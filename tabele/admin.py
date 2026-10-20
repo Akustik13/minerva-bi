@@ -36,6 +36,7 @@ def _get_app_list(self, request, app_label=None):
         'ai_assistant',     # 🏛️ Minerva AI
         'rag_assistant',    # 📚 Помічник по продукції (RAG)
         'email_assistant',  # 📧 Email Асистент
+        'projects',         # 📁 Проєкти з пошти
         'bots',             # 🤖 Боти та AI
         'jlcpcb',           # 🔬 JLCPCB виробництво
         'documents',        # 📄 Документи
@@ -53,6 +54,7 @@ def _get_app_list(self, request, app_label=None):
         'strategy': ['aisettings', 'strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
         'ai_assistant':    ['aiconversation', 'aibudgetlog'],
         'rag_assistant':   ['ragsettings', 'ragconversation'],
+        'projects':        ['project', 'dismissedthread'],
         'email_assistant': ['emailaccount', 'emailsettings', 'emailmessage', 'emailthread'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',

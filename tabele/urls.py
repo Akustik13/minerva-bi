@@ -112,6 +112,7 @@ urlpatterns = [
     path("ai/", include("ai_assistant.urls")),
     path("rag/", include("rag_assistant.urls")),
     path("email/", include("email_assistant.urls")),
+    path("projects/", include("projects.urls")),
     path("calendar/", include("calendar_app.urls")),
     path("bots/", include("bots.urls")),
     path("documents/", include("documents.urls")),

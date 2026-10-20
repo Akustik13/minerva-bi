@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'ai_assistant',     # 🏛️ Minerva AI
     'rag_assistant',    # 📚 Помічник по продукції (зовнішній RAG: даташити + склад)
     'email_assistant',  # 📧 Email Асистент
+    'projects',         # 📁 Проєкти з пошти (після email_assistant: сигнали після прив'язки до CRM)
     'calendar_app',     # 📅 Календар
     'bots',             # 🤖 Боти та AI
     'jlcpcb',           # 🔬 JLCPCB виробництво

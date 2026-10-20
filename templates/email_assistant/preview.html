@@ -12,6 +12,23 @@
 .em-pv-link a{color:var(--link-fg,#3b82f6);text-decoration:none;font-weight:600}
 .em-pv-link a:hover{text-decoration:underline}
 .em-pv-link .why{font-size:10px;color:var(--text-dim);margin-left:auto}
+/* Проєкти гілки: підтверджені (зелені), пропозиції системи (✓/✗), панель «До проєкту» */
+.em-pv-proj{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.em-proj-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 8px;border-radius:12px;
+  border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.08);color:var(--text)}
+.em-proj-chip a{color:var(--text);text-decoration:none;font-weight:600}
+.em-proj-chip a:hover{text-decoration:underline}
+.em-proj-chip.sg{border-color:rgba(59,130,246,.35);background:rgba(59,130,246,.08);border-style:dashed}
+.em-proj-chip i{font-style:normal;font-size:10px;color:var(--text-dim)}
+.em-proj-chip button{border:none;background:none;cursor:pointer;color:var(--text-dim);padding:0 2px;font-size:12px}
+.em-proj-chip button:hover{color:var(--text)}
+.em-proj-panel{display:none;margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg-card)}
+.em-proj-panel.open{display:block}
+.em-proj-cands{max-height:200px;overflow-y:auto;margin:6px 0}
+.em-proj-cand{display:flex;gap:8px;align-items:baseline;padding:5px 6px;border-radius:5px;font-size:12px;cursor:pointer;color:var(--text)}
+.em-proj-cand:hover{background:var(--bg-hover,#1e2d40)}
+.em-proj-cand .c{color:var(--text-dim);font-size:11px;margin-left:auto;white-space:nowrap}
+.em-proj-new{display:flex;gap:6px;align-items:center;padding-top:6px;border-top:1px dashed var(--border-strong)}
 /* «📜 Історія»: факти з Minerva + підсумок AI за бажанням */
 .em-history{display:none;flex-shrink:0;border:1px solid var(--border-strong);border-left:3px solid #f59e0b;border-radius:8px;
   background:var(--bg-card);padding:10px 12px}
@@ -203,6 +220,18 @@
       {% endfor %}
     </div>
     {% endif %}
+    {% if thread %}
+    <div class="em-pv-proj" id="pv-proj" data-tpk="{{ thread.pk }}" data-state="{{ projects_state }}" style="display:none"></div>
+    <div class="em-proj-panel" id="pv-proj-panel">
+      <input class="em-reply-inp" id="pv-proj-q" type="search" autocomplete="off"
+             placeholder="{% trans "Пошук проєкту: код, назва, клієнт…" %}" oninput="pvProjRenderCands()">
+      <div class="em-proj-cands" id="pv-proj-cands"></div>
+      <div class="em-proj-new">
+        <input class="em-reply-inp" id="pv-proj-name" type="text" placeholder="{% trans "Назва нового проєкту" %}">
+        <button class="em-pv-btn" onclick="pvProjCreate()" style="white-space:nowrap">＋ {% trans "Новий проєкт" %}</button>
+      </div>
+    </div>
+    {% endif %}
     <div class="em-pv-acts" style="margin-top:8px">
       {% if last %}
       <a href="/email/compose/?reply_to={{ last.pk }}" class="em-pv-btn">↩ {% trans "Відповісти" %}</a>
@@ -221,6 +250,10 @@
       {% endif %}
       <button class="em-pv-btn" id="pv-history-btn" onclick="pvHistory({{ last.pk }})"
               title="{% trans "Що було з цим замовленням і перепискою: дати, доставка, листи, нотатки CRM" %}">📜 {% trans "Історія" %}</button>
+      {% if thread %}
+      <button class="em-pv-btn" id="pv-proj-btn" onclick="pvProjOpen()"
+              title="{% trans "Додати цю переписку до проєкту або створити новий проєкт" %}">📁 {% trans "До проєкту" %}</button>
+      {% endif %}
       <button class="em-pv-btn danger" onclick="pvDelete({{ last.pk }})">🗑️</button>
       <a href="{% if thread %}/email/thread/{{ thread.pk }}/{% else %}/email/message/{{ last.pk }}/{% endif %}"
          class="em-pv-btn" target="_blank" title="{% trans "Відкрити на повній сторінці" %}">↗ {% trans "Окремо" %}</a>
@@ -981,6 +1014,89 @@ window.pvAiTranslate = async function(pk, force) {
     txt.textContent = d.ok ? d.translation : '⚠️ ' + d.error;
   } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
+
+// ── 📁 Проєкти гілки ──
+(function() {
+  var box = document.getElementById('pv-proj');
+  if (!box) return;
+  var tpk = box.dataset.tpk, cands = [];
+  function esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function toast(msg) {
+    var t = document.getElementById('pv-toast');
+    if (!t) return;
+    t.textContent = msg; t.style.display = 'block';
+    clearTimeout(t._hide); t._hide = setTimeout(function(){ t.style.display = 'none'; }, 2200);
+  }
+  function render(state) {
+    var h = '';
+    (state.confirmed || []).forEach(function(c) {
+      h += '<span class="em-proj-chip" title="' + esc(c.reason) + '">'
+         + '<a href="' + esc(c.project.url) + '" target="_blank">📁 ' + esc(c.project.code) + ' · ' + esc(c.project.name) + '</a>'
+         + '<a href="' + esc(c.project.mail_url) + '" title="{% trans "Усі листи проєкту" %}">✉</a>'
+         + '<button onclick="pvProjRemove(' + c.link + ')" title="{% trans "Прибрати цю переписку з проєкту" %}">✕</button></span>';
+    });
+    (state.suggested || []).forEach(function(s) {
+      h += '<span class="em-proj-chip sg" title="{% trans "Пропозиція системи" %}: ' + esc(s.reason) + '">'
+         + '❔ <a href="' + esc(s.project.url) + '" target="_blank">' + esc(s.project.code) + ' · ' + esc(s.project.name) + '</a>'
+         + '<i>' + esc(s.reason) + '</i>'
+         + '<button onclick="pvProjDecide(' + s.link + ', true)" title="{% trans "Так, це цей проєкт" %}">✓</button>'
+         + '<button onclick="pvProjDecide(' + s.link + ', false)" title="{% trans "Ні — більше не пропонувати" %}">✗</button></span>';
+    });
+    box.innerHTML = h;
+    box.style.display = h ? '' : 'none';
+  }
+  async function post(url, body) {
+    var r = await fetch(url, {method: 'POST', headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+                              body: JSON.stringify(body || {})});
+    return r.json();
+  }
+  window.pvProjDecide = async function(link, accept) {
+    try { var d = await post('/projects/api/link/' + link + '/decide/', {accept: accept}); if (d.ok) render(d); }
+    catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  };
+  window.pvProjRemove = async function(link) {
+    try { var d = await post('/projects/api/link/' + link + '/remove/'); if (d.ok) render(d); }
+    catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  };
+  window.pvProjRenderCands = function() {
+    var q = (document.getElementById('pv-proj-q').value || '').trim().toLowerCase();
+    var list = document.getElementById('pv-proj-cands');
+    var shown = cands.filter(function(p) {
+      return !q || (p.code + ' ' + p.name + ' ' + p.customer).toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 40);
+    list.innerHTML = shown.length ? shown.map(function(p) {
+      return '<div class="em-proj-cand" onclick="pvProjLink(' + p.id + ')"><b>' + esc(p.code) + '</b> ' + esc(p.name)
+           + '<span class="c">' + esc(p.customer) + ' · ' + esc(p.status) + '</span></div>';
+    }).join('') : '<div style="font-size:12px;color:var(--text-dim);padding:4px 6px">{% trans "Відкритих проєктів не знайдено — створіть новий нижче" %}</div>';
+  };
+  window.pvProjOpen = async function() {
+    var panel = document.getElementById('pv-proj-panel');
+    if (panel.classList.toggle('open') === false) return;
+    try {
+      var d = await (await fetch('/projects/api/thread/' + tpk + '/', {credentials: 'same-origin'})).json();
+      cands = d.candidates || [];
+      var name = document.getElementById('pv-proj-name');
+      if (!name.value) name.value = d.name_suggestion || '';
+      pvProjRenderCands();
+      document.getElementById('pv-proj-q').focus();
+    } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  };
+  window.pvProjLink = async function(projectId) {
+    try {
+      var d = await post('/projects/api/thread/' + tpk + '/link/', {project_id: projectId});
+      if (d.ok) { render(d); document.getElementById('pv-proj-panel').classList.remove('open'); toast('📁 {% trans "Додано до проєкту" %}'); }
+    } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  };
+  window.pvProjCreate = async function() {
+    var name = (document.getElementById('pv-proj-name').value || '').trim();
+    try {
+      var d = await post('/projects/api/thread/' + tpk + '/create/', {name: name});
+      if (d.ok) { render(d); document.getElementById('pv-proj-panel').classList.remove('open');
+                  toast('📁 {% trans "Створено проєкт" %} ' + d.project.code); }
+    } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  };
+  try { render(JSON.parse(box.dataset.state || '{}')); } catch (e) {}
+})();
 
 window.pvCopyText = function(text) {
   var done = function() {

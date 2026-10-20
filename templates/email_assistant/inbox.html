@@ -168,6 +168,7 @@
   border:none;font-family:inherit;--c:#9aa0a6;color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent)}
 .em-tag:hover{background:color-mix(in srgb,var(--c) 28%,transparent)}
 .em-tag.cust{--c:#3b82f6;max-width:150px}
+.em-tag.proj{--c:#16a34a}
 .em-tag.cat-customer{--c:#3b82f6}
 .em-tag.cat-supplier{--c:#d97706}
 .em-tag.cat-service{--c:#0d9488}
@@ -411,7 +412,17 @@
         <input type="hidden" id="em-cust-sel" value="{{ customer_filter.pk|default:'' }}">
         <div class="em-cust-list" id="em-cust-list"></div>
       </div>
-      {% if cat_filter or customer_filter %}
+      <select class="em-p2-filter-sel{% if project_filter %} on{% endif %}" id="em-proj-sel"
+              onchange="applyMailFilter()" title="{% trans "Листи проєкту — усі його гілки, по всіх папках" %}">
+        <option value="">📁 {% trans "Усі проєкти" %}</option>
+        {% if project_filter and project_filter not in open_projects %}
+        <option value="{{ project_filter.pk }}" selected>{{ project_filter.code }} · {{ project_filter.name|truncatechars:40 }}</option>
+        {% endif %}
+        {% for p in open_projects %}
+        <option value="{{ p.pk }}"{% if project_filter.pk == p.pk %} selected{% endif %}>{{ p.code }} · {{ p.name|truncatechars:40 }}</option>
+        {% endfor %}
+      </select>
+      {% if cat_filter or customer_filter or project_filter %}
       <button class="em-p2-filter-clear" onclick="clearMailFilter()" title="{% trans "Скинути фільтр" %}">✕</button>
       {% endif %}
     </div>
@@ -479,9 +490,13 @@
             </div>
           </div>
           <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:40 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
-          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag %}
+          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags %}
           <div class="em-row-meta">
             {% if msg.folder_tag %}<span class="em-tag fold" title="{% trans "Папка" %}">{{ msg.folder_tag }}</span>{% endif %}
+            {% for code, ppk, pname in msg.project_tags %}
+            <button class="em-tag proj" onclick="filterMailBy(event, 'project', {{ ppk }})"
+                    title="{% trans "Проєкт" %}: {{ pname }} — {% trans "показати всі листи проєкту" %}">📁 {{ code }}</button>
+            {% endfor %}
             {% if msg.crm_customer_tag %}
             <button class="em-tag cust" onclick="filterMailBy(event, 'customer', {{ msg.crm_customer_tag.pk }})"
                     title="{% trans "Клієнт" %}: {{ msg.crm_customer_tag.name }} — {% trans "показати всі його листи" %}">👤 {{ msg.crm_customer_tag.name }}</button>
@@ -570,6 +585,7 @@
            title="{% trans "Забути вибір для цього контакту — категорію знову визначає система" %}">↺ {% trans "Автоматично" %}</div>
     </div>
   </div>
+  <div class="em-ctx-item" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
   <div class="em-ctx-item" onclick="ctxAction('rule')">📋 Правило з відправника</div>
   <div class="em-ctx-item" onclick="ctxAction('task')">📅 Завдання в календар</div>
   <div class="em-ctx-sep"></div>
@@ -963,8 +979,10 @@ function applyMailFilter() {
   var params = new URLSearchParams(location.search);
   var cat  = document.getElementById('em-cat-sel').value;
   var cust = document.getElementById('em-cust-sel').value;
+  var proj = document.getElementById('em-proj-sel').value;
   if (cat) params.set('cat', cat); else params.delete('cat');
   if (cust) params.set('customer', cust); else params.delete('customer');
+  if (proj) params.set('project', proj); else params.delete('project');
   params.delete('page');
   location.search = params.toString();
 }
@@ -1042,7 +1060,7 @@ function filterMailBy(ev, key, value) {
 }
 function clearMailFilter() {
   var params = new URLSearchParams(location.search);
-  params.delete('cat'); params.delete('customer'); params.delete('page');
+  params.delete('cat'); params.delete('customer'); params.delete('project'); params.delete('page');
   location.search = params.toString();
 }
 
@@ -1621,6 +1639,11 @@ async function ctxAction(action) {
     if (tpk) archiveThread({stopPropagation:function(){}}, tpk);
   } else if (action === 'delete') {
     deleteMsg({stopPropagation:function(){}}, pk);
+  } else if (action === 'project') {
+    // відкрити лист у прев'ю і одразу панель «📁 До проєкту»
+    if (!tpk) { _showToast('⚠️ {% trans "Лист без гілки листування" %}'); return; }
+    await previewMsg(pk, tpk, rowEl);
+    if (window.pvProjOpen) window.pvProjOpen();
   } else if (action === 'rule') {
     openRuleModal();
   } else if (action === 'task') {

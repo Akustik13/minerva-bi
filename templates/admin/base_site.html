@@ -885,7 +885,9 @@ window.MV_GROUPS = [
       { href:'/admin/crm/customer/',                 icon:'👤', label:'Клієнти',    app:'crm',      model:'Customer' },
       { href:'/admin/strategy/customerstrategy/',    icon:'🎯', label:'Стратегії',  app:'strategy', model:'CustomerStrategy' },
       { href:'/admin/strategy/strategytemplate/',    icon:'📋', label:'Шаблони',    app:'strategy', model:'StrategyTemplate' },
-    ], apps:['crm','strategy'] },
+      { href:'/admin/projects/project/',             icon:'📁', label:'Проєкти',    app:'projects', model:'Project' },
+      { href:'/admin/projects/project/triage/',      icon:'📥', label:'Розбір пошти', app:'projects', model:'Project' },
+    ], apps:['crm','strategy','projects'] },
   { id:'sales', icon:'🛒', label:'🛒 Продажі', apps:['sales'] },
   { id:'shop', icon:'🏪', label:'🏪 Інтернет-магазин',
     links:[
@@ -1171,6 +1173,7 @@ document.addEventListener('DOMContentLoaded', function(){
   var _URL_GROUP = {
     '/dashboard/':       'analytics',
     '/admin/crm/':            'crm',
+    '/admin/projects/':       'crm',
     '/admin/strategy/':       'crm',
     '/strategy/':             'crm',
     '/ai/':                   'ai',

@@ -242,6 +242,22 @@ def _parse_mail_filter(request):
     return cat, customer
 
 
+def _parse_project_filter(request):
+    """Проєкт з ?project=<pk> (листи всіх підтверджених гілок проєкту)."""
+    if not str(request.GET.get('project', '')).isdigit():
+        return None
+    from projects.models import Project
+    return Project.objects.filter(pk=int(request.GET['project'])).first()
+
+
+def _attach_project_tags(emails):
+    """📁 мітки в рядку: підтверджені проєкти гілки."""
+    from projects.services import tags_for_threads
+    tags = tags_for_threads({m.thread_id for m in emails if m.thread_id})
+    for m in emails:
+        m.project_tags = tags.get(m.thread_id, [])
+
+
 def _category_counts(qs):
     """[(ключ, назва, листів, непрочитаних)] і клієнти з листами — для меню фільтра (усі папки)."""
     from django.db.models import Count, Q
@@ -325,14 +341,21 @@ def _attach_thread_stats(emails):
             m.thread_pks = ','.join(map(str, pks[m.thread_id]))
 
 
-def _filter_qs(cat, customer) -> str:
+def _filter_qs(cat, customer, project=None) -> str:
     from urllib.parse import urlencode
     params = {}
     if cat:
         params['cat'] = cat
     if customer:
         params['customer'] = customer.pk
+    if project:
+        params['project'] = project.pk
     return ('&' + urlencode(params)) if params else ''
+
+
+def _open_projects():
+    from projects.models import Project
+    return list(Project.objects.filter(status__in=Project.OPEN_STATUSES).order_by('-updated_at')[:200])
 
 
 FOLDERS = [
@@ -359,8 +382,9 @@ def inbox_view(request):
     per_page = 30
 
     cat_filter, customer_filter = _parse_mail_filter(request)
-    # Пошук і фільтри «Категорія / Клієнт» діють по всіх папках (у Спамі й Кошику — лише в них)
-    search_all = bool(q or cat_filter or customer_filter) and folder not in ('spam', 'trash')
+    project_filter = _parse_project_filter(request)
+    # Пошук і фільтри «Категорія / Клієнт / Проєкт» діють по всіх папках (у Спамі й Кошику — лише в них)
+    search_all = bool(q or cat_filter or customer_filter or project_filter) and folder not in ('spam', 'trash')
     qs = _build_qs(account, ALL_FOLDERS if search_all else folder, q)
     counts_qs = qs if folder in ('spam', 'trash') else _build_qs(account, ALL_FOLDERS, q)
     categories, mail_customers = _category_counts(counts_qs)
@@ -371,6 +395,9 @@ def inbox_view(request):
         qs = qs.filter(pk__in=EmailMessage.objects.filter(
             _CQ(thread__crm_customer_id=customer_filter.pk) |
             _CQ(crm_events__customer_id=customer_filter.pk)).values('pk'))
+    if project_filter:
+        from projects.services import project_messages
+        qs = qs.filter(pk__in=project_messages(project_filter).values('pk'))
     # «Групувати по гілці» (⎘, cookie): один рядок на гілку — її найновіший лист у цьому списку
     grouped = request.COOKIES.get('em_group') == '1'
     if grouped:
@@ -383,6 +410,7 @@ def inbox_view(request):
         _attach_thread_stats(emails)
     _attach_crm_customers(emails)
     _attach_contacts(emails)
+    _attach_project_tags(emails)
     if search_all:
         _attach_folder_tags(account, emails)
 
@@ -412,9 +440,11 @@ def inbox_view(request):
         'folder_label':          decode_mutf7(folder),
         'cat_filter':            cat_filter,
         'customer_filter':       customer_filter,
+        'project_filter':        project_filter,
+        'open_projects':         _open_projects(),
         'categories':            categories,
         'mail_customers':        mail_customers,
-        'filter_qs':             _filter_qs(cat_filter, customer_filter),
+        'filter_qs':             _filter_qs(cat_filter, customer_filter, project_filter),
         'grouped':               grouped,
         'category_choices':      EmailMessage.CATEGORY_CHOICES,
         'search_all':            search_all,
@@ -503,6 +533,7 @@ def thread_preview_view(request, thread_pk):
     reply_to_addr, reply_cc = _reply_addresses(account, emails[-1]) if emails else ('', [])
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
+        'projects_state':  _projects_state(thread),
         'links':           links,
         'attach_options':  _attach_options(emails, links),
         'reply_to_addr':   reply_to_addr,
@@ -530,6 +561,7 @@ def message_preview_view(request, message_pk):
     reply_to_addr, reply_cc = _reply_addresses(account, msg)
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
+        'projects_state':  _projects_state(msg.thread),
         'links':           links,
         'attach_options':  _attach_options([msg], links),
         'reply_to_addr':   reply_to_addr,
@@ -539,6 +571,18 @@ def message_preview_view(request, message_pk):
         'last_msg':        msg,
         'reply_signature': _get_signature(account),
     }))
+
+
+def _projects_state(thread) -> str:
+    """JSON проєктів гілки для блоку «📁» у прев'ю (підтверджені + пропозиції системи)."""
+    if thread is None:
+        return ''
+    try:
+        from projects.views import thread_state
+        return json.dumps(thread_state(thread), ensure_ascii=False)
+    except Exception as e:
+        logger.warning('projects state: %s', e)
+        return ''
 
 
 def _attach_options(emails, links):

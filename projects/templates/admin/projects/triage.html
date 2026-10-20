@@ -1,0 +1,105 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a> ›
+  <a href="{% url 'admin:projects_project_changelist' %}">📁 {% trans "Проєкти" %}</a> ›
+  {% trans "Розбір пошти" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.tr-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:4px 0 14px}
+.tr-bar .help{color:var(--text-muted,#888);font-size:12px}
+.tr-days a{padding:4px 10px;border-radius:14px;border:1px solid var(--border-strong,#ccc);text-decoration:none;font-size:12px;margin-right:4px}
+.tr-days a.on{background:#1a73e8;color:#fff;border-color:#1a73e8}
+.tr-group{border:1px solid var(--border-strong,#ccc);border-radius:10px;margin-bottom:14px;background:var(--bg-card,transparent);overflow:hidden}
+.tr-hd{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--bg-input,rgba(0,0,0,.03));border-bottom:1px solid var(--border,#ddd)}
+.tr-hd b{font-size:14px}
+.tr-hd .cnt{color:var(--text-muted,#888);font-size:12px}
+.tr-row{display:grid;grid-template-columns:24px 1fr 70px 110px;gap:8px;align-items:center;padding:6px 14px;border-bottom:1px solid var(--border,#eee);font-size:13px}
+.tr-row:last-of-type{border-bottom:none}
+.tr-row a{text-decoration:none}
+.tr-cl{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;background:rgba(245,158,11,.15);color:#d97706;margin-left:6px}
+.tr-sg{display:inline-block;font-size:11px;padding:1px 7px;border-radius:8px;background:rgba(59,130,246,.12);color:#3b82f6;margin-left:6px}
+.tr-meta{color:var(--text-muted,#888);font-size:12px;text-align:right;white-space:nowrap}
+.tr-acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 14px;background:var(--bg-input,rgba(0,0,0,.02));border-top:1px solid var(--border,#eee)}
+.tr-acts input[type=text]{min-width:260px}
+.tr-acts .sep{width:1px;align-self:stretch;background:var(--border-strong,#ccc)}
+.tr-empty{padding:30px;text-align:center;color:var(--text-muted,#888)}
+</style>
+
+<div class="tr-bar">
+  <span class="tr-days">
+    {% for d in day_choices %}<a href="?days={{ d }}{% if q %}&q={{ q|urlencode }}{% endif %}" class="{% if d == days %}on{% endif %}">{{ d }} {% trans "днів" %}</a>{% endfor %}
+  </span>
+  <form method="get" style="display:flex;gap:6px">
+    <input type="hidden" name="days" value="{{ days }}">
+    <input type="search" name="q" value="{{ q }}" placeholder="{% trans "Клієнт, домен, тема…" %}">
+    <button class="button" type="submit">🔍</button>
+  </form>
+  <span class="help">
+    {% blocktrans count n=total %}{{ n }} гілка без проєкту{% plural %}{{ n }} гілок без проєкту{% endblocktrans %}
+    · {% trans "розсилки, сервісні сповіщення, спам і архів не показуються" %}
+    · {% trans "лише ваші скриньки" %}
+  </span>
+</div>
+
+{% if not has_accounts %}
+  <div class="tr-empty">{% trans "У вас немає підключеної поштової скриньки." %}</div>
+{% elif not groups %}
+  <div class="tr-empty">✅ {% trans "Усі гілки за цей період уже в проєктах або розібрані." %}</div>
+{% endif %}
+
+{% for g in groups %}
+<form method="post" class="tr-group">
+  {% csrf_token %}
+  <input type="hidden" name="days" value="{{ days }}">
+  {% if g.customer %}<input type="hidden" name="customer_id" value="{{ g.customer.pk }}">{% endif %}
+  <div class="tr-hd">
+    <input type="checkbox" title="{% trans "Вибрати всі гілки групи" %}"
+           onclick="this.form.querySelectorAll('input[name=thread]').forEach(function(c){c.checked=this.checked}.bind(this))">
+    {% if g.customer %}
+      <b>👤 <a href="{% url 'admin:crm_customer_change' g.customer.pk %}" target="_blank">{{ g.label }}</a></b>
+    {% else %}
+      <b>🌐 {{ g.label }}</b>
+    {% endif %}
+    <span class="cnt">{{ g.threads|length }} {% trans "гілок" %}</span>
+  </div>
+  {% for item in g.threads %}
+  <label class="tr-row">
+    <input type="checkbox" name="thread" value="{{ item.t.pk }}"{% if item.cluster %} checked{% endif %}>
+    <span>
+      <a href="/email/thread/{{ item.t.pk }}/" target="_blank">{{ item.t.subject|default:"(без теми)" }}</a>
+      {% if item.cluster %}<span class="tr-cl" title="{% trans "Гілок з такою самою темою в цій групі" %}">⧉ {{ item.cluster }}</span>{% endif %}
+      {% for s in item.suggestions %}<span class="tr-sg" title="{{ s.reason }}">❔ {{ s.project.code }}</span>{% endfor %}
+    </span>
+    <span class="tr-meta">{{ item.t.message_count }} ✉</span>
+    <span class="tr-meta">{{ item.t.last_message_at|date:"d.m.Y" }}</span>
+  </label>
+  {% endfor %}
+  <div class="tr-acts">
+    <input type="text" name="name" value="{{ g.name_suggestion }}" title="{% trans "Назва нового проєкту" %}">
+    <button class="button default" type="submit" name="action" value="create">📁 {% trans "Створити проєкт з вибраних" %}</button>
+    <span class="sep"></span>
+    <select name="project_id">
+      <option value="">{% trans "— до наявного проєкту —" %}</option>
+      {% if g.projects %}
+      <optgroup label="{% trans "Проєкти цього клієнта" %}">
+        {% for p in g.projects %}<option value="{{ p.pk }}">{{ p.code }} · {{ p.name|truncatechars:50 }}</option>{% endfor %}
+      </optgroup>
+      {% endif %}
+      <optgroup label="{% trans "Усі відкриті" %}">
+        {% for p in open_projects %}<option value="{{ p.pk }}">{{ p.code }} · {{ p.name|truncatechars:50 }}</option>{% endfor %}
+      </optgroup>
+    </select>
+    <button class="button" type="submit" name="action" value="add">➕ {% trans "Додати" %}</button>
+    <span class="sep"></span>
+    <button class="button" type="submit" name="action" value="dismiss"
+            title="{% trans "Більше не показувати ці гілки в розборі" %}">🚫 {% trans "Не стосується проєктів" %}</button>
+  </div>
+</form>
+{% endfor %}
+{% endblock %}
