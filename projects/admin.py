@@ -57,11 +57,30 @@ class OrderLinkInline(admin.TabularInline):
         return super().get_queryset(request).filter(order__isnull=False).select_related("order")
 
 
+class AttentionFilter(admin.SimpleListFilter):
+    """«Потребує уваги» — відкриті проєкти з терміновим (🔴) або будь-яким важливим (🔴/🟡) пунктом огляду."""
+    title = "терміновістю"          # адмінка показує «За терміновістю»
+    parameter_name = "attention"
+
+    def lookups(self, request, model_admin):
+        return [("high", "🔴 Термінове"), ("any", "⚠️ Термінове або важливе")]
+
+    def queryset(self, request, queryset):
+        if self.value() not in ("high", "any"):
+            return queryset
+        from . import overview
+        levels = ("high",) if self.value() == "high" else ("high", "medium")
+        ids = [p.pk for p in queryset.filter(status__in=Project.OPEN_STATUSES)
+               if any(a["level"] in levels for a in overview.collect(p)["attention"])]
+        return queryset.filter(pk__in=ids)
+
+
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "customer", "status", "owner", "due_date", "threads_col", "updated_at")
+    list_display = ("code", "name", "customer", "status", "attention_col", "owner", "due_date", "threads_col",
+                    "updated_at")
     list_display_links = ("code", "name")
-    list_filter = ("status", "owner")
+    list_filter = (AttentionFilter, "status", "owner")
     search_fields = ("code", "name", "customer__name", "participants__email")
     autocomplete_fields = ("customer",)
     readonly_fields = ("code", "overview_panel", "mail_link", "timeline_html", "offers_panel", "source_thread_link",
@@ -90,6 +109,21 @@ class ProjectAdmin(admin.ModelAdmin):
     @admin.display(description="Гілок", ordering="_threads")
     def threads_col(self, obj):
         return obj._threads or "—"
+
+    @admin.display(description="Увага")
+    def attention_col(self, obj):
+        """🔴 термінове / 🟡 важливе з «Потребує уваги» (без AI); підказка — самі пункти."""
+        if not obj.is_open:
+            return "—"
+        from . import overview
+        items = overview.urgent(overview.collect(obj)["attention"])
+        if not items:
+            return "✅"
+        high = sum(1 for a in items if a["level"] == "high")
+        label = " ".join(x for x in [f"🔴 {high}" if high else "", f"🟡 {len(items) - high}" if len(items) > high else ""] if x)
+        return format_html('<a href="{}#overview" title="{}">{}</a>',
+                           reverse("admin:projects_project_change", args=[obj.pk]),
+                           "\n".join(f"{a['icon']} {a['text']}" for a in items), label)
 
     @admin.display(description="Стан")
     def overview_panel(self, obj):

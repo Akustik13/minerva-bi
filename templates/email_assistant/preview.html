@@ -12,6 +12,7 @@
 .em-pv-link a{color:var(--link-fg,#3b82f6);text-decoration:none;font-weight:600}
 .em-pv-link a:hover{text-decoration:underline}
 .em-pv-link .why{font-size:10px;color:var(--text-dim);margin-left:auto}
+.em-pv-quote{background:rgba(192,38,211,.08);border-color:rgba(192,38,211,.3);margin-top:6px}
 /* Проєкти гілки: підтверджені (зелені), пропозиції системи (✓/✗), панель «До проєкту» */
 .em-pv-proj{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .em-proj-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 8px;border-radius:12px;
@@ -233,6 +234,15 @@
         <span class="why">{% trans "знайдено" %}: {{ l.reason }}</span>
       </div>
       {% endfor %}
+    </div>
+    {% endif %}
+    {% if quote_request %}
+    <div class="em-pv-link em-pv-quote" id="pv-quote">
+      <span>📝 <b>{% trans "Схоже на запит пропозиції" %}</b> · {{ quote_request.reason }}</span>
+      <button class="em-pv-btn ai" style="padding:2px 10px" onclick="pvOfferFromThread({{ thread.pk }}, this)"
+              title="{% trans "Чернетка Angebot: клієнт і проєкт листування, артикули й кількості з листа, ціни з Minerva" %}">📝 {% trans "Створити Angebot" %}</button>
+      <button class="em-pv-btn" style="padding:2px 10px" onclick="pvQuoteDismiss({{ quote_request.pk }})"
+              title="{% trans "Це не запит пропозиції — прибрати підказку" %}">✕ {% trans "Не запит" %}</button>
     </div>
     {% endif %}
     {% if thread %}
@@ -1135,6 +1145,18 @@ window.pvAiTranslate = async function(pk, force) {
   try { render(JSON.parse(box.dataset.state || '{}')); } catch (e) {}
 })();
 
+// «✕ Не запит» — підказку прибрано, мітку в списку теж
+window.pvQuoteDismiss = async function(pk) {
+  try {
+    var d = await (await fetch('/offers/api/quote-request/' + pk + '/dismiss/',
+                               {method: 'POST', headers: {'X-CSRFToken': CSRF}, credentials: 'same-origin'})).json();
+    if (!d.ok) return;
+    var hint = document.getElementById('pv-quote');
+    if (hint) hint.remove();
+    document.querySelectorAll('.em-row.active .em-tag.quote').forEach(function(t){ t.remove(); });
+  } catch (e) { /* мережа */ }
+};
+
 // ── 🧭 Огляд проєкту: потребує уваги (з бази) + AI-огляд; AI-чернетка відповіді його враховує ──
 var _pvOvPid = null;
 function _pvOvToast(msg) {
@@ -1255,6 +1277,9 @@ window.pvOfferFromThread = async function(tpk, btn) {
     var r = await fetch('/offers/api/from-thread/' + tpk + '/', {method: 'POST', headers: {'X-CSRFToken': CSRF}});
     var d = await r.json();
     if (d.ok) {
+      var hint = document.getElementById('pv-quote');   // запит виконано — підказку й мітку прибрати
+      if (hint) hint.remove();
+      document.querySelectorAll('.em-row.active .em-tag.quote').forEach(function(t){ t.remove(); });
       var t = document.getElementById('pv-toast');
       if (t) { t.textContent = '📝 ' + d.number + ' · {% trans "позицій з листа" %}: ' + d.lines; t.style.display = 'block';
                clearTimeout(t._hide); t._hide = setTimeout(function(){ t.style.display = 'none'; }, 2500); }

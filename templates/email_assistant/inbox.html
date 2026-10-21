@@ -169,6 +169,8 @@
 .em-tag:hover{background:color-mix(in srgb,var(--c) 28%,transparent)}
 .em-tag.cust{--c:#3b82f6;max-width:150px}
 .em-tag.proj{--c:#16a34a}
+.em-tag.quote{--c:#c026d3}
+.em-p2-quote{flex:0 0 auto;white-space:nowrap}
 .em-tag.cat-customer{--c:#3b82f6}
 .em-tag.cat-supplier{--c:#d97706}
 .em-tag.cat-service{--c:#0d9488}
@@ -422,7 +424,9 @@
         <option value="{{ p.pk }}"{% if project_filter.pk == p.pk %} selected{% endif %}>{{ p.code }} · {{ p.name|truncatechars:40 }}</option>
         {% endfor %}
       </select>
-      {% if cat_filter or customer_filter or project_filter %}
+      <button class="em-p2-filter-sel em-p2-quote{% if quote_filter %} on{% endif %}" onclick="toggleQuoteFilter()"
+              title="{% trans "Листи, схожі на запит пропозиції, по яких ще немає Angebot (по всіх папках)" %}">📝{% if quote_count %} {{ quote_count }}{% endif %}</button>
+      {% if cat_filter or customer_filter or project_filter or quote_filter %}
       <button class="em-p2-filter-clear" onclick="clearMailFilter()" title="{% trans "Скинути фільтр" %}">✕</button>
       {% endif %}
     </div>
@@ -490,9 +494,13 @@
             </div>
           </div>
           <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:40 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
-          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags %}
+          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag %}
           <div class="em-row-meta">
             {% if msg.folder_tag %}<span class="em-tag fold" title="{% trans "Папка" %}">{{ msg.folder_tag }}</span>{% endif %}
+            {% if msg.quote_request_tag %}
+            <button class="em-tag quote" onclick="filterMailBy(event, 'quote', 1)"
+                    title="{% trans "Схоже на запит пропозиції — показати всі запити без Angebot" %}">📝 {% trans "запит" %}</button>
+            {% endif %}
             {% for code, ppk, pname in msg.project_tags %}
             <button class="em-tag proj" onclick="filterMailBy(event, 'project', {{ ppk }})"
                     title="{% trans "Проєкт" %}: {{ pname }} — {% trans "показати всі листи проєкту" %}">📁 {{ code }}</button>
@@ -1060,7 +1068,13 @@ function filterMailBy(ev, key, value) {
 }
 function clearMailFilter() {
   var params = new URLSearchParams(location.search);
-  params.delete('cat'); params.delete('customer'); params.delete('project'); params.delete('page');
+  params.delete('cat'); params.delete('customer'); params.delete('project'); params.delete('quote'); params.delete('page');
+  location.search = params.toString();
+}
+function toggleQuoteFilter() {
+  var params = new URLSearchParams(location.search);
+  if (params.get('quote') === '1') params.delete('quote'); else params.set('quote', '1');
+  params.delete('page');
   location.search = params.toString();
 }
 

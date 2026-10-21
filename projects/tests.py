@@ -337,6 +337,55 @@ class OverviewTests(ProjectsBase):
         self.assertEqual(state["overview"]["next_action"]["due_fmt"], "25.10.2026")
         self.assertFalse(state["stale"])
 
+    def test_owner_digest_list_column_and_filter(self):
+        quiet_thread = self.mail("Info", from_email=ME, to=("buyer@client.example",), folder="Sent", body="FYI",
+                                 sent=self.ago(1)).thread
+        quiet = services.create_project(name="Quiet", user=self.user, threads=[quiet_thread])
+        quiet.next_action = "Чекаємо"
+        quiet.save()
+        bob = User.objects.create_user("bob", "b@x.y", "p", is_staff=True)
+        foreign = services.create_project(name="Bob project", user=bob, threads=[self.ask.thread])
+        text = overview.digest_text(self.user)
+        self.assertIn(f"{self.project.code} · {self.project.name}: 📨 Чекає нашої відповіді 5 дн.", text)
+        self.assertNotIn("Quiet", text)                                         # нічого важливого — не в дайджесті
+        self.assertNotIn(foreign.code, text)                                    # чужий проєкт
+        self.assertNotIn("Не задано наступну дію", text)                        # info не йде в дайджест
+        page = self.client.get("/admin/projects/project/")
+        self.assertContains(page, "🔴 1")
+        urgent = self.client.get("/admin/projects/project/", {"attention": "high"})
+        self.assertContains(urgent, self.project.name)
+        self.assertNotContains(urgent, ">Quiet<")
+
+    def test_morning_briefing_lists_projects(self):
+        from io import StringIO
+        from django.core.management import call_command
+        from core.models import UserProfile
+        from strategy.models import AISettings
+        profile = UserProfile.objects.get(user=self.user)
+        profile.telegram_id = 4242
+        profile.save()
+        ai = AISettings.get()
+        ai.telegram_bot_token = "test-token"
+        ai.save()
+        sent = []
+
+        class Ok:
+            ok, text = True, ""
+
+        import sys
+        import types
+        from unittest.mock import MagicMock
+        chat = MagicMock(return_value="Доброго ранку!")
+        fake_service = types.ModuleType("ai_assistant.service")   # справжній модуль тягне anthropic
+        fake_service.chat = chat
+        with patch.dict(sys.modules, {"ai_assistant.service": fake_service}), \
+                patch("ai_assistant.tools.execute_tool", return_value={}), \
+                patch("requests.post", side_effect=lambda url, json=None, timeout=None: sent.append(json) or Ok()):
+            call_command("morning_briefing", stdout=StringIO())
+        self.assertIn("ПРОЄКТИ, ЩО ПОТРЕБУЮТЬ УВАГИ", chat.call_args[0][0])
+        self.assertIn("Доброго ранку!\n\n📁 <b>Потребує уваги</b>\n• " + self.project.code, sent[0]["text"])
+        self.assertIn("«Re: Anfrage Antennen»", sent[0]["text"])
+
     def test_ai_reply_draft_uses_project_overview(self):
         with patch("email_assistant.ai_helper._call_ai_direct", lambda *a, **k: self.ai_json()):
             self.client.post(f"/projects/api/project/{self.project.pk}/overview/")

@@ -7,7 +7,7 @@ from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 
 from . import services
-from .models import Offer, OfferLine, OfferRevision, OfferSettings
+from .models import Offer, OfferLine, OfferRevision, OfferSettings, QuoteRequest
 
 
 class OfferLineInline(admin.TabularInline):
@@ -311,3 +311,29 @@ class OfferRevisionAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(QuoteRequest)
+class QuoteRequestAdmin(admin.ModelAdmin):
+    """Листи, схожі на запит пропозиції: перевірити, створити Angebot у пошті («📝 Angebot») або відхилити."""
+    list_display = ("created_at", "mail_link", "sender", "reason", "status", "offer")
+    list_filter = ("status",)
+    search_fields = ("message__subject", "message__from_email", "reason")
+    readonly_fields = ("message", "thread", "reason", "items", "offer", "decided_by", "created_at")
+    fields = ("status", "message", "thread", "reason", "items", "offer", "decided_by", "created_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related("message", "offer")
+        return qs if request.user.is_superuser else qs.filter(message__account__user=request.user)
+
+    @admin.display(description="Лист")
+    def mail_link(self, obj):
+        return format_html('<a href="/email/message/{}/" target="_blank">{}</a>',
+                           obj.message_id, obj.message.subject or "(без теми)")
+
+    @admin.display(description="Від")
+    def sender(self, obj):
+        return obj.message.from_name or obj.message.from_email

@@ -18,7 +18,7 @@ from datetime import date, datetime, timedelta
 from django.utils import timezone
 
 from . import services
-from .models import ProjectLink, ProjectOverview
+from .models import Project, ProjectLink, ProjectOverview
 
 logger = logging.getLogger(__name__)
 
@@ -462,6 +462,33 @@ def facts_text(project, overview, stale) -> str:
     if d["next_action"]:
         lines.append(f"Наступна дія (наша): {d['next_action']['text']}"
                      + (f" до {d['next_action']['due_fmt']}" if d["next_action"]["due_fmt"] else ""))
+    return "\n".join(lines)
+
+
+def urgent(attention) -> list:
+    """Лише важливе (high / medium) — для списку проєктів і ранкового брифінгу; «info» туди не йде."""
+    return [a for a in attention if a["level"] in ("high", "medium")]
+
+
+def owner_digest(user, limit=8) -> list:
+    """Відкриті проєкти відповідального, що потребують уваги → [(project, [items])], термінові першими."""
+    out = []
+    for project in (Project.objects.filter(owner=user, status__in=Project.OPEN_STATUSES)
+                    .select_related("customer").order_by("-updated_at")[:200]):
+        items = urgent(collect(project)["attention"])
+        if items:
+            out.append((project, items))
+    out.sort(key=lambda pi: (-sum(1 for a in pi[1] if a["level"] == "high"), -len(pi[1])))
+    return out[:limit]
+
+
+def digest_text(user, limit=8, per_project=3) -> str:
+    """Текст для брифінгу: «P-2026-001 · Назва: 📨 Чекає нашої відповіді 5 дн. …»."""
+    lines = []
+    for project, items in owner_digest(user, limit):
+        shown = "; ".join(f"{a['icon']} {a['text']}" for a in items[:per_project])
+        more = f" (+ ще {len(items) - per_project})" if len(items) > per_project else ""
+        lines.append(f"• {project.code} · {project.name}: {shown}{more}")
     return "\n".join(lines)
 
 

@@ -796,6 +796,9 @@ class BriefingSettings(models.Model):
     include_reminders = models.BooleanField("🔔 Нагадування на сьогодні", default=True)
     include_stock_alerts = models.BooleanField("🔥 Критичний залишок", default=False)
     include_new_emails = models.BooleanField("📬 Нові листи від клієнтів", default=False)
+    include_projects = models.BooleanField(
+        "📁 Проєкти: потребує уваги", default=True,
+        help_text="Кожному — його відкриті проєкти, де клієнт чекає відповіді, Angebot без рішення, минув строк тощо.")
     custom_instructions = models.TextField(
         "Додаткові інструкції для AI", blank=True,
         help_text=(

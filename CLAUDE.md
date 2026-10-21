@@ -132,6 +132,7 @@ tabele_mvp/
 - Гілки — `sync.get_or_create_thread` (єдине місце, також для .eml-імпорту, адмін-синхронізації й надісланого): ланцюжок Message-ID (In-Reply-To + References) → інакше та сама тема без Re:/AW:/WG: (`normalize_subject`) і спільний зовнішній учасник за 180 днів → нова гілка
 - Відповідь: `reply_to_pk` (inline і compose) → In-Reply-To/References у SMTP; Кому/Копія — `views._reply_addresses` (reply-all, на власний лист — тим самим отримувачам). Локальна копія надісланого: `imap_uid=0`, `imap_folder_name='minerva:<Message-ID>'`; копія з «Надісланих» при синхронізації дописує їй UID (`save_message`), без дубля. .eml-імпорт — `imap_folder_name='eml:…'`, у Вхідних через `views._inbox_q`
 - Швидкий фільтр над списком (`filterP2`) — миттєво по сторінці, потім сервер (`?q=`, усі листи й папки, крім спаму/кошика; шукає й отримувача), список і пагінація підміняються без перезавантаження
+- Заплановані листи (`send_scheduled`): лист «бронюється» атомарним UPDATE `sent_at` перед відправкою — паралельний запуск його пропускає; бронь без результату довше 15 хв → помилка «невідомо, чи пішов» (повтору наосліп немає); у формі адмінки `scheduled_at` — явне поле datetime-local
 - Тести: `python manage.py test email_assistant --settings=tabele.settings_test`
 
 ### projects/ — проєкти з пошти
@@ -167,6 +168,7 @@ tabele_mvp/
   - `fingerprint` — нові листи чи зміни документів після огляду → «застарів»; збій AI лишає попередній огляд;
   - маршрути `/projects/api/project/<pk>/overview/` (GET — стан, право `view_project`; POST — скласти, `change_project`) і `…/overview/next-action/` (наступна дія → поле проєкту);
   - у пошті: «🧭 Огляд проєкту» в прев'ю (і 🧭 на значку проєкту) — панель як «Історія»; збережений огляд проєктів гілки йде в досьє листа (`context.py` → `projects`, `context_text`), тож AI-чернетка відповіді й «Коротко від Minerva» враховують обіцянки й відкриті питання (у «Minerva врахувала» — «огляд проєкту P-…», застарілий позначено).
+- **«Потребує уваги» всюди:** колонка «Увага» (🔴/🟡) і фільтр «За терміновістю» в списку проєктів; ранковий брифінг (`morning_briefing`, `BriefingSettings.include_projects`, config 0038) — кожному відповідальному його проєкти (`overview.digest_text`), повний список додається під текстом AI.
 - Меню: група CRM → «Проєкти», «Розбір пошти». Роль manager має доступ до `projects`.
 - У документах бази знань для RAG проєкти підуть полем `projects` — після погодження контракту.
 - Тести: `python manage.py test projects --settings=tabele.settings_test`
@@ -190,6 +192,10 @@ tabele_mvp/
   - проєкт: панель «📝 Angebote»;
   - продажі: дія «📝 Створити Angebot із запиту пропозиції» (QUOTE);
   - прийнятий Angebot → документ копіюється в `media/orders/angebot/<номер>/`.
+- **Запити пропозицій у пошті** — `offers/detection.py`, модель `QuoteRequest` (offers 0002), сигнал `offers/signals.py`:
+  - правила без AI: вхідний лист customer/other, лише новий текст (без цитати), прохання про Angebot/ціну (de/en/uk/ru) або артикули з кількістю + питання про ціну; не запит — подяка/посилання на наш Angebot, гілка з Angebot;
+  - у пошті: мітка «📝 запит» у рядку, фільтр `?quote=1` (кнопка «📝 N»), підказка в прев'ю «Створити Angebot» / «✕ Не запит» (`/offers/api/quote-request/<pk>/dismiss/`); Angebot з гілки закриває запит (`mark_done`);
+  - рішення людини не перезаписується; історія — `manage.py detect_quote_requests [--days 30]`.
 - **Адмінка:** компактна таблиця позицій (`offers/templates/admin/offers/offer/change_form.html`); маржа видна лише в адмінці.
 - **Меню:** група «Продажі»; роль manager має доступ до `offers`.
 - **Тести:** `python manage.py test offers --settings=tabele.settings_test`. Локально потрібні `docxtpl` і `python-docx` з `requirements.txt`.
