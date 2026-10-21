@@ -378,6 +378,18 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         help_text="Запит пропозиції: тип документа QUOTE, без списання складу і без цін; "
                   "невідомі SKU записуються в нотатку",
     )
+    # Кабінет покупця (shop/accounts.py) — лише для shop/quote; у SalesOrder не записуються
+    customer_session = serializers.CharField(
+        required=False, allow_blank=True, max_length=100, write_only=True,
+        help_text="Ключ сесії покупця (або заголовок X-Customer-Session): замовлення з'явиться в його кабінеті",
+    )
+    vat_rate = serializers.DecimalField(
+        required=False, allow_null=True, max_digits=5, decimal_places=2, min_value=0, max_value=100,
+        write_only=True, help_text="Ставка ПДВ, яку порахував сайт (для сум у кабінеті)",
+    )
+    billing = serializers.DictField(required=False, write_only=True,
+                                    help_text="Платіжна адреса: company, name, street, zip, city, country, vat_id …")
+    lang = serializers.ChoiceField(choices=["de", "en"], required=False, write_only=True)
 
     class Meta:
         model  = SalesOrder
@@ -390,6 +402,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             "ship_name", "ship_company", "ship_phone", "ship_email", "ship_vat_id",
             "shipping_address", "note", "lines", "check_stock", "shop", "quote",
             "payment_method", "payment_status", "payment_reference",
+            "customer_session", "vat_rate", "billing", "lang",
         ]
         validators = []  # дублікат (source, order_number) обробляється ідемпотентно у view
 

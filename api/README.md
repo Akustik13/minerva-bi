@@ -28,6 +28,7 @@
 | `shipments:read` | відправлення, трекінг-номери, статус доставки |
 | `customers:read` / `customers:write` | клієнти CRM |
 | `webhooks:read` / `webhooks:write` | вебхуки, зареєстровані цим ключем |
+| `accounts:read` / `accounts:write` | особистий кабінет покупців магазину ключа (розділ 11a) |
 
 **Ліміт:** 120 запитів/хв на ключ (змінна оточення `API_RATE_LIMIT`, напр. `300/min`). При перевищенні — `429` + заголовок `Retry-After`.
 **Пагінація:** `?page=2&page_size=200` (макс. 500). Відповідь: `{count, next, previous, results}`.
@@ -585,6 +586,32 @@ app.listen(3000);
 **Базові ціни в магазині.** `ShopListing.price_source = base` + `price_factor` (%): ціна і ступені позиції = базові ціни товару (`Product.base_prices`) × курс (`ShopSettings.fx_rates`, якщо валюта товару інша) × %, оновлюються сигналом при зміні базових цін або курсу. Ручна зміна ціни/ступенів перемикає позицію на `manual`. Історія змін базових цін — `inventory.ProductPriceHistory`; імпорт з DigiKey — `inventory/services/base_prices.import_from_digikey`.
 
 Вебхук `stock.changed` надсилається також, коли змінюється позиція магазину (галочка, ціна, ступені) або назва, категорія, фото товару, що є в магазині, — сайт одразу скидає кеш каталогу.
+
+## 11a. Особистий кабінет покупців (`/shop/account/…`)
+
+Акаунти покупців живуть **лише в Minerva** (`shop.ShopCustomer`, адмінка «👤 Акаунти покупців»); логіка — `shop/accounts.py`, API — `api/accounts.py`, листи — `shop/mail.py`. Сайт — посередник: ключ API тільки на його сервері, покупець отримує від сайту cookie (HttpOnly) з ключем сесії, сайт передає його заголовком **`X-Customer-Session`**. Пароль — хеш Django; ключі сесій і посилань з листів у БД — лише SHA-256.
+
+Увімкнення: магазин → «👤 Особистий кабінет покупців» (+ відправник листів: акаунт пошти або SMTP сповіщень), ключу — `accounts:read` + `accounts:write`. «Адреса сайту» магазину обмежує домен посилань у листах.
+
+| Запит | Що робить |
+|---|---|
+| `GET shop/account/` | `{enabled, password_min_length}` — чи ввімкнено кабінет (сайт показує / ховає вхід) |
+| `POST shop/account/register/` | `{email, password, company, name, phone?, vat_id?, street?, zip?, city?, country?, confirm_b2b, lang, link}` → **202** завжди однаково; лист з `link#verify=<token>` (48 год). На вже підтверджений email — лист «у вас уже є акаунт», пароль не змінюється. Непідтверджену реєстрацію перезаписує нова |
+| `POST shop/account/resend/` | `{email, link, lang}` → 202 (повторний лист, не частіше 1/хв) |
+| `POST shop/account/verify/` | `{token, password, remember}` → сесія. **Пароль обов'язковий** — посилання з листа без пароля не дає входу |
+| `POST shop/account/login/` | `{email, password, remember}` → `{session, expires_at, remember, customer}`; 401 `invalid_credentials`, 403 `email_not_verified` / `account_disabled`, 429 `locked` (+`Retry-After`; 5 невдалих → 15 хв) |
+| `POST shop/account/logout/` | завершує сесію з заголовка |
+| `POST shop/account/password/forgot/` | `{email, link, lang}` → 202 завжди; лист з `link#reset=<token>` (60 хв, одноразово) |
+| `POST shop/account/password/reset/` | `{token, password, remember}` → сесія; усі інші сесії завершуються, email вважається підтвердженим |
+| `GET / PATCH / DELETE shop/account/me/` | профіль (`company, name, phone, vat_id, address{…}, shipping{separate, …}, lang, orders_count, cart_count`); `DELETE {password}` — видалити акаунт (замовлення лишаються) |
+| `POST shop/account/me/password/` | `{current_password, new_password}`; інші сесії завершуються |
+| `GET shop/account/me/orders/` | `{count, results[{number, kind: order\|quote, date, status, payment_method, payment_status, currency, net, shipping, vat_rate, vat, gross, items, tracking[{carrier, number, url, status}]}]}` |
+| `GET shop/account/me/orders/{number}/` | + `lines[{sku, name, name_en, qty, unit_price, total}]`, `shipping_address`, `billing`, `dates{received, shipped, delivered}`, `offer` (надісланий Angebot для запиту) |
+| `GET / PUT shop/account/me/cart/` | `{items: {sku: qty}}` (ключі `rq:<артикул>` — запит ціни), до 100 позицій |
+
+Сесія: без «запам'ятати» — 12 год від останньої дії, з ним — 30 днів (максимум 90). Помилки: `{detail, code, fields?, problems?}`; коди пароля: `password_too_short / numeric / common / like_email`. Акаунти одного магазину не бачать інший магазин.
+
+**`POST /orders/`** (shop / quote) додатково приймає `customer_session` (або заголовок `X-Customer-Session`), `vat_rate`, `billing{…}`, `lang` — замовлення з'являється в кабінеті (`shop.ShopOrder`), відповідь містить `account_linked`. Без сесії замовлення прив'язується до **підтвердженого** акаунта з тим самим email; при підтвердженні email попередні замовлення магазину з цією адресою потрапляють у кабінет. Прибирання: `manage.py shop_accounts_cleanup` (cron щодоби).
 
 ## 12. Зовнішня RAG-система (читання каталогу і складу)
 

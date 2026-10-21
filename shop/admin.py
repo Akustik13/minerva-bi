@@ -179,7 +179,7 @@ class ShopAdmin(admin.ModelAdmin):
                     "orders_col", "keys_col"]
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
-    readonly_fields = ["created_at", "keys_col", "zones_tools"]
+    readonly_fields = ["created_at", "keys_col", "zones_tools", "accounts_tools"]
     inlines = [ShippingZoneInline]
     actions = ["action_default_zones", "action_import_dk_zones"]
     fieldsets = [
@@ -191,10 +191,77 @@ class ShopAdmin(admin.ModelAdmin):
                            "Швидкий старт: у списку магазинів позначте магазин → дія «🌍 Створити базові регіони "
                            "доставки» (Німеччина, Європа, США, світ), або «⬇️ Регіони доставки з DigiKey».",
         }),
+        ("👤 Особистий кабінет покупців", {
+            "fields": ["accounts_enabled", "mail_sender", "mail_from_name", "mail_footer", "accounts_tools"],
+            "description": "Реєстрація з підтвердженням email, вхід, скидання пароля, статус замовлень і кошик "
+                           "на сайті. Акаунти зберігаються лише в Minerva; сайт тримає тільки ключ сесії в cookie. "
+                           "Ключу сайту додайте права «Акаунти покупців — читання» і «— запис». "
+                           "Листи покупцям (підтвердження, новий пароль) надсилає Minerva.",
+        }),
         ("Підключення", {"fields": ["keys_col"],
                          "description": "Сайт підключається ключем API, прив'язаним до цього магазину "
                                         "(Адмін → REST API → API Токени → поле «Магазин»)."}),
     ]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "mail_sender":
+            from email_assistant.models import EmailAccount
+            kwargs["queryset"] = EmailAccount.objects.filter(is_active=True).select_related("user")
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        widget = form.base_fields.get("mail_sender") and form.base_fields["mail_sender"].widget
+        if widget is not None:  # акаунти пошти створюються в розділі «Email», не звідси
+            widget.can_add_related = widget.can_change_related = widget.can_delete_related = False
+            widget.can_view_related = False
+        return form
+
+    @admin.display(description="Стан")
+    def accounts_tools(self, obj):
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        from .mail import describe_sender
+        n = obj.customers.count()
+        pending = obj.customers.filter(email_verified_at__isnull=True).count()
+        keys = [k for k, m in services.keys_for_shop(obj) if m != services.KEY_DEFAULT]
+        no_scope = [k.name for k in keys if not {"accounts:read", "accounts:write"} <= set(k.scopes or [])]
+        links = obj.account_links or {}
+        return format_html(
+            '<div><a href="{}">Акаунтів: {}</a>{}</div>'
+            '<div style="margin-top:4px">Листи: {}</div>'
+            '<div style="margin-top:4px">Сторінка кабінету: {}</div>'
+            '{}'
+            '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formnovalidate>'
+            '✉️ Надіслати тестовий лист собі</button> '
+            '<span class="help">на email вашого користувача · незбережені зміни на сторінці не зберігаються</span></div>',
+            reverse("admin:shop_shopcustomer_changelist") + f"?shop__id__exact={obj.pk}", n,
+            f" · очікують підтвердження: {pending}" if pending else "",
+            describe_sender(obj),
+            format_html_join(" · ", '<a href="{}" target="_blank" rel="noopener">{}</a>',
+                             ((u, lang) for lang, u in links.items())) if links
+            else "ще невідома (заповниться з першого запиту сайту)",
+            format_html('<div style="margin-top:4px;color:#ffb74d">⚠ Ключам без прав «Акаунти покупців»: {}</div>',
+                        ", ".join(no_scope)) if no_scope else "",
+            reverse("admin:shop_shop_test_mail", args=[obj.pk]))
+
+    def _test_mail_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        from . import mail
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        to = (request.user.email or "").strip()
+        if not to:
+            self.message_user(request, "У вашого користувача Minerva не задано email.", messages.ERROR)
+        else:
+            try:
+                mail.send(shop, to, "test", "de")
+                self.message_user(request, f"Тестовий лист надіслано на {to} ({mail.describe_sender(shop)}).")
+            except Exception as e:
+                self.message_user(request, f"Лист не надіслано: {e}", messages.ERROR)
+        return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
 
     @admin.display(description="Доставка")
     def shipping_col(self, obj):
@@ -293,6 +360,8 @@ class ShopAdmin(admin.ModelAdmin):
                  name="shop_shop_default_zones"),
             path("<int:pk>/dk-zones/", self.admin_site.admin_view(self._dk_zones_view),
                  name="shop_shop_dk_zones"),
+            path("<int:pk>/test-mail/", self.admin_site.admin_view(self._test_mail_view),
+                 name="shop_shop_test_mail"),
         ] + super().get_urls()
 
     def _zones_view(self, request, pk, run):
@@ -945,3 +1014,6 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
         default = Shop.objects.filter(is_default=True).first()
         return self._form_action(request, queryset, AddToShopForm, "Додати товари в магазин", apply,
                                  initial={"shop": default.pk if default else None})
+
+
+from . import admin_accounts  # noqa: E402,F401  — акаунти покупців (особистий кабінет)

@@ -3,7 +3,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Q
 from django.shortcuts import render
 
-from .models import Shop, ShopListing, ShopPriceTier, ShopSettings
+from .models import Shop, ShopCustomer, ShopListing, ShopPriceTier, ShopSettings
 from .services import KEY_DEFAULT, keys_for_shop
 
 
@@ -16,6 +16,7 @@ def shop_help(request):
     shops = list(Shop.objects.annotate(
         n_listings=Count("listings", distinct=True),
         n_visible=Count("listings", filter=Q(listings__is_visible=True), distinct=True),
+        n_customers=Count("customers", distinct=True),
     ).order_by("-is_default", "name"))
     by_source = {
         row["source"]: row for row in SalesOrder.objects
@@ -39,6 +40,7 @@ def shop_help(request):
             "listings": ShopListing.objects.count(),
             "tiers": ShopPriceTier.objects.count(),
             "webhooks": Webhook.objects.filter(is_active=True).count(),
+            "customers": ShopCustomer.objects.count(),
         },
         "settings_obj": ShopSettings.objects.filter(pk=1).first(),
     })

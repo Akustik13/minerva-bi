@@ -317,6 +317,10 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
         check_stock = d.pop("check_stock", False)
         is_shop     = d.pop("shop", False)
         is_quote    = d.pop("quote", False)
+        account = {  # кабінет покупця: зберігається в shop.ShopOrder, не в SalesOrder
+            "session_token": d.pop("customer_session", "") or request.META.get("HTTP_X_CUSTOMER_SESSION", ""),
+            "vat_rate": d.pop("vat_rate", None), "billing": d.pop("billing", None), "lang": d.pop("lang", ""),
+        }
         key = request.auth if isinstance(request.auth, APIKey) else None
         shop = None
         if is_shop or is_quote:
@@ -357,6 +361,7 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                 product = stock_service.resolve_sku(raw)
             if not product and is_quote:
                 unknown.append(f"{raw} × {ln['qty']:g}")  # запит може стосуватися товару поза Minerva
+                account.setdefault("requested", []).append({"sku": raw, "qty": ln["qty"]})
                 continue
             if not product:
                 errors.append({"line": i, "sku": raw, "error": "Товар не знайдено"})
@@ -444,7 +449,16 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                 order.total_price = total
                 order.save(update_fields=["total_price"])
 
-        return Response(self._detail(order, created=True), status=status.HTTP_201_CREATED)
+        extra = {}
+        if shop is not None:
+            from shop.accounts import record_order
+            try:  # замовлення вже створено — кабінет не повинен його зламати
+                extra["account_linked"] = record_order(order, shop, **account).customer_id is not None
+            except Exception:
+                import logging
+                logging.getLogger("shop").exception("record_order failed for %s", order)
+                extra["account_linked"] = False
+        return Response(self._detail(order, created=True, **extra), status=status.HTTP_201_CREATED)
 
     def perform_update(self, serializer):
         serializer.save(status_source=_key_label(self.request))
