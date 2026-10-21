@@ -11,6 +11,7 @@ from django.utils.html import format_html, format_html_join
 from inventory.services.stock import annotate_stock
 
 from . import services
+from .admin_payments import ShopForm, stripe_tools
 from .models import ShippingZone, Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSettings
 from .shipping import format_countries, parse_countries
 
@@ -179,7 +180,8 @@ class ShopAdmin(admin.ModelAdmin):
                     "orders_col", "keys_col"]
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
-    readonly_fields = ["created_at", "keys_col", "zones_tools", "accounts_tools"]
+    form = ShopForm
+    readonly_fields = ["created_at", "keys_col", "zones_tools", "accounts_tools", "stripe_col"]
     inlines = [ShippingZoneInline]
     actions = ["action_default_zones", "action_import_dk_zones"]
     fieldsets = [
@@ -197,6 +199,13 @@ class ShopAdmin(admin.ModelAdmin):
                            "на сайті. Акаунти зберігаються лише в Minerva; сайт тримає тільки ключ сесії в cookie. "
                            "Ключу сайту додайте права «Акаунти покупців — читання» і «— запис». "
                            "Листи покупцям (підтвердження, новий пароль) надсилає Minerva.",
+        }),
+        ("💳 Оплата Stripe", {
+            "fields": ["stripe_enabled", "stripe_secret_key", "stripe_webhook_secret", "stripe_clear", "stripe_col"],
+            "description": "Покупець обирає на сайті «Kreditkarte / Online (Stripe)» і платить на сторінці Stripe Checkout; "
+                           "суму рахує Minerva (нетто + доставка + ПДВ). Після оплати Stripe повідомляє Minerva "
+                           "(вебхук) — замовлення стає «Оплачено». Способи оплати (картки, Apple/Google Pay, SEPA, Klarna …) "
+                           "вмикаються в Stripe → Settings → Payment methods. Спершу перевірте в тестовому режимі (sk_test_…).",
         }),
         ("Підключення", {"fields": ["keys_col"],
                          "description": "Сайт підключається ключем API, прив'язаним до цього магазину "
@@ -216,6 +225,23 @@ class ShopAdmin(admin.ModelAdmin):
             widget.can_add_related = widget.can_change_related = widget.can_delete_related = False
             widget.can_view_related = False
         return form
+
+    @admin.display(description="Стан Stripe")
+    def stripe_col(self, obj):
+        return stripe_tools(obj)
+
+    def _stripe_check_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        from . import payments
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        try:
+            self.message_user(request, payments.check_key(shop))
+        except payments.PaymentError as e:
+            self.message_user(request, f"❌ {e.message}", messages.ERROR)
+        return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
 
     @admin.display(description="Стан")
     def accounts_tools(self, obj):
@@ -362,6 +388,8 @@ class ShopAdmin(admin.ModelAdmin):
                  name="shop_shop_dk_zones"),
             path("<int:pk>/test-mail/", self.admin_site.admin_view(self._test_mail_view),
                  name="shop_shop_test_mail"),
+            path("<int:pk>/stripe-check/", self.admin_site.admin_view(self._stripe_check_view),
+                 name="shop_shop_stripe_check"),
         ] + super().get_urls()
 
     def _zones_view(self, request, pk, run):

@@ -615,6 +615,20 @@ app.listen(3000);
 
 **`POST /orders/`** (shop / quote) додатково приймає `customer_session` (або заголовок `X-Customer-Session`), `vat_rate`, `billing{…}`, `lang` — замовлення з'являється в кабінеті (`shop.ShopOrder`), відповідь містить `account_linked`. Без сесії замовлення прив'язується до **підтвердженого** акаунта з тим самим email; при підтвердженні email попередні замовлення магазину з цією адресою потрапляють у кабінет. Прибирання: `manage.py shop_accounts_cleanup` (cron щодоби).
 
+## 11b. Онлайн-оплата Stripe
+
+Логіка — `shop/payments.py` (Stripe REST через `requests`, без бібліотеки), API — `api/payments.py`, адмінка — `shop/admin_payments.py`, модель `shop.ShopPayment` (спроба оплати: Checkout Session, PaymentIntent, сума, статус). Ключі Stripe — лише в Minerva: картка магазину → «💳 Оплата Stripe» (`Shop.stripe_enabled`, `stripe_secret_key`, `stripe_webhook_secret`).
+
+| Запит | Scope | Що робить |
+|---|---|---|
+| `GET shop/payments/` | `orders:read` | `{stripe: {enabled, mode: test\|live}}` — сайт показує спосіб оплати |
+| `POST shop/payments/stripe/checkout/` | `orders:write` | `{order_number, success_url, cancel_url, lang}` → `{url, session_id, amount, currency, expires_at, mode}`. Сума = нетто + доставка + ПДВ (`ShopOrder.vat_rate`; без ставки — 409 `vat_unknown`). Відкрита сесія з тією ж сумою використовується повторно; стару з іншою сумою Minerva закриває (`expire`). Адреси повернення — лише домен «Адреса сайту». Помилки: `already_paid`, `not_payable`, `stripe_disabled`, `stripe_error` |
+| `POST shop/payments/stripe/sync/` | `orders:write` | `{order_number}` → `{payment_status, paid}` — Minerva сама питає Stripe (якщо вебхук ще не дійшов) |
+| `POST shop/account/me/orders/<number>/pay/` | `accounts:write` | те саме для власного замовлення покупця (заголовок `X-Customer-Session`) |
+| `POST payments/stripe/webhook/<код магазину>/` | — | для Stripe: підпис `Stripe-Signature` (HMAC, 5 хв). Події: `checkout.session.completed` / `async_payment_succeeded` → `payment_status = paid`, `payment_reference` = PaymentIntent; `async_payment_failed` → `failed`; `expired`; `charge.refunded` (повне) → `refunded` |
+
+Замовлення сайту з оплатою Stripe створюється з `payment_method = stripe`, `payment_status = pending`; у кабінеті покупця `payment_open = true`, доки оплату не завершено.
+
 ## 12. Зовнішня RAG-система (читання каталогу і складу)
 
 RAG читає Minerva під час запиту (без індексації товарів у вектори). Ключ: лише `products:read` і `stock:read`.

@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from . import accounts
+from . import accounts, payments
 from .views import (
     SalesOrderViewSet, ProductViewSet, CustomerViewSet, StockViewSet, MovementViewSet,
     LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ShopShippingView, ping,
@@ -32,6 +32,7 @@ account_urls = [
     path("me/password/",      accounts.PasswordView.as_view(),    name="api-account-password"),
     path("me/orders/",        accounts.OrdersView.as_view(),      name="api-account-orders"),
     path("me/orders/<str:number>/", accounts.OrderDetailView.as_view(), name="api-account-order"),
+    path("me/orders/<str:number>/pay/", accounts.OrderPayView.as_view(), name="api-account-order-pay"),
     path("me/cart/",          accounts.CartView.as_view(),        name="api-account-cart"),
 ]
 
@@ -39,5 +40,9 @@ urlpatterns = [
     path("ping/", ping, name="api-ping"),
     path("shop/shipping/", ShopShippingView.as_view(), name="api-shop-shipping"),
     path("shop/account/", include(account_urls)),
+    path("shop/payments/", payments.PaymentsStatusView.as_view(), name="api-payments-status"),
+    path("shop/payments/stripe/checkout/", payments.StripeCheckoutView.as_view(), name="api-stripe-checkout"),
+    path("shop/payments/stripe/sync/", payments.StripeSyncView.as_view(), name="api-stripe-sync"),
+    path("payments/stripe/webhook/<slug:slug>/", payments.StripeWebhookView.as_view(), name="api-stripe-webhook"),
     path("", include(router.urls)),
 ]

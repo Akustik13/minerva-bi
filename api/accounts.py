@@ -15,6 +15,7 @@
   GET|PATCH|DELETE shop/account/me/    профіль (DELETE {password} — видалити акаунт)
   POST shop/account/me/password/       {current_password, new_password}
   GET  shop/account/me/orders/         замовлення й запити покупця
+  POST shop/account/me/orders/<number>/pay/  {success_url, cancel_url} → сторінка оплати Stripe
   GET  shop/account/me/orders/<number>/
   GET|PUT shop/account/me/cart/        {items: {sku: qty}}
 
@@ -202,6 +203,24 @@ class OrderDetailView(AccountView):
     def get(self, request, number):
         return self.dispatch_account(
             request, lambda req, d: Response(accounts.order_detail(accounts.find_order(self.customer, number))))
+
+
+class OrderPayView(AccountView):
+    """Оплатити своє замовлення онлайн (Stripe) — з кабінету покупця."""
+    customer_required = True
+
+    def post(self, request, number):
+        def run(req, d):
+            from shop import payments
+            from .payments import checkout_payload
+            info = accounts.find_order(self.customer, number)
+            try:
+                payment = payments.start_checkout(self.shop, info.order, d.get("success_url"), d.get("cancel_url"),
+                                                  d.get("lang") or self.customer.lang)
+            except payments.PaymentError as e:
+                raise AccountError(e.status, e.code, e.message)
+            return Response(checkout_payload(payment), status=status.HTTP_201_CREATED)
+        return self.dispatch_account(request, run)
 
 
 class CartView(AccountView):

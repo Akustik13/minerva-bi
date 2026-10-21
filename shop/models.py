@@ -7,6 +7,7 @@
   ShopSettings — шаблон ступенів, націнка, округлення (спільні для всіх магазинів)
   ShopCustomer — акаунт покупця (особистий кабінет на сайті) + токени листів, сесії
   ShopOrder    — замовлення з сайту: акаунт покупця, ставка ПДВ, платіжна адреса
+  ShopPayment  — онлайн-оплата замовлення (Stripe Checkout): сесія, PaymentIntent, статус
 """
 from decimal import Decimal
 
@@ -121,6 +122,21 @@ class Shop(models.Model):
     account_link_error = models.CharField(
         "Відхилена адреса кабінету", max_length=400, blank=True, default="",
         help_text="Остання адреса сторінки кабінету від сайту, яку Minerva не прийняла (інший домен, ніж «Адреса сайту»).",
+    )
+    # ── Онлайн-оплата Stripe (shop/payments.py) ──
+    stripe_enabled = models.BooleanField(
+        "Оплата через Stripe", default=False,
+        help_text="На сайті з'являється спосіб оплати «Kreditkarte / Online (Stripe)». Minerva створює сторінку "
+                  "оплати Stripe Checkout на суму замовлення і отримує підтвердження оплати від Stripe.",
+    )
+    stripe_secret_key = models.CharField(
+        "Stripe: секретний ключ", max_length=255, blank=True, default="",
+        help_text="sk_test_… (тестовий режим) або sk_live_… / rk_live_… (обмежений ключ: права Checkout Sessions — запис, "
+                  "Charges/PaymentIntents — читання). Зберігається лише в Minerva.",
+    )
+    stripe_webhook_secret = models.CharField(
+        "Stripe: секрет вебхука", max_length=255, blank=True, default="",
+        help_text="whsec_… — Stripe → Developers → Webhooks → ваш endpoint → Signing secret.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -398,3 +414,35 @@ class ShopOrder(models.Model):
 
     def __str__(self):
         return str(self.order)
+
+
+class ShopPayment(models.Model):
+    """Онлайн-оплата замовлення через Stripe Checkout (shop/payments.py). Одне замовлення — кілька спроб."""
+    OPEN, PROCESSING, PAID, FAILED, EXPIRED, REFUNDED = "open", "processing", "paid", "failed", "expired", "refunded"
+    STATUSES = [(OPEN, "Очікує оплати"), (PROCESSING, "Обробляється (SEPA тощо)"), (PAID, "Оплачено"),
+                (FAILED, "Помилка оплати"), (EXPIRED, "Сесія закінчилась"), (REFUNDED, "Повернено")]
+
+    order = models.ForeignKey("sales.SalesOrder", on_delete=models.CASCADE, related_name="shop_payments",
+                              verbose_name="Замовлення")
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="payments", verbose_name="Магазин")
+    provider = models.CharField("Платіжна система", max_length=20, default="stripe")
+    session_id = models.CharField("Checkout Session", max_length=255, unique=True)
+    payment_intent = models.CharField("PaymentIntent", max_length=255, blank=True, default="", db_index=True)
+    url = models.URLField("Сторінка оплати", max_length=2000, blank=True, default="")
+    amount = models.DecimalField("Сума", max_digits=12, decimal_places=2)
+    currency = models.CharField("Валюта", max_length=3, default="EUR")
+    status = models.CharField("Статус", max_length=12, choices=STATUSES, default=OPEN, db_index=True)
+    livemode = models.BooleanField("Бойовий режим", default=False)
+    last_event = models.CharField("Остання подія Stripe", max_length=80, blank=True, default="")
+    expires_at = models.DateTimeField("Сесія дійсна до", null=True, blank=True)
+    paid_at = models.DateTimeField("Оплачено", null=True, blank=True)
+    created_at = models.DateTimeField("Створено", auto_now_add=True)
+    updated_at = models.DateTimeField("Змінено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Онлайн-оплата"
+        verbose_name_plural = "💳 Онлайн-оплати"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.order} · {self.amount} {self.currency} · {self.get_status_display()}"

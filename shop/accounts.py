@@ -696,6 +696,10 @@ def order_summary(info: ShopOrder) -> dict:
         "currency": o.currency,
         "net": net, "shipping": shipping, "vat_rate": info.vat_rate, "vat": vat, "gross": gross,
         "items": len(o.lines.all()) + len(info.requested or []),
+        # онлайн-оплата (Stripe) ще не завершена — у кабінеті кнопка «Jetzt bezahlen»
+        "payment_open": (not quote and o.status != "cancelled" and o.payment_method == "stripe"
+                         and o.payment_status in ("", "unpaid", "pending", "failed")
+                         and not any(p.status == "processing" for p in o.shop_payments.all())),
         "tracking": _tracking(o),
     }
 
@@ -737,7 +741,7 @@ def _offer_for_quote(order) -> dict | None:
 def orders_qs(customer: ShopCustomer):
     return (ShopOrder.objects.filter(customer=customer)
             .select_related("order")
-            .prefetch_related("order__lines__product", "order__shipments__carrier")
+            .prefetch_related("order__lines__product", "order__shipments__carrier", "order__shop_payments")
             .order_by("-order__order_date", "-order__pk"))
 
 
