@@ -412,6 +412,59 @@ def for_display(data) -> dict:
     }
 
 
+def state(project, user) -> dict:
+    """Огляд для панелі в пошті (JSON): потребує уваги, лічильники, збережений AI-огляд, чи застарів."""
+    facts = collect(project)
+    overview, stale = saved(project, facts)
+    return {
+        "ok": True,
+        "project": {"id": project.pk, "code": project.code, "name": project.name,
+                    "url": f"/admin/projects/project/{project.pk}/change/#overview",
+                    "next_action": project.next_action},
+        "attention": facts["attention"], "counts": facts["counts"],
+        "overview": for_display(overview.data) if overview else None,
+        "meta": {"created_at": timezone.localtime(overview.created_at).strftime("%d.%m.%Y %H:%M"),
+                 "model": overview.model, "messages_count": overview.messages_count} if overview else None,
+        "stale": stale,
+        "can_change": bool(user and user.has_perm("projects.change_project")),
+    }
+
+
+def thread_overviews(thread) -> list:
+    """Збережені огляди підтверджених проєктів гілки → [(project, ProjectOverview, stale)]."""
+    from django.db.models import Q
+    if thread is None:
+        return []
+    ids = (ProjectLink.objects.filter(Q(thread=thread) | Q(message__thread=thread), status=ProjectLink.CONFIRMED)
+           .values_list("project_id", flat=True))
+    out = []
+    for ov in ProjectOverview.objects.filter(project_id__in=ids).select_related("project"):
+        out.append((ov.project, ov, saved(ov.project)[1]))
+    return out
+
+
+def facts_text(project, overview, stale) -> str:
+    """Огляд проєкту для промпту AI-відповіді: обіцянки, відкриті питання, наступна дія."""
+    d = for_display(overview.data)
+    head = (f"ОГЛЯД ПРОЄКТУ {project.code} «{project.name}» (складено AI з листів проєкту "
+            f"{timezone.localtime(overview.created_at):%d.%m.%Y}"
+            + ("; після огляду були нові листи — перевіряй за перепискою" if stale else "") + "):")
+    lines = [head]
+    if d["summary"]:
+        lines.append(d["summary"])
+    if d["promises"]:
+        lines.append("Обіцянки:")
+        lines += [f"- [{p['status_label']}] {p['who'] or '?'}: {p['text']}" + (f" (строк {p['date_fmt']})" if p["date_fmt"] else "")
+                  for p in d["promises"]]
+    if d["open_questions"]:
+        lines.append("Відкриті питання:")
+        lines += [f"- {q['who'] or '?'}: {q['text']}" for q in d["open_questions"]]
+    if d["next_action"]:
+        lines.append(f"Наступна дія (наша): {d['next_action']['text']}"
+                     + (f" до {d['next_action']['due_fmt']}" if d["next_action"]["due_fmt"] else ""))
+    return "\n".join(lines)
+
+
 def apply_next_action(project) -> str:
     """Наступна дія з огляду → поле проєкту «Наступна дія» (строк дописується в текст)."""
     overview = ProjectOverview.objects.filter(project=project).first()

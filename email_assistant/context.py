@@ -97,7 +97,17 @@ def build_context(msg) -> dict:
         'customer':      customer,
         'other_threads': other_threads,
         'notes':         notes,
+        'projects':      _project_overviews(msg.thread if msg.thread_id else None),
     }
+
+
+def _project_overviews(thread) -> list:
+    """Збережені огляди проєктів гілки: обіцянки й відкриті питання — щоб відповідь їм не суперечила."""
+    try:
+        from projects.overview import thread_overviews
+        return thread_overviews(thread)
+    except Exception:  # noqa: BLE001 — досьє листа не має ламатися через проєкти
+        return []
 
 
 def _shipments(order):
@@ -190,12 +200,17 @@ def used_summary(ctx) -> list:
         used.append(f'інших листувань: {len(ctx["other_threads"])}')
     if ctx['notes']:
         used.append(f'нотаток CRM: {len(ctx["notes"])}')
+    for project, _ov, stale in ctx.get('projects', []):
+        used.append(f'огляд проєкту {project.code}' + (' (застарів)' if stale else ''))
     return used
 
 
 def context_text(ctx, limit=6000) -> str:
-    """Факти для промпту AI (обмежено за довжиною)."""
+    """Факти для промпту AI (обмежено за довжиною). Огляд проєкту — першим: обрізається хронологія, а не він."""
     parts = []
+    if ctx.get('projects'):
+        from projects.overview import facts_text
+        parts += [facts_text(p, ov, stale)[:2500] for p, ov, stale in ctx['projects'][:2]]
     state = state_lines(ctx)
     if state:
         parts.append('ПОТОЧНИЙ СТАН:\n' + '\n'.join(state))
@@ -211,4 +226,5 @@ def context_text(ctx, limit=6000) -> str:
             snippets.append(f'«{t["thread"].subject}» — останній лист {_fmt(last.sent_at)} від '
                             f'{last.from_email}:\n{(last.body_text or "")[:400]}')
         parts.append('ІНШІ ЛИСТУВАННЯ З ЦИМ КЛІЄНТОМ:\n' + '\n---\n'.join(snippets))
-    return '\n\n'.join(parts)[:limit]
+    extra = 2500 * len(ctx.get('projects', [])[:2])     # огляд проєкту не забирає місце в хронології
+    return '\n\n'.join(parts)[:limit + extra]

@@ -47,6 +47,21 @@
   border-radius:7px;background:rgba(0,212,170,.06);border:1px solid rgba(0,212,170,.25)}
 .em-history-ai:empty{display:none}
 .em-ai-used{font-size:11px;color:var(--text-dim);margin-top:6px}
+/* «🧭 Огляд проєкту»: потребує уваги (з бази) + AI-огляд усього проєкту */
+.em-ov{border-left-color:#8b5cf6}
+.em-ov-att div{font-size:12px;line-height:1.6;color:var(--text)}
+.em-ov-att .high{color:var(--err,#e53935);font-weight:600}
+.em-ov-att .info{color:var(--text-dim)}
+.em-ov-att a{color:inherit;text-decoration:none}
+.em-ov-att a:hover{text-decoration:underline}
+.em-ov-meta{font-size:11px;color:var(--text-dim);margin:6px 0}
+.em-ov-stale{background:rgba(245,158,11,.15);color:#f59e0b;border-radius:4px;padding:0 5px;margin-left:6px}
+.em-ov-sum{font-size:12.5px;line-height:1.6;color:var(--text);margin:8px 0 4px}
+.em-ov h5{margin:10px 0 2px;font-size:12px;color:var(--text)}
+.em-ov-item{font-size:12px;line-height:1.55;color:var(--text);margin:2px 0}
+.em-ov-item .s{color:var(--text-dim)}
+.em-ov-item a{color:var(--link-fg,#3b82f6);text-decoration:none;white-space:nowrap}
+.em-ov-next{margin-top:8px;padding:6px 8px;border:1px solid var(--border-strong);border-radius:6px;font-size:12px;color:var(--text)}
 .em-history-draft{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-strong)}
 .em-history-draft-row{display:flex;gap:6px}
 .em-history-draft-txt{white-space:pre-wrap;font-size:13px;line-height:1.6;color:var(--text);margin-top:8px}
@@ -221,7 +236,8 @@
     </div>
     {% endif %}
     {% if thread %}
-    <div class="em-pv-proj" id="pv-proj" data-tpk="{{ thread.pk }}" data-state="{{ projects_state }}" style="display:none"></div>
+    <div class="em-pv-proj" id="pv-proj" data-tpk="{{ thread.pk }}" data-state="{{ projects_state }}"
+         data-ov="{% if perms.projects.view_project %}1{% endif %}" style="display:none"></div>
     <div class="em-proj-panel" id="pv-proj-panel">
       <input class="em-reply-inp" id="pv-proj-q" type="search" autocomplete="off"
              placeholder="{% trans "Пошук проєкту: код, назва, клієнт…" %}" oninput="pvProjRenderCands()">
@@ -253,6 +269,8 @@
       {% if thread %}
       <button class="em-pv-btn" id="pv-proj-btn" onclick="pvProjOpen()"
               title="{% trans "Додати цю переписку до проєкту або створити новий проєкт" %}">📁 {% trans "До проєкту" %}</button>
+      <button class="em-pv-btn" id="pv-ov-btn" style="display:none" onclick="pvProjOverview()"
+              title="{% trans "Весь проєкт: що потребує уваги, обіцянки, виконано, відкриті питання, наступна дія" %}">🧭 {% trans "Огляд проєкту" %}</button>
       <button class="em-pv-btn" onclick="pvOfferFromThread({{ thread.pk }}, this)"
               title="{% trans "Створити чернетку Angebot: клієнт і проєкт листування, артикули й кількості з листа, ціни з Minerva" %}">📝 Angebot</button>
       {% endif %}
@@ -265,6 +283,17 @@
 
   <!-- Messages (Gmail-style: collapsed except last) -->
   <div class="em-msgs">
+    <div class="em-history em-ov" id="pv-ov">
+      <div class="em-history-hd">
+        <b id="pv-ov-title">🧭 {% trans "Огляд проєкту" %}</b>
+        <a class="em-pv-btn" id="pv-ov-page" target="_blank" style="margin-left:auto;padding:3px 10px"
+           title="{% trans "Сторінка проєкту" %}">↗ {% trans "Проєкт" %}</a>
+        <button class="em-pv-btn ai" id="pv-ov-gen" style="display:none;padding:3px 10px" onclick="pvProjOverviewGen()"
+                title="{% trans "AI прочитає листи проєкту, Angebote й замовлення" %}">🧭 {% trans "Скласти огляд" %}</button>
+        <button class="em-ai-close" onclick="pvProjOverview(_pvOvPid)" title="{% trans "Закрити" %}">✕</button>
+      </div>
+      <div id="pv-ov-body"></div>
+    </div>
     <div class="em-history" id="pv-history">
       <div class="em-history-hd">
         <b>📜 {% trans "Історія" %}</b>
@@ -1030,10 +1059,16 @@ window.pvAiTranslate = async function(pk, force) {
     clearTimeout(t._hide); t._hide = setTimeout(function(){ t.style.display = 'none'; }, 2200);
   }
   function render(state) {
-    var h = '';
-    (state.confirmed || []).forEach(function(c) {
+    var h = '', ov = box.dataset.ov === '1', ovBtn = document.getElementById('pv-ov-btn');
+    var confirmed = state.confirmed || [];
+    if (ovBtn) {   // «🧭 Огляд проєкту» у діях — для першого підтвердженого проєкту гілки
+      ovBtn.style.display = ov && confirmed.length ? '' : 'none';
+      ovBtn.dataset.pid = confirmed.length ? confirmed[0].project.id : '';
+    }
+    confirmed.forEach(function(c) {
       h += '<span class="em-proj-chip" title="' + esc(c.reason) + '">'
          + '<a href="' + esc(c.project.url) + '" target="_blank">📁 ' + esc(c.project.code) + ' · ' + esc(c.project.name) + '</a>'
+         + (ov ? '<button onclick="pvProjOverview(' + c.project.id + ')" title="{% trans "Огляд проєкту" %}">🧭</button>' : '')
          + '<a href="' + esc(c.project.mail_url) + '" title="{% trans "Усі листи проєкту" %}">✉</a>'
          + '<button onclick="pvProjRemove(' + c.link + ')" title="{% trans "Прибрати цю переписку з проєкту" %}">✕</button></span>';
     });
@@ -1099,6 +1134,119 @@ window.pvAiTranslate = async function(pk, force) {
   };
   try { render(JSON.parse(box.dataset.state || '{}')); } catch (e) {}
 })();
+
+// ── 🧭 Огляд проєкту: потребує уваги (з бази) + AI-огляд; AI-чернетка відповіді його враховує ──
+var _pvOvPid = null;
+function _pvOvToast(msg) {
+  var t = document.getElementById('pv-toast');
+  if (!t) return;
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(t._hide); t._hide = setTimeout(function(){ t.style.display = 'none'; }, 2200);
+}
+function _pvOvRef(ref) {
+  return ref && ref.url ? ' <a href="' + _pvEsc(ref.url) + '" target="_blank">' + _pvEsc(ref.label) + ' ↗</a>' : '';
+}
+function _pvOvList(title, items, line) {
+  return '<h5>' + title + '</h5>' + (items.length
+    ? items.map(function(i){ return '<div class="em-ov-item">' + line(i) + _pvOvRef(i.ref) + '</div>'; }).join('')
+    : '<div class="em-ov-item s">—</div>');
+}
+function _pvOvRender(d) {
+  var body = document.getElementById('pv-ov-body');
+  document.getElementById('pv-ov-title').textContent = '🧭 ' + d.project.code + ' · ' + d.project.name;
+  document.getElementById('pv-ov-page').href = d.project.url;
+  var gen = document.getElementById('pv-ov-gen');
+  gen.style.display = d.can_change ? '' : 'none';
+  gen.disabled = false;
+  gen.textContent = d.overview ? '🔄 {% trans "Оновити огляд" %}' : '🧭 {% trans "Скласти огляд" %}';
+  var h = '<div class="em-ov-meta" id="pv-ov-status"></div>';
+  h += d.attention.length
+    ? '<div class="em-ov-att">' + d.attention.map(function(a) {
+        var t = _pvEsc(a.icon) + ' ' + _pvEsc(a.text);
+        return '<div class="' + a.level + '">' + (a.url ? '<a href="' + _pvEsc(a.url) + '" target="_blank">' + t + '</a>' : t) + '</div>';
+      }).join('') + '</div>'
+    : '<div class="em-ov-item">✅ {% trans "Нічого термінового" %}</div>';
+  var c = d.counts;
+  h += '<div class="em-ov-meta">📥 ' + c['in'] + ' · 📤 ' + c.out + ' · {% trans "гілок" %} ' + c.threads
+     + ' · Angebote ' + c.offers + ' · {% trans "замовлень" %} ' + c.orders + '</div>';
+  var o = d.overview;
+  if (o) {
+    h += '<div class="em-ov-meta">🤖 {% trans "AI-огляд від" %} ' + _pvEsc(d.meta.created_at)
+       + (d.meta.model ? ' · ' + _pvEsc(d.meta.model) : '') + ' · {% trans "листів" %} ' + d.meta.messages_count
+       + (d.stale ? '<span class="em-ov-stale">{% trans "після огляду були зміни — оновіть" %}</span>' : '') + '</div>';
+    if (o.summary) h += '<div class="em-ov-sum">' + _pvEsc(o.summary) + '</div>';
+    h += _pvOvList('🤝 {% trans "Обіцянки" %}', o.promises, function(p) {
+      return p.status_icon + ' <b>' + _pvEsc(p.status_label) + '</b> · ' + (p.who ? _pvEsc(p.who) + ': ' : '') + _pvEsc(p.text)
+           + (p.date_fmt ? ' <span class="s">· ' + _pvEsc(p.date_fmt) + '</span>' : '')
+           + (p.evidence ? '<div class="s">' + _pvEsc(p.evidence) + '</div>' : '');
+    });
+    h += _pvOvList('✅ {% trans "Виконано" %}', o.done, function(x) {
+      return _pvEsc(x.text) + (x.date_fmt ? ' <span class="s">· ' + _pvEsc(x.date_fmt) + '</span>' : '');
+    });
+    h += _pvOvList('❓ {% trans "Відкриті питання" %}', o.open_questions, function(q) {
+      return (q.who ? '<span class="s">' + _pvEsc(q.who) + ':</span> ' : '') + _pvEsc(q.text);
+    });
+    if (o.next_action) {
+      h += '<div class="em-ov-next">➡️ <b>{% trans "Наступна дія" %}:</b> ' + _pvEsc(o.next_action.text)
+         + (o.next_action.due_fmt ? ' <b>{% trans "до" %} ' + _pvEsc(o.next_action.due_fmt) + '</b>' : '')
+         + (o.next_action.why ? '<div class="em-ov-item s">' + _pvEsc(o.next_action.why) + '</div>' : '')
+         + (d.can_change ? '<div style="margin-top:6px"><button class="em-pv-btn" onclick="pvProjOverviewNext()">'
+            + '{% trans "Записати в «Наступна дія» проєкту" %}</button></div>' : '') + '</div>';
+    }
+    h += '<div class="em-ov-meta">{% trans "AI-чернетка відповіді враховує обіцянки й відкриті питання цього огляду. Перевіряйте за посиланнями ↗." %}</div>';
+  } else {
+    h += '<div class="em-ov-meta">{% trans "AI-огляд ще не складено: AI прочитає листи проєкту, Angebote й замовлення і випише обіцянки, виконане, відкриті питання й наступну дію." %}</div>';
+  }
+  body.innerHTML = h;
+}
+window.pvProjOverview = async function(pid) {
+  var box = document.getElementById('pv-ov'), btn = document.getElementById('pv-ov-btn');
+  pid = +(pid || (btn && btn.dataset.pid) || 0);
+  if (!box || !pid) return;
+  if (box.style.display === 'block' && _pvOvPid === pid) {   // повторне натискання — закрити
+    box.style.display = 'none';
+    if (btn) btn.classList.remove('ai');
+    return;
+  }
+  _pvOvPid = pid;
+  box.style.display = 'block';
+  if (btn) btn.classList.add('ai');
+  setTimeout(function(){ box.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 30);
+  var body = document.getElementById('pv-ov-body');
+  body.innerHTML = '<div class="em-ov-meta">⏳ {% trans "Збираю стан проєкту..." %}</div>';
+  try {
+    var r = await fetch('/projects/api/project/' + pid + '/overview/', {credentials: 'same-origin'});
+    if (!r.ok) throw new Error(r.status);
+    _pvOvRender(await r.json());
+  } catch (e) {
+    body.innerHTML = '<div class="em-ov-item" style="color:var(--err,#e53935)">⚠️ {% trans "Огляд недоступний" %}</div>';
+  }
+};
+window.pvProjOverviewGen = async function() {
+  var gen = document.getElementById('pv-ov-gen'), st = document.getElementById('pv-ov-status');
+  if (!_pvOvPid) return;
+  gen.disabled = true;
+  if (st) st.textContent = '⏳ {% trans "AI читає листи проєкту… (до хвилини)" %}';
+  try {
+    var d = await (await fetch('/projects/api/project/' + _pvOvPid + '/overview/',
+                               {method: 'POST', headers: {'X-CSRFToken': CSRF}, credentials: 'same-origin'})).json();
+    if (d.ok) { _pvOvRender(d); _pvOvToast('🧭 {% trans "Огляд оновлено" %}'); return; }
+    if (st) st.textContent = '⚠️ ' + (d.error || '{% trans "Помилка" %}');
+  } catch (e) {
+    if (st) st.textContent = '⚠️ {% trans "Помилка" %}';
+  }
+  gen.disabled = false;
+};
+window.pvProjOverviewNext = async function() {
+  if (!_pvOvPid) return;
+  try {
+    var d = await (await fetch('/projects/api/project/' + _pvOvPid + '/overview/next-action/',
+                               {method: 'POST', headers: {'X-CSRFToken': CSRF}, credentials: 'same-origin'})).json();
+    _pvOvToast(d.ok ? '➡️ {% trans "Записано в проєкт" %}' : '⚠️ {% trans "Помилка" %}');
+    if (d.ok) _pvOvRender(await (await fetch('/projects/api/project/' + _pvOvPid + '/overview/',
+                                             {credentials: 'same-origin'})).json());
+  } catch (e) { _pvOvToast('⚠️ {% trans "Помилка" %}'); }
+};
 
 // «📝 Angebot» — чернетка з листування відкривається в новій вкладці
 window.pvOfferFromThread = async function(tpk, btn) {

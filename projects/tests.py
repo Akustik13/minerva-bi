@@ -309,14 +309,56 @@ class OverviewTests(ProjectsBase):
             self.assertTrue(r.json()["error"])
         self.assertEqual(ProjectOverview.objects.get(project=self.project).data, before)
 
-    def test_only_users_who_can_change_projects(self):
+    def test_view_and_change_permissions(self):
+        from django.contrib.auth.models import Permission
+        url = f"/projects/api/project/{self.project.pk}/overview/"
+        stranger = User.objects.create_user("stranger", "s2@x.y", "p", is_staff=True)
+        self.client.force_login(stranger)
+        self.assertEqual(self.client.get(url).status_code, 404)              # без доступу до проєктів
         viewer = User.objects.create_user("viewer", "v@x.y", "p", is_staff=True)
+        viewer.user_permissions.add(Permission.objects.get(codename="view_project"))
         self.client.force_login(viewer)
+        state = self.client.get(url).json()
+        self.assertEqual((state["project"]["code"], state["can_change"], state["overview"]),
+                         (self.project.code, False, None))
+        self.assertTrue(any("Чекає нашої відповіді" in a["text"] for a in state["attention"]))
         with patch("email_assistant.ai_helper._call_ai_direct", lambda *a, **k: self.ai_json()):
-            r = self.client.post(f"/projects/api/project/{self.project.pk}/overview/")
-        self.assertEqual(r.status_code, 404)
+            self.assertEqual(self.client.post(url).status_code, 404)          # скласти — лише з правом змінювати
         self.assertFalse(ProjectOverview.objects.exists())
-        self.assertEqual(self.client.get(f"/projects/api/project/{self.project.pk}/overview/").status_code, 405)
+
+    def test_mail_preview_button_and_state_after_generate(self):
+        pv = self.client.get(f"/email/thread/{self.ask.thread_id}/preview/")
+        self.assertContains(pv, 'data-ov="1"')
+        self.assertContains(pv, 'id="pv-ov-btn"')
+        with patch("email_assistant.ai_helper._call_ai_direct", lambda *a, **k: self.ai_json()):
+            state = self.client.post(f"/projects/api/project/{self.project.pk}/overview/").json()
+        self.assertTrue(state["ok"] and state["can_change"])
+        self.assertEqual(state["overview"]["promises"][0]["status_label"], "відкрито")
+        self.assertEqual(state["overview"]["next_action"]["due_fmt"], "25.10.2026")
+        self.assertFalse(state["stale"])
+
+    def test_ai_reply_draft_uses_project_overview(self):
+        with patch("email_assistant.ai_helper._call_ai_direct", lambda *a, **k: self.ai_json()):
+            self.client.post(f"/projects/api/project/{self.project.pk}/overview/")
+        prompts = []
+
+        def fake_ai(prompt, max_tokens=1024, user=None):
+            prompts.append(prompt)
+            return "Sehr geehrte Damen und Herren, das Datenblatt folgt."
+
+        with patch("email_assistant.ai_helper._call_ai_direct", fake_ai):
+            d = self.client.get(f"/email/message/{self.question.pk}/ai-reply/").json()
+        self.assertTrue(d["ok"])
+        self.assertIn(f"ОГЛЯД ПРОЄКТУ {self.project.code}", prompts[0])
+        self.assertIn("[відкрито] ми: Поставка 500 шт у KW 46 (строк 13.11.2026)", prompts[0])
+        self.assertIn("клієнт: Чи можливе IP67?", prompts[0])
+        self.assertIn("не має суперечити нашим обіцянкам", prompts[0])
+        self.assertIn(f"огляд проєкту {self.project.code}", d["used"])
+        self.mail("Re: Anfrage Antennen", body="Und der Preis?", in_reply_to=self.question.message_id, sent=self.ago(0))
+        with patch("email_assistant.ai_helper._call_ai_direct", fake_ai):
+            d = self.client.get(f"/email/message/{self.question.pk}/ai-reply/").json()
+        self.assertIn(f"огляд проєкту {self.project.code} (застарів)", d["used"])
+        self.assertIn("після огляду були нові листи", prompts[1])
 
 
 class TriageTests(ProjectsBase):
