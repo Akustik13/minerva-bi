@@ -348,3 +348,51 @@ class AccountAdminTests(AccountTestCase):
         self.client.post(f"/admin/shop/shop/{self.shop.pk}/test-mail/")
         self.assertEqual(mail.outbox[-1].to, ["adm@example.com"])
         self.assertIn("Shop <shop@example.com>", mail.outbox[-1].from_email)
+
+
+class InviteTests(AccountTestCase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
+
+    def test_status_remembers_links(self):
+        self.c.get("/api/v1/shop/account/", {"link_de": LINK, "link_en": "https://evil.example.org/x"})
+        self.assertEqual(Shop.objects.get().account_links, {"de": LINK})
+
+    def test_admin_creates_account_and_invites(self):
+        Shop.objects.update(account_links={"de": LINK})
+        r = self.client.get("/admin/shop/shopcustomer/add/")
+        self.assertContains(r, "Надіслати запрошення")
+        self.assertContains(self.client.get("/admin/shop/shopcustomer/"), "Додати акаунт покупця")
+        r = self.client.post("/admin/shop/shopcustomer/add/", {
+            "shop": self.shop.pk, "email": " Kunde@Firma.DE ", "lang": "de", "send_invite": "on",
+            "company": "Firma GmbH", "name": "Kunde", "phone": "", "vat_id": "de 1", "street": "", "zip": "",
+            "city": "", "country": "de"})
+        self.assertEqual(r.status_code, 302, r.content[:2000])
+        c = ShopCustomer.objects.get()
+        self.assertEqual((c.email, c.country, c.is_verified, accounts.has_password(c)), ("kunde@firma.de", "DE", False, False))
+        self.assertIn("Kundenkonto", mail.outbox[-1].subject)
+        token = token_from(mail.outbox[-1], "reset")
+        # без пароля увійти не можна; посилання із запрошення задає пароль і підтверджує email
+        self.assertEqual(self.post("login/", {"email": "kunde@firma.de", "password": "anything-123"}).status_code, 401)
+        r = self.post("password/reset/", {"token": token, "password": "Mein-neues-Passwort-1"})
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertTrue(ShopCustomer.objects.get().is_verified)
+        # той самий email у тому ж магазині — помилка форми, не дубль
+        r = self.client.post("/admin/shop/shopcustomer/add/", {"shop": self.shop.pk, "email": "kunde@firma.de",
+                                                               "lang": "de", "company": "X", "name": "Y"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(ShopCustomer.objects.count(), 1)
+
+    def test_resend_for_invited_sends_invite(self):
+        Shop.objects.update(account_links={"de": LINK})
+        self.client.post("/admin/shop/shopcustomer/add/", {"shop": self.shop.pk, "email": "k@firma.de", "lang": "de",
+                                                           "company": "F", "name": "K"})
+        self.assertEqual(len(mail.outbox), 0)  # без галочки — без листа
+        c = ShopCustomer.objects.get()
+        self.client.post("/admin/shop/shopcustomer/", {"action": "action_resend_verify", "_selected_action": [c.pk]})
+        self.assertIn("#reset=", mail.outbox[-1].body)

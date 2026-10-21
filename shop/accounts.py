@@ -28,6 +28,7 @@ from .models import Shop, ShopCustomer, ShopCustomerSession, ShopCustomerToken, 
 
 VERIFY_TTL = timedelta(hours=48)
 RESET_TTL = timedelta(hours=1)
+INVITE_TTL = timedelta(days=7)              # акаунт створив менеджер: посилання «встановити пароль»
 SESSION_TTL = timedelta(hours=12)           # без «запам'ятати»: від останньої дії
 SESSION_TTL_REMEMBER = timedelta(days=30)
 SESSION_MAX_AGE = timedelta(days=90)        # абсолютний максимум сесії
@@ -193,11 +194,11 @@ def _mail(customer: ShopCustomer, kind: str, *, link: str = "", throttle: bool =
     return not error
 
 
-def _issue(customer: ShopCustomer, kind: str) -> str:
+def _issue(customer: ShopCustomer, kind: str, ttl: timedelta | None = None) -> str:
     """Нове посилання для листа; попередні такого типу перестають діяти."""
     customer.tokens.filter(kind=kind, used_at__isnull=True).update(used_at=timezone.now())
     raw, digest = _new_token()
-    ttl = VERIFY_TTL if kind == ShopCustomerToken.VERIFY else RESET_TTL
+    ttl = ttl or (VERIFY_TTL if kind == ShopCustomerToken.VERIFY else RESET_TTL)
     ShopCustomerToken.objects.create(customer=customer, kind=kind, token_hash=digest,
                                      expires_at=timezone.now() + ttl)
     return raw
@@ -221,6 +222,29 @@ def send_reset(customer: ShopCustomer, link: str, throttle: bool = True) -> bool
     raw = _issue(customer, ShopCustomerToken.RESET)
     return _mail(customer, ShopCustomerToken.RESET, link=_mail_link(link, "reset", raw), throttle=False,
                  minutes=int(RESET_TTL.total_seconds() // 60))
+
+
+def send_invite(customer: ShopCustomer, link: str) -> bool:
+    """Акаунт створив менеджер: лист з посиланням «встановити пароль» (7 днів). Встановлення пароля
+    підтверджує email (як скидання пароля) — пароль менеджер не задає і не бачить."""
+    raw = _issue(customer, ShopCustomerToken.RESET, ttl=INVITE_TTL)
+    return _mail(customer, "invite", link=_mail_link(link, "reset", raw), throttle=False,
+                 days=INVITE_TTL.days)
+
+
+def has_password(customer: ShopCustomer) -> bool:
+    from django.contrib.auth.hashers import is_password_usable
+    return bool(customer.password) and is_password_usable(customer.password)
+
+
+def remember_links(shop: Shop, links: dict) -> None:
+    """Сайт повідомляє адреси сторінки кабінету ({мова: адреса}) — для листів з адмінки."""
+    for lang, link in (links or {}).items():
+        if lang in ("de", "en") and link:
+            try:
+                check_link(shop, link, lang)
+            except AccountError:
+                pass
 
 
 def admin_link(customer: ShopCustomer) -> str:

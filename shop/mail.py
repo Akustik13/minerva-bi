@@ -129,6 +129,21 @@ TEXTS = {
                "addresses have been removed. We keep orders as required by statutory retention periods.",
                "", "You can create a new account at any time."),
     },
+    "invite": {
+        "de": ("Ihr Kundenkonto bei {shop}",
+               "für Sie wurde ein Kundenkonto im Online-Shop von {shop} angelegt. Legen Sie über den Link Ihr "
+               "Passwort fest – danach sehen Sie dort Ihre Bestellungen mit Status und Sendungsverfolgung, Ihre "
+               "Adressen und Ihren Warenkorb.",
+               "Passwort festlegen",
+               "Der Link ist {days} Tage gültig. Danach können Sie auf der Anmeldeseite jederzeit „Passwort "
+               "vergessen“ nutzen. Falls Sie kein Konto wünschen, ignorieren Sie diese E-Mail."),
+        "en": ("Your customer account at {shop}",
+               "a customer account has been created for you in the {shop} online shop. Use the link to set your "
+               "password – you will then see your orders with status and tracking, your addresses and your cart.",
+               "Set password",
+               "The link is valid for {days} days. After that you can use “Forgot password” on the sign-in page at "
+               "any time. If you do not want an account, please ignore this e-mail."),
+    },
     "test": {
         "de": ("Testnachricht – {shop}", "dies ist eine Testnachricht aus Minerva: Die E-Mails des "
                "Kundenkontos (Bestätigung, Passwort) werden über diesen Absender versendet.", "", ""),

@@ -4,7 +4,7 @@
 Сайт (PHP) — посередник: ключ API лише на сервері сайту, покупець отримує від сайту cookie (HttpOnly)
 з ключем сесії; сайт передає його в Minerva заголовком  X-Customer-Session.
 
-  GET  shop/account/                   {enabled, password_min_length}
+  GET  shop/account/?link_de=…&link_en=…  {enabled, password_min_length}; адреси кабінету запам'ятовуються
   POST shop/account/register/          {email, password, company, name, phone?, vat_id?, …, confirm_b2b, lang, link}
   POST shop/account/resend/            {email, link, lang}            — повторний лист підтвердження
   POST shop/account/verify/            {token, password, remember}    → сесія
@@ -89,6 +89,9 @@ class StatusView(AccountView):
                             status=status.HTTP_403_FORBIDDEN)
         from shop.services import shop_for_key
         shop = shop_for_key(key)
+        if shop is not None and shop.accounts_enabled:  # сайт повідомляє адреси кабінету (для листів з адмінки)
+            accounts.remember_links(shop, {"de": request.query_params.get("link_de", ""),
+                                           "en": request.query_params.get("link_en", "")})
         return Response({"enabled": bool(shop and shop.accounts_enabled),
                          "password_min_length": accounts.MIN_PASSWORD})
 

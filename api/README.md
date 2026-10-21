@@ -595,7 +595,7 @@ app.listen(3000);
 
 | Запит | Що робить |
 |---|---|
-| `GET shop/account/` | `{enabled, password_min_length}` — чи ввімкнено кабінет (сайт показує / ховає вхід) |
+| `GET shop/account/?link_de=…&link_en=…` | `{enabled, password_min_length}` — чи ввімкнено кабінет (сайт показує / ховає вхід); адреси сторінки кабінету запам'ятовуються для листів з адмінки |
 | `POST shop/account/register/` | `{email, password, company, name, phone?, vat_id?, street?, zip?, city?, country?, confirm_b2b, lang, link}` → **202** завжди однаково; лист з `link#verify=<token>` (48 год). На вже підтверджений email — лист «у вас уже є акаунт», пароль не змінюється. Непідтверджену реєстрацію перезаписує нова |
 | `POST shop/account/resend/` | `{email, link, lang}` → 202 (повторний лист, не частіше 1/хв) |
 | `POST shop/account/verify/` | `{token, password, remember}` → сесія. **Пароль обов'язковий** — посилання з листа без пароля не дає входу |
@@ -608,6 +608,8 @@ app.listen(3000);
 | `GET shop/account/me/orders/` | `{count, results[{number, kind: order\|quote, date, status, payment_method, payment_status, currency, net, shipping, vat_rate, vat, gross, items, tracking[{carrier, number, url, status}]}]}` |
 | `GET shop/account/me/orders/{number}/` | + `lines[{sku, name, name_en, qty, unit_price, total}]`, `shipping_address`, `billing`, `dates{received, shipped, delivered}`, `offer` (надісланий Angebot для запиту) |
 | `GET / PUT shop/account/me/cart/` | `{items: {sku: qty}}` (ключі `rq:<артикул>` — запит ціни), до 100 позицій |
+
+Акаунт може створити й менеджер (адмінка «➕ Додати»): без пароля, лист-запрошення з `link#reset=<token>` (7 днів, `accounts.send_invite`); встановлення пароля підтверджує email.
 
 Сесія: без «запам'ятати» — 12 год від останньої дії, з ним — 30 днів (максимум 90). Помилки: `{detail, code, fields?, problems?}`; коди пароля: `password_too_short / numeric / common / like_email`. Акаунти одного магазину не бачать інший магазин.
 

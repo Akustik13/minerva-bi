@@ -1,11 +1,60 @@
 """Адмінка особистого кабінету покупців: акаунти, їхні замовлення, листи (логіка — shop/accounts.py)."""
+from django import forms
 from django.contrib import admin, messages
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
 from . import accounts
-from .models import ShopCustomer
+from .models import Shop, ShopCustomer
+
+
+def account_status(shop: Shop) -> dict:
+    """Готовність кабінету магазину: увімкнено, ключі без прав, відправник листів, сторінка кабінету."""
+    from . import services
+    from .mail import describe_sender
+    keys = [k for k, m in services.keys_for_shop(shop) if m != services.KEY_DEFAULT]
+    return {
+        "shop": shop, "enabled": shop.accounts_enabled,
+        "keys": [k.name for k in keys],
+        "missing": [k.name for k in keys if not {"accounts:read", "accounts:write"} <= set(k.scopes or [])],
+        "sender": describe_sender(shop),
+        "links": shop.account_links or {},
+        "url": reverse("admin:shop_shop_change", args=[shop.pk]),
+    }
+
+
+class ShopCustomerAddForm(forms.ModelForm):
+    """Акаунт створює менеджер: без пароля — покупець задає його сам за посиланням із запрошення."""
+    send_invite = forms.BooleanField(
+        label="Надіслати запрошення", required=False, initial=True,
+        help_text="Лист покупцю з посиланням «Passwort festlegen» (діє 7 днів). Пароль задає сам покупець; "
+                  "після цього email вважається підтвердженим і попередні замовлення з цією адресою з'являться в кабінеті.")
+
+    class Meta:
+        model = ShopCustomer
+        fields = ["shop", "email", "lang", "company", "name", "phone", "vat_id", "street", "zip", "city", "country"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["shop"].queryset = Shop.objects.filter(is_active=True)
+        default = Shop.objects.filter(is_active=True).order_by("-is_default", "name").first()
+        if default and not self.initial.get("shop"):
+            self.initial["shop"] = default.pk
+        for name in ("company", "name"):
+            self.fields[name].required = True
+
+    def clean_email(self):
+        return accounts.normalize_email(self.cleaned_data.get("email"))
+
+    def clean_country(self):
+        value = (self.cleaned_data.get("country") or "").strip().upper()
+        if value and len(value) != 2:
+            raise forms.ValidationError("Код країни ISO з 2 літер, напр. DE.")
+        return value
+
+    def clean_vat_id(self):
+        return (self.cleaned_data.get("vat_id") or "").upper().replace(" ", "")
 
 
 class VerifiedFilter(admin.SimpleListFilter):
@@ -39,8 +88,8 @@ class ShopCustomerAdmin(admin.ModelAdmin):
     readonly_fields = ["state_col", "email_verified_at", "last_login_at", "created_at", "updated_at",
                        "failed_logins", "locked_until", "sessions_col", "last_mail_at", "last_mail_error",
                        "cart_col", "orders_list"]
-    actions = ["action_send_reset", "action_resend_verify", "action_unlock", "action_logout_all",
-               "action_disable", "action_enable"]
+    actions = ["action_send_reset", "action_send_invite", "action_resend_verify", "action_unlock",
+               "action_logout_all", "action_disable", "action_enable"]
     fieldsets = [
         ("Акаунт", {"fields": ["shop", "email", "state_col", "is_active", "email_verified_at", "lang",
                                "crm_customer"],
@@ -55,8 +104,26 @@ class ShopCustomerAdmin(admin.ModelAdmin):
                                         "last_mail_at", "last_mail_error", "created_at", "updated_at"]}),
     ]
 
-    def has_add_permission(self, request):
-        return False  # акаунт створює покупець на сайті (з підтвердженням email)
+    add_fieldsets = [
+        (None, {"fields": ["shop", "email", "lang", "send_invite"],
+                "description": "Зазвичай акаунт створює сам покупець на сайті. Тут можна створити його за покупця "
+                               "(напр. для постійного клієнта): він отримає лист-запрошення і сам задасть пароль."}),
+        ("Дані покупця", {"fields": ["company", "name", "phone", "vat_id", "street", "zip", "city", "country"]}),
+    ]
+
+    def get_fieldsets(self, request, obj=None):
+        return self.add_fieldsets if obj is None else super().get_fieldsets(request, obj)
+
+    def get_form(self, request, obj=None, **kwargs):
+        if obj is None:
+            kwargs["form"] = ShopCustomerAddForm
+        return super().get_form(request, obj, **kwargs)
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["accounts_info"] = [account_status(s) for s in Shop.objects.filter(is_active=True)
+                                          .order_by("-is_default", "name")]
+        return super().changelist_view(request, extra_context)
 
     def get_queryset(self, request):
         from django.db.models import Count
@@ -120,10 +187,24 @@ class ShopCustomerAdmin(admin.ModelAdmin):
     def _link_or_warn(self, request, customer):
         link = accounts.admin_link(customer)
         if not link:
-            self.message_user(request, f"{customer.email}: сайт ще не повідомив адресу сторінки кабінету — "
-                                       "лист можна надіслати після першого звернення сайту (реєстрація / вхід).",
+            self.message_user(request, f"{customer.email}: сайт ще не повідомив адресу сторінки кабінету. Відкрийте "
+                                       "будь-яку сторінку магазину на сайті (кабінет у магазині має бути ввімкнено) — "
+                                       "адреса підтягнеться протягом хвилини — і повторіть дію «✉️ Надіслати запрошення».",
                               messages.WARNING)
         return link
+
+    @admin.action(description="✉️ Надіслати запрошення (встановити пароль, 7 днів)")
+    def action_send_invite(self, request, queryset):
+        sent = 0
+        for c in queryset.select_related("shop"):
+            link = self._link_or_warn(request, c)
+            if link and accounts.send_invite(c, link):
+                sent += 1
+            elif link:
+                self.message_user(request, f"{c.email}: лист не надіслано — {c.last_mail_error or 'див. журнал'}",
+                                  messages.ERROR)
+        if sent:
+            self.message_user(request, f"Надіслано запрошень: {sent}. Посилання діє 7 днів.")
 
     @admin.action(description="✉️ Надіслати посилання для нового пароля")
     def action_send_reset(self, request, queryset):
@@ -143,9 +224,14 @@ class ShopCustomerAdmin(admin.ModelAdmin):
         sent = 0
         for c in queryset.select_related("shop").filter(email_verified_at__isnull=True):
             link = self._link_or_warn(request, c)
-            if link and accounts.send_verification(c, link, throttle=False):
-                sent += 1
-        self.message_user(request, f"Надіслано листів підтвердження: {sent} (підтверджені акаунти пропущено).")
+            if not link:
+                continue
+            # акаунт створив менеджер (пароля ще немає): підтвердження з паролем неможливе — запрошення
+            ok = (accounts.send_verification(c, link, throttle=False) if accounts.has_password(c)
+                  else accounts.send_invite(c, link))
+            sent += bool(ok)
+        self.message_user(request, f"Надіслано листів підтвердження / запрошень: {sent} "
+                                   "(підтверджені акаунти пропущено).")
 
     @admin.action(description="🔓 Зняти блокування входу")
     def action_unlock(self, request, queryset):
@@ -171,6 +257,16 @@ class ShopCustomerAdmin(admin.ModelAdmin):
         self.message_user(request, f"Увімкнено: {n}.")
 
     def save_model(self, request, obj, form, change):
+        if not change:
+            from django.contrib.auth.hashers import make_password
+            obj.password = make_password(None)  # без пароля: покупець задає його сам за посиланням
         super().save_model(request, obj, form, change)
         if change and "is_active" in form.changed_data and not obj.is_active:
             obj.sessions.all().delete()
+        if not change and form.cleaned_data.get("send_invite"):
+            link = self._link_or_warn(request, obj)
+            if link and accounts.send_invite(obj, link):
+                self.message_user(request, f"Запрошення надіслано на {obj.email} (посилання діє 7 днів).")
+            elif link:
+                self.message_user(request, f"Акаунт створено, але лист не надіслано: {obj.last_mail_error}",
+                                  messages.ERROR)

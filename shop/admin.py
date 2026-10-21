@@ -221,12 +221,11 @@ class ShopAdmin(admin.ModelAdmin):
     def accounts_tools(self, obj):
         if not obj or not obj.pk:
             return "Спершу збережіть магазин."
-        from .mail import describe_sender
+        from .admin_accounts import account_status
+        st = account_status(obj)
         n = obj.customers.count()
         pending = obj.customers.filter(email_verified_at__isnull=True).count()
-        keys = [k for k, m in services.keys_for_shop(obj) if m != services.KEY_DEFAULT]
-        no_scope = [k.name for k in keys if not {"accounts:read", "accounts:write"} <= set(k.scopes or [])]
-        links = obj.account_links or {}
+        no_scope, links = st["missing"], st["links"]
         return format_html(
             '<div><a href="{}">Акаунтів: {}</a>{}</div>'
             '<div style="margin-top:4px">Листи: {}</div>'
@@ -237,7 +236,7 @@ class ShopAdmin(admin.ModelAdmin):
             '<span class="help">на email вашого користувача · незбережені зміни на сторінці не зберігаються</span></div>',
             reverse("admin:shop_shopcustomer_changelist") + f"?shop__id__exact={obj.pk}", n,
             f" · очікують підтвердження: {pending}" if pending else "",
-            describe_sender(obj),
+            st["sender"],
             format_html_join(" · ", '<a href="{}" target="_blank" rel="noopener">{}</a>',
                              ((u, lang) for lang, u in links.items())) if links
             else "ще невідома (заповниться з першого запиту сайту)",
