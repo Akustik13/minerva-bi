@@ -1,0 +1,19 @@
+{% extends "admin/change_list.html" %}
+{% block search %}
+<div class="module" style="padding:10px 14px;margin:0 0 12px;border-left:4px solid var(--accent, #79aec8)">
+  <p style="margin:0 0 6px">Акаунти створюють <b>покупці на сайті</b> (реєстрація з підтвердженням email) — вони з'являються тут автоматично.
+    Можна створити й за покупця: <a href="{% url 'admin:shop_shopcustomer_add' %}">➕ Додати акаунт покупця</a> — він отримає лист-запрошення і сам задасть пароль.
+    Дані покупця редагуються в картці акаунта (клік по email).</p>
+  {% for s in accounts_info %}
+  <div style="margin-top:4px">🏬 <b>{{ s.shop.name }}</b>:
+    {% if s.enabled %}<span style="color:#81c784">кабінет увімкнено</span>{% else %}<span style="color:#ffb74d">кабінет вимкнено</span> — <a href="{{ s.url }}">увімкнути в картці магазину</a>{% endif %}
+    · листи: {{ s.sender }}
+    {% if s.missing %}· <span style="color:#ffb74d">⚠ ключам без прав «Акаунти покупців»: {{ s.missing|join:", " }}</span>{% endif %}
+    {% if not s.keys %}· <span style="color:#ffb74d">⚠ немає ключа API сайту, прив'язаного до магазину</span>{% endif %}
+    {% if s.enabled and not s.links %}· сторінка кабінету ще невідома (відкрийте магазин на сайті){% endif %}
+    {% if s.link_error %}<div style="color:#ff8a80;margin-top:2px">⚠ {{ s.link_error }} <a href="{{ s.url }}">Відкрити магазин →</a></div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{{ block.super }}
+{% endblock %}

@@ -43,6 +43,13 @@ class ScheduledEmailComposeForm(forms.ModelForm):
     cc_raw = forms.CharField(
         required=False, label='CC',
         widget=forms.TextInput(attrs={'autocomplete': 'off', 'id': 'se-cc'}))
+    # Явне поле: інакше адмінка підставляє розділене «дата + час», а шаблон шле одне значення datetime-local
+    scheduled_at = forms.DateTimeField(
+        label='Час відправки',
+        input_formats=['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S',
+                       '%d.%m.%Y %H:%M'],
+        widget=forms.DateTimeInput(format='%Y-%m-%dT%H:%M',
+                                   attrs={'type': 'datetime-local', 'id': 'se-scheduled-at'}))
 
     class Meta:
         model = ScheduledEmail
@@ -579,6 +586,8 @@ class ScheduledEmailAdmin(admin.ModelAdmin):
         if not change:
             obj.status  = ScheduledEmail.STATUS_PENDING
             obj.trigger = 'manual'
+        if obj.status == ScheduledEmail.STATUS_PENDING:
+            obj.sent_at = None   # знову в черзі — зняти бронь send_scheduled
         super().save_model(request, obj, form, change)
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):

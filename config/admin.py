@@ -1372,6 +1372,7 @@ class BriefingSettingsAdmin(admin.ModelAdmin):
                 "include_orders", "include_revenue",
                 "include_overdue", "include_reminders",
                 "include_stock_alerts", "include_new_emails",
+                "include_projects",
             ),
             "description": "AI може включати додаткову важливу інформацію на свій розсуд.",
         }),

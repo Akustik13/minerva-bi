@@ -125,15 +125,20 @@ class Command(BaseCommand):
 
         data_section = '\n'.join(data_lines) if data_lines else '— немає даних —'
 
+        projects = self._projects_text(profile.user) if bs.include_projects else ''
+        projects_prompt = (f"\n\nПРОЄКТИ, ЩО ПОТРЕБУЮТЬ УВАГИ (відповідальний — цей користувач):\n{projects}"
+                           if projects else '')
+
         prompt = (
             f"Зроби короткий ранковий брифінг для "
             f"{profile.user.get_full_name() or profile.user.username}.\n\n"
             f"Дані системи:\n{data_section}"
-            f"{reminder_text}\n\n"
+            f"{reminder_text}{projects_prompt}\n\n"
             "Напиши брифінг для Telegram:\n"
             "- Максимум 5-7 рядків\n"
             "- Ключові цифри дня\n"
-            "- 1-2 конкретні дії які треба зробити сьогодні\n"
+            "- 1-2 конкретні дії які треба зробити сьогодні"
+            + (" (насамперед — найтерміновіше з проєктів)" if projects else "") + "\n"
             "- Легкий тон, але по ділу\n"
             "- Без зайвих слів"
         )
@@ -141,7 +146,19 @@ class Command(BaseCommand):
         if bs.custom_instructions:
             prompt += f"\n\nДодаткові інструкції: {bs.custom_instructions}"
 
-        return chat(prompt, profile=profile, channel='system_briefing')
+        text = chat(prompt, profile=profile, channel='system_briefing')
+        if projects:   # повний список — під текстом AI, щоб нічого не загубилось
+            from html import escape
+            text = (text or '').rstrip() + '\n\n📁 <b>Потребує уваги</b>\n' + escape(projects)
+        return text
+
+    def _projects_text(self, user) -> str:
+        try:
+            from projects.overview import digest_text
+            return digest_text(user)
+        except Exception as e:  # noqa: BLE001 — брифінг не має ламатися через проєкти
+            logger.warning('briefing projects for %s: %s', user, e)
+            return ''
 
     def _send_telegram(self, chat_id: int, text: str):
         import requests

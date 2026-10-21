@@ -150,6 +150,37 @@ class Offer(models.Model):
         return f"{prefix}{(max(numbers) if numbers else 0) + 1:03d}"
 
 
+class QuoteRequest(models.Model):
+    """Лист, схожий на запит пропозиції (offers/detection.py) — підказка «📝 запит» у пошті."""
+    NEW, DONE, DISMISSED = "new", "done", "dismissed"
+    STATUS_CHOICES = [(NEW, "📝 Новий запит"), (DONE, "✅ Angebot створено"), (DISMISSED, "✕ Не запит")]
+
+    message = models.OneToOneField("email_assistant.EmailMessage", on_delete=models.CASCADE,
+                                   related_name="quote_request", verbose_name="Лист")
+    thread = models.ForeignKey("email_assistant.EmailThread", null=True, blank=True, on_delete=models.CASCADE,
+                               related_name="quote_requests", verbose_name="Гілка")
+    reason = models.CharField("Підстава", max_length=255, blank=True, default="")
+    items = models.JSONField("Позиції з листа", default=list, blank=True)
+    status = models.CharField("Статус", max_length=10, choices=STATUS_CHOICES, default=NEW, db_index=True)
+    offer = models.ForeignKey("Offer", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                              verbose_name="Angebot")
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+    created_at = models.DateTimeField("Знайдено", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Запит пропозиції з пошти"
+        verbose_name_plural = "📝 Запити пропозицій з пошти"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_status_display()}: {self.message.subject or '(без теми)'}"
+
+    @property
+    def items_label(self) -> str:
+        return ", ".join(f"{i['sku']} × {i['qty']}" if i.get("qty") else i["sku"] for i in self.items[:6])
+
+
 class OfferLine(models.Model):
     SHOP, SALE_PRICE, BASE, MANUAL, QUOTE = "shop", "sale_price", "base", "manual", "quote"
     PRICE_SOURCES = [(SHOP, "магазин"), (SALE_PRICE, "ціна продажу"), (BASE, "базова ціна × курс"),

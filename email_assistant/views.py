@@ -258,6 +258,20 @@ def _attach_project_tags(emails):
         m.project_tags = tags.get(m.thread_id, [])
 
 
+def _attach_quote_tags(emails):
+    """📝 мітка в рядку: лист схожий на запит пропозиції (offers/detection.py), рішення ще немає."""
+    from offers.detection import tags_for_messages
+    tagged = tags_for_messages([m.pk for m in emails])
+    for m in emails:
+        m.quote_request_tag = m.pk in tagged
+
+
+def _quote_messages(account):
+    """Листи скриньки з відкритим запитом пропозиції — для фільтра «📝 Запити пропозицій»."""
+    from offers.models import QuoteRequest
+    return QuoteRequest.objects.filter(status=QuoteRequest.NEW, message__account=account).values('message_id')
+
+
 def _category_counts(qs):
     """[(ключ, назва, листів, непрочитаних)] і клієнти з листами — для меню фільтра (усі папки)."""
     from django.db.models import Count, Q
@@ -341,7 +355,7 @@ def _attach_thread_stats(emails):
             m.thread_pks = ','.join(map(str, pks[m.thread_id]))
 
 
-def _filter_qs(cat, customer, project=None) -> str:
+def _filter_qs(cat, customer, project=None, quote=False) -> str:
     from urllib.parse import urlencode
     params = {}
     if cat:
@@ -350,6 +364,8 @@ def _filter_qs(cat, customer, project=None) -> str:
         params['customer'] = customer.pk
     if project:
         params['project'] = project.pk
+    if quote:
+        params['quote'] = 1
     return ('&' + urlencode(params)) if params else ''
 
 
@@ -383,8 +399,10 @@ def inbox_view(request):
 
     cat_filter, customer_filter = _parse_mail_filter(request)
     project_filter = _parse_project_filter(request)
-    # Пошук і фільтри «Категорія / Клієнт / Проєкт» діють по всіх папках (у Спамі й Кошику — лише в них)
-    search_all = bool(q or cat_filter or customer_filter or project_filter) and folder not in ('spam', 'trash')
+    quote_filter = request.GET.get('quote') == '1'
+    # Пошук і фільтри «Категорія / Клієнт / Проєкт / Запити» діють по всіх папках (у Спамі й Кошику — лише в них)
+    search_all = bool(q or cat_filter or customer_filter or project_filter or quote_filter) \
+        and folder not in ('spam', 'trash')
     qs = _build_qs(account, ALL_FOLDERS if search_all else folder, q)
     counts_qs = qs if folder in ('spam', 'trash') else _build_qs(account, ALL_FOLDERS, q)
     categories, mail_customers = _category_counts(counts_qs)
@@ -398,6 +416,8 @@ def inbox_view(request):
     if project_filter:
         from projects.services import project_messages
         qs = qs.filter(pk__in=project_messages(project_filter).values('pk'))
+    if quote_filter:
+        qs = qs.filter(pk__in=_quote_messages(account))
     # «Групувати по гілці» (⎘, cookie): один рядок на гілку — її найновіший лист у цьому списку
     grouped = request.COOKIES.get('em_group') == '1'
     if grouped:
@@ -411,6 +431,7 @@ def inbox_view(request):
     _attach_crm_customers(emails)
     _attach_contacts(emails)
     _attach_project_tags(emails)
+    _attach_quote_tags(emails)
     if search_all:
         _attach_folder_tags(account, emails)
 
@@ -443,9 +464,11 @@ def inbox_view(request):
         'customer_filter':       customer_filter,
         'project_filter':        project_filter,
         'open_projects':         _open_projects(),
+        'quote_filter':          quote_filter,
+        'quote_count':           _quote_messages(account).count(),
         'categories':            categories,
         'mail_customers':        mail_customers,
-        'filter_qs':             _filter_qs(cat_filter, customer_filter, project_filter),
+        'filter_qs':             _filter_qs(cat_filter, customer_filter, project_filter, quote_filter),
         'grouped':               grouped,
         'category_choices':      EmailMessage.CATEGORY_CHOICES,
         'search_all':            search_all,
@@ -535,6 +558,7 @@ def thread_preview_view(request, thread_pk):
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
         'projects_state':  _projects_state(thread),
+        'quote_request':   _quote_request(thread),
         'links':           links,
         'attach_options':  _attach_options(emails, links),
         'reply_to_addr':   reply_to_addr,
@@ -572,6 +596,16 @@ def message_preview_view(request, message_pk):
         'last_msg':        msg,
         'reply_signature': _get_signature(account),
     }))
+
+
+def _quote_request(thread):
+    """Відкритий запит пропозиції гілки — підказка «📝 Схоже на запит пропозиції» в прев'ю."""
+    try:
+        from offers.detection import for_thread
+        return for_thread(thread)
+    except Exception as e:  # noqa: BLE001
+        logger.warning('quote request: %s', e)
+        return None
 
 
 def _projects_state(thread) -> str:

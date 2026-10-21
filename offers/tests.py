@@ -235,6 +235,103 @@ class FromMailAndQuoteTests(OffersBase):
         self.assertEqual((rev.sent_message_id, offer.status), ("<offer-mail@sevskiy.de>", Offer.SENT))
 
 
+class QuoteRequestTests(OffersBase):
+    """Запити пропозиції в пошті: розпізнавання, підказка в прев'ю, мітка й фільтр у списку, рішення людини."""
+
+    def setUp(self):
+        super().setUp()
+        from inventory.models import Supplier
+        self.account = EmailAccount.objects.create(
+            user=self.user, email_address=ME, imap_username=ME, imap_password="x",
+            smtp_username=ME, smtp_password="x", imap_folder_inbox="INBOX", imap_folder_sent="Sent")
+        es = EmailSettings.get_for_user(self.user)
+        es.deadline_detection = es.telegram_notify_new = es.mark_read_on_server = False
+        es.save()
+        Supplier.objects.create(name="Parts Ltd", email="sales@parts.example")
+        self._uid = 0
+
+    def mail(self, subject, body, frm="buyer@client.example", folder="INBOX", to=(ME,), in_reply_to=""):
+        self._uid += 1
+        return save_message(self.account, {
+            "uid": self._uid, "message_id": f"<qr{self._uid}@x.example>", "in_reply_to": in_reply_to,
+            "references": [in_reply_to] if in_reply_to else [], "subject": subject, "from_email": frm,
+            "from_name": "", "to_emails": list(to), "cc_emails": [], "body_text": body, "body_html": "",
+            "attachments": [], "is_read": False, "sent_at": datetime(2026, 10, 1, 9, self._uid, tzinfo=dt_tz.utc)},
+            folder)
+
+    def qr(self, msg):
+        from offers.models import QuoteRequest
+        return QuoteRequest.objects.filter(message=msg).first()
+
+    def test_requests_in_several_languages(self):
+        de = self.mail("Anfrage Antennen", "Guten Tag,\nbitte senden Sie uns Ihr Angebot für 500 Stück ANT-100.")
+        en = self.mail("Inquiry", "Hello, could you please send us a quotation for CAB-7 x 20?", frm="ops@newco.example")
+        uk = self.mail("Запит", "Просимо надіслати комерційну пропозицію на 50 шт ANT-100", frm="zakup@firma.example")
+        price = self.mail("Frage", "Was kostet 200 Stk CAB-7?", frm="info@shop.example")
+        for m in (de, en, uk, price):
+            self.assertIsNotNone(self.qr(m), m.subject)
+        self.assertEqual(self.qr(de).items, [{"product_id": self.ant.pk, "sku": "ANT-100", "qty": "500"}])
+        self.assertIn("позиції: ANT-100 × 500", self.qr(de).reason)
+        self.assertIn("артикули з кількістю й питання про ціну", self.qr(price).reason)
+
+    def test_not_requests(self):
+        thanks = self.mail("Re: Angebot", "Vielen Dank für Ihr Angebot, wir bestellen 500 Stück ANT-100.")
+        supplier = self.mail("Unser Angebot", "Bitte beachten Sie unser Angebot für CAB-7.", frm="sales@parts.example")
+        own = self.mail("Angebot A-2026-001", "Bitte finden Sie anbei unser Angebot.", frm=ME, folder="Sent",
+                        to=("buyer@client.example",))
+        news = save_message(self.account, {
+            "uid": 900, "message_id": "<news@x.example>", "in_reply_to": "", "references": [], "subject": "Deals",
+            "from_email": "news@shop.example", "from_name": "", "to_emails": [ME], "cc_emails": [],
+            "body_text": "Request for quotation? Please quote us!", "body_html": "", "attachments": [],
+            "is_read": False, "list_unsubscribe": True, "sent_at": datetime(2026, 10, 1, 8, 0, tzinfo=dt_tz.utc)},
+            "INBOX")
+        quoted = self.mail("Re: Anfrage", "Ok, passt so.\n\nAm 30.09.2026 schrieb Vertrieb:\n> Bitte Angebot für 500 Stück")
+        chat = self.mail("Hallo", "Wie geht es Ihnen? Bis bald.")
+        for m in (thanks, supplier, own, news, quoted, chat):
+            self.assertIsNone(self.qr(m), m.subject)
+        first = self.mail("Anfrage CAB", "Bitte Angebot für CAB-7 x 10")
+        services.create_from_thread(first.thread, self.user)
+        follow = self.mail("Re: Anfrage CAB", "Bitte auch ein Angebot für ANT-100", in_reply_to=first.message_id)
+        self.assertEqual(follow.thread_id, first.thread_id)
+        self.assertIsNone(self.qr(follow))                    # Angebot по гілці вже є — це переговори
+
+    def test_preview_hint_list_tag_filter_and_dismiss(self):
+        req = self.mail("Anfrage Antennen", "Bitte um ein Angebot für 500 Stück ANT-100")
+        other = self.mail("Hallo", "Nur eine Info.")
+        pv = self.client.get(f"/email/thread/{req.thread_id}/preview/")
+        self.assertContains(pv, "Схоже на запит пропозиції")
+        self.assertContains(pv, f"pvQuoteDismiss({self.qr(req).pk})")
+        inbox = self.client.get("/email/")
+        self.assertContains(inbox, "em-tag quote")
+        only = self.client.get("/email/", {"quote": 1})
+        self.assertContains(only, f'id="row-{req.pk}"')
+        self.assertNotContains(only, f'id="row-{other.pk}"')
+        r = self.client.post(f"/offers/api/quote-request/{self.qr(req).pk}/dismiss/")
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(self.qr(req).status, "dismissed")
+        self.assertNotContains(self.client.get(f"/email/thread/{req.thread_id}/preview/"), "Схоже на запит пропозиції")
+        self.assertNotContains(self.client.get("/email/", {"quote": 1}), f'id="row-{req.pk}"')
+        from offers.detection import scan
+        self.assertEqual(scan(req).status, "dismissed")       # рішення людини автоматика не перебиває
+        stranger = User.objects.create_user("bob", "b@x.y", "p", is_staff=True)
+        self.client.force_login(stranger)
+        self.assertEqual(self.client.post(f"/offers/api/quote-request/{self.qr(req).pk}/dismiss/").status_code, 404)
+
+    def test_angebot_from_thread_closes_request_and_backfill(self):
+        from django.core.management import call_command
+        from offers.models import QuoteRequest
+        req = self.mail("Anfrage", "Please quote 500 pcs ANT-100")
+        d = self.client.post(f"/offers/api/from-thread/{req.thread_id}/").json()
+        self.assertEqual((self.qr(req).status, self.qr(req).offer_id), ("done", d["id"]))
+        late = self.mail("RFQ", "RFQ: CAB-7 x 30", frm="ops@other.example")
+        QuoteRequest.objects.filter(message=late).delete()     # як лист до появи розпізнавання
+        out = io.StringIO()
+        with patch("offers.detection.timezone.now", return_value=datetime(2026, 10, 15, tzinfo=dt_tz.utc)):
+            call_command("detect_quote_requests", "--days", "30", stdout=out)
+        self.assertIn("Знайдено запитів пропозиції: 1", out.getvalue())
+        self.assertEqual(self.qr(late).status, "new")
+
+
 class AdminTests(OffersBase):
     def test_add_with_inline_fills_catalog_price(self):
         from projects.models import Project

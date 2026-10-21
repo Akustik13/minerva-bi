@@ -1,0 +1,124 @@
+<div class="pov" id="overview">
+<style>
+  .pov { max-width: 980px; }
+  .pov ul { margin: 4px 0 8px !important; padding-left: 0 !important; }   /* адмінка зсуває ul у .aligned */
+  .pov li { list-style: none; padding: 3px 0; }
+  .pov-att { border-left: 3px solid var(--message-warning-bg, #ffc); padding: 4px 10px; margin-bottom: 8px; }
+  .pov-high { color: var(--error-fg, #ba2121); font-weight: 600; }
+  .pov-high a { color: inherit; }
+  .pov-info { color: var(--body-quiet-color, #666); }
+  .pov-ok { color: var(--body-quiet-color, #666); margin-bottom: 8px; }
+  .pov-counts { color: var(--body-quiet-color, #666); font-size: 12px; margin-bottom: 10px; }
+  .pov-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
+  .pov-meta { color: var(--body-quiet-color, #666); font-size: 12px; }
+  .pov-stale { background: var(--message-warning-bg, #ffc); padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+  .pov-status { font-size: 12px; }
+  .pov h4 { margin: 12px 0 2px; font-size: 13px; }
+  .pov-sub { color: var(--body-quiet-color, #666); font-size: 12px; }
+  .pov-ref { font-size: 12px; white-space: nowrap; }
+  .pov-next { border: 1px solid var(--hairline-color, #ddd); border-radius: 4px; padding: 8px 10px; margin-top: 10px; }
+</style>
+
+{% if attention %}
+  <div class="pov-att">
+    <b>⚠️ Потребує уваги</b>
+    <ul>
+      {% for a in attention %}
+        <li class="pov-{{ a.level }}">{{ a.icon }}
+          {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% else %}
+  <div class="pov-ok">✅ Нічого термінового</div>
+{% endif %}
+<div class="pov-counts">📥 отримано {{ counts.in }} · 📤 надіслано {{ counts.out }} · гілок {{ counts.threads }}
+  · Angebote {{ counts.offers }} · замовлень {{ counts.orders }}</div>
+
+<div class="pov-head">
+  <b>🧭 Огляд (AI)</b>
+  {% if ov %}
+    <span class="pov-meta">складено {{ ov.created_at|date:"d.m.Y H:i" }}{% if ov.model %} · {{ ov.model }}{% endif %}
+      · листів {{ ov.messages_count }}</span>
+    {% if stale %}<span class="pov-stale">після огляду були зміни — оновіть</span>{% endif %}
+  {% endif %}
+  <button type="button" class="button" data-pov-post="{{ generate_url }}"
+          data-wait="AI читає листи проєкту… (до хвилини)">{% if ov %}🔄 Оновити огляд{% else %}🧭 Скласти огляд{% endif %}</button>
+  <span class="pov-status"></span>
+</div>
+
+{% if ov %}
+  {% if d.summary %}<p>{{ d.summary }}</p>{% endif %}
+
+  <h4>🤝 Обіцянки</h4>
+  {% if d.promises %}<ul>
+    {% for p in d.promises %}
+      <li>{{ p.status_icon }} <b>{{ p.status_label }}</b> · {% if p.who %}{{ p.who }}: {% endif %}{{ p.text }}
+        {% if p.date_fmt %}<span class="pov-sub">· {{ p.date_fmt }}</span>{% endif %}
+        {% if p.ref.url %}<a class="pov-ref" href="{{ p.ref.url }}" target="_blank">{{ p.ref.label }} ↗</a>{% endif %}
+        {% if p.evidence %}<div class="pov-sub">{{ p.evidence }}</div>{% endif %}</li>
+    {% endfor %}</ul>
+  {% else %}<div class="pov-sub">не знайдено</div>{% endif %}
+
+  <h4>✅ Виконано</h4>
+  {% if d.done %}<ul>
+    {% for x in d.done %}
+      <li>{{ x.text }}{% if x.date_fmt %} <span class="pov-sub">· {{ x.date_fmt }}</span>{% endif %}
+        {% if x.ref.url %}<a class="pov-ref" href="{{ x.ref.url }}" target="_blank">{{ x.ref.label }} ↗</a>{% endif %}</li>
+    {% endfor %}</ul>
+  {% else %}<div class="pov-sub">—</div>{% endif %}
+
+  <h4>❓ Відкриті питання</h4>
+  {% if d.open_questions %}<ul>
+    {% for q in d.open_questions %}
+      <li>{% if q.who %}<span class="pov-sub">{{ q.who }}:</span> {% endif %}{{ q.text }}
+        {% if q.date_fmt %}<span class="pov-sub">· {{ q.date_fmt }}</span>{% endif %}
+        {% if q.ref.url %}<a class="pov-ref" href="{{ q.ref.url }}" target="_blank">{{ q.ref.label }} ↗</a>{% endif %}</li>
+    {% endfor %}</ul>
+  {% else %}<div class="pov-sub">немає</div>{% endif %}
+
+  {% if d.next_action %}
+    <div class="pov-next">➡️ <b>Наступна дія:</b> {{ d.next_action.text }}
+      {% if d.next_action.due_fmt %}<b>до {{ d.next_action.due_fmt }}</b>{% endif %}
+      {% if d.next_action.why %}<div class="pov-sub">{{ d.next_action.why }}</div>{% endif %}
+      <div style="margin-top:6px"><button type="button" class="button" data-pov-post="{{ next_action_url }}"
+              data-wait="Записую…">Записати в поле «Наступна дія»</button></div>
+    </div>
+  {% endif %}
+  <div class="pov-sub" style="margin-top:8px">AI складає огляд лише з листів і даних Minerva; перевіряйте за посиланнями ↗.</div>
+{% else %}
+  <div class="pov-sub">AI прочитає листи проєкту, Angebote, замовлення й терміни і складе: обіцянки (наші, клієнта,
+    постачальника) зі статусом, що виконано, відкриті питання й наступну дію — кожен пункт із посиланням на лист.</div>
+{% endif %}
+
+<script>
+(function () {
+  var root = document.getElementById('overview');
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = '1';
+  var form = root.closest('form'), dirty = false;
+  if (form) form.addEventListener('input', function () { dirty = true; });
+  function csrf() {
+    var i = document.querySelector('[name=csrfmiddlewaretoken]');
+    return i ? i.value : '';
+  }
+  root.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pov-post]');
+    if (!b) return;
+    e.preventDefault();
+    if (dirty && !confirm('Сторінка перезавантажиться, незбережені зміни у формі пропадуть. Продовжити?')) return;
+    var st = root.querySelector('.pov-status');
+    b.disabled = true;
+    st.textContent = b.dataset.wait || '…';
+    fetch(b.dataset.povPost, {method: 'POST', headers: {'X-CSRFToken': csrf()}, credentials: 'same-origin'})
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return {ok: r.ok && j.ok, j: j}; }); })
+      .then(function (x) {
+        if (x.ok) { location.hash = 'overview'; location.reload(); return; }
+        st.textContent = '⚠️ ' + (x.j.error || 'не вдалося');
+        b.disabled = false;
+      })
+      .catch(function () { st.textContent = '⚠️ немає зв\'язку з сервером'; b.disabled = false; });
+  });
+})();
+</script>
+</div>

@@ -11,6 +11,7 @@ from django.utils.html import format_html, format_html_join
 from inventory.services.stock import annotate_stock
 
 from . import services
+from .admin_payments import ShopForm, stripe_tools
 from .models import ShippingZone, Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSettings
 from .shipping import format_countries, parse_countries
 
@@ -179,11 +180,12 @@ class ShopAdmin(admin.ModelAdmin):
                     "orders_col", "keys_col"]
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
-    readonly_fields = ["created_at", "keys_col", "zones_tools"]
+    form = ShopForm
+    readonly_fields = ["created_at", "keys_col", "zones_tools", "accounts_tools", "stripe_col"]
     inlines = [ShippingZoneInline]
     actions = ["action_default_zones", "action_import_dk_zones"]
     fieldsets = [
-        (None, {"fields": ["name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
+        (None, {"fields": ["name", "public_name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
         ("🚚 Доставка", {
             "fields": ["free_shipping_enabled", "free_shipping_threshold", "zones_tools"],
             "description": "Куди доставляємо — регіони внизу сторінки. Замовити можуть лише покупці з країн цих "
@@ -191,10 +193,108 @@ class ShopAdmin(admin.ModelAdmin):
                            "Швидкий старт: у списку магазинів позначте магазин → дія «🌍 Створити базові регіони "
                            "доставки» (Німеччина, Європа, США, світ), або «⬇️ Регіони доставки з DigiKey».",
         }),
+        ("👤 Особистий кабінет покупців", {
+            "fields": ["accounts_enabled", "mail_sender", "mail_from_name", "mail_footer", "team_lang", "accounts_tools"],
+            "description": "Реєстрація з підтвердженням email, вхід, скидання пароля, статус замовлень і кошик "
+                           "на сайті. Акаунти зберігаються лише в Minerva; сайт тримає тільки ключ сесії в cookie. "
+                           "Ключу сайту додайте права «Акаунти покупців — читання» і «— запис». "
+                           "Листи покупцям (підтвердження, новий пароль) надсилає Minerva.",
+        }),
+        ("💳 Способи оплати на сайті", {
+            "fields": ["payment_methods", "payment_default"],
+            "description": "Які способи оплати бачить покупець у касі. Minerva також перевіряє вибір у кожному "
+                           "замовленні: вимкнений спосіб не приймається.",
+        }),
+        ("💳 Оплата Stripe", {
+            "fields": ["stripe_secret_key", "stripe_webhook_secret", "stripe_clear",
+                       "stripe_poll_minutes", "stripe_col"],
+            "description": "Щоб покупці бачили Stripe, відмітьте «Онлайн через Stripe» у способах оплати вище. "
+                           "Покупець обирає на сайті «Kreditkarte / Online (Stripe)» і платить на сторінці Stripe Checkout; "
+                           "суму рахує Minerva (нетто + доставка + ПДВ). Після оплати Stripe повідомляє Minerva "
+                           "(вебхук) — замовлення стає «Оплачено». Способи оплати (картки, Apple/Google Pay, SEPA, Klarna …) "
+                           "вмикаються в Stripe → Settings → Payment methods. Спершу перевірте в тестовому режимі (sk_test_…).",
+        }),
         ("Підключення", {"fields": ["keys_col"],
                          "description": "Сайт підключається ключем API, прив'язаним до цього магазину "
                                         "(Адмін → REST API → API Токени → поле «Магазин»)."}),
     ]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "mail_sender":
+            from email_assistant.models import EmailAccount
+            kwargs["queryset"] = EmailAccount.objects.filter(is_active=True).select_related("user")
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        widget = form.base_fields.get("mail_sender") and form.base_fields["mail_sender"].widget
+        if widget is not None:  # акаунти пошти створюються в розділі «Email», не звідси
+            widget.can_add_related = widget.can_change_related = widget.can_delete_related = False
+            widget.can_view_related = False
+        return form
+
+    @admin.display(description="Стан Stripe")
+    def stripe_col(self, obj):
+        return stripe_tools(obj)
+
+    def _stripe_check_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        from . import payments
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        try:
+            self.message_user(request, payments.check_key(shop))
+        except payments.PaymentError as e:
+            self.message_user(request, f"❌ {e.message}", messages.ERROR)
+        return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
+
+    @admin.display(description="Стан")
+    def accounts_tools(self, obj):
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        from .admin_accounts import account_status
+        st = account_status(obj)
+        n = obj.customers.count()
+        pending = obj.customers.filter(email_verified_at__isnull=True).count()
+        no_scope, links = st["missing"], st["links"]
+        return format_html(
+            '<div><a href="{}">Акаунтів: {}</a>{}</div>'
+            '<div style="margin-top:4px">Листи: {}</div>'
+            '<div style="margin-top:4px">Сторінка кабінету: {}</div>'
+            '{}{}'
+            '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formnovalidate>'
+            '✉️ Надіслати тестовий лист собі</button> '
+            '<span class="help">на email вашого користувача · незбережені зміни на сторінці не зберігаються</span></div>',
+            reverse("admin:shop_shopcustomer_changelist") + f"?shop__id__exact={obj.pk}", n,
+            f" · очікують підтвердження: {pending}" if pending else "",
+            st["sender"],
+            format_html_join(" · ", '<a href="{}" target="_blank" rel="noopener">{}</a>',
+                             ((u, lang) for lang, u in links.items())) if links
+            else "ще невідома (заповниться з першого запиту сайту)",
+            format_html('<div style="margin-top:4px;color:#ffb74d">⚠ Ключам без прав «Акаунти покупців»: {}</div>',
+                        ", ".join(no_scope)) if no_scope else "",
+            format_html('<div style="margin-top:4px;color:#ff8a80">⚠ {}</div>', st["link_error"]) if st["link_error"] else "",
+            reverse("admin:shop_shop_test_mail", args=[obj.pk]))
+
+    def _test_mail_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        from . import mail
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        to = (request.user.email or "").strip()
+        if not to:
+            self.message_user(request, "У вашого користувача Minerva не задано email.", messages.ERROR)
+        else:
+            try:
+                mail.send(shop, to, "test", "de")
+                self.message_user(request, f"Тестовий лист надіслано на {to} ({mail.describe_sender(shop)}).")
+            except Exception as e:
+                self.message_user(request, f"Лист не надіслано: {e}", messages.ERROR)
+        return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
 
     @admin.display(description="Доставка")
     def shipping_col(self, obj):
@@ -293,6 +393,10 @@ class ShopAdmin(admin.ModelAdmin):
                  name="shop_shop_default_zones"),
             path("<int:pk>/dk-zones/", self.admin_site.admin_view(self._dk_zones_view),
                  name="shop_shop_dk_zones"),
+            path("<int:pk>/test-mail/", self.admin_site.admin_view(self._test_mail_view),
+                 name="shop_shop_test_mail"),
+            path("<int:pk>/stripe-check/", self.admin_site.admin_view(self._stripe_check_view),
+                 name="shop_shop_stripe_check"),
         ] + super().get_urls()
 
     def _zones_view(self, request, pk, run):
@@ -945,3 +1049,7 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
         default = Shop.objects.filter(is_default=True).first()
         return self._form_action(request, queryset, AddToShopForm, "Додати товари в магазин", apply,
                                  initial={"shop": default.pk if default else None})
+
+
+from . import admin_accounts  # noqa: E402,F401  — акаунти покупців (особистий кабінет)
+from . import admin_templates  # noqa: E402,F401  — шаблони листів

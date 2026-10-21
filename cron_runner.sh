@@ -29,8 +29,10 @@ echo "   sync_digikey_orders     interval controlled by DigiKeyConfig in DB"
 echo "   check_digikey_messages  interval controlled by DigiKeyConfig in DB"
 echo "   poll_dk_status          interval controlled by DigiKeyConfig.poll_interval_minutes in DB"
 echo "   send_webhooks           every loop (~60s) — retries of API webhooks"
+echo "   check_stripe_payments   every loop — polls Stripe only while no webhook arrives (interval per shop)"
 echo "   send_digest             time/frequency controlled by NotificationSettings in DB"
 echo "   morning_briefing        daily at ${BRIEFING_HOUR}:00"
+echo "   shop_accounts_cleanup   daily — expired shop customer sessions / links"
 echo "   send_reminders          every ${REMINDER_INTERVAL}s"
 echo "   sync_email              every ${EMAIL_SYNC_INTERVAL}s"
 echo "   send_calendar_reminders every ${CALENDAR_REMINDER_INTERVAL}s"
@@ -41,6 +43,7 @@ LAST_EMAIL_SYNC=0
 LAST_SCHEDULED=0
 LAST_CALENDAR=0
 last_briefing_day=""
+last_cleanup_day=""
 
 while true; do
   NOW=$(date +%s)
@@ -67,6 +70,9 @@ while true; do
   # ── Вебхуки API — повтори невдалих доставок (кожен цикл, ~60с) ──
   python manage.py send_webhooks 2>&1 || true
 
+  # ── Онлайн-оплати Stripe: поки вебхук не працює — перевірка незавершених (інтервал у картці магазину) ──
+  python manage.py check_stripe_payments 2>&1 || true
+
   # ── Digest report — час і частота керуються в NotificationSettings ──
   python manage.py send_digest 2>&1 || true
 
@@ -77,6 +83,12 @@ while true; do
     echo "[$(date '+%H:%M:%S')] Running morning_briefing..."
     python manage.py morning_briefing 2>&1 || true
     last_briefing_day=$current_day
+  fi
+
+  # ── Кабінет покупців магазину: прострочені сесії й посилання — раз на добу ──
+  if [ "$current_day" != "$last_cleanup_day" ]; then
+    python manage.py shop_accounts_cleanup 2>&1 || true
+    last_cleanup_day=$current_day
   fi
 
   # ── Email синхронізація — кожні EMAIL_SYNC_INTERVAL секунд ──

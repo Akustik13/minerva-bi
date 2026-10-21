@@ -28,6 +28,7 @@
 | `shipments:read` | відправлення, трекінг-номери, статус доставки |
 | `customers:read` / `customers:write` | клієнти CRM |
 | `webhooks:read` / `webhooks:write` | вебхуки, зареєстровані цим ключем |
+| `accounts:read` / `accounts:write` | особистий кабінет покупців магазину ключа (розділ 11a) |
 
 **Ліміт:** 120 запитів/хв на ключ (змінна оточення `API_RATE_LIMIT`, напр. `300/min`). При перевищенні — `429` + заголовок `Retry-After`.
 **Пагінація:** `?page=2&page_size=200` (макс. 500). Відповідь: `{count, next, previous, results}`.
@@ -585,6 +586,54 @@ app.listen(3000);
 **Базові ціни в магазині.** `ShopListing.price_source = base` + `price_factor` (%): ціна і ступені позиції = базові ціни товару (`Product.base_prices`) × курс (`ShopSettings.fx_rates`, якщо валюта товару інша) × %, оновлюються сигналом при зміні базових цін або курсу. Ручна зміна ціни/ступенів перемикає позицію на `manual`. Історія змін базових цін — `inventory.ProductPriceHistory`; імпорт з DigiKey — `inventory/services/base_prices.import_from_digikey`.
 
 Вебхук `stock.changed` надсилається також, коли змінюється позиція магазину (галочка, ціна, ступені) або назва, категорія, фото товару, що є в магазині, — сайт одразу скидає кеш каталогу.
+
+## 11a. Особистий кабінет покупців (`/shop/account/…`)
+
+Акаунти покупців живуть **лише в Minerva** (`shop.ShopCustomer`, адмінка «👤 Акаунти покупців»); логіка — `shop/accounts.py`, API — `api/accounts.py`, листи — `shop/mail.py`. Сайт — посередник: ключ API тільки на його сервері, покупець отримує від сайту cookie (HttpOnly) з ключем сесії, сайт передає його заголовком **`X-Customer-Session`**. Пароль — хеш Django; ключі сесій і посилань з листів у БД — лише SHA-256.
+
+Увімкнення: магазин → «👤 Особистий кабінет покупців» (+ відправник листів: акаунт пошти або SMTP сповіщень), ключу — `accounts:read` + `accounts:write`. «Адреса сайту» магазину обмежує домен посилань у листах.
+
+| Запит | Що робить |
+|---|---|
+| `GET shop/account/?link_de=…&link_en=…` | `{enabled, password_min_length}` — чи ввімкнено кабінет (сайт показує / ховає вхід); адреси сторінки кабінету запам'ятовуються для листів з адмінки |
+| `POST shop/account/register/` | `{email, password, company, name, phone?, vat_id?, street?, zip?, city?, country?, confirm_b2b, lang, link}` → **202** завжди однаково; лист з `link#verify=<token>` (48 год). На вже підтверджений email — лист «у вас уже є акаунт», пароль не змінюється. Непідтверджену реєстрацію перезаписує нова |
+| `POST shop/account/resend/` | `{email, link, lang}` → 202 (повторний лист, не частіше 1/хв) |
+| `POST shop/account/verify/` | `{token, password, remember}` → сесія. **Пароль обов'язковий** — посилання з листа без пароля не дає входу |
+| `POST shop/account/login/` | `{email, password, remember}` → `{session, expires_at, remember, customer}`; 401 `invalid_credentials`, 403 `email_not_verified` / `account_disabled`, 429 `locked` (+`Retry-After`; 5 невдалих → 15 хв) |
+| `POST shop/account/logout/` | завершує сесію з заголовка |
+| `POST shop/account/password/forgot/` | `{email, link, lang}` → 202 завжди; лист з `link#reset=<token>` (60 хв, одноразово) |
+| `POST shop/account/password/reset/` | `{token, password, remember}` → сесія; усі інші сесії завершуються, email вважається підтвердженим |
+| `GET / PATCH / DELETE shop/account/me/` | профіль (`company, name, phone, vat_id, address{…}, shipping{separate, …}, lang, orders_count, cart_count`); `DELETE {password}` — видалити акаунт (замовлення лишаються) |
+| `POST shop/account/me/password/` | `{current_password, new_password}`; інші сесії завершуються |
+| `GET shop/account/me/orders/` | `{count, results[{number, kind: order\|quote, date, status, payment_method, payment_status, currency, net, shipping, vat_rate, vat, gross, items, tracking[{carrier, number, url, status}]}]}` |
+| `GET shop/account/me/orders/{number}/` | + `lines[{sku, name, name_en, qty, unit_price, total}]`, `shipping_address`, `billing`, `dates{received, shipped, delivered}`, `offer` (надісланий Angebot для запиту) |
+| `GET / PUT shop/account/me/cart/` | `{items: {sku: qty}}` (ключі `rq:<артикул>` — запит ціни), до 100 позицій |
+
+Акаунт може створити й менеджер (адмінка «➕ Додати»): без пароля, лист-запрошення з `link#reset=<token>` (7 днів, `accounts.send_invite`); встановлення пароля підтверджує email.
+
+Сесія: без «запам'ятати» — 12 год від останньої дії, з ним — 30 днів (максимум 90). Помилки: `{detail, code, fields?, problems?}`; коди пароля: `password_too_short / numeric / common / like_email`. Акаунти одного магазину не бачать інший магазин.
+
+**`POST /orders/`** (shop / quote) додатково приймає `customer_session` (або заголовок `X-Customer-Session`), `vat_rate`, `billing{…}`, `lang` — замовлення з'являється в кабінеті (`shop.ShopOrder`), відповідь містить `account_linked`. Без сесії замовлення прив'язується до **підтвердженого** акаунта з тим самим email; при підтвердженні email попередні замовлення магазину з цією адресою потрапляють у кабінет. Прибирання: `manage.py shop_accounts_cleanup` (cron щодоби).
+
+## 11b. Онлайн-оплата Stripe
+
+Логіка — `shop/payments.py` (Stripe REST через `requests`, без бібліотеки), API — `api/payments.py`, адмінка — `shop/admin_payments.py`, модель `shop.ShopPayment` (спроба оплати: Checkout Session, PaymentIntent, сума, статус). Ключі Stripe — лише в Minerva: картка магазину → «💳 Оплата Stripe» (`Shop.stripe_enabled`, `stripe_secret_key`, `stripe_webhook_secret`).
+
+| Запит | Scope | Що робить |
+|---|---|---|
+| `GET shop/payments/` | `orders:read` | `{methods: [prepayment, invoice, stripe] \| null, stripe: {enabled, connected, mode: test\|live}}` — способи оплати каси в порядку магазину (перший — за замовчуванням; `null` — сайт бере свої), `enabled` — Stripe у касі, `connected` — ключ є (давніші замовлення можна оплатити) |
+| `POST shop/payments/stripe/checkout/` | `orders:write` | `{order_number, success_url, cancel_url, lang}` → `{url, session_id, amount, currency, expires_at, mode}`. Сума = нетто + доставка + ПДВ (`ShopOrder.vat_rate`; без ставки — 409 `vat_unknown`). Відкрита сесія з тією ж сумою використовується повторно; стару з іншою сумою Minerva закриває (`expire`). Адреси повернення — лише домен «Адреса сайту». Помилки: `already_paid`, `not_payable`, `stripe_disabled`, `stripe_error` |
+| `POST shop/payments/stripe/sync/` | `orders:write` | `{order_number}` → `{payment_status, paid}` — Minerva сама питає Stripe (якщо вебхук ще не дійшов) |
+| `POST shop/account/me/orders/<number>/pay/` | `accounts:write` | те саме для власного замовлення покупця (заголовок `X-Customer-Session`) |
+| `POST payments/stripe/webhook/<код магазину>/` | — | для Stripe: підпис `Stripe-Signature` (HMAC, 5 хв). Події: `checkout.session.completed` / `async_payment_succeeded` → `payment_status = paid`, `payment_reference` = PaymentIntent; `async_payment_failed` → `failed`; `expired`; `charge.refunded` (повне) → `refunded` |
+
+**Перевірка незавершених оплат** (сесія відкрита або «обробляється»): кнопки «💳 Перевірити оплати» в картці клієнта CRM (і дія в списку клієнтів), «🔄 Перевірити оплати клієнта» в акаунті покупця, «🔄 Перевірити незавершені оплати» у «💳 Онлайн-оплати» та в картці магазину. **Автоперевірка** — `manage.py check_stripe_payments` (cron щохвилини): поки від Stripe не було підписаного вебхука за 7 днів (`Shop.stripe_webhook_last_at`), раз на `Shop.stripe_poll_minutes` хв (0 — вимкнено) Minerva питає Stripe про незавершені оплати за 14 днів; щойно вебхуки приходять — автоперевірка зупиняється. `--now` — перевірити все зараз.
+
+**Тексти листів** покупцям і сповіщення команді — шаблони `shop.ShopMailTemplate` (адмінка «✉️ Шаблони листів», shop 0014): магазин × лист × мова (de/en), поля «Тема / Звертання / Текст / Кнопка / Завершення» з підстановками `{shop}`, `{name}`, `{number}`, `{amount}` …; немає активного шаблону — стандартний текст (`shop/mail.py`, `TEXTS`). `{shop}` = `Shop.public_name` («Назва для покупців», також у назві оплати на сторінці Stripe); мова сповіщень команді — `Shop.team_lang`.
+
+Способи оплати магазину — `Shop.payment_methods` (адмінка «💳 Способи оплати на сайті», shop 0013); `POST /orders/` з `shop: true` і вимкненим способом → 400 `payment_method_not_allowed`. Після оплати Minerva надсилає покупцю лист «Zahlung erhalten» (`ShopPayment.notified_at`, один раз) і сповіщення команді (NotificationSettings: email / Telegram). Замовлення з сесією покупця очищає кошик акаунта.
+
+Замовлення сайту з оплатою Stripe створюється з `payment_method = stripe`, `payment_status = pending`; у кабінеті покупця `payment_open = true`, доки оплату не завершено.
 
 ## 12. Зовнішня RAG-система (читання каталогу і складу)
 

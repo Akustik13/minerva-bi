@@ -1,13 +1,24 @@
 """
 send_scheduled — відправити заплановані листи.
 Запускається кожні 2 хвилини через cron_runner.sh.
+
+Один лист — не більше одного разу:
+- перед відправкою лист «бронюється» атомарним UPDATE (sent_at ставиться лише якщо він ще порожній) —
+  паралельний запуск (ручний поверх cron, другий контейнер) такий лист пропускає;
+- якщо процес упав посеред відправки, бронь лишається: через CLAIM_TIMEOUT лист позначається помилкою
+  «невідомо, чи пішов» — краще попросити перевірити «Надіслані», ніж надіслати клієнту двічі.
 """
 import logging
+from datetime import timedelta
 
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 logger = logging.getLogger('email_assistant')
+
+CLAIM_TIMEOUT = timedelta(minutes=15)
+UNKNOWN_RESULT = ('Відправку перервано — невідомо, чи лист пішов. Перевірте «Надіслані» і, якщо треба, '
+                  'поставте лист у чергу знову (статус «Очікує»).')
 
 
 class Command(BaseCommand):
@@ -18,12 +29,21 @@ class Command(BaseCommand):
         from email_assistant.smtp_client import SMTPClient
 
         now = timezone.now()
-        due = (ScheduledEmail.objects
-               .filter(status=ScheduledEmail.STATUS_PENDING, scheduled_at__lte=now)
-               .select_related('account', 'account__user'))
+        pending = ScheduledEmail.objects.filter(status=ScheduledEmail.STATUS_PENDING)
+        stuck = pending.filter(sent_at__lt=now - CLAIM_TIMEOUT).update(
+            status=ScheduledEmail.STATUS_FAILED, error_msg=UNKNOWN_RESULT)
+        if stuck:
+            logger.warning('send_scheduled: %s лист(ів) з перерваною відправкою позначено помилкою', stuck)
 
+        due = list(pending.filter(sent_at__isnull=True, scheduled_at__lte=now)
+                   .select_related('account', 'account__user').order_by('scheduled_at', 'pk'))
         sent = errors = 0
         for scheduled in due:
+            claimed = ScheduledEmail.objects.filter(
+                pk=scheduled.pk, status=ScheduledEmail.STATUS_PENDING, sent_at__isnull=True,
+            ).update(sent_at=timezone.now())
+            if not claimed:
+                continue   # уже відправляє інший запуск
             try:
                 result = SMTPClient(scheduled.account).send(
                     to_emails=scheduled.to_emails,
@@ -32,23 +52,20 @@ class Command(BaseCommand):
                     body_html=scheduled.body_html or '',
                     cc_emails=scheduled.cc_emails or [],
                 )
-                if result['ok']:
-                    scheduled.status  = ScheduledEmail.STATUS_SENT
-                    scheduled.sent_at = now
-                    sent += 1
-                    self.stdout.write(f'✓ {scheduled.subject[:40]}')
-                else:
-                    scheduled.status    = ScheduledEmail.STATUS_FAILED
-                    scheduled.error_msg = result.get('error', '')
-                    errors += 1
-                    self.stdout.write(f'✗ {result.get("error")}')
-                scheduled.save()
             except Exception as e:
-                scheduled.status    = ScheduledEmail.STATUS_FAILED
-                scheduled.error_msg = str(e)
-                scheduled.save()
-                errors += 1
+                result = {'ok': False, 'error': str(e)}
                 logger.error('send_scheduled pk=%s: %s', scheduled.pk, e)
+            if result['ok']:
+                scheduled.status, scheduled.sent_at, scheduled.error_msg = \
+                    ScheduledEmail.STATUS_SENT, timezone.now(), ''
+                sent += 1
+                self.stdout.write(f'✓ {scheduled.subject[:40]}')
+            else:   # SMTP відмовив — лист не пішов, бронь знімаємо
+                scheduled.status, scheduled.sent_at, scheduled.error_msg = \
+                    ScheduledEmail.STATUS_FAILED, None, result.get('error', '')
+                errors += 1
+                self.stdout.write(f'✗ {result.get("error")}')
+            scheduled.save(update_fields=['status', 'sent_at', 'error_msg'])
 
-        if sent or errors:
-            self.stdout.write(f'Заплановані: {sent} надіслано, {errors} помилок')
+        if sent or errors or stuck:
+            self.stdout.write(f'Заплановані: {sent} надіслано, {errors} помилок, перервано раніше: {stuck}')

@@ -152,6 +152,26 @@ class ProjectLink(models.Model):
         return f"🛒 {self.order.source}:{self.order.order_number}"
 
 
+class ProjectOverview(models.Model):
+    """Останній AI-огляд проєкту (projects/overview.py): обіцянки, виконано, відкриті питання, наступна дія.
+    fingerprint — стан листів, Angebote, замовлень і термінів на момент огляду: інший → огляд застарів."""
+    project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name="overview")
+    data = models.JSONField(default=dict)
+    fingerprint = models.CharField(max_length=64, blank=True, default="")
+    messages_count = models.PositiveIntegerField(default=0)
+    model = models.CharField("Модель AI", max_length=60, blank=True, default="")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+    created_at = models.DateTimeField("Складено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Огляд проєкту"
+        verbose_name_plural = "Огляди проєктів"
+
+    def __str__(self):
+        return f"Огляд {self.project.code}"
+
+
 class DismissedThread(models.Model):
     """«Розбір пошти»: гілку переглянули — вона не стосується жодного проєкту."""
     thread = models.OneToOneField("email_assistant.EmailThread", on_delete=models.CASCADE,

@@ -290,7 +290,16 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         "action_set_segment_distributor",
         "action_set_segment_reseller",
         "action_set_segment_other",
+        # Онлайн-оплати (Stripe)
+        "action_check_stripe_payments",
     ]
+
+    @admin.action(description="💳 Перевірити оплати Stripe")
+    def action_check_stripe_payments(self, request, queryset):
+        """Запитати Stripe про незавершені онлайн-оплати замовлень вибраних клієнтів (shop/payments.py)."""
+        from shop import payments
+        orders = [o for c in queryset for o in payments.customer_orders(c).values_list("pk", flat=True)]
+        self.message_user(request, payments.stats_text(payments.check_orders(orders)))
 
     def action_merge_customers(self, request, queryset):
         ids = list(queryset.values_list("pk", flat=True))

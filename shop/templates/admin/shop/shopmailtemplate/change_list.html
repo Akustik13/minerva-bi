@@ -1,0 +1,18 @@
+{% extends "admin/change_list.html" %}
+{% block search %}
+<div class="module" style="padding:10px 14px;margin:0 0 12px;border-left:4px solid var(--accent, #79aec8)">
+  <p style="margin:0 0 6px">Тексти листів, які Minerva надсилає покупцям (кабінет, оплата) і команді. Немає шаблону або його вимкнено —
+    використовується стандартний текст. Поля на кшталт <code>{name}</code>, <code>{number}</code>, <code>{amount}</code> підставляються самі;
+    посилання Minerva додає кнопкою. Лист підтвердження замовлення з сайту поки надсилає сам сайт (не з цього списку).</p>
+  <form method="post" action="{% url 'admin:shop_shopmailtemplate_defaults' %}" style="display:inline">{% csrf_token %}
+    <button type="submit" class="button">📄 Створити всі шаблони зі стандартних текстів (DE + EN)</button>
+  </form>
+  <span class="help" style="margin-left:6px">наявні шаблони не змінюються</span>
+  {% for shop, name in shops_info %}
+  <div style="margin-top:6px">🏬 <b>{{ shop.name }}</b> — у листах: «{{ name }}»
+    {% if not shop.public_name %}<span style="color:#ffb74d"> ⚠ задайте «Назва для покупців» у <a href="{% url 'admin:shop_shop_change' shop.pk %}">картці магазину</a> (напр. Sevskiy GmbH)</span>{% endif %}
+    · сповіщення команді: {{ shop.get_team_lang_display }}</div>
+  {% endfor %}
+</div>
+{{ block.super }}
+{% endblock %}

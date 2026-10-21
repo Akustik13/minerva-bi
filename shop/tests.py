@@ -132,6 +132,7 @@ class ShopAdminTests(TestCase):
         services.add_products(self.shop, [self.p])
         r = self.client.get("/dashboard/shop/help/")
         self.assertContains(r, "Зв'язки магазину з базою даних")
+        self.assertContains(r, "Особистий кабінет покупців")
         self.assertContains(r, "webshop")
 
     def test_add_to_shop_action(self):
