@@ -11,6 +11,7 @@
     {% if s.missing %}· <span style="color:#ffb74d">⚠ ключам без прав «Акаунти покупців»: {{ s.missing|join:", " }}</span>{% endif %}
     {% if not s.keys %}· <span style="color:#ffb74d">⚠ немає ключа API сайту, прив'язаного до магазину</span>{% endif %}
     {% if s.enabled and not s.links %}· сторінка кабінету ще невідома (відкрийте магазин на сайті){% endif %}
+    {% if s.link_error %}<div style="color:#ff8a80;margin-top:2px">⚠ {{ s.link_error }} <a href="{{ s.url }}">Відкрити магазин →</a></div>{% endif %}
   </div>
   {% endfor %}
 </div>

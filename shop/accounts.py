@@ -144,8 +144,15 @@ def check_link(shop: Shop, link, lang: str = "") -> str:
     if shop.url:
         allowed = urlsplit(shop.url).hostname
         if allowed and parts.hostname != allowed and not local:
+            # видно в адмінці: що саме надсилає сайт і що вписати в «Адреса сайту»
+            note = f"{timezone.localtime():%d.%m.%Y %H:%M} {link}"[:400]
+            Shop.objects.filter(pk=shop.pk).update(account_link_error=note)
+            shop.account_link_error = note
             raise AccountError(400, "link_not_allowed",
                                f"Адреса кабінету ({parts.hostname}) не збігається з «Адреса сайту» магазину ({allowed}).")
+    if shop.account_link_error:
+        Shop.objects.filter(pk=shop.pk).update(account_link_error="")
+        shop.account_link_error = ""
     if lang:
         _remember_link(shop, lang, link)
     return link

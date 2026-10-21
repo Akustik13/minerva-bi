@@ -21,7 +21,20 @@ def account_status(shop: Shop) -> dict:
         "sender": describe_sender(shop),
         "links": shop.account_links or {},
         "url": reverse("admin:shop_shop_change", args=[shop.pk]),
+        "link_error": _link_error(shop),
     }
+
+
+def _link_error(shop: Shop) -> str:
+    """Сайт надсилає адресу кабінету з іншого домену, ніж «Адреса сайту» → реєстрація не працює."""
+    if not shop.account_link_error:
+        return ""
+    from urllib.parse import urlsplit
+    date, time, link = (shop.account_link_error.split(" ", 2) + ["", "", ""])[:3]  # «дд.мм.рррр гг:хх адреса»
+    parts = urlsplit(link)
+    site = f"{parts.scheme}://{parts.hostname}" if parts.hostname else link
+    return (f"Сайт надсилає адресу кабінету {link} ({date} {time}), а «Адреса сайту» магазину — "
+            f"{shop.url or '—'}. Реєстрація й листи не працюють: впишіть у «Адреса сайту» {site}.")
 
 
 class ShopCustomerAddForm(forms.ModelForm):

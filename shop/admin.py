@@ -230,7 +230,7 @@ class ShopAdmin(admin.ModelAdmin):
             '<div><a href="{}">Акаунтів: {}</a>{}</div>'
             '<div style="margin-top:4px">Листи: {}</div>'
             '<div style="margin-top:4px">Сторінка кабінету: {}</div>'
-            '{}'
+            '{}{}'
             '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formnovalidate>'
             '✉️ Надіслати тестовий лист собі</button> '
             '<span class="help">на email вашого користувача · незбережені зміни на сторінці не зберігаються</span></div>',
@@ -242,6 +242,7 @@ class ShopAdmin(admin.ModelAdmin):
             else "ще невідома (заповниться з першого запиту сайту)",
             format_html('<div style="margin-top:4px;color:#ffb74d">⚠ Ключам без прав «Акаунти покупців»: {}</div>',
                         ", ".join(no_scope)) if no_scope else "",
+            format_html('<div style="margin-top:4px;color:#ff8a80">⚠ {}</div>', st["link_error"]) if st["link_error"] else "",
             reverse("admin:shop_shop_test_mail", args=[obj.pk]))
 
     def _test_mail_view(self, request, pk):

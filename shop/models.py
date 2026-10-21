@@ -118,6 +118,10 @@ class Shop(models.Model):
         "Сторінки кабінету на сайті", default=dict, blank=True,
         help_text="Заповнюється автоматично з запитів сайту: {мова: адреса}. Потрібні для листів з адмінки.",
     )
+    account_link_error = models.CharField(
+        "Відхилена адреса кабінету", max_length=400, blank=True, default="",
+        help_text="Остання адреса сторінки кабінету від сайту, яку Minerva не прийняла (інший домен, ніж «Адреса сайту»).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

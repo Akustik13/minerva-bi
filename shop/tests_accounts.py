@@ -99,6 +99,12 @@ class RegistrationTests(AccountTestCase):
         self.assertEqual(self.post("register/", {**REG, "confirm_b2b": False}).json()["code"], "confirm_b2b")
         self.assertEqual(self.post("register/", {**REG, "link": "https://evil.example.org/x"}).json()["code"],
                          "link_not_allowed")
+        from .admin_accounts import account_status
+        st = account_status(Shop.objects.get())
+        self.assertIn("https://evil.example.org", st["link_error"])
+        self.assertIn("впишіть у «Адреса сайту» https://evil.example.org", st["link_error"])
+        self.post("resend/", {"email": "x@y.de", "link": LINK})  # правильна адреса — попередження зникає
+        self.assertEqual(Shop.objects.get().account_link_error, "")
         self.assertEqual(self.post("register/", {**REG, "link": "http://web.example.com/x"}).json()["code"],
                          "invalid_link")
         self.assertFalse(ShopCustomer.objects.exists())
