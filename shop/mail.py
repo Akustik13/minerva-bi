@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import html
 import logging
+import ssl
 from email.utils import formataddr, parseaddr
 
 from django.conf import settings
@@ -25,42 +26,59 @@ def _backend() -> str:
     return getattr(settings, "SHOP_MAIL_BACKEND", "") or "django.core.mail.backends.smtp.EmailBackend"
 
 
-def sender(shop):
-    """(з'єднання SMTP, адреса From) для листів магазину."""
+def smtp_settings(shop) -> dict:
+    """SMTP для листів магазину: акаунт пошти магазину або SMTP сповіщень Minerva."""
     acc = shop.mail_sender
     if acc is not None and acc.is_active and acc.smtp_host and acc.email_address:
-        conn = get_connection(
-            backend=_backend(), host=acc.smtp_host, port=int(acc.smtp_port or 587),
-            username=acc.smtp_username, password=acc.smtp_password,
-            use_ssl=bool(acc.smtp_use_ssl), use_tls=bool(acc.smtp_use_tls) and not acc.smtp_use_ssl,
-            timeout=20, fail_silently=False,
-        )
-        return conn, formataddr((shop.mail_from_name or acc.display_name or shop.name, acc.email_address))
-
+        return {"host": acc.smtp_host, "port": int(acc.smtp_port or 587), "username": acc.smtp_username,
+                "password": acc.smtp_password, "ssl": bool(acc.smtp_use_ssl),
+                "tls": bool(acc.smtp_use_tls) and not acc.smtp_use_ssl, "source": "акаунт пошти",
+                "from": formataddr((shop.mail_from_name or acc.display_name or shop.name, acc.email_address))}
     from config.models import NotificationSettings
     ns = NotificationSettings.get()
     name, addr = parseaddr((ns.email_from or ns.email_host_user or "").strip())
     if not (ns.email_host and addr):
         raise MailNotConfigured("Не задано SMTP: оберіть «Відправник листів покупцям» у магазині "
                                 "або заповніть SMTP у Налаштування → Сповіщення.")
-    conn = get_connection(
-        backend=_backend(), host=ns.email_host, port=ns.email_port,
-        username=ns.email_host_user, password=ns.email_host_password,
-        use_ssl=bool(ns.email_use_ssl), use_tls=bool(ns.email_use_tls) and not ns.email_use_ssl,
-        timeout=20, fail_silently=False,
-    )
-    return conn, formataddr((shop.mail_from_name or name or shop.name, addr))
+    return {"host": ns.email_host, "port": ns.email_port, "username": ns.email_host_user,
+            "password": ns.email_host_password, "ssl": bool(ns.email_use_ssl),
+            "tls": bool(ns.email_use_tls) and not ns.email_use_ssl, "source": "SMTP сповіщень Minerva",
+            "from": formataddr((shop.mail_from_name or name or shop.name, addr))}
+
+
+def _connection(cfg: dict, swap: bool = False):
+    """swap: інший режим — SSL ↔ STARTTLS (коли SSL увімкнено для порту 587 або навпаки)."""
+    use_ssl, use_tls = cfg["ssl"], cfg["tls"]
+    if swap:
+        use_ssl, use_tls = not cfg["ssl"], cfg["ssl"]
+    return get_connection(backend=_backend(), host=cfg["host"], port=cfg["port"], username=cfg["username"],
+                          password=cfg["password"], use_ssl=use_ssl, use_tls=use_tls and not use_ssl,
+                          timeout=20, fail_silently=False)
+
+
+def sender(shop):
+    """(з'єднання SMTP, адреса From) для листів магазину."""
+    cfg = smtp_settings(shop)
+    return _connection(cfg), cfg["from"]
+
+
+def _mode_mismatch(cfg: dict) -> bool:
+    """SSL на порту STARTTLS (587/25) або без SSL на порту 465 — типова помилка WRONG_VERSION_NUMBER."""
+    return (cfg["ssl"] and cfg["port"] in (25, 587)) or (not cfg["ssl"] and cfg["port"] == 465)
 
 
 def describe_sender(shop) -> str:
     """Для адмінки: через що підуть листи."""
     try:
-        conn, from_addr = sender(shop)
+        cfg = smtp_settings(shop)
     except MailNotConfigured as e:
         return f"❌ {e}"
-    src = "акаунт пошти" if shop.mail_sender_id else "SMTP сповіщень Minerva"
-    server = f" · {conn.host}:{conn.port}" if getattr(conn, "host", None) else ""
-    return f"{from_addr}{server} ({src})"
+    mode = "SSL" if cfg["ssl"] else "TLS (STARTTLS)" if cfg["tls"] else "без шифрування"
+    text = f"{cfg['from']} · {cfg['host']}:{cfg['port']} · {mode} ({cfg['source']})"
+    if _mode_mismatch(cfg):
+        text += (f" ⚠ порт {cfg['port']} і режим «{mode}» не збігаються (587 — TLS без SSL, 465 — SSL без TLS); "
+                 "Minerva перемикає режим автоматично, але краще виправити в налаштуваннях SMTP")
+    return text
 
 
 # ── Тексти (de / en) ─────────────────────────────────────────────────────────
@@ -178,10 +196,20 @@ def compose(shop, kind: str, lang: str, *, name: str = "", link: str = "", **var
 
 
 def send(shop, to: str, kind: str, lang: str, **kwargs) -> None:
-    """Надсилає лист; помилки SMTP — винятком (обробляє виклик)."""
+    """Надсилає лист; помилки SMTP — винятком (обробляє виклик).
+    SSL/TLS не відповідає порту (WRONG_VERSION_NUMBER) → ще одна спроба іншим режимом, як у email_assistant."""
     subject, text, body = compose(shop, kind, lang, **kwargs)
-    conn, from_addr = sender(shop)
-    msg = EmailMultiAlternatives(subject=subject, body=text, from_email=from_addr, to=[to], connection=conn)
+    cfg = smtp_settings(shop)
+    msg = EmailMultiAlternatives(subject=subject, body=text, from_email=cfg["from"], to=[to],
+                                 connection=_connection(cfg))
     msg.attach_alternative(body, "text/html")
-    msg.send()
+    try:
+        msg.send()
+    except ssl.SSLError as e:
+        if "WRONG_VERSION_NUMBER" not in str(e).upper():
+            raise
+        logger.warning("Shop mail %s:%s: SSL/TLS не відповідає порту (%s) — пробую інший режим",
+                       cfg["host"], cfg["port"], e)
+        msg.connection = _connection(cfg, swap=True)
+        msg.send()
     logger.info("Shop mail %s → %s (%s)", kind, to, shop.slug)

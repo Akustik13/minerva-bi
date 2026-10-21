@@ -22,6 +22,23 @@ REG = {"email": "Anna@Firma.de", "password": PASSWORD, "company": "Firma GmbH", 
        "phone": "+49 89 1", "confirm_b2b": True, "lang": "de", "link": LINK}
 
 
+class FlakySSLBackend:
+    """Тестовий SMTP: з SSL — помилка як на порту 587 (WRONG_VERSION_NUMBER), з STARTTLS — лист у outbox."""
+    calls = []
+
+    def __new__(cls, use_ssl=False, use_tls=False, **kwargs):
+        import ssl
+        from django.core.mail.backends.locmem import EmailBackend
+
+        class _Backend(EmailBackend):
+            def send_messages(self, messages):
+                FlakySSLBackend.calls.append((use_ssl, use_tls))
+                if use_ssl:
+                    raise ssl.SSLError(1, "[SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1016)")
+                return super().send_messages(messages)
+        return _Backend(**kwargs)
+
+
 def token_from(message, kind):
     return re.search(kind + r"=([A-Za-z0-9_-]+)", message.body).group(1)
 
@@ -349,6 +366,20 @@ class AccountAdminTests(AccountTestCase):
         self.client.post("/admin/shop/shopcustomer/", {"action": "action_disable", "_selected_action": [c.pk]})
         self.assertFalse(ShopCustomer.objects.get().is_active)
         self.assertFalse(ShopCustomerSession.objects.exists())
+
+    def test_ssl_on_starttls_port_is_retried(self):
+        from django.test import override_settings
+        from config.models import NotificationSettings
+        from .mail import describe_sender
+        NotificationSettings.objects.update(email_port=587, email_use_ssl=True, email_use_tls=False)
+        FlakySSLBackend.calls = []
+        with override_settings(SHOP_MAIL_BACKEND="shop.tests_accounts.FlakySSLBackend"):
+            r = self.post("register/", REG)
+        self.assertEqual(r.status_code, 202, r.content)
+        self.assertEqual(FlakySSLBackend.calls, [(True, False), (False, True)])  # SSL → STARTTLS
+        self.assertEqual(ShopCustomer.objects.get().last_mail_error, "")
+        self.assertIn("#verify=", mail.outbox[-1].body)
+        self.assertIn("не збігаються", describe_sender(Shop.objects.get()))
 
     def test_mail_error_visible_in_list(self):
         from config.models import NotificationSettings
