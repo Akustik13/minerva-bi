@@ -18,7 +18,7 @@
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\start_postgres.ps1
-powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\start_minerva.ps1      # сервер, лишається працювати
+powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\start_minerva.ps1 -Background   # окремий процес, журнал у logs\
 powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\e2e.ps1 seed           # ідемпотентно
 ```
 
@@ -54,7 +54,7 @@ powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\e2e.ps1 rag --url htt
 |---|---|---|
 | 1 | `status` | 6 документів `indexed`, у m3 — фрагменти вкладення |
 | 2 | `search "Liefertermin KW 46 zugesagt"` | anna: email:2 (і 1) |
-| 3 | `search "Kalibrierprotokoll SN-77821"` / `--user e2e_boris` | anna: нічого; boris: email:7 |
+| 3 | `search "Kalibrierprotokoll SN-77821"` / `--user e2e_boris` | anna: без email:7 (лише власні листи); boris: лише email:7 |
 | 4 | `search "Steckverbinder SMA IP67"` | email:3 (вкладення) |
 | 5 | `search "Angebot ANT-2400" --project` | лише листи проєкту |
 | 6 | `step new-mail`, потім `search "Expresszuschlag"` | новий лист email:8 |
@@ -66,14 +66,14 @@ powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\e2e.ps1 rag --url htt
 | 12 | `step delete`, потім `search "Rabatt 8 %"` | email:5 зник (`deleted`) |
 | 13 | `step purge`, потім `search "IP67"` | email:3 і вкладення зникли |
 | 14 | зупинити RAG → `fallback` | усі OK: «недоступний» ≤ 3 с, пауза після 3 збоїв, «Історія» і стрічка працюють |
-| 15 | крок під час зупинки → запустити RAG → `rag` (скинути паузу) → `search` | RAG догнав журнал з курсора |
+| 15 | крок під час зупинки RAG (або Minerva: `stop` 8010) → запустити знову → `rag` (скинути паузу) → `search` | RAG догнав журнал з курсора; поки Minerva недоступна — `last_error: unavailable`, курсор не рухається |
 
 `fallback --simulate` перевіряє те саме без зупинки RAG: тимчасово ставить мертву адресу і повертає попередню.
 
 ## Прибирання
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\stop.ps1            # зупинити PostgreSQL
+powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\stop.ps1            # зупинити сервер і PostgreSQL
 powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\stop.ps1 -Remove    # видалити контейнер і тестові дані
 ```
 

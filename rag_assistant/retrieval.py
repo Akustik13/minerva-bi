@@ -364,7 +364,8 @@ def verify_hits(user, result) -> tuple:
         seen.add(key)
         att = h.get("attachment") or None
         kept.append({
-            "document_id": h["document_id"], "message_pk": pk, "thread_id": msg.thread_id,
+            "document_id": h["document_id"], "document_revision": doc.revision, "message_pk": pk,
+            "thread_id": msg.thread_id,
             "subject": msg.subject or "", "from_email": msg.from_email or "",
             "sent_at": msg.sent_at.isoformat() if msg.sent_at else None,
             "text": str(h.get("text") or "")[:HIT_TEXT_MAX], "score": h.get("score"),
