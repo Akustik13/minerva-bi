@@ -94,3 +94,33 @@ def remove_view(request, link_pk):
     thread = link.thread
     services.unlink(link)
     return JsonResponse({"ok": True, **(thread_state(thread) if thread else {})})
+
+
+# ── Огляд проєкту ────────────────────────────────────────────────────────────
+
+def _project_for_change(request, pk):
+    """Огляд пише в БД і витрачає AI-запит — лише тим, хто може змінювати проєкти."""
+    from django.http import Http404
+    if not request.user.has_perm("projects.change_project"):
+        raise Http404
+    return get_object_or_404(Project, pk=pk)
+
+
+@staff_member_required
+@require_POST
+def overview_view(request, pk):
+    from . import overview
+    project = _project_for_change(request, pk)
+    result, error = overview.generate(project, user=request.user)
+    if result is None:      # як AI-функції пошти: збій AI — не помилка сервера
+        return JsonResponse({"ok": False, "error": error})
+    return JsonResponse({"ok": True, "model": result.model, "data": result.data})
+
+
+@staff_member_required
+@require_POST
+def overview_next_action_view(request, pk):
+    from . import overview
+    project = _project_for_change(request, pk)
+    text = overview.apply_next_action(project)
+    return JsonResponse({"ok": bool(text), "next_action": text})
