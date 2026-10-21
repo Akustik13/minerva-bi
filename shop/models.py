@@ -78,6 +78,11 @@ class ShopSettings(models.Model):
 
 class Shop(models.Model):
     name = models.CharField("Назва", max_length=100)
+    public_name = models.CharField(
+        "Назва для покупців", max_length=100, blank=True, default="",
+        help_text="Як магазин називається в листах покупцям і на сторінці оплати Stripe, напр. «Sevskiy GmbH». "
+                  "Порожньо — «Ім'я відправника», інакше назва вище.",
+    )
     slug = models.CharField(
         "Код (джерело замовлень)", max_length=32, unique=True,
         validators=[RegexValidator(r"^[a-z0-9][a-z0-9_-]*$", "Лише латиниця в нижньому регістрі, цифри, - і _")],
@@ -115,6 +120,9 @@ class Shop(models.Model):
                                       help_text="Напр. «Sevskiy Shop». Порожньо — назва магазину.")
     mail_footer = models.TextField("Підпис листів", blank=True, default="",
                                    help_text="Внизу кожного листа: компанія, адреса, контакти.")
+    team_lang = models.CharField("Мова сповіщень команді", max_length=2, default="de",
+                                 choices=[("de", "Deutsch"), ("en", "English")],
+                                 help_text="«Оплату отримано» тощо — email і Telegram з «Налаштування → Сповіщення».")
     account_links = models.JSONField(
         "Сторінки кабінету на сайті", default=dict, blank=True,
         help_text="Заповнюється автоматично з запитів сайту: {мова: адреса}. Потрібні для листів з адмінки.",
@@ -466,3 +474,42 @@ class ShopPayment(models.Model):
 
     def __str__(self):
         return f"{self.order} · {self.amount} {self.currency} · {self.get_status_display()}"
+
+
+class ShopMailTemplate(models.Model):
+    """Власний текст листа магазину (shop/mail.py). Немає активного шаблону — стандартний текст Minerva."""
+    KINDS = [
+        ("verify", "Підтвердження реєстрації"),
+        ("exists", "Реєстрація на вже наявний email"),
+        ("reset", "Скидання пароля"),
+        ("changed", "Пароль змінено"),
+        ("invite", "Запрошення (акаунт створив менеджер)"),
+        ("deleted", "Акаунт видалено"),
+        ("paid", "Оплату отримано — покупцю"),
+        ("team_paid", "Оплату отримано — команді (email / Telegram)"),
+        ("test", "Тестовий лист"),
+    ]
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="mail_templates", verbose_name="Магазин")
+    kind = models.CharField("Лист", max_length=20, choices=KINDS)
+    lang = models.CharField("Мова", max_length=2, choices=[("de", "Deutsch"), ("en", "English")])
+    subject = models.CharField("Тема", max_length=200)
+    greeting = models.CharField("Звертання", max_length=120, blank=True, default="",
+                                help_text="Напр. «Guten Tag {name},». Без імені покупця частина « {name}» прибирається.")
+    intro = models.TextField("Текст")
+    button = models.CharField("Кнопка", max_length=60, blank=True, default="",
+                              help_text="Підпис кнопки з посиланням (якщо лист його має).")
+    outro = models.TextField("Завершення", blank=True, default="")
+    is_active = models.BooleanField("Використовувати", default=True,
+                                    help_text="Вимкнено — знову стандартний текст Minerva.")
+    updated_at = models.DateTimeField("Змінено", auto_now=True)
+    updated_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+                                   verbose_name="Хто змінив")
+
+    class Meta:
+        verbose_name = "Шаблон листа"
+        verbose_name_plural = "✉️ Шаблони листів"
+        ordering = ["shop", "kind", "lang"]
+        constraints = [models.UniqueConstraint(fields=["shop", "kind", "lang"], name="shop_mail_template_unique")]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} · {self.lang.upper()}"

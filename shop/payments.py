@@ -213,7 +213,8 @@ def start_checkout(shop: Shop, order, success_url, cancel_url, lang: str = "de")
             old.status = ShopPayment.EXPIRED
             old.save(update_fields=["status", "updated_at"])
         meta = {"order_id": order.pk, "order_number": order.order_number, "shop": shop.slug}
-        title = f"{'Bestellung' if lang == 'de' else 'Order'} {order.order_number} – {shop.name}"
+        from .mail import public_name
+        title = f"{'Bestellung' if lang == 'de' else 'Order'} {order.order_number} – {public_name(shop)}"
         data = {
             "mode": "payment",
             "line_items": [{"quantity": 1, "price_data": {
@@ -322,11 +323,16 @@ def _notify_team(payment: ShopPayment) -> None:
         return
     if ns is None:
         return
-    o = payment.order
-    text = f"💳 Оплату отримано: {o.order_number} · {payment.amount:.2f} {payment.currency} · {o.client or o.email}"
+    import html as _html
+    from .mail import team_message
+    o, shop = payment.order, payment.shop
+    lang = shop.team_lang if shop.team_lang in ("de", "en") else "de"
+    text, details = team_message(shop, number=o.order_number, amount=_money_text(payment.amount, payment.currency, lang),
+                                 customer=o.client or o.email, reference=payment.payment_intent or payment.session_id)
     if getattr(ns, "email_enabled", False) and (ns.email_to or "").strip():
         try:
-            _send_event_email(ns, text, f"<p>{text}</p><p>Stripe: {payment.payment_intent or payment.session_id}</p>")
+            _send_event_email(ns, text, f"<p>{_html.escape(text)}</p>"
+                                        f"<p style=\"white-space:pre-line\">{_html.escape(details)}</p>")
         except Exception as e:
             logger.warning("Team mail paid failed: %s", e)
     if getattr(ns, "telegram_enabled", False) and ns.telegram_bot_token and ns.telegram_chat_id:

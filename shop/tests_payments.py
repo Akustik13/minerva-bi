@@ -399,3 +399,79 @@ class CheckButtonsTests(StripeTestCase):
         r = self.client.post("/admin/crm/customer/", {"action": "action_check_stripe_payments",
                                                       "_selected_action": [c.pk]}, follow=True)
         self.assertContains(r, "оплачено 1")
+
+
+class MailTemplateTests(StripeTestCase):
+    def setUp(self):
+        super().setUp()
+        from config.models import NotificationSettings, SystemSettings
+        ns = NotificationSettings.get()
+        ns.email_host, ns.email_from = "smtp.example.com", "Shop <shop@example.com>"
+        ns.email_enabled, ns.email_to = True, "team@example.com"
+        ns.save()
+        patcher = mock.patch("dashboard.notifications._send_event_email")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
+        self.shop.name, self.shop.public_name = "Сайт sevskiy.de", "Sevskiy GmbH"
+        self.shop.save()
+
+    def pay(self):
+        self.order()
+        self.checkout()
+        s = dict(self.fake.sessions["cs_test_1"], status="complete", payment_status="paid", payment_intent="pi_42")
+        body, sig = signed({"id": "evt", "type": "checkout.session.completed", "data": {"object": s}})
+        APIClient().post("/api/v1/payments/stripe/webhook/webshop/", body, content_type="application/json",
+                         HTTP_STRIPE_SIGNATURE=sig)
+
+    def test_public_name_and_german_team_message(self):
+        from django.core import mail as dj_mail
+        from dashboard import notifications
+        self.pay()
+        team_mail = notifications._send_event_email
+        customer = [m for m in dj_mail.outbox if m.to == ["einkauf@firma.de"]][0]
+        self.assertIn("bei Sevskiy GmbH eingegangen", customer.body)
+        self.assertNotIn("Сайт", customer.body)
+        subject = team_mail.call_args[0][1]
+        self.assertEqual(subject, "💳 Zahlung eingegangen: WS-1 · 55,81 EUR · Firma")
+        self.assertIn("Bestellung WS-1 – Sevskiy GmbH", self.fake.calls[0][2]["line_items[0][price_data][product_data][name]"])
+
+    def test_custom_template_used(self):
+        from django.core import mail as dj_mail
+        from .models import ShopMailTemplate
+        ShopMailTemplate.objects.create(shop=self.shop, kind="paid", lang="de", subject="Danke! {number} bezahlt",
+                                        greeting="Hallo {name},", intro="Wir haben {amount} erhalten.", button="Ansehen")
+        self.pay()
+        m = [m for m in dj_mail.outbox if m.to == ["einkauf@firma.de"]][0]
+        self.assertEqual(m.subject, "Danke! WS-1 bezahlt")
+        self.assertIn("Hallo,", m.body)  # без імені покупця — «Hallo,»
+        self.assertIn("Wir haben 55,81 EUR erhalten.", m.body)
+        ShopMailTemplate.objects.update(is_active=False)
+        from . import mail
+        self.assertIn("Zahlung erhalten", mail.compose(self.shop, "paid", "de", number="X", amount="1")[0])
+
+    def test_admin_templates(self):
+        from .models import ShopMailTemplate
+        r = self.client.get("/admin/shop/shopmailtemplate/")
+        self.assertContains(r, "Створити всі шаблони")
+        self.client.post("/admin/shop/shopmailtemplate/create-defaults/")
+        self.assertEqual(ShopMailTemplate.objects.count(), len(ShopMailTemplate.KINDS) * 2)
+        t = ShopMailTemplate.objects.get(kind="verify", lang="de")
+        r = self.client.get(f"/admin/shop/shopmailtemplate/{t.pk}/change/")
+        self.assertContains(r, "Так виглядатиме лист")
+        self.assertContains(r, "E-Mail-Adresse bestätigen – Sevskiy GmbH")
+        self.assertContains(r, "{hours}")
+        # невідоме поле і непарна дужка — помилка форми
+        data = {"shop": self.shop.pk, "kind": "verify", "lang": "de", "is_active": "on", "subject": "Hallo {kunde}",
+                "greeting": "", "intro": "Text {name", "button": "", "outro": ""}
+        r = self.client.post(f"/admin/shop/shopmailtemplate/{t.pk}/change/", data)
+        self.assertContains(r, "Невідомі поля: {kunde}")
+        self.assertContains(r, "Перевірте фігурні дужки")
+        from django.core import mail as dj_mail
+        self.client.post(f"/admin/shop/shopmailtemplate/{t.pk}/test/")
+        self.assertEqual(dj_mail.outbox[-1].to, ["adm@example.com"])
+        r = self.client.get("/admin/shop/shopmailtemplate/add/?kind=paid&lang=en")
+        self.assertContains(r, "Payment received")

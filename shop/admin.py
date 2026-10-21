@@ -185,7 +185,7 @@ class ShopAdmin(admin.ModelAdmin):
     inlines = [ShippingZoneInline]
     actions = ["action_default_zones", "action_import_dk_zones"]
     fieldsets = [
-        (None, {"fields": ["name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
+        (None, {"fields": ["name", "public_name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
         ("🚚 Доставка", {
             "fields": ["free_shipping_enabled", "free_shipping_threshold", "zones_tools"],
             "description": "Куди доставляємо — регіони внизу сторінки. Замовити можуть лише покупці з країн цих "
@@ -194,7 +194,7 @@ class ShopAdmin(admin.ModelAdmin):
                            "доставки» (Німеччина, Європа, США, світ), або «⬇️ Регіони доставки з DigiKey».",
         }),
         ("👤 Особистий кабінет покупців", {
-            "fields": ["accounts_enabled", "mail_sender", "mail_from_name", "mail_footer", "accounts_tools"],
+            "fields": ["accounts_enabled", "mail_sender", "mail_from_name", "mail_footer", "team_lang", "accounts_tools"],
             "description": "Реєстрація з підтвердженням email, вхід, скидання пароля, статус замовлень і кошик "
                            "на сайті. Акаунти зберігаються лише в Minerva; сайт тримає тільки ключ сесії в cookie. "
                            "Ключу сайту додайте права «Акаунти покупців — читання» і «— запис». "
@@ -1052,3 +1052,4 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
 
 
 from . import admin_accounts  # noqa: E402,F401  — акаунти покупців (особистий кабінет)
+from . import admin_templates  # noqa: E402,F401  — шаблони листів

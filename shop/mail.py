@@ -181,30 +181,89 @@ TEXTS = {
                "(confirmation, password) are sent via this sender.", "", ""),
     },
 }
-GREETING = {"de": "Guten Tag {name},", "en": "Dear {name},"}
-GREETING_ANON = {"de": "Guten Tag,", "en": "Hello,"}
+TEXTS["team_paid"] = {
+    "de": ("💳 Zahlung eingegangen: {number} · {amount} · {customer}", "Stripe-Zahlung: {reference}", "", ""),
+    "en": ("💳 Payment received: {number} · {amount} · {customer}", "Stripe payment: {reference}", "", ""),
+}
+GREETING = {"de": "Guten Tag {name},", "en": "Hello {name},"}
+NO_GREETING = ("team_paid",)
+
+# Поля, які можна вставити в шаблон (адмінка показує їх і перевіряє шаблон)
+PLACEHOLDERS = {
+    "verify": ["shop", "name", "hours"], "exists": ["shop", "name"], "reset": ["shop", "name", "minutes"],
+    "changed": ["shop", "name"], "invite": ["shop", "name", "days"], "deleted": ["shop", "name"],
+    "paid": ["shop", "name", "number", "amount"], "team_paid": ["shop", "number", "amount", "customer", "reference"],
+    "test": ["shop"],
+}
+SAMPLE = {"name": "Max Mustermann", "number": "WS-261021-ABC123", "amount": "123,45 EUR", "hours": 48,
+          "minutes": 60, "days": 7, "customer": "Musterfirma GmbH", "reference": "pi_3Example"}
 
 
-def compose(shop, kind: str, lang: str, *, name: str = "", link: str = "", **vars) -> tuple[str, str, str]:
-    """(тема, текст, html) листа."""
-    lang = lang if lang in ("de", "en") else "de"
+class _Keep(dict):
+    """Невідоме поле в шаблоні — лишити як є ({xyz}), а не падати."""
+    def __missing__(self, key):
+        return "{" + key + "}"
+
+
+def _fill(text: str, values: dict) -> str:
+    try:
+        return (text or "").format_map(_Keep(values))
+    except (ValueError, IndexError):  # непарні фігурні дужки — текст без підстановки
+        return text or ""
+
+
+def public_name(shop) -> str:
+    return (shop.public_name or shop.mail_from_name or shop.name).strip()
+
+
+def defaults(kind: str, lang: str) -> dict:
     subject, intro, button, outro = TEXTS[kind][lang]
-    fmt = {"shop": shop.name, **{k: str(v) for k, v in vars.items()}}
-    subject, intro, outro = subject.format(**fmt), intro.format(**fmt), outro.format(**fmt)
-    greet = GREETING[lang].format(name=name) if name else GREETING_ANON[lang]
-    footer = (shop.mail_footer or shop.name).strip()
+    return {"subject": subject, "greeting": "" if kind in NO_GREETING else GREETING[lang],
+            "intro": intro, "button": button, "outro": outro}
 
-    text = "\n\n".join(p for p in [greet, intro, (f"{button}:\n{link}" if link else ""), outro, "—\n" + footer] if p)
+
+def template(shop, kind: str, lang: str) -> dict:
+    """Власний шаблон магазину (активний) або стандартний текст."""
+    from .models import ShopMailTemplate
+    t = ShopMailTemplate.objects.filter(shop=shop, kind=kind, lang=lang, is_active=True).first() if shop.pk else None
+    if t is None:
+        return defaults(kind, lang)
+    return {"subject": t.subject, "greeting": t.greeting, "intro": t.intro, "button": t.button, "outro": t.outro}
+
+
+def compose(shop, kind: str, lang: str, *, name: str = "", link: str = "", tpl: dict | None = None,
+            **vars) -> tuple[str, str, str]:
+    """(тема, текст, html) листа: шаблон магазину або стандартний текст; поля {shop}, {name}, {number} …"""
+    lang = lang if lang in ("de", "en") else "de"
+    t = tpl or template(shop, kind, lang)
+    fmt = {"shop": public_name(shop), "name": name, **{k: str(v) for k, v in vars.items()}}
+    subject = _fill(t["subject"], fmt).replace("\n", " ").strip()
+    intro, outro, button = _fill(t["intro"], fmt), _fill(t["outro"], fmt), _fill(t["button"], fmt)
+    greeting = t["greeting"] if name else t["greeting"].replace(" {name}", "").replace("{name}", "")
+    greet = _fill(greeting, fmt).strip()
+    footer = (shop.mail_footer or public_name(shop)).strip()
+
+    text = "\n\n".join(p for p in [greet, intro, (f"{button or link}:\n{link}" if link else ""), outro,
+                                    "—\n" + footer] if p)
     esc = html.escape
     btn = (f'<p style="margin:24px 0"><a href="{esc(link)}" style="background:#0b5cad;color:#fff;padding:12px 22px;'
-           f'border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">{esc(button)}</a></p>'
+           f'border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">{esc(button or link)}</a></p>'
            f'<p style="font-size:12px;color:#666;word-break:break-all">{esc(link)}</p>') if link else ""
     body = (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#222;max-width:560px">'
-            f'<p>{esc(greet)}</p><p>{esc(intro)}</p>{btn}'
-            + (f'<p style="color:#555">{esc(outro)}</p>' if outro else "")
+            + (f'<p>{esc(greet)}</p>' if greet else "")
+            + f'<p style="white-space:pre-line">{esc(intro)}</p>{btn}'
+            + (f'<p style="color:#555;white-space:pre-line">{esc(outro)}</p>' if outro else "")
             + f'<hr style="border:0;border-top:1px solid #ddd;margin:24px 0">'
               f'<p style="font-size:12px;color:#777;white-space:pre-line">{esc(footer)}</p></div>')
     return subject, text, body
+
+
+def team_message(shop, **vars) -> tuple[str, str]:
+    """Сповіщення команді (мова — «Мова сповіщень команді»): (рядок для Telegram / теми, текст для email)."""
+    lang = shop.team_lang if shop.team_lang in ("de", "en") else "de"
+    t = template(shop, "team_paid", lang)
+    fmt = {"shop": public_name(shop), **{k: str(v) for k, v in vars.items()}}
+    return _fill(t["subject"], fmt).strip(), _fill(t["intro"], fmt).strip()
 
 
 def send(shop, to: str, kind: str, lang: str, **kwargs) -> None:
