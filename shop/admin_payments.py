@@ -26,10 +26,27 @@ class ShopForm(forms.ModelForm):
         widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password", "size": 60}),
         help_text="whsec_… (Stripe → Developers → Webhooks → endpoint → Signing secret). Порожньо — залишити збережений.")
     stripe_clear = forms.BooleanField(label="Видалити збережені ключі Stripe", required=False)
+    payment_methods = forms.MultipleChoiceField(
+        label="Показувати в касі", required=False, choices=Shop.PAYMENT_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Що покупець бачить на сайті. Stripe — лише з ключем (блок «💳 Оплата Stripe» нижче). "
+                  "Банківські реквізити для передоплати й строк оплати рахунку — у shop-config.php сайту.")
+    payment_default = forms.ChoiceField(
+        label="Вибрано за замовчуванням", required=False, choices=[("", "— перший зі списку —")] + Shop.PAYMENT_CHOICES)
 
     class Meta:
         model = Shop
         fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        methods = list(getattr(self.instance, "payment_methods", None) or [])
+        if "payment_methods" in self.fields:
+            # ще не налаштовано: як зараз на сайті (передоплата, рахунок + Stripe, якщо був увімкнений)
+            self.fields["payment_methods"].initial = methods or (
+                ["prepayment", "invoice"] + (["stripe"] if getattr(self.instance, "stripe_enabled", False) else []))
+        if "payment_default" in self.fields and methods:
+            self.fields["payment_default"].initial = methods[0]
 
     def _keep(self, name, prefixes, hint):
         value = (self.cleaned_data.get(name) or "").strip()
@@ -48,11 +65,22 @@ class ShopForm(forms.ModelForm):
 
     def clean(self):
         d = super().clean()
+        if "payment_methods" not in self.fields:
+            return d
         if d.get("stripe_clear"):
             d["stripe_secret_key"] = d["stripe_webhook_secret"] = ""
-            d["stripe_enabled"] = False
-        if d.get("stripe_enabled") and not d.get("stripe_secret_key"):
-            self.add_error("stripe_secret_key", "Щоб увімкнути оплату Stripe, вкажіть секретний ключ.")
+        order = [m for m, _ in Shop.PAYMENT_CHOICES]
+        methods = sorted(d.get("payment_methods") or [], key=order.index)
+        default = d.get("payment_default") or ""
+        if default and default not in methods:
+            self.add_error("payment_default", "Цей спосіб не відмічено в «Показувати в касі».")
+        elif default:
+            methods = [default] + [m for m in methods if m != default]
+        if not methods:
+            self.add_error("payment_methods", "Оберіть хоча б один спосіб оплати.")
+        if "stripe" in methods and not d.get("stripe_secret_key"):
+            self.add_error("payment_methods", "Для Stripe потрібен секретний ключ (блок «💳 Оплата Stripe»).")
+        d["payment_methods"] = methods
         return d
 
 
@@ -165,7 +193,7 @@ class ShopPaymentAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-        extra_context["poll_states"] = [(s, payments.poll_state(s)) for s in Shop.objects.filter(stripe_enabled=True)]
+        extra_context["poll_states"] = [(s, payments.poll_state(s)) for s in Shop.objects.exclude(stripe_secret_key="")]
         extra_context["open_count"] = payments.unfinished().count()
         return super().changelist_view(request, extra_context)
 

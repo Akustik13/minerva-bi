@@ -621,13 +621,15 @@ app.listen(3000);
 
 | Запит | Scope | Що робить |
 |---|---|---|
-| `GET shop/payments/` | `orders:read` | `{stripe: {enabled, mode: test\|live}}` — сайт показує спосіб оплати |
+| `GET shop/payments/` | `orders:read` | `{methods: [prepayment, invoice, stripe] \| null, stripe: {enabled, connected, mode: test\|live}}` — способи оплати каси в порядку магазину (перший — за замовчуванням; `null` — сайт бере свої), `enabled` — Stripe у касі, `connected` — ключ є (давніші замовлення можна оплатити) |
 | `POST shop/payments/stripe/checkout/` | `orders:write` | `{order_number, success_url, cancel_url, lang}` → `{url, session_id, amount, currency, expires_at, mode}`. Сума = нетто + доставка + ПДВ (`ShopOrder.vat_rate`; без ставки — 409 `vat_unknown`). Відкрита сесія з тією ж сумою використовується повторно; стару з іншою сумою Minerva закриває (`expire`). Адреси повернення — лише домен «Адреса сайту». Помилки: `already_paid`, `not_payable`, `stripe_disabled`, `stripe_error` |
 | `POST shop/payments/stripe/sync/` | `orders:write` | `{order_number}` → `{payment_status, paid}` — Minerva сама питає Stripe (якщо вебхук ще не дійшов) |
 | `POST shop/account/me/orders/<number>/pay/` | `accounts:write` | те саме для власного замовлення покупця (заголовок `X-Customer-Session`) |
 | `POST payments/stripe/webhook/<код магазину>/` | — | для Stripe: підпис `Stripe-Signature` (HMAC, 5 хв). Події: `checkout.session.completed` / `async_payment_succeeded` → `payment_status = paid`, `payment_reference` = PaymentIntent; `async_payment_failed` → `failed`; `expired`; `charge.refunded` (повне) → `refunded` |
 
 **Перевірка незавершених оплат** (сесія відкрита або «обробляється»): кнопки «💳 Перевірити оплати» в картці клієнта CRM (і дія в списку клієнтів), «🔄 Перевірити оплати клієнта» в акаунті покупця, «🔄 Перевірити незавершені оплати» у «💳 Онлайн-оплати» та в картці магазину. **Автоперевірка** — `manage.py check_stripe_payments` (cron щохвилини): поки від Stripe не було підписаного вебхука за 7 днів (`Shop.stripe_webhook_last_at`), раз на `Shop.stripe_poll_minutes` хв (0 — вимкнено) Minerva питає Stripe про незавершені оплати за 14 днів; щойно вебхуки приходять — автоперевірка зупиняється. `--now` — перевірити все зараз.
+
+Способи оплати магазину — `Shop.payment_methods` (адмінка «💳 Способи оплати на сайті», shop 0013); `POST /orders/` з `shop: true` і вимкненим способом → 400 `payment_method_not_allowed`. Після оплати Minerva надсилає покупцю лист «Zahlung erhalten» (`ShopPayment.notified_at`, один раз) і сповіщення команді (NotificationSettings: email / Telegram). Замовлення з сесією покупця очищає кошик акаунта.
 
 Замовлення сайту з оплатою Stripe створюється з `payment_method = stripe`, `payment_status = pending`; у кабінеті покупця `payment_open = true`, доки оплату не завершено.
 

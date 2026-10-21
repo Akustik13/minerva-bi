@@ -61,13 +61,28 @@ def key_mode(key: str) -> str:
     return ""
 
 
+def connected(shop: Shop) -> bool:
+    """Ключ Stripe задано: можна оплатити замовлення (і давніші, навіть якщо Stripe прибрали з каси)."""
+    return bool(shop and shop.stripe_secret_key)
+
+
 def enabled(shop: Shop) -> bool:
-    return bool(shop and shop.stripe_enabled and shop.stripe_secret_key)
+    """Stripe пропонується в касі для нових замовлень."""
+    return connected(shop) and bool(shop.stripe_enabled)
+
+
+def site_methods(shop: Shop | None) -> list[str] | None:
+    """Способи оплати для каси сайту (порядок = як у магазині); None — сайт бере власні налаштування."""
+    if shop is None or not shop.payment_methods:
+        return None
+    return [m for m in shop.payment_methods if m != "stripe" or connected(shop)]
 
 
 def public_status(shop: Shop | None) -> dict:
-    """Що бачить сайт: чи доступна оплата Stripe і в якому режимі."""
-    return {"stripe": {"enabled": enabled(shop), "mode": key_mode(shop.stripe_secret_key) if shop else ""}}
+    """Що бачить сайт: способи оплати магазину і стан Stripe."""
+    return {"methods": site_methods(shop),
+            "stripe": {"enabled": enabled(shop), "connected": connected(shop),
+                       "mode": key_mode(shop.stripe_secret_key) if shop else ""}}
 
 
 # ── Stripe API ───────────────────────────────────────────────────────────────
@@ -172,8 +187,8 @@ def find_order(shop: Shop, number):
 def start_checkout(shop: Shop, order, success_url, cancel_url, lang: str = "de") -> ShopPayment:
     """Сторінка оплати Stripe для замовлення: відкрита сесія використовується повторно (без подвійної оплати)."""
     from sales.models import SalesOrder
-    if not enabled(shop):
-        raise PaymentError(403, "stripe_disabled", "Оплату Stripe у магазині вимкнено.")
+    if not connected(shop):  # Stripe прибрали з каси — давніші замовлення все одно можна оплатити
+        raise PaymentError(403, "stripe_disabled", "Stripe у магазині не підключено (немає ключа).")
     success_url, cancel_url = check_return_url(shop, success_url), check_return_url(shop, cancel_url)
     if order.document_type == "QUOTE" or order.status == "cancelled":
         raise PaymentError(409, "not_payable", "Це замовлення не оплачується онлайн.")
@@ -254,6 +269,9 @@ def apply_session(payment: ShopPayment, session: dict, event: str = "") -> ShopP
     if session.get("payment_status") == "paid":
         payment.status, payment.paid_at = ShopPayment.PAID, payment.paid_at or timezone.now()
         _set_order_payment(order, "paid", payment.payment_intent or payment.session_id)
+        payment.save()
+        notify_paid(payment)
+        return payment
     elif session.get("status") == "complete":           # SEPA тощо: гроші ще йдуть
         payment.status = ShopPayment.PROCESSING
         _set_order_payment(order, "pending")
@@ -261,6 +279,61 @@ def apply_session(payment: ShopPayment, session: dict, event: str = "") -> ShopP
         payment.status = ShopPayment.EXPIRED
     payment.save()
     return payment
+
+
+def _money_text(amount, currency: str, lang: str) -> str:
+    text = f"{amount:,.2f}"
+    if lang == "de":
+        text = text.replace(",", " ").replace(".", ",").replace(" ", ".")
+    return f"{text} {currency}"
+
+
+def notify_paid(payment: ShopPayment) -> None:
+    """Оплату отримано: лист покупцю (один раз на оплату) і сповіщення команді (налаштування сповіщень)."""
+    if payment.notified_at:
+        return
+    updated = ShopPayment.objects.filter(pk=payment.pk, notified_at__isnull=True).update(notified_at=timezone.now())
+    if not updated:
+        return  # паралельний вебхук / перевірка вже надіслали
+    payment.notified_at = timezone.now()
+    order, shop = payment.order, payment.shop
+    info = getattr(order, "shop_info", None)
+    lang = (info.lang if info and info.lang else "") or (info.customer.lang if info and info.customer else "de")
+    if order.email:
+        from . import mail
+        link = ""
+        if info is not None and info.customer_id:
+            base = (shop.account_links or {}).get(lang) or next(iter((shop.account_links or {}).values()), "")
+            link = f"{base}#order={order.order_number}" if base else ""
+        try:
+            mail.send(shop, order.email, "paid", lang, name=order.contact_name or "", link=link,
+                      number=order.order_number, amount=_money_text(payment.amount, payment.currency, lang))
+        except Exception as e:  # SMTP — не ламає вебхук; Stripe і адмінка показують оплату
+            logger.warning("Shop mail paid → %s failed: %s", order.email, e)
+    _notify_team(payment)
+
+
+def _notify_team(payment: ShopPayment) -> None:
+    """Email / Telegram з «Налаштування → Сповіщення», якщо там увімкнено."""
+    try:
+        from dashboard.notifications import _get_ns, _send_event_email, _send_telegram
+        ns = _get_ns()
+    except Exception:
+        return
+    if ns is None:
+        return
+    o = payment.order
+    text = f"💳 Оплату отримано: {o.order_number} · {payment.amount:.2f} {payment.currency} · {o.client or o.email}"
+    if getattr(ns, "email_enabled", False) and (ns.email_to or "").strip():
+        try:
+            _send_event_email(ns, text, f"<p>{text}</p><p>Stripe: {payment.payment_intent or payment.session_id}</p>")
+        except Exception as e:
+            logger.warning("Team mail paid failed: %s", e)
+    if getattr(ns, "telegram_enabled", False) and ns.telegram_bot_token and ns.telegram_chat_id:
+        try:
+            _send_telegram(ns, text)
+        except Exception as e:
+            logger.warning("Telegram paid failed: %s", e)
 
 
 def sync(payment: ShopPayment) -> ShopPayment:
@@ -357,7 +430,7 @@ def run_poll(now=None) -> list[tuple[Shop, dict]]:
     """Автоперевірка (cron, кожну хвилину): магазини без працюючого вебхука, коли настав час."""
     now = now or timezone.now()
     done = []
-    for shop in Shop.objects.filter(stripe_enabled=True, stripe_poll_minutes__gt=0).exclude(stripe_secret_key=""):
+    for shop in Shop.objects.filter(stripe_poll_minutes__gt=0).exclude(stripe_secret_key=""):
         if webhook_active(shop, now):
             continue
         if shop.stripe_poll_last_at and now - shop.stripe_poll_last_at < timedelta(minutes=shop.stripe_poll_minutes):

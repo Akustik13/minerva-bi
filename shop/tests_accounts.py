@@ -292,6 +292,13 @@ class ProfileCartOrderTests(AccountTestCase):
         rows = self.get("me/orders/", session).json()["results"]
         self.assertEqual([o["number"] for o in rows], ["WS-1"])
 
+    def test_order_with_session_clears_account_cart(self):
+        session = self.register_and_verify()
+        self.c.put("/api/v1/shop/account/me/cart/", {"items": {"AN-1": 2}}, format="json",
+                   HTTP_X_CUSTOMER_SESSION=session)
+        self.order("WS-C", session=session)
+        self.assertEqual(self.get("me/cart/", session).json()["items"], {})
+
     def test_order_with_session_and_detail(self):
         session = self.register_and_verify()
         r = self.order("WS-2", session=session, email="einkauf@firma.de")

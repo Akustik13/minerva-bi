@@ -162,6 +162,18 @@ TEXTS = {
                "The link is valid for {days} days. After that you can use “Forgot password” on the sign-in page at "
                "any time. If you do not want an account, please ignore this e-mail."),
     },
+    "paid": {
+        "de": ("Zahlung erhalten – Bestellung {number}",
+               "vielen Dank! Ihre Zahlung über {amount} für die Bestellung {number} ist bei {shop} eingegangen. "
+               "Wir bereiten den Versand vor und informieren Sie, sobald die Sendung unterwegs ist.",
+               "Bestellung ansehen",
+               "Bei Fragen antworten Sie einfach auf diese E-Mail."),
+        "en": ("Payment received – order {number}",
+               "thank you! Your payment of {amount} for order {number} has been received by {shop}. "
+               "We are preparing the shipment and will let you know as soon as it is on its way.",
+               "View order",
+               "If you have any questions, simply reply to this e-mail."),
+    },
     "test": {
         "de": ("Testnachricht – {shop}", "dies ist eine Testnachricht aus Minerva: Die E-Mails des "
                "Kundenkontos (Bestätigung, Passwort) werden über diesen Absender versendet.", "", ""),

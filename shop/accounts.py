@@ -626,6 +626,9 @@ def record_order(order, shop: Shop, *, session_token=None, vat_rate=None, billin
     if customer is not None:
         _fill_profile_from_order(customer, order, billing)
         link_crm(customer)
+        if session_token and customer.cart:  # каса надсилає весь кошик — після замовлення він порожній
+            customer.cart, customer.cart_updated_at = {}, timezone.now()
+            customer.save(update_fields=["cart", "cart_updated_at", "updated_at"])
     return info
 
 

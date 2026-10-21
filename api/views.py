@@ -336,6 +336,12 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                 return Response({"detail": "Для ключа не налаштовано магазин.", "code": "no_shop"},
                                 status=status.HTTP_400_BAD_REQUEST)
             d.setdefault("payment_status", "unpaid")
+            from shop.payments import site_methods
+            allowed = site_methods(shop)
+            if allowed is not None and d.get("payment_method") and d["payment_method"] not in allowed:
+                return Response({"detail": f"Спосіб оплати «{d['payment_method']}» у магазині вимкнено.",
+                                 "code": "payment_method_not_allowed", "allowed": allowed},
+                                status=status.HTTP_400_BAD_REQUEST)
 
         if shop is not None:
             d["source"] = shop.slug  # замовлення магазину: джерело = код магазину (сайт може надсилати старий)

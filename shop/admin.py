@@ -200,10 +200,16 @@ class ShopAdmin(admin.ModelAdmin):
                            "Ключу сайту додайте права «Акаунти покупців — читання» і «— запис». "
                            "Листи покупцям (підтвердження, новий пароль) надсилає Minerva.",
         }),
+        ("💳 Способи оплати на сайті", {
+            "fields": ["payment_methods", "payment_default"],
+            "description": "Які способи оплати бачить покупець у касі. Minerva також перевіряє вибір у кожному "
+                           "замовленні: вимкнений спосіб не приймається.",
+        }),
         ("💳 Оплата Stripe", {
-            "fields": ["stripe_enabled", "stripe_secret_key", "stripe_webhook_secret", "stripe_clear",
+            "fields": ["stripe_secret_key", "stripe_webhook_secret", "stripe_clear",
                        "stripe_poll_minutes", "stripe_col"],
-            "description": "Покупець обирає на сайті «Kreditkarte / Online (Stripe)» і платить на сторінці Stripe Checkout; "
+            "description": "Щоб покупці бачили Stripe, відмітьте «Онлайн через Stripe» у способах оплати вище. "
+                           "Покупець обирає на сайті «Kreditkarte / Online (Stripe)» і платить на сторінці Stripe Checkout; "
                            "суму рахує Minerva (нетто + доставка + ПДВ). Після оплати Stripe повідомляє Minerva "
                            "(вебхук) — замовлення стає «Оплачено». Способи оплати (картки, Apple/Google Pay, SEPA, Klarna …) "
                            "вмикаються в Stripe → Settings → Payment methods. Спершу перевірте в тестовому режимі (sk_test_…).",

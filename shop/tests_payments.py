@@ -69,7 +69,8 @@ class StripeTestCase(TestCase):
         InventorySettings.get()
         Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
         self.shop = Shop.objects.create(name="Sevskiy", slug="webshop", is_default=True, url="https://web.example.com",
-                                        stripe_enabled=True, stripe_secret_key=SECRET, stripe_webhook_secret=HOOK)
+                                        payment_methods=["prepayment", "invoice", "stripe"],
+                                        stripe_secret_key=SECRET, stripe_webhook_secret=HOOK)
         p = Product.objects.create(sku="AN-1", name="Antenne", sale_price=Decimal("20.00"))
         create_movement(product=p, tx_type="Incoming", qty=100)
         ShopListing.objects.create(shop=self.shop, product=p)
@@ -97,7 +98,28 @@ class StripeTestCase(TestCase):
 
 class CheckoutTests(StripeTestCase):
     def test_status(self):
-        self.assertEqual(self.c.get("/api/v1/shop/payments/").json(), {"stripe": {"enabled": True, "mode": "test"}})
+        self.assertEqual(self.c.get("/api/v1/shop/payments/").json(), {
+            "methods": ["prepayment", "invoice", "stripe"],
+            "stripe": {"enabled": True, "connected": True, "mode": "test"}})
+        self.shop.payment_methods = ["invoice", "prepayment"]  # Stripe прибрали з каси
+        self.shop.save()
+        d = self.c.get("/api/v1/shop/payments/").json()
+        self.assertEqual((d["methods"], d["stripe"]["enabled"], d["stripe"]["connected"]),
+                         (["invoice", "prepayment"], False, True))
+
+    def test_order_with_disabled_method_rejected(self):
+        self.shop.payment_methods = ["prepayment"]
+        self.shop.save()
+        r = self.c.post("/api/v1/orders/", {"order_number": "WS-9", "client": "Firma", "email": "a@b.de",
+                                            "addr_country": "DE", "shop": True, "payment_method": "invoice",
+                                            "lines": [{"sku": "AN-1", "qty": 1}]}, format="json")
+        self.assertEqual((r.status_code, r.json()["code"]), (400, "payment_method_not_allowed"))
+
+    def test_old_order_payable_after_stripe_removed(self):
+        self.order()
+        self.shop.payment_methods = ["prepayment"]
+        self.shop.save()
+        self.assertEqual(self.checkout().status_code, 201)
 
     def test_checkout_amount_and_reuse(self):
         self.order()
@@ -133,7 +155,7 @@ class CheckoutTests(StripeTestCase):
         self.assertEqual(r.json()["code"], "return_url_not_allowed")
         self.assertEqual(self.c.post("/api/v1/shop/payments/stripe/checkout/", {
             "order_number": "NOPE", "success_url": SITE, "cancel_url": SITE}, format="json").status_code, 404)
-        Shop.objects.update(stripe_enabled=False)
+        Shop.objects.update(stripe_secret_key="")
         self.assertEqual(self.checkout().json()["code"], "stripe_disabled")
 
     def test_vat_unknown(self):
@@ -181,6 +203,22 @@ class WebhookTests(StripeTestCase):
         self.o.payment_status = "paid"
         self.o.save()
         self.assertEqual(self.checkout().json()["code"], "already_paid")
+
+    def test_paid_mail_once(self):
+        from django.core import mail
+        from config.models import NotificationSettings
+        ns = NotificationSettings.get()
+        ns.email_host, ns.email_from = "smtp.example.com", "Shop <shop@example.com>"
+        ns.save()
+        s = dict(self.fake.sessions["cs_test_1"], status="complete", payment_status="paid", payment_intent="pi_1")
+        self.hook("checkout.session.completed", s)
+        self.hook("checkout.session.completed", s)  # повтор від Stripe — без другого листа
+        payments.sync(ShopPayment.objects.get())
+        paid = [m for m in mail.outbox if "Zahlung erhalten" in m.subject]
+        self.assertEqual(len(paid), 1)
+        self.assertEqual(paid[0].to, ["einkauf@firma.de"])
+        self.assertIn("55,81 EUR", paid[0].body)
+        self.assertIsNotNone(ShopPayment.objects.get().notified_at)
 
     def test_async_payment(self):
         s = dict(self.fake.sessions["cs_test_1"], status="complete", payment_status="unpaid", payment_intent="pi_9")
@@ -258,6 +296,30 @@ class StripeAdminTests(StripeTestCase):
         self.assertNotContains(r, SECRET)  # ключ не показується
         self.client.post(f"/admin/shop/shop/{self.shop.pk}/stripe-check/")
         self.client.post("/admin/shop/shoppayment/", {"action": "action_sync", "_selected_action": [p.pk]})
+
+    def test_payment_methods_form(self):
+        url = f"/admin/shop/shop/{self.shop.pk}/change/"
+        r = self.client.get(url)
+        self.assertContains(r, "Показувати в касі")
+        form = r.context["adminform"].form
+        data = {k: v for k, v in form.initial.items() if v is not None and not hasattr(v, "url")}
+        data.update({"name": "Sevskiy", "slug": "webshop", "currency": "EUR", "is_active": "on", "is_default": "on",
+                     "url": "https://web.example.com", "payment_methods": ["invoice", "stripe"],
+                     "payment_default": "stripe", "stripe_poll_minutes": "15",
+                     "shipping_zones-TOTAL_FORMS": "0", "shipping_zones-INITIAL_FORMS": "0"})
+        for k in ("mail_sender", "free_shipping_threshold", "account_links", "account_link_error",
+                  "stripe_secret_key", "stripe_webhook_secret"):
+            data.pop(k, None)
+        data["account_links"] = "{}"
+        r = self.client.post(url, data)
+        self.assertEqual(r.status_code, 302, r.context["adminform"].form.errors if r.context else r)
+        shop = Shop.objects.get()
+        self.assertEqual((shop.payment_methods, shop.stripe_enabled), (["stripe", "invoice"], True))
+        self.assertEqual(shop.stripe_secret_key, SECRET)  # порожнє поле ключа — ключ лишився
+        data["payment_methods"] = ["prepayment"]
+        data["payment_default"] = "invoice"
+        r = self.client.post(url, data)
+        self.assertContains(r, "Цей спосіб не відмічено")
 
     def test_check_key(self):
         self.assertIn("Sevskiy", payments.check_key(self.shop))

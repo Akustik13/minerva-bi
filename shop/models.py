@@ -123,11 +123,16 @@ class Shop(models.Model):
         "Відхилена адреса кабінету", max_length=400, blank=True, default="",
         help_text="Остання адреса сторінки кабінету від сайту, яку Minerva не прийняла (інший домен, ніж «Адреса сайту»).",
     )
+    # ── Способи оплати на сайті ──
+    payment_methods = models.JSONField(
+        "Способи оплати на сайті", default=list, blank=True,
+        help_text="Що бачить покупець у касі, у цьому порядку (перший — вибраний за замовчуванням): "
+                  "prepayment, invoice, stripe. Порожньо — як у налаштуваннях сайту (shop-config.php).",
+    )
     # ── Онлайн-оплата Stripe (shop/payments.py) ──
     stripe_enabled = models.BooleanField(
-        "Оплата через Stripe", default=False,
-        help_text="На сайті з'являється спосіб оплати «Kreditkarte / Online (Stripe)». Minerva створює сторінку "
-                  "оплати Stripe Checkout на суму замовлення і отримує підтвердження оплати від Stripe.",
+        "Stripe у касі", default=False,
+        help_text="Заповнюється автоматично: «stripe» у способах оплати.",
     )
     stripe_secret_key = models.CharField(
         "Stripe: секретний ключ", max_length=255, blank=True, default="",
@@ -161,7 +166,12 @@ class Shop(models.Model):
         if self.free_shipping_enabled and self.free_shipping_threshold is None:
             raise ValidationError({"free_shipping_threshold": "Вкажіть поріг безкоштовної доставки."})
 
+    PAYMENT_CHOICES = [("prepayment", "Передоплата (Vorkasse, переказ)"), ("invoice", "Рахунок (Kauf auf Rechnung)"),
+                       ("stripe", "Онлайн через Stripe (картки, Apple / Google Pay, SEPA …)")]
+
     def save(self, *args, **kwargs):
+        if self.payment_methods:  # «Stripe у касі» = Stripe серед способів оплати (одне місце для налаштування)
+            self.stripe_enabled = "stripe" in self.payment_methods
         super().save(*args, **kwargs)
         if self.is_default:
             Shop.objects.exclude(pk=self.pk).filter(is_default=True).update(is_default=False)
@@ -444,6 +454,8 @@ class ShopPayment(models.Model):
     last_event = models.CharField("Остання подія Stripe", max_length=80, blank=True, default="")
     expires_at = models.DateTimeField("Сесія дійсна до", null=True, blank=True)
     paid_at = models.DateTimeField("Оплачено", null=True, blank=True)
+    notified_at = models.DateTimeField("Лист «оплату отримано»", null=True, blank=True,
+                                       help_text="Покупцю надіслано підтвердження оплати (один раз).")
     created_at = models.DateTimeField("Створено", auto_now_add=True)
     updated_at = models.DateTimeField("Змінено", auto_now=True)
 
