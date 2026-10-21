@@ -48,27 +48,47 @@ powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\e2e.ps1 rag --url htt
 
 ## Сценарій
 
-Після кожного кроку зачекайте, поки RAG забере зміни. `e2e.ps1 status` показує статус індексації з RAG по кожному документу.
+### Автоматичний прогін (для регресій)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\e2e.ps1 scenario            # кроки 1–14
+powershell -ExecutionPolicy Bypass -File rag_assistant\e2e\e2e.ps1 scenario --outage   # + крок 15 (зупиняє і запускає 8010)
+```
+
+Сценарій (`rag_assistant/e2e_scenario.py`) повторюваний:
+- на початку відновлює вихідний стан (`baseline`);
+- для кроків 6 і 13 створює власний лист прогону з TXT-вкладенням, а наприкінці повертає дані як були;
+- після кожної зміни чекає, доки `applied_seq` RAG дорівняється `last_seq` і статуси відповідатимуть чинним ревізіям.
+
+JSON-звіт пишеться в `%USERPROFILE%\minerva-e2e\reports\e2e-<run_id>.json`, без ключів і текстів листів. У ньому:
+- кожна перевірка;
+- кожен пошук: час, `document_revision`, score, вкладення, `dropped`;
+- синхронізації;
+- підсумок: p50 і max часу пошуку.
+
+Якщо є збої, команда завершується з кодом 1. Логіку без RAG покривають тести `rag_assistant/tests_e2e_scenario.py`.
+
+### Вручну
+
+`e2e.ps1 status` показує статус індексації з RAG по кожному документу. `e2e.ps1 baseline` повертає вихідний стан. Після кожного кроку зачекайте, поки RAG забере зміни.
 
 | # | Команда | Очікування |
 |---|---|---|
 | 1 | `status` | 6 документів `indexed`, у m3 — фрагменти вкладення |
-| 2 | `search "Liefertermin KW 46 zugesagt"` | anna: email:2 (і 1) |
-| 3 | `search "Kalibrierprotokoll SN-77821"` / `--user e2e_boris` | anna: без email:7 (лише власні листи); boris: лише email:7 |
-| 4 | `search "Steckverbinder SMA IP67"` | email:3 (вкладення) |
+| 2 | `search "Liefertermin KW 46 zugesagt"` | anna: m2 (і m1) |
+| 3 | `search "Kalibrierprotokoll SN-77821"` / `--user e2e_boris` | anna: без m7 (лише власні листи); boris: лише m7 |
+| 4 | `search "Steckverbinder SMA IP67"` | m3 (вкладення) |
 | 5 | `search "Angebot ANT-2400" --project` | лише листи проєкту |
-| 6 | `step new-mail`, потім `search "Expresszuschlag"` | новий лист email:8 |
-| 7 | `step edit`, потім `search "CAB-7 Lieferung"` | текст із 21.11.2026, стара ревізія не повертається |
+| 6 | `step new-mail`, потім `search "Expresszuschlag"` / `"Prüfbericht Vibrationstest"` | новий лист m8 і його вкладення |
+| 7 | `step edit` (дата CAB-7 перемикається 14.11 ↔ 21.11), потім `search "CAB-7 Lieferung"` | лише чинна ревізія з новою датою |
 | 8 | `step reassign`, потім `search "KW 46" --user e2e_boris` | boris бачить листи vertrieb; RAG не віддає їх для user_id anna; anna — «скриньки не підключені» |
 | 9 | `step restore-owner` | права повертаються |
 | 10 | `step deactivate` / `step activate` | tombstone `access_revoked` → пошук порожній → повернення |
 | 11 | `step exclude` / `step include` | гілка CAB-7 зникає з пошуку і повертається |
-| 12 | `step delete`, потім `search "Rabatt 8 %"` | email:5 зник (`deleted`) |
-| 13 | `step purge`, потім `search "IP67"` | email:3 і вкладення зникли |
-| 14 | зупинити RAG → `fallback` | усі OK: «недоступний» ≤ 3 с, пауза після 3 збоїв, «Історія» і стрічка працюють |
+| 12 | `step delete` / `step undelete`, `search "Rabatt 8 %"` | m5 зникає (`deleted`) і повертається |
+| 13 | `step purge` | лист m8 і його вкладення зникли |
+| 14 | `fallback --simulate` або зупинити RAG → `fallback` | усі OK: «недоступний» ≤ 3 с, пауза після 3 збоїв, «Історія» і стрічка працюють |
 | 15 | крок під час зупинки RAG (або Minerva: `stop` 8010) → запустити знову → `rag` (скинути паузу) → `search` | RAG догнав журнал з курсора; поки Minerva недоступна — `last_error: unavailable`, курсор не рухається |
-
-`fallback --simulate` перевіряє те саме без зупинки RAG: тимчасово ставить мертву адресу і повертає попередню.
 
 ## Прибирання
 
