@@ -347,7 +347,8 @@ def register(shop: Shop, data: dict, link: str) -> None:
 
     existing = ShopCustomer.objects.filter(shop=shop, email=email).first()
     if existing and existing.is_verified:
-        _mail(existing, "exists", link=link)  # власник адреси дізнається про спробу; пароль не змінюється
+        # власник адреси дізнається про спробу; пароль не змінюється
+        _raise_if_mail_failed(existing, _mail(existing, "exists", link=link))
         return
     with transaction.atomic():
         if existing:  # непідтверджена реєстрація: остання перемагає (власник адреси може «перезаписати» чужу)
@@ -360,7 +361,14 @@ def register(shop: Shop, data: dict, link: str) -> None:
         customer.password = make_password(password)
         customer.save()
         customer.sessions.all().delete()
-    send_verification(customer, link, throttle=bool(existing))
+    _raise_if_mail_failed(customer, send_verification(customer, link, throttle=bool(existing)))
+
+
+def _raise_if_mail_failed(customer: ShopCustomer, sent: bool):
+    """Реєстрація: лист не пішов через SMTP — сказати покупцю (акаунт лишається, повторна реєстрація надішле знову).
+    Однаково для нового й наявного акаунта, тож це не розкриває, чи зареєстрована адреса."""
+    if not sent and customer.last_mail_error:
+        raise AccountError(503, "mail_failed", "Лист не надіслано: " + customer.last_mail_error)
 
 
 def resend_verification(shop: Shop, email, link, lang="") -> None:

@@ -350,6 +350,15 @@ class AccountAdminTests(AccountTestCase):
         self.assertFalse(ShopCustomer.objects.get().is_active)
         self.assertFalse(ShopCustomerSession.objects.exists())
 
+    def test_mail_error_visible_in_list(self):
+        from config.models import NotificationSettings
+        NotificationSettings.objects.update(email_host="")  # SMTP не налаштовано
+        r = self.post("register/", REG)
+        self.assertEqual((r.status_code, r.json()["code"]), (503, "mail_failed"))
+        c = ShopCustomer.objects.get()
+        self.assertIn("SMTP", c.last_mail_error)
+        self.assertContains(self.client.get("/admin/shop/shopcustomer/"), "не надіслано")
+
     def test_test_mail(self):
         self.client.post(f"/admin/shop/shop/{self.shop.pk}/test-mail/")
         self.assertEqual(mail.outbox[-1].to, ["adm@example.com"])

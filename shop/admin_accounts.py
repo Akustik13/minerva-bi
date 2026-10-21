@@ -93,7 +93,8 @@ class VerifiedFilter(admin.SimpleListFilter):
 
 @admin.register(ShopCustomer)
 class ShopCustomerAdmin(admin.ModelAdmin):
-    list_display = ["email", "company", "name", "shop", "state_col", "orders_col", "last_login_at", "created_at"]
+    list_display = ["email", "company", "name", "shop", "state_col", "mail_col", "orders_col", "last_login_at",
+                    "created_at"]
     list_filter = ["shop", VerifiedFilter, "lang"]
     search_fields = ["email", "company", "name", "city"]
     list_select_related = ["shop"]
@@ -156,6 +157,16 @@ class ShopCustomerAdmin(admin.ModelAdmin):
         if not obj.is_verified:
             return format_html('<span style="color:#ffb74d">{}</span>', "⏳ email не підтверджено")
         return format_html('<span style="color:#81c784">{}</span>', "✅ активний")
+
+    @admin.display(description="Лист", ordering="last_mail_at")
+    def mail_col(self, obj):
+        """Останній лист покупцю: надіслано / помилка SMTP (текст помилки — у підказці й у картці акаунта)."""
+        if obj.last_mail_error:
+            return format_html('<span style="color:#e57373" title="{}">❌ не надіслано</span>', obj.last_mail_error)
+        if obj.last_mail_at:
+            return format_html('<span style="color:#81c784">✅ {}</span>',
+                               timezone.localtime(obj.last_mail_at).strftime("%d.%m %H:%M"))
+        return "—"
 
     @admin.display(description="Замовлень", ordering="_orders")
     def orders_col(self, obj):
