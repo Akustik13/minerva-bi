@@ -101,9 +101,9 @@ class ShopCustomerAdmin(admin.ModelAdmin):
     raw_id_fields = ["crm_customer"]
     readonly_fields = ["state_col", "email_verified_at", "last_login_at", "created_at", "updated_at",
                        "failed_logins", "locked_until", "sessions_col", "last_mail_at", "last_mail_error",
-                       "cart_col", "orders_list"]
+                       "cart_col", "orders_list", "payments_col"]
     actions = ["action_send_reset", "action_send_invite", "action_resend_verify", "action_unlock",
-               "action_logout_all", "action_disable", "action_enable"]
+               "action_logout_all", "action_disable", "action_enable", "action_check_payments"]
     fieldsets = [
         ("Акаунт", {"fields": ["shop", "email", "state_col", "is_active", "email_verified_at", "lang",
                                "crm_customer"],
@@ -113,7 +113,7 @@ class ShopCustomerAdmin(admin.ModelAdmin):
         ("Адреса доставки", {"classes": ["collapse"],
                              "fields": ["ship_separate", "ship_company", "ship_name", "ship_street", "ship_zip",
                                         "ship_city", "ship_country", "ship_phone"]}),
-        ("Замовлення і кошик", {"fields": ["orders_list", "cart_col"]}),
+        ("Замовлення і кошик", {"fields": ["orders_list", "payments_col", "cart_col"]}),
         ("Безпека і листи", {"fields": ["last_login_at", "sessions_col", "failed_logins", "locked_until",
                                         "last_mail_at", "last_mail_error", "created_at", "updated_at"]}),
     ]
@@ -192,6 +192,27 @@ class ShopCustomerAdmin(admin.ModelAdmin):
         return format_html('{}<div class="help">змінено {}</div>', format_html_join(
             "", "<div>{} × {}</div>", ((qty, sku[3:] + " (запит ціни)" if sku.startswith("rq:") else sku)
                                       for sku, qty in items.items())), when)
+
+    @admin.display(description="Онлайн-оплати")
+    def payments_col(self, obj):
+        from .models import ShopPayment
+        from .payments import UNFINISHED
+        if not obj or not obj.pk:
+            return "—"
+        qs = ShopPayment.objects.filter(order__shop_info__customer=obj)
+        if not qs.exists():
+            return "немає"
+        n_open = qs.filter(status__in=UNFINISHED).count()
+        return format_html(
+            '{} · незавершених: {} <button type="submit" class="button" formaction="{}" formnovalidate '
+            'style="margin-left:8px">🔄 Перевірити оплати клієнта</button>',
+            f"оплат: {qs.count()}", n_open, reverse("admin:shop_shoppayment_check_account", args=[obj.pk]))
+
+    @admin.action(description="🔄 Перевірити оплати Stripe")
+    def action_check_payments(self, request, queryset):
+        from . import payments
+        orders = [i for c in queryset for i in c.orders.values_list("order_id", flat=True)]
+        self.message_user(request, payments.stats_text(payments.check_orders(orders)))
 
     @admin.display(description="Замовлення з кабінету")
     def orders_list(self, obj):

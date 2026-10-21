@@ -1,7 +1,9 @@
 """Адмінка онлайн-оплат (Stripe): налаштування в картці магазину, список оплат (логіка — shop/payments.py)."""
 from django import forms
 from django.contrib import admin, messages
-from django.urls import reverse
+from django.core.exceptions import PermissionDenied
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 
@@ -73,14 +75,19 @@ def stripe_tools(shop: Shop) -> str:
         '<script>(function(){{var c=document.getElementById("stripe-hook-{}");if(c)c.textContent=location.origin+c.textContent;}})();</script>'
         '<div class="help">Події: {}</div></div>'
         '<div style="margin-top:6px">Остання оплата: {}</div>'
+        '<div style="margin-top:6px">Перевірка оплат: {}</div>'
         '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formnovalidate>'
-        '🔌 Перевірити ключ Stripe</button> <span class="help">перевіряє збережений ключ (спершу збережіть зміни)</span></div>',
+        '🔌 Перевірити ключ Stripe</button> '
+        '<button type="submit" class="button" formaction="{}" formnovalidate>🔄 Перевірити незавершені оплати зараз</button> '
+        '<span class="help">незбережені зміни на сторінці не зберігаються</span></div>',
         tail(shop.stripe_secret_key), tail(shop.stripe_webhook_secret), mode_html,
         shop.pk, path, shop.pk, ", ".join(STRIPE_EVENTS),
         format_html('<a href="{}">{} · {} {} · {}</a>', reverse("admin:shop_shoppayment_change", args=[last.pk]),
                     timezone.localtime(last.created_at).strftime("%d.%m.%Y %H:%M"), last.amount, last.currency,
                     last.get_status_display()) if last else "ще немає",
-        reverse("admin:shop_shop_stripe_check", args=[shop.pk]))
+        payments.poll_state(shop),
+        reverse("admin:shop_shop_stripe_check", args=[shop.pk]),
+        reverse("admin:shop_shoppayment_check_open") + f"?shop={shop.pk}")
 
 
 @admin.register(ShopPayment)
@@ -118,6 +125,49 @@ class ShopPaymentAdmin(admin.ModelAdmin):
     @admin.display(description="Stripe")
     def stripe_link(self, obj):
         return format_html('<a href="{}" target="_blank" rel="noopener">відкрити ↗</a>', payments.dashboard_url(obj))
+
+    # ── Перевірка незавершених оплат: усі / магазин / клієнт CRM / акаунт покупця ──
+    def get_urls(self):
+        view = self.admin_site.admin_view
+        return [
+            path("check-open/", view(self._check_open_view), name="shop_shoppayment_check_open"),
+            path("check-crm/<int:pk>/", view(self._check_crm_view), name="shop_shoppayment_check_crm"),
+            path("check-account/<int:pk>/", view(self._check_account_view), name="shop_shoppayment_check_account"),
+        ] + super().get_urls()
+
+    def _guard(self, request):
+        if request.method != "POST" or not self.has_view_permission(request):
+            raise PermissionDenied
+
+    def _check_open_view(self, request):
+        self._guard(request)
+        qs = ShopPayment.objects.all()
+        if request.GET.get("shop"):
+            qs = qs.filter(shop_id=request.GET["shop"])
+        self.message_user(request, payments.stats_text(payments.check_payments(qs)))
+        return redirect(request.META.get("HTTP_REFERER") or reverse("admin:shop_shoppayment_changelist"))
+
+    def _check_crm_view(self, request, pk):
+        from crm.models import Customer
+        self._guard(request)
+        customer = get_object_or_404(Customer, pk=pk)
+        self.message_user(request, f"{customer}: " + payments.stats_text(
+            payments.check_orders(payments.customer_orders(customer))))
+        return redirect(reverse("admin:crm_customer_change", args=[pk]))
+
+    def _check_account_view(self, request, pk):
+        from .models import ShopCustomer
+        self._guard(request)
+        account = get_object_or_404(ShopCustomer, pk=pk)
+        self.message_user(request, f"{account.email}: " + payments.stats_text(
+            payments.check_orders(account.orders.values_list("order_id", flat=True))))
+        return redirect(reverse("admin:shop_shopcustomer_change", args=[pk]))
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context["poll_states"] = [(s, payments.poll_state(s)) for s in Shop.objects.filter(stripe_enabled=True)]
+        extra_context["open_count"] = payments.unfinished().count()
+        return super().changelist_view(request, extra_context)
 
     @admin.action(description="🔄 Оновити стан зі Stripe")
     def action_sync(self, request, queryset):

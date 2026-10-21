@@ -34,6 +34,14 @@
     </li>
     {% endif %}
     <li>
+      <form method="post" action="{% url 'admin:shop_shoppayment_check_crm' original.pk %}" style="display:inline;margin:0">
+        {% csrf_token %}
+        <button type="submit" title="Запитати Stripe про всі незавершені онлайн-оплати замовлень цього клієнта"
+                style="background:#5e35b1;color:#fff;padding:6px 14px;border-radius:4px;border:0;cursor:pointer;
+                       font-size:13px;font-weight:500;white-space:nowrap">💳 Перевірити оплати</button>
+      </form>
+    </li>
+    <li>
       <a href="{% url 'admin:sales_salesorder_changelist' %}?q={{ original.email|default:original.name }}"
          style="background:#1b5e20;color:#fff;padding:6px 14px;border-radius:4px;
                 text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap">

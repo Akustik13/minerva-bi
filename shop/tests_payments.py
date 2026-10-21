@@ -261,3 +261,79 @@ class StripeAdminTests(StripeTestCase):
 
     def test_check_key(self):
         self.assertIn("Sevskiy", payments.check_key(self.shop))
+
+
+class PollingTests(StripeTestCase):
+    def setUp(self):
+        super().setUp()
+        self.o = self.order()
+        self.checkout()
+        self.fake.sessions["cs_test_1"].update(status="complete", payment_status="paid", payment_intent="pi_7")
+
+    def test_poll_until_webhook_works(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        self.assertEqual(payments.run_poll()[0][1]["paid"], 1)          # вебхука ще немає → перевірено
+        self.o.refresh_from_db()
+        self.assertEqual(self.o.payment_status, "paid")
+        self.assertEqual(payments.run_poll(), [])                        # інтервал ще не минув
+        Shop.objects.update(stripe_poll_last_at=timezone.now() - timedelta(minutes=20))
+        self.assertEqual(payments.run_poll()[0][1]["checked"], 0)        # оплачене більше не перевіряється
+        # вебхук прийшов → автоперевірка зупиняється
+        body, sig = signed({"id": "evt", "type": "ping", "data": {"object": {}}})
+        APIClient().post("/api/v1/payments/stripe/webhook/webshop/", body, content_type="application/json",
+                         HTTP_STRIPE_SIGNATURE=sig)
+        Shop.objects.update(stripe_poll_last_at=timezone.now() - timedelta(minutes=20))
+        self.assertTrue(payments.webhook_active(Shop.objects.get()))
+        self.assertEqual(payments.run_poll(), [])
+        self.assertIn("вебхук працює", payments.poll_state(Shop.objects.get()))
+
+    def test_poll_disabled(self):
+        Shop.objects.update(stripe_poll_minutes=0)
+        self.assertEqual(payments.run_poll(), [])
+
+    def test_command(self):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        call_command("check_stripe_payments", stdout=out)
+        self.assertIn("оплачено 1", out.getvalue())
+
+
+class CheckButtonsTests(StripeTestCase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
+        self.o = self.order()
+        self.checkout()
+        self.fake.sessions["cs_test_1"].update(status="complete", payment_status="paid", payment_intent="pi_8")
+
+    def test_check_crm_customer(self):
+        from crm.models import Customer
+        c = Customer.objects.get(external_key=SalesOrder.objects.get(pk=self.o.pk).customer_key)
+        r = self.client.get(f"/admin/crm/customer/{c.pk}/change/")
+        self.assertContains(r, "Перевірити оплати")
+        r = self.client.post(f"/admin/shop/shoppayment/check-crm/{c.pk}/", follow=True)
+        self.assertContains(r, "оплачено 1")
+        self.o.refresh_from_db()
+        self.assertEqual(self.o.payment_status, "paid")
+        self.assertEqual(self.client.get(f"/admin/shop/shoppayment/check-crm/{c.pk}/").status_code, 403)  # лише POST
+
+    def test_check_all_and_list(self):
+        r = self.client.get("/admin/shop/shoppayment/")
+        self.assertContains(r, "Незавершених зараз: <b>1</b>")
+        r = self.client.post("/admin/shop/shoppayment/check-open/", follow=True)
+        self.assertContains(r, "оплачено 1")
+        r = self.client.post("/admin/shop/shoppayment/check-open/", follow=True)
+        self.assertContains(r, "Незавершених онлайн-оплат немає")
+
+    def test_crm_list_action(self):
+        from crm.models import Customer
+        c = Customer.objects.get(external_key=SalesOrder.objects.get(pk=self.o.pk).customer_key)
+        r = self.client.post("/admin/crm/customer/", {"action": "action_check_stripe_payments",
+                                                      "_selected_action": [c.pk]}, follow=True)
+        self.assertContains(r, "оплачено 1")

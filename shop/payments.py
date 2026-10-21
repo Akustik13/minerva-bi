@@ -33,6 +33,8 @@ from .models import Shop, ShopPayment
 logger = logging.getLogger("shop")
 
 WEBHOOK_TOLERANCE = 300          # с — допустима різниця часу підпису вебхука
+WEBHOOK_ACTIVE = timedelta(days=7)   # вебхук «працює», якщо від Stripe була підписана подія за цей час
+POLL_MAX_AGE = timedelta(days=14)    # автоперевірка — лише оплати, створені за цей час
 MIN_AMOUNT = Decimal("0.50")     # мінімум Stripe для EUR
 REUSE_MARGIN = timedelta(minutes=10)
 UNPAID = ("", "unpaid", "pending", "failed")
@@ -279,6 +281,93 @@ def sync_order(shop: Shop, order) -> str:
     return order.payment_status
 
 
+# ── Перевірка незавершених оплат (кнопки в адмінці та автоперевірка) ───────────
+#
+# Незавершені = сесія оплати ще відкрита або оплата «обробляється» (SEPA тощо) — саме ті, по яких
+# Stripe ще не повідомив остаточний результат. Оплачені, прострочені й повернені не перевіряються.
+
+UNFINISHED = (ShopPayment.OPEN, ShopPayment.PROCESSING)
+
+
+def unfinished(qs=None):
+    return (qs if qs is not None else ShopPayment.objects.all()).filter(status__in=UNFINISHED)
+
+
+def check_payments(qs) -> dict:
+    """Запитати Stripe про кожну незавершену оплату з qs. Повертає лічильники для повідомлення."""
+    stats = {"checked": 0, "paid": 0, "processing": 0, "expired": 0, "open": 0, "errors": 0}
+    for p in unfinished(qs).select_related("shop", "order"):
+        stats["checked"] += 1
+        try:
+            p = sync(p)
+        except PaymentError as e:
+            stats["errors"] += 1
+            logger.warning("Stripe check %s: %s", p.session_id, e.message)
+            continue
+        key = {ShopPayment.PAID: "paid", ShopPayment.PROCESSING: "processing",
+               ShopPayment.EXPIRED: "expired"}.get(p.status, "open")
+        stats[key] += 1
+    return stats
+
+
+def check_orders(orders) -> dict:
+    """Усі незавершені оплати цих замовлень (queryset або id; напр. усіх замовлень клієнта)."""
+    return check_payments(ShopPayment.objects.filter(order__in=orders))
+
+
+def customer_orders(crm_customer):
+    """Замовлення клієнта CRM: за ключем клієнта або email."""
+    from django.db.models import Q
+    from sales.models import SalesOrder
+    q = Q(customer_key=crm_customer.external_key)
+    if crm_customer.email:
+        q |= Q(email__iexact=crm_customer.email)
+    return SalesOrder.objects.filter(q)
+
+
+def stats_text(stats: dict) -> str:
+    if not stats["checked"]:
+        return "Незавершених онлайн-оплат немає — перевіряти нічого."
+    parts = [f"оплачено {stats['paid']}" if stats["paid"] else "",
+             f"обробляється {stats['processing']}" if stats["processing"] else "",
+             f"сесія закінчилась {stats['expired']}" if stats["expired"] else "",
+             f"ще не оплачено {stats['open']}" if stats["open"] else "",
+             f"помилок {stats['errors']}" if stats["errors"] else ""]
+    return f"Перевірено в Stripe: {stats['checked']} — " + ", ".join(p for p in parts if p) + "."
+
+
+def webhook_active(shop: Shop, now=None) -> bool:
+    now = now or timezone.now()
+    return bool(shop.stripe_webhook_last_at and now - shop.stripe_webhook_last_at < WEBHOOK_ACTIVE)
+
+
+def poll_state(shop: Shop) -> str:
+    """Для адмінки: як зараз перевіряються оплати."""
+    if webhook_active(shop):
+        return (f"вебхук працює (остання подія {timezone.localtime(shop.stripe_webhook_last_at):%d.%m.%Y %H:%M}) — "
+                "автоперевірка не потрібна; незавершені оплати можна перевірити кнопкою")
+    if not shop.stripe_poll_minutes:
+        return "автоперевірку вимкнено — лише кнопка «🔄 Перевірити оплати»"
+    last = (f", остання {timezone.localtime(shop.stripe_poll_last_at):%d.%m.%Y %H:%M}"
+            if shop.stripe_poll_last_at else "")
+    return f"вебхуків від Stripe ще немає — Minerva перевіряє незавершені оплати кожні {shop.stripe_poll_minutes} хв{last}"
+
+
+def run_poll(now=None) -> list[tuple[Shop, dict]]:
+    """Автоперевірка (cron, кожну хвилину): магазини без працюючого вебхука, коли настав час."""
+    now = now or timezone.now()
+    done = []
+    for shop in Shop.objects.filter(stripe_enabled=True, stripe_poll_minutes__gt=0).exclude(stripe_secret_key=""):
+        if webhook_active(shop, now):
+            continue
+        if shop.stripe_poll_last_at and now - shop.stripe_poll_last_at < timedelta(minutes=shop.stripe_poll_minutes):
+            continue
+        Shop.objects.filter(pk=shop.pk).update(stripe_poll_last_at=now)
+        qs = ShopPayment.objects.filter(shop=shop, created_at__gte=now - POLL_MAX_AGE)
+        done.append((shop, check_payments(qs)))
+    return done
+
+
 # ── Вебхук Stripe ────────────────────────────────────────────────────────────
 
 def verify_signature(payload: bytes, header: str, secret: str, now: float | None = None) -> bool:
@@ -299,6 +388,8 @@ def verify_signature(payload: bytes, header: str, secret: str, now: float | None
 def handle_webhook(shop: Shop, payload: bytes, signature: str) -> str:
     if not verify_signature(payload, signature, (shop.stripe_webhook_secret or "").strip()):
         raise PaymentError(400, "bad_signature", "Невірний підпис вебхука Stripe.")
+    # вебхук працює → автоперевірка оплат зупиняється (див. run_poll)
+    Shop.objects.filter(pk=shop.pk).update(stripe_webhook_last_at=timezone.now())
     try:
         event = json.loads(payload.decode("utf-8"))
         kind, obj = event["type"], event["data"]["object"]

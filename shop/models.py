@@ -138,6 +138,14 @@ class Shop(models.Model):
         "Stripe: секрет вебхука", max_length=255, blank=True, default="",
         help_text="whsec_… — Stripe → Developers → Webhooks → ваш endpoint → Signing secret.",
     )
+    stripe_poll_minutes = models.PositiveSmallIntegerField(
+        "Автоперевірка оплат, хв", default=15,
+        help_text="Поки вебхук Stripe не працює, Minerva раз на стільки хвилин сама питає Stripe про незавершені "
+                  "оплати (за 14 днів). 0 — вимкнено. Щойно приходять вебхуки, автоперевірка зупиняється — "
+                  "лишаються кнопки «🔄 Перевірити оплати».",
+    )
+    stripe_poll_last_at = models.DateTimeField("Остання автоперевірка", null=True, blank=True)
+    stripe_webhook_last_at = models.DateTimeField("Останній вебхук Stripe", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

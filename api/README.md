@@ -627,6 +627,8 @@ app.listen(3000);
 | `POST shop/account/me/orders/<number>/pay/` | `accounts:write` | те саме для власного замовлення покупця (заголовок `X-Customer-Session`) |
 | `POST payments/stripe/webhook/<код магазину>/` | — | для Stripe: підпис `Stripe-Signature` (HMAC, 5 хв). Події: `checkout.session.completed` / `async_payment_succeeded` → `payment_status = paid`, `payment_reference` = PaymentIntent; `async_payment_failed` → `failed`; `expired`; `charge.refunded` (повне) → `refunded` |
 
+**Перевірка незавершених оплат** (сесія відкрита або «обробляється»): кнопки «💳 Перевірити оплати» в картці клієнта CRM (і дія в списку клієнтів), «🔄 Перевірити оплати клієнта» в акаунті покупця, «🔄 Перевірити незавершені оплати» у «💳 Онлайн-оплати» та в картці магазину. **Автоперевірка** — `manage.py check_stripe_payments` (cron щохвилини): поки від Stripe не було підписаного вебхука за 7 днів (`Shop.stripe_webhook_last_at`), раз на `Shop.stripe_poll_minutes` хв (0 — вимкнено) Minerva питає Stripe про незавершені оплати за 14 днів; щойно вебхуки приходять — автоперевірка зупиняється. `--now` — перевірити все зараз.
+
 Замовлення сайту з оплатою Stripe створюється з `payment_method = stripe`, `payment_status = pending`; у кабінеті покупця `payment_open = true`, доки оплату не завершено.
 
 ## 12. Зовнішня RAG-система (читання каталогу і складу)

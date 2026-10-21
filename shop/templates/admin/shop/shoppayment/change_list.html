@@ -1,0 +1,12 @@
+{% extends "admin/change_list.html" %}
+{% block search %}
+<div class="module" style="padding:10px 14px;margin:0 0 12px;border-left:4px solid var(--accent, #79aec8)">
+  <form method="post" action="{% url 'admin:shop_shoppayment_check_open' %}" style="display:inline">{% csrf_token %}
+    <button type="submit" class="button">🔄 Перевірити незавершені оплати в Stripe</button>
+  </form>
+  <span style="margin-left:8px">Незавершених зараз: <b>{{ open_count }}</b> (сесія відкрита або оплата обробляється).
+    Оплачені, прострочені й повернені не перевіряються.</span>
+  {% for shop, state in poll_states %}<div style="margin-top:4px">🏬 <b>{{ shop.name }}</b>: {{ state }}</div>{% endfor %}
+</div>
+{{ block.super }}
+{% endblock %}
