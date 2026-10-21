@@ -212,6 +212,24 @@ class FeedTests(KnowledgeBase):
         self.assertEqual(doc["projects"], [{"id": p.pk, "code": p.code, "name": "Antennen"}])
         self.assertEqual(doc["document_revision"], 2)
 
+    def test_mailbox_rights_change_updates_documents(self):
+        self.mail()
+        last = self.changes()["next_after"]
+        anna = User.objects.create_user("anna", "a@x.y", "p")
+        self.account.user = anna
+        with self.captureOnCommitCallbacks(execute=True):
+            self.account.save()
+        item = self.changes(last)["items"][0]
+        self.assertEqual((item["action"], item["document"]["access"]["user_ids"]), ("upsert", [anna.pk]))
+        self.account.is_active = False
+        with self.captureOnCommitCallbacks(execute=True):
+            self.account.save(update_fields=["is_active"])
+        item = self.changes(item["seq"])["items"][0]
+        self.assertEqual((item["action"], item["reason"]), ("delete", "access_revoked"))
+        with self.captureOnCommitCallbacks(execute=True):
+            self.account.save()                                  # права не змінились — подій немає
+        self.assertEqual(self.changes(item["seq"])["items"], [])
+
 
 class CursorAndSnapshotTests(KnowledgeBase):
     def test_cursor_errors(self):

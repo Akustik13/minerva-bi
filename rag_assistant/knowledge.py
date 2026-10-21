@@ -380,6 +380,28 @@ def safe_touch(pks=(), thread_id=None):
         logger.warning("knowledge touch failed (thread=%s, pks=%s): %s", thread_id, list(pks)[:5], e)
 
 
+def touch_account(account_id, batch=300) -> int:
+    """Права на скриньку змінились (власник, активність, адреса): нові ревізії або tombstone для всіх її листів."""
+    from email_assistant.models import EmailMessage
+    pks = list(EmailMessage.objects.filter(account_id=account_id).order_by("pk").values_list("pk", flat=True))
+    return sum(touch_messages(pks[i:i + batch]) for i in range(0, len(pks), batch))
+
+
+def start_account_touch(account_id):
+    """touch_account у фоні: збереження скриньки не чекає перевірки тисяч листів."""
+    caller = threading.current_thread()
+
+    def run():
+        try:
+            touch_account(account_id)
+        except Exception as e:  # noqa: BLE001
+            logger.exception("knowledge account touch failed (account=%s): %s", account_id, e)
+        finally:
+            if threading.current_thread() is not caller:   # власне з'єднання фонового потоку
+                connection.close()
+    _start_background(run)
+
+
 def refresh_all(batch=300) -> dict:
     """Повна звірка: усі допущені листи + усі передані документи. Також чистить журнал і старі знімки."""
     from email_assistant.crm_link import own_addresses
