@@ -161,6 +161,20 @@ tabele_mvp/
   - **Адмінка «База знань»:** адреса приватного API, стан запобіжника, кнопка «Перевірити пошук RAG».
   - **Тести:** `rag_assistant/tests_retrieval.py` — двійник RAG перевіряє кожен запит і відповідь закріпленими схемами.
 - **Наскрізний тест із живим RAG** — `rag_assistant/e2e/README.md`, `tabele/settings_e2e.py` (окрема PostgreSQL `minerva_e2e`, лише 127.0.0.1), `manage.py knowledge_e2e seed|scenario [--outage]|baseline|step|search|status|rag|fallback` (лише settings_e2e), логіка — `rag_assistant/e2e_scenario.py` (повторюваний, JSON-звіт у `%USERPROFILE%\minerva-e2e\reports\`), тести `rag_assistant/tests_e2e_scenario.py`. Dev-RAG Codex — 192.168.2.68 `D:\RAG-private-e2e` через SSH-тунелі (8788 → RAG, reverse 18010 → 8010).
+- **Робочий приватний RAG `sevskiy-prod`** (22.10.2026) — інструкція `rag_assistant/deploy/README.md`:
+  - **RAG-ПК:**
+    - тека `D:\RAG-private-prod`, слухає `127.0.0.1:8789`;
+    - Qdrant `minerva-rag-prod-qdrant` (`127.0.0.1:16334`, з ключем), колекція `crm_correspondence`;
+    - автозапуск — задача `Minerva-Private-RAG` → `launcher.py`;
+    - ключі в `data\` (ACL: лише user і SYSTEM).
+  - **Канал** — SSH-тунель, який відкриває NAS: `rag_assistant/deploy/nas_rag_tunnel.sh setup|start|status`.
+    - Minerva → шлюз Docker-мережі:18789 → RAG;
+    - RAG → свій `127.0.0.1:18081` → NAS :8000;
+    - ключ тунелю лежить у `/volume1/docker/rag-tunnel` і дозволяє лише ці два перенаправлення портів.
+  - **Ключі вставляє користувач:**
+    - `data\private-api-key.txt` → «API-ключ RAG (Minerva → RAG)»;
+    - «🔑 Створити ключ для RAG» → `data\minerva-knowledge-key.txt`.
+  - Через `app.sevskiy.com` (публічний RAG продукції) приватний API не публікувати.
 
 ### email_assistant/ — пошта ↔ CRM
 - Прив'язка листа до клієнта — ТІЛЬКИ `email_assistant/crm_link.py` (сигнал post_save `EmailMessage` → `link_message_to_crm`; legacy `fetch_emails` теж через нього): напрям за відправником (власні адреси/домен = 📤), клієнт серед To/Cc без власних адрес, номер замовлення з теми/тексту → `CustomerTimeline.related_order_id`, дедуплікація за `CustomerTimeline.message_id` (crm 0015, + FK `email_message`)
