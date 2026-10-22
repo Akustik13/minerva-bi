@@ -167,10 +167,10 @@ tabele_mvp/
     - Qdrant `minerva-rag-prod-qdrant` (`127.0.0.1:16334`, з ключем), колекція `crm_correspondence`;
     - автозапуск — задача `Minerva-Private-RAG` → `launcher.py`;
     - ключі в `data\` (ACL: лише user і SYSTEM).
-  - **Канал** — SSH-тунель, який відкриває NAS: `rag_assistant/deploy/nas_rag_tunnel.sh setup|start|status`.
-    - Minerva → шлюз Docker-мережі:18789 → RAG;
-    - RAG → свій `127.0.0.1:18081` → NAS :8000;
-    - ключ тунелю лежить у `/volume1/docker/rag-tunnel` і дозволяє лише ці два перенаправлення портів.
+  - **Канал без SSH:**
+    - Minerva → `192.168.2.68:8789`: Windows portproxy до `127.0.0.1:8789` + правило брандмауера «Minerva private RAG from NAS only» (лише NAS 192.168.2.123), як у публічного RAG 8787;
+    - RAG → Minerva: `https://sevskiy.minerva-bi.com` (`source.base_url`).
+    - У Minerva: адреса `192.168.2.68`, порт `8789`, HTTPS вимкнено, назва `sevskiy-prod`.
   - **Ключі вставляє користувач:**
     - `data\private-api-key.txt` → «API-ключ RAG (Minerva → RAG)»;
     - «🔑 Створити ключ для RAG» → `data\minerva-knowledge-key.txt`.
