@@ -325,6 +325,7 @@ python manage.py runserver
 python manage.py makemigrations <app>
 python manage.py migrate
 python manage.py check           # перевірка перед деплоєм
+python manage.py test core --settings=tabele.settings_test   # ланцюжок міграцій: нова БД з нуля, моделі = міграції
 
 # Docker (production)
 docker-compose up -d
@@ -356,6 +357,7 @@ docker-compose exec web python manage.py migrate
 | CSRF помилка | Додати домен в `CSRF_TRUSTED_ORIGINS` у `settings.py` |
 | БД порожня після restart | `docker-compose down` БЕЗ `-v` |
 | Міграції конфліктують | `migrate <app> <номер> --fake` → `migrate` |
+| Нова БД з нуля | `migrate` без `--fake` (PostgreSQL і SQLite). Міграцію, яку вже пройшли робочі бази, правити лише так, щоб опис моделей не змінився (`SeparateDatabaseAndState`, як sales 0009 / inventory 0022); запобіжник — `core/tests_migrations.py` |
 | Static files 404 | `python manage.py collectstatic` або `DJANGO_DEBUG=1` |
 | `relation does not exist` | Placeholder app — override `get_urls()`, не викликати `changelist_view` |
 | Edit tool "File has not been read" | Спочатку Read потрібного offset, потім Edit |

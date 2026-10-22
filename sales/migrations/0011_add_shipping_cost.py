@@ -1,19 +1,15 @@
-from django.db import migrations, models
+from django.db import migrations
 
 
 class Migration(migrations.Migration):
-    """Додає shipping_cost до SalesOrder."""
-    
+    """
+    Колишній ручний «ADD COLUMN IF NOT EXISTS shipping_cost» для робочої бази.
+    Стовпець shipping_cost створює 0014 (AddField), а на новій базі цей SQL ламав 0014
+    («column already exists»), тому тут більше нічого не робиться.
+    """
+
     dependencies = [
         ('sales', '0010_add_price_fields_force'),
     ]
 
-    operations = [
-        migrations.RunSQL(
-            sql="""
-                ALTER TABLE sales_salesorder 
-                ADD COLUMN IF NOT EXISTS shipping_cost NUMERIC(10,2) DEFAULT 0;
-            """,
-            reverse_sql="-- No reverse"
-        ),
-    ]
+    operations = []
