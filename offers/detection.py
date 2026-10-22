@@ -10,8 +10,10 @@
 """
 import logging
 import re
+import threading
 from datetime import timedelta
 
+from django.db import connection, transaction
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,7 @@ QUOTE_START_RE = re.compile(
     r"^\s*(?:>|-{2,}\s*(?:original|ursprüngliche|forwarded|weitergeleitete)|(?:on|am)\s.{5,80}(?:wrote|schrieb)\s*:"
     r"|von:\s|from:\s|gesendet:\s|sent:\s|від:\s|от:\s)", re.IGNORECASE)
 SNIPPET = 60
+SCAN_BATCH = 200
 
 
 def _qty(value) -> str:
@@ -102,16 +105,67 @@ def scan(msg):
     return QuoteRequest.objects.create(message=msg, thread_id=msg.thread_id, **found)
 
 
-def scan_recent(days=30) -> int:
-    """Дозаповнити історію: вхідні листи за N днів без рішення."""
+def scan_recent(days=30, progress=None) -> tuple:
+    """Дозаповнити історію: вхідні листи за N днів (None — уся пошта), ще без підказки.
+    progress(перевірено, усього, знайдено) — після кожної порції. → (перевірено, знайдено)."""
+    from django.db import IntegrityError
+
     from email_assistant.models import EmailMessage
-    since = timezone.now() - timedelta(days=days)
-    n = 0
-    for msg in (EmailMessage.objects.filter(sent_at__gte=since, category__in=CATEGORIES, is_spam=False,
-                                            is_deleted=False, quote_request__isnull=True)
-                .exclude(folder__in=("sent", "spam", "trash")).select_related("thread").order_by("sent_at")):
-        n += scan(msg) is not None
-    return n
+    qs = (EmailMessage.objects.filter(category__in=CATEGORIES, is_spam=False, is_deleted=False,
+                                      quote_request__isnull=True)
+          .exclude(folder__in=("sent", "spam", "trash")))
+    if days:
+        qs = qs.filter(sent_at__gte=timezone.now() - timedelta(days=days))
+    ids = list(qs.order_by("sent_at", "pk").values_list("pk", flat=True))
+    found = 0
+    for start in range(0, len(ids), SCAN_BATCH):
+        part = ids[start:start + SCAN_BATCH]
+        for msg in EmailMessage.objects.filter(pk__in=part).select_related("thread").order_by("sent_at", "pk"):
+            try:
+                with transaction.atomic():
+                    found += scan(msg) is not None
+            except IntegrityError:   # той самий лист щойно обробив сигнал або паралельний запуск
+                continue
+        if progress:
+            progress(start + len(part), len(ids), found)
+    return len(ids), found
+
+
+_scan_lock = threading.Lock()
+
+
+def _start_background(fn):
+    threading.Thread(target=fn, daemon=True).start()
+
+
+def start_scan(depth):
+    """«Знайти запити в уже отриманій пошті» з налаштувань: у фоні, стан — OfferSettings.quote_scan_status."""
+    from .models import OfferSettings
+    days = None if depth == OfferSettings.SCAN_ALL else int(depth)
+    label = dict(OfferSettings.SCAN_CHOICES).get(depth, f"{depth} дн.")
+    caller = threading.current_thread()
+
+    def status(text):
+        OfferSettings.objects.filter(pk=1).update(quote_scan_status=text[:255], quote_scan_at=timezone.now())
+
+    def run():
+        if not _scan_lock.acquire(blocking=False):
+            logger.info("quote request scan already running — %s skipped", label)
+            return
+        try:
+            status(f"⏳ {label}: підготовка…")
+            seen, found = scan_recent(days, progress=lambda done, total, n: status(
+                f"⏳ {label}: перевірено {done} з {total}, знайдено {n}"))
+            status(f"✅ {timezone.localtime():%d.%m.%Y %H:%M} · {label}: перевірено листів {seen}, "
+                   f"знайдено нових запитів {found}")
+        except Exception as e:  # noqa: BLE001
+            logger.exception("quote request scan failed: %s", e)
+            status(f"❌ Обробку перервано ({type(e).__name__}) — спробуйте ще раз")
+        finally:
+            _scan_lock.release()
+            if threading.current_thread() is not caller:   # власне з'єднання фонового потоку
+                connection.close()
+    _start_background(run)
 
 
 def for_thread(thread):

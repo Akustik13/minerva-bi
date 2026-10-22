@@ -2,8 +2,10 @@ from decimal import Decimal
 
 from django import forms
 from django.contrib import admin, messages
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import path, reverse
+from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
 from . import services
@@ -283,12 +285,37 @@ class OfferAdmin(admin.ModelAdmin):
 
 @admin.register(OfferSettings)
 class OfferSettingsAdmin(admin.ModelAdmin):
+    readonly_fields = ["quote_scan_state"]
     fieldsets = [
         ("Номер і умови", {"fields": ["number_prefix", "validity_days", "default_currency", "default_vat_rate",
                                       "default_language", "email_subject"]}),
         ("Тексти за замовчуванням", {"fields": ["intro_text", "payment_terms", "delivery_terms", "outro_text"]}),
         ("Реквізити в документі", {"fields": ["company_block", "footer_text", "template"]}),
+        ("📝 Запити пропозицій у пошті", {
+            "fields": ["quote_scan_depth", "quote_scan_state"],
+            "description": "Нові листи перевіряються автоматично. Щоб позначити листи, отримані раніше, "
+                           "виберіть глибину й збережіть — обробка йде у фоні."}),
     ]
+
+    def save_model(self, request, obj, form, change):
+        depth = obj.quote_scan_depth
+        obj.quote_scan_depth = OfferSettings.SCAN_OFF   # одноразова дія: після запуску поле знову «—»
+        super().save_model(request, obj, form, change)
+        if depth != OfferSettings.SCAN_OFF:
+            from . import detection
+            OfferSettings.objects.filter(pk=obj.pk).update(quote_scan_status="⏳ Запущено…", quote_scan_at=timezone.now())
+            transaction.on_commit(lambda: detection.start_scan(depth))
+            self.message_user(request, f"Пошук запитів ({dict(OfferSettings.SCAN_CHOICES)[depth]}) запущено у фоні — "
+                                       f"оновіть сторінку, щоб побачити прогрес.")
+
+    @admin.display(description="Стан обробки")
+    def quote_scan_state(self, obj):
+        open_requests = QuoteRequest.objects.filter(status=QuoteRequest.NEW).count()
+        link = format_html('<a href="{}?status__exact=new">📝 Відкриті запити: {}</a>',
+                           reverse("admin:offers_quoterequest_changelist"), open_requests)
+        if not obj or not obj.quote_scan_status:
+            return format_html("ще не запускалось · {}", link)
+        return format_html("{} · {}", obj.quote_scan_status, link)
 
     def has_add_permission(self, request):
         return not OfferSettings.objects.exists()

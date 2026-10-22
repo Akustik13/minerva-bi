@@ -43,6 +43,15 @@ class OfferSettings(models.Model):
         "Власний шаблон DOCX", upload_to="offers/templates/", blank=True,
         validators=[FileExtensionValidator(["docx"])],
         help_text="Порожньо — стандартний шаблон Minerva (offers/templates_docx/offer_template.docx).")
+    SCAN_OFF, SCAN_ALL = 0, -1
+    SCAN_CHOICES = [(SCAN_OFF, "—"), (30, "30 днів"), (90, "3 місяці"), (180, "6 місяців"), (365, "1 рік"),
+                    (SCAN_ALL, "Уся пошта")]
+    quote_scan_depth = models.IntegerField(
+        "Знайти запити в уже отриманій пошті", choices=SCAN_CHOICES, default=SCAN_OFF,
+        help_text="Одноразово: після збереження обробка йде у фоні, а поле повертається на «—». "
+                  "Нова пошта перевіряється автоматично; листи з уже прийнятим рішенням не змінюються.")
+    quote_scan_status = models.CharField("Стан обробки", max_length=255, blank=True, default="", editable=False)
+    quote_scan_at = models.DateTimeField("Оновлено", null=True, blank=True, editable=False)
 
     class Meta:
         verbose_name = "Налаштування Angebote"

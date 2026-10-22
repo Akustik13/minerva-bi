@@ -246,7 +246,7 @@ tabele_mvp/
 - **Запити пропозицій у пошті** — `offers/detection.py`, модель `QuoteRequest` (offers 0002), сигнал `offers/signals.py`:
   - правила без AI: вхідний лист customer/other, лише новий текст (без цитати), прохання про Angebot/ціну (de/en/uk/ru) або артикули з кількістю + питання про ціну; не запит — подяка/посилання на наш Angebot, гілка з Angebot;
   - у пошті: мітка «📝 запит» у рядку, фільтр `?quote=1` (кнопка «📝 N»), підказка в прев'ю «Створити Angebot» / «✕ Не запит» (`/offers/api/quote-request/<pk>/dismiss/`); Angebot з гілки закриває запит (`mark_done`);
-  - рішення людини не перезаписується; історія — `manage.py detect_quote_requests [--days 30]`.
+  - рішення людини не перезаписується; історія — «⚙️ Налаштування Angebote» → «Знайти запити в уже отриманій пошті» (30 днів … 1 рік / уся пошта; offers 0003): фоновий `detection.start_scan` порціями по 200, стан і прогрес у `quote_scan_status`, поле після запуску знову «—»; або `manage.py detect_quote_requests [--days 30 | --all]`.
 - **Адмінка:** компактна таблиця позицій (`offers/templates/admin/offers/offer/change_form.html`); маржа видна лише в адмінці.
 - **Меню:** група «Продажі»; роль manager має доступ до `offers`.
 - **Тести:** `python manage.py test offers --settings=tabele.settings_test`. Локально потрібні `docxtpl` і `python-docx` з `requirements.txt`.

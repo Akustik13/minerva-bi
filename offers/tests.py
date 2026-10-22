@@ -235,8 +235,8 @@ class FromMailAndQuoteTests(OffersBase):
         self.assertEqual((rev.sent_message_id, offer.status), ("<offer-mail@sevskiy.de>", Offer.SENT))
 
 
-class QuoteRequestTests(OffersBase):
-    """Запити пропозиції в пошті: розпізнавання, підказка в прев'ю, мітка й фільтр у списку, рішення людини."""
+class QuoteMailBase(OffersBase):
+    """Скринька, клієнт, постачальник і помічник для листів — для тестів запитів пропозиції."""
 
     def setUp(self):
         super().setUp()
@@ -262,6 +262,10 @@ class QuoteRequestTests(OffersBase):
     def qr(self, msg):
         from offers.models import QuoteRequest
         return QuoteRequest.objects.filter(message=msg).first()
+
+
+class QuoteRequestTests(QuoteMailBase):
+    """Запити пропозиції в пошті: розпізнавання, підказка в прев'ю, мітка й фільтр у списку, рішення людини."""
 
     def test_requests_in_several_languages(self):
         de = self.mail("Anfrage Antennen", "Guten Tag,\nbitte senden Sie uns Ihr Angebot für 500 Stück ANT-100.")
@@ -330,6 +334,57 @@ class QuoteRequestTests(OffersBase):
             call_command("detect_quote_requests", "--days", "30", stdout=out)
         self.assertIn("Знайдено запитів пропозиції: 1", out.getvalue())
         self.assertEqual(self.qr(late).status, "new")
+
+
+class QuoteScanSettingsTests(QuoteMailBase):
+    """«⚙️ Налаштування Angebote» → «Знайти запити в уже отриманій пошті»: глибина, фон, поле знову «—»."""
+
+    def setUp(self):
+        super().setUp()
+        background = patch("offers.detection._start_background", lambda fn: fn())
+        background.start()
+        self.addCleanup(background.stop)
+
+    def save_settings(self, depth):
+        from offers.models import OfferSettings
+        OfferSettings.get()
+        with self.captureOnCommitCallbacks(execute=True):
+            return self.client.post(f"/admin/offers/offersettings/1/change/", {
+                "number_prefix": "A", "validity_days": 30, "default_currency": "EUR", "default_vat_rate": "19.00",
+                "default_language": "de", "email_subject": "Angebot {number}", "quote_scan_depth": depth})
+
+    def test_scan_old_mail_by_depth_and_switch_off(self):
+        from offers.models import OfferSettings, QuoteRequest
+        recent = self.mail("Anfrage", "Bitte Angebot für 500 Stück ANT-100")
+        old = save_message(self.account, {
+            "uid": 777, "message_id": "<old@x.example>", "in_reply_to": "", "references": [], "subject": "RFQ CAB-7",
+            "from_email": "ops@old.example", "from_name": "", "to_emails": [ME], "cc_emails": [],
+            "body_text": "Please quote 30 pcs CAB-7", "body_html": "", "attachments": [], "is_read": True,
+            "sent_at": datetime(2024, 3, 1, 9, 0, tzinfo=dt_tz.utc)}, "INBOX")
+        QuoteRequest.objects.all().delete()                     # як пошта, отримана до появи розпізнавання
+        r = self.save_settings(30)
+        self.assertEqual(r.status_code, 302, r.content[:400])
+        s = OfferSettings.get()
+        self.assertEqual(s.quote_scan_depth, OfferSettings.SCAN_OFF)          # одноразово — знову «—»
+        self.assertTrue(s.quote_scan_status.startswith("✅"), s.quote_scan_status)
+        self.assertIn("30 днів", s.quote_scan_status)
+        self.assertIn("знайдено нових запитів 1", s.quote_scan_status)
+        self.assertIsNotNone(self.qr(recent))
+        self.assertIsNone(self.qr(old))                                        # старіший за 30 днів
+        self.save_settings(OfferSettings.SCAN_ALL)
+        self.assertIsNotNone(self.qr(old))
+        self.assertIn("Уся пошта", OfferSettings.get().quote_scan_status)
+        page = self.client.get("/admin/offers/offersettings/1/change/")
+        self.assertContains(page, "Знайти запити в уже отриманій пошті")
+        self.assertContains(page, "📝 Відкриті запити: 2")
+
+    def test_dismissed_requests_are_not_reopened(self):
+        from offers.models import OfferSettings
+        req = self.mail("Anfrage", "Bitte Angebot für 500 Stück ANT-100")
+        self.client.post(f"/offers/api/quote-request/{self.qr(req).pk}/dismiss/")
+        self.save_settings(OfferSettings.SCAN_ALL)
+        self.assertEqual(self.qr(req).status, "dismissed")
+        self.assertIn("знайдено нових запитів 0", OfferSettings.get().quote_scan_status)
 
 
 class AdminTests(OffersBase):
