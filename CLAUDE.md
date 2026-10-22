@@ -167,14 +167,15 @@ tabele_mvp/
     - Qdrant `minerva-rag-prod-qdrant` (`127.0.0.1:16334`, з ключем), колекція `crm_correspondence`;
     - автозапуск — задача `Minerva-Private-RAG` → `launcher.py`;
     - ключі в `data\` (ACL: лише user і SYSTEM).
-  - **Канал без SSH:**
-    - Minerva → `192.168.2.68:8789`: Windows portproxy до `127.0.0.1:8789` + правило брандмауера «Minerva private RAG from NAS only» (лише NAS 192.168.2.123), як у публічного RAG 8787;
+  - **Канал** — Minerva і RAG-ПК у різних мережах, тож лише через наявні HTTPS-адреси, без SSH:
+    - Minerva → `https://app.sevskiy.com/v2` → DSM-проксі → portproxy 8787 → розподільник `D:\RAG-router` (`127.0.0.1:8786`, задача `Minerva-RAG-Router`, код `rag_assistant/deploy/rag_router.py`, перевірка `check_rag_router.py`);
+    - розподільник: `/v2` → приватний RAG лише з публічної IP Minerva (DNS `sevskiy.minerva-bi.com`, звіряються `X-Real-IP` і останній `X-Forwarded-For`), решта → публічний RAG без змін;
     - RAG → Minerva: `https://sevskiy.minerva-bi.com` (`source.base_url`).
-    - У Minerva: адреса `192.168.2.68`, порт `8789`, HTTPS вимкнено, назва `sevskiy-prod`.
+    - У Minerva: адреса `app.sevskiy.com`, порт `443`, HTTPS і перевірка сертифіката увімкнені, назва `sevskiy-prod`.
   - **Ключі вставляє користувач:**
     - `data\private-api-key.txt` → «API-ключ RAG (Minerva → RAG)»;
     - «🔑 Створити ключ для RAG» → `data\minerva-knowledge-key.txt`.
-  - Через `app.sevskiy.com` (публічний RAG продукції) приватний API не публікувати.
+  - Код публічного RAG не змінювати; `/v2` — лише через розподільник з перевіркою адреси.
 
 ### email_assistant/ — пошта ↔ CRM
 - Прив'язка листа до клієнта — ТІЛЬКИ `email_assistant/crm_link.py` (сигнал post_save `EmailMessage` → `link_message_to_crm`; legacy `fetch_emails` теж через нього): напрям за відправником (власні адреси/домен = 📤), клієнт серед To/Cc без власних адрес, номер замовлення з теми/тексту → `CustomerTimeline.related_order_id`, дедуплікація за `CustomerTimeline.message_id` (crm 0015, + FK `email_message`)
