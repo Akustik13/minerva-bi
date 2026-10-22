@@ -18,7 +18,7 @@ from django.test import override_settings
 from django.utils import timezone
 
 from email_assistant.models import EmailAccount, EmailSettings
-from rag_assistant import retrieval
+from rag_assistant import knowledge, retrieval
 from rag_assistant.models import KnowledgeDoc, KnowledgeSettings, RetrievalJob
 from rag_assistant.tests_knowledge import KnowledgeBase
 
@@ -97,7 +97,8 @@ class FakeRag:
     def __call__(self, method, url, params=None, json=None, headers=None, timeout=None,
                  allow_redirects=None, verify=None):
         t = self.test
-        self.calls.append({"method": method, "url": url, "params": params, "json": json, "headers": headers})
+        self.calls.append({"method": method, "url": url, "params": params, "json": json, "headers": headers,
+                           "verify": verify})
         t.assertEqual(headers["Authorization"], "Bearer test-private-key")
         t.assertFalse(allow_redirects)
         t.assertEqual(timeout[0], retrieval.CONNECT_TIMEOUT)
@@ -281,6 +282,76 @@ class ClientTests(RetrievalBase):
         self.assertEqual(len(self.fake.calls), n)
         page = self.client.get("/admin/rag_assistant/knowledgesettings/1/change/")
         self.assertContains(page, "пошук <b>ready</b>")
+
+
+class ConnectionSettingsTests(RetrievalBase):
+    """«🧠 База знань» → підключення RAG: адреса/порт/HTTPS, назва сервера, ключі в обидва боки."""
+
+    def form(self, **over):
+        data = {"categories": ["customer"], "attachment_types_text": "pdf", "attachment_max_mb": 10,
+                "instance_id": "", "rag_host": "192.168.2.68", "rag_port": 8788, "private_verify_tls": "on"}
+        data.update(over)
+        return self.client.post("/admin/rag_assistant/knowledgesettings/1/change/", data)
+
+    def test_address_fields_compose_url_and_keep_key(self):
+        self.client.force_login(self.user)
+        page = self.client.get("/admin/rag_assistant/knowledgesettings/1/change/")
+        self.assertContains(page, 'name="rag_host" value="rag.test.example"')          # розібрано з URL
+        self.assertContains(page, 'name="rag_port" value="443"')
+        self.assertEqual(self.form().status_code, 302)
+        ks = KnowledgeSettings.get()
+        self.assertEqual((ks.private_base_url, ks.private_api_key), ("http://192.168.2.68:8788", "test-private-key"))
+        self.form(rag_host="rag-tunnel", rag_port=18788, rag_https="on")
+        self.assertEqual(KnowledgeSettings.get().private_base_url, "https://rag-tunnel:18788")
+        for bad in ("http://192.168.2.68", "192.168.2.68:8788", "rag/v2"):
+            r = self.form(rag_host=bad)
+            self.assertEqual(r.status_code, 200)
+            self.assertContains(r, "без http://")
+        self.form(rag_host="")
+        self.assertEqual(KnowledgeSettings.get().private_base_url, "")
+        self.assertIn("адресу", retrieval.not_configured_reason())
+
+    def test_no_fallback_to_public_rag_address(self):
+        from rag_assistant.models import RagSettings
+        rs = RagSettings.get()
+        rs.base_url = "https://app.public.example"
+        rs.save()
+        KnowledgeSettings.objects.update(private_base_url="")
+        self.assertEqual(retrieval.base_url(), "")
+        self.assertFalse(retrieval.available())
+
+    def test_instance_id_from_settings_when_env_empty(self):
+        self.client.force_login(self.user)
+        with override_settings(MINERVA_INSTANCE_ID=""):
+            self.assertEqual(self.api("get", "/api/v1/knowledge/summary/").status_code, 503)
+            r = self.form(instance_id="Sevskiy Prod")
+            self.assertContains(r, "Лише малі латинські літери")
+            self.form(instance_id="sevskiy-prod")
+            self.assertEqual(knowledge.instance_id(), "sevskiy-prod")
+            self.assertEqual(knowledge.instance_id_source(), "settings")
+            summary = self.api("get", "/api/v1/knowledge/summary/")
+            self.assertEqual((summary.status_code, summary.json()["source_instance_id"]), (200, "sevskiy-prod"))
+        self.assertEqual(knowledge.instance_id(), "test-suite")                          # змінна середовища важливіша
+
+    def test_create_feed_key_for_rag(self):
+        from api.models import APIKey
+        self.client.force_login(self.user)
+        before = APIKey.objects.count()
+        self.assertRedirects(self.client.get("/admin/rag_assistant/knowledgesettings/feedkey/"),
+                             "/admin/rag_assistant/knowledgesettings/1/change/", fetch_redirect_response=False)
+        self.assertEqual(APIKey.objects.count(), before)                                 # лише POST
+        r = self.client.post("/admin/rag_assistant/knowledgesettings/feedkey/")
+        key = APIKey.objects.latest("created_at")
+        self.assertRedirects(r, f"/admin/api/apikey/{key.pk}/change/", fetch_redirect_response=False)
+        self.assertEqual((key.scopes, key.shop_id), (["knowledge:read", "knowledge:write"], None))
+        page = self.client.get("/admin/rag_assistant/knowledgesettings/1/change/")
+        self.assertContains(page, f"…{key.key[-4:]}")
+        self.assertContains(page, "🔑 Створити ключ для RAG")
+
+    def test_tls_verification_setting_is_used(self):
+        KnowledgeSettings.objects.update(private_verify_tls=False)
+        retrieval.start(self.user, "q")
+        self.assertFalse(self.fake.calls[0]["verify"])
 
 
 class ModesAndMailTests(RetrievalBase):

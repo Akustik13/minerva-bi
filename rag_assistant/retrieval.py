@@ -66,16 +66,16 @@ def _settings():
 
 
 def base_url(s=None) -> str:
-    from .models import RagSettings
+    """Лише явна адреса приватного API: адреса публічного помічника сюди не підставляється."""
     s = s or _settings()
-    return (s.private_base_url or RagSettings.get().base_url or "").rstrip("/")
+    return (s.private_base_url or "").rstrip("/")
 
 
 def not_configured_reason(s=None) -> str:
     from .knowledge import instance_id
     s = s or _settings()
     if not instance_id():
-        return "на сервері не задано MINERVA_INSTANCE_ID"
+        return "не задано назву цього сервера для RAG (MINERVA_INSTANCE_ID)"
     if not s.private_api_key:
         return "не задано ключ приватного пошуку RAG"
     if not base_url(s):
@@ -112,14 +112,13 @@ def _until_text(until) -> str:
 
 
 def _request(method, path, *, s, params=None, body=None, idempotency_key=None, wait_ms=0):
-    from .models import RagSettings
     headers = {"Authorization": f"Bearer {s.private_api_key}", "Accept": "application/json"}
     if idempotency_key:
         headers["Idempotency-Key"] = idempotency_key
     try:
         r = requests.request(method, base_url(s) + path, params=params, json=body, headers=headers,
                              timeout=(CONNECT_TIMEOUT, wait_ms / 1000 + 5), allow_redirects=False,
-                             verify=bool(RagSettings.get().verify_tls))
+                             verify=bool(s.private_verify_tls))
     except requests.exceptions.ReadTimeout:
         _record_failure()
         raise RetrievalUnknown("RAG не відповів вчасно")

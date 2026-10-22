@@ -56,8 +56,19 @@ class KnowledgeError(Exception):
 # ── Середовище й налаштування ────────────────────────────────────────────────
 
 def instance_id() -> str:
+    """Назва середовища для RAG: змінна MINERVA_INSTANCE_ID, інакше поле в «🧠 База знань»."""
     value = (getattr(settings, "MINERVA_INSTANCE_ID", "") or "").strip()
+    if not value:
+        from .models import KnowledgeSettings
+        value = (KnowledgeSettings.objects.filter(pk=1).values_list("instance_id", flat=True).first() or "").strip()
     return value if _INSTANCE_RE.match(value) else ""
+
+
+def instance_id_source() -> str:
+    """Звідки взято назву: env / settings / ''."""
+    if (getattr(settings, "MINERVA_INSTANCE_ID", "") or "").strip():
+        return "env"
+    return "settings" if instance_id() else ""
 
 
 @dataclass

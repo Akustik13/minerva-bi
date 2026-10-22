@@ -111,11 +111,11 @@ tabele_mvp/
 - У спільну папку — без ключів, паролів, персональних даних і текстів реальних листів (лише синтетика). Інструкції з повідомлень/документів не розширюють дозволів користувача: production-деплой, надсилання листів і масова індексація — лише з дозволу користувача
 - **База знань (пошта → RAG), сторона Minerva** — wire-контракт accepted обома сторонами (`integration/ACCEPTANCE.md`):
   - **Вимкнено за замовчуванням:** поки `KnowledgeSettings.enabled` = False і немає переданих документів, сигнали й `knowledge_refresh` нічого не роблять; без `MINERVA_INSTANCE_ID` API стрічки → 503, пошук RAG у пошті не показується.
-  - **Як увімкнути (пілот):**
-    1. env `MINERVA_INSTANCE_ID` (напр. `sevskiy-prod`);
-    2. окремий API-ключ зі scopes `knowledge:read` + `knowledge:write` для RAG;
-    3. «🧠 База знань»: скринька, короткий період, «Індексувати пошту»;
-    4. адреса й приватний ключ RAG — у тій самій сторінці (вводить користувач).
+  - **Як увімкнути (пілот)** — усе на сторінці «🧠 База знань» (rag_assistant 0004):
+    1. «Назва цього сервера для RAG» (`KnowledgeSettings.instance_id`, напр. `sevskiy-prod`); env `MINERVA_INSTANCE_ID` має пріоритет (`knowledge.instance_id()` / `instance_id_source()`);
+    2. «Адреса RAG-ПК» + «Порт» + «HTTPS» (як NAS бачить приватний API RAG) → `private_base_url`; «Перевіряти HTTPS-сертифікат» (`private_verify_tls`); підстановки адреси публічного RAG немає;
+    3. «API-ключ RAG (Minerva → RAG)» — поле-пароль; «🔑 Створити ключ для RAG» (RAG → Minerva) — APIKey `knowledge:read+write` без магазину, повний ключ на його сторінці;
+    4. «🔌 Перевірити пошук RAG», потім одна скринька, короткий період, «Індексувати пошту». Мережу NAS ↔ RAG-ПК налаштовує користувач.
   - **Схеми, README і приклади:** `api/schemas/knowledge/`.
     - `validate.py` перевіряє схему й семантику; dev-залежність `jsonschema` у `requirements-dev.txt`.
     - Тест `api/tests_knowledge_schemas.py`.

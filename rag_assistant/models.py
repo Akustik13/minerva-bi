@@ -123,12 +123,20 @@ class KnowledgeSettings(models.Model):
     include_attachments = models.BooleanField("Індексувати вкладення", default=True)
     attachment_types = models.JSONField("Типи вкладень", default=_default_attachment_types, blank=True)
     attachment_max_mb = models.PositiveSmallIntegerField("Макс. розмір вкладення, МБ", default=15)
+    instance_id = models.CharField(
+        "Назва цього сервера для RAG", max_length=64, blank=True, default="",
+        help_text="Стала назва середовища, напр. sevskiy-prod (латиниця, цифри, . _ -). Змінна середовища "
+                  "MINERVA_INSTANCE_ID має пріоритет. Не копіюйте цю назву разом із базою на інший сервер.")
     private_api_key = models.CharField(
         "Ключ приватного пошуку RAG", max_length=200, blank=True, default="",
         help_text="Окремий Bearer-ключ RAG для /v2/* (не ключ магазину). Лише на сервері Minerva.")
-    private_base_url = models.URLField(
-        "Адреса приватного API RAG", blank=True, default="",
-        help_text="Без /v2 у кінці. Порожньо — та сама адреса, що в «Налаштуваннях помічника».")
+    private_base_url = models.CharField(
+        "Адреса приватного API RAG", max_length=200, blank=True, default="",
+        help_text="http(s)://адреса:порт без /v2 — складається з полів «Адреса RAG-ПК», «Порт», «HTTPS». "
+                  "Порожньо — пошук RAG вимкнено.")
+    private_verify_tls = models.BooleanField(
+        "Перевіряти HTTPS-сертифікат RAG", default=True,
+        help_text="Вимикати лише для власного (self-signed) сертифіката в закритій мережі.")
     rag_failures = models.PositiveSmallIntegerField(default=0, editable=False,
                                                     help_text="Збоїв поспіль (запобіжник).")
     rag_down_until = models.DateTimeField(null=True, blank=True, editable=False,

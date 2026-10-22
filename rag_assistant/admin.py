@@ -140,6 +140,12 @@ from email_assistant.models import EmailMessage as _EmailMessage  # noqa: E402
 from . import knowledge  # noqa: E402
 from .models import KnowledgeDoc, KnowledgeSettings  # noqa: E402
 
+import re  # noqa: E402
+
+# Адреса RAG-ПК: IPv4 або ім'я хоста (без схеми, порту й шляху)
+_HOST_RE = re.compile(r"^(?=.{1,150}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$")
+FEED_SCOPES = ["knowledge:read", "knowledge:write"]
+
 
 class KnowledgeSettingsForm(forms.ModelForm):
     categories = forms.MultipleChoiceField(
@@ -148,22 +154,50 @@ class KnowledgeSettingsForm(forms.ModelForm):
         help_text="Розсилки й сервісні сповіщення за замовчуванням не індексуються.")
     attachment_types_text = forms.CharField(
         label="Типи вкладень", required=False, help_text="Через кому: pdf, docx, txt, csv")
+    rag_host = forms.CharField(
+        label="Адреса RAG-ПК", required=False, max_length=150,
+        widget=forms.TextInput(attrs={"size": 40, "placeholder": "192.168.2.68"}),
+        help_text="IP або ім'я, за яким сервер Minerva (NAS) бачить приватний API RAG: напряму, через тунель "
+                  "чи проксі на NAS. Без http:// і без порту. Порожньо — пошук RAG вимкнено.")
+    rag_port = forms.IntegerField(label="Порт", min_value=1, max_value=65535, initial=8788, required=False)
+    rag_https = forms.BooleanField(label="HTTPS", required=False,
+                                   help_text="Увімкніть, якщо перед RAG стоїть HTTPS-проксі.")
     private_api_key = forms.CharField(
-        label="Ключ приватного пошуку RAG", required=False, max_length=200,
+        label="API-ключ RAG (Minerva → RAG)", required=False, max_length=200,
         widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password", "size": 50}),
-        help_text="Окремий Bearer-ключ RAG для /v2/* (не ключ магазину). Порожньо — залишити збережений.")
+        help_text="Bearer-ключ приватного API RAG (файл private-api-key.txt на RAG-ПК), не ключ магазину. "
+                  "Порожньо — залишити збережений.")
     clear_key = forms.BooleanField(label="Видалити збережений ключ", required=False)
 
     class Meta:
         model = KnowledgeSettings
         fields = ["enabled", "accounts", "categories", "index_from", "include_attachments", "attachment_max_mb",
-                  "private_base_url", "private_api_key"]
-        widgets = {"accounts": forms.CheckboxSelectMultiple}
+                  "instance_id", "private_api_key", "private_verify_tls"]
+        widgets = {"accounts": forms.CheckboxSelectMultiple,
+                   "instance_id": forms.TextInput(attrs={"size": 30, "placeholder": "sevskiy-prod"})}
 
     def __init__(self, *args, **kwargs):
+        from urllib.parse import urlsplit
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
             self.fields["attachment_types_text"].initial = ", ".join(self.instance.attachment_types or [])
+            url = urlsplit(self.instance.private_base_url or "")
+            if url.hostname:
+                self.fields["rag_host"].initial = url.hostname
+                self.fields["rag_port"].initial = url.port or (443 if url.scheme == "https" else 80)
+                self.fields["rag_https"].initial = url.scheme == "https"
+
+    def clean_instance_id(self):
+        value = (self.cleaned_data.get("instance_id") or "").strip()
+        if value and not knowledge._INSTANCE_RE.match(value):
+            raise forms.ValidationError("Лише малі латинські літери, цифри, «.», «_», «-»; 2–64 символи, напр. sevskiy-prod.")
+        return value
+
+    def clean_rag_host(self):
+        value = (self.cleaned_data.get("rag_host") or "").strip()
+        if value and not _HOST_RE.match(value):
+            raise forms.ValidationError("Лише адреса або ім'я хоста, напр. 192.168.2.68 — без http://, порту й шляху.")
+        return value
 
     def clean_private_api_key(self):
         value = (self.cleaned_data.get("private_api_key") or "").strip()
@@ -181,6 +215,10 @@ class KnowledgeSettingsForm(forms.ModelForm):
         obj = super().save(commit=False)
         obj.attachment_types = [t.strip().lower().lstrip(".") for t in
                                 (self.cleaned_data.get("attachment_types_text") or "").split(",") if t.strip()]
+        host = self.cleaned_data.get("rag_host")
+        port = self.cleaned_data.get("rag_port") or 8788
+        scheme = "https" if self.cleaned_data.get("rag_https") else "http"
+        obj.private_base_url = f"{scheme}://{host}:{port}" if host else ""
         if commit:
             obj.save()
             self.save_m2m()
@@ -190,7 +228,7 @@ class KnowledgeSettingsForm(forms.ModelForm):
 @admin.register(KnowledgeSettings)
 class KnowledgeSettingsAdmin(admin.ModelAdmin):
     form = KnowledgeSettingsForm
-    readonly_fields = ["status_panel", "connection_help", "key_status", "search_status"]
+    readonly_fields = ["status_panel", "connection_help", "key_status", "feed_keys", "search_status"]
     fieldsets = [
         ("Стан", {"fields": ["status_panel"]}),
         ("Що індексувати", {
@@ -199,8 +237,10 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
             "description": "Minerva вирішує, які листи можна передати в RAG; RAG сам забирає зміни (pull) і звітує. "
                            "Вектори створюються локально на ПК RAG. Після збереження стрічка звіряється у фоні.",
         }),
-        ("Підключення RAG", {"fields": ["connection_help", "private_base_url", "private_api_key", "key_status",
-                                        "clear_key", "search_status"]}),
+        ("Підключення RAG", {"fields": ["connection_help", "instance_id", "rag_host", "rag_port", "rag_https",
+                                        "private_verify_tls", "search_status"]}),
+        ("API-ключі", {"fields": ["private_api_key", "key_status", "clear_key", "feed_keys"],
+                       "description": "Два різні ключі: Minerva → RAG (пошук) і RAG → Minerva (стрічка листів)."}),
     ]
 
     def has_add_permission(self, request):
@@ -222,19 +262,40 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
         knowledge.start_refresh()
         self.message_user(request, "Налаштування збережено; стрічка бази знань звіряється у фоні.")
 
-    @admin.display(description="Збережений ключ")
+    @admin.display(description="Збережений ключ RAG")
     def key_status(self, obj):
         if not obj or not obj.private_api_key:
             return format_html('<span style="color:#e57373">{}</span>', "не задано (потрібен для пошуку, не для індексації)")
         return f"задано (…{obj.private_api_key[-4:]})"
 
+    @admin.display(description="Ключ Minerva для RAG (RAG → Minerva)")
+    def feed_keys(self, obj):
+        """API-ключі Minerva з правами бази знань: RAG ними забирає стрічку /api/v1/knowledge/."""
+        from api.models import APIKey
+        keys = [k for k in APIKey.objects.filter(is_active=True).order_by("-created_at")
+                if "knowledge:read" in (k.scopes or [])]
+        rows = format_html_join("", "<li><a href='{}'>{}</a> · …{} · {}</li>", (
+            (reverse("admin:api_apikey_change", args=[k.pk]), k.name, k.key[-4:],
+             f"востаннє {timezone.localtime(k.last_used):%d.%m.%Y %H:%M}" if k.last_used else "ще не використовувався")
+            for k in keys))
+        button = format_html(
+            '<button type="submit" class="button" formaction="{}" formnovalidate>🔑 Створити ключ для RAG</button>',
+            reverse("admin:rag_assistant_knowledgesettings_feedkey"))
+        return format_html(
+            "{}<div style='margin-top:6px'>{}</div><div class='help'>Ключ із правами <code>knowledge:read</code> і "
+            "<code>knowledge:write</code>, без магазину. Повний ключ — на його сторінці (відкрийте посилання); "
+            "його вписують у конфігурацію RAG разом з адресою Minerva, яку бачить RAG-ПК.</div>",
+            format_html("<ul style='margin:0;padding-left:18px'>{}</ul>", rows) if keys
+            else format_html('<span style="color:#e57373">{}</span>', "ще немає"), button)
+
     @admin.display(description="Стан індексації")
     def status_panel(self, obj):
         inst = knowledge.instance_id()
+        source = {"env": "змінна середовища", "settings": "поле нижче"}.get(knowledge.instance_id_source(), "")
         s = knowledge.summary()
         d = s["documents"]
         rows = [
-            ("Середовище (MINERVA_INSTANCE_ID)", inst or format_html(
+            ("Назва сервера для RAG", f"{inst} ({source})" if inst else format_html(
                 '<b style="color:#e57373">не задано — маршрути для RAG вимкнені (503)</b>')),
             ("Покоління журналу", s["generation"]),
             ("Остання подія журналу (seq)", s["last_seq"]),
@@ -298,13 +359,14 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
     def connection_help(self, obj):
         return format_html(
             "<ol style='margin:0;padding-left:18px'>"
-            "<li>На сервері задайте змінну середовища <code>MINERVA_INSTANCE_ID</code> (напр. <code>sevskiy-prod</code>).</li>"
-            "<li><a href='{}' target='_blank'>Адмін → REST API → API Ключі</a>: новий ключ <b>без магазину</b> з правами "
-            "<code>knowledge:read</code> і <code>knowledge:write</code> — передайте його адміністратору RAG.</li>"
-            "<li>RAG сам забирає зміни з <code>/api/v1/knowledge/changes/</code> і звітує статуси — прогрес видно вище.</li>"
-            "<li>Почніть з короткого періоду однієї скриньки; масову індексацію архіву — лише після перевірки.</li>"
-            "</ol><div class='help'>Контракт: api/schemas/knowledge/README.md</div>",
-            reverse("admin:api_apikey_add"))
+            "<li><b>Назва сервера</b> — напр. <code>sevskiy-prod</code> (або змінна середовища <code>MINERVA_INSTANCE_ID</code>).</li>"
+            "<li><b>Мережа:</b> сервер Minerva (NAS) має бачити приватний API RAG за адресою й портом нижче "
+            "(напряму, через тунель або HTTPS-проксі на NAS), а RAG-ПК — Minerva (стрічку <code>/api/v1/knowledge/</code>).</li>"
+            "<li><b>Ключі:</b> «API-ключ RAG» — з RAG-ПК; «🔑 Створити ключ для RAG» — ключ Minerva, який вписують у RAG.</li>"
+            "<li><b>«🔌 Перевірити пошук RAG»</b> — Minerva звернеться до RAG і покаже відповідь чи причину відмови.</li>"
+            "<li>Увімкніть «Індексувати пошту» для однієї скриньки й короткого періоду; масову індексацію архіву — лише після перевірки.</li>"
+            "</ol><div class='help'>Контракт: api/schemas/knowledge/README.md · API-ключі: <a href='{}'>REST API → API Ключі</a></div>",
+            reverse("admin:api_apikey_changelist"))
 
     def get_urls(self):
         return [
@@ -313,7 +375,18 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
             path("generation/", self.admin_site.admin_view(self.generation_view),
                  name="rag_assistant_knowledgesettings_generation"),
             path("check/", self.admin_site.admin_view(self.check_view), name="rag_assistant_knowledgesettings_check"),
+            path("feedkey/", self.admin_site.admin_view(self.feedkey_view), name="rag_assistant_knowledgesettings_feedkey"),
         ] + super().get_urls()
+
+    def feedkey_view(self, request):
+        """Новий API-ключ Minerva для RAG (лише права бази знань, без магазину) → його сторінка з повним ключем."""
+        from api.models import APIKey
+        if request.method != "POST" or not request.user.has_perm("api.add_apikey"):
+            return self._back()
+        key = APIKey.objects.create(name=f"RAG — база знань ({timezone.localdate():%d.%m.%Y})", scopes=FEED_SCOPES)
+        self.message_user(request, "Створено ключ для RAG. Скопіюйте його з розділу «Технічна інформація» у "
+                                   "конфігурацію RAG; старий ключ, якщо він більше не потрібен, вимкніть.")
+        return redirect(reverse("admin:api_apikey_change", args=[key.pk]))
 
     def _back(self):
         return redirect(reverse("admin:rag_assistant_knowledgesettings_change", args=[KnowledgeSettings.get().pk]))
