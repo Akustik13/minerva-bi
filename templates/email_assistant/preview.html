@@ -320,12 +320,14 @@
       </div>
       <div class="em-history-ai" id="pv-history-ai"></div>
       <div id="pv-history-body"></div>
+      {% if rag_available %}
       <div class="em-history-rag">
         <button class="em-pv-btn" onclick="pvRagSearch({{ last.pk|default:0 }}, this)"
                 title="{% trans "Знайти в інших листуваннях (база знань RAG): обіцянки, домовленості, попередні пропозиції. Без RAG усе інше працює." %}">🔎 {% trans "Доповнити через RAG" %}</button>
         <div class="em-rag-status" id="pv-rag-status"></div>
         <div id="pv-rag-hits"></div>
       </div>
+      {% endif %}
       <div class="em-history-draft">
         <div class="em-history-draft-row">
           <input class="em-ai-prompt-inp" id="pv-history-prompt" type="text"

@@ -73,7 +73,20 @@ def _ctx(request, ctx: dict) -> dict:
     """Inject is_nav_sidebar_enabled based on user's EmailSettings."""
     from email_assistant.models import EmailSettings
     ctx['is_nav_sidebar_enabled'] = EmailSettings.get_for_user(request.user).show_admin_sidebar
+    ctx.update(_rag_flags())
     return ctx
+
+
+def _rag_flags() -> dict:
+    """Що з бази знань показувати в пошті: пошук RAG — лише якщо налаштований; «🔒 Приватне» — якщо
+    на цьому сервері є база знань (MINERVA_INSTANCE_ID), щоб приватні гілки можна було позначити до пілоту."""
+    try:
+        from rag_assistant import retrieval
+        from rag_assistant.knowledge import instance_id
+        return {'rag_available': retrieval.available(), 'knowledge_available': bool(instance_id())}
+    except Exception as e:  # noqa: BLE001 — пошта працює й без бази знань
+        logger.warning('rag flags: %s', e)
+        return {'rag_available': False, 'knowledge_available': False}
 
 
 def _get_signature(account) -> str:

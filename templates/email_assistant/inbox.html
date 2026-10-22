@@ -351,6 +351,7 @@
           {% endfor %}
         </select>
       </label>
+      {% if rag_available %}
       <label class="em-sync-btn" style="cursor:pointer;gap:6px"
              title="{% trans "Пошук в інших листуваннях (база знань RAG) для «Історії» й AI-відповіді. Без RAG Minerva працює як звичайно." %}">
         🔎
@@ -361,6 +362,7 @@
           {% endfor %}
         </select>
       </label>
+      {% endif %}
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
       <div id="sync-countdown"></div>
     </div>
@@ -604,8 +606,10 @@
     </div>
   </div>
   <div class="em-ctx-item" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
+  {% if knowledge_available %}
   <div class="em-ctx-item" onclick="ctxAction('kb')"
        title="{% trans "Приватна переписка: не передавати в базу знань RAG (повторне натискання — повернути)" %}">🔒 {% trans "Приватне — не в базу знань" %}</div>
+  {% endif %}
   <div class="em-ctx-item" onclick="ctxAction('rule')">📋 Правило з відправника</div>
   <div class="em-ctx-item" onclick="ctxAction('task')">📅 Завдання в календар</div>
   <div class="em-ctx-sep"></div>

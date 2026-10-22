@@ -83,6 +83,11 @@ def not_configured_reason(s=None) -> str:
     return ""
 
 
+def available(s=None) -> bool:
+    """RAG налаштований на цьому сервері (середовище, ключ, адреса) — інакше пошта його не згадує взагалі."""
+    return not not_configured_reason(s)
+
+
 def breaker_until(s=None):
     s = s or _settings()
     return s.rag_down_until if s.rag_down_until and s.rag_down_until > timezone.now() else None
@@ -429,6 +434,8 @@ def search_for_context(user, ctx, *, purpose, mode, instruction=""):
     опитування); якщо RAG не встиг — job лишається незавершеним, AI працює лише з даними Minerva.
     """
     import time
+    if not available():   # RAG ще не підключено — AI працює з даними Minerva без приміток і записів
+        return {"used": False, "reason": "RAG не налаштований", "job": None}
     use, reason = decide(mode, purpose, ctx, instruction)
     if not use:
         return {"used": False, "reason": reason, "job": None}

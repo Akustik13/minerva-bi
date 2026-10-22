@@ -14,6 +14,7 @@ from unittest.mock import patch
 import requests
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.test import override_settings
 from django.utils import timezone
 
 from email_assistant.models import EmailAccount, EmailSettings
@@ -346,6 +347,27 @@ class ModesAndMailTests(RetrievalBase):
         d, facts = self._ai_reply(msg)
         self.assertTrue(d["ok"])
         self.assertTrue(any("лише дані Minerva" in u for u in d["used"]), d["used"])
+
+    def test_unconfigured_rag_is_invisible_in_mail(self):
+        """Сервер без підключеного RAG: жодних кнопок, приміток і записів про пошук — лише дані Minerva."""
+        self.client.force_login(self.user)
+        old, new = self.mail("Earlier: delivery week 46"), self.mail("Status?")
+        configured = self.client.get(f"/email/thread/{new.thread_id}/preview/")
+        self.assertContains(configured, "pvRagSearch(")
+        KnowledgeSettings.objects.update(private_api_key="")
+        es = EmailSettings.get_for_user(self.user)
+        es.rag_mode = "extended"
+        es.save()
+        d, facts = self._ai_reply(new, "Що ми обіцяли?")
+        self.assertTrue(d["ok"])
+        self.assertFalse(any("RAG" in u for u in d["used"]), d["used"])
+        self.assertEqual((self.fake.calls, RetrievalJob.objects.count()), ([], 0))
+        self.assertNotContains(self.client.get(f"/email/thread/{new.thread_id}/preview/"), "pvRagSearch(")
+        inbox = self.client.get("/email/")
+        self.assertNotContains(inbox, 'id="em-rag-mode"')
+        self.assertContains(inbox, "ctxAction('kb')")                       # база знань на сервері є — «🔒» лишається
+        with override_settings(MINERVA_INSTANCE_ID=""):
+            self.assertNotContains(self.client.get("/email/"), "ctxAction('kb')")
 
     def test_mode_setting_from_mailbox(self):
         self.client.force_login(self.user)
