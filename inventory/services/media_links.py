@@ -3,6 +3,9 @@
 Правило — шаблон з {key}: https://…/download.php?file={key}.pdf. {key} = «Спільний файл» товару (image_key /
 datasheet_key), а якщо порожньо — артикул (SKU). Однаковий спільний файл у кількох товарах = одне посилання.
 
+Розширення: фото бувають .jpg і .png — під час перевірки Minerva пробує спершу розширення з правила, далі інші
+(EXTS) і бере те посилання, що відповідає. Спільний файл, вписаний уже з розширенням («X.png»), береться як є.
+
 Перевірка йде у фоні (стан і звіт — MediaLinkCheck, жива панель): для кожного товару нове посилання, поточне,
 чи відповідають вони (лише початок файлу: справжнє фото / PDF, а не сторінка помилки) і що з цим робити.
 Записуються лише вибрані людиною рядки; потім «🖼 Фото й даташити» магазину перевірить їх як змінені.
@@ -10,9 +13,10 @@ datasheet_key), а якщо порожньо — артикул (SKU). Одна�
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from datetime import timedelta
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 from django.db import connection, transaction
 from django.utils import timezone
@@ -27,6 +31,8 @@ KINDS = (IMAGE, DATASHEET)
 FIELDS = {IMAGE: ("image_url", "image_key", "image_url_template"),
           DATASHEET: ("datasheet_url", "datasheet_key", "datasheet_url_template")}
 LABEL = {IMAGE: "фото", DATASHEET: "даташит"}
+EXTS = {IMAGE: ("jpg", "png", "jpeg", "webp"), DATASHEET: ("pdf",)}
+_TPL_EXT = re.compile(r"\{key\}\.([A-Za-z0-9]{2,5})")
 STALE_RUN = timedelta(minutes=3)
 _lock = threading.Lock()
 
@@ -54,8 +60,44 @@ def key_for(product, kind) -> str:
     return (getattr(product, FIELDS[kind][1]) or "").strip() or product.sku
 
 
-def build_url(template: str, key: str) -> str:
-    return template.replace("{key}", quote(key, safe="-_.~()")) if template and key else ""
+def candidates(template: str, key: str, kind: str) -> list[str]:
+    """Можливі посилання: спершу з розширенням правила, далі інші розширення цього виду.
+    Спільний файл уже з розширенням («X.png») — лише він, без розширення правила (не «X.png.jpg»)."""
+    if not template or not key:
+        return []
+    name = quote(key, safe="-_.~()")
+    m = _TPL_EXT.search(template)
+    if m is None:
+        return [template.replace("{key}", name)]
+    head, tail = template[:m.start()], template[m.end():]
+    if re.search(r"\.(?:" + "|".join(EXTS[kind]) + r")$", key, re.I):
+        return [head + name + tail]
+    first = m.group(1)
+    return [head + name + "." + ext + tail for ext in [first] + [e for e in EXTS[kind] if e != first.lower()]]
+
+
+def build_url(template: str, key: str, kind: str) -> str:
+    """Основне посилання за правилом (без перевірки)."""
+    found = candidates(template, key, kind)
+    return found[0] if found else ""
+
+
+def resolve(found: list[str], kind: str, checked) -> tuple[str, str | None]:
+    """Перше посилання, що відповідає → (url, ''); жодне — (основне, помилка); без перевірки — (основне, None).
+    checked(url, kind) → '' / текст помилки / None."""
+    first_error = None
+    for i, url in enumerate(found):
+        error = checked(url, kind)
+        if error is None:
+            return found[0], None
+        if error == "":
+            return url, ""
+        if i == 0:
+            first_error = error
+    if len(found) > 1:
+        others = ", ".join("." + u.rsplit(".", 1)[-1].split("&")[0] for u in found[1:])
+        first_error = f"{first_error} (також немає {others})"
+    return found[0], first_error
 
 
 def example(kind: str, product=None) -> str:
@@ -64,7 +106,7 @@ def example(kind: str, product=None) -> str:
     if not t:
         return ""
     product = product or Product.objects.filter(is_active=True).order_by("sku").first()
-    return build_url(t, key_for(product, kind) if product else "AN050201-01C-175-MHF1")
+    return build_url(t, key_for(product, kind) if product else "AN050201-01C-175-MHF1", kind)
 
 
 def scope_products(scope: str, ids=None):
@@ -136,11 +178,14 @@ def run(scope="all", ids=None, kinds=KINDS, check_links=True, by="") -> dict:
             done += 1
             key = key_for(p, kind)
             current = (getattr(p, FIELDS[kind][0]) or "").strip()
-            new = build_url(tpl[kind], key)
+            found = candidates(tpl[kind], key, kind)
             state.update(done=done, current=f"{p.sku} · {LABEL[kind]}", heartbeat=timezone.now().isoformat())
             if done % 2 == 0 or done == total:
                 _save_state(state)
-            new_error = checked(new, kind)
+            if current and current in found and checked(current, kind) in (None, ""):
+                new, new_error = current, checked(current, kind)   # поточне вже за правилом і відповідає (.png теж)
+            else:
+                new, new_error = resolve(found, kind, checked)
             current_error = checked(current, kind) if current and current != new else None
             action, selected = decide(current, new, new_error, current_error)
             rows.append({"id": p.pk, "sku": p.sku, "name": (p.name or "")[:80], "kind": kind, "key": key,
@@ -236,7 +281,8 @@ def set_shared(products, kinds, key: str) -> dict:
     out = {}
     for kind in kinds:
         url_field, key_field, _ = FIELDS[kind]
-        url = build_url(tpl[kind], key)
+        found = candidates(tpl[kind], key, kind)
+        url, error = resolve(found, kind, probe) if found else ("", None)
         for p in products:
             fields = []
             own = "" if key == p.sku else key
@@ -248,8 +294,45 @@ def set_shared(products, kinds, key: str) -> dict:
                 fields.append(url_field)
             if fields:
                 p.save(update_fields=fields)
-        out[kind] = (url, probe(url, kind) if url else None)
+        out[kind] = (url, error if found else None)
     return out
+
+
+def key_from_url(template: str, url: str, kind: str) -> str | None:
+    """Назва файлу з посилання, якщо воно за правилом («…?file=X.png» → «X.png», «…?file=X.jpg» при правилі
+    {key}.jpg → «X»); інакше None."""
+    if not template or "{key}" not in template or not url:
+        return None
+    m = _TPL_EXT.search(template)
+    head, tail = (template[:m.start()], template[m.end():]) if m else template.split("{key}", 1)
+    if not url.startswith(head) or (tail and not url.endswith(tail)) or len(url) <= len(head) + len(tail):
+        return None
+    name = unquote(url[len(head):len(url) - len(tail)] if tail else url[len(head):])
+    if m and name.lower().endswith("." + m.group(1).lower()):
+        name = name[:-len(m.group(1)) - 1]   # розширення правила — допише саме правило
+    return name if name and "/" not in name and "?" not in name else None
+
+
+def set_link(products, kind, url: str) -> tuple[str, str, bool]:
+    """Дія «🔗 Спільне фото / даташит»: одне готове посилання для вибраних товарів.
+    Посилання за правилом — ще й «спільний файл», щоб перевірка «за правилом» потім його не міняла.
+    Повертає (url, помилка перевірки або '', чи посилання за правилом)."""
+    url = (url or "").strip()
+    url_field, key_field, _ = FIELDS[kind]
+    key = key_from_url(templates()[kind], url, kind)
+    for p in products:
+        fields = []
+        if getattr(p, url_field) != url:
+            setattr(p, url_field, url)
+            fields.append(url_field)
+        if key is not None:
+            own = "" if key == p.sku else key
+            if getattr(p, key_field) != own:
+                setattr(p, key_field, own)
+                fields.append(key_field)
+        if fields:
+            p.save(update_fields=fields)
+    return url, probe(url, kind), key is not None
 
 
 def shared_groups() -> dict[str, list[tuple[str, list[str]]]]:

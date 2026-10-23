@@ -118,25 +118,46 @@ def status_view(model_admin, request):
 def shared_form_class(products):
     """Форма дії «🖼 Спільне фото / даташит»: файл одного з вибраних товарів або своя назва."""
     choices = [(p.sku, p.sku) for p in products[:200]]
+    wide = forms.URLInput(attrs={"style": "width:100%;min-width:420px;max-width:680px"})
 
     class SharedMediaForm(forms.Form):
+        image_link = forms.URLField(
+            label="🖼 Готове посилання на фото", required=False, max_length=500, assume_scheme="https", widget=wide,
+            help_text="Однакове для всіх вибраних, напр. https://docs.sevskiy.com/pictures/download.php?file=CA-MHF1-MC1.13-XXX-MHF4.png")
+        datasheet_link = forms.URLField(label="📄 Готове посилання на даташит", required=False, max_length=500,
+                                        assume_scheme="https", widget=wide)
         kinds = forms.MultipleChoiceField(
-            label="Що спільне", widget=forms.CheckboxSelectMultiple, initial=[ml.IMAGE],
-            choices=[(ml.IMAGE, "🖼 Фото"), (ml.DATASHEET, "📄 Даташит")])
+            label="…або спільний файл за правилом для", widget=forms.CheckboxSelectMultiple, required=False,
+            choices=[(ml.IMAGE, "🖼 Фото"), (ml.DATASHEET, "📄 Даташит")],
+            help_text="Посилання збере правило з Налаштувань складу. Вид, для якого вписано готове посилання, тут не діє.")
         key = forms.ChoiceField(label="Файл якого товару", required=False, widget=forms.RadioSelect,
                                 choices=choices, initial=choices[0][0] if choices else None)
         custom = forms.CharField(label="…або назва файлу", required=False, max_length=120,
-                                 help_text="Без розширення, напр. AN050201-01C-175-MHF1. Має пріоритет над вибором вище.")
+                                 help_text="Напр. AN050201-01C-175-MHF1 — тоді Minerva пробує .jpg, .png … і бере те, що є; "
+                                           "з розширенням (X.png) — береться як є. Має пріоритет над вибором вище.")
 
         def clean(self):
             d = super().clean()
+            d["links"] = {k: d[f] for k, f in ((ml.IMAGE, "image_link"), (ml.DATASHEET, "datasheet_link")) if d.get(f)}
+            d["key_kinds"] = [k for k in d.get("kinds") or [] if k not in d["links"]]
             d["final"] = (d.get("custom") or "").strip() or d.get("key") or ""
-            if not d["final"]:
+            if not d["links"] and not d["key_kinds"]:
+                raise forms.ValidationError("Вставте готове посилання або позначте «Фото» / «Даташит» для спільного файлу.")
+            if d["key_kinds"] and not d["final"]:
                 raise forms.ValidationError("Оберіть товар або вкажіть назву файлу.")
-            if not re.fullmatch(r"[\w.\-()~ ]{1,120}", d["final"]):
+            if d["key_kinds"] and not re.fullmatch(r"[\w.\-()~ ]{1,120}", d["final"]):
                 raise forms.ValidationError("Назва файлу — літери, цифри, «-», «_», «.»")
             return d
     return SharedMediaForm
+
+
+def link_result_text(kind, count, url, error, by_rule) -> tuple[int, str]:
+    label = "фото" if kind == ml.IMAGE else "даташит"
+    note = "" if by_rule else (" Посилання не за правилом Налаштувань складу — у «Сформувати й перевірити» не записуйте "
+                               "для цих товарів рядки «замінити», якщо хочете лишити його.")
+    if error:
+        return messages.WARNING, f"Спільне посилання на {label} для {count} товарів: {url} — ⚠ {error}.{note}"
+    return messages.SUCCESS, f"Спільне посилання на {label} для {count} товарів: {url} — ✅ відповідає.{note}"
 
 
 def shared_result_text(key, count, result) -> list[tuple[int, str]]:

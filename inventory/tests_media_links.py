@@ -48,7 +48,7 @@ class MediaLinksTests(TestCase):
         self.assertEqual(s.image_url_template, "https://docs.example.com/pictures/{key}.png")   # {key} є — як є
         s.datasheet_url_template, s.image_url_template = DS, IMG
         s.save()
-        self.assertEqual(ml.build_url(DS, "AN 1"), self.url(DS, "AN%201"))
+        self.assertEqual(ml.build_url(DS, "AN 1", ml.DATASHEET), self.url(DS, "AN%201"))
         self.assertEqual(ml.key_for(self.c, ml.IMAGE), "AN-1")
         self.assertEqual(ml.key_for(self.c, ml.DATASHEET), "AN-3")
         self.assertEqual(ml.example(ml.DATASHEET, self.a), self.url(DS, "AN-1"))
@@ -74,6 +74,28 @@ class MediaLinksTests(TestCase):
         self.assertEqual((self.c.image_url, self.c.datasheet_url), (self.url(IMG, "AN-1"), "https://old.example.com/AN-3.pdf"))
         rows = {(r["sku"], r["kind"]): r for r in MediaLinkCheck.objects.get(pk=1).rows}
         self.assertEqual(rows[("AN-1", "datasheet")]["action"], ml.SAME)   # записане — «без змін»
+
+    def test_image_extensions(self):
+        # спільний файл з розширенням — як є (не «X.png.jpg»)
+        self.assertEqual(ml.candidates(IMG, "CA-MHF1-MC1.13-XXX-MHF4.png", ml.IMAGE),
+                         ["https://files.example.com/pictures/download.php?file=CA-MHF1-MC1.13-XXX-MHF4.png"])
+        # без розширення: спершу з правила (.jpg), далі .png, .jpeg, .webp; «.13» в артикулі — не розширення
+        self.assertEqual([u.rsplit(".", 1)[-1] for u in ml.candidates(IMG, "CA-MHF1-MC1.13", ml.IMAGE)],
+                         ["jpg", "png", "jpeg", "webp"])
+        self.assertEqual(len(ml.candidates(DS, "AN-1", ml.DATASHEET)), 1)
+        png = self.url(IMG, "AN-2").replace(".jpg", ".png")
+        self.b.image_url = png
+        self.b.save()
+        with links({self.url(IMG, "AN-1").replace(".jpg", ".png"), png}):
+            ml.run("all", kinds=[ml.IMAGE])
+        rows = {r["sku"]: r for r in MediaLinkCheck.objects.get(pk=1).rows}
+        self.assertEqual((rows["AN-1"]["new"], rows["AN-1"]["action"]), (self.url(IMG, "AN-1").replace(".jpg", ".png"), ml.FILL))
+        self.assertEqual(rows["AN-2"]["action"], ml.SAME)            # робочий .png не міняємо на .jpg
+        with links(set()):
+            ml.run("selected", ids=[self.a.pk], kinds=[ml.IMAGE])
+        row = MediaLinkCheck.objects.get(pk=1).rows[0]
+        self.assertEqual(row["new"], self.url(IMG, "AN-1"))           # нічого немає — основне посилання з помилкою
+        self.assertIn("також немає .png, .jpeg, .webp", row["new_error"])
 
     def test_without_checking_links(self):
         with links(set()) as probe:
@@ -125,6 +147,31 @@ class MediaLinksAdminTests(TestCase):
         self.p.refresh_from_db()
         self.assertEqual(self.p.datasheet_url, DS.replace("{key}", "AN-1"))
         self.assertEqual(self.client.get("/admin/inventory/inventorysettings/media-links/status/").json()["state"], "done")
+
+    def test_shared_link_action(self):
+        url = "/admin/inventory/product/"
+        sel = [self.p.pk, self.q.pk]
+        s = InventorySettings.get()
+        s.image_url_template = IMG
+        s.save()
+        link = "https://files.example.com/pictures/download.php?file=CA-FAMILY.png"   # за правилом, з розширенням
+        with links({link}):
+            r = self.client.post(url, {"action": "action_shared_media", "apply": "1", "_selected_action": sel,
+                                       "image_link": link}, follow=True)
+        self.assertContains(r, "✅ відповідає")
+        self.p.refresh_from_db(), self.q.refresh_from_db()
+        self.assertEqual((self.p.image_url, self.p.image_key, self.q.image_key), (link, "CA-FAMILY.png", "CA-FAMILY.png"))
+        self.assertEqual((self.p.datasheet_url, self.p.datasheet_key), ("", ""))   # даташит не чіпали
+        self.assertEqual(ml.key_from_url(IMG, "https://files.example.com/pictures/download.php?file=X.jpg", ml.IMAGE), "X")
+        other = "https://cdn.example.org/cables.pdf"                                   # не за правилом
+        with links({other}):
+            r = self.client.post(url, {"action": "action_shared_media", "apply": "1", "_selected_action": sel,
+                                       "datasheet_link": other}, follow=True)
+        self.assertContains(r, "не за правилом")
+        self.q.refresh_from_db()
+        self.assertEqual((self.q.datasheet_url, self.q.datasheet_key), (other, ""))
+        r = self.client.post(url, {"action": "action_shared_media", "apply": "1", "_selected_action": sel})
+        self.assertContains(r, "Вставте готове посилання")
 
     def test_shared_media_action(self):
         url = "/admin/inventory/product/"

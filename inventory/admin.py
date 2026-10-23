@@ -2318,18 +2318,22 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         from .admin_media_links import page_url
         return redirect(page_url(list(queryset.values_list("pk", flat=True)[:2000])))
 
-    @admin.action(description="🖼 Спільне фото / даташит для вибраних…")
+    @admin.action(description="🔗 Спільне фото / даташит (посилання або файл) для вибраних…")
     def action_shared_media(self, request, queryset):
         from shop.admin import FormActionMixin
-        from .admin_media_links import shared_form_class, shared_result_text
-        from .services.media_links import set_shared
+        from .admin_media_links import link_result_text, shared_form_class, shared_result_text
+        from .services.media_links import set_link, set_shared
         products = list(queryset.order_by("sku"))
 
         def apply(qs, d):
-            result = set_shared(products, d["kinds"], d["final"])
-            for level, text in shared_result_text(d["final"], len(products), result):
-                messages.add_message(request, level, text)
-            return f"Спільний файл «{d['final']}»: {len(products)} товарів."
+            for kind, url in d["links"].items():   # готове посилання — однакове для всіх вибраних
+                url, error, by_rule = set_link(products, kind, url)
+                messages.add_message(request, *link_result_text(kind, len(products), url, error, by_rule))
+            if d["key_kinds"]:
+                result = set_shared(products, d["key_kinds"], d["final"])
+                for level, text in shared_result_text(d["final"], len(products), result):
+                    messages.add_message(request, level, text)
+            return f"Спільне фото / даташит: {len(products)} товарів."
         return FormActionMixin._form_action(self, request, queryset, shared_form_class(products),
                                             "Спільне фото / даташит для вибраних товарів", apply)
 
@@ -3824,8 +3828,10 @@ class InventorySettingsAdmin(admin.ModelAdmin):
             "description": (
                 "<b>Правило посилань</b>: досить початку адреси, напр. <code>https://docs.sevskiy.com/datasheets/download.php?file=</code> "
                 "— при збереженні Minerva допише <code>{key}.pdf</code> (для фото — <code>{key}.jpg</code>); {key} = артикул товару "
-                "(або його «спільний файл», якщо кілька товарів мають одне фото чи даташит). Інше розширення чи артикул у "
-                "середині адреси — впишіть {key} самі. Порожнє поле — посилання цього типу не формуються. "
+                "(або його «спільний файл», якщо кілька товарів мають одне фото чи даташит). Фото бувають .jpg і .png: якщо "
+                "файлу з розширенням правила немає, Minerva під час перевірки пробує .png, .jpeg, .webp і бере те, що є; "
+                "спільний файл, вписаний з розширенням (X.png), береться як є. Артикул у середині адреси — впишіть {key} "
+                "самі. Порожнє поле — посилання цього типу не формуються. "
                 "<b>Кешування</b>: завантажує PDF-датащити та фото з вказаних URL на сервер — файли відкриваються швидше і "
                 "доступні, навіть якщо зовнішній сервер недоступний."
             ),
