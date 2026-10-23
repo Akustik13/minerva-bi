@@ -158,6 +158,23 @@
 /* Інструкція для AI — як поле чату: кілька рядків, росте з текстом; Enter — генерувати, Shift+Enter — новий рядок */
 textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;max-height:240px;resize:vertical;box-sizing:border-box}
 .em-ai-prompt-row{display:flex;gap:6px;align-items:flex-end}
+.em-ai-btns{display:flex;flex-direction:column;gap:6px}
+/* «📋 Підготувати»: етапи, бриф під чернеткою */
+.em-brief-stages{font-size:12px;color:var(--text-muted);margin:2px 0 8px;line-height:1.7}
+.em-brief-stages:empty{display:none}
+.em-brief-stages .st-running{color:var(--text);font-weight:600}
+.em-brief-stages .st-failed{color:#e57373}
+.em-brief{margin-top:10px;border:1px solid var(--border-strong);border-radius:6px;padding:6px 10px}
+.em-brief summary{cursor:pointer;font-size:12px;color:var(--text-muted)}
+.em-brief-meta{font-size:11px;margin-left:4px}
+.em-brief-meta.stale{color:#e57373}
+.em-brief-txt{width:100%;min-height:160px;margin-top:8px;padding:8px;box-sizing:border-box;border-radius:6px;
+  border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;line-height:1.5;
+  font-family:inherit;resize:vertical;outline:none}
+.em-brief-txt:focus{border-color:#1a73e8}
+.em-brief-src{font-size:11px;color:var(--text-muted);margin-top:6px;max-height:150px;overflow:auto;line-height:1.6}
+.em-brief-src a{color:inherit}
+.em-brief-hint{font-size:11px;color:var(--text-dim)}
 /* Reply box */
 .em-reply{flex-shrink:0;border-top:1px solid var(--border-strong);background:var(--bg-input);max-height:58vh;overflow-y:auto}
 /* Поля відповіді: Кому / Копія / Тема — компактна сітка */
@@ -397,10 +414,26 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
                  placeholder="{% trans "Що відповісти? (залиш порожнім для авто-відповіді). Shift+Enter — новий рядок" %}"
                  oninput="pvGrow(this)"
                  onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();pvAiGenerate({{ msg.pk }});}"></textarea>
-          <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">{% trans "Генерувати" %} →</button>
+          <div class="em-ai-btns">
+            <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})"
+                    title="{% trans "Швидко: листування гілки й дані Minerva" %}">{% trans "Генерувати" %} →</button>
+            <button class="em-pv-btn ai" onclick="pvAiPrepare({{ msg.pk }})"
+                    title="{% trans "Повна підготовка (~30 с): гілка, проєкт, Angebote, вкладення, RAG → бриф → лист. Бриф можна виправити й переписати лист" %}">📋 {% trans "Підготувати" %}</button>
+          </div>
         </div>
+        <div class="em-brief-stages" id="pv-brief-stages-{{ msg.pk }}"></div>
         <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
         <div class="em-ai-used" id="pv-ai-used-{{ msg.pk }}"></div>
+        <details class="em-brief" id="pv-brief-{{ msg.pk }}" hidden
+                 ontoggle="if(this.open)pvGrowBrief(document.getElementById('pv-brief-txt-{{ msg.pk }}'))">
+          <summary>📋 {% trans "Бриф — з чого писала Minerva" %} <span class="em-brief-meta" id="pv-brief-meta-{{ msg.pk }}"></span></summary>
+          <textarea class="em-brief-txt" id="pv-brief-txt-{{ msg.pk }}" oninput="pvGrowBrief(this)" spellcheck="false"></textarea>
+          <div class="em-brief-src" id="pv-brief-src-{{ msg.pk }}"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+            <button class="em-pv-btn ai" onclick="pvBriefRewrite({{ msg.pk }})">↻ {% trans "Переписати" %}</button>
+            <span class="em-brief-hint">{% trans "Допишіть чи викресліть у брифі — лист перепишеться за ним" %}</span>
+          </div>
+        </details>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 {% trans "Копіювати" %}</button>
           <button class="em-pv-btn ai" id="pv-ai-use-{{ msg.pk }}" onclick="pvUseAsReply({{ msg.pk }})">{% trans "Вставити у відповідь" %} →</button>
@@ -960,6 +993,10 @@ function _pvAiOpen(pk, mode) {
   document.getElementById('pv-ai-lbl-' + pk).textContent = _PV_AI_LABELS[mode];
   document.getElementById('pv-ai-prompt-row-' + pk).style.display = mode === 'reply' ? 'flex' : 'none';
   document.getElementById('pv-ai-use-' + pk).style.display = mode === 'reply' ? '' : 'none';
+  ['pv-brief-stages-', 'pv-brief-'].forEach(function(id) {      // бриф — лише для відповіді, не для перекладу
+    var el = document.getElementById(id + pk);
+    if (el) el.style.display = mode === 'reply' ? '' : 'none';
+  });
   var langSel = document.getElementById('pv-ai-lang-' + pk);
   if (langSel) langSel.style.display = mode === 'translate' ? '' : 'none';
   box.style.display = 'block';
@@ -986,6 +1023,7 @@ window.pvAiReply = function(pk) {
   if (!_pvAiOpen(pk, 'reply')) return;
   var inp = document.getElementById('pv-ai-prompt-' + pk);
   if (inp) { setTimeout(function(){ inp.focus({preventScroll: true}); }, 50); }
+  _pvBriefRestore(pk);
 };
 
 window.pvAiGenerate = async function(pk) {
@@ -1004,6 +1042,109 @@ window.pvAiGenerate = async function(pk) {
     _pvUsed('pv-ai-used-' + pk, (d.to ? ['{% trans "кому" %}: ' + d.to] : []).concat(d.used || []));
   } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
+
+// «📋 Підготувати відповідь»: бриф → лист у фоні (email_assistant/reply_brief.py); етапи видно під полем,
+// бриф — згорнутий під чернеткою: його можна виправити й «↻ Переписати» лише лист
+var _pvBriefIds = {};
+var _PV_STAGE_ICON = {done: '✓', running: '⏳', pending: '·', skipped: '–', failed: '✗'};
+
+window.pvGrowBrief = function(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight + 2, 600) + 'px';
+};
+
+function _pvBriefRender(pk, b, restore) {
+  if (!b) return;
+  _pvBriefIds[pk] = b.id;
+  var st  = document.getElementById('pv-brief-stages-' + pk);
+  var txt = document.getElementById('pv-ai-txt-' + pk);
+  var box = document.getElementById('pv-ai-' + pk);
+  if (st) st.innerHTML = b.status === 'done' ? '' : (b.stages || []).map(function(s) {
+    return '<div class="st-' + s.status + '">' + (_PV_STAGE_ICON[s.status] || '·') + ' ' + _pvEsc(s.label) +
+           (s.detail ? ' — ' + _pvEsc(s.detail) : '') + '</div>';
+  }).join('');
+  if (b.status === 'running') {
+    if (txt) txt.textContent = '⏳ {% trans "Minerva готує відповідь…" %}';
+  } else if (b.status === 'error') {
+    if (txt) txt.textContent = '⚠️ ' + (b.error || '{% trans "Помилка" %}');
+  } else if (txt && (!restore || !txt.textContent.trim())) {
+    txt.textContent = b.draft || '';
+    if (box) { box._to = b.to || ''; box._cc = (b.cc || []).join(', '); }
+    _pvUsed('pv-ai-used-' + pk, (b.to ? ['{% trans "кому" %}: ' + b.to] : []).concat(b.used || []));
+  }
+  var det = document.getElementById('pv-brief-' + pk);
+  if (!det || !b.brief) return;
+  det.hidden = false;
+  var ta = document.getElementById('pv-brief-txt-' + pk);
+  if (ta && b.status !== 'running' && document.activeElement !== ta) { ta.value = b.brief; pvGrowBrief(ta); }
+  var meta = document.getElementById('pv-brief-meta-' + pk);
+  if (meta) {
+    meta.textContent = '· ' + b.updated + (b.stale ? ' · {% trans "застарів: у гілці нові листи" %}' : '');
+    meta.classList.toggle('stale', !!b.stale);
+  }
+  var src = document.getElementById('pv-brief-src-' + pk);
+  if (src) src.innerHTML = (b.sources || []).map(function(s) {
+    var label = '[#' + s.n + '] ' + _pvEsc(s.label);
+    return '<div>' + (s.url ? '<a href="' + _pvEsc(s.url) + '" target="_blank">' + label + '</a>' : label) + '</div>';
+  }).join('');
+}
+
+function _pvBriefPoll(pk, b) {
+  _pvBriefRender(pk, b);
+  if (!b || b.status !== 'running') return;
+  setTimeout(function() {
+    if (!document.getElementById('pv-ai-' + pk) || _pvBriefIds[pk] !== b.id) return;   // прев'ю закрито / новий запуск
+    fetch('/email/brief/' + b.id + '/')
+      .then(function(r) { return r.json(); })
+      .then(function(d) { _pvBriefPoll(pk, d); })
+      .catch(function() { _pvBriefPoll(pk, b); });                                      // мережа — спробувати ще
+  }, 1500);
+}
+
+window.pvAiPrepare = async function(pk) {
+  var inp = document.getElementById('pv-ai-prompt-' + pk);
+  var txt = document.getElementById('pv-ai-txt-' + pk);
+  _pvUsed('pv-ai-used-' + pk, null);
+  txt.textContent = '⏳ {% trans "Minerva збирає дані…" %}';
+  try {
+    var r = await fetch('/email/message/' + pk + '/ai-prepare/', {method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({wish: inp ? inp.value.trim() : ''})});
+    _pvBriefPoll(pk, await r.json());
+  } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
+};
+
+window.pvBriefRewrite = async function(pk) {
+  var id  = _pvBriefIds[pk];
+  var ta  = document.getElementById('pv-brief-txt-' + pk);
+  var inp = document.getElementById('pv-ai-prompt-' + pk);
+  var txt = document.getElementById('pv-ai-txt-' + pk);
+  if (!id || !ta) return;
+  txt.textContent = '⏳ {% trans "Minerva переписує лист за брифом…" %}';
+  try {
+    var r = await fetch('/email/brief/' + id + '/rewrite/', {method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({brief: ta.value, wish: inp ? inp.value.trim() : ''})});
+    var d = await r.json();
+    if (d.ok === false) { txt.textContent = '⚠️ ' + d.error; return; }
+    _pvBriefPoll(pk, d);
+  } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
+};
+
+// Збережений бриф цього листа — показати під чернеткою без повторного збору
+function _pvBriefRestore(pk) {
+  if (_pvBriefIds[pk]) return;
+  fetch('/email/message/' + pk + '/brief/')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.brief && d.brief.message_id === pk && !_pvBriefIds[pk]) {
+        if (d.brief.status === 'running') _pvBriefPoll(pk, d.brief);
+        else _pvBriefRender(pk, d.brief, true);
+      }
+    })
+    .catch(function() {});
+}
 
 // «Minerva врахувала: …» — які дані з бази пішли в AI
 function _pvUsed(id, used) {

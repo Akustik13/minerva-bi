@@ -519,3 +519,41 @@ class EmailCategoryRule(models.Model):
 
     def __str__(self):
         return f'{self.key} → {self.get_category_display()}'
+
+
+class ReplyBrief(models.Model):
+    """
+    «📋 Підготувати відповідь»: бриф (з чого писати) і лист за ним — email_assistant/reply_brief.py.
+    Готується у фоні: status / stages читає браузер; «Переписати» — лише крок листа з виправленим брифом.
+    Останній бриф користувача для гілки показується під чернеткою; застарів — якщо в гілці з'явились нові листи.
+    """
+    RUNNING, DONE, ERROR = 'running', 'done', 'error'
+
+    user          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reply_briefs')
+    message       = models.ForeignKey(EmailMessage, on_delete=models.CASCADE, related_name='+',
+                                      verbose_name='Відповідь на лист')
+    thread        = models.ForeignKey(EmailThread, null=True, blank=True, on_delete=models.CASCADE, related_name='+')
+    wish          = models.TextField('Побажання', blank=True, default='')
+    brief         = models.TextField('Бриф', blank=True, default='')
+    sources       = models.JSONField(default=list, blank=True, help_text='[{n, kind, label, url}] — на що посилається [#N]')
+    draft         = models.TextField('Чернетка листа', blank=True, default='')
+    recipient     = models.CharField(max_length=300, blank=True, default='', help_text='Кому пишемо (для AI)')
+    to_email      = models.CharField(max_length=254, blank=True, default='')
+    cc            = models.JSONField(default=list, blank=True)
+    used          = models.JSONField(default=list, blank=True, help_text='«Minerva врахувала»')
+    stages        = models.JSONField(default=list, blank=True, help_text='[{key, label, status, detail}]')
+    status        = models.CharField(max_length=10, default=RUNNING)
+    error         = models.CharField(max_length=300, blank=True, default='')
+    last_message_id = models.PositiveIntegerField(default=0, help_text='Найновіший лист гілки на момент збору')
+    brief_model   = models.CharField(max_length=60, blank=True, default='')
+    letter_model  = models.CharField(max_length=60, blank=True, default='')
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Бриф відповіді'
+        verbose_name_plural = 'Брифи відповідей'
+        ordering            = ['-updated_at']
+
+    def __str__(self):
+        return f'Бриф для листа #{self.message_id}'

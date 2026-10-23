@@ -1119,6 +1119,71 @@ def ai_suggest_reply(request, message_pk):
                          'error': '' if reply else 'AI не повернув відповідь'})
 
 
+def _json_body(request) -> dict:
+    try:
+        body = json.loads(request.body or b'{}')
+    except ValueError:
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
+@staff_member_required
+@require_POST
+def ai_prepare_view(request, message_pk):
+    """«📋 Підготувати відповідь»: зібрати дані → бриф → лист у фоні; браузер опитує /email/brief/<id>/."""
+    from email_assistant import reply_brief
+    from email_assistant.context import build_context
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    thread_messages = reply_brief.thread_messages(msg)
+    to_email, to_label = _reply_recipient(thread_messages[-1], build_context(msg))
+    _to, cc = _reply_addresses(account, thread_messages[-1])
+    if (to_email or '').lower() != (_to or '').lower():
+        cc = []   # внутрішнє пересилання → пишемо клієнту, колег у копію не тягнемо
+    wish = str(_json_body(request).get('wish') or '')
+    brief = reply_brief.start(request.user, msg, wish=wish, recipient=to_label or '', to_email=to_email or '', cc=cc)
+    return JsonResponse(reply_brief.as_json(brief))
+
+
+@staff_member_required
+def reply_brief_view(request, brief_pk):
+    """Стан підготовки — лише власник (чужий / невідомий → 404)."""
+    from email_assistant import reply_brief
+    from email_assistant.models import ReplyBrief
+    brief = get_object_or_404(ReplyBrief.objects.select_related('message'), pk=brief_pk, user=request.user)
+    return JsonResponse(reply_brief.as_json(brief))
+
+
+@staff_member_required
+@require_POST
+def reply_brief_rewrite_view(request, brief_pk):
+    """«↻ Переписати»: лише лист, за (виправленим) брифом."""
+    from email_assistant import reply_brief
+    from email_assistant.models import ReplyBrief
+    brief = get_object_or_404(ReplyBrief.objects.select_related('message'), pk=brief_pk, user=request.user)
+    if brief.status == ReplyBrief.RUNNING:
+        return JsonResponse({'ok': False, 'error': 'Бриф ще готується'}, status=409)
+    body = _json_body(request)
+    text = str(body.get('brief') or '').strip()
+    if not text:
+        return JsonResponse({'ok': False, 'error': 'Бриф порожній'}, status=400)
+    wish = body.get('wish')
+    reply_brief.start_rewrite(brief, text, str(wish) if wish is not None else None)
+    return JsonResponse(reply_brief.as_json(brief))
+
+
+@staff_member_required
+def message_brief_view(request, message_pk):
+    """Останній бриф користувача для гілки листа — щоб показати його під чернеткою без повторного збору."""
+    from email_assistant import reply_brief
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    brief = reply_brief.latest_for(request.user, msg)
+    return JsonResponse({'brief': reply_brief.as_json(brief) if brief else None})
+
+
 def _rag_for_ai(user, ctx, purpose, instruction=''):
     """
     Пошук у базі знань RAG для AI (режим — EmailSettings.rag_mode). Ніколи не ламає AI-функцію:
