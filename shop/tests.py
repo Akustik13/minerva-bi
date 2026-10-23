@@ -322,7 +322,7 @@ class ShippingTests(TestCase):
         s.save()
         self.client.force_login(User.objects.create_superuser("a", "a@x.y", "p"))
         self.assertEqual(self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/").status_code, 200)
-        self.assertContains(self.client.get("/admin/shop/shop/"), "2 регіонів")
+        self.assertContains(self.client.get("/admin/shop/shop/"), "2 зон")
         r = self.client.post("/admin/inventory/product/", {"action": "action_set_category",
                                                            "_selected_action": [self.p.pk]})
         self.assertContains(r, "Змінити категорію товарів")
@@ -378,7 +378,7 @@ class ShopCardTests(TestCase):
         r = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
         self.assertContains(r, "site-key")
         self.assertContains(r, "за джерелом «webshop»")
-        self.assertContains(r, "Створити базові регіони")
+        self.assertContains(r, "Створити базові зони")
 
     def test_unlinked_key_shown_separately(self):
         self.shop.slug = "sevskiyde"

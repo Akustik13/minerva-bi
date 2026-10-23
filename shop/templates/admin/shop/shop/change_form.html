@@ -1,0 +1,288 @@
+{% extends "admin/change_form.html" %}
+{% comment %}
+  Картка магазину: редактор країн зон доставки (як на DigiKey) — регіони з галочками, пошук,
+  країни інших зон (перенести сюди), «усі інші країни», винятки країни (своя ціна / термін).
+  Дані: прихований JSON у полі «Країни» і «Винятки» кожної зони (shop/admin.py → CountryPickerWidget).
+{% endcomment %}
+{% block extrahead %}{{ block.super }}
+<style>
+.ship-picker{width:100%}
+.ship-picker-ui{border:1px solid var(--hairline-color,#444);border-radius:8px;padding:10px 12px;background:var(--darkened-bg,rgba(127,127,127,.06))}
+.sp-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sp-head strong{margin-right:4px}
+.sp-chip{display:inline-block;padding:2px 9px;border-radius:999px;border:1px solid var(--hairline-color,#555);font-size:12px;white-space:nowrap}
+.sp-chip.is-ov{border-color:#e6a23c;color:#e6a23c}
+.sp-more{opacity:.7;font-size:12px}
+.sp-toggle{margin-left:auto}
+.sp-ovs{margin-top:8px;font-size:12px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.sp-ovs .sp-ov{padding:2px 8px;border-radius:6px;background:rgba(230,162,60,.14);color:#e6a23c}
+.sp-panel{margin-top:10px;border-top:1px solid var(--hairline-color,#444);padding-top:10px}
+.sp-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.sp-search{flex:1 1 420px;max-width:560px;padding:6px 8px}
+.sp-gear{opacity:.35}
+.sp-row:hover .sp-gear,.sp-gear.is-on,.sp-gear:focus{opacity:1}
+.sp-group{border:1px solid var(--hairline-color,#444);border-radius:6px;margin:6px 0;background:var(--body-bg,transparent)}
+.sp-group>summary{cursor:pointer;padding:7px 10px;display:flex;gap:8px;align-items:center;list-style:none}
+.sp-group>summary::-webkit-details-marker{display:none}
+.sp-group>summary::before{content:'▸';opacity:.6}
+.sp-group[open]>summary::before{content:'▾'}
+.sp-cnt{opacity:.75;font-size:12px}
+.sp-cnt.is-some{color:var(--link-fg,#79aec8);opacity:1}
+.sp-rows{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:2px 14px;padding:4px 12px 10px}
+.sp-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:3px 4px;border-radius:4px}
+.sp-row label{display:flex;align-items:center;gap:6px;cursor:pointer;flex:1 1 auto;min-width:0}
+.sp-row.is-on{background:rgba(121,174,200,.10)}
+.sp-row.is-other .sp-name{opacity:.5}
+.sp-row[hidden],.sp-group[hidden]{display:none}
+.sp-mini{font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid var(--hairline-color,#555);background:transparent;color:inherit;cursor:pointer}
+.sp-mini.is-on{border-color:#e6a23c;color:#e6a23c}
+.sp-move{font-size:11px;padding:1px 6px;border:0;background:transparent;color:var(--link-fg,#79aec8);cursor:pointer;text-decoration:underline}
+.sp-ov-edit{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;padding:4px 0 6px 26px}
+.sp-ov-edit input{width:6em;padding:3px 5px}
+.sp-rest{margin-top:8px;padding:8px 10px;border:1px dashed var(--hairline-color,#555);border-radius:6px}
+.sp-hint{font-size:12px;opacity:.7}
+</style>
+{% endblock %}
+
+{% block admin_change_form_document_ready %}{{ block.super }}
+{{ ship_catalog|json_script:"ship-catalog" }}
+<script>
+(function () {
+  'use strict';
+  var dataEl = document.getElementById('ship-catalog');
+  if (!dataEl) return;
+  var CAT = JSON.parse(dataEl.textContent);
+  var INFO = {};
+  CAT.regions.forEach(function (r) {
+    r.countries.forEach(function (c) { INFO[c[0]] = { code: c[0], uk: c[1], de: c[2], en: c[3], region: r.key }; });
+  });
+
+  function el(tag, attrs, children) {
+    var n = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k === 'text') n.textContent = v;
+      else if (k === 'class') n.className = v;
+      else if (k.slice(0, 2) === 'on') n.addEventListener(k.slice(2), v);
+      else if (k === 'value') n.value = v;
+      else n.setAttribute(k, v === true ? '' : v);
+    });
+    (children || []).forEach(function (c) { if (c !== null && c !== undefined && c !== false) n.append(c.nodeType ? c : String(c)); });
+    return n;
+  }
+  function plural(n) {
+    var a = n % 10, b = n % 100;
+    return a === 1 && b !== 11 ? 'країна' : a >= 2 && a <= 4 && (b < 12 || b > 14) ? 'країни' : 'країн';
+  }
+  function label(code) {
+    if (code === '*') return 'Усі інші країни (*)';
+    var c = INFO[code];
+    return c ? c.uk + ' (' + code + ')' : code;
+  }
+
+  // ── Зони на сторінці ──
+  function pickers() {
+    return Array.prototype.filter.call(document.querySelectorAll('.ship-picker'), function (p) {
+      return p.dataset.field.indexOf('__prefix__') < 0;
+    });
+  }
+  function prefix(p) { return p.dataset.field.replace(/-countries$/, ''); }
+  function inp(p, f) { return document.querySelector('[name="' + prefix(p) + '-' + f + '"]'); }
+  function hidden(p) { return p.querySelector('input[type=hidden]'); }
+  function read(p) {
+    var c = [], o = {};
+    try { c = JSON.parse(hidden(p).value || '[]'); } catch (e) {
+      c = String(hidden(p).value || '').toUpperCase().split(/[\s,;]+/).filter(Boolean);  // старий текст «DE, AT»
+    }
+    try { o = JSON.parse((inp(p, 'overrides') || {}).value || '{}') || {}; } catch (e) { o = {}; }
+    return { countries: Array.isArray(c) ? c : [], overrides: o };
+  }
+  function write(p, st) {
+    hidden(p).value = JSON.stringify(st.countries);
+    Object.keys(st.overrides).forEach(function (k) {
+      var o = st.overrides[k];
+      if (st.countries.indexOf(k) < 0 || !o || !Object.keys(o).some(function (f) { return o[f] !== '' && o[f] !== null; })) delete st.overrides[k];
+    });
+    var ov = inp(p, 'overrides');
+    if (ov) ov.value = JSON.stringify(st.overrides);
+  }
+  function isActive(p) {
+    var a = inp(p, 'is_active'), d = inp(p, 'DELETE');
+    return (!a || a.checked) && !(d && d.checked);
+  }
+  function zoneName(p) { var n = inp(p, 'name'); return (n && n.value.trim()) || 'нова зона'; }
+  function owners(except) {
+    var m = {};
+    pickers().forEach(function (p) {
+      if (p === except || !isActive(p)) return;
+      read(p).countries.forEach(function (c) { m[c] = { picker: p, name: zoneName(p) }; });
+    });
+    return m;
+  }
+  function defaults(p) {
+    function v(f) { var i = inp(p, f); return i ? i.value.trim() : ''; }
+    return { price: v('price'), dmin: v('delivery_days_min'), dmax: v('delivery_days_max') };
+  }
+  function daysText(lo, hi) {
+    lo = (lo === undefined || lo === null) ? '' : String(lo); hi = (hi === undefined || hi === null) ? '' : String(hi);
+    if (!lo && !hi) return '';
+    if (!lo || !hi || lo === hi) return (lo || hi) + ' дн.';
+    return lo + '–' + hi + ' дн.';
+  }
+  function ovText(o, def) {
+    var parts = [];
+    if (o.price !== undefined && o.price !== '') parts.push(String(o.price).replace('.', ',') + ' €');
+    var d = daysText(o.days_min, o.days_max);
+    if (d) parts.push(d);
+    return parts.join(' · ') || 'як у зоні';
+  }
+
+  // ── Відмалювати одну зону ──
+  function render(p) {
+    var ui = p.querySelector('.ship-picker-ui'), st = read(p), own = owners(p), def = defaults(p);
+    var set = {};
+    st.countries.forEach(function (c) { set[c] = true; });
+    if (p.dataset.open === undefined) p.dataset.open = st.countries.length ? '0' : '1';
+    var open = p.dataset.open === '1';
+    var real = st.countries.filter(function (c) { return c !== '*'; });
+
+    var chips = real.slice(0, 16).map(function (c) { return el('span', { class: 'sp-chip' + (st.overrides[c] ? ' is-ov' : ''), text: label(c), title: st.overrides[c] ? 'виняток: ' + ovText(st.overrides[c], def) : null }); });
+    var head = el('div', { class: 'sp-head' }, [
+      el('strong', { text: real.length ? real.length + ' ' + plural(real.length) : (set['*'] ? '' : 'країни не вибрано') })]
+      .concat(set['*'] ? [el('span', { class: 'sp-chip', text: label('*') })] : [], chips,
+        real.length > 16 ? [el('span', { class: 'sp-more', text: '+ ще ' + (real.length - 16) })] : [],
+        [el('button', { type: 'button', class: 'button sp-toggle', text: open ? '▲ Згорнути' : '🌍 Вибрати країни',
+                        onclick: function () { p.dataset.open = open ? '0' : '1'; render(p); } })]));
+    var nodes = [head];
+    var ovs = Object.keys(st.overrides);
+    if (ovs.length) nodes.push(el('div', { class: 'sp-ovs' }, [el('span', { text: '⚙ Винятки:' })].concat(ovs.map(function (c) {
+      return el('span', { class: 'sp-ov', text: label(c) + ' — ' + ovText(st.overrides[c], def) });
+    }))));
+    if (open) nodes.push(panel(p, st, own, def, set));
+    ui.replaceChildren.apply(ui, nodes);
+    applySearch(p);
+  }
+
+  function commit(p, st) { write(p, st); renderAll(); }
+
+  function panel(p, st, own, def, set) {
+    p._openGroups = p._openGroups || {};
+    p._editing = p._editing || {};
+    var search = el('input', { type: 'search', class: 'sp-search', placeholder: 'Пошук: назва або код — напр. Schweiz, Швейцарія, CH', value: p.dataset.q || '' });
+    search.addEventListener('input', function () { p.dataset.q = search.value; applySearch(p); });
+    var tools = el('div', { class: 'sp-tools' }, [search,
+      el('span', { class: 'sp-hint', text: 'Галочка — країна в цій зоні. Сірі — уже в іншій зоні (можна перенести). ⚙ — своя ціна чи термін для країни.' })]);
+
+    function add(code) { if (st.countries.indexOf(code) < 0) st.countries.push(code); }
+    function remove(code) { st.countries = st.countries.filter(function (c) { return c !== code; }); delete st.overrides[code]; }
+
+    function row(code) {
+      var c = INFO[code], checked = !!set[code], other = own[code], ov = st.overrides[code];
+      var cb = el('input', { type: 'checkbox', checked: checked, disabled: !!(other && !checked) });
+      cb.addEventListener('change', function () { if (cb.checked) add(code); else remove(code); commit(p, st); });
+      var name = el('span', { class: 'sp-name', text: c ? c.uk + ' (' + code + ')' : code, title: c ? c.de + ' · ' + c.en : null });
+      var parts = [el('label', {}, [cb, name])];
+      if (other && !checked) {
+        parts.push(el('button', { type: 'button', class: 'sp-move', text: '→ ' + other.name + ' · перенести сюди', onclick: function () {
+          if (!confirm('Перенести ' + label(code) + ' із зони «' + other.name + '» у «' + zoneName(p) + '»?')) return;
+          var os = read(other.picker);
+          os.countries = os.countries.filter(function (x) { return x !== code; });
+          delete os.overrides[code];
+          write(other.picker, os);
+          add(code); commit(p, st);
+        } }));
+      }
+      if (checked) {
+        parts.push(el('button', { type: 'button', class: 'sp-mini sp-gear' + (ov ? ' is-on' : ''), text: ov ? '⚙ ' + ovText(ov, def) : '⚙',
+          title: 'Своя ціна або термін доставки для цієї країни (замість правила зони)',
+          onclick: function () { p._editing[code] = !p._editing[code]; render(p); } }));
+      }
+      var r = el('div', { class: 'sp-row' + (checked ? ' is-on' : '') + (other && !checked ? ' is-other' : ''),
+                          'data-search': (code + ' ' + (c ? c.uk + ' ' + c.de + ' ' + c.en : '')).toLowerCase() }, parts);
+      if (checked && p._editing[code]) r.appendChild(ovEditor(code));
+      return r;
+    }
+
+    function ovEditor(code) {
+      var o = st.overrides[code] = st.overrides[code] || {};
+      function field(key, ph, title) {
+        var i = el('input', { type: 'number', min: 0, step: key === 'price' ? '0.01' : '1', placeholder: ph || '—', title: title,
+                              value: o[key] === undefined ? '' : o[key] });
+        i.addEventListener('input', function () {
+          if (i.value === '') delete o[key]; else o[key] = key === 'price' ? i.value : parseInt(i.value, 10);
+          st.overrides[code] = o;  // порожній виняток write() прибирає — повернути перед записом
+          write(p, st);
+        });
+        i.addEventListener('change', function () { renderAll(); });
+        return i;
+      }
+      return el('div', { class: 'sp-ov-edit' }, [
+        'Ціна, €', field('price', def.price, 'Порожньо — ціна зони (' + (def.price || '—') + ')'),
+        'термін від', field('days_min', def.dmin, 'Порожньо — термін зони'), 'до', field('days_max', def.dmax, 'Порожньо — термін зони'), 'роб. днів',
+        el('button', { type: 'button', class: 'sp-mini', text: '✕ без винятку', onclick: function () {
+          delete st.overrides[code]; p._editing[code] = false; commit(p, st);
+        } }),
+        el('span', { class: 'sp-hint', text: 'порожні поля — як у зоні' })]);
+    }
+
+    var groups = CAT.regions.map(function (r) {
+      var codes = r.countries.map(function (c) { return c[0]; });
+      var sel = codes.filter(function (c) { return set[c]; }).length;
+      var free = codes.filter(function (c) { return !own[c]; });
+      if (p._openGroups[r.key] === undefined) p._openGroups[r.key] = sel > 0;
+      var summary = el('summary', {}, [el('b', { text: r.label }),
+        el('span', { class: 'sp-cnt' + (sel ? ' is-some' : ''), text: sel + ' з ' + codes.length }),
+        el('button', { type: 'button', class: 'sp-mini', text: '✓ усі', title: 'Вибрати всі країни регіону, крім тих, що в інших зонах',
+                       onclick: function (e) { e.preventDefault(); free.forEach(add); p._openGroups[r.key] = true; commit(p, st); } }),
+        el('button', { type: 'button', class: 'sp-mini', text: '✕ жодної',
+                       onclick: function (e) { e.preventDefault(); codes.forEach(function (c) { if (set[c]) remove(c); }); commit(p, st); } })]);
+      var det = el('details', { class: 'sp-group', open: !!p._openGroups[r.key] || !!(p.dataset.q || '').trim(), 'data-region': r.key },
+                   [summary, el('div', { class: 'sp-rows' }, codes.map(row))]);
+      det.addEventListener('toggle', function () { if (!(p.dataset.q || '').trim()) p._openGroups[r.key] = det.open; });
+      return det;
+    });
+    var unknown = st.countries.filter(function (c) { return c !== '*' && !INFO[c]; });
+    if (unknown.length) groups.push(el('details', { class: 'sp-group', open: true }, [
+      el('summary', {}, [el('b', { text: 'Інші коди' }), el('span', { class: 'sp-cnt', text: 'немає в довіднику — лишаються як є' })]),
+      el('div', { class: 'sp-rows' }, unknown.map(row))]));
+
+    var restOwner = own['*'];
+    var rest = el('input', { type: 'checkbox', checked: !!set['*'], disabled: !!(restOwner && !set['*']) });
+    rest.addEventListener('change', function () { if (rest.checked) add('*'); else remove('*'); commit(p, st); });
+    var restBox = el('div', { class: 'sp-rest' }, [el('label', {}, [rest, ' ', el('b', { text: 'Усі інші країни (*)' }),
+      ' — куди не діє жодна інша зона' + (restOwner && !set['*'] ? ' (уже в зоні «' + restOwner.name + '»)' : '')])]);
+    return el('div', { class: 'sp-panel' }, [tools].concat(groups, [restBox]));
+  }
+
+  // Пошук без перемальовування (курсор лишається в полі)
+  function applySearch(p) {
+    var q = (p.dataset.q || '').trim().toLowerCase();
+    p.querySelectorAll('.sp-group').forEach(function (g) {
+      var any = false;
+      g.querySelectorAll('.sp-row').forEach(function (r) {
+        var ok = !q || r.dataset.search.indexOf(q) >= 0;
+        r.hidden = !ok; if (ok) any = true;
+      });
+      g.hidden = !any;
+      if (q && any) g.open = true;
+    });
+  }
+
+  function renderAll() { pickers().forEach(render); }
+
+  // Зміни ціни / терміну / назви / «Активний» / «Видалити» зони — оновити підказки й «зайняті» країни
+  var timer = null;
+  document.addEventListener('input', function (e) {
+    if (/^shipping_zones-\d+-(name|price|delivery_days_min|delivery_days_max)$/.test(e.target.name || '')) {
+      clearTimeout(timer); timer = setTimeout(renderAll, 400);
+    }
+  });
+  document.addEventListener('change', function (e) {
+    if (/^shipping_zones-\d+-(is_active|DELETE)$/.test(e.target.name || '')) renderAll();
+  });
+  document.addEventListener('formset:added', function () { renderAll(); });
+  renderAll();
+})();
+</script>
+{% endblock %}

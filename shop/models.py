@@ -287,7 +287,7 @@ REST_OF_WORLD = "*"
 class ShippingZone(models.Model):
     """Регіон доставки магазину: країни, ціна доставки (нетто), участь у безкоштовній доставці."""
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="shipping_zones", verbose_name="Магазин")
-    name = models.CharField("Регіон", max_length=80)
+    name = models.CharField("Назва зони", max_length=80, help_text="Напр. «Europa (Standard)» — видно покупцям у касі.")
     countries = models.JSONField(
         "Країни", default=list,
         help_text="Коди ISO через кому: DE, AT, CH. «EU» — усі країни ЄС, «*» — решта світу.",
@@ -296,14 +296,22 @@ class ShippingZone(models.Model):
                                 validators=[MinValueValidator(Decimal("0"))])
     free_shipping = models.BooleanField("Діє безкоштовна доставка", default=True,
                                         help_text="Якщо в магазині увімкнено безкоштовну доставку від порогу.")
+    delivery_days_min = models.PositiveSmallIntegerField(
+        "Доставка від, роб. днів", null=True, blank=True, validators=[MaxValueValidator(365)],
+        help_text="Термін доставки після відправлення (робочі дні) — покупець бачить його в касі.")
+    delivery_days_max = models.PositiveSmallIntegerField(
+        "Доставка до, роб. днів", null=True, blank=True, validators=[MaxValueValidator(365)])
+    overrides = models.JSONField(
+        "Винятки по країнах", default=dict, blank=True,
+        help_text='Своя ціна / термін для окремих країн зони: {"CH": {"price": "25.00", "days_min": 4, "days_max": 7}}.')
     is_active = models.BooleanField("Активний", default=True)
     sort_order = models.PositiveSmallIntegerField("Порядок", default=0)
     dk_code = models.CharField("Код DigiKey", max_length=40, blank=True, default="",
                                help_text="Заповнюється при імпорті регіонів з DigiKey.")
 
     class Meta:
-        verbose_name = "Регіон доставки"
-        verbose_name_plural = "🚚 Регіони доставки"
+        verbose_name = "Зона доставки"
+        verbose_name_plural = "🚚 Зони доставки"
         ordering = ["shop", "sort_order", "name"]
 
     def __str__(self):

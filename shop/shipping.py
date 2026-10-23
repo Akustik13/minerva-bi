@@ -1,4 +1,9 @@
-"""Доставка магазину: регіони (країни), ціна доставки, безкоштовна доставка від порогу."""
+"""Доставка магазину: зони (країни), ціна і термін доставки, винятки по країнах, безкоштовна доставка від порогу.
+
+Зона — правило для своїх країн (ціна, термін, участь у безкоштовній доставці). Окрема країна зони може мати
+виняток (ShippingZone.overrides): свою ціну і / або свій термін. Країна — лише в одній активній зоні;
+«*» — усі інші країни.
+"""
 from __future__ import annotations
 
 import re
@@ -60,6 +65,40 @@ def zone_for(shop: Shop, country: str, zones: list[ShippingZone] | None = None) 
     return rest
 
 
+def _override(zone: ShippingZone, country: str) -> dict:
+    return (zone.overrides or {}).get((country or "").upper()) or {}
+
+
+def rule_for(shop: Shop, country: str, zones: list[ShippingZone] | None = None) -> dict | None:
+    """Правило доставки для країни: зона + виняток країни. None — у цю країну не доставляємо."""
+    zone = zone_for(shop, country, zones)
+    if zone is None:
+        return None
+    o = _override(zone, country)
+    price = Decimal(str(o["price"])) if o.get("price") not in (None, "") else zone.price
+    if o.get("days_min") is not None or o.get("days_max") is not None:
+        days = (o.get("days_min"), o.get("days_max"))
+    else:
+        days = (zone.delivery_days_min, zone.delivery_days_max)
+    return {"zone": zone, "price": price, "days_min": days[0], "days_max": days[1],
+            "free_shipping": zone.free_shipping, "override": bool(o)}
+
+
+DAYS = {"de": ("Werktag", "Werktage"), "en": ("business day", "business days"), "uk": ("роб. день", "роб. днів")}
+
+
+def delivery_label(days_min, days_max, lang: str = "de") -> str:
+    """«1–2 Werktage», «3 Werktage», «1 Werktag»; немає терміну — ''."""
+    one, many = DAYS.get(lang, DAYS["de"])
+    lo, hi = days_min, days_max
+    if lo is None and hi is None:
+        return ""
+    if lo is None or hi is None or lo == hi:
+        n = hi if lo is None else lo
+        return f"{n} {one if n == 1 else many}"
+    return f"{lo}–{hi} {many}"
+
+
 def is_free(shop: Shop, zone: ShippingZone, net) -> bool:
     return bool(shop.free_shipping_enabled and zone.free_shipping and shop.free_shipping_threshold is not None
                 and Decimal(str(net)) >= shop.free_shipping_threshold)
@@ -67,10 +106,10 @@ def is_free(shop: Shop, zone: ShippingZone, net) -> bool:
 
 def shipping_cost(shop: Shop, country: str, net) -> Decimal | None:
     """Вартість доставки (нетто) або None, якщо в цю країну магазин не доставляє."""
-    zone = zone_for(shop, country)
-    if zone is None:
+    rule = rule_for(shop, country)
+    if rule is None:
         return None
-    return Decimal("0.00") if is_free(shop, zone, net) else zone.price
+    return Decimal("0.00") if is_free(shop, rule["zone"], net) else rule["price"]
 
 
 def allowed_countries(zones: list[ShippingZone]) -> list[str] | None:
@@ -99,8 +138,54 @@ def public_config(shop: Shop) -> dict:
             "price": z.price,
             "free_shipping": bool(z.free_shipping and threshold is not None),
             "free_from": threshold if (z.free_shipping and threshold is not None) else None,
+            "delivery_days": _days(z.delivery_days_min, z.delivery_days_max),
+            # винятки країн: своя ціна (null — як у зоні) і / або свій термін
+            "overrides": {code: {"price": Decimal(str(o["price"])) if o.get("price") not in (None, "") else None,
+                                 "delivery_days": _days(o.get("days_min"), o.get("days_max"))}
+                          for code, o in (z.overrides or {}).items()},
         } for z in zones],
     }
+
+
+def _days(lo, hi):
+    return None if lo is None and hi is None else {"min": lo, "max": hi}
+
+
+def clean_overrides(raw, countries) -> dict:
+    """Винятки з редактора → {код: {price?, days_min?, days_max?}}; ValueError з поясненням.
+    Країни, яких немає в зоні, і порожні винятки відкидаються."""
+    if not raw:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError("Некоректні винятки по країнах.")
+    out = {}
+    for code, o in raw.items():
+        code = str(code).upper()
+        if code not in (countries or []) or not isinstance(o, dict):
+            continue
+        item = {}
+        if o.get("price") not in (None, ""):
+            try:
+                price = Decimal(str(o["price"]).replace(",", "."))
+            except Exception:
+                raise ValueError(f"{code}: ціна «{o['price']}» — не число.")
+            if price < 0:
+                raise ValueError(f"{code}: ціна не може бути від'ємною.")
+            item["price"] = str(price.quantize(Decimal("0.01")))
+        for key in ("days_min", "days_max"):
+            if o.get(key) not in (None, ""):
+                try:
+                    n = int(o[key])
+                except (TypeError, ValueError):
+                    raise ValueError(f"{code}: термін «{o[key]}» — не ціле число днів.")
+                if not 0 <= n <= 365:
+                    raise ValueError(f"{code}: термін має бути від 0 до 365 днів.")
+                item[key] = n
+        if "days_min" in item and "days_max" in item and item["days_min"] > item["days_max"]:
+            raise ValueError(f"{code}: «від» більше за «до».")
+        if item:
+            out[code] = item
+    return out
 
 
 def import_digikey_zones(shop: Shop, rates: list[dict]) -> tuple[int, int]:
@@ -134,12 +219,14 @@ def import_digikey_zones(shop: Shop, rates: list[dict]) -> tuple[int, int]:
 EUROPE_NON_EU = ["CH", "GB", "NO", "LI", "IS"]
 WORLD_EXPRESS = ["CA", "MX", "BR", "AR", "CL", "CO", "JP", "KR", "CN", "TW", "HK", "SG", "MY", "TH", "VN", "IN",
                  "AU", "NZ", "IL", "AE", "SA", "QA", "TR", "ZA", "UA", "MA", "EG"]
+# Терміни — орієнтовні (робочі дні після відправлення), змініть під свого перевізника.
 DEFAULT_ZONES = [
-    {"name": "Deutschland", "countries": ["DE"], "price": Decimal("6.90"), "free_shipping": True},
+    {"name": "Deutschland", "countries": ["DE"], "price": Decimal("6.90"), "free_shipping": True, "days": (1, 2)},
     {"name": "Europa (Standard)", "countries": [c for c in EU_COUNTRIES if c != "DE"] + EUROPE_NON_EU,
-     "price": Decimal("17.00"), "free_shipping": True},
-    {"name": "USA (Express)", "countries": ["US"], "price": Decimal("25.00"), "free_shipping": False},
-    {"name": "Welt (Express)", "countries": WORLD_EXPRESS, "price": Decimal("42.00"), "free_shipping": False},
+     "price": Decimal("17.00"), "free_shipping": True, "days": (3, 6)},
+    {"name": "USA (Express)", "countries": ["US"], "price": Decimal("25.00"), "free_shipping": False, "days": (2, 4)},
+    {"name": "Welt (Express)", "countries": WORLD_EXPRESS, "price": Decimal("42.00"), "free_shipping": False,
+     "days": (3, 7)},
 ]
 
 
@@ -153,7 +240,8 @@ def create_default_zones(shop: Shop) -> int:
         if not countries or shop.shipping_zones.filter(name=z["name"]).exists():
             continue
         ShippingZone.objects.create(shop=shop, name=z["name"], countries=countries, price=z["price"],
-                                    free_shipping=z["free_shipping"], sort_order=(i + 1) * 10)
+                                    free_shipping=z["free_shipping"], sort_order=(i + 1) * 10,
+                                    delivery_days_min=z["days"][0], delivery_days_max=z["days"][1])
         taken.update(countries)
         created += 1
     if shop.free_shipping_threshold is None:

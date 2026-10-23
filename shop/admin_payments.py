@@ -41,12 +41,13 @@ class ShopForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         methods = list(getattr(self.instance, "payment_methods", None) or [])
+        # self.initial, а не field.initial: значення з бази ([] — ще не налаштовано) мають пріоритет над field.initial
         if "payment_methods" in self.fields:
             # ще не налаштовано: як зараз на сайті (передоплата, рахунок + Stripe, якщо був увімкнений)
-            self.fields["payment_methods"].initial = methods or (
+            self.initial["payment_methods"] = methods or (
                 ["prepayment", "invoice"] + (["stripe"] if getattr(self.instance, "stripe_enabled", False) else []))
         if "payment_default" in self.fields and methods:
-            self.fields["payment_default"].initial = methods[0]
+            self.initial["payment_default"] = methods[0]
 
     def _keep(self, name, prefixes, hint):
         value = (self.cleaned_data.get(name) or "").strip()

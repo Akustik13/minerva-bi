@@ -1,4 +1,5 @@
 """Розділ «Інтернет-магазин»: магазини, асортимент і ціни кожного магазину, масові дії."""
+import json
 from decimal import Decimal, InvalidOperation
 
 from django import forms
@@ -13,7 +14,8 @@ from inventory.services.stock import annotate_stock
 from . import services
 from .admin_payments import ShopForm, stripe_tools
 from .models import ShippingZone, Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSettings
-from .shipping import format_countries, parse_countries
+from .countries import catalog as country_catalog, name as country_name
+from .shipping import clean_overrides, delivery_label, parse_countries
 
 
 # ── Налаштування цін (синглтон) ──────────────────────────────────────────────
@@ -121,33 +123,67 @@ class ShopSettingsAdmin(admin.ModelAdmin):
 
 # ── Магазини ─────────────────────────────────────────────────────────────────
 
+class CountryPickerWidget(forms.Widget):
+    """Країни зони — прихований JSON-список; редактор (регіони, галочки, винятки) малює JS у картці магазину
+    (templates/admin/shop/shop/change_form.html)."""
+
+    def format_value(self, value):
+        if isinstance(value, (list, tuple)):
+            return json.dumps(list(value))
+        return value or "[]"
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = attrs or {}
+        return format_html('<div class="ship-picker" data-field="{}"><input type="hidden" name="{}" id="{}" value="{}">'
+                           '<div class="ship-picker-ui">⏳</div></div>',
+                           name, name, attrs.get("id", "id_" + name), self.format_value(value))
+
+
 class ShippingZoneForm(forms.ModelForm):
-    countries = forms.CharField(
-        label="Країни", widget=forms.TextInput(attrs={"size": 46}),
-        help_text="Коди ISO через кому: DE, AT, CH. «EU» — усі країни ЄС, «*» — решта світу.",
-    )
+    countries = forms.CharField(label="Країни", widget=CountryPickerWidget, required=False)
+    overrides = forms.CharField(widget=forms.HiddenInput, required=False)
 
     class Meta:
         model = ShippingZone
-        fields = ["name", "countries", "price", "free_shipping", "is_active", "sort_order"]
+        fields = ["name", "price", "free_shipping", "delivery_days_min", "delivery_days_max", "is_active",
+                  "sort_order", "countries", "overrides"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk:
-            self.initial["countries"] = format_countries(self.instance.countries)
+            self.initial["overrides"] = json.dumps(self.instance.overrides or {})
+        else:
+            self.initial.setdefault("overrides", "{}")
+        for f in ("delivery_days_min", "delivery_days_max"):
+            self.fields[f].widget.attrs.update({"style": "width:5em", "min": 0, "max": 365})
+        self.fields["sort_order"].widget.attrs.update({"style": "width:5em"})
 
     def clean_countries(self):
-        try:
-            codes = parse_countries(self.cleaned_data["countries"])
-        except ValueError as e:
+        raw = (self.cleaned_data.get("countries") or "").strip()
+        try:  # редактор надсилає JSON; без JavaScript — текст «DE, AT, EU»
+            value = json.loads(raw) if raw.startswith("[") else raw
+            codes = parse_countries(value)
+        except (ValueError, TypeError) as e:
             raise forms.ValidationError(str(e))
         if not codes:
-            raise forms.ValidationError("Вкажіть хоча б одну країну.")
+            raise forms.ValidationError("Оберіть хоча б одну країну.")
         return codes
+
+    def clean(self):
+        d = super().clean()
+        lo, hi = d.get("delivery_days_min"), d.get("delivery_days_max")
+        if lo is not None and hi is not None and lo > hi:
+            self.add_error("delivery_days_max", "«До» менше за «від».")
+        try:
+            raw = json.loads(d.get("overrides") or "{}")
+            d["overrides"] = clean_overrides(raw, d.get("countries") or [])
+        except ValueError as e:
+            self.add_error(None, f"Винятки по країнах: {e}")
+        return d
 
 
 class ShippingZoneFormSet(forms.BaseInlineFormSet):
-    """Країна може бути лише в одному активному регіоні магазину."""
+    """Країна може бути лише в одній активній зоні магазину."""
 
     def clean(self):
         super().clean()
@@ -158,20 +194,21 @@ class ShippingZoneFormSet(forms.BaseInlineFormSet):
                 continue
             for c in d.get("countries") or []:
                 if c in seen:
-                    label = "«решта світу» (*)" if c == "*" else c
-                    raise forms.ValidationError(f"{label} є і в «{seen[c]}», і в «{d.get('name')}».")
+                    raise forms.ValidationError(f"{country_name(c)} є і в «{seen[c]}», і в «{d.get('name')}».")
                 seen[c] = d.get("name")
 
 
-class ShippingZoneInline(admin.TabularInline):
+class ShippingZoneInline(admin.StackedInline):
     model = ShippingZone
     form = ShippingZoneForm
     formset = ShippingZoneFormSet
     extra = 0
-    fields = ["name", "countries", "price", "free_shipping", "is_active", "sort_order", "dk_code"]
     readonly_fields = ["dk_code"]
-    verbose_name = "Регіон доставки"
-    verbose_name_plural = "🚚 Регіони доставки — куди доставляємо і скільки коштує (нетто)"
+    fieldsets = [(None, {"fields": [("name", "price", "free_shipping", "is_active"),
+                                    ("delivery_days_min", "delivery_days_max", "sort_order", "dk_code"),
+                                    "countries", "overrides"]})]
+    verbose_name = "Зона доставки"
+    verbose_name_plural = "🚚 Зони доставки — куди доставляємо, за скільки і як швидко (нетто)"
 
 
 @admin.register(Shop)
@@ -188,10 +225,11 @@ class ShopAdmin(admin.ModelAdmin):
         (None, {"fields": ["name", "public_name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
         ("🚚 Доставка", {
             "fields": ["free_shipping_enabled", "free_shipping_threshold", "zones_tools"],
-            "description": "Куди доставляємо — регіони внизу сторінки. Замовити можуть лише покупці з країн цих "
-                           "регіонів; без регіонів сайт використовує власні налаштування доставки. "
-                           "Швидкий старт: у списку магазинів позначте магазин → дія «🌍 Створити базові регіони "
-                           "доставки» (Німеччина, Європа, США, світ), або «⬇️ Регіони доставки з DigiKey».",
+            "description": "Куди доставляємо — зони внизу сторінки. Зона — правило (ціна, термін доставки, "
+                           "безкоштовна доставка) для своїх країн; країни вибираються списком по регіонах (ЄС, "
+                           "Європа, Азія, Африка …), окрема країна може мати виняток — свою ціну чи термін (⚙). "
+                           "Замовити можуть лише покупці з країн зон; без зон сайт використовує власні налаштування. "
+                           "Швидкий старт: «🌍 Створити базові зони» або «⬇️ Імпортувати з DigiKey».",
         }),
         ("👤 Особистий кабінет покупців", {
             "fields": ["accounts_enabled", "mail_sender", "mail_from_name", "mail_footer", "team_lang", "accounts_tools"],
@@ -296,6 +334,10 @@ class ShopAdmin(admin.ModelAdmin):
                 self.message_user(request, f"Лист не надіслано: {e}", messages.ERROR)
         return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
 
+    def render_change_form(self, request, context, *args, **kwargs):
+        context["ship_catalog"] = country_catalog()  # редактор країн зон (json_script у change_form.html)
+        return super().render_change_form(request, context, *args, **kwargs)
+
     @admin.display(description="Доставка")
     def shipping_col(self, obj):
         zones = [z for z in obj.shipping_zones.all() if z.is_active]
@@ -303,17 +345,17 @@ class ShopAdmin(admin.ModelAdmin):
             return format_html('<span style="color:#9e9e9e">{}</span>', "не задано")
         free = (f", безкоштовно від {obj.free_shipping_threshold:.2f}"
                 if obj.free_shipping_enabled and obj.free_shipping_threshold is not None else "")
-        return f"{len(zones)} регіонів{free}"
+        return f"{len(zones)} зон{free}"
 
-    @admin.action(description="🌍 Створити базові регіони доставки")
+    @admin.action(description="🌍 Створити базові зони доставки")
     def action_default_zones(self, request, queryset):
         from .shipping import create_default_zones
         for shop in queryset:
             n = create_default_zones(shop)
-            self.message_user(request, f"«{shop}»: створено регіонів: {n}. Ціни можна змінити в таблиці регіонів; "
+            self.message_user(request, f"«{shop}»: створено зон: {n}. Ціни й терміни можна змінити в зонах внизу картки; "
                                        "безкоштовна доставка — галочка в блоці «🚚 Доставка» (поріг уже вписано).")
 
-    @admin.action(description="⬇️ Регіони доставки з DigiKey")
+    @admin.action(description="⬇️ Зони доставки з DigiKey")
     def action_import_dk_zones(self, request, queryset):
         from bots.services.dk_marketplace import fetch_shipping_rates
         from .shipping import import_digikey_zones
@@ -328,7 +370,7 @@ class ShopAdmin(admin.ModelAdmin):
             return
         for shop in queryset:
             created, updated = import_digikey_zones(shop, rates)
-            self.message_user(request, f"«{shop}»: регіонів з DigiKey створено {created}, оновлено {updated}. "
+            self.message_user(request, f"«{shop}»: зон з DigiKey створено {created}, оновлено {updated}. "
                                        "Перевірте ціни — DigiKey дає лише мінімальну ціну доставки регіону.")
 
     def get_queryset(self, request):
@@ -368,7 +410,7 @@ class ShopAdmin(admin.ModelAdmin):
             'тому працюють з магазином за замовчуванням: {}</div>',
             main, format_html_join(", ", '<a href="{}">{}</a>', ((link(k), k.name) for k in loose)))
 
-    # ── Кнопки регіонів доставки в картці магазину ───────────────────────────
+    # ── Кнопки зон доставки в картці магазину ───────────────────────────
     @admin.display(description="Регіони")
     def zones_tools(self, obj):
         if not obj or not obj.pk:
@@ -377,12 +419,12 @@ class ShopAdmin(admin.ModelAdmin):
         # formaction: кнопка надсилає основну форму (з CSRF-токеном) на окрему адресу
         return format_html(
             '<span style="margin-right:10px">{}</span>'
-            '<button type="submit" class="button" formaction="{}" formnovalidate>🌍 Створити базові регіони</button> '
+            '<button type="submit" class="button" formaction="{}" formnovalidate>🌍 Створити базові зони</button> '
             '<button type="submit" class="button" formaction="{}" formnovalidate>⬇️ Імпортувати з DigiKey</button>'
-            '<div class="help" style="margin-top:6px">Базові: Deutschland 6,90 · Europa 17,00 · USA 25,00 · Welt 42,00 € '
-            '(нетто, за зразком правил на DigiKey). Наявні регіони не змінюються — лише додаються відсутні. '
+            '<div class="help" style="margin-top:6px">Базові: Deutschland 6,90 (1–2 дн.) · Europa 17,00 (3–6) · USA 25,00 (2–4) · '
+            'Welt 42,00 € (3–7) — нетто, за зразком правил на DigiKey, терміни орієнтовні. Наявні зони не змінюються. '
             'Незбережені зміни на цій сторінці не зберігаються.</div>',
-            f"Регіонів: {n}." if n else "Регіонів ще немає.",
+            f"Зон: {n}." if n else "Зон ще немає.",
             reverse("admin:shop_shop_default_zones", args=[obj.pk]),
             reverse("admin:shop_shop_dk_zones", args=[obj.pk]))
 
