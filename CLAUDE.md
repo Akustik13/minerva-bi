@@ -189,6 +189,15 @@ tabele_mvp/
     - `data\private-api-key.txt` → «API-ключ RAG (Minerva → RAG)»;
     - «🔑 Створити ключ для RAG» → `data\minerva-knowledge-key.txt`.
   - Код публічного RAG не змінювати; `/v2` — лише через розподільник з перевіркою адреси.
+  - **Панель на RAG-ПК** — GUI «RAG — керування» (`D:\RAG\rag_manager.py`), вкладки «Огляд» і «Пошта Minerva» (код у Codex: `AI_models\rag_private_status.py` / `rag_private_ui.py`):
+    - сервіси, канали, журнал дій, пошуки, листи в індексі;
+    - пауза — `data\pause-indexing.flag`, «синхронізувати» — `data\sync-now.flag`.
+  - **Приватний RAG з 23.10** (за дорученням користувача замість Codex, реліз `private-rag-20261023`):
+    - звіти пачками до 200;
+    - черга змін — 20 с за цикл;
+    - 429 від Minerva — пауза без помилки;
+    - старі покоління прибираються з Qdrant.
+  - **Production прийнято 23.10** — 15/15, `rag_assistant/deploy/prod_acceptance.py` (лише читання, запуск на RAG-ПК).
 
 ### email_assistant/ — пошта ↔ CRM
 - Прив'язка листа до клієнта — ТІЛЬКИ `email_assistant/crm_link.py` (сигнал post_save `EmailMessage` → `link_message_to_crm`; legacy `fetch_emails` теж через нього): напрям за відправником (власні адреси/домен = 📤), клієнт серед To/Cc без власних адрес, номер замовлення з теми/тексту → `CustomerTimeline.related_order_id`, дедуплікація за `CustomerTimeline.message_id` (crm 0015, + FK `email_message`)
@@ -287,7 +296,7 @@ tabele_mvp/
   - у пошті: «🧭 Огляд проєкту» в прев'ю (і 🧭 на значку проєкту) — панель як «Історія»; збережений огляд проєктів гілки йде в досьє листа (`context.py` → `projects`, `context_text`), тож AI-чернетка відповіді й «Коротко від Minerva» враховують обіцянки й відкриті питання (у «Minerva врахувала» — «огляд проєкту P-…», застарілий позначено).
 - **«Потребує уваги» всюди:** колонка «Увага» (🔴/🟡) і фільтр «За терміновістю» в списку проєктів; ранковий брифінг (`morning_briefing`, `BriefingSettings.include_projects`, config 0038) — кожному відповідальному його проєкти (`overview.digest_text`), повний список додається під текстом AI.
 - Меню: група CRM → «Проєкти», «Розбір пошти». Роль manager має доступ до `projects`.
-- У документах бази знань для RAG проєкти підуть полем `projects` — після погодження контракту.
+- У документах бази знань для RAG проєкти вже передаються полем `projects`; RAG фільтрує пошук за `project_id`.
 - Тести: `python manage.py test projects --settings=tabele.settings_test`
 
 ### offers/ — Angebote (комерційні пропозиції)
