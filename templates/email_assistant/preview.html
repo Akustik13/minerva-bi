@@ -153,8 +153,11 @@
 .em-ai-txt{font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);max-height:45vh;overflow-y:auto}
 .em-ai-txt:empty{display:none}
 .em-hd-btn.on{background:rgba(0,212,170,.14);color:#00d4aa}
-.em-ai-prompt-inp{flex:1;padding:5px 9px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;outline:none}
+.em-ai-prompt-inp{flex:1;padding:6px 9px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;outline:none}
 .em-ai-prompt-inp:focus{border-color:#1a73e8}
+/* Інструкція для AI — як поле чату: кілька рядків, росте з текстом; Enter — генерувати, Shift+Enter — новий рядок */
+textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;max-height:240px;resize:vertical;box-sizing:border-box}
+.em-ai-prompt-row{display:flex;gap:6px;align-items:flex-end}
 /* Reply box */
 .em-reply{flex-shrink:0;border-top:1px solid var(--border-strong);background:var(--bg-input);max-height:58vh;overflow-y:auto}
 /* Поля відповіді: Кому / Копія / Тема — компактна сітка */
@@ -329,10 +332,11 @@
       </div>
       {% endif %}
       <div class="em-history-draft">
-        <div class="em-history-draft-row">
-          <input class="em-ai-prompt-inp" id="pv-history-prompt" type="text"
+        <div class="em-history-draft-row em-ai-prompt-row">
+          <textarea class="em-ai-prompt-inp" id="pv-history-prompt" rows="3"
                  placeholder="{% trans "Що написати? Напр.: попроси клієнта оплатити мито до 27.10" %}"
-                 onkeydown="if(event.key==='Enter'){event.preventDefault();pvHistoryDraft({{ last.pk|default:0 }});}">
+                 oninput="pvGrow(this)"
+                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();pvHistoryDraft({{ last.pk|default:0 }});}"></textarea>
           <button class="em-pv-btn ai" onclick="pvHistoryDraft({{ last.pk|default:0 }})">✍️ {% trans "Чернетка листа" %}</button>
         </div>
         <div class="em-history-draft-txt" id="pv-history-draft"></div>
@@ -346,7 +350,7 @@
     {% for msg in emails %}
     {% with is_last=forloop.last %}
     {# розгорнутий — найновіший лист, хоч би де він стояв (нові зверху чи знизу) #}
-    <div class="em-card{% if msg.pk == last_msg.pk %} expanded{% endif %}" id="pv-card-{{ msg.pk }}">
+    <div class="em-card{% if msg.pk == last_msg.pk %} expanded{% endif %}" id="pv-card-{{ msg.pk }}" data-subject="{{ msg.subject }}">
 
       <!-- Header: always visible, clickable to expand/collapse -->
       <div class="em-card-hd" onclick="pvToggleCard({{ msg.pk }}, event)">
@@ -387,11 +391,12 @@
           <span class="em-ai-ctx">↳ {{ msg.from_name|default:msg.from_email }} · {{ msg.sent_at|date:"d.m.Y H:i" }}</span>
           <button class="em-ai-close" onclick="pvAiClose({{ msg.pk }})" title="{% trans "Закрити" %}">✕</button>
         </div>
-        <div id="pv-ai-prompt-row-{{ msg.pk }}" style="display:flex;gap:6px;margin-bottom:8px">
-          <input class="em-ai-prompt-inp" type="text"
+        <div id="pv-ai-prompt-row-{{ msg.pk }}" class="em-ai-prompt-row" style="margin-bottom:8px">
+          <textarea class="em-ai-prompt-inp" rows="3"
                  id="pv-ai-prompt-{{ msg.pk }}"
-                 placeholder="{% trans "Що відповісти? (залиш порожнім для авто-відповіді)" %}"
-                 onkeydown="if(event.key==='Enter'){event.preventDefault();pvAiGenerate({{ msg.pk }});}">
+                 placeholder="{% trans "Що відповісти? (залиш порожнім для авто-відповіді). Shift+Enter — новий рядок" %}"
+                 oninput="pvGrow(this)"
+                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();pvAiGenerate({{ msg.pk }});}"></textarea>
           <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">{% trans "Генерувати" %} →</button>
         </div>
         <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
@@ -503,10 +508,12 @@
         </div>
         <!-- AI write panel inside reply -->
         <div id="pv-reply-ai-box" style="display:none;padding:8px 0 10px">
-          <div style="display:flex;gap:6px">
-            <input id="pv-reply-ai-prompt" type="text"
-                   style="flex:1;padding:5px 9px;border-radius:6px;border:1px solid rgba(0,212,170,.3);background:rgba(0,212,170,.04);color:var(--text);font-size:12px;outline:none"
-                   placeholder="{% trans "Що написати? (наприклад: підтвердь отримання)" %}">
+          <div class="em-ai-prompt-row">
+            <textarea id="pv-reply-ai-prompt" class="em-ai-prompt-inp" rows="3"
+                   style="border-color:rgba(0,212,170,.3);background:rgba(0,212,170,.04)"
+                   placeholder="{% trans "Що написати? (наприклад: підтвердь отримання)" %}"
+                   oninput="pvGrow(this)"
+                   onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();pvReplyAIGenerate({{ last.pk }});}"></textarea>
             <button class="em-pv-btn ai" onclick="pvReplyAIGenerate({{ last.pk }})">{% trans "Генерувати" %} →</button>
           </div>
           <div id="pv-reply-ai-result" style="margin-top:8px;font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.6"></div>
@@ -653,20 +660,52 @@ window.pvToggleCard = function(pk, e) {
   }
 };
 
-// Track current reply context
-var _pvReplyPk   = {{ last.pk|default:'0' }};
-var _pvReplySubj = '{{ last.subject|default:''|escapejs }}';
+// Track current reply context. Скрипт стоїть поза блоком «with last» — тут лише last_msg
+// (раніше _pvReplyPk виходив 0, і відповідь ішла новим листом без In-Reply-To).
+var _pvReplyPk   = {{ last_msg.pk|default:'0' }};
+var _pvReplySubj = '{{ last_msg.subject|default:''|escapejs }}';
+// Типові Кому / Копія / тема відповіді на останній лист гілки (сервер: _reply_addresses)
+var _pvReplyDefaults = {to: '{{ reply_to_addr|escapejs }}', subj: _pvReplySubj, cc: '{{ reply_cc|escapejs }}'};
+
+// Поле інструкції для AI росте з текстом, як у чаті
+window.pvGrow = function(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight + 2, 240) + 'px';
+};
+
+// «Re: » / «Fwd: » + тема без наявних Re:/AW:/WG:… — однакова тема тримає відповідь у розмові клієнта
+function _pvReSubject(mode, subj) {
+  return (mode === 'forward' ? 'Fwd: ' : 'Re: ') +
+    (subj || '').replace(/^(\s*(re|aw|antw|wg|fw|fwd|sv|vs|tr)\s*(\[\d+\])?\s*:\s*)+/i, '');
+}
+
+// Відкрити відповідь, не затираючи вже введене: порожні Кому / Копія / Тема заповнюються типовими
+function _pvEnsureReply(to, subj, cc) {
+  var body = document.getElementById('pv-reply-body');
+  var arrow = document.getElementById('pv-reply-arrow');
+  if (body) body.style.display = 'block';
+  if (arrow) arrow.style.transform = '';
+  var toInp = document.getElementById('pv-reply-to');
+  var ccInp = document.getElementById('pv-reply-cc');
+  var subjInp = document.getElementById('pv-reply-subj');
+  if (toInp && !toInp.value.trim()) toInp.value = to || '';
+  if (ccInp && !ccInp.value.trim() && cc) { ccInp.value = cc; pvShowCc(true); }
+  if (subjInp && !subjInp.value.trim()) subjInp.value = _pvReSubject('reply', subj);
+  _pvReplySubj = subjInp ? subjInp.value : _pvReSubject('reply', subj);
+}
 
 window.pvToggleReply = function() {
   var body  = document.getElementById('pv-reply-body');
   var arrow = document.getElementById('pv-reply-arrow');
   var open  = body.style.display !== 'none';
-  body.style.display = open ? 'none' : 'block';
-  if (arrow) arrow.style.transform = open ? 'rotate(180deg)' : '';
-  if (!open) {
-    var ed = document.getElementById('pv-reply-editor');
-    if (ed) setTimeout(function(){ ed.focus(); }, 50);
+  if (open) {
+    body.style.display = 'none';
+    if (arrow) arrow.style.transform = 'rotate(180deg)';
+    return;
   }
+  _pvEnsureReply(_pvReplyDefaults.to, _pvReplyDefaults.subj, _pvReplyDefaults.cc);
+  var ed = document.getElementById('pv-reply-editor');
+  if (ed) setTimeout(function(){ ed.focus(); }, 50);
 };
 
 window.pvOpenReply = function(mode, toEmail, subj, cc) {
@@ -680,7 +719,7 @@ window.pvOpenReply = function(mode, toEmail, subj, cc) {
     ccInp.value = mode === 'reply' ? (cc || '') : '';
     if (ccInp.value) pvShowCc(true);
   }
-  _pvReplySubj = (mode === 'forward' ? 'Fwd: ' : 'Re: ') + (subj || '').replace(/^(\s*(re|aw|antw|wg|fw|fwd|sv|vs|tr)\s*(\[\d+\])?\s*:\s*)+/i, '');
+  _pvReplySubj = _pvReSubject(mode, subj);
   var subjInp = document.getElementById('pv-reply-subj');
   if (subjInp) subjInp.value = _pvReplySubj;
   body.style.display = 'block';
@@ -1364,16 +1403,14 @@ window.pvUseAsReply = function(pk) {
   var txt = document.getElementById('pv-ai-txt-' + pk);
   var ed  = document.getElementById('pv-reply-editor');
   if (!txt || !ed) return;
-  // Auto-open reply box if collapsed
-  var body = document.getElementById('pv-reply-body');
-  if (body && body.style.display === 'none') pvToggleReply();
+  var box  = document.getElementById('pv-ai-' + pk);
+  var card = document.getElementById('pv-card-' + pk);
+  // відповідь саме на цей лист: In-Reply-To/References і тема «Re: …» → та сама розмова в пошті клієнта;
+  // адресат від Minerva (клієнт, якщо лист — внутрішнє пересилання), інакше типовий для гілки
+  _pvReplyPk = pk;
+  _pvEnsureReply((box && box._to) || _pvReplyDefaults.to,
+                 (card && card.dataset.subject) || _pvReplyDefaults.subj, (box && box._cc) || '');
   ed.innerText = txt.textContent;
-  // адресат від Minerva (клієнт, якщо лист — внутрішнє пересилання)
-  var toInp = document.getElementById('pv-reply-to');
-  var box = document.getElementById('pv-ai-' + pk);
-  if (toInp && box && box._to && !toInp.value) toInp.value = box._to;
-  var ccInp = document.getElementById('pv-reply-cc');
-  if (ccInp && box && box._cc && !ccInp.value) { ccInp.value = box._cc; pvShowCc(true); }
   ed.scrollIntoView({behavior:'smooth'});
   ed.focus();
 };

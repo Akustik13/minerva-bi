@@ -1276,6 +1276,35 @@ class ReplyThreadingTests(MailLinksTests):
                                                        in_reply_to='<reply1@sevskiy.de>'), 'INBOX')
         self.assertEqual(answer.thread_id, orig.thread_id)
 
+    def test_preview_reply_targets_last_message(self):
+        """Вбудована відповідь у прев'ю знає, на який лист відповідає (інакше йшла новим листом без гілки)."""
+        import re as _re
+        msg = self._em(from_email='buyer@client.com', subject='Anfrage Boards', message_id='<p1@client.com>')
+        html = self.client.get(f'/email/message/{msg.pk}/preview/').content.decode()
+        self.assertRegex(html, rf'_pvReplyPk\s*=\s*{msg.pk};')
+        self.assertIn("_pvReplySubj = 'Anfrage Boards'", html)
+        self.assertIn(f'data-subject="Anfrage Boards"', html)
+        self.assertEqual(len(_re.findall(r'<textarea class="em-ai-prompt-inp"', html)), 2)   # AI-поля — багаторядкові
+
+    def test_reply_without_subject_gets_re_subject(self):
+        orig = self._em(from_email='buyer@client.com', subject='Anfrage Boards', message_id='<q1@client.com>')
+        aw = self._em(from_email='buyer@client.com', subject='AW: Lieferung', message_id='<q2@client.com>')
+        sent = []
+
+        def fake_send(client, **kw):
+            sent.append(kw)
+            return {'ok': True, 'message_id': f'<r{len(sent)}@sevskiy.de>', 'via': 'test'}
+        with patch('email_assistant.smtp_client.SMTPClient.send', fake_send):
+            for m in (orig, aw):
+                d = self.client.post('/email/send/', {'reply_to_pk': m.pk, 'to': 'buyer@client.com',
+                                                      'subject': '  ', 'body': 'Hi'}).json()
+                self.assertTrue(d['ok'], d)
+            d = self.client.post('/email/send/', {'to': 'buyer@client.com', 'subject': '', 'body': 'Hi'}).json()
+        self.assertEqual([s['subject'] for s in sent], ['Re: Anfrage Boards', 'AW: Lieferung'])
+        self.assertEqual(sent[0]['reply_to_message'], orig)
+        self.assertEqual(EmailMessage.objects.get(message_id='<r1@sevskiy.de>').subject, 'Re: Anfrage Boards')
+        self.assertFalse(d['ok'])                      # новий лист без теми — як і раніше, помилка
+
     def test_two_sends_without_sync_do_not_collide(self):
         n = iter(range(1, 10))
 

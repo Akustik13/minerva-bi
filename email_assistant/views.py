@@ -917,9 +917,7 @@ def compose_view(request):
     if reply_to_pk:
         from email_assistant.models import EmailMessage
         reply_to = get_object_or_404(EmailMessage, pk=reply_to_pk, account=account)
-        subj = reply_to.subject
-        if not re.match(r'\s*(re|aw|antw|sv)\s*:', subj, re.IGNORECASE):
-            subj = f'Re: {subj}'
+        subj = _reply_subject(reply_to.subject)
         reply_to_addr, reply_cc = _reply_addresses(account, reply_to)
         initial = {
             'to':         reply_to_addr,
@@ -969,13 +967,21 @@ def compose_view(request):
     }))
 
 
+def _reply_subject(subject):
+    """Тема відповіді: наявне Re:/AW: лишається, інакше «Re: » — щоб програма клієнта лишила лист у тій самій розмові."""
+    subject = (subject or '').strip()
+    return subject if re.match(r'\s*(re|aw|antw|sv)\s*:', subject, re.IGNORECASE) else f'Re: {subject}'
+
+
 def _handle_send(request, account, reply_to=None):
     from email_assistant.smtp_client import SMTPClient
     from email_assistant.models import EmailMessage
 
     to_raw  = request.POST.get('to', '')
     cc_raw  = request.POST.get('cc', '')
-    subject = request.POST.get('subject', '')
+    subject = request.POST.get('subject', '').strip()
+    if not subject and reply_to:     # відповідь без теми (напр. текст вставлено з AI) — тема листа, на який відповідаємо
+        subject = _reply_subject(reply_to.subject)
     body      = request.POST.get('body', '')
     body_html = request.POST.get('body_html', '').strip()
 
