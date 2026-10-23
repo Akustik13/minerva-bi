@@ -269,6 +269,33 @@ class CursorAndSnapshotTests(KnowledgeBase):
         r = self.api("get", f"/api/v1/knowledge/manifest/snapshots/{snap['snapshot_id']}/")
         self.assertEqual((r.status_code, r.json()["code"]), (410, "snapshot_expired"))
 
+    def test_tombstones_before_snapshot_settle_without_report(self):
+        """RAG починає зі знімка: видалень до нього він не бачить і не звітує — Minerva закриває їх сама."""
+        old, late, kept = self.mail("Old"), self.mail("Late"), self.mail("Kept")
+        old.is_deleted = True
+        old.save(update_fields=["is_deleted"])
+
+        def pending():
+            return self.api("get", "/api/v1/knowledge/summary/").json()["documents"]["pending_delete"]
+        self.changes()                                        # знімка ще не було — нічого не закривається
+        self.assertEqual(pending(), 1)
+        snap = self.api("post", "/api/v1/knowledge/manifest/snapshots/").json()
+        self.assertEqual(snap["total"], 2)
+        late.is_deleted = True                                # після знімка: RAG отримає подію й звітує сам
+        late.save(update_fields=["is_deleted"])
+        self.assertEqual(pending(), 2)
+        self.changes(snap["snapshot_seq"])                    # RAG читає журнал після знімка — знімок завершено
+        self.assertEqual(pending(), 1)
+        doc = self.doc_state(old)
+        self.assertEqual((doc.state, doc.status_revision), (KnowledgeDoc.DELETED, doc.revision))
+        r = self.api("post", "/api/v1/knowledge/status/", data={
+            "source_instance_id": "test-suite", "generation": snap["generation"],
+            "items": [{"document_id": f"email:{late.pk}", "document_revision": self.doc_state(late).revision,
+                       "attempt_id": 1, "state": "deleted", "reported_at": "2026-10-23T14:00:00Z"}]})
+        self.assertEqual(r.json()["results"][0]["result"], "accepted")
+        self.assertEqual(pending(), 0)
+        self.assertEqual(self.doc_state(kept).state, KnowledgeDoc.PENDING)
+
     def test_clear_and_new_generation(self):
         a, b = self.mail(), self.mail("Two")
         last = self.changes()["next_after"]

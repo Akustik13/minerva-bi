@@ -111,6 +111,7 @@ class ChangesView(KnowledgeView):
         data = knowledge.read_changes(after=after, limit=_int_param(request, "limit", 50, 1, 200),
                                       generation=request.query_params.get("generation") or None)
         knowledge.note_activity(f"зміни після seq {after}: подій {len(data['items'])}", changes=True)
+        knowledge.settle_tombstones(after)    # видалення до знімка RAG — закриті без його звіту
         return Response(data)
 
 

@@ -771,6 +771,45 @@ def validate_status_payload(payload):
             bad(f"items[{i}].error обов'язковий для failed.")
 
 
+def _unconfirmed_tombstones():
+    from django.db.models import F
+    from .models import KnowledgeDoc
+    return (KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, fed=False, revision__gt=0)
+            .exclude(status_revision=F("revision"), state=KnowledgeDoc.DELETED))
+
+
+def settle_tombstones(after) -> int:
+    """Tombstone, що з'явилися до завершеного знімка RAG і без подій журналу після нього, — закриті без звіту RAG.
+    Знімок містить лише живі документи, а журнал RAG читає вже після snapshot_seq — про такі видалення RAG
+    не дізнається й deleted не надішле (інакше «Видалення ще не підтверджено» не зникне ніколи).
+    Ознака завершеного знімка — запит /changes/ з after ≥ snapshot_seq: RAG читає журнал лише після знімка.
+    Видалення з подіями після знімка чекають звіту RAG, як і раніше. Викликає ChangesView; збій не ламає відповідь."""
+    from django.db.models import F
+    from .models import KnowledgeChange, KnowledgeDoc, KnowledgeSettings, KnowledgeSnapshot
+    try:
+        if not _unconfirmed_tombstones().exists():
+            return 0
+        s = KnowledgeSettings.get()
+        snap = (KnowledgeSnapshot.objects.filter(generation=s.generation, snapshot_seq__lte=after)
+                .order_by("-snapshot_seq", "-created_at").first())
+        if snap is None:
+            return 0
+        later = KnowledgeChange.objects.filter(doc_type=DOC_TYPE, id__gt=snap.snapshot_seq).values("obj_id")
+        if not _unconfirmed_tombstones().exclude(obj_id__in=later).exists():
+            return 0
+        with journal_writer():      # разом із записувачами: tombstone не зміниться посеред оновлення
+            n = (_unconfirmed_tombstones().exclude(obj_id__in=later)
+                 .update(state=KnowledgeDoc.DELETED, status_revision=F("revision"), chunks=0, error="",
+                         last_status_at=timezone.now()))
+        if n:
+            logger.info("knowledge: %s tombstone(s) before snapshot seq %s settled without RAG report",
+                        n, snap.snapshot_seq)
+        return n
+    except Exception as e:  # noqa: BLE001
+        logger.warning("knowledge tombstones not settled: %s", e)
+        return 0
+
+
 def summary() -> dict:
     from .models import KnowledgeChange, KnowledgeDoc, KnowledgeSettings
     from django.db.models import F
@@ -780,8 +819,7 @@ def summary() -> dict:
     current = fed.filter(status_revision=F("revision"))
     counts = {k: current.filter(state=k).count() for k in ("indexed", "failed", "skipped")}
     eligible = fed.count()
-    pending_delete = (docs.filter(fed=False, revision__gt=0)
-                      .exclude(status_revision=F("revision"), state=KnowledgeDoc.DELETED).count())
+    pending_delete = _unconfirmed_tombstones().count()
     last_status = docs.aggregate(m=Max("last_status_at"))["m"]
     return {
         "contract_version": CONTRACT_VERSION, "source_instance_id": instance_id(), "generation": str(s.generation),

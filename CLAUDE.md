@@ -125,6 +125,7 @@ tabele_mvp/
     - `journal_writer()` = `pg_advisory_xact_lock` ДО видачі `seq` (порядок `seq` = порядок commit);
     - `KnowledgeDoc.revision` монотонна, рядок не видаляється;
     - `scope_reason`, `build_content`, `content_version`, `read_changes`, `create_snapshot` (REPEATABLE READ), `apply_status` (за `attempt_id`), `summary`, `refresh_all`, `clear_index`, `new_generation`.
+    - `settle_tombstones(after)` (з `ChangesView`): tombstone без подій журналу після `snapshot_seq` знімка, який RAG завершив (`/changes/` з `after` ≥ `snapshot_seq`), закриваються як `deleted` без звіту RAG. Знімок містить лише живі документи, тож про такі видалення RAG не дізнається. Видалення з подіями після знімка чекають звіту, як і раніше.
   - **Моделі:** `KnowledgeSettings` (синглтон, `generation`), `KnowledgeChange` (id = `seq`), `KnowledgeDoc`, `KnowledgeSnapshot` / `KnowledgeSnapshotItem` — міграція rag_assistant 0002. Поле `EmailThread.knowledge_excluded` — email_assistant 0018.
   - **API:** `api/knowledge_views.py` → `/api/v1/knowledge/…`.
     - Права ключа `knowledge:read` / `knowledge:write`; ключ магазину → 403; сесія не діє.
