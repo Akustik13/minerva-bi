@@ -16,6 +16,8 @@ from datetime import timedelta
 from django.db import connection, transaction
 from django.utils import timezone
 
+from email_assistant.quotes import QUOTE_START_RE, new_text  # noqa: F401 — текст без цитати, спільний із поштою
+
 logger = logging.getLogger(__name__)
 
 CATEGORIES = ("customer", "other")
@@ -41,10 +43,6 @@ THANKS_RE = re.compile(
     r"|\b(?:bezug\w*\s+auf|bezugnehmend\s+auf|bez[üu]glich|regarding|with\s+reference\s+to|щодо|по\s+поводу)\s+"
     r"(?:ihr\w*|unser\w*|your|our|вашої|вашего|нашої|нашего)\s+(?:angebot|quot\w*|offer|пропозиці\w*|предложени\w*)",
     re.IGNORECASE)
-# Початок процитованої історії
-QUOTE_START_RE = re.compile(
-    r"^\s*(?:>|-{2,}\s*(?:original|ursprüngliche|forwarded|weitergeleitete)|(?:on|am)\s.{5,80}(?:wrote|schrieb)\s*:"
-    r"|von:\s|from:\s|gesendet:\s|sent:\s|від:\s|от:\s)", re.IGNORECASE)
 SNIPPET = 60
 SCAN_BATCH = 200
 
@@ -52,16 +50,6 @@ SCAN_BATCH = 200
 def _qty(value) -> str:
     text = f"{value:f}"   # 500 → «500», 2.500 → «2.5» (нулі прибираються лише після крапки)
     return text.rstrip("0").rstrip(".") if "." in text else text
-
-
-def new_text(body) -> str:
-    """Текст листа без процитованої історії (відповідь клієнта зверху, далі — наш попередній лист)."""
-    out = []
-    for line in (body or "").splitlines():
-        if QUOTE_START_RE.match(line):
-            break
-        out.append(line)
-    return "\n".join(out)[:20000]
 
 
 def detect(msg):

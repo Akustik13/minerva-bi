@@ -184,6 +184,25 @@ class StepsTests(ReplyBriefBase):
         self.assertEqual((b3['status'], b3['draft']), ('done', 'Sehr geehrte Frau Muster,\nder Preis beträgt 12,50 EUR.'))
         self.assertEqual([c['kind'] for c in self.ai.calls], ['brief', 'letter'])
 
+    def test_thread_letters_without_quotes_except_target(self):
+        first = self.mail(body='Bitte Preis für 500 Stück ANT-1.')
+        ours = self.mail(subject='AW: Anfrage ANT-1', from_email=ME, in_reply_to=first.message_id, day=2,
+                         folder='Sent', folder_type='sent',
+                         body='Der Preis beträgt 12,50 EUR.\n\nAm 01.10.2026 schrieb buyer@client.com:\n'
+                              '> Bitte Preis für 500 Stück ANT-1.')
+        target = self.mail(subject='AW: AW: Anfrage ANT-1', in_reply_to=ours.message_id, day=3,
+                           body='Danke, und die Lieferzeit?\n\nVon: Viacheslav Pryimak\nGesendet: 02.10.2026\n'
+                                'Der Preis beträgt 12,50 EUR.')
+        self.assertEqual(len({first.thread_id, ours.thread_id, target.thread_id}), 1)
+        b = self.prepare(target, mode='data')
+        mail = {s['url']: s['text'] for s in b['sources'] if s['kind'] == 'mail'}
+        self.assertEqual(mail[f'/email/message/{ours.pk}/'], f'Der Preis beträgt 12,50 EUR.\n{reply_brief.QUOTE_NOTE}')
+        self.assertIn('Gesendet: 02.10.2026', mail[f'/email/message/{target.pk}/'])     # лист-адресат — повністю
+        self.assertEqual(mail[f'/email/message/{first.pk}/'], 'Bitte Preis für 500 Stück ANT-1.')   # без цитати — як є
+        self.assertEqual(b['dedup']['quote_letters'], 1)
+        self.assertGreater(b['dedup']['quote_chars'], 30)
+        self.assertIn('цитати прибрано в 1', [s for s in b['stages'] if s['key'] == 'thread'][0]['detail'])
+
     def test_brief_mode_stops_before_letter(self):
         b = self.prepare(self.mail(), mode='brief')
         self.assertEqual((b['status'], bool(b['brief']), b['draft']), ('done', True, ''))
@@ -223,6 +242,37 @@ class RagScopeTests(ReplyBriefBase):
         self.assertTrue(start.call_args.args[1].startswith('яку ціну давали торік?'))
         self.assertIn('11,90 EUR vereinbart', self.ai.prompt('brief'))
         self.assertEqual({s['key']: s['status'] for s in b['stages']}['rag'], 'done')
+
+    def test_rag_skips_sources_and_project_threads_and_merges_fragments(self):
+        from projects.services import create_project
+        msg = self.mail()
+        older = self.mail(subject='Muster ANT-1', body='Muster sind angekommen.', day=2)
+        project = create_project(name='Antennen 2026', customer=self.client_c, threads=[msg.thread, older.thread])
+
+        def hit(pk, text, thread_id=None):
+            return {'message_pk': pk, 'thread_id': thread_id, 'sent_at': '2026-03-02T10:00:00Z',
+                    'from_email': 'buyer@client.com', 'subject': f'Lieferung {pk}', 'text': text,
+                    'url': f'/email/message/{pk}/'}
+        hits = [hit(older.pk, 'Muster sind angekommen.'),                    # уже в джерелах (лист проєкту)
+                hit(501, 'Teil eins: Preis 11,90 EUR'), hit(501, 'Teil zwei: Lieferzeit 3 Wochen'),
+                hit(501, 'Teil zwei: Lieferzeit 3 Wochen'),                  # той самий фрагмент удруге
+                hit(502, 'Alter Projektbrief', thread_id=older.thread_id),   # гілка проєкту, хоч RAG мав її оминути
+                hit(503, 'Rabatt 5 % ab 1000 Stück')]
+        with patch('rag_assistant.retrieval.available', return_value=True), \
+                patch('rag_assistant.retrieval.start', return_value=self._job(hits)) as start:
+            b = self.prepare(msg, mode='data')
+        kw = start.call_args.kwargs
+        self.assertEqual(set(kw['exclude_thread_ids']), {msg.thread_id, older.thread_id})
+        self.assertEqual(kw['limit'], reply_brief.RAG_REQUEST)
+        rag = [s for s in b['sources'] if s['kind'] == 'rag']
+        self.assertEqual([s['url'] for s in rag], ['/email/message/501/', '/email/message/503/'])
+        self.assertIn('фрагментів 2', rag[0]['label'])
+        self.assertEqual(rag[0]['text'], 'Teil eins: Preis 11,90 EUR\n[…]\nTeil zwei: Lieferzeit 3 Wochen')
+        self.assertEqual((b['dedup']['rag_dropped'], b['dedup']['rag_merged']), (2, 2))   # 501: ще 1 фрагмент + повтор
+        detail = [s for s in b['stages'] if s['key'] == 'rag'][0]['detail']
+        self.assertIn('листів 2', detail)
+        self.assertIn('відкинуто дублів 2', detail)
+        self.assertEqual(project.code[:2], 'P-')
 
     def test_no_rag_without_customer_or_project(self):
         msg = self.mail(from_email='unknown@nowhere.test')

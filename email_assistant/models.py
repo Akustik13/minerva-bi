@@ -547,6 +547,8 @@ class ReplyBrief(models.Model):
     to_email      = models.CharField(max_length=254, blank=True, default='')
     cc            = models.JSONField(default=list, blank=True)
     used          = models.JSONField(default=list, blank=True, help_text='«Minerva врахувала»')
+    dedup         = models.JSONField(default=dict, blank=True,
+                                     help_text='Без дублів: {quote_letters, quote_chars, rag_dropped, rag_merged}')
     stages        = models.JSONField(default=list, blank=True, help_text='[{key, label, status, detail}]')
     status        = models.CharField(max_length=10, default=RUNNING)
     error         = models.CharField(max_length=300, blank=True, default='')

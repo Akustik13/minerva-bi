@@ -12,6 +12,10 @@
    - attachment — текст вкладень гілки (PDF, DOCX, TXT, CSV);
    - rag        — фрагменти з бази знань RAG, лише в листуваннях цього клієнта (або проєкту),
                   запит — побажання менеджера + суть листа.
+   Без дублів (ReplyBrief.dedup — показується в «Зібраних даних»):
+   - листи гілки, крім того, на який відповідаємо, — без процитованої історії (вона й так є окремими джерелами);
+   - RAG не шукає в цій гілці й у гілках проєкту; листи, що вже є в джерелах, відкидаються;
+     кілька фрагментів одного листа — одне джерело.
    Текст джерел зберігається в ReplyBrief.sources — бриф можна скласти пізніше без повторного збору.
 2. Бриф — швидша модель (ai_helper.BRIEF_MODEL), українською, з посиланнями [#N].
 3. Лист — модель із «Налаштувань пошти» за брифом; «↻ Переписати» / «✍️ Написати лист» — лише цей крок.
@@ -39,6 +43,8 @@ OFFERS, OFFER_LINES = 5, 12
 ATTACHMENT_FILES, ATTACHMENT_CHARS, ATTACHMENT_TOTAL, ATTACHMENT_MAX_MB = 4, 4000, 12000, 15
 ATTACHMENT_TYPES = ('pdf', 'docx', 'txt', 'csv')
 RAG_HITS, RAG_HIT_CHARS, RAG_WAIT_SECONDS = 8, 1200, 12
+RAG_REQUEST, RAG_LETTER_CHARS = 16, 2400   # фрагментів у запиті (із запасом на дублі) / тексту на один лист
+QUOTE_NOTE = '[… цитату попередніх листів прибрано]'
 
 STAGES = [
     ('thread', '📨 Ця гілка'),
@@ -155,20 +161,24 @@ def gather(brief, on_stage=None) -> tuple:
     account = msg.account
     own = (account.email_address or '').lower()
     src, used = Sources(), []
+    dedup = {'quote_letters': 0, 'quote_chars': 0, 'rag_dropped': 0, 'rag_merged': 0}
 
     on_stage('thread', 'running')
     msgs = thread_messages(msg)
     target = ''
     for m in msgs:
-        n = src.add('mail', _message_label(m, own), (m.body_text or '')[:NEWEST_CHARS if m.pk == msg.pk else MESSAGE_CHARS],
-                    f'/email/message/{m.pk}/')
+        text = (m.body_text or '')[:NEWEST_CHARS] if m.pk == msg.pk else _without_quotes(m.body_text, dedup)
+        n = src.add('mail', _message_label(m, own), text, f'/email/message/{m.pk}/')
         if m.pk == msg.pk:
             target = f'[#{n}] {_message_label(m, own)}'
     used.append(f'листів гілки: {len(msgs)}')
-    on_stage('thread', 'done', f'{len(msgs)} лист.')
+    on_stage('thread', 'done', f'{len(msgs)} лист.'
+             + (f' · цитати прибрано в {dedup["quote_letters"]}' if dedup['quote_letters'] else ''))
+    seen = {m.pk for m in msgs}                     # листи, що вже є в джерелах, — RAG їх не дублює
 
     on_stage('minerva', 'running')
     ctx = build_context(msg)
+    seen |= {t['last'].pk for t in ctx.get('other_threads') or []}
     detail = _minerva(src, ctx)
     used += [d for d in detail if d]
     on_stage('minerva', 'done' if detail else 'skipped', ' · '.join(detail) or 'нічого пов\'язаного в базі')
@@ -182,7 +192,9 @@ def gather(brief, on_stage=None) -> tuple:
                 + (f' · строк {p.due_date:%d.%m.%Y}' if p.due_date else '')
                 + (f' · наступна дія: {p.next_action}' if p.next_action else ''))
         src.add('project', head, head, f'/admin/projects/project/{p.pk}/change/')
-        project_letters += _project_letters(src, p, msg, own)
+        letters = _project_letters(src, p, msg, own)
+        seen |= letters
+        project_letters += len(letters)
     if projects:
         used.append(f'проєкт {", ".join(p.code for p in projects)}: листів з інших гілок {project_letters}')
     on_stage('projects', 'done' if projects else 'skipped',
@@ -202,13 +214,25 @@ def gather(brief, on_stage=None) -> tuple:
     on_stage('attachments', 'done' if files else 'skipped', ', '.join(files) or 'немає текстових вкладень')
 
     on_stage('rag', 'running')
-    status, detail, note = _rag(src, user, msg, ctx, wish, customer, projects)
+    status, detail, note = _rag(src, user, msg, ctx, wish, customer, projects, seen, dedup)
     if note:
         used.append(note)
     on_stage('rag', status, detail)
 
-    brief.used = used
+    brief.used, brief.dedup = used, dedup
     return src, msgs, target
+
+
+def _without_quotes(body, dedup) -> str:
+    """Лист гілки без процитованої історії: попередні листи гілки й так є окремими джерелами."""
+    from email_assistant.quotes import new_text
+    full = (body or '').strip()
+    own = re.sub(r'[\s_]+$', '', new_text(full))
+    if not own.strip() or len(own) >= len(full):    # цитати немає або лист — лише пересилання: лишаємо як є
+        return full[:MESSAGE_CHARS]
+    dedup['quote_letters'] += 1
+    dedup['quote_chars'] += len(full) - len(own)
+    return f'{own[:MESSAGE_CHARS]}\n{QUOTE_NOTE}'
 
 
 def _minerva(src, ctx) -> list:
@@ -258,7 +282,8 @@ def _projects(msg) -> list:
     return list(found.values())[:PROJECTS]
 
 
-def _project_letters(src, project, msg, own) -> int:
+def _project_letters(src, project, msg, own) -> set:
+    """Останні листи інших гілок проєкту → джерела; повертає їхні pk."""
     from projects.services import project_messages
     qs = project_messages(project)
     if msg.thread_id:
@@ -267,7 +292,16 @@ def _project_letters(src, project, msg, own) -> int:
     for m in reversed(letters):
         src.add('project', f'{project.code}: {_message_label(m, own)}', (m.body_text or '')[:PROJECT_CHARS],
                 f'/email/message/{m.pk}/')
-    return len(letters)
+    return {m.pk for m in letters}
+
+
+def _project_thread_ids(projects) -> list:
+    """Підтверджені гілки проєктів — RAG у них не шукає: проєкт уже є окремим джерелом."""
+    if not projects:
+        return []
+    from projects.models import ProjectLink
+    return list(ProjectLink.objects.filter(project__in=projects, status=ProjectLink.CONFIRMED, thread__isnull=False)
+                .values_list('thread_id', flat=True).distinct())
 
 
 def _offers(src, msg, customer, projects) -> list:
@@ -314,8 +348,11 @@ def _attachments(src, msgs) -> list:
     return names
 
 
-def _rag(src, user, msg, ctx, wish, customer, projects) -> tuple:
-    """RAG лише в листуваннях цього клієнта (або єдиного проєкту); → (status, detail для етапу, note для «врахувала»)."""
+def _rag(src, user, msg, ctx, wish, customer, projects, seen=(), dedup=None) -> tuple:
+    """RAG лише в листуваннях цього клієнта (або єдиного проєкту); → (status, detail для етапу, note для «врахувала»).
+    Без дублів: не шукає в цій гілці й гілках проєкту, відкидає листи з `seen` (уже в джерелах),
+    фрагменти одного листа (чи одного вкладення) складає в одне джерело."""
+    dedup = dedup if dedup is not None else {}
     try:
         from rag_assistant import retrieval
     except ImportError:
@@ -327,9 +364,9 @@ def _rag(src, user, msg, ctx, wish, customer, projects) -> tuple:
     if not customer_id and not project_id:
         return 'skipped', 'клієнта чи проєкт не визначено — у всій пошті не шукаємо', ''
     query = ' · '.join(p for p in (wish.strip(), retrieval.query_for(ctx)) if p)
+    excluded = list(dict.fromkeys(([msg.thread_id] if msg.thread_id else []) + _project_thread_ids(projects)))[:100]
     job = retrieval.start(user, query, purpose='reply', thread=msg.thread, customer_id=customer_id,
-                          project_id=project_id, exclude_thread_ids=[msg.thread_id] if msg.thread_id else [],
-                          limit=RAG_HITS, wait_ms=8000)
+                          project_id=project_id, exclude_thread_ids=excluded, limit=RAG_REQUEST, wait_ms=8000)
     deadline = time.monotonic() + RAG_WAIT_SECONDS
     while not job.is_terminal and time.monotonic() < deadline:
         time.sleep(min(max(job.poll_after_ms or 1000, 300), 1500) / 1000)
@@ -338,11 +375,32 @@ def _rag(src, user, msg, ctx, wish, customer, projects) -> tuple:
     asked = f'запит «{query[:70]}{"…" if len(query) > 70 else ""}»'
     if job.status != job.COMPLETED:
         return 'skipped', f'{(job.message or "RAG не встиг")[:90]} · {asked}', ''
-    hits = job.hits[:RAG_HITS]
-    for h in hits:
-        src.add('rag', f'RAG · {(h.get("sent_at") or "")[:10]} · {h.get("from_email", "")} · «{(h.get("subject") or "")[:80]}»',
-                (h.get('text') or '')[:RAG_HIT_CHARS], h.get('url') or '')
-    return 'done', f'фрагментів {len(hits)} у листуваннях {scope} · {asked}', f'RAG: фрагментів {len(hits)}'
+    letters, dropped, fragments, skip_threads = {}, 0, 0, set(excluded)
+    for h in job.hits:
+        att = h.get('attachment') or None
+        if (h.get('message_pk') in seen and not att) or (h.get('thread_id') and h.get('thread_id') in skip_threads):
+            dropped += 1                                   # лист уже є серед джерел (або гілка проєкту / ця гілка)
+            continue
+        key = (h.get('message_pk') or h.get('url'), att.get('index') if att else None)
+        if key not in letters:
+            if len(letters) >= RAG_HITS:
+                continue
+            letters[key] = (h, [])
+        fragments += 1
+        text = (h.get('text') or '').strip()[:RAG_HIT_CHARS]
+        if text and text not in letters[key][1]:
+            letters[key][1].append(text)
+    for h, texts in letters.values():
+        att = h.get('attachment') or None
+        label = (f'RAG · {(h.get("sent_at") or "")[:10]} · {h.get("from_email", "")} · «{(h.get("subject") or "")[:80]}»'
+                 + (f' · вкладення «{att.get("name") or "?"}»' if att else '')
+                 + (f' · фрагментів {len(texts)}' if len(texts) > 1 else ''))
+        src.add('rag', label, '\n[…]\n'.join(texts)[:RAG_LETTER_CHARS], h.get('url') or '')
+    dedup['rag_dropped'] = dedup.get('rag_dropped', 0) + dropped
+    dedup['rag_merged'] = dedup.get('rag_merged', 0) + fragments - len(letters)
+    detail = (f'листів {len(letters)} (фрагментів {fragments}) у листуваннях {scope}'
+              + (f' · відкинуто дублів {dropped}' if dropped else '') + f' · {asked}')
+    return 'done', detail, f'RAG: листів {len(letters)}'
 
 
 # ── Запуск ───────────────────────────────────────────────────────────────────
@@ -442,7 +500,7 @@ def _prepare(pk):
     try:
         src, msgs, target = gather(brief, set_stage)
         brief.sources, brief.target = src.public(), target
-        brief.save(update_fields=['sources', 'target', 'used', 'updated_at'])
+        brief.save(update_fields=['sources', 'target', 'used', 'dedup', 'updated_at'])
         if brief.mode != ReplyBrief.MODE_DATA:
             _make_brief(brief, src, set_stage)
             if brief.mode == ReplyBrief.MODE_LETTER:
@@ -533,7 +591,7 @@ def as_json(brief) -> dict:
     stale = not running and latest_message_id(brief.message) != brief.last_message_id
     return {'id': brief.pk, 'status': brief.status, 'mode': brief.mode, 'error': brief.error, 'stages': brief.stages,
             'brief': brief.brief, 'sources': Sources(brief.sources).public(texts=not running), 'draft': brief.draft,
-            'to': brief.to_email, 'cc': brief.cc, 'used': brief.used, 'wish': brief.wish,
+            'to': brief.to_email, 'cc': brief.cc, 'used': brief.used, 'dedup': brief.dedup or {}, 'wish': brief.wish,
             'message_id': brief.message_id, 'stale': stale,
             'updated': timezone.localtime(brief.updated_at).strftime('%d.%m %H:%M'),
             'gathered': timezone.localtime(brief.created_at).strftime('%d.%m.%Y %H:%M')}
