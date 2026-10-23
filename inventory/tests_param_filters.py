@@ -18,10 +18,15 @@ class ParamFacetTests(TestCase):
         self.assertEqual(pf.parse(["Connector Type:SMA", "Connector Type:U.FL", "Length:1 m", "bad", ":x"]),
                          {"Connector Type": {"SMA", "U.FL"}, "Length": {"1 m"}})
         self.assertEqual(pf.params_of({"Gain": " 2 dBi ", "hts": "8529", "Bands": ["GPS", "GLONASS"], "Empty": ""}),
-                         {"Gain": "2 dBi", "Bands": "GPS, GLONASS"})   # службові коди й порожні — ні
-        rows = [{"Connector Type": "SMA", "Length": "1 m", "Color": "Black"},
-                {"Connector Type": "SMA", "Length": "2 m", "Color": "Black"},
-                {"Connector Type": "U.FL", "Length": "1 m", "Color": "Black"}]
+                         {"Gain": ["2 dBi"], "Bands": ["GPS", "GLONASS"]})   # службові коди й порожні — ні
+        # значення через кому — окремі варіанти; кома в дужках і десяткова — ні
+        self.assertEqual(pf._split("UHF (300MHz ~ 1GHz), UHF (2GHz ~ 3GHz)"), ["UHF (300MHz ~ 1GHz)", "UHF (2GHz ~ 3GHz)"])
+        self.assertEqual(pf._split("U.FL (UMCC), I-PEX MHF1"), ["U.FL (UMCC)", "I-PEX MHF1"])
+        self.assertEqual(pf._split("Cable (1, 2 m)"), ["Cable (1, 2 m)"])
+        self.assertEqual(pf._split("1,5 mm"), ["1,5 mm"])
+        rows = [{"Connector Type": ["SMA"], "Length": ["1 m"], "Color": ["Black"]},
+                {"Connector Type": ["SMA"], "Length": ["2 m"], "Color": ["Black"]},
+                {"Connector Type": ["U.FL"], "Length": ["1 m"], "Color": ["Black"]}]
         sel = {"Connector Type": {"SMA"}}
         out = {f["name"]: {v["value"]: v["count"] for v in f["values"]} for f in pf.facets(rows, sel)}
         self.assertEqual(out["Connector Type"], {"SMA": 2, "U.FL": 1})   # свій вибір не звужує власні значення («або»)
@@ -58,6 +63,16 @@ class ParamFilterAdminTests(TestCase):
         self.assertContains(r, "✕ Connector Type: SMA")                   # у бічній панелі — зняти
         self.assertContains(r, "скинути всі")
 
+    def test_multi_value_parameter(self):
+        Product.objects.create(sku="AN-BT", name="BT", category="antenna",
+                               tech_attributes={"RF Family/Standard": "802.15.4, Bluetooth, WiFi", "Gain": "3 dBi"})
+        Product.objects.create(sku="AN-LTE", name="LTE", category="antenna",
+                               tech_attributes={"RF Family/Standard": "Cellular, LTE", "Gain": "3 dBi"})
+        r = self.client.get("/admin/inventory/product/?category=antenna&attr=RF+Family/Standard:Bluetooth")
+        self.assertEqual(self.shown(r), ["AN-BT"])
+        values = {v["value"] for f in r.context["param_panel"]["facets"] if f["name"] == "RF Family/Standard" for v in f["values"]}
+        self.assertTrue({"Bluetooth", "WiFi", "LTE", "802.15.4"} <= values)
+
     def test_listing_list_and_supply(self):
         from shop.models import Shop, ShopListing
         shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
@@ -67,8 +82,10 @@ class ParamFilterAdminTests(TestCase):
         self.assertEqual(self.shown(r), ["CA-SMA-2M"])
         self.assertContains(r, "🔎 Параметри")
         # посилання на значення зберігають категорію (product__… не губиться разом з номером сторінки «p»)
-        links = [v["url"] for f in r.context["param_panel"]["facets"] for v in f["values"]]
+        panel = r.context["param_panel"]
+        links = [f["base_url"] for f in panel["facets"]] + [c["url"] for c in panel["chips"]]
         self.assertTrue(links and all("product__category=cable" in u for u in links))
+        self.assertEqual([(c["name"], c["value"]) for c in panel["chips"]], [("Cable Type", "RG316")])
         r = self.client.get("/admin/inventory/reorderproxy/supply/")
         self.assertContains(r, 'id="sv-params-data"')
         self.assertContains(r, "RG174")

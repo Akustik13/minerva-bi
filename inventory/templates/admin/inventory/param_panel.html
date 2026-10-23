@@ -1,48 +1,112 @@
-{# Панель «🔎 Параметри» над списком (inventory/param_filters.panel_context): значення з кількістю, клік — фільтр #}
+{# Панель «🔎 Параметри» над списком (param_filters.panel_context): кнопки параметрів → список значень; вибране — чипи #}
 {% if param_panel %}
 <style>
-  #pp { padding: 8px 12px; margin: 0 0 10px; border: 1px solid var(--border-strong, #2a3a4d); border-radius: 6px; font-size: 12px; }
-  #pp .pp-head { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
-  #pp .pp-hint { opacity: .75; }
-  #pp .pp-grid { display: flex; flex-wrap: wrap; gap: 10px 22px; }
-  #pp .pp-f { min-width: 180px; max-width: 360px; }
-  #pp .pp-name { font-weight: 700; margin-bottom: 3px; color: var(--text-muted, #9aafbe); }
-  #pp .pp-f.is-active .pp-name { color: var(--accent, #58a6ff); }
-  #pp .pp-vals { display: flex; flex-wrap: wrap; gap: 4px; }
-  #pp a.pp-v { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border-strong, #2a3a4d); text-decoration: none;
-    color: var(--text, #c9d8e4); white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
-  #pp a.pp-v span { opacity: .6; margin-left: 3px; }
-  #pp a.pp-v:hover { border-color: var(--accent, #58a6ff); }
-  #pp a.pp-v.is-on { background: var(--accent, #1565c0); border-color: var(--accent, #1565c0); color: #fff; }
-  #pp a.pp-v.is-zero { opacity: .45; }
-  #pp details { width: 100%; }
-  #pp details summary { cursor: pointer; opacity: .75; margin-top: 2px; }
-  #pp details .pp-vals { margin-top: 4px; }
+  #pp { margin: 0 0 10px; font-size: 12px; }
+  #pp .pp-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  #pp .pp-toggle { font-weight: 700; background: none; border: none; color: var(--body-fg, #c9d8e4); cursor: pointer; padding: 3px 4px; font-size: 12px; }
+  #pp .pp-hint { opacity: .7; }
+  #pp.is-collapsed .pp-dd { display: none; }
+  #pp .pp-dd { position: relative; }
+  #pp .pp-btn { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border-strong, #2a3a4d); background: none;
+    color: var(--body-fg, #c9d8e4); cursor: pointer; white-space: nowrap; font-size: 12px; }
+  #pp .pp-btn:hover, #pp .pp-dd.open .pp-btn { border-color: var(--accent, #58a6ff); }
+  #pp .pp-btn.on { border-color: var(--accent, #58a6ff); color: var(--accent, #58a6ff); font-weight: 700; }
+  #pp .pp-pop { position: absolute; z-index: 60; top: calc(100% + 4px); left: 0; width: 340px; max-width: 86vw;
+    background: var(--bg-card, var(--body-bg, #121d2a)); color: var(--text, var(--body-fg, #c9d8e4));
+    border: 1px solid var(--border-strong, #2a3a4d); border-radius: 6px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .45); padding: 8px; }
+  #pp .pp-pop.right { left: auto; right: 0; }
+  #pp .pp-q { width: 100%; box-sizing: border-box; margin-bottom: 6px; padding: 4px 8px; font-size: 12px; }
+  #pp .pp-list { max-height: 280px; overflow: auto; }
+  #pp .pp-opt { display: flex; gap: 6px; align-items: flex-start; padding: 3px 2px; cursor: pointer; border-radius: 3px; }
+  #pp .pp-opt:hover { background: rgba(88, 166, 255, .08); }
+  #pp .pp-opt em { margin-left: auto; padding-left: 8px; opacity: .6; font-style: normal; }
+  #pp .pp-opt.zero { opacity: .45; }
+  #pp .pp-act { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
+  #pp .pp-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  #pp a.pp-chip { padding: 2px 8px; border-radius: 999px; background: var(--accent, #1565c0); color: #fff; text-decoration: none; }
+  #pp a.pp-chip b { font-weight: 400; opacity: .8; }
 </style>
-<div class="module" id="pp">
+<div id="pp">
   {% if param_panel.hint %}
-    <div class="pp-hint">🔎 <b>Пошук за параметрами</b>: оберіть категорію (фільтр праворуч) — тут з'являться її параметри
-      (тип штекера, довжина й тип кабелю, частота…) зі значеннями й кількістю товарів.</div>
+    <span class="pp-hint">🔎 <b>Пошук за параметрами</b>: оберіть категорію (фільтр праворуч) — тут з'являться її параметри
+      (тип штекера, довжина кабелю, частота…).</span>
   {% elif param_panel.facets %}
-    <div class="pp-head"><b>🔎 Параметри</b>
-      <span class="pp-hint">кілька значень одного параметра — «або», різних — «і»</span>
-      {% if param_panel.selected %}<a href="{{ param_panel.clear_url }}">✕ скинути всі</a>{% endif %}</div>
-    <div class="pp-grid">
-    {% for f in param_panel.facets %}
-      <div class="pp-f{% if f.active %} is-active{% endif %}">
-        <div class="pp-name">{{ f.name }}{% if f.active %} <a href="{{ f.clear_url }}" title="Скинути цей параметр">✕</a>{% endif %}</div>
-        <div class="pp-vals">
-          {% for v in f.shown %}<a class="pp-v{% if v.active %} is-on{% endif %}{% if not v.count %} is-zero{% endif %}" href="{{ v.url }}" title="{{ v.value }}">{{ v.value|truncatechars:42 }}<span>{{ v.count }}</span></a>{% endfor %}
-          {% if f.more %}<details><summary>ще {{ f.more|length }}…</summary><div class="pp-vals">
-            {% for v in f.more %}<a class="pp-v{% if v.active %} is-on{% endif %}{% if not v.count %} is-zero{% endif %}" href="{{ v.url }}" title="{{ v.value }}">{{ v.value|truncatechars:42 }}<span>{{ v.count }}</span></a>{% endfor %}
-          </div></details>{% endif %}
+    <div class="pp-bar">
+      <button type="button" class="pp-toggle" title="Згорнути / розгорнути параметри">🔎 Параметри ({{ param_panel.facets|length }}) <span class="pp-arrow">▾</span></button>
+      {% for f in param_panel.facets %}
+        <div class="pp-dd">
+          <button type="button" class="pp-btn{% if f.active %} on{% endif %}">{{ f.name }}{% if f.n_active %} · {{ f.n_active }}{% endif %} ▾</button>
+          <div class="pp-pop" hidden data-name="{{ f.name }}" data-base="{{ f.base_url }}">
+            {% if f.values|length > 8 %}<input type="search" class="pp-q" placeholder="Пошук серед {{ f.values|length }} значень…">{% endif %}
+            <div class="pp-list">
+              {% for v in f.values %}<label class="pp-opt{% if not v.count %} zero{% endif %}"><input type="checkbox" value="{{ v.value }}"{% if v.active %} checked{% endif %}><span>{{ v.value }}</span><em>{{ v.count }}</em></label>{% endfor %}
+            </div>
+            <div class="pp-act"><button type="button" class="button default pp-apply">Застосувати</button>
+              {% if f.active %}<a href="{{ f.base_url }}">скинути</a>{% endif %}
+              <span class="pp-hint">кілька — «або»</span></div>
+          </div>
         </div>
-      </div>
-    {% endfor %}
+      {% endfor %}
+      {% if param_panel.selected %}<a href="{{ param_panel.clear_url }}">✕ скинути всі</a>{% endif %}
     </div>
+    {% if param_panel.chips %}<div class="pp-chips">{% for c in param_panel.chips %}<a class="pp-chip" href="{{ c.url }}" title="Зняти"><b>{{ c.name }}:</b> {{ c.value }} ✕</a>{% endfor %}</div>{% endif %}
   {% else %}
-    <div class="pp-hint">🔎 У товарів цієї вибірки немає технічних параметрів для фільтра — синхронізуйте з DigiKey
-      («🔄 Синх технічних атрибутів з DigiKey») або додайте їх у картці товару («📡 Технічні атрибути»).</div>
+    <span class="pp-hint">🔎 У товарів цієї вибірки немає технічних параметрів для фільтра — синхронізуйте з DigiKey
+      («🔄 Синх технічних атрибутів з DigiKey») або додайте їх у картці товару («📡 Технічні атрибути»).</span>
   {% endif %}
 </div>
+<script>
+(function () {
+  var pp = document.getElementById('pp'), toggle = pp && pp.querySelector('.pp-toggle');
+  if (!toggle) return;
+  var KEY = 'mv-param-panel-open';
+  function setOpen(open) {
+    pp.classList.toggle('is-collapsed', !open);
+    toggle.querySelector('.pp-arrow').textContent = open ? '▾' : '▸';
+    try { localStorage.setItem(KEY, open ? '1' : '0'); } catch (e) {}
+  }
+  var stored = null; try { stored = localStorage.getItem(KEY); } catch (e) {}
+  setOpen(stored !== '0');
+  toggle.addEventListener('click', function () { setOpen(pp.classList.contains('is-collapsed')); });
+
+  function closeAll(except) {
+    pp.querySelectorAll('.pp-dd.open').forEach(function (d) { if (d !== except) { d.classList.remove('open'); d.querySelector('.pp-pop').hidden = true; } });
+  }
+  function apply(pop) {
+    var base = pop.getAttribute('data-base'), name = pop.getAttribute('data-name');
+    var vals = Array.prototype.map.call(pop.querySelectorAll('input[type=checkbox]:checked'), function (c) {
+      return 'attr=' + encodeURIComponent(name + ':' + c.value);
+    });
+    location.href = base + (vals.length ? (base.length > 1 ? '&' : '') + vals.join('&') : '');
+  }
+  pp.addEventListener('click', function (e) {
+    var btn = e.target.closest('.pp-btn');
+    if (btn) {
+      var dd = btn.parentNode, pop = dd.querySelector('.pp-pop'), open = !dd.classList.contains('open');
+      closeAll(dd);
+      dd.classList.toggle('open', open); pop.hidden = !open;
+      if (open) {
+        pop.classList.toggle('right', btn.getBoundingClientRect().left > window.innerWidth / 2);
+        var q = pop.querySelector('.pp-q'); if (q) q.focus();
+      }
+      return;
+    }
+    if (e.target.closest('.pp-apply')) apply(e.target.closest('.pp-pop'));
+  });
+  pp.addEventListener('input', function (e) {
+    if (!e.target.classList.contains('pp-q')) return;
+    var q = e.target.value.trim().toLowerCase();
+    e.target.closest('.pp-pop').querySelectorAll('.pp-opt').forEach(function (o) {
+      o.hidden = !!q && o.textContent.toLowerCase().indexOf(q) === -1;
+    });
+  });
+  pp.addEventListener('keydown', function (e) {
+    var pop = e.target.closest('.pp-pop');
+    if (pop && e.key === 'Enter') { e.preventDefault(); apply(pop); }
+  });
+  document.addEventListener('click', function (e) { if (!e.target.closest('#pp .pp-dd')) closeAll(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+})();
+</script>
 {% endif %}

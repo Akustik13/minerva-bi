@@ -1,9 +1,11 @@
-"""Пошук за технічними параметрами, як на DigiKey: обираєте категорію — над списком її параметри (тип штекера,
-товщина кабелю, частота…) зі значеннями й кількістю товарів; клік — фільтр, кілька значень одного параметра —
-«або», різних параметрів — «і».
+"""Пошук за технічними параметрами, як на DigiKey: обираєте категорію — над списком рядок кнопок її параметрів
+(тип штекера, довжина кабелю, частота…); кнопка відкриває список значень з кількістю товарів, пошуком і галочками.
+Кілька значень одного параметра — «або», різних параметрів — «і».
 
-Параметри — Product.tech_attributes без службових кодів DigiKey (api.serializers.split_attributes).
-Списки: Товари й Асортимент і ціни — на сервері (?attr=Назва:значення, ParamFilter + facets), Склад → огляд
+Параметри — Product.tech_attributes без службових кодів DigiKey (api.serializers.split_attributes). Значення через
+кому («802.15.4, Bluetooth, WiFi») — окремі варіанти: «Bluetooth» знаходить усі товари, де він є; кома в дужках
+чи десяткова («1,5») не ділить.
+Списки: Товари й Асортимент і ціни — на сервері (?attr=Назва:значення, ParamFilter + panel_context), Склад → огляд
 залишків — на сторінці (JS, дані з params_map).
 """
 from __future__ import annotations
@@ -12,20 +14,43 @@ import re
 
 from django.contrib import admin
 
-MAX_DISTINCT = 60      # параметр, де майже в кожного товару своє значення, як фільтр не допомагає
-SHOWN_VALUES = 12      # решта значень — під «ще …»
+MAX_DISTINCT = 150     # більше варіантів — не фільтр
+MOSTLY_UNIQUE = 0.7    # і понад 25 варіантів, а варіантів більше за 70 % товарів (VSWR, Return Loss…) — теж ні
 
 
-def _text(value) -> str:
-    if isinstance(value, (list, tuple)):
-        value = ", ".join(str(v) for v in value)
-    return re.sub(r"\s+", " ", str(value)).strip()
+def _split(value: str) -> list[str]:
+    """Значення через «, » → окремі варіанти; кома в дужках не ділить («U.FL (UMCC), I-PEX» → 2, «(a, b)» → 1)."""
+    out, depth, cur = [], 0, []
+    for i, ch in enumerate(value):
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth = max(depth - 1, 0)
+        if ch == "," and depth == 0 and (i + 1 == len(value) or value[i + 1] == " "):
+            out.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    out.append("".join(cur))
+    seen, result = set(), []
+    for t in (re.sub(r"\s+", " ", x).strip() for x in out):
+        if t and t not in seen:
+            seen.add(t)
+            result.append(t)
+    return result
 
 
-def params_of(attrs) -> dict[str, str]:
-    """Технічні параметри товару {назва: значення-рядок}."""
+def params_of(attrs) -> dict[str, list[str]]:
+    """Технічні параметри товару {назва: [варіанти]}."""
     from api.serializers import split_attributes
-    return {k: _text(v) for k, v in split_attributes(attrs)[0].items() if _text(v)}
+    out = {}
+    for name, value in split_attributes(attrs)[0].items():
+        parts = []
+        for v in (value if isinstance(value, (list, tuple)) else [value]):
+            parts += _split(str(v))
+        if parts:
+            out[name] = list(dict.fromkeys(parts))
+    return out
 
 
 def parse(values) -> dict[str, set[str]]:
@@ -39,7 +64,7 @@ def parse(values) -> dict[str, set[str]]:
 
 
 def matches(params: dict, selected: dict, skip: str | None = None) -> bool:
-    return all(params.get(name) in values for name, values in selected.items() if name != skip)
+    return all(any(v in values for v in params.get(name, ())) for name, values in selected.items() if name != skip)
 
 
 def _natural(value: str):
@@ -47,8 +72,8 @@ def _natural(value: str):
 
 
 def facets(rows: list[dict], selected: dict) -> list[dict]:
-    """Параметри для панелі: [{name, values: [{value, count, active}], active, more}].
-    Лічильник значення — серед товарів, що відповідають решті вибраних параметрів (як на DigiKey)."""
+    """Параметри для панелі: [{name, values: [{value, count, active}], active}].
+    Лічильник — серед товарів, що відповідають решті вибраних параметрів (як на DigiKey)."""
     names = {}
     for params in rows:
         for name in params:
@@ -58,12 +83,14 @@ def facets(rows: list[dict], selected: dict) -> list[dict]:
         counts = {}
         for params in rows:
             if name in params and matches(params, selected, skip=name):
-                counts[params[name]] = counts.get(params[name], 0) + 1
+                for v in params[name]:
+                    counts[v] = counts.get(v, 0) + 1
         chosen = selected.get(name, set())
-        if not chosen and (len(counts) < 2 or len(counts) > MAX_DISTINCT):
-            continue   # усі однакові або в кожного своє — нічого фільтрувати
+        if not chosen and (len(counts) < 2 or len(counts) > MAX_DISTINCT
+                           or (len(counts) > 25 and len(counts) > MOSTLY_UNIQUE * have)):
+            continue   # усі однакові або майже в кожного своє — фільтрувати нічого
         values = sorted(counts.items(), key=lambda x: (-x[1], _natural(x[0])))
-        for v in chosen - set(counts):   # вибране, якого серед решти вже немає, — щоб можна було зняти
+        for v in sorted(chosen - set(counts)):   # вибране, якого серед решти вже немає, — щоб можна було зняти
             values.append((v, 0))
         out.append({"name": name, "active": bool(chosen),
                     "values": [{"value": v, "count": c, "active": v in chosen} for v, c in values]})
@@ -72,7 +99,7 @@ def facets(rows: list[dict], selected: dict) -> list[dict]:
 
 class ParamFilter(admin.ListFilter):
     """?attr=Назва:значення (можна кілька). У бічній панелі — лише вибрані параметри з «скинути»;
-    вибір — на панелі над списком (facets). Ставити останнім у list_filter: решта фільтрів уже застосована."""
+    вибір — на панелі над списком. Ставити останнім у list_filter: решта фільтрів уже застосована."""
     title = "Параметри"
     parameter_name = "attr"
     prefix = ""   # шлях до товару, напр. «product__»
@@ -111,7 +138,7 @@ class ListingParamFilter(ParamFilter):
 
 
 def panel_context(request, changelist, category_param: str) -> dict:
-    """Дані панелі над списком: параметри (лише коли вибрано категорію), посилання на вибір / зняття."""
+    """Дані панелі над списком: кнопки параметрів (лише коли вибрано категорію), вибрані значення-чипи."""
     rows = getattr(request, "_param_rows", None)
     raw = request.GET.getlist(ParamFilter.parameter_name)
     selected = parse(raw)
@@ -123,13 +150,13 @@ def panel_context(request, changelist, category_param: str) -> dict:
         return changelist.get_query_string({ParamFilter.parameter_name: new_raw or None, "p": None})
     groups = []
     for f in facets([params for _pk, params in rows], selected):
-        for v in f["values"]:
-            item = f"{f['name']}:{v['value']}"
-            v["url"] = link([x for x in raw if x != item] if v["active"] else raw + [item])
-        f["clear_url"] = link([x for x in raw if not x.startswith(f["name"] + ":")])
-        f["shown"], f["more"] = f["values"][:SHOWN_VALUES], f["values"][SHOWN_VALUES:]
+        f["base_url"] = link([x for x in raw if not x.startswith(f["name"] + ":")])   # без вибору цього параметра
+        f["n_active"] = sum(1 for v in f["values"] if v["active"])
         groups.append(f)
-    return {"param_panel": {"hint": False, "facets": groups, "selected": bool(selected), "clear_url": link([])}}
+    chips = [{"name": n, "value": v, "url": link([x for x in raw if x != f"{n}:{v}"])}
+             for n, values in selected.items() for v in sorted(values, key=_natural)]
+    return {"param_panel": {"hint": False, "facets": groups, "selected": bool(selected), "chips": chips,
+                            "clear_url": link([])}}
 
 
 def params_map(products) -> dict[int, dict]:
