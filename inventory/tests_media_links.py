@@ -36,9 +36,18 @@ class MediaLinksTests(TestCase):
 
     def test_template_validation_and_build(self):
         validate_url_template(DS)
-        for bad in ("files.example.com/{key}.pdf", "https://files.example.com/AN.pdf"):
-            with self.assertRaises(ValidationError):
-                validate_url_template(bad)
+        validate_url_template("https://files.example.com/download.php?file=")   # досить початку адреси
+        with self.assertRaises(ValidationError):
+            validate_url_template("files.example.com/{key}.pdf")
+        s = InventorySettings.get()
+        s.datasheet_url_template = " https://docs.example.com/datasheets/download.php?file= "
+        s.image_url_template = "https://docs.example.com/pictures/{key}.png"
+        s.save()
+        s.refresh_from_db()
+        self.assertEqual(s.datasheet_url_template, "https://docs.example.com/datasheets/download.php?file={key}.pdf")
+        self.assertEqual(s.image_url_template, "https://docs.example.com/pictures/{key}.png")   # {key} є — як є
+        s.datasheet_url_template, s.image_url_template = DS, IMG
+        s.save()
         self.assertEqual(ml.build_url(DS, "AN 1"), self.url(DS, "AN%201"))
         self.assertEqual(ml.key_for(self.c, ml.IMAGE), "AN-1")
         self.assertEqual(ml.key_for(self.c, ml.DATASHEET), "AN-3")

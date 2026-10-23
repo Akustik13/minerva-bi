@@ -3394,6 +3394,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                  name="inventory_product_serve_datasheet"),
             path("base-prices/", self.admin_site.admin_view(self._base_prices_editor_view),
                  name="inventory_product_base_prices"),
+            path("base-prices/template/", self.admin_site.admin_view(self._base_prices_template_view),
+                 name="inventory_product_base_prices_template"),
             path('dk-sync-status/', self.admin_site.admin_view(self._dk_sync_status_view),
                  name='inventory_product_dk_sync_status'),
             path('dk-sync-cancel/', self.admin_site.admin_view(self._dk_sync_cancel_view),
@@ -3404,6 +3406,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     def _base_prices_editor_view(self, request):
         from .admin_prices import editor_view
         return editor_view(self, request)
+
+    def _base_prices_template_view(self, request):
+        from .admin_prices import template_view
+        return template_view(self, request)
 
     def serve_datasheet_view(self, request, pk):
         """Serve product datasheet file via Django (bypasses Synology/nginx media routing)."""
@@ -3760,10 +3766,12 @@ class InventorySettingsAdmin(admin.ModelAdmin):
         ("🖼️ Кешування медіа (Datasheet / Фото)", {
             "fields": ("datasheet_url_template", "image_url_template", "media_links_panel", "media_cache_panel"),
             "description": (
-                "<b>Правило посилань</b>: адреса з {key} — Minerva підставить артикул товару (або його «спільний файл», "
-                "якщо кілька товарів мають одне фото чи даташит) і заповнить поля «Посилання на Datasheet» / «Зображення (URL)» "
-                "після перевірки, що файл справді є. <b>Кешування</b>: завантажує PDF-датащити та фото з вказаних URL на "
-                "сервер — файли відкриваються швидше і доступні, навіть якщо зовнішній сервер недоступний."
+                "<b>Правило посилань</b>: досить початку адреси, напр. <code>https://docs.sevskiy.com/datasheets/download.php?file=</code> "
+                "— при збереженні Minerva допише <code>{key}.pdf</code> (для фото — <code>{key}.jpg</code>); {key} = артикул товару "
+                "(або його «спільний файл», якщо кілька товарів мають одне фото чи даташит). Інше розширення чи артикул у "
+                "середині адреси — впишіть {key} самі. Порожнє поле — посилання цього типу не формуються. "
+                "<b>Кешування</b>: завантажує PDF-датащити та фото з вказаних URL на сервер — файли відкриваються швидше і "
+                "доступні, навіть якщо зовнішній сервер недоступний."
             ),
         }),
     )
@@ -3777,8 +3785,8 @@ class InventorySettingsAdmin(admin.ModelAdmin):
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         field = super().formfield_for_dbfield(db_field, request, **kwargs)
-        examples = {"datasheet_url_template": "https://sevskiy.i234.me/datasheets/download.php?file={key}.pdf",
-                    "image_url_template": "https://sevskiy.i234.me/pictures/download.php?file={key}.jpg"}
+        examples = {"datasheet_url_template": "https://docs.sevskiy.com/datasheets/download.php?file=",
+                    "image_url_template": "https://docs.sevskiy.com/pictures/download.php?file="}
         if db_field.name in examples:   # довгі адреси — на всю ширину
             field.widget.attrs.update({"style": "width:100%;max-width:640px", "placeholder": examples[db_field.name]})
         return field

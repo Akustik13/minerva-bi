@@ -677,6 +677,26 @@ class ProductListShopsAndBulkPricesTests(TestCase):
         self.p.refresh_from_db()
         self.assertEqual(self.p.base_prices[0]["unit_price"], "8.8")
 
+    def test_editor_tier_template_saved_as_standard(self):
+        import json
+        page = self.client.get(f"/admin/inventory/product/base-prices/?ids={self.p.pk}")
+        self.assertContains(page, "Ступені за шаблоном")
+        url = "/admin/inventory/product/base-prices/template/"
+        r = self.client.post(url, json.dumps({"price_breaks": [{"min_qty": 100, "discount": "10"}, {"min_qty": 10, "discount": 5}]}),
+                             content_type="application/json")
+        self.assertEqual(r.json(), {"ok": True, "price_breaks": [{"min_qty": 10, "discount": 5.0}, {"min_qty": 100, "discount": 10.0}]})
+        self.assertEqual(ShopSettings.get().price_breaks, [{"min_qty": 10, "discount": 5.0}, {"min_qty": 100, "discount": 10.0}])
+        r = self.client.post(url, json.dumps({"price_breaks": [{"min_qty": 1, "discount": 5}]}), content_type="application/json")
+        self.assertEqual((r.status_code, r.json()["ok"]), (400, False))
+        self.assertIn("від 2 шт.", r.json()["error"])
+        self.assertEqual(self.client.get(url).status_code, 405)
+        staff = User.objects.create_user("clerk", "c@x.y", "p", is_staff=True)
+        from django.contrib.auth.models import Permission
+        staff.user_permissions.add(*Permission.objects.filter(codename__in=["change_product", "view_product"]))
+        self.client.force_login(staff)
+        r = self.client.post(url, json.dumps({"price_breaks": []}), content_type="application/json")
+        self.assertEqual(r.status_code, 403)   # «Налаштування цін» змінює лише той, хто має на це право
+
     def test_card_applies_base_prices_to_checked_shops(self):
         other = Shop.objects.create(name="Market", slug="market", currency="EUR")
         page = self.client.get(f"/admin/inventory/product/{self.p.pk}/change/")

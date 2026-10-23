@@ -55,25 +55,10 @@ class ShopSettingsForm(forms.ModelForm):
         return out
 
     def clean_price_breaks(self):
-        raw = self.cleaned_data.get("price_breaks") or []
-        if not isinstance(raw, list):
-            raise forms.ValidationError("Очікується список ступенів.")
-        out, seen = [], set()
-        for row in raw:
-            try:
-                qty = int(row["min_qty"])
-                disc = Decimal(str(row["discount"]).replace(",", "."))
-            except (KeyError, TypeError, ValueError, InvalidOperation):
-                raise forms.ValidationError("Кожен ступінь: кількість (ціле число) і знижка у %.")
-            if qty < 2:
-                raise forms.ValidationError("Кількість у ступені — від 2 шт. (1 шт. — це базова ціна).")
-            if not (0 <= disc < 100):
-                raise forms.ValidationError(f"Від {qty} шт.: знижка має бути від 0 до 99 %.")
-            if qty in seen:
-                raise forms.ValidationError(f"Кількість {qty} шт. повторюється.")
-            seen.add(qty)
-            out.append({"min_qty": qty, "discount": float(disc)})
-        return sorted(out, key=lambda r: r["min_qty"])
+        try:
+            return services.parse_price_breaks(self.cleaned_data.get("price_breaks") or [])
+        except ValueError as e:
+            raise forms.ValidationError(str(e))
 
 
 @admin.register(ShopSettings)

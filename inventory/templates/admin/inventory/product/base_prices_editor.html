@@ -41,6 +41,9 @@
   #bpe .bpe-sub input { width: 90px; text-align: right; }
   #bpe .bpe-shops { margin: 14px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
   #bpe .bpe-shop { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 6px 0; font-size: 12px; }
+  #bpe .bpe-tpl { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--accent, #58a6ff); border-radius: 6px; }
+  #bpe .bpe-tpl .bpe-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 4px 0; font-size: 12px; }
+  #bpe .bpe-tpl td.eg { color: var(--muted); font-family: monospace; }
   #bpe .bpe-foot { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-top: 12px; }
   #bpe .bpe-msg { color: #ffb74d; font-weight: 600; }
   #bpe .bpe-err { color: #e57373; }
@@ -53,12 +56,26 @@
     <span class="bpe-tool">Усі ціни <input type="text" class="t-pct" placeholder="+5"> % <button type="button" class="bpe-b b-pct">Змінити</button></span>
     <span class="bpe-tool">Закупівля + <input type="text" class="t-mk"> % <button type="button" class="bpe-b b-mk" title="Ціна за 1 шт. = закупівельна × (1 + націнка); знижки ступенів зберігаються">→ ціна 1 шт.</button></span>
     <span class="bpe-sep"></span>
-    <span class="bpe-tool"><button type="button" class="bpe-b b-tpl" title="Ступені від ціни за 1 шт. за шаблоном «Налаштування цін»">Знижки за шаблоном</button></span>
+    <span class="bpe-tool"><button type="button" class="bpe-b b-tplbox" title="Ступені за кількістю для позначених: знижки від ціни за 1 шт. або однакові ціни">📐 Ступені за шаблоном…</button></span>
     <span class="bpe-tool">Округлення <select class="t-rnd"></select><button type="button" class="bpe-b b-rnd">Округлити</button></span>
     <span class="bpe-sep"></span>
     <span class="bpe-tool">Конвертувати в <input type="text" class="cur t-to" maxlength="3"> курс <input type="text" class="t-rate" placeholder="авто"> <button type="button" class="bpe-b b-conv" title="Курс порожній — з «Налаштувань цін → Курси валют» для валюти кожного товару">Конвертувати</button></span>
     <span class="bpe-sep"></span>
     <span class="bpe-tool"><button type="button" class="bpe-b b-undo" title="Повернути ціни позначених товарів, як були при відкритті">↶ Скасувати</button></span>
+  </div>
+  <div class="bpe-tpl" id="bpe-tpl" hidden>
+    <div class="bpe-row"><b>📐 Ступені цін для позначених товарів</b>
+      <label><input type="radio" name="tpl-mode" value="disc" checked> знижка від ціни за 1 шт. (у кожного товару своя ціна)</label>
+      <label><input type="radio" name="tpl-mode" value="price"> однакові ціни для всіх</label></div>
+    <table class="bpe-sub"><thead><tr><th>Від, шт.</th><th id="tpl-h"></th><th id="tpl-eg"></th><th></th></tr></thead>
+      <tbody id="tpl-body"></tbody></table>
+    <div class="bpe-row">
+      <button type="button" class="bpe-b t-add">+ Ступінь</button>
+      <button type="button" class="bpe-b t-std" title="Шаблон з «Інтернет-магазин → Налаштування цін»">↺ Стандартний шаблон</button>
+      <button type="button" class="bpe-b t-save" title="Цей шаблон стане стандартним: «Налаштування цін», кнопка «Знижки за шаблоном» у картці товару, генерація ступенів у магазині">💾 Зберегти як стандартний</button>
+      <button type="button" class="button default t-apply">Застосувати до позначених</button>
+      <span class="bpe-muted" id="tpl-state"></span>
+    </div>
   </div>
   <div class="bpe-msg" id="bpe-note" hidden></div>
   <table class="bpe-t">
@@ -261,17 +278,101 @@
     var s = each(function (it) { if (!(it.purchase > 0)) return false; return setBase(it, roundMode(it.purchase * (100 + mk) / 100, rnd())); });
     tell(s.length ? 'Без закупівельної ціни (пропущено): ' + s.join(', ') : '');
   });
-  $('.b-tpl').addEventListener('click', function () {
-    var tpl = cfg.template || [];
-    if (!tpl.length) { tell('Шаблон знижок порожній («Інтернет-магазин → Налаштування цін»).'); return; }
-    if (!confirm('Замінити ступені позначених товарів на шаблон (' + tpl.map(function (t) { return t.min_qty + ' шт. −' + t.discount + ' %'; }).join(', ') + ')?')) return;
-    var s = each(function (it) {
-      var b = base(it); if (!(b > 0)) return false;
-      it.rows = [{ q: 1, p: b }].concat(tpl.filter(function (t) { return t.min_qty > 1; }).map(function (t) {
-        return { q: t.min_qty, p: roundMode(b * (100 - t.discount) / 100, rnd()) };
-      }));
+  // ── Шаблон ступенів: знижки від ціни за 1 шт. (disc) або однакові ціни (price) ──
+  var tplBox = document.getElementById('bpe-tpl'), tplBody = document.getElementById('tpl-body');
+  var tpl = { disc: [], price: [], priceEdited: false };   // priceEdited — ціни змінено вручну → знижки рахувати з них
+  function tplMode() { return tplBox.querySelector('input[name=tpl-mode]:checked').value; }
+  function tplRows() { return tpl[tplMode()]; }
+  function tplState(text, bad) { var el = document.getElementById('tpl-state'); el.textContent = text || ''; el.className = bad ? 'bpe-err' : 'bpe-muted'; }
+  function exampleItem() { return items.filter(function (it) { return it.on && base(it) > 0; })[0]; }
+  function tplStd() { tpl.disc = (cfg.template || []).map(function (t) { return { q: t.min_qty, v: t.discount }; }); }
+  function discToPrice(b) {   // зберегти «форму» шаблону при перемиканні
+    return [{ q: 1, v: b > 0 ? b : NaN }].concat(tpl.disc.map(function (r) { return { q: r.q, v: b > 0 ? roundMode(b * (100 - r.v) / 100, rnd()) : NaN }; }));
+  }
+  function priceToDisc() {
+    var one = tpl.price.filter(function (r) { return r.q === 1; })[0], b = one ? one.v : NaN;
+    return tpl.price.filter(function (r) { return r.q !== 1; }).map(function (r) {
+      return { q: r.q, v: b > 0 && r.v > 0 ? Math.round((1 - r.v / b) * 1000) / 10 : NaN };
     });
-    tell(s.length ? 'Без ціни за 1 шт. (пропущено): ' + s.join(', ') : '');
+  }
+  function tplDraw() {
+    var mode = tplMode(), ex = exampleItem(), b = ex ? base(ex) : NaN;
+    document.getElementById('tpl-h').textContent = mode === 'disc' ? 'Знижка від 1 шт., %' : 'Ціна за шт. (у валюті товару)';
+    document.getElementById('tpl-eg').textContent = mode === 'disc' && ex ? 'Напр. ' + ex.sku + ', ' + ex.currency : '';
+    var html = mode === 'disc' ? '<tr><td><input type="text" value="1" disabled></td><td><input type="text" value="0" disabled title="1 шт. — ціна товару (100 %)"></td>' +
+      '<td class="eg">' + (b > 0 ? fmt(b) : '') + '</td><td></td></tr>' : '';
+    html += tplRows().map(function (r, i) {
+      var eg = mode === 'disc' && b > 0 && r.v >= 0 && r.v < 100 ? fmt(roundMode(b * (100 - r.v) / 100, rnd())) : '';
+      return '<tr><td><input type="text" class="t-q" data-i="' + i + '" value="' + (isNaN(r.q) ? '' : r.q) + '" placeholder="напр. 10"></td>' +
+             '<td><input type="text" class="t-v" data-i="' + i + '" value="' + (r.v >= 0 ? String(mode === 'disc' ? r.v : fmt(r.v)).replace('.', ',') : '') + '"></td>' +
+             '<td class="eg">' + eg + '</td><td><button type="button" class="bpe-b t-del" data-i="' + i + '" title="Видалити">×</button></td></tr>';
+    }).join('');
+    tplBody.innerHTML = html;
+    tplBox.querySelector('.t-save').hidden = !(cfg.can_save_template && mode === 'disc');
+  }
+  function tplCheck() {
+    var mode = tplMode(), rows = tplRows(), seen = {};
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i], minQ = mode === 'disc' ? 2 : 1;
+      if (!(r.q >= minQ && Math.floor(r.q) === r.q)) return 'Кількість — ціле число від ' + minQ + ' шт.';
+      if (seen[r.q]) return 'Ступінь «від ' + r.q + ' шт.» двічі.';
+      seen[r.q] = true;
+      if (mode === 'disc' && !(r.v >= 0 && r.v < 100)) return 'Від ' + r.q + ' шт.: знижка від 0 до 99 %.';
+      if (mode === 'price' && !(r.v > 0)) return 'Від ' + r.q + ' шт.: вкажіть ціну.';
+    }
+    if (mode === 'price' && !seen[1]) return 'Потрібна ціна за 1 шт.';
+    return '';
+  }
+  $('.b-tplbox').addEventListener('click', function () {
+    tplBox.hidden = !tplBox.hidden;
+    if (!tplBox.hidden && !tpl.disc.length && !tpl.price.length) { tplStd(); tpl.price = discToPrice(NaN); }
+    tplDraw();
+  });
+  tplBox.addEventListener('change', function (e) {
+    var t = e.target, i = Number(t.getAttribute('data-i'));
+    if (t.name === 'tpl-mode') {
+      var ex = exampleItem();
+      if (t.value === 'price') { tpl.price = discToPrice(ex ? base(ex) : NaN); tpl.priceEdited = false; }
+      else if (tpl.priceEdited) tpl.disc = priceToDisc();   // інакше — початкові знижки без похибки округлення
+    } else if (t.classList.contains('t-q')) { tplRows()[i].q = num(t.value); tpl.priceEdited = tplMode() === 'price'; }
+    else if (t.classList.contains('t-v')) { tplRows()[i].v = num(t.value); tpl.priceEdited = tplMode() === 'price'; }
+    tplState(''); tplDraw();
+  });
+  tplBox.addEventListener('click', function (e) {
+    var t = e.target; if (t.tagName !== 'BUTTON') return;
+    var rows = tplRows(), mode = tplMode();
+    if (mode === 'price' && (t.classList.contains('t-del') || t.classList.contains('t-add'))) tpl.priceEdited = true;
+    if (t.classList.contains('t-del')) rows.splice(Number(t.getAttribute('data-i')), 1);
+    else if (t.classList.contains('t-add')) {
+      var last = rows[rows.length - 1];
+      rows.push(mode === 'disc' ? { q: last ? last.q * 10 : 10, v: last ? Math.min(last.v + 5, 90) : 5 } : { q: last ? last.q * 10 : 1, v: last ? last.v : NaN });
+    } else if (t.classList.contains('t-std')) { tplStd(); if (mode === 'price') { var ex = exampleItem(); tpl.price = discToPrice(ex ? base(ex) : NaN); tpl.priceEdited = false; } }
+    else if (t.classList.contains('t-save')) {
+      var err = tplCheck(); if (err) return tplState(err, true);
+      var csrf = (document.querySelector('#bpe-form [name=csrfmiddlewaretoken]') || {}).value || '';
+      fetch(cfg.template_url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                                body: JSON.stringify({ price_breaks: tpl.disc.map(function (r) { return { min_qty: r.q, discount: r.v }; }) }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) { cfg.template = d.price_breaks; tplState('✅ Збережено як стандартний шаблон («Налаштування цін»).'); } else tplState(d.error || 'Не збережено.', true); })
+        .catch(function () { tplState('Не вдалося зберегти — немає зв\'язку з Minerva.', true); });
+      return;
+    } else if (t.classList.contains('t-apply')) {
+      var problem = tplCheck(); if (problem) return tplState(problem, true);
+      var on = items.filter(function (it) { return it.on; });
+      if (!on.length) return tplState('Позначте товари в таблиці.', true);
+      var curs = {}; on.forEach(function (it) { curs[it.currency] = 1; });
+      var warn = mode === 'price' && Object.keys(curs).length > 1 ? '\nУвага: товари в різних валютах (' + Object.keys(curs).join(', ') + ') — ціни запишуться у валюті кожного товару.' : '';
+      if (!confirm('Замінити всі ступені ' + on.length + ' позначених товарів на цей шаблон?' + warn)) return;
+      var skipped = each(function (it) {
+        if (mode === 'price') { it.rows = tpl.price.map(function (r) { return { q: r.q, p: r.v }; }); return; }
+        var b = base(it); if (!(b > 0)) return false;
+        it.rows = [{ q: 1, p: b }].concat(tpl.disc.map(function (r) { return { q: r.q, p: roundMode(b * (100 - r.v) / 100, rnd()) }; }));
+      });
+      tell(skipped.length ? 'Без ціни за 1 шт. (пропущено): ' + skipped.join(', ') : '');
+      tplState('Застосовано до ' + (on.length - skipped.length) + ' товарів — перевірте таблицю й натисніть «💾 Зберегти».');
+      return;
+    }
+    tplState(''); tplDraw();
   });
   $('.b-rnd').addEventListener('click', function () { each(function (it) { eachPrice(it, function (p) { return p; }); }); tell(''); });
   $('.b-conv').addEventListener('click', function () {

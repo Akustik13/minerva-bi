@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
@@ -218,9 +219,29 @@ def editor_view(model_admin, request):
         return redirect(url)
     cfg = editor_config()
     cfg["shops"] = [{"id": s.pk, "name": s.name, "currency": s.currency} for s in _shops()]
+    cfg["template_url"] = reverse("admin:inventory_product_base_prices_template")
+    cfg["can_save_template"] = request.user.has_perm("shop.change_shopsettings")
     return render(request, "admin/inventory/product/base_prices_editor.html", {
         **model_admin.admin_site.each_context(request),
         "title": f"Базові ціни: {len(products)} товарів", "opts": Product._meta,
         "items": editor_items(products), "config": cfg, "ids": ",".join(str(p.pk) for p in products),
         "back_url": reverse("admin:inventory_product_changelist"),
     })
+
+
+def template_view(model_admin, request):
+    """POST {price_breaks: [{min_qty, discount}]} — шаблон ступенів з редактора → «Налаштування цін» (стандартний)."""
+    from shop.models import ShopSettings
+    from shop.services import parse_price_breaks
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "Лише POST."}, status=405)
+    if not request.user.has_perm("shop.change_shopsettings"):
+        return JsonResponse({"ok": False, "error": "Немає права змінювати «Налаштування цін»."}, status=403)
+    try:
+        rows = parse_price_breaks(json.loads(request.body or b"{}").get("price_breaks"))
+    except (ValueError, AttributeError) as e:
+        return JsonResponse({"ok": False, "error": str(e) or "Неправильний шаблон."}, status=400)
+    st = ShopSettings.get()
+    st.price_breaks = rows
+    st.save(update_fields=["price_breaks"])
+    return JsonResponse({"ok": True, "price_breaks": rows})

@@ -432,6 +432,28 @@ def use_base_prices(listings, factor=Decimal("100")) -> tuple[int, list[str], li
     return done, missing, no_rate
 
 
+def parse_price_breaks(raw) -> list[dict]:
+    """Шаблон ступенів [{min_qty, discount}] → перевірений і відсортований; ValueError з поясненням."""
+    if not isinstance(raw, list):
+        raise ValueError("Очікується список ступенів.")
+    out, seen = [], set()
+    for row in raw:
+        try:
+            qty = int(row["min_qty"])
+            disc = Decimal(str(row["discount"]).replace(",", "."))
+        except (KeyError, TypeError, ValueError, ArithmeticError):
+            raise ValueError("Кожен ступінь: кількість (ціле число) і знижка у %.") from None
+        if qty < 2:
+            raise ValueError("Кількість у ступені — від 2 шт. (1 шт. — це базова ціна).")
+        if not (0 <= disc < 100):
+            raise ValueError(f"Від {qty} шт.: знижка має бути від 0 до 99 %.")
+        if qty in seen:
+            raise ValueError(f"Кількість {qty} шт. повторюється.")
+        seen.add(qty)
+        out.append({"min_qty": qty, "discount": float(disc)})
+    return sorted(out, key=lambda r: r["min_qty"])
+
+
 APPLY_TEXT = {
     "ok": "базові ціни застосовано (далі оновлюються автоматично)",
     "added": "додано в магазин з базовими цінами",

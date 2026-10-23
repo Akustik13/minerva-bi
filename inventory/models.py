@@ -429,10 +429,16 @@ class PurchaseOrderLine(models.Model):
 
 
 def validate_url_template(value: str):
-    """Правило посилання: http(s)://… з {key} — місцем для артикула (або спільного файлу)."""
-    if value and (not value.startswith(("http://", "https://")) or "{key}" not in value):
-        raise ValidationError("Посилання має починатися з http:// або https:// і містити {key} — місце для артикула, "
+    """Правило посилання: http(s)://…; {key} — місце для артикула (або спільного файлу)."""
+    if value and not value.strip().startswith(("http://", "https://")):
+        raise ValidationError("Посилання має починатися з http:// або https://, "
                               "напр. https://example.com/download.php?file={key}.pdf")
+
+
+def complete_url_template(value: str, ext: str) -> str:
+    """Лише початок адреси («…?file=») → «…?file={key}.pdf»: артикул і розширення в кінці."""
+    value = (value or "").strip()
+    return value + "{key}" + ext if value and "{key}" not in value else value
 
 
 class InventorySettings(models.Model):
@@ -535,6 +541,8 @@ class InventorySettings(models.Model):
 
     def save(self, *args, **kwargs):
         self.pk = 1
+        self.datasheet_url_template = complete_url_template(self.datasheet_url_template, ".pdf")
+        self.image_url_template = complete_url_template(self.image_url_template, ".jpg")
         super().save(*args, **kwargs)
 
 
