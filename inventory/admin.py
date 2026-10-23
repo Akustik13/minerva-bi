@@ -247,6 +247,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         from django.db.models import Sum, Max
         from collections import defaultdict
 
+        from . import thumbs
+
         DONE_STATUSES = {'shipped', 'delivered', 'cancelled'}
         PO_ACTIVE = ['draft', 'ordered', 'partial']
 
@@ -400,6 +402,9 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
             rows.append({
                 'product':               p,
+                'thumb_url':             thumbs.thumb_url(p),
+                'image_href':            thumbs.image_href(p) if thumbs.has_image(p) else '',
+                'ds_href':               thumbs.datasheet_href(p),
                 'stock':                 stock,
                 'reserved':              reserved,
                 'net_avail':             stock - reserved,
@@ -2162,6 +2167,36 @@ class ProductAdminForm(forms.ModelForm):
         return (self.cleaned_data.get("base_currency") or "EUR").upper()
 
 
+class ProductMediaFilter(admin.SimpleListFilter):
+    """Є / немає фото чи даташита (файл у картці або посилання)."""
+    title = "Фото / даташит"
+    parameter_name = "media"
+
+    def lookups(self, request, model_admin):
+        return [("no_image", "🖼 Без фото"), ("no_ds", "📄 Без даташита"), ("no_both", "Без фото й без даташита"),
+                ("image", "З фото"), ("ds", "З даташитом"),
+                ("broken", "❌ Посилання не відповідає (перевірка для сайту)")]
+
+    def queryset(self, request, qs):
+        from django.db.models import Q
+        no_image = (Q(image="") | Q(image__isnull=True)) & Q(image_url="")
+        no_ds = (Q(datasheet_file="") | Q(datasheet_file__isnull=True)) & Q(datasheet_url="")
+        v = self.value()
+        if v == "no_image":
+            return qs.filter(no_image)
+        if v == "no_ds":
+            return qs.filter(no_ds)
+        if v == "no_both":
+            return qs.filter(no_image & no_ds)
+        if v == "image":
+            return qs.exclude(no_image)
+        if v == "ds":
+            return qs.exclude(no_ds)
+        if v == "broken":   # «🖼 Фото й даташити»: перевірка не вдалась і копії немає
+            return qs.filter(shop_media__status="error", shop_media__stale=False).distinct()
+        return qs
+
+
 class ProductShopFilter(admin.SimpleListFilter):
     """У якому інтернет-магазині товар."""
     title = "Магазин"
@@ -2212,12 +2247,13 @@ class ProductCategoryForm(forms.Form):
 class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     change_list_template = "admin/inventory/product/change_list.html"
     list_display = (
-        "sku", "sku_short", "category", "shops_col", "kind", "bom_type", "is_active",
+        "sku", "media_col", "sku_short", "category", "shops_col", "kind", "bom_type", "is_active",
         "stock_qty", "reserved_qty", "stock_badge", "incoming_qty", "buildable_qty",
         "reorder_badge", "label_btn", "set_stock_link",
     )
     search_fields = ("sku", "sku_short", "name")
-    list_filter   = ("category", ProductShopFilter, "lifecycle_status", "kind", "bom_type", "is_active")
+    list_filter   = ("category", ProductShopFilter, ProductMediaFilter, "lifecycle_status", "kind", "bom_type",
+                     "is_active")
     list_per_page = 50
     autocomplete_fields = ("successor",)
     form          = ProductAdminForm
@@ -2387,7 +2423,12 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
              + (" · базові ціни" if l.price_source == "base" else ""),
              "#2e7d32" if l.is_visible else "#757575", l.shop.slug) for l in rows))
 
-    @admin.display(description="Магазини")
+    @admin.display(description="🖼")
+    def media_col(self, obj):
+        """Мініатюра фото й 📄 даташит (inventory/thumbs.py); бліді — немає."""
+        from .thumbs import cell
+        return cell(obj)
+
     def shop_listings_info(self, obj):
         """Магазини: стан, ціна, «Базові ціни → магазин» (виконується при «Зберегти», admin_prices.py)."""
         from .admin_prices import shop_prices_panel
@@ -3392,6 +3433,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             path("<int:pk>/datasheet/",
                  self.admin_site.admin_view(self.serve_datasheet_view),
                  name="inventory_product_serve_datasheet"),
+            path("<int:pk>/thumb/", self.admin_site.admin_view(self._thumb_view),
+                 name="inventory_product_thumb"),
             path("base-prices/", self.admin_site.admin_view(self._base_prices_editor_view),
                  name="inventory_product_base_prices"),
             path("base-prices/template/", self.admin_site.admin_view(self._base_prices_template_view),
@@ -3402,6 +3445,19 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                  name='inventory_product_dk_sync_cancel'),
         ]
         return custom + urls
+
+    def _thumb_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.http import HttpResponse
+        from .thumbs import get
+        if not self.has_view_or_change_permission(request):
+            raise PermissionDenied
+        data = get(get_object_or_404(Product, pk=pk))
+        if data is None:
+            return HttpResponse(status=404)
+        resp = HttpResponse(data, content_type="image/jpeg")
+        resp["Cache-Control"] = "private, max-age=604800"   # адреса з ?v= змінюється разом з фото
+        return resp
 
     def _base_prices_editor_view(self, request):
         from .admin_prices import editor_view

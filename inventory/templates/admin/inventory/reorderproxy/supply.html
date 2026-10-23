@@ -74,6 +74,10 @@
 
 /* ── SKU cell ── */
 .sv-sku { font-family: monospace; font-size: 13px; font-weight: 700; color: var(--text); }
+.sv-prod { display: flex; align-items: center; gap: 8px; }
+.sv-thumb { width: 32px; height: 32px; flex: none; object-fit: contain; border-radius: 4px; background: #fff; display: block; }
+.sv-thumb-none { background: none; opacity: .35; font-size: 13px; line-height: 32px; text-align: center; white-space: nowrap; }
+.sv-ds { margin-left: 4px; font-size: 13px; text-decoration: none; }
 .sv-name { font-size: 11px; color: var(--text-dim); margin-top: 1px;
            max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sv-cat { font-size: 10px; color: var(--text-dim); }
@@ -236,6 +240,8 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     <button class="sv-filter-btn" onclick="svFilter('critical', this)">⚠️ {% trans "Критичні" %}</button>
     <button class="sv-filter-btn" onclick="svFilter('reserved', this)">📋 {% trans "В резерві" %}</button>
     <button class="sv-filter-btn" onclick="svFilter('incoming', this)">📦 {% trans "Очікується" %}</button>
+    <button class="sv-filter-btn" onclick="svFilter('noimg', this)">🖼 {% trans "Без фото" %} <span id="cnt-noimg"></span></button>
+    <button class="sv-filter-btn" onclick="svFilter('nods', this)">📄 {% trans "Без даташита" %} <span id="cnt-nods"></span></button>
   </div>
   <!-- Category filters (built by JS) -->
   <div class="sv-filters" id="sv-cat-filters" style="margin-top:4px"></div>
@@ -274,6 +280,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}" data-buildable="{{ row.buildable_qty }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
           data-ds-ext="{{ p.datasheet_url }}" data-ds-file="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% endif %}"
+          data-has-img="{% if row.thumb_url %}1{% endif %}" data-has-ds="{% if row.ds_href %}1{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% elif stock <= p.reorder_point and p.reorder_point > 0 %}{% with state="critical" %}
@@ -284,6 +291,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}" data-buildable="{{ row.buildable_qty }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
           data-ds-ext="{{ p.datasheet_url }}" data-ds-file="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% endif %}"
+          data-has-img="{% if row.thumb_url %}1{% endif %}" data-has-ds="{% if row.ds_href %}1{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% else %}{% with state="ok" %}
@@ -294,6 +302,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}" data-buildable="{{ row.buildable_qty }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
           data-ds-ext="{{ p.datasheet_url }}" data-ds-file="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% endif %}"
+          data-has-img="{% if row.thumb_url %}1{% endif %}" data-has-ds="{% if row.ds_href %}1{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% endif %}
@@ -303,17 +312,24 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
         </td>
         <!-- SKU / Name -->
         <td>
-          <div class="sv-sku">
-            <a href="/admin/inventory/product/{{ p.pk }}/change/"
-               style="color:var(--text);text-decoration:none"
-               onclick="event.stopPropagation()"
-               data-ds-trigger data-pk="{{ p.pk }}">{{ p.sku }}</a>
-            {% if p.datasheet_file or p.datasheet_url %}
-            <span style="color:var(--text-dim);margin-left:4px;font-size:10px;cursor:default"
-                  title="{% trans "Datasheet доступний — наведи для перегляду" %}">📄</span>
-            {% endif %}
+          <div class="sv-prod">
+            {% if row.thumb_url %}<a href="{{ row.image_href }}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
+               title="{% trans "Фото — відкрити" %}"><img class="sv-thumb" src="{{ row.thumb_url }}" alt="" loading="lazy" width="32" height="32"
+               onerror="this.parentNode.replaceWith(Object.assign(document.createElement('span'),{className:'sv-thumb sv-thumb-none',textContent:'🖼✕',title:'Фото недоступне'}))"></a>
+            {% else %}<span class="sv-thumb sv-thumb-none" title="{% trans "Немає фото" %}">🖼</span>{% endif %}
+            <div>
+              <div class="sv-sku">
+                <a href="/admin/inventory/product/{{ p.pk }}/change/"
+                   style="color:var(--text);text-decoration:none"
+                   onclick="event.stopPropagation()"
+                   data-ds-trigger data-pk="{{ p.pk }}">{{ p.sku }}</a>
+                {% if row.ds_href %}<a href="{{ row.ds_href }}" target="_blank" rel="noopener" class="sv-ds"
+                   onclick="event.stopPropagation()"
+                   title="{% trans "Даташит — відкрити (наведіть на артикул — перегляд)" %}">📄</a>{% endif %}
+              </div>
+              <div class="sv-name">{{ p.name }}</div>
+            </div>
           </div>
-          <div class="sv-name">{{ p.name }}</div>
         </td>
         <!-- Stock -->
         <td style="text-align:right">
@@ -632,8 +648,10 @@ var _svi = {
 
   /* ── Counts for chips ── */
   var rows = document.querySelectorAll('.sv-main-row');
-  var cntEmpty = 0, cntCrit = 0, cntRes = 0, cntInc = 0;
+  var cntEmpty = 0, cntCrit = 0, cntRes = 0, cntInc = 0, cntNoImg = 0, cntNoDs = 0;
   rows.forEach(function(r) {
+    if (!r.dataset.hasImg) cntNoImg++;
+    if (!r.dataset.hasDs)  cntNoDs++;
     var stock    = parseFloat(r.dataset.stock    || 0);
     var reorder  = parseFloat(r.dataset.reorder  || 0);
     var reserved = parseFloat(r.dataset.reserved || 0);
@@ -644,6 +662,8 @@ var _svi = {
     if (incoming > 0)                      cntInc++;
   });
   document.getElementById('cnt-empty').textContent = cntEmpty;
+  document.getElementById('cnt-noimg').textContent = cntNoImg ? '(' + cntNoImg + ')' : '';
+  document.getElementById('cnt-nods').textContent  = cntNoDs ? '(' + cntNoDs + ')' : '';
   document.getElementById('cnt-crit').textContent  = cntCrit;
   document.getElementById('cnt-res').textContent   = cntRes;
   document.getElementById('cnt-inc').textContent   = cntInc;
@@ -714,6 +734,8 @@ var _svi = {
     else if (activeFilter === 'critical') filterOk = stock <= reorder && reorder > 0;
     else if (activeFilter === 'reserved') filterOk = reserved > 0;
     else if (activeFilter === 'incoming') filterOk = incoming > 0;
+    else if (activeFilter === 'noimg')    filterOk = !r.dataset.hasImg;
+    else if (activeFilter === 'nods')     filterOk = !r.dataset.hasDs;
     var catOk = !activeCategory || (r.dataset.cat || '') === activeCategory;
     var searchOk = true;
     if (activeSearch) {

@@ -1,6 +1,18 @@
 {% extends "admin/change_list.html" %}
 {% load i18n %}
 
+{% block extrastyle %}
+{{ block.super }}
+<style>
+/* Колонка «🖼»: мініатюра фото й 📄 даташит (inventory/thumbs.py) */
+.inv-media { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.inv-thumb { width: 36px; height: 36px; object-fit: contain; border-radius: 4px; background: #fff; display: block; }
+.inv-thumb-none { display: inline-block; width: 36px; text-align: center; opacity: .35; font-size: 13px; white-space: nowrap; }
+.inv-ds { font-size: 16px; text-decoration: none; }
+.inv-ds-none { opacity: .25; }
+</style>
+{% endblock %}
+
 {% block object-tools-items %}
   <li>
     <a href="{% url 'admin:inventory_product_import_excel' %}"
