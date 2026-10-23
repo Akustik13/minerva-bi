@@ -2455,7 +2455,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
                        "image_preview", "datasheet_link", "movement_history", "shop_listings_info",
-                       "base_prices_info")
+                       "base_prices_info", "shop_media_panel")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
@@ -2482,7 +2482,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             "description": "Асортимент, ціни і ступені цін кожного магазину — розділ «🏪 Інтернет-магазин».",
         }),
         ("🔗 Медіа та документи", {
-            "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "image_url", "image", "image_preview"),
+            "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "image_url", "image", "image_preview",
+                       "shop_media_panel"),
             "classes": ("collapse",),
         }),
         ("🛃 Митне оформлення", {
@@ -3281,6 +3282,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         )
     image_preview.short_description = _("Попередній перегляд")
 
+    def shop_media_panel(self, obj):
+        from shop.admin_media import product_panel  # що з фото й даташита отримує сайт (shop/media.py)
+        return product_panel(obj)
+    shop_media_panel.short_description = "🖼 Для сайту"
+
     def set_stock_link(self, obj):
         url = reverse("admin:inventory_product_set_stock", args=[obj.pk])
         return format_html('<a class="button" href="{}">Set stock…</a>', url)
@@ -3934,9 +3940,11 @@ function invMediaCache() {{
       '<div style="font-weight:700;margin-bottom:6px;color:var(--text)">✅ Готово!</div>' +
       '<div>📄 Datasheet: <span style="color:#4caf50">+' + s.datasheets.done + ' завантажено</span>' +
            (s.datasheets.skipped ? ', ' + s.datasheets.skipped + ' вже є' : '') +
+           (s.datasheets.fixed ? ', виправлено розширень: ' + s.datasheets.fixed : '') +
            (s.datasheets.failed  ? ', <span style="color:var(--err)">' + s.datasheets.failed + ' помилок</span>' : '') + '</div>' +
       '<div>🖼️ Фото: <span style="color:#4caf50">+' + s.images.done + ' завантажено</span>' +
            (s.images.skipped ? ', ' + s.images.skipped + ' вже є' : '') +
+           (s.images.fixed ? ', виправлено розширень: ' + s.images.fixed : '') +
            (s.images.failed  ? ', <span style="color:var(--err)">' + s.images.failed + ' помилок</span>' : '') + '</div>' +
       (d.errors && d.errors.length ? '<details style="margin-top:6px"><summary style="font-size:11px;cursor:pointer;color:var(--text-muted)">' + d.errors.length + ' помилок — деталі</summary>' +
            '<pre style="font-size:10px;color:var(--err);margin:4px 0 0;overflow:auto;max-height:120px">' + d.errors.join('\\n') + '</pre></details>' : '') +
@@ -3971,58 +3979,53 @@ function invMediaCache() {{
     def media_cache_view(self, request):
         from django.http import JsonResponse
         from django.core.files.base import ContentFile
-        import urllib.request as _urllib
-        import urllib.error
-        import posixpath
         import os as _os
+        from inventory.services.media_files import DATASHEET, IMAGE, MediaError, check, fetch, read_field
 
-        stats  = {'datasheets': {'done': 0, 'skipped': 0, 'failed': 0},
-                  'images':     {'done': 0, 'skipped': 0, 'failed': 0}}
+        stats  = {'datasheets': {'done': 0, 'skipped': 0, 'failed': 0, 'fixed': 0},
+                  'images':     {'done': 0, 'skipped': 0, 'failed': 0, 'fixed': 0}}
         errors = []
 
+        def fix_extension(field, kind):
+            """Раніше розширення бралося з адреси (…/download.php?file=X.pdf → «.php») — перейменувати за вмістом."""
+            try:
+                data = read_field(field, kind)
+            except MediaError:
+                return False
+            ext = check(data, kind)[0]
+            root, old_ext = _os.path.splitext(field.name)
+            if old_ext.lower().lstrip('.') in (ext, 'jpeg' if ext == 'jpg' else ext):
+                return False
+            old = field.name
+            field.save(_os.path.basename(root) + '.' + ext, ContentFile(data), save=True)
+            field.storage.delete(old)
+            return True
+
         products = Product.objects.filter(is_active=True)
+        base = lambda p: p.sku.replace('/', '_').replace(' ', '_')  # noqa: E731
 
         for p in products:
-            # ── Datasheet ──────────────────────────────────────────────
-            has_ds = p.datasheet_file and p.datasheet_file.name
-            if p.datasheet_url and not has_ds:
+            for key, kind, url, field, suffix, tag in (
+                    ('datasheets', DATASHEET, p.datasheet_url, p.datasheet_file, '_datasheet', 'DS'),
+                    ('images', IMAGE, p.image_url, p.image, '', 'IMG')):
+                if field and field.name:
+                    stats[key]['skipped'] += 1
+                    try:
+                        if fix_extension(field, kind):
+                            stats[key]['fixed'] += 1
+                    except Exception as e:  # noqa: BLE001
+                        errors.append(f'{tag} {p.sku}: {e}')
+                    continue
+                if not url:
+                    stats[key]['skipped'] += 1
+                    continue
                 try:
-                    req = _urllib.Request(p.datasheet_url,
-                                         headers={'User-Agent': 'Mozilla/5.0 (compatible; Minerva-BI/1.0)'})
-                    with _urllib.urlopen(req, timeout=20) as resp:
-                        data = resp.read()
-                    url_path = p.datasheet_url.split('?')[0]
-                    ext = _os.path.splitext(posixpath.basename(url_path))[1].lower() or '.pdf'
-                    fname = p.sku.replace('/', '_').replace(' ', '_') + '_datasheet' + ext
-                    p.datasheet_file.save(fname, ContentFile(data), save=True)
-                    stats['datasheets']['done'] += 1
-                except Exception as e:
-                    stats['datasheets']['failed'] += 1
-                    errors.append(f'DS {p.sku}: {e}')
-            else:
-                stats['datasheets']['skipped'] += 1
-
-            # ── Image ──────────────────────────────────────────────────
-            has_img = p.image and p.image.name
-            if p.image_url and not has_img:
-                try:
-                    req = _urllib.Request(p.image_url,
-                                         headers={'User-Agent': 'Mozilla/5.0 (compatible; Minerva-BI/1.0)'})
-                    with _urllib.urlopen(req, timeout=15) as resp:
-                        ct   = resp.headers.get('Content-Type', '')
-                        data = resp.read()
-                    url_path = p.image_url.split('?')[0]
-                    ext = _os.path.splitext(posixpath.basename(url_path))[1].lower()
-                    if not ext:
-                        ext = '.png' if 'png' in ct else '.jpg'
-                    fname = p.sku.replace('/', '_').replace(' ', '_') + ext
-                    p.image.save(fname, ContentFile(data), save=True)
-                    stats['images']['done'] += 1
-                except Exception as e:
-                    stats['images']['failed'] += 1
-                    errors.append(f'IMG {p.sku}: {e}')
-            else:
-                stats['images']['skipped'] += 1
+                    data = fetch(url, kind)
+                    field.save(base(p) + suffix + '.' + check(data, kind)[0], ContentFile(data), save=True)
+                    stats[key]['done'] += 1
+                except Exception as e:  # noqa: BLE001 — MediaError з поясненням або помилка сховища
+                    stats[key]['failed'] += 1
+                    errors.append(f'{tag} {p.sku}: {e}')
 
         return JsonResponse({'ok': True, 'stats': stats, 'errors': errors[:50]})
 

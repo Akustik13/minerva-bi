@@ -1095,3 +1095,4 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
 
 from . import admin_accounts  # noqa: E402,F401  — акаунти покупців (особистий кабінет)
 from . import admin_templates  # noqa: E402,F401  — шаблони листів
+from . import admin_media  # noqa: E402,F401  — фото й даташити для сайту

@@ -1,0 +1,161 @@
+{% extends "admin/change_list.html" %}
+{# Панель «🖼 Фото й даташити»: дані — shop.media.progress(), під час індексації оновлюється кожні 2 с #}
+{% block search %}
+{{ media_progress|json_script:"mp-data" }}
+<style>
+  #mp { padding: 10px 14px; margin: 0 0 12px; border-left: 4px solid var(--accent, #79aec8); }
+  #mp .mp-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+  #mp .mp-on { color: #81c784; } #mp .mp-off { color: #ffb74d; }
+  #mp .mp-help { margin: 6px 0 8px; color: var(--body-quiet-color, #888); font-size: 12px; max-width: 900px; }
+  #mp .mp-buttons { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 6px 0 10px; }
+  #mp .mp-buttons form { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 0; }
+  #mp .mp-text { font-weight: 600; margin: 4px 0; }
+  #mp .mp-bar { height: 8px; border-radius: 4px; background: var(--darkened-bg, #eee); overflow: hidden; margin: 6px 0; max-width: 600px; }
+  #mp .mp-bar > div { height: 100%; width: 0; background: var(--primary, #417690); transition: width .6s; }
+  #mp .mp-line { margin: 3px 0; color: var(--body-quiet-color, #777); }
+  #mp .mp-line b { color: var(--body-fg, #333); }
+  #mp .mp-sites form { display: inline; margin-left: 8px; }
+  #mp .mp-problem { color: #e57373; font-size: 11px; margin-left: 18px; }
+  #mp .mp-updated { font-size: 11px; color: var(--body-quiet-color, #999); margin-top: 6px; }
+</style>
+<div class="module" id="mp" data-url="{% url 'admin:shop_productmedia_status' %}"
+     data-site-sync="{% url 'admin:shop_productmedia_site_sync' 0 %}">
+  <div class="mp-head"><b>🖼 Фото й даташити для сайту</b> <span id="mp-enabled"></span></div>
+  <p class="mp-help">Для кожного товару магазину: <b>посилання з картки</b> → якщо недоступне, <b>файл у картці Minerva</b>
+    → якщо й його немає, сайт показує <b>свій файл</b>. Minerva перевіряє вміст (справжнє фото чи PDF, а не сторінка
+    помилки) і зберігає копію; сайт забирає її в свій кеш і віддає відвідувачам зі свого сервера.</p>
+  {% if media_can_manage %}
+  <div class="mp-buttons">
+    <form method="post" action="{% url 'admin:shop_productmedia_run' %}">{% csrf_token %}
+      <button class="button default" type="submit" name="mode" value="changed"
+              title="Ще не перевірені, змінені в картці товару, давно не перевірені посилання">🔄 Індексувати нові й змінені</button>
+      <button class="button" type="submit" name="mode" value="all"
+              title="Кожне посилання й файл заново (довше)">🔁 Перевірити все заново</button>
+    </form>
+    <form method="post" action="{% url 'admin:shop_productmedia_settings' %}">{% csrf_token %}
+      {% if media_progress.enabled %}
+        <button class="button" type="submit" name="enabled" value="0">⏸ Вимкнути для сайту</button>
+      {% else %}
+        <button class="button default" type="submit" name="enabled" value="1"
+                title="Сайт почне забирати перевірені файли; до того можна проіндексувати й переглянути результат">▶ Увімкнути для сайту</button>
+      {% endif %}
+      <label>Повторно перевіряти посилання:
+        <select name="recheck_days" onchange="this.form.submit()">
+          {% for d in media_recheck_choices %}<option value="{{ d }}"{% if d == media_progress.recheck_days %} selected{% endif %}>{% if d %}кожні {{ d }} дн.{% else %}ні, лише нові й змінені{% endif %}</option>{% endfor %}
+        </select></label>
+    </form>
+  </div>
+  {% endif %}
+  <div class="mp-text" id="mp-text"></div>
+  <div class="mp-bar" id="mp-bar" hidden><div id="mp-fill"></div></div>
+  <div class="mp-line" id="mp-counts"></div>
+  <div id="mp-sum"></div>
+  <div class="mp-sites" id="mp-sites"></div>
+  <div class="mp-updated" id="mp-updated"></div>
+</div>
+<script>
+(function () {
+  var box = document.getElementById('mp');
+  var data = JSON.parse(document.getElementById('mp-data').textContent);
+  var csrfInput = box.querySelector('[name=csrfmiddlewaretoken]');
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function when(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function dur(sec) { sec = Math.max(0, Math.round(sec)); return sec < 60 ? sec + ' с' : Math.round(sec / 60) + ' хв'; }
+  var lastState = (data.run || {}).state;
+
+  function drawRun(r) {
+    var c = r.counts || {}, text = '', bar = false;
+    if (r.state === 'running') {
+      var spent = (Date.now() - new Date(r.started_at).getTime()) / 1000, rate = r.done && spent > 0 ? r.done / spent : 0;
+      text = '⏳ Перевірка ' + (r.done || 0) + ' з ' + (r.total || '…') + (r.current ? ' · ' + r.current : '') +
+             (rate && r.total > r.done ? ' · ще ≈ ' + dur((r.total - r.done) / rate) : '');
+      bar = true;
+      $('mp-fill').style.width = (r.total ? Math.round(100 * r.done / r.total) : 0) + '%';
+    } else if (r.state === 'done') {
+      text = '✅ Індексація ' + when(r.finished_at) + (r.by ? ' (' + r.by + ')' : '') + ': перевірено ' + (r.total || 0) +
+             (r.mode === 'all' ? ' (усе заново)' : '') + (r.message ? ' · ' + r.message : '');
+    } else if (r.state === 'interrupted') {
+      text = '⚠ Індексацію перервано (перезапуск сервера?) — уже перевірене збережено, запустіть ще раз.';
+    } else if (r.state === 'error') {
+      text = '❌ Індексація ' + (r.message || 'зупинилась з помилкою');
+    } else {
+      text = 'Індексацію ще не запускали — натисніть «🔄 Індексувати нові й змінені».';
+    }
+    $('mp-text').textContent = text;
+    $('mp-bar').hidden = !bar;
+    var parts = [];
+    if (r.state && r.state !== 'idle' && r.counts && Object.keys(c).length) {
+      parts = ['✅ ' + (c.ok || 0), '⚠ посилання недоступне → файл ' + (c.fallback || 0), '— немає ' + (c.none || 0),
+               '❌ ' + (c.error || 0), 'вміст змінився ' + (c.changed || 0)];
+    }
+    $('mp-counts').textContent = parts.join(' · ');
+  }
+
+  function drawSummary(s) {
+    var rows = [['image', '🖼 Фото'], ['datasheet', '📄 Даташити']].map(function (k) {
+      var c = s[k[0]] || {};
+      var bits = ['✅ готово <b>' + (c.ok || 0) + '</b>'];
+      if (c.fallback) bits.push('⚠ посилання недоступне → файл <b>' + c.fallback + '</b>');
+      if (c.stale) bits.push('⚠ остання перевірена копія <b>' + c.stale + '</b>');
+      bits.push('— у Minerva немає <b>' + (c.none || 0) + '</b>');
+      if ((c.error || 0) - (c.stale || 0) > 0) bits.push('❌ недоступно <b>' + ((c.error || 0) - (c.stale || 0)) + '</b>');
+      if ((c.unchecked || 0) + (c.pending || 0)) bits.push('⏳ не перевірено <b>' + ((c.unchecked || 0) + (c.pending || 0)) + '</b>');
+      bits.push('<span title="Звідки взято готові копії">джерело: посилання ' + (c.url || 0) + ' / файл ' + (c.file || 0) + '</span>');
+      return '<div class="mp-line">' + k[1] + ': ' + bits.join(' · ') + '</div>';
+    });
+    $('mp-sum').innerHTML = '<div class="mp-line">Товарів у магазинах: <b>' + (s.products || 0) + '</b></div>' + rows.join('');
+  }
+
+  function drawSites(d) {
+    var html = (d.sites || []).map(function (s) {
+      var line = '🏬 <b>' + esc(s.name) + '</b>: ';
+      if (!d.enabled) line += 'вимкнено — сайт показує власні файли';
+      else if (!s.wanted && !s.reported_at) line += 'немає товарів з перевіреними фото чи даташитами';
+      else {
+        line += 'на сайті <b>' + s.have + '</b> з ' + s.wanted;
+        if (s.failed) line += ' · <span style="color:#e57373">❌ не вдалося ' + s.failed + '</span>';
+        line += s.reported_at ? ' · звіт сайту ' + when(s.reported_at) : ' · сайт ще не звітував (оновіть файли сайту й відкрийте сторінку магазину)';
+        if (s.ping_error) line += ' · <span style="color:#ffb74d">⚠ ' + esc(s.ping_error) + '</span>';
+        if (s.sync_url && csrfInput && s.have < s.wanted) {
+          line += '<form method="post" action="' + box.getAttribute('data-site-sync').replace(/0\/$/, s.shop + '/') + '">' +
+                  '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(csrfInput.value) + '">' +
+                  '<button class="button" type="submit">▶ Забрати на сайт зараз</button></form>';
+        }
+      }
+      return '<div class="mp-line">' + line + '</div>' + (s.problems || []).map(function (p) {
+        return '<div class="mp-problem">' + esc(p) + '</div>';
+      }).join('');
+    });
+    $('mp-sites').innerHTML = html.join('');
+  }
+
+  function draw(d) {
+    $('mp-enabled').innerHTML = d.enabled ? '<span class="mp-on">✅ сайт отримує файли з Minerva</span>'
+                                          : '<span class="mp-off">⏸ вимкнено — сайт показує власні файли</span>';
+    drawRun(d.run || {});
+    drawSummary(d.summary || {});
+    drawSites(d);
+    $('mp-updated').textContent = 'Оновлено ' + new Date().toLocaleTimeString('uk-UA') +
+      (d.auto_at ? ' · автоматична перевірка ' + when(d.auto_at) : '');
+  }
+
+  function schedule() { setTimeout(poll, (data.run || {}).state === 'running' ? 2000 : 15000); }
+  function poll() {
+    fetch(box.getAttribute('data-url'), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var was = lastState; data = d; lastState = (d.run || {}).state; draw(d);
+        if (was === 'running' && lastState !== 'running') { location.reload(); return; }   // таблиця нижче — після завершення
+        schedule();
+      }).catch(schedule);
+  }
+  draw(data);
+  schedule();
+})();
+</script>
+{{ block.super }}
+{% endblock %}

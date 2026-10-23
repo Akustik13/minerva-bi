@@ -113,13 +113,28 @@ class ShopProductSerializer(serializers.ModelSerializer):
         help_text="Базові ціни товару у своїй валюті {currency, price_breaks} або null")
     lifecycle_status = serializers.SerializerMethodField(help_text="active | nrnd | discontinued (з урахуванням магазину)")
     successor = serializers.SerializerMethodField(help_text="Рекомендована заміна {sku, name} для NRND / EOL або null")
+    media = serializers.SerializerMethodField(
+        help_text="Перевірені фото й даташит {image, datasheet}: {sha256, size, content_type, ext, source url|file, "
+                  "stale, updated_at, url} або null (немає — сайт показує свій файл); media = null — вимкнено в Minerva")
 
     class Meta:
         model  = Product
         fields = ["sku", "name", "name_export", "category", "unit_type", "manufacturer",
                   "price", "price_breaks", "price_origin", "offer", "is_new", "lifecycle_status", "successor",
                   "base_prices", "available", "incoming", "in_stock", "lead_time_days",
-                  "net_weight_g", "image_url", "datasheet_url", "tech_attributes", "last_movement_at"]
+                  "net_weight_g", "image_url", "datasheet_url", "media", "tech_attributes", "last_movement_at"]
+
+    def get_media(self, obj):
+        from shop import media
+        enabled = self.context.get("_media_enabled")
+        if enabled is None:   # один раз на запит (контекст спільний для всього списку)
+            enabled = self.context["_media_enabled"] = media.settings_obj().enabled
+        if not enabled:
+            return None
+        rows = getattr(obj, "_media", None)
+        rows = {r.kind: r for r in (rows if rows is not None else obj.shop_media.all())}
+        request = self.context.get("request")
+        return {kind: media.payload(rows.get(kind), request) for kind in media.KINDS}
 
     @staticmethod
     def _listing(obj):

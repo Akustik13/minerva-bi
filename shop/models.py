@@ -8,6 +8,8 @@
   ShopCustomer — акаунт покупця (особистий кабінет на сайті) + токени листів, сесії
   ShopOrder    — замовлення з сайту: акаунт покупця, ставка ПДВ, платіжна адреса
   ShopPayment  — онлайн-оплата замовлення (Stripe Checkout): сесія, PaymentIntent, статус
+  ProductMedia — фото / даташит товару для сайту: звідки взято (URL → файл Minerva), перевірена копія
+  ShopMediaSite— що з цих файлів уже зберіг у себе сайт магазину (звіт сайту)
 """
 from decimal import Decimal
 
@@ -521,3 +523,96 @@ class ShopMailTemplate(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} · {self.lang.upper()}"
+
+
+class ShopMediaSettings(models.Model):
+    """Фото й даташити з Minerva для сайтів — синглтон (pk=1), логіка — shop/media.py.
+    Змінюється лише кнопками сторінки «🖼 Фото й даташити» (.update), тож фонова індексація і форма
+    не затирають одна одну."""
+    enabled = models.BooleanField(
+        "Віддавати сайту фото й даташити з Minerva", default=False,
+        help_text="Вимкнено — сайт показує лише власні файли; перевірити (проіндексувати) можна й до ввімкнення.")
+    recheck_days = models.PositiveSmallIntegerField(
+        "Повторно перевіряти посилання, днів", default=7, validators=[MaxValueValidator(365)],
+        help_text="Вміст за посиланням може змінитися без зміни адреси. 0 — перевіряти лише нові й змінені.")
+    run = models.JSONField("Стан індексації", default=dict, blank=True)
+    auto_at = models.DateTimeField("Останній автоматичний прохід", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Налаштування фото й даташитів"
+        verbose_name_plural = "Налаштування фото й даташитів"
+
+    def __str__(self):
+        return "Фото й даташити для сайту"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+
+class ProductMedia(models.Model):
+    """Фото або даташит товару для сайту. Порядок джерел: посилання (URL) → файл у картці товару Minerva;
+    нічого придатного — сайт показує власний файл. Перевірена копія лежить у MEDIA_ROOT/shop_media/<sha256>.<ext>."""
+    IMAGE, DATASHEET = "image", "datasheet"
+    KINDS = [(IMAGE, "🖼 Фото"), (DATASHEET, "📄 Даташит")]
+    PENDING, OK, FALLBACK, NONE, ERROR = "pending", "ok", "fallback", "none", "error"
+    STATUSES = [
+        (PENDING, "⏳ Чекає перевірки"),
+        (OK, "✅ Готово"),
+        (FALLBACK, "⚠ URL недоступний → файл Minerva"),
+        (NONE, "— У Minerva немає"),
+        (ERROR, "❌ Недоступно"),
+    ]
+    SOURCES = [("url", "Посилання (URL)"), ("file", "Файл Minerva")]
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="shop_media", verbose_name="Товар")
+    kind = models.CharField("Тип", max_length=10, choices=KINDS)
+    status = models.CharField("Стан", max_length=10, choices=STATUSES, default=PENDING, db_index=True)
+    source = models.CharField("Звідки взято", max_length=4, choices=SOURCES, blank=True, default="")
+    stale = models.BooleanField(
+        "Остання придатна копія", default=False,
+        help_text="Джерело зараз недоступне, але не змінювалось — сайт отримує копію з попередньої перевірки.")
+    inputs = models.CharField("Перевірені джерела", max_length=700, blank=True, default="",
+                              help_text="Посилання й ім'я файлу на момент перевірки; зміна в картці → перевірити знову.")
+    url_error = models.CharField("Помилка посилання", max_length=300, blank=True, default="")
+    file_error = models.CharField("Помилка файлу", max_length=300, blank=True, default="")
+    sha256 = models.CharField("SHA-256", max_length=64, blank=True, default="", db_index=True)
+    size = models.PositiveIntegerField("Розмір, байт", null=True, blank=True)
+    content_type = models.CharField("Тип вмісту", max_length=60, blank=True, default="")
+    stored = models.CharField("Копія", max_length=200, blank=True, default="",
+                              help_text="Шлях у MEDIA_ROOT (shop_media/<sha256>.<ext>).")
+    checked_at = models.DateTimeField("Перевірено", null=True, blank=True)
+    changed_at = models.DateTimeField("Вміст змінився", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Фото / даташит для сайту"
+        verbose_name_plural = "🖼 Фото й даташити"
+        ordering = ["product__sku", "kind"]
+        constraints = [models.UniqueConstraint(fields=["product", "kind"], name="shop_product_media_unique")]
+
+    def __str__(self):
+        return f"{self.product.sku} · {self.get_kind_display()}"
+
+    @property
+    def usable(self) -> bool:
+        """Є перевірена копія — сайт її отримує."""
+        return bool(self.sha256 and self.stored)
+
+
+class ShopMediaSite(models.Model):
+    """Що з фото й даташитів уже є на сайті магазину — звіт сайту (POST /api/v1/shop/media/status/)."""
+    shop = models.OneToOneField(Shop, on_delete=models.CASCADE, related_name="media_site", verbose_name="Магазин")
+    reported_at = models.DateTimeField("Звіт сайту", null=True, blank=True)
+    have = models.JSONField("Збережено на сайті (SHA-256)", default=list, blank=True)
+    failed = models.JSONField("Помилки завантаження {SHA-256: текст}", default=dict, blank=True)
+    sync_url = models.URLField("Адреса синхронізації сайту", blank=True, default="",
+                               help_text="Сайт повідомляє її сам; лише на домені «Адреса сайту» магазину.")
+    ping_at = models.DateTimeField("Minerva викликала синхронізацію", null=True, blank=True)
+    ping_error = models.CharField("Помилка виклику", max_length=255, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Фото й даташити на сайті"
+        verbose_name_plural = "Фото й даташити на сайті"
+
+    def __str__(self):
+        return f"{self.shop} · фото й даташити"

@@ -228,7 +228,8 @@ class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
                     .prefetch_related("tiers"))
         qs = (Product.objects.filter(is_active=True, shop_listings__shop=shop, shop_listings__is_visible=True)
               .select_related("successor")
-              .prefetch_related(Prefetch("shop_listings", queryset=listings, to_attr="_listings")))
+              .prefetch_related(Prefetch("shop_listings", queryset=listings, to_attr="_listings"),
+                                Prefetch("shop_media", to_attr="_media")))
         return stock_service.annotate_stock(qs).order_by("category", "sku")
 
 

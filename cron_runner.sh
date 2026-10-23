@@ -30,6 +30,7 @@ echo "   check_digikey_messages  interval controlled by DigiKeyConfig in DB"
 echo "   poll_dk_status          interval controlled by DigiKeyConfig.poll_interval_minutes in DB"
 echo "   send_webhooks           every loop (~60s) — retries of API webhooks"
 echo "   check_stripe_payments   every loop — polls Stripe only while no webhook arrives (interval per shop)"
+echo "   index_shop_media        every 5 min — product photos / datasheets for the shop site (when enabled)"
 echo "   send_digest             time/frequency controlled by NotificationSettings in DB"
 echo "   morning_briefing        daily at ${BRIEFING_HOUR}:00"
 echo "   shop_accounts_cleanup   daily — expired shop customer sessions / links"
@@ -72,6 +73,9 @@ while true; do
 
   # ── Онлайн-оплати Stripe: поки вебхук не працює — перевірка незавершених (інтервал у картці магазину) ──
   python manage.py check_stripe_payments 2>&1 || true
+
+  # ── Фото й даташити для сайту: нові / змінені / давно не перевірені (сам стежить за інтервалом) ──
+  python manage.py index_shop_media --if-due 2>&1 || true
 
   # ── Digest report — час і частота керуються в NotificationSettings ──
   python manage.py send_digest 2>&1 || true

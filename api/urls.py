@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from . import accounts, payments
+from . import accounts, media, payments
 from .views import (
     SalesOrderViewSet, ProductViewSet, CustomerViewSet, StockViewSet, MovementViewSet,
     LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ShopShippingView, ping,
@@ -42,6 +42,8 @@ urlpatterns = [
     path("ping/", ping, name="api-ping"),
     path("shop/shipping/", ShopShippingView.as_view(), name="api-shop-shipping"),
     path("shop/account/", include(account_urls)),
+    path("shop/media/status/", media.MediaStatusView.as_view(), name="api-shop-media-status"),
+    path("shop/media/<str:sha>/", media.MediaFileView.as_view(), name="api-shop-media-file"),
     path("shop/payments/", payments.PaymentsStatusView.as_view(), name="api-payments-status"),
     path("shop/payments/stripe/checkout/", payments.StripeCheckoutView.as_view(), name="api-stripe-checkout"),
     path("shop/payments/stripe/sync/", payments.StripeSyncView.as_view(), name="api-stripe-sync"),
