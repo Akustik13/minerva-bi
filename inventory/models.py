@@ -7,6 +7,7 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 
 
 class ProductCategory(models.Model):
@@ -162,6 +163,13 @@ class Product(models.Model):
     image_url     = models.URLField("Зображення (URL)", blank=True, default="")
     image         = models.ImageField("Зображення (файл)", upload_to="products/images/",
                                       null=True, blank=True)
+    image_key     = models.CharField(
+        "Фото: спільний файл", max_length=120, blank=True, default="",
+        help_text="Для посилань за правилом (Налаштування складу). Порожньо — артикул товару; "
+                  "однакове значення в кількох товарах = одне спільне фото.")
+    datasheet_key = models.CharField(
+        "Даташит: спільний файл", max_length=120, blank=True, default="",
+        help_text="Порожньо — артикул товару; однакове значення в кількох товарах = один спільний даташит.")
     updated_at    = models.DateTimeField("Змінено", auto_now=True, db_index=True,
                                          help_text="Будь-яка зміна картки товару (для API changed_since / RAG).")
 
@@ -420,6 +428,13 @@ class PurchaseOrderLine(models.Model):
                     })
 
 
+def validate_url_template(value: str):
+    """Правило посилання: http(s)://… з {key} — місцем для артикула (або спільного файлу)."""
+    if value and (not value.startswith(("http://", "https://")) or "{key}" not in value):
+        raise ValidationError("Посилання має починатися з http:// або https:// і містити {key} — місце для артикула, "
+                              "напр. https://example.com/download.php?file={key}.pdf")
+
+
 class InventorySettings(models.Model):
     """Налаштування модуля складу — синглтон (завжди pk=1)."""
 
@@ -496,6 +511,18 @@ class InventorySettings(models.Model):
         "Підпис",
         default="Mit freundlichen Grüßen",
     )
+
+    # ── Посилання на фото й даташити за правилом (inventory/services/media_links.py) ──
+    datasheet_url_template = models.CharField(
+        "Правило: посилання на даташит", max_length=300, blank=True, default="",
+        validators=[validate_url_template],
+        help_text="{key} — артикул товару (або «Даташит: спільний файл»), напр. "
+                  "https://sevskiy.i234.me/datasheets/download.php?file={key}.pdf")
+    image_url_template = models.CharField(
+        "Правило: посилання на фото", max_length=300, blank=True, default="",
+        validators=[validate_url_template],
+        help_text="{key} — артикул товару (або «Фото: спільний файл»), напр. "
+                  "https://sevskiy.i234.me/pictures/download.php?file={key}.jpg")
 
     class Meta:
         verbose_name = _("Налаштування складу")
@@ -637,3 +664,18 @@ class ProductPriceHistory(models.Model):
 
     def __str__(self):
         return f"{self.product.sku}: {self.get_source_display()} {self.created_at:%d.%m.%Y %H:%M}"
+
+
+class MediaLinkCheck(models.Model):
+    """Перевірка посилань на фото й даташити за правилом — синглтон (pk=1): стан запуску й звіт для сторінки
+    «🔗 Посилання за правилом». Змінюється лише через .update() (inventory/services/media_links.py)."""
+    state = models.JSONField("Стан", default=dict, blank=True)
+    rows = models.JSONField("Звіт", default=list, blank=True)
+
+    class Meta:
+        verbose_name = "Перевірка посилань на фото й даташити"
+        verbose_name_plural = "Перевірка посилань на фото й даташити"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)

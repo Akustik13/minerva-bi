@@ -646,31 +646,55 @@ class ProductListShopsAndBulkPricesTests(TestCase):
         r = self.client.get("/admin/inventory/product/")
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, ">webshop</a>")
-        self.assertContains(r, "Базові ціни: ±% / валюта")
+        self.assertContains(r, "Редактор базових цін для вибраних")
         Product.objects.create(sku="NO-SHOP", name="X")
         r = self.client.get("/admin/inventory/product/?in_shop=none")
         self.assertContains(r, "NO-SHOP")
         self.assertNotContains(r, ">AN-1<")
         self.assertContains(self.client.get(f"/admin/inventory/product/?in_shop={self.shop.pk}"), "AN-1")
 
-    def test_bulk_percent_and_convert(self):
-        url = "/admin/inventory/product/"
-        self.client.post(url, {"action": "action_base_bulk", "apply": "1", "_selected_action": [self.p.pk],
-                               "operation": "percent", "percent": "10", "rounding": "0.01"})
+    def test_bulk_editor_saves_and_applies_to_shop(self):
+        import json
+        r = self.client.post("/admin/inventory/product/", {"action": "action_base_editor", "_selected_action": [self.p.pk]})
+        self.assertRedirects(r, f"/admin/inventory/product/base-prices/?ids={self.p.pk}", fetch_redirect_response=False)
+        page = self.client.get(f"/admin/inventory/product/base-prices/?ids={self.p.pk}")
+        self.assertContains(page, "Застосувати базові ціни в магазинах")
+        self.assertContains(page, "AN-1")
+        payload = {"note": "літо", "products": [{"id": self.p.pk, "currency": "eur",
+                                                 "rows": [{"min_qty": 1, "unit_price": "8.8"}, {"min_qty": 10, "unit_price": "7.92"}]}],
+                   "shops": [{"id": self.shop.pk, "factor": "", "add": False}]}
+        self.client.post(page.request["PATH_INFO"] + f"?ids={self.p.pk}", {"ids": str(self.p.pk), "payload": json.dumps(payload)})
         self.p.refresh_from_db()
-        self.assertEqual([r["unit_price"] for r in self.p.base_prices], ["11", "9.9"])
-        self.client.post(url, {"action": "action_base_bulk", "apply": "1", "_selected_action": [self.p.pk],
-                               "operation": "convert", "currency": "eur", "rounding": "0.01"})
-        self.p.refresh_from_db()
-        self.assertEqual((self.p.base_price_currency, self.p.base_prices[0]["unit_price"]), ("EUR", "8.8"))
+        self.assertEqual((self.p.base_price_currency, [r["unit_price"] for r in self.p.base_prices]), ("EUR", ["8.8", "7.92"]))
         h = self.p.price_history.first()
-        self.assertEqual((h.user_label, h.note[:17]), ("boss", "Масова зміна: USD"))
+        self.assertEqual((h.user_label, h.note), ("boss", "Масовий редактор · літо"))
+        listing = ShopListing.objects.get(shop=self.shop, product=self.p)
+        self.assertEqual((listing.price_source, listing.price), (ShopListing.PRICE_BASE, Decimal("8.80")))
+        # помилковий рядок (перший ступінь не від 1 шт.) не зберігається
+        bad = {"products": [{"id": self.p.pk, "currency": "EUR", "rows": [{"min_qty": 5, "unit_price": "1"}]}]}
+        r = self.client.post(f"/admin/inventory/product/base-prices/?ids={self.p.pk}", {"payload": json.dumps(bad)}, follow=True)
+        self.assertContains(r, "перший ступінь має бути від 1 шт.")
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.base_prices[0]["unit_price"], "8.8")
 
-    def test_template(self):
-        from inventory.services.base_prices import from_template
-        rows = from_template([{"min_qty": 1, "unit_price": "100"}], [{"min_qty": 10, "discount": 5}], "0.01")
-        self.assertEqual(rows, [{"min_qty": 1, "unit_price": "100"}, {"min_qty": 10, "unit_price": "95"}])
-
+    def test_card_applies_base_prices_to_checked_shops(self):
+        other = Shop.objects.create(name="Market", slug="market", currency="EUR")
+        page = self.client.get(f"/admin/inventory/product/{self.p.pk}/change/")
+        self.assertContains(page, 'name="shop_apply"')
+        self.assertContains(page, "Market")   # новий магазин з'являється сам
+        from inventory.admin_prices import apply_shop_choices
+        from django.test import RequestFactory
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        req = RequestFactory().post("/", {"shop_apply": [str(self.shop.pk), str(other.pk)], f"shop_factor_{self.shop.pk}": "95",
+                                          f"shop_factor_{other.pk}": "100", f"shop_visible_{other.pk}": "on"})
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        apply_shop_choices(req, self.p)
+        web = ShopListing.objects.get(shop=self.shop, product=self.p)
+        self.assertEqual((web.price_source, web.price_factor, web.price), (ShopListing.PRICE_BASE, Decimal("95"), Decimal("7.60")))
+        added = ShopListing.objects.get(shop=other, product=self.p)   # товару там не було — додано
+        self.assertEqual((added.price_source, added.is_visible, added.price), (ShopListing.PRICE_BASE, True, Decimal("8.00")))
+        self.assertEqual([t.min_qty for t in added.tiers.all()], [10])
 
 
 class BasePriceFallbackTests(TestCase):

@@ -1,0 +1,158 @@
+{% extends "admin/base_site.html" %}
+{# «🔗 Посилання на фото й даташити за правилом» (inventory/admin_media_links.py, services/media_links.py) #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{{ settings_url }}">⚙️ Налаштування складу</a> &rsaquo; 🔗 {{ title }}
+</div>
+{% endblock %}
+{% block content %}
+<style>
+  #ml { --line: var(--border-strong, #243347); --muted: var(--text-muted, #9aafbe); font-size: 13px; }
+  #ml .ml-box { padding: 10px 14px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 6px; }
+  #ml .ml-muted { color: var(--muted); font-size: 12px; }
+  #ml code { font-size: 12px; word-break: break-all; }
+  #ml .ml-row { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 6px 0; }
+  #ml .ml-bar { height: 8px; border-radius: 4px; background: var(--darkened-bg, #eee); overflow: hidden; max-width: 600px; margin: 6px 0; }
+  #ml .ml-bar > div { height: 100%; width: 0; background: var(--primary, #417690); transition: width .6s; }
+  #ml .ml-filters button { margin: 0 6px 6px 0; }
+  #ml .ml-filters button.is-on { outline: 2px solid var(--accent, #58a6ff); }
+  #ml table.ml-t { border-collapse: collapse; width: 100%; font-size: 12px; }
+  #ml .ml-t th { text-align: left; padding: 6px 8px; font-size: 11px; color: var(--muted); text-transform: uppercase;
+    border-bottom: 2px solid var(--line); white-space: nowrap; }
+  #ml .ml-t td { padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  #ml .ml-ok { color: #81c784; } #ml .ml-bad { color: #e57373; }
+  #ml .ml-url { max-width: 420px; word-break: break-all; }
+  #ml .ml-groups li { margin: 2px 0; }
+</style>
+<div id="ml">
+  <div class="ml-box">
+    <b>Правило</b> <span class="ml-muted">— {key} = артикул товару або його «спільний файл» (Налаштування складу → «🖼️ Кешування медіа»)</span>
+    {% for kind, label, tpl, ex in templates %}
+      <div class="ml-row"><span style="min-width:100px">{{ label }}</span>
+        {% if tpl %}<code>{{ tpl }}</code> <span class="ml-muted">→ напр. <code>{{ ex }}</code></span>
+        {% else %}<span class="ml-muted">не задано</span>{% endif %}</div>
+    {% endfor %}
+    <a href="{{ settings_url }}">✎ Змінити правило</a>
+  </div>
+
+  {% if can_change %}
+  <form method="post" class="ml-box">{% csrf_token %}
+    <input type="hidden" name="ids" value="{{ ids }}">
+    <div class="ml-row"><b>Для яких товарів</b>
+      <label><input type="radio" name="scope" value="all"{% if not n_selected %} checked{% endif %}> усі активні ({{ n_all }})</label>
+      <label><input type="radio" name="scope" value="shop"> лише в магазинах ({{ n_shop }})</label>
+      {% if n_selected %}<label><input type="radio" name="scope" value="selected" checked> вибрані в списку товарів ({{ n_selected }})</label>{% endif %}
+    </div>
+    <div class="ml-row"><b>Що</b>
+      {% for kind, label, tpl, ex in templates %}
+        <label><input type="checkbox" name="kind" value="{{ kind }}"{% if tpl %} checked{% else %} disabled{% endif %}> {{ label }}</label>
+      {% endfor %}
+      <label title="Minerva відкриє кожне посилання (лише початок файлу) і перевірить, що там справді фото / PDF">
+        <input type="checkbox" name="check" value="1" checked> перевірити, чи посилання відповідають</label>
+    </div>
+    <button type="submit" class="button default">🔍 Сформувати й перевірити</button>
+    <span class="ml-muted">Нічого не записується — спершу звіт нижче.</span>
+  </form>
+  {% endif %}
+
+  <div class="ml-box" id="ml-run" data-url="{{ status_url }}" data-state="{{ state.state|default:'' }}">
+    <div id="ml-text"><b>
+      {% if state.state == "running" %}⏳ Перевірка…
+      {% elif state.state == "done" %}✅ Звіт від {{ state.finished_text }}{% if state.by %} ({{ state.by }}){% endif %}
+      {% elif state.state == "interrupted" %}⚠ Перевірку перервано — запустіть ще раз
+      {% elif state.state == "error" %}❌ {{ state.message }}
+      {% else %}Перевірку ще не запускали{% endif %}</b></div>
+    <div class="ml-bar" id="ml-bar"{% if state.state != "running" %} hidden{% endif %}><div id="ml-fill"></div></div>
+    <div class="ml-muted" id="ml-current"></div>
+    {% if state.stale_rules %}<div class="ml-bad">Правило змінилось після цієї перевірки — запустіть перевірку ще раз.</div>{% endif %}
+  </div>
+
+  {% if rows %}
+  <form method="post" id="ml-apply">{% csrf_token %}
+    <input type="hidden" name="ids" value="{{ ids }}">
+    <input type="hidden" name="apply" value="1">
+    <div class="ml-filters">
+      <button type="button" class="button is-on" data-f="">усі ({{ rows|length }})</button>
+      {% for a, text, n, color in counts %}{% if n %}
+        <button type="button" class="button" data-f="{{ a }}"><span style="color:{{ color }}">●</span> {{ text }} ({{ n }})</button>
+      {% endif %}{% endfor %}
+    </div>
+    <table class="ml-t">
+      <thead><tr><th><input type="checkbox" id="ml-all" title="Позначити видимі"></th><th>Товар</th><th>Що</th>
+        <th>Файл</th><th>Зараз</th><th>Буде</th><th>Що зробити</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr data-a="{{ r.action }}">
+          <td>{% if r.action != "same" %}<input type="checkbox" name="row" value="{{ r.id }}:{{ r.kind }}"{% if r.selected %} checked{% endif %}>{% endif %}</td>
+          <td><a href="{{ r.url }}" target="_blank"><b>{{ r.sku }}</b></a><div class="ml-muted">{{ r.name }}</div></td>
+          <td style="white-space:nowrap">{{ r.kind_label }}</td>
+          <td><code>{{ r.key }}</code>{% if r.shared > 1 %}<div class="ml-muted">спільний: {{ r.shared }} товарів</div>{% endif %}</td>
+          <td class="ml-url">{% if r.current %}<code>{{ r.current }}</code>
+              {% if r.current_error == "" %}<div class="ml-ok">✅ відповідає</div>{% elif r.current_error %}<div class="ml-bad">❌ {{ r.current_error }}</div>{% endif %}
+            {% else %}<span class="ml-muted">порожньо</span>{% endif %}</td>
+          <td class="ml-url">{% if r.action == "same" %}<span class="ml-muted">те саме</span>{% else %}<code>{{ r.new }}</code>{% endif %}
+              {% if r.new_error == "" %}<div class="ml-ok">✅ відповідає</div>{% elif r.new_error %}<div class="ml-bad">❌ {{ r.new_error }}</div>{% endif %}</td>
+          <td style="color:{{ r.color }};white-space:nowrap">{{ r.action_text }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if can_change %}
+    <div class="ml-row" style="margin-top:10px">
+      <button type="submit" class="button default" id="ml-save">✍️ Записати вибрані</button>
+      <span class="ml-muted">Позначені рядки за замовчуванням — нові посилання, які відповідають. Можна позначити й інші.</span>
+    </div>
+    {% endif %}
+  </form>
+  {% endif %}
+
+  <div class="ml-box">
+    <b>🔗 Спільні файли</b> <span class="ml-muted">— кілька товарів з одним фото чи даташитом (одне посилання).
+      Задати: список товарів → позначте товари → дія «🖼 Спільне фото / даташит для вибраних…», або поле «спільний файл» у картці товару.</span>
+    {% if groups %}
+      {% for label, items in groups %}
+        <div style="margin-top:6px"><b>{{ label }}</b></div>
+        <ul class="ml-groups">{% for key, skus in items %}<li><code>{{ key }}</code> ← {{ skus|length }}: {{ skus|join:", " }}</li>{% endfor %}</ul>
+      {% endfor %}
+    {% else %}<div class="ml-muted" style="margin-top:6px">Поки немає — у кожного товару свій файл (за артикулом).</div>{% endif %}
+  </div>
+</div>
+<script>
+(function () {
+  var run = document.getElementById('ml-run');
+  function poll() {
+    fetch(run.getAttribute('data-url'), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (s) {
+      if (s.state !== 'running') { location.reload(); return; }
+      document.getElementById('ml-text').innerHTML = '<b>⏳ Перевірка ' + (s.done || 0) + ' з ' + (s.total || '…') + '</b>';
+      document.getElementById('ml-current').textContent = s.current || '';
+      document.getElementById('ml-bar').hidden = false;
+      document.getElementById('ml-fill').style.width = (s.total ? Math.round(100 * s.done / s.total) : 0) + '%';
+      setTimeout(poll, 2000);
+    }).catch(function () { setTimeout(poll, 5000); });
+  }
+  if (run.getAttribute('data-state') === 'running') setTimeout(poll, 1000);
+
+  var table = document.querySelector('#ml .ml-t');
+  if (!table) return;
+  var filter = '';
+  document.querySelectorAll('#ml .ml-filters button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      filter = b.getAttribute('data-f');
+      document.querySelectorAll('#ml .ml-filters button').forEach(function (x) { x.classList.toggle('is-on', x === b); });
+      table.querySelectorAll('tbody tr').forEach(function (tr) { tr.hidden = !!filter && tr.getAttribute('data-a') !== filter; });
+    });
+  });
+  document.getElementById('ml-all').addEventListener('change', function () {
+    var v = this.checked;
+    table.querySelectorAll('tbody tr').forEach(function (tr) { var c = tr.querySelector('input[name=row]'); if (c && !tr.hidden) c.checked = v; });
+    count();
+  });
+  var save = document.getElementById('ml-save');
+  function count() { if (save) save.textContent = '✍️ Записати вибрані (' + table.querySelectorAll('input[name=row]:checked').length + ')'; }
+  table.addEventListener('change', count);
+  count();
+})();
+</script>
+{% endblock %}

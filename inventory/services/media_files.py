@@ -60,8 +60,8 @@ def check(data: bytes, kind: str) -> tuple[str, str]:
     raise MediaError(f"вміст не схожий на {want}")
 
 
-def fetch(url: str, kind: str, timeout: tuple[float, float] = (5, 30)) -> bytes:
-    """Завантажує файл за посиланням і перевіряє вміст; MediaError з поясненням."""
+def _download(url: str, limit: int, timeout, stop_at: int | None = None) -> bytes:
+    """Вміст за посиланням (stop_at — лише початок файлу); MediaError з поясненням."""
     if urlsplit(url).scheme not in ("http", "https"):
         raise MediaError("посилання має починатися з http:// або https://")
     try:
@@ -69,12 +69,14 @@ def fetch(url: str, kind: str, timeout: tuple[float, float] = (5, 30)) -> bytes:
                           headers={"User-Agent": USER_AGENT, "Accept": "*/*"}) as resp:
             if resp.status_code != 200:
                 raise MediaError(f"сервер відповів HTTP {resp.status_code}")
-            limit, chunks, size = MAX_BYTES[kind], [], 0
+            chunks, size = [], 0
             for chunk in resp.iter_content(64 * 1024):
                 size += len(chunk)
+                chunks.append(chunk)
+                if stop_at and size >= stop_at:
+                    break
                 if size > limit:
                     raise MediaError(f"файл завеликий (понад {limit // (1024 * 1024)} МБ)")
-                chunks.append(chunk)
     except requests.exceptions.Timeout:
         raise MediaError("сервер не відповів вчасно") from None
     except requests.exceptions.SSLError:
@@ -83,9 +85,24 @@ def fetch(url: str, kind: str, timeout: tuple[float, float] = (5, 30)) -> bytes:
         raise MediaError("немає з'єднання з сервером") from None
     except requests.exceptions.RequestException as e:
         raise MediaError(f"помилка запиту ({type(e).__name__})") from None
-    data = b"".join(chunks)
+    return b"".join(chunks)
+
+
+def fetch(url: str, kind: str, timeout: tuple[float, float] = (5, 30)) -> bytes:
+    """Завантажує файл за посиланням і перевіряє вміст; MediaError з поясненням."""
+    data = _download(url, MAX_BYTES[kind], timeout)
     check(data, kind)
     return data
+
+
+def probe(url: str, kind: str, timeout: tuple[float, float] = (5, 15)) -> str:
+    """Чи відповідає посилання і чи там справді фото / PDF — за початком файлу.
+    '' — так; інакше текст помилки (як у MediaError)."""
+    try:
+        check(_download(url, MAX_BYTES[kind], timeout, stop_at=4096), kind)
+    except MediaError as e:
+        return str(e)
+    return ""
 
 
 def read_field(field, kind: str) -> bytes:

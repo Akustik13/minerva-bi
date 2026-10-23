@@ -2162,11 +2162,6 @@ class ProductAdminForm(forms.ModelForm):
         return (self.cleaned_data.get("base_currency") or "EUR").upper()
 
 
-def _rounding_choices():
-    from shop.models import ShopSettings
-    return [("", "Без округлення (до 0,0001)")] + list(ShopSettings.Rounding.choices)
-
-
 class ProductShopFilter(admin.SimpleListFilter):
     """У якому інтернет-магазині товар."""
     title = "Магазин"
@@ -2183,39 +2178,6 @@ class ProductShopFilter(admin.SimpleListFilter):
         if v:
             return qs.filter(shop_listings__shop_id=v).distinct()
         return qs
-
-
-class BasePricesBulkForm(forms.Form):
-    operation = forms.ChoiceField(label="Що зробити", widget=forms.RadioSelect, initial="percent", choices=[
-        ("percent", "Змінити всі ступені на ±%"),
-        ("convert", "Конвертувати в іншу валюту"),
-        ("template", "Перерахувати ступені за шаблоном знижок (від ціни за 1 шт.)"),
-        ("round", "Лише округлити"),
-    ])
-    percent = forms.DecimalField(label="±%", required=False, max_digits=7, decimal_places=2,
-                                 help_text="Напр. 5 = +5 %, −10 = −10 %")
-    currency = forms.RegexField(label="Нова валюта", required=False, regex=r"^[A-Za-z]{3}$", max_length=3,
-                                help_text="Для конвертації, напр. EUR")
-    rate = forms.DecimalField(label="Курс", required=False, max_digits=12, decimal_places=6, min_value=Decimal("0.000001"),
-                              help_text="1 одиниця поточної валюти = X нової. Порожньо — з «Налаштувань цін → Курси валют»")
-    rounding = forms.ChoiceField(label="Округлення", required=False)
-    note = forms.CharField(label="Примітка в історію", required=False, max_length=150)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        from shop.models import ShopSettings
-        self.fields["rounding"].choices = _rounding_choices()
-        self.fields["rounding"].initial = ShopSettings.get().rounding
-
-    def clean(self):
-        d = super().clean()
-        if d.get("operation") == "percent" and d.get("percent") in (None, ""):
-            self.add_error("percent", "Вкажіть відсоток.")
-        if d.get("operation") == "convert" and not d.get("currency"):
-            self.add_error("currency", "Вкажіть валюту.")
-        if d.get("currency"):
-            d["currency"] = d["currency"].upper()
-        return d
 
 
 class BaseFromDigiKeyForm(forms.Form):
@@ -2259,19 +2221,20 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     list_per_page = 50
     autocomplete_fields = ("successor",)
     form          = ProductAdminForm
-    actions       = ["action_set_category", "action_set_lifecycle", "action_base_bulk", "action_base_from_dk",
-                     "action_sale_price_from_base",
+    actions       = ["action_set_category", "action_set_lifecycle", "action_base_editor", "action_base_from_dk",
+                     "action_sale_price_from_base", "action_media_links", "action_shared_media",
                      "bulk_sync_digikey_attrs"]
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
-        if form is None or "base_prices_text" not in getattr(form, "cleaned_data", {}):
-            return
-        from .services.base_prices import set_base_prices
-        d = form.cleaned_data
-        if set_base_prices(obj, d["base_prices_text"], source="manual", user=request.user,
-                           currency=d.get("base_currency"), note=d.get("base_note", "")):
-            self.message_user(request, f"{obj.sku}: базові ціни змінено (записано в історію).")
+        if form is not None and "base_prices_text" in getattr(form, "cleaned_data", {}):
+            from .services.base_prices import set_base_prices
+            d = form.cleaned_data
+            if set_base_prices(obj, d["base_prices_text"], source="manual", user=request.user,
+                               currency=d.get("base_currency"), note=d.get("base_note", "")):
+                self.message_user(request, f"{obj.sku}: базові ціни змінено (записано в історію).")
+        from .admin_prices import apply_shop_choices   # галочки «Базові ціни → магазин» (🏪 Інтернет-магазини)
+        apply_shop_choices(request, obj)
 
     # ── Масові дії: категорія, ціни DigiKey ──────────────────────────────────
     @admin.action(description="🏷️ Змінити категорію…")
@@ -2308,44 +2271,31 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             return f"Життєвий цикл «{Product.Lifecycle(d['status']).label}»: {n} товарів"
         return FormActionMixin._form_action(self, request, queryset, LifecycleForm, "Життєвий цикл товарів", apply)
 
-    @admin.action(description="💰 Базові ціни: ±%% / валюта / шаблон / округлення…")
-    def action_base_bulk(self, request, queryset):
+    @admin.action(description="💰 Редактор базових цін для вибраних…")
+    def action_base_editor(self, request, queryset):
+        """Сторінка-таблиця: інструменти як у картці, правка кожного товару, застосування в магазинах."""
+        ids = ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)[:1000])
+        return redirect(reverse("admin:inventory_product_base_prices") + "?ids=" + ids)
+
+    @admin.action(description="🔗 Посилання на фото й даташити за правилом…")
+    def action_media_links(self, request, queryset):
+        from .admin_media_links import page_url
+        return redirect(page_url(list(queryset.values_list("pk", flat=True)[:2000])))
+
+    @admin.action(description="🖼 Спільне фото / даташит для вибраних…")
+    def action_shared_media(self, request, queryset):
         from shop.admin import FormActionMixin
-        from shop.models import ShopSettings
-        from .services import base_prices as bp
+        from .admin_media_links import shared_form_class, shared_result_text
+        from .services.media_links import set_shared
+        products = list(queryset.order_by("sku"))
 
         def apply(qs, d):
-            op, rnd = d["operation"], d.get("rounding") or None
-            changed, skipped, no_rate = 0, [], []
-            for p in qs:
-                rows, cur = bp.normalize(p.base_prices), p.base_price_currency
-                if not rows:
-                    skipped.append(p.sku)
-                    continue
-                if op == "percent":
-                    rows = bp.scale(rows, (Decimal(100) + d["percent"]) / 100, rnd)
-                    label = f"{d['percent']:+g} %"
-                elif op == "convert":
-                    rate = d.get("rate") or bp.fx_factor(cur, d["currency"])
-                    if rate is None:
-                        no_rate.append(f"{p.sku} ({cur}→{d['currency']})")
-                        continue
-                    rows, label, cur = bp.scale(rows, rate, rnd), f"{cur}→{d['currency']} × {rate:g}", d["currency"]
-                elif op == "template":
-                    rows, label = bp.from_template(rows, ShopSettings.get().price_breaks, rnd), "ступені за шаблоном"
-                else:
-                    rows, label = bp.round_all(rows, rnd or "0.01"), "округлення"
-                note = f"Масова зміна: {label}" + (f" · {d['note']}" if d.get("note") else "")
-                if bp.set_base_prices(p, rows, source="manual", user=request.user, currency=cur, note=note):
-                    changed += 1
-            if skipped:
-                messages.warning(request, "Без базових цін (пропущено): " + ", ".join(skipped[:20]))
-            if no_rate:
-                messages.warning(request, "Немає курсу («Інтернет-магазин → Налаштування цін → Курси валют») — "
-                                          "вкажіть курс у формі: " + ", ".join(no_rate[:20]))
-            return f"Базові ціни змінено: {changed} товарів (записано в історію)."
-        return FormActionMixin._form_action(self, request, queryset, BasePricesBulkForm,
-                                            "Базові ціни: масова зміна", apply)
+            result = set_shared(products, d["kinds"], d["final"])
+            for level, text in shared_result_text(d["final"], len(products), result):
+                messages.add_message(request, level, text)
+            return f"Спільний файл «{d['final']}»: {len(products)} товарів."
+        return FormActionMixin._form_action(self, request, queryset, shared_form_class(products),
+                                            "Спільне фото / даташит для вибраних товарів", apply)
 
     @admin.action(description="⬇️ Базові ціни ← DigiKey (перезаписати)…")
     def action_base_from_dk(self, request, queryset):
@@ -2439,18 +2389,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
     @admin.display(description="Магазини")
     def shop_listings_info(self, obj):
-        """Де продається товар (керування — розділ «🏪 Інтернет-магазин»)."""
-        from django.urls import reverse
-        rows = list(obj.shop_listings.select_related("shop")) if obj and obj.pk else []
-        add = reverse("admin:shop_shopproduct_changelist") + f"?q={obj.sku}" if obj and obj.pk else "#"
-        if not rows:
-            return format_html('Не продається в жодному магазині — <a href="{}">додати в магазин →</a>', add)
-        items = format_html_join(
-            "", '<li><a href="{}">{}</a>: {} · {}</li>',
-            ((reverse("admin:shop_shoplisting_change", args=[l.pk]), l.shop.name,
-              "показується" if l.is_visible else "сховано",
-              f"{l.effective_price:.2f}" if l.effective_price is not None else "ціна за запитом") for l in rows))
-        return format_html("<ul style='margin:0'>{}</ul>", items)
+        """Магазини: стан, ціна, «Базові ціни → магазин» (виконується при «Зберегти», admin_prices.py)."""
+        from .admin_prices import shop_prices_panel
+        return shop_prices_panel(obj)
+    shop_listings_info.short_description = "Магазини"
+
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
@@ -2482,8 +2425,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             "description": "Асортимент, ціни і ступені цін кожного магазину — розділ «🏪 Інтернет-магазин».",
         }),
         ("🔗 Медіа та документи", {
-            "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "image_url", "image", "image_preview",
-                       "shop_media_panel"),
+            "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "datasheet_key",
+                       "image_url", "image", "image_preview", "image_key", "shop_media_panel"),
             "classes": ("collapse",),
         }),
         ("🛃 Митне оформлення", {
@@ -2509,16 +2452,6 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     )
 
     DK_SYNC_TASK = 'product_dk_attr_sync'
-
-    def get_urls(self):
-        from django.urls import path
-        urls = super().get_urls()
-        return [
-            path('dk-sync-status/', self.admin_site.admin_view(self._dk_sync_status_view),
-                 name='inventory_product_dk_sync_status'),
-            path('dk-sync-cancel/', self.admin_site.admin_view(self._dk_sync_cancel_view),
-                 name='inventory_product_dk_sync_cancel'),
-        ] + urls
 
     def _dk_sync_status_view(self, request):
         import json as _json
@@ -2627,20 +2560,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         extra_context = extra_context or {}
-        try:
-            from shop.models import Shop, ShopSettings
-            st = ShopSettings.get()
-            extra_context["bp_config"] = {
-                "fx_rates": {k.upper(): float(v) for k, v in (st.fx_rates or {}).items() if v},
-                "home": getattr(Shop.objects.filter(is_default=True).first(), "currency", None) or "EUR",
-                "rounding": st.rounding,
-                "roundings": [[k, str(v)] for k, v in st.Rounding.choices],
-                "template": [{"min_qty": int(r["min_qty"]), "discount": float(r["discount"])}
-                             for r in (st.price_breaks or [])],
-                "markup": float(st.default_markup),
-            }
-        except Exception:
-            extra_context["bp_config"] = {}
+        from .admin_prices import editor_config
+        extra_context["bp_config"] = editor_config()
         if object_id:
             try:
                 from bots.models import DigiKeyListing
@@ -3471,8 +3392,18 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             path("<int:pk>/datasheet/",
                  self.admin_site.admin_view(self.serve_datasheet_view),
                  name="inventory_product_serve_datasheet"),
+            path("base-prices/", self.admin_site.admin_view(self._base_prices_editor_view),
+                 name="inventory_product_base_prices"),
+            path('dk-sync-status/', self.admin_site.admin_view(self._dk_sync_status_view),
+                 name='inventory_product_dk_sync_status'),
+            path('dk-sync-cancel/', self.admin_site.admin_view(self._dk_sync_cancel_view),
+                 name='inventory_product_dk_sync_cancel'),
         ]
         return custom + urls
+
+    def _base_prices_editor_view(self, request):
+        from .admin_prices import editor_view
+        return editor_view(self, request)
 
     def serve_datasheet_view(self, request, pk):
         """Serve product datasheet file via Django (bypasses Synology/nginx media routing)."""
@@ -3827,15 +3758,30 @@ class InventorySettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ("🖼️ Кешування медіа (Datasheet / Фото)", {
-            "fields": ("media_cache_panel",),
+            "fields": ("datasheet_url_template", "image_url_template", "media_links_panel", "media_cache_panel"),
             "description": (
-                "Завантажує PDF-датащити та фото товарів з вказаних URL на сервер. "
-                "Після кешування файли відкриваються швидше і залишаються доступними навіть якщо зовнішній сервер недоступний."
+                "<b>Правило посилань</b>: адреса з {key} — Minerva підставить артикул товару (або його «спільний файл», "
+                "якщо кілька товарів мають одне фото чи даташит) і заповнить поля «Посилання на Datasheet» / «Зображення (URL)» "
+                "після перевірки, що файл справді є. <b>Кешування</b>: завантажує PDF-датащити та фото з вказаних URL на "
+                "сервер — файли відкриваються швидше і доступні, навіть якщо зовнішній сервер недоступний."
             ),
         }),
     )
 
-    readonly_fields = ("media_cache_panel", "rfq_email_templates_panel")
+    readonly_fields = ("media_cache_panel", "rfq_email_templates_panel", "media_links_panel")
+
+    def media_links_panel(self, obj):
+        from .admin_media_links import settings_panel
+        return settings_panel(obj)
+    media_links_panel.short_description = "Посилання за правилом"
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        field = super().formfield_for_dbfield(db_field, request, **kwargs)
+        examples = {"datasheet_url_template": "https://sevskiy.i234.me/datasheets/download.php?file={key}.pdf",
+                    "image_url_template": "https://sevskiy.i234.me/pictures/download.php?file={key}.jpg"}
+        if db_field.name in examples:   # довгі адреси — на всю ширину
+            field.widget.attrs.update({"style": "width:100%;max-width:640px", "placeholder": examples[db_field.name]})
+        return field
 
     def rfq_email_templates_panel(self, obj):
         from django.urls import reverse as _rev
@@ -3973,8 +3919,20 @@ function invMediaCache() {{
             path("media-cache/",
                  self.admin_site.admin_view(self.media_cache_view),
                  name="inventory_inventorysettings_media_cache"),
+            path("media-links/", self.admin_site.admin_view(self._media_links_view),
+                 name="inventory_inventorysettings_media_links"),
+            path("media-links/status/", self.admin_site.admin_view(self._media_links_status_view),
+                 name="inventory_inventorysettings_media_links_status"),
         ]
         return custom + urls
+
+    def _media_links_view(self, request):
+        from .admin_media_links import page_view
+        return page_view(self, request)
+
+    def _media_links_status_view(self, request):
+        from .admin_media_links import status_view
+        return status_view(self, request)
 
     def media_cache_view(self, request):
         from django.http import JsonResponse

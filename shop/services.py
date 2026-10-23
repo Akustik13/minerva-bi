@@ -432,6 +432,35 @@ def use_base_prices(listings, factor=Decimal("100")) -> tuple[int, list[str], li
     return done, missing, no_rate
 
 
+APPLY_TEXT = {
+    "ok": "базові ціни застосовано (далі оновлюються автоматично)",
+    "added": "додано в магазин з базовими цінами",
+    "not_listed": "товару немає в магазині",
+    "no_prices": "у товару немає базових цін",
+    "no_rate": "немає курсу валюти («Налаштування цін → Курси валют»)",
+}
+
+
+def apply_base_to_shop(product, shop: Shop, factor=None, add: bool = False, visible: bool = True) -> str:
+    """Картка товару / масовий редактор цін: позиція магазину бере базові ціни товару (× factor %) і далі
+    оновлюється разом з ними. add — додати товар у магазин, якщо його там ще немає.
+    Повертає ключ APPLY_TEXT."""
+    listing = ShopListing.objects.filter(shop=shop, product=product).select_related("product", "shop").first()
+    if listing is None and not add:
+        return "not_listed"
+    if not base_tiers(product):
+        return "no_prices"
+    if fx_rate(product.base_price_currency, shop.currency) is None:
+        return "no_rate"
+    created = listing is None
+    if created:
+        listing = ShopListing.objects.create(shop=shop, product=product, is_visible=visible)
+    if factor is None:
+        factor = listing.price_factor if listing.price_source == ShopListing.PRICE_BASE else Decimal("100")
+    use_base_prices([listing], factor)
+    return "added" if created else "ok"
+
+
 def reapply_base_prices(product_id=None) -> int:
     """Перерахувати позиції з базовими цінами (товару або всі — напр. після зміни курсу)."""
     qs = ShopListing.objects.filter(price_source=ShopListing.PRICE_BASE).select_related("product", "shop")
