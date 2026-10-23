@@ -151,6 +151,11 @@ class KnowledgeSettings(models.Model):
         default=0, editable=False, help_text="Журнал до цього seq очищено: старші курсори → 410 cursor_expired.")
     last_refresh_at = models.DateTimeField("Остання звірка стрічки", null=True, blank=True, editable=False)
     last_refresh_result = models.CharField(max_length=255, blank=True, default="", editable=False)
+    feed_paused = models.BooleanField(
+        "Індексацію призупинено", default=False, editable=False,
+        help_text="Кнопка «⏸ Пауза»: стрічка відповідає RAG «зачекайте» (429), звіти RAG приймаються; "
+                  "пошук працює з уже проіндексованим.")
+    feed_paused_at = models.DateTimeField(null=True, blank=True, editable=False)
 
     class Meta:
         verbose_name = "База знань (пошта → RAG)"
@@ -158,6 +163,31 @@ class KnowledgeSettings(models.Model):
 
     def __str__(self):
         return "База знань"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+
+class KnowledgeActivity(models.Model):
+    """Що RAG робить зараз — за його зверненнями до стрічки (синглтон pk=1, лише для показу на «Базі знань»).
+    Окремо від KnowledgeSettings, щоб збереження форми налаштувань не затирало лічильники."""
+    IDLE, SNAPSHOT, CHANGES = "idle", "snapshot", "changes"
+
+    phase = models.CharField(max_length=10, default=IDLE)
+    phase_started_at = models.DateTimeField(null=True, blank=True)
+    snapshot_total = models.PositiveIntegerField(default=0, help_text="Документів у знімку повної звірки")
+    snapshot_served = models.PositiveIntegerField(default=0, help_text="Скільки з них RAG уже забрав")
+    reported = models.PositiveIntegerField(default=0, help_text="Прийнято записів зі звітів RAG за етап")
+    last_call = models.CharField(max_length=200, blank=True, default="")
+    last_call_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Активність RAG"
 
     def save(self, *args, **kwargs):
         self.pk = 1

@@ -2,6 +2,8 @@
 
 Лише APIKey з правами knowledge:read / knowledge:write; ключ магазину → 403 shop_key_forbidden.
 Будь-яка помилка — JSON {code, message, retryable, request_id[, details]}.
+«⏸ Пауза» на сторінці «База знань» → усе, крім прийому звітів, відповідає 429 rate_limited (retry_after_seconds).
+Кожне вдале звернення RAG фіксується (knowledge.note_activity) — з цього сторінка показує етап і прогрес.
 """
 import json
 import logging
@@ -59,6 +61,7 @@ class KnowledgeView(APIView):
     throttle_classes = [KnowledgeRateThrottle]
     renderer_classes = [JSONRenderer]
     scope_mode = "read"
+    pausable = True
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
@@ -72,11 +75,17 @@ class KnowledgeView(APIView):
         if not knowledge.instance_id():
             raise KnowledgeError("instance_not_configured", 503,
                                  "MINERVA_INSTANCE_ID не задано — база знань вимкнена на цьому сервері.", retryable=True)
+        if self.pausable and knowledge.feed_paused():
+            knowledge.note_activity("запит під час паузи — RAG чекає")
+            raise KnowledgeError("rate_limited", 429, "Індексацію призупинено в Minerva — повторіть пізніше.",
+                                 retryable=True, details={"retry_after_seconds": knowledge.PAUSE_RETRY_SECONDS})
 
     def handle_exception(self, exc):
         request = self.request
         if isinstance(exc, KnowledgeError):
-            return error_response(request, exc.code, exc.status, exc.message, exc.retryable, exc.details)
+            wait = (exc.details or {}).get("retry_after_seconds")
+            return error_response(request, exc.code, exc.status, exc.message, exc.retryable, exc.details,
+                                  headers={"Retry-After": str(wait)} if wait else None)
         if isinstance(exc, (drf_exc.NotAuthenticated, drf_exc.AuthenticationFailed)):
             return error_response(request, "unauthorized", 401, str(getattr(exc, "detail", "")) or "Невірний ключ.",
                                   headers={"WWW-Authenticate": "Token"})
@@ -98,15 +107,18 @@ class KnowledgeView(APIView):
 
 class ChangesView(KnowledgeView):
     def get(self, request):
-        return Response(knowledge.read_changes(
-            after=_int_param(request, "after", 0, 0, 2 ** 62),
-            limit=_int_param(request, "limit", 50, 1, 200),
-            generation=request.query_params.get("generation") or None))
+        after = _int_param(request, "after", 0, 0, 2 ** 62)
+        data = knowledge.read_changes(after=after, limit=_int_param(request, "limit", 50, 1, 200),
+                                      generation=request.query_params.get("generation") or None)
+        knowledge.note_activity(f"зміни після seq {after}: подій {len(data['items'])}", changes=True)
+        return Response(data)
 
 
 class DocumentView(KnowledgeView):
     def get(self, request, document_id):
-        return Response(knowledge.get_document(document_id)[2])
+        document = knowledge.get_document(document_id)[2]
+        knowledge.note_activity(f"документ {document_id}", document=True)
+        return Response(document)
 
 
 class AttachmentView(KnowledgeView):
@@ -115,6 +127,7 @@ class AttachmentView(KnowledgeView):
         if revision is None:
             raise KnowledgeError("invalid_request", 400, "Параметр revision обов'язковий.")
         data, att = knowledge.attachment_bytes(document_id, index, revision)
+        knowledge.note_activity(f"вкладення {document_id} #{index}")
         response = HttpResponse(data, content_type=att["content_type"])
         digest = att["content_hash"].split(":", 1)[1]
         response["X-Content-SHA256"] = digest
@@ -125,26 +138,36 @@ class AttachmentView(KnowledgeView):
 
 class SnapshotCreateView(KnowledgeView):
     def post(self, request):
-        return Response(knowledge.create_snapshot(), status=201)
+        snap = knowledge.create_snapshot()
+        knowledge.note_activity(f"знімок для повної звірки: документів {snap['total']}", snapshot_total=snap["total"])
+        return Response(snap, status=201)
 
 
 class SnapshotPageView(KnowledgeView):
     def get(self, request, snapshot_id):
-        return Response(knowledge.snapshot_page(snapshot_id, request.query_params.get("cursor"),
-                                                _int_param(request, "limit", 500, 1, 5000)))
+        page = knowledge.snapshot_page(snapshot_id, request.query_params.get("cursor"),
+                                       _int_param(request, "limit", 500, 1, 5000))
+        knowledge.note_activity(f"сторінка знімка: документів {len(page['items'])}")
+        return Response(page)
 
 
 class StatusView(KnowledgeView):
     scope_mode = "write"
+    pausable = False      # результати вже виконаної роботи приймаються й під час паузи
 
     def post(self, request):
         try:
             payload = json.loads(request.body or b"null")
         except ValueError:
             raise KnowledgeError("invalid_request", 400, "Тіло — не JSON.")
-        return Response(knowledge.apply_status(payload, _request_id(request)))
+        result = knowledge.apply_status(payload, _request_id(request))
+        knowledge.note_activity(f"звіт RAG: записів {len(payload['items'])}, прийнято {result['accepted']}",
+                                reported=result["accepted"])
+        return Response(result)
 
 
 class SummaryView(KnowledgeView):
     def get(self, request):
-        return Response(knowledge.summary())
+        data = knowledge.summary()
+        knowledge.note_activity("перевірка стану стрічки")
+        return Response(data)

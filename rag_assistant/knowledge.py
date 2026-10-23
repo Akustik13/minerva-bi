@@ -37,6 +37,8 @@ TEXT_NEW_MAX = 20_000
 CHANGE_RETENTION_DAYS = 30
 SNAPSHOT_TTL = timedelta(hours=24)
 REFRESH_EVERY = timedelta(hours=24)
+PAUSE_RETRY_SECONDS = 60        # «⏸ Пауза»: через скільки RAG варто спробувати знову (429 rate_limited)
+RAG_SILENT_AFTER = timedelta(minutes=5)   # RAG опитує стрічку кожні кілька секунд — довша тиша означає збій
 EXCLUDED_FOLDERS = ("trash", "spam", "draft")
 # Збереження листа лише з цими полями не змінює документ
 IRRELEVANT_FIELDS = frozenset({"is_read", "is_starred", "ai_summary", "ai_reply_draft", "ai_translated",
@@ -789,3 +791,99 @@ def summary() -> dict:
         "documents": {"eligible": eligible, **counts,
                       "pending": eligible - sum(counts.values()), "pending_delete": pending_delete},
     }
+
+
+# ── Що RAG робить зараз (сторінка «База знань») ──────────────────────────────
+
+def feed_paused() -> bool:
+    from .models import KnowledgeSettings
+    return KnowledgeSettings.objects.filter(pk=1, feed_paused=True).exists()
+
+
+def set_feed_paused(paused: bool):
+    """«⏸ Пауза»: стрічка відповідає RAG 429 rate_limited (код контракту), звіти RAG приймаються далі.
+    Після «▶ Продовжити» RAG сам повторює запит; уже проіндексоване він пропускає без повторних embeddings."""
+    from .models import KnowledgeSettings
+    KnowledgeSettings.get()
+    KnowledgeSettings.objects.filter(pk=1).update(feed_paused=paused, feed_paused_at=timezone.now() if paused else None)
+
+
+def note_activity(call, *, snapshot_total=None, document=False, changes=False, reported=0):
+    """Звернення RAG до стрічки → етап і прогрес. Збій обліку ніколи не ламає відповідь API.
+    Порядок роботи RAG: знімок (повна звірка) → документи знімка → лише потім стрічка змін."""
+    from django.db.models import F
+    from .models import KnowledgeActivity
+    try:
+        now = timezone.now()
+        act = KnowledgeActivity.get()
+        fields = {"last_call": call[:200], "last_call_at": now}
+        if snapshot_total is not None:
+            fields.update(phase=KnowledgeActivity.SNAPSHOT, phase_started_at=now, snapshot_total=snapshot_total,
+                          snapshot_served=0, reported=0)
+        elif document and act.phase == KnowledgeActivity.SNAPSHOT:
+            fields["snapshot_served"] = F("snapshot_served") + 1
+        elif changes and act.phase != KnowledgeActivity.CHANGES:   # знімок завершено — RAG перейшов до змін
+            fields.update(phase=KnowledgeActivity.CHANGES, phase_started_at=now, reported=0)
+        if reported:
+            fields["reported"] = F("reported") + reported
+        KnowledgeActivity.objects.filter(pk=1).update(**fields)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("knowledge activity not recorded: %s", e)
+
+
+def _duration(seconds) -> str:
+    minutes = max(1, round(seconds / 60))
+    return f"~{minutes} хв" if minutes < 60 else f"~{minutes // 60} год {minutes % 60} хв"
+
+
+def progress() -> dict:
+    """Етап і прогрес індексації для живої панелі «База знань» (без звернення до RAG).
+    stage: setup / off / paused / waiting / snapshot / updating / ready; step — номер кроку 0…3 для смужки етапів."""
+    from . import retrieval
+    from .models import KnowledgeActivity, KnowledgeSettings
+    s, act, now = KnowledgeSettings.get(), KnowledgeActivity.get(), timezone.now()
+    d = summary()["documents"]
+    waiting_docs = d["pending"] + d["pending_delete"]
+    seen_ago = int((now - act.last_call_at).total_seconds()) if act.last_call_at else None
+    out = {"paused": s.feed_paused, "enabled": s.enabled, "documents": d, "percent": None, "eta": None, "rate": None,
+           "served": act.snapshot_served, "total": act.snapshot_total, "last_call": act.last_call,
+           "seen_ago": seen_ago, "silent": False, "rag": None, "breaker": None,
+           "updated": timezone.localtime(now).strftime("%H:%M:%S")}
+    caps = s.last_capabilities or {}
+    if caps:
+        ready, idx = caps.get("readiness") or {}, caps.get("index") or {}
+        out["rag"] = {"retrieval": ready.get("retrieval"), "indexing": ready.get("indexing"), "docs": idx.get("docs"),
+                      "chunks": idx.get("chunks"), "checked": timezone.localtime(s.last_capabilities_at).strftime(
+                          "%d.%m %H:%M:%S") if s.last_capabilities_at else ""}
+    until = retrieval.breaker_until(s)
+    if until:
+        out["breaker"] = timezone.localtime(until).strftime("%H:%M")
+    working = not s.feed_paused and seen_ago is not None and seen_ago <= RAG_SILENT_AFTER.total_seconds()
+    if act.phase == KnowledgeActivity.SNAPSHOT and act.snapshot_total:
+        served = min(act.snapshot_served, act.snapshot_total)
+        out["percent"] = int(served * 100 / act.snapshot_total)
+        elapsed = (now - act.phase_started_at).total_seconds() if act.phase_started_at else 0
+        if working and served >= 3 and elapsed > 0:     # під час паузи чи тиші швидкість і час до кінця не показуємо
+            out["rate"] = f"{served * 60 / elapsed:.0f} док./хв"
+            out["eta"] = _duration((act.snapshot_total - served) * elapsed / served)
+    if not instance_id():
+        stage, step, text = "setup", 0, "Не задано назву сервера для RAG — стрічка для RAG вимкнена."
+    elif s.feed_paused:
+        stage, step, text = "paused", None, ("⏸ Призупинено: Minerva відповідає RAG «зачекайте». "
+                                             "Пошук працює з уже проіндексованим.")
+    elif act.phase == KnowledgeActivity.SNAPSHOT:
+        stage, step = "snapshot", 1
+        text = (f"Повна вигрузка: RAG забирає й індексує листи — {min(act.snapshot_served, act.snapshot_total)} "
+                f"з {act.snapshot_total}. Пошук увімкнеться після завершення.")
+    elif not s.enabled and not d["eligible"] and not waiting_docs:
+        stage, step, text = "off", None, "Індексацію не ввімкнено — позначте «Індексувати пошту» нижче й збережіть."
+    elif act.last_call_at is None:
+        stage, step, text = "waiting", 0, "RAG ще не звертався до Minerva — перевірте ключ і з'єднання на RAG-ПК."
+    elif waiting_docs:
+        stage, step, text = "updating", 2, f"Обробка змін: RAG ще не підтвердив документів — {waiting_docs}."
+    else:
+        stage, step, text = "ready", 3, "✅ Усе проіндексовано — пошук готовий."
+    out.update(stage=stage, step=step, text=text)
+    out["silent"] = (seen_ago is not None and seen_ago > RAG_SILENT_AFTER.total_seconds()
+                     and stage in ("snapshot", "updating", "ready", "paused"))
+    return out

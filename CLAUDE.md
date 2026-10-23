@@ -132,7 +132,15 @@ tabele_mvp/
     - Масові `.update()` → `email_assistant/knowledge_hook.touch()` (категорії, масові дії, проєкти).
     - Розбіжності самовиправляються при читанні; нічна звірка `knowledge_refresh --if-due` (cron).
   - **UI:**
-    - адмінка «🧠 База знань»: налаштування, стан за статусами RAG, «Звірити / Прибрати все / Нове покоління»;
+    - адмінка «🧠 База знань» (меню «Minerva AI»): налаштування, стан за статусами RAG, «Звірити / Прибрати все / Переіндексувати все з нуля» (`new_generation`);
+    - жива панель «Що зараз робить RAG» (`knowledge.progress()`, шаблон `admin/rag_assistant/knowledge_live.html`, `…/knowledgesettings/live/` кожні 5 с):
+      - етапи підключення → повна вигрузка (N з M, швидкість, час до кінця) → нові зміни → готово;
+      - остання дія RAG і попередження, якщо він мовчить понад 5 хв;
+    - облік звернень RAG — `knowledge.note_activity` у `api/knowledge_views.py`, модель `KnowledgeActivity` (rag_assistant 0005; окремо від налаштувань, щоб збереження форми не затирало лічильники);
+    - «⏸ Пауза / ▶ Продовжити» (`KnowledgeSettings.feed_paused`, `…/pause/?action=`):
+      - стрічка відповідає 429 `rate_limited` (`retry_after_seconds` 60), `POST /status/` приймається;
+      - після продовження RAG робить новий знімок, але вже проіндексоване пропускає без embeddings;
+      - прапорець «Індексувати пошту» — інше: він лише перестає додавати нові листи;
     - у пошті — меню «🔒 Приватне — не в базу знань» (`/email/thread/<pk>/knowledge/`).
   - **v1:** `text_new_mode = full` — цитати не обрізаються. Вкладення дають `indexable` лише зі збереженим файлом і `sha256`, який кешується в `EmailMessage.attachments`.
   - **Тести:** `rag_assistant/tests_knowledge.py`. Відповіді API перевіряються тими самими схемами; тест порядку commit — лише на PostgreSQL.

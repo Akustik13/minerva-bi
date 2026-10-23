@@ -1,0 +1,98 @@
+{# Жива панель «Що зараз робить RAG» на сторінці «База знань»: дані — knowledge.progress(), оновлення — live/ кожні 5 с #}
+{{ progress|json_script:"kl-data" }}
+<style>
+  #kl { max-width: 760px; }
+  #kl .kl-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  #kl .kl-steps span { padding: 3px 10px; border-radius: 12px; font-size: 12px; border: 1px solid var(--hairline-color, #ccc);
+                       color: var(--body-quiet-color, #888); }
+  #kl .kl-steps span.done { color: var(--body-fg, #333); border-color: var(--body-quiet-color, #888); }
+  #kl .kl-steps span.now { color: #fff; background: var(--primary, #417690); border-color: var(--primary, #417690); font-weight: 600; }
+  #kl .kl-text { font-size: 14px; font-weight: 600; margin: 4px 0 8px; }
+  #kl .kl-bar { height: 10px; border-radius: 5px; background: var(--darkened-bg, #eee); overflow: hidden; margin: 6px 0; }
+  #kl .kl-bar > div { height: 100%; width: 0; background: var(--primary, #417690); transition: width .6s; }
+  #kl .kl-line { margin: 3px 0; color: var(--body-quiet-color, #666); }
+  #kl .kl-line b { color: var(--body-fg, #333); }
+  #kl .kl-warn { margin: 8px 0; padding: 6px 10px; border-radius: 4px; background: rgba(229, 115, 115, .15);
+                 border-left: 3px solid #e57373; }
+  #kl .kl-buttons { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+  #kl .kl-updated { font-size: 11px; color: var(--body-quiet-color, #999); margin-top: 6px; }
+</style>
+<div id="kl" data-url="{{ live_url }}">
+  <div class="kl-steps">
+    <span data-step="0">① Підключення</span><span data-step="1">② Повна вигрузка</span>
+    <span data-step="2">③ Нові зміни</span><span data-step="3">✅ Готово</span>
+  </div>
+  <div class="kl-text" id="kl-text"></div>
+  <div class="kl-bar" id="kl-bar" hidden><div id="kl-fill"></div></div>
+  <div class="kl-line" id="kl-progress"></div>
+  <div class="kl-line" id="kl-docs"></div>
+  <div class="kl-line" id="kl-seen"></div>
+  <div class="kl-line" id="kl-rag"></div>
+  <div class="kl-warn" id="kl-warn" hidden></div>
+  <div class="kl-buttons">
+    {% if paused %}
+      <button type="submit" class="button default" formaction="{{ pause_url }}?action=resume" formnovalidate>▶ Продовжити індексацію</button>
+    {% else %}
+      <button type="submit" class="button" formaction="{{ pause_url }}?action=pause" formnovalidate
+              title="RAG зупиниться після поточного листа; пошук працює з уже проіндексованим">⏸ Пауза</button>
+    {% endif %}
+    <button type="submit" class="button" formaction="{{ refresh_url }}" formnovalidate
+            title="Minerva заново перевірить, які листи мають бути в індексі, і передасть відмінності">🔄 Звірити стрічку зараз</button>
+    <button type="submit" class="button" formaction="{{ generation_url }}" formnovalidate
+            onclick="return confirm('RAG забуде поточний індекс і заново проіндексує ВСІ листи — це довго. Потрібно також після відновлення БД з бекапу. Продовжити?')">♻ Переіндексувати все з нуля</button>
+    <button type="submit" class="button" formaction="{{ clear_url }}" formnovalidate
+            onclick="return confirm('Прибрати всі листи з індексу RAG і вимкнути індексацію?')">🧹 Прибрати все з індексу</button>
+  </div>
+  <div class="kl-updated" id="kl-updated"></div>
+</div>
+<script>
+(function () {
+  var box = document.getElementById('kl');
+  if (!box || box.dataset.ready) return;
+  box.dataset.ready = '1';
+  var url = box.dataset.url, ticks = 0, failures = 0;
+  function $(id) { return document.getElementById(id); }
+  function span(s) {
+    if (s < 60) return s + ' с';
+    if (s < 3600) return Math.round(s / 60) + ' хв';
+    return Math.round(s / 3600) + ' год';
+  }
+  function ago(s) { return s === null || s === undefined ? 'ще не звертався' : span(s) + ' тому'; }
+  function setText(id, text) { $(id).textContent = text || ''; $(id).hidden = !text; }
+  function render(p) {
+    box.querySelectorAll('.kl-steps span').forEach(function (el) {
+      var n = +el.dataset.step;
+      el.className = p.step === null || p.step === undefined ? '' : (n === p.step ? 'now' : (n < p.step ? 'done' : ''));
+    });
+    setText('kl-text', p.text);
+    var bar = p.percent !== null && p.percent !== undefined;
+    $('kl-bar').hidden = !bar;
+    if (bar) $('kl-fill').style.width = p.percent + '%';
+    setText('kl-progress', bar ? (p.percent + '% · ' + Math.min(p.served, p.total) + ' з ' + p.total +
+      (p.rate ? ' · ' + p.rate : '') + (p.eta ? ' · залишилось ' + p.eta : '')) : '');
+    var d = p.documents || {};
+    setText('kl-docs', 'У Minerva: мають бути в індексі ' + (d.eligible || 0) + ' · підтверджено RAG ' + (d.indexed || 0) +
+      ' · чекають підтвердження ' + ((d.pending || 0) + (d.pending_delete || 0)) +
+      ((d.failed || d.skipped) ? ' · помилки ' + (d.failed || 0) + ' / пропущено ' + (d.skipped || 0) : ''));
+    setText('kl-seen', 'RAG востаннє звертався: ' + ago(p.seen_ago) + (p.last_call ? ' — ' + p.last_call : ''));
+    setText('kl-rag', p.rag ? 'Сам RAG (перевірено ' + p.rag.checked + '): пошук ' + p.rag.retrieval + ', індексація ' +
+      p.rag.indexing + ', документів в індексі ' + (p.rag.docs === null || p.rag.docs === undefined ? '?' : p.rag.docs) : '');
+    var warn = [];
+    if (p.silent) warn.push('⚠️ RAG не звертався до Minerva вже ' + span(p.seen_ago) +
+      '. Перевірте RAG-ПК: задача «Minerva-Private-RAG», журнал D:\\RAG-private-prod\\logs\\runtime.log.');
+    if (p.breaker) warn.push('⏸ Після кількох збоїв Minerva не звертається до RAG до ' + p.breaker + '.');
+    setText('kl-warn', warn.join(' '));
+    setText('kl-updated', 'Оновлено ' + p.updated + ' · сторінка оновлюється сама');
+  }
+  function tick() {
+    ticks += 1;
+    fetch(url + (ticks % 6 === 1 ? '?probe=1' : ''), {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (p) { failures = 0; render(p); })
+      .catch(function () { failures += 1; if (failures > 2) setText('kl-updated', 'Немає зв\'язку з Minerva — спробую ще.'); });
+  }
+  render(JSON.parse($('kl-data').textContent));
+  tick();
+  setInterval(tick, 5000);
+})();
+</script>

@@ -1,6 +1,9 @@
 from django import forms
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
 from django.shortcuts import redirect
+from django.template.loader import render_to_string
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
@@ -228,9 +231,9 @@ class KnowledgeSettingsForm(forms.ModelForm):
 @admin.register(KnowledgeSettings)
 class KnowledgeSettingsAdmin(admin.ModelAdmin):
     form = KnowledgeSettingsForm
-    readonly_fields = ["status_panel", "connection_help", "key_status", "feed_keys", "search_status"]
+    readonly_fields = ["live_panel", "status_panel", "connection_help", "key_status", "feed_keys", "search_status"]
     fieldsets = [
-        ("Стан", {"fields": ["status_panel"]}),
+        ("Стан", {"fields": ["live_panel", "status_panel"]}),
         ("Що індексувати", {
             "fields": ["enabled", "accounts", "categories", "index_from", "include_attachments",
                        "attachment_types_text", "attachment_max_mb"],
@@ -288,6 +291,18 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
             format_html("<ul style='margin:0;padding-left:18px'>{}</ul>", rows) if keys
             else format_html('<span style="color:#e57373">{}</span>', "ще немає"), button)
 
+    @admin.display(description="Що зараз робить RAG")
+    def live_panel(self, obj):
+        """Етап, прогрес і остання дія RAG; оновлюється сама (live/ кожні 5 с, capabilities RAG — раз на ~хвилину)."""
+        progress = knowledge.progress()
+        return render_to_string("admin/rag_assistant/knowledge_live.html", {
+            "progress": progress, "paused": progress["paused"],
+            "live_url": reverse("admin:rag_assistant_knowledgesettings_live"),
+            "pause_url": reverse("admin:rag_assistant_knowledgesettings_pause"),
+            "refresh_url": reverse("admin:rag_assistant_knowledgesettings_refresh"),
+            "clear_url": reverse("admin:rag_assistant_knowledgesettings_clear"),
+            "generation_url": reverse("admin:rag_assistant_knowledgesettings_generation")})
+
     @admin.display(description="Стан індексації")
     def status_panel(self, obj):
         inst = knowledge.instance_id()
@@ -313,20 +328,9 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
         failed = (KnowledgeDoc.objects.filter(fed=True, state=KnowledgeDoc.FAILED).order_by("-last_status_at")[:10])
         errors = format_html_join("", '<li><a href="/email/message/{}/" target="_blank">{}</a>: {}</li>',
                                   ((f.obj_id, f.document_id, f.error) for f in failed if f.status_revision == f.revision))
-        buttons = format_html(
-            '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
-            '<button type="submit" class="button" formaction="{}" formnovalidate>🔄 Звірити стрічку зараз</button>'
-            '<button type="submit" class="button" formaction="{}" formnovalidate '
-            'onclick="return confirm(\'Прибрати всі листи з індексу RAG і поставити на паузу?\')">🧹 Прибрати все з індексу</button>'
-            '<button type="submit" class="button" formaction="{}" formnovalidate '
-            'onclick="return confirm(\'Нове покоління — лише після відновлення БД з бекапу. RAG зробить повну звірку. Продовжити?\')">'
-            '♻ Нове покоління (після відновлення БД)</button></div>',
-            reverse("admin:rag_assistant_knowledgesettings_refresh"),
-            reverse("admin:rag_assistant_knowledgesettings_clear"),
-            reverse("admin:rag_assistant_knowledgesettings_generation"))
-        return format_html('<table>{}</table>{}{}', table,
+        return format_html('<table>{}</table>{}', table,
                            format_html('<div style="margin-top:8px"><b>Останні помилки RAG:</b><ul>{}</ul></div>', errors)
-                           if errors else "", buttons)
+                           if errors else "")
 
     @admin.display(description="Приватний пошук (/v2)")
     def search_status(self, obj):
@@ -376,7 +380,30 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
                  name="rag_assistant_knowledgesettings_generation"),
             path("check/", self.admin_site.admin_view(self.check_view), name="rag_assistant_knowledgesettings_check"),
             path("feedkey/", self.admin_site.admin_view(self.feedkey_view), name="rag_assistant_knowledgesettings_feedkey"),
+            path("live/", self.admin_site.admin_view(self.live_view), name="rag_assistant_knowledgesettings_live"),
+            path("pause/", self.admin_site.admin_view(self.pause_view), name="rag_assistant_knowledgesettings_pause"),
         ] + super().get_urls()
+
+    def live_view(self, request):
+        """JSON для живої панелі. ?probe=1 — також оновити capabilities RAG (кеш 60 с і запобіжник діють)."""
+        from . import retrieval
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        if request.GET.get("probe") and retrieval.available():
+            retrieval.capabilities(request.user)
+        return JsonResponse(knowledge.progress())
+
+    def pause_view(self, request):
+        if request.method == "POST" and self.has_change_permission(request):
+            paused = request.GET.get("action") == "pause"
+            knowledge.set_feed_paused(paused)
+            if paused:
+                self.message_user(request, "⏸ Індексацію призупинено: RAG зупиниться після поточного листа. "
+                                           "Пошук працює з уже проіндексованим.", messages.WARNING)
+            else:
+                self.message_user(request, "▶ Індексацію продовжено: RAG підхопить протягом хвилини. Уже оброблені "
+                                           "листи він лише звірить, тож швидко дійде до місця зупинки.")
+        return self._back()
 
     def feedkey_view(self, request):
         """Новий API-ключ Minerva для RAG (лише права бази знань, без магазину) → його сторінка з повним ключем."""
