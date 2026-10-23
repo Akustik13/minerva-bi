@@ -16,6 +16,8 @@ from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
+
+from . import thumbs
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
@@ -2167,36 +2169,6 @@ class ProductAdminForm(forms.ModelForm):
         return (self.cleaned_data.get("base_currency") or "EUR").upper()
 
 
-class ProductMediaFilter(admin.SimpleListFilter):
-    """Є / немає фото чи даташита (файл у картці або посилання)."""
-    title = "Фото / даташит"
-    parameter_name = "media"
-
-    def lookups(self, request, model_admin):
-        return [("no_image", "🖼 Без фото"), ("no_ds", "📄 Без даташита"), ("no_both", "Без фото й без даташита"),
-                ("image", "З фото"), ("ds", "З даташитом"),
-                ("broken", "❌ Посилання не відповідає (перевірка для сайту)")]
-
-    def queryset(self, request, qs):
-        from django.db.models import Q
-        no_image = (Q(image="") | Q(image__isnull=True)) & Q(image_url="")
-        no_ds = (Q(datasheet_file="") | Q(datasheet_file__isnull=True)) & Q(datasheet_url="")
-        v = self.value()
-        if v == "no_image":
-            return qs.filter(no_image)
-        if v == "no_ds":
-            return qs.filter(no_ds)
-        if v == "no_both":
-            return qs.filter(no_image & no_ds)
-        if v == "image":
-            return qs.exclude(no_image)
-        if v == "ds":
-            return qs.exclude(no_ds)
-        if v == "broken":   # «🖼 Фото й даташити»: перевірка не вдалась і копії немає
-            return qs.filter(shop_media__status="error", shop_media__stale=False).distinct()
-        return qs
-
-
 class ProductShopFilter(admin.SimpleListFilter):
     """У якому інтернет-магазині товар."""
     title = "Магазин"
@@ -2252,7 +2224,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         "reorder_badge", "label_btn", "set_stock_link",
     )
     search_fields = ("sku", "sku_short", "name")
-    list_filter   = ("category", ProductShopFilter, ProductMediaFilter, "lifecycle_status", "kind", "bom_type",
+    list_filter   = ("category", ProductShopFilter, thumbs.MediaFilter, "lifecycle_status", "kind", "bom_type",
                      "is_active")
     list_per_page = 50
     autocomplete_fields = ("successor",)

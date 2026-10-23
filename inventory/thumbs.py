@@ -1,4 +1,5 @@
-"""Мініатюри фото й посилання на даташит для списків (Товари, Склад → огляд залишків).
+"""Мініатюри фото й посилання на даташит для списків (Товари, Асортимент і ціни, Склад → огляд залишків)
+і фільтр «Фото / даташит».
 
 Мініатюра 96 px робиться на сервері й кешується в MEDIA_ROOT/thumbs/: джерело — файл у картці товару,
 інакше перевірена копія «🖼 Фото й даташити» магазину, інакше посилання (завантажується один раз).
@@ -11,7 +12,9 @@ import hashlib
 import time
 from io import BytesIO
 
+from django.contrib import admin
 from django.core.files.base import ContentFile
+from django.db.models import Q
 from django.core.files.storage import default_storage
 from django.urls import reverse
 from django.utils.html import format_html
@@ -115,16 +118,58 @@ def get(p) -> bytes | None:
     return data
 
 
-def cell(p) -> str:
-    """Мініатюра + 📄 для колонки списку; бліді значки — немає."""
+_NONE = "display:inline-block;width:36px;text-align:center;opacity:.35;font-size:13px;white-space:nowrap"
+
+
+def cell(p, note="") -> str:
+    """Мініатюра + 📄 для колонки списку; бліді значки — немає. note — додаткова позначка (напр. стан на сайті)."""
     thumb, ds = thumb_url(p), datasheet_href(p)
     img = (format_html('<a href="{}" target="_blank" rel="noopener" title="Фото — відкрити" onclick="event.stopPropagation()">'
                        '<img src="{}" alt="" loading="lazy" width="36" height="36" class="inv-thumb" '
+                       'style="width:36px;height:36px;object-fit:contain;border-radius:4px;background:#fff;display:block" '
                        'onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),'
-                       '{{textContent:\'🖼✕\',title:\'Фото недоступне\',className:\'inv-thumb-none\'}}))"></a>',
-                       image_href(p), thumb)
-           if thumb else format_html('<span class="inv-thumb-none" title="Немає фото">🖼</span>'))
+                       '{{textContent:\'🖼✕\',title:\'Фото недоступне\',className:\'inv-thumb-none\'}},'
+                       '{{style:\'{}\'}}))"></a>', image_href(p), thumb, _NONE)
+           if thumb else format_html('<span class="inv-thumb-none" style="{}" title="Немає фото">🖼</span>', _NONE))
     sheet = (format_html('<a href="{}" target="_blank" rel="noopener" class="inv-ds" title="Даташит — відкрити" '
-                         'onclick="event.stopPropagation()">📄</a>', ds)
-             if ds else format_html('<span class="inv-ds inv-ds-none" title="Немає даташита">📄</span>'))
-    return format_html('<span class="inv-media">{}{}</span>', img, sheet)
+                         'style="font-size:16px;text-decoration:none" onclick="event.stopPropagation()">📄</a>', ds)
+             if ds else format_html('<span class="inv-ds inv-ds-none" style="font-size:16px;opacity:.25" '
+                                    'title="Немає даташита">📄</span>'))
+    return format_html('<span class="inv-media" style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap">'
+                       '{}{}{}</span>', img, sheet, note)
+
+
+class MediaFilter(admin.SimpleListFilter):
+    """Є / немає фото чи даташита (файл у картці або посилання). prefix — шлях до товару (напр. «product__»)."""
+    title = "Фото / даташит"
+    parameter_name = "media"
+    prefix = ""
+
+    def lookups(self, request, model_admin):
+        return [("no_image", "🖼 Без фото"), ("no_ds", "📄 Без даташита"), ("no_both", "Без фото й без даташита"),
+                ("image", "З фото"), ("ds", "З даташитом"),
+                ("broken", "❌ Посилання не відповідає (перевірка для сайту)")]
+
+    def queryset(self, request, qs):
+        p = self.prefix
+        no_image = (Q(**{p + "image": ""}) | Q(**{p + "image__isnull": True})) & Q(**{p + "image_url": ""})
+        no_ds = ((Q(**{p + "datasheet_file": ""}) | Q(**{p + "datasheet_file__isnull": True}))
+                 & Q(**{p + "datasheet_url": ""}))
+        v = self.value()
+        if v == "no_image":
+            return qs.filter(no_image)
+        if v == "no_ds":
+            return qs.filter(no_ds)
+        if v == "no_both":
+            return qs.filter(no_image & no_ds)
+        if v == "image":
+            return qs.exclude(no_image)
+        if v == "ds":
+            return qs.exclude(no_ds)
+        if v == "broken":   # «🖼 Фото й даташити»: перевірка не вдалась і копії немає
+            return qs.filter(**{p + "shop_media__status": "error", p + "shop_media__stale": False}).distinct()
+        return qs
+
+
+class ListingMediaFilter(MediaFilter):
+    prefix = "product__"

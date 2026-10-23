@@ -68,7 +68,7 @@ tabele_mvp/
 
 ### inventory/
 - `Product` — SKU, reorder_point, ціни purchase/sale
-- Мініатюри фото й 📄 даташит у списку товарів і огляді складу — `inventory/thumbs.py` (96 px, кеш `MEDIA_ROOT/thumbs/`, `…/product/<pk>/thumb/`); фільтр «Фото / даташит» (`ProductMediaFilter`), кнопки «Без фото / Без даташита» в `reorderproxy/supply.html`
+- Мініатюри фото й 📄 даташит у списках товарів, «Асортимент і ціни» (+ 🌐 — чи забрав сайт магазину фото/даташит з Minerva, `shop/admin_media.listing_marker`) і огляді складу — `inventory/thumbs.py` (96 px, кеш `MEDIA_ROOT/thumbs/`, `…/product/<pk>/thumb/`); фільтр «Фото / даташит» — `thumbs.MediaFilter` / `ListingMediaFilter`, кнопки «Без фото / Без даташита» в `reorderproxy/supply.html`
 - `InventoryTransaction` — Прихід/Витрата/Коригування
 - `ReorderProxy` — managed=False, аналіз що замовити
 - `Supplier`, `PurchaseOrder`, `PurchaseOrderLine`

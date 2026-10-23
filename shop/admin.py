@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 
 from inventory.services.stock import annotate_stock
+from inventory.thumbs import ListingMediaFilter
 
 from . import services
 from .admin_payments import ShopForm, stripe_tools
@@ -661,11 +662,12 @@ class ShopPriceTierInline(admin.TabularInline):
 
 @admin.register(ShopListing)
 class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
-    list_display = ["sku_col", "name_col", "shop", "is_visible", "price", "promo_col", "source_col",
+    list_display = ["sku_col", "media_col", "name_col", "shop", "is_visible", "price", "promo_col", "source_col",
                     "sale_price_col", "purchase_col", "margin_col", "tiers_col", "available_col"]
     list_display_links = ["sku_col"]
     list_editable = ["is_visible", "price"]
-    list_filter = [ShopFilter, "is_visible", PromoFilter, LifecycleFilter, "price_source", PriceStateFilter, StockFilter, "product__category"]
+    list_filter = [ShopFilter, "is_visible", PromoFilter, LifecycleFilter, "price_source", PriceStateFilter, StockFilter,
+                   "product__category", ListingMediaFilter]
     search_fields = ["product__sku", "product__name", "product__name_export", "product__manufacturer"]
     list_select_related = ["shop", "product"]
     list_per_page = 100
@@ -735,10 +737,11 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
                               messages.INFO)
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("tiers")
+        return super().get_queryset(request).prefetch_related("tiers", "product__shop_media")
 
     def changelist_view(self, request, extra_context=None):
         self._stock = None  # залишки рахуються один раз на сторінку
+        self._media_sites = None  # що вже забрали сайти — один раз на сторінку
         # Вкладки магазинів над списком: видно, з яким магазином зараз працюємо
         current = request.GET.get("shop__id__exact", "")
         base = reverse("admin:shop_shoplisting_changelist")
@@ -756,6 +759,15 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     @admin.display(description="SKU", ordering="product__sku")
     def sku_col(self, obj):
         return obj.product.sku
+
+    @admin.display(description="🖼")
+    def media_col(self, obj):
+        """Мініатюра й 📄 товару + 🌐 — чи забрав сайт цього магазину фото / даташит з Minerva."""
+        from inventory.thumbs import cell
+        from .admin_media import listing_marker, sites_state
+        if getattr(self, "_media_sites", None) is None:
+            self._media_sites = sites_state()
+        return cell(obj.product, listing_marker(obj, *self._media_sites))
 
     @admin.display(description="Назва", ordering="product__name")
     def name_col(self, obj):

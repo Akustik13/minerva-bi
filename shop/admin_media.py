@@ -47,6 +47,36 @@ def _problems(row):
     return " · ".join(parts)
 
 
+def sites_state() -> tuple[bool, dict]:
+    """(увімкнено, {магазин: SHA-256, що сайт уже має}) — для позначки 🌐 у списку «Асортимент і ціни»."""
+    return (media.settings_obj().enabled,
+            {s.shop_id: set(s.have or []) for s in ShopMediaSite.objects.all()})
+
+
+def listing_marker(listing, enabled, have_by_shop) -> str:
+    """🌐✓ — сайт магазину вже показує фото й даташит з Minerva, 🌐⏳ — ще не забрав; без позначки — свої файли сайту."""
+    if not enabled:
+        return ""
+    rows = {r.kind: r for r in listing.product.shop_media.all()}
+    have, lines, states = have_by_shop.get(listing.shop_id, set()), [], []
+    for kind, label in media.KIND_LABEL.items():
+        r = rows.get(kind)
+        if r is None or not r.usable:
+            lines.append(f"{label}: свій файл сайту" if r and r.status != ProductMedia.PENDING else f"{label}: ще не перевірено")
+            continue
+        on = r.sha256 in have
+        states.append(on)
+        lines.append(f"{label}: з Minerva — {'✅ на сайті' if on else '⏳ сайт ще не забрав'}")
+    if not listing.is_visible:
+        lines.append("позицію сховано — сайт її не отримує")
+    title = f"Сайт «{listing.shop}»: " + " · ".join(lines)
+    if not states or not listing.is_visible:
+        return format_html('<span title="{}" style="font-size:11px;opacity:.35">🌐</span>', title)
+    ok = all(states)
+    return format_html('<span title="{}" style="font-size:11px;color:{}">🌐{}</span>', title,
+                       "#81c784" if ok else "#ffb74d", "✓" if ok else "⏳")
+
+
 def product_panel(product) -> str:
     """Блок «Для сайту» в картці товару (🔗 Медіа та документи)."""
     if not product or not product.pk:

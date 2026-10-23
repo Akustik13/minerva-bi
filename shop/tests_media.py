@@ -239,6 +239,23 @@ class MediaAdminTests(MediaTestBase):
         s = ShopMediaSettings.objects.get(pk=1)
         self.assertEqual((s.enabled, s.recheck_days), (True, 14))
 
+    def test_listing_column_marker_and_filter(self):
+        with web({self.p.image_url: JPG, self.p.datasheet_url: PDF}):
+            media.index_product(self.p)
+        self.enable()
+        r = self.client.get("/admin/shop/shoplisting/")
+        self.assertContains(r, 'class="inv-thumb"')
+        self.assertContains(r, "🌐⏳")                                   # сайт ще не забрав
+        sha = [m.sha256 for m in ProductMedia.objects.filter(product=self.p)]
+        ShopMediaSite.objects.create(shop=self.shop, have=sha)
+        r = self.client.get("/admin/shop/shoplisting/")
+        self.assertContains(r, "🌐✓")
+        self.assertContains(r, "фото: з Minerva — ✅ на сайті")
+        other = Product.objects.create(sku="NO-MEDIA", name="Без нічого")
+        ShopListing.objects.create(shop=self.shop, product=other)
+        r = self.client.get("/admin/shop/shoplisting/?media=no_both")
+        self.assertEqual([l.product.sku for l in r.context["cl"].result_list], ["NO-MEDIA"])
+
     def test_product_card_check_now(self):
         r = self.client.get(f"/admin/inventory/product/{self.p.pk}/change/")
         self.assertContains(r, "Для сайту")
