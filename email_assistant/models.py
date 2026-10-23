@@ -528,14 +528,20 @@ class ReplyBrief(models.Model):
     Останній бриф користувача для гілки показується під чернеткою; застарів — якщо в гілці з'явились нові листи.
     """
     RUNNING, DONE, ERROR = 'running', 'done', 'error'
+    MODE_DATA, MODE_BRIEF, MODE_LETTER = 'data', 'brief', 'letter'
+    MODE_CHOICES = [(MODE_DATA, 'Лише дані'), (MODE_BRIEF, 'Дані + бриф'), (MODE_LETTER, 'Дані + бриф + лист')]
 
     user          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reply_briefs')
+    mode          = models.CharField(max_length=10, choices=MODE_CHOICES, default=MODE_LETTER,
+                                     help_text='До якого кроку готувати; далі — кнопками «Скласти бриф» / «Написати лист»')
+    target        = models.TextField(blank=True, default='', help_text='Лист, на який відповідаємо (мітка [#N] для брифу)')
     message       = models.ForeignKey(EmailMessage, on_delete=models.CASCADE, related_name='+',
                                       verbose_name='Відповідь на лист')
     thread        = models.ForeignKey(EmailThread, null=True, blank=True, on_delete=models.CASCADE, related_name='+')
     wish          = models.TextField('Побажання', blank=True, default='')
     brief         = models.TextField('Бриф', blank=True, default='')
-    sources       = models.JSONField(default=list, blank=True, help_text='[{n, kind, label, url}] — на що посилається [#N]')
+    sources       = models.JSONField(default=list, blank=True,
+                                     help_text='[{n, kind, label, url, text}] — зібрані дані; бриф посилається на них як [#N]')
     draft         = models.TextField('Чернетка листа', blank=True, default='')
     recipient     = models.CharField(max_length=300, blank=True, default='', help_text='Кому пишемо (для AI)')
     to_email      = models.CharField(max_length=254, blank=True, default='')

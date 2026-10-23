@@ -1141,8 +1141,25 @@ def ai_prepare_view(request, message_pk):
     _to, cc = _reply_addresses(account, thread_messages[-1])
     if (to_email or '').lower() != (_to or '').lower():
         cc = []   # внутрішнє пересилання → пишемо клієнту, колег у копію не тягнемо
-    wish = str(_json_body(request).get('wish') or '')
-    brief = reply_brief.start(request.user, msg, wish=wish, recipient=to_label or '', to_email=to_email or '', cc=cc)
+    body = _json_body(request)
+    brief = reply_brief.start(request.user, msg, wish=str(body.get('wish') or ''), recipient=to_label or '',
+                              to_email=to_email or '', cc=cc, mode=str(body.get('mode') or 'letter'))
+    return JsonResponse(reply_brief.as_json(brief))
+
+
+@staff_member_required
+@require_POST
+def reply_brief_compose_view(request, brief_pk):
+    """«📋 Скласти бриф» зі збережених даних — без повторного збору."""
+    from email_assistant import reply_brief
+    from email_assistant.models import ReplyBrief
+    brief = get_object_or_404(ReplyBrief.objects.select_related('message'), pk=brief_pk, user=request.user)
+    if brief.status == ReplyBrief.RUNNING:
+        return JsonResponse({'ok': False, 'error': 'Ще готується'}, status=409)
+    if not brief.sources:
+        return JsonResponse({'ok': False, 'error': 'Даних немає — натисніть «📋 Підготувати»'}, status=400)
+    wish = _json_body(request).get('wish')
+    reply_brief.start_brief(brief, str(wish) if wish is not None else None)
     return JsonResponse(reply_brief.as_json(brief))
 
 
@@ -1163,7 +1180,7 @@ def reply_brief_rewrite_view(request, brief_pk):
     from email_assistant.models import ReplyBrief
     brief = get_object_or_404(ReplyBrief.objects.select_related('message'), pk=brief_pk, user=request.user)
     if brief.status == ReplyBrief.RUNNING:
-        return JsonResponse({'ok': False, 'error': 'Бриф ще готується'}, status=409)
+        return JsonResponse({'ok': False, 'error': 'Ще готується'}, status=409)
     body = _json_body(request)
     text = str(body.get('brief') or '').strip()
     if not text:

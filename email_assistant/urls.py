@@ -26,6 +26,7 @@ urlpatterns = [
     path('message/<int:message_pk>/ai-prepare/',         views.ai_prepare_view,      name='ai_prepare'),
     path('message/<int:message_pk>/brief/',              views.message_brief_view,   name='message_brief'),
     path('brief/<int:brief_pk>/',                         views.reply_brief_view,     name='reply_brief'),
+    path('brief/<int:brief_pk>/compose/',                 views.reply_brief_compose_view, name='reply_brief_compose'),
     path('brief/<int:brief_pk>/rewrite/',                 views.reply_brief_rewrite_view, name='reply_brief_rewrite'),
     path('message/<int:message_pk>/ai-translate/',       views.ai_translate,         name='ai_translate'),
     path('message/<int:message_pk>/history/',            views.history_view,         name='history'),

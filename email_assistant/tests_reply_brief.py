@@ -78,8 +78,8 @@ class ReplyBriefBase(CategoryBase):
              'file_path': f'email_attachments/{name}'}])
         msg.refresh_from_db()
 
-    def prepare(self, msg, wish=''):
-        r = self.client.post(f'/email/message/{msg.pk}/ai-prepare/', json.dumps({'wish': wish}),
+    def prepare(self, msg, wish='', mode='letter'):
+        r = self.client.post(f'/email/message/{msg.pk}/ai-prepare/', json.dumps({'wish': wish, 'mode': mode}),
                              content_type='application/json')
         self.assertEqual(r.status_code, 200, r.content[:300])
         return self.client.get(f'/email/brief/{r.json()["id"]}/').json()
@@ -123,8 +123,9 @@ class PrepareTests(ReplyBriefBase):
                              content_type='application/json')
         self.assertEqual(r.status_code, 200)
         b2 = self.client.get(f'/email/brief/{b["id"]}/').json()
-        self.assertEqual((b2['status'], b2['draft'], [s['key'] for s in b2['stages']]),
-                         ('done', 'Neuer Text mit 5 % Rabatt.', ['letter']))
+        self.assertEqual((b2['status'], b2['draft']), ('done', 'Neuer Text mit 5 % Rabatt.'))
+        stages = {s['key']: s['status'] for s in b2['stages']}
+        self.assertEqual((stages['thread'], stages['letter']), ('done', 'done'))   # етапи збору лишились видимими
         self.assertIn('МІЙ БРИФ: знижка 5 %', self.ai.prompt('letter'))
         self.assertEqual(len([c for c in self.ai.calls if c['kind'] == 'brief']), 1)   # дані заново не збирались
         r = self.client.post(f'/email/brief/{b["id"]}/rewrite/', json.dumps({'brief': '  '}),
@@ -150,6 +151,57 @@ class PrepareTests(ReplyBriefBase):
         self.assertEqual(b['status'], 'error')
         self.assertIn('бриф', b['error'])
         self.assertEqual({s['key']: s['status'] for s in b['stages']}['brief'], 'failed')
+
+
+class StepsTests(ReplyBriefBase):
+    def test_data_only_then_brief_then_letter_without_regathering(self):
+        msg = self.mail(body='Bitte Preis für 500 Stück ANT-1.')
+        self.mail(subject='Rechnung 2025', body='Die Rechnung 4711 ist bezahlt.', day=2)   # інше листування клієнта
+        b = self.prepare(msg, wish='назви ціну', mode='data')
+        self.assertEqual((b['status'], b['mode'], b['brief'], b['draft']), ('done', 'data', '', ''))
+        self.assertEqual(self.ai.calls, [])                                   # лише дані — без AI
+        stages = {s['key']: (s['status'], s['detail']) for s in b['stages']}
+        self.assertEqual(stages['brief'][0], 'skipped')
+        self.assertIn('кнопкою', stages['brief'][1])
+        kinds = {s['kind'] for s in b['sources']}
+        self.assertTrue({'mail', 'history', 'others'} <= kinds, kinds)
+        others = [s for s in b['sources'] if s['kind'] == 'others'][0]
+        self.assertIn('Rechnung 4711', others['text'])                          # повний текст для показу
+        self.assertIn('Rechnung 2025', others['label'])
+
+        with patch('email_assistant.reply_brief.gather', side_effect=AssertionError('no regather')):
+            r = self.client.post(f'/email/brief/{b["id"]}/compose/', json.dumps({}), content_type='application/json')
+            self.assertEqual(r.status_code, 200)
+            b2 = self.client.get(f'/email/brief/{b["id"]}/').json()
+            stages = {s['key']: s['status'] for s in b2['stages']}
+            self.assertEqual((b2['status'], b2['draft'], stages['thread'], stages['brief'], stages['letter']),
+                             ('done', '', 'done', 'done', 'skipped'))
+            self.assertTrue(b2['brief'].startswith('ПИТАННЯ'))
+            self.assertIn('Rechnung 4711', self.ai.prompt('brief'))           # бриф — зі збережених даних
+            self.client.post(f'/email/brief/{b["id"]}/rewrite/', json.dumps({'brief': b2['brief']}),
+                             content_type='application/json')
+            b3 = self.client.get(f'/email/brief/{b["id"]}/').json()
+        self.assertEqual((b3['status'], b3['draft']), ('done', 'Sehr geehrte Frau Muster,\nder Preis beträgt 12,50 EUR.'))
+        self.assertEqual([c['kind'] for c in self.ai.calls], ['brief', 'letter'])
+
+    def test_brief_mode_stops_before_letter(self):
+        b = self.prepare(self.mail(), mode='brief')
+        self.assertEqual((b['status'], bool(b['brief']), b['draft']), ('done', True, ''))
+        self.assertEqual([c['kind'] for c in self.ai.calls], ['brief'])
+
+    def test_running_state_has_no_source_texts(self):
+        msg = self.mail()
+        brief = ReplyBrief.objects.create(user=self.user, message=msg, thread=msg.thread, status=ReplyBrief.RUNNING,
+                                          sources=[{'n': 1, 'kind': 'mail', 'label': 'x', 'url': '', 'text': 'secret body'}])
+        self.assertNotIn('text', reply_brief.as_json(brief)['sources'][0])      # легке опитування під час роботи
+        brief.status = ReplyBrief.DONE
+        self.assertEqual(reply_brief.as_json(brief)['sources'][0]['text'], 'secret body')
+
+    def test_compose_needs_gathered_data(self):
+        msg = self.mail()
+        brief = ReplyBrief.objects.create(user=self.user, message=msg, thread=msg.thread, status=ReplyBrief.DONE)
+        r = self.client.post(f'/email/brief/{brief.pk}/compose/', json.dumps({}), content_type='application/json')
+        self.assertEqual(r.status_code, 400)
 
 
 class RagScopeTests(ReplyBriefBase):

@@ -1,16 +1,21 @@
 """
-«📋 Підготувати відповідь» — одним кліком: зібрати дані → бриф → лист (ReplyBrief).
+«📋 Підготувати відповідь» — по кроках: дані → бриф → лист (ReplyBrief). До якого кроку йти, вибирає менеджер
+(ReplyBrief.mode: лише дані / + бриф / + лист); далі — кнопками «📋 Скласти бриф» і «✍️ Написати лист».
 
-1. gather() — без AI; кожне джерело отримує номер [#N], бриф посилається на них:
-   - листування гілки (до листа, на який відповідаємо);
-   - дані Minerva: замовлення, відправлення, клієнт, нотатки CRM, інші листування, огляд проєкту (context.py);
-   - проєкти гілки: шапка й останні листи з інших гілок проєкту;
-   - Angebote гілки / клієнта / проєкту з позиціями;
-   - текст вкладень гілки (PDF, DOCX, TXT, CSV);
-   - RAG — лише в листуваннях цього клієнта (або проєкту), запит — побажання менеджера + суть листа.
-2. Бриф — швидша модель (ai_helper.BRIEF_MODEL), українською, для менеджера.
-3. Лист — модель із «Налаштувань пошти» за брифом. «↻ Переписати» — лише цей крок з виправленим брифом.
-Усе у фоні: браузер опитує стан (stages). Бриф застарів, якщо в гілці з'явились новіші листи.
+1. gather() — БЕЗ AI (0 токенів), у момент натискання; кожне джерело отримує номер [#N] і групу походження:
+   - mail       — листи цієї гілки до листа, на який відповідаємо;
+   - history    — стан і хронологія, те саме, що в «📜 Історії» (замовлення, відправлення, нотатки CRM);
+   - overview   — збережений AI-огляд проєкту (обіцянки, відкриті питання);
+   - project    — шапка проєкту й останні листи з інших його гілок;
+   - others     — інші листування з клієнтом з бази Minerva (останній лист кожного; це не RAG);
+   - offer      — Angebote гілки / клієнта / проєкту з позиціями;
+   - attachment — текст вкладень гілки (PDF, DOCX, TXT, CSV);
+   - rag        — фрагменти з бази знань RAG, лише в листуваннях цього клієнта (або проєкту),
+                  запит — побажання менеджера + суть листа.
+   Текст джерел зберігається в ReplyBrief.sources — бриф можна скласти пізніше без повторного збору.
+2. Бриф — швидша модель (ai_helper.BRIEF_MODEL), українською, з посиланнями [#N].
+3. Лист — модель із «Налаштувань пошти» за брифом; «↻ Переписати» / «✍️ Написати лист» — лише цей крок.
+Усе у фоні: браузер опитує стан (stages). Дані застарілі, якщо в гілці з'явились новіші листи.
 """
 import logging
 import os
@@ -27,6 +32,8 @@ logger = logging.getLogger('email_assistant')
 
 THREAD_LAST = 12
 NEWEST_CHARS, MESSAGE_CHARS = 10000, 2500
+HISTORY_EVENTS = 40
+OTHER_THREAD_CHARS = 800
 PROJECTS, PROJECT_MESSAGES, PROJECT_CHARS = 2, 8, 1200
 OFFERS, OFFER_LINES = 5, 12
 ATTACHMENT_FILES, ATTACHMENT_CHARS, ATTACHMENT_TOTAL, ATTACHMENT_MAX_MB = 4, 4000, 12000, 15
@@ -34,22 +41,23 @@ ATTACHMENT_TYPES = ('pdf', 'docx', 'txt', 'csv')
 RAG_HITS, RAG_HIT_CHARS, RAG_WAIT_SECONDS = 8, 1200, 12
 
 STAGES = [
-    ('thread', 'Листування гілки'),
-    ('minerva', 'Дані Minerva: замовлення, клієнт, CRM'),
-    ('projects', 'Проєкт'),
-    ('offers', 'Angebote'),
-    ('attachments', 'Вкладення'),
-    ('rag', 'Інші листування (RAG)'),
-    ('brief', 'Бриф'),
-    ('letter', 'Лист'),
+    ('thread', '📨 Ця гілка'),
+    ('minerva', '📜 Історія (як у «📜 Історії»), огляд проєкту, інші листування з клієнтом'),
+    ('projects', '📁 Проєкт: інші гілки'),
+    ('offers', '📝 Angebote'),
+    ('attachments', '📎 Вкладення'),
+    ('rag', '🔎 RAG: пошук в інших листуваннях клієнта'),
+    ('brief', '📋 Бриф (AI)'),
+    ('letter', '✍️ Лист (AI)'),
 ]
+GATHER_STAGES = [k for k, _ in STAGES if k not in ('brief', 'letter')]
 
 
 class Sources:
-    """Нумеровані джерела [#N]: повний текст — для брифу, мітки й посилання — для показу менеджеру."""
+    """Нумеровані джерела [#N]: текст — для брифу й для показу менеджеру, група — звідки дані."""
 
-    def __init__(self):
-        self.items = []
+    def __init__(self, items=None):
+        self.items = list(items or [])
 
     def add(self, kind, label, text, url=''):
         self.items.append({'n': len(self.items) + 1, 'kind': kind, 'label': label[:200], 'url': url,
@@ -57,10 +65,11 @@ class Sources:
         return len(self.items)
 
     def text(self) -> str:
-        return '\n\n'.join(f'[#{i["n"]}] {i["label"]}\n{i["text"] or "—"}' for i in self.items)
+        return '\n\n'.join(f'[#{i["n"]}] {i["label"]}\n{i.get("text") or "—"}' for i in self.items)
 
-    def public(self) -> list:
-        return [{k: i[k] for k in ('n', 'kind', 'label', 'url')} for i in self.items]
+    def public(self, texts=True) -> list:
+        keys = ('n', 'kind', 'label', 'url', 'text') if texts else ('n', 'kind', 'label', 'url')
+        return [{k: i.get(k, '') for k in keys} for i in self.items]
 
 
 def _dt(value) -> str:
@@ -136,11 +145,11 @@ def attachment_text(att, limit=ATTACHMENT_CHARS) -> str:
     return re.sub(r'[ \t]+', ' ', re.sub(r'\n{3,}', '\n\n', text)).strip()[:limit]
 
 
-# ── Збір джерел ──────────────────────────────────────────────────────────────
+# ── Збір джерел (без AI) ─────────────────────────────────────────────────────
 
 def gather(brief, on_stage=None) -> tuple:
     """(Sources, листи гілки, мітка листа-адресата). on_stage(key, status, detail) — для показу етапів."""
-    from email_assistant.context import build_context, context_text, used_summary
+    from email_assistant.context import build_context
     on_stage = on_stage or (lambda *a: None)
     msg, user, wish = brief.message, brief.user, brief.wish
     account = msg.account
@@ -160,12 +169,9 @@ def gather(brief, on_stage=None) -> tuple:
 
     on_stage('minerva', 'running')
     ctx = build_context(msg)
-    facts = context_text(ctx)
-    if facts:
-        src.add('minerva', 'Minerva: замовлення, відправлення, клієнт, нотатки CRM, інші листування, огляд проєкту', facts)
-    summary = used_summary(ctx)
-    used += summary
-    on_stage('minerva', 'done', ', '.join(summary) or 'нічого пов\'язаного')
+    detail = _minerva(src, ctx)
+    used += [d for d in detail if d]
+    on_stage('minerva', 'done' if detail else 'skipped', ' · '.join(detail) or 'нічого пов\'язаного в базі')
     customer = ctx.get('customer')
 
     on_stage('projects', 'running')
@@ -196,13 +202,47 @@ def gather(brief, on_stage=None) -> tuple:
     on_stage('attachments', 'done' if files else 'skipped', ', '.join(files) or 'немає текстових вкладень')
 
     on_stage('rag', 'running')
-    status, detail = _rag(src, user, msg, ctx, wish, customer, projects)
-    if status == 'done':
-        used.append(detail)
+    status, detail, note = _rag(src, user, msg, ctx, wish, customer, projects)
+    if note:
+        used.append(note)
     on_stage('rag', status, detail)
 
     brief.used = used
     return src, msgs, target
+
+
+def _minerva(src, ctx) -> list:
+    """Дані з бази Minerva, розкладені за походженням (історія / огляд проєкту / інші листування)."""
+    from email_assistant.context import _fmt, history_events, state_lines
+    detail = []
+    state, events = state_lines(ctx), history_events(ctx)
+    if state or events:
+        lines = (['ПОТОЧНИЙ СТАН:'] + state if state else []) + \
+            (['ХРОНОЛОГІЯ:'] + [f'{_fmt(d)} {icon} {text}' + ('' if scope == 'order' else ' [інше по клієнту]')
+                                for d, icon, text, scope in events[-HISTORY_EVENTS:]] if events else [])
+        src.add('history', 'Історія: стан і хронологія (замовлення, відправлення, нотатки CRM)', '\n'.join(lines))
+        if ctx.get('customer') is not None:
+            detail.append(f'клієнт {ctx["customer"].name}')
+        if ctx['orders']:
+            detail.append(f'замовлень: {len(ctx["orders"])}')
+        if ctx['notes']:
+            detail.append(f'нотаток CRM: {len(ctx["notes"])}')
+    if ctx.get('projects'):
+        from projects.overview import facts_text
+        for project, overview, stale in ctx['projects'][:PROJECTS]:
+            when = timezone.localtime(overview.updated_at).strftime('%d.%m.%Y') if getattr(overview, 'updated_at', None) else ''
+            src.add('overview', f'Огляд проєкту {project.code}' + (f' від {when}' if when else '')
+                    + (' (застарів)' if stale else ''), facts_text(project, overview, stale)[:2500],
+                    f'/admin/projects/project/{project.pk}/change/')
+            detail.append(f'огляд {project.code}' + (' (застарів)' if stale else ''))
+    for t in ctx.get('other_threads') or []:
+        last = t['last']
+        src.add('others', f'Інше листування «{t["thread"].subject or "—"}» ({t["count"]} лист.) — останній лист '
+                          f'{_dt(last.sent_at)} від {last.from_email}', (last.body_text or '')[:OTHER_THREAD_CHARS],
+                f'/email/message/{last.pk}/')
+    if ctx.get('other_threads'):
+        detail.append(f'інших листувань: {len(ctx["other_threads"])}')
+    return detail
 
 
 def _projects(msg) -> list:
@@ -275,17 +315,17 @@ def _attachments(src, msgs) -> list:
 
 
 def _rag(src, user, msg, ctx, wish, customer, projects) -> tuple:
-    """RAG лише в листуваннях цього клієнта (або єдиного проєкту); → (status, detail)."""
+    """RAG лише в листуваннях цього клієнта (або єдиного проєкту); → (status, detail для етапу, note для «врахувала»)."""
     try:
         from rag_assistant import retrieval
     except ImportError:
-        return 'skipped', 'RAG не підключено'
+        return 'skipped', 'RAG не підключено', ''
     if not retrieval.available():
-        return 'skipped', 'RAG не налаштований'
+        return 'skipped', 'RAG не налаштований', ''
     customer_id = customer.pk if customer is not None else None
     project_id = projects[0].pk if len(projects) == 1 and not customer_id else None
     if not customer_id and not project_id:
-        return 'skipped', 'клієнта чи проєкт не визначено — у всій пошті не шукаємо'
+        return 'skipped', 'клієнта чи проєкт не визначено — у всій пошті не шукаємо', ''
     query = ' · '.join(p for p in (wish.strip(), retrieval.query_for(ctx)) if p)
     job = retrieval.start(user, query, purpose='reply', thread=msg.thread, customer_id=customer_id,
                           project_id=project_id, exclude_thread_ids=[msg.thread_id] if msg.thread_id else [],
@@ -294,20 +334,34 @@ def _rag(src, user, msg, ctx, wish, customer, projects) -> tuple:
     while not job.is_terminal and time.monotonic() < deadline:
         time.sleep(min(max(job.poll_after_ms or 1000, 300), 1500) / 1000)
         retrieval.poll(job)
+    scope = f'клієнта {customer.name}' if customer_id else f'проєкту {projects[0].code}'
+    asked = f'запит «{query[:70]}{"…" if len(query) > 70 else ""}»'
     if job.status != job.COMPLETED:
-        return 'skipped', (job.message or 'RAG не встиг')[:200]
-    for h in job.hits[:RAG_HITS]:
+        return 'skipped', f'{(job.message or "RAG не встиг")[:90]} · {asked}', ''
+    hits = job.hits[:RAG_HITS]
+    for h in hits:
         src.add('rag', f'RAG · {(h.get("sent_at") or "")[:10]} · {h.get("from_email", "")} · «{(h.get("subject") or "")[:80]}»',
                 (h.get('text') or '')[:RAG_HIT_CHARS], h.get('url') or '')
-    scope = 'клієнта' if customer_id else 'проєкту'
-    return 'done', f'RAG: фрагментів {min(len(job.hits), RAG_HITS)} з листувань {scope}'
+    return 'done', f'фрагментів {len(hits)} у листуваннях {scope} · {asked}', f'RAG: фрагментів {len(hits)}'
 
 
 # ── Запуск ───────────────────────────────────────────────────────────────────
 
-def _stages(keys=None) -> list:
-    return [{'key': k, 'label': label, 'status': 'pending', 'detail': ''}
+def _stages(keys=None, skip=()) -> list:
+    return [{'key': k, 'label': label, 'status': 'skipped' if k in skip else 'pending',
+             'detail': 'наступний крок — кнопкою нижче' if k in skip else ''}
             for k, label in STAGES if keys is None or k in keys]
+
+
+def _restage(brief, run, skip=()) -> list:
+    """Наступний крок: етапи збору лишаються (видно, звідки дані), кроки run — заново, skip — «кнопкою нижче»."""
+    stages = brief.stages or _stages()
+    for s in stages:
+        if s['key'] in run:
+            s['status'], s['detail'] = 'pending', ''
+        elif s['key'] in skip:
+            s['status'], s['detail'] = 'skipped', 'наступний крок — кнопкою нижче'
+    return stages
 
 
 def _start_background(fn):
@@ -326,24 +380,37 @@ def _in_background(fn):
     _start_background(run)
 
 
-def start(user, msg, *, wish='', recipient='', to_email='', cc=()):
-    """Новий бриф для листа msg і підготовка у фоні. → ReplyBrief (status running)."""
+def start(user, msg, *, wish='', recipient='', to_email='', cc=(), mode='letter'):
+    """Нова підготовка для листа msg у фоні до кроку mode (data / brief / letter). → ReplyBrief (running)."""
     from email_assistant.models import ReplyBrief
+    mode = mode if mode in dict(ReplyBrief.MODE_CHOICES) else ReplyBrief.MODE_LETTER
+    skip = {'data': ('brief', 'letter'), 'brief': ('letter',)}.get(mode, ())
     brief = ReplyBrief.objects.create(
-        user=user, message=msg, thread=msg.thread if msg.thread_id else None, wish=(wish or '')[:2000],
-        recipient=recipient[:300], to_email=to_email[:254], cc=list(cc), stages=_stages(),
+        user=user, message=msg, thread=msg.thread if msg.thread_id else None, wish=(wish or '')[:2000], mode=mode,
+        recipient=recipient[:300], to_email=to_email[:254], cc=list(cc), stages=_stages(skip=skip),
         last_message_id=latest_message_id(msg))
     _in_background(lambda: _prepare(brief.pk))
     return brief
 
 
+def start_brief(brief, wish=None):
+    """«📋 Скласти бриф» зі збережених даних (без повторного збору). → той самий ReplyBrief (running)."""
+    from email_assistant.models import ReplyBrief
+    if wish is not None:
+        brief.wish = wish[:2000]
+    brief.status, brief.error, brief.stages = ReplyBrief.RUNNING, '', _restage(brief, ['brief'], skip=['letter'])
+    brief.save()
+    _in_background(lambda: _compose(brief.pk))
+    return brief
+
+
 def start_rewrite(brief, text, wish=None):
-    """«↻ Переписати»: лише лист, з (виправленим) брифом. → той самий ReplyBrief (status running)."""
+    """«↻ Переписати» / «✍️ Написати лист»: лише лист, з (виправленим) брифом. → той самий ReplyBrief (running)."""
     from email_assistant.models import ReplyBrief
     brief.brief = (text or '').strip()[:20000]
     if wish is not None:
         brief.wish = wish[:2000]
-    brief.status, brief.error, brief.stages = ReplyBrief.RUNNING, '', _stages(['letter'])
+    brief.status, brief.error, brief.stages = ReplyBrief.RUNNING, '', _restage(brief, ['letter'])
     brief.save()
     _in_background(lambda: _rewrite(brief.pk))
     return brief
@@ -358,7 +425,7 @@ def _stage_setter(brief):
     def set_stage(key, status, detail=''):
         for s in brief.stages:
             if s['key'] == key:
-                s['status'], s['detail'] = status, (detail or '')[:200]
+                s['status'], s['detail'] = status, (detail or '')[:220]
         brief.save(update_fields=['stages', 'updated_at'])
     return set_stage
 
@@ -369,25 +436,33 @@ def _model_label(model) -> str:
 
 
 def _prepare(pk):
-    from email_assistant import ai_helper
     from email_assistant.models import ReplyBrief
     brief = _load(pk)
     set_stage = _stage_setter(brief)
     try:
         src, msgs, target = gather(brief, set_stage)
-        brief.sources = src.public()
-        brief.save(update_fields=['sources', 'used', 'updated_at'])
-        set_stage('brief', 'running')
-        profile = getattr(brief.user, 'profile', None)
-        text = ai_helper.make_reply_brief(src.text(), brief.wish, target, brief.message.account, profile)
-        if not text:
-            raise RuntimeError('AI не повернув бриф — перевірте ключ AI або спробуйте ще раз')
-        brief.brief, brief.brief_model = text, ai_helper.last_model()
-        set_stage('brief', 'done', f'модель {_model_label(brief.brief_model)}')
-        _write_letter(brief, msgs, set_stage)
+        brief.sources, brief.target = src.public(), target
+        brief.save(update_fields=['sources', 'target', 'used', 'updated_at'])
+        if brief.mode != ReplyBrief.MODE_DATA:
+            _make_brief(brief, src, set_stage)
+            if brief.mode == ReplyBrief.MODE_LETTER:
+                _write_letter(brief, msgs, set_stage)
         brief.status = ReplyBrief.DONE
     except Exception as e:  # noqa: BLE001
         logger.exception('reply brief %s failed: %s', pk, e)
+        _fail(brief, e)
+    brief.save()
+
+
+def _compose(pk):
+    from email_assistant.models import ReplyBrief
+    brief = _load(pk)
+    set_stage = _stage_setter(brief)
+    try:
+        _make_brief(brief, Sources(brief.sources), set_stage)
+        brief.status = ReplyBrief.DONE
+    except Exception as e:  # noqa: BLE001
+        logger.exception('reply brief compose %s failed: %s', pk, e)
         _fail(brief, e)
     brief.save()
 
@@ -405,6 +480,19 @@ def _rewrite(pk):
     brief.save()
 
 
+def _make_brief(brief, src, set_stage):
+    from email_assistant import ai_helper
+    set_stage('brief', 'running')
+    profile = getattr(brief.user, 'profile', None)
+    text = ai_helper.make_reply_brief(src.text(), brief.wish, brief.target, brief.message.account, profile)
+    if not text:
+        raise RuntimeError('AI не повернув бриф — перевірте ключ AI або спробуйте ще раз')
+    brief.brief, brief.brief_model, brief.draft = text, ai_helper.last_model(), ''
+    brief.used = [u for u in brief.used if not u.startswith(('бриф —', 'лист —'))] + \
+        [f'бриф — {_model_label(brief.brief_model)}']
+    set_stage('brief', 'done', f'модель {_model_label(brief.brief_model)}')
+
+
 def _write_letter(brief, msgs, set_stage):
     from email_assistant import ai_helper
     from email_assistant.models import EmailMessage
@@ -415,8 +503,7 @@ def _write_letter(brief, msgs, set_stage):
     if not draft:
         raise RuntimeError('AI не повернув лист — спробуйте «Переписати»')
     brief.draft, brief.letter_model = draft, ai_helper.last_model()
-    brief.used = [u for u in brief.used if not u.startswith(('бриф —', 'лист —'))] + \
-        ([f'бриф — {_model_label(brief.brief_model)}'] if brief.brief_model else []) + \
+    brief.used = [u for u in brief.used if not u.startswith('лист —')] + \
         [f'лист — {_model_label(brief.letter_model)}']
     set_stage('letter', 'done', f'модель {_model_label(brief.letter_model)}')
     EmailMessage.objects.filter(pk=brief.message_id).update(ai_reply_draft=draft)
@@ -433,7 +520,7 @@ def _fail(brief, error):
 # ── Для браузера ─────────────────────────────────────────────────────────────
 
 def latest_for(user, msg):
-    """Останній бриф користувача для гілки листа (або для самого листа без гілки)."""
+    """Остання підготовка користувача для гілки листа (або для самого листа без гілки)."""
     from email_assistant.models import ReplyBrief
     qs = ReplyBrief.objects.filter(user=user)
     qs = qs.filter(thread_id=msg.thread_id) if msg.thread_id else qs.filter(message=msg)
@@ -441,8 +528,12 @@ def latest_for(user, msg):
 
 
 def as_json(brief) -> dict:
-    stale = brief.status == brief.DONE and latest_message_id(brief.message) != brief.last_message_id
-    return {'id': brief.pk, 'status': brief.status, 'error': brief.error, 'stages': brief.stages,
-            'brief': brief.brief, 'sources': brief.sources, 'draft': brief.draft, 'to': brief.to_email,
-            'cc': brief.cc, 'used': brief.used, 'wish': brief.wish, 'message_id': brief.message_id,
-            'stale': stale, 'updated': timezone.localtime(brief.updated_at).strftime('%d.%m %H:%M')}
+    """Стан для браузера; повний текст джерел — лише коли крок завершено (опитування під час роботи — легке)."""
+    running = brief.status == brief.RUNNING
+    stale = not running and latest_message_id(brief.message) != brief.last_message_id
+    return {'id': brief.pk, 'status': brief.status, 'mode': brief.mode, 'error': brief.error, 'stages': brief.stages,
+            'brief': brief.brief, 'sources': Sources(brief.sources).public(texts=not running), 'draft': brief.draft,
+            'to': brief.to_email, 'cc': brief.cc, 'used': brief.used, 'wish': brief.wish,
+            'message_id': brief.message_id, 'stale': stale,
+            'updated': timezone.localtime(brief.updated_at).strftime('%d.%m %H:%M'),
+            'gathered': timezone.localtime(brief.created_at).strftime('%d.%m.%Y %H:%M')}
