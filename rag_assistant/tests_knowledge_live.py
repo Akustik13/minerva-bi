@@ -46,10 +46,19 @@ class ActivityTests(KnowledgeBase):
         self.changes(snap["snapshot_seq"])                                # знімок завершено — RAG перейшов до змін
         self.assertEqual(KnowledgeActivity.get().phase, KnowledgeActivity.CHANGES)
         p = knowledge.progress()
-        self.assertEqual((p["stage"], p["step"], p["percent"]), ("updating", 2, None))
+        self.assertEqual((p["stage"], p["step"], p["percent"]), ("confirm", 3, None))
+        self.assertEqual([st["status"] for st in p["steps"]], ["done", "done", "done", "current", "todo"])
+        self.assertIn("ще 4", p["steps"][3]["detail"])
+        last = knowledge.summary()["last_seq"]                            # RAG ще не застосував увесь журнал
+        KnowledgeSettings.objects.update(last_capabilities={"index": {"received_seq": last, "applied_seq": last - 2}})
+        p = knowledge.progress()
+        self.assertEqual((p["stage"], p["step"], p["seq"]["applied"]), ("changes", 2, last - 2))
+        self.assertEqual(p["steps"][2]["detail"], "ще подій 2")
+        KnowledgeSettings.objects.update(last_capabilities={"index": {"received_seq": last, "applied_seq": last}})
         KnowledgeDoc.objects.update(state=KnowledgeDoc.INDEXED, status_revision=1)   # RAG підтвердив усі
         p = knowledge.progress()
-        self.assertEqual((p["stage"], p["step"], p["silent"]), ("ready", 3, False))
+        self.assertEqual((p["stage"], p["step"], p["silent"]), ("ready", 4, False))
+        self.assertEqual({st["status"] for st in p["steps"]}, {"done"})
         KnowledgeActivity.objects.update(last_call_at=timezone.now() - timedelta(minutes=10))
         self.assertTrue(knowledge.progress()["silent"])                  # RAG замовк — попередження
 
@@ -62,6 +71,8 @@ class ActivityTests(KnowledgeBase):
         knowledge.set_feed_paused(True)
         p = knowledge.progress()
         self.assertEqual((p["stage"], p["percent"], p["eta"], p["rate"]), ("paused", 80, None, None))
+        self.assertEqual((p["step"], p["steps"][1]["status"]), (1, "current"))   # пауза на кроці «Повна вигрузка»
+        self.assertIn("«Повна вигрузка»", p["text"])
         knowledge.set_feed_paused(False)
         KnowledgeActivity.objects.update(last_call_at=timezone.now() - timedelta(minutes=10))
         p = knowledge.progress()
@@ -82,7 +93,9 @@ class ActivityTests(KnowledgeBase):
 
     def test_off_when_disabled_and_nothing_fed(self):
         KnowledgeSettings.objects.update(enabled=False)
-        self.assertEqual(knowledge.progress()["stage"], "off")
+        p = knowledge.progress()
+        self.assertEqual((p["stage"], p["step"]), ("off", None))
+        self.assertEqual({st["status"] for st in p["steps"]}, {"todo"})
 
 
 class AdminLiveTests(KnowledgeBase):

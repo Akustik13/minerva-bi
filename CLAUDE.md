@@ -136,7 +136,8 @@ tabele_mvp/
   - **UI:**
     - адмінка «🧠 База знань» (меню «Minerva AI»): налаштування, стан за статусами RAG, «Звірити / Прибрати все / Переіндексувати все з нуля» (`new_generation`);
     - жива панель «Що зараз робить RAG» (`knowledge.progress()`, шаблон `admin/rag_assistant/knowledge_live.html`, `…/knowledgesettings/live/` кожні 5 с):
-      - етапи підключення → повна вигрузка (N з M, швидкість, час до кінця) → нові зміни → готово;
+      - дорожня карта — крапки з лінією (`knowledge.ROADMAP`, `progress()['steps']`: done / current / todo + коротка деталь): підключення → повна вигрузка (N з M, швидкість, час до кінця) → нові зміни (`applied_seq` з capabilities RAG < `last_seq`) → підтвердження (RAG усе застосував, Minerva чекає звітів по документах) → готово; пауза — поверх поточного кроку;
+      - темп «нових змін» і підтверджень та час до кінця рахує браузер з `seq` / `reported` / `documents`, поки сторінка відкрита;
       - остання дія RAG і попередження, якщо він мовчить понад 5 хв;
     - облік звернень RAG — `knowledge.note_activity` у `api/knowledge_views.py`, модель `KnowledgeActivity` (rag_assistant 0005; окремо від налаштувань, щоб збереження форми не затирало лічильники);
     - «⏸ Пауза / ▶ Продовжити» (`KnowledgeSettings.feed_paused`, `…/pause/?action=`):

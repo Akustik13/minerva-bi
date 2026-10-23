@@ -836,13 +836,21 @@ def _duration(seconds) -> str:
     return f"~{minutes} хв" if minutes < 60 else f"~{minutes // 60} год {minutes % 60} хв"
 
 
+ROADMAP = [("connect", "Підключення"), ("snapshot", "Повна вигрузка"), ("changes", "Нові зміни"),
+           ("confirm", "Підтвер­дження"), ("ready", "Готово")]   # м'який перенос — у вузькій колонці під крапкою
+
+
 def progress() -> dict:
     """Етап і прогрес індексації для живої панелі «База знань» (без звернення до RAG).
-    stage: setup / off / paused / waiting / snapshot / updating / ready; step — номер кроку 0…3 для смужки етапів."""
+    stage: setup / off / paused / waiting / snapshot / changes / confirm / ready;
+    step — номер кроку дорожньої карти ROADMAP (0 підключення … 4 готово), steps — карта з деталями кроків.
+    «Нові зміни» — RAG ще застосовує журнал (applied_seq з capabilities < last_seq);
+    «Підтвердження» — RAG усе застосував і надсилає звіти, а Minerva ще чекає підтвердження документів."""
     from . import retrieval
     from .models import KnowledgeActivity, KnowledgeSettings
     s, act, now = KnowledgeSettings.get(), KnowledgeActivity.get(), timezone.now()
-    d = summary()["documents"]
+    summ = summary()
+    d = summ["documents"]
     waiting_docs = d["pending"] + d["pending_delete"]
     seen_ago = int((now - act.last_call_at).total_seconds()) if act.last_call_at else None
     out = {"paused": s.feed_paused, "enabled": s.enabled, "documents": d, "percent": None, "eta": None, "rate": None,
@@ -866,24 +874,57 @@ def progress() -> dict:
         if working and served >= 3 and elapsed > 0:     # під час паузи чи тиші швидкість і час до кінця не показуємо
             out["rate"] = f"{served * 60 / elapsed:.0f} док./хв"
             out["eta"] = _duration((act.snapshot_total - served) * elapsed / served)
+    idx = (caps.get("index") or {}) if caps else {}
+    applied, last_seq = idx.get("applied_seq"), summ["last_seq"]
+    behind = last_seq - applied if isinstance(applied, int) and applied < last_seq else 0
+    out["seq"] = {"last": last_seq, "received": idx.get("received_seq"), "applied": applied}
+    out["reported"] = act.reported            # браузер рахує з нього швидкість підтверджень
+    served = min(act.snapshot_served, act.snapshot_total)
     if not instance_id():
         stage, step, text = "setup", 0, "Не задано назву сервера для RAG — стрічка для RAG вимкнена."
-    elif s.feed_paused:
-        stage, step, text = "paused", None, ("⏸ Призупинено: Minerva відповідає RAG «зачекайте». "
-                                             "Пошук працює з уже проіндексованим.")
     elif act.phase == KnowledgeActivity.SNAPSHOT:
         stage, step = "snapshot", 1
-        text = (f"Повна вигрузка: RAG забирає й індексує листи — {min(act.snapshot_served, act.snapshot_total)} "
-                f"з {act.snapshot_total}. Пошук увімкнеться після завершення.")
+        text = (f"Повна вигрузка: RAG забирає й індексує листи — {served} з {act.snapshot_total}. "
+                f"Пошук увімкнеться після завершення.")
     elif not s.enabled and not d["eligible"] and not waiting_docs:
         stage, step, text = "off", None, "Індексацію не ввімкнено — позначте «Індексувати пошту» нижче й збережіть."
     elif act.last_call_at is None:
         stage, step, text = "waiting", 0, "RAG ще не звертався до Minerva — перевірте ключ і з'єднання на RAG-ПК."
+    elif behind:
+        stage, step = "changes", 2
+        text = f"Нові зміни: RAG застосовує журнал — ще подій {behind} (застосовано до seq {applied} з {last_seq})."
     elif waiting_docs:
-        stage, step, text = "updating", 2, f"Обробка змін: RAG ще не підтвердив документів — {waiting_docs}."
+        stage, step = "confirm", 3
+        text = (f"RAG обробив зміни й надсилає підтвердження в Minerva — ще не підтверджено {waiting_docs} "
+                f"(нових чи змінених {d['pending']}, видалень {d['pending_delete']}). Пошук уже працює.")
     else:
-        stage, step, text = "ready", 3, "✅ Усе проіндексовано — пошук готовий."
+        stage, step, text = "ready", 4, "✅ Усе проіндексовано й підтверджено — пошук готовий."
+    if s.feed_paused and step is not None:     # пауза — поверх кроку, на якому зупинились
+        stage, text = "paused", (f"⏸ Призупинено на кроці «{ROADMAP[step][1].replace(chr(0xad), '')}»: "
+                                 "Minerva відповідає RAG «зачекайте». "
+                                 "Пошук працює з уже проіндексованим.")
+    details = {     # (коли крок пройдено, коли він поточний) — коротко, бо під крапками; повний опис — у text
+        "connect": (f"звертався {_ago(seen_ago)}" if seen_ago is not None else "",
+                    "немає назви сервера" if stage == "setup" else "чекаємо RAG"),
+        "snapshot": (f"{act.snapshot_total} док." if act.snapshot_total else "",
+                     f"{served} з {act.snapshot_total}" + (f" · {out['eta']}" if out["eta"] else "")),
+        "changes": (f"до seq {applied}" if isinstance(applied, int) else "", f"ще подій {behind}"),
+        "confirm": ("усе підтверджено", f"ще {waiting_docs}"),
+        "ready": ("пошук готовий", ""),
+    }
+    out["steps"] = []
+    for i, (key, label) in enumerate(ROADMAP):
+        status = ("todo" if step is None else "done" if i < step or (i == step and key == "ready")
+                  else "current" if i == step else "todo")
+        out["steps"].append({"key": key, "label": label, "status": status,
+                             "detail": {"done": details[key][0], "current": details[key][1]}.get(status, "")})
     out.update(stage=stage, step=step, text=text)
     out["silent"] = (seen_ago is not None and seen_ago > RAG_SILENT_AFTER.total_seconds()
-                     and stage in ("snapshot", "updating", "ready", "paused"))
+                     and stage in ("snapshot", "changes", "confirm", "ready", "paused"))
     return out
+
+
+def _ago(seconds) -> str:
+    if seconds < 60:
+        return f"{seconds} с тому"
+    return f"{seconds // 60} хв тому" if seconds < 3600 else f"{seconds // 3600} год тому"

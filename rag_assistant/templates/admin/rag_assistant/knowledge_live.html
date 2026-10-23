@@ -2,11 +2,28 @@
 {{ progress|json_script:"kl-data" }}
 <style>
   #kl { max-width: 760px; }
-  #kl .kl-steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-  #kl .kl-steps span { padding: 3px 10px; border-radius: 12px; font-size: 12px; border: 1px solid var(--hairline-color, #ccc);
-                       color: var(--body-quiet-color, #888); }
-  #kl .kl-steps span.done { color: var(--body-fg, #333); border-color: var(--body-quiet-color, #888); }
-  #kl .kl-steps span.now { color: #fff; background: var(--primary, #417690); border-color: var(--primary, #417690); font-weight: 600; }
+  /* Дорожня карта: крапки з лінією; лінія перед кроком зафарбована, якщо до нього дійшли */
+  #kl .kl-road { display: flex; list-style: none; margin: 4px 0 12px; padding: 0; }
+  #kl .kl-road li { flex: 1; position: relative; text-align: center; padding: 0 2px; min-width: 0; list-style: none;
+                    color: var(--body-quiet-color, #888); }
+  #kl .kl-road li::before { content: ''; position: absolute; top: 9px; left: -50%; width: 100%; height: 3px;
+                            background: var(--hairline-color, #ccc); }
+  #kl .kl-road li:first-child::before { display: none; }
+  #kl .kl-road li.done::before, #kl .kl-road li.current::before { background: var(--primary, #417690); }
+  #kl .kl-road .dot { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center;
+                      width: 21px; height: 21px; box-sizing: border-box; border-radius: 50%; font-size: 11px; line-height: 1;
+                      border: 3px solid var(--hairline-color, #ccc); background: var(--body-bg, #fff); color: #fff; }
+  #kl .kl-road li.done .dot { background: var(--primary, #417690); border-color: var(--primary, #417690); }
+  #kl .kl-road li.current .dot { border-color: var(--primary, #417690); color: var(--primary, #417690); }
+  #kl .kl-road li.current .dot::after { content: ''; position: absolute; inset: -3px; border-radius: 50%;
+                                        border: 2px solid currentColor; animation: kl-pulse 1.6s ease-out infinite; }
+  #kl .kl-road li.current.still .dot::after { display: none; }
+  @keyframes kl-pulse { from { transform: scale(1); opacity: .9; } to { transform: scale(2); opacity: 0; } }
+  #kl .kl-road .lbl { display: block; margin-top: 4px; font-size: 12px; hyphens: auto; }
+  #kl .kl-road li.done .lbl { color: var(--body-fg, #333); }
+  #kl .kl-road li.current .lbl { color: var(--body-fg, #333); font-weight: 700; }
+  #kl .kl-road .det { display: block; margin-top: 1px; font-size: 11px; overflow-wrap: anywhere; }
+  #kl .kl-road li.current .det { color: var(--body-fg, #333); font-weight: 600; }
   #kl .kl-text { font-size: 14px; font-weight: 600; margin: 4px 0 8px; }
   #kl .kl-bar { height: 10px; border-radius: 5px; background: var(--darkened-bg, #eee); overflow: hidden; margin: 6px 0; }
   #kl .kl-bar > div { height: 100%; width: 0; background: var(--primary, #417690); transition: width .6s; }
@@ -18,13 +35,11 @@
   #kl .kl-updated { font-size: 11px; color: var(--body-quiet-color, #999); margin-top: 6px; }
 </style>
 <div id="kl" data-url="{{ live_url }}">
-  <div class="kl-steps">
-    <span data-step="0">① Підключення</span><span data-step="1">② Повна вигрузка</span>
-    <span data-step="2">③ Нові зміни</span><span data-step="3">✅ Готово</span>
-  </div>
+  <ol class="kl-road" id="kl-road" lang="uk" aria-label="Етапи індексації"></ol>
   <div class="kl-text" id="kl-text"></div>
   <div class="kl-bar" id="kl-bar" hidden><div id="kl-fill"></div></div>
   <div class="kl-line" id="kl-progress"></div>
+  <div class="kl-line" id="kl-flow"></div>
   <div class="kl-line" id="kl-docs"></div>
   <div class="kl-line" id="kl-seen"></div>
   <div class="kl-line" id="kl-rag"></div>
@@ -50,7 +65,7 @@
   var box = document.getElementById('kl');
   if (!box || box.dataset.ready) return;
   box.dataset.ready = '1';
-  var url = box.dataset.url, ticks = 0, failures = 0;
+  var url = box.dataset.url, ticks = 0, failures = 0, flow = null;
   function $(id) { return document.getElementById(id); }
   function span(s) {
     if (s < 60) return s + ' с';
@@ -59,12 +74,39 @@
   }
   function ago(s) { return s === null || s === undefined ? 'ще не звертався' : span(s) + ' тому'; }
   function setText(id, text) { $(id).textContent = text || ''; $(id).hidden = !text; }
-  function render(p) {
-    box.querySelectorAll('.kl-steps span').forEach(function (el) {
-      var n = +el.dataset.step;
-      el.className = p.step === null || p.step === undefined ? '' : (n === p.step ? 'now' : (n < p.step ? 'done' : ''));
+  function road(p) {
+    var ol = $('kl-road');
+    ol.textContent = '';
+    (p.steps || []).forEach(function (st) {
+      var li = document.createElement('li'), dot = document.createElement('span'),
+          lbl = document.createElement('span'), det = document.createElement('span');
+      li.className = st.status + (st.status === 'current' && (p.stage === 'paused' || p.silent) ? ' still' : '');
+      dot.className = 'dot';
+      dot.textContent = st.status === 'done' ? '✓' : (st.status === 'current' && p.stage === 'paused' ? '⏸' : '');
+      lbl.className = 'lbl'; lbl.textContent = st.label;
+      det.className = 'det'; det.textContent = st.detail || '';
+      li.title = st.label + (st.detail ? ': ' + st.detail : '');
+      li.append(dot, lbl, det);
+      ol.appendChild(li);
     });
+  }
+  // Швидкість підтверджень рахує браузер: з першого стану на цьому етапі, поки сторінка відкрита
+  function flowText(p) {
+    var d = p.documents || {}, seq = p.seq || {}, now = Date.now(),
+        left = p.stage === 'changes' ? (seq.last || 0) - (seq.applied || 0) : (d.pending || 0) + (d.pending_delete || 0);
+    if (p.stage !== 'confirm' && p.stage !== 'changes') { flow = null; return ''; }
+    if (!flow || flow.stage !== p.stage || p.reported < flow.reported)
+      flow = {stage: p.stage, t: now, reported: p.reported || 0, left: left};
+    var secs = Math.round((now - flow.t) / 1000);
+    if (secs < 60) return 'Рахую темп — потрібна хвилина з відкритою сторінкою…';
+    var done = Math.max(0, flow.left - left), eta = done > 0 ? ' · за цим темпом залишилось ~' + span(Math.round(left * secs / done)) : '';
+    if (p.stage === 'changes') return 'За ' + span(secs) + ': RAG застосував подій ' + done + eta;
+    return 'За ' + span(secs) + ': звітів від RAG ' + ((p.reported || 0) - flow.reported) + ', підтверджено документів ' + done + eta;
+  }
+  function render(p) {
+    road(p);
     setText('kl-text', p.text);
+    setText('kl-flow', flowText(p));
     var bar = p.percent !== null && p.percent !== undefined;
     $('kl-bar').hidden = !bar;
     if (bar) $('kl-fill').style.width = p.percent + '%';
