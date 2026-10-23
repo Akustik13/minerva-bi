@@ -1,0 +1,11 @@
+{% load i18n %}{# Бічна панель: вибрані технічні параметри (inventory/param_filters.ParamFilter); вибір — на панелі над списком #}
+<details data-filter-title="{{ title }}" open>
+  <summary>{% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}</summary>
+  <ul>
+  {% for choice in choices %}
+    <li><a href="{{ choice.query_string|iriencode }}" title="Зняти цей параметр">✕ {{ choice.display }}</a></li>
+  {% empty %}
+    <li style="opacity:.7">оберіть категорію — параметри над списком</li>
+  {% endfor %}
+  </ul>
+</details>

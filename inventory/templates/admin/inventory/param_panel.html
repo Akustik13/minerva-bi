@@ -1,0 +1,48 @@
+{# Панель «🔎 Параметри» над списком (inventory/param_filters.panel_context): значення з кількістю, клік — фільтр #}
+{% if param_panel %}
+<style>
+  #pp { padding: 8px 12px; margin: 0 0 10px; border: 1px solid var(--border-strong, #2a3a4d); border-radius: 6px; font-size: 12px; }
+  #pp .pp-head { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
+  #pp .pp-hint { opacity: .75; }
+  #pp .pp-grid { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+  #pp .pp-f { min-width: 180px; max-width: 360px; }
+  #pp .pp-name { font-weight: 700; margin-bottom: 3px; color: var(--text-muted, #9aafbe); }
+  #pp .pp-f.is-active .pp-name { color: var(--accent, #58a6ff); }
+  #pp .pp-vals { display: flex; flex-wrap: wrap; gap: 4px; }
+  #pp a.pp-v { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border-strong, #2a3a4d); text-decoration: none;
+    color: var(--text, #c9d8e4); white-space: nowrap; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+  #pp a.pp-v span { opacity: .6; margin-left: 3px; }
+  #pp a.pp-v:hover { border-color: var(--accent, #58a6ff); }
+  #pp a.pp-v.is-on { background: var(--accent, #1565c0); border-color: var(--accent, #1565c0); color: #fff; }
+  #pp a.pp-v.is-zero { opacity: .45; }
+  #pp details { width: 100%; }
+  #pp details summary { cursor: pointer; opacity: .75; margin-top: 2px; }
+  #pp details .pp-vals { margin-top: 4px; }
+</style>
+<div class="module" id="pp">
+  {% if param_panel.hint %}
+    <div class="pp-hint">🔎 <b>Пошук за параметрами</b>: оберіть категорію (фільтр праворуч) — тут з'являться її параметри
+      (тип штекера, довжина й тип кабелю, частота…) зі значеннями й кількістю товарів.</div>
+  {% elif param_panel.facets %}
+    <div class="pp-head"><b>🔎 Параметри</b>
+      <span class="pp-hint">кілька значень одного параметра — «або», різних — «і»</span>
+      {% if param_panel.selected %}<a href="{{ param_panel.clear_url }}">✕ скинути всі</a>{% endif %}</div>
+    <div class="pp-grid">
+    {% for f in param_panel.facets %}
+      <div class="pp-f{% if f.active %} is-active{% endif %}">
+        <div class="pp-name">{{ f.name }}{% if f.active %} <a href="{{ f.clear_url }}" title="Скинути цей параметр">✕</a>{% endif %}</div>
+        <div class="pp-vals">
+          {% for v in f.shown %}<a class="pp-v{% if v.active %} is-on{% endif %}{% if not v.count %} is-zero{% endif %}" href="{{ v.url }}" title="{{ v.value }}">{{ v.value|truncatechars:42 }}<span>{{ v.count }}</span></a>{% endfor %}
+          {% if f.more %}<details><summary>ще {{ f.more|length }}…</summary><div class="pp-vals">
+            {% for v in f.more %}<a class="pp-v{% if v.active %} is-on{% endif %}{% if not v.count %} is-zero{% endif %}" href="{{ v.url }}" title="{{ v.value }}">{{ v.value|truncatechars:42 }}<span>{{ v.count }}</span></a>{% endfor %}
+          </div></details>{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+  {% else %}
+    <div class="pp-hint">🔎 У товарів цієї вибірки немає технічних параметрів для фільтра — синхронізуйте з DigiKey
+      («🔄 Синх технічних атрибутів з DigiKey») або додайте їх у картці товару («📡 Технічні атрибути»).</div>
+  {% endif %}
+</div>
+{% endif %}

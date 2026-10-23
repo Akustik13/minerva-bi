@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 
 from inventory.services.stock import annotate_stock
+from inventory.param_filters import ListingParamFilter, panel_context
 from inventory.thumbs import ListingMediaFilter
 
 from . import services
@@ -667,7 +668,7 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     list_display_links = ["sku_col"]
     list_editable = ["is_visible", "price"]
     list_filter = [ShopFilter, "is_visible", PromoFilter, LifecycleFilter, "price_source", PriceStateFilter, StockFilter,
-                   "product__category", ListingMediaFilter]
+                   "product__category", ListingMediaFilter, ListingParamFilter]   # параметри — останнім
     search_fields = ["product__sku", "product__name", "product__name_export", "product__manufacturer"]
     list_select_related = ["shop", "product"]
     list_per_page = 100
@@ -750,7 +751,10 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         tabs += [{"label": s.name + (" ★" if s.is_default else ""), "url": f"{base}?shop__id__exact={s.pk}",
                   "count": s._n, "active": current == str(s.pk)} for s in shops]
         extra_context = {**(extra_context or {}), "shop_tabs": tabs}
-        return super().changelist_view(request, extra_context)
+        response = super().changelist_view(request, extra_context)
+        if getattr(response, "context_data", None) and response.context_data.get("cl") is not None:
+            response.context_data.update(panel_context(request, response.context_data["cl"], "product__category"))
+        return response
 
     def get_readonly_fields(self, request, obj=None):
         return self.readonly_fields + (["shop", "product"] if obj else [])

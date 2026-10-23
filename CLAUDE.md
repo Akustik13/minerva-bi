@@ -69,6 +69,7 @@ tabele_mvp/
 ### inventory/
 - `Product` — SKU, reorder_point, ціни purchase/sale
 - Мініатюри фото й 📄 даташит у списках товарів, «Асортимент і ціни» (+ 🌐 — чи забрав сайт магазину фото/даташит з Minerva, `shop/admin_media.listing_marker`) і огляді складу — `inventory/thumbs.py` (96 px, кеш `MEDIA_ROOT/thumbs/`, `…/product/<pk>/thumb/`); фільтр «Фото / даташит» — `thumbs.MediaFilter` / `ListingMediaFilter`, кнопки «Без фото / Без даташита» в `reorderproxy/supply.html`
+- Пошук за технічними параметрами (як на DigiKey) — `inventory/param_filters.py`: після вибору категорії над списком параметри (`tech_attributes` без службових кодів) зі значеннями й кількістю; одна назва — «або», різні — «і»; Товари й Асортимент і ціни — `?attr=Назва:значення` (`ParamFilter` останнім у list_filter, панель `admin/inventory/param_panel.html`), огляд складу — на сторінці (JS, `params`). Номер сторінки скидати `{"p": None}`, не `remove=["p"]` (прибере й `product__…`)
 - `InventoryTransaction` — Прихід/Витрата/Коригування
 - `ReorderProxy` — managed=False, аналіз що замовити
 - `Supplier`, `PurchaseOrder`, `PurchaseOrderLine`

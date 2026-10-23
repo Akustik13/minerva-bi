@@ -75,6 +75,24 @@
 /* ── SKU cell ── */
 .sv-sku { font-family: monospace; font-size: 13px; font-weight: 700; color: var(--text); }
 .sv-prod { display: flex; align-items: center; gap: 8px; }
+/* Пошук за параметрами (як на DigiKey) */
+.sv-params { margin: 6px 0 12px; font-size: 12px; }
+.sv-param-hint { color: var(--text-dim); }
+.sv-phead { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
+.sv-pgrid { display: flex; flex-wrap: wrap; gap: 10px 22px; }
+.sv-pf { min-width: 180px; max-width: 360px; }
+.sv-pn { font-weight: 700; color: var(--text-dim); margin-bottom: 3px; }
+.sv-pf.on .sv-pn { color: #2196f3; }
+.sv-pv { display: flex; flex-wrap: wrap; gap: 4px; }
+.sv-pchip { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border-strong); background: none; color: var(--text);
+  cursor: pointer; font-size: 12px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-pchip span { opacity: .6; margin-left: 3px; }
+.sv-pchip:hover { border-color: #2196f3; }
+.sv-pchip.on { background: #1565c0; border-color: #1565c0; color: #fff; }
+.sv-pchip.zero { opacity: .45; }
+.sv-pchip.more { display: none; }
+.sv-pf.open .sv-pchip.more { display: inline-block; }
+.sv-pmore { border: none; background: none; color: var(--text-dim); cursor: pointer; font-size: 12px; }
 .sv-thumb { width: 32px; height: 32px; flex: none; object-fit: contain; border-radius: 4px; background: #fff; display: block; }
 .sv-thumb-none { background: none; opacity: .35; font-size: 13px; line-height: 32px; text-align: center; white-space: nowrap; }
 .sv-ds { margin-left: 4px; font-size: 13px; text-decoration: none; }
@@ -245,6 +263,9 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   </div>
   <!-- Category filters (built by JS) -->
   <div class="sv-filters" id="sv-cat-filters" style="margin-top:4px"></div>
+  <!-- Technical parameters of the chosen category (built by JS) -->
+  {{ params|json_script:"sv-params-data" }}
+  <div class="sv-params" id="sv-param-panel"></div>
 
   <!-- Search -->
   <div class="sv-search-wrap">
@@ -643,6 +664,7 @@ var _svi = {
     try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e) { return {}; }
   }
   function saveState(s) {
+    s.attrs = activeAttrs;   // вибрані параметри — разом з рештою стану сторінки
     try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch(e) {}
   }
 
@@ -686,6 +708,7 @@ var _svi = {
 
   window.svCatFilter = function(cat, btn) {
     activeCategory = cat;
+    activeAttrs = {};   // у різних категорій різні параметри
     document.querySelectorAll('#sv-cat-filters .sv-filter-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
     saveState({filter: activeFilter, search: activeSearch, cat: activeCategory, sortCol: sortCol, sortDir: sortDir});
@@ -724,7 +747,7 @@ var _svi = {
     applyVisibility();
   };
 
-  function rowMatches(r) {
+  function baseMatches(r) {
     var stock    = parseFloat(r.dataset.stock    || 0);
     var reorder  = parseFloat(r.dataset.reorder  || 0);
     var reserved = parseFloat(r.dataset.reserved || 0);
@@ -746,6 +769,67 @@ var _svi = {
     return filterOk && catOk && searchOk;
   }
 
+  /* ── Пошук за параметрами (як на DigiKey): параметри вибраної категорії, значення з кількістю ── */
+  var dataEl = document.getElementById('sv-params-data');
+  var PARAMS = {};
+  try { PARAMS = JSON.parse(dataEl ? dataEl.textContent : '{}') || {}; } catch (e) {}
+  var activeAttrs = (st.attrs && typeof st.attrs === 'object') ? st.attrs : {};   // {назва: [значення]}
+  function escP(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function attrsOk(r, skip) {
+    var p = PARAMS[r.dataset.pk] || {};
+    return Object.keys(activeAttrs).every(function (n) {
+      return n === skip || !activeAttrs[n].length || activeAttrs[n].indexOf(p[n]) !== -1;
+    });
+  }
+  function rowMatches(r) { return baseMatches(r) && attrsOk(r); }
+  function renderParams() {
+    var box = document.getElementById('sv-param-panel');
+    if (!box) return;
+    if (!activeCategory) {
+      box.innerHTML = '<span class="sv-param-hint">🔎 <b>Пошук за параметрами</b>: оберіть категорію вище — тут з\'являться її параметри (тип штекера, довжина й тип кабелю, частота…) зі значеннями й кількістю товарів.</span>';
+      return;
+    }
+    var base = Array.prototype.filter.call(rows, baseMatches), names = {};
+    base.forEach(function (r) { Object.keys(PARAMS[r.dataset.pk] || {}).forEach(function (n) { names[n] = (names[n] || 0) + 1; }); });
+    var html = Object.keys(names).sort(function (a, b) { return names[b] - names[a] || a.localeCompare(b); }).map(function (n) {
+      var counts = {};
+      base.forEach(function (r) {
+        var v = (PARAMS[r.dataset.pk] || {})[n];
+        if (v !== undefined && attrsOk(r, n)) counts[v] = (counts[v] || 0) + 1;
+      });
+      var chosen = activeAttrs[n] || [], vals = Object.keys(counts);
+      if (!chosen.length && (vals.length < 2 || vals.length > 60)) return '';   // усі однакові або в кожного своє
+      chosen.forEach(function (v) { if (!(v in counts)) counts[v] = 0; });
+      vals = Object.keys(counts).sort(function (a, b) { return counts[b] - counts[a] || a.localeCompare(b, undefined, { numeric: true }); });
+      var chips = vals.map(function (v, i) {
+        return '<button type="button" class="sv-pchip' + (chosen.indexOf(v) !== -1 ? ' on' : '') + (counts[v] ? '' : ' zero') +
+               (i >= 12 && chosen.indexOf(v) === -1 ? ' more' : '') + '" data-n="' + escP(n) + '" data-v="' + escP(v) + '" title="' + escP(v) + '">' +
+               escP(v) + '<span>' + counts[v] + '</span></button>';
+      }).join('') + (vals.length > 12 ? '<button type="button" class="sv-pmore" data-more="1">ще ' + (vals.length - 12) + '…</button>' : '');
+      return '<div class="sv-pf' + (chosen.length ? ' on' : '') + '"><div class="sv-pn">' + escP(n) +
+             (chosen.length ? ' <button type="button" class="sv-pmore" data-clear="' + escP(n) + '" title="Скинути цей параметр">✕</button>' : '') +
+             '</div><div class="sv-pv">' + chips + '</div></div>';
+    }).join('');
+    var any = Object.keys(activeAttrs).some(function (n) { return activeAttrs[n].length; });
+    box.innerHTML = html
+      ? '<div class="sv-phead"><b>🔎 Параметри</b><span class="sv-param-hint">кілька значень одного параметра — «або», різних — «і»</span>' +
+        (any ? '<button type="button" class="sv-pmore" data-reset="1">✕ скинути всі</button>' : '') + '</div><div class="sv-pgrid">' + html + '</div>'
+      : '<span class="sv-param-hint">🔎 У товарів цієї категорії немає технічних параметрів для фільтра — синхронізуйте з DigiKey або додайте їх у картці товару («📡 Технічні атрибути»).</span>';
+  }
+  document.getElementById('sv-param-panel').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.more) { b.closest('.sv-pf').classList.add('open'); b.remove(); return; }
+    if (b.dataset.reset) activeAttrs = {};
+    else if (b.dataset.clear) delete activeAttrs[b.dataset.clear];
+    else if (b.dataset.n) {
+      var list = activeAttrs[b.dataset.n] || (activeAttrs[b.dataset.n] = []), i = list.indexOf(b.dataset.v);
+      if (i === -1) list.push(b.dataset.v); else list.splice(i, 1);
+      if (!list.length) delete activeAttrs[b.dataset.n];
+    }
+    saveState({filter: activeFilter, search: activeSearch, cat: activeCategory, sortCol: sortCol, sortDir: sortDir});
+    applyVisibility();
+  });
+
   function applyVisibility() {
     var anyVisible = false;
     rows.forEach(function(r) {
@@ -760,6 +844,7 @@ var _svi = {
     });
     var noRes = document.getElementById('sv-no-results');
     if (noRes) noRes.style.display = anyVisible ? 'none' : 'block';
+    renderParams();
   }
 
   /* ── Expand / collapse detail ── */

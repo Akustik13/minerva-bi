@@ -17,7 +17,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
 
-from . import thumbs
+from . import param_filters, thumbs
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
@@ -426,6 +426,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'title':    _('Склад — огляд залишків та руху'),
             'subtitle': None,
             'rows':     rows,
+            'params':   param_filters.params_map(products),   # пошук за параметрами на сторінці
             'opts':     ReorderProxy._meta,
         }
         return render(request, 'admin/inventory/reorderproxy/supply.html', context)
@@ -2225,7 +2226,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     )
     search_fields = ("sku", "sku_short", "name")
     list_filter   = ("category", ProductShopFilter, thumbs.MediaFilter, "lifecycle_status", "kind", "bom_type",
-                     "is_active")
+                     "is_active", param_filters.ParamFilter)   # параметри — останнім (решта фільтрів уже застосована)
     list_per_page = 50
     autocomplete_fields = ("successor",)
     form          = ProductAdminForm
@@ -2663,7 +2664,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception:
             extra['dk_sync_status_url'] = ''
             extra['dk_sync_cancel_url'] = ''
-        return super().changelist_view(request, extra)
+        response = super().changelist_view(request, extra)
+        if getattr(response, "context_data", None) and response.context_data.get("cl") is not None:
+            response.context_data.update(param_filters.panel_context(request, response.context_data["cl"], "category"))
+        return response
 
     # ── Computed columns ──────────────────────────────────────────────────────
 
