@@ -284,5 +284,45 @@
   document.addEventListener('formset:added', function () { renderAll(); });
   renderAll();
 })();
+
+// «🔌 Перевірити зв'язок із сайтом» (shop/connection.py): адреса з поля, сторінка не перезавантажується
+(function () {
+  'use strict';
+  var box = document.getElementById('shop-conn');
+  if (!box) return;
+  var btn = document.getElementById('shop-conn-run'), out = document.getElementById('shop-conn-out');
+  var ICON = { ok: '✅', warn: '⚠️', error: '❌', info: 'ℹ️' };
+  var COLOR = { ok: '#81c784', warn: '#ffb74d', error: '#ff8a80', info: 'inherit' };
+  function line(c) {
+    var row = document.createElement('div');
+    row.style.cssText = 'margin:3px 0;line-height:1.45';
+    var b = document.createElement('strong');
+    b.textContent = ICON[c.level] + ' ' + c.title;
+    b.style.color = COLOR[c.level];
+    row.appendChild(b);
+    if (c.detail) row.appendChild(document.createTextNode(' — ' + c.detail));
+    return row;
+  }
+  btn.addEventListener('click', function () {
+    var field = document.getElementById('id_url');
+    var body = new FormData();
+    body.append('url', field ? field.value : '');
+    body.append('csrfmiddlewaretoken', (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '');
+    btn.disabled = true;
+    out.textContent = '⏳ Перевіряю… (до хвилини: сайт може сам звертатися до Minerva)';
+    fetch(box.dataset.url, { method: 'POST', body: body, credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (res) {
+        out.textContent = '';
+        var head = document.createElement('div');
+        head.style.cssText = 'font-weight:600;margin-bottom:4px';
+        head.textContent = res.summary + ' · ' + (res.url || '—') + ' · ' + res.checked_at;
+        out.appendChild(head);
+        res.checks.forEach(function (c) { out.appendChild(line(c)); });
+      })
+      .catch(function (e) { out.textContent = '❌ Перевірку не виконано: ' + e.message; })
+      .then(function () { btn.disabled = false; });
+  });
+})();
 </script>
 {% endblock %}

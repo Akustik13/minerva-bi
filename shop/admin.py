@@ -205,7 +205,7 @@ class ShopAdmin(admin.ModelAdmin):
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     form = ShopForm
-    readonly_fields = ["created_at", "keys_col", "zones_tools", "accounts_tools", "stripe_col"]
+    readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "stripe_col"]
     inlines = [ShippingZoneInline]
     actions = ["action_default_zones", "action_import_dk_zones"]
     fieldsets = [
@@ -239,9 +239,10 @@ class ShopAdmin(admin.ModelAdmin):
                            "(вебхук) — замовлення стає «Оплачено». Способи оплати (картки, Apple/Google Pay, SEPA, Klarna …) "
                            "вмикаються в Stripe → Settings → Payment methods. Спершу перевірте в тестовому режимі (sk_test_…).",
         }),
-        ("Підключення", {"fields": ["keys_col"],
-                         "description": "Сайт підключається ключем API, прив'язаним до цього магазину "
-                                        "(Адмін → REST API → API Токени → поле «Магазин»)."}),
+        ("Підключення", {"fields": ["keys_col", "connection_col"],
+                         "description": "Сайт підключається ключем API, який видає лише Minerva: Адмін → REST API → "
+                                        "API Токени → поле «Магазин». На сайті ключ лежить у private/shop-config.php "
+                                        "('minerva_token')."}),
     ]
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -302,6 +303,29 @@ class ShopAdmin(admin.ModelAdmin):
                         ", ".join(no_scope)) if no_scope else "",
             format_html('<div style="margin-top:4px;color:#ff8a80">⚠ {}</div>', st["link_error"]) if st["link_error"] else "",
             reverse("admin:shop_shop_test_mail", args=[obj.pk]))
+
+    @admin.display(description="Перевірка зв'язку")
+    def connection_col(self, obj):
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        # результат малює JS у change_form.html; адреса — з поля «Адреса сайту», навіть ще не збережена
+        return format_html(
+            '<div id="shop-conn" data-url="{}">'
+            '<button type="button" class="button" id="shop-conn-run">🔌 Перевірити зв\'язок із сайтом</button> '
+            '<span class="help">Minerva звертається до сайту (каталог, вебхук), сайт — до Minerva своїм ключем. '
+            'Адреса — з поля «Адреса сайту», можна перевірити й незбережену (напр. тестовий домен).</span>'
+            '<div id="shop-conn-out" style="margin-top:8px"></div></div>',
+            reverse("admin:shop_shop_connection_check", args=[obj.pk]))
+
+    def _connection_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        from . import connection
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        return JsonResponse(connection.check(shop, request.POST.get("url")))
 
     def _test_mail_view(self, request, pk):
         from django.core.exceptions import PermissionDenied
@@ -426,6 +450,8 @@ class ShopAdmin(admin.ModelAdmin):
                  name="shop_shop_test_mail"),
             path("<int:pk>/stripe-check/", self.admin_site.admin_view(self._stripe_check_view),
                  name="shop_shop_stripe_check"),
+            path("<int:pk>/connection-check/", self.admin_site.admin_view(self._connection_view),
+                 name="shop_shop_connection_check"),
         ] + super().get_urls()
 
     def _zones_view(self, request, pk, run):
