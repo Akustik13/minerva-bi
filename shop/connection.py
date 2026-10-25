@@ -58,9 +58,18 @@ def site_bases(shop: Shop, url: str | None = None) -> list[str]:
     return out + [root] if root not in out else out
 
 
+def site_keys(shop: Shop) -> list[tuple]:
+    """Ключі сайту — прив'язані до магазину (поле «Магазин» або джерело замовлень). Ключі без прив'язки теж
+    працюють з магазином за замовчуванням, але зазвичай належать іншим системам (RAG тощо), тож беруться лише
+    коли прив'язаних немає, і лише ті, що читають каталог (products:read)."""
+    from . import services
+    keys = services.keys_for_shop(shop)
+    bound = [(k, m) for k, m in keys if m != services.KEY_DEFAULT]
+    return bound or [(k, m) for k, m in keys if k.has_scope("products:read")]
+
+
 def check(shop: Shop, url: str | None = None) -> dict:
     """Усі перевірки по черзі. url — адреса з форми (ще не збережена); None — «Адреса сайту» магазину."""
-    from . import services
     checks = []
     bases, base = site_bases(shop, url), ""
     if url is not None and url.strip() and url.strip() != (shop.url or "").strip():
@@ -68,7 +77,7 @@ def check(shop: Shop, url: str | None = None) -> dict:
 
     started = timezone.now()
     found, base = _catalog(shop, bases) if bases else ([], "")
-    keys = services.keys_for_shop(shop)   # після запиту до сайту: «востаннє звертався» враховує і його
+    keys = site_keys(shop)   # після запиту до сайту: «востаннє звертався» враховує і його
     checks += _keys(shop, keys)
     if not bases:
         checks.append(_item(ERROR, "Адреса сайту",
@@ -98,16 +107,19 @@ def _keys(shop: Shop, keys) -> list:
     today = timezone.localdate()
     need = dict(REQUIRED_SCOPES, **(ACCOUNT_SCOPES if shop.accounts_enabled else {}))
     for key, mode in keys:
+        loose = mode == services.KEY_DEFAULT
         how = {services.KEY_LINKED: "прив'язаний до магазину", services.KEY_SOURCE: f"за джерелом «{shop.slug}»",
-               services.KEY_DEFAULT: "без прив'язки — працює з магазином за замовчуванням"}[mode]
+               services.KEY_DEFAULT: "без прив'язки (прив'язаних ключів немає) — працює з магазином за "
+                                     "замовчуванням; ключ сайту варто прив'язати полем «Магазин»"}[mode]
         title = f"Ключ «{key.name}»"
         if key.expires_at and key.expires_at < today:
             out.append(_item(ERROR, title, f"Прострочений з {key.expires_at:%d.%m.%Y} — сайт отримує відмову. "
                                            "Продовжте «Дійсний до» в картці ключа."))
             continue
         missing = [f"{scope} ({why})" for scope, why in need.items() if not key.has_scope(scope)]
-        used = (f"сайт востаннє звертався {_when(key.last_used)}" if key.last_used
-                else "цим ключем ще ніхто не звертався")
+        # ключем без прив'язки можуть користуватися й інші системи — тоді «сайт» стверджувати не можна
+        used = (f"{'ключем востаннє користувались' if loose else 'сайт востаннє звертався'} {_when(key.last_used)}"
+                if key.last_used else "цим ключем ще ніхто не звертався")
         if missing:
             out.append(_item(WARN, title, f"{how}; бракує прав: {', '.join(missing)}. Додайте їх у картці ключа. "
                                           f"{used[0].upper() + used[1:]}."))
@@ -216,9 +228,12 @@ def _compare(shop: Shop, data: dict) -> list:
 
 
 def _callback(keys, started) -> list:
-    """Чи звернувся сайт до Minerva під час перевірки (кеш сайту був застарілий) — доказ зв'язку в обидва боки."""
+    """Чи звернувся сайт до Minerva під час перевірки (кеш сайту був застарілий) — доказ зв'язку в обидва боки.
+    Лише прив'язані ключі: ключем без прив'язки міг саме тоді скористатися хтось інший (RAG)."""
     from api.models import APIKey
-    used = [k.name for k in APIKey.objects.filter(pk__in=[k.pk for k, _ in keys], last_used__gte=started)]
+    from .services import KEY_DEFAULT
+    bound = [k.pk for k, mode in keys if mode != KEY_DEFAULT]
+    used = [k.name for k in APIKey.objects.filter(pk__in=bound, last_used__gte=started)]
     if used:
         return [_item(OK, "В обидва боки", f"Під час перевірки сайт сам звернувся до Minerva ключем "
                                            f"«{', '.join(used)}» — зв'язок працює в обидва боки.")]
@@ -251,6 +266,9 @@ def _webhook(shop: Shop, base: str) -> list:
                       "у private/shop-config.php сайту.")
         elif d.response_code:
             detail = f"Сайт відповів HTTP {d.response_code} на {hook.url}."
+            right = base + "api/shop/webhook.php"
+            if d.response_code == 404 and hook.url != right:   # напр. сайт переїхав з /dist/ у корінь домену
+                detail += f" Адреса вебхука для цього сайту — {right}: змініть URL у REST API → Вебхуки."
         else:
             detail = f"Немає відповіді від {hook.url}: {d.response_body[:160]}"
         out.append(_item(ERROR, title, detail))

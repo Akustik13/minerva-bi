@@ -110,6 +110,26 @@ class ConnectionCheckTests(ConnectionBase):
         self.assertIn("ще ніхто не звертався", text)
         self.assertEqual(self.levels(res)["Кабінет покупця"], "warn")
 
+    def test_unbound_keys_of_other_systems_are_ignored(self):
+        """Ключі RAG без прив'язки працюють з магазином за замовчуванням, але це не ключі сайту."""
+        APIKey.objects.create(name="API RAG", scopes=["products:read", "stock:read"], last_used=timezone.now())
+        APIKey.objects.create(name="RAG — база знань", scopes=["knowledge:read"], last_used=timezone.now())
+        with self.site(FakeResponse(data=self.catalog())):
+            res = connection.check(self.shop)
+        titles = [c["title"] for c in res["checks"]]
+        self.assertIn("Ключ «Сайт»", titles)
+        self.assertFalse([t for t in titles if "RAG" in t], titles)
+        self.assertEqual(res["warnings"], 1, res)   # лише «вебхук не налаштовано»
+        # прив'язаних немає — береться ключ без прив'язки, що читає каталог; RAG без каталогу — ні
+        self.key.delete()
+        with self.site(FakeResponse(data=self.catalog()), callback=False):
+            res = connection.check(self.shop)
+        titles = [c["title"] for c in res["checks"]]
+        self.assertIn("Ключ «API RAG»", titles)
+        self.assertNotIn("Ключ «RAG — база знань»", titles)
+        self.assertIn("ключем востаннє користувались", self.detail(res, "Ключ «API RAG»").lower())
+        self.assertNotIn("В обидва боки", titles)   # ключ без прив'язки не доводить, що звертався саме сайт
+
     def test_expired_key(self):
         APIKey.objects.filter(pk=self.key.pk).update(expires_at=timezone.localdate() - timezone.timedelta(days=1))
         with self.site(FakeResponse(data=self.catalog())):
@@ -159,6 +179,13 @@ class ConnectionCheckTests(ConnectionBase):
         self.assertIn("webhook_secret", self.detail(res, "Вебхук «Сайт»"))
         d = WebhookDelivery.objects.get(webhook=hook)
         self.assertEqual((d.event, d.status), ("ping", WebhookDelivery.FAILED))
+
+    def test_webhook_old_path_suggests_right_url(self):
+        Webhook.objects.create(name="Сайт", url="https://shop.example.com/dist/api/shop/webhook.php")
+        with self.site(FakeResponse(data=self.catalog())), \
+                mock.patch("requests.post", return_value=FakeResponse(404, text="<html>")):
+            res = connection.check(self.shop)
+        self.assertIn("— https://shop.example.com/api/shop/webhook.php: змініть URL", self.detail(res, "Вебхук «Сайт»"))
 
     def test_no_webhook_is_warning(self):
         with self.site(FakeResponse(data=self.catalog())):
