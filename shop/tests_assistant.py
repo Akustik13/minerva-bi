@@ -30,8 +30,8 @@ class AssistantApiTests(TestCase):
 
     def test_default_site_decides(self):
         data = self.get(self.site_key).json()
-        self.assertEqual(data, {"shop": "webshop", "managed": False, "enabled": False, "upstream_url": "",
-                                "bridge_key": ""})
+        self.assertEqual(data, {"shop": "webshop", "managed": False, "enabled": False, "backend": "bridge",
+                                "upstream_url": "", "bridge_key": ""})
 
     def test_on_with_address_and_key_only_for_bound_key(self):
         Shop.objects.filter(pk=self.shop.pk).update(assistant_mode="on", assistant_url="https://rag.example.com",
@@ -53,6 +53,23 @@ class AssistantApiTests(TestCase):
         Shop.objects.filter(pk=self.shop.pk).update(assistant_mode="on", assistant_key="bridge-secret")
         by_source = APIKey.objects.create(name="За джерелом", scopes=["products:read"], default_source="webshop")
         self.assertEqual(self.get(by_source).json()["bridge_key"], "bridge-secret")
+
+    def test_rag_api_backend_uses_product_assistant_settings(self):
+        from rag_assistant.models import RagSettings
+        rag = RagSettings.get()
+        rag.base_url, rag.api_key, rag.latest_only = "https://app.example.com/", "rag-api-key", True
+        rag.save()
+        Shop.objects.filter(pk=self.shop.pk).update(assistant_mode="on", assistant_backend="rag_api",
+                                                    assistant_url="http://192.168.2.68:8790", assistant_key="bridge")
+        data = self.get(self.site_key).json()
+        self.assertEqual((data["backend"], data["upstream_url"], data["api_key"], data["bridge_key"], data["latest"]),
+                         ("rag_api", "https://app.example.com", "rag-api-key", "", True))
+        self.assertEqual(self.get(self.rag_key).json()["api_key"], "")   # ключ без прив'язки — без ключа RAG
+        self.shop.refresh_from_db()
+        self.assertIn("RAG API помічника Minerva", assistant.describe(self.shop))
+        rag.api_key = ""
+        rag.save()
+        self.assertIn("не задано адресу або ключ", assistant.describe(self.shop))
 
     def test_check_url(self):
         for ok in ("", "https://rag.example.com", "https://app.sevskiy.com/site-chat", "http://192.168.2.68:8790",
@@ -118,6 +135,17 @@ class AssistantConnectionTests(ConnectionBase):
         level, text = self.run_check("site", self.status(enabled=True, source="site", reachable=True))
         self.assertEqual(level, "info")
         self.assertIn("RAG відповідає", text)
+
+    def test_rag_api_reasons(self):
+        level, text = self.run_check("on", self.status(reason="no_upstream", backend="rag_api"))
+        self.assertEqual(level, "error")
+        self.assertIn("Налаштування помічника", text)
+        level, text = self.run_check("on", self.status(enabled=True, reachable=True, backend="rag_api"))
+        self.assertEqual(level, "ok")
+        self.assertIn("через RAG API", text)
+        level, text = self.run_check("on", self.status(enabled=True, reachable=False, backend="rag_api"))
+        self.assertEqual(level, "error")
+        self.assertIn("не дістає RAG API", text)
 
     def test_old_site_without_status(self):
         level, text = self.run_check("on", None)

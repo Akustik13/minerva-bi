@@ -260,11 +260,14 @@ class ShopAdmin(admin.ModelAdmin):
                            "вмикаються в Stripe → Settings → Payment methods. Спершу перевірте в тестовому режимі (sk_test_…).",
         }),
         ("🤖 Помічник Minerva на сайті", {
-            "fields": ["assistant_mode", "assistant_url", "assistant_key", "assistant_clear", "assistant_col"],
+            "fields": ["assistant_mode", "assistant_backend", "assistant_url", "assistant_key", "assistant_clear",
+                       "assistant_col"],
             "description": "Кнопка «Minerva» (чат з відповідями з даташитів і каталогу) на сайті магазину. "
-                           "«Вимкнено» — кнопки на сайті немає; «Увімкнено» — є, адреса й ключ RAG — звідси "
-                           "(порожні — з private/minerva-config.php сайту). Сайт перевіряє раз на хвилину. "
-                           "Перевірити, що бачить сайт, — «🔌 Перевірити зв'язок із сайтом» нижче.",
+                           "«Вимкнено» — кнопки на сайті немає; «Увімкнено» — є. Відповіді: «RAG API» — той самий "
+                           "сервіс і ключ, що в «Помічник по продукції» (Minerva AI → ⚙️ Налаштування помічника), "
+                           "працює з будь-якого хостингу, поля адреси й ключа нижче тоді не потрібні; «Веб-міст» — "
+                           "адреса й ключ нижче (порожні — з private/minerva-config.php), лише з локальної мережі. "
+                           "Сайт перевіряє раз на хвилину; що він бачить — «🔌 Перевірити зв'язок із сайтом» нижче.",
         }),
         ("Підключення", {"fields": ["keys_col", "connection_col"],
                          "description": "Сайт підключається ключем API, який видає лише Minerva: Адмін → REST API → "

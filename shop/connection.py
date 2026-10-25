@@ -276,6 +276,12 @@ def _webhook(shop: Shop, base: str) -> list:
     return out
 
 
+RAG_API_REASONS = {   # режим «RAG API, як помічник Minerva»: адреса й ключ — з налаштувань помічника
+    "no_upstream": "у «⚙️ Налаштування помічника» (Minerva AI) не задано адресу RAG API",
+    "no_key": "сайт не отримав ключ RAG API: задайте його в «⚙️ Налаштування помічника»; ключ сайту має бути "
+              "прив'язаний до магазину",
+    "bad_url": "адреса RAG API в «⚙️ Налаштування помічника» не підходить для сайту: потрібен https://",
+}
 ASSISTANT_REASONS = {
     "off": "вимкнено",
     "no_upstream": "не задано адресу RAG — вкажіть «Адреса помічника» тут або upstream_url у private/minerva-config.php",
@@ -298,7 +304,10 @@ def _assistant(shop: Shop, base: str) -> list:
     if not isinstance(data, dict) or "enabled" not in data:
         return [_item(INFO, title, "Сайт не повідомляє стан помічника (версія сайту без керування з Minerva).")]
     on, source = bool(data.get("enabled")), data.get("source")
-    reason = ASSISTANT_REASONS.get(str(data.get("reason") or ""), str(data.get("reason") or ""))
+    code = str(data.get("reason") or "")
+    reasons = dict(ASSISTANT_REASONS, **(RAG_API_REASONS if data.get("backend") == Shop.ASSISTANT_RAG_API else {}))
+    reason = reasons.get(code, code)
+    via = " (через RAG API помічника Minerva)" if data.get("backend") == Shop.ASSISTANT_RAG_API else ""
     from_site = " Сайт бере налаштування з private/minerva-config.php." if source == "site" else ""
     mode = shop.assistant_mode
     if mode == Shop.ASSISTANT_OFF:
@@ -314,9 +323,13 @@ def _assistant(shop: Shop, base: str) -> list:
         return [_item(ERROR if source == "minerva" else WARN, title,
                       f"У Minerva увімкнено, але на сайті кнопки немає: {reason or 'невідома причина'}.{from_site}")]
     if data.get("reachable") is False:
+        if via:
+            return [_item(ERROR, title, "Кнопка на сайті є, але сервер сайту не дістає RAG API (адреса чи ключ з "
+                                        "«⚙️ Налаштування помічника» не приймаються, або RAG вимкнений).")]
         return [_item(ERROR, title, "Кнопка на сайті є, але сервер сайту не дістає RAG за заданою адресою — "
-                                    "з інтернет-хостингу локальна адреса (192.168.…) недоступна, потрібна https://.")]
-    return [_item(OK, title, "Кнопка «Minerva» на сайті є, RAG відповідає." + from_site)]
+                                    "з інтернет-хостингу локальна адреса (192.168.…) недоступна, потрібна https:// "
+                                    "або режим «RAG API».")]
+    return [_item(OK, title, f"Кнопка «Minerva» на сайті є, RAG відповідає{via}." + from_site)]
 
 
 def _media(shop: Shop, base: str) -> list:

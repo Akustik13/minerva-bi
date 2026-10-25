@@ -170,6 +170,15 @@ class Shop(models.Model):
                  (ASSISTANT_OFF, "Вимкнено — кнопки на сайті немає")],
         help_text="Сайт перевіряє налаштування раз на хвилину.",
     )
+    ASSISTANT_BRIDGE, ASSISTANT_RAG_API = "bridge", "rag_api"
+    assistant_backend = models.CharField(
+        "Звідки відповіді", max_length=8, default=ASSISTANT_BRIDGE,
+        choices=[(ASSISTANT_RAG_API, "RAG API — як «Помічник по продукції» Minerva (адреса й ключ з «⚙️ Налаштування "
+                                     "помічника»; працює з будь-якого хостингу)"),
+                 (ASSISTANT_BRIDGE, "Веб-міст RAG (адреса й ключ нижче або з private/minerva-config.php; "
+                                    "лише з локальної мережі)")],
+        help_text="RAG API — той самий публічний сервіс і ключ, що в Minerva; розмови зберігає сайт.",
+    )
     assistant_url = models.CharField(
         "Адреса помічника (RAG)", max_length=255, blank=True, default="",
         help_text="Звідки сервер сайту бере відповіді чату: https://… або http:// лише до IP локальної мережі "
