@@ -41,7 +41,34 @@
 .sp-ov-edit input{width:6em;padding:3px 5px}
 .sp-rest{margin-top:8px;padding:8px 10px;border:1px dashed var(--hairline-color,#555);border-radius:6px}
 .sp-hint{font-size:12px;opacity:.7}
+/* копія магазину: поля, які треба змінити (shop/copying.py) */
+.cp-review{outline:2px solid #e53935;outline-offset:-2px;background:rgba(229,57,53,.10);border-radius:6px}
+.cp-review label{color:#ff8a80}
+.cp-banner{border:1px solid #e53935;background:rgba(229,57,53,.12);border-radius:8px;padding:10px 14px;margin:0 0 14px}
+.cp-banner strong{color:#ff8a80}
+.cp-banner .cp-chip{display:inline-block;margin:2px 4px 2px 0;padding:1px 8px;border-radius:9px;border:1px solid #e53935;
+  color:#ff8a80;font-size:12px;cursor:pointer;background:transparent}
 </style>
+{% endblock %}
+
+{% block object-tools-items %}
+{% if shop_copy %}<li><a href="{{ shop_copy.url }}">📋 Копіювати магазин</a></li>{% endif %}
+{{ block.super }}
+{% endblock %}
+
+{% block form_top %}{{ block.super }}
+{% if shop_copy.review %}
+<div class="cp-banner">
+  <strong>Копія{% if shop_copy.source %} магазину «{{ shop_copy.source.name }}»{% endif %}.</strong>
+  Змініть поля, підсвічені червоним (натисніть — перейти до поля):
+  {% for f, label in shop_copy.pairs %}<button type="button" class="cp-chip" data-field="{{ f }}">{{ label }}</button>{% endfor %}
+  <div style="margin-top:6px;font-size:12px;opacity:.85">Підсвічування зникає, щойно поле змінено й збережено. Якщо поле
+    навмисно лишається таким самим:
+    <button type="submit" class="button" formaction="{{ shop_copy.done_url }}" formnovalidate>✓ Усе перевірено</button>
+    <span class="help">(незбережені зміни на сторінці не зберігаються)</span></div>
+</div>
+{{ shop_copy.review|json_script:"cp-review" }}
+{% endif %}
 {% endblock %}
 
 {% block admin_change_form_document_ready %}{{ block.super }}
@@ -322,6 +349,32 @@
       })
       .catch(function (e) { out.textContent = '❌ Перевірку не виконано: ' + e.message; })
       .then(function () { btn.disabled = false; });
+  });
+})();
+
+// Копія магазину (shop/copying.py): підсвітити поля, які ще треба змінити; клік по назві в банері — до поля
+(function () {
+  'use strict';
+  var data = document.getElementById('cp-review');
+  if (!data) return;
+  function row(name) {
+    return document.querySelector('.fieldBox.field-' + name + ', .form-row.field-' + name);
+  }
+  JSON.parse(data.textContent).forEach(function (name) {
+    var r = row(name);
+    if (!r) return;
+    r.classList.add('cp-review');
+    var d = r.closest('details');
+    if (d) d.open = true;   // згорнутий блок — розгорнути
+  });
+  document.querySelectorAll('.cp-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var r = row(chip.dataset.field);
+      if (!r) return;
+      r.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      var input = r.querySelector('input:not([type=hidden]), select, textarea');
+      if (input) setTimeout(function () { input.focus(); }, 300);
+    });
   });
 })();
 </script>

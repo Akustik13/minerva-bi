@@ -1,0 +1,63 @@
+{% extends "admin/base_site.html" %}
+{% comment %}Копія магазину без ключів (shop/copying.py, ShopAdmin._copy_view).{% endcomment %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{% url 'admin:shop_shop_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a> ›
+  <a href="{% url 'admin:shop_shop_change' src.pk %}">{{ src.name }}</a> › Копіювати
+</div>
+{% endblock %}
+{% block content %}
+<style>
+.cp-grid{display:grid;grid-template-columns:minmax(320px,1fr) minmax(280px,1fr);gap:18px;max-width:1100px}
+.cp-box{border:1px solid var(--hairline-color,#444);border-radius:8px;padding:12px 16px;background:var(--darkened-bg,rgba(127,127,127,.06))}
+.cp-box h3{margin:0 0 8px;font-size:14px}
+.cp-box ul{margin:0;padding-left:18px;line-height:1.7}
+.cp-no li{color:#ffb74d}
+.cp-form .form-row{padding:8px 0;border:0}
+.cp-form label{display:block;font-weight:600;margin-bottom:4px}
+.cp-form input[type=text],.cp-form input[type=url]{width:100%;max-width:420px;padding:6px 8px}
+.cp-form .cp-check label{display:inline;font-weight:400}
+@media(max-width:800px){.cp-grid{grid-template-columns:1fr}}
+</style>
+<p>Новий магазин отримає всі налаштування «{{ src.name }}», <strong>крім ключів</strong>. Він буде вимкнений;
+поля, які треба змінити, підсвітяться червоним у його картці.</p>
+<div class="cp-grid">
+  <form method="post" class="cp-box cp-form">{% csrf_token %}
+    <h3>Новий магазин</h3>
+    {% if form.non_field_errors %}<div class="errornote">{{ form.non_field_errors }}</div>{% endif %}
+    {% for f in form %}
+      {% if f.field.widget.input_type == "checkbox" %}
+        <div class="form-row cp-check">{{ f }} <label for="{{ f.id_for_label }}">{{ f.label }}</label></div>
+      {% else %}
+        <div class="form-row">{{ f.label_tag }}{{ f }}{% if f.help_text %}<div class="help">{{ f.help_text }}</div>{% endif %}{{ f.errors }}</div>
+      {% endif %}
+    {% endfor %}
+    <div class="submit-row" style="margin-top:10px">
+      <input type="submit" class="default" value="📋 Створити копію">
+      <a href="{% url 'admin:shop_shop_change' src.pk %}" class="button" style="margin-left:8px">Скасувати</a>
+    </div>
+  </form>
+  <div>
+    <div class="cp-box">
+      <h3>✅ Копіюється</h3>
+      <ul>
+        <li>Налаштування картки: валюта, доставка й безкоштовна доставка, кабінет покупця й листи, способи оплати,
+            помічник Minerva (без ключа), нотатки</li>
+        <li>Асортимент: {{ summary.listings }} товарів, ступенів цін: {{ summary.tiers }}</li>
+        <li>Зони доставки: {{ summary.zones }} (країни, ціни, терміни, винятки)</li>
+        <li>Шаблони листів: {{ summary.templates }}</li>
+      </ul>
+    </div>
+    <div class="cp-box cp-no" style="margin-top:12px">
+      <h3>⛔ Не копіюється</h3>
+      <ul>
+        <li>Ключі й секрети{% if summary.secrets %}: {{ summary.secrets|join:", " }}{% endif %} — введіть нові в копії</li>
+        <li>Ключі API сайту ({{ summary.keys }}) — для нового сайту створіть свій ключ (REST API → API Токени → «Магазин»)</li>
+        <li>Покупці ({{ summary.customers }}), замовлення ({{ summary.orders }}), оплати, звіт сайту про фото</li>
+        <li>«За замовчуванням» і «Активний» — копія вимкнена, доки ви її не ввімкнете</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

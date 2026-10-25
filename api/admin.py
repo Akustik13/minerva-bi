@@ -62,22 +62,23 @@ class APIKeyAdmin(admin.ModelAdmin):
         return super().change_view(request, object_id, form_url, extra_context)
 
     def key_preview(self, obj):
-        return f"{obj.key[:8]}…{obj.key[-4:]}"
+        from core.secrets import mask
+        return mask(obj.key)
     key_preview.short_description = 'Ключ'
 
     def key_display(self, obj):
         if obj.pk:
+            from core.secrets import reveal
+            # ключ замасковано (видно початок і кінець); «Копіювати» бере повний — для shop-config.php сайту
             return format_html(
-                '<code style="font-size:13px;user-select:all;'
-                'background:#0d1117;padding:6px 10px;border-radius:4px;'
-                'border:1px solid #2a3f52;display:inline-block;">{}</code>'
-                '<div style="margin-top:8px;font-size:12px;opacity:.8">Перевірка підключення:</div>'
+                '{}<div style="margin-top:8px;font-size:12px;opacity:.8">Перевірка підключення '
+                '(замість &lt;ключ&gt; — скопійований ключ):</div>'
                 '<code style="font-size:12px;user-select:all;display:inline-block;margin-top:4px">'
-                'curl -H "Authorization: Token {}" {}/api/v1/ping/</code>'
+                'curl -H "Authorization: Token &lt;ключ&gt;" {}/api/v1/ping/</code>'
                 '<div style="margin-top:6px;font-size:12px;opacity:.8">'
                 'Документація: <code>api/README.md</code> · '
                 '<a href="/dashboard/api/console/?preset=minerva_ping">Консоль API</a></div>',
-                obj.key, obj.key, self._base_url,
+                reveal(obj.key), self._base_url,
             )
         return '— буде згенеровано після збереження —'
     key_display.short_description = 'API Ключ (скопіюй)'
@@ -148,10 +149,10 @@ class WebhookAdmin(admin.ModelAdmin):
     def secret_display(self, obj):
         if not obj.pk:
             return '— буде згенеровано після збереження —'
-        return format_html(
-            '<code style="user-select:all">{}</code><div style="font-size:12px;opacity:.8;margin-top:6px">'
-            'Перевіряйте заголовок <code>X-Minerva-Signature</code>: '
-            'HMAC-SHA256(secret, "&lt;t&gt;.&lt;body&gt;"). Приклад — api/README.md</div>', obj.secret)
+        from core.secrets import reveal
+        return reveal(obj.secret, format_html(
+            'Той самий секрет — на сайті в private/shop-config.php (<code>webhook_secret</code>). Перевіряйте заголовок '
+            '<code>X-Minerva-Signature</code>: HMAC-SHA256(secret, "&lt;t&gt;.&lt;body&gt;"). Приклад — api/README.md'))
     secret_display.short_description = 'Секрет підпису'
 
     @admin.action(description='📡 Надіслати тестову подію (ping)')

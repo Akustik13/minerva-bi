@@ -65,7 +65,8 @@ class RagSettingsAdmin(admin.ModelAdmin):
     def key_status(self, obj):
         if not obj or not obj.api_key:
             return format_html('<span style="color:#e57373">{}</span>', "не задано")
-        return f"задано (…{obj.api_key[-4:]})"
+        from core.secrets import mask
+        return f"задано ({mask(obj.api_key)})"
 
     @admin.display(description="Перевірка зв'язку")
     def check_status(self, obj):
@@ -269,16 +270,18 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
     def key_status(self, obj):
         if not obj or not obj.private_api_key:
             return format_html('<span style="color:#e57373">{}</span>', "не задано (потрібен для пошуку, не для індексації)")
-        return f"задано (…{obj.private_api_key[-4:]})"
+        from core.secrets import mask
+        return f"задано ({mask(obj.private_api_key)})"
 
     @admin.display(description="Ключ Minerva для RAG (RAG → Minerva)")
     def feed_keys(self, obj):
         """API-ключі Minerva з правами бази знань: RAG ними забирає стрічку /api/v1/knowledge/."""
         from api.models import APIKey
+        from core.secrets import mask
         keys = [k for k in APIKey.objects.filter(is_active=True).order_by("-created_at")
                 if "knowledge:read" in (k.scopes or [])]
-        rows = format_html_join("", "<li><a href='{}'>{}</a> · …{} · {}</li>", (
-            (reverse("admin:api_apikey_change", args=[k.pk]), k.name, k.key[-4:],
+        rows = format_html_join("", "<li><a href='{}'>{}</a> · {} · {}</li>", (
+            (reverse("admin:api_apikey_change", args=[k.pk]), k.name, mask(k.key),
              f"востаннє {timezone.localtime(k.last_used):%d.%m.%Y %H:%M}" if k.last_used else "ще не використовувався")
             for k in keys))
         button = format_html(

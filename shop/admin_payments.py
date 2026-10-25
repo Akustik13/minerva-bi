@@ -46,6 +46,10 @@ class ShopForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        from core.secrets import placeholder
+        for name in ("stripe_secret_key", "stripe_webhook_secret", "assistant_key"):   # що збережено — замасковано
+            if name in self.fields:
+                self.fields[name].widget.attrs["placeholder"] = placeholder(getattr(self.instance, name, ""))
         methods = list(getattr(self.instance, "payment_methods", None) or [])
         # self.initial, а не field.initial: значення з бази ([] — ще не налаштовано) мають пріоритет над field.initial
         if "payment_methods" in self.fields:

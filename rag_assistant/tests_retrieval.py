@@ -345,7 +345,9 @@ class ConnectionSettingsTests(RetrievalBase):
         self.assertRedirects(r, f"/admin/api/apikey/{key.pk}/change/", fetch_redirect_response=False)
         self.assertEqual((key.scopes, key.shop_id), (["knowledge:read", "knowledge:write"], None))
         page = self.client.get("/admin/rag_assistant/knowledgesettings/1/change/")
-        self.assertContains(page, f"…{key.key[-4:]}")
+        from core.secrets import mask
+        self.assertContains(page, mask(key.key))   # замасковано: початок і кінець
+        self.assertNotContains(page, key.key)
         self.assertContains(page, "🔑 Створити ключ для RAG")
 
     def test_tls_verification_setting_is_used(self):

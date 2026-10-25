@@ -250,13 +250,15 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         from collections import defaultdict
 
         from . import thumbs
+        from shop.badges import badges as shop_badges
 
         DONE_STATUSES = {'shipped', 'delivered', 'cancelled'}
         PO_ACTIVE = ['draft', 'ordered', 'partial']
 
-        # All active products
+        # All active products (+ магазини — бейджі під назвою)
         products = list(
             Product.objects.filter(is_active=True)
+            .prefetch_related('shop_listings__shop')
             .order_by('sku')
         )
         if not products:
@@ -407,6 +409,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'thumb_url':             thumbs.thumb_url(p),
                 'image_href':            thumbs.image_href(p) if thumbs.has_image(p) else '',
                 'ds_href':               thumbs.datasheet_href(p),
+                'shops':                 shop_badges(p.shop_listings.all(), empty=''),
                 'stock':                 stock,
                 'reserved':              reserved,
                 'net_avail':             stock - reserved,
@@ -2387,18 +2390,9 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
     @admin.display(description="Магазини")
     def shops_col(self, obj):
-        """У яких магазинах товар: бейдж на магазин (зелений — показується, сірий — сховано)."""
-        rows = list(obj.shop_listings.all())
-        if not rows:
-            return format_html('<span style="opacity:.45">{}</span>', "—")
-        return format_html_join(" ", '<a href="{}" title="{}" style="display:inline-block;padding:1px 7px;'
-                                     'border-radius:9px;background:{};color:#fff;font-size:11px;'
-                                     'text-decoration:none;white-space:nowrap">{}</a>', (
-            (reverse("admin:shop_shoplisting_change", args=[l.pk]),
-             f"{l.shop.name} · {'показується' if l.is_visible else 'сховано'} · "
-             + (f"{l.effective_price:.2f} {l.shop.currency}" if l.effective_price is not None else "ціна за запитом")
-             + (" · базові ціни" if l.price_source == "base" else ""),
-             "#2e7d32" if l.is_visible else "#757575", l.shop.slug) for l in rows))
+        """У яких магазинах товар (shop/badges.py): зелений — показується, сірий — сховано, пунктир — магазин вимкнено."""
+        from shop.badges import badges
+        return badges(obj.shop_listings.all())
 
     @admin.display(description="🖼")
     def media_col(self, obj):

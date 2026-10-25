@@ -101,6 +101,7 @@
 .sv-pchip b { font-weight: 400; opacity: .8; }
 .sv-plink { border: none; background: none; color: var(--text-dim); cursor: pointer; font-size: 12px; text-decoration: underline; }
 .sv-thumb { width: 32px; height: 32px; flex: none; object-fit: contain; border-radius: 4px; background: #fff; display: block; }
+.sv-shops { margin-top: 2px; }
 .sv-thumb-none { background: none; opacity: .35; font-size: 13px; line-height: 32px; text-align: center; white-space: nowrap; }
 .sv-ds { margin-left: 4px; font-size: 13px; text-decoration: none; }
 .sv-name { font-size: 11px; color: var(--text-dim); margin-top: 1px;
@@ -356,6 +357,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                    title="{% trans "Даташит — відкрити (наведіть на артикул — перегляд)" %}">📄</a>{% endif %}
               </div>
               <div class="sv-name">{{ p.name }}</div>
+              {% if row.shops %}<div class="sv-shops" onclick="event.stopPropagation()">{{ row.shops }}</div>{% endif %}
             </div>
           </div>
         </td>

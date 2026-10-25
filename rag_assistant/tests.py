@@ -65,7 +65,7 @@ class RagAssistantTests(TestCase):
         page = self.client.get("/admin/rag_assistant/ragsettings/1/change/")
         self.assertEqual(page.status_code, 200)
         self.assertNotContains(page, "secret-key-1234")
-        self.assertContains(page, "…1234")
+        self.assertContains(page, "secr••••••••1234")   # замасковано: початок і кінець (core/secrets.py)
         self.assertContains(self.client.get("/admin/"), 'id="rg-pill"')
 
     def test_ask_poll_complete_with_products_and_history(self):

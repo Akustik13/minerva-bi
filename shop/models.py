@@ -179,6 +179,15 @@ class Shop(models.Model):
         "Ключ помічника", max_length=255, blank=True, default="",
         help_text="Ключ сайту для RAG (заголовок X-Minerva-Bridge). Порожньо — ключ з private/minerva-config.php сайту.",
     )
+    # ── Копія магазину (shop/copying.py) ──
+    copied_from = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="copies",
+        verbose_name="Скопійовано з",
+    )
+    review_fields = models.JSONField(
+        "Змінити після копіювання", default=dict, blank=True,
+        help_text="{поле: значення в момент копіювання}; поле підсвічене червоним, доки його не змінили.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -9,6 +9,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 
+from inventory.admin import ProductShopFilter
 from inventory.services.stock import annotate_stock
 from inventory.param_filters import ListingParamFilter, panel_context
 from inventory.thumbs import ListingMediaFilter
@@ -198,17 +199,35 @@ class ShippingZoneInline(admin.StackedInline):
     verbose_name_plural = "🚚 Зони доставки — куди доставляємо, за скільки і як швидко (нетто)"
 
 
+class CopyShopForm(forms.Form):
+    name = forms.CharField(label="Назва нового магазину", max_length=100)
+    slug = forms.CharField(
+        label="Код (джерело замовлень)", max_length=32,
+        validators=Shop._meta.get_field("slug").validators,
+        help_text="Латиниця в нижньому регістрі, цифри, - і _. Записується в замовлення нового сайту як «Джерело».")
+    url = forms.URLField(label="Адреса сайту", required=False, help_text="Можна вказати пізніше в картці магазину.")
+    listings = forms.BooleanField(label="Асортимент і ціни (зі ступенями)", required=False, initial=True)
+    zones = forms.BooleanField(label="Зони доставки", required=False, initial=True)
+    templates = forms.BooleanField(label="Шаблони листів покупцям", required=False, initial=True)
+
+    def clean_slug(self):
+        slug = self.cleaned_data["slug"].strip()
+        if Shop.objects.filter(slug=slug).exists():
+            raise forms.ValidationError("Такий код уже є — оберіть інший.")
+        return slug
+
+
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
     list_display = ["name", "slug", "is_default", "is_active", "currency", "listings_col", "shipping_col",
-                    "orders_col", "keys_col"]
+                    "orders_col", "keys_col", "review_col"]
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     form = ShopForm
     readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "stripe_col",
                        "assistant_col"]
     inlines = [ShippingZoneInline]
-    actions = ["action_default_zones", "action_import_dk_zones"]
+    actions = ["action_copy", "action_default_zones", "action_import_dk_zones"]
     fieldsets = [
         (None, {"fields": ["name", "public_name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
         ("🚚 Доставка", {
@@ -360,7 +379,74 @@ class ShopAdmin(admin.ModelAdmin):
 
     def render_change_form(self, request, context, *args, **kwargs):
         context["ship_catalog"] = country_catalog()  # редактор країн зон (json_script у change_form.html)
+        obj = kwargs.get("obj") or context.get("original")
+        if obj is not None and obj.pk:
+            from . import copying
+            left = copying.pending(obj)
+            context["shop_copy"] = {
+                "url": reverse("admin:shop_shop_copy", args=[obj.pk]),
+                "review": left, "pairs": list(zip(left, copying.labels(obj, left))), "source": obj.copied_from,
+                "done_url": reverse("admin:shop_shop_review_done", args=[obj.pk]),
+            }
         return super().render_change_form(request, context, *args, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if obj.review_fields:   # копія: змінені поля більше не підсвічуються
+            from . import copying
+            copying.refresh(obj)
+
+    # ── Копія магазину (shop/copying.py) ─────────────────────────────────
+    @admin.display(description="Налаштування")
+    def review_col(self, obj):
+        from . import copying
+        left = copying.pending(obj) if obj.review_fields else []
+        if not left:
+            return format_html('<span style="opacity:.45">{}</span>', "—")
+        return format_html('<span style="color:#ff8a80" title="{}">⚠ змінити: {}</span>',
+                           ", ".join(copying.labels(obj, left)), len(left))
+
+    @admin.action(description="📋 Копіювати магазин (без ключів)")
+    def action_copy(self, request, queryset):
+        if queryset.count() != 1:
+            self.message_user(request, "Виберіть один магазин для копіювання.", messages.WARNING)
+            return None
+        return redirect(reverse("admin:shop_shop_copy", args=[queryset.first().pk]))
+
+    def _copy_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        from . import copying
+        src = get_object_or_404(Shop, pk=pk)
+        if not (self.has_add_permission(request) and self.has_view_permission(request, src)):
+            raise PermissionDenied
+        if request.method == "POST":
+            form = CopyShopForm(request.POST)
+            if form.is_valid():
+                d = form.cleaned_data
+                new = copying.copy_shop(src, d["name"], d["slug"], d["url"], listings=d["listings"],
+                                        zones=d["zones"], templates=d["templates"])
+                left = copying.labels(new, copying.pending(new))
+                self.message_user(request, f"Створено копію «{new.name}» (вимкнена). "
+                                           + (f"Змініть поля, підсвічені червоним: {', '.join(left)}." if left else ""),
+                                  messages.WARNING if left else messages.SUCCESS)
+                return redirect(reverse("admin:shop_shop_change", args=[new.pk]))
+        else:
+            form = CopyShopForm(initial=copying.suggest(src))
+        return render(request, "admin/shop/shop/copy.html", {
+            **self.admin_site.each_context(request), "opts": self.model._meta, "title": f"Копіювати «{src.name}»",
+            "src": src, "form": form, "summary": copying.summary(src),
+        })
+
+    def _review_done_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        Shop.objects.filter(pk=shop.pk).update(review_fields={})
+        self.message_user(request, "Позначено як перевірене — поля більше не підсвічуються.")
+        return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
 
     @admin.display(description="Доставка")
     def shipping_col(self, obj):
@@ -420,9 +506,11 @@ class ShopAdmin(admin.ModelAdmin):
         link = lambda k: reverse("admin:api_apikey_change", args=[k.pk])  # noqa: E731
         bound = [(k, m) for k, m in keys if m != services.KEY_DEFAULT]
         loose = [k for k, m in keys if m == services.KEY_DEFAULT]
+        from core.secrets import mask
         if bound:
-            main = format_html_join(", ", '<a href="{}">{}</a> <span style="opacity:.7">({})</span>', (
-                (link(k), k.name, "прив'язаний" if m == services.KEY_LINKED else f"за джерелом «{obj.slug}»")
+            main = format_html_join(", ", '<a href="{}">{}</a> <code style="opacity:.75">{}</code> '
+                                          '<span style="opacity:.7">({})</span>', (
+                (link(k), k.name, mask(k.key), "прив'язаний" if m == services.KEY_LINKED else f"за джерелом «{obj.slug}»")
                 for k, m in bound))
         else:
             main = format_html('прив\'язаних немає — у ключі сайту оберіть поле «Магазин» = «{}» '
@@ -465,6 +553,9 @@ class ShopAdmin(admin.ModelAdmin):
                  name="shop_shop_stripe_check"),
             path("<int:pk>/connection-check/", self.admin_site.admin_view(self._connection_view),
                  name="shop_shop_connection_check"),
+            path("<int:pk>/copy/", self.admin_site.admin_view(self._copy_view), name="shop_shop_copy"),
+            path("<int:pk>/review-done/", self.admin_site.admin_view(self._review_done_view),
+                 name="shop_shop_review_done"),
         ] + super().get_urls()
 
     def _zones_view(self, request, pk, run):
@@ -1091,7 +1182,7 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
 class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
     list_display = ["sku", "name_col", "category", "sale_price", "purchase_price", "shops_col"]
     list_display_links = None
-    list_filter = ["category", "kind", "is_active"]
+    list_filter = ["category", ProductShopFilter, "kind", "is_active"]
     search_fields = ["sku", "sku_short", "name", "name_export", "manufacturer"]
     list_per_page = 100
     ordering = ["category", "sku"]
@@ -1112,13 +1203,8 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
 
     @admin.display(description="У магазинах")
     def shops_col(self, obj):
-        rows = list(obj.shop_listings.all())
-        if not rows:
-            return "—"
-        return format_html_join(
-            " ", '<span title="{}" style="padding:1px 6px;border-radius:8px;background:{};color:#fff">{}</span>',
-            (("показується" if l.is_visible else "сховано", "#2e7d32" if l.is_visible else "#757575", l.shop.slug)
-             for l in rows))
+        from .badges import badges
+        return badges(obj.shop_listings.all())
 
     @admin.action(description="➕ Додати в магазин…")
     def action_add_to_shop(self, request, queryset):
