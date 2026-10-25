@@ -225,7 +225,7 @@ class ShopAdmin(admin.ModelAdmin):
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     form = ShopForm
     readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "stripe_col",
-                       "assistant_col"]
+                       "assistant_col", "assistant_test_col"]
     inlines = [ShippingZoneInline]
     actions = ["action_copy", "action_default_zones", "action_import_dk_zones"]
     fieldsets = [
@@ -261,7 +261,7 @@ class ShopAdmin(admin.ModelAdmin):
         }),
         ("🤖 Помічник Minerva на сайті", {
             "fields": ["assistant_mode", "assistant_backend", "assistant_url", "assistant_key", "assistant_clear",
-                       "assistant_col"],
+                       "assistant_col", "assistant_test_col"],
             "description": "Кнопка «Minerva» (чат з відповідями з даташитів і каталогу) на сайті магазину. "
                            "«Вимкнено» — кнопки на сайті немає; «Увімкнено» — є. Відповіді: «RAG API» — той самий "
                            "сервіс і ключ, що в «Помічник по продукції» (Minerva AI → ⚙️ Налаштування помічника), "
@@ -336,8 +336,84 @@ class ShopAdmin(admin.ModelAdmin):
 
     @admin.display(description="Зараз")
     def assistant_col(self, obj):
-        from .assistant import describe
-        return describe(obj) if obj and obj.pk else "Спершу збережіть магазин."
+        """Налаштування Minerva + що фактично використовує кожен сайт (з його звіту) + видалення файлу на сайтах."""
+        from django.utils import timezone
+        from django.utils.dateparse import parse_datetime
+        from . import assistant
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        rows = []
+        for host, report in (obj.assistant_sites or {}).items():
+            eff = assistant.effective(obj, report)
+            kind = "RAG API" if eff["backend"] == Shop.ASSISTANT_RAG_API else "веб-міст"
+            at = parse_datetime(report.get("at") or "")
+            rows.append((
+                host, "кнопка є" if eff["on"] and eff["endpoint"] and eff["key_from"] else "кнопки немає",
+                f"{kind} {eff['endpoint'] or '— адреси немає'}", eff["url_from"], eff["key_from"] or "немає",
+                (("є" + (", вимкнено" if not report.get("file_enabled") else "")
+                  + (f" · {report.get('file_url')}" if report.get("file_url") else "")) if report.get("file") else "немає"),
+                f"{timezone.localtime(at):%d.%m %H:%M}" if at else "—"))
+        table = format_html(
+            '<table style="margin-top:6px;font-size:12px"><tr><th>Сайт</th><th>Стан</th><th>Звертається до</th>'
+            '<th>Адреса з</th><th>Ключ з</th><th>private/minerva-config.php</th><th>Звіт</th></tr>{}</table>',
+            format_html_join("", "<tr>" + "<td>{}</td>" * 7 + "</tr>", rows)) if rows else format_html(
+            '<div class="help" style="margin-top:6px">{}</div>', "Сайти ще не звітували (звіт — разом із запитом "
+            "налаштувань, коли на сторінці магазину відкривають чат або перевіряють зв'язок).")
+        has_file = any(r.get("file") for r in (obj.assistant_sites or {}).values())
+        if obj.assistant_remove_file:
+            action = format_html('<div style="margin-top:6px;color:#ffb74d">{}</div>',
+                                 "🗑 Видалення файлу заплановано — сайти виконають його протягом хвилини.")
+        elif has_file:
+            reason = assistant.can_remove_file(obj)
+            action = format_html(
+                '<div style="margin-top:6px"><button type="submit" class="button" formaction="{}" formnovalidate {}'
+                ' onclick="return confirm(&#39;Видалити private/minerva-config.php на сайтах? Адреса й ключ чату '
+                'лишаться тільки в Minerva.&#39;)">🗑 Видалити private/minerva-config.php на сайтах</button> '
+                '<span class="help">{}</span></div>',
+                reverse("admin:shop_shop_assistant_remove_file", args=[obj.pk]), "disabled" if reason else "",
+                reason or "адреса й ключ чату лишаться тільки в Minerva · незбережені зміни на сторінці не зберігаються")
+        else:
+            action = ""
+        return format_html('<div><strong>{}</strong></div>{}{}', assistant.describe(obj), table, action)
+
+    @admin.display(description="Перевірка RAG")
+    def assistant_test_col(self, obj):
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        return format_html(
+            '<div id="shop-ragtest" data-url="{}">'
+            '<input type="text" id="shop-ragtest-q" size="50" maxlength="500" placeholder="Тестове запитання (необов’язково)"'
+            ' value="Welche Antennen gibt es für 868 MHz?"> '
+            '<button type="button" class="button" id="shop-ragtest-run">🧪 Перевірити RAG</button> '
+            '<span class="help">Minerva сама звертається до RAG, яким користуються сайти (збережені налаштування); '
+            'із запитанням — чекає відповідь до 45 с.</span><div id="shop-ragtest-out" style="margin-top:8px"></div></div>',
+            reverse("admin:shop_shop_assistant_test", args=[obj.pk]))
+
+    def _assistant_remove_file_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        from . import assistant
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        reason = assistant.can_remove_file(shop)
+        if reason:
+            self.message_user(request, reason, messages.ERROR)
+        else:
+            Shop.objects.filter(pk=shop.pk).update(assistant_remove_file=True)
+            self.message_user(request, "Заплановано: сайти видалять private/minerva-config.php при наступному запиті "
+                                       "налаштувань (протягом хвилини). Стан — у таблиці «Зараз».")
+        return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
+
+    def _assistant_test_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        from . import assistant
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        return JsonResponse(assistant.test_rag(shop, request.POST.get("question", "")))
 
     @admin.display(description="Перевірка зв'язку")
     def connection_col(self, obj):
@@ -557,6 +633,10 @@ class ShopAdmin(admin.ModelAdmin):
             path("<int:pk>/connection-check/", self.admin_site.admin_view(self._connection_view),
                  name="shop_shop_connection_check"),
             path("<int:pk>/copy/", self.admin_site.admin_view(self._copy_view), name="shop_shop_copy"),
+            path("<int:pk>/assistant-remove-file/", self.admin_site.admin_view(self._assistant_remove_file_view),
+                 name="shop_shop_assistant_remove_file"),
+            path("<int:pk>/assistant-test/", self.admin_site.admin_view(self._assistant_test_view),
+                 name="shop_shop_assistant_test"),
             path("<int:pk>/review-done/", self.admin_site.admin_view(self._review_done_view),
                  name="shop_shop_review_done"),
         ] + super().get_urls()

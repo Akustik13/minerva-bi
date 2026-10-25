@@ -188,6 +188,15 @@ class Shop(models.Model):
         "Ключ помічника", max_length=255, blank=True, default="",
         help_text="Ключ сайту для RAG (заголовок X-Minerva-Bridge). Порожньо — ключ з private/minerva-config.php сайту.",
     )
+    assistant_sites = models.JSONField(
+        "Звіти сайтів про помічника", default=dict, blank=True,
+        help_text="{домен сайту: {at, file, file_enabled, file_url, file_key}} — сайт повідомляє, що в його "
+                  "private/minerva-config.php (без ключа), разом із запитом налаштувань.",
+    )
+    assistant_remove_file = models.BooleanField(
+        "Видалити private/minerva-config.php на сайтах", default=False,
+        help_text="Сайт видаляє файл при наступному запиті налаштувань; знімається, коли сайти повідомили, що файлу немає.",
+    )
     # ── Копія магазину (shop/copying.py) ──
     copied_from = models.ForeignKey(
         "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="copies",

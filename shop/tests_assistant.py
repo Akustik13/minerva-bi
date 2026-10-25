@@ -31,7 +31,7 @@ class AssistantApiTests(TestCase):
     def test_default_site_decides(self):
         data = self.get(self.site_key).json()
         self.assertEqual(data, {"shop": "webshop", "managed": False, "enabled": False, "backend": "bridge",
-                                "upstream_url": "", "bridge_key": ""})
+                                "upstream_url": "", "bridge_key": "", "remove_file": False})
 
     def test_on_with_address_and_key_only_for_bound_key(self):
         Shop.objects.filter(pk=self.shop.pk).update(assistant_mode="on", assistant_url="https://rag.example.com",

@@ -352,6 +352,39 @@
   });
 })();
 
+// «🧪 Перевірити RAG» (shop/assistant.py test_rag): Minerva сама звертається до RAG, яким користуються сайти
+(function () {
+  'use strict';
+  var box = document.getElementById('shop-ragtest');
+  if (!box) return;
+  var btn = document.getElementById('shop-ragtest-run'), out = document.getElementById('shop-ragtest-out');
+  var ICON = { ok: '✅', warn: '⚠️', error: '❌', info: 'ℹ️' };
+  btn.addEventListener('click', function () {
+    var body = new FormData();
+    body.append('question', document.getElementById('shop-ragtest-q').value || '');
+    body.append('csrfmiddlewaretoken', (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '');
+    btn.disabled = true;
+    out.textContent = '⏳ Перевіряю RAG… (із запитанням — до хвилини)';
+    fetch(box.dataset.url, { method: 'POST', body: body, credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (res) {
+        out.textContent = '';
+        var head = document.createElement('div');
+        head.style.cssText = 'font-weight:600;margin-bottom:4px';
+        head.textContent = res.summary + ' · ' + res.seconds + ' с';
+        out.appendChild(head);
+        res.checks.forEach(function (c) {
+          var row = document.createElement('div');
+          row.style.cssText = 'margin:3px 0;line-height:1.45';
+          row.textContent = ICON[c.level] + ' ' + c.title + (c.detail ? ' — ' + c.detail : '');
+          out.appendChild(row);
+        });
+      })
+      .catch(function (e) { out.textContent = '❌ Перевірку не виконано: ' + e.message; })
+      .then(function () { btn.disabled = false; });
+  });
+})();
+
 // Копія магазину (shop/copying.py): підсвітити поля, які ще треба змінити; клік по назві в банері — до поля
 (function () {
   'use strict';

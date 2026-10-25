@@ -267,6 +267,8 @@ class ShopAssistantView(APIView):
         if shop is None:
             return Response({"detail": "Для ключа не налаштовано магазин.", "code": "no_shop"},
                             status=status.HTTP_404_NOT_FOUND)
+        if request.query_params.get("site") and assistant.key_is_bound(shop, key):
+            assistant.record_report(shop, request.query_params)   # що в private/minerva-config.php сайту (без ключа)
         return Response(assistant.public_config(shop, key))
 
 
