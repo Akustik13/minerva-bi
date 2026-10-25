@@ -661,3 +661,71 @@ class ShopMediaSite(models.Model):
 
     def __str__(self):
         return f"{self.shop} · фото й даташити"
+
+
+# ── Адмінка сайту магазину (/admin/ на сайті; shop/site_admin.py) ─────────────────────────────────────────────
+
+class ShopStaff(models.Model):
+    """Хто з команди може входити в адмінку сайту магазину і з якою роллю (вхід — логіном і паролем Minerva)."""
+    ROLE_ADMIN, ROLE_MANAGER, ROLE_VIEWER = "admin", "manager", "viewer"
+    ROLES = [(ROLE_ADMIN, "Адміністратор сайту — усі налаштування, ключі й паролі"),
+             (ROLE_MANAGER, "Менеджер магазину — налаштування без ключів і паролів"),
+             (ROLE_VIEWER, "Перегляд — лише бачить налаштування")]
+    # Що дозволено на сайті (сайт перевіряє за цим списком)
+    PERMISSIONS = {ROLE_ADMIN: ["settings.view", "settings.edit", "secrets.edit", "pair"],
+                   ROLE_MANAGER: ["settings.view", "settings.edit"],
+                   ROLE_VIEWER: ["settings.view"]}
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="staff", verbose_name="Магазин")
+    user = models.ForeignKey("auth.User", on_delete=models.CASCADE, related_name="shop_roles",
+                             verbose_name="Користувач Minerva")
+    role = models.CharField("Роль на сайті", max_length=10, choices=ROLES, default=ROLE_MANAGER)
+    is_active = models.BooleanField("Доступ дозволено", default=True)
+    last_site_login = models.DateTimeField("Останній вхід на сайт", null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Доступ до адмінки сайту"
+        verbose_name_plural = "👥 Доступ до адмінки сайту"
+        constraints = [models.UniqueConstraint(fields=["shop", "user"], name="shop_staff_unique")]
+
+    def __str__(self):
+        return f"{self.user} · {self.get_role_display()}"
+
+    @property
+    def permissions(self) -> list[str]:
+        return list(self.PERMISSIONS.get(self.role, []))
+
+
+class ShopPairing(models.Model):
+    """Одноразовий код підключення сайту: сайт обмінює його на ключ API й секрет вебхука (без перенесення файлів)."""
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="pairings", verbose_name="Магазин")
+    code_hash = models.CharField(max_length=64, unique=True)
+    created_by = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField("Дійсний до")
+    used_at = models.DateTimeField("Використано", null=True, blank=True)
+    site_url = models.URLField("Сайт", blank=True, default="")
+    api_key = models.ForeignKey("api.APIKey", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+                                verbose_name="Виданий ключ API")
+
+    class Meta:
+        verbose_name = "Код підключення сайту"
+        verbose_name_plural = "Коди підключення сайту"
+
+
+class ShopSiteEvent(models.Model):
+    """Журнал адмінки сайту: вхід, зміни налаштувань (лише назви полів, без значень), підключення."""
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="site_events", verbose_name="Магазин")
+    at = models.DateTimeField("Коли", auto_now_add=True)
+    site = models.CharField("Сайт", max_length=120, blank=True, default="")
+    user = models.CharField("Хто", max_length=150, blank=True, default="")
+    action = models.CharField("Дія", max_length=40)
+    details = models.JSONField("Подробиці", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "Подія адмінки сайту"
+        verbose_name_plural = "Журнал адмінки сайту"
+        ordering = ["-at"]
+
+    def __str__(self):
+        return f"{self.at:%d.%m.%Y %H:%M} · {self.site} · {self.user} · {self.action}"

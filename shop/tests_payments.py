@@ -306,7 +306,8 @@ class StripeAdminTests(StripeTestCase):
         data.update({"name": "Sevskiy", "slug": "webshop", "currency": "EUR", "is_active": "on", "is_default": "on",
                      "url": "https://web.example.com", "payment_methods": ["invoice", "stripe"],
                      "payment_default": "stripe", "stripe_poll_minutes": "15",
-                     "shipping_zones-TOTAL_FORMS": "0", "shipping_zones-INITIAL_FORMS": "0"})
+                     "shipping_zones-TOTAL_FORMS": "0", "shipping_zones-INITIAL_FORMS": "0",
+                     "staff-TOTAL_FORMS": "0", "staff-INITIAL_FORMS": "0"})
         for k in ("mail_sender", "free_shipping_threshold", "account_links", "account_link_error",
                   "stripe_secret_key", "stripe_webhook_secret"):
             data.pop(k, None)

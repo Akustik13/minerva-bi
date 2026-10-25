@@ -16,7 +16,7 @@ from inventory.thumbs import ListingMediaFilter
 
 from . import services
 from .admin_payments import ShopForm, stripe_tools
-from .models import ShippingZone, Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSettings
+from .models import ShippingZone, Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSettings, ShopStaff
 from .countries import catalog as country_catalog, name as country_name
 from .shipping import clean_overrides, delivery_label, parse_countries
 
@@ -186,6 +186,17 @@ class ShippingZoneFormSet(forms.BaseInlineFormSet):
                 seen[c] = d.get("name")
 
 
+class ShopStaffInline(admin.TabularInline):
+    model = ShopStaff
+    extra = 0
+    autocomplete_fields = ["user"]
+    fields = ["user", "role", "is_active", "last_site_login"]
+    readonly_fields = ["last_site_login"]
+    verbose_name = "Користувач з доступом до адмінки сайту"
+    verbose_name_plural = ("👥 Доступ до адмінки сайту (/admin/ на сайті) — вхід логіном і паролем Minerva; "
+                           "адміністратор — усі налаштування й ключі, менеджер — без ключів, перегляд — лише бачить")
+
+
 class ShippingZoneInline(admin.StackedInline):
     model = ShippingZone
     form = ShippingZoneForm
@@ -225,8 +236,8 @@ class ShopAdmin(admin.ModelAdmin):
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     form = ShopForm
     readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "stripe_col",
-                       "assistant_col", "assistant_test_col"]
-    inlines = [ShippingZoneInline]
+                       "assistant_col", "assistant_test_col", "site_admin_col"]
+    inlines = [ShippingZoneInline, ShopStaffInline]
     actions = ["action_copy", "action_default_zones", "action_import_dk_zones"]
     fieldsets = [
         (None, {"fields": ["name", "public_name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
@@ -268,6 +279,12 @@ class ShopAdmin(admin.ModelAdmin):
                            "працює з будь-якого хостингу, поля адреси й ключа нижче тоді не потрібні; «Веб-міст» — "
                            "адреса й ключ нижче (порожні — з private/minerva-config.php), лише з локальної мережі. "
                            "Сайт перевіряє раз на хвилину; що він бачить — «🔌 Перевірити зв'язок із сайтом» нижче.",
+        }),
+        ("🌐 Адмінка сайту", {
+            "fields": ["site_admin_col"],
+            "description": "На сайті — сторінка /admin/: ключі, паролі, оплата, пошта, магазин без перенесення файлів. "
+                           "Хто має доступ — таблиця «👥 Доступ до адмінки сайту» внизу. Новий сайт підключається "
+                           "кодом: Minerva сама видає йому ключ API й налаштовує вебхук.",
         }),
         ("Підключення", {"fields": ["keys_col", "connection_col"],
                          "description": "Сайт підключається ключем API, який видає лише Minerva: Адмін → REST API → "
@@ -375,6 +392,47 @@ class ShopAdmin(admin.ModelAdmin):
         else:
             action = ""
         return format_html('<div><strong>{}</strong></div>{}{}', assistant.describe(obj), table, action)
+
+    @admin.display(description="Сайт")
+    def site_admin_col(self, obj):
+        """Код підключення сайту, хто має доступ, останні події адмінки сайту (shop/site_admin.py)."""
+        from django.utils import timezone
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        staff = [s for s in obj.staff.select_related("user") if s.is_active]
+        events = list(obj.site_events.all()[:12])
+        labels = {"login": "вхід", "login_failed": "невдалий вхід", "settings": "змінено налаштування",
+                  "pair": "підключено кодом", "logout": "вихід", "test": "перевірка"}
+        rows = format_html_join("", "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>", (
+            (f"{timezone.localtime(e.at):%d.%m %H:%M}", e.site or "—", e.user or "—", labels.get(e.action, e.action),
+             ", ".join((e.details or {}).get("fields") or []) or "") for e in events))
+        return format_html(
+            '<div>Доступ мають: {}</div>'
+            '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formnovalidate>'
+            '🔗 Підключити сайт (код)</button> <span class="help">одноразовий код на {} хв: на сайті /admin/ → '
+            '«Підключити до Minerva»; незбережені зміни на сторінці не зберігаються</span></div>{}',
+            format_html_join(", ", "{} <span style='opacity:.7'>({})</span>",
+                             ((s.user.get_full_name() or s.user.get_username(), s.get_role_display().split(" —")[0])
+                              for s in staff)) if staff else "нікого — додайте внизу «👥 Доступ до адмінки сайту»",
+            reverse("admin:shop_shop_pair_code", args=[obj.pk]), 30,
+            format_html('<table style="margin-top:10px;font-size:12px"><tr><th>Коли</th><th>Сайт</th><th>Хто</th>'
+                        '<th>Дія</th><th>Поля</th></tr>{}</table>', rows) if events else "")
+
+    def _pair_code_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        from django.utils import timezone
+        from . import site_admin
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        code, until = site_admin.new_pairing(shop, request.user)
+        self.message_user(request, format_html(
+            "🔗 Код підключення сайту: <code style='font-size:18px;letter-spacing:2px;user-select:all'>{}</code> — "
+            "дійсний до {} (один раз). На сайті відкрийте /admin/ → «Підключити до Minerva», вкажіть адресу Minerva {} "
+            "і цей код. Сайт отримає новий ключ API й вебхук; попередній ключ, виданий цьому сайту кодом, вимкнеться.",
+            code, f"{timezone.localtime(until):%H:%M}", request.build_absolute_uri("/").rstrip("/")), messages.WARNING)
+        return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
 
     @admin.display(description="Перевірка RAG")
     def assistant_test_col(self, obj):
@@ -633,6 +691,7 @@ class ShopAdmin(admin.ModelAdmin):
             path("<int:pk>/connection-check/", self.admin_site.admin_view(self._connection_view),
                  name="shop_shop_connection_check"),
             path("<int:pk>/copy/", self.admin_site.admin_view(self._copy_view), name="shop_shop_copy"),
+            path("<int:pk>/pair-code/", self.admin_site.admin_view(self._pair_code_view), name="shop_shop_pair_code"),
             path("<int:pk>/assistant-remove-file/", self.admin_site.admin_view(self._assistant_remove_file_view),
                  name="shop_shop_assistant_remove_file"),
             path("<int:pk>/assistant-test/", self.admin_site.admin_view(self._assistant_test_view),
