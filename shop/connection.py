@@ -87,6 +87,7 @@ def check(shop: Shop, url: str | None = None) -> dict:
         checks += found
         checks += _callback(keys, started)
         checks += _webhook(shop, base)
+        checks += _assistant(shop, base)
         checks += _media(shop, base)
     errors = sum(c["level"] == ERROR for c in checks)
     warnings = sum(c["level"] == WARN for c in checks)
@@ -273,6 +274,49 @@ def _webhook(shop: Shop, base: str) -> list:
             detail = f"Немає відповіді від {hook.url}: {d.response_body[:160]}"
         out.append(_item(ERROR, title, detail))
     return out
+
+
+ASSISTANT_REASONS = {
+    "off": "вимкнено",
+    "no_upstream": "не задано адресу RAG — вкажіть «Адреса помічника» тут або upstream_url у private/minerva-config.php",
+    "no_key": "не задано ключ — вкажіть «Ключ помічника» тут (ключ сайту має бути прив'язаний до магазину) "
+              "або bridge_key у private/minerva-config.php",
+    "bad_url": "адреса RAG не підходить: потрібен https:// або http:// до IP локальної мережі",
+    "no_curl": "на хостингу немає PHP-розширення curl",
+}
+
+
+def _assistant(shop: Shop, base: str) -> list:
+    """Що бачить сайт: GET <сайт>/api/minerva/index.php?action=status&check=1 (без адреси й ключа у відповіді)."""
+    title = "Помічник на сайті"
+    try:
+        r = requests.get(base + "api/minerva/index.php", params={"action": "status", "check": "1"}, timeout=(5, 20),
+                         allow_redirects=False, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+        data = r.json() if r.status_code == 200 else None
+    except (requests.exceptions.RequestException, ValueError):
+        data = None
+    if not isinstance(data, dict) or "enabled" not in data:
+        return [_item(INFO, title, "Сайт не повідомляє стан помічника (версія сайту без керування з Minerva).")]
+    on, source = bool(data.get("enabled")), data.get("source")
+    reason = ASSISTANT_REASONS.get(str(data.get("reason") or ""), str(data.get("reason") or ""))
+    from_site = " Сайт бере налаштування з private/minerva-config.php." if source == "site" else ""
+    mode = shop.assistant_mode
+    if mode == Shop.ASSISTANT_OFF:
+        if not on:
+            return [_item(OK, title, "Вимкнено — кнопки «Minerva» на сайті немає.")]
+        return [_item(WARN, title, "У Minerva вимкнено, а сайт ще показує кнопку — оновиться протягом хвилини."
+                                   + from_site)]
+    if mode == Shop.ASSISTANT_SITE:
+        state = ("увімкнено" + (", RAG відповідає" if data.get("reachable") else ", але RAG не відповідає")
+                 if on else f"вимкнено ({reason})")
+        return [_item(INFO, title, f"Керує сайт (private/minerva-config.php): {state}.")]
+    if not on:
+        return [_item(ERROR if source == "minerva" else WARN, title,
+                      f"У Minerva увімкнено, але на сайті кнопки немає: {reason or 'невідома причина'}.{from_site}")]
+    if data.get("reachable") is False:
+        return [_item(ERROR, title, "Кнопка на сайті є, але сервер сайту не дістає RAG за заданою адресою — "
+                                    "з інтернет-хостингу локальна адреса (192.168.…) недоступна, потрібна https://.")]
+    return [_item(OK, title, "Кнопка «Minerva» на сайті є, RAG відповідає." + from_site)]
 
 
 def _media(shop: Shop, base: str) -> list:

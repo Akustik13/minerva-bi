@@ -161,6 +161,24 @@ class Shop(models.Model):
     )
     stripe_poll_last_at = models.DateTimeField("Остання автоперевірка", null=True, blank=True)
     stripe_webhook_last_at = models.DateTimeField("Останній вебхук Stripe", null=True, blank=True)
+    # ── Помічник Minerva на сайті (чат RAG; shop/assistant.py, сайт читає GET /api/v1/shop/assistant/) ──
+    ASSISTANT_SITE, ASSISTANT_ON, ASSISTANT_OFF = "site", "on", "off"
+    assistant_mode = models.CharField(
+        "Помічник на сайті", max_length=4, default=ASSISTANT_SITE,
+        choices=[(ASSISTANT_SITE, "Як налаштовано на сайті (private/minerva-config.php)"),
+                 (ASSISTANT_ON, "Увімкнено — кнопка «Minerva» на сайті"),
+                 (ASSISTANT_OFF, "Вимкнено — кнопки на сайті немає")],
+        help_text="Сайт перевіряє налаштування раз на хвилину.",
+    )
+    assistant_url = models.CharField(
+        "Адреса помічника (RAG)", max_length=255, blank=True, default="",
+        help_text="Звідки сервер сайту бере відповіді чату: https://… або http:// лише до IP локальної мережі "
+                  "(напр. http://192.168.2.68:8790). Порожньо — адреса з private/minerva-config.php сайту.",
+    )
+    assistant_key = models.CharField(
+        "Ключ помічника", max_length=255, blank=True, default="",
+        help_text="Ключ сайту для RAG (заголовок X-Minerva-Bridge). Порожньо — ключ з private/minerva-config.php сайту.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

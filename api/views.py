@@ -251,6 +251,25 @@ class ShopShippingView(APIView):
         return Response(public_config(shop))
 
 
+class ShopAssistantView(APIView):
+    """
+    Помічник Minerva (чат RAG) на сайті магазину ключа — керування з картки магазину (shop/assistant.py).
+    GET /shop/assistant/  →  {shop, managed, enabled, upstream_url, bridge_key}
+    managed=false — сайт бере все з private/minerva-config.php; bridge_key — лише ключу, прив'язаному до магазину.
+    """
+    resource_scope = "products"
+
+    def get(self, request):
+        from shop import assistant
+        from shop.services import shop_for_key
+        key = request.auth if isinstance(request.auth, APIKey) else None
+        shop = shop_for_key(key)
+        if shop is None:
+            return Response({"detail": "Для ключа не налаштовано магазин.", "code": "no_shop"},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response(assistant.public_config(shop, key))
+
+
 # ── Товари ────────────────────────────────────────────────────────────────────
 
 class ProductViewSet(NoDeleteMixin, viewsets.ModelViewSet):

@@ -50,9 +50,12 @@ class ConnectionBase(TestCase):
         data.update(over)
         return data
 
-    def site(self, response, callback=False):
-        """Імітація сайту: GET catalog.php; callback — сайт під час відповіді звертається до Minerva ключем."""
+    def site(self, response, callback=False, assistant=None):
+        """Імітація сайту: GET catalog.php; callback — сайт під час відповіді звертається до Minerva ключем;
+        assistant — відповідь api/minerva/index.php?action=status (без неї — 404, стара версія сайту)."""
         def get(url, **kw):
+            if "/api/minerva/" in url:
+                return assistant or FakeResponse(404)
             self.calls.append(url)
             if callback:
                 APIKey.objects.filter(pk=self.key.pk).update(last_used=timezone.now())
@@ -217,7 +220,8 @@ class ConnectionCheckTests(ConnectionBase):
         ShopMediaSite.objects.create(shop=self.shop, sync_url="https://shop.example.com/neu/api/shop/media_sync.php")
         answers = {"https://shop.example.com/neu/api/shop/catalog.php": FakeResponse(404),
                    "https://shop.example.com/api/shop/catalog.php": FakeResponse(data=self.catalog())}
-        with mock.patch.object(connection.requests, "get", side_effect=lambda url, **kw: answers[url]):
+        with mock.patch.object(connection.requests, "get",
+                               side_effect=lambda url, **kw: answers.get(url, FakeResponse(404))):
             res = connection.check(self.shop)
         self.assertEqual(res["url"], "https://shop.example.com/")
         self.assertEqual(self.levels(res)["Minerva → сайт"], "ok")

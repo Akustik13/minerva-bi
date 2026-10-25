@@ -205,7 +205,8 @@ class ShopAdmin(admin.ModelAdmin):
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     form = ShopForm
-    readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "stripe_col"]
+    readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "stripe_col",
+                       "assistant_col"]
     inlines = [ShippingZoneInline]
     actions = ["action_default_zones", "action_import_dk_zones"]
     fieldsets = [
@@ -238,6 +239,13 @@ class ShopAdmin(admin.ModelAdmin):
                            "суму рахує Minerva (нетто + доставка + ПДВ). Після оплати Stripe повідомляє Minerva "
                            "(вебхук) — замовлення стає «Оплачено». Способи оплати (картки, Apple/Google Pay, SEPA, Klarna …) "
                            "вмикаються в Stripe → Settings → Payment methods. Спершу перевірте в тестовому режимі (sk_test_…).",
+        }),
+        ("🤖 Помічник Minerva на сайті", {
+            "fields": ["assistant_mode", "assistant_url", "assistant_key", "assistant_clear", "assistant_col"],
+            "description": "Кнопка «Minerva» (чат з відповідями з даташитів і каталогу) на сайті магазину. "
+                           "«Вимкнено» — кнопки на сайті немає; «Увімкнено» — є, адреса й ключ RAG — звідси "
+                           "(порожні — з private/minerva-config.php сайту). Сайт перевіряє раз на хвилину. "
+                           "Перевірити, що бачить сайт, — «🔌 Перевірити зв'язок із сайтом» нижче.",
         }),
         ("Підключення", {"fields": ["keys_col", "connection_col"],
                          "description": "Сайт підключається ключем API, який видає лише Minerva: Адмін → REST API → "
@@ -303,6 +311,11 @@ class ShopAdmin(admin.ModelAdmin):
                         ", ".join(no_scope)) if no_scope else "",
             format_html('<div style="margin-top:4px;color:#ff8a80">⚠ {}</div>', st["link_error"]) if st["link_error"] else "",
             reverse("admin:shop_shop_test_mail", args=[obj.pk]))
+
+    @admin.display(description="Зараз")
+    def assistant_col(self, obj):
+        from .assistant import describe
+        return describe(obj) if obj and obj.pk else "Спершу збережіть магазин."
 
     @admin.display(description="Перевірка зв'язку")
     def connection_col(self, obj):

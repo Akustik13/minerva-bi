@@ -26,6 +26,12 @@ class ShopForm(forms.ModelForm):
         widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password", "size": 60}),
         help_text="whsec_… (Stripe → Developers → Webhooks → endpoint → Signing secret). Порожньо — залишити збережений.")
     stripe_clear = forms.BooleanField(label="Видалити збережені ключі Stripe", required=False)
+    assistant_key = forms.CharField(
+        label="Ключ помічника", required=False, max_length=255,
+        widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password", "size": 60}),
+        help_text="Ключ сайту для RAG (X-Minerva-Bridge). Порожньо — залишити збережений; без збереженого — ключ "
+                  "з private/minerva-config.php сайту. Передається лише серверу сайту ключем, прив'язаним до магазину.")
+    assistant_clear = forms.BooleanField(label="Видалити збережений ключ помічника", required=False)
     payment_methods = forms.MultipleChoiceField(
         label="Показувати в касі", required=False, choices=Shop.PAYMENT_CHOICES,
         widget=forms.CheckboxSelectMultiple,
@@ -64,12 +70,26 @@ class ShopForm(forms.ModelForm):
     def clean_stripe_webhook_secret(self):
         return self._keep("stripe_webhook_secret", ("whsec_",), "Секрет вебхука починається з whsec_….")
 
+    def clean_assistant_key(self):
+        value = (self.cleaned_data.get("assistant_key") or "").strip()   # порожньо — залишити збережений
+        return value or (self.instance.assistant_key if self.instance and self.instance.pk else "")
+
+    def clean_assistant_url(self):
+        from .assistant import check_url
+        url = (self.cleaned_data.get("assistant_url") or "").strip().rstrip("/")
+        error = check_url(url)
+        if error:
+            raise forms.ValidationError(error)
+        return url
+
     def clean(self):
         d = super().clean()
         if "payment_methods" not in self.fields:
             return d
         if d.get("stripe_clear"):
             d["stripe_secret_key"] = d["stripe_webhook_secret"] = ""
+        if d.get("assistant_clear"):
+            d["assistant_key"] = ""
         order = [m for m, _ in Shop.PAYMENT_CHOICES]
         methods = sorted(d.get("payment_methods") or [], key=order.index)
         default = d.get("payment_default") or ""
