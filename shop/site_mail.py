@@ -3,7 +3,7 @@
 Сайт (api/shop/_lib.php shop_mail_remote) раз на хвилину читає GET /api/v1/shop/site-mail/ своїм ключем:
 - «Сайт надсилає листи з цієї ж скриньки» вимкнено (managed = false) — сайт бере пошту з private/contact-config.php
   і /admin/ → «Пошта», як раніше;
-- увімкнено — SMTP, відправник, ім'я й «Відповіді покупців» беруться з акаунта пошти «Відправник» картки магазину;
+- увімкнено — SMTP, відправник, ім'я, «Відповіді покупців» і «Прихована копія» беруться з картки магазину;
   підтвердження замовлення покупцю — «Сайт надсилає покупцю підтвердження замовлення», сповіщення про нові
   замовлення — «Сповіщення команді — на адреси» (порожньо — як на сайті).
 У тому самому запиті сайт повідомляє, що в його власних налаштуваннях пошти (без пароля), — це видно в картці.
@@ -39,6 +39,7 @@ def public_config(shop: Shop, key=None) -> dict:
         "from": acc.email_address,
         "from_name": shop.mail_from_name or acc.display_name or shop.name,
         "reply_to": shop.mail_reply_to,
+        "bcc": addresses(shop.mail_bcc),   # прихована копія листів покупцям (як у листах Minerva)
         "notify": addresses(shop.team_emails),
         "confirmation": bool(shop.site_order_confirmation),
     })

@@ -65,7 +65,7 @@ class SiteEventView(APIView):
 class SiteMailView(APIView):
     """
     GET /shop/site-mail/ — пошта сайту з Minerva (shop/site_mail.py): {managed, smtp{host, port, security, user,
-    password}, from, from_name, reply_to, notify[], confirmation}; managed=false — сайт лишається на своїх
+    password}, from, from_name, reply_to, bcc[], notify[], confirmation}; managed=false — сайт лишається на своїх
     налаштуваннях. Параметри mail_* — звіт сайту про власні налаштування пошти (без пароля).
     """
     resource_scope = "products"

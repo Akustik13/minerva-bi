@@ -21,7 +21,7 @@ class SiteMailTests(TestCase):
             smtp_username="info@sevskiy.de", smtp_password="smtp-secret")
         self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True, url="https://shop.example.com",
                                         mail_sender=self.acc, mail_reply_to="service@sevskiy.de",
-                                        team_emails="team@sevskiy.de, chef@sevskiy.de")
+                                        mail_bcc="archiv@sevskiy.de", team_emails="team@sevskiy.de, chef@sevskiy.de")
         self.key = APIKey.objects.create(name="Сайт", scopes=["products:read"], shop=self.shop)
         self.c = APIClient()
         self.c.credentials(HTTP_AUTHORIZATION="Token " + self.key.key)
@@ -38,9 +38,9 @@ class SiteMailTests(TestCase):
         self.assertTrue(d["managed"])
         self.assertEqual(d["smtp"], {"host": "smtp.ionos.de", "port": 465, "security": "ssl", "user": "info@sevskiy.de",
                                      "password": "smtp-secret"})
-        self.assertEqual((d["from"], d["from_name"], d["reply_to"], d["notify"], d["confirmation"]),
-                         ("info@sevskiy.de", "Sevskiy Shop", "service@sevskiy.de", ["team@sevskiy.de", "chef@sevskiy.de"],
-                          False))
+        self.assertEqual((d["from"], d["from_name"], d["reply_to"], d["bcc"], d["notify"], d["confirmation"]),
+                         ("info@sevskiy.de", "Sevskiy Shop", "service@sevskiy.de", ["archiv@sevskiy.de"],
+                          ["team@sevskiy.de", "chef@sevskiy.de"], False))
 
     def test_password_only_for_bound_key_and_needs_sender(self):
         Shop.objects.filter(pk=self.shop.pk).update(site_mail_managed=True)
