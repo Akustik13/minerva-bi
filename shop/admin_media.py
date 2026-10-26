@@ -292,9 +292,8 @@ class ProductMediaAdmin(admin.ModelAdmin):
     def _site_sync_view(self, request, shop_id):
         self._manage(request)
         shop = get_object_or_404(Shop, pk=shop_id)
-        if not getattr(shop, "media_site", None) or not shop.media_site.sync_url:
-            self.message_user(request, f"«{shop}»: сайт ще не повідомив адресу синхронізації — оновіть файли сайту "
-                                       "і відкрийте будь-яку сторінку магазину.", messages.WARNING)
+        if not media.sync_urls(shop):
+            self.message_user(request, f"«{shop}»: у картці магазину не задано адресу сайту.", messages.WARNING)
         else:
             import threading
             threading.Thread(target=media.ping_site, args=(shop,), daemon=True).start()

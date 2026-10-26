@@ -2,7 +2,9 @@
 python manage.py test shop --settings=tabele.settings_test"""
 import shutil
 import tempfile
+from types import SimpleNamespace
 from unittest import mock
+from urllib.parse import urlsplit
 
 import requests
 from django.contrib.auth.models import User
@@ -212,6 +214,21 @@ class MediaApiTests(MediaTestBase):
         site.refresh_from_db()
         self.assertEqual(site.sync_url, "https://web.example.com/dist/api/shop/media_sync.php")
 
+    def test_ping_site_that_never_reported(self):
+        """Сайт без PHP-FPM сам не звітує — Minerva стукає на api/shop/media_sync.php у корені адреси магазину."""
+        self.assertFalse(ShopMediaSite.objects.filter(shop=self.shop).exists())
+        root = f"https://{urlsplit(self.shop.url).hostname}/api/shop/media_sync.php"
+        self.assertEqual(media.sync_urls(self.shop), [root])
+        with mock.patch("shop.media.requests.get", return_value=SimpleNamespace(status_code=200)) as get:
+            self.assertEqual(media.ping_site(self.shop), "")
+        self.assertEqual(get.call_args[0][0], root)
+        site = ShopMediaSite.objects.get(shop=self.shop)
+        self.assertTrue(site.ping_at and not site.ping_error and not site.reported_at)
+        ShopMediaSite.objects.filter(pk=site.pk).update(sync_url=self.shop.url.rstrip("/") + "/x/api/shop/media_sync.php")
+        self.assertEqual(media.sync_urls(self.shop), [self.shop.url.rstrip("/") + "/x/api/shop/media_sync.php"])
+        with mock.patch("shop.media.requests.get", return_value=SimpleNamespace(status_code=503)):
+            self.assertIn("HTTP 503", media.ping_site(self.shop))
+
 
 class MediaAdminTests(MediaTestBase):
     def setUp(self):
@@ -311,6 +328,7 @@ class PerShopMediaTests(MediaTestBase):
         self.assertContains(page, "AN-2")
         self.assertNotContains(page, ">AN-1<")
         data = self.client.get(f"/admin/shop/productmedia/status/?shop={test.pk}").json()
+        self.assertIs(data["sites"][0]["can_sync"], bool(test.url))
         self.assertEqual(([s["name"] for s in data["sites"]], data["summary"]["products"]), (["Test (test)"], 1))
         from .models import ShopMediaSite
         img = ProductMedia.objects.get(product=other, kind=IMAGE)

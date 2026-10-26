@@ -205,10 +205,13 @@ def run(mode="changed", products=None, limit=None, by="", shop: Shop | None = No
                 counts["changed"] += 1
         state["done"] = i
     removed = cleanup_store()
+    notes = [f"видалено старих копій: {removed}"] if removed else []
+    if shop is not None and not counts["changed"]:
+        notes.append("нових файлів немає — сайту надіслано запит звірити свої копії")
     state.update(state="done", current="", heartbeat=_iso(timezone.now()), finished_at=_iso(timezone.now()),
-                 message=f"видалено старих копій: {removed}" if removed else "")
+                 message=" · ".join(notes))
     _save_run(state)
-    if counts["changed"]:
+    if counts["changed"] or shop is not None:   # для одного магазину — завжди: його сайт міг ще жодного разу не звітувати
         ping_sites(only=shop)
     return state
 
@@ -333,25 +336,39 @@ def record_report(shop: Shop, data: dict) -> dict:
     return {"ok": True, "wanted": len(want), "have": len(set(have) & set(want)), "sync_url_accepted": site.sync_url == sync_url}
 
 
-def ping_site(shop: Shop) -> str:
-    """Попросити сайт забрати нові файли (GET адреси, яку сайт повідомив сам). '' — успішно."""
+def sync_urls(shop: Shop) -> list[str]:
+    """Куди просити сайт забрати файли: адреса, яку сайт повідомив сам, інакше api/shop/media_sync.php у корені
+    адреси магазину. Сайт на хостингу без PHP-FPM (IONOS тощо) сам після каталогу не синхронізується й не звітує,
+    тож без цього Minerva не могла б його розбудити."""
     site = ShopMediaSite.objects.filter(shop=shop).first()
-    if not site or not _same_site(shop, site.sync_url):
-        return "сайт ще не повідомив адресу синхронізації"
+    if site and _same_site(shop, site.sync_url):
+        return [site.sync_url]
+    from .connection import SYNC_PATH, site_bases
+    return [base + SYNC_PATH for base in site_bases(shop)]
+
+
+def ping_site(shop: Shop) -> str:
+    """Попросити сайт забрати нові файли (GET; сайт звіриться з Minerva й надішле звіт). '' — успішно."""
+    urls = sync_urls(shop)
+    if not urls:
+        return "у картці магазину не задано адресу сайту"
     error = ""
-    try:
-        r = requests.get(site.sync_url, params={"from": "minerva"}, timeout=(5, 90),
-                         headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
-        if r.status_code != 200:
-            error = f"сайт відповів HTTP {r.status_code}"
-    except requests.exceptions.RequestException as e:
-        error = f"немає відповіді від сайту ({type(e).__name__})"
+    for url in urls:
+        try:
+            r = requests.get(url, params={"from": "minerva"}, timeout=(5, 90),
+                             headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+            error = "" if r.status_code == 200 else f"сайт відповів HTTP {r.status_code} ({url})"
+        except requests.exceptions.RequestException as e:
+            error = f"немає відповіді від сайту ({type(e).__name__}, {url})"
+        if not error:
+            break
+    site, _ = ShopMediaSite.objects.get_or_create(shop=shop)
     ShopMediaSite.objects.filter(pk=site.pk).update(ping_at=timezone.now(), ping_error=error[:255])
     return error
 
 
 def ping_sites(background=True, only: Shop | None = None):
-    shops = list(Shop.objects.filter(is_active=True, media_enabled=True, media_site__sync_url__gt=""))
+    shops = list(Shop.objects.filter(is_active=True, media_enabled=True).exclude(url=""))
     if only is not None:
         shops = [s for s in shops if s.pk == only.pk]
     if not shops:
@@ -409,7 +426,8 @@ def sites_status(only: Shop | None = None) -> list[dict]:
                     "wanted": len(want), "have": len(have & set(want)),
                     "failed": len([h for h in failed if h in want]), "problems": problems,
                     "reported_at": _iso(site.reported_at) if site else None,
-                    "sync_url": site.sync_url if site else "", "ping_at": _iso(site.ping_at) if site else None,
+                    "sync_url": site.sync_url if site else "", "can_sync": bool(sync_urls(shop)),
+                    "ping_at": _iso(site.ping_at) if site else None,
                     "ping_error": site.ping_error if site else ""})
     return out
 

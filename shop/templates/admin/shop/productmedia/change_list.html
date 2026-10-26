@@ -131,9 +131,9 @@
       else {
         line += 'на сайті <b>' + s.have + '</b> з ' + s.wanted;
         if (s.failed) line += ' · <span style="color:#e57373">❌ не вдалося ' + s.failed + '</span>';
-        line += s.reported_at ? ' · звіт сайту ' + when(s.reported_at) : ' · сайт ще не звітував (оновіть файли сайту й відкрийте сторінку магазину)';
+        line += s.reported_at ? ' · звіт сайту ' + when(s.reported_at) : ' · сайт ще не звітував — натисніть «▶ Забрати на сайт зараз»';
         if (s.ping_error) line += ' · <span style="color:#ffb74d">⚠ ' + esc(s.ping_error) + '</span>';
-        if (s.sync_url && csrfInput) {
+        if (s.can_sync && csrfInput) {
           line += '<form method="post" action="' + box.getAttribute('data-site-sync').replace(/0\/$/, s.shop + '/') + '">' +
                   '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(csrfInput.value) + '">' +
                   '<button class="button" type="submit">▶ Забрати на сайт зараз</button></form>';
