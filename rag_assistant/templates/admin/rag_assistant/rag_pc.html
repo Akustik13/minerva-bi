@@ -1,0 +1,76 @@
+<div id="rag-pc" data-status="{{ status_url }}" data-cancel="{{ cancel_url }}" data-unload="{{ unload_url }}"
+     style="line-height:1.6">
+  <div id="rag-pc-body" style="opacity:.8">Запитую RAG-ПК…</div>
+  <div style="margin-top:8px">
+    <button type="button" class="button" id="rag-pc-refresh">🔄 Оновити</button>
+    {% if can_change %}<button type="button" class="button" id="rag-pc-unload"
+      title="Звільнити відеопам'ять; наступний запит завантажить потрібну модель сам (перший запит буде повільніший)">🧹 Вивантажити моделі з відеопам'яті</button>{% endif %}
+    <span id="rag-pc-msg" style="margin-left:8px"></span>
+  </div>
+  <div class="help" style="margin-top:6px">Оновлюється кожні 5 с, поки сторінка відкрита. «⏹ Зупинити» — як «Зупинити запит» у GUI на
+    RAG-ПК: потік відповіді закривається, програми й моделі не зупиняються.</div>
+</div>
+<script>
+(function () {
+  var box = document.getElementById('rag-pc'), body = document.getElementById('rag-pc-body'), msg = document.getElementById('rag-pc-msg');
+  var csrf = document.querySelector('[name=csrfmiddlewaretoken]'), canChange = {{ can_change|yesno:"true,false" }};
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function provider(p, m) {
+    if (!p) return '—';
+    var local = p === 'ollama';
+    return '<b>' + esc(p) + ' / ' + esc(m) + '</b> <span style="color:' + (local ? '#81c784' : '#ffb74d') + '">' +
+      (local ? 'локально, без оплати' : 'хмара, платно — ключем RAG') + '</span>';
+  }
+  function draw(d) {
+    if (!d.ok) { body.innerHTML = '<span style="color:#ff8a80">❌ ' + esc(d.error) + '</span>'; return; }
+    var h = [];
+    if (d.llm) {
+      h.push('<div>Відповідь: ' + provider(d.llm.provider, d.llm.model) + '</div>');
+      h.push('<div>Аналізатор запиту: ' + (d.llm.hybrid_enabled ? provider(d.llm.analyzer_provider, d.llm.analyzer_model) : 'не використовується (гібрид вимкнено)') + '</div>');
+    } else h.push('<div style="color:#ffb74d">⚠ ' + esc(d.llm_note) + '</div>');
+    if (d.runtime) {
+      var r = d.runtime, vram = r.vram_total_mb ? (r.vram_used_mb / 1024).toFixed(1) + ' / ' + (r.vram_total_mb / 1024).toFixed(1) + ' ГБ' : 'невідомо';
+      h.push('<div>Відеопам\'ять: ' + vram + ' · у пам\'яті: ' + (r.models.length ? esc(r.models.join(', ')) : (r.ollama ? 'жодної моделі' : 'Ollama недоступна')) + '</div>');
+    }
+    if (d.metrics_error) h.push('<div style="color:#ff8a80">Запити: ' + esc(d.metrics_error) + '</div>');
+    if (d.active) {
+      h.push('<div style="margin-top:6px"><b>Зараз виконується: ' + (d.active.length || 'нічого') + '</b></div>');
+      d.active.forEach(function (a) {
+        h.push('<div>⏳ ' + esc(a.client) + ' · ' + a.seconds + ' с · ' + esc(a.stage) + (a.stopping ? ' · <i>зупиняється…</i>' :
+          (canChange ? ' <button type="button" class="button" data-run="' + esc(a.id) + '">⏹ Зупинити</button>' : '')) + '</div>');
+      });
+    }
+    if (d.recent && d.recent.length) {
+      h.push('<details style="margin-top:6px"><summary>Останні запити</summary>' + d.recent.map(function (r) {
+        var icon = { completed: '✅', cancelled: '⏹', busy: '⌛', failed: '❌', interrupted: '❌' }[r.status] || '•';
+        return '<div>' + icon + ' ' + esc(r.client) + ' · ' + (r.status === 'busy' ? 'RAG був зайнятий' : r.seconds + ' с') + ' · ' + Math.round(r.ago / 60) + ' хв тому</div>';
+      }).join('') + '</details>');
+    }
+    if (d.clients && d.clients.length) {
+      h.push('<details><summary>Хто звертався за 2 год</summary>' + d.clients.map(function (c) {
+        return '<div>' + esc(c.client) + ': запитів ' + c.requests + ', готово ' + c.completed + ', помилок ' + c.errors +
+          ', «зайнято» ' + c.busy + (c.avg ? ', в середньому ' + c.avg + ' с' : '') + '</div>';
+      }).join('') + '</details>');
+    }
+    body.innerHTML = h.join('');
+  }
+  function load() {
+    fetch(box.getAttribute('data-status'), { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+      .then(draw).catch(function () { body.textContent = 'Немає відповіді від Minerva'; });
+  }
+  function post(url, done) {
+    msg.textContent = '…';
+    fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrf ? csrf.value : '' } })
+      .then(function (r) { return r.json(); }).then(function (d) { msg.textContent = d.text; msg.style.color = d.ok ? '#81c784' : '#ff8a80'; load(); })
+      .catch(function () { msg.textContent = 'Немає відповіді від Minerva'; msg.style.color = '#ff8a80'; });
+  }
+  body.addEventListener('click', function (e) {
+    var run = e.target.getAttribute && e.target.getAttribute('data-run');
+    if (run) post(box.getAttribute('data-cancel').replace('RUN', run));
+  });
+  document.getElementById('rag-pc-refresh').addEventListener('click', load);
+  var unloadBtn = document.getElementById('rag-pc-unload');
+  if (unloadBtn) unloadBtn.addEventListener('click', function () { post(box.getAttribute('data-unload')); });
+  load(); setInterval(function () { if (!document.hidden) load(); }, 5000);
+})();
+</script>

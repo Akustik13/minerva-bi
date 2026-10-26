@@ -331,10 +331,11 @@ def ai_ready(shop: Shop) -> str:
 RAG_TIPS = 3
 RAG_CACHE = 24 * 3600
 RAG_EMPTY_CACHE = 3600       # RAG нічого не порадив або завдання не вдалося — годину не питати знову
-RAG_JOB_MAX = 90             # завдання довше — вважається втраченим
+RAG_JOB_MAX = 180            # завдання довше — вважається втраченим (локальна модель на RAG-ПК відповідає до 1–2 хв)
 RAG_PARALLEL = 1             # RAG обробляє один запит за раз (ним користуються й співробітники в Minerva)
 RAG_TIMEOUT = 4              # одне звернення Minerva → RAG: сайт чекає відповіді Minerva
 RAG_DOWN = 300
+RAG_ABANDONED = 15           # завдання, яке сайт не опитував стільки секунд, — відвідувач пішов: зупинити на RAG-ПК
 RAG_ACTIVE = "shop-search-rag-active"
 RAG_DOWN_KEY = "shop-search-rag-down"
 RAG_LANGS = {"de", "en", "uk"}   # мови відповідей RAG; інші — англійською
@@ -460,6 +461,7 @@ def _rag_poll(shop: Shop, settings, key: str, digest: str, job: dict) -> dict:
         finish(_EMPTY, RAG_EMPTY_CACHE)
         _count(shop, rag_errors=1)
         return {"status": "unavailable", "tips": []}
+    cache.set(jobkey, {**job, "polled": time.time()}, RAG_JOB_MAX + 60)   # сайт ще чекає — не покинуте
     try:
         data = _rag_client(settings).job(job["id"])
     except RagError as e:
@@ -469,8 +471,9 @@ def _rag_poll(shop: Shop, settings, key: str, digest: str, job: dict) -> dict:
             return {"status": "unavailable", "tips": []}
         return {"status": "pending", "tips": []}   # мережа на мить — сайт спитає ще раз
     state = data.get("status")
-    if state not in ("completed", "failed"):
-        return {"status": "pending", "tips": []}
+    if state not in ("completed", "failed"):   # сайт показує, що Minerva працює: етап RAG і скільки минуло
+        return {"status": "pending", "tips": [], "stage": str(data.get("stage") or "")[:80],
+                "elapsed": int(time.time() - float(job.get("at") or time.time()))}
     if state == "failed":
         finish(_EMPTY, RAG_EMPTY_CACHE)
         _count(shop, rag_errors=1)
@@ -482,6 +485,16 @@ def _rag_poll(shop: Shop, settings, key: str, digest: str, job: dict) -> dict:
         _count(shop, rag_model={"provider": str(result.get("provider") or "")[:40],
                                 "model": str(result.get("model") or "")[:80], "at": timezone.now().isoformat()})
     return _rag_out(shop, item, cached=False)
+
+
+def _cancel(settings, job: dict) -> bool:
+    """Зупинити покинуте завдання на RAG-ПК (POST /v1/jobs/{id}/cancel). False — RAG ще не вміє або вже не має його."""
+    from rag_assistant.client import RagError
+    try:
+        data = _rag_client(settings).cancel_job(job["id"])
+    except RagError:
+        return False
+    return data.get("status") in ("cancelling", "completed", "failed")
 
 
 def rag_tips(shop: Shop, q, lang: str = "") -> dict:
@@ -514,12 +527,18 @@ def rag_tips(shop: Shop, q, lang: str = "") -> dict:
     if int(usage(shop).get("rag_calls") or 0) >= shop.search_ai_daily_limit:
         return {"status": "limit", "tips": []}
     for other in list(_active()) if len(_active()) >= RAG_PARALLEL else []:
-        # завдання, яке більше ніхто не опитує (відвідувач змінив запит), — дочитати й звільнити чергу
+        # завдання, яке більше ніхто не опитує (відвідувач змінив запит): зупинити на RAG-ПК і звільнити чергу;
+        # RAG API без зупинки — дочитати, коли буде готове
         other_job = cache.get(f"shop-search-rag-job:{other}")
-        if other_job:
-            _rag_poll(shop, settings, f"shop-search-rag:{other}", other, other_job)
-        else:
+        if not other_job:
             _set_active(other, False)
+        elif (time.time() - float(other_job.get("polled") or other_job.get("at") or 0) > RAG_ABANDONED
+              and _cancel(settings, other_job)):
+            cache.delete(f"shop-search-rag-job:{other}")
+            _set_active(other, False)
+            _count(shop, rag_cancelled=1)
+        else:
+            _rag_poll(shop, settings, f"shop-search-rag:{other}", other, other_job)
     if len(_active()) >= RAG_PARALLEL:
         _count(shop, rag_busy=1)
         return {"status": "busy", "tips": []}
@@ -537,17 +556,21 @@ def rag_tips(shop: Shop, q, lang: str = "") -> dict:
     cache.set(f"shop-search-rag-job:{digest}", {"id": job_id, "at": time.time()}, RAG_JOB_MAX + 60)
     _set_active(digest, True)
     _count(shop, rag_calls=1)
-    return {"status": "pending", "tips": []}
+    return {"status": "pending", "tips": [], "stage": "", "elapsed": 0}
 
 
 RAG_LOCAL = {"ollama"}   # постачальники RAG, що працюють на самому RAG-ПК (без оплати)
 
 
-def rag_is_local(shop: Shop) -> bool:
-    """RAG відповідає без оплати: модель відповіді й аналізатор (якщо він є) — локальні."""
+def rag_is_local(shop: Shop):
+    """True — RAG відповідає без оплати (відповідь і аналізатор локальні), False — щось іде в хмару, None — невідомо
+    (результат завдання називає лише модель відповіді; аналізатор показує «🔄 Запитати RAG-ПК»)."""
     m = usage(shop).get("rag_model")
-    return (isinstance(m, dict) and m.get("provider") in RAG_LOCAL
-            and (not m.get("analyzer_provider") or m.get("analyzer_provider") in RAG_LOCAL))
+    if not isinstance(m, dict) or not m.get("provider"):
+        return None
+    if m.get("provider") not in RAG_LOCAL or (m.get("analyzer_provider") and m["analyzer_provider"] not in RAG_LOCAL):
+        return False
+    return True if m.get("source") == "health" else None
 
 
 def rag_model_text(shop: Shop) -> str:
@@ -562,8 +585,12 @@ def rag_model_text(shop: Shop) -> str:
     at = parse_datetime(str(m.get("at") or ""))
     source = "запит до RAG-ПК" if m.get("source") == "health" else "останнє завдання"
     when = f" · {source} {timezone.localtime(at):%d.%m %H:%M}" if at else ""
-    if rag_is_local(shop):
+    local = rag_is_local(shop)
+    if local:
         return f"RAG відповідає: {provider} / {model}{analyzer} — локально на RAG-ПК, без оплати{when}"
+    if local is None:
+        return (f"RAG відповідає: {provider} / {model} — модель відповіді локальна, без оплати; чи платний аналізатор "
+                f"запиту — «🔄 Запитати RAG-ПК, яка модель зараз»{when}")
     cloud = sorted({p for p in (provider, m.get("analyzer_provider")) if p and p not in RAG_LOCAL})
     return (f"⚠ RAG відповідає: {provider} / {model}{analyzer} — хмарна модель: кожна RAG-підказка оплачується ключем "
             f"{', '.join(cloud)} на RAG-ПК (не ключем Minerva, у витратах вище не враховано). Безкоштовно — RAG Documents → "

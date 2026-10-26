@@ -80,3 +80,26 @@ class RagClient:
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", job_id or ""):
             raise RagError("not_found", "Некоректний номер завдання.")
         return self._call("GET", f"/v1/jobs/{job_id}")
+
+    # ── Стан і керування RAG-ПК (панель «🖥 RAG-ПК зараз») ──
+    def metrics(self) -> dict:
+        return self._call("GET", "/v1/metrics")
+
+    def runtime(self) -> dict:
+        return self._call("GET", "/v1/runtime")
+
+    def cancel_job(self, job_id: str) -> dict:
+        """Зупинити своє завдання (RAG API з /v1/jobs/{id}/cancel; старіший → RagError not_found)."""
+        if not re.fullmatch(r"[0-9a-f]{32}", job_id or ""):
+            raise RagError("not_found", "Некоректний номер завдання.")
+        return self._call("POST", f"/v1/jobs/{job_id}/cancel", {})
+
+    def cancel_run(self, run_id: str) -> dict:
+        """Зупинити будь-який запит зі списку /v1/metrics (як «Зупинити запит» у GUI RAG-ПК)."""
+        if not re.fullmatch(r"[0-9a-f]{32}", run_id or ""):
+            raise RagError("not_found", "Некоректний номер запиту.")
+        return self._call("POST", f"/v1/runs/{run_id}/cancel", {})
+
+    def unload(self) -> dict:
+        """Вивантажити моделі Ollama з відеопам'яті (наступний запит завантажить потрібну сам)."""
+        return self._call("POST", "/v1/runtime/unload", {})

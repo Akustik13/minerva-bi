@@ -4,8 +4,8 @@ GET /shop/search/assist/?config=1             → {mode}: off | rules | ai | rag
 GET /shop/search/assist/?q=…&n=…&skus=…&lang=…&ai=0|1&rag=0|1&log=0|1
     → {mode, together[{sku, orders}], ai{status, tips[{sku, reason}], cached}?, rag{status, tips, note, cached}?}
     n — скільки знайшов сайт (журнал «що шукають»), skus — перші результати сайту (для «часто купують разом»).
-GET /shop/search/assist/?q=…&lang=…&rag=1&poll=1 → {mode, rag} — опитування відповіді RAG (status pending →
-    ok | busy | unavailable …), без журналу, «разом» і AI.
+GET /shop/search/assist/?q=…&lang=…&rag=1&poll=1 → {mode, rag} — опитування відповіді RAG (status pending
+    {stage, elapsed} → ok | busy | unavailable …), без журналу, «разом» і AI.
 Лише ключ, прив'язаний до магазину (права products:read).
 """
 from rest_framework import status

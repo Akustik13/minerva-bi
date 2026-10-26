@@ -49,8 +49,13 @@ class RagSettingsAdmin(admin.ModelAdmin):
                            "http://192.168.2.68:8787 (RAG API має слухати мережу, а не лише 127.0.0.1).",
         }),
         ("Відповіді", {"fields": ["language", "latest_only"]}),
+        ("🖥 RAG-ПК зараз", {
+            "fields": ["pc_panel"],
+            "description": "Чим зараз відповідає RAG (локальна модель — без оплати, хмара — платить ключ RAG), що він "
+                           "робить, хто звертається; зупинка зайвого запиту й звільнення відеопам'яті.",
+        }),
     ]
-    readonly_fields = ["key_status", "check_status"]
+    readonly_fields = ["key_status", "check_status", "pc_panel"]
 
     def has_add_permission(self, request):
         return not RagSettings.objects.exists()
@@ -78,9 +83,46 @@ class RagSettingsAdmin(admin.ModelAdmin):
                            '<div class="help">Перевіряє збережені налаштування (спершу збережіть зміни).</div>',
                            url, last)
 
+    @admin.display(description="Стан")
+    def pc_panel(self, obj):
+        request = getattr(self, "_request", None)
+        return render_to_string("admin/rag_assistant/rag_pc.html", {
+            "status_url": reverse("admin:rag_assistant_ragsettings_pc"),
+            "cancel_url": reverse("admin:rag_assistant_ragsettings_pc_cancel", args=["RUN"]),
+            "unload_url": reverse("admin:rag_assistant_ragsettings_pc_unload"),
+            "can_change": bool(request and self.has_change_permission(request, obj)),
+        })
+
+    def change_view(self, request, object_id, form_url="", extra_context=None):
+        self._request = request   # для pc_panel: право керувати RAG-ПК
+        return super().change_view(request, object_id, form_url, extra_context)
+
     def get_urls(self):
-        return [path("check/", self.admin_site.admin_view(self.check_view), name="rag_assistant_ragsettings_check")] \
+        return [path("check/", self.admin_site.admin_view(self.check_view), name="rag_assistant_ragsettings_check"),
+                path("pc/", self.admin_site.admin_view(self.pc_view), name="rag_assistant_ragsettings_pc"),
+                path("pc/cancel/<str:run>/", self.admin_site.admin_view(self.pc_cancel_view),
+                     name="rag_assistant_ragsettings_pc_cancel"),
+                path("pc/unload/", self.admin_site.admin_view(self.pc_unload_view),
+                     name="rag_assistant_ragsettings_pc_unload")] \
             + super().get_urls()
+
+    def pc_view(self, request):
+        from . import pc
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        return JsonResponse(pc.status())
+
+    def pc_cancel_view(self, request, run):
+        from . import pc
+        if request.method != "POST" or not self.has_change_permission(request):
+            raise PermissionDenied
+        return JsonResponse(pc.cancel(run))
+
+    def pc_unload_view(self, request):
+        from . import pc
+        if request.method != "POST" or not self.has_change_permission(request):
+            raise PermissionDenied
+        return JsonResponse(pc.unload())
 
     def check_view(self, request):
         st = RagSettings.get()

@@ -430,9 +430,10 @@ class ShopAdmin(admin.ModelAdmin):
         problem = search_assist.ai_ready(obj) if obj.search_assist in obj.SEARCH_WITH_AI else ""
         rag_problem = search_assist.rag_ready(obj) if obj.search_assist in obj.SEARCH_WITH_RAG else ""
         rag_model = search_assist.rag_model_text(obj)
-        rag_paid = rag_model and not search_assist.rag_is_local(obj)
+        rag_paid = rag_model and search_assist.rag_is_local(obj) is False
         rag_line = lambda d: (f"завдань {d.get('rag_calls', 0)} · з кешу {d.get('rag_cached', 0)} · "  # noqa: E731
-                              f"RAG зайнятий {d.get('rag_busy', 0)} · помилок {d.get('rag_errors', 0)}")
+                              f"RAG зайнятий {d.get('rag_busy', 0)} · зупинено покинутих {d.get('rag_cancelled', 0)} · "
+                              f"помилок {d.get('rag_errors', 0)}")
         line = lambda d: (f"викликів {d.get('calls', 0)} · з кешу {d.get('cached', 0)} · помилок {d.get('errors', 0)} · "  # noqa: E731
                           f"витрачено ≈ {search_assist.spent(d)} · "
                           f"токенів: вхід {d.get('input', 0)}, з кешу промпту {d.get('cache_read', 0)}, "
@@ -462,8 +463,10 @@ class ShopAdmin(admin.ModelAdmin):
                 ".then(function(r){{return r.json()}}).then(function(d){{s.textContent=d.text;"
                 "s.style.color=d.ok?(d.local?'#81c784':'#ffb74d'):'#ff8a80'}})"
                 ".catch(function(){{s.textContent='Немає відповіді від Minerva';s.style.color='#ff8a80'}})"
-                '">🔄 Запитати RAG-ПК, яка модель зараз</button> <span></span></div>',
-                reverse("admin:shop_shop_rag_model", args=[obj.pk])),
+                '">🔄 Запитати RAG-ПК, яка модель зараз</button> <span></span> '
+                '<a href="{}#rag-pc" style="margin-left:8px">🖥 RAG-ПК: що зараз робить →</a></div>',
+                reverse("admin:shop_shop_rag_model", args=[obj.pk]),
+                reverse("admin:rag_assistant_ragsettings_change", args=[1])),
             format_html_join(", ", "«{}» ×{}", zero) if zero else "—", report)
 
     @admin.display(description="Пошта сайтів")

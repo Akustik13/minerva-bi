@@ -195,7 +195,9 @@ class RagTipsTests(TestCase):
         question = self.rag.ask.call_args[0][0]
         self.assertIn("«ble and gnss»", question)
         self.assertEqual(self.rag.ask.call_args[1]["language"], "de")
-        self.assertEqual(self.get("ble and gnss", poll="1")["rag"]["status"], "pending")
+        pending = self.get("ble and gnss", poll="1")["rag"]
+        self.assertEqual((pending["status"], pending["stage"]), ("pending", "search"))   # сайт показує етап і час
+        self.assertGreaterEqual(pending["elapsed"], 0)
         self.assertNotIn("together", self.get("ble and gnss", poll="1"))      # опитування — лише RAG
         answer = ("Für BLE und GNSS eignet sich eine Kombiantenne mit zwei Ports [1].\n\n"
                   "1. **AN-BLE** — Dualband-Antenne für Bluetooth und GNSS L1 [2].\n"
@@ -224,6 +226,9 @@ class RagTipsTests(TestCase):
         self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
         self.assertContains(self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/"), "RAG відповідає: anthropic / claude-opus-5")
         search_assist._count(self.shop, rag_model={"provider": "ollama", "model": "qwen2.5:7b"})
+        self.assertIsNone(search_assist.rag_is_local(self.shop))     # з завдання аналізатор невідомий
+        self.assertIn("модель відповіді локальна", search_assist.rag_model_text(self.shop))
+        search_assist._count(self.shop, rag_model={"provider": "ollama", "model": "qwen2.5:7b", "source": "health"})
         self.assertTrue(search_assist.rag_is_local(self.shop))
         self.assertIn("без оплати", search_assist.rag_model_text(self.shop))
 
@@ -293,6 +298,21 @@ class RagTipsTests(TestCase):
         self.assertTrue(prod.CACHES["shared"]["BACKEND"].endswith("FileBasedCache"))
         from core.shared_cache import cache as shared
         self.assertIs(search_assist.cache, shared)
+
+    def test_abandoned_job_cancelled_on_rag_pc(self):
+        """Сайт не опитував завдання довше RAG_ABANDONED — Minerva зупиняє його на RAG-ПК і ставить нове."""
+        import hashlib
+        self.rag.job.return_value = {"status": "running"}
+        self.get("gnss antenne")
+        jobkey = "shop-search-rag-job:" + hashlib.sha256("de|gnss antenne".encode()).hexdigest()[:32]
+        cache.set(jobkey, {**cache.get(jobkey), "polled": 1})
+        self.rag.cancel_job.return_value = {"status": "cancelling"}
+        self.assertEqual(self.get("lora 868")["rag"]["status"], "pending")
+        self.rag.cancel_job.assert_called_once_with("job-1")
+        self.assertIsNone(cache.get(jobkey))
+        self.assertEqual(self.rag.ask.call_count, 2)
+        self.shop.refresh_from_db()
+        self.assertEqual(self.shop.search_ai_usage["rag_cancelled"], 1)
 
     def test_abandoned_job_frees_queue(self):
         self.rag.job.return_value = {"status": "running"}
