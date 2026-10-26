@@ -67,14 +67,18 @@ class RagClient:
         return self._call("GET", "/v1/documents").get("documents", [])
 
     def ask(self, question: str, history: list, language: str = "uk", latest: bool = True,
-            document_id: str | None = None) -> str:
+            document_id: str | None = None, path: str = "/v1/ask") -> str:
         body = {"question": question[:3000], "history": history[-8:], "language": language, "latest": latest}
         if document_id:
             body["document_id"] = document_id
-        data = self._call("POST", "/v1/ask", body)
+        data = self._call("POST", path, body)
         if not data.get("job_id"):
             raise RagError("unavailable", "Помічник не повернув номер завдання.")
         return data["job_id"]
+
+    def search(self, question: str, history: list, language: str = "uk", latest: bool = True) -> str:
+        """Лише пошук, без моделі (/v1/search): даташити й каталог → products, sources; швидше й без оплати LLM."""
+        return self.ask(question, history, language=language, latest=latest, path="/v1/search")
 
     def job(self, job_id: str) -> dict:
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", job_id or ""):

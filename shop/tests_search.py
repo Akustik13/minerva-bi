@@ -257,6 +257,9 @@ class RagTipsTests(TestCase):
         cache.set(jobkey, {**cache.get(jobkey), "at": 1})                    # завдання «зависло» в RAG
         self.assertEqual(self.get("gnss antenne", poll="1")["rag"]["status"], "unavailable")
         self.assertEqual(self.get("gnss antenne")["rag"], {"status": "ok", "tips": [], "note": "", "cached": True})
+        with mock.patch.object(search_assist.cache, "set") as cache_set:   # збій кешується на 2 хв, не на годину
+            search_assist._rag_poll(self.shop, None, "k", "d", {"id": "x", "at": 1})
+        self.assertEqual(cache_set.call_args_list[-1][0][2], search_assist.RAG_FAIL_CACHE)
         cache.clear()
         from rag_assistant.models import RagSettings
         RagSettings.objects.filter(pk=1).update(api_key="")
@@ -298,6 +301,29 @@ class RagTipsTests(TestCase):
         self.assertTrue(prod.CACHES["shared"]["BACKEND"].endswith("FileBasedCache"))
         from core.shared_cache import cache as shared
         self.assertIs(search_assist.cache, shared)
+
+    def test_empty_answer_falls_back_to_search(self):
+        """RAG відповів «немає даних» без товарів → /v1/search по даташитах (без LLM) → товари."""
+        self.rag.job.return_value = {"status": "completed", "result": {
+            "answer": "Ich habe keine bestätigten Angaben gefunden.", "products": [], "provider": "anthropic"}}
+        self.get("lora antenne sma")
+        self.rag.search.return_value = "job-2"
+        d = self.get("lora antenne sma", poll="1")["rag"]
+        self.assertEqual(d["status"], "pending")
+        self.assertEqual(self.rag.search.call_args[0][0], self.rag.ask.call_args[0][0])   # те саме запитання
+        self.rag.job.return_value = {"status": "completed", "result": {
+            "products": [{"product": "AN-BLE", "source": "a.pdf"}], "provider": "anthropic", "model": "claude-opus-5"}}
+        d = self.get("lora antenne sma", poll="1")["rag"]
+        self.assertEqual((d["status"], [t["sku"] for t in d["tips"]]), ("ok", ["AN-BLE"]))
+        self.assertEqual(self.rag.job.call_args[0][0], "job-2")
+        self.shop.refresh_from_db()
+        self.assertEqual(self.shop.search_ai_usage["rag_fallback"], 1)
+        self.assertNotIn("rag_model", self.shop.search_ai_usage)   # пошук без LLM — модель відповіді не записуємо
+        self.rag.job.return_value = {"status": "completed", "result": {"answer": "", "products": []}}
+        self.get("uwb modul")
+        self.get("uwb modul", poll="1")                                   # → запасний пошук
+        self.assertEqual(self.get("uwb modul", poll="1")["rag"]["tips"], [])   # і він порожній — «нічого не знайдено»
+        self.assertEqual(self.rag.search.call_count, 2)
 
     def test_abandoned_job_cancelled_on_rag_pc(self):
         """Сайт не опитував завдання довше RAG_ABANDONED — Minerva зупиняє його на RAG-ПК і ставить нове."""

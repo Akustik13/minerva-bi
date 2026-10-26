@@ -14,25 +14,26 @@
 (function () {
   var box = document.getElementById('rag-pc'), body = document.getElementById('rag-pc-body'), msg = document.getElementById('rag-pc-msg');
   var csrf = document.querySelector('[name=csrfmiddlewaretoken]'), canChange = {{ can_change|yesno:"true,false" }};
+  var OK = 'background:#e8f5e9;color:#1b5e20;border-left:3px solid #2e7d32;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5', WARN = 'background:#fff3e0;color:#6d3500;border-left:3px solid #ef6c00;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5', ERR = 'background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5';   // плашки: читаються на світлій і темній темі
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function provider(p, m) {
     if (!p) return '—';
     var local = p === 'ollama';
-    return '<b>' + esc(p) + ' / ' + esc(m) + '</b> <span style="color:' + (local ? '#81c784' : '#ffb74d') + '">' +
+    return '<b>' + esc(p) + ' / ' + esc(m) + '</b> <span style="' + (local ? OK : WARN) + '">' +
       (local ? 'локально, без оплати' : 'хмара, платно — ключем RAG') + '</span>';
   }
   function draw(d) {
-    if (!d.ok) { body.innerHTML = '<span style="color:#ff8a80">❌ ' + esc(d.error) + '</span>'; return; }
+    if (!d.ok) { body.innerHTML = '<span style="' + ERR + '">❌ ' + esc(d.error) + '</span>'; return; }
     var h = [];
     if (d.llm) {
       h.push('<div>Відповідь: ' + provider(d.llm.provider, d.llm.model) + '</div>');
       h.push('<div>Аналізатор запиту: ' + (d.llm.hybrid_enabled ? provider(d.llm.analyzer_provider, d.llm.analyzer_model) : 'не використовується (гібрид вимкнено)') + '</div>');
-    } else h.push('<div style="color:#ffb74d">⚠ ' + esc(d.llm_note) + '</div>');
+    } else h.push('<div><span style="' + WARN + '">⚠ ' + esc(d.llm_note) + '</span></div>');
     if (d.runtime) {
       var r = d.runtime, vram = r.vram_total_mb ? (r.vram_used_mb / 1024).toFixed(1) + ' / ' + (r.vram_total_mb / 1024).toFixed(1) + ' ГБ' : 'невідомо';
       h.push('<div>Відеопам\'ять: ' + vram + ' · у пам\'яті: ' + (r.models.length ? esc(r.models.join(', ')) : (r.ollama ? 'жодної моделі' : 'Ollama недоступна')) + '</div>');
     }
-    if (d.metrics_error) h.push('<div style="color:#ff8a80">Запити: ' + esc(d.metrics_error) + '</div>');
+    if (d.metrics_error) h.push('<div><span style="' + ERR + '">Запити: ' + esc(d.metrics_error) + '</span></div>');
     if (d.active) {
       h.push('<div style="margin-top:6px"><b>Зараз виконується: ' + (d.active.length || 'нічого') + '</b></div>');
       d.active.forEach(function (a) {
@@ -61,8 +62,8 @@
   function post(url, done) {
     msg.textContent = '…';
     fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRFToken': csrf ? csrf.value : '' } })
-      .then(function (r) { return r.json(); }).then(function (d) { msg.textContent = d.text; msg.style.color = d.ok ? '#81c784' : '#ff8a80'; load(); })
-      .catch(function () { msg.textContent = 'Немає відповіді від Minerva'; msg.style.color = '#ff8a80'; });
+      .then(function (r) { return r.json(); }).then(function (d) { msg.textContent = d.text; msg.style.cssText = 'margin-left:8px;' + (d.ok ? OK : ERR); load(); })
+      .catch(function () { msg.textContent = 'Немає відповіді від Minerva'; msg.style.cssText = 'margin-left:8px;' + ERR; });
   }
   body.addEventListener('click', function (e) {
     var run = e.target.getAttribute && e.target.getAttribute('data-run');

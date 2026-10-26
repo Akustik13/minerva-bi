@@ -389,9 +389,9 @@ class ShopAdmin(admin.ModelAdmin):
             format_html_join(" · ", '<a href="{}" target="_blank" rel="noopener">{}</a>',
                              ((u, lang) for lang, u in links.items())) if links
             else "ще невідома (заповниться з першого запиту сайту)",
-            format_html('<div style="margin-top:4px;color:#ffb74d">⚠ Ключам без прав «Акаунти покупців»: {}</div>',
+            format_html('<div style="margin-top:4px;background:#fff3e0;color:#6d3500;border-left:3px solid #ef6c00;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5">⚠ Ключам без прав «Акаунти покупців»: {}</div>',
                         ", ".join(no_scope)) if no_scope else "",
-            format_html('<div style="margin-top:4px;color:#ff8a80">⚠ {}</div>', st["link_error"]) if st["link_error"] else "")
+            format_html('<div style="margin-top:4px;background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5">⚠ {}</div>', st["link_error"]) if st["link_error"] else "")
 
     @admin.display(description="Кроки")
     def roadmap_col(self, obj):
@@ -415,7 +415,7 @@ class ShopAdmin(admin.ModelAdmin):
             return format_html('<a href="{}" style="color:#7bc67b">✅ працює</a>{}{}', url,
                                format_html(' <span style="color:#f0b35a">· ! {}</span>', s["warnings"])
                                if s["warnings"] else "", test)
-        return format_html('<a href="{}" style="color:#ff8a80">⛔ критичних {}</a>{}<div class="help">далі: {}</div>', url,
+        return format_html('<a href="{}" style="background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5">⛔ критичних {}</a>{}<div class="help">далі: {}</div>', url,
                            s["critical"], test, s["next"]["title"] if s["next"] else "—")
 
     @admin.display(description="Стан і витрати")
@@ -433,6 +433,7 @@ class ShopAdmin(admin.ModelAdmin):
         rag_paid = rag_model and search_assist.rag_is_local(obj) is False
         rag_line = lambda d: (f"завдань {d.get('rag_calls', 0)} · з кешу {d.get('rag_cached', 0)} · "  # noqa: E731
                               f"RAG зайнятий {d.get('rag_busy', 0)} · зупинено покинутих {d.get('rag_cancelled', 0)} · "
+                              f"запасний пошук по даташитах {d.get('rag_fallback', 0)} · "
                               f"помилок {d.get('rag_errors', 0)}")
         line = lambda d: (f"викликів {d.get('calls', 0)} · з кешу {d.get('cached', 0)} · помилок {d.get('errors', 0)} · "  # noqa: E731
                           f"витрачено ≈ {search_assist.spent(d)} · "
@@ -449,20 +450,20 @@ class ShopAdmin(admin.ModelAdmin):
             '<div style="margin-top:6px">RAG сьогодні: {} з {}</div><div style="opacity:.8">RAG загалом: {}</div>{}{}'
             '<div style="margin-top:6px">Шукали й не знайшли: {}</div><div style="margin-top:6px"><a href="{}">'
             '🔎 Усі запити на сайті →</a></div>',
-            format_html('<div style="color:#ff8a80">⚠ AI: {}</div>', problem) if problem else "",
-            format_html('<div style="color:#ff8a80">⚠ RAG: {}</div>', rag_problem) if rag_problem else "",
+            format_html('<div style="background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5">⚠ AI: {}</div>', problem) if problem else "",
+            format_html('<div style="background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5">⚠ RAG: {}</div>', rag_problem) if rag_problem else "",
             line(u), obj.search_ai_daily_limit, line(total),
             rag_line(u), obj.search_ai_daily_limit, rag_line(total),
-            format_html('<div style="color:{}">{}</div>', "#ffb74d" if rag_paid else "inherit", rag_model)
+            format_html('<div style="{}">{}</div>', "background:#fff3e0;color:#6d3500;border-left:3px solid #ef6c00;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5" if rag_paid else "", rag_model)
             if rag_model else "",
             format_html(
                 '<div style="margin-top:6px"><button type="button" class="button" data-url="{}" onclick="'
                 "var b=this,s=b.nextElementSibling,t=document.querySelector('[name=csrfmiddlewaretoken]');"
-                "s.style.color='inherit';s.textContent='Запитую RAG-ПК…';"
+                "s.style.cssText='';s.textContent='Запитую RAG-ПК…';"
                 "fetch(b.dataset.url,{{method:'POST',credentials:'same-origin',headers:{{'X-CSRFToken':t?t.value:''}}}})"
                 ".then(function(r){{return r.json()}}).then(function(d){{s.textContent=d.text;"
-                "s.style.color=d.ok?(d.local?'#81c784':'#ffb74d'):'#ff8a80'}})"
-                ".catch(function(){{s.textContent='Немає відповіді від Minerva';s.style.color='#ff8a80'}})"
+                "s.style.cssText=d.ok?(d.local?'background:#e8f5e9;color:#1b5e20;border-left:3px solid #2e7d32;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5':'background:#fff3e0;color:#6d3500;border-left:3px solid #ef6c00;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5'):'background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5'}})"
+                ".catch(function(){{s.textContent='Немає відповіді від Minerva';s.style.cssText='background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5'}})"
                 '">🔄 Запитати RAG-ПК, яка модель зараз</button> <span></span> '
                 '<a href="{}#rag-pc" style="margin-left:8px">🖥 RAG-ПК: що зараз робить →</a></div>',
                 reverse("admin:shop_shop_rag_model", args=[obj.pk]),
@@ -499,7 +500,7 @@ class ShopAdmin(admin.ModelAdmin):
             format_html_join("", "<tr>" + "<td>{}</td>" * 6 + "</tr>", rows)) if rows else format_html(
             '<div class="help">{}</div>', "Сайти ще не звітували про пошту (звіт — разом із запитом налаштувань, "
                                          "раз на хвилину, коли на сайті щось надсилається або перевіряють зв'язок).")
-        return format_html('{}{}', format_html('<div style="color:#ff8a80;margin-bottom:6px">⚠ {}</div>', warn)
+        return format_html('{}{}', format_html('<div style="background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5;margin-bottom:6px">⚠ {}</div>', warn)
                            if warn else "", table)
 
     @admin.display(description="Зараз")
@@ -549,7 +550,7 @@ class ShopAdmin(admin.ModelAdmin):
             "налаштувань, коли на сторінці магазину відкривають чат або перевіряють зв'язок).")
         has_file = any(r.get("file") for r in (obj.assistant_sites or {}).values())
         if obj.assistant_remove_file:
-            action = format_html('<div style="margin-top:6px;color:#ffb74d">{}</div>',
+            action = format_html('<div style="margin-top:6px;background:#fff3e0;color:#6d3500;border-left:3px solid #ef6c00;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5">{}</div>',
                                  "🗑 Видалення файлу заплановано — сайти виконають його протягом хвилини.")
         elif has_file:
             reason = assistant.can_remove_file(obj)
@@ -711,7 +712,7 @@ class ShopAdmin(admin.ModelAdmin):
         left = copying.pending(obj) if obj.review_fields else []
         if not left:
             return format_html('<span style="opacity:.45">{}</span>', "—")
-        return format_html('<span style="color:#ff8a80" title="{}">⚠ змінити: {}</span>',
+        return format_html('<span style="background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5" title="{}">⚠ змінити: {}</span>',
                            ", ".join(copying.labels(obj, left)), len(left))
 
     @admin.action(description="📋 Копіювати магазин (без ключів)")
@@ -1334,7 +1335,7 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         url = reverse("admin:shop_shopsettings_change", args=[ShopSettings.get().pk])
         rate = services.fx_rate(cur, shop_cur)
         if rate is None:
-            return format_html('<span style="color:#e57373">⚠ Немає курсу {} → {}</span> — '
+            return format_html('<span style="background:#ffebee;color:#8e1b1b;border-left:3px solid #d32f2f;border-radius:4px;padding:2px 8px;display:inline-block;line-height:1.5">⚠ Немає курсу {} → {}</span> — '
                                '<a href="{}">задати в «Налаштування цін → Курси валют»</a>', cur, shop_cur, url)
         return format_html('курс 1 {} = {} {} (<a href="{}">змінити курс</a>)', cur, self._num(rate), shop_cur, url)
 

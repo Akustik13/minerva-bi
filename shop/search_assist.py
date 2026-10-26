@@ -330,7 +330,8 @@ def ai_ready(shop: Shop) -> str:
 
 RAG_TIPS = 3
 RAG_CACHE = 24 * 3600
-RAG_EMPTY_CACHE = 3600       # RAG нічого не порадив або завдання не вдалося — годину не питати знову
+RAG_EMPTY_CACHE = 3600       # RAG і запасний пошук нічого не знайшли — годину не питати знову
+RAG_FAIL_CACHE = 120         # завдання не вдалося / загубилось (перезапуск RAG, тайм-аут) — повторити незабаром
 RAG_JOB_MAX = 180            # завдання довше — вважається втраченим (локальна модель на RAG-ПК відповідає до 1–2 хв)
 RAG_PARALLEL = 1             # RAG обробляє один запит за раз (ним користуються й співробітники в Minerva)
 RAG_TIMEOUT = 4              # одне звернення Minerva → RAG: сайт чекає відповіді Minerva
@@ -458,7 +459,7 @@ def _rag_poll(shop: Shop, settings, key: str, digest: str, job: dict) -> dict:
         cache.set(key, item, ttl)
 
     if time.time() - float(job.get("at") or 0) > RAG_JOB_MAX:
-        finish(_EMPTY, RAG_EMPTY_CACHE)
+        finish(_EMPTY, RAG_FAIL_CACHE)
         _count(shop, rag_errors=1)
         return {"status": "unavailable", "tips": []}
     cache.set(jobkey, {**job, "polled": time.time()}, RAG_JOB_MAX + 60)   # сайт ще чекає — не покинуте
@@ -466,7 +467,7 @@ def _rag_poll(shop: Shop, settings, key: str, digest: str, job: dict) -> dict:
         data = _rag_client(settings).job(job["id"])
     except RagError as e:
         if e.code in ("not_found", "auth", "bad_request"):
-            finish(_EMPTY, RAG_EMPTY_CACHE)
+            finish(_EMPTY, RAG_FAIL_CACHE)
             _count(shop, rag_errors=1)
             return {"status": "unavailable", "tips": []}
         return {"status": "pending", "tips": []}   # мережа на мить — сайт спитає ще раз
@@ -475,13 +476,26 @@ def _rag_poll(shop: Shop, settings, key: str, digest: str, job: dict) -> dict:
         return {"status": "pending", "tips": [], "stage": str(data.get("stage") or "")[:80],
                 "elapsed": int(time.time() - float(job.get("at") or time.time()))}
     if state == "failed":
-        finish(_EMPTY, RAG_EMPTY_CACHE)
+        finish(_EMPTY, RAG_FAIL_CACHE)
         _count(shop, rag_errors=1)
         return {"status": "unavailable", "tips": []}
     result = data.get("result") or {}
     item = _rag_result(result)
+    if not item["items"] and job.get("kind") != "search" and job.get("question"):
+        # аналізатор RAG інколи будує надто вузький план (лише каталог із фільтрами) і відповідає «немає даних» без
+        # моделі — тоді пошук по даташитах без LLM (/v1/search): швидко, без оплати, товари з даташитів
+        try:
+            search_id = _rag_client(settings).search(job["question"], [], language=job.get("lang") or "en",
+                                                     latest=settings.latest_only)
+        except RagError:
+            search_id = None
+        if search_id:
+            now = time.time()
+            cache.set(jobkey, {**job, "id": search_id, "at": now, "polled": now, "kind": "search"}, RAG_JOB_MAX + 60)
+            _count(shop, rag_fallback=1)
+            return {"status": "pending", "tips": [], "stage": "", "elapsed": 0}
     finish(item, RAG_CACHE if item["items"] else RAG_EMPTY_CACHE)
-    if result.get("provider") or result.get("model"):   # чим RAG відповідав: локально чи хмарою (платно)
+    if job.get("kind") != "search" and (result.get("provider") or result.get("model")):   # чим відповідав: локально чи хмарою
         _count(shop, rag_model={"provider": str(result.get("provider") or "")[:40],
                                 "model": str(result.get("model") or "")[:80], "at": timezone.now().isoformat()})
     return _rag_out(shop, item, cached=False)
@@ -553,7 +567,8 @@ def rag_tips(shop: Shop, q, lang: str = "") -> dict:
         cache.set(RAG_DOWN_KEY, 1, RAG_DOWN)
         _count(shop, rag_errors=1)
         return {"status": "unavailable", "tips": []}
-    cache.set(f"shop-search-rag-job:{digest}", {"id": job_id, "at": time.time()}, RAG_JOB_MAX + 60)
+    cache.set(f"shop-search-rag-job:{digest}", {"id": job_id, "at": time.time(), "lang": lang,
+                                                 "question": RAG_QUESTION[lang].format(q=query)}, RAG_JOB_MAX + 60)
     _set_active(digest, True)
     _count(shop, rag_calls=1)
     return {"status": "pending", "tips": [], "stage": "", "elapsed": 0}
