@@ -132,8 +132,8 @@ class Shop(models.Model):
         "Підказки в пошуку на сайті", max_length=10, choices=SEARCH_CHOICES, default=SEARCH_OFF,
         help_text="Розумний пошук розпізнає частоту, роз'єм і стандарт у запиті, показує схожі товари, "
                   "підходящі кабелі й «часто купують разом». AI-підказки — ще й рекомендації моделі з каталогу "
-                  "магазину; RAG — рекомендації нашого RAG за даташитами (без токенів Anthropic). Будь-який збій — "
-                  "сайт шукає як звичайно.")
+                  "магазину; RAG — рекомендації нашого RAG за даташитами (Minerva токенів не витрачає; платно лише "
+                  "коли на RAG-ПК вибрано хмарну модель). Будь-який збій — сайт шукає як звичайно.")
     search_ai_model = models.CharField("AI-модель підказок", max_length=40, choices=SEARCH_MODELS,
                                        default="claude-opus-5-5")
     search_ai_daily_limit = models.PositiveIntegerField(

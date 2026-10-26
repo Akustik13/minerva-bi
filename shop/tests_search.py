@@ -262,6 +262,30 @@ class RagTipsTests(TestCase):
         self.assertEqual(step["state"], "warn")
         self.assertIn("RAG-підказки", step["hint"])
 
+    def test_rag_now_button(self):
+        """«Запитати RAG-ПК, яка модель зараз»: /v1/health → llm; старий RAG без llm — підказка перезапустити API."""
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
+        url = f"/admin/shop/shop/{self.shop.pk}/rag-model/"
+        self.assertContains(self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/"), "Запитати RAG-ПК, яка модель зараз")
+        self.assertEqual(self.client.get(url).status_code, 403)                  # лише POST
+        self.rag.health.return_value = {"status": "ok", "api_version": "1"}
+        d = self.client.post(url).json()
+        self.assertFalse(d["ok"])
+        self.assertIn("RAG-Integration-API", d["text"])
+        self.rag.health.return_value = {"status": "ok", "llm": {"provider": "anthropic", "model": "claude-opus-5",
+                                                                "analyzer_provider": "ollama", "analyzer_model": "qwen2.5:7b"}}
+        d = self.client.post(url).json()
+        self.assertEqual((d["ok"], d["local"]), (True, False))
+        self.assertIn("anthropic / claude-opus-5 · аналізатор запиту: ollama / qwen2.5:7b", d["text"])
+        self.assertIn("запит до RAG-ПК", d["text"])
+        self.rag.health.return_value = {"status": "ok", "llm": {"provider": "ollama", "model": "qwen2.5:7b"}}
+        self.assertTrue(self.client.post(url).json()["local"])
+        from rag_assistant.client import RagError
+        self.rag.health.side_effect = RagError("network", "Немає зв'язку з помічником.")
+        self.assertIn("не відповів", self.client.post(url).json()["text"])
+
     def test_shared_cache_in_production_settings(self):
         """Обидва процеси gunicorn мають бачити ті самі завдання RAG і кеш AI — не кеш у пам'яті процесу."""
         import importlib

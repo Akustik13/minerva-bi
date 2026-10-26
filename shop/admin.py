@@ -445,7 +445,7 @@ class ShopAdmin(admin.ModelAdmin):
             '<div style="opacity:.65;font-size:.9em">≈ за цінами Anthropic API для моделі, що відповіла, без ПДВ; '
             'точна сума за всі AI-функції Minerva — Claude Console → Usage / Cost. RAG-підказки токенів Anthropic '
             'не витрачають.</div>'
-            '<div style="margin-top:6px">RAG сьогодні: {} з {}</div><div style="opacity:.8">RAG загалом: {}</div>{}'
+            '<div style="margin-top:6px">RAG сьогодні: {} з {}</div><div style="opacity:.8">RAG загалом: {}</div>{}{}'
             '<div style="margin-top:6px">Шукали й не знайшли: {}</div><div style="margin-top:6px"><a href="{}">'
             '🔎 Усі запити на сайті →</a></div>',
             format_html('<div style="color:#ff8a80">⚠ AI: {}</div>', problem) if problem else "",
@@ -454,6 +454,16 @@ class ShopAdmin(admin.ModelAdmin):
             rag_line(u), obj.search_ai_daily_limit, rag_line(total),
             format_html('<div style="color:{}">{}</div>', "#ffb74d" if rag_paid else "inherit", rag_model)
             if rag_model else "",
+            format_html(
+                '<div style="margin-top:6px"><button type="button" class="button" data-url="{}" onclick="'
+                "var b=this,s=b.nextElementSibling,t=document.querySelector('[name=csrfmiddlewaretoken]');"
+                "s.style.color='inherit';s.textContent='Запитую RAG-ПК…';"
+                "fetch(b.dataset.url,{{method:'POST',credentials:'same-origin',headers:{{'X-CSRFToken':t?t.value:''}}}})"
+                ".then(function(r){{return r.json()}}).then(function(d){{s.textContent=d.text;"
+                "s.style.color=d.ok?(d.local?'#81c784':'#ffb74d'):'#ff8a80'}})"
+                ".catch(function(){{s.textContent='Немає відповіді від Minerva';s.style.color='#ff8a80'}})"
+                '">🔄 Запитати RAG-ПК, яка модель зараз</button> <span></span></div>',
+                reverse("admin:shop_shop_rag_model", args=[obj.pk])),
             format_html_join(", ", "«{}» ×{}", zero) if zero else "—", report)
 
     @admin.display(description="Пошта сайтів")
@@ -856,7 +866,19 @@ class ShopAdmin(admin.ModelAdmin):
                  name="shop_shop_assistant_test"),
             path("<int:pk>/review-done/", self.admin_site.admin_view(self._review_done_view),
                  name="shop_shop_review_done"),
+            path("<int:pk>/rag-model/", self.admin_site.admin_view(self._rag_model_view), name="shop_shop_rag_model"),
         ] + super().get_urls()
+
+    def _rag_model_view(self, request, pk):
+        """POST → JSON: яка модель зараз відповідає на RAG-ПК (search_assist.rag_now)."""
+        from django.core.exceptions import PermissionDenied
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        from . import search_assist
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        return JsonResponse(search_assist.rag_now(shop))
 
     def _zones_view(self, request, pk, run):
         from django.core.exceptions import PermissionDenied

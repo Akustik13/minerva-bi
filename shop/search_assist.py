@@ -544,24 +544,55 @@ RAG_LOCAL = {"ollama"}   # постачальники RAG, що працюють
 
 
 def rag_is_local(shop: Shop) -> bool:
+    """RAG відповідає без оплати: модель відповіді й аналізатор (якщо він є) — локальні."""
     m = usage(shop).get("rag_model")
-    return isinstance(m, dict) and m.get("provider") in RAG_LOCAL
+    return (isinstance(m, dict) and m.get("provider") in RAG_LOCAL
+            and (not m.get("analyzer_provider") or m.get("analyzer_provider") in RAG_LOCAL))
 
 
 def rag_model_text(shop: Shop) -> str:
-    """Чим RAG відповідав востаннє (з результату завдання) і чи це платно; '' — ще не відповідав."""
+    """Чим RAG відповідає (останнє завдання або запит «яка модель зараз») і чи це платно; '' — ще невідомо."""
     m = usage(shop).get("rag_model")
     if not isinstance(m, dict) or not (m.get("provider") or m.get("model")):
         return ""
     from django.utils.dateparse import parse_datetime
     provider, model = m.get("provider") or "?", m.get("model") or "?"
+    analyzer = (f" · аналізатор запиту: {m['analyzer_provider']} / {m.get('analyzer_model') or '?'}"
+                if m.get("analyzer_provider") else "")
     at = parse_datetime(str(m.get("at") or ""))
-    when = f" · останнє завдання {timezone.localtime(at):%d.%m %H:%M}" if at else ""
-    if provider in RAG_LOCAL:
-        return f"RAG відповідає: {provider} / {model} — локальна модель на RAG-ПК, без оплати{when}"
-    return (f"⚠ RAG відповідає: {provider} / {model} — хмарна модель: кожна RAG-підказка оплачується ключем "
-            f"{provider} на RAG-ПК (не ключем Minerva, у витратах вище не враховано). Безкоштовно — RAG Documents → "
+    source = "запит до RAG-ПК" if m.get("source") == "health" else "останнє завдання"
+    when = f" · {source} {timezone.localtime(at):%d.%m %H:%M}" if at else ""
+    if rag_is_local(shop):
+        return f"RAG відповідає: {provider} / {model}{analyzer} — локально на RAG-ПК, без оплати{when}"
+    cloud = sorted({p for p in (provider, m.get("analyzer_provider")) if p and p not in RAG_LOCAL})
+    return (f"⚠ RAG відповідає: {provider} / {model}{analyzer} — хмарна модель: кожна RAG-підказка оплачується ключем "
+            f"{', '.join(cloud)} на RAG-ПК (не ключем Minerva, у витратах вище не враховано). Безкоштовно — RAG Documents → "
             f"Налаштування → постачальник ollama (qwen2.5:7b){when}")
+
+
+def rag_now(shop: Shop) -> dict:
+    """Кнопка «Запитати RAG-ПК, яка модель зараз»: GET /v1/health → llm (без ключів); результат — у rag_model."""
+    from rag_assistant.client import RagError
+    try:
+        settings = _rag_settings()
+    except Exception:  # noqa: BLE001
+        return {"ok": False, "text": "налаштування помічника по продукції недоступні"}
+    if not settings.configured:
+        return {"ok": False, "text": "не задано адресу або ключ RAG API (Minerva AI → «📚 Помічник по продукції»)"}
+    try:
+        data = _rag_client(settings).health()
+    except RagError as e:
+        return {"ok": False, "text": f"RAG-ПК не відповів: {e.message}"}
+    llm = data.get("llm") if isinstance(data, dict) else None
+    if not isinstance(llm, dict) or not llm.get("provider"):
+        return {"ok": False, "text": "RAG-ПК працює, але ще не повідомляє модель — перезапустіть на RAG-ПК задачу "
+                                     "«RAG-Integration-API» (оновлений rag_api.py уже там)"}
+    clean = lambda v, n: str(v or "")[:n] or None  # noqa: E731
+    _count(shop, rag_model={"provider": clean(llm.get("provider"), 40), "model": clean(llm.get("model"), 80),
+                            "analyzer_provider": clean(llm.get("analyzer_provider"), 40),
+                            "analyzer_model": clean(llm.get("analyzer_model"), 80),
+                            "at": timezone.now().isoformat(), "source": "health"})
+    return {"ok": True, "text": rag_model_text(shop), "local": rag_is_local(shop)}
 
 
 def rag_ready(shop: Shop) -> str:
