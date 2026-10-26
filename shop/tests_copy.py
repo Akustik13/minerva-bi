@@ -22,6 +22,8 @@ class Base(TestCase):
             assistant_url="https://rag.example.com", assistant_key="bridge-secret-1234",
             stripe_secret_key="sk_test_51abcdefghijklmnop9876", stripe_webhook_secret="whsec_abcdefghijklmn5432",
             account_links={"de": "https://web.example.com/de/konto/"}, free_shipping_enabled=True,
+            site_mail_reports={"web.example.com": {"at": "2026-10-26T08:00:00+00:00", "host": "smtp.example.com"}},
+            assistant_sites={"web.example.com": {"at": "2026-10-26T08:00:00+00:00", "file": True}},
             free_shipping_threshold=Decimal("250"))
         ShippingZone.objects.create(shop=self.src, name="DE", countries=["DE"], price=Decimal("6.90"),
                                     delivery_days_min=1, delivery_days_max=2, overrides={"AT": {"price": "9"}})
@@ -48,6 +50,7 @@ class CopyTests(Base):
                          (self.p, Decimal("19.50"), [10]))
         self.assertEqual(new.mail_templates.get().subject, "Bitte bestätigen")
         self.assertEqual(new.api_keys.count(), 0)   # ключі API сайту — свої для кожного сайту
+        self.assertEqual((new.site_mail_reports, new.assistant_sites), ({}, {}))   # звіти — лише від свого сайту
         self.assertEqual(self.src.listings.count(), 1)   # оригінал не змінився
         self.src.refresh_from_db()
         self.assertTrue(self.src.is_default)

@@ -18,7 +18,9 @@ from .models import ShippingZone, Shop, ShopListing, ShopMailTemplate, ShopPrice
 SECRETS = ("stripe_secret_key", "stripe_webhook_secret", "assistant_key")
 # Значення копії, які не беруться з оригіналу
 RESET = {"is_default": False, "is_active": False, "account_links": {}, "account_link_error": "",
-         "stripe_poll_last_at": None, "stripe_webhook_last_at": None}
+         "stripe_poll_last_at": None, "stripe_webhook_last_at": None,
+         # звіти сайтів — про сайти оригіналу; копія отримає свої від власного сайту
+         "site_mail_reports": {}, "assistant_sites": {}, "assistant_remove_file": False}
 SKIP = {"id", "created_at", "copied_from_id", "review_fields"}
 
 
