@@ -361,7 +361,10 @@ def register(shop: Shop, data: dict, link: str) -> None:
         customer.password = make_password(password)
         customer.save()
         customer.sessions.all().delete()
-    _raise_if_mail_failed(customer, send_verification(customer, link, throttle=bool(existing)))
+    sent = send_verification(customer, link, throttle=bool(existing))
+    if not existing and customer.shop.team_notify_registration:
+        _notify_team_registered(customer)
+    _raise_if_mail_failed(customer, sent)
 
 
 def _raise_if_mail_failed(customer: ShopCustomer, sent: bool):
@@ -410,9 +413,23 @@ def verify_email(shop: Shop, raw_token, password, remember=False) -> tuple[ShopC
 
 
 def on_verified(customer: ShopCustomer):
-    """Email підтверджено: старі замовлення з цією адресою — в кабінет, зв'язок з клієнтом CRM."""
+    """Email підтверджено: старі замовлення з цією адресою — в кабінет, зв'язок з клієнтом CRM, лист
+    «Ласкаво просимо» (після commit — без листа, якщо підтвердження відкотилося)."""
     attach_guest_orders(customer)
     link_crm(customer)
+    if customer.shop.mail_welcome:
+        transaction.on_commit(lambda: _mail(customer, "welcome", link=admin_link(customer), throttle=False))
+
+
+def _notify_team_registered(customer: ShopCustomer) -> None:
+    """«Команді: новий акаунт покупця» (картка магазину). Помилка пошти не заважає реєстрації."""
+    from . import mail
+    try:
+        mail.send_team(customer.shop, "team_registered", email=customer.email, company=customer.company or "—",
+                       name=customer.name or "—")
+    except Exception as e:
+        import logging
+        logging.getLogger("shop").warning("Team mail team_registered failed: %s", e)
 
 
 def link_crm(customer: ShopCustomer):
@@ -534,7 +551,8 @@ def reset_password(shop: Shop, raw_token, password, remember=False) -> tuple[Sho
         if not was_verified:
             on_verified(customer)
     raw, session = start_session(customer, remember)
-    _mail(customer, "changed", link=admin_link(customer), throttle=False)
+    if was_verified:   # уперше задав пароль (запрошення) — замість «пароль змінено» лист «Ласкаво просимо»
+        _mail(customer, "changed", link=admin_link(customer), throttle=False)
     return customer, raw, session
 
 

@@ -235,7 +235,8 @@ class ShopAdmin(admin.ModelAdmin):
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     form = ShopForm
-    readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "stripe_col",
+    readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "mail_tools",
+                       "stripe_col",
                        "assistant_col", "assistant_test_col", "site_admin_col"]
     inlines = [ShippingZoneInline, ShopStaffInline]
     actions = ["action_copy", "action_default_zones", "action_import_dk_zones"]
@@ -249,12 +250,21 @@ class ShopAdmin(admin.ModelAdmin):
                            "Замовити можуть лише покупці з країн зон; без зон сайт використовує власні налаштування. "
                            "Швидкий старт: «🌍 Створити базові зони» або «⬇️ Імпортувати з DigiKey».",
         }),
+        ("✉️ Пошта магазину", {
+            "fields": ["mail_sender", "mail_from_name", "mail_reply_to", "mail_bcc", "team_emails", "mail_welcome",
+                       "team_notify_registration", "mail_footer", "team_lang", "mail_tools"],
+            "description": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату "
+                           "отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину "
+                           "додайте в Minerva як акаунт пошти (Email → Акаунти): тоді відповіді покупців потрапляють у "
+                           "пошту Minerva й прив'язуються до клієнта в CRM. Тексти — «Шаблони листів». Підтвердження "
+                           "замовлення й контактну форму надсилає сайт — там у /admin/ → «Пошта» вкажіть ту саму скриньку.",
+        }),
         ("👤 Особистий кабінет покупців", {
-            "fields": ["accounts_enabled", "mail_sender", "mail_from_name", "mail_footer", "team_lang", "accounts_tools"],
+            "fields": ["accounts_enabled", "accounts_tools"],
             "description": "Реєстрація з підтвердженням email, вхід, скидання пароля, статус замовлень і кошик "
                            "на сайті. Акаунти зберігаються лише в Minerva; сайт тримає тільки ключ сесії в cookie. "
                            "Ключу сайту додайте права «Акаунти покупців — читання» і «— запис». "
-                           "Листи покупцям (підтвердження, новий пароль) надсилає Minerva.",
+                           "Листи покупцям надсилає Minerva — з «✉️ Пошта магазину» вище.",
         }),
         ("💳 Способи оплати на сайті", {
             "fields": ["payment_methods", "payment_default"],
@@ -334,22 +344,36 @@ class ShopAdmin(admin.ModelAdmin):
         no_scope, links = st["missing"], st["links"]
         return format_html(
             '<div><a href="{}">Акаунтів: {}</a>{}</div>'
-            '<div style="margin-top:4px">Листи: {}</div>'
             '<div style="margin-top:4px">Сторінка кабінету: {}</div>'
-            '{}{}'
-            '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formnovalidate>'
-            '✉️ Надіслати тестовий лист собі</button> '
-            '<span class="help">на email вашого користувача · незбережені зміни на сторінці не зберігаються</span></div>',
+            '{}{}',
             reverse("admin:shop_shopcustomer_changelist") + f"?shop__id__exact={obj.pk}", n,
             f" · очікують підтвердження: {pending}" if pending else "",
-            st["sender"],
             format_html_join(" · ", '<a href="{}" target="_blank" rel="noopener">{}</a>',
                              ((u, lang) for lang, u in links.items())) if links
             else "ще невідома (заповниться з першого запиту сайту)",
             format_html('<div style="margin-top:4px;color:#ffb74d">⚠ Ключам без прав «Акаунти покупців»: {}</div>',
                         ", ".join(no_scope)) if no_scope else "",
-            format_html('<div style="margin-top:4px;color:#ff8a80">⚠ {}</div>', st["link_error"]) if st["link_error"] else "",
-            reverse("admin:shop_shop_test_mail", args=[obj.pk]))
+            format_html('<div style="margin-top:4px;color:#ff8a80">⚠ {}</div>', st["link_error"]) if st["link_error"] else "")
+
+    @admin.display(description="Зараз")
+    def mail_tools(self, obj):
+        """Через що підуть листи, куди відповіді й сповіщення, тестовий лист, шаблони."""
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        from . import mail
+        team = mail.addresses(obj.team_emails)
+        return format_html(
+            '<div>Відправник: {}</div><div style="margin-top:4px">Відповіді покупців: {}</div>'
+            '<div style="margin-top:4px">Прихована копія: {}</div><div style="margin-top:4px">Сповіщення команді: {}</div>'
+            '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formnovalidate>'
+            '✉️ Надіслати тестовий лист собі</button> <a class="button" href="{}">📝 Шаблони листів</a> '
+            '<a class="button" href="{}">➕ Додати скриньку в Minerva</a> '
+            '<span class="help">незбережені зміни на сторінці не зберігаються</span></div>',
+            mail.describe_sender(obj), obj.mail_reply_to or "на адресу відправника",
+            obj.mail_bcc or "немає", ", ".join(team) if team else "email з «Налаштування → Сповіщення»",
+            reverse("admin:shop_shop_test_mail", args=[obj.pk]),
+            reverse("admin:shop_shopmailtemplate_changelist") + f"?shop__id__exact={obj.pk}",
+            reverse("admin:email_assistant_emailaccount_add"))
 
     @admin.display(description="Зараз")
     def assistant_col(self, obj):

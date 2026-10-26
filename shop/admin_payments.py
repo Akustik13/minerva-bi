@@ -14,6 +14,14 @@ STRIPE_EVENTS = ["checkout.session.completed", "checkout.session.async_payment_s
                  "checkout.session.async_payment_failed", "checkout.session.expired", "charge.refunded"]
 
 
+def _valid(validator, value) -> bool:
+    try:
+        validator(value)
+        return True
+    except forms.ValidationError:
+        return False
+
+
 class ShopForm(forms.ModelForm):
     """Ключі Stripe — як паролі: збережене значення не показується, порожнє поле його не змінює."""
     stripe_secret_key = forms.CharField(
@@ -77,6 +85,21 @@ class ShopForm(forms.ModelForm):
     def clean_assistant_key(self):
         value = (self.cleaned_data.get("assistant_key") or "").strip()   # порожньо — залишити збережений
         return value or (self.instance.assistant_key if self.instance and self.instance.pk else "")
+
+    def _clean_addresses(self, name):
+        from django.core.validators import validate_email
+        from .mail import addresses
+        items = addresses(self.cleaned_data.get(name))
+        bad = [a for a in items if not _valid(validate_email, a)]
+        if bad:
+            raise forms.ValidationError(f"Некоректні адреси: {', '.join(bad)}")
+        return ", ".join(items)
+
+    def clean_mail_bcc(self):
+        return self._clean_addresses("mail_bcc")
+
+    def clean_team_emails(self):
+        return self._clean_addresses("team_emails")
 
     def clean_assistant_url(self):
         from .assistant import check_url

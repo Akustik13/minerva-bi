@@ -315,29 +315,24 @@ def notify_paid(payment: ShopPayment) -> None:
 
 
 def _notify_team(payment: ShopPayment) -> None:
-    """Email / Telegram з «Налаштування → Сповіщення», якщо там увімкнено."""
+    """Команді: email на адреси команди магазину (інакше — «Налаштування → Сповіщення») і Telegram, якщо увімкнено."""
+    from .mail import send_team, team_message
+    o, shop = payment.order, payment.shop
+    lang = shop.team_lang if shop.team_lang in ("de", "en") else "de"
+    fields = dict(number=o.order_number, amount=_money_text(payment.amount, payment.currency, lang),
+                  customer=o.client or o.email, reference=payment.payment_intent or payment.session_id)
     try:
-        from dashboard.notifications import _get_ns, _send_event_email, _send_telegram
+        send_team(shop, "team_paid", **fields)
+    except Exception as e:
+        logger.warning("Team mail paid failed: %s", e)
+    try:
+        from dashboard.notifications import _get_ns, _send_telegram
         ns = _get_ns()
     except Exception:
         return
-    if ns is None:
-        return
-    import html as _html
-    from .mail import team_message
-    o, shop = payment.order, payment.shop
-    lang = shop.team_lang if shop.team_lang in ("de", "en") else "de"
-    text, details = team_message(shop, number=o.order_number, amount=_money_text(payment.amount, payment.currency, lang),
-                                 customer=o.client or o.email, reference=payment.payment_intent or payment.session_id)
-    if getattr(ns, "email_enabled", False) and (ns.email_to or "").strip():
+    if ns is not None and getattr(ns, "telegram_enabled", False) and ns.telegram_bot_token and ns.telegram_chat_id:
         try:
-            _send_event_email(ns, text, f"<p>{_html.escape(text)}</p>"
-                                        f"<p style=\"white-space:pre-line\">{_html.escape(details)}</p>")
-        except Exception as e:
-            logger.warning("Team mail paid failed: %s", e)
-    if getattr(ns, "telegram_enabled", False) and ns.telegram_bot_token and ns.telegram_chat_id:
-        try:
-            _send_telegram(ns, text)
+            _send_telegram(ns, team_message(shop, "team_paid", **fields)[0])
         except Exception as e:
             logger.warning("Telegram paid failed: %s", e)
 

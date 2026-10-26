@@ -174,6 +174,18 @@ TEXTS = {
                "View order",
                "If you have any questions, simply reply to this e-mail."),
     },
+    "welcome": {
+        "de": ("Willkommen bei {shop}",
+               "vielen Dank – Ihr Kundenkonto im Online-Shop von {shop} ist jetzt aktiv. Im Kundenkonto sehen Sie "
+               "Ihre Bestellungen mit Status und Sendungsverfolgung, Ihre Adressen und Ihren Warenkorb.",
+               "Zum Kundenkonto",
+               "Bei Fragen antworten Sie einfach auf diese E-Mail – wir helfen gern."),
+        "en": ("Welcome to {shop}",
+               "thank you – your customer account in the {shop} online shop is now active. In your account you "
+               "can see your orders with status and tracking, your addresses and your cart.",
+               "Go to my account",
+               "If you have any questions, simply reply to this e-mail – we are happy to help."),
+    },
     "test": {
         "de": ("Testnachricht – {shop}", "dies ist eine Testnachricht aus Minerva: Die E-Mails des "
                "Kundenkontos (Bestätigung, Passwort) werden über diesen Absender versendet.", "", ""),
@@ -185,18 +197,38 @@ TEXTS["team_paid"] = {
     "de": ("💳 Zahlung eingegangen: {number} · {amount} · {customer}", "Stripe-Zahlung: {reference}", "", ""),
     "en": ("💳 Payment received: {number} · {amount} · {customer}", "Stripe payment: {reference}", "", ""),
 }
+TEXTS["team_registered"] = {
+    "de": ("👤 Neues Kundenkonto: {email} · {company}", "Name: {name}\nFirma: {company}\nE-Mail: {email}\n"
+           "Das Konto wird aktiv, sobald die E-Mail-Adresse bestätigt ist.", "", ""),
+    "en": ("👤 New customer account: {email} · {company}", "Name: {name}\nCompany: {company}\nE-mail: {email}\n"
+           "The account becomes active once the e-mail address is confirmed.", "", ""),
+}
 GREETING = {"de": "Guten Tag {name},", "en": "Hello {name},"}
-NO_GREETING = ("team_paid",)
+NO_GREETING = ("team_paid", "team_registered")
+TEAM_KINDS = ("team_paid", "team_registered")
+SECRET_KINDS = ("verify", "reset", "invite")   # одноразові посилання — без прихованої копії
 
 # Поля, які можна вставити в шаблон (адмінка показує їх і перевіряє шаблон)
 PLACEHOLDERS = {
     "verify": ["shop", "name", "hours"], "exists": ["shop", "name"], "reset": ["shop", "name", "minutes"],
     "changed": ["shop", "name"], "invite": ["shop", "name", "days"], "deleted": ["shop", "name"],
     "paid": ["shop", "name", "number", "amount"], "team_paid": ["shop", "number", "amount", "customer", "reference"],
+    "welcome": ["shop", "name"], "team_registered": ["shop", "email", "company", "name"],
     "test": ["shop"],
 }
 SAMPLE = {"name": "Max Mustermann", "number": "WS-261021-ABC123", "amount": "123,45 EUR", "hours": 48,
-          "minutes": 60, "days": 7, "customer": "Musterfirma GmbH", "reference": "pi_3Example"}
+          "minutes": 60, "days": 7, "customer": "Musterfirma GmbH", "reference": "pi_3Example",
+          "email": "einkauf@musterfirma.de", "company": "Musterfirma GmbH"}
+
+
+def addresses(value) -> list[str]:
+    """«a@x.de, b@y.de» → список адрес (порожні й дублікати відкидаються)."""
+    out = []
+    for part in str(value or "").replace(";", ",").split(","):
+        part = part.strip()
+        if part and part.lower() not in (a.lower() for a in out):
+            out.append(part)
+    return out
 
 
 class _Keep(dict):
@@ -258,10 +290,10 @@ def compose(shop, kind: str, lang: str, *, name: str = "", link: str = "", tpl: 
     return subject, text, body
 
 
-def team_message(shop, **vars) -> tuple[str, str]:
+def team_message(shop, kind: str = "team_paid", **vars) -> tuple[str, str]:
     """Сповіщення команді (мова — «Мова сповіщень команді»): (рядок для Telegram / теми, текст для email)."""
     lang = shop.team_lang if shop.team_lang in ("de", "en") else "de"
-    t = template(shop, "team_paid", lang)
+    t = template(shop, kind, lang)
     fmt = {"shop": public_name(shop), **{k: str(v) for k, v in vars.items()}}
     return _fill(t["subject"], fmt).strip(), _fill(t["intro"], fmt).strip()
 
@@ -271,9 +303,42 @@ def send(shop, to: str, kind: str, lang: str, **kwargs) -> None:
     SSL/TLS не відповідає порту (WRONG_VERSION_NUMBER) → ще одна спроба іншим режимом, як у email_assistant."""
     subject, text, body = compose(shop, kind, lang, **kwargs)
     cfg = smtp_settings(shop)
-    msg = EmailMultiAlternatives(subject=subject, body=text, from_email=cfg["from"], to=[to],
-                                 connection=_connection(cfg))
+    customer_mail = kind not in TEAM_KINDS and kind != "test"
+    msg = EmailMultiAlternatives(
+        subject=subject, body=text, from_email=cfg["from"], to=[to], connection=_connection(cfg),
+        reply_to=[shop.mail_reply_to] if shop.mail_reply_to and customer_mail else None,
+        bcc=addresses(shop.mail_bcc) if customer_mail and kind not in SECRET_KINDS else None)
     msg.attach_alternative(body, "text/html")
+    _deliver(msg, cfg)
+    logger.info("Shop mail %s → %s (%s)", kind, to, shop.slug)
+
+
+def send_team(shop, kind: str, **vars) -> str:
+    """Сповіщення команді: на «Сповіщення команді — на адреси» магазину (з відправника магазину), інакше —
+    email з «Налаштування → Сповіщення». '' — нікому не надіслано. Telegram — окремо (payments._notify_team)."""
+    import html as _html
+    subject, details = team_message(shop, kind, **vars)
+    to = addresses(shop.team_emails)
+    if to:
+        cfg = smtp_settings(shop)
+        msg = EmailMultiAlternatives(subject=subject, body=details, from_email=cfg["from"], to=to,
+                                     connection=_connection(cfg))
+        msg.attach_alternative(f'<p style="white-space:pre-line">{_html.escape(details)}</p>', "text/html")
+        _deliver(msg, cfg)
+        return "team"
+    try:
+        from dashboard.notifications import _get_ns, _send_event_email
+        ns = _get_ns()
+    except Exception:
+        return ""
+    if ns is None or not getattr(ns, "email_enabled", False) or not (ns.email_to or "").strip():
+        return ""
+    _send_event_email(ns, subject, f"<p>{_html.escape(subject)}</p>"
+                                   f"<p style=\"white-space:pre-line\">{_html.escape(details)}</p>")
+    return "notifications"
+
+
+def _deliver(msg, cfg) -> None:
     try:
         msg.send()
     except ssl.SSLError as e:
@@ -283,4 +348,3 @@ def send(shop, to: str, kind: str, lang: str, **kwargs) -> None:
                        cfg["host"], cfg["port"], e)
         msg.connection = _connection(cfg, swap=True)
         msg.send()
-    logger.info("Shop mail %s → %s (%s)", kind, to, shop.slug)

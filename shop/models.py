@@ -125,6 +125,25 @@ class Shop(models.Model):
     team_lang = models.CharField("Мова сповіщень команді", max_length=2, default="de",
                                  choices=[("de", "Deutsch"), ("en", "English")],
                                  help_text="«Оплату отримано» тощо — email і Telegram з «Налаштування → Сповіщення».")
+    # ── Пошта магазину (shop/mail.py) ──
+    mail_reply_to = models.EmailField(
+        "Відповіді покупців — на адресу", blank=True, default="",
+        help_text="Куди приходять відповіді на листи магазину (Reply-To). Порожньо — на адресу відправника.",
+    )
+    mail_bcc = models.CharField(
+        "Прихована копія листів покупцям", max_length=300, blank=True, default="",
+        help_text="Через кому, напр. archiv@… Копія листів «Ласкаво просимо», «Оплату отримано» тощо; листи з "
+                  "одноразовими посиланнями (підтвердження, новий пароль, запрошення) не копіюються.",
+    )
+    team_emails = models.CharField(
+        "Сповіщення команді — на адреси", max_length=300, blank=True, default="",
+        help_text="Через кому. Оплати, нові акаунти покупців. Порожньо — email з «Налаштування → Сповіщення».",
+    )
+    mail_welcome = models.BooleanField(
+        "Лист «Ласкаво просимо» після підтвердження реєстрації", default=True,
+        help_text="Також коли покупець уперше задає пароль за запрошенням менеджера.",
+    )
+    team_notify_registration = models.BooleanField("Команді: новий акаунт покупця", default=False)
     account_links = models.JSONField(
         "Сторінки кабінету на сайті", default=dict, blank=True,
         help_text="Заповнюється автоматично з запитів сайту: {мова: адреса}. Потрібні для листів з адмінки.",
@@ -540,8 +559,10 @@ class ShopMailTemplate(models.Model):
         ("changed", "Пароль змінено"),
         ("invite", "Запрошення (акаунт створив менеджер)"),
         ("deleted", "Акаунт видалено"),
+        ("welcome", "Ласкаво просимо (акаунт підтверджено)"),
         ("paid", "Оплату отримано — покупцю"),
         ("team_paid", "Оплату отримано — команді (email / Telegram)"),
+        ("team_registered", "Новий акаунт покупця — команді"),
         ("test", "Тестовий лист"),
     ]
     shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="mail_templates", verbose_name="Магазин")

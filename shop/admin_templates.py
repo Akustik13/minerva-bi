@@ -84,7 +84,7 @@ class ShopMailTemplateAdmin(admin.ModelAdmin):
         if not obj or not obj.pk:
             return "Збережіть шаблон, щоб побачити попередній перегляд."
         tpl = {f: getattr(obj, f) for f in TEXT_FIELDS}
-        if obj.kind == "team_paid":
+        if obj.kind in mail.TEAM_KINDS:
             subject = mail._fill(obj.subject, {"shop": mail.public_name(obj.shop), **mail.SAMPLE})
             body = mail._fill(obj.intro, {"shop": mail.public_name(obj.shop), **mail.SAMPLE})
             return format_html('<div><b>{}</b></div><div style="white-space:pre-line;margin-top:6px">{}</div>', subject, body)
@@ -146,7 +146,7 @@ class ShopMailTemplateAdmin(admin.ModelAdmin):
             self.message_user(request, "У вашого користувача Minerva не задано email.", messages.ERROR)
             return back
         try:
-            if t.kind == "team_paid":
+            if t.kind in mail.TEAM_KINDS:
                 subject = mail._fill(t.subject, {"shop": mail.public_name(t.shop), **mail.SAMPLE})
                 body = mail._fill(t.intro, {"shop": mail.public_name(t.shop), **mail.SAMPLE})
                 from django.core.mail import EmailMultiAlternatives
