@@ -305,3 +305,16 @@ class PerShopMediaTests(MediaTestBase):
         self.assertEqual((sites["Test (test)"]["media_enabled"], sites["Test (test)"]["is_test"], sites["Web (webshop)"]["media_enabled"]),
                          (False, True, True))
         self.assertContains(self.client.get("/admin/shop/productmedia/"), "усіх магазинів")
+        # фільтри по магазину: лише його товари, панель — його підсумок і сайт
+        page = self.client.get(f"/admin/shop/productmedia/?shop={test.pk}")
+        self.assertContains(page, "Показано для магазину")
+        self.assertContains(page, "AN-2")
+        self.assertNotContains(page, ">AN-1<")
+        data = self.client.get(f"/admin/shop/productmedia/status/?shop={test.pk}").json()
+        self.assertEqual(([s["name"] for s in data["sites"]], data["summary"]["products"]), (["Test (test)"], 1))
+        from .models import ShopMediaSite
+        img = ProductMedia.objects.get(product=other, kind=IMAGE)
+        ShopMediaSite.objects.create(shop=test, have=[img.sha256])
+        have = self.client.get(f"/admin/shop/productmedia/?shop={test.pk}&onsite=have")
+        missing = self.client.get(f"/admin/shop/productmedia/?shop={test.pk}&onsite=missing")
+        self.assertEqual((have.context["cl"].result_count, missing.context["cl"].result_count), (1, 0))

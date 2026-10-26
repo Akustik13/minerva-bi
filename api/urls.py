@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from . import accounts, media, payments, site_admin
+from . import accounts, media, payments, search, site_admin
 from .views import (
     SalesOrderViewSet, ProductViewSet, CustomerViewSet, StockViewSet, MovementViewSet,
     LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ShopShippingView,
@@ -49,6 +49,7 @@ urlpatterns = [
     path("shop/site-events/", site_admin.SiteEventView.as_view(), name="api-shop-site-events"),
     path("shop/pair/", site_admin.PairView.as_view(), name="api-shop-pair"),
     path("shop/site-mail/", site_admin.SiteMailView.as_view(), name="api-shop-site-mail"),
+    path("shop/search/assist/", search.ShopSearchAssistView.as_view(), name="api-shop-search-assist"),
     path("shop/account/", include(account_urls)),
     path("shop/media/status/", media.MediaStatusView.as_view(), name="api-shop-media-status"),
     path("shop/media/<str:sha>/", media.MediaFileView.as_view(), name="api-shop-media-file"),

@@ -116,11 +116,58 @@ def product_panel(product) -> str:
         reverse("admin:shop_productmedia_changelist"), product.sku)
 
 
+class ShopMediaFilter(admin.SimpleListFilter):
+    """Товари, видимі в асортименті вибраного магазину."""
+    title = "Магазин"
+    parameter_name = "shop"
+
+    def lookups(self, request, model_admin):
+        return [(str(s.pk), f"{s.name} ({s.slug})" + (" 🧪" if s.is_test else ""))
+                for s in Shop.objects.filter(is_active=True).order_by("-is_default", "name")]
+
+    def queryset(self, request, queryset):
+        if self.value() and self.value().isdigit():
+            return queryset.filter(product__shop_listings__shop_id=int(self.value()),
+                                   product__shop_listings__is_visible=True).distinct()
+        return queryset
+
+
+class OnSiteFilter(admin.SimpleListFilter):
+    """Чи забрав сайт копію: для вибраного магазину (фільтр «Магазин») або для будь-якого сайту."""
+    title = "На сайті магазину"
+    parameter_name = "onsite"
+
+    def lookups(self, request, model_admin):
+        return [("have", "✅ сайт забрав"), ("missing", "⏳ ще не забрав"), ("failed", "❌ не вдалося завантажити"),
+                ("none", "— сайту нічого віддавати (немає копії)")]
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+        if value == "none":
+            return queryset.filter(stored="")
+        sites = ShopMediaSite.objects.filter(shop__is_active=True)
+        shop = request.GET.get("shop", "")
+        if shop.isdigit():
+            sites = sites.filter(shop_id=int(shop))
+        have, failed = set(), set()
+        for site in sites:
+            have |= set(site.have or [])
+            failed |= set((site.failed or {}).keys())
+        usable = queryset.exclude(stored="")
+        if value == "have":
+            return usable.filter(sha256__in=have)
+        if value == "failed":
+            return usable.filter(sha256__in=failed)
+        return usable.exclude(sha256__in=have | failed)
+
+
 @admin.register(ProductMedia)
 class ProductMediaAdmin(admin.ModelAdmin):
     change_list_template = "admin/shop/productmedia/change_list.html"
     list_display = ["product_link", "kind", "status_col", "size_col", "checked_at", "site_col", "problem_col"]
-    list_filter = ["kind", "status", "source", "stale"]
+    list_filter = [ShopMediaFilter, OnSiteFilter, "kind", "status", "source", "stale"]
     search_fields = ["product__sku", "product__name"]
     list_select_related = ["product"]
     actions = ["action_check"]
@@ -134,11 +181,17 @@ class ProductMediaAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False   # лише перегляд: стан змінює індексація
 
+    def _selected_shop(self, request):
+        value = request.GET.get("shop", "")
+        return Shop.objects.filter(pk=int(value), is_active=True).first() if value.isdigit() else None
+
     def changelist_view(self, request, extra_context=None):
         self._sites = None   # кеш звітів сайтів на один запит
+        shop = self._selected_shop(request)
         extra_context = {**(extra_context or {}), "media_recheck_choices": RECHECK_CHOICES,
                          "media_shops": Shop.objects.filter(is_active=True).order_by("-is_default", "name"),
-                         "media_progress": media.progress(),
+                         "media_shop": shop,
+                         "media_progress": media.progress(shop),
                          "media_can_manage": request.user.has_perm("shop.change_shop")}
         return super().changelist_view(request, extra_context)
 
@@ -205,7 +258,7 @@ class ProductMediaAdmin(admin.ModelAdmin):
     def _status_view(self, request):
         if not self.has_view_permission(request):
             raise PermissionDenied
-        return JsonResponse(media.progress())
+        return JsonResponse(media.progress(self._selected_shop(request)))
 
     def _run_view(self, request):
         self._manage(request)

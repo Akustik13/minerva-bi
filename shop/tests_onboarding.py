@@ -44,7 +44,7 @@ class RoadmapTests(TestCase):
         s = onboarding.summary(onboarding.steps(self.shop))
         self.assertFalse(s["complete"])
         self.assertEqual(s["next"]["key"], "products")
-        self.assertEqual((s["critical"], s["total"]), (5, 15))
+        self.assertEqual((s["critical"], s["total"]), (5, 16))
         Shop.objects.filter(pk=self.shop.pk).update(is_active=False)
         self.shop.refresh_from_db()
         self.assertEqual(by_key(self.shop)["active"]["state"], onboarding.TODO)

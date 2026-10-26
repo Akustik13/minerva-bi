@@ -335,13 +335,31 @@ def _assistant(shop) -> dict:
                  "Відповіді перевіряє «🧪 Перевірити RAG».", go="assistant_test_col")
 
 
+def _search(shop) -> dict:
+    from . import search_assist
+    if shop.search_assist == Shop.SEARCH_OFF:
+        return _step("search", "Підказки в пошуку", OPTIONAL, SKIP, "вимкнено — звичайний пошук",
+                     "За бажанням: розпізнавання частоти й роз'єму в запиті, схожі товари, кабелі, «часто купують "
+                     "разом» (без AI, безкоштовно) або ще й AI-підказки.", go="search_assist")
+    if shop.search_assist == Shop.SEARCH_AI:
+        problem = search_assist.ai_ready(shop)
+        u = search_assist.usage(shop)
+        detail = f"правила + AI ({shop.search_ai_model}) · сьогодні AI-викликів {u.get('calls', 0)} з {shop.search_ai_daily_limit}"
+        if problem:
+            return _step("search", "Підказки в пошуку", OPTIONAL, WARN, detail,
+                         f"AI-підказки не працюють: {problem}. Сайт показує підказки за правилами.", go="search_col")
+        return _step("search", "Підказки в пошуку", OPTIONAL, DONE, detail, go="search_col")
+    return _step("search", "Підказки в пошуку", OPTIONAL, DONE, "розумний пошук і підказки за правилами (без AI)",
+                 go="search_assist")
+
+
 def steps(shop: Shop) -> list[dict]:
     from . import copying
     pending = set(copying.pending(shop)) if shop.review_fields else set()
     return [_identity(shop, pending), _url(shop, pending), _active(shop), _products(shop), _shipping(shop),
             _payment(shop), _key(shop), _staff(shop), _connected(shop),
             _webhook(shop), _mail(shop), _order(shop),
-            _accounts(shop), _media(shop), _assistant(shop)]
+            _accounts(shop), _media(shop), _assistant(shop), _search(shop)]
 
 
 def summary(items: list[dict]) -> dict:

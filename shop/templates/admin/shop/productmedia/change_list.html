@@ -18,10 +18,12 @@
   #mp .mp-problem { color: #e57373; font-size: 11px; margin-left: 18px; }
   #mp .mp-updated { font-size: 11px; color: var(--body-quiet-color, #999); margin-top: 6px; }
 </style>
-<div class="module" id="mp" data-url="{% url 'admin:shop_productmedia_status' %}"
+<div class="module" id="mp" data-url="{% url 'admin:shop_productmedia_status' %}{% if media_shop %}?shop={{ media_shop.pk }}{% endif %}"
      data-site-sync="{% url 'admin:shop_productmedia_site_sync' 0 %}"
      data-site-toggle="{% url 'admin:shop_productmedia_site_toggle' 0 %}">
   <div class="mp-head"><b>🖼 Фото й даташити для сайту</b> <span id="mp-enabled"></span></div>
+  {% if media_shop %}<div class="mp-line">🏬 Показано для магазину <b>{{ media_shop.name }} ({{ media_shop.slug }})</b>{% if media_shop.is_test %} 🧪{% endif %}:
+    підсумок, сайт і список нижче — лише його товари. <a href="?">Усі магазини →</a></div>{% endif %}
   <p class="mp-help">Для кожного товару магазину: <b>посилання з картки</b> → якщо недоступне, <b>файл у картці Minerva</b>
     → якщо й його немає, сайт показує <b>свій файл</b>. Minerva перевіряє вміст (справжнє фото чи PDF, а не сторінка
     помилки) і зберігає копію; сайт забирає її в свій кеш і віддає відвідувачам зі свого сервера.</p>
@@ -35,7 +37,7 @@
       <label title="Лише товари вибраного магазину; про нові файли дізнається лише його сайт (напр. спершу тестовий, потім справжній)">для:
         <select name="shop">
           <option value="">усіх магазинів</option>
-          {% for s in media_shops %}<option value="{{ s.pk }}">{{ s.name }} ({{ s.slug }}){% if s.is_test %} 🧪{% endif %}</option>{% endfor %}
+          {% for s in media_shops %}<option value="{{ s.pk }}"{% if media_shop and s.pk == media_shop.pk %} selected{% endif %}>{{ s.name }} ({{ s.slug }}){% if s.is_test %} 🧪{% endif %}</option>{% endfor %}
         </select></label>
     </form>
     <form method="post" action="{% url 'admin:shop_productmedia_settings' %}">{% csrf_token %}

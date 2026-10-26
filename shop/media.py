@@ -373,9 +373,9 @@ def ping_sites(background=True, only: Shop | None = None):
 
 # ── Для сторінки й картки товару ───────────────────────────────────────────────
 
-def summary() -> dict:
-    """Підсумок за видами: скільки готово / з файлу / немає / помилок / не перевірено."""
-    products = site_products()
+def summary(shop: Shop | None = None) -> dict:
+    """Підсумок за видами: скільки готово / з файлу / немає / помилок / не перевірено (shop — лише його товари)."""
+    products = shop_products(shop) if shop is not None else site_products()
     n_products = products.count()
     out = {}
     for kind in KINDS:
@@ -395,9 +395,10 @@ def summary() -> dict:
     return out
 
 
-def sites_status() -> list[dict]:
+def sites_status(only: Shop | None = None) -> list[dict]:
     out = []
-    for shop in Shop.objects.filter(is_active=True).order_by("-is_default", "name"):
+    shops = Shop.objects.filter(is_active=True).order_by("-is_default", "name")
+    for shop in shops.filter(pk=only.pk) if only is not None else shops:
         want = wanted(shop)
         site = ShopMediaSite.objects.filter(shop=shop).first()
         have = set(site.have) if site else set()
@@ -413,13 +414,15 @@ def sites_status() -> list[dict]:
     return out
 
 
-def progress() -> dict:
+def progress(shop: Shop | None = None) -> dict:
+    """Стан для панелі; shop — підсумок і сайт лише цього магазину."""
     s = settings_obj()
     run_state = dict(s.run or {})
     if run_state.get("state") == "running" and not is_running(run_state):
         run_state["state"] = "interrupted"
     return {"run": run_state, "enabled": s.enabled, "recheck_days": s.recheck_days,
-            "auto_at": _iso(s.auto_at), "summary": summary(), "sites": sites_status()}
+            "auto_at": _iso(s.auto_at), "summary": summary(shop), "sites": sites_status(shop),
+            "shop": {"id": shop.pk, "name": f"{shop} ({shop.slug})"} if shop is not None else None}
 
 
 def on_site(row: ProductMedia, sites=None) -> list[tuple[str, str]]:

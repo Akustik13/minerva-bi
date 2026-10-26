@@ -16,7 +16,8 @@ from inventory.thumbs import ListingMediaFilter
 
 from . import services
 from .admin_payments import ShopForm, stripe_tools
-from .models import ShippingZone, Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSettings, ShopStaff
+from .models import (ShippingZone, Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSearchQuery, ShopSettings,
+                     ShopStaff)
 from .countries import catalog as country_catalog, name as country_name
 from .shipping import clean_overrides, delivery_label, parse_countries
 
@@ -243,7 +244,8 @@ class ShopAdmin(admin.ModelAdmin):
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     form = ShopForm
-    readonly_fields = ["created_at", "roadmap_col", "keys_col", "connection_col", "zones_tools", "accounts_tools",
+    readonly_fields = ["created_at", "roadmap_col", "search_col", "keys_col", "connection_col", "zones_tools",
+                       "accounts_tools",
                        "mail_tools",
                        "site_mail_col",
                        "stripe_col",
@@ -258,6 +260,15 @@ class ShopAdmin(admin.ModelAdmin):
         }),
         (None, {"fields": ["name", "public_name", "slug", "url", "currency", "is_active", "is_default", "is_test",
                            "test_affects_stock", "media_enabled", "notes"]}),
+        ("🔎 Пошук на сайті", {
+            "classes": ["collapse"],
+            "fields": ["search_assist", "search_ai_model", "search_ai_daily_limit", "search_col"],
+            "description": "Підказки під полем пошуку на сайті. «Правила» — без AI і безкоштовно: розпізнавання частоти, "
+                           "роз'єму й стандарту в запиті, схожі товари, підходящі кабелі, наступник, «часто купують "
+                           "разом». «AI» — ще й рекомендації моделі з каталогу магазину (витрачає токени, з денним "
+                           "лімітом). На сайті підказки можна вимкнути в /admin/ → «Магазин». Будь-який збій — сайт "
+                           "шукає як звичайно.",
+        }),
         ("🚚 Доставка", {
             "fields": ["free_shipping_enabled", "free_shipping_threshold", "zones_tools"],
             "description": "Куди доставляємо — зони внизу сторінки. Зона — правило (ціна, термін доставки, "
@@ -397,6 +408,30 @@ class ShopAdmin(admin.ModelAdmin):
                                if s["warnings"] else "", test)
         return format_html('<a href="{}" style="color:#ff8a80">⛔ критичних {}</a>{}<div class="help">далі: {}</div>', url,
                            s["critical"], test, s["next"]["title"] if s["next"] else "—")
+
+    @admin.display(description="Стан і витрати")
+    def search_col(self, obj):
+        """Режим, готовність AI, токени за сьогодні й загалом, найчастіші запити без результатів."""
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        from . import search_assist
+        from .models import ShopSearchQuery
+        u = search_assist.usage(obj)
+        total = u.get("total") or {}
+        problem = search_assist.ai_ready(obj) if obj.search_assist == obj.SEARCH_AI else ""
+        line = lambda d: (f"викликів {d.get('calls', 0)} · з кешу {d.get('cached', 0)} · помилок {d.get('errors', 0)} · "  # noqa: E731
+                          f"токенів: вхід {d.get('input', 0)}, з кешу промпту {d.get('cache_read', 0)}, "
+                          f"запис у кеш {d.get('cache_write', 0)}, відповідь {d.get('output', 0)}")
+        zero = list(ShopSearchQuery.objects.filter(shop=obj, zero_results__gt=0).order_by("-zero_results", "-last_at")
+                    .values_list("query", "zero_results")[:8])
+        report = reverse("admin:shop_shopsearchquery_changelist") + f"?shop__id__exact={obj.pk}"
+        return format_html(
+            '{}<div>AI сьогодні: {} з {}</div><div style="opacity:.8">AI загалом: {}</div>'
+            '<div style="margin-top:6px">Шукали й не знайшли: {}</div><div style="margin-top:6px"><a href="{}">'
+            '🔎 Усі запити на сайті →</a></div>',
+            format_html('<div style="color:#ff8a80">⚠ {}</div>', problem) if problem else "",
+            line(u), obj.search_ai_daily_limit, line(total),
+            format_html_join(", ", "«{}» ×{}", zero) if zero else "—", report)
 
     @admin.display(description="Пошта сайтів")
     def site_mail_col(self, obj):
@@ -1464,3 +1499,35 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
 from . import admin_accounts  # noqa: E402,F401  — акаунти покупців (особистий кабінет)
 from . import admin_templates  # noqa: E402,F401  — шаблони листів
 from . import admin_media  # noqa: E402,F401  — фото й даташити для сайту
+
+
+
+class _ZeroResultsFilter(admin.SimpleListFilter):
+    title = "Результати"
+    parameter_name = "zero"
+
+    def lookups(self, request, model_admin):
+        return [("1", "Шукали й не знайшли"), ("0", "Знаходили")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "1":
+            return queryset.filter(zero_results__gt=0)
+        if self.value() == "0":
+            return queryset.filter(zero_results=0)
+        return queryset
+
+
+@admin.register(ShopSearchQuery)
+class ShopSearchQueryAdmin(admin.ModelAdmin):
+    """Що шукають на сайтах магазинів (shop/search_assist.py) — лише текст запиту й лічильники."""
+    list_display = ["query", "shop", "searches", "zero_results", "last_results", "last_at"]
+    list_filter = ["shop", _ZeroResultsFilter]
+    search_fields = ["query"]
+    ordering = ["-searches"]
+    readonly_fields = ["shop", "query", "searches", "zero_results", "last_results", "first_at", "last_at"]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

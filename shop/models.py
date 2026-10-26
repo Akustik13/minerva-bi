@@ -115,6 +115,28 @@ class Shop(models.Model):
     media_enabled = models.BooleanField(
         "Сайт отримує фото й даташити з Minerva", default=True,
         help_text="Окремо для кожного магазину; спільний перемикач — «🖼 Фото й даташити».")
+    SEARCH_OFF, SEARCH_RULES, SEARCH_AI = "off", "rules", "ai"
+    SEARCH_CHOICES = [
+        (SEARCH_OFF, "Вимкнено — звичайний пошук"),
+        (SEARCH_RULES, "Розумний пошук + підказки за правилами (без AI, безкоштовно)"),
+        (SEARCH_AI, "Розумний пошук + правила + AI-підказки (витрачає токени)"),
+    ]
+    SEARCH_MODELS = [("claude-opus-5-5", "Claude Opus 5.5 — найкраща якість"),
+                     ("claude-sonnet-5-5", "Claude Sonnet 5.5 — швидше й дешевше"),
+                     ("claude-haiku-5-5", "Claude Haiku 5.5 — найшвидше й найдешевше")]
+    search_assist = models.CharField(
+        "Підказки в пошуку на сайті", max_length=10, choices=SEARCH_CHOICES, default=SEARCH_OFF,
+        help_text="Розумний пошук розпізнає частоту, роз'єм і стандарт у запиті, показує схожі товари, "
+                  "підходящі кабелі й «часто купують разом». AI-підказки — ще й рекомендації моделі з каталогу "
+                  "магазину. Будь-який збій — сайт шукає як звичайно.")
+    search_ai_model = models.CharField("AI-модель підказок", max_length=40, choices=SEARCH_MODELS,
+                                       default="claude-opus-5-5")
+    search_ai_daily_limit = models.PositiveIntegerField(
+        "AI-підказок на добу (максимум)", default=200,
+        help_text="Після ліміту сайт до кінця доби показує лише підказки за правилами. Повторні запити — з кешу, "
+                  "у ліміт не входять.")
+    search_ai_usage = models.JSONField("Витрати AI-підказок", default=dict, blank=True,
+                                       help_text="Лічильники за сьогодні й загалом: виклики, кеш, токени.")
     free_shipping_enabled = models.BooleanField(
         "Безкоштовна доставка", default=False,
         help_text="Доставка безкоштовна, коли сума товарів (нетто) досягає порогу. Діє в регіонах, де це дозволено.",
@@ -818,3 +840,23 @@ class ShopSiteEvent(models.Model):
 
     def __str__(self):
         return f"{self.at:%d.%m.%Y %H:%M} · {self.site} · {self.user} · {self.action}"
+
+
+class ShopSearchQuery(models.Model):
+    """Що шукають на сайті магазину (без персональних даних: лише текст запиту й лічильники)."""
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="search_queries", verbose_name="Магазин")
+    query = models.CharField("Запит", max_length=100)
+    searches = models.PositiveIntegerField("Пошуків", default=0)
+    zero_results = models.PositiveIntegerField("Без результатів", default=0)
+    last_results = models.PositiveIntegerField("Знайдено востаннє", default=0)
+    first_at = models.DateTimeField("Вперше", auto_now_add=True)
+    last_at = models.DateTimeField("Востаннє", auto_now=True)
+
+    class Meta:
+        verbose_name = "Пошук на сайті"
+        verbose_name_plural = "🔎 Пошук на сайті"
+        ordering = ["-last_at"]
+        constraints = [models.UniqueConstraint(fields=["shop", "query"], name="shop_search_query_unique")]
+
+    def __str__(self):
+        return self.query
