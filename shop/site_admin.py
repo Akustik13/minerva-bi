@@ -101,9 +101,9 @@ def pair(code: str, site_url: str, minerva_url: str) -> dict:
     """Сайт обмінює код на ключ API магазину й вебхук на свою адресу. Попередні ключі, видані цьому сайту
     кодом, вимикаються (ключі, створені вручну, не чіпаються)."""
     from api.models import APIKey, Webhook, _webhook_secret
+    # без select_related: PostgreSQL не дозволяє FOR UPDATE разом з LEFT JOIN на необов'язковий created_by
     p = (ShopPairing.objects.select_for_update()
-         .filter(code_hash=_code_hash(code), used_at__isnull=True, expires_at__gt=timezone.now())
-         .select_related("shop", "created_by").first())
+         .filter(code_hash=_code_hash(code), used_at__isnull=True, expires_at__gt=timezone.now()).first())
     if p is None:
         raise SiteAdminError("invalid_code", "Код недійсний, уже використаний або протермінований — створіть новий "
                                              "у Minerva (картка магазину → «🔗 Підключити сайт»).", 400)
