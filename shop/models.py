@@ -119,9 +119,9 @@ class Shop(models.Model):
     SEARCH_CHOICES = [
         (SEARCH_OFF, "Вимкнено — звичайний пошук"),
         (SEARCH_RULES, "Розумний пошук + підказки за правилами (без AI, безкоштовно)"),
-        (SEARCH_AI, "Розумний пошук + правила + AI-підказки (витрачає токени)"),
-        (SEARCH_RAG, "Розумний пошук + правила + AI-підказки RAG (наш RAG, за даташитами)"),
-        (SEARCH_AI_RAG, "Розумний пошук + правила + AI-підказки і RAG разом (для порівняння)"),
+        (SEARCH_AI, "Розумний пошук + правила + AI-підказки Claude (платно — ключ Anthropic у Minerva)"),
+        (SEARCH_RAG, "Розумний пошук + правила + AI-підказки RAG (наш RAG; платно лише з хмарною моделлю в RAG)"),
+        (SEARCH_AI_RAG, "Розумний пошук + правила + Claude і RAG разом (для порівняння; блок Claude платний)"),
     ]
     SEARCH_WITH_AI = {SEARCH_AI, SEARCH_AI_RAG}
     SEARCH_WITH_RAG = {SEARCH_RAG, SEARCH_AI_RAG}

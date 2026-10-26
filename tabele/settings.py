@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import tempfile
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -8,6 +9,16 @@ DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = ['*']
 # ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 LABELS_DIR = BASE_DIR / 'media' / 'labels'
+
+# Кеш: "default" — у пам'яті кожного процесу (як раніше); "shared" (core.shared_cache) — спільний для обох процесів
+# gunicorn: завдання RAG і відповіді AI в пошуку сайту, блокування входу в адмінку сайту. Файли в тимчасовій теці
+# контейнера — після перезапуску порожньо.
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "shared": {"BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+               "LOCATION": os.path.join(tempfile.gettempdir(), "minerva-shared-cache"),
+               "OPTIONS": {"MAX_ENTRIES": 5000}},
+}
 
 
 # DigiKey OAuth redirect URI (override для локального тестування)

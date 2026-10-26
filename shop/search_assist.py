@@ -22,7 +22,7 @@ import re
 import time
 from datetime import timedelta
 
-from django.core.cache import cache
+from core.shared_cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q
 from django.utils import timezone
@@ -147,7 +147,7 @@ def usage(shop: Shop) -> dict:
     u = dict(shop.search_ai_usage or {})
     if u.get("day") != timezone.localdate().isoformat():
         u = {"day": timezone.localdate().isoformat(), "total": u.get("total") or {},
-             **({"ai_problem": u["ai_problem"]} if u.get("ai_problem") else {})}
+             **{k: u[k] for k in ("ai_problem", "rag_model") if u.get(k)}}
     return u
 
 
@@ -166,8 +166,8 @@ def spent(d: dict) -> str:
     return f"${value:.4f}" if value < 1 else f"${value:.2f}"
 
 
-def _count(shop: Shop, problem=None, **inc) -> None:
-    """+inc до лічильників; problem — записати збій AI, False — зняти (успішний виклик)."""
+def _count(shop: Shop, problem=None, rag_model=None, **inc) -> None:
+    """+inc до лічильників; problem — записати збій AI, False — зняти (успішний виклик); rag_model — чим відповів RAG."""
     with transaction.atomic():
         raw = Shop.objects.select_for_update().values_list("search_ai_usage", flat=True).get(pk=shop.pk)
         shop.search_ai_usage = raw or {}
@@ -186,6 +186,8 @@ def _count(shop: Shop, problem=None, **inc) -> None:
             u["ai_problem"] = problem
         elif problem is False:
             u.pop("ai_problem", None)
+        if rag_model:
+            u["rag_model"] = rag_model
         Shop.objects.filter(pk=shop.pk).update(search_ai_usage=u)
         shop.search_ai_usage = u
 
@@ -473,8 +475,12 @@ def _rag_poll(shop: Shop, settings, key: str, digest: str, job: dict) -> dict:
         finish(_EMPTY, RAG_EMPTY_CACHE)
         _count(shop, rag_errors=1)
         return {"status": "unavailable", "tips": []}
-    item = _rag_result(data.get("result") or {})
+    result = data.get("result") or {}
+    item = _rag_result(result)
     finish(item, RAG_CACHE if item["items"] else RAG_EMPTY_CACHE)
+    if result.get("provider") or result.get("model"):   # чим RAG відповідав: локально чи хмарою (платно)
+        _count(shop, rag_model={"provider": str(result.get("provider") or "")[:40],
+                                "model": str(result.get("model") or "")[:80], "at": timezone.now().isoformat()})
     return _rag_out(shop, item, cached=False)
 
 
@@ -532,6 +538,30 @@ def rag_tips(shop: Shop, q, lang: str = "") -> dict:
     _set_active(digest, True)
     _count(shop, rag_calls=1)
     return {"status": "pending", "tips": []}
+
+
+RAG_LOCAL = {"ollama"}   # постачальники RAG, що працюють на самому RAG-ПК (без оплати)
+
+
+def rag_is_local(shop: Shop) -> bool:
+    m = usage(shop).get("rag_model")
+    return isinstance(m, dict) and m.get("provider") in RAG_LOCAL
+
+
+def rag_model_text(shop: Shop) -> str:
+    """Чим RAG відповідав востаннє (з результату завдання) і чи це платно; '' — ще не відповідав."""
+    m = usage(shop).get("rag_model")
+    if not isinstance(m, dict) or not (m.get("provider") or m.get("model")):
+        return ""
+    from django.utils.dateparse import parse_datetime
+    provider, model = m.get("provider") or "?", m.get("model") or "?"
+    at = parse_datetime(str(m.get("at") or ""))
+    when = f" · останнє завдання {timezone.localtime(at):%d.%m %H:%M}" if at else ""
+    if provider in RAG_LOCAL:
+        return f"RAG відповідає: {provider} / {model} — локальна модель на RAG-ПК, без оплати{when}"
+    return (f"⚠ RAG відповідає: {provider} / {model} — хмарна модель: кожна RAG-підказка оплачується ключем "
+            f"{provider} на RAG-ПК (не ключем Minerva, у витратах вище не враховано). Безкоштовно — RAG Documents → "
+            f"Налаштування → постачальник ollama (qwen2.5:7b){when}")
 
 
 def rag_ready(shop: Shop) -> str:

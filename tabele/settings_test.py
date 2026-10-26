@@ -20,3 +20,6 @@ DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memor
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 WEBHOOKS_SYNC = True  # вебхуки в тестах відправляються без фонового потоку
 SHOP_MAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"  # листи кабінету покупців
+# спільний кеш у тестах — той самий LocMem, що й default (однакова LOCATION): cache.clear() очищає обидва
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+          "shared": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}

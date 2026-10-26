@@ -350,7 +350,10 @@ def _search(shop) -> dict:
             if search_assist.ai_ready(shop):
                 problems.append("AI-підказки: " + search_assist.ai_ready(shop))
         if shop.search_assist in Shop.SEARCH_WITH_RAG:
-            parts.append(f"RAG (сьогодні {u.get('rag_calls', 0)} з {shop.search_ai_daily_limit})")
+            m = u.get("rag_model") if isinstance(u.get("rag_model"), dict) else {}
+            model = f"{m.get('provider')} / {m.get('model')}, " if m.get("provider") else ""
+            paid = "" if not m.get("provider") or search_assist.rag_is_local(shop) else "платно — ключ RAG, "
+            parts.append(f"RAG ({model}{paid}сьогодні {u.get('rag_calls', 0)} з {shop.search_ai_daily_limit})")
             if search_assist.rag_ready(shop):
                 problems.append("RAG-підказки: " + search_assist.rag_ready(shop))
         detail = " + ".join(parts)

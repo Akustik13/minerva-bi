@@ -160,6 +160,7 @@ class SearchAssistTests(TestCase):
         self.assertContains(page, "«rp-sma 2,4 ghz» ×1")
         self.assertContains(page, "RAG сьогодні")
         self.assertContains(page, "витрачено ≈ $0.0000")
+        self.assertContains(page, "<li><b>AI-підказки RAG</b>")      # пояснення режимів — HTML, не екрановано
         report = self.client.get("/admin/shop/shopsearchquery/?zero=1")
         self.assertContains(report, "rp-sma 2,4 ghz")
 
@@ -201,8 +202,8 @@ class RagTipsTests(TestCase):
                   "| AN-BLE | 2,4 GHz |\n- **HIDDEN** — versteckt\n- NOPE-123 — erfunden\n"
                   "Dazu passt das Kabel CA-MHF1 mit MHF1-Stecker.")
         self.rag.job.return_value = {"status": "completed", "result": {
-            "answer": answer, "products": [{"product": "AN-BLE", "source": "a.pdf", "page": 2},
-                                           {"product": "NOPE-123"}, {"sku": "HIDDEN"}]}}
+            "answer": answer, "provider": "anthropic", "model": "claude-opus-5",
+            "products": [{"product": "AN-BLE", "source": "a.pdf", "page": 2}, {"product": "NOPE-123"}, {"sku": "HIDDEN"}]}}
         d = self.get("ble and gnss", poll="1")["rag"]
         self.assertEqual((d["status"], d["cached"]), ("ok", False))
         self.assertEqual(d["tips"], [{"sku": "AN-BLE", "reason": "Dualband-Antenne für Bluetooth und GNSS L1."},
@@ -215,6 +216,16 @@ class RagTipsTests(TestCase):
         self.shop.refresh_from_db()
         u = self.shop.search_ai_usage
         self.assertEqual((u["rag_calls"], u["rag_cached"]), (1, 1))
+        self.assertEqual((u["rag_model"]["provider"], u["rag_model"]["model"]), ("anthropic", "claude-opus-5"))
+        self.assertFalse(search_assist.rag_is_local(self.shop))
+        self.assertIn("оплачується ключем anthropic на RAG-ПК", search_assist.rag_model_text(self.shop))
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
+        self.assertContains(self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/"), "RAG відповідає: anthropic / claude-opus-5")
+        search_assist._count(self.shop, rag_model={"provider": "ollama", "model": "qwen2.5:7b"})
+        self.assertTrue(search_assist.rag_is_local(self.shop))
+        self.assertIn("без оплати", search_assist.rag_model_text(self.shop))
 
     def test_busy_parallel_failure_and_modes(self):
         from rag_assistant.client import RagError
@@ -250,6 +261,14 @@ class RagTipsTests(TestCase):
         step = [x for x in steps(self.shop) if x["key"] == "search"][0]
         self.assertEqual(step["state"], "warn")
         self.assertIn("RAG-підказки", step["hint"])
+
+    def test_shared_cache_in_production_settings(self):
+        """Обидва процеси gunicorn мають бачити ті самі завдання RAG і кеш AI — не кеш у пам'яті процесу."""
+        import importlib
+        prod = importlib.import_module("tabele.settings")
+        self.assertTrue(prod.CACHES["shared"]["BACKEND"].endswith("FileBasedCache"))
+        from core.shared_cache import cache as shared
+        self.assertIs(search_assist.cache, shared)
 
     def test_abandoned_job_frees_queue(self):
         self.rag.job.return_value = {"status": "running"}

@@ -263,13 +263,20 @@ class ShopAdmin(admin.ModelAdmin):
         ("🔎 Пошук на сайті", {
             "classes": ["collapse"],
             "fields": ["search_assist", "search_ai_model", "search_ai_daily_limit", "search_col"],
-            "description": "Підказки під полем пошуку на сайті. «Правила» — без AI і безкоштовно: розпізнавання частоти, "
-                           "роз'єму й стандарту в запиті, схожі товари, підходящі кабелі, наступник, «часто купують "
-                           "разом». «AI» — ще й рекомендації моделі з каталогу магазину (витрачає токени, з денним "
-                           "лімітом). «RAG» — рекомендації нашого RAG за даташитами (адреса й ключ — «📚 Помічник по "
-                           "продукції»; без токенів Anthropic, відповідь за 5–20 с, з'являється окремим блоком). "
-                           "«AI і RAG разом» — обидва блоки, щоб порівняти. На сайті підказки можна вимкнути в "
-                           "/admin/ → «Магазин». Будь-який збій — сайт шукає як звичайно.",
+            "description": "Підказки під полем пошуку на сайті. Будь-який збій — сайт шукає як звичайно; на сайті "
+                           "підказки можна вимкнути в /admin/ → «Магазин».<ul style='margin:6px 0 0 18px'>"
+                           "<li><b>Правила</b> — без AI, безкоштовно: частота, роз'єм і стандарт у запиті, схожі "
+                           "товари, кабелі, наступник, «часто купують разом».</li>"
+                           "<li><b>AI-підказки Claude</b> — Minerva питає Claude з каталогом магазину ключем Anthropic "
+                           "з «Minerva AI → Налаштування». Платно (рахунок у Claude Console), з денним лімітом; "
+                           "витрати — нижче.</li>"
+                           "<li><b>AI-підказки RAG</b> — Minerva до Anthropic не звертається: запит іде до нашого RAG "
+                           "(адреса й ключ — «📚 Помічник по продукції»), відповідь за даташитами за 5–20 с. Платно чи ні, "
+                           "вирішує модель на RAG-ПК (RAG Documents → Налаштування): <b>ollama</b> (qwen2.5:7b) — "
+                           "локально й безкоштовно; <b>anthropic / openai</b> — платить RAG своїм ключем. Чим RAG "
+                           "відповідав востаннє — рядок «RAG відповідає» нижче.</li>"
+                           "<li><b>Claude і RAG разом</b> — обидва блоки, щоб порівняти; блок Claude платний завжди."
+                           "</li></ul>",
         }),
         ("🚚 Доставка", {
             "fields": ["free_shipping_enabled", "free_shipping_threshold", "zones_tools"],
@@ -422,6 +429,8 @@ class ShopAdmin(admin.ModelAdmin):
         total = u.get("total") or {}
         problem = search_assist.ai_ready(obj) if obj.search_assist in obj.SEARCH_WITH_AI else ""
         rag_problem = search_assist.rag_ready(obj) if obj.search_assist in obj.SEARCH_WITH_RAG else ""
+        rag_model = search_assist.rag_model_text(obj)
+        rag_paid = rag_model and not search_assist.rag_is_local(obj)
         rag_line = lambda d: (f"завдань {d.get('rag_calls', 0)} · з кешу {d.get('rag_cached', 0)} · "  # noqa: E731
                               f"RAG зайнятий {d.get('rag_busy', 0)} · помилок {d.get('rag_errors', 0)}")
         line = lambda d: (f"викликів {d.get('calls', 0)} · з кешу {d.get('cached', 0)} · помилок {d.get('errors', 0)} · "  # noqa: E731
@@ -436,13 +445,15 @@ class ShopAdmin(admin.ModelAdmin):
             '<div style="opacity:.65;font-size:.9em">≈ за цінами Anthropic API для моделі, що відповіла, без ПДВ; '
             'точна сума за всі AI-функції Minerva — Claude Console → Usage / Cost. RAG-підказки токенів Anthropic '
             'не витрачають.</div>'
-            '<div style="margin-top:6px">RAG сьогодні: {} з {}</div><div style="opacity:.8">RAG загалом: {}</div>'
+            '<div style="margin-top:6px">RAG сьогодні: {} з {}</div><div style="opacity:.8">RAG загалом: {}</div>{}'
             '<div style="margin-top:6px">Шукали й не знайшли: {}</div><div style="margin-top:6px"><a href="{}">'
             '🔎 Усі запити на сайті →</a></div>',
             format_html('<div style="color:#ff8a80">⚠ AI: {}</div>', problem) if problem else "",
             format_html('<div style="color:#ff8a80">⚠ RAG: {}</div>', rag_problem) if rag_problem else "",
             line(u), obj.search_ai_daily_limit, line(total),
             rag_line(u), obj.search_ai_daily_limit, rag_line(total),
+            format_html('<div style="color:{}">{}</div>', "#ffb74d" if rag_paid else "inherit", rag_model)
+            if rag_model else "",
             format_html_join(", ", "«{}» ×{}", zero) if zero else "—", report)
 
     @admin.display(description="Пошта сайтів")
