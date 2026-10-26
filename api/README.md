@@ -180,6 +180,7 @@
 3. Замовлення створюється атомарно → склад списується/бронюється за правилами **Налаштувань складу** (при створенні / при відправці / бронювання), клієнт автоматично з'являється в CRM, приходить сповіщення (email/Telegram).
 4. `total_price` рахується з рядків, якщо не передано.
 5. **Ідемпотентність:** повторний POST з тим самим `source + order_number` не створює дубль — повертає існуюче замовлення з `"created": false` і кодом `200`. Тому магазин може безпечно повторювати запит при таймауті.
+6. **Замовлення інтернет-магазину** (`"shop": true`): Minerva дає своє `order_number` — `PO-<Kundennummer>-NNN` (Kundennummer — одна на клієнта CRM, з 31728, `shop/numbering.py`); номер сайту зберігається як `ShopOrder.site_ref`, повтор з ним повертає те саме замовлення. Сайт бере номер з відповіді (листи, оплата); оплата й кабінет приймають і номер сайту.
 
 Відповідь `201`: повне замовлення з `lines`, `shipments` і `"created": true`.
 
@@ -615,7 +616,8 @@ app.listen(3000);
 | `GET / PATCH / DELETE shop/account/me/` | профіль (`company, name, phone, vat_id, address{…}, shipping{separate, …}, lang, orders_count, cart_count`); `DELETE {password}` — видалити акаунт (замовлення лишаються) |
 | `POST shop/account/me/password/` | `{current_password, new_password}`; інші сесії завершуються |
 | `GET shop/account/me/orders/` | `{count, results[{number, kind: order\|quote, date, status, payment_method, payment_status, currency, net, shipping, vat_rate, vat, gross, items, tracking[{carrier, number, url, status}]}]}` |
-| `GET shop/account/me/orders/{number}/` | + `lines[{sku, name, name_en, qty, unit_price, total}]`, `shipping_address`, `billing`, `dates{received, shipped, delivered}`, `offer` (надісланий Angebot для запиту) |
+| `GET shop/account/me/orders/{number}/` | + `lines[{sku, name, name_en, qty, unit_price, total}]`, `shipping_address`, `billing`, `dates{received, shipped, delivered}`, `offer` (надісланий Angebot для запиту), `documents[{kind: OC\|PI\|CI\|PL, title, name, number, size, date}]` (PDF з теки замовлення, які створила Minerva), `doc_numbers` |
+| `GET shop/account/me/orders/{number}/documents/{name}/` | PDF документа зі списку `documents` (інші файли теки — 404) |
 | `GET / PUT shop/account/me/cart/` | `{items: {sku: qty}}` (ключі `rq:<артикул>` — запит ціни), до 100 позицій |
 
 Акаунт може створити й менеджер (адмінка «➕ Додати»): без пароля, лист-запрошення з `link#reset=<token>` (7 днів, `accounts.send_invite`); встановлення пароля підтверджує email.
