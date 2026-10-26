@@ -425,6 +425,7 @@ class ShopAdmin(admin.ModelAdmin):
         rag_line = lambda d: (f"завдань {d.get('rag_calls', 0)} · з кешу {d.get('rag_cached', 0)} · "  # noqa: E731
                               f"RAG зайнятий {d.get('rag_busy', 0)} · помилок {d.get('rag_errors', 0)}")
         line = lambda d: (f"викликів {d.get('calls', 0)} · з кешу {d.get('cached', 0)} · помилок {d.get('errors', 0)} · "  # noqa: E731
+                          f"витрачено ≈ {search_assist.spent(d)} · "
                           f"токенів: вхід {d.get('input', 0)}, з кешу промпту {d.get('cache_read', 0)}, "
                           f"запис у кеш {d.get('cache_write', 0)}, відповідь {d.get('output', 0)}")
         zero = list(ShopSearchQuery.objects.filter(shop=obj, zero_results__gt=0).order_by("-zero_results", "-last_at")
@@ -432,6 +433,9 @@ class ShopAdmin(admin.ModelAdmin):
         report = reverse("admin:shop_shopsearchquery_changelist") + f"?shop__id__exact={obj.pk}"
         return format_html(
             '{}{}<div>AI сьогодні: {} з {}</div><div style="opacity:.8">AI загалом: {}</div>'
+            '<div style="opacity:.65;font-size:.9em">≈ за цінами Anthropic API для моделі, що відповіла, без ПДВ; '
+            'точна сума за всі AI-функції Minerva — Claude Console → Usage / Cost. RAG-підказки токенів Anthropic '
+            'не витрачають.</div>'
             '<div style="margin-top:6px">RAG сьогодні: {} з {}</div><div style="opacity:.8">RAG загалом: {}</div>'
             '<div style="margin-top:6px">Шукали й не знайшли: {}</div><div style="margin-top:6px"><a href="{}">'
             '🔎 Усі запити на сайті →</a></div>',

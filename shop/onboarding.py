@@ -345,7 +345,8 @@ def _search(shop) -> dict:
         u = search_assist.usage(shop)
         parts, problems = ["правила"], []
         if shop.search_assist in Shop.SEARCH_WITH_AI:
-            parts.append(f"AI ({shop.search_ai_model}, сьогодні {u.get('calls', 0)} з {shop.search_ai_daily_limit})")
+            parts.append(f"AI ({shop.search_ai_model}, сьогодні {u.get('calls', 0)} з {shop.search_ai_daily_limit}, "
+                         f"≈ {search_assist.spent(u)})")
             if search_assist.ai_ready(shop):
                 problems.append("AI-підказки: " + search_assist.ai_ready(shop))
         if shop.search_assist in Shop.SEARCH_WITH_RAG:

@@ -85,10 +85,60 @@ class SearchAssistTests(TestCase):
         self.shop.refresh_from_db()
         u = self.shop.search_ai_usage
         self.assertEqual((u["calls"], u["cached"], u["input"], u["cache_read"], u["output"]), (1, 1, 5000, 4800, 60))
+        # Opus 5.5: 5000 × $4 + 4800 × $0,20 + 60 × $20 за 1 млн токенів = $0,02216
+        self.assertEqual((u["cost_musd"], u["total"]["cost_musd"]), (22160, 22160))
+        self.assertEqual(search_assist.spent(u), "$0.0222")
         self.c.get(URL, {"q": "gnss", "n": "1", "skus": "AN-GNSS", "ai": "1"})
         limited = self.c.get(URL, {"q": "kabel sma", "n": "1", "skus": "", "ai": "1"}).json()
         self.assertEqual(limited["ai"]["status"], "limit")   # денний ліміт — лише правила
         self.assertEqual(ShopSearchQuery.objects.get(query="868 mhz").searches, 1)   # log=0 — не рахується
+
+    @mock.patch("shop.search_assist._call")
+    def test_ai_problem_shown_until_success(self, call):
+        """Anthropic відмовив (немає кредитів) → зрозуміла причина в картці; успішний виклик її знімає."""
+        class ApiError(Exception):
+            def __init__(self, status, kind, message):
+                super().__init__(message)
+                self.status_code, self.message = status, message
+                self.body = {"type": "error", "error": {"type": kind, "message": message}}
+
+        Shop.objects.filter(pk=self.shop.pk).update(search_assist=Shop.SEARCH_AI)
+        self.shop.refresh_from_db()
+        key = mock.patch("strategy.models.AISettings.get", return_value=SimpleNamespace(anthropic_api_key="test"))
+        key.start()
+        self.addCleanup(key.stop)
+        call.side_effect = ApiError(400, "invalid_request_error", "Your credit balance is too low to access the API.")
+        self.assertEqual(self.c.get(URL, {"q": "868 mhz", "n": "0", "ai": "1"}).json()["ai"]["status"], "unavailable")
+        self.shop.refresh_from_db()
+        self.assertEqual(self.shop.search_ai_usage["ai_problem"]["code"], "billing")
+        self.assertIn("закінчились кредити", search_assist.ai_ready(self.shop))
+        from .onboarding import steps
+        step = [x for x in steps(self.shop) if x["key"] == "search"][0]
+        self.assertEqual(step["state"], "warn")
+        self.assertIn("Credits kaufen", step["hint"])
+        self.assertEqual(search_assist.problem_of(ApiError(402, "billing_error", "x"))["code"], "billing")
+        self.assertEqual(search_assist.problem_of(ApiError(401, "authentication_error", "x"))["code"], "auth")
+        self.assertEqual(search_assist.problem_of(ApiError(404, "not_found_error", "x"))["code"], "model")
+        self.assertEqual(search_assist.problem_of(TimeoutError("timed out"))["code"], "unavailable")
+        cache.delete(f"shop-search-ai-down:{self.shop.pk}")       # минуло 5 хв, кредити поповнили
+        call.side_effect, call.return_value = None, fake_response([{"sku": "CA-MHF1", "reason": "Kabel."}])
+        self.assertEqual(self.c.get(URL, {"q": "868 mhz", "n": "0", "ai": "1"}).json()["ai"]["status"], "ok")
+        self.shop.refresh_from_db()
+        self.assertNotIn("ai_problem", self.shop.search_ai_usage)
+        self.assertEqual(search_assist.ai_ready(self.shop), "")
+
+    def test_cost_backfill_and_models(self):
+        """Лічильники без вартості (до оновлення) — оцінка за поточною моделлю; ціна — моделі, що відповіла."""
+        self.assertAlmostEqual(search_assist.cost_usd("claude-sonnet-5-5", input=1_000_000, output=100_000), 3.0)
+        self.assertAlmostEqual(search_assist.cost_usd("claude-haiku-5-5", cache_write=1_000_000), 0.125)
+        self.assertEqual(search_assist.cost_usd("unknown-model", input=10), 0.0)
+        Shop.objects.filter(pk=self.shop.pk).update(search_ai_model="claude-sonnet-5-5", search_ai_usage={
+            "total": {"calls": 3, "input": 1_000_000, "output": 0}})
+        self.shop.refresh_from_db()
+        search_assist._count(self.shop, calls=1, input=1000, cost_musd=4000)
+        total = self.shop.search_ai_usage["total"]
+        self.assertEqual((total["calls"], total["cost_musd"]), (4, 2_004_000))   # $2 оцінка + $0,004
+        self.assertEqual(search_assist.spent(total), "$2.00")
 
     @mock.patch("shop.search_assist._call", side_effect=RuntimeError("no_api_key"))
     def test_ai_failure_falls_back(self, call):
@@ -109,6 +159,7 @@ class SearchAssistTests(TestCase):
         self.assertContains(page, "🔎 Пошук на сайті")
         self.assertContains(page, "«rp-sma 2,4 ghz» ×1")
         self.assertContains(page, "RAG сьогодні")
+        self.assertContains(page, "витрачено ≈ $0.0000")
         report = self.client.get("/admin/shop/shopsearchquery/?zero=1")
         self.assertContains(report, "rp-sma 2,4 ghz")
 

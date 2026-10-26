@@ -41,6 +41,11 @@ AI_MAX_TOKENS = 4000         # коротка JSON-відповідь + розд
 TOGETHER_CACHE = 3600
 TOGETHER_MIN = 2             # «часто» — щонайменше у двох замовленнях разом
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5"}
+# Ціни Anthropic API, $ за 1 млн токенів: запит, відповідь, читання кешу (запис у кеш на 5 хв = 1,25 × запит).
+# Haiku 5.5 — для запитів до 100K токенів (каталог магазину значно менший).
+PRICES = {"claude-opus-5-5": (4.0, 20.0, 0.20), "claude-sonnet-5-5": (2.0, 10.0, 0.20),
+          "claude-haiku-5-5": (0.10, 0.50, 0.01)}
+TOKEN_KEYS = ("input", "output", "cache_read", "cache_write")
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 LANGS = {"de": "Deutsch", "en": "English", "uk": "Українська", "ar": "العربية", "es": "Español", "fr": "Français",
          "it": "Italiano", "ja": "日本語", "ko": "한국어", "tr": "Türkçe", "zh": "中文"}
@@ -138,23 +143,49 @@ def catalog_text(shop: Shop) -> tuple[str, set]:
 
 
 def usage(shop: Shop) -> dict:
-    """Лічильники за сьогодні (обнуляються з новою добою) і загалом (total)."""
+    """Лічильники за сьогодні (обнуляються з новою добою), загалом (total) і останній збій AI (ai_problem)."""
     u = dict(shop.search_ai_usage or {})
     if u.get("day") != timezone.localdate().isoformat():
-        u = {"day": timezone.localdate().isoformat(), "total": u.get("total") or {}}
+        u = {"day": timezone.localdate().isoformat(), "total": u.get("total") or {},
+             **({"ai_problem": u["ai_problem"]} if u.get("ai_problem") else {})}
     return u
 
 
-def _count(shop: Shop, **inc) -> None:
+def cost_usd(model, input=0, output=0, cache_read=0, cache_write=0) -> float:
+    """Вартість одного виклику за цінами Anthropic API (без ПДВ); невідома модель — 0."""
+    price = next((p for m, p in PRICES.items() if str(model or "").startswith(m)), None)
+    if price is None:
+        return 0.0
+    inp, out, read = price
+    return (input * inp + cache_write * inp * 1.25 + cache_read * read + output * out) / 1_000_000
+
+
+def spent(d: dict) -> str:
+    """Витрачено, $ — з лічильника cost_musd (мільйонні долара)."""
+    value = int((d or {}).get("cost_musd") or 0) / 1_000_000
+    return f"${value:.4f}" if value < 1 else f"${value:.2f}"
+
+
+def _count(shop: Shop, problem=None, **inc) -> None:
+    """+inc до лічильників; problem — записати збій AI, False — зняти (успішний виклик)."""
     with transaction.atomic():
         raw = Shop.objects.select_for_update().values_list("search_ai_usage", flat=True).get(pk=shop.pk)
         shop.search_ai_usage = raw or {}
         u = usage(shop)
         total = dict(u.get("total") or {})
+        if "cost_musd" in inc:   # лічильники до обліку вартості — оцінка за поточною моделлю
+            for d in (u, total):
+                if "cost_musd" not in d and any(d.get(k) for k in TOKEN_KEYS):
+                    d["cost_musd"] = round(cost_usd(shop.search_ai_model,
+                                                    **{k: int(d.get(k) or 0) for k in TOKEN_KEYS}) * 1_000_000)
         for k, v in inc.items():
             u[k] = int(u.get(k) or 0) + int(v or 0)
             total[k] = int(total.get(k) or 0) + int(v or 0)
         u["total"] = total
+        if problem:
+            u["ai_problem"] = problem
+        elif problem is False:
+            u.pop("ai_problem", None)
         Shop.objects.filter(pk=shop.pk).update(search_ai_usage=u)
         shop.search_ai_usage = u
 
@@ -179,6 +210,34 @@ def _call(shop: Shop, catalog: str, payload: dict):
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
         **extra)
+
+
+def problem_of(e) -> dict:
+    """Збій звернення до Anthropic → {code, text, at}: що сталося і що зробити (для картки магазину)."""
+    status = getattr(e, "status_code", None)
+    body = getattr(e, "body", None)
+    kind = str(getattr(e, "type", "") or "")
+    if not kind and isinstance(body, dict) and isinstance(body.get("error"), dict):
+        kind = str(body["error"].get("type") or "")
+    message = str(getattr(e, "message", "") or e).lower()
+    if str(e) == "no_api_key":
+        code, text = "no_key", "не задано ключ Anthropic (Minerva AI → Налаштування)"
+    elif status == 402 or kind == "billing_error" or "credit balance" in message:
+        code, text = "billing", ("на рахунку API Anthropic закінчились кредити — поповніть у Claude Console → "
+                                 "«Abrechnung» → «Credits kaufen» (це окремий рахунок, не підписка Claude)")
+    elif status == 401 or kind == "authentication_error":
+        code, text = "auth", "Anthropic не приймає ключ API — перевірте ключ у «Minerva AI → Налаштування»"
+    elif status == 403 or kind == "permission_error":
+        code, text = "permission", "ключ API не має доступу до цієї моделі — виберіть іншу модель або перевірте ключ"
+    elif status == 404 or kind == "not_found_error":
+        code, text = "model", "модель недоступна для цього рахунку API — виберіть іншу модель"
+    elif status == 400 and "anthropic-beta" in message:
+        code, text = "beta", "рахунок API не приймає резервні моделі (fallbacks) — виберіть модель Haiku 5.5"
+    elif status == 429 or kind == "rate_limit_error":
+        code, text = "rate", "Anthropic обмежив кількість запитів — Minerva повторить за 5 хв"
+    else:
+        code, text = "unavailable", "Anthropic не відповів (мережа, тайм-аут або перевантаження) — Minerva повторить за 5 хв"
+    return {"code": code, "text": text, "at": timezone.now().isoformat()}
 
 
 def _parse(text: str) -> list:
@@ -219,14 +278,17 @@ def ai_tips(shop: Shop, q, results, lang: str = "") -> dict:
     try:
         response = _call(shop, catalog, {"query": query, "language": LANGS[lang], "results": results})
     except Exception as e:  # noqa: BLE001 — модель недоступна: сайт лишається з підказками за правилами
-        logger.warning("shop search AI failed (%s): %s", shop.slug, e)
+        problem = problem_of(e)
+        logger.warning("shop search AI failed (%s, %s): %s", shop.slug, problem["code"], e)
         cache.set(f"shop-search-ai-down:{shop.pk}", 1, AI_DOWN)
-        _count(shop, errors=1)
+        _count(shop, problem=problem, errors=1)
         return {"status": "unavailable", "tips": []}
     u = getattr(response, "usage", None)
-    _count(shop, calls=1, input=getattr(u, "input_tokens", 0) or 0, output=getattr(u, "output_tokens", 0) or 0,
-           cache_read=getattr(u, "cache_read_input_tokens", 0) or 0,
-           cache_write=getattr(u, "cache_creation_input_tokens", 0) or 0)
+    tokens = {"input": getattr(u, "input_tokens", 0) or 0, "output": getattr(u, "output_tokens", 0) or 0,
+              "cache_read": getattr(u, "cache_read_input_tokens", 0) or 0,
+              "cache_write": getattr(u, "cache_creation_input_tokens", 0) or 0}
+    served = getattr(response, "model", "") or shop.search_ai_model   # резервна модель має свою ціну
+    _count(shop, problem=False, calls=1, cost_musd=round(cost_usd(served, **tokens) * 1_000_000), **tokens)
     text = "" if getattr(response, "stop_reason", "") == "refusal" else "".join(
         getattr(b, "text", "") for b in (response.content or []) if getattr(b, "type", "") == "text")
     tips, seen = [], set(results)
@@ -253,6 +315,12 @@ def ai_ready(shop: Shop) -> str:
         return "налаштування Minerva AI недоступні"
     if int(usage(shop).get("calls") or 0) >= shop.search_ai_daily_limit:
         return "денний ліміт вичерпано — до кінця доби лише підказки за правилами"
+    problem = usage(shop).get("ai_problem")
+    if isinstance(problem, dict) and problem.get("text"):
+        from django.utils.dateparse import parse_datetime
+        at = parse_datetime(str(problem.get("at") or ""))
+        when = f" (останній збій {timezone.localtime(at):%d.%m %H:%M})" if at else ""
+        return f"{problem['text']}{when}; після першого успішного запиту попередження зникне"
     return ""
 
 
