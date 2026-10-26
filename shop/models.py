@@ -102,6 +102,19 @@ class Shop(models.Model):
     )
     url = models.URLField("Адреса сайту", blank=True, default="")
     notes = models.TextField("Нотатки", blank=True, default="")
+    is_test = models.BooleanField(
+        "🧪 Тестовий магазин", default=False,
+        help_text="Окрема нумерація: замовлення TEST-PO-0001, документи TEST-OC / CI / PI / PL-0001, акаунти TEST-1 — "
+                  "справжні номери й Kundennummern не витрачаються (shop/numbering.py).")
+    test_affects_stock = models.BooleanField(
+        "Тестові замовлення списують склад", default=False,
+        help_text="Вимкнено — замовлення тестового магазину не бронюють і не списують товар і не потрапляють у "
+                  "статистику продажів (affects_stock = ні).")
+    test_counters = models.JSONField("Лічильники тестової нумерації", default=dict, blank=True,
+                                     help_text='{"PO": 3, "OC": 1, "KN": 2} — останній номер кожного виду.')
+    media_enabled = models.BooleanField(
+        "Сайт отримує фото й даташити з Minerva", default=True,
+        help_text="Окремо для кожного магазину; спільний перемикач — «🖼 Фото й даташити».")
     free_shipping_enabled = models.BooleanField(
         "Безкоштовна доставка", default=False,
         help_text="Доставка безкоштовна, коли сума товарів (нетто) досягає порогу. Діє в регіонах, де це дозволено.",
@@ -478,6 +491,8 @@ class ShopCustomer(models.Model):
                                      related_name="shop_accounts", verbose_name="Клієнт CRM")
     customer_number = models.ForeignKey(CustomerNumber, on_delete=models.SET_NULL, null=True, blank=True,
                                         related_name="accounts", verbose_name="Kundennummer")
+    test_number = models.PositiveIntegerField("Тестовий номер (TEST-N)", null=True, blank=True,
+                                              help_text="Акаунт тестового магазину: замість справжньої Kundennummer.")
     payment_method = models.CharField("Спосіб оплати за замовчуванням", max_length=20, blank=True, default="",
                                       help_text="Каса сайту вибирає його першим («Als Standard speichern»).")
     claimed_orders = models.JSONField(

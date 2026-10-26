@@ -98,3 +98,36 @@ class NumberingTests(AccountTestCase):
         self.assertEqual(SalesOrder.objects.get(order_number=number).shop_info.customer, None)
         self.assertEqual(self.get("me/", session).json()["customer_number"], 31729)   # без замовлень — новий номер
         self.assertEqual(CustomerNumber.objects.get(number=31729).crm_customer, None)
+
+
+class TestShopNumberingTests(AccountTestCase):
+    """Тестовий магазин: TEST-PO-0001 …, без складу й без справжніх Kundennummern."""
+    def test_separate_numbers_and_no_stock(self):
+        from rest_framework.test import APIClient
+        from api.models import APIKey
+        from .models import Shop, ShopListing
+        test = Shop.objects.create(name="Test", slug="testshop", is_test=True, accounts_enabled=True,
+                                   url="https://web.example.com")
+        ShopListing.objects.create(shop=test, product=self.p)
+        key = APIKey.objects.create(name="t", shop=test, scopes=["products:read", "orders:write", "orders:read",
+                                                                  "accounts:read", "accounts:write"])
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {key.key}")
+        body = {"order_number": "WS-T1", "client": "Firma GmbH", "contact_name": "Anna", "email": "anna@firma.de",
+                "addr_country": "DE", "shop": True, "lines": [{"sku": "AN-1", "qty": 2}], "vat_rate": "19"}
+        r = c.post("/api/v1/orders/", body, format="json")
+        self.assertEqual(r.json()["order_number"], "TEST-PO-0001")
+        order = SalesOrder.objects.get(order_number="TEST-PO-0001")
+        self.assertFalse(order.affects_stock)   # без складу й поза статистикою
+        self.assertFalse(InventoryTransaction.objects.filter(external_key__startswith="so:testshop:").exists())
+        self.assertEqual(numbering.doc_number(order, "OC"), "TEST-OC-0001")
+        self.assertEqual(CustomerNumber.objects.count(), 0)   # справжні номери не витрачено
+        real = self.c.post("/api/v1/orders/", dict(body, order_number="WS-R1"), format="json").json()
+        self.assertEqual(real["order_number"], "PO-31728-001")   # справжня нумерація — як була
+        test.refresh_from_db()
+        self.assertEqual(test.test_counters, {"PO": 1, "OC": 1})
+        account = ShopCustomer.objects.create(shop=test, email="t@firma.de", name="T", company="Firma GmbH")
+        from django.utils import timezone
+        ShopCustomer.objects.filter(pk=account.pk).update(email_verified_at=timezone.now())
+        account.refresh_from_db()
+        self.assertEqual(numbering.display_number(account), "TEST-1")

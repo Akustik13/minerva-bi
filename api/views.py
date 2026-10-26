@@ -367,6 +367,8 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
 
         if shop is not None:
             d["source"] = shop.slug  # замовлення магазину: джерело = код магазину (сайт може надсилати старий)
+            if shop.is_test and not shop.test_affects_stock:
+                d["affects_stock"] = False   # тестовий магазин: без складу й поза статистикою
         else:
             d["source"] = (d.get("source") or (key.default_source if key else "") or "api").strip()
         d.setdefault("order_date", timezone.localdate())

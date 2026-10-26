@@ -19,7 +19,8 @@
   #mp .mp-updated { font-size: 11px; color: var(--body-quiet-color, #999); margin-top: 6px; }
 </style>
 <div class="module" id="mp" data-url="{% url 'admin:shop_productmedia_status' %}"
-     data-site-sync="{% url 'admin:shop_productmedia_site_sync' 0 %}">
+     data-site-sync="{% url 'admin:shop_productmedia_site_sync' 0 %}"
+     data-site-toggle="{% url 'admin:shop_productmedia_site_toggle' 0 %}">
   <div class="mp-head"><b>🖼 Фото й даташити для сайту</b> <span id="mp-enabled"></span></div>
   <p class="mp-help">Для кожного товару магазину: <b>посилання з картки</b> → якщо недоступне, <b>файл у картці Minerva</b>
     → якщо й його немає, сайт показує <b>свій файл</b>. Minerva перевіряє вміст (справжнє фото чи PDF, а не сторінка
@@ -31,6 +32,11 @@
               title="Ще не перевірені, змінені в картці товару, давно не перевірені посилання">🔄 Індексувати нові й змінені</button>
       <button class="button" type="submit" name="mode" value="all"
               title="Кожне посилання й файл заново (довше)">🔁 Перевірити все заново</button>
+      <label title="Лише товари вибраного магазину; про нові файли дізнається лише його сайт (напр. спершу тестовий, потім справжній)">для:
+        <select name="shop">
+          <option value="">усіх магазинів</option>
+          {% for s in media_shops %}<option value="{{ s.pk }}">{{ s.name }} ({{ s.slug }}){% if s.is_test %} 🧪{% endif %}</option>{% endfor %}
+        </select></label>
     </form>
     <form method="post" action="{% url 'admin:shop_productmedia_settings' %}">{% csrf_token %}
       {% if media_progress.enabled %}
@@ -76,7 +82,7 @@
       bar = true;
       $('mp-fill').style.width = (r.total ? Math.round(100 * r.done / r.total) : 0) + '%';
     } else if (r.state === 'done') {
-      text = '✅ Індексація ' + when(r.finished_at) + (r.by ? ' (' + r.by + ')' : '') + ': перевірено ' + (r.total || 0) +
+      text = '✅ Індексація ' + when(r.finished_at) + (r.by ? ' (' + r.by + ')' : '') + (r.shop ? ' · ' + r.shop : '') + ': перевірено ' + (r.total || 0) +
              (r.mode === 'all' ? ' (усе заново)' : '') + (r.message ? ' · ' + r.message : '');
     } else if (r.state === 'interrupted') {
       text = '⚠ Індексацію перервано (перезапуск сервера?) — уже перевірене збережено, запустіть ще раз.';
@@ -112,19 +118,25 @@
 
   function drawSites(d) {
     var html = (d.sites || []).map(function (s) {
-      var line = '🏬 <b>' + esc(s.name) + '</b>: ';
+      var line = '🏬 <b>' + esc(s.name) + '</b>' + (s.is_test ? ' 🧪' : '') + ': ';
+      var toggle = csrfInput && d.enabled ? '<form method="post" action="' + box.getAttribute('data-site-toggle').replace(/0\/$/, s.shop + '/') + '">' +
+        '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(csrfInput.value) + '">' +
+        '<input type="hidden" name="enabled" value="' + (s.media_enabled ? '0' : '1') + '">' +
+        '<button class="button" type="submit">' + (s.media_enabled ? '⏸ Вимкнути для цього сайту' : '▶ Увімкнути для цього сайту') + '</button></form>' : '';
       if (!d.enabled) line += 'вимкнено — сайт показує власні файли';
-      else if (!s.wanted && !s.reported_at) line += 'немає товарів з перевіреними фото чи даташитами';
+      else if (!s.media_enabled) line += 'вимкнено для цього сайту — він показує власні файли' + toggle;
+      else if (!s.wanted && !s.reported_at) line += 'немає товарів з перевіреними фото чи даташитами' + toggle;
       else {
         line += 'на сайті <b>' + s.have + '</b> з ' + s.wanted;
         if (s.failed) line += ' · <span style="color:#e57373">❌ не вдалося ' + s.failed + '</span>';
         line += s.reported_at ? ' · звіт сайту ' + when(s.reported_at) : ' · сайт ще не звітував (оновіть файли сайту й відкрийте сторінку магазину)';
         if (s.ping_error) line += ' · <span style="color:#ffb74d">⚠ ' + esc(s.ping_error) + '</span>';
-        if (s.sync_url && csrfInput && s.have < s.wanted) {
+        if (s.sync_url && csrfInput) {
           line += '<form method="post" action="' + box.getAttribute('data-site-sync').replace(/0\/$/, s.shop + '/') + '">' +
                   '<input type="hidden" name="csrfmiddlewaretoken" value="' + esc(csrfInput.value) + '">' +
                   '<button class="button" type="submit">▶ Забрати на сайт зараз</button></form>';
         }
+        line += toggle;
       }
       return '<div class="mp-line">' + line + '</div>' + (s.problems || []).map(function (p) {
         return '<div class="mp-problem">' + esc(p) + '</div>';

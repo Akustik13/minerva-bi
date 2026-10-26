@@ -171,15 +171,23 @@ def is_running(run: dict | None) -> bool:
     return bool(beat and timezone.now() - beat < STALE_RUN)
 
 
-def run(mode="changed", products=None, limit=None, by="") -> dict:
-    """Перевіряє due(...) по черзі, після кожного — стан для живої панелі."""
+def shop_products(shop: Shop):
+    """Товари одного магазину (видимі в його асортименті) — індексація лише для нього."""
+    return site_products().filter(shop_listings__shop=shop, shop_listings__is_visible=True)
+
+
+def run(mode="changed", products=None, limit=None, by="", shop: Shop | None = None) -> dict:
+    """Перевіряє due(...) по черзі, після кожного — стан для живої панелі. shop — лише товари цього магазину,
+    і про нові файли дізнається лише його сайт."""
     settings_obj()
+    if shop is not None and products is None:
+        products = shop_products(shop)
     items = due(mode, products, limit)
     counts = {"ok": 0, "fallback": 0, "none": 0, "error": 0, "changed": 0}
     now = timezone.now()
     state = {"state": "running", "mode": mode, "by": by, "started_at": _iso(now), "heartbeat": _iso(now),
              "finished_at": None, "total": len(items), "done": 0, "current": "підготовка…", "counts": counts,
-             "message": ""}
+             "message": "", "shop": str(shop) if shop else ""}
     _save_run(state)
     for i, (product, kind, row) in enumerate(items, 1):
         state["current"] = f"{product.sku} · {KIND_LABEL[kind]}"
@@ -201,7 +209,7 @@ def run(mode="changed", products=None, limit=None, by="") -> dict:
                  message=f"видалено старих копій: {removed}" if removed else "")
     _save_run(state)
     if counts["changed"]:
-        ping_sites()
+        ping_sites(only=shop)
     return state
 
 
@@ -209,8 +217,8 @@ def _start_background(fn):
     threading.Thread(target=fn, daemon=True).start()
 
 
-def start(mode="changed", product_ids=None, by="") -> bool:
-    """Кнопки сторінки: запуск у фоні. False — уже йде інша індексація."""
+def start(mode="changed", product_ids=None, by="", shop_id=None) -> bool:
+    """Кнопки сторінки: запуск у фоні (shop_id — лише товари цього магазину). False — уже йде інша індексація."""
     settings_obj()
     with transaction.atomic():
         s = ShopMediaSettings.objects.select_for_update().get(pk=1)
@@ -218,7 +226,8 @@ def start(mode="changed", product_ids=None, by="") -> bool:
             return False
         now = _iso(timezone.now())
         _save_run({"state": "running", "mode": mode, "by": by, "started_at": now, "heartbeat": now,
-                   "finished_at": None, "total": 0, "done": 0, "current": "підготовка…", "counts": {}, "message": ""})
+                   "finished_at": None, "total": 0, "done": 0, "current": "підготовка…", "counts": {}, "message": "",
+                   "shop": str(Shop.objects.filter(pk=shop_id).first() or "") if shop_id else ""})
     caller = threading.current_thread()
 
     def work():
@@ -226,7 +235,8 @@ def start(mode="changed", product_ids=None, by="") -> bool:
             return
         try:
             products = Product.objects.filter(pk__in=product_ids) if product_ids else None
-            run(mode, products=products, by=by)
+            shop = Shop.objects.filter(pk=shop_id).first() if shop_id else None
+            run(mode, products=products, by=by, shop=shop)
         except Exception as e:  # noqa: BLE001
             logger.exception("shop media indexing failed: %s", e)
             _save_run({**(settings_obj().run or {}), "state": "error", "current": "",
@@ -281,7 +291,7 @@ def payload(row: ProductMedia | None, request=None) -> dict | None:
 
 def file_for(shop: Shop, sha: str) -> ProductMedia | None:
     """Копія для завантаження сайтом: лише товари, видимі в його магазині, і лише коли ввімкнено."""
-    if not _SHA.fullmatch(sha or "") or not settings_obj().enabled:
+    if not _SHA.fullmatch(sha or "") or not settings_obj().enabled or not shop.media_enabled:
         return None
     row = (ProductMedia.objects.filter(sha256=sha, product__is_active=True, product__shop_listings__shop=shop,
                                        product__shop_listings__is_visible=True).exclude(stored="").first())
@@ -291,8 +301,8 @@ def file_for(shop: Shop, sha: str) -> ProductMedia | None:
 
 
 def wanted(shop: Shop) -> dict[str, ProductMedia]:
-    """{sha256: рядок} — що сайт магазину має отримати."""
-    if not settings_obj().enabled:
+    """{sha256: рядок} — що сайт магазину має отримати (спільний перемикач і перемикач магазину)."""
+    if not settings_obj().enabled or not shop.media_enabled:
         return {}
     rows = (ProductMedia.objects.filter(product__is_active=True, product__shop_listings__shop=shop,
                                         product__shop_listings__is_visible=True).exclude(stored="")
@@ -340,8 +350,10 @@ def ping_site(shop: Shop) -> str:
     return error
 
 
-def ping_sites(background=True):
-    shops = list(Shop.objects.filter(is_active=True, media_site__sync_url__gt=""))
+def ping_sites(background=True, only: Shop | None = None):
+    shops = list(Shop.objects.filter(is_active=True, media_enabled=True, media_site__sync_url__gt=""))
+    if only is not None:
+        shops = [s for s in shops if s.pk == only.pk]
     if not shops:
         return
     caller = threading.current_thread()
@@ -392,7 +404,8 @@ def sites_status() -> list[dict]:
         failed = (site.failed or {}) if site else {}
         problems = [f"{want[h].product.sku} · {KIND_LABEL.get(want[h].kind, want[h].kind)}: {msg}"
                     for h, msg in failed.items() if h in want][:5]
-        out.append({"shop": shop.pk, "name": str(shop), "wanted": len(want), "have": len(have & set(want)),
+        out.append({"shop": shop.pk, "name": f"{shop} ({shop.slug})", "is_test": shop.is_test, "media_enabled": shop.media_enabled,
+                    "wanted": len(want), "have": len(have & set(want)),
                     "failed": len([h for h in failed if h in want]), "problems": problems,
                     "reported_at": _iso(site.reported_at) if site else None,
                     "sync_url": site.sync_url if site else "", "ping_at": _iso(site.ping_at) if site else None,

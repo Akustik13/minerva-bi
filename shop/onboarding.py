@@ -351,6 +351,9 @@ def summary(items: list[dict]) -> dict:
     nxt = (next((s for s in required if s["state"] == TODO), None)
            or next((s for s in items if s["kind"] == RECOMMENDED and s["state"] == TODO), None)
            or next((s for s in items if s["state"] == WARN), None))
-    return {"required": len(required), "passed": len(passed), "next": nxt,
-            "warnings": sum(1 for s in items if s["state"] == WARN),
+    count = lambda state: sum(1 for s in items if s["state"] == state)  # noqa: E731
+    return {"required": len(required), "passed": len(passed), "next": nxt, "total": len(items),
+            "done": count(DONE), "warnings": count(WARN), "skipped": count(SKIP),
+            "critical": sum(1 for s in required if s["state"] == TODO),   # обов'язкові, не зроблені
+            "todo": sum(1 for s in items if s["kind"] != REQUIRED and s["state"] == TODO),
             "complete": len(passed) == len(required)}

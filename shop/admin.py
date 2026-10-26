@@ -256,7 +256,8 @@ class ShopAdmin(admin.ModelAdmin):
             "description": "Кроки від назви до першого замовлення: ✓ готово, ! працює, але варто поправити, "
                            "номер — ще не зроблено. «Зробити ↓» веде до потрібного поля на цій сторінці.",
         }),
-        (None, {"fields": ["name", "public_name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
+        (None, {"fields": ["name", "public_name", "slug", "url", "currency", "is_active", "is_default", "is_test",
+                           "test_affects_stock", "media_enabled", "notes"]}),
         ("🚚 Доставка", {
             "fields": ["free_shipping_enabled", "free_shipping_threshold", "zones_tools"],
             "description": "Куди доставляємо — зони внизу сторінки. Зона — правило (ціна, термін доставки, "
@@ -389,12 +390,13 @@ class ShopAdmin(admin.ModelAdmin):
         from . import onboarding
         s = onboarding.summary(onboarding.steps(obj))
         url = reverse("admin:shop_shop_change", args=[obj.pk])
+        test = format_html(' <span title="Тестовий магазин — окрема нумерація TEST-…">🧪</span>') if obj.is_test else ""
         if s["complete"]:
-            return format_html('<a href="{}" style="color:#7bc67b">✅ підключено</a>{}', url,
+            return format_html('<a href="{}" style="color:#7bc67b">✅ працює</a>{}{}', url,
                                format_html(' <span style="color:#f0b35a">· ! {}</span>', s["warnings"])
-                               if s["warnings"] else "")
-        return format_html('<a href="{}" style="color:#f0b35a">{} з {}</a><div class="help">далі: {}</div>', url,
-                           s["passed"], s["required"], s["next"]["title"] if s["next"] else "—")
+                               if s["warnings"] else "", test)
+        return format_html('<a href="{}" style="color:#ff8a80">⛔ критичних {}</a>{}<div class="help">далі: {}</div>', url,
+                           s["critical"], test, s["next"]["title"] if s["next"] else "—")
 
     @admin.display(description="Пошта сайтів")
     def site_mail_col(self, obj):

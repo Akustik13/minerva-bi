@@ -276,3 +276,32 @@ class MediaAdminTests(MediaTestBase):
         self.assertEqual((d["stats"]["images"]["fixed"], d["stats"]["datasheets"]["failed"]), (1, 1))
         self.assertIn("HTML", d["errors"][0])
         self.assertFalse(self.p.datasheet_file)   # сторінку помилки не зберегли як «даташит»
+
+
+class PerShopMediaTests(MediaTestBase):
+    """Фото для кожного магазину окремо: перемикач сайту й індексація лише товарів вибраного магазину."""
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
+
+    def test_toggle_and_index_one_shop(self):
+        self.enable()
+        test = Shop.objects.create(name="Test", slug="test", is_test=True, url="https://test.example.com")
+        other = Product.objects.create(sku="AN-2", name="Other", image_url="https://img.example.com/AN-2.jpg")
+        ShopListing.objects.create(shop=test, product=other)
+        with web({other.image_url: JPG}):
+            self.client.post("/admin/shop/productmedia/run/", {"mode": "changed", "shop": str(test.pk)})
+        run = self.client.get("/admin/shop/productmedia/status/").json()["run"]
+        self.assertEqual((run["state"], run["shop"], run["total"]), ("done", "Test", 2))   # лише AN-2: фото + даташит
+        self.assertFalse(ProductMedia.objects.filter(product=self.p).exists())
+        self.assertTrue(media.wanted(test))
+        self.client.post(f"/admin/shop/productmedia/site-toggle/{test.pk}/", {"enabled": "0"})
+        test.refresh_from_db()
+        self.assertFalse(test.media_enabled)
+        self.assertEqual(media.wanted(test), {})
+        sites = {s["name"]: s for s in self.client.get("/admin/shop/productmedia/status/").json()["sites"]}
+        self.assertEqual((sites["Test (test)"]["media_enabled"], sites["Test (test)"]["is_test"], sites["Web (webshop)"]["media_enabled"]),
+                         (False, True, True))
+        self.assertContains(self.client.get("/admin/shop/productmedia/"), "усіх магазинів")

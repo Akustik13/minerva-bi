@@ -336,13 +336,14 @@ def profile(customer: ShopCustomer) -> dict:
     }
 
 
-def _customer_number(customer: ShopCustomer) -> int | None:
-    """Kundennummer (shop/numbering.py) — у підтвердженого акаунта; збій нумерації не ламає кабінет."""
+def _customer_number(customer: ShopCustomer) -> int | str | None:
+    """Kundennummer (shop/numbering.py; тестовий магазин — «TEST-N») — у підтвердженого акаунта; збій нумерації
+    не ламає кабінет."""
     if not customer.is_verified:
         return None
     try:
-        from .numbering import for_account
-        return for_account(customer).number
+        from .numbering import display_number
+        return display_number(customer)
     except Exception:
         import logging
         logging.getLogger("shop").exception("customer number for %s failed", customer.pk)

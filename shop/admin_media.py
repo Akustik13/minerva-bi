@@ -55,7 +55,7 @@ def sites_state() -> tuple[bool, dict]:
 
 def listing_marker(listing, enabled, have_by_shop) -> str:
     """🌐✓ — сайт магазину вже показує фото й даташит з Minerva, 🌐⏳ — ще не забрав; без позначки — свої файли сайту."""
-    if not enabled:
+    if not enabled or not listing.shop.media_enabled:
         return ""
     rows = {r.kind: r for r in listing.product.shop_media.all()}
     have, lines, states = have_by_shop.get(listing.shop_id, set()), [], []
@@ -137,6 +137,7 @@ class ProductMediaAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         self._sites = None   # кеш звітів сайтів на один запит
         extra_context = {**(extra_context or {}), "media_recheck_choices": RECHECK_CHOICES,
+                         "media_shops": Shop.objects.filter(is_active=True).order_by("-is_default", "name"),
                          "media_progress": media.progress(),
                          "media_can_manage": request.user.has_perm("shop.change_shop")}
         return super().changelist_view(request, extra_context)
@@ -191,6 +192,8 @@ class ProductMediaAdmin(admin.ModelAdmin):
             path("run/", view(require_POST(self._run_view)), name="shop_productmedia_run"),
             path("settings/", view(require_POST(self._settings_view)), name="shop_productmedia_settings"),
             path("site-sync/<int:shop_id>/", view(require_POST(self._site_sync_view)), name="shop_productmedia_site_sync"),
+            path("site-toggle/<int:shop_id>/", view(require_POST(self._site_toggle_view)),
+                 name="shop_productmedia_site_toggle"),
             path("check-product/<int:pk>/", view(require_POST(self._check_product_view)),
                  name="shop_productmedia_check_product"),
         ] + super().get_urls()
@@ -207,8 +210,10 @@ class ProductMediaAdmin(admin.ModelAdmin):
     def _run_view(self, request):
         self._manage(request)
         mode = "all" if request.POST.get("mode") == "all" else "changed"
-        if media.start(mode, by=request.user.get_username()):
-            self.message_user(request, "Індексацію запущено — прогрес на панелі.")
+        shop_id = request.POST.get("shop", "")
+        shop = Shop.objects.filter(pk=shop_id).first() if shop_id.isdigit() else None
+        if media.start(mode, by=request.user.get_username(), shop_id=shop.pk if shop else None):
+            self.message_user(request, "Індексацію запущено" + (f" для «{shop}»" if shop else "") + " — прогрес на панелі.")
         else:
             self.message_user(request, "Уже йде індексація — дочекайтесь її завершення.", messages.WARNING)
         return redirect("admin:shop_productmedia_changelist")
@@ -241,6 +246,20 @@ class ProductMediaAdmin(admin.ModelAdmin):
             import threading
             threading.Thread(target=media.ping_site, args=(shop,), daemon=True).start()
             self.message_user(request, f"«{shop}»: сайт отримав запит забрати нові файли — стан оновиться за хвилину.")
+        return redirect("admin:shop_productmedia_changelist")
+
+    def _site_toggle_view(self, request, shop_id):
+        """Перемикач одного магазину: його сайт отримує файли з Minerva або показує власні."""
+        self._manage(request)
+        shop = get_object_or_404(Shop, pk=shop_id)
+        on = request.POST.get("enabled") == "1"
+        Shop.objects.filter(pk=shop.pk).update(media_enabled=on)
+        if on:
+            shop.media_enabled = True
+            import threading
+            threading.Thread(target=media.ping_site, args=(shop,), daemon=True).start()
+        self.message_user(request, f"«{shop}»: " + ("сайт знову отримує фото й даташити з Minerva." if on
+                                                     else "вимкнено — сайт показує власні файли."))
         return redirect("admin:shop_productmedia_changelist")
 
     def _check_product_view(self, request, pk):

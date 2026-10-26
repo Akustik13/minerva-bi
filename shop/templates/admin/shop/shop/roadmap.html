@@ -2,12 +2,17 @@
 <div class="rm">
   <div class="rm-sum">
     <div class="rm-bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{ sum.required }}" aria-valuenow="{{ sum.passed }}"><span style="width:{{ pct }}%"></span></div>
-    <div>{% if sum.complete %}<b>✅ Магазин підключено</b> — обов'язкові кроки готові ({{ sum.passed }} з {{ sum.required }}){% if sum.warnings %}, є що поправити: {{ sum.warnings }}{% endif %}.
-    {% else %}<b>Обов'язкові кроки: {{ sum.passed }} з {{ sum.required }}</b>{% endif %}
-    {% if sum.next %} Далі: {% if sum.next.go %}<a href="#" data-go="{{ sum.next.go }}">{{ sum.next.title }}</a>{% else %}<b>{{ sum.next.title }}</b>{% endif %}.{% endif %}</div>
+    <div>{% if sum.complete %}<b class="rm-ok">✅ Магазин працює</b>{% else %}<b class="rm-bad">⛔ Магазин ще не працює</b>{% endif %}
+      · кроків {{ sum.total }}:
+      <span class="rm-c is-done" title="готово">✓ {{ sum.done }}</span>
+      <span class="rm-c is-warn" title="працює, але варто поправити">! {{ sum.warnings }}</span>
+      <span class="rm-c{% if sum.critical %} is-bad{% endif %}" title="обов'язкові кроки, без яких магазин не працює">✗ {{ sum.critical }} критичних</span>{% if sum.todo %}
+      <span class="rm-c" title="рекомендовані або за бажанням, ще не зроблені">○ {{ sum.todo }}</span>{% endif %}{% if sum.skipped %}
+      <span class="rm-c" title="вимкнено (за бажанням)">– {{ sum.skipped }}</span>{% endif %}
+      {% if sum.next %}· далі: {% if sum.next.go %}<a href="#" data-go="{{ sum.next.go }}">{{ sum.next.title }}</a>{% else %}<b>{{ sum.next.title }}</b>{% endif %}{% endif %}</div>
   </div>
-  <details class="rm-list"{% if not sum.complete or sum.warnings %} open{% endif %}>
-    <summary>Усі кроки ({{ steps|length }})</summary>
+  <details class="rm-list">
+    <summary>Показати всі кроки ({{ steps|length }})</summary>
     <ol class="rm-steps">
       {% for s in steps %}
       <li class="rm-step is-{{ s.state }}{% if s is sum.next %} is-next{% endif %}">
