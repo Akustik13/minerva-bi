@@ -88,7 +88,7 @@ class StripeTestCase(TestCase):
             "payment_method": "stripe", "payment_status": "pending", "shipping_cost": "6.90",
             "lines": [{"sku": "AN-1", "qty": 2}], "vat_rate": vat}, format="json")
         self.assertEqual(r.status_code, 201, r.content)
-        return SalesOrder.objects.get(order_number=number)
+        return SalesOrder.objects.get(shop_info__site_ref=number)   # у Minerva — PO-<Kundennummer>-NNN
 
     def checkout(self, number="WS-1"):
         return self.c.post("/api/v1/shop/payments/stripe/checkout/", {
@@ -131,7 +131,7 @@ class CheckoutTests(StripeTestCase):
         self.assertEqual(d["amount"], 55.81)
         method, path, form, headers = self.fake.calls[-1]
         self.assertEqual(form["line_items[0][price_data][unit_amount]"], "5581")
-        self.assertEqual(form["metadata[order_number]"], "WS-1")
+        self.assertEqual(form["metadata[order_number]"], "PO-31728-001")   # номер Minerva (shop/numbering.py)
         self.assertEqual(form["customer_email"], "einkauf@firma.de")
         self.assertEqual(headers["Authorization"], f"Bearer {SECRET}")
         self.assertTrue(headers["Idempotency-Key"].startswith("minerva-webshop-"))
@@ -437,8 +437,8 @@ class MailTemplateTests(StripeTestCase):
         self.assertIn("bei Sevskiy GmbH eingegangen", customer.body)
         self.assertNotIn("Сайт", customer.body)
         subject = team_mail.call_args[0][1]
-        self.assertEqual(subject, "💳 Zahlung eingegangen: WS-1 · 55,81 EUR · Firma")
-        self.assertIn("Bestellung WS-1 – Sevskiy GmbH", self.fake.calls[0][2]["line_items[0][price_data][product_data][name]"])
+        self.assertEqual(subject, "💳 Zahlung eingegangen: PO-31728-001 · 55,81 EUR · Firma")
+        self.assertIn("Bestellung PO-31728-001 – Sevskiy GmbH", self.fake.calls[0][2]["line_items[0][price_data][product_data][name]"])
 
     def test_custom_template_used(self):
         from django.core import mail as dj_mail
@@ -447,7 +447,7 @@ class MailTemplateTests(StripeTestCase):
                                         greeting="Hallo {name},", intro="Wir haben {amount} erhalten.", button="Ansehen")
         self.pay()
         m = [m for m in dj_mail.outbox if m.to == ["einkauf@firma.de"]][0]
-        self.assertEqual(m.subject, "Danke! WS-1 bezahlt")
+        self.assertEqual(m.subject, "Danke! PO-31728-001 bezahlt")
         self.assertIn("Hallo,", m.body)  # без імені покупця — «Hallo,»
         self.assertIn("Wir haben 55,81 EUR erhalten.", m.body)
         ShopMailTemplate.objects.update(is_active=False)

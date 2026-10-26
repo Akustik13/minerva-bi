@@ -303,7 +303,7 @@ class ShippingTests(TestCase):
                                             "shipping_cost": "0"}, format="json")
         self.assertEqual(r.status_code, 201, r.content)
         from sales.models import SalesOrder
-        self.assertEqual(SalesOrder.objects.get(order_number="WS-S2").shipping_cost, Decimal("6.90"))
+        self.assertEqual(SalesOrder.objects.get(shop_info__site_ref="WS-S2").shipping_cost, Decimal("6.90"))
 
     def test_digikey_zone_import(self):
         from .shipping import import_digikey_zones
@@ -767,7 +767,7 @@ class ShopSettingsFormTests(TestCase):
 
     def _post(self, fx, breaks):
         import json
-        return self.client.post(self.url, {"default_markup": "100", "rounding": "0.01",
+        return self.client.post(self.url, {"default_markup": "100", "rounding": "0.01", "customer_number_start": "31728",
                                            "fx_rates": json.dumps(fx), "price_breaks": json.dumps(breaks)})
 
     def test_page_and_valid_save(self):

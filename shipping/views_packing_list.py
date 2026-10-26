@@ -23,6 +23,14 @@ def _staff(view_fn):
     return staff_member_required(view_fn, login_url="/admin/login/")
 
 
+def _default_number(order) -> str:
+    """Номер без введеного: веб-магазин — PL-<Kundennummer>-NNN (shop/numbering.py), інакше номер замовлення."""
+    if order is None:
+        return ""
+    from shop.numbering import doc_number
+    return doc_number(order, "PL") or order.order_number
+
+
 def _ctx(request, **kw):
     return {**admin.site.each_context(request), **kw}
 
@@ -116,7 +124,7 @@ def _save_weights_to_products(request, parcels):
 
 def _save_and_generate(request, pl, data):
     _save_weights_to_products(request, data["parcels"])
-    pl.number          = data["number"] or (pl.sales_order.order_number if pl.sales_order else "")
+    pl.number          = data["number"] or _default_number(pl.sales_order)
     pl.pl_date         = data["pl_date"]
     pl.ship_to         = data["ship_to"]
     pl.parcels         = data["parcels"]

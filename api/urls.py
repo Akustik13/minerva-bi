@@ -36,6 +36,8 @@ account_urls = [
     path("me/orders/",        accounts.OrdersView.as_view(),      name="api-account-orders"),
     path("me/orders/<str:number>/", accounts.OrderDetailView.as_view(), name="api-account-order"),
     path("me/orders/<str:number>/pay/", accounts.OrderPayView.as_view(), name="api-account-order-pay"),
+    path("me/orders/<str:number>/documents/<str:name>/", accounts.OrderDocumentView.as_view(),
+         name="api-account-order-document"),
     path("me/cart/",          accounts.CartView.as_view(),        name="api-account-cart"),
 ]
 

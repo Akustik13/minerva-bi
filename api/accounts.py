@@ -17,6 +17,7 @@
   GET  shop/account/me/orders/         замовлення й запити покупця
   POST shop/account/me/orders/<number>/pay/  {success_url, cancel_url} → сторінка оплати Stripe
   GET  shop/account/me/orders/<number>/
+  GET  shop/account/me/orders/<number>/documents/<name>/  PDF документа замовлення (список — у documents)
   GET|PUT shop/account/me/cart/        {items: {sku: qty}}
 
 Права ключа: accounts:read (GET), accounts:write (решта). Магазин має бути з «Особистий кабінет покупців».
@@ -203,6 +204,19 @@ class OrderDetailView(AccountView):
     def get(self, request, number):
         return self.dispatch_account(
             request, lambda req, d: Response(accounts.order_detail(accounts.find_order(self.customer, number))))
+
+
+class OrderDocumentView(AccountView):
+    """Документ свого замовлення (Auftragsbestätigung, Rechnung, Lieferschein …) — PDF з теки замовлення."""
+    customer_required = True
+
+    def get(self, request, number, name):
+        def run(req, d):
+            from django.http import FileResponse
+            path = accounts.document_file(accounts.find_order(self.customer, number), name)
+            return FileResponse(path.open("rb"), content_type="application/pdf", as_attachment=True,
+                                filename=path.name)
+        return self.dispatch_account(request, run)
 
 
 class OrderPayView(AccountView):

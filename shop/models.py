@@ -57,6 +57,10 @@ class ShopSettings(models.Model):
         help_text='Для базових цін в іншій валюті: скільки одиниць валюти магазину за 1 одиницю, '
                   'напр. {"USD": 0.86} — 1 USD = 0,86 EUR.',
     )
+    customer_number_start = models.PositiveIntegerField(
+        "Kundennummer — перший номер", default=31728,
+        help_text="Перший покупець веб-магазину отримує цей номер, кожен наступний — на одиницю більший. "
+                  "Від нього номери документів: PO / OC / CI / PI / PL-<Kundennummer>-001 (shop/numbering.py).")
 
     class Meta:
         verbose_name = "Налаштування цін магазину"
@@ -420,6 +424,24 @@ class ShopProduct(Product):
         verbose_name_plural = "📦 Каталог → додати в магазин"
 
 
+class CustomerNumber(models.Model):
+    """Kundennummer покупця веб-магазину — одна на клієнта CRM, спільна для всіх магазинів (shop/numbering.py).
+    counters — останній номер документа кожного виду для цього клієнта: {"PO": 3, "OC": 1, …}."""
+    number = models.PositiveIntegerField("Kundennummer", unique=True)
+    crm_customer = models.OneToOneField("crm.Customer", on_delete=models.SET_NULL, null=True, blank=True,
+                                        related_name="shop_number", verbose_name="Клієнт CRM")
+    counters = models.JSONField("Лічильники документів", default=dict, blank=True)
+    created_at = models.DateTimeField("Видано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Kundennummer"
+        verbose_name_plural = "🔢 Kundennummern"
+        ordering = ["-number"]
+
+    def __str__(self):
+        return str(self.number)
+
+
 # ── Особистий кабінет покупців ───────────────────────────────────────────────
 #
 # Акаунти живуть лише в Minerva; сайт зберігає тільки випадковий ключ сесії в cookie (HttpOnly).
@@ -454,6 +476,14 @@ class ShopCustomer(models.Model):
 
     crm_customer = models.ForeignKey("crm.Customer", on_delete=models.SET_NULL, null=True, blank=True,
                                      related_name="shop_accounts", verbose_name="Клієнт CRM")
+    customer_number = models.ForeignKey(CustomerNumber, on_delete=models.SET_NULL, null=True, blank=True,
+                                        related_name="accounts", verbose_name="Kundennummer")
+    payment_method = models.CharField("Спосіб оплати за замовчуванням", max_length=20, blank=True, default="",
+                                      help_text="Каса сайту вибирає його першим («Als Standard speichern»).")
+    claimed_orders = models.JSONField(
+        "Замовлення до перенесення", default=list, blank=True,
+        help_text="Номери замовлень, оформлених без входу, — після підтвердження email переходять у кабінет "
+                  "(реєстрація зі сторінки «Дякуємо за замовлення»).")
     cart = models.JSONField("Кошик", default=dict, blank=True, help_text="{артикул: кількість}")
     cart_updated_at = models.DateTimeField("Кошик змінено", null=True, blank=True)
 
@@ -522,11 +552,18 @@ class ShopOrder(models.Model):
     requested = models.JSONField("Запитані позиції поза каталогом", default=list, blank=True,
                                  help_text="Запит пропозиції: [{sku, qty}] артикулів, яких немає в Minerva.")
     lang = models.CharField("Мова", max_length=2, blank=True, default="")
+    site_ref = models.CharField("Номер від сайту", max_length=64, blank=True, default="",
+                                help_text="Номер, з яким сайт надіслав замовлення (повтор того самого — те саме "
+                                          "замовлення); у Minerva замовлення отримує PO-<Kundennummer>-NNN.")
+    doc_numbers = models.JSONField("Номери документів", default=dict, blank=True,
+                                   help_text='Видані номери документів замовлення: {"OC": "OC-31728-001", …}.')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = "Замовлення з сайту"
         verbose_name_plural = "Замовлення з сайту"
+        constraints = [models.UniqueConstraint(fields=["shop", "site_ref"], condition=~models.Q(site_ref=""),
+                                               name="shop_order_unique_site_ref")]
 
     def __str__(self):
         return str(self.order)

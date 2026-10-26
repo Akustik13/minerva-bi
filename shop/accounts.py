@@ -16,7 +16,7 @@ from __future__ import annotations
 import hashlib
 import re
 import secrets
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from urllib.parse import urlsplit
 
@@ -38,6 +38,14 @@ MAIL_INTERVAL = timedelta(seconds=60)
 MAIL_PER_DAY = 10
 MIN_PASSWORD = 10
 CART_MAX_LINES = 100
+CLAIM_DAYS = 14                             # реєстрація зі сторінки «Дякуємо»: замовлення не старше
+# Документи замовлення в кабінеті — PDF з media/orders/{джерело}/{номер}/ (їх створює Minerva), за назвою файлу
+DOC_PREFIXES = (
+    ("OC", ("orderconfirmation", "auftragsbest")),
+    ("PI", ("proformainvoice", "proforma")),
+    ("CI", ("invoice_", "invoice-", "commercialinvoice", "commercial invoice", "rechnung")),
+    ("PL", ("packinglist", "packing list", "packing_list", "lieferschein")),
+)
 
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{20,100}$")
 _CART_KEY_RE = re.compile(r"^(rq:)?[A-Za-z0-9._\-/]{1,64}$")
@@ -301,6 +309,12 @@ def _apply_profile(customer: ShopCustomer, data: dict, *, require_company=True) 
                     bad.append(f"shipping.{api_name}")
     if "lang" in data:
         customer.lang = _lang(data.get("lang"))
+    if "payment_method" in data:   # «Als Standard speichern» у кабінеті — каса вибирає його першим
+        method = str(data.get("payment_method") or "").strip()
+        if method and method not in dict(Shop.PAYMENT_CHOICES):
+            bad.append("payment_method")
+        else:
+            customer.payment_method = method
     return sorted(set(bad))
 
 
@@ -313,6 +327,8 @@ def profile(customer: ShopCustomer) -> dict:
                      "street": customer.ship_street, "zip": customer.ship_zip, "city": customer.ship_city,
                      "country": customer.ship_country, "phone": customer.ship_phone},
         "lang": customer.lang,
+        "customer_number": _customer_number(customer),
+        "payment_method": customer.payment_method,
         "created_at": customer.created_at,
         "last_login_at": customer.last_login_at,
         "cart_count": len(customer.cart or {}),
@@ -320,7 +336,22 @@ def profile(customer: ShopCustomer) -> dict:
     }
 
 
+def _customer_number(customer: ShopCustomer) -> int | None:
+    """Kundennummer (shop/numbering.py) — у підтвердженого акаунта; збій нумерації не ламає кабінет."""
+    if not customer.is_verified:
+        return None
+    try:
+        from .numbering import for_account
+        return for_account(customer).number
+    except Exception:
+        import logging
+        logging.getLogger("shop").exception("customer number for %s failed", customer.pk)
+        return None
+
+
 def update_profile(customer: ShopCustomer, data: dict) -> ShopCustomer:
+    # окремі поля («Als Standard speichern»: лише адреса доставки чи спосіб оплати) — обов'язкові лишаються
+    data = {"company": customer.company, "name": customer.name, **data}
     bad = _apply_profile(customer, data)
     if bad:
         raise AccountError(400, "invalid", "Перевірте поля.", fields=bad)
@@ -359,6 +390,9 @@ def register(shop: Shop, data: dict, link: str) -> None:
         else:
             customer = probe
         customer.password = make_password(password)
+        claim = str(data.get("claim_order") or "").strip()[:64]
+        if claim:   # реєстрація зі сторінки «Дякуємо»: це замовлення — у кабінет після підтвердження email
+            customer.claimed_orders = list(dict.fromkeys([claim] + list(customer.claimed_orders or [])))[:5]
         customer.save()
         customer.sessions.all().delete()
     sent = send_verification(customer, link, throttle=bool(existing))
@@ -415,8 +449,10 @@ def verify_email(shop: Shop, raw_token, password, remember=False) -> tuple[ShopC
 def on_verified(customer: ShopCustomer):
     """Email підтверджено: старі замовлення з цією адресою — в кабінет, зв'язок з клієнтом CRM, лист
     «Ласкаво просимо» (після commit — без листа, якщо підтвердження відкотилося)."""
+    attach_claimed_orders(customer)
     attach_guest_orders(customer)
     link_crm(customer)
+    _customer_number(customer)
     if customer.shop.mail_welcome:
         transaction.on_commit(lambda: _mail(customer, "welcome", link=admin_link(customer), throttle=False))
 
@@ -444,6 +480,8 @@ def link_crm(customer: ShopCustomer):
     if crm is not None:
         ShopCustomer.objects.filter(pk=customer.pk).update(crm_customer=crm)
         customer.crm_customer = crm
+        from .numbering import sync_account
+        sync_account(customer)   # Kundennummer клієнта CRM — і в кабінеті
 
 
 # ── Вхід, сесії ──────────────────────────────────────────────────────────────
@@ -660,6 +698,23 @@ def _fill_profile_from_order(customer: ShopCustomer, order, billing: dict):
     customer.save()
 
 
+def attach_claimed_orders(customer: ShopCustomer) -> int:
+    """Реєстрація зі сторінки «Дякуємо за замовлення»: це замовлення (оформлене без входу, можливо з іншою адресою)
+    — у кабінет. Лише замовлення цього магазину без акаунта, не старші CLAIM_DAYS; сайт передає номер, тільки
+    коли браузер довів, що замовлення оформив він (підписаний cookie / посилання оплати)."""
+    from django.db.models import Q
+    refs = [str(r)[:64] for r in (customer.claimed_orders or [])][:5]
+    if not refs:
+        return 0
+    since = timezone.now() - timedelta(days=CLAIM_DAYS)
+    infos = (ShopOrder.objects.filter(shop=customer.shop, customer__isnull=True, created_at__gte=since)
+             .filter(Q(order__order_number__in=refs) | Q(site_ref__in=refs)))
+    n = infos.update(customer=customer)
+    ShopCustomer.objects.filter(pk=customer.pk).update(claimed_orders=[])
+    customer.claimed_orders = []
+    return n
+
+
 def attach_guest_orders(customer: ShopCustomer) -> int:
     """Замовлення магазину з тим самим email (оформлені без входу) — у кабінет підтвердженого покупця."""
     from sales.models import SalesOrder
@@ -743,7 +798,51 @@ def order_detail(info: ShopOrder) -> dict:
     data["dates"] = {"received": o.order_date, "shipped": o.shipped_at,
                      "delivered": timezone.localdate(o.delivered_at) if o.delivered_at else None}
     data["offer"] = _offer_for_quote(o) if data["kind"] == "quote" else None
+    data["documents"] = order_documents(info)
+    data["doc_numbers"] = dict(info.doc_numbers or {})
     return data
+
+
+def _doc_kind(name: str) -> str:
+    low = name.lower()
+    for kind, prefixes in DOC_PREFIXES:
+        if low.startswith(prefixes):
+            return kind
+    return ""
+
+
+def _doc_folder(order):
+    from pathlib import Path
+    from django.conf import settings
+    return Path(settings.MEDIA_ROOT) / "orders" / (order.source or "manual") / order.order_number
+
+
+def order_documents(info: ShopOrder) -> list[dict]:
+    """Документи замовлення для кабінету: PDF Auftragsbestätigung / Proforma / Rechnung / Lieferschein з теки
+    замовлення (їх створює й зберігає менеджер у Minerva — «💾»). Інші файли теки покупцю не показуються."""
+    from .numbering import KINDS
+    folder = _doc_folder(info.order)
+    if not folder.is_dir():
+        return []
+    order_of = {k: i for i, (k, _) in enumerate(DOC_PREFIXES)}
+    out = []
+    for f in folder.iterdir():
+        kind = _doc_kind(f.name) if f.is_file() and f.suffix.lower() == ".pdf" else ""
+        if not kind:
+            continue
+        st = f.stat()
+        out.append({"kind": kind, "title": KINDS[kind], "name": f.name,
+                    "number": (info.doc_numbers or {}).get(kind, ""), "size": st.st_size,
+                    "date": datetime.fromtimestamp(st.st_mtime, tz=timezone.get_current_timezone()).date()})
+    return sorted(out, key=lambda d: (order_of[d["kind"]], d["name"].lower()))
+
+
+def document_file(info: ShopOrder, name):
+    """Файл документа з order_documents (лише з цього списку — без довільних шляхів)."""
+    for doc in order_documents(info):
+        if doc["name"] == str(name or ""):
+            return _doc_folder(info.order) / doc["name"]
+    raise AccountError(404, "not_found", "Документ не знайдено.")
 
 
 def _offer_for_quote(order) -> dict | None:
@@ -767,7 +866,9 @@ def orders_qs(customer: ShopCustomer):
 
 
 def find_order(customer: ShopCustomer, number) -> ShopOrder:
-    info = orders_qs(customer).filter(order__order_number=str(number or "")[:64]).first()
+    number = str(number or "")[:64]
+    info = orders_qs(customer).filter(order__order_number=number).first() or (
+        orders_qs(customer).filter(site_ref=number).first() if number else None)   # номер сайту (до PO-…)
     if info is None:
         raise AccountError(404, "not_found", "Замовлення не знайдено.")
     return info

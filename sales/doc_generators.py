@@ -222,6 +222,15 @@ def _para(text: str, style=None, fontSize=9, bold=False, color=None, align=TA_LE
 # 1. Packing List
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _shop_doc_number(order, kind: str) -> str:
+    """Номер документа замовлення веб-магазину (PL-31728-001 …, shop/numbering.py); '' — інші замовлення."""
+    try:
+        from shop.numbering import doc_number
+        return doc_number(order, kind)
+    except Exception:
+        return ""
+
+
 def generate_packing_list(order, overrides=None) -> BytesIO:
     """Generate a packing list PDF for the given SalesOrder."""
     buf = BytesIO()
@@ -247,6 +256,9 @@ def generate_packing_list(order, overrides=None) -> BytesIO:
         f"Order: <b>{order.order_number}</b>",
         f"Date: {order_date_str}",
     ]
+    pl_number = _shop_doc_number(order, "PL")
+    if pl_number:
+        right.insert(0, f"<b>{pl_number}</b>")
     story.append(_header_table(left, "PACKING LIST", right))
     story.append(Spacer(1, 0.4 * cm))
 
@@ -334,8 +346,16 @@ def generate_packing_list(order, overrides=None) -> BytesIO:
 # 2. Proforma Invoice
 # ══════════════════════════════════════════════════════════════════════════════
 
-def generate_proforma(order, overrides=None) -> BytesIO:
-    """Generate a proforma invoice PDF for the given SalesOrder."""
+DOC_TITLES = {"PI": "PROFORMA INVOICE", "OC": "ORDER CONFIRMATION"}
+
+
+def generate_order_confirmation(order, overrides=None) -> BytesIO:
+    """Auftragsbestätigung (Order Confirmation) — як Proforma, з номером OC-…"""
+    return generate_proforma(order, overrides, kind="OC")
+
+
+def generate_proforma(order, overrides=None, kind="PI") -> BytesIO:
+    """Generate a proforma invoice PDF for the given SalesOrder (kind="OC" — order confirmation)."""
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -347,7 +367,7 @@ def generate_proforma(order, overrides=None) -> BytesIO:
     ovr = overrides or {}
     company = _get_company()
     order_date_str = order.order_date.strftime("%d.%m.%Y") if order.order_date else "—"
-    pi_number = f"PI-{order.order_number}"
+    pi_number = _shop_doc_number(order, kind) or f"{kind}-{order.order_number}"
     currency_sym = {"USD": "$", "EUR": "€", "GBP": "£"}.get(order.currency or "EUR", "€")
 
     story = []
@@ -361,7 +381,7 @@ def generate_proforma(order, overrides=None) -> BytesIO:
         f"<b>{pi_number}</b>",
         order_date_str,
     ]
-    story.append(_header_table(left, "PROFORMA INVOICE", right))
+    story.append(_header_table(left, DOC_TITLES[kind], right))
     story.append(Spacer(1, 0.4 * cm))
 
     # FROM / TO block as two-column table
@@ -482,10 +502,11 @@ def generate_proforma(order, overrides=None) -> BytesIO:
     payment_terms = ovr.get('payment_terms', ds.proforma_payment_terms)
     if payment_terms:
         story.append(_para(f"Payment terms: {payment_terms}", fontSize=8, color=_MUTED))
-    story.append(_para(
-        "This is a proforma invoice — not a VAT tax document.",
-        fontSize=8, color=_MUTED,
-    ))
+    if kind == "PI":
+        story.append(_para(
+            "This is a proforma invoice — not a VAT tax document.",
+            fontSize=8, color=_MUTED,
+        ))
     proforma_notes = ovr.get('notes', ds.proforma_notes)
     if proforma_notes:
         story.append(Spacer(1, 0.2 * cm))

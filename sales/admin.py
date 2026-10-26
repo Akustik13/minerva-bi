@@ -1219,6 +1219,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         docs = [
             (f"{base}/packing-list/", f"{base}/packing-list/?action=save",
              "📋 Пакувальний лист", "#1976d2", "pl", pl_panel),
+            (f"{base}/order-confirmation/", f"{base}/order-confirmation/?action=save",
+             "✅ Auftragsbestätigung", "#00897b", "oc", pf_panel),
             (f"{base}/proforma/",     f"{base}/proforma/?action=save",
              "📄 Proforma Invoice",   "#388e3c", "pf", pf_panel),
             (f"{base}/customs/",      f"{base}/customs/?action=save",
@@ -2536,6 +2538,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/doc/proforma/',
                  self.admin_site.admin_view(self._doc_proforma),
                  name='sales_salesorder_doc_proforma'),
+            path('<int:pk>/doc/order-confirmation/',
+                 self.admin_site.admin_view(self._doc_order_confirmation),
+                 name='sales_salesorder_doc_order_confirmation'),
             path('<int:pk>/doc/customs/',
                  self.admin_site.admin_view(self._doc_customs),
                  name='sales_salesorder_doc_customs'),
@@ -3491,6 +3496,19 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         response = HttpResponse(buf.getvalue(), content_type="application/pdf")
         response["Content-Disposition"] = (
             f'attachment; filename="ProformaInvoice-{order.order_number}.pdf"'
+        )
+        return response
+
+    def _doc_order_confirmation(self, request, pk):
+        order = get_object_or_404(SalesOrder, pk=pk)
+        from sales.doc_generators import generate_order_confirmation
+        overrides = {k: v for k, v in request.GET.items() if k != 'action'}
+        buf = generate_order_confirmation(order, overrides=overrides or None)
+        if request.GET.get('action') == 'save':
+            return self._save_pdf_to_media(order, buf, f'OrderConfirmation-{order.order_number}.pdf')
+        response = HttpResponse(buf.getvalue(), content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="OrderConfirmation-{order.order_number}.pdf"'
         )
         return response
 

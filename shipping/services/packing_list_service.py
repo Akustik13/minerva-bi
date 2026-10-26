@@ -307,8 +307,10 @@ def initial_data(order) -> dict:
     else:
         parcels = [{"dims": "", "gross_kg": 0, "lines": order_lines}]
     signer_name, signer_position = last_signer()
+    from shop.numbering import doc_number
     return {
-        "number":          order.order_number or "",
+        # веб-магазин: PL-<Kundennummer>-NNN — номер закріплюється за замовленням (shop/numbering.py)
+        "number":          doc_number(order, "PL") or order.order_number or "",
         "pl_date":         date.today(),
         "ship_to":         build_ship_to(order, shipment),
         "parcels":         parcels,

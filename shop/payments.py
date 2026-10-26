@@ -179,6 +179,9 @@ def find_order(shop: Shop, number):
     from sales.models import SalesOrder
     order = (SalesOrder.objects.filter(source=shop.slug, order_number=str(number or "")[:64])
              .select_related("shop_info").first())
+    if order is None:   # номер, з яким сайт надіслав замовлення (до PO-…, shop/numbering.py)
+        from .numbering import find_by_site_ref
+        order = find_by_site_ref(shop, str(number or "")[:64])
     if order is None:
         raise PaymentError(404, "not_found", "Замовлення не знайдено.")
     return order

@@ -188,8 +188,10 @@ def initial_data(order) -> dict:
     signer_name, signer_position = last_signer()
     billing = ", ".join(x for x in (ship_to.get("company"), ship_to.get("street"),
                                     ship_to.get("city_line"), ship_to.get("country")) if x)
+    from shop.numbering import doc_number
     return {
-        "number":          order.order_number or "",
+        # веб-магазин: CI-<Kundennummer>-NNN — номер закріплюється за замовленням (shop/numbering.py)
+        "number":          doc_number(order, "CI") or order.order_number or "",
         "inv_date":        date.today(),
         "ship_to":         ship_to,
         "billing_address": f"{billing}." if billing else "",

@@ -81,6 +81,14 @@ class ShopSettingsAdmin(admin.ModelAdmin):
                            "в «Асортимент і ціни» і кнопкою «Знижки за шаблоном» у базових цінах товару. "
                            "Спільний для всіх магазинів.",
         }),
+        ("🔢 Kundennummer і номери документів", {
+            "fields": ["customer_number_start"],
+            "description": "Кожен покупець веб-магазину (і гість) отримує Kundennummer з першим замовленням або "
+                           "реєстрацією — одну на клієнта CRM, спільну для всіх магазинів. Номери документів "
+                           "замовлень з сайту: PO-<Kundennummer>-001 (Bestellnummer), OC (Auftragsbestätigung), "
+                           "CI (Rechnung), PI (Proforma), PL (Lieferschein) — окремий лічильник для кожного виду "
+                           "й клієнта. Видані номери — «🔢 Kundennummern».",
+        }),
     ]
     readonly_fields = ["price_breaks_preview"]
 

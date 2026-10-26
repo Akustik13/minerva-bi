@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
 from . import accounts
-from .models import Shop, ShopCustomer
+from .models import CustomerNumber, Shop, ShopCustomer
 
 
 def account_status(shop: Shop) -> dict:
@@ -100,20 +100,21 @@ class ShopCustomerAdmin(admin.ModelAdmin):
     list_select_related = ["shop"]
     raw_id_fields = ["crm_customer"]
     readonly_fields = ["state_col", "email_verified_at", "last_login_at", "created_at", "updated_at",
+                       "customer_number", "claimed_orders",
                        "failed_logins", "locked_until", "sessions_col", "last_mail_at", "last_mail_error",
                        "cart_col", "orders_list", "payments_col"]
     actions = ["action_send_reset", "action_send_invite", "action_resend_verify", "action_unlock",
                "action_logout_all", "action_disable", "action_enable", "action_check_payments"]
     fieldsets = [
         ("Акаунт", {"fields": ["shop", "email", "state_col", "is_active", "email_verified_at", "lang",
-                               "crm_customer"],
+                               "crm_customer", "customer_number", "payment_method"],
                     "description": "Пароль покупця не видно нікому (зберігається лише хеш). Щоб допомогти покупцю — "
                                    "дія «✉️ Надіслати посилання для нового пароля» у списку акаунтів."}),
         ("Дані покупця", {"fields": ["company", "name", "phone", "vat_id", "street", "zip", "city", "country"]}),
         ("Адреса доставки", {"classes": ["collapse"],
                              "fields": ["ship_separate", "ship_company", "ship_name", "ship_street", "ship_zip",
                                         "ship_city", "ship_country", "ship_phone"]}),
-        ("Замовлення і кошик", {"fields": ["orders_list", "payments_col", "cart_col"]}),
+        ("Замовлення і кошик", {"fields": ["orders_list", "payments_col", "cart_col", "claimed_orders"]}),
         ("Безпека і листи", {"fields": ["last_login_at", "sessions_col", "failed_logins", "locked_until",
                                         "last_mail_at", "last_mail_error", "created_at", "updated_at"]}),
     ]
@@ -315,3 +316,29 @@ class ShopCustomerAdmin(admin.ModelAdmin):
             elif link:
                 self.message_user(request, f"Акаунт створено, але лист не надіслано: {obj.last_mail_error}",
                                   messages.ERROR)
+
+
+@admin.register(CustomerNumber)
+class CustomerNumberAdmin(admin.ModelAdmin):
+    """Видані Kundennummern (shop/numbering.py) і лічильники документів кожного клієнта."""
+    list_display = ["number", "crm_customer", "accounts_col", "counters_col", "created_at"]
+    search_fields = ["=number", "crm_customer__company", "crm_customer__name", "crm_customer__email",
+                     "accounts__email"]
+    raw_id_fields = ["crm_customer"]
+    readonly_fields = ["number", "created_at"]
+    fields = ["number", "crm_customer", "counters", "created_at"]
+
+    def has_add_permission(self, request):
+        return False   # номери видає лише Minerva (перше замовлення / реєстрація)
+
+    @admin.display(description="Акаунти кабінету")
+    def accounts_col(self, obj):
+        rows = [(reverse("admin:shop_shopcustomer_change", args=[a.pk]), a.email, a.shop.name)
+                for a in obj.accounts.select_related("shop")]
+        return format_html_join(", ", '<a href="{}">{}</a> ({})', rows) if rows else "—"
+
+    @admin.display(description="Видано документів")
+    def counters_col(self, obj):
+        from .numbering import KINDS
+        parts = [f"{k} {obj.counters[k]}" for k in KINDS if (obj.counters or {}).get(k)]
+        return " · ".join(parts) or "—"

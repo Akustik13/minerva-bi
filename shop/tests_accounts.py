@@ -290,7 +290,7 @@ class ProfileCartOrderTests(AccountTestCase):
         self.assertFalse(self.order("WS-1", email="ANNA@firma.de").json()["account_linked"])
         session = self.register_and_verify()
         rows = self.get("me/orders/", session).json()["results"]
-        self.assertEqual([o["number"] for o in rows], ["WS-1"])
+        self.assertEqual([o["number"] for o in rows], ["PO-31728-001"])   # номер від Minerva
 
     def test_order_with_session_clears_account_cart(self):
         session = self.register_and_verify()

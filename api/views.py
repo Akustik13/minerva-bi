@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action, api_view
@@ -373,7 +373,11 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
         currency = d.get("currency") or "EUR"
         d["currency"] = currency
 
-        existing = SalesOrder.objects.filter(source=d["source"], order_number=d["order_number"]).first()
+        site_ref = str(d["order_number"])   # магазин: номер сайту → у Minerva PO-<Kundennummer>-NNN (shop/numbering.py)
+        existing = SalesOrder.objects.filter(source=d["source"], order_number=site_ref).first()
+        if existing is None and is_shop:
+            from shop.numbering import find_by_site_ref
+            existing = find_by_site_ref(shop, site_ref)
         if existing:
             return Response(self._detail(existing, created=False), status=status.HTTP_200_OK)
 
@@ -452,10 +456,37 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             # спершу — товари поза каталогом (нотатка обрізається до 500 символів)
             d["internal_note"] = ("Поза каталогом Minerva: " + ", ".join(unknown) + (" | " + note if note else ""))[:500]
 
+        try:
+            order = self._create_order(request, d, resolved, listings, shop if is_shop else None, site_ref,
+                                       is_shop, is_quote, currency)
+        except IntegrityError:
+            dup = None
+            if is_shop:   # той самий номер сайту паралельним запитом — те саме замовлення
+                from shop.numbering import find_by_site_ref
+                dup = find_by_site_ref(shop, site_ref)
+            if dup is None:
+                raise
+            return Response(self._detail(dup, created=False), status=status.HTTP_200_OK)
+
+        extra = {}
+        if shop is not None:
+            from shop.accounts import record_order
+            try:  # замовлення вже створено — кабінет не повинен його зламати
+                extra["account_linked"] = record_order(order, shop, **account).customer_id is not None
+            except Exception:
+                import logging
+                logging.getLogger("shop").exception("record_order failed for %s", order)
+                extra["account_linked"] = False
+        return Response(self._detail(order, created=True, **extra), status=status.HTTP_201_CREATED)
+
+    def _create_order(self, request, d, resolved, listings, shop, site_ref, is_shop, is_quote, currency):
         with transaction.atomic():
             order = SalesOrder(**d)
             order.status_source = _key_label(request)
             order.save()
+            if shop is not None:   # до рядків: ключі складу беруть номер замовлення
+                from shop.numbering import assign_order_number
+                assign_order_number(order, shop, site_ref)
             total = Decimal("0")
             for product, raw, ln in resolved:
                 if is_shop:
@@ -476,17 +507,7 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             if d.get("total_price") is None and not is_quote:
                 order.total_price = total
                 order.save(update_fields=["total_price"])
-
-        extra = {}
-        if shop is not None:
-            from shop.accounts import record_order
-            try:  # замовлення вже створено — кабінет не повинен його зламати
-                extra["account_linked"] = record_order(order, shop, **account).customer_id is not None
-            except Exception:
-                import logging
-                logging.getLogger("shop").exception("record_order failed for %s", order)
-                extra["account_linked"] = False
-        return Response(self._detail(order, created=True, **extra), status=status.HTTP_201_CREATED)
+        return order
 
     def perform_update(self, serializer):
         serializer.save(status_source=_key_label(self.request))

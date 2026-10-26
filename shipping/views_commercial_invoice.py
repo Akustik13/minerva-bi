@@ -25,6 +25,14 @@ def _staff(view_fn):
     return staff_member_required(view_fn, login_url="/admin/login/")
 
 
+def _default_number(order) -> str:
+    """Номер без введеного: веб-магазин — CI-<Kundennummer>-NNN (shop/numbering.py), інакше номер замовлення."""
+    if order is None:
+        return ""
+    from shop.numbering import doc_number
+    return doc_number(order, "CI") or order.order_number
+
+
 def _num(v, default=0.0):
     try:
         return float(str(v).replace(",", "."))
@@ -109,7 +117,7 @@ def _save_and_generate(request, ci, data) -> bool:
     for k in ("ship_to", "billing_address", "currency", "lines", "shipping_cost", "incoterm",
               "export_reason", "payment_terms", "signer_name", "signer_position", "inv_date"):
         setattr(ci, k, data[k])
-    ci.number = data["number"] or (ci.sales_order.order_number if ci.sales_order else "")
+    ci.number = data["number"] or _default_number(ci.sales_order)
     if not ci.pk:
         ci.created_by = request.user
     ci.save()
