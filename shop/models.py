@@ -137,13 +137,29 @@ class Shop(models.Model):
     )
     team_emails = models.CharField(
         "Сповіщення команді — на адреси", max_length=300, blank=True, default="",
-        help_text="Через кому. Оплати, нові акаунти покупців. Порожньо — email з «Налаштування → Сповіщення».",
+        help_text="Через кому. Оплати, нові акаунти покупців, а з «Сайт надсилає листи з цієї ж скриньки» — і нові "
+                  "замовлення з сайту. Порожньо — email з «Налаштування → Сповіщення» (замовлення — як на сайті).",
     )
     mail_welcome = models.BooleanField(
         "Лист «Ласкаво просимо» після підтвердження реєстрації", default=True,
         help_text="Також коли покупець уперше задає пароль за запрошенням менеджера.",
     )
     team_notify_registration = models.BooleanField("Команді: новий акаунт покупця", default=False)
+    # ── Пошта сайту з Minerva (shop/site_mail.py; сайт читає GET /api/v1/shop/site-mail/) ──
+    site_mail_managed = models.BooleanField(
+        "Сайт надсилає листи з цієї ж скриньки", default=False,
+        help_text="Сайт бере SMTP, відправника й «Відповіді покупців» звідси (акаунт пошти вище) замість "
+                  "private/contact-config.php і /admin/ → «Пошта». Перевіряє раз на хвилину.",
+    )
+    site_order_confirmation = models.BooleanField(
+        "Сайт надсилає покупцю підтвердження замовлення", default=True,
+        help_text="Діє разом з «Сайт надсилає листи з цієї ж скриньки». Сповіщення про нові замовлення з сайту "
+                  "тоді йдуть на «Сповіщення команді — на адреси» (порожньо — як налаштовано на сайті).",
+    )
+    site_mail_reports = models.JSONField(
+        "Звіти сайтів про пошту", default=dict, blank=True,
+        help_text="{домен: {at, …}} — що в пошті сайту (без пароля), разом із запитом налаштувань.",
+    )
     account_links = models.JSONField(
         "Сторінки кабінету на сайті", default=dict, blank=True,
         help_text="Заповнюється автоматично з запитів сайту: {мова: адреса}. Потрібні для листів з адмінки.",

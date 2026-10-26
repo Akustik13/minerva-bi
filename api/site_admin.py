@@ -3,6 +3,7 @@
 POST /shop/staff/login/   {login, password, site}        — вхід персоналу (ключ сайту, прив'язаний до магазину)
 POST /shop/site-events/   {user, action, fields[], site} — журнал змін на сайті (лише назви полів)
 POST /shop/pair/          {code, site_url}               — код підключення → ключ API й секрет вебхука (без ключа)
+GET  /shop/site-mail/                                    — пошта сайту з Minerva (shop/site_mail.py) + звіт сайту
 """
 from rest_framework import status
 from rest_framework.permissions import AllowAny
@@ -59,6 +60,28 @@ class SiteEventView(APIView):
         site_admin.record_event(shop, str(d.get("site") or ""), str(d.get("user") or ""),
                                 str(d.get("action") or "settings"), {"fields": fields} if fields else {})
         return Response({"ok": True}, status=status.HTTP_201_CREATED)
+
+
+class SiteMailView(APIView):
+    """
+    GET /shop/site-mail/ — пошта сайту з Minerva (shop/site_mail.py): {managed, smtp{host, port, security, user,
+    password}, from, from_name, reply_to, notify[], confirmation}; managed=false — сайт лишається на своїх
+    налаштуваннях. Параметри mail_* — звіт сайту про власні налаштування пошти (без пароля).
+    """
+    resource_scope = "products"
+
+    def get(self, request):
+        from shop import site_mail
+        from shop.services import shop_for_key
+        key = request.auth if isinstance(request.auth, APIKey) else None
+        shop = shop_for_key(key)
+        if shop is None:
+            return Response({"detail": "Для ключа не налаштовано магазин.", "code": "no_shop"},
+                            status=status.HTTP_404_NOT_FOUND)
+        bound = _bound_shop(request) is not None
+        if bound and request.query_params.get("mail_site"):
+            site_mail.record_report(shop, request.query_params)
+        return Response(site_mail.public_config(shop, key))
 
 
 class PairThrottle(SimpleRateThrottle):

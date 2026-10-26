@@ -236,6 +236,7 @@ class ShopAdmin(admin.ModelAdmin):
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     form = ShopForm
     readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "mail_tools",
+                       "site_mail_col",
                        "stripe_col",
                        "assistant_col", "assistant_test_col", "site_admin_col"]
     inlines = [ShippingZoneInline, ShopStaffInline]
@@ -252,12 +253,14 @@ class ShopAdmin(admin.ModelAdmin):
         }),
         ("✉️ Пошта магазину", {
             "fields": ["mail_sender", "mail_from_name", "mail_reply_to", "mail_bcc", "team_emails", "mail_welcome",
-                       "team_notify_registration", "mail_footer", "team_lang", "mail_tools"],
+                       "team_notify_registration", "mail_footer", "team_lang", "mail_tools",
+                       "site_mail_managed", "site_order_confirmation", "site_mail_col"],
             "description": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату "
                            "отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину "
                            "додайте в Minerva як акаунт пошти (Email → Акаунти): тоді відповіді покупців потрапляють у "
                            "пошту Minerva й прив'язуються до клієнта в CRM. Тексти — «Шаблони листів». Підтвердження "
-                           "замовлення й контактну форму надсилає сайт — там у /admin/ → «Пошта» вкажіть ту саму скриньку.",
+                           "замовлення й контактну форму надсилає сайт: з «Сайт надсилає листи з цієї ж скриньки» — "
+                           "з цієї самої скриньки, інакше — з власних налаштувань сайту (/admin/ → «Пошта»).",
         }),
         ("👤 Особистий кабінет покупців", {
             "fields": ["accounts_enabled", "accounts_tools"],
@@ -354,6 +357,39 @@ class ShopAdmin(admin.ModelAdmin):
             format_html('<div style="margin-top:4px;color:#ffb74d">⚠ Ключам без прав «Акаунти покупців»: {}</div>',
                         ", ".join(no_scope)) if no_scope else "",
             format_html('<div style="margin-top:4px;color:#ff8a80">⚠ {}</div>', st["link_error"]) if st["link_error"] else "")
+
+    @admin.display(description="Пошта сайтів")
+    def site_mail_col(self, obj):
+        """Що фактично використовує кожен сайт для своїх листів (звіт сайту + налаштування Minerva)."""
+        from django.utils import timezone
+        from django.utils.dateparse import parse_datetime
+        from . import mail, site_mail
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        acc = site_mail.sender_account(obj)
+        from_minerva = obj.site_mail_managed and acc is not None
+        team = mail.addresses(obj.team_emails)
+        rows = []
+        for host, r in (obj.site_mail_reports or {}).items():
+            at = parse_datetime(r.get("at") or "")
+            if from_minerva:
+                uses = f"скринька Minerva {acc.email_address} ({acc.smtp_host})"
+                notify, confirm = (", ".join(team) if team else (r.get("notify") or "—")), obj.site_order_confirmation
+            else:
+                uses = (f"файли сайту: {r.get('from') or '—'} ({r.get('host') or 'SMTP не задано'}"
+                        + ("" if r.get("password") else ", без пароля") + ")")
+                notify, confirm = r.get("notify") or "—", r.get("confirmation")
+            rows.append((host, uses, notify, "так" if confirm else "ні", r.get("recipient") or "—",
+                         f"{timezone.localtime(at):%d.%m %H:%M}" if at else "—"))
+        warn = site_mail.problem(obj)
+        table = format_html(
+            '<table style="font-size:12px"><tr><th>Сайт</th><th>Листи йдуть з</th><th>Сповіщення про замовлення</th>'
+            '<th>Підтвердження покупцю</th><th>Контактна форма → </th><th>Звіт</th></tr>{}</table>',
+            format_html_join("", "<tr>" + "<td>{}</td>" * 6 + "</tr>", rows)) if rows else format_html(
+            '<div class="help">{}</div>', "Сайти ще не звітували про пошту (звіт — разом із запитом налаштувань, "
+                                         "раз на хвилину, коли на сайті щось надсилається або перевіряють зв'язок).")
+        return format_html('{}{}', format_html('<div style="color:#ff8a80;margin-bottom:6px">⚠ {}</div>', warn)
+                           if warn else "", table)
 
     @admin.display(description="Зараз")
     def mail_tools(self, obj):
