@@ -46,6 +46,38 @@
 .cp-review label{color:#ff8a80}
 .cp-banner{border:1px solid #e53935;background:rgba(229,57,53,.12);border-radius:8px;padding:10px 14px;margin:0 0 14px}
 .cp-banner strong{color:#ff8a80}
+/* Дорожня карта підключення (roadmap.html, shop/onboarding.py) */
+.rm{max-width:980px}
+.form-row.field-roadmap_col .flex-container>label{display:none}
+.form-row.field-roadmap_col .readonly{margin-left:0;width:100%}
+.rm-sum{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:8px}
+.rm-bar{flex:0 0 160px;height:8px;border-radius:4px;background:rgba(127,127,127,.25);overflow:hidden}
+.rm-bar span{display:block;height:100%;background:#4caf50}
+.rm-list>summary{cursor:pointer;opacity:.8;margin-bottom:6px}
+.rm-steps{list-style:none;margin:0;padding:0}
+.rm-step{position:relative;display:flex;gap:12px;padding:0 0 12px;margin:0}
+.rm-step:not(:last-child)::before{content:'';position:absolute;left:11px;top:24px;bottom:0;width:2px;background:rgba(127,127,127,.3)}
+.rm-step.is-done:not(:last-child)::before{background:#4caf50}
+.rm-dot{flex:0 0 24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+  border:2px solid #9e9e9e;color:#9e9e9e;background:var(--body-bg,#121212);z-index:1}
+.rm-step.is-done .rm-dot{border-color:#4caf50;background:#4caf50;color:#fff}
+.rm-step.is-warn .rm-dot{border-color:#f0b35a;background:#f0b35a;color:#000}
+.rm-step.is-todo .rm-dot{border-color:#ff8a80;color:#ff8a80}
+.rm-step.is-skip .rm-dot{border-style:dashed;opacity:.6}
+.rm-step.is-next .rm-dot{box-shadow:0 0 0 4px rgba(255,138,128,.25)}
+.rm-body{flex:1 1 auto;min-width:0;padding-top:2px}
+.rm-title{font-weight:600}
+.rm-state{font-weight:400;font-size:12px;margin-left:6px;opacity:.75}
+.rm-step.is-todo .rm-state{color:#ff8a80;opacity:1}
+.rm-step.is-warn .rm-state{color:#f0b35a;opacity:1}
+.rm-kind{font-weight:400;font-size:11px;margin-left:6px;padding:0 6px;border:1px solid rgba(127,127,127,.5);border-radius:8px;opacity:.8}
+.rm-detail{font-size:12px;margin-top:2px;overflow-wrap:anywhere}
+.rm-hint{font-size:12px;margin-top:3px;opacity:.8;overflow-wrap:anywhere}
+.rm-step.is-done .rm-hint,.rm-step.is-skip .rm-hint{opacity:.6}
+.rm-act{margin-top:5px;display:flex;flex-wrap:wrap;gap:6px}
+.rm-act .button{font-size:12px;padding:3px 9px}
+.rm-note{font-size:11px;opacity:.6;margin-top:2px}
+.rm-flash{outline:2px solid #f0b35a;outline-offset:4px;border-radius:4px;transition:outline-color 1.5s}
 .cp-banner .cp-chip{display:inline-block;margin:2px 4px 2px 0;padding:1px 8px;border-radius:9px;border:1px solid #e53935;
   color:#ff8a80;font-size:12px;cursor:pointer;background:transparent}
 </style>
@@ -382,6 +414,26 @@
       })
       .catch(function (e) { out.textContent = '❌ Перевірку не виконано: ' + e.message; })
       .then(function () { btn.disabled = false; });
+  });
+})();
+
+// Дорожня карта (roadmap.html): «Зробити ↓» — до поля картки (назва поля або #id блоку), розгорнути й підсвітити
+(function () {
+  'use strict';
+  document.querySelectorAll('[data-go]').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var go = a.dataset.go;
+      var r = go.charAt(0) === '#' ? document.getElementById(go.slice(1))
+        : document.querySelector('.fieldBox.field-' + go + ', .form-row.field-' + go);
+      if (!r) return;
+      for (var d = r.closest('details'); d; d = d.parentElement && d.parentElement.closest('details')) d.open = true;
+      r.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      r.classList.add('rm-flash');
+      setTimeout(function () { r.classList.remove('rm-flash'); }, 2200);
+      var input = r.querySelector('input:not([type=hidden]), select, textarea');
+      if (input && go.charAt(0) !== '#') setTimeout(function () { input.focus({ preventScroll: true }); }, 400);
+    });
   });
 })();
 

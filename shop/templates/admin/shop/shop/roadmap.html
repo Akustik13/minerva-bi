@@ -1,0 +1,32 @@
+{% comment %}Дорожня карта підключення магазину (shop/onboarding.py) — у картці магазину, стилі й переходи до полів — change_form.html{% endcomment %}
+<div class="rm">
+  <div class="rm-sum">
+    <div class="rm-bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{ sum.required }}" aria-valuenow="{{ sum.passed }}"><span style="width:{{ pct }}%"></span></div>
+    <div>{% if sum.complete %}<b>✅ Магазин підключено</b> — обов'язкові кроки готові ({{ sum.passed }} з {{ sum.required }}){% if sum.warnings %}, є що поправити: {{ sum.warnings }}{% endif %}.
+    {% else %}<b>Обов'язкові кроки: {{ sum.passed }} з {{ sum.required }}</b>{% endif %}
+    {% if sum.next %} Далі: {% if sum.next.go %}<a href="#" data-go="{{ sum.next.go }}">{{ sum.next.title }}</a>{% else %}<b>{{ sum.next.title }}</b>{% endif %}.{% endif %}</div>
+  </div>
+  <details class="rm-list"{% if not sum.complete or sum.warnings %} open{% endif %}>
+    <summary>Усі кроки ({{ steps|length }})</summary>
+    <ol class="rm-steps">
+      {% for s in steps %}
+      <li class="rm-step is-{{ s.state }}{% if s is sum.next %} is-next{% endif %}">
+        <span class="rm-dot" aria-hidden="true">{% if s.state == "done" %}✓{% elif s.state == "warn" %}!{% elif s.state == "skip" %}–{% else %}{{ forloop.counter }}{% endif %}</span>
+        <div class="rm-body">
+          <div class="rm-title">{{ s.title }}
+            <span class="rm-state">{% if s.state == "done" %}готово{% elif s.state == "warn" %}працює, але варто поправити{% elif s.state == "skip" %}вимкнено{% else %}не зроблено{% endif %}</span>
+            {% if s.kind == "recommended" %}<span class="rm-kind">рекомендовано</span>{% elif s.kind == "optional" %}<span class="rm-kind">за бажанням</span>{% endif %}
+          </div>
+          {% if s.detail %}<div class="rm-detail">{{ s.detail }}</div>{% endif %}
+          {% if s.hint %}<div class="rm-hint">💡 {{ s.hint }}</div>{% endif %}
+          {% if s.go or s.link %}<div class="rm-act">
+            {% if s.go %}<a href="#" class="button" data-go="{{ s.go }}">{% if s.state == "done" or s.state == "skip" %}Перейти{% else %}Зробити{% endif %} ↓</a>{% endif %}
+            {% if s.link %}<a href="{{ s.link.url }}" class="button">{{ s.link.label }} →</a>{% endif %}
+          </div>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </details>
+  <div class="rm-note">Стан — з бази Minerva, оновлюється після збереження сторінки. Живу перевірку сайту робить «🔌 Перевірити зв'язок із сайтом» у блоці «Підключення».</div>
+</div>

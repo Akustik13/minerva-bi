@@ -230,18 +230,24 @@ class CopyShopForm(forms.Form):
 
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
-    list_display = ["name", "slug", "is_default", "is_active", "currency", "listings_col", "shipping_col",
-                    "orders_col", "keys_col", "review_col"]
+    list_display = ["name", "roadmap_list_col", "slug", "is_default", "is_active", "currency", "listings_col",
+                    "shipping_col", "orders_col", "keys_col", "review_col"]
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     form = ShopForm
-    readonly_fields = ["created_at", "keys_col", "connection_col", "zones_tools", "accounts_tools", "mail_tools",
+    readonly_fields = ["created_at", "roadmap_col", "keys_col", "connection_col", "zones_tools", "accounts_tools",
+                       "mail_tools",
                        "site_mail_col",
                        "stripe_col",
                        "assistant_col", "assistant_test_col", "site_admin_col"]
     inlines = [ShippingZoneInline, ShopStaffInline]
     actions = ["action_copy", "action_default_zones", "action_import_dk_zones"]
     fieldsets = [
+        ("🧭 Підключення магазину — що зроблено і що далі", {
+            "fields": ["roadmap_col"],
+            "description": "Кроки від назви до першого замовлення: ✓ готово, ! працює, але варто поправити, "
+                           "номер — ще не зроблено. «Зробити ↓» веде до потрібного поля на цій сторінці.",
+        }),
         (None, {"fields": ["name", "public_name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
         ("🚚 Доставка", {
             "fields": ["free_shipping_enabled", "free_shipping_threshold", "zones_tools"],
@@ -357,6 +363,30 @@ class ShopAdmin(admin.ModelAdmin):
             format_html('<div style="margin-top:4px;color:#ffb74d">⚠ Ключам без прав «Акаунти покупців»: {}</div>',
                         ", ".join(no_scope)) if no_scope else "",
             format_html('<div style="margin-top:4px;color:#ff8a80">⚠ {}</div>', st["link_error"]) if st["link_error"] else "")
+
+    @admin.display(description="Кроки")
+    def roadmap_col(self, obj):
+        """Дорожня карта підключення (shop/onboarding.py)."""
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин — тоді тут з'являться кроки підключення й підказки."
+        from django.template.loader import render_to_string
+        from . import onboarding
+        items = onboarding.steps(obj)
+        s = onboarding.summary(items)
+        return render_to_string("admin/shop/shop/roadmap.html", {
+            "steps": items, "sum": s, "pct": round(100 * s["passed"] / s["required"]) if s["required"] else 100})
+
+    @admin.display(description="Підключення")
+    def roadmap_list_col(self, obj):
+        from . import onboarding
+        s = onboarding.summary(onboarding.steps(obj))
+        url = reverse("admin:shop_shop_change", args=[obj.pk])
+        if s["complete"]:
+            return format_html('<a href="{}" style="color:#7bc67b">✅ підключено</a>{}', url,
+                               format_html(' <span style="color:#f0b35a">· ! {}</span>', s["warnings"])
+                               if s["warnings"] else "")
+        return format_html('<a href="{}" style="color:#f0b35a">{} з {}</a><div class="help">далі: {}</div>', url,
+                           s["passed"], s["required"], s["next"]["title"] if s["next"] else "—")
 
     @admin.display(description="Пошта сайтів")
     def site_mail_col(self, obj):
