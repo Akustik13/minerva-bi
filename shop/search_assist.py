@@ -4,9 +4,13 @@
 наступник) рахує сам сайт (shop.js) з даних каталогу — миттєво й без Minerva. Minerva додає:
 - журнал «що шукають і не знаходять» (ShopSearchQuery — лише текст запиту й лічильники, без персональних даних);
 - «часто купують разом» — з історії замовлень;
-- AI-підказки (режим «ai»): модель вибирає з каталогу магазину до 3 товарів з коротким поясненням; кожен
-  артикул перевіряється (є в магазині й видимий, не з поточних результатів), відповіді кешуються на добу,
-  є денний ліміт і облік токенів (Shop.search_ai_usage).
+- AI-підказки (режими «ai», «ai_rag»): модель вибирає з каталогу магазину до 3 товарів з коротким поясненням;
+  кожен артикул перевіряється (є в магазині й видимий, не з поточних результатів), відповіді кешуються на добу,
+  є денний ліміт і облік токенів (Shop.search_ai_usage);
+- підказки нашого RAG (режими «rag», «ai_rag»): запит відвідувача → RAG API v1 (/v1/ask, той самий, що «Помічник
+  по продукції») → товари з відповіді RAG, перевірені за асортиментом магазину, + коротке речення. RAG відповідає
+  5–20 с, тому сайт опитує Minerva (rag=1) кілька разів; Minerva тримає одне завдання до RAG одночасно, кешує
+  відповідь на добу (спільно для всіх магазинів — RAG знає всі товари), лічильники rag_* у Shop.search_ai_usage.
 Будь-який збій — порожня відповідь, і сайт шукає як звичайно.
 """
 from __future__ import annotations
@@ -15,6 +19,7 @@ import hashlib
 import json
 import logging
 import re
+import time
 from datetime import timedelta
 
 from django.core.cache import cache
@@ -190,7 +195,7 @@ def _parse(text: str) -> list:
 
 def ai_tips(shop: Shop, q, results, lang: str = "") -> dict:
     """{status: ok|off|short|limit|unavailable, tips[{sku, reason}], cached}. Збій — status без підказок."""
-    if shop.search_assist != Shop.SEARCH_AI:
+    if shop.search_assist not in Shop.SEARCH_WITH_AI:
         return {"status": "off", "tips": []}
     query = normalize(q)
     if len(query) < 3:
@@ -248,4 +253,229 @@ def ai_ready(shop: Shop) -> str:
         return "налаштування Minerva AI недоступні"
     if int(usage(shop).get("calls") or 0) >= shop.search_ai_daily_limit:
         return "денний ліміт вичерпано — до кінця доби лише підказки за правилами"
+    return ""
+
+
+# ── Підказки нашого RAG ────────────────────────────────────────────────────────
+
+RAG_TIPS = 3
+RAG_CACHE = 24 * 3600
+RAG_EMPTY_CACHE = 3600       # RAG нічого не порадив або завдання не вдалося — годину не питати знову
+RAG_JOB_MAX = 90             # завдання довше — вважається втраченим
+RAG_PARALLEL = 1             # RAG обробляє один запит за раз (ним користуються й співробітники в Minerva)
+RAG_TIMEOUT = 4              # одне звернення Minerva → RAG: сайт чекає відповіді Minerva
+RAG_DOWN = 300
+RAG_ACTIVE = "shop-search-rag-active"
+RAG_DOWN_KEY = "shop-search-rag-down"
+RAG_LANGS = {"de", "en", "uk"}   # мови відповідей RAG; інші — англійською
+RAG_QUESTION = {
+    "de": "Kundensuche in unserem Online-Shop: «{q}». Welche unserer Produkte passen am besten? Nenne höchstens 3 "
+          "Artikelnummern aus unserem Sortiment, zu jeder einen kurzen Satz, warum (laut Datenblatt). Kurz, ohne Preise.",
+    "en": "Customer search in our online shop: \"{q}\". Which of our products fit best? Name at most 3 part numbers "
+          "from our range, each with one short sentence why (according to the datasheet). Brief, no prices.",
+    "uk": "Пошук покупця в нашому інтернет-магазині: «{q}». Які наші товари підходять найкраще? Назви щонайбільше 3 "
+          "артикули з нашого асортименту, до кожного одне коротке речення чому (за даташитом). Коротко, без цін.",
+}
+_MARKUP = re.compile(r"\*\*|__|`|\[\d+(?:\s*[,–-]\s*\d+)*\]|^\s*(?:#+|[-*•]|\d+[.)])\s+", re.M)
+_TOKEN = re.compile(r"(?<![\w./-])([A-Za-z0-9][A-Za-z0-9._/-]{2,62}[A-Za-z0-9])(?![\w-])")
+_EMPTY = {"items": [], "note": ""}
+
+
+def _plain(text) -> str:
+    return re.sub(r"\s+([.,;:!?])", r"\1", " ".join(_MARKUP.sub("", text or "").split()))
+
+
+def _cut(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:–—-") + " …"
+
+
+def _reason(answer: str, names) -> str:
+    """Речення відповіді RAG про цей товар (без артикула й розмітки)."""
+    for line in (answer or "").splitlines():
+        low = line.lower()
+        name = next((n for n in names if n and n.lower() in low), None)
+        if name is None or "|" in line:          # рядок таблиці — не речення
+            continue
+        text = _plain(re.sub(r"\(\s*\)", "", re.sub(re.escape(name), "", _plain(line), flags=re.I)))
+        text = re.sub(r"^[\s\-–—:;,.()]+", "", text).strip()
+        if len(text) >= 8:
+            return _cut(text[:1].upper() + text[1:], 200)
+    return ""
+
+
+def _note(answer: str, names) -> str:
+    """Перше звичайне речення відповіді (не про конкретний товар) — «пару слів» над підказками."""
+    for line in (answer or "").splitlines():
+        text = _plain(line)
+        low = text.lower()
+        if len(text) < 20 or "|" in text or any(n and n.lower() in low for n in names):
+            continue
+        out = ""
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            if out and len(out) + len(sentence) > 220:
+                break
+            out = (out + " " + sentence).strip()
+        return _cut(out, 220)
+    return ""
+
+
+def _rag_result(result: dict) -> dict:
+    """Відповідь RAG → артикули Minerva з поясненням: спершу товари з products, потім артикули з тексту."""
+    from inventory.services.stock import resolve_sku
+    answer = str(result.get("answer") or "")
+    items, seen = [], set()
+
+    def add(product, raw):
+        if product is not None and product.sku not in seen and len(items) < 8:
+            seen.add(product.sku)
+            items.append({"sku": product.sku, "reason": _reason(answer, {raw, product.sku})})
+
+    for p in (result.get("products") or [])[:15]:
+        raw = str((p.get("product") or p.get("sku") or "") if isinstance(p, dict) else "").strip()
+        if raw:
+            add(resolve_sku(raw), raw)
+    tokens = [t for t in dict.fromkeys(_TOKEN.findall(answer)) if any(ch.isdigit() for ch in t)][:20]
+    if tokens:
+        from inventory.models import Product
+        found = {p.sku.lower(): p for p in Product.objects.filter(sku__in=tokens)}
+        for t in tokens:
+            add(found.get(t.lower()), t)
+    return {"items": items, "note": _note(answer, {i["sku"] for i in items})}
+
+
+def _rag_settings():
+    from rag_assistant.models import RagSettings
+    return RagSettings.get()
+
+
+def _rag_client(settings):
+    from rag_assistant.client import RagClient
+    client = RagClient(settings, client_id="shop-search")
+    client.timeout = RAG_TIMEOUT
+    return client
+
+
+def _active() -> dict:
+    now = time.time()
+    return {k: t for k, t in (cache.get(RAG_ACTIVE) or {}).items() if now - t < RAG_JOB_MAX}
+
+
+def _set_active(digest: str, on: bool) -> None:
+    active = _active()
+    if on:
+        active[digest] = time.time()
+    else:
+        active.pop(digest, None)
+    cache.set(RAG_ACTIVE, active, RAG_JOB_MAX * 2)
+
+
+def _rag_out(shop: Shop, item: dict, cached: bool) -> dict:
+    visible = set(_visible(shop).values_list("product__sku", flat=True))
+    tips = [dict(t) for t in item.get("items") or [] if t.get("sku") in visible][:RAG_TIPS]
+    if cached:
+        _count(shop, rag_cached=1)
+    return {"status": "ok", "tips": tips, "note": item.get("note", "") if tips else "", "cached": cached}
+
+
+def _rag_poll(shop: Shop, settings, key: str, digest: str, job: dict) -> dict:
+    from rag_assistant.client import RagError
+    jobkey = f"shop-search-rag-job:{digest}"
+
+    def finish(item, ttl):
+        cache.delete(jobkey)
+        _set_active(digest, False)
+        cache.set(key, item, ttl)
+
+    if time.time() - float(job.get("at") or 0) > RAG_JOB_MAX:
+        finish(_EMPTY, RAG_EMPTY_CACHE)
+        _count(shop, rag_errors=1)
+        return {"status": "unavailable", "tips": []}
+    try:
+        data = _rag_client(settings).job(job["id"])
+    except RagError as e:
+        if e.code in ("not_found", "auth", "bad_request"):
+            finish(_EMPTY, RAG_EMPTY_CACHE)
+            _count(shop, rag_errors=1)
+            return {"status": "unavailable", "tips": []}
+        return {"status": "pending", "tips": []}   # мережа на мить — сайт спитає ще раз
+    state = data.get("status")
+    if state not in ("completed", "failed"):
+        return {"status": "pending", "tips": []}
+    if state == "failed":
+        finish(_EMPTY, RAG_EMPTY_CACHE)
+        _count(shop, rag_errors=1)
+        return {"status": "unavailable", "tips": []}
+    item = _rag_result(data.get("result") or {})
+    finish(item, RAG_CACHE if item["items"] else RAG_EMPTY_CACHE)
+    return _rag_out(shop, item, cached=False)
+
+
+def rag_tips(shop: Shop, q, lang: str = "") -> dict:
+    """{status: ok|pending|busy|limit|unavailable|off|short, tips[{sku, reason}], note, cached}.
+
+    Перший виклик ставить завдання RAG (pending), наступні (сайт опитує) — забирають відповідь."""
+    from rag_assistant.client import RagError
+    if shop.search_assist not in Shop.SEARCH_WITH_RAG:
+        return {"status": "off", "tips": []}
+    query = normalize(q)
+    if len(query) < 3:
+        return {"status": "short", "tips": []}
+    lang = lang if lang in RAG_LANGS else "en"
+    digest = hashlib.sha256(f"{lang}|{query}".encode()).hexdigest()[:32]
+    key = f"shop-search-rag:{digest}"
+    hit = cache.get(key)
+    if hit is not None:
+        return _rag_out(shop, hit, cached=True)
+    try:
+        settings = _rag_settings()
+    except Exception:  # noqa: BLE001
+        return {"status": "unavailable", "tips": []}
+    if not settings.configured:
+        return {"status": "unavailable", "tips": []}
+    job = cache.get(f"shop-search-rag-job:{digest}")
+    if job:
+        return _rag_poll(shop, settings, key, digest, job)
+    if cache.get(RAG_DOWN_KEY):
+        return {"status": "unavailable", "tips": []}
+    if int(usage(shop).get("rag_calls") or 0) >= shop.search_ai_daily_limit:
+        return {"status": "limit", "tips": []}
+    for other in list(_active()) if len(_active()) >= RAG_PARALLEL else []:
+        # завдання, яке більше ніхто не опитує (відвідувач змінив запит), — дочитати й звільнити чергу
+        other_job = cache.get(f"shop-search-rag-job:{other}")
+        if other_job:
+            _rag_poll(shop, settings, f"shop-search-rag:{other}", other, other_job)
+        else:
+            _set_active(other, False)
+    if len(_active()) >= RAG_PARALLEL:
+        _count(shop, rag_busy=1)
+        return {"status": "busy", "tips": []}
+    try:
+        job_id = _rag_client(settings).ask(RAG_QUESTION[lang].format(q=query), [], language=lang,
+                                           latest=settings.latest_only)
+    except RagError as e:
+        if e.code == "busy":     # RAG відповідає комусь іншому — сайт спитає ще раз
+            _count(shop, rag_busy=1)
+            return {"status": "busy", "tips": []}
+        logger.warning("shop search RAG failed (%s): %s", shop.slug, e.code)
+        cache.set(RAG_DOWN_KEY, 1, RAG_DOWN)
+        _count(shop, rag_errors=1)
+        return {"status": "unavailable", "tips": []}
+    cache.set(f"shop-search-rag-job:{digest}", {"id": job_id, "at": time.time()}, RAG_JOB_MAX + 60)
+    _set_active(digest, True)
+    _count(shop, rag_calls=1)
+    return {"status": "pending", "tips": []}
+
+
+def rag_ready(shop: Shop) -> str:
+    """Чому RAG-підказки не працюють ('' — усе гаразд)."""
+    try:
+        settings = _rag_settings()
+    except Exception:  # noqa: BLE001
+        return "налаштування помічника по продукції недоступні"
+    if not settings.configured:
+        return "не задано адресу або ключ RAG API (Minerva AI → «📚 Помічник по продукції»)"
+    if cache.get(RAG_DOWN_KEY):
+        return "RAG щойно не відповів — 5 хв пауза, сайт показує підказки за правилами"
+    if int(usage(shop).get("rag_calls") or 0) >= shop.search_ai_daily_limit:
+        return "денний ліміт RAG вичерпано — до кінця доби лише інші підказки"
     return ""

@@ -340,14 +340,22 @@ def _search(shop) -> dict:
     if shop.search_assist == Shop.SEARCH_OFF:
         return _step("search", "Підказки в пошуку", OPTIONAL, SKIP, "вимкнено — звичайний пошук",
                      "За бажанням: розпізнавання частоти й роз'єму в запиті, схожі товари, кабелі, «часто купують "
-                     "разом» (без AI, безкоштовно) або ще й AI-підказки.", go="search_assist")
-    if shop.search_assist == Shop.SEARCH_AI:
-        problem = search_assist.ai_ready(shop)
+                     "разом» (без AI, безкоштовно) або ще й AI-підказки чи підказки нашого RAG.", go="search_assist")
+    if shop.search_assist != Shop.SEARCH_RULES:
         u = search_assist.usage(shop)
-        detail = f"правила + AI ({shop.search_ai_model}) · сьогодні AI-викликів {u.get('calls', 0)} з {shop.search_ai_daily_limit}"
-        if problem:
+        parts, problems = ["правила"], []
+        if shop.search_assist in Shop.SEARCH_WITH_AI:
+            parts.append(f"AI ({shop.search_ai_model}, сьогодні {u.get('calls', 0)} з {shop.search_ai_daily_limit})")
+            if search_assist.ai_ready(shop):
+                problems.append("AI-підказки: " + search_assist.ai_ready(shop))
+        if shop.search_assist in Shop.SEARCH_WITH_RAG:
+            parts.append(f"RAG (сьогодні {u.get('rag_calls', 0)} з {shop.search_ai_daily_limit})")
+            if search_assist.rag_ready(shop):
+                problems.append("RAG-підказки: " + search_assist.rag_ready(shop))
+        detail = " + ".join(parts)
+        if problems:
             return _step("search", "Підказки в пошуку", OPTIONAL, WARN, detail,
-                         f"AI-підказки не працюють: {problem}. Сайт показує підказки за правилами.", go="search_col")
+                         "Не працюють " + "; ".join(problems) + ". Сайт показує підказки за правилами.", go="search_col")
         return _step("search", "Підказки в пошуку", OPTIONAL, DONE, detail, go="search_col")
     return _step("search", "Підказки в пошуку", OPTIONAL, DONE, "розумний пошук і підказки за правилами (без AI)",
                  go="search_assist")

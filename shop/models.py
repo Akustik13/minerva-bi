@@ -115,12 +115,16 @@ class Shop(models.Model):
     media_enabled = models.BooleanField(
         "Сайт отримує фото й даташити з Minerva", default=True,
         help_text="Окремо для кожного магазину; спільний перемикач — «🖼 Фото й даташити».")
-    SEARCH_OFF, SEARCH_RULES, SEARCH_AI = "off", "rules", "ai"
+    SEARCH_OFF, SEARCH_RULES, SEARCH_AI, SEARCH_RAG, SEARCH_AI_RAG = "off", "rules", "ai", "rag", "ai_rag"
     SEARCH_CHOICES = [
         (SEARCH_OFF, "Вимкнено — звичайний пошук"),
         (SEARCH_RULES, "Розумний пошук + підказки за правилами (без AI, безкоштовно)"),
         (SEARCH_AI, "Розумний пошук + правила + AI-підказки (витрачає токени)"),
+        (SEARCH_RAG, "Розумний пошук + правила + AI-підказки RAG (наш RAG, за даташитами)"),
+        (SEARCH_AI_RAG, "Розумний пошук + правила + AI-підказки і RAG разом (для порівняння)"),
     ]
+    SEARCH_WITH_AI = {SEARCH_AI, SEARCH_AI_RAG}
+    SEARCH_WITH_RAG = {SEARCH_RAG, SEARCH_AI_RAG}
     SEARCH_MODELS = [("claude-opus-5-5", "Claude Opus 5.5 — найкраща якість"),
                      ("claude-sonnet-5-5", "Claude Sonnet 5.5 — швидше й дешевше"),
                      ("claude-haiku-5-5", "Claude Haiku 5.5 — найшвидше й найдешевше")]
@@ -128,13 +132,14 @@ class Shop(models.Model):
         "Підказки в пошуку на сайті", max_length=10, choices=SEARCH_CHOICES, default=SEARCH_OFF,
         help_text="Розумний пошук розпізнає частоту, роз'єм і стандарт у запиті, показує схожі товари, "
                   "підходящі кабелі й «часто купують разом». AI-підказки — ще й рекомендації моделі з каталогу "
-                  "магазину. Будь-який збій — сайт шукає як звичайно.")
+                  "магазину; RAG — рекомендації нашого RAG за даташитами (без токенів Anthropic). Будь-який збій — "
+                  "сайт шукає як звичайно.")
     search_ai_model = models.CharField("AI-модель підказок", max_length=40, choices=SEARCH_MODELS,
                                        default="claude-opus-5-5")
     search_ai_daily_limit = models.PositiveIntegerField(
         "AI-підказок на добу (максимум)", default=200,
-        help_text="Після ліміту сайт до кінця доби показує лише підказки за правилами. Повторні запити — з кешу, "
-                  "у ліміт не входять.")
+        help_text="Окремо для AI (Claude) і для RAG. Після ліміту сайт до кінця доби показує лише підказки за "
+                  "правилами. Повторні запити — з кешу, у ліміт не входять.")
     search_ai_usage = models.JSONField("Витрати AI-підказок", default=dict, blank=True,
                                        help_text="Лічильники за сьогодні й загалом: виклики, кеш, токени.")
     free_shipping_enabled = models.BooleanField(

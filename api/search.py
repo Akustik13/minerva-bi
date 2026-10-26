@@ -1,9 +1,11 @@
 """Підказки в пошуку сайту магазину — логіка в shop/search_assist.py.
 
-GET /shop/search/assist/?config=1                      → {mode}: off | rules | ai (режим з картки магазину)
-GET /shop/search/assist/?q=…&n=…&skus=…&lang=…&ai=0|1&log=0|1
-    → {mode, together[{sku, orders}], ai{status, tips[{sku, reason}], cached}?}
+GET /shop/search/assist/?config=1             → {mode}: off | rules | ai | rag | ai_rag (режим з картки магазину)
+GET /shop/search/assist/?q=…&n=…&skus=…&lang=…&ai=0|1&rag=0|1&log=0|1
+    → {mode, together[{sku, orders}], ai{status, tips[{sku, reason}], cached}?, rag{status, tips, note, cached}?}
     n — скільки знайшов сайт (журнал «що шукають»), skus — перші результати сайту (для «часто купують разом»).
+GET /shop/search/assist/?q=…&lang=…&rag=1&poll=1 → {mode, rag} — опитування відповіді RAG (status pending →
+    ok | busy | unavailable …), без журналу, «разом» і AI.
 Лише ключ, прив'язаний до магазину (права products:read).
 """
 from rest_framework import status
@@ -29,9 +31,12 @@ class ShopSearchAssistView(APIView):
             return Response(out)
         q, skus = p.get("q", ""), search_assist.clean_skus(p.get("skus", ""))
         n = p.get("n", "")
-        if p.get("log") != "0" and n.isdigit():
-            search_assist.record(shop, q, int(n))
-        out["together"] = search_assist.together(shop, skus)
-        if p.get("ai") == "1":
-            out["ai"] = search_assist.ai_tips(shop, q, skus, p.get("lang", ""))
+        if p.get("poll") != "1":
+            if p.get("log") != "0" and n.isdigit():
+                search_assist.record(shop, q, int(n))
+            out["together"] = search_assist.together(shop, skus)
+            if p.get("ai") == "1":
+                out["ai"] = search_assist.ai_tips(shop, q, skus, p.get("lang", ""))
+        if p.get("rag") == "1":
+            out["rag"] = search_assist.rag_tips(shop, q, p.get("lang", ""))
         return Response(out)

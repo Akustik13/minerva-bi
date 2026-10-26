@@ -108,5 +108,102 @@ class SearchAssistTests(TestCase):
         page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
         self.assertContains(page, "🔎 Пошук на сайті")
         self.assertContains(page, "«rp-sma 2,4 ghz» ×1")
+        self.assertContains(page, "RAG сьогодні")
         report = self.client.get("/admin/shop/shopsearchquery/?zero=1")
         self.assertContains(report, "rp-sma 2,4 ghz")
+
+
+class RagTipsTests(TestCase):
+    """Підказки нашого RAG: завдання → опитування → товари, перевірені за асортиментом (RAG підмінено)."""
+
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        from rag_assistant.models import RagSettings
+        RagSettings.objects.update_or_create(pk=1, defaults={"base_url": "https://rag.example", "api_key": "k"})
+        self.shop = Shop.objects.create(name="Web", slug="webshop", search_assist=Shop.SEARCH_RAG)
+        for sku in ("AN-BLE", "CA-MHF1", "HIDDEN"):
+            p = Product.objects.create(sku=sku, name=sku, sale_price=Decimal("5"))
+            ShopListing.objects.create(shop=self.shop, product=p, is_visible=sku != "HIDDEN")
+        key = APIKey.objects.create(name="site", shop=self.shop, scopes=["products:read"])
+        self.c = APIClient()
+        self.c.credentials(HTTP_AUTHORIZATION=f"Token {key.key}")
+        patcher = mock.patch("shop.search_assist._rag_client")
+        self.rag = patcher.start().return_value
+        self.addCleanup(patcher.stop)
+        self.rag.ask.return_value = "job-1"
+
+    def get(self, q, **extra):
+        return self.c.get(URL, {"q": q, "n": "2", "skus": "", "rag": "1", "lang": "de", **extra}).json()
+
+    def test_job_poll_validate_cache(self):
+        self.rag.job.return_value = {"status": "running", "stage": "search"}
+        d = self.get("ble and gnss")
+        self.assertEqual(d["rag"]["status"], "pending")
+        question = self.rag.ask.call_args[0][0]
+        self.assertIn("«ble and gnss»", question)
+        self.assertEqual(self.rag.ask.call_args[1]["language"], "de")
+        self.assertEqual(self.get("ble and gnss", poll="1")["rag"]["status"], "pending")
+        self.assertNotIn("together", self.get("ble and gnss", poll="1"))      # опитування — лише RAG
+        answer = ("Für BLE und GNSS eignet sich eine Kombiantenne mit zwei Ports [1].\n\n"
+                  "1. **AN-BLE** — Dualband-Antenne für Bluetooth und GNSS L1 [2].\n"
+                  "| AN-BLE | 2,4 GHz |\n- **HIDDEN** — versteckt\n- NOPE-123 — erfunden\n"
+                  "Dazu passt das Kabel CA-MHF1 mit MHF1-Stecker.")
+        self.rag.job.return_value = {"status": "completed", "result": {
+            "answer": answer, "products": [{"product": "AN-BLE", "source": "a.pdf", "page": 2},
+                                           {"product": "NOPE-123"}, {"sku": "HIDDEN"}]}}
+        d = self.get("ble and gnss", poll="1")["rag"]
+        self.assertEqual((d["status"], d["cached"]), ("ok", False))
+        self.assertEqual(d["tips"], [{"sku": "AN-BLE", "reason": "Dualband-Antenne für Bluetooth und GNSS L1."},
+                                     {"sku": "CA-MHF1", "reason": "Dazu passt das Kabel mit MHF1-Stecker."}])
+        self.assertEqual(d["note"], "Für BLE und GNSS eignet sich eine Kombiantenne mit zwei Ports.")
+        # кеш спільний для магазинів (RAG знає всі товари), перевірка — за асортиментом кожного магазину
+        again = self.get("BLE  and gnss")["rag"]
+        self.assertTrue(again["cached"])
+        self.assertEqual(self.rag.ask.call_count, 1)
+        self.shop.refresh_from_db()
+        u = self.shop.search_ai_usage
+        self.assertEqual((u["rag_calls"], u["rag_cached"]), (1, 1))
+
+    def test_busy_parallel_failure_and_modes(self):
+        from rag_assistant.client import RagError
+        self.rag.job.return_value = {"status": "running"}
+        self.assertEqual(self.get("gnss antenne")["rag"]["status"], "pending")
+        self.assertEqual(self.get("lora 868")["rag"]["status"], "busy")       # одне завдання до RAG одночасно
+        self.assertEqual(self.rag.ask.call_count, 1)
+        cache.clear()
+        self.rag.ask.side_effect = RagError("busy", "busy", 429)
+        self.assertEqual(self.get("lora 868")["rag"]["status"], "busy")
+        self.rag.ask.side_effect = RagError("network", "down")
+        self.assertEqual(self.get("wifi 6")["rag"]["status"], "unavailable")
+        self.assertEqual(self.get("uwb antenne")["rag"]["status"], "unavailable")
+        self.assertEqual(self.rag.ask.call_count, 3)                          # 5 хв без звернень після збою
+        self.assertIn("5 хв", search_assist.rag_ready(self.shop))
+        Shop.objects.filter(pk=self.shop.pk).update(search_assist=Shop.SEARCH_AI)
+        self.assertEqual(self.get("wifi 6")["rag"]["status"], "off")
+
+    def test_lost_job_and_unconfigured(self):
+        self.rag.job.return_value = {"status": "running"}
+        self.get("gnss antenne")
+        import hashlib
+        jobkey = "shop-search-rag-job:" + hashlib.sha256("de|gnss antenne".encode()).hexdigest()[:32]
+        cache.set(jobkey, {**cache.get(jobkey), "at": 1})                    # завдання «зависло» в RAG
+        self.assertEqual(self.get("gnss antenne", poll="1")["rag"]["status"], "unavailable")
+        self.assertEqual(self.get("gnss antenne")["rag"], {"status": "ok", "tips": [], "note": "", "cached": True})
+        cache.clear()
+        from rag_assistant.models import RagSettings
+        RagSettings.objects.filter(pk=1).update(api_key="")
+        self.assertEqual(self.get("wifi 6")["rag"]["status"], "unavailable")
+        self.assertIn("ключ RAG API", search_assist.rag_ready(self.shop))
+        from .onboarding import steps
+        step = [x for x in steps(self.shop) if x["key"] == "search"][0]
+        self.assertEqual(step["state"], "warn")
+        self.assertIn("RAG-підказки", step["hint"])
+
+    def test_abandoned_job_frees_queue(self):
+        self.rag.job.return_value = {"status": "running"}
+        self.get("gnss antenne")                       # відвідувач пішов далі, це завдання ніхто не опитує
+        self.rag.job.return_value = {"status": "completed", "result": {"answer": "x", "products": [{"product": "AN-BLE"}]}}
+        self.assertEqual(self.get("lora 868")["rag"]["status"], "pending")   # Minerva дочитала його сама
+        self.assertEqual(self.rag.ask.call_count, 2)
+        self.assertEqual([t["sku"] for t in self.get("gnss antenne")["rag"]["tips"]], ["AN-BLE"])

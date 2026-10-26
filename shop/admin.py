@@ -266,8 +266,10 @@ class ShopAdmin(admin.ModelAdmin):
             "description": "Підказки під полем пошуку на сайті. «Правила» — без AI і безкоштовно: розпізнавання частоти, "
                            "роз'єму й стандарту в запиті, схожі товари, підходящі кабелі, наступник, «часто купують "
                            "разом». «AI» — ще й рекомендації моделі з каталогу магазину (витрачає токени, з денним "
-                           "лімітом). На сайті підказки можна вимкнути в /admin/ → «Магазин». Будь-який збій — сайт "
-                           "шукає як звичайно.",
+                           "лімітом). «RAG» — рекомендації нашого RAG за даташитами (адреса й ключ — «📚 Помічник по "
+                           "продукції»; без токенів Anthropic, відповідь за 5–20 с, з'являється окремим блоком). "
+                           "«AI і RAG разом» — обидва блоки, щоб порівняти. На сайті підказки можна вимкнути в "
+                           "/admin/ → «Магазин». Будь-який збій — сайт шукає як звичайно.",
         }),
         ("🚚 Доставка", {
             "fields": ["free_shipping_enabled", "free_shipping_threshold", "zones_tools"],
@@ -418,7 +420,10 @@ class ShopAdmin(admin.ModelAdmin):
         from .models import ShopSearchQuery
         u = search_assist.usage(obj)
         total = u.get("total") or {}
-        problem = search_assist.ai_ready(obj) if obj.search_assist == obj.SEARCH_AI else ""
+        problem = search_assist.ai_ready(obj) if obj.search_assist in obj.SEARCH_WITH_AI else ""
+        rag_problem = search_assist.rag_ready(obj) if obj.search_assist in obj.SEARCH_WITH_RAG else ""
+        rag_line = lambda d: (f"завдань {d.get('rag_calls', 0)} · з кешу {d.get('rag_cached', 0)} · "  # noqa: E731
+                              f"RAG зайнятий {d.get('rag_busy', 0)} · помилок {d.get('rag_errors', 0)}")
         line = lambda d: (f"викликів {d.get('calls', 0)} · з кешу {d.get('cached', 0)} · помилок {d.get('errors', 0)} · "  # noqa: E731
                           f"токенів: вхід {d.get('input', 0)}, з кешу промпту {d.get('cache_read', 0)}, "
                           f"запис у кеш {d.get('cache_write', 0)}, відповідь {d.get('output', 0)}")
@@ -426,11 +431,14 @@ class ShopAdmin(admin.ModelAdmin):
                     .values_list("query", "zero_results")[:8])
         report = reverse("admin:shop_shopsearchquery_changelist") + f"?shop__id__exact={obj.pk}"
         return format_html(
-            '{}<div>AI сьогодні: {} з {}</div><div style="opacity:.8">AI загалом: {}</div>'
+            '{}{}<div>AI сьогодні: {} з {}</div><div style="opacity:.8">AI загалом: {}</div>'
+            '<div style="margin-top:6px">RAG сьогодні: {} з {}</div><div style="opacity:.8">RAG загалом: {}</div>'
             '<div style="margin-top:6px">Шукали й не знайшли: {}</div><div style="margin-top:6px"><a href="{}">'
             '🔎 Усі запити на сайті →</a></div>',
-            format_html('<div style="color:#ff8a80">⚠ {}</div>', problem) if problem else "",
+            format_html('<div style="color:#ff8a80">⚠ AI: {}</div>', problem) if problem else "",
+            format_html('<div style="color:#ff8a80">⚠ RAG: {}</div>', rag_problem) if rag_problem else "",
             line(u), obj.search_ai_daily_limit, line(total),
+            rag_line(u), obj.search_ai_daily_limit, rag_line(total),
             format_html_join(", ", "«{}» ×{}", zero) if zero else "—", report)
 
     @admin.display(description="Пошта сайтів")
