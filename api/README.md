@@ -606,14 +606,14 @@ app.listen(3000);
 | Запит | Що робить |
 |---|---|
 | `GET shop/account/?link_de=…&link_en=…` | `{enabled, password_min_length}` — чи ввімкнено кабінет (сайт показує / ховає вхід); адреси сторінки кабінету запам'ятовуються для листів з адмінки |
-| `POST shop/account/register/` | `{email, password, company, name, phone?, vat_id?, street?, zip?, city?, country?, confirm_b2b, lang, link}` → **202** завжди однаково; лист з `link#verify=<token>` (48 год). На вже підтверджений email — лист «у вас уже є акаунт», пароль не змінюється. Непідтверджену реєстрацію перезаписує нова |
+| `POST shop/account/register/` | `{email, password, company, name, phone?, vat_id?, street?, zip?, city?, country?, confirm_b2b, lang, link, claim_order?}` → **202** завжди однаково; лист з `link#verify=<token>` (48 год). На вже підтверджений email — лист «у вас уже є акаунт», пароль не змінюється. Непідтверджену реєстрацію перезаписує нова. `claim_order` — номер замовлення без акаунта (сайт передає його лише з підписаним cookie браузера, що оформив замовлення): після підтвердження email воно переходить у кабінет (не старше 14 днів, лише без акаунта) |
 | `POST shop/account/resend/` | `{email, link, lang}` → 202 (повторний лист, не частіше 1/хв) |
 | `POST shop/account/verify/` | `{token, password, remember}` → сесія. **Пароль обов'язковий** — посилання з листа без пароля не дає входу |
 | `POST shop/account/login/` | `{email, password, remember}` → `{session, expires_at, remember, customer}`; 401 `invalid_credentials`, 403 `email_not_verified` / `account_disabled`, 429 `locked` (+`Retry-After`; 5 невдалих → 15 хв) |
 | `POST shop/account/logout/` | завершує сесію з заголовка |
 | `POST shop/account/password/forgot/` | `{email, link, lang}` → 202 завжди; лист з `link#reset=<token>` (60 хв, одноразово) |
 | `POST shop/account/password/reset/` | `{token, password, remember}` → сесія; усі інші сесії завершуються, email вважається підтвердженим |
-| `GET / PATCH / DELETE shop/account/me/` | профіль (`company, name, phone, vat_id, address{…}, shipping{separate, …}, lang, orders_count, cart_count`); `DELETE {password}` — видалити акаунт (замовлення лишаються) |
+| `GET / PATCH / DELETE shop/account/me/` | профіль (`company, name, phone, vat_id, address{…}, shipping{separate, …}, lang, customer_number` (Kundennummer), `payment_method` (за замовчуванням у касі), `orders_count, cart_count`); `PATCH` — і окремі поля («Als Standard speichern»); `DELETE {password}` — видалити акаунт (замовлення лишаються) |
 | `POST shop/account/me/password/` | `{current_password, new_password}`; інші сесії завершуються |
 | `GET shop/account/me/orders/` | `{count, results[{number, kind: order\|quote, date, status, payment_method, payment_status, currency, net, shipping, vat_rate, vat, gross, items, tracking[{carrier, number, url, status}]}]}` |
 | `GET shop/account/me/orders/{number}/` | + `lines[{sku, name, name_en, qty, unit_price, total}]`, `shipping_address`, `billing`, `dates{received, shipped, delivered}`, `offer` (надісланий Angebot для запиту), `documents[{kind: OC\|PI\|CI\|PL, title, name, number, size, date}]` (PDF з теки замовлення, які створила Minerva), `doc_numbers` |
