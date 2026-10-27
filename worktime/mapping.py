@@ -50,6 +50,53 @@ def suggest(project, dante_projects) -> tuple[DanteProject, str] | None:
     return None
 
 
+def suggest_customer(dp: DanteProject, customers=None):
+    """Клієнт CRM для проєкту askDANTE за назвою клієнта askDANTE (компанія або контактна особа, без GmbH/AG…).
+    Лише один збіг — підказка; кілька або жодного — None. customers — заздалегідь [(pk, norm company, norm name)]."""
+    want = _norm(dp.customer_name)
+    if not want:
+        return None
+    if customers is None:
+        customers = customer_index()
+    hits = {pk for pk, company, name in customers if want in (company, name)}
+    if len(hits) != 1:
+        return None
+    from crm.models import Customer
+    return Customer.objects.filter(pk=hits.pop()).first()
+
+
+def customer_index() -> list[tuple[int, str, str]]:
+    from crm.models import Customer
+    return [(pk, _norm(company), _norm(name)) for pk, company, name in
+            Customer.objects.values_list("pk", "company", "name")]
+
+
+def find_customer(text: str):
+    """Клієнт CRM з введеного тексту: «#123», точна компанія / ім'я / email або єдиний частковий збіг."""
+    from crm.models import Customer
+    text = (text or "").strip()
+    if not text:
+        return None
+    if text.startswith("#") and text[1:].isdigit():
+        return Customer.objects.filter(pk=int(text[1:])).first()
+    for field in ("company__iexact", "name__iexact", "email__iexact"):
+        qs = Customer.objects.filter(**{field: text})
+        if qs.count() == 1:
+            return qs.first()
+    qs = Customer.objects.filter(company__icontains=text) | Customer.objects.filter(name__icontains=text)
+    qs = qs.distinct()
+    return qs.first() if qs.count() == 1 else None
+
+
+def create_in_minerva(dp: DanteProject, user=None):
+    """Проєкт Minerva з проєкту askDANTE (назва, клієнт CRM, якщо прив'язано), одразу зв'язаний з ним."""
+    from projects import services as project_services
+    project = project_services.create_project(name=dp.name, user=user, customer=dp.crm_customer,
+                                              description=f"Створено з проєкту askDANTE «{dp}».")
+    link(project, dp, user)
+    return project
+
+
 def link(project, dante_project: DanteProject, user=None) -> ProjectMap:
     m, _ = ProjectMap.objects.update_or_create(project=project, defaults={
         "dante_project": dante_project, "created_by": user if getattr(user, "pk", None) else None})

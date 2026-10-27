@@ -54,6 +54,14 @@
 .wt-legend .filled{background:rgba(34,197,94,.15)}
 .wt-legend .empty{border:1px dashed #ef4444}
 .wt-legend .absent{background:rgba(245,158,11,.15)}
+.wt-pr{display:block;margin-top:2px;font-size:11px;color:#3b82f6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wt-pday{position:absolute;bottom:5px;right:6px;font-size:11px;text-decoration:none;opacity:.7}
+.wt-pday:hover{opacity:1}
+.wt-pchips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.wt-pchip{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border-strong,#ccc);border-radius:14px;padding:3px 10px;font-size:13px;cursor:pointer}
+.wt-pchip:has(input:checked){border-color:#1a73e8;box-shadow:0 0 0 1px #1a73e8 inset;background:rgba(26,115,232,.08)}
+.wt-durs{display:flex;flex-wrap:wrap;gap:4px;align-items:center}
+.wt-durs .button{padding:2px 7px;font-size:12px}
 @media (max-width:700px){.wt-nav b{min-width:0}.wt-fill{flex-direction:column;align-items:stretch}}
 </style>
 
@@ -121,7 +129,47 @@
   <span>{% trans "Днів із записами" %}: <b>{{ totals.worked }}</b></span>
   <span>{% trans "Порожніх робочих днів" %}: <b style="color:{% if totals.empty %}#ef4444{% else %}inherit{% endif %}">{{ totals.empty }}</b></span>
   <span>{% trans "Відсутностей" %}: <b>{{ totals.absent }}</b></span>
+  {% if totals.project_minutes %}<span>📁 {% trans "На проєкти" %}: <b>{{ totals.projects }}</b></span>{% endif %}
 </div>
+
+{% if balance or balance_error %}
+<div class="wt-card">
+  <h3>📊 {% trans "Місяць в askDANTE" %}</h3>
+  {% if balance %}<div class="wt-totals">{% for k, v in balance %}<span>{{ k }}: <b>{{ v }}</b></span>{% endfor %}</div>{% endif %}
+  {% if balance_error %}<div class="wt-muted">⚠️ {{ balance_error }}</div>{% endif %}
+</div>
+{% endif %}
+
+{% if st.enabled %}
+<div class="wt-card" id="project">
+  <h3>📁 {% trans "Час на проєкт" %}</h3>
+  {% if my_projects %}
+  <form method="post" class="wt-proj" onsubmit="this.querySelectorAll('button[type=submit]').forEach(function(b){b.disabled=true})">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="project"><input type="hidden" name="u" value="{{ du.pk }}">
+    <input type="hidden" name="m" value="{{ cur_m }}">
+    <div class="wt-pchips">
+      {% for p in my_projects %}<label class="wt-pchip"><input type="radio" name="project" value="{{ p.pk }}" {% if forloop.first %}checked{% endif %}> {% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</label>{% endfor %}
+    </div>
+    <div class="wt-fill">
+      <label>{% trans "Дата" %}<input type="date" name="date" id="wt-pdate" value="{{ project_date|date:"Y-m-d" }}" max="{{ today|date:"Y-m-d" }}" required></label>
+      <label>{% trans "Тривалість" %}<span class="wt-durs"><input name="duration" id="wt-pdur" placeholder="1:30" size="6" required>
+        <button type="button" class="button" data-d="0:15">0:15</button><button type="button" class="button" data-d="0:30">0:30</button><button type="button" class="button" data-d="1:00">1:00</button><button type="button" class="button" data-d="2:00">2:00</button><button type="button" class="button" data-d="4:00">4:00</button></span></label>
+      {% if activities %}<label>{% trans "Вид роботи" %}<select name="activity">
+        {% if not default_activity %}<option value="">—</option>{% endif %}
+        {% for a in activities %}<option value="{{ a.pk }}" {% if a.pk == default_activity %}selected{% endif %}>{{ a.name }}</option>{% endfor %}
+      </select></label>{% endif %}
+      <label style="flex:1;min-width:180px">{% trans "Коментар" %}<input name="comment" maxlength="500" placeholder="{% trans 'що робили (піде в askDANTE)' %}"></label>
+      <button class="button default" type="submit">✓ {% trans "в askDANTE" %}</button>
+    </div>
+  </form>
+  <p class="wt-muted">☆ {% trans "Тут лише ваші проєкти" %} — <a href="{{ mapping_url }}?view=dante">{% trans "змінити" %}</a>. {% trans "Записи askDANTE через API не видаляються — помилку виправте в askDANTE." %}</p>
+  {% else %}
+  <p>{% trans "Позначте ☆ свої проєкти askDANTE — тоді тут з'являться кнопки для швидкого запису часу." %}
+    <a class="button" href="{{ mapping_url }}?view=dante&amp;f=all">📁 {% trans "Проєкти askDANTE" %}</a></p>
+  {% endif %}
+</div>
+{% endif %}
 
 <div class="wt-scroll">
 <div class="wt-grid">
@@ -134,8 +182,11 @@
       {% for t in c.times %}<span class="wt-t">{{ t.coming }}–{{ t.leaving|default:"…" }}</span>{% endfor %}
       {% if c.kind == "empty" and c.date < today %}<span class="wt-lbl wt-empty-lbl">{% trans "порожньо" %}</span>
       {% elif c.label %}<span class="wt-lbl">{{ c.label }}</span>{% endif %}
+      {% if c.absences %}<span class="wt-lbl">{{ c.absences }}</span>{% endif %}
+      {% for pr in c.projects %}<span class="wt-pr" title="{{ pr.title }}">📁 {{ pr.name|truncatechars:16 }} <b>{{ pr.dur }}</b></span>{% endfor %}
       {% if c.activity %}<span class="wt-act" title="{% trans "Перша й остання дія в Minerva · кількість дій" %}">👣 {{ c.activity }}</span>{% endif %}
       {% if st.enabled and c.kind != "future" %}
+      {% if my_projects %}<a href="#project" class="wt-pday" data-date="{{ c.date|date:"Y-m-d" }}" title="{% trans "Час на проєкт за цей день" %}">📁＋</a>{% endif %}
       <details>
         <summary>＋ {% trans "записати" %}</summary>
         <form method="post" onsubmit="this.querySelector('button').disabled=true">
@@ -217,4 +268,15 @@
 {% endif %}
 
 {% endif %}
+<script>
+(function(){
+  var dur = document.getElementById('wt-pdur'), date = document.getElementById('wt-pdate');
+  document.querySelectorAll('.wt-durs [data-d]').forEach(function(b){
+    b.addEventListener('click', function(){ if (dur) { dur.value = b.dataset.d; dur.focus(); } });
+  });
+  document.querySelectorAll('.wt-pday').forEach(function(a){
+    a.addEventListener('click', function(){ if (date) date.value = a.dataset.date; setTimeout(function(){ dur && dur.focus(); }, 300); });
+  });
+})();
+</script>
 {% endblock %}

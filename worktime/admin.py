@@ -39,6 +39,24 @@ def _duration(minutes) -> str:
     return f"{minutes // 60}:{minutes % 60:02d}"
 
 
+def parse_minutes(value) -> int:
+    """Тривалість з форми: «1:30», «90» (хв), «1,5» / «1.5» (год), «2h», «45m»; 0 — не розібрано."""
+    text = str(value or "").strip().lower().replace(" ", "")
+    try:
+        if ":" in text:
+            h, m = text.split(":", 1)
+            return int(h or 0) * 60 + int(m or 0)
+        if text.endswith(("h", "г", "год")):
+            return round(float(text.rstrip("hгод").replace(",", ".")) * 60)
+        if text.endswith(("m", "хв")):
+            return int(text.rstrip("mхв"))
+        if "," in text or "." in text:
+            return round(float(text.replace(",", ".")) * 60)
+        return int(text)
+    except ValueError:
+        return 0
+
+
 # ── Налаштування ─────────────────────────────────────────────────
 class DanteSettingsForm(forms.ModelForm):
     api_key = forms.CharField(
@@ -104,8 +122,34 @@ class DanteSettingsAdmin(admin.ModelAdmin):
                            "«▶ Заповнити зараз» — те саме одразу, без очікування години запуску; після кожного "
                            "запуску — звіт по днях: що записано, що вже було, що пропущено й чому.",
         }),
+        ("📁 Час на проєкти й години", {
+            "fields": ["default_activity", "records_days", "records_status"],
+            "description": "Час на проєкти пишеться в askDANTE з календаря (☆ мої проєкти). Години проєктів і "
+                           "клієнтів у Minerva — з копії записів askDANTE, оновлюється щоночі й кнопкою.",
+        }),
     ]
-    readonly_fields = ["calendar_link", "check_status", "autofill_status"]
+    readonly_fields = ["calendar_link", "check_status", "autofill_status", "records_status"]
+
+    @admin.display(description="Записи часу")
+    def records_status(self, obj):
+        from .models import TimeRecord
+        last = (f"оновлено {timezone.localtime(obj.records_synced_at):%d.%m.%Y %H:%M}"
+                if obj and obj.records_synced_at else "ще не оновлювались")
+        return format_html('<div>{} · у Minerva записів: {}</div><button type="submit" class="button" formaction="{}" '
+                           'formnovalidate>🔄 Оновити години з askDANTE</button>',
+                           last, TimeRecord.objects.count(), reverse("admin:worktime_dantesettings_records"))
+
+    def records_view(self, request):
+        back = self._post_only(request)
+        if request.method != "POST":
+            return back
+        try:
+            r = services.sync_records()
+            self.message_user(request, f"✅ Записів часу: {r['records']} ({r['from']:%d.%m.%Y}–{r['to']:%d.%m.%Y}), "
+                                       f"прибрано зниклих: {r['removed']}.", messages.SUCCESS)
+        except DanteError as e:
+            self.message_user(request, f"❌ {e.message}", messages.ERROR)
+        return back
 
     def has_add_permission(self, request):
         return not DanteSettings.objects.exists()
@@ -165,7 +209,8 @@ class DanteSettingsAdmin(admin.ModelAdmin):
                 path("sync/", view(self.sync_view), name="worktime_dantesettings_sync"),
                 path("fill-now/", view(self.fillnow_view), name="worktime_dantesettings_fillnow"),
                 path("dry-run/", view(self.dryrun_view), name="worktime_dantesettings_dryrun"),
-                path("report/", view(self.report_view), name="worktime_dantesettings_report")] + super().get_urls()
+                path("report/", view(self.report_view), name="worktime_dantesettings_report"),
+                path("records/", view(self.records_view), name="worktime_dantesettings_records")] + super().get_urls()
 
     def _post_only(self, request):
         if not self.has_change_permission(request):
@@ -386,8 +431,25 @@ class WorkDayAdmin(admin.ModelAdmin):
                 error = f"askDANTE: {e.message} Показано останні збережені дані."
         cached = services.cached_days(du, first, last)
         cached.update(days)
+        balance = None
+        if st.enabled and first <= today:
+            try:   # час на проєкти за місяць — свіжий; місячний підсумок — кеш на годину
+                services.sync_records(st, first, min(last, today))
+            except DanteError as e:
+                error = error or f"Записи часу askDANTE не оновлено: {e.message}"
+            balance = services.balance(du, first.year, first.month)
+        records = services.day_records(du, first, last)
 
-        weeks, totals = self._grid(st, du, first, last, cached, today)
+        weeks, totals = self._grid(st, du, first, last, cached, today, records)
+        from .models import DanteActivity
+        ctx.update({
+            "balance": services.balance_lines(balance), "balance_error": balance.error if balance else "",
+            "my_projects": list(services.my_projects(request.user)),
+            "activities": list(DanteActivity.objects.filter(archived=False)),
+            "default_activity": st.default_activity_id,
+            "project_date": today if first <= today <= last else min(last, today),
+            "mapping_url": reverse("admin:worktime_danteproject_changelist"),
+        })
         prev_m = (first - datetime.timedelta(days=1)).replace(day=1)
         next_m = (last + datetime.timedelta(days=1))
         ctx.update({
@@ -409,9 +471,10 @@ class WorkDayAdmin(admin.ModelAdmin):
         return next((p for p in people if p.user_id == request.user.pk), None) or (people[0] if people else None)
 
     @staticmethod
-    def _grid(st, du, first, last, days, today):
+    def _grid(st, du, first, last, days, today, records=None):
         weeks, week = [], []
-        totals = {"minutes": 0, "worked": 0, "empty": 0, "absent": 0}
+        records = records or {}
+        totals = {"minutes": 0, "worked": 0, "empty": 0, "absent": 0, "project_minutes": 0}
         start = first - datetime.timedelta(days=first.weekday())
         end = last + datetime.timedelta(days=6 - last.weekday())
         day = start
@@ -442,12 +505,19 @@ class WorkDayAdmin(admin.ModelAdmin):
                     span = services.activity_span(du.user, day)
                     if span:
                         cell["activity"] = f"{span[0]:%H:%M}–{span[1]:%H:%M} · {span[2]}"
+                if cell["kind"] == "filled":   # пів дня відпустки поруч із роботою
+                    cell["absences"] = services.absences_text(wd)
+                cell["projects"] = [{"name": str(r.dante_project or r.project_name), "dur": _duration(r.duration),
+                                     "title": " · ".join(x for x in (r.activity_name, r.description) if x)}
+                                    for r in records.get(day, [])]
+                totals["project_minutes"] += sum(r.duration for r in records.get(day, []))
             week.append(cell)
             if len(week) == 7:
                 weeks.append(week)
                 week = []
             day += datetime.timedelta(days=1)
         totals["hours"] = _duration(totals["minutes"])
+        totals["projects"] = _duration(totals["project_minutes"])
         return weeks, totals
 
     def _preview(self, request, st, du, today):
@@ -487,6 +557,9 @@ class WorkDayAdmin(admin.ModelAdmin):
         p = request.POST
         back_q = f"?u={du.pk}&m={p.get('m', '')}" if du else ""
         back = redirect(reverse("admin:worktime_workday_changelist") + back_q)
+        nxt = p.get("next") or ""
+        if nxt.startswith("/calendar/") and "//" not in nxt:   # форма з календаря Minerva — назад туди
+            back = redirect(nxt)
         if du is None:
             messages.error(request, "Працівника не знайдено або немає доступу.")
             return back
@@ -513,9 +586,32 @@ class WorkDayAdmin(admin.ModelAdmin):
             elif action == "clock_cancel":
                 services.clock_cancel(du)
                 messages.info(request, "Відмітку «Прийшов» скасовано, в askDANTE нічого не записано.")
+            elif action == "project":
+                self._report_project(request, self.book_project_from(p, st, du, request.user))
         except DanteError as e:
             messages.error(request, f"❌ {e.message}")
         return back
+
+    @staticmethod
+    def book_project_from(p, st, du, user, source=Booking.MANUAL):
+        """Запис часу на проєкт з форми (календар робочого часу або календар Minerva)."""
+        from .models import DanteActivity
+        day, minutes = _date(p.get("date")), parse_minutes(p.get("duration"))
+        dp = services.my_projects(user).filter(pk=p.get("project") or 0).first() \
+            or DanteProject.objects.filter(pk=p.get("project") or 0, gone=False).first()
+        if not (day and dp and minutes):
+            raise DanteError("bad_request", "Вкажіть дату, проєкт і тривалість (напр. 1:30 або 90).")
+        activity = DanteActivity.objects.filter(pk=p.get("activity") or 0).first()
+        return services.book_project(du, day, dp, minutes, activity, p.get("comment", ""), user=user, source=source,
+                                     st=st)
+
+    @staticmethod
+    def _report_project(request, b):
+        if b.status == Booking.SENT:
+            messages.success(request, f"✅ Записано в askDANTE: {b.date:%d.%m.%Y} · {b.dante_project} · "
+                                      f"{_duration(b.duration)}")
+        else:
+            messages.error(request, f"❌ {b.date:%d.%m.%Y} · {b.dante_project}: {b.error}")
 
     @staticmethod
     def _report_booking(request, b):
@@ -564,14 +660,70 @@ class DanteProjectAdmin(admin.ModelAdmin):
     def mapping_view(self, request):
         if not self.has_view_permission(request):
             raise PermissionDenied
-        from projects.models import Project
-        show = request.GET.get("show", "open")
         if request.method == "POST":
+            back = request.get_full_path()
+            if request.POST.get("pin"):   # ☆ — особистий вибір, може кожен
+                dp = DanteProject.objects.filter(pk=request.POST["pin"]).first()
+                if dp:
+                    services.toggle_pin(request.user, dp)
+                return redirect(back)
             if not services.is_manager(request.user):
                 raise PermissionDenied
             self._mapping_post(request)
-            return redirect(f"{reverse('admin:worktime_danteproject_changelist')}?show={show}")
+            return redirect(back)
+        if request.GET.get("view", "dante") == "dante":
+            return self._dante_view(request)
+        return self._minerva_view(request)
 
+    FILTERS = [("mine", "☆ Мої"), ("all", "Усі"), ("nocrm", "Без клієнта CRM"),
+               ("nominerva", "Без проєкту Minerva"), ("archived", "Архів askDANTE")]
+
+    def _dante_view(self, request):
+        """Проєкти askDANTE: ☆ мої, клієнт CRM, проєкти Minerva, години за останні N днів."""
+        from django.db.models import Exists, OuterRef, Q as Q_, Subquery, Sum
+        from .models import TimeRecord
+        user = request.user
+        pinned = DanteProject.pinned_by.through.objects.filter(danteproject_id=OuterRef("pk"), user_id=user.pk)
+        minutes = TimeRecord.objects.filter(dante_project=OuterRef("pk")).values("dante_project") \
+            .annotate(m=Sum("duration")).values("m")[:1]
+        base = DanteProject.objects.filter(gone=False)
+        has_mine = base.filter(pinned_by=user).exists()
+        f = request.GET.get("f") or ("mine" if has_mine else "all")
+        q = (request.GET.get("q") or "").strip()
+        qs = base.select_related("parent", "crm_customer").prefetch_related("maps__project") \
+            .annotate(pinned=Exists(pinned), minutes=Subquery(minutes))
+        qs = qs.filter(archived=True) if f == "archived" else qs.filter(archived=False)
+        qs = {"mine": qs.filter(pinned=True), "nocrm": qs.filter(crm_customer__isnull=True),
+              "nominerva": qs.filter(maps__isnull=True)}.get(f, qs)
+        if q:
+            qs = qs.filter(Q_(name__icontains=q) | Q_(reference_number__icontains=q) | Q_(customer_name__icontains=q)
+                           | Q_(crm_customer__company__icontains=q) | Q_(crm_customer__name__icontains=q))
+        can_edit = services.is_manager(user)
+        index = mapping.customer_index() if can_edit else []
+        rows = []
+        for dp in qs.distinct().order_by("-pinned", "name")[:500]:
+            rows.append({"dp": dp, "maps": list(dp.maps.all()), "hm": _duration(dp.minutes) if dp.minutes else "",
+                         "suggest": mapping.suggest_customer(dp, index) if can_edit and not dp.crm_customer_id
+                         else None})
+        live = base.filter(archived=False)
+        counts = {"mine": live.filter(pinned_by=user).count(), "all": live.count(),
+                  "nocrm": live.filter(crm_customer__isnull=True).count(),
+                  "nominerva": live.filter(maps__isnull=True).count(), "archived": base.filter(archived=True).count()}
+        st = DanteSettings.get()
+        names = []
+        if can_edit:
+            from crm.models import Customer
+            names = sorted({c or n for c, n in Customer.objects.values_list("company", "name")[:3000] if c or n})
+        ctx = {**self.admin_site.each_context(request), "title": "📁 Проєкти askDANTE ↔ Minerva",
+               "opts": self.model._meta, "view": "dante", "rows": rows, "f": f, "q": q, "has_mine": has_mine,
+               "filters": [(k, label, counts[k]) for k, label in self.FILTERS], "can_edit": can_edit,
+               "customer_names": names, "st": st, "any": base.exists(),
+               "settings_url": reverse("admin:worktime_dantesettings_change", args=[st.pk])}
+        return render(request, "admin/worktime/mapping.html", ctx)
+
+    def _minerva_view(self, request):
+        from projects.models import Project
+        show = request.GET.get("show", "open")
         dante = list(DanteProject.objects.filter(gone=False).select_related("parent")
                      .annotate(n_maps=Count("maps")))
         qs = Project.objects.select_related("customer", "dante_map__dante_project").order_by("-updated_at")
@@ -584,7 +736,7 @@ class DanteProjectAdmin(admin.ModelAdmin):
             rows.append({"project": pr, "link": link,
                          "suggestion": None if link else mapping.suggest(pr, usable)})
         st = DanteSettings.get()
-        ctx = {**self.admin_site.each_context(request), "title": "📁 Проєкти askDANTE ↔ Minerva",
+        ctx = {**self.admin_site.each_context(request), "title": "📁 Проєкти askDANTE ↔ Minerva", "view": "minerva",
                "opts": self.model._meta, "rows": rows, "dante": dante, "usable": usable, "show": show,
                "st": st, "settings_url": reverse("admin:worktime_dantesettings_change", args=[st.pk]),
                "can_edit": services.is_manager(request.user),
@@ -595,6 +747,41 @@ class DanteProjectAdmin(admin.ModelAdmin):
     def _mapping_post(request):
         from projects.models import Project
         p = request.POST
+        if p.get("crm_accept"):   # підказка клієнта CRM для проєкту askDANTE
+            dp = DanteProject.objects.filter(pk=p["crm_accept"]).first()
+            from crm.models import Customer
+            customer = Customer.objects.filter(pk=p.get(f"crm_suggest_{p['crm_accept']}")).first()
+            if dp and customer:
+                DanteProject.objects.filter(pk=dp.pk).update(crm_customer=customer)
+                messages.success(request, f"{dp} → клієнт CRM «{customer}»")
+            return
+        if p.get("crm_clear"):
+            DanteProject.objects.filter(pk=p["crm_clear"]).update(crm_customer=None)
+            messages.success(request, "Клієнта CRM відв'язано.")
+            return
+        if p.get("to_minerva"):
+            dp = DanteProject.objects.filter(pk=p["to_minerva"]).first()
+            if dp and not dp.maps.exists():
+                pr = mapping.create_in_minerva(dp, request.user)
+                messages.success(request, f"✅ У Minerva створено проєкт {pr.code} «{pr.name}», зв'язаний з askDANTE.")
+            return
+        typed = [(k[4:], v.strip()) for k, v in p.items() if k.startswith("crm_") and k[4:].isdigit() and v.strip()]
+        if typed:
+            done, missed = 0, []
+            for pk, text in typed:
+                dp = DanteProject.objects.filter(pk=pk).first()
+                customer = mapping.find_customer(text)
+                if dp and customer:
+                    DanteProject.objects.filter(pk=dp.pk).update(crm_customer=customer)
+                    done += 1
+                elif dp:
+                    missed.append(f"«{text}»")
+            if done:
+                messages.success(request, f"Прив'язано клієнтів CRM: {done}.")
+            if missed:
+                messages.warning(request, "Не знайдено одного клієнта CRM за: " + ", ".join(missed)
+                                 + " — уточніть назву (або #номер клієнта).")
+            return
         if p.get("accept"):
             pr = Project.objects.filter(pk=p["accept"]).first()
             dp = DanteProject.objects.filter(pk=p.get(f"suggest_{p['accept']}")).first()

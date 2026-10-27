@@ -171,6 +171,25 @@
         <div class="cal-hint">Свій Chat ID можна дізнатись у боті @userinfobot</div>
       </div>
 
+      <p class="cal-section-title" id="invites">📨 Зустрічі з пошти</p>
+      <div class="cal-hint" style="margin-bottom:8px">Запрошення Outlook / Teams / Google / Zoom (iCalendar) з ваших листів.
+        Нові листи перевіряються самі; зміни часу й скасування оновлюють ту саму зустріч.
+        {% if invites_pending %}Чекають рішення: <a href="/calendar/">{{ invites_pending }}</a>.{% endif %}</div>
+      <div class="cal-field">
+        <label>
+          <input type="checkbox" name="invites_auto" value="1" {% if cfg.invites_auto %}checked{% endif %}>
+          Заносити в календар без підтвердження
+        </label>
+        <div class="cal-hint">Вимкнено — кожне запрошення, зміна й скасування чекає ✓ угорі календаря.</div>
+      </div>
+      <div class="cal-field-row">
+        <label>Знайти запрошення в уже отриманих листах від</label>
+        <input type="date" name="invites_since" value="{{ cfg.invites_since|date:'Y-m-d' }}">
+        <div style="margin-top:6px"><button type="submit" name="invites_scan" value="1" class="cal-save-btn">🔎 Зберегти й знайти</button></div>
+        {% if cfg.invites_scan_status %}<div class="cal-hint" style="margin-top:6px">{{ cfg.invites_scan_status }}</div>{% endif %}
+        <div class="cal-hint">Шукає у ваших скриньках від цієї дати; листи Outlook без вкладення .ics Minerva бере з пошти ще раз (лише читання).</div>
+      </div>
+
       <div style="margin-top: 24px;">
         <button type="submit" class="cal-save-btn">💾 Зберегти</button>
         {% if saved %}

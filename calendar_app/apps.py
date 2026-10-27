@@ -5,3 +5,6 @@ class CalendarAppConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'calendar_app'
     verbose_name = '📅 Календар'
+
+    def ready(self):
+        from . import signals  # noqa: F401  — запрошення на зустрічі в новій пошті

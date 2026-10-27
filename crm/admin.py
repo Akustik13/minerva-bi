@@ -423,7 +423,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         "orders_count", "revenue_display", "avg_order_display",
         "last_order_display", "repeat_badge",
         "top_products_display", "order_history_display",
-        "strategy_btn", "upload_widget_customer",
+        "strategy_btn", "upload_widget_customer", "dante_hours",
     )
     inlines = [CustomerNoteInline, CustomerTimelineInline]
 
@@ -1019,6 +1019,10 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         ("📜 Історія замовлень", {
             "fields": ("order_history_display",),
         }),
+        ("⏱ Час askDANTE", {
+            "fields": ("dante_hours",),
+            "description": "Години з askDANTE: проєкти askDANTE цього клієнта й проєкти Minerva, зв'язані з askDANTE.",
+        }),
         ("ℹ️ Метадані", {
             "fields": ("created_at", "updated_at"),
             "classes": ("collapse",),
@@ -1231,6 +1235,13 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             **rfm, color=color
         )
     rfm_display.short_description = "RFM Аналіз"
+
+    @admin.display(description="Години")
+    def dante_hours(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        from worktime.panels import customer_panel   # робочий час askDANTE: лише читає копію записів
+        return customer_panel(obj)
 
     def strategy_btn(self, obj):
         """Рекомендація стратегії + кнопка одного кліку."""

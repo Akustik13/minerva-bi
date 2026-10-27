@@ -78,6 +78,7 @@ def calendar_view(request):
     for ev in events:
         events_by_day.setdefault(ev.start_at.day, []).append(ev)
 
+    wt = _worktime_layer(request, year, month)
     weeks_data = []
     for week in raw_weeks:
         week_cells = []
@@ -87,6 +88,7 @@ def calendar_view(request):
                 'events':   events_by_day.get(day, []) if day else [],
                 'is_today': day == today_day,
                 'other':    day == 0,
+                'wt':       wt['days'].get(day) if wt and day else None,
             })
         weeks_data.append(week_cells)
 
@@ -108,8 +110,27 @@ def calendar_view(request):
         'event_colors_json':  json.dumps(EVENT_COLORS),
         'event_labels_json':  json.dumps(EVENT_TYPE_LABELS),
         'custom_cats_json':   json.dumps(custom_cats),
+        'wt':                 wt,
+        'wt_days':            wt['days'] if wt else {},
+        'invites':            _invites(request.user),
         'is_nav_sidebar_enabled': True,
     })
+
+
+def _worktime_layer(request, year, month):
+    """Шар «⏱ Робочий час» askDANTE (прихід/відхід, відсутності, час на проєкти); None — не підключено."""
+    try:
+        from worktime.calendar_layer import layer
+        return layer(request.user, year, month, refresh=request.GET.get('wt_refresh') == '1')
+    except Exception:   # календар працює й без askDANTE
+        import logging
+        logging.getLogger(__name__).exception('worktime layer')
+        return None
+
+
+def _invites(user):
+    from calendar_app import invites
+    return invites.pending(user)
 
 
 @staff_member_required
@@ -394,12 +415,39 @@ def settings_view(request):
             pass
         cfg.email_to         = request.POST.get('email_to', '').strip()
         cfg.telegram_chat_id = request.POST.get('telegram_chat_id', '').strip()
+        cfg.invites_auto     = request.POST.get('invites_auto') == '1'
+        from django.utils.dateparse import parse_date
+        cfg.invites_since    = parse_date(request.POST.get('invites_since') or '') or cfg.invites_since
         cfg.save()
         saved = True
+        if request.POST.get('invites_scan') == '1' and cfg.invites_since:
+            from calendar_app import invites
+            cfg.invites_scan_status = f'⏳ Листи від {cfg.invites_since:%d.%m.%Y}: запуск…'
+            cfg.save(update_fields=['invites_scan_status'])
+            invites.start_scan(request.user, cfg.invites_since)
 
+    from calendar_app.models import MeetingInvite
     return render(request, 'calendar_app/cal_settings.html', {
         'title': 'Налаштування сповіщень календаря',
         'cfg':   cfg,
         'saved': saved,
+        'invites_pending': MeetingInvite.objects.filter(user=request.user,
+                                                        status__in=MeetingInvite.PENDING).count(),
         'is_nav_sidebar_enabled': True,
     })
+
+
+@staff_member_required
+@require_POST
+def invite_decide(request, pk, action):
+    """✓ / ✕ запрошення з пошти (лише своє)."""
+    from calendar_app import invites
+    from calendar_app.models import MeetingInvite
+    inv = get_object_or_404(MeetingInvite, pk=pk, user=request.user)
+    if action == 'accept':
+        invites.accept(inv, request.user)
+    elif action == 'dismiss':
+        invites.dismiss(inv, request.user)
+    else:
+        return JsonResponse({'ok': False, 'error': 'Невідома дія'}, status=400)
+    return JsonResponse({'ok': True, 'status': inv.status, 'event_id': inv.event_id})

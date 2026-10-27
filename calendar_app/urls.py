@@ -17,4 +17,5 @@ urlpatterns = [
     path('ai-chat/',                         views.calendar_ai_chat,    name='ai_chat'),
     path('pending-push/',                   views.pending_push_view,   name='pending_push'),
     path('settings/',                       views.settings_view,       name='settings'),
+    path('invites/<int:pk>/<str:action>/',  views.invite_decide,       name='invite_decide'),
 ]

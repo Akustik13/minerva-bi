@@ -26,21 +26,38 @@ class FakeClient:
 
     def __init__(self):
         self.times, self.att, self.calls, self.fail = {}, {}, [], {}
-        self.att_error = None
+        self.att_error, self.cal, self.records, self.periods = None, None, [], {}
 
     def working_time(self, a, b, dante_id):
         return {d: [dict(t) for t in v] for d, v in self.times.items() if a <= d <= b}
 
+    def calendar(self, a, b, dante_id):
+        if self.cal is None:   # як askDANTE без календаря — запасний шлях attendances
+            raise DanteError("not_found", "немає календаря")
+        return {d: v for d, v in self.cal.items() if a <= d <= b}
+
     def attendances(self, a, b, email="", personnel_number=""):
         if self.att_error:
             raise self.att_error
-        return {d: v for d, v in self.att.items() if a <= d <= b}
+        out, d = {}, a   # askDANTE віддає кожен день періоду
+        while d <= b:
+            out[d] = self.att.get(d, {"planned": "BUSINESS_DAY", "absences": []})
+            d += datetime.timedelta(days=1)
+        return out
+
+    def time_records(self, a, b):
+        return [r for r in self.records if a <= r["day"] <= b]
+
+    def performance_period(self, name):
+        return self.periods.get(name, {})
 
     def track(self, dante_id, record):
         d = datetime.date.fromisoformat(record["date"])
         if d in self.fail:
             raise self.fail[d]
         self.calls.append(record)
+        if "projectData" in record:   # час на проєкт — без приходу / відходу
+            return
         self.times.setdefault(d, []).append({"coming": record["start"], "leaving": record["stop"],
                                              "source": "MANUAL",
                                              "minutes": minutes_between(record["start"], record["stop"])})
@@ -189,7 +206,7 @@ class ProposeTests(Base):
         self.assertIn("вже є: 09:00–17:00", got[D(1)][1])
         self.assertEqual(got[D(2)], (False, "відпустка"))
         self.assertEqual(got[D(3)], (False, "свято"))
-        self.assertIn("частину дня", got[D(4)][1])
+        self.assertIn("частина дня", got[D(4)][1])
         self.assertEqual(got[D(5)], (False, "вихідний"))
         self.assertEqual(got[D(6)], (False, "вихідний"))
 
@@ -494,9 +511,9 @@ class AdminPageTests(Base):
         pr = Project.objects.create(name="Antenne")
         dp = DanteProject.objects.create(dante_id="7", name="Antenne")
         url = reverse("admin:worktime_danteproject_changelist")
-        r = self.client.get(url)
+        r = self.client.get(url + "?view=minerva")
         self.assertContains(r, "та сама назва")
-        self.client.post(url + "?show=open", {f"map_{pr.pk}": dp.pk})
+        self.client.post(url + "?view=minerva&show=open", {f"map_{pr.pk}": dp.pk})
         self.assertEqual(ProjectMap.objects.get(project=pr).dante_project, dp)
         self.client.post(url, {f"map_{pr.pk}": ""})
         self.assertFalse(ProjectMap.objects.exists())
@@ -541,3 +558,225 @@ class AdminPageTests(Base):
         self.assertNotContains(r, "secret-token-123456")
         self.client.post(reverse("admin:worktime_dantesettings_sync"))
         self.assertTrue(DanteProject.objects.filter(dante_id="2").exists())
+
+
+# ── години, відсутності, баланс, ☆ і час на проєкти ───────────────
+class ReadFormatsTests(ClientTests):
+    def test_calendar_absences_with_state_and_half_day(self):
+        data = {"id": 1108, "timeAccountAttendanceDays": [
+            {"date": "2026-09-08", "targetTime": 28800000, "workingTime": 0, "absenceRatio": 1,
+             "absences": [{"ratio": 1, "approvalState": "SUBMITTED", "absenceReason": "DEFAULT_LEAVE"}]},
+            {"date": "2026-09-09", "targetTime": 28800000, "workingTime": 14400000,
+             "absences": [{"ratio": 0.5, "approvalState": "APPROVED", "absenceReason": "DISEASE"}]},
+            {"date": "2026-09-12", "targetTime": 0, "absences": [{"ratio": 1, "absenceReason": "WEEKEND"}]},
+            {"date": "2026-09-14", "targetTime": 28800000, "absences": [
+                {"ratio": 1, "approvalState": "APPROVED", "absenceReason": "CUSTOM", "absenceName": "AWH"}]}]}
+        with mock.patch("requests.request", return_value=Resp(data=data)) as req:
+            cal = self.c.calendar(D(1), D(7), "1108")
+        self.assertIn("/calendar/1108", req.call_args.args[1])
+        self.assertEqual(req.call_args.kwargs["params"]["start"], "2026-09-08")
+        self.assertEqual(cal[D(1)]["planned"], "LEAVE")
+        self.assertEqual(cal[D(1)]["target"], 480)
+        self.assertEqual(cal[D(2)]["planned"], "BUSINESS_DAY")   # пів дня лікарняного — робочий день
+        self.assertEqual(cal[D(5)]["planned"], "NONEBUSINESS_DAY")
+        self.assertEqual(services.absence_label(cal[D(1)]["absences"][0]), "відпустка (подано)")
+        self.assertEqual(services.absence_label(cal[D(2)]["absences"][0]), "лікарняний ½")
+        self.assertEqual(services.absence_label(cal[D(7)]["absences"][0]), "AWH")
+
+    def test_time_records_xml(self):
+        xml = ('<?xml version="1.0" encoding="UTF-8"?><timerecords><timerecord id="270"><personId>1108</personId>'
+               '<firstName>Anna</firstName><start>2026-09-07T09:00:00.000</start><stop>2026-09-07T10:30:00.000</stop>'
+               '<duration>90</duration><day>2026-09-07</day><description>Abstimmung</description>'
+               '<hourlyRate>80.00</hourlyRate><activity id="378">meeting</activity>'
+               '<project id="363" finalElement="false" creator="x">Main</project>'
+               '<project_item id="364">Child</project_item></timerecord>'
+               '<timerecord id="271"><personId>1108</personId><duration>30</duration><day>2026-09-08</day>'
+               '</timerecord></timerecords>')
+        with mock.patch("requests.request", return_value=Resp(text=xml)) as req:
+            recs = self.c.time_records(MON, D(1))
+        self.assertEqual(req.call_args.args[0], "POST")
+        self.assertEqual(req.call_args.kwargs["params"], {"start": "07.09.2026", "stop": "08.09.2026"})
+        self.assertEqual(req.call_args.kwargs["headers"]["Content-Type"], "application/x-www-form-urlencoded")
+        r = recs[0]
+        self.assertEqual((r["id"], r["duration"], r["start"], r["stop"], r["item_id"], r["project_id"],
+                          r["activity_name"], str(r["hourly_rate"])),
+                         ("270", 90, "09:00", "10:30", "364", "363", "meeting", "80.00"))
+        self.assertEqual(recs[1]["project_id"], "")
+
+    def test_performance_period_xml_and_missing(self):
+        xml = ('<performancePeriodUsers period-name="09-2026" period-start="2026-09-01" period-stop="2026-09-30" '
+               'period-status="OPEN"><performancePeriodDetail personId="1108"><targetTime>10080</targetTime>'
+               '<workingTime>10200</workingTime><overTime>120</overTime><overTimeTotal>-90</overTimeTotal>'
+               '<remainingLeave>4.50</remainingLeave><diseaseDays>1</diseaseDays><email>a@b.c</email>'
+               '<customAbsences><customAbsence><name>AWH</name></customAbsence></customAbsences>'
+               '</performancePeriodDetail></performancePeriodUsers>')
+        with mock.patch("requests.request", return_value=Resp(text=xml)) as req:
+            rows = self.c.performance_period("09-2026")
+        self.assertEqual(req.call_args.kwargs["data"], {"name": "09-2026"})
+        self.assertEqual(rows["1108"]["remainingLeave"], 4.5)
+        self.assertEqual(rows["1108"]["email"], "a@b.c")
+        with mock.patch("requests.request", return_value=Resp(text="<error>No period</error>")):
+            with self.assertRaises(DanteError):
+                self.c.performance_period("13-2026")
+
+
+class PlanTests(Base):
+    def test_calendar_first_then_attendances_fallback(self):
+        self.fake.cal = {D(1): {"planned": "LEAVE", "target": 480, "worked": 0,
+                                "absences": [{"type": "DEFAULT_LEAVE", "name": "", "ratio": 1, "state": "SUBMITTED"}]}}
+        days = self.days(D(1), D(1))
+        self.assertEqual(days[D(1)].target_minutes, 480)
+        self.assertEqual(services.day_blocker(self.st, days[D(1)], D(1)), "відпустка (подано)")
+        self.fake.cal = None   # немає календаря → attendances
+        self.assertEqual(self.days(D(1), D(1))[D(1)].planned_state, "BUSINESS_DAY")
+        self.fake.cal = {}     # порожньо → теж attendances
+        self.assertFalse(self.days(D(1), D(1)).attendance_error)
+        self.fake.cal, self.fake.att_error = None, DanteError("auth", "немає прав")
+        self.assertIn("немає прав", self.days(D(1), D(1)).attendance_error)
+
+
+class RecordsTests(Base):
+    def setUp(self):
+        super().setUp()
+        self.main = DanteProject.objects.create(dante_id="363", name="Antenne")
+        self.child = DanteProject.objects.create(dante_id="364", name="Prototyp", parent=self.main)
+
+    def rec(self, rid, day, minutes, project="363", item="", rate=None):
+        return {"id": rid, "person_id": "1108", "day": day, "duration": minutes, "start": "", "stop": "",
+                "description": "Abstimmung", "project_id": project, "project_name": "Antenne", "item_id": item,
+                "item_name": "Prototyp" if item else "", "activity_id": "", "activity_name": "meeting",
+                "hourly_rate": rate, "cost_center": ""}
+
+    def test_sync_hours_and_removed_records(self):
+        from decimal import Decimal
+        from crm.models import Customer
+        from projects.models import Project
+        from worktime import panels
+        from worktime.models import TimeRecord
+        self.fake.records = [self.rec("1", MON, 90, rate=Decimal("80")), self.rec("2", D(1), 30, item="364"),
+                             self.rec("3", D(2), 60, project="")]
+        r = services.sync_records(self.st, MON, D(6))
+        self.assertEqual((r["records"], r["removed"]), (3, 0))
+        self.assertEqual(TimeRecord.objects.get(dante_id="2").dante_project, self.child)
+        self.assertEqual(TimeRecord.objects.get(dante_id="1").dante_user, self.du)
+        h = services.hours([self.main])   # з підпроєктом
+        self.assertEqual(h["total"], 120)
+        self.assertEqual(h["cost"], Decimal("120.00"))
+        customer = Customer.objects.create(name="Max", company="ACME GmbH")
+        pr = Project.objects.create(name="Antennen-Entwicklung", customer=customer)
+        mapping.link(pr, self.main)
+        self.assertEqual(services.project_hours(pr)["total"], 120)
+        self.assertEqual(services.customer_hours(customer)["total"], 120)
+        self.child.crm_customer = customer
+        self.child.save()
+        self.assertEqual(services.customer_hours(customer)["total"], 120)   # без подвійного рахунку
+        self.fake.records = [self.rec("1", MON, 90)]   # 2 і 3 видалили в askDANTE
+        self.assertEqual(services.sync_records(self.st, MON, D(6))["removed"], 2)
+        self.assertIn("1:30", panels.project_panel(pr))
+
+    def test_balance_cached_for_all_users(self):
+        from worktime.models import PeriodBalance
+        other = DanteUser.objects.create(dante_id="2", first_name="Bob")
+        self.fake.periods = {"09-2026": {"1108": {"targetTime": 10080.0, "workingTime": 10200.0,
+                                                  "overTimeTotal": -90.0, "remainingLeave": 4.5},
+                                         "2": {"targetTime": 5040.0}}}
+        pb = services.balance(self.du, 2026, 9)
+        lines = dict(services.balance_lines(pb))
+        self.assertEqual(lines["Баланс переробок"][-4:], "1:30")
+        self.assertTrue(lines["Баланс переробок"].startswith("−"))
+        self.assertEqual(lines["Відпустка: залишок, днів"], "4.5")
+        self.assertTrue(PeriodBalance.objects.filter(dante_user=other, period="2026-09").exists())
+        self.fake.periods = {}
+        self.assertEqual(services.balance(self.du, 2026, 9).data["remainingLeave"], 4.5)   # кеш на годину
+        self.assertIn("не повернув", services.balance(self.du, 2026, 9, max_age_minutes=0).error)
+
+    def test_book_project_payload_and_guards(self):
+        from worktime.models import DanteActivity
+        act = DanteActivity.objects.create(dante_id="190", name="Entwicklung")
+        self.st.default_activity = act
+        self.st.save()
+        b = services.book_project(self.du, MON, self.child, 90, comment="Prototyp prüfen", user=self.user, st=self.st)
+        self.assertEqual(b.status, Booking.SENT)
+        self.assertEqual(self.fake.calls, [{"date": "2026-09-07", "duration": 90, "projectData": {
+            "projectId": "364", "activityId": "190", "comment": "Prototyp prüfen"}}])
+        with self.assertRaises(DanteError):   # подвійне натискання
+            services.book_project(self.du, MON, self.child, 90, comment="Prototyp prüfen", st=self.st)
+        with self.assertRaises(DanteError):
+            services.book_project(self.du, services.local_today() + datetime.timedelta(days=1), self.child, 30)
+        self.child.archived = True
+        self.child.save()
+        with self.assertRaises(DanteError):
+            services.book_project(self.du, MON, self.child, 30)
+        self.assertEqual(len(self.fake.calls), 1)
+
+    def test_pins_and_parse_minutes(self):
+        from worktime.admin import parse_minutes
+        self.assertTrue(services.toggle_pin(self.user, self.main))
+        self.assertEqual(list(services.my_projects(self.user)), [self.main])
+        self.assertFalse(services.toggle_pin(self.user, self.main))
+        self.assertEqual([parse_minutes(x) for x in ("1:30", "90", "1,5", "2h", "45m", "", "abc")],
+                         [90, 90, 90, 120, 45, 0, 0])
+
+    def test_customer_suggest_find_and_create_in_minerva(self):
+        from crm.models import Customer
+        acme = Customer.objects.create(name="Max Muster", company="ACME GmbH", email="max@acme.example")
+        Customer.objects.create(name="Other", company="Beta AG")
+        self.main.customer_name = "ACME"
+        self.assertEqual(mapping.suggest_customer(self.main), acme)
+        self.assertEqual(mapping.find_customer("max@acme.example"), acme)
+        self.assertEqual(mapping.find_customer(f"#{acme.pk}"), acme)
+        self.assertIsNone(mapping.find_customer("e"))   # кілька збігів
+        self.main.crm_customer = acme
+        pr = mapping.create_in_minerva(self.main, self.user)
+        self.assertEqual((pr.name, pr.customer, pr.dante_map.dante_project), ("Antenne", acme, self.main))
+
+
+class NewPagesTests(AdminPageTests):
+    def test_dante_projects_view_pin_crm_and_minerva(self):
+        from crm.models import Customer
+        acme = Customer.objects.create(name="Max", company="ACME")
+        dp = DanteProject.objects.create(dante_id="363", name="Antenne", customer_name="ACME GmbH")
+        url = reverse("admin:worktime_danteproject_changelist")
+        r = self.client.get(url)
+        self.assertContains(r, "Antenne")
+        self.assertContains(r, 'name="crm_suggest_%d"' % dp.pk)
+        self.client.post(url + "?view=dante&f=all", {"pin": dp.pk})
+        self.assertTrue(dp.pinned_by.filter(pk=self.admin.pk).exists())
+        self.assertContains(self.client.get(url), "★")   # «мої» за замовчуванням
+        self.client.post(url, {"crm_accept": dp.pk, f"crm_suggest_{dp.pk}": acme.pk})
+        dp.refresh_from_db()
+        self.assertEqual(dp.crm_customer, acme)
+        self.client.post(url, {"to_minerva": dp.pk})
+        self.assertEqual(dp.maps.get().project.customer, acme)
+
+    def test_calendar_project_entry_balance_and_minerva_calendar(self):
+        dp = DanteProject.objects.create(dante_id="363", name="Antenne")
+        dp.pinned_by.add(self.admin)
+        self.du.user = self.admin
+        self.du.save()
+        self.fake.periods = {"09-2026": {"1108": {"targetTime": 10080.0, "remainingLeave": 4.5}}}
+        r = self.client.get(self.url, {"m": "2026-09"})
+        self.assertContains(r, "Місяць в askDANTE")
+        self.assertContains(r, "Час на проєкт")
+        r = self.client.post(self.url, {"action": "project", "u": self.du.pk, "m": "2026-09", "date": "2026-09-08",
+                                        "project": dp.pk, "duration": "1:15", "comment": "Test",
+                                        "next": "/calendar/?year=2026&month=9"})
+        self.assertRedirects(r, "/calendar/?year=2026&month=9", fetch_redirect_response=False)
+        self.assertEqual(self.fake.calls[-1]["duration"], 75)
+        r = self.client.get("/calendar/?year=2026&month=9")
+        self.assertContains(r, "Робочий час ·")
+        self.assertContains(r, "wt-days")
+        r = self.client.post(self.url, {"action": "project", "u": self.du.pk, "date": "2026-09-08", "project": dp.pk,
+                                        "duration": "1:00", "next": "https://evil.example/"})
+        self.assertNotIn("evil", r["Location"])
+
+    def test_project_and_customer_cards_show_hours(self):
+        from crm.models import Customer
+        from projects.models import Project
+        customer = Customer.objects.create(name="Max", company="ACME")
+        pr = Project.objects.create(name="Antenne", customer=customer)
+        r = self.client.get(reverse("admin:projects_project_change", args=[pr.pk]))
+        self.assertContains(r, "Час askDANTE")
+        self.assertContains(r, "ще не зв")
+        r = self.client.get(reverse("admin:crm_customer_change", args=[customer.pk]))
+        self.assertContains(r, "Час askDANTE")

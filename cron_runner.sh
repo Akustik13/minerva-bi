@@ -35,6 +35,7 @@ echo "   send_digest             time/frequency controlled by NotificationSettin
 echo "   morning_briefing        daily at ${BRIEFING_HOUR}:00"
 echo "   shop_accounts_cleanup   daily — expired shop customer sessions / links"
 echo "   worktime_autofill       daily after hour from DanteSettings — empty work days in askDANTE (when enabled)"
+echo "   worktime_sync           daily after the same hour — askDANTE time records and month balances"
 echo "   send_reminders          every ${REMINDER_INTERVAL}s"
 echo "   sync_email              every ${EMAIL_SYNC_INTERVAL}s"
 echo "   send_calendar_reminders every ${CALENDAR_REMINDER_INTERVAL}s"
@@ -98,6 +99,7 @@ while true; do
 
   # ── Робочий час askDANTE: порожні робочі дні — раз на добу (режим і година — у налаштуваннях askDANTE) ──
   python manage.py worktime_autofill --if-due 2>&1 || true
+  python manage.py worktime_sync --if-due 2>&1 || true
 
   # ── Email синхронізація — кожні EMAIL_SYNC_INTERVAL секунд ──
   if [ $((NOW - LAST_EMAIL_SYNC)) -ge "$EMAIL_SYNC_INTERVAL" ]; then

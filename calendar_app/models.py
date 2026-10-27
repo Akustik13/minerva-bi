@@ -98,6 +98,14 @@ class CalendarSettings(models.Model):
                                         verbose_name='Telegram Chat ID',
                                         help_text='Порожньо → UserProfile.telegram_id або системний')
 
+    invites_auto = models.BooleanField(
+        default=False, verbose_name='Заносити запрошення з пошти без підтвердження',
+        help_text='Вимкнено — запрошення (і зміни, скасування) чекають ✓ угорі календаря.')
+    invites_since = models.DateField(null=True, blank=True, verbose_name='Шукати запрошення в листах від',
+                                     help_text='Для пошуку в уже отриманій пошті.')
+    invites_scan_status = models.CharField(max_length=255, blank=True, default='',
+                                           verbose_name='Пошук запрошень — стан')
+
     class Meta:
         verbose_name        = 'Налаштування сповіщень календаря'
         verbose_name_plural = 'Налаштування сповіщень календаря'
@@ -109,3 +117,48 @@ class CalendarSettings(models.Model):
     def for_user(cls, user):
         obj, _ = cls.objects.get_or_create(user=user)
         return obj
+
+
+class MeetingInvite(models.Model):
+    """Запрошення на зустріч з пошти (iCalendar: Outlook / Teams / Google / Zoom). Один рядок на зустріч (UID):
+    зміни й скасування оновлюють його. У календар — лише після ✓ (або «без підтвердження» в налаштуваннях);
+    відхилене людиною не повертається. Логіка — calendar_app/invites.py."""
+    NEW, UPDATE, CANCEL = 'new', 'update', 'cancel'          # чекають рішення
+    ADDED, DISMISSED, CANCELLED = 'added', 'dismissed', 'cancelled'
+    STATUS_CHOICES = [
+        (NEW, '📨 Нове'), (UPDATE, '♻ Змінено'), (CANCEL, '✖ Скасовано організатором'),
+        (ADDED, '✅ У календарі'), (DISMISSED, '— Не заносити'), (CANCELLED, '✖ Знято з календаря'),
+    ]
+    PENDING = (NEW, UPDATE, CANCEL)
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='meeting_invites')
+    uid = models.CharField(max_length=500, verbose_name='UID зустрічі')
+    sequence = models.IntegerField(default=0)
+    method = models.CharField(max_length=20, blank=True, default='')
+    title = models.CharField(max_length=300, verbose_name='Назва')
+    start_at = models.DateTimeField(verbose_name='Початок', db_index=True)
+    end_at = models.DateTimeField(null=True, blank=True, verbose_name='Кінець')
+    all_day = models.BooleanField(default=False)
+    location = models.CharField(max_length=500, blank=True, default='', verbose_name='Місце')
+    organizer = models.CharField(max_length=300, blank=True, default='', verbose_name='Організатор')
+    join_url = models.CharField(max_length=1000, blank=True, default='', verbose_name='Посилання (Teams / Zoom)')
+    description = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=NEW, db_index=True,
+                              verbose_name='Стан')
+    email_message = models.ForeignKey('email_assistant.EmailMessage', null=True, blank=True,
+                                      on_delete=models.SET_NULL, related_name='meeting_invites', verbose_name='Лист')
+    crm_customer = models.ForeignKey('crm.Customer', null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name='meeting_invites', verbose_name='CRM клієнт')
+    event = models.ForeignKey(CalendarEvent, null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name='invites', verbose_name='Подія календаря')
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Запрошення з пошти'
+        verbose_name_plural = '📨 Запрошення з пошти'
+        ordering = ['start_at']
+        unique_together = [('user', 'uid')]
+
+    def __str__(self):
+        return f'{self.title} ({self.start_at:%d.%m.%Y %H:%M})'

@@ -6,7 +6,11 @@
 Методи повертають прості словники (дати — date, час — "HH:MM"), формат askDANTE знає лише цей файл:
 - POST /timetracking/{userId} — один готовий запис: дата + початок і кінець (окремих «Kommen»/«Gehen» немає);
 - GET /v1/workingTime/{yyyyMMdd}-{yyyyMMdd} — записи за період (до 100 днів), JSON;
-- GET /v1/attendances — план дня й відсутності (до 31 дня), задокументовано лише XML.
+- GET /calendar/{userId} — норма дня й відсутності зі статусом погодження (до 31 дня), JSON;
+- GET /v1/attendances — план дня й відсутності (до 31 дня), задокументовано лише XML (запасний шлях);
+- POST /v1/timeRecords — записи часу всіх працівників з проєктами й видами робіт (до 1 року), лише XML;
+- POST /v1/performancePeriod — місяць: норма, факт, переробки, залишок відпустки, лікарняні, XML.
+Відсутності (відпустка, лікарняний) через API лише читаються — створювати їх askDANTE не дозволяє.
 """
 from __future__ import annotations
 
@@ -94,7 +98,7 @@ class DanteClient:
         self.timeout = max(5, int(st.timeout or 20))
 
     # ── транспорт ────────────────────────────────────────────────
-    def _send(self, method, path, params, body, accept, in_query):
+    def _send(self, method, path, params, body, accept, in_query, form=None):
         headers = {"Accept": accept}
         params = dict(params or {})
         if in_query:
@@ -105,14 +109,17 @@ class DanteClient:
         if body is not None:
             headers["Content-Type"] = JSON
             data = json.dumps(body).encode("utf-8")
+        elif form is not None:   # старі v1-методи askDANTE: POST application/x-www-form-urlencoded
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+            data = form
         return requests.request(method, self.base + path, params=params, data=data, headers=headers,
                                 timeout=self.timeout)
 
-    def _call(self, method: str, path: str, params=None, body=None, accept=JSON):
+    def _call(self, method: str, path: str, params=None, body=None, accept=JSON, form=None):
         try:
-            r = self._send(method, path, params, body, accept, self.st.key_in_query)
+            r = self._send(method, path, params, body, accept, self.st.key_in_query, form)
             if r.status_code in (401, 403) and not self.st.key_in_query:
-                retry = self._send(method, path, params, body, accept, True)
+                retry = self._send(method, path, params, body, accept, True, form)
                 if retry.status_code not in (401, 403) and self.st.pk:
                     self.st.key_in_query = True
                     type(self.st).objects.filter(pk=self.st.pk).update(key_in_query=True)
@@ -287,6 +294,84 @@ class DanteClient:
         walk(data)
         return out
 
+    def calendar(self, date_from: datetime.date, date_to: datetime.date, dante_id: str) -> dict:
+        """{date: {"planned", "absences": [{"type", "name", "ratio", "state"}], "target": хв | None, "worked": хв}}.
+
+        absenceReason askDANTE: PUBLIC_HOLIDAY, DISEASE, WEEKEND, DEFAULT_LEAVE, OVERTIME_REDUCTION, CUSTOM (+ назва);
+        approvalState: SUBMITTED (подано) / APPROVED; ratio 0.5 — пів дня; час askDANTE віддає в мілісекундах."""
+        out = {}
+        start = date_from
+        while start <= date_to:
+            end = min(date_to, start + datetime.timedelta(days=30))
+            data = self._json(self._call("GET", f"/calendar/{dante_id}",
+                                         {"start": start.isoformat(), "stop": end.isoformat()}))
+            for day in _find(data, lambda n: "date" in n and ("absences" in n or "targetTime" in n)):
+                try:
+                    d = datetime.date.fromisoformat(str(day.get("date"))[:10])
+                except ValueError:
+                    continue
+                raw = day.get("absences") or []
+                raw = raw.get("absence", []) if isinstance(raw, dict) else raw
+                absences = [{"type": (a.get("absenceReason") or "").upper(), "name": a.get("absenceName") or "",
+                             "ratio": float(a.get("ratio") if a.get("ratio") is not None else 1),
+                             "state": (a.get("approvalState") or "").upper()}
+                            for a in (raw if isinstance(raw, list) else [raw]) if isinstance(a, dict)]
+                target = _ms_minutes(day.get("targetTime"))
+                out[d] = {"planned": _planned(absences, target), "absences": absences, "target": target,
+                          "worked": _ms_minutes(day.get("workingTime")) or 0}
+            start = end + datetime.timedelta(days=1)
+        return out
+
+    def time_records(self, date_from: datetime.date, date_to: datetime.date) -> list[dict]:
+        """Записи часу всіх працівників: прихід/відхід і час на проєкти (XML, до 1 року за запит)."""
+        out = []
+        start = date_from
+        while start <= date_to:
+            end = min(date_to, start + datetime.timedelta(days=364))
+            r = self._call("POST", "/v1/timeRecords", {"start": f"{start:%d.%m.%Y}", "stop": f"{end:%d.%m.%Y}"},
+                           accept=XML, form=b"")
+            for rec in (el for el in _xml(r, "записів часу").iter() if _local(el.tag) == "timerecord"):
+                project, item, activity = _child(rec, "project"), _child(rec, "project_item"), _child(rec, "activity")
+                try:
+                    day = datetime.date.fromisoformat(_text(rec, "day")[:10])
+                except ValueError:
+                    continue
+                out.append({
+                    "id": rec.get("id") or "", "person_id": _text(rec, "personId"), "day": day,
+                    "duration": int(float(_text(rec, "duration", "0") or 0)),
+                    "start": _clock(_text(rec, "start")), "stop": _clock(_text(rec, "stop")),
+                    "description": _text(rec, "description"),
+                    "project_id": project.get("id", "") if project is not None else "",
+                    "project_name": (project.text or "").strip() if project is not None else "",
+                    "item_id": item.get("id", "") if item is not None else "",
+                    "item_name": (item.text or "").strip() if item is not None else "",
+                    "activity_id": activity.get("id", "") if activity is not None else "",
+                    "activity_name": (activity.text or "").strip() if activity is not None else "",
+                    "hourly_rate": _decimal(_text(rec, "hourlyRate")),
+                    "cost_center": _text(rec, "costCenter"),
+                })
+            start = end + datetime.timedelta(days=1)
+        return [r for r in out if r["id"]]
+
+    def performance_period(self, name: str) -> dict:
+        """Місяць (назва askDANTE, напр. «10-2026»): {personId: {targetTime, workingTime, overTime, overTimeTotal,
+        remainingLeave, leaveDays, diseaseDays, diseaseDaysTotal, …, "closed"}}; хвилини й дні — числа."""
+        r = self._call("POST", "/v1/performancePeriod", accept=XML, form={"name": name})
+        root = _xml(r, "місячного підсумку")
+        if _local(root.tag) == "error":
+            raise DanteError("not_found", f"В askDANTE немає розрахункового періоду «{name}».")
+        out = {}
+        for el in (e for e in root.iter() if _local(e.tag) == "performancePeriodDetail"):
+            row = {"status": root.get("period-status") or ""}
+            for c in el:
+                key, value = _local(c.tag), (c.text or "").strip()
+                if key == "customAbsences" or list(c):
+                    continue
+                num = _decimal(value)
+                row[key] = float(num) if num is not None and key not in ("personnelNumber",) else value
+            out[str(el.get("personId") or row.get("personId") or "")] = row
+        return out
+
     # ── запис ────────────────────────────────────────────────────
     def track(self, dante_id: str, record: dict) -> None:
         """Один запис: {"date": "2026-09-10", "start": "08:00", "stop": "16:30"} або час на проєкт з projectData."""
@@ -303,6 +388,62 @@ class DanteClient:
             p = {}
         return {"id": str(p.get("id") or ""), "name": p.get("name") or name,
                 "reference_number": p.get("referenceNumber") or reference_number}
+
+
+FULL_DAY_LEAVE = {"DEFAULT_LEAVE", "LEAVE", "VACATION", "SPECIAL_LEAVE", "OVERTIME_REDUCTION", "CUSTOM"}
+
+
+def _planned(absences: list, target) -> str:
+    """План дня для календаря askDANTE — у тих самих кодах, що й attendances."""
+    full = {a["type"] for a in absences if a["ratio"] >= 1}
+    if full & {"DISEASE", "ILLNESS", "SICK"}:
+        return "ILLNESS"
+    if full & FULL_DAY_LEAVE:
+        return "LEAVE"
+    if full & {"WEEKEND", "PUBLIC_HOLIDAY", "HOLIDAY"} or target == 0:
+        return "NONEBUSINESS_DAY"
+    return "BUSINESS_DAY"
+
+
+def _find(node, match) -> list:
+    """Усі словники відповіді, що підходять (askDANTE загортає дані по-різному: особа, список осіб…)."""
+    found = []
+    if isinstance(node, dict):
+        if match(node):
+            return [node]
+        for v in node.values():
+            found += _find(v, match)
+    elif isinstance(node, list):
+        for v in node:
+            found += _find(v, match)
+    return found
+
+
+def _ms_minutes(value):
+    try:
+        return int(value) // 60000 if value is not None and value != "" else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _clock(value: str) -> str:
+    """'2016-03-14T09:00:00.000' → '09:00'; порожньо — ''."""
+    return value[11:16] if len(value) >= 16 and value[10] == "T" else ""
+
+
+def _decimal(value):
+    import decimal
+    try:
+        return decimal.Decimal(str(value).replace(",", ".")) if str(value).strip() else None
+    except decimal.InvalidOperation:
+        return None
+
+
+def _xml(r, what: str):
+    try:
+        return ET.fromstring((r.text or "").lstrip().encode("utf-8"))
+    except ET.ParseError:
+        raise DanteError("unavailable", f"askDANTE повернув некоректний XML {what}.")
 
 
 def _put_attendance(out: dict, date_value, planned, absences):

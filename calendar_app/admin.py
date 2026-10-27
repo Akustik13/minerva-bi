@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CalendarEvent, CalendarSettings
+from .models import CalendarEvent, CalendarSettings, MeetingInvite
 
 
 @admin.register(CalendarEvent)
@@ -67,3 +67,15 @@ class CalendarSettingsAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False  # created automatically via for_user()
+
+
+@admin.register(MeetingInvite)
+class MeetingInviteAdmin(admin.ModelAdmin):
+    """Запрошення з пошти — рішення ✓ / ✕ приймаються в календарі (/calendar/)."""
+    list_display = ('title', 'start_at', 'organizer', 'status', 'user', 'event')
+    list_filter = ('status', 'user')
+    search_fields = ('title', 'organizer', 'location', 'uid')
+    readonly_fields = [f.name for f in MeetingInvite._meta.fields]
+
+    def has_add_permission(self, request):
+        return False

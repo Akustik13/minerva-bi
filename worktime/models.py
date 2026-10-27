@@ -57,6 +57,14 @@ class DanteSettings(models.Model):
     last_autofill_result = models.CharField("Результат автозаповнення", max_length=255, blank=True, default="")
     last_autofill_report = models.JSONField("Звіт автозаповнення", default=dict, blank=True, editable=False,
                                             help_text="Останній запуск (щоденний або «Заповнити зараз») по днях.")
+    default_activity = models.ForeignKey(
+        "DanteActivity", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        verbose_name="Вид роботи за замовчуванням",
+        help_text="Для часу на проєкти, якщо в askDANTE увімкнено види робіт (Tätigkeiten).")
+    records_days = models.PositiveSmallIntegerField(
+        "Години на проєктах — днів назад", default=90,
+        help_text="Скільки днів записів часу askDANTE Minerva тримає в себе (оновлення — щоночі й кнопкою).")
+    records_synced_at = models.DateTimeField("Записи часу оновлено", null=True, blank=True)
 
     class Meta:
         verbose_name = "Налаштування askDANTE"
@@ -121,9 +129,10 @@ class WorkDay(models.Model):
     date = models.DateField("Дата", db_index=True)
     planned_state = models.CharField("План askDANTE", max_length=20, blank=True, default="",
                                      help_text="BUSINESS_DAY / NONEBUSINESS_DAY / LEAVE / ILLNESS; порожньо — невідомо.")
-    absences = models.JSONField("Відсутності", default=list, blank=True)   # [{type, reason, ratio}]
+    absences = models.JSONField("Відсутності", default=list, blank=True)   # [{type, name, ratio, state}]
     times = models.JSONField("Записи", default=list, blank=True)           # [{coming, leaving, source, minutes}]
     minutes = models.PositiveIntegerField("Хвилин", default=0)
+    target_minutes = models.PositiveIntegerField("Норма, хв", null=True, blank=True)
     fetched_at = models.DateTimeField("Прочитано з askDANTE", null=True, blank=True)
 
     class Meta:
@@ -149,6 +158,12 @@ class DanteProject(models.Model):
     gone = models.BooleanField("Немає в askDANTE", default=False,
                                help_text="askDANTE більше не повертає цей проєкт.")
     synced_at = models.DateTimeField("Оновлено з askDANTE", null=True, blank=True)
+    crm_customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name="dante_projects", verbose_name="Клієнт CRM",
+                                     help_text="Години цього проєкту askDANTE рахуються клієнту в CRM.")
+    pinned_by = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="dante_pins",
+                                       verbose_name="☆ Мої проєкти",
+                                       help_text="Кому показувати в швидкому записі часу й фільтрі «мої».")
 
     class Meta:
         verbose_name = "Проєкт askDANTE"
@@ -196,9 +211,9 @@ class Booking(models.Model):
     """Журнал: що Minerva записала (або пробувала записати) в askDANTE."""
     WORK, PROJECT = "work", "project"
     KINDS = [(WORK, "Робочий час"), (PROJECT, "Час на проєкт")]
-    MANUAL, FILL, AUTO, CLOCK = "manual", "fill", "auto", "clock"
+    MANUAL, FILL, AUTO, CLOCK, MEETING = "manual", "fill", "auto", "clock", "meeting"
     SOURCES = [(MANUAL, "Вручну в календарі"), (FILL, "Заповнення пропусків"),
-               (AUTO, "Автозаповнення"), (CLOCK, "Прийшов / Пішов")]
+               (AUTO, "Автозаповнення"), (CLOCK, "Прийшов / Пішов"), (MEETING, "Зустріч з календаря")]
     SENT, FAILED = "sent", "failed"
     STATUSES = [(SENT, "✅ Записано"), (FAILED, "❌ Помилка")]
 
@@ -230,3 +245,46 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"{self.dante_user} · {self.date:%d.%m.%Y} · {self.get_status_display()}"
+
+
+class TimeRecord(models.Model):
+    """Запис часу askDANTE (копія для звітів: години на проєктах і клієнтах). Головне — askDANTE; рядок, якого
+    askDANTE більше не повертає за період, видаляється під час оновлення (services.sync_records)."""
+    dante_id = models.CharField("ID в askDANTE", max_length=40, unique=True)
+    dante_user = models.ForeignKey(DanteUser, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="records", verbose_name="Працівник")
+    person_id = models.CharField("Працівник askDANTE", max_length=40, blank=True, default="")
+    day = models.DateField("Дата", db_index=True)
+    duration = models.PositiveIntegerField("Хвилин", default=0)
+    start = models.CharField("Початок", max_length=5, blank=True, default="")
+    stop = models.CharField("Кінець", max_length=5, blank=True, default="")
+    dante_project = models.ForeignKey(DanteProject, null=True, blank=True, on_delete=models.SET_NULL,
+                                      related_name="records", verbose_name="Проєкт askDANTE")
+    project_name = models.CharField("Проєкт (як в askDANTE)", max_length=255, blank=True, default="")
+    activity_name = models.CharField("Вид роботи", max_length=255, blank=True, default="")
+    description = models.TextField("Опис", blank=True, default="")
+    hourly_rate = models.DecimalField("Ставка за годину", max_digits=10, decimal_places=2, null=True, blank=True)
+    synced_at = models.DateTimeField("Оновлено", auto_now=True)
+
+    class Meta:
+        verbose_name = "Запис часу askDANTE"
+        verbose_name_plural = "⏱ Записи часу askDANTE"
+        ordering = ["-day", "start"]
+        indexes = [models.Index(fields=["dante_project", "day"])]
+
+    def __str__(self):
+        return f"{self.day:%d.%m.%Y} · {self.project_name or 'без проєкту'} · {self.duration} хв"
+
+
+class PeriodBalance(models.Model):
+    """Місячний підсумок askDANTE працівника (performancePeriod): норма, факт, переробки, відпустка, лікарняні."""
+    dante_user = models.ForeignKey(DanteUser, on_delete=models.CASCADE, related_name="balances")
+    period = models.CharField("Місяць", max_length=7)   # 2026-10
+    data = models.JSONField(default=dict, blank=True)
+    error = models.CharField(max_length=255, blank=True, default="")
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Місячний підсумок askDANTE"
+        verbose_name_plural = "Місячні підсумки askDANTE"
+        unique_together = [("dante_user", "period")]

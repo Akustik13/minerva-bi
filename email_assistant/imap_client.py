@@ -163,6 +163,18 @@ def _get_attachments_raw(msg) -> list:
                     '_data':        data,
                     'content_id':   cid,
                 })
+        elif part.get_content_type() == 'text/calendar':
+            # Запрошення Outlook / Teams: блок text/calendar без імені файлу — зберігається як invite.ics
+            # (календар Minerva знаходить у ньому зустріч, calendar_app/invites.py)
+            data = part.get_payload(decode=True) or b''
+            if data:
+                attachments.append({
+                    'name':         'invite.ics',
+                    'content_type': 'text/calendar',
+                    'size':         len(data),
+                    '_data':        data,
+                    'content_id':   cid,
+                })
         elif cid and ct_main == 'image':
             # Inline CID image (embedded in HTML body)
             filename = _decode_str(part.get_filename('') or '') or f'img_{cid[:16]}'

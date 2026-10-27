@@ -83,14 +83,15 @@ class ProjectAdmin(admin.ModelAdmin):
     list_filter = (AttentionFilter, "status", "owner")
     search_fields = ("code", "name", "customer__name", "participants__email")
     autocomplete_fields = ("customer",)
-    readonly_fields = ("code", "overview_panel", "mail_link", "timeline_html", "offers_panel", "source_thread_link",
-                       "created_by", "created_at", "updated_at")
+    readonly_fields = ("code", "overview_panel", "mail_link", "timeline_html", "offers_panel", "dante_hours",
+                       "source_thread_link", "created_by", "created_at", "updated_at")
     fieldsets = [
         (None, {"fields": ["code", "name", "status", "customer", "owner", "due_date", "next_action"]}),
         ("🧭 Огляд проєкту", {"fields": ["overview_panel"]}),
         ("Опис і вимоги", {"fields": ["description"]}),
         ("Листування й хронологія", {"fields": ["mail_link", "timeline_html"]}),
         ("📝 Angebote", {"fields": ["offers_panel"]}),
+        ("⏱ Час askDANTE", {"fields": ["dante_hours"]}),
         ("Службове", {"fields": ["source_thread_link", "created_by", "created_at", "updated_at"],
                       "classes": ["collapse"]}),
     ]
@@ -179,6 +180,13 @@ class ProjectAdmin(admin.ModelAdmin):
         add = reverse("admin:offers_offer_add") + f"?project={obj.pk}" + \
             (f"&customer={obj.customer_id}" if obj.customer_id else "")
         return format_html('<table>{}</table><a class="button" href="{}">📝 Новий Angebot</a>', rows, add)
+
+    @admin.display(description="Години")
+    def dante_hours(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        from worktime.panels import project_panel   # робочий час askDANTE: лише читає копію записів
+        return project_panel(obj)
 
     @admin.display(description="Створено з листування")
     def source_thread_link(self, obj):

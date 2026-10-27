@@ -19,12 +19,17 @@ from django.db.models import Q
 from django.utils import timezone
 
 from .client import DanteClient, DanteError, hhmm, minutes_between
-from .models import Booking, DanteActivity, DanteProject, DanteSettings, DanteUser, WorkDay
+from .models import (Booking, DanteActivity, DanteProject, DanteSettings, DanteUser, PeriodBalance, TimeRecord,
+                     WorkDay)
 
 ABSENCE_LABELS = {
     "WEEKEND": "вихідний", "HOLIDAY": "свято", "PUBLIC_HOLIDAY": "свято", "LEAVE": "відпустка",
-    "VACATION": "відпустка", "ILLNESS": "лікарняний", "DISEASE": "лікарняний", "SICK": "лікарняний",
+    "VACATION": "відпустка", "DEFAULT_LEAVE": "відпустка", "SPECIAL_LEAVE": "спецвідпустка",
+    "OVERTIME_REDUCTION": "відгул за переробки", "ILLNESS": "лікарняний", "DISEASE": "лікарняний",
+    "SICK": "лікарняний",
 }
+ABSENCE_ICONS = {"відпустка": "🏖", "спецвідпустка": "🏖", "лікарняний": "🤒", "свято": "🎉",
+                 "відгул за переробки": "⏳", "вихідний": ""}
 PLANNED_LABELS = {WorkDay.LEAVE: "відпустка", WorkDay.ILLNESS: "лікарняний", WorkDay.NON_BUSINESS: "неробочий день"}
 LONG_DAY_MINUTES = 10 * 60      # ArbZG: понад 10 годин — попередження
 MAX_CLOCK_HOURS = 16            # «Прийшов» довше — забута відмітка, записувати вручну
@@ -123,6 +128,30 @@ class Days(dict):
     attendance_error = ""
 
 
+def read_plan(du: DanteUser, date_from: datetime.date, date_to: datetime.date, c: DanteClient) -> dict:
+    """План днів і відсутності: календар askDANTE (норма, статус «подано / погоджено»), запасний шлях — attendances.
+    Порожня відповідь — теж збій: без плану свята й відпустки виглядали б робочими днями."""
+    errors = []
+    try:
+        plan = c.calendar(date_from, date_to, du.dante_id)
+        if plan:
+            return plan
+        errors.append("календар askDANTE не повернув днів")
+    except DanteError as e:
+        errors.append(e.message)
+    if du.email or du.personnel_number:
+        try:
+            plan = c.attendances(date_from, date_to, email=du.email, personnel_number=du.personnel_number)
+            if plan:
+                return plan
+            errors.append("відсутності askDANTE порожні")
+        except DanteError as e:
+            errors.append(e.message)
+    else:
+        errors.append("у працівника askDANTE немає логіна й табельного номера")
+    raise DanteError("unavailable", "; ".join(dict.fromkeys(errors)))
+
+
 def refresh_days(du: DanteUser, date_from: datetime.date, date_to: datetime.date,
                  c: DanteClient | None = None) -> Days:
     """Свіже читання днів з askDANTE → кеш WorkDay."""
@@ -130,9 +159,7 @@ def refresh_days(du: DanteUser, date_from: datetime.date, date_to: datetime.date
     times = c.working_time(date_from, date_to, du.dante_id)
     out = Days()
     try:
-        if not (du.email or du.personnel_number):
-            raise DanteError("bad_request", "у працівника askDANTE немає логіна й табельного номера")
-        att = c.attendances(date_from, date_to, email=du.email, personnel_number=du.personnel_number)
+        att = read_plan(du, date_from, date_to, c)
     except DanteError as e:
         att, out.attendance_error = {}, e.message
     now = timezone.now()
@@ -143,6 +170,8 @@ def refresh_days(du: DanteUser, date_from: datetime.date, date_to: datetime.date
         defaults = {"times": t, "minutes": sum(x["minutes"] for x in t), "fetched_at": now}
         if a is not None or not out.attendance_error:
             defaults.update(planned_state=(a or {}).get("planned", ""), absences=(a or {}).get("absences", []))
+            if (a or {}).get("target") is not None:
+                defaults["target_minutes"] = a["target"]
         wd, _ = WorkDay.objects.update_or_create(dante_user=du, date=day, defaults=defaults)
         out[day] = wd
         day += datetime.timedelta(days=1)
@@ -224,19 +253,42 @@ class Proposal:
         return minutes_between(hhmm(self.start), hhmm(self.stop)) if self.start and self.stop else 0
 
 
+def absence_label(a: dict) -> str:
+    """«відпустка», «лікарняний ½», «AWH (подано)» — тип askDANTE, власна назва, частина дня, статус."""
+    kind = (a.get("type") or "").upper()
+    label = (a.get("name") or "").strip() if kind == "CUSTOM" or kind not in ABSENCE_LABELS else ""
+    label = label or ABSENCE_LABELS.get(kind) or (kind or "відсутність").lower()
+    if float(a.get("ratio") if a.get("ratio") is not None else 1) < 1:
+        label += " ½" if float(a["ratio"]) == 0.5 else f" {float(a['ratio']):.0%}"
+    if (a.get("state") or "").upper() == "SUBMITTED":
+        label += " (подано)"
+    return label
+
+
+def absences_text(wd: WorkDay | None) -> str:
+    """Відсутності дня для календарів, без вихідних: «🏖 відпустка (подано)»."""
+    out = []
+    for a in (wd.absences if wd else None) or []:
+        label = absence_label(a)
+        if label.startswith("вихідний"):
+            continue
+        icon = next((v for k, v in ABSENCE_ICONS.items() if label.startswith(k)), "📌")
+        out.append(f"{icon} {label}".strip())
+    return ", ".join(out)
+
+
 def day_blocker(st: DanteSettings, wd: WorkDay | None, day: datetime.date) -> str:
     """Чому в день не можна автоматично ставити прихід / відхід; '' — можна."""
     if wd and wd.times:
         return "вже є: " + ", ".join(f"{t['coming']}–{t.get('leaving') or '…'}" for t in wd.times)
     planned = wd.planned_state if wd else ""
     absences = (wd.absences if wd else None) or []
-    labels = [ABSENCE_LABELS.get((a.get("type") or "").upper(), (a.get("type") or "відсутність").lower())
-              for a in absences]
+    labels = [absence_label(a) for a in absences]
     if planned in PLANNED_LABELS:
         return labels[0] if labels else PLANNED_LABELS[planned]
     if absences:
         partial = any(float(a.get("ratio") or 1) < 1 for a in absences)
-        return f"{labels[0]} частину дня — заповніть вручну" if partial else labels[0]
+        return f"{labels[0]} — частина дня, заповніть вручну" if partial else labels[0]
     if not st.is_workday(day):
         return "вихідний"
     return ""
@@ -512,3 +564,188 @@ def _summary(report: dict) -> str:
                                                      ("skipped", "пропущено"), ("failed", "помилок")) if n[key]]
     parts += [f"{u['name']}: {u['error']}" for u in report["users"] if u["error"]]
     return " · ".join(parts)
+
+
+# ── записи часу askDANTE: години на проєктах і клієнтах ──────────
+def sync_records(st: DanteSettings | None = None, date_from=None, date_to=None, c: DanteClient | None = None) -> dict:
+    """Записи часу askDANTE за період → TimeRecord (копія для звітів). Чого askDANTE більше не повертає — видаляється:
+    головне — askDANTE, правки там після наступного оновлення видно й у Minerva."""
+    st = st or DanteSettings.get()
+    today = local_today()
+    date_to = date_to or today
+    date_from = date_from or today - datetime.timedelta(days=max(1, st.records_days))
+    records = (c or client(st)).time_records(date_from, date_to)
+    users = {u.dante_id: u for u in DanteUser.objects.all()}
+    projects = {p.dante_id: p for p in DanteProject.objects.all()}
+    seen = set()
+    for r in records:
+        seen.add(r["id"])
+        TimeRecord.objects.update_or_create(dante_id=r["id"], defaults={
+            "dante_user": users.get(r["person_id"]), "person_id": r["person_id"][:40], "day": r["day"],
+            "duration": max(0, r["duration"]), "start": r["start"], "stop": r["stop"],
+            "dante_project": projects.get(r["item_id"]) or projects.get(r["project_id"]),
+            "project_name": (r["item_name"] or r["project_name"])[:255], "activity_name": r["activity_name"][:255],
+            "description": r["description"], "hourly_rate": r["hourly_rate"]})
+    removed = TimeRecord.objects.filter(day__range=(date_from, date_to)).exclude(dante_id__in=seen).delete()[0]
+    if date_to - date_from >= datetime.timedelta(days=7):   # не після кожного запису одного дня
+        st.records_synced_at = timezone.now()
+        st.save(update_fields=["records_synced_at"])
+    return {"records": len(records), "removed": removed, "from": date_from, "to": date_to}
+
+
+def _tree(dante_projects) -> list[int]:
+    """pk проєктів askDANTE з усіма підпроєктами."""
+    ids, todo = set(), [p.pk for p in dante_projects]
+    while todo:
+        ids.update(todo)
+        todo = [pk for pk in DanteProject.objects.filter(parent_id__in=todo).values_list("pk", flat=True)
+                if pk not in ids]
+    return sorted(ids)
+
+
+def hours(dante_projects) -> dict | None:
+    """Години на проєктах askDANTE (з підпроєктами) з копії записів: усього, по працівниках, по місяцях, останні."""
+    from django.db.models import Sum
+    from django.db.models.functions import TruncMonth
+    ids = _tree(dante_projects)
+    if not ids:
+        return None
+    qs = TimeRecord.objects.filter(dante_project_id__in=ids)
+    total = qs.aggregate(m=Sum("duration"))["m"] or 0
+    people = [(row["dante_user__first_name"] or row["person_id"], row["m"]) for row in
+              qs.values("dante_user__first_name", "person_id").annotate(m=Sum("duration")).order_by("-m")]
+    months = [(row["month"], row["m"]) for row in
+              qs.annotate(month=TruncMonth("day")).values("month").annotate(m=Sum("duration")).order_by("-month")[:6]]
+    cost = sum((r.hourly_rate or 0) * r.duration for r in qs.exclude(hourly_rate=None).only("hourly_rate", "duration"))
+    st = DanteSettings.get()
+    return {"total": total, "people": people, "months": months, "recent": list(qs.select_related("dante_user")[:8]),
+            "cost": round(cost / 60, 2) if cost else None, "projects": list(DanteProject.objects.filter(pk__in=ids)),
+            "synced_at": st.records_synced_at, "days": st.records_days}
+
+
+def project_hours(project) -> dict | None:
+    """Години проєкту Minerva — з проєкту askDANTE, з яким він зв'язаний (ProjectMap)."""
+    from .models import ProjectMap
+    m = ProjectMap.objects.filter(project=project).select_related("dante_project").first() if project.pk else None
+    if m is None:
+        return None
+    data = hours([m.dante_project])
+    if data is not None:
+        data["shared"] = m.dante_project.maps.exclude(project=project).count()
+    return data
+
+
+def customer_hours(customer) -> dict | None:
+    """Години клієнта CRM: проєкти askDANTE, прив'язані до клієнта, і проєкти askDANTE його проєктів Minerva."""
+    from .models import ProjectMap
+    dps = set(DanteProject.objects.filter(crm_customer=customer))
+    dps |= {m.dante_project for m in
+            ProjectMap.objects.filter(project__customer=customer).select_related("dante_project")}
+    return hours(dps) if dps else None
+
+
+def balance(du: DanteUser, year: int, month: int, c: DanteClient | None = None, max_age_minutes: int = 60):
+    """Місячний підсумок askDANTE (кеш на годину; askDANTE віддає всіх працівників одразу — зберігаються всі)."""
+    period = f"{year:04d}-{month:02d}"
+    pb = PeriodBalance.objects.filter(dante_user=du, period=period).first()
+    if pb and pb.fetched_at > timezone.now() - datetime.timedelta(minutes=max_age_minutes):
+        return pb
+    try:
+        rows = (c or client()).performance_period(f"{month:02d}-{year:04d}")
+    except DanteError as e:
+        PeriodBalance.objects.update_or_create(dante_user=du, period=period, defaults={"error": e.message[:255]})
+        return PeriodBalance.objects.get(dante_user=du, period=period)
+    for other in DanteUser.objects.filter(dante_id__in=list(rows)):
+        PeriodBalance.objects.update_or_create(dante_user=other, period=period,
+                                               defaults={"data": rows[other.dante_id], "error": ""})
+    if du.dante_id not in rows:
+        PeriodBalance.objects.update_or_create(dante_user=du, period=period, defaults={
+            "data": {}, "error": "askDANTE не повернув підсумок цього працівника за місяць"})
+    return PeriodBalance.objects.get(dante_user=du, period=period)
+
+
+def balance_lines(pb) -> list[tuple[str, str]]:
+    """Підсумок місяця для показу: [(назва, значення)]; хвилини — як 160:00."""
+    d = (pb.data if pb else None) or {}
+
+    def hm(key):
+        v = d.get(key)
+        if not isinstance(v, (int, float)):
+            return None
+        sign, v = ("−" if v < 0 else ""), abs(int(round(v)))
+        return f"{sign}{v // 60}:{v % 60:02d}"
+
+    def days(key):
+        v = d.get(key)
+        return f"{v:g}" if isinstance(v, (int, float)) else None
+
+    rows = [("Норма", hm("targetTime")), ("Відпрацьовано", hm("workingTime")),
+            ("Переробки за місяць", hm("overTime")), ("Баланс переробок", hm("overTimeTotal")),
+            ("Відпустка: залишок, днів", days("remainingLeave")), ("Відпустка цього місяця, днів", days("leaveDays")),
+            ("Лікарняні цього місяця, днів", days("diseaseDays")), ("Лікарняні з початку року", days("diseaseDaysTotal"))]
+    return [(k, v) for k, v in rows if v is not None]
+
+
+# ── «мої проєкти» і швидкий запис часу на проєкт ─────────────────
+def my_projects(user):
+    """☆ проєкти askDANTE користувача, у які можна писати час."""
+    return (DanteProject.objects.filter(pinned_by=user, archived=False, gone=False, time_trackable=True)
+            .select_related("parent").order_by("name"))
+
+
+def toggle_pin(user, dp: DanteProject) -> bool:
+    if dp.pinned_by.filter(pk=user.pk).exists():
+        dp.pinned_by.remove(user)
+        return False
+    dp.pinned_by.add(user)
+    return True
+
+
+def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: int, activity=None, comment: str = "",
+                 user=None, source: str = Booking.MANUAL, st: DanteSettings | None = None) -> Booking:
+    """Час на проєкт askDANTE (тривалість у хвилинах, без приходу/відходу). Повтор того самого запису за 2 хв —
+    відмова (подвійне натискання), бо записи askDANTE через API не видаляються."""
+    st = st or DanteSettings.get()
+    if day > local_today():
+        raise DanteError("bad_request", "Час на проєкт за майбутній день записувати не можна.")
+    if not 0 < minutes <= 24 * 60:
+        raise DanteError("bad_request", "Тривалість — від 1 хвилини до 24 годин.")
+    if dp.archived or dp.gone or not dp.time_trackable:
+        raise DanteError("bad_request", f"У проєкт askDANTE «{dp}» час записувати не можна (архів або вимкнено).")
+    activity = activity or st.default_activity
+    comment = (comment or "").strip()[:500]
+    recent = timezone.now() - datetime.timedelta(minutes=2)
+    if Booking.objects.filter(dante_user=du, kind=Booking.PROJECT, date=day, dante_project=dp, duration=minutes,
+                              comment=comment, status=Booking.SENT, created_at__gte=recent).exists():
+        raise DanteError("bad_request", "Такий самий запис щойно вже пішов в askDANTE — оновіть сторінку.")
+    data = {"projectId": dp.dante_id}
+    if activity:
+        data["activityId"] = activity.dante_id
+    if comment:
+        data["comment"] = comment
+    c = client(st)
+    with lock(du):
+        booking = Booking(dante_user=du, date=day, kind=Booking.PROJECT, source=source, duration=minutes,
+                          dante_project=dp, activity=activity, comment=comment, reason="час на проєкт",
+                          created_by=user if getattr(user, "pk", None) else None)
+        try:
+            c.track(du.dante_id, {"date": day.isoformat(), "duration": minutes, "projectData": data})
+            booking.status = Booking.SENT
+        except DanteError as e:
+            booking.status, booking.error = Booking.FAILED, e.message
+        booking.save()
+    if booking.status == Booking.SENT:
+        try:
+            sync_records(st, day, day, c)   # одразу видно в годинах; збій — підтягнеться нічним оновленням
+        except DanteError:
+            pass
+    return booking
+
+
+def day_records(du: DanteUser, date_from, date_to) -> dict:
+    """{дата: [TimeRecord з проєктом]} — час на проєкти по днях (з копії записів)."""
+    out = {}
+    for r in (TimeRecord.objects.filter(dante_user=du, day__range=(date_from, date_to))
+              .exclude(dante_project=None, project_name="").select_related("dante_project")):
+        out.setdefault(r.day, []).append(r)
+    return out
