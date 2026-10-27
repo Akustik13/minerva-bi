@@ -29,6 +29,11 @@ PLANNED_LABELS = {WorkDay.LEAVE: "відпустка", WorkDay.ILLNESS: "лік�
 LONG_DAY_MINUTES = 10 * 60      # ArbZG: понад 10 годин — попередження
 MAX_CLOCK_HOURS = 16            # «Прийшов» довше — забута відмітка, записувати вручну
 LOCK_MINUTES = 10
+REPORT_STATUSES = {             # звіт автозаповнення по днях; порядок — як у підсумку
+    "sent": "записано", "would": "запишеться", "had": "вже було", "review": "на перевірку",
+    "skipped": "пропущено", "failed": "помилка",
+}
+UNKNOWN_STOP = "askDANTE не відповів — решту днів не перевірено, наступний запуск продовжить."
 
 
 def client(st: DanteSettings | None = None) -> DanteClient:
@@ -212,6 +217,7 @@ class Proposal:
     stop: datetime.time | None = None
     reason: str = ""
     warnings: list = field(default_factory=list)
+    existing: list = field(default_factory=list)   # записи askDANTE, що вже є в дні
 
     @property
     def minutes(self) -> int:
@@ -250,7 +256,7 @@ def propose(st: DanteSettings, du: DanteUser, days: dict, date_from, date_to, mo
     while day <= date_to:
         wd = days.get(day)
         blocker = day_blocker(st, wd, day)
-        p = Proposal(date=day, book=False)
+        p = Proposal(date=day, book=False, existing=list(wd.times) if wd and wd.times else [])
         if day > now.date():
             p.reason = "майбутній день"
         elif blocker:
@@ -281,6 +287,24 @@ def propose(st: DanteSettings, du: DanteUser, days: dict, date_from, date_to, mo
         out.append(p)
         day += datetime.timedelta(days=1)
     return out
+
+
+def report_row(p: Proposal, status: str = "", error: str = "") -> dict:
+    """Рядок звіту: що з днем зроблено (або зробилось би) і чому."""
+    if not status:
+        status = "had" if p.existing else "skipped" if not p.book else "review" if p.warnings else "would"
+    span = f"{hhmm(p.start)}–{hhmm(p.stop)}" if p.start and p.stop else ""
+    if status == "had":
+        text = ", ".join(f"{t['coming']}–{t.get('leaving') or '…'}" for t in p.existing)
+        if any(not t.get("leaving") for t in p.existing):
+            text += " · немає відходу — допишіть в askDANTE"
+    elif status == "skipped":
+        text = p.reason
+    elif status == "review":
+        text = f"{span} · {'; '.join(p.warnings)} — перевірте й запишіть у календарі"
+    else:
+        text = f"{span} · {error or p.reason}"
+    return {"date": p.date.isoformat(), "status": status, "text": text}
 
 
 # ── запис ────────────────────────────────────────────────────────
@@ -316,7 +340,7 @@ def fill(du: DanteUser, date_from, date_to, mode: str, start=None, stop=None, fa
     """
     st = st or DanteSettings.get()
     c = client(st)
-    result = {"sent": [], "failed": [], "skipped": []}
+    result = {"sent": [], "failed": [], "skipped": [], "days": [], "stopped": ""}
     with lock(du):
         days = refresh_days(du, date_from, date_to, c)
         for p in propose(st, du, days, date_from, date_to, mode, start, stop, fallback):
@@ -325,11 +349,15 @@ def fill(du: DanteUser, date_from, date_to, mode: str, start=None, stop=None, fa
             if not p.book or (only_dates is None and p.warnings):
                 if only_dates is not None or p.warnings:
                     result["skipped"].append((p.date, p.reason if not p.book else "; ".join(p.warnings)))
+                result["days"].append(report_row(p))
                 continue
             b = _send(c, du, p.date, p.start, p.stop, source, user, p.reason)
-            (result["sent"] if b.status == Booking.SENT else result["failed"]).append((p.date, b.error or p.reason))
-            if b.status != Booking.SENT and b.error and "невідомо" in b.error:
-                break   # askDANTE не відповів — не продовжувати наосліп; наступне читання покаже, що записано
+            sent = b.status == Booking.SENT
+            (result["sent"] if sent else result["failed"]).append((p.date, b.error or p.reason))
+            result["days"].append(report_row(p, "sent" if sent else "failed", b.error))
+            if not sent and b.error and "невідомо" in b.error:
+                result["stopped"] = UNKNOWN_STOP   # не продовжувати наосліп; наступне читання покаже, що записано
+                break
     return result
 
 
@@ -429,8 +457,16 @@ def autofill_range(st: DanteSettings):
     return date_from, today - datetime.timedelta(days=1)
 
 
-def autofill(st: DanteSettings | None = None, dry_run: bool = False) -> str:
-    """Порожні робочі дні за останні N днів (не раніше autofill_since) до вчора — для працівників з автозаповненням."""
+def autofill(st: DanteSettings | None = None, dry_run: bool = False, manual: bool = False) -> str:
+    """Порожні робочі дні за останні N днів (не раніше autofill_since) до вчора — для працівників з автозаповненням.
+    Повертає підсумок одним рядком; звіт по днях — autofill_report."""
+    return autofill_report(st, dry_run, manual)["summary"]
+
+
+def autofill_report(st: DanteSettings | None = None, dry_run: bool = False, manual: bool = False) -> dict:
+    """Автозаповнення зі звітом по кожному дню кожного працівника: записано / вже було в askDANTE / на перевірку /
+    пропущено (вихідний, відпустка, свято, без активності…) / помилка. Не dry_run — звіт зберігається в налаштуваннях
+    (`last_autofill_report`): і щоденний запуск, і «Заповнити зараз» (manual)."""
     st = st or DanteSettings.get()
     date_from, date_to = autofill_range(st)
     if not st.last_sync_at or timezone.now() - st.last_sync_at > datetime.timedelta(hours=20):
@@ -438,27 +474,41 @@ def autofill(st: DanteSettings | None = None, dry_run: bool = False) -> str:
             sync_directory(st)
         except DanteError:
             pass   # довідник — не головне; читання днів нижче покаже, чи є зв'язок
-    sent = failed = review = 0
-    errors = []
-    for du in DanteUser.objects.filter(autofill=True, archived=False).select_related("user"):
-        if date_from > date_to:
-            break
+    people = list(DanteUser.objects.filter(autofill=True, archived=False).select_related("user"))
+    report = {"at": timezone.now().isoformat(), "manual": manual, "dry_run": dry_run, "mode": st.autofill_mode,
+              "from": date_from.isoformat(), "to": date_to.isoformat(), "people": len(people), "users": [],
+              "counts": dict.fromkeys(REPORT_STATUSES, 0)}
+    for du in people if date_from <= date_to else []:
+        entry = {"id": du.pk, "name": str(du), "days": [], "error": ""}
         try:
             if dry_run:
                 days = refresh_days(du, date_from, date_to)
-                plan = propose(st, du, days, date_from, date_to, st.autofill_mode)
-                sent += sum(p.book and not p.warnings for p in plan)
-                review += sum(p.book and bool(p.warnings) for p in plan)
-                continue
-            r = fill(du, date_from, date_to, st.autofill_mode, source=Booking.AUTO, st=st)
-            sent, failed, review = sent + len(r["sent"]), failed + len(r["failed"]), review + len(r["skipped"])
+                entry["days"] = [report_row(p) for p in propose(st, du, days, date_from, date_to, st.autofill_mode)]
+            else:
+                r = fill(du, date_from, date_to, st.autofill_mode, source=Booking.AUTO, st=st)
+                entry["days"], entry["error"] = r["days"], r["stopped"]
         except DanteError as e:
-            errors.append(f"{du}: {e.message}")
-    result = (f"{'перевірка, записалось би' if dry_run else 'записано'} днів: {sent}"
-              + (f" · помилок: {failed}" if failed else "")
-              + (f" · на перевірку в календарі: {review}" if review else "")
-              + (f" · {'; '.join(errors)}" if errors else ""))
+            entry["error"] = e.message
+        for row in entry["days"]:
+            report["counts"][row["status"]] += 1
+        report["users"].append(entry)
+    report["summary"] = _summary(report)
     if not dry_run:
-        st.last_autofill_at, st.last_autofill_result = timezone.now(), result[:255]
-        st.save(update_fields=["last_autofill_at", "last_autofill_result"])
-    return result
+        st.last_autofill_at, st.last_autofill_result = timezone.now(), report["summary"][:255]
+        st.last_autofill_report = report
+        st.save(update_fields=["last_autofill_at", "last_autofill_result", "last_autofill_report"])
+    return report
+
+
+def _summary(report: dict) -> str:
+    if not report["people"]:
+        return "немає працівників з галочкою «Автозаповнення» (👥 Працівники askDANTE)"
+    if report["from"] > report["to"]:
+        return "немає днів для перевірки — дата «Не раніше» ще не минула"
+    n = report["counts"]
+    parts = [f"перевірка, записалось би днів: {n['would']}" if report["dry_run"] else f"записано днів: {n['sent']}"]
+    parts += [f"{label}: {n[key]}" for key, label in (("had", "вже було в askDANTE"),
+                                                     ("review", "на перевірку в календарі"),
+                                                     ("skipped", "пропущено"), ("failed", "помилок")) if n[key]]
+    parts += [f"{u['name']}: {u['error']}" for u in report["users"] if u["error"]]
+    return " · ".join(parts)

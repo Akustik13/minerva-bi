@@ -359,6 +359,44 @@ class AutofillTests(Base):
         self.assertIn("записалось би днів: 2", result)
         self.assertIsNone(DanteSettings.get().last_autofill_at)
 
+    def test_report_per_day(self):
+        self.st.autofill_mode, self.st.last_sync_at = DanteSettings.MODE_FIXED, timezone.now()
+        self.st.autofill_since, self.st.autofill_lookback_days = MON, 30
+        self.st.save()
+        self.du.autofill = True
+        self.du.save()
+        self.fake.times[D(1)] = [{"coming": "07:55", "leaving": "16:10", "source": "TERMINAL", "minutes": 495}]
+        self.fake.times[D(2)] = [{"coming": "08:00", "leaving": None, "source": "APP", "minutes": 0}]
+        self.fake.att[D(3)] = {"planned": "LEAVE", "absences": [{"type": "LEAVE", "ratio": 1}]}
+        self.fake.fail[D(4)] = DanteError("bad_request", "Zeitraum gesperrt")
+        with mock.patch("worktime.services.local_today", return_value=D(7)):
+            report = services.autofill_report(self.st, manual=True)
+        self.assertEqual(self.fake.calls, [{"date": "2026-09-07", "start": "08:00", "stop": "16:30"}])
+        rows = {r["date"]: r for r in report["users"][0]["days"]}
+        self.assertEqual(rows["2026-09-07"]["status"], "sent")
+        self.assertEqual(rows["2026-09-08"], {"date": "2026-09-08", "status": "had", "text": "07:55–16:10"})
+        self.assertIn("немає відходу", rows["2026-09-09"]["text"])   # прихід без відходу не перезаписується
+        self.assertEqual(rows["2026-09-10"]["text"], "відпустка")
+        self.assertEqual(rows["2026-09-11"]["status"], "failed")
+        self.assertIn("Zeitraum gesperrt", rows["2026-09-11"]["text"])
+        self.assertEqual(rows["2026-09-12"]["text"], "вихідний")
+        self.assertEqual(report["counts"], {"sent": 1, "would": 0, "had": 2, "review": 0, "skipped": 3, "failed": 1})
+        st = DanteSettings.get()
+        self.assertTrue(st.last_autofill_report["manual"])
+        self.assertIn("вже було в askDANTE: 2", st.last_autofill_result)
+        # повторний запуск: усе вже є — нічого не пише
+        self.fake.calls.clear()
+        del self.fake.fail[D(4)]
+        with mock.patch("worktime.services.local_today", return_value=D(7)):
+            report = services.autofill_report(self.st, manual=True)
+        self.assertEqual([c["date"] for c in self.fake.calls], ["2026-09-11"])
+        self.assertEqual(report["counts"]["had"], 3)
+
+    def test_report_explains_empty_run(self):
+        self.st.autofill_mode = DanteSettings.MODE_FIXED
+        self.st.last_sync_at = timezone.now()
+        self.assertIn("немає працівників", services.autofill(self.st))
+
 
 class SyncTests(Base):
     def test_sync_links_users_by_email_and_projects(self):
@@ -462,6 +500,40 @@ class AdminPageTests(Base):
         self.assertEqual(ProjectMap.objects.get(project=pr).dante_project, dp)
         self.client.post(url, {f"map_{pr.pk}": ""})
         self.assertFalse(ProjectMap.objects.exists())
+
+    def test_fill_now_and_report(self):
+        self.st.autofill_mode, self.st.last_sync_at = DanteSettings.MODE_FIXED, timezone.now()
+        self.st.autofill_since = MON
+        self.st.save()
+        self.du.autofill = True
+        self.du.save()
+        self.fake.times[D(1)] = [{"coming": "07:55", "leaving": "16:10", "source": "TERMINAL", "minutes": 495}]
+        url = reverse("admin:worktime_dantesettings_fillnow")
+        with mock.patch("worktime.services.local_today", return_value=D(3)):
+            self.assertEqual(self.client.get(url).status_code, 302)   # лише POST
+            self.assertEqual(self.fake.calls, [])
+            r = self.client.post(reverse("admin:worktime_dantesettings_dryrun"))
+            self.assertContains(r, "нічого не записано")
+            self.assertContains(r, "запишеться")
+            self.assertEqual(self.fake.calls, [])
+            self.assertEqual(DanteSettings.get().last_autofill_report, {})
+            r = self.client.post(url)
+        self.assertRedirects(r, reverse("admin:worktime_dantesettings_report"))
+        self.assertEqual([c["date"] for c in self.fake.calls], ["2026-09-07", "2026-09-09"])
+        r = self.client.get(reverse("admin:worktime_dantesettings_report"))
+        self.assertContains(r, "Заповнено вручну")
+        self.assertContains(r, "07:55–16:10")
+        self.assertContains(r, "вже було")
+        r = self.client.get(reverse("admin:worktime_dantesettings_changelist"), follow=True)
+        self.assertContains(r, "Звіт по днях")
+        self.assertContains(r, "Заповнити зараз")
+
+    def test_fill_now_needs_mode(self):
+        self.du.autofill = True
+        self.du.save()
+        r = self.client.post(reverse("admin:worktime_dantesettings_fillnow"), follow=True)
+        self.assertContains(r, "Автозаповнення вимкнено")
+        self.assertEqual(self.fake.calls, [])
 
     def test_settings_pages(self):
         r = self.client.get(reverse("admin:worktime_dantesettings_changelist"), follow=True)

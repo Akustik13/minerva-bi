@@ -99,8 +99,10 @@ class DanteSettingsAdmin(admin.ModelAdmin):
                        "activity_fallback", "round_minutes", "min_activity_minutes", "autofill_status"],
             "description": "Працює лише для працівників з галочкою «Автозаповнення» (👥 Працівники askDANTE). "
                            "Заповнює робочі дні до вчора, у яких в askDANTE немає жодного запису, відпустки, "
-                           "лікарняного чи свята. Дні з попередженнями (понад 10 годин, не прочитано свята) "
-                           "лишаються на перевірку в календарі.",
+                           "лікарняного чи свята; день, де вже внесено прихід і відхід, пропускається. Дні з "
+                           "попередженнями (понад 10 годин, не прочитано свята) лишаються на перевірку в календарі. "
+                           "«▶ Заповнити зараз» — те саме одразу, без очікування години запуску; після кожного "
+                           "запуску — звіт по днях: що записано, що вже було, що пропущено й чому.",
         }),
     ]
     readonly_fields = ["calendar_link", "check_status", "autofill_status"]
@@ -134,19 +136,36 @@ class DanteSettingsAdmin(admin.ModelAdmin):
 
     @admin.display(description="Стан")
     def autofill_status(self, obj):
-        last = (f"Останній запуск {timezone.localtime(obj.last_autofill_at):%d.%m.%Y %H:%M} — {obj.last_autofill_result}"
-                if obj and obj.last_autofill_at else "ще не запускалось")
+        if obj and obj.last_autofill_at:
+            how = "вручну («Заповнити зараз»)" if (obj.last_autofill_report or {}).get("manual") else "щоденний"
+            last = format_html('Останній запуск {} ({}) — {} · <a href="{}">📋 Звіт по днях</a>',
+                               f"{timezone.localtime(obj.last_autofill_at):%d.%m.%Y %H:%M}", how,
+                               obj.last_autofill_result, reverse("admin:worktime_dantesettings_report"))
+        else:
+            last = "ще не запускалось"
         people = DanteUser.objects.filter(autofill=True, archived=False).count()
+        date_from, date_to = services.autofill_range(obj or DanteSettings.get())
+        confirm = (f"Записати в askDANTE порожні робочі дні {date_from:%d.%m.%Y}–{date_to:%d.%m.%Y} "
+                   f"(працівників з автозаповненням: {people})? Дні, де вже є прихід і відхід, відпустка чи свято, "
+                   "не чіпаються. Записи askDANTE через API не видаляються.")
         return format_html(
-            '{}<div class="help">Працівників з автозаповненням: {}.</div>'
+            '<div>{}</div><div class="help">Працівників з автозаповненням: {} · період зараз: {}–{} '
+            '(«Перевіряти днів назад», не раніше «Не раніше дати», до вчора). Кнопки працюють зі збереженими '
+            'налаштуваннями — спершу збережіть зміни.</div><div style="margin-top:6px">'
+            '<button type="submit" class="button" formaction="{}" formnovalidate '
+            'onclick="return confirm(this.dataset.confirm)" data-confirm="{}">▶ Заповнити зараз</button> '
             '<button type="submit" class="button" formaction="{}" formnovalidate>🧪 Що записалось би зараз '
-            '(без запису)</button>', last, people, reverse("admin:worktime_dantesettings_dryrun"))
+            '(без запису)</button></div>',
+            last, people, f"{date_from:%d.%m.%Y}", f"{date_to:%d.%m.%Y}",
+            reverse("admin:worktime_dantesettings_fillnow"), confirm, reverse("admin:worktime_dantesettings_dryrun"))
 
     def get_urls(self):
         view = self.admin_site.admin_view
         return [path("check/", view(self.check_view), name="worktime_dantesettings_check"),
                 path("sync/", view(self.sync_view), name="worktime_dantesettings_sync"),
-                path("dry-run/", view(self.dryrun_view), name="worktime_dantesettings_dryrun")] + super().get_urls()
+                path("fill-now/", view(self.fillnow_view), name="worktime_dantesettings_fillnow"),
+                path("dry-run/", view(self.dryrun_view), name="worktime_dantesettings_dryrun"),
+                path("report/", view(self.report_view), name="worktime_dantesettings_report")] + super().get_urls()
 
     def _post_only(self, request):
         if not self.has_change_permission(request):
@@ -183,22 +202,68 @@ class DanteSettingsAdmin(admin.ModelAdmin):
             self.message_user(request, f"❌ {e.message}", messages.ERROR)
         return back
 
+    def _autofill_problem(self, st) -> str:
+        if not st.configured:
+            return "Спершу вкажіть адресу й API-Key askDANTE і збережіть."
+        if st.autofill_mode == DanteSettings.MODE_OFF:
+            return "Автозаповнення вимкнено — виберіть режим («Стандартний робочий день» або «За активністю») і збережіть."
+        return ""
+
+    def fillnow_view(self, request):
+        """«▶ Заповнити зараз» — те саме, що щоденний запуск, але одразу; звіт зберігається й відкривається."""
+        back = self._post_only(request)
+        if request.method != "POST":
+            return back
+        st = DanteSettings.get()
+        problem = self._autofill_problem(st) or ("" if st.enabled else "Увімкніть askDANTE (галочка вгорі) і збережіть.")
+        if problem:
+            self.message_user(request, problem, messages.WARNING)
+            return back
+        report = services.autofill_report(st, manual=True)
+        failed = report["counts"]["failed"] or any(u["error"] for u in report["users"])
+        self.message_user(request, report["summary"], messages.WARNING if failed else messages.SUCCESS)
+        return redirect(reverse("admin:worktime_dantesettings_report"))
+
     def dryrun_view(self, request):
         back = self._post_only(request)
         if request.method != "POST":
             return back
         st = DanteSettings.get()
-        if st.autofill_mode == DanteSettings.MODE_OFF:
-            self.message_user(request, "Автозаповнення вимкнено — виберіть режим і збережіть.", messages.WARNING)
+        problem = self._autofill_problem(st)
+        if problem:
+            self.message_user(request, problem, messages.WARNING)
             return back
-        date_from, date_to = services.autofill_range(st)
+        return self._render_report(request, services.autofill_report(st, dry_run=True))
+
+    def report_view(self, request):
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        return self._render_report(request, DanteSettings.get().last_autofill_report or {})
+
+    def _render_report(self, request, report: dict):
+        users = []
+        for u in report.get("users", []):
+            rows = []
+            for r in u["days"]:
+                day = _date(r["date"])
+                rows.append({**r, "day": day, "wd": WEEKDAYS[day.weekday()], "month": f"{day:%Y-%m}",
+                             "label": services.REPORT_STATUSES.get(r["status"], r["status"])})
+            users.append({**u, "rows": rows})
+        counts = report.get("counts", {})
         try:
-            result = services.autofill(st, dry_run=True)
-            self.message_user(request, f"{date_from:%d.%m}–{date_to:%d.%m}: {result}. Нічого не записано.",
-                              messages.INFO)
-        except DanteError as e:
-            self.message_user(request, f"❌ {e.message}", messages.ERROR)
-        return back
+            at = timezone.localtime(datetime.datetime.fromisoformat(report["at"]))
+        except (KeyError, ValueError):
+            at = None
+        st = DanteSettings.get()
+        context = {**self.admin_site.each_context(request), "title": "Звіт автозаповнення", "report": report,
+                   "users": users, "at": at, "from": _date(report.get("from")), "to": _date(report.get("to")),
+                   "mode": dict(DanteSettings.MODES).get(report.get("mode"), ""),
+                   "counts": [(k, label, counts.get(k, 0)) for k, label in services.REPORT_STATUSES.items()
+                              if counts.get(k)],
+                   "settings_url": reverse("admin:worktime_dantesettings_change", args=[st.pk]),
+                   "calendar_url": reverse("admin:worktime_workday_changelist"),
+                   "users_url": reverse("admin:worktime_danteuser_changelist")}
+        return render(request, "admin/worktime/autofill_report.html", context)
 
 
 # ── Працівники ───────────────────────────────────────────────────

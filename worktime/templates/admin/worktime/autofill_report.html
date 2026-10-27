@@ -1,0 +1,109 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a> ›
+  ⏱ {% trans "Робочий час" %} › <a href="{{ settings_url }}">{% trans "Налаштування askDANTE" %}</a> ›
+  {% trans "Звіт автозаповнення" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.wt-card{border:1px solid var(--border-strong,#ccc);border-radius:10px;background:var(--bg-card,transparent);padding:12px 14px;margin-bottom:14px}
+.wt-card h3{margin:0 0 8px;font-size:14px}
+.wt-dry{border-color:#1a73e8;background:rgba(26,115,232,.07)}
+.wt-muted{color:var(--text-muted,#888);font-size:12px}
+.wt-err{color:#ef4444}
+.wt-chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}
+.wt-chips button{cursor:pointer;border:1px solid var(--border-strong,#ccc);border-radius:14px;padding:3px 11px;font-size:12px;background:transparent;color:inherit}
+.wt-chips button.on{box-shadow:0 0 0 2px #1a73e8 inset}
+.wt-rep{width:100%;border-collapse:collapse;font-size:13px}
+.wt-rep td{padding:5px 8px;border-bottom:1px solid var(--border,#eee);vertical-align:top}
+.wt-rep td.d{white-space:nowrap;font-variant-numeric:tabular-nums;width:1%}
+.wt-rep td.s{white-space:nowrap;width:1%}
+.wt-b{display:inline-block;padding:1px 8px;border-radius:8px;font-size:11px;border:1px solid var(--border,#ddd)}
+.s-sent .wt-b{background:rgba(34,197,94,.18);border-color:rgba(34,197,94,.6)}
+.s-would .wt-b{background:rgba(26,115,232,.14);border-color:rgba(26,115,232,.5)}
+.s-had .wt-b{background:rgba(34,197,94,.07)}
+.s-review .wt-b{background:rgba(245,158,11,.18);border-color:rgba(245,158,11,.7)}
+.s-failed .wt-b{background:rgba(239,68,68,.15);border-color:#ef4444}
+.s-failed td{color:#ef4444}
+tr.s-skipped td{color:var(--text-muted,#888)}
+.wt-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+</style>
+
+{% if not report %}
+  <div class="wt-card">
+    <h3>{% trans "Автозаповнення ще не запускалось" %}</h3>
+    <p>{% trans "Запустіть «▶ Заповнити зараз» у налаштуваннях або дочекайтесь щоденного запуску." %}</p>
+    <a class="button" href="{{ settings_url }}">⚙️ {% trans "Налаштування askDANTE" %}</a>
+  </div>
+{% else %}
+  <div class="wt-card{% if report.dry_run %} wt-dry{% endif %}">
+    <h3>
+      {% if report.dry_run %}🧪 {% trans "Перевірка — нічого не записано, так було б зараз" %}
+      {% elif report.manual %}▶ {% trans "Заповнено вручну («Заповнити зараз»)" %}
+      {% else %}⏰ {% trans "Щоденний запуск" %}{% endif %}
+    </h3>
+    <div>
+      {% if at %}{{ at|date:"d.m.Y H:i" }} · {% endif %}
+      {% trans "період" %} {{ from|date:"d.m.Y" }}–{{ to|date:"d.m.Y" }}
+      {% if mode %}· {{ mode }}{% endif %}
+    </div>
+    <div style="margin-top:6px"><b>{{ report.summary }}</b></div>
+    {% if not report.people %}
+      <p><a href="{{ users_url }}">👥 {% trans "Працівники askDANTE" %}</a> —
+        {% trans "поставте галочку «Автозаповнення» тим, кому заповнювати." %}</p>
+    {% endif %}
+    {% if counts %}
+      <div class="wt-chips" id="wt-filter">
+        <button type="button" class="on" data-f="">{% trans "Усі дні" %}</button>
+        {% for key, label, n in counts %}<button type="button" data-f="{{ key }}" class="s-{{ key }}"><span class="wt-b">{{ label }}</span> {{ n }}</button>{% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  {% for u in users %}
+    <div class="wt-card">
+      <h3>👤 {{ u.name }}</h3>
+      {% if u.error %}<p class="wt-err">❌ {{ u.error }}</p>{% endif %}
+      {% if u.rows %}
+        <table class="wt-rep">
+          {% for r in u.rows %}
+            <tr class="s-{{ r.status }}" data-s="{{ r.status }}">
+              <td class="d"><a href="{{ calendar_url }}?u={{ u.id }}&amp;m={{ r.month }}">{{ r.wd }} {{ r.day|date:"d.m" }}</a></td>
+              <td class="s"><span class="wt-b">{{ r.label }}</span></td>
+              <td>{{ r.text }}</td>
+            </tr>
+          {% endfor %}
+        </table>
+      {% elif not u.error %}
+        <p class="wt-muted">{% trans "Днів у періоді немає." %}</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="wt-actions">
+  <a class="button" href="{{ settings_url }}">⚙️ {% trans "Налаштування askDANTE" %}</a>
+  <a class="button" href="{{ calendar_url }}">📅 {% trans "Календар робочого часу" %}</a>
+</div>
+
+<script>
+(function(){
+  var bar = document.getElementById('wt-filter');
+  if (!bar) return;
+  bar.addEventListener('click', function(e){
+    var b = e.target.closest('button[data-f]');
+    if (!b) return;
+    bar.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x === b); });
+    var f = b.dataset.f;
+    document.querySelectorAll('tr[data-s]').forEach(function(tr){
+      tr.style.display = (!f || tr.dataset.s === f) ? '' : 'none';
+    });
+  });
+})();
+</script>
+{% endblock %}
