@@ -948,12 +948,15 @@ window.MV_GROUPS = [
     links:[
       { href:'/calendar/',                                      icon:'📅', label:'Мій календар',  app:'calendar_app' },
       { href:'/admin/calendar_app/calendarevent/add/',          icon:'➕', label:'Нова подія',     app:'calendar_app', model:'CalendarEvent' },
+      { href:'/calendar/deadlines/',                            icon:'🔎', label:'Терміни з пошти', app:'calendar_app' },
+      { href:'/calendar/connections/',                          icon:'🔗', label:'Календарі Google / Outlook', app:'calendar_app' },
       { href:'/calendar/settings/',                             icon:'🔔', label:'Сповіщення',    app:'calendar_app' },
     ], apps:['calendar_app'] },
   { id:'worktime', icon:'⏱', label:'⏱ Робочий час', href:'/admin/worktime/workday/',
     links:[
       { href:'/admin/worktime/workday/',                        icon:'📅', label:'Прийшов / пішов',  app:'worktime' },
       { href:'/admin/worktime/workday/#fill',                   icon:'🧩', label:'Заповнити пропуски', app:'worktime' },
+      { href:'/admin/worktime/workday/report/',                 icon:'📊', label:'Звіт по працівниках', app:'worktime' },
     ], apps:['worktime'] },
   { id:'documents', icon:'📄', label:'📄 Документи',
     links:[

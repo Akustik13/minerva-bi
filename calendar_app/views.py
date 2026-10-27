@@ -79,6 +79,7 @@ def calendar_view(request):
         events_by_day.setdefault(ev.start_at.day, []).append(ev)
 
     wt = _worktime_layer(request, year, month)
+    ext_by_day = _external_events(request.user, year, month)
     weeks_data = []
     for week in raw_weeks:
         week_cells = []
@@ -89,6 +90,7 @@ def calendar_view(request):
                 'is_today': day == today_day,
                 'other':    day == 0,
                 'wt':       wt['days'].get(day) if wt and day else None,
+                'ext':      ext_by_day.get(day, []) if day else [],
             })
         weeks_data.append(week_cells)
 
@@ -113,6 +115,7 @@ def calendar_view(request):
         'wt':                 wt,
         'wt_days':            wt['days'] if wt else {},
         'invites':            _invites(request.user),
+        'deadlines_pending':  _deadlines_pending(request.user),
         'is_nav_sidebar_enabled': True,
     })
 
@@ -126,6 +129,24 @@ def _worktime_layer(request, year, month):
         import logging
         logging.getLogger(__name__).exception('worktime layer')
         return None
+
+
+def _external_events(user, year, month) -> dict:
+    """Події підписаних календарів (Google / Outlook через iCal) по днях місяця — лише показ."""
+    from calendar_app.models import ExternalEvent
+    out = {}
+    for e in (ExternalEvent.objects.filter(feed__user=user, feed__enabled=True, start_at__year=year,
+                                           start_at__month=month).select_related("feed")[:1000]):
+        start = timezone.localtime(e.start_at)
+        out.setdefault(start.day, []).append({
+            "title": e.title, "color": e.feed.color, "feed": e.feed.name,
+            "time": "" if e.all_day else f"{start:%H:%M}", "location": e.location})
+    return out
+
+
+def _deadlines_pending(user):
+    from calendar_app.models import FoundDeadline
+    return FoundDeadline.objects.filter(user=user, status=FoundDeadline.NEW).count()
 
 
 def _invites(user):
@@ -451,3 +472,134 @@ def invite_decide(request, pk, action):
     else:
         return JsonResponse({'ok': False, 'error': 'Невідома дія'}, status=400)
     return JsonResponse({'ok': True, 'status': inv.status, 'event_id': inv.event_id})
+
+
+MASK_KEYS = ('accounts', 'folder', 'date_from', 'date_to', 'sender', 'subject', 'category', 'customer', 'project')
+
+
+@staff_member_required
+def deadlines_view(request):
+    """🔎 Терміни з пошти: маска → скільки листів → пошук у фоні (AI) → ✓ / ✕ знайдених термінів."""
+    from calendar_app import deadlines
+    from calendar_app.models import CalendarSettings, FoundDeadline
+    from email_assistant.models import EmailAccount, EmailMessage
+    cfg = CalendarSettings.for_user(request.user)
+    src = request.POST if request.method == 'POST' else request.GET
+    mask = {k: (src.getlist(k) if k == 'accounts' else src.get(k, '').strip()) for k in MASK_KEYS} \
+        if any(k in src for k in MASK_KEYS) else dict(cfg.deadline_mask or {})
+    mask = {k: v for k, v in mask.items() if v}
+    if mask.get('customer') and not str(mask['customer']).isdigit():
+        from worktime.mapping import find_customer
+        c = find_customer(mask['customer'])
+        mask['customer'] = str(c.pk) if c else ''
+    info = None
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'start':
+            try:
+                limit = max(1, min(deadlines.MAX_PER_RUN, int(request.POST.get('limit') or 200)))
+            except ValueError:
+                limit = 200
+            cfg.deadline_mask = mask
+            cfg.deadline_scan_status = '⏳ Запуск…'
+            cfg.save(update_fields=['deadline_mask', 'deadline_scan_status'])
+            deadlines.start_scan(request.user, mask, limit)
+        elif action == 'auto':
+            cfg.deadlines_auto = request.POST.get('deadlines_auto') == '1'
+            cfg.save(update_fields=['deadlines_auto'])
+        elif action in ('accept', 'dismiss'):
+            ids = [int(x) for x in request.POST.getlist('ids') if x.isdigit()]
+            for d in FoundDeadline.objects.filter(user=request.user, pk__in=ids, status=FoundDeadline.NEW) \
+                    .select_related('email_message__thread'):
+                (deadlines.accept if action == 'accept' else deadlines.dismiss)(d)
+        from django.shortcuts import redirect
+        return redirect('/calendar/deadlines/')
+    if 'count' in src:
+        total, cands = deadlines.candidates(request.user, mask)
+        info = {'total': total, 'ai': len(cands),
+                'tokens': sum(len((m.body_text or '')[:5000]) // 4 + 500 for m in cands)}
+    from projects.models import Project
+    found = list(FoundDeadline.objects.filter(user=request.user, status=FoundDeadline.NEW)
+                 .select_related('email_message').order_by('due_at')[:300])
+    today = timezone.localdate()
+    for d in found:
+        d.past = timezone.localtime(d.due_at).date() < today
+    return render(request, 'calendar_app/deadlines.html', {
+        'title': '🔎 Терміни з пошти', 'cfg': cfg, 'mask': mask, 'info': info, 'found': found,
+        'accounts': EmailAccount.objects.filter(user=request.user),
+        'categories': EmailMessage.CATEGORY_CHOICES,
+        'projects': Project.objects.filter(status__in=Project.OPEN_STATUSES).order_by('code')[:300],
+        'added': FoundDeadline.objects.filter(user=request.user, status=FoundDeadline.ADDED).count(),
+        'is_nav_sidebar_enabled': True,
+    })
+
+
+def calendar_feed(request, token):
+    """ICS календаря Minerva за секретною адресою — для підписки в Google / Outlook (без входу в Minerva)."""
+    from django.http import Http404, HttpResponse
+    from calendar_app import feeds
+    from calendar_app.models import CalendarSettings
+    if len(token) < 20:
+        raise Http404
+    cfg = CalendarSettings.objects.filter(feed_token=token).select_related('user').first()
+    if cfg is None or not cfg.user.is_active:
+        raise Http404
+    resp = HttpResponse(feeds.export(cfg.user, request.get_host().split(':')[0]),
+                        content_type='text/calendar; charset=utf-8')
+    resp['Content-Disposition'] = 'inline; filename="minerva.ics"'
+    resp['Cache-Control'] = 'private, max-age=300'
+    return resp
+
+
+@staff_member_required
+def connections_view(request):
+    """🔗 Календарі: підписка на Minerva (ICS), підписані календарі Google / Outlook, далі — двостороння синхронізація."""
+    from django.shortcuts import redirect
+    from calendar_app import feeds
+    from calendar_app.models import CalendarFeed, CalendarSettings
+    cfg = CalendarSettings.for_user(request.user)
+    if request.method == 'POST':
+        p = request.POST
+        action = p.get('action')
+        if action == 'feed_on':
+            feeds.new_token(cfg)
+        elif action == 'feed_off':
+            cfg.feed_token = ''
+            cfg.save(update_fields=['feed_token'])
+        elif action == 'feed_opts':
+            cfg.feed_worktime = p.get('feed_worktime') == '1'
+            cfg.feed_busy_only = p.get('feed_busy_only') == '1'
+            cfg.save(update_fields=['feed_worktime', 'feed_busy_only'])
+        elif action == 'add_feed':
+            url = (p.get('url') or '').strip()
+            if url.lower().startswith(('https://', 'http://', 'webcal://')):
+                feed = CalendarFeed.objects.create(user=request.user, name=(p.get('name') or 'Календар')[:100],
+                                                   url=url[:1000], color=(p.get('color') or '#8e24aa')[:7])
+                feeds.fetch(feed)
+        elif action in ('refresh', 'delete', 'toggle'):
+            feed = CalendarFeed.objects.filter(pk=p.get('feed') or 0, user=request.user).first()
+            if feed and action == 'refresh':
+                feeds.fetch(feed)
+            elif feed and action == 'delete':
+                feed.delete()
+            elif feed:
+                feed.enabled = not feed.enabled
+                feed.save(update_fields=['enabled'])
+        return redirect('/calendar/connections/')
+    feed_url = request.build_absolute_uri(f'/calendar/feed/{cfg.feed_token}.ics') if cfg.feed_token else ''
+    sync = _sync_context(request)
+    return render(request, 'calendar_app/connections.html', {
+        'title': '🔗 Календарі', 'cfg': cfg, 'feed_url': feed_url,
+        'webcal_url': feed_url.replace('https://', 'webcal://').replace('http://', 'webcal://') if feed_url else '',
+        'feeds': [(f, feeds.masked(f.url)) for f in CalendarFeed.objects.filter(user=request.user)],
+        **sync, 'is_nav_sidebar_enabled': True,
+    })
+
+
+def _sync_context(request):
+    """Двостороння синхронізація (рівень 2) — підключення Google / Microsoft і правила; без неї — порожньо."""
+    try:
+        from calendar_app import sync
+        return sync.page_context(request)
+    except ImportError:
+        return {}

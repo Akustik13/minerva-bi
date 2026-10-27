@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import sync, views
 
 app_name = 'calendar_app'
 
@@ -18,4 +18,10 @@ urlpatterns = [
     path('pending-push/',                   views.pending_push_view,   name='pending_push'),
     path('settings/',                       views.settings_view,       name='settings'),
     path('invites/<int:pk>/<str:action>/',  views.invite_decide,       name='invite_decide'),
+    path('deadlines/',                      views.deadlines_view,      name='deadlines'),
+    path('connections/',                    views.connections_view,    name='connections'),
+    path('feed/<str:token>.ics',            views.calendar_feed,       name='feed'),
+    path('connections/oauth/<str:provider>/start/',    sync.oauth_start,    name='oauth_start'),
+    path('connections/oauth/<str:provider>/callback/', sync.oauth_callback, name='oauth_callback'),
+    path('connections/sync/',               sync.sync_action,          name='sync_action'),
 ]

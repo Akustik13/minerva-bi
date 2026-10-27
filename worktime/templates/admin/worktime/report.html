@@ -1,0 +1,75 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a> ›
+  ⏱ <a href="{% url 'admin:worktime_workday_changelist' %}">{% trans "Робочий час" %}</a> › {% trans "Звіт по працівниках" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.rp-card{border:1px solid var(--border-strong,#ccc);border-radius:10px;background:var(--bg-card,transparent);padding:12px 14px;margin-bottom:14px}
+.rp-form{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.rp-form label{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.rp-people{display:flex;flex-wrap:wrap;gap:6px;max-width:100%}
+.rp-people label{flex-direction:row;align-items:center;gap:4px;border:1px solid var(--border,#ddd);border-radius:12px;padding:2px 9px}
+.rp-muted{color:var(--text-muted,#888);font-size:12px}
+.rp-paper{background:#fff;border-radius:10px;padding:14px;overflow-x:auto;color:#1f2937}
+/* лист показується як є: тема адмінки не перефарбовує його таблицю */
+.rp-paper table,.rp-paper tr,.rp-paper td,.rp-paper th{background:transparent!important;color:inherit;border-color:#e5e7eb}
+.rp-paper tr:first-child{background:#f3f4f6!important}
+.rp-paper b{color:inherit}
+.rp-presets a{margin-right:8px;font-size:12px}
+</style>
+
+<form method="get" class="rp-card">
+  <div class="rp-form">
+    <label>{% trans "Від" %}<input type="date" name="from" value="{{ from|date:'Y-m-d' }}"></label>
+    <label>{% trans "До" %}<input type="date" name="to" value="{{ to|date:'Y-m-d' }}"></label>
+    <span class="rp-presets"><a href="?preset=last_week">{% trans "минулий тиждень" %}</a><a href="?preset=last_month">{% trans "минулий місяць" %}</a><a href="?">{% trans "цей місяць" %}</a></span>
+    {% if manager %}<label style="flex-direction:row;gap:6px;align-items:center"><input type="checkbox" name="types" value="1" {% if show_types %}checked{% endif %}> {% trans "показувати тип відсутності" %}</label>{% endif %}
+    <button class="button default">📊 {% trans "Показати" %}</button>
+  </div>
+  {% if manager and people|length > 1 %}
+  <div class="rp-people" style="margin-top:10px">
+    {% for p in people %}<label><input type="checkbox" name="u" value="{{ p.pk }}" {% if not chosen or p.pk|stringformat:"s" in chosen %}checked{% endif %}> {{ p }}</label>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="rp-muted" style="margin-top:6px">{% trans "Дані askDANTE читаються зараз (дні й записи часу за період). Порожній день — робочий день без приходу й відходу." %}
+    {% if not manager %}{% trans "Ви бачите лише свій звіт." %}{% endif %}</div>
+</form>
+
+{% if report %}
+<div class="rp-paper">{{ report_html|safe }}</div>
+
+<form method="post" class="rp-card" style="margin-top:14px">
+  {% csrf_token %}
+  <input type="hidden" name="from" value="{{ from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ to|date:'Y-m-d' }}">
+  {% if show_types %}<input type="hidden" name="types" value="1">{% endif %}
+  {% for c in chosen %}<input type="hidden" name="u" value="{{ c }}">{% endfor %}
+  <b>✉️ {% trans "Надіслати цей звіт" %}</b>
+  <div class="rp-form" style="margin-top:8px">
+    <label style="flex:1;min-width:240px">{% trans "Кому (через кому)" %}<input name="to" value="{{ me }}" required></label>
+    {% if accounts %}<label>{% trans "З якої скриньки" %}<select name="sender"><option value="">{% trans "SMTP сповіщень Minerva" %}</option>{% for a in accounts %}<option value="{{ a.pk }}">{{ a.email_address }}</option>{% endfor %}</select></label>{% endif %}
+    <button class="button" name="send" value="1" onclick="return confirm('{% trans "Надіслати звіт поштою?" %}')">✉️ {% trans "Надіслати" %}</button>
+  </div>
+</form>
+{% elif not people %}
+<div class="rp-card">{% trans "Немає працівників askDANTE — завантажте їх у налаштуваннях." %}</div>
+{% endif %}
+
+{% if manager %}
+<div class="rp-card">
+  <b>🗓 {% trans "Звіти поштою за розкладом" %}</b>
+  <span class="rp-muted">— {% trans "кому, як часто, за який період; кожному працівнику — його частина, якщо в «👥 Працівники askDANTE» заповнено «Email для звіту»." %}</span>
+  <ul style="margin:8px 0">
+    {% for s in schedules %}<li><a href="{% url 'admin:worktime_workreport_change' s.pk %}">{{ s }}</a> — {{ s.get_frequency_display }}, {{ s.get_period_display|lower }}{% if not s.enabled %} · {% trans "вимкнено" %}{% endif %}{% if s.last_sent_at %} · {% trans "надіслано" %} {{ s.last_sent_at|date:"d.m.Y H:i" }}: {{ s.last_result }}{% endif %}</li>
+    {% empty %}<li class="rp-muted">{% trans "Ще немає." %}</li>{% endfor %}
+  </ul>
+  <a class="button" href="{% url 'admin:worktime_workreport_add' %}">＋ {% trans "Новий розклад" %}</a>
+  <a class="button" href="{{ users_url }}">👥 {% trans "Email для звіту працівників" %}</a>
+</div>
+{% endif %}
+{% endblock %}

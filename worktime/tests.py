@@ -4,7 +4,7 @@ from unittest import mock
 
 import requests
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -709,6 +709,23 @@ class RecordsTests(Base):
             services.book_project(self.du, MON, self.child, 30)
         self.assertEqual(len(self.fake.calls), 1)
 
+    def test_book_project_from_to_and_overlap(self):
+        from worktime.models import TimeRecord
+        b = services.book_project(self.du, MON, self.main, start=datetime.time(9, 0), stop=datetime.time(10, 30),
+                                  comment="Abstimmung", st=self.st)
+        self.assertEqual((b.status, b.duration), (Booking.SENT, 90))
+        self.assertEqual(self.fake.calls[-1], {"date": "2026-09-07", "start": "09:00", "stop": "10:30",
+                                               "projectData": {"projectId": "363", "comment": "Abstimmung"}})
+        self.fake.records = [self.rec("9", MON, 90)]
+        self.fake.records[0].update(start="09:00", stop="10:30")
+        with self.assertRaises(DanteError):   # перекриття з наявним записом проєкту
+            services.book_project(self.du, MON, self.child, start=datetime.time(10, 0), stop=datetime.time(11, 0))
+        self.assertTrue(TimeRecord.objects.filter(dante_id="9", start="09:00").exists())
+        with self.assertRaises(DanteError):
+            services.book_project(self.du, MON, self.child, start=datetime.time(11, 0))
+        services.book_project(self.du, MON, self.child, start=datetime.time(10, 30), stop=datetime.time(11, 0))
+        self.assertEqual(len(self.fake.calls), 2)
+
     def test_pins_and_parse_minutes(self):
         from worktime.admin import parse_minutes
         self.assertTrue(services.toggle_pin(self.user, self.main))
@@ -780,3 +797,145 @@ class NewPagesTests(AdminPageTests):
         self.assertContains(r, "ще не зв")
         r = self.client.get(reverse("admin:crm_customer_change", args=[customer.pk]))
         self.assertContains(r, "Час askDANTE")
+
+
+class MatchingTests(Base):
+    def setUp(self):
+        super().setUp()
+        from crm.models import Customer
+        from projects.models import Project
+        self.acme = Customer.objects.create(name="Max", company="ACME GmbH", email="max@acme.de")
+        self.pr = Project.objects.create(name="Antennen Messkampagne", customer=self.acme)
+        self.support = DanteProject.objects.create(dante_id="11", name="ACME Support", customer_name="ACME")
+        self.other = DanteProject.objects.create(dante_id="12", name="Intern Verwaltung")
+
+    def best(self):
+        from worktime import matching
+        ctx = matching.Context(DanteProject.objects.all())
+        return matching.ranked(self.pr, ctx)
+
+    def test_customer_code_and_rule(self):
+        from worktime.models import MatchRule
+        top = self.best()
+        self.assertEqual(top[0][0], self.support)
+        self.assertIn("клієнт «ACME»", top[0][2])
+        self.other.reference_number = self.pr.code
+        self.other.save()
+        self.assertEqual(self.best()[0][:2], (self.other, 100))
+        self.other.reference_number = ""
+        self.other.save()
+        MatchRule.objects.create(kind=MatchRule.KEYWORD, value="messkampagne", dante_project=self.other)
+        self.assertEqual(self.best()[0][:2], (self.other, 90))
+
+    def test_offer_number_and_behaviour(self):
+        from offers.models import Offer
+        from worktime.models import TimeRecord
+        offer = Offer.objects.create(customer=self.acme, project=self.pr)
+        TimeRecord.objects.create(dante_id="t1", dante_user=self.du, day=services.local_today(), duration=60,
+                                  dante_project=self.other, description=f"Angebot {offer.number} erstellt")
+        top = {dp: (s, why) for dp, s, why in self.best()}
+        self.assertGreaterEqual(top[self.other][0], 70)
+        self.assertTrue(any(offer.number in w for w in top[self.other][1]))
+
+    def test_behaviour_common_days(self):
+        from worktime import matching
+        from worktime.models import TimeRecord
+        facts = matching.project_facts(self.pr)
+        today = services.local_today()
+        facts["mail_days"] = {(self.user.pk, today - datetime.timedelta(days=i)) for i in range(4)}
+        for i in range(3):
+            TimeRecord.objects.create(dante_id=f"b{i}", dante_user=self.du, day=today - datetime.timedelta(days=i),
+                                      duration=30, dante_project=self.other)
+        ctx = matching.Context(DanteProject.objects.all())
+        s, why = matching.score(self.pr, facts, self.other, ctx)
+        self.assertGreaterEqual(s, 35)
+        self.assertIn("у 3 з 4 днів листування записано час сюди", why)
+
+
+class MatchingPageTests(AdminPageTests):
+    def test_rule_add_accept_all_and_pair(self):
+        from crm.models import Customer
+        from projects.models import Project
+        from worktime.models import MatchRule, ProjectMap
+        acme = Customer.objects.create(name="Max", company="ACME")
+        pr = Project.objects.create(name="Kalibrierung", customer=acme)
+        dp = DanteProject.objects.create(dante_id="11", name="ACME Kalibrierung", customer_name="ACME")
+        url = reverse("admin:worktime_danteproject_changelist")
+        r = self.client.get(url + "?view=minerva")
+        self.assertContains(r, "Правила зв")
+        self.client.post(url + "?view=minerva", {"rule_add": "1", "rule_kind": "customer", "rule_value": "ACME",
+                                                 "rule_project": dp.pk})
+        self.assertEqual(MatchRule.objects.get().customer, acme)
+        self.client.post(url + "?view=minerva", {"accept_all": "1", "min_score": "80"})
+        self.assertEqual(ProjectMap.objects.get(project=pr).dante_project, dp)
+        ProjectMap.objects.all().delete()
+        self.client.post(url + "?view=dante", {"pair": f"{pr.pk}:{dp.pk}"})
+        self.assertTrue(ProjectMap.objects.filter(project=pr, dante_project=dp).exists())
+        r = self.client.get(url + "?view=dante&f=all&suggest=1&cust=ACME&sort=customer")
+        self.assertContains(r, "ACME Kalibrierung")
+        self.assertContains(r, "pm-group")
+
+
+@override_settings(WORKTIME_MAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class ReportTests(Base):
+    def setUp(self):
+        super().setUp()
+        from config.models import NotificationSettings, SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.admin = get_user_model().objects.create_superuser("boss", "boss@example.com", "x")
+        self.client.force_login(self.admin)
+        ns = NotificationSettings.get()
+        ns.email_host, ns.email_from = "smtp.example", "minerva@example.com"
+        ns.save()
+        self.fake.times[MON] = [{"coming": "08:00", "leaving": "16:30", "source": "MANUAL", "minutes": 510}]
+        self.fake.att[D(3)] = {"planned": "ILLNESS", "absences": [{"type": "DISEASE", "name": "", "ratio": 1}]}
+        DanteProject.objects.create(dante_id="363", name="Antenne")
+        self.fake.records = [{"id": "1", "person_id": "1108", "day": MON, "duration": 120, "start": "", "stop": "",
+                              "description": "", "project_id": "363", "project_name": "Antenne", "item_id": "",
+                              "item_name": "", "activity_id": "", "activity_name": "", "hourly_rate": None,
+                              "cost_center": ""}]
+
+    def test_person_summary(self):
+        from worktime import reports
+        rep = reports.build([self.du], MON, D(4))
+        r = rep["rows"][0]
+        self.assertEqual((r["filled"], r["workdays"], len(r["empty"]), r["absent_days"]), (1, 4, 3, 1))
+        self.assertEqual(r["empty_text"], "08–09.09, 11.09")
+        self.assertEqual((r["worked"], r["projects_hm"], r["share"]), ("8:30", "2:00", 24))
+        self.assertEqual(r["absence_kinds"], [("лікарняний", 1)])
+        html, text = reports.render(rep, "Тест", show_types=False)
+        self.assertNotIn("лікарняний", html)   # DSGVO: у повному звіті без типу
+        self.assertIn("1 дн.", html)
+        self.assertIn("лікарняний", reports.render(rep, "Тест", show_types=True)[0])
+
+    def test_schedule_due_send_and_employee_part(self):
+        from django.core import mail
+        from worktime import reports
+        from worktime.models import WorkReport
+        rep = WorkReport.objects.create(name="Команда", period=WorkReport.WEEK, frequency=WorkReport.WEEKLY,
+                                        weekday=0, hour=8, send_to="boss@example.com", send_to_employees=True)
+        self.assertTrue(reports.due(rep, at(D(7), 9)))       # понеділок після 8:00
+        self.assertFalse(reports.due(rep, at(D(7), 7)))
+        self.assertFalse(reports.due(rep, at(D(8), 9)))      # вівторок
+        self.assertEqual(reports.period_of(rep, D(7)), (MON, D(6)))
+        self.du.report_email = "anna@example.com"
+        self.du.save()
+        with mock.patch("worktime.services.local_today", return_value=D(7)):
+            result = reports.send(rep, today=D(7))
+        self.assertIn("повний: надіслано", result)
+        self.assertEqual(sorted(m.to[0] for m in mail.outbox), ["anna@example.com", "boss@example.com"])
+        self.assertFalse(reports.due(WorkReport.objects.get(pk=rep.pk), timezone.now()))
+
+    def test_report_page_and_send_now(self):
+        from django.core import mail
+        url = reverse("admin:worktime_workday_report")
+        r = self.client.get(url, {"from": "2026-09-07", "to": "2026-09-11"})
+        self.assertContains(r, "Anna")
+        self.assertContains(r, "Звіти поштою за розкладом")
+        self.client.post(url, {"from": "2026-09-07", "to": "2026-09-11", "send": "1", "to": "boss@example.com"})
+        self.assertEqual(len(mail.outbox), 1)
+        self.client.force_login(self.user)   # не адміністратор — лише свій звіт, без розкладів
+        r = self.client.get(url, {"from": "2026-09-07", "to": "2026-09-11"})
+        self.assertNotContains(r, "Звіти поштою за розкладом")

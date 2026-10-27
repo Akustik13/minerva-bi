@@ -153,7 +153,9 @@
     </div>
     <div class="wt-fill">
       <label>{% trans "Дата" %}<input type="date" name="date" id="wt-pdate" value="{{ project_date|date:"Y-m-d" }}" max="{{ today|date:"Y-m-d" }}" required></label>
-      <label>{% trans "Тривалість" %}<span class="wt-durs"><input name="duration" id="wt-pdur" placeholder="1:30" size="6" required>
+      <label>{% trans "З" %}<input type="time" name="start" class="wt-from"></label>
+      <label>{% trans "По" %}<input type="time" name="stop" class="wt-to"></label>
+      <label>{% trans "або тривалість" %}<span class="wt-durs"><input name="duration" id="wt-pdur" placeholder="1:30" size="6">
         <button type="button" class="button" data-d="0:15">0:15</button><button type="button" class="button" data-d="0:30">0:30</button><button type="button" class="button" data-d="1:00">1:00</button><button type="button" class="button" data-d="2:00">2:00</button><button type="button" class="button" data-d="4:00">4:00</button></span></label>
       {% if activities %}<label>{% trans "Вид роботи" %}<select name="activity">
         {% if not default_activity %}<option value="">—</option>{% endif %}
@@ -269,11 +271,31 @@
 
 {% endif %}
 <script>
+/* «з … по …» → тривалість (для перегляду); без «з–по» потрібна тривалість */
+function wtFromTo(form) {
+  if (!form) return;
+  var a = form.querySelector('input[name=start]'), b = form.querySelector('input[name=stop]'),
+      d = form.querySelector('input[name=duration]');
+  function sync() {
+    if (a.value && b.value) {
+      var m = (+b.value.slice(0,2) * 60 + +b.value.slice(3)) - (+a.value.slice(0,2) * 60 + +a.value.slice(3));
+      if (b.value === '00:00') m += 1440;
+      d.value = m > 0 ? Math.floor(m / 60) + ':' + ('0' + m % 60).slice(-2) : '';
+      d.readOnly = true;
+    } else { d.readOnly = false; }
+  }
+  a.addEventListener('change', sync); b.addEventListener('change', sync);
+  form.addEventListener('submit', function(e){
+    if ((a.value && !b.value) || (!a.value && b.value)) { alert('Вкажіть і «з», і «по» — або лише тривалість.'); e.preventDefault(); }
+    else if (!a.value && !d.value) { alert('Вкажіть «з … по …» або тривалість.'); e.preventDefault(); }
+  });
+}
 (function(){
   var dur = document.getElementById('wt-pdur'), date = document.getElementById('wt-pdate');
   document.querySelectorAll('.wt-durs [data-d]').forEach(function(b){
     b.addEventListener('click', function(){ if (dur) { dur.value = b.dataset.d; dur.focus(); } });
   });
+  wtFromTo(document.querySelector('.wt-proj'));
   document.querySelectorAll('.wt-pday').forEach(function(a){
     a.addEventListener('click', function(){ if (date) date.value = a.dataset.date; setTimeout(function(){ dur && dur.focus(); }, 300); });
   });

@@ -108,6 +108,9 @@ class DanteUser(models.Model):
     busy_until = models.DateTimeField(null=True, blank=True, editable=False,
                                       help_text="Іде запис в askDANTE (захист від подвійного натискання).")
     synced_at = models.DateTimeField("Оновлено з askDANTE", null=True, blank=True)
+    report_email = models.CharField("Email для звіту", max_length=254, blank=True, default="",
+                                    help_text="Заповнено — працівник отримує свою частину звіту поштою "
+                                              "(якщо в звіті увімкнено «Кожному працівнику»).")
 
     class Meta:
         verbose_name = "Працівник askDANTE"
@@ -288,3 +291,74 @@ class PeriodBalance(models.Model):
         verbose_name = "Місячний підсумок askDANTE"
         verbose_name_plural = "Місячні підсумки askDANTE"
         unique_together = [("dante_user", "period")]
+
+
+class MatchRule(models.Model):
+    """Правило зв'язку: проєкт Minerva з таким доменом / словом / клієнтом CRM → цей проєкт askDANTE
+    (підказка з балом 90 у worktime/matching.py; зв'язок усе одно ставить людина)."""
+    DOMAIN, KEYWORD, CUSTOMER = "domain", "keyword", "customer"
+    KINDS = [(DOMAIN, "Домен email учасників"), (KEYWORD, "Слово в назві, описі або темах листів"),
+             (CUSTOMER, "Клієнт CRM")]
+    kind = models.CharField("Ознака", max_length=10, choices=KINDS, default=KEYWORD)
+    value = models.CharField("Значення", max_length=200, blank=True, default="",
+                             help_text="Домен (acme.de) або слово; для клієнта CRM — порожньо.")
+    customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.CASCADE, related_name="+",
+                                 verbose_name="Клієнт CRM")
+    dante_project = models.ForeignKey(DanteProject, on_delete=models.CASCADE, related_name="rules",
+                                      verbose_name="Проєкт askDANTE")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Правило зв'язку проєктів"
+        verbose_name_plural = "Правила зв'язку проєктів"
+        ordering = ["kind", "value"]
+
+    def __str__(self):
+        what = self.customer if self.kind == self.CUSTOMER else self.value
+        return f"{self.get_kind_display()} «{what}» → {self.dante_project}"
+
+
+class WorkReport(models.Model):
+    """Звіт по працівниках askDANTE поштою за розкладом: що заповнено, що ні, час на проєкти.
+    Логіка — worktime/reports.py; запуск — cron `worktime_reports --if-due`."""
+    WEEK, MONTH, DAYS = "week", "month", "days"
+    PERIODS = [(WEEK, "Минулий тиждень (пн–нд)"), (MONTH, "Минулий місяць"), (DAYS, "Останні N днів до вчора")]
+    DAILY, WEEKLY, MONTHLY = "daily", "weekly", "monthly"
+    FREQS = [(DAILY, "Щодня"), (WEEKLY, "Щотижня"), (MONTHLY, "Щомісяця")]
+    WEEKDAYS = [(0, "понеділок"), (1, "вівторок"), (2, "середа"), (3, "четвер"), (4, "п'ятниця"), (5, "субота"),
+                (6, "неділя")]
+
+    name = models.CharField("Назва", max_length=120, default="Робочий час команди")
+    enabled = models.BooleanField("Надсилати", default=True)
+    period = models.CharField("Період звіту", max_length=10, choices=PERIODS, default=WEEK)
+    days = models.PositiveSmallIntegerField("N днів", default=7, help_text="Для «Останні N днів».")
+    frequency = models.CharField("Як часто", max_length=10, choices=FREQS, default=WEEKLY)
+    weekday = models.PositiveSmallIntegerField("День тижня", choices=WEEKDAYS, default=0)
+    month_day = models.PositiveSmallIntegerField("День місяця", default=1, help_text="1–28.")
+    hour = models.PositiveSmallIntegerField("О годині", default=8, help_text="0–23, після цієї години.")
+    people = models.ManyToManyField(DanteUser, blank=True, related_name="reports", verbose_name="Працівники",
+                                    help_text="Порожньо — усі, хто не в архіві askDANTE.")
+    send_to = models.TextField("Кому (повний звіт)", blank=True, default="",
+                               help_text="Адреси через кому або з нового рядка.")
+    send_to_employees = models.BooleanField(
+        "Кожному працівнику — його частину", default=False,
+        help_text="Лише тим, у кого в «👥 Працівники askDANTE» заповнено «Email для звіту».")
+    show_absence_types = models.BooleanField(
+        "Показувати тип відсутності (лікарняний, відпустка)", default=False,
+        help_text="Вимкнено — у повному звіті лише «відсутність» (DSGVO). Працівник свої бачить завжди.")
+    sender = models.ForeignKey("email_assistant.EmailAccount", null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name="+", verbose_name="З якої скриньки Minerva",
+                               help_text="Порожньо — SMTP сповіщень (Налаштування → Сповіщення).")
+    last_sent_at = models.DateTimeField("Останнє надсилання", null=True, blank=True)
+    last_result = models.CharField("Результат", max_length=255, blank=True, default="")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+
+    class Meta:
+        verbose_name = "Звіт поштою"
+        verbose_name_plural = "✉️ Звіти поштою"
+
+    def __str__(self):
+        return self.name

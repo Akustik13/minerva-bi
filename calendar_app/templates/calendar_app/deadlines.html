@@ -1,0 +1,96 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+.dl-wrap{max-width:1100px;margin:0 auto;padding:12px 0}
+.dl-card{border:1px solid var(--border-color,rgba(128,128,128,.35));border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.dl-card h3{margin:0 0 8px;font-size:15px}
+.dl-form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.dl-form label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--text-muted)}
+.dl-form input[type=text],.dl-form select{min-width:150px}
+.dl-acc{display:flex;flex-wrap:wrap;gap:6px}
+.dl-acc label{flex-direction:row;align-items:center;gap:4px;border:1px solid rgba(128,128,128,.4);border-radius:12px;padding:2px 9px;color:inherit}
+.dl-muted{color:var(--text-muted);font-size:12px}
+.dl-info{margin-top:10px;padding:8px 10px;border-radius:8px;background:rgba(26,115,232,.08)}
+.dl-table{width:100%;border-collapse:collapse;font-size:13px}
+.dl-table td,.dl-table th{padding:6px 8px;border-bottom:1px solid rgba(128,128,128,.25);text-align:left;vertical-align:top}
+.dl-past td{opacity:.6}
+.dl-q{color:var(--text-muted);font-size:12px;font-style:italic}
+.dl-btn{border:none;border-radius:6px;padding:6px 12px;background:#1a73e8;color:#fff;cursor:pointer}
+.dl-btn2{border:1px solid rgba(128,128,128,.4);border-radius:6px;padding:6px 12px;background:none;color:inherit;cursor:pointer}
+.dl-scroll{overflow-x:auto}
+</style>
+<div class="dl-wrap">
+  <a href="/calendar/" class="dl-muted">← {% trans "Календар" %}</a>
+
+  <form method="get" class="dl-card">
+    <h3>🔎 {% trans "Які листи переглянути" %}</h3>
+    <div class="dl-form">
+      {% if accounts|length > 1 %}<div class="dl-acc">{% for a in accounts %}<label><input type="checkbox" name="accounts" value="{{ a.pk }}" {% if not mask.accounts or a.pk|stringformat:"s" in mask.accounts %}checked{% endif %}> {{ a.email_address }}</label>{% endfor %}</div>{% endif %}
+      <label>{% trans "Папки" %}<select name="folder">
+        <option value="">{% trans "усі (крім спаму й кошика)" %}</option>
+        <option value="inbox" {% if mask.folder == "inbox" %}selected{% endif %}>{% trans "вхідні" %}</option>
+        <option value="sent" {% if mask.folder == "sent" %}selected{% endif %}>{% trans "надіслані" %}</option></select></label>
+      <label>{% trans "Від дати" %}<input type="date" name="date_from" value="{{ mask.date_from }}"></label>
+      <label>{% trans "До дати" %}<input type="date" name="date_to" value="{{ mask.date_to }}"></label>
+      <label>{% trans "Відправник (адреса або домен)" %}<input type="text" name="sender" value="{{ mask.sender }}" placeholder="acme.de"></label>
+      <label>{% trans "Слово в темі" %}<input type="text" name="subject" value="{{ mask.subject }}" placeholder="Auftrag"></label>
+      <label>{% trans "Категорія" %}<select name="category"><option value="">{% trans "усі" %}</option>{% for k, label in categories %}<option value="{{ k }}" {% if mask.category == k %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label>{% trans "Клієнт CRM" %}<input type="text" name="customer" value="{% if mask.customer %}#{{ mask.customer }}{% endif %}" placeholder="{% trans 'назва, email або #номер' %}"></label>
+      <label>{% trans "Проєкт" %}<select name="project"><option value="">{% trans "усі" %}</option>{% for p in projects %}<option value="{{ p.pk }}" {% if mask.project == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.code }} {{ p.name|truncatechars:40 }}</option>{% endfor %}</select></label>
+      <button class="dl-btn2" name="count" value="1">🔢 {% trans "Порахувати" %}</button>
+    </div>
+    {% if info %}
+    <div class="dl-info">
+      {% trans "За маскою листів" %}: <b>{{ info.total }}</b> · {% trans "з датами чи словами-термінами, ще не перевірених" %}: <b>{{ info.ai }}</b>
+      — {% trans "це запитів до AI" %} (≈ {{ info.tokens|floatformat:0 }} {% trans "токенів на вході" %}).
+    </div>
+    {% endif %}
+  </form>
+
+  <form method="post" class="dl-card">
+    {% csrf_token %}
+    {% for k, v in mask.items %}{% if k == "accounts" %}{% for a in v %}<input type="hidden" name="accounts" value="{{ a }}">{% endfor %}{% else %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endif %}{% endfor %}
+    <h3>🤖 {% trans "Знайти терміни" %}</h3>
+    <div class="dl-form">
+      <label>{% trans "Не більше листів за раз" %}<input type="number" name="limit" value="200" min="1" max="1000" style="width:90px"></label>
+      <button class="dl-btn" name="action" value="start" onclick="return confirm('{% trans "Запустити пошук термінів? Кожен відібраний лист — один запит до AI." %}')">🔎 {% trans "Знайти за маскою" %}</button>
+    </div>
+    {% if cfg.deadline_scan_status %}<div class="dl-muted" style="margin-top:8px">{{ cfg.deadline_scan_status }} · <a href="">{% trans "оновити" %}</a></div>{% endif %}
+    <div class="dl-muted" style="margin-top:6px">{% trans "Без AI дату з тексту не витягнути надійно. Кожен термін Minerva перевіряє цитатою з листа; уже перевірені листи вдруге не йдуть в AI. Нові вхідні листи й далі перевіряються самі, якщо в «Налаштуваннях пошти» увімкнено «Визначати дедлайни в листах»." %}</div>
+  </form>
+
+  <form method="post" class="dl-card">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="auto">
+    <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="deadlines_auto" value="1" {% if cfg.deadlines_auto %}checked{% endif %} onchange="this.form.submit()"> {% trans "Заносити знайдені терміни в календар без підтвердження" %}</label>
+  </form>
+
+  <form method="post" class="dl-card">
+    {% csrf_token %}
+    <h3>📋 {% trans "Знайдені терміни" %} ({{ found|length }}){% if added %} <span class="dl-muted">· {% trans "уже в календарі" %}: {{ added }}</span>{% endif %}</h3>
+    {% if found %}
+    <div class="dl-scroll"><table class="dl-table">
+      <tr><th><input type="checkbox" checked onclick="document.querySelectorAll('.dl-pick').forEach(function(c){c.checked=this.checked}.bind(this))"></th><th>{% trans "Коли" %}</th><th>{% trans "Що" %}</th><th>{% trans "Лист" %}</th></tr>
+      {% for d in found %}
+      <tr class="{% if d.past %}dl-past{% endif %}">
+        <td><input type="checkbox" class="dl-pick" name="ids" value="{{ d.pk }}" {% if not d.past %}checked{% endif %}></td>
+        <td style="white-space:nowrap">{{ d.due_at|date:"D d.m.Y" }}{% if not d.all_day %} {{ d.due_at|time:"H:i" }}{% endif %}{% if d.past %}<div class="dl-muted">{% trans "минуло" %}</div>{% endif %}</td>
+        <td><b>{{ d.title }}</b>{% if d.quote %}<div class="dl-q">«{{ d.quote }}»</div>{% endif %}</td>
+        <td><a href="/email/?msg={{ d.email_message_id }}" target="_blank">✉️ {{ d.email_message.subject|truncatechars:50 }}</a><div class="dl-muted">{{ d.email_message.from_email }} · {{ d.email_message.sent_at|date:"d.m.Y" }}</div></td>
+      </tr>
+      {% endfor %}
+    </table></div>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="dl-btn" name="action" value="accept">✓ {% trans "Вибрані — в календар" %}</button>
+      <button class="dl-btn2" name="action" value="dismiss">✕ {% trans "Вибрані — не заносити" %}</button>
+    </div>
+    {% else %}
+    <div class="dl-muted">{% trans "Поки нічого не знайдено. Вкажіть маску, «Порахувати», потім «Знайти за маскою»." %}</div>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

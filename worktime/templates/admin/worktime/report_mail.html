@@ -1,0 +1,33 @@
+<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1f2937;line-height:1.45">
+  <h2 style="margin:0 0 4px;font-size:18px">⏱ {{ title }}</h2>
+  <div style="color:#6b7280;font-size:12px;margin-bottom:12px">askDANTE · {{ from|date:"d.m.Y" }}–{{ to|date:"d.m.Y" }} · складено {{ generated|date:"d.m.Y H:i" }}
+    {% if empty_total or no_project_total %} · <b style="color:#dc2626">порожніх днів: {{ empty_total }}</b> · без часу на проєкти: {{ no_project_total }}{% endif %}</div>
+  <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:13px">
+    <tr style="background:#f3f4f6;text-align:left">
+      <th style="padding:6px 8px;border-bottom:1px solid #e5e7eb">Працівник</th>
+      <th style="padding:6px 8px;border-bottom:1px solid #e5e7eb">Заповнено днів</th>
+      <th style="padding:6px 8px;border-bottom:1px solid #e5e7eb">Відпрацьовано</th>
+      <th style="padding:6px 8px;border-bottom:1px solid #e5e7eb">На проєкти</th>
+      <th style="padding:6px 8px;border-bottom:1px solid #e5e7eb">Відсутності</th>
+    </tr>
+    {% for r in rows %}
+    <tr style="vertical-align:top">
+      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb"><b>{{ r.du }}</b>{% if r.error %}<div style="color:#d97706;font-size:11px">askDANTE: {{ r.error }} — з копії Minerva</div>{% endif %}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb">
+        <b style="color:{% if r.empty %}#dc2626{% else %}#16a34a{% endif %}">{{ r.filled }} з {{ r.workdays }}</b>{% if r.fill is not None %} · {{ r.fill }}%{% endif %}
+        {% if r.empty %}<div style="color:#dc2626;font-size:12px">порожньо: {{ r.empty_text }}</div>{% endif %}
+      </td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb">{{ r.worked }}{% if r.target %} <span style="color:#6b7280">/ норма {{ r.target }}</span>{% endif %}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb">
+        {{ r.projects_hm }}{% if r.share is not None %} · {{ r.share }}%{% endif %}
+        {% for name, h in r.projects %}<div style="font-size:12px;color:#374151">📁 {{ name }} {{ h }}</div>{% endfor %}
+        {% if r.no_project %}<div style="color:#d97706;font-size:12px">без часу на проєкти: {{ r.no_project_text }}</div>{% endif %}
+      </td>
+      <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb">
+        {% if r.absent_days %}{% if show_types %}{% for k, n in r.absence_kinds %}<div>{{ k }}: {{ n }}</div>{% endfor %}{% else %}{{ r.absent_days }} дн.{% endif %}{% else %}—{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <div style="color:#9ca3af;font-size:11px;margin-top:10px">Порожній день — робочий день без приходу й відходу в askDANTE (без відпустки, лікарняного, свята). Minerva · робочий час askDANTE.</div>
+</div>

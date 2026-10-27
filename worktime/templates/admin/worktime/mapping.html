@@ -30,6 +30,11 @@
 .pm-search{display:flex;gap:6px;align-items:center}
 .pm-search input{min-width:200px}
 .pm-crm input{width:170px}
+.pm-filters label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--text-muted,#888)}
+.pm-filters select{max-width:220px}
+.pm-group td{background:rgba(26,115,232,.08);font-weight:600;padding-top:10px}
+.pm-strong{background:rgba(34,197,94,.15);color:#16a34a}
+.pm-alt .pm-star{font-size:12px;color:var(--text-muted,#888)}
 </style>
 
 <div class="pm-bar pm-tabs pm-views">
@@ -49,13 +54,37 @@
     </div>
   {% endif %}
 
-  <form method="get" class="pm-bar">
-    <input type="hidden" name="view" value="dante">
-    <span class="pm-tabs">
-      {% for key, label, n in filters %}<a href="?view=dante&amp;f={{ key }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}" class="{% if f == key %}on{% endif %}">{{ label }} · {{ n }}</a>{% endfor %}
-    </span>
-    <input type="hidden" name="f" value="{{ f }}">
+  <div class="pm-bar pm-tabs">
+    {% for key, label, n, url in filters %}<a href="{{ url }}" class="{% if f == key %}on{% endif %}">{{ label }} · {{ n }}</a>{% endfor %}
+  </div>
+  <form method="get" class="pm-bar pm-filters">
+    <input type="hidden" name="view" value="dante"><input type="hidden" name="f" value="{{ f }}">
+    <label>{% trans "Клієнт askDANTE" %}
+      <select name="cust" onchange="this.form.submit()">
+        <option value="">— {% trans "усі" %} —</option>
+        <option value="-" {% if cust == "-" %}selected{% endif %}>{% trans "без клієнта" %}</option>
+        {% for c in cust_options %}<option value="{{ c.customer_name }}" {% if cust == c.customer_name %}selected{% endif %}>{{ c.customer_name }} · {{ c.n }}</option>{% endfor %}
+      </select></label>
+    <label>{% trans "Клієнт CRM" %}
+      <select name="crm" onchange="this.form.submit()">
+        <option value="">— {% trans "усі" %} —</option>
+        <option value="-" {% if crm == "-" %}selected{% endif %}>{% trans "не прив'язано" %}</option>
+        {% for c in crm_options %}<option value="{{ c.crm_customer }}" {% if crm == c.crm_customer|stringformat:"s" %}selected{% endif %}>{{ c.crm_customer__company|default:c.crm_customer__name }} · {{ c.n }}</option>{% endfor %}
+      </select></label>
+    <label>{% trans "Проєкт" %}
+      <select name="top" onchange="this.form.submit()">
+        <option value="">— {% trans "усі" %} —</option>
+        {% for p in top_options %}<option value="{{ p.pk }}" {% if top == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.name }}{% if p.n %} (+{{ p.n }} {% trans "підпроєкти" %}){% endif %}</option>{% endfor %}
+      </select></label>
+    <label>{% trans "Порядок" %}
+      <select name="sort" onchange="this.form.submit()">
+        <option value="customer" {% if sort == "customer" %}selected{% endif %}>{% trans "за клієнтом" %}</option>
+        <option value="name" {% if sort == "name" %}selected{% endif %}>{% trans "за проєктом" %}</option>
+        <option value="hours" {% if sort == "hours" %}selected{% endif %}>{% trans "за годинами" %}</option>
+      </select></label>
     <span class="pm-search"><input type="search" name="q" value="{{ q }}" placeholder="{% trans 'Пошук: назва, номер, клієнт' %}"><button class="button">🔎</button></span>
+    {% if narrowed %}<a href="{{ reset_url }}">✕ {% trans "скинути" %}</a>{% endif %}
+    {% if can_edit and not suggest %}<a class="button" href="{{ suggest_url }}" title="{% trans 'Код, номери замовлень і Angebote, клієнт, домени email, дні листування й записів часу, схожа назва, ваші правила' %}">🧠 {% trans "Підказати проєкти Minerva" %}</a>{% endif %}
   </form>
   {% if f == "mine" and not has_mine %}
     <div class="pm-card">{% trans "Ще немає ваших проєктів — у «Усі» натисніть ☆ біля потрібних." %}</div>
@@ -68,9 +97,10 @@
     <table class="pm-table">
       <tr><th></th><th>{% trans "Проєкт askDANTE" %}</th><th>{% trans "Клієнт askDANTE" %}</th><th>{% trans "Клієнт CRM" %}</th><th>{% trans "Проєкт Minerva" %}</th><th class="pm-num">{% trans "Години" %}</th></tr>
       {% for r in rows %}
+      {% if r.header %}<tr class="pm-group"><td colspan="6">👤 {{ r.group|default:_("Без клієнта") }} <span class="pm-muted">· {{ r.group_size }}</span></td></tr>{% endif %}
       <tr>
         <td><button class="pm-star{% if r.dp.pinned %} on{% endif %}" name="pin" value="{{ r.dp.pk }}" title="{% if r.dp.pinned %}{% trans 'Прибрати з моїх' %}{% else %}{% trans 'Додати до моїх' %}{% endif %}">{% if r.dp.pinned %}★{% else %}☆{% endif %}</button></td>
-        <td>{% if r.dp.parent %}<span class="pm-muted">{{ r.dp.parent.name }} ›</span> {% endif %}<b>{{ r.dp.name }}</b>
+        <td style="padding-left:{% widthratio r.depth 1 18 %}px">{% if r.depth %}<span class="pm-muted">↳</span> {% endif %}{% if r.dp.parent and sort != "customer" and sort != "name" %}<span class="pm-muted">{{ r.dp.parent.name }} ›</span> {% endif %}<b>{{ r.dp.name }}</b>
             {% if r.dp.reference_number %}<div class="pm-muted">{{ r.dp.reference_number }}</div>{% endif %}
             {% if not r.dp.time_trackable %}<div class="pm-muted">{% trans "час не записується" %}</div>{% endif %}</td>
         <td>{{ r.dp.customer_name|default:"—" }}</td>
@@ -90,6 +120,9 @@
         </td>
         <td>
           {% for m in r.maps %}<a href="{% url 'admin:projects_project_change' m.project.pk %}" target="_blank" class="pm-chip">{{ m.project.code }} {{ m.project.name|truncatechars:30 }}</a>{% endfor %}
+          {% if r.minerva_suggest %}<div><span class="pm-sg" title="{{ r.minerva_suggest.2 }}">💡 {{ r.minerva_suggest.0.code }} {{ r.minerva_suggest.0.name|truncatechars:28 }} · {{ r.minerva_suggest.1 }}</span>
+            <button class="button" name="pair" value="{{ r.minerva_suggest.0.pk }}:{{ r.dp.pk }}" title="{% trans 'Зв’язати' %}">✓</button>
+            <div class="pm-muted">{{ r.minerva_suggest.2 }}</div></div>{% endif %}
           {% if not r.maps and can_edit %}<button class="button" name="to_minerva" value="{{ r.dp.pk }}"
              onclick="return confirm('{% trans "Створити в Minerva проєкт" %} «{{ r.dp.name|escapejs }}» {% trans "і зв’язати з askDANTE?" %}')">➕ {% trans "у Minerva" %}</button>{% elif not r.maps %}—{% endif %}
         </td>
@@ -136,9 +169,11 @@
         <td>
           {% if r.link %}<span class="pm-ok">✓ {% trans "прив'язано" %}</span>
           {% elif r.suggestion %}
-            <span class="pm-sg" title="{{ r.suggestion.1 }}">{{ r.suggestion.0 }} · {{ r.suggestion.1 }}</span>
+            <span class="pm-sg{% if r.suggestion.1 >= min_score %} pm-strong{% endif %}">{{ r.suggestion.0 }} · <b>{{ r.suggestion.1 }}</b></span>
             {% if can_edit %}<input type="hidden" name="suggest_{{ r.project.pk }}" value="{{ r.suggestion.0.pk }}">
             <button class="button" name="accept" value="{{ r.project.pk }}" title="{% trans "Прийняти підказку" %}">✓</button>{% endif %}
+            <div class="pm-muted">{{ r.suggestion.2 }}</div>
+            {% for o in r.options|slice:"1:" %}<div class="pm-alt">{% if can_edit %}<button class="pm-star" name="pair" value="{{ r.project.pk }}:{{ o.0.pk }}" title="{{ o.2|join:'; ' }}">↳ {{ o.0 }} · {{ o.1 }}</button>{% else %}↳ {{ o.0 }} · {{ o.1 }}{% endif %}</div>{% endfor %}
           {% else %}<span class="pm-muted">—</span>{% endif %}
         </td>
         <td>
@@ -160,8 +195,27 @@
       {% endfor %}
     </table>
     </div>
-    {% if can_edit and rows %}<p><button class="button default" type="submit">💾 {% trans "Зберегти зв'язки" %}</button></p>{% endif %}
+    {% if can_edit and rows %}<p><button class="button default" type="submit">💾 {% trans "Зберегти зв'язки" %}</button>
+      {% if n_strong %}<button class="button" name="accept_all" value="1" onclick="return confirm('{% trans "Зв’язати всі проєкти з підказкою, бал якої" %} ≥ {{ min_score }}?')">✓ {% trans "Прийняти всі з балом" %} ≥ {{ min_score }} ({{ n_strong }})</button>
+      <input type="hidden" name="min_score" value="{{ min_score }}">{% endif %}</p>{% endif %}
   </form>
+
+  {% if can_edit %}
+  <div class="pm-card">
+    <b>🧩 {% trans "Правила зв'язку" %}</b>
+    <span class="pm-muted">— {% trans "проєкт Minerva з таким доменом email учасників, словом (у назві, описі, темах листів) або клієнтом CRM отримує підказку з балом 90." %}</span>
+    <form method="post" class="pm-bar" style="margin-top:8px">
+      {% csrf_token %}
+      <select name="rule_kind">{% for k, label in rule_kinds %}<option value="{{ k }}">{{ label }}</option>{% endfor %}</select>
+      <input name="rule_value" placeholder="{% trans 'acme.de · Prototyp · назва клієнта' %}" required>
+      → <select name="rule_project" required><option value="">— {% trans "проєкт askDANTE" %} —</option>
+        {% for d in usable %}<option value="{{ d.pk }}">{% if d.parent %}{{ d.parent.name }} › {% endif %}{{ d }}</option>{% endfor %}</select>
+      <button class="button" name="rule_add" value="1">＋ {% trans "Додати" %}</button>
+    </form>
+    {% if rules %}<form method="post">{% csrf_token %}{% for rule in rules %}
+      <div class="pm-chip">{{ rule }} <button class="pm-star" name="rule_delete" value="{{ rule.pk }}" title="{% trans 'Видалити' %}">✕</button></div>{% endfor %}</form>{% endif %}
+  </div>
+  {% endif %}
 
   {% if unlinked_dante %}
   <div class="pm-card">

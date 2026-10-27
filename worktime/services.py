@@ -701,13 +701,33 @@ def toggle_pin(user, dp: DanteProject) -> bool:
     return True
 
 
-def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: int, activity=None, comment: str = "",
-                 user=None, source: str = Booking.MANUAL, st: DanteSettings | None = None) -> Booking:
-    """Час на проєкт askDANTE (тривалість у хвилинах, без приходу/відходу). Повтор того самого запису за 2 хв —
-    відмова (подвійне натискання), бо записи askDANTE через API не видаляються."""
+def project_overlap(du: DanteUser, day: datetime.date, start: datetime.time, stop: datetime.time) -> str:
+    """Запис часу на проєкт askDANTE того самого дня, що перекривається з «з … по …» (з копії записів)."""
+    a, b = _span(hhmm(start), hhmm(stop))
+    for r in TimeRecord.objects.filter(dante_user=du, day=day).exclude(start="").exclude(stop=""):
+        c, d = _span(r.start, r.stop)
+        if a < d and c < b:
+            return f"{r.start}–{r.stop} {r.project_name}".strip()
+    return ""
+
+
+def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: int = 0, activity=None,
+                 comment: str = "", user=None, source: str = Booking.MANUAL, st: DanteSettings | None = None,
+                 start: datetime.time | None = None, stop: datetime.time | None = None) -> Booking:
+    """Час на проєкт askDANTE: «з … по …» (start/stop) або тривалість у хвилинах. Повтор того самого запису за
+    2 хв — відмова (подвійне натискання), бо записи askDANTE через API не видаляються."""
     st = st or DanteSettings.get()
+    now = timezone.localtime()
     if day > local_today():
         raise DanteError("bad_request", "Час на проєкт за майбутній день записувати не можна.")
+    if start and stop:
+        if stop != datetime.time(0, 0) and stop <= start:
+            raise DanteError("bad_request", "«По» має бути пізніше за «з» (00:00 — кінець доби).")
+        if day == now.date() and (stop == datetime.time(0, 0) or stop > now.time()):
+            raise DanteError("bad_request", "Час, який ще не настав, записувати не можна.")
+        minutes = minutes_between(hhmm(start), hhmm(stop))
+    elif start or stop:
+        raise DanteError("bad_request", "Вкажіть і «з», і «по» — або лише тривалість.")
     if not 0 < minutes <= 24 * 60:
         raise DanteError("bad_request", "Тривалість — від 1 хвилини до 24 годин.")
     if dp.archived or dp.gone or not dp.time_trackable:
@@ -716,20 +736,30 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
     comment = (comment or "").strip()[:500]
     recent = timezone.now() - datetime.timedelta(minutes=2)
     if Booking.objects.filter(dante_user=du, kind=Booking.PROJECT, date=day, dante_project=dp, duration=minutes,
-                              comment=comment, status=Booking.SENT, created_at__gte=recent).exists():
+                              start=start, comment=comment, status=Booking.SENT, created_at__gte=recent).exists():
         raise DanteError("bad_request", "Такий самий запис щойно вже пішов в askDANTE — оновіть сторінку.")
     data = {"projectId": dp.dante_id}
     if activity:
         data["activityId"] = activity.dante_id
     if comment:
         data["comment"] = comment
+    record = {"date": day.isoformat(), "projectData": data}
+    record.update({"start": hhmm(start), "stop": hhmm(stop)} if start else {"duration": minutes})
     c = client(st)
     with lock(du):
+        if start:   # свіжа копія записів дня — перекриття з іншим проєктом askDANTE не пишемо
+            try:
+                sync_records(st, day, day, c)
+            except DanteError:
+                pass
+            busy = project_overlap(du, day, start, stop)
+            if busy:
+                raise DanteError("bad_request", f"Перекривається з записом askDANTE {busy}.")
         booking = Booking(dante_user=du, date=day, kind=Booking.PROJECT, source=source, duration=minutes,
-                          dante_project=dp, activity=activity, comment=comment, reason="час на проєкт",
-                          created_by=user if getattr(user, "pk", None) else None)
+                          start=start, stop=stop, dante_project=dp, activity=activity, comment=comment,
+                          reason="час на проєкт", created_by=user if getattr(user, "pk", None) else None)
         try:
-            c.track(du.dante_id, {"date": day.isoformat(), "duration": minutes, "projectData": data})
+            c.track(du.dante_id, record)
             booking.status = Booking.SENT
         except DanteError as e:
             booking.status, booking.error = Booking.FAILED, e.message

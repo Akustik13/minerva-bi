@@ -1,0 +1,179 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+.cn-wrap{max-width:1100px;margin:0 auto;padding:12px 0}
+.cn-card{border:1px solid var(--border-color,rgba(128,128,128,.35));border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.cn-card h3{margin:0 0 6px;font-size:15px}
+.cn-muted{color:var(--text-muted);font-size:12px}
+.cn-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.cn-row label{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--text-muted)}
+.cn-row input[type=text],.cn-row input[type=password],.cn-row select{min-width:160px}
+.cn-url{font-family:monospace;font-size:12px;padding:6px 8px;border-radius:6px;background:rgba(128,128,128,.12);word-break:break-all;flex:1;min-width:240px}
+.cn-btn{border:none;border-radius:6px;padding:6px 12px;background:#1a73e8;color:#fff;cursor:pointer;text-decoration:none;display:inline-block}
+.cn-btn2{border:1px solid rgba(128,128,128,.4);border-radius:6px;padding:5px 11px;background:none;color:inherit;cursor:pointer;text-decoration:none;display:inline-block}
+.cn-table{width:100%;border-collapse:collapse;font-size:13px}
+.cn-table td,.cn-table th{padding:6px 8px;border-bottom:1px solid rgba(128,128,128,.25);text-align:left;vertical-align:top}
+.cn-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+.cn-err{color:#ef4444;font-size:12px}
+.cn-ok{color:#16a34a;font-size:12px}
+.cn-steps{margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--text-muted)}
+.cn-scroll{overflow-x:auto}
+details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
+</style>
+<div class="cn-wrap">
+  <a href="/calendar/" class="cn-muted">← {% trans "Календар" %}</a>
+  <div class="cn-card">
+    <b>🔗 {% trans "Календарі в одному місці" %}</b>
+    <div class="cn-muted" style="margin-top:4px">
+      {% trans "Два рівні. Підписки (iCal) — просто й без доступу на запис: бачити все в Minerva і показати календар Minerva в Google / Outlook. Синхронізація (нижче) — справжні події в Google і Outlook за правилами «звідки → куди», в обидва боки, без дублів і петель." %}
+    </div>
+  </div>
+
+  <!-- ── 📤 Minerva → Google / Outlook ── -->
+  <div class="cn-card">
+    <h3>📤 {% trans "Календар Minerva — у Google / Outlook (підписка)" %}</h3>
+    {% if feed_url %}
+      <div class="cn-row"><span class="cn-url" id="cn-feed">{{ feed_url }}</span>
+        <button class="cn-btn2" type="button" onclick="navigator.clipboard.writeText(document.getElementById('cn-feed').textContent);this.textContent='✓ скопійовано'">📋 {% trans "Копіювати" %}</button>
+        <a class="cn-btn2" href="{{ webcal_url }}">📅 webcal://</a></div>
+      <form method="post" class="cn-row">{% csrf_token %}<input type="hidden" name="action" value="feed_opts">
+        <label style="flex-direction:row;gap:6px;align-items:center;color:inherit"><input type="checkbox" name="feed_worktime" value="1" {% if cfg.feed_worktime %}checked{% endif %} onchange="this.form.submit()"> {% trans "з відпустками й лікарняними askDANTE" %}</label>
+        <label style="flex-direction:row;gap:6px;align-items:center;color:inherit"><input type="checkbox" name="feed_busy_only" value="1" {% if cfg.feed_busy_only %}checked{% endif %} onchange="this.form.submit()"> {% trans "лише «Зайнято» (без назв і описів)" %}</label>
+      </form>
+      <details class="cn-help"><summary>{% trans "Як підписати" %}</summary><ol class="cn-steps">
+        <li>Google Calendar → «Інші календарі» ＋ → «За URL» → вставити адресу.</li>
+        <li>Outlook → «Додати календар» → «Підписатися з Інтернету» → вставити адресу.</li>
+        <li>{% trans "Адреса — як пароль: хто її знає, бачить календар. Google сам вирішує, як часто оновлювати (інколи раз на кілька годин)." %}</li></ol></details>
+      <form method="post" class="cn-row">{% csrf_token %}
+        <button class="cn-btn2" name="action" value="feed_on" onclick="return confirm('{% trans "Нова адреса — стара перестане працювати. Далі?" %}')">♻ {% trans "Нова секретна адреса" %}</button>
+        <button class="cn-btn2" name="action" value="feed_off">⏸ {% trans "Вимкнути адресу" %}</button></form>
+    {% else %}
+      <div class="cn-muted">{% trans "Секретна адреса календаря Minerva (зустрічі, терміни з пошти, за бажанням — відпустки askDANTE), щоб підписати її в Google і Outlook. Там — лише читання." %}</div>
+      <form method="post" class="cn-row">{% csrf_token %}<button class="cn-btn" name="action" value="feed_on">🔑 {% trans "Створити адресу" %}</button></form>
+    {% endif %}
+  </div>
+
+  <!-- ── 📥 Google / Outlook → Minerva ── -->
+  <div class="cn-card">
+    <h3>📥 {% trans "Календарі Google / Outlook — у Minerva (підписка, лише читання)" %}</h3>
+    {% if feeds %}
+    <div class="cn-scroll"><table class="cn-table">
+      {% for f, masked in feeds %}
+      <tr>
+        <td><span class="cn-dot" style="background:{{ f.color }}"></span><b>{{ f.name }}</b>{% if not f.enabled %} <span class="cn-muted">({% trans "сховано" %})</span>{% endif %}<div class="cn-muted">{{ masked }}</div></td>
+        <td>{% if f.last_error %}<span class="cn-err">❌ {{ f.last_error }}</span>{% elif f.last_fetch %}<span class="cn-ok">✓ {{ f.events_count }} {% trans "подій" %}</span>{% endif %}
+          {% if f.last_fetch %}<div class="cn-muted">{{ f.last_fetch|date:"d.m H:i" }}</div>{% endif %}</td>
+        <td><form method="post" style="display:flex;gap:4px">{% csrf_token %}<input type="hidden" name="feed" value="{{ f.pk }}">
+          <button class="cn-btn2" name="action" value="refresh">↻</button>
+          <button class="cn-btn2" name="action" value="toggle">{% if f.enabled %}🙈{% else %}👁{% endif %}</button>
+          <button class="cn-btn2" name="action" value="delete" onclick="return confirm('{% trans "Видалити підписку?" %}')">✕</button></form></td>
+      </tr>
+      {% endfor %}
+    </table></div>
+    {% endif %}
+    <form method="post" class="cn-row">{% csrf_token %}<input type="hidden" name="action" value="add_feed">
+      <label>{% trans "Назва" %}<input type="text" name="name" placeholder="Google · робочий" required></label>
+      <label style="flex:1;min-width:260px">{% trans "Секретна адреса iCal / ICS" %}<input type="password" name="url" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" required autocomplete="off"></label>
+      <label>{% trans "Колір" %}<input type="color" name="color" value="#8e24aa"></label>
+      <button class="cn-btn">＋ {% trans "Підписати" %}</button>
+    </form>
+    <details class="cn-help"><summary>{% trans "Де взяти адресу" %}</summary><ol class="cn-steps">
+      <li>Google: calendar.google.com → ⚙ Налаштування → ваш календар → «Інтегрувати календар» → «Секретна адреса у форматі iCal».</li>
+      <li>Outlook (Microsoft 365 / outlook.com): ⚙ Налаштування → Календар → «Спільні календарі» → «Опублікувати календар» → «Можна переглядати всі відомості» → посилання ICS.</li></ol></details>
+  </div>
+
+  <!-- ── 🔄 двостороння синхронізація ── -->
+  {% if sync_on %}
+  <div class="cn-card" id="sync">
+    <h3>🔄 {% trans "Синхронізація Google ↔ Outlook ↔ Minerva" %}</h3>
+    <div class="cn-muted">{% trans "Підключіть акаунти, далі правила «звідки → куди». В обидва боки — два правила: копії Minerva ніколи не копіює назад, тож дублів і петель не буде. Змінюйте оригінал — копія оновиться сама." %}</div>
+
+    <div class="cn-row">
+      {% if google_ready %}<a class="cn-btn" href="{% url 'calendar_app:oauth_start' 'google' %}">＋ Google Calendar</a>{% endif %}
+      {% if ms_ready %}<a class="cn-btn" href="{% url 'calendar_app:oauth_start' 'microsoft' %}">＋ Outlook / Microsoft 365</a>{% endif %}
+      {% if not google_ready and not ms_ready %}<span class="cn-muted">⚠️ {% trans "Спершу адміністратор вносить ключі застосунків Google і Microsoft (нижче)." %}</span>{% endif %}
+    </div>
+
+    {% if accounts %}
+    <div class="cn-scroll" style="margin-top:10px"><table class="cn-table">
+      {% for a in accounts %}
+      <tr><td><b>{{ a }}</b>{% if a.last_error %}<div class="cn-err">{{ a.last_error }}</div>{% endif %}
+          <div class="cn-muted">{% for c in a.calendars.all %}<span class="cn-dot" style="background:{{ c.color|default:'#888' }}"></span>{{ c.name }}{% if c.primary %} ★{% endif %}{% if not c.can_write %} ({% trans "лише читання" %}){% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</div></td>
+        <td><form method="post" action="{% url 'calendar_app:sync_action' %}" style="display:flex;gap:4px">{% csrf_token %}<input type="hidden" name="account" value="{{ a.pk }}">
+          <button class="cn-btn2" name="action" value="calendars" title="{% trans 'Оновити список календарів' %}">↻</button>
+          <button class="cn-btn2" name="action" value="disconnect" onclick="return confirm('{% trans "Відключити акаунт? Його правила буде видалено, події лишаться." %}')">✕</button></form></td></tr>
+      {% endfor %}
+    </table></div>
+
+    <h3 style="margin-top:14px">📏 {% trans "Правила" %}</h3>
+    {% if rules %}
+    <div class="cn-scroll"><table class="cn-table">
+      {% for r in rules %}
+      <tr><td><b>{{ r }}</b><div class="cn-muted">{{ r.get_what_display }} · {{ r.get_mode_display }}{% if r.keyword %} · «{{ r.keyword }}»{% endif %} · −{{ r.days_back }}…+{{ r.days_ahead }} {% trans "дн." %}{% if r.propagate_delete %} · {% trans "видалення теж" %}{% endif %}</div>
+          {% if r.last_run %}<div class="cn-muted">{{ r.last_run|date:"d.m H:i" }} — {{ r.last_result }}</div>{% endif %}</td>
+        <td><form method="post" action="{% url 'calendar_app:sync_action' %}" style="display:flex;flex-wrap:wrap;gap:4px">{% csrf_token %}<input type="hidden" name="rule" value="{{ r.pk }}">
+          <button class="cn-btn2" name="action" value="rule_preview">👁 {% trans "Перегляд" %}</button>
+          <button class="cn-btn2" name="action" value="rule_run" onclick="return confirm('{% trans "Синхронізувати зараз?" %}')">▶ {% trans "Зараз" %}</button>
+          <button class="cn-btn2" name="action" value="rule_toggle">{% if r.enabled %}⏸ {% trans "Вимкнути" %}{% else %}✅ {% trans "Увімкнути" %}{% endif %}</button>
+          <button class="cn-btn2" name="action" value="rule_delete" onclick="return confirm('{% trans "Видалити правило?" %}')">✕</button></form></td></tr>
+      {% endfor %}
+    </table></div>
+    {% endif %}
+    {% if preview %}
+    <div class="cn-card" style="margin-top:10px;background:rgba(26,115,232,.06)">
+      <b>👁 {% trans "Перегляд" %}: {{ preview.rule }}</b> — {% trans "створити" %} {{ preview.counts.create }}, {% trans "змінити" %} {{ preview.counts.update }}, {% trans "прибрати" %} {{ preview.counts.delete }}{% if preview.counts.errors %}, {% trans "помилок" %} {{ preview.counts.errors }}{% endif %}. {% trans "Нічого не записано." %}
+      <ul class="cn-steps">{% for x in preview.create %}<li>＋ {{ x }}</li>{% endfor %}{% for x in preview.update %}<li>✎ {{ x }}</li>{% endfor %}{% for x in preview.errors %}<li class="cn-err">{{ x }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+    <form method="post" action="{% url 'calendar_app:sync_action' %}" class="cn-row">{% csrf_token %}<input type="hidden" name="action" value="rule_add">
+      <label>{% trans "Звідки" %}<select name="source"><option value="">Minerva</option>{% for c in remote_calendars %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}</select></label>
+      <label>{% trans "Куди" %}<select name="target"><option value="">Minerva</option>{% for c in remote_calendars %}{% if c.can_write %}<option value="{{ c.pk }}" {% if forloop.first %}selected{% endif %}>{{ c }}</option>{% endif %}{% endfor %}</select></label>
+      <label>{% trans "Що" %}<select name="what">{% for k, l in rule_what %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
+      <label>{% trans "Як" %}<select name="mode">{% for k, l in rule_modes %}<option value="{{ k }}">{{ l }}</option>{% endfor %}</select></label>
+      <label>{% trans "Слово в назві" %}<input type="text" name="keyword" placeholder="{% trans 'необов’язково' %}" style="min-width:110px"></label>
+      <label>{% trans "Днів назад" %}<input type="number" name="days_back" value="7" min="0" max="365" style="width:70px"></label>
+      <label>{% trans "уперед" %}<input type="number" name="days_ahead" value="90" min="1" max="730" style="width:70px"></label>
+      <label style="flex-direction:row;gap:6px;align-items:center;color:inherit"><input type="checkbox" name="propagate_delete" value="1" checked> {% trans "видаляти копію разом з оригіналом" %}</label>
+      <button class="cn-btn">＋ {% trans "Правило" %}</button>
+    </form>
+    {% endif %}
+
+    {% if sync_admin %}
+    <details class="cn-card" style="margin-top:14px" {% if not google_ready and not ms_ready %}open{% endif %}>
+      <summary><b>🔑 {% trans "Ключі застосунків (адміністратор)" %}</b></summary>
+      <form method="post" action="{% url 'calendar_app:sync_action' %}">{% csrf_token %}<input type="hidden" name="action" value="keys">
+        <div class="cn-row"><b>Google</b></div>
+        <div class="cn-row">
+          <label>Client ID<input type="text" name="google_client_id" value="{{ sync_settings.google_client_id }}" style="min-width:320px"></label>
+          <label>Client Secret<input type="password" name="google_client_secret" placeholder="{{ google_secret_ph }}" autocomplete="new-password"></label>
+          <label style="flex-direction:row;gap:4px;align-items:center"><input type="checkbox" name="clear_google_client_secret" value="1"> {% trans "видалити" %}</label>
+        </div>
+        <div class="cn-muted" style="margin-top:4px">Redirect URI: <code>{{ google_redirect }}</code></div>
+        <ol class="cn-steps"><li>console.cloud.google.com → новий проєкт → «APIs &amp; Services» → увімкнути «Google Calendar API».</li>
+          <li>«OAuth consent screen»: External, додати свою пошту; потім «Publish app» → «In production» (у режимі Testing Google відкликає доступ кожні 7 днів; попередження «неперевірений застосунок» — нормально для власного).</li>
+          <li>«Credentials» → «Create OAuth client ID» → Web application → Authorized redirect URI — адреса вище → скопіювати Client ID і Secret сюди.</li></ol>
+        <div class="cn-row" style="margin-top:12px"><b>Microsoft (Outlook / Microsoft 365)</b></div>
+        <div class="cn-row">
+          <label>Application (client) ID<input type="text" name="ms_client_id" value="{{ sync_settings.ms_client_id }}" style="min-width:300px"></label>
+          <label>Client Secret<input type="password" name="ms_client_secret" placeholder="{{ ms_secret_ph }}" autocomplete="new-password"></label>
+          <label style="flex-direction:row;gap:4px;align-items:center"><input type="checkbox" name="clear_ms_client_secret" value="1"> {% trans "видалити" %}</label>
+          <label>Tenant<input type="text" name="ms_tenant" value="{{ sync_settings.ms_tenant }}" style="min-width:100px"></label>
+        </div>
+        <div class="cn-muted" style="margin-top:4px">Redirect URI: <code>{{ ms_redirect }}</code></div>
+        <ol class="cn-steps"><li>entra.microsoft.com → «App registrations» → «New registration»: «Accounts in any organizational directory and personal Microsoft accounts»; Redirect URI (Web) — адреса вище.</li>
+          <li>«API permissions» → Microsoft Graph → Delegated: Calendars.ReadWrite, User.Read, offline_access.</li>
+          <li>«Certificates &amp; secrets» → «New client secret» → значення (Value) сюди; Application (client) ID — з «Overview».</li></ol>
+        <div class="cn-row"><label>{% trans "Синхронізувати кожні, хв" %}<input type="number" name="interval_minutes" value="{{ sync_settings.interval_minutes }}" min="5" max="240" style="width:80px"></label>
+          <button class="cn-btn">💾 {% trans "Зберегти ключі" %}</button></div>
+        <div class="cn-muted">{% trans "Ключі зберігаються лише на сервері Minerva. Порожнє поле секрету — лишити збережений." %}</div>
+      </form>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

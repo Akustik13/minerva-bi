@@ -58,7 +58,7 @@ def _get_app_list(self, request, app_label=None):
         'rag_assistant':   ['ragsettings', 'ragconversation', 'knowledgesettings', 'knowledgedoc'],
         'projects':        ['project', 'dismissedthread'],
         'offers':          ['offer', 'offersettings', 'offerrevision'],
-        'worktime':        ['workday', 'danteproject', 'danteuser', 'booking', 'dantesettings'],
+        'worktime':        ['workday', 'danteproject', 'workreport', 'danteuser', 'booking', 'dantesettings'],
         'email_assistant': ['emailaccount', 'emailsettings', 'emailmessage', 'emailthread'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',

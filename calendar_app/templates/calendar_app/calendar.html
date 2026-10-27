@@ -119,6 +119,7 @@ body.wt-hide .cal-wt,body.wt-hide #cal-wt-panel{display:none}
 .cal-inv-cancel{background:rgba(239,68,68,.15);color:#ef4444}
 .cal-inv-btns{display:flex;gap:6px}
 .cal-inv-ok{border:none;border-radius:6px;padding:4px 10px;background:#1a73e8;color:#fff;cursor:pointer;font-size:12px}
+.cal-ext{opacity:.85;font-style:italic}
 .cal-inv-no{border:1px solid rgba(128,128,128,.4);border-radius:6px;padding:4px 9px;background:none;color:inherit;cursor:pointer}
 .cal-chip{display:flex;align-items:center;gap:3px;padding:2px 5px;border-radius:4px;
   margin-bottom:2px;font-size:10px;cursor:pointer;transition:opacity .1s;
@@ -242,11 +243,13 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
               onclick="toggleDone()" title="Показати/приховати виконані події">
         {% if show_done %}☑ З виконаними{% else %}☐ Виконані{% endif %}
       </button>
+      <a href="/calendar/connections/" class="cal-done-toggle" title="Google, Outlook, підписки">🔗 Календарі</a>
       {% if wt %}<button class="cal-done-toggle" id="cal-wt-toggle" onclick="wtToggle()" title="Показати/приховати робочий час askDANTE">⏱ Робочий час</button>{% endif %}
       <a href="/admin/calendar_app/calendarevent/add/" class="cal-add-btn">+ Подія</a>
     </div>
   </div>
 
+  {% if deadlines_pending %}<div class="cal-inv"><b>🔎 Терміни з пошти на перевірку: {{ deadlines_pending }}</b> <a href="/calendar/deadlines/">переглянути й занести →</a></div>{% endif %}
   {% if invites %}
   <div class="cal-inv" id="cal-inv">
     <div class="cal-inv-head"><b>📨 Запрошення на зустрічі з пошти ({{ invites|length }})</b>
@@ -326,6 +329,8 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
             {% if cell.wt.absences %}<span class="cal-wt-a">{{ cell.wt.absences }}</span>{% endif %}
             {% if cell.wt.project_total %}<span class="cal-wt-p" title="Час на проєкти в askDANTE">📁 {{ cell.wt.project_total }}</span>{% endif %}
           </div>{% endif %}
+          {% for x in cell.ext %}<div class="cal-chip cal-ext" style="background:{{ x.color }}22;color:{{ x.color }}" title="{{ x.feed }} · {{ x.time }} {{ x.title }}{% if x.location %} · {{ x.location }}{% endif %}">
+            <span class="cal-chip-dot" style="background:{{ x.color }}"></span><span class="cal-chip-txt">{% if x.time %}{{ x.time }} {% endif %}{{ x.title|truncatechars:18 }}</span></div>{% endfor %}
           {% for ev in cell.events %}
           <div class="cal-chip{% if ev.is_done %} done-ev{% endif %}"
                style="background:{{ ev.display_color }}33;color:{{ ev.display_color }}"
@@ -378,7 +383,9 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
           {% for p in wt.my_projects %}<label class="cal-wt-chip"><input type="radio" name="project" value="{{ p.pk }}" {% if forloop.first %}checked{% endif %}> {% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</label>{% endfor %}
         </div>
         <div class="cal-wt-row">
-          <input name="duration" id="wt-dur" placeholder="1:30" size="5" required>
+          з <input type="time" name="start"> по <input type="time" name="stop">
+          <span class="cal-wt-muted">або</span>
+          <input name="duration" id="wt-dur" placeholder="1:30" size="5">
           <button type="button" class="cal-wt-q" data-d="0:15">0:15</button><button type="button" class="cal-wt-q" data-d="0:30">0:30</button><button type="button" class="cal-wt-q" data-d="1:00">1:00</button><button type="button" class="cal-wt-q" data-d="2:00">2:00</button><button type="button" class="cal-wt-q" data-d="4:00">4:00</button>
           {% if wt.activities %}<select name="activity">{% if not wt.default_activity %}<option value="">— вид роботи —</option>{% endif %}{% for a in wt.activities %}<option value="{{ a.pk }}" {% if a.pk == wt.default_activity %}selected{% endif %}>{{ a.name }}</option>{% endfor %}</select>{% endif %}
         </div>
@@ -1234,9 +1241,16 @@ function wtShow(day) {
 function wtSubmit(form) {
   var proj = form.querySelector('input[name=project]:checked');
   var label = document.getElementById('wt-day-label').textContent;
+  var a = form.querySelector('input[name=start]'), b = form.querySelector('input[name=stop]'),
+      dur = form.querySelector('input[name=duration]');
+  var span = a && b && a.value && b.value ? a.value + '–' + b.value : '';
+  if (form.querySelector('input[name=action]').value === 'project') {
+    if ((a.value && !b.value) || (!a.value && b.value)) { alert('Вкажіть і «з», і «по» — або лише тривалість.'); return false; }
+    if (!span && !(dur && dur.value)) { alert('Вкажіть «з … по …» або тривалість.'); return false; }
+  }
   var what = form.querySelector('input[name=action]').value === 'project'
-    ? (proj ? proj.parentNode.textContent.trim() : '') + ' · ' + (form.querySelector('input[name=duration]') || {}).value
-    : form.querySelector('input[name=start]').value + '–' + form.querySelector('input[name=stop]').value;
+    ? (proj ? proj.parentNode.textContent.trim() : '') + ' · ' + (span || (dur || {}).value)
+    : span;
   if (!confirm('Записати в askDANTE за ' + label + ': ' + what + '?\n\nЗаписи askDANTE через API не видаляються.')) return false;
   form.querySelectorAll('button[type=submit]').forEach(function(b){ b.disabled = true; });
   return true;
