@@ -35,8 +35,9 @@ def _norm_ws(text: str) -> str:
 def messages_for(user, mask: dict):
     """Листи користувача за маскою (лише його скриньки; без спаму й кошика)."""
     from email_assistant.models import EmailMessage
-    qs = EmailMessage.objects.filter(account__user=user, is_spam=False, is_deleted=False) \
-        .exclude(folder=EmailMessage.FOLDER_TRASH)
+    qs = EmailMessage.objects.filter(account__user=user, is_spam=False)
+    if not mask.get("trash"):   # «включно з кошиком» — і видалені в Minerva
+        qs = qs.filter(is_deleted=False).exclude(folder=EmailMessage.FOLDER_TRASH)
     if mask.get("accounts"):
         qs = qs.filter(account_id__in=[int(a) for a in mask["accounts"] if str(a).isdigit()])
     if mask.get("folder") == "inbox":
@@ -137,7 +138,8 @@ def scan(user, mask: dict, limit: int = 200, progress=None) -> tuple[int, int]:
     """(перевірено листів AI, нових термінів)."""
     from calendar_app.models import CalendarSettings, DeadlineScanMark, FoundDeadline
     _, msgs = candidates(user, mask, limit)
-    auto = CalendarSettings.for_user(user).deadlines_auto
+    cfg = CalendarSettings.for_user(user)
+    auto, target = cfg.deadlines_auto, cfg.deadline_target
     found = 0
     for i, msg in enumerate(msgs, 1):
         items = extract(msg, user)
@@ -148,19 +150,32 @@ def scan(user, mask: dict, limit: int = 200, progress=None) -> tuple[int, int]:
             if created:
                 found += 1
                 if auto:
-                    accept(obj)
+                    try:
+                        accept(obj, target)
+                    except Exception as e:  # noqa: BLE001 — Google / Outlook недоступний: лишається на ✓
+                        logger.warning("deadline auto-accept %s: %s", obj.pk, e)
         DeadlineScanMark.objects.update_or_create(user=user, email_message=msg, defaults={"found": len(items)})
         if progress and i % 10 == 0:
             progress(i, len(msgs), found)
     return len(msgs), found
 
 
-def accept(d):
+def accept(d, target=None):
+    """✓: у календар Minerva (подія «⏰ Дедлайн») або в підключений Google / Outlook (target — RemoteCalendar)."""
     from calendar_app.models import CalendarEvent, CalendarSettings, FoundDeadline
     msg = d.email_message
     thread = getattr(msg, "thread", None)
     desc = "\n".join(x for x in (f"«{d.quote}»" if d.quote else "", f"✉️ {msg.subject}" if msg.subject else "",
                                  f"від {msg.from_email}" if msg.from_email else "") if x)
+    if target is not None:
+        from calendar_app.sync import client
+        end = d.due_at + (datetime.timedelta(days=1) if d.all_day else datetime.timedelta(minutes=30))
+        d.remote_id = client(target.account).create(target.remote_id, {
+            "title": f"⏰ {d.title}"[:300], "start": d.due_at, "end": end, "all_day": d.all_day, "location": "",
+            "description": desc})
+        d.status, d.target = FoundDeadline.ADDED, target
+        d.save(update_fields=["status", "target", "remote_id"])
+        return None
     ev = CalendarEvent.objects.create(
         user=d.user, title=d.title[:300], description=desc, event_type=CalendarEvent.TYPE_DEADLINE,
         start_at=d.due_at, all_day=d.all_day, email_message=msg,

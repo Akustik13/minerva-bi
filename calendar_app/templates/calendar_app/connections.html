@@ -22,6 +22,8 @@
 .cn-ok{color:#16a34a;font-size:12px}
 .cn-steps{margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--text-muted)}
 .cn-scroll{overflow-x:auto}
+.cn-cals{display:flex;flex-direction:column;gap:4px;margin-top:4px}
+.cn-cal{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
 details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
 </style>
 <div class="cn-wrap">
@@ -102,7 +104,13 @@ details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
     <div class="cn-scroll" style="margin-top:10px"><table class="cn-table">
       {% for a in accounts %}
       <tr><td><b>{{ a }}</b>{% if a.last_error %}<div class="cn-err">{{ a.last_error }}</div>{% endif %}
-          <div class="cn-muted">{% for c in a.calendars.all %}<span class="cn-dot" style="background:{{ c.color|default:'#888' }}"></span>{{ c.name }}{% if c.primary %} ★{% endif %}{% if not c.can_write %} ({% trans "лише читання" %}){% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</div></td>
+          <div class="cn-cals">{% for c in a.calendars.all %}
+            <form method="post" action="{% url 'calendar_app:sync_action' %}" class="cn-cal">{% csrf_token %}
+              <input type="hidden" name="action" value="layer"><input type="hidden" name="calendar" value="{{ c.pk }}">
+              <span class="cn-dot" style="background:{{ c.color|default:'#888' }}"></span>{{ c.name }}{% if c.primary %} ★{% endif %}{% if not c.can_write %} <span class="cn-muted">({% trans "лише читання" %})</span>{% endif %}
+              <button class="cn-btn2" title="{% trans 'Показувати події в календарі Minerva (без копіювання)' %}">{% if c.show_in_minerva %}👁 {% trans "у Minerva" %} ✓{% else %}👁 {% trans "показати в Minerva" %}{% endif %}</button>
+              {% if c.show_in_minerva %}<span class="cn-muted">{% if c.layer_error %}<span class="cn-err">❌ {{ c.layer_error }}</span>{% elif c.layer_fetched_at %}{{ c.layer_fetched_at|date:"d.m H:i" }}{% endif %}</span>{% endif %}
+            </form>{% endfor %}</div></td>
         <td><form method="post" action="{% url 'calendar_app:sync_action' %}" style="display:flex;gap:4px">{% csrf_token %}<input type="hidden" name="account" value="{{ a.pk }}">
           <button class="cn-btn2" name="action" value="calendars" title="{% trans 'Оновити список календарів' %}">↻</button>
           <button class="cn-btn2" name="action" value="disconnect" onclick="return confirm('{% trans "Відключити акаунт? Його правила буде видалено, події лишаться." %}')">✕</button></form></td></tr>

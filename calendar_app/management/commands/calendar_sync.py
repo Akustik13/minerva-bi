@@ -18,5 +18,8 @@ class Command(BaseCommand):
         n = feeds.refresh_due()
         if n:
             self.stdout.write(f"calendar_sync: підписок оновлено {n}")
+        n = sync.refresh_layers()
+        if n:
+            self.stdout.write(f"calendar_sync: календарів Google / Outlook у Minerva оновлено {n}")
         for line in sync.run_due():
             self.stdout.write(f"calendar_sync: {line}")

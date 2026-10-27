@@ -334,12 +334,15 @@ def pending(user) -> list:
 _scan_lock = threading.Lock()
 
 
-def scan(user, since: datetime.date, progress=None, imap=True) -> tuple[int, int]:
-    """Листи користувача від дати → запрошення. (перевірено листів, нових або змінених запрошень)."""
+def scan(user, since: datetime.date, progress=None, imap=True, trash: bool = False) -> tuple[int, int]:
+    """Листи користувача від дати → запрошення. (перевірено листів, нових або змінених запрошень).
+    trash — і листи з кошика (запрошення часто видаляють після того, як Outlook заніс їх у календар)."""
     from email_assistant.models import EmailMessage
     start = timezone.make_aware(datetime.datetime.combine(since, datetime.time.min))
-    qs = (EmailMessage.objects.filter(account__user=user, sent_at__gte=start, is_spam=False)
-          .exclude(folder=EmailMessage.FOLDER_TRASH).select_related("account", "thread").order_by("sent_at"))
+    qs = EmailMessage.objects.filter(account__user=user, sent_at__gte=start, is_spam=False)
+    if not trash:
+        qs = qs.exclude(folder=EmailMessage.FOLDER_TRASH)
+    qs = qs.select_related("account", "thread").order_by("sent_at")
     total, seen, found = qs.count(), 0, 0
     for msg in qs.iterator(chunk_size=200):
         seen += 1
@@ -353,7 +356,7 @@ def scan(user, since: datetime.date, progress=None, imap=True) -> tuple[int, int
     return seen, found
 
 
-def start_scan(user, since: datetime.date):
+def start_scan(user, since: datetime.date, trash: bool = False):
     """«🔎 Знайти запрошення» з налаштувань календаря: у фоні, стан — CalendarSettings.invites_scan_status."""
     from .models import CalendarSettings
     caller = threading.current_thread()
@@ -367,7 +370,7 @@ def start_scan(user, since: datetime.date):
             return
         try:
             status(f"⏳ Листи від {since:%d.%m.%Y}: підготовка…")
-            seen, found = scan(user, since, progress=lambda done, total, n: status(
+            seen, found = scan(user, since, trash=trash, progress=lambda done, total, n: status(
                 f"⏳ Листи від {since:%d.%m.%Y}: перевірено {done} з {total}, запрошень {n}"))
             status(f"✅ {timezone.localtime():%d.%m.%Y %H:%M} · листи від {since:%d.%m.%Y}: перевірено {seen}, "
                    f"нових або змінених запрошень {found}")

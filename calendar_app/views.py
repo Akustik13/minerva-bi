@@ -135,13 +135,25 @@ def _external_events(user, year, month) -> dict:
     """Події підписаних календарів (Google / Outlook через iCal) по днях місяця — лише показ."""
     from calendar_app.models import ExternalEvent
     out = {}
-    for e in (ExternalEvent.objects.filter(feed__user=user, feed__enabled=True, start_at__year=year,
-                                           start_at__month=month).select_related("feed")[:1000]):
+    from django.db.models import Q
+    shown = Q(feed__user=user, feed__enabled=True) | Q(remote__account__user=user, remote__show_in_minerva=True)
+    for e in (ExternalEvent.objects.filter(shown, start_at__year=year, start_at__month=month)
+              .select_related("feed", "remote__account")[:1500]):
         start = timezone.localtime(e.start_at)
+        src = e.feed or e.remote
+        color = (e.feed.color if e.feed else e.remote.color) or "#8e24aa"
+        name = e.feed.name if e.feed else f"{e.remote.account.get_provider_display()}: {e.remote.name}"
         out.setdefault(start.day, []).append({
-            "title": e.title, "color": e.feed.color, "feed": e.feed.name,
+            "title": e.title, "color": color, "feed": name if src else "",
             "time": "" if e.all_day else f"{start:%H:%M}", "location": e.location})
     return out
+
+
+def _write_targets(user) -> list:
+    """Календарі, куди можна заносити: підключені Google / Outlook з правом запису."""
+    from calendar_app.models import RemoteCalendar
+    return list(RemoteCalendar.objects.filter(account__user=user, can_write=True)
+                .select_related('account').order_by('account__provider', '-primary', 'name'))
 
 
 def _deadlines_pending(user):
@@ -445,7 +457,7 @@ def settings_view(request):
             from calendar_app import invites
             cfg.invites_scan_status = f'⏳ Листи від {cfg.invites_since:%d.%m.%Y}: запуск…'
             cfg.save(update_fields=['invites_scan_status'])
-            invites.start_scan(request.user, cfg.invites_since)
+            invites.start_scan(request.user, cfg.invites_since, trash=request.POST.get('invites_trash') == '1')
 
     from calendar_app.models import MeetingInvite
     return render(request, 'calendar_app/cal_settings.html', {
@@ -474,7 +486,8 @@ def invite_decide(request, pk, action):
     return JsonResponse({'ok': True, 'status': inv.status, 'event_id': inv.event_id})
 
 
-MASK_KEYS = ('accounts', 'folder', 'date_from', 'date_to', 'sender', 'subject', 'category', 'customer', 'project')
+MASK_KEYS = ('accounts', 'folder', 'date_from', 'date_to', 'sender', 'subject', 'category', 'customer', 'project',
+             'trash')
 
 
 @staff_member_required
@@ -508,10 +521,32 @@ def deadlines_view(request):
             cfg.deadlines_auto = request.POST.get('deadlines_auto') == '1'
             cfg.save(update_fields=['deadlines_auto'])
         elif action in ('accept', 'dismiss'):
+            from django.contrib import messages as msgs
+            from calendar_app.models import RemoteCalendar
             ids = [int(x) for x in request.POST.getlist('ids') if x.isdigit()]
+            target = None
+            if action == 'accept':   # крок 2: у який календар; останній вибір — і для «без підтвердження»
+                tid = request.POST.get('target', '')
+                target = RemoteCalendar.objects.filter(pk=tid, account__user=request.user, can_write=True) \
+                    .select_related('account').first() if tid.isdigit() else None
+                cfg.deadline_target = target
+                cfg.save(update_fields=['deadline_target'])
+            done, errors = 0, []
             for d in FoundDeadline.objects.filter(user=request.user, pk__in=ids, status=FoundDeadline.NEW) \
                     .select_related('email_message__thread'):
-                (deadlines.accept if action == 'accept' else deadlines.dismiss)(d)
+                if action == 'dismiss':
+                    deadlines.dismiss(d)
+                    continue
+                try:
+                    deadlines.accept(d, target)
+                    done += 1
+                except Exception as e:  # noqa: BLE001 — Google / Outlook відмовив: лишається на ✓
+                    errors.append(f'{d.title}: {e}')
+            if action == 'accept':
+                if done:
+                    msgs.success(request, f'✓ Занесено в «{target or "календар Minerva"}»: {done}.')
+                for e in errors[:5]:
+                    msgs.error(request, f'❌ {e}')
         from django.shortcuts import redirect
         return redirect('/calendar/deadlines/')
     if 'count' in src:
@@ -530,6 +565,7 @@ def deadlines_view(request):
         'categories': EmailMessage.CATEGORY_CHOICES,
         'projects': Project.objects.filter(status__in=Project.OPEN_STATUSES).order_by('code')[:300],
         'added': FoundDeadline.objects.filter(user=request.user, status=FoundDeadline.ADDED).count(),
+        'targets': _write_targets(request.user),
         'is_nav_sidebar_enabled': True,
     })
 

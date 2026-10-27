@@ -302,6 +302,39 @@ class GraphClient(_Base):
         self._req("DELETE", f"{GRAPH}/me/events/{event_id}")
 
 
+LAYER_BEFORE, LAYER_AFTER, LAYER_MINUTES = 60, 365, 15
+
+
+def refresh_layer(cal: RemoteCalendar) -> int:
+    """Події підключеного календаря для показу в календарі Minerva (ExternalEvent, без копіювання)."""
+    from .models import ExternalEvent
+    now = timezone.now()
+    try:
+        items = client(cal.account).events(cal.remote_id, now - datetime.timedelta(days=LAYER_BEFORE),
+                                           now + datetime.timedelta(days=LAYER_AFTER))
+    except SyncError as e:
+        RemoteCalendar.objects.filter(pk=cal.pk).update(layer_error=str(e)[:255], layer_fetched_at=now)
+        return 0
+    ExternalEvent.objects.filter(remote=cal).delete()
+    ExternalEvent.objects.bulk_create([ExternalEvent(
+        remote=cal, uid=e["id"][:500], title=("Зайнято" if e.get("private") else e["title"])[:300],
+        start_at=e["start"], end_at=e.get("end"), all_day=e["all_day"], location=(e.get("location") or "")[:500])
+        for e in items])
+    RemoteCalendar.objects.filter(pk=cal.pk).update(layer_error="", layer_fetched_at=now)
+    return len(items)
+
+
+def refresh_layers(now=None) -> int:
+    now = now or timezone.now()
+    n = 0
+    for cal in RemoteCalendar.objects.filter(show_in_minerva=True).select_related("account"):
+        if cal.layer_fetched_at and now - cal.layer_fetched_at < datetime.timedelta(minutes=LAYER_MINUTES):
+            continue
+        refresh_layer(cal)
+        n += 1
+    return n
+
+
 def refresh_calendars(acc: CalendarAccount) -> int:
     items = client(acc).calendars()
     seen = set()
@@ -556,7 +589,21 @@ def sync_action(request):
             except SyncError as e:
                 messages.error(request, f"❌ {e}")
         return back
-    own = {c.pk: c for c in RemoteCalendar.objects.filter(account__user=user)}
+    own = {c.pk: c for c in RemoteCalendar.objects.filter(account__user=user).select_related("account")}
+    if action == "layer":   # 👁 показувати в календарі Minerva
+        cal = own.get(_int(p.get("calendar"), 0))
+        if cal:
+            cal.show_in_minerva = not cal.show_in_minerva
+            cal.save(update_fields=["show_in_minerva"])
+            if cal.show_in_minerva:
+                n = refresh_layer(cal)
+                cal.refresh_from_db()
+                (messages.error if cal.layer_error else messages.success)(
+                    request, f"❌ {cal.layer_error}" if cal.layer_error else f"👁 «{cal.name}» у календарі Minerva: {n} подій.")
+            else:
+                from .models import ExternalEvent
+                ExternalEvent.objects.filter(remote=cal).delete()
+        return back
 
     def pick(name):
         v = p.get(name) or ""

@@ -185,6 +185,7 @@
       <div class="cal-field-row">
         <label>Знайти запрошення в уже отриманих листах від</label>
         <input type="date" name="invites_since" value="{{ cfg.invites_since|date:'Y-m-d' }}">
+        <label style="display:flex;gap:6px;align-items:center;margin-top:6px"><input type="checkbox" name="invites_trash" value="1"> включно з кошиком (запрошення часто видаляють, коли Outlook уже заніс їх у календар)</label>
         <div style="margin-top:6px"><button type="submit" name="invites_scan" value="1" class="cal-save-btn">🔎 Зберегти й знайти</button></div>
         {% if cfg.invites_scan_status %}<div class="cal-hint" style="margin-top:6px">{{ cfg.invites_scan_status }}</div>{% endif %}
         <div class="cal-hint">Шукає у ваших скриньках від цієї дати; листи Outlook без вкладення .ics Minerva бере з пошти ще раз (лише читання).</div>

@@ -190,3 +190,49 @@ class SyncTests(TestCase):
                                                              "target": self.gc.pk, "days_back": "x"})
         rule = SyncRule.objects.get()
         self.assertEqual((rule.enabled, rule.days_back), (False, 7))   # спершу перегляд
+
+
+class LayerAndTargetTests(SyncTests):
+    def login(self):
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.get_or_create(pk=1)[0]
+        ss.is_onboarding_complete = True
+        ss.save()
+        self.client.force_login(self.user)
+
+    def test_connected_calendar_as_layer(self):
+        self.login()
+        FakeRemote(self.o).create(self.oc.remote_id, self.ev("Outlook Termin", 3))
+        self.client.post("/calendar/connections/sync/", {"action": "layer", "calendar": self.oc.pk})
+        self.oc.refresh_from_db()
+        self.assertTrue(self.oc.show_in_minerva)
+        self.assertEqual(ExternalEvent.objects.filter(remote=self.oc).count(), 1)
+        now = timezone.localtime(timezone.now() + datetime.timedelta(hours=3))
+        r = self.client.get(f"/calendar/?year={now.year}&month={now.month}")
+        self.assertContains(r, "Outlook Termin")
+        self.assertEqual(CalendarEvent.objects.count(), 0)   # лише показ, без копіювання
+        self.client.post("/calendar/connections/sync/", {"action": "layer", "calendar": self.oc.pk})
+        self.assertFalse(ExternalEvent.objects.filter(remote=self.oc).exists())
+
+    def test_deadline_to_google_and_trash_mask(self):
+        from calendar_app import deadlines
+        from calendar_app.models import FoundDeadline
+        from email_assistant.models import EmailAccount, EmailMessage
+        self.login()
+        acc = EmailAccount.objects.create(user=self.user, email_address="a@x.y", imap_username="a@x.y",
+                                          imap_password="x", smtp_username="a@x.y", smtp_password="x")
+        msg = EmailMessage.objects.create(account=acc, from_email="max@acme.example", subject="Lieferung",
+                                          body_text="Bitte bis 30.11.2026 liefern.", folder=EmailMessage.FOLDER_TRASH,
+                                          sent_at=timezone.now())
+        self.assertEqual(deadlines.messages_for(self.user, {}).count(), 0)
+        self.assertEqual(deadlines.messages_for(self.user, {"trash": "1"}).count(), 1)
+        d = FoundDeadline.objects.create(user=self.user, email_message=msg, title="Lieferung",
+                                         due_at=timezone.now() + datetime.timedelta(days=30), quote="bis 30.11.2026")
+        r = self.client.get("/calendar/deadlines/")
+        self.assertContains(r, "Крок 2")
+        self.assertContains(r, "Google: Main")
+        self.client.post("/calendar/deadlines/", {"action": "accept", "ids": [d.pk], "target": self.gc.pk})
+        d.refresh_from_db()
+        self.assertEqual((d.status, d.target, CalendarEvent.objects.count()), (FoundDeadline.ADDED, self.gc, 0))
+        self.assertIn("⏰ Lieferung", [e["title"] for e in FakeRemote.store[self.gc.remote_id].values()])
+        self.assertEqual(CalendarSettings.for_user(self.user).deadline_target, self.gc)   # запам'ятано

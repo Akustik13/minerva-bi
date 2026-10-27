@@ -108,6 +108,9 @@ class CalendarSettings(models.Model):
     deadlines_auto = models.BooleanField(
         default=False, verbose_name='Заносити знайдені терміни без підтвердження')
     deadline_mask = models.JSONField(default=dict, blank=True, verbose_name='Остання маска пошуку термінів')
+    deadline_target = models.ForeignKey('RemoteCalendar', null=True, blank=True, on_delete=models.SET_NULL,
+                                        related_name='+', verbose_name='Куди заносити терміни (останній вибір)',
+                                        help_text='Порожньо — календар Minerva.')
     deadline_scan_status = models.CharField(max_length=255, blank=True, default='',
                                             verbose_name='Пошук термінів — стан')
     feed_token = models.CharField(max_length=64, blank=True, default='', editable=False,
@@ -188,6 +191,9 @@ class FoundDeadline(models.Model):
     quote = models.TextField(blank=True, default='', verbose_name='Цитата з листа')
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=NEW, db_index=True)
     event = models.ForeignKey(CalendarEvent, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    target = models.ForeignKey('RemoteCalendar', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                               verbose_name='Занесено в календар', help_text='Порожньо — календар Minerva.')
+    remote_id = models.CharField(max_length=500, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -236,7 +242,9 @@ class CalendarFeed(models.Model):
 
 class ExternalEvent(models.Model):
     """Подія підписаного календаря (копія для показу; повторювані — розгорнуті в межах вікна)."""
-    feed = models.ForeignKey(CalendarFeed, on_delete=models.CASCADE, related_name='events')
+    feed = models.ForeignKey(CalendarFeed, null=True, blank=True, on_delete=models.CASCADE, related_name='events')
+    remote = models.ForeignKey('RemoteCalendar', null=True, blank=True, on_delete=models.CASCADE,
+                               related_name='layer_events')
     uid = models.CharField(max_length=500)
     title = models.CharField(max_length=300)
     start_at = models.DateTimeField(db_index=True)
@@ -301,6 +309,10 @@ class RemoteCalendar(models.Model):
     color = models.CharField(max_length=7, blank=True, default='')
     can_write = models.BooleanField(default=True)
     primary = models.BooleanField(default=False)
+    show_in_minerva = models.BooleanField(default=False, verbose_name='Показувати в календарі Minerva',
+                                          help_text='Події видно шаром у /calendar/ (лише показ, без копіювання).')
+    layer_fetched_at = models.DateTimeField(null=True, blank=True)
+    layer_error = models.CharField(max_length=255, blank=True, default='')
 
     class Meta:
         unique_together = [('account', 'remote_id')]

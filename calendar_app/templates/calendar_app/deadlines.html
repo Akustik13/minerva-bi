@@ -22,6 +22,9 @@
 .dl-btn{border:none;border-radius:6px;padding:6px 12px;background:#1a73e8;color:#fff;cursor:pointer}
 .dl-btn2{border:1px solid rgba(128,128,128,.4);border-radius:6px;padding:6px 12px;background:none;color:inherit;cursor:pointer}
 .dl-scroll{overflow-x:auto}
+.dl-step{margin-top:12px;padding:10px 12px;border-radius:8px;border:1px solid rgba(26,115,232,.5);background:rgba(26,115,232,.06)}
+.dl-targets{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.dl-targets label{display:flex;gap:6px;align-items:center;cursor:pointer}
 </style>
 <div class="dl-wrap">
   <a href="/calendar/" class="dl-muted">← {% trans "Календар" %}</a>
@@ -41,6 +44,7 @@
       <label>{% trans "Категорія" %}<select name="category"><option value="">{% trans "усі" %}</option>{% for k, label in categories %}<option value="{{ k }}" {% if mask.category == k %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
       <label>{% trans "Клієнт CRM" %}<input type="text" name="customer" value="{% if mask.customer %}#{{ mask.customer }}{% endif %}" placeholder="{% trans 'назва, email або #номер' %}"></label>
       <label>{% trans "Проєкт" %}<select name="project"><option value="">{% trans "усі" %}</option>{% for p in projects %}<option value="{{ p.pk }}" {% if mask.project == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.code }} {{ p.name|truncatechars:40 }}</option>{% endfor %}</select></label>
+      <label style="flex-direction:row;gap:6px;align-items:center;color:inherit"><input type="checkbox" name="trash" value="1" {% if mask.trash %}checked{% endif %}> {% trans "включно з кошиком і видаленими" %}</label>
       <button class="dl-btn2" name="count" value="1">🔢 {% trans "Порахувати" %}</button>
     </div>
     {% if info %}
@@ -85,9 +89,31 @@
       {% endfor %}
     </table></div>
     <div style="margin-top:10px;display:flex;gap:8px">
-      <button class="dl-btn" name="action" value="accept">✓ {% trans "Вибрані — в календар" %}</button>
+      <button class="dl-btn" type="button" onclick="dlStep(true)">✓ {% trans "Вибрані — в календар…" %}</button>
       <button class="dl-btn2" name="action" value="dismiss">✕ {% trans "Вибрані — не заносити" %}</button>
     </div>
+    <div class="dl-step" id="dl-step" hidden>
+      <b>{% trans "Крок 2 — у який календар?" %}</b> <span class="dl-muted" id="dl-n"></span>
+      <div class="dl-targets">
+        <label><input type="radio" name="target" value="" {% if not cfg.deadline_target_id %}checked{% endif %}> 📅 {% trans "Календар Minerva" %}</label>
+        {% for t in targets %}<label><input type="radio" name="target" value="{{ t.pk }}" {% if cfg.deadline_target_id == t.pk %}checked{% endif %}> {% if t.account.provider == "google" %}🟦 Google{% else %}🟧 Outlook{% endif %}: {{ t.name }}{% if t.primary %} ★{% endif %} <span class="dl-muted">{{ t.account.email }}</span></label>{% endfor %}
+      </div>
+      {% if not targets %}<div class="dl-muted">{% trans "Щоб заносити просто в Google або Outlook — підключіть їх у" %} <a href="/calendar/connections/#sync">🔗 {% trans "Календарі" %}</a>.</div>{% endif %}
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button class="dl-btn" name="action" value="accept">✓ {% trans "Занести" %}</button>
+        <button class="dl-btn2" type="button" onclick="dlStep(false)">{% trans "Скасувати" %}</button>
+      </div>
+      <div class="dl-muted" style="margin-top:4px">{% trans "Вибір запам'ятовується — і для «без підтвердження»." %}</div>
+    </div>
+    <script>
+    function dlStep(on) {
+      var n = document.querySelectorAll('.dl-pick:checked').length;
+      if (on && !n) { alert('{% trans "Виберіть хоча б один термін." %}'); return; }
+      document.getElementById('dl-n').textContent = '· {% trans "вибрано" %} ' + n;
+      document.getElementById('dl-step').hidden = !on;
+      if (on) document.getElementById('dl-step').scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+    </script>
     {% else %}
     <div class="dl-muted">{% trans "Поки нічого не знайдено. Вкажіть маску, «Порахувати», потім «Знайти за маскою»." %}</div>
     {% endif %}
