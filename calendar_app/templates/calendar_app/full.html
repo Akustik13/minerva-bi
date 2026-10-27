@@ -1,0 +1,152 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/locales/uk.global.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<style>
+.fv-wrap{display:grid;grid-template-columns:250px 1fr;gap:14px;align-items:start}
+.fv-side{border:1px solid var(--border-color,rgba(128,128,128,.35));border-radius:10px;padding:10px 12px;font-size:13px;position:sticky;top:8px}
+.fv-group{margin:10px 0 4px;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em}
+.fv-src{display:flex;align-items:center;gap:6px;padding:3px 0}
+.fv-src input{accent-color:var(--c)}
+.fv-src .dot{width:10px;height:10px;border-radius:3px;background:var(--c);flex:none}
+.fv-src .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fv-src button{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:11px;padding:0 2px}
+.fv-err{color:#ef4444;font-size:11px;margin:-2px 0 4px 22px}
+.fv-muted{color:var(--text-muted);font-size:12px}
+.fv-cal{border:1px solid var(--border-color,rgba(128,128,128,.35));border-radius:10px;padding:10px;min-width:0}
+#fv-calendar{--fc-border-color:rgba(128,128,128,.28);--fc-page-bg-color:transparent;--fc-neutral-bg-color:rgba(128,128,128,.08);
+  --fc-today-bg-color:rgba(26,115,232,.10);--fc-list-event-hover-bg-color:rgba(128,128,128,.12);font-size:13px}
+#fv-calendar tr{background:transparent!important}   /* смуги таблиць адмінки не для календаря */
+#fv-calendar .fc-toolbar-title{font-size:18px}
+#fv-calendar .fc-button{padding:4px 10px;font-size:13px}
+#fv-calendar .fc-event{cursor:pointer}
+#fv-calendar .fc-col-header-cell-cushion,#fv-calendar .fc-daygrid-day-number{color:inherit;text-decoration:none}
+.fv-pop{position:fixed;z-index:1000;max-width:380px;width:calc(100vw - 32px);background:var(--body-bg,#1e1e1e);color:inherit;
+  border:1px solid var(--border-color,rgba(128,128,128,.4));border-radius:10px;padding:12px 14px;box-shadow:0 8px 28px rgba(0,0,0,.35);font-size:13px}
+.fv-pop h4{margin:0 0 6px;font-size:15px;display:flex;gap:8px;align-items:flex-start}
+.fv-pop .row{margin:3px 0}
+.fv-pop .desc{white-space:pre-wrap;max-height:180px;overflow:auto;margin-top:6px;color:var(--text-muted)}
+.fv-pop .x{margin-left:auto;border:none;background:none;color:inherit;font-size:18px;cursor:pointer}
+@media (max-width:820px){.fv-wrap{grid-template-columns:1fr}.fv-side{position:static}}
+</style>
+
+<div class="fv-wrap">
+  <aside class="fv-side">
+    <a href="/calendar/" class="fv-muted">← {% trans "Календар Minerva" %}</a> ·
+    <a href="/calendar/connections/" class="fv-muted">🔗 {% trans "Підключення" %}</a>
+    <div id="fv-sources"></div>
+    <div class="fv-muted" style="margin-top:10px">{% trans "Підключені календарі читаються наживо (оновлення — раз на 2 хв). «лише» — показати один календар, щоб звірити з оригіналом. ↗ — відкрити оригінал." %}</div>
+  </aside>
+  <section class="fv-cal"><div id="fv-calendar"></div></section>
+</div>
+<div class="fv-pop" id="fv-pop" hidden></div>
+{{ sources|json_script:"fv-src-data" }}
+
+<script>
+(function(){
+  var SOURCES = JSON.parse(document.getElementById('fv-src-data').textContent);
+  var ONLY = '{{ only|escapejs }}';
+  var KEY = 'fv-on';
+  var on = {};
+  try { on = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
+  SOURCES.forEach(function(s){ if (!(s.id in on)) on[s.id] = true; });
+  if (ONLY) SOURCES.forEach(function(s){ on[s.id] = (s.id === ONLY); });
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(on)); } catch (e) {} }
+  function esc(t){ var d = document.createElement('div'); d.textContent = t == null ? '' : String(t); return d.innerHTML; }
+
+  var errors = {};
+  function source(s){
+    return {
+      id: s.id, color: s.color,
+      events: function(info, ok, fail){
+        var q = new URLSearchParams({src: s.id, start: info.startStr, end: info.endStr});
+        fetch('/calendar/full/events/?' + q.toString(), {credentials: 'same-origin'})
+          .then(function(r){ return r.json(); })
+          .then(function(d){ errors[s.id] = d.error || ''; renderSources(); ok(d.events || []); })
+          .catch(function(){ errors[s.id] = 'немає зв\'язку з Minerva'; renderSources(); fail(); });
+      }
+    };
+  }
+
+  function renderSources(){
+    var box = document.getElementById('fv-sources'), html = [], group = null;
+    SOURCES.forEach(function(s){
+      if (s.group !== group) { group = s.group; html.push('<div class="fv-group">' + esc(group) + '</div>'); }
+      html.push('<label class="fv-src" style="--c:' + esc(s.color) + '"><input type="checkbox" data-id="' + esc(s.id) + '"' + (on[s.id] ? ' checked' : '') + '>' +
+        '<span class="dot"></span><span class="nm" title="' + esc(s.name) + '">' + esc(s.name) + '</span>' +
+        '<button type="button" data-only="' + esc(s.id) + '" title="Показати лише цей">лише</button>' +
+        (s.original ? '<a href="' + esc(s.original) + '" target="_blank" rel="noopener" title="Відкрити оригінал" class="fv-muted">↗</a>' : '') + '</label>');
+      if (errors[s.id]) html.push('<div class="fv-err">' + esc(errors[s.id]) + '</div>');
+    });
+    box.innerHTML = html.join('');
+  }
+
+  var cal = new FullCalendar.Calendar(document.getElementById('fv-calendar'), {
+    locale: 'uk', firstDay: 1, initialView: window.innerWidth < 700 ? 'listWeek' : 'timeGridWeek',
+    height: 'auto', nowIndicator: true, navLinks: true, dayMaxEvents: true, slotMinTime: '06:00:00',
+    scrollTime: '07:30:00', weekNumbers: true,
+    headerToolbar: {left: 'prev,next today', center: 'title', right: 'timeGridDay,timeGridWeek,dayGridMonth,listWeek'},
+    buttonText: {today: 'Сьогодні', day: 'День', week: 'Тиждень', month: 'Місяць', list: 'Список'},
+    eventSources: SOURCES.filter(function(s){ return on[s.id]; }).map(source),
+    eventClick: function(info){ info.jsEvent.preventDefault(); popup(info.event, info.jsEvent); }
+  });
+  cal.render();
+
+  document.getElementById('fv-sources').addEventListener('click', function(e){
+    var only = e.target.closest('[data-only]');
+    if (only) {
+      e.preventDefault();
+      SOURCES.forEach(function(s){ on[s.id] = (s.id === only.dataset.only); });
+      sync();
+    }
+  });
+  document.getElementById('fv-sources').addEventListener('change', function(e){
+    var id = e.target.dataset.id;
+    if (!id) return;
+    on[id] = e.target.checked;
+    sync();
+  });
+  function sync(){
+    save();
+    cal.getEventSources().forEach(function(src){ src.remove(); });
+    SOURCES.forEach(function(s){ if (on[s.id]) cal.addEventSource(source(s)); });
+    renderSources();
+  }
+  renderSources();
+
+  var pop = document.getElementById('fv-pop');
+  function fmt(d, allDay){
+    if (!d) return '';
+    return allDay ? d.toLocaleDateString('uk-UA', {weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric'})
+                  : d.toLocaleString('uk-UA', {weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+  }
+  function popup(ev, js){
+    var p = ev.extendedProps || {}, src = SOURCES.find(function(s){ return s.id === ev.source.id; }) || {};
+    var end = ev.end ? (ev.allDay ? '' : ' – ' + ev.end.toLocaleTimeString('uk-UA', {hour: '2-digit', minute: '2-digit'})) : '';
+    var rows = ['<h4><span>' + esc(ev.title) + '</span><button class="x" type="button" aria-label="Закрити">×</button></h4>',
+      '<div class="row">🕒 ' + esc(fmt(ev.start, ev.allDay)) + esc(end) + '</div>',
+      '<div class="row" style="color:' + esc(src.color) + '">● ' + esc(src.name || '') + '</div>'];
+    if (p.location) rows.push('<div class="row">📍 ' + esc(p.location) + '</div>');
+    if (p.organizer) rows.push('<div class="row">👤 ' + esc(p.organizer) + (p.attendees ? ' · ' + p.attendees + ' учасн.' : '') + '</div>');
+    if (p.type) rows.push('<div class="row">' + esc(p.type) + '</div>');
+    if (p.description) rows.push('<div class="desc">' + esc(p.description) + '</div>');
+    if (p.link) rows.push('<div class="row" style="margin-top:8px"><a href="' + esc(p.link) + '" target="_blank" rel="noopener">' +
+      (ev.source.id === 'minerva' ? '✏️ Відкрити в Minerva' : '↗ Відкрити в оригіналі') + '</a></div>');
+    pop.innerHTML = rows.join('');
+    pop.hidden = false;
+    var x = Math.min(js.clientX + 8, window.innerWidth - pop.offsetWidth - 12), y = Math.min(js.clientY + 8, window.innerHeight - pop.offsetHeight - 12);
+    pop.style.left = Math.max(8, x) + 'px'; pop.style.top = Math.max(8, y) + 'px';
+    pop.querySelector('.x').onclick = function(){ pop.hidden = true; };
+  }
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') pop.hidden = true; });
+  document.addEventListener('click', function(e){ if (!pop.hidden && !pop.contains(e.target) && !e.target.closest('.fc-event')) pop.hidden = true; });
+})();
+</script>
+{% endblock %}

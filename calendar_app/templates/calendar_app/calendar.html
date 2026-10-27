@@ -243,6 +243,7 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
               onclick="toggleDone()" title="Показати/приховати виконані події">
         {% if show_done %}☑ З виконаними{% else %}☐ Виконані{% endif %}
       </button>
+      <a href="/calendar/full/" class="cal-done-toggle" title="День, тиждень, місяць — як у Google / Outlook">🗓 Повний вигляд</a>
       <a href="/calendar/connections/" class="cal-done-toggle" title="Google, Outlook, підписки">🔗 Календарі</a>
       {% if wt %}<button class="cal-done-toggle" id="cal-wt-toggle" onclick="wtToggle()" title="Показати/приховати робочий час askDANTE">⏱ Робочий час</button>{% endif %}
       <a href="/admin/calendar_app/calendarevent/add/" class="cal-add-btn">+ Подія</a>

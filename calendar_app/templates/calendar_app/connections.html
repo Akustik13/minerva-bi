@@ -25,6 +25,17 @@
 .cn-cals{display:flex;flex-direction:column;gap:4px;margin-top:4px}
 .cn-cal{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
 details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
+.rm-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.rm-head{display:flex;justify-content:space-between;margin-bottom:6px}
+.rm-step{display:flex;gap:10px;position:relative;padding-bottom:12px}
+.rm-step:not(:last-child)::before{content:'';position:absolute;left:11px;top:24px;bottom:0;width:2px;background:rgba(128,128,128,.3)}
+.rm-dot{flex:none;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;border:2px solid rgba(128,128,128,.5)}
+.rm-done .rm-dot{background:#16a34a;border-color:#16a34a;color:#fff}
+.rm-current .rm-dot{border-color:#1a73e8;color:#1a73e8;box-shadow:0 0 0 3px rgba(26,115,232,.2)}
+.rm-todo{opacity:.6}
+.rm-body{font-size:13px;min-width:0}
+.rm-do{margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rm-do code{word-break:break-all}
 </style>
 <div class="cn-wrap">
   <a href="/calendar/" class="cn-muted">← {% trans "Календар" %}</a>
@@ -34,6 +45,51 @@ details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
       {% trans "Два рівні. Підписки (iCal) — просто й без доступу на запис: бачити все в Minerva і показати календар Minerva в Google / Outlook. Синхронізація (нижче) — справжні події в Google і Outlook за правилами «звідки → куди», в обидва боки, без дублів і петель." %}
     </div>
   </div>
+
+  {% if roadmap %}
+  <!-- ── 🧭 дорожня карта підключення ── -->
+  <div class="cn-card" id="roadmap">
+    <h3>🧭 {% trans "Підключення по кроках" %}</h3>
+    <div class="rm-cols">
+    {% for r in roadmap %}
+      <div class="rm-col">
+        <div class="rm-head"><b>{% if r.provider == "google" %}🟦{% else %}🟧{% endif %} {{ r.label }}</b>
+          <span class="cn-muted">{{ r.done }} / {{ r.total }}</span></div>
+        {% for st in r.steps %}
+        <div class="rm-step rm-{{ st.state }}">
+          <span class="rm-dot">{% if st.state == "done" %}✓{% else %}{{ forloop.counter }}{% endif %}</span>
+          <div class="rm-body"><b>{{ st.title }}</b> <span class="cn-muted">{{ st.detail }}</span>
+          {% if st.state == "current" or st.key == "compare" and st.state == "done" %}<div class="rm-do">
+            {% if st.key == "keys" %}
+              {% if sync_admin %}<a class="cn-btn2" href="#keys" onclick="document.getElementById('keys').open=true">🔑 {% trans "Внести ключі ↓" %}</a>
+                <div class="cn-muted" style="margin-top:4px">Redirect URI: <code>{% if r.provider == "google" %}{{ google_redirect }}{% else %}{{ ms_redirect }}{% endif %}</code></div>
+              {% else %}<span class="cn-muted">{% trans "Попросіть адміністратора Minerva внести ключі застосунку." %}</span>{% endif %}
+            {% elif st.key == "account" %}
+              {% if r.provider == "microsoft" %}<div class="cn-muted" style="margin-bottom:4px">{% trans "Спершу перевірте: у outlook.office.com / outlook.live.com видно ваш календар? Тоді він у хмарі — підключайте." %}</div>{% endif %}
+              <a class="cn-btn" href="{% url 'calendar_app:oauth_start' r.provider %}">＋ {% trans "Увійти в" %} {{ r.label }}</a>
+            {% elif st.key == "calendars" %}
+              <span class="cn-muted">{% trans "Оновіть список календарів кнопкою ↻ у таблиці акаунтів нижче." %}</span>
+            {% elif st.key == "show" %}
+              {% for c in r.calendars %}<form method="post" action="{% url 'calendar_app:sync_action' %}" style="display:inline">{% csrf_token %}
+                <input type="hidden" name="action" value="layer"><input type="hidden" name="calendar" value="{{ c.pk }}">
+                <button class="cn-btn2">👁 {{ c.name }}{% if c.primary %} ★{% endif %}</button></form>{% endfor %}
+            {% elif st.key == "compare" %}
+              {% if r.first_shown %}<a class="cn-btn" href="{% url 'calendar_app:full' %}?only=r:{{ r.first_shown.pk }}">🗓 {% trans "Відкрити в Minerva — лише цей" %}</a>{% endif %}
+              <a class="cn-btn2" href="{{ r.original }}" target="_blank" rel="noopener">↗ {% trans "Оригінал" %}</a>
+              <div class="cn-muted" style="margin-top:4px">{% trans "Відкрийте обидва поруч і порівняйте тиждень. Якщо щось не так — надішліть знімок." %}</div>
+            {% elif st.key == "rules" %}
+              <a class="cn-btn2" href="#sync">📏 {% trans "До правил ↓" %}</a>
+            {% endif %}
+          </div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    </div>
+    <div class="cn-row"><a class="cn-btn" href="{% url 'calendar_app:full' %}">🗓 {% trans "Повний календар (усі джерела)" %}</a></div>
+  </div>
+  {% endif %}
 
   <!-- ── 📤 Minerva → Google / Outlook ── -->
   <div class="cn-card">
@@ -151,7 +207,7 @@ details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
     {% endif %}
 
     {% if sync_admin %}
-    <details class="cn-card" style="margin-top:14px" {% if not google_ready and not ms_ready %}open{% endif %}>
+    <details class="cn-card" id="keys" style="margin-top:14px" {% if not google_ready and not ms_ready %}open{% endif %}>
       <summary><b>🔑 {% trans "Ключі застосунків (адміністратор)" %}</b></summary>
       <form method="post" action="{% url 'calendar_app:sync_action' %}">{% csrf_token %}<input type="hidden" name="action" value="keys">
         <div class="cn-row"><b>Google</b></div>

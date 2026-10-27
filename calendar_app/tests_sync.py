@@ -236,3 +236,71 @@ class LayerAndTargetTests(SyncTests):
         self.assertEqual((d.status, d.target, CalendarEvent.objects.count()), (FoundDeadline.ADDED, self.gc, 0))
         self.assertIn("⏰ Lieferung", [e["title"] for e in FakeRemote.store[self.gc.remote_id].values()])
         self.assertEqual(CalendarSettings.for_user(self.user).deadline_target, self.gc)   # запам'ятано
+
+
+class RoadmapAndFullViewTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        FakeRemote.store = {}
+        self.user = get_user_model().objects.create_user("anna", "a@x.y", "x", is_staff=True, is_superuser=True)
+        p = mock.patch("calendar_app.sync.client", side_effect=FakeRemote)
+        p.start()
+        self.addCleanup(p.stop)
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.get_or_create(pk=1)[0]
+        ss.is_onboarding_complete = True
+        ss.save()
+        self.client.force_login(self.user)
+
+    def steps(self, provider="google"):
+        req = mock.Mock(user=self.user)
+        r = next(x for x in sync.roadmap(req) if x["provider"] == provider)
+        return {s["key"]: s["state"] for s in r["steps"]}, r
+
+    def test_roadmap_progress(self):
+        st, r = self.steps()
+        self.assertEqual((st["keys"], st["account"]), ("current", "todo"))
+        s = CalendarSyncSettings.get()
+        s.google_client_id, s.google_client_secret = "id", "secret"
+        s.save()
+        self.assertEqual(self.steps()[0]["account"], "current")
+        acc = CalendarAccount.objects.create(user=self.user, provider="google", email="g@x.y")
+        sync.refresh_calendars(acc)
+        st, r = self.steps()
+        self.assertEqual((st["account"], st["calendars"], st["show"]), ("done", "done", "current"))
+        cal = acc.calendars.get()
+        self.client.post("/calendar/connections/sync/", {"action": "layer", "calendar": cal.pk})
+        st, r = self.steps()
+        self.assertEqual((st["show"], st["compare"], st["rules"]), ("done", "done", "current"))
+        self.assertEqual(r["first_shown"], cal)
+        page = self.client.get("/calendar/connections/")
+        self.assertContains(page, "Підключення по кроках")
+        self.assertContains(page, f"?only=r:{cal.pk}")
+        self.assertEqual(self.steps("microsoft")[0]["keys"], "current")
+
+    def test_full_view_sources_and_events(self):
+        acc = CalendarAccount.objects.create(user=self.user, provider="microsoft", email="o@x.y")
+        sync.refresh_calendars(acc)
+        cal = acc.calendars.get()
+        start = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0) + datetime.timedelta(days=1)
+        FakeRemote(acc).create(cal.remote_id, {"title": "Kunde ACME", "start": start,
+                                               "end": start + datetime.timedelta(hours=1), "all_day": False,
+                                               "location": "Teams", "description": "Agenda"})
+        CalendarEvent.objects.create(user=self.user, title="Minerva Termin", start_at=start)
+        r = self.client.get("/calendar/full/?only=r:%d" % cal.pk)
+        self.assertContains(r, "fullcalendar@6.1.15")
+        self.assertContains(r, '"id": "r:%d"' % cal.pk)
+        rng = {"start": (start - datetime.timedelta(days=2)).isoformat(),
+               "end": (start + datetime.timedelta(days=5)).isoformat()}
+        d = self.client.get("/calendar/full/events/", {**rng, "src": f"r:{cal.pk}"}).json()
+        self.assertEqual([e["title"] for e in d["events"]], ["Kunde ACME"])
+        self.assertEqual(d["events"][0]["extendedProps"]["location"], "Teams")
+        d = self.client.get("/calendar/full/events/", {**rng, "src": "minerva"}).json()
+        self.assertEqual([e["title"] for e in d["events"]], ["Minerva Termin"])
+        other = get_user_model().objects.create_user("bob", "b@x.y", "x", is_staff=True)
+        self.client.force_login(other)
+        d = self.client.get("/calendar/full/events/", {**rng, "src": f"r:{cal.pk}"}).json()
+        self.assertEqual(d["events"], [])   # чужий календар
+        self.assertEqual(self.client.get("/calendar/full/events/", {"start": rng["end"], "end": rng["start"],
+                                                                   "src": "minerva"}).status_code, 400)

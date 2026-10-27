@@ -207,7 +207,10 @@ class GoogleClient(_Base):
                 out.append({"id": e["id"], "title": e.get("summary") or "(без назви)", "start": s, "end": en,
                             "all_day": all_day, "location": e.get("location") or "",
                             "description": e.get("description") or "", "attendees": e.get("attendees") or [],
-                            "private": e.get("visibility") in ("private", "confidential")})
+                            "private": e.get("visibility") in ("private", "confidential"),
+                            "link": e.get("htmlLink") or "",
+                            "organizer": (e.get("organizer") or {}).get("displayName")
+                            or (e.get("organizer") or {}).get("email") or ""})
             token = data.get("nextPageToken")
             if not token:
                 return out
@@ -270,7 +273,9 @@ class GraphClient(_Base):
                 out.append({"id": e["id"], "title": e.get("subject") or "(без назви)", "start": s, "end": en,
                             "all_day": all_day, "location": (e.get("location") or {}).get("displayName") or "",
                             "description": e.get("bodyPreview") or "", "attendees": e.get("attendees") or [],
-                            "private": e.get("sensitivity") in ("private", "confidential")})
+                            "private": e.get("sensitivity") in ("private", "confidential"),
+                            "link": e.get("webLink") or "",
+                            "organizer": ((e.get("organizer") or {}).get("emailAddress") or {}).get("name") or ""})
             url, params = data.get("@odata.nextLink"), None
         return out
 
@@ -527,6 +532,7 @@ def page_context(request) -> dict:
         "rules": list(SyncRule.objects.filter(user=request.user).select_related("source__account", "target__account")),
         "rule_what": SyncRule.WHAT, "rule_modes": SyncRule.MODES,
         "preview": request.session.pop("cal_sync_preview", None),
+        "roadmap": roadmap(request),
     }
 
 
@@ -645,3 +651,116 @@ def sync_action(request):
         except SyncError as e:
             messages.error(request, f"❌ {e}")
     return back
+
+
+# ── дорожня карта підключення ───────────────────────────────────────────────
+ORIGINAL = {CalendarAccount.GOOGLE: "https://calendar.google.com/calendar/r/week",
+            CalendarAccount.MICROSOFT: "https://outlook.office.com/calendar/view/week"}
+
+
+def roadmap(request) -> list[dict]:
+    """Кроки підключення Google і Outlook: done / current / todo — лише читає базу.
+    [{provider, label, steps: [{key, title, state, detail}], done, total, current}]"""
+    user = request.user
+    out = []
+    for provider, label in CalendarAccount.PROVIDERS:
+        accounts = [a for a in CalendarAccount.objects.filter(user=user, provider=provider)
+                    .prefetch_related("calendars")]
+        cals = [c for a in accounts for c in a.calendars.all()]
+        shown = [c for c in cals if c.show_in_minerva]
+        ok_layer = [c for c in shown if c.layer_fetched_at and not c.layer_error]
+        rules = SyncRule.objects.filter(user=user, enabled=True).filter(
+            models_q(source__account__provider=provider) | models_q(target__account__provider=provider))
+        steps = [
+            ("keys", "Ключі застосунку", configured(provider),
+             "внесено" if configured(provider) else "адміністратор створює застосунок і вносить ключі"),
+            ("account", "Вхід в акаунт", bool(accounts) and not any(a.last_error for a in accounts),
+             ", ".join(a.email for a in accounts) or "натисніть «＋» і увійдіть"),
+            ("calendars", "Календарі отримано", bool(cals), f"{len(cals)} календарів" if cals else "ще немає"),
+            ("show", "Показати в Minerva", bool(shown), ", ".join(c.name for c in shown) or "виберіть календарі «👁»"),
+            ("compare", "Звірити з оригіналом", bool(ok_layer),
+             f"подій отримано · {timezone.localtime(ok_layer[0].layer_fetched_at):%d.%m %H:%M}" if ok_layer
+             else (shown[0].layer_error if shown and shown[0].layer_error else "відкрийте повний календар поруч з оригіналом")),
+            ("rules", "Звести в один (правила)", rules.exists(),
+             f"правил: {rules.count()}" if rules.exists() else "за бажанням — після звірки"),
+        ]
+        items, current = [], None
+        for key, title, done, detail in steps:
+            state = "done" if done else ("current" if current is None else "todo")
+            if state == "current":
+                current = key
+            items.append({"key": key, "title": title, "state": state, "detail": detail})
+        done = sum(1 for i in items if i["state"] == "done")
+        out.append({"provider": provider, "label": label, "steps": items, "done": done, "total": len(items),
+                    "current": current, "original": ORIGINAL[provider],
+                    "first_shown": shown[0] if shown else None, "calendars": cals})
+    return out
+
+
+def models_q(**kw):
+    from django.db.models import Q
+    return Q(**kw)
+
+
+# ── повний календар: події джерела за діапазон ──────────────────────────────
+def view_events(user, src: str, start, end) -> tuple[list[dict], str]:
+    """(події FullCalendar, помилка) для джерела: "minerva", "r:<pk>" (наживо з Google / Outlook, кеш 2 хв),
+    "f:<pk>" (підписка iCal, з копії)."""
+    from django.core.cache import cache
+    from .models import CalendarFeed, ExternalEvent
+    if src == "minerva":
+        return [{"id": f"m{e.pk}", "title": e.title, "start": e.start_at.isoformat(),
+                 "end": e.end_at.isoformat() if e.end_at else None, "allDay": e.all_day,
+                 "extendedProps": {"description": e.description or "", "type": e.get_event_type_display(),
+                                   "link": f"/admin/calendar_app/calendarevent/{e.pk}/change/", "done": e.is_done}}
+                for e in CalendarEvent.objects.filter(user=user, start_at__gte=start, start_at__lt=end)], ""
+    kind, _, pk = src.partition(":")
+    if kind == "f":
+        feed = CalendarFeed.objects.filter(pk=pk or 0, user=user).first()
+        if feed is None:
+            return [], "немає такої підписки"
+        return [_fc(e.uid, e.title, e.start_at, e.end_at, e.all_day, e.location) for e in
+                ExternalEvent.objects.filter(feed=feed, start_at__gte=start, start_at__lt=end)], feed.last_error
+    cal = RemoteCalendar.objects.filter(pk=pk or 0, account__user=user).select_related("account").first()
+    if cal is None:
+        return [], "немає такого календаря"
+    key = f"calview:{cal.pk}:{start:%Y%m%d%H}:{end:%Y%m%d%H}"
+    cached = cache.get(key)
+    if cached is not None:
+        return cached, ""
+    try:
+        items = [_fc(e["id"], ("🔒 " if e.get("private") else "") + e["title"], e["start"], e.get("end"), e["all_day"],
+                     e.get("location", ""), e.get("description", ""), e.get("link", ""), e.get("organizer", ""),
+                     len(e.get("attendees") or []))
+                 for e in client(cal.account).events(cal.remote_id, start, end)]
+    except SyncError as err:   # недоступний — з копії шару, якщо є
+        items = [_fc(e.uid, e.title, e.start_at, e.end_at, e.all_day, e.location) for e in
+                 ExternalEvent.objects.filter(remote=cal, start_at__gte=start, start_at__lt=end)]
+        return items, f"{err} — показано збережену копію" if items else str(err)
+    cache.set(key, items, 120)
+    return items, ""
+
+
+def _fc(uid, title, start, end, all_day, location="", description="", link="", organizer="", attendees=0) -> dict:
+    if all_day:
+        s = timezone.localtime(start).date().isoformat()
+        e = timezone.localtime(end).date().isoformat() if end else None
+    else:
+        s, e = start.isoformat(), end.isoformat() if end else None
+    return {"id": uid, "title": title, "start": s, "end": e, "allDay": all_day,
+            "extendedProps": {"location": location, "description": (description or "")[:1500], "link": link,
+                              "organizer": organizer, "attendees": attendees}}
+
+
+def sources(user) -> list[dict]:
+    """Джерела повного календаря: Minerva, підключені календарі, підписки iCal."""
+    from .models import CalendarFeed
+    out = [{"id": "minerva", "name": "Minerva", "color": "#1a73e8", "group": "Minerva"}]
+    for c in RemoteCalendar.objects.filter(account__user=user).select_related("account") \
+            .order_by("account__provider", "-primary", "name"):
+        out.append({"id": f"r:{c.pk}", "name": c.name, "color": c.color or "#8e24aa",
+                    "group": f"{c.account.get_provider_display()} · {c.account.email}",
+                    "original": ORIGINAL.get(c.account.provider, "")})
+    for f in CalendarFeed.objects.filter(user=user):
+        out.append({"id": f"f:{f.pk}", "name": f.name, "color": f.color, "group": "Підписки iCal"})
+    return out

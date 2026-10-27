@@ -639,3 +639,29 @@ def _sync_context(request):
         return sync.page_context(request)
     except ImportError:
         return {}
+
+
+@staff_member_required
+def full_view(request):
+    """🗓 Повний календар у форматі Google / Outlook: день, тиждень, місяць, список; джерела — Minerva, підключені
+    календарі (наживо), підписки iCal. ?only=r:<pk> — лише один календар, щоб звірити з оригіналом."""
+    from calendar_app import sync
+    srcs = sync.sources(request.user)
+    return render(request, 'calendar_app/full.html', {
+        'title': '🗓 Повний календар', 'sources': srcs, 'only': request.GET.get('only', ''),
+        'is_nav_sidebar_enabled': True,
+    })
+
+
+@staff_member_required
+@require_GET
+def full_events(request):
+    from django.utils.dateparse import parse_datetime
+    from calendar_app import sync
+    start, end = parse_datetime(request.GET.get('start', '')), parse_datetime(request.GET.get('end', ''))
+    if not start or not end or end <= start or (end - start).days > 62:
+        return JsonResponse({'events': [], 'error': 'неправильний період'}, status=400)
+    if timezone.is_naive(start):
+        start, end = timezone.make_aware(start), timezone.make_aware(end)
+    events, error = sync.view_events(request.user, request.GET.get('src', ''), start, end)
+    return JsonResponse({'events': events, 'error': error})
