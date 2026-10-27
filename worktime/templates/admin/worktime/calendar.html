@@ -1,0 +1,220 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a> ›
+  ⏱ {% trans "Робочий час" %} › {% trans "Календар" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.wt-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:4px 0 14px}
+.wt-bar .help,.wt-muted{color:var(--text-muted,#888);font-size:12px}
+.wt-nav{display:flex;align-items:center;gap:6px}
+.wt-nav a{padding:3px 10px;border:1px solid var(--border-strong,#ccc);border-radius:14px;text-decoration:none}
+.wt-nav b{font-size:16px;min-width:140px;text-align:center}
+.wt-card{border:1px solid var(--border-strong,#ccc);border-radius:10px;background:var(--bg-card,transparent);padding:12px 14px;margin-bottom:14px}
+.wt-card h3{margin:0 0 8px;font-size:14px}
+.wt-warn{border-color:#d97706;background:rgba(245,158,11,.08)}
+.wt-clock{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.wt-clock .big{font-size:15px;font-weight:600}
+.wt-totals{display:flex;flex-wrap:wrap;gap:18px;margin:0 0 10px;font-size:13px}
+.wt-totals b{font-size:15px}
+.wt-scroll{overflow-x:auto}
+.wt-grid{display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));gap:6px;min-width:840px}
+.wt-wd{font-size:12px;color:var(--text-muted,#888);text-align:center;padding:2px 0}
+.wt-day{border:1px solid var(--border,#ddd);border-radius:8px;padding:6px 7px;min-height:92px;font-size:12px;background:var(--bg-card,transparent);position:relative}
+.wt-day.out{opacity:.25}
+.wt-day .n{font-weight:600;font-size:13px}
+.wt-day.today{box-shadow:0 0 0 2px #1a73e8 inset}
+.wt-day.filled{border-color:rgba(34,197,94,.6);background:rgba(34,197,94,.10)}
+.wt-day.empty{border:1px dashed #ef4444;background:rgba(239,68,68,.06)}
+.wt-day.absent{border-color:rgba(245,158,11,.6);background:rgba(245,158,11,.10)}
+.wt-day.off{opacity:.55}
+.wt-day.future{opacity:.6}
+.wt-t{display:block;font-variant-numeric:tabular-nums}
+.wt-sum{position:absolute;top:6px;right:7px;font-weight:600;color:#16a34a}
+.wt-lbl{display:block;margin-top:2px}
+.wt-empty-lbl{color:#ef4444}
+.wt-act{display:block;margin-top:3px;color:var(--text-muted,#888);font-size:11px}
+.wt-day details{margin-top:4px}
+.wt-day details summary{cursor:pointer;color:var(--text-muted,#888);font-size:11px;list-style:none}
+.wt-day details form{display:flex;flex-direction:column;gap:3px;margin-top:3px}
+.wt-day input[type=time]{width:100%;font-size:12px;padding:1px 2px}
+.wt-fill{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.wt-fill label{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.wt-fill .modes{display:flex;flex-direction:column;gap:4px;font-size:13px}
+.wt-plan{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+.wt-plan th,.wt-plan td{padding:5px 8px;border-bottom:1px solid var(--border,#eee);text-align:left}
+.wt-plan tr.no td{color:var(--text-muted,#888)}
+.wt-plan .w{color:#d97706}
+.wt-legend span{display:inline-block;padding:1px 8px;border-radius:8px;margin-right:4px;font-size:11px;border:1px solid var(--border,#ddd)}
+.wt-legend .filled{background:rgba(34,197,94,.15)}
+.wt-legend .empty{border:1px dashed #ef4444}
+.wt-legend .absent{background:rgba(245,158,11,.15)}
+@media (max-width:700px){.wt-nav b{min-width:0}.wt-fill{flex-direction:column;align-items:stretch}}
+</style>
+
+{% if not st.configured %}
+  <div class="wt-card wt-warn">
+    <h3>🔌 {% trans "askDANTE ще не підключено" %}</h3>
+    <p>{% trans "Вставте API-Key (askDANTE → Einstellungen → Schnittstellen → Rest API) у налаштуваннях, увімкніть і завантажте працівників." %}</p>
+    <a class="button" href="{{ settings_url }}">⚙️ {% trans "Налаштування askDANTE" %}</a>
+  </div>
+{% elif not du %}
+  <div class="wt-card wt-warn">
+    <h3>👤 {% trans "Немає працівника askDANTE для вас" %}</h3>
+    {% if is_manager %}
+      <p>{% trans "Завантажте працівників з askDANTE в налаштуваннях і прив'яжіть користувача Minerva (за email це робиться саме)." %}</p>
+      <a class="button" href="{{ settings_url }}">⚙️ {% trans "Налаштування" %}</a>
+      <a class="button" href="{{ users_url }}">👥 {% trans "Працівники askDANTE" %}</a>
+    {% else %}
+      <p>{% trans "Попросіть адміністратора прив'язати ваш обліковий запис Minerva до працівника askDANTE." %}</p>
+    {% endif %}
+  </div>
+{% else %}
+
+<div class="wt-bar">
+  {% if people|length > 1 %}
+  <select onchange="location.href='?m={{ cur_m }}&u='+this.value">
+    {% for p in people %}<option value="{{ p.pk }}" {% if p.pk == du.pk %}selected{% endif %}>{{ p }}{% if p.archived %} ({% trans "архів" %}){% endif %}</option>{% endfor %}
+  </select>
+  {% else %}<b>👤 {{ du }}</b>{% endif %}
+  <span class="wt-nav">
+    <a href="?u={{ du.pk }}&m={{ prev_m }}" title="{% trans "Попередній місяць" %}">‹</a>
+    <b>{{ month_label }}</b>
+    {% if next_m %}<a href="?u={{ du.pk }}&m={{ next_m }}" title="{% trans "Наступний місяць" %}">›</a>{% endif %}
+  </span>
+  <span class="wt-legend">
+    <span class="filled">{% trans "є записи" %}</span><span class="empty">{% trans "порожньо" %}</span><span class="absent">{% trans "відсутність" %}</span>
+  </span>
+  <span class="help">{% trans "дані askDANTE читаються при відкритті сторінки" %} · <a href="{{ settings_url }}">⚙️</a></span>
+</div>
+
+{% if not st.enabled %}
+  <div class="wt-card wt-warn">{% trans "askDANTE вимкнено в налаштуваннях — показано збережені дані, записувати не можна." %}</div>
+{% endif %}
+{% if error %}<div class="wt-card wt-warn">⚠️ {{ error }}</div>{% endif %}
+
+{% if st.enabled %}
+<div class="wt-card">
+  <form method="post" class="wt-clock" onsubmit="this.querySelectorAll('button').forEach(function(b){b.disabled=true})">
+    {% csrf_token %}
+    <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="m" value="{{ cur_m }}">
+    {% if open_since %}
+      <span class="big">▶ {% trans "Прийшов о" %} {{ open_since|time:"H:i" }}</span>
+      <span class="wt-muted">{% trans "минуло" %} {{ open_duration }}</span>
+      <button class="button default" name="action" value="clock_out">⏹ {% trans "Пішов — записати в askDANTE" %}</button>
+      <button class="button" name="action" value="clock_cancel" onclick="return confirm('{% trans "Скасувати відмітку «Прийшов»? В askDANTE нічого не записано." %}')">✖ {% trans "Скасувати" %}</button>
+    {% else %}
+      <button class="button default" name="action" value="clock_in">▶ {% trans "Прийшов" %}</button>
+      <span class="wt-muted">{% trans "askDANTE приймає лише готовий запис, тож він піде, коли натиснете «Пішов». Через північ — два записи." %}</span>
+    {% endif %}
+  </form>
+</div>
+{% endif %}
+
+<div class="wt-totals">
+  <span>{% trans "Відпрацьовано" %}: <b>{{ totals.hours }}</b></span>
+  <span>{% trans "Днів із записами" %}: <b>{{ totals.worked }}</b></span>
+  <span>{% trans "Порожніх робочих днів" %}: <b style="color:{% if totals.empty %}#ef4444{% else %}inherit{% endif %}">{{ totals.empty }}</b></span>
+  <span>{% trans "Відсутностей" %}: <b>{{ totals.absent }}</b></span>
+</div>
+
+<div class="wt-scroll">
+<div class="wt-grid">
+  {% for w in weekdays %}<div class="wt-wd">{{ w }}</div>{% endfor %}
+  {% for week in weeks %}{% for c in week %}
+  <div class="wt-day {% if not c.in_month %}out{% else %}{{ c.kind }}{% endif %}{% if c.today %} today{% endif %}">
+    <span class="n">{{ c.date.day }}</span>
+    {% if c.in_month %}
+      {% if c.minutes %}<span class="wt-sum" title="{% trans "Разом за день в askDANTE" %}">{{ c.dur }}</span>{% endif %}
+      {% for t in c.times %}<span class="wt-t">{{ t.coming }}–{{ t.leaving|default:"…" }}</span>{% endfor %}
+      {% if c.kind == "empty" and c.date < today %}<span class="wt-lbl wt-empty-lbl">{% trans "порожньо" %}</span>
+      {% elif c.label %}<span class="wt-lbl">{{ c.label }}</span>{% endif %}
+      {% if c.activity %}<span class="wt-act" title="{% trans "Перша й остання дія в Minerva · кількість дій" %}">👣 {{ c.activity }}</span>{% endif %}
+      {% if st.enabled and c.kind != "future" %}
+      <details>
+        <summary>＋ {% trans "записати" %}</summary>
+        <form method="post" onsubmit="this.querySelector('button').disabled=true">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="book"><input type="hidden" name="u" value="{{ du.pk }}">
+          <input type="hidden" name="m" value="{{ cur_m }}"><input type="hidden" name="date" value="{{ c.date|date:"Y-m-d" }}">
+          <input type="time" name="start" value="{{ def_start }}" required>
+          <input type="time" name="stop" value="{{ def_stop }}" required>
+          <button class="button" type="submit">✓ {% trans "в askDANTE" %}</button>
+        </form>
+      </details>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endfor %}{% endfor %}
+</div>
+</div>
+<p class="wt-muted">{% trans "Справа вгорі — години за день в askDANTE. 👣 — перша й остання дія в Minerva (журнал дій і надіслані листи) і кількість дій." %}</p>
+
+{% if st.enabled %}
+<div class="wt-card" id="fill">
+  <h3>🧩 {% trans "Заповнити пропуски" %}</h3>
+  <p class="wt-muted">{% trans "Спершу перегляд: Minerva заново читає askDANTE і показує, що поставить у кожен день. Записується лише в робочі дні без жодного запису, відпустки, лікарняного чи свята." %}</p>
+  <form method="get" action="#fill" class="wt-fill">
+    <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="m" value="{{ cur_m }}">
+    <label>{% trans "Від" %}<input type="date" name="fill_from" value="{{ fill_from|date:"Y-m-d" }}" required></label>
+    <label>{% trans "До" %}<input type="date" name="fill_to" value="{{ fill_to|date:"Y-m-d" }}" max="{{ today|date:"Y-m-d" }}" required></label>
+    <div class="modes">
+      <label style="flex-direction:row;gap:6px"><input type="radio" name="mode" value="fixed" {% if fill_mode != "activity" %}checked{% endif %}> {% trans "Стандартний день" %}</label>
+      <label style="flex-direction:row;gap:6px"><input type="radio" name="mode" value="activity" {% if fill_mode == "activity" %}checked{% endif %}> {% trans "За активністю в Minerva" %}</label>
+    </div>
+    <label>{% trans "Прихід" %}<input type="time" name="start" value="{{ fill_start|default:def_start }}"></label>
+    <label>{% trans "Відхід" %}<input type="time" name="stop" value="{{ fill_stop|default:def_stop }}"></label>
+    <label style="flex-direction:row;gap:6px;align-items:center"><input type="checkbox" name="fallback" value="1" {% if fill_fallback %}checked{% endif %}> {% trans "без активності — стандартний день" %}</label>
+    <button class="button" type="submit">👁 {% trans "Переглянути" %}</button>
+  </form>
+
+  {% if fill_error %}<p style="color:#ef4444;margin-top:10px">⚠️ {{ fill_error }}</p>{% endif %}
+
+  {% if plan %}
+  <form method="post" id="wt-plan-form">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="fill"><input type="hidden" name="u" value="{{ du.pk }}">
+    <input type="hidden" name="m" value="{{ cur_m }}">
+    <input type="hidden" name="fill_from" value="{{ fill_from|date:"Y-m-d" }}"><input type="hidden" name="fill_to" value="{{ fill_to|date:"Y-m-d" }}">
+    <input type="hidden" name="mode" value="{{ fill_mode }}"><input type="hidden" name="start" value="{{ fill_start }}">
+    <input type="hidden" name="stop" value="{{ fill_stop }}"><input type="hidden" name="fallback" value="{% if fill_fallback %}1{% endif %}">
+    {% if plan_attendance_error %}<p class="w" style="color:#d97706">⚠️ {% trans "Свята й відпустки askDANTE не прочитано" %} ({{ plan_attendance_error }}) — {% trans "перевірте дні вручну." %}</p>{% endif %}
+    <table class="wt-plan">
+      <tr><th><input type="checkbox" checked onclick="document.querySelectorAll('.wt-pick:not([disabled])').forEach(function(c){c.checked=this.checked}.bind(this));wtCount()"></th>
+          <th>{% trans "Дата" %}</th><th>{% trans "Буде записано" %}</th><th>{% trans "Підстава / чому ні" %}</th></tr>
+      {% for p in plan %}
+      <tr class="{% if not p.book %}no{% endif %}">
+        <td><input type="checkbox" class="wt-pick" name="dates" value="{{ p.date|date:"Y-m-d" }}" {% if p.book %}checked{% else %}disabled{% endif %} onchange="wtCount()"></td>
+        <td>{{ p.date|date:"D d.m.Y" }}</td>
+        <td>{% if p.book %}<b>{{ p.start|time:"H:i" }}–{{ p.stop|time:"H:i" }}</b>{% else %}—{% endif %}</td>
+        <td>{{ p.reason }}{% for w in p.warnings %} <span class="w">⚠️ {{ w }}</span>{% endfor %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p style="margin-top:10px">
+      {% if plan_book %}
+      {% trans "Буде записано днів" %}: <b id="wt-count">{{ plan_book }}</b> · {% trans "разом" %} {{ plan_minutes }}
+      <button class="button default" type="submit" style="margin-left:10px">✅ {% trans "Записати в askDANTE" %}</button>
+      {% else %}✅ {% trans "У цьому періоді немає порожніх робочих днів — записувати нічого." %}<span id="wt-count" hidden>0</span>{% endif %}
+    </p>
+  </form>
+  <script>
+  function wtCount(){document.getElementById('wt-count').textContent=document.querySelectorAll('.wt-pick:checked').length}
+  document.getElementById('wt-plan-form').addEventListener('submit',function(e){
+    var n=document.querySelectorAll('.wt-pick:checked').length;
+    if(!n){e.preventDefault();return}
+    if(!confirm('{% trans "Записати в askDANTE днів" %}: '+n+'?\n\n{% trans "Через API askDANTE записи не виправляються й не видаляються — помилку доведеться правити в askDANTE." %}')){e.preventDefault();return}
+    this.querySelector('button[type=submit]').disabled=true;
+  });
+  </script>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

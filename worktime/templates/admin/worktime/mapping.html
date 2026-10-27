@@ -1,0 +1,93 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a> ›
+  ⏱ {% trans "Робочий час" %} › {% trans "Проєкти askDANTE ↔ Minerva" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.pm-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:4px 0 14px}
+.pm-bar .help,.pm-muted{color:var(--text-muted,#888);font-size:12px}
+.pm-tabs a{padding:4px 10px;border-radius:14px;border:1px solid var(--border-strong,#ccc);text-decoration:none;font-size:12px;margin-right:4px}
+.pm-tabs a.on{background:#1a73e8;color:#fff;border-color:#1a73e8}
+.pm-card{border:1px solid var(--border-strong,#ccc);border-radius:10px;background:var(--bg-card,transparent);padding:12px 14px;margin-bottom:14px}
+.pm-warn{border-color:#d97706;background:rgba(245,158,11,.08)}
+.pm-scroll{overflow-x:auto}
+.pm-table{width:100%;border-collapse:collapse;font-size:13px;min-width:760px}
+.pm-table th,.pm-table td{padding:6px 8px;border-bottom:1px solid var(--border,#eee);text-align:left;vertical-align:middle}
+.pm-table select{max-width:320px}
+.pm-sg{display:inline-block;font-size:12px;padding:2px 8px;border-radius:8px;background:rgba(59,130,246,.12);color:#3b82f6}
+.pm-ok{color:#16a34a}
+.pm-chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:8px;border:1px solid var(--border,#ddd);margin:2px 4px 2px 0}
+</style>
+
+<div class="pm-card">
+  {% blocktrans %}askDANTE лишається своїм довідником — там уже є проєкти й дані, Minerva їх не змінює. Тут лише вказується, у який проєкт askDANTE піде час кожного проєкту Minerva (згодом — автоматичний облік часу на листування й роботу над проєктом). Кілька проєктів Minerva можуть писати в один проєкт askDANTE. Підказки нічого не зберігають, поки ви не натиснете ✓.{% endblocktrans %}
+</div>
+
+{% if not dante %}
+  <div class="pm-card pm-warn">
+    {% trans "Проєкти askDANTE ще не завантажено." %}
+    <a class="button" href="{{ settings_url }}">⚙️ {% trans "Налаштування → «Завантажити працівників, проєкти й види робіт»" %}</a>
+  </div>
+{% endif %}
+
+<div class="pm-bar">
+  <span class="pm-tabs">
+    <a href="?show=open" class="{% if show != 'all' %}on{% endif %}">{% trans "Відкриті проєкти Minerva" %}</a>
+    <a href="?show=all" class="{% if show == 'all' %}on{% endif %}">{% trans "Усі" %}</a>
+  </span>
+  <span class="help">{% if st.last_sync_at %}{% trans "Довідник askDANTE оновлено" %} {{ st.last_sync_at|date:"d.m.Y H:i" }}{% endif %} · <a href="{{ settings_url }}">⚙️</a></span>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="pm-scroll">
+  <table class="pm-table">
+    <tr><th>{% trans "Проєкт Minerva" %}</th><th>{% trans "Клієнт" %}</th><th>{% trans "Підказка" %}</th><th>{% trans "Проєкт askDANTE" %}</th>{% if can_edit %}<th></th>{% endif %}</tr>
+    {% for r in rows %}
+    <tr>
+      <td><a href="{% url 'admin:projects_project_change' r.project.pk %}" target="_blank"><b>{{ r.project.code }}</b> {{ r.project.name }}</a>
+          <div class="pm-muted">{{ r.project.get_status_display }}</div></td>
+      <td>{{ r.project.customer|default:"—" }}</td>
+      <td>
+        {% if r.link %}<span class="pm-ok">✓ {% trans "прив'язано" %}</span>
+        {% elif r.suggestion %}
+          <span class="pm-sg" title="{{ r.suggestion.1 }}">{{ r.suggestion.0 }} · {{ r.suggestion.1 }}</span>
+          {% if can_edit %}<input type="hidden" name="suggest_{{ r.project.pk }}" value="{{ r.suggestion.0.pk }}">
+          <button class="button" name="accept" value="{{ r.project.pk }}" title="{% trans "Прийняти підказку" %}">✓</button>{% endif %}
+        {% else %}<span class="pm-muted">—</span>{% endif %}
+      </td>
+      <td>
+        {% if can_edit %}
+        <select name="map_{{ r.project.pk }}">
+          <option value="">— {% trans "не прив'язано" %} —</option>
+          {% for d in usable %}<option value="{{ d.pk }}" {% if r.link and r.link.dante_project_id == d.pk %}selected{% endif %}>{% if d.parent %}{{ d.parent.name }} › {% endif %}{{ d }}{% if d.customer_name %} · {{ d.customer_name }}{% endif %}</option>{% endfor %}
+        </select>
+        {% else %}{{ r.link.dante_project|default:"—" }}{% endif %}
+      </td>
+      {% if can_edit %}
+      <td>{% if not r.link %}<button class="button" name="create" value="{{ r.project.pk }}"
+             onclick="return confirm('{% trans "Створити в askDANTE новий проєкт" %} «{{ r.project.code|escapejs }} {{ r.project.name|escapejs }}» {% trans "і прив'язати?" %}')"
+             title="{% trans "Створити такий проєкт в askDANTE" %}">➕ askDANTE</button>{% endif %}</td>
+      {% endif %}
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" class="pm-muted">{% trans "Проєктів Minerva немає." %}</td></tr>
+    {% endfor %}
+  </table>
+  </div>
+  {% if can_edit and rows %}<p><button class="button default" type="submit">💾 {% trans "Зберегти зв'язки" %}</button></p>{% endif %}
+</form>
+
+{% if unlinked_dante %}
+<div class="pm-card">
+  <b>{% trans "Проєкти askDANTE без проєкту Minerva" %}</b> <span class="pm-muted">({{ unlinked_dante|length }}) — {% trans "це нормально: не кожен проєкт askDANTE має бути в Minerva." %}</span>
+  <div style="margin-top:6px">{% for d in unlinked_dante %}<span class="pm-chip">{{ d }}{% if d.customer_name %} · {{ d.customer_name }}{% endif %}</span>{% endfor %}</div>
+</div>
+{% endif %}
+{% endblock %}

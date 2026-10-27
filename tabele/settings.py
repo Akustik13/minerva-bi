@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'rag_assistant',    # 📚 Помічник по продукції + база знань для RAG (ПІСЛЯ email_assistant і projects:
                         #    сигнал журналу бачить уже категорію, клієнта й проєкти листа)
     'calendar_app',     # 📅 Календар
+    'worktime',         # ⏱ Робочий час — askDANTE (прийшов / пішов, проєкти)
     'bots',             # 🤖 Боти та AI
     'jlcpcb',           # 🔬 JLCPCB виробництво
     'documents',        # 📄 Документи

@@ -52,7 +52,8 @@ ROLE_DEFAULTS = {
     },
     'manager': {
         'modules': ['crm', 'strategy', 'sales', 'shipping', 'dashboard', 'tasks',
-                    'email_assistant', 'projects', 'offers', 'calendar_app', 'faq', 'labels_app', 'documents'],
+                    'email_assistant', 'projects', 'offers', 'calendar_app', 'worktime', 'faq', 'labels_app',
+                    'documents'],
         'can_delete': False,
         'can_export': True,
         'can_import': False,

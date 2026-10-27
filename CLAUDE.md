@@ -340,6 +340,23 @@ tabele_mvp/
 - **Тести:** `python manage.py test offers --settings=tabele.settings_test`. Локально потрібні `docxtpl` і `python-docx` з `requirements.txt`.
 - ⚠️ `.gitignore` ігнорує `*.json` і `test_*.py`: тестові модулі називати `tests*.py`, JSON — додавати винятком.
 
+### worktime/ — робочий час askDANTE (прийшов / пішов, проєкти)
+- **askDANTE — головний облік часу** (Arbeitszeiterfassung, зарплата), Minerva — пульт: читає дні й дописує лише туди, де порожньо. REST API askDANTE: https://my.askdante.com/rest-api/index.html; ключ `apiAuthenticationToken` (askDANTE → Einstellungen → Schnittstellen → Rest API) вставляє користувач у «⚙️ Налаштування askDANTE» (поле-пароль). Ключ іде заголовком, при 401/403 — параметром адреси (`DanteSettings.key_in_query`); в повідомленнях про помилки адреси з ключем немає.
+- ⚠️ **Записи askDANTE через API не виправляються й не видаляються** і окремих «Kommen»/«Gehen» немає: `POST /timetracking/{userId}` приймає лише готовий запис (дата + `HH:mm` початок і кінець; 00:00 = кінець доби). Тому перед кожним записом — свіже читання дня (`refresh_days`), рішення приймає сервер, а не браузер.
+- Формат askDANTE знає лише `worktime/client.py` (`DanteClient`: users / projects з підпроєктами / activities, `working_time` — JSON до 100 днів, `attendances` — XML до 31 дня за `login` або `personnelNumber`, `track`, `create_project`).
+- Логіка — лише `worktime/services.py`:
+  - `sync_directory` — працівники (прив'язка до користувача Minerva за email), проєкти, види робіт;
+  - `refresh_days` → кеш `WorkDay` (записи, `planned_state`, відсутності); `Days.attendance_error` — свята й відпустки не прочитано;
+  - `day_blocker` / `propose` — що поставити в день: лише робочий день (`DanteSettings.workdays` І план askDANTE), без записів, відпустки, лікарняного, свята; часткова відсутність — вручну; режими `fixed` (стандартний день, свій час працівника `DanteUser.start/stop`) і `activity` (перша й остання дія в Minerva: `AuditLog` + надіслані листи, округлення, мінімум активності; без активності — пропуск або `activity_fallback`); попередження: понад 10 год, не прочитано свята;
+  - `fill` (людина підтвердила дні в перегляді) і `autofill` (cron, лише працівники з `DanteUser.autofill`, від `autofill_since`, до вчора; дні з попередженнями — на перевірку, не пишуться); після «невідомо, чи записано» (тайм-аут) далі не пише;
+  - `book_day` — ручний інтервал без перекриття наявних; `clock_in` / `clock_out` / `clock_cancel` — «Прийшов» запам'ятовується в `DanteUser.open_since`, «Пішов» пише запис (через північ — два, після кожного успішного `open_since` зсувається; понад 16 год — лише вручну);
+  - `lock` — атомарний UPDATE `DanteUser.busy_until`: один запис на працівника одночасно (подвійне натискання).
+- Журнал усього, що Minerva записала чи пробувала — `Booking` (джерело manual / fill / auto / clock, помилка askDANTE).
+- Проєкти: askDANTE лишається своїм довідником (`DanteProject` — копія, `gone` — зник), `ProjectMap` — проєкт Minerva → проєкт askDANTE (кілька проєктів Minerva можуть писати в один). Підказки без збереження — `worktime/mapping.py` (`suggest`: код P-…, та сама назва, клієнт, схожа назва), «➕ askDANTE» створює проєкт «P-… Назва» з `referenceNumber` = код. Запис часу на проєкти й автообліку листування ще немає (наступний етап; `Booking.kind=project` і `DanteActivity` закладено).
+- Адмінка: «📅 Календар робочого часу» = список `WorkDay` (`/admin/worktime/workday/`, шаблон `admin/worktime/calendar.html`: місяць, 👣 активність, «Прийшов / Пішов», ручний запис дня, «🧩 Заповнити пропуски» — GET-перегляд, POST-запис з підтвердженням); адміністратор бачить усіх, інший — лише свого працівника (`services.users_for`; роль manager має модуль `worktime`). «📁 Проєкти askDANTE ↔ Minerva» = список `DanteProject` (`admin/worktime/mapping.html`). Налаштування: «🔌 Перевірити зв'язок», «🔄 Завантажити працівників…», «🧪 Що записалось би зараз».
+- Cron: `worktime_autofill --if-due` (раз на добу після `autofill_hour`, лише коли увімкнено). Меню — група «⏱ Робочий час».
+- Тести: `python manage.py test worktime --settings=tabele.settings_test` (askDANTE імітується).
+
 ### faq/ (placeholder, no DB)
 - `models.py`: `managed = False`
 - `admin.py`: override `get_urls()` → тільки `info_view`
