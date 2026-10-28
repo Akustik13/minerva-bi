@@ -28,14 +28,16 @@ def forwarded(body):
         return None
     if FORWARD_RE.match(lines[i]):
         i += 1
-    headers = {}
-    while i < len(lines):
+    headers, end = {}, i
+    while i < len(lines):   # заголовки, між якими можуть бути порожні рядки; перший інший рядок — текст листа
         m = HEADER_RE.match(lines[i])
         if m:
             headers.setdefault(m.group(1).lower(), m.group(2).strip())
-        elif lines[i].strip() or headers:
+            end = i + 1
+        elif lines[i].strip():
             break
         i += 1
+    i = end
     sender = next((headers[h] for h in SENDER_HEADERS if h in headers), "")
     address = ADDRESS_RE.search(sender)
     if not address:
@@ -43,6 +45,30 @@ def forwarded(body):
     return {"from": address.group(0).lower(), "name": sender.split("<")[0].strip(' "\''),
             "subject": next((headers[h] for h in SUBJECT_HEADERS if h in headers), ""),
             "text": new_text("\n".join(lines[i:]))}
+
+
+SIGN_OFF_RE = re.compile(r"^\s*(?:best\s+regards?|kind\s+regards|warm\s+regards|regards|sincerely|cheers|"
+                         r"mit\s+freundlichen\s+grüßen|freundliche\s+grüße|viele\s+grüße|beste\s+grüße|"
+                         r"з\s+повагою|с\s+уважением)\b[\s,.!]*$", re.IGNORECASE)
+CONTACT_LINE_RE = re.compile(r"^\s*(?:tel|phone|fon|mob|mobile|cell|fax|e-?mail|mail|web|www|http|skype|whatsapp)\b",
+                             re.IGNORECASE)
+
+
+def signature(text) -> dict:
+    """Підпис відправника внизу листа: рядки після «--» або після прощання («Best regards,» окремим рядком).
+    → {lines: адреса (без телефонів / email / сайтів), name: ім'я з першого рядка («Denys R. - supply manager …»)}."""
+    lines = [ln.strip() for ln in (text or "").splitlines()]
+    start = next((i + 1 for i in range(len(lines) - 1, -1, -1) if lines[i] in ("--", "—", "-- ")), None)
+    if start is None:
+        start = next((i + 1 for i in range(len(lines) - 1, -1, -1) if SIGN_OFF_RE.match(lines[i])), None)
+    if start is None:
+        return {"lines": [], "name": ""}
+    out = [ln for ln in lines[start:] if ln and not SIGN_OFF_RE.match(ln) and len(ln) <= 120][:8]
+    address = [ln for ln in out if not CONTACT_LINE_RE.match(ln) and "@" not in ln]
+    name = re.split(r"\s+[-–|,]\s+", address[0])[0] if address else ""
+    if not 2 < len(name) <= 60:
+        return {"lines": address, "name": ""}
+    return {"lines": address[1:] or address, "name": name}   # ім'я — окремо (контактна особа), далі — фірма й адреса
 
 
 def new_text(body) -> str:

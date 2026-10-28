@@ -591,11 +591,15 @@ def quick_prefill(thread=None) -> dict:
     if not rows:   # артикула немає в каталозі — підставити схоже на артикул слово з листа
         sku = SKU_RE.search(text)
         rows.append({**BLANK_ROW, "sku": sku.group(1) if sku else "", "qtys": _qtys_text(qtys) or "1"})
+    # клієнта в CRM немає — адреса й ім'я з підпису листа (для пересланого — з пересланого листа)
+    from email_assistant.quotes import signature
+    sig = signature(fw["text"] if fw else new_text(source.body_text)) if customer is None else {"lines": [], "name": ""}
     data.update(
         customer=customer, project=project, source=source, forwarded=fw, lines=rows,
-        contact_name=(customer.name if customer else "") or (fw["name"] if fw else source.from_name) or "",
+        contact_name=(customer.name if customer else "") or sig["name"] or (fw["name"] if fw else source.from_name) or "",
         contact_email=(fw["from"] if fw else source.from_email) or getattr(customer, "email", "") or "",
-        billing_address=customer_address(customer), language=guess_language(text, s.default_language))
+        billing_address=customer_address(customer) or "\n".join(sig["lines"]),
+        language=guess_language(text, s.default_language))
     return data
 
 

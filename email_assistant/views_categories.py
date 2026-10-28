@@ -133,7 +133,14 @@ def message_why_view(request, message_pk):
                          Project.objects.filter(status__in=Project.OPEN_STATUSES).order_by('-updated_at')[:200]]
     except ImportError:
         pass
+    quote = None
+    try:   # 📝 запит пропозиції: чи схоже і чому ні (offers/detection.py)
+        from offers.detection import explain
+        quote = explain(msg)
+    except ImportError:
+        pass
     return JsonResponse({
+        'quote': quote,
         'subject': msg.subject or '', 'category': cat_json(why['category']), 'how': why['how'], 'rule': why['rule'],
         'text': why['text'], 'also': [cat_json(c) for c in why['also']], 'stale': why['stale'],
         'expected': cat_json(why['expected']),

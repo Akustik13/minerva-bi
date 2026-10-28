@@ -47,6 +47,8 @@ THANKS_RE = re.compile(
     re.IGNORECASE)
 SNIPPET = 60
 SCAN_BATCH = 200
+PROGRESS_EVERY = 25      # листів між оновленнями стану
+STALE_MINUTES = 3        # «⏳» без оновлення довше — обробка, мабуть, перервалась (перезапуск сервера)
 
 
 def _qty(value) -> str:
@@ -56,26 +58,34 @@ def _qty(value) -> str:
 
 def detect(msg):
     """→ {reason, items} якщо лист схожий на запит пропозиції, інакше None."""
+    return check(msg)[0]
+
+
+def check(msg):
+    """→ ({reason, items} | None, чому не запит — зрозуміло людині; '' — запит). Для «🔍 Чому лист тут»."""
     from email_assistant.crm_link import is_own, own_addresses
 
     from .models import Offer
     from .services import detect_items
-    if msg.is_spam or msg.is_deleted or msg.folder in ("sent", "spam", "trash", "draft"):
-        return None
+    if msg.is_spam or msg.is_deleted:
+        return None, "лист у спамі або видалений"
+    if msg.folder in ("sent", "spam", "trash", "draft"):
+        return None, "наш надісланий лист, чернетка або кошик"
     own = own_addresses()
     fw = None
     if msg.category not in CATEGORIES or is_own(msg.from_email, own):
-        fw = forwarded_request(msg, own)   # колега переслав лист клієнта
+        fw, why = _forwarded(msg, own)   # колега переслав лист клієнта
         if fw is None:
-            return None
-    if msg.thread_id and Offer.objects.filter(source_message__thread_id=msg.thread_id).exists():
-        return None   # по цій гілці Angebot уже є — далі переговори, а не новий запит
+            return None, why
+    offer = Offer.objects.filter(source_message__thread_id=msg.thread_id).first() if msg.thread_id else None
+    if offer is not None:   # по цій гілці Angebot уже є — далі переговори, а не новий запит
+        return None, f"по цій гілці вже є Angebot {offer.display_number} — далі переговори, а не новий запит"
     body = fw["text"] if fw else new_text(msg.body_text)
     subject = (fw["subject"] or msg.subject or "") if fw else (msg.subject or "")
     text = f"{subject}\n{body}"
     request = REQUEST_RE.search(body) or REQUEST_RE.search(subject)   # у підставу — фраза з тексту
     if THANKS_RE.search(text) and not (request and re.search(r"neu\w*|new|нов\w*", request.group(0), re.I)):
-        return None
+        return None, "схоже на подяку за наш Angebot або відповідь на нього"
     items = [{"product_id": p.pk, "sku": p.sku, "qty": _qty(q) if q else None} for p, q in detect_items(text)]
     parts = [f"переслано від {fw['from']}"] if fw else []
     if request:
@@ -83,23 +93,52 @@ def detect(msg):
     elif any(i["qty"] for i in items) and PRICE_RE.search(text):
         parts.append("артикули з кількістю й питання про ціну")
     else:
-        return None
+        return None, ("немає прохання про Angebot / ціну" + (f" у пересланому листі від {fw['from']}" if fw else "")
+                      + " (і артикулів каталогу з кількістю разом із питанням про ціну)")
     if items:
         parts.append("позиції: " + ", ".join(f"{i['sku']} × {i['qty']}" if i["qty"] else i["sku"] for i in items[:4]))
-    return {"reason": " · ".join(parts)[:255], "items": items[:30]}
+    return {"reason": " · ".join(parts)[:255], "items": items[:30]}, ""
 
 
 def forwarded_request(msg, own=None):
     """Пересланий колегою лист клієнта / нового контакту → {from, name, subject, text}; інакше None."""
+    return _forwarded(msg, own)[0]
+
+
+def _forwarded(msg, own=None):
+    """→ (пересланий лист клієнта | None, чому ні)."""
     from email_assistant.categorize import address_category
     from email_assistant.crm_link import is_own, own_addresses
+    from email_assistant.models import EmailMessage
     own = own if own is not None else own_addresses()
+    labels = dict(EmailMessage.CATEGORY_CHOICES)
     if not (is_own(msg.from_email, own) or msg.category == "internal"):
-        return None
+        return None, (f"тип співрозмовника — {labels.get(msg.category, msg.category or 'ще не визначено')}: "
+                      "запити шукаються лише від клієнтів і нових контактів")
     fw = forwarded(msg.body_text)
-    if fw is None or is_own(fw["from"], own) or address_category(msg.account_id, fw["from"]) not in CATEGORIES:
-        return None
-    return fw
+    if fw is None:
+        return None, "лист від своєї адреси, і пересланого листа з «Von: / From:» та адресою в ньому не знайдено"
+    if is_own(fw["from"], own):
+        return None, f"переслано від своєї адреси {fw['from']}"
+    kind = address_category(msg.account_id, fw["from"])
+    if kind not in CATEGORIES:
+        return None, f"переслано від {fw['from']} — це {labels.get(kind, kind)}, а не клієнт чи новий контакт"
+    return fw, ""
+
+
+def explain(msg) -> dict:
+    """Для «🔍 Чому лист тут»: {state: new | done | dismissed | found | none, reason, request_id, offer}.
+    found — лист схожий на запит, але підказки ще немає (перевірка ще не проходила) — «↻ Перевірити ще раз»."""
+    from .models import QuoteRequest
+    qr = QuoteRequest.objects.filter(message=msg).select_related("offer").first()
+    if qr is not None:
+        state = {QuoteRequest.NEW: "new", QuoteRequest.DONE: "done", QuoteRequest.DISMISSED: "dismissed"}.get(
+            qr.status, "new")
+        return {"state": state, "reason": qr.reason, "request_id": qr.pk,
+                "offer": qr.offer.display_number if qr.offer_id else ""}
+    found, why = check(msg)
+    return {"state": "found" if found else "none", "reason": found["reason"] if found else why,
+            "request_id": None, "offer": ""}
 
 
 def scan(msg):
@@ -129,12 +168,15 @@ def scan_recent(days=30, progress=None) -> tuple:
     found = 0
     for start in range(0, len(ids), SCAN_BATCH):
         part = ids[start:start + SCAN_BATCH]
-        for msg in EmailMessage.objects.filter(pk__in=part).select_related("thread").order_by("sent_at", "pk"):
+        for n, msg in enumerate(EmailMessage.objects.filter(pk__in=part).select_related("thread")
+                                .order_by("sent_at", "pk"), 1):
             try:
                 with transaction.atomic():
                     found += scan(msg) is not None
             except IntegrityError:   # той самий лист щойно обробив сигнал або паралельний запуск
-                continue
+                pass
+            if progress and n % PROGRESS_EVERY == 0:
+                progress(start + n, len(ids), found)
         if progress:
             progress(start + len(part), len(ids), found)
     return len(ids), found

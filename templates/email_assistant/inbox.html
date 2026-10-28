@@ -857,6 +857,14 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     </div>
     <label>👤 {% trans "Хто пише" %}</label>
     <div style="font-size:12px" id="why-kind"></div>
+    <div id="why-quote-box">
+      <label>📝 {% trans "Запит пропозиції (Angebot)" %}</label>
+      <div style="font-size:12px" id="why-quote"></div>
+      <div class="wc-btns" style="justify-content:flex-start;margin-top:4px">
+        <button type="button" class="button" id="why-quote-rescan" onclick="emWhyRescan()">↻ {% trans "Перевірити ще раз" %}</button>
+        <button type="button" class="button" id="why-quote-offer" onclick="emWhyOffer()">📝 {% trans "Angebot (легка форма)" %}</button>
+      </div>
+    </div>
     <label>🧑 {% trans "Клієнт CRM гілки" %}</label>
     <div id="why-cust-box">
       <div style="font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1493,6 +1501,7 @@ async function emWhy(pk) {
   document.getElementById('why-scope').value = _why.contact ? 'sender' : 'thread';
   document.getElementById('why-kind').textContent = (_why.contact || '—') + (_why.kind ? ' · ' + _why.kind : '')
     + (_why.kind_manual ? ' ({% trans "вручну для" %} ' + _why.kind_manual + ')' : (_why.kind ? ' ({% trans "автоматично" %})' : ''));
+  _whyQuoteShow();
   _whyCustomerShow();
   document.getElementById('why-cust-q').value = ''; document.getElementById('why-cust-res').innerHTML = '';
   document.getElementById('why-cust-box').style.display = _why.thread ? '' : 'none';
@@ -1502,6 +1511,31 @@ async function emWhy(pk) {
   if (_why.thread) await _whyProjects();
   if (!dlg.open) dlg.showModal();
 }
+function _whyQuoteShow() {
+  var q = _why.quote, box = document.getElementById('why-quote-box');
+  box.style.display = q ? '' : 'none';
+  if (!q) return;
+  var text = {
+    'new': '✅ {% trans "Так — підказка «📝 запит» уже є" %}: ',
+    'done': '✅ {% trans "Angebot створено" %}' + (q.offer ? ' ' + q.offer : '') + ': ',
+    'dismissed': '✕ {% trans "Позначено «Не запит» — автоматика це рішення не змінює" %}: ',
+    'found': '🟡 {% trans "Схоже на запит, але підказки ще немає (перевірка ще не проходила) — «↻ Перевірити ще раз»" %}: ',
+    'none': '— {% trans "Не запит, бо" %} '
+  }[q.state] || '';
+  document.getElementById('why-quote').textContent = text + (q.reason || '');
+  document.getElementById('why-quote-rescan').style.display = (q.state === 'found' || q.state === 'none') ? '' : 'none';
+  document.getElementById('why-quote-offer').style.display = _why.thread ? '' : 'none';
+}
+async function emWhyRescan() {
+  try {
+    var r = await fetch('/offers/api/message/' + _why.pk + '/rescan/', {method: 'POST', headers: {'X-CSRFToken': CSRF}});
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    _why.quote = d; _whyQuoteShow();
+    if (d.state === 'new') _showToast('📝 {% trans "Позначено як запит пропозиції" %}');
+  } catch (e) { document.getElementById('why-err').textContent = '❌ ' + e.message; }
+}
+function emWhyOffer() { if (_why && _why.thread) window.open('/offers/quick/?thread=' + _why.thread, '_blank'); }
 function _whyCustomerShow() {
   var c = _why.customer, s = _why.customer_suggest, box = document.getElementById('why-cust');
   box.innerHTML = '';

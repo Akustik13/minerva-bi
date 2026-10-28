@@ -107,6 +107,7 @@
         <th style="text-align:right">Gesamt</th><th></th>
       </tr></thead><tbody id="of-lines"></tbody></table></div>
       <button type="button" class="of-btn sm" style="margin-top:6px" onclick="ofAddLine()">＋ Позиція</button>
+      <span class="of-muted">📐 — каскад цін за шаблоном ступенів{% if price_breaks %} ({% for b in price_breaks %}від {{ b.min_qty }} шт −{{ b.discount }}%{% if not forloop.last %}, {% endif %}{% endfor %}){% endif %}: від першої ціни знижки за кількістю; ціни можна змінити.</span>
       <div class="of-totals">
         <span>Сума позицій (перша кількість):</span><b id="of-goods" style="text-align:right"></b>
         <label for="of-shipping">Versand / доставка:</label>
@@ -140,6 +141,7 @@
 </div>
 
 {{ lines|json_script:"of-lines-data" }}
+{{ price_breaks|json_script:"of-breaks" }}
 <script>
 (function(){
   var lines = JSON.parse(document.getElementById('of-lines-data').textContent) || [];
@@ -184,7 +186,8 @@
         + '<td style="width:56px">' + inp(j, 'unit', l.unit || 'Stk') + '</td>'
         + '<td style="width:110px">' + inp(j, 'lead_time', l.lead_time, '4 Wochen') + '</td>'
         + '<td class="num">' + (t === null ? 'на запит' : money(t)) + '</td>'
-        + '<td><button type="button" class="of-btn sm danger" onclick="ofDelLine('+j+')" title="Видалити">✕</button></td>'
+        + '<td style="white-space:nowrap"><button type="button" class="of-btn sm" onclick="ofCascade('+j+')" title="Каскад цін за шаблоном ступенів: від першої ціни — знижки за кількістю (одна кількість — ще й кількості з шаблону)">📐</button> '
+        + '<button type="button" class="of-btn sm danger" onclick="ofDelLine('+j+')" title="Видалити">✕</button></td>'
         + '</tr><tr><td></td><td colspan="8" class="of-hint">' + esc(hintText(l)) + '</td></tr>';
     });
     body.innerHTML = html;
@@ -215,6 +218,25 @@
   });
   document.getElementById('of-shipping').addEventListener('input', totals);
   document.getElementById('of-currency').addEventListener('change', function(){ lines.forEach(function(_l, j){ hints(j); }); });
+  // 📐 каскад: шаблон ступенів [{min_qty, discount}] (Склад → «📐 Ступені за шаблоном» / стандартний магазину)
+  var BREAKS = JSON.parse(document.getElementById('of-breaks').textContent || '[]');
+  function disc(q){ var d = 0; BREAKS.forEach(function(b){ if (q >= b.min_qty) d = num(b.discount); }); return d; }
+  window.ofCascade = function(j){
+    var l = lines[j];
+    var qtys = String(l.qtys || '1').split(/[;,\s]+/).map(num).filter(function(q){ return q > 0; });
+    if (qtys.length <= 1) {   // одна кількість — додати кількості з шаблону
+      var base = qtys[0] || 1;
+      qtys = [base].concat(BREAKS.map(function(b){ return num(b.min_qty); }).filter(function(q){ return q > base; }));
+    }
+    var price = num(first(l.prices)) || (l._hint && l._hint[0] && num(l._hint[0].unit_price));
+    if (!price) { alert('Спершу введіть ціну для першої кількості (або артикул з ціною в Minerva)'); return; }
+    var d0 = disc(qtys[0]);
+    l.qtys = qtys.join('; ');
+    l.prices = qtys.map(function(q){
+      return (Math.round(price * (100 - disc(q)) / (100 - d0) * 100) / 100).toFixed(2).replace('.', ',');
+    }).join('; ');
+    render(); hints(j);
+  };
   window.ofAddLine = function(){ lines.push({sku:'', description:'', qtys:'1', prices:'', unit:'Stk', lead_time:''}); render(); };
   window.ofDelLine = function(j){ lines.splice(j, 1); render(); };
 

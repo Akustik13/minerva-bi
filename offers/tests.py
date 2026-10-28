@@ -385,7 +385,7 @@ class QuoteScanSettingsTests(QuoteMailBase):
         self.assertIn("Уся пошта", OfferSettings.get().quote_scan_status)
         page = self.client.get("/admin/offers/offersettings/1/change/")
         self.assertContains(page, "Знайти запити в уже отриманій пошті")
-        self.assertContains(page, "📝 Відкриті запити: 2")
+        self.assertContains(page, '📝 Відкриті запити: <span id="qs-open">2</span>')
 
     def test_dismissed_requests_are_not_reopened(self):
         from offers.models import OfferSettings
@@ -542,3 +542,74 @@ class QuickOfferTests(QuoteMailBase):
         services.set_tiers(line, services.parse_tiers("35; 150"))
         line.save()
         self.assertEqual(services.tiers_text(line), "35: 10; 150: 8")
+
+
+class ForwardedFormatsAndExplainTests(QuoteMailBase):
+    """Формати пересилання різних програм, адреса з підпису, «чому не запит», хід пошуку наживо."""
+
+    SIG = ("\n\nI look forward to your prompt response. Best regards,\n\n--\nBest regard,\n"
+           "Denys Repetynskyi - supply manager Module ETP LLC\nModule ETP LLC\nPeremohy Ave 12\n03057 Kyiv, Ukraine\n"
+           "Tel.: +380 44 123 45 67\nprocurement10@moduletp.example\n")
+
+    def test_blank_lines_between_headers_thunderbird(self):
+        body = ("Gruss\n\n-------- Weitergeleitete Nachricht --------\n\nBetreff: Filters\n\nDatum: Tue, 28 Oct 2026\n\n"
+                "Von: Denys <procurement10@moduletp.example>\n\nAn: " + ME + "\n\n"
+                "Please provide pricing for 35 units and 100 units of ANT-100." + self.SIG)
+        m = self.mail("WG: Filters", body, frm=ME)
+        self.assertIsNotNone(self.qr(m))
+
+    def test_address_and_contact_from_signature(self):
+        body = ForwardedQuoteRequestTests.FW.format(frm="procurement10@moduletp.example") + self.SIG
+        m = self.mail("FW: Filters", body, frm=ME)
+        data = services.quick_prefill(m.thread)
+        self.assertEqual(data["contact_name"], "Denys Repetynskyi")
+        self.assertEqual(data["billing_address"], "Module ETP LLC\nPeremohy Ave 12\n03057 Kyiv, Ukraine")
+
+    def test_explain_why_not_and_rescan(self):
+        from offers import detection
+        from offers.models import QuoteRequest
+        supplier = self.mail("FW: Offer", ForwardedQuoteRequestTests.FW.format(frm="sales@parts.example"), frm=ME)
+        self.assertIn("постачальн", detection.explain(supplier)["reason"].lower())
+        chat = self.mail("Hallo", "Wie geht es Ihnen?")
+        self.assertEqual(detection.explain(chat)["state"], "none")
+        first = self.mail("Anfrage CAB", "Bitte Angebot für CAB-7 x 10")
+        services.create_from_thread(first.thread, self.user)
+        follow = self.mail("Re: Anfrage CAB", "Bitte auch Angebot für ANT-100", in_reply_to=first.message_id)
+        self.assertIn("вже є Angebot", detection.explain(follow)["reason"])
+        req = self.mail("FW: Filters", ForwardedQuoteRequestTests.FW.format(frm="procurement10@moduletp.example"), frm=ME)
+        QuoteRequest.objects.filter(message=req).delete()          # як лист, отриманий до оновлення
+        self.assertEqual(detection.explain(req)["state"], "found")
+        d = self.client.post(f"/offers/api/message/{req.pk}/rescan/").json()
+        self.assertEqual(d["state"], "new")
+        why = self.client.get(f"/email/message/{req.pk}/why/").json()
+        self.assertEqual(why["quote"]["state"], "new")
+
+    def test_scan_progress_live(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from offers.models import OfferSettings
+        for i in range(30):
+            self.mail(f"Frage {i}", "Wie geht es?", frm=f"x{i}@client.example")
+        steps = []
+        from offers import detection
+        detection.scan_recent(None, progress=lambda done, total, n: steps.append(done))
+        self.assertIn(25, steps)                                     # кожні 25 листів, не лише наприкінці
+        s = OfferSettings.get()
+        OfferSettings.objects.filter(pk=s.pk).update(quote_scan_status="⏳ 30 днів: перевірено 25 з 343",
+                                                     quote_scan_at=timezone.now())
+        state = self.client.get("/admin/offers/offersettings/scan-status/").json()
+        self.assertTrue(state["running"])
+        page = self.client.get(f"/admin/offers/offersettings/{s.pk}/change/")
+        self.assertContains(page, "scan-status/")
+        OfferSettings.objects.filter(pk=s.pk).update(quote_scan_at=timezone.now() - timedelta(minutes=10))
+        state = self.client.get("/admin/offers/offersettings/scan-status/").json()
+        self.assertFalse(state["running"])
+        self.assertIn("зупинилась", state["text"])
+
+    def test_cascade_button_and_breaks(self):
+        from shop.models import ShopSettings
+        ShopSettings.get()
+        page = self.client.get("/offers/quick/")
+        self.assertContains(page, "ofCascade(")
+        self.assertContains(page, 'id="of-breaks"')
+        self.assertContains(page, "від 10 шт")

@@ -31,6 +31,16 @@ def from_thread_view(request, thread_pk):
 
 @staff_member_required
 @require_POST
+def rescan_message_view(request, message_pk):
+    """«↻ Перевірити ще раз» з «🔍 Чому лист тут»: лист знову перевіряється правилами (рішення людини лишається)."""
+    from email_assistant.models import EmailMessage
+    msg = get_object_or_404(EmailMessage, pk=message_pk, thread__in=_user_threads(request))
+    detection.scan(msg)
+    return JsonResponse({"ok": True, **detection.explain(msg)})
+
+
+@staff_member_required
+@require_POST
 def dismiss_quote_request_view(request, pk):
     """«✕ Не запит»: підказку прибрано, автоматика цей лист більше не позначить."""
     qr = get_object_or_404(QuoteRequest, pk=pk, thread__in=_user_threads(request))
@@ -116,7 +126,13 @@ def quick_view(request, pk=None):
             messages.warning(request, f"Angebot {offer.display_number} збережено, але документ не сформовано: {e}")
         return redirect(reverse("offers:quick_edit", args=[offer.pk]))
     data = services.quick_prefill(thread) if offer is None else services.quick_from_offer(offer)
+    try:
+        from shop.models import ShopSettings
+        breaks = ShopSettings.get().price_breaks or []
+    except ImportError:
+        breaks = []
     return render(request, "offers/quick.html", {
+        "price_breaks": breaks,
         **admin.site.each_context(request),
         "title": f"Angebot {offer.display_number}" if offer else "Новий Angebot",
         "data": data, "offer": offer, "thread": thread, "languages": LANGUAGES,

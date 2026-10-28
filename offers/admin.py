@@ -329,16 +329,44 @@ class OfferSettingsAdmin(admin.ModelAdmin):
             OfferSettings.objects.filter(pk=obj.pk).update(quote_scan_status="⏳ Запущено…", quote_scan_at=timezone.now())
             transaction.on_commit(lambda: detection.start_scan(depth))
             self.message_user(request, f"Пошук запитів ({dict(OfferSettings.SCAN_CHOICES)[depth]}) запущено у фоні — "
-                                       f"оновіть сторінку, щоб побачити прогрес.")
+                                       f"хід видно в «Стан обробки» наживо.")
+
+    @staticmethod
+    def _scan_state(obj) -> dict:
+        """Стан «Знайти запити»: text, running; «⏳» без оновлення понад STALE_MINUTES — перервано."""
+        from datetime import timedelta
+
+        from .detection import STALE_MINUTES
+        text = (obj.quote_scan_status if obj else "") or ""
+        running = text.startswith("⏳")
+        if running and obj.quote_scan_at and timezone.now() - obj.quote_scan_at > timedelta(minutes=STALE_MINUTES):
+            text, running = (f"⚠️ Обробка зупинилась ({timezone.localtime(obj.quote_scan_at):%d.%m %H:%M}: {text[2:]}) — "
+                             "мабуть, сервер перезапускався. Запустіть ще раз."), False
+        return {"text": text or "ще не запускалось", "running": running,
+                "open": QuoteRequest.objects.filter(status=QuoteRequest.NEW).count()}
+
+    def get_urls(self):
+        return [path("scan-status/", self.admin_site.admin_view(self.scan_status_view),
+                     name="offers_offersettings_scan_status")] + super().get_urls()
+
+    def scan_status_view(self, request):
+        from django.http import JsonResponse
+        return JsonResponse(self._scan_state(OfferSettings.get()))
 
     @admin.display(description="Стан обробки")
     def quote_scan_state(self, obj):
-        open_requests = QuoteRequest.objects.filter(status=QuoteRequest.NEW).count()
-        link = format_html('<a href="{}?status__exact=new">📝 Відкриті запити: {}</a>',
-                           reverse("admin:offers_quoterequest_changelist"), open_requests)
-        if not obj or not obj.quote_scan_status:
-            return format_html("ще не запускалось · {}", link)
-        return format_html("{} · {}", obj.quote_scan_status, link)
+        st = self._scan_state(obj)
+        link = format_html('<a href="{}?status__exact=new">📝 Відкриті запити: <span id="qs-open">{}</span></a>',
+                           reverse("admin:offers_quoterequest_changelist"), st["open"])
+        html = format_html('<span id="qs-text">{}</span> · {}', st["text"], link)
+        if st["running"]:   # хід наживо: опитування кожні 2 с, доки «⏳»
+            html += format_html(
+                '<script>(function(){{function t(){{fetch("{}",{{credentials:"same-origin"}}).then(function(r){{return r.json();}})'
+                '.then(function(s){{document.getElementById("qs-text").textContent=s.text;'
+                'document.getElementById("qs-open").textContent=s.open;if(s.running)setTimeout(t,2000);}})'
+                '.catch(function(){{setTimeout(t,5000);}});}}setTimeout(t,1500);}})();</script>',
+                reverse("admin:offers_offersettings_scan_status"))
+        return html
 
     def has_add_permission(self, request):
         return not OfferSettings.objects.exists()
