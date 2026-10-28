@@ -87,7 +87,32 @@
     {% if shared %}<br>ℹ️ {% trans "У цей самий проєкт askDANTE пишуть і" %}: {{ shared|join:", " }} — {% trans "їхній час у тих самих рядках (askDANTE рахує день × проєкт)." %}{% endif %}
     · <a href="{{ focus_url }}">⚙ {% trans "проєкт і норми категорії" %}</a> · <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}">{% trans "усі категорії" %}</a></div>
   {% else %}
-  ⚠️ <b>{{ focus_cat.label }}</b>: {% trans "у категорії ще немає проєкту askDANTE — виберіть його в картці категорії (блок «⏱ Час на ці листи в askDANTE»)" %}: <a href="{{ focus_url }}">⚙ {% trans "відкрити категорію" %}</a>
+  ⚠️ <b>{{ focus_cat.label }}</b>: {% trans "у категорії ще немає проєкту askDANTE." %}
+  {% if can_bind %}
+  <form method="post" class="mt-form" style="margin-top:8px" onsubmit="var n = this.elements['new']; return !n.value || confirm('{% trans "Створити в askDANTE новий проєкт" %} «' + this.elements['name'].value + '» — ' + n.options[n.selectedIndex].text.replace(' ⭐', '') + '? {% trans "Видалити його можна лише в askDANTE." %}')">{% csrf_token %}
+    <input type="hidden" name="action" value="bind"><input type="hidden" name="cat" value="{{ focus_cat.pk }}">
+    {% if du %}<input type="hidden" name="u" value="{{ du.pk }}">{% endif %}<input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}">
+    <label>📁 {% trans "Писати в проєкт askDANTE" %}<select name="dp">
+      <option value="">—</option>
+      {% if hints.projects %}<optgroup label="⭐ {% trans "Підходить" %}">{% for dp, why in hints.projects %}<option value="{{ dp.pk }}"{% if forloop.first %} selected{% endif %}>{% if dp.parent %}{{ dp.parent.name }} › {% endif %}{{ dp.name }} — {{ why }}</option>{% endfor %}</optgroup>{% endif %}
+      <optgroup label="{% trans "Усі проєкти" %}">{% for p in projects %}{% if p.time_trackable %}<option value="{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endif %}{% endfor %}</optgroup></select></label>
+    <label>＋ {% trans "або створити новий" %}<select name="new">
+      <option value="">—</option>
+      {% if new_customers %}<optgroup label="{% trans "Новий проєкт у клієнта askDANTE" %}">{% for value, label in new_customers %}<option value="{{ value }}"{% if value == preset_new %} selected{% endif %}>{{ label }}{% if value == hints.new %} ⭐{% endif %}</option>{% endfor %}</optgroup>{% endif %}
+      <optgroup label="{% trans "Новий підпроєкт під проєктом" %}">{% for value, label in new_parents %}<option value="{{ value }}"{% if value == preset_new %} selected{% endif %}>{{ label }}{% if value == hints.new %} ⭐{% endif %}</option>{% endfor %}</optgroup></select></label>
+    <label>{% trans "Назва нового" %}<input type="text" name="name" value="{{ focus_cat.name }}" maxlength="255" size="18"></label>
+    <label>{% trans "Вид роботи" %}<select name="activity"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if focus.activity_id == a.pk %} selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></label>
+    <label>{% trans "хв: відповідь / прочитаний" %}<span style="display:flex;gap:4px"><input type="number" name="reply" value="{% if focus %}{{ focus.reply_minutes }}{% else %}10{% endif %}" min="0" style="width:56px"><input type="number" name="read" value="{% if focus %}{{ focus.read_minutes }}{% else %}3{% endif %}" min="0" style="width:56px"></span></label>
+    <label title="{% trans "Щодня записувати за вчора без підтвердження" %}"><span><input type="checkbox" name="auto" value="1"{% if focus.auto %} checked{% endif %}> {% trans "авто" %}</span></label>
+    <button class="button default">✓ {% trans "Прив'язати й показати час" %}</button>
+  </form>
+  <div class="mt-muted" style="margin-top:4px">💡 {% if hints.projects %}{% trans "Вибрано найкращий збіг — перевірте." %}{% else %}{% trans "Підходящого проєкту не знайшлось." %}{% endif %}
+    {% if hints.new_label %}{% trans "Для нового рекомендую" %}: {{ hints.new_label }} — «{{ focus_cat.name }}» ({% trans "так влаштовані проєкти інших категорій" %}).{% endif %}
+    {% trans "Якщо вибрано «або створити новий», Minerva створить проєкт в askDANTE і одразу прив'яже; інакше — наявний проєкт." %}
+    · <a href="{{ focus_url }}">⚙ {% trans "картка категорії" %}</a></div>
+  {% else %}
+  {% trans "Виберіть його в картці категорії (блок «⏱ Час на ці листи в askDANTE»)" %}: <a href="{{ focus_url }}">⚙ {% trans "відкрити категорію" %}</a>
+  {% endif %}
   {% endif %}
 </div>
 {% endif %}

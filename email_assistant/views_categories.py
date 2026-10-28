@@ -62,10 +62,55 @@ def category_info_view(request, pk):
     })
 
 
+def _customer_json(c):
+    if c is None:
+        return None
+    label = c.company or c.name
+    if c.company and c.name and c.name != c.company:
+        label += f' — {c.name}'
+    return {'id': c.pk, 'label': label + (f' <{c.email}>' if c.email else ''),
+            'url': reverse('admin:crm_customer_change', args=[c.pk])}
+
+
+@staff_member_required
+def customers_search_view(request):
+    """Пошук клієнта CRM для гілки (компанія, ім'я, email; від 2 символів)."""
+    from django.db.models import Q
+    from crm.models import Customer
+    q = (request.GET.get('q') or '').strip()
+    if len(q) < 2:
+        return JsonResponse({'results': []})
+    found = Customer.objects.filter(Q(company__icontains=q) | Q(name__icontains=q) | Q(email__icontains=q))
+    return JsonResponse({'results': [_customer_json(c) for c in found.order_by('company', 'name')[:15]]})
+
+
+@staff_member_required
+@require_POST
+def message_customer_view(request, message_pk):
+    """Клієнт CRM гілки листа вручну: {customer: id | ''} → crm_link.set_thread_customer."""
+    from crm.models import Customer
+    from email_assistant.crm_link import set_thread_customer
+    from email_assistant.knowledge_hook import touch
+    from email_assistant.models import EmailMessage
+    msg = get_object_or_404(EmailMessage.objects.select_related('thread'), pk=message_pk, account__user=request.user)
+    if not msg.thread_id:
+        return JsonResponse({'ok': False, 'error': 'Лист без гілки листування'})
+    try:
+        data = json.loads(request.body or b'{}')
+    except ValueError:
+        data = {}
+    value = str(data.get('customer') or '')
+    customer = get_object_or_404(Customer, pk=int(value)) if value.isdigit() else None
+    n = set_thread_customer(msg.thread, customer, user=request.user)
+    touch(thread_id=msg.thread_id)   # клієнт гілки — у документах бази знань
+    return JsonResponse({'ok': True, 'customer': _customer_json(customer), 'mails': n})
+
+
 @staff_member_required
 def message_why_view(request, message_pk):
     """«🔍 Чому лист тут»: своя категорія й правило, що спрацювало, інші категорії, що теж підходять,
-    хто пише (тип співрозмовника — авто чи вручну), проєкти й клієнт гілки."""
+    хто пише (тип співрозмовника — авто чи вручну), клієнт гілки й відкриті проєкти для вибору
+    (проєкти гілки браузер бере з /projects/api/thread/<pk>/)."""
     from email_assistant.categorize import counterparts
     from email_assistant.crm_link import own_addresses
     from email_assistant.models import EmailCategoryRule, EmailMessage, MailCategory
@@ -78,15 +123,16 @@ def message_why_view(request, message_pk):
     contact = (counterparts(msg, own_addresses()) or [''])[0]
     domain = '@' + contact.split('@', 1)[1] if '@' in contact else ''
     manual = EmailCategoryRule.objects.filter(account=msg.account, key__in=[k for k in (contact, domain) if k]).first()
-    projects = []
-    if msg.thread_id:
-        try:
-            from projects.models import ProjectLink
-            projects = [f'{lk.project.code} {lk.project.name}'.strip() for lk in ProjectLink.objects.filter(
-                thread_id=msg.thread_id, status=ProjectLink.CONFIRMED).select_related('project')]
-        except ImportError:
-            pass
     customer = msg.thread.crm_customer if msg.thread_id and msg.thread.crm_customer_id else None
+    from email_assistant.crm_link import find_customer
+    by_address = find_customer([contact]) if contact else None
+    open_projects = []
+    try:
+        from projects.models import Project
+        open_projects = [{'id': p.pk, 'label': f'{p.code} {p.name}'.strip()} for p in
+                         Project.objects.filter(status__in=Project.OPEN_STATUSES).order_by('-updated_at')[:200]]
+    except ImportError:
+        pass
     return JsonResponse({
         'subject': msg.subject or '', 'category': cat_json(why['category']), 'how': why['how'], 'rule': why['rule'],
         'text': why['text'], 'also': [cat_json(c) for c in why['also']], 'stale': why['stale'],
@@ -95,7 +141,10 @@ def message_why_view(request, message_pk):
         'contact': contact, 'domain': domain,
         'kind': dict(EmailMessage.CATEGORY_CHOICES).get(msg.category, '') if msg.category else '',
         'kind_manual': manual.key if manual else '',
-        'projects': projects, 'customer': str(customer) if customer else '',
+        'thread': msg.thread_id,
+        'customer': _customer_json(customer),
+        'customer_suggest': _customer_json(by_address) if by_address and by_address != customer else None,
+        'open_projects': open_projects,
         'categories': [cat_json(c) for c in MailCategory.objects.filter(is_active=True)],
         'can_change': request.user.has_perm('email_assistant.change_mailcategory'),
     })

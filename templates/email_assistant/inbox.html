@@ -788,8 +788,31 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     </div>
     <label>👤 {% trans "Хто пише" %}</label>
     <div style="font-size:12px" id="why-kind"></div>
-    <label>📁 {% trans "Проєкти й клієнт гілки" %}</label>
-    <div style="font-size:12px" id="why-proj"></div>
+    <label>🧑 {% trans "Клієнт CRM гілки" %}</label>
+    <div id="why-cust-box">
+      <div style="font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span id="why-cust"></span>
+        <button type="button" class="button" id="why-cust-sugg" onclick="emWhyCustomer(this.dataset.id)"></button>
+        <button type="button" class="button" id="why-cust-clear" onclick="emWhyCustomer('')">✕ {% trans "відв'язати" %}</button>
+      </div>
+      <input type="text" id="why-cust-q" placeholder="{% trans "Змінити: компанія, ім'я або email…" %}" oninput="emWhyCustSearch(this.value)"
+             style="margin-top:5px;width:100%;box-sizing:border-box;background:var(--bg-input,var(--bg));color:var(--text);border:1px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px">
+      <div id="why-cust-res" style="display:flex;flex-direction:column;gap:2px;margin-top:3px"></div>
+    </div>
+    <label>📁 {% trans "Проєкти гілки" %}</label>
+    <div id="why-proj-box">
+      <div id="why-proj" style="display:flex;flex-direction:column;gap:3px;font-size:12px"></div>
+      <div class="wc-row" style="align-items:center;flex-wrap:wrap;margin-top:5px">
+        <select id="why-proj-add" style="flex:1;min-width:180px"></select>
+        <button type="button" class="button" onclick="emWhyProjAdd()">＋ {% trans "Додати до проєкту" %}</button>
+      </div>
+      <div class="wc-row" style="align-items:center;flex-wrap:wrap;margin-top:5px">
+        <input type="text" id="why-proj-new" placeholder="{% trans "Назва нового проєкту" %}" maxlength="200"
+               style="flex:1;min-width:180px;background:var(--bg-input,var(--bg));color:var(--text);border:1px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px">
+        <button type="button" class="button" onclick="emWhyProjNew()">＋ {% trans "Новий проєкт" %}</button>
+      </div>
+    </div>
+    <div class="wc-muted" id="why-nothread" style="display:none">{% trans "Лист без гілки листування — клієнта й проєкт задати не можна." %}</div>
     <div class="wc-muted" id="why-err" style="color:#ef5350"></div>
     <div class="wc-btns"><button type="button" class="button" onclick="document.getElementById('em-why-dlg').close()">{% trans "Закрити" %}</button></div>
   </form>
@@ -1352,14 +1375,116 @@ async function emWhy(pk) {
   var sel = document.getElementById('why-move'); sel.innerHTML = '';
   _why.categories.forEach(function(k){ var o = document.createElement('option'); o.value = k.pk; o.textContent = k.label;
     if (c && k.pk === c.pk) o.selected = true; sel.appendChild(o); });
-  var none = document.createElement('option'); none.value = ''; none.textContent = '↺ {% trans "без своєї категорії" %}'; sel.appendChild(none);
+  var none = document.createElement('option'); none.value = ''; none.textContent = '↺ {% trans "без своєї категорії" %}';
+  if (!c) none.selected = true;
+  sel.appendChild(none);
   document.getElementById('why-scope').value = _why.contact ? 'sender' : 'thread';
   document.getElementById('why-kind').textContent = (_why.contact || '—') + (_why.kind ? ' · ' + _why.kind : '')
     + (_why.kind_manual ? ' ({% trans "вручну для" %} ' + _why.kind_manual + ')' : (_why.kind ? ' ({% trans "автоматично" %})' : ''));
-  document.getElementById('why-proj').textContent = (_why.projects.length ? '📁 ' + _why.projects.join(', ') : '{% trans "проєктів немає" %}')
-    + (_why.customer ? ' · 🧑 ' + _why.customer : '');
+  _whyCustomerShow();
+  document.getElementById('why-cust-q').value = ''; document.getElementById('why-cust-res').innerHTML = '';
+  document.getElementById('why-cust-box').style.display = _why.thread ? '' : 'none';
+  document.getElementById('why-proj-box').style.display = _why.thread ? '' : 'none';
+  document.getElementById('why-nothread').style.display = _why.thread ? 'none' : '';
   document.getElementById('why-err').textContent = '';
-  dlg.showModal();
+  if (_why.thread) await _whyProjects();
+  if (!dlg.open) dlg.showModal();
+}
+function _whyCustomerShow() {
+  var c = _why.customer, s = _why.customer_suggest, box = document.getElementById('why-cust');
+  box.innerHTML = '';
+  if (c) { var a = document.createElement('a'); a.href = c.url; a.target = '_blank'; a.textContent = '🧑 ' + c.label; box.appendChild(a); }
+  else box.textContent = '{% trans "не вибрано" %}';
+  var sg = document.getElementById('why-cust-sugg');
+  sg.style.display = s ? '' : 'none';
+  if (s) { sg.dataset.id = s.id; sg.textContent = '👤 {% trans "За адресою" %}: ' + s.label; }
+  document.getElementById('why-cust-clear').style.display = c ? '' : 'none';
+}
+var _whyCustTimer = null;
+function emWhyCustSearch(q) {
+  clearTimeout(_whyCustTimer);
+  var res = document.getElementById('why-cust-res');
+  if (q.trim().length < 2) { res.innerHTML = ''; return; }
+  _whyCustTimer = setTimeout(async function(){
+    var d = await (await fetch('/email/customers/?q=' + encodeURIComponent(q.trim()), {credentials: 'same-origin'})).json();
+    res.innerHTML = '';
+    if (!d.results.length) { res.textContent = '{% trans "Нічого не знайдено" %}'; return; }
+    d.results.forEach(function(c){
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'button'; b.style.textAlign = 'left';
+      b.textContent = '🧑 ' + c.label; b.onclick = function(){ emWhyCustomer(c.id); }; res.appendChild(b);
+    });
+  }, 250);
+}
+async function emWhyCustomer(id) {
+  if (!_why) return;
+  if (id === '' && !confirm('{% trans "Відв’язати гілку від клієнта? Події в хронології клієнта лишаються; нові листи можуть прив’язати її знову за адресою." %}')) return;
+  try {
+    var r = await fetch('/email/message/' + _why.pk + '/customer/', {method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify({customer: id})});
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || _i18n.помилка);
+    _why.customer = d.customer;
+    if (d.customer && _why.customer_suggest && _why.customer_suggest.id === d.customer.id) _why.customer_suggest = null;
+    _whyCustomerShow();
+    document.getElementById('why-cust-q').value = ''; document.getElementById('why-cust-res').innerHTML = '';
+    _showToast(d.customer ? '🧑 ' + d.customer.label + ' · {% trans "листів гілки в хронології" %}: ' + d.mails : '{% trans "Гілку відв’язано від клієнта" %}');
+  } catch (e) { document.getElementById('why-err').textContent = '❌ ' + e.message; }
+}
+async function _whyProjects(state) {
+  // проєкти гілки — те саме API, що панель «📁 До проєкту» (projects/views.py)
+  state = state || await (await fetch('/projects/api/thread/' + _why.thread + '/', {credentials: 'same-origin'})).json();
+  var box = document.getElementById('why-proj'); box.innerHTML = '';
+  var linked = {};
+  (state.confirmed || []).forEach(function(c){
+    linked[c.project.id] = 1;
+    var row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;align-items:center';
+    var a = document.createElement('a'); a.href = c.project.url; a.target = '_blank'; a.textContent = '📁 ' + c.project.code + ' ' + c.project.name;
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'button'; x.textContent = '✕';
+    x.title = '{% trans "Прибрати гілку з проєкту" %}'; x.onclick = function(){ _whyProjCall('/projects/api/link/' + c.link + '/remove/', {}); };
+    row.appendChild(a); row.appendChild(x); box.appendChild(row);
+  });
+  (state.suggested || []).forEach(function(c){
+    linked[c.project.id] = 1;
+    var row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;align-items:center;opacity:.85';
+    var t = document.createElement('span'); t.textContent = '❔ ' + c.project.code + ' ' + c.project.name + (c.reason ? ' — ' + c.reason : '');
+    var ok = document.createElement('button'); ok.type = 'button'; ok.className = 'button'; ok.textContent = '✓';
+    ok.onclick = function(){ _whyProjCall('/projects/api/link/' + c.link + '/decide/', {accept: true}); };
+    var no = document.createElement('button'); no.type = 'button'; no.className = 'button'; no.textContent = '✗';
+    no.onclick = function(){ _whyProjCall('/projects/api/link/' + c.link + '/decide/', {accept: false}); };
+    row.appendChild(t); row.appendChild(ok); row.appendChild(no); box.appendChild(row);
+  });
+  if (!box.children.length) box.textContent = '{% trans "проєктів немає" %}';
+  var sel = document.getElementById('why-proj-add'); sel.innerHTML = '';
+  var first = document.createElement('option'); first.value = ''; first.textContent = '{% trans "— вибрати проєкт —" %}'; sel.appendChild(first);
+  var seen = {};
+  (state.candidates || []).map(function(p){ return {id: p.id, label: '⭐ ' + p.code + ' ' + p.name}; })
+    .concat(_why.open_projects).forEach(function(p){
+      if (linked[p.id] || seen[p.id]) return; seen[p.id] = 1;
+      var o = document.createElement('option'); o.value = p.id; o.textContent = p.label; sel.appendChild(o);
+    });
+  var nm = document.getElementById('why-proj-new');
+  if (!nm.value) nm.value = state.name_suggestion || '';
+}
+async function _whyProjCall(url, body) {
+  try {
+    var r = await fetch(url, {method: 'POST', headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify(body)});
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || _i18n.помилка);
+    await _whyProjects();
+    return d;
+  } catch (e) { document.getElementById('why-err').textContent = '❌ ' + e.message; }
+}
+function emWhyProjAdd() {
+  var id = document.getElementById('why-proj-add').value;
+  if (!id) return;
+  _whyProjCall('/projects/api/thread/' + _why.thread + '/link/', {project_id: id});
+}
+async function emWhyProjNew() {
+  var name = document.getElementById('why-proj-new').value.trim();
+  if (!name) { document.getElementById('why-err').textContent = '{% trans "Вкажіть назву проєкту" %}'; return; }
+  var d = await _whyProjCall('/projects/api/thread/' + _why.thread + '/create/', {name: name});
+  if (d && d.project) { document.getElementById('why-proj-new').value = ''; _showToast('📁 ' + d.project.code + ' ' + d.project.name); }
 }
 function emWhyRules() {
   if (!_why || !_why.category) return;

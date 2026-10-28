@@ -535,3 +535,75 @@ def auto(st: DanteSettings | None = None, dry_run: bool = False, today=None) -> 
     if not dry_run:
         DanteSettings.objects.filter(pk=st.pk).update(mail_time_last_day=today, mail_time_result=text[:255])
     return text
+
+
+# ── категорія → проєкт askDANTE (сторінка «🗂 Категорії → askDANTE» і картка категорії в «✉️ Час на пошту») ──
+def bind_category(cat, *, project=None, new: str = "", name: str = "", activity=None, reply=None, read=None,
+                  order=None, auto: bool | None = None, st: DanteSettings | None = None) -> MailCategoryTime:
+    """Дати своїй категорії проєкт askDANTE (наявний `project` або новий — `new` = «c:<клієнт>» / «p:<проєкт>»
+    + `name`, через services.create_target) і норми. Порожні норми / auto=None — лишаються як були."""
+    ct = MailCategoryTime.objects.filter(category=cat).first() or MailCategoryTime(category=cat)
+    made = services.create_target(new, (name or cat.name).strip(), st) if new else None
+    ct.dante_project = made or project
+    ct.activity = activity
+    for field, value in (("reply_minutes", reply), ("read_minutes", read), ("order_minutes", order)):
+        if value is not None:
+            setattr(ct, field, max(0, int(value)))
+    if auto is not None:
+        ct.auto = auto
+    ct.save()
+    return ct
+
+
+def _norm_name(text) -> str:
+    return re.sub(r"[^\w]+", " ", (text or "").lower()).strip()
+
+
+def binding_hints(cat, limit: int = 5) -> dict:
+    """Підказки для категорії без проєкту askDANTE (без AI): наявні проєкти з причиною — листи категорії вже
+    в проєкті Minerva, зв'язаному з askDANTE; схожа назва — і куди створити новий (так само, як проєкти інших
+    категорій: той самий батьківський проєкт або клієнт askDANTE). → {projects: [(проєкт, причина)], new, new_label}"""
+    import difflib
+    from collections import Counter
+    from email_assistant.models import EmailMessage
+    found = {}
+    threads = list(EmailMessage.objects.filter(work_category=cat).exclude(thread=None)
+                   .values_list("thread_id", flat=True).distinct()[:500])
+    if threads:
+        try:
+            from projects.models import ProjectLink
+            linked = Counter(ProjectLink.objects.filter(thread_id__in=threads, status=ProjectLink.CONFIRMED)
+                             .values_list("project_id", flat=True))
+        except ImportError:
+            linked = Counter()
+        for m in ProjectMap.objects.filter(project_id__in=list(linked)).select_related("dante_project", "project"):
+            dp = m.dante_project
+            if not (dp.archived or dp.gone):
+                found.setdefault(dp.pk, (dp, f"гілок категорії в проєкті Minerva {m.project.code}: {linked[m.project_id]}",
+                                         2 + linked[m.project_id]))
+    name = _norm_name(cat.name)
+    for dp in DanteProject.objects.filter(archived=False, gone=False, time_trackable=True).select_related("parent"):
+        other = _norm_name(dp.name)
+        if not name or not other or dp.pk in found:
+            continue
+        score = 0.9 if (name in other or other in name) else difflib.SequenceMatcher(None, name, other).ratio()
+        if score >= 0.6:
+            found[dp.pk] = (dp, "схожа назва", score)
+    projects = [(dp, why) for dp, why, _ in sorted(found.values(), key=lambda t: -t[2])[:limit]]
+    places = Counter()
+    for dp in DanteProject.objects.filter(mail_categories__isnull=False).select_related("parent"):
+        if dp.parent_id:
+            places[f"p:{dp.parent_id}"] += 1
+        elif dp.customer_ref:
+            places[f"c:{dp.customer_ref}"] += 1
+    new = places.most_common(1)[0][0] if places else ""
+    customers = dict(services.dante_customers())
+    if not new:   # як заведено для внутрішніх проєктів: клієнт «… Eigene Projekte …» / «Intern»
+        new = next((f"c:{ref}" for ref, cname in customers.items() if re.search(r"eigen|intern", cname, re.I)), "")
+    label = ""
+    if new.startswith("p:"):
+        parent = DanteProject.objects.filter(pk=int(new[2:])).first()
+        label = f"підпроєкт під «{parent}»" if parent else ""
+    elif new.startswith("c:"):
+        label = f"проєкт у клієнта «{customers.get(new[2:], new[2:])}»"
+    return {"projects": projects, "new": new if label else "", "new_label": label}

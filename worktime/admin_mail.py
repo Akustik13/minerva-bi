@@ -132,6 +132,35 @@ def mail_time_page(model_admin, request):
     back = (f"{reverse('admin:worktime_workday_mailtime')}?u={du.pk if du else ''}&from={date_from}&to={date_to}"
             f"&show={show}" + (f"&cat={focus_cat.pk}" if focus_cat else ""))
 
+    can_bind = services.is_manager(request.user) or request.user.has_perm("worktime.change_mailcategorytime")
+    if request.method == "POST" and request.POST.get("action") == "bind" and focus_cat is not None:
+        # категорія без проєкту askDANTE → наявний проєкт або новий (рекомендації — mail_time.binding_hints)
+        if not can_bind:
+            messages.error(request, "Немає права змінювати проєкти askDANTE категорій.")
+            return redirect(back)
+        p = request.POST
+
+        def num(name):
+            try:
+                return max(0, int(p.get(name)))
+            except (TypeError, ValueError):
+                return None
+        try:
+            ct = mail_time.bind_category(
+                focus_cat, project=DanteProject.objects.filter(pk=p.get("dp") or 0, archived=False, gone=False).first(),
+                new=p.get("new") or "", name=p.get("name") or focus_cat.name,
+                activity=DanteActivity.objects.filter(pk=p.get("activity") or 0).first(),
+                reply=num("reply"), read=num("read"), auto=p.get("auto") == "1", st=st)
+        except DanteError as e:
+            messages.error(request, f"askDANTE: {e.message}")
+            return redirect(back)
+        if ct.dante_project_id:
+            messages.success(request, f"{focus_cat.label} → askDANTE: {ct.dante_project}. Нижче — час на ці листи "
+                                      "за період; перевірте й запишіть.")
+        else:
+            messages.warning(request, "Виберіть проєкт askDANTE або «створити новий».")
+        return redirect(back)
+
     if request.method == "POST" and du is not None and request.POST.get("action") in ("assign", "ignore", "unignore"):
         return _loose_action(request, du, st, back)
 
@@ -207,6 +236,8 @@ def mail_time_page(model_admin, request):
     cats = list(MailCategoryTime.objects.select_related("category", "dante_project").order_by("category__order"))
     shared = [c.category.label for c in cats if focus and focus.dante_project_id and c.pk != focus.pk
               and c.dante_project_id == focus.dante_project_id]
+    hints = mail_time.binding_hints(focus_cat) if focus_cat and not (focus and focus.dante_project_id) else None
+    projects = list(DanteProject.objects.filter(archived=False, gone=False).select_related("parent").order_by("name"))
     context = {
         **model_admin.admin_site.each_context(request), "title": "✉️ Час на пошту", "st": st, "du": du,
         "people": people, "manager": services.is_manager(request.user), "date_from": date_from, "date_to": date_to,
@@ -218,12 +249,15 @@ def mail_time_page(model_admin, request):
         "activities": list(DanteActivity.objects.filter(archived=False)),
         "needs_activity": st.activity_required and not st.default_activity_id,
         "show": show, "n_loose": sum(len(d["loose"]) for d in days), "n_ignored": sum(len(d["ignored"]) for d in days),
-        "focus": focus, "focus_cat": focus_cat, "shared": shared,
+        "focus": focus, "focus_cat": focus_cat, "shared": shared, "can_bind": can_bind,
+        "hints": hints, "preset_new": hints["new"] if hints and not hints["projects"] else "",
+        "new_customers": [(f"c:{ref}", cname) for ref, cname in services.dante_customers()],
+        "new_parents": [(f"p:{p.pk}", f"{p.parent.name} › {p.name}" if p.parent else p.name) for p in projects
+                        if p.time_trackable or not p.parent_id],
         "focus_url": (reverse("admin:email_assistant_mailcategory_change", args=[focus_cat.pk]) if focus_cat else ""),
         "categories": list(MailCategory.objects.filter(is_active=True)),
         "can_categorize": services.is_manager(request.user) or request.user.has_perm("email_assistant.add_mailcategory"),
-        "projects": list(DanteProject.objects.filter(archived=False, gone=False).select_related("parent")
-                         .order_by("name")),
+        "projects": projects,
         "customers": services.dante_customers(),
         "lang": dict(DanteSettings.COMMENT_LANGS).get(st.comment_lang, st.comment_lang),
         "dante_url": st.base_url,

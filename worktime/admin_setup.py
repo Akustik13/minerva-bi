@@ -10,9 +10,9 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from . import services
+from . import mail_time, services
 from .client import DanteError
-from .models import DanteActivity, DanteProject, DanteSettings, MailCategoryTime
+from .models import DanteActivity, DanteProject, DanteSettings
 
 
 def _date(value):
@@ -76,16 +76,13 @@ def categories_page(model_admin, request):
                     p = request.POST
                     if f"dp_{cat.pk}" not in p:
                         continue
-                    ct = MailCategoryTime.objects.filter(category=cat).first() or MailCategoryTime(category=cat)
-                    made = services.create_target(p.get(f"new_{cat.pk}"), p.get(f"sub_{cat.pk}") or cat.name, st)
                     # ＋ новий проєкт клієнта / підпроєкт — або вибраний наявний
-                    ct.dante_project = made or DanteProject.objects.filter(pk=p.get(f"dp_{cat.pk}") or 0).first()
-                    ct.activity = DanteActivity.objects.filter(pk=p.get(f"act_{cat.pk}") or 0).first()
-                    ct.reply_minutes = _int(p.get(f"reply_{cat.pk}"), ct.reply_minutes)
-                    ct.read_minutes = _int(p.get(f"read_{cat.pk}"), ct.read_minutes)
-                    ct.order_minutes = _int(p.get(f"order_{cat.pk}"), ct.order_minutes)
-                    ct.auto = p.get(f"auto_{cat.pk}") == "1"
-                    ct.save()
+                    mail_time.bind_category(
+                        cat, project=DanteProject.objects.filter(pk=p.get(f"dp_{cat.pk}") or 0).first(),
+                        new=p.get(f"new_{cat.pk}") or "", name=p.get(f"sub_{cat.pk}") or cat.name,
+                        activity=DanteActivity.objects.filter(pk=p.get(f"act_{cat.pk}") or 0).first(),
+                        reply=_int(p.get(f"reply_{cat.pk}"), None), read=_int(p.get(f"read_{cat.pk}"), None),
+                        order=_int(p.get(f"order_{cat.pk}"), None), auto=p.get(f"auto_{cat.pk}") == "1", st=st)
                     n += 1
                 messages.success(request, f"Збережено категорій: {n}. Далі — «✉️ Час на пошту»: оцінка по днях і запис.")
                 return redirect(f"{url}#map")

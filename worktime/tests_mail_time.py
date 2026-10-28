@@ -163,9 +163,7 @@ class PagesTests(MailTimeBase):
         self.assertEqual(_activity_label((t, t.replace(hour=9), 5)), "08:28–09:28 · 5 дій")
 
 
-class CategoryFilterTests(MailTimeBase):
-    """«⏱ Перенести в askDANTE» з категорії: сторінка лише з її проєктом askDANTE за період."""
-
+class CategoryPageBase(MailTimeBase):
     def setUp(self):
         super().setUp()
         self.user.is_superuser = True
@@ -179,6 +177,10 @@ class CategoryFilterTests(MailTimeBase):
         self.shop = MailCategory.objects.create(name="Shop", subject_words="bestellung", order=1)
         MailCategoryTime.objects.create(category=self.shop, dante_project=self.dp2, reply_minutes=10, read_minutes=3)
         self.url = reverse("admin:worktime_workday_mailtime")
+
+
+class CategoryFilterTests(CategoryPageBase):
+    """«⏱ Перенести в askDANTE» з категорії: сторінка лише з її проєктом askDANTE за період."""
 
     def test_only_rows_of_the_category_project(self):
         self.msg(folder=EmailMessage.FOLDER_SENT)
@@ -211,3 +213,50 @@ class CategoryFilterTests(MailTimeBase):
         self.assertEqual(page.context["date_from"].day, 1)
         setup = self.client.get(reverse("admin:worktime_danteproject_categories"))
         self.assertContains(setup, f"?cat={self.cat.pk}&amp;from=")
+
+
+class BindCategoryTests(CategoryPageBase):
+    """Категорія без проєкту askDANTE: підказки й прив'язка прямо на «✉️ Час на пошту»."""
+
+    def setUp(self):
+        super().setUp()
+        self.internal = MailCategory.objects.create(name="Internal", order=3)
+        self.intern = DanteProject.objects.create(dante_id="90", name="Intern")
+        self.own = DanteProject.objects.create(dante_id="91", name="Antenna design", customer_ref="5",
+                                               customer_name="000 :: Eigene Projekte Sevskiy GmbH")
+        MailCategoryTime.objects.filter(category=self.shop).update(dante_project=self.own)
+
+    def test_hints_by_name_minerva_project_and_place(self):
+        from projects.models import Project, ProjectLink
+        hints = mail_time.binding_hints(self.internal)
+        self.assertEqual([dp for dp, _ in hints["projects"]], [self.intern])
+        self.assertEqual(hints["new"], "c:5")   # як проєкт іншої категорії — у клієнта «Eigene Projekte»
+        self.assertIn("Eigene Projekte", hints["new_label"])
+        thread = EmailThread.objects.create(account=self.account, subject="LTE")
+        m = self.msg(cat=False, thread=thread)
+        EmailMessage.objects.filter(pk=m.pk).update(work_category=self.internal)
+        project = Project.objects.create(name="LTE Board", status=Project.ACTIVE)
+        ProjectLink.objects.create(project=project, thread=thread, status=ProjectLink.CONFIRMED)
+        ProjectMap.objects.create(project=project, dante_project=self.own)
+        first, why = mail_time.binding_hints(self.internal)["projects"][0]
+        self.assertEqual(first, self.own)
+        self.assertIn(project.code, why)
+
+    def test_page_form_and_bind_existing(self):
+        page = self.client.get(self.url, {"cat": self.internal.pk})
+        self.assertContains(page, 'name="action" value="bind"')
+        self.assertContains(page, f'<option value="{self.intern.pk}" selected>')
+        r = self.client.post(self.url, {"action": "bind", "cat": self.internal.pk, "dp": self.intern.pk,
+                                        "reply": "8", "read": "2", "auto": "1"})
+        self.assertIn(f"cat={self.internal.pk}", r["Location"])
+        ct = MailCategoryTime.objects.get(category=self.internal)
+        self.assertEqual((ct.dante_project, ct.reply_minutes, ct.read_minutes, ct.auto), (self.intern, 8, 2, True))
+
+    def test_bind_new_project_in_customer(self):
+        made = DanteProject.objects.create(dante_id="92", name="Internal", customer_ref="5")
+        with mock.patch("worktime.services.create_dante", return_value=made) as create:
+            self.client.post(self.url, {"action": "bind", "cat": self.internal.pk, "dp": self.intern.pk,
+                                        "new": "c:5", "name": "Internal Mails"})
+        self.assertEqual(create.call_args[0][0], "Internal Mails")
+        self.assertEqual(create.call_args[1]["customer"][0], "5")
+        self.assertEqual(MailCategoryTime.objects.get(category=self.internal).dante_project, made)   # новий — перевага

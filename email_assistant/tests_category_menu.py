@@ -138,3 +138,64 @@ class WhyTests(MenuBase):
 
     def test_foreign_mail_is_404(self):
         self.assertEqual(self.client.get(f"/email/message/{self.foreign.pk}/why/").status_code, 404)
+
+
+class WhyCustomerProjectTests(MenuBase):
+    """«🔍 Чому лист тут»: клієнт CRM і проєкти гілки."""
+
+    def setUp(self):
+        super().setUp()
+        from crm.models import Customer
+        self.acme = Customer.objects.create(name="Max Muster", company="ACME GmbH", email="max@acme.example")
+        self.raynool = Customer.objects.create(name="Oscar Yang", company="Raynool", email="oscar@raynool.example")
+
+    def set_customer(self, msg, customer):
+        return self.client.post(f"/email/message/{msg.pk}/customer/", json.dumps({"customer": customer}),
+                                content_type="application/json").json()
+
+    def test_search_and_suggestion_by_address(self):
+        self.assertEqual(self.client.get("/email/customers/?q=a").json()["results"], [])
+        found = self.client.get("/email/customers/?q=acme").json()["results"]
+        self.assertEqual([c["id"] for c in found], [self.acme.pk])
+        self.assertIn("ACME GmbH", found[0]["label"])
+        m = self.mail("oscar@raynool.example", subject="Cable assemblies")
+        d = self.client.get(f"/email/message/{m.pk}/why/").json()
+        self.assertEqual(d["thread"], m.thread_id)
+        self.assertEqual((d["customer"] or {}).get("id"), self.raynool.pk)   # знайдено за адресою автоматично
+
+    def test_set_customer_moves_thread_mails_into_timeline(self):
+        from crm.models import CustomerTimeline
+        m1 = self.mail("oscar@raynool.example", subject="Cable assemblies", msg_id="<c1@x>")
+        m2 = self.mail("oscar@raynool.example", subject="Re: Cable assemblies", msg_id="<c2@x>", reply_to="<c1@x>")
+        self.assertEqual(m1.thread_id, m2.thread_id)
+        self.assertEqual(CustomerTimeline.objects.filter(customer=self.raynool).count(), 2)
+        d = self.set_customer(m1, self.acme.pk)
+        self.assertEqual((d["ok"], d["mails"], d["customer"]["id"]), (True, 2, self.acme.pk))
+        m1.thread.refresh_from_db()
+        self.assertEqual(m1.thread.crm_customer, self.acme)
+        self.assertEqual(CustomerTimeline.objects.filter(customer=self.acme, email_message__in=[m1, m2]).count(), 2)
+        self.assertFalse(CustomerTimeline.objects.filter(customer=self.raynool).exists())
+        self.assertEqual(self.set_customer(m1, self.acme.pk)["mails"], 2)   # повтор — без дублів
+        self.assertEqual(CustomerTimeline.objects.filter(customer=self.acme).count(), 2)
+        self.assertIsNone(self.set_customer(m1, "")["customer"])
+        m1.thread.refresh_from_db()
+        self.assertIsNone(m1.thread.crm_customer)
+
+    def test_no_customer_yet_creates_events(self):
+        from crm.models import CustomerTimeline
+        m = self.mail("someone@nowhere.example", subject="Anfrage")
+        self.assertFalse(CustomerTimeline.objects.filter(email_message=m).exists())
+        self.set_customer(m, self.acme.pk)
+        ev = CustomerTimeline.objects.get(email_message=m)
+        self.assertEqual((ev.customer, ev.event_type, ev.title), (self.acme, "email_in", "Anfrage"))
+
+    def test_foreign_mail_refused_and_projects_listed(self):
+        r = self.client.post(f"/email/message/{self.foreign.pk}/customer/", json.dumps({"customer": self.acme.pk}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 404)
+        from projects.models import Project
+        p = Project.objects.create(name="LTE Board", status=Project.ACTIVE)
+        d = self.client.get(f"/email/message/{self.a.pk}/why/").json()
+        self.assertIn(p.pk, [x["id"] for x in d["open_projects"]])
+        page = self.client.get("/email/")
+        self.assertContains(page, "/projects/api/thread/")

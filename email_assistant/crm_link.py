@@ -223,6 +223,36 @@ def link_to_crm(*, user, subject, body, from_email, to_emails, cc_emails=(),
     )
 
 
+def set_thread_customer(thread, customer, user=None) -> int:
+    """Клієнт гілки вручну («🔍 Чому лист тут»): гілка → клієнт, листи гілки — у його хронології (подія листа
+    іншого клієнта переноситься, а якщо в нього вже є — зайва видаляється; бракує — створюється, як для нового
+    листа). customer=None — лише відв'язати гілку (події хронології лишаються). → листів у хронології клієнта."""
+    from crm.models import CustomerTimeline
+    from email_assistant.models import EmailMessage, EmailThread
+    EmailThread.objects.filter(pk=thread.pk).update(crm_customer=customer)
+    if customer is None:
+        return 0
+    own, n = own_addresses(), 0
+    for em in (EmailMessage.objects.filter(thread=thread, is_deleted=False, is_spam=False)
+               .exclude(folder__in=[EmailMessage.FOLDER_SPAM, EmailMessage.FOLDER_DRAFT])):
+        events = CustomerTimeline.objects.filter(email_message=em)
+        if events.filter(customer=customer).exists():
+            events.exclude(customer=customer).delete()
+        elif events.exists():
+            first = events.first()
+            events.exclude(pk=first.pk).delete()
+            CustomerTimeline.objects.filter(pk=first.pk).update(customer=customer)
+        else:
+            outgoing = em.folder == EmailMessage.FOLDER_SENT or is_own(em.from_email, own)
+            CustomerTimeline.objects.create(
+                customer=customer, user=user, event_type='email_out' if outgoing else 'email_in',
+                title=(em.subject or '(без теми)')[:300], body=(em.body_text or '')[:2000],
+                related_email_id=em.imap_uid or None, email_message=em,
+                message_id=(em.message_id or '').strip()[:500], created_at=em.sent_at or timezone.now())
+        n += 1
+    return n
+
+
 def link_message_to_crm(em, own=None):
     """Прив'язати збережений EmailMessage до клієнта (і його гілку листування теж)."""
     from email_assistant.models import EmailMessage, EmailThread
