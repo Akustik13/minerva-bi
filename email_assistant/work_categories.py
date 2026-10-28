@@ -20,6 +20,8 @@ from email_assistant.crm_link import _addr
 logger = logging.getLogger('email_assistant')
 
 STATUS_KEY = 'mail_categories_scan'
+PROGRESS_EVERY = 25      # листів між оновленнями стану
+STALE_SECONDS = 180      # стільки без оновлення — перерахунок, мабуть, перервався (сервер перезапустився)
 
 
 class Rules:
@@ -149,19 +151,40 @@ def recompute(qs, rules=None, progress=None) -> int:
         if assign(em, rules):
             changed += 1
         done += 1
-        if progress and done % 500 == 0:
+        if progress and done % PROGRESS_EVERY == 0:
             progress(done, changed)
     return changed
 
 
+def state() -> dict:
+    """Стан фонового перерахунку для сторінки: text, running, done, total.
+    «Іде», але давно не оновлювався — перервався (перезапуск сервера), можна запускати знову."""
+    import datetime
+    import time
+    from django.utils import timezone
+    from core.shared_cache import cache
+    raw = cache.get(STATUS_KEY) or {}
+    if isinstance(raw, str):   # старий формат — лише текст
+        raw = {'text': raw}
+    st = {'text': raw.get('text', ''), 'running': bool(raw.get('running')),
+          'done': raw.get('done', 0), 'total': raw.get('total', 0)}
+    if st['running'] and time.time() - raw.get('at', 0) > STALE_SECONDS:
+        at = timezone.localtime(datetime.datetime.fromtimestamp(raw.get('at', 0), tz=datetime.timezone.utc))
+        st.update(running=False, text=f"⚠️ Перерахунок зупинився на {st['done']} з {st['total']} листів "
+                                       f"(останній знак {at:%d.%m %H:%M}) — мабуть, сервер перезапускався. "
+                                       "Запустіть ще раз.")
+    return st
+
+
 def status() -> str:
-    from core.shared_cache import cache
-    return cache.get(STATUS_KEY) or ''
+    return state()['text']
 
 
-def _set_status(text: str):
+def _set_status(text: str, running: bool = False, done: int = 0, total: int = 0):
+    import time
     from core.shared_cache import cache
-    cache.set(STATUS_KEY, text, 24 * 3600)
+    cache.set(STATUS_KEY, {'text': text, 'running': running, 'done': done, 'total': total, 'at': time.time()},
+              24 * 3600)
 
 
 _lock = threading.Lock()
@@ -179,13 +202,16 @@ def period_bounds(date_from=None, date_to=None, days: int = 60):
     return start, end
 
 
-def start_recompute(days: int = 730, date_from=None, date_to=None):
-    """У фоні: листи за `days` днів (0 — усі) за новими правилами."""
+def start_recompute(days: int = 730, date_from=None, date_to=None) -> bool:
+    """У фоні: листи за `days` днів (0 — усі) за новими правилами. False — інший перерахунок ще йде."""
     import datetime
     from django.db import connection
     from django.utils import timezone
     from email_assistant.models import EmailMessage
     caller = threading.current_thread()
+    if state()['running'] or _lock.locked():
+        return False
+    _set_status('⏳ Збираю листи…', running=True)
 
     def run():
         if not _lock.acquire(blocking=False):
@@ -198,9 +224,11 @@ def start_recompute(days: int = 730, date_from=None, date_to=None):
             elif days:
                 qs = qs.filter(sent_at__gte=timezone.now() - datetime.timedelta(days=days))
             total = qs.count()
-            _set_status(f'⏳ Перераховую {total} листів…')
-            n = recompute(qs, progress=lambda done, ch: _set_status(f'⏳ {done} з {total} листів, змінилось {ch}'))
-            _set_status(f'✅ {timezone.localtime():%d.%m.%Y %H:%M} · перевірено {total}, змінилось {n}')
+            _set_status(f'⏳ 0 з {total} листів…', running=True, total=total)
+            n = recompute(qs, progress=lambda done, ch: _set_status(f'⏳ {done} з {total} листів, змінилось {ch}',
+                                                                    running=True, done=done, total=total))
+            _set_status(f'✅ {timezone.localtime():%d.%m.%Y %H:%M} · перевірено {total}, змінилось {n}',
+                        done=total, total=total)
         except Exception as e:  # noqa: BLE001
             logger.exception('work categories recompute: %s', e)
             _set_status(f'❌ Перерахунок перервано ({type(e).__name__})')
@@ -210,6 +238,7 @@ def start_recompute(days: int = 730, date_from=None, date_to=None):
                 connection.close()
 
     threading.Thread(target=run, daemon=True).start()
+    return True
 
 
 # ── з меню листа «Віднести до категорії → своя» ─────────────────────────────

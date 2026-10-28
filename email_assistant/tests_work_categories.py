@@ -154,3 +154,68 @@ class NavTests(Base):
         page = self.client.get("/email/")
         self.assertNotContains(page, 'class="em-p2-filter-row em-chips"')   # без фільтрів — без чипів
         self.assertNotContains(page, 'id="em-cat-sel"')                     # старих випадаючих списків немає
+
+
+class RecomputeProgressTests(Base):
+    """Фоновий перерахунок: хід наживо, повторний запуск, зупинений перерахунок."""
+
+    def setUp(self):
+        super().setUp()
+        from core.shared_cache import cache
+        cache.clear()
+
+    def run_sync(self):
+        from unittest import mock
+
+        class SyncThread:
+            def __init__(self, target, daemon=None):
+                self.target = target
+
+            def start(self):
+                self.target()
+        with mock.patch.object(work_categories.threading, "Thread", SyncThread):
+            return work_categories.start_recompute(0)
+
+    def test_progress_and_done(self):
+        for i in range(30):
+            self.mail(f"x{i}@digikey.de", subject=f"Order {i}")
+        from unittest import mock
+        seen, real = [], work_categories._set_status
+
+        def spy(*a, **k):
+            seen.append(k.get("done", 0))
+            real(*a, **k)
+        with mock.patch.object(work_categories, "_set_status", side_effect=spy):
+            self.assertTrue(self.run_sync())
+        self.assertIn(25, seen)   # хід — кожні PROGRESS_EVERY листів, не лише наприкінці
+        st = work_categories.state()
+        self.assertFalse(st["running"])
+        self.assertIn("перевірено 30", st["text"])
+
+    def test_second_start_refused_while_running(self):
+        work_categories._set_status("⏳ 5 з 100 листів", running=True, done=5, total=100)
+        self.assertFalse(work_categories.start_recompute(0))
+        self.assertTrue(work_categories.state()["running"])
+
+    def test_stale_run_is_reported_and_can_restart(self):
+        import time
+        from core.shared_cache import cache
+        cache.set(work_categories.STATUS_KEY, {"text": "⏳ 500 з 840 листів", "running": True, "done": 500,
+                                               "total": 840, "at": time.time() - 600})
+        st = work_categories.state()
+        self.assertFalse(st["running"])
+        self.assertIn("зупинився на 500 з 840", st["text"])
+        self.assertTrue(self.run_sync())
+        cache.set(work_categories.STATUS_KEY, "✅ старий текст")   # старий формат кешу
+        self.assertEqual(work_categories.status(), "✅ старий текст")
+
+    def test_page_polls_status_while_running(self):
+        self.client.force_login(self.user)
+        work_categories._set_status("⏳ 25 з 840 листів, змінилось 3", running=True, done=25, total=840)
+        page = self.client.get("/admin/email_assistant/mailcategory/")
+        self.assertContains(page, "recompute/status/")
+        self.assertContains(page, 'value="25"')
+        data = self.client.get("/admin/email_assistant/mailcategory/recompute/status/").json()
+        self.assertEqual((data["running"], data["done"], data["total"]), (True, 25, 840))
+        r = self.client.post("/admin/email_assistant/mailcategory/recompute/", {"days": "730"}, follow=True)
+        self.assertContains(r, "Перерахунок уже йде")

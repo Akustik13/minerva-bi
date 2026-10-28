@@ -56,10 +56,12 @@ def categories_page(model_admin, request):
                     made.append(work_categories.create_from_suggestion(name, data.get("senders", []),
                                                                        data.get("sources", [])).name)
                 if made:
-                    work_categories.start_recompute(days, date_from, date_to)
-                    messages.success(request, f"Створено категорій: {len(made)} ({', '.join(made)}). Листи "
-                                              f"{date_from:%d.%m}–{date_to:%d.%m} розкладаються у фоні — далі виберіть "
-                                              "їм проєкт askDANTE.")
+                    started = work_categories.start_recompute(days, date_from, date_to)
+                    messages.success(request, f"Створено категорій: {len(made)} ({', '.join(made)}). " + (
+                        f"Листи {date_from:%d.%m}–{date_to:%d.%m} розкладаються у фоні — далі виберіть їм проєкт "
+                        "askDANTE." if started else
+                        "Інший перерахунок листів ще йде — після нього натисніть «🔄 Перерахувати листи за "
+                        "правилами» в «🏷 Свої категорії»."))
                 return redirect(f"{url}?{period}#map")
             if action == "top":      # ＋ проєкт askDANTE верхнього рівня — сам або у клієнта (Eigene Projekte …)
                 ref = request.POST.get("top_customer") or ""

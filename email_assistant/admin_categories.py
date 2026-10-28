@@ -76,7 +76,13 @@ class MailCategoryAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         return [path('recompute/', self.admin_site.admin_view(self.recompute_view),
-                     name='email_assistant_mailcategory_recompute')] + super().get_urls()
+                     name='email_assistant_mailcategory_recompute'),
+                path('recompute/status/', self.admin_site.admin_view(self.recompute_status_view),
+                     name='email_assistant_mailcategory_recompute_status')] + super().get_urls()
+
+    def recompute_status_view(self, request):
+        from django.http import JsonResponse
+        return JsonResponse(work_categories.state())
 
     def recompute_view(self, request):
         if request.method == 'POST' and self.has_change_permission(request):
@@ -89,17 +95,22 @@ class MailCategoryAdmin(admin.ModelAdmin):
                     return None
             date_from, date_to = _d(request.POST.get('from')), _d(request.POST.get('to'))
             days = int(request.POST.get('days') or 730)
-            work_categories.start_recompute(days, date_from, date_to)
-            messages.info(request, 'Перерахунок запущено у фоні — стан видно над списком.')
+            if work_categories.start_recompute(days, date_from, date_to):
+                messages.info(request, 'Перерахунок запущено у фоні — хід видно над списком.')
+            else:
+                messages.warning(request, 'Перерахунок уже йде — дочекайтеся кінця (хід над списком).')
         return redirect(reverse('admin:email_assistant_mailcategory_changelist'))
 
     def changelist_view(self, request, extra_context=None):
-        extra_context = {**(extra_context or {}), 'scan_status': work_categories.status()}
+        extra_context = {**(extra_context or {}), 'scan': work_categories.state()}
         return super().changelist_view(request, extra_context)
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
         if {'senders', 'subject_words', 'sources', 'by_customer_orders', 'accounts', 'is_active', 'order'} \
                 & set(form.changed_data):
-            work_categories.start_recompute(365)
-            messages.info(request, 'Правила змінились — листи за рік перераховуються у фоні.')
+            if work_categories.start_recompute(365):
+                messages.info(request, 'Правила змінились — листи за рік перераховуються у фоні.')
+            else:
+                messages.warning(request, 'Правила збережено, але інший перерахунок ще йде — після нього '
+                                          'натисніть «🔄 Перерахувати листи за правилами».')

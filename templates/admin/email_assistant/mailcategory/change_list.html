@@ -13,8 +13,25 @@
     <select name="days" title="{% trans "Якщо дати не вказано" %}"><option value="90">{% trans "або за 90 днів" %}</option><option value="365">{% trans "за рік" %}</option>
       <option value="730" selected>{% trans "за 2 роки" %}</option><option value="0">{% trans "усі листи" %}</option></select>
     <button class="button" type="submit">🔄 {% trans "Перерахувати листи за правилами" %}</button>
-    {% if scan_status %}<span style="color:var(--text-muted)">{{ scan_status }}</span>{% endif %}
+    <span id="mc-scan" style="color:var(--text-muted);display:inline-flex;gap:8px;align-items:center">
+      <progress id="mc-scan-bar" max="{{ scan.total|default:1 }}" value="{{ scan.done }}" style="width:140px{% if not scan.running %};display:none{% endif %}"></progress>
+      <span id="mc-scan-text">{{ scan.text }}</span></span>
   </form>
+  {% if scan.running %}
+  <script>
+  (function () {   // хід перерахунку наживо; наприкінці — оновити список (лічильники листів)
+    var bar = document.getElementById('mc-scan-bar'), txt = document.getElementById('mc-scan-text');
+    function tick() {
+      fetch('recompute/status/', {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (s) {
+        txt.textContent = s.text;
+        bar.max = s.total || 1; bar.value = s.done || 0;
+        if (s.running) { setTimeout(tick, 2000); } else { bar.style.display = 'none'; setTimeout(function () { location.reload(); }, 1200); }
+      }).catch(function () { setTimeout(tick, 5000); });
+    }
+    setTimeout(tick, 1500);
+  })();
+  </script>
+  {% endif %}
 </div>
 {{ block.super }}
 {% endblock %}
