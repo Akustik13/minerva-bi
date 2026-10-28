@@ -2,7 +2,10 @@
 
 Зелений — показується, сірий — сховано, з пунктирною рамкою — сам магазин вимкнений (напр. свіжа копія).
 Підказка: назва магазину, стан, ціна. Посилання — на позицію в «Асортимент і ціни».
+Останнім — «DigiKey», якщо в товару є лістинг DigiKey Marketplace (bots.DigiKeyListing): червоний — виставлено,
+сірий — вимкнено на DigiKey, пунктир — чернетка / очікує затвердження, ⚠ — помилка синхронізації.
 """
+from django.core.exceptions import ObjectDoesNotExist
 from django.urls import reverse
 from django.utils.html import format_html, format_html_join
 
@@ -29,12 +32,56 @@ def style(listing) -> str:
     return f"{STYLE}background:transparent;border:1px dashed {color};color:{color};opacity:.85"
 
 
-def badges(listings, link: bool = True, empty: str = "—"):
-    rows = sorted(listings, key=lambda l: (not l.shop.is_active, not l.shop.is_default, l.shop.name))
-    if not rows:
-        return format_html('<span style="opacity:.45">{}</span>', empty)
+DK_RED, DK_GREY = "#c8102e", "#757575"
+
+
+def dk_listing(product):
+    """Лістинг DigiKey Marketplace товару або None (для запиту — select_related("dk_listing"))."""
+    try:
+        return product.dk_listing
+    except (ObjectDoesNotExist, AttributeError):
+        return None
+
+
+def dk_badge(listing, link: bool = True):
+    """Бейдж «DigiKey»: стан лістингу, кількість і ціна на DigiKey у підказці; '' — лістингу немає."""
+    if listing is None:
+        return ""
+    status = listing.sync_status
+    if status == listing.SYNC_PUBLISHED and listing.dk_is_active:
+        text, state, color, solid = "DigiKey", "виставлено", DK_RED, True
+    elif status == listing.SYNC_PUBLISHED:
+        text, state, color, solid = "DigiKey", "вимкнено на DigiKey", DK_GREY, True
+    elif status == listing.SYNC_STAGED:
+        text, state, color, solid = "DigiKey ⏳", "очікує затвердження DigiKey", DK_RED, False
+    elif status == listing.SYNC_ERROR:
+        text, state, color, solid = "DigiKey ⚠", "помилка синхронізації: " + (listing.last_error or "")[:120], DK_RED, False
+    else:
+        text, state, color, solid = "DigiKey", "чернетка — ще не виставлено", DK_GREY, False
+    parts = ["DigiKey Marketplace", state]
+    if listing.dk_quantity_available is not None:
+        parts.append(f"на DigiKey {listing.dk_quantity_available} шт.")
+    if listing.dk_price_min is not None:
+        parts.append(f"ціна за 1 шт. {listing.dk_price_min:.2f}")
+    tint = "#fdecee" if color == DK_RED else "#f1f1f1"   # світла плашка — читається на світлій і темній темі
+    css = (f"{STYLE}background:{color};border:1px solid {color}" if solid else
+           f"{STYLE}background:{tint};border:1px dashed {color};color:{color}")
     if link:
-        return format_html_join("", '<a href="{}" title="{}" style="{}">{}</a>', (
+        return format_html('<a href="{}" title="{}" style="{}">{}</a>',
+                           reverse("admin:bots_digikeylisting_change", args=[listing.pk]), " · ".join(parts), css, text)
+    return format_html('<span title="{}" style="{}">{}</span>', " · ".join(parts), css, text)
+
+
+def badges(listings, link: bool = True, empty: str = "—", dk=None):
+    """Магазини товару, а за ним — DigiKey (dk — лістинг з dk_listing(product))."""
+    rows = sorted(listings, key=lambda l: (not l.shop.is_active, not l.shop.is_default, l.shop.name))
+    digikey = dk_badge(dk, link)
+    if not rows:
+        return digikey or format_html('<span style="opacity:.45">{}</span>', empty)
+    if link:
+        shops = format_html_join("", '<a href="{}" title="{}" style="{}">{}</a>', (
             (reverse("admin:shop_shoplisting_change", args=[l.pk]), title(l), style(l), l.shop.slug) for l in rows))
-    return format_html_join("", '<span title="{}" style="{}">{}</span>',
-                            ((title(l), style(l), l.shop.slug) for l in rows))
+    else:
+        shops = format_html_join("", '<span title="{}" style="{}">{}</span>',
+                                 ((title(l), style(l), l.shop.slug) for l in rows))
+    return format_html("{}{}", shops, digikey)

@@ -1521,7 +1521,7 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
         return False
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("shop_listings__shop")
+        return super().get_queryset(request).prefetch_related("shop_listings__shop").select_related("dk_listing")
 
     @admin.display(description="Назва", ordering="name")
     def name_col(self, obj):
@@ -1529,8 +1529,8 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
 
     @admin.display(description="У магазинах")
     def shops_col(self, obj):
-        from .badges import badges
-        return badges(obj.shop_listings.all())
+        from .badges import badges, dk_listing
+        return badges(obj.shop_listings.all(), dk=dk_listing(obj))
 
     @admin.action(description="➕ Додати в магазин…")
     def action_add_to_shop(self, request, queryset):

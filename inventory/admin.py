@@ -250,7 +250,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         from collections import defaultdict
 
         from . import thumbs
-        from shop.badges import badges as shop_badges
+        from shop.badges import badges as shop_badges, dk_listing as shop_dk_listing
 
         DONE_STATUSES = {'shipped', 'delivered', 'cancelled'}
         PO_ACTIVE = ['draft', 'ordered', 'partial']
@@ -259,6 +259,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         products = list(
             Product.objects.filter(is_active=True)
             .prefetch_related('shop_listings__shop')
+            .select_related('dk_listing')
             .order_by('sku')
         )
         if not products:
@@ -409,7 +410,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'thumb_url':             thumbs.thumb_url(p),
                 'image_href':            thumbs.image_href(p) if thumbs.has_image(p) else '',
                 'ds_href':               thumbs.datasheet_href(p),
-                'shops':                 shop_badges(p.shop_listings.all(), empty=''),
+                'shops':                 shop_badges(p.shop_listings.all(), empty='',
+                                                     dk=shop_dk_listing(p)),
                 'stock':                 stock,
                 'reserved':              reserved,
                 'net_avail':             stock - reserved,
@@ -2390,9 +2392,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
     @admin.display(description="Магазини")
     def shops_col(self, obj):
-        """У яких магазинах товар (shop/badges.py): зелений — показується, сірий — сховано, пунктир — магазин вимкнено."""
-        from shop.badges import badges
-        return badges(obj.shop_listings.all())
+        """У яких магазинах товар і чи є на DigiKey Marketplace (shop/badges.py): зелений — показується, сірий —
+        сховано, пунктир — магазин вимкнено; «DigiKey» червоний — виставлено."""
+        from shop.badges import badges, dk_listing
+        return badges(obj.shop_listings.all(), dk=dk_listing(obj))
 
     @admin.display(description="🖼")
     def media_col(self, obj):
@@ -2633,7 +2636,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     order__order_date__gte=since_3m,
                 ).values('product').annotate(t=Sum('qty')).values('t')
             )
-            return super().get_queryset(request).prefetch_related("shop_listings__shop").annotate(
+            return super().get_queryset(request).prefetch_related("shop_listings__shop").select_related("dk_listing").annotate(
                 _stock_total=Coalesce(Subquery(stock_subq), Value(Decimal('0'))),
                 _reserved_total=Coalesce(Subquery(reserved_subq), Value(Decimal('0'))),
                 _incoming_total=Coalesce(Subquery(incoming_subq), Value(Decimal('0'))),
