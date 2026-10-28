@@ -724,10 +724,13 @@ def run_custom_command(cmd_str: str) -> dict:
             "ok": False,
             "error": (
                 "Консоль виконує лише команди manage.py.\n"
-                "docker-compose тут не підтримується — він запускається ззовні контейнера.\n\n"
-                "Щоб збудувати scraper-worker, виконайте на хості (SSH або Synology Task Scheduler):\n"
-                "  docker-compose up -d --build scraper-worker\n\n"
-                "Або скористайтесь кнопками «Оновлення системи» вище."
+                "docker-compose тут не підтримується — він запускається ззовні контейнера, на самому NAS.\n\n"
+                "Перезапустити контейнер (напр. cron): DSM → Container Manager → «Контейнер» → "
+                "tabele_mvp-<назва>-1 → «Дія» → «Перезапустити».\n"
+                "Або SSH на NAS у теці проєкту:\n"
+                f"  {cmd}\n\n"
+                "Збудувати scraper-worker: docker-compose up -d --build scraper-worker (на хості) "
+                "або кнопкою «Оновлення системи» вище."
             ),
             "duration": round(time.time() - start, 1),
         }

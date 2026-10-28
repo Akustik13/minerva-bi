@@ -615,6 +615,24 @@ def connections_view(request):
             cfg.feed_worktime = p.get('feed_worktime') == '1'
             cfg.feed_busy_only = p.get('feed_busy_only') == '1'
             cfg.save(update_fields=['feed_worktime', 'feed_busy_only'])
+        elif action == 'quick_add':
+            from django.contrib import messages as msgs
+            feed, n, error, warning = feeds.quick_add(request.user, p.get('url'))
+            if error:
+                msgs.error(request, f'Не підключено: {error}')
+            else:
+                msgs.success(request, f'✓ Підключено «{feed.name}» — подій: {n}. Видно в календарі Minerva й у '
+                                      '«Повному вигляді»; оновлюється кожні 15 хв.')
+                if warning:
+                    msgs.warning(request, warning)
+            return redirect('/calendar/connections/')
+        elif action == 'add_to':
+            target = p.get('to')
+            if not cfg.feed_token:
+                feeds.new_token(cfg)
+            links = feeds.add_links(request.build_absolute_uri(f'/calendar/feed/{cfg.feed_token}.ics'))
+            if target in links:
+                return redirect(links[target])
         elif action == 'add_feed':
             url = (p.get('url') or '').strip()
             if url.lower().startswith(('https://', 'http://', 'webcal://')):
@@ -633,10 +651,17 @@ def connections_view(request):
         return redirect('/calendar/connections/')
     feed_url = request.build_absolute_uri(f'/calendar/feed/{cfg.feed_token}.ics') if cfg.feed_token else ''
     sync = _sync_context(request)
+    from calendar_app.models import CalendarAccount, CalendarSyncSettings
+    # який спосіб показати першим: уже почали повне (ключі або акаунт) — повне, інакше просте
+    keys = CalendarSyncSettings.get()
+    started_full = bool(keys.google_client_id or keys.ms_client_id) or \
+        CalendarAccount.objects.filter(user=request.user).exists()
     return render(request, 'calendar_app/connections.html', {
+        'default_mode': 'full' if started_full else 'simple',
         'title': '🔗 Календарі', 'cfg': cfg, 'feed_url': feed_url,
         'webcal_url': feed_url.replace('https://', 'webcal://').replace('http://', 'webcal://') if feed_url else '',
         'feeds': [(f, feeds.masked(f.url)) for f in CalendarFeed.objects.filter(user=request.user)],
+        'quick_roadmap': feeds.quick_roadmap(request.user, cfg.feed_token),
         **sync, 'is_nav_sidebar_enabled': True,
     })
 

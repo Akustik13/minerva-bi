@@ -502,6 +502,9 @@ def autofill_due(st: DanteSettings, now=None) -> bool:
 
 
 CRON_STALE_MINUTES = 15
+CRON_RESTART_HINT = ("Перезапустіть контейнер cron на NAS: DSM → Container Manager → «Контейнер» → tabele_mvp-cron-1 → "
+                     "«Дія» → «Перезапустити» (або SSH у теці проєкту: docker-compose restart cron). Консоль команд "
+                     "Minerva і «Повне оновлення» цього не вміють — вони перезапускають лише веб-частину.")
 
 
 def autofill_schedule(st: DanteSettings, now=None) -> dict:
@@ -521,11 +524,11 @@ def autofill_schedule(st: DanteSettings, now=None) -> dict:
     warning = ""
     if not st.cron_seen_at:
         warning = ("Контейнер cron ще жодного разу не викликав автозаповнення — щоденний запуск не працює. "
-                   "На NAS: docker-compose restart cron (далі після оновлень він перезапускається сам).")
+                   + CRON_RESTART_HINT + " Потрібно один раз: далі після оновлень cron перезапускається сам.")
     elif now - timezone.localtime(st.cron_seen_at) > datetime.timedelta(minutes=CRON_STALE_MINUTES):
         warning = (f"Контейнер cron не звертався з {timezone.localtime(st.cron_seen_at):%d.%m.%Y %H:%M} — "
-                   "щоденні запуски стоять. На NAS: docker-compose ps (чи працює cron), "
-                   "docker-compose restart cron, журнал — docker-compose logs --tail 100 cron.")
+                   "щоденні запуски стоять (контейнер зупинено або він завис). " + CRON_RESTART_HINT
+                   + " Журнал — там само, вкладка «Журнал» контейнера.")
     return {"next": nxt, "warning": warning}
 
 

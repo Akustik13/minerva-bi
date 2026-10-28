@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
 import secrets
+from urllib.parse import quote
 
 import requests
 from django.utils import timezone
@@ -101,6 +103,10 @@ def fetch(feed) -> int:
         text = raw.decode(r.encoding or "utf-8", errors="replace")
         if "BEGIN:VCALENDAR" not in text:
             raise ValueError("за адресою не календар iCal — перевірте, що це секретна адреса .ics")
+        if not feed.name:   # швидке підключення: назва — як у Google / Outlook
+            m = re.search(r"^X-WR-CALNAME:(.+)$", text, re.M)
+            feed.name = (_unescape(m.group(1).strip()) if m else PROVIDERS[detect(feed.url)["provider"]]["label"])[:100]
+            feed.save(update_fields=["name"])
     except (requests.RequestException, ValueError) as e:
         msg = f"HTTP {e.response.status_code}" if getattr(e, "response", None) is not None else str(e)
         feed.last_error = f"{msg}"[:255]
@@ -116,6 +122,131 @@ def fetch(feed) -> int:
     feed.last_error, feed.last_fetch, feed.events_count = "", now, len(items)
     feed.save(update_fields=["last_error", "last_fetch", "events_count"])
     return len(items)
+
+
+# ── ⚡ швидке підключення: одне посилання, без ключів застосунку ──────────────
+PROVIDERS = {
+    "google": {"label": "Google Calendar", "color": "#1a73e8"},
+    "microsoft": {"label": "Outlook", "color": "#f97316"},
+    "other": {"label": "Календар", "color": "#8e24aa"},
+}
+
+
+def detect(url: str) -> dict:
+    """Що за посилання вставили: {"provider", "error", "warning"} (error — не підключати)."""
+    u = (url or "").strip()
+    low = u.lower()
+    out = {"provider": "other", "error": "", "warning": ""}
+    if not low.startswith(("https://", "http://", "webcal://")):
+        out["error"] = "Потрібне посилання, що починається з https:// (або webcal://)."
+        return out
+    if "calendar.google.com" in low or "googleusercontent.com" in low:
+        out["provider"] = "google"
+        if "/calendar/ical/" not in low:
+            out["error"] = ("Це не посилання iCal. У Google: налаштування календаря → «Інтеграція календаря» → "
+                            "«Секретна адреса у форматі iCal» (закінчується на basic.ics).")
+        elif "/public/" in low:
+            out["warning"] = ("Це публічна адреса — Minerva побачить події, лише якщо календар відкрито для всіх. "
+                              "Для свого календаря краще «Секретна адреса у форматі iCal».")
+    elif "outlook." in low or "office365.com" in low or "live.com" in low:
+        out["provider"] = "microsoft"
+        if low.split("?")[0].endswith(".html"):
+            out["error"] = ("Це посилання HTML (для браузера). В Outlook після «Опублікувати» скопіюйте "
+                            "посилання ICS (закінчується на .ics).")
+    return out
+
+
+def quick_add(user, url: str):
+    """Підключити календар за одним посиланням. → (CalendarFeed | None, подій, помилка, попередження)."""
+    from .models import CalendarFeed
+    url = (url or "").strip()
+    info = detect(url)
+    if info["error"]:
+        return None, 0, info["error"], ""
+    existing = CalendarFeed.objects.filter(user=user, url=url[:1000]).first()
+    if existing:
+        n = fetch(existing)
+        return existing, n, existing.last_error, "Цей календар уже підключено — оновлено."
+    feed = CalendarFeed.objects.create(user=user, name="", url=url[:1000], refresh_minutes=15,
+                                       color=PROVIDERS[info["provider"]]["color"])
+    n = fetch(feed)
+    if feed.last_error:
+        err = feed.last_error
+        feed.delete()   # не прийнялось — у списку не лишаємо
+        if err.startswith("HTTP 404") or err.startswith("HTTP 403"):
+            err += (" — посилання не діє: його скинули або календар не опубліковано. Скопіюйте ще раз."
+                    if info["provider"] != "google" or "/public/" not in url else
+                    " — календар не публічний: візьміть «Секретна адреса у форматі iCal».")
+        return None, 0, err, ""
+    return feed, n, "", info["warning"]
+
+
+QUICK_SETTINGS = {
+    "google": [("Відкрити налаштування Google Calendar", "https://calendar.google.com/calendar/r/settings")],
+    "microsoft": [("Outlook (робочий / Microsoft 365)",
+                   "https://outlook.office.com/calendar/options/calendar/SharedCalendars"),
+                  ("outlook.com (особистий)", "https://outlook.live.com/calendar/options/calendar/SharedCalendars")],
+}
+QUICK_HOWTO = {
+    "google": "ліворуч — ваш календар («Налаштування моїх календарів») → «Інтеграція календаря» → "
+              "«Секретна адреса у форматі iCal» → копіювати",
+    "microsoft": "«Опублікувати календар» → виберіть календар і «Може переглядати всі відомості» → «Опублікувати» → "
+                 "скопіюйте посилання ICS (не HTML)",
+}
+ORIGINAL = {"google": "https://calendar.google.com/calendar/r/week",
+            "microsoft": "https://outlook.office.com/calendar/view/week"}
+
+
+def quick_roadmap(user, feed_token: str = "") -> list[dict]:
+    """⚡ Просте підключення по кроках (як «Підключення по кроках», але без ключів): для Google і Outlook
+    підключити посилання → видно в Minerva → звірити з оригіналом → Minerva туди (за бажанням) → влаштовує?
+    Лише читає базу. [{provider, label, feeds, steps: [{key, title, state, detail}], done, total}]"""
+    from .models import CalendarFeed
+    mine = list(CalendarFeed.objects.filter(user=user).order_by("pk"))
+    out = []
+    for provider in ("google", "microsoft"):
+        own = [f for f in mine if detect(f.url)["provider"] == provider]
+        shown = [f for f in own if f.enabled and not f.last_error and f.events_count]
+        broken = [f for f in own if f.last_error]
+        steps = []
+
+        def step(key, title, done, detail=""):
+            steps.append({"key": key, "title": title, "state": "done" if done else "todo", "detail": detail})
+
+        step("link", "Вставити посилання на календар", bool(own),
+             ", ".join(f"«{f.name}»" for f in own) if own else "одне посилання з налаштувань календаря")
+        if broken and not shown:
+            detail = f"не читається: {broken[0].last_error}"
+        elif own and not shown:
+            detail = "приховано або в календарі немає подій"
+        else:
+            detail = f"подій: {sum(f.events_count for f in shown)}" if shown else ""
+        step("show", "Видно в календарі Minerva", bool(shown), detail)
+        step("compare", "Звірити з оригіналом", bool(shown), "тиждень у Minerva поруч із оригіналом")
+        step("back", "Minerva → у " + ("Google" if provider == "google" else "Outlook") + " (за бажанням)",
+             bool(feed_token) and bool(shown), "одна кнопка — календар Minerva з'явиться там")
+        step("decide", "Влаштовує?", False, "так — готово; ні — «🔄 Повне підключення» (запис і правила)")
+        for s in steps:   # перший незроблений — поточний
+            if s["state"] == "todo":
+                s["state"] = "current"
+                break
+        out.append({"provider": provider, "label": PROVIDERS[provider]["label"], "feeds": own, "shown": shown,
+                    "broken": broken, "settings": QUICK_SETTINGS[provider], "howto": QUICK_HOWTO[provider],
+                    "original": ORIGINAL[provider], "steps": steps,
+                    "done": sum(1 for s in steps if s["state"] == "done"), "total": len(steps)})
+    return out
+
+
+def add_links(feed_url: str) -> dict:
+    """Додати календар Minerva в Google / Outlook одним кліком (вони самі підпишуться на адресу)."""
+    if not feed_url:
+        return {}
+    webcal = re.sub(r"^https?://", "webcal://", feed_url)
+    https = re.sub(r"^webcal://", "https://", feed_url)
+    q = quote(https, safe="")
+    return {"google": "https://calendar.google.com/calendar/r?cid=" + quote(webcal, safe=""),
+            "outlook": f"https://outlook.office.com/calendar/0/addfromweb?url={q}&name=Minerva",
+            "outlook_live": f"https://outlook.live.com/calendar/0/addfromweb?url={q}&name=Minerva"}
 
 
 def refresh_due(now=None) -> int:

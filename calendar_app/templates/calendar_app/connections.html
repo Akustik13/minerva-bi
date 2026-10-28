@@ -25,6 +25,18 @@
 .cn-cals{display:flex;flex-direction:column;gap:4px;margin-top:4px}
 .cn-cal{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
 details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
+.md-tabs{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 8px}
+.md-tab{flex:1;min-width:240px;text-align:left;border:2px solid rgba(128,128,128,.35);border-radius:10px;padding:10px 12px;
+  background:none;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px}
+.md-tab span{font-size:12px;color:var(--text-muted)}
+.md-tab.on{border-color:#1a73e8;background:rgba(26,115,232,.08)}
+.md-panel[hidden]{display:none}
+.qc-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:18px;margin-top:10px}
+.qc-head{font-weight:600;margin-bottom:6px}
+.qc-steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.qc-steps .cn-muted{margin-top:3px}
+.qc-form{display:flex;gap:6px;flex-wrap:wrap}
+.qc-form input{flex:1;min-width:220px}
 .rm-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
 .rm-head{display:flex;justify-content:space-between;margin-bottom:6px}
 .rm-step{display:flex;gap:10px;position:relative;padding-bottom:12px}
@@ -46,10 +58,73 @@ details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
     </div>
   </div>
 
+  <!-- ── спосіб підключення: просте / повне (обидва лишаються; вибір — localStorage cn-mode) ── -->
+  <div class="cn-card md" id="mode" data-default="{{ default_mode }}">
+    <h3>{% trans "Як підключити Google і Outlook?" %}</h3>
+    <div class="md-tabs">
+      <button type="button" class="md-tab" data-mode="simple"><b>⚡ {% trans "Просте" %}</b><span>{% trans "бачити в Minerva · одне посилання · без ключів · хвилина" %}</span></button>
+      <button type="button" class="md-tab" data-mode="full"><b>🔄 {% trans "Повне" %}</b><span>{% trans "запис у Google / Outlook · правила · ключі застосунку (раз)" %}</span></button>
+    </div>
+    <div class="cn-muted">{% trans "Почніть із простого. Не влаштує — перейдіть до повного: просте не заважає, його можна лишити або вимкнути." %}</div>
+  </div>
+
+  <!-- ── ⚡ просте підключення по кроках (feeds.quick_roadmap / quick_add) ── -->
+  <div class="cn-card md-panel" id="quick" data-mode="simple">
+    <h3>⚡ {% trans "Просте підключення по кроках" %}</h3>
+    <div class="cn-muted" style="margin-bottom:8px">{% trans "Підписка на календар: лише читання, оновлення кожні 15 хв. Події з'являються в календарі Minerva й у «Повному вигляді»." %}</div>
+    <div class="rm-cols">
+    {% for r in quick_roadmap %}
+      <div class="rm-col">
+        <div class="rm-head"><b>{% if r.provider == "google" %}🟦{% else %}🟧{% endif %} {{ r.label }}</b>
+          <span class="cn-muted">{{ r.done }} / {{ r.total }}</span></div>
+        {% for st in r.steps %}
+        <div class="rm-step rm-{{ st.state }}">
+          <span class="rm-dot">{% if st.state == "done" %}✓{% else %}{{ forloop.counter }}{% endif %}</span>
+          <div class="rm-body"><b>{{ st.title }}</b> <span class="cn-muted">{{ st.detail }}</span>
+          {% if st.state == "current" or st.key == "compare" and st.state == "done" or st.key == "back" and st.state == "done" %}<div class="rm-do">
+            {% if st.key == "link" %}
+              <div style="width:100%"><span class="cn-muted">1)</span>
+                {% for label, url in r.settings %}<a class="cn-btn2" href="{{ url }}" target="_blank" rel="noopener">↗ {{ label }}</a> {% endfor %}
+                <div class="cn-muted" style="margin-top:3px">{{ r.howto }}</div></div>
+              <form method="post" class="qc-form" style="width:100%">{% csrf_token %}<input type="hidden" name="action" value="quick_add">
+                <span class="cn-muted">2)</span>
+                <input type="password" name="url" required autocomplete="off"
+                       placeholder="{% if r.provider == 'google' %}https://calendar.google.com/calendar/ical/…/basic.ics{% else %}https://outlook.office365.com/owa/calendar/…/calendar.ics{% endif %}">
+                <button class="cn-btn">✓ {% trans "Підключити" %}</button></form>
+              {% if r.provider == "microsoft" %}<div class="cn-muted">{% trans "Пункту «Опублікувати календар» немає — його вимкнув адміністратор Microsoft 365; тоді лише «🔄 Повне»." %}</div>{% endif %}
+            {% elif st.key == "show" %}
+              {% for f in r.feeds %}<form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="feed" value="{{ f.pk }}">
+                {% if not f.enabled %}<button class="cn-btn2" name="action" value="toggle">👁 {% trans "Показати" %} {{ f.name }}</button>{% endif %}
+                <button class="cn-btn2" name="action" value="refresh">↻ {% trans "Оновити" %} {{ f.name }}</button></form>{% endfor %}
+              <span class="cn-muted">{% trans "Не читається — скопіюйте посилання ще раз (його могли скинути) і вставте в кроці 1." %}</span>
+            {% elif st.key == "compare" %}
+              {% for f in r.shown %}<a class="cn-btn" href="{% url 'calendar_app:full' %}?only=f:{{ f.pk }}">🗓 {% trans "У Minerva — лише" %} {{ f.name }}</a>{% endfor %}
+              <a class="cn-btn2" href="{{ r.original }}" target="_blank" rel="noopener">↗ {% trans "Оригінал" %}</a>
+            {% elif st.key == "back" %}
+              <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="add_to">
+                {% if r.provider == "google" %}<button class="cn-btn2" name="to" value="google" formtarget="_blank">＋ {% trans "Додати календар Minerva в Google" %}</button>
+                {% else %}<button class="cn-btn2" name="to" value="outlook" formtarget="_blank">＋ {% trans "в Outlook (робочий)" %}</button>
+                <button class="cn-btn2" name="to" value="outlook_live" formtarget="_blank">＋ {% trans "в outlook.com" %}</button>{% endif %}</form>
+              <div class="cn-muted" style="margin-top:3px">{% if r.provider == "google" %}{% trans "Google відкриється з готовою адресою — «Додати». Оновлює сам, інколи раз на кілька годин." %}{% else %}{% trans "Outlook відкриється з готовою адресою. Не відкрилось — «Додати календар» → «Підписатися з Інтернету», адреса — у картці «📤» нижче." %}{% endif %}</div>
+            {% elif st.key == "decide" %}
+              <span class="cn-ok">✓ {% trans "Так — готово." %}</span>
+              <button type="button" class="cn-btn2" onclick="cnMode('full', true)">🔄 {% trans "Ні — перейти до повного підключення" %}</button>
+            {% endif %}
+          </div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    </div>
+    <div class="cn-row"><a class="cn-btn" href="{% url 'calendar_app:full' %}">🗓 {% trans "Повний календар (усі джерела)" %}</a></div>
+  </div>
+
   {% if roadmap %}
   <!-- ── 🧭 дорожня карта підключення ── -->
-  <div class="cn-card" id="roadmap">
-    <h3>🧭 {% trans "Підключення по кроках" %}</h3>
+  <div class="cn-card md-panel" id="roadmap" data-mode="full">
+    <h3>🧭 {% trans "Підключення по кроках — із записом у Google / Outlook і правилами" %}</h3>
+    <div class="cn-muted" style="margin-bottom:8px">{% trans "Потрібне, щоб Minerva сама створювала й оновлювала події в Google / Outlook. Перший крок — ключі застосунку: їх робить адміністратор один раз на всю Minerva (бо Minerva працює на вашому домені, а не як спільний сервіс). Далі кожен працівник підключається кнопкою «Увійти» в один клік. Лише бачити — досить «⚡ Простого» підключення." %}</div>
     <div class="rm-cols">
     {% for r in roadmap %}
       <div class="rm-col">
@@ -240,4 +315,20 @@ details.cn-help summary{cursor:pointer;font-size:12px;color:#1a73e8}
   </div>
   {% endif %}
 </div>
+<script>
+// Просте / повне: обидва способи лишаються, показується вибраний (запам'ятовується в браузері)
+function cnMode(mode, scroll) {
+  document.querySelectorAll('.md-tab').forEach(function(b){ b.classList.toggle('on', b.dataset.mode === mode); });
+  document.querySelectorAll('.md-panel').forEach(function(p){ p.hidden = p.dataset.mode !== mode; });
+  try { localStorage.setItem('cn-mode', mode); } catch (e) {}
+  if (scroll) document.getElementById('mode').scrollIntoView({behavior: 'smooth'});
+}
+document.querySelectorAll('.md-tab').forEach(function(b){ b.addEventListener('click', function(){ cnMode(b.dataset.mode); }); });
+(function(){
+  var saved = null;
+  try { saved = localStorage.getItem('cn-mode'); } catch (e) {}
+  var hash = location.hash === '#keys' || location.hash === '#sync' || location.hash === '#roadmap' ? 'full' : '';
+  cnMode(hash || saved || document.getElementById('mode').dataset.default);
+})();
+</script>
 {% endblock %}
