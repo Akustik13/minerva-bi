@@ -123,6 +123,16 @@
 #em-wc-dlg .wc-rules{font-size:12px;color:var(--text-muted);margin:4px 0 0;padding-left:16px}
 #em-wc-dlg .wc-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
 #em-wc-dlg .wc-muted{font-size:11px;color:var(--text-dim)}
+#em-icon-dlg{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-card);color:var(--text);
+  padding:14px 16px;width:min(420px,94vw);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+#em-icon-dlg::backdrop{background:rgba(0,0,0,.45)}
+#em-icon-dlg label{display:block;font-size:11px;color:var(--text-dim);margin:8px 0 2px}
+#em-icon-dlg .wc-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+#em-wc-dlg .wc-icons,#em-icon-dlg .wc-icons{display:flex;flex-wrap:wrap;gap:2px;margin-top:6px}
+#em-icon-dlg .wc-icons button,#em-wc-dlg .wc-icons button{width:28px;height:26px;border:1px solid transparent;border-radius:6px;background:transparent;
+  cursor:pointer;font-size:15px;line-height:1;padding:0;color:var(--text)}
+#em-wc-dlg .wc-icons button:hover,#em-icon-dlg .wc-icons button:hover{border-color:var(--border-strong)}
+#em-icon-dlg .wc-icons button.on,#em-wc-dlg .wc-icons button.on{border-color:#1a73e8;background:rgba(26,115,232,.12)}
 .em-nav-head{cursor:pointer}
 .em-nav-tg.collapsed{transform:rotate(-90deg)}
 .em-nav-body[hidden]{display:none}
@@ -203,7 +213,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 .em-star-btn:hover,.em-star-btn.starred{color:#f5c518}
 /* No yellow on light theme */
 [data-theme="light"] .em-star-btn:hover,[data-theme="light"] .em-star-btn.starred{color:#e6a817}
-.em-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#1565c0,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff}
+.em-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#1565c0,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;position:relative;overflow:hidden}
+.em-av-logo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;padding:4px;box-sizing:border-box;border-radius:50%}
 .em-row-body{flex:1;min-width:0}
 .em-row-top{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px}
 .em-row-sender{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
@@ -379,7 +390,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
              data-n="{{ n }}" data-unread="{{ unread }}" data-hidden="{% if c.pk in hidden_wcats %}1{% endif %}"
              onclick="return emNav(event, 'wcat', '{{ c.pk }}')" oncontextmenu="return showWcCtx(event, this)"
              title="{{ c.name }} — {% trans "клік: показати; перетягніть лист сюди — віднести; правий клік — меню" %}">
-            <span class="em-nav-dot" style="background:{{ c.color }}"></span><span class="em-folder-label">{{ c.label }}</span>
+            <span class="em-nav-dot" style="background:{{ c.color }}"></span><span class="em-folder-label">{% if email_settings.nav_icons %}{{ c.label }}{% else %}{{ c.name }}{% endif %}</span>
             {% if unread %}<span class="em-badge">{{ unread }}</span>{% elif n %}<span class="em-nav-n">{{ n }}</span>{% endif %}
           </a>
           {% endfor %}
@@ -421,12 +432,12 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         <div class="em-nav-body" data-sec="proj">
           {% if project_filter %}{% with pf=project_filter %}
           <a href="#" class="em-folder-link em-nav-item active" onclick="return emNav(event, 'project', '{{ pf.pk }}')"
-             data-proj="{{ pf.pk }}" data-name="{{ pf.name }}" oncontextmenu="return showPrCtx(event, this)">
-            <span class="em-folder-label">{{ pf.code }} · {{ pf.name }}</span></a>{% endwith %}{% endif %}
+             data-proj="{{ pf.pk }}" data-name="{{ pf.name }}" data-icon="{{ pf.icon }}" oncontextmenu="return showPrCtx(event, this)">
+            <span class="em-folder-label">{% if pf.icon and email_settings.nav_icons %}{{ pf.icon }} {% endif %}{% if email_settings.nav_project_codes %}{{ pf.code }} · {% endif %}{{ pf.name }}</span></a>{% endwith %}{% endif %}
           {% for p in nav_projects %}{% if p.project_id != project_filter.pk %}
-          <a href="#" class="em-folder-link em-nav-item" onclick="return emNav(event, 'project', '{{ p.project_id }}')" title="{{ p.project__name }} — {% trans "правий клік — меню" %}"
-             data-proj="{{ p.project_id }}" data-name="{{ p.project__name }}" oncontextmenu="return showPrCtx(event, this)">
-            <span class="em-folder-label">{{ p.project__code }} · {{ p.project__name }}</span><span class="em-nav-n">{{ p.n }}</span>
+          <a href="#" class="em-folder-link em-nav-item" onclick="return emNav(event, 'project', '{{ p.project_id }}')" title="{{ p.project__code }} · {{ p.project__name }} — {% trans "правий клік — меню" %}"
+             data-proj="{{ p.project_id }}" data-name="{{ p.project__name }}" data-icon="{{ p.project__icon }}" oncontextmenu="return showPrCtx(event, this)">
+            <span class="em-folder-label">{% if p.project__icon and email_settings.nav_icons %}{{ p.project__icon }} {% endif %}{% if email_settings.nav_project_codes %}{{ p.project__code }} · {% endif %}{{ p.project__name }}</span><span class="em-nav-n">{{ p.n }}</span>
           </a>
           {% endif %}{% endfor %}
         </div>
@@ -491,6 +502,18 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
                {% if email_settings.mark_read_on_server %}checked{% endif %}
                onchange="toggleEmailSetting('mark_read_on_server', this)">
         {% trans "Прочитане ↔ сервер" %}
+      </label>
+      <label class="em-sync-btn" style="cursor:pointer;gap:6px"
+             title="{% trans "Значок сайту компанії відправника замість букви в кружку. Minerva бере його сама з сайту домену, раз на домен (без сторонніх сервісів); Gmail та інші поштові сервіси — без логотипа" %}">
+        <input type="checkbox" style="margin:0;accent-color:#1a73e8"
+               {% if email_settings.sender_logos %}checked{% endif %}
+               onchange="toggleEmailSetting('sender_logos', this)">
+        {% trans "Логотипи відправників" %}
+      </label>
+      <label class="em-sync-btn" style="cursor:pointer;gap:6px" title="{% trans "Емодзі перед назвою своїх категорій і проєктів (ліва колонка й мітки листів)" %}">
+        <input type="checkbox" style="margin:0;accent-color:#1a73e8" {% if email_settings.nav_icons %}checked{% endif %}
+               onchange="toggleEmailSetting('nav_icons', this); setTimeout(function(){ location.reload(); }, 400)">
+        {% trans "Значки категорій і проєктів" %}
       </label>
       <label class="em-sync-btn" style="cursor:pointer;gap:6px"
              title="{% trans "AI модель для відповідей, перекладу, історії, граматики й нових листів" %}">
@@ -615,7 +638,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
           {% if msg.is_starred %}⭐{% else %}☆{% endif %}
         </button>
 
-        <div class="em-avatar">{{ msg.sender_display|first|upper }}</div>
+        <div class="em-avatar">{{ msg.sender_display|first|upper }}{% if email_settings.sender_logos and msg.logo_domain %}<img class="em-av-logo" src="/email/logo/{{ msg.logo_domain }}/" alt="" loading="lazy" onerror="this.remove()">{% endif %}</div>
 
         <div class="em-row-body">
           <div class="em-row-top">
@@ -639,16 +662,16 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
           <div class="em-row-meta">
             {% if msg.work_category_id %}
             <button class="em-tag wcat" style="--c:{{ msg.work_category.color }}" onclick="filterMailBy(event, 'wcat', {{ msg.work_category_id }})"
-                    title="{% trans "Своя категорія" %}: {{ msg.work_category.name }} — {% trans "показати всі її листи" %}">{{ msg.work_category.label }}</button>
+                    title="{% trans "Своя категорія" %}: {{ msg.work_category.name }} — {% trans "показати всі її листи" %}">{% if email_settings.nav_icons %}{{ msg.work_category.label }}{% else %}{{ msg.work_category.name }}{% endif %}</button>
             {% endif %}
             {% if msg.folder_tag %}<span class="em-tag fold" title="{% trans "Папка" %}">{{ msg.folder_tag }}</span>{% endif %}
             {% if msg.quote_request_tag %}
             <button class="em-tag quote" onclick="filterMailBy(event, 'quote', 1)"
                     title="{% trans "Схоже на запит пропозиції — показати всі запити без Angebot" %}">📝 {% trans "запит" %}</button>
             {% endif %}
-            {% for code, ppk, pname in msg.project_tags %}
+            {% for code, ppk, pname, picon in msg.project_tags %}
             <button class="em-tag proj" onclick="filterMailBy(event, 'project', {{ ppk }})"
-                    title="{% trans "Проєкт" %}: {{ pname }} — {% trans "показати всі листи проєкту" %}">📁 {{ code }}</button>
+                    title="{% trans "Проєкт" %}: {{ pname }} — {% trans "показати всі листи проєкту" %}">{% if email_settings.nav_icons %}{{ picon|default:"📁" }}{% else %}📁{% endif %} {{ code }}</button>
             {% endfor %}
             {% if msg.crm_customer_tag %}
             <button class="em-tag cust" onclick="filterMailBy(event, 'customer', {{ msg.crm_customer_tag.pk }})"
@@ -775,7 +798,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" id="em-wc-read" onclick="wcAction('read')">✓ {% trans "Позначити всі прочитаними" %}</div>
   <div class="em-ctx-sep"></div>
   <div class="em-ctx-item" onclick="wcAction('rules')">🔍 {% if can_change_work_category %}{% trans "Правила (фільтр) — переглянути й змінити…" %}{% else %}{% trans "Правила (фільтр)…" %}{% endif %}</div>
-  {% if can_change_work_category %}<div class="em-ctx-item" onclick="wcAction('rename')">✏️ {% trans "Перейменувати…" %}</div>{% endif %}
+  {% if can_change_work_category %}<div class="em-ctx-item" onclick="wcAction('rename')">✏️ {% trans "Перейменувати…" %}</div>
+  <div class="em-ctx-item" onclick="wcAction('icon')">🎨 {% trans "Значок і колір…" %}</div>{% endif %}
   <div class="em-ctx-item" onclick="wcAction('card')">⚙ {% trans "Розширені налаштування (картка)" %}</div>
   {% if can_change_work_category %}<div class="em-ctx-item" onclick="wcAction('recompute')">🔄 {% trans "Перерахувати листи за правилами" %}</div>{% endif %}
   <div class="em-ctx-item" id="em-wc-dante" onclick="wcAction('dante')">⏱ {% trans "Занести в askDANTE…" %}</div>
@@ -789,10 +813,29 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-sub-hd" id="em-pr-hd"></div>
   <div class="em-ctx-item" onclick="prAction('show')">👁 {% trans "Показати листи проєкту" %}</div>
   <div class="em-ctx-item" onclick="prAction('card')">📁 {% trans "Відкрити проєкт" %}</div>
-  {% if can_change_project %}<div class="em-ctx-item" onclick="prAction('rename')">✏️ {% trans "Перейменувати…" %}</div>{% endif %}
+  {% if can_change_project %}<div class="em-ctx-item" onclick="prAction('rename')">✏️ {% trans "Перейменувати…" %}</div>
+  <div class="em-ctx-item" onclick="prAction('icon')">🎨 {% trans "Значок…" %}</div>{% endif %}
+  <div class="em-ctx-item" onclick="prAction('codes')" title="{% trans "Лише для вас; діє на весь список «📁 Проєкти»" %}">🔢 {% if email_settings.nav_project_codes %}{% trans "Ховати номер P-… перед назвою" %}{% else %}{% trans "Показувати номер P-… перед назвою" %}{% endif %}</div>
   {% if mail_time_url %}<div class="em-ctx-sep"></div>
-  <div class="em-ctx-item" onclick="prAction('dante')" title="{% trans "Час на листи проєкту по днях за 30 днів; немає проєкту askDANTE — вибрати або створити" %}">⏱ {% trans "Занести в askDANTE…" %}</div>{% endif %}
+  <div class="em-ctx-item" onclick="prAction('dante')" title="{% trans "Час на листи проєкту по днях за 30 днів; немає проєкту askDANTE — вибрати або створити" %}">⏱ {% trans "Занести в askDANTE…" %}</div>
+  <div class="em-ctx-item" onclick="prAction('work')" title="{% trans "Не листи: виміри, розробка, зустріч… — з описом (AI)" %}">📝 {% trans "Інша робота на проєкт…" %}</div>{% endif %}
 </div>
+<dialog id="em-icon-dlg">
+  <form method="dialog" onsubmit="return false">
+    <b style="font-size:14px">🎨 {% trans "Значок" %}</b>
+    <div class="wc-icons" id="em-icon-grid">
+      {% for i in category_icons %}<button type="button" onclick="emIconSet(this.textContent.trim())">{{ i }}</button>{% endfor %}
+      <button type="button" onclick="emIconSet('')" title="{% trans "Без значка" %}">∅</button>
+    </div>
+    <label>{% trans "Або будь-який емодзі (Windows: Win + .)" %}</label>
+    <input type="text" id="em-icon-inp" maxlength="8" style="width:90px">
+    <div class="wc-muted" id="em-icon-err" style="color:#ef5350"></div>
+    <div class="wc-btns">
+      <button type="button" class="button" onclick="document.getElementById('em-icon-dlg').close()">{% trans "Закрити" %}</button>
+      <button type="button" class="button default" onclick="emIconSave()">💾 {% trans "Зберегти" %}</button>
+    </div>
+  </form>
+</dialog>
 <dialog id="em-why-dlg">
   <form method="dialog" onsubmit="return false">
     <div style="display:flex;gap:8px;align-items:center"><b style="font-size:14px">🔍 {% trans "Чому лист тут" %}</b>
@@ -851,6 +894,10 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
       <div style="flex:1"><label>{% trans "Назва" %}</label><input type="text" id="wc-name" maxlength="80"></div>
       <div style="width:64px"><label>{% trans "Значок" %}</label><input type="text" id="wc-icon" maxlength="8"></div>
       <div><label>{% trans "Колір" %}</label><input type="color" id="wc-color"></div>
+    </div>
+    <div class="wc-icons" id="wc-icons" title="{% trans "Клік — поставити значок; або будь-який емодзі в полі «Значок» (Windows: Win + .)" %}">
+      {% for i in category_icons %}<button type="button" onclick="wcIcon(this)">{{ i }}</button>{% endfor %}
+      <button type="button" onclick="wcIcon(this)" data-icon="" title="{% trans "Без значка" %}">∅</button>
     </div>
     <label>✉️ {% trans "Відправники — по одному в рядку: адреса, @домен або частина домену (digikey)" %}</label>
     <textarea id="wc-senders"></textarea>
@@ -1304,6 +1351,7 @@ async function wcAction(action) {
   try {
     if (action === 'show') { emNav(null, 'wcat', pk); return; }
     if (action === 'rules') { wcOpen(pk); return; }
+    if (action === 'icon') { await wcOpen(pk); document.getElementById('wc-icons').scrollIntoView({block: 'nearest'}); return; }
     var info = await _wcInfo(pk);
     if (action === 'card') { location.href = info.card_url; return; }
     if (action === 'rename') {
@@ -1355,6 +1403,7 @@ async function wcOpen(pk) {
   document.getElementById('wc-stats').textContent = info.mails + ' {% trans "листів" %} · ' + info.unread + ' {% trans "непрочитаних" %}';
   document.getElementById('wc-name').value = info.name;
   document.getElementById('wc-icon').value = info.icon;
+  _wcIconMark();
   document.getElementById('wc-color').value = info.color;
   document.getElementById('wc-senders').value = info.senders;
   document.getElementById('wc-words').value = info.subject_words;
@@ -1367,6 +1416,36 @@ async function wcOpen(pk) {
   document.getElementById('wc-err').textContent = '';
   dlg.querySelectorAll('input,textarea').forEach(function(f){ f.disabled = !info.can_change; });
   dlg.showModal();
+}
+var _emIconCb = null;
+function emIconPick(current, onSave) {   // вибір значка (проєкт): палітра або будь-який емодзі
+  _emIconCb = onSave;
+  document.getElementById('em-icon-inp').value = current || '';
+  document.getElementById('em-icon-err').textContent = '';
+  emIconSet(current || '', true);
+  document.getElementById('em-icon-dlg').showModal();
+}
+function emIconSet(icon, keep) {
+  if (!keep) document.getElementById('em-icon-inp').value = icon;
+  document.querySelectorAll('#em-icon-grid button').forEach(function(b){
+    b.classList.toggle('on', (b.textContent.trim() === '∅' ? '' : b.textContent.trim()) === icon);
+  });
+}
+async function emIconSave() {
+  try { await _emIconCb(document.getElementById('em-icon-inp').value.trim()); document.getElementById('em-icon-dlg').close(); }
+  catch (e) { document.getElementById('em-icon-err').textContent = '❌ ' + e.message; }
+}
+function wcIcon(btn) {
+  var inp = document.getElementById('wc-icon');
+  if (inp.disabled) return;
+  inp.value = btn.dataset.icon !== undefined ? btn.dataset.icon : btn.textContent.trim();
+  _wcIconMark();
+}
+function _wcIconMark() {
+  var v = document.getElementById('wc-icon').value.trim();
+  document.querySelectorAll('#wc-icons button').forEach(function(b){
+    b.classList.toggle('on', (b.dataset.icon !== undefined ? b.dataset.icon : b.textContent.trim()) === v);
+  });
 }
 async function wcSave() {
   var dlg = document.getElementById('em-wc-dlg'), err = document.getElementById('wc-err');
@@ -1555,7 +1634,7 @@ var _pr = null;
 function showPrCtx(ev, el) {
   ev.preventDefault(); ev.stopPropagation();
   var menu = document.getElementById('em-pr-ctx');
-  _pr = {pk: el.dataset.proj, name: el.dataset.name};
+  _pr = {pk: el.dataset.proj, name: el.dataset.name, icon: el.dataset.icon || ''};
   document.getElementById('em-pr-hd').textContent = (el.querySelector('.em-folder-label') || el).textContent.trim();
   menu.classList.add('open');
   var x = ev.clientX, y = ev.clientY;
@@ -1569,11 +1648,28 @@ async function prAction(action) {
   document.getElementById('em-pr-ctx').classList.remove('open');
   if (!_pr) return;
   if (action === 'show') { emNav(null, 'project', _pr.pk); return; }
+  if (action === 'icon') { emIconPick(_pr.icon, async function(icon){
+      var r = await fetch('/projects/api/project/' + _pr.pk + '/rename/', {method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify({icon: icon})});
+      var d = await r.json();
+      if (!d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+      location.reload();
+    }); return; }
+  if (action === 'codes') {
+    try {
+      var r = await fetch('{% url "email_assistant:settings_toggle" %}', {method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+        body: JSON.stringify({field: 'nav_project_codes', value: {% if email_settings.nav_project_codes %}false{% else %}true{% endif %}})});
+      if ((await r.json()).ok) location.reload();
+    } catch (e) { _showToast('❌ ' + _i18n.помилка); }
+    return;
+  }
   if (action === 'card') { location.href = '/admin/projects/project/' + _pr.pk + '/change/'; return; }
-  if (action === 'dante') {
+  if (action === 'dante' || action === 'work') {
     var to = new Date(), from = new Date(); from.setDate(to.getDate() - 29);
     var iso = function(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
-    location.href = '{{ mail_time_url|escapejs }}?proj=' + _pr.pk + '&from=' + iso(from) + '&to=' + iso(to); return;
+    location.href = '{{ mail_time_url|escapejs }}?proj=' + _pr.pk + '&from=' + iso(from) + '&to=' + iso(to)
+      + (action === 'work' ? '&work=1#work' : ''); return;
   }
   if (action === 'rename') {
     var name = prompt('{% trans "Нова назва проєкту (код P-… лишається)" %}', _pr.name);

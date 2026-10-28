@@ -227,7 +227,7 @@ def mail_time_page(model_admin, request):
                     b = mail_time.rewrite(du, day, int(dp), comment=text, user=request.user, st=st, activity=activity)
                 else:
                     b = mail_time.book(du, day, int(dp), user=request.user, source=Booking.MAIL, st=st,
-                                       activity=activity, comment=text)
+                                       activity=activity, comment=text, attendance=request.POST.get("attendance", ""))
             except DanteError as e:
                 messages.error(request, f"{day:%d.%m}: {e.message}")
                 continue
@@ -296,6 +296,11 @@ def mail_time_page(model_admin, request):
         "show": show, "n_loose": sum(len(d["loose"]) for d in days), "n_ignored": sum(len(d["ignored"]) for d in days),
         "focus": focus, "focus_cat": focus_cat, "shared": shared, "can_bind": can_bind,
         "focus_proj": focus_proj, "pmap": pmap, "proj_hints": proj_hints,
+        "open_work": g.get("work") == "1",
+        "day_times": "–".join(t.strftime("%H:%M") for t in du.times(st)) if du else "",
+        "describe_url": reverse("admin:worktime_workday_record_describe"),
+        "save_url": reverse("admin:worktime_workday_record_save"),
+        "page_url": request.get_full_path(),
         "dante_name": services.fit_name(f"{focus_proj.code} {focus_proj.name}") if focus_proj else "",
         "cat_dante_name": services.fit_name(focus_cat.name) if focus_cat else "",
         "proj_url": reverse("admin:projects_project_change", args=[focus_proj.pk]) if focus_proj else "",

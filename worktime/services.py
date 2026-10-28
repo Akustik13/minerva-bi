@@ -917,6 +917,22 @@ def has_worktime(du: DanteUser, day: datetime.date) -> bool | None:
     return any(t.get("coming") for t in (wd.times or []))
 
 
+def ensure_attendance(du: DanteUser, day: datetime.date, mode: str, user=None,
+                      st: DanteSettings | None = None) -> str:
+    """День без приходу / відходу в askDANTE → записати їх, як «🧩 Заповнити пропуски» (`fill` для одного дня:
+    стандартний день працівника або за активністю в Minerva; свята, відпустки, вихідні й день, що ще триває, —
+    ні). → '' — прихід є або записано, інакше причина."""
+    st = st or DanteSettings.get()
+    if has_worktime(du, day):
+        return ""
+    result = fill(du, day, day, mode, only_dates=[day], user=user, source=Booking.FILL, st=st)
+    if result["sent"]:
+        return ""
+    if has_worktime(du, day):   # тим часом з'явився в askDANTE
+        return ""
+    return (result["failed"] or result["skipped"] or [(day, result["stopped"] or "не вдалося")])[0][1]
+
+
 def _no_worktime_error(e: DanteError) -> bool:
     """askDANTE: «start: Es wurden keine Arbeitszeiten erfasst» — час на проєкт поза робочим часом дня."""
     return "arbeitszeit" in (e.fields.get("start") or "").lower()
@@ -931,7 +947,7 @@ def _remember(st: DanteSettings, **flags):
 def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: int = 0, activity=None,
                  comment: str = "", user=None, source: str = Booking.MANUAL, st: DanteSettings | None = None,
                  start: datetime.time | None = None, stop: datetime.time | None = None,
-                 prefer: datetime.time | None = None) -> Booking:
+                 prefer: datetime.time | None = None, attendance: str = "") -> Booking:
     """Час на проєкт askDANTE: «з … по …» (start/stop) або тривалість у хвилинах. Повтор того самого запису за
     2 хв — відмова (подвійне натискання), бо записи askDANTE через API не видаляються.
     askDANTE може не приймати тривалість і вимагати вид роботи (налаштування фірми): Minerva запам'ятовує це з
@@ -976,6 +992,16 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
         return r
 
     c = client(st)
+    if attendance in (DanteSettings.MODE_FIXED, DanteSettings.MODE_ACTIVITY):
+        # людина вибрала: у дні без приходу спершу записати прихід / відхід (askDANTE пише час на проєкт лише в них)
+        try:
+            refresh_days(du, day, day, c)
+        except DanteError:
+            pass
+        why = ensure_attendance(du, day, attendance, user, st)
+        if why:
+            raise DanteError("bad_request", f"Прихід / відхід за {day:%d.%m} не записано: {why}. Внесіть їх вручну "
+                                            "(📅 клік на дату) — або не записуйте цей день.")
     with lock(du):
         if st.attendance_required:   # askDANTE не прийме час на проєкт без приходу / відходу дня
             try:

@@ -275,7 +275,7 @@ def _nav_projects(account, limit=15):
     from projects.models import Project, ProjectLink
     return list(ProjectLink.objects.filter(status=ProjectLink.CONFIRMED, thread__account=account,
                                            project__status__in=Project.OPEN_STATUSES)
-                .values('project_id', 'project__code', 'project__name')
+                .values('project_id', 'project__code', 'project__name', 'project__icon')
                 .annotate(n=Count('thread__messages', distinct=True), last=Max('thread__last_message_at'))
                 .order_by('-last')[:limit])
 
@@ -340,6 +340,7 @@ def _category_counts(qs):
     return categories, customers
 
 
+CATEGORY_ICONS = ['🏷', '🟥', '🟧', '🟨', '🟩', '🟦', '🟪', '⬛', '⭐', '🛒', '📦', '🚚', '✈️', '🛃', '🧾', '💳', '💶', '🏭', '🔌', '📡', '📶', '🔋', '🛠️', '🧪', '📐', '🖥️', '📱', '🎛️', '🧲', '🏢', '👥', '🤝', '✉️', '🌐', '📢', '⚙️', '💡', '📄', '🗂️', '⚖️', '🎓', '🔔', '🧩', '🚀']   # палітра «Значок» своєї категорії (або будь-який емодзі)
 CUSTOMER_SOURCE_CHIPS = 4   # джерел-перемикачів над «👤 Клієнти», решта — «інші»
 
 
@@ -528,6 +529,9 @@ def inbox_view(request):
     _attach_contacts(emails)
     _attach_project_tags(emails)
     _attach_quote_tags(emails)
+    from email_assistant.logos import domain_for as _logo_domain
+    for m in emails:
+        m.logo_domain = _logo_domain(m.from_email)
     if search_all:
         _attach_folder_tags(account, emails)
 
@@ -576,6 +580,7 @@ def inbox_view(request):
         'n_hidden_wcats':        sum(1 for c, _n, _u in work_categories if c.pk in hidden_wcats),
         'can_change_work_category': request.user.has_perm('email_assistant.change_mailcategory'),
         'can_change_project':    request.user.has_perm('projects.change_project'),
+        'category_icons':        CATEGORY_ICONS,
         'mail_time_url':         _mail_time_url(),
         'can_delete_work_category': request.user.has_perm('email_assistant.delete_mailcategory'),
         'grouped':               grouped,
@@ -2037,7 +2042,7 @@ def set_work_category_view(request, message_pk):
                          'color': msg.work_category.color if msg.work_category_id else ''})
 
 
-_SETTINGS_TOGGLES = {'mark_read_on_server'}
+_SETTINGS_TOGGLES = {'mark_read_on_server', 'nav_project_codes', 'sender_logos', 'nav_icons'}
 _SETTINGS_CHOICES = {'ai_model', 'rag_mode'}
 
 
@@ -2051,6 +2056,25 @@ def _model_label(model_id: str) -> str:
     import re as _re
     m = _re.match(r'claude-(opus|sonnet|haiku|fable)-(\d+)-(\d+)', model_id or '')
     return f'Claude {m.group(1).title()} {m.group(2)}.{m.group(3)}' if m else model_id
+
+
+@staff_member_required
+def sender_logo_view(request, domain):
+    """Логотип відправника (email_assistant/logos.py): копія — одразу; ще немає — шукається у фоні, а поки 404
+    (у кружку лишається буква)."""
+    from django.http import FileResponse, Http404
+    from email_assistant import logos
+    from email_assistant.models import EmailSettings
+    domain = (domain or '').lower()
+    if logos.domain_for('x@' + domain) != domain or not EmailSettings.get_for_user(request.user).sender_logos:
+        raise Http404
+    found = logos.cached(domain)
+    if found is None:
+        logos.start(domain)
+        raise Http404
+    response = FileResponse(open(found[0], 'rb'), content_type=found[1])
+    response['Cache-Control'] = 'private, max-age=604800'
+    return response
 
 
 @staff_member_required

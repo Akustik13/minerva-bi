@@ -263,12 +263,13 @@ def timeline(project, limit=300) -> list:
 
 
 def tags_for_threads(thread_ids) -> dict:
-    """{thread_id: [(code, pk, name)]} — підтверджені проєкти для міток у списку листів."""
+    """{thread_id: [(code, pk, name, icon)]} — підтверджені проєкти для міток у списку листів."""
     out = {}
-    for tid, code, pk, name in (ProjectLink.objects
-                                .filter(thread_id__in=thread_ids, status=ProjectLink.CONFIRMED)
-                                .values_list("thread_id", "project__code", "project_id", "project__name")):
-        out.setdefault(tid, []).append((code, pk, name))
+    for tid, code, pk, name, icon in (ProjectLink.objects
+                                      .filter(thread_id__in=thread_ids, status=ProjectLink.CONFIRMED)
+                                      .values_list("thread_id", "project__code", "project_id", "project__name",
+                                                   "project__icon")):
+        out.setdefault(tid, []).append((code, pk, name, icon))
     return out
 
 

@@ -488,7 +488,8 @@ class WorkDayAdmin(admin.ModelAdmin):
         du, dp = self._record_target(request, p)
         back = f"{reverse('admin:worktime_workday_changelist')}?u={du.pk}&m={p.get('m', '')}"
         day_url = reverse("admin:worktime_workday_day")
-        if (p.get("next") or "").startswith(day_url + "?"):   # зі сторінки дня — туди ж
+        mail_url = reverse("admin:worktime_workday_mailtime")
+        if (p.get("next") or "").startswith((day_url + "?", mail_url + "?")):   # зі сторінки дня / пошти — туди ж
             back = p["next"]
         st = DanteSettings.get()
         start, stop = _time(p.get("start")), _time(p.get("stop"))
@@ -509,7 +510,7 @@ class WorkDayAdmin(admin.ModelAdmin):
                 if not (day and (minutes or (start and stop))):
                     raise DanteError("bad_request", "Вкажіть дату й «з … по …» (або тривалість).")
                 b = services.book_project(du, day, dp, minutes, activity, comment, user=request.user, st=st,
-                                          start=start, stop=stop)
+                                          start=start, stop=stop, attendance=p.get("attendance", ""))
             self._report_project(request, b)
             if b.status != Booking.SENT and p.get("mode") == "replace":
                 back += f"&rec={p.get('rec')}"

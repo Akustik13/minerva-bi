@@ -113,13 +113,20 @@ def _project_for_change(request, pk):
 @staff_member_required
 @require_POST
 def rename_view(request, pk):
-    """✏️ Перейменувати проєкт (правий клік у пошті) — право change; код P-… не змінюється."""
+    """✏️ Перейменувати проєкт / 🎨 значок (правий клік у пошті): {name} і / або {icon} — право change;
+    код P-… не змінюється."""
     project = _project_for_change(request, pk)
-    name = str(_body(request).get("name") or "").strip()[:200]
-    if not name:
-        return JsonResponse({"ok": False, "error": "Вкажіть назву"}, status=400)
-    project.name = name
-    project.save(update_fields=["name", "updated_at"])
+    body, fields = _body(request), ["updated_at"]
+    if "name" in body:
+        name = str(body.get("name") or "").strip()[:200]
+        if not name:
+            return JsonResponse({"ok": False, "error": "Вкажіть назву"}, status=400)
+        project.name = name
+        fields.append("name")
+    if "icon" in body:
+        project.icon = str(body.get("icon") or "").strip()[:8]
+        fields.append("icon")
+    project.save(update_fields=fields)
     return JsonResponse({"ok": True, "project": _project_dict(project)})
 
 

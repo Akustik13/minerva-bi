@@ -72,6 +72,7 @@ urlpatterns = [
     path('message/<int:message_pk>/why/',               views_categories.message_why_view,     name='message_why'),
     path('category/<int:pk>/action/',                   views_categories.category_action_view, name='work_category_action'),
     # Quick settings toggles (e.g. mark read on server)
+    path('logo/<str:domain>/',                          views.sender_logo_view,        name='sender_logo'),
     path('settings/toggle/',                             views.settings_toggle_view,    name='settings_toggle'),
     # Email rules
     path('rules/',                                       views.rules_list,              name='rules_list'),

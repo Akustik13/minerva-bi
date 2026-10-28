@@ -240,3 +240,50 @@ class ProjectMenuAndSourcesTests(MenuBase):
                          [("digikey", "DigiKey", 2), ("sevskiy-shop", "Webshop", 1), ("other", "інші", 1)])
         self.assertEqual([c["src"] for c in customers], [["digikey"], ["digikey", "sevskiy-shop"], []])
         self.assertEqual(_customer_sources([]), [])
+
+
+class IconsAndCodesTests(MenuBase):
+    """Значки категорій і проєктів, номер проєкту перед назвою в лівій колонці."""
+
+    def setUp(self):
+        super().setUp()
+        from projects.models import Project, ProjectLink
+        self.p = Project.objects.create(name="Transponder", status=Project.ACTIVE)
+        ProjectLink.objects.create(project=self.p, thread=self.a.thread, status=ProjectLink.CONFIRMED)
+
+    def test_icon_palette_and_project_icon(self):
+        page = self.client.get("/email/")
+        self.assertContains(page, 'id="wc-icons"')
+        self.assertContains(page, "prAction('icon')")
+        r = self.client.post(f"/projects/api/project/{self.p.pk}/rename/", json.dumps({"icon": "📡"}),
+                             content_type="application/json").json()
+        self.assertTrue(r["ok"])
+        self.p.refresh_from_db()
+        self.assertEqual((self.p.icon, self.p.name), ("📡", "Transponder"))   # назва не змінилась
+        page = self.client.get("/email/")
+        self.assertContains(page, f"📡 {self.p.code} · Transponder")    # ліва колонка
+        self.assertContains(page, f"📡 {self.p.code}</button>")         # мітка в рядку
+
+    def test_project_code_toggle(self):
+        self.assertContains(self.client.get("/email/"), f"{self.p.code} · Transponder")
+        r = self.client.post("/email/settings/toggle/", json.dumps({"field": "nav_project_codes", "value": False}),
+                             content_type="application/json").json()
+        self.assertTrue(r["ok"])
+        page = self.client.get("/email/")
+        self.assertNotContains(page, f'<span class="em-folder-label">{self.p.code} · Transponder')
+        self.assertContains(page, '<span class="em-folder-label">Transponder</span>')   # номер — у підказці
+        self.assertContains(page, "Показувати номер P-")
+
+    def test_icons_toggle(self):
+        self.client.post(f"/projects/api/project/{self.p.pk}/rename/", json.dumps({"icon": "📡"}),
+                         content_type="application/json")
+        self.dk.icon = "🟥"
+        self.dk.save()
+        page = self.client.get("/email/")
+        self.assertContains(page, "🟥 DigiKey")
+        self.assertContains(page, "prAction('work')")
+        self.client.post("/email/settings/toggle/", json.dumps({"field": "nav_icons", "value": False}),
+                         content_type="application/json")
+        page = self.client.get("/email/")
+        self.assertNotContains(page, '<span class="em-folder-label">🟥 DigiKey')
+        self.assertNotContains(page, f"📡 {self.p.code}")

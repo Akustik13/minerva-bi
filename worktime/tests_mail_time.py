@@ -274,7 +274,7 @@ class NoWorktimeDayTests(CategoryPageBase):
         WorkDay.objects.create(dante_user=self.du, date=MON, times=[])
         WorkDay.objects.create(dante_user=self.du, date=TUE, times=[{"coming": "08:00", "leaving": "16:00"}])
         page = self.client.get(self.url, {"u": self.du.pk, "from": MON.isoformat(), "to": TUE.isoformat()})
-        self.assertContains(page, f'value="{MON.isoformat()}|{self.dp.pk}" >')
+        self.assertContains(page, f'value="{MON.isoformat()}|{self.dp.pk}"  data-nowork="1">')   # не позначено
         self.assertContains(page, f'value="{TUE.isoformat()}|{self.dp.pk}" checked>')
         self.assertContains(page, "немає приходу / відходу")
         self.assertContains(page, f"day/?u={self.du.pk}&amp;d={MON.isoformat()}")
@@ -348,3 +348,39 @@ class DanteNameTests(ProjectBase):
             self.assertEqual(ProjectMap.objects.get(project=self.project).dante_project.dante_id, "555")
             with self.assertRaises(DanteError):   # задовгу назву askDANTE не надсилаємо
                 mapping.create_in_dante(self.project, name="x" * 51)
+
+    def test_attendance_choice_and_other_work_form(self):
+        from worktime.models import Booking
+        self.st.attendance_required = True
+        self.st.save()
+        self.msg(folder=EmailMessage.FOLDER_SENT)
+        WorkDay.objects.create(dante_user=self.du, date=MON, times=[])
+        page = self.client.get(self.url, {"u": self.du.pk, "from": MON.isoformat(), "to": TUE.isoformat()})
+        self.assertContains(page, 'name="attendance"')
+        self.assertContains(page, 'data-nowork="1"')
+        with mock.patch("worktime.mail_time.book") as book:
+            book.return_value = Booking(status=Booking.FAILED, error="x", date=MON, dante_project=self.dp)
+            self.client.post(self.url, {"u": self.du.pk, "from": MON.isoformat(), "to": TUE.isoformat(),
+                                        "action": "book", "attendance": "fixed",
+                                        "pick": [f"{MON.isoformat()}|{self.dp.pk}"]})
+        self.assertEqual(book.call_args[1]["attendance"], "fixed")
+
+
+class OtherWorkTests(ProjectBase):
+    """«📝 Інша робота на проєкт»: форма на картці проєкту → record/save → назад на «✉️ Час на пошту»."""
+
+    def test_form_and_save_returns_here(self):
+        ProjectMap.objects.create(project=self.project, dante_project=self.dp3)
+        page = self.client.get(self.url, {**self.args, "work": "1"})
+        self.assertContains(page, 'id="work" style="margin-top:8px" open')
+        self.assertContains(page, f'name="project" value="{self.dp3.pk}"')
+        back = f"{self.url}?proj={self.project.pk}&u={self.du.pk}"
+        with mock.patch("worktime.services.book_project") as book:
+            from worktime.models import Booking
+            book.return_value = Booking(status=Booking.SENT, date=MON, dante_project=self.dp3, duration=90)
+            r = self.client.post(reverse("admin:worktime_workday_record_save"), {
+                "mode": "new", "u": self.du.pk, "project": self.dp3.pk, "date": MON.isoformat(), "duration": "1:30",
+                "comment": "Messungen Antenne", "attendance": "fixed", "next": back})
+        self.assertEqual(r["Location"], back)
+        self.assertEqual(book.call_args[1]["attendance"], "fixed")
+        self.assertEqual(book.call_args[0][2], self.dp3)

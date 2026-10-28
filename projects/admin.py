@@ -86,7 +86,7 @@ class ProjectAdmin(admin.ModelAdmin):
     readonly_fields = ("code", "overview_panel", "mail_link", "timeline_html", "offers_panel", "dante_hours",
                        "source_thread_link", "created_by", "created_at", "updated_at")
     fieldsets = [
-        (None, {"fields": ["code", "name", "status", "customer", "owner", "due_date", "next_action"]}),
+        (None, {"fields": ["code", "name", "icon", "status", "customer", "owner", "due_date", "next_action"]}),
         ("🧭 Огляд проєкту", {"fields": ["overview_panel"]}),
         ("Опис і вимоги", {"fields": ["description"]}),
         ("Листування й хронологія", {"fields": ["mail_link", "timeline_html"]}),

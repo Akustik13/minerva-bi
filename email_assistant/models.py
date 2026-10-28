@@ -289,6 +289,15 @@ class EmailSettings(models.Model):
     show_admin_sidebar = models.BooleanField(
         default=True, verbose_name='Показувати панель навігації Minerva',
         help_text='Відображати ліве меню системи на сторінках Email асистента')
+    sender_logos = models.BooleanField(
+        default=True, verbose_name='Логотипи відправників',
+        help_text='Значок сайту домену відправника замість букви в кружку (email_assistant/logos.py)')
+    nav_icons = models.BooleanField(
+        default=True, verbose_name='Значки категорій і проєктів',
+        help_text='Емодзі перед назвою своїх категорій і проєктів у лівій колонці й мітках листів')
+    nav_project_codes = models.BooleanField(
+        default=True, verbose_name='Номер проєкту перед назвою',
+        help_text='Ліва колонка скриньки «📁 Проєкти»: «P-2026-002 · Назва» або лише назва')
     hidden_work_categories = models.JSONField(
         default=list, blank=True, verbose_name='Сховані свої категорії',
         help_text='pk своїх категорій, яких не показувати в лівій колонці скриньки (правий клік → «Сховати»)')

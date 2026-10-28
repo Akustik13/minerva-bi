@@ -23,6 +23,8 @@ class Project(models.Model):
     code = models.CharField("Код", max_length=20, unique=True, editable=False,
                             help_text="P-РРРР-NNN; якщо згадати код у темі листа, лист сам прив'яжеться до проєкту")
     name = models.CharField("Назва", max_length=200)
+    icon = models.CharField("Значок", max_length=8, blank=True, default="",
+                            help_text="Емодзі в пошті замість 📁 (правий клік на проєкті → «🎨 Значок…»)")
     description = models.TextField("Опис / вимоги", blank=True, default="")
     customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.SET_NULL,
                                  related_name="projects", verbose_name="Клієнт")

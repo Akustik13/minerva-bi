@@ -90,6 +90,26 @@
   <div class="mt-muted">{% trans "Незаписані дні вже позначено — перевірте опис і натисніть «✓ Записати» внизу; повторний запис дописує лише різницю." %}
     {% if not st.mail_projects %}<br>⚠️ {% trans "Листи проєктів Minerva зараз не рахуються — увімкніть «Листи проєктів Minerva — на їхній проєкт askDANTE» у" %} <a href="{{ settings_url }}">⚙️ {% trans "налаштуваннях askDANTE" %}</a>.{% endif %}
     · <a href="{{ proj_url }}">📁 {% trans "проєкт" %}</a> · <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}">{% trans "усе" %}</a></div>
+  {% if du %}
+  <details id="work" style="margin-top:8px"{% if open_work %} open{% endif %}>
+    <summary>📝 <b>{% trans "Інша робота на цей проєкт" %}</b> — {% trans "не листи: виміри, розробка, зустріч, дзвінок…" %}</summary>
+    <form method="post" action="{{ save_url }}" class="mt-form" id="mt-work" style="margin-top:6px">{% csrf_token %}
+      <input type="hidden" name="mode" value="new"><input type="hidden" name="u" value="{{ du.pk }}">
+      <input type="hidden" name="project" value="{{ pmap.dante_project_id }}"><input type="hidden" name="next" value="{{ page_url }}">
+      <label>{% trans "Дата" %}<input type="date" name="date" value="{{ today|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" required></label>
+      <label>{% trans "з" %}<input type="time" name="start"></label><label>{% trans "по" %}<input type="time" name="stop"></label>
+      <label>{% trans "або тривалість" %}<input type="text" name="duration" placeholder="1:30" size="6"></label>
+      <label>{% trans "Вид роботи" %}<select name="activity"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}">{{ a.name }}</option>{% endfor %}</select></label>
+      {% if st.attendance_required %}<label title="{% trans "askDANTE приймає час на проєкт лише в межах приходу–відходу" %}">{% trans "Без приходу в askDANTE" %}<select name="attendance">
+        <option value="">{% trans "не записувати" %}</option><option value="fixed">{% trans "спершу прихід і відхід" %} {{ day_times }}</option>
+        <option value="activity">{% trans "спершу за активністю в Minerva" %}</option></select></label>{% endif %}
+      <label style="flex-basis:100%">{% trans "Що робили (підказка для AI)" %}<input type="text" id="mt-work-hint" placeholder="{% trans "напр. виміри антени в камері, правки PCB" %}"></label>
+      <label style="flex-basis:100%">{% trans "Опис для askDANTE" %} ({{ lang }})<textarea name="comment" id="mt-work-comment" rows="3" maxlength="500" style="width:100%" required></textarea></label>
+      <button type="button" class="button" onclick="mtWorkDescribe(this)">✍️ {% trans "Описати детально (AI)" %}</button>
+      <button class="button default" onclick="return confirm('{% trans "Записати в askDANTE? Через API askDANTE запис потім не виправити й не видалити." %}')">✓ {% trans "Записати в askDANTE" %}</button>
+    </form>
+  </details>
+  {% endif %}
   {% else %}
   ⚠️ 📁 <b>{{ focus_proj.code }} {{ focus_proj.name }}</b>: {% trans "у проєкту ще немає проєкту askDANTE." %}
   {% if can_bind %}
@@ -169,7 +189,7 @@
       {% if d.unmapped %}<span class="mt-muted">· {% trans "ще листів без категорії / проєкту askDANTE" %}: {{ d.unmapped }}{% if show == "dante" %} — <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}&show=all">{% trans "показати" %}</a>{% endif %}</span>{% endif %}</h3>
     {% for r in d.rows %}
     <div class="mt-row">
-      <input type="checkbox" name="pick" value="{{ d.day|date:'Y-m-d' }}|{{ r.dp.pk }}" {% if not r.to_book %}disabled{% elif not r.no_worktime %}checked{% endif %}>
+      <input type="checkbox" name="pick" value="{{ d.day|date:'Y-m-d' }}|{{ r.dp.pk }}" {% if not r.to_book %}disabled{% elif not r.no_worktime %}checked{% endif %}{% if r.to_book and r.no_worktime and not d.ongoing %} data-nowork="1"{% endif %}>
       <div><b>{{ r.label }}</b>{% if r.auto %} <span class="mt-badge">{% trans "авто" %}</span>{% endif %}
         <div class="mt-muted">→ askDANTE: {{ r.dp }}</div></div>
       <div>{% if r.replies %}📤 {{ r.replies }} {% trans "відп." %} {% endif %}{% if r.received %}📥 {{ r.received }} {% trans "лист." %} {% endif %}{% if r.orders %}🧾 {{ r.orders }} {% trans "замовл." %}{% endif %}
@@ -239,6 +259,11 @@
   <div class="mt-bar">
     <label class="mt-muted">{% trans "Вид роботи" %}
       <select name="activity"><option value="">{% trans "як у категорії / налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if needs_activity and forloop.first and activities|length == 1 %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></label>
+    {% if st.attendance_required %}<label class="mt-muted" title="{% trans "askDANTE приймає час на проєкт лише в межах приходу–відходу. Свята, відпустки, вихідні й сьогоднішній день — не заповнюються" %}">{% trans "Днів без приходу" %}
+      <select name="attendance" id="mt-attendance">
+        <option value="">{% trans "не записувати" %}</option>
+        <option value="fixed">{% trans "спершу прихід і відхід стандартного дня" %} {{ day_times }}</option>
+        <option value="activity">{% trans "спершу прихід і відхід за активністю в Minerva" %}</option></select></label>{% endif %}
     <button class="button" name="action" value="describe" title="{% trans "Одне речення про суть листів кожного рядка — потім можна виправити" %}">📝 {% trans "Описати листи (AI)" %}</button>
     <button class="button default" type="submit" name="action" value="book"{% if not st.enabled %} disabled{% endif %}>✓ {% trans "Записати вибране в askDANTE" %}</button>
     <span class="mt-muted">{% trans "Записи askDANTE через API не виправляються й не видаляються — перевірте опис перед записом (виправити потім — «♻ Перезаписати»). Записане не дублюється: наступного разу піде лише різниця." %}</span>
@@ -247,6 +272,29 @@
 {% endif %}
 
 <script>
+async function mtWorkDescribe(btn) {   // те саме, що «✍️ Описати детально» в календарі робочого часу (record_ai.describe)
+  var f = document.getElementById('mt-work'), fd = new FormData();
+  ['u', 'date', 'project', 'start', 'stop'].forEach(function(k){ fd.append(k, f.elements[k].value); });
+  fd.append('current', f.elements['comment'].value); fd.append('hint', document.getElementById('mt-work-hint').value);
+  var old = btn.textContent; btn.disabled = true; btn.textContent = '⏳…';
+  try {
+    var r = await fetch('{{ describe_url }}', {method: 'POST', headers: {'X-CSRFToken': f.elements['csrfmiddlewaretoken'].value}, body: fd});
+    var d = await r.json();
+    if (d.ok && d.text) f.elements['comment'].value = d.text; else alert(d.error || '{% trans "AI не дав опису" %}');
+  } catch (e) { alert(e.message); }
+  btn.disabled = false; btn.textContent = old;
+}
+(function(){   // «спершу прихід і відхід» — позначити й дні без приходу (крім сьогоднішнього); вибір пам'ятається
+  var sel = document.getElementById('mt-attendance');
+  if (!sel) return;
+  try { sel.value = localStorage.getItem('mt-attendance') || ''; } catch (e) {}
+  function apply() {
+    document.querySelectorAll('input[name="pick"][data-nowork]').forEach(function(c){ c.checked = !!sel.value; });
+    try { localStorage.setItem('mt-attendance', sel.value); } catch (e) {}
+  }
+  sel.addEventListener('change', apply);
+  if (sel.value) apply();
+})();
 function mtConfirm(e){
   var by = e && e.submitter;
   if (by && by.value === 'describe') return true;

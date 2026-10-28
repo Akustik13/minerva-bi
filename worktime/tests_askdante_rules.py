@@ -132,3 +132,19 @@ class WorktimeRequiredTests(Base):
         services.refresh_days(self.du, self.sun, MON, self.fake)
         self.assertFalse(services.has_worktime(self.du, self.sun))
         self.assertTrue(services.has_worktime(self.du, MON))
+
+    def test_attendance_first_when_chosen(self):
+        st = DanteSettings.get()
+        st.attendance_required = True
+        st.save()
+        tue = MON + datetime.timedelta(days=1)
+        b = services.book_project(self.du, tue, self.dp, start=datetime.time(10, 0), stop=datetime.time(10, 30),
+                                  attendance=DanteSettings.MODE_FIXED)
+        self.assertEqual(b.status, Booking.SENT)
+        kinds = ["project" if "projectData" in r else "attendance" for r in self.fake.calls if r["date"] == tue.isoformat()]
+        self.assertEqual(kinds, ["attendance", "project"])   # спершу прихід / відхід, потім час на проєкт
+        self.assertTrue(services.has_worktime(self.du, tue))
+        with self.assertRaises(DanteError) as e:   # неділя — вихідний: прихід автоматично не ставиться
+            services.book_project(self.du, self.sun, self.dp, start=datetime.time(10, 0), stop=datetime.time(10, 30),
+                                  attendance=DanteSettings.MODE_FIXED)
+        self.assertIn("не записано", e.exception.message)

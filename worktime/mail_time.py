@@ -416,7 +416,8 @@ def comment_for(du, r, st: DanteSettings, user=None) -> str:
 
 
 def book(du: DanteUser, day: datetime.date, dp_pk: int, user=None, source: str = Booking.MAIL,
-         st: DanteSettings | None = None, activity=None, comment: str | None = None) -> Booking:
+         st: DanteSettings | None = None, activity=None, comment: str | None = None,
+         attendance: str = "") -> Booking:
     """Записати в askDANTE оцінку дня по проєкту (лише ще не записану різницю)."""
     st = st or DanteSettings.get()
     if day > services.local_today():
@@ -427,7 +428,7 @@ def book(du: DanteUser, day: datetime.date, dp_pk: int, user=None, source: str =
     booking = services.book_project(du, day, r["dp"], minutes=r["to_book"], activity=r["activity"] or activity,
                                     comment=_plain(comment)[:COMMENT_MAX] if comment and comment.strip()
                                     else comment_for(du, r, st, user),
-                                    user=user, source=source, st=st, prefer=r["first"])
+                                    user=user, source=source, st=st, prefer=r["first"], attendance=attendance)
     if booking.status == Booking.SENT:
         entry, _ = MailTimeEntry.objects.get_or_create(dante_user=du, day=day, dante_project=r["dp"])
         entry.minutes_booked += r["to_book"]
