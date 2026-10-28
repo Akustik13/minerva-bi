@@ -83,6 +83,27 @@
 
 /* ── Panel 2 search ── */
 .em-p2-search-row{padding:5px 10px 4px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
+.em-sync-more{display:flex;flex-direction:column;gap:4px}
+.em-sync-more[open]{gap:4px}
+.em-sync-more > summary{list-style:none;justify-content:center}
+.em-sync-more > summary::-webkit-details-marker{display:none}
+.em-sync-more[open] > summary{margin-bottom:4px}
+.em-nav-n{font-size:11px;color:var(--text-dim);flex-shrink:0}
+.em-nav-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.em-nav-sub{font-size:10px;color:var(--text-dim);padding:6px 12px 2px 15px;text-transform:uppercase;letter-spacing:.05em}
+.em-nav-item{padding:5px 12px;font-size:12px}
+.em-nav-head{cursor:pointer}
+.em-nav-tg.collapsed{transform:rotate(-90deg)}
+.em-nav-body[hidden]{display:none}
+.em-nav-search{padding:2px 10px 4px;position:relative}
+.em-p1.collapsed .em-nav{display:none}
+body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:-2px}
+.em-drop.em-drop-on{background:rgba(26,115,232,.18)!important;color:var(--text)}
+.em-chips{flex-wrap:wrap}
+.em-chip{--c:#1a73e8;display:inline-flex;align-items:center;gap:4px;border:1px solid var(--c);color:var(--c);border-radius:12px;
+  padding:1px 4px 1px 9px;font-size:11px;font-weight:600;background:color-mix(in srgb,var(--c) 10%,transparent)}
+.em-chip button{border:none;background:none;color:inherit;cursor:pointer;font-size:11px;padding:0 3px}
+.em-chips-hint{font-size:10px;color:var(--text-dim);margin-left:auto}
 .em-p2-filter-row{padding:4px 10px 5px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border);position:relative}
 .em-p2-filter-sel{flex:1;min-width:0;padding:4px 6px;border-radius:6px;border:1px solid var(--border-strong);
   background:var(--bg-input);color:var(--text);font-size:11px;cursor:pointer;outline:none}
@@ -314,6 +335,84 @@
         {% endwith %}
       </a>
       {% endfor %}
+      <!-- ── Категорії / проєкти / клієнти — як папки й мітки в Thunderbird: клік — показати, лист сюди — віднести ── -->
+      <div class="em-nav" id="em-nav">
+        <div class="em-folders-divider em-nav-head" data-sec="cats">
+          <button class="em-folders-divider-toggle em-nav-tg" type="button">▾</button>
+          <span>🏷 {% trans "Категорії" %}</span>
+          <a class="em-folders-divider-add" href="/admin/email_assistant/mailcategory/" title="{% trans "Свої категорії й правила" %}">⚙</a>
+        </div>
+        <div class="em-nav-body" data-sec="cats">
+          {% for c, n, unread in work_categories %}
+          <a href="#" class="em-folder-link em-nav-item em-drop{% if work_filter.pk == c.pk %} active{% endif %}" data-wcat="{{ c.pk }}"
+             onclick="return emNav(event, 'wcat', '{{ c.pk }}')" title="{{ c.name }} — {% trans "клік: показати; перетягніть лист сюди — віднести" %}">
+            <span class="em-nav-dot" style="background:{{ c.color }}"></span><span class="em-folder-label">{{ c.label }}</span>
+            {% if unread %}<span class="em-badge">{{ unread }}</span>{% elif n %}<span class="em-nav-n">{{ n }}</span>{% endif %}
+          </a>
+          {% endfor %}
+          {% if work_categories %}
+          <a href="#" class="em-folder-link em-nav-item{% if no_category %} active{% endif %}" onclick="return emNav(event, 'wcat', '0')"
+             title="{% trans "Листи, яких ще немає в жодній своїй категорії" %}">
+            <span class="em-nav-dot" style="background:transparent;border:1px dashed var(--text-dim)"></span>
+            <span class="em-folder-label">{% trans "Без своєї категорії" %}</span>{% if no_category_count %}<span class="em-nav-n">{{ no_category_count }}</span>{% endif %}
+          </a>
+          {% endif %}
+          {% if quote_count %}
+          <a href="#" class="em-folder-link em-nav-item{% if quote_filter %} active{% endif %}" onclick="return emNav(event, 'quote', '1')"
+             title="{% trans "Листи, схожі на запит пропозиції, по яких ще немає Angebot" %}">
+            <span class="em-folder-icon">📝</span><span class="em-folder-label">{% trans "Запити пропозицій" %}</span><span class="em-badge">{{ quote_count }}</span>
+          </a>
+          {% endif %}
+          <div class="em-nav-sub">{% trans "Хто пише" %}</div>
+          {% for key, label, n, unread in categories %}{% if n %}
+          <a href="#" class="em-folder-link em-nav-item{% if cat_filter == key %} active{% endif %}" onclick="return emNav(event, 'cat', '{{ key }}')">
+            <span class="em-folder-label">{{ label }}</span>
+            {% if unread %}<span class="em-badge">{{ unread }}</span>{% else %}<span class="em-nav-n">{{ n }}</span>{% endif %}
+          </a>
+          {% endif %}{% endfor %}
+        </div>
+
+        {% if nav_projects or project_filter %}
+        <div class="em-folders-divider em-nav-head" data-sec="proj">
+          <button class="em-folders-divider-toggle em-nav-tg" type="button">▾</button>
+          <span>📁 {% trans "Проєкти" %}</span>
+          <a class="em-folders-divider-add" href="/admin/projects/project/" title="{% trans "Усі проєкти" %}">⋯</a>
+        </div>
+        <div class="em-nav-body" data-sec="proj">
+          {% if project_filter %}{% with pf=project_filter %}
+          <a href="#" class="em-folder-link em-nav-item active" onclick="return emNav(event, 'project', '{{ pf.pk }}')">
+            <span class="em-folder-label">{{ pf.code }} · {{ pf.name }}</span></a>{% endwith %}{% endif %}
+          {% for p in nav_projects %}{% if p.project_id != project_filter.pk %}
+          <a href="#" class="em-folder-link em-nav-item" onclick="return emNav(event, 'project', '{{ p.project_id }}')" title="{{ p.project__name }}">
+            <span class="em-folder-label">{{ p.project__code }} · {{ p.project__name }}</span><span class="em-nav-n">{{ p.n }}</span>
+          </a>
+          {% endif %}{% endfor %}
+        </div>
+        {% endif %}
+
+        {% if mail_customers %}
+        <div class="em-folders-divider em-nav-head" data-sec="cust">
+          <button class="em-folders-divider-toggle em-nav-tg" type="button">▾</button>
+          <span>👤 {% trans "Клієнти" %}</span><span></span>
+        </div>
+        <div class="em-nav-body" data-sec="cust">
+          <div class="em-cust-box em-nav-search">
+            <input class="em-p2-filter-sel{% if customer_filter %} on{% endif %}" id="em-cust-inp" type="search" autocomplete="off"
+                   placeholder="🔍 {% trans "Клієнт: почніть вводити…" %}" value="{{ customer_filter.name|default:'' }}"
+                   oninput="custSuggest(this.value)" onfocus="custSuggest(this.value)" onkeydown="custKey(event)"
+                   onblur="setTimeout(custHide, 150)">
+            <input type="hidden" id="em-cust-sel" value="{{ customer_filter.pk|default:'' }}">
+            <div class="em-cust-list" id="em-cust-list"></div>
+          </div>
+          {% for c in mail_customers|slice:":8" %}
+          <a href="#" class="em-folder-link em-nav-item{% if customer_filter.pk == c.id %} active{% endif %}" onclick="return emNav(event, 'customer', '{{ c.id }}')" title="{{ c.email }}">
+            <span class="em-folder-label">{{ c.name }}</span>
+            {% if c.unread %}<span class="em-badge">{{ c.unread }}</span>{% else %}<span class="em-nav-n">{{ c.n }}</span>{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
       <!-- Server folders (loaded via AJAX) -->
       <div id="em-server-folders"></div>
     </div>
@@ -322,6 +421,8 @@
       <button class="em-sync-btn" onclick="syncNow(this,false)" title="{% trans "Завантажити нові листи з вхідних" %}">
         🔄 {% trans "Синхронізувати" %}
       </button>
+      <details class="em-sync-more" id="em-sync-more">
+      <summary class="em-sync-btn">⋯ {% trans "Ще: папки, налаштування, AI" %}</summary>
       <button class="em-sync-btn" onclick="syncAllFolders(this)" title="{% trans "Синхронізувати всі IMAP-папки (повільно)" %}">
         📂 {% trans "Всі папки" %}
       </button>
@@ -364,6 +465,7 @@
         </select>
       </label>
       {% endif %}
+      </details>
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
       <div id="sync-countdown"></div>
     </div>
@@ -407,53 +509,19 @@
               title="{% if grouped %}{% trans "Гілки листування: увімкнено — кожна гілка одним рядком з кількістю листів" %}{% else %}{% trans "Групувати по гілці листування" %}{% endif %}">⎘</button>
     </div>
 
-    <!-- Category / customer filter -->
-    <div class="em-p2-filter-row">
-      <select class="em-p2-filter-sel{% if cat_filter or work_filter %} on{% endif %}" id="em-cat-sel"
-              onchange="applyMailFilter()" title="{% trans "Показати листи певної категорії (по всіх папках)" %}">
-        <option value="">🗂 {% trans "Усі категорії" %}</option>
-        {% if work_categories %}
-        <optgroup label="{% trans "Свої категорії" %}">
-          {% for c, n, unread in work_categories %}
-          <option value="w{{ c.pk }}"{% if work_filter.pk == c.pk %} selected{% endif %}{% if not n %} disabled{% endif %}>
-            {{ c.label }} · {{ n }}{% if unread %} ({{ unread }} {% trans "нових" %}){% endif %}
-          </option>
-          {% endfor %}
-        </optgroup>
-        <optgroup label="{% trans "Хто пише" %}">
-        {% endif %}
-        {% for key, label, n, unread in categories %}
-        <option value="{{ key }}"{% if cat_filter == key %} selected{% endif %}{% if not n %} disabled{% endif %}>
-          {{ label }} · {{ n }}{% if unread %} ({{ unread }} {% trans "нових" %}){% endif %}
-        </option>
-        {% endfor %}
-        {% if work_categories %}</optgroup>{% endif %}
-      </select>
-      <div class="em-cust-box">
-        <input class="em-p2-filter-sel{% if customer_filter %} on{% endif %}" id="em-cust-inp" type="search"
-               autocomplete="off" placeholder="👤 {% trans "Клієнт: почніть вводити…" %}"
-               value="{{ customer_filter.name|default:'' }}"
-               oninput="custSuggest(this.value)" onfocus="custSuggest(this.value)" onkeydown="custKey(event)"
-               onblur="setTimeout(custHide, 150)" title="{% trans "Листи конкретного клієнта (по всіх папках)" %}">
-        <input type="hidden" id="em-cust-sel" value="{{ customer_filter.pk|default:'' }}">
-        <div class="em-cust-list" id="em-cust-list"></div>
-      </div>
-      <select class="em-p2-filter-sel{% if project_filter %} on{% endif %}" id="em-proj-sel"
-              onchange="applyMailFilter()" title="{% trans "Листи проєкту — усі його гілки, по всіх папках" %}">
-        <option value="">📁 {% trans "Усі проєкти" %}</option>
-        {% if project_filter and project_filter not in open_projects %}
-        <option value="{{ project_filter.pk }}" selected>{{ project_filter.code }} · {{ project_filter.name|truncatechars:40 }}</option>
-        {% endif %}
-        {% for p in open_projects %}
-        <option value="{{ p.pk }}"{% if project_filter.pk == p.pk %} selected{% endif %}>{{ p.code }} · {{ p.name|truncatechars:40 }}</option>
-        {% endfor %}
-      </select>
-      <button class="em-p2-filter-sel em-p2-quote{% if quote_filter %} on{% endif %}" onclick="toggleQuoteFilter()"
-              title="{% trans "Листи, схожі на запит пропозиції, по яких ще немає Angebot (по всіх папках)" %}">📝{% if quote_count %} {{ quote_count }}{% endif %}</button>
-      {% if cat_filter or work_filter or customer_filter or project_filter or quote_filter %}
-      <button class="em-p2-filter-clear" onclick="clearMailFilter()" title="{% trans "Скинути фільтр" %}">✕</button>
-      {% endif %}
+    <!-- Активні фільтри — чипи з ✕ (вибір — у лівій колонці: категорії, проєкти, клієнти) -->
+    {% if cat_filter or work_filter or customer_filter or project_filter or quote_filter %}
+    <div class="em-p2-filter-row em-chips">
+      {% if work_filter and not no_category %}<span class="em-chip" style="--c:{{ work_filter.color }}">{{ work_filter.label }}<button onclick="emDrop('wcat')" title="{% trans "Прибрати" %}">✕</button></span>{% endif %}
+      {% if no_category %}<span class="em-chip">{% trans "Без своєї категорії" %}<button onclick="emDrop('wcat')">✕</button></span>{% endif %}
+      {% if cat_filter %}{% for key, label, n, unread in categories %}{% if key == cat_filter %}<span class="em-chip">{{ label }}<button onclick="emDrop('cat')">✕</button></span>{% endif %}{% endfor %}{% endif %}
+      {% if project_filter %}<span class="em-chip" style="--c:#16a34a">📁 {{ project_filter.code }}<button onclick="emDrop('project')">✕</button></span>{% endif %}
+      {% if customer_filter %}<span class="em-chip" style="--c:#3b82f6">👤 {{ customer_filter.name|truncatechars:28 }}<button onclick="emDrop('customer')">✕</button></span>{% endif %}
+      {% if quote_filter %}<span class="em-chip" style="--c:#c026d3">📝 {% trans "запити" %}<button onclick="emDrop('quote')">✕</button></span>{% endif %}
+      <button class="em-p2-filter-clear" onclick="clearMailFilter()" title="{% trans "Скинути всі фільтри" %}">{% trans "✕ усе" %}</button>
+      <span class="em-chips-hint">{% trans "по всіх папках" %}</span>
     </div>
+    {% endif %}
 
     <!-- Bulk actions bar (visible when rows are selected) -->
     <div class="em-bulk-bar" id="em-bulk-bar">
@@ -1030,20 +1098,85 @@ window.spamRow = function(pk) {
 };
 
 /* ── Category / customer filter (server-side, зберігається в URL) ── */
+// Клієнт із пошуку в лівій колонці (custPick) → ?customer=
 function applyMailFilter() {
   var params = new URLSearchParams(location.search);
-  var cat  = document.getElementById('em-cat-sel').value;
-  // свої категорії — value «w<pk>» → ?wcat=<pk>; тип співрозмовника → ?cat=
-  params.delete('wcat');
-  if (cat.charAt(0) === 'w') { params.set('wcat', cat.slice(1)); cat = ''; }
-  var cust = document.getElementById('em-cust-sel').value;
-  var proj = document.getElementById('em-proj-sel').value;
-  if (cat) params.set('cat', cat); else params.delete('cat');
+  var cust = (document.getElementById('em-cust-sel') || {}).value;
   if (cust) params.set('customer', cust); else params.delete('customer');
-  if (proj) params.set('project', proj); else params.delete('project');
   params.delete('page');
   location.search = params.toString();
 }
+// Ліва колонка: клік — показати (ще раз по активному — прибрати); своя категорія й тип співрозмовника — одне з двох
+function emNav(ev, key, value) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  var params = new URLSearchParams(location.search);
+  if (params.get(key) === String(value)) params.delete(key); else params.set(key, value);
+  if (key === 'wcat') params.delete('cat');
+  if (key === 'cat') params.delete('wcat');
+  params.delete('page');
+  location.search = params.toString();
+  return false;
+}
+function emDrop(key) {
+  var params = new URLSearchParams(location.search);
+  params.delete(key); params.delete('page');
+  location.search = params.toString();
+}
+(function(){   // «⋯ Ще» під «Синхронізувати» — пам'ятає, чи розгорнуто
+  var more = document.getElementById('em-sync-more');
+  if (!more) return;
+  try { more.open = localStorage.getItem('em-sync-more') === '1'; } catch (e) {}
+  more.addEventListener('toggle', function(){ try { localStorage.setItem('em-sync-more', more.open ? '1' : '0'); } catch (e) {} });
+})();
+(function(){   // розділи лівої колонки згортаються (localStorage em-nav-<розділ>)
+  document.querySelectorAll('.em-nav-head').forEach(function(h){
+    var sec = h.dataset.sec, body = document.querySelector('.em-nav-body[data-sec="' + sec + '"]');
+    var closed = false;
+    try { closed = localStorage.getItem('em-nav-' + sec) === '1'; } catch (e) {}
+    function show(){ if (body) body.hidden = closed; h.querySelector('.em-nav-tg').classList.toggle('collapsed', closed); }
+    h.addEventListener('click', function(e){
+      if (e.target.closest('a')) return;
+      closed = !closed;
+      try { localStorage.setItem('em-nav-' + sec, closed ? '1' : '0'); } catch (err) {}
+      show();
+    });
+    show();
+  });
+})();
+// Перетягнути лист (рядок) на свою категорію ліворуч — віднести (правило для співрозмовника; Alt — увесь домен)
+(function(){
+  // делегування: рядки підміняються без перезавантаження (швидкий пошук), тож draggable ставиться при наведенні
+  document.addEventListener('mouseover', function(e){
+    var r = e.target.closest && e.target.closest('.em-row[data-pk]');
+    if (r && !r.hasAttribute('draggable')) r.setAttribute('draggable', 'true');
+  });
+  document.addEventListener('dragstart', function(e){
+    var r = e.target.closest && e.target.closest('.em-row[data-pk]');
+    if (!r) return;
+    e.dataTransfer.setData('text/plain', r.dataset.pk);
+    e.dataTransfer.effectAllowed = 'copy';
+    document.body.classList.add('em-dragging');
+  });
+  document.addEventListener('dragend', function(){ document.body.classList.remove('em-dragging'); });
+  document.querySelectorAll('.em-drop').forEach(function(t){
+    t.addEventListener('dragover', function(e){ e.preventDefault(); t.classList.add('em-drop-on'); });
+    t.addEventListener('dragleave', function(){ t.classList.remove('em-drop-on'); });
+    t.addEventListener('drop', async function(e){
+      e.preventDefault(); t.classList.remove('em-drop-on');
+      var pk = e.dataTransfer.getData('text/plain');
+      if (!pk) return;
+      try {
+        var r = await fetch('/email/message/' + pk + '/work-category/', {method: 'POST',
+          headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+          body: JSON.stringify({category: t.dataset.wcat, scope: e.altKey ? 'domain' : 'sender'})});
+        var d = await r.json();
+        if (!d.ok) { _showToast('⚠️ ' + (d.error || _i18n.помилка)); return; }
+        _showToast('🏷 ' + d.category + ' · {% trans "правило для" %} ' + d.key + (d.changed ? ' · {% trans "оновлено листів" %}: ' + d.changed : ''));
+        setTimeout(function(){ location.reload(); }, 800);
+      } catch (err) { _showToast('⚠️ ' + _i18n.помилка); }
+    });
+  });
+})();
 /* ── Клієнт: пошук за першими літерами з підсвіткою збігу ── */
 var _custData = JSON.parse(document.getElementById('em-customers-data').textContent || '[]');
 var _custActive = -1;
@@ -1113,6 +1246,8 @@ function filterMailBy(ev, key, value) {
   ev.stopPropagation();
   var params = new URLSearchParams(location.search);
   params.set(key, value);
+  if (key === 'wcat') params.delete('cat');
+  if (key === 'cat') params.delete('wcat');
   params.delete('page');
   location.search = params.toString();
 }

@@ -39,14 +39,16 @@
   <h3>1 · 🔎 {% trans "Знайти групи в пошті" %}</h3>
   <form method="get" class="ct-row">
     <input type="hidden" name="scan" value="1">
-    <label class="ct-muted">{% trans "за" %} <select name="days"><option value="30"{% if days == 30 %} selected{% endif %}>30</option><option value="60"{% if days == 60 %} selected{% endif %}>60</option>
-      <option value="90"{% if days == 90 %} selected{% endif %}>90</option><option value="180"{% if days == 180 %} selected{% endif %}>180</option></select> {% trans "днів" %}</label>
+    <label class="ct-muted">{% trans "з" %} <input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}"></label>
+    <label class="ct-muted">{% trans "по" %} <input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}"></label>
+    <span class="ct-muted">{% trans "або" %} <a href="?scan=1&days=7">7</a> · <a href="?scan=1&days=30">30</a> · <a href="?scan=1&days=90">90</a> {% trans "днів" %}</span>
     <button class="button default">🔎 {% trans "Знайти" %}</button>
     <span class="ct-muted">{% trans "Лише листи, які ще не в жодній своїй категорії; групи від 5 листів." %}</span>
   </form>
   {% if scanned %}
     {% if suggestions %}
-    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="create"><input type="hidden" name="days" value="{{ days }}">
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="create">
+      <input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}">
       <div class="ct-scroll"><table class="ct-table">
         <tr><th></th><th>{% trans "Назва категорії" %}</th><th>{% trans "Правила" %}</th><th>{% trans "Листів" %}</th><th>{% trans "Приклади тем" %}</th></tr>
         {% for s in suggestions %}
@@ -75,7 +77,7 @@
   {% if rows %}
   <form method="post">{% csrf_token %}<input type="hidden" name="action" value="save">
     <div class="ct-scroll"><table class="ct-table">
-      <tr><th>{% trans "Категорія" %}</th><th>{% trans "Листів" %}<br>{{ days }} {% trans "дн." %}</th><th>{% trans "Проєкт askDANTE" %}</th><th>{% trans "або новий проєкт / підпроєкт" %}</th>
+      <tr><th>{% trans "Категорія" %}</th><th>{% trans "Листів" %}<br>{{ date_from|date:"d.m" }}–{{ date_to|date:"d.m" }}</th><th>{% trans "Проєкт askDANTE" %}</th><th>{% trans "або новий проєкт / підпроєкт" %}</th>
         <th>{% trans "Вид роботи" %}</th><th>{% trans "хв: відповідь / лист / замовл." %}</th><th>{% trans "Авто" %}</th></tr>
       {% for r in rows %}
       <tr>

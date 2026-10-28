@@ -16,7 +16,7 @@ from worktime.tests import MON, Base
 from worktime.tests_mail_time import MailTimeBase
 
 
-class SuggestTests(Base):
+class SuggestBase(Base):
     def setUp(self):
         super().setUp()
         self.acc = EmailAccount.objects.create(user=self.user, email_address="anna@example.com", imap_username="a",
@@ -35,6 +35,8 @@ class SuggestTests(Base):
             EmailMessage.objects.filter(pk=m.pk).update(category=category)
         return m
 
+
+class SuggestTests(SuggestBase):
     def test_groups_from_orders_and_service_domains(self):
         for i in range(6):
             self.mail("marketplace@digikey.com", f"Your order #10112197{i} has shipped", category="service")
@@ -102,3 +104,15 @@ class OrderRefsTests(MailTimeBase):
         self.assertEqual(r["refs"], {"101121975": 2, "101121980": 1})
         text = mail_time.default_comment(r, "de")   # день 0:30 на 3 листи: 2 листи → 0:20, 1 → 0:10
         self.assertTrue(text.startswith("E-Mails DigiKey: Aufträge: 101121975 ~0:20, 101121980 ~0:10 · "), text)
+
+
+class PeriodTests(SuggestBase):
+    def test_suggest_only_inside_from_to(self):
+        old = timezone.now() - datetime.timedelta(days=20)
+        for i in range(6):
+            m = self.mail("marketplace@digikey.com", f"Order 10112197{i}", category="service")
+            EmailMessage.objects.filter(pk=m.pk).update(sent_at=old)
+        today = timezone.localdate()
+        self.assertEqual(work_categories.suggest(date_from=today - datetime.timedelta(days=7), date_to=today), [])
+        found = work_categories.suggest(date_from=today - datetime.timedelta(days=30), date_to=today)
+        self.assertEqual([g["key"] for g in found], ["digikey"])

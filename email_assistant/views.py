@@ -255,12 +255,29 @@ def _parse_mail_filter(request):
     return cat, customer
 
 
+NO_CATEGORY = 'none'   # ?wcat=0 — листи без своєї категорії
+
+
 def _parse_work_filter(request):
-    """Своя категорія з ?wcat=<pk>."""
-    if not str(request.GET.get('wcat', '')).isdigit():
+    """Своя категорія з ?wcat=<pk>; ?wcat=0 — листи без своєї категорії (NO_CATEGORY)."""
+    value = str(request.GET.get('wcat', ''))
+    if value == '0':
+        return NO_CATEGORY
+    if not value.isdigit():
         return None
     from email_assistant.models import MailCategory
-    return MailCategory.objects.filter(pk=int(request.GET['wcat'])).first()
+    return MailCategory.objects.filter(pk=int(value)).first()
+
+
+def _nav_projects(account, limit=15):
+    """Ліва колонка «📁 Проєкти»: відкриті проєкти з листами цієї скриньки, свіжі зверху."""
+    from django.db.models import Count, Max
+    from projects.models import Project, ProjectLink
+    return list(ProjectLink.objects.filter(status=ProjectLink.CONFIRMED, thread__account=account,
+                                           project__status__in=Project.OPEN_STATUSES)
+                .values('project_id', 'project__code', 'project__name')
+                .annotate(n=Count('thread__messages', distinct=True), last=Max('thread__last_message_at'))
+                .order_by('-last')[:limit])
 
 
 def _parse_project_filter(request):
@@ -382,7 +399,7 @@ def _filter_qs(cat, customer, project=None, quote=False, wcat=None) -> str:
     if cat:
         params['cat'] = cat
     if wcat:
-        params['wcat'] = wcat.pk
+        params['wcat'] = 0 if wcat == NO_CATEGORY else wcat.pk
     if customer:
         params['customer'] = customer.pk
     if project:
@@ -434,7 +451,9 @@ def inbox_view(request):
     work_categories = _work_counts(counts_qs)
     if cat_filter:
         qs = qs.filter(category=cat_filter)
-    if work_filter:
+    if work_filter == NO_CATEGORY:
+        qs = qs.filter(work_category=None)
+    elif work_filter:
         qs = qs.filter(work_category=work_filter)
     if customer_filter:
         from django.db.models import Q as _CQ
@@ -498,6 +517,9 @@ def inbox_view(request):
         'mail_customers':        mail_customers,
         'filter_qs':             _filter_qs(cat_filter, customer_filter, project_filter, quote_filter, work_filter),
         'work_filter':           work_filter,
+        'no_category':           work_filter == NO_CATEGORY,
+        'no_category_count':     counts_qs.filter(work_category=None).count() if work_categories else 0,
+        'nav_projects':          _nav_projects(account),
         'work_categories':       work_categories,
         'can_add_work_category': request.user.has_perm('email_assistant.add_mailcategory'),
         'grouped':               grouped,

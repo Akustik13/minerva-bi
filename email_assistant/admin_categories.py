@@ -80,8 +80,16 @@ class MailCategoryAdmin(admin.ModelAdmin):
 
     def recompute_view(self, request):
         if request.method == 'POST' and self.has_change_permission(request):
+            import datetime as _dt
+
+            def _d(v):
+                try:
+                    return _dt.date.fromisoformat(v)
+                except (TypeError, ValueError):
+                    return None
+            date_from, date_to = _d(request.POST.get('from')), _d(request.POST.get('to'))
             days = int(request.POST.get('days') or 730)
-            work_categories.start_recompute(days)
+            work_categories.start_recompute(days, date_from, date_to)
             messages.info(request, 'Перерахунок запущено у фоні — стан видно над списком.')
         return redirect(reverse('admin:email_assistant_mailcategory_changelist'))
 

@@ -124,7 +124,8 @@ class InboxTests(Base):
         page = self.client.get("/email/", {"wcat": self.dk.pk})
         self.assertContains(page, "DK order")
         self.assertNotContains(page, "Other mail")
-        self.assertContains(page, f'value="w{self.dk.pk}"')
+        self.assertContains(page, f'data-wcat="{self.dk.pk}"')   # категорія ліворуч — і ціль для перетягування
+        self.assertContains(page, "Без своєї категорії")
         self.assertContains(page, "ctxSetWorkCategory")
         r = self.client.post(f"/email/message/{dk.pk}/work-category/",
                              {"category": "new", "name": "Митниця", "scope": "thread"},
@@ -139,3 +140,17 @@ class InboxTests(Base):
         self.assertContains(self.client.get("/admin/email_assistant/mailcategory/"), "DigiKey")
         page = self.client.get(f"/admin/email_assistant/mailcategory/{self.dk.pk}/change/")
         self.assertContains(page, "askDANTE")
+
+
+class NavTests(Base):
+    def test_left_column_filters_and_no_category(self):
+        self.client.force_login(self.user)
+        self.mail("marketplace@digikey.com", subject="DK order")
+        self.mail("x@other.example", subject="Other mail")
+        page = self.client.get("/email/", {"wcat": 0})
+        self.assertContains(page, "Other mail")
+        self.assertNotContains(page, "DK order")
+        self.assertContains(page, "em-chip")
+        page = self.client.get("/email/")
+        self.assertNotContains(page, 'class="em-p2-filter-row em-chips"')   # без фільтрів — без чипів
+        self.assertNotContains(page, 'id="em-cat-sel"')                     # старих випадаючих списків немає

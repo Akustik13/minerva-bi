@@ -15,6 +15,13 @@ from .client import DanteError
 from .models import DanteActivity, DanteProject, DanteSettings, MailCategoryTime
 
 
+def _date(value):
+    try:
+        return datetime.date.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _int(value, default=0):
     try:
         return max(0, int(value))
@@ -29,7 +36,14 @@ def categories_page(model_admin, request):
         raise PermissionDenied
     st = DanteSettings.get()
     url = reverse("admin:worktime_danteproject_categories")
-    days = _int(request.POST.get("days") or request.GET.get("days"), 60) or 60
+    g = request.POST if request.method == "POST" else request.GET
+    today = timezone.localdate()
+    date_to = _date(g.get("to")) or today
+    date_from = _date(g.get("from")) or (date_to - datetime.timedelta(days=max(1, _int(g.get("days"), 30)) - 1))
+    if date_from > date_to:
+        date_from = date_to
+    days = (date_to - date_from).days + 1
+    period = f"from={date_from}&to={date_to}"
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -42,10 +56,11 @@ def categories_page(model_admin, request):
                     made.append(work_categories.create_from_suggestion(name, data.get("senders", []),
                                                                        data.get("sources", [])).name)
                 if made:
-                    work_categories.start_recompute(days)
-                    messages.success(request, f"Створено категорій: {len(made)} ({', '.join(made)}). Листи за "
-                                              f"{days} днів розкладаються у фоні — далі виберіть їм проєкт askDANTE.")
-                return redirect(f"{url}?days={days}#map")
+                    work_categories.start_recompute(days, date_from, date_to)
+                    messages.success(request, f"Створено категорій: {len(made)} ({', '.join(made)}). Листи "
+                                              f"{date_from:%d.%m}–{date_to:%d.%m} розкладаються у фоні — далі виберіть "
+                                              "їм проєкт askDANTE.")
+                return redirect(f"{url}?{period}#map")
             if action == "top":      # ＋ проєкт askDANTE верхнього рівня — сам або у клієнта (Eigene Projekte …)
                 ref = request.POST.get("top_customer") or ""
                 names = dict(services.dante_customers())
@@ -83,20 +98,21 @@ def categories_page(model_admin, request):
             pass
     suggestions = []
     if request.GET.get("scan") == "1":
-        suggestions = work_categories.suggest(days)
+        suggestions = work_categories.suggest(days, date_from=date_from, date_to=date_to)
         for s in suggestions:
             s["json"] = json.dumps({"name": s["name"], "senders": s["senders"], "sources": s["sources"]})
-    since = timezone.now() - datetime.timedelta(days=days)
+    since, until = work_categories.period_bounds(date_from, date_to)
     rows = []
     for cat in MailCategory.objects.filter(is_active=True).select_related("dante__dante_project", "dante__activity"):
         ct = getattr(cat, "dante", None)
         rows.append({"cat": cat, "ct": ct,
-                     "mails": EmailMessage.objects.filter(work_category=cat, sent_at__gte=since,
+                     "mails": EmailMessage.objects.filter(work_category=cat, sent_at__gte=since, sent_at__lt=until,
                                                           is_deleted=False).count()})
     projects = list(DanteProject.objects.filter(archived=False, gone=False).select_related("parent").order_by("name"))
     context = {
         **model_admin.admin_site.each_context(request), "title": "🗂 Категорії листів → askDANTE", "st": st,
-        "days": days, "scanned": request.GET.get("scan") == "1", "suggestions": suggestions, "rows": rows,
+        "days": days, "date_from": date_from, "date_to": date_to, "period": period,
+        "scanned": request.GET.get("scan") == "1", "suggestions": suggestions, "rows": rows,
         "projects": projects, "parents": [p for p in projects if p.time_trackable or not p.parent_id],
         "customers": services.dante_customers(),
         "activities": list(DanteActivity.objects.filter(archived=False)),

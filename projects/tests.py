@@ -179,7 +179,8 @@ class MailUiTests(ProjectsBase):
         self.assertContains(r, f'id="row-{a.pk}"')
         self.assertNotContains(r, f'id="row-{b.pk}"')
         self.assertContains(r, f"📁 {p.code}")
-        self.assertContains(r, f'<option value="{p.pk}" selected>')
+        self.assertContains(r, f"emNav(event, 'project', '{p.pk}')")   # активний проєкт — у лівій колонці
+        self.assertContains(r, 'class="em-chip"')                          # і чипом над листами
         pv = self.client.get(f"/email/thread/{a.thread_id}/preview/")
         self.assertContains(pv, 'id="pv-proj"')
         self.assertContains(pv, p.code)   # стан проєктів у data-state

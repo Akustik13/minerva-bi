@@ -8,7 +8,8 @@
   <a href="/admin/worktime/workday/mail-time/">✉️ {% trans "Час на пошту" %}</a> {% trans "або автоматично)." %}
   <form method="post" action="recompute/" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
     {% csrf_token %}
-    <select name="days"><option value="90">{% trans "за 90 днів" %}</option><option value="365">{% trans "за рік" %}</option>
+    <label>{% trans "з" %} <input type="date" name="from"></label> <label>{% trans "по" %} <input type="date" name="to"></label>
+    <select name="days" title="{% trans "Якщо дати не вказано" %}"><option value="90">{% trans "або за 90 днів" %}</option><option value="365">{% trans "за рік" %}</option>
       <option value="730" selected>{% trans "за 2 роки" %}</option><option value="0">{% trans "усі листи" %}</option></select>
     <button class="button" type="submit">🔄 {% trans "Перерахувати листи за правилами" %}</button>
     {% if scan_status %}<span style="color:var(--text-muted)">{{ scan_status }}</span>{% endif %}

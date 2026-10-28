@@ -167,7 +167,19 @@ def _set_status(text: str):
 _lock = threading.Lock()
 
 
-def start_recompute(days: int = 730):
+def period_bounds(date_from=None, date_to=None, days: int = 60):
+    """Початок і кінець періоду (aware): «з … по …» включно, інакше останні `days` днів."""
+    import datetime
+    from django.utils import timezone
+    tz = timezone.get_current_timezone()
+    end = (timezone.make_aware(datetime.datetime.combine(date_to + datetime.timedelta(days=1), datetime.time.min), tz)
+           if date_to else timezone.now())
+    start = (timezone.make_aware(datetime.datetime.combine(date_from, datetime.time.min), tz) if date_from
+             else end - datetime.timedelta(days=days))
+    return start, end
+
+
+def start_recompute(days: int = 730, date_from=None, date_to=None):
     """У фоні: листи за `days` днів (0 — усі) за новими правилами."""
     import datetime
     from django.db import connection
@@ -180,7 +192,10 @@ def start_recompute(days: int = 730):
             return
         try:
             qs = EmailMessage.objects.filter(is_spam=False, is_deleted=False)
-            if days:
+            if date_from or date_to:
+                start, end = period_bounds(date_from, date_to, days or 730)
+                qs = qs.filter(sent_at__gte=start, sent_at__lt=end)
+            elif days:
                 qs = qs.filter(sent_at__gte=timezone.now() - datetime.timedelta(days=days))
             total = qs.count()
             _set_status(f'⏳ Перераховую {total} листів…')
@@ -270,7 +285,7 @@ def _domain_label(address: str) -> str:
     return parts[-2] if len(parts) >= 2 else domain
 
 
-def suggest(days: int = 60, accounts=None) -> list:
+def suggest(days: int = 60, accounts=None, date_from=None, date_to=None) -> list:
     """Групи листів за `days` днів, які ще не в своїх категоріях: джерела замовлень (номер / трек-номер у листі або
     замовлення CRM-події — так само, як блок «🔗» у листі) і постійні відправники-сервіси / постачальники (за
     доменом). Те саме джерело й домен (digikey) — одна група. → [{key, name, senders, sources, mails, subjects}]"""
@@ -284,8 +299,9 @@ def suggest(days: int = 60, accounts=None) -> list:
     from sales.models import SalesOrder, SalesSource
     from shipping.models import Shipment
 
-    since = timezone.now() - datetime.timedelta(days=days)
-    qs = EmailMessage.objects.filter(sent_at__gte=since, is_spam=False, is_deleted=False, work_category=None)
+    since, until = period_bounds(date_from, date_to, days)
+    qs = EmailMessage.objects.filter(sent_at__gte=since, sent_at__lt=until, is_spam=False, is_deleted=False,
+                                     work_category=None)
     if accounts is not None:
         qs = qs.filter(account__in=accounts)
     msgs = list(qs.order_by('-sent_at').values('pk', 'subject', 'body_text', 'from_email', 'to_emails', 'cc_emails',
