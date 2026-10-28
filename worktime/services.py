@@ -882,6 +882,24 @@ def _pick_activity(st: DanteSettings):
     return active[0] if len(active) == 1 else None
 
 
+NO_WORKTIME = ("У askDANTE за {day:%d.%m} немає робочого часу (прихід / відхід), а askDANTE приймає час на проєкт "
+               "лише в його межах. Спершу внесіть прихід і відхід (📅 клік на дату → «👣 З активності в Minerva» "
+               "або вручну) — або не записуйте цей день.")
+
+
+def has_worktime(du: DanteUser, day: datetime.date) -> bool | None:
+    """Чи є в копії askDANTE прихід за день (WorkDay.times); None — день ще не читався з askDANTE."""
+    wd = WorkDay.objects.filter(dante_user=du, date=day).only("times").first()
+    if wd is None:
+        return None
+    return any(t.get("coming") for t in (wd.times or []))
+
+
+def _no_worktime_error(e: DanteError) -> bool:
+    """askDANTE: «start: Es wurden keine Arbeitszeiten erfasst» — час на проєкт поза робочим часом дня."""
+    return "arbeitszeit" in (e.fields.get("start") or "").lower()
+
+
 def _remember(st: DanteSettings, **flags):
     DanteSettings.objects.filter(pk=st.pk).update(**flags)
     for k, v in flags.items():
@@ -937,6 +955,13 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
 
     c = client(st)
     with lock(du):
+        if st.attendance_required:   # askDANTE не прийме час на проєкт без приходу / відходу дня
+            try:
+                refresh_days(du, day, day, c)
+            except DanteError:
+                pass
+            if not has_worktime(du, day):
+                raise DanteError("bad_request", NO_WORKTIME.format(day=day))
         if start or not st.durations_allowed:   # свіжа копія записів дня — без перекриття з іншим проєктом
             try:
                 sync_records(st, day, day, c)
@@ -959,6 +984,10 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
             except DanteError as e:
                 booking.status, booking.error = Booking.FAILED, e.message
                 if attempt or e.status != 400:
+                    break
+                if _no_worktime_error(e):   # повтор не допоможе — спершу прихід / відхід дня
+                    _remember(st, attendance_required=True)
+                    booking.error = NO_WORKTIME.format(day=day)
                     break
                 retry = False
                 if not start and "duration" in e.fields:   # «Die Verwendung einer Dauer ist nicht erlaubt»

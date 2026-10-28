@@ -199,3 +199,44 @@ class WhyCustomerProjectTests(MenuBase):
         self.assertIn(p.pk, [x["id"] for x in d["open_projects"]])
         page = self.client.get("/email/")
         self.assertContains(page, "/projects/api/thread/")
+
+
+class ProjectMenuAndSourcesTests(MenuBase):
+    """Меню проєкту в лівій колонці, перейменування, перемикачі джерел над «👤 Клієнти»."""
+
+    def test_project_menu_and_rename(self):
+        from projects.models import Project, ProjectLink
+        p = Project.objects.create(name="Transponder", status=Project.ACTIVE)
+        ProjectLink.objects.create(project=p, thread=self.a.thread, status=ProjectLink.CONFIRMED)
+        page = self.client.get("/email/")
+        self.assertContains(page, 'oncontextmenu="return showPrCtx(event, this)"')
+        self.assertContains(page, "/admin/worktime/workday/mail-time/")
+        self.assertContains(page, "wcAction('rename')")
+        r = self.client.post(f"/projects/api/project/{p.pk}/rename/", json.dumps({"name": "Transponder 2 LTE"}),
+                             content_type="application/json").json()
+        self.assertTrue(r["ok"])
+        p.refresh_from_db()
+        self.assertEqual(p.name, "Transponder 2 LTE")
+        self.assertEqual(self.client.post(f"/projects/api/project/{p.pk}/rename/", json.dumps({"name": " "}),
+                                          content_type="application/json").status_code, 400)
+
+    def test_customer_sources_chips(self):
+        import datetime
+        from crm.models import Customer
+        from sales.models import SalesOrder, SalesSource
+        from email_assistant.views import _customer_sources
+        SalesSource.objects.create(slug="digikey", name="DigiKey")
+        SalesSource.objects.create(slug="sevskiy-shop", name="Webshop")
+        dk = Customer.objects.create(name="DK buyer", email="dk@buyer.example", external_key="k-dk")
+        both = Customer.objects.create(name="Both", email="both@buyer.example", external_key="k-both")
+        other = Customer.objects.create(name="Other", email="other@buyer.example", external_key="k-other")
+        day = datetime.date(2026, 10, 1)
+        SalesOrder.objects.create(source="digikey", order_number="D1", order_date=day, customer_key="k-dk")
+        SalesOrder.objects.create(source="digikey", order_number="D2", order_date=day, customer_key="k-both")
+        SalesOrder.objects.create(source="sevskiy-shop", order_number="S1", order_date=day, email="both@buyer.example")
+        customers = [{"id": dk.pk}, {"id": both.pk}, {"id": other.pk}]
+        chips = _customer_sources(customers)
+        self.assertEqual([(c["key"], c["label"], c["n"]) for c in chips],
+                         [("digikey", "DigiKey", 2), ("sevskiy-shop", "Webshop", 1), ("other", "інші", 1)])
+        self.assertEqual([c["src"] for c in customers], [["digikey"], ["digikey", "sevskiy-shop"], []])
+        self.assertEqual(_customer_sources([]), [])

@@ -97,7 +97,14 @@
 .em-nav-sm{color:var(--text-dim);font-size:11px}
 #em-wc-ctx{display:none;position:fixed;z-index:99999;background:var(--bg-card);border:1px solid var(--border-strong);
   border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.35);padding:4px 0;min-width:250px}
-#em-wc-ctx.open{display:block}
+#em-wc-ctx.open,#em-pr-ctx.open{display:block}
+.em-cust-src{display:flex;flex-wrap:wrap;gap:4px;padding:2px 12px 4px}
+.em-src-chip{font-size:10px;border:1px solid var(--border-strong);border-radius:10px;padding:1px 7px;background:transparent;
+  color:var(--text-dim);cursor:pointer}
+.em-src-chip.on{background:rgba(26,115,232,.15);color:#1a73e8;border-color:#1a73e8}
+.em-src-chip span{opacity:.7}
+#em-pr-ctx{display:none;position:fixed;z-index:99999;background:var(--bg-card);border:1px solid var(--border-strong);
+  border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.35);padding:4px 0;min-width:230px}
 #em-wc-ctx .em-ctx-item.off{opacity:.45;pointer-events:none}
 #em-wc-dlg{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-card);color:var(--text);
   padding:14px 16px;width:min(560px,94vw);box-shadow:0 10px 30px rgba(0,0,0,.4)}
@@ -413,10 +420,12 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         </div>
         <div class="em-nav-body" data-sec="proj">
           {% if project_filter %}{% with pf=project_filter %}
-          <a href="#" class="em-folder-link em-nav-item active" onclick="return emNav(event, 'project', '{{ pf.pk }}')">
+          <a href="#" class="em-folder-link em-nav-item active" onclick="return emNav(event, 'project', '{{ pf.pk }}')"
+             data-proj="{{ pf.pk }}" data-name="{{ pf.name }}" oncontextmenu="return showPrCtx(event, this)">
             <span class="em-folder-label">{{ pf.code }} · {{ pf.name }}</span></a>{% endwith %}{% endif %}
           {% for p in nav_projects %}{% if p.project_id != project_filter.pk %}
-          <a href="#" class="em-folder-link em-nav-item" onclick="return emNav(event, 'project', '{{ p.project_id }}')" title="{{ p.project__name }}">
+          <a href="#" class="em-folder-link em-nav-item" onclick="return emNav(event, 'project', '{{ p.project_id }}')" title="{{ p.project__name }} — {% trans "правий клік — меню" %}"
+             data-proj="{{ p.project_id }}" data-name="{{ p.project__name }}" oncontextmenu="return showPrCtx(event, this)">
             <span class="em-folder-label">{{ p.project__code }} · {{ p.project__name }}</span><span class="em-nav-n">{{ p.n }}</span>
           </a>
           {% endif %}{% endfor %}
@@ -437,12 +446,19 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
             <input type="hidden" id="em-cust-sel" value="{{ customer_filter.pk|default:'' }}">
             <div class="em-cust-list" id="em-cust-list"></div>
           </div>
+          {% if cust_sources %}
+          <div class="em-cust-src" id="em-cust-src" title="{% trans "Лише клієнти, що замовляли через вибрані джерела (можна кілька); «інші» — без замовлень цих джерел; нічого не вибрано — усі" %}">
+            {% for s in cust_sources %}<button type="button" class="em-src-chip" data-src="{{ s.key }}">{{ s.label }} <span>{{ s.n }}</span></button>{% endfor %}
+          </div>
+          {% endif %}
+          <div id="em-cust-top">
           {% for c in mail_customers|slice:":8" %}
           <a href="#" class="em-folder-link em-nav-item{% if customer_filter.pk == c.id %} active{% endif %}" onclick="return emNav(event, 'customer', '{{ c.id }}')" title="{{ c.email }}">
             <span class="em-folder-label">{{ c.name }}</span>
             {% if c.unread %}<span class="em-badge">{{ c.unread }}</span>{% else %}<span class="em-nav-n">{{ c.n }}</span>{% endif %}
           </a>
           {% endfor %}
+          </div>
         </div>
         {% endif %}
       </div>
@@ -759,6 +775,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" id="em-wc-read" onclick="wcAction('read')">✓ {% trans "Позначити всі прочитаними" %}</div>
   <div class="em-ctx-sep"></div>
   <div class="em-ctx-item" onclick="wcAction('rules')">🔍 {% if can_change_work_category %}{% trans "Правила (фільтр) — переглянути й змінити…" %}{% else %}{% trans "Правила (фільтр)…" %}{% endif %}</div>
+  {% if can_change_work_category %}<div class="em-ctx-item" onclick="wcAction('rename')">✏️ {% trans "Перейменувати…" %}</div>{% endif %}
   <div class="em-ctx-item" onclick="wcAction('card')">⚙ {% trans "Розширені налаштування (картка)" %}</div>
   {% if can_change_work_category %}<div class="em-ctx-item" onclick="wcAction('recompute')">🔄 {% trans "Перерахувати листи за правилами" %}</div>{% endif %}
   <div class="em-ctx-item" id="em-wc-dante" onclick="wcAction('dante')">⏱ {% trans "Занести в askDANTE…" %}</div>
@@ -766,6 +783,15 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" id="em-wc-hide" onclick="wcAction('hide')">🙈 {% trans "Сховати з цього списку" %}</div>
   <div class="em-ctx-item danger" onclick="wcAction('trash')">🗑 {% trans "Усі листи категорії в Кошик…" %}</div>
   {% if can_delete_work_category %}<div class="em-ctx-item danger" onclick="wcAction('delete')">❌ {% trans "Видалити категорію…" %}</div>{% endif %}
+</div>
+<!-- Правий клік на проєкті (ліва колонка) -->
+<div id="em-pr-ctx" onclick="event.stopPropagation()">
+  <div class="em-ctx-sub-hd" id="em-pr-hd"></div>
+  <div class="em-ctx-item" onclick="prAction('show')">👁 {% trans "Показати листи проєкту" %}</div>
+  <div class="em-ctx-item" onclick="prAction('card')">📁 {% trans "Відкрити проєкт" %}</div>
+  {% if can_change_project %}<div class="em-ctx-item" onclick="prAction('rename')">✏️ {% trans "Перейменувати…" %}</div>{% endif %}
+  {% if mail_time_url %}<div class="em-ctx-sep"></div>
+  <div class="em-ctx-item" onclick="prAction('dante')" title="{% trans "Час на листи проєкту по днях за 30 днів; немає проєкту askDANTE — вибрати або створити" %}">⏱ {% trans "Занести в askDANTE…" %}</div>{% endif %}
 </div>
 <dialog id="em-why-dlg">
   <form method="dialog" onsubmit="return false">
@@ -1280,6 +1306,13 @@ async function wcAction(action) {
     if (action === 'rules') { wcOpen(pk); return; }
     var info = await _wcInfo(pk);
     if (action === 'card') { location.href = info.card_url; return; }
+    if (action === 'rename') {
+      var name = prompt('{% trans "Нова назва категорії" %}', info.name);
+      if (!name || !name.trim() || name.trim() === info.name) return;
+      await _wcPost(pk, {action: 'save', name: name.trim(), icon: info.icon, color: info.color,
+                         senders: info.senders, subject_words: info.subject_words});
+      location.reload(); return;
+    }
     if (action === 'dante') {
       if (!info.dante) { _showToast('{% trans "Облік часу askDANTE не встановлено" %}'); return; }
       location.href = info.dante.url; return;
@@ -1517,6 +1550,43 @@ async function emWhyMove() {
     setTimeout(function(){ location.reload(); }, 900);
   } catch (e) { document.getElementById('why-err').textContent = '❌ ' + e.message; }
 }
+/* ── правий клік на проєкті ── */
+var _pr = null;
+function showPrCtx(ev, el) {
+  ev.preventDefault(); ev.stopPropagation();
+  var menu = document.getElementById('em-pr-ctx');
+  _pr = {pk: el.dataset.proj, name: el.dataset.name};
+  document.getElementById('em-pr-hd').textContent = (el.querySelector('.em-folder-label') || el).textContent.trim();
+  menu.classList.add('open');
+  var x = ev.clientX, y = ev.clientY;
+  if (x + menu.offsetWidth > window.innerWidth) x = window.innerWidth - menu.offsetWidth - 5;
+  if (y + menu.offsetHeight > window.innerHeight) y = Math.max(5, window.innerHeight - menu.offsetHeight - 5);
+  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  return false;
+}
+document.addEventListener('click', function(){ var m = document.getElementById('em-pr-ctx'); if (m) m.classList.remove('open'); });
+async function prAction(action) {
+  document.getElementById('em-pr-ctx').classList.remove('open');
+  if (!_pr) return;
+  if (action === 'show') { emNav(null, 'project', _pr.pk); return; }
+  if (action === 'card') { location.href = '/admin/projects/project/' + _pr.pk + '/change/'; return; }
+  if (action === 'dante') {
+    var to = new Date(), from = new Date(); from.setDate(to.getDate() - 29);
+    var iso = function(d){ return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+    location.href = '{{ mail_time_url|escapejs }}?proj=' + _pr.pk + '&from=' + iso(from) + '&to=' + iso(to); return;
+  }
+  if (action === 'rename') {
+    var name = prompt('{% trans "Нова назва проєкту (код P-… лишається)" %}', _pr.name);
+    if (!name || !name.trim() || name.trim() === _pr.name) return;
+    try {
+      var r = await fetch('/projects/api/project/' + _pr.pk + '/rename/', {method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify({name: name.trim()})});
+      var d = await r.json();
+      if (!d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+      location.reload();
+    } catch (e) { _showToast('❌ ' + e.message); }
+  }
+}
 function emToggleHidden(ev) {
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
   document.getElementById('em-nav').classList.toggle('show-hidden');
@@ -1601,6 +1671,7 @@ function custSuggest(value) {
   // Спершу ті, у кого назва починається з введеного, потім — слово в назві, потім — будь-де / email
   var scored = [];
   _custData.forEach(function(c) {
+    if (window._custMatch && !window._custMatch(c)) return;   // перемикачі джерел над «👤 Клієнти»
     var name = (c.name || '').toLowerCase(), email = (c.email || '').toLowerCase();
     var score = !q ? 3
       : name.indexOf(q) === 0 ? 0
@@ -1624,6 +1695,43 @@ function custSuggest(value) {
     : '<div class="em-cust-empty">{% trans "Немає клієнтів з такими літерами" %}</div>';
   list.classList.add('open');
 }
+(function(){   // «👤 Клієнти»: DigiKey · Магазин · інші — які клієнти показувати (localStorage em-cust-src)
+  var box = document.getElementById('em-cust-src');
+  if (!box) return;
+  var top = document.getElementById('em-cust-top'), original = top.innerHTML;
+  var chips = Array.prototype.slice.call(box.querySelectorAll('.em-src-chip'));
+  var known = chips.map(function(b){ return b.dataset.src; }).filter(function(k){ return k !== 'other'; });
+  var sel = [];
+  try { sel = JSON.parse(localStorage.getItem('em-cust-src') || '[]').filter(function(k){ return k === 'other' || known.indexOf(k) >= 0; }); } catch (e) {}
+  window._custMatch = function(c) {
+    if (!sel.length) return true;
+    var s = c.src || [];
+    if (s.some(function(x){ return sel.indexOf(x) >= 0; })) return true;
+    return sel.indexOf('other') >= 0 && !s.some(function(x){ return known.indexOf(x) >= 0; });
+  };
+  function render() {
+    chips.forEach(function(b){ b.classList.toggle('on', sel.indexOf(b.dataset.src) >= 0); });
+    if (!sel.length) { top.innerHTML = original; return; }
+    var current = document.getElementById('em-cust-sel').value;
+    var shown = _custData.filter(window._custMatch).slice(0, 8);
+    top.innerHTML = shown.length ? shown.map(function(c){
+      return '<a href="#" class="em-folder-link em-nav-item' + (String(c.id) === current ? ' active' : '') + '"'
+        + ' onclick="return emNav(event, \'customer\', \'' + c.id + '\')" title="' + _custEsc(c.email || '') + '">'
+        + '<span class="em-folder-label">' + _custEsc(c.name || '') + '</span>'
+        + (c.unread ? '<span class="em-badge">' + c.unread + '</span>' : '<span class="em-nav-n">' + c.n + '</span>') + '</a>';
+    }).join('') : '<div class="em-nav-sm" style="padding:4px 12px">{% trans "Немає таких клієнтів у цій скриньці" %}</div>';
+  }
+  chips.forEach(function(b){
+    b.addEventListener('click', function(ev){
+      ev.preventDefault(); ev.stopPropagation();
+      var i = sel.indexOf(b.dataset.src);
+      if (i >= 0) sel.splice(i, 1); else sel.push(b.dataset.src);
+      try { localStorage.setItem('em-cust-src', JSON.stringify(sel)); } catch (e) {}
+      render();
+    });
+  });
+  render();
+})();
 function custHide() { document.getElementById('em-cust-list').classList.remove('open'); }
 function custPick(id) {
   document.getElementById('em-cust-sel').value = id;

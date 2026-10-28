@@ -75,6 +75,10 @@ class DanteSettings(models.Model):
     activity_required = models.BooleanField(
         "askDANTE вимагає вид роботи", default=False,
         help_text="Ставиться само, коли askDANTE відповів «activityId: Eine Eingabe ist erforderlich».")
+    attendance_required = models.BooleanField(
+        "askDANTE приймає час на проєкт лише в межах робочого часу дня", default=False,
+        help_text="Ставиться само, коли askDANTE відповів «start: Es wurden keine Arbeitszeiten erfasst»: тоді "
+                  "дні без приходу / відходу Minerva не позначає й не надсилає, а пояснює, що спершу внести.")
 
     mail_time = models.BooleanField(
         "Рахувати час на пошту", default=False,

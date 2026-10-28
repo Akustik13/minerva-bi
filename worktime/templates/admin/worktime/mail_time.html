@@ -47,6 +47,9 @@
 {% if not st.durations_allowed %}
 <div class="mt-card mt-muted" style="font-size:12px">ℹ️ {% trans "askDANTE не приймає тривалість — Minerva записує «з … по …»: у межах приходу–відходу дня, від першого листа, у вільний від інших записів на проєкти відрізок." %}</div>
 {% endif %}
+{% if st.attendance_required %}
+<div class="mt-card mt-muted" style="font-size:12px">ℹ️ {% trans "askDANTE приймає час на проєкт лише в межах робочого часу дня: дні без приходу / відходу в askDANTE не позначено — спершу внесіть прихід і відхід (📅 посилання біля дня), потім запишіть." %}</div>
+{% endif %}
 {% if not st.mail_time %}
 <div class="mt-card" style="border-color:#f59e0b">⚠️ {% trans "Облік часу на пошту вимкнено. Увімкніть «Рахувати час на пошту» в" %} <a href="{{ settings_url }}">⚙️ {% trans "налаштуваннях askDANTE" %}</a>. {% trans "Оцінку видно й зараз, але автоматично нічого не записується." %}</div>
 {% endif %}
@@ -62,12 +65,13 @@
       <option value="">{% trans "усі" %}</option>
       {% for c in cats %}{% if c.dante_project_id %}<option value="{{ c.category_id }}"{% if focus_cat and c.category_id == focus_cat.pk %} selected{% endif %}>{{ c.category.label }} → {{ c.dante_project }}</option>{% endif %}{% endfor %}
       {% if focus_cat and not focus.dante_project_id %}<option value="{{ focus_cat.pk }}" selected>{{ focus_cat.label }} → —</option>{% endif %}</select></label>
-    {% if not focus_cat %}<label>{% trans "Листи" %}<select name="show">
+    {% if not focus_cat and not focus_proj %}<label>{% trans "Листи" %}<select name="show">
       <option value="dante"{% if show == "dante" %} selected{% endif %}>{% trans "лише до askDANTE" %}</option>
       <option value="all"{% if show == "all" %} selected{% endif %}>{% trans "усі — і без категорії / проєкту" %}</option>
       <option value="ignored"{% if show == "ignored" %} selected{% endif %}>{% trans "проігноровані" %}</option></select></label>{% endif %}
     <button class="button default">✉️ {% trans "Показати" %}</button>
-    <span class="mt-muted"><a href="?preset=this_month{% if du %}&u={{ du.pk }}{% endif %}{% if focus_cat %}&cat={{ focus_cat.pk }}{% endif %}">{% trans "цей місяць" %}</a> · <a href="?preset=last_month{% if du %}&u={{ du.pk }}{% endif %}{% if focus_cat %}&cat={{ focus_cat.pk }}{% endif %}">{% trans "минулий місяць" %}</a></span>
+    {% if focus_proj %}<input type="hidden" name="proj" value="{{ focus_proj.pk }}">{% endif %}
+    <span class="mt-muted"><a href="?preset=this_month{% if du %}&u={{ du.pk }}{% endif %}{% if focus_cat %}&cat={{ focus_cat.pk }}{% endif %}{% if focus_proj %}&proj={{ focus_proj.pk }}{% endif %}">{% trans "цей місяць" %}</a> · <a href="?preset=last_month{% if du %}&u={{ du.pk }}{% endif %}{% if focus_cat %}&cat={{ focus_cat.pk }}{% endif %}{% if focus_proj %}&proj={{ focus_proj.pk }}{% endif %}">{% trans "минулий місяць" %}</a></span>
     <span class="mt-muted">{% trans "Разом" %} <b>{{ total }}</b> · {% trans "ще не в askDANTE" %} <b>{{ todo }}</b></span>
   </div>
   <div class="mt-muted" style="margin-top:8px">
@@ -77,6 +81,36 @@
     · <a href="{% url 'admin:worktime_danteproject_categories' %}">🗂 {% trans "категорії → askDANTE" %}</a> · <a href="{{ cats_url }}">🏷 {% trans "правила" %}</a> · <a href="{% url 'admin:worktime_workday_meetings' %}">🤝 {% trans "зустрічі → askDANTE" %}</a> · <a href="{{ mapping_url }}">📁 {% trans "проєкти Minerva ↔ askDANTE" %}</a>
   </div>
 </form>
+
+{% if focus_proj %}
+<div class="mt-card" style="border-color:{% if pmap %}#1a73e8{% else %}#f59e0b{% endif %}">
+  {% if pmap %}
+  ⏱ 📁 <b>{{ focus_proj.code }} {{ focus_proj.name }}</b> → askDANTE: <b>{{ pmap.dante_project }}</b> · {{ st.mail_reply_minutes }}/{{ st.mail_read_minutes }} {% trans "хв на відповідь / прочитаний" %}
+  · {{ date_from|date:"d.m.Y" }}–{{ date_to|date:"d.m.Y" }}: {% trans "разом" %} <b>{{ total }}</b>, {% trans "ще не в askDANTE" %} <b>{{ todo }}</b>
+  <div class="mt-muted">{% trans "Незаписані дні вже позначено — перевірте опис і натисніть «✓ Записати» внизу; повторний запис дописує лише різницю." %}
+    {% if not st.mail_projects %}<br>⚠️ {% trans "Листи проєктів Minerva зараз не рахуються — увімкніть «Листи проєктів Minerva — на їхній проєкт askDANTE» у" %} <a href="{{ settings_url }}">⚙️ {% trans "налаштуваннях askDANTE" %}</a>.{% endif %}
+    · <a href="{{ proj_url }}">📁 {% trans "проєкт" %}</a> · <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}">{% trans "усе" %}</a></div>
+  {% else %}
+  ⚠️ 📁 <b>{{ focus_proj.code }} {{ focus_proj.name }}</b>: {% trans "у проєкту ще немає проєкту askDANTE." %}
+  {% if can_bind %}
+  <form method="post" class="mt-form" style="margin-top:8px">{% csrf_token %}
+    <input type="hidden" name="action" value="bind_project"><input type="hidden" name="proj" value="{{ focus_proj.pk }}">
+    {% if du %}<input type="hidden" name="u" value="{{ du.pk }}">{% endif %}<input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}">
+    <label>📁 {% trans "Писати в проєкт askDANTE" %}<select name="dp">
+      <option value="">—</option>
+      {% if proj_hints %}<optgroup label="⭐ {% trans "Підходить" %}">{% for dp, why in proj_hints %}<option value="{{ dp.pk }}"{% if forloop.first %} selected{% endif %}>{% if dp.parent %}{{ dp.parent.name }} › {% endif %}{{ dp.name }} — {{ why }}</option>{% endfor %}</optgroup>{% endif %}
+      <optgroup label="{% trans "Усі проєкти" %}">{% for p in projects %}{% if p.time_trackable %}<option value="{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endif %}{% endfor %}</optgroup></select></label>
+    <button class="button default">✓ {% trans "Прив'язати й показати час" %}</button>
+    <button class="button" name="create" value="1" onclick="return confirm('{% trans "Створити в askDANTE новий проєкт" %} «{{ focus_proj.code|escapejs }} {{ focus_proj.name|escapejs }}» {% trans "і прив'язати? Видалити його можна лише в askDANTE." %}')">＋ {% trans "Створити в askDANTE" %} «{{ focus_proj.code }} {{ focus_proj.name|truncatechars:40 }}»</button>
+  </form>
+  <div class="mt-muted" style="margin-top:4px">💡 {% if proj_hints %}{% trans "Вибрано найкращий збіг (код, клієнт, назва, листування) — перевірте." %}{% else %}{% trans "Підходящого проєкту в askDANTE не знайшлось — створіть новий: «P-… Назва» з номером = код Minerva." %}{% endif %}
+    · <a href="{{ proj_url }}">📁 {% trans "проєкт" %}</a></div>
+  {% else %}
+  <a href="{{ mapping_url }}">📁 {% trans "проєкти Minerva ↔ askDANTE" %}</a>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}
 
 {% if focus_cat %}
 <div class="mt-card" style="border-color:{% if focus.dante_project_id %}#1a73e8{% else %}#f59e0b{% endif %}">
@@ -124,15 +158,16 @@
 {% else %}
 <form method="post" onsubmit="return mtConfirm(event)">
   {% csrf_token %}
-  <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}"><input type="hidden" name="show" value="{{ show }}">{% if focus_cat %}<input type="hidden" name="cat" value="{{ focus_cat.pk }}">{% endif %}
+  <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}"><input type="hidden" name="show" value="{{ show }}">{% if focus_cat %}<input type="hidden" name="cat" value="{{ focus_cat.pk }}">{% endif %}{% if focus_proj %}<input type="hidden" name="proj" value="{{ focus_proj.pk }}">{% endif %}
   {% for d in days %}
   <div class="mt-day">
     <h3>{{ d.wd }} {{ d.day|date:"d.m.Y" }}
+      {% if d.no_worktime %}<span class="mt-badge" style="background:rgba(245,158,11,.15);color:#f59e0b">⚠️ {% trans "в askDANTE немає приходу / відходу" %} — <a href="{{ d.day_url }}">📅 {% trans "внести" %}</a></span>{% endif %}
       {% if d.ongoing %}<span class="mt-muted">{% trans "день ще триває — оцінка зросте; автоматично записується наступного дня" %}</span>{% endif %}
       {% if d.unmapped %}<span class="mt-muted">· {% trans "ще листів без категорії / проєкту askDANTE" %}: {{ d.unmapped }}{% if show == "dante" %} — <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}&show=all">{% trans "показати" %}</a>{% endif %}</span>{% endif %}</h3>
     {% for r in d.rows %}
     <div class="mt-row">
-      <input type="checkbox" name="pick" value="{{ d.day|date:'Y-m-d' }}|{{ r.dp.pk }}" {% if r.to_book %}checked{% else %}disabled{% endif %}>
+      <input type="checkbox" name="pick" value="{{ d.day|date:'Y-m-d' }}|{{ r.dp.pk }}" {% if not r.to_book %}disabled{% elif not r.no_worktime %}checked{% endif %}>
       <div><b>{{ r.label }}</b>{% if r.auto %} <span class="mt-badge">{% trans "авто" %}</span>{% endif %}
         <div class="mt-muted">→ askDANTE: {{ r.dp }}</div></div>
       <div>{% if r.replies %}📤 {{ r.replies }} {% trans "відп." %} {% endif %}{% if r.received %}📥 {{ r.received }} {% trans "лист." %} {% endif %}{% if r.orders %}🧾 {{ r.orders }} {% trans "замовл." %}{% endif %}

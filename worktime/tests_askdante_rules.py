@@ -89,3 +89,46 @@ class RulesTests(Base):
                                     sent_at=timezone.make_aware(datetime.datetime.combine(MON, datetime.time(11, 7))))
         b = mail_time.book(self.du, MON, self.dp.pk)
         self.assertEqual((b.status, b.start, b.stop), (Booking.SENT, datetime.time(11, 5), datetime.time(11, 20)))
+
+
+class NeedsWorktime(FakeClient):
+    """askDANTE фірми: час на проєкт — лише в день з приходом / відходом («Es wurden keine Arbeitszeiten erfasst»)."""
+
+    def track(self, dante_id, record):
+        d = datetime.date.fromisoformat(record["date"])
+        self.tried = getattr(self, "tried", []) + [record]
+        if "projectData" in record and not self.times.get(d):
+            raise DanteError("bad_request", "askDANTE не прийняв запит: start: Es wurden keine Arbeitszeiten erfasst.",
+                             400, {"start": "Es wurden keine Arbeitszeiten erfasst."})
+        return super().track(dante_id, record)
+
+
+class WorktimeRequiredTests(Base):
+    """Неділя без приходу / відходу: перша відмова вчить, далі — пояснення без запиту, дні не позначено."""
+
+    def setUp(self):
+        super().setUp()
+        self.fake.__class__ = NeedsWorktime
+        self.dp = DanteProject.objects.create(dante_id="77", name="DigiKey Marketplace")
+        self.sun = MON - datetime.timedelta(days=1)
+        self.fake.times[MON] = [{"coming": "08:00", "leaving": "16:30", "minutes": 510}]
+
+    def test_first_refusal_teaches_then_precheck(self):
+        b = services.book_project(self.du, self.sun, self.dp, start=datetime.time(10, 0), stop=datetime.time(10, 30))
+        self.assertEqual(b.status, Booking.FAILED)
+        self.assertIn("немає робочого часу", b.error)
+        self.assertIn("прихід і відхід", b.error)
+        self.assertTrue(DanteSettings.get().attendance_required)
+        self.assertEqual(len(self.fake.tried), 1)   # повтор не допоможе — без другої спроби
+        with self.assertRaises(DanteError) as e:     # далі — без запиту в askDANTE
+            services.book_project(self.du, self.sun, self.dp, start=datetime.time(11, 0), stop=datetime.time(11, 30))
+        self.assertIn(f"{self.sun:%d.%m}", e.exception.message)
+        self.assertEqual(len(self.fake.tried), 1)
+        ok = services.book_project(self.du, MON, self.dp, start=datetime.time(9, 0), stop=datetime.time(9, 30))
+        self.assertEqual(ok.status, Booking.SENT)   # робочий день — як завжди
+
+    def test_has_worktime(self):
+        self.assertIsNone(services.has_worktime(self.du, self.sun))   # ще не читали
+        services.refresh_days(self.du, self.sun, MON, self.fake)
+        self.assertFalse(services.has_worktime(self.du, self.sun))
+        self.assertTrue(services.has_worktime(self.du, MON))

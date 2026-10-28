@@ -9,7 +9,7 @@ from email_assistant.models import MailCategory
 
 from . import mail_time, services
 from .client import DanteError
-from .models import Booking, DanteActivity, DanteProject, DanteSettings, MailCategoryTime
+from .models import Booking, DanteActivity, DanteProject, DanteSettings, MailCategoryTime, ProjectMap
 
 
 class MailCategoryTimeInline(admin.StackedInline):
@@ -127,12 +127,44 @@ def mail_time_page(model_admin, request):
              .filter(category_id=g.get("cat")).first() if str(g.get("cat") or "").isdigit() else None)
     focus_cat = focus.category if focus else MailCategory.objects.filter(pk=g.get("cat") or 0).first() \
         if str(g.get("cat") or "").isdigit() else None
-    if focus_cat is not None:
+    # або лише один проєкт Minerva — рядки його проєкту askDANTE (ProjectMap)
+    focus_proj = pmap = None
+    if focus_cat is None and str(g.get("proj") or "").isdigit():
+        from projects.models import Project
+        focus_proj = Project.objects.filter(pk=int(g["proj"])).first()
+        pmap = ProjectMap.objects.filter(project=focus_proj).select_related("dante_project").first() \
+            if focus_proj else None
+    narrowed = focus_cat is not None or focus_proj is not None
+    only_dp = (focus.dante_project_id if focus else None) if focus_cat else (pmap.dante_project_id if pmap else None)
+    if narrowed:
         show = "dante"
     back = (f"{reverse('admin:worktime_workday_mailtime')}?u={du.pk if du else ''}&from={date_from}&to={date_to}"
-            f"&show={show}" + (f"&cat={focus_cat.pk}" if focus_cat else ""))
+            f"&show={show}" + (f"&cat={focus_cat.pk}" if focus_cat else "")
+            + (f"&proj={focus_proj.pk}" if focus_proj else ""))
 
     can_bind = services.is_manager(request.user) or request.user.has_perm("worktime.change_mailcategorytime")
+    if request.method == "POST" and request.POST.get("action") == "bind_project" and focus_proj is not None:
+        # проєкт Minerva без askDANTE → наявний проєкт askDANTE або новий «P-… Назва» (mapping.py)
+        if not can_bind:
+            messages.error(request, "Немає права змінювати проєкти askDANTE.")
+            return redirect(back)
+        from . import mapping
+        try:
+            if request.POST.get("create") == "1":
+                dp = mapping.create_in_dante(focus_proj, request.user)
+            else:
+                dp = DanteProject.objects.filter(pk=request.POST.get("dp") or 0, archived=False, gone=False).first()
+                if dp is None:
+                    messages.warning(request, "Виберіть проєкт askDANTE або «＋ Створити в askDANTE».")
+                    return redirect(back)
+                mapping.link(focus_proj, dp, request.user)
+        except DanteError as e:
+            messages.error(request, f"askDANTE: {e.message}")
+            return redirect(back)
+        messages.success(request, f"{focus_proj.code} → askDANTE: {dp}. Нижче — час на листи проєкту за період; "
+                                  "перевірте й запишіть.")
+        return redirect(back)
+
     if request.method == "POST" and request.POST.get("action") == "bind" and focus_cat is not None:
         # категорія без проєкту askDANTE → наявний проєкт або новий (рекомендації — mail_time.binding_hints)
         if not can_bind:
@@ -215,9 +247,14 @@ def mail_time_page(model_admin, request):
         for b in Booking.objects.filter(dante_user=du, date__range=(date_from, date_to), kind=Booking.PROJECT,
                                         source=Booking.MAIL, status=Booking.SENT).order_by("created_at"):
             sent.setdefault((b.date, b.dante_project_id), []).append(b)
+        worktime = {}   # дні з / без приходу в копії askDANTE — якщо askDANTE пише час на проєкт лише в них
+        if st.attendance_required:
+            from .models import WorkDay
+            worktime = {wd.date: any(t.get("coming") for t in (wd.times or []))
+                        for wd in WorkDay.objects.filter(dante_user=du, date__range=(date_from, date_to))}
         for day, info in mail_time.estimate(du, date_from, date_to, st).items():
-            if focus_cat is not None:
-                info["rows"] = [r for r in info["rows"] if focus and r["dp"].pk == focus.dante_project_id]
+            if narrowed:
+                info["rows"] = [r for r in info["rows"] if only_dp and r["dp"].pk == only_dp]
                 if not info["rows"]:
                     continue
                 info["unmapped"], info["loose"], info["ignored"] = 0, [], []
@@ -227,9 +264,12 @@ def mail_time_page(model_admin, request):
                 summary = mail_time.cached_summary(du, r, st.comment_lang)
                 r["comment"], r["ai"] = mail_time.default_comment(r, st.comment_lang, summary), bool(summary)
                 r["sent"] = sent.get((day, r["dp"].pk), [])
+                r["no_worktime"] = worktime.get(day) is False
                 total += r["minutes"]
                 todo += r["to_book"]
             days.append({"day": day, "wd": WEEKDAYS[day.weekday()], "rows": info["rows"], "unmapped": info["unmapped"],
+                         "no_worktime": worktime.get(day) is False,
+                         "day_url": f"{reverse('admin:worktime_workday_day')}?u={du.pk}&d={day}",
                          "loose": info["loose"], "ignored": info["ignored"],
                          "ongoing": day == today})
     days.reverse()   # свіжі дні зверху
@@ -237,6 +277,11 @@ def mail_time_page(model_admin, request):
     shared = [c.category.label for c in cats if focus and focus.dante_project_id and c.pk != focus.pk
               and c.dante_project_id == focus.dante_project_id]
     hints = mail_time.binding_hints(focus_cat) if focus_cat and not (focus and focus.dante_project_id) else None
+    proj_hints = []
+    if focus_proj is not None and pmap is None:
+        from . import matching
+        proj_hints = [(dp, ", ".join(why)) for dp, _s, why in matching.ranked(focus_proj, matching.Context(
+            DanteProject.objects.filter(gone=False, archived=False, time_trackable=True)), limit=5)]
     projects = list(DanteProject.objects.filter(archived=False, gone=False).select_related("parent").order_by("name"))
     context = {
         **model_admin.admin_site.each_context(request), "title": "✉️ Час на пошту", "st": st, "du": du,
@@ -250,6 +295,8 @@ def mail_time_page(model_admin, request):
         "needs_activity": st.activity_required and not st.default_activity_id,
         "show": show, "n_loose": sum(len(d["loose"]) for d in days), "n_ignored": sum(len(d["ignored"]) for d in days),
         "focus": focus, "focus_cat": focus_cat, "shared": shared, "can_bind": can_bind,
+        "focus_proj": focus_proj, "pmap": pmap, "proj_hints": proj_hints,
+        "proj_url": reverse("admin:projects_project_change", args=[focus_proj.pk]) if focus_proj else "",
         "hints": hints, "preset_new": hints["new"] if hints and not hints["projects"] else "",
         "new_customers": [(f"c:{ref}", cname) for ref, cname in services.dante_customers()],
         "new_parents": [(f"p:{p.pk}", f"{p.parent.name} › {p.name}" if p.parent else p.name) for p in projects

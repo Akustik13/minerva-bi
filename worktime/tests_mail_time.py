@@ -260,3 +260,53 @@ class BindCategoryTests(CategoryPageBase):
         self.assertEqual(create.call_args[0][0], "Internal Mails")
         self.assertEqual(create.call_args[1]["customer"][0], "5")
         self.assertEqual(MailCategoryTime.objects.get(category=self.internal).dante_project, made)   # новий — перевага
+
+
+class NoWorktimeDayTests(CategoryPageBase):
+    """askDANTE пише час на проєкт лише в межах робочого часу: день без приходу не позначено, є посилання внести."""
+
+    def test_day_without_worktime_is_unchecked_with_link(self):
+        self.st.attendance_required = True
+        self.st.save()
+        self.msg(folder=EmailMessage.FOLDER_SENT)            # понеділок — без приходу в askDANTE
+        self.msg(day=TUE, folder=EmailMessage.FOLDER_SENT)   # вівторок — з приходом
+        WorkDay.objects.create(dante_user=self.du, date=MON, times=[])
+        WorkDay.objects.create(dante_user=self.du, date=TUE, times=[{"coming": "08:00", "leaving": "16:00"}])
+        page = self.client.get(self.url, {"u": self.du.pk, "from": MON.isoformat(), "to": TUE.isoformat()})
+        self.assertContains(page, f'value="{MON.isoformat()}|{self.dp.pk}" >')
+        self.assertContains(page, f'value="{TUE.isoformat()}|{self.dp.pk}" checked>')
+        self.assertContains(page, "немає приходу / відходу")
+        self.assertContains(page, f"day/?u={self.du.pk}&amp;d={MON.isoformat()}")
+
+
+class ProjectFocusTests(CategoryPageBase):
+    """Правий клік на проєкті → «⏱ Занести в askDANTE»: лише його рядки; без askDANTE — вибрати або створити."""
+
+    def setUp(self):
+        super().setUp()
+        from projects.models import Project, ProjectLink
+        self.project = Project.objects.create(name="Indoor positioning", status=Project.ACTIVE)
+        thread = EmailThread.objects.create(account=self.account, subject="Indoor")
+        ProjectLink.objects.create(project=self.project, thread=thread, status=ProjectLink.CONFIRMED)
+        self.msg(folder=EmailMessage.FOLDER_SENT, thread=thread, cat=False, sender=ME, to=["x@client.example"])
+        self.msg(folder=EmailMessage.FOLDER_SENT)   # DigiKey — не цього проєкту
+        self.dp3 = DanteProject.objects.create(dante_id="93", name="Indoor positioning")
+        self.args = {"u": self.du.pk, "from": MON.isoformat(), "to": TUE.isoformat(), "proj": self.project.pk}
+
+    def test_without_askdante_project_offers_existing_or_new(self):
+        page = self.client.get(self.url, self.args)
+        self.assertContains(page, 'name="action" value="bind_project"')
+        self.assertContains(page, f'<option value="{self.dp3.pk}" selected>')   # та сама назва
+        self.assertContains(page, "Створити в askDANTE")
+        self.client.post(self.url, {**self.args, "action": "bind_project", "dp": self.dp3.pk})
+        self.assertEqual(ProjectMap.objects.get(project=self.project).dante_project, self.dp3)
+        page = self.client.get(self.url, self.args)
+        self.assertContains(page, f'value="{MON.isoformat()}|{self.dp3.pk}"')
+        self.assertNotContains(page, f'value="{MON.isoformat()}|{self.dp.pk}"')   # DigiKey — ні
+
+    def test_create_in_askdante(self):
+        with mock.patch("worktime.mapping.create_in_dante", return_value=self.dp3) as create:
+            r = self.client.post(self.url, {**self.args, "action": "bind_project", "create": "1"})
+        create.assert_called_once()
+        self.assertEqual(create.call_args[0][0], self.project)
+        self.assertIn(f"proj={self.project.pk}", r["Location"])

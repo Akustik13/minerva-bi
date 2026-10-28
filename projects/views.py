@@ -111,6 +111,19 @@ def _project_for_change(request, pk):
 
 
 @staff_member_required
+@require_POST
+def rename_view(request, pk):
+    """✏️ Перейменувати проєкт (правий клік у пошті) — право change; код P-… не змінюється."""
+    project = _project_for_change(request, pk)
+    name = str(_body(request).get("name") or "").strip()[:200]
+    if not name:
+        return JsonResponse({"ok": False, "error": "Вкажіть назву"}, status=400)
+    project.name = name
+    project.save(update_fields=["name", "updated_at"])
+    return JsonResponse({"ok": True, "project": _project_dict(project)})
+
+
+@staff_member_required
 @require_http_methods(["GET", "POST"])
 def overview_view(request, pk):
     """GET — стан огляду (панель у пошті); POST — скласти AI-огляд заново."""

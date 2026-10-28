@@ -80,8 +80,8 @@
         </select>
         {% if r.reason %}<div class="mg-muted">💡 {{ r.reason }}</div>{% endif %}
         {% elif r.dp %}<span class="mg-muted">{{ r.dp }}</span>{% endif %}</span>
-      <span class="{% if r.state == 'booked' %}mg-ok{% elif r.state == 'overlap' %}mg-warn{% else %}mg-muted{% endif %}">
-        {% if r.state == 'ready' %}{% trans "можна записати" %}{% elif r.state == 'booked' %}✓ {{ r.note }}{% elif r.state == 'overlap' %}⚠️ {{ r.note }}{% else %}— {{ r.note }}{% endif %}</span>
+      <span class="{% if r.state == 'booked' %}mg-ok{% elif r.state == 'overlap' or r.state == 'no_worktime' %}mg-warn{% else %}mg-muted{% endif %}">
+        {% if r.state == 'ready' %}{% trans "можна записати" %}{% elif r.state == 'booked' %}✓ {{ r.note }}{% elif r.state == 'overlap' or r.state == 'no_worktime' %}⚠️ {{ r.note }}{% else %}— {{ r.note }}{% endif %}</span>
     </div>
     {% endfor %}
   </div>

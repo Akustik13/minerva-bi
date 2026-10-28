@@ -280,6 +280,15 @@ def _nav_projects(account, limit=15):
                 .order_by('-last')[:limit])
 
 
+def _mail_time_url() -> str:
+    """«✉️ Час на пошту» (worktime) — для «⏱ Занести в askDANTE» з меню проєкту; без worktime — ''."""
+    from django.urls import NoReverseMatch, reverse
+    try:
+        return reverse('admin:worktime_workday_mailtime')
+    except NoReverseMatch:
+        return ''
+
+
 def _parse_project_filter(request):
     """Проєкт з ?project=<pk> (листи всіх підтверджених гілок проєкту)."""
     if not str(request.GET.get('project', '')).isdigit():
@@ -329,6 +338,44 @@ def _category_counts(qs):
                   .order_by('-unread', '-n')[:1000])
     ]
     return categories, customers
+
+
+CUSTOMER_SOURCE_CHIPS = 4   # джерел-перемикачів над «👤 Клієнти», решта — «інші»
+
+
+def _customer_sources(customers) -> list:
+    """Джерела замовлень клієнтів зі списку (як crm_link.customer_orders: ключ CRM або email) → c['src'];
+    перемикачі над «👤 Клієнти»: [{key, label, n}] — найчастіші джерела + «інші» (без замовлень цих джерел)."""
+    from collections import Counter, defaultdict
+    from django.db.models import Q
+    from crm.models import Customer
+    from sales.models import SalesOrder, SalesSource
+    ids = [c['id'] for c in customers]
+    if not ids:
+        return []
+    by_key, by_mail = {}, {}
+    for pk, key, mail in Customer.objects.filter(pk__in=ids).values_list('pk', 'external_key', 'email'):
+        if key:
+            by_key[key] = pk
+        if mail:
+            by_mail[mail.lower()] = pk
+    src = defaultdict(set)
+    for key, mail, source in (SalesOrder.objects.filter(Q(customer_key__in=list(by_key)) | Q(email__in=list(by_mail)))
+                              .exclude(source='').values_list('customer_key', 'email', 'source').distinct()):
+        pk = by_key.get(key) or by_mail.get((mail or '').lower())
+        if pk:
+            src[pk].add(source)
+    used = Counter()
+    for c in customers:
+        c['src'] = sorted(src.get(c['id'], ()))
+        used.update(c['src'])
+    if not used:
+        return []
+    names = dict(SalesSource.objects.values_list('slug', 'name'))
+    top = [s for s, _n in used.most_common(CUSTOMER_SOURCE_CHIPS)]
+    chips = [{'key': s, 'label': names.get(s) or s, 'n': used[s]} for s in top]
+    chips.append({'key': 'other', 'label': 'інші', 'n': sum(1 for c in customers if not set(c['src']) & set(top))})
+    return chips
 
 
 def _attach_folder_tags(account, emails):
@@ -517,6 +564,7 @@ def inbox_view(request):
         'quote_count':           _quote_messages(account).count(),
         'categories':            categories,
         'mail_customers':        mail_customers,
+        'cust_sources':          _customer_sources(mail_customers),
         'filter_qs':             _filter_qs(cat_filter, customer_filter, project_filter, quote_filter, work_filter),
         'work_filter':           work_filter,
         'no_category':           work_filter == NO_CATEGORY,
@@ -527,6 +575,8 @@ def inbox_view(request):
         'hidden_wcats':          hidden_wcats,
         'n_hidden_wcats':        sum(1 for c, _n, _u in work_categories if c.pk in hidden_wcats),
         'can_change_work_category': request.user.has_perm('email_assistant.change_mailcategory'),
+        'can_change_project':    request.user.has_perm('projects.change_project'),
+        'mail_time_url':         _mail_time_url(),
         'can_delete_work_category': request.user.has_perm('email_assistant.delete_mailcategory'),
         'grouped':               grouped,
         'category_choices':      EmailMessage.CATEGORY_CHOICES,

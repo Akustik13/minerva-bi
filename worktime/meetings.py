@@ -140,6 +140,7 @@ def plan(du: DanteUser, date_from, date_to, now=None) -> list:
     now = now or timezone.now()
     start, end = _bounds(date_from, date_to)
     hints = Hints(du.user)
+    st = DanteSettings.get()
     sent = {(b.date, b.start, b.stop) for b in Booking.objects.filter(dante_user=du, kind=Booking.PROJECT,
                                                                       status=Booking.SENT,
                                                                       date__range=(date_from, date_to))}
@@ -169,6 +170,9 @@ def plan(du: DanteUser, date_from, date_to, now=None) -> list:
                 row.update(state="booked", note="уже записано з Minerva")
             elif _norm(title) in described.get(day, set()):
                 row.update(state="booked", note="в askDANTE того дня вже є запис з такою назвою")
+            elif st.attendance_required and services.has_worktime(du, day) is False:
+                row.update(state="no_worktime", note="в askDANTE за цей день немає приходу / відходу — спершу "
+                                                     "внесіть їх (📅 клік на дату в календарі робочого часу)")
             else:
                 busy = services.project_overlap(du, day, row["start"], row["stop"])
                 if busy:
