@@ -19,8 +19,15 @@
    Текст джерел зберігається в ReplyBrief.sources — бриф можна скласти пізніше без повторного збору.
 2. Бриф — швидша модель (ai_helper.BRIEF_MODEL), українською, з посиланнями [#N].
 3. Лист — модель із «Налаштувань пошти» за брифом; «↻ Переписати» / «✍️ Написати лист» — лише цей крок.
+Ті самі зібрані дані — й для двох інших режимів у «📜 Історії» (замість брифу й листа):
+   - answer — «❓ Запитати про лист»: відповідь на запитання менеджера з посиланнями [#N] (склад, історія,
+     проблеми з товаром…); RAG — у всій пошті користувача, запит = запитання + суть листа + артикули;
+   - review — «🧭 Що обіцяли / зробили»: обіцянки (хто, строк, статус), виконане, відкриті питання, наступна дія —
+     той самий формат і перевірка, що огляд проєкту (projects.overview.validate), але для листування без проєкту.
+Пересланий колегою лист (context.forwarded_origin) — RAG шукає за оригіналом у всій пошті, без фільтра клієнта.
 Усе у фоні: браузер опитує стан (stages). Дані застарілі, якщо в гілці з'явились новіші листи.
 """
+import json
 import logging
 import os
 import re
@@ -55,8 +62,13 @@ STAGES = [
     ('rag', '🔎 RAG: пошук в інших листуваннях клієнта'),
     ('brief', '📋 Бриф (AI)'),
     ('letter', '✍️ Лист (AI)'),
+    ('answer', '❓ Відповідь на запитання (AI)'),
+    ('review', '🧭 Що обіцяли / зробили (AI)'),
 ]
-GATHER_STAGES = [k for k, _ in STAGES if k not in ('brief', 'letter')]
+GATHER_STAGES = [k for k, _ in STAGES if k not in ('brief', 'letter', 'answer', 'review')]
+MODE_STEPS = {'data': ['brief', 'letter'], 'brief': ['brief', 'letter'], 'letter': ['brief', 'letter'],
+              'answer': ['answer'], 'review': ['review']}
+REPLY_MODES = ('data', 'brief', 'letter')
 
 
 class Sources:
@@ -214,7 +226,8 @@ def gather(brief, on_stage=None) -> tuple:
     on_stage('attachments', 'done' if files else 'skipped', ', '.join(files) or 'немає текстових вкладень')
 
     on_stage('rag', 'running')
-    status, detail, note = _rag(src, user, msg, ctx, wish, customer, projects, seen, dedup)
+    status, detail, note = _rag(src, user, msg, ctx, wish, customer, projects, seen, dedup,
+                                wide=brief.mode in ('answer', 'review'), everywhere=brief.mode == 'answer')
     if note:
         used.append(note)
     on_stage('rag', status, detail)
@@ -348,10 +361,11 @@ def _attachments(src, msgs) -> list:
     return names
 
 
-def _rag(src, user, msg, ctx, wish, customer, projects, seen=(), dedup=None) -> tuple:
+def _rag(src, user, msg, ctx, wish, customer, projects, seen=(), dedup=None, wide=False, everywhere=False) -> tuple:
     """RAG лише в листуваннях цього клієнта (або єдиного проєкту); → (status, detail для етапу, note для «врахувала»).
-    Без дублів: не шукає в цій гілці й гілках проєкту, відкидає листи з `seen` (уже в джерелах),
-    фрагменти одного листа (чи одного вкладення) складає в одне джерело."""
+    У всій пошті користувача — для пересланого колегою листа (шукаємо за оригіналом) і коли менеджер сам питає
+    (wide: «❓ Запитати», «🧭 Що обіцяли»). Без дублів: не шукає в цій гілці й гілках проєкту, відкидає листи
+    з `seen` (уже в джерелах), фрагменти одного листа (чи одного вкладення) складає в одне джерело."""
     dedup = dedup if dedup is not None else {}
     try:
         from rag_assistant import retrieval
@@ -359,11 +373,14 @@ def _rag(src, user, msg, ctx, wish, customer, projects, seen=(), dedup=None) -> 
         return 'skipped', 'RAG не підключено', ''
     if not retrieval.available():
         return 'skipped', 'RAG не налаштований', ''
-    customer_id = customer.pk if customer is not None else None
-    project_id = projects[0].pk if len(projects) == 1 and not customer_id else None
-    if not customer_id and not project_id:
+    # запитання менеджера («які були проблеми з цим фільтром?») — про всіх клієнтів, тож без фільтра клієнта й проєкту
+    customer_id = retrieval.customer_filter(ctx) if customer is not None and not everywhere else None
+    project_id = (projects[0].pk if len(projects) == 1 and not customer_id and not ctx.get('customer_from_origin')
+                  and not everywhere else None)
+    wide = wide or bool(ctx.get('origin'))
+    if not customer_id and not project_id and not wide:
         return 'skipped', 'клієнта чи проєкт не визначено — у всій пошті не шукаємо', ''
-    query = ' · '.join(p for p in (wish.strip(), retrieval.query_for(ctx)) if p)
+    query = retrieval.build_query(ctx, wish)   # стандартна частина з листа + побажання / запитання менеджера
     excluded = list(dict.fromkeys(([msg.thread_id] if msg.thread_id else []) + _project_thread_ids(projects)))[:100]
     job = retrieval.start(user, query, purpose='reply', thread=msg.thread, customer_id=customer_id,
                           project_id=project_id, exclude_thread_ids=excluded, limit=RAG_REQUEST, wait_ms=8000)
@@ -371,7 +388,8 @@ def _rag(src, user, msg, ctx, wish, customer, projects, seen=(), dedup=None) -> 
     while not job.is_terminal and time.monotonic() < deadline:
         time.sleep(min(max(job.poll_after_ms or 1000, 300), 1500) / 1000)
         retrieval.poll(job)
-    scope = f'клієнта {customer.name}' if customer_id else f'проєкту {projects[0].code}'
+    scope = (f'клієнта {customer.name}' if customer_id else f'проєкту {projects[0].code}' if project_id
+             else 'усій вашій пошті')
     asked = f'запит «{query[:70]}{"…" if len(query) > 70 else ""}»'
     if job.status != job.COMPLETED:
         return 'skipped', f'{(job.message or "RAG не встиг")[:90]} · {asked}', ''
@@ -413,7 +431,7 @@ def _stages(keys=None, skip=()) -> list:
 
 def _restage(brief, run, skip=()) -> list:
     """Наступний крок: етапи збору лишаються (видно, звідки дані), кроки run — заново, skip — «кнопкою нижче»."""
-    stages = brief.stages or _stages()
+    stages = brief.stages or _stages(GATHER_STAGES + MODE_STEPS['letter'])
     for s in stages:
         if s['key'] in run:
             s['status'], s['detail'] = 'pending', ''
@@ -443,9 +461,10 @@ def start(user, msg, *, wish='', recipient='', to_email='', cc=(), mode='letter'
     from email_assistant.models import ReplyBrief
     mode = mode if mode in dict(ReplyBrief.MODE_CHOICES) else ReplyBrief.MODE_LETTER
     skip = {'data': ('brief', 'letter'), 'brief': ('letter',)}.get(mode, ())
+    keys = GATHER_STAGES + MODE_STEPS[mode]
     brief = ReplyBrief.objects.create(
         user=user, message=msg, thread=msg.thread if msg.thread_id else None, wish=(wish or '')[:2000], mode=mode,
-        recipient=recipient[:300], to_email=to_email[:254], cc=list(cc), stages=_stages(skip=skip),
+        recipient=recipient[:300], to_email=to_email[:254], cc=list(cc), stages=_stages(keys, skip=skip),
         last_message_id=latest_message_id(msg))
     _in_background(lambda: _prepare(brief.pk))
     return brief
@@ -501,7 +520,11 @@ def _prepare(pk):
         src, msgs, target = gather(brief, set_stage)
         brief.sources, brief.target = src.public(), target
         brief.save(update_fields=['sources', 'target', 'used', 'dedup', 'updated_at'])
-        if brief.mode != ReplyBrief.MODE_DATA:
+        if brief.mode == ReplyBrief.MODE_ANSWER:
+            _make_answer(brief, src, set_stage)
+        elif brief.mode == ReplyBrief.MODE_REVIEW:
+            _make_review(brief, src, set_stage)
+        elif brief.mode != ReplyBrief.MODE_DATA:
             _make_brief(brief, src, set_stage)
             if brief.mode == ReplyBrief.MODE_LETTER:
                 _write_letter(brief, msgs, set_stage)
@@ -567,6 +590,51 @@ def _write_letter(brief, msgs, set_stage):
     EmailMessage.objects.filter(pk=brief.message_id).update(ai_reply_draft=draft)
 
 
+def _make_answer(brief, src, set_stage):
+    """«❓ Запитати про лист»: відповідь на запитання менеджера лише за зібраними джерелами, з [#N]."""
+    from email_assistant import ai_helper
+    set_stage('answer', 'running')
+    text = ai_helper.answer_from_sources(src.text(), brief.wish, brief.target, brief.message.account,
+                                         getattr(brief.user, 'profile', None))
+    if not text:
+        raise RuntimeError('AI не відповів — перевірте ключ AI або спробуйте ще раз')
+    brief.brief, brief.brief_model = text, ai_helper.last_model()
+    brief.used = [u for u in brief.used if not u.startswith('відповідь —')] + \
+        [f'відповідь — {_model_label(brief.brief_model)}']
+    set_stage('answer', 'done', f'модель {_model_label(brief.brief_model)}')
+
+
+def _make_review(brief, src, set_stage):
+    """«🧭 Що обіцяли / зробили»: JSON як в огляді проєкту, перевірений; [#N] → лист чи документ із джерел."""
+    from email_assistant import ai_helper
+    from projects.overview import _parse_json, validate
+    set_stage('review', 'running')
+    raw = ai_helper.review_from_sources(src.text(), brief.target, brief.message.account,
+                                        getattr(brief.user, 'profile', None))
+    data = _parse_json(raw)
+    if data is None:
+        raise RuntimeError('AI не відповів у форматі огляду — спробуйте ще раз')
+    by_n = {i['n']: i for i in src.items}
+
+    def resolve(value):
+        m = re.search(r'#\s*(\d+)', str(value or ''))
+        item = by_n.get(int(m.group(1))) if m else None
+        return {'label': f'#{item["n"]}', 'url': item.get('url') or ''} if item else {'label': '', 'url': ''}
+    brief.brief = json.dumps(validate(data, [], {}, resolve=resolve), ensure_ascii=False)
+    brief.brief_model = ai_helper.last_model()
+    brief.used = [u for u in brief.used if not u.startswith('огляд —')] + [f'огляд — {_model_label(brief.brief_model)}']
+    set_stage('review', 'done', f'модель {_model_label(brief.brief_model)}')
+
+
+def review_display(brief):
+    """Огляд «що обіцяли / зробили» для браузера: підписи статусів і дат, як у панелі огляду проєкту."""
+    from projects.overview import for_display
+    try:
+        return for_display(json.loads(brief.brief)) if brief.brief else None
+    except ValueError:
+        return None
+
+
 def _fail(brief, error):
     from email_assistant.models import ReplyBrief
     for s in brief.stages:
@@ -577,10 +645,11 @@ def _fail(brief, error):
 
 # ── Для браузера ─────────────────────────────────────────────────────────────
 
-def latest_for(user, msg):
-    """Остання підготовка користувача для гілки листа (або для самого листа без гілки)."""
+def latest_for(user, msg, modes=REPLY_MODES):
+    """Остання підготовка користувача для гілки листа (або для самого листа без гілки) серед режимів modes:
+    відповідь листом (data / brief / letter) окремо від «❓ Запитати» (answer) і «🧭 Що обіцяли» (review)."""
     from email_assistant.models import ReplyBrief
-    qs = ReplyBrief.objects.filter(user=user)
+    qs = ReplyBrief.objects.filter(user=user, mode__in=modes)
     qs = qs.filter(thread_id=msg.thread_id) if msg.thread_id else qs.filter(message=msg)
     return qs.select_related('message').first()
 
@@ -589,8 +658,10 @@ def as_json(brief) -> dict:
     """Стан для браузера; повний текст джерел — лише коли крок завершено (опитування під час роботи — легке)."""
     running = brief.status == brief.RUNNING
     stale = not running and latest_message_id(brief.message) != brief.last_message_id
+    review = review_display(brief) if brief.mode == brief.MODE_REVIEW and not running else None
     return {'id': brief.pk, 'status': brief.status, 'mode': brief.mode, 'error': brief.error, 'stages': brief.stages,
-            'brief': brief.brief, 'sources': Sources(brief.sources).public(texts=not running), 'draft': brief.draft,
+            'brief': '' if review is not None else brief.brief, 'review': review,
+            'sources': Sources(brief.sources).public(texts=not running), 'draft': brief.draft,
             'to': brief.to_email, 'cc': brief.cc, 'used': brief.used, 'dedup': brief.dedup or {}, 'wish': brief.wish,
             'message_id': brief.message_id, 'stale': stale,
             'updated': timezone.localtime(brief.updated_at).strftime('%d.%m %H:%M'),

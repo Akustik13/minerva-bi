@@ -71,6 +71,27 @@
   border:1px solid rgba(124,58,237,.18)}
 .em-rag-hit a{color:var(--link-fg,#3b82f6);text-decoration:none;font-weight:600}
 .em-rag-hit .m{color:var(--text-dim);font-size:11px}
+.em-rag-hit mark,.em-ask-out mark{background:rgba(245,158,11,.35);color:inherit;border-radius:2px;padding:0 1px}
+.em-rag-hit details{margin-top:2px}
+.em-rag-hit details summary{cursor:pointer;font-size:11px;color:var(--text-dim)}
+.em-rag-hit pre{white-space:pre-wrap;font-family:inherit;font-size:11px;margin:4px 0 0;max-height:220px;overflow:auto;color:var(--text-muted)}
+/* «❓ Запитати про лист» і «🧭 Що обіцяли / зробили» — на тих самих зібраних даних, що «📋 Підготувати» */
+.em-history-ask{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-strong)}
+.em-ask-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.em-ask-out{margin-top:8px;font-size:12.5px;line-height:1.6;color:var(--text)}
+.em-ask-out:empty{display:none}
+.em-ask-stages{font-size:11px;color:var(--text-dim);line-height:1.5;margin-bottom:6px}
+.em-ask-text{white-space:pre-wrap}
+.em-ask-out a.ref{color:var(--link-fg,#3b82f6);text-decoration:none;font-size:11px}
+.em-ask-out details{margin-top:8px}
+.em-ask-out details summary{cursor:pointer;font-size:12px;color:var(--text-muted)}
+.em-ask-src{margin:3px 0 3px 10px;font-size:11px;color:var(--text-muted)}
+.em-ask-src pre{white-space:pre-wrap;font-family:inherit;font-size:11px;margin:3px 0 6px;max-height:220px;overflow:auto;
+  color:var(--text);border-left:2px solid var(--border-strong);padding-left:8px}
+/* Виділили текст у листі → «🔎 Шукати виділене» / «❓ Запитати» / «🔍 У пошті» */
+#pv-sel-bar{position:fixed;z-index:1000;display:none;gap:4px;padding:4px;border-radius:8px;background:var(--bg-card);
+  border:1px solid var(--border-strong);box-shadow:0 4px 14px rgba(0,0,0,.25)}
+#pv-sel-bar .em-pv-btn{padding:3px 9px;font-size:11.5px;background:var(--bg-card)}
 .em-history-draft-row{display:flex;gap:6px}
 .em-history-draft-txt{white-space:pre-wrap;font-size:13px;line-height:1.6;color:var(--text);margin-top:8px}
 .em-history-draft-txt:empty{display:none}
@@ -332,6 +353,13 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
     </div>
   </div>
 
+  <!-- Виділили текст у листі: шукати лише за ним (RAG / пошта Minerva) або запитати -->
+  <div id="pv-sel-bar" data-pk="{{ last.pk|default:0 }}">
+    {% if rag_available %}<button class="em-pv-btn ai" onmousedown="event.preventDefault()" onclick="pvSelRag()">🔎 {% trans "Шукати виділене в RAG" %}</button>{% endif %}
+    <button class="em-pv-btn" onmousedown="event.preventDefault()" onclick="pvSelAsk()">❓ {% trans "Запитати" %}</button>
+    <button class="em-pv-btn" onmousedown="event.preventDefault()" onclick="pvSelMail()">🔍 {% trans "У пошті" %}</button>
+  </div>
+
   <!-- Messages (Gmail-style: collapsed except last) -->
   <div class="em-msgs">
     <div class="em-history em-ov" id="pv-ov">
@@ -356,12 +384,33 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
       <div id="pv-history-body"></div>
       {% if rag_available %}
       <div class="em-history-rag">
-        <button class="em-pv-btn" onclick="pvRagSearch({{ last.pk|default:0 }}, this)"
-                title="{% trans "Знайти в інших листуваннях (база знань RAG): обіцянки, домовленості, попередні пропозиції. Без RAG усе інше працює." %}">🔎 {% trans "Доповнити через RAG" %}</button>
+        <div class="em-history-draft-row">
+          <input class="em-reply-inp" id="pv-rag-q" style="flex:1"
+                 placeholder="{% trans "Що шукати додатково (необов’язково): напр. проблеми з фільтром, ціна на 100 шт." %}"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();pvRagSearch({{ last.pk|default:0 }}, null);}">
+          <button class="em-pv-btn" onclick="pvRagSearch({{ last.pk|default:0 }}, this)"
+                  title="{% trans "Запит: тема, відправник, суть листа й артикули + те, що ви дописали чи виділили в листі (воно найважливіше). Порожнє поле — лише за листом, по клієнту. Без RAG усе інше працює." %}">🔎 {% trans "Доповнити через RAG" %}</button>
+        </div>
+        <span class="em-rag-status">{% trans "Порожнє поле — шукаю за листом по клієнту; дописали чи виділили текст у листі — додаю його до запиту й шукаю в усій вашій пошті" %}</span>
         <div class="em-rag-status" id="pv-rag-status"></div>
         <div id="pv-rag-hits"></div>
       </div>
       {% endif %}
+      <div class="em-history-ask">
+        <div class="em-history-draft-row em-ai-prompt-row">
+          <textarea class="em-ai-prompt-inp" id="pv-ask-q" rows="2"
+                 placeholder="{% trans "❓ Запитати про лист: чого не вистачає на складі? які були проблеми з цим товаром? що ми вже відправляли цьому клієнту?" %}"
+                 oninput="pvGrow(this)"
+                 onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();pvAsk({{ last.pk|default:0 }});}"></textarea>
+          <button class="em-pv-btn ai" onclick="pvAsk({{ last.pk|default:0 }})"
+                  title="{% trans "Minerva збере листування, історію, склад, Angebote й знайдене в базі знань і відповість з посиланнями на джерела" %}">❓ {% trans "Запитати" %}</button>
+        </div>
+        <div class="em-ask-btns">
+          <button class="em-pv-btn" onclick="pvReview({{ last.pk|default:0 }})"
+                  title="{% trans "Обіцянки (хто, строк, виконано чи ні), що вже зроблено, відкриті питання й наступна дія — з джерелами" %}">🧭 {% trans "Що обіцяли / зробили / відкрите" %}</button>
+        </div>
+        <div class="em-ask-out" id="pv-ask-out"></div>
+      </div>
       <div class="em-history-draft">
         <div class="em-history-draft-row em-ai-prompt-row">
           <textarea class="em-ai-prompt-inp" id="pv-history-prompt" rows="3"
@@ -1311,6 +1360,11 @@ window.pvHistory = async function(pk) {
   try {
     var d = await (await fetch('/email/message/' + pk + '/history/')).json();
     box.dataset.loaded = '1';
+    // останній огляд «що обіцяли / зробили» цієї гілки — одразу видно, без нового виклику AI
+    fetch('/email/message/' + pk + '/brief/?mode=review').then(function(r) { return r.json(); }).then(function(x) {
+      var out = document.getElementById('pv-ask-out');
+      if (x.brief && x.brief.status === 'done' && out && !out.innerHTML) _pvAskRender(x.brief);
+    }).catch(function() {});
     var html = '';
     if (d.state && d.state.length) {
       html += '<div class="em-history-state">' + d.state.map(function(s){ return '<div>' + _pvEsc(s) + '</div>'; }).join('') + '</div>';
@@ -1377,24 +1431,45 @@ window.pvHistoryAI = async function(pk) {
   } catch(e) { out.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
 
-// «🔎 Доповнити через RAG»: старт пошуку, далі опитування стану (бюджет ~20 с); job_id RAG браузер не бачить
-window.pvRagSearch = async function(pk, btn) {
+// Підсвітити слова запиту в уже екранованому тексті
+function _pvMark(html, terms) {
+  (terms || []).forEach(function(t) {
+    var e = _pvEsc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (e.length >= 3) html = html.replace(new RegExp('(' + e + ')', 'gi'), '<mark>$1</mark>');
+  });
+  return html;
+}
+
+// «🔎 Доповнити через RAG»: старт пошуку, далі опитування стану (бюджет ~20 с); job_id RAG браузер не бачить.
+// Запит складає сервер (retrieval.build_query): стандартна частина з листа + що ви дописали в полі чи виділили
+// (query; без нього — значення поля «Що шукати додатково»). Видно, з яким запитом і де шукали.
+window.pvRagSearch = async function(pk, btn, query) {
   var st = document.getElementById('pv-rag-status'), box = document.getElementById('pv-rag-hits');
+  var inp = document.getElementById('pv-rag-q');
   if (!st || !pk) return;
+  if (query && inp) inp.value = query;
+  query = inp ? inp.value.trim() : (query || '');
   if (btn) btn.disabled = true;
   st.textContent = '⏳ {% trans "Шукаю в базі знань…" %}';
   box.innerHTML = '';
+  var scope = '';
   var render = function(d) {
-    st.textContent = (d.status === 'completed' ? '🔎 ' : (d.terminal ? '⚠️ ' : '⏳ ')) + (d.message || '');
+    scope = d.scope || scope;
+    var q = (d.query || '').length > 160 ? d.query.slice(0, 160) + '…' : (d.query || '');
+    st.textContent = (d.status === 'completed' ? '🔎 ' : (d.terminal ? '⚠️ ' : '⏳ ')) + (d.message || '')
+                   + (scope ? ' · ' + scope : '') + (q ? ' · {% trans "запит" %}: «' + q + '»' : '');
     box.innerHTML = (d.hits || []).map(function(h) {
       var when = (h.sent_at || '').slice(0, 10);
       return '<div class="em-rag-hit"><a href="' + _pvEsc(h.url) + '" target="_blank">' + _pvEsc(h.subject || '(без теми)') + '</a>'
            + ' <span class="m">' + _pvEsc(when) + ' · ' + _pvEsc(h.from_email)
-           + (h.attachment ? ' · 📎 ' + _pvEsc(h.attachment.name) : '') + '</span><br>' + _pvEsc(h.text) + '</div>';
+           + (h.attachment ? ' · 📎 ' + _pvEsc(h.attachment.name) : '') + '</span><br>'
+           + _pvMark(_pvEsc(h.snippet || h.text), d.terms)
+           + '<details><summary>{% trans "весь фрагмент" %}</summary><pre>' + _pvEsc(h.text) + '</pre></details></div>';
     }).join('');
   };
   try {
-    var d = await (await fetch('/email/message/' + pk + '/rag-search/', {method: 'POST', headers: {'X-CSRFToken': CSRF}})).json();
+    var d = await (await fetch('/email/message/' + pk + '/rag-search/', {method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify({query: query || ''})})).json();
     var deadline = Date.now() + 20000;
     render(d);
     while (!d.terminal && Date.now() < deadline) {
@@ -1405,6 +1480,168 @@ window.pvRagSearch = async function(pk, btn) {
     if (!d.terminal) st.textContent = '⚠️ {% trans "RAG не встиг — працюємо з даними Minerva" %}';
   } catch (e) { st.textContent = '⚠️ {% trans "RAG недоступний — працюємо з даними Minerva" %}'; }
   finally { if (btn) btn.disabled = false; }
+};
+
+// «❓ Запитати про лист» / «🧭 Що обіцяли / зробили»: збір джерел і AI у фоні (reply_brief), опитування /email/brief/<id>/
+var _pvAskRun = 0;
+async function _pvAskStart(url, body) {
+  var out = document.getElementById('pv-ask-out');
+  if (!out) return;
+  var run = ++_pvAskRun;
+  out.innerHTML = '<div class="em-ask-stages">⏳ {% trans "Minerva збирає листування, історію, склад і базу знань…" %}</div>';
+  try {
+    var b = await (await fetch(url, {method: 'POST', headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+                                     body: JSON.stringify(body || {})})).json();
+    if (b.ok === false) { out.innerHTML = '<div>⚠️ ' + _pvEsc(b.error || '{% trans "Помилка" %}') + '</div>'; return; }
+    var deadline = Date.now() + 180000;
+    _pvAskRender(b);
+    while (b.status === 'running' && Date.now() < deadline && run === _pvAskRun) {
+      await new Promise(function(r) { setTimeout(r, 1500); });
+      b = await (await fetch('/email/brief/' + b.id + '/')).json();
+      if (run === _pvAskRun) _pvAskRender(b);
+    }
+  } catch (e) { out.innerHTML = '<div>⚠️ {% trans "Помилка" %}</div>'; }
+}
+
+// [#N] у тексті → посилання на джерело (лист, Angebot…) з підказкою, звідки воно
+function _pvRefs(html, sources) {
+  var by = {};
+  (sources || []).forEach(function(s) { by[s.n] = s; });
+  return html.replace(/\[#(\d+)\]/g, function(m, n) {
+    var s = by[+n];
+    if (!s) return m;
+    return s.url ? '<a class="ref" href="' + _pvEsc(s.url) + '" target="_blank" title="' + _pvEsc(s.label) + '">[#' + n + ']</a>'
+                 : '<span class="ref" title="' + _pvEsc(s.label) + '">[#' + n + ']</span>';
+  });
+}
+
+function _pvAskRender(b) {
+  var out = document.getElementById('pv-ask-out');
+  if (!out || !b) return;
+  var icon = {done: '✓', running: '⏳', skipped: '–', failed: '✗', pending: '·'};
+  var html = '<div class="em-ask-stages">' + (b.status === 'running' ? '' : '🕒 ' + _pvEsc(b.gathered) + (b.stale ? ' · {% trans "у гілці вже нові листи" %}' : '') + '<br>')
+    + (b.stages || []).map(function(s) {
+        return (icon[s.status] || '·') + ' ' + _pvEsc(s.label) + (s.detail ? ' — ' + _pvEsc(s.detail) : '');
+      }).join('<br>') + '</div>';
+  if (b.status === 'error') html += '<div>⚠️ ' + _pvEsc(b.error || '{% trans "Помилка" %}') + '</div>';
+  var ref = function(r) { return r && r.label ? ' ' + _pvRefs(_pvEsc('[' + r.label + ']'), b.sources) : ''; };
+  if (b.mode === 'answer' && b.brief) {
+    html += '<div class="em-ask-text"><b>❓ ' + _pvEsc(b.wish) + '</b>\n\n' + _pvRefs(_pvEsc(b.brief), b.sources) + '</div>';
+  }
+  if (b.mode === 'review' && b.review) {
+    var r = b.review;
+    if (r.summary) html += '<div class="em-ov-sum">' + _pvEsc(r.summary) + '</div>';
+    if ((r.promises || []).length) html += '<h5>🤝 {% trans "Обіцянки" %}</h5>' + r.promises.map(function(p) {
+      return '<div class="em-ov-item">' + _pvEsc(p.status_icon) + ' <b>' + _pvEsc(p.who || '?') + ':</b> ' + _pvEsc(p.text)
+        + (p.date_fmt ? ' <span class="s">({% trans "строк" %} ' + _pvEsc(p.date_fmt) + ')</span>' : '') + ref(p.ref)
+        + (p.evidence ? '<div class="s">' + _pvEsc(p.evidence) + '</div>' : '') + '</div>';
+    }).join('');
+    if ((r.done || []).length) html += '<h5>✅ {% trans "Зроблено" %}</h5>' + r.done.map(function(d) {
+      return '<div class="em-ov-item">' + _pvEsc(d.text) + (d.date_fmt ? ' <span class="s">' + _pvEsc(d.date_fmt) + '</span>' : '') + ref(d.ref) + '</div>';
+    }).join('');
+    if ((r.open_questions || []).length) html += '<h5>❔ {% trans "Відкриті питання" %}</h5>' + r.open_questions.map(function(q) {
+      return '<div class="em-ov-item"><b>' + _pvEsc(q.who || '?') + ':</b> ' + _pvEsc(q.text) + ref(q.ref) + '</div>';
+    }).join('');
+    if (r.next_action) html += '<div class="em-ov-next">➡ <b>{% trans "Наступна дія" %}:</b> ' + _pvEsc(r.next_action.text)
+      + (r.next_action.due_fmt ? ' · {% trans "до" %} ' + _pvEsc(r.next_action.due_fmt) : '')
+      + (r.next_action.why ? '<div class="s">' + _pvEsc(r.next_action.why) + '</div>' : '') + '</div>';
+  }
+  if (b.status !== 'running' && (b.sources || []).length) {
+    html += '<details><summary>🔍 {% trans "Джерела" %} (' + b.sources.length + ') — {% trans "звідки дані" %}</summary>'
+      + b.sources.map(function(s) {
+          return '<details class="em-ask-src"><summary>[#' + s.n + '] ' + _pvEsc(s.label)
+            + (s.url ? ' <a href="' + _pvEsc(s.url) + '" target="_blank" onclick="event.stopPropagation()">↗</a>' : '')
+            + '</summary><pre>' + _pvEsc(s.text || '—') + '</pre></details>';
+        }).join('') + '</details>';
+  }
+  if (b.used && b.used.length && b.status !== 'running') html += '<div class="em-ask-stages">🧩 ' + _pvEsc(b.used.join(' · ')) + '</div>';
+  out.innerHTML = html;
+}
+
+window.pvAsk = function(pk) {
+  var q = document.getElementById('pv-ask-q');
+  if (!pk || !q || !q.value.trim()) { if (q) q.focus(); return; }
+  _pvAskStart('/email/message/' + pk + '/ai-ask/', {question: q.value.trim()});
+};
+window.pvReview = function(pk) {
+  if (pk) _pvAskStart('/email/message/' + pk + '/ai-review/', {});
+};
+
+// Виділений у листі текст (і в iframe HTML-листа): плаваюча панель «🔎 Шукати виділене / ❓ Запитати / 🔍 У пошті»
+var _pvSel = '';
+function _pvSelHide() { var bar = document.getElementById('pv-sel-bar'); if (bar) bar.style.display = 'none'; }
+function _pvSelCheck(doc, frame) {
+  var bar = document.getElementById('pv-sel-bar');
+  var sel = doc.getSelection ? doc.getSelection() : null;
+  var text = sel ? String(sel).replace(/\s+/g, ' ').trim() : '';
+  if (!bar || !sel || !sel.rangeCount || text.length < 3 || text.length > 3000) { _pvSelHide(); return; }
+  if (!frame) {   // лише текст листів у прев'ю, не поля вводу й панелі
+    var node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+    if (!node || !node.closest('.em-card-body-text, .em-card-body') || node.closest('textarea, input, .em-history')) { _pvSelHide(); return; }
+  }
+  var r = sel.getRangeAt(0).getBoundingClientRect(), top = r.top, left = r.left;
+  if (frame) { var f = frame.getBoundingClientRect(); top += f.top; left += f.left; }
+  _pvSel = text;
+  bar.style.display = 'flex';
+  bar.style.top = Math.max(8, top - 42) + 'px';
+  bar.style.left = Math.max(8, Math.min(window.innerWidth - 420, left)) + 'px';
+}
+function _pvSelHook(doc, frame) {
+  if (!doc || doc._pvSelHooked) return;
+  doc._pvSelHooked = true;
+  doc.addEventListener('mouseup', function() { setTimeout(function() { _pvSelCheck(doc, frame); }, 10); });
+  doc.addEventListener('keyup', function(e) { if (e.shiftKey) _pvSelCheck(doc, frame); });
+  doc.addEventListener('mousedown', function(e) {
+    var bar = document.getElementById('pv-sel-bar');
+    if (!bar || !bar.contains(e.target)) _pvSelHide();
+  });
+}
+_pvSelHook(document, null);
+document.querySelectorAll('iframe.em-body-iframe').forEach(function(f) {
+  var hook = function() { try { _pvSelHook(f.contentDocument, f); } catch (e) {} };
+  f.addEventListener('load', hook);
+  try { if (f.contentDocument && f.contentDocument.readyState === 'complete' && f.src) hook(); } catch (e) {}
+});
+function _pvSelOpenHistory(pk, then) {
+  try {   // дію вибрано — виділення більше не потрібне (інакше панель з'явиться знову)
+    document.getSelection().removeAllRanges();
+    document.querySelectorAll('iframe.em-body-iframe').forEach(function(f) {
+      if (f.contentDocument) f.contentDocument.getSelection().removeAllRanges();
+    });
+  } catch (e) {}
+  _pvSelHide();
+  var box = document.getElementById('pv-history');
+  if (box && box.style.display !== 'block') pvHistory(pk);
+  setTimeout(then, 60);
+}
+{% if rag_available %}
+window.pvSelRag = function() {
+  var pk = +(document.getElementById('pv-sel-bar') || {dataset: {}}).dataset.pk, text = _pvSel;
+  _pvSelHide();
+  if (pk && text) _pvSelOpenHistory(pk, function() {
+    pvRagSearch(pk, null, text);
+    var st = document.getElementById('pv-rag-status');
+    if (st) st.scrollIntoView({behavior: 'smooth', block: 'center'});
+  });
+};
+{% endif %}
+window.pvSelAsk = function() {
+  var pk = +(document.getElementById('pv-sel-bar') || {dataset: {}}).dataset.pk, text = _pvSel;
+  _pvSelHide();
+  if (pk && text) _pvSelOpenHistory(pk, function() {
+    var q = document.getElementById('pv-ask-q');
+    if (!q) return;
+    q.value = '{% trans "Що відомо про" %}: «' + text.slice(0, 500) + '»?';
+    pvGrow(q);
+    q.scrollIntoView({behavior: 'smooth', block: 'center'});
+    q.focus();
+  });
+};
+window.pvSelMail = function() {
+  var text = _pvSel;
+  try { document.getSelection().removeAllRanges(); } catch (e) {}
+  _pvSelHide();
+  if (text) window.open('/email/?q=' + encodeURIComponent(text.slice(0, 200)), '_blank');
 };
 
 // force — зміна мови у випадному списку: перекласти заново, панель не закривати

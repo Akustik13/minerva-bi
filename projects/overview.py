@@ -322,14 +322,15 @@ def _ref(value, refs, docs) -> dict:
     return {"label": "", "url": ""}
 
 
-def validate(data, refs, docs) -> dict:
+def validate(data, refs, docs, resolve=None) -> dict:
+    """resolve(ref) → {label, url} — свій розбір посилань (огляд листування в пошті: [#N] — номер джерела)."""
     def items(key, extra):
         out = []
         for raw in (data.get(key) or [])[:ITEM_LIMIT]:
             if not isinstance(raw, dict) or not _text(raw.get("text")):
                 continue
             item = {"text": _text(raw.get("text")), "date": _date(raw.get("date")),
-                    "ref": _ref(raw.get("ref"), refs, docs)}
+                    "ref": resolve(raw.get("ref")) if resolve else _ref(raw.get("ref"), refs, docs)}
             item.update(extra(raw))
             out.append(item)
         return out

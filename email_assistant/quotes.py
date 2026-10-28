@@ -79,3 +79,64 @@ def new_text(body) -> str:
             break
         out.append(line)
     return "\n".join(out)[:20000]
+
+
+# Прощання й підпис: короткий рядок «Mit freundlichen Grüßen / Best regards», «-- », «=====»
+SIGNOFF_RE = re.compile(
+    r"^\s*(?:(?:mit\s+freundlichen|freundliche|viele|beste|liebe)\s+gr(?:ü|ue)(?:ß|ss)(?:en|e)|"
+    r"best\s+regards?|kind\s+regards|warm\s+regards|regards|sincerely|cheers|з\s+повагою|с\s+уважением)"
+    r"(?:[\s,.!/:-].{0,50})?$|^\s*(?:--|={4,}|_{4,})\s*$", re.IGNORECASE)
+_REPLY_HEADER_RE = re.compile(r"(?:schrieb|wrote|geschrieben|написав|написал)\s*:\s*$", re.IGNORECASE)
+_LINKS_RE = re.compile(r"<(?:mailto:|https?://)[^>]{0,300}>|\[(?:https?://|mailto:)[^\]]{0,300}\]")
+
+
+def strip_signature(text) -> str:
+    """Текст до прощання й підпису (перший рядок підписом не вважається) — для пошукового запиту."""
+    lines = (text or "").splitlines()
+    for n, line in enumerate(lines[1:], 1):
+        if SIGNOFF_RE.match(line):
+            return "\n".join(lines[:n]).rstrip()
+    return "\n".join(lines).rstrip()
+
+
+def tidy(text) -> str:
+    """
+    Фрагмент листа для показу одним абзацом: без «>» цитування, без підписів (від прощання до наступного
+    заголовка листа — «Von: …», «… schrieb:»), без посилань <mailto:…> і зайвих пробілів. Зміст цитат лишається.
+    """
+    out, skipping = [], False
+    for raw in (text or "").splitlines():
+        line = re.sub(r"^\s*(?:>\s?)+", "", raw)
+        if skipping:
+            if not (FORWARD_RE.match(line) or HEADER_RE.match(line) or _REPLY_HEADER_RE.search(line)):
+                continue
+            skipping = False
+        if out and SIGNOFF_RE.match(line):
+            skipping = True
+            continue
+        out.append(line)
+    return " ".join(_LINKS_RE.sub("", " ".join(out)).split())
+
+
+def around(text, terms, size=420) -> str:
+    """Шматок тексту довжиною ~size навколо першого збігу з terms (без збігу — початок)."""
+    low = text.lower()
+    hits = [low.find(t.lower()) for t in terms if t and low.find(t.lower()) >= 0]
+    if not hits or len(text) <= size:
+        return text[:size] + ("…" if len(text) > size else "")
+    start = max(0, min(hits) - size // 3)
+    piece = text[start:start + size]
+    return ("…" if start else "") + piece + ("…" if start + size < len(text) else "")
+
+
+def terms_of(query, limit=12) -> list:
+    """Значущі слова запиту для підсвічування: артикули (з цифрами) першими, далі слова від 5 літер."""
+    words = re.findall(r"[\w][\w./-]{2,}", query or "")
+    codes = [w.strip("./-") for w in words if any(ch.isdigit() for ch in w) and len(w) >= 4]
+    rest = [w for w in words if not any(ch.isdigit() for ch in w) and len(w) >= 5]
+    seen, out = set(), []
+    for w in codes + rest:
+        if w.lower() not in seen:
+            seen.add(w.lower())
+            out.append(w)
+    return out[:limit]

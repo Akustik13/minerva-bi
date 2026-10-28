@@ -1284,7 +1284,8 @@ class ReplyThreadingTests(MailLinksTests):
         self.assertRegex(html, rf'_pvReplyPk\s*=\s*{msg.pk};')
         self.assertIn("_pvReplySubj = 'Anfrage Boards'", html)
         self.assertIn(f'data-subject="Anfrage Boards"', html)
-        self.assertEqual(len(_re.findall(r'<textarea class="em-ai-prompt-inp"', html)), 2)   # AI-поля — багаторядкові
+        # AI-поля — багаторядкові: інструкція в AI-панелі, «Що написати?» і «❓ Запитати про лист» в «Історії»
+        self.assertEqual(len(_re.findall(r'<textarea class="em-ai-prompt-inp"', html)), 3)
 
     def test_reply_without_subject_gets_re_subject(self):
         orig = self._em(from_email='buyer@client.com', subject='Anfrage Boards', message_id='<q1@client.com>')

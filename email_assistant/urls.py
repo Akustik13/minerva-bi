@@ -25,6 +25,9 @@ urlpatterns = [
     # «📋 Підготувати відповідь»: бриф → лист у фоні (reply_brief.py)
     path('message/<int:message_pk>/ai-prepare/',         views.ai_prepare_view,      name='ai_prepare'),
     path('message/<int:message_pk>/brief/',              views.message_brief_view,   name='message_brief'),
+    # «📜 Історія»: запитання про лист і «що обіцяли / зробили» — на тих самих зібраних даних
+    path('message/<int:message_pk>/ai-ask/',             views.ai_ask_view,          name='ai_ask'),
+    path('message/<int:message_pk>/ai-review/',          views.ai_review_view,       name='ai_review'),
     path('brief/<int:brief_pk>/',                         views.reply_brief_view,     name='reply_brief'),
     path('brief/<int:brief_pk>/compose/',                 views.reply_brief_compose_view, name='reply_brief_compose'),
     path('brief/<int:brief_pk>/rewrite/',                 views.reply_brief_rewrite_view, name='reply_brief_rewrite'),

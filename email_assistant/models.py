@@ -598,10 +598,14 @@ class ReplyBrief(models.Model):
     «📋 Підготувати відповідь»: бриф (з чого писати) і лист за ним — email_assistant/reply_brief.py.
     Готується у фоні: status / stages читає браузер; «Переписати» — лише крок листа з виправленим брифом.
     Останній бриф користувача для гілки показується під чернеткою; застарів — якщо в гілці з'явились нові листи.
+    Ті самі зібрані дані — й для «❓ Запитати про лист» (answer: відповідь у полі brief) і «🧭 Що обіцяли / зробили»
+    (review: перевірений JSON у полі brief).
     """
     RUNNING, DONE, ERROR = 'running', 'done', 'error'
     MODE_DATA, MODE_BRIEF, MODE_LETTER = 'data', 'brief', 'letter'
-    MODE_CHOICES = [(MODE_DATA, 'Лише дані'), (MODE_BRIEF, 'Дані + бриф'), (MODE_LETTER, 'Дані + бриф + лист')]
+    MODE_ANSWER, MODE_REVIEW = 'answer', 'review'
+    MODE_CHOICES = [(MODE_DATA, 'Лише дані'), (MODE_BRIEF, 'Дані + бриф'), (MODE_LETTER, 'Дані + бриф + лист'),
+                    (MODE_ANSWER, 'Запитання про лист'), (MODE_REVIEW, 'Що обіцяли / зробили')]
 
     user          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reply_briefs')
     mode          = models.CharField(max_length=10, choices=MODE_CHOICES, default=MODE_LETTER,

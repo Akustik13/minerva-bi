@@ -1293,13 +1293,43 @@ def reply_brief_rewrite_view(request, brief_pk):
 
 @staff_member_required
 def message_brief_view(request, message_pk):
-    """Останній бриф користувача для гілки листа — щоб показати його під чернеткою без повторного збору."""
+    """Останній бриф користувача для гілки листа — щоб показати його під чернеткою без повторного збору.
+    ?mode=answer | review — остання відповідь на запитання / огляд «що обіцяли» для «📜 Історії»."""
     from email_assistant import reply_brief
     from email_assistant.models import EmailMessage
     account = _get_account(request)
     msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
-    brief = reply_brief.latest_for(request.user, msg)
+    mode = request.GET.get('mode')
+    modes = (mode,) if mode in ('answer', 'review') else reply_brief.REPLY_MODES
+    brief = reply_brief.latest_for(request.user, msg, modes)
     return JsonResponse({'brief': reply_brief.as_json(brief) if brief else None})
+
+
+@staff_member_required
+@require_POST
+def ai_ask_view(request, message_pk):
+    """«❓ Запитати про лист» {question}: ті самі зібрані дані, що «📋 Підготувати», + RAG у всій пошті → відповідь."""
+    from email_assistant import reply_brief
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    question = str(_json_body(request).get('question') or '').strip()
+    if not question:
+        return JsonResponse({'ok': False, 'error': 'Напишіть запитання'}, status=400)
+    brief = reply_brief.start(request.user, msg, wish=question, mode='answer')
+    return JsonResponse(reply_brief.as_json(brief))
+
+
+@staff_member_required
+@require_POST
+def ai_review_view(request, message_pk):
+    """«🧭 Що обіцяли / зробили»: обіцянки, виконане, відкриті питання й наступна дія по листуванню (без проєкту)."""
+    from email_assistant import reply_brief
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    brief = reply_brief.start(request.user, msg, mode='review')
+    return JsonResponse(reply_brief.as_json(brief))
 
 
 def _rag_for_ai(user, ctx, purpose, instruction=''):
@@ -1326,19 +1356,24 @@ def _rag_for_ai(user, ctx, purpose, instruction=''):
 @staff_member_required
 @require_POST
 def rag_search_view(request, message_pk):
-    """«🔎 Доповнити через RAG»: пошук в інших листуваннях (явний запит = розширений режим)."""
+    """
+    «🔎 Доповнити через RAG»: пошук в інших листуваннях (явний запит = розширений режим).
+    Запит — retrieval.build_query: стандартна частина з листа + {"query": "…"} — що менеджер дописав чи виділив
+    (воно першим); порожньо — лише стандартна. Зі своїм запитом — у всій пошті користувача, без — по клієнту.
+    """
     from email_assistant.context import build_context
     from email_assistant.models import EmailMessage
     from rag_assistant import retrieval
     account = _get_account(request)
     msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    wish = ' '.join(str(_json_body(request).get('query') or '').split())
     ctx = build_context(msg)
-    customer = ctx.get('customer')
-    job = retrieval.start(request.user, retrieval.query_for(ctx), purpose='history', thread=msg.thread,
-                          customer_id=customer.pk if customer is not None else None,
-                          exclude_thread_ids=[msg.thread_id] if msg.thread_id else [],
+    customer_id = None if wish else retrieval.customer_filter(ctx)
+    job = retrieval.start(request.user, retrieval.build_query(ctx, wish), purpose='history', thread=msg.thread,
+                          customer_id=customer_id, exclude_thread_ids=[msg.thread_id] if msg.thread_id else [],
                           wait_ms=retrieval.WAIT_EXTENDED_MS)
-    return JsonResponse(retrieval.job_json(job))
+    scope = f'по клієнту {ctx["customer"].name}' if customer_id else 'у всій вашій пошті'
+    return JsonResponse(dict(retrieval.job_json(job), scope=scope))
 
 
 @staff_member_required
@@ -1373,18 +1408,25 @@ def _reply_addresses(account, msg):
 
 
 def _reply_recipient(msg, ctx):
-    """(email, «Ім'я <email>») — кому відповідати: співрозмовник листа, а для внутрішнього
-    пересилання (колега переслав лист UPS) — клієнт із досьє."""
+    """(email, «Ім'я <email>») — кому відповідати: співрозмовник листа, а для внутрішнього пересилання — клієнт
+    із досьє (колега переслав лист UPS про мито → пишемо клієнту), а якщо клієнта немає (чи його знайдено лише
+    за адресою пересланого листа) — відправник пересланого листа (колега переслав FW запиту від нового клієнта)."""
     from email_assistant.categorize import counterparts
     from email_assistant.crm_link import own_addresses
     own = own_addresses()
     sender = (msg.from_email or '').lower()
     contacts = counterparts(msg, own)
+    origin = ctx.get('origin')
+    customer = ctx.get('customer')
     if contacts and (sender in contacts or msg.folder == 'sent'):
         email = contacts[0]
         name = msg.from_name if sender == email else ''
-    elif ctx.get('customer') is not None and ctx['customer'].email:
-        email, name = ctx['customer'].email, ctx['customer'].name
+    elif customer is not None and customer.email and not (origin and ctx.get('customer_from_origin')):
+        email, name = customer.email, customer.name
+    elif origin:
+        email, name = origin['from'], origin.get('name') or ''
+    elif customer is not None and customer.email:
+        email, name = customer.email, customer.name
     elif contacts:
         email, name = contacts[0], ''
     else:

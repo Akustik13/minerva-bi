@@ -415,16 +415,45 @@ def decide(mode, purpose, ctx=None, instruction="") -> tuple:
     return False, ""
 
 
-def query_for(ctx) -> str:
-    """Запит для пошуку: тема гілки, клієнт і суть останнього листа (без довгих цитат)."""
-    msg = ctx["message"]
-    parts = [msg.subject or ""]
-    if ctx.get("customer") is not None:
-        parts.append(ctx["customer"].name or "")
-    body = (msg.body_text or "").split("\n>")[0]
-    body = re.split(r"\n(?:Von|From|Am .{0,80}schrieb|On .{0,80}wrote)[: ]", body, maxsplit=1)[0]
-    parts.append(" ".join(body.split())[:1500])
-    return " · ".join(p for p in parts if p)[:QUERY_MAX]
+QUERY_BODY, QUERY_BODY_WITH_WISH = 1500, 400   # скільки тексту листа брати у стандартний запит
+
+
+def query_for(ctx, body_chars=QUERY_BODY) -> str:
+    """
+    Стандартний запит для пошуку: тема, клієнт і суть листа — без цитат і підпису, плюс артикули з листа.
+    Лист, який переслав колега (FW / WG), — за пересланим оригіналом: його тема, відправник і текст,
+    а не передмова й підпис колеги.
+    """
+    from email_assistant.quotes import new_text, strip_signature
+    msg, origin = ctx["message"], ctx.get("origin")
+    if origin:
+        head = [origin.get("subject") or msg.subject or "", origin.get("name") or "", origin.get("from") or ""]
+        body = strip_signature(origin.get("text") or "")
+    else:
+        customer = ctx.get("customer")
+        head = [msg.subject or "", (customer.name or "") if customer is not None else ""]
+        body = strip_signature(new_text(msg.body_text))
+    parts = head + [" ".join(body.split())[:body_chars]] + [item["sku"] for item in ctx.get("stock") or []]
+    return " · ".join(" ".join(p.split()) for p in parts if p and p.strip())[:QUERY_MAX]
+
+
+def build_query(ctx, wish="") -> str:
+    """
+    Єдиний спосіб скласти запит до RAG: стандартна частина з листа (query_for) + що хоче менеджер
+    (виділений текст, запитання, інструкція для AI). Побажання — першим, а текст листа тоді коротший,
+    щоб не заглушив його. Нічого не вказали — лише стандартна частина.
+    """
+    wish = " ".join(str(wish or "").split())
+    if not wish:
+        return query_for(ctx)
+    return f"{wish[:QUERY_MAX // 2]} · {query_for(ctx, QUERY_BODY_WITH_WISH)}"[:QUERY_MAX]
+
+
+def customer_filter(ctx):
+    """Обмежити пошук клієнтом CRM — але не тоді, коли клієнта знайдено лише за адресою пересланого листа:
+    листи, які пересилали колеги, з клієнтом зазвичай не пов'язані, і фільтр їх би сховав."""
+    customer = ctx.get("customer")
+    return customer.pk if customer is not None and not ctx.get("customer_from_origin") else None
 
 
 def search_for_context(user, ctx, *, purpose, mode, instruction=""):
@@ -439,11 +468,10 @@ def search_for_context(user, ctx, *, purpose, mode, instruction=""):
     if not use:
         return {"used": False, "reason": reason, "job": None}
     msg = ctx["message"]
-    customer = ctx.get("customer")
     wait = WAIT_EXTENDED_MS if mode == "extended" else WAIT_AUTO_MS
-    job = start(user, query_for(ctx), purpose=purpose, thread=msg.thread,
-                customer_id=customer.pk if customer is not None else None,
-                exclude_thread_ids=[msg.thread_id] if msg.thread_id else [], wait_ms=wait)
+    job = start(user, build_query(ctx, instruction), purpose=purpose, thread=msg.thread,
+                customer_id=customer_filter(ctx), exclude_thread_ids=[msg.thread_id] if msg.thread_id else [],
+                wait_ms=wait)
     if job.status in (job.QUEUED, job.RUNNING, job.PENDING):
         time.sleep(min(job.poll_after_ms, 1500) / 1000)
         poll(job)
@@ -463,6 +491,10 @@ def facts_text(job) -> str:
 
 
 def job_json(job) -> dict:
+    """Стан для браузера; кожен фрагмент ще й читабельним шматком навколо збігу (snippet) і словами запиту (terms)."""
+    from email_assistant.quotes import around, terms_of, tidy
+    terms = terms_of((job.request or {}).get("query", ""))
+    hits = [dict(h, snippet=around(tidy(h.get("text") or ""), terms)) for h in job.hits or []]
     return {"id": str(job.pk), "status": job.status, "message": job.message or coverage(job),
-            "hits": job.hits, "dropped": job.dropped, "poll_after_ms": job.poll_after_ms,
-            "terminal": job.is_terminal}
+            "hits": hits, "dropped": job.dropped, "poll_after_ms": job.poll_after_ms,
+            "terminal": job.is_terminal, "query": (job.request or {}).get("query", ""), "terms": terms}
