@@ -5,6 +5,8 @@ from django.contrib import admin, messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
 
+from email_assistant.models import MailCategory
+
 from . import mail_time, services
 from .client import DanteError
 from .models import Booking, DanteActivity, DanteProject, DanteSettings, MailCategoryTime
@@ -39,6 +41,58 @@ def _hm(minutes) -> str:
     return f"{minutes // 60}:{minutes % 60:02d}"
 
 
+def _loose_action(request, du, st, back):
+    """Листи без askDANTE: 🏷 до категорії (+ проєкт askDANTE) або 🙈 не рахувати / ↺ знову рахувати."""
+    from email_assistant.models import MailCategory
+    from .models import MailTimeIgnore
+    p = request.POST
+    mails = [int(x) for x in p.getlist("mail") if str(x).isdigit()]
+    if not mails:
+        messages.warning(request, "Виберіть листи галочками.")
+        return redirect(back)
+    action = p.get("action")
+    if action == "ignore":
+        scope = p.get("ignore_scope") if p.get("ignore_scope") in dict(MailTimeIgnore.KINDS) else MailTimeIgnore.MESSAGE
+        n = mail_time.ignore(du.user, mails, scope)   # рішення — для скриньок цього працівника
+        messages.success(request, f"🙈 Не рахувати: {n} ({dict(MailTimeIgnore.KINDS)[scope].lower()}). Повернути — "
+                                  "фільтр «проігноровані» → «↺ Знову рахувати».")
+        return redirect(back)
+    if action == "unignore":
+        n = mail_time.unignore(du.user, mails)
+        messages.success(request, f"↺ Знову рахуються (знято рішень: {n}).")
+        return redirect(back)
+    # assign
+    if not (services.is_manager(request.user) or request.user.has_perm("email_assistant.add_mailcategory")):
+        messages.error(request, "Немає права змінювати категорії листів.")
+        return redirect(back)
+    value = p.get("wcat") or ""
+    if value == "new":
+        name = (p.get("wcat_name") or "").strip()[:80]
+        if not name:
+            messages.error(request, "Вкажіть назву нової категорії.")
+            return redirect(back)
+        category = MailCategory.objects.filter(name__iexact=name).first() or MailCategory.objects.create(
+            name=name, order=MailCategory.objects.count())
+    else:
+        category = MailCategory.objects.filter(pk=value or 0).first()
+        if category is None:
+            messages.error(request, "Виберіть категорію.")
+            return redirect(back)
+    dp = None
+    try:
+        dp = services.create_target(p.get("new_target"), p.get("sub_name") or category.name, st)
+        if dp is None and p.get("dp"):   # ＋ новий проєкт клієнта / підпроєкт — або вибраний наявний
+            dp = DanteProject.objects.filter(pk=p.get("dp")).first()
+    except DanteError as e:
+        messages.error(request, f"askDANTE: {e.message}")
+        return redirect(back)
+    scope = p.get("scope") if p.get("scope") in ("sender", "domain", "thread") else "sender"
+    r = mail_time.assign(du.user, mails, category, scope, dp)
+    messages.success(request, f"🏷 {r['category']}: оновлено листів {r['changed']}"
+                              + (f" · askDANTE: {dp}" if dp else " · проєкт askDANTE ще не вибрано (🗂 Категорії → askDANTE)"))
+    return redirect(back)
+
+
 def mail_time_page(model_admin, request):
     """Оцінка часу на пошту по днях і проєктах askDANTE; ✓ — записати різницю в askDANTE."""
     from .admin import WEEKDAYS, WorkDayAdmin
@@ -53,7 +107,12 @@ def mail_time_page(model_admin, request):
         date_from = date_to
     if (date_to - date_from).days >= mail_time.MAX_DAYS:
         date_from = date_to - datetime.timedelta(days=mail_time.MAX_DAYS - 1)
-    back = f"{reverse('admin:worktime_workday_mailtime')}?u={du.pk if du else ''}&from={date_from}&to={date_to}"
+    show = g.get("show") if g.get("show") in ("all", "ignored") else "dante"
+    back = (f"{reverse('admin:worktime_workday_mailtime')}?u={du.pk if du else ''}&from={date_from}&to={date_to}"
+            f"&show={show}")
+
+    if request.method == "POST" and du is not None and request.POST.get("action") in ("assign", "ignore", "unignore"):
+        return _loose_action(request, du, st, back)
 
     if request.method == "POST" and du is not None:
         if not (st.enabled and st.configured):
@@ -116,6 +175,7 @@ def mail_time_page(model_admin, request):
                 total += r["minutes"]
                 todo += r["to_book"]
             days.append({"day": day, "wd": WEEKDAYS[day.weekday()], "rows": info["rows"], "unmapped": info["unmapped"],
+                         "loose": info["loose"], "ignored": info["ignored"],
                          "ongoing": day == today})
     days.reverse()   # свіжі дні зверху
     cats = list(MailCategoryTime.objects.select_related("category", "dante_project").order_by("category__order"))
@@ -129,6 +189,12 @@ def mail_time_page(model_admin, request):
         "mapping_url": reverse("admin:worktime_danteproject_changelist") + "?view=minerva",
         "activities": list(DanteActivity.objects.filter(archived=False)),
         "needs_activity": st.activity_required and not st.default_activity_id,
+        "show": show, "n_loose": sum(len(d["loose"]) for d in days), "n_ignored": sum(len(d["ignored"]) for d in days),
+        "categories": list(MailCategory.objects.filter(is_active=True)),
+        "can_categorize": services.is_manager(request.user) or request.user.has_perm("email_assistant.add_mailcategory"),
+        "projects": list(DanteProject.objects.filter(archived=False, gone=False).select_related("parent")
+                         .order_by("name")),
+        "customers": services.dante_customers(),
         "lang": dict(DanteSettings.COMMENT_LANGS).get(st.comment_lang, st.comment_lang),
         "dante_url": st.base_url,
     }

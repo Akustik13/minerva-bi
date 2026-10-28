@@ -70,7 +70,7 @@ class SuggestTests(Base):
         cat = MailCategory.objects.get(name="DigiKey")
         intern = DanteProject.objects.create(dante_id="500", name="Intern")
         self.fake.create_project_item = mock.Mock(return_value={"id": "501", "name": "DigiKey"})
-        self.client.post(url, {"action": "save", f"dp_{cat.pk}": "", f"parent_{cat.pk}": intern.pk,
+        self.client.post(url, {"action": "save", f"dp_{cat.pk}": "", f"new_{cat.pk}": f"p:{intern.pk}",
                                f"sub_{cat.pk}": "DigiKey", f"reply_{cat.pk}": "8", f"read_{cat.pk}": "2",
                                f"order_{cat.pk}": "0"})
         self.fake.create_project_item.assert_called_once_with("DigiKey", "500", parent_is_item=False)

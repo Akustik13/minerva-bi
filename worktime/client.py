@@ -203,6 +203,7 @@ class DanteClient:
                     "name": p.get("name") or f"#{p['id']}",
                     "reference_number": p.get("referenceNumber") or "",
                     "customer_name": customer.get("name") or "",
+                    "customer_id": str(customer.get("id") or ""),
                     "archived": _bool(p.get("archived")),
                     "time_trackable": p.get("timeTrackable") is not False,
                     "parent": parent,
@@ -403,10 +404,12 @@ class DanteClient:
             p = {}
         return {"id": str(p.get("id") or ""), "name": p.get("name") or name}
 
-    def create_project(self, name: str, reference_number: str = "") -> dict:
+    def create_project(self, name: str, reference_number: str = "", customer_id: str = "") -> dict:
         body = {"name": name[:255], "timeTrackable": True, "archived": False}
         if reference_number:
             body["referenceNumber"] = reference_number
+        if customer_id:   # проєкт клієнта askDANTE (напр. «000 :: Eigene Projekte …»)
+            body["customer"] = {"id": str(customer_id)}
         r = self._call("POST", "/projects", body=body)
         try:
             p = r.json()

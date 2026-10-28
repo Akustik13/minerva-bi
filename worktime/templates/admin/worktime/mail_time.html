@@ -25,6 +25,12 @@
 .mt-row .done{color:#16a34a}
 .mt-subj{color:var(--text-muted);font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mt-badge{font-size:11px;padding:1px 6px;border-radius:8px;background:rgba(26,115,232,.14);color:#1a73e8}
+.mt-loose{padding:6px 12px 8px;border-top:1px dashed rgba(128,128,128,.35)}
+.mt-mail{display:grid;grid-template-columns:22px 44px 22px minmax(160px,2fr) minmax(140px,1fr);gap:6px;align-items:center;
+  padding:3px 0;font-size:12px}
+.mt-mail .s{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mt-act .mt-form{margin-top:8px}
+.mt-form label[hidden]{display:none}
 .mt-desc{grid-column:2/-1;display:flex;flex-direction:column;gap:3px}
 .mt-text{width:100%;max-width:900px;box-sizing:border-box}
 .mt-sent{font-size:12px;color:#16a34a}
@@ -52,6 +58,10 @@
     {% endif %}
     <label>{% trans "Від" %}<input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}"></label>
     <label>{% trans "До" %}<input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}"></label>
+    <label>{% trans "Листи" %}<select name="show">
+      <option value="dante"{% if show == "dante" %} selected{% endif %}>{% trans "лише до askDANTE" %}</option>
+      <option value="all"{% if show == "all" %} selected{% endif %}>{% trans "усі — і без категорії / проєкту" %}</option>
+      <option value="ignored"{% if show == "ignored" %} selected{% endif %}>{% trans "проігноровані" %}</option></select></label>
     <button class="button default">✉️ {% trans "Показати" %}</button>
     <span class="mt-muted">{% trans "Разом" %} <b>{{ total }}</b> · {% trans "ще не в askDANTE" %} <b>{{ todo }}</b></span>
   </div>
@@ -70,12 +80,12 @@
 {% else %}
 <form method="post" onsubmit="return mtConfirm(event)">
   {% csrf_token %}
-  <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}">
+  <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}"><input type="hidden" name="show" value="{{ show }}">
   {% for d in days %}
   <div class="mt-day">
     <h3>{{ d.wd }} {{ d.day|date:"d.m.Y" }}
       {% if d.ongoing %}<span class="mt-muted">{% trans "день ще триває — оцінка зросте; автоматично записується наступного дня" %}</span>{% endif %}
-      {% if d.unmapped %}<span class="mt-muted">· {% trans "ще листів без категорії / проєкту askDANTE" %}: {{ d.unmapped }}</span>{% endif %}</h3>
+      {% if d.unmapped %}<span class="mt-muted">· {% trans "ще листів без категорії / проєкту askDANTE" %}: {{ d.unmapped }}{% if show == "dante" %} — <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}&show=all">{% trans "показати" %}</a>{% endif %}</span>{% endif %}</h3>
     {% for r in d.rows %}
     <div class="mt-row">
       <input type="checkbox" name="pick" value="{{ d.day|date:'Y-m-d' }}|{{ r.dp.pk }}" {% if r.to_book %}checked{% else %}disabled{% endif %}>
@@ -104,8 +114,47 @@
       </div>
     </div>
     {% endfor %}
+    {% if show == "all" and d.loose or show == "ignored" and d.ignored %}
+    <div class="mt-loose">
+      <div class="mt-muted">{% if show == "all" %}{% trans "Без категорії / проєкту askDANTE — виберіть і віднесіть до категорії або 🙈 не рахуйте:" %}{% else %}{% trans "Проігноровані — не рахуються:" %}{% endif %}</div>
+      {% if show == "all" %}{% for m in d.loose %}{% include "admin/worktime/_mail_line.html" %}{% endfor %}
+      {% else %}{% for m in d.ignored %}{% include "admin/worktime/_mail_line.html" %}{% endfor %}{% endif %}
+    </div>
+    {% endif %}
   </div>
   {% endfor %}
+  {% if show == "all" and n_loose %}
+  <div class="mt-card mt-act" id="loose-actions">
+    <b>{% trans "Вибрані листи" %} (<span id="mt-nmail">0</span>)</b>
+    {% if can_categorize %}
+    <div class="mt-form">
+      <label>🏷 {% trans "До категорії" %}<select name="wcat" id="mt-wcat" onchange="document.getElementById('mt-wcat-new').hidden = this.value !== 'new'">
+        <option value="">—</option>{% for c in categories %}<option value="{{ c.pk }}">{{ c.label }}</option>{% endfor %}
+        <option value="new">＋ {% trans "нова категорія…" %}</option></select></label>
+      <label id="mt-wcat-new" hidden>{% trans "Назва" %}<input name="wcat_name" maxlength="80" placeholder="DigiKey"></label>
+      <label>{% trans "Для кого правило" %}<select name="scope">
+        <option value="sender">{% trans "цей співрозмовник (адреса)" %}</option><option value="domain">{% trans "увесь його домен" %}</option>
+        <option value="thread">{% trans "лише ця гілка" %}</option></select></label>
+      <label>{% trans "Проєкт askDANTE для категорії" %}<select name="dp"><option value="">{% trans "— залишити / пізніше" %}</option>{% for p in projects %}<option value="{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</select></label>
+      <label>{% trans "або новий в askDANTE" %}<select name="new_target"><option value="">—</option>
+          {% if customers %}<optgroup label="{% trans "Новий проєкт у клієнта askDANTE" %}">{% for ref, cname in customers %}<option value="c:{{ ref }}">{{ cname }}</option>{% endfor %}</optgroup>{% endif %}
+          <optgroup label="{% trans "Новий підпроєкт під проєктом" %}">{% for p in projects %}<option value="p:{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</optgroup></select></label>
+      <label>{% trans "назва нового" %}<input name="sub_name" maxlength="255" placeholder="{% trans 'як категорія' %}"></label>
+      <button class="button default" name="action" value="assign">🏷 {% trans "Віднести" %}</button>
+    </div>
+    {% endif %}
+    <div class="mt-form">
+      <label>🙈 {% trans "Не рахувати" %}<select name="ignore_scope">
+        <option value="message">{% trans "лише ці листи" %}</option><option value="thread">{% trans "усю гілку" %}</option>
+        <option value="sender">{% trans "усе від цього співрозмовника" %}</option></select></label>
+      <button class="button" name="action" value="ignore">🙈 {% trans "Не рахувати" %}</button>
+      <span class="mt-muted">{% trans "Категорія діє й у скриньці (фільтр «🗂», мітка), як правий клік → «Віднести до категорії»." %}</span>
+    </div>
+  </div>
+  {% elif show == "ignored" and n_ignored %}
+  <div class="mt-card mt-act"><b>{% trans "Вибрані" %} (<span id="mt-nmail">0</span>)</b>
+    <button class="button" name="action" value="unignore">↺ {% trans "Знову рахувати" %}</button></div>
+  {% endif %}
   <div class="mt-bar">
     <label class="mt-muted">{% trans "Вид роботи" %}
       <select name="activity"><option value="">{% trans "як у категорії / налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if needs_activity and forloop.first and activities|length == 1 %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></label>
@@ -120,10 +169,20 @@
 function mtConfirm(e){
   var by = e && e.submitter;
   if (by && by.value === 'describe') return true;
+  if (by && (by.value === 'assign' || by.value === 'ignore' || by.value === 'unignore')) {
+    if (!document.querySelectorAll('input[name="mail"]:checked').length) { alert('{% trans "Виберіть листи галочками" %}'); return false; }
+    if (by.value === 'assign' && !document.getElementById('mt-wcat').value) { alert('{% trans "Виберіть категорію" %}'); return false; }
+    return true;
+  }
   if (by && by.name === 'rewrite') return confirm('{% trans "Старий запис уже видалено в askDANTE? Minerva перевірить і запише заново." %}');
   var n = document.querySelectorAll('input[name="pick"]:checked').length;
   if (!n) { alert('{% trans "Нічого не вибрано" %}'); return false; }
   return confirm('{% trans "Записати в askDANTE" %}: ' + n + '?');
 }
+document.addEventListener('change', function(e){
+  if (e.target.name !== 'mail') return;
+  var el = document.getElementById('mt-nmail');
+  if (el) el.textContent = document.querySelectorAll('input[name="mail"]:checked').length;
+});
 </script>
 {% endblock %}

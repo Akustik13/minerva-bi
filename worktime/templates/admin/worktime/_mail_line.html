@@ -1,0 +1,4 @@
+{% load i18n %}<label class="mt-mail"><input type="checkbox" name="mail" value="{{ m.pk }}">
+  <span class="mt-muted">{{ m.at|time:"H:i" }}</span><span>{% if m.out %}📤{% else %}📥{% endif %}</span>
+  <span class="s" title="{{ m.subject }}"><a href="/email/?msg={{ m.pk }}" target="_blank">{{ m.subject|default:_("(без теми)") }}</a></span>
+  <span class="s mt-muted" title="{{ m.contact }}">{% if m.name %}{{ m.name }} · {% endif %}{{ m.contact }}{% if m.category %} · {{ m.category }}{% endif %}</span></label>

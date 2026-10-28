@@ -106,7 +106,8 @@ def sync_directory(st: DanteSettings | None = None) -> dict:
         seen.add(p["id"])
         DanteProject.objects.update_or_create(dante_id=p["id"], defaults={
             "name": p["name"][:255], "reference_number": p["reference_number"][:100],
-            "customer_name": p["customer_name"][:255], "archived": p["archived"],
+            "customer_name": p["customer_name"][:255], "customer_ref": p.get("customer_id", "")[:40],
+            "archived": p["archived"],
             "time_trackable": p["time_trackable"], "gone": False, "synced_at": now})
     parents = {p.dante_id: p for p in DanteProject.objects.filter(dante_id__in=seen)}
     for p in projects:
@@ -745,24 +746,54 @@ def balance_lines(pb) -> list[tuple[str, str]]:
 
 
 # ── «мої проєкти» і швидкий запис часу на проєкт ─────────────────
-def create_dante(name: str, parent: DanteProject | None = None, st: DanteSettings | None = None) -> DanteProject:
-    """Новий проєкт askDANTE (parent=None) або підпроєкт під `parent` — одразу і в довіднику Minerva.
+def create_dante(name: str, parent: DanteProject | None = None, st: DanteSettings | None = None,
+                 customer: tuple | None = None) -> DanteProject:
+    """Новий проєкт askDANTE (parent=None; customer=(id, назва) — проєкт цього клієнта askDANTE, напр.
+    «000 :: Eigene Projekte …») або підпроєкт під `parent` — одразу і в довіднику Minerva.
     Такий самий підпроєкт / проєкт уже є — повертається наявний (без дубля)."""
     st = st or DanteSettings.get()
     name = (name or "").strip()[:255]
     if not name:
         raise DanteError("bad_request", "Вкажіть назву проєкту askDANTE.")
-    same = DanteProject.objects.filter(name__iexact=name, parent=parent, gone=False).first()
-    if same:
-        return same
+    same = DanteProject.objects.filter(name__iexact=name, parent=parent, gone=False)
+    if parent is None and customer:
+        same = same.filter(customer_ref=customer[0])
+    if same.first():
+        return same.first()
     c = client(st)
     if parent is None:
-        made = c.create_project(name)
+        made = c.create_project(name, customer_id=customer[0] if customer else "")
     else:
         made = c.create_project_item(name, parent.dante_id, parent_is_item=bool(parent.parent_id))
     if not made.get("id"):
         raise DanteError("unavailable", "askDANTE не повернув ID нового проєкту — оновіть довідник і перевірте.")
-    return DanteProject.objects.create(dante_id=made["id"], name=made["name"][:255], parent=parent)
+    return DanteProject.objects.create(dante_id=made["id"], name=made["name"][:255], parent=parent,
+                                       customer_ref=customer[0] if customer and not parent else "",
+                                       customer_name=(customer[1] if customer and not parent else "")[:255])
+
+
+def dante_customers() -> list:
+    """[(id, назва)] клієнтів askDANTE з довідника проєктів — для «новий проєкт у клієнта»."""
+    seen = {}
+    for ref, name in (DanteProject.objects.filter(gone=False).exclude(customer_ref="")
+                      .values_list("customer_ref", "customer_name").order_by("customer_name")):
+        seen.setdefault(ref, name or f"#{ref}")
+    return list(seen.items())
+
+
+def create_target(target: str, name: str, st: DanteSettings | None = None):
+    """Вибір «або новий»: «p:<pk>» — підпроєкт під проєктом, «c:<id клієнта>» — новий проєкт клієнта askDANTE.
+    → DanteProject або None, якщо нічого не вибрано."""
+    kind, _, value = (target or "").partition(":")
+    if kind == "p" and value.isdigit():
+        parent = DanteProject.objects.filter(pk=int(value), gone=False).first()
+        return create_dante(name, parent, st) if parent else None
+    if kind == "c" and value:
+        names = dict(dante_customers())
+        if value not in names:
+            raise DanteError("not_found", "Клієнта askDANTE не знайдено — оновіть довідник askDANTE.")
+        return create_dante(name, None, st, customer=(value, names[value]))
+    return None
 
 
 def my_projects(user):

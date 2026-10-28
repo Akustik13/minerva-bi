@@ -23,8 +23,8 @@ from django.utils import timezone
 
 from . import services
 from .client import DanteError, hhmm
-from .models import (Booking, DanteProject, DanteSettings, DanteUser, MailCategoryTime, MailTimeEntry, ProjectMap,
-                     TimeRecord, WorkDay)
+from .models import (Booking, DanteProject, DanteSettings, DanteUser, MailCategoryTime, MailTimeEntry,
+                     MailTimeIgnore, ProjectMap, TimeRecord, WorkDay)
 
 LOOKBACK_DAYS = 3        # автозапис: за скільки минулих днів дописати різницю
 MAX_DAYS = 62
@@ -98,8 +98,17 @@ def _order_counts(user, start, end, categories):
     return out
 
 
+def ignored_by(user):
+    """Що людина вирішила не рахувати: (pk листів, pk гілок, [ключі відправників])."""
+    rules = list(MailTimeIgnore.objects.filter(user=user))
+    return ({r.message_id for r in rules if r.kind == MailTimeIgnore.MESSAGE},
+            {r.thread_id for r in rules if r.kind == MailTimeIgnore.THREAD},
+            [r.key for r in rules if r.kind == MailTimeIgnore.SENDER and r.key])
+
+
 def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None) -> dict:
-    """{день: {"rows": [...], "unmapped": N}} — оцінка часу на пошту по проєктах askDANTE (нічого не записує)."""
+    """{день: {"rows": [...], "unmapped": N, "loose": [листи без askDANTE], "ignored": [проігноровані]}} — оцінка часу
+    на пошту по проєктах askDANTE (нічого не записує)."""
     st = st or DanteSettings.get()
     if du.user_id is None:
         return {}
@@ -110,13 +119,18 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
                                             is_spam=False, is_deleted=False)
                 .exclude(folder__in=[EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_TRASH])
                 .values("pk", "thread_id", "work_category_id", "folder", "is_read", "sent_at", "subject", "from_email",
-                        "message_id", "body_text").order_by("sent_at", "pk"))
+                        "from_name", "to_emails", "cc_emails", "message_id", "body_text").order_by("sent_at", "pk"))
     cats = {c.category_id: c for c in MailCategoryTime.objects.filter(dante_project__isnull=False,
                                                                        category__is_active=True)
             .select_related("dante_project", "activity", "category").prefetch_related("category__sources")}
     projects = _project_targets({m["thread_id"] for m in msgs if m["thread_id"]}, {m["pk"] for m in msgs}) \
         if st.mail_projects else {}
-    rows, unmapped = {}, {}
+    rows, unmapped, loose, skipped = {}, {}, {}, {}
+    ign_msgs, ign_threads, ign_keys = ignored_by(du.user)
+    from email_assistant.categorize import counterparts
+    from email_assistant.models import MailCategory
+    from email_assistant.spam import matches as key_matches
+    cat_label = {c.pk: c.label for c in MailCategory.objects.all()}
 
     def row(day, dp, label, kind, auto, activity):
         r = rows.setdefault((day, dp.pk), {"day": day, "dp": dp, "labels": [], "kinds": set(), "replies": 0,
@@ -141,6 +155,15 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
         outgoing = m["folder"] == EmailMessage.FOLDER_SENT or is_own(m["from_email"], own)
         if not outgoing and not m["is_read"]:
             continue   # непрочитаний — ще не опрацьований
+        contact = (counterparts(EmailMessage(from_email=m["from_email"], to_emails=m["to_emails"] or [],
+                                             cc_emails=m["cc_emails"] or []), own) or [""])[0]
+        brief = {"pk": m["pk"], "at": timezone.localtime(m["sent_at"]).time(), "out": outgoing,
+                 "subject": (m["subject"] or "")[:120], "contact": contact, "name": m["from_name"] if not outgoing else "",
+                 "category": cat_label.get(m["work_category_id"], ""), "thread": m["thread_id"]}
+        if (m["pk"] in ign_msgs or m["thread_id"] in ign_threads
+                or (contact and any(key_matches(contact, k) for k in ign_keys))):
+            skipped.setdefault(day, []).append(brief)   # 🙈 людина вирішила не рахувати
+            continue
         target = projects.get(("m", m["pk"])) or projects.get(("t", m["thread_id"]))
         if target:
             project, dp = target
@@ -152,6 +175,7 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
             r["raw"] += c.reply_minutes if outgoing else c.read_minutes
         else:
             unmapped[day] = unmapped.get(day, 0) + 1
+            loose.setdefault(day, []).append(brief)
             continue
         r["replies" if outgoing else "received"] += 1
         r["ids"].append(m["pk"])
@@ -181,10 +205,72 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
         r["to_book"] = max(0, r["minutes"] - r["booked"])
         r["label"] = " · ".join(r["labels"])
         r["kinds"] = sorted(r["kinds"])
-        out.setdefault(day, {"rows": [], "unmapped": 0})["rows"].append(r)
+        out.setdefault(day, _empty())["rows"].append(r)
     for day, n in unmapped.items():
-        out.setdefault(day, {"rows": [], "unmapped": 0})["unmapped"] = n
+        out.setdefault(day, _empty())["unmapped"] = n
+    for day, items in loose.items():
+        out.setdefault(day, _empty())["loose"] = items
+    for day, items in skipped.items():
+        out.setdefault(day, _empty())["ignored"] = items
     return dict(sorted(out.items()))
+
+
+def _empty() -> dict:
+    return {"rows": [], "unmapped": 0, "loose": [], "ignored": []}
+
+
+# ── листи без askDANTE: віднести до категорії з проєктом askDANTE або 🙈 не рахувати ─────────────
+def ignore(user, message_ids, scope: str = MailTimeIgnore.MESSAGE) -> int:
+    """🙈 Не рахувати: лист, усю гілку або відправника (адреса співрозмовника) цих листів. Лише свої скриньки."""
+    from email_assistant.categorize import counterparts
+    from email_assistant.crm_link import own_addresses
+    from email_assistant.models import EmailMessage
+    own, n = own_addresses(), 0
+    for em in EmailMessage.objects.filter(pk__in=list(message_ids), account__user=user):
+        if scope == MailTimeIgnore.THREAD and em.thread_id:
+            _, made = MailTimeIgnore.objects.get_or_create(user=user, kind=scope, thread_id=em.thread_id)
+        elif scope == MailTimeIgnore.SENDER:
+            contact = (counterparts(em, own) or [""])[0]
+            if not contact:
+                continue
+            _, made = MailTimeIgnore.objects.get_or_create(user=user, kind=scope, key=contact)
+        else:
+            _, made = MailTimeIgnore.objects.get_or_create(user=user, kind=MailTimeIgnore.MESSAGE, message=em)
+        n += made
+    return n
+
+
+def unignore(user, message_ids) -> int:
+    """↺ Знову рахувати ці листи: прибрати рішення «ігнорувати» для листа, його гілки й відправника."""
+    from email_assistant.categorize import counterparts
+    from email_assistant.crm_link import own_addresses
+    from email_assistant.models import EmailMessage
+    from email_assistant.spam import matches as key_matches
+    own, gone = own_addresses(), 0
+    for em in EmailMessage.objects.filter(pk__in=list(message_ids), account__user=user):
+        contact = (counterparts(em, own) or [""])[0]
+        qs = MailTimeIgnore.objects.filter(user=user)
+        ids = [r.pk for r in qs if (r.kind == MailTimeIgnore.MESSAGE and r.message_id == em.pk)
+               or (r.kind == MailTimeIgnore.THREAD and em.thread_id and r.thread_id == em.thread_id)
+               or (r.kind == MailTimeIgnore.SENDER and contact and key_matches(contact, r.key))]
+        gone += MailTimeIgnore.objects.filter(pk__in=ids).delete()[0]
+    return gone
+
+
+def assign(user, message_ids, category, scope: str = "sender", dante_project=None) -> dict:
+    """🏷 Віднести листи до своєї категорії (правило для співрозмовника / домену або лише гілка — як у скриньці) і,
+    якщо задано, дати категорії проєкт askDANTE. → {"category", "changed"}"""
+    from email_assistant import work_categories
+    from email_assistant.models import EmailMessage
+    changed = 0
+    for em in EmailMessage.objects.filter(pk__in=list(message_ids), account__user=user):
+        changed += work_categories.set_for_message(em, category, scope)["changed"]
+    if dante_project is not None:
+        ct, _ = MailCategoryTime.objects.get_or_create(category=category)
+        if ct.dante_project_id != dante_project.pk:
+            ct.dante_project = dante_project
+            ct.save(update_fields=["dante_project"])
+    return {"category": category.label, "changed": changed}
 
 
 def _plain(text: str) -> str:

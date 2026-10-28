@@ -188,6 +188,8 @@ class DanteProject(models.Model):
     name = models.CharField("Назва", max_length=255)
     reference_number = models.CharField("Номер", max_length=100, blank=True, default="")
     customer_name = models.CharField("Клієнт askDANTE", max_length=255, blank=True, default="")
+    customer_ref = models.CharField("ID клієнта askDANTE", max_length=40, blank=True, default="",
+                                    help_text="Щоб створювати нові проєкти цього клієнта з Minerva.")
     parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="children",
                                verbose_name="Батьківський проєкт")
     archived = models.BooleanField("В архіві", default=False)
@@ -440,3 +442,22 @@ class MailTimeEntry(models.Model):
         verbose_name = "Час на пошту за день"
         verbose_name_plural = "Час на пошту за день"
         unique_together = [("dante_user", "day", "dante_project")]
+
+
+class MailTimeIgnore(models.Model):
+    """Лист, гілка чи відправник не рахується в «✉️ Час на пошту» — людина вирішила «🙈 ігнорувати»."""
+    MESSAGE, THREAD, SENDER = "message", "thread", "sender"
+    KINDS = [(MESSAGE, "Лист"), (THREAD, "Гілка"), (SENDER, "Відправник")]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    kind = models.CharField("Що", max_length=8, choices=KINDS, default=MESSAGE)
+    message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True, on_delete=models.CASCADE,
+                                related_name="+")
+    thread = models.ForeignKey("email_assistant.EmailThread", null=True, blank=True, on_delete=models.CASCADE,
+                               related_name="+")
+    key = models.CharField("Адреса або @домен", max_length=254, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Не рахувати в часі на пошту"
+        verbose_name_plural = "Не рахувати в часі на пошту"

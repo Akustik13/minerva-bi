@@ -67,21 +67,24 @@
 <div class="ct-card" id="map">
   <h3>2 · {% trans "Категорії → проєкт askDANTE і норми" %}</h3>
   <form method="post" class="ct-row" style="margin-bottom:10px">{% csrf_token %}<input type="hidden" name="action" value="top">
-    <span class="ct-muted">{% trans "Немає батьківського проєкту (напр. «Intern»)?" %}</span>
-    <input name="top_name" placeholder="Intern" maxlength="255" required>
+    <span class="ct-muted">{% trans "Новий проєкт askDANTE" %}</span>
+    <input name="top_name" placeholder="DigiKey" maxlength="255" required>
+    {% if customers %}<select name="top_customer"><option value="">{% trans "без клієнта" %}</option>{% for ref, cname in customers %}<option value="{{ ref }}">{% trans "у клієнта" %} {{ cname }}</option>{% endfor %}</select>{% endif %}
     <button class="button"{% if not st.enabled %} disabled{% endif %}>＋ {% trans "Створити проєкт в askDANTE" %}</button>
   </form>
   {% if rows %}
   <form method="post">{% csrf_token %}<input type="hidden" name="action" value="save">
     <div class="ct-scroll"><table class="ct-table">
-      <tr><th>{% trans "Категорія" %}</th><th>{% trans "Листів" %}<br>{{ days }} {% trans "дн." %}</th><th>{% trans "Проєкт askDANTE" %}</th><th>{% trans "або новий підпроєкт" %}</th>
+      <tr><th>{% trans "Категорія" %}</th><th>{% trans "Листів" %}<br>{{ days }} {% trans "дн." %}</th><th>{% trans "Проєкт askDANTE" %}</th><th>{% trans "або новий проєкт / підпроєкт" %}</th>
         <th>{% trans "Вид роботи" %}</th><th>{% trans "хв: відповідь / лист / замовл." %}</th><th>{% trans "Авто" %}</th></tr>
       {% for r in rows %}
       <tr>
         <td><a href="{% url 'admin:email_assistant_mailcategory_change' r.cat.pk %}">{{ r.cat.label }}</a></td>
         <td><a href="/email/?wcat={{ r.cat.pk }}">{{ r.mails }}</a></td>
         <td><select name="dp_{{ r.cat.pk }}"><option value="">—</option>{% for p in projects %}<option value="{{ p.pk }}"{% if r.ct and r.ct.dante_project_id == p.pk %} selected{% endif %}>{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</select></td>
-        <td><div class="ct-row"><select name="parent_{{ r.cat.pk }}"><option value="">{% trans "під…" %}</option>{% for p in parents %}<option value="{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</select>
+        <td><div class="ct-row"><select name="new_{{ r.cat.pk }}"><option value="">{% trans "новий…" %}</option>
+          {% if customers %}<optgroup label="{% trans "Новий проєкт у клієнта askDANTE" %}">{% for ref, cname in customers %}<option value="c:{{ ref }}">{{ cname }}</option>{% endfor %}</optgroup>{% endif %}
+          <optgroup label="{% trans "Новий підпроєкт під проєктом" %}">{% for p in parents %}<option value="p:{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</optgroup></select>
           <input name="sub_{{ r.cat.pk }}" value="{{ r.cat.name }}" maxlength="255" size="14"></div></td>
         <td><select name="act_{{ r.cat.pk }}"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if r.ct and r.ct.activity_id == a.pk %} selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></td>
         <td class="ct-row"><input type="number" name="reply_{{ r.cat.pk }}" value="{% if r.ct %}{{ r.ct.reply_minutes }}{% else %}10{% endif %}" min="0">
@@ -92,7 +95,7 @@
       {% endfor %}
     </table></div>
     <div class="ct-row" style="margin-top:8px"><button class="button default"{% if not st.enabled %} disabled{% endif %}>✓ {% trans "Зберегти" %}</button>
-      <span class="ct-muted">{% trans "«Під…» + назва — Minerva створить підпроєкт в askDANTE (Intern › DigiKey) і одразу прив'яже. «Авто» — щодня записувати за вчора без підтвердження. Потім —" %} <a href="{{ mail_url }}">✉️ {% trans "Час на пошту" %}</a>.</span></div>
+      <span class="ct-muted">{% trans "«Новий…» + назва — Minerva створить в askDANTE проєкт у вибраного клієнта (напр. «Eigene Projekte …» › DigiKey) або підпроєкт під проєктом і одразу прив'яже. «Авто» — щодня записувати за вчора без підтвердження. Потім —" %} <a href="{{ mail_url }}">✉️ {% trans "Час на пошту" %}</a>.</span></div>
   </form>
   {% else %}<div class="ct-muted">{% trans "Ще немає своїх категорій — знайдіть групи в кроці 1 або створіть у" %} <a href="{{ cats_url }}">🏷 {% trans "Свої категорії" %}</a>.</div>{% endif %}
 </div>
