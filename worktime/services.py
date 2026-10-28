@@ -501,6 +501,34 @@ def autofill_due(st: DanteSettings, now=None) -> bool:
     return not st.last_autofill_at or timezone.localtime(st.last_autofill_at).date() < now.date()
 
 
+CRON_STALE_MINUTES = 15
+
+
+def autofill_schedule(st: DanteSettings, now=None) -> dict:
+    """Чи спрацює щоденний запуск і коли: {"next": текст, "warning": текст або ''}."""
+    now = timezone.localtime(now) if now else timezone.localtime()
+    if not st.enabled or not st.configured:
+        return {"next": "вимкнено (askDANTE не увімкнено або немає ключа)", "warning": ""}
+    if st.autofill_mode == DanteSettings.MODE_OFF:
+        return {"next": "вимкнено (режим «Вимкнено»)", "warning": ""}
+    done_today = st.last_autofill_at and timezone.localtime(st.last_autofill_at).date() >= now.date()
+    if done_today:
+        nxt = f"завтра після {st.autofill_hour:02d}:00"
+    elif now.hour < st.autofill_hour:
+        nxt = f"сьогодні після {st.autofill_hour:02d}:00"
+    else:
+        nxt = "зараз — протягом хвилини, коли cron перевірить"
+    warning = ""
+    if not st.cron_seen_at:
+        warning = ("Контейнер cron ще жодного разу не викликав автозаповнення — щоденний запуск не працює. "
+                   "На NAS: docker-compose restart cron (далі після оновлень він перезапускається сам).")
+    elif now - timezone.localtime(st.cron_seen_at) > datetime.timedelta(minutes=CRON_STALE_MINUTES):
+        warning = (f"Контейнер cron не звертався з {timezone.localtime(st.cron_seen_at):%d.%m.%Y %H:%M} — "
+                   "щоденні запуски стоять. На NAS: docker-compose ps (чи працює cron), "
+                   "docker-compose restart cron, журнал — docker-compose logs --tail 100 cron.")
+    return {"next": nxt, "warning": warning}
+
+
 def autofill_range(st: DanteSettings):
     today = local_today()
     date_from = today - datetime.timedelta(days=max(1, st.autofill_lookback_days))

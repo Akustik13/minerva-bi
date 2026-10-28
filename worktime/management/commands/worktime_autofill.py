@@ -4,6 +4,7 @@
     python manage.py worktime_autofill --dry-run   # що записалось би, без запису
 """
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from worktime import services
 from worktime.models import DanteSettings
@@ -18,6 +19,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         st = DanteSettings.get()
+        if opts["if_due"]:   # виклик із cron — відмітка «cron живий» для сторінки налаштувань
+            DanteSettings.objects.filter(pk=st.pk).update(cron_seen_at=timezone.now())
         if opts["if_due"] and not services.autofill_due(st):
             return
         if st.autofill_mode == DanteSettings.MODE_OFF:

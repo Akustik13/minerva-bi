@@ -54,6 +54,9 @@ class DanteSettings(models.Model):
     last_check_result = models.CharField("Результат перевірки", max_length=255, blank=True, default="")
     last_sync_at = models.DateTimeField("Довідники оновлено", null=True, blank=True)
     last_autofill_at = models.DateTimeField("Останнє автозаповнення", null=True, blank=True)
+    cron_seen_at = models.DateTimeField(
+        "Cron востаннє перевіряв", null=True, blank=True, editable=False,
+        help_text="Контейнер cron викликає автозаповнення щохвилини; давно не було — щоденні запуски не працюють.")
     last_autofill_result = models.CharField("Результат автозаповнення", max_length=255, blank=True, default="")
     last_autofill_report = models.JSONField("Звіт автозаповнення", default=dict, blank=True, editable=False,
                                             help_text="Останній запуск (щоденний або «Заповнити зараз») по днях.")

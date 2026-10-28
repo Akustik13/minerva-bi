@@ -226,6 +226,12 @@ class DanteSettingsAdmin(admin.ModelAdmin):
         else:
             last = "ще не запускалось"
         people = DanteUser.objects.filter(autofill=True, archived=False).count()
+        plan = services.autofill_schedule(obj or DanteSettings.get())
+        seen = (f" · cron перевіряв {timezone.localtime(obj.cron_seen_at):%d.%m %H:%M}"
+                if obj and obj.cron_seen_at else "")
+        last = format_html('{}<div>Наступний щоденний запуск: {}{}</div>{}', last, plan["next"], seen,
+                           format_html('<div style="color:#d97706;font-weight:600">⚠️ {}</div>', plan["warning"])
+                           if plan["warning"] else "")
         date_from, date_to = services.autofill_range(obj or DanteSettings.get())
         confirm = (f"Записати в askDANTE порожні робочі дні {date_from:%d.%m.%Y}–{date_to:%d.%m.%Y} "
                    f"(працівників з автозаповненням: {people})? Дні, де вже є прихід і відхід, відпустка чи свято, "
@@ -436,8 +442,15 @@ class WorkDayAdmin(admin.ModelAdmin):
     def get_urls(self):
         return [path("", self.admin_site.admin_view(self.calendar_view), name="worktime_workday_changelist"),
                 path("report/", self.admin_site.admin_view(self.report_view), name="worktime_workday_report"),
-                path("mail-time/", self.admin_site.admin_view(self.mail_time_view), name="worktime_workday_mailtime")] \
+                path("mail-time/", self.admin_site.admin_view(self.mail_time_view), name="worktime_workday_mailtime"),
+                path("meetings/", self.admin_site.admin_view(self.meetings_view), name="worktime_workday_meetings")] \
             + super().get_urls()
+
+    def meetings_view(self, request):
+        from .admin_meetings import meetings_page
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        return meetings_page(self, request)
 
     def mail_time_view(self, request):
         from .admin_mail import mail_time_page
@@ -550,6 +563,7 @@ class WorkDayAdmin(admin.ModelAdmin):
             "project_date": today if first <= today <= last else min(last, today),
             "mapping_url": reverse("admin:worktime_danteproject_changelist"),
             "mail_url": reverse("admin:worktime_workday_mailtime") if st.mail_time else "",
+            "meetings_url": reverse("admin:worktime_workday_meetings"),
         })
         prev_m = (first - datetime.timedelta(days=1)).replace(day=1)
         next_m = (last + datetime.timedelta(days=1))

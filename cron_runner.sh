@@ -43,6 +43,11 @@ echo "   send_reminders          every ${REMINDER_INTERVAL}s"
 echo "   sync_email              every ${EMAIL_SYNC_INTERVAL}s"
 echo "   send_calendar_reminders every ${CALENDAR_REMINDER_INTERVAL}s"
 
+# Код змонтовано (./:/app) і підхоплюється сам, а цей цикл shell читає лише при старті контейнера.
+# Тому після оновлення файлу (git pull) runner перезапускає сам себе — нові команди почнуть працювати без
+# `docker-compose restart cron`.
+SCRIPT_STAMP=$(stat -c %Y "$0" 2>/dev/null || echo 0)
+
 LAST_TRACK=0
 LAST_REMINDER=0
 LAST_EMAIL_SYNC=0
@@ -135,4 +140,9 @@ while true; do
   fi
 
   sleep 60
+
+  if [ "$(stat -c %Y "$0" 2>/dev/null || echo 0)" != "$SCRIPT_STAMP" ]; then
+    echo "[$(date '+%H:%M:%S')] cron_runner.sh оновлено — перезапуск з новим розкладом"
+    exec sh "$0"
+  fi
 done

@@ -1,0 +1,111 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a> ›
+  ⏱ <a href="{{ calendar_url }}">{% trans "Робочий час" %}</a> › {% trans "Зустрічі → askDANTE" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.mg-card{border:1px solid var(--border-strong,#ccc);border-radius:10px;background:var(--bg-card,transparent);padding:12px 14px;margin-bottom:14px;max-width:1180px}
+.mg-form{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.mg-form label{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.mg-muted{color:var(--text-muted,#888);font-size:12px}
+.mg-presets a{margin-right:8px;font-size:12px}
+.mg-list{max-width:1180px;border:1px solid var(--border-strong,#ccc);border-radius:10px;overflow:hidden}
+.mg-row{display:grid;grid-template-columns:24px 92px 96px minmax(200px,1.5fr) minmax(220px,1.3fr) minmax(140px,1fr);gap:8px;
+  align-items:center;padding:7px 12px;border-top:1px solid rgba(128,128,128,.15);font-size:13px}
+.mg-row:first-child{border-top:none}
+.mg-row.head{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;background:rgba(128,128,128,.07)}
+.mg-row.off{opacity:.55}
+.mg-row select{max-width:100%}
+.mg-t{min-width:0}
+.mg-t b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mg-ok{color:#16a34a}.mg-warn{color:#d97706}
+.mg-bar{position:sticky;bottom:0;background:var(--body-bg,#1e1e1e);border-top:1px solid rgba(128,128,128,.35);padding:10px 0;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:1180px}
+#content-main tr{background:transparent}
+@media (max-width:820px){.mg-row{grid-template-columns:24px 1fr 1fr}.mg-row.head{display:none}}
+</style>
+
+<form method="get" class="mg-card">
+  <div class="mg-form">
+    {% if people|length > 1 %}
+    <label>{% trans "Працівник" %}<select name="u">{% for p in people %}<option value="{{ p.pk }}"{% if du and p.pk == du.pk %} selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+    {% endif %}
+    <label>{% trans "Від" %}<input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}"></label>
+    <label>{% trans "До" %}<input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}"></label>
+    <span class="mg-presets"><a href="?preset=last_month{% if du %}&u={{ du.pk }}{% endif %}">{% trans "минулий місяць" %}</a><a href="?preset=this_month{% if du %}&u={{ du.pk }}{% endif %}">{% trans "цей місяць" %}</a><a href="?{% if du %}u={{ du.pk }}{% endif %}">{% trans "30 днів" %}</a></span>
+    <button class="button default">🤝 {% trans "Показати" %}</button>
+  </div>
+  <div class="mg-muted" style="margin-top:8px">
+    {% trans "Зустрічі календаря Minerva (зокрема прийняті запрошення з пошти) і події підключених Google / Outlook та підписок, які показуються в Minerva, — як час на проєкт askDANTE «з … по …». Проєкт підказано: код P-… у назві, так само як минулого разу, проєкт листа-запрошення, клієнт CRM, правила зв'язку, назва проєкту в назві зустрічі; змініть, якщо треба. Галочка стоїть лише там, де проєкт підказано і запису ще немає." %}
+    <a href="{{ mapping_url }}?view=minerva">📁 {% trans "правила зв'язку" %}</a>
+  </div>
+  {% if error %}<div class="mg-warn" style="margin-top:6px">⚠️ {{ error }}</div>{% endif %}
+</form>
+
+{% if du is None %}
+<div class="mg-card">{% trans "Вас не прив'язано до працівника askDANTE (👥 Працівники askDANTE → «Користувач Minerva»)." %}</div>
+{% elif not rows %}
+<div class="mg-card">✨ {% trans "За цей період у календарі немає зустрічей з часом." %}</div>
+{% else %}
+<form method="post" onsubmit="return mgConfirm()">
+  {% csrf_token %}
+  <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}">
+  <div class="mg-list">
+    <div class="mg-row head"><span></span><span>{% trans "День" %}</span><span>{% trans "Час" %}</span><span>{% trans "Зустріч" %}</span><span>{% trans "Проєкт askDANTE" %}</span><span>{% trans "Стан" %}</span></div>
+    {% for r in rows %}
+    <div class="mg-row{% if r.state != 'ready' %} off{% endif %}">
+      <input type="checkbox" name="pick" value="{{ r.key }}" {% if r.checked %}checked{% endif %}{% if r.state != 'ready' %} disabled{% endif %}>
+      <span>{{ r.wd }} {{ r.day|date:"d.m" }}</span>
+      <span>{{ r.start|time:"H:i" }}{% if r.stop %}–{{ r.stop|time:"H:i" }}{% endif %}{% if r.minutes %} <span class="mg-muted">{{ r.dur }}</span>{% endif %}</span>
+      <span class="mg-t"><b title="{{ r.title }}">{{ r.title }}</b><span class="mg-muted">{{ r.where }}</span></span>
+      <span>{% if r.state == 'ready' %}
+        <select name="p_{{ r.key }}" data-key="{{ r.key }}" onchange="mgPick(this)">
+          <option value="">— {% trans "вибрати" %} —</option>
+          {% if mine %}<optgroup label="☆ {% trans "Мої" %}">{% for p in mine %}<option value="{{ p.pk }}"{% if r.dp and r.dp.pk == p.pk %} selected{% endif %}>{{ p }}</option>{% endfor %}</optgroup>{% endif %}
+          <optgroup label="{% trans "Усі" %}">{% for p in others %}<option value="{{ p.pk }}"{% if r.dp and r.dp.pk == p.pk %} selected{% endif %}>{{ p }}</option>{% endfor %}</optgroup>
+        </select>
+        {% if r.reason %}<div class="mg-muted">💡 {{ r.reason }}</div>{% endif %}
+        {% elif r.dp %}<span class="mg-muted">{{ r.dp }}</span>{% endif %}</span>
+      <span class="{% if r.state == 'booked' %}mg-ok{% elif r.state == 'overlap' %}mg-warn{% else %}mg-muted{% endif %}">
+        {% if r.state == 'ready' %}{% trans "можна записати" %}{% elif r.state == 'booked' %}✓ {{ r.note }}{% elif r.state == 'overlap' %}⚠️ {{ r.note }}{% else %}— {{ r.note }}{% endif %}</span>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="mg-bar">
+    <label class="mg-muted">{% trans "Вид роботи" %}
+      <select name="activity"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if a.pk == st.default_activity_id %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></label>
+    <button class="button default" type="submit"{% if not st.enabled %} disabled{% endif %}>✓ {% trans "Записати вибране в askDANTE" %} (<span id="mg-n">{{ n_checked }}</span>)</button>
+    <span class="mg-muted">{% trans "Можна записати" %}: {{ n_ready }} · {% trans "за раз до" %} {{ max_per_submit }}. {% trans "Записи askDANTE через API не виправляються й не видаляються — перевірте проєкти перед записом. Перекриття з іншими записами askDANTE не пишеться." %}</span>
+  </div>
+</form>
+{% endif %}
+
+<script>
+function mgCount(){
+  var n = document.querySelectorAll('input[name="pick"]:checked').length;
+  var el = document.getElementById('mg-n'); if (el) el.textContent = n;
+  return n;
+}
+function mgPick(sel){   // вибрали проєкт — галочка сама; прибрали — знімається
+  var box = document.querySelector('input[name="pick"][value="' + sel.dataset.key + '"]');
+  if (box) box.checked = !!sel.value;
+  mgCount();
+}
+function mgConfirm(){
+  var picked = [].slice.call(document.querySelectorAll('input[name="pick"]:checked'));
+  if (!picked.length) { alert('{% trans "Нічого не вибрано" %}'); return false; }
+  var noProject = picked.filter(function(b){ var s = document.querySelector('select[name="p_' + b.value + '"]'); return !s || !s.value; });
+  if (noProject.length) { alert('{% trans "Для вибраних зустрічей не задано проєкт" %}: ' + noProject.length); return false; }
+  return confirm('{% trans "Записати в askDANTE зустрічей" %}: ' + picked.length + '?');
+}
+document.addEventListener('change', function(e){ if (e.target.name === 'pick') mgCount(); });
+</script>
+{% endblock %}

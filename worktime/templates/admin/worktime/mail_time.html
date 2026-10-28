@@ -48,7 +48,7 @@
     {% trans "Оцінка за нормами: наші відповіді й прочитані отримані листи (і змінені вами замовлення, якщо так задано в категорії), округлено вгору до" %} {{ st.mail_step }} {% trans "хв за день на проєкт. Куди: гілка проєкту Minerva, зв'язаного з askDANTE, — туди; інакше своя категорія листа з проєктом askDANTE. Непрочитані, спам і видалені не рахуються." %}
     <br>{% trans "Категорії й норми" %}:
     {% for c in cats %}<span class="mt-badge" style="margin-right:4px">{{ c.category.label }} → {{ c.dante_project|default:"—" }} · {{ c.reply_minutes }}/{{ c.read_minutes }} {% trans "хв" %}{% if c.auto %} · {% trans "авто" %}{% endif %}</span>{% empty %}<i>{% trans "жодна категорія ще не має проєкту askDANTE" %}</i>{% endfor %}
-    · <a href="{{ cats_url }}">🏷 {% trans "налаштувати" %}</a> · <a href="{{ mapping_url }}">📁 {% trans "проєкти Minerva ↔ askDANTE" %}</a>
+    · <a href="{{ cats_url }}">🏷 {% trans "налаштувати" %}</a> · <a href="{% url 'admin:worktime_workday_meetings' %}">🤝 {% trans "зустрічі → askDANTE" %}</a> · <a href="{{ mapping_url }}">📁 {% trans "проєкти Minerva ↔ askDANTE" %}</a>
   </div>
 </form>
 
