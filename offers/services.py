@@ -588,9 +588,11 @@ def quick_prefill(thread=None) -> dict:
         tiers = qtys if len(items) == 1 and len(qtys) > 1 else ([qty] if qty else qtys[:1])
         rows.append({**BLANK_ROW, "sku": product.sku, "description": product.name_export or product.name,
                      "qtys": _qtys_text(tiers) or "1"})
-    if not rows:   # артикула немає в каталозі — підставити схоже на артикул слово з листа
+    if not rows:   # артикула немає в каталозі — схоже на артикул слово з листа, опис — рядок листа з ним
         sku = SKU_RE.search(text)
-        rows.append({**BLANK_ROW, "sku": sku.group(1) if sku else "", "qtys": _qtys_text(qtys) or "1"})
+        line = next((ln.strip(" .:;") for ln in text.splitlines() if sku and sku.group(1) in ln), "")
+        rows.append({**BLANK_ROW, "sku": sku.group(1) if sku else "",
+                     "description": line if len(line) <= 100 else "", "qtys": _qtys_text(qtys) or "1"})
     # клієнта в CRM немає — адреса й ім'я з підпису листа (для пересланого — з пересланого листа)
     from email_assistant.quotes import signature
     sig = signature(fw["text"] if fw else new_text(source.body_text)) if customer is None else {"lines": [], "name": ""}

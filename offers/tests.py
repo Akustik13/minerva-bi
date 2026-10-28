@@ -613,3 +613,51 @@ class ForwardedFormatsAndExplainTests(QuoteMailBase):
         self.assertContains(page, "ofCascade(")
         self.assertContains(page, 'id="of-breaks"')
         self.assertContains(page, "від 10 шт")
+
+
+class OfferTemplateTests(QuoteMailBase):
+    """📄 Word шаблон Angebot: поточний (бланк CI), приклад, свій з перевіркою, скидання; позиція з листа."""
+
+    def test_download_sample_upload_reset(self):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from docx import Document
+
+        from offers.models import OfferSettings
+        r = self.client.get("/offers/template/download/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("angebot_template.docx", r["Content-Disposition"])
+        current = b"".join(r.streaming_content)
+        self.assertIn("{{ L.customer }}", "".join(c.text for c in Document(BytesIO(current)).tables[0]._cells))   # бланк CI зі змінними
+        sample = self.client.get("/offers/template/sample/")
+        self.assertEqual(sample.status_code, 200)
+        doc = Document(BytesIO(sample.content))
+        cells = "\n".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
+        self.assertIn("35 Stk\n100 Stk", cells)
+        bad = Document()
+        bad.add_paragraph("{{ unclosed")
+        buf = BytesIO()
+        bad.save(buf)
+        r = self.client.post("/offers/template/upload/", {"template": SimpleUploadedFile("x.docx", buf.getvalue())},
+                             follow=True)
+        self.assertContains(r, "Шаблон не прийнято")
+        self.assertFalse(OfferSettings.get().template)
+        r = self.client.post("/offers/template/upload/", {"template": SimpleUploadedFile("mine.docx", current)},
+                             follow=True)
+        self.assertContains(r, "Власний шаблон Angebot завантажено")
+        self.assertTrue(OfferSettings.get().template)
+        self.assertContains(self.client.get("/offers/quick/"), "власний (завантажений)")
+        self.client.post("/offers/template/reset/")
+        self.assertFalse(OfferSettings.get().template)
+        page = self.client.get("/offers/quick/")
+        self.assertContains(page, "на бланку Commercial Invoice")
+        self.assertContains(page, "{{ l.qty }}")                       # довідник змінних
+
+    def test_item_not_in_catalog_from_mail(self):
+        body = ("Gruss\n\n-------- Ursprüngliche Nachricht --------\nVon: Denys <procurement10@moduletp.example>\n"
+                "Betreff: Denys SL Tire\nGood afternoon, we'd like to place a larger order.\n\nFilter FT220407.\n"
+                "Please provide pricing and production lead times for 35 units and 100 units.\n")
+        m = self.mail("FW: Denys SL Tire", body, frm=ME)
+        row = services.quick_prefill(m.thread)["lines"][0]
+        self.assertEqual((row["sku"], row["description"], row["qtys"]), ("FT220407", "Filter FT220407", "35; 100"))

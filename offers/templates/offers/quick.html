@@ -138,6 +138,40 @@
       <a class="of-btn" href="{% if offer %}{% url 'admin:offers_offer_change' offer.pk %}{% else %}{% url 'admin:offers_offer_changelist' %}{% endif %}">{% if offer %}📋 Повна картка{% else %}Скасувати{% endif %}</a>
     </div>
   </form>
+
+  <div class="of-card" style="margin-top:24px">
+    <div class="of-card-title">📄 Word шаблон Angebot</div>
+    <p style="margin:0 0 12px;color:var(--text)">
+      Зараз використовується: <b>{% if has_custom_template %}власний (завантажений){% else %}на бланку Commercial Invoice (логотип, реквізити й таблиця адрес — з бланка; бланк CI змінили — Angebot теж){% endif %}</b>.
+    </p>
+    <div class="of-actions">
+      <a class="of-btn" href="{% url 'offers:template_download' %}">⬇️ Завантажити поточний шаблон</a>
+      <a class="of-btn" href="{% url 'offers:template_sample' %}" title="Документ на тестових даних: ступені 35 / 100, Deutsch + English">👁 Приклад документа</a>
+      {% if can_template %}
+      <form method="post" action="{% url 'offers:template_upload' %}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <input type="file" name="template" accept=".docx" required style="color:var(--text);font-size:12px">
+        <button class="of-btn" type="submit">⬆️ Завантажити свій</button>
+      </form>
+      {% if has_custom_template %}
+      <form method="post" action="{% url 'offers:template_reset' %}" onsubmit="return confirm('Повернути шаблон на бланку Commercial Invoice?')">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="of-btn" type="submit">↩️ Бланк CI</button>
+      </form>
+      {% endif %}{% endif %}
+    </div>
+    <p class="of-muted" style="margin:12px 0 8px">
+      Як змінити оформлення: завантажте поточний шаблон, відредагуйте у Word (шрифти, розміщення, тексти), не чіпаючи змінних у {% verbatim %}<code>{{ … }}</code> і <code>{% … %}</code>{% endverbatim %}, і завантажте назад — перед збереженням шаблон перевіряється на тестових даних.
+    </p>
+    <details>
+      <summary style="cursor:pointer;color:var(--link-fg);font-size:13px">📚 Довідник змінних</summary>
+      <div class="of-scroll" style="margin-top:8px"><table class="of-lines" style="min-width:0">
+        <thead><tr><th>Змінна</th><th>Що підставляється</th><th>Приклад</th></tr></thead>
+        <tbody>{% for var, desc, ex in template_vars %}<tr><td><code>{{ var }}</code></td><td>{{ desc }}</td><td class="of-muted">{{ ex|linebreaksbr }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      <p class="of-muted" style="margin-top:8px">{% verbatim %}Рядки таблиці позицій — між окремими рядками-маркерами <code>{%tr for l in lines %}</code> і <code>{%tr endfor %}</code>. Ступінчасті ціни самі стають кількома рядками в комірках <code>{{ l.qty }}</code>, <code>{{ l.unit_price }}</code>, <code>{{ l.total }}</code> — окремої розмітки не треба. Мова підписів <code>{{ L.… }}</code> — з поля «Мова документа».{% endverbatim %}</p>
+    </details>
+  </div>
 </div>
 
 {{ lines|json_script:"of-lines-data" }}

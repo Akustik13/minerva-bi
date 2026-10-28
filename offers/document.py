@@ -144,6 +144,68 @@ def build_context(snap: dict) -> dict:
     }
 
 
+# Довідник змінних шаблону Angebot (як у Commercial Invoice): (змінна, що підставляється, приклад)
+TEMPLATE_VARS = [
+    ("{{ L.title }}", "Заголовок мовою документа", "Angebot / Quotation"),
+    ("{{ L.number }} … {{ L.gross }}", "Усі підписи мовою документа (L.date, L.customer, L.qty, L.total, L.net…)", "Menge / Qty"),
+    ("{{ number }}", "Номер Angebot (з версією)", "A-2026-014"),
+    ("{{ date }}", "Дата документа", "28.10.2026"),
+    ("{{ valid_until }}", "Дійсний до", "27.11.2026"),
+    ("{{ customer_name }}", "Клієнт (компанія або ім'я)", "Module ETP LLC"),
+    ("{{ billing_address }}", "Адреса (кілька рядків)", "Peremohy Ave 12\n03057 Kyiv, Ukraine"),
+    ("{{ contact_name }}", "Контактна особа", "Denys Repetynskyi"),
+    ("{{ contact_email }}", "Email контакту", "procurement10@moduletp.com"),
+    ("{{ project }}", "Проєкт (код · назва), може бути порожнім", "P-2026-002 · Indoor positioning"),
+    ("{{ intro_text }}", "Вступ (з налаштувань Angebote / форми)", "vielen Dank für Ihre Anfrage…"),
+    ("{%tr for l in lines %}", "Рядок-маркер початку таблиці позицій", ""),
+    ("{{ l.pos }}", "Позиція", "1"),
+    ("{{ l.sku }}", "Артикул", "FT220407"),
+    ("{{ l.description }}", "Опис", "Filter FT220407"),
+    ("{{ l.qty }}", "Кількість — для ступенів кілька рядків", "35 Stk\n100 Stk"),
+    ("{{ l.unit_price }}", "Ціна за одиницю (ступені — рядками)", "12,50\n10,90"),
+    ("{{ l.discount }}", "Знижка, якщо є", "5 %"),
+    ("{{ l.total }}", "Сума позиції (ступені — рядками)", "437,50\n1 090,00"),
+    ("{{ l.lead_time }}", "Строк поставки позиції", "4 Wochen"),
+    ("{%tr endfor %}", "Рядок-маркер кінця таблиці", ""),
+    ("{{ currency }}", "Валюта", "EUR"),
+    ("{%p if has_shipping %} … {%p endif %}", "Абзац лише якщо є доставка; {{ shipping_cost }} — сума", "1 000,00"),
+    ("{{ net_total }}", "Сума netto (для ступенів — з першої кількості)", "437,50"),
+    ("{{ vat_rate }} / {{ vat_total }}", "Ставка й сума ПДВ", "19 / 83,13"),
+    ("{{ gross_total }}", "Разом brutto", "520,63"),
+    ("{{ payment_terms }}", "Умови оплати", "Zahlbar innerhalb von 14 Tagen…"),
+    ("{{ delivery_terms }}", "Умови поставки", "Lieferung DAP…"),
+    ("{{ outro_text }}", "Завершення (+ примітка про ступені, якщо є)", "Für Rückfragen stehen wir…"),
+    ("{{ signer }}", "Хто підписує (власник Angebot)", "Viacheslav Pryimak"),
+    ("{{ company_block }} / {{ footer_text }}", "Реквізити з налаштувань (для шаблону без бланка)", "Sevskiy GmbH…"),
+]
+
+
+def sample_snapshot() -> dict:
+    """Тестові дані — перевірити завантажений шаблон (і подивитися, як виглядає документ)."""
+    return {
+        "number": "A-2026-014", "display_number": "A-2026-014", "revision": 1, "date": "2026-10-28",
+        "valid_until": "2026-11-27", "language": "de_en", "currency": "EUR",
+        "customer": {"id": None, "name": "Denys Repetynskyi", "company": "Module ETP LLC"},
+        "contact_name": "Denys Repetynskyi", "contact_email": "procurement10@moduletp.com",
+        "billing_address": "Module ETP LLC\nPeremohy Ave 12\n03057 Kyiv, Ukraine", "signer": "Viacheslav Pryimak",
+        "project": {"id": 1, "code": "P-2026-002", "name": "Indoor positioning"},
+        "intro_text": "vielen Dank für Ihre Anfrage.", "payment_terms": "Zahlbar innerhalb von 14 Tagen.",
+        "delivery_terms": "Lieferung DAP.", "outro_text": "Für Rückfragen stehen wir Ihnen gerne zur Verfügung.",
+        "lines": [{"position": 1, "sku": "FT220407", "description": "Filter FT220407", "qty": "35", "unit": "Stk",
+                   "unit_price": "12.5", "discount_percent": "0", "line_total": "437.50", "lead_time": "4 Wochen",
+                   "tiers": [{"qty": "35", "unit_price": "12.5", "line_total": "437.50"},
+                             {"qty": "100", "unit_price": "10.9", "line_total": "1090.00"}]}],
+        "shipping_cost": "0", "vat_rate": "19", "net_total": "437.50", "vat_total": "83.13", "gross_total": "520.63",
+    }
+
+
+def check_template(data: bytes) -> None:
+    """Шаблон рендериться на тестових даних (інакше — виняток з поясненням docxtpl / Jinja)."""
+    from docxtpl import DocxTemplate
+    tpl = DocxTemplate(BytesIO(data))
+    tpl.render(build_context(sample_snapshot()), autoescape=True)
+
+
 def blank_template() -> str:
     """Шаблон Angebot на бланку Commercial Invoice (той самий логотип і реквізити); перебудовується, коли бланк
     змінився (завантажили свій) або змінилась побудова. Немає бланка / збій — ''."""

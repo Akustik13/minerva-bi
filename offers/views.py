@@ -131,8 +131,12 @@ def quick_view(request, pk=None):
         breaks = ShopSettings.get().price_breaks or []
     except ImportError:
         breaks = []
+    from . import document
+    from .models import OfferSettings
     return render(request, "offers/quick.html", {
-        "price_breaks": breaks,
+        "price_breaks": breaks, "template_vars": document.TEMPLATE_VARS,
+        "has_custom_template": bool(OfferSettings.get().template),
+        "can_template": request.user.has_perm("offers.change_offersettings"),
         **admin.site.each_context(request),
         "title": f"Angebot {offer.display_number}" if offer else "Новий Angebot",
         "data": data, "offer": offer, "thread": thread, "languages": LANGUAGES,
@@ -140,6 +144,84 @@ def quick_view(request, pk=None):
         "locked": bool(offer and offer.is_locked), "warnings": services.warnings(offer) if offer else [],
         "lines": data["lines"],
     })
+
+
+def _offer_settings_perm(request):
+    from django.core.exceptions import PermissionDenied
+    if not request.user.has_perm("offers.change_offersettings"):
+        raise PermissionDenied
+
+
+@staff_member_required
+def template_download_view(request):
+    """⬇ Поточний шаблон Angebot (власний або зібраний з бланка Commercial Invoice) — редагувати у Word."""
+    from django.http import FileResponse
+
+    from . import document
+    from .models import OfferSettings
+    custom = bool(OfferSettings.get().template)
+    return FileResponse(open(document.template_path(), "rb"), as_attachment=True,
+                        filename="angebot_template_custom.docx" if custom else "angebot_template.docx")
+
+
+@staff_member_required
+@require_POST
+def template_upload_view(request):
+    """⬆ Власний шаблон Angebot: перевіряється на тестових даних, потім — для всіх нових документів."""
+    from django.contrib import messages
+    from django.core.files.base import ContentFile
+    from django.shortcuts import redirect
+
+    from . import document
+    from .models import OfferSettings
+    _offer_settings_perm(request)
+    back = request.POST.get("next") or reverse("offers:quick")
+    f = request.FILES.get("template")
+    if not f or not f.name.lower().endswith(".docx"):
+        messages.error(request, "❌ Потрібен файл .docx")
+        return redirect(back)
+    data = f.read()
+    try:
+        document.check_template(data)
+    except Exception as e:  # noqa: BLE001 — помилку шаблону показати людині
+        messages.error(request, f"❌ Шаблон не прийнято — помилка в змінних: {e}")
+        return redirect(back)
+    s = OfferSettings.get()
+    if s.template:
+        s.template.delete(save=False)
+    s.template.save("angebot_template_custom.docx", ContentFile(data), save=True)
+    messages.success(request, "✅ Власний шаблон Angebot завантажено й перевірено — нові документи робляться з нього.")
+    return redirect(back)
+
+
+@staff_member_required
+@require_POST
+def template_reset_view(request):
+    """↺ Знову шаблон з бланка Commercial Invoice (власний шаблон Angebot прибирається)."""
+    from django.contrib import messages
+    from django.shortcuts import redirect
+
+    from .models import OfferSettings
+    _offer_settings_perm(request)
+    s = OfferSettings.get()
+    if s.template:
+        s.template.delete(save=False)
+        s.template = None
+        s.save(update_fields=["template"])
+    messages.success(request, "↩️ Знову шаблон на бланку Commercial Invoice.")
+    return redirect(request.POST.get("next") or reverse("offers:quick"))
+
+
+@staff_member_required
+def template_sample_view(request):
+    """👁 Приклад документа на тестових даних (DOCX) — як виглядатиме Angebot з поточним шаблоном."""
+    from django.http import HttpResponse
+
+    from . import document
+    response = HttpResponse(document.render_docx(document.sample_snapshot()),
+                            content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    response["Content-Disposition"] = 'attachment; filename="angebot_beispiel.docx"'
+    return response
 
 
 @staff_member_required
