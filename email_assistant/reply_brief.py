@@ -133,11 +133,12 @@ def _attachment_path(att) -> str:
     return path if path.startswith(root + os.sep) and os.path.isfile(path) else ''
 
 
-def attachment_text(att, limit=ATTACHMENT_CHARS) -> str:
-    """Текст PDF / DOCX / TXT / CSV із збереженого вкладення; '' — якщо недоступне чи інший тип."""
+def attachment_text(att, limit=ATTACHMENT_CHARS, path=None) -> str:
+    """Текст PDF / DOCX / TXT / CSV із збереженого вкладення; '' — якщо недоступне чи інший тип.
+    path — уже перевірений шлях (файл із папки «📂 Джерела знань»), інакше — file_path у MEDIA."""
     name = (att.get('name') or '').lower()
     ext = name.rsplit('.', 1)[-1] if '.' in name else ''
-    path = _attachment_path(att)
+    path = path if path is not None else _attachment_path(att)
     if ext not in ATTACHMENT_TYPES or not path or os.path.getsize(path) > ATTACHMENT_MAX_MB * 1024 * 1024:
         return ''
     try:

@@ -569,8 +569,8 @@ class KnowledgeItemAdmin(admin.ModelAdmin):
     """Файли й посилання бази знань (тип document). Додавати зручніше в картці клієнта / проєкту / замовлення /
     товару («📎 Документи й посилання»); тут — увесь список, пошук, зміна прив'язок і видимості."""
     list_display = ["title", "kind", "links_col", "visibility", "owner", "rag_col", "created_at"]
-    list_filter = ["kind", "visibility", "auto"]
-    search_fields = ["title", "note", "url", "file_name", "source_key"]
+    list_filter = ["kind", "visibility", "auto", "knowledge_source"]
+    search_fields = ["title", "note", "url", "file_name", "source_key", "source_path"]
     raw_id_fields = ["customer", "project", "order", "product", "offer"]
     readonly_fields = ["file_name", "file_size", "content_type", "fetched_at", "fetch_error", "owner", "auto",
                        "source_key", "rag_col", "created_at", "updated_at"]
@@ -625,3 +625,139 @@ class KnowledgeItemAdmin(admin.ModelAdmin):
             return "—"
         from .views_entity import item_json
         return item_json(obj, None)["rag"]
+
+
+from . import knowledge_sources  # noqa: E402
+from .models import KnowledgeSource  # noqa: E402
+
+
+class KnowledgeSourceForm(forms.ModelForm):
+    file_types_text = forms.CharField(
+        label="Типи файлів", required=False,
+        help_text="Через кому; порожньо — pdf, docx, txt, csv, md, html, htm, xlsx. PDF / DOCX / TXT / CSV читає RAG, "
+                  "Excel / HTML / Markdown — Minerva. Скани без тексту не розпізнаються.")
+
+    class Meta:
+        model = KnowledgeSource
+        fields = ["name", "kind", "path", "url", "recursive", "max_files", "max_file_mb", "rescan_hours", "enabled",
+                  "visibility", "customer", "project", "product", "link_products_by_sku"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["file_types_text"].initial = ", ".join(self.instance.file_types or [])
+
+    def clean(self):
+        d = super().clean()
+        if d.get("kind") == KnowledgeSource.FOLDER:
+            try:
+                knowledge_sources.check_folder((d.get("path") or "").strip())
+            except knowledge_sources.SourceError as e:
+                self.add_error("path", str(e))
+        elif not d.get("url"):
+            self.add_error("url", "Вкажіть адресу sitemap.xml або сторінки сайту")
+        return d
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        obj.path = (obj.path or "").strip()
+        obj.file_types = [t.strip().lower().lstrip(".") for t in
+                          (self.cleaned_data.get("file_types_text") or "").split(",") if t.strip()]
+        if commit:
+            obj.save()
+        return obj
+
+
+@admin.register(KnowledgeSource)
+class KnowledgeSourceAdmin(admin.ModelAdmin):
+    """Папки й сайти, які Minerva сама обходить і передає в базу знань (rag_assistant/knowledge_sources.py)."""
+    form = KnowledgeSourceForm
+    list_display = ["name", "kind", "where_col", "enabled", "docs_col", "last_col"]
+    list_filter = ["kind", "enabled"]
+    raw_id_fields = ["customer", "project", "product"]
+    readonly_fields = ["roots_help", "state_panel"]
+    actions = ["scan_action"]
+    fieldsets = [
+        (None, {"fields": ["name", "kind", "path", "url", "roots_help", "enabled"]}),
+        ("Що брати", {"fields": ["file_types_text", "recursive", "max_files", "max_file_mb", "rescan_hours"]}),
+        ("Хто бачить і до чого прив'язати", {"fields": ["visibility", "customer", "project", "product",
+                                                         "link_products_by_sku"]}),
+        ("Стан", {"fields": ["state_panel"]}),
+    ]
+
+    def get_urls(self):
+        return [path("<int:pk>/scan/", self.admin_site.admin_view(self.scan_view),
+                     name="rag_assistant_knowledgesource_scan")] + super().get_urls()
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.owner = request.user
+        super().save_model(request, obj, form, change)
+        knowledge_sources.start_scan(obj)          # одразу після збереження — перевірити (у фоні)
+        messages.info(request, "Перевірку джерела запущено у фоні — стан оновиться за хвилину.")
+
+    def delete_model(self, request, obj):
+        obj.delete()                               # документи джерела → tombstone (сигнал post_delete)
+
+    def scan_view(self, request, pk):
+        source = KnowledgeSource.objects.filter(pk=pk).first()
+        if source is None or request.method != "POST" or not self.has_change_permission(request, source):
+            raise PermissionDenied
+        if knowledge_sources.start_scan(source):
+            messages.success(request, f"«{source.name}»: перевірку запущено у фоні.")
+        else:
+            messages.warning(request, f"«{source.name}»: перевірка вже йде.")
+        return redirect(reverse("admin:rag_assistant_knowledgesource_change", args=[pk]))
+
+    @admin.action(description="🔄 Перевірити зараз")
+    def scan_action(self, request, queryset):
+        n = sum(1 for s in queryset if knowledge_sources.start_scan(s))
+        self.message_user(request, f"Запущено перевірок: {n} (у фоні).")
+
+    @admin.display(description="Де")
+    def where_col(self, obj):
+        return obj.path if obj.kind == KnowledgeSource.FOLDER else obj.url
+
+    @admin.display(description="Документів")
+    def docs_col(self, obj):
+        n = obj.items.count()
+        url = reverse("admin:rag_assistant_knowledgeitem_changelist") + f"?knowledge_source__id__exact={obj.pk}"
+        return format_html('<a href="{}">{}</a>', url, n)
+
+    @admin.display(description="Остання перевірка")
+    def last_col(self, obj):
+        if knowledge_sources.running(obj):
+            return "⏳ іде перевірка…"
+        if obj.last_error:
+            return format_html('<span style="color:#e57373">⚠️ {}</span>', obj.last_error)
+        return obj.last_scan_result or "ще не було"
+
+    @admin.display(description="Де можна брати папки")
+    def roots_help(self, obj):
+        roots = format_html_join("", "<li><code>{}</code></li>", ((r,) for r in knowledge_sources.allowed_roots()))
+        return format_html(
+            '<div style="max-width:760px">Minerva читає лише папки в цих коренях (файли не копіює):<ul>{}</ul>'
+            'Найпростіше — покласти або скопіювати документи в <code>knowledge_sources</code> у теці Minerva на NAS '
+            '(<code>/volume1/docker/tabele_mvp/knowledge_sources/…</code>): у Docker вона вже видна як '
+            '<code>/app/knowledge_sources/…</code>.<br>Іншу папку NAS — змонтувати в <code>docker-compose.yml</code> '
+            '(сервіси web і cron, напр. <code>- /volume1/Office/Dokumentation:/knowledge/dokumentation:ro</code>) '
+            'і додати <code>MINERVA_KNOWLEDGE_ROOTS: "/knowledge"</code> у environment.</div>', roots)
+
+    @admin.display(description="Стан")
+    def state_panel(self, obj):
+        if not obj or not obj.pk:
+            return "Після збереження Minerva одразу перевірить джерело."
+        from django.db.models import Count
+        from .models import KnowledgeDoc
+        ids = list(obj.items.values_list("pk", flat=True))
+        states = dict(KnowledgeDoc.objects.filter(doc_type="document", obj_id__in=ids, fed=True)
+                      .values_list("state").annotate(n=Count("pk")))
+        scan_url = reverse("admin:rag_assistant_knowledgesource_scan", args=[obj.pk])
+        return format_html(
+            '<div>{}</div><div style="margin-top:4px">Документів: <b>{}</b> · передано в базу знань: <b>{}</b> · '
+            'у RAG: <b>{}</b> · помилки / пропущено: {} / {}</div>'
+            '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formmethod="post">'
+            '🔄 Перевірити зараз</button></div>',
+            self.last_col(obj), len(ids), sum(states.values()), states.get("indexed", 0), states.get("failed", 0),
+            states.get("skipped", 0), scan_url)
+

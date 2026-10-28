@@ -18,6 +18,7 @@ env/
 local_settings.py
 staticfiles/
 media/
+knowledge_sources/
 
 # ── Database / Backups ───────────────────────────────────
 backups/

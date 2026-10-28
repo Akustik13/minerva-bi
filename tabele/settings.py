@@ -272,3 +272,7 @@ REST_FRAMEWORK = {
 # База знань для RAG: стале позначення цього середовища/БД (напр. sevskiy-prod, dev-claude).
 # Без нього маршрути /api/v1/knowledge/ відповідають 503 instance_not_configured.
 MINERVA_INSTANCE_ID = os.getenv("MINERVA_INSTANCE_ID", "")
+# «📂 Джерела знань»: де Minerva може читати папки (крім knowledge_sources у проєкті й у MEDIA) — змонтовані в Docker
+# шляхи через кому, напр. MINERVA_KNOWLEDGE_ROOTS=/knowledge (rag_assistant/knowledge_sources.py)
+KNOWLEDGE_SOURCE_ROOTS = [p.strip() for p in os.getenv("MINERVA_KNOWLEDGE_ROOTS", "").replace(";", ",").split(",")
+                          if p.strip()]

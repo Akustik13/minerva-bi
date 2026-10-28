@@ -204,7 +204,7 @@ eh_review=False — лише «❓ Запитати» (проєкт: огляд 
 
   // 📎 Документи й посилання картки → база знань (knowledge_items.py)
   var docs = root.querySelector('.ehw-docs'), list = root.querySelector('.ehw-docs-list');
-  var icons = {upload: '📄', link: '🔗', offer: '📝', order_file: '📦', datasheet: '📑'};
+  var icons = {upload: '📄', link: '🔗', offer: '📝', order_file: '📦', datasheet: '📑', source: '📂'};
   function renderDocs(items) {
     root.querySelector('.ehw-docs-n').textContent = items.length ? '(' + items.length + ')' : '';
     list.innerHTML = items.length ? items.map(function (d) {

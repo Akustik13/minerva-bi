@@ -405,8 +405,9 @@ class KnowledgeItem(models.Model):
     текст сторінки за посиланням — Minerva (RAG зовнішніх адрес не відкриває).
     """
     UPLOAD, LINK, OFFER, ORDER_FILE, DATASHEET = "upload", "link", "offer", "order_file", "datasheet"
+    SOURCE = "source"
     KINDS = [(UPLOAD, "📄 файл"), (LINK, "🔗 посилання"), (OFFER, "📝 Angebot"), (ORDER_FILE, "📦 документ замовлення"),
-             (DATASHEET, "📑 даташит")]
+             (DATASHEET, "📑 даташит"), (SOURCE, "📂 з джерела знань")]
     TEAM, PRIVATE = "team", "private"
     VISIBILITY = [(TEAM, "усі, хто бачить картку"), (PRIVATE, "🔒 лише я")]
 
@@ -439,6 +440,12 @@ class KnowledgeItem(models.Model):
     auto = models.BooleanField(default=False, help_text="Додано автоматично (етап 3): Minerva сама оновлює й прибирає")
     source_key = models.CharField(max_length=300, blank=True, default="", db_index=True,
                                   help_text="Для автоматичних: offer:<версія>, order_file:<замовлення>:<файл>, datasheet:<товар>")
+    knowledge_source = models.ForeignKey("rag_assistant.KnowledgeSource", null=True, blank=True,
+                                         on_delete=models.CASCADE, related_name="items", verbose_name="Джерело знань")
+    source_path = models.CharField(max_length=1000, blank=True, default="",
+                                   help_text="Папка: шлях файлу відносно папки джерела; сайт — адреса сторінки")
+    source_stamp = models.CharField(max_length=80, blank=True, default="",
+                                    help_text="Розмір і час зміни файлу / хеш сторінки — щоб перечитувати лише змінене")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -453,3 +460,58 @@ class KnowledgeItem(models.Model):
     @property
     def document_id(self) -> str:
         return f"document:{self.pk}"
+
+
+class KnowledgeSource(models.Model):
+    """
+    «📂 Джерело знань» (rag_assistant/knowledge_sources.py): папка або сайт, які Minerva сама обходить за розкладом
+    і передає в базу знань (KnowledgeItem kind=source; тип document для RAG). Папка — лише всередині дозволених коренів
+    (knowledge_sources у проєкті, MEDIA/knowledge_sources, MINERVA_KNOWLEDGE_ROOTS); файли не копіюються.
+    """
+    FOLDER, WEBSITE = "folder", "website"
+    KINDS = [(FOLDER, "📁 папка"), (WEBSITE, "🌐 сайт")]
+    TEAM, PRIVATE = "team", "private"
+    VISIBILITY = [(TEAM, "усі, хто бачить пов'язані картки (без прив'язок — усі співробітники)"), (PRIVATE, "🔒 лише я")]
+
+    name = models.CharField("Назва", max_length=200)
+    kind = models.CharField("Вид", max_length=10, choices=KINDS, default=FOLDER)
+    path = models.CharField("Папка", max_length=500, blank=True, default="",
+                            help_text="Шлях усередині Minerva, напр. /app/knowledge_sources/Dokumentation. "
+                                      "Лише в дозволених коренях — список і як підключити папку NAS — нижче.")
+    url = models.URLField("Сайт", max_length=1000, blank=True, default="",
+                          help_text="Адреса sitemap.xml або сторінки, з якої брати посилання того ж сайту")
+    recursive = models.BooleanField("З підпапками", default=True)
+    file_types = models.JSONField("Типи файлів", default=list, blank=True,
+                                  help_text="Порожньо — pdf, docx, txt, csv, md, html, htm, xlsx")
+    max_files = models.PositiveIntegerField("Макс. файлів / сторінок", default=2000)
+    max_file_mb = models.PositiveSmallIntegerField("Макс. розмір файлу, МБ", default=25)
+    rescan_hours = models.PositiveSmallIntegerField("Перевіряти кожні, год", default=24)
+    enabled = models.BooleanField("Увімкнено", default=True,
+                                  help_text="Вимкнено — документи джерела прибираються з RAG (у Minerva лишаються)")
+    visibility = models.CharField("Хто бачить", max_length=10, choices=VISIBILITY, default=TEAM)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name="knowledge_sources", verbose_name="Додав")
+    customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name="+", verbose_name="Клієнт (для всіх документів)")
+    project = models.ForeignKey("projects.Project", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="+", verbose_name="Проєкт (для всіх документів)")
+    product = models.ForeignKey("inventory.Product", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="+", verbose_name="Товар (для всіх документів)")
+    link_products_by_sku = models.BooleanField(
+        "Артикул у назві файлу → товар", default=True,
+        help_text="Файл «FT220407_Datenblatt.pdf» прив'яжеться до товару FT220407 (артикул каталогу в назві файлу чи сторінки)")
+    last_scan_at = models.DateTimeField("Остання перевірка", null=True, blank=True, editable=False)
+    last_scan_result = models.CharField(max_length=300, blank=True, default="", editable=False)
+    last_error = models.CharField(max_length=300, blank=True, default="", editable=False)
+    scan_started_at = models.DateTimeField(null=True, blank=True, editable=False,
+                                           help_text="Йде перевірка (порожньо — ні); старіша за годину вважається зупиненою")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Джерело знань"
+        verbose_name_plural = "📂 Джерела знань"
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+

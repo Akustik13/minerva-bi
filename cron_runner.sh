@@ -116,6 +116,7 @@ while true; do
   if [ $((NOW - LAST_EMAIL_SYNC)) -ge "$EMAIL_SYNC_INTERVAL" ]; then
     python manage.py sync_email --folders 2>&1 || true
     python manage.py knowledge_refresh --if-due 2>&1 || true   # база знань RAG: раз на добу, якщо використовується
+    python manage.py knowledge_sources --if-due 2>&1 || true   # «📂 Джерела знань»: папки й сайти за їх розкладом
     LAST_EMAIL_SYNC=$(date +%s)
   fi
 

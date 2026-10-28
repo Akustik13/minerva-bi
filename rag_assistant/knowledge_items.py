@@ -122,8 +122,20 @@ def _ext(name) -> str:
     return name.rsplit(".", 1)[-1] if "." in name else ""
 
 
+def source_file(item) -> bool:
+    """Файл лежить у папці «📂 Джерела знань» (не в MEDIA) — читається на місці."""
+    return bool(item.knowledge_source_id and item.source_path and item.knowledge_source.kind == "folder")
+
+
+def has_file(item) -> bool:
+    return bool(item.file) or source_file(item)
+
+
 def file_path(item) -> str:
-    """Шлях до файлу документа лише всередині MEDIA_ROOT."""
+    """Шлях до файлу документа: у MEDIA_ROOT або в папці джерела знань (лише в дозволених коренях)."""
+    if source_file(item):
+        from .knowledge_sources import resolve
+        return resolve(item.knowledge_source, item.source_path)
     if not item.file:
         return ""
     root = os.path.normpath(str(settings.MEDIA_ROOT))
@@ -158,9 +170,9 @@ def local_text(item, limit=LOCAL_TEXT) -> str:
     parts = [item.note.strip()] if item.note.strip() else []
     if item.text.strip():
         parts.append(item.text.strip())
-    if item.file:
-        text = attachment_text({"name": item.file_name or item.file.name,
-                                "file_path": item.file.name}, limit=limit)
+    if has_file(item) and not (source_file(item) and item.text.strip()):   # Excel / HTML / MD джерела — текст уже є
+        text = attachment_text({"name": item.file_name or (item.file.name if item.file else item.source_path)},
+                               limit=limit, path=file_path(item))
         if text:
             parts.append(text)
     return "\n\n".join(parts)[:limit]
@@ -357,11 +369,11 @@ class Handler:
     def load(self, pks):
         from .models import KnowledgeItem
         return {i.pk: i for i in KnowledgeItem.objects.filter(pk__in=pks)
-                .select_related("owner", "customer", "project", "order", "product")}
+                .select_related("owner", "customer", "project", "order", "product", "knowledge_source")}
 
     def admitted(self, scope):
         from .models import KnowledgeItem
-        return KnowledgeItem.objects.select_related("owner", "customer", "project", "order", "product")
+        return KnowledgeItem.objects.select_related("owner", "customer", "project", "order", "product", "knowledge_source")
 
     def extras(self, items):
         cache = {}
@@ -371,7 +383,9 @@ class Handler:
         toggle = AUTO_TOGGLES.get(item.kind)
         if item.auto and toggle and not getattr(scope, toggle, False):
             return "out_of_scope"
-        if not (item.file or item.text.strip() or item.note.strip()):
+        if item.knowledge_source_id and not item.knowledge_source.enabled:
+            return "out_of_scope"           # джерело вимкнено
+        if not (has_file(item) or item.text.strip() or item.note.strip()):
             return "out_of_scope"           # посилання ще не завантажено
         if not access_user_ids(item, (extra or {}).get("users")):
             return "access_revoked"
@@ -381,7 +395,9 @@ class Handler:
         from .knowledge import TEXT_MAX, _iso
         body = "\n\n".join(p for p in [item.note.strip(), item.text.strip()] if p)
         return {
-            "kind": item.kind,
+            # вид для RAG — з погодженого переліку контракту: документ із «📂 Джерела знань» іде як файл (папка)
+            # або посилання (сайт), тож RAG-ПК не треба оновлювати; що це джерело — знає Minerva
+            "kind": item.kind if item.kind != item.SOURCE else ("upload" if source_file(item) else "link"),
             "title": item.title[:500],
             "created_at": _iso(item.created_at),
             "source_url": item.url[:2000] or None,
@@ -399,9 +415,11 @@ class Handler:
         }
 
     def _attachments(self, item, scope) -> list:
-        if not item.file:
+        if not has_file(item):
             return []
-        name = (item.file_name or os.path.basename(item.file.name) or "document")[:300]
+        if source_file(item) and item.text.strip():
+            return []                       # Excel / HTML / Markdown: текст уже витягла Minerva (item.text)
+        name = (item.file_name or os.path.basename(item.file.name if item.file else item.source_path) or "document")[:300]
         path, reason = file_path(item), ""
         if _ext(name) not in scope.attachment_types:
             reason = "type_not_allowed"
