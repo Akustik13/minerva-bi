@@ -103,10 +103,17 @@ def link(project, dante_project: DanteProject, user=None) -> ProjectMap:
     return m
 
 
-def create_in_dante(project, user=None) -> DanteProject:
-    """Новий проєкт в askDANTE «P-… Назва» з номером = код Minerva, одразу прив'язаний."""
+def default_dante_name(project) -> str:
+    """Назва нового проєкту askDANTE для проєкту Minerva: «P-… Назва», до 50 символів."""
     from . import services
-    data = services.client().create_project(f"{project.code} {project.name}".strip(), project.code)
+    return services.fit_name(f"{project.code} {project.name}")
+
+
+def create_in_dante(project, user=None, name: str = "") -> DanteProject:
+    """Новий проєкт в askDANTE з номером = код Minerva, одразу прив'язаний. Назва — `name` (людина підтвердила /
+    змінила), інакше «P-… Назва», скорочена до 50 символів (більше askDANTE не приймає)."""
+    from . import services
+    data = services.client().create_project(services.check_name(name or default_dante_name(project)), project.code)
     if not data["id"]:
         from .client import DanteError
         raise DanteError("unavailable", "askDANTE створив проєкт, але не повернув його ID — "

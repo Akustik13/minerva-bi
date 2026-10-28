@@ -746,15 +746,37 @@ def balance_lines(pb) -> list[tuple[str, str]]:
 
 
 # ── «мої проєкти» і швидкий запис часу на проєкт ─────────────────
+NAME_MAX = 50   # askDANTE: «name: Eine Eingabe bis 50 Zeichen ist zulässig»
+
+
+def fit_name(text: str, limit: int = NAME_MAX) -> str:
+    """Підказка назви нового проєкту askDANTE: не довше `limit`, обрізано по слову з «…»."""
+    text = " ".join((text or "").split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit - 1]
+    if " " in cut[limit // 2:]:
+        cut = cut[:cut.rindex(" ")]
+    return cut.rstrip(" -–,.:;") + "…"
+
+
+def check_name(name: str) -> str:
+    name = " ".join((name or "").split())
+    if not name:
+        raise DanteError("bad_request", "Вкажіть назву проєкту askDANTE.")
+    if len(name) > NAME_MAX:
+        raise DanteError("bad_request", f"Назва проєкту askDANTE — не довше {NAME_MAX} символів (зараз {len(name)}): "
+                                        f"«{name}». Скоротіть.")
+    return name
+
+
 def create_dante(name: str, parent: DanteProject | None = None, st: DanteSettings | None = None,
                  customer: tuple | None = None) -> DanteProject:
     """Новий проєкт askDANTE (parent=None; customer=(id, назва) — проєкт цього клієнта askDANTE, напр.
     «000 :: Eigene Projekte …») або підпроєкт під `parent` — одразу і в довіднику Minerva.
     Такий самий підпроєкт / проєкт уже є — повертається наявний (без дубля)."""
     st = st or DanteSettings.get()
-    name = (name or "").strip()[:255]
-    if not name:
-        raise DanteError("bad_request", "Вкажіть назву проєкту askDANTE.")
+    name = check_name(name)
     same = DanteProject.objects.filter(name__iexact=name, parent=parent, gone=False)
     if parent is None and customer:
         same = same.filter(customer_ref=customer[0])

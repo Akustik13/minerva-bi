@@ -101,7 +101,9 @@
       {% if proj_hints %}<optgroup label="⭐ {% trans "Підходить" %}">{% for dp, why in proj_hints %}<option value="{{ dp.pk }}"{% if forloop.first %} selected{% endif %}>{% if dp.parent %}{{ dp.parent.name }} › {% endif %}{{ dp.name }} — {{ why }}</option>{% endfor %}</optgroup>{% endif %}
       <optgroup label="{% trans "Усі проєкти" %}">{% for p in projects %}{% if p.time_trackable %}<option value="{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endif %}{% endfor %}</optgroup></select></label>
     <button class="button default">✓ {% trans "Прив'язати й показати час" %}</button>
-    <button class="button" name="create" value="1" onclick="return confirm('{% trans "Створити в askDANTE новий проєкт" %} «{{ focus_proj.code|escapejs }} {{ focus_proj.name|escapejs }}» {% trans "і прив'язати? Видалити його можна лише в askDANTE." %}')">＋ {% trans "Створити в askDANTE" %} «{{ focus_proj.code }} {{ focus_proj.name|truncatechars:40 }}»</button>
+    <input type="hidden" name="dante_name" value="{{ dante_name }}">
+    <button class="button" name="create" value="1" data-name="{{ dante_name }}"
+            onclick="var n = wtAskName(this.dataset.name); if (!n) return false; this.form.elements['dante_name'].value = n; return true;">＋ {% trans "Створити в askDANTE" %} «{{ dante_name }}»…</button>
   </form>
   <div class="mt-muted" style="margin-top:4px">💡 {% if proj_hints %}{% trans "Вибрано найкращий збіг (код, клієнт, назва, листування) — перевірте." %}{% else %}{% trans "Підходящого проєкту в askDANTE не знайшлось — створіть новий: «P-… Назва» з номером = код Minerva." %}{% endif %}
     · <a href="{{ proj_url }}">📁 {% trans "проєкт" %}</a></div>
@@ -134,7 +136,7 @@
       <option value="">—</option>
       {% if new_customers %}<optgroup label="{% trans "Новий проєкт у клієнта askDANTE" %}">{% for value, label in new_customers %}<option value="{{ value }}"{% if value == preset_new %} selected{% endif %}>{{ label }}{% if value == hints.new %} ⭐{% endif %}</option>{% endfor %}</optgroup>{% endif %}
       <optgroup label="{% trans "Новий підпроєкт під проєктом" %}">{% for value, label in new_parents %}<option value="{{ value }}"{% if value == preset_new %} selected{% endif %}>{{ label }}{% if value == hints.new %} ⭐{% endif %}</option>{% endfor %}</optgroup></select></label>
-    <label>{% trans "Назва нового" %}<input type="text" name="name" value="{{ focus_cat.name }}" maxlength="255" size="18"></label>
+    <label>{% trans "Назва нового (до 50 символів)" %}<input type="text" name="name" value="{{ cat_dante_name }}" maxlength="50" size="18"></label>
     <label>{% trans "Вид роботи" %}<select name="activity"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if focus.activity_id == a.pk %} selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></label>
     <label>{% trans "хв: відповідь / прочитаний" %}<span style="display:flex;gap:4px"><input type="number" name="reply" value="{% if focus %}{{ focus.reply_minutes }}{% else %}10{% endif %}" min="0" style="width:56px"><input type="number" name="read" value="{% if focus %}{{ focus.read_minutes }}{% else %}3{% endif %}" min="0" style="width:56px"></span></label>
     <label title="{% trans "Щодня записувати за вчора без підтвердження" %}"><span><input type="checkbox" name="auto" value="1"{% if focus.auto %} checked{% endif %}> {% trans "авто" %}</span></label>
@@ -218,7 +220,7 @@
       <label>{% trans "або новий в askDANTE" %}<select name="new_target"><option value="">—</option>
           {% if customers %}<optgroup label="{% trans "Новий проєкт у клієнта askDANTE" %}">{% for ref, cname in customers %}<option value="c:{{ ref }}">{{ cname }}</option>{% endfor %}</optgroup>{% endif %}
           <optgroup label="{% trans "Новий підпроєкт під проєктом" %}">{% for p in projects %}<option value="p:{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</optgroup></select></label>
-      <label>{% trans "назва нового" %}<input name="sub_name" maxlength="255" placeholder="{% trans 'як категорія' %}"></label>
+      <label>{% trans "назва нового" %}<input name="sub_name" maxlength="50" placeholder="{% trans 'як категорія' %}"></label>
       <button class="button default" name="action" value="assign">🏷 {% trans "Віднести" %}</button>
     </div>
     {% endif %}
@@ -263,5 +265,14 @@ document.addEventListener('change', function(e){
   var el = document.getElementById('mt-nmail');
   if (el) el.textContent = document.querySelectorAll('input[name="mail"]:checked').length;
 });
+</script>
+<script>
+function wtAskName(name) {   // назва нового проєкту askDANTE — підтвердити / змінити; askDANTE приймає до 50 символів
+  var n = prompt('{% trans "Назва нового проєкту в askDANTE (до 50 символів) — змініть або підтвердьте" %}', name);
+  while (n !== null && n.trim().length > 50) {
+    n = prompt('{% trans "Задовга назва" %}: ' + n.trim().length + ' {% trans "символів — askDANTE приймає до 50. Скоротіть:" %}', n.trim().slice(0, 50));
+  }
+  return n === null || !n.trim() ? null : n.trim();
+}
 </script>
 {% endblock %}

@@ -71,7 +71,7 @@
   <h3>2 · {% trans "Категорії → проєкт askDANTE і норми" %}</h3>
   <form method="post" class="ct-row" style="margin-bottom:10px">{% csrf_token %}<input type="hidden" name="action" value="top">
     <span class="ct-muted">{% trans "Новий проєкт askDANTE" %}</span>
-    <input name="top_name" placeholder="DigiKey" maxlength="255" required>
+    <input name="top_name" placeholder="DigiKey" maxlength="50" required title="{% trans "askDANTE приймає до 50 символів" %}">
     {% if customers %}<select name="top_customer"><option value="">{% trans "без клієнта" %}</option>{% for ref, cname in customers %}<option value="{{ ref }}">{% trans "у клієнта" %} {{ cname }}</option>{% endfor %}</select>{% endif %}
     <button class="button"{% if not st.enabled %} disabled{% endif %}>＋ {% trans "Створити проєкт в askDANTE" %}</button>
   </form>
@@ -89,7 +89,7 @@
         <td><div class="ct-row"><select name="new_{{ r.cat.pk }}"><option value="">{% trans "новий…" %}</option>
           {% if customers %}<optgroup label="{% trans "Новий проєкт у клієнта askDANTE" %}">{% for ref, cname in customers %}<option value="c:{{ ref }}">{{ cname }}</option>{% endfor %}</optgroup>{% endif %}
           <optgroup label="{% trans "Новий підпроєкт під проєктом" %}">{% for p in parents %}<option value="p:{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</optgroup></select>
-          <input name="sub_{{ r.cat.pk }}" value="{{ r.cat.name }}" maxlength="255" size="14"></div></td>
+          <input name="sub_{{ r.cat.pk }}" value="{{ r.cat.name|truncatechars:50 }}" maxlength="50" size="14" title="{% trans "askDANTE приймає до 50 символів" %}"></div></td>
         <td><select name="act_{{ r.cat.pk }}"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if r.ct and r.ct.activity_id == a.pk %} selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></td>
         <td class="ct-row"><input type="number" name="reply_{{ r.cat.pk }}" value="{% if r.ct %}{{ r.ct.reply_minutes }}{% else %}10{% endif %}" min="0">
           <input type="number" name="read_{{ r.cat.pk }}" value="{% if r.ct %}{{ r.ct.read_minutes }}{% else %}3{% endif %}" min="0">

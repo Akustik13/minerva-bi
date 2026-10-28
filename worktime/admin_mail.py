@@ -151,7 +151,7 @@ def mail_time_page(model_admin, request):
         from . import mapping
         try:
             if request.POST.get("create") == "1":
-                dp = mapping.create_in_dante(focus_proj, request.user)
+                dp = mapping.create_in_dante(focus_proj, request.user, request.POST.get("dante_name") or "")
             else:
                 dp = DanteProject.objects.filter(pk=request.POST.get("dp") or 0, archived=False, gone=False).first()
                 if dp is None:
@@ -296,6 +296,8 @@ def mail_time_page(model_admin, request):
         "show": show, "n_loose": sum(len(d["loose"]) for d in days), "n_ignored": sum(len(d["ignored"]) for d in days),
         "focus": focus, "focus_cat": focus_cat, "shared": shared, "can_bind": can_bind,
         "focus_proj": focus_proj, "pmap": pmap, "proj_hints": proj_hints,
+        "dante_name": services.fit_name(f"{focus_proj.code} {focus_proj.name}") if focus_proj else "",
+        "cat_dante_name": services.fit_name(focus_cat.name) if focus_cat else "",
         "proj_url": reverse("admin:projects_project_change", args=[focus_proj.pk]) if focus_proj else "",
         "hints": hints, "preset_new": hints["new"] if hints and not hints["projects"] else "",
         "new_customers": [(f"c:{ref}", cname) for ref, cname in services.dante_customers()],

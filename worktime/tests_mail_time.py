@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from email_assistant.models import EmailAccount, EmailMessage, EmailSettings, EmailThread, MailCategory
 from worktime import mail_time
+from worktime.client import DanteError
 from worktime.admin import _activity_label
 from worktime.models import Booking, DanteProject, MailCategoryTime, MailTimeEntry, ProjectMap, WorkDay
 from worktime.tests import MON, Base
@@ -279,9 +280,7 @@ class NoWorktimeDayTests(CategoryPageBase):
         self.assertContains(page, f"day/?u={self.du.pk}&amp;d={MON.isoformat()}")
 
 
-class ProjectFocusTests(CategoryPageBase):
-    """Правий клік на проєкті → «⏱ Занести в askDANTE»: лише його рядки; без askDANTE — вибрати або створити."""
-
+class ProjectBase(CategoryPageBase):
     def setUp(self):
         super().setUp()
         from projects.models import Project, ProjectLink
@@ -292,6 +291,10 @@ class ProjectFocusTests(CategoryPageBase):
         self.msg(folder=EmailMessage.FOLDER_SENT)   # DigiKey — не цього проєкту
         self.dp3 = DanteProject.objects.create(dante_id="93", name="Indoor positioning")
         self.args = {"u": self.du.pk, "from": MON.isoformat(), "to": TUE.isoformat(), "proj": self.project.pk}
+
+
+class ProjectFocusTests(ProjectBase):
+    """Правий клік на проєкті → «⏱ Занести в askDANTE»: лише його рядки; без askDANTE — вибрати або створити."""
 
     def test_without_askdante_project_offers_existing_or_new(self):
         page = self.client.get(self.url, self.args)
@@ -310,3 +313,38 @@ class ProjectFocusTests(CategoryPageBase):
         create.assert_called_once()
         self.assertEqual(create.call_args[0][0], self.project)
         self.assertIn(f"proj={self.project.pk}", r["Location"])
+
+
+class DanteNameTests(ProjectBase):
+    """askDANTE: «name: Eine Eingabe bis 50 Zeichen ist zulässig» — назву підтверджують / скорочують до запиту."""
+
+    def test_fit_and_check_name(self):
+        from worktime import services
+        long = "P-2026-002 Indoor positioning for mail-sorting locations"
+        short = services.fit_name(long)
+        self.assertLessEqual(len(short), 50)
+        self.assertTrue(short.startswith("P-2026-002 Indoor positioning") and short.endswith("…"))
+        self.assertEqual(services.fit_name("DigiKey"), "DigiKey")
+        with self.assertRaises(DanteError):
+            services.check_name(long)
+
+    def test_page_suggests_short_name_and_creates_with_confirmed_one(self):
+        from worktime import mapping
+        self.project.name = "Indoor positioning for mail-sorting locations"
+        self.project.save()
+        page = self.client.get(self.url, self.args)
+        self.assertContains(page, 'name="dante_name"')
+        self.assertContains(page, "function wtAskName")
+        sent = {}
+
+        class Fake:
+            def create_project(self, name, reference_number="", customer_id=""):
+                sent.update(name=name, ref=reference_number)
+                return {"id": "555", "name": name, "reference_number": reference_number}
+        with mock.patch("worktime.services.client", return_value=Fake()):
+            self.client.post(self.url, {**self.args, "action": "bind_project", "create": "1",
+                                        "dante_name": "P-2026-002 Indoor positioning"})
+            self.assertEqual(sent, {"name": "P-2026-002 Indoor positioning", "ref": self.project.code})
+            self.assertEqual(ProjectMap.objects.get(project=self.project).dante_project.dante_id, "555")
+            with self.assertRaises(DanteError):   # задовгу назву askDANTE не надсилаємо
+                mapping.create_in_dante(self.project, name="x" * 51)

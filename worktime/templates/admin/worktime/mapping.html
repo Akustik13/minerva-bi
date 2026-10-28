@@ -186,9 +186,11 @@
           {% else %}{{ r.link.dante_project|default:"—" }}{% endif %}
         </td>
         {% if can_edit %}
-        <td>{% if not r.link %}<button class="button" name="create" value="{{ r.project.pk }}"
-               onclick="return confirm('{% trans "Створити в askDANTE новий проєкт" %} «{{ r.project.code|escapejs }} {{ r.project.name|escapejs }}» {% trans "і прив'язати?" %}')"
-               title="{% trans "Створити такий проєкт в askDANTE" %}">➕ askDANTE</button>{% endif %}</td>
+        <td>{% if not r.link %}<input type="hidden" name="create_name_{{ r.project.pk }}">
+          <button class="button" name="create" value="{{ r.project.pk }}"
+               onclick="var n = wtAskName(this.dataset.name); if (!n) return false; this.previousElementSibling.value = n; return true;"
+               data-name="{{ r.project.code }} {{ r.project.name }}"
+               title="{% trans "Створити такий проєкт в askDANTE (назву можна змінити, до 50 символів)" %}">➕ askDANTE</button>{% endif %}</td>
         {% endif %}
       </tr>
       {% empty %}
@@ -225,4 +227,13 @@
   </div>
   {% endif %}
 {% endif %}
+<script>
+function wtAskName(name) {   // назва нового проєкту askDANTE — підтвердити / змінити; askDANTE приймає до 50 символів
+  var n = prompt('{% trans "Назва нового проєкту в askDANTE (до 50 символів) — змініть або підтвердьте" %}', name);
+  while (n !== null && n.trim().length > 50) {
+    n = prompt('{% trans "Задовга назва" %}: ' + n.trim().length + ' {% trans "символів — askDANTE приймає до 50. Скоротіть:" %}', n.trim().slice(0, 50));
+  }
+  return n === null || !n.trim() ? null : n.trim();
+}
+</script>
 {% endblock %}

@@ -1131,7 +1131,7 @@ class DanteProjectAdmin(admin.ModelAdmin):
             if pr is None:
                 return
             try:
-                dp = mapping.create_in_dante(pr, request.user)
+                dp = mapping.create_in_dante(pr, request.user, p.get(f"create_name_{pr.pk}") or "")
                 messages.success(request, f"✅ В askDANTE створено проєкт «{dp.name}» і прив'язано до {pr.code}.")
             except DanteError as e:
                 messages.error(request, f"❌ {e.message}")
