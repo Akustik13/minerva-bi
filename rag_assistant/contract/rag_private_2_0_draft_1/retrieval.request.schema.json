@@ -23,12 +23,16 @@
       "pattern": "\\S"
     },
     "types": {
+      "description": "Без поля — лише email. document — лише якщо capabilities.document_types його містить.",
       "type": "array",
       "items": {
-        "const": "email"
+        "enum": [
+          "email",
+          "document"
+        ]
       },
       "minItems": 1,
-      "maxItems": 1,
+      "maxItems": 2,
       "uniqueItems": true
     },
     "filters": {

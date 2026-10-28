@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import threading
+from contextlib import contextmanager
 from urllib.parse import urljoin, urlparse
 
 from django.conf import settings
@@ -41,6 +42,22 @@ PERMS = {"customer": "crm.view_customer", "project": "projects.view_project",
          "order": "sales.view_salesorder", "product": "inventory.view_product"}
 AUTO_TOGGLES = {"offer": "auto_offers", "order_file": "auto_order_files", "datasheet": "auto_datasheets"}
 _TITLE_RE = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
+_quiet = threading.local()
+
+
+@contextmanager
+def quiet():
+    """Масові зміни (knowledge_auto): сигнали не шлють подію на кожен запис — викликач робить touch пачками."""
+    previous = getattr(_quiet, "on", False)
+    _quiet.on = True
+    try:
+        yield
+    finally:
+        _quiet.on = previous
+
+
+def is_quiet() -> bool:
+    return getattr(_quiet, "on", False)
 
 
 class ItemError(Exception):
@@ -136,12 +153,12 @@ def file_hash(item) -> str:
 
 
 def local_text(item, limit=LOCAL_TEXT) -> str:
-    """Текст для Minerva без RAG (огляд / запитання картки): опис + текст сторінки або файлу."""
+    """Текст для Minerva без RAG (огляд / запитання картки): опис + текст сторінки / автоматичний опис + файл."""
     from email_assistant.reply_brief import attachment_text
     parts = [item.note.strip()] if item.note.strip() else []
     if item.text.strip():
         parts.append(item.text.strip())
-    elif item.file:
+    if item.file:
         text = attachment_text({"name": item.file_name or item.file.name,
                                 "file_path": item.file.name}, limit=limit)
         if text:
@@ -314,8 +331,9 @@ def update(item, *, title=None, note=None, private=None):
 
 
 def delete(item):
-    """Видалити документ: файл і запис; сигнал post_delete → tombstone у стрічці (RAG прибере вектори)."""
-    if item.file:
+    """Видалити документ: файл і запис; сигнал post_delete → tombstone у стрічці (RAG прибере вектори).
+    Файл автоматичного документа належить Angebot / замовленню / товару — він лишається."""
+    if item.file and not item.auto:
         item.file.delete(save=False)
     item.delete()
 

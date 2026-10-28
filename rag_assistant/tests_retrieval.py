@@ -24,15 +24,15 @@ from rag_assistant.tests_knowledge import KnowledgeBase
 
 CONTRACT_DIR = pathlib.Path(settings.BASE_DIR) / "rag_assistant" / "contract" / "rag_private_2_0_draft_1"
 BASE = "https://rag.test.example"
-PINS = {   # integration/reviews/rag-schemas-20261020.json (package cd452d68…5f43)
+PINS = {   # integration/reviews/rag-schemas-20261028-documents.json (2026-10-20 + тип document)
     "accepted.response.schema.json": "0c21094959ec6c9d7a7547b97632a510118e8a441cdfda1c63c510df5818ab0e",
     "cancel.request.schema.json": "a1827941b20f17a169fab40fe6a6a8da03fea6dd64f72a57d23c668009184d3f",
-    "capabilities.response.schema.json": "25e70826afc5efa9e15015201a46a2080d3365e2c0e90aaa9ce63d75603196de",
-    "common.schema.json": "5fc3632438a89eeb65a06886449d9ac8cf5786626c2bcbab8ac4726db12c48cd",
+    "capabilities.response.schema.json": "a189832d2c84ecdaf0deac3bb06ac92f7b821b32ffaabe3aa938b05093f078e1",
+    "common.schema.json": "6e6f5737a32519c5798bf240e46fdddfdb631ebe577e2ec1e38865c7f6bf62c8",
     "context.request.schema.json": "adfad51af9d62ad3a31676c16891e7e4eff940f5760133ac123b402689d22a80",
     "error.schema.json": "7bf1907c66d06e54191709ddb43a2088bb7b2f018ff6be0ea01164372419bce2",
     "job.response.schema.json": "1e136e285968c7ac0edf8adcc72071a958cca1ad20b214253feeaf5cfa6c12bb",
-    "retrieval.request.schema.json": "e243952f33a21dbce83a555c235feb50070541ec14cd1b3b9a58db97b46a6411",
+    "retrieval.request.schema.json": "d3e420e9c6b149250ed84e0fa7272aca697b70e02db6fb8e883c032360656646",
     "retrieval.response.schema.json": "8d98c7540c253e8be13bfcb0886dc23bc660cdc1b3f04f73d23bd207b1fe27a2",
 }
 

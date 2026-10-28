@@ -500,6 +500,11 @@ def refresh_all(batch=300) -> dict:
     """Повна звірка: усі допущені листи + усі передані документи. Також чистить журнал і старі знімки."""
     from email_assistant.crm_link import own_addresses
     from .models import KnowledgeDoc, KnowledgeSettings
+    try:                        # етап 3: Angebote, документи замовлень, даташити — за галочками (knowledge_auto)
+        from . import knowledge_auto
+        knowledge_auto.sync_all()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("knowledge auto documents not synced: %s", e)
     scope, own = get_scope(), own_addresses()
     events = 0
     for doc_type in DOC_TYPES:

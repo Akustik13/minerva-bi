@@ -105,6 +105,19 @@
         }
       }
     },
+    "document_types": {
+      "description": "Які типи документів цей RAG індексує й шукає. Без поля — лише email (RAG до розширення документами).",
+      "type": "array",
+      "items": {
+        "enum": [
+          "email",
+          "document"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 2,
+      "uniqueItems": true
+    },
     "index": {
       "type": "object",
       "additionalProperties": false,

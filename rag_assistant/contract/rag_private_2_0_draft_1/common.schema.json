@@ -14,15 +14,16 @@
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     },
     "document_type": {
-      "description": "v1: лише email. project і offer зарезервовані для наступних версій.",
+      "description": "email — лист; document — файл / посилання / автоматичний документ (Angebot, документ замовлення, даташит). RAG отримує document лише на ?types=email,document.",
       "enum": [
-        "email"
+        "email",
+        "document"
       ]
     },
     "document_id": {
       "description": "<document_type>:<pk>. Стабільний у межах source_instance_id + generation.",
       "type": "string",
-      "pattern": "^email:[1-9][0-9]{0,18}$"
+      "pattern": "^(email|document):[1-9][0-9]{0,18}$"
     },
     "document_revision": {
       "description": "Монотонна ревізія документа (кожна зміна content_version, ACL, tombstone, повернення після tombstone → +1). Ніколи не зменшується.",
@@ -220,7 +221,15 @@
           ]
         },
         "mailbox_id": {
-          "$ref": "common.schema.json#/$defs/pk"
+          "description": "Скринька листа; для document — null (доступ за access.user_ids документа).",
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/pk"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "customer_id": {
           "anyOf": [

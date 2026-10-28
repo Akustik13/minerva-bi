@@ -59,13 +59,46 @@ def knowledge_account_saved(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender="rag_assistant.KnowledgeItem", dispatch_uid="knowledge_item_saved")
 def knowledge_item_saved(sender, instance, **kwargs):
-    if kwargs.get("raw"):
+    from .knowledge_items import is_quiet, touch
+    if kwargs.get("raw") or is_quiet():
         return
-    from .knowledge_items import touch
     touch([instance.pk])
 
 
 @receiver(post_delete, sender="rag_assistant.KnowledgeItem", dispatch_uid="knowledge_item_deleted")
 def knowledge_item_deleted(sender, instance, **kwargs):
-    from .knowledge_items import touch
-    touch([instance.pk])
+    from .knowledge_items import is_quiet, touch
+    if not is_quiet():
+        touch([instance.pk])
+
+
+# ── Етап 3: Angebot надіслано, даташит змінено → автоматичний документ одразу (knowledge_auto) ─────────
+
+def _auto_safely(fn, *args, **kwargs):
+    try:
+        fn(*args, **kwargs)
+    except Exception as e:  # noqa: BLE001 — база знань не ламає збереження Angebot / товару
+        import logging
+        logging.getLogger(__name__).warning("knowledge auto document failed: %s", e)
+
+
+@receiver(post_save, sender="offers.OfferRevision", dispatch_uid="knowledge_offer_revision_saved")
+def knowledge_offer_revision_saved(sender, instance, **kwargs):
+    from .models import KnowledgeSettings
+    if kwargs.get("raw") or not instance.sent_at:
+        return
+    if KnowledgeSettings.objects.filter(pk=1, auto_offers=True).exists():
+        from .knowledge_auto import sync_offers
+        offer_id = instance.offer_id
+        transaction.on_commit(lambda: _auto_safely(
+            sync_offers, offer=type(instance.offer).objects.filter(pk=offer_id).first()))
+
+
+@receiver(post_save, sender="inventory.Product", dispatch_uid="knowledge_product_datasheet_saved")
+def knowledge_product_saved(sender, instance, update_fields=None, **kwargs):
+    from .models import KnowledgeSettings
+    if kwargs.get("raw") or (update_fields is not None and "datasheet_file" not in update_fields):
+        return
+    if KnowledgeSettings.objects.filter(pk=1, auto_datasheets=True).exists():
+        from .knowledge_auto import sync_datasheets
+        transaction.on_commit(lambda: _auto_safely(sync_datasheets, product=instance))
