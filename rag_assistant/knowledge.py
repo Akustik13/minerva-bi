@@ -1,6 +1,9 @@
 """База знань: пошта Minerva → стрічка змін для RAG.
 
 Контракт: api/schemas/knowledge (JSON-схеми, README), integration/API_CONTRACT.md (draft 0.3).
+Типи документів (DOC_TYPES): email — листи (тут), document — файли й посилання (knowledge_items.py, тип
+описує handler(doc_type)). RAG отримує документи типу лише тоді, коли сам про нього просить (?types=email,document):
+старий RAG бачить лише листи, як і раніше.
 Гарантії:
 - записувачі журналу серіалізовані: journal_writer() бере pg_advisory_xact_lock ДО видачі seq і тримає до commit,
   тож порядок seq = порядок commit (на SQLite запис і так серіалізований);
@@ -44,7 +47,8 @@ EXCLUDED_FOLDERS = ("trash", "spam", "draft")
 IRRELEVANT_FIELDS = frozenset({"is_read", "is_starred", "ai_summary", "ai_reply_draft", "ai_translated",
                                "ai_translate_to", "imap_uid", "imap_folder_name"})
 _INSTANCE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
-_DOC_ID_RE = re.compile(r"^email:([1-9][0-9]{0,18})$")
+DOC_TYPES = ("email", "document")      # document — файли й посилання (knowledge_items.py)
+_DOC_ID_RE = re.compile(r"^(email|document):([1-9][0-9]{0,18})$")
 
 
 class KnowledgeError(Exception):
@@ -83,6 +87,9 @@ class Scope:
     attachment_types: set
     attachment_max: int
     generation: str
+    auto_offers: bool = False
+    auto_order_files: bool = False
+    auto_datasheets: bool = False
 
 
 def get_scope():
@@ -98,6 +105,7 @@ def get_scope():
         attachment_types={t.strip().lower().lstrip(".") for t in (s.attachment_types or []) if t.strip()},
         attachment_max=int(s.attachment_max_mb or 0) * 1024 * 1024,
         generation=str(s.generation),
+        auto_offers=s.auto_offers, auto_order_files=s.auto_order_files, auto_datasheets=s.auto_datasheets,
     )
 
 
@@ -302,6 +310,61 @@ def render_document(msg, content, doc, generation) -> dict:
     return out
 
 
+class _EmailHandler:
+    """Тип email: те, що вище (листи), в інтерфейсі обробника типу — як knowledge_items.Handler для document."""
+    doc_type = DOC_TYPE
+
+    def load(self, pks):
+        return {m.pk: m for m in _messages_qs().filter(pk__in=pks)}
+
+    def admitted(self, scope):
+        return scope_qs(scope).select_related("account", "thread", "thread__crm_customer")
+
+    def extras(self, msgs):
+        return _batch_extras(msgs)
+
+    def reason(self, msg, scope, extra=None):
+        return scope_reason(msg, scope)
+
+    def content(self, msg, scope, own, extra):
+        return build_content(msg, scope, own, extra)
+
+    def render(self, msg, content, doc, generation):
+        return render_document(msg, content, doc, generation)
+
+    def attachment_path(self, msg, index):
+        atts = list(msg.attachments or [])
+        return _attachment_path(atts[index]) if 0 <= index < len(atts) else ""
+
+    def reset_hash(self, msg, index):
+        from email_assistant.models import EmailMessage
+        raw = copy.deepcopy(list(msg.attachments or []))   # файл змінився: скинути кеш хешу → нова ревізія
+        raw[index].pop("sha256", None)
+        EmailMessage.objects.filter(pk=msg.pk).update(attachments=raw)
+        msg.attachments = raw
+
+
+EMAIL = _EmailHandler()
+
+
+def handler(doc_type):
+    if doc_type == DOC_TYPE:
+        return EMAIL
+    from .knowledge_items import HANDLER
+    return HANDLER
+
+
+def parse_types(value, default=(DOC_TYPE,)) -> tuple:
+    """?types=email,document → ('email', 'document'); порожньо — лише email (старий RAG)."""
+    if value is None or value == "" or value == []:
+        return tuple(default)
+    items = value if isinstance(value, (list, tuple)) else str(value).split(",")
+    items = [str(t).strip() for t in items if str(t).strip()]
+    if not items or any(t not in DOC_TYPES for t in items) or len(set(items)) != len(items):
+        raise KnowledgeError("invalid_request", 400, "types: email та/або document без повторів.")
+    return tuple(t for t in DOC_TYPES if t in items)
+
+
 # ── Записувачі журналу ───────────────────────────────────────────────────────
 
 @contextmanager
@@ -320,40 +383,42 @@ def _tombstone(doc, now):
     doc.save()
 
 
-def _sync_batch(messages, scope, own, missing_ids=()) -> int:
-    """Під блокуванням порівняти поточний стан листів із KnowledgeDoc і записати події. Повертає кількість подій."""
+def _sync_batch(messages, scope, own, missing_ids=(), doc_type=DOC_TYPE) -> int:
+    """Під блокуванням порівняти поточний стан об'єктів типу doc_type (листів, документів) із KnowledgeDoc
+    і записати події. Повертає кількість подій."""
     from .models import KnowledgeChange, KnowledgeDoc
+    h = handler(doc_type)
     messages = list(messages)
     ids = [m.pk for m in messages] + list(missing_ids)
     if not ids:
         return 0
-    extras = _batch_extras(messages)
+    extras = h.extras(messages)
     now = timezone.now()
     with journal_writer():
-        docs = {d.obj_id: d for d in KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, obj_id__in=ids)}
+        docs = {d.obj_id: d for d in KnowledgeDoc.objects.filter(doc_type=doc_type, obj_id__in=ids)}
         events = []
         for m in messages:
             doc = docs.get(m.pk)
-            reason = scope_reason(m, scope)
+            reason = h.reason(m, scope, extras[m.pk])
             was_fed = doc is not None and doc.fed
             if not reason and (was_fed or scope.enabled):
-                cv = content_version(build_content(m, scope, own, extras[m.pk]))
+                cv = content_version(h.content(m, scope, own, extras[m.pk]))
                 if was_fed and doc.feed_version == cv:
                     continue
-                doc = doc or KnowledgeDoc(doc_type=DOC_TYPE, obj_id=m.pk)
+                doc = doc or KnowledgeDoc(doc_type=doc_type, obj_id=m.pk)
                 doc.revision += 1
                 doc.fed, doc.feed_version, doc.fed_at = True, cv, now
                 doc.save()
-                events.append(KnowledgeChange(doc_type=DOC_TYPE, obj_id=m.pk, action=KnowledgeChange.UPSERT))
+                events.append(KnowledgeChange(doc_type=doc_type, obj_id=m.pk, action=KnowledgeChange.UPSERT))
             elif was_fed:
                 _tombstone(doc, now)
-                events.append(KnowledgeChange(doc_type=DOC_TYPE, obj_id=m.pk, action=KnowledgeChange.DELETE,
+                events.append(KnowledgeChange(doc_type=doc_type, obj_id=m.pk, action=KnowledgeChange.DELETE,
                                               reason=reason or "out_of_scope"))
         for pk in missing_ids:
             doc = docs.get(pk)
             if doc is not None and doc.fed:
                 _tombstone(doc, now)
-                events.append(KnowledgeChange(doc_type=DOC_TYPE, obj_id=pk, action=KnowledgeChange.DELETE,
+                events.append(KnowledgeChange(doc_type=doc_type, obj_id=pk, action=KnowledgeChange.DELETE,
                                               reason="deleted"))
         for e in events:      # по одному: seq видається під блокуванням у порядку подій
             e.save()
@@ -372,6 +437,22 @@ def touch_messages(pks) -> int:
         return 0
     msgs = list(_messages_qs().filter(pk__in=pks))
     return _sync_batch(msgs, scope, own_addresses(), set(pks) - {m.pk for m in msgs})
+
+
+def touch_docs(doc_type, pks) -> int:
+    """touch_messages для будь-якого типу (документи — knowledge_items.touch)."""
+    from email_assistant.crm_link import own_addresses
+    from .models import KnowledgeDoc
+    if doc_type == DOC_TYPE:
+        return touch_messages(pks)
+    pks = sorted({int(p) for p in pks if p})
+    if not pks:
+        return 0
+    scope = get_scope()
+    if not scope.enabled and not KnowledgeDoc.objects.filter(doc_type=doc_type, obj_id__in=pks, fed=True).exists():
+        return 0
+    objs = handler(doc_type).load(pks)
+    return _sync_batch(list(objs.values()), scope, own_addresses(), set(pks) - set(objs), doc_type=doc_type)
 
 
 def touch_thread(thread_id) -> int:
@@ -420,23 +501,25 @@ def refresh_all(batch=300) -> dict:
     from email_assistant.crm_link import own_addresses
     from .models import KnowledgeDoc, KnowledgeSettings
     scope, own = get_scope(), own_addresses()
-    seen, events = set(), 0
-    if scope.enabled:
-        last = 0
-        base = scope_qs(scope).select_related("account", "thread", "thread__crm_customer").order_by("pk")
-        while True:
-            chunk = list(base.filter(pk__gt=last)[:batch])
-            if not chunk:
-                break
-            events += _sync_batch(chunk, scope, own)
-            seen.update(m.pk for m in chunk)
-            last = chunk[-1].pk
-    rest = [i for i in KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, fed=True).values_list("obj_id", flat=True)
-            if i not in seen]
-    for i in range(0, len(rest), batch):
-        part = rest[i:i + batch]
-        msgs = list(_messages_qs().filter(pk__in=part))
-        events += _sync_batch(msgs, scope, own, set(part) - {m.pk for m in msgs})
+    events = 0
+    for doc_type in DOC_TYPES:
+        h, seen = handler(doc_type), set()
+        if scope.enabled:
+            last = 0
+            base = h.admitted(scope).order_by("pk")
+            while True:
+                chunk = list(base.filter(pk__gt=last)[:batch])
+                if not chunk:
+                    break
+                events += _sync_batch(chunk, scope, own, doc_type=doc_type)
+                seen.update(m.pk for m in chunk)
+                last = chunk[-1].pk
+        rest = [i for i in KnowledgeDoc.objects.filter(doc_type=doc_type, fed=True).values_list("obj_id", flat=True)
+                if i not in seen]
+        for i in range(0, len(rest), batch):
+            part = rest[i:i + batch]
+            objs = h.load(part)
+            events += _sync_batch(list(objs.values()), scope, own, set(part) - set(objs), doc_type=doc_type)
     pruned = prune()
     cleanup_snapshots()
     result = f"{timezone.localtime():%d.%m.%Y %H:%M}: подій {events}, очищено журналу до seq {pruned or '—'}"
@@ -499,9 +582,9 @@ def clear_index() -> int:
     now, n = timezone.now(), 0
     with journal_writer():
         KnowledgeSettings.objects.filter(pk=1).update(enabled=False)
-        for doc in KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, fed=True).order_by("obj_id"):
+        for doc in KnowledgeDoc.objects.filter(fed=True).order_by("doc_type", "obj_id"):
             _tombstone(doc, now)
-            KnowledgeChange.objects.create(doc_type=DOC_TYPE, obj_id=doc.obj_id, action=KnowledgeChange.DELETE,
+            KnowledgeChange.objects.create(doc_type=doc.doc_type, obj_id=doc.obj_id, action=KnowledgeChange.DELETE,
                                            reason="index_cleared")
             n += 1
     return n
@@ -520,41 +603,46 @@ def new_generation() -> str:
 
 # ── Читання для RAG ──────────────────────────────────────────────────────────
 
-def parse_document_id(document_id) -> int:
+def parse_document_id(document_id) -> tuple:
+    """«email:12» / «document:3» → (тип, pk)."""
     m = _DOC_ID_RE.match(document_id or "")
     if not m:
-        raise KnowledgeError("invalid_request", 400, "Некоректний document_id (очікується email:<pk>).")
-    return int(m.group(1))
+        raise KnowledgeError("invalid_request", 400, "Некоректний document_id (очікується email:<pk> або document:<pk>).")
+    return m.group(1), int(m.group(2))
 
 
-def _current(pks, scope, own):
-    """{pk: (msg|None, doc|None, content|None)} — з самовиправленням розбіжностей (нова ревізія під блокуванням)."""
+def _current(pks, scope, own, doc_type=DOC_TYPE):
+    """{pk: (об'єкт|None, doc|None, content|None)} — з самовиправленням розбіжностей (нова ревізія під блокуванням)."""
     from .models import KnowledgeDoc
-    msgs = {m.pk: m for m in _messages_qs().filter(pk__in=pks)}
-    docs = {d.obj_id: d for d in KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, obj_id__in=pks)}
-    extras = _batch_extras(msgs.values())
+    h = handler(doc_type)
+    msgs = h.load(pks)
+    docs = {d.obj_id: d for d in KnowledgeDoc.objects.filter(doc_type=doc_type, obj_id__in=pks)}
+    extras = h.extras(list(msgs.values()))
     contents, drift = {}, []
     for pk in pks:
         doc, msg = docs.get(pk), msgs.get(pk)
         if doc is None or not doc.fed:
             continue
-        if msg is None or scope_reason(msg, scope):
+        if msg is None or h.reason(msg, scope, extras[pk]):
             drift.append(pk)
             continue
-        contents[pk] = build_content(msg, scope, own, extras[pk])
+        contents[pk] = h.content(msg, scope, own, extras[pk])
         if content_version(contents[pk]) != doc.feed_version:
             drift.append(pk)
     if drift:
-        _sync_batch([msgs[p] for p in drift if p in msgs], scope, own, {p for p in drift if p not in msgs})
-        docs = {d.obj_id: d for d in KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, obj_id__in=pks)}
-        msgs = {m.pk: m for m in _messages_qs().filter(pk__in=pks)}
+        _sync_batch([msgs[p] for p in drift if p in msgs], scope, own, {p for p in drift if p not in msgs},
+                    doc_type=doc_type)
+        docs = {d.obj_id: d for d in KnowledgeDoc.objects.filter(doc_type=doc_type, obj_id__in=pks)}
+        msgs = h.load(pks)
         for p in drift:
             if p in msgs and docs[p].fed:
-                contents[p] = build_content(msgs[p], scope, own, _batch_extras([msgs[p]])[p])
+                contents[p] = h.content(msgs[p], scope, own, h.extras([msgs[p]])[p])
     return {pk: (msgs.get(pk), docs.get(pk), contents.get(pk)) for pk in pks}
 
 
-def read_changes(after=0, limit=50, generation=None) -> dict:
+def read_changes(after=0, limit=50, generation=None, types=(DOC_TYPE,)) -> dict:
+    """Сторінка журналу. Події типів поза types пропускаються (курсор однаково йде далі): старий RAG без
+    ?types=…,document документів не бачить; новий, коли вперше просить document, робить повну звірку (snapshot)."""
     from email_assistant.crm_link import own_addresses
     from .models import KnowledgeChange, KnowledgeSettings
     s = KnowledgeSettings.get()
@@ -572,22 +660,27 @@ def read_changes(after=0, limit=50, generation=None) -> dict:
     rows = list(KnowledgeChange.objects.filter(id__gt=after).order_by("id")[:limit])
     latest = {}
     for r in rows:
-        latest[(r.doc_type, r.obj_id)] = r
+        if r.doc_type in types:
+            latest[(r.doc_type, r.obj_id)] = r
     ordered = sorted(latest.values(), key=lambda r: r.id)
-    scope = get_scope()
-    state = _current([r.obj_id for r in ordered], scope, own_addresses())
+    scope, own = get_scope(), own_addresses()
+    state = {}
+    for t in {r.doc_type for r in ordered}:
+        part = _current([r.obj_id for r in ordered if r.doc_type == t], scope, own, doc_type=t)
+        state.update({(t, pk): v for pk, v in part.items()})
     items = []
     for r in ordered:
-        msg, doc, content = state[r.obj_id]
+        msg, doc, content = state[(r.doc_type, r.obj_id)]
         item = {"seq": r.id, "document_id": r.document_id, "document_type": r.doc_type,
                 "changed_at": _iso(r.created_at), "document_revision": max(doc.revision if doc else 1, 1)}
         if doc is not None and doc.fed and msg is not None and content is not None:
             item["action"] = "upsert"
-            item["document"] = render_document(msg, content, doc, gen)
+            item["document"] = handler(r.doc_type).render(msg, content, doc, gen)
         else:
             item["action"] = "delete"
             item["reason"] = (r.reason if r.action == KnowledgeChange.DELETE and r.reason
-                              else ("deleted" if msg is None else scope_reason(msg, scope) or "index_cleared"))
+                              else ("deleted" if msg is None else handler(r.doc_type).reason(msg, scope)
+                                    or "index_cleared"))
         items.append(item)
     next_after = rows[-1].id if rows else after
     last_seq = max(KnowledgeChange.objects.aggregate(m=Max("id"))["m"] or 0, s.pruned_seq, next_after)
@@ -599,36 +692,34 @@ def read_changes(after=0, limit=50, generation=None) -> dict:
 
 
 def get_document(document_id):
-    """(msg, doc, документ) або KnowledgeError document_not_found."""
+    """(об'єкт, doc, документ) або KnowledgeError document_not_found."""
     from email_assistant.crm_link import own_addresses
     from .models import KnowledgeSettings
-    pk = parse_document_id(document_id)
-    msg, doc, content = _current([pk], get_scope(), own_addresses())[pk]
+    doc_type, pk = parse_document_id(document_id)
+    msg, doc, content = _current([pk], get_scope(), own_addresses(), doc_type=doc_type)[pk]
     if doc is None or not doc.fed or msg is None or content is None:
         raise KnowledgeError("document_not_found", 404, "Документ не підлягає індексації.")
-    return msg, doc, render_document(msg, content, doc, str(KnowledgeSettings.get().generation))
+    return msg, doc, handler(doc_type).render(msg, content, doc, str(KnowledgeSettings.get().generation))
 
 
 def attachment_bytes(document_id, index, revision):
     """(байти, вкладення документа) з перевіркою ревізії й хешу."""
-    from email_assistant.models import EmailMessage
     msg, doc, document = get_document(document_id)
+    doc_type = document["document_type"]
     if revision != doc.revision:
         raise KnowledgeError("revision_mismatch", 412, "Документ змінився — перечитайте його.", retryable=True,
                              details={"current_revision": doc.revision})
     att = next((a for a in document["attachments"] if a["index"] == index), None)
     if att is None or not att["indexable"]:
         raise KnowledgeError("attachment_not_found", 404, "Вкладення недоступне для індексації.")
-    path = _attachment_path((msg.attachments or [])[index])
+    path = handler(doc_type).attachment_path(msg, index)
     data = None
     if path:
         with open(path, "rb") as fh:
             data = fh.read()
     if data is None or "sha256:" + hashlib.sha256(data).hexdigest() != att["content_hash"]:
-        raw = copy.deepcopy(list(msg.attachments or []))   # файл змінився: скинути кеш хешу → нова ревізія
-        raw[index].pop("sha256", None)
-        EmailMessage.objects.filter(pk=msg.pk).update(attachments=raw)
-        touch_messages([msg.pk])
+        handler(doc_type).reset_hash(msg, index)     # файл змінився: скинути кеш хешу → нова ревізія
+        touch_docs(doc_type, [msg.pk])
         raise KnowledgeError("revision_mismatch", 412, "Вкладення змінилось — перечитайте документ.", retryable=True,
                              details={"current_revision": max(doc.revision + 1, 1)})
     return data, att
@@ -641,7 +732,7 @@ def cleanup_snapshots():
     KnowledgeSnapshot.objects.filter(expires_at__lt=timezone.now()).delete()
 
 
-def create_snapshot() -> dict:
+def create_snapshot(types=(DOC_TYPE,)) -> dict:
     from .models import KnowledgeChange, KnowledgeDoc, KnowledgeSettings, KnowledgeSnapshot, KnowledgeSnapshotItem
     cleanup_snapshots()
     s = KnowledgeSettings.get()
@@ -651,14 +742,14 @@ def create_snapshot() -> dict:
             with connection.cursor() as cur:   # один MVCC-знімок для snapshot_seq і складу
                 cur.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
         snapshot_seq = max(KnowledgeChange.objects.aggregate(m=Max("id"))["m"] or 0, s.pruned_seq)
-        docs = list(KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, fed=True).order_by("obj_id")
-                    .values_list("obj_id", "revision", "feed_version"))
+        docs = list(KnowledgeDoc.objects.filter(doc_type__in=types, fed=True).order_by("doc_type", "obj_id")
+                    .values_list("doc_type", "obj_id", "revision", "feed_version"))
         now = timezone.now()
         snap = KnowledgeSnapshot.objects.create(snapshot_seq=snapshot_seq, generation=s.generation,
                                                 total=len(docs), expires_at=now + SNAPSHOT_TTL)
         KnowledgeSnapshotItem.objects.bulk_create(
-            [KnowledgeSnapshotItem(snapshot=snap, position=i + 1, doc_type=DOC_TYPE, obj_id=o, revision=r,
-                                   content_version=v) for i, (o, r, v) in enumerate(docs)], batch_size=2000)
+            [KnowledgeSnapshotItem(snapshot=snap, position=i + 1, doc_type=t, obj_id=o, revision=r,
+                                   content_version=v) for i, (t, o, r, v) in enumerate(docs)], batch_size=2000)
     return {"contract_version": CONTRACT_VERSION, "snapshot_id": str(snap.pk), "snapshot_seq": snapshot_seq,
             "source_instance_id": instance_id(), "generation": str(snap.generation),
             "created_at": _iso(snap.created_at), "expires_at": _iso(snap.expires_at), "total": snap.total}
@@ -706,7 +797,7 @@ def apply_status(payload, request_id) -> dict:
             res = {"document_id": item["document_id"], "document_revision": item["document_revision"],
                    "attempt_id": item["attempt_id"]}
             m = _DOC_ID_RE.match(item["document_id"])
-            doc = KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, obj_id=int(m.group(1))).first() if m else None
+            doc = KnowledgeDoc.objects.filter(doc_type=m.group(1), obj_id=int(m.group(2))).first() if m else None
             if not same_source:
                 res["result"] = "instance_mismatch"
             elif doc is None or doc.revision == 0:
@@ -771,10 +862,10 @@ def validate_status_payload(payload):
             bad(f"items[{i}].error обов'язковий для failed.")
 
 
-def _unconfirmed_tombstones():
+def _unconfirmed_tombstones(types=DOC_TYPES):
     from django.db.models import F
     from .models import KnowledgeDoc
-    return (KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, fed=False, revision__gt=0)
+    return (KnowledgeDoc.objects.filter(doc_type__in=types, fed=False, revision__gt=0)
             .exclude(status_revision=F("revision"), state=KnowledgeDoc.DELETED))
 
 
@@ -794,13 +885,15 @@ def settle_tombstones(after) -> int:
                 .order_by("-snapshot_seq", "-created_at").first())
         if snap is None:
             return 0
-        later = KnowledgeChange.objects.filter(doc_type=DOC_TYPE, id__gt=snap.snapshot_seq).values("obj_id")
-        if not _unconfirmed_tombstones().exclude(obj_id__in=later).exists():
-            return 0
-        with journal_writer():      # разом із записувачами: tombstone не зміниться посеред оновлення
-            n = (_unconfirmed_tombstones().exclude(obj_id__in=later)
-                 .update(state=KnowledgeDoc.DELETED, status_revision=F("revision"), chunks=0, error="",
-                         last_status_at=timezone.now()))
+        n = 0
+        for doc_type in DOC_TYPES:      # той самий тип: obj_id різних типів не перетинаються
+            later = KnowledgeChange.objects.filter(doc_type=doc_type, id__gt=snap.snapshot_seq).values("obj_id")
+            if not _unconfirmed_tombstones((doc_type,)).exclude(obj_id__in=later).exists():
+                continue
+            with journal_writer():      # разом із записувачами: tombstone не зміниться посеред оновлення
+                n += (_unconfirmed_tombstones((doc_type,)).exclude(obj_id__in=later)
+                      .update(state=KnowledgeDoc.DELETED, status_revision=F("revision"), chunks=0, error="",
+                              last_status_at=timezone.now()))
         if n:
             logger.info("knowledge: %s tombstone(s) before snapshot seq %s settled without RAG report",
                         n, snap.snapshot_seq)
@@ -810,16 +903,16 @@ def settle_tombstones(after) -> int:
         return 0
 
 
-def summary() -> dict:
+def summary(types=(DOC_TYPE,)) -> dict:
     from .models import KnowledgeChange, KnowledgeDoc, KnowledgeSettings
     from django.db.models import F
     s = KnowledgeSettings.get()
-    docs = KnowledgeDoc.objects.filter(doc_type=DOC_TYPE)
+    docs = KnowledgeDoc.objects.filter(doc_type__in=types)
     fed = docs.filter(fed=True)
     current = fed.filter(status_revision=F("revision"))
     counts = {k: current.filter(state=k).count() for k in ("indexed", "failed", "skipped")}
     eligible = fed.count()
-    pending_delete = _unconfirmed_tombstones().count()
+    pending_delete = _unconfirmed_tombstones(types).count()
     last_status = docs.aggregate(m=Max("last_status_at"))["m"]
     return {
         "contract_version": CONTRACT_VERSION, "source_instance_id": instance_id(), "generation": str(s.generation),
@@ -846,7 +939,7 @@ def set_feed_paused(paused: bool):
     KnowledgeSettings.objects.filter(pk=1).update(feed_paused=paused, feed_paused_at=timezone.now() if paused else None)
 
 
-def note_activity(call, *, snapshot_total=None, document=False, changes=False, reported=0):
+def note_activity(call, *, snapshot_total=None, document=False, changes=False, reported=0, types=None):
     """Звернення RAG до стрічки → етап і прогрес. Збій обліку ніколи не ламає відповідь API.
     Порядок роботи RAG: знімок (повна звірка) → документи знімка → лише потім стрічка змін."""
     from django.db.models import F
@@ -864,6 +957,8 @@ def note_activity(call, *, snapshot_total=None, document=False, changes=False, r
             fields.update(phase=KnowledgeActivity.CHANGES, phase_started_at=now, reported=0)
         if reported:
             fields["reported"] = F("reported") + reported
+        if types is not None and changes:
+            fields["rag_types"] = list(types)
         KnowledgeActivity.objects.filter(pk=1).update(**fields)
     except Exception as e:  # noqa: BLE001
         logger.warning("knowledge activity not recorded: %s", e)

@@ -10,6 +10,8 @@
        product  — товар, параметри, склад по локаціях, очікується (закупівлі), продажі, Angebote;
    - mail — листи з ВЛАСНИХ скриньок користувача: проєкту / клієнта / з номером замовлення чи трек-номером /
      з артикулом (останній лист кожної гілки, без процитованої історії);
+   - document — файли й посилання, прив'язані до картки (knowledge_items: «📥 Додати», етап 3 — автоматичні),
+     текст Minerva бере сама (без RAG);
    - rag — база знань (reply_brief.rag_sources: без дублів, фрагменти одного листа — одне джерело):
      клієнт — лише його листування; проєкт — листування клієнта поза гілками проєкту (без клієнта — уся пошта);
      замовлення й товар — уся пошта користувача.
@@ -46,6 +48,7 @@ QUERY_STANDARD_WITH_WISH = 800
 
 STAGES = [
     ("minerva", "📋 Дані Minerva"),
+    ("documents", "📎 Документи й посилання картки"),
     ("mail", "✉️ Листи у ваших скриньках"),
     ("rag", "🔎 RAG: база знань"),
     ("answer", "❓ Відповідь на запитання (AI)"),
@@ -462,7 +465,21 @@ def _mail(src, user, kind, obj) -> tuple:
 
 # ── RAG ──────────────────────────────────────────────────────────────────────
 
-def _rag(src, user, kind, obj, question, seen, threads, dedup) -> tuple:
+def _documents(src, user, kind, obj) -> tuple:
+    """Файли й посилання, прив'язані до картки (knowledge_items), які бачить користувач — текст бере Minerva сама,
+    без RAG. → (document_id для пропуску в RAG, деталь етапу)."""
+    from . import knowledge_items
+    ids = []
+    for item in knowledge_items.items_for(user, kind, obj)[:DOCUMENTS]:
+        text = knowledge_items.local_text(item)
+        src.add("document", f"{item.get_kind_display()} «{item.title}»"
+                + (f" · {item.file_name}" if item.file_name else "") + (f" · {item.url}" if item.url else ""),
+                text or "(тексту ще немає — лише назва)", f"/rag/knowledge/{item.pk}/")
+        ids.append(item.document_id)
+    return ids, (f"документів {len(ids)}" if ids else "не додано")
+
+
+def _rag(src, user, kind, obj, question, seen, threads, dedup, seen_documents=()) -> tuple:
     """→ (status, detail, note). Фільтр клієнта — лише для клієнта (і проєкту з клієнтом); решта — уся пошта."""
     try:
         from rag_assistant import retrieval
@@ -475,13 +492,14 @@ def _rag(src, user, kind, obj, question, seen, threads, dedup) -> tuple:
     scope = (f"клієнта {obj.company or obj.name}" if kind == "customer"
              else f"клієнта проєкту" if customer_id else "усій вашій пошті")
     return rag_sources(src, user, build_query(kind, obj, question), scope=scope, seen=seen, dedup=dedup,
-                       customer_id=customer_id, exclude_thread_ids=threads, purpose="entity")
+                       customer_id=customer_id, exclude_thread_ids=threads, purpose="entity",
+                       seen_documents=set(seen_documents))
 
 
 # ── Запуск ───────────────────────────────────────────────────────────────────
 
 def _stages(mode) -> list:
-    keys = ["minerva", "mail", "rag", mode]
+    keys = ["minerva", "documents", "mail", "rag", mode]
     return [{"key": k, "label": label, "status": "pending", "detail": ""} for k, label in STAGES if k in keys]
 
 
@@ -514,16 +532,19 @@ def _run(pk):
         src, detail = minerva_sources(h.kind, obj)
         h.fingerprint = fingerprint(src)
         set_stage("minerva", "done", " · ".join(detail))
+        set_stage("documents", "running")
+        doc_ids, detail = _documents(src, h.user, h.kind, obj)
+        set_stage("documents", "done" if doc_ids else "skipped", detail)
         set_stage("mail", "running")
         pks, threads, detail = _mail(src, h.user, h.kind, obj)
         set_stage("mail", "done" if pks else "skipped", detail)
         set_stage("rag", "running")
         dedup = {}
-        status, detail, note = _rag(src, h.user, h.kind, obj, h.question, set(pks), threads, dedup)
+        status, detail, note = _rag(src, h.user, h.kind, obj, h.question, set(pks), threads, dedup, doc_ids)
         set_stage("rag", status, detail)
         h.sources = src.public()
         h.used = [f"даних Minerva {sum(1 for i in src.items if i['kind'] in ('minerva', 'offer', 'overview'))}",
-                  f"листів {len(pks)}"] + ([note] if note else [])
+                  f"листів {len(pks)}"] + ([f"документів {len(doc_ids)}"] if doc_ids else []) + ([note] if note else [])
         h.save(update_fields=["sources", "used", "fingerprint", "updated_at"])
         set_stage(h.mode, "running")
         if h.mode == EntityHelp.MODE_REVIEW:

@@ -49,6 +49,10 @@ def _document_semantics(doc, where="document") -> list:
     kind, _, pk = doc["document_id"].partition(":")
     if kind != doc["document_type"]:
         errs.append(f"{where}: document_id не відповідає document_type")
+    if kind == "document":
+        if doc["url"] != f"/rag/knowledge/{pk}/":
+            errs.append(f"{where}: url документа не відповідає document_id")
+        return errs + _attachment_semantics(doc, where)
     if doc["url"] != f"/email/message/{pk}/":
         errs.append(f"{where}: url листа не відповідає document_id")
     if doc["text_new_mode"] == "full":
@@ -58,6 +62,14 @@ def _document_semantics(doc, where="document") -> list:
             errs.append(f"{where}: text_new_truncated не відповідає довжині тексту")
     elif doc["text_new_mode"] == "reply_trimmed":
         errs.append(f"{where}: reply_trimmed зарезервовано, у v1 не використовується")
+    errs += _attachment_semantics(doc, where)
+    if doc["mailbox"]["id"] != doc["access"]["mailbox_id"]:
+        errs.append(f"{where}: access.mailbox_id ≠ mailbox.id")
+    return errs
+
+
+def _attachment_semantics(doc, where) -> list:
+    errs = []
     indexes = [a["index"] for a in doc["attachments"]]
     if len(set(indexes)) != len(indexes):
         errs.append(f"{where}: індекси вкладень повторюються")
@@ -67,8 +79,6 @@ def _document_semantics(doc, where="document") -> list:
                        f"?revision={doc['document_revision']}"
             if a["url"] != expected:
                 errs.append(f"{where}: url вкладення {a['index']} не прив'язаний до документа/ревізії")
-    if doc["mailbox"]["id"] != doc["access"]["mailbox_id"]:
-        errs.append(f"{where}: access.mailbox_id ≠ mailbox.id")
     return errs
 
 
@@ -84,12 +94,12 @@ def semantic_errors(name, data) -> list:
         ids = [i["document_id"] for i in items]
         if len(set(ids)) != len(ids):
             errs.append("document_id повторюється на одній сторінці")
-        if items and data["next_after"] != seqs[-1]:
-            errs.append("next_after ≠ seq останньої події сторінки")
+        # Події типів, яких клієнт не просив (?types=), пропускаються, але курсор іде далі: next_after може бути
+        # більшим за seq останньої показаної події, а сторінка — порожньою з has_more.
+        if items and data["next_after"] < seqs[-1]:
+            errs.append("next_after < seq останньої події сторінки")
         if data["next_after"] > data["last_seq"]:
             errs.append("next_after > last_seq")
-        if data["has_more"] and not items:
-            errs.append("has_more без подій")
         for i in items:
             if i["action"] != "upsert":
                 continue

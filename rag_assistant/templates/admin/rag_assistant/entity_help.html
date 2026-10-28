@@ -31,6 +31,14 @@ eh_review=False — лише «❓ Запитати» (проєкт: огляд 
   .ehw-src { margin: 3px 0 3px 10px; font-size: 12px; }
   .ehw-src pre { white-space: pre-wrap; font-family: inherit; font-size: 12px; margin: 3px 0 6px; max-height: 240px; overflow: auto;
                  background: var(--body-bg, transparent); border-left: 2px solid var(--hairline-color, #ddd); padding: 4px 8px; }
+  .ehw-docs { border-top: 1px dashed var(--hairline-color, #ddd); padding-top: 6px; }
+  .ehw-docs > summary { font-size: 13px !important; color: var(--text, inherit) !important; }
+  .ehw-doc { padding: 4px 0; border-bottom: 1px solid var(--hairline-color, #eee); }
+  .ehw-doc button { font-size: 11px; padding: 1px 6px; margin-left: 4px; cursor: pointer; }
+  .ehw-add { margin-top: 8px; }
+  .ehw-add-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0; }
+  .ehw-add-row input[type=url], .ehw-add-row input[type=text] { flex: 1 1 240px; min-width: 0; }
+  .ehw-warn { color: var(--error-fg, #ba2121); font-size: 12px; }
 </style>
   <summary>
     <b>{% if eh_review %}🧭 Огляд і ❓ запитання{% else %}❓ Запитати про проєкт{% endif %}</b>
@@ -46,6 +54,29 @@ eh_review=False — лише «❓ Запитати» (проєкт: огляд 
   </div>
   <div class="ehw-out ehw-out-answer"></div>
   <div class="ehw-out ehw-out-review"></div>
+  <details class="ehw-docs">
+    <summary>📎 Документи й посилання <span class="ehw-docs-n"></span> · 📥 Додати</summary>
+    <div class="ehw-docs-list"></div>
+    <div class="ehw-add">
+      <div class="ehw-add-row">
+        <input type="file" class="ehw-file" accept=".pdf,.docx,.txt,.csv">
+        <span class="ehw-sub">або</span>
+        <input type="url" class="ehw-url" placeholder="https://… посилання на сторінку або PDF">
+      </div>
+      <div class="ehw-add-row">
+        <input type="text" class="ehw-title" maxlength="300" placeholder="Назва (необов'язково)">
+        <input type="text" class="ehw-note" maxlength="2000" placeholder="Що в ньому важливого (необов'язково, теж шукається)">
+      </div>
+      <div class="ehw-add-row">
+        <label class="ehw-sub"><input type="checkbox" class="ehw-private"> 🔒 лише я</label>
+        <button type="button" class="button ehw-add-btn">📥 Додати в базу знань</button>
+        <span class="ehw-sub ehw-add-st"></span>
+      </div>
+      <div class="ehw-sub">Файл (PDF, DOCX, TXT, CSV — текст витягує RAG; до 25 МБ) або посилання (сторінку Minerva забирає
+        сама, «🔄» — оновити). Документ прив'язується до цієї картки, його бачать усі, хто має доступ до неї, або лише ви (🔒).
+        «❓ Запитати» й огляд одразу беруть його в джерела.</div>
+    </div>
+  </details>
 <script>
 (function () {
   var root = document.getElementById('ehw-{{ eh_kind }}-{{ eh_id }}');
@@ -170,6 +201,76 @@ eh_review=False — лише «❓ Запитати» (проєкт: огляд 
         if (last) last.textContent += ' · ' + labels[mode] + ' ' + b.gathered + (b.stale ? ' (дані змінились)' : '');
       }).catch(function () {});
   });
+
+  // 📎 Документи й посилання картки → база знань (knowledge_items.py)
+  var docs = root.querySelector('.ehw-docs'), list = root.querySelector('.ehw-docs-list');
+  var icons = {upload: '📄', link: '🔗', offer: '📝', order_file: '📦', datasheet: '📑'};
+  function renderDocs(items) {
+    root.querySelector('.ehw-docs-n').textContent = items.length ? '(' + items.length + ')' : '';
+    list.innerHTML = items.length ? items.map(function (d) {
+      var meta = [d.file_name ? d.file_name + (d.size_kb ? ' · ' + d.size_kb + ' КБ' : '') : '', d.created, d.owner,
+                  d.private ? '🔒 лише ви' : ''].filter(Boolean).join(' · ');
+      var btns = d.can_change ? ((d.url ? '<button type="button" data-act="refresh" data-id="' + d.id + '" title="Забрати сторінку ще раз">🔄</button>' : '')
+        + '<button type="button" data-act="visibility" data-id="' + d.id + '" title="' + (d.private ? 'Показати всім, хто бачить картку' : 'Лише я') + '">'
+        + (d.private ? '👥' : '🔒') + '</button>'
+        + '<button type="button" data-act="delete" data-id="' + d.id + '" title="Видалити з бази знань">✕</button>') : '';
+      return '<div class="ehw-doc">' + (icons[d.kind] || '📄') + ' <a href="' + esc(d.open) + '" target="_blank">' + esc(d.title) + '</a>'
+        + ' <span class="ehw-sub">· ' + esc(meta) + ' · ' + esc(d.rag) + '</span>' + btns
+        + (d.fetch_error ? '<div class="ehw-warn">⚠️ ' + esc(d.fetch_error) + '</div>' : '')
+        + (d.note ? '<div class="ehw-sub">' + esc(d.note) + '</div>' : '') + '</div>';
+    }).join('') : '<div class="ehw-sub">Ще немає — додайте файл або посилання нижче.</div>';
+  }
+  function loadDocs(again) {
+    fetch(base + 'documents/', {credentials: 'same-origin'}).then(function (r) { return r.json(); })
+      .then(function (b) {
+        if (!b || b.ok === false) return;
+        renderDocs(b.items || []);
+        // сторінку за посиланням Minerva забирає у фоні — оновити стан, доки йде
+        if ((b.items || []).some(function (d) { return d.rag.indexOf('завантажує') >= 0; }) && (again || 0) < 10)
+          setTimeout(function () { loadDocs((again || 0) + 1); }, 2000);
+      }).catch(function () {});
+  }
+  docs.querySelectorAll('input').forEach(function (i) {
+    i.addEventListener('input', function (e) { e.stopPropagation(); });
+    i.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });   // не відправляти форму адмінки
+  });
+  root.querySelector('.ehw-add-btn').addEventListener('click', function () {
+    var file = root.querySelector('.ehw-file'), url = root.querySelector('.ehw-url'), st = root.querySelector('.ehw-add-st');
+    if (!file.files.length && !url.value.trim()) { st.textContent = 'Виберіть файл або вставте посилання'; return; }
+    var fd = new FormData();
+    if (file.files.length) fd.append('file', file.files[0]); else fd.append('url', url.value.trim());
+    fd.append('title', root.querySelector('.ehw-title').value);
+    fd.append('note', root.querySelector('.ehw-note').value);
+    if (root.querySelector('.ehw-private').checked) fd.append('private', '1');
+    this.disabled = true;
+    st.textContent = '⏳ Додаю…';
+    var btn = this;
+    fetch(base + 'documents/', {method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': csrf()}, body: fd})
+      .then(function (r) { return r.json().catch(function () { return {ok: false}; }); })
+      .then(function (b) {
+        btn.disabled = false;
+        if (!b || b.ok === false) { st.textContent = '⚠️ ' + ((b && b.error) || 'Не вдалося'); return; }
+        st.textContent = '✓ Додано';
+        file.value = ''; url.value = '';
+        root.querySelector('.ehw-title').value = ''; root.querySelector('.ehw-note').value = '';
+        renderDocs(b.items || []);
+        loadDocs();
+      }).catch(function () { btn.disabled = false; st.textContent = '⚠️ Немає зв\'язку з сервером'; });
+  });
+  list.addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-act]');
+    if (!b) return;
+    if (b.dataset.act === 'delete' && !confirm('Видалити документ з бази знань? RAG теж його прибере.')) return;
+    b.disabled = true;
+    fetch('/rag/api/knowledge/' + b.dataset.id + '/' + b.dataset.act + '/',
+          {method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': csrf()}})
+      .then(function (r) { return r.json().catch(function () { return {ok: false}; }); })
+      .then(function (x) {
+        if (x && x.ok === false) alert(x.error || 'Не вдалося');
+        loadDocs();
+      }).catch(function () { b.disabled = false; });
+  });
+  loadDocs();
 })();
 </script>
 </details>

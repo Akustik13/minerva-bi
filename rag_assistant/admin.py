@@ -218,7 +218,8 @@ class KnowledgeSettingsForm(forms.ModelForm):
     class Meta:
         model = KnowledgeSettings
         fields = ["enabled", "accounts", "categories", "index_from", "include_attachments", "attachment_max_mb",
-                  "instance_id", "private_api_key", "private_verify_tls"]
+                  "instance_id", "private_api_key", "private_verify_tls", "auto_offers", "auto_order_files",
+                  "auto_datasheets"]
         widgets = {"accounts": forms.CheckboxSelectMultiple,
                    "instance_id": forms.TextInput(attrs={"size": 30, "placeholder": "sevskiy-prod"})}
 
@@ -274,7 +275,8 @@ class KnowledgeSettingsForm(forms.ModelForm):
 @admin.register(KnowledgeSettings)
 class KnowledgeSettingsAdmin(admin.ModelAdmin):
     form = KnowledgeSettingsForm
-    readonly_fields = ["live_panel", "status_panel", "connection_help", "key_status", "feed_keys", "search_status"]
+    readonly_fields = ["live_panel", "status_panel", "connection_help", "key_status", "feed_keys", "search_status",
+                       "documents_panel"]
     fieldsets = [
         ("Стан", {"fields": ["live_panel", "status_panel"]}),
         ("Що індексувати", {
@@ -282,6 +284,13 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
                        "attachment_types_text", "attachment_max_mb"],
             "description": "Minerva вирішує, які листи можна передати в RAG; RAG сам забирає зміни (pull) і звітує. "
                            "Вектори створюються локально на ПК RAG. Після збереження стрічка звіряється у фоні.",
+        }),
+        ("📎 Документи й посилання", {
+            "fields": ["documents_panel", "auto_offers", "auto_order_files", "auto_datasheets"],
+            "description": "Крім листів — файли й посилання, які додають у картках клієнта, проєкту, замовлення й товару "
+                           "(«📎 Документи й посилання»), а за галочками нижче — і документи, які Minerva додає сама. "
+                           "Передаються, лише коли ввімкнено «Індексувати пошту»; RAG отримує їх, коли сам уміє "
+                           "(оновлений RAG-ПК). Галочки — масова індексація: вмикайте по одній і дивіться на стан.",
         }),
         ("Підключення RAG", {"fields": ["connection_help", "instance_id", "rag_host", "rag_port", "rag_https",
                                         "private_verify_tls", "search_status"]}),
@@ -371,11 +380,31 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
         table = format_html_join("", "<tr><td style='padding:2px 12px 2px 0;color:var(--body-quiet-color)'>{}</td>"
                                      "<td style='padding:2px 0'><b>{}</b></td></tr>", rows)
         failed = (KnowledgeDoc.objects.filter(fed=True, state=KnowledgeDoc.FAILED).order_by("-last_status_at")[:10])
-        errors = format_html_join("", '<li><a href="/email/message/{}/" target="_blank">{}</a>: {}</li>',
-                                  ((f.obj_id, f.document_id, f.error) for f in failed if f.status_revision == f.revision))
+        errors = format_html_join("", '<li><a href="{}" target="_blank">{}</a>: {}</li>',
+                                  ((f"/rag/knowledge/{f.obj_id}/" if f.doc_type == "document" else f"/email/message/{f.obj_id}/",
+                                    f.document_id, f.error) for f in failed if f.status_revision == f.revision))
         return format_html('<table>{}</table>{}', table,
                            format_html('<div style="margin-top:8px"><b>Останні помилки RAG:</b><ul>{}</ul></div>', errors)
                            if errors else "")
+
+    @admin.display(description="Стан документів")
+    def documents_panel(self, obj):
+        """Файли й посилання (тип document): скільки в Minerva, чи RAG їх уже приймає, стан індексації."""
+        from . import retrieval
+        from .models import KnowledgeItem
+        d = knowledge.summary(types=("document",))["documents"]
+        total = KnowledgeItem.objects.count()
+        auto = KnowledgeItem.objects.filter(auto=True).count()
+        if retrieval.documents_supported():
+            rag = format_html("✅ RAG приймає документи · у індексі <b>{}</b>, чекають <b>{}</b>, помилки / пропущено {} / {}",
+                              d["indexed"], d["pending"], d["failed"], d["skipped"])
+        else:
+            rag = format_html('<b style="color:#e57373">RAG ще не приймає документи</b> — потрібне оновлення RAG-ПК '
+                              '(private_rag з підтримкою document). До того документи працюють лише в Minerva: '
+                              '«❓ Запитати» й огляди карток беруть їх напряму.')
+        return format_html('Документів і посилань: <b>{}</b> (автоматичних {}) · <a href="{}">📎 список</a><br>'
+                           'Передано в стрічку: <b>{}</b><br>{}', total, auto,
+                           reverse("admin:rag_assistant_knowledgeitem_changelist"), d["eligible"], rag)
 
     @admin.display(description="Приватний пошук (/v2)")
     def search_status(self, obj):
@@ -498,7 +527,7 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
 @admin.register(KnowledgeDoc)
 class KnowledgeDocAdmin(admin.ModelAdmin):
     list_display = ["document_id_col", "revision", "fed", "state_col", "chunks", "error", "last_status_at"]
-    list_filter = ["fed", "state"]
+    list_filter = ["doc_type", "fed", "state"]
     search_fields = ["obj_id", "error"]
     readonly_fields = [f.name for f in KnowledgeDoc._meta.fields]
 
@@ -510,8 +539,78 @@ class KnowledgeDocAdmin(admin.ModelAdmin):
 
     @admin.display(description="Документ")
     def document_id_col(self, obj):
-        return format_html('<a href="/email/message/{}/" target="_blank">{}</a>', obj.obj_id, obj.document_id)
+        url = f"/rag/knowledge/{obj.obj_id}/" if obj.doc_type == "document" else f"/email/message/{obj.obj_id}/"
+        return format_html('<a href="{}" target="_blank">{}</a>', url, obj.document_id)
 
     @admin.display(description="Стан чинної ревізії")
     def state_col(self, obj):
         return dict(KnowledgeDoc.STATES).get(obj.current_state, obj.current_state)
+
+
+from django.db.models import Q  # noqa: E402
+
+from . import knowledge_items  # noqa: E402
+from .models import KnowledgeItem  # noqa: E402
+
+
+@admin.register(KnowledgeItem)
+class KnowledgeItemAdmin(admin.ModelAdmin):
+    """Файли й посилання бази знань (тип document). Додавати зручніше в картці клієнта / проєкту / замовлення /
+    товару («📎 Документи й посилання»); тут — увесь список, пошук, зміна прив'язок і видимості."""
+    list_display = ["title", "kind", "links_col", "visibility", "owner", "rag_col", "created_at"]
+    list_filter = ["kind", "visibility", "auto"]
+    search_fields = ["title", "note", "url", "file_name", "source_key"]
+    raw_id_fields = ["customer", "project", "order", "product", "offer"]
+    readonly_fields = ["file_name", "file_size", "content_type", "fetched_at", "fetch_error", "owner", "auto",
+                       "source_key", "rag_col", "created_at", "updated_at"]
+    fieldsets = [
+        (None, {"fields": ["kind", "title", "note", "file", "url", "visibility"]}),
+        ("Прив'язки", {"fields": ["customer", "project", "order", "product", "offer"]}),
+        ("Стан", {"fields": ["rag_col", "file_name", "file_size", "content_type", "fetched_at", "fetch_error",
+                             "owner", "auto", "source_key", "created_at", "updated_at"]}),
+    ]
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related("owner", "customer", "project", "order", "product")
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(Q(visibility=KnowledgeItem.TEAM) | Q(owner=request.user))
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and not knowledge_items.can_change(request.user, obj) and not request.user.is_superuser:
+            return False
+        return super().has_change_permission(request, obj)
+
+    has_delete_permission = has_change_permission
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.owner = request.user
+        if "file" in form.changed_data and obj.file:
+            data = obj.file.read()
+            obj.file.seek(0)
+            obj.file_name = obj.file.name.rsplit("/", 1)[-1][:300]
+            obj.file_size, obj.file_sha256 = len(data), knowledge_items._sha(data)
+            obj.content_type = (getattr(obj.file.file, "content_type", "") or "")[:200]
+        refetch = bool(obj.url) and "url" in form.changed_data
+        if refetch:
+            obj.fetched_at, obj.fetch_error = None, ""
+        super().save_model(request, obj, form, change)
+        if refetch:
+            knowledge_items.start_fetch(obj.pk)
+
+    def delete_model(self, request, obj):
+        knowledge_items.delete(obj)
+
+    @admin.display(description="Прив'язки")
+    def links_col(self, obj):
+        parts = [f"👤 {obj.customer}" if obj.customer_id else "", f"📁 {obj.project.code}" if obj.project_id else "",
+                 f"🛒 {obj.order.order_number}" if obj.order_id else "", f"📦 {obj.product.sku}" if obj.product_id else ""]
+        return " · ".join(p for p in parts if p) or "—"
+
+    @admin.display(description="У RAG")
+    def rag_col(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        from .views_entity import item_json
+        return item_json(obj, None)["rag"]

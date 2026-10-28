@@ -105,12 +105,21 @@ class KnowledgeView(APIView):
         return error_response(request, "internal_error", 500, "Внутрішня помилка Minerva.", True)
 
 
+def _types(request, body=None):
+    """?types=email,document (або {"types": [...]} у тілі) — які типи документів RAG уміє; без — лише email."""
+    value = request.query_params.get("types")
+    if value is None and isinstance(body, dict):
+        value = body.get("types")
+    return knowledge.parse_types(value)
+
+
 class ChangesView(KnowledgeView):
     def get(self, request):
         after = _int_param(request, "after", 0, 0, 2 ** 62)
+        types = _types(request)
         data = knowledge.read_changes(after=after, limit=_int_param(request, "limit", 50, 1, 200),
-                                      generation=request.query_params.get("generation") or None)
-        knowledge.note_activity(f"зміни після seq {after}: подій {len(data['items'])}", changes=True)
+                                      generation=request.query_params.get("generation") or None, types=types)
+        knowledge.note_activity(f"зміни після seq {after}: подій {len(data['items'])}", changes=True, types=types)
         knowledge.settle_tombstones(after)    # видалення до знімка RAG — закриті без його звіту
         return Response(data)
 
@@ -139,7 +148,11 @@ class AttachmentView(KnowledgeView):
 
 class SnapshotCreateView(KnowledgeView):
     def post(self, request):
-        snap = knowledge.create_snapshot()
+        try:
+            body = json.loads(request.body or b"{}")
+        except ValueError:
+            raise KnowledgeError("invalid_request", 400, "Тіло — не JSON.")
+        snap = knowledge.create_snapshot(types=_types(request, body))
         knowledge.note_activity(f"знімок для повної звірки: документів {snap['total']}", snapshot_total=snap["total"])
         return Response(snap, status=201)
 
@@ -169,6 +182,6 @@ class StatusView(KnowledgeView):
 
 class SummaryView(KnowledgeView):
     def get(self, request):
-        data = knowledge.summary()
+        data = knowledge.summary(types=_types(request))
         knowledge.note_activity("перевірка стану стрічки")
         return Response(data)

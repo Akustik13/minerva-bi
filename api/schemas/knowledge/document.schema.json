@@ -1,8 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.minerva-bi.com/knowledge/v1/document.schema.json",
-  "title": "Документ email для індексації",
-  "description": "GET /api/v1/knowledge/documents/{document_id}/ і поле document у подіях upsert. Поточний стан на момент читання; document_revision — чинна ревізія цього стану.",
+  "title": "Документ для індексації: лист (email) або документ / посилання (document)",
+  "description": "GET /api/v1/knowledge/documents/{document_id}/ і поле document у подіях upsert. Поточний стан на момент читання; document_revision — чинна ревізія цього стану. Тип document RAG отримує лише тоді, коли сам просить його (?types=email,document).",
+  "oneOf": [{"$ref": "#/$defs/email"}, {"$ref": "#/$defs/document"}],
+  "$defs": {
+  "email": {
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -14,7 +17,7 @@
   ],
   "properties": {
     "document_id": {"$ref": "common.schema.json#/$defs/document_id"},
-    "document_type": {"$ref": "common.schema.json#/$defs/document_type"},
+    "document_type": {"const": "email"},
     "document_revision": {"$ref": "common.schema.json#/$defs/document_revision"},
     "content_version": {
       "$ref": "common.schema.json#/$defs/sha256",
@@ -84,8 +87,71 @@
       }
     },
     "updated_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  }
   },
-  "$defs": {
+    "document": {
+      "description": "Файл або посилання, додані в картці клієнта / проєкту / замовлення / товару, або автоматичні (Angebot, документ замовлення, даташит). Текст файлу витягує RAG (attachments, як у листа), текст сторінки за посиланням — Minerva (text); RAG зовнішніх адрес не відкриває.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "document_id", "document_type", "document_revision", "content_version", "source_instance_id", "generation",
+        "url", "kind", "title", "created_at", "source_url", "text", "text_truncated",
+        "customer", "projects", "orders", "products", "attachments", "access", "updated_at"
+      ],
+      "properties": {
+        "document_id": {"type": "string", "pattern": "^document:[1-9][0-9]{0,18}$"},
+        "document_type": {"const": "document"},
+        "document_revision": {"$ref": "common.schema.json#/$defs/document_revision"},
+        "content_version": {"$ref": "common.schema.json#/$defs/sha256",
+                            "description": "sha256 полів, що індексуються (назва, текст, вид, прив'язки, файл з content_hash, access)."},
+        "source_instance_id": {"$ref": "common.schema.json#/$defs/source_instance_id"},
+        "generation": {"$ref": "common.schema.json#/$defs/generation"},
+        "url": {"type": "string", "pattern": "^/rag/knowledge/[1-9][0-9]*/$", "description": "Сторінка документа в Minerva (перевіряє права)."},
+        "kind": {"enum": ["upload", "link", "offer", "order_file", "datasheet"]},
+        "title": {"type": "string", "minLength": 1, "maxLength": 500},
+        "created_at": {"$ref": "common.schema.json#/$defs/timestamp", "description": "Дата документа — для фільтра since (як sent_at листа)."},
+        "source_url": {"oneOf": [{"type": "null"}, {"type": "string", "maxLength": 2000}],
+                       "description": "Звідки посилання (лише показ; RAG його не відкриває)."},
+        "text": {"type": "string", "maxLength": 100000, "description": "Опис людини + текст сторінки за посиланням (може бути порожнім для файлу)."},
+        "text_truncated": {"type": "boolean"},
+        "customer": {
+          "oneOf": [
+            {"type": "null"},
+            {"type": "object", "additionalProperties": false, "required": ["id", "name"],
+             "properties": {"id": {"$ref": "common.schema.json#/$defs/pk"}, "name": {"type": "string", "maxLength": 300}}}
+          ]
+        },
+        "projects": {
+          "type": "array", "maxItems": 50,
+          "items": {"type": "object", "additionalProperties": false, "required": ["id", "code", "name"],
+                    "properties": {"id": {"$ref": "common.schema.json#/$defs/pk"},
+                                   "code": {"type": "string", "pattern": "^P-\\d{4}-\\d{3,}$"},
+                                   "name": {"type": "string", "maxLength": 200}}}
+        },
+        "orders": {
+          "type": "array", "maxItems": 50,
+          "items": {"type": "object", "additionalProperties": false, "required": ["id", "number"],
+                    "properties": {"id": {"$ref": "common.schema.json#/$defs/pk"}, "number": {"type": "string", "maxLength": 200}}}
+        },
+        "products": {
+          "type": "array", "maxItems": 50,
+          "items": {"type": "object", "additionalProperties": false, "required": ["id", "sku"],
+                    "properties": {"id": {"$ref": "common.schema.json#/$defs/pk"}, "sku": {"type": "string", "maxLength": 100}}}
+        },
+        "attachments": {"type": "array", "maxItems": 1, "items": {"$ref": "#/$defs/attachment"},
+                        "description": "Файл документа (index 0) або порожньо для посилання на сторінку."},
+        "access": {
+          "type": "object", "additionalProperties": false, "required": ["scope", "user_ids"],
+          "properties": {
+            "scope": {"const": "users"},
+            "user_ids": {"type": "array", "minItems": 1, "maxItems": 500, "uniqueItems": true,
+                         "items": {"$ref": "common.schema.json#/$defs/pk"},
+                         "description": "Хто бачить документ зараз: власник (🔒) або всі, хто має право бачити пов'язану картку."}
+          }
+        },
+        "updated_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+      }
+    },
     "attachment": {
       "type": "object",
       "additionalProperties": false,
@@ -99,7 +165,7 @@
         "indexable": {"type": "boolean"},
         "reason": {"enum": ["not_downloaded", "type_not_allowed", "too_large", "attachments_disabled"],
                    "description": "Чому вкладення не indexable."},
-        "url": {"type": "string", "pattern": "^/api/v1/knowledge/documents/email:[1-9][0-9]*/attachments/[0-9]+/\\?revision=[1-9][0-9]*$",
+        "url": {"type": "string", "pattern": "^/api/v1/knowledge/documents/(email|document):[1-9][0-9]*/attachments/[0-9]+/\\?revision=[1-9][0-9]*$",
                 "description": "Лише для indexable; прив'язано до ревізії документа (412 revision_mismatch при зміні)."}
       },
       "if": {"properties": {"indexable": {"const": true}}},

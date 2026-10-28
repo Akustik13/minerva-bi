@@ -156,6 +156,17 @@ class KnowledgeSettings(models.Model):
         help_text="Кнопка «⏸ Пауза»: стрічка відповідає RAG «зачекайте» (429), звіти RAG приймаються; "
                   "пошук працює з уже проіндексованим.")
     feed_paused_at = models.DateTimeField(null=True, blank=True, editable=False)
+    # Етап 3 — що Minerva сама додає в базу знань (документи типу document, KnowledgeItem.auto)
+    auto_offers = models.BooleanField(
+        "Angebote", default=False,
+        help_text="Кожна надіслана версія Angebot (DOCX / PDF) — документ бази знань, прив'язаний до клієнта й проєкту.")
+    auto_order_files = models.BooleanField(
+        "Документи замовлень", default=False,
+        help_text="Файли з папки замовлення (media/orders/<джерело>/<номер>/): рахунки, пакувальні листи, "
+                  "Auftragsbestätigung… — прив'язані до замовлення й клієнта.")
+    auto_datasheets = models.BooleanField(
+        "Даташити товарів", default=False,
+        help_text="Файл даташита в картці товару — прив'язаний до товару (посилання на сайт виробника не завантажуються).")
 
     class Meta:
         verbose_name = "База знань (пошта → RAG)"
@@ -185,6 +196,8 @@ class KnowledgeActivity(models.Model):
     reported = models.PositiveIntegerField(default=0, help_text="Прийнято записів зі звітів RAG за етап")
     last_call = models.CharField(max_length=200, blank=True, default="")
     last_call_at = models.DateTimeField(null=True, blank=True)
+    rag_types = models.JSONField(default=list, blank=True,
+                                 help_text="Які типи документів RAG просив востаннє (/changes/?types=); старий RAG — лише email")
 
     class Meta:
         verbose_name = "Активність RAG"
@@ -373,3 +386,66 @@ class EntityHelp(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} #{self.obj_id} · {self.mode} · {self.status}"
+
+
+def _knowledge_upload_to(instance, filename):
+    return f"knowledge/{uuid.uuid4().hex[:12]}/{filename}"
+
+
+class KnowledgeItem(models.Model):
+    """
+    Документ бази знань поза поштою (тип document у стрічці для RAG, rag_assistant/knowledge_items.py):
+    етап 2 — файл або посилання, додані людиною в картці клієнта / проєкту / замовлення / товару;
+    етап 3 — автоматично: надіслана версія Angebot, файл із папки замовлення, даташит товару (auto, source_key).
+    Видимість: team — усі, хто бачить пов'язану картку; private — лише власник. Текст файлу витягує RAG,
+    текст сторінки за посиланням — Minerva (RAG зовнішніх адрес не відкриває).
+    """
+    UPLOAD, LINK, OFFER, ORDER_FILE, DATASHEET = "upload", "link", "offer", "order_file", "datasheet"
+    KINDS = [(UPLOAD, "📄 файл"), (LINK, "🔗 посилання"), (OFFER, "📝 Angebot"), (ORDER_FILE, "📦 документ замовлення"),
+             (DATASHEET, "📑 даташит")]
+    TEAM, PRIVATE = "team", "private"
+    VISIBILITY = [(TEAM, "усі, хто бачить картку"), (PRIVATE, "🔒 лише я")]
+
+    kind = models.CharField("Вид", max_length=12, choices=KINDS, default=UPLOAD)
+    title = models.CharField("Назва", max_length=300)
+    note = models.TextField("Опис / навіщо", blank=True, default="",
+                            help_text="Індексується разом із документом: коротко, що в ньому важливого.")
+    file = models.FileField("Файл", upload_to=_knowledge_upload_to, max_length=400, blank=True)
+    file_name = models.CharField(max_length=300, blank=True, default="")
+    file_size = models.PositiveBigIntegerField(default=0)
+    content_type = models.CharField(max_length=200, blank=True, default="")
+    file_sha256 = models.CharField(max_length=80, blank=True, default="", help_text="sha256:… байтів файлу")
+    url = models.URLField("Посилання", max_length=2000, blank=True, default="")
+    text = models.TextField(blank=True, default="", help_text="Текст сторінки за посиланням (Minerva забирає сама)")
+    fetched_at = models.DateTimeField(null=True, blank=True)
+    fetch_error = models.CharField(max_length=300, blank=True, default="")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name="knowledge_items", verbose_name="Додав")
+    visibility = models.CharField("Хто бачить", max_length=10, choices=VISIBILITY, default=TEAM)
+    customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name="knowledge_items", verbose_name="Клієнт")
+    project = models.ForeignKey("projects.Project", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="knowledge_items", verbose_name="Проєкт")
+    order = models.ForeignKey("sales.SalesOrder", null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name="knowledge_items", verbose_name="Замовлення")
+    product = models.ForeignKey("inventory.Product", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="knowledge_items", verbose_name="Товар")
+    offer = models.ForeignKey("offers.Offer", null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name="knowledge_items", verbose_name="Angebot")
+    auto = models.BooleanField(default=False, help_text="Додано автоматично (етап 3): Minerva сама оновлює й прибирає")
+    source_key = models.CharField(max_length=300, blank=True, default="", db_index=True,
+                                  help_text="Для автоматичних: offer:<версія>, order_file:<замовлення>:<файл>, datasheet:<товар>")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Документ / посилання бази знань"
+        verbose_name_plural = "📚 Документи й посилання бази знань"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def document_id(self) -> str:
+        return f"document:{self.pk}"

@@ -19,13 +19,13 @@
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
     },
     "document_type": {
-      "description": "v1: лише email. project і offer зарезервовані для наступних версій.",
-      "enum": ["email"]
+      "description": "email — лист; document — файл / посилання / автоматичний документ (Angebot, документ замовлення, даташит). RAG отримує document лише на ?types=email,document.",
+      "enum": ["email", "document"]
     },
     "document_id": {
       "description": "<document_type>:<pk>. Стабільний у межах source_instance_id + generation.",
       "type": "string",
-      "pattern": "^email:[1-9][0-9]{0,18}$"
+      "pattern": "^(email|document):[1-9][0-9]{0,18}$"
     },
     "document_revision": {
       "description": "Монотонна ревізія документа (кожна зміна content_version, ACL, tombstone, повернення після tombstone → +1). Ніколи не зменшується.",

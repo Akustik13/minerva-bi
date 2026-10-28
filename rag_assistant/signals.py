@@ -53,3 +53,19 @@ def knowledge_account_saved(sender, instance, created, **kwargs):
     if before is not None and before != tuple(getattr(instance, f) for f in ACCOUNT_FIELDS):
         account_id = instance.pk
         transaction.on_commit(lambda: start_account_touch(account_id))   # фоновий потік бачить уже збережене
+
+
+# ── Документи й посилання (KnowledgeItem, тип document) ──────────────────────
+
+@receiver(post_save, sender="rag_assistant.KnowledgeItem", dispatch_uid="knowledge_item_saved")
+def knowledge_item_saved(sender, instance, **kwargs):
+    if kwargs.get("raw"):
+        return
+    from .knowledge_items import touch
+    touch([instance.pk])
+
+
+@receiver(post_delete, sender="rag_assistant.KnowledgeItem", dispatch_uid="knowledge_item_deleted")
+def knowledge_item_deleted(sender, instance, **kwargs):
+    from .knowledge_items import touch
+    touch([instance.pk])

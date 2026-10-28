@@ -355,7 +355,25 @@ def validate(data, refs, docs, resolve=None) -> dict:
 
 # ── Огляд ────────────────────────────────────────────────────────────────────
 
-def _rag_block(project, user, facts, refs) -> str:
+def _documents_block(project, user, refs) -> tuple:
+    """Файли й посилання проєкту з бази знань (rag_assistant.knowledge_items), які бачить користувач;
+    номери [#N] — після листів, refs доповнюється адресами документів. → (текст, document_id)."""
+    if user is None:
+        return "", set()
+    try:
+        from rag_assistant import knowledge_items
+    except ImportError:
+        return "", set()
+    blocks, ids = [], set()
+    for item in knowledge_items.items_for(user, "project", project)[:10]:
+        refs.append(f"/rag/knowledge/{item.pk}/")
+        ids.add(item.document_id)
+        blocks.append(f"[#{len(refs)}] {item.get_kind_display()} «{item.title}»\n"
+                      f"{knowledge_items.local_text(item, 3000) or '—'}")
+    return ("ДОКУМЕНТИ Й ПОСИЛАННЯ ПРОЄКТУ:\n\n" + "\n\n".join(blocks) if blocks else ""), ids
+
+
+def _rag_block(project, user, facts, refs, seen_documents=()) -> str:
     """
     База знань RAG для огляду: листування клієнта поза гілками проєкту (без клієнта — уся пошта користувача),
     запит — з картки проєкту (rag_assistant.entity_help.build_query). Номери [#N] — далі після листів проєкту,
@@ -374,7 +392,7 @@ def _rag_block(project, user, facts, refs) -> str:
         status, _detail, _note = rag_sources(
             src, user, build_query("project", project), scope="клієнта проєкту" if project.customer_id else "усій пошті",
             seen={x["msg"].pk for x in facts["messages"]}, customer_id=project.customer_id or None,
-            exclude_thread_ids=threads, purpose="overview")
+            exclude_thread_ids=threads, purpose="overview", seen_documents=set(seen_documents))
     except Exception as e:  # noqa: BLE001 — огляд без бази знань краще, ніж жодного
         logger.warning("project overview %s: RAG failed: %s", project.code, e)
         return ""
@@ -393,7 +411,10 @@ def generate(project, user=None) -> tuple:
     from email_assistant import ai_helper
     facts = collect(project)
     text, refs = prompt_text(facts)
-    rag = _rag_block(project, user, facts, refs)
+    documents, seen_documents = _documents_block(project, user, refs)
+    if documents:
+        text += "\n\n" + documents
+    rag = _rag_block(project, user, facts, refs, seen_documents)
     if rag:
         text += "\n\n" + rag
     docs = {o.display_number: f"/admin/offers/offer/{o.pk}/change/" for o in facts["offers"]}

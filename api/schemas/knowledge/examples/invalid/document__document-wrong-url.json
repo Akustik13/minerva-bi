@@ -1,0 +1,52 @@
+{
+  "document_id": "document:7",
+  "document_type": "document",
+  "document_revision": 2,
+  "content_version": "sha256:4f1c7e1b0d9a8c2e6b5a3f7d9e1c0b2a4d6f8e0c1b3a5d7f9e2c4b6a8d0f1e3c",
+  "source_instance_id": "dev-synthetic",
+  "generation": "3f6c9a1e-5b2d-4c8e-9f10-2a3b4c5d6e7f",
+  "url": "/email/message/7/",
+  "kind": "upload",
+  "title": "Prüfbericht Filter FT-100",
+  "created_at": "2026-10-28T10:15:00Z",
+  "source_url": null,
+  "text": "Messprotokoll vom Kunden, Abweichung bei 2,45 GHz.",
+  "text_truncated": false,
+  "customer": {
+    "id": 15,
+    "name": "Client GmbH"
+  },
+  "projects": [
+    {
+      "id": 3,
+      "code": "P-2026-003",
+      "name": "Antennen Client"
+    }
+  ],
+  "orders": [],
+  "products": [
+    {
+      "id": 40,
+      "sku": "FT-100"
+    }
+  ],
+  "attachments": [
+    {
+      "index": 0,
+      "name": "Pruefbericht.pdf",
+      "content_type": "application/pdf",
+      "size": 120400,
+      "content_hash": "sha256:e65b9dd6e2a03378dd9b4faf240d0a781d1ed0069e2dd2cdfd31c95c0c09e644",
+      "indexable": true,
+      "url": "/api/v1/knowledge/documents/document:7/attachments/0/?revision=2"
+    }
+  ],
+  "access": {
+    "scope": "users",
+    "user_ids": [
+      1,
+      4
+    ]
+  },
+  "updated_at": "2026-10-28T10:16:00Z"
+}

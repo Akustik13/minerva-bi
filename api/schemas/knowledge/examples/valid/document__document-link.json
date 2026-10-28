@@ -1,0 +1,22 @@
+{
+  "document_id": "document:8",
+  "document_type": "document",
+  "document_revision": 1,
+  "content_version": "sha256:9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b",
+  "source_instance_id": "dev-synthetic",
+  "generation": "3f6c9a1e-5b2d-4c8e-9f10-2a3b4c5d6e7f",
+  "url": "/rag/knowledge/8/",
+  "kind": "link",
+  "title": "Application note: SMA connectors",
+  "created_at": "2026-10-28T11:00:00Z",
+  "source_url": "https://www.example.com/appnote-sma",
+  "text": "Torque for SMA connectors: 0.56 Nm.",
+  "text_truncated": false,
+  "customer": null,
+  "projects": [],
+  "orders": [],
+  "products": [],
+  "attachments": [],
+  "access": {"scope": "users", "user_ids": [4]},
+  "updated_at": "2026-10-28T11:01:00Z"
+}

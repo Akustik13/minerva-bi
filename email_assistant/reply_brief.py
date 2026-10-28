@@ -389,11 +389,12 @@ def _rag(src, user, msg, ctx, wish, customer, projects, seen=(), dedup=None, wid
 
 
 def rag_sources(src, user, query, *, scope, seen=(), dedup=None, thread=None, customer_id=None, project_id=None,
-                exclude_thread_ids=(), purpose='reply') -> tuple:
+                exclude_thread_ids=(), purpose='reply', seen_documents=()) -> tuple:
     """
     Пошук у RAG → джерела `rag` без дублів (спільне для «📋 Підготувати», огляду проєкту й карток проєкту / клієнта /
-    замовлення / товару — rag_assistant/entity_help.py): листи з `seen` і гілки exclude_thread_ids відкидаються,
-    фрагменти одного листа (вкладення) — одне джерело. → (status, detail для етапу, note для «врахувала»).
+    замовлення / товару — rag_assistant/entity_help.py): листи з `seen`, документи з `seen_documents` («document:N»)
+    і гілки exclude_thread_ids відкидаються, фрагменти одного листа (вкладення) чи документа — одне джерело.
+    → (status, detail для етапу, note для «врахувала»).
     """
     from rag_assistant import retrieval
     dedup = dedup if dedup is not None else {}
@@ -410,10 +411,12 @@ def rag_sources(src, user, query, *, scope, seen=(), dedup=None, thread=None, cu
     letters, dropped, fragments, skip_threads = {}, 0, 0, set(excluded)
     for h in job.hits:
         att = h.get('attachment') or None
-        if (h.get('message_pk') in seen and not att) or (h.get('thread_id') and h.get('thread_id') in skip_threads):
-            dropped += 1                                   # лист уже є серед джерел (або виключена гілка)
+        document = h.get('kind') == 'document'
+        if (h.get('message_pk') in seen and not att) or (h.get('thread_id') and h.get('thread_id') in skip_threads) \
+                or h.get('document_id') in seen_documents:
+            dropped += 1                                   # лист / документ уже є серед джерел (або виключена гілка)
             continue
-        key = (h.get('message_pk') or h.get('url'), att.get('index') if att else None)
+        key = (h.get('url'), None) if document else (h.get('message_pk') or h.get('url'), att.get('index') if att else None)
         if key not in letters:
             if len(letters) >= RAG_HITS:
                 continue
@@ -424,7 +427,12 @@ def rag_sources(src, user, query, *, scope, seen=(), dedup=None, thread=None, cu
             letters[key][1].append(text)
     for h, texts in letters.values():
         att = h.get('attachment') or None
-        label = (f'RAG · {(h.get("sent_at") or "")[:10]} · {h.get("from_email", "")} · «{(h.get("subject") or "")[:80]}»'
+        if h.get('kind') == 'document':     # файл / посилання бази знань: файл — сам документ, не вкладення
+            label, att = (f'RAG · {h.get("document_kind") or "документ"} · {(h.get("sent_at") or "")[:10]} · '
+                          f'«{(h.get("subject") or "")[:80]}»'), None
+        else:
+            label = f'RAG · {(h.get("sent_at") or "")[:10]} · {h.get("from_email", "")} · «{(h.get("subject") or "")[:80]}»'
+        label = (label
                  + (f' · вкладення «{att.get("name") or "?"}»' if att else '')
                  + (f' · фрагментів {len(texts)}' if len(texts) > 1 else ''))
         src.add('rag', label, '\n[…]\n'.join(texts)[:RAG_LETTER_CHARS], h.get('url') or '')
