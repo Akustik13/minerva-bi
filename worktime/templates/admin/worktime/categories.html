@@ -82,7 +82,8 @@
         <th>{% trans "Вид роботи" %}</th><th>{% trans "хв: відповідь / лист / замовл." %}</th><th>{% trans "Авто" %}</th></tr>
       {% for r in rows %}
       <tr>
-        <td><a href="{% url 'admin:email_assistant_mailcategory_change' r.cat.pk %}">{{ r.cat.label }}</a></td>
+        <td><a href="{% url 'admin:email_assistant_mailcategory_change' r.cat.pk %}">{{ r.cat.label }}</a>
+          {% if r.ct and r.ct.dante_project_id %}<br><a class="ct-muted" href="{% url 'admin:worktime_workday_mailtime' %}?cat={{ r.cat.pk }}&amp;{{ period }}" title="{% trans "Час на листи цієї категорії по днях за цей період — перевірити й записати" %}">⏱ {% trans "перенести в askDANTE" %}</a>{% endif %}</td>
         <td><a href="/email/?wcat={{ r.cat.pk }}">{{ r.mails }}</a></td>
         <td><select name="dp_{{ r.cat.pk }}"><option value="">—</option>{% for p in projects %}<option value="{{ p.pk }}"{% if r.ct and r.ct.dante_project_id == p.pk %} selected{% endif %}>{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</select></td>
         <td><div class="ct-row"><select name="new_{{ r.cat.pk }}"><option value="">{% trans "новий…" %}</option>

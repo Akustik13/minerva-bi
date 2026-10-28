@@ -72,7 +72,10 @@ class MailCategoryAdmin(admin.ModelAdmin):
         dante = getattr(obj, 'dante', None)
         if dante is None or not dante.dante_project_id:
             return '—'
-        return format_html('{}{}', dante.dante_project, ' · авто' if dante.auto else '')
+        from worktime.admin_mail import transfer_url
+        return format_html('{}{}<br><a href="{}" title="{}">⏱ перенести в askDANTE</a>', dante.dante_project,
+                           ' · авто' if dante.auto else '', transfer_url(obj),
+                           'Час на листи цієї категорії по днях за період — перевірити й записати')
 
     def get_urls(self):
         return [path('recompute/', self.admin_site.admin_view(self.recompute_view),

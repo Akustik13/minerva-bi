@@ -93,6 +93,13 @@ def _loose_action(request, du, st, back):
     return redirect(back)
 
 
+def transfer_url(category, days: int = 30) -> str:
+    """«⏱ Перенести в askDANTE»: сторінка «✉️ Час на пошту» лише з цією категорією за останні `days` днів."""
+    today = services.local_today()
+    return (f"{reverse('admin:worktime_workday_mailtime')}?cat={category.pk}"
+            f"&from={today - datetime.timedelta(days=days - 1)}&to={today}")
+
+
 def mail_time_page(model_admin, request):
     """Оцінка часу на пошту по днях і проєктах askDANTE; ✓ — записати різницю в askDANTE."""
     from .admin import WEEKDAYS, WorkDayAdmin
@@ -101,15 +108,29 @@ def mail_time_page(model_admin, request):
     du = WorkDayAdmin._pick(request, people)
     today = services.local_today()
     g = request.POST if request.method == "POST" else request.GET
-    date_to = min(_day(g.get("to"), today), today)
-    date_from = _day(g.get("from"), date_to - datetime.timedelta(days=6))
+    first = today.replace(day=1)
+    if g.get("preset") == "last_month":
+        date_to = first - datetime.timedelta(days=1)
+        date_from = date_to.replace(day=1)
+    elif g.get("preset") == "this_month":
+        date_from, date_to = first, today
+    else:
+        date_to = min(_day(g.get("to"), today), today)
+        date_from = _day(g.get("from"), date_to - datetime.timedelta(days=6))
     if date_from > date_to:
         date_from = date_to
     if (date_to - date_from).days >= mail_time.MAX_DAYS:
         date_from = date_to - datetime.timedelta(days=mail_time.MAX_DAYS - 1)
     show = g.get("show") if g.get("show") in ("all", "ignored") else "dante"
+    # лише одна своя категорія — рядки її проєкту askDANTE (запис іде на день × проєкт)
+    focus = (MailCategoryTime.objects.select_related("category", "dante_project")
+             .filter(category_id=g.get("cat")).first() if str(g.get("cat") or "").isdigit() else None)
+    focus_cat = focus.category if focus else MailCategory.objects.filter(pk=g.get("cat") or 0).first() \
+        if str(g.get("cat") or "").isdigit() else None
+    if focus_cat is not None:
+        show = "dante"
     back = (f"{reverse('admin:worktime_workday_mailtime')}?u={du.pk if du else ''}&from={date_from}&to={date_to}"
-            f"&show={show}")
+            f"&show={show}" + (f"&cat={focus_cat.pk}" if focus_cat else ""))
 
     if request.method == "POST" and du is not None and request.POST.get("action") in ("assign", "ignore", "unignore"):
         return _loose_action(request, du, st, back)
@@ -166,6 +187,11 @@ def mail_time_page(model_admin, request):
                                         source=Booking.MAIL, status=Booking.SENT).order_by("created_at"):
             sent.setdefault((b.date, b.dante_project_id), []).append(b)
         for day, info in mail_time.estimate(du, date_from, date_to, st).items():
+            if focus_cat is not None:
+                info["rows"] = [r for r in info["rows"] if focus and r["dp"].pk == focus.dante_project_id]
+                if not info["rows"]:
+                    continue
+                info["unmapped"], info["loose"], info["ignored"] = 0, [], []
             for r in info["rows"]:
                 r["dur"], r["booked_dur"], r["todo_dur"] = _hm(r["minutes"]), _hm(r["booked"]), _hm(r["to_book"])
                 r["key"] = f"{day:%Y-%m-%d}|{r['dp'].pk}"
@@ -179,6 +205,8 @@ def mail_time_page(model_admin, request):
                          "ongoing": day == today})
     days.reverse()   # свіжі дні зверху
     cats = list(MailCategoryTime.objects.select_related("category", "dante_project").order_by("category__order"))
+    shared = [c.category.label for c in cats if focus and focus.dante_project_id and c.pk != focus.pk
+              and c.dante_project_id == focus.dante_project_id]
     context = {
         **model_admin.admin_site.each_context(request), "title": "✉️ Час на пошту", "st": st, "du": du,
         "people": people, "manager": services.is_manager(request.user), "date_from": date_from, "date_to": date_to,
@@ -190,6 +218,8 @@ def mail_time_page(model_admin, request):
         "activities": list(DanteActivity.objects.filter(archived=False)),
         "needs_activity": st.activity_required and not st.default_activity_id,
         "show": show, "n_loose": sum(len(d["loose"]) for d in days), "n_ignored": sum(len(d["ignored"]) for d in days),
+        "focus": focus, "focus_cat": focus_cat, "shared": shared,
+        "focus_url": (reverse("admin:email_assistant_mailcategory_change", args=[focus_cat.pk]) if focus_cat else ""),
         "categories": list(MailCategory.objects.filter(is_active=True)),
         "can_categorize": services.is_manager(request.user) or request.user.has_perm("email_assistant.add_mailcategory"),
         "projects": list(DanteProject.objects.filter(archived=False, gone=False).select_related("parent")

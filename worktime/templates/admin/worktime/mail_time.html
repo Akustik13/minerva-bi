@@ -58,11 +58,16 @@
     {% endif %}
     <label>{% trans "Від" %}<input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}"></label>
     <label>{% trans "До" %}<input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}"></label>
-    <label>{% trans "Листи" %}<select name="show">
+    <label>🏷 {% trans "Категорія" %}<select name="cat" onchange="this.form.submit()">
+      <option value="">{% trans "усі" %}</option>
+      {% for c in cats %}{% if c.dante_project_id %}<option value="{{ c.category_id }}"{% if focus_cat and c.category_id == focus_cat.pk %} selected{% endif %}>{{ c.category.label }} → {{ c.dante_project }}</option>{% endif %}{% endfor %}
+      {% if focus_cat and not focus.dante_project_id %}<option value="{{ focus_cat.pk }}" selected>{{ focus_cat.label }} → —</option>{% endif %}</select></label>
+    {% if not focus_cat %}<label>{% trans "Листи" %}<select name="show">
       <option value="dante"{% if show == "dante" %} selected{% endif %}>{% trans "лише до askDANTE" %}</option>
       <option value="all"{% if show == "all" %} selected{% endif %}>{% trans "усі — і без категорії / проєкту" %}</option>
-      <option value="ignored"{% if show == "ignored" %} selected{% endif %}>{% trans "проігноровані" %}</option></select></label>
+      <option value="ignored"{% if show == "ignored" %} selected{% endif %}>{% trans "проігноровані" %}</option></select></label>{% endif %}
     <button class="button default">✉️ {% trans "Показати" %}</button>
+    <span class="mt-muted"><a href="?preset=this_month{% if du %}&u={{ du.pk }}{% endif %}{% if focus_cat %}&cat={{ focus_cat.pk }}{% endif %}">{% trans "цей місяць" %}</a> · <a href="?preset=last_month{% if du %}&u={{ du.pk }}{% endif %}{% if focus_cat %}&cat={{ focus_cat.pk }}{% endif %}">{% trans "минулий місяць" %}</a></span>
     <span class="mt-muted">{% trans "Разом" %} <b>{{ total }}</b> · {% trans "ще не в askDANTE" %} <b>{{ todo }}</b></span>
   </div>
   <div class="mt-muted" style="margin-top:8px">
@@ -73,6 +78,20 @@
   </div>
 </form>
 
+{% if focus_cat %}
+<div class="mt-card" style="border-color:{% if focus.dante_project_id %}#1a73e8{% else %}#f59e0b{% endif %}">
+  {% if focus.dante_project_id %}
+  ⏱ <b>{{ focus_cat.label }}</b> → askDANTE: <b>{{ focus.dante_project }}</b>{% if focus.activity %} · {{ focus.activity }}{% endif %} · {{ focus.reply_minutes }}/{{ focus.read_minutes }} {% trans "хв на відповідь / прочитаний" %}
+  · {{ date_from|date:"d.m.Y" }}–{{ date_to|date:"d.m.Y" }}: {% trans "разом" %} <b>{{ total }}</b>, {% trans "ще не в askDANTE" %} <b>{{ todo }}</b>
+  <div class="mt-muted">{% trans "Незаписані дні вже позначено — перевірте опис і натисніть «✓ Записати» внизу. Кожен день — окремий запис askDANTE; повторний запис дописує лише різницю." %}
+    {% if shared %}<br>ℹ️ {% trans "У цей самий проєкт askDANTE пишуть і" %}: {{ shared|join:", " }} — {% trans "їхній час у тих самих рядках (askDANTE рахує день × проєкт)." %}{% endif %}
+    · <a href="{{ focus_url }}">⚙ {% trans "проєкт і норми категорії" %}</a> · <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}">{% trans "усі категорії" %}</a></div>
+  {% else %}
+  ⚠️ <b>{{ focus_cat.label }}</b>: {% trans "у категорії ще немає проєкту askDANTE — виберіть його в картці категорії (блок «⏱ Час на ці листи в askDANTE»)" %}: <a href="{{ focus_url }}">⚙ {% trans "відкрити категорію" %}</a>
+  {% endif %}
+</div>
+{% endif %}
+
 {% if du is None %}
 <div class="mt-card">{% trans "Вас не прив'язано до працівника askDANTE (👥 Працівники askDANTE → «Користувач Minerva»)." %}</div>
 {% elif not days %}
@@ -80,7 +99,7 @@
 {% else %}
 <form method="post" onsubmit="return mtConfirm(event)">
   {% csrf_token %}
-  <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}"><input type="hidden" name="show" value="{{ show }}">
+  <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}"><input type="hidden" name="show" value="{{ show }}">{% if focus_cat %}<input type="hidden" name="cat" value="{{ focus_cat.pk }}">{% endif %}
   {% for d in days %}
   <div class="mt-day">
     <h3>{{ d.wd }} {{ d.day|date:"d.m.Y" }}

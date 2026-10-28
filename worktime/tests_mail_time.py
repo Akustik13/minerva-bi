@@ -161,3 +161,53 @@ class PagesTests(MailTimeBase):
         self.assertEqual(_activity_label((t, t, 1)), "08:28 · 1 дія")
         self.assertEqual(_activity_label((t, t.replace(hour=17, minute=40), 52)), "08:28–17:40 · 52 дії")
         self.assertEqual(_activity_label((t, t.replace(hour=9), 5)), "08:28–09:28 · 5 дій")
+
+
+class CategoryFilterTests(MailTimeBase):
+    """«⏱ Перенести в askDANTE» з категорії: сторінка лише з її проєктом askDANTE за період."""
+
+    def setUp(self):
+        super().setUp()
+        self.user.is_superuser = True
+        self.user.save()
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.get_or_create(pk=1)[0]
+        ss.is_onboarding_complete = True
+        ss.save()
+        self.client.force_login(self.user)
+        self.dp2 = DanteProject.objects.create(dante_id="78", name="Webshop Kunden")
+        self.shop = MailCategory.objects.create(name="Shop", subject_words="bestellung", order=1)
+        MailCategoryTime.objects.create(category=self.shop, dante_project=self.dp2, reply_minutes=10, read_minutes=3)
+        self.url = reverse("admin:worktime_workday_mailtime")
+
+    def test_only_rows_of_the_category_project(self):
+        self.msg(folder=EmailMessage.FOLDER_SENT)
+        m = self.msg(subject="Bestellung 5", sender="kunde@shop.example", cat=False)
+        EmailMessage.objects.filter(pk=m.pk).update(work_category=self.shop)
+        args = {"u": self.du.pk, "from": MON.isoformat(), "to": TUE.isoformat()}
+        everything = self.client.get(self.url, args)
+        self.assertContains(everything, f'value="{MON.isoformat()}|{self.dp2.pk}"')
+        page = self.client.get(self.url, {**args, "cat": self.shop.pk})
+        self.assertContains(page, f'value="{MON.isoformat()}|{self.dp2.pk}"')
+        self.assertNotContains(page, f'value="{MON.isoformat()}|{self.dp.pk}"')
+        self.assertContains(page, f'name="cat" value="{self.shop.pk}"')
+        self.assertContains(page, "Webshop Kunden</b>")
+        r = self.client.post(self.url, {**args, "cat": self.shop.pk, "pick": [f"{MON.isoformat()}|{self.dp2.pk}"]})
+        self.assertIn(f"cat={self.shop.pk}", r["Location"])
+        self.assertEqual(MailTimeEntry.objects.get().dante_project, self.dp2)
+
+    def test_category_without_project_explains(self):
+        other = MailCategory.objects.create(name="Zoll", order=2)
+        page = self.client.get(self.url, {"cat": other.pk})
+        self.assertContains(page, "ще немає проєкту askDANTE")
+
+    def test_links_and_month_presets(self):
+        page = self.client.get(reverse("admin:email_assistant_mailcategory_changelist"))
+        self.assertContains(page, f"?cat={self.cat.pk}&amp;from=")
+        self.assertContains(page, "перенести в askDANTE")
+        page = self.client.get(self.url, {"preset": "last_month", "cat": self.cat.pk})
+        first = (TUE + datetime.timedelta(days=1)).replace(day=1)
+        self.assertEqual(page.context["date_to"], first - datetime.timedelta(days=1))
+        self.assertEqual(page.context["date_from"].day, 1)
+        setup = self.client.get(reverse("admin:worktime_danteproject_categories"))
+        self.assertContains(setup, f"?cat={self.cat.pk}&amp;from=")
