@@ -12,11 +12,28 @@ from . import services
 from .models import Offer, OfferLine, OfferRevision, OfferSettings, QuoteRequest
 
 
+class OfferLineForm(forms.ModelForm):
+    """Ступені (Staffelpreise) у тій самій таблиці: «35; 100» або «35: 12,50; 100: 10,90»."""
+    tiers_input = forms.CharField(
+        label="Ступені", required=False, widget=forms.TextInput(attrs={"style": "width:130px", "placeholder": "35; 100"}),
+        help_text="Кілька кількостей через «;», ціна — після «:» (без ціни — з Minerva). Перша — основна.")
+
+    class Meta:
+        model = OfferLine
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["tiers_input"].initial = services.tiers_text(self.instance)
+
+
 class OfferLineInline(admin.TabularInline):
     model = OfferLine
+    form = OfferLineForm
     extra = 1
     fields = ("position", "product", "sku", "description", "qty", "unit", "unit_price", "discount_percent",
-              "lead_time", "line_total", "price_info")
+              "tiers_input", "lead_time", "line_total", "price_info")
     readonly_fields = ("price_info", "line_total")
     autocomplete_fields = ("product",)
     verbose_name_plural = "Позиції (ціна порожня — з каталогу Minerva: магазин → ціна продажу → базова ціна)"
@@ -136,6 +153,12 @@ class OfferAdmin(admin.ModelAdmin):
         for line in instances:
             line.offer = form.instance
             services.fill_line(line)
+            line.save()
+        for f in formset.forms:   # ступені: змінили поле — перерахувати ціни ступенів
+            line = f.instance
+            if not line.pk or f in formset.deleted_forms or "tiers_input" not in f.changed_data:
+                continue
+            services.set_tiers(line, services.parse_tiers(f.cleaned_data.get("tiers_input")))
             line.save()
         formset.save_m2m()
 

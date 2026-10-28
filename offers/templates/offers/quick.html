@@ -1,0 +1,261 @@
+{% extends "admin/base_site.html" %}
+{% load i18n l10n %}
+
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; <a href="{% url 'admin:offers_offer_changelist' %}">Angebote</a>
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.of-wrap { padding: 24px 32px 60px; max-width: 1150px; }
+@media (max-width: 768px) { .of-wrap { padding: 16px; } }
+.of-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 18px 22px; margin-bottom: 20px; }
+.of-card-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em;
+                 margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-strong); display: flex; align-items: center; gap: 8px; }
+.of-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.of-field { display: flex; flex-direction: column; gap: 5px; position: relative; }
+.of-label { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.of-input { background: var(--bg-input); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px;
+            padding: 7px 10px; font-size: 13px; font-family: inherit; width: 100%; box-sizing: border-box; }
+.of-input:focus { border-color: var(--link-fg); outline: none; }
+.of-btn { background: var(--bg-hover); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 8px 14px;
+          font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
+.of-btn:hover { border-color: var(--link-fg); }
+.of-btn.primary { background: var(--link-fg); border-color: var(--link-fg); color: var(--bg-card); font-weight: 700; }
+.of-btn.sm { padding: 3px 9px; font-size: 12px; }
+.of-btn.danger { color: var(--err); }
+.of-muted { color: var(--text-muted); font-size: 12px; }
+.of-note { border: 1px dashed var(--err); color: var(--text); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; font-size: 13px; }
+.of-scroll { overflow-x: auto; }
+.of-lines { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+.of-lines th { text-align: left; color: var(--text-dim); font-weight: 600; font-size: 11px; padding: 6px 4px; border-bottom: 1px solid var(--border-strong); }
+.of-lines td { padding: 4px; vertical-align: top; }
+.of-lines td.num { text-align: right; color: var(--text-muted); white-space: nowrap; font-family: monospace; padding-top: 10px; }
+.of-hint { font-size: 11px; color: var(--text-muted); padding: 0 4px 8px; }
+.of-totals { display: grid; grid-template-columns: auto 160px; gap: 6px 14px; justify-content: end; align-items: center; margin-top: 12px; font-size: 13px; color: var(--text); }
+.of-totals .big { font-size: 15px; font-weight: 700; }
+.of-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.of-res { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--bg-card); border: 1px solid var(--border-strong);
+          border-radius: 6px; max-height: 240px; overflow: auto; display: none; }
+.of-res div { padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.of-res div:hover { background: var(--bg-hover); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="of-wrap">
+  <h1 style="margin:0 0 6px;color:var(--text)">📝 {{ title }}</h1>
+  <p class="of-muted" style="margin:0 0 18px">
+    {% if data.source %}З листа «{{ data.source.subject|default:"(без теми)"|truncatechars:80 }}»{% if data.forwarded %} · переслано від {{ data.forwarded.from }}{% endif %} ·{% endif %}
+    документ — на бланку Commercial Invoice (той самий логотип і реквізити); ступені — кілька кількостей через «;», ціна кожної — з Minerva або вручну.
+    {% if offer %}· <a href="{% url 'admin:offers_offer_change' offer.pk %}" style="color:var(--link-fg)">📋 повна картка</a>{% endif %}
+  </p>
+
+  {% if locked %}<div class="of-note">🔒 Цю версію вже надіслано — її не змінюють. «♻ Нова версія» — у <a href="{% url 'admin:offers_offer_change' offer.pk %}">картці</a>.</div>{% endif %}
+  {% for w in warnings %}<div class="of-note">⚠️ {{ w }}</div>{% endfor %}
+
+  <form method="post" id="of-form" action="{% if offer %}{% url 'offers:quick_edit' offer.pk %}{% else %}{% url 'offers:quick' %}{% endif %}">
+    {% csrf_token %}
+    {% if thread %}<input type="hidden" name="thread" value="{{ thread.pk }}">{% endif %}
+    {% if data.project %}<input type="hidden" name="project" value="{{ data.project.pk }}">{% endif %}
+    <input type="hidden" name="lines_json" id="lines_json">
+
+    <div class="of-card">
+      <div class="of-card-title">🧾 Документ</div>
+      <div class="of-grid">
+        <div class="of-field"><label class="of-label">Мова документа</label>
+          <select class="of-input" name="language">{% for key, label in languages %}<option value="{{ key }}"{% if key == data.language %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="of-field"><label class="of-label">Валюта</label>
+          <input class="of-input" name="currency" id="of-currency" value="{{ data.currency }}" maxlength="3" style="text-transform:uppercase" required></div>
+        <div class="of-field"><label class="of-label">Дійсний, днів</label>
+          <input class="of-input" type="number" name="valid_days" value="{{ data.valid_days }}" min="0" max="365"></div>
+        {% if data.project %}<div class="of-field"><label class="of-label">Проєкт</label>
+          <div class="of-muted" style="padding-top:8px">📁 {{ data.project.code }} {{ data.project.name }}</div></div>{% endif %}
+      </div>
+    </div>
+
+    <div class="of-card">
+      <div class="of-card-title">👤 Клієнт</div>
+      <div class="of-grid">
+        <div class="of-field" style="grid-column:1/-1"><label class="of-label">Клієнт CRM</label>
+          <input type="hidden" name="customer" id="of-customer" value="{{ data.customer.pk|default:'' }}">
+          <input class="of-input" id="of-customer-q" autocomplete="off" placeholder="компанія, ім'я або email — почніть вводити"
+                 value="{% if data.customer %}{{ data.customer.company|default:data.customer.name }}{% endif %}">
+          <div class="of-res" id="of-customer-res"></div></div>
+        <div class="of-field"><label class="of-label">Контактна особа</label>
+          <input class="of-input" name="contact_name" id="of-contact" value="{{ data.contact_name }}"></div>
+        <div class="of-field"><label class="of-label">Email</label>
+          <input class="of-input" name="contact_email" id="of-email" value="{{ data.contact_email }}"></div>
+        <div class="of-field" style="grid-column:1/-1">
+          <label class="of-label" style="display:flex;align-items:center;gap:8px">Адреса
+            <button type="button" class="of-btn sm" onclick="ofFillCustomer(true)" title="Адреса й контакт з картки клієнта CRM">⇄ з картки клієнта</button></label>
+          <textarea class="of-input" name="billing_address" id="of-address" rows="3">{{ data.billing_address }}</textarea></div>
+      </div>
+    </div>
+
+    <div class="of-card">
+      <div class="of-card-title">📦 Позиції</div>
+      <div class="of-scroll"><table class="of-lines"><thead><tr>
+        <th>Pos.</th><th>Artikel</th><th>Beschreibung</th><th>Menge / ступені<br><span style="font-weight:400">35; 100</span></th>
+        <th>Einzelpreis<br><span style="font-weight:400">порожньо — Minerva</span></th><th>Einh.</th><th>Lieferzeit</th>
+        <th style="text-align:right">Gesamt</th><th></th>
+      </tr></thead><tbody id="of-lines"></tbody></table></div>
+      <button type="button" class="of-btn sm" style="margin-top:6px" onclick="ofAddLine()">＋ Позиція</button>
+      <div class="of-totals">
+        <span>Сума позицій (перша кількість):</span><b id="of-goods" style="text-align:right"></b>
+        <label for="of-shipping">Versand / доставка:</label>
+        {% localize off %}<input class="of-input" name="shipping_cost" id="of-shipping" value="{{ data.shipping_cost }}" inputmode="decimal" style="text-align:right">{% endlocalize %}
+        <span class="big">Netto:</span><b class="big" id="of-total" style="text-align:right"></b>
+      </div>
+    </div>
+
+    <details class="of-card">
+      <summary class="of-card-title" style="cursor:pointer;border:none;margin:0;padding:0">📋 Тексти й умови (з налаштувань Angebote — можна змінити)</summary>
+      <div class="of-grid" style="margin-top:14px">
+        <div class="of-field" style="grid-column:1/-1"><label class="of-label">Вступ</label>
+          <textarea class="of-input" name="intro_text" rows="2">{{ data.intro_text }}</textarea></div>
+        <div class="of-field"><label class="of-label">Умови оплати</label>
+          <textarea class="of-input" name="payment_terms" rows="2">{{ data.payment_terms }}</textarea></div>
+        <div class="of-field"><label class="of-label">Умови поставки</label>
+          <textarea class="of-input" name="delivery_terms" rows="2">{{ data.delivery_terms }}</textarea></div>
+        <div class="of-field" style="grid-column:1/-1"><label class="of-label">Завершення</label>
+          <textarea class="of-input" name="outro_text" rows="2">{{ data.outro_text }}</textarea></div>
+      </div>
+    </details>
+
+    <div class="of-actions">
+      <button type="submit" class="of-btn primary"{% if locked %} disabled{% endif %}>📄 {% if offer %}Перегенерувати{% else %}Згенерувати{% endif %} Angebot</button>
+      {% if rev and rev.pdf_file %}<a class="of-btn" href="{{ rev.pdf_file.url }}" target="_blank">PDF</a>{% endif %}
+      {% if rev and rev.docx_file %}<a class="of-btn" href="{{ rev.docx_file.url }}">DOCX</a>{% endif %}
+      {% if offer and rev %}<a class="of-btn" href="/email/compose/?offer={{ offer.pk }}" target="_blank">✉️ Надіслати клієнту</a>{% endif %}
+      <a class="of-btn" href="{% if offer %}{% url 'admin:offers_offer_change' offer.pk %}{% else %}{% url 'admin:offers_offer_changelist' %}{% endif %}">{% if offer %}📋 Повна картка{% else %}Скасувати{% endif %}</a>
+    </div>
+  </form>
+</div>
+
+{{ lines|json_script:"of-lines-data" }}
+<script>
+(function(){
+  var lines = JSON.parse(document.getElementById('of-lines-data').textContent) || [];
+  var body = document.getElementById('of-lines');
+  var CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  function num(v){ var f = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isNaN(f) ? 0 : f; }
+  function money(v){ return (Math.round(num(v) * 100) / 100).toFixed(2); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function inp(j, k, v, ph, w){
+    return '<input class="of-input" data-l="'+j+'" data-k="'+k+'" value="'+esc(v)+'" placeholder="'+esc(ph || '')+'"'
+      + (w ? ' style="width:' + w + '"' : '') + '>';
+  }
+  function first(text){ return String(text || '').split(';')[0]; }
+  function lineTotal(l){
+    var price = first(l.prices) || (l._hint && l._hint[0] ? l._hint[0].unit_price : '');
+    var qty = num(String(l.qtys || '1').split(/[;\s,]+/)[0]);
+    return price === '' ? null : Math.round(qty * num(price) * 100) / 100;
+  }
+  function totals(){
+    var cur = document.getElementById('of-currency').value.toUpperCase();
+    var goods = lines.reduce(function(s, l){ return s + (lineTotal(l) || 0); }, 0);
+    document.getElementById('of-goods').textContent = money(goods) + ' ' + cur;
+    document.getElementById('of-total').textContent = money(goods + num(document.getElementById('of-shipping').value)) + ' ' + cur;
+  }
+  function hintText(l){
+    if (!l._found) return l.sku ? '— немає в каталозі Minerva: опис і ціну введіть вручну' : '';
+    return 'Minerva: ' + (l._name ? l._name + ' · ' : '') + l._hint.map(function(t){
+      return t.qty + ' → ' + (t.unit_price ? t.unit_price.replace('.', ',') : 'на запит') + (t.note ? ' (' + t.note + ')' : '');
+    }).join(' · ');
+  }
+  function render(){
+    var html = '';
+    lines.forEach(function(l, j){
+      var t = lineTotal(l);
+      html += '<tr>'
+        + '<td class="num">' + (j + 1) + '</td>'
+        + '<td style="width:130px">' + inp(j, 'sku', l.sku, 'ANT-100') + '</td>'
+        + '<td>' + inp(j, 'description', l.description, l._name || '') + '</td>'
+        + '<td style="width:110px">' + inp(j, 'qtys', l.qtys, '35; 100') + '</td>'
+        + '<td style="width:130px">' + inp(j, 'prices', l.prices, l._hint && l._hint.length ? l._hint.map(function(x){ return (x.unit_price || '?').replace('.', ','); }).join('; ') : '') + '</td>'
+        + '<td style="width:56px">' + inp(j, 'unit', l.unit || 'Stk') + '</td>'
+        + '<td style="width:110px">' + inp(j, 'lead_time', l.lead_time, '4 Wochen') + '</td>'
+        + '<td class="num">' + (t === null ? 'на запит' : money(t)) + '</td>'
+        + '<td><button type="button" class="of-btn sm danger" onclick="ofDelLine('+j+')" title="Видалити">✕</button></td>'
+        + '</tr><tr><td></td><td colspan="8" class="of-hint">' + esc(hintText(l)) + '</td></tr>';
+    });
+    body.innerHTML = html;
+    totals();
+  }
+  var timers = {};
+  function hints(j){
+    var l = lines[j];
+    clearTimeout(timers[j]);
+    if (!l.sku) { l._found = false; l._hint = []; render(); return; }
+    timers[j] = setTimeout(async function(){
+      var cur = document.getElementById('of-currency').value;
+      try {
+        var d = await (await fetch('{% url "offers:price" %}?sku=' + encodeURIComponent(l.sku) + '&qtys=' + encodeURIComponent(l.qtys || '1')
+                                   + '&currency=' + encodeURIComponent(cur), {credentials: 'same-origin'})).json();
+        l._found = d.found; l._hint = d.tiers || []; l._name = d.name || '';
+      } catch (e) {}
+      render();
+    }, 300);
+  }
+  body.addEventListener('input', function(e){
+    var el = e.target; if (el.dataset.l === undefined) return;
+    lines[el.dataset.l][el.dataset.k] = el.value;
+  });
+  body.addEventListener('change', function(e){
+    var k = e.target.dataset.k, j = e.target.dataset.l;
+    if (k === 'sku' || k === 'qtys') hints(+j); else render();
+  });
+  document.getElementById('of-shipping').addEventListener('input', totals);
+  document.getElementById('of-currency').addEventListener('change', function(){ lines.forEach(function(_l, j){ hints(j); }); });
+  window.ofAddLine = function(){ lines.push({sku:'', description:'', qtys:'1', prices:'', unit:'Stk', lead_time:''}); render(); };
+  window.ofDelLine = function(j){ lines.splice(j, 1); render(); };
+
+  // клієнт CRM: пошук (той самий, що в пошті), вибір — контакт і адреса з картки
+  var q = document.getElementById('of-customer-q'), res = document.getElementById('of-customer-res'), qt = null;
+  q.addEventListener('input', function(){
+    document.getElementById('of-customer').value = '';
+    clearTimeout(qt);
+    if (q.value.trim().length < 2) { res.style.display = 'none'; return; }
+    qt = setTimeout(async function(){
+      var d = await (await fetch('/email/customers/?q=' + encodeURIComponent(q.value.trim()), {credentials: 'same-origin'})).json();
+      res.innerHTML = '';
+      (d.results || []).forEach(function(c){
+        var div = document.createElement('div'); div.textContent = c.label;
+        div.onmousedown = function(){ document.getElementById('of-customer').value = c.id; q.value = c.label.split(' <')[0];
+          res.style.display = 'none'; ofFillCustomer(false); };
+        res.appendChild(div);
+      });
+      res.style.display = (d.results || []).length ? 'block' : 'none';
+    }, 250);
+  });
+  q.addEventListener('blur', function(){ setTimeout(function(){ res.style.display = 'none'; }, 200); });
+  window.ofFillCustomer = async function(replace){
+    var id = document.getElementById('of-customer').value;
+    if (!id) { alert('Спершу виберіть клієнта CRM'); return; }
+    var c = await (await fetch('/offers/api/customer/' + id + '/', {credentials: 'same-origin'})).json();
+    [['of-address', c.address], ['of-contact', c.name], ['of-email', c.email]].forEach(function(p){
+      var el = document.getElementById(p[0]);
+      if (p[1] && (replace || !el.value.trim())) el.value = p[1];
+    });
+  };
+
+  document.getElementById('of-form').addEventListener('submit', function(e){
+    var empty = lines.filter(function(l){ return l.sku || l.description; });
+    if (!empty.length) { alert('Додайте хоча б одну позицію'); e.preventDefault(); return; }
+    document.getElementById('lines_json').value = JSON.stringify(lines.map(function(l){
+      return {sku: l.sku, description: l.description, qtys: l.qtys, prices: l.prices, unit: l.unit, lead_time: l.lead_time};
+    }));
+  });
+  render();
+  lines.forEach(function(_l, j){ hints(j); });
+})();
+</script>
+{% endblock %}

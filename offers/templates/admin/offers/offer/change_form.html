@@ -1,4 +1,8 @@
 {% extends "admin/change_form.html" %}
+{% block object-tools-items %}
+{% if original.pk %}<li><a href="{% url 'offers:quick_edit' original.pk %}">⚡ Легка форма</a></li>{% else %}<li><a href="{% url 'offers:quick' %}">⚡ Легка форма</a></li>{% endif %}
+{{ block.super }}
+{% endblock %}
 {# Angebot: компактна таблиця позицій — усі колонки (ціна, знижка, сума, маржа) видно без прокрутки #}
 {% block extrastyle %}{{ block.super }}
 <style>

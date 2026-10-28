@@ -1,8 +1,9 @@
 """Документ Angebot: DOCX за шаблоном (docxtpl) + PDF через LibreOffice (documents.service._convert_to_pdf).
 
 Дані — лише зі знімка версії (OfferRevision.snapshot), тож документ надісланої версії відтворюваний.
-Шаблон: власний (OfferSettings.template) або стандартний offers/templates_docx/offer_template.docx
-(створюється командою build_offer_template). Підписи — мовою документа (de / en / uk).
+Шаблон: власний (OfferSettings.template), інакше — на бланку Commercial Invoice (offers/template_builder.py,
+кеш MEDIA_ROOT/offer_templates/), інакше простий offers/templates_docx/offer_template.docx
+(build_offer_template). Підписи — мовою документа (de / en / de_en / uk).
 """
 import logging
 from decimal import Decimal
@@ -39,6 +40,14 @@ LABELS = {
            "delivery": "Умови поставки", "on_request": "за запитом", "closing": "З повагою",
            "version": "Версія"},
 }
+LABELS["de"]["seller"], LABELS["en"]["seller"], LABELS["uk"]["seller"] = "Anbieter", "Supplier", "Постачальник"
+LABELS["de"]["tiers_note"] = "Staffelpreise: Die Summen beziehen sich jeweils auf die erste Menge."
+LABELS["en"]["tiers_note"] = "Tiered prices: totals refer to the first quantity of each item."
+LABELS["uk"]["tiers_note"] = "Ступінчасті ціни: суми — для першої кількості кожної позиції."
+# «Deutsch + English» — один документ, підписи обома мовами («Menge / Qty»), числа й дати — як у німецькому
+LABELS["de_en"] = {k: v if v == LABELS["en"][k] else f"{v} / {LABELS['en'][k]}" for k, v in LABELS["de"].items()}
+LABELS["de_en"]["tiers_note"] = f"{LABELS['de']['tiers_note']}\n{LABELS['en']['tiers_note']}"
+EUROPEAN = ("de", "uk", "de_en")   # 1 234,50 і 28.10.2026
 
 
 def _fmt_money(value, lang) -> str:
@@ -46,7 +55,7 @@ def _fmt_money(value, lang) -> str:
         return ""
     d = Decimal(str(value)).quantize(Decimal("0.01"))
     s = f"{d:,.2f}"                                   # 1,234.50
-    return s.replace(",", " ").replace(".", ",") if lang in ("de", "uk") else s
+    return s.replace(",", " ").replace(".", ",") if lang in EUROPEAN else s
 
 
 def _fmt_unit(value, lang) -> str:
@@ -56,7 +65,7 @@ def _fmt_unit(value, lang) -> str:
     d = Decimal(str(value)).normalize()
     places = max(2, min(4, -d.as_tuple().exponent if d.as_tuple().exponent < 0 else 0))
     s = f"{Decimal(str(value)):,.{places}f}"
-    return s.replace(",", " ").replace(".", ",") if lang in ("de", "uk") else s
+    return s.replace(",", " ").replace(".", ",") if lang in EUROPEAN else s
 
 
 def _fmt_qty(value) -> str:
@@ -68,7 +77,7 @@ def _fmt_date(iso, lang) -> str:
     if not iso:
         return ""
     y, m, d = iso.split("-")
-    return f"{d}.{m}.{y}" if lang in ("de", "uk") else f"{y}-{m}-{d}"
+    return f"{d}.{m}.{y}" if lang in EUROPEAN else f"{y}-{m}-{d}"
 
 
 def build_context(snap: dict) -> dict:
@@ -83,16 +92,31 @@ def build_context(snap: dict) -> dict:
     for l in snap.get("lines", []):
         on_request = l.get("unit_price") in (None, "")
         disc = Decimal(l.get("discount_percent") or "0")
+        tiers = l.get("tiers") or []
+        if tiers:   # Staffelpreise: кожна к-сть — окремий рядок у тих самих комірках (шаблон не змінюється)
+            qty = Listing("\n".join(f"{_fmt_qty(t['qty'])} {l.get('unit', '')}".strip() for t in tiers))
+            unit_price = Listing("\n".join(_fmt_unit(t["unit_price"], lang) if t.get("unit_price") else L["on_request"]
+                                           for t in tiers))
+            total = Listing("\n".join(_fmt_money(t["line_total"], lang) if t.get("unit_price") else L["on_request"]
+                                      for t in tiers))
+        else:
+            qty = f"{_fmt_qty(l.get('qty', '0'))} {l.get('unit', '')}".strip()
+            unit_price = L["on_request"] if on_request else _fmt_unit(l.get("unit_price"), lang)
+            total = L["on_request"] if on_request else _fmt_money(l.get("line_total"), lang)
         lines.append({
             "pos": l.get("position"), "sku": l.get("sku", ""), "description": Listing(l.get("description", "")),
-            "qty": f"{_fmt_qty(l.get('qty', '0'))} {l.get('unit', '')}".strip(),
-            "unit_price": L["on_request"] if on_request else _fmt_unit(l.get("unit_price"), lang),
+            "qty": qty, "unit_price": unit_price,
             "discount": f"{_fmt_qty(disc)} %" if disc else "",
-            "total": L["on_request"] if on_request else _fmt_money(l.get("line_total"), lang),
+            "total": total,
             "lead_time": l.get("lead_time", ""),
         })
+    has_tiers = any(l.get("tiers") for l in snap.get("lines", []))
     shipping = Decimal(snap.get("shipping_cost") or "0")
     customer = snap.get("customer") or {}
+    customer_name = customer.get("company") or customer.get("name") or ""
+    # адреса без рядків, що вже стоять окремо (назва клієнта, контактна особа)
+    address = "\n".join(ln for ln in (snap.get("billing_address") or "").splitlines()
+                        if ln.strip() and ln.strip() not in (customer_name, snap.get("contact_name", "")))
     project = snap.get("project") or {}
     return {
         "L": L, "currency": cur,
@@ -100,11 +124,14 @@ def build_context(snap: dict) -> dict:
         "number": snap.get("display_number") or snap.get("number", ""),
         "revision": snap.get("revision", 1),
         "date": _fmt_date(snap.get("date"), lang), "valid_until": _fmt_date(snap.get("valid_until"), lang),
-        "customer_name": customer.get("company") or customer.get("name") or "",
-        "billing_address": Listing(snap.get("billing_address", "")),
-        "contact_name": snap.get("contact_name", ""),
+        "customer_name": customer_name,
+        "billing_address": Listing(address),
+        "contact_name": snap.get("contact_name", ""), "contact_email": snap.get("contact_email", ""),
+        "signer": snap.get("signer", ""),
         "project": f"{project.get('code', '')} · {project.get('name', '')}" if project else "",
-        "intro_text": Listing(snap.get("intro_text", "")), "outro_text": Listing(snap.get("outro_text", "")),
+        "intro_text": Listing(snap.get("intro_text", "")),
+        "outro_text": Listing("\n\n".join(t for t in ((L["tiers_note"] if has_tiers else ""),
+                                                        snap.get("outro_text", "")) if t)),
         "payment_terms": Listing(snap.get("payment_terms", "")),
         "delivery_terms": Listing(snap.get("delivery_terms", "")),
         "lines": lines,
@@ -117,6 +144,28 @@ def build_context(snap: dict) -> dict:
     }
 
 
+def blank_template() -> str:
+    """Шаблон Angebot на бланку Commercial Invoice (той самий логотип і реквізити); перебудовується, коли бланк
+    змінився (завантажили свій) або змінилась побудова. Немає бланка / збій — ''."""
+    from . import template_builder
+    try:
+        from shipping.services.commercial_invoice_service import active_template_path
+        blank = Path(active_template_path())
+    except ImportError:
+        return ""
+    if not blank.exists():
+        return ""
+    out = Path(settings.MEDIA_ROOT) / "offer_templates" / f"from_ci_v{template_builder.VERSION}.docx"
+    try:
+        if not out.exists() or out.stat().st_mtime < blank.stat().st_mtime:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            template_builder.build(out, blank=blank)
+        return str(out)
+    except Exception as e:  # noqa: BLE001 — запасний простий шаблон
+        logger.warning("offer template from CI blank: %s", e)
+        return ""
+
+
 def template_path() -> str:
     from .models import OfferSettings
     s = OfferSettings.get()
@@ -125,7 +174,7 @@ def template_path() -> str:
             return s.template.path
         except (ValueError, NotImplementedError):
             pass
-    return str(DEFAULT_TEMPLATE)
+    return blank_template() or str(DEFAULT_TEMPLATE)
 
 
 def render_docx(snap: dict) -> bytes:

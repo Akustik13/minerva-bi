@@ -91,6 +91,17 @@ def counterparts(em, own) -> list:
     return [sender] if sender in external else external
 
 
+def address_category(account_id, address, ctx=None) -> str:
+    """Тип співрозмовника для однієї адреси (напр. відправника пересланого колегою листа) — ті самі правила,
+    що й `categorize`, без тексту листа."""
+    ctx = ctx or CategoryContext()
+    a = _addr(address)
+    if not a or is_own(a, ctx.own):
+        return 'internal'
+    return ctx.rule_for(account_id, [a]) or ('customer' if ctx.is_customer([a]) else 'supplier'
+                                              if ctx.is_supplier([a]) else 'service' if _is_service(a) else 'other')
+
+
 def categorize(em, ctx=None, list_unsubscribe=False) -> str:
     ctx = ctx or CategoryContext()
     contacts = counterparts(em, ctx.own)

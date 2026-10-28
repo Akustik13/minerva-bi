@@ -23,6 +23,13 @@ ME = "sales@sevskiy.de"
 D = Decimal
 
 
+def _all_text(path) -> str:
+    """Увесь текст DOCX, включно з вкладеними таблицями бланка."""
+    import re
+    import zipfile
+    return " ".join(re.findall(r"<w:t[^>]*>([^<]*)</w:t>", zipfile.ZipFile(path).read("word/document.xml").decode()))
+
+
 class OffersBase(TestCase):
     def setUp(self):
         from config.models import SystemSettings
@@ -122,7 +129,9 @@ class LifecycleTests(OffersBase):
         rev = services.generate_document(offer)
         text = "\n".join(p.text for p in Document(rev.docx_file.path).paragraphs)
         cells = "\n".join(c.text for t in Document(rev.docx_file.path).tables for r in t.rows for c in r.cells)
-        self.assertIn(f"Angebot {offer.number}", text)
+        self.assertIn(f"Angebotsnummer: {offer.number}", text)                # бланк Commercial Invoice
+        self.assertIn("Kunde:", cells)
+        self.assertIn("Anbieter:", _all_text(rev.docx_file.path))          # блок продавця — вкладена таблиця
         self.assertIn("Summe netto: 2 250,00 EUR", text)                     # 1 250 + доставка 1 000
         self.assertIn("Gesamtbetrag: 2 677,50 EUR", text)
         self.assertIn("ANT-100", cells)
@@ -418,3 +427,118 @@ class AdminTests(OffersBase):
         self.assertTrue(OfferRevision.objects.filter(offer=offer, revision=1).exists())
         proj = self.client.get(f"/admin/projects/project/{project.pk}/change/")
         self.assertContains(proj, offer.number)
+
+
+class ForwardedQuoteRequestTests(QuoteMailBase):
+    """Колега переслав запит клієнта (FW / WG): відправник і текст — з пересланого листа."""
+
+    FW = ("Mit freundlichen Grüßen\nSergey\n\n-------- Ursprüngliche Nachricht --------\n"
+          "Von: Denys Repetynskyi <{frm}>\nDatum: 28.10.26 14:23\nAn: \"Sergey\" <" + ME + ">\nBetreff: Filters\n\n"
+          "Good afternoon, we'd like to place a larger order.\n"
+          "Please provide pricing and production lead times for 35 units and 100 units of ANT-100.\n")
+
+    def test_forwarded_request_is_found(self):
+        m = self.mail("FW: Filters", self.FW.format(frm="procurement10@moduletp.example"), frm=ME)
+        self.assertEqual(m.category, "internal")
+        qr = self.qr(m)
+        self.assertIsNotNone(qr)
+        self.assertTrue(qr.reason.startswith("переслано від procurement10@moduletp.example"))
+        self.assertIn("Please provide pricing", qr.reason)
+
+    def test_forwarded_from_supplier_or_colleague_is_not(self):
+        supplier = self.mail("FW: Offer", self.FW.format(frm="sales@parts.example"), frm=ME)
+        colleague = self.mail("FW: intern", self.FW.format(frm=ME), frm=ME)
+        plain = self.mail("Notiz", "Please provide pricing — intern, ohne Weiterleitung", frm=ME)
+        for m in (supplier, colleague, plain):
+            self.assertIsNone(self.qr(m), m.subject)
+
+    def test_angebot_contact_and_customer_from_forwarded_sender(self):
+        from crm.models import Customer
+        buyer = Customer.objects.create(name="Denys", company="SL Tire", email="procurement10@moduletp.example")
+        m = self.mail("FW: Filters", self.FW.format(frm="procurement10@moduletp.example"), frm=ME)
+        offer = services.create_from_thread(m.thread, self.user)
+        self.assertEqual((offer.contact_email, offer.contact_name, offer.customer),
+                         ("procurement10@moduletp.example", "Denys", buyer))   # ім'я — з картки клієнта CRM
+
+
+class QuickOfferTests(QuoteMailBase):
+    """⚡ Легка форма Angebot: бланк Commercial Invoice, ступені (Staffelpreise), Deutsch + English, з листа."""
+
+    def setUp(self):
+        super().setUp()
+        from shop.models import Shop, ShopListing, ShopPriceTier
+        shop = Shop.objects.create(name="Website", slug="webshop", is_default=True, currency="EUR")
+        listing = ShopListing.objects.create(shop=shop, product=self.ant, price=D("10.00"))
+        ShopPriceTier.objects.create(listing=listing, min_qty=100, unit_price=D("8.00"))
+
+    def test_parse_tiers(self):
+        self.assertEqual(services.parse_tiers("35; 100"), [(D("35"), None), (D("100"), None)])
+        self.assertEqual(services.parse_tiers("35, 100"), [(D("35"), None), (D("100"), None)])
+        self.assertEqual(services.parse_tiers("35: 12,50; 100: 10,9"), [(D("35"), D("12.50")), (D("100"), D("10.9"))])
+        self.assertEqual(services.parse_tiers(""), [])
+
+    def test_tiers_price_each_quantity_and_document(self):
+        from docx import Document
+        offer = services.new_offer(customer=self.customer, user=self.user, language="de_en")
+        offer = services.save_quick({"customer": self.customer, "language": "de_en"},
+                                    [{"sku": "ANT-100", "qtys": "35; 100", "prices": ""},
+                                     {"sku": "", "description": "Sonderanfertigung", "qtys": "1", "prices": "99,90"}],
+                                    self.user, offer=offer)
+        line = offer.lines.get(sku="ANT-100")
+        self.assertEqual([(t["qty"], t["unit_price"]) for t in line.tiers], [("35", "10.0000"), ("100", "8.0000")])
+        self.assertEqual((line.qty, line.unit_price, line.line_total), (D("35"), D("10.0000"), D("350.00")))
+        offer.refresh_from_db()
+        self.assertEqual(offer.net_total, D("449.90"))   # перша к-сть: 350 + 99,90
+        rev = services.generate_document(offer)
+        doc = Document(rev.docx_file.path)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        cells = "\n".join(c.text for t in doc.tables for r in t.rows for c in r.cells)
+        self.assertIn("Angebot / Quotation", text)                        # обома мовами
+        self.assertIn("Menge / Qty", cells)
+        self.assertIn("35 Stk\n100 Stk", cells)                           # ступені — рядками в комірці
+        self.assertIn("8,00", cells)
+        self.assertIn("Staffelpreise", text)
+        self.assertIn("Tiered prices", text)
+        self.assertIn("Sevskiy GmbH", _all_text(rev.docx_file.path))     # бланк Commercial Invoice
+        self.assertIn("Kunde / Customer:", cells)
+        self.assertIn("Client GmbH", cells)
+        self.assertNotIn("{{", text + cells)
+        self.assertNotIn("Ship to", cells)
+
+    def test_prefill_from_forwarded_mail_and_create(self):
+        from offers.models import QuoteRequest
+        m = self.mail("FW: Filters", ForwardedQuoteRequestTests.FW.format(frm="procurement10@moduletp.example"), frm=ME)
+        self.assertIsNotNone(self.qr(m))
+        page = self.client.get(f"/offers/quick/?thread={m.thread_id}")
+        self.assertEqual(page.status_code, 200)
+        data = page.context["data"]
+        self.assertEqual((data["language"], data["contact_email"]), ("en", "procurement10@moduletp.example"))
+        self.assertEqual(data["lines"][0]["sku"], "ANT-100")
+        self.assertEqual(data["lines"][0]["qtys"], "35; 100")             # «35 units and 100 units» → ступені
+        import json
+        r = self.client.post("/offers/quick/", {
+            "thread": m.thread_id, "language": "en", "currency": "EUR", "valid_days": "30",
+            "contact_name": "Denys", "contact_email": "procurement10@moduletp.example", "billing_address": "SL Tire",
+            "lines_json": json.dumps(data["lines"])})
+        offer = Offer.objects.latest("pk")
+        self.assertRedirects(r, f"/offers/{offer.pk}/quick/", fetch_redirect_response=False)
+        self.assertEqual((offer.language, offer.source_message_id, offer.lines.get().tiers[1]["qty"]),
+                         ("en", m.pk, "100"))
+        self.assertEqual(QuoteRequest.objects.get(message=m).status, QuoteRequest.DONE)
+        self.assertTrue(offer.revisions.exists())                          # документ сформовано
+        page = self.client.get(f"/offers/{offer.pk}/quick/")
+        self.assertContains(page, "Перегенерувати")
+
+    def test_price_hints_and_customer_api(self):
+        d = self.client.get("/offers/api/price/?sku=ant-100&qtys=35;100&currency=EUR").json()
+        self.assertEqual([t["unit_price"] for t in d["tiers"]], ["10", "8"])
+        self.assertFalse(self.client.get("/offers/api/price/?sku=NOPE&qtys=1").json()["found"])
+        c = self.client.get(f"/offers/api/customer/{self.customer.pk}/").json()
+        self.assertIn("Hauptstr. 1", c["address"])
+
+    def test_admin_tiers_field(self):
+        offer = services.new_offer(customer=self.customer, user=self.user)
+        line = services.add_line(offer, product=self.ant, qty=35)
+        services.set_tiers(line, services.parse_tiers("35; 150"))
+        line.save()
+        self.assertEqual(services.tiers_text(line), "35: 10; 150: 8")

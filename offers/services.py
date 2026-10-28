@@ -81,7 +81,8 @@ def fill_line(line, *, sku="", description="", unit_price=None, price_source=Non
     line.sku = sku or line.sku or (p.sku if p else "")
     line.description = description or line.description or (p.name_export or p.name if p else "") or line.sku
     if p and not line.lead_time and getattr(p, "lead_time_days", None):
-        line.lead_time = f"{p.lead_time_days} Tage" if line.offer.language == "de" else f"{p.lead_time_days} days"
+        days = {"de": "Tage", "de_en": "Tage / days", "uk": "днів"}.get(line.offer.language, "days")
+        line.lead_time = f"{p.lead_time_days} {days}"
     if unit_price is not None:
         line.unit_price = Decimal(str(unit_price))
         line.price_source = price_source or OfferLine.MANUAL
@@ -94,13 +95,83 @@ def fill_line(line, *, sku="", description="", unit_price=None, price_source=Non
     line.line_total = pricing.line_total(line.qty, line.unit_price, line.discount_percent)
 
 
+def parse_tiers(text) -> list:
+    """«35; 100» або «35: 12,50; 100: 10,90» → [(к-сть, ціна | None)] (ступені — через «;», ціна — після «:»).
+    Без «:» кількості можна й через кому з пробілом: «35, 100»."""
+    text = (text or "").strip()
+    if not text:
+        return []
+    parts = re.split(r"[;\n|]+", text) if (";" in text or ":" in text or "\n" in text) else re.split(r",\s+|\s+", text)
+    out = []
+    for part in parts:
+        q, _, p = part.partition(":")
+        q, p = q.strip().replace(",", "."), p.strip().replace(" ", "").replace(",", ".")
+        try:
+            qty = Decimal(q)
+        except Exception:  # noqa: BLE001
+            continue
+        if qty <= 0:
+            continue
+        try:
+            price = Decimal(p) if p else None
+        except Exception:  # noqa: BLE001
+            price = None
+        out.append((qty, price))
+    return out
+
+
+def tiers_text(line) -> str:
+    """Ступені позиції для поля адмінки: «35: 12.5; 100: 10.9» (ціна з Minerva — теж показана)."""
+    return "; ".join(f"{pricing._num(t['qty'])}: {pricing._num(t['unit_price'])}" if t.get("unit_price")
+                     else pricing._num(t["qty"]) for t in (line.tiers or []))
+
+
+def set_tiers(line, tiers) -> None:
+    """Ступінчасті ціни (Staffelpreise): [(к-сть, ціна | None)]; без ціни — з каталогу Minerva саме для цієї к-сті
+    (ступені магазину / базові ціни). Перша — основна к-сть і ціна позиції (з неї сума Angebot); одна або жодної —
+    звичайна позиція. Не зберігає."""
+    rows = []
+    for qty, price in tiers:
+        source, note = OfferLine.MANUAL, "Введено вручну"
+        if price is None and line.product_id:
+            q = pricing.quote_price(line.product, qty, line.offer.currency)
+            price, source, note = q.unit_price, q.source, q.note
+        elif price is None:
+            note = "на запит"
+        rows.append({"qty": pricing._num(qty), "unit_price": _s(price) if price is not None else "",
+                     "line_total": _s(pricing.line_total(qty, price, line.discount_percent)), "price_note": note,
+                     "price_source": source})
+    line.tiers = rows if len(rows) > 1 else []
+    if rows:
+        first = rows[0]
+        line.qty = Decimal(first["qty"])
+        line.unit_price = Decimal(first["unit_price"]) if first["unit_price"] else None
+        line.price_source, line.price_note = first["price_source"], first["price_note"]
+    line.line_total = pricing.line_total(line.qty, line.unit_price, line.discount_percent)
+
+
+def _sync_tiers(line) -> bool:
+    """Перший ступінь = к-сть і ціна позиції (їх можна змінити в адмінці), суми ступенів — зі знижкою."""
+    if not line.tiers:
+        return False
+    rows = [dict(t) for t in line.tiers]
+    rows[0].update(qty=pricing._num(line.qty), unit_price=_s(line.unit_price) if line.unit_price is not None else "")
+    for t in rows:
+        t["line_total"] = _s(pricing.line_total(Decimal(t["qty"]), Decimal(t["unit_price"]) if t["unit_price"]
+                                                else None, line.discount_percent))
+    changed = rows != line.tiers
+    line.tiers = rows
+    return changed
+
+
 def recalculate(offer) -> Offer:
     lines = list(offer.lines.all())
     for i, line in enumerate(lines, 1):
         total = pricing.line_total(line.qty, line.unit_price, line.discount_percent)
-        if line.line_total != total or line.position != i:
+        tiers_changed = _sync_tiers(line)
+        if line.line_total != total or line.position != i or tiers_changed:
             line.line_total, line.position = total, i
-            line.save(update_fields=["line_total", "position"])
+            line.save(update_fields=["line_total", "position", "tiers"])
     t = pricing.totals([l.line_total for l in lines], offer.shipping_cost, offer.vat_rate)
     offer.net_total, offer.vat_total, offer.gross_total = t["net"], t["vat"], t["gross"]
     Offer.objects.filter(pk=offer.pk).update(net_total=t["net"], vat_total=t["vat"], gross_total=t["gross"],
@@ -137,6 +208,7 @@ def snapshot(offer) -> dict:
                      "company": getattr(offer.customer, "company", "")},
         "contact_name": offer.contact_name, "contact_email": offer.contact_email,
         "billing_address": offer.billing_address,
+        "signer": (offer.owner.get_full_name() or offer.owner.get_username()) if offer.owner_id else "",
         "project": {"id": offer.project_id, "code": getattr(offer.project, "code", ""),
                     "name": getattr(offer.project, "name", "")} if offer.project_id else None,
         "intro_text": offer.intro_text, "payment_terms": offer.payment_terms,
@@ -144,7 +216,8 @@ def snapshot(offer) -> dict:
         "lines": [{"position": l.position, "sku": l.sku, "description": l.description, "qty": _s(l.qty),
                    "unit": l.unit, "unit_price": _s(l.unit_price), "discount_percent": _s(l.discount_percent),
                    "line_total": _s(l.line_total), "lead_time": l.lead_time, "price_source": l.price_source,
-                   "price_note": l.price_note, "product_id": l.product_id} for l in offer.lines.all()],
+                   "price_note": l.price_note, "product_id": l.product_id, "tiers": l.tiers or []}
+                  for l in offer.lines.all()],
         "shipping_cost": _s(offer.shipping_cost), "vat_rate": _s(offer.vat_rate),
         "net_total": _s(offer.net_total), "vat_total": _s(offer.vat_total), "gross_total": _s(offer.gross_total),
     }
@@ -324,11 +397,20 @@ def create_from_thread(thread, user=None) -> Offer:
     except ImportError:
         pass
     customer = thread.crm_customer or (project.customer if project else None)
+    fw = None
+    if source is not None and is_own(source.from_email, own):   # колега переслав лист клієнта (FW / WG)
+        from email_assistant.quotes import forwarded
+        fw = forwarded(source.body_text)
+        if fw and is_own(fw["from"], own):
+            fw = None
+        if fw and customer is None:
+            from email_assistant.crm_link import find_customer
+            customer = find_customer([fw["from"]])
     offer = new_offer(customer=customer, user=user, project=project, source_message=source)
     if source is not None:
-        if not offer.contact_email and not is_own(source.from_email, own):
-            offer.contact_email = source.from_email
-            offer.contact_name = offer.contact_name or source.from_name
+        if not offer.contact_email and (fw or not is_own(source.from_email, own)):
+            offer.contact_email = fw["from"] if fw else source.from_email
+            offer.contact_name = offer.contact_name or (fw["name"] if fw else source.from_name)
             offer.save(update_fields=["contact_email", "contact_name"])
         for product, qty in detect_items(f"{source.subject}\n{source.body_text}"):
             line = add_line(offer, product=product, qty=qty or 1, recalc=False)
@@ -392,18 +474,20 @@ def compose_initial(offer_pk, user=None) -> dict:
     offer = get_object_or_404(Offer, pk=offer_pk)
     rev = generate_document(offer, user)          # надіслана версія не перезаписується
     settings_ = OfferSettings.get()
-    lang = offer.language if offer.language in _MAIL_TEXT else "de"
-    hello, hello_named, body = _MAIL_TEXT[lang]
+    langs = ["de", "en"] if offer.language == "de_en" else [offer.language if offer.language in _MAIL_TEXT else "de"]
     valid = offer.valid_until.strftime("%d.%m.%Y") if offer.valid_until else "—"
-    greeting = hello_named.format(name=offer.contact_name) if offer.contact_name else hello
-    text = body.format(number=offer.display_number, valid=valid)
+    paragraphs = []
+    for lang in langs:   # «Deutsch + English» — обидва абзаци
+        hello, hello_named, body = _MAIL_TEXT[lang]
+        greeting = hello_named.format(name=offer.contact_name) if offer.contact_name else hello
+        paragraphs.append(f"{html.escape(greeting)}<br><br>{html.escape(body.format(number=offer.display_number, valid=valid))}")
     subject = settings_.email_subject.format(
         number=offer.display_number, customer=getattr(offer.customer, "company", "") or getattr(offer.customer, "name", ""))
     att = revision_attachment(rev.pk)
     return {
         "to": offer.contact_email or getattr(offer.customer, "email", "") or "",
         "subject": subject,
-        "body_html": f"{html.escape(greeting)}<br><br>{html.escape(text)}",
+        "body_html": "<br><br>".join(paragraphs),
         "att_refs": [{"ref": f"offer:{rev.pk}", "name": att["name"]}] if att else [],
     }
 
@@ -418,3 +502,187 @@ def mark_sent_refs(refs, message_id="") -> int:
             mark_sent(rev, message_id)
             n += 1
     return n
+
+
+# ── ⚡ Легка форма Angebot (як Commercial Invoice: сторінка → документ на бланку) ──────────────
+QTY_RE = re.compile(r"(?<![\w.,/-])(\d{1,6}(?:[.,]\d{1,3})?)\s*(?:x\s*)?(?:units?|pcs\.?|pieces?|stk\.?|stück|"
+                    r"st\.|шт\.?|штук\w*|items?|ea)(?!\w)", re.IGNORECASE)
+SKU_RE = re.compile(r"\b([A-Z]{1,6}[-_]?\d{3,}[A-Z0-9-]*)\b")
+_DE_RE = re.compile(r"\b(?:und|bitte|für|mit|wir|ihr|ihnen|sehr|geehrte\w*|grüßen|angebot|stück|liefer\w*|anfrage)\b",
+                    re.IGNORECASE)
+_EN_RE = re.compile(r"\b(?:the|and|please|for|with|we|you|regards|quotation|quote|units|pricing|delivery|lead)\b",
+                    re.IGNORECASE)
+BLANK_ROW = {"sku": "", "description": "", "qtys": "1", "prices": "", "lead_time": "", "unit": "Stk"}
+
+
+def thread_source(thread):
+    """Для Angebot з листування: (вихідний лист, пересланий лист клієнта | None, клієнт, проєкт).
+    Колега переслав (FW / WG) — контакт і клієнт з пересланого листа."""
+    from email_assistant.crm_link import find_customer, is_own, own_addresses
+    from email_assistant.quotes import forwarded
+    msgs = list(thread.messages.filter(is_deleted=False).order_by("-sent_at"))
+    own = own_addresses()
+    source = next((m for m in msgs if not is_own(m.from_email, own)), msgs[0] if msgs else None)
+    project = None
+    try:
+        from projects.models import ProjectLink
+        link = (ProjectLink.objects.filter(thread=thread, status=ProjectLink.CONFIRMED)
+                .select_related("project").order_by("-created_at").first())
+        project = link.project if link else None
+    except ImportError:
+        pass
+    customer = thread.crm_customer or (project.customer if project else None)
+    fw = None
+    if source is not None and is_own(source.from_email, own):
+        fw = forwarded(source.body_text)
+        if fw and is_own(fw["from"], own):
+            fw = None
+        if fw and customer is None:
+            customer = find_customer([fw["from"]])
+    return source, fw, customer, project
+
+
+def guess_language(text: str, default: str) -> str:
+    """Мова документа за мовою листа: англійський текст → en, німецький → de, інакше — як у налаштуваннях."""
+    de, en = len(_DE_RE.findall(text or "")), len(_EN_RE.findall(text or ""))
+    if en >= 3 and en > de * 1.5:
+        return "en"
+    if de >= 3 and de > en:
+        return "de"
+    return default
+
+
+def _quantities(text: str) -> list:
+    out = []
+    for m in QTY_RE.finditer(text or ""):
+        q = Decimal(m.group(1).replace(",", "."))
+        if q > 0 and q not in out:
+            out.append(q)
+    return out
+
+
+def _qtys_text(values) -> str:
+    return "; ".join(pricing._num(v) for v in values)
+
+
+def quick_prefill(thread=None) -> dict:
+    """Дані легкої форми: з листування (клієнт, контакт, проєкт, мова листа, артикули каталогу; кількості з листа —
+    ступенями, напр. «35 units and 100 units» → 35; 100) або порожні з налаштувань."""
+    from email_assistant.quotes import new_text
+    s = OfferSettings.get()
+    data = {"customer": None, "contact_name": "", "contact_email": "", "billing_address": "", "project": None,
+            "language": s.default_language, "currency": s.default_currency, "valid_days": s.validity_days,
+            "shipping_cost": "0", "intro_text": s.intro_text, "payment_terms": s.payment_terms,
+            "delivery_terms": s.delivery_terms, "outro_text": s.outro_text, "source": None, "forwarded": None,
+            "lines": [dict(BLANK_ROW)]}
+    if thread is None:
+        return data
+    source, fw, customer, project = thread_source(thread)
+    if source is None:
+        return data
+    text = f"{fw['subject']}\n{fw['text']}" if fw else f"{source.subject or ''}\n{new_text(source.body_text)}"
+    qtys = _quantities(text)
+    items = detect_items(text)
+    rows = []
+    for product, qty in items:
+        tiers = qtys if len(items) == 1 and len(qtys) > 1 else ([qty] if qty else qtys[:1])
+        rows.append({**BLANK_ROW, "sku": product.sku, "description": product.name_export or product.name,
+                     "qtys": _qtys_text(tiers) or "1"})
+    if not rows:   # артикула немає в каталозі — підставити схоже на артикул слово з листа
+        sku = SKU_RE.search(text)
+        rows.append({**BLANK_ROW, "sku": sku.group(1) if sku else "", "qtys": _qtys_text(qtys) or "1"})
+    data.update(
+        customer=customer, project=project, source=source, forwarded=fw, lines=rows,
+        contact_name=(customer.name if customer else "") or (fw["name"] if fw else source.from_name) or "",
+        contact_email=(fw["from"] if fw else source.from_email) or getattr(customer, "email", "") or "",
+        billing_address=customer_address(customer), language=guess_language(text, s.default_language))
+    return data
+
+
+def quick_from_offer(offer) -> dict:
+    """Чернетка Angebot у легкій формі: ціни — лише введені вручну (інші знову рахує Minerva)."""
+    def manual(t):
+        return t.get("unit_price") if t.get("price_source", OfferLine.MANUAL) == OfferLine.MANUAL else ""
+    rows = []
+    for l in offer.lines.all():
+        tiers = l.tiers or [{"qty": _s(l.qty), "unit_price": _s(l.unit_price) if l.unit_price is not None else "",
+                             "price_source": l.price_source}]
+        prices = [manual(t) for t in tiers]
+        rows.append({"sku": l.sku, "description": l.description,
+                     "qtys": _qtys_text(Decimal(t["qty"]) for t in tiers),
+                     "prices": "; ".join(pricing._num(p).replace(".", ",") if p else "" for p in prices).strip("; "),
+                     "lead_time": l.lead_time, "unit": l.unit})
+    s = OfferSettings.get()
+    valid_days = (offer.valid_until - timezone.localdate()).days if offer.valid_until else s.validity_days
+    return {"customer": offer.customer, "contact_name": offer.contact_name, "contact_email": offer.contact_email,
+            "billing_address": offer.billing_address, "project": offer.project, "language": offer.language,
+            "currency": offer.currency, "valid_days": max(valid_days, 0), "shipping_cost": _s(offer.shipping_cost),
+            "intro_text": offer.intro_text, "payment_terms": offer.payment_terms,
+            "delivery_terms": offer.delivery_terms, "outro_text": offer.outro_text, "source": offer.source_message,
+            "forwarded": None, "lines": rows or [dict(BLANK_ROW)]}
+
+
+def _row_tiers(row) -> list:
+    """Рядок форми: «35; 100» + «12,50; 10,90» → [(35, 12.50), (100, 10.90)]; ціни немає — None (з Minerva)."""
+    qtys = [q for q, _p in parse_tiers(row.get("qtys") or "")] or [Decimal("1")]
+    prices = []
+    for part in (row.get("prices") or "").split(";"):
+        part = part.strip().replace(" ", "").replace(",", ".")
+        try:
+            prices.append(Decimal(part) if part else None)
+        except Exception:  # noqa: BLE001
+            prices.append(None)
+    return [(q, prices[i] if i < len(prices) else None) for i, q in enumerate(qtys)]
+
+
+@transaction.atomic
+def save_quick(fields: dict, rows: list, user=None, offer=None, source=None, thread=None) -> Offer:
+    """Легка форма → Angebot (новий або та сама чернетка): поля й позиції (артикул з каталогу — товар і ціна з
+    Minerva для кожної кількості; ступені — set_tiers). Позиції чернетки замінюються цілком."""
+    from inventory.models import Product
+    keys = ("contact_name", "contact_email", "billing_address", "language", "currency", "valid_until",
+            "shipping_cost", "intro_text", "payment_terms", "delivery_terms", "outro_text", "project")
+    if offer is None:
+        offer = new_offer(customer=fields.get("customer"), user=user, source_message=source,
+                          **{k: fields[k] for k in keys if k in fields})
+    else:
+        if offer.is_locked:
+            raise OfferError("Надіслану пропозицію не змінюють — створіть нову версію.")
+        offer.customer = fields.get("customer")
+        for k in keys:
+            if k in fields:
+                setattr(offer, k, fields[k])
+        offer.save()
+        offer.lines.all().delete()
+    for row in rows:
+        sku = (row.get("sku") or "").strip()[:255]
+        description = (row.get("description") or "").strip()
+        if not (sku or description):
+            continue
+        product = Product.objects.filter(sku__iexact=sku).first() if sku else None
+        tiers = _row_tiers(row)
+        line = add_line(offer, product=product, qty=tiers[0][0], sku=sku, description=description,
+                        unit_price=tiers[0][1], lead_time=(row.get("lead_time") or "").strip()[:100],
+                        unit=(row.get("unit") or "Stk").strip()[:16] or "Stk", recalc=False)
+        if len(tiers) > 1:
+            set_tiers(line, tiers)
+            line.save()
+    recalculate(offer)
+    if thread is not None:
+        from .detection import mark_done
+        mark_done(thread, offer, user)
+    return offer
+
+
+def price_hints(sku: str, qtys: str, currency: str) -> dict:
+    """Ціни Minerva для артикула й кількостей — підказка в легкій формі (нічого не зберігає)."""
+    from inventory.models import Product
+    product = Product.objects.filter(sku__iexact=(sku or "").strip()).first() if sku else None
+    if product is None:
+        return {"found": False, "tiers": []}
+    out = []
+    for q, _x in parse_tiers(qtys or "1") or [(Decimal("1"), None)]:
+        p = pricing.quote_price(product, q, currency)
+        out.append({"qty": pricing._num(q), "unit_price": pricing._num(p.unit_price) if p.unit_price is not None else "",
+                    "note": p.note})
+    return {"found": True, "name": product.name_export or product.name, "tiers": out}

@@ -3,6 +3,8 @@
 
 Правила, без AI (миттєво й безкоштовно):
 - лише вхідний лист від клієнта чи нового контакту (категорії customer / other), не спам і не видалений;
+- або лист, який колега переслав (FW / WG): тоді відправник і текст — з пересланого листа (`quotes.forwarded`),
+  і відправник має бути клієнтом чи новим контактом (`categorize.address_category`);
 - аналізується новий текст листа — без процитованої історії;
 - запит: явне прохання про пропозицію / ціну (de, en, uk, ru) або артикули каталогу з кількістю + питання про ціну;
 - не запит: подяка за наш Angebot / відповідь на нього, гілка, де Angebot уже створено.
@@ -16,7 +18,7 @@ from datetime import timedelta
 from django.db import connection, transaction
 from django.utils import timezone
 
-from email_assistant.quotes import QUOTE_START_RE, new_text  # noqa: F401 — текст без цитати, спільний із поштою
+from email_assistant.quotes import QUOTE_START_RE, forwarded, new_text  # noqa: F401 — текст без цитати, спільний із поштою
 
 logger = logging.getLogger(__name__)
 
@@ -58,18 +60,24 @@ def detect(msg):
 
     from .models import Offer
     from .services import detect_items
-    if msg.is_spam or msg.is_deleted or msg.folder in ("sent", "spam", "trash", "draft") \
-            or msg.category not in CATEGORIES or is_own(msg.from_email, own_addresses()):
+    if msg.is_spam or msg.is_deleted or msg.folder in ("sent", "spam", "trash", "draft"):
         return None
+    own = own_addresses()
+    fw = None
+    if msg.category not in CATEGORIES or is_own(msg.from_email, own):
+        fw = forwarded_request(msg, own)   # колега переслав лист клієнта
+        if fw is None:
+            return None
     if msg.thread_id and Offer.objects.filter(source_message__thread_id=msg.thread_id).exists():
         return None   # по цій гілці Angebot уже є — далі переговори, а не новий запит
-    body = new_text(msg.body_text)
-    text = f"{msg.subject or ''}\n{body}"
-    request = REQUEST_RE.search(body) or REQUEST_RE.search(msg.subject or "")   # у підставу — фраза з тексту
+    body = fw["text"] if fw else new_text(msg.body_text)
+    subject = (fw["subject"] or msg.subject or "") if fw else (msg.subject or "")
+    text = f"{subject}\n{body}"
+    request = REQUEST_RE.search(body) or REQUEST_RE.search(subject)   # у підставу — фраза з тексту
     if THANKS_RE.search(text) and not (request and re.search(r"neu\w*|new|нов\w*", request.group(0), re.I)):
         return None
     items = [{"product_id": p.pk, "sku": p.sku, "qty": _qty(q) if q else None} for p, q in detect_items(text)]
-    parts = []
+    parts = [f"переслано від {fw['from']}"] if fw else []
     if request:
         parts.append(f"«{' '.join(request.group(0).split())[:SNIPPET]}»")
     elif any(i["qty"] for i in items) and PRICE_RE.search(text):
@@ -79,6 +87,19 @@ def detect(msg):
     if items:
         parts.append("позиції: " + ", ".join(f"{i['sku']} × {i['qty']}" if i["qty"] else i["sku"] for i in items[:4]))
     return {"reason": " · ".join(parts)[:255], "items": items[:30]}
+
+
+def forwarded_request(msg, own=None):
+    """Пересланий колегою лист клієнта / нового контакту → {from, name, subject, text}; інакше None."""
+    from email_assistant.categorize import address_category
+    from email_assistant.crm_link import is_own, own_addresses
+    own = own if own is not None else own_addresses()
+    if not (is_own(msg.from_email, own) or msg.category == "internal"):
+        return None
+    fw = forwarded(msg.body_text)
+    if fw is None or is_own(fw["from"], own) or address_category(msg.account_id, fw["from"]) not in CATEGORIES:
+        return None
+    return fw
 
 
 def scan(msg):
@@ -99,7 +120,7 @@ def scan_recent(days=30, progress=None) -> tuple:
     from django.db import IntegrityError
 
     from email_assistant.models import EmailMessage
-    qs = (EmailMessage.objects.filter(category__in=CATEGORIES, is_spam=False, is_deleted=False,
+    qs = (EmailMessage.objects.filter(category__in=CATEGORIES + ("internal",), is_spam=False, is_deleted=False,
                                       quote_request__isnull=True)
           .exclude(folder__in=("sent", "spam", "trash")))
     if days:

@@ -1635,23 +1635,10 @@ window.pvProjOverviewNext = async function() {
   } catch (e) { _pvOvToast('⚠️ {% trans "Помилка" %}'); }
 };
 
-// «📝 Angebot» — чернетка з листування відкривається в новій вкладці
-window.pvOfferFromThread = async function(tpk, btn) {
-  if (btn) btn.disabled = true;
-  try {
-    var r = await fetch('/offers/api/from-thread/' + tpk + '/', {method: 'POST', headers: {'X-CSRFToken': CSRF}});
-    var d = await r.json();
-    if (d.ok) {
-      var hint = document.getElementById('pv-quote');   // запит виконано — підказку й мітку прибрати
-      if (hint) hint.remove();
-      document.querySelectorAll('.em-row.active .em-tag.quote').forEach(function(t){ t.remove(); });
-      var t = document.getElementById('pv-toast');
-      if (t) { t.textContent = '📝 ' + d.number + ' · {% trans "позицій з листа" %}: ' + d.lines; t.style.display = 'block';
-               clearTimeout(t._hide); t._hide = setTimeout(function(){ t.style.display = 'none'; }, 2500); }
-      window.open(d.url, '_blank');
-    }
-  } catch (e) { /* мережа */ }
-  finally { if (btn) btn.disabled = false; }
+// «📝 Angebot» — легка форма з листування (клієнт, контакт, мова, артикули, кількості-ступені) у новій вкладці;
+// запит закривається, коли Angebot створено
+window.pvOfferFromThread = function(tpk, btn) {
+  window.open('/offers/quick/?thread=' + tpk, '_blank');
 };
 
 window.pvCopyText = function(text) {

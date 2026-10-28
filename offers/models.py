@@ -11,7 +11,7 @@ from django.core.validators import FileExtensionValidator, MinValueValidator
 from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
-LANGUAGES = [("de", "Deutsch"), ("en", "English"), ("uk", "Українська")]
+LANGUAGES = [("de", "Deutsch"), ("en", "English"), ("de_en", "Deutsch + English"), ("uk", "Українська")]
 
 
 class OfferSettings(models.Model):
@@ -21,7 +21,7 @@ class OfferSettings(models.Model):
     validity_days = models.PositiveSmallIntegerField("Дійсна, днів", default=30)
     default_currency = models.CharField("Валюта", max_length=3, default="EUR")
     default_vat_rate = models.DecimalField("ПДВ, %", max_digits=5, decimal_places=2, default=Decimal("19.00"))
-    default_language = models.CharField("Мова документа", max_length=2, choices=LANGUAGES, default="de")
+    default_language = models.CharField("Мова документа", max_length=5, choices=LANGUAGES, default="de")
     intro_text = models.TextField(
         "Вступ", blank=True,
         default="vielen Dank für Ihre Anfrage. Gerne unterbreiten wir Ihnen folgendes Angebot:")
@@ -91,7 +91,8 @@ class Offer(models.Model):
                                 related_name="offers", verbose_name="Проєкт")
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                               related_name="owned_offers", verbose_name="Відповідальний")
-    language = models.CharField("Мова документа", max_length=2, choices=LANGUAGES, default="de")
+    language = models.CharField("Мова документа", max_length=5, choices=LANGUAGES, default="de",
+                                help_text="«Deutsch + English» — один документ з підписами обома мовами")
     currency = models.CharField("Валюта", max_length=3, default="EUR")
     vat_rate = models.DecimalField("ПДВ, %", max_digits=5, decimal_places=2, default=Decimal("19.00"),
                                    validators=[MinValueValidator(Decimal("0"))],
@@ -212,6 +213,10 @@ class OfferLine(models.Model):
     price_note = models.CharField("Звідки ціна", max_length=255, blank=True, default="")
     lead_time = models.CharField("Строк поставки", max_length=100, blank=True, default="")
     line_total = models.DecimalField("Сума", max_digits=14, decimal_places=2, default=Decimal("0"))
+    tiers = models.JSONField(
+        "Ступені (Staffelpreise)", default=list, blank=True,
+        help_text="[{qty, unit_price, line_total, price_note}] — кілька кількостей з ціною кожної; перша — "
+                  "основна к-сть позиції (з неї сума Angebot). services.set_tiers")
 
     class Meta:
         verbose_name = "Позиція"
