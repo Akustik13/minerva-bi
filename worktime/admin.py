@@ -151,7 +151,7 @@ class DanteSettingsAdmin(admin.ModelAdmin):
         }),
         ("✉️ Час на пошту", {
             "fields": ["mail_time", "mail_projects", "mail_projects_auto", "mail_reply_minutes", "mail_read_minutes",
-                       "mail_step", "mail_time_status"],
+                       "mail_step", "comment_lang", "comment_ai", "mail_time_status"],
             "description": "Minerva оцінює за нормами, скільки часу пішло на листи: свої категорії листів "
                            "(🏷 DigiKey, магазин… — проєкт askDANTE і хвилини задаються в самій категорії) і "
                            "гілки проєктів Minerva, зв'язаних з askDANTE. Оцінка по днях — «✉️ Час на пошту»; "

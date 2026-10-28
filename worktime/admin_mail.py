@@ -61,13 +61,32 @@ def mail_time_page(model_admin, request):
             return redirect(back)
         done = minutes = 0
         activity = DanteActivity.objects.filter(pk=request.POST.get("activity") or 0).first()
-        for pick in request.POST.getlist("pick"):
+        if request.POST.get("action") == "describe":   # 📝 короткі описи AI для рядків періоду (далі — правити вручну)
+            n = 0
+            for day, info in mail_time.estimate(du, date_from, date_to, st).items():
+                for r in info["rows"]:
+                    if n < mail_time.MAX_DESCRIBE and not mail_time.cached_summary(du, r, st.comment_lang):
+                        n += bool(mail_time.describe(du, r, st.comment_lang, request.user))
+            if n:
+                messages.success(request, f"Описів AI: {n}. Перевірте й за потреби виправте текст перед записом.")
+            else:
+                messages.warning(request, "AI не дав описів (немає ключа Anthropic або листи без тексту) — "
+                                          "лишається опис за темами листів.")
+            return redirect(back)
+        rewrite = request.POST.get("rewrite", "")
+        picks = [rewrite] if rewrite else request.POST.getlist("pick")
+        for pick in picks:
             day_s, _, dp = pick.partition("|")
             day = _day(day_s, None)
             if day is None or not dp.isdigit():
                 continue
+            text = request.POST.get(f"c_{pick}", "")
             try:
-                b = mail_time.book(du, day, int(dp), user=request.user, source=Booking.MAIL, st=st, activity=activity)
+                if rewrite:
+                    b = mail_time.rewrite(du, day, int(dp), comment=text, user=request.user, st=st, activity=activity)
+                else:
+                    b = mail_time.book(du, day, int(dp), user=request.user, source=Booking.MAIL, st=st,
+                                       activity=activity, comment=text)
             except DanteError as e:
                 messages.error(request, f"{day:%d.%m}: {e.message}")
                 continue
@@ -83,9 +102,17 @@ def mail_time_page(model_admin, request):
     days = []
     total = todo = 0
     if du is not None:
+        sent = {}
+        for b in Booking.objects.filter(dante_user=du, date__range=(date_from, date_to), kind=Booking.PROJECT,
+                                        source=Booking.MAIL, status=Booking.SENT).order_by("created_at"):
+            sent.setdefault((b.date, b.dante_project_id), []).append(b)
         for day, info in mail_time.estimate(du, date_from, date_to, st).items():
             for r in info["rows"]:
                 r["dur"], r["booked_dur"], r["todo_dur"] = _hm(r["minutes"]), _hm(r["booked"]), _hm(r["to_book"])
+                r["key"] = f"{day:%Y-%m-%d}|{r['dp'].pk}"
+                summary = mail_time.cached_summary(du, r, st.comment_lang)
+                r["comment"], r["ai"] = mail_time.default_comment(r, st.comment_lang, summary), bool(summary)
+                r["sent"] = sent.get((day, r["dp"].pk), [])
                 total += r["minutes"]
                 todo += r["to_book"]
             days.append({"day": day, "wd": WEEKDAYS[day.weekday()], "rows": info["rows"], "unmapped": info["unmapped"],
@@ -102,5 +129,7 @@ def mail_time_page(model_admin, request):
         "mapping_url": reverse("admin:worktime_danteproject_changelist") + "?view=minerva",
         "activities": list(DanteActivity.objects.filter(archived=False)),
         "needs_activity": st.activity_required and not st.default_activity_id,
+        "lang": dict(DanteSettings.COMMENT_LANGS).get(st.comment_lang, st.comment_lang),
+        "dante_url": st.base_url,
     }
     return render(request, "admin/worktime/mail_time.html", context)

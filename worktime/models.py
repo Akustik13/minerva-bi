@@ -89,6 +89,13 @@ class DanteSettings(models.Model):
     mail_step = models.PositiveSmallIntegerField(
         "Округлювати вгору до, хв", default=15,
         help_text="Оцінка за день по проєкту округлюється вгору (15 — чверть години).")
+    COMMENT_LANGS = [("de", "Deutsch"), ("en", "English"), ("uk", "Українська")]
+    comment_lang = models.CharField("Мова опису в askDANTE", max_length=2, choices=COMMENT_LANGS, default="de",
+                                    help_text="Опис запису часу на пошту: про що листи й скільки їх.")
+    comment_ai = models.BooleanField(
+        "Короткий опис листів — AI", default=True,
+        help_text="Одне речення про суть листів (Claude Haiku, тема й новий текст листів без цитат). Вимкнено або "
+                  "AI недоступний — теми листів. Перед записом опис видно й можна виправити.")
     mail_time_last_day = models.DateField("Час на пошту записано по", null=True, blank=True, editable=False)
     mail_time_result = models.CharField("Час на пошту — останній запуск", max_length=255, blank=True, default="",
                                         editable=False)

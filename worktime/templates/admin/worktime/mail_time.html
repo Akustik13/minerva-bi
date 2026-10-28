@@ -25,6 +25,11 @@
 .mt-row .done{color:#16a34a}
 .mt-subj{color:var(--text-muted);font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mt-badge{font-size:11px;padding:1px 6px;border-radius:8px;background:rgba(26,115,232,.14);color:#1a73e8}
+.mt-desc{grid-column:2/-1;display:flex;flex-direction:column;gap:3px}
+.mt-text{width:100%;max-width:900px;box-sizing:border-box}
+.mt-sent{font-size:12px;color:#16a34a}
+.mt-rw summary{cursor:pointer;font-size:12px;color:#1a73e8}
+.mt-rw ol{margin:4px 0 6px 18px;padding:0}
 .mt-bar{position:sticky;bottom:0;background:var(--body-bg,#1e1e1e);border-top:1px solid rgba(128,128,128,.35);padding:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:1100px}
 #content-main tr{background:transparent}
 @media (max-width:760px){.mt-row{grid-template-columns:24px 1fr 1fr}.mt-row .num{text-align:left}}
@@ -63,7 +68,7 @@
 {% elif not days %}
 <div class="mt-card">✨ {% trans "За цей період немає листів своїх категорій чи проєктів з askDANTE." %}</div>
 {% else %}
-<form method="post" onsubmit="return mtConfirm()">
+<form method="post" onsubmit="return mtConfirm(event)">
   {% csrf_token %}
   <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}">
   {% for d in days %}
@@ -81,6 +86,22 @@
       <div class="num" title="{% trans "Оцінка за день" %}">{{ r.dur }}</div>
       <div class="num done" title="{% trans "Уже записано в askDANTE" %}">{% if r.booked %}✓ {{ r.booked_dur }}{% else %}—{% endif %}</div>
       <div class="num {% if r.to_book %}todo{% endif %}" title="{% trans "Ще не записано" %}">{% if r.to_book %}+{{ r.todo_dur }}{% else %}{% trans "записано" %}{% endif %}</div>
+      <div class="mt-desc">
+        {% for b in r.sent %}<div class="mt-sent">✓ {% trans "в askDANTE" %}{% if b.start %} {{ b.start|time:"H:i" }}–{{ b.stop|time:"H:i" }}{% endif %}: «{{ b.comment }}»</div>{% endfor %}
+        {% if r.to_book %}
+          <label class="mt-muted">{% trans "Опис для askDANTE" %} ({{ lang }}){% if r.ai %} · 🤖 AI{% endif %} — {% trans "можна виправити" %}</label>
+          <input type="text" class="mt-text" name="c_{{ r.key }}" value="{{ r.comment }}" maxlength="250">
+        {% else %}
+          <details class="mt-rw"><summary>♻ {% trans "Перезаписати з іншим описом" %}</summary>
+            <ol class="mt-muted">
+              <li>{% trans "Видаліть старий запис в askDANTE — через API askDANTE змінювати й видаляти записи не дозволяє:" %} <a href="{{ dante_url }}" target="_blank" rel="noopener">↗ askDANTE</a></li>
+              <li>{% trans "Виправте текст і натисніть «♻ Перезаписати» — Minerva перечитає день і запише заново, лише якщо старого запису там уже немає (без дублів)." %}</li>
+            </ol>
+            <input type="text" class="mt-text" name="c_{{ r.key }}" value="{{ r.comment }}" maxlength="250">
+            <button class="button" name="rewrite" value="{{ r.key }}">♻ {% trans "Перезаписати" %} ({{ r.dur }})</button>
+          </details>
+        {% endif %}
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -88,14 +109,18 @@
   <div class="mt-bar">
     <label class="mt-muted">{% trans "Вид роботи" %}
       <select name="activity"><option value="">{% trans "як у категорії / налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if needs_activity and forloop.first and activities|length == 1 %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></label>
-    <button class="button default" type="submit"{% if not st.enabled %} disabled{% endif %}>✓ {% trans "Записати вибране в askDANTE" %}</button>
-    <span class="mt-muted">{% trans "Записи askDANTE через API не виправляються й не видаляються — перевірте перед записом. Записане не дублюється: наступного разу піде лише різниця." %}</span>
+    <button class="button" name="action" value="describe" title="{% trans "Одне речення про суть листів кожного рядка — потім можна виправити" %}">📝 {% trans "Описати листи (AI)" %}</button>
+    <button class="button default" type="submit" name="action" value="book"{% if not st.enabled %} disabled{% endif %}>✓ {% trans "Записати вибране в askDANTE" %}</button>
+    <span class="mt-muted">{% trans "Записи askDANTE через API не виправляються й не видаляються — перевірте опис перед записом (виправити потім — «♻ Перезаписати»). Записане не дублюється: наступного разу піде лише різниця." %}</span>
   </div>
 </form>
 {% endif %}
 
 <script>
-function mtConfirm(){
+function mtConfirm(e){
+  var by = e && e.submitter;
+  if (by && by.value === 'describe') return true;
+  if (by && by.name === 'rewrite') return confirm('{% trans "Старий запис уже видалено в askDANTE? Minerva перевірить і запише заново." %}');
   var n = document.querySelectorAll('input[name="pick"]:checked').length;
   if (!n) { alert('{% trans "Нічого не вибрано" %}'); return false; }
   return confirm('{% trans "Записати в askDANTE" %}: ' + n + '?');

@@ -18,6 +18,8 @@ TUE = MON + datetime.timedelta(days=1)
 class MailTimeBase(Base):
     def setUp(self):
         super().setUp()
+        from core.shared_cache import cache
+        cache.clear()   # описи AI кешуються спільно — між тестами не переносити
         self.st.mail_time = True
         self.st.save()
         self.account = EmailAccount.objects.create(
@@ -83,7 +85,7 @@ class EstimateTests(MailTimeBase):
         self.assertEqual((b.status, b.duration, b.source), (Booking.SENT, 15, Booking.MAIL))
         call = self.fake.calls[-1]
         self.assertEqual((call["duration"], call["projectData"]["projectId"]), (15, "77"))
-        self.assertEqual(call["projectData"]["comment"], "Пошта Minerva: DigiKey — відповідей 1")   # без емодзі
+        self.assertEqual(call["projectData"]["comment"], "E-Mails DigiKey: Order 1 (1 Antwort)")   # без емодзі
         with self.assertRaises(mail_time.DanteError):
             mail_time.book(self.du, MON, self.dp.pk)   # уже записано
         for _ in range(2):
