@@ -92,6 +92,30 @@
 .em-nav-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0}
 .em-nav-sub{font-size:10px;color:var(--text-dim);padding:6px 12px 2px 15px;text-transform:uppercase;letter-spacing:.05em}
 .em-nav-item{padding:5px 12px;font-size:12px}
+.em-nav-hid{display:none!important}
+#em-nav.show-hidden .em-nav-hid{display:flex!important;opacity:.55}
+.em-nav-sm{color:var(--text-dim);font-size:11px}
+#em-wc-ctx{display:none;position:fixed;z-index:99999;background:var(--bg-card);border:1px solid var(--border-strong);
+  border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.35);padding:4px 0;min-width:250px}
+#em-wc-ctx.open{display:block}
+#em-wc-ctx .em-ctx-item.off{opacity:.45;pointer-events:none}
+#em-wc-dlg{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-card);color:var(--text);
+  padding:14px 16px;width:min(560px,94vw);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+#em-wc-dlg::backdrop,#em-why-dlg::backdrop{background:rgba(0,0,0,.45)}
+#em-why-dlg{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-card);color:var(--text);
+  padding:14px 16px;width:min(560px,94vw);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+#em-why-dlg label{display:block;font-size:11px;color:var(--text-dim);margin:10px 0 3px}
+#em-why-dlg select{background:var(--bg-input,var(--bg));color:var(--text);border:1px solid var(--border-strong);border-radius:6px;padding:4px 6px;font-size:12px}
+#em-why-dlg .wc-row{display:flex;gap:8px}#em-why-dlg .wc-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+#em-why-dlg .wc-muted{font-size:11px;color:var(--text-dim)}
+#em-wc-dlg label{display:block;font-size:11px;color:var(--text-dim);margin:8px 0 2px}
+#em-wc-dlg input[type=text],#em-wc-dlg textarea{width:100%;box-sizing:border-box;background:var(--bg-input,var(--bg));
+  color:var(--text);border:1px solid var(--border-strong);border-radius:6px;padding:5px 7px;font:inherit;font-size:12px}
+#em-wc-dlg textarea{min-height:64px;resize:vertical}
+#em-wc-dlg .wc-row{display:flex;gap:8px;align-items:flex-end}
+#em-wc-dlg .wc-rules{font-size:12px;color:var(--text-muted);margin:4px 0 0;padding-left:16px}
+#em-wc-dlg .wc-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+#em-wc-dlg .wc-muted{font-size:11px;color:var(--text-dim)}
 .em-nav-head{cursor:pointer}
 .em-nav-tg.collapsed{transform:rotate(-90deg)}
 .em-nav-body[hidden]{display:none}
@@ -344,12 +368,18 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         </div>
         <div class="em-nav-body" data-sec="cats">
           {% for c, n, unread in work_categories %}
-          <a href="#" class="em-folder-link em-nav-item em-drop{% if work_filter.pk == c.pk %} active{% endif %}" data-wcat="{{ c.pk }}"
-             onclick="return emNav(event, 'wcat', '{{ c.pk }}')" title="{{ c.name }} — {% trans "клік: показати; перетягніть лист сюди — віднести" %}">
+          <a href="#" class="em-folder-link em-nav-item em-drop{% if work_filter.pk == c.pk %} active{% elif c.pk in hidden_wcats %} em-nav-hid{% endif %}" data-wcat="{{ c.pk }}"
+             data-n="{{ n }}" data-unread="{{ unread }}" data-hidden="{% if c.pk in hidden_wcats %}1{% endif %}"
+             onclick="return emNav(event, 'wcat', '{{ c.pk }}')" oncontextmenu="return showWcCtx(event, this)"
+             title="{{ c.name }} — {% trans "клік: показати; перетягніть лист сюди — віднести; правий клік — меню" %}">
             <span class="em-nav-dot" style="background:{{ c.color }}"></span><span class="em-folder-label">{{ c.label }}</span>
             {% if unread %}<span class="em-badge">{{ unread }}</span>{% elif n %}<span class="em-nav-n">{{ n }}</span>{% endif %}
           </a>
           {% endfor %}
+          {% if n_hidden_wcats %}
+          <a href="#" class="em-folder-link em-nav-item em-nav-sm" onclick="return emToggleHidden(event)" title="{% trans "Сховані правим кліком → «Сховати з цього списку»" %}">
+            👁 <span class="em-folder-label">{% trans "Сховані" %}: {{ n_hidden_wcats }}</span></a>
+          {% endif %}
           {% if work_categories %}
           <a href="#" class="em-folder-link em-nav-item{% if no_category %} active{% endif %}" onclick="return emNav(event, 'wcat', '0')"
              title="{% trans "Листи, яких ще немає в жодній своїй категорії" %}">
@@ -707,6 +737,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
            title="{% trans "Забути вибір для цього контакту — категорію знову визначає система" %}">↺ {% trans "Автоматично" %}</div>
     </div>
   </div>
+  <div class="em-ctx-item" onclick="ctxAction('why')" title="{% trans "До якої своєї категорії й чому, хто пише, проєкти — і швидко змінити правило" %}">🔍 {% trans "Чому лист тут — ознаки й правила…" %}</div>
   <div class="em-ctx-item" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
   {% if knowledge_available %}
   <div class="em-ctx-item" onclick="ctxAction('kb')"
@@ -721,6 +752,73 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 </div>
 
 <!-- Folder context menu -->
+<!-- Правий клік на своїй категорії (ліва колонка) — email_assistant/views_categories.py -->
+<div id="em-wc-ctx" onclick="event.stopPropagation()">
+  <div class="em-ctx-sub-hd" id="em-wc-hd"></div>
+  <div class="em-ctx-item" onclick="wcAction('show')">👁 {% trans "Показати листи категорії" %}</div>
+  <div class="em-ctx-item" id="em-wc-read" onclick="wcAction('read')">✓ {% trans "Позначити всі прочитаними" %}</div>
+  <div class="em-ctx-sep"></div>
+  <div class="em-ctx-item" onclick="wcAction('rules')">🔍 {% if can_change_work_category %}{% trans "Правила (фільтр) — переглянути й змінити…" %}{% else %}{% trans "Правила (фільтр)…" %}{% endif %}</div>
+  <div class="em-ctx-item" onclick="wcAction('card')">⚙ {% trans "Розширені налаштування (картка)" %}</div>
+  {% if can_change_work_category %}<div class="em-ctx-item" onclick="wcAction('recompute')">🔄 {% trans "Перерахувати листи за правилами" %}</div>{% endif %}
+  <div class="em-ctx-item" id="em-wc-dante" onclick="wcAction('dante')">⏱ {% trans "Занести в askDANTE…" %}</div>
+  <div class="em-ctx-sep"></div>
+  <div class="em-ctx-item" id="em-wc-hide" onclick="wcAction('hide')">🙈 {% trans "Сховати з цього списку" %}</div>
+  <div class="em-ctx-item danger" onclick="wcAction('trash')">🗑 {% trans "Усі листи категорії в Кошик…" %}</div>
+  {% if can_delete_work_category %}<div class="em-ctx-item danger" onclick="wcAction('delete')">❌ {% trans "Видалити категорію…" %}</div>{% endif %}
+</div>
+<dialog id="em-why-dlg">
+  <form method="dialog" onsubmit="return false">
+    <div style="display:flex;gap:8px;align-items:center"><b style="font-size:14px">🔍 {% trans "Чому лист тут" %}</b>
+      <span class="wc-muted" id="why-subj" style="margin-left:auto;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+    <label>🏷 {% trans "Своя категорія" %}</label>
+    <div style="display:flex;gap:8px;align-items:center"><span id="why-dot" class="em-nav-dot"></span><b id="why-cat"></b></div>
+    <div class="wc-muted" id="why-text" style="margin-top:3px;font-size:12px;color:var(--text-muted)"></div>
+    <div class="wc-muted" id="why-also" style="margin-top:3px"></div>
+    <div class="wc-muted" id="why-stale" style="margin-top:3px;color:#f59e0b"></div>
+    <div class="wc-btns" style="justify-content:flex-start;margin-top:6px">
+      <button type="button" class="button" id="why-rules" onclick="emWhyRules()">🔍 {% trans "Правила категорії…" %}</button>
+      <button type="button" class="button" id="why-cut" onclick="emWhyCut()"></button>
+    </div>
+    <label>↪ {% trans "Віднести інакше — правило для" %} <span id="why-for"></span></label>
+    <div class="wc-row" style="align-items:center;flex-wrap:wrap">
+      <select id="why-move" style="flex:1;min-width:160px"></select>
+      <select id="why-scope"><option value="sender">{% trans "цієї адреси" %}</option><option value="domain">{% trans "усього домену" %}</option><option value="thread">{% trans "лише цієї гілки" %}</option></select>
+      <button type="button" class="button default" onclick="emWhyMove()">✓ {% trans "Віднести" %}</button>
+    </div>
+    <label>👤 {% trans "Хто пише" %}</label>
+    <div style="font-size:12px" id="why-kind"></div>
+    <label>📁 {% trans "Проєкти й клієнт гілки" %}</label>
+    <div style="font-size:12px" id="why-proj"></div>
+    <div class="wc-muted" id="why-err" style="color:#ef5350"></div>
+    <div class="wc-btns"><button type="button" class="button" onclick="document.getElementById('em-why-dlg').close()">{% trans "Закрити" %}</button></div>
+  </form>
+</dialog>
+<dialog id="em-wc-dlg">
+  <form method="dialog" onsubmit="return false">
+    <div style="display:flex;gap:8px;align-items:center"><span id="wc-dot" class="em-nav-dot"></span><b id="wc-title" style="font-size:14px"></b>
+      <span class="wc-muted" id="wc-stats" style="margin-left:auto"></span></div>
+    <div class="wc-row">
+      <div style="flex:1"><label>{% trans "Назва" %}</label><input type="text" id="wc-name" maxlength="80"></div>
+      <div style="width:64px"><label>{% trans "Значок" %}</label><input type="text" id="wc-icon" maxlength="8"></div>
+      <div><label>{% trans "Колір" %}</label><input type="color" id="wc-color"></div>
+    </div>
+    <label>✉️ {% trans "Відправники — по одному в рядку: адреса, @домен або частина домену (digikey)" %}</label>
+    <textarea id="wc-senders"></textarea>
+    <label>🔤 {% trans "Слова в темі — по одному в рядку" %}</label>
+    <textarea id="wc-words"></textarea>
+    <label>{% trans "Зараз діє" %}</label>
+    <ul class="wc-rules" id="wc-rules"></ul>
+    <div class="wc-muted" style="margin-top:6px">{% trans "Лист іде в першу за порядком категорію, правила якої підходять; відповіді в гілці — туди ж. Джерела замовлень, скриньки й порядок — у картці." %}
+      <a href="#" id="wc-card">⚙ {% trans "Розширені налаштування" %}</a> · <a href="#" id="wc-dante"></a></div>
+    <div class="wc-muted" id="wc-err" style="color:#ef5350"></div>
+    <div class="wc-btns">
+      <button type="button" class="button" onclick="document.getElementById('em-wc-dlg').close()">{% trans "Закрити" %}</button>
+      {% if can_change_work_category %}<button type="button" class="button default" onclick="wcSave()">💾 {% trans "Зберегти й перерахувати" %}</button>{% endif %}
+    </div>
+  </form>
+</dialog>
+
 <div id="em-sf-ctx">
   <div class="em-ctx-item" onclick="sfCtxAction('open')">📂 Відкрити</div>
   <div class="em-ctx-item" id="em-sf-fav-item" onclick="sfCtxAction('fav')">⭐ Додати в улюблені</div>
@@ -1118,6 +1216,185 @@ function emNav(ev, key, value) {
   if (key === 'cat') params.delete('wcat');
   params.delete('page');
   location.search = params.toString();
+  return false;
+}
+/* ── правий клік на своїй категорії ── */
+var _wc = null;   // {pk, el}
+function showWcCtx(ev, el) {
+  ev.preventDefault(); ev.stopPropagation();
+  var menu = document.getElementById('em-wc-ctx');
+  _wc = {pk: el.dataset.wcat, el: el};
+  var unread = parseInt(el.dataset.unread || '0', 10), hidden = el.dataset.hidden === '1';
+  document.getElementById('em-wc-hd').textContent = (el.querySelector('.em-folder-label') || el).textContent.trim()
+    + ' · ' + (el.dataset.n || 0) + ' {% trans "лист." %}';
+  var read = document.getElementById('em-wc-read');
+  read.textContent = '✓ {% trans "Позначити всі прочитаними" %}' + (unread ? ' (' + unread + ')' : '');
+  read.classList.toggle('off', !unread);
+  document.getElementById('em-wc-hide').textContent = hidden ? '👁 {% trans "Показувати в списку знову" %}' : '🙈 {% trans "Сховати з цього списку" %}';
+  var x = ev.clientX, y = ev.clientY;
+  menu.classList.add('open');
+  if (x + menu.offsetWidth > window.innerWidth) x = window.innerWidth - menu.offsetWidth - 5;
+  if (y + menu.offsetHeight > window.innerHeight) y = Math.max(5, window.innerHeight - menu.offsetHeight - 5);
+  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  return false;
+}
+document.addEventListener('click', function(){ var m = document.getElementById('em-wc-ctx'); if (m) m.classList.remove('open'); });
+async function _wcPost(pk, body) {
+  var r = await fetch('/email/category/' + pk + '/action/', {method: 'POST',
+    headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+  var d = {};
+  try { d = await r.json(); } catch (e) {}
+  if (!d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+  return d;
+}
+async function _wcInfo(pk) { return (await fetch('/email/category/' + pk + '/', {credentials: 'same-origin'})).json(); }
+async function wcAction(action) {
+  document.getElementById('em-wc-ctx').classList.remove('open');
+  if (!_wc) return;
+  var pk = _wc.pk, el = _wc.el;
+  try {
+    if (action === 'show') { emNav(null, 'wcat', pk); return; }
+    if (action === 'rules') { wcOpen(pk); return; }
+    var info = await _wcInfo(pk);
+    if (action === 'card') { location.href = info.card_url; return; }
+    if (action === 'dante') {
+      if (!info.dante) { _showToast('{% trans "Облік часу askDANTE не встановлено" %}'); return; }
+      location.href = info.dante.url; return;
+    }
+    if (action === 'hide') {
+      await _wcPost(pk, {action: el.dataset.hidden === '1' ? 'unhide' : 'hide'});
+      location.reload(); return;
+    }
+    if (action === 'read') {
+      var d = await _wcPost(pk, {action: 'read'});
+      _showToast('✓ {% trans "Позначено прочитаними" %}: ' + d.changed); setTimeout(function(){ location.reload(); }, 600); return;
+    }
+    if (action === 'recompute') {
+      var d2 = await _wcPost(pk, {action: 'recompute'});
+      _showToast(d2.recompute ? '🔄 {% trans "Перерахунок запущено — хід у «🏷 Свої категорії»" %}' : '⏳ {% trans "Перерахунок уже йде" %}'); return;
+    }
+    if (action === 'trash') {
+      if (!info.mails) { _showToast('{% trans "У категорії немає листів" %}'); return; }
+      if (!confirm(info.label + ': ' + info.mails + ' {% trans "листів цієї скриньки" %}'
+          + (info.sent ? ' ({% trans "з них надісланих" %}: ' + info.sent + ')' : '')
+          + ' {% trans "перемістити в Кошик — і на сервері? З Кошика їх можна повернути." %}')) return;
+      var d3 = await _wcPost(pk, {action: 'trash'});
+      _showToast('🗑 {% trans "У Кошику" %}: ' + d3.moved); setTimeout(function(){ location.reload(); }, 600); return;
+    }
+    if (action === 'delete') {
+      if (!confirm('{% trans "Видалити категорію" %} «' + info.label + '» {% trans "для всіх скриньок?" %}\n'
+          + '{% trans "Листи лишаються (без цієї категорії; інші правила можуть їх підхопити), її правила й зв’язок з askDANTE зникнуть. Уже записане в askDANTE не змінюється." %}')) return;
+      await _wcPost(pk, {action: 'delete'});
+      var params = new URLSearchParams(location.search);
+      if (params.get('wcat') === String(pk)) params.delete('wcat');
+      location.search = params.toString(); return;
+    }
+  } catch (e) { _showToast('❌ ' + e.message); }
+}
+async function wcOpen(pk) {
+  var dlg = document.getElementById('em-wc-dlg'), info = await _wcInfo(pk);
+  dlg.dataset.pk = pk;
+  document.getElementById('wc-title').textContent = info.label;
+  document.getElementById('wc-dot').style.background = info.color;
+  document.getElementById('wc-stats').textContent = info.mails + ' {% trans "листів" %} · ' + info.unread + ' {% trans "непрочитаних" %}';
+  document.getElementById('wc-name').value = info.name;
+  document.getElementById('wc-icon').value = info.icon;
+  document.getElementById('wc-color').value = info.color;
+  document.getElementById('wc-senders').value = info.senders;
+  document.getElementById('wc-words').value = info.subject_words;
+  var ul = document.getElementById('wc-rules'); ul.innerHTML = '';
+  info.rules.forEach(function(t){ var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
+  document.getElementById('wc-card').href = info.card_url;
+  var dl = document.getElementById('wc-dante');
+  if (info.dante) { dl.href = info.dante.url; dl.textContent = '⏱ askDANTE: ' + (info.dante.project || '{% trans "проєкт ще не вибрано" %}'); }
+  else { dl.textContent = ''; }
+  document.getElementById('wc-err').textContent = '';
+  dlg.querySelectorAll('input,textarea').forEach(function(f){ f.disabled = !info.can_change; });
+  dlg.showModal();
+}
+async function wcSave() {
+  var dlg = document.getElementById('em-wc-dlg'), err = document.getElementById('wc-err');
+  err.textContent = '⏳…';
+  try {
+    var d = await _wcPost(dlg.dataset.pk, {action: 'save', name: document.getElementById('wc-name').value,
+      icon: document.getElementById('wc-icon').value, color: document.getElementById('wc-color').value,
+      senders: document.getElementById('wc-senders').value, subject_words: document.getElementById('wc-words').value});
+    dlg.close();
+    _showToast(d.recompute === null ? '💾 {% trans "Збережено" %}' : d.recompute
+      ? '💾 {% trans "Збережено — листи за рік перераховуються у фоні" %}' : '💾 {% trans "Збережено; інший перерахунок ще йде — запустіть потім ще раз" %}');
+    setTimeout(function(){ location.reload(); }, 900);
+  } catch (e) { err.textContent = '❌ ' + e.message; }
+}
+/* ── «🔍 Чому лист тут» (правий клік на листі) ── */
+var _why = null;
+async function emWhy(pk) {
+  var dlg = document.getElementById('em-why-dlg');
+  try { _why = await (await fetch('/email/message/' + pk + '/why/', {credentials: 'same-origin'})).json(); }
+  catch (e) { _showToast('⚠️ ' + _i18n.помилка); return; }
+  _why.pk = pk;
+  var c = _why.category;
+  document.getElementById('why-subj').textContent = _why.subject;
+  document.getElementById('why-dot').style.background = c ? c.color : 'transparent';
+  document.getElementById('why-dot').style.border = c ? '' : '1px dashed var(--text-dim)';
+  document.getElementById('why-cat').textContent = c ? c.label : '{% trans "без своєї категорії" %}';
+  document.getElementById('why-text').textContent = _why.text;
+  document.getElementById('why-also').textContent = _why.also.length
+    ? '{% trans "Теж підходить під" %}: ' + _why.also.map(function(a){ return a.label; }).join(', ')
+      + ' — {% trans "лист іде в першу за порядком (порядок — у «🏷 Свої категорії»)" %}' : '';
+  document.getElementById('why-stale').textContent = _why.stale
+    ? '⚠️ {% trans "Мітка ще стара: за чинними правилами буде" %} «' + (_why.expected ? _why.expected.label : '{% trans "без категорії" %}')
+      + '» — {% trans "оновиться після перерахунку" %}' : '';
+  document.getElementById('why-rules').style.display = c ? '' : 'none';
+  var cut = document.getElementById('why-cut');
+  cut.style.display = (_why.field && _why.can_change) ? '' : 'none';
+  cut.textContent = '✂ {% trans "Прибрати правило" %} «' + _why.rule + '» {% trans "з категорії" %}';
+  document.getElementById('why-for').textContent = _why.contact || '{% trans "(внутрішній лист — лише гілка)" %}';
+  var sel = document.getElementById('why-move'); sel.innerHTML = '';
+  _why.categories.forEach(function(k){ var o = document.createElement('option'); o.value = k.pk; o.textContent = k.label;
+    if (c && k.pk === c.pk) o.selected = true; sel.appendChild(o); });
+  var none = document.createElement('option'); none.value = ''; none.textContent = '↺ {% trans "без своєї категорії" %}'; sel.appendChild(none);
+  document.getElementById('why-scope').value = _why.contact ? 'sender' : 'thread';
+  document.getElementById('why-kind').textContent = (_why.contact || '—') + (_why.kind ? ' · ' + _why.kind : '')
+    + (_why.kind_manual ? ' ({% trans "вручну для" %} ' + _why.kind_manual + ')' : (_why.kind ? ' ({% trans "автоматично" %})' : ''));
+  document.getElementById('why-proj').textContent = (_why.projects.length ? '📁 ' + _why.projects.join(', ') : '{% trans "проєктів немає" %}')
+    + (_why.customer ? ' · 🧑 ' + _why.customer : '');
+  document.getElementById('why-err').textContent = '';
+  dlg.showModal();
+}
+function emWhyRules() {
+  if (!_why || !_why.category) return;
+  document.getElementById('em-why-dlg').close();
+  wcOpen(_why.category.pk);
+}
+async function emWhyCut() {
+  if (!_why || !_why.category) return;
+  if (!confirm('{% trans "Прибрати правило" %} «' + _why.rule + '» {% trans "з категорії" %} «' + _why.category.label
+      + '»? {% trans "Листи за рік перерахуються; інші листи, що трималися лише за це правило, теж вийдуть з категорії." %}')) return;
+  try {
+    var d = await _wcPost(_why.category.pk, {action: 'remove_line', field: _why.field, line: _why.rule});
+    document.getElementById('em-why-dlg').close();
+    _showToast('✂ {% trans "Правило прибрано" %}' + (d.recompute ? ' · {% trans "листи перераховуються" %}' : ''));
+    setTimeout(function(){ location.reload(); }, 1500);
+  } catch (e) { document.getElementById('why-err').textContent = '❌ ' + e.message; }
+}
+async function emWhyMove() {
+  if (!_why) return;
+  try {
+    var r = await fetch('/email/message/' + _why.pk + '/work-category/', {method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({category: document.getElementById('why-move').value, scope: document.getElementById('why-scope').value})});
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || _i18n.помилка);
+    document.getElementById('em-why-dlg').close();
+    _showToast((d.category ? '🏷 ' + d.category : '↺ {% trans "Без своєї категорії" %}')
+      + ' · ' + (d.scope === 'thread' ? '{% trans "лише ця гілка" %}' : '{% trans "правило для" %} ' + d.key)
+      + (d.changed ? ' · {% trans "оновлено листів" %}: ' + d.changed : ''));
+    setTimeout(function(){ location.reload(); }, 900);
+  } catch (e) { document.getElementById('why-err').textContent = '❌ ' + e.message; }
+}
+function emToggleHidden(ev) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  document.getElementById('em-nav').classList.toggle('show-hidden');
   return false;
 }
 function emDrop(key) {
@@ -1856,6 +2133,7 @@ async function ctxAction(action) {
   if (!_ctxMsg) return;
   var {pk, tpk, rowEl} = _ctxMsg;
 
+  if (action === 'why') { emWhy(pk); return; }
   if (action === 'open') {
     var url = tpk ? '/email/thread/' + tpk + '/' : '/email/message/' + pk + '/';
     window.open(url, '_blank');

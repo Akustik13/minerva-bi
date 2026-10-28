@@ -289,6 +289,9 @@ class EmailSettings(models.Model):
     show_admin_sidebar = models.BooleanField(
         default=True, verbose_name='Показувати панель навігації Minerva',
         help_text='Відображати ліве меню системи на сторінках Email асистента')
+    hidden_work_categories = models.JSONField(
+        default=list, blank=True, verbose_name='Сховані свої категорії',
+        help_text='pk своїх категорій, яких не показувати в лівій колонці скриньки (правий клік → «Сховати»)')
 
     # Auto-reply
     auto_reply_enabled = models.BooleanField(

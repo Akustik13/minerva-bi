@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, views_sort
+from . import views, views_categories, views_sort
 
 app_name = 'email_assistant'
 
@@ -66,6 +66,9 @@ urlpatterns = [
     path('message/<int:message_pk>/category/',          views.set_category_view,       name='set_category'),
     path('message/<int:message_pk>/work-category/',     views.set_work_category_view,  name='set_work_category'),
     path('sort/',                                       views_sort.sort_view,          name='sort'),
+    path('category/<int:pk>/',                          views_categories.category_info_view,   name='work_category_info'),
+    path('message/<int:message_pk>/why/',               views_categories.message_why_view,     name='message_why'),
+    path('category/<int:pk>/action/',                   views_categories.category_action_view, name='work_category_action'),
     # Quick settings toggles (e.g. mark read on server)
     path('settings/toggle/',                             views.settings_toggle_view,    name='settings_toggle'),
     # Email rules

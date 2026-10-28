@@ -449,6 +449,8 @@ def inbox_view(request):
     categories, mail_customers = _category_counts(counts_qs)
     from email_assistant.work_categories import counts as _work_counts
     work_categories = _work_counts(counts_qs)
+    from email_assistant.models import EmailSettings as _ES
+    hidden_wcats = set(_ES.get_for_user(request.user).hidden_work_categories or [])
     if cat_filter:
         qs = qs.filter(category=cat_filter)
     if work_filter == NO_CATEGORY:
@@ -522,6 +524,10 @@ def inbox_view(request):
         'nav_projects':          _nav_projects(account),
         'work_categories':       work_categories,
         'can_add_work_category': request.user.has_perm('email_assistant.add_mailcategory'),
+        'hidden_wcats':          hidden_wcats,
+        'n_hidden_wcats':        sum(1 for c, _n, _u in work_categories if c.pk in hidden_wcats),
+        'can_change_work_category': request.user.has_perm('email_assistant.change_mailcategory'),
+        'can_delete_work_category': request.user.has_perm('email_assistant.delete_mailcategory'),
         'grouped':               grouped,
         'category_choices':      EmailMessage.CATEGORY_CHOICES,
         'search_all':            search_all,

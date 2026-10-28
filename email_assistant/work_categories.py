@@ -80,31 +80,74 @@ def _order_sources(em) -> set:
     return sources
 
 
+def _hits(em, rules):
+    """Категорії, правила яких підходять до листа, по черзі (за `order`): (категорія, ознака, правило, адреса).
+    Ознака: sender / word / account / order / customer. Ліниво — `match` бере лише першу."""
+    contacts = _contacts(em, rules.own)
+    subject = (em.subject or '').lower()
+    orders = None
+    for it in rules.items:
+        hit = None
+        if it['senders']:
+            hit = next((('sender', r, a) for a in contacts for r in it['senders'] if sender_matches(a, r)), None)
+        if hit is None and it['words']:
+            hit = next((('word', w, '') for w in it['words'] if w in subject), None)
+        if hit is None and it['accounts'] and em.account_id in it['accounts']:
+            hit = ('account', '', '')
+        if hit is None and it['sources']:
+            if orders is None:
+                orders = _order_sources(em)
+            if orders & it['sources']:
+                hit = ('order', ', '.join(sorted(orders & it['sources'])), '')
+            elif it['by_customer'] and contacts:
+                from sales.models import SalesOrder
+                if SalesOrder.objects.filter(email__in=contacts, source__in=it['sources']).exists():
+                    hit = ('customer', ', '.join(sorted(it['sources'])), '')
+        if hit:
+            yield (it['cat'],) + hit
+
+
 def match(em, rules=None):
     """Своя категорія листа за правилами (без гілки) або None."""
     rules = rules if rules is not None else Rules()
     if not rules:
         return None
-    contacts = _contacts(em, rules.own)
-    subject = (em.subject or '').lower()
-    lazy = {}
-    for it in rules.items:
-        if it['senders'] and any(sender_matches(a, r) for a in contacts for r in it['senders']):
-            return it['cat']
-        if it['words'] and any(w in subject for w in it['words']):
-            return it['cat']
-        if it['accounts'] and em.account_id in it['accounts']:
-            return it['cat']
-        if it['sources']:
-            if 'orders' not in lazy:
-                lazy['orders'] = _order_sources(em)
-            if lazy['orders'] & it['sources']:
-                return it['cat']
-            if it['by_customer'] and contacts:
-                from sales.models import SalesOrder
-                if SalesOrder.objects.filter(email__in=contacts, source__in=it['sources']).exists():
-                    return it['cat']
-    return None
+    hit = next(_hits(em, rules), None)
+    return hit[0] if hit else None
+
+
+def explain(em) -> dict:
+    """Чому лист у своїй категорії (або чому ні) — для «🔍 Чому тут» у скриньці.
+    → {category, how (thread / sender / word / account / order / customer / inherit / ''), rule, contact, text,
+       also (інші категорії, що теж підходять), expected (що дасть перерахунок), stale}"""
+    rules = Rules()
+    hits = list(_hits(em, rules)) if rules else []
+    thread = em.thread if em.thread_id else None
+    out = {'category': em.work_category if em.work_category_id else None, 'how': '', 'rule': '', 'contact': '',
+           'text': '', 'also': []}
+    if thread is not None and thread.work_category_id in rules.by_pk:
+        out.update(how='thread', text=f'✋ Гілку віднесено до «{rules.by_pk[thread.work_category_id].label}» '
+                                      'вручну — для неї це важливіше за правила')
+        out['also'] = [h[0] for h in hits if h[0].pk != thread.work_category_id]
+    elif hits:
+        cat, how, rule, contact = hits[0]
+        text = {
+            'sender': f'✉️ співрозмовник {contact} підходить під правило «{rule}» (Відправники)',
+            'word': f'🔤 у темі є «{rule}» (Слова в темі)',
+            'account': f'📮 лист у скриньці {em.account.email_address} (Усі листи скриньки)' if em.account_id else '',
+            'order': f'🧾 у листі номер або трек-номер замовлення з джерела {rule}',
+            'customer': f'🧾 співрозмовник замовляв через {rule} (і листи покупців цих джерел)',
+        }[how]
+        out.update(how=how, rule=rule, contact=contact, text=text)
+        out['also'] = [h[0] for h in hits[1:]]
+    elif out['category'] is not None:
+        out.update(how='inherit', text='↪ як інші листи цієї гілки (сам лист під правила не підходить)')
+    else:
+        out['text'] = 'Жодне правило своїх категорій не підходить'
+    expected = resolve(em, rules) if rules else None
+    out['expected'] = expected
+    out['stale'] = (expected.pk if expected else None) != em.work_category_id
+    return out
 
 
 def resolve(em, rules=None):
@@ -288,6 +331,26 @@ def set_for_message(em, category, scope: str = 'sender') -> dict:
     em.refresh_from_db(fields=['work_category'])
     return {'key': key or 'гілка', 'scope': scope, 'changed': changed,
             'category': em.work_category.label if em.work_category_id else ''}
+
+
+def rules_summary(cat) -> list:
+    """Правила категорії людською мовою (правий клік на категорії в скриньці)."""
+    out = []
+    if cat.lines('senders'):
+        out.append('✉️ Відправники: ' + ', '.join(cat.lines('senders')))
+    if cat.lines('subject_words'):
+        out.append('🔤 Слова в темі: ' + ', '.join(cat.lines('subject_words')))
+    sources = [s.name or s.slug for s in cat.sources.all()]
+    if sources:
+        out.append('🧾 Номер / трек-номер замовлення з джерел: ' + ', '.join(sources)
+                   + (' — і всі листи їхніх покупців' if cat.by_customer_orders else ''))
+    boxes = [a.email_address for a in cat.accounts.all()]
+    if boxes:
+        out.append('📮 Усі листи скриньок: ' + ', '.join(boxes))
+    manual = cat.threads.count()
+    if manual:
+        out.append(f'✋ Гілок віднесено вручну: {manual}')
+    return out or ['Правил немає — лише листи, віднесені вручну']
 
 
 def counts(qs) -> list:
