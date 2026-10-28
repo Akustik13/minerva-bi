@@ -7,6 +7,7 @@ app_name = "offers"
 urlpatterns = [
     path("quick/", views.quick_view, name="quick"),
     path("<int:pk>/quick/", views.quick_view, name="quick_edit"),
+    path("api/currency/", views.currency_view, name="currency"),
     path("api/price/", views.price_view, name="price"),
     path("template/download/", views.template_download_view, name="template_download"),
     path("template/upload/", views.template_upload_view, name="template_upload"),

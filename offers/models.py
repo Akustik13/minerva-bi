@@ -12,6 +12,12 @@ from django.db import IntegrityError, models, transaction
 from django.utils import timezone
 
 LANGUAGES = [("de", "Deutsch"), ("en", "English"), ("de_en", "Deutsch + English"), ("uk", "Українська")]
+# Звідки ціни й строки позицій (offers/pricing.py)
+PRICE_MODES = [("auto", "📦 Склад Minerva → 🔷 DigiKey Marketplace"), ("stock", "📦 Лише склад Minerva"),
+               ("digikey", "🔷 DigiKey Marketplace → 📦 склад Minerva"), ("manual", "✍️ Вручну")]
+LEAD_MODES = [("auto", "📦 Наявність на складі → картка товару → 🔷 DigiKey"),
+              ("product", "Картка товару → 🔷 DigiKey"), ("digikey", "🔷 DigiKey Marketplace → картка товару"),
+              ("manual", "✍️ Вручну")]
 
 
 class OfferSettings(models.Model):
@@ -19,7 +25,18 @@ class OfferSettings(models.Model):
     number_prefix = models.CharField("Префікс номера", max_length=5, default="A",
                                      help_text="Номер: <префікс>-РРРР-NNN, напр. A-2026-001")
     validity_days = models.PositiveSmallIntegerField("Дійсна, днів", default=30)
-    default_currency = models.CharField("Валюта", max_length=3, default="EUR")
+    default_currency = models.CharField("Валюта", max_length=3, default="EUR",
+                                        help_text="Коли країну клієнта не визначено або валюта не за країною.")
+    currency_by_country = models.BooleanField(
+        "Валюта за країною клієнта", default=True,
+        help_text="Країна — з картки CRM, інакше з адреси (підпису листа), інакше з домену email (.de, .ua…).")
+    currency_europe = models.CharField("Валюта для Європи", max_length=3, default="EUR")
+    currency_other = models.CharField("Валюта для інших країн", max_length=3, default="USD")
+    price_mode = models.CharField(
+        "Ціни з", max_length=10, choices=PRICE_MODES, default="auto",
+        help_text="За замовчуванням для нових Angebote; у формі можна вибрати інше. Інша валюта — × курс із "
+                  "«Налаштувань цін» магазину.")
+    lead_mode = models.CharField("Строки поставки з", max_length=10, choices=LEAD_MODES, default="auto")
     default_vat_rate = models.DecimalField("ПДВ, %", max_digits=5, decimal_places=2, default=Decimal("19.00"))
     default_language = models.CharField("Мова документа", max_length=5, choices=LANGUAGES, default="de")
     intro_text = models.TextField(
@@ -94,6 +111,15 @@ class Offer(models.Model):
     language = models.CharField("Мова документа", max_length=5, choices=LANGUAGES, default="de",
                                 help_text="«Deutsch + English» — один документ з підписами обома мовами")
     currency = models.CharField("Валюта", max_length=3, default="EUR")
+    price_mode = models.CharField("Ціни з", max_length=10, choices=PRICE_MODES, default="auto",
+                                  help_text="Для позицій без ціни (ціну, введену вручну, Minerva не змінює).")
+    lead_mode = models.CharField("Строки поставки з", max_length=10, choices=LEAD_MODES, default="auto")
+    STOCK, PRODUCTION, MIXED = "stock", "production", "mixed"
+    REQUEST_KINDS = [(STOCK, "📦 Товар з каталогу"), (PRODUCTION, "🏭 Виробництво / розробка"),
+                     (MIXED, "📦 + 🏭 Каталог і виробництво")]
+    request_kind = models.CharField(
+        "Тип запиту", max_length=12, choices=REQUEST_KINDS, default=STOCK, editable=False,
+        help_text="Позиції, яких немає ні в каталозі Minerva, ні на DigiKey, — виробництво / розробка.")
     vat_rate = models.DecimalField("ПДВ, %", max_digits=5, decimal_places=2, default=Decimal("19.00"),
                                    validators=[MinValueValidator(Decimal("0"))],
                                    help_text="0 — напр. Reverse Charge / експорт (вкажіть у вступі чи умовах).")
@@ -193,8 +219,9 @@ class QuoteRequest(models.Model):
 
 class OfferLine(models.Model):
     SHOP, SALE_PRICE, BASE, MANUAL, QUOTE = "shop", "sale_price", "base", "manual", "quote"
+    DIGIKEY = "digikey"
     PRICE_SOURCES = [(SHOP, "магазин"), (SALE_PRICE, "ціна продажу"), (BASE, "базова ціна × курс"),
-                     (MANUAL, "вручну"), (QUOTE, "із запиту клієнта")]
+                     (MANUAL, "вручну"), (QUOTE, "із запиту клієнта"), (DIGIKEY, "DigiKey Marketplace")]
 
     offer = models.ForeignKey(Offer, on_delete=models.CASCADE, related_name="lines")
     position = models.PositiveSmallIntegerField("№", default=1)
@@ -212,10 +239,11 @@ class OfferLine(models.Model):
     price_source = models.CharField("Джерело ціни", max_length=12, choices=PRICE_SOURCES, default=MANUAL)
     price_note = models.CharField("Звідки ціна", max_length=255, blank=True, default="")
     lead_time = models.CharField("Строк поставки", max_length=100, blank=True, default="")
+    lead_note = models.CharField("Звідки строк", max_length=255, blank=True, default="")
     line_total = models.DecimalField("Сума", max_digits=14, decimal_places=2, default=Decimal("0"))
     tiers = models.JSONField(
         "Ступені (Staffelpreise)", default=list, blank=True,
-        help_text="[{qty, unit_price, line_total, price_note}] — кілька кількостей з ціною кожної; перша — "
+        help_text="[{qty, unit_price, line_total, price_note, lead_time}] — кілька кількостей з ціною кожної; перша — "
                   "основна к-сть позиції (з неї сума Angebot). services.set_tiers")
 
     class Meta:

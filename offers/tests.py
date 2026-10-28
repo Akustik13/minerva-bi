@@ -81,7 +81,9 @@ class PricingTests(OffersBase):
         self.assertIn("від 500 шт", q.note)
         nothing = Product.objects.create(sku="X-1", name="No price")
         self.assertIsNone(pricing.quote_price(nothing, 1, "EUR").unit_price)
-        self.assertIsNone(pricing.quote_price(self.cab, 1, "USD").unit_price)   # інша валюта — без вигадок
+        self.assertIsNone(pricing.quote_price(self.cab, 1, "GBP").unit_price)   # курсу немає — без вигадок
+        q = pricing.quote_price(self.cab, 1, "USD")                            # є курс USD — перерахунок
+        self.assertEqual((q.unit_price, q.source), (D("3.3700"), OfferLine.SALE_PRICE))
 
     def test_totals_are_exact(self):
         offer = services.new_offer(customer=self.customer, user=self.user, shipping_cost=D("15.00"))
@@ -360,6 +362,8 @@ class QuoteScanSettingsTests(QuoteMailBase):
         with self.captureOnCommitCallbacks(execute=True):
             return self.client.post(f"/admin/offers/offersettings/1/change/", {
                 "number_prefix": "A", "validity_days": 30, "default_currency": "EUR", "default_vat_rate": "19.00",
+                "currency_by_country": "on", "currency_europe": "EUR", "currency_other": "USD",
+                "price_mode": "auto", "lead_mode": "auto",
                 "default_language": "de", "email_subject": "Angebot {number}", "quote_scan_depth": depth})
 
     def test_scan_old_mail_by_depth_and_switch_off(self):
@@ -406,6 +410,7 @@ class AdminTests(OffersBase):
             "status": "draft", "customer": self.customer.pk, "contact_name": "Alex", "contact_email": "a@b.example",
             "billing_address": "x", "project": project.pk, "owner": self.user.pk, "language": "de",
             "currency": "EUR", "vat_rate": "19", "shipping_cost": "0", "valid_until": "2026-12-31",
+            "price_mode": "auto", "lead_mode": "auto",
             "intro_text": "", "payment_terms": "", "delivery_terms": "", "outro_text": "", "internal_notes": "",
             "lines-TOTAL_FORMS": "1", "lines-INITIAL_FORMS": "0", "lines-MIN_NUM_FORMS": "0",
             "lines-MAX_NUM_FORMS": "1000",
@@ -661,3 +666,149 @@ class OfferTemplateTests(QuoteMailBase):
         m = self.mail("FW: Denys SL Tire", body, frm=ME)
         row = services.quick_prefill(m.thread)["lines"][0]
         self.assertEqual((row["sku"], row["description"], row["qtys"]), ("FT220407", "Filter FT220407", "35; 100"))
+
+
+class PricingSourcesTests(QuoteMailBase):
+    """Ціни Angebot: валюта за країною (Європа — EUR, інші — USD), склад Minerva → DigiKey, курс, строки зі складу,
+    звідки що взято, 🏭 виробництво / розробка."""
+
+    def setUp(self):
+        super().setUp()
+        from bots.models import DigiKeyConfig, DigiKeyListing
+        from shop.models import ShopSettings
+        ss = ShopSettings.get()
+        ss.fx_rates = {"USD": "0.9"}                                   # 1 USD = 0,90 EUR
+        ss.save()
+        cfg = DigiKeyConfig.get()
+        cfg.locale_currency = "USD"
+        cfg.save()
+        self.flt = Product.objects.create(sku="FLT-9", name="Filter 9", lead_time_days=21)   # без цін у Minerva
+        DigiKeyListing.objects.create(product=self.flt, dk_title="Bandpass filter 9", dk_description="x",
+                                      dk_prices=[{"qty": 1, "price": 20.0}, {"qty": 100, "price": 15.0}],
+                                      dk_lead_time_days=11)
+        DigiKeyListing.objects.create(dk_supplier_sku="DK-ONLY", dk_title="Only on DigiKey", dk_description="x",
+                                      dk_prices=[{"qty": 10, "price": 5.0}])
+
+    def test_currency_by_country(self):
+        from offers.models import OfferSettings
+        r = pricing.currency_for(self.customer)
+        self.assertEqual(r["currency"], "EUR")
+        self.assertIn("Німеччина", r["reason"])
+        us = Customer.objects.create(name="Bob", company="US Inc", country="US")
+        self.assertEqual(pricing.currency_for(us)["currency"], "USD")
+        self.assertEqual(pricing.currency_for(None, address="Module ETP LLC\nKyiv 01001, Ukraine")["currency"], "EUR")
+        self.assertEqual(pricing.currency_for(None, address="1 Main St\nAtlanta, Georgia 30301\nUSA")["currency"],
+                         "USD")
+        self.assertEqual(pricing.currency_for(None, email="a@shop.ca")["currency"], "USD")
+        r = pricing.currency_for(None, email="a@moduletp.com")
+        self.assertEqual(r["currency"], "EUR")                            # країну не визначено — з налаштувань
+        self.assertIn("не визначено", r["reason"])
+        self.assertEqual(services.defaults(us)["currency"], "USD")
+        s = OfferSettings.get()
+        s.currency_by_country = False
+        s.save()
+        self.assertEqual(pricing.currency_for(us)["currency"], "EUR")
+        s.currency_by_country = True
+        s.save()
+        d = self.client.get(f"/offers/api/currency/?customer={us.pk}").json()
+        self.assertEqual((d["currency"], d["country"]), ("USD", "US"))
+
+    def test_stock_then_digikey_with_rate(self):
+        q = pricing.quote_price(self.ant, 10, "USD")                      # склад Minerva: 12,50 EUR → USD
+        self.assertEqual((q.unit_price, q.source), (D("13.8900"), OfferLine.SALE_PRICE))
+        self.assertIn("× курс", q.note)
+        self.assertIsNone(pricing.quote_price(self.ant, 10, "GBP").unit_price)   # курсу немає — без вигадок
+        q = pricing.quote_price(self.flt, 150, "EUR")                     # у Minerva ціни немає → DigiKey
+        self.assertEqual((q.unit_price, q.source), (D("13.5000"), OfferLine.DIGIKEY))
+        self.assertIn("DigiKey Marketplace: від 100 шт", q.note)
+        self.assertIsNone(pricing.quote_price(self.flt, 150, "EUR", mode="stock").unit_price)
+        self.assertIsNone(pricing.quote_price(self.flt, 150, "EUR", mode="manual").unit_price)
+        self.assertEqual(pricing.quote_price(self.ant, 1, "EUR", mode="digikey").source, OfferLine.SALE_PRICE)
+        q = pricing.quote_price(None, 2, "USD", sku="dk-only")             # лише офер DigiKey, менше MOQ
+        self.assertEqual(q.unit_price, D("5.0000"))
+        self.assertIn("DigiKey продає від 10 шт", q.note)
+        q = pricing.quote_price(None, 35, "EUR", sku="FT220407")
+        self.assertIsNone(q.unit_price)
+        self.assertIn("виробництво / розробку", q.note)
+
+    def test_lead_time_from_stock_card_and_digikey_per_tier(self):
+        from docx import Document
+
+        from inventory.models import Location
+        from inventory.services.stock import create_movement
+        Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
+        create_movement(product=self.ant, tx_type="Incoming", qty=50)
+        self.ant.lead_time_days = 14
+        self.ant.save()
+        offer = services.new_offer(customer=self.customer, user=self.user, language="de")
+        offer = services.save_quick({"customer": self.customer, "language": "de"},
+                                    [{"sku": "ANT-100", "qtys": "35; 100"},
+                                     {"sku": "FLT-9", "qtys": "5", "lead_time": ""},
+                                     {"sku": "CAB-7", "qtys": "10; 20", "lead_time": "1 Woche; 3 Wochen"}],
+                                    self.user, offer=offer)
+        ant = offer.lines.get(sku="ANT-100")
+        self.assertEqual([t["lead_time"] for t in ant.tiers], ["ab Lager", "14 Tage"])   # 35 є, 100 — ні
+        self.assertEqual(ant.lead_time, "ab Lager")
+        self.assertIn("доступно 50 шт", ant.lead_note)
+        flt = offer.lines.get(sku="FLT-9")
+        self.assertEqual((flt.lead_time, flt.price_source), ("21 Tage", OfferLine.DIGIKEY))   # картка товару
+        self.assertEqual(flt.description, "Filter 9")
+        cab = offer.lines.get(sku="CAB-7")
+        self.assertEqual([t["lead_time"] for t in cab.tiers], ["1 Woche", "3 Wochen"])      # вручну через «;»
+        rev = services.generate_document(offer)
+        cells = "\n".join(c.text for t in Document(rev.docx_file.path).tables for r in t.rows for c in r.cells)
+        self.assertIn("35 Stk: ab Lager\n100 Stk: 14 Tage", cells)
+        self.assertEqual(services.quick_from_offer(offer)["lines"][2]["lead_time"], "1 Woche; 3 Wochen")
+        self.assertEqual(services.quick_from_offer(offer)["lines"][0]["lead_time"], "")    # з Minerva — знову
+        offer2 = services.new_offer(customer=self.customer, user=self.user, language="en", lead_mode="digikey")
+        line = services.add_line(offer2, product=self.flt, qty=5)
+        self.assertEqual(line.lead_time, "11 days")
+        self.assertTrue(line.lead_note.startswith("DigiKey Marketplace"), line.lead_note)
+
+    def test_production_request_kind(self):
+        from offers.models import Offer
+        offer = services.save_quick({"customer": self.customer, "language": "en"},
+                                    [{"sku": "FT220407", "description": "Filter FT220407", "qtys": "35; 100"}],
+                                    self.user)
+        self.assertEqual(offer.request_kind, Offer.PRODUCTION)
+        self.assertIn("виробництво", offer.lines.get().price_note)
+        self.assertTrue(any("🏭" in w for w in services.warnings(offer)))
+        offer = services.save_quick({"customer": self.customer, "language": "en"},
+                                    [{"sku": "FT220407", "qtys": "35"}, {"sku": "ANT-100", "qtys": "1"},
+                                     {"sku": "DK-ONLY", "qtys": "10"}], self.user, offer=offer)
+        self.assertEqual(offer.request_kind, Offer.MIXED)
+        self.assertEqual(offer.lines.get(sku="DK-ONLY").description, "Only on DigiKey")
+        self.assertContains(self.client.get("/admin/offers/offer/?request_kind__exact=mixed"), offer.number)
+
+    def test_quick_form_shows_where_data_came_from(self):
+        body = ("Gruss\n\n-------- Ursprüngliche Nachricht --------\nVon: Denys <procurement10@moduletp.example>\n"
+                "Betreff: Denys SL Tire\nGood afternoon, we'd like to place a larger order.\n\nFilter FT220407.\n"
+                "Please provide pricing and production lead times for 35 units and 100 units.\n\n"
+                "Best regards,\nDenys Repetynskyi - supply manager\nModule ETP LLC\nKyiv, Ukraine\n")
+        m = self.mail("FW: Denys SL Tire", body, frm=ME)
+        page = self.client.get(f"/offers/quick/?thread={m.thread_id}")
+        data = page.context["data"]
+        self.assertEqual(data["currency"], "EUR")
+        self.assertIn("Україна", data["currency_reason"])
+        self.assertEqual(data["origin"]["address"], "підпис листа")
+        self.assertIn("кількості з листа: 35; 100", data["origin"]["lines"])
+        self.assertContains(page, "↳ підпис листа")
+        self.assertContains(page, "Строки поставки з")
+        d = self.client.get("/offers/api/price/", {"sku": "FLT-9", "qtys": "1; 100", "currency": "EUR",
+                                                    "language": "en"}).json()
+        self.assertEqual([(t["unit_price"], t["group"]) for t in d["tiers"]], [("18", "digikey"), ("13.5", "digikey")])
+        self.assertEqual(d["tiers"][0]["lead_time"], "21 days")
+        self.assertEqual(d["digikey"]["title"], "Bandpass filter 9")
+        d = self.client.get("/offers/api/price/", {"sku": "FT220407", "qtys": "35"}).json()
+        self.assertEqual((d["found"], d["kind"]), (False, "production"))
+
+    def test_all_quantities_for_each_item_and_codes_outside_catalog(self):
+        body = ("-------- Original Message --------\nFrom: Denys <procurement10@moduletp.example>\nSubject: RFQ\n\n"
+                "We'd like to place a larger order.\nFilter FT220407, antenna ANT-100 and filter FLT-9.\n"
+                "Please provide pricing and production lead times for 35 units and 100 units.\n\n"
+                "Best regards,\nDenys\nModule ETP LLC, VAT DE123456789\n")
+        m = self.mail("FW: RFQ", body, frm=ME)
+        rows = {r["sku"]: r for r in services.quick_prefill(m.thread)["lines"]}
+        self.assertEqual(set(rows), {"ANT-100", "FLT-9", "FT220407"})          # VAT ID з підпису — не артикул
+        self.assertEqual({r["qtys"] for r in rows.values()}, {"35; 100"})      # обидві кількості — кожній позиції
+        self.assertEqual(rows["FT220407"]["description"], "Filter FT220407")

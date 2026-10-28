@@ -41,6 +41,13 @@
 .of-totals { display: grid; grid-template-columns: auto 160px; gap: 6px 14px; justify-content: end; align-items: center; margin-top: 12px; font-size: 13px; color: var(--text); }
 .of-totals .big { font-size: 15px; font-weight: 700; }
 .of-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.of-origin { font-size: 11px; color: var(--text-muted); }
+.of-hint div { margin-top: 2px; }
+.of-src-stock { color: var(--ok, #16a34a); }
+.of-src-digikey { color: var(--link-fg); }
+.of-src-manual { color: var(--text-muted); }
+.of-prod { color: #d97706; }
+.of-kind { font-weight: 600; text-transform: none; letter-spacing: 0; margin-left: auto; font-size: 12px; color: var(--text); }
 .of-res { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--bg-card); border: 1px solid var(--border-strong);
           border-radius: 6px; max-height: 240px; overflow: auto; display: none; }
 .of-res div { padding: 6px 10px; cursor: pointer; font-size: 13px; }
@@ -53,7 +60,7 @@
   <h1 style="margin:0 0 6px;color:var(--text)">📝 {{ title }}</h1>
   <p class="of-muted" style="margin:0 0 18px">
     {% if data.source %}З листа «{{ data.source.subject|default:"(без теми)"|truncatechars:80 }}»{% if data.forwarded %} · переслано від {{ data.forwarded.from }}{% endif %} ·{% endif %}
-    документ — на бланку Commercial Invoice (той самий логотип і реквізити); ступені — кілька кількостей через «;», ціна кожної — з Minerva або вручну.
+    документ — на бланку Commercial Invoice (той самий логотип і реквізити); ступені — кілька кількостей через «;», ціна й строк кожної — з Minerva або вручну; під кожним полем — звідки взято.
     {% if offer %}· <a href="{% url 'admin:offers_offer_change' offer.pk %}" style="color:var(--link-fg)">📋 повна картка</a>{% endif %}
   </p>
 
@@ -70,9 +77,17 @@
       <div class="of-card-title">🧾 Документ</div>
       <div class="of-grid">
         <div class="of-field"><label class="of-label">Мова документа</label>
-          <select class="of-input" name="language">{% for key, label in languages %}<option value="{{ key }}"{% if key == data.language %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+          <select class="of-input" name="language" id="of-language">{% for key, label in languages %}<option value="{{ key }}"{% if key == data.language %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          {% if data.origin.language %}<div class="of-origin">↳ {{ data.origin.language }}</div>{% endif %}</div>
         <div class="of-field"><label class="of-label">Валюта</label>
-          <input class="of-input" name="currency" id="of-currency" value="{{ data.currency }}" maxlength="3" style="text-transform:uppercase" required></div>
+          <input class="of-input" name="currency" id="of-currency" value="{{ data.currency }}" maxlength="3" style="text-transform:uppercase" required>
+          <div class="of-origin" id="of-currency-why">🌍 {{ data.currency_reason }}</div></div>
+        <div class="of-field"><label class="of-label">Ціни з</label>
+          <select class="of-input" name="price_mode" id="of-price-mode">{% for key, label in price_modes %}<option value="{{ key }}"{% if key == data.price_mode %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          <div class="of-origin">інша валюта — × курс із «Налаштувань цін» магазину; ціна, введена вручну, — як є</div></div>
+        <div class="of-field"><label class="of-label">Строки поставки з</label>
+          <select class="of-input" name="lead_mode" id="of-lead-mode">{% for key, label in lead_modes %}<option value="{{ key }}"{% if key == data.lead_mode %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          <div class="of-origin">є на складі — «ab Lager», інакше термін поставки</div></div>
         <div class="of-field"><label class="of-label">Дійсний, днів</label>
           <input class="of-input" type="number" name="valid_days" value="{{ data.valid_days }}" min="0" max="365"></div>
         {% if data.project %}<div class="of-field"><label class="of-label">Проєкт</label>
@@ -87,23 +102,28 @@
           <input type="hidden" name="customer" id="of-customer" value="{{ data.customer.pk|default:'' }}">
           <input class="of-input" id="of-customer-q" autocomplete="off" placeholder="компанія, ім'я або email — почніть вводити"
                  value="{% if data.customer %}{{ data.customer.company|default:data.customer.name }}{% endif %}">
-          <div class="of-res" id="of-customer-res"></div></div>
+          <div class="of-res" id="of-customer-res"></div>
+          {% if data.origin.customer %}<div class="of-origin">↳ {{ data.origin.customer }}</div>{% endif %}</div>
         <div class="of-field"><label class="of-label">Контактна особа</label>
-          <input class="of-input" name="contact_name" id="of-contact" value="{{ data.contact_name }}"></div>
+          <input class="of-input" name="contact_name" id="of-contact" value="{{ data.contact_name }}">
+          {% if data.origin.contact %}<div class="of-origin">↳ {{ data.origin.contact }}</div>{% endif %}</div>
         <div class="of-field"><label class="of-label">Email</label>
-          <input class="of-input" name="contact_email" id="of-email" value="{{ data.contact_email }}"></div>
+          <input class="of-input" name="contact_email" id="of-email" value="{{ data.contact_email }}">
+          {% if data.origin.email %}<div class="of-origin">↳ {{ data.origin.email }}</div>{% endif %}</div>
         <div class="of-field" style="grid-column:1/-1">
           <label class="of-label" style="display:flex;align-items:center;gap:8px">Адреса
             <button type="button" class="of-btn sm" onclick="ofFillCustomer(true)" title="Адреса й контакт з картки клієнта CRM">⇄ з картки клієнта</button></label>
-          <textarea class="of-input" name="billing_address" id="of-address" rows="3">{{ data.billing_address }}</textarea></div>
+          <textarea class="of-input" name="billing_address" id="of-address" rows="3">{{ data.billing_address }}</textarea>
+          {% if data.origin.address %}<div class="of-origin">↳ {{ data.origin.address }}</div>{% endif %}</div>
       </div>
     </div>
 
     <div class="of-card">
-      <div class="of-card-title">📦 Позиції</div>
+      <div class="of-card-title">📦 Позиції <span class="of-kind" id="of-kind"></span></div>
+      {% if data.origin.lines %}<div class="of-origin" style="margin:-6px 0 8px">↳ {{ data.origin.lines }}</div>{% endif %}
       <div class="of-scroll"><table class="of-lines"><thead><tr>
         <th>Pos.</th><th>Artikel</th><th>Beschreibung</th><th>Menge / ступені<br><span style="font-weight:400">35; 100</span></th>
-        <th>Einzelpreis<br><span style="font-weight:400">порожньо — Minerva</span></th><th>Einh.</th><th>Lieferzeit</th>
+        <th>Einzelpreis<br><span style="font-weight:400">порожньо — Minerva</span></th><th>Einh.</th><th>Lieferzeit<br><span style="font-weight:400">порожньо — Minerva</span></th>
         <th style="text-align:right">Gesamt</th><th></th>
       </tr></thead><tbody id="of-lines"></tbody></table></div>
       <button type="button" class="of-btn sm" style="margin-top:6px" onclick="ofAddLine()">＋ Позиція</button>
@@ -183,6 +203,7 @@
   var CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
   function num(v){ var f = parseFloat(String(v == null ? '' : v).replace(/\s/g, '').replace(',', '.')); return isNaN(f) ? 0 : f; }
   function money(v){ return (Math.round(num(v) * 100) / 100).toFixed(2); }
+  function price(v){ var d = (String(v).split('.')[1] || '').length; return num(v).toFixed(Math.min(4, Math.max(2, d))).replace('.', ','); }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function inp(j, k, v, ph, w){
@@ -201,11 +222,38 @@
     document.getElementById('of-goods').textContent = money(goods) + ' ' + cur;
     document.getElementById('of-total').textContent = money(goods + num(document.getElementById('of-shipping').value)) + ' ' + cur;
   }
-  function hintText(l){
-    if (!l._found) return l.sku ? '— немає в каталозі Minerva: опис і ціну введіть вручну' : '';
-    return 'Minerva: ' + (l._name ? l._name + ' · ' : '') + l._hint.map(function(t){
-      return t.qty + ' → ' + (t.unit_price ? t.unit_price.replace('.', ',') : 'на запит') + (t.note ? ' (' + t.note + ')' : '');
-    }).join(' · ');
+  var ICON = {stock: '📦', digikey: '🔷', manual: '✍️', product: '🗂'};
+  function hintHtml(l){
+    if (!l.sku) return l.description ? '<span class="of-prod">🏭 Без артикула — ціну й строк введіть вручну</span>' : '';
+    if (!l._checked) return '';
+    if (!l._found) return '<span class="of-prod">' + esc(l._note) + '</span>';
+    var cur = document.getElementById('of-currency').value.toUpperCase();
+    var head = [l._name ? esc(l._name) : ''];
+    if (l._stock !== null && l._stock !== undefined) head.push('📦 на складі: ' + esc(l._stock) + ' шт');
+    else head.push('немає в каталозі Minerva');
+    if (l._dk) head.push('🔷 офер DigiKey' + (l._dk.moq > 1 ? ', MOQ ' + l._dk.moq : '')
+      + (l._dk.available !== null ? ', там ' + l._dk.available + ' шт' : '') + (l._dk.active ? '' : ' (неактивний)'));
+    var own = String(l.prices || '').trim() !== '', ownLead = String(l.lead_time || '').trim() !== '';
+    var rows = l._hint.map(function(t){
+      return '<div>💶 ' + esc(t.qty) + ' шт → <b>' + (t.unit_price ? esc(price(t.unit_price)) + ' ' + esc(cur) : 'на запит') + '</b> '
+        + '<span class="of-src-' + esc(t.group) + '">' + (ICON[t.group] || '') + ' ' + esc(t.note) + '</span>'
+        + ' · ⏱ <b>' + (t.lead_time ? esc(t.lead_time) : '—') + '</b> <span class="of-src-' + (t.lead_source === 'digikey' ? 'digikey' : t.lead_time ? 'stock' : 'manual') + '">'
+        + esc(t.lead_note) + '</span></div>';
+    }).join('');
+    var mine = (own || ownLead) ? '<div class="of-src-manual">✍️ у формі введено вручну: ' + [own ? 'ціни' : '', ownLead ? 'строк' : ''].filter(Boolean).join(' і ') + ' — у документі будуть вони, а не Minerva</div>' : '';
+    return '<div>Minerva: ' + head.filter(Boolean).join(' · ') + '</div>' + rows + mine;
+  }
+  function leadPlaceholder(l){
+    var leads = (l._hint || []).map(function(t){ return t.lead_time || '—'; });
+    var uniq = leads.filter(function(x, i){ return leads.indexOf(x) === i; });
+    return uniq.length > 1 ? leads.join('; ') : (uniq[0] && uniq[0] !== '—' ? uniq[0] : '4 Wochen');
+  }
+  function kindSummary(){
+    var used = lines.filter(function(l){ return l.sku || l.description; });
+    var prod = used.filter(function(l){ return !l.sku || (l._checked && !l._found); }).length;
+    document.getElementById('of-kind').textContent = !used.length ? '' : prod === 0 ? '📦 Товар з каталогу'
+      : prod === used.length ? '🏭 Запит на виробництво / розробку — ціни й строки вручну'
+      : '📦 + 🏭 Каталог і виробництво (' + prod + ' з ' + used.length + ' — вручну)';
   }
   function render(){
     var html = '';
@@ -216,32 +264,37 @@
         + '<td style="width:130px">' + inp(j, 'sku', l.sku, 'ANT-100') + '</td>'
         + '<td>' + inp(j, 'description', l.description, l._name || '') + '</td>'
         + '<td style="width:110px">' + inp(j, 'qtys', l.qtys, '35; 100') + '</td>'
-        + '<td style="width:130px">' + inp(j, 'prices', l.prices, l._hint && l._hint.length ? l._hint.map(function(x){ return (x.unit_price || '?').replace('.', ','); }).join('; ') : '') + '</td>'
+        + '<td style="width:130px">' + inp(j, 'prices', l.prices, l._hint && l._hint.length ? l._hint.map(function(x){ return x.unit_price ? price(x.unit_price) : '?'; }).join('; ') : '') + '</td>'
         + '<td style="width:56px">' + inp(j, 'unit', l.unit || 'Stk') + '</td>'
-        + '<td style="width:110px">' + inp(j, 'lead_time', l.lead_time, '4 Wochen') + '</td>'
+        + '<td style="width:130px">' + inp(j, 'lead_time', l.lead_time, leadPlaceholder(l)) + '</td>'
         + '<td class="num">' + (t === null ? 'на запит' : money(t)) + '</td>'
         + '<td style="white-space:nowrap"><button type="button" class="of-btn sm" onclick="ofCascade('+j+')" title="Каскад цін за шаблоном ступенів: від першої ціни — знижки за кількістю (одна кількість — ще й кількості з шаблону)">📐</button> '
         + '<button type="button" class="of-btn sm danger" onclick="ofDelLine('+j+')" title="Видалити">✕</button></td>'
-        + '</tr><tr><td></td><td colspan="8" class="of-hint">' + esc(hintText(l)) + '</td></tr>';
+        + '</tr><tr><td></td><td colspan="8" class="of-hint">' + hintHtml(l) + '</td></tr>';
     });
     body.innerHTML = html;
     totals();
+    kindSummary();
   }
   var timers = {};
   function hints(j){
     var l = lines[j];
     clearTimeout(timers[j]);
-    if (!l.sku) { l._found = false; l._hint = []; render(); return; }
+    if (!l.sku) { l._found = false; l._checked = false; l._hint = []; render(); return; }
     timers[j] = setTimeout(async function(){
-      var cur = document.getElementById('of-currency').value;
+      var qs = {sku: l.sku, qtys: l.qtys || '1', currency: document.getElementById('of-currency').value,
+                price_mode: document.getElementById('of-price-mode').value,
+                lead_mode: document.getElementById('of-lead-mode').value,
+                language: document.getElementById('of-language').value};
       try {
-        var d = await (await fetch('{% url "offers:price" %}?sku=' + encodeURIComponent(l.sku) + '&qtys=' + encodeURIComponent(l.qtys || '1')
-                                   + '&currency=' + encodeURIComponent(cur), {credentials: 'same-origin'})).json();
-        l._found = d.found; l._hint = d.tiers || []; l._name = d.name || '';
+        var d = await (await fetch('{% url "offers:price" %}?' + new URLSearchParams(qs), {credentials: 'same-origin'})).json();
+        l._checked = true; l._found = d.found; l._hint = d.tiers || []; l._name = d.name || ''; l._note = d.note || '';
+        l._stock = d.stock; l._dk = d.digikey;
       } catch (e) {}
       render();
     }, 300);
   }
+  function rehintAll(){ lines.forEach(function(_l, j){ hints(j); }); }
   body.addEventListener('input', function(e){
     var el = e.target; if (el.dataset.l === undefined) return;
     lines[el.dataset.l][el.dataset.k] = el.value;
@@ -251,7 +304,23 @@
     if (k === 'sku' || k === 'qtys') hints(+j); else render();
   });
   document.getElementById('of-shipping').addEventListener('input', totals);
-  document.getElementById('of-currency').addEventListener('change', function(){ lines.forEach(function(_l, j){ hints(j); }); });
+  // валюта: за країною клієнта (Європа / інші), доки її не змінили вручну
+  var curEl = document.getElementById('of-currency'), curWhy = document.getElementById('of-currency-why');
+  var curTouched = {% if offer %}true{% else %}false{% endif %};
+  curEl.addEventListener('input', function(){ curTouched = true; curWhy.textContent = '✍️ вибрано вручну'; });
+  curEl.addEventListener('change', rehintAll);
+  ['of-price-mode', 'of-lead-mode', 'of-language'].forEach(function(id){ document.getElementById(id).addEventListener('change', rehintAll); });
+  async function autoCurrency(){
+    if (curTouched) return;
+    var qs = new URLSearchParams({customer: document.getElementById('of-customer').value,
+      address: document.getElementById('of-address').value, email: document.getElementById('of-email').value});
+    try {
+      var d = await (await fetch('{% url "offers:currency" %}?' + qs, {credentials: 'same-origin'})).json();
+      curWhy.textContent = '🌍 ' + d.reason;
+      if (d.currency && d.currency !== curEl.value.toUpperCase()) { curEl.value = d.currency; rehintAll(); }
+    } catch (e) {}
+  }
+  ['of-address', 'of-email'].forEach(function(id){ document.getElementById(id).addEventListener('change', autoCurrency); });
   // 📐 каскад: шаблон ступенів [{min_qty, discount}] (Склад → «📐 Ступені за шаблоном» / стандартний магазину)
   var BREAKS = JSON.parse(document.getElementById('of-breaks').textContent || '[]');
   function disc(q){ var d = 0; BREAKS.forEach(function(b){ if (q >= b.min_qty) d = num(b.discount); }); return d; }
@@ -301,6 +370,7 @@
       var el = document.getElementById(p[0]);
       if (p[1] && (replace || !el.value.trim())) el.value = p[1];
     });
+    autoCurrency();
   };
 
   document.getElementById('of-form').addEventListener('submit', function(e){
@@ -311,7 +381,7 @@
     }));
   });
   render();
-  lines.forEach(function(_l, j){ hints(j); });
+  rehintAll();
 })();
 </script>
 {% endblock %}

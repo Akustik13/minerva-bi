@@ -99,16 +99,21 @@ def build_context(snap: dict) -> dict:
                                            for t in tiers))
             total = Listing("\n".join(_fmt_money(t["line_total"], lang) if t.get("unit_price") else L["on_request"]
                                       for t in tiers))
+            # різні строки для кількостей — з кількістю: «35 Stk: ab Lager / 100 Stk: 14 Tage»
+            leads = [t.get("lead_time") or l.get("lead_time", "") for t in tiers]
+            lead_time = Listing("\n".join(f"{_fmt_qty(t['qty'])} {l.get('unit', '')}".strip() + f": {x or '—'}"
+                                          for t, x in zip(tiers, leads))) if len(set(leads)) > 1 else l.get("lead_time", "")
         else:
             qty = f"{_fmt_qty(l.get('qty', '0'))} {l.get('unit', '')}".strip()
             unit_price = L["on_request"] if on_request else _fmt_unit(l.get("unit_price"), lang)
             total = L["on_request"] if on_request else _fmt_money(l.get("line_total"), lang)
+            lead_time = l.get("lead_time", "")
         lines.append({
             "pos": l.get("position"), "sku": l.get("sku", ""), "description": Listing(l.get("description", "")),
             "qty": qty, "unit_price": unit_price,
             "discount": f"{_fmt_qty(disc)} %" if disc else "",
             "total": total,
-            "lead_time": l.get("lead_time", ""),
+            "lead_time": lead_time,
         })
     has_tiers = any(l.get("tiers") for l in snap.get("lines", []))
     shipping = Decimal(snap.get("shipping_cost") or "0")

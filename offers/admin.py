@@ -36,7 +36,7 @@ class OfferLineInline(admin.TabularInline):
               "tiers_input", "lead_time", "line_total", "price_info")
     readonly_fields = ("price_info", "line_total")
     autocomplete_fields = ("product",)
-    verbose_name_plural = "Позиції (ціна порожня — з каталогу Minerva: магазин → ціна продажу → базова ціна)"
+    verbose_name_plural = "Позиції (ціна й строк порожні — за «Ціни з» / «Строки поставки з»: склад Minerva → DigiKey)"
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         field = super().formfield_for_dbfield(db_field, request, **kwargs)
@@ -55,10 +55,12 @@ class OfferLineInline(admin.TabularInline):
         """Звідки ціна (повне пояснення — у підказці) і маржа — лише для вас, у документ не потрапляє."""
         if not obj or not obj.pk:
             return "—"
+        lead = format_html('<br><span style="opacity:.75" title="{}">⏱ {}</span>', obj.lead_note,
+                           obj.lead_note[:40] + ("…" if len(obj.lead_note) > 40 else "")) if obj.lead_note else ""
         if obj.unit_price is None:
-            return format_html('<span style="color:#e57373" title="{}">⚠ на запит</span>', obj.price_note)
-        return format_html('<span title="{}">{}</span><br><span style="opacity:.85">маржа {}</span>',
-                           obj.price_note, obj.get_price_source_display(), self.margin(obj))
+            return format_html('<span style="color:#e57373" title="{}">⚠ на запит</span>{}', obj.price_note, lead)
+        return format_html('<span title="{}">{}</span><br><span style="opacity:.85">маржа {}</span>{}',
+                           obj.price_note, obj.get_price_source_display(), self.margin(obj), lead)
 
     def margin(self, obj):
         if not obj or not obj.product_id or obj.unit_price is None or not obj.qty:
@@ -85,17 +87,19 @@ class OfferLineInline(admin.TabularInline):
 
 @admin.register(Offer)
 class OfferAdmin(admin.ModelAdmin):
-    list_display = ("number_col", "customer", "project", "status_col", "gross_col", "valid_until", "owner",
-                    "updated_at")
-    list_filter = ("status", "owner", "currency")
+    list_display = ("number_col", "customer", "project", "status_col", "request_kind", "gross_col", "valid_until",
+                    "owner", "updated_at")
+    list_filter = ("status", "request_kind", "owner", "currency")
     search_fields = ("number", "customer__name", "customer__company", "contact_email", "lines__sku")
     autocomplete_fields = ("customer", "project")
-    readonly_fields = ("number_rev", "totals_panel", "actions_panel", "documents_panel", "sources_panel")
+    readonly_fields = ("number_rev", "request_kind", "totals_panel", "actions_panel", "documents_panel",
+                       "sources_panel")
     inlines = [OfferLineInline]
     fieldsets = [
-        (None, {"fields": ["number_rev", "actions_panel", "status", "customer", "contact_name", "contact_email",
-                           "billing_address", "project", "owner"]}),
-        ("Умови", {"fields": ["language", "currency", "vat_rate", "shipping_cost", "valid_until"]}),
+        (None, {"fields": ["number_rev", "actions_panel", "status", "request_kind", "customer", "contact_name",
+                           "contact_email", "billing_address", "project", "owner"]}),
+        ("Умови", {"fields": ["language", "currency", "vat_rate", "shipping_cost", "valid_until", "price_mode",
+                              "lead_mode"]}),
         ("Тексти документа", {"fields": ["intro_text", "payment_terms", "delivery_terms", "outro_text"],
                               "classes": ["collapse"]}),
         ("Підсумок", {"fields": ["totals_panel"]}),
@@ -310,8 +314,16 @@ class OfferAdmin(admin.ModelAdmin):
 class OfferSettingsAdmin(admin.ModelAdmin):
     readonly_fields = ["quote_scan_state"]
     fieldsets = [
-        ("Номер і умови", {"fields": ["number_prefix", "validity_days", "default_currency", "default_vat_rate",
-                                      "default_language", "email_subject"]}),
+        ("Номер і умови", {"fields": ["number_prefix", "validity_days", "default_vat_rate", "default_language",
+                                      "email_subject"]}),
+        ("💶 Валюта, ціни й строки", {
+            "fields": ["currency_by_country", "currency_europe", "currency_other", "default_currency", "price_mode",
+                       "lead_mode"],
+            "description": "Ціни: 📦 склад Minerva (магазин за замовчуванням → ціна продажу → базові ціни), немає — "
+                           "🔷 наш офер на DigiKey Marketplace. Строк: є на складі потрібна кількість — «ab Lager», "
+                           "інакше «Термін поставки» товару, інакше строк відвантаження DigiKey. У формі Angebot видно, "
+                           "звідки кожна ціна й строк, і можна вибрати інше джерело. Позиції, яких немає ні в каталозі, "
+                           "ні на DigiKey, позначаються 🏭 «виробництво / розробка» — ціну й строк вводять вручну."}),
         ("Тексти за замовчуванням", {"fields": ["intro_text", "payment_terms", "delivery_terms", "outro_text"]}),
         ("Реквізити в документі", {
             "fields": ["company_block", "footer_text", "template"],

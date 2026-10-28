@@ -45,7 +45,9 @@ def customer_address(customer) -> str:
 def defaults(customer=None) -> dict:
     s = OfferSettings.get()
     return {
-        "currency": s.default_currency, "vat_rate": s.default_vat_rate, "language": s.default_language,
+        "currency": pricing.currency_for(customer)["currency"] if customer is not None else s.default_currency,
+        "price_mode": s.price_mode, "lead_mode": s.lead_mode,
+        "vat_rate": s.default_vat_rate, "language": s.default_language,
         "valid_until": timezone.localdate() + timedelta(days=s.validity_days),
         "intro_text": s.intro_text, "payment_terms": s.payment_terms, "delivery_terms": s.delivery_terms,
         "outro_text": s.outro_text,
@@ -61,7 +63,7 @@ def new_offer(*, customer=None, user=None, **fields) -> Offer:
 
 def add_line(offer, *, product=None, qty=1, sku="", description="", unit_price=None, discount_percent=0,
              price_source=None, price_note="", lead_time="", unit="Stk", recalc=True) -> OfferLine:
-    """Позиція: без ціни — ціна з каталогу Minerva (pricing.quote_price)."""
+    """Позиція: без ціни — ціна за «Ціни з» Angebot (pricing.quote_price), без строку — pricing.quote_lead."""
     if offer.is_locked:
         raise OfferError("Надіслану пропозицію не змінюють — створіть нову версію.")
     line = OfferLine(offer=offer, product=product, qty=Decimal(str(qty)), unit=unit,
@@ -75,21 +77,30 @@ def add_line(offer, *, product=None, qty=1, sku="", description="", unit_price=N
     return line
 
 
+def _dk_title(sku) -> str:
+    listing = pricing.dk_listing(None, sku) if sku else None
+    return listing.dk_title if listing else ""
+
+
 def fill_line(line, *, sku="", description="", unit_price=None, price_source=None, price_note=""):
-    """Доповнити позицію з товару: артикул, опис, ціна з каталогу (якщо ціни не задано вручну)."""
-    p = line.product
+    """Доповнити позицію: артикул, опис і строк — з товару (або нашого офера DigiKey), ціна — за «Ціни з»
+    Angebot, якщо її не задано вручну. Немає ні в каталозі, ні на DigiKey — примітка «виробництво / розробка»."""
+    p, offer = line.product, line.offer
     line.sku = sku or line.sku or (p.sku if p else "")
-    line.description = description or line.description or (p.name_export or p.name if p else "") or line.sku
-    if p and not line.lead_time and getattr(p, "lead_time_days", None):
-        days = {"de": "Tage", "de_en": "Tage / days", "uk": "днів"}.get(line.offer.language, "days")
-        line.lead_time = f"{p.lead_time_days} {days}"
+    line.description = description or line.description or (p.name_export or p.name if p else "") or \
+        _dk_title(line.sku) or line.sku
+    if not line.lead_time:
+        lq = pricing.quote_lead(p, line.qty, offer.language, offer.lead_mode, sku=line.sku)
+        line.lead_time, line.lead_note = lq.text, lq.note[:255]
+    elif not line.lead_note:
+        line.lead_note = pricing.MANUAL_LEAD
     if unit_price is not None:
         line.unit_price = Decimal(str(unit_price))
         line.price_source = price_source or OfferLine.MANUAL
         line.price_note = price_note
-    elif line.unit_price is None and p is not None:
-        q = pricing.quote_price(p, line.qty, line.offer.currency)
-        line.unit_price, line.price_source, line.price_note = q.unit_price, q.source, q.note
+    elif line.unit_price is None:
+        q = pricing.quote_price(p, line.qty, offer.currency, offer.price_mode, sku=line.sku)
+        line.unit_price, line.price_source, line.price_note = q.unit_price, q.source, q.note[:255]
     elif line.unit_price is not None and not line.price_note:
         line.price_source, line.price_note = OfferLine.MANUAL, "Введено вручну"
     line.line_total = pricing.line_total(line.qty, line.unit_price, line.discount_percent)
@@ -126,27 +137,40 @@ def tiers_text(line) -> str:
                      else pricing._num(t["qty"]) for t in (line.tiers or []))
 
 
-def set_tiers(line, tiers) -> None:
-    """Ступінчасті ціни (Staffelpreise): [(к-сть, ціна | None)]; без ціни — з каталогу Minerva саме для цієї к-сті
-    (ступені магазину / базові ціни). Перша — основна к-сть і ціна позиції (з неї сума Angebot); одна або жодної —
-    звичайна позиція. Не зберігає."""
-    rows = []
-    for qty, price in tiers:
+def _lead_is_auto(line) -> bool:
+    """Строк позиції підставила Minerva (не введено вручну; старі позиції без примітки — вручну)."""
+    return not line.lead_time or bool(line.lead_note and line.lead_note != pricing.MANUAL_LEAD)
+
+
+def set_tiers(line, tiers, leads=None) -> None:
+    """Ступінчасті ціни (Staffelpreise): [(к-сть, ціна | None)]; без ціни — за «Ціни з» Angebot саме для цієї
+    к-сті (ступені магазину / базові ціни / DigiKey). Строк — свій для кожної к-сті (35 є на складі — «ab Lager»,
+    100 — термін поставки) або leads, введені вручну через «;». Перша — основна к-сть і ціна позиції (з неї сума
+    Angebot); одна або жодної — звичайна позиція. Не зберігає."""
+    offer, rows = line.offer, []
+    auto_lead = not leads and _lead_is_auto(line)
+    for i, (qty, price) in enumerate(tiers):
         source, note = OfferLine.MANUAL, "Введено вручну"
-        if price is None and line.product_id:
-            q = pricing.quote_price(line.product, qty, line.offer.currency)
+        if price is None:
+            q = pricing.quote_price(line.product, qty, offer.currency, offer.price_mode, sku=line.sku)
             price, source, note = q.unit_price, q.source, q.note
-        elif price is None:
-            note = "на запит"
+        if leads:
+            lead, lead_note = (leads[i] if i < len(leads) and leads[i] else leads[-1]), pricing.MANUAL_LEAD
+        elif auto_lead:
+            lq = pricing.quote_lead(line.product, qty, offer.language, offer.lead_mode, sku=line.sku)
+            lead, lead_note = lq.text, lq.note
+        else:
+            lead, lead_note = line.lead_time, line.lead_note
         rows.append({"qty": pricing._num(qty), "unit_price": _s(price) if price is not None else "",
                      "line_total": _s(pricing.line_total(qty, price, line.discount_percent)), "price_note": note,
-                     "price_source": source})
+                     "price_source": source, "lead_time": lead, "lead_note": lead_note[:255]})
     line.tiers = rows if len(rows) > 1 else []
     if rows:
         first = rows[0]
         line.qty = Decimal(first["qty"])
         line.unit_price = Decimal(first["unit_price"]) if first["unit_price"] else None
-        line.price_source, line.price_note = first["price_source"], first["price_note"]
+        line.price_source, line.price_note = first["price_source"], first["price_note"][:255]
+        line.lead_time, line.lead_note = first["lead_time"][:100], first["lead_note"]
     line.line_total = pricing.line_total(line.qty, line.unit_price, line.discount_percent)
 
 
@@ -164,6 +188,14 @@ def _sync_tiers(line) -> bool:
     return changed
 
 
+def request_kind(lines) -> str:
+    """📦 каталог / 🏭 виробництво й розробка (немає ні в каталозі Minerva, ні на DigiKey) / змішаний."""
+    known = [bool(l.product_id) or (bool(l.sku) and pricing.dk_listing(None, l.sku) is not None) for l in lines]
+    if not known or all(known):
+        return Offer.STOCK
+    return Offer.MIXED if any(known) else Offer.PRODUCTION
+
+
 def recalculate(offer) -> Offer:
     lines = list(offer.lines.all())
     for i, line in enumerate(lines, 1):
@@ -174,8 +206,9 @@ def recalculate(offer) -> Offer:
             line.save(update_fields=["line_total", "position", "tiers"])
     t = pricing.totals([l.line_total for l in lines], offer.shipping_cost, offer.vat_rate)
     offer.net_total, offer.vat_total, offer.gross_total = t["net"], t["vat"], t["gross"]
+    offer.request_kind = request_kind(lines)
     Offer.objects.filter(pk=offer.pk).update(net_total=t["net"], vat_total=t["vat"], gross_total=t["gross"],
-                                             updated_at=timezone.now())
+                                             request_kind=offer.request_kind, updated_at=timezone.now())
     return offer
 
 
@@ -188,6 +221,9 @@ def warnings(offer) -> list:
         out.append("Немає позицій")
     if not (offer.contact_email or getattr(offer.customer, "email", "")):
         out.append("Немає email клієнта")
+    if offer.request_kind != Offer.STOCK:
+        out.append("🏭 Є позиції, яких немає ні в каталозі Minerva, ні на DigiKey (виробництво / розробка) — "
+                   "ціну й строк перевірте вручну")
     return out
 
 
@@ -565,6 +601,20 @@ def _qtys_text(values) -> str:
     return "; ".join(pricing._num(v) for v in values)
 
 
+_FILLER = {"and", "und", "or", "oder", "the", "for", "für", "with", "mit", "of", "von", "і", "та", "и"}
+MAX_EXTRA_CODES = 5
+_VAT_RE = re.compile(r"^[A-Z]{2}\d{8,12}$")    # USt-IdNr / VAT ID (DE123456789), не артикул
+
+
+def _describe_code(text, code) -> str:
+    """Опис позиції без каталогу: короткий рядок листа з артикулом («Filter FT220407») або слово перед ним."""
+    line = next((ln.strip(" .:;,-") for ln in text.splitlines() if code in ln), "")
+    if line and len(line) <= 60 and len(SKU_RE.findall(line)) == 1:   # рядок з кількома артикулами — ні
+        return line
+    m = re.search(rf"([A-Za-zÄÖÜäöüßА-Яа-яІіЇїЄє]+)\s+{re.escape(code)}", line)
+    return f"{m.group(1)} {code}" if m and m.group(1).lower() not in _FILLER else code
+
+
 def quick_prefill(thread=None) -> dict:
     """Дані легкої форми: з листування (клієнт, контакт, проєкт, мова листа, артикули каталогу; кількості з листа —
     ступенями, напр. «35 units and 100 units» → 35; 100) або порожні з налаштувань."""
@@ -572,6 +622,9 @@ def quick_prefill(thread=None) -> dict:
     s = OfferSettings.get()
     data = {"customer": None, "contact_name": "", "contact_email": "", "billing_address": "", "project": None,
             "language": s.default_language, "currency": s.default_currency, "valid_days": s.validity_days,
+            "currency_reason": "з «Налаштувань Angebote» — виберіть клієнта, і валюта стане за його країною"
+            if s.currency_by_country else "з «Налаштувань Angebote»",
+            "price_mode": s.price_mode, "lead_mode": s.lead_mode, "origin": {},
             "shipping_cost": "0", "intro_text": s.intro_text, "payment_terms": s.payment_terms,
             "delivery_terms": s.delivery_terms, "outro_text": s.outro_text, "source": None, "forwarded": None,
             "lines": [dict(BLANK_ROW)]}
@@ -584,24 +637,60 @@ def quick_prefill(thread=None) -> dict:
     qtys = _quantities(text)
     items = detect_items(text)
     rows = []
-    for product, qty in items:
-        tiers = qtys if len(items) == 1 and len(qtys) > 1 else ([qty] if qty else qtys[:1])
+    for product, qty in items:   # «35 units and 100 units» для всіх — кожному артикулу всі кількості
+        tiers = qtys if len(qtys) > 1 and (len(items) == 1 or not qty) else ([qty] if qty else qtys[:1])
         rows.append({**BLANK_ROW, "sku": product.sku, "description": product.name_export or product.name,
                      "qtys": _qtys_text(tiers) or "1"})
-    if not rows:   # артикула немає в каталозі — схоже на артикул слово з листа, опис — рядок листа з ним
-        sku = SKU_RE.search(text)
-        line = next((ln.strip(" .:;") for ln in text.splitlines() if sku and sku.group(1) in ln), "")
-        rows.append({**BLANK_ROW, "sku": sku.group(1) if sku else "",
-                     "description": line if len(line) <= 100 else "", "qtys": _qtys_text(qtys) or "1"})
+    # схожі на артикул слова, яких немає в каталозі (FT220407) — теж позиції: DigiKey або 🏭 виробництво / розробка
+    from email_assistant.quotes import strip_signature
+    from inventory.services.stock import resolve_sku
+    from sales.models import SalesOrder
+    known = {r["sku"].upper() for r in rows}
+    extra = []
+    for code in dict.fromkeys(m.group(1) for m in SKU_RE.finditer(strip_signature(text))):   # без підпису
+        if code.upper() in known or len(extra) >= MAX_EXTRA_CODES or _VAT_RE.match(code) or \
+                resolve_sku(code) is not None or SalesOrder.objects.filter(order_number__iexact=code).exists():
+            continue
+        extra.append(code)
+        rows.append({**BLANK_ROW, "sku": code, "description": _describe_code(text, code),
+                     "qtys": _qtys_text(qtys) or "1"})
+    if not rows:
+        rows.append(dict(BLANK_ROW))
     # клієнта в CRM немає — адреса й ім'я з підпису листа (для пересланого — з пересланого листа)
     from email_assistant.quotes import signature
     sig = signature(fw["text"] if fw else new_text(source.body_text)) if customer is None else {"lines": [], "name": ""}
+    language = guess_language(text, "")
     data.update(
         customer=customer, project=project, source=source, forwarded=fw, lines=rows,
         contact_name=(customer.name if customer else "") or sig["name"] or (fw["name"] if fw else source.from_name) or "",
         contact_email=(fw["from"] if fw else source.from_email) or getattr(customer, "email", "") or "",
         billing_address=customer_address(customer) or "\n".join(sig["lines"]),
-        language=guess_language(text, s.default_language))
+        language=language or s.default_language)
+    cur = pricing.currency_for(customer, address=data["billing_address"], email=data["contact_email"])
+    data.update(currency=cur["currency"], currency_reason=cur["reason"])
+    # звідки що взято — підписи під полями форми
+    if customer is None:
+        who = "клієнта в CRM не знайдено — дані з листа"
+    elif thread.crm_customer_id == customer.pk:
+        who = "лист прив'язаний до цього клієнта CRM"
+    elif project is not None and project.customer_id == customer.pk:
+        who = f"клієнт проєкту {project.code}"
+    else:
+        who = "знайдено в CRM за адресою пересланого листа"
+    data["origin"] = {
+        "customer": who,
+        "contact": "картка CRM" if customer and customer.name else "підпис листа" if sig["name"] else
+        "«Von:» пересланого листа" if fw else "відправник листа",
+        "email": "«Von:» пересланого листа" if fw else "відправник листа",
+        "address": "картка CRM" if customer_address(customer) else "підпис листа" if sig["lines"] else
+        "у листі не знайдено — введіть",
+        "language": "за мовою листа" if language else "з «Налаштувань Angebote» (мову листа не визначено)",
+        "lines": "; ".join(x for x in (
+            "артикули з каталогу Minerva, знайдені в листі" if items else "",
+            f"без каталогу Minerva: {', '.join(extra)} — артикул і опис з листа" if extra else "",
+            "артикулів у листі не знайдено — введіть" if not (items or extra) else "",
+            f"кількості з листа: {_qtys_text(qtys)}" if qtys else "") if x),
+    }
     return data
 
 
@@ -614,15 +703,19 @@ def quick_from_offer(offer) -> dict:
         tiers = l.tiers or [{"qty": _s(l.qty), "unit_price": _s(l.unit_price) if l.unit_price is not None else "",
                              "price_source": l.price_source}]
         prices = [manual(t) for t in tiers]
+        leads = [t.get("lead_time") or l.lead_time for t in tiers]
+        lead = "" if _lead_is_auto(l) else ("; ".join(leads) if len(set(leads)) > 1 else l.lead_time)
         rows.append({"sku": l.sku, "description": l.description,
                      "qtys": _qtys_text(Decimal(t["qty"]) for t in tiers),
                      "prices": "; ".join(pricing._num(p).replace(".", ",") if p else "" for p in prices).strip("; "),
-                     "lead_time": l.lead_time, "unit": l.unit})
+                     "lead_time": lead, "unit": l.unit})
     s = OfferSettings.get()
     valid_days = (offer.valid_until - timezone.localdate()).days if offer.valid_until else s.validity_days
     return {"customer": offer.customer, "contact_name": offer.contact_name, "contact_email": offer.contact_email,
             "billing_address": offer.billing_address, "project": offer.project, "language": offer.language,
-            "currency": offer.currency, "valid_days": max(valid_days, 0), "shipping_cost": _s(offer.shipping_cost),
+            "currency": offer.currency, "currency_reason": "збережено в цьому Angebot",
+            "price_mode": offer.price_mode, "lead_mode": offer.lead_mode, "origin": {},
+            "valid_days": max(valid_days, 0), "shipping_cost": _s(offer.shipping_cost),
             "intro_text": offer.intro_text, "payment_terms": offer.payment_terms,
             "delivery_terms": offer.delivery_terms, "outro_text": offer.outro_text, "source": offer.source_message,
             "forwarded": None, "lines": rows or [dict(BLANK_ROW)]}
@@ -647,7 +740,8 @@ def save_quick(fields: dict, rows: list, user=None, offer=None, source=None, thr
     Minerva для кожної кількості; ступені — set_tiers). Позиції чернетки замінюються цілком."""
     from inventory.models import Product
     keys = ("contact_name", "contact_email", "billing_address", "language", "currency", "valid_until",
-            "shipping_cost", "intro_text", "payment_terms", "delivery_terms", "outro_text", "project")
+            "shipping_cost", "intro_text", "payment_terms", "delivery_terms", "outro_text", "project",
+            "price_mode", "lead_mode")
     if offer is None:
         offer = new_offer(customer=fields.get("customer"), user=user, source_message=source,
                           **{k: fields[k] for k in keys if k in fields})
@@ -667,11 +761,12 @@ def save_quick(fields: dict, rows: list, user=None, offer=None, source=None, thr
             continue
         product = Product.objects.filter(sku__iexact=sku).first() if sku else None
         tiers = _row_tiers(row)
+        leads = [x.strip()[:100] for x in (row.get("lead_time") or "").split(";")]   # «ab Lager; 4 Wochen»
         line = add_line(offer, product=product, qty=tiers[0][0], sku=sku, description=description,
-                        unit_price=tiers[0][1], lead_time=(row.get("lead_time") or "").strip()[:100],
+                        unit_price=tiers[0][1], lead_time=leads[0],
                         unit=(row.get("unit") or "Stk").strip()[:16] or "Stk", recalc=False)
         if len(tiers) > 1:
-            set_tiers(line, tiers)
+            set_tiers(line, tiers, leads if len(leads) > 1 else None)
             line.save()
     recalculate(offer)
     if thread is not None:
@@ -680,15 +775,27 @@ def save_quick(fields: dict, rows: list, user=None, offer=None, source=None, thr
     return offer
 
 
-def price_hints(sku: str, qtys: str, currency: str) -> dict:
-    """Ціни Minerva для артикула й кількостей — підказка в легкій формі (нічого не зберігає)."""
+def price_hints(sku: str, qtys: str, currency: str, price_mode="auto", lead_mode="auto", language="de") -> dict:
+    """Підказка в легкій формі (нічого не зберігає): для кожної кількості — ціна й строк і звідки вони
+    (📦 склад Minerva / 🔷 DigiKey); склад і офер DigiKey; немає ніде — kind=production (виробництво / розробка)."""
     from inventory.models import Product
-    product = Product.objects.filter(sku__iexact=(sku or "").strip()).first() if sku else None
-    if product is None:
-        return {"found": False, "tiers": []}
+    sku = (sku or "").strip()
+    product = Product.objects.filter(sku__iexact=sku).first() if sku else None
+    listing = pricing.dk_listing(product, sku) if sku else None
+    if product is None and listing is None:
+        return {"found": False, "kind": Offer.PRODUCTION, "tiers": [], "note": pricing.PRODUCTION_NOTE}
     out = []
     for q, _x in parse_tiers(qtys or "1") or [(Decimal("1"), None)]:
-        p = pricing.quote_price(product, q, currency)
+        p = pricing.quote_price(product, q, currency, price_mode, sku)
+        lq = pricing.quote_lead(product, q, language, lead_mode, sku)
         out.append({"qty": pricing._num(q), "unit_price": pricing._num(p.unit_price) if p.unit_price is not None else "",
-                    "note": p.note})
-    return {"found": True, "name": product.name_export or product.name, "tiers": out}
+                    "note": p.note, "source": p.source, "group": pricing.SOURCE_GROUPS.get(p.source, "manual"),
+                    "lead_time": lq.text, "lead_note": lq.note, "lead_source": lq.source})
+    stock = None
+    if product is not None:
+        from inventory.services.stock import get_available
+        stock = pricing._num(get_available(product))
+    dk = {"title": listing.dk_title, "moq": listing.dk_min_order_qty, "available": listing.dk_quantity_available,
+          "active": listing.dk_is_active} if listing else None
+    return {"found": True, "kind": Offer.STOCK, "in_catalog": product is not None, "stock": stock, "digikey": dk,
+            "name": (product.name_export or product.name) if product else listing.dk_title, "tiers": out}

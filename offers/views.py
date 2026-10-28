@@ -57,7 +57,7 @@ def _quick_fields(request) -> dict:
 
     from crm.models import Customer
 
-    from .models import LANGUAGES
+    from .models import LANGUAGES, LEAD_MODES, PRICE_MODES
     P = request.POST
     customer = Customer.objects.filter(pk=P.get("customer")).first() if str(P.get("customer") or "").isdigit() else None
     project = None
@@ -74,6 +74,8 @@ def _quick_fields(request) -> dict:
         shipping = Decimal(0)
     language = P.get("language") if P.get("language") in dict(LANGUAGES) else "de"
     return {"customer": customer, "project": project, "language": language,
+            "price_mode": P.get("price_mode") if P.get("price_mode") in dict(PRICE_MODES) else "auto",
+            "lead_mode": P.get("lead_mode") if P.get("lead_mode") in dict(LEAD_MODES) else "auto",
             "contact_name": P.get("contact_name", "").strip()[:200],
             "contact_email": P.get("contact_email", "").strip()[:254],
             "billing_address": P.get("billing_address", "").strip(),
@@ -101,7 +103,7 @@ def quick_view(request, pk=None):
     from django.core.exceptions import PermissionDenied
     from django.shortcuts import redirect, render
 
-    from .models import LANGUAGES, Offer
+    from .models import LANGUAGES, LEAD_MODES, PRICE_MODES, Offer
     offer = get_object_or_404(Offer, pk=pk) if pk else None
     thread = None
     tpk = request.POST.get("thread") or request.GET.get("thread")
@@ -140,6 +142,7 @@ def quick_view(request, pk=None):
         **admin.site.each_context(request),
         "title": f"Angebot {offer.display_number}" if offer else "Новий Angebot",
         "data": data, "offer": offer, "thread": thread, "languages": LANGUAGES,
+        "price_modes": PRICE_MODES, "lead_modes": LEAD_MODES,
         "rev": services.current_revision(offer) if offer else None,
         "locked": bool(offer and offer.is_locked), "warnings": services.warnings(offer) if offer else [],
         "lines": data["lines"],
@@ -228,7 +231,20 @@ def template_sample_view(request):
 def price_view(request):
     """Ціни Minerva для артикула й кількостей (підказка в легкій формі)."""
     g = request.GET
-    return JsonResponse(services.price_hints(g.get("sku", ""), g.get("qtys", ""), g.get("currency", "EUR")))
+    return JsonResponse(services.price_hints(g.get("sku", ""), g.get("qtys", ""), g.get("currency", "EUR"),
+                                             g.get("price_mode", "auto"), g.get("lead_mode", "auto"),
+                                             g.get("language", "de")))
+
+
+@staff_member_required
+def currency_view(request):
+    """Валюта за країною клієнта (клієнт CRM, адреса, email) — для легкої форми."""
+    from crm.models import Customer
+
+    from . import pricing
+    g = request.GET
+    customer = Customer.objects.filter(pk=g["customer"]).first() if str(g.get("customer") or "").isdigit() else None
+    return JsonResponse(pricing.currency_for(customer, address=g.get("address", ""), email=g.get("email", "")))
 
 
 @staff_member_required
