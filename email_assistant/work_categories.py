@@ -254,3 +254,114 @@ def counts(qs) -> list:
             .annotate(n=Count('id'), unread=Count('id', filter=Q(is_read=False)))}
     return [(c, rows.get(c.pk, {}).get('n', 0), rows.get(c.pk, {}).get('unread', 0))
             for c in MailCategory.objects.filter(is_active=True)]
+
+
+# ── 🔎 пропозиції категорій за період (без AI: з того, що Minerva вже знаходить у листах) ─────────────────
+SUGGEST_MIN = 5          # менше листів — групу не пропонуємо
+SUGGEST_LIMIT = 4000     # листів за раз
+
+
+def _domain_label(address: str) -> str:
+    """digikey.de / eu.digikey.com → digikey (частина домену для правила «Відправники»)."""
+    domain = address.split('@', 1)[1] if '@' in address else address
+    parts = [p for p in domain.lower().split('.') if p]
+    if len(parts) >= 3 and parts[-2] in ('co', 'com', 'org', 'net') and len(parts[-1]) == 2:
+        return parts[-3]   # example.co.uk
+    return parts[-2] if len(parts) >= 2 else domain
+
+
+def suggest(days: int = 60, accounts=None) -> list:
+    """Групи листів за `days` днів, які ще не в своїх категоріях: джерела замовлень (номер / трек-номер у листі або
+    замовлення CRM-події — так само, як блок «🔗» у листі) і постійні відправники-сервіси / постачальники (за
+    доменом). Те саме джерело й домен (digikey) — одна група. → [{key, name, senders, sources, mails, subjects}]"""
+    import datetime
+    from collections import Counter, defaultdict
+    from django.utils import timezone
+    from crm.models import CustomerTimeline
+    from email_assistant.categorize import counterparts
+    from email_assistant.crm_link import FREE_MAIL_DOMAINS, _TOKEN_RE, own_addresses
+    from email_assistant.models import EmailMessage
+    from sales.models import SalesOrder, SalesSource
+    from shipping.models import Shipment
+
+    since = timezone.now() - datetime.timedelta(days=days)
+    qs = EmailMessage.objects.filter(sent_at__gte=since, is_spam=False, is_deleted=False, work_category=None)
+    if accounts is not None:
+        qs = qs.filter(account__in=accounts)
+    msgs = list(qs.order_by('-sent_at').values('pk', 'subject', 'body_text', 'from_email', 'to_emails', 'cc_emails',
+                                               'category')[:SUGGEST_LIMIT])
+    own = own_addresses()
+    tokens_of = {}
+    for m in msgs:
+        text = f"{m['subject']} {(m['body_text'] or '')[:6000]}"
+        tokens_of[m['pk']] = {t for t in _TOKEN_RE.findall(text) if sum(ch.isdigit() for ch in t) >= 5}
+    every = set().union(*tokens_of.values()) if tokens_of else set()
+    every |= {t.upper() for t in every}
+    by_token = {}
+    for number, source in SalesOrder.objects.filter(order_number__in=every).values_list('order_number', 'source'):
+        by_token[number] = source
+    for number, source in (SalesOrder.objects.filter(tracking_number__in=every).exclude(tracking_number='')
+                           .values_list('tracking_number', 'source')):
+        by_token.setdefault(number, source)
+    for number, source in (Shipment.objects.filter(tracking_number__in=every).exclude(tracking_number='')
+                           .exclude(order=None).values_list('tracking_number', 'order__source')):
+        by_token.setdefault(number, source)
+    crm_source = dict(CustomerTimeline.objects.filter(email_message_id__in=[m['pk'] for m in msgs])
+                      .exclude(related_order_id=None).values_list('email_message_id', 'related_order_id'))
+    if crm_source:
+        order_src = dict(SalesOrder.objects.filter(pk__in=set(crm_source.values())).values_list('pk', 'source'))
+        crm_source = {mid: order_src.get(oid) for mid, oid in crm_source.items()}
+
+    groups = defaultdict(lambda: {'mails': set(), 'senders': set(), 'sources': set(), 'subjects': Counter()})
+    for m in msgs:
+        sources = {by_token[t] for t in tokens_of[m['pk']] | {t.upper() for t in tokens_of[m['pk']]} if t in by_token}
+        if crm_source.get(m['pk']):
+            sources.add(crm_source[m['pk']])
+        em = EmailMessage(from_email=m['from_email'], to_emails=m['to_emails'] or [], cc_emails=m['cc_emails'] or [])
+        contacts = counterparts(em, own)
+        keys = set()
+        for s in sources - {None, ''}:
+            keys.add(s.lower())
+            groups[s.lower()]['sources'].add(s)
+        if m['category'] in ('service', 'supplier'):
+            for a in contacts:
+                domain = a.split('@', 1)[1]
+                if domain in FREE_MAIL_DOMAINS:
+                    continue
+                label = _domain_label(a)
+                keys.add(label)
+                groups[label]['senders'].add(label)
+        for k in keys:
+            groups[k]['mails'].add(m['pk'])
+            groups[k]['subjects'][(m['subject'] or '')[:80]] += 1
+
+    names = {s.slug.lower(): s.name for s in SalesSource.objects.all()}
+    rules = Rules()
+    out = []
+    for key, g in groups.items():
+        if len(g['mails']) < SUGGEST_MIN:
+            continue
+        if any(set(it['sources']) & g['sources'] or any(sender_matches(f'x@{key}.com', r) for r in it['senders'])
+               for it in rules.items):
+            continue   # уже є категорія з цим джерелом / відправником
+        out.append({'key': key, 'name': names.get(key) or key.capitalize(), 'senders': sorted(g['senders']),
+                    'sources': sorted(g['sources']), 'mails': len(g['mails']),
+                    'subjects': [s for s, _ in g['subjects'].most_common(4) if s]})
+    out.sort(key=lambda g: -g['mails'])
+    return out
+
+
+def create_from_suggestion(name: str, senders, sources, icon: str = '🏷'):
+    """Своя категорія з пропозиції: правила «Відправники» (частина домену) і «Замовлення з джерел»."""
+    from email_assistant.models import MailCategory
+    from sales.models import SalesSource
+    cat = MailCategory.objects.filter(name__iexact=name).first() or MailCategory.objects.create(
+        name=name[:80], icon=icon[:8], order=MailCategory.objects.count())
+    lines = [ln for ln in (cat.senders or '').splitlines() if ln.strip()]
+    for s in senders:
+        if s.lower() not in [ln.strip().lower() for ln in lines]:
+            lines.append(s)
+    cat.senders = '\n'.join(lines)
+    cat.save(update_fields=['senders'])
+    cat.sources.add(*SalesSource.objects.filter(slug__in=list(sources)))
+    return cat

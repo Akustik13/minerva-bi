@@ -35,11 +35,11 @@ logger = logging.getLogger(__name__)
 
 WORDS = {   # мова опису в askDANTE (DanteSettings.comment_lang)
     "de": {"prefix": "E-Mails", "replies": ("Antwort", "Antworten"), "received": ("E-Mail", "E-Mails"),
-           "orders": ("Bestellung", "Bestellungen"), "lang": "German"},
+           "orders": ("Bestellung", "Bestellungen"), "refs": "Aufträge", "lang": "German"},
     "en": {"prefix": "Emails", "replies": ("reply", "replies"), "received": ("email", "emails"),
-           "orders": ("order", "orders"), "lang": "English"},
+           "orders": ("order", "orders"), "refs": "Orders", "lang": "English"},
     "uk": {"prefix": "Пошта", "replies": ("відповідь", "відповідей"), "received": ("лист", "листів"),
-           "orders": ("замовлення", "замовлень"), "lang": "Ukrainian"},
+           "orders": ("замовлення", "замовлень"), "refs": "Замовлення", "lang": "Ukrainian"},
 }
 
 
@@ -110,7 +110,7 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
                                             is_spam=False, is_deleted=False)
                 .exclude(folder__in=[EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_TRASH])
                 .values("pk", "thread_id", "work_category_id", "folder", "is_read", "sent_at", "subject", "from_email",
-                        "message_id").order_by("sent_at", "pk"))
+                        "message_id", "body_text").order_by("sent_at", "pk"))
     cats = {c.category_id: c for c in MailCategoryTime.objects.filter(dante_project__isnull=False,
                                                                        category__is_active=True)
             .select_related("dante_project", "activity", "category").prefetch_related("category__sources")}
@@ -121,7 +121,8 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
     def row(day, dp, label, kind, auto, activity):
         r = rows.setdefault((day, dp.pk), {"day": day, "dp": dp, "labels": [], "kinds": set(), "replies": 0,
                                             "received": 0, "orders": 0, "raw": 0, "auto": False, "activity": activity,
-                                            "subjects": [], "first": None, "ids": [], "topics": []})
+                                            "subjects": [], "first": None, "ids": [], "topics": [],
+                                            "refs": {}})
         if label not in r["labels"]:
             r["labels"].append(label)
         r["kinds"].add(kind)
@@ -130,6 +131,7 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
 
     from email_assistant.crm_link import is_own, own_addresses
     own, seen = own_addresses(), set()
+    refs = _order_refs(msgs)
     for m in msgs:
         if m["message_id"]:   # той самий лист у двох папках (копія собі в CC + «Надіслані») — один раз
             if m["message_id"] in seen:
@@ -153,6 +155,8 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
             continue
         r["replies" if outgoing else "received"] += 1
         r["ids"].append(m["pk"])
+        for ref in refs.get(m["pk"], ()):   # замовлення з листа (як блок «🔗»): скільки листів по кожному
+            r["refs"][ref] = r["refs"].get(ref, 0) + 1
         topic = _topic(m["subject"])
         if topic and topic.lower() not in {t.lower() for t in r["topics"]}:
             r["topics"].append(topic)
@@ -201,6 +205,46 @@ def _topic(subject: str) -> str:
     return " ".join(s.split())[:120]
 
 
+def _order_refs(msgs) -> dict:
+    """{pk листа: [номер замовлення]} — номер або трек-номер замовлення / відправлення в темі й тексті (як `links`),
+    одним запитом на всі листи."""
+    from email_assistant.crm_link import _TOKEN_RE
+    from sales.models import SalesOrder
+    from shipping.models import Shipment
+    tokens = {}
+    for m in msgs:
+        text = f"{m['subject']} {(m.get('body_text') or '')[:6000]}"
+        found = {t for t in _TOKEN_RE.findall(text) if sum(ch.isdigit() for ch in t) >= 5}
+        tokens[m["pk"]] = found | {t.upper() for t in found}
+    every = set().union(*tokens.values()) if tokens else set()
+    if not every:
+        return {}
+    label = dict(SalesOrder.objects.filter(order_number__in=every).values_list("order_number", "order_number"))
+    label.update({t: n for t, n in SalesOrder.objects.filter(tracking_number__in=every).exclude(tracking_number="")
+                  .values_list("tracking_number", "order_number") if t not in label})
+    label.update({t: n for t, n in Shipment.objects.filter(tracking_number__in=every).exclude(tracking_number="")
+                  .exclude(order=None).values_list("tracking_number", "order__order_number") if t not in label})
+    out = {}
+    for pk, found in tokens.items():
+        nums = sorted({label[t] for t in found if t in label})
+        if nums:
+            out[pk] = nums
+    return out
+
+
+def _refs_text(r, lang: str) -> str:
+    """«Aufträge: 101121975 ~0:10, 101121980 ~0:05» — час дня, поділений за кількістю листів по замовленню."""
+    if not r.get("refs"):
+        return ""
+    mails = max(1, r["replies"] + r["received"])
+    per = r.get("minutes", 0) / mails
+    parts = []
+    for num, n in sorted(r["refs"].items(), key=lambda kv: -kv[1]):
+        m = max(5, int(round(n * per / 5.0)) * 5)
+        parts.append(f"{num} ~{m // 60}:{m % 60:02d}")
+    return f"{WORDS.get(lang, WORDS['de'])['refs']}: " + ", ".join(parts)
+
+
 def _counts(r, lang: str) -> str:
     w = WORDS.get(lang, WORDS["de"])
     parts = []
@@ -218,6 +262,9 @@ def default_comment(r, lang: str = "de", summary: str = "") -> str:
     head = _plain(f"{w['prefix']} {r['label']}") + ": "
     tail = f" ({_counts(r, lang)})"
     body = _plain(summary) or "; ".join(r["topics"]) or "—"
+    refs = _refs_text(r, lang)
+    if refs:
+        body = f"{refs} · {body}"   # замовлення спершу — їх не обріже
     room = COMMENT_MAX - len(head) - len(tail)
     if len(body) > room:
         body = body[:max(10, room - 1)].rstrip(" ;,") + "…"

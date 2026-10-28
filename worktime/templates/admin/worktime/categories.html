@@ -1,0 +1,99 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a> ›
+  ⏱ <a href="{% url 'admin:worktime_workday_changelist' %}">{% trans "Робочий час" %}</a> › {% trans "Категорії листів → askDANTE" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.ct-card{border:1px solid var(--border-strong,#ccc);border-radius:10px;padding:12px 14px;margin-bottom:14px;max-width:1180px}
+.ct-card h3{margin:0 0 6px;font-size:15px}
+.ct-muted{color:var(--text-muted,#888);font-size:12px}
+.ct-steps{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 0}
+.ct-step{border:1px solid rgba(128,128,128,.35);border-radius:16px;padding:3px 10px;font-size:12px}
+.ct-table{width:100%;border-collapse:collapse;font-size:13px}
+.ct-table th,.ct-table td{padding:6px 8px;border-bottom:1px solid rgba(128,128,128,.2);text-align:left;vertical-align:top;background:transparent!important}
+.ct-table th{font-size:11px;color:var(--text-muted);text-transform:uppercase}
+.ct-table input[type=number]{width:56px}
+.ct-chip{display:inline-block;border:1px solid rgba(128,128,128,.4);border-radius:10px;padding:0 6px;font-size:11px;margin:1px}
+.ct-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.ct-scroll{overflow-x:auto}
+</style>
+
+<div class="ct-card">
+  <b>🗂 {% trans "Пошта → категорії → askDANTE" %}</b>
+  <div class="ct-steps">
+    <span class="ct-step">1 · {% trans "знайти групи в пошті" %}</span><span class="ct-step">2 · {% trans "проєкт / підпроєкт askDANTE і норми" %}</span>
+    <span class="ct-step">3 · <a href="{{ mail_url }}">✉️ {% trans "Час на пошту" %}</a> — {% trans "оцінка по днях і запис" %}</span>
+  </div>
+  <div class="ct-muted" style="margin-top:6px">{% trans "Групи шукаються в тому, що Minerva вже знає про листи: номер або трек-номер замовлення (як блок «🔗» у листі — DigiKey, магазин…) і постійні відправники-сервіси й постачальники. Листи проєктів Minerva, зв'язаних з askDANTE, ідуть у свої проєкти й без категорій." %}</div>
+</div>
+
+<div class="ct-card" id="scan">
+  <h3>1 · 🔎 {% trans "Знайти групи в пошті" %}</h3>
+  <form method="get" class="ct-row">
+    <input type="hidden" name="scan" value="1">
+    <label class="ct-muted">{% trans "за" %} <select name="days"><option value="30"{% if days == 30 %} selected{% endif %}>30</option><option value="60"{% if days == 60 %} selected{% endif %}>60</option>
+      <option value="90"{% if days == 90 %} selected{% endif %}>90</option><option value="180"{% if days == 180 %} selected{% endif %}>180</option></select> {% trans "днів" %}</label>
+    <button class="button default">🔎 {% trans "Знайти" %}</button>
+    <span class="ct-muted">{% trans "Лише листи, які ще не в жодній своїй категорії; групи від 5 листів." %}</span>
+  </form>
+  {% if scanned %}
+    {% if suggestions %}
+    <form method="post">{% csrf_token %}<input type="hidden" name="action" value="create"><input type="hidden" name="days" value="{{ days }}">
+      <div class="ct-scroll"><table class="ct-table">
+        <tr><th></th><th>{% trans "Назва категорії" %}</th><th>{% trans "Правила" %}</th><th>{% trans "Листів" %}</th><th>{% trans "Приклади тем" %}</th></tr>
+        {% for s in suggestions %}
+        <tr><td><input type="checkbox" name="pick" value="{{ s.key }}" checked><input type="hidden" name="s_{{ s.key }}" value="{{ s.json }}"></td>
+          <td><input name="n_{{ s.key }}" value="{{ s.name }}" maxlength="80"></td>
+          <td>{% for x in s.sources %}<span class="ct-chip">🧾 {% trans "замовлення" %} {{ x }}</span>{% endfor %}{% for x in s.senders %}<span class="ct-chip">✉️ {{ x }}</span>{% endfor %}</td>
+          <td>{{ s.mails }}</td>
+          <td class="ct-muted">{% for t in s.subjects %}{{ t }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td></tr>
+        {% endfor %}
+      </table></div>
+      <div class="ct-row" style="margin-top:8px"><button class="button default">✓ {% trans "Створити вибрані категорії" %}</button>
+        <span class="ct-muted">{% trans "Назву можна змінити. Правила потім — у" %} <a href="{{ cats_url }}">🏷 {% trans "Свої категорії" %}</a>.</span></div>
+    </form>
+    {% else %}<div class="ct-muted" style="margin-top:6px">✨ {% trans "Нових груп не знайдено — усе вже в категоріях або листів замало." %}</div>{% endif %}
+  {% endif %}
+</div>
+
+<div class="ct-card" id="map">
+  <h3>2 · {% trans "Категорії → проєкт askDANTE і норми" %}</h3>
+  <form method="post" class="ct-row" style="margin-bottom:10px">{% csrf_token %}<input type="hidden" name="action" value="top">
+    <span class="ct-muted">{% trans "Немає батьківського проєкту (напр. «Intern»)?" %}</span>
+    <input name="top_name" placeholder="Intern" maxlength="255" required>
+    <button class="button"{% if not st.enabled %} disabled{% endif %}>＋ {% trans "Створити проєкт в askDANTE" %}</button>
+  </form>
+  {% if rows %}
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="save">
+    <div class="ct-scroll"><table class="ct-table">
+      <tr><th>{% trans "Категорія" %}</th><th>{% trans "Листів" %}<br>{{ days }} {% trans "дн." %}</th><th>{% trans "Проєкт askDANTE" %}</th><th>{% trans "або новий підпроєкт" %}</th>
+        <th>{% trans "Вид роботи" %}</th><th>{% trans "хв: відповідь / лист / замовл." %}</th><th>{% trans "Авто" %}</th></tr>
+      {% for r in rows %}
+      <tr>
+        <td><a href="{% url 'admin:email_assistant_mailcategory_change' r.cat.pk %}">{{ r.cat.label }}</a></td>
+        <td><a href="/email/?wcat={{ r.cat.pk }}">{{ r.mails }}</a></td>
+        <td><select name="dp_{{ r.cat.pk }}"><option value="">—</option>{% for p in projects %}<option value="{{ p.pk }}"{% if r.ct and r.ct.dante_project_id == p.pk %} selected{% endif %}>{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</select></td>
+        <td><div class="ct-row"><select name="parent_{{ r.cat.pk }}"><option value="">{% trans "під…" %}</option>{% for p in parents %}<option value="{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</select>
+          <input name="sub_{{ r.cat.pk }}" value="{{ r.cat.name }}" maxlength="255" size="14"></div></td>
+        <td><select name="act_{{ r.cat.pk }}"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if r.ct and r.ct.activity_id == a.pk %} selected{% endif %}>{{ a.name }}</option>{% endfor %}</select></td>
+        <td class="ct-row"><input type="number" name="reply_{{ r.cat.pk }}" value="{% if r.ct %}{{ r.ct.reply_minutes }}{% else %}10{% endif %}" min="0">
+          <input type="number" name="read_{{ r.cat.pk }}" value="{% if r.ct %}{{ r.ct.read_minutes }}{% else %}3{% endif %}" min="0">
+          <input type="number" name="order_{{ r.cat.pk }}" value="{% if r.ct %}{{ r.ct.order_minutes }}{% else %}0{% endif %}" min="0"></td>
+        <td><input type="checkbox" name="auto_{{ r.cat.pk }}" value="1"{% if r.ct and r.ct.auto %} checked{% endif %}></td>
+      </tr>
+      {% endfor %}
+    </table></div>
+    <div class="ct-row" style="margin-top:8px"><button class="button default"{% if not st.enabled %} disabled{% endif %}>✓ {% trans "Зберегти" %}</button>
+      <span class="ct-muted">{% trans "«Під…» + назва — Minerva створить підпроєкт в askDANTE (Intern › DigiKey) і одразу прив'яже. «Авто» — щодня записувати за вчора без підтвердження. Потім —" %} <a href="{{ mail_url }}">✉️ {% trans "Час на пошту" %}</a>.</span></div>
+  </form>
+  {% else %}<div class="ct-muted">{% trans "Ще немає своїх категорій — знайдіть групи в кроці 1 або створіть у" %} <a href="{{ cats_url }}">🏷 {% trans "Свої категорії" %}</a>.</div>{% endif %}
+</div>
+{% endblock %}

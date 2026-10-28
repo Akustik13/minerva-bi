@@ -697,8 +697,8 @@ class RecordsTests(Base):
         self.st.save()
         b = services.book_project(self.du, MON, self.child, 90, comment="Prototyp prüfen", user=self.user, st=self.st)
         self.assertEqual(b.status, Booking.SENT)
-        self.assertEqual(self.fake.calls, [{"date": "2026-09-07", "duration": 90, "projectData": {
-            "projectId": "364", "activityId": "190", "comment": "Prototyp prüfen"}}])
+        self.assertEqual(self.fake.calls, [{"date": "2026-09-07", "duration": 90, "projectData": {   # підпроєкт —
+            "projectItemId": "364", "activityId": "190", "comment": "Prototyp prüfen"}}])        # projectItemId
         with self.assertRaises(DanteError):   # подвійне натискання
             services.book_project(self.du, MON, self.child, 90, comment="Prototyp prüfen", st=self.st)
         with self.assertRaises(DanteError):

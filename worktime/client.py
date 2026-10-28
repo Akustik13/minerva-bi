@@ -388,6 +388,21 @@ class DanteClient:
         """Один запис: {"date": "2026-09-10", "start": "08:00", "stop": "16:30"} або час на проєкт з projectData."""
         self._call("POST", f"/timetracking/{dante_id}", body=record)
 
+    def create_project_item(self, name: str, parent_id: str, parent_is_item: bool = False,
+                            reference_number: str = "") -> dict:
+        """Підпроєкт askDANTE (project item): під проєкт (`parentProjectId`) або під інший підпроєкт
+        (`parentProjectItemId`) — вкладеність будь-якої глибини."""
+        body = {"name": name[:255], "timeTrackable": True,
+                ("parentProjectItemId" if parent_is_item else "parentProjectId"): str(parent_id)}
+        if reference_number:
+            body["referenceNumber"] = reference_number
+        r = self._call("POST", "/projectItems", body=body)
+        try:
+            p = r.json()
+        except ValueError:
+            p = {}
+        return {"id": str(p.get("id") or ""), "name": p.get("name") or name}
+
     def create_project(self, name: str, reference_number: str = "") -> dict:
         body = {"name": name[:255], "timeTrackable": True, "archived": False}
         if reference_number:

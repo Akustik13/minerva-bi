@@ -718,6 +718,26 @@ def balance_lines(pb) -> list[tuple[str, str]]:
 
 
 # ── «мої проєкти» і швидкий запис часу на проєкт ─────────────────
+def create_dante(name: str, parent: DanteProject | None = None, st: DanteSettings | None = None) -> DanteProject:
+    """Новий проєкт askDANTE (parent=None) або підпроєкт під `parent` — одразу і в довіднику Minerva.
+    Такий самий підпроєкт / проєкт уже є — повертається наявний (без дубля)."""
+    st = st or DanteSettings.get()
+    name = (name or "").strip()[:255]
+    if not name:
+        raise DanteError("bad_request", "Вкажіть назву проєкту askDANTE.")
+    same = DanteProject.objects.filter(name__iexact=name, parent=parent, gone=False).first()
+    if same:
+        return same
+    c = client(st)
+    if parent is None:
+        made = c.create_project(name)
+    else:
+        made = c.create_project_item(name, parent.dante_id, parent_is_item=bool(parent.parent_id))
+    if not made.get("id"):
+        raise DanteError("unavailable", "askDANTE не повернув ID нового проєкту — оновіть довідник і перевірте.")
+    return DanteProject.objects.create(dante_id=made["id"], name=made["name"][:255], parent=parent)
+
+
 def my_projects(user):
     """☆ проєкти askDANTE користувача, у які можна писати час."""
     return (DanteProject.objects.filter(pinned_by=user, archived=False, gone=False, time_trackable=True)
@@ -847,7 +867,8 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
                               start=start, comment=comment, status=Booking.SENT, created_at__gte=recent).exists():
         raise DanteError("bad_request", "Такий самий запис щойно вже пішов в askDANTE — оновіть сторінку.")
     def record():
-        data = {"projectId": dp.dante_id}
+        # підпроєкт askDANTE (project item) — інше поле, ніж проєкт
+        data = {"projectItemId": dp.dante_id} if dp.parent_id else {"projectId": dp.dante_id}
         if activity:
             data["activityId"] = activity.dante_id
         if comment:
@@ -891,6 +912,9 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
                         booking.error = slot_error.message
                         break
                     booking.start, booking.stop, retry = start, stop, True
+                if len(comment) > 250 and any(k.endswith("comment") for k in e.fields):   # задовгий опис
+                    comment = comment[:249].rstrip() + "…"
+                    booking.comment, retry = comment, True
                 if activity is None and any(k.endswith("activityId") for k in e.fields):
                     _remember(st, activity_required=True)
                     activity = _pick_activity(st)

@@ -443,8 +443,72 @@ class WorkDayAdmin(admin.ModelAdmin):
         return [path("", self.admin_site.admin_view(self.calendar_view), name="worktime_workday_changelist"),
                 path("report/", self.admin_site.admin_view(self.report_view), name="worktime_workday_report"),
                 path("mail-time/", self.admin_site.admin_view(self.mail_time_view), name="worktime_workday_mailtime"),
-                path("meetings/", self.admin_site.admin_view(self.meetings_view), name="worktime_workday_meetings")] \
+                path("meetings/", self.admin_site.admin_view(self.meetings_view), name="worktime_workday_meetings"),
+                path("record/describe/", self.admin_site.admin_view(self.record_describe_view),
+                     name="worktime_workday_record_describe"),
+                path("record/save/", self.admin_site.admin_view(self.record_save_view),
+                     name="worktime_workday_record_save")] \
             + super().get_urls()
+
+    # ── ✍️ запис askDANTE з календаря: опис AI, правка, заміна або новий (record_ai.py) ──
+    def _record_target(self, request, p):
+        du = next((x for x in services.users_for(request.user) if str(x.pk) == str(p.get("u"))), None)
+        if du is None:
+            raise PermissionDenied
+        dp = DanteProject.objects.filter(pk=p.get("project") or 0, gone=False).first()
+        return du, dp
+
+    def record_describe_view(self, request):
+        """POST {u, date, project, start, stop, current, hint} → {ok, text, sources} (нічого не записує)."""
+        from django.http import JsonResponse
+        from . import record_ai
+        if request.method != "POST" or not self.has_view_permission(request):
+            raise PermissionDenied
+        p = request.POST
+        du, dp = self._record_target(request, p)
+        day = _date(p.get("date"))
+        if not (day and dp):
+            return JsonResponse({"ok": False, "error": "Виберіть дату й проєкт askDANTE."})
+        try:
+            r = record_ai.describe(du, day, dp, _time(p.get("start")), _time(p.get("stop")),
+                                   p.get("current", ""), p.get("hint", ""), user=request.user)
+        except DanteError as e:
+            return JsonResponse({"ok": False, "error": e.message})
+        return JsonResponse({"ok": True, **r})
+
+    def record_save_view(self, request):
+        """POST mode=new — новий запис; mode=replace + rec — замість запису askDANTE (після видалення там)."""
+        from . import record_ai
+        from .models import DanteActivity, TimeRecord
+        if request.method != "POST" or not self.has_view_permission(request):
+            raise PermissionDenied
+        p = request.POST
+        du, dp = self._record_target(request, p)
+        back = f"{reverse('admin:worktime_workday_changelist')}?u={du.pk}&m={p.get('m', '')}"
+        st = DanteSettings.get()
+        start, stop = _time(p.get("start")), _time(p.get("stop"))
+        minutes = parse_minutes(p.get("duration"))
+        activity = DanteActivity.objects.filter(pk=p.get("activity") or 0).first()
+        comment = record_ai.clean(p.get("comment", ""))
+        try:
+            if dp is None:
+                raise DanteError("bad_request", "Виберіть проєкт askDANTE.")
+            if p.get("mode") == "replace":
+                rec = TimeRecord.objects.filter(pk=p.get("rec") or 0, dante_user=du).first()
+                if rec is None:
+                    raise DanteError("not_found", "Запис askDANTE не знайдено — оновіть сторінку.")
+                b = record_ai.replace(du, rec, dp, start, stop, minutes or rec.duration, activity, comment,
+                                      user=request.user, st=st)
+            else:
+                day = _date(p.get("date"))
+                if not (day and (minutes or (start and stop))):
+                    raise DanteError("bad_request", "Вкажіть дату й «з … по …» (або тривалість).")
+                b = services.book_project(du, day, dp, minutes, activity, comment, user=request.user, st=st,
+                                          start=start, stop=stop)
+            self._report_project(request, b)
+        except DanteError as e:
+            messages.error(request, f"❌ {e.message}")
+        return redirect(back)
 
     def meetings_view(self, request):
         from .admin_meetings import meetings_page
@@ -563,6 +627,9 @@ class WorkDayAdmin(admin.ModelAdmin):
             "project_date": today if first <= today <= last else min(last, today),
             "mapping_url": reverse("admin:worktime_danteproject_changelist"),
             "mail_url": reverse("admin:worktime_workday_mailtime") if st.mail_time else "",
+            "rec_data": self._rec_data(records),
+            "all_projects": list(DanteProject.objects.filter(archived=False, gone=False, time_trackable=True)
+                                 .select_related("parent").order_by("name")),
             "meetings_url": reverse("admin:worktime_workday_meetings"),
         })
         prev_m = (first - datetime.timedelta(days=1)).replace(day=1)
@@ -577,6 +644,16 @@ class WorkDayAdmin(admin.ModelAdmin):
         })
         ctx.update(self._preview(request, st, du, today))
         return render(request, "admin/worktime/calendar.html", ctx)
+
+    @staticmethod
+    def _rec_data(records) -> dict:
+        """Записи askDANTE місяця для вікна «✍️ Запис» (json_script)."""
+        from .models import DanteActivity
+        by_name = {a.name.lower(): a.pk for a in DanteActivity.objects.all()}
+        return {str(r.pk): {"date": f"{r.day:%Y-%m-%d}", "start": r.start, "stop": r.stop, "minutes": r.duration,
+                            "project": r.dante_project_id, "project_name": str(r.dante_project or r.project_name),
+                            "activity": by_name.get((r.activity_name or "").lower()), "description": r.description}
+                for day_records in records.values() for r in day_records}
 
     @staticmethod
     def _pick(request, people):
@@ -623,7 +700,8 @@ class WorkDayAdmin(admin.ModelAdmin):
                         cell["activity_title"] = _activity_title(span)
                 if cell["kind"] == "filled":   # пів дня відпустки поруч із роботою
                     cell["absences"] = services.absences_text(wd)
-                cell["projects"] = [{"name": str(r.dante_project or r.project_name), "dur": _duration(r.duration),
+                cell["projects"] = [{"pk": r.pk, "name": str(r.dante_project or r.project_name),
+                                     "dur": _duration(r.duration),
                                      "title": " · ".join(x for x in (r.activity_name, r.description) if x)}
                                     for r in records.get(day, [])]
                 totals["project_minutes"] += sum(r.duration for r in records.get(day, []))
@@ -778,8 +856,13 @@ class DanteProjectAdmin(admin.ModelAdmin):
         return False
 
     def get_urls(self):
-        return [path("", self.admin_site.admin_view(self.mapping_view), name="worktime_danteproject_changelist")] \
-            + super().get_urls()
+        return [path("", self.admin_site.admin_view(self.mapping_view), name="worktime_danteproject_changelist"),
+                path("categories/", self.admin_site.admin_view(self.categories_view),
+                     name="worktime_danteproject_categories")] + super().get_urls()
+
+    def categories_view(self, request):
+        from .admin_setup import categories_page
+        return categories_page(self, request)
 
     def mapping_view(self, request):
         if not self.has_view_permission(request):
