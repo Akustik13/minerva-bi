@@ -126,6 +126,8 @@ def scope_reason(msg, scope) -> str:
         return "access_revoked"
     if scope.account_ids is not None and msg.account_id not in scope.account_ids:
         return "out_of_scope"
+    if msg.thread_id and msg.thread.knowledge_forced:      # «🧠 Передати в базу знань»: категорія й дата не важать
+        return ""
     if msg.category not in scope.categories:
         return "out_of_scope"
     if scope.since and (not msg.sent_at or msg.sent_at < scope.since):
@@ -137,13 +139,115 @@ def scope_qs(scope):
     """Листи, допущені до індексу (DB-версія scope_reason)."""
     from email_assistant.models import EmailMessage
     qs = (EmailMessage.objects.filter(is_deleted=False, is_spam=False, account__is_active=True,
-                                      account__user__isnull=False, category__in=scope.categories)
+                                      account__user__isnull=False)
           .exclude(folder__in=EXCLUDED_FOLDERS).exclude(thread__knowledge_excluded=True))
     if scope.account_ids is not None:
         qs = qs.filter(account_id__in=scope.account_ids)
-    if scope.since:
-        qs = qs.filter(sent_at__gte=scope.since)
-    return qs
+    rules = Q(category__in=scope.categories) & (Q(sent_at__gte=scope.since) if scope.since else Q())
+    return qs.filter(rules | Q(thread__knowledge_forced=True))
+
+
+CATEGORY_LABELS = {"customer": "клієнти", "supplier": "постачальники", "internal": "внутрішні", "other": "інші",
+                   "service": "сервісні сповіщення", "newsletter": "розсилки"}
+
+
+def scope_detail(msg, scope) -> tuple:
+    """Чому лист не в базі знань — людською мовою: (код, текст, чи допоможе «🧠 Передати в базу знань»)."""
+    reason = scope_reason(msg, scope)
+    if reason == "deleted":
+        return reason, "лист видалено або в кошику", False
+    if reason == "excluded":
+        return reason, "🔒 приватна переписка", True
+    if reason == "access_revoked":
+        return reason, "скринька неактивна або без власника", False
+    if msg.is_spam or msg.folder in EXCLUDED_FOLDERS:
+        return "folder", "спам / чернетка не індексуються", False
+    if scope.account_ids is not None and msg.account_id not in scope.account_ids:
+        return "mailbox", "ця скринька не вибрана на «🧠 База знань»", False
+    if msg.category not in scope.categories:
+        return "category", f"категорія «{CATEGORY_LABELS.get(msg.category, msg.category)}» не індексується", True
+    if scope.since and (not msg.sent_at or msg.sent_at < scope.since):
+        return "date", f"лист старіший за «Листи починаючи з» ({timezone.localtime(scope.since):%d.%m.%Y})", True
+    if not scope.enabled:
+        return "disabled", "індексацію пошти вимкнено («🧠 База знань»)", False
+    return "", "", False
+
+
+def mail_state(messages) -> dict:
+    """Стан листів (гілки) у базі знань для пошти: скільки в RAG, чекає, з помилкою, не передається й чому.
+    status: in — усе в RAG; wait — передано, RAG ще не обробив; fail — RAG не зміг; out — не передається; mixed."""
+    from .models import KnowledgeDoc
+    messages = list(messages)
+    scope = get_scope()
+    docs = {d.obj_id: d for d in KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, obj_id__in=[m.pk for m in messages])}
+    counts, reasons, can_send = {"in": 0, "wait": 0, "fail": 0, "out": 0}, {}, False
+    for m in messages:
+        doc = docs.get(m.pk)
+        if doc is not None and doc.fed:
+            state = doc.current_state
+            counts["in" if state == KnowledgeDoc.INDEXED else "fail" if state in (KnowledgeDoc.FAILED,
+                                                                              KnowledgeDoc.SKIPPED) else "wait"] += 1
+            continue
+        code, text, forceable = scope_detail(m, scope)
+        counts["out"] += 1
+        if not code:       # допущено, але ще не потрапило в стрічку (звірка не дійшла) — передати можна одразу
+            code, text, forceable = "not_yet", "ще не передано (звірка стрічки ще не дійшла)", True
+        reasons[text] = reasons.get(text, 0) + 1
+        can_send = can_send or forceable
+    total = len(messages)
+    status = next((k for k in ("in", "wait", "fail", "out") if counts[k] == total and total), "mixed")
+    parts = []
+    if counts["in"]:
+        parts.append(f"🧠 у RAG: {counts['in']}")
+    if counts["wait"]:
+        parts.append(f"⏳ чекає RAG: {counts['wait']}")
+    if counts["fail"]:
+        parts.append(f"⚠️ RAG не обробив: {counts['fail']}")
+    if counts["out"]:
+        parts.append("— не в базі знань: " + "; ".join(f"{t}" + (f" ({n})" if total > 1 else "") for t, n in reasons.items()))
+    return {"status": status, "counts": counts, "total": total, "text": " · ".join(parts),
+            "can_send": can_send and scope.enabled, "can_resend": bool(counts["fail"] or counts["in"] or counts["wait"]),
+            "enabled": scope.enabled}
+
+
+def tags_for(pks) -> dict:
+    """{pk листа: 'in' | 'wait' | 'fail'} для позначок у списку пошти (одним запитом; не передані — без позначки)."""
+    from .models import KnowledgeDoc
+    out = {}
+    for pk, state, sr, rev in (KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, obj_id__in=list(pks), fed=True)
+                               .values_list("obj_id", "state", "status_revision", "revision")):
+        current = state if sr == rev else KnowledgeDoc.PENDING
+        out[pk] = ("in" if current == KnowledgeDoc.INDEXED else
+                   "fail" if current in (KnowledgeDoc.FAILED, KnowledgeDoc.SKIPPED) else "wait")
+    return out
+
+
+def resend(doc_type, pks) -> int:
+    """«🔄 Передати ще раз»: нова ревізія вже переданих документів — RAG обробить їх заново (той самий вміст)."""
+    from .models import KnowledgeChange, KnowledgeDoc
+    now, n = timezone.now(), 0
+    with journal_writer():
+        for doc in KnowledgeDoc.objects.filter(doc_type=doc_type, obj_id__in=list(pks), fed=True).order_by("obj_id"):
+            doc.revision += 1
+            doc.fed_at = now
+            doc.save()
+            KnowledgeChange.objects.create(doc_type=doc_type, obj_id=doc.obj_id, action=KnowledgeChange.UPSERT)
+            n += 1
+    return n
+
+
+def send_thread(thread) -> dict:
+    """«🧠 Передати в базу знань» для гілки: зняти «🔒 приватне», дозволити поза правилами категорій і дат,
+    передати, а те, що RAG не обробив, — ще раз. → {"sent", "resent"}."""
+    from email_assistant.models import EmailThread
+    from .models import KnowledgeDoc
+    EmailThread.objects.filter(pk=thread.pk).update(knowledge_forced=True, knowledge_excluded=False)
+    pks = list(thread.messages.values_list("pk", flat=True))
+    sent = touch_messages(pks)
+    failed = list(KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, obj_id__in=pks, fed=True,
+                                              state__in=(KnowledgeDoc.FAILED, KnowledgeDoc.SKIPPED))
+                  .values_list("obj_id", flat=True))
+    return {"sent": sent, "resent": resend(DOC_TYPE, failed) if failed else 0}
 
 
 # ── Документ ─────────────────────────────────────────────────────────────────

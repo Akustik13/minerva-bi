@@ -8,7 +8,7 @@ from email_assistant.models import EmailAccount, EmailMessage, EmailThread
 
 from .knowledge import IRRELEVANT_FIELDS, safe_touch, start_account_touch
 
-THREAD_FIELDS = frozenset({"subject", "crm_customer", "knowledge_excluded"})
+THREAD_FIELDS = frozenset({"subject", "crm_customer", "knowledge_excluded", "knowledge_forced"})
 # Поля скриньки, від яких залежать права (access.user_ids, допуск) і mailbox.address у документах
 ACCOUNT_FIELDS = ("user_id", "is_active", "email_address")
 

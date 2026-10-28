@@ -233,6 +233,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 .em-tag.cust{--c:#3b82f6;max-width:150px}
 .em-tag.proj{--c:#16a34a}
 .em-tag.quote{--c:#c026d3}
+.em-tag.kb{--c:#0891b2;max-width:none;cursor:default}
+.em-tag.kb.kb-wait{--c:#d97706}.em-tag.kb.kb-fail{--c:#dc2626}
 .em-p2-quote{flex:0 0 auto;white-space:nowrap}
 .em-tag.cat-customer{--c:#3b82f6}
 .em-tag.wcat{max-width:140px;font-weight:600}
@@ -658,13 +660,16 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
             </div>
           </div>
           <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:40 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
-          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag or msg.work_category_id %}
+          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag or msg.work_category_id or msg.kb_tag %}
           <div class="em-row-meta">
             {% if msg.work_category_id %}
             <button class="em-tag wcat" style="--c:{{ msg.work_category.color }}" onclick="filterMailBy(event, 'wcat', {{ msg.work_category_id }})"
                     title="{% trans "Своя категорія" %}: {{ msg.work_category.name }} — {% trans "показати всі її листи" %}">{% if email_settings.nav_icons %}{{ msg.work_category.label }}{% else %}{{ msg.work_category.name }}{% endif %}</button>
             {% endif %}
             {% if msg.folder_tag %}<span class="em-tag fold" title="{% trans "Папка" %}">{{ msg.folder_tag }}</span>{% endif %}
+            {% if msg.kb_tag == 'in' %}<span class="em-tag kb" title="{% trans "У базі знань RAG — знаходиться пошуком" %}">🧠</span>
+            {% elif msg.kb_tag == 'wait' %}<span class="em-tag kb kb-wait" title="{% trans "Передано в базу знань, RAG ще не обробив" %}">⏳🧠</span>
+            {% elif msg.kb_tag == 'fail' %}<span class="em-tag kb kb-fail" title="{% trans "RAG не зміг обробити — відкрийте лист: «🔄 Передати ще раз»" %}">⚠️🧠</span>{% endif %}
             {% if msg.quote_request_tag %}
             <button class="em-tag quote" onclick="filterMailBy(event, 'quote', 1)"
                     title="{% trans "Схоже на запит пропозиції — показати всі запити без Angebot" %}">📝 {% trans "запит" %}</button>
@@ -779,6 +784,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" onclick="ctxAction('why')" title="{% trans "До якої своєї категорії й чому, хто пише, проєкти — і швидко змінити правило" %}">🔍 {% trans "Чому лист тут — ознаки й правила…" %}</div>
   <div class="em-ctx-item" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
   {% if knowledge_available %}
+  <div class="em-ctx-item" onclick="ctxAction('kbsend')"
+       title="{% trans "Передати цю переписку в базу знань RAG, навіть якщо категорія чи дата поза правилами (або ще раз, якщо RAG не обробив)" %}">🧠 {% trans "Передати в базу знань" %}</div>
   <div class="em-ctx-item" onclick="ctxAction('kb')"
        title="{% trans "Приватна переписка: не передавати в базу знань RAG (повторне натискання — повернути)" %}">🔒 {% trans "Приватне — не в базу знань" %}</div>
   {% endif %}
@@ -2520,6 +2527,13 @@ async function ctxAction(action) {
     if (!tpk) { _showToast('⚠️ {% trans "Лист без гілки листування" %}'); return; }
     await previewMsg(pk, tpk, rowEl);
     if (window.pvProjOpen) window.pvProjOpen();
+  } else if (action === 'kbsend') {
+    try {
+      var r = await fetch('/email/message/' + pk + '/knowledge/', {method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+                                                                   body: JSON.stringify({action: 'send'})});
+      var d = await r.json();
+      _showToast(d.ok === false ? '⚠️ ' + (d.error || _i18n.помилка) : '🧠 ' + (d.text || '{% trans "Передано в базу знань" %}'));
+    } catch(e) { _showToast('⚠️ ' + _i18n.помилка); }
   } else if (action === 'kb') {
     if (!tpk) { _showToast('⚠️ {% trans "Лист без гілки листування" %}'); return; }
     try {

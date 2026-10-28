@@ -15,6 +15,9 @@
 .em-pv-quote{background:rgba(192,38,211,.08);border-color:rgba(192,38,211,.3);margin-top:6px}
 /* Проєкти гілки: підтверджені (зелені), пропозиції системи (✓/✗), панель «До проєкту» */
 .em-pv-proj{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.em-pv-kb{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:var(--text-muted)}
+.em-pv-kb .kb-in{color:#16a34a}.em-pv-kb .kb-fail{color:#dc2626}.em-pv-kb .kb-wait{color:#d97706}
+.em-pv-kb button{font-size:11px;padding:1px 8px}
 .em-proj-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 8px;border-radius:12px;
   border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.08);color:var(--text)}
 .em-proj-chip a{color:var(--text);text-decoration:none;font-weight:600}
@@ -319,6 +322,9 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
         <button class="em-pv-btn" onclick="pvProjCreate()" style="white-space:nowrap">＋ {% trans "Новий проєкт" %}</button>
       </div>
     </div>
+    {% endif %}
+    {% if knowledge_available and last %}
+    <div class="em-pv-kb" id="pv-kb" data-pk="{{ last.pk }}" style="display:none"></div>
     {% endif %}
     <div class="em-pv-acts" style="margin-top:8px">
       {% if last %}
@@ -2045,6 +2051,41 @@ window.attTipHide = function() {
   if (msgs.querySelectorAll('.em-card').length > 1 && msgs.querySelector('.em-card.expanded')) {
     msgs.classList.add('has-expanded');
   }
+})();
+
+// 🧠 Лист (гілка) у базі знань RAG: що передано, що ні й чому; «🧠 Передати» / «🔄 Передати ще раз»
+(function() {
+  var box = document.getElementById('pv-kb');
+  if (!box) return;
+  var url = '/email/message/' + box.dataset.pk + '/knowledge/';
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); }
+  function render(d) {
+    if (!d || d.ok === false) return;
+    var cls = {in: 'kb-in', wait: 'kb-wait', fail: 'kb-fail'}[d.status] || '';
+    var html = '<span class="' + cls + '" title="{% trans "База знань RAG: що з цієї переписки вже можна знайти пошуком" %}">'
+      + (d.status === 'in' ? '🧠 {% trans "У базі знань" %}' + (d.total > 1 ? ' (' + d.total + ')' : '') : esc(d.text)) + '</span>';
+    if (d.can_send && d.status !== 'in')
+      html += '<button class="em-pv-btn" data-kb="send" title="{% trans "Передати цю переписку в RAG, навіть якщо категорія чи дата поза правилами бази знань" %}">🧠 {% trans "Передати в базу знань" %}</button>';
+    if (d.counts && d.counts.fail)
+      html += '<button class="em-pv-btn" data-kb="resend" title="{% trans "RAG обробить ці листи заново" %}">🔄 {% trans "Передати ще раз" %}</button>';
+    box.innerHTML = html;
+    box.style.display = 'flex';
+  }
+  box.addEventListener('click', async function(e) {
+    var b = e.target.closest('button[data-kb]');
+    if (!b) return;
+    b.disabled = true;
+    try {
+      var r = await fetch(url, {method: 'POST', headers: {'X-CSRFToken': (typeof CSRF !== 'undefined' ? CSRF : ''), 'Content-Type': 'application/json'},
+                                body: JSON.stringify({action: b.dataset.kb})});
+      var d = await r.json();
+      if (d.ok === false) { (window._showToast || alert)('⚠️ ' + (d.error || '{% trans "Помилка" %}')); b.disabled = false; return; }
+      render(d);
+      (window._showToast || function() {})('🧠 {% trans "Передано в базу знань — RAG забере найближчим часом" %}');
+    } catch (err) { b.disabled = false; }
+  });
+  fetch(url).then(function(r) { return r.json(); }).then(render).catch(function() {});
 })();
 
 })();

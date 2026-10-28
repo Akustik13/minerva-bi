@@ -210,10 +210,11 @@ eh_review=False — лише «❓ Запитати» (проєкт: огляд 
     list.innerHTML = items.length ? items.map(function (d) {
       var meta = [d.file_name ? d.file_name + (d.size_kb ? ' · ' + d.size_kb + ' КБ' : '') : '', d.created, d.owner,
                   d.private ? '🔒 лише ви' : ''].filter(Boolean).join(' · ');
-      var btns = d.can_change ? ((d.url ? '<button type="button" data-act="refresh" data-id="' + d.id + '" title="Забрати сторінку ще раз">🔄</button>' : '')
+      var btns = (d.can_resend ? '<button type="button" data-act="resend" data-id="' + d.id + '" title="Передати в RAG ще раз — він обробить документ заново">🧠↻</button>' : '')
+        + (d.can_change ? ((d.url ? '<button type="button" data-act="refresh" data-id="' + d.id + '" title="Забрати сторінку ще раз">🔄</button>' : '')
         + '<button type="button" data-act="visibility" data-id="' + d.id + '" title="' + (d.private ? 'Показати всім, хто бачить картку' : 'Лише я') + '">'
         + (d.private ? '👥' : '🔒') + '</button>'
-        + '<button type="button" data-act="delete" data-id="' + d.id + '" title="Видалити з бази знань">✕</button>') : '';
+        + '<button type="button" data-act="delete" data-id="' + d.id + '" title="Видалити з бази знань">✕</button>') : '');
       return '<div class="ehw-doc">' + (icons[d.kind] || '📄') + ' <a href="' + esc(d.open) + '" target="_blank">' + esc(d.title) + '</a>'
         + ' <span class="ehw-sub">· ' + esc(meta) + ' · ' + esc(d.rag) + '</span>' + btns
         + (d.fetch_error ? '<div class="ehw-warn">⚠️ ' + esc(d.fetch_error) + '</div>' : '')

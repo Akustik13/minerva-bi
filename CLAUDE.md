@@ -139,6 +139,11 @@ tabele_mvp/
   - **картки й огляди без RAG:** етап «📎 Документи й посилання картки» в `entity_help` (`_documents`, текст — `knowledge_items.local_text`), огляд проєкту — `projects.overview._documents_block`.
   - **контракт:** `api/schemas/knowledge/document.schema.json` = oneOf(email, document), копія RAG-схем `rag_assistant/contract/` (+ `document_types`, `types`, `mailbox_id` null), опис — `integration/revisions/API_CONTRACT-documents-20261028.md`. RAG-бік — `AI_models\private_rag` (TYPES, повна звірка один раз після оновлення, фільтр Qdrant email/document, `visible()` за `user_ids`).
   - Тести: `rag_assistant/tests_knowledge_items.py`, `rag_assistant/tests_knowledge_auto.py`
+- **🧠 Позначки бази знань у пошті** (що передано в RAG, що ні й чому):
+  - рядок списку — `🧠` у RAG, `⏳🧠` передано й чекає, `⚠️🧠` RAG не обробив; без позначки — не передано (`views._attach_kb_tags` → `knowledge.tags_for`, лише з `MINERVA_INSTANCE_ID`);
+  - прев'ю — рядок `#pv-kb`: стан гілки людською мовою (`knowledge.mail_state` / `scope_detail`: категорія, дата, скринька не вибрана, 🔒 приватне, спам, вимкнено) і кнопки «🧠 Передати в базу знань» / «🔄 Передати ще раз»; `GET|POST /email/message/<pk>/knowledge/` {action: send | resend}; те саме — у меню правого кліку;
+  - «🧠 Передати» — `knowledge.send_thread`: `EmailThread.knowledge_forced` (email_assistant 0028) — гілка йде в RAG поза правилами категорій і дат (не поза вибором скриньок), знімає «🔒 приватне», повторює те, що RAG не обробив; «🔒 Приватне» знімає `knowledge_forced`;
+  - «🔄 Передати ще раз» — `knowledge.resend(doc_type, pks)`: нова ревізія з тим самим вмістом → RAG обробить заново; для документів — «🧠↻» у блоці «📎» картки (`/rag/api/knowledge/<pk>/resend/`), дія в адмінці «Документи бази знань (RAG)». Тести: `rag_assistant/tests_knowledge_marks.py`
 - Тести: `python manage.py test rag_assistant --settings=tabele.settings_test` (mock RAG)
 
 ### 🔗 Інтеграція Minerva ↔ RAG (Claude — Minerva, Codex — RAG)

@@ -86,6 +86,7 @@ def item_json(item, user, supported=None) -> dict:
         "owner": (item.owner.get_full_name() or item.owner.username) if item.owner_id else "",
         "created": timezone.localtime(item.created_at).strftime("%d.%m.%Y"), "fetch_error": item.fetch_error,
         "auto": item.auto, "can_change": knowledge_items.can_change(user, item), "rag": rag,
+        "can_resend": bool(doc is not None and doc.fed and supported),
     }
 
 
@@ -119,12 +120,17 @@ def entity_documents(request, kind, pk):
 
 @require_POST
 def knowledge_item_action(request, pk, action):
-    """«🔄 Оновити» сторінку посилання, «🔒 / 👥» видимість, «✕ Видалити» — лише власник або адміністратор."""
-    from . import knowledge_items
+    """«🔄 Оновити» сторінку посилання, «🔒 / 👥» видимість, «✕ Видалити» — лише власник або адміністратор;
+    «🧠 Передати ще раз» (resend: нова ревізія — RAG обробить документ заново) — кожен, хто бачить документ."""
+    from . import knowledge, knowledge_items
     from .models import KnowledgeItem
     item = KnowledgeItem.objects.filter(pk=pk).first()
     if item is None or not knowledge_items.can_view(request.user, item):
         raise Http404
+    if action == "resend":
+        if not knowledge.resend(knowledge_items.DOC_TYPE, [item.pk]):
+            return JsonResponse({"ok": False, "error": "Документ ще не в базі знань (індексацію вимкнено?)"}, status=400)
+        return JsonResponse({"ok": True, "item": item_json(item, request.user)})
     if not knowledge_items.can_change(request.user, item):
         return JsonResponse({"ok": False, "error": "Змінити може той, хто додав документ, або адміністратор"}, status=403)
     if action == "delete":

@@ -524,10 +524,21 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
         return self._back()
 
 
+DOC_TYPES_FOR_ADMIN = knowledge.DOC_TYPES
+
+
 @admin.register(KnowledgeDoc)
 class KnowledgeDocAdmin(admin.ModelAdmin):
     list_display = ["document_id_col", "revision", "fed", "state_col", "chunks", "error", "last_status_at"]
     list_filter = ["doc_type", "fed", "state"]
+    actions = ["resend_action"]
+
+    @admin.action(description="🔄 Передати в RAG ще раз (нова ревізія — RAG обробить заново)")
+    def resend_action(self, request, queryset):
+        n = 0
+        for doc_type in DOC_TYPES_FOR_ADMIN:
+            n += knowledge.resend(doc_type, queryset.filter(doc_type=doc_type, fed=True).values_list("obj_id", flat=True))
+        self.message_user(request, f"Передано ще раз: {n}. Решта не в базі знань (видалені / поза правилами).")
     search_fields = ["obj_id", "error"]
     readonly_fields = [f.name for f in KnowledgeDoc._meta.fields]
 

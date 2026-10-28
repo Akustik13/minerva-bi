@@ -99,6 +99,10 @@ class EmailThread(models.Model):
     knowledge_excluded = models.BooleanField(
         default=False, verbose_name='Не індексувати в базі знань',
         help_text='Приватна переписка: не передавати в RAG (rag_assistant/knowledge.py)')
+    knowledge_forced = models.BooleanField(
+        default=False, verbose_name='Примусово в базу знань',
+        help_text='«🧠 Передати в базу знань»: гілка йде в RAG, навіть якщо категорія чи дата листів поза правилами '
+                  '(скринька має бути вибрана для бази знань)')
     crm_customer  = models.ForeignKey(
         'crm.Customer', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='email_threads',

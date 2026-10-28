@@ -313,6 +313,21 @@ def _attach_quote_tags(emails):
         m.quote_request_tag = m.pk in tagged
 
 
+def _attach_kb_tags(emails):
+    """🧠 у рядку: лист уже в базі знань RAG (in), передано й чекає RAG (wait), RAG не обробив (fail).
+    Без позначки — не передано (чому — у прев'ю). Лише коли на сервері є база знань."""
+    if not _rag_flags().get('knowledge_available'):
+        return
+    try:
+        from rag_assistant.knowledge import tags_for
+        tags = tags_for([m.pk for m in emails])
+    except Exception as e:  # noqa: BLE001 — список листів не ламається через базу знань
+        logger.warning('kb tags: %s', e)
+        return
+    for m in emails:
+        m.kb_tag = tags.get(m.pk, '')
+
+
 def _quote_messages(account):
     """Листи скриньки з відкритим запитом пропозиції — для фільтра «📝 Запити пропозицій»."""
     from offers.models import QuoteRequest
@@ -529,6 +544,7 @@ def inbox_view(request):
     _attach_contacts(emails)
     _attach_project_tags(emails)
     _attach_quote_tags(emails)
+    _attach_kb_tags(emails)
     from email_assistant.logos import domain_for as _logo_domain
     for m in emails:
         m.logo_domain = _logo_domain(m.from_email)
@@ -1163,8 +1179,42 @@ def thread_knowledge_view(request, thread_pk):
     except ValueError:
         body = {}
     thread.knowledge_excluded = bool(body['excluded']) if 'excluded' in body else not thread.knowledge_excluded
-    thread.save(update_fields=['knowledge_excluded'])
+    fields = ['knowledge_excluded']
+    if thread.knowledge_excluded and thread.knowledge_forced:   # приватне сильніше за «🧠 Передати»
+        thread.knowledge_forced = False
+        fields.append('knowledge_forced')
+    thread.save(update_fields=fields)
     return JsonResponse({'ok': True, 'excluded': thread.knowledge_excluded})
+
+
+@staff_member_required
+def message_knowledge_view(request, message_pk):
+    """Лист (гілка) у базі знань RAG: GET — стан людською мовою (rag_assistant.knowledge.mail_state);
+    POST {action: send} — «🧠 Передати в базу знань» (гілка поза правилами категорій / дат + повтор того, що RAG
+    не обробив), {action: resend} — «🔄 Передати ще раз» (нова ревізія вже переданих листів)."""
+    from email_assistant.models import EmailMessage
+    from rag_assistant import knowledge
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    msgs = list(msg.thread.messages.filter(is_deleted=False)) if msg.thread_id else [msg]
+    if request.method == 'POST':
+        try:
+            body = json.loads(request.body or b'{}')
+        except ValueError:
+            body = {}
+        if not knowledge.get_scope().enabled:
+            return JsonResponse({'ok': False, 'error': 'Індексацію пошти вимкнено — увімкніть на «🧠 База знань»'},
+                                status=400)
+        if body.get('action') == 'send':
+            if not msg.thread_id:
+                return JsonResponse({'ok': False, 'error': 'Лист без гілки листування'}, status=400)
+            knowledge.send_thread(msg.thread)
+        elif body.get('action') == 'resend':
+            knowledge.resend(knowledge.DOC_TYPE, [m.pk for m in msgs])
+        else:
+            return JsonResponse({'ok': False, 'error': 'Невідома дія'}, status=400)
+        msgs = list(EmailMessage.objects.filter(pk__in=[m.pk for m in msgs]).select_related('account', 'thread'))
+    return JsonResponse({'ok': True, **knowledge.mail_state(msgs)})
 
 
 @staff_member_required
