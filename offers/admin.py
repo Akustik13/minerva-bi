@@ -313,7 +313,10 @@ class OfferSettingsAdmin(admin.ModelAdmin):
         ("Номер і умови", {"fields": ["number_prefix", "validity_days", "default_currency", "default_vat_rate",
                                       "default_language", "email_subject"]}),
         ("Тексти за замовчуванням", {"fields": ["intro_text", "payment_terms", "delivery_terms", "outro_text"]}),
-        ("Реквізити в документі", {"fields": ["company_block", "footer_text", "template"]}),
+        ("Реквізити в документі", {
+            "fields": ["company_block", "footer_text", "template"],
+            "description": 'Документ будується на бланку Commercial Invoice. Завантажити шаблон, приклад документа, '
+                           'свій шаблон і довідник змінних — <a href="/offers/quick/#template">📄 Word шаблон Angebot</a>.'}),
         ("📝 Запити пропозицій у пошті", {
             "fields": ["quote_scan_depth", "quote_scan_state"],
             "description": "Нові листи перевіряються автоматично. Щоб позначити листи, отримані раніше, "
