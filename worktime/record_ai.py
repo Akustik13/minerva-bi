@@ -151,6 +151,7 @@ def replace(du: DanteUser, rec: TimeRecord, dp, start, stop, minutes: int, activ
         span = f"{rec.start}–{rec.stop} " if rec.start else ""
         raise DanteError("bad_request", f"Запис {rec.day:%d.%m} {span}«{(rec.description or rec.project_name)[:50]}» "
                                         "ще є в askDANTE. askDANTE не дозволяє змінити чи видалити його через API: "
-                                        "видаліть його в askDANTE і натисніть «♻ Замінити» ще раз — опис збережено.")
+                                        "або вставте новий опис у нього в askDANTE («📋 Копіювати»), або видаліть "
+                                        "його там і натисніть «♻ Замінити» ще раз — текст лишився у вікні.")
     return services.book_project(du, rec.day, dp, minutes=minutes if not (start and stop) else 0, activity=activity,
                                  comment=comment, user=user, source=Booking.MANUAL, st=st, start=start, stop=stop)

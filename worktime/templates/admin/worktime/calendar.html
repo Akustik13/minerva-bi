@@ -51,9 +51,33 @@
 <script>
 (function(){
   var REC = JSON.parse(document.getElementById('wt-rec-data').textContent || '{}');
+  var REC_MONTH = Object.keys(REC).length > 0;
   var CSRF = (document.querySelector('#wt-rm input[name=csrfmiddlewaretoken]') || {}).value;
   var $ = function(id){ return document.getElementById(id); };
   function hm(m){ return Math.floor(m / 60) + ':' + ('0' + m % 60).slice(-2); }
+  // Чернетка запису (опис від AI, час, проєкт) — у браузері, щоб текст не губився, коли askDANTE ще не дозволив заміну
+  var DRAFT = 'wt-rec-draft-';
+  function saveDraft(){
+    var rec = $('wt-rm-rec').value;
+    if (!rec) return;
+    try { localStorage.setItem(DRAFT + rec, JSON.stringify({at: Date.now(), date: $('wt-rm-date').value,
+      comment: $('wt-rm-comment').value,
+      start: $('wt-rm-start').value, stop: $('wt-rm-stop').value, dur: $('wt-rm-dur').value,
+      project: $('wt-rm-project').value, activity: $('wt-rm-activity') ? $('wt-rm-activity').value : '',
+      hint: $('wt-rm-hint').value})); } catch (e) {}
+  }
+  function loadDraft(rec){
+    try { return JSON.parse(localStorage.getItem(DRAFT + rec) || 'null'); } catch (e) { return null; }
+  }
+  try {   // прибрати чернетки записів, яких уже немає (замінено) або старших за 2 тижні
+    Object.keys(localStorage).forEach(function(k){
+      if (k.indexOf(DRAFT) !== 0) return;
+      var d = null; try { d = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+      var rec = k.slice(DRAFT.length);
+      var here = d && (d.date || '').slice(0, 7) === '{{ cur_m }}';   // лише чернетки цього місяця
+      if (!d || Date.now() - d.at > 14 * 864e5 || (here && REC_MONTH && !(rec in REC))) localStorage.removeItem(k);
+    });
+  } catch (e) {}
   window.wtRmOpen = function(recPk, date){
     var r = recPk ? REC[recPk] : null;
     $('wt-rm-mode').value = r ? 'replace' : 'new';
@@ -71,6 +95,19 @@
     $('wt-rm-comment').value = r ? (r.description || '') : '';
     $('wt-rm-hint').value = '';
     $('wt-rm-save').textContent = r ? '♻ Замінити в askDANTE' : '✓ Записати в askDANTE';
+    var d = r ? loadDraft(recPk) : null;
+    if (d) {
+      $('wt-rm-comment').value = d.comment || $('wt-rm-comment').value;
+      if (d.start || d.stop) { $('wt-rm-start').value = d.start; $('wt-rm-stop').value = d.stop; }
+      if (d.dur) $('wt-rm-dur').value = d.dur;
+      if (d.project) $('wt-rm-project').value = d.project;
+      if (d.activity && $('wt-rm-activity')) $('wt-rm-activity').value = d.activity;
+      $('wt-rm-hint').value = d.hint || '';
+      $('wt-rm-ai-note').textContent = '📝 Чернетка від ' + new Date(d.at).toLocaleString('uk-UA', {day: '2-digit',
+        month: '2-digit', hour: '2-digit', minute: '2-digit'}) + ' — текст збережено в браузері.';
+    } else {
+      $('wt-rm-ai-note').textContent = 'AI читає листи й зустрічі проєкту за цей і 2 попередні дні та систематизує, що зроблено. Текст можна виправити.';
+    }
     $('wt-rm-replace-note').hidden = !r;
     $('wt-rm').hidden = false;
   };
@@ -85,7 +122,7 @@
       var r = await fetch('{% url "admin:worktime_workday_record_describe" %}', {method: 'POST', credentials: 'same-origin',
         headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'}, body: body});
       var d = await r.json();
-      if (d.ok) { $('wt-rm-comment').value = d.text; note.textContent = '✓ З ' + d.sources + ' листів / зустрічей. Перевірте й за потреби виправте.'; }
+      if (d.ok) { $('wt-rm-comment').value = d.text; saveDraft(); note.textContent = '✓ З ' + d.sources + ' листів / зустрічей. Перевірте й за потреби виправте.'; }
       else { note.textContent = '⚠️ ' + d.error; }
     } catch (e) { note.textContent = '⚠️ немає зв\'язку з Minerva'; }
     btn.disabled = false;
@@ -100,6 +137,7 @@
     var msg = $('wt-rm-mode').value === 'replace'
       ? 'Старий запис уже видалено в askDANTE? Minerva перевірить і запише новий.' : 'Записати в askDANTE?';
     if (!confirm(msg)) return false;
+    saveDraft();
     $('wt-rm-save').disabled = true;
     return true;
   };
@@ -110,6 +148,9 @@
     if (add) { e.preventDefault(); e.stopImmediatePropagation(); wtRmOpen(null, add.dataset.date); }
   }, true);
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape') wtRmClose(); });
+  $('wt-rm-comment').addEventListener('input', saveDraft);
+  var again = new URLSearchParams(location.search).get('rec');   // заміну не прийнято — вікно знову, з чернеткою
+  if (again && REC[again]) wtRmOpen(again);
 })();
 </script>
 {% endif %}

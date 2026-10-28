@@ -506,8 +506,12 @@ class WorkDayAdmin(admin.ModelAdmin):
                 b = services.book_project(du, day, dp, minutes, activity, comment, user=request.user, st=st,
                                           start=start, stop=stop)
             self._report_project(request, b)
+            if b.status != Booking.SENT and p.get("mode") == "replace":
+                back += f"&rec={p.get('rec')}"
         except DanteError as e:
             messages.error(request, f"❌ {e.message}")
+            if p.get("mode") == "replace":   # вікно відкриється знову з тим самим текстом (чернетка в браузері)
+                back += f"&rec={p.get('rec')}"
         return redirect(back)
 
     def meetings_view(self, request):

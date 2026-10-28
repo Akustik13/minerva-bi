@@ -99,9 +99,10 @@ class PageTests(RecordBase):
                                  {"u": self.du.pk, "date": MON.isoformat(), "project": self.dp.pk}).json()
         self.assertEqual((d["ok"], d["text"], d["sources"]), (True, "Messungen\n- S11", 1))
         save = reverse("admin:worktime_workday_record_save")
-        self.client.post(save, {"u": self.du.pk, "mode": "replace", "rec": r1.pk, "project": self.dp.pk,
-                                "start": "08:00", "stop": "11:00", "comment": "Neu"})
+        r = self.client.post(save, {"u": self.du.pk, "mode": "replace", "rec": r1.pk, "project": self.dp.pk,
+                                    "start": "08:00", "stop": "11:00", "comment": "Neu"})
         self.assertEqual([c for c in self.fake.calls if "projectData" in c], [])   # старий ще в askDANTE
+        self.assertIn(f"rec={r1.pk}", r["Location"])   # вікно відкриється знову з чернеткою
         self.client.post(save, {"u": self.du.pk, "mode": "new", "date": MON.isoformat(), "project": self.dp.pk,
                                 "start": "13:00", "stop": "14:00", "comment": "Bericht"})
         self.assertEqual(self.fake.calls[-1]["start"], "13:00")
