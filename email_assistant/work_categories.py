@@ -361,7 +361,7 @@ def suggest(days: int = 60, accounts=None, date_from=None, date_to=None) -> list
                for it in rules.items):
             continue   # уже є категорія з цим джерелом / відправником
         out.append({'key': key, 'name': names.get(key) or key.capitalize(), 'senders': sorted(g['senders']),
-                    'sources': sorted(g['sources']), 'mails': len(g['mails']),
+                    'sources': sorted(g['sources']), 'mails': len(g['mails']), 'pks': sorted(g['mails']),
                     'subjects': [s for s, _ in g['subjects'].most_common(4) if s]})
     out.sort(key=lambda g: -g['mails'])
     return out

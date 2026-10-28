@@ -357,6 +357,9 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
             <span class="em-folder-label">{% trans "Без своєї категорії" %}</span>{% if no_category_count %}<span class="em-nav-n">{{ no_category_count }}</span>{% endif %}
           </a>
           {% endif %}
+          <a href="/email/sort/" class="em-folder-link em-nav-item" title="{% trans "Minerva згрупує листи без категорії (правила + AI) — ви приймаєте, правите або відхиляєте" %}">
+            <span class="em-folder-icon">🧠</span><span class="em-folder-label">{% trans "Розібрати пошту" %}</span>
+          </a>
           {% if quote_count %}
           <a href="#" class="em-folder-link em-nav-item{% if quote_filter %} active{% endif %}" onclick="return emNav(event, 'quote', '1')"
              title="{% trans "Листи, схожі на запит пропозиції, по яких ще немає Angebot" %}">

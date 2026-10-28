@@ -1,0 +1,90 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+.sr-wrap{max-width:1180px}
+.sr-card{border:1px solid var(--border-strong,#ccc);border-radius:10px;padding:12px 14px;margin-bottom:12px;background:var(--bg-card,transparent)}
+.sr-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sr-head h2{margin:0;font-size:18px}
+.sr-muted{color:var(--text-muted,#888);font-size:12px}
+.sr-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sr-row label{display:flex;gap:4px;align-items:center;font-size:12px}
+.sr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:12px}
+.sr-g{border:1px solid var(--border-strong,#ccc);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.sr-g.ai{border-left:4px solid #8b5cf6}.sr-g.rules{border-left:4px solid #1a73e8}
+.sr-g .top{display:flex;gap:6px;align-items:center}
+.sr-g .top input[name=name]{flex:1;font-weight:600}
+.sr-src{font-size:10px;border-radius:8px;padding:1px 6px;white-space:nowrap}
+.sr-src.ai{background:rgba(139,92,246,.15);color:#8b5cf6}.sr-src.rules{background:rgba(26,115,232,.15);color:#1a73e8}
+.sr-why{color:var(--text-muted);font-size:12px}
+.sr-rule{display:flex;flex-wrap:wrap;gap:4px}
+.sr-chip{display:inline-flex;gap:3px;align-items:center;border:1px solid rgba(128,128,128,.4);border-radius:10px;padding:0 7px;font-size:11px}
+.sr-mails{max-height:190px;overflow:auto;border-top:1px dashed rgba(128,128,128,.3);padding-top:4px}
+.sr-mail{display:grid;grid-template-columns:18px 70px 1fr;gap:6px;font-size:12px;align-items:baseline}
+.sr-mail .s{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sr-btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+#content-main tr{background:transparent}
+</style>
+
+<div class="sr-wrap">
+  <div class="sr-card">
+    <div class="sr-head">
+      <span class="sr-muted">{% trans "Без своєї категорії зараз" %}: <b>{{ pending }}</b> · {% trans "ваших рішень" %}: {{ decided }}</span>
+      <a class="sr-muted" href="/email/?wcat=0">✉️ {% trans "до скриньки" %}</a> · <a class="sr-muted" href="{{ cats_url }}">🏷 {% trans "категорії й правила" %}</a></div>
+    <div class="sr-muted" style="margin:6px 0">{% trans "Minerva групує листи без своєї категорії: спершу правилами (номери замовлень, постійні відправники), решту — AI за темами. Ви вирішуєте: ✓ прийняти (назву, правило й листи можна змінити) · ✕ не групувати (більше не запропоную) · 🙈 не рахувати час. Прийняте стає правилом: нова пошта сортуватиметься сама." %}</div>
+    <form method="post" class="sr-row">{% csrf_token %}<input type="hidden" name="action" value="start">
+      <label>{% trans "з" %} <input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}"></label>
+      <label>{% trans "по" %} <input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}"></label>
+      <span class="sr-muted"><a href="?days=7">7</a> · <a href="?days=30">30</a> · <a href="?days=90">90</a> {% trans "днів" %}</span>
+      <label title="{% if not ai_ready %}{% trans "Немає ключа Anthropic у налаштуваннях AI — лише правила" %}{% endif %}"><input type="checkbox" name="ai" value="1"{% if ai_ready %} checked{% else %} disabled{% endif %}> 🤖 {% trans "і AI для решти" %}</label>
+      <button class="button default">🔎 {% trans "Розібрати" %}</button>
+    </form>
+    {% if run %}<div class="sr-muted" style="margin-top:6px" id="sr-status">{{ run.date_from|date:"d.m" }}–{{ run.date_to|date:"d.m.Y" }} ·
+      {% if run.status == "done" %}{% if run.use_ai %}🤖 {% endif %}{% trans "розібрано листів" %}: {{ run.mails }} · {% trans "груп залишилось" %}: {{ groups|length }}{% else %}{{ run.progress }}{% endif %}</div>{% endif %}
+  </div>
+
+  {% if run and run.status == "running" %}
+    <div class="sr-card">⏳ {% trans "Розбираю… сторінка оновиться сама." %}</div>
+    <script>setTimeout(function(){ location.reload(); }, 3000);</script>
+  {% elif run and not groups %}
+    <div class="sr-card">✨ {% trans "Груп немає: усе вже в категоріях, або листів замало для груп." %}</div>
+  {% endif %}
+
+  <div class="sr-grid">
+  {% for g in groups %}
+    <form method="post" class="sr-g {{ g.source }}">{% csrf_token %}
+      <input type="hidden" name="run" value="{{ run.pk }}"><input type="hidden" name="key" value="{{ g.key }}">
+      <div class="top">
+        <input name="name" value="{{ g.name }}" maxlength="80">
+        <span class="sr-src {{ g.source }}">{% if g.source == "ai" %}🤖 AI{% else %}{% trans "правила" %}{% endif %}</span>
+        <b>{{ g.count }}</b>
+      </div>
+      {% if g.reason %}<div class="sr-why">💡 {{ g.reason }}</div>{% endif %}
+      <div class="sr-rule">
+        {% for s in g.sources %}<span class="sr-chip">🧾 {% trans "замовлення" %} {{ s }}</span>{% endfor %}
+        {% for s in g.senders %}<label class="sr-chip"><input type="checkbox" name="sender" value="{{ s }}" checked> ✉️ {{ s }}</label>{% endfor %}
+        {% for w in g.words %}<label class="sr-chip"><input type="checkbox" name="word" value="{{ w }}" checked> 🔤 {{ w }}</label>{% endfor %}
+        {% if not g.senders and not g.words and not g.sources %}<span class="sr-muted">{% trans "без правила — лише ці гілки" %}</span>{% endif %}
+      </div>
+      <div class="sr-row"><label>{% trans "Категорія" %} <select name="existing">
+        <option value="">＋ {% trans "нова" %}</option>
+        {% for c in categories %}<option value="{{ c.pk }}"{% if g.existing == c.name %} selected{% endif %}>{{ c.label }}</option>{% endfor %}</select></label></div>
+      <div class="sr-mails">
+        {% for m in g.sample %}<label class="sr-mail"><input type="checkbox" name="mail" value="{{ m.pk }}" checked>
+          <span class="sr-muted">{{ m.at }}</span><span class="s" title="{{ m.contact }}"><a href="/email/?msg={{ m.pk }}" target="_blank">{{ m.subject|default:_("(без теми)") }}</a> <span class="sr-muted">· {{ m.contact }}</span></span></label>{% endfor %}
+        {% for pk in g.ids|slice:"8:" %}<input type="hidden" name="mail" value="{{ pk }}">{% endfor %}
+        {% if g.count > 8 %}<div class="sr-muted">{% trans "і ще" %} {{ g.count|add:"-8" }} {% trans "листів" %}</div>{% endif %}
+      </div>
+      <div class="sr-btns">
+        <button class="button default" name="action" value="accept">✓ {% trans "Прийняти" %}</button>
+        <button class="button" name="action" value="reject" formnovalidate>✕ {% trans "Не групувати" %}</button>
+        <button class="button" name="action" value="ignore" formnovalidate title="{% trans "Не рахувати час на ці гілки (✉️ Час на пошту)" %}">🙈 {% trans "Не рахувати" %}</button>
+      </div>
+    </form>
+  {% endfor %}
+  </div>
+</div>
+{% endblock %}

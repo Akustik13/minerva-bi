@@ -625,3 +625,48 @@ class ReplyBrief(models.Model):
 
     def __str__(self):
         return f'Бриф для листа #{self.message_id}'
+
+
+class MailSortRun(models.Model):
+    """«🧠 Розбір пошти» за період: групи листів без своєї категорії — за правилами й AI (email_assistant/sorting.py).
+    Результат зберігається, щоб не питати AI вдруге при кожному відкритті сторінки."""
+    RUNNING, DONE, FAILED = 'running', 'done', 'failed'
+    STATUSES = [(RUNNING, '⏳ Йде'), (DONE, '✅ Готово'), (FAILED, '❌ Помилка')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mail_sort_runs')
+    date_from = models.DateField('З')
+    date_to = models.DateField('По')
+    use_ai = models.BooleanField('З AI', default=True)
+    status = models.CharField('Стан', max_length=8, choices=STATUSES, default=RUNNING)
+    progress = models.CharField('Хід', max_length=255, blank=True, default='')
+    groups = models.JSONField('Групи', default=list, blank=True)
+    mails = models.PositiveIntegerField('Листів розібрано', default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Розбір пошти'
+        verbose_name_plural = 'Розбори пошти'
+        ordering = ['-created_at']
+
+
+class MailSortDecision(models.Model):
+    """Рішення людини щодо групи «🧠 Розбору пошти»: прийняла (категорія й правила) або «не групувати».
+    Відхилене не пропонується знову; прийняте — приклади для навчання сортування."""
+    ACCEPTED, REJECTED, IGNORED = 'accepted', 'rejected', 'ignored'
+    DECISIONS = [(ACCEPTED, '✓ Прийнято'), (REJECTED, '✕ Не групувати'), (IGNORED, '🙈 Не рахувати')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mail_sort_decisions')
+    key = models.CharField('Ключ групи', max_length=255, db_index=True)
+    decision = models.CharField('Рішення', max_length=10, choices=DECISIONS)
+    name = models.CharField('Назва', max_length=120, blank=True, default='')
+    category = models.ForeignKey(MailCategory, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    rule = models.JSONField('Правило', default=dict, blank=True)
+    message_ids = models.JSONField('Листи', default=list, blank=True)
+    source = models.CharField('Звідки', max_length=8, blank=True, default='')   # rules / ai
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Рішення розбору пошти'
+        verbose_name_plural = 'Рішення розбору пошти'
+        ordering = ['-created_at']
