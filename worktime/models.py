@@ -68,6 +68,13 @@ class DanteSettings(models.Model):
         "Години на проєктах — днів назад", default=90,
         help_text="Скільки днів записів часу askDANTE Minerva тримає в себе (оновлення — щоночі й кнопкою).")
     records_synced_at = models.DateTimeField("Записи часу оновлено", null=True, blank=True)
+    durations_allowed = models.BooleanField(
+        "askDANTE приймає час на проєкт тривалістю", default=True,
+        help_text="Знімається само, коли askDANTE відповів «Die Verwendung einer Dauer ist nicht erlaubt»: тоді "
+                  "Minerva пише «з … по …» у вільний відрізок дня.")
+    activity_required = models.BooleanField(
+        "askDANTE вимагає вид роботи", default=False,
+        help_text="Ставиться само, коли askDANTE відповів «activityId: Eine Eingabe ist erforderlich».")
 
     mail_time = models.BooleanField(
         "Рахувати час на пошту", default=False,

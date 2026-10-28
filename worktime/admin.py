@@ -145,7 +145,7 @@ class DanteSettingsAdmin(admin.ModelAdmin):
                            "запуску — звіт по днях: що записано, що вже було, що пропущено й чому.",
         }),
         ("📁 Час на проєкти й години", {
-            "fields": ["default_activity", "records_days", "records_status"],
+            "fields": ["default_activity", "durations_allowed", "activity_required", "records_days", "records_status"],
             "description": "Час на проєкти пишеться в askDANTE з календаря (☆ мої проєкти). Години проєктів і "
                            "клієнтів у Minerva — з копії записів askDANTE, оновлюється щоночі й кнопкою.",
         }),

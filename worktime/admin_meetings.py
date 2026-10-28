@@ -90,5 +90,7 @@ def meetings_page(model_admin, request):
         "calendar_url": reverse("admin:worktime_workday_changelist"),
         "mapping_url": reverse("admin:worktime_danteproject_changelist"),
         "max_per_submit": meetings.MAX_PER_SUBMIT,
+        "needs_activity": st.activity_required and not st.default_activity_id,
+        "settings_url": reverse("admin:worktime_dantesettings_change", args=[st.pk]),
     }
     return render(request, "admin/worktime/meetings.html", context)

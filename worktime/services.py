@@ -742,11 +742,83 @@ def project_overlap(du: DanteUser, day: datetime.date, start: datetime.time, sto
     return ""
 
 
+ACTIVITY_MISSING = ("askDANTE вимагає вид роботи (Tätigkeit). Виберіть «Вид роботи за замовчуванням» у ⚙️ Налаштуваннях "
+                    "askDANTE (блок «📁 Час на проєкти») — або вид роботи в категорії листів чи на сторінці.")
+
+
+def _minutes(t: datetime.time) -> int:
+    return t.hour * 60 + t.minute
+
+
+def _clock_of(m: int) -> datetime.time:
+    return datetime.time(0, 0) if m >= 24 * 60 else datetime.time(m // 60, m % 60)
+
+
+def find_slot(du: DanteUser, day: datetime.date, minutes: int, prefer: datetime.time | None = None,
+              st: DanteSettings | None = None) -> tuple[datetime.time, datetime.time]:
+    """Вільний відрізок «з … по …» на `minutes` для часу на проєкт, якщо askDANTE не приймає тривалість.
+    У межах приходу–відходу дня (якщо записані), інакше від свого / стандартного приходу до кінця доби; не
+    перекривається з іншими записами на проєкти (копія записів askDANTE); сьогодні — не пізніше, ніж зараз.
+    Спершу — від `prefer` (напр. час першого листа), далі — з початку вікна; крок 5 хв."""
+    st = st or DanteSettings.get()
+    step = 5
+    wd = WorkDay.objects.filter(dante_user=du, date=day).first()
+    windows = [_span(t["coming"], t.get("leaving")) for t in (wd.times if wd else None) or [] if t.get("coming")]
+    if not windows:
+        windows = [(_minutes(du.times(st)[0]), 24 * 60)]
+    limit = 24 * 60
+    if day == local_today():
+        now = timezone.localtime()
+        limit = (now.hour * 60 + now.minute) // step * step
+    busy = sorted(_span(r.start, r.stop) for r in TimeRecord.objects.filter(dante_user=du, day=day)
+                  .exclude(start="").exclude(stop=""))
+
+    def fit(s, end):
+        s = -(-s // step) * step
+        while s + minutes <= min(end, limit):
+            clash = next(((a, b) for a, b in busy if a < s + minutes and s < b), None)
+            if clash is None:
+                return s
+            s = -(-clash[1] // step) * step
+        return None
+
+    want = _minutes(prefer) // step * step if prefer else None
+    for a, b in sorted(windows):
+        if want is not None and want < b:
+            s = fit(max(a, want), b)
+            if s is not None:
+                return _clock_of(s), _clock_of(s + minutes)
+    for a, b in sorted(windows):
+        s = fit(a, b)
+        if s is not None:
+            return _clock_of(s), _clock_of(s + minutes)
+    raise DanteError("bad_request", f"askDANTE не приймає тривалість, а {day:%d.%m} немає вільних {minutes} хв поза "
+                                    "іншими записами на проєкти (у межах приходу–відходу) — запишіть «з … по …» вручну.")
+
+
+def _pick_activity(st: DanteSettings):
+    """Вид роботи, коли askDANTE його вимагає, а не вибрано: за замовчуванням або єдиний наявний."""
+    if st.default_activity_id:
+        return st.default_activity
+    active = list(DanteActivity.objects.filter(archived=False)[:2])
+    return active[0] if len(active) == 1 else None
+
+
+def _remember(st: DanteSettings, **flags):
+    DanteSettings.objects.filter(pk=st.pk).update(**flags)
+    for k, v in flags.items():
+        setattr(st, k, v)
+
+
 def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: int = 0, activity=None,
                  comment: str = "", user=None, source: str = Booking.MANUAL, st: DanteSettings | None = None,
-                 start: datetime.time | None = None, stop: datetime.time | None = None) -> Booking:
+                 start: datetime.time | None = None, stop: datetime.time | None = None,
+                 prefer: datetime.time | None = None) -> Booking:
     """Час на проєкт askDANTE: «з … по …» (start/stop) або тривалість у хвилинах. Повтор того самого запису за
-    2 хв — відмова (подвійне натискання), бо записи askDANTE через API не видаляються."""
+    2 хв — відмова (подвійне натискання), бо записи askDANTE через API не видаляються.
+    askDANTE може не приймати тривалість і вимагати вид роботи (налаштування фірми): Minerva запам'ятовує це з
+    першої відмови (`durations_allowed`, `activity_required`), пише тривалість як «з … по …» у вільний відрізок
+    (`find_slot`, від `prefer`) і бере вид роботи за замовчуванням або єдиний — і повторює запит один раз."""
     st = st or DanteSettings.get()
     now = timezone.localtime()
     if day > local_today():
@@ -764,36 +836,70 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
     if dp.archived or dp.gone or not dp.time_trackable:
         raise DanteError("bad_request", f"У проєкт askDANTE «{dp}» час записувати не можна (архів або вимкнено).")
     activity = activity or st.default_activity
+    if activity is None and st.activity_required:
+        activity = _pick_activity(st)
+        if activity is None:
+            raise DanteError("bad_request", ACTIVITY_MISSING)
     comment = (comment or "").strip()[:500]
+    fixed_times = bool(start)
     recent = timezone.now() - datetime.timedelta(minutes=2)
     if Booking.objects.filter(dante_user=du, kind=Booking.PROJECT, date=day, dante_project=dp, duration=minutes,
                               start=start, comment=comment, status=Booking.SENT, created_at__gte=recent).exists():
         raise DanteError("bad_request", "Такий самий запис щойно вже пішов в askDANTE — оновіть сторінку.")
-    data = {"projectId": dp.dante_id}
-    if activity:
-        data["activityId"] = activity.dante_id
-    if comment:
-        data["comment"] = comment
-    record = {"date": day.isoformat(), "projectData": data}
-    record.update({"start": hhmm(start), "stop": hhmm(stop)} if start else {"duration": minutes})
+    def record():
+        data = {"projectId": dp.dante_id}
+        if activity:
+            data["activityId"] = activity.dante_id
+        if comment:
+            data["comment"] = comment
+        r = {"date": day.isoformat(), "projectData": data}
+        r.update({"start": hhmm(start), "stop": hhmm(stop)} if start else {"duration": minutes})
+        return r
+
     c = client(st)
     with lock(du):
-        if start:   # свіжа копія записів дня — перекриття з іншим проєктом askDANTE не пишемо
+        if start or not st.durations_allowed:   # свіжа копія записів дня — без перекриття з іншим проєктом
             try:
                 sync_records(st, day, day, c)
             except DanteError:
                 pass
+        if not start and not st.durations_allowed:
+            start, stop = find_slot(du, day, minutes, prefer, st)
+        if fixed_times:
             busy = project_overlap(du, day, start, stop)
             if busy:
                 raise DanteError("bad_request", f"Перекривається з записом askDANTE {busy}.")
         booking = Booking(dante_user=du, date=day, kind=Booking.PROJECT, source=source, duration=minutes,
                           start=start, stop=stop, dante_project=dp, activity=activity, comment=comment,
                           reason="час на проєкт", created_by=user if getattr(user, "pk", None) else None)
-        try:
-            c.track(du.dante_id, record)
-            booking.status = Booking.SENT
-        except DanteError as e:
-            booking.status, booking.error = Booking.FAILED, e.message
+        for attempt in range(2):
+            try:
+                c.track(du.dante_id, record())
+                booking.status, booking.error = Booking.SENT, ""
+                break
+            except DanteError as e:
+                booking.status, booking.error = Booking.FAILED, e.message
+                if attempt or e.status != 400:
+                    break
+                retry = False
+                if not start and "duration" in e.fields:   # «Die Verwendung einer Dauer ist nicht erlaubt»
+                    _remember(st, durations_allowed=False)
+                    try:
+                        sync_records(st, day, day, c)
+                        start, stop = find_slot(du, day, minutes, prefer, st)
+                    except DanteError as slot_error:
+                        booking.error = slot_error.message
+                        break
+                    booking.start, booking.stop, retry = start, stop, True
+                if activity is None and any(k.endswith("activityId") for k in e.fields):
+                    _remember(st, activity_required=True)
+                    activity = _pick_activity(st)
+                    if activity is None:
+                        booking.error = ACTIVITY_MISSING
+                        break
+                    booking.activity, retry = activity, True
+                if not retry:
+                    break
         booking.save()
     if booking.status == Booking.SENT:
         try:

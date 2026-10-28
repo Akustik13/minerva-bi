@@ -33,6 +33,12 @@
 @media (max-width:820px){.mg-row{grid-template-columns:24px 1fr 1fr}.mg-row.head{display:none}}
 </style>
 
+{% if needs_activity %}
+<div class="mg-card" style="border-color:#f59e0b">⚠️ {% trans "Ваш askDANTE вимагає вид роботи (Tätigkeit) для кожного запису на проєкт. Виберіть його внизу перед записом — або раз і назавжди «Вид роботи за замовчуванням» у" %} <a href="{{ settings_url }}">⚙️ {% trans "налаштуваннях askDANTE" %}</a>.</div>
+{% endif %}
+{% if not st.durations_allowed %}
+<div class="mg-card mg-muted" style="font-size:12px">ℹ️ {% trans "askDANTE не приймає тривалість — зустрічі й так пишуться «з … по …»." %}</div>
+{% endif %}
 <form method="get" class="mg-card">
   <div class="mg-form">
     {% if people|length > 1 %}

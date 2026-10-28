@@ -104,7 +104,7 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
     def row(day, dp, label, kind, auto, activity):
         r = rows.setdefault((day, dp.pk), {"day": day, "dp": dp, "labels": [], "kinds": set(), "replies": 0,
                                             "received": 0, "orders": 0, "raw": 0, "auto": False, "activity": activity,
-                                            "subjects": []})
+                                            "subjects": [], "first": None})
         if label not in r["labels"]:
             r["labels"].append(label)
         r["kinds"].add(kind)
@@ -135,6 +135,9 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
             unmapped[day] = unmapped.get(day, 0) + 1
             continue
         r["replies" if outgoing else "received"] += 1
+        at = timezone.localtime(m["sent_at"]).time()
+        if r["first"] is None or at < r["first"]:
+            r["first"] = at   # askDANTE без тривалості — відрізок «з … по …» починається від першого листа
         if len(r["subjects"]) < 5 and m["subject"]:
             r["subjects"].append(("📤 " if outgoing else "📥 ") + m["subject"][:80])
 
@@ -177,7 +180,7 @@ def _comment(r) -> str:
 
 
 def book(du: DanteUser, day: datetime.date, dp_pk: int, user=None, source: str = Booking.MAIL,
-         st: DanteSettings | None = None) -> Booking:
+         st: DanteSettings | None = None, activity=None) -> Booking:
     """Записати в askDANTE оцінку дня по проєкту (лише ще не записану різницю)."""
     st = st or DanteSettings.get()
     if day > services.local_today():
@@ -185,8 +188,8 @@ def book(du: DanteUser, day: datetime.date, dp_pk: int, user=None, source: str =
     r = next((x for x in estimate(du, day, day, st).get(day, {}).get("rows", []) if x["dp"].pk == int(dp_pk)), None)
     if r is None or r["to_book"] <= 0:
         raise DanteError("bad_request", "Цей час на пошту вже записано в askDANTE.")
-    booking = services.book_project(du, day, r["dp"], minutes=r["to_book"], activity=r["activity"],
-                                    comment=_comment(r), user=user, source=source, st=st)
+    booking = services.book_project(du, day, r["dp"], minutes=r["to_book"], activity=r["activity"] or activity,
+                                    comment=_comment(r), user=user, source=source, st=st, prefer=r["first"])
     if booking.status == Booking.SENT:
         entry, _ = MailTimeEntry.objects.get_or_create(dante_user=du, day=day, dante_project=r["dp"])
         entry.minutes_booked += r["to_book"]

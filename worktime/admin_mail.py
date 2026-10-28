@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from . import mail_time, services
 from .client import DanteError
-from .models import Booking, DanteProject, DanteSettings, MailCategoryTime
+from .models import Booking, DanteActivity, DanteProject, DanteSettings, MailCategoryTime
 
 
 class MailCategoryTimeInline(admin.StackedInline):
@@ -60,13 +60,14 @@ def mail_time_page(model_admin, request):
             messages.error(request, "askDANTE вимкнено або не налаштовано.")
             return redirect(back)
         done = minutes = 0
+        activity = DanteActivity.objects.filter(pk=request.POST.get("activity") or 0).first()
         for pick in request.POST.getlist("pick"):
             day_s, _, dp = pick.partition("|")
             day = _day(day_s, None)
             if day is None or not dp.isdigit():
                 continue
             try:
-                b = mail_time.book(du, day, int(dp), user=request.user, source=Booking.MAIL, st=st)
+                b = mail_time.book(du, day, int(dp), user=request.user, source=Booking.MAIL, st=st, activity=activity)
             except DanteError as e:
                 messages.error(request, f"{day:%d.%m}: {e.message}")
                 continue
@@ -99,5 +100,7 @@ def mail_time_page(model_admin, request):
         "settings_url": reverse("admin:worktime_dantesettings_change", args=[st.pk]),
         "calendar_url": reverse("admin:worktime_workday_changelist"),
         "mapping_url": reverse("admin:worktime_danteproject_changelist") + "?view=minerva",
+        "activities": list(DanteActivity.objects.filter(archived=False)),
+        "needs_activity": st.activity_required and not st.default_activity_id,
     }
     return render(request, "admin/worktime/mail_time.html", context)

@@ -28,9 +28,10 @@ TOKEN = "apiAuthenticationToken"
 class DanteError(Exception):
     """Помилка askDANTE з кодом для інтерфейсу: unconfigured, auth, bad_request, not_found, busy, unavailable, network."""
 
-    def __init__(self, code: str, message: str, status: int | None = None):
+    def __init__(self, code: str, message: str, status: int | None = None, fields: dict | None = None):
         super().__init__(message)
         self.code, self.message, self.status = code, message, status
+        self.fields = fields or {}   # 400: {поле askDANTE: повідомлення} — щоб Minerva могла підлаштуватись
 
 
 _MESSAGES = {
@@ -131,13 +132,23 @@ class DanteClient:
         except requests.exceptions.RequestException:
             raise DanteError("network", "Немає зв'язку з askDANTE.")
         if r.status_code == 400:
-            raise DanteError("bad_request", "askDANTE не прийняв запит: " + self._field_errors(r), 400)
+            raise DanteError("bad_request", "askDANTE не прийняв запит: " + self._field_errors(r), 400,
+                             self._fields(r))
         if r.status_code in _MESSAGES:
             code, msg = _MESSAGES[r.status_code]
             raise DanteError(code, msg, r.status_code)
         if r.status_code >= 400:
             raise DanteError("unavailable", f"askDANTE повернув помилку HTTP {r.status_code}.", r.status_code)
         return r
+
+    @staticmethod
+    def _fields(r) -> dict:
+        try:
+            data = r.json()
+        except ValueError:
+            return {}
+        errors = (data.get("fieldErrors") or data.get("errors") or []) if isinstance(data, dict) else []
+        return {str(e["on"]): str(e.get("message") or "") for e in errors if isinstance(e, dict) and e.get("on")}
 
     @staticmethod
     def _field_errors(r) -> str:

@@ -30,6 +30,12 @@
 @media (max-width:760px){.mt-row{grid-template-columns:24px 1fr 1fr}.mt-row .num{text-align:left}}
 </style>
 
+{% if needs_activity %}
+<div class="mt-card" style="border-color:#f59e0b">⚠️ {% trans "Ваш askDANTE вимагає вид роботи (Tätigkeit) для кожного запису на проєкт. Виберіть його внизу перед записом — або раз і назавжди «Вид роботи за замовчуванням» у" %} <a href="{{ settings_url }}">⚙️ {% trans "налаштуваннях askDANTE" %}</a>.</div>
+{% endif %}
+{% if not st.durations_allowed %}
+<div class="mt-card mt-muted" style="font-size:12px">ℹ️ {% trans "askDANTE не приймає тривалість — Minerva записує «з … по …»: у межах приходу–відходу дня, від першого листа, у вільний від інших записів на проєкти відрізок." %}</div>
+{% endif %}
 {% if not st.mail_time %}
 <div class="mt-card" style="border-color:#f59e0b">⚠️ {% trans "Облік часу на пошту вимкнено. Увімкніть «Рахувати час на пошту» в" %} <a href="{{ settings_url }}">⚙️ {% trans "налаштуваннях askDANTE" %}</a>. {% trans "Оцінку видно й зараз, але автоматично нічого не записується." %}</div>
 {% endif %}
@@ -80,6 +86,8 @@
   </div>
   {% endfor %}
   <div class="mt-bar">
+    <label class="mt-muted">{% trans "Вид роботи" %}
+      <select name="activity"><option value="">{% trans "як у категорії / налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if needs_activity and forloop.first and activities|length == 1 %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></label>
     <button class="button default" type="submit"{% if not st.enabled %} disabled{% endif %}>✓ {% trans "Записати вибране в askDANTE" %}</button>
     <span class="mt-muted">{% trans "Записи askDANTE через API не виправляються й не видаляються — перевірте перед записом. Записане не дублюється: наступного разу піде лише різниця." %}</span>
   </div>
