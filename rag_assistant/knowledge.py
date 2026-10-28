@@ -275,6 +275,21 @@ def _attachment_path(att) -> str:
     return path if path.startswith(root + os.sep) and os.path.isfile(path) else ""
 
 
+def attachment_reason(att, scope) -> str:
+    """Чому Minerva не передає вкладення в RAG ('' — передає): вимкнено / тип / розмір / файл не збережено."""
+    name = (att.get("name") or "attachment")[:300]
+    ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if not scope.include_attachments:
+        return "attachments_disabled"
+    if ext not in scope.attachment_types:
+        return "type_not_allowed"
+    if int(att.get("size") or 0) > scope.attachment_max:
+        return "too_large"
+    if not _attachment_path(att):
+        return "not_downloaded"
+    return ""
+
+
 def _attachments(msg, scope) -> list:
     """Вкладення для документа. Хеш байтів рахується один раз і кешується в EmailMessage.attachments."""
     from email_assistant.models import EmailMessage
@@ -285,17 +300,8 @@ def _attachments(msg, scope) -> list:
             continue
         name = (a.get("name") or "attachment")[:300]
         size = int(a.get("size") or 0)
-        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
         path = _attachment_path(a)
-        reason = ""
-        if not scope.include_attachments:
-            reason = "attachments_disabled"
-        elif ext not in scope.attachment_types:
-            reason = "type_not_allowed"
-        elif size > scope.attachment_max:
-            reason = "too_large"
-        elif not path:
-            reason = "not_downloaded"
+        reason = attachment_reason(a, scope)
         content_hash = a.get("sha256") or None
         if not reason and not content_hash:
             content_hash = _sha_file(path)
@@ -929,6 +935,7 @@ def apply_status(payload, request_id) -> dict:
                 doc.state = _STATE_FOR[item["state"]]
                 doc.status_revision, doc.attempt_id = doc.revision, item["attempt_id"]
                 doc.chunks = int(item.get("chunks") or 0)
+                doc.attachments = None if item["state"] == "deleted" else _reported_attachments(item.get("attachments"))
                 err = item.get("error") or {}
                 doc.error = (f"{err.get('code', '')}: {err.get('message', '')}" if err else "")[:500]
                 doc.last_status_at = now
@@ -939,6 +946,71 @@ def apply_status(payload, request_id) -> dict:
                 accepted += 1
             results.append(res)
     return {"request_id": request_id, "accepted": accepted, "results": results}
+
+
+def _reported_attachments(value):
+    """Звіт RAG по вкладеннях → [{index, state, reason}] (без хешів); None — RAG про вкладення не звітував."""
+    if not isinstance(value, list):
+        return None
+    out = []
+    for a in value[:100]:
+        if (isinstance(a, dict) and isinstance(a.get("index"), int) and not isinstance(a.get("index"), bool)
+                and a["index"] >= 0 and a.get("state") in ("indexed", "skipped", "failed")):
+            out.append({"index": a["index"], "state": a["state"], "reason": str(a.get("reason") or "")[:100]})
+    return out
+
+
+ATTACHMENT_LABELS = {
+    "indexed": "у RAG — знаходиться пошуком",
+    "pending": "передано, RAG ще не обробив",
+    "unknown": "лист у RAG, але про це вкладення RAG не звітував (проіндексовано раніше) — «🔄 Передати ще раз», щоб дізнатися",
+    "attachments_disabled": "вкладення не індексуються (налаштування «🧠 База знань»)",
+    "type_not_allowed": "такий тип файлу не індексується",
+    "too_large": "завеликий для індексації",
+    "not_downloaded": "файл не збережено в Minerva — лише на поштовому сервері",
+    "no_extractable_text": "немає тексту — скан чи картинка (розпізнавання тексту немає)",
+    "document_extraction_budget": "не вмістився — лист із вкладеннями завеликий",
+    "attachment_unavailable_or_unreadable": "RAG не зміг прочитати файл",
+}
+
+
+def attachment_states(messages) -> dict:
+    """Стан кожного вкладення листів у RAG для пошти: {pk листа: {індекс: {"state", "label"}}}.
+    state: in — у RAG; wait — чекає RAG; skip — не індексується (причина в label); fail — RAG не прочитав;
+    unknown — лист у RAG, звіту про вкладення немає. Листи поза базою знань не потрапляють (причина — у рядку листа)."""
+    from .models import KnowledgeDoc
+    messages = list(messages)
+    scope = get_scope()
+    docs = {d.obj_id: d for d in KnowledgeDoc.objects.filter(doc_type=DOC_TYPE, obj_id__in=[m.pk for m in messages],
+                                                             fed=True)}
+    short = {"indexed": "in", "skipped": "skip", "failed": "fail"}
+    out = {}
+    for m in messages:
+        doc = docs.get(m.pk)
+        if doc is None:
+            continue
+        current = doc.status_revision == doc.revision and doc.state != KnowledgeDoc.PENDING
+        reported = {a["index"]: a for a in (doc.attachments or [])} if current else {}
+        per = {}
+        for i, a in enumerate(m.attachments or []):
+            if a.get("is_inline"):
+                continue
+            own = attachment_reason(a, scope)
+            r = reported.get(i)
+            if r is not None:
+                state, reason = short[r["state"]], r["reason"] or r["state"]
+            elif own:
+                state, reason = "skip", own
+            elif not current:
+                state, reason = "wait", "pending"
+            elif doc.attachments is None:
+                state, reason = "unknown", "unknown"
+            else:                      # звіт є, але цього вкладення в ньому немає — RAG його не бачив
+                state, reason = "wait", "pending"
+            label = ATTACHMENT_LABELS.get(reason) or (ATTACHMENT_LABELS["indexed"] if state == "in" else reason)
+            per[i] = {"state": state, "label": label}
+        out[m.pk] = per
+    return out
 
 
 def validate_status_payload(payload):

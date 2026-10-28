@@ -79,6 +79,10 @@ def item_json(item, user, supported=None) -> dict:
     else:
         rag = {"indexed": "✓ у RAG", "failed": f"✗ RAG: {doc.error or 'помилка'}", "skipped": "RAG пропустив (немає тексту)",
                "pending": "⏳ чекає RAG", "deleted": "прибрано"}.get(doc.current_state, doc.current_state)
+        file_report = (doc.attachments or [None])[0] if doc.current_state == "indexed" else None
+        if file_report and file_report["state"] != "indexed":     # опис / сторінка в RAG, а текст файлу — ні
+            from .knowledge import ATTACHMENT_LABELS
+            rag += " · файл: " + ATTACHMENT_LABELS.get(file_report["reason"], file_report["reason"] or "не прочитано")
     return {
         "id": item.pk, "kind": item.kind, "kind_label": item.get_kind_display(), "title": item.title, "note": item.note,
         "url": item.url, "open": f"/rag/knowledge/{item.pk}/", "file_name": item.file_name,

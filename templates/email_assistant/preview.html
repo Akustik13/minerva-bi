@@ -18,6 +18,9 @@
 .em-pv-kb{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:var(--text-muted)}
 .em-pv-kb .kb-in{color:#16a34a}.em-pv-kb .kb-fail{color:#dc2626}.em-pv-kb .kb-wait{color:#d97706}
 .em-pv-kb button{font-size:11px;padding:1px 8px}
+.em-att-kb:empty{display:none}
+.em-att-kb{padding:4px 6px 4px 0;font-size:11px;cursor:help}
+.em-att-kb.kb-skip{opacity:.65}
 .em-proj-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 8px;border-radius:12px;
   border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.08);color:var(--text)}
 .em-proj-chip a{color:var(--text);text-decoration:none;font-weight:600}
@@ -543,11 +546,13 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
                data-att-name="{{ att.name|escapejs }}"
                data-att-ct="{{ att.content_type|default:''|escapejs }}"
                data-att-size="{{ att.size|default:0 }}"
+               data-kb-msg="{{ msg.pk }}" data-kb-idx="{{ forloop.counter0 }}"
                onmouseenter="attTipShow(event,this)"
                onmousemove="attTipMove(event)"
                onmouseleave="attTipHide()">
             <span class="em-att-name" title="{{ att.name }}">📎 {{ att.name }}</span>
             {% if att.size %}<span style="padding:4px 6px 4px 0;font-size:10px;color:var(--text-dim)">{{ att.size|filesizeformat }}</span>{% endif %}
+            <span class="em-att-kb"></span>
             <span class="em-att-sep"></span>
             <a class="em-att-btn"
                href="/email/message/{{ msg.pk }}/attachment/{{ forloop.counter0 }}/"
@@ -2071,6 +2076,16 @@ window.attTipHide = function() {
       html += '<button class="em-pv-btn" data-kb="resend" title="{% trans "RAG обробить ці листи заново" %}">🔄 {% trans "Передати ще раз" %}</button>';
     box.innerHTML = html;
     box.style.display = 'flex';
+    // кожне вкладення: у RAG / чекає / не індексується й чому (звіт RAG, rag_assistant.knowledge.attachment_states)
+    var icons = {in: '🧠', wait: '⏳', skip: '–', fail: '⚠️', unknown: 'ℹ️'};
+    document.querySelectorAll('.em-att-item[data-kb-msg]').forEach(function(el) {
+      var span = el.querySelector('.em-att-kb');
+      var st = ((d.attachments || {})[el.dataset.kbMsg] || {})[el.dataset.kbIdx];
+      if (!span) return;
+      span.className = 'em-att-kb' + (st ? ' kb-' + st.state : '');
+      span.textContent = st ? icons[st.state] || '' : '';
+      span.title = st ? '{% trans "База знань RAG" %}: ' + st.label : '';
+    });
   }
   box.addEventListener('click', async function(e) {
     var b = e.target.closest('button[data-kb]');

@@ -1214,7 +1214,9 @@ def message_knowledge_view(request, message_pk):
         else:
             return JsonResponse({'ok': False, 'error': 'Невідома дія'}, status=400)
         msgs = list(EmailMessage.objects.filter(pk__in=[m.pk for m in msgs]).select_related('account', 'thread'))
-    return JsonResponse({'ok': True, **knowledge.mail_state(msgs)})
+    return JsonResponse({'ok': True, **knowledge.mail_state(msgs),
+                         'attachments': {str(pk): {str(i): v for i, v in per.items()}
+                                         for pk, per in knowledge.attachment_states(msgs).items()}})
 
 
 @staff_member_required

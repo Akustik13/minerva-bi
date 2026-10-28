@@ -254,6 +254,10 @@ class KnowledgeDoc(models.Model):
     status_revision = models.PositiveIntegerField(default=0)
     attempt_id = models.PositiveBigIntegerField(default=0)
     chunks = models.PositiveIntegerField(default=0)
+    attachments = models.JSONField(
+        null=True, blank=True, default=None,
+        help_text="Звіт RAG по вкладеннях для status_revision: [{index, state, reason}]. "
+                  "None — RAG про вкладення цієї ревізії не звітував (наприклад, проіндексовано до 28.10.2026).")
     error = models.CharField(max_length=500, blank=True, default="")
     indexed_at = models.DateTimeField(null=True, blank=True)
     last_status_at = models.DateTimeField(null=True, blank=True)
