@@ -334,3 +334,42 @@ class RetrievalJob(models.Model):
     @property
     def is_terminal(self) -> bool:
         return self.status in self.TERMINAL
+
+
+class EntityHelp(models.Model):
+    """
+    «🧭 Огляд» і «❓ Запитати» в картці проєкту, клієнта, замовлення чи товару (rag_assistant/entity_help.py):
+    дані Minerva + листи + база знань RAG → відповідь AI з посиланнями [#N]. Як ReplyBrief у пошті, але для картки.
+    Лише власник бачить свій запис (RAG шукає лише в його скриньках).
+    """
+    KINDS = [("project", "проєкт"), ("customer", "клієнт"), ("order", "замовлення"), ("product", "товар")]
+    MODE_ANSWER, MODE_REVIEW = "answer", "review"
+    MODES = [(MODE_ANSWER, "❓ запитання"), (MODE_REVIEW, "🧭 огляд")]
+    RUNNING, DONE, ERROR = "running", "done", "error"
+    STATUSES = [(RUNNING, "виконується"), (DONE, "готово"), (ERROR, "помилка")]
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="entity_helps")
+    kind = models.CharField(max_length=10, choices=KINDS)
+    obj_id = models.PositiveIntegerField()
+    mode = models.CharField(max_length=10, choices=MODES, default=MODE_ANSWER)
+    question = models.TextField(blank=True, default="")
+    target = models.CharField(max_length=300, blank=True, default="", help_text="Про що питали (назва картки)")
+    stages = models.JSONField(default=list, blank=True)
+    sources = models.JSONField(default=list, blank=True, help_text="Джерела [#N]: група, підпис, посилання, текст")
+    used = models.JSONField(default=list, blank=True)
+    result = models.TextField(blank=True, default="", help_text="Відповідь AI або JSON огляду")
+    model = models.CharField(max_length=60, blank=True, default="")
+    fingerprint = models.CharField(max_length=64, blank=True, default="", help_text="Стан даних на момент збору")
+    status = models.CharField(max_length=10, choices=STATUSES, default=RUNNING)
+    error = models.CharField(max_length=300, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Огляд / запитання по картці"
+        verbose_name_plural = "Огляди й запитання по картках"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "kind", "obj_id", "mode"], name="entityhelp_lookup")]
+
+    def __str__(self):
+        return f"{self.get_kind_display()} #{self.obj_id} · {self.mode} · {self.status}"

@@ -1,0 +1,175 @@
+{% comment %}
+«🧭 Огляд» і «❓ Запитати» в картці (rag_assistant/entity_help.py).
+{% include "admin/rag_assistant/entity_help.html" with eh_kind="customer" eh_id=original.pk eh_review=True %}
+eh_review=False — лише «❓ Запитати» (проєкт: огляд — свій, у блоці «🧭 Огляд проєкту»); eh_open=True — розгорнуто.
+Згорнуто / розгорнуто — запам'ятовується для виду картки (localStorage ehw-open-<вид>).
+{% endcomment %}
+<details class="ehw" id="ehw-{{ eh_kind }}-{{ eh_id }}" data-kind="{{ eh_kind }}" data-id="{{ eh_id }}"
+         data-review="{% if eh_review %}1{% endif %}"{% if eh_open %} open{% endif %}>
+<style>
+  .ehw { max-width: 980px; margin: 10px 0 14px; padding: 8px 12px; border: 1px solid var(--border-strong, var(--hairline-color, #ddd));
+         border-radius: 8px; background: var(--bg-card, transparent); color: var(--text, inherit); font-size: 13px; line-height: 1.55; }
+  .ehw > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; list-style: none; }
+  .ehw > summary::-webkit-details-marker { display: none; }
+  .ehw > summary::before { content: '▸'; color: var(--text-muted, #666); }
+  .ehw[open] > summary::before { content: '▾'; }
+  .ehw[open] > summary { margin-bottom: 6px; }
+  .ehw-sub, .ehw-stages { color: var(--text-muted, var(--body-quiet-color, #666)); font-size: 12px; }
+  .ehw-stages { line-height: 1.5; margin: 6px 0; }
+  .ehw textarea { width: 100%; box-sizing: border-box; min-height: 44px; resize: vertical; font: inherit; }
+  .ehw-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .ehw-out:empty { display: none; }
+  .ehw-out { margin-top: 8px; border-top: 1px dashed var(--hairline-color, #ddd); padding-top: 6px; }
+  .ehw-text { white-space: pre-wrap; }
+  .ehw h5 { margin: 10px 0 2px; font-size: 13px; }
+  .ehw-item { padding: 2px 0; }
+  .ehw-next { border: 1px solid var(--hairline-color, #ddd); border-radius: 4px; padding: 6px 8px; margin-top: 8px; }
+  .ehw-stale { background: var(--message-warning-bg, #ffc); padding: 1px 6px; border-radius: 3px; font-size: 12px; }
+  .ehw a.ref { font-size: 11px; text-decoration: none; }
+  .ehw details { margin-top: 8px; }
+  .ehw details summary { cursor: pointer; font-size: 12px; color: var(--body-quiet-color, #666); }
+  .ehw-src { margin: 3px 0 3px 10px; font-size: 12px; }
+  .ehw-src pre { white-space: pre-wrap; font-family: inherit; font-size: 12px; margin: 3px 0 6px; max-height: 240px; overflow: auto;
+                 background: var(--body-bg, transparent); border-left: 2px solid var(--hairline-color, #ddd); padding: 4px 8px; }
+</style>
+  <summary>
+    <b>{% if eh_review %}🧭 Огляд і ❓ запитання{% else %}❓ Запитати про проєкт{% endif %}</b>
+    <span class="ehw-sub">дані Minerva + листи з ваших скриньок + база знань RAG · кожен пункт із посиланням [#N]</span>
+    <span class="ehw-sub ehw-last"></span>
+  </summary>
+  <textarea class="ehw-q" rows="2"
+            placeholder="{% if eh_kind == 'product' %}Напр.: які були проблеми з цим товаром? кому продавали й за якою ціною? чого не вистачає?{% elif eh_kind == 'order' %}Напр.: чого не вистачає на складі? що обіцяли клієнту щодо строку? де посилка?{% elif eh_kind == 'customer' %}Напр.: що клієнт замовляв і на яких умовах? які були скарги? що ми обіцяли?{% else %}Напр.: що ще не надіслали клієнту? які домовленості щодо ціни й строків?{% endif %}"></textarea>
+  <div class="ehw-btns">
+    <button type="button" class="button ehw-ask">❓ Запитати</button>
+    {% if eh_review %}<button type="button" class="button ehw-review">🧭 Що обіцяли / зробили / відкрите</button>{% endif %}
+    <span class="ehw-sub">Enter — запитати, Shift+Enter — новий рядок</span>
+  </div>
+  <div class="ehw-out ehw-out-answer"></div>
+  <div class="ehw-out ehw-out-review"></div>
+<script>
+(function () {
+  var root = document.getElementById('ehw-{{ eh_kind }}-{{ eh_id }}');
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = '1';
+  var base = '/rag/api/entity/' + root.dataset.kind + '/' + root.dataset.id + '/';
+  var runs = {answer: 0, review: 0};
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+    });
+  }
+  function csrf() {
+    var i = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (i) return i.value;
+    var m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+  function refs(html, sources) {   // [#N] → посилання на джерело з підказкою, звідки воно
+    var by = {};
+    (sources || []).forEach(function (s) { by[s.n] = s; });
+    return html.replace(/\[#(\d+)\]/g, function (m, n) {
+      var s = by[+n];
+      if (!s) return m;
+      return s.url ? '<a class="ref" href="' + esc(s.url) + '" target="_blank" title="' + esc(s.label) + '">[#' + n + ']</a>'
+                   : '<span class="ref" title="' + esc(s.label) + '">[#' + n + ']</span>';
+    });
+  }
+  function render(b) {
+    var out = root.querySelector('.ehw-out-' + b.mode);
+    if (!out) return;
+    var icon = {done: '✓', running: '⏳', skipped: '–', failed: '✗', pending: '·'};
+    var html = '<div class="ehw-stages">' + (b.status === 'running' ? '' : '🕒 ' + esc(b.gathered)
+      + (b.stale ? ' <span class="ehw-stale">дані в Minerva змінились — оновіть</span>' : '') + '<br>')
+      + (b.stages || []).map(function (s) {
+          return (icon[s.status] || '·') + ' ' + esc(s.label) + (s.detail ? ' — ' + esc(s.detail) : '');
+        }).join('<br>') + '</div>';
+    if (b.status === 'error') html += '<div>⚠️ ' + esc(b.error || 'Помилка') + '</div>';
+    var ref = function (r) { return r && r.label ? ' ' + refs(esc('[' + r.label + ']'), b.sources) : ''; };
+    if (b.mode === 'answer' && b.answer) {
+      html += '<div class="ehw-text"><b>❓ ' + esc(b.question) + '</b>\n\n' + refs(esc(b.answer), b.sources) + '</div>';
+    }
+    if (b.mode === 'review' && b.review) {
+      var r = b.review;
+      if (r.summary) html += '<div>' + esc(r.summary) + '</div>';
+      if ((r.promises || []).length) html += '<h5>🤝 Обіцянки</h5>' + r.promises.map(function (p) {
+        return '<div class="ehw-item">' + esc(p.status_icon) + ' <b>' + esc(p.status_label) + '</b> · '
+          + (p.who ? esc(p.who) + ': ' : '') + esc(p.text) + (p.date_fmt ? ' <span class="ehw-sub">· ' + esc(p.date_fmt) + '</span>' : '')
+          + ref(p.ref) + (p.evidence ? '<div class="ehw-sub">' + esc(p.evidence) + '</div>' : '') + '</div>';
+      }).join('');
+      if ((r.done || []).length) html += '<h5>✅ Виконано</h5>' + r.done.map(function (d) {
+        return '<div class="ehw-item">' + esc(d.text) + (d.date_fmt ? ' <span class="ehw-sub">· ' + esc(d.date_fmt) + '</span>' : '') + ref(d.ref) + '</div>';
+      }).join('');
+      if ((r.open_questions || []).length) html += '<h5>❓ Відкриті питання</h5>' + r.open_questions.map(function (q) {
+        return '<div class="ehw-item">' + (q.who ? '<span class="ehw-sub">' + esc(q.who) + ':</span> ' : '') + esc(q.text) + ref(q.ref) + '</div>';
+      }).join('');
+      if (r.next_action) html += '<div class="ehw-next">➡️ <b>Наступна дія:</b> ' + esc(r.next_action.text)
+        + (r.next_action.due_fmt ? ' <b>до ' + esc(r.next_action.due_fmt) + '</b>' : '')
+        + (r.next_action.why ? '<div class="ehw-sub">' + esc(r.next_action.why) + '</div>' : '') + '</div>';
+    }
+    if (b.status !== 'running' && (b.sources || []).length) {
+      html += '<details><summary>🔍 Джерела (' + b.sources.length + ') — звідки дані</summary>'
+        + b.sources.map(function (s) {
+            return '<details class="ehw-src"><summary>[#' + s.n + '] ' + esc(s.label)
+              + (s.url ? ' <a href="' + esc(s.url) + '" target="_blank" onclick="event.stopPropagation()">↗</a>' : '')
+              + '</summary><pre>' + esc(s.text || '—') + '</pre></details>';
+          }).join('') + '</details>';
+    }
+    if (b.used && b.used.length && b.status !== 'running') html += '<div class="ehw-stages">🧩 ' + esc(b.used.join(' · ')) + '</div>';
+    out.innerHTML = html;
+  }
+  async function poll(b, run) {
+    var deadline = Date.now() + 240000;
+    render(b);
+    while (b.status === 'running' && Date.now() < deadline && run === runs[b.mode]) {
+      await new Promise(function (r) { setTimeout(r, 1500); });
+      b = await (await fetch('/rag/api/entity/help/' + b.id + '/', {credentials: 'same-origin'})).json();
+      if (run === runs[b.mode]) render(b);
+    }
+  }
+  async function start(mode, question) {
+    var out = root.querySelector('.ehw-out-' + mode);
+    var run = ++runs[mode];
+    out.innerHTML = '<div class="ehw-stages">⏳ Minerva збирає дані картки, листи й базу знань…</div>';
+    try {
+      var r = await fetch(base + mode + '/', {method: 'POST', credentials: 'same-origin',
+        headers: {'X-CSRFToken': csrf(), 'Content-Type': 'application/json'}, body: JSON.stringify({question: question || ''})});
+      var b = await r.json().catch(function () { return {ok: false}; });
+      if (!r.ok || b.ok === false) { out.innerHTML = '<div>⚠️ ' + esc(b.error || 'Не вдалося') + '</div>'; return; }
+      await poll(b, run);
+    } catch (e) { out.innerHTML = '<div>⚠️ Немає зв\'язку з сервером</div>'; }
+  }
+  var q = root.querySelector('.ehw-q');
+  function ask() {
+    if (!q.value.trim()) { q.focus(); return; }
+    start('answer', q.value.trim());
+  }
+  q.addEventListener('input', function (e) { e.stopPropagation(); });   // запитання — не «незбережена зміна» форми
+  root.querySelector('.ehw-ask').addEventListener('click', ask);
+  q.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask(); }   // не відправляти форму адмінки
+  });
+  var rb = root.querySelector('.ehw-review');
+  if (rb) rb.addEventListener('click', function () { start('review', ''); });
+  // згорнуто / розгорнуто — як востаннє для цього виду картки
+  var openKey = 'ehw-open-' + root.dataset.kind;
+  if (!root.hasAttribute('open')) {
+    try { if (localStorage.getItem(openKey) === '1') root.open = true; } catch (e) {}
+    root.addEventListener('toggle', function () {
+      try { localStorage.setItem(openKey, root.open ? '1' : '0'); } catch (e) {}
+    });
+  }
+  // останні результати користувача для цієї картки — одразу при відкритті сторінки
+  var last = root.querySelector('.ehw-last'), labels = {review: 'огляд', answer: 'запитання'};
+  ['review', 'answer'].forEach(function (mode) {
+    if (mode === 'review' && !root.dataset.review) return;
+    fetch(base + 'latest/?mode=' + mode, {credentials: 'same-origin'}).then(function (r) { return r.json(); })
+      .then(function (b) {
+        if (!b || b.none || b.ok === false) return;
+        if (b.status === 'running') poll(b, ++runs[mode]); else render(b);
+        if (mode === 'answer' && b.question && !q.value) q.value = b.question;
+        if (last) last.textContent += ' · ' + labels[mode] + ' ' + b.gathered + (b.stale ? ' (дані змінились)' : '');
+      }).catch(function () {});
+  });
+})();
+</script>
+</details>

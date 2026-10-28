@@ -139,6 +139,7 @@ class ProjectAdmin(admin.ModelAdmin):
             "d": overview.for_display(saved.data) if saved else {},
             "generate_url": reverse("projects:overview", args=[obj.pk]),
             "next_action_url": reverse("projects:overview_next_action", args=[obj.pk]),
+            "project_id": obj.pk,   # «❓ Запитати про проєкт» (rag_assistant/entity_help.py)
         })
 
     @admin.display(description="Пошта")

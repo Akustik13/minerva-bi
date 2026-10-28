@@ -4,8 +4,9 @@
 Два шари:
 - collect() — факти з бази без AI: листування (хто кому винен відповідь), Angebote, замовлення, терміни з листів,
   і список «потребує уваги». Безкоштовно, показується завжди.
-- generate() — AI-огляд на вимогу: модель отримує ці факти й листи проєкту, відповідає JSON; кожен пункт
-  посилається на лист [#N] або документ. Відповідь перевіряється (посилання, дати, статуси) і зберігається
+- generate() — AI-огляд на вимогу: модель отримує ці факти, листи проєкту й знайдене в базі знань RAG
+  (листування клієнта поза гілками проєкту — _rag_block), відповідає JSON; кожен пункт посилається на лист [#N]
+  або документ. Відповідь перевіряється (посилання, дати, статуси) і зберігається
   в ProjectOverview; якщо після огляду з'явились нові листи чи змінились документи — огляд позначено застарілим.
 Тексти листів для AI — дані, а не інструкції.
 """
@@ -315,6 +316,8 @@ def _ref(value, refs, docs) -> dict:
     m = _REF_RE.search(value)
     if m and 1 <= int(m.group(1)) <= len(refs):
         pk = refs[int(m.group(1)) - 1]
+        if isinstance(pk, str):   # знайдене в базі знань — адреса листа з RAG
+            return {"label": f"#{m.group(1)}", "url": pk}
         return {"label": f"#{m.group(1)}", "url": f"/email/message/{pk}/", "message": pk}
     for label, url in docs.items():
         if label and label.lower() in value.lower():
@@ -352,11 +355,47 @@ def validate(data, refs, docs, resolve=None) -> dict:
 
 # ── Огляд ────────────────────────────────────────────────────────────────────
 
+def _rag_block(project, user, facts, refs) -> str:
+    """
+    База знань RAG для огляду: листування клієнта поза гілками проєкту (без клієнта — уся пошта користувача),
+    запит — з картки проєкту (rag_assistant.entity_help.build_query). Номери [#N] — далі після листів проєкту,
+    refs доповнюється адресами знайдених листів. RAG не налаштований чи недоступний — огляд без нього.
+    """
+    if user is None:
+        return ""
+    try:
+        from email_assistant.reply_brief import Sources, rag_sources
+        from rag_assistant import retrieval
+        from rag_assistant.entity_help import build_query
+        if not retrieval.available():
+            return ""
+        src = Sources()
+        threads = list(dict.fromkeys(x["msg"].thread_id for x in facts["messages"] if x["msg"].thread_id))
+        status, _detail, _note = rag_sources(
+            src, user, build_query("project", project), scope="клієнта проєкту" if project.customer_id else "усій пошті",
+            seen={x["msg"].pk for x in facts["messages"]}, customer_id=project.customer_id or None,
+            exclude_thread_ids=threads, purpose="overview")
+    except Exception as e:  # noqa: BLE001 — огляд без бази знань краще, ніж жодного
+        logger.warning("project overview %s: RAG failed: %s", project.code, e)
+        return ""
+    if status != "done" or not src.items:
+        return ""
+    blocks = []
+    for item in src.items:
+        refs.append(item["url"] or "")
+        blocks.append(f"[#{len(refs)}] {item['label']}\n{item['text']}")
+    return ("ЗНАЙДЕНО В БАЗІ ЗНАНЬ (інші листування — для контексту, можуть бути старішими за листи проєкту):\n\n"
+            + "\n\n".join(blocks))
+
+
 def generate(project, user=None) -> tuple:
     """AI-огляд → (ProjectOverview | None, помилка). Попередній огляд лишається, якщо AI не відповів."""
     from email_assistant import ai_helper
     facts = collect(project)
     text, refs = prompt_text(facts)
+    rag = _rag_block(project, user, facts, refs)
+    if rag:
+        text += "\n\n" + rag
     docs = {o.display_number: f"/admin/offers/offer/{o.pk}/change/" for o in facts["offers"]}
     for o in facts["orders"]:   # AI може назвати замовлення з джерелом або лише номером
         url = f"/admin/sales/salesorder/{o.pk}/change/"

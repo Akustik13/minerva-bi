@@ -382,14 +382,28 @@ def _rag(src, user, msg, ctx, wish, customer, projects, seen=(), dedup=None, wid
         return 'skipped', 'клієнта чи проєкт не визначено — у всій пошті не шукаємо', ''
     query = retrieval.build_query(ctx, wish)   # стандартна частина з листа + побажання / запитання менеджера
     excluded = list(dict.fromkeys(([msg.thread_id] if msg.thread_id else []) + _project_thread_ids(projects)))[:100]
-    job = retrieval.start(user, query, purpose='reply', thread=msg.thread, customer_id=customer_id,
+    scope = (f'клієнта {customer.name}' if customer_id else f'проєкту {projects[0].code}' if project_id
+             else 'усій вашій пошті')
+    return rag_sources(src, user, query, scope=scope, seen=seen, dedup=dedup, thread=msg.thread,
+                       customer_id=customer_id, project_id=project_id, exclude_thread_ids=excluded)
+
+
+def rag_sources(src, user, query, *, scope, seen=(), dedup=None, thread=None, customer_id=None, project_id=None,
+                exclude_thread_ids=(), purpose='reply') -> tuple:
+    """
+    Пошук у RAG → джерела `rag` без дублів (спільне для «📋 Підготувати», огляду проєкту й карток проєкту / клієнта /
+    замовлення / товару — rag_assistant/entity_help.py): листи з `seen` і гілки exclude_thread_ids відкидаються,
+    фрагменти одного листа (вкладення) — одне джерело. → (status, detail для етапу, note для «врахувала»).
+    """
+    from rag_assistant import retrieval
+    dedup = dedup if dedup is not None else {}
+    excluded = list(exclude_thread_ids)[:100]
+    job = retrieval.start(user, query, purpose=purpose, thread=thread, customer_id=customer_id,
                           project_id=project_id, exclude_thread_ids=excluded, limit=RAG_REQUEST, wait_ms=8000)
     deadline = time.monotonic() + RAG_WAIT_SECONDS
     while not job.is_terminal and time.monotonic() < deadline:
         time.sleep(min(max(job.poll_after_ms or 1000, 300), 1500) / 1000)
         retrieval.poll(job)
-    scope = (f'клієнта {customer.name}' if customer_id else f'проєкту {projects[0].code}' if project_id
-             else 'усій вашій пошті')
     asked = f'запит «{query[:70]}{"…" if len(query) > 70 else ""}»'
     if job.status != job.COMPLETED:
         return 'skipped', f'{(job.message or "RAG не встиг")[:90]} · {asked}', ''
@@ -397,7 +411,7 @@ def _rag(src, user, msg, ctx, wish, customer, projects, seen=(), dedup=None, wid
     for h in job.hits:
         att = h.get('attachment') or None
         if (h.get('message_pk') in seen and not att) or (h.get('thread_id') and h.get('thread_id') in skip_threads):
-            dropped += 1                                   # лист уже є серед джерел (або гілка проєкту / ця гілка)
+            dropped += 1                                   # лист уже є серед джерел (або виключена гілка)
             continue
         key = (h.get('message_pk') or h.get('url'), att.get('index') if att else None)
         if key not in letters:

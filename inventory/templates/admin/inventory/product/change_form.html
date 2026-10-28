@@ -467,3 +467,8 @@ document.addEventListener('DOMContentLoaded', function(e) {
 });
 </script>
 {% endblock %}
+
+{% block form_top %}
+{{ block.super }}
+{% if original %}{% include "admin/rag_assistant/entity_help.html" with eh_kind="product" eh_id=original.pk eh_review=True %}{% endif %}
+{% endblock %}
