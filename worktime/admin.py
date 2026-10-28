@@ -447,7 +447,8 @@ class WorkDayAdmin(admin.ModelAdmin):
                 path("record/describe/", self.admin_site.admin_view(self.record_describe_view),
                      name="worktime_workday_record_describe"),
                 path("record/save/", self.admin_site.admin_view(self.record_save_view),
-                     name="worktime_workday_record_save")] \
+                     name="worktime_workday_record_save"),
+                path("day/", self.admin_site.admin_view(self.day_view), name="worktime_workday_day")] \
             + super().get_urls()
 
     # ── ✍️ запис askDANTE з календаря: опис AI, правка, заміна або новий (record_ai.py) ──
@@ -485,6 +486,9 @@ class WorkDayAdmin(admin.ModelAdmin):
         p = request.POST
         du, dp = self._record_target(request, p)
         back = f"{reverse('admin:worktime_workday_changelist')}?u={du.pk}&m={p.get('m', '')}"
+        day_url = reverse("admin:worktime_workday_day")
+        if (p.get("next") or "").startswith(day_url + "?"):   # зі сторінки дня — туди ж
+            back = p["next"]
         st = DanteSettings.get()
         start, stop = _time(p.get("start")), _time(p.get("stop"))
         minutes = parse_minutes(p.get("duration"))
@@ -513,6 +517,12 @@ class WorkDayAdmin(admin.ModelAdmin):
             if p.get("mode") == "replace":   # вікно відкриється знову з тим самим текстом (чернетка в браузері)
                 back += f"&rec={p.get('rec')}"
         return redirect(back)
+
+    def day_view(self, request):
+        from .admin_day import day_page
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        return day_page(self, request)
 
     def meetings_view(self, request):
         from .admin_meetings import meetings_page
@@ -631,6 +641,7 @@ class WorkDayAdmin(admin.ModelAdmin):
             "project_date": today if first <= today <= last else min(last, today),
             "mapping_url": reverse("admin:worktime_danteproject_changelist"),
             "mail_url": reverse("admin:worktime_workday_mailtime") if st.mail_time else "",
+            "day_url": reverse("admin:worktime_workday_day"),
             "rec_data": self._rec_data(records),
             "all_projects": list(DanteProject.objects.filter(archived=False, gone=False, time_trackable=True)
                                  .select_related("parent").order_by("name")),

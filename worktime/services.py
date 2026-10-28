@@ -206,6 +206,33 @@ def activity_span(user, day: datetime.date):
     return min(stamps), max(stamps), len(stamps)
 
 
+def activity_log(user, day: datetime.date, limit: int = 80) -> list[dict]:
+    """👣 Що користувач робив у Minerva за день: журнал дій (вхід, створення, зміни) і надіслані листи — по часу."""
+    if user is None:
+        return []
+    tz = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.datetime.combine(day, datetime.time.min), tz)
+    end = start + datetime.timedelta(days=1)
+    from core.models import AuditLog
+    out = []
+    for a in (AuditLog.objects.filter(user=user, timestamp__gte=start, timestamp__lt=end)
+              .select_related("content_type").order_by("timestamp")[:limit]):
+        what = a.content_type.model_class()._meta.verbose_name if a.content_type and a.content_type.model_class() \
+            else ""
+        out.append({"at": timezone.localtime(a.timestamp, tz), "icon": "🖊", "kind": a.get_action_display(),
+                    "text": " · ".join(x for x in (str(what), a.object_repr) if x)})
+    try:
+        from email_assistant.models import EmailMessage
+        for m in (EmailMessage.objects.filter(account__user=user, folder=EmailMessage.FOLDER_SENT,
+                                              sent_at__gte=start, sent_at__lt=end).order_by("sent_at")[:limit]):
+            out.append({"at": timezone.localtime(m.sent_at, tz), "icon": "📤", "kind": "лист",
+                        "text": m.subject or "(без теми)"})
+    except Exception:  # noqa: BLE001 — пошта не встановлена
+        pass
+    out.sort(key=lambda x: x["at"])
+    return out[:limit]
+
+
 def _round(t: datetime.datetime, step: int, up: bool) -> datetime.time:
     step = max(1, step or 1)
     minutes = t.hour * 60 + t.minute + (1 if up and (t.second or t.microsecond) else 0)

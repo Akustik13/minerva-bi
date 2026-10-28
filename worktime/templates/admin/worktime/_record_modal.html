@@ -1,0 +1,166 @@
+{% load i18n %}
+{# ✍️ Вікно запису askDANTE (record_ai.py): календар робочого часу і сторінка дня. У контексті: st, du, cur_m, today, my_projects, all_projects, activities, default_activity, rec_data, rec_next. #}
+<style>
+.wt-rm{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;
+  padding:40px 16px;overflow:auto}
+.wt-rm[hidden]{display:none}
+.wt-rm-box{background:var(--body-bg,#1e1e1e);border:1px solid var(--border-strong,#888);border-radius:12px;padding:16px 18px;
+  width:100%;max-width:640px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.wt-rm-head{display:flex;justify-content:space-between;align-items:center;font-size:15px}
+.wt-rm-x{border:none;background:none;color:inherit;font-size:20px;cursor:pointer}
+.wt-rm-grid{display:flex;flex-wrap:wrap;gap:10px}
+.wt-rm-grid label,.wt-rm-l{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.wt-rm-grid label.wide{flex:1;min-width:220px}
+.wt-rm-l input,.wt-rm-l textarea{width:100%;box-sizing:border-box}
+.wt-rm-ai{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.wt-rm-btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+</style>
+{% if st.enabled %}
+<!-- ── ✍️ запис askDANTE: клік на запис у дні (правка / заміна) або «📁＋» (новий) — record_ai.py ── -->
+<div class="wt-rm" id="wt-rm" hidden>
+  <form class="wt-rm-box" method="post" action="{% url 'admin:worktime_workday_record_save' %}" onsubmit="return wtRmSubmit(event)">
+    {% csrf_token %}
+    <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="m" value="{{ cur_m }}">
+    <input type="hidden" name="next" value="{{ rec_next|default:'' }}">
+    <input type="hidden" name="mode" id="wt-rm-mode" value="new"><input type="hidden" name="rec" id="wt-rm-rec">
+    <div class="wt-rm-head"><b id="wt-rm-title">＋ {% trans "Новий запис" %}</b><button type="button" class="wt-rm-x" onclick="wtRmClose()">×</button></div>
+    <div class="wt-muted" id="wt-rm-old"></div>
+    <div class="wt-rm-grid">
+      <label>{% trans "Дата" %}<input type="date" name="date" id="wt-rm-date" max="{{ today|date:"Y-m-d" }}" required></label>
+      <label>{% trans "З" %}<input type="time" name="start" id="wt-rm-start"></label>
+      <label>{% trans "По" %}<input type="time" name="stop" id="wt-rm-stop"></label>
+      <label>{% trans "або тривалість" %}<input name="duration" id="wt-rm-dur" placeholder="1:30" size="6"></label>
+      <label class="wide">{% trans "Проєкт askDANTE" %}<select name="project" id="wt-rm-project" required>
+        <option value="">—</option>
+        {% if my_projects %}<optgroup label="☆ {% trans "Мої" %}">{% for p in my_projects %}<option value="{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</optgroup>{% endif %}
+        <optgroup label="{% trans "Усі" %}">{% for p in all_projects %}<option value="{{ p.pk }}">{% if p.parent %}{{ p.parent.name }} › {% endif %}{{ p.name }}</option>{% endfor %}</optgroup>
+      </select></label>
+      {% if activities %}<label>{% trans "Вид роботи" %}<select name="activity" id="wt-rm-activity">
+        <option value="">{% if default_activity %}{% trans "як у налаштуваннях" %}{% else %}—{% endif %}</option>
+        {% for a in activities %}<option value="{{ a.pk }}">{{ a.name }}</option>{% endfor %}
+      </select></label>{% endif %}
+    </div>
+    <label class="wt-rm-l">{% trans "Що робили — кілька слів для AI (необов'язково)" %}
+      <input id="wt-rm-hint" placeholder="{% trans 'напр. Messungen am LTE-Board, Antenne abgeglichen' %}"></label>
+    <div class="wt-rm-ai"><button type="button" class="button" id="wt-rm-ai" onclick="wtRmDescribe()">✍️ {% trans "Описати детально (AI)" %}</button>
+      <span class="wt-muted" id="wt-rm-ai-note">{% trans "AI читає листи й зустрічі проєкту за цей і 2 попередні дні та систематизує, що зроблено. Текст можна виправити." %}</span></div>
+    <label class="wt-rm-l">{% trans "Опис для askDANTE" %}<textarea name="comment" id="wt-rm-comment" rows="6" maxlength="500"></textarea></label>
+    <div class="wt-rm-btns">
+      <button type="button" class="button" onclick="wtRmCopy(this)">📋 {% trans "Копіювати опис" %}</button>
+      <button type="submit" class="button default" id="wt-rm-save">✓ {% trans "Записати в askDANTE" %}</button>
+    </div>
+    <div class="wt-muted" id="wt-rm-replace-note" hidden>
+      {% trans "askDANTE не дозволяє змінити чи видалити запис через API. Щоб замінити: 1) видаліть старий запис в askDANTE" %}
+      <a href="{{ st.base_url }}" target="_blank" rel="noopener">↗ askDANTE</a>,
+      {% trans "2) натисніть «♻ Замінити» — Minerva перечитає день і запише новий, лише якщо старого там уже немає. Або «📋 Копіювати» й вставте опис в askDANTE самі." %}
+    </div>
+  </form>
+</div>
+{{ rec_data|json_script:"wt-rec-data" }}
+<script>
+(function(){
+  var REC = JSON.parse(document.getElementById('wt-rec-data').textContent || '{}');
+  var REC_MONTH = Object.keys(REC).length > 0;
+  var CSRF = (document.querySelector('#wt-rm input[name=csrfmiddlewaretoken]') || {}).value;
+  var $ = function(id){ return document.getElementById(id); };
+  function hm(m){ return Math.floor(m / 60) + ':' + ('0' + m % 60).slice(-2); }
+  // Чернетка запису (опис від AI, час, проєкт) — у браузері, щоб текст не губився, коли askDANTE ще не дозволив заміну
+  var DRAFT = 'wt-rec-draft-';
+  function saveDraft(){
+    var rec = $('wt-rm-rec').value;
+    if (!rec) return;
+    try { localStorage.setItem(DRAFT + rec, JSON.stringify({at: Date.now(), date: $('wt-rm-date').value,
+      comment: $('wt-rm-comment').value,
+      start: $('wt-rm-start').value, stop: $('wt-rm-stop').value, dur: $('wt-rm-dur').value,
+      project: $('wt-rm-project').value, activity: $('wt-rm-activity') ? $('wt-rm-activity').value : '',
+      hint: $('wt-rm-hint').value})); } catch (e) {}
+  }
+  function loadDraft(rec){
+    try { return JSON.parse(localStorage.getItem(DRAFT + rec) || 'null'); } catch (e) { return null; }
+  }
+  try {   // прибрати чернетки записів, яких уже немає (замінено) або старших за 2 тижні
+    Object.keys(localStorage).forEach(function(k){
+      if (k.indexOf(DRAFT) !== 0) return;
+      var d = null; try { d = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+      var rec = k.slice(DRAFT.length);
+      var scope = '{% firstof rec_scope cur_m %}';   // місяць календаря або день сторінки дня
+      var here = d && (d.date || '').slice(0, scope.length) === scope;
+      if (!d || Date.now() - d.at > 14 * 864e5 || (here && REC_MONTH && !(rec in REC))) localStorage.removeItem(k);
+    });
+  } catch (e) {}
+  window.wtRmOpen = function(recPk, date){
+    var r = recPk ? REC[recPk] : null;
+    $('wt-rm-mode').value = r ? 'replace' : 'new';
+    $('wt-rm-rec').value = r ? recPk : '';
+    $('wt-rm-title').textContent = r ? '✏️ Запис askDANTE · ' + r.date.split('-').reverse().join('.') : '＋ Новий запис';
+    $('wt-rm-old').textContent = r ? ('Зараз в askDANTE: ' + (r.start ? r.start + '–' + r.stop + ' · ' : hm(r.minutes) + ' · ')
+      + r.project_name + (r.description ? ' · «' + r.description + '»' : '')) : '';
+    $('wt-rm-date').value = r ? r.date : (date || '');
+    $('wt-rm-date').readOnly = !!r;
+    $('wt-rm-start').value = r && r.start ? r.start : '';
+    $('wt-rm-stop').value = r && r.stop ? r.stop : '';
+    $('wt-rm-dur').value = r && !r.start ? hm(r.minutes) : '';
+    $('wt-rm-project').value = r && r.project ? r.project : '';
+    if ($('wt-rm-activity')) $('wt-rm-activity').value = r && r.activity ? r.activity : '';
+    $('wt-rm-comment').value = r ? (r.description || '') : '';
+    $('wt-rm-hint').value = '';
+    $('wt-rm-save').textContent = r ? '♻ Замінити в askDANTE' : '✓ Записати в askDANTE';
+    var d = r ? loadDraft(recPk) : null;
+    if (d) {
+      $('wt-rm-comment').value = d.comment || $('wt-rm-comment').value;
+      if (d.start || d.stop) { $('wt-rm-start').value = d.start; $('wt-rm-stop').value = d.stop; }
+      if (d.dur) $('wt-rm-dur').value = d.dur;
+      if (d.project) $('wt-rm-project').value = d.project;
+      if (d.activity && $('wt-rm-activity')) $('wt-rm-activity').value = d.activity;
+      $('wt-rm-hint').value = d.hint || '';
+      $('wt-rm-ai-note').textContent = '📝 Чернетка від ' + new Date(d.at).toLocaleString('uk-UA', {day: '2-digit',
+        month: '2-digit', hour: '2-digit', minute: '2-digit'}) + ' — текст збережено в браузері.';
+    } else {
+      $('wt-rm-ai-note').textContent = 'AI читає листи й зустрічі проєкту за цей і 2 попередні дні та систематизує, що зроблено. Текст можна виправити.';
+    }
+    $('wt-rm-replace-note').hidden = !r;
+    $('wt-rm').hidden = false;
+  };
+  window.wtRmClose = function(){ $('wt-rm').hidden = true; };
+  window.wtRmDescribe = async function(){
+    var btn = $('wt-rm-ai'), note = $('wt-rm-ai-note');
+    if (!$('wt-rm-project').value) { alert('Спершу виберіть проєкт askDANTE.'); return; }
+    btn.disabled = true; note.textContent = '⏳ AI читає листи й зустрічі…';
+    var body = new URLSearchParams({u: '{{ du.pk }}', date: $('wt-rm-date').value, project: $('wt-rm-project').value,
+      start: $('wt-rm-start').value, stop: $('wt-rm-stop').value, current: $('wt-rm-comment').value, hint: $('wt-rm-hint').value});
+    try {
+      var r = await fetch('{% url "admin:worktime_workday_record_describe" %}', {method: 'POST', credentials: 'same-origin',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'}, body: body});
+      var d = await r.json();
+      if (d.ok) { $('wt-rm-comment').value = d.text; saveDraft(); note.textContent = '✓ З ' + d.sources + ' листів / зустрічей. Перевірте й за потреби виправте.'; }
+      else { note.textContent = '⚠️ ' + d.error; }
+    } catch (e) { note.textContent = '⚠️ немає зв\'язку з Minerva'; }
+    btn.disabled = false;
+  };
+  window.wtRmCopy = function(btn){
+    navigator.clipboard.writeText($('wt-rm-comment').value).then(function(){ btn.textContent = '✓ Скопійовано'; });
+  };
+  window.wtRmSubmit = function(e){
+    var a = $('wt-rm-start').value, b = $('wt-rm-stop').value;
+    if ((a && !b) || (!a && b)) { alert('Вкажіть і «з», і «по» — або лише тривалість.'); return false; }
+    if (!a && !$('wt-rm-dur').value) { alert('Вкажіть «з … по …» або тривалість.'); return false; }
+    var msg = $('wt-rm-mode').value === 'replace'
+      ? 'Старий запис уже видалено в askDANTE? Minerva перевірить і запише новий.' : 'Записати в askDANTE?';
+    if (!confirm(msg)) return false;
+    saveDraft();
+    $('wt-rm-save').disabled = true;
+    return true;
+  };
+  document.addEventListener('click', function(e){
+    var rec = e.target.closest('.wt-rec');
+    if (rec) { e.preventDefault(); wtRmOpen(rec.dataset.rec); return; }
+    var add = e.target.closest('.wt-pday');
+    if (add) { e.preventDefault(); e.stopImmediatePropagation(); wtRmOpen(null, add.dataset.date); }
+  }, true);
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') wtRmClose(); });
+  $('wt-rm-comment').addEventListener('input', saveDraft);
+  var again = new URLSearchParams(location.search).get('rec');   // заміну не прийнято — вікно знову, з чернеткою
+  if (again && REC[again]) wtRmOpen(again);
+})();
+</script>
+{% endif %}

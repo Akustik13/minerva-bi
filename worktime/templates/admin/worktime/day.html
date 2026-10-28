@@ -1,0 +1,115 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a> ›
+  ⏱ <a href="{{ cal_url }}">{% trans "Робочий час" %}</a> › {{ wd_name }} {{ day|date:"d.m.Y" }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.dy-wrap{max-width:1100px}
+.dy-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.dy-head h2{margin:0;font-size:20px}
+.dy-card{border:1px solid var(--border-strong,#ccc);border-radius:10px;padding:12px 14px;margin-bottom:14px}
+.dy-card h3{margin:0 0 8px;font-size:15px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.dy-muted{color:var(--text-muted,#888);font-size:12px}
+.dy-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dy-list{display:flex;flex-direction:column}
+.dy-item{display:grid;grid-template-columns:110px 60px minmax(160px,1fr) minmax(200px,2fr) auto;gap:8px;align-items:start;
+  padding:6px 0;border-top:1px solid rgba(128,128,128,.18);font-size:13px}
+.dy-item:first-child{border-top:none}
+.dy-desc{white-space:pre-line;color:var(--text-muted);font-size:12px}
+.dy-t{display:inline-block;border:1px solid rgba(22,163,74,.5);color:#16a34a;border-radius:8px;padding:1px 8px;margin:2px;font-size:13px}
+.dy-log{display:grid;grid-template-columns:52px 24px 90px 1fr;gap:2px 8px;font-size:12px;max-height:320px;overflow:auto}
+.dy-ok{color:#16a34a}.dy-warn{color:#d97706}
+@media (max-width:760px){.dy-item{grid-template-columns:1fr 1fr}.dy-log{grid-template-columns:48px 20px 1fr}.dy-log .k{display:none}}
+</style>
+
+<div class="dy-wrap">
+  <div class="dy-head">
+    <a class="button" href="?u={{ du.pk }}&d={{ prev|date:'Y-m-d' }}">‹ {{ prev|date:"d.m" }}</a>
+    <h2>{{ wd_name }} {{ day|date:"d.m.Y" }}</h2>
+    {% if next <= today %}<a class="button" href="?u={{ du.pk }}&d={{ next|date:'Y-m-d' }}">{{ next|date:"d.m" }} ›</a>{% endif %}
+    {% if people|length > 1 %}<form method="get" class="dy-row"><input type="hidden" name="d" value="{{ day|date:'Y-m-d' }}">
+      <select name="u" onchange="this.form.submit()">{% for p in people %}<option value="{{ p.pk }}"{% if du and p.pk == du.pk %} selected{% endif %}>{{ p }}</option>{% endfor %}</select></form>{% endif %}
+    <a href="{{ cal_url }}" class="dy-muted">📅 {% trans "до календаря" %}</a>
+  </div>
+  {% if error %}<div class="dy-card dy-warn">⚠️ {{ error }}</div>{% endif %}
+  {% if du is None %}<div class="dy-card">{% trans "Вас не прив'язано до працівника askDANTE." %}</div>{% else %}
+
+  <!-- ⏱ прихід / відхід -->
+  <div class="dy-card">
+    <h3>⏱ {% trans "Прихід і відхід в askDANTE" %}
+      {% if day_minutes %}<span class="dy-muted">{% trans "разом" %} {{ day_minutes }}{% if target %} · {% trans "норма" %} {{ target }}{% endif %}</span>{% endif %}</h3>
+    <div>{% for t in times %}<span class="dy-t">{{ t.coming }}–{{ t.leaving|default:"…" }}</span>{% empty %}<span class="dy-muted">{% if blocker %}{{ blocker }}{% else %}{% trans "ще немає" %}{% endif %}</span>{% endfor %}
+      {% if absences %}<span class="dy-muted"> · {{ absences }}</span>{% endif %}</div>
+    {% if st.enabled and day <= today %}
+    <form method="post" class="dy-row" style="margin-top:8px" onsubmit="return confirm('{% trans "Записати прихід і відхід в askDANTE? Записи через API не видаляються." %}')">
+      {% csrf_token %}<input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="d" value="{{ day|date:'Y-m-d' }}">
+      <label class="dy-muted">{% trans "Прихід" %} <input type="time" name="start" id="dy-start" value="{% if not times %}{{ def_start }}{% endif %}" required></label>
+      <label class="dy-muted">{% trans "Відхід" %} <input type="time" name="stop" id="dy-stop" value="{% if not times %}{{ def_stop }}{% endif %}" required></label>
+      {% if plan and plan.book %}<button type="button" class="button" onclick="document.getElementById('dy-start').value='{{ plan.start|time:"H:i" }}';document.getElementById('dy-stop').value='{{ plan.stop|time:"H:i" }}'"
+        title="{{ plan.reason }}">👣 {% trans "З активності в Minerva" %}: {{ plan.start|time:"H:i" }}–{{ plan.stop|time:"H:i" }}</button>{% endif %}
+      <button class="button default" type="submit">✓ {% trans "в askDANTE" %}</button>
+    </form>
+    <div class="dy-muted" style="margin-top:4px">
+      {% if span %}👣 {% trans "Сліди в Minerva" %}: {{ span.0|time:"H:i" }}–{{ span.1|time:"H:i" }} · {{ span.2 }}{% if plan and not plan.book %} — {{ plan.reason }}{% endif %}.{% endif %}
+      {% if times %}{% trans "Новий інтервал записується лише без перекриття з наявними." %}{% endif %}
+      {% trans "Прихід / відхід, внесений неправильно, виправляється в askDANTE." %}</div>
+    {% endif %}
+  </div>
+
+  <!-- 📁 записи на проєкти -->
+  <div class="dy-card">
+    <h3>📁 {% trans "Час на проєкти" %} {% if st.enabled %}<button type="button" class="button" onclick="wtRmOpen(null, '{{ day|date:'Y-m-d' }}')">＋ {% trans "Новий запис" %}</button>{% endif %}</h3>
+    <div class="dy-list">
+      {% for x in records %}
+      <div class="dy-item">
+        <span>{% if x.r.start %}{{ x.r.start }}–{{ x.r.stop }}{% else %}—{% endif %}</span><b>{{ x.dur }}</b>
+        <span>{{ x.r.dante_project|default:x.r.project_name }}<div class="dy-muted">{{ x.r.activity_name }}</div></span>
+        <span class="dy-desc">{{ x.r.description|default:"—" }}</span>
+        {% if st.enabled %}<button type="button" class="button wt-rec" data-rec="{{ x.r.pk }}">✍️ {% trans "Опис / заміна" %}</button>{% endif %}
+      </div>
+      {% empty %}<div class="dy-muted">{% trans "Записів на проєкти за цей день немає." %}</div>{% endfor %}
+    </div>
+  </div>
+
+  <!-- ✉️ пошта дня -->
+  <div class="dy-card">
+    <h3>✉️ {% trans "Пошта цього дня" %} <a class="dy-muted" href="{{ mail_url }}">{% trans "записати / описати →" %}</a></h3>
+    {% for r in mail_rows %}
+    <div class="dy-item"><span>{{ r.label }}</span><b>{{ r.dur }}</b>
+      <span>→ {{ r.dp }}<div class="dy-muted">{% if r.replies %}📤 {{ r.replies }} {% endif %}{% if r.received %}📥 {{ r.received }}{% endif %}</div></span>
+      <span class="dy-desc">{% for s in r.subjects %}{{ s }}{% if not forloop.last %}
+{% endif %}{% endfor %}</span>
+      <span class="{% if r.to_book %}dy-warn{% else %}dy-ok{% endif %}">{% if r.to_book %}+{{ r.todo_dur }}{% else %}✓ {% trans "записано" %}{% endif %}</span></div>
+    {% empty %}<div class="dy-muted">{% trans "Листів своїх категорій чи проєктів з askDANTE за цей день немає." %}</div>{% endfor %}
+    {% if unmapped %}<div class="dy-muted">{% trans "Ще листів без категорії / проєкту askDANTE" %}: {{ unmapped }}</div>{% endif %}
+  </div>
+
+  <!-- 🤝 зустрічі -->
+  <div class="dy-card">
+    <h3>🤝 {% trans "Зустрічі" %} <a class="dy-muted" href="{{ meetings_url }}">{% trans "записати в askDANTE →" %}</a></h3>
+    {% for r in meet_rows %}
+    <div class="dy-item"><span>{{ r.start|time:"H:i" }}{% if r.stop %}–{{ r.stop|time:"H:i" }}{% endif %}</span><b>{% if r.minutes %}{{ r.dur }}{% endif %}</b>
+      <span>{{ r.title }}<div class="dy-muted">{{ r.where }}</div></span>
+      <span class="dy-muted">{% if r.dp %}→ {{ r.dp }}{% if r.reason %} · 💡 {{ r.reason }}{% endif %}{% endif %}</span>
+      <span class="{% if r.state == 'booked' %}dy-ok{% elif r.state == 'overlap' %}dy-warn{% else %}dy-muted{% endif %}">{% if r.state == 'ready' %}{% trans "можна записати" %}{% else %}{{ r.note }}{% endif %}</span></div>
+    {% empty %}<div class="dy-muted">{% trans "Зустрічей з часом за цей день немає." %}</div>{% endfor %}
+  </div>
+
+  <!-- 👣 що робили в Minerva -->
+  <div class="dy-card">
+    <h3>👣 {% trans "Що робили в Minerva" %} <span class="dy-muted">{% trans "журнал дій і надіслані листи — підказка для опису й часу" %}</span></h3>
+    {% if log %}<div class="dy-log">{% for x in log %}<span>{{ x.at|time:"H:i" }}</span><span>{{ x.icon }}</span><span class="k dy-muted">{{ x.kind }}</span><span>{{ x.text }}</span>{% endfor %}</div>
+    {% else %}<div class="dy-muted">{% trans "Слідів за цей день немає." %}</div>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% if du %}{% include "admin/worktime/_record_modal.html" %}{% endif %}
+{% endblock %}
