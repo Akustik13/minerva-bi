@@ -103,6 +103,10 @@ class EmailThread(models.Model):
         'crm.Customer', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='email_threads',
         verbose_name='CRM клієнт')
+    work_category = models.ForeignKey(
+        'MailCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='threads',
+        verbose_name='Своя категорія гілки',
+        help_text='Вибрано вручну для всієї гілки — має пріоритет над правилами категорій')
 
     class Meta:
         verbose_name = 'Гілка листування'
@@ -153,6 +157,10 @@ class EmailMessage(models.Model):
         max_length=20, blank=True, default='', db_index=True, choices=CATEGORY_CHOICES,
         verbose_name='Категорія',
         help_text='Визначається автоматично (email_assistant/categorize.py); порожньо — ще не визначено')
+    work_category = models.ForeignKey(
+        'MailCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='messages',
+        verbose_name='Своя категорія',
+        help_text='DigiKey, Інтернет-магазин… — за правилами категорії (email_assistant/work_categories.py)')
     imap_folder_name = models.CharField(max_length=200, blank=True, default='', db_index=True,
         verbose_name='Папка IMAP',
         help_text='Оригінальна назва папки на IMAP-сервері (напр. "Meine Order")')
@@ -455,6 +463,9 @@ class EmailRule(models.Model):
             msg.folder = EmailMessage.FOLDER_TRASH; changed.append('folder')
         elif self.action == self.ACTION_ADD_CALENDAR:
             try:
+                from calendar_app.blocks import is_blocked
+                if is_blocked(msg.account.user, msg):
+                    return False
                 from calendar_app.models import CalendarEvent
                 from django.utils import timezone as _tz
                 from datetime import timedelta
@@ -519,6 +530,55 @@ class EmailCategoryRule(models.Model):
 
     def __str__(self):
         return f'{self.key} → {self.get_category_display()}'
+
+
+class MailCategory(models.Model):
+    """
+    Своя категорія листів (DigiKey, Інтернет-магазин…) — друга ознака поруч із типом співрозмовника
+    (клієнт / постачальник / сервіс). Спільна для всіх скриньок; лист потрапляє в першу за порядком,
+    правила якої підходять. Логіка — email_assistant/work_categories.py; час на неї в askDANTE —
+    worktime (MailCategoryTime).
+    """
+    name   = models.CharField('Назва', max_length=80)
+    icon   = models.CharField('Значок', max_length=8, default='🏷', blank=True)
+    color  = models.CharField('Колір', max_length=9, default='#1a73e8',
+                              help_text='HEX, напр. #e53935')
+    order  = models.PositiveSmallIntegerField('Порядок', default=0,
+                                              help_text='Лист, що підходить до кількох, іде в першу.')
+    is_active = models.BooleanField('Увімкнено', default=True)
+    senders = models.TextField(
+        'Відправники', blank=True, default='',
+        help_text='По одному в рядку: адреса (sales@digikey.com), @домен (@digikey.com — разом із '
+                  'піддоменами) або частина домену без @ (digikey → digikey.com, digikey.de…). '
+                  'Діє і на наші відповіді цим адресам.')
+    subject_words = models.TextField(
+        'Слова в темі', blank=True, default='',
+        help_text='По одному в рядку, без різниці великі чи малі літери (Marketplace, Bestellung).')
+    sources = models.ManyToManyField(
+        'sales.SalesSource', blank=True, related_name='+', verbose_name='Замовлення з джерел',
+        help_text='Лист, у якому є номер або трек-номер замовлення з цих джерел.')
+    by_customer_orders = models.BooleanField(
+        'І листи покупців, які замовляли через ці джерела', default=False,
+        help_text='Навіть без номера замовлення в листі. Не вмикайте для джерела, через яке замовляє майже кожен.')
+    accounts = models.ManyToManyField(
+        EmailAccount, blank=True, related_name='+', verbose_name='Усі листи скриньок',
+        help_text='Напр. скринька магазину shop@… — усе, що в неї приходить і з неї йде.')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Своя категорія листів'
+        verbose_name_plural = '🏷 Свої категорії листів'
+        ordering            = ['order', 'name']
+
+    def __str__(self):
+        return f'{self.icon} {self.name}'.strip()
+
+    @property
+    def label(self):
+        return str(self)
+
+    def lines(self, field: str) -> list:
+        return [ln.strip().lower() for ln in (getattr(self, field) or '').splitlines() if ln.strip()]
 
 
 class ReplyBrief(models.Model):

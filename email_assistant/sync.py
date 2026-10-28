@@ -176,7 +176,10 @@ def save_message(account, msg_data, imap_folder, folder_type=None, persist_files
         sent_at=msg_data['sent_at'],
     )
     em._list_unsubscribe = msg_data.get('list_unsubscribe', False)  # підказка для категорії (сигнал)
+    from email_assistant import spam
+    spam.before_save(em)   # відомий спамер → у Спам ще до сигналів (запрошення, терміни, CRM)
     em.save()
+    spam.after_save(em)
     thread.message_count = thread.messages.count()
     if not thread.last_message_at or (msg_data['sent_at'] and msg_data['sent_at'] > thread.last_message_at):
         thread.last_message_at = msg_data['sent_at']

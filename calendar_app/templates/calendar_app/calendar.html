@@ -225,6 +225,18 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
 #cal-popup-meta{font-size:12px;color:var(--text-muted);line-height:1.6}
 #cal-popup-close{position:absolute;top:8px;right:10px;border:none;background:none;
   cursor:pointer;color:var(--text-dim);font-size:16px;line-height:1}
+.cal-pm-from{font-size:12px;color:var(--text-muted)}
+.cal-pm-btn{padding:4px 8px;border-radius:6px;border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text);font-size:11px}
+.cal-pm-btn:hover{border-color:#1a73e8}
+.cal-pm-btn.danger{color:#e53935}
+.cal-block-wrap{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.cal-block-wrap[hidden]{display:none}
+.cal-block-box{background:var(--bg-card);border:1px solid var(--border-strong);border-radius:12px;padding:18px 20px;max-width:520px;width:100%;max-height:85vh;overflow:auto;font-size:13px}
+.cal-block-box h4{margin:0 0 10px;font-size:15px}
+.cal-block-scope{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.cal-block-preview{border-top:1px solid var(--border-strong);border-bottom:1px solid var(--border-strong);padding:8px 0;margin-bottom:12px;color:var(--text-muted)}
+.cal-block-preview ul{margin:6px 0 0;padding-left:18px;max-height:220px;overflow:auto}
+.cal-block-btns{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 {% endblock %}
 
@@ -245,6 +257,7 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
       </button>
       <a href="/calendar/full/" class="cal-done-toggle" title="День, тиждень, місяць — як у Google / Outlook">🗓 Повний вигляд</a>
       <a href="/calendar/connections/" class="cal-done-toggle" title="Google, Outlook, підписки">🔗 Календарі</a>
+      <a href="/calendar/cleanup/" class="cal-done-toggle" title="Прибрати спам і події від відправників, від яких ви більше не хочете термінів — спершу видно, що саме прибереться">🧹 Почистити</a>
       {% if wt %}<button class="cal-done-toggle" id="cal-wt-toggle" onclick="wtToggle()" title="Показати/приховати робочий час askDANTE">⏱ Робочий час</button>{% endif %}
       <a href="/admin/calendar_app/calendarevent/add/" class="cal-add-btn">+ Подія</a>
     </div>
@@ -272,6 +285,7 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
         <button class="cal-inv-ok" onclick="invDecide({{ inv.pk }}, 'accept')">✓ В календар</button>
         {% endif %}
         <button class="cal-inv-no" onclick="invDecide({{ inv.pk }}, 'dismiss')" title="Не заносити">✕</button>
+        {% if inv.email_message_id %}<button class="cal-inv-no" onclick="calBlock({invite: {{ inv.pk }}})" title="Від цього відправника більше нічого не заносити (або це спам)">🚫</button>{% endif %}
       </div>
     </div>
     {% endfor %}
@@ -498,6 +512,14 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
   <button id="cal-popup-close" onclick="closePopup()">×</button>
   <div id="cal-popup-title"></div>
   <div id="cal-popup-meta"></div>
+  <div id="cal-popup-mail" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-strong)">
+    <div class="cal-pm-from" id="cal-pm-from"></div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:6px">
+      <button class="cal-pm-btn" onclick="popupNotNeeded()" title="Прибрати лише цю подію — з пошти вона не повернеться">🙅 Не потрібен</button>
+      <button class="cal-pm-btn" onclick="calBlock({event: _popupPk})" title="Прибрати все від цього відправника й більше не заносити — спершу покаже, що саме">🚫 Більше не заносити від нього</button>
+      <button class="cal-pm-btn danger" onclick="calBlock({event: _popupPk}, 'spam')" title="Лист — спам: відправник у Спам у пошті, з календаря все прибрано">🗑 Це спам</button>
+    </div>
+  </div>
   <div style="margin-top:10px;border-top:1px solid var(--border-strong);padding-top:8px">
     <div style="font-size:10px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Категорія</div>
     <div id="cal-popup-types" style="display:flex;flex-wrap:wrap;gap:4px"></div>
@@ -511,6 +533,22 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
        style="flex:1;padding:6px 4px;border-radius:6px;border:1px solid var(--border-strong);text-align:center;color:var(--link-fg);text-decoration:none;font-size:12px;display:block">
       ✏️ Редагувати
     </a>
+  </div>
+</div>
+
+<!-- ── «Більше не заносити від …»: що прибереться → підтвердження ── -->
+<div id="cal-block" class="cal-block-wrap" hidden>
+  <div class="cal-block-box">
+    <h4 id="cal-block-title">🚫 Більше не заносити в календар</h4>
+    <div class="cal-block-scope">
+      <label><input type="radio" name="cal-block-scope" value="sender" checked onchange="calBlockLoad()"> лише адреса <b id="cal-block-addr"></b></label>
+      <label><input type="radio" name="cal-block-scope" value="domain" onchange="calBlockLoad()"> увесь домен <b id="cal-block-dom"></b></label>
+    </div>
+    <div id="cal-block-preview" class="cal-block-preview">…</div>
+    <div class="cal-block-btns">
+      <button class="cal-inv-ok" id="cal-block-ok" onclick="calBlockGo()">🙅 Прибрати й більше не заносити</button>
+      <button class="cal-inv-no" onclick="calBlockClose()">Скасувати</button>
+    </div>
   </div>
 </div>
 
@@ -999,6 +1037,14 @@ async function showEventPopup(ev, pk) {
     if (d.source_email) meta += '📧 <a href="' + d.source_email.url + '" target="_blank" style="color:var(--link-fg)">' + (d.source_email.subject||'Відкрити лист') + '</a><br>';
     if (d.description)  meta += '<br>' + d.description;
     document.getElementById('cal-popup-meta').innerHTML = meta;
+    var pm = document.getElementById('cal-popup-mail');
+    if (d.sender && d.sender.address) {
+      pm.style.display = '';
+      document.getElementById('cal-pm-from').textContent = '✉️ від ' + (d.sender.name ? d.sender.name + ' · ' : '') + d.sender.address
+        + (d.sender.blocked ? ' · 🚫 уже не заноситься (' + d.sender.blocked + ')' : '');
+    } else {
+      pm.style.display = 'none';
+    }
     buildPopupTypes(d.type_key);
     var doneBtn = document.getElementById('cal-popup-done-btn');
     if (doneBtn) {
@@ -1048,6 +1094,72 @@ async function popupSetType(newType) {
     }
   } catch(e){ console.error(e); }
 }
+
+// ── Календар без сміття (calendar_app/blocks.py) ──────────────────────────
+async function popupNotNeeded() {
+  if (!_popupPk) return;
+  var r = await fetch('/calendar/event/' + _popupPk + '/not-needed/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (!d.ok) return;
+  document.querySelectorAll('.cal-chip[data-pk="' + _popupPk + '"]').forEach(function(el){ el.remove(); });
+  var row = document.getElementById('ev-' + _popupPk);
+  if (row) row.remove();
+  closePopup();
+}
+
+var _blk = {params: null, reason: '', data: null};
+function _blkEsc(t){ var x = document.createElement('div'); x.textContent = t == null ? '' : String(t); return x.innerHTML; }
+function calBlock(params, reason) {
+  _blk = {params: params, reason: reason || '', data: null};
+  document.getElementById('cal-block-title').textContent = reason === 'spam'
+    ? '🗑 Це спам — прибрати все від відправника' : '🚫 Більше не заносити в календар';
+  document.getElementById('cal-block-ok').textContent = reason === 'spam'
+    ? '🗑 Спам: у пошті — у Спам, з календаря — прибрати' : '🙅 Прибрати й більше не заносити';
+  document.querySelector('input[name="cal-block-scope"][value="sender"]').checked = true;
+  document.getElementById('cal-block').hidden = false;
+  if (typeof closePopup === 'function') closePopup();
+  calBlockLoad();
+}
+function _blkScope() { return document.querySelector('input[name="cal-block-scope"]:checked').value; }
+async function calBlockLoad() {
+  var box = document.getElementById('cal-block-preview');
+  box.textContent = '⏳ Рахую, що прибереться…';
+  var q = new URLSearchParams(Object.assign({scope: _blkScope()}, _blk.params));
+  try {
+    var d = await (await fetch('/calendar/blocks/preview/?' + q.toString(), {credentials:'same-origin'})).json();
+    if (!d.ok) { box.textContent = '⚠️ ' + (d.error || 'не вдалося'); return; }
+    _blk.data = d;
+    var key = d.key, addr = key.charAt(0) === '@' ? '' : key;
+    if (addr) {
+      document.getElementById('cal-block-addr').textContent = addr;
+      document.getElementById('cal-block-dom').textContent = '@' + addr.split('@')[1];
+    }
+    var html = '<b>' + _blkEsc(key) + '</b> — з календаря прибереться: подій <b>' + d.n_events + '</b>'
+      + ', запрошень на перевірці <b>' + d.n_invites + '</b>, знайдених термінів <b>' + d.n_deadlines + '</b>'
+      + (d.n_remote ? ', у Google / Outlook <b>' + d.n_remote + '</b>' : '') + '.';
+    if (d.events.length) {
+      html += '<ul>' + d.events.map(function(e){
+        return '<li>' + new Date(e.date).toLocaleDateString('uk-UA') + ' · ' + _blkEsc(e.title) + (e.done ? ' (виконано)' : '') + '</li>';
+      }).join('') + (d.n_events > d.events.length ? '<li>… ще ' + (d.n_events - d.events.length) + '</li>' : '') + '</ul>';
+    }
+    html += '<div style="margin-top:6px">Нові листи від нього в календар не потраплятимуть. Скасувати — «🧹 Почистити» → фільтри.</div>';
+    box.innerHTML = html;
+  } catch (e) { box.textContent = '⚠️ немає зв\'язку з Minerva'; }
+}
+async function calBlockGo() {
+  if (!_blk.data) return;
+  var btn = document.getElementById('cal-block-ok');
+  btn.disabled = true;
+  try {
+    var body = Object.assign({scope: _blkScope(), reason: _blk.reason || 'not_needed'}, _blk.params);
+    var d = await (await fetch('/calendar/blocks/', {method:'POST',
+      headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'}, body: JSON.stringify(body)})).json();
+    if (!d.ok) { alert(d.error || 'Не вдалося'); btn.disabled = false; return; }
+    location.reload();
+  } catch (e) { btn.disabled = false; }
+}
+function calBlockClose() { document.getElementById('cal-block').hidden = true; }
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape') calBlockClose(); });
 
 async function popupToggleDone() {
   if (!_popupPk) return;

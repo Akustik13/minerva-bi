@@ -186,7 +186,9 @@
       {% elif c.label %}<span class="wt-lbl">{{ c.label }}</span>{% endif %}
       {% if c.absences %}<span class="wt-lbl">{{ c.absences }}</span>{% endif %}
       {% for pr in c.projects %}<span class="wt-pr" title="{{ pr.title }}">📁 {{ pr.name|truncatechars:16 }} <b>{{ pr.dur }}</b></span>{% endfor %}
-      {% if c.activity %}<span class="wt-act" title="{% trans "Перша й остання дія в Minerva · кількість дій" %}">👣 {{ c.activity }}</span>{% endif %}
+      {% if c.activity %}<span class="wt-act" title="{{ c.activity_title }}">👣 {{ c.activity }}</span>{% endif %}
+      {% if c.mail %}<a class="wt-pr wt-mail" href="{{ mail_url }}?u={{ du.pk }}&from={{ c.date|date:"Y-m-d" }}&to={{ c.date|date:"Y-m-d" }}"
+         title="{% trans "Час на пошту (оцінка): " %}{{ c.mail.title }}">✉️ {{ c.mail.dur }}{% if c.mail.todo %} <b>+{{ c.mail.todo }}</b>{% endif %}</a>{% endif %}
       {% if st.enabled and c.kind != "future" %}
       {% if my_projects %}<a href="#project" class="wt-pday" data-date="{{ c.date|date:"Y-m-d" }}" title="{% trans "Час на проєкт за цей день" %}">📁＋</a>{% endif %}
       <details>
@@ -206,7 +208,9 @@
   {% endfor %}{% endfor %}
 </div>
 </div>
-<p class="wt-muted">{% trans "Справа вгорі — години за день в askDANTE. 👣 — перша й остання дія в Minerva (журнал дій і надіслані листи) і кількість дій." %}</p>
+<p class="wt-muted">{% trans "Справа вгорі — години за день в askDANTE." %}
+  {% trans "👣 — сліди роботи в Minerva: перша й остання дія дня та кількість дій (вхід, збереження записів, надіслані листи). «08:28 · 1 дія» — за день була одна дія о 08:28, зазвичай це лише вхід. Його бачить режим автозаповнення «за активністю»; в askDANTE саме не записується." %}
+  {% if mail_url %}{% trans "✉️ — оцінка часу на пошту за день (свої категорії листів і проєкти); +N — ще не записано в askDANTE." %} <a href="{{ mail_url }}?u={{ du.pk }}">{% trans "Час на пошту" %} →</a>{% endif %}</p>
 
 {% if st.enabled %}
 <div class="wt-card" id="fill">

@@ -120,6 +120,7 @@
         </td>
         <td>
           {% for m in r.maps %}<a href="{% url 'admin:projects_project_change' m.project.pk %}" target="_blank" class="pm-chip">{{ m.project.code }} {{ m.project.name|truncatechars:30 }}</a>{% endfor %}
+          {% for mc in r.dp.mail_categories.all %}<a href="{% url 'admin:email_assistant_mailcategory_change' mc.category_id %}" target="_blank" class="pm-chip" title="{% trans "Час на листи цієї категорії йде в цей проєкт askDANTE" %}">✉️ {{ mc.category.label }}</a>{% endfor %}
           {% if r.minerva_suggest %}<div><span class="pm-sg" title="{{ r.minerva_suggest.2 }}">💡 {{ r.minerva_suggest.0.code }} {{ r.minerva_suggest.0.name|truncatechars:28 }} · {{ r.minerva_suggest.1 }}</span>
             <button class="button" name="pair" value="{{ r.minerva_suggest.0.pk }}:{{ r.dp.pk }}" title="{% trans 'Зв’язати' %}">✓</button>
             <div class="pm-muted">{{ r.minerva_suggest.2 }}</div></div>{% endif %}

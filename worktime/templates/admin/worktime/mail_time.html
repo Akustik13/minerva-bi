@@ -1,0 +1,96 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a> ›
+  ⏱ <a href="{{ calendar_url }}">{% trans "Робочий час" %}</a> › {% trans "Час на пошту" %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.mt-card{border:1px solid var(--border-strong,#ccc);border-radius:10px;background:var(--bg-card,transparent);padding:12px 14px;margin-bottom:14px;max-width:1100px}
+.mt-form{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.mt-form label{display:flex;flex-direction:column;gap:3px;font-size:12px}
+.mt-muted{color:var(--text-muted,#888);font-size:12px}
+.mt-day{border:1px solid var(--border-strong,#ccc);border-radius:10px;margin:0 0 10px;max-width:1100px;overflow:hidden}
+.mt-day h3{margin:0;padding:8px 12px;font-size:14px;background:rgba(128,128,128,.07);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.mt-row{display:grid;grid-template-columns:24px minmax(160px,1.4fr) minmax(180px,1.6fr) 70px 80px 90px;gap:8px;align-items:center;
+  padding:7px 12px;border-top:1px solid rgba(128,128,128,.15);font-size:13px}
+.mt-row .num{text-align:right;font-variant-numeric:tabular-nums}
+.mt-row .todo{font-weight:700;color:#1a73e8}
+.mt-row .done{color:#16a34a}
+.mt-subj{color:var(--text-muted);font-size:11px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt-badge{font-size:11px;padding:1px 6px;border-radius:8px;background:rgba(26,115,232,.14);color:#1a73e8}
+.mt-bar{position:sticky;bottom:0;background:var(--body-bg,#1e1e1e);border-top:1px solid rgba(128,128,128,.35);padding:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:1100px}
+#content-main tr{background:transparent}
+@media (max-width:760px){.mt-row{grid-template-columns:24px 1fr 1fr}.mt-row .num{text-align:left}}
+</style>
+
+{% if not st.mail_time %}
+<div class="mt-card" style="border-color:#f59e0b">⚠️ {% trans "Облік часу на пошту вимкнено. Увімкніть «Рахувати час на пошту» в" %} <a href="{{ settings_url }}">⚙️ {% trans "налаштуваннях askDANTE" %}</a>. {% trans "Оцінку видно й зараз, але автоматично нічого не записується." %}</div>
+{% endif %}
+
+<form method="get" class="mt-card">
+  <div class="mt-form">
+    {% if people|length > 1 %}
+    <label>{% trans "Працівник" %}<select name="u">{% for p in people %}<option value="{{ p.pk }}"{% if du and p.pk == du.pk %} selected{% endif %}>{{ p }}</option>{% endfor %}</select></label>
+    {% endif %}
+    <label>{% trans "Від" %}<input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}"></label>
+    <label>{% trans "До" %}<input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}"></label>
+    <button class="button default">✉️ {% trans "Показати" %}</button>
+    <span class="mt-muted">{% trans "Разом" %} <b>{{ total }}</b> · {% trans "ще не в askDANTE" %} <b>{{ todo }}</b></span>
+  </div>
+  <div class="mt-muted" style="margin-top:8px">
+    {% trans "Оцінка за нормами: наші відповіді й прочитані отримані листи (і змінені вами замовлення, якщо так задано в категорії), округлено вгору до" %} {{ st.mail_step }} {% trans "хв за день на проєкт. Куди: гілка проєкту Minerva, зв'язаного з askDANTE, — туди; інакше своя категорія листа з проєктом askDANTE. Непрочитані, спам і видалені не рахуються." %}
+    <br>{% trans "Категорії й норми" %}:
+    {% for c in cats %}<span class="mt-badge" style="margin-right:4px">{{ c.category.label }} → {{ c.dante_project|default:"—" }} · {{ c.reply_minutes }}/{{ c.read_minutes }} {% trans "хв" %}{% if c.auto %} · {% trans "авто" %}{% endif %}</span>{% empty %}<i>{% trans "жодна категорія ще не має проєкту askDANTE" %}</i>{% endfor %}
+    · <a href="{{ cats_url }}">🏷 {% trans "налаштувати" %}</a> · <a href="{{ mapping_url }}">📁 {% trans "проєкти Minerva ↔ askDANTE" %}</a>
+  </div>
+</form>
+
+{% if du is None %}
+<div class="mt-card">{% trans "Вас не прив'язано до працівника askDANTE (👥 Працівники askDANTE → «Користувач Minerva»)." %}</div>
+{% elif not days %}
+<div class="mt-card">✨ {% trans "За цей період немає листів своїх категорій чи проєктів з askDANTE." %}</div>
+{% else %}
+<form method="post" onsubmit="return mtConfirm()">
+  {% csrf_token %}
+  <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}">
+  {% for d in days %}
+  <div class="mt-day">
+    <h3>{{ d.wd }} {{ d.day|date:"d.m.Y" }}
+      {% if d.ongoing %}<span class="mt-muted">{% trans "день ще триває — оцінка зросте; автоматично записується наступного дня" %}</span>{% endif %}
+      {% if d.unmapped %}<span class="mt-muted">· {% trans "ще листів без категорії / проєкту askDANTE" %}: {{ d.unmapped }}</span>{% endif %}</h3>
+    {% for r in d.rows %}
+    <div class="mt-row">
+      <input type="checkbox" name="pick" value="{{ d.day|date:'Y-m-d' }}|{{ r.dp.pk }}" {% if r.to_book %}checked{% else %}disabled{% endif %}>
+      <div><b>{{ r.label }}</b>{% if r.auto %} <span class="mt-badge">{% trans "авто" %}</span>{% endif %}
+        <div class="mt-muted">→ askDANTE: {{ r.dp }}</div></div>
+      <div>{% if r.replies %}📤 {{ r.replies }} {% trans "відп." %} {% endif %}{% if r.received %}📥 {{ r.received }} {% trans "лист." %} {% endif %}{% if r.orders %}🧾 {{ r.orders }} {% trans "замовл." %}{% endif %}
+        {% for s in r.subjects %}<div class="mt-subj">{{ s }}</div>{% endfor %}</div>
+      <div class="num" title="{% trans "Оцінка за день" %}">{{ r.dur }}</div>
+      <div class="num done" title="{% trans "Уже записано в askDANTE" %}">{% if r.booked %}✓ {{ r.booked_dur }}{% else %}—{% endif %}</div>
+      <div class="num {% if r.to_book %}todo{% endif %}" title="{% trans "Ще не записано" %}">{% if r.to_book %}+{{ r.todo_dur }}{% else %}{% trans "записано" %}{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <div class="mt-bar">
+    <button class="button default" type="submit"{% if not st.enabled %} disabled{% endif %}>✓ {% trans "Записати вибране в askDANTE" %}</button>
+    <span class="mt-muted">{% trans "Записи askDANTE через API не виправляються й не видаляються — перевірте перед записом. Записане не дублюється: наступного разу піде лише різниця." %}</span>
+  </div>
+</form>
+{% endif %}
+
+<script>
+function mtConfirm(){
+  var n = document.querySelectorAll('input[name="pick"]:checked').length;
+  if (!n) { alert('{% trans "Нічого не вибрано" %}'); return false; }
+  return confirm('{% trans "Записати в askDANTE" %}: ' + n + '?');
+}
+</script>
+{% endblock %}

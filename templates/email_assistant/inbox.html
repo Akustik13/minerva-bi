@@ -172,6 +172,7 @@
 .em-tag.quote{--c:#c026d3}
 .em-p2-quote{flex:0 0 auto;white-space:nowrap}
 .em-tag.cat-customer{--c:#3b82f6}
+.em-tag.wcat{max-width:140px;font-weight:600}
 .em-tag.cat-supplier{--c:#d97706}
 .em-tag.cat-service{--c:#0d9488}
 .em-tag.cat-newsletter{--c:#9333ea}
@@ -408,14 +409,25 @@
 
     <!-- Category / customer filter -->
     <div class="em-p2-filter-row">
-      <select class="em-p2-filter-sel{% if cat_filter %} on{% endif %}" id="em-cat-sel"
+      <select class="em-p2-filter-sel{% if cat_filter or work_filter %} on{% endif %}" id="em-cat-sel"
               onchange="applyMailFilter()" title="{% trans "Показати листи певної категорії (по всіх папках)" %}">
         <option value="">🗂 {% trans "Усі категорії" %}</option>
+        {% if work_categories %}
+        <optgroup label="{% trans "Свої категорії" %}">
+          {% for c, n, unread in work_categories %}
+          <option value="w{{ c.pk }}"{% if work_filter.pk == c.pk %} selected{% endif %}{% if not n %} disabled{% endif %}>
+            {{ c.label }} · {{ n }}{% if unread %} ({{ unread }} {% trans "нових" %}){% endif %}
+          </option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="{% trans "Хто пише" %}">
+        {% endif %}
         {% for key, label, n, unread in categories %}
         <option value="{{ key }}"{% if cat_filter == key %} selected{% endif %}{% if not n %} disabled{% endif %}>
           {{ label }} · {{ n }}{% if unread %} ({{ unread }} {% trans "нових" %}){% endif %}
         </option>
         {% endfor %}
+        {% if work_categories %}</optgroup>{% endif %}
       </select>
       <div class="em-cust-box">
         <input class="em-p2-filter-sel{% if customer_filter %} on{% endif %}" id="em-cust-inp" type="search"
@@ -438,7 +450,7 @@
       </select>
       <button class="em-p2-filter-sel em-p2-quote{% if quote_filter %} on{% endif %}" onclick="toggleQuoteFilter()"
               title="{% trans "Листи, схожі на запит пропозиції, по яких ще немає Angebot (по всіх папках)" %}">📝{% if quote_count %} {{ quote_count }}{% endif %}</button>
-      {% if cat_filter or customer_filter or project_filter or quote_filter %}
+      {% if cat_filter or work_filter or customer_filter or project_filter or quote_filter %}
       <button class="em-p2-filter-clear" onclick="clearMailFilter()" title="{% trans "Скинути фільтр" %}">✕</button>
       {% endif %}
     </div>
@@ -506,8 +518,12 @@
             </div>
           </div>
           <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:40 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
-          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag %}
+          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag or msg.work_category_id %}
           <div class="em-row-meta">
+            {% if msg.work_category_id %}
+            <button class="em-tag wcat" style="--c:{{ msg.work_category.color }}" onclick="filterMailBy(event, 'wcat', {{ msg.work_category_id }})"
+                    title="{% trans "Своя категорія" %}: {{ msg.work_category.name }} — {% trans "показати всі її листи" %}">{{ msg.work_category.label }}</button>
+            {% endif %}
             {% if msg.folder_tag %}<span class="em-tag fold" title="{% trans "Папка" %}">{{ msg.folder_tag }}</span>{% endif %}
             {% if msg.quote_request_tag %}
             <button class="em-tag quote" onclick="filterMailBy(event, 'quote', 1)"
@@ -593,6 +609,21 @@
     🗂 {% trans "Віднести до категорії" %} <span style="margin-left:auto;padding-left:12px">▸</span>
     <div class="em-ctx-sub" onclick="event.stopPropagation()">
       <div class="em-ctx-sub-hd" id="em-ctx-cat-hd"></div>
+      {% if work_categories or can_add_work_category %}
+      <div class="em-ctx-sub-hd">{% trans "Свої" %}</div>
+      {% for c, n, unread in work_categories %}
+      <div class="em-ctx-item" data-wcat="{{ c.pk }}" onclick="ctxSetWorkCategory('{{ c.pk }}')"><span style="color:{{ c.color }}">●</span> {{ c.label }}</div>
+      {% endfor %}
+      {% if can_add_work_category %}<div class="em-ctx-item" onclick="ctxSetWorkCategory('new')">＋ {% trans "Нова категорія…" %}</div>{% endif %}
+      <div class="em-ctx-item" onclick="ctxSetWorkCategory('')" title="{% trans "Прибрати лист (і співрозмовника) зі своєї категорії" %}">↺ {% trans "Без своєї категорії" %}</div>
+      <label class="em-ctx-item" style="font-size:12px" title="{% trans "Лише ця гілка — правило для співрозмовника не створюється" %}">
+        <input type="checkbox" id="em-ctx-wcat-thread" style="margin:0;accent-color:#1a73e8">
+        <span>{% trans "Лише ця гілка" %}</span>
+      </label>
+      <a class="em-ctx-item" href="/admin/email_assistant/mailcategory/" target="_blank" style="font-size:12px">⚙ {% trans "Правила й час askDANTE" %}</a>
+      <div class="em-ctx-sep"></div>
+      <div class="em-ctx-sub-hd">{% trans "Хто пише" %}</div>
+      {% endif %}
       {% for key, label in category_choices %}
       <div class="em-ctx-item" data-cat="{{ key }}" onclick="ctxSetCategory('{{ key }}')">{{ label }}</div>
       {% endfor %}
@@ -1002,6 +1033,9 @@ window.spamRow = function(pk) {
 function applyMailFilter() {
   var params = new URLSearchParams(location.search);
   var cat  = document.getElementById('em-cat-sel').value;
+  // свої категорії — value «w<pk>» → ?wcat=<pk>; тип співрозмовника → ?cat=
+  params.delete('wcat');
+  if (cat.charAt(0) === 'w') { params.set('wcat', cat.slice(1)); cat = ''; }
   var cust = document.getElementById('em-cust-sel').value;
   var proj = document.getElementById('em-proj-sel').value;
   if (cat) params.set('cat', cat); else params.delete('cat');
@@ -1084,7 +1118,7 @@ function filterMailBy(ev, key, value) {
 }
 function clearMailFilter() {
   var params = new URLSearchParams(location.search);
-  params.delete('cat'); params.delete('customer'); params.delete('project'); params.delete('quote'); params.delete('page');
+  params.delete('cat'); params.delete('wcat'); params.delete('customer'); params.delete('project'); params.delete('quote'); params.delete('page');
   location.search = params.toString();
 }
 function toggleQuoteFilter() {
@@ -1144,9 +1178,7 @@ async function rowSpam(ev, pk) {
   // у Спамі кнопка повертає лист у Вхідні; в інших папках — переносить у Спам
   if (row) row.remove();
   if (_activeRow === row) { _activeRow = null; resetPreview(); }
-  _showToast(d.spam
-    ? '🚫 {% trans "Переміщено до Спаму" %}' + (d.auto_rule ? ' · {% trans "Правило додано для" %} ' + d.auto_rule : '')
-    : '✅ {% trans "Повернуто у Вхідні" %}');
+  _showToast(d.spam ? _spamText(d) : '✅ {% trans "Повернуто у Вхідні" %}');
   window.refreshBadges && window.refreshBadges();
 }
 
@@ -1168,9 +1200,19 @@ async function spamMsg(pk, rowEl) {
   if (d.ok && d.spam) {
     if (rowEl) rowEl.remove();
     if (_activeRow === rowEl) { _activeRow = null; resetPreview(); }
-    _showToast('🚫 {% trans "Переміщено до Спаму" %}' + (d.auto_rule ? ' · {% trans "Правило додано для" %} ' + d.auto_rule : ''));
+    _showToast(_spamText(d));
     window.refreshBadges && window.refreshBadges();
   }
+}
+
+// «Спам» запам'ятовує відправника: його інші листи теж у Спам, з календаря прибрано (email_assistant/spam.py)
+function _spamText(d) {
+  var keys = d.auto_rule || (d.keys || []).join(', ');
+  var t = '🚫 {% trans "Переміщено до Спаму" %}';
+  if (keys) t += ' · {% trans "далі від" %} ' + keys + ' {% trans "— одразу в Спам" %}';
+  if (d.more) t += ' · {% trans "ще листів від нього" %}: ' + d.more;
+  if (d.calendar) t += ' · {% trans "з календаря прибрано" %}: ' + d.calendar;
+  return t;
 }
 
 function _showToast(msg) {
@@ -1646,6 +1688,31 @@ async function ctxSetCategory(cat) {
   setTimeout(function(){ location.reload(); }, 900);
 }
 
+// Своя категорія (DigiKey, магазин…): правило для співрозмовника (або домену) чи лише ця гілка
+async function ctxSetWorkCategory(cat) {
+  _ctx.classList.remove('open');
+  if (!_ctxMsg) return;
+  var body = {category: cat};
+  if (cat === 'new') {
+    var name = prompt('{% trans "Назва нової категорії (напр. DigiKey, Інтернет-магазин)" %}');
+    if (!name) return;
+    body.name = name;
+  }
+  body.scope = document.getElementById('em-ctx-wcat-thread').checked ? 'thread'
+    : (document.getElementById('em-ctx-cat-domain').checked ? 'domain' : 'sender');
+  try {
+    var r = await fetch('/email/message/' + _ctxMsg.pk + '/work-category/', {
+      method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    var d = await r.json();
+  } catch(e) { _showToast('⚠️ ' + _i18n.помилка); return; }
+  if (!d.ok) { _showToast('⚠️ ' + (d.error || _i18n.помилка)); return; }
+  _showToast((d.category ? '🏷 ' + d.category : '↺ {% trans "Без своєї категорії" %}')
+    + ' · ' + (d.scope === 'thread' ? '{% trans "лише ця гілка" %}' : '{% trans "правило для" %} ' + d.key)
+    + (d.changed ? ' · {% trans "оновлено листів" %}: ' + d.changed : ''));
+  setTimeout(function(){ location.reload(); }, 900);
+}
+
 async function ctxAction(action) {
   _ctx.classList.remove('open');
   if (!_ctxMsg) return;
@@ -1973,6 +2040,7 @@ window.bulkAction = async function(action) {
     });
     var d = await r.json();
     if (!d.ok) return;
+    if (action === 'spam') _showToast(_spamText(d));
     if (action === 'delete' || action === 'archive' || action === 'spam') {
       pks.forEach(function(pk) {
         var row = document.getElementById('row-' + pk);

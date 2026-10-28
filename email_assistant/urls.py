@@ -64,6 +64,7 @@ urlpatterns = [
     path('message/<int:message_pk>/unread/',             views.mark_unread_api,         name='mark_unread'),
     # Віднести лист до категорії (запам'ятовується для відправника / домену)
     path('message/<int:message_pk>/category/',          views.set_category_view,       name='set_category'),
+    path('message/<int:message_pk>/work-category/',     views.set_work_category_view,  name='set_work_category'),
     # Quick settings toggles (e.g. mark read on server)
     path('settings/toggle/',                             views.settings_toggle_view,    name='settings_toggle'),
     # Email rules

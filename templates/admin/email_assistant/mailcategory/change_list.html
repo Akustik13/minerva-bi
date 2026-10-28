@@ -1,0 +1,18 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content %}
+<div style="border:1px solid rgba(128,128,128,.35);border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:13px;max-width:980px">
+  <b>🏷 {% trans "Свої категорії листів" %}</b> — {% trans "напрями роботи: DigiKey, Інтернет-магазин, Митниця… Лист потрапляє в першу за порядком, правила якої підходять; відповіді в гілці — туди ж. У скриньці: фільтр «🗂», мітка в рядку, правий клік → «Віднести до категорії»." %}
+  <br>⏱ {% trans "Кожній категорії можна дати проєкт askDANTE і норми часу — тоді Minerva щодня оцінює, скільки часу пішло на ці листи, і записує в askDANTE (після ✓ на сторінці" %}
+  <a href="/admin/worktime/workday/mail-time/">✉️ {% trans "Час на пошту" %}</a> {% trans "або автоматично)." %}
+  <form method="post" action="recompute/" style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    {% csrf_token %}
+    <select name="days"><option value="90">{% trans "за 90 днів" %}</option><option value="365">{% trans "за рік" %}</option>
+      <option value="730" selected>{% trans "за 2 роки" %}</option><option value="0">{% trans "усі листи" %}</option></select>
+    <button class="button" type="submit">🔄 {% trans "Перерахувати листи за правилами" %}</button>
+    {% if scan_status %}<span style="color:var(--text-muted)">{{ scan_status }}</span>{% endif %}
+  </form>
+</div>
+{{ block.super }}
+{% endblock %}

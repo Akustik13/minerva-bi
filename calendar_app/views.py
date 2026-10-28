@@ -227,8 +227,17 @@ def event_detail_api(request, pk):
         'is_done':      ev.is_done,
         'customer':     str(ev.crm_customer) if ev.crm_customer_id else '',
         'source_email': source_email,
+        'sender':       _sender(request.user, ev),
         'custom_cat_id': ev.custom_category_id,
     })
+
+
+def _sender(user, ev):
+    from calendar_app.views_cleanup import sender_info
+    try:
+        return sender_info(user, ev.email_message) if ev.email_message_id else {}
+    except Exception:  # noqa: BLE001 — вікно події не повинне падати через пошту
+        return {}
 
 
 @staff_member_required

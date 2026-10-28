@@ -84,7 +84,8 @@
         <td><input type="checkbox" class="dl-pick" name="ids" value="{{ d.pk }}" {% if not d.past %}checked{% endif %}></td>
         <td style="white-space:nowrap">{{ d.due_at|date:"D d.m.Y" }}{% if not d.all_day %} {{ d.due_at|time:"H:i" }}{% endif %}{% if d.past %}<div class="dl-muted">{% trans "минуло" %}</div>{% endif %}</td>
         <td><b>{{ d.title }}</b>{% if d.quote %}<div class="dl-q">«{{ d.quote }}»</div>{% endif %}</td>
-        <td><a href="/email/?msg={{ d.email_message_id }}" target="_blank">✉️ {{ d.email_message.subject|truncatechars:50 }}</a><div class="dl-muted">{{ d.email_message.from_email }} · {{ d.email_message.sent_at|date:"d.m.Y" }}</div></td>
+        <td><a href="/email/?msg={{ d.email_message_id }}" target="_blank">✉️ {{ d.email_message.subject|truncatechars:50 }}</a><div class="dl-muted">{{ d.email_message.from_email }} · {{ d.email_message.sent_at|date:"d.m.Y" }}
+          · <a href="/calendar/cleanup/?add={{ d.email_message.from_email|urlencode }}" title="{% trans "Від цього відправника терміни не потрібні: показати, що прибереться, і більше не заносити" %}">🚫</a></div></td>
       </tr>
       {% endfor %}
     </table></div>

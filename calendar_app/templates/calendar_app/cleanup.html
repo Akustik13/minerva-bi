@@ -1,0 +1,127 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+.cl-wrap{max-width:980px}
+.cl-card{border:1px solid var(--border-color,rgba(128,128,128,.35));border-radius:10px;padding:12px 16px;margin:0 0 14px}
+.cl-muted{color:var(--text-muted);font-size:12px}
+.cl-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.cl-group{border:1px solid var(--border-color,rgba(128,128,128,.35));border-radius:10px;margin:0 0 10px;overflow:hidden}
+.cl-group > summary{list-style:none;cursor:pointer;padding:9px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  background:rgba(128,128,128,.06)}
+.cl-group > summary::-webkit-details-marker{display:none}
+.cl-group.new > summary{background:rgba(26,115,232,.10)}
+.cl-group.spam > summary{background:rgba(229,57,53,.08)}
+.cl-count{margin-left:auto;font-size:12px;color:var(--text-muted)}
+.cl-items{padding:6px 14px 10px}
+.cl-item{display:flex;gap:8px;align-items:baseline;padding:3px 0;font-size:13px;border-top:1px solid rgba(128,128,128,.15)}
+.cl-item:first-child{border-top:none}
+.cl-item .what{flex:none;width:92px;font-size:11px;color:var(--text-muted)}
+.cl-item .when{flex:none;width:96px;font-size:12px;color:var(--text-muted)}
+.cl-item .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.cl-chip{display:inline-flex;gap:6px;align-items:center;border:1px solid rgba(128,128,128,.4);border-radius:14px;padding:2px 4px 2px 10px;font-size:12px;margin:2px}
+.cl-chip button{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:14px}
+.cl-bar{position:sticky;bottom:0;background:var(--body-bg,#1e1e1e);border-top:1px solid rgba(128,128,128,.35);padding:10px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cl-done{border-left:4px solid #43a047}
+#content-main tr{background:transparent}
+@media (max-width:700px){.cl-item{flex-wrap:wrap}.cl-item .what,.cl-item .when{width:auto}}
+</style>
+
+<div class="cl-wrap">
+  <p><a href="/calendar/" class="cl-muted">← {% trans "Календар" %}</a> · <a href="/calendar/deadlines/" class="cl-muted">🔎 {% trans "Терміни з пошти" %}</a></p>
+
+  {% if done %}
+  <div class="cl-card cl-done">✅ {% trans "Прибрано" %}: {% trans "подій" %} <b>{{ done.events }}</b>, {% trans "запрошень" %} <b>{{ done.invites }}</b>,
+    {% trans "термінів" %} <b>{{ done.deadlines }}</b>{% if done.remote %}, {% trans "у Google / Outlook" %} <b>{{ done.remote }}</b>{% endif %}.
+    {% if done.remote_failed %}<span style="color:#ef4444">{% trans "Не вдалося видалити в Google / Outlook" %}: {{ done.remote_failed }} — {% trans "видаліть там вручну" %}.</span>{% endif %}
+    {% trans "З пошти вони більше не повернуться." %}</div>
+  {% endif %}
+
+  <div class="cl-card">
+    <b>🧹 {% trans "Що прибирається" %}</b>
+    <div class="cl-muted" style="margin:4px 0 8px">
+      {% trans "Події, запрошення й знайдені терміни, що прийшли з листів: від спаму (лист у Спамі або відправник, якого ви позначили спамом) і від відправників у фільтрах нижче. Нічого не видаляється, поки ви не підтвердите. Події, внесені вручну, тут не з'являються." %}
+    </div>
+    <div><b style="font-size:13px">{% trans "Фільтри — не заносити від" %}:</b>
+      {% for f in filters %}
+      <form method="post" style="display:inline">{% csrf_token %}
+        <input type="hidden" name="action" value="unblock"><input type="hidden" name="block" value="{{ f.pk }}">
+        <span class="cl-chip" title="{{ f.get_reason_display }} · {% trans "додано" %} {{ f.created_at|date:"d.m.Y" }}{% if f.removed %} · {% trans "прибрано" %} {{ f.removed }}{% endif %}">
+          {% if f.reason == "spam" %}🚫{% else %}🙅{% endif %} {{ f.key }}
+          <button type="submit" title="{% trans "Прибрати фільтр — від цього відправника знову можна заносити" %}" onclick="return confirm('{% trans "Прибрати фільтр" %} {{ f.key|escapejs }}?')">×</button>
+        </span>
+      </form>
+      {% empty %}<span class="cl-muted">{% trans "ще немає — додайте нижче або в календарі: подія з листа → «🚫 Більше не заносити від нього»" %}</span>{% endfor %}
+    </div>
+    <form method="get" class="cl-row" style="margin-top:8px">
+      <input type="text" name="add" value="{{ extra }}" placeholder="noreply@example.com {% trans "або" %} @example.com" style="min-width:260px">
+      <button class="button" type="submit">🔎 {% trans "Показати, що прибереться" %}</button>
+      {% if add_error %}<span style="color:#ef4444;font-size:12px">{% trans "Вкажіть адресу (a@b.com) або домен (@b.com)" %}</span>{% endif %}
+    </form>
+  </div>
+
+  {% if groups %}
+  <form method="post" id="cl-form" onsubmit="return clConfirm()">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="clean">
+    {% for g in groups %}
+    <details class="cl-group{% if g.new %} new{% elif g.reason == 'spam' %} spam{% endif %}"{% if g.new or forloop.counter <= 3 %} open{% endif %}>
+      <summary>
+        <input type="checkbox" class="cl-all" data-g="{{ forloop.counter }}" checked onclick="event.stopPropagation()" onchange="clGroup(this)">
+        <b>{{ g.label }}</b>
+        {% if g.new %}<span class="cl-muted">{% trans "ще не у фільтрах" %} ·
+          <label onclick="event.stopPropagation()"><input type="checkbox" name="block_new" value="{{ g.key }}" checked> {% trans "і більше не заносити від нього" %}</label></span>{% endif %}
+        <span class="cl-count">{{ g.count }} {% trans "шт." %}</span>
+      </summary>
+      <div class="cl-items">
+        {% for e in g.events %}
+        <label class="cl-item"><input type="checkbox" name="ev" value="{{ e.pk }}" data-g="{{ forloop.parentloop.counter }}" checked>
+          <span class="what">📅 {% trans "подія" %}</span><span class="when">{{ e.start_at|date:"d.m.Y" }}</span>
+          <span class="t">{{ e.title }}{% if e.is_done %} <span class="cl-muted">({% trans "виконано" %})</span>{% endif %}
+            {% if e.email_message_id %}<a href="/email/?msg={{ e.email_message_id }}" target="_blank" class="cl-muted">✉️</a>{% endif %}</span></label>
+        {% endfor %}
+        {% for i in g.invites %}
+        <label class="cl-item"><input type="checkbox" name="inv" value="{{ i.pk }}" data-g="{{ forloop.parentloop.counter }}" checked>
+          <span class="what">📨 {{ i.get_status_display }}</span><span class="when">{{ i.start_at|date:"d.m.Y" }}</span>
+          <span class="t">{{ i.title }}{% if i.organizer %} <span class="cl-muted">· {{ i.organizer }}</span>{% endif %}</span></label>
+        {% endfor %}
+        {% for d in g.deadlines %}
+        <label class="cl-item"><input type="checkbox" name="dl" value="{{ d.pk }}" data-g="{{ forloop.parentloop.counter }}" checked>
+          <span class="what">⏰ {{ d.get_status_display }}</span><span class="when">{{ d.due_at|date:"d.m.Y" }}</span>
+          <span class="t">{{ d.title }}{% if d.target_id %} <span class="cl-muted">· {% trans "у" %} {{ d.target }}</span>{% endif %}</span></label>
+        {% endfor %}
+        {% if not g.count %}<div class="cl-muted">{% trans "Зараз у календарі від нього нічого немає — фільтр лише не пустить нове." %}</div>{% endif %}
+      </div>
+    </details>
+    {% endfor %}
+    <div class="cl-bar">
+      <button class="button default" type="submit">🧹 {% trans "Прибрати вибране" %} (<span id="cl-n">{{ total }}</span>)</button>
+      <span class="cl-muted">{% trans "Події видаляються, запрошення й терміни позначаються «не заносити» — повторний пошук у пошті їх не поверне." %}</span>
+    </div>
+  </form>
+  {% else %}
+  <div class="cl-card">✨ {% trans "Календар чистий: від спаму й відправників з фільтрів нічого немає." %}</div>
+  {% endif %}
+</div>
+
+<script>
+function clCount(){
+  var n = document.querySelectorAll('#cl-form input[name="ev"]:checked, #cl-form input[name="inv"]:checked, #cl-form input[name="dl"]:checked').length;
+  var el = document.getElementById('cl-n'); if (el) el.textContent = n;
+  return n;
+}
+function clGroup(box){
+  document.querySelectorAll('#cl-form .cl-items input[data-g="' + box.dataset.g + '"]').forEach(function(c){ c.checked = box.checked; });
+  clCount();
+}
+function clConfirm(){
+  var n = clCount(), nb = document.querySelectorAll('#cl-form input[name="block_new"]:checked').length;
+  if (!n && !nb) { alert('{% trans "Нічого не вибрано" %}'); return false; }
+  return confirm('{% trans "Прибрати з календаря" %}: ' + n + (nb ? ' · {% trans "нових фільтрів" %}: ' + nb : '') + '?');
+}
+document.addEventListener('change', function(e){ if (e.target.closest && e.target.closest('.cl-items')) clCount(); });
+</script>
+{% endblock %}

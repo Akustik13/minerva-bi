@@ -224,6 +224,9 @@ def detect(message, texts=None) -> list:
     texts = calendars_of(message) if texts is None else texts
     if not texts:
         return []
+    from .blocks import is_blocked
+    if is_blocked(user, message):   # спам або «більше не заносити від цього відправника»
+        return []
     auto = CalendarSettings.for_user(user).invites_auto
     touched = []
     for text in texts:

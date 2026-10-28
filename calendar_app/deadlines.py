@@ -76,10 +76,16 @@ def candidates(user, mask: dict, limit: int = MAX_PER_RUN) -> tuple[int, list]:
     done = set(DeadlineScanMark.objects.filter(user=user).values_list("email_message_id", flat=True))
     legacy = set(CalendarEvent.objects.filter(user=user, event_type=CalendarEvent.TYPE_DEADLINE)
                  .exclude(email_message=None).values_list("email_message_id", flat=True))
+    from email_assistant.crm_link import own_addresses
+    from .blocks import blocked_key, counterpart, keys
+    user_keys, own = keys(user), own_addresses()
     out = []
-    for m in qs.only("pk", "subject", "body_text", "sent_at").iterator(chunk_size=300):
+    for m in qs.only("pk", "subject", "body_text", "sent_at", "from_email", "to_emails",
+                     "cc_emails").iterator(chunk_size=300):
         if m.pk in done or m.pk in legacy:
             continue
+        if user_keys and blocked_key(user, counterpart(m, own), user_keys):
+            continue   # «більше не заносити від цього відправника»
         if DATE_HINT.search(f"{m.subject}\n{new_text(m.body_text or '')[:6000]}"):
             out.append(m)
             if len(out) >= limit:

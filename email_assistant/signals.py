@@ -71,6 +71,9 @@ def link_email_to_crm(sender, instance, created, **kwargs):
     from email_assistant.crm_link import link_message_to_crm
     link_message_to_crm(instance)
     _set_category(instance)
+    if not instance.is_spam:
+        from email_assistant.work_categories import assign
+        assign(instance)   # своя категорія (DigiKey, магазин…) — після CRM: замовлення з листа вже знайдено
 
 
 def _set_category(em):

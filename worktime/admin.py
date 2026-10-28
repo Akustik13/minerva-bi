@@ -36,6 +36,26 @@ def _time(value):
         return None
 
 
+def _plural(n: int, one: str, few: str, many: str) -> str:
+    if n % 10 == 1 and n % 100 != 11:
+        return one
+    return few if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else many
+
+
+def _activity_label(span) -> str:
+    """👣 08:28 · 1 дія  /  👣 08:05–17:40 · 52 дії"""
+    first, last, n = span
+    when = f"{first:%H:%M}" if f"{first:%H:%M}" == f"{last:%H:%M}" else f"{first:%H:%M}–{last:%H:%M}"
+    return f"{when} · {n} {_plural(n, 'дія', 'дії', 'дій')}"
+
+
+def _activity_title(span) -> str:
+    first, last, n = span
+    return (f"Сліди роботи в Minerva за день: перша дія о {first:%H:%M}, остання о {last:%H:%M}, усього {n} "
+            f"(вхід, збереження записів, надіслані листи). Одна дія — зазвичай лише вхід. Так бачить день режим "
+            f"автозаповнення «за активністю»; в askDANTE це не записується саме.")
+
+
 def _duration(minutes) -> str:
     minutes = int(minutes or 0)
     return f"{minutes // 60}:{minutes % 60:02d}"
@@ -129,8 +149,24 @@ class DanteSettingsAdmin(admin.ModelAdmin):
             "description": "Час на проєкти пишеться в askDANTE з календаря (☆ мої проєкти). Години проєктів і "
                            "клієнтів у Minerva — з копії записів askDANTE, оновлюється щоночі й кнопкою.",
         }),
+        ("✉️ Час на пошту", {
+            "fields": ["mail_time", "mail_projects", "mail_projects_auto", "mail_reply_minutes", "mail_read_minutes",
+                       "mail_step", "mail_time_status"],
+            "description": "Minerva оцінює за нормами, скільки часу пішло на листи: свої категорії листів "
+                           "(🏷 DigiKey, магазин… — проєкт askDANTE і хвилини задаються в самій категорії) і "
+                           "гілки проєктів Minerva, зв'язаних з askDANTE. Оцінка по днях — «✉️ Час на пошту»; "
+                           "в askDANTE записується після ✓ там або щодня автоматично (галочка в категорії). "
+                           "Записане не дублюється — наступного разу дописується лише різниця.",
+        }),
     ]
-    readonly_fields = ["calendar_link", "check_status", "autofill_status", "records_status"]
+    readonly_fields = ["calendar_link", "check_status", "autofill_status", "records_status", "mail_time_status"]
+
+    @admin.display(description="Стан")
+    def mail_time_status(self, obj):
+        url = reverse("admin:worktime_workday_mailtime")
+        cats = reverse("admin:email_assistant_mailcategory_changelist")
+        return format_html('<div>{}</div><a href="{}">✉️ Час на пошту — по днях</a> · <a href="{}">🏷 Свої категорії '
+                           'листів і їхні проєкти askDANTE</a>', obj.mail_time_result if obj else "", url, cats)
 
     @admin.display(description="Записи часу")
     def records_status(self, obj):
@@ -399,8 +435,15 @@ class WorkDayAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         return [path("", self.admin_site.admin_view(self.calendar_view), name="worktime_workday_changelist"),
-                path("report/", self.admin_site.admin_view(self.report_view), name="worktime_workday_report")] \
+                path("report/", self.admin_site.admin_view(self.report_view), name="worktime_workday_report"),
+                path("mail-time/", self.admin_site.admin_view(self.mail_time_view), name="worktime_workday_mailtime")] \
             + super().get_urls()
+
+    def mail_time_view(self, request):
+        from .admin_mail import mail_time_page
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        return mail_time_page(self, request)
 
     # ── звіт по працівниках ──────────────────────────────────────
     def report_view(self, request):
@@ -492,8 +535,12 @@ class WorkDayAdmin(admin.ModelAdmin):
                 error = error or f"Записи часу askDANTE не оновлено: {e.message}"
             balance = services.balance(du, first.year, first.month)
         records = services.day_records(du, first, last)
+        mail = {}
+        if st.mail_time and first <= today:
+            from . import mail_time
+            mail = mail_time.estimate(du, first, min(last, today), st)
 
-        weeks, totals = self._grid(st, du, first, last, cached, today, records)
+        weeks, totals = self._grid(st, du, first, last, cached, today, records, mail)
         from .models import DanteActivity
         ctx.update({
             "balance": services.balance_lines(balance), "balance_error": balance.error if balance else "",
@@ -502,6 +549,7 @@ class WorkDayAdmin(admin.ModelAdmin):
             "default_activity": st.default_activity_id,
             "project_date": today if first <= today <= last else min(last, today),
             "mapping_url": reverse("admin:worktime_danteproject_changelist"),
+            "mail_url": reverse("admin:worktime_workday_mailtime") if st.mail_time else "",
         })
         prev_m = (first - datetime.timedelta(days=1)).replace(day=1)
         next_m = (last + datetime.timedelta(days=1))
@@ -524,9 +572,9 @@ class WorkDayAdmin(admin.ModelAdmin):
         return next((p for p in people if p.user_id == request.user.pk), None) or (people[0] if people else None)
 
     @staticmethod
-    def _grid(st, du, first, last, days, today, records=None):
+    def _grid(st, du, first, last, days, today, records=None, mail=None):
         weeks, week = [], []
-        records = records or {}
+        records, mail = records or {}, mail or {}
         totals = {"minutes": 0, "worked": 0, "empty": 0, "absent": 0, "project_minutes": 0}
         start = first - datetime.timedelta(days=first.weekday())
         end = last + datetime.timedelta(days=6 - last.weekday())
@@ -557,13 +605,20 @@ class WorkDayAdmin(admin.ModelAdmin):
                 if day <= today and du.user_id:
                     span = services.activity_span(du.user, day)
                     if span:
-                        cell["activity"] = f"{span[0]:%H:%M}–{span[1]:%H:%M} · {span[2]}"
+                        cell["activity"] = _activity_label(span)
+                        cell["activity_title"] = _activity_title(span)
                 if cell["kind"] == "filled":   # пів дня відпустки поруч із роботою
                     cell["absences"] = services.absences_text(wd)
                 cell["projects"] = [{"name": str(r.dante_project or r.project_name), "dur": _duration(r.duration),
                                      "title": " · ".join(x for x in (r.activity_name, r.description) if x)}
                                     for r in records.get(day, [])]
                 totals["project_minutes"] += sum(r.duration for r in records.get(day, []))
+                rows = mail.get(day, {}).get("rows", [])
+                if rows:
+                    todo = sum(r["to_book"] for r in rows)
+                    cell["mail"] = {"dur": _duration(sum(r["minutes"] for r in rows)),
+                                    "todo": _duration(todo) if todo else "",
+                                    "title": " · ".join(f"{r['label']} {_duration(r['minutes'])}" for r in rows)}
             week.append(cell)
             if len(week) == 7:
                 weeks.append(week)
@@ -745,7 +800,8 @@ class DanteProjectAdmin(admin.ModelAdmin):
         has_mine = base.filter(pinned_by=user).exists()
         f = request.GET.get("f") or ("mine" if has_mine else "all")
         q = (request.GET.get("q") or "").strip()
-        qs = base.select_related("parent", "crm_customer").prefetch_related("maps__project") \
+        qs = base.select_related("parent", "crm_customer").prefetch_related("maps__project",
+                                                                             "mail_categories__category") \
             .annotate(pinned=Exists(pinned), minutes=Subquery(minutes))
         qs = qs.filter(archived=True) if f == "archived" else qs.filter(archived=False)
         qs = {"mine": qs.filter(pinned=True), "nocrm": qs.filter(crm_customer__isnull=True),

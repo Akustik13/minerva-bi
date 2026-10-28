@@ -37,6 +37,7 @@ echo "   shop_accounts_cleanup   daily — expired shop customer sessions / link
 echo "   worktime_autofill       daily after hour from DanteSettings — empty work days in askDANTE (when enabled)"
 echo "   worktime_sync           daily after the same hour — askDANTE time records and month balances"
 echo "   worktime_reports        askDANTE work-time reports by e-mail (schedule in Minerva)"
+echo "   worktime_mail_time      daily — time spent on mail categories/projects into askDANTE (auto categories)"
 echo "   calendar_sync           iCal subscriptions + Google / Outlook / Minerva sync rules"
 echo "   send_reminders          every ${REMINDER_INTERVAL}s"
 echo "   sync_email              every ${EMAIL_SYNC_INTERVAL}s"
@@ -103,6 +104,7 @@ while true; do
   python manage.py worktime_autofill --if-due 2>&1 || true
   python manage.py worktime_sync --if-due 2>&1 || true
   python manage.py worktime_reports --if-due 2>&1 || true
+  python manage.py worktime_mail_time --if-due 2>&1 || true
   python manage.py calendar_sync --if-due 2>&1 || true
 
   # ── Email синхронізація — кожні EMAIL_SYNC_INTERVAL секунд ──

@@ -255,6 +255,14 @@ def _parse_mail_filter(request):
     return cat, customer
 
 
+def _parse_work_filter(request):
+    """Своя категорія з ?wcat=<pk>."""
+    if not str(request.GET.get('wcat', '')).isdigit():
+        return None
+    from email_assistant.models import MailCategory
+    return MailCategory.objects.filter(pk=int(request.GET['wcat'])).first()
+
+
 def _parse_project_filter(request):
     """Проєкт з ?project=<pk> (листи всіх підтверджених гілок проєкту)."""
     if not str(request.GET.get('project', '')).isdigit():
@@ -368,11 +376,13 @@ def _attach_thread_stats(emails):
             m.thread_pks = ','.join(map(str, pks[m.thread_id]))
 
 
-def _filter_qs(cat, customer, project=None, quote=False) -> str:
+def _filter_qs(cat, customer, project=None, quote=False, wcat=None) -> str:
     from urllib.parse import urlencode
     params = {}
     if cat:
         params['cat'] = cat
+    if wcat:
+        params['wcat'] = wcat.pk
     if customer:
         params['customer'] = customer.pk
     if project:
@@ -411,16 +421,21 @@ def inbox_view(request):
     per_page = 30
 
     cat_filter, customer_filter = _parse_mail_filter(request)
+    work_filter = _parse_work_filter(request)
     project_filter = _parse_project_filter(request)
     quote_filter = request.GET.get('quote') == '1'
     # Пошук і фільтри «Категорія / Клієнт / Проєкт / Запити» діють по всіх папках (у Спамі й Кошику — лише в них)
-    search_all = bool(q or cat_filter or customer_filter or project_filter or quote_filter) \
+    search_all = bool(q or cat_filter or work_filter or customer_filter or project_filter or quote_filter) \
         and folder not in ('spam', 'trash')
     qs = _build_qs(account, ALL_FOLDERS if search_all else folder, q)
     counts_qs = qs if folder in ('spam', 'trash') else _build_qs(account, ALL_FOLDERS, q)
     categories, mail_customers = _category_counts(counts_qs)
+    from email_assistant.work_categories import counts as _work_counts
+    work_categories = _work_counts(counts_qs)
     if cat_filter:
         qs = qs.filter(category=cat_filter)
+    if work_filter:
+        qs = qs.filter(work_category=work_filter)
     if customer_filter:
         from django.db.models import Q as _CQ
         qs = qs.filter(pk__in=EmailMessage.objects.filter(
@@ -438,7 +453,7 @@ def inbox_view(request):
     total = qs.count()
     start = (page - 1) * per_page
     # rename key to `emails` to avoid shadowing Django messages framework
-    emails = list(qs.select_related('thread', 'thread__crm_customer')[start:start + per_page])
+    emails = list(qs.select_related('thread', 'thread__crm_customer', 'work_category')[start:start + per_page])
     if grouped:
         _attach_thread_stats(emails)
     _attach_crm_customers(emails)
@@ -481,7 +496,10 @@ def inbox_view(request):
         'quote_count':           _quote_messages(account).count(),
         'categories':            categories,
         'mail_customers':        mail_customers,
-        'filter_qs':             _filter_qs(cat_filter, customer_filter, project_filter, quote_filter),
+        'filter_qs':             _filter_qs(cat_filter, customer_filter, project_filter, quote_filter, work_filter),
+        'work_filter':           work_filter,
+        'work_categories':       work_categories,
+        'can_add_work_category': request.user.has_perm('email_assistant.add_mailcategory'),
         'grouped':               grouped,
         'category_choices':      EmailMessage.CATEGORY_CHOICES,
         'search_all':            search_all,
@@ -1534,32 +1552,17 @@ def restore_message_view(request, message_pk):
 @staff_member_required
 @require_POST
 def toggle_spam_view(request, message_pk):
-    from email_assistant.models import EmailMessage, EmailRule
+    """Спам ↔ не спам. Спам: правило на відправника, решта його листів у Спам, з календаря прибрано (spam.py)."""
+    from email_assistant import spam
+    from email_assistant.models import EmailMessage
     account = _get_account(request)
     msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
-    was_spam = msg.is_spam
-    msg.is_spam = not msg.is_spam
-    msg.folder  = EmailMessage.FOLDER_SPAM if msg.is_spam else EmailMessage.FOLDER_INBOX
-    msg.save(update_fields=['is_spam', 'folder'])
-    if msg.is_spam and not was_spam and msg.imap_uid:
-        from email_assistant.sync import default_imap_folder
-        _imap_bg(account.pk, default_imap_folder(account, msg), msg.imap_uid, 'spam')
-
-    auto_rule = None
-    if msg.is_spam and msg.from_email and '@' in msg.from_email:
-        domain = '@' + msg.from_email.split('@')[-1].lower().rstrip('>')
-        _, created = EmailRule.objects.get_or_create(
-            account=account,
-            condition_field=EmailRule.FIELD_FROM_EMAIL,
-            condition_op=EmailRule.OP_CONTAINS,
-            condition_value=domain,
-            action=EmailRule.ACTION_MARK_SPAM,
-            defaults={'name': f'Спам: {domain}'},
-        )
-        if created:
-            auto_rule = domain
-
-    return JsonResponse({'ok': True, 'spam': msg.is_spam, 'auto_rule': auto_rule})
+    if msg.is_spam:
+        spam.unmark(account, [msg])
+        return JsonResponse({'ok': True, 'spam': False, 'auto_rule': None})
+    result = spam.mark(account, [msg])
+    return JsonResponse({'ok': True, 'spam': True, 'auto_rule': ', '.join(result['keys']) or None,
+                         'more': result['more'], 'calendar': result['calendar']})
 
 
 @staff_member_required
@@ -1923,6 +1926,39 @@ def set_category_view(request, message_pk):
                          'category': msg.category, 'label': msg.get_category_display()})
 
 
+@staff_member_required
+@require_POST
+def set_work_category_view(request, message_pk):
+    """POST {category: pk | '' | 'new', name, scope: sender|domain|thread}: своя категорія (DigiKey, магазин…).
+    sender / domain — правило категорії для співрозмовника, thread — лише ця гілка (work_categories.py)."""
+    import json as _json
+    from email_assistant import work_categories
+    from email_assistant.models import EmailMessage, MailCategory
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    try:
+        data = _json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+    value = str(data.get('category') or '')
+    if value == 'new':
+        name = (data.get('name') or '').strip()[:80]
+        if not name:
+            return JsonResponse({'ok': False, 'error': 'Вкажіть назву категорії'})
+        if not request.user.has_perm('email_assistant.add_mailcategory'):
+            return JsonResponse({'ok': False, 'error': 'Немає права створювати категорії'}, status=403)
+        category = MailCategory.objects.filter(name__iexact=name).first() or MailCategory.objects.create(
+            name=name, icon=(data.get('icon') or '🏷')[:8], order=MailCategory.objects.count())
+    elif value.isdigit():
+        category = get_object_or_404(MailCategory, pk=int(value))
+    else:
+        category = None
+    scope = data.get('scope') if data.get('scope') in ('sender', 'domain', 'thread') else 'sender'
+    result = work_categories.set_for_message(msg, category, scope)
+    return JsonResponse({'ok': True, **result, 'id': msg.work_category_id,
+                         'color': msg.work_category.color if msg.work_category_id else ''})
+
+
 _SETTINGS_TOGGLES = {'mark_read_on_server'}
 _SETTINGS_CHOICES = {'ai_model', 'rag_mode'}
 
@@ -2043,13 +2079,13 @@ def bulk_action_view(request):
         msgs.filter(folder=EmailMessage.FOLDER_TRASH).update(is_deleted=True)
         EmailMessage.objects.filter(pk__in=[m.pk for m in to_trash]).update(folder=EmailMessage.FOLDER_TRASH)
     elif action == 'spam':
-        from email_assistant.sync import default_imap_folder
-        new_spam = list(msgs.filter(is_spam=False))
-        _imap_bg_many(account, [(default_imap_folder(account, m), m.imap_uid)
-                                for m in new_spam if m.imap_uid], 'spam')
-        msgs.update(is_spam=True, folder=EmailMessage.FOLDER_SPAM)
+        from email_assistant import spam
+        result = spam.mark(account, list(msgs))
+        return JsonResponse({'ok': True, 'more': result['more'], 'calendar': result['calendar'],
+                             'keys': result['keys']})
     elif action == 'unspam':
-        msgs.filter(is_spam=True).update(is_spam=False, folder=EmailMessage.FOLDER_INBOX)
+        from email_assistant import spam
+        spam.unmark(account, list(msgs.filter(is_spam=True)))
     elif action == 'archive':
         tpk_set = set(msgs.exclude(thread=None).values_list('thread_id', flat=True))
         if tpk_set:

@@ -642,3 +642,6 @@ class EmailRuleAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         return qs.filter(account__user=request.user)
+
+
+from . import admin_categories  # noqa: E402,F401 — «🏷 Свої категорії листів»

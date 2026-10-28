@@ -217,6 +217,28 @@ class DeadlineScanMark(models.Model):
         unique_together = [('user', 'email_message')]
 
 
+class CalendarSenderBlock(models.Model):
+    """Від цього відправника (адреса або @домен) в календар нічого не заносити: запрошення, терміни з пошти,
+    нагадування. Створюється з події «🚫 Більше не заносити» або коли лист позначено спамом. Логіка — blocks.py."""
+    NOT_NEEDED, SPAM = 'not_needed', 'spam'
+    REASONS = [(NOT_NEEDED, '🙅 Не потрібні терміни'), (SPAM, '🚫 Спам')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='calendar_blocks')
+    key = models.CharField('Адреса або @домен', max_length=254)
+    reason = models.CharField('Чому', max_length=12, choices=REASONS, default=NOT_NEEDED)
+    removed = models.PositiveIntegerField('Прибрано з календаря', default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Відправник без календаря'
+        verbose_name_plural = '🚫 Відправники без календаря'
+        ordering = ['key']
+        unique_together = [('user', 'key')]
+
+    def __str__(self):
+        return f'{self.key} ({self.get_reason_display()})'
+
+
 class CalendarFeed(models.Model):
     """Підписаний календар (секретна адреса iCal Google / опублікований ICS Outlook): лише читання, шар у календарі.
     Логіка — calendar_app/feeds.py; оновлення — cron `calendar_feeds --if-due` і кнопкою."""

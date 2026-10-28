@@ -66,6 +66,23 @@ class DanteSettings(models.Model):
         help_text="Скільки днів записів часу askDANTE Minerva тримає в себе (оновлення — щоночі й кнопкою).")
     records_synced_at = models.DateTimeField("Записи часу оновлено", null=True, blank=True)
 
+    mail_time = models.BooleanField(
+        "Рахувати час на пошту", default=False,
+        help_text="Листи своїх категорій (DigiKey, магазин…) і проєктів Minerva → оцінка часу по днях → "
+                  "запис у їхній проєкт askDANTE (після ✓ або автоматично, як задано в категорії).")
+    mail_projects = models.BooleanField(
+        "Листи проєктів Minerva — на їхній проєкт askDANTE", default=True,
+        help_text="Гілка в проєкті Minerva, який зв'язано з askDANTE, іде туди раніше за свою категорію.")
+    mail_projects_auto = models.BooleanField("Проєкти — записувати автоматично", default=False)
+    mail_reply_minutes = models.PositiveSmallIntegerField("Хв на нашу відповідь (проєкти)", default=10)
+    mail_read_minutes = models.PositiveSmallIntegerField("Хв на отриманий лист (проєкти)", default=3)
+    mail_step = models.PositiveSmallIntegerField(
+        "Округлювати вгору до, хв", default=15,
+        help_text="Оцінка за день по проєкту округлюється вгору (15 — чверть години).")
+    mail_time_last_day = models.DateField("Час на пошту записано по", null=True, blank=True, editable=False)
+    mail_time_result = models.CharField("Час на пошту — останній запуск", max_length=255, blank=True, default="",
+                                        editable=False)
+
     class Meta:
         verbose_name = "Налаштування askDANTE"
         verbose_name_plural = "⚙️ Налаштування askDANTE"
@@ -214,9 +231,10 @@ class Booking(models.Model):
     """Журнал: що Minerva записала (або пробувала записати) в askDANTE."""
     WORK, PROJECT = "work", "project"
     KINDS = [(WORK, "Робочий час"), (PROJECT, "Час на проєкт")]
-    MANUAL, FILL, AUTO, CLOCK, MEETING = "manual", "fill", "auto", "clock", "meeting"
+    MANUAL, FILL, AUTO, CLOCK, MEETING, MAIL = "manual", "fill", "auto", "clock", "meeting", "mail"
     SOURCES = [(MANUAL, "Вручну в календарі"), (FILL, "Заповнення пропусків"),
-               (AUTO, "Автозаповнення"), (CLOCK, "Прийшов / Пішов"), (MEETING, "Зустріч з календаря")]
+               (AUTO, "Автозаповнення"), (CLOCK, "Прийшов / Пішов"), (MEETING, "Зустріч з календаря"),
+               (MAIL, "Час на пошту")]
     SENT, FAILED = "sent", "failed"
     STATUSES = [(SENT, "✅ Записано"), (FAILED, "❌ Помилка")]
 
@@ -362,3 +380,46 @@ class WorkReport(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class MailCategoryTime(models.Model):
+    """Своя категорія листів → проєкт askDANTE і норми часу. Оцінка й запис — worktime/mail_time.py."""
+    category = models.OneToOneField("email_assistant.MailCategory", on_delete=models.CASCADE,
+                                    related_name="dante", verbose_name="Категорія листів")
+    dante_project = models.ForeignKey(DanteProject, null=True, blank=True, on_delete=models.SET_NULL,
+                                      related_name="mail_categories", verbose_name="Проєкт askDANTE",
+                                      help_text="Порожньо — час на цю категорію не рахується.")
+    activity = models.ForeignKey(DanteActivity, null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                 verbose_name="Вид роботи", help_text="Порожньо — як у налаштуваннях askDANTE.")
+    reply_minutes = models.PositiveSmallIntegerField("Хв на кожну нашу відповідь", default=10)
+    read_minutes = models.PositiveSmallIntegerField("Хв на кожен отриманий і прочитаний лист", default=3)
+    order_minutes = models.PositiveSmallIntegerField(
+        "Хв на кожне замовлення цих джерел, яке ви змінили в Minerva", default=0,
+        help_text="За журналом дій: статус, відправка, документи… 0 — не рахувати.")
+    auto = models.BooleanField("Записувати в askDANTE автоматично", default=False,
+                               help_text="Щодня за вчора, без підтвердження. Вимкнено — лише після ✓ на сторінці "
+                                         "«✉️ Час на пошту».")
+
+    class Meta:
+        verbose_name = "Час на категорію листів"
+        verbose_name_plural = "Час на категорії листів"
+
+    def __str__(self):
+        return f"{self.category} → {self.dante_project or '—'}"
+
+
+class MailTimeEntry(models.Model):
+    """Скільки часу на пошту по проєкту askDANTE за день уже записано (askDANTE не дозволяє виправити запис —
+    наступного разу дописується лише різниця)."""
+    dante_user = models.ForeignKey(DanteUser, on_delete=models.CASCADE, related_name="mail_time")
+    day = models.DateField("День", db_index=True)
+    dante_project = models.ForeignKey(DanteProject, on_delete=models.CASCADE, related_name="+")
+    minutes_booked = models.PositiveIntegerField("Записано хв", default=0)
+    details = models.JSONField(default=dict, blank=True)
+    booking = models.ForeignKey(Booking, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Час на пошту за день"
+        verbose_name_plural = "Час на пошту за день"
+        unique_together = [("dante_user", "day", "dante_project")]

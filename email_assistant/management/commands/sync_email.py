@@ -205,8 +205,11 @@ class Command(BaseCommand):
         es = EmailSettings.get_for_user(account.user)
 
         self._apply_rules(em, account)
-
-        if es.deadline_detection:
+        em.refresh_from_db(fields=['is_spam', 'folder'])
+        if em.is_spam:   # спам — без термінів у календарі й без автовідповіді
+            return
+        from calendar_app.blocks import is_blocked
+        if es.deadline_detection and not is_blocked(account.user, em):
             self._detect_deadlines(em, account)
 
         if es.auto_reply_enabled:
@@ -215,8 +218,11 @@ class Command(BaseCommand):
     def _apply_rules(self, em, account):
         """Check active rules and apply the first matching one."""
         from email_assistant.models import EmailRule
+        from email_assistant.spam import too_broad
         try:
             for rule in account.rules.filter(is_active=True):
+                if too_broad(rule):
+                    continue
                 if rule.matches(em):
                     rule.apply_to(em)
                     logger.info('Rule "%s" applied to uid=%s', rule.name, em.imap_uid)
