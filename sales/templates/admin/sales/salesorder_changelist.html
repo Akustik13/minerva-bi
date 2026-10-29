@@ -422,7 +422,7 @@ document.addEventListener('DOMContentLoaded', function () {
             {% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center">
-            {% if lsku %}<span class="sv-lbl-btn sv-lbl-off sv-line-lbl" data-sku="{{ lsku }}" data-qty="{{ lqty }}">🏷️</span>{% else %}—{% endif %}
+            {% if lsku %}<span class="sv-lbl-btn sv-lbl-off sv-line-lbl" data-sku="{{ lsku }}" data-qty="{{ lqty }}" data-order="{{ order.pk }}">🏷️</span>{% else %}—{% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center;font-size:11px;white-space:nowrap"
               {% if line.product_id %}data-sv-stock-ord="{{ order.pk }}" data-sv-stock-pid="{{ line.product.pk }}"{% endif %}>
@@ -585,6 +585,8 @@ document.addEventListener('DOMContentLoaded', function () {
 <div id="sv-table">
   {{ block.super }}
 </div>
+
+{% include "labels/_label_actions.html" with label_source=sv_dymo_label_source %}
 
 <script>
 // ── DYMO mode from server settings ───────────────────────────────────────────
@@ -1020,22 +1022,27 @@ function svSetView(mode) {
         var sku = (btn.dataset.sku || '').trim();
         var qty = btn.dataset.qty || '1';
         if (data[sku] && data[sku].found) {
-          var _lurl = '/labels/serve/' + encodeURIComponent(sku) + '/';
           var _wrap = document.createElement('span');
           _wrap.style.cssText = 'display:inline-flex;gap:3px;align-items:center';
-          var a = document.createElement('button');
-          a.type = 'button';
-          a.title = '🖨️ ' + sku + ' × ' + qty;
-          a.className = 'sv-lbl-btn sv-lbl-on';
+          // Клік і правий клік (меню «з бази / згенерувати») — labels/_label_actions.html за data-svl
+          var _lbl = function (el, act) {
+            el.type = 'button';
+            el.className = 'sv-lbl-btn sv-lbl-on';
+            el.dataset.svl = data[sku].generate || '';
+            el.dataset.sku = sku;
+            el.dataset.qty = qty;
+            el.dataset.order = btn.dataset.order || '';
+            el.dataset.file = data[sku].file ? '1' : '';
+            el.dataset.svlAct = act;
+            return el;
+          };
+          var a = _lbl(document.createElement('button'), 'print');
+          a.title = '🖨️ ' + sku + ' × ' + qty + ' · {% trans "правий клік — меню" %}';
           a.textContent = '🖨️ {% trans "Друкувати" %}';
-          (function(u,s,q){a.onclick=function(){(s.toUpperCase().startsWith('CA-')?svCaGenThenOpen:svDymoOpen)(u,s,q);};}(_lurl,sku,qty));
-          var _dl = document.createElement('button');
-          _dl.type = 'button';
-          _dl.title = '⬇️ {% trans "Скачати" %} ' + sku;
-          _dl.className = 'sv-lbl-btn sv-lbl-on';
+          var _dl = _lbl(document.createElement('button'), 'download');
+          _dl.title = '⬇️ {% trans "Скачати" %} ' + sku + ' · {% trans "правий клік — меню" %}';
           _dl.style.cssText = 'padding:2px 6px;font-size:11px;opacity:.75';
           _dl.textContent = '⬇️';
-          (function(u,s){_dl.onclick=function(){svDymoDownload(u,s);};}(_lurl,sku));
           _wrap.appendChild(a);
           _wrap.appendChild(_dl);
           btn.parentNode.replaceChild(_wrap, btn);

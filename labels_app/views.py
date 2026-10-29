@@ -12,6 +12,7 @@ from django.conf import settings
 from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.contrib.admin.views.decorators import staff_member_required
 
 
@@ -96,18 +97,52 @@ def serve_label(request, sku):
     return response
 
 
-@staff_member_required  
+def label_kinds(skus) -> dict:
+    """{sku: 'antenna' | 'cable' | ''} — чи можна сформувати етикетку з шаблону (інакше лише готовий файл)."""
+    from shipping.services.dymo_label_service import parse_part_number
+    from inventory.models import Product
+    from labels_app import antenna
+    by_category = {s.upper() for s in Product.objects.filter(category__icontains='antenn', sku__in=list(skus))
+                   .values_list('sku', flat=True)}
+    kinds = {}
+    for sku in skus:
+        kind = ''
+        if sku.upper().startswith('CA-'):
+            try:
+                parse_part_number(sku)
+                kind = 'cable'
+            except ValueError:
+                pass
+        elif antenna.is_antenna(sku) or sku.upper() in by_category:
+            kind = 'antenna'
+        kinds[sku] = kind
+    return kinds
+
+
+def label_source() -> str:
+    """Налаштування «Звідки брати етикетку DYMO»: generate — з шаблону, file — готовий файл."""
+    try:
+        from sales.models import SalesSettings
+        return SalesSettings.get().dymo_label_source
+    except Exception:
+        return 'generate'
+
+
+@staff_member_required
 def label_status(request):
-    """JSON: які SKU мають етикетки, які ні."""
+    """JSON: які SKU мають етикетки (файл або шаблон антени / кабелю), які ні."""
     skus = request.GET.get('skus', '').split(',')
     skus = [s.strip() for s in skus if s.strip()]
-    
+    kinds = label_kinds(skus)
+
     result = {}
     for sku in skus:
         path = get_label_path(sku)
         result[sku] = {
-            'found': path is not None,
+            'found': path is not None or bool(kinds[sku]),
             'filename': path.name if path else None,
+            'file': path is not None,
+            'generate': kinds[sku],
         }
     return JsonResponse(result)
 
@@ -176,21 +211,98 @@ def delete_label(request, sku):
 @staff_member_required
 def list_labels(request):
     """Список всіх доступних етикеток — HTML-сторінка або JSON (?json=1)."""
+    from labels_app import antenna
     LABELS_DIR.mkdir(parents=True, exist_ok=True)
     labels = []
     for f in sorted(LABELS_DIR.glob('*.dymo')):
         mtime = f.stat().st_mtime
         sku = f.stem
+        base_sku = re.split(r'[ _]', sku.strip(), maxsplit=1)[0]   # «AN100201-01H Alt» → AN100201-01H
         labels.append({
             'sku': sku,
             'filename': f.name,
             'size_kb': round(f.stat().st_size / 1024, 1),
             'modified_fmt': datetime.fromtimestamp(mtime).strftime('%d.%m.%Y %H:%M'),
             'is_cable': sku.upper().startswith('CA-'),
+            'antenna_sku': base_sku if antenna.is_antenna(base_sku) else '',
         })
     if request.GET.get('json'):
         return JsonResponse({'labels': labels})
-    return render(request, 'labels/list.html', {'labels': labels})
+    return render(request, 'labels/list.html', {'labels': labels, 'label_source': label_source()})
+
+
+# ── Етикетки антен з шаблону (labels_app/antenna.py) ──────────────────────────
+
+def _antenna_args(params):
+    """sku, qty, замовлення, Digi-Key P/N (None — за джерелом замовлення), виправлення з вікна."""
+    from labels_app import antenna
+    from sales.models import SalesOrder
+    order = None
+    order_id = str(params.get('order') or '').strip()
+    if order_id.isdigit():
+        order = SalesOrder.objects.filter(pk=int(order_id)).first()
+    dk = params.get('dk')
+    show_dk = None if dk in (None, '') else str(dk).lower() in ('1', 'true', 'on')
+    edits = {f: params.get(f) for f in antenna.FIELDS if params.get(f) is not None}
+    return (params.get('sku') or '').strip(), params.get('qty') or 1, order, show_dk, edits
+
+
+def _antenna_json(data, order):
+    from urllib.parse import quote, urlencode
+    query = {'qty': data['qty'], 'dk': int(data['show_dk'])}
+    if order is not None:
+        query['order'] = order.pk
+    data = dict(data, lines=[[prefix, value] for prefix, value in data['lines']])
+    data['url'] = f"/labels/antenna/{quote(data['pn'])}/?{urlencode(query)}"
+    if data['file']:
+        data['file_url'] = f"/labels/serve/{quote(data['sku'] or data['pn'])}/?qty={data['qty']}"
+    return JsonResponse({'ok': True, **data})
+
+
+@staff_member_required
+def antenna_check(request):
+    """GET ?sku=&qty=&order=[&dk=&description=&frequency=&connector=] → дані для вікна перевірки."""
+    from labels_app import antenna
+    sku, qty, order, show_dk, edits = _antenna_args(request.GET)
+    if not sku:
+        return JsonResponse({'ok': False, 'error': 'sku required'}, status=400)
+    return _antenna_json(antenna.build(sku, qty, order=order, show_dk=show_dk, edits=edits), order)
+
+
+@staff_member_required
+@require_POST
+def antenna_save(request):
+    """POST JSON {sku, qty, order, dk, description, frequency, connector} — людина перевірила етикетку."""
+    import json as _json
+    from labels_app import antenna
+    try:
+        payload = _json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'JSON required'}, status=400)
+    sku, qty, order, show_dk, edits = _antenna_args(payload)
+    if not sku:
+        return JsonResponse({'ok': False, 'error': 'sku required'}, status=400)
+    data = antenna.build(sku, qty, order=order, show_dk=show_dk, edits=edits)
+    if not data['can_print']:
+        return JsonResponse({'ok': False, 'error': next(i['text'] for i in data['issues'] if i['level'] == 'error')},
+                            status=400)
+    antenna.save(sku, edits, user=request.user)
+    return _antenna_json(antenna.build(sku, qty, order=order, show_dk=show_dk), order)
+
+
+@staff_member_required
+def antenna_label(request, sku):
+    """Готовий .dymo антени з шаблону з актуальними даними (?qty=&order=&dk=)."""
+    from labels_app import antenna
+    _sku, qty, order, show_dk, _edits = _antenna_args({**request.GET.dict(), 'sku': sku})
+    data = antenna.build(sku, qty, order=order, show_dk=show_dk)
+    if not data['can_print']:
+        problems = '; '.join(i['text'] for i in data['issues'] if i['level'] == 'error')
+        return HttpResponse(f'Етикетку {sku} не сформовано: {problems}', status=400,
+                            content_type='text/plain; charset=utf-8')
+    response = HttpResponse(antenna.render(data).encode('utf-8'), content_type='application/octet-stream')
+    response['Content-Disposition'] = f'attachment; filename="{data["pn"]}.dymo"'
+    return response
 
 
 @staff_member_required

@@ -320,6 +320,21 @@ class SalesSettings(models.Model):
                   "«Запитувати» — показує діалог вибору щоразу.",
     )
 
+    class DymoLabelSource(models.TextChoices):
+        GENERATE = "generate", "🧩 Сформувати з шаблону з актуальними даними (антени AN…, кабелі CA-…)"
+        FILE     = "file",     "📄 Готовий .dymo файл з бази, як є"
+
+    dymo_label_source = models.CharField(
+        "Звідки брати етикетку DYMO",
+        max_length=16,
+        choices=DymoLabelSource.choices,
+        default=DymoLabelSource.GENERATE,
+        help_text="«Сформувати» — антени й кабелі заповнюються з шаблону: артикул, кількість із замовлення, "
+                  "опис / частота / роз'єм зі складу або DigiKey, поточний рік; перший раз — вікно перевірки. "
+                  "Решта товарів — готовий файл. "
+                  "Правий клік на 🖨️ Друкувати — меню: «Завантажити з бази» / «Згенерувати й завантажити».",
+    )
+
     class Meta:
         verbose_name = 'Налаштування'
         verbose_name_plural = 'Налаштування'

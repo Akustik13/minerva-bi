@@ -160,7 +160,7 @@ class SalesSettingsAdmin(admin.ModelAdmin):
         }),
         ('🖥️ Відображення списку замовлень', {
             'fields': ('show_product_image_tooltip', 'show_pdf_preview', 'datasheet_priority', 'image_priority',
-                       'label_open_mode', 'dymo_open_mode'),
+                       'label_open_mode', 'dymo_open_mode', 'dymo_label_source'),
             'description': (
                 '<b>Попередній перегляд фото / PDF</b> — при наведенні на Артикул або значок 📄 '
                 'показує фото або PDF у маленькому спливаючому вікні.<br>'
@@ -544,6 +544,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         extra_context['sv_image_prio']       = _ss.image_priority
         extra_context['sv_label_open_mode']  = _ss.label_open_mode
         extra_context['sv_dymo_open_mode']   = _ss.dymo_open_mode
+        extra_context['sv_dymo_label_source'] = _ss.dymo_label_source
 
         response = super().changelist_view(request, extra_context=extra_context)
 
@@ -2207,6 +2208,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def label_buttons_list(self, obj):
         from pathlib import Path
         from django.conf import settings
+        from labels_app.views import label_kinds
         labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
         buttons = []
         for line in obj.lines.all():
@@ -2223,14 +2225,15 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 if s == sku_up or (s.startswith(sku_up) and len(s) > len(sku_up) and s[len(sku_up)] in (' ', '_')):
                     found = True
                     break
-            if found:
-                url = f"/labels/serve/{sku}/?qty={qty}"
-                _sku_js = sku.replace("'", "\\'")
-                buttons.append(
-                    f'<button type="button" onclick="svDymoOpen(\'{url}\',\'{_sku_js}\',{qty})" '
-                    f'style="display:inline-block;margin:2px;background:#1976d2;color:#fff;border:none;'
-                    f'padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;'
-                    f'white-space:nowrap">🖨️ {sku}</button>')
+            kind = label_kinds([sku])[sku]
+            if found or kind:
+                # клік / правий клік — labels/_label_actions.html (підключено в salesorder_changelist.html)
+                buttons.append(format_html(
+                    '<button type="button" data-svl="{}" data-sku="{}" data-qty="{}" data-order="{}" data-file="{}" '
+                    'data-svl-act="print" title="Правий клік — меню: з бази / згенерувати" '
+                    'style="display:inline-block;margin:2px;background:#1976d2;color:#fff;border:none;'
+                    'padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;'
+                    'white-space:nowrap">🖨️ {}</button>', kind, sku, qty, obj.pk, '1' if found else '', sku))
             else:
                 buttons.append(
                     f'<span style="display:inline-block;margin:2px;background:#bdbdbd;color:#fff;'
@@ -2244,11 +2247,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def label_buttons_detail(self, obj):
         from pathlib import Path
         from django.conf import settings
+        from django.template.loader import render_to_string
+        from labels_app.views import label_kinds, label_source
         import re as _re
 
         if not obj.pk:
             return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
 
+        source = label_source()
         labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
         rows = []
         inputs_js = []
@@ -2273,24 +2279,28 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 if label_path is None and s.startswith(sku_up) and len(s) > len(sku_up) and s[len(sku_up)] in (' ', '_'):
                     label_path = f
 
-            if label_path:
-                print_url = f"/labels/serve/{sku}/?qty={qty}"
-                _sku_js = sku.replace("'", "\\'")
-                print_btn = (
-                    f'<button type="button" '
-                    f'onclick="svDymoOpen(\'{print_url}\',\'{_sku_js}\',{qty})" '
-                    f'style="background:#1976d2;color:#fff;padding:7px 14px;border:none;'
-                    f'border-radius:7px;cursor:pointer;font-weight:bold;font-size:13px">'
-                    f'🖨️ Друкувати ({qty} шт.)</button>'
-                )
+            kind = label_kinds([sku])[sku]
+            if label_path or kind:
+                # клік — як у «Звідки брати етикетку DYMO», правий клік — меню (labels/_label_actions.html)
+                print_btn = format_html(
+                    '<button type="button" data-svl="{}" data-sku="{}" data-qty="{}" data-order="{}" data-file="{}" '
+                    'data-svl-act="print" title="Правий клік — меню: з бази / згенерувати" '
+                    'style="background:#1976d2;color:#fff;padding:7px 14px;border:none;'
+                    'border-radius:7px;cursor:pointer;font-weight:bold;font-size:13px">'
+                    '🖨️ Друкувати ({} шт.)</button>', kind, sku, qty, obj.pk, '1' if label_path else '', qty)
                 upload_btn = (
                     f'<button type="button" onclick="document.getElementById(\'dfi_{sku_id}\').click()" '
                     f'style="background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4);'
                     f'border:1px solid var(--border-color,#333);padding:7px 14px;'
                     f'border-radius:7px;cursor:pointer;font-size:13px;margin-left:8px">'
-                    f'🔄 Оновити етикетку</button>'
+                    f'{"🔄 Оновити етикетку" if label_path else "📎 Додати файл"}</button>'
                 )
-                status = f'<span style="color:#4caf50;font-size:12px;margin-left:8px">✅ {label_path.name}</span>'
+                notes = []
+                if kind and (source == 'generate' or not label_path):
+                    notes.append('🧩 з шаблону ' + ('антени' if kind == 'antenna' else 'кабелю'))
+                if label_path:
+                    notes.append(f'📄 у базі: {label_path.name}')
+                status = f'<span style="color:#4caf50;font-size:12px;margin-left:8px">✅ {" · ".join(notes)}</span>'
                 actions = print_btn + upload_btn + status
             else:
                 upload_btn = (
@@ -2338,7 +2348,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '📂 Переглянути всі етикетки</button>'
             '</div>'
         )
-        return mark_safe(html)
+        return mark_safe(html + render_to_string('labels/_label_actions.html', {'label_source': source}))
     label_buttons_detail.short_description = "Друк та завантаження етикеток"
 
 

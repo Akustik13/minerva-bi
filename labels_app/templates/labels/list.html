@@ -79,6 +79,16 @@
                          border:none;cursor:pointer;font-size:12px;font-weight:600">
             ⬇️ Завантажити
           </button>
+          {% if lbl.antenna_sku %}
+          <button type="button" data-svl="antenna" data-sku="{{ lbl.antenna_sku }}" data-qty-input="qty-{{ lbl.sku }}"
+                  data-file="1" data-svl-act="check"
+                  title="Сформувати з шаблону антени з актуальними даними (перевірка перед друком) · правий клік — меню"
+                  style="background:var(--bg-hover);color:var(--text);padding:4px 8px;
+                         border-radius:4px;border:1px solid var(--border-strong);
+                         cursor:pointer;font-size:12px;margin-left:4px">
+            🧩
+          </button>
+          {% endif %}
           {% if lbl.is_cable %}
           <button type="button" onclick="regenLabel('{{ lbl.sku }}')"
                   title="Згенерувати заново"
@@ -114,14 +124,14 @@
             style="position:absolute;top:14px;right:16px;background:none;border:none;
                    font-size:20px;cursor:pointer;color:var(--text-dim)">✕</button>
 
-    <h3 style="margin:0 0 20px;font-size:16px;color:var(--text)">🖨️ Генерація наклейки RF кабелю</h3>
+    <h3 style="margin:0 0 20px;font-size:16px;color:var(--text)">🖨️ Генерація наклейки RF кабелю або антени</h3>
 
     <div style="display:flex;flex-direction:column;gap:14px">
       <div>
         <label style="font-size:12px;color:var(--text-dim);font-weight:600;
                       text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">
           Part Number</label>
-        <input type="text" id="genPartNo" placeholder="CA-MHF1-MC1.13-175-MHF4"
+        <input type="text" id="genPartNo" placeholder="CA-MHF1-MC1.13-175-MHF4 або AN220213-01C"
                style="width:100%;padding:8px 12px;background:var(--bg-input);
                       border:1px solid var(--border-strong);border-radius:6px;
                       color:var(--text);font-family:monospace;font-size:14px;box-sizing:border-box">
@@ -218,6 +228,11 @@ function fetchPreview() {
   var pvEl  = document.getElementById('genPreview');
   var btn   = document.getElementById('genBtn');
   if (!pn) { pvEl.style.display = 'none'; errEl.style.display = 'none'; btn.disabled = true; btn.style.opacity = '.5'; _previewOk = false; return; }
+  if (/^AN\d{4}/i.test(pn)) {   // антена — далі вікно перевірки етикетки (labels/_label_actions.html)
+    pvEl.style.display = 'none'; errEl.style.display = 'none';
+    _previewOk = true; btn.disabled = false; btn.style.opacity = '1';
+    return;
+  }
 
   fetch('/labels/preview/?part_no=' + encodeURIComponent(pn) + '&qty=' + qty)
     .then(function (r) { return r.json(); })
@@ -257,6 +272,11 @@ function doGenerate() {
   var qty = parseInt(document.getElementById('genQty').value) || 1;
   var btn = document.getElementById('genBtn');
   if (!pn || !_previewOk) return;
+  if (/^AN\d{4}/i.test(pn)) {
+    closeGenModal();
+    window.svLabel.check({sku: pn, qty: qty});
+    return;
+  }
 
   btn.textContent = '⏳ Генерація...';
   btn.disabled = true;
@@ -348,4 +368,5 @@ function deleteLabel(sku) {
   .catch(function (e) { alert('Помилка мережі: ' + e); });
 }
 </script>
+{% include "labels/_label_actions.html" %}
 {% endblock %}

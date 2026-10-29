@@ -2939,20 +2939,32 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
   📤 {_replace_lbl if label_path else _upload_lbl}
 </label>'''
 
-        if label_path:
+        from django.template.loader import render_to_string
+        from labels_app.views import label_kinds, label_source
+        kind = label_kinds([sku])[sku]   # антена / кабель — етикетку можна сформувати з шаблону
+        if label_path or kind:
             url_base = f"/labels/serve/{sku}/"
             _qty_lbl = str(_("К-сть:"))
             _print_lbl = str(_("Друкувати"))
+            source = label_source()
+            notes = []
+            if kind and (source == 'generate' or not label_path):
+                notes.append(str(_("🧩 з шаблону")) + (' · ' + str(_("правий клік — меню"))))
+            if label_path:
+                notes.append(f'📄 {label_path.name}')
+            svl_attrs = (format_html(' data-svl="{}" data-sku="{}" data-qty-input="lbl-qty-{}" data-file="{}" data-svl-act="print"',
+                                     kind, sku, sku, '1' if label_path else '') if kind else '')
+            svl_js = render_to_string('labels/_label_actions.html', {'label_source': source}) if kind else ''
             return mark_safe(f'''
 <div style="display:flex;flex-direction:column;gap:12px;padding:4px 0">
   <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-    <span style="color:#4caf50;font-size:13px">✅ {label_path.name}</span>
+    <span style="color:#4caf50;font-size:13px">✅ {" · ".join(notes)}</span>
     <div style="display:flex;align-items:center;gap:8px">
       <label style="font-size:12px;color:#9aafbe">{_qty_lbl}</label>
       <input id="lbl-qty-{sku}" type="number" value="1" min="1" max="999"
              style="width:60px;padding:4px 6px;background:#111c26;border:1px solid #2a3f52;
                     border-radius:5px;color:#c9d8e4;font-size:13px;text-align:center">
-      <a id="lbl-btn-{sku}" href="{url_base}?qty=1" target="_blank"
+      <a id="lbl-btn-{sku}" href="{url_base}?qty=1" target="_blank"{svl_attrs}
          style="background:#1976d2;color:#fff;padding:7px 18px;border-radius:7px;
                 font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">
         🖨️ {_print_lbl}
@@ -2969,7 +2981,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     btn.href = '{url_base}?qty=' + (parseInt(inp.value) || 1);
   }});
 }})();
-</script>''')
+</script>{svl_js}''')
 
         _not_found = str(_("Файл %(sku)s.dymo не знайдено") % {"sku": sku})
         return mark_safe(f'''

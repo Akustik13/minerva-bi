@@ -1,0 +1,323 @@
+{# Кнопки етикеток DYMO: клік — дія з «Налаштування продажів → Звідки брати етикетку DYMO», #}
+{# правий клік — меню «з бази / згенерувати»; вікно перевірки етикетки антени (labels_app/antenna.py). #}
+{# Кнопка: data-svl="antenna|cable|" data-sku data-qty | data-qty-input data-order data-file="1" data-svl-act="print|download|check" #}
+<style>
+.svl-menu{position:fixed;z-index:10001;min-width:250px;background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45);padding:5px 0;font-size:13px}
+.svl-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text,#c9d8e4);padding:8px 14px;cursor:pointer;font-size:13px;white-space:nowrap}
+.svl-menu button:hover:not(:disabled){background:var(--bg-hover,#1e2d40)}
+.svl-menu button:disabled{opacity:.45;cursor:default}
+.svl-menu .svl-def{font-size:11px;color:var(--text-muted,#9aafbe);margin-left:6px}
+.svl-menu .svl-foot{border-top:1px solid var(--border-strong,#243347);margin-top:4px;padding:6px 14px 2px;font-size:11px;color:var(--text-muted,#9aafbe);white-space:normal}
+.svl-menu .svl-foot a{color:var(--link,#58a6ff)}
+.svl-modal{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box}
+.svl-box{background:var(--bg-card,#1a2535);color:var(--text,#c9d8e4);border:1px solid var(--border-strong,#243347);border-radius:12px;width:100%;max-width:760px;max-height:94vh;overflow:auto;padding:18px 20px;box-sizing:border-box;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.svl-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.svl-head b{font-size:15px}
+.svl-x{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted,#9aafbe)}
+.svl-paper{container-type:inline-size;background:#fff;color:#000;border-radius:14px;width:100%;max-width:560px;aspect-ratio:3.43/1.43;position:relative;margin:0 auto 14px;font-family:Arial,Helvetica,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.35);overflow:hidden}
+.svl-paper div{position:absolute;white-space:nowrap;overflow:hidden}
+.svl-paper mark{background:rgba(255,106,0,.32);color:inherit;border-radius:2px;padding:0 1px}
+.svl-pn{left:6.5%;top:4%;font-size:4.1cqw}
+.svl-qty{left:6.5%;top:23%;font-size:3.9cqw}
+.svl-logo{right:3.5%;top:4%;font-size:3.9cqw;font-weight:700;font-style:italic}
+.svl-bc{left:47%;top:17%;width:49.5%;height:22%;text-align:center}
+.svl-bars{height:68%;background:repeating-linear-gradient(90deg,#000 0 1px,#fff 1px 2px,#000 2px 4px,#fff 4px 5px,#000 5px 6px,#fff 6px 8px)}
+.svl-bc span{font-size:2.9cqw;line-height:1.1}
+.svl-qr{left:6.5%;top:41%;width:21%;height:53%}
+.svl-qr svg{width:100%;height:100%}
+.svl-text{left:30.6%;top:39%;width:67%;height:56%;display:flex;flex-direction:column;justify-content:flex-end;font-size:3.24cqw;line-height:1.16;white-space:normal!important}
+.svl-text p{margin:0;white-space:nowrap;overflow:hidden;position:static}
+.svl-grid{display:grid;grid-template-columns:120px 1fr;gap:8px 12px;align-items:start;font-size:13px}
+.svl-grid > label{padding-top:6px;color:var(--text-muted,#9aafbe);font-weight:600}
+.svl-grid input[type=text],.svl-grid input[type=number]{width:100%;box-sizing:border-box;padding:6px 9px;background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;color:var(--text,#c9d8e4);font-size:13px}
+.svl-src{font-size:11px;color:var(--text-muted,#9aafbe);margin-top:3px}
+.svl-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+.svl-chip{background:var(--bg-hover,#1e2d40);border:1px solid var(--border-strong,#243347);color:var(--text,#c9d8e4);border-radius:12px;padding:2px 9px;font-size:11px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.svl-chip.on{border-color:#ff6a00}
+.svl-issues{margin:12px 0 0;padding:0;list-style:none;font-size:12px}
+.svl-issues li{padding:5px 9px;border-radius:5px;margin-bottom:4px}
+.svl-issues .error{background:rgba(198,40,40,.18);color:#ef9a9a}
+.svl-issues .warn{background:rgba(255,152,0,.15);color:#ffcc80}
+.svl-issues .info{background:rgba(96,125,139,.15);color:var(--text-muted,#9aafbe)}
+.svl-foot-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
+.svl-btn{border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4);border:1px solid var(--border-strong,#243347)}
+.svl-btn.main{background:#1565c0;color:#fff;border-color:#1565c0}
+.svl-btn:disabled{opacity:.45;cursor:default}
+.svl-note{font-size:11px;color:var(--text-muted,#9aafbe);flex-basis:100%}
+@media (max-width:560px){.svl-grid{grid-template-columns:1fr}.svl-grid > label{padding-top:0}}
+</style>
+<script>
+(function () {
+  if (window.svLabel) return;
+  var SOURCE = '{{ label_source|default:"generate"|escapejs }}';
+  var SOURCE_TEXT = SOURCE === 'file' ? '📄 готовий файл з бази' : '🧩 сформувати з шаблону';
+
+  function csrf() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : ((document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '');
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+    });
+  }
+  function download(url, name) {
+    if (window.svDymoDownload) return window.svDymoDownload(url, name);
+    var a = document.createElement('a'); a.href = url; a.download = (name || 'label') + '.dymo';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  // Друк — як усі кнопки DYMO: «Дія при натисканні 🖨️ Друкувати» (завантажити / DYMO / запитати)
+  function open(url, sku, qty) {
+    if (window.svDymoOpen) return window.svDymoOpen(url, sku, qty);
+    download(url, sku);
+  }
+  function opts(el) {
+    var d = el.dataset, qty = d.qty;
+    if (d.qtyInput) { var inp = document.getElementById(d.qtyInput); if (inp) qty = inp.value; }
+    return {kind: d.svl || '', sku: d.sku || '', qty: parseInt(qty, 10) || 1, order: d.order || '',
+            file: d.file === '1', act: d.svlAct || 'print'};
+  }
+
+  function fromFile(o, act) {
+    var url = '/labels/serve/' + encodeURIComponent(o.sku) + '/?qty=' + o.qty;
+    if (act === 'download') download(url, o.sku); else open(url, o.sku, o.qty);
+  }
+  function generate(o, act) {
+    if (o.kind === 'cable') {
+      fetch('/labels/generate/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+                                  body: JSON.stringify({part_no: o.sku, qty: o.qty})})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) { alert('Етикетку ' + o.sku + ' не сформовано: ' + (d.error || '')); return; }
+          if (act === 'download') download(d.download_url, o.sku); else open(d.download_url, o.sku, o.qty);
+        })
+        .catch(function (e) { alert('Помилка мережі: ' + e); });
+      return;
+    }
+    var q = new URLSearchParams({sku: o.sku, qty: o.qty});
+    if (o.order) q.set('order', o.order);
+    fetch('/labels/antenna/check/?' + q.toString())
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) { alert(d.error || 'Помилка'); return; }
+        // «тиснем і робить»: перевірено раніше й без зауважень — одразу; інакше — вікно перевірки
+        if (d.ready && act !== 'check') {
+          if (act === 'download') download(d.url, d.pn); else open(d.url, d.pn, d.qty);
+        } else { modal(o, d, act === 'check' ? 'print' : act); }
+      })
+      .catch(function (e) { alert('Помилка мережі: ' + e); });
+  }
+  function run(o, act) {
+    act = act || o.act;
+    if (act === 'check') return generate(o, 'check');
+    if (o.kind && (SOURCE === 'generate' || !o.file)) return generate(o, act);
+    if (o.file) return fromFile(o, act);
+    alert('Для ' + o.sku + ' немає етикетки в базі.');
+  }
+
+  // ── Меню правого кліку ──────────────────────────────────────────────────────
+  function closeMenu() { var m = document.getElementById('svl-menu'); if (m) m.remove(); }
+  function menu(el, ev) {
+    closeMenu();
+    var o = opts(el);
+    var m = document.createElement('div');
+    m.id = 'svl-menu'; m.className = 'svl-menu';
+    // «· клік» — те, що ця кнопка робить звичайним кліком (run)
+    var defGen = o.kind && (SOURCE === 'generate' || !o.file);
+    var dl = o.act === 'download', chk = o.act === 'check';
+    var items = [
+      {t: '📄 Завантажити з бази' + (o.file ? '' : ' — файлу немає'), dis: !o.file, def: !defGen && dl,
+       f: function () { fromFile(o, 'download'); }},
+    ];
+    if (o.kind) {
+      items.push({t: '🧩 Згенерувати наклейку й завантажити', def: defGen && dl,
+                  f: function () { generate(o, 'download'); }});
+      items.push({t: '🖨️ Згенерувати й друкувати', def: defGen && !dl && !chk, f: function () { generate(o, 'print'); }});
+    }
+    if (o.kind === 'antenna') items.push({t: '🔍 Перевірити дані етикетки…', def: chk, f: function () { generate(o, 'check'); }});
+    if (o.file) items.push({t: '🖨️ Друкувати файл з бази', def: !defGen && !dl && !chk, f: function () { fromFile(o, 'print'); }});
+    items.forEach(function (it) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.disabled = !!it.dis;
+      b.innerHTML = esc(it.t) + (it.def ? '<span class="svl-def">· клік</span>' : '');
+      b.onclick = function () { closeMenu(); it.f(); };
+      m.appendChild(b);
+    });
+    var foot = document.createElement('div');
+    foot.className = 'svl-foot';
+    foot.innerHTML = 'Клік: ' + esc(SOURCE_TEXT) + ' · <a href="/admin/sales/salessettings/" target="_blank">змінити</a>';
+    m.appendChild(foot);
+    document.body.appendChild(m);
+    var x = Math.min(ev.clientX, window.innerWidth - m.offsetWidth - 8);
+    var y = Math.min(ev.clientY, window.innerHeight - m.offsetHeight - 8);
+    m.style.left = Math.max(4, x) + 'px'; m.style.top = Math.max(4, y) + 'px';
+  }
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('#svl-menu')) closeMenu();
+    var el = e.target.closest('[data-svl]');
+    if (!el || e.button !== 0) return;
+    e.preventDefault();
+    run(opts(el));
+  });
+  document.addEventListener('contextmenu', function (e) {
+    var el = e.target.closest('[data-svl]');
+    if (!el) { closeMenu(); return; }
+    e.preventDefault();
+    menu(el, e);
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+  window.addEventListener('scroll', closeMenu, true);
+
+  // ── Вікно перевірки етикетки антени ─────────────────────────────────────────
+  function qrSvg(text) {
+    var n = 21, cells = '', h = 2166136261;
+    function finder(x, y) {
+      return '<rect x="' + x + '" y="' + y + '" width="7" height="7"/><rect x="' + (x + 1) + '" y="' + (y + 1) +
+             '" width="5" height="5" fill="#fff"/><rect x="' + (x + 2) + '" y="' + (y + 2) + '" width="3" height="3"/>';
+    }
+    for (var i = 0; i < n * n; i++) {
+      var x = i % n, y = Math.floor(i / n);
+      if ((x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12)) continue;
+      h ^= text.charCodeAt(i % text.length) + i; h = Math.imul(h, 16777619) >>> 0;
+      if (h & 1) cells += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>';
+    }
+    return '<svg viewBox="0 0 21 21" shape-rendering="crispEdges">' + finder(0, 0) + finder(14, 0) + finder(0, 14) + cells + '</svg>';
+  }
+  function paper(d) {
+    var lines = d.lines.map(function (l) {
+      return '<p>' + esc(l[0]) + '<mark>' + esc(l[1]) + '</mark></p>';
+    }).join('');
+    return '<div class="svl-pn">P/N: <mark>' + esc(d.pn) + '</mark></div>'
+      + '<div class="svl-qty">QTY: <mark>' + esc(d.qty) + '</mark> PCS</div>'
+      + '<div class="svl-logo">Sevskiy GmbH</div>'
+      + '<div class="svl-bc"><div class="svl-bars" style="position:static"></div><span><mark>' + esc(d.pn) + '</mark></span></div>'
+      + '<div class="svl-qr" title="QR: ' + esc(d.pn) + '">' + qrSvg(d.pn) + '</div>'
+      + '<div class="svl-text">' + lines
+      + '<p>Copyright © 2009 - <mark>' + esc(d.year) + '</mark> Sevskiy GmbH.</p>'
+      + '<p>All rights reserved. Reproduction prohibited.</p></div>';
+  }
+  var NAMES = {description: 'Опис', frequency: 'Частота', connector: "Роз'єм"};
+
+  function modal(o, d, act) {
+    var old = document.getElementById('svl-modal'); if (old) old.remove();
+    var m = document.createElement('div');
+    m.id = 'svl-modal'; m.className = 'svl-modal';
+    var fieldsHtml = Object.keys(NAMES).map(function (f) {
+      return '<label for="svl-f-' + f + '">' + NAMES[f] + '</label><div><input type="text" id="svl-f-' + f + '" data-f="' + f
+        + '" maxlength="200"><div class="svl-src" id="svl-s-' + f + '"></div><div class="svl-chips" id="svl-c-' + f + '"></div></div>';
+    }).join('');
+    m.innerHTML = '<div class="svl-box" role="dialog" aria-label="Етикетка антени">'
+      + '<div class="svl-head"><b>🏷️ Етикетка антени · ' + esc(d.pn) + '</b><button type="button" class="svl-x" title="Закрити">✕</button></div>'
+      + '<div class="svl-paper" id="svl-paper"></div>'
+      + '<div class="svl-grid">'
+      + '<label for="svl-qty">Кількість</label><div><input type="number" id="svl-qty" min="1" max="99999" style="max-width:120px"></div>'
+      + '<label>Digi-Key P/N</label><div><label style="display:flex;gap:8px;align-items:center;cursor:pointer">'
+      + '<input type="checkbox" id="svl-dk"> <span id="svl-dk-text"></span></label></div>'
+      + fieldsHtml
+      + '<label>Рік</label><div style="padding-top:6px" id="svl-year"></div>'
+      + '</div><ul class="svl-issues" id="svl-issues"></ul>'
+      + '<div class="svl-foot-btns">'
+      + '<button type="button" class="svl-btn main" id="svl-print">🖨️ Друкувати</button>'
+      + '<button type="button" class="svl-btn" id="svl-dl">⬇️ Завантажити .dymo</button>'
+      + (d.file_url ? '<button type="button" class="svl-btn" id="svl-old" title="' + esc(d.file.name) + ' — як є, без змін">📄 Старий файл</button>' : '')
+      + '<button type="button" class="svl-btn" id="svl-cancel">Скасувати</button>'
+      + '<span class="svl-note" id="svl-note"></span></div></div>';
+    document.body.appendChild(m);
+    var box = m.querySelector('.svl-box');
+    function close() { m.remove(); }
+    m.addEventListener('click', function (e) { if (e.target === m) close(); });
+    box.querySelector('.svl-x').onclick = close;
+    box.querySelector('#svl-cancel').onclick = close;
+    m.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') close();
+      if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox') { e.preventDefault(); act === 'download' ? dl.click() : pr.click(); }
+    });
+    var qtyEl = box.querySelector('#svl-qty'), dkEl = box.querySelector('#svl-dk');
+    var pr = box.querySelector('#svl-print'), dl = box.querySelector('#svl-dl');
+    if (act === 'download') { dl.classList.add('main'); pr.classList.remove('main'); }
+    qtyEl.value = d.qty;
+    Object.keys(NAMES).forEach(function (f) { box.querySelector('#svl-f-' + f).value = d.fields[f].value; });
+    var state = d, touched = {}, timer = null;
+
+    function params() {
+      var p = {sku: o.sku, qty: parseInt(qtyEl.value, 10) || 0, dk: dkEl.checked ? 1 : 0};
+      if (o.order) p.order = o.order;
+      Object.keys(NAMES).forEach(function (f) { if (touched[f]) p[f] = box.querySelector('#svl-f-' + f).value; });
+      return p;
+    }
+    function show(d) {
+      state = d;
+      box.querySelector('#svl-paper').innerHTML = paper(d);
+      dkEl.checked = d.show_dk; dkEl.disabled = !d.digikey_pn;
+      box.querySelector('#svl-dk-text').textContent = d.digikey_pn
+        ? d.digikey_pn + (d.dk_reason ? ' · ' + d.dk_reason : '') : 'немає — ' + d.digikey_from;
+      box.querySelector('#svl-year').innerHTML = '<b>' + esc(d.year) + '</b> <span class="svl-src">— поточний, ставиться сам</span>';
+      Object.keys(NAMES).forEach(function (f) {
+        var fd = d.fields[f], inp = box.querySelector('#svl-f-' + f);
+        box.querySelector('#svl-s-' + f).textContent = fd.label ? 'Зараз: ' + fd.label : '';
+        var chips = box.querySelector('#svl-c-' + f);
+        chips.innerHTML = '';
+        fd.candidates.forEach(function (c) {
+          if (c.source === 'edit' || !c.value) return;
+          var b = document.createElement('button');
+          b.type = 'button'; b.className = 'svl-chip' + (c.value === inp.value ? ' on' : '');
+          b.title = c.label + ': ' + c.value;
+          b.textContent = c.label + ': ' + c.value;
+          b.onclick = function () { inp.value = c.value; touched[f] = true; recheck(0); };
+          chips.appendChild(b);
+        });
+      });
+      box.querySelector('#svl-issues').innerHTML = d.issues.map(function (i) {
+        var icon = i.level === 'error' ? '⛔' : i.level === 'warn' ? '⚠️' : '✓';
+        return '<li class="' + i.level + '">' + icon + ' ' + esc(i.text) + '</li>';
+      }).join('') || '<li class="info">✓ Артикул, кількість і рік перевірено — зауважень немає.</li>';
+      pr.disabled = dl.disabled = !d.can_print;
+      box.querySelector('#svl-note').textContent = d.product
+        ? 'Тексти запам\'ятаються для ' + d.pn + ' — наступного разу клік друкує одразу, поки дані на складі й DigiKey не зміняться.'
+          + (d.checked_at ? ' Перевіряв: ' + (d.checked_by || '—') + ', ' + d.checked_at.slice(0, 10) + '.' : '')
+        : 'Товару немає на складі — тексти не запам\'ятаються.';
+    }
+    function recheck(delay) {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        fetch('/labels/antenna/check/?' + new URLSearchParams(params()).toString())
+          .then(function (r) { return r.json(); })
+          .then(function (d) { if (d.ok) show(d); });
+      }, delay);
+    }
+    Object.keys(NAMES).forEach(function (f) {
+      box.querySelector('#svl-f-' + f).addEventListener('input', function () { touched[f] = true; recheck(350); });
+    });
+    qtyEl.addEventListener('input', function () { recheck(350); });
+    dkEl.addEventListener('change', function () { recheck(0); });
+
+    function go(action) {
+      pr.disabled = dl.disabled = true;
+      var p = params();
+      Object.keys(NAMES).forEach(function (f) { p[f] = box.querySelector('#svl-f-' + f).value; });
+      var done = function (d) {
+        close();
+        if (action === 'download') download(d.url, d.pn); else open(d.url, d.pn, d.qty);
+      };
+      if (!state.product) { done(state); return; }
+      fetch('/labels/antenna/save/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+                                      body: JSON.stringify(p)})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) { done(d); return; }
+          pr.disabled = dl.disabled = false;
+          box.querySelector('#svl-issues').insertAdjacentHTML('afterbegin', '<li class="error">⛔ ' + esc(d.error || 'Помилка') + '</li>');
+        })
+        .catch(function (e) { pr.disabled = dl.disabled = false; alert('Помилка мережі: ' + e); });
+    }
+    pr.onclick = function () { go('print'); };
+    dl.onclick = function () { go('download'); };
+    var oldBtn = box.querySelector('#svl-old');
+    if (oldBtn) oldBtn.onclick = function () { close(); open(d.file_url, d.sku, d.qty); };
+    show(d);
+    (act === 'download' ? dl : pr).focus();
+  }
+
+  window.svLabel = {run: run, menu: menu, check: function (o) { generate(Object.assign({kind: 'antenna', qty: 1, order: ''}, o), 'check'); }};
+})();
+</script>
