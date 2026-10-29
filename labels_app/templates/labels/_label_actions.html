@@ -2,6 +2,8 @@
 {# правий клік — меню «з бази / згенерувати»; вікно перевірки етикетки антени (labels_app/antenna.py). #}
 {# Кнопка: data-svl="antenna|cable|" data-sku data-qty | data-qty-input data-order data-file="1" data-svl-act="print|download|check" #}
 {# Етикетка замовлення: data-svl="order" data-order=<pk> data-sku=<номер замовлення> (labels_app/order_label.py) #}
+{# Друк — служба DYMO Connect на цьому ПК (https://127.0.0.1:41951, GetPrinters / PrintLabel), програму не відкривати; #}
+{# контекст: label_source, dymo_mode — labels_app.views.label_context(). Інші скрипти сторінок друкують через svLabel.print. #}
 <style>
 .svl-menu{position:fixed;z-index:10001;min-width:250px;background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45);padding:5px 0;font-size:13px}
 .svl-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text,#c9d8e4);padding:8px 14px;cursor:pointer;font-size:13px;white-space:nowrap}
@@ -45,6 +47,16 @@
 .svl-btn.main{background:#1565c0;color:#fff;border-color:#1565c0}
 .svl-btn:disabled{opacity:.45;cursor:default}
 .svl-note{font-size:11px;color:var(--text-muted,#9aafbe);flex-basis:100%}
+.svl-menu button.svl-sep{border-top:1px solid var(--border-strong,#243347);margin-top:4px;padding-top:9px;color:var(--text-muted,#9aafbe)}
+.svl-toast{position:fixed;right:18px;bottom:18px;z-index:10002;background:var(--bg-card,#1a2535);color:var(--text,#c9d8e4);border:1px solid var(--border-strong,#243347);border-left:4px solid #2e7d32;border-radius:8px;padding:10px 14px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.35);max-width:min(420px,calc(100vw - 36px))}
+.svl-toast.bad{border-left-color:#e53935}
+.svl-dlg-body{font-size:13px;line-height:1.55}
+.svl-dlg-body p{margin:0 0 8px}
+.svl-steps{margin:0;padding-left:20px}
+.svl-steps li{margin-bottom:6px}
+.svl-printers label{display:flex;gap:8px;align-items:center;padding:6px 4px;cursor:pointer}
+.svl-ok{color:#2e7d32;font-size:11px}
+.svl-off{color:var(--text-muted,#9aafbe);font-size:11px}
 @media (max-width:560px){.svl-grid{grid-template-columns:1fr}.svl-grid > label{padding-top:0}}
 </style>
 <script>
@@ -52,6 +64,9 @@
   if (window.svLabel) return;
   var SOURCE = '{{ label_source|default:"generate"|escapejs }}';
   var SOURCE_TEXT = SOURCE === 'file' ? '📄 готовий файл з бази' : '🧩 сформувати з шаблону';
+  var DYMO_MODE = '{{ dymo_mode|default:"download"|escapejs }}';   // «Дія при натисканні 🖨️ Друкувати»
+  var DYMO = 'https://127.0.0.1:41951/DYMO/DLS/Printing/';          // служба DYMO Connect на цьому ПК
+  var PRINTER_KEY = 'svl-dymo-printer';
 
   function csrf() {
     var m = document.cookie.match(/csrftoken=([^;]+)/);
@@ -63,14 +78,142 @@
     });
   }
   function download(url, name) {
-    if (window.svDymoDownload) return window.svDymoDownload(url, name);
     var a = document.createElement('a'); a.href = url; a.download = (name || 'label') + '.dymo';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   }
-  // Друк — як усі кнопки DYMO: «Дія при натисканні 🖨️ Друкувати» (завантажити / DYMO / запитати)
-  function open(url, sku, qty) {
-    if (window.svDymoOpen) return window.svDymoOpen(url, sku, qty);
-    download(url, sku);
+  function stored(key, value) {      // localStorage може бути недоступний — тоді просто без пам'яті
+    try { if (value === undefined) return localStorage.getItem(key); localStorage.setItem(key, value); } catch (e) {}
+    return null;
+  }
+  function toast(text, bad) {
+    var t = document.getElementById('svl-toast') || document.createElement('div');
+    t.id = 'svl-toast'; t.className = 'svl-toast' + (bad ? ' bad' : ''); t.textContent = text;
+    if (!t.parentNode) document.body.appendChild(t);
+    clearTimeout(t._hide); t._hide = setTimeout(function () { t.remove(); }, bad ? 7000 : 3500);
+  }
+  function dialog(title, html, buttons) {   // buttons: [{t, main, f}] — f() після закриття вікна
+    var old = document.getElementById('svl-dlg'); if (old) old.remove();
+    var m = document.createElement('div');
+    m.id = 'svl-dlg'; m.className = 'svl-modal';
+    m.innerHTML = '<div class="svl-box" style="max-width:480px"><div class="svl-head"><b>' + esc(title) + '</b>'
+      + '<button type="button" class="svl-x" title="Закрити">✕</button></div><div class="svl-dlg-body">' + html + '</div>'
+      + '<div class="svl-foot-btns"></div></div>';
+    var foot = m.querySelector('.svl-foot-btns');
+    buttons.forEach(function (b) {
+      var el = document.createElement('button');
+      el.type = 'button'; el.className = 'svl-btn' + (b.main ? ' main' : ''); el.textContent = b.t;
+      el.onclick = function () { m.remove(); if (b.f) b.f(); };
+      foot.appendChild(el);
+    });
+    m.querySelector('.svl-x').onclick = function () { m.remove(); };
+    m.addEventListener('click', function (e) { if (e.target === m) m.remove(); });
+    document.body.appendChild(m);
+    var main = foot.querySelector('.main'); if (main) main.focus();
+    return m;
+  }
+
+  // ── Прямий друк: служба DYMO Connect на цьому ПК (програму відкривати не треба) ──────────────
+  function dymo(cmd, params) {
+    var init = params ? {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                         body: new URLSearchParams(params).toString()} : {};
+    return fetch(DYMO + cmd, init)
+      .catch(function () { throw {offline: true}; })
+      .then(function (r) {
+        return r.text().then(function (t) { if (!r.ok) throw new Error(t || ('HTTP ' + r.status)); return t; });
+      });
+  }
+  function printers() {
+    return dymo('GetPrinters').then(function (xml) {
+      var root = new DOMParser().parseFromString(xml, 'text/xml').documentElement, out = [];
+      Array.prototype.forEach.call(root ? root.children : [], function (p) {
+        var get = function (tag) { var e = p.getElementsByTagName(tag)[0]; return e ? e.textContent.trim() : ''; };
+        if (get('Name')) out.push({name: get('Name'), model: get('ModelName'), connected: get('IsConnected') !== 'False'});
+      });
+      return out;
+    });
+  }
+  // Принтер: запам'ятований → єдиний підключений → вибір у вікні (запам'ятовується в цьому браузері)
+  function pickPrinter(list, force) {
+    var saved = stored(PRINTER_KEY);
+    var live = list.filter(function (p) { return p.connected; });
+    if (!list.length) return Promise.reject(new Error('Служба DYMO не бачить жодного принтера — перевірте USB і живлення.'));
+    if (!force && saved && list.some(function (p) { return p.name === saved; })) return Promise.resolve(saved);
+    if (!force && live.length === 1) return Promise.resolve(live[0].name);
+    if (!force && !live.length && list.length === 1) return Promise.resolve(list[0].name);
+    return new Promise(function (resolve, reject) {
+      var choice = saved && list.some(function (p) { return p.name === saved; }) ? saved : (live[0] || list[0]).name;
+      var html = '<div class="svl-printers">' + list.map(function (p) {
+        return '<label><input type="radio" name="svl-printer" value="' + esc(p.name) + '"'
+          + (p.name === choice ? ' checked' : '') + '> <b>' + esc(p.name) + '</b> '
+          + (p.connected ? '<span class="svl-ok">● підключено</span>' : '<span class="svl-off">○ не підключено</span>')
+          + '</label>';
+      }).join('') + '</div><div class="svl-src">Вибір запам\'ятовується в цьому браузері; змінити — правий клік на 🖨️ → «Принтер DYMO…».</div>';
+      var dlg = dialog('🖨️ Принтер DYMO', html, [
+        {t: '✓ Вибрати', main: true, f: function () {
+          var name = (dlg.querySelector('input[name=svl-printer]:checked') || {}).value || choice;
+          stored(PRINTER_KEY, name); resolve(name);
+        }},
+        {t: 'Скасувати', f: function () { reject({cancel: true}); }},
+      ]);
+    });
+  }
+  function offline(url, name) {
+    dialog('⚠️ DYMO Connect не відповідає', '<ol class="svl-steps">'
+      + '<li>На цьому ПК має працювати <b>DYMO Connect</b> (значок у треї біля годинника).</li>'
+      + '<li>Один раз дозвольте браузеру службу DYMO: «🔒 Відкрити службу DYMO» → <b>Додатково → Перейти до 127.0.0.1</b> '
+      + '(Firefox: «Прийняти ризик і продовжити»). Сторінка покаже <code>true</code>.</li>'
+      + '<li>Якщо браузер питає про доступ до пристроїв локальної мережі — <b>Дозволити</b>.</li>'
+      + '<li>Поверніться сюди й натисніть «🔄 Повторити».</li></ol>', [
+      {t: '🔒 Відкрити службу DYMO', f: function () { window.open(DYMO + 'StatusConnected', '_blank'); offline(url, name); }},
+      {t: '🔄 Повторити', main: true, f: function () { if (url) directPrint(url, name); else choosePrinter(); }},
+    ].concat(url ? [{t: '⬇️ Завантажити файл', f: function () { download(url, name); }}] : []));
+  }
+  function directPrint(url, name) {
+    var printer;
+    toast('🖨️ ' + name + ' — надсилаю на DYMO…');
+    var label = fetch(url, {credentials: 'same-origin'}).then(function (r) {
+      return r.text().then(function (t) { if (!r.ok) throw new Error(t || ('HTTP ' + r.status)); return t; });
+    });
+    label.catch(function () {});
+    return printers()
+      .then(function (list) { return pickPrinter(list); })
+      .then(function (p) { printer = p; return label; })
+      .then(function (xml) {
+        return dymo('PrintLabel', {printerName: printer, printParamsXml: '', labelXml: xml, labelSetXml: ''});
+      })
+      .then(function (res) {
+        if (/false/i.test(res)) throw new Error('DYMO не прийняв етикетку (' + res.trim() + ').');
+        toast('✓ ' + name + ' → ' + printer);
+      })
+      .catch(function (e) {
+        var t = document.getElementById('svl-toast'); if (t) t.remove();
+        if (e && e.cancel) return;
+        if (e && e.offline) return offline(url, name);
+        dialog('⚠️ Не надруковано', '<p>' + esc((e && e.message) || e) + '</p>', [
+          {t: '🔄 Повторити', main: true, f: function () { directPrint(url, name); }},
+          {t: '⬇️ Завантажити файл', f: function () { download(url, name); }},
+        ]);
+      });
+  }
+  function choosePrinter() {
+    printers().then(function (list) { return pickPrinter(list, true); })
+      .then(function (name) { toast('🖨️ Принтер DYMO: ' + name); })
+      .catch(function (e) {
+        if (e && e.cancel) return;
+        if (e && e.offline) return offline('', '');
+        toast('⚠️ ' + ((e && e.message) || e), true);
+      });
+  }
+  // Клік «🖨️ Друкувати» — як «Дія при натисканні 🖨️ Друкувати»; direct — пункт меню «…на DYMO»
+  function open(url, name, qty, direct) {
+    if (direct || DYMO_MODE === 'print') return directPrint(url, name);
+    if (DYMO_MODE === 'ask') {
+      return dialog('🖨️ ' + name, '', [
+        {t: '🖨️ Друкувати на DYMO', main: true, f: function () { directPrint(url, name); }},
+        {t: '⬇️ Завантажити .dymo', f: function () { download(url, name); }},
+      ]);
+    }
+    download(url, name);
   }
   function opts(el) {
     var d = el.dataset, qty = d.qty;
@@ -81,7 +224,7 @@
 
   function fromFile(o, act) {
     var url = '/labels/serve/' + encodeURIComponent(o.sku) + '/?qty=' + o.qty;
-    if (act === 'download') download(url, o.sku); else open(url, o.sku, o.qty);
+    if (act === 'download') download(url, o.sku); else open(url, o.sku, o.qty, act === 'direct');
   }
   function generate(o, act) {
     if (o.kind === 'cable') {
@@ -90,7 +233,7 @@
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (!d.ok) { alert('Етикетку ' + o.sku + ' не сформовано: ' + (d.error || '')); return; }
-          if (act === 'download') download(d.download_url, o.sku); else open(d.download_url, o.sku, o.qty);
+          if (act === 'download') download(d.download_url, o.sku); else open(d.download_url, o.sku, o.qty, act === 'direct');
         })
         .catch(function (e) { alert('Помилка мережі: ' + e); });
       return;
@@ -103,7 +246,7 @@
         if (!d.ok) { alert(d.error || 'Помилка'); return; }
         // «тиснем і робить»: перевірено раніше й без зауважень — одразу; інакше — вікно перевірки
         if (d.ready && act !== 'check') {
-          if (act === 'download') download(d.url, d.pn); else open(d.url, d.pn, d.qty);
+          if (act === 'download') download(d.url, d.pn); else open(d.url, d.pn, d.qty, act === 'direct');
         } else { modal(o, d, act === 'check' ? 'print' : act); }
       })
       .catch(function (e) { alert('Помилка мережі: ' + e); });
@@ -111,7 +254,7 @@
   // Етикетка замовлення — завжди з даних замовлення, без вікна перевірки
   function orderLabel(o, act) {
     var url = '/labels/order/' + encodeURIComponent(o.order) + '/', name = 'Order-' + o.sku;
-    if (act === 'download') download(url, name); else open(url, name, 1);
+    if (act === 'download') download(url, name); else open(url, name, 1, act === 'direct');
   }
   function run(o, act) {
     act = act || o.act;
@@ -129,35 +272,41 @@
     var o = opts(el);
     var m = document.createElement('div');
     m.id = 'svl-menu'; m.className = 'svl-menu';
-    // «· клік» — те, що ця кнопка робить звичайним кліком (run)
+    // «· клік» — те, що ця кнопка робить звичайним кліком (run + «Дія при натисканні 🖨️ Друкувати»)
     var defGen = o.kind && (SOURCE === 'generate' || !o.file);
     var dl = o.act === 'download', chk = o.act === 'check';
+    var direct = o.act === 'direct';
+    var clickPrints = direct || (!dl && !chk && DYMO_MODE === 'print');
+    var clickSaves = dl || (!direct && !chk && DYMO_MODE === 'download');
     var items = o.kind === 'order' ? [
-      {t: '🖨️ Друкувати етикетку замовлення', def: !dl, f: function () { orderLabel(o, 'print'); }},
-      {t: '⬇️ Завантажити етикетку замовлення', def: dl, f: function () { orderLabel(o, 'download'); }},
+      {t: '🖨️ Друкувати на DYMO', def: clickPrints, f: function () { orderLabel(o, 'direct'); }},
+      {t: '⬇️ Завантажити етикетку замовлення', def: clickSaves, f: function () { orderLabel(o, 'download'); }},
     ] : [
-      {t: '📄 Завантажити з бази' + (o.file ? '' : ' — файлу немає'), dis: !o.file, def: !defGen && dl,
+      {t: '📄 Завантажити з бази' + (o.file ? '' : ' — файлу немає'), dis: !o.file, def: !defGen && clickSaves,
        f: function () { fromFile(o, 'download'); }},
     ];
     if (o.kind && o.kind !== 'order') {
-      items.push({t: '🧩 Згенерувати наклейку й завантажити', def: defGen && dl,
+      items.push({t: '🧩 Згенерувати наклейку й завантажити', def: defGen && clickSaves,
                   f: function () { generate(o, 'download'); }});
-      items.push({t: '🖨️ Згенерувати й друкувати', def: defGen && !dl && !chk, f: function () { generate(o, 'print'); }});
+      items.push({t: '🖨️ Згенерувати й друкувати на DYMO', def: defGen && clickPrints, f: function () { generate(o, 'direct'); }});
     }
     if (o.kind === 'antenna') items.push({t: '🔍 Перевірити дані етикетки…', def: chk, f: function () { generate(o, 'check'); }});
-    if (o.file) items.push({t: '🖨️ Друкувати файл з бази', def: !defGen && !dl && !chk, f: function () { fromFile(o, 'print'); }});
+    if (o.file) items.push({t: '🖨️ Друкувати файл з бази на DYMO', def: !defGen && clickPrints, f: function () { fromFile(o, 'direct'); }});
+    items.push({t: '⚙️ Принтер DYMO: ' + (stored(PRINTER_KEY) || 'автоматично') + '…', sep: true, f: choosePrinter});
     items.forEach(function (it) {
       var b = document.createElement('button');
       b.type = 'button'; b.disabled = !!it.dis;
+      if (it.sep) b.className = 'svl-sep';
       b.innerHTML = esc(it.t) + (it.def ? '<span class="svl-def">· клік</span>' : '');
       b.onclick = function () { closeMenu(); it.f(); };
       m.appendChild(b);
     });
+    var click = DYMO_MODE === 'print' ? 'одразу на принтер' : DYMO_MODE === 'ask' ? 'запитати' : 'завантажити файл';
     var foot = document.createElement('div');
     foot.className = 'svl-foot';
-    foot.innerHTML = o.kind === 'order'
-      ? 'Номер замовлення, штрихкод і всі артикули з кількістю · друк — як <a href="/admin/sales/salessettings/" target="_blank">«🖨️ Друкувати»</a>'
-      : 'Клік: ' + esc(SOURCE_TEXT) + ' · <a href="/admin/sales/salessettings/" target="_blank">змінити</a>';
+    foot.innerHTML = (o.kind === 'order' ? 'Номер замовлення, країна й усі артикули з кількістю'
+                                          : 'Клік: ' + esc(SOURCE_TEXT)) + ', ' + click
+      + ' · <a href="/admin/sales/salessettings/" target="_blank">змінити</a>';
     m.appendChild(foot);
     document.body.appendChild(m);
     var x = Math.min(ev.clientX, window.innerWidth - m.offsetWidth - 8);
@@ -317,7 +466,7 @@
       Object.keys(NAMES).forEach(function (f) { p[f] = box.querySelector('#svl-f-' + f).value; });
       var done = function (d) {
         close();
-        if (action === 'download') download(d.url, d.pn); else open(d.url, d.pn, d.qty);
+        if (action === 'download') download(d.url, d.pn); else open(d.url, d.pn, d.qty, act === 'direct');
       };
       fetch('/labels/antenna/save/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
                                       body: JSON.stringify(p)})
@@ -337,6 +486,7 @@
     (act === 'download' ? dl : pr).focus();
   }
 
-  window.svLabel = {run: run, menu: menu, check: function (o) { generate(Object.assign({kind: 'antenna', qty: 1, order: ''}, o), 'check'); }};
+  window.svLabel = {run: run, menu: menu, print: directPrint, open: open, choosePrinter: choosePrinter,
+                    check: function (o) { generate(Object.assign({kind: 'antenna', qty: 1, order: ''}, o), 'check'); }};
 })();
 </script>

@@ -2258,13 +2258,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         from pathlib import Path
         from django.conf import settings
         from django.template.loader import render_to_string
-        from labels_app.views import label_kinds, label_source
+        from labels_app.views import label_context, label_kinds
         import re as _re
 
         if not obj.pk:
             return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
 
-        source = label_source()
+        label_ctx = label_context()
+        source = label_ctx['label_source']
         labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
         rows = []
         inputs_js = []
@@ -2365,7 +2366,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '📂 Переглянути всі етикетки</button>'
             '</div>'
         )
-        return mark_safe(html + render_to_string('labels/_label_actions.html', {'label_source': source}))
+        return mark_safe(html + render_to_string('labels/_label_actions.html', label_ctx))
     label_buttons_detail.short_description = "Друк та завантаження етикеток"
 
 

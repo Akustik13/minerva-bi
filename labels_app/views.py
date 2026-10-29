@@ -119,13 +119,20 @@ def label_kinds(skus) -> dict:
     return kinds
 
 
-def label_source() -> str:
-    """Налаштування «Звідки брати етикетку DYMO»: generate — з шаблону, file — готовий файл."""
+def label_context() -> dict:
+    """Контекст labels/_label_actions.html: «Звідки брати етикетку DYMO» (generate / file)
+    і «Дія при натисканні 🖨️ Друкувати» (download / print — одразу на DYMO / ask)."""
     try:
         from sales.models import SalesSettings
-        return SalesSettings.get().dymo_label_source
+        settings_ = SalesSettings.get()
+        return {'label_source': settings_.dymo_label_source, 'dymo_mode': settings_.dymo_open_mode}
     except Exception:
-        return 'generate'
+        return {'label_source': 'generate', 'dymo_mode': 'download'}
+
+
+def label_source() -> str:
+    """Налаштування «Звідки брати етикетку DYMO»: generate — з шаблону, file — готовий файл."""
+    return label_context()['label_source']
 
 
 @staff_member_required
@@ -228,7 +235,7 @@ def list_labels(request):
         })
     if request.GET.get('json'):
         return JsonResponse({'labels': labels})
-    return render(request, 'labels/list.html', {'labels': labels, 'label_source': label_source()})
+    return render(request, 'labels/list.html', {'labels': labels, **label_context()})
 
 
 # ── Етикетки антен з шаблону (labels_app/antenna.py) ──────────────────────────

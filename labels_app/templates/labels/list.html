@@ -79,6 +79,13 @@
                          border:none;cursor:pointer;font-size:12px;font-weight:600">
             ⬇️ Завантажити
           </button>
+          <button type="button" data-svl="" data-sku="{{ lbl.sku }}" data-qty-input="qty-{{ lbl.sku }}"
+                  data-file="1" data-svl-act="direct" title="Друкувати цей файл одразу на DYMO · правий клік — меню"
+                  style="background:var(--bg-hover);color:var(--text);padding:4px 8px;
+                         border-radius:4px;border:1px solid var(--border-strong);
+                         cursor:pointer;font-size:12px;margin-left:4px">
+            🖨️
+          </button>
           {% if lbl.antenna_sku %}
           <button type="button" data-svl="antenna" data-sku="{{ lbl.antenna_sku }}" data-qty-input="qty-{{ lbl.sku }}"
                   data-file="1" data-svl-act="check"

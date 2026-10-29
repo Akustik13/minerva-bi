@@ -598,154 +598,26 @@ document.addEventListener('DOMContentLoaded', function () {
   {{ block.super }}
 </div>
 
-{% include "labels/_label_actions.html" with label_source=sv_dymo_label_source %}
+{% include "labels/_label_actions.html" with label_source=sv_dymo_label_source dymo_mode=sv_dymo_open_mode %}
 
 <script>
 // ── DYMO mode from server settings ───────────────────────────────────────────
 var SV_DYMO_MODE = '{{ sv_dymo_open_mode|default:"download" }}';
 window.SV_DYMO_MODE = SV_DYMO_MODE;
 
-// ── DYMO label open helper ────────────────────────────────────────────────────
+// ── DYMO: друк і завантаження — спільні з labels/_label_actions.html ─────────
+// svLabel.open — як «Дія при натисканні 🖨️ Друкувати»; друк — служба DYMO Connect на цьому ПК
 (function(){
-  var _fwL=false,_fwLg=false,_fwCb=[];
-  function _loadFW(cb){
-    if(_fwL&&window.dymo&&window.dymo.label){cb(null);return;}
-    _fwCb.push(cb);if(_fwLg)return;_fwLg=true;
-    var s=document.createElement('script');
-    s.src='https://labelwriter.com/software/dls/sdk/js/DYMO.Label.Framework.latest.js';
-    s.onload=function(){_fwL=true;_fwLg=false;_fwCb.forEach(function(f){f(null);});_fwCb=[];};
-    s.onerror=function(){_fwLg=false;_fwCb.forEach(function(f){f('SDK error');});_fwCb=[];};
-    document.head.appendChild(s);
-  }
-  function _modal(html){
-    var m=document.getElementById('sv-dymo-modal')||document.createElement('div');
-    m.id='sv-dymo-modal';
-    m.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
-    m.innerHTML=html;if(!m.parentNode)document.body.appendChild(m);
-    m.onclick=function(e){if(e.target===m)m.remove();};
-  }
   window.svDymoDownload=function(url,sku){
     var a=document.createElement('a');a.href=url;a.download=(sku||'label')+'.dymo';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
   };
+  window.svDymoPrint=function(url,sku){window.svLabel.print(url,sku);};
+  window.svDymoOpen=function(url,sku,qty){window.svLabel.open(url,sku,qty);};
   window.svCaGenThenOpen=function(u,s,q){
     fetch('/labels/generate/',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({part_no:s,qty:parseInt(q)||1})
-    }).then(function(r){return r.json();})
-      .then(function(d){
-        if(d.ok&&d.xml){
-          var mode=typeof window.SV_DYMO_MODE!=='undefined'?window.SV_DYMO_MODE:'download';
-          if(mode==='print'){svDymoPrint(u,s,q,d.xml);}
-          else if(mode==='ask'){svDymoAsk(u,s,q);}
-          else{svDymoDownload(u,s);}
-        }else{svDymoOpen(u,s,q);}
-      })
-      .catch(function(){svDymoOpen(u,s,q);});
-  };
-  window.svDymoError=function(url,sku,msg){
-    _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:24px 28px;max-width:440px;width:90%">'
-      +'<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text,#c9d8e4)">⚠️ {% trans "DYMO недоступний" %}</div>'
-      +'<div style="font-size:13px;color:var(--text-muted,#9aafbe);margin-bottom:18px;line-height:1.6">'+msg+'</div>'
-      +'<div style="display:flex;gap:10px">'
-      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
-        +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">⬇️ {% trans "Завантажити файл" %}</button>'
-      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
-        +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 12px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
-      +'</div></div>');
-  };
-  // DYMO Connect REST API — no old Framework SDK needed
-  var _DYMO_BASE = 'https://127.0.0.1:41951';
-  function _dymoCertError(url,sku){
-    var btnStyle='background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;margin-top:10px;margin-right:8px';
-    window.svDymoError(url,sku,
-      '⚠️ {% trans "DYMO Connect не відповідає." %}<br><br>'
-      +'<b>{% trans "Крок 1:" %}</b> {% trans "Прийміть сертифікат (один раз у браузері):" %}<br>'
-      +'<button onclick="window.open(\'https://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected\',\'_blank\')" style="'+btnStyle+'">🔒 {% trans "Відкрити DYMO (прийняти сертифікат)" %}</button><br><br>'
-      +'<b>{% trans "Крок 2:" %}</b> {% trans "У вкладці що відкрилась:" %}<br>'
-      +'&nbsp;&nbsp;Chrome: <b>{% trans "Додатково → Перейти до 127.0.0.1" %}</b><br>'
-      +'&nbsp;&nbsp;Firefox: <b>{% trans "Прийняти ризик і продовжити" %}</b><br><br>'
-      +'<b>{% trans "Крок 3:" %}</b> {% trans "Поверніться і натисніть «Повторити»" %}'
-    );
-    // Append retry button to error modal
-    setTimeout(function(){
-      var m=document.getElementById('sv-dymo-modal');
-      if(!m) return;
-      var box=m.querySelector('div');
-      if(!box) return;
-      var rb=document.createElement('button');
-      rb.type='button';
-      rb.textContent='🔄 {% trans "Повторити" %}';
-      rb.style.cssText=btnStyle+';background:#2e7d32;margin-top:6px';
-      rb.onclick=function(){m.remove();window.svDymoPrint(url,sku,qty);};
-      box.appendChild(rb);
-    },50);
-  }
-  window.svDymoPrint=function(url,sku,qty,labelXmlDirect){
-    function _doprint(printer,labelXml){
-      var fd=new FormData();
-      fd.append('printerName',printer);
-      fd.append('printParamsXml','');
-      fd.append('labelXml',labelXml);
-      fd.append('labelSetXml','');
-      fetch(_DYMO_BASE+'/DYMO/DLS/Printing/PrintLabel',{method:'POST',body:fd})
-      .then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(t);});})
-      .catch(function(e){window.svDymoError(url,sku,'{% trans "Помилка друку:" %} '+(e.message||String(e)));});
-    }
-    // Step 1: get printers list (REST API, no SDK needed)
-    fetch(_DYMO_BASE+'/DYMO/DLS/Printing/GetPrinters')
-    .then(function(r){
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      return r.text();
-    })
-    .then(function(xml){
-      var m=xml.match(/<Name>([^<]+)<\/Name>/);
-      if(!m){window.svDymoError(url,sku,'{% trans "Принтер DYMO не знайдено. Перевірте підключення USB та що DYMO Connect запущено." %}');return;}
-      var printer=m[1];
-      if(labelXmlDirect){
-        // Step 2a: use XML passed directly — no extra fetch needed
-        _doprint(printer,labelXmlDirect);
-      } else {
-        // Step 2b: fetch label XML from server
-        fetch(url)
-        .then(function(r){return r.text();})
-        .then(function(labelXml){_doprint(printer,labelXml);})
-        .catch(function(e){window.svDymoError(url,sku,'{% trans "Помилка завантаження мітки:" %} '+e);});
-      }
-    })
-    .catch(function(e){
-      // Try HTTP fallback (old DYMO Label Software)
-      fetch('http://127.0.0.1:41951/DYMO/DLS/Printing/GetPrinters')
-      .then(function(r){return r.text();})
-      .then(function(xml){
-        var m=xml.match(/<Name>([^<]+)<\/Name>/);
-        if(!m){window.svDymoError(url,sku,'{% trans "Принтер DYMO не знайдено." %}');return;}
-        _loadFW(function(err){
-          if(err){window.svDymoError(url,sku,'{% trans "Помилка SDK:" %} '+err);return;}
-          var lxml=labelXmlDirect||null;
-          var _print=function(x){try{var l=window.dymo.label.framework.openLabelXml(x);l.print(m[1]);}catch(ex){window.svDymoError(url,sku,'{% trans "Помилка SDK:" %} '+(ex.message||ex));}};
-          if(lxml){_print(lxml);}else{fetch(url).then(function(r){return r.text();}).then(_print);}
-        });
-      })
-      .catch(function(){_dymoCertError(url,sku);});
-    });
-  };
-  window.svDymoAsk=function(url,sku,qty){
-    _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:22px 26px;max-width:360px;width:90%">'
-      +'<div style="font-weight:700;font-size:15px;margin-bottom:14px;color:var(--text,#c9d8e4)">🖨️ {% trans "Мітка:" %} '+sku+'</div>'
-      +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
-      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoPrint(\''+url+'\',\''+sku+'\','+qty+')" '
-        +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">🖨️ {% trans "Через DYMO" %}</button>'
-      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
-        +'style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted,#9aafbe)">⬇️ {% trans "Завантажити" %}</button>'
-      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
-        +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
-      +'</div></div>');
-  };
-  window.svDymoOpen=function(url,sku,qty,mode){
-    mode=mode||(typeof window.SV_DYMO_MODE!=='undefined'?window.SV_DYMO_MODE:'download');
-    if(mode==='print') window.svDymoPrint(url,sku,qty);
-    else if(mode==='ask') window.svDymoAsk(url,sku,qty);
-    else window.svDymoDownload(url,sku);
+    }).then(function(){svDymoOpen(u,s,q);}).catch(function(){svDymoOpen(u,s,q);});
   };
 })();
 

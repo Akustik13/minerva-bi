@@ -349,6 +349,31 @@ class LabelViewsTests(TestCase):
         r = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
         self.assertContains(r, "SOURCE = 'file'")
 
+    def test_direct_print_is_the_same_everywhere(self):
+        """«🖨️ Надрукувати через DYMO» — одна функція (служба DYMO Connect) у списку, формі, картці товару, /labels/."""
+        from sales.models import SalesOrderLine
+        SalesOrderLine.objects.create(order=self.order, product=self.product, sku_raw="AN220213-01C", qty=2)
+        filter_ = Product.objects.create(sku="FT220407-01A", name="Filter")
+        (self.dir / "FT220407-01A.dymo").write_text("<x/>", encoding="utf-8")
+        settings_obj = SalesSettings.get()
+        settings_obj.dymo_open_mode = "print"
+        settings_obj.save()
+        pages = {
+            "order list": "/admin/sales/salesorder/",
+            "order form": f"/admin/sales/salesorder/{self.order.pk}/change/",
+            "product card": f"/admin/inventory/product/{filter_.pk}/change/",
+            "labels page": "/labels/",
+        }
+        with self.settings(LABELS_DIR=self.dir):                          # картка товару шукає файл сама
+            for name, url in pages.items():
+                r = self.client.get(url)
+                self.assertContains(r, "DYMO_MODE = 'print'", msg_prefix=name)
+                self.assertContains(r, "https://127.0.0.1:41951/DYMO/DLS/Printing/", msg_prefix=name)
+                self.assertNotContains(r, "labelwriter.com", msg_prefix=name)   # старий скрипт DYMO Label Software
+            r = self.client.get(pages["product card"])
+        self.assertContains(r, 'data-svl="" data-sku="FT220407-01A"')      # звичайна етикетка з файлу теж друкується
+        self.assertContains(self.client.get(pages["labels page"]), 'data-svl-act="direct"')
+
 
 class OrderLabelTests(TestCase):
     """Етикетка замовлення: номер (текст і штрихкод) і всі артикули з кількістю."""

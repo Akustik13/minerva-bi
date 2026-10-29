@@ -2940,21 +2940,23 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 </label>'''
 
         from django.template.loader import render_to_string
-        from labels_app.views import label_kinds, label_source
+        from labels_app.views import label_context, label_kinds
         kind = label_kinds([sku])[sku]   # антена / кабель — етикетку можна сформувати з шаблону
         if label_path or kind:
             url_base = f"/labels/serve/{sku}/"
             _qty_lbl = str(_("К-сть:"))
             _print_lbl = str(_("Друкувати"))
-            source = label_source()
+            label_ctx = label_context()
             notes = []
-            if kind and (source == 'generate' or not label_path):
-                notes.append(str(_("🧩 з шаблону")) + (' · ' + str(_("правий клік — меню"))))
+            if kind and (label_ctx['label_source'] == 'generate' or not label_path):
+                notes.append(str(_("🧩 з шаблону")))
             if label_path:
                 notes.append(f'📄 {label_path.name}')
-            svl_attrs = (format_html(' data-svl="{}" data-sku="{}" data-qty-input="lbl-qty-{}" data-file="{}" data-svl-act="print"',
-                                     kind, sku, sku, '1' if label_path else '') if kind else '')
-            svl_js = render_to_string('labels/_label_actions.html', {'label_source': source}) if kind else ''
+            notes.append(str(_("правий клік — меню")))
+            # клік / правий клік (друк одразу на DYMO або файл) — labels/_label_actions.html
+            svl_attrs = format_html(' data-svl="{}" data-sku="{}" data-qty-input="lbl-qty-{}" data-file="{}" data-svl-act="print"',
+                                    kind, sku, sku, '1' if label_path else '')
+            svl_js = render_to_string('labels/_label_actions.html', label_ctx)
             return mark_safe(f'''
 <div style="display:flex;flex-direction:column;gap:12px;padding:4px 0">
   <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
