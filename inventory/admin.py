@@ -28,7 +28,7 @@ from .forms import ExcelUploadForm, SetStockForm
 from .models import (
     Product, ProductAlias, Location,
     InventoryTransaction, ProductComponent,
-    Supplier, PurchaseOrder, PurchaseOrderLine,
+    Supplier, PurchaseOrder, PurchaseOrderLine, PurchaseReceipt,
     ProductCategory, InventorySettings, IncomingShipment,
     RFQEmailTemplate,
 )
@@ -3792,8 +3792,11 @@ class InventorySettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ("📥 Надходження на склад (закупівлі)", {
-            "fields": ("add_on_po_receive",),
-            "description": "Контролює чи автоматично зараховувати товар при зміні qty_received у PO.",
+            "fields": ("add_on_po_receive", "api_delivery_mode"),
+            "description": "Контролює чи автоматично зараховувати товар при зміні qty_received у PO. "
+                           "Закупівлі, які зробила зовнішня CRM, приходять через REST API "
+                           "(/api/v1/purchase-orders/, права purchases:read / purchases:write): "
+                           "повідомлення «доставлено» оприбутковується один раз — повтор не дублює прихід.",
         }),
         ("📍 Загальні параметри", {
             "fields": ("default_location", "low_stock_alert_enabled"),
@@ -4111,6 +4114,23 @@ class PurchaseOrderLineInline(admin.TabularInline):
         return PrefillFormSet
 
 
+class PurchaseReceiptInline(admin.TabularInline):
+    """Доставки, про які повідомила зовнішня система (API): одна на ключ — повтор не оприбутковує вдруге."""
+    model = PurchaseReceipt
+    extra = 0
+    can_delete = False
+    fields = ("delivered_at", "delivery_key", "tracking_number", "booked", "lines_text", "source", "created_at")
+    readonly_fields = fields
+    verbose_name_plural = _("📦 Доставки, про які повідомила зовнішня система (API)")
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def lines_text(self, obj):
+        return ", ".join(f"{l.get('sku') or '?'} × {l.get('qty')}" for l in (obj.lines or [])) or "—"
+    lines_text.short_description = _("Позиції")
+
+
 @admin.register(Supplier)
 class SupplierAdmin(admin.ModelAdmin):
     list_display  = ("name", "contact_person", "email", "phone", "currency", "website")
@@ -4135,12 +4155,12 @@ class SupplierAdmin(admin.ModelAdmin):
 class PurchaseOrderAdmin(admin.ModelAdmin):
     list_display  = ("code", "supplier", "status_badge", "order_date",
                      "expected_date", "received_date", "lines_count",
-                     "total_price", "tracking_number")
-    list_filter   = ("supplier", "status", "order_date")
-    search_fields = ("code", "tracking_number", "supplier__name", "notes")
+                     "total_price", "tracking_number", "external_col")
+    list_filter   = ("supplier", "status", "order_date", "external_source")
+    search_fields = ("code", "tracking_number", "supplier__name", "notes", "external_id", "supplier_order_no")
     date_hierarchy = "order_date"
-    inlines       = (PurchaseOrderLineInline,)
-    readonly_fields = ("code", "created_at")
+    inlines       = (PurchaseOrderLineInline, PurchaseReceiptInline)
+    readonly_fields = ("code", "created_at", "updated_at", "external_source", "external_id", "delivered_reported_at")
     preserve_filters = True
 
     class Media:
@@ -4202,6 +4222,14 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
         c = obj.lines.count()
         return format_html('<b>{}</b> {}', c, _("поз."))
     lines_count.short_description = _("Позицій")
+
+    def external_col(self, obj):
+        if not obj.external_source:
+            return format_html('<span style="opacity:.45">{}</span>', "Minerva")
+        return format_html('<span title="{}">🔗 {} · {}</span>',
+                           "Передала зовнішня система через REST API", obj.external_source, obj.external_id)
+    external_col.short_description = _("Звідки")
+    external_col.admin_order_field = "external_source"
 
 
 @admin.register(PurchaseOrderLine)

@@ -383,6 +383,25 @@ class PurchaseOrder(models.Model):
     currency = models.CharField(max_length=8, blank=True, default="EUR")
     notes = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Замовлення, яке зробила зовнішня система (CRM) і передала через REST API (inventory/services/purchases.py)
+    external_source = models.CharField(
+        "Зовнішня система", max_length=32, blank=True, default="",
+        help_text="Звідки прийшло замовлення через API (напр. crm). Порожньо — створено в Minerva.")
+    external_id = models.CharField(
+        "Номер у зовнішній системі", max_length=64, blank=True, default="",
+        help_text="Одне замовлення на пару «система + номер»: повтор з тим самим номером оновлює це замовлення.")
+    supplier_order_no = models.CharField(
+        "Номер замовлення / підтвердження постачальника", max_length=64, blank=True, default="")
+    delivered_reported_at = models.DateTimeField(
+        "Доставку повідомила зовнішня система", null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["external_source", "external_id"], condition=~models.Q(external_id=""),
+                                    name="po_unique_external_order"),
+        ]
 
     def save(self, *args, **kwargs):
         creating = self.pk is None
@@ -404,6 +423,12 @@ class PurchaseOrderLine(models.Model):
     unit_price = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     currency = models.CharField(max_length=8, blank=True, default="EUR")
     notes = models.CharField(max_length=255, blank=True, default="")
+    external_line_id = models.CharField(
+        "Позиція у зовнішній системі", max_length=64, blank=True, default="",
+        help_text="За цим номером API знаходить позицію при оновленні й доставці (інакше — за артикулом).")
+    external_sku = models.CharField(
+        "Артикул із зовнішньої системи", max_length=100, blank=True, default="",
+        help_text="Як його передала зовнішня система (товару з таким артикулом у Minerva може не бути).")
 
     def __str__(self) -> str:
         p = self.product.sku if self.product_id else (self.description or "line")
@@ -467,6 +492,13 @@ class InventorySettings(models.Model):
         default="MAIN",
         help_text="Код складської локації для нових транзакцій (наприклад: MAIN, WAREHOUSE-A).",
     )
+    API_DELIVERY_RECEIVE, API_DELIVERY_ARRIVED = "receive", "arrived"
+    api_delivery_mode = models.CharField(
+        "Зовнішня система повідомила «доставлено»", max_length=10, default=API_DELIVERY_RECEIVE,
+        choices=[(API_DELIVERY_RECEIVE, "Одразу оприбуткувати на склад (без дублікатів)"),
+                 (API_DELIVERY_ARRIVED, "Лише позначити «прибуло» — оприбуткує склад у Minerva")],
+        help_text="REST API /purchase-orders/…/deliveries/ (закупівлі, які зробила CRM). "
+                  "Оприбуткування — як «Додавати при надходженні закупівлі».")
     allow_negative_stock = models.BooleanField(
         "Дозволити від'ємний залишок",
         default=True,
@@ -643,6 +675,34 @@ class IncomingShipment(models.Model):
             parts.append(f'← {self.purchase_order}')
         return ' '.join(parts) or f'#{self.pk}'
 
+
+
+class PurchaseReceipt(models.Model):
+    """Одна доставка закупівлі, про яку повідомила зовнішня система через API.
+
+    Одна на (замовлення, delivery_key): повтор того самого повідомлення нічого не додає на склад."""
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="receipts",
+                                       verbose_name="Закупівля")
+    delivery_key = models.CharField("Ключ доставки", max_length=120,
+                                    help_text="delivery_id зовнішньої системи, tracking:<номер> або all")
+    delivered_at = models.DateTimeField("Доставлено", default=timezone.now)
+    tracking_number = models.CharField("Трек-номер", max_length=255, blank=True, default="")
+    lines = models.JSONField("Позиції", default=list, blank=True,
+                             help_text="[{line, sku, qty}] — що привезла ця доставка (booked — чи оприбутковано)")
+    booked = models.BooleanField("Оприбутковано на склад", default=True,
+                                 help_text="Ні — лише позначено «прибуло» (налаштування складу)")
+    source = models.CharField("Звідки", max_length=32, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Доставка закупівлі (API)")
+        verbose_name_plural = _("Доставки закупівель (API)")
+        ordering = ["-created_at"]
+        constraints = [models.UniqueConstraint(fields=["purchase_order", "delivery_key"],
+                                               name="po_receipt_unique_delivery")]
+
+    def __str__(self):
+        return f"{self.purchase_order} · {self.delivery_key}"
 
 
 class ProductPriceHistory(models.Model):

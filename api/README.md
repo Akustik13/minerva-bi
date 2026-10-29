@@ -26,6 +26,7 @@
 | `products:read` / `products:write` | каталог товарів, категорії |
 | `orders:read` / `orders:write` | замовлення: читання / створення, зміна статусу, скасування |
 | `shipments:read` | відправлення, трекінг-номери, статус доставки |
+| `purchases:read` / `purchases:write` | закупівлі зовнішньої CRM: замовлення постачальникам, трекінг, «доставлено» (розділ 2a) |
 | `customers:read` / `customers:write` | клієнти CRM |
 | `webhooks:read` / `webhooks:write` | вебхуки, зареєстровані цим ключем |
 | `accounts:read` / `accounts:write` | особистий кабінет покупців магазину ключа (розділ 11a) |
@@ -117,6 +118,107 @@
 
 ### `GET /locations/`, `GET /categories/`
 Довідники складів та категорій товарів.
+
+## 2a. Закупівлі з зовнішньої CRM (`/purchase-orders/`)
+
+Сценарій: замовлення постачальнику робить **ваша CRM**, а склад веде Minerva. CRM передає, у кого, що, скільки й коли замовили, номер підтвердження постачальника, трек-номер, орієнтовну доставку — склад бачить товар у колонці «Очікується» (`incoming` у `/stock/`). Коли CRM дізналась, що товар доставлено, вона повідомляє Minerva — та оприбутковує його на склад **один раз**, навіть якщо повідомлення прийде двічі.
+
+Права ключа: `purchases:read` (читання), `purchases:write` (передати, змінити, трекінг, доставка, скасування). Окремий ключ для CRM; у полі ключа «Джерело замовлень» — назва системи, напр. `crm` (порожньо — `crm`). Її видно в Minerva в колонці «Звідки» закупівель.
+
+### Як Minerva не допускає дублікатів
+
+| Що | Ключ | Повтор |
+|---|---|---|
+| Замовлення | `source` + `external_id` (номер у вашій CRM) | `POST` з тим самим номером **оновлює** те саме замовлення (`200`, `"created": false`) |
+| Позиція | `line_id` (номер рядка у CRM), інакше артикул | оновлює кількість / ціну цього рядка; однаковий артикул кількома рядками — з різними `line_id` |
+| Відправлення | трек-номер (без регістру) | одне вхідне відправлення на номер |
+| Доставка | `delivery_id`, інакше `tracking:<трек-номер>`, інакше «вся решта» | `200` з `"duplicate": true`, на склад нічого не додається |
+| Забагато | отримано більше, ніж замовлено | `409 over_receipt` — схоже на ту саму доставку під іншим id; якщо справді так — `"allow_over": true` |
+
+### `POST /purchase-orders/` — передати замовлення
+```json
+{
+  "external_id": "B-2026-0042",
+  "supplier": {"name": "Acme Components GmbH", "email": "sales@acme.example", "contact_person": "J. Doe",
+               "phone": "+49 30 123", "country": "DE", "currency": "EUR"},
+  "supplier_order_no": "AB-7781",
+  "order_date": "2026-10-20",
+  "expected_date": "2026-11-05",
+  "currency": "EUR",
+  "notes": "Rahmenvertrag 2026",
+  "tracking_number": "1Z999AA10123456784",
+  "carrier": "UPS",
+  "lines": [
+    {"line_id": "1", "sku": "AMP-100", "qty": 10, "unit_price": "12.50", "description": "Amplifier 100 W"},
+    {"line_id": "2", "sku": "CABLE-M", "qty": 25}
+  ]
+}
+```
+- Постачальник — рядок (назва) або об'єкт; шукається за назвою, потім email, інакше створюється картка постачальника. Заповнені поля наявної картки не перезаписуються.
+- Артикул шукається як у `/stock/` (SKU, аліас, без регістру). Немає в Minerva — позиція зберігається без товару, у відповіді `warnings: [{"code": "sku_not_found", …}]`, на склад вона не рахується. `"strict": true` — тоді `404 sku_not_found` і нічого не зберігається.
+- Позиції, яких немає в запиті, не змінюються; `qty: 0` — позицію скасовано. Кількість не може стати меншою за вже отриману (`409 qty_below_received`).
+- `status`: лише `ordered` або `cancelled`; `partial` / `received` Minerva рахує сама з доставок.
+- `tracking_number` у замовленні = те саме, що `POST …/shipments/` (статус не змінюється).
+
+Відповідь `201` (нове) / `200` (оновлено) — закупівля з `"created"` і `"warnings"`:
+```json
+{
+  "id": "PO-57", "code": "PO-57", "source": "crm", "external_id": "B-2026-0042",
+  "status": "ordered", "status_label": "Ordered",
+  "supplier": {"id": 4, "name": "Acme Components GmbH", "email": "sales@acme.example", "country": "DE", …},
+  "supplier_order_no": "AB-7781", "order_date": "2026-10-20", "expected_date": "2026-11-05", "received_date": null,
+  "currency": "EUR", "total": 125, "carrier": "UPS", "tracking_number": "1Z999AA10123456784",
+  "delivered_reported_at": null, "qty_ordered": 35, "qty_received": 0, "qty_open": 35,
+  "lines": [{"line_id": "1", "sku": "AMP-100", "product_sku": "AMP-100", "in_minerva": true,
+             "qty_ordered": 10, "qty_received": 0, "qty_open": 10, "unit_price": 12.5, …}],
+  "shipments": [{"tracking_number": "1Z999AA10123456784", "carrier": "UPS", "status": "in_transit",
+                 "expected_date": null, "shipped_date": null, "received_date": null, …}],
+  "deliveries": [],
+  "created_at": "…", "updated_at": "…", "created": true, "warnings": []
+}
+```
+
+### `GET /purchase-orders/` і `GET /purchase-orders/{ref}/`
+`{ref}` — код Minerva (`PO-57`) або `ext:<номер у CRM>` (`ext:B-2026-0042`). Номер зі «/» — `GET /purchase-orders/?external_id=2026/42`.
+Фільтри списку: `status=ordered,partial`, `open=1` (ще очікуються), `source=crm`, `external_id`, `supplier` (частина назви), `sku`, `tracking_number`, `changed_since=2026-10-29T08:00:00+01:00` (для синхронізації — змінені з цього часу).
+
+### `PATCH /purchase-orders/{ref}/` — змінити
+Ті самі поля, що в `POST`, крім `external_id`: нова орієнтовна дата, номер підтвердження постачальника, позиції, `status: "cancelled"`.
+
+### `POST /purchase-orders/{ref}/shipments/` — трек-номер і стан
+```json
+{"tracking_number": "1Z999AA10123456784", "carrier": "UPS", "tracking_url": "https://…",
+ "status": "customs", "carrier_status": "Zollabfertigung", "expected_date": "2026-11-03", "shipped_date": "2026-10-28",
+ "events": [{"time": "2026-10-28T09:00:00Z", "text": "Picked up"}]}
+```
+`status`: `pending`, `in_transit`, `customs`, `arrived`, `exception`, `delivered` (= ще й доставка, як нижче). `expected_date` відправлення стає орієнтовною датою замовлення.
+
+### `POST /purchase-orders/{ref}/deliveries/` — «доставлено»
+Уся решта (одне відправлення):
+```json
+{"tracking_number": "1Z999AA10123456784", "delivered_at": "2026-11-04T10:15:00+01:00"}
+```
+Частина:
+```json
+{"delivery_id": "LS-2026-118", "delivered_at": "2026-11-04", "lines": [{"line_id": "1", "qty": 4}, {"sku": "CABLE-M", "qty": 25}]}
+```
+- З переліком позицій потрібен `delivery_id` (або `tracking_number`), інакше `400 delivery_id_required` — так Minerva відрізняє повтор від нової доставки.
+- Без позицій оприбутковується вся решта. Якщо в замовлення кілька незакритих відправлень, а позицій не передано, — відправлення позначається доставленим, на склад нічого не йде, у `warnings` — `lines_needed`.
+- Що робить Minerva — «Налаштування складу» → «Зовнішня система повідомила «доставлено»»: **оприбуткувати одразу** (за замовчуванням; прихід — як «Отримано» в огляді складу, якщо ввімкнено «Додавати при надходженні закупівлі») або **лише позначити «прибуло»** (`booked: false`) — тоді товар приймає склад у Minerva.
+
+Відповідь `201` (нова доставка) / `200` (повтор) — закупівля з `"delivery"`:
+```json
+{"delivery": {"duplicate": false, "delivery_id": "LS-2026-118", "booked": true, "stock_updated": true,
+              "delivered_at": "2026-11-04T00:00:00+01:00", "lines": [{"line": 81, "line_id": "1", "sku": "AMP-100", "qty": "4"}],
+              "warnings": []},
+ "status": "partial", …}
+```
+
+### Інше
+- `POST /purchase-orders/{ref}/cancel/` `{"reason": "…"}` — скасувати: решта більше не очікується, отримане лишається.
+- `POST /purchase-orders/shipments/` і `POST /purchase-orders/deliveries/` — те саме з `"external_id"` у тілі (для номерів зі «/»).
+- Закупівлі, створені в Minerva, через API лише читаються (`403 not_external`).
+- Вебхук `purchase_order.updated` (розділ 6) — Minerva повідомляє CRM, коли склад прийняв товар, змінився стан чи трекінг.
 
 ---
 
@@ -226,6 +328,7 @@
 | `order.created` | створено замовлення (з будь-якого джерела) | `id, source, order_number, status, order_date, total_price, currency, …` |
 | `order.status_changed` | змінився статус замовлення | те саме + `previous_status` |
 | `shipment.updated` | з'явився трекінг-номер або змінився статус відправлення | як у `/shipments/` + `previous_status` |
+| `purchase_order.updated` | закупівля: стан, отримано на склад, трекінг, орієнтовна дата, доставка. **Лише вебхукам, які вибрали саме цю подію** («усі події» її не отримують), підписатись через API — ключ з `purchases:read` | `{"purchase_order": <як у /purchase-orders/>, "changed_by": "crm"}` — `changed_by` = хто змінив: джерело ключа API або `minerva`, щоб CRM не реагувала на власні зміни |
 | `ping` | тест з адмінки або `POST /webhooks/{id}/test/` | `{"message": …}` |
 
 **Реєстрація:** Адмін → REST API → Вебхуки, або через API:
@@ -509,6 +612,9 @@ app.listen(3000);
 | 405 | — | DELETE не підтримується | для замовлень — `/cancel/` |
 | 409 | `insufficient_stock` | товару не вистачає; перелік — у `items` / `details` | повідомити покупця або менеджера |
 | 409 | `already_shipped` | скасування відправленого замовлення | оформити повернення вручну |
+| 400 | `external_id_required`, `supplier_required`, `duplicate_line`, `delivery_id_required`, `bad_date`, `bad_qty`, `bad_status` | закупівлі (розділ 2a): чого бракує — у `detail` | виправити запит |
+| 403 | `not_external` | закупівля створена в Minerva — через API лише читання | — |
+| 409 | `over_receipt`, `qty_below_received` | доставка більша за замовлене / кількість менша за отриману | перевірити, чи це не повтор; інакше `allow_over: true` |
 | 429 | — | перевищено ліміт запитів | чекати `Retry-After` секунд і повторити |
 | 502 | — | тестовий вебхук не доставлено | дивитись `response_code`, `response_body` |
 | 5xx | — | помилка сервера Minerva | повторити пізніше; замовлення не дублюються |

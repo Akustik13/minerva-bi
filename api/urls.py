@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from . import accounts, media, payments, search, site_admin
+from . import accounts, media, payments, purchases, search, site_admin
 from .views import (
     SalesOrderViewSet, ProductViewSet, CustomerViewSet, StockViewSet, MovementViewSet,
     LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ShopShippingView,
@@ -21,6 +21,7 @@ router.register("orders",          SalesOrderViewSet, basename="order")
 router.register("shipments",       ShipmentViewSet,   basename="shipment")
 router.register("customers",       CustomerViewSet,   basename="customer")
 router.register("webhooks",        WebhookViewSet,    basename="webhook")
+router.register("purchase-orders", purchases.PurchaseOrderViewSet, basename="purchase-order")
 
 account_urls = [
     path("",                  accounts.StatusView.as_view(),      name="api-account-status"),

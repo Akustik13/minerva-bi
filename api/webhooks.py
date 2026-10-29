@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import json
@@ -183,6 +184,11 @@ def order_payload(order, previous_status=None):
     return data
 
 
+def purchase_payload(po, changed_by="minerva"):
+    from .purchases import purchase_data
+    return {"purchase_order": purchase_data(po), "changed_by": changed_by}
+
+
 def shipment_payload(shipment, previous_status=None):
     from .serializers import ShipmentSerializer
     data = dict(ShipmentSerializer(shipment).data)
@@ -298,8 +304,93 @@ def _shipment_post_save(sender, instance, created, **kwargs):
     transaction.on_commit(run)
 
 
+# purchase_order.updated: усі зміни закупівлі за транзакцію (замовлення, позиції, відправлення, доставки) —
+# одна подія після commit. changed_by — хто змінив: джерело ключа API (purchases_changed_by) або "minerva",
+# щоб зовнішня система могла не реагувати на власні зміни.
+
+@contextlib.contextmanager
+def purchases_changed_by(label):
+    previous = getattr(_local, "po_changed_by", None)
+    _local.po_changed_by = label
+    try:
+        yield
+    finally:
+        _local.po_changed_by = previous
+
+
+def _flush_purchases():
+    from inventory.models import PurchaseOrder
+    queued = getattr(_local, "po_ids", None) or {}
+    _local.po_ids = None
+    for pk, changed_by in sorted(queued.items()):
+        try:
+            po = PurchaseOrder.objects.select_related("supplier").filter(pk=pk).first()
+            if po:
+                emit("purchase_order.updated", purchase_payload(po, changed_by),
+                     source=po.external_source or None)
+        except Exception:
+            logger.exception("webhooks: purchase_order.updated failed")
+
+
+def _queue_purchase(po_id):
+    if not po_id:
+        return
+    changed_by = getattr(_local, "po_changed_by", None) or "minerva"
+    ids = getattr(_local, "po_ids", None)
+    registered = any(item[1] is _flush_purchases for item in connection.run_on_commit)
+    if ids is None or not registered:
+        _local.po_ids = {po_id: changed_by}
+        transaction.on_commit(_flush_purchases)
+    else:
+        ids[po_id] = changed_by
+
+
+_PO_FIELDS = ("status", "expected_date", "received_date", "tracking_number", "shipping_service",
+              "supplier_order_no", "supplier_id", "delivered_reported_at")
+_PO_LINE_FIELDS = ("qty_ordered", "qty_received", "product_id")
+_INCOMING_FIELDS = ("status", "tracking_number", "expected_date", "received_date", "carrier_status_label")
+
+
+def _capture(fields):
+    def pre_save_handler(sender, instance, **kwargs):
+        instance._wh_po_old = (sender.objects.filter(pk=instance.pk).values_list(*fields).first()
+                               if instance.pk else None)
+    return pre_save_handler
+
+
+def _changed(instance, fields, created):
+    old = getattr(instance, "_wh_po_old", None)
+    return created or old is None or old != tuple(getattr(instance, f) for f in fields)
+
+
+def _po_post_save(sender, instance, created, **kwargs):
+    if _changed(instance, _PO_FIELDS, created):
+        _queue_purchase(instance.pk)
+
+
+def _po_line_post_save(sender, instance, created, **kwargs):
+    if _changed(instance, _PO_LINE_FIELDS, created):
+        _queue_purchase(instance.purchase_order_id)
+
+
+def _incoming_post_save(sender, instance, created, **kwargs):
+    if _changed(instance, _INCOMING_FIELDS, created):
+        _queue_purchase(instance.purchase_order_id)
+
+
+def _receipt_post_save(sender, instance, created, **kwargs):
+    if created:
+        _queue_purchase(instance.purchase_order_id)
+
+
+_po_pre_save = _capture(_PO_FIELDS)
+_po_line_pre_save = _capture(_PO_LINE_FIELDS)
+_incoming_pre_save = _capture(_INCOMING_FIELDS)
+
+
 def connect_signals():
-    from inventory.models import InventoryTransaction, Product
+    from inventory.models import (IncomingShipment, InventoryTransaction, Product, PurchaseOrder,
+                                  PurchaseOrderLine, PurchaseReceipt)
     from sales.models import SalesOrder
     from shipping.models import Shipment
 
@@ -311,3 +402,10 @@ def connect_signals():
     post_save.connect(_order_post_save, sender=SalesOrder, dispatch_uid="wh_order_post")
     pre_save.connect(_shipment_pre_save, sender=Shipment, dispatch_uid="wh_ship_pre")
     post_save.connect(_shipment_post_save, sender=Shipment, dispatch_uid="wh_ship_post")
+    pre_save.connect(_po_pre_save, sender=PurchaseOrder, dispatch_uid="wh_po_pre")
+    post_save.connect(_po_post_save, sender=PurchaseOrder, dispatch_uid="wh_po_post")
+    pre_save.connect(_po_line_pre_save, sender=PurchaseOrderLine, dispatch_uid="wh_po_line_pre")
+    post_save.connect(_po_line_post_save, sender=PurchaseOrderLine, dispatch_uid="wh_po_line_post")
+    pre_save.connect(_incoming_pre_save, sender=IncomingShipment, dispatch_uid="wh_incoming_pre")
+    post_save.connect(_incoming_post_save, sender=IncomingShipment, dispatch_uid="wh_incoming_post")
+    post_save.connect(_receipt_post_save, sender=PurchaseReceipt, dispatch_uid="wh_po_receipt_post")

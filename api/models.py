@@ -14,6 +14,8 @@ SCOPE_CHOICES = [
     ('stock:read',      'Склад — залишки, рухи, локації (читання)'),
     ('stock:write',     'Склад — прихід, списання, інвентаризація'),
     ('shipments:read',  'Доставка — відправлення і трекінг (читання)'),
+    ('purchases:read',  'Закупівлі — замовлення постачальникам, трекінг, доставки (читання)'),
+    ('purchases:write', 'Закупівлі — передати замовлення зовнішньої CRM, трекінг, «доставлено»'),
     ('accounts:read',   'Акаунти покупців магазину — кабінет, замовлення, кошик (читання)'),
     ('accounts:write',  'Акаунти покупців магазину — реєстрація, вхід, пароль, профіль, кошик'),
     ('webhooks:read',   'Вебхуки — перегляд'),
@@ -27,7 +29,12 @@ WEBHOOK_EVENTS = [
     ('order.created',        'Замовлення — створено'),
     ('order.status_changed', 'Замовлення — змінився статус'),
     ('shipment.updated',     'Доставка — статус або трекінг-номер'),
+    ('purchase_order.updated', 'Закупівля — стан, трекінг, очікувана дата, доставка (лише якщо вибрано)'),
 ]
+
+# Події лише для вебхуків, які вибрали саме їх: «усі події» (порожній список) їх не отримують —
+# дані закупівель (постачальники, ціни) не йдуть на сайт магазину.
+EXPLICIT_EVENTS = {'purchase_order.updated'}
 
 
 class APIKey(models.Model):
@@ -114,6 +121,8 @@ class Webhook(models.Model):
         if not self.is_active:
             return False
         if self.events and event not in self.events and event != 'ping':
+            return False
+        if event in EXPLICIT_EVENTS and event not in (self.events or []):
             return False
         if source is not None and self.order_sources.strip():
             allowed = {s.strip() for s in self.order_sources.split(',') if s.strip()}

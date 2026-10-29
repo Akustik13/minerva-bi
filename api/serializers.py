@@ -455,6 +455,13 @@ class WebhookSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Лише http(s) URL.")
         return v
 
+    def validate_events(self, v):
+        request = self.context.get("request")
+        key = getattr(request, "auth", None)
+        if "purchase_order.updated" in v and hasattr(key, "has_scope") and not key.has_scope("purchases:read"):
+            raise serializers.ValidationError("Подія purchase_order.updated — лише для ключа з правом purchases:read.")
+        return v
+
 
 class WebhookDeliverySerializer(serializers.ModelSerializer):
     class Meta:
