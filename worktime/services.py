@@ -480,13 +480,14 @@ def clock_cancel(du: DanteUser) -> None:
     du.save(update_fields=["open_since"])
 
 
-def clock_out(du: DanteUser, user=None) -> list[Booking]:
-    """«Пішов»: запис від «Прийшов» до зараз; через північ — два записи. Після кожного успішного «Прийшов» зсувається,
-    тож повтор після збою не задвоює вже записану частину."""
+def clock_out(du: DanteUser, user=None, until: datetime.datetime | None = None, source: str = Booking.CLOCK,
+              reason: str = "«Прийшов» / «Пішов» у Minerva") -> list[Booking]:
+    """«Пішов»: запис від «Прийшов» до зараз (або до `until`); через північ — два записи. Після кожного успішного
+    «Прийшов» зсувається, тож повтор після збою не задвоює вже записану частину."""
     if not du.open_since:
         raise DanteError("bad_request", "Спершу відмітьте «Прийшов».")
     since = timezone.localtime(du.open_since)
-    now = timezone.localtime().replace(second=0, microsecond=0)
+    now = (timezone.localtime(until) if until else timezone.localtime()).replace(second=0, microsecond=0)
     if now - since > datetime.timedelta(hours=MAX_CLOCK_HOURS):
         raise DanteError("bad_request", f"«Прийшов» відмічено {since:%d.%m %H:%M} — понад {MAX_CLOCK_HOURS} годин "
                                         "тому. Скасуйте відмітку й запишіть день вручну в календарі.")
@@ -510,13 +511,53 @@ def clock_out(du: DanteUser, user=None) -> list[Booking]:
             if busy:
                 raise DanteError("bad_request", f"Перекривається з наявним записом {busy} в askDANTE — "
                                                 "перевірте день у календарі.")
-            booking = _send(c, du, day, a.time(), stop, Booking.CLOCK, user, "«Прийшов» / «Пішов» у Minerva")
+            booking = _send(c, du, day, a.time(), stop, source, user, reason)
             bookings.append(booking)
             if booking.status != Booking.SENT:
                 break
             du.open_since = b if b < now else None
             du.save(update_fields=["open_since"])
     return bookings
+
+
+def clock_out_at(du: DanteUser, st: DanteSettings) -> datetime.datetime | None:
+    """Коли Minerva сама відмітить «Пішов»: стандартний відхід працівника в день «Прийшов»; None — не відмітить
+    (вимкнено, «Пішов» не потрібен або «Прийшов» уже після відходу — вечірня робота)."""
+    if not (st.auto_clock_out and du.open_since):
+        return None
+    since = timezone.localtime(du.open_since)
+    stop = du.times(st)[1]
+    if stop == datetime.time(0, 0) or stop <= since.time():
+        return None
+    return timezone.make_aware(datetime.datetime.combine(since.date(), stop))
+
+
+def auto_clock_out(st: DanteSettings | None = None) -> list[Booking]:
+    """Cron: забули «Пішов» — після стандартного відходу запис від «Прийшов» до нього (`DanteSettings.auto_clock_out`).
+    В askDANTE вже є запис на цей час (термінал, додаток) або запис не вдався — відмітка знімається, без повторів:
+    записи askDANTE через API не виправляються, а «невідомо, чи записано» повторювати наосліп не можна."""
+    st = st or DanteSettings.get()
+    if not (st.enabled and st.configured and st.auto_clock_out):
+        return []
+    now = timezone.localtime()
+    out = []
+    for du in DanteUser.objects.exclude(open_since=None):
+        at = clock_out_at(du, st)
+        if at is None or now < at:
+            continue
+        try:
+            done = clock_out(du, until=at, source=Booking.AUTO, reason="«Пішов» автоматично — стандартний відхід")
+        except DanteError as e:   # до запису не дійшло (читання дня, перекриття, задовго)
+            if e.code != "bad_request":   # askDANTE недоступний / інший запис саме йде — наступного разу
+                continue
+            done = [Booking.objects.create(dante_user=du, date=timezone.localtime(du.open_since).date(),
+                                           kind=Booking.WORK, source=Booking.AUTO, status=Booking.FAILED,
+                                           error=e.message[:2000], reason="«Пішов» автоматично — не записано")]
+        out += done
+        du.refresh_from_db(fields=["open_since"])
+        if du.open_since and any(b.status != Booking.SENT for b in done):
+            clock_cancel(du)
+    return out
 
 
 # ── автозаповнення (cron) ────────────────────────────────────────
@@ -954,8 +995,10 @@ def _attendance_today(du: DanteUser, mode: str, user, st: DanteSettings, cover_f
         du.open_since = timezone.make_aware(datetime.datetime.combine(day, stop))
         du.save(update_fields=["open_since"])
     if notes is not None:
+        at = clock_out_at(du, st)
         notes.append(f"Прихід за сьогодні {hhmm(start)}–{hhmm(stop)} записано в askDANTE. Minerva вважає, що ви ще "
-                     "на роботі: коли підете, натисніть «Пішов» у календарі робочого часу — допише решту дня.")
+                     "на роботі: коли підете, натисніть «Пішов» у календарі робочого часу — допише решту дня"
+                     + (f" (не натиснете — відмітить сама о {at:%H:%M}, як відхід у налаштуваннях)." if at else "."))
     return ""
 
 

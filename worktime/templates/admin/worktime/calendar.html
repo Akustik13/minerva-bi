@@ -118,7 +118,7 @@ button.wt-rec:hover{text-decoration:underline}
     <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="m" value="{{ cur_m }}">
     {% if open_since %}
       <span class="big">▶ {% trans "Прийшов о" %} {{ open_since|time:"H:i" }}</span>
-      <span class="wt-muted">{% trans "минуло" %} {{ open_duration }}</span>
+      <span class="wt-muted">{% trans "минуло" %} {{ open_duration }}{% if auto_out %} · {% trans "не натиснете «Пішов» — Minerva відмітить його сама о" %} {{ auto_out|time:"H:i" }}{% endif %}</span>
       <button class="button default" name="action" value="clock_out">⏹ {% trans "Пішов — записати в askDANTE" %}</button>
       <button class="button" name="action" value="clock_cancel" onclick="return confirm('{% trans "Скасувати відмітку «Прийшов»? В askDANTE нічого не записано." %}')">✖ {% trans "Скасувати" %}</button>
     {% else %}

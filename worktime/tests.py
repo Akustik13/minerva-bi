@@ -484,6 +484,12 @@ class AdminPageTests(Base):
         self.assertContains(r, "Записати в askDANTE")
         self.assertEqual(self.fake.calls, [])   # перегляд нічого не пише
 
+    def test_calendar_says_when_clock_out_is_automatic(self):
+        self.du.open_since = at(timezone.localdate(), 8, 0)
+        self.du.save(update_fields=["open_since"])
+        r = self.client.get(self.url, {"u": self.du.pk})
+        self.assertContains(r, "Minerva відмітить його сама о 16:30")
+
     def test_post_fill_and_book(self):
         r = self.client.post(self.url, {"action": "fill", "u": self.du.pk, "m": "2026-09",
                                         "fill_from": "2026-09-07", "fill_to": "2026-09-13", "mode": "fixed",

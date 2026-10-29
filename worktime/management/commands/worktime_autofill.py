@@ -2,6 +2,8 @@
 
     python manage.py worktime_autofill --if-due    # з cron: раз на добу після «Запуск о годині», лише якщо увімкнено
     python manage.py worktime_autofill --dry-run   # що записалось би, без запису
+
+З --if-due (кожен цикл cron) ще й «Пішов» автоматично після стандартного відходу (services.auto_clock_out).
 """
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -21,6 +23,10 @@ class Command(BaseCommand):
         st = DanteSettings.get()
         if opts["if_due"]:   # виклик із cron — відмітка «cron живий» для сторінки налаштувань
             DanteSettings.objects.filter(pk=st.pk).update(cron_seen_at=timezone.now())
+            # забули «Пішов» — після стандартного відходу (кожен цикл cron, не раз на добу)
+            for b in services.auto_clock_out(st):
+                self.stdout.write(f"worktime_autofill: «Пішов» автоматично {b.dante_user} {b.date} "
+                                  f"{services.hhmm(b.start)}–{services.hhmm(b.stop)} · {b.status} {b.error}".rstrip())
         if opts["if_due"] and not services.autofill_due(st):
             return
         if st.autofill_mode == DanteSettings.MODE_OFF:

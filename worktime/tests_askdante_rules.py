@@ -168,6 +168,7 @@ class WorktimeRequiredTests(Base):
             self.assertEqual((first[0]["start"], first[0]["stop"]), ("07:30", "16:15"))   # від початку запису, до зараз
             self.assertIn("projectData", first[1])
             self.assertIn("«Пішов»", b.notice)
+            self.assertIn("сама о 16:30", b.notice)   # стандартний відхід — «Пішов» автоматично
             self.du.refresh_from_db()
             self.assertEqual(timezone.localtime(self.du.open_since).time(), datetime.time(16, 15))
         later = now + datetime.timedelta(hours=1, minutes=12)
@@ -189,3 +190,47 @@ class WorktimeRequiredTests(Base):
                                       attendance=DanteSettings.MODE_ACTIVITY)
         self.assertIn("немає дій у Minerva", e.exception.message)
         self.assertFalse([r for r in self.fake.calls if r["date"] == today.isoformat()])
+
+
+class AutoClockOutTests(Base):
+    """Забули «Пішов»: після стандартного відходу Minerva сама записує решту дня (DanteSettings.auto_clock_out)."""
+
+    def run_at(self, day, h, m=0):
+        from unittest import mock
+
+        from django.utils import timezone
+        now = timezone.make_aware(datetime.datetime.combine(day, datetime.time(h, m)))
+        with mock.patch("django.utils.timezone.now", return_value=now), \
+                mock.patch("worktime.services.local_today", return_value=day):
+            return services.auto_clock_out()
+
+    def open_at(self, day, h, m=0):
+        from django.utils import timezone
+        self.du.open_since = timezone.make_aware(datetime.datetime.combine(day, datetime.time(h, m)))
+        self.du.save(update_fields=["open_since"])
+
+    def test_closes_at_standard_departure_once(self):
+        self.open_at(MON, 8, 0)
+        self.assertEqual(self.run_at(MON, 16, 0), [])                    # ще до відходу (16:30) — чекає
+        out = self.run_at(MON, 17, 40)
+        self.assertEqual([(b.start, b.stop, b.source, b.status) for b in out],
+                         [(datetime.time(8, 0), datetime.time(16, 30), Booking.AUTO, Booking.SENT)])
+        self.du.refresh_from_db()
+        self.assertIsNone(self.du.open_since)
+        self.assertEqual(self.run_at(MON, 17, 41), [])                   # уже закрито — без повторів
+
+    def test_evening_work_disabled_and_overlap(self):
+        self.open_at(MON, 18, 0)                                        # «Прийшов» після відходу — не чіпаємо
+        self.assertIsNone(services.clock_out_at(self.du, DanteSettings.get()))
+        self.assertEqual(self.run_at(MON, 23, 0), [])
+        self.open_at(MON, 8, 0)
+        DanteSettings.objects.update(auto_clock_out=False)
+        self.assertEqual(self.run_at(MON, 17, 0), [])
+        DanteSettings.objects.update(auto_clock_out=True)
+        self.fake.times[MON] = [{"coming": "09:00", "leaving": "17:00", "minutes": 480}]   # уже в askDANTE (термінал)
+        out = self.run_at(MON, 17, 0)
+        self.assertEqual([b.status for b in out], [Booking.FAILED])
+        self.assertIn("Перекривається", out[0].error)
+        self.du.refresh_from_db()
+        self.assertIsNone(self.du.open_since)                          # відмітку знято — без спроб щохвилини
+        self.assertFalse([r for r in self.fake.calls if r["date"] == MON.isoformat()])

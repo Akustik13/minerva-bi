@@ -32,6 +32,11 @@ class DanteSettings(models.Model):
     workdays = models.CharField("Робочі дні", max_length=7, default="12345",
                                 help_text="Номери днів тижня: 1 — понеділок … 7 — неділя. "
                                           "Свята й відпустки askDANTE враховуються окремо.")
+    auto_clock_out = models.BooleanField(
+        "«Пішов» автоматично о відході", default=True,
+        help_text="Відмічено «Прийшов» (або Minerva записала прихід за сьогодні до зараз), а «Пішов» не натиснули — "
+                  "після стандартного відходу працівника Minerva сама запише в askDANTE решту дня до нього. "
+                  "«Прийшов» уже після відходу (вечірня робота) не закривається.")
 
     autofill_mode = models.CharField("Автозаповнення", max_length=10, choices=MODES, default=MODE_OFF,
                                      help_text="Щодня заповнює порожні робочі дні працівників, яким увімкнено "
