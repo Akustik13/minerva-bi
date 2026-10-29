@@ -160,13 +160,22 @@ class SalesSettingsAdmin(admin.ModelAdmin):
         }),
         ('🖥️ Відображення списку замовлень', {
             'fields': ('show_product_image_tooltip', 'show_pdf_preview', 'datasheet_priority', 'image_priority',
-                       'label_open_mode', 'dymo_open_mode', 'dymo_label_source'),
+                       'label_open_mode'),
             'description': (
                 '<b>Попередній перегляд фото / PDF</b> — при наведенні на Артикул або значок 📄 '
                 'показує фото або PDF у маленькому спливаючому вікні.<br>'
                 '<b>Пріоритет PDF / Фото</b> — якщо у товару є і локально завантажений файл, '
                 'і посилання (URL) — вкажіть що відображати в першу чергу. '
                 'Fallback: якщо пріоритетне джерело порожнє — використовується інше.'
+            ),
+        }),
+        ('🏷️ Етикетки DYMO', {
+            'fields': ('dymo_open_mode', 'dymo_label_source',
+                       'antenna_label_sources', 'antenna_label_digikey', 'antenna_label_window'),
+            'description': (
+                'Кнопка 🖨️ Друкувати в замовленнях, картці товару й на сторінці «Наклейки DYMO»; '
+                'правий клік на ній — інші варіанти. Етикетка антени (AN…) формується з шаблону; '
+                'тут — що вікно перевірки бере за замовчуванням.'
             ),
         }),
         ('⚙️ Поведінка при генерації документів', {

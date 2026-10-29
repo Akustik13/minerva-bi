@@ -36,10 +36,10 @@
 .svl-chip{background:var(--bg-hover,#1e2d40);border:1px solid var(--border-strong,#243347);color:var(--text,#c9d8e4);border-radius:12px;padding:2px 9px;font-size:11px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .svl-chip.on{border-color:#ff6a00}
 .svl-issues{margin:12px 0 0;padding:0;list-style:none;font-size:12px}
-.svl-issues li{padding:5px 9px;border-radius:5px;margin-bottom:4px}
-.svl-issues .error{background:rgba(198,40,40,.18);color:#ef9a9a}
-.svl-issues .warn{background:rgba(255,152,0,.15);color:#ffcc80}
-.svl-issues .info{background:rgba(96,125,139,.15);color:var(--text-muted,#9aafbe)}
+.svl-issues li{padding:5px 9px;border-radius:5px;margin-bottom:4px;border-left:4px solid transparent;color:var(--text,#c9d8e4)}
+.svl-issues .error{background:rgba(198,40,40,.12);border-left-color:#e53935;font-weight:600}
+.svl-issues .warn{background:rgba(255,152,0,.12);border-left-color:#ff9800}
+.svl-issues .info{background:rgba(96,125,139,.10);border-left-color:#90a4ae;color:var(--text-muted,#9aafbe)}
 .svl-foot-btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;align-items:center}
 .svl-btn{border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4);border:1px solid var(--border-strong,#243347)}
 .svl-btn.main{background:#1565c0;color:#fff;border-color:#1565c0}
@@ -224,7 +224,10 @@
         + '<div class="svl-src" id="svl-s-' + f + '"></div><div class="svl-chips" id="svl-c-' + f + '"></div></div>';
     }).join('');
     m.innerHTML = '<div class="svl-box" role="dialog" aria-label="Етикетка антени">'
-      + '<div class="svl-head"><b>🏷️ Етикетка антени · ' + esc(d.pn) + '</b><button type="button" class="svl-x" title="Закрити">✕</button></div>'
+      + '<div class="svl-head"><b>🏷️ Етикетка антени · ' + esc(d.pn) + '</b>'
+      + '<span style="display:flex;gap:12px;align-items:center"><a href="/admin/sales/salessettings/" target="_blank" '
+      + 'style="font-size:12px;color:var(--link,#58a6ff)" title="Звідки брати тексти, Digi-Key P/N, коли показувати це вікно">'
+      + '⚙️ За замовчуванням</a><button type="button" class="svl-x" title="Закрити">✕</button></span></div>'
       + '<div class="svl-paper" id="svl-paper"></div>'
       + '<div class="svl-grid">'
       + '<label for="svl-qty">Кількість</label><div><input type="number" id="svl-qty" min="1" max="99999" style="max-width:120px"></div>'

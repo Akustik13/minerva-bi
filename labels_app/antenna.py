@@ -331,6 +331,31 @@ def _digikey_pn(listing, old) -> tuple[str, str]:
 
 # ── Дані етикетки ─────────────────────────────────────────────────────────────
 
+# «Продажі → Налаштування → 🏷️ Етикетки DYMO» (SalesSettings.antenna_label_*)
+SOURCE_ORDERS = {
+    "stock": ("stock", "digikey", "file"),
+    "file": ("file", "stock", "digikey"),
+    "digikey": ("digikey", "stock", "file"),
+}
+DEFAULT_SETTINGS = {"sources": "stock", "digikey": "digikey_orders", "window": "auto"}
+
+
+def label_settings() -> dict:
+    """Налаштування вікна етикетки антени за замовчуванням: порядок джерел, Digi-Key P/N, коли показувати вікно."""
+    try:
+        from sales.models import SalesSettings
+        s = SalesSettings.get()
+        return {"sources": s.antenna_label_sources, "digikey": s.antenna_label_digikey,
+                "window": s.antenna_label_window}
+    except Exception:
+        return dict(DEFAULT_SETTINGS)
+
+
+def _seen_key(field, value) -> str:
+    """Для порівняння з `seen`: частота — без огляду на одиниці (старі записи «600MHz...7.2GHz»)."""
+    return _norm(_fmt_frequency(value) if field == "frequency" else value)
+
+
 def _issue(level, text):
     return {"level": level, "text": text}
 
@@ -346,6 +371,7 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
     listing = _listing(product)
     saved = _saved(pn)
     old = read_file(pn)
+    prefs = label_settings()
     edits = {f: v for f, v in (edits or {}).items() if f in EDIT_FIELDS}
     year = timezone.localdate().year
     issues = []
@@ -372,10 +398,10 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
             autos_raw = [("digikey", dk_auto), ("file", old_dk if own else "")]
             chips_raw = autos_raw + ([] if own else [("file", old_dk)])
         else:
-            stock = ("stock", _stock_value(field, product))
-            digikey = ("digikey", _digikey_value(field, listing))
-            file = ("file", (old or {}).get(field) or "")
-            autos_raw = [stock, digikey, file] if exact else [file, digikey, stock]
+            values = {"stock": _stock_value(field, product), "digikey": _digikey_value(field, listing),
+                      "file": (old or {}).get(field) or ""}
+            order_of = SOURCE_ORDERS.get(prefs["sources"], SOURCE_ORDERS["stock"]) if exact else SOURCE_ORDERS["file"]
+            autos_raw = [(src, values[src]) for src in order_of]
             chips_raw = autos_raw
         saved_value = _clean(getattr(saved, field)) if saved is not None else ""
         cands = _candidates(([("saved", saved_value)] if saved_value else []) + chips_raw, edits.get(field))
@@ -395,7 +421,7 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
                 issues.append(_issue("warn", f"{name}: {SOURCES[chosen['source']]} «{chosen['value']}», "
                                              f"а {other['label']} «{other['value']}» — перевірте."))
         seen = (saved.seen or {}).get(field) if saved is not None and isinstance(saved.seen, dict) else None
-        if chosen["source"] == "saved" and seen is not None and _norm(seen) != _norm(fields[field]["auto"]):
+        if chosen["source"] == "saved" and seen is not None and _seen_key(field, seen) != _seen_key(field, fields[field]["auto"]):
             issues.append(_issue("warn", f"{name}: {auto['label'] if auto else 'дані'} тепер «{fields[field]['auto']}» "
                                          f"(під час перевірки було «{seen}») — перевірте."))
 
@@ -405,15 +431,19 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
     if not fields["frequency"]["value"]:
         issues.append(_issue("info" if fields["frequency"]["source"] in deliberate else "warn",
                              "Немає частоти — рядок «Frequency» не друкується."))
-    elif _mixed_units(fields["frequency"]["value"]):
-        issues.append(_issue("warn", f"Частота «{fields['frequency']['value']}»: у діапазоні різні одиниці — "
-                                     "впишіть в одних (напр. 0.650...9 GHz)."))
+    elif _mixed_units(fields["frequency"]["value"]):   # підтверджене людиною — лише нагадування, друк не зупиняє
+        issues.append(_issue("info" if fields["frequency"]["source"] == "saved" else "warn",
+                             f"Частота «{fields['frequency']['value']}»: у діапазоні різні одиниці — "
+                             "краще в одних (напр. 0.650...9 GHz)."))
     if not fields["connector"]["value"]:
         issues.append(_issue("info" if fields["connector"]["source"] in deliberate else "warn",
                              "Немає роз'єму — рядок «Connector type» не друкується."))
 
     dk_pn = fields["digikey_pn"]["value"]
-    if show_dk is None:
+    if show_dk is None and prefs["digikey"] in ("always", "never"):
+        show_dk = bool(dk_pn) and prefs["digikey"] == "always"
+        dk_reason = "за замовчуванням — завжди" if prefs["digikey"] == "always" else "за замовчуванням — ні"
+    elif show_dk is None:
         source = (getattr(order, "source", "") or "").lower()
         show_dk = bool(dk_pn) and (not order or source == "digikey")
         dk_reason = ("замовлення DigiKey" if source == "digikey" else
@@ -452,14 +482,20 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
         if len(prefix + value) > LINE_MAX:
             issues.append(_issue("warn", f"Рядок «{prefix}{value}» довший за {LINE_MAX} символів — DYMO обріже кінець."))
 
+    can_print = not any(i["level"] == "error" for i in issues)
+    if prefs["window"] == "always":
+        ready = False
+    elif prefs["window"] == "errors":
+        ready = can_print and not edits
+    else:   # «тиснем і робить»: людина вже перевіряла, і з того часу немає зауважень — друк без вікна
+        ready = saved is not None and not edits and not any(i["level"] in ("error", "warn") for i in issues)
     return {
         "sku": sku, "pn": pn, "qty": qty, "year": year,
         "product": ({"pk": product.pk, "name": product.name, "sku": product.sku} if product is not None else None),
         "digikey_pn": dk_pn, "digikey_from": dk_why, "show_dk": bool(show_dk), "dk_reason": dk_reason,
         "fields": fields, "lines": lines, "issues": issues, "file": old,
-        "can_print": not any(i["level"] == "error" for i in issues),
-        # «тиснем і робить»: людина вже перевіряла, і з того часу немає зауважень — друк без вікна
-        "ready": saved is not None and not edits and not any(i["level"] in ("error", "warn") for i in issues),
+        "can_print": can_print,
+        "ready": ready,
         "checked_at": saved.checked_at.isoformat() if saved is not None and saved.checked_at else None,
         "checked_by": saved.checked_by if saved is not None else "",
     }

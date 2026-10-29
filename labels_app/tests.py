@@ -360,7 +360,7 @@ class OrderLabelTests(TestCase):
         ss.save()
         self.user = User.objects.create_user("staff", password="x", is_staff=True, is_superuser=True)
         self.client.force_login(self.user)
-        self.order = SalesOrder.objects.create(source="digikey", order_number="102497269")
+        self.order = SalesOrder.objects.create(source="digikey", order_number="102497269", addr_country="NZ")
 
     def add(self, sku, qty, sku_raw=None):
         from sales.models import SalesOrderLine
@@ -372,19 +372,41 @@ class OrderLabelTests(TestCase):
         for sku, qty in (("AN220214-01A", 5), ("AN220215-01A", 4), ("AN220213-01C", 2), ("AN220203-02A", 4)):
             self.add(sku, qty)
         data = order_label.build(self.order)
-        self.assertEqual(data["summary"], "4 Pos. · 15 PCS")
-        self.assertEqual(data["font_size"], 10)
-        self.assertEqual(data["lines"], ["AN220214-01A × 5", "AN220215-01A × 4", "AN220213-01C × 2", "AN220203-02A × 4"])
+        self.assertEqual(data["country"], "NZ")
+        self.assertEqual(data["font_size"], 12)
+        self.assertEqual(data["lines"], ["1. AN220214-01A × 5", "2. AN220215-01A × 4", "3. AN220213-01C × 2", "4. AN220203-02A × 4"])
         xml = order_label.render(data)
         root = ET.fromstring(xml.encode("utf-8"))
         texts = [t.text for t in root.iter("Text")]
         self.assertIn("Order: 102497269", texts)
-        self.assertIn("4 Pos. · 15 PCS", texts)
-        self.assertIn("AN220214-01A × 5", texts)
-        self.assertEqual([d.text for d in root.iter("DataString") if d.text], ["102497269"])
+        self.assertIn("   NZ", texts)                # у рядку номера замовлення
+        self.assertNotIn("Pos.", xml)
+        first = "1. AN220214-01A × 5"
+        self.assertIn(first, texts)
+        self.assertEqual(root.find(".//BarcodeObject"), None)  # штрихкода немає
+        for span in root.iter("TextSpan"):                    # артикули й країна — жирним
+            if span.find("Text").text in ("   NZ", first):
+                self.assertEqual(span.find("FontInfo/IsBold").text, "True")
         self.assertEqual(root.find(".//QRCodeObject"), None)
+        self.assertEqual(root.find(".//ImageObject"), None)   # без логотипа
+        line = root.find(".//TextObject[Name='ITextObject2']//LineTextSpan")
+        self.assertEqual([t.text for t in line.iter("Text")], ["Order: 102497269", "   NZ"])
         self.assertNotIn("{{", xml)
         self.assertNotIn("Copyright", xml)
+
+    def test_country_falls_back_to_shipment_and_region(self):
+        self.order.addr_country = ""
+        self.order.shipping_region = "Germany"
+        self.order.save()
+        self.assertEqual(order_label.country(self.order), "DE")
+        from shipping.models import Carrier, Shipment
+        Shipment.objects.create(order=self.order, recipient_country="at",
+                                carrier=Carrier.objects.create(name="UPS", carrier_type="ups"))
+        self.assertEqual(order_label.country(self.order), "AT")
+        self.order.shipping_region = ""
+        self.order.save()
+        Shipment.objects.all().delete()
+        self.assertEqual(order_label.country(self.order), "")
 
     def test_same_sku_is_summed_and_ordered_sku_is_used(self):
         self.add("AN220214-01A", 2, sku_raw="AN220203-02A")
@@ -416,3 +438,82 @@ class OrderLabelTests(TestCase):
     def test_order_without_lines(self):
         self.assertEqual(self.client.get(f"/labels/order/{self.order.pk}/").status_code, 400)
         self.assertEqual(self.client.get("/labels/order/999999/").status_code, 404)
+
+
+class LabelSettingsTests(TestCase):
+    """«Продажі → Налаштування → 🏷️ Етикетки DYMO»: що вікно етикетки антени бере за замовчуванням."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+        patcher = mock.patch.object(label_views, "LABELS_DIR", self.dir)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.product = Product.objects.create(
+            sku="AN220214-01A", name_export="Multi-purpose UWB PCB antenna", category="antenna",
+            tech_attributes={"Frequency Range": "600MHz ~ 7.2GHz", "Termination": "SMA-Female"})
+        DigiKeyListing.objects.create(product=self.product, dk_title="RF ANT Omni 0.6-8GHz 5G/LTE SMA",
+                                      dk_description="", dk_product_id="u-1")
+        cfg = DigiKeyConfig.get()
+        cfg.marketplace_supplier_id = "3228"
+        cfg.save()
+        (self.dir / "AN220214-01A.dymo").write_text(old_label("AN220214-01A", [
+            "Multi-purpose UWB PCB antenna.", "Frequency range: 0.650...9 GHz.", "Connector type: SMA female."]),
+            encoding="utf-8")
+        self.settings = SalesSettings.get()
+
+    def use(self, **values):
+        for name, value in values.items():
+            setattr(self.settings, name, value)
+        self.settings.save()
+
+    def test_old_label_first(self):
+        self.assertEqual(antenna.build("AN220214-01A")["fields"]["frequency"]["value"], "0.600...7.2 GHz")
+        self.use(antenna_label_sources="file")
+        fields = antenna.build("AN220214-01A")["fields"]
+        self.assertEqual((fields["frequency"]["value"], fields["frequency"]["source"]), ("0.650...9 GHz", "file"))
+        self.assertEqual(fields["connector"]["value"], "SMA female")
+
+    def test_digikey_first(self):
+        self.use(antenna_label_sources="digikey")
+        self.assertEqual(antenna.build("AN220214-01A")["fields"]["description"]["value"], "RF ANT Omni 0.6-8GHz 5G/LTE SMA")
+
+    def test_digikey_line_default(self):
+        shop = SalesOrder.objects.create(source="webshop", order_number="W1")
+        self.assertFalse(antenna.build("AN220214-01A", order=shop)["show_dk"])
+        self.use(antenna_label_digikey="always")
+        self.assertTrue(antenna.build("AN220214-01A", order=shop)["show_dk"])
+        self.use(antenna_label_digikey="never")
+        digikey = SalesOrder.objects.create(source="digikey", order_number="D1")
+        self.assertFalse(antenna.build("AN220214-01A", order=digikey)["show_dk"])
+        self.assertTrue(antenna.build("AN220214-01A", order=digikey, show_dk=True)["show_dk"])  # галочка у вікні
+
+    def test_window_mode(self):
+        self.assertFalse(antenna.build("AN220214-01A")["ready"])          # перший раз — вікно
+        self.use(antenna_label_window="errors")
+        self.assertTrue(antenna.build("AN220214-01A")["ready"])           # попередження друк не зупиняють
+        antenna.save("AN220214-01A", {})
+        self.use(antenna_label_window="always")
+        self.assertFalse(antenna.build("AN220214-01A")["ready"])
+
+    def test_confirmed_mixed_units_do_not_reopen_the_window(self):
+        """Скриншот 29.10: збережено «600MHz...7.2GHz» до того, як частота стала в одних одиницях."""
+        LabelText.objects.create(sku="AN220214-01A", product=self.product, description="Multi-purpose UWB PCB antenna",
+                                 frequency="600MHz...7.2GHz", connector="SMA-Female", digikey_pn="",
+                                 seen={"description": "Multi-purpose UWB PCB antenna", "frequency": "600MHz...7.2GHz",
+                                       "connector": "SMA-Female", "digikey_pn": ""}, checked_at=timezone.now())
+        data = antenna.build("AN220214-01A")
+        self.assertEqual(data["fields"]["frequency"]["value"], "600MHz...7.2GHz")
+        mixed = [i for i in data["issues"] if "різні одиниці" in i["text"]]
+        self.assertEqual([i["level"] for i in mixed], ["info"])
+        self.assertTrue(data["ready"], data["issues"])
+
+    def test_settings_page_has_label_block(self):
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.get_or_create(pk=1)[0]
+        ss.is_onboarding_complete = True
+        ss.save()
+        self.client.force_login(User.objects.create_user("staff", password="x", is_staff=True, is_superuser=True))
+        r = self.client.get(f"/admin/sales/salessettings/{self.settings.pk}/change/")
+        self.assertContains(r, "🏷️ Етикетки DYMO")
+        self.assertContains(r, "id_antenna_label_window")

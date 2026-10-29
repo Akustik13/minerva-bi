@@ -335,6 +335,46 @@ class SalesSettings(models.Model):
                   "Правий клік на 🖨️ Друкувати — меню: «Завантажити з бази» / «Згенерувати й завантажити».",
     )
 
+    # ── Етикетка антени: вікно перевірки за замовчуванням (labels_app/antenna.py) ──
+    class AntennaLabelSources(models.TextChoices):
+        STOCK   = "stock",   "📦 Склад → 🔷 DigiKey → 📄 стара етикетка"
+        FILE    = "file",    "📄 Стара етикетка → 📦 склад → 🔷 DigiKey"
+        DIGIKEY = "digikey", "🔷 DigiKey → 📦 склад → 📄 стара етикетка"
+
+    antenna_label_sources = models.CharField(
+        "Етикетка антени: звідки брати опис, частоту, роз'єм",
+        max_length=16,
+        choices=AntennaLabelSources.choices,
+        default=AntennaLabelSources.STOCK,
+        help_text="Береться перше непорожнє. Перевірене у вікні запам'ятовується для артикула й має перевагу. "
+                  "«Стара етикетка» — тексти наявного .dymo файлу цього артикула.",
+    )
+
+    class AntennaLabelDigikey(models.TextChoices):
+        DIGIKEY_ORDERS = "digikey_orders", "Лише на замовленнях DigiKey"
+        ALWAYS         = "always",         "Завжди, якщо товар є на DigiKey"
+        NEVER          = "never",          "Ні (можна ввімкнути галочкою у вікні)"
+
+    antenna_label_digikey = models.CharField(
+        "Етикетка антени: рядок Digi-Key P/N",
+        max_length=16,
+        choices=AntennaLabelDigikey.choices,
+        default=AntennaLabelDigikey.DIGIKEY_ORDERS,
+    )
+
+    class AntennaLabelWindow(models.TextChoices):
+        AUTO   = "auto",   "Коли треба перевірити: перший раз, змінились дані, є зауваження"
+        ERRORS = "errors", "Лише при помилках — попередження друк не зупиняють"
+        ALWAYS = "always", "Завжди перед друком"
+
+    antenna_label_window = models.CharField(
+        "Етикетка антени: коли показувати вікно перевірки",
+        max_length=16,
+        choices=AntennaLabelWindow.choices,
+        default=AntennaLabelWindow.AUTO,
+        help_text="Правий клік на 🖨️ Друкувати → «🔍 Перевірити дані етикетки…» відкриває вікно завжди.",
+    )
+
     class Meta:
         verbose_name = 'Налаштування'
         verbose_name_plural = 'Налаштування'
