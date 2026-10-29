@@ -135,6 +135,18 @@
 #em-icon-dlg{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-card);color:var(--text);
   padding:14px 16px;width:min(420px,94vw);box-shadow:0 10px 30px rgba(0,0,0,.4)}
 #em-icon-dlg::backdrop{background:rgba(0,0,0,.45)}
+#em-logo-dlg,#em-ctx-cfg{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-card);color:var(--text);
+  padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+#em-logo-dlg::backdrop,#em-ctx-cfg::backdrop{background:rgba(0,0,0,.45)}
+#em-logo-dlg .wc-btns,#em-ctx-cfg .wc-btns{display:flex;gap:8px;margin-top:12px}
+#em-ctx-cfg{width:min(480px,94vw)}
+#em-ctx-cfg .cfg-list{max-height:60vh;overflow-y:auto;margin-top:8px;border:1px solid var(--border);border-radius:8px}
+#em-ctx-cfg table{width:100%;border-collapse:collapse;font-size:12.5px}
+#em-ctx-cfg th{position:sticky;top:0;background:var(--bg-card);font-size:11px;font-weight:600;color:var(--text-dim);padding:6px 8px;text-align:center}
+#em-ctx-cfg th:first-child{text-align:left}
+#em-ctx-cfg td{padding:4px 8px;border-top:1px solid var(--border);background:transparent;color:var(--text)}
+#em-ctx-cfg td.c{text-align:center;width:72px;color:var(--text-dim)}
+#em-ctx-cfg tr.grp td{background:var(--bg-input,transparent);font-size:11px;color:var(--text-dim);padding:3px 8px}
 #em-icon-dlg label{display:block;font-size:11px;color:var(--text-dim);margin:8px 0 2px}
 #em-icon-dlg .wc-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 #em-wc-dlg .wc-icons,#em-icon-dlg .wc-icons{display:flex;flex-wrap:wrap;gap:2px;margin-top:6px}
@@ -314,6 +326,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 #em-ctx.sub-left .em-ctx-sub{left:auto;right:100%}
 .em-ctx-sub-hd{padding:4px 14px 6px;font-size:11px;color:var(--text-dim);white-space:nowrap;max-width:280px;
   overflow:hidden;text-overflow:ellipsis}
+.em-ctx-arrow{margin-left:auto;padding-left:12px}
+.em-ctx-item.em-ctx-cfg-item{font-size:12px;color:var(--text-dim)}
 .em-ctx-item.current{color:#3b82f6;font-weight:600}
 .em-ctx-item.current::after{content:'✓';margin-left:auto}
 
@@ -758,15 +772,27 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 {{ mail_customers|json_script:"em-customers-data" }}
 {{ email_settings.nav_pinned|json_script:"em-nav-pins-data" }}
 
-<!-- Context menu -->
+<!-- Меню правого кліку: рядок листа (list) і відкритий лист у прев'ю (letter). Пункти — data-k (nav_prefs.CTX_KEYS),
+     група — data-g; data-where="letter" — лише в листі, data-sel — коли виділено текст, data-need — потрібна функція прев'ю.
+     Що в меню, а що в «⋯ Ще» — ⚙ «Налаштувати це меню» (EmailSettings.ctx_menu); порядок і роздільники ставить _ctxArrange -->
 <div id="em-ctx">
-  <div class="em-ctx-item" onclick="ctxAction('open')">↗ Відкрити окремо</div>
-  <div class="em-ctx-item" onclick="ctxAction('read')">✉️ Позначити прочитаним</div>
-  <div class="em-ctx-item" onclick="ctxAction('unread')">📩 Позначити непрочитаним</div>
-  <div class="em-ctx-item" onclick="ctxAction('star')">⭐ Важливе</div>
-  <div class="em-ctx-sep"></div>
-  <div class="em-ctx-item has-sub" onclick="event.stopPropagation()">
-    🗂 {% trans "Віднести до категорії" %} <span style="margin-left:auto;padding-left:12px">▸</span>
+  <div class="em-ctx-item" data-k="sel_copy" data-g="sel" data-where="letter" data-sel="1" onclick="ctxAction('sel_copy')">📋 {% trans "Копіювати виділене" %}</div>
+  <div class="em-ctx-item" data-k="sel_rag" data-g="sel" data-where="letter" data-sel="1" data-need="pvSelRag" onclick="ctxAction('sel_rag')">🔎 {% trans "Шукати виділене в RAG" %}</div>
+  <div class="em-ctx-item" data-k="sel_ask" data-g="sel" data-where="letter" data-sel="1" data-need="pvSelAsk" onclick="ctxAction('sel_ask')">❓ {% trans "Запитати про виділене" %}</div>
+  <div class="em-ctx-item" data-k="sel_mail" data-g="sel" data-where="letter" data-sel="1" onclick="ctxAction('sel_mail')">🔍 {% trans "Шукати виділене в пошті" %}</div>
+  <div class="em-ctx-item" data-k="reply" data-g="letter" data-where="letter" onclick="ctxAction('reply')">↩ {% trans "Відповісти" %}</div>
+  <div class="em-ctx-item" data-k="forward" data-g="letter" data-where="letter" onclick="ctxAction('forward')">→ {% trans "Переслати" %}</div>
+  <div class="em-ctx-item" data-k="ai_reply" data-g="letter" data-where="letter" data-need="pvAiReply" onclick="ctxAction('ai_reply')">🏛️ {% trans "AI-відповідь на цей лист" %}</div>
+  <div class="em-ctx-item" data-k="translate" data-g="letter" data-where="letter" data-need="pvAiTranslate" onclick="ctxAction('translate')">🌐 {% trans "Перекласти лист" %}</div>
+  <div class="em-ctx-item" data-k="history" data-g="letter" data-where="letter" data-need="pvHistory" onclick="ctxAction('history')"
+       title="{% trans "Що було з цим замовленням і перепискою: дати, доставка, листи, нотатки CRM" %}">📜 {% trans "Історія" %}</div>
+  <div class="em-ctx-item" data-k="angebot" data-g="letter" data-where="letter" data-need="pvOfferFromThread" data-thread="1" onclick="ctxAction('angebot')"
+       title="{% trans "Чернетка Angebot: клієнт і проєкт листування, артикули й кількості з листа, ціни з Minerva" %}">📝 Angebot</div>
+  <div class="em-ctx-item" data-k="open" data-g="mark" onclick="ctxAction('open')">↗ {% trans "Відкрити окремо" %}</div>
+  <div class="em-ctx-item" data-k="read" data-g="mark" data-label="✉️ {% trans "Позначити прочитаним / непрочитаним" %}" onclick="ctxAction(this.dataset.act || 'read')">✉️ {% trans "Позначити прочитаним" %}</div>
+  <div class="em-ctx-item" data-k="star" data-g="mark" onclick="ctxAction('star')">⭐ {% trans "Важливе" %}</div>
+  <div class="em-ctx-item has-sub" data-k="cat" data-g="org" onclick="event.stopPropagation()">
+    🗂 {% trans "Віднести до категорії" %} <span class="em-ctx-arrow">▸</span>
     <div class="em-ctx-sub" onclick="event.stopPropagation()">
       <div class="em-ctx-sub-hd" id="em-ctx-cat-hd"></div>
       {% if work_categories or can_add_work_category %}
@@ -796,24 +822,46 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
            title="{% trans "Забути вибір для цього контакту — категорію знову визначає система" %}">↺ {% trans "Автоматично" %}</div>
     </div>
   </div>
-  {% if email_settings.sender_logos %}<div class="em-ctx-item" onclick="ctxAction('logo')" title="{% trans "Свій значок замість логотипа сайту — для цієї адреси або всього домену; або буква" %}">🖼 {% trans "Значок відправника…" %}</div>{% endif %}
-  {% if mail_time_url %}<div class="em-ctx-item" onclick="ctxAction('dante')" title="{% trans "Час на проєкт листа в askDANTE: дата й час з листа, AI коротко опише, що зроблено, і що надіслали" %}">⏱ {% trans "Записати в askDANTE з листа…" %}</div>{% endif %}
-  <div class="em-ctx-item" onclick="ctxAction('customer')" title="{% trans "Новий клієнт CRM з даних листа (ім'я, компанія, email, телефон, адреса з підпису) — і гілка, Angebote та проєкти до нього; або вибрати наявного" %}">👤 {% trans "Клієнт CRM з листа…" %}</div>
-  <div class="em-ctx-item" onclick="ctxAction('why')" title="{% trans "До якої своєї категорії й чому, хто пише, проєкти — і швидко змінити правило" %}">🔍 {% trans "Чому лист тут — ознаки й правила…" %}</div>
-  <div class="em-ctx-item" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
+  {% if email_settings.sender_logos %}<div class="em-ctx-item" data-k="logo" data-g="org" onclick="ctxAction('logo')" title="{% trans "Свій значок замість логотипа сайту — для цієї адреси або всього домену; або буква" %}">🖼 {% trans "Значок відправника…" %}</div>{% endif %}
+  {% if mail_time_url %}<div class="em-ctx-item" data-k="dante" data-g="org" onclick="ctxAction('dante')" title="{% trans "Час на проєкт листа в askDANTE: дата й час з листа, AI коротко опише, що зроблено, і що надіслали" %}">⏱ {% trans "Записати в askDANTE з листа…" %}</div>{% endif %}
+  <div class="em-ctx-item" data-k="customer" data-g="org" onclick="ctxAction('customer')" title="{% trans "Новий клієнт CRM з даних листа (ім'я, компанія, email, телефон, адреса з підпису) — і гілка, Angebote та проєкти до нього; або вибрати наявного" %}">👤 {% trans "Клієнт CRM з листа…" %}</div>
+  <div class="em-ctx-item" data-k="why" data-g="org" onclick="ctxAction('why')" title="{% trans "До якої своєї категорії й чому, хто пише, проєкти — і швидко змінити правило" %}">🔍 {% trans "Чому лист тут — ознаки й правила…" %}</div>
+  <div class="em-ctx-item" data-k="project" data-g="org" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
   {% if knowledge_available %}
-  <div class="em-ctx-item" onclick="ctxAction('kbsend')"
+  <div class="em-ctx-item" data-k="kbsend" data-g="kb" onclick="ctxAction('kbsend')"
        title="{% trans "Передати цю переписку в базу знань RAG, навіть якщо категорія чи дата поза правилами (або ще раз, якщо RAG не обробив)" %}">🧠 {% trans "Передати в базу знань" %}</div>
-  <div class="em-ctx-item" onclick="ctxAction('kb')"
+  <div class="em-ctx-item" data-k="kb" data-g="kb" onclick="ctxAction('kb')"
        title="{% trans "Приватна переписка: не передавати в базу знань RAG (повторне натискання — повернути)" %}">🔒 {% trans "Приватне — не в базу знань" %}</div>
   {% endif %}
-  <div class="em-ctx-item" onclick="ctxAction('rule')">📋 Правило з відправника</div>
-  <div class="em-ctx-item" onclick="ctxAction('task')">📅 Завдання в календар</div>
-  <div class="em-ctx-sep"></div>
-  <div class="em-ctx-item" onclick="ctxAction('spam')">🚫 Спам</div>
-  <div class="em-ctx-item" onclick="ctxAction('archive')">📦 Архів</div>
-  <div class="em-ctx-item danger" onclick="ctxAction('delete')">🗑️ Видалити</div>
+  <div class="em-ctx-item" data-k="rule" data-g="tools" onclick="ctxAction('rule')">📋 {% trans "Правило з відправника" %}</div>
+  <div class="em-ctx-item" data-k="task" data-g="tools" onclick="ctxAction('task')">📅 {% trans "Завдання в календар" %}</div>
+  <div class="em-ctx-item" data-k="spam" data-g="danger" onclick="ctxAction('spam')">🚫 {% trans "Спам" %}</div>
+  <div class="em-ctx-item" data-k="archive" data-g="danger" onclick="ctxAction('archive')">📦 {% trans "Архів" %}</div>
+  <div class="em-ctx-item danger" data-k="delete" data-g="danger" onclick="ctxAction('delete')">🗑️ {% trans "Видалити" %}</div>
+  <div class="em-ctx-item has-sub" id="em-ctx-more" onclick="if(!event.target.closest('.em-ctx-sub'))event.stopPropagation()">
+    ⋯ {% trans "Ще" %} <span class="em-ctx-arrow">▸</span>
+    <div class="em-ctx-sub" id="em-ctx-more-sub"></div>
+  </div>
+  <div class="em-ctx-item em-ctx-cfg-item" id="em-ctx-cfg-item" onclick="ctxConfig()"
+       title="{% trans "Що показувати в цьому меню, а що сховати в «⋯ Ще» — окремо для списку й відкритого листа" %}">⚙ {% trans "Налаштувати це меню…" %}</div>
 </div>
+{{ ctx_hidden|json_script:"em-ctx-hidden" }}
+<dialog id="em-ctx-cfg">
+  <form method="dialog" onsubmit="return false">
+    <b style="font-size:14px">⚙ {% trans "Меню правого кліку на листі" %}</b>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:4px">{% trans "Галочка — пункт у меню; без галочки — сховано в «⋯ Ще» внизу меню. Лише для вас. Shift + правий клік — звичайне меню браузера." %}</div>
+    <div class="cfg-list"><table id="em-ctx-cfg-tbl">
+      <thead><tr><th>{% trans "Пункт" %}</th><th>{% trans "У списку листів" %}</th><th>{% trans "У відкритому листі" %}</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <div class="wc-btns">
+      <button type="button" class="button default" onclick="ctxConfigSave(false)">💾 {% trans "Зберегти" %}</button>
+      <button type="button" class="button" onclick="ctxConfigSave(true)">↺ {% trans "Як за замовчуванням" %}</button>
+      <button type="button" class="button" style="margin-left:auto" onclick="document.getElementById('em-ctx-cfg').close()">{% trans "Закрити" %}</button>
+    </div>
+    <div id="em-ctx-cfg-err" style="color:var(--err,#e57373);font-size:12px;margin-top:4px"></div>
+  </form>
+</dialog>
 
 <!-- Folder context menu -->
 <!-- Правий клік на своїй категорії (ліва колонка) — email_assistant/views_categories.py -->
@@ -1341,6 +1389,7 @@ async function previewMsg(pk, tpk, rowEl) {
       document.head.appendChild(newSc);
       document.head.removeChild(newSc);
     });
+    cont.querySelectorAll('iframe.em-body-iframe').forEach(_ctxHookFrame);   // правий клік у HTML-листі — меню листа
   } catch(e) {
     cont.innerHTML = '<div style="padding:24px;color:var(--err)">⚠️ ' + _i18n.помилкаЗавант + '</div>';
   }
@@ -1573,8 +1622,7 @@ async function wcAction(action) {
                          senders: info.senders, subject_words: info.subject_words});
       location.reload(); return;
     }
-    if (action === 'logo') { emLogoDialog(_ctxMsg.from || ''); return; }
-  if (action === 'dante') {
+    if (action === 'dante') {
       if (!info.dante) { _showToast('{% trans "Облік часу askDANTE не встановлено" %}'); return; }
       location.href = info.dante.url; return;
     }
@@ -2661,10 +2709,53 @@ function _applyP2Visibility() {
 var _ctxMsg = null; // {pk, tpk, rowEl, from}
 var _ctx = document.getElementById('em-ctx');
 
-function showCtxMenu(ev, pk, tpk, rowEl) {
-  ev.preventDefault();
-  ev.stopPropagation();
-  _ctxMsg = {pk: pk, tpk: tpk, rowEl: rowEl, from: rowEl.dataset.from || ''};
+var CTX_HIDDEN = JSON.parse(document.getElementById('em-ctx-hidden').textContent || '{}');   // {list: [...], letter: [...]}
+var _CTX_ALL = Array.prototype.slice.call(_ctx.querySelectorAll(':scope > [data-k]'));
+var _ctxMore = document.getElementById('em-ctx-more'), _ctxMoreSub = document.getElementById('em-ctx-more-sub'),
+    _ctxCfgItem = document.getElementById('em-ctx-cfg-item');
+function _ctxSep() { var s = document.createElement('div'); s.className = 'em-ctx-sep'; return s; }
+function _ctxFits(el, ctx) {
+  if (el.dataset.where === 'letter' && ctx.mode !== 'letter') return false;
+  if (el.dataset.sel && !ctx.sel) return false;
+  if (el.dataset.need && typeof window[el.dataset.need] !== 'function') return false;
+  if (el.dataset.thread && !+ctx.tpk) return false;
+  return true;
+}
+// Пункти — у меню або в «⋯ Ще» (CTX_HIDDEN[режим]), у початковому порядку, роздільник між групами
+function _ctxArrange(ctx) {
+  var hidden = CTX_HIDDEN[ctx.mode] || [], shown = [], more = [];
+  _CTX_ALL.forEach(function(el) {
+    if (_ctxFits(el, ctx)) (hidden.indexOf(el.dataset.k) >= 0 ? more : shown).push(el);
+  });
+  [_ctx, _ctxMoreSub].forEach(function(box) { while (box.firstChild) box.removeChild(box.firstChild); });
+  function put(list, box) {
+    var g = null;
+    list.forEach(function(el) { if (g !== null && el.dataset.g !== g) box.appendChild(_ctxSep()); g = el.dataset.g; box.appendChild(el); });
+  }
+  put(shown, _ctx);
+  _ctx.appendChild(_ctxSep());
+  if (more.length) { put(more, _ctxMoreSub); _ctxMoreSub.appendChild(_ctxSep()); _ctxMoreSub.appendChild(_ctxCfgItem); _ctx.appendChild(_ctxMore); }
+  else _ctx.appendChild(_ctxCfgItem);
+}
+// Підменю, що не влазить донизу екрана, піднімається
+_ctx.addEventListener('mouseover', function(e) {
+  var it = e.target.closest && e.target.closest('.em-ctx-item.has-sub');
+  var sub = it && it.querySelector(':scope > .em-ctx-sub');
+  if (!sub || sub._fit === _ctx._openId) return;
+  sub._fit = _ctx._openId;
+  sub.style.top = '-5px';
+  var r = sub.getBoundingClientRect(), over = r.bottom - (window.innerHeight - 6);
+  if (over > 0) sub.style.top = (-5 - Math.min(over, Math.max(0, r.top - 6))) + 'px';
+});
+function _ctxOpen(ctx) {   // ctx: {mode: list | letter, pk, tpk, rowEl, from, sel, x, y}
+  _ctxMsg = ctx;
+  var rowEl = ctx.rowEl;
+  var rd = _ctx.querySelector('[data-k="read"]');
+  if (rd) {
+    var unread = rowEl.classList.contains('unread');
+    rd.dataset.act = unread ? 'read' : 'unread';
+    rd.textContent = unread ? '✉️ {% trans "Позначити прочитаним" %}' : '📩 {% trans "Позначити непрочитаним" %}';
+  }
   // Підменю категорій: поточна категорія, для кого запам'ятовується, домен
   var contact = rowEl.dataset.contact || '';
   var domain  = contact.indexOf('@') > 0 ? '@' + contact.split('@')[1] : '';
@@ -2675,13 +2766,133 @@ function showCtxMenu(ev, pk, tpk, rowEl) {
   _ctx.querySelectorAll('.em-ctx-sub [data-cat]').forEach(function(el) {
     el.classList.toggle('current', el.dataset.cat === rowEl.dataset.cat);
   });
-  var x = ev.clientX, y = ev.clientY;
-  if (x + 200 > window.innerWidth) x = window.innerWidth - 205;
-  if (y + 320 > window.innerHeight) y = window.innerHeight - 325;
-  _ctx.classList.toggle('sub-left', x + 200 + 240 > window.innerWidth);
+  _ctxArrange(ctx);
+  _ctx._openId = (_ctx._openId || 0) + 1;
+  _ctx.style.left = '0px'; _ctx.style.top = '0px';
+  _ctx.classList.add('open');
+  var x = ctx.x, y = ctx.y, w = _ctx.offsetWidth, h = _ctx.offsetHeight;
+  if (x + w > window.innerWidth - 5) x = Math.max(5, window.innerWidth - w - 5);
+  if (y + h > window.innerHeight - 5) y = Math.max(5, window.innerHeight - h - 5);
+  _ctx.classList.toggle('sub-left', x + w + 240 > window.innerWidth);
   _ctx.style.left = x + 'px';
   _ctx.style.top  = y + 'px';
-  _ctx.classList.add('open');
+}
+function showCtxMenu(ev, pk, tpk, rowEl) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  _ctxOpen({mode: 'list', pk: pk, tpk: tpk, rowEl: rowEl, from: rowEl.dataset.from || '', x: ev.clientX, y: ev.clientY});
+}
+// Правий клік у відкритому листі (прев'ю й HTML-лист в iframe): те саме меню для цього листа + виділений текст.
+// Посилання, поля вводу, кнопки, відповідь, AI-панелі — звичайне меню браузера; Shift + правий клік — теж.
+function emLetterCtx(ev, frame) {
+  if (ev.shiftKey) return;
+  var t = ev.target;
+  if (t && t.nodeType !== 1) t = t.parentElement;
+  if (!t || !t.closest || t.closest('a[href], input, textarea, select, button, [contenteditable], .em-reply, .em-ai-box, .em-history, .em-proj-panel, dialog')) return;
+  var pk = 0, card = null, bar = document.getElementById('pv-sel-bar');
+  if (frame) { pk = +(frame.id || '').replace('pv-iframe-', ''); card = document.getElementById('pv-card-' + pk); }
+  else if ((card = t.closest('.em-card'))) pk = +card.id.replace('pv-card-', '');
+  else if (t.closest('.em-pv-hd') && bar) pk = +bar.dataset.pk;
+  if (!pk) return;
+  ev.preventDefault(); ev.stopPropagation();
+  var sel = '';
+  try { sel = String((frame ? frame.contentDocument : document).getSelection()).replace(/\s+/g, ' ').trim().slice(0, 3000); } catch (e) {}
+  if (sel.length < 2) sel = '';
+  if (sel) { window._pvSel = sel; if (window._pvSelHide) _pvSelHide(); }
+  var rowEl = document.getElementById('row-' + pk) || _activeRow;
+  if (!rowEl) { rowEl = document.createElement('div'); rowEl.dataset.subject = ((card && card.dataset.subject) || '').toLowerCase(); }
+  var from = card && card.querySelector('.em-card-from');
+  var proj = document.getElementById('pv-proj');
+  var x = ev.clientX, y = ev.clientY;
+  if (frame) { var fr = frame.getBoundingClientRect(); x += fr.left; y += fr.top; }
+  _ctxOpen({mode: 'letter', pk: pk, tpk: (proj && proj.dataset.tpk) || rowEl.dataset.tpk || 0, rowEl: rowEl,
+            from: (from && from.title) || rowEl.dataset.from || '', sel: sel, x: x, y: y});
+}
+function _ctxHookFrame(f) {
+  var hook = function() {
+    try {
+      var d = f.contentDocument;
+      if (!d || d._emCtx) return;
+      d._emCtx = true;
+      d.addEventListener('contextmenu', function(e) { emLetterCtx(e, f); });
+      d.addEventListener('mousedown', function() { emCtxCloseAll(); });
+      d.addEventListener('keydown', function(e) { if (e.key === 'Escape') emCtxCloseAll(); });
+    } catch (e) {}
+  };
+  f.addEventListener('load', hook);
+  hook();
+}
+document.getElementById('em-p3-content').addEventListener('contextmenu', function(e) { emLetterCtx(e, null); });
+/* ⚙ Налаштувати меню: що в меню, що в «⋯ Ще» — окремо для списку й відкритого листа */
+function _ctxLabel(el) {
+  if (el.dataset.label) return el.dataset.label;
+  var c = el.cloneNode(true);
+  c.querySelectorAll('.em-ctx-sub, .em-ctx-arrow').forEach(function(x) { x.remove(); });
+  return c.textContent.replace(/\s+/g, ' ').trim();
+}
+function ctxConfig() {
+  emCtxCloseAll();
+  var tb = document.querySelector('#em-ctx-cfg-tbl tbody'), g = null;
+  tb.innerHTML = '';
+  _CTX_ALL.forEach(function(el) {
+    if (el.dataset.g !== g && (el.dataset.g === 'sel' || el.dataset.g === 'letter' || g === 'letter')) {
+      var hd = document.createElement('tr'); hd.className = 'grp';
+      hd.innerHTML = '<td colspan="3"></td>';
+      hd.cells[0].textContent = el.dataset.g === 'sel' ? '{% trans "Коли в листі виділено текст" %}'
+        : el.dataset.g === 'letter' ? '{% trans "Лише у відкритому листі" %}' : '{% trans "Лист і переписка" %}';
+      tb.appendChild(hd);
+    }
+    g = el.dataset.g;
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td></td><td class="c"></td><td class="c"></td>';
+    tr.cells[0].textContent = _ctxLabel(el);
+    ['list', 'letter'].forEach(function(where, i) {
+      if (where === 'list' && el.dataset.where === 'letter') { tr.cells[i + 1].textContent = '—'; return; }
+      var cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.dataset.k = el.dataset.k; cb.dataset.where = where;
+      cb.checked = (CTX_HIDDEN[where] || []).indexOf(el.dataset.k) < 0;
+      tr.cells[i + 1].appendChild(cb);
+    });
+    tb.appendChild(tr);
+  });
+  document.getElementById('em-ctx-cfg-err').textContent = '';
+  var dlg = document.getElementById('em-ctx-cfg');
+  if (!dlg.open) dlg.showModal();
+}
+async function ctxConfigSave(reset) {
+  var body = {reset: true}, err = document.getElementById('em-ctx-cfg-err');
+  if (!reset) {   // пункти, яких на цій сторінці немає (база знань вимкнена…), лишаються як були
+    var here = _CTX_ALL.map(function(el) { return el.dataset.k; });
+    body = {};
+    ['list', 'letter'].forEach(function(where) {
+      body[where] = (CTX_HIDDEN[where] || []).filter(function(k) { return here.indexOf(k) < 0; });
+    });
+    document.querySelectorAll('#em-ctx-cfg-tbl input[type=checkbox]').forEach(function(cb) {
+      if (!cb.checked) body[cb.dataset.where].push(cb.dataset.k);
+    });
+  }
+  try {
+    var r = await fetch('/email/ctx-menu/', {method: 'POST', headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+                                             body: JSON.stringify(body)});
+    var d = {};
+    try { d = await r.json(); } catch (e) {}
+    if (!d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    CTX_HIDDEN = d.hidden;
+    if (reset) { ctxConfig(); _showToast('↺ {% trans "Меню — як за замовчуванням" %}'); }
+    else { document.getElementById('em-ctx-cfg').close(); _showToast('💾 {% trans "Меню збережено" %}'); }
+  } catch (e) { err.textContent = '❌ ' + e.message; }
+}
+function _ctxCopy(text) {
+  var done = function() { _showToast('📋 {% trans "Скопійовано" %}'); };
+  var old = function() {
+    var t = document.createElement('textarea');
+    t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    t.remove();
+  };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, function() { old(); done(); });
+  else { old(); done(); }
 }
 
 document.addEventListener('click', function() { _ctx.classList.remove('open'); });
@@ -2689,6 +2900,7 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') _ctx.
 (function(){   // будь-яке меню правого кліку: клік поза ним (і в тексті листа — iframe), Escape, прокрутка — сховати
   var MENUS = '#em-ctx, #em-wc-ctx, #em-pr-ctx, #em-nv-ctx';
   function closeAll(){ document.querySelectorAll(MENUS).forEach(function(m){ m.classList.remove('open'); }); }
+  window.emCtxCloseAll = closeAll;
   function outside(e){ return !(e.target && e.target.closest && e.target.closest(MENUS)); }
   document.addEventListener('mousedown', function(e){ if (outside(e)) closeAll(); }, true);   // до stopPropagation рядків
   document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeAll(); }, true);
@@ -2744,6 +2956,32 @@ async function ctxAction(action) {
   if (!_ctxMsg) return;
   var {pk, tpk, rowEl} = _ctxMsg;
 
+  if (action.indexOf('sel_') === 0) {   // виділений у листі текст — ті самі дії, що в панелі над виділеним
+    if (action === 'sel_copy') { _ctxCopy(_ctxMsg.sel || ''); return; }
+    var bar = document.getElementById('pv-sel-bar'), was = bar ? bar.dataset.pk : null;
+    window._pvSel = _ctxMsg.sel || '';
+    if (bar) bar.dataset.pk = pk;
+    try {
+      if (action === 'sel_rag' && window.pvSelRag) pvSelRag();
+      else if (action === 'sel_ask' && window.pvSelAsk) pvSelAsk();
+      else if (action === 'sel_mail') {
+        if (window.pvSelMail) pvSelMail(); else window.open('/email/?q=' + encodeURIComponent(_ctxMsg.sel.slice(0, 200)), '_blank');
+      }
+    } finally { if (bar && was !== null) bar.dataset.pk = was; }
+    return;
+  }
+  if (action === 'reply' || action === 'forward') {
+    // останній лист гілки — швидка відповідь унизу прев'ю; старіший лист — повна форма саме на нього
+    var wrap = document.getElementById('pv-reply-wrap');
+    var btn = wrap && +wrap.dataset.pk === +pk && wrap.querySelectorAll('#pv-reply-hd button')[action === 'reply' ? 0 : 1];
+    if (btn) { btn.click(); return; }
+    location.href = '/email/compose/?' + (action === 'reply' ? 'reply_to=' : 'forward=') + pk; return;
+  }
+  if (action === 'ai_reply') { pvAiReply(pk); return; }
+  if (action === 'translate') { pvAiTranslate(pk); return; }
+  if (action === 'history') { pvHistory(pk); return; }
+  if (action === 'angebot') { pvOfferFromThread(tpk); return; }
+  if (action === 'logo') { emLogoDialog(_ctxMsg.from || ''); return; }
   if (action === 'why') { emWhy(pk); return; }
   if (action === 'dante') { window.open('/admin/worktime/workday/from-mail/' + pk + '/', '_blank'); return; }
   if (action === 'customer') {   // «👤 Клієнт CRM з листа»: те саме вікно, одразу з формою нового клієнта
@@ -2773,7 +3011,7 @@ async function ctxAction(action) {
   } else if (action === 'project') {
     // відкрити лист у прев'ю і одразу панель «📁 До проєкту»
     if (!tpk) { _showToast('⚠️ {% trans "Лист без гілки листування" %}'); return; }
-    await previewMsg(pk, tpk, rowEl);
+    if (_ctxMsg.mode !== 'letter') await previewMsg(pk, tpk, rowEl);
     if (window.pvProjOpen) window.pvProjOpen();
   } else if (action === 'kbsend') {
     try {

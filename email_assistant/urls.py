@@ -76,6 +76,7 @@ urlpatterns = [
     path('customers/',                                  views_categories.customers_search_view, name='customers_search'),
     path('message/<int:message_pk>/why/',               views_categories.message_why_view,     name='message_why'),
     path('nav/',                                        views_categories.nav_pref_view,        name='nav_pref'),
+    path('ctx-menu/',                                   views_categories.ctx_menu_view,        name='ctx_menu'),
     path('category/<int:pk>/action/',                   views_categories.category_action_view, name='work_category_action'),
     # Quick settings toggles (e.g. mark read on server)
     path('logo-set/',                                   views.sender_logo_set_view,    name='sender_logo_set'),

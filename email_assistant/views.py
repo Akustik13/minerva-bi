@@ -530,6 +530,7 @@ def inbox_view(request):
                                         name_of=lambda r: r[0].name)
     categories = nav_prefs.ordered(categories, _es, lambda r: f'kind:{r[0]}', n_of=lambda r: r[2],
                                    name_of=lambda r: r[1])
+    ctx_hidden = nav_prefs.ctx_hidden(_es)
     if cat_filter:
         qs = qs.filter(category=cat_filter)
     if work_filter == NO_CATEGORY:
@@ -591,6 +592,7 @@ def inbox_view(request):
         'title':                 'Email Асистент',
         'account':               account,
         'email_settings':        EmailSettings.get_for_user(request.user),
+        'ctx_hidden':            ctx_hidden,
         'ai_model_choices':      EmailSettings.AI_MODEL_CHOICES,
         'rag_mode_choices':      EmailSettings.RAG_MODE_CHOICES,
         'folder_label':          decode_mutf7(folder),

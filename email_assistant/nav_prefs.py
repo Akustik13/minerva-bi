@@ -85,3 +85,44 @@ def ordered(items, es, key_of, n_of=None, name_of=None) -> list:
     pins = sorted((p for p in indexed if key_of(p[1]) in pos), key=lambda p: pos[key_of(p[1])])
     others = sorted((p for p in indexed if key_of(p[1]) not in pos), key=rest)
     return [item for _i, item in pins + others]
+
+
+# ── Меню правого кліку листа (у списку й у відкритому листі) — для кожного окремо ──────────────────────────
+# EmailSettings.ctx_menu = {"list": [...], "letter": [...]} — ключі пунктів, що сховані в «⋯ Ще» внизу меню;
+# немає списку — CTX_DEFAULT_HIDDEN. Пункти letter_only є лише в меню відкритого листа.
+CTX_KEYS = (
+    "sel_copy", "sel_rag", "sel_ask", "sel_mail",                                  # виділений текст
+    "reply", "forward", "ai_reply", "translate", "history", "angebot",             # лише у відкритому листі
+    "open", "read", "star", "cat", "logo", "dante", "customer", "why", "project",
+    "kbsend", "kb", "rule", "task", "spam", "archive", "delete",
+)
+CTX_LETTER_ONLY = frozenset(CTX_KEYS[:10])
+CTX_DEFAULT_HIDDEN = {
+    "list": ["open", "logo", "kbsend", "kb", "rule", "task"],
+    "letter": ["translate", "open", "star", "logo", "kbsend", "kb", "rule", "task", "spam", "archive"],
+}
+
+
+def ctx_hidden(es) -> dict:
+    """{"list": [...], "letter": [...]} — що сховано в «⋯ Ще» (збережене або за замовчуванням)."""
+    saved = es.ctx_menu if isinstance(es.ctx_menu, dict) else {}
+    out = {}
+    for where, default in CTX_DEFAULT_HIDDEN.items():
+        keys = saved.get(where)
+        out[where] = [k for k in keys if k in CTX_KEYS] if isinstance(keys, list) else list(default)
+    return out
+
+
+def set_ctx_hidden(es, data) -> dict:
+    """Зберегти вибір «що в меню» (data = {"list": [...], "letter": [...]}; {"reset": true} — як за замовчуванням)."""
+    if data.get("reset"):
+        menu = {}
+    else:
+        menu = dict(es.ctx_menu) if isinstance(es.ctx_menu, dict) else {}
+        for where in CTX_DEFAULT_HIDDEN:
+            keys = data.get(where)
+            if isinstance(keys, list):
+                menu[where] = [k for k in CTX_KEYS if k in keys and (where == "letter" or k not in CTX_LETTER_ONLY)]
+    es.ctx_menu = menu
+    es.save(update_fields=["ctx_menu"])
+    return ctx_hidden(es)

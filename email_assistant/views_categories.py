@@ -34,6 +34,22 @@ def nav_pref_view(request):
     return JsonResponse({'ok': True, 'pinned': nav_prefs.change(es, action, key)})
 
 
+@staff_member_required
+@require_POST
+def ctx_menu_view(request):
+    """Меню правого кліку листа — що в меню, що в «⋯ Ще», лише для себе: POST {list: [...], letter: [...]} | {reset: true}."""
+    from email_assistant import nav_prefs
+    from email_assistant.models import EmailSettings
+    try:
+        data = json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    es = EmailSettings.get_for_user(request.user)
+    return JsonResponse({'ok': True, 'hidden': nav_prefs.set_ctx_hidden(es, data)})
+
+
 def _mails(account, cat):
     from email_assistant.views import ALL_FOLDERS, _build_qs
     return _build_qs(account, ALL_FOLDERS).filter(work_category=cat)

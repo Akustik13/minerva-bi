@@ -71,3 +71,24 @@ class NavPrefsTests(Base):
         self.assertLess(ctx.index(f"ctxSetWorkCategory('{self.internal.pk}')"), ctx.index(f"ctxSetWorkCategory('{self.dk.pk}')"))
         why = self.client.get(f"/email/message/{msg.pk}/why/").json()
         self.assertEqual(why["categories"][0]["pk"], self.internal.pk)
+
+    def test_message_menu_what_is_shown_and_what_goes_to_more(self):
+        """Меню правого кліку листа: за замовчуванням частину сховано в «⋯ Ще», свій вибір — окремо для списку й листа."""
+        self.assertEqual(nav_prefs.ctx_hidden(self.es), nav_prefs.CTX_DEFAULT_HIDDEN)
+
+        def save(body):
+            return self.client.post("/email/ctx-menu/", json.dumps(body), content_type="application/json").json()
+        r = save({"list": ["star", "reply", "bogus"], "letter": ["spam", "reply"]})
+        self.assertEqual(r["hidden"], {"list": ["star"], "letter": ["reply", "spam"]})   # лише відомі; reply — лише в листі
+        self.assertEqual(EmailSettings.get_for_user(self.user).ctx_menu, r["hidden"])
+        self.assertEqual(save({"list": []})["hidden"]["letter"], ["reply", "spam"])     # інший список не змінюється
+        html = self.client.get("/email/").content.decode()
+        self.assertIn('<script id="em-ctx-hidden" type="application/json">{"list": [], "letter": ["reply", "spam"]}', html)
+        for key in ("sel_copy", "reply", "angebot", "read", "cat", "why", "delete"):
+            self.assertIn(f'data-k="{key}"', html)
+        self.assertIn('id="em-ctx-more"', html)
+        self.assertIn("ctxAction('logo')", html)                                    # 🖼 значок — у меню листа
+        self.assertIn("if (action === 'logo') { emLogoDialog(_ctxMsg.from", html)
+        self.assertEqual(save({"reset": True})["hidden"], nav_prefs.CTX_DEFAULT_HIDDEN)
+        bad = self.client.post("/email/ctx-menu/", "[1]", content_type="application/json")
+        self.assertEqual(bad.status_code, 400)

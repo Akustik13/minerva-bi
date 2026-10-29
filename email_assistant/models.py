@@ -315,6 +315,10 @@ class EmailSettings(models.Model):
         max_length=8, default='usage', verbose_name='Порядок лівої колонки',
         choices=[('usage', '🔥 За вживанням — часті вгорі'), ('count', '🔢 За кількістю листів'),
                  ('name', '🔤 За назвою'), ('order', '⚙ Як у налаштуваннях категорій')])
+    ctx_menu = models.JSONField(
+        default=dict, blank=True, verbose_name='Меню правого кліку листа',
+        help_text='{"list": [...], "letter": [...]} — пункти, сховані в «⋯ Ще» (у списку й у відкритому листі); '
+                  'порожньо — як за замовчуванням')
 
     # Auto-reply
     auto_reply_enabled = models.BooleanField(
