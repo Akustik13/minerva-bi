@@ -236,6 +236,18 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 [data-theme="light"] .em-star-btn:hover,[data-theme="light"] .em-star-btn.starred{color:#e6a817}
 .em-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#1565c0,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;position:relative;overflow:hidden}
 .em-av-logo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;padding:4px;box-sizing:border-box;border-radius:50%}
+.em-av-logo.em-av-icon{padding:0;background:transparent}
+#em-logo-dlg .lg-icons{display:flex;flex-wrap:wrap;gap:2px;max-width:420px}
+#em-logo-dlg .lg-icons button{width:30px;height:28px;border:1px solid transparent;border-radius:6px;background:transparent;
+  cursor:pointer;font-size:16px;line-height:1;padding:0;color:var(--text)}
+#em-logo-dlg .lg-icons button:hover{background:var(--bg-hover,rgba(128,128,128,.15))}
+#em-logo-dlg .lg-icons button.on{border-color:#1a73e8;background:rgba(26,115,232,.12)}
+#em-logo-dlg .lg-colors{display:flex;gap:4px;align-items:center;margin-top:6px;flex-wrap:wrap}
+#em-logo-dlg .lg-colors button{width:20px;height:20px;border-radius:50%;border:2px solid var(--border-strong);cursor:pointer;padding:0}
+#em-logo-dlg .lg-colors button.on{outline:2px solid #1a73e8;outline-offset:1px}
+#em-logo-dlg .lg-prev{width:40px;height:40px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+  font-size:22px;flex-shrink:0;border:1px solid var(--border)}
+#em-logo-dlg .lg-sec{font-size:12px;margin:10px 0 4px;color:var(--text-muted)}
 .em-row-body{flex:1;min-width:0}
 .em-row-top{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px}
 .em-row-sender{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
@@ -668,7 +680,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
           {% if msg.is_starred %}⭐{% else %}☆{% endif %}
         </button>
 
-        <div class="em-avatar">{{ msg.sender_display|first|upper }}{% if email_settings.sender_logos and msg.logo_domain %}<img class="em-av-logo" src="/email/logo/{{ msg.logo_domain }}/{% if msg.logo_v %}?v={{ msg.logo_v }}{% endif %}" alt="" loading="lazy" onerror="this.remove()">{% endif %}</div>
+        <div class="em-avatar">{{ msg.sender_display|first|upper }}{% if email_settings.sender_logos and msg.logo_domain %}<img class="em-av-logo{% if msg.logo_v|slice:':1' == 'i' %} em-av-icon{% endif %}" src="/email/logo/{{ msg.logo_domain }}/{% if msg.logo_v %}?v={{ msg.logo_v }}{% endif %}" alt="" loading="lazy" onerror="this.remove()">{% endif %}</div>
 
         <div class="em-row-body">
           <div class="em-row-top">
@@ -917,9 +929,21 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     <div style="font-size:12px;margin:8px 0 4px">{% trans "Для кого" %}:</div>
     <label style="display:block;font-size:12px"><input type="radio" name="em-logo-for" value="addr" checked> <span id="em-logo-addr"></span></label>
     <label style="display:block;font-size:12px" id="em-logo-dom-row"><input type="radio" name="em-logo-for" value="dom"> {% trans "весь домен" %} <span id="em-logo-dom"></span></label>
-    <input type="file" id="em-logo-file" accept="image/png,image/jpeg,image/gif,image/webp,image/x-icon" style="display:block;margin:8px 0;font-size:12px;color:var(--text)">
+    <div class="lg-sec">{% trans "Стандартний значок — клік, колір фону, «✓ Поставити значок»" %}:</div>
+    <div class="lg-icons" id="em-logo-icons">{% for i in sender_icons %}<button type="button" onclick="emLogoIcon(this.textContent)">{{ i }}</button>{% endfor %}</div>
+    <div class="lg-colors" id="em-logo-colors">
+      {% for c in sender_colors %}<button type="button" data-color="{{ c }}" style="background:{{ c }}" title="{{ c }}" onclick="emLogoColor('{{ c }}')"></button>{% endfor %}
+      <input type="text" id="em-logo-emoji" maxlength="8" placeholder="{% trans "або свій емодзі" %}" oninput="emLogoIcon(this.value.trim(), true)"
+             style="width:110px;margin-left:8px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input,var(--bg));color:var(--text)">
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
+      <span class="lg-prev" id="em-logo-prev"></span>
+      <button type="button" class="button default" onclick="emLogoSave('icon')">✓ {% trans "Поставити значок" %}</button>
+    </div>
+    <div class="lg-sec">{% trans "Або своє зображення" %}:</div>
+    <input type="file" id="em-logo-file" accept="image/png,image/jpeg,image/gif,image/webp,image/x-icon" style="display:block;margin:4px 0 8px;font-size:12px;color:var(--text)">
     <div class="wc-btns" style="justify-content:flex-start;flex-wrap:wrap">
-      <button type="button" class="button default" onclick="emLogoSave('upload')">⬆ {% trans "Поставити це зображення" %}</button>
+      <button type="button" class="button" onclick="emLogoSave('upload')">⬆ {% trans "Поставити це зображення" %}</button>
       <button type="button" class="button" onclick="emLogoSave('letter')">🔤 {% trans "Буква замість логотипа" %}</button>
       <button type="button" class="button" onclick="emLogoSave('auto')">↺ {% trans "Автоматично (логотип сайту)" %}</button>
       <button type="button" class="button" onclick="document.getElementById('em-logo-dlg').close()">{% trans "Закрити" %}</button>
@@ -1585,12 +1609,30 @@ function emLogoDialog(addr) {
   document.getElementById('em-logo-dom-row').style.display = dom ? '' : 'none';
   document.querySelector('input[name="em-logo-for"][value="addr"]').checked = true;
   document.getElementById('em-logo-file').value = ''; document.getElementById('em-logo-err').textContent = '';
+  document.getElementById('em-logo-emoji').value = '';
+  emLogoIcon(''); emLogoColor((document.querySelector('#em-logo-colors [data-color]') || {dataset: {}}).dataset.color || '#1a73e8');
   document.getElementById('em-logo-dlg').showModal();
+}
+var _logoIcon = '', _logoColor = '';
+function emLogoIcon(icon, typed) {   // стандартний значок з сітки або свій емодзі з поля
+  _logoIcon = icon || '';
+  if (!typed) document.getElementById('em-logo-emoji').value = '';
+  document.querySelectorAll('#em-logo-icons button').forEach(function(b) { b.classList.toggle('on', b.textContent === _logoIcon); });
+  document.getElementById('em-logo-prev').textContent = _logoIcon;
+}
+function emLogoColor(color) {
+  _logoColor = color;
+  document.querySelectorAll('#em-logo-colors [data-color]').forEach(function(b) { b.classList.toggle('on', b.dataset.color === color); });
+  document.getElementById('em-logo-prev').style.background = color;
 }
 async function emLogoSave(action) {
   var dom = document.querySelector('input[name="em-logo-for"]:checked').value === 'dom';
   var fd = new FormData();
   fd.append('key', dom ? _logoAddr.split('@')[1] : _logoAddr); fd.append('action', action);
+  if (action === 'icon') {
+    if (!_logoIcon) { document.getElementById('em-logo-err').textContent = '{% trans "Виберіть значок" %}'; return; }
+    fd.append('icon', _logoIcon); fd.append('color', _logoColor);
+  }
   if (action === 'upload') {
     var f = document.getElementById('em-logo-file').files[0];
     if (!f) { document.getElementById('em-logo-err').textContent = '{% trans "Виберіть зображення" %}'; return; }

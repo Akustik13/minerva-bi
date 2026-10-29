@@ -296,6 +296,7 @@ def mail_time_page(model_admin, request):
                                         source=Booking.MAIL, status=Booking.SENT).order_by("created_at"):
             sent.setdefault((b.date, b.dante_project_id), []).append(b)
         worktime = {}   # дні з / без приходу в копії askDANTE — якщо askDANTE пише час на проєкт лише в них
+        needs_act, last_act = st.activity_required and not st.default_activity_id, {}
         if st.attendance_required:
             from .models import WorkDay
             worktime = {wd.date: any(t.get("coming") for t in (wd.times or []))
@@ -308,6 +309,11 @@ def mail_time_page(model_admin, request):
                 info["unmapped"], info["loose"], info["ignored"] = 0, [], []
             for r in info["rows"]:
                 r["dur"], r["booked_dur"], r["todo_dur"] = _hm(r["minutes"]), _hm(r["booked"]), _hm(r["to_book"])
+                if needs_act and not r["activity"] and r["to_book"]:   # askDANTE вимагає вид роботи, а в рядку його немає
+                    if r["dp"].pk not in last_act:
+                        last_act[r["dp"].pk] = services.last_activity(du, r["dp"])
+                    r["last_activity"] = last_act[r["dp"].pk]
+                    r["no_activity"] = r["last_activity"] is None
                 r["key"] = f"{day:%Y-%m-%d}|{r['dp'].pk}"
                 summary = mail_time.cached_summary(du, r, st.comment_lang)
                 r["comment"], r["ai"] = mail_time.default_comment(r, st.comment_lang, summary), bool(summary)

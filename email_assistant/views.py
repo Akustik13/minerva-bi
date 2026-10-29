@@ -563,10 +563,7 @@ def inbox_view(request):
     _attach_project_tags(emails)
     _attach_quote_tags(emails)
     _attach_kb_tags(emails)
-    from email_assistant import logos as _logos
-    _custom = _logos.custom_map()   # свої значки (🖼 правий клік) — один перелік теки на сторінку
-    for m in emails:
-        m.logo_domain, m.logo_v = _logos.logo_for(m.from_email, _custom)
+    _attach_logos(emails)
     if search_all:
         _attach_folder_tags(account, emails)
 
@@ -586,6 +583,7 @@ def inbox_view(request):
     }
     unread_count = unread_inbox  # backwards-compat for template
 
+    from email_assistant import logos
     from email_assistant.imap_client import decode_mutf7
     from email_assistant.models import EmailSettings
     return render(request, 'email_assistant/inbox.html', _ctx(request, {
@@ -593,6 +591,8 @@ def inbox_view(request):
         'account':               account,
         'email_settings':        EmailSettings.get_for_user(request.user),
         'ctx_hidden':            ctx_hidden,
+        'sender_icons':          logos.STANDARD_ICONS,
+        'sender_colors':         logos.STANDARD_COLORS,
         'ai_model_choices':      EmailSettings.AI_MODEL_CHOICES,
         'rag_mode_choices':      EmailSettings.RAG_MODE_CHOICES,
         'folder_label':          decode_mutf7(folder),
@@ -693,10 +693,18 @@ def message_view(request, message_pk):
     }))
 
 
+def _attach_logos(emails):
+    """Логотип / свій значок відправника кожного листа (m.logo_domain, m.logo_v) — список і шапки листів у прев'ю."""
+    from email_assistant import logos
+    custom = logos.custom_map()   # свої значки (🖼 правий клік) — один перелік теки на сторінку
+    for m in emails:
+        m.logo_domain, m.logo_v = logos.logo_for(m.from_email, custom)
+
+
 @staff_member_required
 def thread_preview_view(request, thread_pk):
     """AJAX: HTML fragment loaded into panel-3 of 3-panel inbox."""
-    from email_assistant.models import EmailThread
+    from email_assistant.models import EmailSettings, EmailThread
 
     account = _get_account(request)
     thread  = get_object_or_404(EmailThread, pk=thread_pk, account=account)
@@ -708,9 +716,11 @@ def thread_preview_view(request, thread_pk):
     set_read(account, emails, True)
 
     links = _mail_links(emails)
+    _attach_logos(emails)
     reply_to_addr, reply_cc = _reply_addresses(account, emails[-1]) if emails else ('', [])
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
+        'sender_logos':    EmailSettings.get_for_user(request.user).sender_logos,
         'projects_state':  _projects_state(thread),
         'quote_request':   _quote_request(thread),
         'links':           links,
@@ -729,7 +739,7 @@ def thread_preview_view(request, thread_pk):
 @staff_member_required
 def message_preview_view(request, message_pk):
     """AJAX: HTML fragment for a single message in panel-3."""
-    from email_assistant.models import EmailMessage
+    from email_assistant.models import EmailMessage, EmailSettings
 
     account = _get_account(request)
     msg     = get_object_or_404(EmailMessage, pk=message_pk, account=account)
@@ -737,9 +747,11 @@ def message_preview_view(request, message_pk):
     set_read(account, [msg], True)
 
     links = _mail_links([msg])
+    _attach_logos([msg])
     reply_to_addr, reply_cc = _reply_addresses(account, msg)
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
+        'sender_logos':    EmailSettings.get_for_user(request.user).sender_logos,
         'projects_state':  _projects_state(msg.thread),
         'links':           links,
         'attach_options':  _attach_options([msg], links),
@@ -2194,6 +2206,11 @@ def sender_logo_view(request, domain):
     if own is not None:
         if own[0] == logos.LETTER:
             raise Http404
+        if own[0].endswith('.' + logos.ICON):   # стандартний значок — SVG малює Minerva (емодзі на кружку)
+            response = HttpResponse(logos.icon_svg(own[0]), content_type='image/svg+xml')
+            response['X-Content-Type-Options'] = 'nosniff'
+            response['Cache-Control'] = 'private, max-age=604800'
+            return response
         response = FileResponse(open(own[0], 'rb'), content_type=logos.TYPES[own[0].rsplit('.', 1)[1]])
         response['Cache-Control'] = 'private, max-age=604800'   # адреса з ?v=<час зміни>
         return response
@@ -2219,6 +2236,11 @@ def sender_logo_set_view(request):
             if f is None:
                 return JsonResponse({'ok': False, 'error': 'Виберіть зображення'})
             state = logos.set_custom(request.POST.get('key'), f.read(logos.CUSTOM_MAX + 1))
+        elif request.POST.get('action') == 'icon':
+            state = logos.set_custom(request.POST.get('key'), icon=request.POST.get('icon', ''),
+                                     color=request.POST.get('color', ''))
+            if state != 'icon':
+                return JsonResponse({'ok': False, 'error': 'Виберіть значок'})
         else:
             state = logos.set_custom(request.POST.get('key'), letter=request.POST.get('action') == 'letter')
     except ValueError as e:

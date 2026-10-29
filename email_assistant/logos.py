@@ -66,11 +66,43 @@ def cached(domain: str):
     return None
 
 
-# ── 🖼 Свій значок (людина вибрала): для адреси або домену, замість автоматичного; «буква» — без логотипа ──
+# ── 🖼 Свій значок (людина вибрала): для адреси або домену, замість автоматичного; «буква» — без логотипа;
+#    стандартний значок — емодзі на кольоровому кружку (файл <ключ>.icon: «емодзі\nколір», SVG малює icon_svg) ──
 CUSTOM = 'custom'
 CUSTOM_MAX = 1_000_000
 KEY_RE = re.compile(r'^(?:[a-z0-9._%+-]+@)?[a-z0-9-]+(\.[a-z0-9-]+)+$')
 LETTER = 'letter'
+ICON = 'icon'
+STANDARD_ICONS = ('🏢', '🏭', '🏬', '🛒', '📦', '🚚', '✈️', '🚢', '🏦', '💶', '🧾', '📑', '⚙️', '🔧', '🔬', '🧪',
+                  '💡', '📡', '🔌', '🖥️', '📱', '🛰️', '🎓', '🏥', '🏛️', '⚖️', '📰', '📣', '🤝', '👤', '👥', '⭐',
+                  '❤️', '🔒', '🤖', '🌐', '📬', '🏠')
+STANDARD_COLORS = ('#1a73e8', '#0f9d58', '#f4b400', '#db4437', '#8e24aa', '#00897b', '#6d4c41', '#546e7a',
+                   '#263238', '#ffffff')
+COLOR_RE = re.compile(r'^#[0-9a-f]{6}$')
+
+
+def _icon_ok(icon: str) -> bool:
+    """Стандартний або свій емодзі: до 8 символів, без звичайних літер / цифр / розмітки."""
+    return icon in STANDARD_ICONS or (0 < len(icon) <= 8 and not any(ch.isascii() for ch in icon))
+
+
+def icon_svg(path: str) -> bytes:
+    """SVG стандартного значка (емодзі на кружку) з файла <ключ>.icon."""
+    from html import escape
+    try:
+        with open(path, encoding='utf-8') as fh:
+            icon, _, color = fh.read().partition('\n')
+    except OSError:
+        icon, color = '', ''
+    icon, color = icon.strip(), color.strip().lower()
+    if not _icon_ok(icon):
+        icon = '✉️'
+    if not COLOR_RE.match(color):
+        color = STANDARD_COLORS[0]
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" '
+            f'fill="{color}"/><text x="32" y="34" text-anchor="middle" dominant-baseline="central" font-size="34" '
+            f'font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, sans-serif">{escape(icon)}</text>'
+            '</svg>').encode('utf-8')
 
 
 def _custom_dir() -> str:
@@ -86,16 +118,17 @@ def custom_map() -> dict:
         return out
     for name in names:
         key, _, ext = name.rpartition('.')
-        if not KEY_RE.match(key) or (ext not in TYPES and ext != LETTER):
+        if not KEY_RE.match(key) or (ext not in TYPES and ext not in (LETTER, ICON)):
             continue
         path = os.path.join(_custom_dir(), name)
         out[key] = (LETTER if ext == LETTER else path, int(os.path.getmtime(path)))
     return out
 
 
-def set_custom(key: str, data: bytes = b'', letter: bool = False) -> str:
-    """Свій значок для адреси / домену (data — PNG / JPG / GIF / ICO / WEBP), letter — буква без логотипа,
-    обидва порожні — назад автоматичний. → що тепер: 'image' | 'letter' | 'auto'. ValueError — не той файл."""
+def set_custom(key: str, data: bytes = b'', letter: bool = False, icon: str = '', color: str = '') -> str:
+    """Свій значок для адреси / домену (data — PNG / JPG / GIF / ICO / WEBP), icon — стандартний значок (емодзі на
+    кружку кольору color), letter — буква без логотипа, усе порожнє — назад автоматичний.
+    → що тепер: 'image' | 'icon' | 'letter' | 'auto'. ValueError — не той файл / значок."""
     key = (key or '').strip().lower()
     if not KEY_RE.match(key):
         raise ValueError('Неправильна адреса або домен')
@@ -104,8 +137,13 @@ def set_custom(key: str, data: bytes = b'', letter: bool = False) -> str:
         raise ValueError('Потрібне зображення PNG, JPG, GIF, ICO або WEBP')
     if len(data) > CUSTOM_MAX:
         raise ValueError('Зображення завелике (до 1 МБ)')
+    icon, color = (icon or '').strip(), (color or '').strip().lower()
+    if icon and not _icon_ok(icon):
+        raise ValueError('Виберіть значок зі списку або один емодзі')
+    if icon and not COLOR_RE.match(color):
+        color = STANDARD_COLORS[0]
     os.makedirs(_custom_dir(), exist_ok=True)
-    for ext in list(TYPES) + [LETTER]:
+    for ext in list(TYPES) + [LETTER, ICON]:
         try:
             os.remove(os.path.join(_custom_dir(), f'{key}.{ext}'))
         except OSError:
@@ -114,6 +152,10 @@ def set_custom(key: str, data: bytes = b'', letter: bool = False) -> str:
         with open(os.path.join(_custom_dir(), f'{key}.{kind}'), 'wb') as fh:
             fh.write(data)
         return 'image'
+    if icon:
+        with open(os.path.join(_custom_dir(), f'{key}.{ICON}'), 'w', encoding='utf-8') as fh:
+            fh.write(f'{icon}\n{color}')
+        return 'icon'
     if letter:
         open(os.path.join(_custom_dir(), f'{key}.{LETTER}'), 'wb').close()
         return 'letter'
@@ -122,7 +164,7 @@ def set_custom(key: str, data: bytes = b'', letter: bool = False) -> str:
 
 def logo_for(address: str, custom: dict | None = None):
     """(ключ для /email/logo/<ключ>/, версія) для рядка листа: свій значок адреси → свій домену → автоматичний
-    домену; «буква» — ('', '')."""
+    домену; «буква» — ('', ''); версія стандартного значка починається з «i» (кружок без білої рамки)."""
     custom = custom_map() if custom is None else custom
     address = (address or '').strip().lower()
     domain = domain_for(address)
@@ -130,7 +172,9 @@ def logo_for(address: str, custom: dict | None = None):
     for key in (address, full, domain):
         if key and key in custom:
             path, mtime = custom[key]
-            return ('', '') if path == LETTER else (key, str(mtime))
+            if path == LETTER:
+                return ('', '')
+            return (key, ('i' if path.endswith('.' + ICON) else '') + str(mtime))
     return (domain, '') if domain else ('', '')
 
 

@@ -117,7 +117,9 @@
 .em-card-hd:hover{background:var(--bg-hover,#1e2d40)}
 .em-card.expanded .em-card-hd{border-bottom:1px solid var(--border);cursor:default}
 .em-card.expanded .em-card-hd:hover{background:var(--bg-input)}
-.em-card-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1565c0,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.em-card-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1565c0,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0;position:relative;overflow:hidden}
+.em-card-av .em-av-logo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;padding:3px;box-sizing:border-box;border-radius:50%}
+.em-card-av .em-av-logo.em-av-icon{padding:0;background:transparent}
 .em-card-info{flex:1;min-width:0}
 .em-card-row1{display:flex;align-items:baseline;gap:6px}
 .em-card-from{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
@@ -443,7 +445,7 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
 
       <!-- Header: always visible, clickable to expand/collapse -->
       <div class="em-card-hd" onclick="pvToggleCard({{ msg.pk }}, event)">
-        <div class="em-card-av">{{ msg.sender_display|first|upper }}</div>
+        <div class="em-card-av">{{ msg.sender_display|first|upper }}{% if sender_logos and msg.logo_domain %}<img class="em-av-logo{% if msg.logo_v|slice:':1' == 'i' %} em-av-icon{% endif %}" src="/email/logo/{{ msg.logo_domain }}/{% if msg.logo_v %}?v={{ msg.logo_v }}{% endif %}" alt="" onerror="this.remove()">{% endif %}</div>
         <div class="em-card-info">
           <div class="em-card-row1">
             <span class="em-card-from" title="{{ msg.from_email }}">{{ msg.from_name|default:msg.from_email }}</span>

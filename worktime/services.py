@@ -883,8 +883,10 @@ def project_overlap(du: DanteUser, day: datetime.date, start: datetime.time, sto
     return ""
 
 
-ACTIVITY_MISSING = ("askDANTE вимагає вид роботи (Tätigkeit). Виберіть «Вид роботи за замовчуванням» у ⚙️ Налаштуваннях "
-                    "askDANTE (блок «📁 Час на проєкти») — або вид роботи в категорії листів чи на сторінці.")
+ACTIVITY_MISSING = ("askDANTE вимагає вид роботи (Tätigkeit), а для цього проєкту його не вибрано й раніше не "
+                    "записувалось. Виберіть «Вид роботи» біля кнопки запису (діє на все вибране) — або раз і назавжди "
+                    "«Вид роботи за замовчуванням» у ⚙️ Налаштуваннях askDANTE (блок «📁 Час на проєкти»); для своїх "
+                    "категорій листів — вид роботи в категорії.")
 
 
 def _minutes(t: datetime.time) -> int:
@@ -937,12 +939,33 @@ def find_slot(du: DanteUser, day: datetime.date, minutes: int, prefer: datetime.
                                     "іншими записами на проєкти (у межах приходу–відходу) — запишіть «з … по …» вручну.")
 
 
-def _pick_activity(st: DanteSettings):
-    """Вид роботи, коли askDANTE його вимагає, а не вибрано: за замовчуванням або єдиний наявний."""
+def last_activity(du: DanteUser, dp: DanteProject):
+    """Вид роботи, з яким працівник востаннє записував час на цей проєкт askDANTE (журнал Minerva, далі копія
+    записів askDANTE); None — ще не записував."""
+    b = (Booking.objects.filter(dante_user=du, dante_project=dp, kind=Booking.PROJECT, status=Booking.SENT,
+                                activity__archived=False).exclude(activity=None)
+         .select_related("activity").order_by("-created_at").first())
+    if b:
+        return b.activity
+    for name in (TimeRecord.objects.filter(dante_user=du, dante_project=dp).exclude(activity_name="")
+                 .order_by("-day").values_list("activity_name", flat=True)[:5]):
+        a = DanteActivity.objects.filter(name=name, archived=False).first()
+        if a:
+            return a
+    return None
+
+
+def _pick_activity(st: DanteSettings, du: DanteUser | None = None, dp: DanteProject | None = None):
+    """Вид роботи, коли askDANTE його вимагає, а не вибрано: за замовчуванням → востаннє на цьому проєкті →
+    єдиний наявний. → (вид роботи | None, як вибрано — для пояснення людині; '' — за замовчуванням)."""
     if st.default_activity_id:
-        return st.default_activity
+        return st.default_activity, ""
+    if du is not None and dp is not None:
+        a = last_activity(du, dp)
+        if a:
+            return a, "як востаннє на цьому проєкті"
     active = list(DanteActivity.objects.filter(archived=False)[:2])
-    return active[0] if len(active) == 1 else None
+    return (active[0], "єдиний в askDANTE") if len(active) == 1 else (None, "")
 
 
 NO_WORKTIME = ("У askDANTE за {day:%d.%m} немає робочого часу (прихід / відхід), а askDANTE приймає час на проєкт "
@@ -1059,10 +1082,13 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
     if dp.archived or dp.gone or not dp.time_trackable:
         raise DanteError("bad_request", f"У проєкт askDANTE «{dp}» час записувати не можна (архів або вимкнено).")
     activity = activity or st.default_activity
+    notes = []
     if activity is None and st.activity_required:
-        activity = _pick_activity(st)
+        activity, how = _pick_activity(st, du, dp)
         if activity is None:
             raise DanteError("bad_request", ACTIVITY_MISSING)
+        if how:
+            notes.append(f"Вид роботи «{activity}» — {how} ({dp}).")
     comment = (comment or "").strip()[:500]
     fixed_times = bool(start)
     recent = timezone.now() - datetime.timedelta(minutes=2)
@@ -1081,7 +1107,6 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
         return r
 
     c = client(st)
-    notes = []
     if attendance in (DanteSettings.MODE_FIXED, DanteSettings.MODE_ACTIVITY):
         # людина вибрала: у дні без приходу спершу записати прихід / відхід (askDANTE пише час на проєкт лише в них)
         try:
@@ -1143,10 +1168,12 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
                     booking.comment, retry = comment, True
                 if activity is None and any(k.endswith("activityId") for k in e.fields):
                     _remember(st, activity_required=True)
-                    activity = _pick_activity(st)
+                    activity, how = _pick_activity(st, du, dp)
                     if activity is None:
                         booking.error = ACTIVITY_MISSING
                         break
+                    if how:
+                        notes.append(f"Вид роботи «{activity}» — {how} ({dp}).")
                     booking.activity, retry = activity, True
                 if not retry:
                     break

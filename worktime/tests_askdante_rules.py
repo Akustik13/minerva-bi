@@ -61,6 +61,23 @@ class RulesTests(Base):
         b = services.book_project(self.du, MON, self.dp, minutes=30, comment="3")
         self.assertEqual((b.status, b.activity.name), (Booking.SENT, "Entwicklung"))
 
+    def test_activity_as_last_time_on_this_project(self):
+        """Вид роботи не вибрано, а askDANTE вимагає: як востаннє на цьому проєкті (Minerva або копія askDANTE)."""
+        DanteActivity.objects.create(dante_id="190", name="Kommunikation")
+        mess = DanteActivity.objects.create(dante_id="191", name="Messungen")
+        st = DanteSettings.get()
+        st.activity_required = True
+        st.save()
+        with self.assertRaises(DanteError) as e:   # ще не записували — пояснення, без запиту
+            services.book_project(self.du, MON, self.dp, minutes=30)
+        self.assertIn("Вид роботи» біля кнопки запису", e.exception.message)
+        TimeRecord.objects.create(dante_id="r1", dante_user=self.du, day=MON - datetime.timedelta(days=3),
+                                  dante_project=self.dp, activity_name="Messungen", duration=60)
+        self.assertEqual(services.last_activity(self.du, self.dp), mess)
+        b = services.book_project(self.du, MON, self.dp, minutes=30, comment="x")
+        self.assertEqual((b.status, b.activity), (Booking.SENT, mess))
+        self.assertIn("як востаннє на цьому проєкті", b.notice)
+
     def test_find_slot_inside_attendance_and_free(self):
         TimeRecord.objects.create(dante_id="t1", dante_user=self.du, day=MON, start="09:00", stop="10:00",
                                   project_name="Intern")

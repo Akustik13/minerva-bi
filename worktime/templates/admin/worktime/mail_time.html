@@ -173,9 +173,11 @@
       {% if d.unmapped %}<span class="mt-muted">· {% trans "ще листів без категорії / проєкту askDANTE" %}: {{ d.unmapped }}{% if show == "dante" %} — <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}&show=all">{% trans "показати" %}</a>{% endif %}</span>{% endif %}</h3>
     {% for r in d.rows %}
     <div class="mt-row">
-      <input type="checkbox" name="pick" value="{{ d.day|date:'Y-m-d' }}|{{ r.dp.pk }}" {% if not r.to_book %}disabled{% elif not r.no_worktime %}checked{% endif %}{% if r.to_book and r.no_worktime and not d.ongoing %} data-nowork="1"{% endif %}>
+      <input type="checkbox" name="pick" value="{{ d.day|date:'Y-m-d' }}|{{ r.dp.pk }}" {% if not r.to_book %}disabled{% elif not r.no_worktime %}checked{% endif %}{% if r.to_book and r.no_worktime and not d.ongoing %} data-nowork="1"{% endif %}{% if r.no_activity %} data-noact="1"{% endif %}>
       <div><b>{{ r.label }}</b>{% if r.auto %} <span class="mt-badge">{% trans "авто" %}</span>{% endif %}
-        <div class="mt-muted">→ askDANTE: {{ r.dp }}</div></div>
+        <div class="mt-muted">→ askDANTE: {{ r.dp }}</div>
+        {% if r.last_activity %}<div class="mt-muted" title="{% trans "У рядку немає свого виду роботи — візьметься той, з яким ви востаннє записували час на цей проєкт (або вибраний унизу)" %}">🛠 {{ r.last_activity }} · {% trans "як востаннє" %}</div>
+        {% elif r.no_activity %}<div class="mt-muted" style="color:#f59e0b">🛠 {% trans "вид роботи не вибрано — виберіть унизу" %}</div>{% endif %}</div>
       <div>{% if r.replies %}📤 {{ r.replies }} {% trans "відп." %} {% endif %}{% if r.received %}📥 {{ r.received }} {% trans "лист." %} {% endif %}{% if r.orders %}🧾 {{ r.orders }} {% trans "замовл." %}{% endif %}
         {% for s in r.subjects %}<div class="mt-subj">{{ s }}</div>{% endfor %}</div>
       <div class="num" title="{% trans "Оцінка за день" %}">{{ r.dur }}</div>
@@ -291,6 +293,13 @@ function mtConfirm(e){
   if (by && by.name === 'rewrite') return confirm('{% trans "Старий запис уже видалено в askDANTE? Minerva перевірить і запише заново." %}');
   var n = document.querySelectorAll('input[name="pick"]:checked').length;
   if (!n) { alert('{% trans "Нічого не вибрано" %}'); return false; }
+  var act = document.querySelector('select[name="activity"]');
+  if (act && !act.value && document.querySelectorAll('input[name="pick"][data-noact]:checked').length) {
+    // askDANTE без виду роботи не приймає — не надсилати рядки, які він відхилить
+    alert('{% trans "Для вибраних рядків проєктів (🛠 вид роботи не вибрано) askDANTE вимагає вид роботи. Виберіть «Вид роботи» біля кнопки запису — або «Вид роботи за замовчуванням» у налаштуваннях askDANTE." %}');
+    act.focus(); act.style.outline = '2px solid #f59e0b';
+    return false;
+  }
   return confirm('{% trans "Записати в askDANTE" %}: ' + n + '?');
 }
 document.addEventListener('change', function(e){
