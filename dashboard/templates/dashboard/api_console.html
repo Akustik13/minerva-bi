@@ -235,6 +235,10 @@
         <span class="con-preset" onclick="loadPreset('minerva_movement')">📥 Прихід</span>
         <span class="con-preset" onclick="loadPreset('minerva_order_create')">🧾 Нове замовлення</span>
         <span class="con-preset" onclick="loadPreset('minerva_shipments')">🚚 Відправлення</span>
+        <span class="con-preset" onclick="loadPreset('minerva_purchase_create')">📦 Закупівля CRM</span>
+        <span class="con-preset" onclick="loadPreset('minerva_purchase_track')">🚛 Трек закупівлі</span>
+        <span class="con-preset" onclick="loadPreset('minerva_purchase_delivered')">✅ Доставлено</span>
+        <span class="con-preset" onclick="loadPreset('minerva_purchases_open')">📋 Очікуються</span>
         <span class="con-preset" onclick="loadPreset('dhl_test')">🟡 DHL Test</span>
         <span class="con-preset" onclick="loadPreset('dhl_rates')">🟡 DHL Rates</span>
         <span class="con-preset" onclick="loadPreset('dhl_tracking')">📡 DHL Track</span>
@@ -407,6 +411,44 @@ const PRESETS = {
     headers: { 'Accept': 'application/json' },
     body:    '',
     params:  '?order_number=TEST-1001',
+  },
+  minerva_purchase_create: {
+    method:  'POST',
+    url:     window.location.origin + '/api/v1/purchase-orders/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    body:    JSON.stringify({
+      external_id: 'B-TEST-1', supplier: { name: 'Acme Components GmbH', email: 'sales@acme.example', country: 'DE' },
+      supplier_order_no: 'AB-7781', expected_date: '2026-11-05', currency: 'EUR',
+      lines: [{ line_id: '1', sku: 'YOUR-SKU', qty: 10, unit_price: '12.50' }],
+    }, null, 2),
+  },
+  minerva_purchase_track: {
+    method:  'POST',
+    url:     window.location.origin + '/api/v1/purchase-orders/ext:B-TEST-1/shipments/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ tracking_number: '1Z999AA10123456784', carrier: 'UPS',
+                              status: 'in_transit', expected_date: '2026-11-03' }, null, 2),
+  },
+  minerva_purchase_delivered: {
+    method:  'POST',
+    url:     window.location.origin + '/api/v1/purchase-orders/ext:B-TEST-1/deliveries/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ delivery_id: 'LS-1', lines: [{ line_id: '1', qty: 4 }] }, null, 2),
+  },
+  minerva_purchases_open: {
+    method:  'GET',
+    url:     window.location.origin + '/api/v1/purchase-orders/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json' },
+    body:    '',
+    params:  '?open=1',
   },
   dhl_test: {
     method:  'GET',

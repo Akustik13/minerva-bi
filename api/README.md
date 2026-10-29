@@ -2,7 +2,7 @@
 
 Базовий URL: `https://<ваш-домен>/api/v1/` (локально `http://localhost:8000/api/v1/`)
 
-**Зміст:** 1. Підключення · 2. Склад · 3. Товари · 4. Замовлення · 5. Доставка · 6. Вебхуки · 7. Як протестувати · 8. Як впровадити в магазин · 9. Коди помилок · 10. Безпека і запуск · 11. Інтернет-магазин сайту
+**Зміст:** 1. Підключення · 2. Склад · 2a. Закупівлі з CRM · 3. Товари · 4. Замовлення · 5. Доставка · 6. Вебхуки · 7. Як протестувати · 8. Як впровадити в магазин · 8a. Як впровадити в CRM · 9. Коди помилок · 10. Безпека і запуск · 11. Інтернет-магазин сайту
 
 ## 1. Підключення
 
@@ -219,6 +219,24 @@
 - `POST /purchase-orders/shipments/` і `POST /purchase-orders/deliveries/` — те саме з `"external_id"` у тілі (для номерів зі «/»).
 - Закупівлі, створені в Minerva, через API лише читаються (`403 not_external`).
 - Вебхук `purchase_order.updated` (розділ 6) — Minerva повідомляє CRM, коли склад прийняв товар, змінився стан чи трекінг.
+- Готовий клієнт — [`examples/crm_purchases.py`](examples/crm_purchases.py), план впровадження — розділ 8a.
+
+### Повний цикл — приклад
+Замовили в постачальника 10 шт `AMP-100` і 25 шт `CABLE-M`; приїхало двома доставками. Відповіді скорочено.
+
+| # | Подія в CRM | Запит | Відповідь Minerva | Склад |
+|---|---|---|---|---|
+| 1 | Замовлення постачальнику підтверджено | `POST /purchase-orders/` (як вище) | `201`, `PO-57`, `status: ordered` | очікується: AMP-100 +10, CABLE-M +25 |
+| 2 | Тайм-аут — CRM повторює той самий запит | той самий `POST /purchase-orders/` | `200`, `created: false` | без змін |
+| 3 | Постачальник надіслав трек-номер | `POST /purchase-orders/ext:B-2026-0042/shipments/` `{"tracking_number": "1Z…", "carrier": "UPS", "expected_date": "2026-11-03"}` | `200`, `expected_date: 2026-11-03` | без змін |
+| 4 | Приїхала перша частина (накладна LS-118) | `POST …/ext:B-2026-0042/deliveries/` `{"delivery_id": "LS-118", "lines": [{"line_id": "1", "qty": 4}]}` | `201`, `delivery.booked: true`, `status: partial` | на складі AMP-100 +4, очікується 6 |
+| 5 | Перевізник повторно надіслав «доставлено» LS-118 | той самий запит | `200`, `delivery.duplicate: true` | **без змін** |
+| 6 | Помилково та сама доставка під іншим номером | `{"delivery_id": "LS-118-B", "lines": [{"line_id": "1", "qty": 9}]}` | `409 over_receipt` (лишилось 6) | без змін |
+| 7 | Решта приїхала (накладна LS-131) | `{"delivery_id": "LS-131"}` — без позицій = уся решта | `201`, `status: received` | AMP-100 +6, CABLE-M +25 |
+
+Після кроків 1, 3, 4 і 7 Minerva надсилає вебхук `purchase_order.updated` з `changed_by: "crm"` — CRM його пропускає. Коли склад сам прийняв товар у Minerva («Отримано» в огляді складу), приходить `changed_by: "minerva"` — тоді CRM оновлює у себе кількість отриманого.
+
+Те саме одним скриптом: `python api/examples/crm_purchases.py demo AMP-100` (розділ 7, п. D).
 
 ---
 
@@ -371,9 +389,9 @@ if (!hash_equals($expected, $sig['v1'] ?? '') || abs(time() - (int)$sig['t']) > 
 
 ## 7. Як протестувати
 
-**0. API-тестер у браузері (найпростіше)** — файл [`examples/api_tester.html`](examples/api_tester.html) (кнопка «🧪 Завантажити API-тестер» на сторінці документації). Відкрийте його подвійним кліком, вставте адресу Minerva і ключ — кнопки «Перевірити підключення», «Залишки», «Перевірка кошика», «Створити тестове замовлення», «Скасувати» тощо самі формують запит і показують відповідь з поясненням коду. Працює з будь-якого комп'ютера: для `/api/v1/` увімкнено CORS (лише ключ у заголовку, cookie не передаються).
+**0. API-тестер у браузері (найпростіше)** — файл [`examples/api_tester.html`](examples/api_tester.html) (кнопка «🧪 Завантажити API-тестер» на сторінці документації). Відкрийте його подвійним кліком, вставте адресу Minerva і ключ — кнопки «Перевірити підключення», «Залишки», «Перевірка кошика», «Створити тестове замовлення», «Скасувати» тощо самі формують запит і показують відповідь з поясненням коду. Блок «Закупівлі з CRM»: «Передати замовлення» → «Трек-номер» → «Доставлено» (ще раз — `duplicate`) → «Скасувати». Працює з будь-якого комп'ютера: для `/api/v1/` увімкнено CORS (лише ключ у заголовку, cookie не передаються).
 
-**A. Вбудована консоль** — `/dashboard/api/console/` → пресети «🔌 Ping», «🏬 Залишки», «🛒 Перевірка кошика», «📥 Прихід», «🧾 Нове замовлення», «🚚 Відправлення». Ключ підставляється автоматично (перший активний). Замініть `YOUR-SKU` на реальний SKU.
+**A. Вбудована консоль** — `/dashboard/api/console/` → пресети «🔌 Ping», «🏬 Залишки», «🛒 Перевірка кошика», «📥 Прихід», «🧾 Нове замовлення», «🚚 Відправлення»; закупівлі CRM — «📦 Закупівля CRM», «🚛 Трек закупівлі», «✅ Доставлено», «📋 Очікуються» (номер `B-TEST-1`). Ключ підставляється автоматично (перший активний). Замініть `YOUR-SKU` на реальний SKU.
 
 **B. Browsable API** — увійдіть в адмінку і відкрийте `/api/v1/` (тільки читання, при `DJANGO_DEBUG=1`).
 
@@ -386,15 +404,32 @@ curl -X POST -H "Authorization: Token $TOKEN" -H "Content-Type: application/json
 curl -X POST -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
      -d '{"order_number":"TEST-1","client":"Test","addr_country":"DE","lines":[{"sku":"AMP-100","qty":1}]}' \
      http://localhost:8000/api/v1/orders/
+
+# Закупівля з CRM: замовлення → трек → доставлено (повтор останнього → "duplicate": true)
+curl -X POST -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+     -d '{"external_id":"B-TEST-1","supplier":"Acme Components GmbH","lines":[{"line_id":"1","sku":"AMP-100","qty":10}]}' \
+     http://localhost:8000/api/v1/purchase-orders/
+curl -X POST -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+     -d '{"tracking_number":"1Z999AA10123456784","carrier":"UPS","expected_date":"2026-11-05"}' \
+     http://localhost:8000/api/v1/purchase-orders/ext:B-TEST-1/shipments/
+curl -X POST -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
+     -d '{"delivery_id":"LS-1","lines":[{"line_id":"1","qty":4}]}' \
+     http://localhost:8000/api/v1/purchase-orders/ext:B-TEST-1/deliveries/
 ```
 
 **D. Python-скрипт** [`api/examples/shop_client.py`](examples/shop_client.py) — готові сценарії магазину: `ping`, `stock`, `check`, `receive`, `order`, `cancel`, `track`, `sync`.
+
+**D2. Python-скрипт для CRM** [`api/examples/crm_purchases.py`](examples/crm_purchases.py) — закупівлі: `order`, `get`, `list`, `track`, `delivered`, `cancel`, `sync`, а `demo <артикул>` проходить увесь цикл з таблиці розділу 2a і показує склад на кожному кроці (для залишків ключу потрібне ще `stock:read`):
+```bash
+python api/examples/crm_purchases.py demo AMP-100
+python api/examples/crm_purchases.py delivered B-2026-0042 LS-118 AMP-100:4
+```
 
 **E. Вебхуки локально:**
 ```bash
 python api/examples/webhook_receiver.py
 ```
-(з `WEBHOOK_SECRET=<секрет вебхука>`), у Minerva вебхук на `http://<IP цього ПК>:9000/` → дія «📡 Надіслати тестову подію».
+(з `WEBHOOK_SECRET=<секрет вебхука>`), у Minerva вебхук на `http://<IP цього ПК>:9000/` → дія «📡 Надіслати тестову подію». Для CRM — подія `purchase_order.updated` і `OWN_SOURCE=crm`: приймач коротко показує стан закупівлі й пропускає зміни самої CRM.
 
 **F. Автотести:** `python manage.py test api --settings=tabele.settings_test`
 
@@ -594,6 +629,34 @@ app.post('/minerva-hook', express.raw({ type: 'application/json' }), (req, res) 
 });
 app.listen(3000);
 ```
+
+## 8a. Як впровадити в CRM (закупівлі)
+
+Інтеграція — чотири виклики з CRM і (за бажанням) один вебхук назад. Довідник запитів — розділ 2a, готовий клієнт — [`examples/crm_purchases.py`](examples/crm_purchases.py).
+
+| Подія в CRM | Виклик Minerva |
+|---|---|
+| Замовлення постачальнику підтверджено / змінено (кількість, дата, номер AB) | `POST /purchase-orders/` з тим самим `external_id` — створює або оновлює |
+| Постачальник надіслав трек-номер, змінився стан у перевізника | `POST /purchase-orders/ext:<номер>/shipments/` |
+| Товар доставлено (накладна, сповіщення перевізника) | `POST /purchase-orders/ext:<номер>/deliveries/` з `delivery_id` = номер накладної |
+| Замовлення скасовано | `POST /purchase-orders/ext:<номер>/cancel/` |
+| Склад прийняв товар у Minerva, змінився стан | вебхук `purchase_order.updated` (`changed_by: "minerva"`) або `GET /purchase-orders/?changed_since=…` |
+
+### План впровадження
+
+1. **Ключ.** Адмін → REST API → API Ключі: назва `crm`, права `purchases:read`, `purchases:write` (для вебхука через API — ще `webhooks:read`, `webhooks:write`; для перевірки залишків — `stock:read`); «Джерело замовлень» — `crm`. Ключ — у налаштуваннях сервера CRM, не в браузері.
+2. **Артикули.** Артикул у CRM має збігатися з артикулом Minerva або бути його аліасом (`/admin/inventory/productalias/`). На час запуску — `"strict": true`: невідомий артикул повертає `404 sku_not_found` і нічого не зберігає, тож розбіжності видно одразу.
+3. **Номер замовлення.** `external_id` — постійний номер замовлення в CRM (не змінюється при редагуванні). `line_id` — номер рядка в CRM, щоб зміни кількості потрапляли в той самий рядок.
+4. **Повтори.** При збої мережі, `429` чи `5xx` CRM повторює **той самий** запит пізніше. Дубля не буде: замовлення — за `external_id`, відправлення — за трек-номером, доставка — за `delivery_id`.
+5. **«Доставлено».** Завжди з `delivery_id` (номер накладної / Lieferschein) і, якщо доставка часткова, з позиціями. `409 over_receipt` означає «більше, ніж замовлено» — найчастіше це та сама доставка під іншим номером; оприбутковувати її ще раз не треба.
+6. **Що робить склад.** «Налаштування складу» → «Зовнішня система повідомила «доставлено»»: оприбуткувати одразу або лише позначити «прибуло», і тоді товар приймає склад у Minerva.
+7. **Зворотний зв'язок.** Вебхук з подією `purchase_order.updated` — лише ця подія, вибрати явно:
+   ```json
+   POST /api/v1/webhooks/
+   {"name": "crm", "url": "https://crm.example/minerva-hook", "events": ["purchase_order.updated"]}
+   ```
+   Обробник перевіряє підпис (розділ 6) і пропускає події з `changed_by` = вашому джерелу (`crm`) — це зміни самої CRM. Приклад — [`examples/webhook_receiver.py`](examples/webhook_receiver.py) з `OWN_SOURCE=crm`. Страховка — раз на годину чи добу `GET /purchase-orders/?changed_since=<час минулого запуску>` (`crm_purchases.py sync`).
+8. **Тест.** `crm_purchases.py demo <артикул>` на тестовому товарі: «очікується» → трек → часткова доставка → повтор (`duplicate`) → «забагато» (`409`) → решта. Потім — Склад → Закупівлі, колонка «Звідки» = `crm`.
 
 ---
 

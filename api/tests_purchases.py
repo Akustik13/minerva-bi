@@ -1,7 +1,15 @@
 """Закупівлі зовнішньої CRM через REST API (/purchase-orders/, inventory/services/purchases.py).
 python manage.py test api --settings=tabele.settings_test"""
+import importlib.util
+import io
 import json
+import os
+import shutil
+import tempfile
+from contextlib import redirect_stdout
+from pathlib import Path
 from unittest import mock
+from urllib.parse import parse_qsl, urlsplit
 
 from django.core.cache import cache
 
@@ -244,3 +252,79 @@ class PurchaseAdminTests(PurchaseBase):
         self.assertContains(page, "AMP-100 × 10,")
         self.assertContains(self.client.get("/admin/inventory/purchaseorder/"), "🔗 crm · B-2026-0042")
         self.assertContains(self.client.get("/admin/inventory/inventorysettings/1/change/"), "api_delivery_mode")
+        self.assertContains(self.client.get("/dashboard/api/docs/examples/crm_purchases.py"), "def send_delivered")
+        docs = self.client.get("/dashboard/api/docs/")
+        self.assertContains(docs, "інтеграція магазину і CRM")
+        self.assertContains(docs, "/dashboard/api/docs/examples/crm_purchases.py")    # посилання з README
+        self.assertContains(docs, "purchase-orders/ext:B-TEST-1/deliveries/")
+
+
+class _ClientResp:
+    def __init__(self, r):
+        self.status_code, self.headers, self.text, self._r = r.status_code, r.headers, r.content.decode(), r
+
+    def json(self):
+        return self._r.json()
+
+
+class _ClientSession:
+    """requests.Session прикладу → тестовий клієнт Django (без мережі)."""
+    def __init__(self, client):
+        self.client = client
+
+    def request(self, method, url, timeout=None, json=None, params=None):
+        parts = urlsplit(url)
+        if method == "GET":
+            return _ClientResp(self.client.get(parts.path, {**dict(parse_qsl(parts.query)), **(params or {})}))
+        return _ClientResp(getattr(self.client, method.lower())(parts.path, json or {}, format="json"))
+
+
+class CRMExampleTests(PurchaseBase):
+    """api/examples/crm_purchases.py проти справжнього API: приклад із документації не розходиться з кодом."""
+    def example(self):
+        spec = importlib.util.spec_from_file_location(
+            "crm_purchases_example", Path(__file__).resolve().parent / "examples" / "crm_purchases.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.session = _ClientSession(self.client)
+        mod.STATE_FILE = os.path.join(tempfile.mkdtemp(), ".last_purchase_sync")
+        self.addCleanup(shutil.rmtree, os.path.dirname(mod.STATE_FILE), True)
+        return mod
+
+    def run_example(self, mod, *args):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            mod.main(*args)
+        return out.getvalue()
+
+    def test_demo_cycle(self):
+        out = self.run_example(self.example(), "demo", "AMP-100", "--yes")
+        self.assertIn("created=True", out)
+        self.assertIn("created=False — дубля немає", out)
+        self.assertIn("duplicate=False, booked=True", out)
+        self.assertIn("duplicate=True — на склад нічого не додано", out)
+        self.assertIn("409 over_receipt", out)
+        po = PurchaseOrder.objects.get()
+        self.assertEqual((po.external_source, po.status), ("crm", "received"))
+        self.assertEqual(PurchaseReceipt.objects.count(), 2)              # LS-1 і LS-2, повтор і 409 — ні
+        self.assertEqual(self.stock()["on_hand"], 10)
+        self.assertIn("AMP-100: на складі 10, очікується 0", out)
+
+    def test_commands_and_sync(self):
+        mod = self.example()
+        self.run_example(mod, "order", "2026/42", "AMP-100:3", "CABLE-M:5")
+        self.run_example(mod, "track", "2026/42", "1Z777", "UPS", "2026-11-05")
+        self.run_example(mod, "delivered", "2026/42", "LS-9", "AMP-100:3")
+        self.run_example(mod, "delivered", "2026/42", "LS-9", "AMP-100:3")     # повтор
+        po = PurchaseOrder.objects.get(external_id="2026/42")
+        self.assertEqual((po.status, str(po.expected_date)), ("partial", "2026-11-05"))
+        self.assertEqual(po.incoming_shipments.get().tracking_number, "1Z777")
+        self.assertEqual(self.stock()["on_hand"], 3)
+        self.assertIn('"external_id": "2026/42"', self.run_example(mod, "get", "2026/42"))
+
+        self.assertIn("Змінених закупівель: 1 (з початку)", self.run_example(mod, "sync"))
+        self.assertIn("Змінених закупівель: 0", self.run_example(mod, "sync"))   # лише змінене після минулого
+
+        self.run_example(mod, "order", "B-7", "CABLE-M:2")
+        self.run_example(mod, "cancel", "B-7", "Lieferant storniert")
+        self.assertEqual(PurchaseOrder.objects.get(external_id="B-7").status, "cancelled")

@@ -140,6 +140,28 @@ pre {
     </div>
 
     <div class="card">
+      <h2>Закупівлі з CRM</h2>
+      <div class="row">
+        <div><label for="po-ext">Номер замовлення в CRM</label><input id="po-ext" placeholder="заповниться автоматично"></div>
+        <div><label for="po-supplier">Постачальник</label><input id="po-supplier" value="Acme Components GmbH"></div>
+      </div>
+      <div class="row">
+        <div><label for="po-tracking">Трек-номер</label><input id="po-tracking" placeholder="напр. 1Z999AA10123456784"></div>
+        <div class="narrow"><label for="po-delivery">Накладна (delivery_id)</label><input id="po-delivery" placeholder="авто"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="po-partial" checked> Доставлено частково — SKU і кількість з блоку «Склад» (інакше — уся решта)</label>
+      <div class="btns">
+        <button data-act="po_open">📋 Ще очікуються</button>
+        <button data-act="po_find">🔎 Знайти за номером</button>
+        <button class="write" data-act="po_create">📦 Передати замовлення</button>
+        <button class="write" data-act="po_track">🚛 Трек-номер</button>
+        <button class="write" data-act="po_delivered">✅ Доставлено</button>
+        <button class="write" data-act="po_cancel">✖ Скасувати</button>
+      </div>
+      <p class="hint">Потрібен ключ з правами <code>purchases:read</code> і <code>purchases:write</code>. Повторне натискання «Передати» оновлює те саме замовлення, повторне «Доставлено» з тією самою накладною — <b>duplicate</b>, на склад нічого не додається. «Доставлено» справді оприбутковує товар (якщо так налаштовано склад).</p>
+    </div>
+
+    <div class="card">
       <h2>Довільний запит</h2>
       <div class="row">
         <div class="narrow"><label for="m">Метод</label>
@@ -242,6 +264,35 @@ pre {
     },
     order_cancel: () => ['POST', 'orders/' + enc(need('order-id', 'ID Minerva')) + '/cancel/', { restock: true },
       `Скасувати замовлення ID ${$('order-id').value.trim()} і повернути товар на склад?`],
+    po_open:  () => ['GET', 'purchase-orders/?open=1&page_size=20'],
+    po_find:  () => ['GET', 'purchase-orders/?external_id=' + enc(need('po-ext', 'Номер замовлення в CRM'))],
+    po_create: () => {
+      if (!$('po-ext').value.trim()) $('po-ext').value = 'B-TEST-' + Date.now().toString().slice(-6);
+      return ['POST', 'purchase-orders/', {
+        external_id: $('po-ext').value.trim(),
+        supplier: { name: $('po-supplier').value.trim() || 'Acme Components GmbH' },
+        expected_date: new Date(Date.now() + 10 * 864e5).toISOString().slice(0, 10),
+        currency: 'EUR',
+        lines: [{ line_id: '1', sku: need('sku', 'SKU'), qty: num('qty') }],
+      }, `Передати закупівлю ${$('po-ext').value.trim()}: ${num('qty')} шт «${$('sku').value.trim()}»?`];
+    },
+    po_track: () => {
+      if (!$('po-tracking').value.trim()) $('po-tracking').value = '1ZTEST' + Date.now().toString().slice(-8);
+      return ['POST', 'purchase-orders/shipments/', {
+        external_id: need('po-ext', 'Номер замовлення в CRM'),
+        tracking_number: $('po-tracking').value.trim(), carrier: 'UPS', status: 'in_transit',
+        expected_date: new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10),
+      }, `Додати трек-номер ${$('po-tracking').value.trim()} до закупівлі ${$('po-ext').value.trim()}?`];
+    },
+    po_delivered: () => {
+      if (!$('po-delivery').value.trim()) $('po-delivery').value = 'LS-' + Date.now().toString().slice(-6);
+      const body = { external_id: need('po-ext', 'Номер замовлення в CRM'), delivery_id: $('po-delivery').value.trim() };
+      if ($('po-partial').checked) body.lines = [{ sku: need('sku', 'SKU'), qty: num('qty') }];
+      return ['POST', 'purchase-orders/deliveries/', body,
+        `Позначити доставку ${body.delivery_id} (${body.lines ? num('qty') + ' шт «' + $('sku').value.trim() + '»' : 'уся решта'}) — товар буде оприбутковано?`];
+    },
+    po_cancel: () => ['POST', 'purchase-orders/ext:' + enc(need('po-ext', 'Номер замовлення в CRM')) + '/cancel/',
+      { reason: 'API тестер' }, `Скасувати закупівлю ${$('po-ext').value.trim()}?`],
     custom: () => {
       const m = $('m').value, raw = $('b').value.trim();
       let body;
@@ -257,6 +308,8 @@ pre {
   function explain(status, data) {
     const d = data && typeof data === 'object' ? data : {};
     if (status === 0) return ['err', 'Сервер не відповів. Перевірте адресу; якщо адреса правильна — на сервері ще не встановлено оновлення з підтримкою CORS (Оновлення системи → 🚀 Повне оновлення).'];
+    if (status === 200 && d.delivery && d.delivery.duplicate) return ['ok', '200 — цю доставку вже прийнято раніше, на склад нічого не додано (повтор безпечний).'];
+    if (status === 201 && d.delivery) return ['ok', '201 — доставку прийнято' + (d.delivery.booked ? ', товар оприбутковано.' : ', позначено «прибуло» (оприбуткує склад у Minerva).')];
     if (status === 200 && d.created === false) return ['ok', '200 — таке замовлення вже існувало, дубль не створено (повтор безпечний).'];
     if (status === 200) return ['ok', '200 — успішно.'];
     if (status === 201) return ['ok', '201 — створено.'];

@@ -6,6 +6,8 @@
 
 Далі в Minerva: Адмін → REST API → Вебхуки → URL http://<IP цього ПК>:9000/
 → дія «Надіслати тестову подію (ping)».
+Для CRM (закупівлі): у вебхуку виберіть подію purchase_order.updated і задайте
+OWN_SOURCE=crm — зміни, які зробила сама CRM, приймач пропускає.
 Лише стандартна бібліотека Python.
 """
 import hashlib
@@ -20,6 +22,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 SECRET = os.getenv("WEBHOOK_SECRET", "")
+OWN_SOURCE = os.getenv("OWN_SOURCE", "")  # джерело ключа CRM, напр. crm
 PORT = int(os.getenv("PORT", "9000"))
 seen = set()  # X-Minerva-Delivery — для відсіву повторів
 
@@ -34,6 +37,20 @@ def verify(secret, body, header, tolerance=300):
         return False
     expected = hmac.new(secret.encode(), f"{ts}.{body}".encode(), hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, sig)
+
+
+def purchase_updated(data):
+    """Закупівля змінилась у Minerva: склад прийняв товар, новий стан, трек, дата."""
+    po = data["purchase_order"]
+    if OWN_SOURCE and data.get("changed_by") == OWN_SOURCE:
+        print(f"  ↺ {po['code']} ({po['external_id']}): власна зміна CRM — нічого не робимо")
+        return
+    print(f"  {po['code']} ({po['external_id'] or 'створено в Minerva'}): {po['status']}, "
+          f"отримано {po['qty_received']} з {po['qty_ordered']}, очікується {po['expected_date'] or '—'} "
+          f"[змінив: {data.get('changed_by')}]")
+    for d in po.get("deliveries", []):
+        print(f"    доставка {d['delivery_id']}: {d['delivered_at']}, на склад: {'так' if d['booked'] else 'ні'}")
+    # тут — оновити стан замовлення постачальнику у вашій CRM
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -55,7 +72,10 @@ class Handler(BaseHTTPRequestHandler):
             seen.add(delivery)
             payload = json.loads(body)
             print(f"✓ {event} [{delivery}]")
-            print(json.dumps(payload["data"], ensure_ascii=False, indent=2))
+            if event == "purchase_order.updated":
+                purchase_updated(payload["data"])
+            else:
+                print(json.dumps(payload["data"], ensure_ascii=False, indent=2))
 
         # Відповідайте 2xx швидко (<10 с); важку обробку — у фон/чергу
         self.send_response(200)

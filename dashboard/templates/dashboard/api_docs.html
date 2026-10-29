@@ -96,8 +96,8 @@
 
 <div class="doc-wrap">
   <div class="doc-top">
-    <h1>📖 Minerva API — інтеграція магазину</h1>
-    <p>Як підключити зовнішній сайт: залишки складу, замовлення з магазину, доставка і трекінг, вебхуки, приклади коду і тестування.</p>
+    <h1>📖 Minerva API — інтеграція магазину і CRM</h1>
+    <p>Як підключити зовнішній сайт або CRM: залишки складу, замовлення з магазину, закупівлі в постачальників з CRM (трекінг, «доставлено» без дублів), доставка, вебхуки, приклади коду і тестування.</p>
     <div>Базова адреса API: <span class="doc-base">{{ api_base }}</span></div>
     <div class="doc-links">
       <a class="doc-btn" href="/admin/api/apikey/">🔑 API Токени</a>
@@ -106,6 +106,8 @@
       <a class="doc-btn" href="{% url 'api_console' %}?preset=minerva_ping">🖥 Консоль (Ping)</a>
       <a class="doc-btn" href="{% url 'api_docs_example' 'api_tester.html' %}?download=1" style="border-color:var(--accent)">🧪 Завантажити API-тестер (HTML)</a>
       <a class="doc-btn" href="{% url 'api_docs_example' 'shop_client.py' %}?download=1">⬇ shop_client.py</a>
+      <a class="doc-btn" href="{% url 'api_docs_example' 'crm_purchases.py' %}?download=1">⬇ crm_purchases.py (закупівлі CRM)</a>
+      <a class="doc-btn" href="{% url 'api_console' %}?preset=minerva_purchase_create">🖥 Консоль (закупівля CRM)</a>
       <a class="doc-btn" href="{% url 'api_docs_example' 'webhook_receiver.py' %}?download=1">⬇ webhook_receiver.py</a>
     </div>
   </div>
