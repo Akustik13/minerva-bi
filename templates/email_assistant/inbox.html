@@ -50,7 +50,27 @@
 .em-p1.collapsed .em-folder-link{padding:10px;justify-content:center}
 
 /* ── Sync buttons ── */
-.em-sync-area{padding:8px 10px;border-top:1px solid var(--border-strong);display:flex;flex-direction:column;gap:4px}
+.em-sync-area{padding:6px 10px 2px;border-top:1px solid var(--border-strong);display:flex;flex-direction:column;gap:2px}
+.em-sync-meta{margin-left:auto;font-size:10px;color:var(--text-dim)}
+.em-sync-meta #sync-status{font-size:10px;min-height:0;line-height:1}
+.em-pane{display:none}
+.em-pane.on{display:block}
+.em-pane.em-more.on{display:flex;flex-direction:column;gap:4px;padding:8px 10px}
+.em-pane-empty{padding:16px 12px;font-size:12px;color:var(--text-dim);line-height:1.5}
+.em-p1{container-type:inline-size}
+.em-p1-tabs{display:flex;border-top:1px solid var(--border-strong);background:var(--bg-input);flex-shrink:0}
+.em-p1-tab{flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 2px 6px;
+  border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:17px;line-height:1;transition:background .1s,color .1s}
+.em-p1-tab small{font-size:9.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.em-p1-tab:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.em-p1-tab.on{color:#1a73e8;box-shadow:inset 0 2px 0 #1a73e8;background:rgba(26,115,232,.08)}
+.em-p1-tab .n{position:absolute;top:2px;right:calc(50% - 22px);min-width:14px;padding:1px 4px;border-radius:8px;box-sizing:border-box;
+  background:#1a73e8;color:#fff;font-size:9px;font-weight:700;line-height:12px}
+.em-p1-tab .n:empty{display:none}
+.em-p1-tab .n.warn{background:#f59e0b}
+.em-p1-tab .dot{position:absolute;top:5px;left:calc(50% - 16px);width:7px;height:7px;border-radius:50%;background:#1a73e8}
+@container (max-width:200px){.em-p1-tab small{display:none}.em-p1-tab{padding:9px 2px}}
+.em-p1.collapsed .em-p1-tabs{display:none}
 .em-p1.collapsed .em-sync-area{display:none}
 .em-sync-btn{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;transition:background .1s;box-sizing:border-box;overflow:hidden;white-space:nowrap}
 .em-sync-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
@@ -83,11 +103,6 @@
 
 /* ── Panel 2 search ── */
 .em-p2-search-row{padding:5px 10px 4px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
-.em-sync-more{display:flex;flex-direction:column;gap:4px}
-.em-sync-more[open]{gap:4px}
-.em-sync-more > summary{list-style:none;justify-content:center}
-.em-sync-more > summary::-webkit-details-marker{display:none}
-.em-sync-more[open] > summary{margin-bottom:4px}
 .em-nav-n{font-size:11px;color:var(--text-dim);flex-shrink:0}
 .em-nav-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0}
 .em-nav-sub{font-size:10px;color:var(--text-dim);padding:6px 12px 2px 15px;text-transform:uppercase;letter-spacing:.05em}
@@ -154,8 +169,6 @@
   cursor:pointer;font-size:15px;line-height:1;padding:0;color:var(--text)}
 #em-wc-dlg .wc-icons button:hover,#em-icon-dlg .wc-icons button:hover{border-color:var(--border-strong)}
 #em-icon-dlg .wc-icons button.on,#em-wc-dlg .wc-icons button.on{border-color:#1a73e8;background:rgba(26,115,232,.12)}
-.em-nav-head{cursor:pointer}
-.em-nav-tg.collapsed{transform:rotate(-90deg)}
 .em-nav-body[hidden]{display:none}
 .em-nav-search{padding:2px 10px 4px;position:relative}
 .em-p1.collapsed .em-nav{display:none}
@@ -395,7 +408,9 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
       <input class="em-search-inp" type="search" name="q" value="{{ q }}" placeholder="🔍 {% trans "Пошук..." %}" id="em-q">
     </form>
 
-    <div class="em-folders">
+    <!-- Ліва колонка — вкладки внизу, як в Outlook: одна панель на всю висоту (em-p1-tabs, localStorage em-p1-tab) -->
+    <div class="em-folders" id="em-panes">
+      <div class="em-pane" data-pane="mail">
       {% for fkey, flabel, ficon in folders %}
       <a href="?folder={{ fkey }}{% if q %}&q={{ q }}{% endif %}"
          class="em-folder-link{% if folder == fkey %} active{% endif %}"
@@ -414,10 +429,13 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         {% endwith %}
       </a>
       {% endfor %}
+      <!-- Server folders (loaded via AJAX) -->
+      <div id="em-server-folders"></div>
+      </div>
       <!-- ── Категорії / проєкти / клієнти — як папки й мітки в Thunderbird: клік — показати, лист сюди — віднести ── -->
       <div class="em-nav" id="em-nav">
+        <div class="em-pane" data-pane="cats">
         <div class="em-folders-divider em-nav-head" data-sec="cats">
-          <button class="em-folders-divider-toggle em-nav-tg" type="button">▾</button>
           <span>🏷 {% trans "Категорії" %}</span>
           <button class="em-folders-divider-add" type="button" onclick="return showNavSort(event)" title="{% trans "Порядок списку: ⭐ обране зверху, решта — за вживанням, кількістю листів або назвою" %}">↕</button>
           <a class="em-folders-divider-add" href="/admin/email_assistant/mailcategory/" title="{% trans "Свої категорії й правила" %}">⚙</a>
@@ -462,10 +480,11 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
           </a>
           {% endif %}{% endfor %}
         </div>
+        </div>
 
+        <div class="em-pane" data-pane="proj">
         {% if nav_projects or project_filter %}
         <div class="em-folders-divider em-nav-head" data-sec="proj">
-          <button class="em-folders-divider-toggle em-nav-tg" type="button">▾</button>
           <span>📁 {% trans "Проєкти" %}</span>
           <a class="em-folders-divider-add" href="/admin/projects/project/" title="{% trans "Усі проєкти" %}">⋯</a>
         </div>
@@ -481,11 +500,13 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
           </a>
           {% endif %}{% endfor %}
         </div>
+        {% else %}<div class="em-pane-empty">📁 {% trans "Відкритих проєктів з листами цієї скриньки немає" %} · <a href="/admin/projects/project/">{% trans "усі проєкти" %}</a></div>
         {% endif %}
+        </div>
 
+        <div class="em-pane" data-pane="cust">
         {% if mail_customers %}
         <div class="em-folders-divider em-nav-head" data-sec="cust">
-          <button class="em-folders-divider-toggle em-nav-tg" type="button">▾</button>
           <span>👤 {% trans "Клієнти" %}</span><span></span>
         </div>
         <div class="em-nav-body" data-sec="cust">
@@ -511,23 +532,16 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
           {% endfor %}
           </div>
         </div>
+        {% else %}<div class="em-pane-empty">👤 {% trans "Клієнтів CRM у листах цієї скриньки ще немає" %}</div>
         {% endif %}
+        </div>
       </div>
-      <!-- Server folders (loaded via AJAX) -->
-      <div id="em-server-folders"></div>
-    </div>
-
-    <div class="em-sync-area">
-      <button class="em-sync-btn" onclick="syncNow(this,false)" title="{% trans "Завантажити нові листи з вхідних" %}">
-        🔄 {% trans "Синхронізувати" %}
-      </button>
-      <details class="em-sync-more" id="em-sync-more">
-      <summary class="em-sync-btn">⋯ {% trans "Ще: папки, налаштування, AI" %}</summary>
+      <div class="em-pane em-more" data-pane="more">
       <button class="em-sync-btn" onclick="syncAllFolders(this)" title="{% trans "Синхронізувати всі IMAP-папки (повільно)" %}">
         📂 {% trans "Всі папки" %}
       </button>
       <a href="/admin/email_assistant/emailaccount/{{ account.pk }}/change/"
-         class="em-sync-btn" style="text-decoration:none;justify-content:center">
+         class="em-sync-btn" style="text-decoration:none">
         ⚙️ {% trans "Налаштування" %}
       </a>
       <button class="em-sync-btn" onclick="resetPanelSizes()" title="{% trans "Відновити пропорції панелей" %}">
@@ -577,10 +591,23 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         </select>
       </label>
       {% endif %}
-      </details>
-      <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
+      </div>
+    </div>
+
+    <div class="em-sync-area">
+      <button class="em-sync-btn" onclick="syncNow(this,false)" title="{% trans "Завантажити нові листи з вхідних" %}">
+        🔄 {% trans "Синхронізувати" %}
+        <span class="em-sync-meta"><span id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</span></span>
+      </button>
       <div id="sync-countdown"></div>
     </div>
+    <nav class="em-p1-tabs" id="em-p1-tabs">
+      <button type="button" class="em-p1-tab" data-pane="mail" title="{% trans "Папки: вхідні, надіслані, важливі, спам, архів, папки сервера" %}">✉️<small>{% trans "Папки" %}</small><span class="n" id="em-tab-mail-n"></span></button>
+      <button type="button" class="em-p1-tab" data-pane="cats" title="{% trans "Категорії: свої категорії, запити пропозицій, хто пише; перетягніть лист і затримайте тут — відкриється" %}">🏷<small>{% trans "Категорії" %}</small>{% if quote_count %}<span class="n warn" title="{% trans "Запити пропозицій" %}">{{ quote_count }}</span>{% endif %}{% if work_filter or cat_filter or quote_filter or no_category %}<span class="dot"></span>{% endif %}</button>
+      <button type="button" class="em-p1-tab" data-pane="proj" title="{% trans "Проєкти з листами цієї скриньки" %}">📁<small>{% trans "Проєкти" %}</small>{% if project_filter %}<span class="dot"></span>{% endif %}</button>
+      <button type="button" class="em-p1-tab" data-pane="cust" title="{% trans "Клієнти CRM з листів" %}">👤<small>{% trans "Клієнти" %}</small>{% if customer_filter %}<span class="dot"></span>{% endif %}</button>
+      <button type="button" class="em-p1-tab" data-pane="more" title="{% trans "Ще: усі папки, налаштування скриньки, фільтри спаму, AI, логотипи" %}">⋯<small>{% trans "Ще" %}</small></button>
+    </nav>
   </div>
 
   <!-- Drag handle 1: resize P1 -->
@@ -2056,26 +2083,40 @@ function emDrop(key) {
   params.delete(key); params.delete('page');
   location.search = params.toString();
 }
-(function(){   // «⋯ Ще» під «Синхронізувати» — пам'ятає, чи розгорнуто
-  var more = document.getElementById('em-sync-more');
-  if (!more) return;
-  try { more.open = localStorage.getItem('em-sync-more') === '1'; } catch (e) {}
-  more.addEventListener('toggle', function(){ try { localStorage.setItem('em-sync-more', more.open ? '1' : '0'); } catch (e) {} });
-})();
-(function(){   // розділи лівої колонки згортаються (localStorage em-nav-<розділ>)
-  document.querySelectorAll('.em-nav-head').forEach(function(h){
-    var sec = h.dataset.sec, body = document.querySelector('.em-nav-body[data-sec="' + sec + '"]');
-    var closed = false;
-    try { closed = localStorage.getItem('em-nav-' + sec) === '1'; } catch (e) {}
-    function show(){ if (body) body.hidden = closed; h.querySelector('.em-nav-tg').classList.toggle('collapsed', closed); }
-    h.addEventListener('click', function(e){
-      if (e.target.closest('a')) return;
-      closed = !closed;
-      try { localStorage.setItem('em-nav-' + sec, closed ? '1' : '0'); } catch (err) {}
-      show();
-    });
-    show();
+(function(){   // ліва колонка — вкладки внизу (як в Outlook): одна панель на всю висоту, localStorage em-p1-tab
+  var tabs = document.querySelectorAll('#em-p1-tabs .em-p1-tab'), panes = document.getElementById('em-panes');
+  if (!tabs.length || !panes) return;
+  var p = new URLSearchParams(location.search), want = '';
+  if (p.get('wcat') !== null || p.get('cat') || p.get('quote')) want = 'cats';   // відкрито з фільтром — його вкладка
+  else if (p.get('project')) want = 'proj';
+  else if (p.get('customer')) want = 'cust';
+  function show(name) {
+    panes.querySelectorAll('.em-pane').forEach(function(x){ x.classList.toggle('on', x.dataset.pane === name); });
+    tabs.forEach(function(t){ t.classList.toggle('on', t.dataset.pane === name); });
+    try { localStorage.setItem('em-p1-tab', name); } catch (e) {}
+    panes.scrollTop = 0;
+  }
+  window.emP1Tab = show;
+  var saved = 'mail';
+  try { saved = localStorage.getItem('em-p1-tab') || 'mail'; } catch (e) {}
+  if (!panes.querySelector('.em-pane[data-pane="' + saved + '"]')) saved = 'mail';
+  show(want || saved);
+  tabs.forEach(function(t){
+    t.addEventListener('click', function(){ show(t.dataset.pane); });
+    var timer = null;   // перетягують лист і затримали над вкладкою — вона відкривається (лист — на категорію)
+    t.addEventListener('dragenter', function(e){ e.preventDefault(); clearTimeout(timer); timer = setTimeout(function(){ show(t.dataset.pane); }, 350); });
+    t.addEventListener('dragover', function(e){ e.preventDefault(); });
+    t.addEventListener('dragleave', function(){ clearTimeout(timer); });
+    t.addEventListener('drop', function(e){ e.preventDefault(); clearTimeout(timer); });
   });
+  var src = document.getElementById('badge-inbox'), dst = document.getElementById('em-tab-mail-n');   // непрочитані вхідні — і на ✉️
+  function mirror(){
+    if (!src || !dst) return;
+    var n = src.style.display === 'none' ? '' : src.textContent.trim();
+    dst.textContent = n && n !== '0' ? n : '';
+  }
+  mirror();
+  if (src && window.MutationObserver) new MutationObserver(mirror).observe(src, {childList: true, characterData: true, subtree: true, attributes: true});
 })();
 // Перетягнути лист (рядок) на свою категорію ліворуч — віднести (правило для співрозмовника; Alt — увесь домен)
 (function(){

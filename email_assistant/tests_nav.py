@@ -92,3 +92,15 @@ class NavPrefsTests(Base):
         self.assertEqual(save({"reset": True})["hidden"], nav_prefs.CTX_DEFAULT_HIDDEN)
         bad = self.client.post("/email/ctx-menu/", "[1]", content_type="application/json")
         self.assertEqual(bad.status_code, 400)
+
+    def test_left_column_bottom_tabs(self):
+        """Ліва колонка — вкладки внизу (як в Outlook): папки, категорії, проєкти, клієнти, «⋯ Ще»."""
+        html = self.client.get("/email/").content.decode()
+        self.assertIn('id="em-p1-tabs"', html)
+        for pane in ("mail", "cats", "proj", "cust", "more"):
+            self.assertIn(f'class="em-p1-tab" data-pane="{pane}"', html)
+            self.assertIn(f'data-pane="{pane}">', html)
+        more = html[html.index('data-pane="more">'):]
+        self.assertLess(more.index("openSpamFilter()"), more.index('id="em-p1-tabs"'))   # «Фільтри спаму» — у «⋯ Ще»
+        self.assertNotIn('id="em-sync-more"', html)
+        self.assertIn("Відкритих проєктів з листами цієї скриньки немає", html)
