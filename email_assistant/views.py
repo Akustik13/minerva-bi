@@ -562,9 +562,10 @@ def inbox_view(request):
     _attach_project_tags(emails)
     _attach_quote_tags(emails)
     _attach_kb_tags(emails)
-    from email_assistant.logos import domain_for as _logo_domain
+    from email_assistant import logos as _logos
+    _custom = _logos.custom_map()   # свої значки (🖼 правий клік) — один перелік теки на сторінку
     for m in emails:
-        m.logo_domain = _logo_domain(m.from_email)
+        m.logo_domain, m.logo_v = _logos.logo_for(m.from_email, _custom)
     if search_all:
         _attach_folder_tags(account, emails)
 
@@ -2185,7 +2186,16 @@ def sender_logo_view(request, domain):
     from email_assistant import logos
     from email_assistant.models import EmailSettings
     domain = (domain or '').lower()
-    if logos.domain_for('x@' + domain) != domain or not EmailSettings.get_for_user(request.user).sender_logos:
+    if not EmailSettings.get_for_user(request.user).sender_logos:
+        raise Http404
+    own = logos.custom_map().get(domain)   # свій значок адреси / домену
+    if own is not None:
+        if own[0] == logos.LETTER:
+            raise Http404
+        response = FileResponse(open(own[0], 'rb'), content_type=logos.TYPES[own[0].rsplit('.', 1)[1]])
+        response['Cache-Control'] = 'private, max-age=604800'   # адреса з ?v=<час зміни>
+        return response
+    if logos.domain_for('x@' + domain) != domain:
         raise Http404
     found = logos.cached(domain)
     if found is None:
@@ -2194,6 +2204,24 @@ def sender_logo_view(request, domain):
     response = FileResponse(open(found[0], 'rb'), content_type=found[1])
     response['Cache-Control'] = 'private, max-age=604800'
     return response
+
+
+@staff_member_required
+@require_POST
+def sender_logo_set_view(request):
+    """🖼 «Значок відправника»: POST key (адреса або домен) + file — свій / action=letter — буква / auto — назад."""
+    from email_assistant import logos
+    try:
+        if request.POST.get('action') == 'upload':
+            f = request.FILES.get('file')
+            if f is None:
+                return JsonResponse({'ok': False, 'error': 'Виберіть зображення'})
+            state = logos.set_custom(request.POST.get('key'), f.read(logos.CUSTOM_MAX + 1))
+        else:
+            state = logos.set_custom(request.POST.get('key'), letter=request.POST.get('action') == 'letter')
+    except ValueError as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+    return JsonResponse({'ok': True, 'state': state})
 
 
 @staff_member_required

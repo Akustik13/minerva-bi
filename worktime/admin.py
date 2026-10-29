@@ -444,6 +444,8 @@ class WorkDayAdmin(admin.ModelAdmin):
         return [path("", self.admin_site.admin_view(self.calendar_view), name="worktime_workday_changelist"),
                 path("report/", self.admin_site.admin_view(self.report_view), name="worktime_workday_report"),
                 path("mail-time/", self.admin_site.admin_view(self.mail_time_view), name="worktime_workday_mailtime"),
+                path("from-mail/<int:message_pk>/", self.admin_site.admin_view(self.from_mail_view),
+                     name="worktime_workday_from_mail"),
                 path("meetings/", self.admin_site.admin_view(self.meetings_view), name="worktime_workday_meetings"),
                 path("record/describe/", self.admin_site.admin_view(self.record_describe_view),
                      name="worktime_workday_record_describe"),
@@ -460,6 +462,12 @@ class WorkDayAdmin(admin.ModelAdmin):
         dp = DanteProject.objects.filter(pk=p.get("project") or 0, gone=False).first()
         return du, dp
 
+    def from_mail_view(self, request, message_pk):
+        from .admin_mail import from_mail_page
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        return from_mail_page(self, request, message_pk)
+
     def record_describe_view(self, request):
         """POST {u, date, project, start, stop, current, hint} → {ok, text, sources} (нічого не записує)."""
         from django.http import JsonResponse
@@ -472,8 +480,11 @@ class WorkDayAdmin(admin.ModelAdmin):
         if not (day and dp):
             return JsonResponse({"ok": False, "error": "Виберіть дату й проєкт askDANTE."})
         try:
+            from email_assistant.models import EmailMessage
+            msg = EmailMessage.objects.filter(pk=p["msg"], account__user=request.user).first() \
+                if str(p.get("msg") or "").isdigit() else None   # з листа — опис за цим листом
             r = record_ai.describe(du, day, dp, _time(p.get("start")), _time(p.get("stop")),
-                                   p.get("current", ""), p.get("hint", ""), user=request.user)
+                                   p.get("current", ""), p.get("hint", ""), user=request.user, message=msg)
         except DanteError as e:
             return JsonResponse({"ok": False, "error": e.message})
         return JsonResponse({"ok": True, **r})

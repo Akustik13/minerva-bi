@@ -654,7 +654,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
           {% if msg.is_starred %}⭐{% else %}☆{% endif %}
         </button>
 
-        <div class="em-avatar">{{ msg.sender_display|first|upper }}{% if email_settings.sender_logos and msg.logo_domain %}<img class="em-av-logo" src="/email/logo/{{ msg.logo_domain }}/" alt="" loading="lazy" onerror="this.remove()">{% endif %}</div>
+        <div class="em-avatar">{{ msg.sender_display|first|upper }}{% if email_settings.sender_logos and msg.logo_domain %}<img class="em-av-logo" src="/email/logo/{{ msg.logo_domain }}/{% if msg.logo_v %}?v={{ msg.logo_v }}{% endif %}" alt="" loading="lazy" onerror="this.remove()">{% endif %}</div>
 
         <div class="em-row-body">
           <div class="em-row-top">
@@ -796,6 +796,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
            title="{% trans "Забути вибір для цього контакту — категорію знову визначає система" %}">↺ {% trans "Автоматично" %}</div>
     </div>
   </div>
+  {% if email_settings.sender_logos %}<div class="em-ctx-item" onclick="ctxAction('logo')" title="{% trans "Свій значок замість логотипа сайту — для цієї адреси або всього домену; або буква" %}">🖼 {% trans "Значок відправника…" %}</div>{% endif %}
+  {% if mail_time_url %}<div class="em-ctx-item" onclick="ctxAction('dante')" title="{% trans "Час на проєкт листа в askDANTE: дата й час з листа, AI коротко опише, що зроблено, і що надіслали" %}">⏱ {% trans "Записати в askDANTE з листа…" %}</div>{% endif %}
   <div class="em-ctx-item" onclick="ctxAction('customer')" title="{% trans "Новий клієнт CRM з даних листа (ім'я, компанія, email, телефон, адреса з підпису) — і гілка, Angebote та проєкти до нього; або вибрати наявного" %}">👤 {% trans "Клієнт CRM з листа…" %}</div>
   <div class="em-ctx-item" onclick="ctxAction('why')" title="{% trans "До якої своєї категорії й чому, хто пише, проєкти — і швидко змінити правило" %}">🔍 {% trans "Чому лист тут — ознаки й правила…" %}</div>
   <div class="em-ctx-item" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
@@ -861,6 +863,23 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" onclick="prAction('dante')" title="{% trans "Час на листи проєкту по днях за 30 днів; немає проєкту askDANTE — вибрати або створити" %}">⏱ {% trans "Занести в askDANTE…" %}</div>
   <div class="em-ctx-item" onclick="prAction('work')" title="{% trans "Не листи: виміри, розробка, зустріч… — з описом (AI)" %}">📝 {% trans "Інша робота на проєкт…" %}</div>{% endif %}
 </div>
+<dialog id="em-logo-dlg">
+  <form method="dialog" onsubmit="return false" style="min-width:320px">
+    <b style="font-size:14px">🖼 {% trans "Значок відправника" %}</b>
+    <div style="font-size:12px;margin:8px 0 4px">{% trans "Для кого" %}:</div>
+    <label style="display:block;font-size:12px"><input type="radio" name="em-logo-for" value="addr" checked> <span id="em-logo-addr"></span></label>
+    <label style="display:block;font-size:12px" id="em-logo-dom-row"><input type="radio" name="em-logo-for" value="dom"> {% trans "весь домен" %} <span id="em-logo-dom"></span></label>
+    <input type="file" id="em-logo-file" accept="image/png,image/jpeg,image/gif,image/webp,image/x-icon" style="display:block;margin:8px 0;font-size:12px;color:var(--text)">
+    <div class="wc-btns" style="justify-content:flex-start;flex-wrap:wrap">
+      <button type="button" class="button default" onclick="emLogoSave('upload')">⬆ {% trans "Поставити це зображення" %}</button>
+      <button type="button" class="button" onclick="emLogoSave('letter')">🔤 {% trans "Буква замість логотипа" %}</button>
+      <button type="button" class="button" onclick="emLogoSave('auto')">↺ {% trans "Автоматично (логотип сайту)" %}</button>
+      <button type="button" class="button" onclick="document.getElementById('em-logo-dlg').close()">{% trans "Закрити" %}</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">{% trans "Значок бачать усі користувачі Minerva. PNG / JPG / GIF / WEBP / ICO до 1 МБ, квадратний виглядає найкраще." %}</div>
+    <div id="em-logo-err" style="color:var(--err,#e57373);font-size:12px;margin-top:4px"></div>
+  </form>
+</dialog>
 <dialog id="em-icon-dlg">
   <form method="dialog" onsubmit="return false">
     <b style="font-size:14px">🎨 {% trans "Значок" %}</b>
@@ -1507,6 +1526,35 @@ async function _wcPost(pk, body) {
   return d;
 }
 async function _wcInfo(pk) { return (await fetch('/email/category/' + pk + '/', {credentials: 'same-origin'})).json(); }
+var _logoAddr = '';
+function emLogoDialog(addr) {
+  _logoAddr = (addr || '').toLowerCase();
+  if (!_logoAddr) { _showToast('⚠️ {% trans "У листа немає адреси відправника" %}'); return; }
+  var dom = _logoAddr.split('@')[1] || '';
+  document.getElementById('em-logo-addr').textContent = _logoAddr;
+  document.getElementById('em-logo-dom').textContent = dom;
+  document.getElementById('em-logo-dom-row').style.display = dom ? '' : 'none';
+  document.querySelector('input[name="em-logo-for"][value="addr"]').checked = true;
+  document.getElementById('em-logo-file').value = ''; document.getElementById('em-logo-err').textContent = '';
+  document.getElementById('em-logo-dlg').showModal();
+}
+async function emLogoSave(action) {
+  var dom = document.querySelector('input[name="em-logo-for"]:checked').value === 'dom';
+  var fd = new FormData();
+  fd.append('key', dom ? _logoAddr.split('@')[1] : _logoAddr); fd.append('action', action);
+  if (action === 'upload') {
+    var f = document.getElementById('em-logo-file').files[0];
+    if (!f) { document.getElementById('em-logo-err').textContent = '{% trans "Виберіть зображення" %}'; return; }
+    fd.append('file', f);
+  }
+  try {
+    var d = await (await fetch('/email/logo-set/', {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd})).json();
+    if (!d.ok) throw new Error(d.error || _i18n.помилка);
+    document.getElementById('em-logo-dlg').close();
+    _showToast('🖼 {% trans "Значок змінено — оновлюю список" %}');
+    setTimeout(function(){ location.reload(); }, 500);
+  } catch (e) { document.getElementById('em-logo-err').textContent = '❌ ' + e.message; }
+}
 async function wcAction(action) {
   document.getElementById('em-wc-ctx').classList.remove('open');
   if (!_wc) return;
@@ -1525,7 +1573,8 @@ async function wcAction(action) {
                          senders: info.senders, subject_words: info.subject_words});
       location.reload(); return;
     }
-    if (action === 'dante') {
+    if (action === 'logo') { emLogoDialog(_ctxMsg.from || ''); return; }
+  if (action === 'dante') {
       if (!info.dante) { _showToast('{% trans "Облік часу askDANTE не встановлено" %}'); return; }
       location.href = info.dante.url; return;
     }
@@ -2637,6 +2686,15 @@ function showCtxMenu(ev, pk, tpk, rowEl) {
 
 document.addEventListener('click', function() { _ctx.classList.remove('open'); });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') _ctx.classList.remove('open'); });
+(function(){   // будь-яке меню правого кліку: клік поза ним (і в тексті листа — iframe), Escape, прокрутка — сховати
+  var MENUS = '#em-ctx, #em-wc-ctx, #em-pr-ctx, #em-nv-ctx';
+  function closeAll(){ document.querySelectorAll(MENUS).forEach(function(m){ m.classList.remove('open'); }); }
+  function outside(e){ return !(e.target && e.target.closest && e.target.closest(MENUS)); }
+  document.addEventListener('mousedown', function(e){ if (outside(e)) closeAll(); }, true);   // до stopPropagation рядків
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeAll(); }, true);
+  document.addEventListener('scroll', function(e){ if (outside(e)) closeAll(); }, true);
+  window.addEventListener('blur', closeAll);   // клік у листі (iframe) забирає фокус у сторінки
+})();
 
 async function ctxSetCategory(cat) {
   _ctx.classList.remove('open');
@@ -2687,6 +2745,7 @@ async function ctxAction(action) {
   var {pk, tpk, rowEl} = _ctxMsg;
 
   if (action === 'why') { emWhy(pk); return; }
+  if (action === 'dante') { window.open('/admin/worktime/workday/from-mail/' + pk + '/', '_blank'); return; }
   if (action === 'customer') {   // «👤 Клієнт CRM з листа»: те саме вікно, одразу з формою нового клієнта
     await emWhy(pk);
     if (_why && !_why.customer && _why.can_add_customer) emWhyNewCustomer(true);

@@ -91,24 +91,7 @@
     {% if not st.mail_projects %}<br>⚠️ {% trans "Листи проєктів Minerva зараз не рахуються — увімкніть «Листи проєктів Minerva — на їхній проєкт askDANTE» у" %} <a href="{{ settings_url }}">⚙️ {% trans "налаштуваннях askDANTE" %}</a>.{% endif %}
     · <a href="{{ proj_url }}">📁 {% trans "проєкт" %}</a> · <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}">{% trans "усе" %}</a></div>
   {% if du %}
-  <details id="work" style="margin-top:8px"{% if open_work %} open{% endif %}>
-    <summary>📝 <b>{% trans "Інша робота на цей проєкт" %}</b> — {% trans "не листи: виміри, розробка, зустріч, дзвінок…" %}</summary>
-    <form method="post" action="{{ save_url }}" class="mt-form" id="mt-work" style="margin-top:6px">{% csrf_token %}
-      <input type="hidden" name="mode" value="new"><input type="hidden" name="u" value="{{ du.pk }}">
-      <input type="hidden" name="project" value="{{ pmap.dante_project_id }}"><input type="hidden" name="next" value="{{ page_url }}">
-      <label>{% trans "Дата" %}<input type="date" name="date" value="{{ today|date:'Y-m-d' }}" max="{{ today|date:'Y-m-d' }}" required></label>
-      <label>{% trans "з" %}<input type="time" name="start"></label><label>{% trans "по" %}<input type="time" name="stop"></label>
-      <label>{% trans "або тривалість" %}<input type="text" name="duration" placeholder="1:30" size="6"></label>
-      <label>{% trans "Вид роботи" %}<select name="activity"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}">{{ a.name }}</option>{% endfor %}</select></label>
-      {% if st.attendance_required %}<label title="{% trans "askDANTE приймає час на проєкт лише в межах приходу–відходу" %}">{% trans "Без приходу в askDANTE" %}<select name="attendance">
-        <option value="">{% trans "не записувати" %}</option><option value="fixed">{% trans "спершу прихід і відхід" %} {{ day_times }}</option>
-        <option value="activity">{% trans "спершу за активністю в Minerva" %}</option></select></label>{% endif %}
-      <label style="flex-basis:100%">{% trans "Що робили (підказка для AI)" %}<input type="text" id="mt-work-hint" placeholder="{% trans "напр. виміри антени в камері, правки PCB" %}"></label>
-      <label style="flex-basis:100%">{% trans "Опис для askDANTE" %} ({{ lang }})<textarea name="comment" id="mt-work-comment" rows="3" maxlength="500" style="width:100%" required></textarea></label>
-      <button type="button" class="button" onclick="mtWorkDescribe(this)">✍️ {% trans "Описати детально (AI)" %}</button>
-      <button class="button default" onclick="return confirm('{% trans "Записати в askDANTE? Через API askDANTE запис потім не виправити й не видалити." %}')">✓ {% trans "Записати в askDANTE" %}</button>
-    </form>
-  </details>
+  {% with work_dp=pmap.dante_project_id %}{% include "admin/worktime/_work_form.html" %}{% endwith %}
   {% endif %}
   {% else %}
   ⚠️ 📁 <b>{{ focus_proj.code }} {{ focus_proj.name }}</b>: {% trans "у проєкту ще немає проєкту askDANTE." %}
@@ -142,6 +125,7 @@
   <div class="mt-muted">{% trans "Незаписані дні вже позначено — перевірте опис і натисніть «✓ Записати» внизу. Кожен день — окремий запис askDANTE; повторний запис дописує лише різницю." %}
     {% if shared %}<br>ℹ️ {% trans "У цей самий проєкт askDANTE пишуть і" %}: {{ shared|join:", " }} — {% trans "їхній час у тих самих рядках (askDANTE рахує день × проєкт)." %}{% endif %}
     · <a href="{{ focus_url }}">⚙ {% trans "проєкт і норми категорії" %}</a> · <a href="?u={{ du.pk }}&from={{ date_from|date:'Y-m-d' }}&to={{ date_to|date:'Y-m-d' }}">{% trans "усі категорії" %}</a></div>
+  {% if du %}{% with work_dp=focus.dante_project_id %}{% include "admin/worktime/_work_form.html" %}{% endwith %}{% endif %}
   {% else %}
   ⚠️ <b>{{ focus_cat.label }}</b>: {% trans "у категорії ще немає проєкту askDANTE." %}
   {% if can_bind %}
@@ -275,6 +259,7 @@
 async function mtWorkDescribe(btn) {   // те саме, що «✍️ Описати детально» в календарі робочого часу (record_ai.describe)
   var f = document.getElementById('mt-work'), fd = new FormData();
   ['u', 'date', 'project', 'start', 'stop'].forEach(function(k){ fd.append(k, f.elements[k].value); });
+  if (f.elements['msg']) fd.append('msg', f.elements['msg'].value);   // з листа — опис за цим листом
   fd.append('current', f.elements['comment'].value); fd.append('hint', document.getElementById('mt-work-hint').value);
   var old = btn.textContent; btn.disabled = true; btn.textContent = '⏳…';
   try {

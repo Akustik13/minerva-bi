@@ -4,6 +4,7 @@ import datetime
 from django.contrib import admin, messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from email_assistant.models import MailCategory
 
@@ -98,6 +99,51 @@ def transfer_url(category, days: int = 30) -> str:
     today = services.local_today()
     return (f"{reverse('admin:worktime_workday_mailtime')}?cat={category.pk}"
             f"&from={today - datetime.timedelta(days=days - 1)}&to={today}")
+
+
+WORK_FROM_MAIL_MINUTES = 30   # «з … по …» для роботи з листа: півгодини до часу листа
+
+
+def work_mail(request, pk):
+    """Лист для «📝 Інша робота» (лише свої скриньки): дата, «з … по …» до часу листа, підказка, вкладення."""
+    from email_assistant.models import EmailMessage
+    msg = EmailMessage.objects.filter(pk=pk, account__user=request.user).first() if str(pk or "").isdigit() else None
+    if msg is None or not msg.sent_at:
+        return None
+    at = timezone.localtime(msg.sent_at)
+    stop = at.replace(minute=at.minute - at.minute % 5, second=0, microsecond=0)
+    start = max(stop - datetime.timedelta(minutes=WORK_FROM_MAIL_MINUTES), stop.replace(hour=0, minute=0))
+    files = [a.get("name") or "" for a in (msg.attachments or []) if isinstance(a, dict) and a.get("name")][:8]
+    return {"pk": msg.pk, "date": at.date(), "start": f"{start:%H:%M}", "stop": f"{stop:%H:%M}",
+            "when": f"{at:%d.%m %H:%M}", "subject": msg.subject or "", "files": files,
+            "hint": (msg.subject or "")[:200]}
+
+
+def from_mail_page(model_admin, request, message_pk):
+    """«⏱ Записати в askDANTE з листа»: проєкт Minerva гілки (або своя категорія з проєктом askDANTE) →
+    «📝 Інша робота» цього проєкту з датою й часом листа; AI-опис — за цим листом."""
+    from django.contrib import messages
+    from django.db.models import Q
+    from django.shortcuts import get_object_or_404, redirect
+
+    from email_assistant.models import EmailMessage
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account__user=request.user)
+    day = timezone.localtime(msg.sent_at).date() if msg.sent_at else services.local_today()
+    base = f"{reverse('admin:worktime_workday_mailtime')}?from={day}&to={day}&work=1&msg={msg.pk}"
+    try:
+        from projects.models import ProjectLink
+        cond = Q(message=msg) | (Q(thread_id=msg.thread_id) if msg.thread_id else Q(pk__in=[]))
+        link = ProjectLink.objects.filter(cond, status=ProjectLink.CONFIRMED).order_by("-created_at").first()
+    except ImportError:
+        link = None
+    if link is not None:
+        return redirect(base + f"&proj={link.project_id}")
+    if msg.work_category_id and MailCategoryTime.objects.filter(category_id=msg.work_category_id) \
+            .exclude(dante_project=None).exists():
+        return redirect(base + f"&cat={msg.work_category_id}")
+    messages.warning(request, "Лист не в проєкті Minerva й не у своїй категорії з проєктом askDANTE — спершу "
+                              "«📁 До проєкту…» в меню листа (або прив'яжіть категорію до askDANTE).")
+    return redirect(request.META.get("HTTP_REFERER") or "/email/")
 
 
 def mail_time_page(model_admin, request):
@@ -297,6 +343,7 @@ def mail_time_page(model_admin, request):
         "focus": focus, "focus_cat": focus_cat, "shared": shared, "can_bind": can_bind,
         "focus_proj": focus_proj, "pmap": pmap, "proj_hints": proj_hints,
         "open_work": g.get("work") == "1",
+        "work_mail": work_mail(request, g.get("msg")),
         "day_times": "–".join(t.strftime("%H:%M") for t in du.times(st)) if du else "",
         "describe_url": reverse("admin:worktime_workday_record_describe"),
         "save_url": reverse("admin:worktime_workday_record_save"),

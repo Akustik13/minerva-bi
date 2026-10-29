@@ -1,0 +1,19 @@
+{% load i18n %}  <details id="work" style="margin-top:8px"{% if open_work %} open{% endif %}>
+    <summary>📝 <b>{% trans "Інша робота на цей проєкт" %}</b> — {% trans "не листи: виміри, розробка, зустріч, дзвінок…" %}</summary>
+    {% if work_mail %}<div class="mt-muted" style="margin:4px 0">✉️ {% trans "З листа" %} «{{ work_mail.subject }}» {{ work_mail.when }}{% if work_mail.files %} · 📎 {{ work_mail.files|join:", " }}{% endif %} — {% trans "«✍️ Описати детально (AI)» опише роботу за цим листом і додасть, що надіслали." %}</div>{% endif %}
+    <form method="post" action="{{ save_url }}" class="mt-form" id="mt-work" style="margin-top:6px">{% csrf_token %}
+      <input type="hidden" name="mode" value="new"><input type="hidden" name="u" value="{{ du.pk }}">
+      <input type="hidden" name="project" value="{{ work_dp }}">{% if work_mail %}<input type="hidden" name="msg" value="{{ work_mail.pk }}">{% endif %}<input type="hidden" name="next" value="{{ page_url }}">
+      <label>{% trans "Дата" %}<input type="date" name="date" value="{% if work_mail %}{{ work_mail.date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" max="{{ today|date:'Y-m-d' }}" required></label>
+      <label>{% trans "з" %}<input type="time" name="start" value="{{ work_mail.start|default:'' }}"></label><label>{% trans "по" %}<input type="time" name="stop" value="{{ work_mail.stop|default:'' }}"></label>
+      <label>{% trans "або тривалість" %}<input type="text" name="duration" placeholder="1:30" size="6"></label>
+      <label>{% trans "Вид роботи" %}<select name="activity"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}">{{ a.name }}</option>{% endfor %}</select></label>
+      {% if st.attendance_required %}<label title="{% trans "askDANTE приймає час на проєкт лише в межах приходу–відходу" %}">{% trans "Без приходу в askDANTE" %}<select name="attendance">
+        <option value="">{% trans "не записувати" %}</option><option value="fixed">{% trans "спершу прихід і відхід" %} {{ day_times }}</option>
+        <option value="activity">{% trans "спершу за активністю в Minerva" %}</option></select></label>{% endif %}
+      <label style="flex-basis:100%">{% trans "Що робили (підказка для AI)" %}<input type="text" id="mt-work-hint" value="{{ work_mail.hint|default:'' }}" placeholder="{% trans "напр. виміри антени в камері, правки PCB" %}"></label>
+      <label style="flex-basis:100%">{% trans "Опис для askDANTE" %} ({{ lang }})<textarea name="comment" id="mt-work-comment" rows="3" maxlength="500" style="width:100%" required></textarea></label>
+      <button type="button" class="button" onclick="mtWorkDescribe(this)">✍️ {% trans "Описати детально (AI)" %}</button>
+      <button class="button default" onclick="return confirm('{% trans "Записати в askDANTE? Через API askDANTE запис потім не виправити й не видалити." %}')">✓ {% trans "Записати в askDANTE" %}</button>
+    </form>
+  </details>

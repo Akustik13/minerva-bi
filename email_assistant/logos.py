@@ -66,6 +66,74 @@ def cached(domain: str):
     return None
 
 
+# ── 🖼 Свій значок (людина вибрала): для адреси або домену, замість автоматичного; «буква» — без логотипа ──
+CUSTOM = 'custom'
+CUSTOM_MAX = 1_000_000
+KEY_RE = re.compile(r'^(?:[a-z0-9._%+-]+@)?[a-z0-9-]+(\.[a-z0-9-]+)+$')
+LETTER = 'letter'
+
+
+def _custom_dir() -> str:
+    return os.path.join(settings.MEDIA_ROOT, DIR, CUSTOM)
+
+
+def custom_map() -> dict:
+    """{ключ (адреса або домен): (шлях | LETTER, mtime)} — свої значки, один перелік теки на сторінку."""
+    out = {}
+    try:
+        names = os.listdir(_custom_dir())
+    except OSError:
+        return out
+    for name in names:
+        key, _, ext = name.rpartition('.')
+        if not KEY_RE.match(key) or (ext not in TYPES and ext != LETTER):
+            continue
+        path = os.path.join(_custom_dir(), name)
+        out[key] = (LETTER if ext == LETTER else path, int(os.path.getmtime(path)))
+    return out
+
+
+def set_custom(key: str, data: bytes = b'', letter: bool = False) -> str:
+    """Свій значок для адреси / домену (data — PNG / JPG / GIF / ICO / WEBP), letter — буква без логотипа,
+    обидва порожні — назад автоматичний. → що тепер: 'image' | 'letter' | 'auto'. ValueError — не той файл."""
+    key = (key or '').strip().lower()
+    if not KEY_RE.match(key):
+        raise ValueError('Неправильна адреса або домен')
+    kind = _kind(data) if data else ''
+    if data and not kind:
+        raise ValueError('Потрібне зображення PNG, JPG, GIF, ICO або WEBP')
+    if len(data) > CUSTOM_MAX:
+        raise ValueError('Зображення завелике (до 1 МБ)')
+    os.makedirs(_custom_dir(), exist_ok=True)
+    for ext in list(TYPES) + [LETTER]:
+        try:
+            os.remove(os.path.join(_custom_dir(), f'{key}.{ext}'))
+        except OSError:
+            pass
+    if data:
+        with open(os.path.join(_custom_dir(), f'{key}.{kind}'), 'wb') as fh:
+            fh.write(data)
+        return 'image'
+    if letter:
+        open(os.path.join(_custom_dir(), f'{key}.{LETTER}'), 'wb').close()
+        return 'letter'
+    return 'auto'
+
+
+def logo_for(address: str, custom: dict | None = None):
+    """(ключ для /email/logo/<ключ>/, версія) для рядка листа: свій значок адреси → свій домену → автоматичний
+    домену; «буква» — ('', '')."""
+    custom = custom_map() if custom is None else custom
+    address = (address or '').strip().lower()
+    domain = domain_for(address)
+    full = address.split('@', 1)[1] if '@' in address else ''
+    for key in (address, full, domain):
+        if key and key in custom:
+            path, mtime = custom[key]
+            return ('', '') if path == LETTER else (key, str(mtime))
+    return (domain, '') if domain else ('', '')
+
+
 def _missing_recently(domain: str) -> bool:
     try:
         return time.time() - os.path.getmtime(_base(domain) + '.none') < RETRY_DAYS * 86400

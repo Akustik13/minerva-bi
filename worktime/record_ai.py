@@ -100,24 +100,44 @@ PROMPT = (
     "supported by the data or by the worker's note; do not invent numbers or results. No names of people, no e-mail "
     "addresses, phone numbers or prices.\n"
     "Format: one short headline line, then 2–5 lines starting with «- ». Max {limit} characters in total. "
-    "Answer with the description only.\n\n{data}"
+    "Answer with the description only.{focus}\n\n{data}"
 )
+FOCUS = ("\nThe entry is about the e-mail marked [THIS E-MAIL]: describe the work done according to it (what was "
+         "changed, prepared, checked, decided — concretely, e.g. pins, parts, versions, measurements, if stated). "
+         "If files or data were sent, end with one line «- {sent}: …» naming them (file names / what data). "
+         "Other e-mails are only context.")
+SENT_WORD = {"de": "Gesendet", "en": "Sent", "uk": "Надіслано"}
+
+
+def mail_material(msg) -> str:
+    """Текст для опису роботи з одного листа: тема, кому, новий текст (без цитат), вкладення."""
+    from email_assistant.quotes import new_text
+    when = timezone.localtime(msg.sent_at) if msg.sent_at else None
+    files = [a.get("name") for a in (msg.attachments or []) if isinstance(a, dict) and a.get("name")]
+    to = ", ".join((msg.to_emails or [])[:3])
+    text = re.sub(r"[ \t]+", " ", new_text(msg.body_text or ""))[:3000]
+    return (f"[THIS E-MAIL {when:%d.%m %H:%M}]" if when else "[THIS E-MAIL]") + f" Subject: {msg.subject}\n" + \
+        (f"To: {to}\n" if to else "") + (f"Attachments: {', '.join(files)}\n" if files else "") + text
 
 
 def describe(du: DanteUser, day: datetime.date, dp, start=None, stop=None, current: str = "", hint: str = "",
-             lang: str | None = None, user=None) -> dict:
-    """Детальний опис запису від AI. → {"text", "sources"} або DanteError з поясненням."""
+             lang: str | None = None, user=None, message=None) -> dict:
+    """Детальний опис запису від AI. → {"text", "sources"} або DanteError з поясненням.
+    message — запис «з листа»: опис саме за цим листом, наприкінці — що надіслали (вкладення)."""
     from email_assistant import ai_helper
     st = DanteSettings.get()
     lang = lang or st.comment_lang
     data = material(du, day, dp)
+    if message is not None:
+        data = [mail_material(message)] + [d for d in data if f"Subject: {message.subject}\n" not in d][:MAX_MAILS - 1]
     if not data and not (hint or current).strip():
         raise DanteError("bad_request", "Немає листів чи зустрічей по цьому проєкту за ці дні — напишіть у полі "
                                         "«Що робили» кілька слів, і AI оформить опис.")
     span = f"{services.hhmm(start)}–{services.hhmm(stop)}" if start and stop else "time not set"
     prompt = PROMPT.format(language=LANGS.get(lang, "German"), date=f"{day:%d.%m.%Y}", span=span,
                            project=str(dp), current=(current or "—")[:300], hint=(hint or "—")[:300],
-                           limit=MAX_TEXT, data="\n---\n".join(data) or "(no e-mails or calendar entries)")
+                           limit=MAX_TEXT, data="\n---\n".join(data) or "(no e-mails or calendar entries)",
+                           focus=FOCUS.format(sent=SENT_WORD.get(lang, "Sent")) if message is not None else "")
     try:
         raw = ai_helper._call_ai_direct(prompt, max_tokens=900, user=user, model=AI_MODEL) or ""
     except Exception as e:  # noqa: BLE001
