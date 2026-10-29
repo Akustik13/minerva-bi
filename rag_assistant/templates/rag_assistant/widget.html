@@ -82,6 +82,11 @@
 .rg-cite { display: inline-block; min-width: 16px; padding: 0 4px; margin: 0 1px; border-radius: 4px; font-size: 11px;
   line-height: 16px; text-align: center; background: var(--rg-cite); color: var(--rg-cite-text); cursor: pointer; font-weight: 700; }
 .rg-stage { color: var(--rg-muted); font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.rg-mode { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 11px; color: var(--rg-muted); margin: 0 0 4px; }
+.rg-mode button { border: 1px solid var(--rg-border-strong); background: none; color: var(--rg-muted); border-radius: 10px;
+                  font-size: 11px; padding: 1px 8px; cursor: pointer; }
+.rg-mode button:hover { color: var(--rg-accent); border-color: var(--rg-accent); }
+a.rg-link { color: var(--rg-link); text-decoration: underline; }
 .rg-spin { width: 14px; height: 14px; border: 2px solid var(--rg-border-strong); border-top-color: var(--rg-accent);
   border-radius: 50%; animation: rgSpin .8s linear infinite; flex-shrink: 0; }
 @keyframes rgSpin { to { transform: rotate(360deg); } }
@@ -191,12 +196,20 @@
   }
 
   // ── Безпечний Markdown (лише DOM-вузли, без innerHTML тексту моделі) ──
+  // Посилання — лише на сторінки Minerva (/…) і https://; інші адреси лишаються текстом
+  function safeHref(h) { return /^\/(?!\/)/.test(h) || /^https:\/\//.test(h) ? h : null; }
   function inline(text, parent, onCite) {
-    var re = /(\*\*[^*]+\*\*|`[^`]+`|\[\d+\]|\*[^*\s][^*]*\*)/g, last = 0, m;
+    var re = /(\[[^\]]+\]\([^)\s]+\)|\*\*[^*]+\*\*|`[^`]+`|\[\d+\]|\*[^*\s][^*]*\*)/g, last = 0, m;
     while ((m = re.exec(text))) {
       if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
-      var t = m[0], node;
-      if (t.indexOf('**') === 0) node = el('strong', null, t.slice(2, -2));
+      var t = m[0], node, link = t.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+      if (link) {
+        var href = safeHref(link[2]);
+        node = href ? el('a', 'rg-link') : el('span');
+        if (href) { node.href = href; if (href[0] !== '/') { node.target = '_blank'; node.rel = 'noopener noreferrer'; } }
+        inline(link[1], node, onCite);
+      }
+      else if (t.indexOf('**') === 0) { node = el('strong'); inline(t.slice(2, -2), node, onCite); }
       else if (t[0] === '`') node = el('code', null, t.slice(1, -1));
       else if (t[0] === '[') { node = el('span', 'rg-cite', t.slice(1, -1)); (function (n) { node.onclick = function () { onCite && onCite(n); }; })(+t.slice(1, -1)); }
       else node = el('em', null, t.slice(1, -1));
@@ -285,12 +298,29 @@
     return box;
   }
 
+  // Хто відповідав (📚 гід / 📦 продукція) і «↻ відповісти інакше» — те саме запитання іншим способом
+  var MODES = { guide: '📚 Гід по Minerva', products: '📦 Продукція й даташити' };
+  function modeBar(m, row) {
+    var bar = el('div', 'rg-mode'), other = m.mode === 'guide' ? 'products' : 'guide';
+    bar.appendChild(el('span', null, MODES[m.mode] || MODES.products));
+    var ready = other === 'guide' ? state.guide : state.products;
+    var prev = row.previousElementSibling, q = prev && prev.classList.contains('user') ? prev.querySelector('.rg-b').textContent : '';
+    if (ready && q && m.status !== 'pending') {
+      var b = el('button', null, '↻ відповісти як ' + MODES[other].split(' ')[0]); b.type = 'button';
+      b.title = 'Те саме запитання — ' + (other === 'guide' ? 'про роботу Minerva' : 'про продукцію (даташити)');
+      b.onclick = function () { input.value = q; send(0, other); };
+      bar.appendChild(b);
+    }
+    return bar;
+  }
+
   function renderMsg(m) {
     var row = el('div', 'rg-m ' + m.role + (m.status === 'failed' ? ' failed' : '')), bubble = el('div', 'rg-b');
     row.dataset.id = m.id;
     if (m.role === 'assistant') { var av = el('img'); av.src = AVATAR; av.alt = ''; row.appendChild(av); }
     row.appendChild(bubble);
     if (m.role === 'user') { bubble.textContent = m.content; return row; }
+    if (m.mode) setTimeout(function () { if (row.isConnected && !bubble.querySelector('.rg-mode')) bubble.insertBefore(modeBar(m, row), bubble.firstChild); }, 0);
     if (m.status === 'pending') {
       var st = el('div', 'rg-stage'); st.appendChild(el('span', 'rg-spin')); st.appendChild(el('span', null, m.stage || 'Обробляю запит…'));
       bubble.appendChild(st);
@@ -328,7 +358,9 @@
       srcBox = el('details'); srcBox.appendChild(el('summary', null, 'Джерела (' + m.sources.length + ')'));
       m.sources.forEach(function (s) {
         var d = el('div', 'rg-src'); d.dataset.n = s.id;
-        d.appendChild(el('b', null, '[' + s.id + '] ' + s.source + (s.page != null ? ', с. ' + s.page : '')));
+        var label = '[' + s.id + '] ' + s.source + (s.page != null ? ', с. ' + s.page : '');
+        if (s.url && safeHref(s.url)) { var sa = el('a', 'rg-link', label); sa.href = s.url; d.appendChild(sa); }
+        else d.appendChild(el('b', null, label));
         if (s.text) d.appendChild(el('div', null, s.text));
         srcBox.appendChild(d);
       });
@@ -352,9 +384,14 @@
       if (pill.dataset.admin) { var a = el('a', null, 'Відкрити налаштування →'); a.href = pill.dataset.settings; box.appendChild(a); }
       msgsEl.appendChild(box); return;
     }
-    box.appendChild(el('div', null, 'Привіт! Я ' + state.name + ' — допоможу з характеристиками товарів, даташитами та наявністю на складі.'));
-    var hints = el('div', 'rg-hints');
-    ['Які антени підтримують Bluetooth і є на складі?', 'Яка потужність AN050201-01C-175-MHF1?', 'Порівняй частотні діапазони антен для LoRa']
+    var can = [];
+    if (state.guide) can.push('як працює Minerva — де що знайти й як налаштувати');
+    if (state.products) can.push('характеристики товарів, даташити й наявність на складі');
+    box.appendChild(el('div', null, 'Привіт! Я ' + state.name + ' — допоможу: ' + can.join('; ') + '. Просто запитайте — я сама зрозумію, про що.'));
+    var hints = el('div', 'rg-hints'), examples = [];
+    if (state.guide) examples.push('Як додати даташити в базу знань?', 'Як створити Angebot з листа?');
+    if (state.products) examples.push('Які антени підтримують Bluetooth і є на складі?', 'Яка потужність AN050201-01C-175-MHF1?');
+    examples.slice(0, 4)
       .forEach(function (q) { var b = el('button', null, q); b.type = 'button'; b.onclick = function () { input.value = q; send(); }; hints.appendChild(b); });
     box.appendChild(hints);
     msgsEl.appendChild(box);
@@ -422,16 +459,16 @@
       state.convs.unshift(d.conversation); msgsEl.innerHTML = ''; return state.conv;
     });
   }
-  function send(retry) {
+  function send(retry, mode) {
     var q = input.value.trim();
     if (!q || state.pending || (state.sending && !retry)) return;
     state.sending = true; setBusy(true);
-    ensureConv().then(function (cid) {
-      return api('conversations/' + cid + '/ask/', { method: 'POST', body: { question: q } });
+    ensureConv().then(function (cid) {      // page — де зараз людина: гід бере сторінку про неї
+      return api('conversations/' + cid + '/ask/', { method: 'POST', body: { question: q, page: location.pathname, mode: mode || '' } });
     }).then(function (d) {
       if (d._status === 429 && (retry || 0) < 40) {   // зайнято іншим запитом — запит не прийнято, повторюємо
         showWait('Помічник зайнятий іншим запитом — зачекайте, надішлю автоматично…');
-        setTimeout(function () { send((retry || 0) + 1); }, 3000); return;
+        setTimeout(function () { send((retry || 0) + 1, mode); }, 3000); return;
       }
       state.sending = false; hideWait();
       if (d._status !== 202) { setBusy(false); showError(d.error || 'Помилка запиту.'); return; }
@@ -466,6 +503,13 @@
     .then(function (d) {
       if (!d || !d.enabled) { pill.remove(); panel.remove(); return; }
       state.configured = d.configured; state.name = d.name || 'Minerva'; state.convs = d.conversations || [];
+      state.guide = d.guide !== false && !!d.guide; state.products = d.products !== false;
+      var sub = [state.guide ? 'гід по Minerva' : '', state.products ? 'продукція й даташити' : ''].filter(Boolean).join(' · ');
+      panel.querySelector('.rg-title small').textContent = sub;
+      if (state.guide) {
+        input.placeholder = state.products ? 'Як щось зробити в Minerva — або про товар, характеристики, наявність…' : 'Як щось зробити в Minerva?';
+        panel.querySelector('.rg-note').textContent = 'Про Minerva — за гідом (📚), про товари — за даташитами й каталогом (📦). Перевіряйте важливе в джерелах.';
+      }
       pill.querySelector('.rg-name').textContent = state.name; panel.querySelector('.rg-hname').textContent = state.name;
       pill.style.display = 'inline-flex';
       var saved = +ls(LS.conv);

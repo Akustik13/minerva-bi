@@ -1,0 +1,64 @@
+{% extends "admin/base_site.html" %}
+{% comment %}📚 Сторінка гіда: текст з docs/guide/<розділ>/<сторінка>.md (guide/render.py), «де знайти», зміст, пов'язане{% endcomment %}
+{% block title %}{{ page.title }} | Гід по Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+{% block extrastyle %}{{ block.super }}{% include "guide/_styles.html" %}{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; <a href="{% url 'guide:index' %}">📚 Гід</a>
+  &rsaquo; {% if section %}{{ section.icon }} {{ section.title }} &rsaquo; {% endif %}{{ page.title }}</div>
+{% endblock %}
+{% block content %}
+<div class="gd">
+  <div class="gd-layout">
+    <article>
+      <div class="gd-head">
+        <h1>{{ page.title }}</h1>
+        {% if page.summary %}<p class="gd-sum">{{ page.summary }}</p>{% endif %}
+      </div>
+      {% if page.where or page.urls %}
+      <div class="gd-where">
+        <span>📍</span>{% if page.where %}<span class="gd-path">{{ page.where }}</span>{% endif %}
+        {% for u in page.urls %}<a class="button" href="{{ u }}">Відкрити{% if page.urls|length > 1 %} {{ forloop.counter }}{% endif %} →</a>{% endfor %}
+        {% if page.roles %}<span class="gd-muted">· хто: {{ page.roles|join:", " }}</span>{% endif %}
+      </div>
+      {% endif %}
+      <div class="gd-body">{{ body|safe }}</div>
+      <div class="gd-nav">
+        <span>{% if prev %}<a href="{{ prev.url }}">← {{ prev.title }}</a>{% endif %}</span>
+        <span>{% if next %}<a href="{{ next.url }}">{{ next.title }} →</a>{% endif %}</span>
+      </div>
+      {% if user.is_superuser %}<p class="gd-muted" style="margin-top:10px;font-size:12px">Джерело: <code>{{ page.path }}</code></p>{% endif %}
+    </article>
+    <aside class="gd-side">
+      {% if toc %}
+      <div class="gd-box"><h3>На цій сторінці</h3><ul>
+        {% for level, anchor, text in toc %}<li class="l{{ level }}"><a href="#{{ anchor }}">{{ text }}</a></li>{% endfor %}
+      </ul></div>
+      {% endif %}
+      {% if related %}
+      <div class="gd-box"><h3>Пов'язане</h3><ul>
+        {% for r in related %}<li><a href="{{ r.url }}">{{ r.title }}</a></li>{% endfor %}
+      </ul></div>
+      {% endif %}
+      {% if section %}
+      <div class="gd-box"><h3>{{ section.icon }} {{ section.title }}</h3><ul>
+        {% for p in section.pages %}<li>{% if p.slug == page.slug %}<b>{{ p.title }}</b>{% else %}<a href="{{ p.url }}">{{ p.title }}</a>{% endif %}</li>{% endfor %}
+      </ul></div>
+      {% endif %}
+      <div class="gd-box"><a href="{% url 'guide:index' %}">📚 Увесь гід</a></div>
+    </aside>
+  </div>
+</div>
+<script>
+document.querySelectorAll('.gd-copy').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var code = btn.parentElement.querySelector('code');
+    if (!code || !navigator.clipboard) return;
+    navigator.clipboard.writeText(code.innerText).then(function () {
+      btn.textContent = '✓';
+      setTimeout(function () { btn.textContent = '📋'; }, 1200);
+    });
+  });
+});
+</script>
+{% endblock %}

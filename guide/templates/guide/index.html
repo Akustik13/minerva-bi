@@ -1,0 +1,63 @@
+{% extends "admin/base_site.html" %}
+{% comment %}📚 Гід по Minerva — зміст за розділами й пошук (guide/views.index){% endcomment %}
+{% block title %}Гід по Minerva | Minerva{% endblock %}
+{% block extrastyle %}{{ block.super }}{% include "guide/_styles.html" %}{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; 📚 Гід по Minerva</div>
+{% endblock %}
+{% block content %}
+<div class="gd">
+  <p class="gd-muted">Як працює кожен розділ Minerva, де що натиснути, як налаштувати, приклади. Сторінок: {{ total }}.</p>
+  <form method="get" class="gd-search">
+    <input type="search" name="q" id="gd-q" value="{{ q }}" placeholder="Що шукаєте? Напр. «завантажити даташит», «Stripe», «askDANTE прихід»" autofocus>
+    <button type="submit" class="button">🔎 Шукати</button>
+  </form>
+
+  {% if q %}
+  <h2>Знайдено за «{{ q }}»</h2>
+  <ul class="gd-results">
+    {% for p, score in results %}
+    <li><a href="{{ p.url }}"><b>{{ p.title }}</b></a> <span class="gd-muted">· {{ p.where }}</span><div>{{ p.summary }}</div></li>
+    {% empty %}<li class="gd-muted">Нічого не знайдено — спробуйте інші слова або перегляньте розділи нижче.</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <div class="gd-sections" id="gd-sections">
+    {% for s in sections %}
+    <section class="gd-sec">
+      <h2>{{ s.icon }} {{ s.title }}</h2>
+      {% if s.intro %}<p class="gd-intro gd-muted">{{ s.intro }}</p>{% endif %}
+      <ul>
+        {% for p in s.pages %}
+        <li data-text="{{ p.title|lower }} {{ p.summary|lower }} {{ p.keywords|join:' '|lower }}">
+          <a href="{{ p.url }}">{{ p.title }}</a><div>{{ p.summary }}</div></li>
+        {% empty %}<li class="gd-muted">Сторінок ще немає.</li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% empty %}
+    <p class="gd-muted">Гід ще порожній — сторінки лежать у docs/guide/.</p>
+    {% endfor %}
+  </div>
+</div>
+<script>
+(function () {
+  // Миттєвий фільтр змісту під час введення; Enter — повний пошук на сервері
+  var q = document.getElementById('gd-q');
+  if (!q) return;
+  q.addEventListener('input', function () {
+    var v = q.value.trim().toLowerCase();
+    document.querySelectorAll('#gd-sections .gd-sec').forEach(function (sec) {
+      var shown = 0;
+      sec.querySelectorAll('li[data-text]').forEach(function (li) {
+        var ok = !v || li.dataset.text.indexOf(v) >= 0;
+        li.style.display = ok ? '' : 'none';
+        shown += ok;
+      });
+      sec.style.display = shown || !v ? '' : 'none';
+    });
+  });
+})();
+</script>
+{% endblock %}

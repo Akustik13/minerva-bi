@@ -78,6 +78,9 @@ C:/
 C\357\200\272/
 digikey/
 gunicorn.ctl
+# 📚 Гід по Minerva: розділи «ai» і «digikey» — не службові теки вище
+!docs/guide/ai/
+!docs/guide/digikey/
 
 # ── Backup copies of source files ────────────────────────
 *.backup

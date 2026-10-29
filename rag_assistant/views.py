@@ -21,6 +21,7 @@ from .models import RagConversation, RagMessage, RagSettings
 
 APP_LABEL = "rag_assistant"
 PENDING_LIMIT = timedelta(minutes=20)
+GUIDE_LIMIT = timedelta(minutes=3)
 
 
 # ── Доступ ───────────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ def _client(request) -> RagClient:
 
 def _msg(m: RagMessage) -> dict:
     return {"id": m.id, "role": m.role, "content": m.content, "status": m.status, "stage": m.stage,
-            "sources": m.sources, "products": m.products, "trace": m.trace, "error": m.error,
+            "sources": m.sources, "products": m.products, "trace": m.trace, "error": m.error, "mode": m.mode,
             "created_at": m.created_at.isoformat()}
 
 
@@ -182,7 +183,11 @@ def _catalog_cards(question: str, shown_skus=()) -> list:
 
 
 def _refresh(m: RagMessage, client: RagClient | None) -> None:
-    """Опитати RAG для повідомлення, що виконується, і зберегти результат."""
+    """Опитати RAG для повідомлення, що виконується, і зберегти результат (гід відповідає у фоні сам)."""
+    if m.status == RagMessage.PENDING and m.mode == RagMessage.GUIDE and timezone.now() - m.created_at > GUIDE_LIMIT:
+        m.status, m.error, m.finished_at = RagMessage.FAILED, "Гід не відповів вчасно — спробуйте ще раз.", timezone.now()
+        m.save(update_fields=["status", "error", "finished_at"])
+        return
     if m.status != RagMessage.PENDING or not m.rag_job_id:
         return
     if timezone.now() - m.created_at > PENDING_LIMIT:
@@ -243,10 +248,13 @@ def avatar(request):
 @require_GET
 @_guard
 def state(request):
+    """Віконце показується, коли працює хоча б одне: помічник по продукції (RAG) або 📚 гід по Minerva."""
+    from guide import assistant as guide_assistant
     st = RagSettings.get()
     convs = RagConversation.objects.filter(user=request.user)[:30]
-    return JsonResponse({"enabled": st.enabled, "configured": st.configured, "name": st.name,
-                         "conversations": [_conv(c) for c in convs]})
+    products, guide = bool(st.enabled and st.configured), guide_assistant.available()
+    return JsonResponse({"enabled": st.enabled or guide, "configured": products or guide, "products": products,
+                         "guide": guide, "name": st.name, "conversations": [_conv(c) for c in convs]})
 
 
 @require_POST
@@ -281,21 +289,45 @@ def ask(request, pk):
     question = str(body.get("question") or "").strip()
     if not 1 <= len(question) <= 3000:
         return JsonResponse({"error": "Запитання — від 1 до 3000 символів."}, status=400)
+    from guide import assistant as guide_assistant
     st = RagSettings.get()
-    if not st.enabled:
-        return JsonResponse({"error": "Помічник вимкнений у налаштуваннях."}, status=503)
+    products_ready = bool(st.enabled and st.configured)
     if c.messages.filter(status=RagMessage.PENDING).exists():
         return JsonResponse({"error": "Дочекайтеся відповіді на попереднє запитання."}, status=409)
     history = [{"role": m.role, "content": m.content[:3000]}
                for m in c.messages.filter(status=RagMessage.DONE).exclude(content="").order_by("-created_at", "-pk")[:8]]
     history.reverse()
+    page = str(body.get("page") or "")[:300]
+    mode, reason = body.get("mode"), "ви вибрали самі"                  # «↻ відповісти інакше» — без вгадування
+    if mode not in (RagMessage.GUIDE, RagMessage.PRODUCTS):
+        last = c.messages.filter(role=RagMessage.ROLE_ASSISTANT).order_by("-created_at", "-pk").first()
+        mode, reason = guide_assistant.route(question, page, rag_ready=products_ready,
+                                             previous=last.mode if last else "")
+        if mode == RagMessage.GUIDE and products_ready and not guide_assistant.available():
+            mode = RagMessage.PRODUCTS                                   # гід вимкнений — як раніше, усе в RAG
+    if mode == RagMessage.GUIDE:
+        if not guide_assistant.available():
+            return JsonResponse({"error": "Гід по Minerva недоступний: немає ключа Anthropic у налаштуваннях AI."},
+                                status=503)
+        user_msg = RagMessage.objects.create(conversation=c, role=RagMessage.ROLE_USER, content=question)
+        bot_msg = RagMessage.objects.create(
+            conversation=c, role=RagMessage.ROLE_ASSISTANT, status=RagMessage.PENDING, mode=RagMessage.GUIDE,
+            stage="📚 Шукаю в гіді по Minerva…", trace=[{"title": f"📚 Гід: {reason}", "status": "completed"}])
+        if not c.title:
+            c.title = question[:120]
+        c.save(update_fields=["title", "updated_at"])
+        guide_assistant.start(bot_msg.pk, question, page, history, request.user.pk)
+        return JsonResponse({"user": _msg(user_msg), "assistant": _msg(bot_msg), "conversation": _conv(c)},
+                            status=202)
+    if not products_ready:
+        return JsonResponse({"error": "Помічник по продукції вимкнений або не налаштований."}, status=503)
     try:
         job_id = _client(request).ask(question, history, language=st.language, latest=st.latest_only)
     except RagError as e:
         return _err(e)  # 429 busy — запит не прийнято, віджет повторить
     user_msg = RagMessage.objects.create(conversation=c, role=RagMessage.ROLE_USER, content=question)
     bot_msg = RagMessage.objects.create(conversation=c, role=RagMessage.ROLE_ASSISTANT, status=RagMessage.PENDING,
-                                        rag_job_id=job_id, stage="Запит прийнято")
+                                        rag_job_id=job_id, stage="Запит прийнято", mode=RagMessage.PRODUCTS)
     if not c.title:
         c.title = question[:120]
     c.save(update_fields=["title", "updated_at"])

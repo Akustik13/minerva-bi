@@ -66,8 +66,11 @@ class RagConversation(models.Model):
 class RagMessage(models.Model):
     ROLE_USER, ROLE_ASSISTANT = "user", "assistant"
     PENDING, DONE, FAILED = "pending", "done", "failed"
+    PRODUCTS, GUIDE = "products", "guide"
 
     conversation = models.ForeignKey(RagConversation, on_delete=models.CASCADE, related_name="messages")
+    mode = models.CharField("Хто відповідав", max_length=10, default=PRODUCTS,
+                            choices=[(PRODUCTS, "📦 продукція (RAG)"), (GUIDE, "📚 гід по Minerva")])
     role = models.CharField(max_length=10, choices=[(ROLE_USER, "Користувач"), (ROLE_ASSISTANT, "Помічник")])
     content = models.TextField(blank=True, default="")
     status = models.CharField(max_length=10, default=DONE,

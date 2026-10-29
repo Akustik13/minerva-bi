@@ -995,6 +995,7 @@ window.MV_GROUPS = [
     ], apps:['bots','api','jlcpcb','scraper_hub'] },
   { id:'system', icon:'⚙️', label:'⚙️ Система', href:'/dashboard/system/',
     links:[
+      { href:'/guide/',                                       icon:'📚', label:'Гід по Minerva' },
       { href:'/admin/config/integrations/',                    icon:'🔌', label:'Інтеграції',          app:'config' },
       { href:'/admin/autoimport/autoimportprofile/',          icon:'🔄', label:'Авто-імпорт',         app:'autoimport' },
       { href:'/dashboard/import/',                            icon:'📤', label:'Імпорт даних',        app:'config' },
@@ -1246,6 +1247,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/admin/shop/':          'shop',
     '/dashboard/shop/':      'shop',
     '/dashboard/system/':    'system',
+    '/guide/':               'system',
     '/dashboard/import/':    'system',
     '/admin/shipping/shipment/dhl-track-lookup/': 'shipping',
     '/admin/shipping/shipment/order-tracking/':   'shipping',

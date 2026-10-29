@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     'jlcpcb',           # 🔬 JLCPCB виробництво
     'documents',        # 📄 Документи
     'faq',              # ❓ FAQ та підтримка
+    'guide',            # 📚 Гід по Minerva (docs/guide/, без моделей)
     'labels_app',       # 🏷️ Етикетки
     'backup',           # 💾 Резервне копіювання
     'scraper_hub',      # 📥 Scraper рахунків (JLCPCB, UPS)
