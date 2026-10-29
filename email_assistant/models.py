@@ -305,6 +305,16 @@ class EmailSettings(models.Model):
     hidden_work_categories = models.JSONField(
         default=list, blank=True, verbose_name='Сховані свої категорії',
         help_text='pk своїх категорій, яких не показувати в лівій колонці скриньки (правий клік → «Сховати»)')
+    # ⭐ обране й порядок лівої колонки (email_assistant/nav_prefs.py)
+    nav_pinned = models.JSONField(
+        default=list, blank=True, verbose_name='⭐ Обране в лівій колонці',
+        help_text='Ключі (wc:<pk>, kind:<тип>, quote, nocat, sort) у порядку закріплення — завжди зверху')
+    nav_usage = models.JSONField(default=dict, blank=True, verbose_name='Вживання пунктів лівої колонки',
+                                 help_text='{ключ: [бал, дата]} — кліки, «старіють» вдвічі за 30 днів')
+    nav_sort = models.CharField(
+        max_length=8, default='usage', verbose_name='Порядок лівої колонки',
+        choices=[('usage', '🔥 За вживанням — часті вгорі'), ('count', '🔢 За кількістю листів'),
+                 ('name', '🔤 За назвою'), ('order', '⚙ Як у налаштуваннях категорій')])
 
     # Auto-reply
     auto_reply_enabled = models.BooleanField(

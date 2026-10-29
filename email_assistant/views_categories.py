@@ -14,9 +14,37 @@ from email_assistant import work_categories
 COLOR_RE = re.compile(r'^#[0-9a-fA-F]{6}$')
 
 
+@staff_member_required
+@require_POST
+def nav_pref_view(request):
+    """⭐ обране й вживання лівої колонки — лише для себе: POST {action: pin | unpin | up | down | use, key}."""
+    from email_assistant import nav_prefs
+    from email_assistant.models import EmailSettings
+    try:
+        data = json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    action, key = data.get('action'), str(data.get('key') or '')
+    if action not in ('pin', 'unpin', 'up', 'down', 'use') or not nav_prefs.valid(key):
+        return JsonResponse({'ok': False, 'error': 'Невідома дія або пункт'}, status=400)
+    es = EmailSettings.get_for_user(request.user)
+    if action == 'use':
+        nav_prefs.record_use(es, key)
+        return JsonResponse({'ok': True})
+    return JsonResponse({'ok': True, 'pinned': nav_prefs.change(es, action, key)})
+
+
 def _mails(account, cat):
     from email_assistant.views import ALL_FOLDERS, _build_qs
     return _build_qs(account, ALL_FOLDERS).filter(work_category=cat)
+
+
+def _nav_ordered(user, cats) -> list:
+    """Свої категорії в порядку лівої колонки користувача (⭐ обране, далі за вживанням / назвою …)."""
+    from email_assistant import nav_prefs
+    from email_assistant.models import EmailSettings
+    return nav_prefs.ordered(list(cats), EmailSettings.get_for_user(user), lambda c: f'wc:{c.pk}',
+                             name_of=lambda c: c.name)
 
 
 def _lines(text) -> str:
@@ -152,7 +180,7 @@ def message_why_view(request, message_pk):
         'customer': _customer_json(customer),
         'customer_suggest': _customer_json(by_address) if by_address and by_address != customer else None,
         'open_projects': open_projects,
-        'categories': [cat_json(c) for c in MailCategory.objects.filter(is_active=True)],
+        'categories': [cat_json(c) for c in _nav_ordered(request.user, MailCategory.objects.filter(is_active=True))],
         'can_change': request.user.has_perm('email_assistant.change_mailcategory'),
     })
 

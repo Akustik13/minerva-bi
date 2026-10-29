@@ -115,11 +115,12 @@ def _forwarded(msg, own=None):
     if not (is_own(msg.from_email, own) or msg.category == "internal"):
         return None, (f"тип співрозмовника — {labels.get(msg.category, msg.category or 'ще не визначено')}: "
                       "запити шукаються лише від клієнтів і нових контактів")
-    fw = forwarded(msg.body_text)
+    fw = forwarded(msg.body_text, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні
     if fw is None:
+        inner = forwarded(msg.body_text)
+        if inner is not None:
+            return None, f"переслано лише зі своїх адрес ({inner['from']}) — листа ззовні всередині не знайдено"
         return None, "лист від своєї адреси, і пересланого листа з «Von: / From:» та адресою в ньому не знайдено"
-    if is_own(fw["from"], own):
-        return None, f"переслано від своєї адреси {fw['from']}"
     kind = address_category(msg.account_id, fw["from"])
     if kind not in CATEGORIES:
         return None, f"переслано від {fw['from']} — це {labels.get(kind, kind)}, а не клієнт чи новий контакт"

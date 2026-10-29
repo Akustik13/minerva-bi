@@ -131,15 +131,28 @@ class LifecycleTests(OffersBase):
         rev = services.generate_document(offer)
         text = "\n".join(p.text for p in Document(rev.docx_file.path).paragraphs)
         cells = "\n".join(c.text for t in Document(rev.docx_file.path).tables for r in t.rows for c in r.cells)
-        self.assertIn(f"Angebotsnummer: {offer.number}", text)                # бланк Commercial Invoice
-        self.assertIn("Kunde:", cells)
-        self.assertIn("Anbieter:", _all_text(rev.docx_file.path))          # блок продавця — вкладена таблиця
-        self.assertIn("Summe netto: 2 250,00 EUR", text)                     # 1 250 + доставка 1 000
-        self.assertIn("Gesamtbetrag: 2 677,50 EUR", text)
-        self.assertIn("ANT-100", cells)
+        self.assertIn(f"Angebotsnr.: \t{offer.number}", text)              # бланк Commercial Invoice як Quotation
+        self.assertIn("Lieferadresse (Empfänger/Käufer):", cells)
+        self.assertIn("Absender (Verkäufer):", _all_text(rev.docx_file.path))   # блок продавця — вкладена таблиця
+        self.assertIn("Rechnungsadresse: Client GmbH, Hauptstr. 1, 10115 Berlin, Germany", text)
+        self.assertIn("Summe netto", cells)                                   # рядок таблиці: 1 250 + доставка 1 000
+        self.assertIn("2.250,00", cells)
+        self.assertIn("Verpackung und Versand", cells)
+        self.assertIn("Gesamtbetrag: 2.677,50 EUR", text)                    # ПДВ 19 % — під таблицею
+        self.assertIn("Antenna 2.4 GHz ANT-100", cells)
         self.assertIn("auf Anfrage", cells)
-        self.assertIn("Lieferzeit: 3 Wochen", cells)
+        self.assertIn("3 Wochen", cells)
+        self.assertIn("Alle Preise verstehen sich zzgl. MwSt.", text)
+        self.assertNotIn("Zahlungsinformationen", text)                       # реквізитів не задано — блоку немає
         self.assertNotIn("{{", text + cells)
+        from offers.models import OfferSettings
+        s = OfferSettings.get()
+        s.payment_info = "Beneficiary: Sevskiy GmbH\nIBAN: DE00 0000"
+        s.save()
+        rev = services.generate_document(offer)
+        text = "\n".join(p.text for p in Document(rev.docx_file.path).paragraphs)
+        self.assertIn("Zahlungsinformationen:", text)
+        self.assertIn("Beneficiary: Sevskiy GmbH\nIBAN: DE00 0000", text)
 
     def test_accept_creates_order(self):
         offer = services.new_offer(customer=self.customer, user=self.user)
@@ -457,6 +470,25 @@ class ForwardedQuoteRequestTests(QuoteMailBase):
         for m in (supplier, colleague, plain):
             self.assertIsNone(self.qr(m), m.subject)
 
+    def test_colleague_forwards_own_forward(self):
+        """«WG: FW: …» — колега переслав свій же FW: відправник — клієнт усередині, а не своя адреса."""
+        inner = self.FW.format(frm="procurement10@moduletp.example")
+        body = ("Mit freundlichen Grüßen\nDr. Sergey Sevskiy\n\n-----Ursprüngliche Nachricht-----\n"
+                "Von: Dr. Sergey Sevskiy <" + ME + ">\nGesendet: Dienstag, 28. Oktober 2026 17:20\n"
+                "An: slava@sevskiy.example\nBetreff: FW: Filters\n\n" + inner)
+        m = self.mail("WG: FW: Filters", body, frm=ME)
+        qr = self.qr(m)
+        self.assertIsNotNone(qr)
+        self.assertTrue(qr.reason.startswith("переслано від procurement10@moduletp.example"), qr.reason)
+        data = services.quick_prefill(m.thread)
+        self.assertEqual(data["contact_email"], "procurement10@moduletp.example")
+        self.assertEqual(data["lines"][0]["qtys"], "35; 100")
+        own_only = self.mail("WG: intern", body.replace("procurement10@moduletp.example", ME), frm=ME)
+        from offers import detection
+        self.assertIn("лише зі своїх адрес", detection.explain(own_only)["reason"])
+        r = self.client.post(f"/offers/api/message/{own_only.pk}/rescan/").json()
+        self.assertEqual((r["ok"], r["state"]), (True, "none"))
+
     def test_angebot_contact_and_customer_from_forwarded_sender(self):
         from crm.models import Customer
         buyer = Customer.objects.create(name="Denys", company="SL Tire", email="procurement10@moduletp.example")
@@ -499,16 +531,15 @@ class QuickOfferTests(QuoteMailBase):
         text = "\n".join(p.text for p in doc.paragraphs)
         cells = "\n".join(c.text for t in doc.tables for r in t.rows for c in r.cells)
         self.assertIn("Angebot / Quotation", text)                        # обома мовами
-        self.assertIn("Menge / Qty", cells)
-        self.assertIn("35 Stk\n100 Stk", cells)                           # ступені — рядками в комірці
-        self.assertIn("8,00", cells)
-        self.assertIn("Staffelpreise", text)
-        self.assertIn("Tiered prices", text)
+        self.assertIn("Menge, Einh.\nQty, Units", cells)
+        rows = [[c.text for c in r.cells] for r in doc.tables[1].rows]
+        self.assertIn(["1", "Antenna 2.4 GHz ANT-100", "35", "10,00", "350,00", ""], rows)   # кожна к-сть — позиція
+        self.assertIn(["2", "Antenna 2.4 GHz ANT-100", "100", "8,00", "800,00", ""], rows)
+        self.assertNotIn("Summe netto", cells)                            # ступені — варіанти, суми немає
         self.assertIn("Sevskiy GmbH", _all_text(rev.docx_file.path))     # бланк Commercial Invoice
-        self.assertIn("Kunde / Customer:", cells)
+        self.assertIn("Ship to (Receiver/Buyer):", cells)
         self.assertIn("Client GmbH", cells)
         self.assertNotIn("{{", text + cells)
-        self.assertNotIn("Ship to", cells)
 
     def test_prefill_from_forwarded_mail_and_create(self):
         from offers.models import QuoteRequest
@@ -634,12 +665,14 @@ class OfferTemplateTests(QuoteMailBase):
         self.assertEqual(r.status_code, 200)
         self.assertIn("angebot_template.docx", r["Content-Disposition"])
         current = b"".join(r.streaming_content)
-        self.assertIn("{{ L.customer }}", "".join(c.text for c in Document(BytesIO(current)).tables[0]._cells))   # бланк CI зі змінними
+        self.assertIn("{{ L.ship_to }}", "".join(c.text for c in Document(BytesIO(current)).tables[0]._cells))   # бланк CI зі змінними
         sample = self.client.get("/offers/template/sample/")
         self.assertEqual(sample.status_code, 200)
         doc = Document(BytesIO(sample.content))
-        cells = "\n".join(c.text for t in doc.tables for row in t.rows for c in row.cells)
-        self.assertIn("35 Stk\n100 Stk", cells)
+        rows = [[c.text for c in r.cells] for r in doc.tables[1].rows]
+        self.assertIn(["1", "Filter FT220407", "35", "12,50", "437,50", "1-2"], rows)    # як на бланку Quotation
+        self.assertIn(["2", "Filter FT220407", "100", "10,90", "1.090,00", "3-4"], rows)
+        self.assertIn(["3", "Packaging and Shipping Costs", "1", "30,00", "30,00", ""], rows)
         bad = Document()
         bad.add_paragraph("{{ unclosed")
         buf = BytesIO()
@@ -747,22 +780,23 @@ class PricingSourcesTests(QuoteMailBase):
                                      {"sku": "CAB-7", "qtys": "10; 20", "lead_time": "1 Woche; 3 Wochen"}],
                                     self.user, offer=offer)
         ant = offer.lines.get(sku="ANT-100")
-        self.assertEqual([t["lead_time"] for t in ant.tiers], ["ab Lager", "14 Tage"])   # 35 є, 100 — ні
+        self.assertEqual([t["lead_time"] for t in ant.tiers], ["ab Lager", "2-3"])   # 35 є, 100 — 14 днів ≈ 2-3 тижні
         self.assertEqual(ant.lead_time, "ab Lager")
         self.assertIn("доступно 50 шт", ant.lead_note)
         flt = offer.lines.get(sku="FLT-9")
-        self.assertEqual((flt.lead_time, flt.price_source), ("21 Tage", OfferLine.DIGIKEY))   # картка товару
+        self.assertEqual((flt.lead_time, flt.price_source), ("3-4", OfferLine.DIGIKEY))   # картка товару, тижні
         self.assertEqual(flt.description, "Filter 9")
         cab = offer.lines.get(sku="CAB-7")
         self.assertEqual([t["lead_time"] for t in cab.tiers], ["1 Woche", "3 Wochen"])      # вручну через «;»
         rev = services.generate_document(offer)
         cells = "\n".join(c.text for t in Document(rev.docx_file.path).tables for r in t.rows for c in r.cells)
-        self.assertIn("35 Stk: ab Lager\n100 Stk: 14 Tage", cells)
+        rows = [[c.text for c in r.cells] for r in Document(rev.docx_file.path).tables[1].rows]
+        self.assertEqual([r[5] for r in rows if r[1].startswith("Antenna")], ["ab Lager", "2-3"])
         self.assertEqual(services.quick_from_offer(offer)["lines"][2]["lead_time"], "1 Woche; 3 Wochen")
         self.assertEqual(services.quick_from_offer(offer)["lines"][0]["lead_time"], "")    # з Minerva — знову
         offer2 = services.new_offer(customer=self.customer, user=self.user, language="en", lead_mode="digikey")
         line = services.add_line(offer2, product=self.flt, qty=5)
-        self.assertEqual(line.lead_time, "11 days")
+        self.assertEqual(line.lead_time, "2-3")
         self.assertTrue(line.lead_note.startswith("DigiKey Marketplace"), line.lead_note)
 
     def test_production_request_kind(self):
@@ -797,7 +831,7 @@ class PricingSourcesTests(QuoteMailBase):
         d = self.client.get("/offers/api/price/", {"sku": "FLT-9", "qtys": "1; 100", "currency": "EUR",
                                                     "language": "en"}).json()
         self.assertEqual([(t["unit_price"], t["group"]) for t in d["tiers"]], [("18", "digikey"), ("13.5", "digikey")])
-        self.assertEqual(d["tiers"][0]["lead_time"], "21 days")
+        self.assertEqual(d["tiers"][0]["lead_time"], "3-4")
         self.assertEqual(d["digikey"]["title"], "Bandpass filter 9")
         d = self.client.get("/offers/api/price/", {"sku": "FT220407", "qtys": "35"}).json()
         self.assertEqual((d["found"], d["kind"]), (False, "production"))
@@ -812,3 +846,16 @@ class PricingSourcesTests(QuoteMailBase):
         self.assertEqual(set(rows), {"ANT-100", "FLT-9", "FT220407"})          # VAT ID з підпису — не артикул
         self.assertEqual({r["qtys"] for r in rows.values()}, {"35; 100"})      # обидві кількості — кожній позиції
         self.assertEqual(rows["FT220407"]["description"], "Filter FT220407")
+
+    def test_article_search_from_stock(self):
+        Product.objects.create(sku="FT220407", name="Bandpass filter 2.2 GHz")
+        Product.objects.create(sku="FT-2201", name="Filter 2.2", category="filter")
+        Product.objects.create(sku="SOFT-1", name="Software licence")
+        r = self.client.get("/offers/api/products/", {"q": "FT"}).json()["results"]
+        self.assertEqual([x["sku"] for x in r[:2]], ["FT-2201", "FT220407"])        # артикул починається з FT
+        self.assertIn("SOFT-1", [x["sku"] for x in r])                              # містить — нижче
+        self.assertEqual(services.search_products("ft 2204")[0]["sku"], "FT220407")   # без розділювачів
+        self.assertEqual([x["sku"] for x in services.search_products("filter 9")], ["FLT-9"])   # слова — у назві
+        dk = services.search_products("only")
+        self.assertEqual((dk[0]["sku"], dk[0]["source"]), ("DK-ONLY", "digikey"))     # офер DigiKey без товару
+        self.assertEqual(services.search_products("  "), [])

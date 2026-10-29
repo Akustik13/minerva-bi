@@ -51,7 +51,9 @@
 .of-res { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--bg-card); border: 1px solid var(--border-strong);
           border-radius: 6px; max-height: 240px; overflow: auto; display: none; }
 .of-res div { padding: 6px 10px; cursor: pointer; font-size: 13px; }
-.of-res div:hover { background: var(--bg-hover); }
+.of-res div:hover, .of-res div.on { background: var(--bg-hover); }
+#of-sku-res { position: fixed; z-index: 50; max-height: 320px; min-width: 380px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+#of-sku-res .sub { color: var(--text-muted); font-size: 11px; }
 </style>
 {% endblock %}
 
@@ -90,6 +92,11 @@
           <div class="of-origin">є на складі — «ab Lager», інакше термін поставки</div></div>
         <div class="of-field"><label class="of-label">Дійсний, днів</label>
           <input class="of-input" type="number" name="valid_days" value="{{ data.valid_days }}" min="0" max="365"></div>
+        <div class="of-field"><label class="of-label">Підписує</label>
+          <input class="of-input" name="signer_name" value="{{ data.signer_name }}" placeholder="відповідальний">
+          <div class="of-origin">як у Commercial Invoice — підпис і печатка з бланка</div></div>
+        <div class="of-field"><label class="of-label">Посада</label>
+          <input class="of-input" name="signer_position" value="{{ data.signer_position }}" placeholder="CEO"></div>
         {% if data.project %}<div class="of-field"><label class="of-label">Проєкт</label>
           <div class="of-muted" style="padding-top:8px">📁 {{ data.project.code }} {{ data.project.name }}</div></div>{% endif %}
       </div>
@@ -110,6 +117,9 @@
         <div class="of-field"><label class="of-label">Email</label>
           <input class="of-input" name="contact_email" id="of-email" value="{{ data.contact_email }}">
           {% if data.origin.email %}<div class="of-origin">↳ {{ data.origin.email }}</div>{% endif %}</div>
+        <div class="of-field"><label class="of-label">Телефон</label>
+          <input class="of-input" name="contact_phone" id="of-phone" value="{{ data.contact_phone }}">
+          {% if data.origin.phone %}<div class="of-origin">↳ {{ data.origin.phone }}</div>{% endif %}</div>
         <div class="of-field" style="grid-column:1/-1">
           <label class="of-label" style="display:flex;align-items:center;gap:8px">Адреса
             <button type="button" class="of-btn sm" onclick="ofFillCustomer(true)" title="Адреса й контакт з картки клієнта CRM">⇄ з картки клієнта</button></label>
@@ -123,7 +133,7 @@
       {% if data.origin.lines %}<div class="of-origin" style="margin:-6px 0 8px">↳ {{ data.origin.lines }}</div>{% endif %}
       <div class="of-scroll"><table class="of-lines"><thead><tr>
         <th>Pos.</th><th>Artikel</th><th>Beschreibung</th><th>Menge / ступені<br><span style="font-weight:400">35; 100</span></th>
-        <th>Einzelpreis<br><span style="font-weight:400">порожньо — Minerva</span></th><th>Einh.</th><th>Lieferzeit<br><span style="font-weight:400">порожньо — Minerva</span></th>
+        <th>Einzelpreis<br><span style="font-weight:400">порожньо — Minerva</span></th><th>Einh.</th><th>Lieferzeit, тижні<br><span style="font-weight:400">порожньо — Minerva</span></th>
         <th style="text-align:right">Gesamt</th><th></th>
       </tr></thead><tbody id="of-lines"></tbody></table></div>
       <button type="button" class="of-btn sm" style="margin-top:6px" onclick="ofAddLine()">＋ Позиція</button>
@@ -194,6 +204,7 @@
   </div>
 </div>
 
+<div class="of-res" id="of-sku-res"></div>
 {{ lines|json_script:"of-lines-data" }}
 {{ price_breaks|json_script:"of-breaks" }}
 <script>
@@ -261,7 +272,7 @@
       var t = lineTotal(l);
       html += '<tr>'
         + '<td class="num">' + (j + 1) + '</td>'
-        + '<td style="width:130px">' + inp(j, 'sku', l.sku, 'ANT-100') + '</td>'
+        + '<td style="width:130px">' + inp(j, 'sku', l.sku, 'FT… — пошук') + '</td>'
         + '<td>' + inp(j, 'description', l.description, l._name || '') + '</td>'
         + '<td style="width:110px">' + inp(j, 'qtys', l.qtys, '35; 100') + '</td>'
         + '<td style="width:130px">' + inp(j, 'prices', l.prices, l._hint && l._hint.length ? l._hint.map(function(x){ return x.unit_price ? price(x.unit_price) : '?'; }).join('; ') : '') + '</td>'
@@ -340,6 +351,56 @@
     }).join('; ');
     render(); hints(j);
   };
+  // 🔎 артикул зі складу: «FT» → усі FT… (і офери DigiKey); ↑ ↓ Enter — вибрати, Esc — закрити
+  var skuRes = document.getElementById('of-sku-res'), skuTimer = null, skuFor = null, skuItems = [], skuOn = -1;
+  function skuClose(){ skuRes.style.display = 'none'; skuFor = null; skuItems = []; skuOn = -1; }
+  function skuPick(it){
+    var j = skuFor ? +skuFor.dataset.l : -1;
+    if (j < 0 || !lines[j]) return skuClose();
+    lines[j].sku = it.sku;
+    if (!String(lines[j].description || '').trim()) lines[j].description = it.name || '';
+    skuClose(); render(); hints(j);
+  }
+  function skuShow(input, items){
+    skuFor = input; skuItems = items; skuOn = -1; skuRes.innerHTML = '';
+    if (!items.length) { skuRes.innerHTML = '<div class="sub">нічого не знайдено — артикул піде як є (🏭, якщо його немає ніде)</div>'; }
+    items.forEach(function(it, i){
+      var div = document.createElement('div');
+      div.innerHTML = '<b>' + esc(it.sku) + '</b> — ' + esc(it.name) + ' <span class="sub">'
+        + (it.source === 'digikey' ? '🔷 DigiKey' : '📦 ' + esc(it.available) + ' шт' + (it.price ? ' · ' + esc(price(it.price)) : '')
+           + (it.category && it.category !== 'other' ? ' · ' + esc(it.category) : '')) + '</span>';
+      div.onmousedown = function(e){ e.preventDefault(); skuPick(it); };
+      skuRes.appendChild(div);
+    });
+    var r = input.getBoundingClientRect();
+    skuRes.style.left = r.left + 'px'; skuRes.style.top = (r.bottom + 2) + 'px';
+    skuRes.style.display = 'block';
+  }
+  function skuSearch(input){
+    clearTimeout(skuTimer);
+    var q = input.value.trim();
+    if (!q) return skuClose();
+    skuTimer = setTimeout(async function(){
+      try {
+        var d = await (await fetch('{% url "offers:products" %}?q=' + encodeURIComponent(q), {credentials: 'same-origin'})).json();
+        if (input === document.activeElement && input.value.trim() === q) skuShow(input, d.results || []);
+      } catch (e) {}
+    }, 200);
+  }
+  body.addEventListener('input', function(e){ if (e.target.dataset.k === 'sku') skuSearch(e.target); });
+  body.addEventListener('focusin', function(e){ if (e.target.dataset.k === 'sku' && e.target.value.trim()) skuSearch(e.target); });
+  body.addEventListener('focusout', function(e){ if (e.target.dataset.k === 'sku') setTimeout(skuClose, 150); });
+  body.addEventListener('keydown', function(e){
+    if (e.target.dataset.k !== 'sku' || skuRes.style.display !== 'block' || !skuItems.length) return;
+    var rows = skuRes.querySelectorAll('div');
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      skuOn = (skuOn + (e.key === 'ArrowDown' ? 1 : -1) + skuItems.length) % skuItems.length;
+      rows.forEach(function(r, i){ r.classList.toggle('on', i === skuOn); });
+    } else if (e.key === 'Enter' && skuOn >= 0) { e.preventDefault(); skuPick(skuItems[skuOn]); }
+    else if (e.key === 'Escape') skuClose();
+  });
+  window.addEventListener('scroll', skuClose, true);
   window.ofAddLine = function(){ lines.push({sku:'', description:'', qtys:'1', prices:'', unit:'Stk', lead_time:''}); render(); };
   window.ofDelLine = function(j){ lines.splice(j, 1); render(); };
 
@@ -366,7 +427,7 @@
     var id = document.getElementById('of-customer').value;
     if (!id) { alert('Спершу виберіть клієнта CRM'); return; }
     var c = await (await fetch('/offers/api/customer/' + id + '/', {credentials: 'same-origin'})).json();
-    [['of-address', c.address], ['of-contact', c.name], ['of-email', c.email]].forEach(function(p){
+    [['of-address', c.address], ['of-contact', c.name], ['of-email', c.email], ['of-phone', c.phone]].forEach(function(p){
       var el = document.getElementById(p[0]);
       if (p[1] && (replace || !el.value.trim())) el.value = p[1];
     });

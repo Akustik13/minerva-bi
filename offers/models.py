@@ -54,6 +54,10 @@ class OfferSettings(models.Model):
     footer_text = models.TextField(
         "Нижній колонтитул", blank=True, default="",
         help_text="Банк, IBAN/BIC, реєстр, керівник — кожне з нового рядка.")
+    payment_info = models.TextField(
+        "Платіжні реквізити (Payment information)", blank=True, default="",
+        help_text="Блок під умовами Angebot, жирним, кожне з нового рядка — напр. «Beneficiary: …», «Bank Name: …», "
+                  "«IBAN: …», «BIC / SWIFT: …». Порожньо — блоку немає.")
     email_subject = models.CharField("Тема листа", max_length=200, default="Angebot {number}",
                                      help_text="Змінні: {number} {customer}")
     template = models.FileField(
@@ -103,11 +107,15 @@ class Offer(models.Model):
                                  related_name="offers", verbose_name="Клієнт")
     contact_name = models.CharField("Контактна особа", max_length=255, blank=True, default="")
     contact_email = models.EmailField("Email", blank=True, default="")
+    contact_phone = models.CharField("Телефон контакту", max_length=50, blank=True, default="")
     billing_address = models.TextField("Адреса клієнта", blank=True, default="")
     project = models.ForeignKey("projects.Project", null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name="offers", verbose_name="Проєкт")
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                               related_name="owned_offers", verbose_name="Відповідальний")
+    signer_name = models.CharField("Підписує", max_length=150, blank=True, default="",
+                                   help_text="Як у Commercial Invoice; порожньо — відповідальний.")
+    signer_position = models.CharField("Посада", max_length=100, blank=True, default="")
     language = models.CharField("Мова документа", max_length=5, choices=LANGUAGES, default="de",
                                 help_text="«Deutsch + English» — один документ з підписами обома мовами")
     currency = models.CharField("Валюта", max_length=3, default="EUR")

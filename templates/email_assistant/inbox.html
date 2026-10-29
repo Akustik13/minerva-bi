@@ -97,7 +97,16 @@
 .em-nav-sm{color:var(--text-dim);font-size:11px}
 #em-wc-ctx{display:none;position:fixed;z-index:99999;background:var(--bg-card);border:1px solid var(--border-strong);
   border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.35);padding:4px 0;min-width:250px}
-#em-wc-ctx.open,#em-pr-ctx.open{display:block}
+#em-wc-ctx.open,#em-pr-ctx.open,#em-nv-ctx.open{display:block}
+#em-nv-ctx{display:none;position:fixed;z-index:99999;background:var(--bg-card);border:1px solid var(--border-strong);
+  border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.35);padding:4px 0;min-width:240px}
+#em-nv-ctx .em-ctx-item.on{font-weight:700}
+.em-nav-star{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:12px;padding:0 2px;margin-left:2px;
+  visibility:hidden;flex-shrink:0;line-height:1}
+.em-nav-item:hover .em-nav-star{visibility:visible}
+.em-nav-star.on{color:#f5b301}
+#em-nav-pins .em-nav-star.on{visibility:visible;opacity:.75}
+#em-nav-pins{border-bottom:1px dashed var(--border-strong);margin-bottom:4px;padding-bottom:4px}
 .em-cust-src{display:flex;flex-wrap:wrap;gap:4px;padding:2px 12px 4px}
 .em-src-chip{font-size:10px;border:1px solid var(--border-strong);border-radius:10px;padding:1px 7px;background:transparent;
   color:var(--text-dim);cursor:pointer}
@@ -384,11 +393,13 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         <div class="em-folders-divider em-nav-head" data-sec="cats">
           <button class="em-folders-divider-toggle em-nav-tg" type="button">▾</button>
           <span>🏷 {% trans "Категорії" %}</span>
+          <button class="em-folders-divider-add" type="button" onclick="return showNavSort(event)" title="{% trans "Порядок списку: ⭐ обране зверху, решта — за вживанням, кількістю листів або назвою" %}">↕</button>
           <a class="em-folders-divider-add" href="/admin/email_assistant/mailcategory/" title="{% trans "Свої категорії й правила" %}">⚙</a>
         </div>
         <div class="em-nav-body" data-sec="cats">
+          <div id="em-nav-pins" hidden><div class="em-nav-sub" title="{% trans "Правий клік або ☆ біля пункту — у топ / прибрати; ⬆ ⬇ — порядок" %}">⭐ {% trans "Обране" %}</div></div>
           {% for c, n, unread in work_categories %}
-          <a href="#" class="em-folder-link em-nav-item em-drop{% if work_filter.pk == c.pk %} active{% elif c.pk in hidden_wcats %} em-nav-hid{% endif %}" data-wcat="{{ c.pk }}"
+          <a href="#" class="em-folder-link em-nav-item em-drop{% if work_filter.pk == c.pk %} active{% elif c.pk in hidden_wcats %} em-nav-hid{% endif %}" data-wcat="{{ c.pk }}" data-nav="wc:{{ c.pk }}"
              data-n="{{ n }}" data-unread="{{ unread }}" data-hidden="{% if c.pk in hidden_wcats %}1{% endif %}"
              onclick="return emNav(event, 'wcat', '{{ c.pk }}')" oncontextmenu="return showWcCtx(event, this)"
              title="{{ c.name }} — {% trans "клік: показати; перетягніть лист сюди — віднести; правий клік — меню" %}">
@@ -402,23 +413,24 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
           {% endif %}
           {% if work_categories %}
           <a href="#" class="em-folder-link em-nav-item{% if no_category %} active{% endif %}" onclick="return emNav(event, 'wcat', '0')"
-             title="{% trans "Листи, яких ще немає в жодній своїй категорії" %}">
+             data-nav="nocat" oncontextmenu="return showNavCtx(event, this)" title="{% trans "Листи, яких ще немає в жодній своїй категорії" %}">
             <span class="em-nav-dot" style="background:transparent;border:1px dashed var(--text-dim)"></span>
             <span class="em-folder-label">{% trans "Без своєї категорії" %}</span>{% if no_category_count %}<span class="em-nav-n">{{ no_category_count }}</span>{% endif %}
           </a>
           {% endif %}
-          <a href="/email/sort/" class="em-folder-link em-nav-item" title="{% trans "Minerva згрупує листи без категорії (правила + AI) — ви приймаєте, правите або відхиляєте" %}">
+          <a href="/email/sort/" class="em-folder-link em-nav-item" data-nav="sort" onclick="navUse('sort')" oncontextmenu="return showNavCtx(event, this)" title="{% trans "Minerva згрупує листи без категорії (правила + AI) — ви приймаєте, правите або відхиляєте" %}">
             <span class="em-folder-icon">🧠</span><span class="em-folder-label">{% trans "Розібрати пошту" %}</span>
           </a>
-          {% if quote_count %}
+          {% if quote_count or "quote" in email_settings.nav_pinned %}
           <a href="#" class="em-folder-link em-nav-item{% if quote_filter %} active{% endif %}" onclick="return emNav(event, 'quote', '1')"
-             title="{% trans "Листи, схожі на запит пропозиції, по яких ще немає Angebot" %}">
-            <span class="em-folder-icon">📝</span><span class="em-folder-label">{% trans "Запити пропозицій" %}</span><span class="em-badge">{{ quote_count }}</span>
+             data-nav="quote" oncontextmenu="return showNavCtx(event, this)" title="{% trans "Листи, схожі на запит пропозиції, по яких ще немає Angebot" %}">
+            <span class="em-folder-icon">📝</span><span class="em-folder-label">{% trans "Запити пропозицій" %}</span>{% if quote_count %}<span class="em-badge">{{ quote_count }}</span>{% endif %}
           </a>
           {% endif %}
           <div class="em-nav-sub">{% trans "Хто пише" %}</div>
           {% for key, label, n, unread in categories %}{% if n %}
-          <a href="#" class="em-folder-link em-nav-item{% if cat_filter == key %} active{% endif %}" onclick="return emNav(event, 'cat', '{{ key }}')">
+          <a href="#" class="em-folder-link em-nav-item{% if cat_filter == key %} active{% endif %}" onclick="return emNav(event, 'cat', '{{ key }}')"
+             data-nav="kind:{{ key }}" oncontextmenu="return showNavCtx(event, this)">
             <span class="em-folder-label">{{ label }}</span>
             {% if unread %}<span class="em-badge">{{ unread }}</span>{% else %}<span class="em-nav-n">{{ n }}</span>{% endif %}
           </a>
@@ -742,6 +754,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 </div>
 
 {{ mail_customers|json_script:"em-customers-data" }}
+{{ email_settings.nav_pinned|json_script:"em-nav-pins-data" }}
 
 <!-- Context menu -->
 <div id="em-ctx">
@@ -802,6 +815,9 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 <div id="em-wc-ctx" onclick="event.stopPropagation()">
   <div class="em-ctx-sub-hd" id="em-wc-hd"></div>
   <div class="em-ctx-item" onclick="wcAction('show')">👁 {% trans "Показати листи категорії" %}</div>
+  <div class="em-ctx-item" id="em-wc-pin" onclick="wcAction('pin')"></div>
+  <div class="em-ctx-item" id="em-wc-up" onclick="wcAction('up')">⬆ {% trans "Вище в обраному" %}</div>
+  <div class="em-ctx-item" id="em-wc-down" onclick="wcAction('down')">⬇ {% trans "Нижче в обраному" %}</div>
   <div class="em-ctx-item" id="em-wc-read" onclick="wcAction('read')">✓ {% trans "Позначити всі прочитаними" %}</div>
   <div class="em-ctx-sep"></div>
   <div class="em-ctx-item" onclick="wcAction('rules')">🔍 {% if can_change_work_category %}{% trans "Правила (фільтр) — переглянути й змінити…" %}{% else %}{% trans "Правила (фільтр)…" %}{% endif %}</div>
@@ -814,6 +830,21 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" id="em-wc-hide" onclick="wcAction('hide')">🙈 {% trans "Сховати з цього списку" %}</div>
   <div class="em-ctx-item danger" onclick="wcAction('trash')">🗑 {% trans "Усі листи категорії в Кошик…" %}</div>
   {% if can_delete_work_category %}<div class="em-ctx-item danger" onclick="wcAction('delete')">❌ {% trans "Видалити категорію…" %}</div>{% endif %}
+</div>
+<!-- Правий клік на інших пунктах «🏷 Категорії» і «↕» — ⭐ обране й порядок (лише для себе, nav_prefs.py) -->
+<div id="em-nv-ctx" onclick="event.stopPropagation()">
+  <div class="em-ctx-sub-hd" id="em-nv-hd"></div>
+  <div id="em-nv-item">
+    <div class="em-ctx-item" id="em-nv-pin" onclick="nvAction('pin')"></div>
+    <div class="em-ctx-item" id="em-nv-up" onclick="nvAction('up')">⬆ {% trans "Вище в обраному" %}</div>
+    <div class="em-ctx-item" id="em-nv-down" onclick="nvAction('down')">⬇ {% trans "Нижче в обраному" %}</div>
+    <div class="em-ctx-sep"></div>
+  </div>
+  <div class="em-ctx-sub-hd">↕ {% trans "Порядок решти (⭐ обране — завжди зверху)" %}</div>
+  <div class="em-ctx-item" data-sort="usage" onclick="navSort('usage')">🔥 {% trans "За вживанням — часті вгорі, рідкісні внизу" %}</div>
+  <div class="em-ctx-item" data-sort="count" onclick="navSort('count')">🔢 {% trans "За кількістю листів" %}</div>
+  <div class="em-ctx-item" data-sort="name" onclick="navSort('name')">🔤 {% trans "За назвою" %}</div>
+  <div class="em-ctx-item" data-sort="order" onclick="navSort('order')">⚙ {% trans "Як у налаштуваннях категорій" %}</div>
 </div>
 <!-- Правий клік на проєкті (ліва колонка) -->
 <div id="em-pr-ctx" onclick="event.stopPropagation()">
@@ -1322,12 +1353,110 @@ function applyMailFilter() {
 function emNav(ev, key, value) {
   if (ev) { ev.preventDefault(); ev.stopPropagation(); }
   var params = new URLSearchParams(location.search);
-  if (params.get(key) === String(value)) params.delete(key); else params.set(key, value);
+  if (params.get(key) === String(value)) params.delete(key);
+  else {
+    params.set(key, value);
+    var nk = key === 'wcat' ? (String(value) === '0' ? 'nocat' : 'wc:' + value) : key === 'quote' ? 'quote'
+      : key === 'cat' ? 'kind:' + value : '';
+    if (nk) navUse(nk);   // вживання — часті пункти піднімаються вгору
+  }
   if (key === 'wcat') params.delete('cat');
   if (key === 'cat') params.delete('wcat');
   params.delete('page');
   location.search = params.toString();
   return false;
+}
+/* ── ⭐ обране й порядок лівої колонки (лише для себе; сервер — nav_prefs.py) ── */
+var NAV_PINS = JSON.parse(document.getElementById('em-nav-pins-data').textContent || '[]');
+var NAV_SORT = '{{ email_settings.nav_sort|escapejs }}';
+function navUse(key) {
+  try { fetch('/email/nav/', {method: 'POST', keepalive: true, headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+                              body: JSON.stringify({action: 'use', key: key})}); } catch (e) {}
+}
+function _navEl(key) { return document.querySelector('#em-nav [data-nav="' + key + '"]'); }
+function _navPinsShow() {
+  var box = document.getElementById('em-nav-pins');
+  box.hidden = !box.querySelector('[data-nav]');
+  document.querySelectorAll('#em-nav [data-nav] .em-nav-star').forEach(function(s){
+    var on = NAV_PINS.indexOf(s.parentNode.dataset.nav) >= 0;
+    s.classList.toggle('on', on); s.textContent = on ? '★' : '☆';
+    s.title = on ? '{% trans "Прибрати з обраного" %}' : '{% trans "У топ — завжди зверху" %}';
+  });
+}
+function _navPlace() {   // обране — у блок «⭐ Обране» (у порядку закріплення), решта — на своє місце
+  var box = document.getElementById('em-nav-pins');
+  NAV_PINS.forEach(function(k){
+    var el = _navEl(k);
+    if (!el) return;
+    if (!el._home) { el._home = document.createComment('nav'); el.parentNode.insertBefore(el._home, el); }
+    el.classList.remove('em-nav-hid');
+    box.appendChild(el);
+  });
+  box.querySelectorAll('[data-nav]').forEach(function(el){
+    if (NAV_PINS.indexOf(el.dataset.nav) < 0 && el._home) el._home.parentNode.insertBefore(el, el._home);
+  });
+  _navPinsShow();
+}
+async function navPin(key, action) {
+  if (!action) action = NAV_PINS.indexOf(key) >= 0 ? 'unpin' : 'pin';
+  try {
+    var r = await fetch('/email/nav/', {method: 'POST', headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+                                        body: JSON.stringify({action: action, key: key})});
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    NAV_PINS = d.pinned; _navPlace();
+    if (action === 'pin') _showToast('⭐ {% trans "У топі — завжди зверху списку" %}');
+  } catch (e) { alert('❌ ' + e.message); }
+}
+(function(){
+  document.querySelectorAll('#em-nav [data-nav]').forEach(function(el){
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'em-nav-star';
+    b.onclick = function(ev){ ev.preventDefault(); ev.stopPropagation(); navPin(el.dataset.nav); };
+    var n = el.querySelector('.em-badge, .em-nav-n');
+    if (n) el.insertBefore(b, n); else el.appendChild(b);
+  });
+  _navPlace();
+})();
+var _nv = null;
+function _navMenu(ev, item) {
+  ev.preventDefault(); ev.stopPropagation();
+  var menu = document.getElementById('em-nv-ctx');
+  _nv = item;
+  document.getElementById('em-nv-item').style.display = item ? '' : 'none';
+  document.getElementById('em-nv-hd').textContent = item ? (item.querySelector('.em-folder-label') || item).textContent.trim()
+                                                         : '↕ {% trans "Порядок списку «🏷 Категорії»" %}';
+  if (item) {
+    var on = NAV_PINS.indexOf(item.dataset.nav) >= 0;
+    document.getElementById('em-nv-pin').textContent = on ? '☆ {% trans "Прибрати з обраного" %}' : '⭐ {% trans "У топ — завжди зверху" %}';
+    document.getElementById('em-nv-up').style.display = on ? '' : 'none';
+    document.getElementById('em-nv-down').style.display = on ? '' : 'none';
+  }
+  menu.querySelectorAll('[data-sort]').forEach(function(x){
+    x.classList.toggle('on', x.dataset.sort === NAV_SORT);
+    x.textContent = x.textContent.replace(/^✓ /, '');
+    if (x.dataset.sort === NAV_SORT) x.textContent = '✓ ' + x.textContent;
+  });
+  var x = ev.clientX, y = ev.clientY;
+  menu.classList.add('open');
+  if (x + menu.offsetWidth > window.innerWidth) x = window.innerWidth - menu.offsetWidth - 5;
+  if (y + menu.offsetHeight > window.innerHeight) y = Math.max(5, window.innerHeight - menu.offsetHeight - 5);
+  menu.style.left = x + 'px'; menu.style.top = y + 'px';
+  return false;
+}
+function showNavCtx(ev, el) { return _navMenu(ev, el); }
+function showNavSort(ev) { return _navMenu(ev, null); }
+document.addEventListener('click', function(){ var m = document.getElementById('em-nv-ctx'); if (m) m.classList.remove('open'); });
+function nvAction(action) {
+  document.getElementById('em-nv-ctx').classList.remove('open');
+  if (_nv) navPin(_nv.dataset.nav, action === 'pin' ? '' : action);
+}
+async function navSort(value) {
+  document.getElementById('em-nv-ctx').classList.remove('open');
+  if (value === NAV_SORT) return;
+  var r = await fetch('/email/settings/toggle/', {method: 'POST', headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+                                                  body: JSON.stringify({field: 'nav_sort', value: value})});
+  var d = await r.json();
+  if (d.ok) location.reload(); else alert('❌ ' + (d.error || ''));
 }
 /* ── правий клік на своїй категорії ── */
 var _wc = null;   // {pk, el}
@@ -1342,6 +1471,10 @@ function showWcCtx(ev, el) {
   read.textContent = '✓ {% trans "Позначити всі прочитаними" %}' + (unread ? ' (' + unread + ')' : '');
   read.classList.toggle('off', !unread);
   document.getElementById('em-wc-hide').textContent = hidden ? '👁 {% trans "Показувати в списку знову" %}' : '🙈 {% trans "Сховати з цього списку" %}';
+  var pinned = NAV_PINS.indexOf('wc:' + _wc.pk) >= 0;
+  document.getElementById('em-wc-pin').textContent = pinned ? '☆ {% trans "Прибрати з обраного" %}' : '⭐ {% trans "У топ — завжди зверху" %}';
+  document.getElementById('em-wc-up').style.display = pinned ? '' : 'none';
+  document.getElementById('em-wc-down').style.display = pinned ? '' : 'none';
   var x = ev.clientX, y = ev.clientY;
   menu.classList.add('open');
   if (x + menu.offsetWidth > window.innerWidth) x = window.innerWidth - menu.offsetWidth - 5;
@@ -1365,6 +1498,7 @@ async function wcAction(action) {
   var pk = _wc.pk, el = _wc.el;
   try {
     if (action === 'show') { emNav(null, 'wcat', pk); return; }
+    if (action === 'pin' || action === 'up' || action === 'down') { navPin('wc:' + pk, action === 'pin' ? '' : action); return; }
     if (action === 'rules') { wcOpen(pk); return; }
     if (action === 'icon') { await wcOpen(pk); document.getElementById('wc-icons').scrollIntoView({block: 'nearest'}); return; }
     var info = await _wcInfo(pk);
@@ -1534,13 +1668,20 @@ function _whyQuoteShow() {
   document.getElementById('why-quote-offer').style.display = _why.thread ? '' : 'none';
 }
 async function emWhyRescan() {
+  var btn = document.getElementById('why-quote-rescan'), label = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ {% trans "Перевіряю…" %}';
   try {
     var r = await fetch('/offers/api/message/' + _why.pk + '/rescan/', {method: 'POST', headers: {'X-CSRFToken': CSRF}});
     var d = await r.json();
     if (!d.ok) throw new Error(d.error || ('HTTP ' + r.status));
     _why.quote = d; _whyQuoteShow();
-    if (d.state === 'new') _showToast('📝 {% trans "Позначено як запит пропозиції" %}');
+    var now = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    var el = document.getElementById('why-quote');   // перевірено щойно — навіть якщо результат той самий
+    el.textContent = '↻ ' + now + ' · ' + el.textContent;
+    _showToast(d.state === 'new' ? '📝 {% trans "Позначено як запит пропозиції" %}'
+                                 : '↻ {% trans "Перевірено: усе ще не запит" %}');
   } catch (e) { document.getElementById('why-err').textContent = '❌ ' + e.message; }
+  btn.disabled = false; btn.textContent = label;
 }
 function emWhyOffer() { if (_why && _why.thread) window.open('/offers/quick/?thread=' + _why.thread, '_blank'); }
 function _whyCustomerShow() {

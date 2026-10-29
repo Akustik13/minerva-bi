@@ -78,6 +78,9 @@ def _quick_fields(request) -> dict:
             "lead_mode": P.get("lead_mode") if P.get("lead_mode") in dict(LEAD_MODES) else "auto",
             "contact_name": P.get("contact_name", "").strip()[:200],
             "contact_email": P.get("contact_email", "").strip()[:254],
+            "contact_phone": P.get("contact_phone", "").strip()[:50],
+            "signer_name": P.get("signer_name", "").strip()[:150],
+            "signer_position": P.get("signer_position", "").strip()[:100],
             "billing_address": P.get("billing_address", "").strip(),
             "currency": (P.get("currency", "").strip().upper() or "EUR")[:3],
             "valid_until": timezone.localdate() + datetime.timedelta(days=days), "shipping_cost": shipping,
@@ -237,6 +240,12 @@ def price_view(request):
 
 
 @staff_member_required
+def products_view(request):
+    """Пошук артикула зі складу для легкої форми: ?q=FT → товари (і офери DigiKey), що підходять."""
+    return JsonResponse({"results": services.search_products(request.GET.get("q", ""))})
+
+
+@staff_member_required
 def currency_view(request):
     """Валюта за країною клієнта (клієнт CRM, адреса, email) — для легкої форми."""
     from crm.models import Customer
@@ -253,4 +262,5 @@ def customer_view(request, pk):
     from crm.models import Customer
     c = get_object_or_404(Customer, pk=pk)
     return JsonResponse({"id": c.pk, "label": c.company or c.name, "name": c.name or "", "email": c.email or "",
+                         "phone": c.phone or "",
                          "address": services.customer_address(c)})

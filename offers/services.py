@@ -31,8 +31,11 @@ class OfferError(Exception):
 def customer_address(customer) -> str:
     if customer is None:
         return ""
+    from shop.countries import COUNTRIES
+    country = (customer.country or "").strip()      # «DE» → «Germany» (як на бланку Quotation)
+    country = COUNTRIES.get(country.upper(), {}).get("en", country) if len(country) == 2 else country
     parts = [customer.company or "", customer.name or "", customer.addr_street or "",
-             " ".join(p for p in (customer.addr_zip, customer.addr_city) if p), customer.country or ""]
+             " ".join(p for p in (customer.addr_zip, customer.addr_city) if p), country]
     seen, out = set(), []
     for p in parts:
         p = (p or "").strip()
@@ -52,8 +55,18 @@ def defaults(customer=None) -> dict:
         "intro_text": s.intro_text, "payment_terms": s.payment_terms, "delivery_terms": s.delivery_terms,
         "outro_text": s.outro_text,
         "contact_name": getattr(customer, "name", "") or "", "contact_email": getattr(customer, "email", "") or "",
-        "billing_address": customer_address(customer),
+        "contact_phone": getattr(customer, "phone", "") or "", "billing_address": customer_address(customer),
+        **dict(zip(("signer_name", "signer_position"), last_signer())),
     }
+
+
+def last_signer() -> tuple:
+    """Підписант і посада — як в останньому Commercial Invoice / пакувальному листі (підпис і печатка бланка)."""
+    try:
+        from shipping.services.packing_list_service import last_signer as _last
+        return _last()
+    except Exception:  # noqa: BLE001 — без доставки: підписує відповідальний
+        return "", ""
 
 
 def new_offer(*, customer=None, user=None, **fields) -> Offer:
@@ -242,9 +255,11 @@ def snapshot(offer) -> dict:
         "language": offer.language, "currency": offer.currency,
         "customer": {"id": offer.customer_id, "name": getattr(offer.customer, "name", ""),
                      "company": getattr(offer.customer, "company", "")},
-        "contact_name": offer.contact_name, "contact_email": offer.contact_email,
+        "contact_name": offer.contact_name, "contact_email": offer.contact_email, "contact_phone": offer.contact_phone,
         "billing_address": offer.billing_address,
-        "signer": (offer.owner.get_full_name() or offer.owner.get_username()) if offer.owner_id else "",
+        "signer": offer.signer_name or ((offer.owner.get_full_name() or offer.owner.get_username())
+                                        if offer.owner_id else ""),
+        "signer_position": offer.signer_position,
         "project": {"id": offer.project_id, "code": getattr(offer.project, "code", ""),
                     "name": getattr(offer.project, "name", "")} if offer.project_id else None,
         "intro_text": offer.intro_text, "payment_terms": offer.payment_terms,
@@ -436,9 +451,7 @@ def create_from_thread(thread, user=None) -> Offer:
     fw = None
     if source is not None and is_own(source.from_email, own):   # колега переслав лист клієнта (FW / WG)
         from email_assistant.quotes import forwarded
-        fw = forwarded(source.body_text)
-        if fw and is_own(fw["from"], own):
-            fw = None
+        fw = forwarded(source.body_text, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні
         if fw and customer is None:
             from email_assistant.crm_link import find_customer
             customer = find_customer([fw["from"]])
@@ -570,9 +583,7 @@ def thread_source(thread):
     customer = thread.crm_customer or (project.customer if project else None)
     fw = None
     if source is not None and is_own(source.from_email, own):
-        fw = forwarded(source.body_text)
-        if fw and is_own(fw["from"], own):
-            fw = None
+        fw = forwarded(source.body_text, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні
         if fw and customer is None:
             customer = find_customer([fw["from"]])
     return source, fw, customer, project
@@ -620,7 +631,8 @@ def quick_prefill(thread=None) -> dict:
     ступенями, напр. «35 units and 100 units» → 35; 100) або порожні з налаштувань."""
     from email_assistant.quotes import new_text
     s = OfferSettings.get()
-    data = {"customer": None, "contact_name": "", "contact_email": "", "billing_address": "", "project": None,
+    data = {"customer": None, "contact_name": "", "contact_email": "", "contact_phone": "", "billing_address": "",
+            "project": None, **dict(zip(("signer_name", "signer_position"), last_signer())),
             "language": s.default_language, "currency": s.default_currency, "valid_days": s.validity_days,
             "currency_reason": "з «Налаштувань Angebote» — виберіть клієнта, і валюта стане за його країною"
             if s.currency_by_country else "з «Налаштувань Angebote»",
@@ -658,13 +670,14 @@ def quick_prefill(thread=None) -> dict:
         rows.append(dict(BLANK_ROW))
     # клієнта в CRM немає — адреса й ім'я з підпису листа (для пересланого — з пересланого листа)
     from email_assistant.quotes import signature
-    sig = signature(fw["text"] if fw else new_text(source.body_text)) if customer is None else {"lines": [], "name": ""}
+    sig = signature(fw["text"] if fw else new_text(source.body_text))
     language = guess_language(text, "")
     data.update(
         customer=customer, project=project, source=source, forwarded=fw, lines=rows,
         contact_name=(customer.name if customer else "") or sig["name"] or (fw["name"] if fw else source.from_name) or "",
         contact_email=(fw["from"] if fw else source.from_email) or getattr(customer, "email", "") or "",
-        billing_address=customer_address(customer) or "\n".join(sig["lines"]),
+        contact_phone=getattr(customer, "phone", "") or sig.get("phone", ""),
+        billing_address=customer_address(customer) or ("\n".join(sig["lines"]) if customer is None else ""),
         language=language or s.default_language)
     cur = pricing.currency_for(customer, address=data["billing_address"], email=data["contact_email"])
     data.update(currency=cur["currency"], currency_reason=cur["reason"])
@@ -682,8 +695,9 @@ def quick_prefill(thread=None) -> dict:
         "contact": "картка CRM" if customer and customer.name else "підпис листа" if sig["name"] else
         "«Von:» пересланого листа" if fw else "відправник листа",
         "email": "«Von:» пересланого листа" if fw else "відправник листа",
-        "address": "картка CRM" if customer_address(customer) else "підпис листа" if sig["lines"] else
-        "у листі не знайдено — введіть",
+        "address": "картка CRM" if customer_address(customer) else "підпис листа" if sig["lines"] and customer is None
+        else "у листі не знайдено — введіть",
+        "phone": "картка CRM" if getattr(customer, "phone", "") else "підпис листа" if sig.get("phone") else "",
         "language": "за мовою листа" if language else "з «Налаштувань Angebote» (мову листа не визначено)",
         "lines": "; ".join(x for x in (
             "артикули з каталогу Minerva, знайдені в листі" if items else "",
@@ -712,6 +726,8 @@ def quick_from_offer(offer) -> dict:
     s = OfferSettings.get()
     valid_days = (offer.valid_until - timezone.localdate()).days if offer.valid_until else s.validity_days
     return {"customer": offer.customer, "contact_name": offer.contact_name, "contact_email": offer.contact_email,
+            "contact_phone": offer.contact_phone, "signer_name": offer.signer_name,
+            "signer_position": offer.signer_position,
             "billing_address": offer.billing_address, "project": offer.project, "language": offer.language,
             "currency": offer.currency, "currency_reason": "збережено в цьому Angebot",
             "price_mode": offer.price_mode, "lead_mode": offer.lead_mode, "origin": {},
@@ -741,7 +757,7 @@ def save_quick(fields: dict, rows: list, user=None, offer=None, source=None, thr
     from inventory.models import Product
     keys = ("contact_name", "contact_email", "billing_address", "language", "currency", "valid_until",
             "shipping_cost", "intro_text", "payment_terms", "delivery_terms", "outro_text", "project",
-            "price_mode", "lead_mode")
+            "price_mode", "lead_mode", "contact_phone", "signer_name", "signer_position")
     if offer is None:
         offer = new_offer(customer=fields.get("customer"), user=user, source_message=source,
                           **{k: fields[k] for k in keys if k in fields})
@@ -773,6 +789,63 @@ def save_quick(fields: dict, rows: list, user=None, offer=None, source=None, thr
         from .detection import mark_done
         mark_done(thread, offer, user)
     return offer
+
+
+_SEP_RE = re.compile(r"[\s\-_/.,]+")
+SEARCH_LIMIT = 15
+
+
+def _norm(text) -> str:
+    """«ft-220 407» → «FT220407»: артикул без розділювачів і регістру."""
+    return _SEP_RE.sub("", str(text or "")).upper()
+
+
+def search_products(q: str, limit: int = SEARCH_LIMIT) -> list:
+    """Пошук для поля «Artikel» легкої форми (нічого не зберігає): «FT» → усі FT…; кілька слів — кожне в артикулі
+    (без розділювачів: «FT-220» = «FT220»), назві, аліасі, категорії, виробнику чи технічних параметрах; плюс наші
+    офери DigiKey без товару в каталозі. Порядок: точний артикул → артикул починається з → містить → решта;
+    у межах — є на складі першими."""
+    from django.db.models import F, Q, TextField, Value
+    from django.db.models.functions import Cast, Replace, Upper
+
+    from inventory.models import Product
+    from inventory.services.stock import annotate_stock
+    words = [w for w in (q or "").split() if w][:5]
+    if not words:
+        return []
+    norm = Upper("sku")
+    for sep in ("-", " ", "/", ".", "_"):
+        norm = Replace(norm, Value(sep), Value(""))
+    qs = Product.objects.filter(is_active=True).annotate(sku_norm=norm, attrs_text=Cast("tech_attributes", TextField()))
+    for w in words:
+        n = _norm(w)
+        cond = (Q(sku__icontains=w) | Q(name__icontains=w) | Q(name_export__icontains=w) | Q(sku_short__icontains=w)
+                | Q(manufacturer__icontains=w) | Q(category__icontains=w) | Q(productalias__alias__icontains=w)
+                | Q(attrs_text__icontains=w))
+        if n:
+            cond |= Q(sku_norm__contains=n)
+        qs = qs.filter(cond)
+    ids = list(qs.values_list("pk", flat=True).distinct()[:300])
+    first = _norm(words[0])
+    found = []
+    for p in annotate_stock(Product.objects.filter(pk__in=ids)):
+        s = _norm(p.sku)
+        rank = 0 if s == first else 1 if s.startswith(first) else 2 if first in s else 3
+        found.append((rank, 0 if p._available > 0 else 1, p.sku.upper(), p))
+    found.sort(key=lambda t: t[:3])
+    out = [{"sku": p.sku, "name": p.name_export or p.name, "available": pricing._num(p._available),
+            "price": pricing._num(p.sale_price) if p.sale_price is not None else "", "category": p.category or "",
+            "source": "minerva"} for *_k, p in found[:limit]]
+    try:   # наші офери DigiKey, яких немає в каталозі Minerva
+        from bots.models import DigiKeyListing
+        dk = DigiKeyListing.objects.filter(product__isnull=True)
+        for w in words:
+            dk = dk.filter(Q(dk_supplier_sku__icontains=w) | Q(dk_title__icontains=w))
+        out += [{"sku": l.dk_supplier_sku, "name": l.dk_title, "available": "", "price": "", "category": "",
+                 "source": "digikey"} for l in dk.exclude(dk_supplier_sku="")[:max(0, limit - len(out))]]
+    except ImportError:
+        pass
+    return out
 
 
 def price_hints(sku: str, qtys: str, currency: str, price_mode="auto", lead_mode="auto", language="de") -> dict:

@@ -97,7 +97,8 @@ class OfferAdmin(admin.ModelAdmin):
     inlines = [OfferLineInline]
     fieldsets = [
         (None, {"fields": ["number_rev", "actions_panel", "status", "request_kind", "customer", "contact_name",
-                           "contact_email", "billing_address", "project", "owner"]}),
+                           "contact_email", "contact_phone", "billing_address", "project", "owner", "signer_name",
+                           "signer_position"]}),
         ("Умови", {"fields": ["language", "currency", "vat_rate", "shipping_cost", "valid_until", "price_mode",
                               "lead_mode"]}),
         ("Тексти документа", {"fields": ["intro_text", "payment_terms", "delivery_terms", "outro_text"],
@@ -326,7 +327,7 @@ class OfferSettingsAdmin(admin.ModelAdmin):
                            "ні на DigiKey, позначаються 🏭 «виробництво / розробка» — ціну й строк вводять вручну."}),
         ("Тексти за замовчуванням", {"fields": ["intro_text", "payment_terms", "delivery_terms", "outro_text"]}),
         ("Реквізити в документі", {
-            "fields": ["company_block", "footer_text", "template"],
+            "fields": ["payment_info", "company_block", "footer_text", "template"],
             "description": 'Документ будується на бланку Commercial Invoice. Завантажити шаблон, приклад документа, '
                            'свій шаблон і довідник змінних — <a href="/offers/quick/#template">📄 Word шаблон Angebot</a>.'}),
         ("📝 Запити пропозицій у пошті", {

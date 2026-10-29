@@ -74,6 +74,7 @@ urlpatterns = [
     path('message/<int:message_pk>/customer/',          views_categories.message_customer_view, name='message_customer'),
     path('customers/',                                  views_categories.customers_search_view, name='customers_search'),
     path('message/<int:message_pk>/why/',               views_categories.message_why_view,     name='message_why'),
+    path('nav/',                                        views_categories.nav_pref_view,        name='nav_pref'),
     path('category/<int:pk>/action/',                   views_categories.category_action_view, name='work_category_action'),
     # Quick settings toggles (e.g. mark read on server)
     path('logo/<str:domain>/',                          views.sender_logo_view,        name='sender_logo'),

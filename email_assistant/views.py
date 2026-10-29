@@ -512,8 +512,15 @@ def inbox_view(request):
     categories, mail_customers = _category_counts(counts_qs)
     from email_assistant.work_categories import counts as _work_counts
     work_categories = _work_counts(counts_qs)
+    from email_assistant import nav_prefs
     from email_assistant.models import EmailSettings as _ES
-    hidden_wcats = set(_ES.get_for_user(request.user).hidden_work_categories or [])
+    _es = _ES.get_for_user(request.user)
+    hidden_wcats = set(_es.hidden_work_categories or [])
+    # ⭐ обране зверху, решта — за вибраним порядком (вживання / листів / назва); так само в «Віднести до категорії»
+    work_categories = nav_prefs.ordered(work_categories, _es, lambda r: f'wc:{r[0].pk}', n_of=lambda r: r[1],
+                                        name_of=lambda r: r[0].name)
+    categories = nav_prefs.ordered(categories, _es, lambda r: f'kind:{r[0]}', n_of=lambda r: r[2],
+                                   name_of=lambda r: r[1])
     if cat_filter:
         qs = qs.filter(category=cat_filter)
     if work_filter == NO_CATEGORY:
@@ -2137,7 +2144,7 @@ def set_work_category_view(request, message_pk):
 
 
 _SETTINGS_TOGGLES = {'mark_read_on_server', 'nav_project_codes', 'sender_logos', 'nav_icons'}
-_SETTINGS_CHOICES = {'ai_model', 'rag_mode'}
+_SETTINGS_CHOICES = {'ai_model', 'rag_mode', 'nav_sort'}
 
 
 def _model_label(model_id: str) -> str:

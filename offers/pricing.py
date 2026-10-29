@@ -8,7 +8,8 @@
 у валюті DigiKeyConfig.locale_currency, як і «Базові ціни ← DigiKey»).
 Інша валюта — × курс із «Налаштувань цін» магазину (ShopSettings.fx_rates: скільки одиниць валюти Minerva за 1
 одиницю); курсу немає — ціни немає, без вигадок.
-Строк (Offer.lead_mode): є на складі потрібна кількість — «ab Lager»; інакше «Термін поставки» товару; інакше DigiKey.
+Строк (Offer.lead_mode), у тижнях: є на складі потрібна кількість — «ab Lager»; інакше «Термін поставки» товару; інакше
+DigiKey (14 днів → «2-3»).
 Валюта (currency_for): за країною клієнта — Європа / інші (OfferSettings), країну не визначено — «Валюта».
 Округлення: ціна за одиницю — 4 знаки, суми — 2 знаки, ROUND_HALF_UP.
 """
@@ -21,7 +22,6 @@ Q4 = Decimal("0.0001")
 HUNDRED = Decimal("100")
 
 STOCK_TEXT = {"de": "ab Lager", "en": "from stock", "de_en": "ab Lager / from stock", "uk": "зі складу"}
-DAYS_TEXT = {"de": "{n} Tage", "en": "{n} days", "de_en": "{n} Tage / days", "uk": "{n} днів"}
 MANUAL_LEAD = "Введено вручну"
 # Групи джерел для форми: 📦 склад Minerva, 🔷 DigiKey, ✍️ вручну
 SOURCE_GROUPS = {"shop": "stock", "sale_price": "stock", "base": "stock", "quote": "stock", "digikey": "digikey",
@@ -307,8 +307,10 @@ def quote_price(product, qty, currency, mode="auto", sku="") -> PriceQuote:
 
 # ── Строк поставки ───────────────────────────────────────────────────────────
 
-def _days(n, language) -> str:
-    return DAYS_TEXT.get(language, DAYS_TEXT["en"]).format(n=n)
+def _weeks(days) -> str:
+    """Строк у тижнях — колонка бланка «Lead time, weeks, approx.»: 14 днів → «2-3», 3 дні → «1-2»."""
+    w = max(1, -(-int(days) // 7))
+    return f"{w}-{w + 1}"
 
 
 def _lead_stock(product, qty, language, sku="") -> LeadQuote:
@@ -325,7 +327,7 @@ def _lead_stock(product, qty, language, sku="") -> LeadQuote:
 def _lead_product(product, qty, language, sku="") -> LeadQuote:
     if product is None or not getattr(product, "lead_time_days", None):
         return LeadQuote("", "product", "")
-    return LeadQuote(_days(product.lead_time_days, language), "product",
+    return LeadQuote(_weeks(product.lead_time_days), "product",
                      f"Картка товару: термін поставки {product.lead_time_days} днів")
 
 
@@ -333,7 +335,7 @@ def _lead_digikey(product, qty, language, sku="") -> LeadQuote:
     listing = dk_listing(product, sku)
     if listing is None or not listing.dk_lead_time_days:
         return LeadQuote("", "digikey", "")
-    return LeadQuote(_days(listing.dk_lead_time_days, language), "digikey",
+    return LeadQuote(_weeks(listing.dk_lead_time_days), "digikey",
                      f"DigiKey Marketplace: відвантаження за {listing.dk_lead_time_days} днів")
 
 

@@ -18,33 +18,43 @@ SUBJECT_HEADERS = ("betreff", "subject", "тема")
 ADDRESS_RE = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
 
 
-def forwarded(body):
-    """Перший пересланий лист у тексті (FW / WG від колеги): {from, name, subject, text} — відправник із «Von: /
-    From:» і його текст без власної історії; немає блоку з адресою відправника — None."""
-    lines = (body or "").splitlines()
-    i = next((n for n, ln in enumerate(lines) if FORWARD_RE.match(ln) or (
-        HEADER_RE.match(ln) and HEADER_RE.match(ln).group(1).lower() in SENDER_HEADERS)), None)
-    if i is None:
-        return None
-    if FORWARD_RE.match(lines[i]):
-        i += 1
-    headers, end = {}, i
-    while i < len(lines):   # заголовки, між якими можуть бути порожні рядки; перший інший рядок — текст листа
-        m = HEADER_RE.match(lines[i])
-        if m:
-            headers.setdefault(m.group(1).lower(), m.group(2).strip())
-            end = i + 1
-        elif lines[i].strip():
-            break
-        i += 1
-    i = end
-    sender = next((headers[h] for h in SENDER_HEADERS if h in headers), "")
-    address = ADDRESS_RE.search(sender)
-    if not address:
-        return None
-    return {"from": address.group(0).lower(), "name": sender.split("<")[0].strip(' "\''),
-            "subject": next((headers[h] for h in SUBJECT_HEADERS if h in headers), ""),
-            "text": new_text("\n".join(lines[i:]))}
+def _forward_blocks(lines):
+    """Переслані листи в тексті по черзі (зовнішній — першим): {from, name, subject, text}."""
+    start = 0
+    while True:
+        i = next((n for n in range(start, len(lines)) if FORWARD_RE.match(lines[n]) or (
+            HEADER_RE.match(lines[n]) and HEADER_RE.match(lines[n]).group(1).lower() in SENDER_HEADERS)), None)
+        if i is None:
+            return
+        if FORWARD_RE.match(lines[i]):
+            i += 1
+        headers, end = {}, i
+        while i < len(lines):   # заголовки, між якими можуть бути порожні рядки; перший інший рядок — текст листа
+            m = HEADER_RE.match(lines[i])
+            if m:
+                headers.setdefault(m.group(1).lower(), m.group(2).strip())
+                end = i + 1
+            elif lines[i].strip():
+                break
+            i += 1
+        start = max(end, i) if end > start else i + 1   # далі — наступний пересланий лист усередині
+        sender = next((headers[h] for h in SENDER_HEADERS if h in headers), "")
+        address = ADDRESS_RE.search(sender)
+        if address:
+            yield {"from": address.group(0).lower(), "name": sender.split("<")[0].strip(' "\''),
+                   "subject": next((headers[h] for h in SUBJECT_HEADERS if h in headers), ""),
+                   "text": new_text("\n".join(lines[end:]))}
+
+
+def forwarded(body, skip=None):
+    """Пересланий лист у тексті (FW / WG від колеги): {from, name, subject, text} — відправник із «Von: /
+    From:» і його текст без власної історії; немає блоку з адресою відправника — None.
+    skip(адреса) → True — пропустити (свої адреси: колега переслав власний FW — «WG: FW: …»), береться
+    наступний пересланий лист усередині."""
+    for block in _forward_blocks((body or "").splitlines()):
+        if skip is None or not skip(block["from"]):
+            return block
+    return None
 
 
 SIGN_OFF_RE = re.compile(r"^\s*(?:best\s+regards?|kind\s+regards|warm\s+regards|regards|sincerely|cheers|"
@@ -52,23 +62,29 @@ SIGN_OFF_RE = re.compile(r"^\s*(?:best\s+regards?|kind\s+regards|warm\s+regards|
                          r"з\s+повагою|с\s+уважением)\b[\s,.!]*$", re.IGNORECASE)
 CONTACT_LINE_RE = re.compile(r"^\s*(?:tel|phone|fon|mob|mobile|cell|fax|e-?mail|mail|web|www|http|skype|whatsapp)\b",
                              re.IGNORECASE)
+PHONE_RE = re.compile(r"(?:^\s*(?:tel|phone|fon|mob|mobile|cell|whatsapp)\b\.?[\s:.]*|^\s*)(\+?\d[\d\s()./-]{6,}\d)\s*$",
+                      re.IGNORECASE)
 
 
 def signature(text) -> dict:
     """Підпис відправника внизу листа: рядки після «--» або після прощання («Best regards,» окремим рядком).
-    → {lines: адреса (без телефонів / email / сайтів), name: ім'я з першого рядка («Denys R. - supply manager …»)}."""
+    → {lines: адреса (без телефонів / email / сайтів), name: ім'я з першого рядка («Denys R. - supply manager …»),
+    phone: перший телефон (не факс)}."""
     lines = [ln.strip() for ln in (text or "").splitlines()]
     start = next((i + 1 for i in range(len(lines) - 1, -1, -1) if lines[i] in ("--", "—", "-- ")), None)
     if start is None:
         start = next((i + 1 for i in range(len(lines) - 1, -1, -1) if SIGN_OFF_RE.match(lines[i])), None)
     if start is None:
-        return {"lines": [], "name": ""}
+        return {"lines": [], "name": "", "phone": ""}
     out = [ln for ln in lines[start:] if ln and not SIGN_OFF_RE.match(ln) and len(ln) <= 120][:8]
-    address = [ln for ln in out if not CONTACT_LINE_RE.match(ln) and "@" not in ln]
+    phone = next((m.group(1).strip() for ln in out if not re.match(r"^\s*fax", ln, re.I)
+                  for m in [PHONE_RE.match(ln)] if m), "")
+    address = [ln for ln in out if not CONTACT_LINE_RE.match(ln) and "@" not in ln and not PHONE_RE.match(ln)]
     name = re.split(r"\s+[-–|,]\s+", address[0])[0] if address else ""
     if not 2 < len(name) <= 60:
-        return {"lines": address, "name": ""}
-    return {"lines": address[1:] or address, "name": name}   # ім'я — окремо (контактна особа), далі — фірма й адреса
+        return {"lines": address, "name": "", "phone": phone}
+    # ім'я — окремо (контактна особа), далі — фірма й адреса
+    return {"lines": address[1:] or address, "name": name, "phone": phone}
 
 
 def new_text(body) -> str:
