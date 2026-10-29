@@ -1,11 +1,16 @@
 """
-Етикетка антени DYMO з шаблону — як для кабелів CA-* (shipping/services/dymo_label_service.py).
+Етикетка товару DYMO з шаблону — один рушій для антен (AN…), фільтрів (FT…) і решти товарів
+(кабелі CA-* — свій шаблон: shipping/services/dymo_label_service.py; етикетка замовлення — order_label.py).
 
-Шаблон shipping/templates_dymo/antenna_label_template.dymo (макет AN220213-01C), змінюється лише:
+Принцип: етикетки, якої немає в базі (LABELS_DIR), не буває — її формує шаблон
+shipping/templates_dymo/product_label_template.dymo (макет AN220213-01C), змінюється лише:
   {{PN}}   — артикул з рядка замовлення (саме той, що замовили): рядок P/N, штрихкод, QR;
   {{QTY}}  — кількість з рядка замовлення;
   {{LINE}} — рядки над Copyright (блок <!--LINE--> повторюється): Digi-Key P/N, опис, частота, роз'єм;
   {{YEAR}} — поточний рік у Copyright.
+Вид товару (KINDS: антена / фільтр / інший) визначає, які рядки обов'язкові й як підписана частота
+(антена — «Frequency range», фільтр — «Pass band» / «Stop band»); макет, джерела, вікно перевірки,
+друк, копії й позначка в куті — однакові для всіх.
 
 Опис, частота, роз'єм і Digi-Key P/N: підтверджене людиною для цього артикула (LabelText) → склад (Product) →
 DigiKey (лістинг) → старий .dymo. Якщо товар знайдено лише за Supplier SKU DigiKey (у замовленні інший артикул,
@@ -26,16 +31,29 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
-TEMPLATE_PATH = Path(settings.BASE_DIR) / "shipping" / "templates_dymo" / "antenna_label_template.dymo"
+TEMPLATE_PATH = Path(settings.BASE_DIR) / "shipping" / "templates_dymo" / "product_label_template.dymo"
 
 LINE_MAX = 46          # символів у рядку (Arial 8, блок 2,31″, FitMode None) — довше DYMO обріже
 TEXT_LINES_MAX = 4     # рядків над Copyright: блок вміщує 6 разом із двома рядками Copyright
-DESC_LINES_MAX = 2
+DESC_LINES_MAX = 2     # антена й фільтр; інший товар — KINDS["generic"]["desc_lines"]
 
 FIELDS = ("description", "frequency", "connector")
 EDIT_FIELDS = FIELDS + ("digikey_pn",)
 FREQ_KEYS = ("Frequency Range", "Frequency (Center/Band)", "Frequency", "Frequency Band")
+FILTER_FREQ_KEYS = ("Pass Band", "Passband", "Pass band", "Frequency Range", "Stop Band", "Stopband",
+                    "Frequency (Center/Band)", "Frequency")
+FILTER_TYPE_KEYS = ("Filter Type", "Type")
 CONN_KEYS = ("Termination", "Connector Type", "Connector", "Connector Style")
+
+# Вид товару: need — порожнє поле дає попередження (warn), optional — лише примітку (info), решта — мовчки
+KINDS = {
+    "antenna": {"title": "антени", "name": "Антена", "freq_keys": FREQ_KEYS, "desc_lines": DESC_LINES_MAX,
+                "need": ("frequency", "connector"), "optional": (), "freq_name": "Частота"},
+    "filter": {"title": "фільтра", "name": "Фільтр", "freq_keys": FILTER_FREQ_KEYS, "desc_lines": DESC_LINES_MAX,
+               "need": ("frequency",), "optional": ("connector",), "freq_name": "Смуга (Pass / Stop band)"},
+    "generic": {"title": "товару", "name": "Товар", "freq_keys": FREQ_KEYS, "desc_lines": 3,
+                "need": (), "optional": (), "freq_name": "Частота"},
+}
 SOURCES = {
     "edit": "✏️ щойно вписано",
     "saved": "✋ перевірено раніше",
@@ -47,16 +65,21 @@ SOURCES = {
 _FIELD_NAMES = {"description": "Опис", "frequency": "Частота", "connector": "Роз'єм", "digikey_pn": "Digi-Key P/N"}
 
 ANTENNA_RE = re.compile(r"^AN\d{4}", re.I)
+FILTER_RE = re.compile(r"^FT\d{4}", re.I)
 _CYR = re.compile(r"[\u0400-\u04FF]")
 _DK_RE = re.compile(r"^(?:Digi[- ]?Key\s*)?P\s*[/I]\s*N\s*:\s*(\d{3,6}-\S+?-ND)\.?$", re.I)
 _DK_PN_RE = re.compile(r"(?<![\w-])(\d{3,6})-([A-Za-z0-9][\w.\-]*?)-ND(?![\w-])", re.I)
-_FREQ_RE = re.compile(r"^Freq(?:uency)?\.?(?:\s+range)?\s*:\s*(.+)$", re.I)
+_FREQ_RE = re.compile(r"^(Freq(?:uency)?\.?(?:\s+range)?|(?:Low|High)[- ]?pass(?:\s+band)?|Pass[- ]?band"
+                      r"|Stop[- ]?band|Band[- ]?(?:Stop|Pass)|Notch)\s*:\s*(.+)$", re.I)
+_DESC_RE = re.compile(r"^Description\s*:\s*(.+)$", re.I)
+_QTY_RE = re.compile(r"^QTY\s*:", re.I)
+_STOP_RE = re.compile(r"stop|notch|reject|sperr", re.I)
 _CONN_RE = re.compile(r"^Connector\s+type\s*:\s*(.+)$", re.I)
 _COPY_RE = re.compile(r"Copyright\b.*(\d{4})", re.I)
-_PN_RE = re.compile(r"^P/N:\s*\S+\.?$", re.I)
-_RANGE_RE = re.compile(r"\.\.\.|…|~|\d\s*-\s*\d")
+_PN_RE = re.compile(r"^P\s*/\s*N\s*:", re.I)
+_RANGE_RE = re.compile(r"\.\.\.|…|~|\d\s*-\s*\d|\d\s+to\s+\d", re.I)
 _UNIT_RANGE_RE = re.compile(
-    r"(\d+(?:[.,]\d+)?)\s*(kHz|MHz|GHz)?\s*(?:\.\.\.|…|~|-)\s*(\d+(?:[.,]\d+)?)\s*(kHz|MHz|GHz)", re.I)
+    r"(\d+(?:[.,]\d+)?)\s*(kHz|MHz|GHz)?\s*(?:\.\.\.|…|~|-|\s+to\s+)\s*(\d+(?:[.,]\d+)?)\s*(kHz|MHz|GHz)", re.I)
 _UNITS = {"khz": ("kHz", 0.001), "mhz": ("MHz", 1.0), "ghz": ("GHz", 1000.0)}   # множник до MHz
 
 
@@ -64,6 +87,25 @@ def is_antenna(sku, product=None) -> bool:
     if product is not None and "antenn" in (product.category or "").lower():
         return True
     return bool(ANTENNA_RE.match((sku or "").strip()))
+
+
+def kind_of(sku, category="") -> str:
+    """Шаблон етикетки артикула: 'cable' (CA-…, розбирається), 'antenna', 'filter', 'generic'; без артикула — ''."""
+    sku, category = (sku or "").strip(), (category or "").lower()
+    if not sku:
+        return ""
+    if sku.upper().startswith("CA-"):
+        from shipping.services.dymo_label_service import parse_part_number
+        try:
+            parse_part_number(sku)
+            return "cable"
+        except ValueError:
+            pass
+    if "antenn" in category or ANTENNA_RE.match(sku):
+        return "antenna"
+    if "filt" in category or FILTER_RE.match(sku):
+        return "filter"
+    return "generic"
 
 
 def _clean(value) -> str:
@@ -132,17 +174,20 @@ def read_file(sku):
     if not path:
         return None
     out = {"name": path.name, "standard": False, "pn": "", "qty": None, "barcode": "", "qr": "",
-           "digikey_pn": "", "description": "", "frequency": "", "connector": "", "year": None}
+           "digikey_pn": "", "description": "", "frequency": "", "band": "", "connector": "", "year": None}
     try:
         xml = path.read_text(encoding="utf-8-sig")
     except (OSError, UnicodeDecodeError):
         return out
-    body = []
+    body, loose = [], []
     for block in re.findall(r"<TextObject>(.*?)</TextObject>", xml, re.S):
+        if "<Name>MinervaMark</Name>" in block:      # позначка походження (labels_app/mark.py)
+            continue
         lines = _object_lines(block)
         if any("Copyright" in line for line in lines):
             body = lines
             continue
+        loose.extend(lines)
         for line in lines:
             s = _clean(line)
             if s.upper().startswith("P/N:") and not out["pn"]:
@@ -158,8 +203,9 @@ def read_file(sku):
     if m:
         out["qr"] = html.unescape(m.group(1)).strip()
 
+    out["standard"] = bool(body)
     desc, state = [], "desc"
-    for line in body:
+    for line in body or loose:      # інший макет (без Copyright) — усі тексти, крім P/N і QTY
         s = " ".join(line.replace("\u00a0", " ").split())
         if not s:
             continue
@@ -175,20 +221,22 @@ def read_file(sku):
             continue
         m = _FREQ_RE.match(s)
         if m:
-            out["frequency"], state = _clean(m.group(1)), "freq"
+            # «2700 to 3650 MHz» (старі етикетки фільтрів) → «2700...3650 MHz»
+            out["frequency"], state = _clean(re.sub(r"(\d)\s+to\s+(\d)", r"\1...\2", m.group(2))), "freq"
+            out["band"] = "stop" if _STOP_RE.search(m.group(1)) else ("pass" if "pass" in m.group(1).lower() else "")
             continue
         m = _CONN_RE.match(s)
         if m:
             out["connector"], state = _clean(m.group(1)), "conn"
             continue
-        if _PN_RE.match(s):
+        if _PN_RE.match(s) or _QTY_RE.match(s):
             continue
         if state == "freq" and out["frequency"].endswith(","):
             out["frequency"] = _clean(out["frequency"] + " " + s)
             continue
-        desc.append(s)
+        m = _DESC_RE.match(s)
+        desc.append(m.group(1) if m else s)
     out["description"] = _clean(" ".join(desc))
-    out["standard"] = bool(body)
     return out
 
 
@@ -231,7 +279,7 @@ def _attr(attrs, keys) -> str:
     return ""
 
 
-def _stock_value(field, product) -> str:
+def _stock_value(field, product, freq_keys=FREQ_KEYS) -> str:
     if product is None:
         return ""
     if field == "description":
@@ -241,13 +289,13 @@ def _stock_value(field, product) -> str:
                 return value
         return ""
     if field == "frequency":
-        return _fmt_frequency(_attr(product.tech_attributes, FREQ_KEYS))
+        return _fmt_frequency(_attr(product.tech_attributes, freq_keys))
     if field == "connector":
         return _clean(_attr(product.tech_attributes, CONN_KEYS))
     return ""
 
 
-def _digikey_value(field, listing) -> str:
+def _digikey_value(field, listing, freq_keys=FREQ_KEYS) -> str:
     if listing is None:
         return ""
     if field == "description":
@@ -257,7 +305,7 @@ def _digikey_value(field, listing) -> str:
         first = _clean(re.split(r"(?<=[.!?])\s", (listing.dk_description or "").strip(), maxsplit=1)[0])[:200]
         return "" if not first or _is_code(first) else first
     if field == "frequency":
-        return _fmt_frequency(_attr(listing.dk_attributes, FREQ_KEYS))
+        return _fmt_frequency(_attr(listing.dk_attributes, freq_keys))
     if field == "connector":
         return _clean(_attr(listing.dk_attributes, CONN_KEYS))
     return ""
@@ -341,7 +389,7 @@ DEFAULT_SETTINGS = {"sources": "stock", "digikey": "digikey_orders", "window": "
 
 
 def label_settings() -> dict:
-    """Налаштування вікна етикетки антени за замовчуванням: порядок джерел, Digi-Key P/N, коли показувати вікно."""
+    """Налаштування етикеток з шаблону (усі види) за замовчуванням: порядок джерел, Digi-Key P/N, коли вікно."""
     try:
         from sales.models import SalesSettings
         s = SalesSettings.get()
@@ -360,12 +408,27 @@ def _issue(level, text):
     return {"level": level, "text": text}
 
 
+def _freq_label(kind, frequency, product=None, listing=None, old=None, description="") -> str:
+    """Підпис рядка частоти: фільтр — «Pass band» / «Stop band» (тип фільтра, старий файл, опис), інші —
+    «Frequency range» для діапазону, інакше «Frequency»."""
+    if kind != "filter":
+        return "Frequency range: " if _RANGE_RE.search(frequency or "") else "Frequency: "
+    typed = " ".join(filter(None, (
+        _attr(getattr(product, "tech_attributes", None), FILTER_TYPE_KEYS),
+        _attr(getattr(listing, "dk_attributes", None), FILTER_TYPE_KEYS),
+        (old or {}).get("band") or ""))) or description or ""
+    return "Stop band: " if _STOP_RE.search(typed) else "Pass band: "
+
+
 def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
     """Усе для вікна перевірки й для файлу: значення, джерела, рядки, зауваження.
 
     edits — {поле: текст} з вікна (ще не збережено); show_dk — None = за джерелом замовлення."""
     sku = (sku or "").strip()
     product = find_product(sku)
+    kind = kind_of(sku, product.category if product is not None else "")
+    kind = kind if kind in KINDS else "generic"          # кабель, який не розібрано, — як інший товар
+    prof = KINDS[kind]
     exact = product is not None and product.sku.upper() == sku.upper()
     pn = product.sku if exact else sku               # на етикетці — артикул із замовлення
     listing = _listing(product)
@@ -398,7 +461,8 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
             autos_raw = [("digikey", dk_auto), ("file", old_dk if own else "")]
             chips_raw = autos_raw + ([] if own else [("file", old_dk)])
         else:
-            values = {"stock": _stock_value(field, product), "digikey": _digikey_value(field, listing),
+            values = {"stock": _stock_value(field, product, prof["freq_keys"]),
+                      "digikey": _digikey_value(field, listing, prof["freq_keys"]),
                       "file": (old or {}).get(field) or ""}
             order_of = SOURCE_ORDERS.get(prefs["sources"], SOURCE_ORDERS["stock"]) if exact else SOURCE_ORDERS["file"]
             autos_raw = [(src, values[src]) for src in order_of]
@@ -415,7 +479,7 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
             chosen = auto or {"source": "", "value": ""}
         fields[field] = {"value": chosen["value"], "source": chosen["source"], "label": SOURCES.get(chosen["source"], ""),
                          "auto": auto["value"] if auto else "", "candidates": cands}
-        name = _FIELD_NAMES[field]
+        name = prof["freq_name"] if field == "frequency" else _FIELD_NAMES[field]
         if chosen["source"] in ("stock", "digikey", "file"):
             for other in autos[1:]:
                 issues.append(_issue("warn", f"{name}: {SOURCES[chosen['source']]} «{chosen['value']}», "
@@ -426,18 +490,22 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
                                          f"(під час перевірки було «{seen}») — перевірте."))
 
     deliberate = ("saved", "edit")
+    freq_label = _freq_label(kind, fields["frequency"]["value"], product, listing, old,
+                             fields["description"]["value"])
     if not fields["description"]["value"]:
         issues.append(_issue("error", "Немає опису: ні на складі, ні на DigiKey, ні в старому файлі — впишіть."))
-    if not fields["frequency"]["value"]:
-        issues.append(_issue("info" if fields["frequency"]["source"] in deliberate else "warn",
-                             "Немає частоти — рядок «Frequency» не друкується."))
-    elif _mixed_units(fields["frequency"]["value"]):   # підтверджене людиною — лише нагадування, друк не зупиняє
+    missing = {"frequency": f"Немає частоти — рядок «{freq_label.rstrip(': ')}» не друкується.",
+               "connector": "Немає роз'єму — рядок «Connector type» не друкується."}
+    for field, text in missing.items():
+        if fields[field]["value"] or not (field in prof["need"] or field in prof["optional"]):
+            continue
+        warn = field in prof["need"] and fields[field]["source"] not in deliberate
+        issues.append(_issue("warn" if warn else "info", text))
+    if fields["frequency"]["value"] and _mixed_units(fields["frequency"]["value"]):
+        # підтверджене людиною — лише нагадування, друк не зупиняє
         issues.append(_issue("info" if fields["frequency"]["source"] == "saved" else "warn",
                              f"Частота «{fields['frequency']['value']}»: у діапазоні різні одиниці — "
                              "краще в одних (напр. 0.650...9 GHz)."))
-    if not fields["connector"]["value"]:
-        issues.append(_issue("info" if fields["connector"]["source"] in deliberate else "warn",
-                             "Немає роз'єму — рядок «Connector type» не друкується."))
 
     dk_pn = fields["digikey_pn"]["value"]
     if show_dk is None and prefs["digikey"] in ("always", "never"):
@@ -471,10 +539,10 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
             issues.append(_issue("info", f"Файл {old['name']} має інший макет — його можна надрукувати як є («📄 Старий файл»)."))
 
     lines = label_lines(dk_pn if show_dk else "", fields["description"]["value"],
-                        fields["frequency"]["value"], fields["connector"]["value"])
+                        fields["frequency"]["value"], fields["connector"]["value"], freq_label=freq_label)
     desc_lines = sum(1 for prefix, _v in lines if prefix == "")
-    if desc_lines > DESC_LINES_MAX:
-        issues.append(_issue("error", f"Опис займає {desc_lines} рядки — вміщується {DESC_LINES_MAX}. Скоротіть."))
+    if desc_lines > prof["desc_lines"]:
+        issues.append(_issue("error", f"Опис займає {desc_lines} рядки — вміщується {prof['desc_lines']}. Скоротіть."))
     elif len(lines) > TEXT_LINES_MAX:
         issues.append(_issue("error", f"Над Copyright {len(lines)} рядків — вміщується {TEXT_LINES_MAX}. "
                                       "Скоротіть опис до одного рядка або приберіть Digi-Key P/N."))
@@ -496,6 +564,8 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
         ready = saved is not None and not edits and not any(i["level"] in ("error", "warn") for i in issues)
     return {
         "sku": sku, "pn": pn, "qty": qty, "year": year,
+        "kind": kind, "kind_title": prof["title"], "kind_name": prof["name"], "freq_label": freq_label,
+        "field_names": {**_FIELD_NAMES, "frequency": prof["freq_name"]},
         "product": ({"pk": product.pk, "name": product.name, "sku": product.sku} if product is not None else None),
         "digikey_pn": dk_pn, "digikey_from": dk_why, "show_dk": bool(show_dk), "dk_reason": dk_reason,
         "fields": fields, "lines": lines, "issues": issues, "file": old,
@@ -507,8 +577,8 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
     }
 
 
-def label_lines(digikey_pn, description, frequency, connector) -> list[tuple[str, str]]:
-    """Рядки над Copyright як (незмінний початок, значення з даних)."""
+def label_lines(digikey_pn, description, frequency, connector, freq_label=None) -> list[tuple[str, str]]:
+    """Рядки над Copyright як (незмінний початок, значення з даних); freq_label — підпис частоти за видом товару."""
     lines = []
     if digikey_pn:
         lines.append(("Digi-Key P/N: ", _sentence(digikey_pn)))
@@ -516,7 +586,7 @@ def label_lines(digikey_pn, description, frequency, connector) -> list[tuple[str
         for part in textwrap.wrap(_sentence(description), LINE_MAX, break_long_words=False, break_on_hyphens=False):
             lines.append(("", part))
     if frequency:
-        prefix = "Frequency range: " if _RANGE_RE.search(frequency) else "Frequency: "
+        prefix = freq_label or ("Frequency range: " if _RANGE_RE.search(frequency) else "Frequency: ")
         lines.append((prefix, _sentence(frequency)))
     if connector:
         lines.append(("Connector type: ", _sentence(connector)))

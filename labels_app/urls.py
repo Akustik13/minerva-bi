@@ -12,8 +12,12 @@ urlpatterns = [
     path('delete/<str:sku>/',           views.delete_label,          name='delete'),
     path('preview/',                    views.preview_cable_label,   name='preview'),
     path('generate/',                   views.generate_cable_label,  name='generate'),
-    path('antenna/check/',              views.antenna_check,         name='antenna_check'),
-    path('antenna/save/',               views.antenna_save,          name='antenna_save'),
-    path('antenna/<str:sku>/',          views.antenna_label,         name='antenna'),
+    path('product/check/',              views.product_check,         name='product_check'),
+    path('product/save/',               views.product_save,          name='product_save'),
+    path('product/<str:sku>/',          views.product_label_file,    name='product'),
+    # старі адреси етикеток антен (сторінки, відкриті до оновлення)
+    path('antenna/check/',              views.product_check),
+    path('antenna/save/',               views.product_save),
+    path('antenna/<str:sku>/',          views.product_label_file),
     path('order/<int:pk>/',             views.order_label,           name='order'),
 ]

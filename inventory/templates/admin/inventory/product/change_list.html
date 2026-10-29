@@ -88,5 +88,6 @@
 })();
 </script>
 {% endif %}
+{% if label_ctx %}{% include "labels/_label_actions.html" with label_source=label_ctx.label_source dymo_mode=label_ctx.dymo_mode print_preview=label_ctx.print_preview %}{% endif %}
 {{ block.super }}
 {% endblock %}

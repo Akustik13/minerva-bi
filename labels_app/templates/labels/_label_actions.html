@@ -1,6 +1,7 @@
 {# Кнопки етикеток DYMO: клік — дія з «Налаштування продажів → Звідки брати етикетку DYMO», #}
-{# правий клік — меню «з бази / згенерувати»; вікно перевірки етикетки антени (labels_app/antenna.py). #}
-{# Кнопка: data-svl="antenna|cable|" data-sku data-qty | data-qty-input data-order data-file="1" data-svl-act="print|download|check" #}
+{# правий клік — меню «з бази / згенерувати»; вікно перевірки етикетки товару (labels_app/product_label.py). #}
+{# Кнопка: data-svl="antenna|filter|generic|cable|" data-sku data-qty | data-qty-input data-order data-file="1" #}
+{# data-svl-act="print|download|check|direct". Загальне правило: файлу немає — етикетка з шаблону (templ / uses_template). #}
 {# Етикетка замовлення: data-svl="order" data-order=<pk> data-sku=<номер замовлення> (labels_app/order_label.py) #}
 {# Друк — служба DYMO Connect на цьому ПК (https://127.0.0.1:41951, GetPrinters / RenderLabel / PrintLabel), програму не відкривати; #}
 {# перед друком — вікно перегляду (картинка від DYMO, копії, «✏️ Правки» лише для цього друку) або одразу — print_preview; #}
@@ -86,7 +87,7 @@
 (function () {
   if (window.svLabel) return;
   var SOURCE = '{{ label_source|default:"generate"|escapejs }}';
-  var SOURCE_TEXT = SOURCE === 'file' ? '📄 готовий файл з бази' : '🧩 сформувати з шаблону';
+  var PRODUCT_KINDS = ['antenna', 'filter', 'generic'];   // labels_app/product_label.py; кабель — свій шаблон
   var DYMO_MODE = '{{ dymo_mode|default:"download"|escapejs }}';   // «Дія при натисканні 🖨️ Друкувати»
   var DYMO = 'https://127.0.0.1:41951/DYMO/DLS/Printing/';          // служба DYMO Connect на цьому ПК
   var PRINTER_KEY = 'svl-dymo-printer';
@@ -296,7 +297,7 @@
     var old = document.getElementById('svl-pv'); if (old) old.remove();
     var doc = parseXml(xml), rows = doc ? editables(doc) : [];
     var mark = doc ? markNode(doc) : null, markOrig = mark ? mark.textContent : '';
-    var antenna = ctx.o && ctx.o.kind === 'antenna';
+    var product = ctx.o && PRODUCT_KINDS.indexOf(ctx.o.kind) >= 0;   // етикетка товару з шаблону
     var current = xml, edited = false, timer = null, seq = 0;
     var m = document.createElement('div');
     m.id = 'svl-pv'; m.className = 'svl-modal';
@@ -318,10 +319,10 @@
       + '<button type="button" data-d="1" title="Більше">＋</button></span>'
       + '<span class="svl-src">Принтер: <b id="svl-pr-name"></b> · <a href="#" id="svl-pr-change">змінити</a></span></div>'
       + '<div class="svl-src" id="svl-mark-note"></div>'
-      + (rows.length || antenna ? '<button type="button" class="svl-btn svl-ed-toggle" id="svl-ed-toggle" aria-expanded="false">✏️ Правки ▸</button>'
+      + (rows.length || product ? '<button type="button" class="svl-btn svl-ed-toggle" id="svl-ed-toggle" aria-expanded="false">✏️ Правки ▸</button>'
         + '<div class="svl-edits" id="svl-edits" hidden>' + edits
         + '<div class="svl-ed-foot">' + (rows.length ? '<button type="button" class="svl-btn" id="svl-ed-reset">↺ Як було</button>' : '')
-        + (antenna ? '<button type="button" class="svl-btn" id="svl-ed-data" title="Опис, частота, роз\'єм, Digi-Key P/N — '
+        + (product ? '<button type="button" class="svl-btn" id="svl-ed-data" title="Опис, частота, роз\'єм, Digi-Key P/N — '
           + 'запам\'ятовуються для артикула">🔍 Дані зі складу / DigiKey…</button>' : '')
         + '<span class="svl-note">Правки — лише для цього друку, у базі нічого не змінюється'
         + (mark ? '; позначка в куті стане «E»' : '') + '.</span></div></div>' : '')
@@ -474,7 +475,7 @@
     }
     var q = new URLSearchParams({sku: o.sku, qty: o.qty});
     if (o.order) q.set('order', o.order);
-    fetch('/labels/antenna/check/?' + q.toString())
+    fetch('/labels/product/check/?' + q.toString())
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) { alert(d.error || 'Помилка'); return; }
@@ -490,11 +491,16 @@
     var url = '/labels/order/' + encodeURIComponent(o.order) + '/', name = 'Order-' + o.sku;
     if (act === 'download') download(url, name); else open(url, name, 1, act === 'direct', {how: how, o: o});
   }
+  // Те саме правило, що labels_app.views.uses_template: файлу немає — з шаблону; є — антени, фільтри й
+  // кабелі за «Звідки брати етикетку DYMO», інші товари — файл з бази
+  function templ(o) {
+    return !!o.kind && o.kind !== 'order' && (!o.file || (o.kind !== 'generic' && SOURCE === 'generate'));
+  }
   function run(o, act, how) {
     act = act || o.act;
     if (o.kind === 'order') return orderLabel(o, act, how);
     if (act === 'check') return generate(o, 'check', how);
-    if (o.kind && (SOURCE === 'generate' || !o.file)) return generate(o, act, how);
+    if (templ(o)) return generate(o, act, how);
     if (o.file) return fromFile(o, act, how);
     alert('Для ' + o.sku + ' немає етикетки в базі.');
   }
@@ -507,7 +513,7 @@
     var m = document.createElement('div');
     m.id = 'svl-menu'; m.className = 'svl-menu';
     // «· клік» — те, що ця кнопка робить звичайним кліком (run + «Дія при натисканні 🖨️ Друкувати»)
-    var defGen = o.kind && (SOURCE === 'generate' || !o.file);
+    var defGen = templ(o);
     var dl = o.act === 'download', chk = o.act === 'check';
     var direct = o.act === 'direct';
     var clickPrints = direct || (!dl && !chk && DYMO_MODE === 'print');
@@ -526,7 +532,9 @@
       items.push({t: '🖨️ Згенерувати й друкувати на DYMO' + dots, def: defGen && clickPrints,
                   f: function () { generate(o, 'direct'); }});
     }
-    if (o.kind === 'antenna') items.push({t: '🔍 Перевірити дані етикетки…', def: chk, f: function () { generate(o, 'check'); }});
+    if (PRODUCT_KINDS.indexOf(o.kind) >= 0) {
+      items.push({t: '🔍 Перевірити дані етикетки…', def: chk, f: function () { generate(o, 'check'); }});
+    }
     if (o.file) items.push({t: '🖨️ Друкувати файл з бази на DYMO' + dots, def: !defGen && clickPrints,
                             f: function () { fromFile(o, 'direct'); }});
     if (o.kind || o.file) {   // те саме, що клік, але з переглядом / без — навпаки до налаштування
@@ -547,7 +555,8 @@
     var foot = document.createElement('div');
     foot.className = 'svl-foot';
     foot.innerHTML = (o.kind === 'order' ? 'Номер замовлення, країна й усі артикули з кількістю'
-                                          : 'Клік: ' + esc(SOURCE_TEXT)) + ', ' + click
+                                          : 'Клік: ' + (defGen ? '🧩 сформувати з шаблону' : '📄 готовий файл з бази'))
+      + ', ' + click
       + ' · <a href="/admin/sales/salessettings/" target="_blank">змінити</a>';
     m.appendChild(foot);
     document.body.appendChild(m);
@@ -605,17 +614,19 @@
     var old = document.getElementById('svl-modal'); if (old) old.remove();
     var m = document.createElement('div');
     m.id = 'svl-modal'; m.className = 'svl-modal';
+    var names = d.field_names || NAMES;
     var fieldsHtml = Object.keys(NAMES).map(function (f) {
       var input = '<input type="text" id="svl-f-' + f + '" data-f="' + f + '" maxlength="200">';
       if (f === 'digikey_pn') {   // галочка — друкувати рядок на цій етикетці (за замовчуванням — замовлення DigiKey)
         input = '<div style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="svl-dk" title="Друкувати рядок Digi-Key P/N">'
           + input + '</div>';
       }
-      return '<label for="svl-f-' + f + '">' + NAMES[f] + '</label><div>' + input
+      return '<label for="svl-f-' + f + '">' + esc(names[f]) + '</label><div>' + input
         + '<div class="svl-src" id="svl-s-' + f + '"></div><div class="svl-chips" id="svl-c-' + f + '"></div></div>';
     }).join('');
-    m.innerHTML = '<div class="svl-box" role="dialog" aria-label="Етикетка антени">'
-      + '<div class="svl-head"><b>🏷️ Етикетка антени · ' + esc(d.pn) + '</b>'
+    var title = '🏷️ Етикетка ' + (d.kind_title || 'товару') + ' · ' + d.pn;
+    m.innerHTML = '<div class="svl-box" role="dialog" aria-label="' + esc(title) + '">'
+      + '<div class="svl-head"><b>' + esc(title) + '</b>'
       + '<span style="display:flex;gap:12px;align-items:center"><a href="/admin/sales/salessettings/" target="_blank" '
       + 'style="font-size:12px;color:var(--link,#58a6ff)" title="Звідки брати тексти, Digi-Key P/N, коли показувати це вікно">'
       + '⚙️ За замовчуванням</a><button type="button" class="svl-x" title="Закрити">✕</button></span></div>'
@@ -691,7 +702,7 @@
     function recheck(delay) {
       clearTimeout(timer);
       timer = setTimeout(function () {
-        fetch('/labels/antenna/check/?' + new URLSearchParams(params()).toString())
+        fetch('/labels/product/check/?' + new URLSearchParams(params()).toString())
           .then(function (r) { return r.json(); })
           .then(function (d) { if (d.ok) show(d); });
       }, delay);
@@ -710,7 +721,7 @@
         close();
         if (action === 'download') download(d.url, d.pn); else open(d.url, d.pn, d.qty, act === 'direct', {how: how, o: o});
       };
-      fetch('/labels/antenna/save/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+      fetch('/labels/product/save/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
                                       body: JSON.stringify(p)})
         .then(function (r) { return r.json(); })
         .then(function (d) {
@@ -730,6 +741,6 @@
 
   window.svLabel = {run: run, menu: menu, print: directPrint, open: open, choosePrinter: choosePrinter,
                     preview: function (url, name) { return directPrint(url, name, {how: 'preview'}); },
-                    check: function (o) { generate(Object.assign({kind: 'antenna', qty: 1, order: ''}, o), 'check'); }};
+                    check: function (o) { generate(Object.assign({kind: 'generic', qty: 1, order: ''}, o), 'check'); }};
 })();
 </script>

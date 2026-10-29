@@ -86,10 +86,10 @@
                          cursor:pointer;font-size:12px;margin-left:4px">
             🖨️
           </button>
-          {% if lbl.antenna_sku %}
-          <button type="button" data-svl="antenna" data-sku="{{ lbl.antenna_sku }}" data-qty-input="qty-{{ lbl.sku }}"
+          {% if lbl.template_sku %}
+          <button type="button" data-svl="{{ lbl.template_kind }}" data-sku="{{ lbl.template_sku }}" data-qty-input="qty-{{ lbl.sku }}"
                   data-file="1" data-svl-act="check"
-                  title="Сформувати з шаблону антени з актуальними даними (перевірка перед друком) · правий клік — меню"
+                  title="Сформувати з шаблону {{ lbl.template_title }} з актуальними даними (перевірка перед друком) · правий клік — меню"
                   style="background:var(--bg-hover);color:var(--text);padding:4px 8px;
                          border-radius:4px;border:1px solid var(--border-strong);
                          cursor:pointer;font-size:12px;margin-left:4px">
@@ -235,7 +235,7 @@ function fetchPreview() {
   var pvEl  = document.getElementById('genPreview');
   var btn   = document.getElementById('genBtn');
   if (!pn) { pvEl.style.display = 'none'; errEl.style.display = 'none'; btn.disabled = true; btn.style.opacity = '.5'; _previewOk = false; return; }
-  if (/^AN\d{4}/i.test(pn)) {   // антена — далі вікно перевірки етикетки (labels/_label_actions.html)
+  if (!/^CA-/i.test(pn)) {   // не кабель — етикетка товару з шаблону, далі вікно перевірки (labels/_label_actions.html)
     pvEl.style.display = 'none'; errEl.style.display = 'none';
     _previewOk = true; btn.disabled = false; btn.style.opacity = '1';
     return;
@@ -279,7 +279,7 @@ function doGenerate() {
   var qty = parseInt(document.getElementById('genQty').value) || 1;
   var btn = document.getElementById('genBtn');
   if (!pn || !_previewOk) return;
-  if (/^AN\d{4}/i.test(pn)) {
+  if (!/^CA-/i.test(pn)) {
     closeGenModal();
     window.svLabel.check({sku: pn, qty: qty});
     return;

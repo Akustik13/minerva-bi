@@ -174,8 +174,9 @@ class SalesSettingsAdmin(admin.ModelAdmin):
                        'antenna_label_sources', 'antenna_label_digikey', 'antenna_label_window'),
             'description': (
                 'Кнопка 🖨️ Друкувати в замовленнях, картці товару й на сторінці «Наклейки DYMO»; '
-                'правий клік на ній — інші варіанти. Етикетка антени (AN…) формується з шаблону; '
-                'тут — що вікно перевірки бере за замовчуванням.'
+                'правий клік на ній — інші варіанти. Етикетки, якої немає в базі, не буває: антени (AN…), '
+                'фільтри (FT…) та інші товари формуються з шаблону; тут — що вікно перевірки бере за замовчуванням. '
+                'Перегляд, копії й позначка в куті — для всіх етикеток.'
             ),
         }),
         ('⚙️ Поведінка при генерації документів', {
@@ -2259,7 +2260,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         from pathlib import Path
         from django.conf import settings
         from django.template.loader import render_to_string
-        from labels_app.views import label_context, label_kinds
+        from labels_app.views import KIND_TITLES, label_context, label_kinds, uses_template
         import re as _re
 
         if not obj.pk:
@@ -2309,8 +2310,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     f'{"🔄 Оновити етикетку" if label_path else "📎 Додати файл"}</button>'
                 )
                 notes = []
-                if kind and (source == 'generate' or not label_path):
-                    notes.append('🧩 з шаблону ' + ('антени' if kind == 'antenna' else 'кабелю'))
+                if uses_template(kind, bool(label_path), source):
+                    notes.append('🧩 з шаблону ' + KIND_TITLES.get(kind, 'товару'))
                 if label_path:
                     notes.append(f'📄 у базі: {label_path.name}')
                 status = f'<span style="color:#4caf50;font-size:12px;margin-left:8px">✅ {" · ".join(notes)}</span>'

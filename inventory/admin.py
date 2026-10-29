@@ -2655,6 +2655,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception:
             self._cached_labels = set()
         extra = extra_context or {}
+        from labels_app.views import label_context
+        extra['label_ctx'] = label_context()      # кнопки 🖨️ у колонці «🏷️ Друк» (labels/_label_actions.html)
         try:
             extra['dk_sync_status_url'] = reverse('admin:inventory_product_dk_sync_status')
             extra['dk_sync_cancel_url'] = reverse('admin:inventory_product_dk_sync_cancel')
@@ -2940,16 +2942,16 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 </label>'''
 
         from django.template.loader import render_to_string
-        from labels_app.views import label_context, label_kinds
-        kind = label_kinds([sku])[sku]   # антена / кабель — етикетку можна сформувати з шаблону
+        from labels_app.views import KIND_TITLES, label_context, label_kinds, uses_template
+        kind = label_kinds([sku])[sku]   # шаблон етикетки: антена / фільтр / кабель / інший товар
         if label_path or kind:
             url_base = f"/labels/serve/{sku}/"
             _qty_lbl = str(_("К-сть:"))
             _print_lbl = str(_("Друкувати"))
             label_ctx = label_context()
             notes = []
-            if kind and (label_ctx['label_source'] == 'generate' or not label_path):
-                notes.append(str(_("🧩 з шаблону")))
+            if uses_template(kind, bool(label_path), label_ctx['label_source']):
+                notes.append(str(_("🧩 з шаблону")) + ' ' + KIND_TITLES.get(kind, ''))
             if label_path:
                 notes.append(f'📄 {label_path.name}')
             notes.append(str(_("правий клік — меню")))
@@ -2994,6 +2996,9 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     label_detail.short_description = _("Друк етикетки")
 
     def label_btn(self, obj):
+        """🖨️ — як усі кнопки етикеток (labels/_label_actions.html, підключено в change_list.html):
+        файл з бази або, якщо його немає, етикетка з шаблону."""
+        from labels_app.product_label import kind_of
         sku = (obj.sku or "").strip()
         if not sku:
             return format_html('<span style="color:#607d8b">—</span>')
@@ -3011,15 +3016,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             s == sku_up or (s.startswith(sku_up) and len(s) > len(sku_up) and s[len(sku_up)] in (' ', '_'))
             for s in labels
         )
-        if found:
-            url = f"/labels/serve/{sku}/?qty=1"
-            return mark_safe(
-                f'<a href="{url}" '
-                f'style="display:inline-block;background:#1976d2;color:#fff;'
-                f'padding:3px 10px;border-radius:6px;font-size:11px;text-decoration:none;white-space:nowrap">'
-                f'🖨️ Друк</a>')
-        return mark_safe(
-            f'<span style="color:#607d8b;font-size:11px" title="Немає {sku}.dymo">—</span>')
+        title = f'{_("файл з бази") if found else _("з шаблону — файлу немає")} · {_("правий клік — меню")}'
+        return format_html(
+            '<button type="button" data-svl="{}" data-sku="{}" data-qty="1" data-file="{}" data-svl-act="print" '
+            'title="{}" style="display:inline-block;background:{};color:#fff;border:none;cursor:pointer;'
+            'padding:3px 10px;border-radius:6px;font-size:11px;white-space:nowrap">🖨️ {}</button>',
+            kind_of(sku, obj.category), sku, '1' if found else '', title,
+            '#1976d2' if found else '#455a64', _("Друк"))
     label_btn.short_description = _("🏷️ Друк")
 
     def movement_history(self, obj):

@@ -100,26 +100,28 @@ def serve_label(request, sku):
     return response
 
 
+KIND_TITLES = {'antenna': 'антени', 'filter': 'фільтра', 'cable': 'кабелю', 'generic': 'товару'}
+
+
 def label_kinds(skus) -> dict:
-    """{sku: 'antenna' | 'cable' | ''} — чи можна сформувати етикетку з шаблону (інакше лише готовий файл)."""
-    from shipping.services.dymo_label_service import parse_part_number
+    """{sku: 'antenna' | 'filter' | 'cable' | 'generic'} — шаблон, з якого формується етикетка артикула
+    (labels_app/product_label.kind_of); без артикула — ''. Етикетка є для кожного артикула."""
     from inventory.models import Product
-    from labels_app import antenna
-    by_category = {s.upper() for s in Product.objects.filter(category__icontains='antenn', sku__in=list(skus))
-                   .values_list('sku', flat=True)}
-    kinds = {}
-    for sku in skus:
-        kind = ''
-        if sku.upper().startswith('CA-'):
-            try:
-                parse_part_number(sku)
-                kind = 'cable'
-            except ValueError:
-                pass
-        elif antenna.is_antenna(sku) or sku.upper() in by_category:
-            kind = 'antenna'
-        kinds[sku] = kind
-    return kinds
+    from labels_app import product_label
+    skus = list(skus)
+    categories = {sku.upper(): category for sku, category in
+                  Product.objects.filter(sku__in=skus).values_list('sku', 'category')}
+    return {sku: product_label.kind_of(sku, categories.get(sku.upper(), '')) for sku in skus}
+
+
+def uses_template(kind, has_file, source=None) -> bool:
+    """Загальне правило (те саме в labels/_label_actions.html): файлу немає — етикетка з шаблону;
+    файл є — антени, фільтри й кабелі за «Звідки брати етикетку DYMO», інші товари — файл."""
+    if not kind:
+        return False
+    if not has_file:
+        return True
+    return kind != 'generic' and (source or label_source()) == 'generate'
 
 
 def label_context() -> dict:
@@ -222,31 +224,39 @@ def delete_label(request, sku):
 @staff_member_required
 def list_labels(request):
     """Список всіх доступних етикеток — HTML-сторінка або JSON (?json=1)."""
-    from labels_app import antenna
+    from inventory.models import Product
     LABELS_DIR.mkdir(parents=True, exist_ok=True)
+    files = sorted(LABELS_DIR.glob('*.dymo'))
+    bases = {f: re.split(r'[ _]', f.stem.strip(), maxsplit=1)[0] for f in files}   # «AN100201-01H Alt» → AN100201-01H
+    kinds = label_kinds(set(bases.values()))
+    products = {s.upper() for s in Product.objects.filter(sku__in=list(set(bases.values()))).values_list('sku', flat=True)}
     labels = []
-    for f in sorted(LABELS_DIR.glob('*.dymo')):
+    for f in files:
         mtime = f.stat().st_mtime
         sku = f.stem
-        base_sku = re.split(r'[ _]', sku.strip(), maxsplit=1)[0]   # «AN100201-01H Alt» → AN100201-01H
+        base_sku, kind = bases[f], kinds[bases[f]]
+        # 🧩 — та сама етикетка з шаблону з актуальними даними (антени й фільтри за префіксом, інші — товари складу)
+        template = kind in ('antenna', 'filter') or (kind == 'generic' and base_sku.upper() in products)
         labels.append({
             'sku': sku,
             'filename': f.name,
             'size_kb': round(f.stat().st_size / 1024, 1),
             'modified_fmt': datetime.fromtimestamp(mtime).strftime('%d.%m.%Y %H:%M'),
             'is_cable': sku.upper().startswith('CA-'),
-            'antenna_sku': base_sku if antenna.is_antenna(base_sku) else '',
+            'template_sku': base_sku if template else '',
+            'template_kind': kind if template else '',
+            'template_title': KIND_TITLES.get(kind, ''),
         })
     if request.GET.get('json'):
         return JsonResponse({'labels': labels})
     return render(request, 'labels/list.html', {'labels': labels, **label_context()})
 
 
-# ── Етикетки антен з шаблону (labels_app/antenna.py) ──────────────────────────
+# ── Етикетки товарів з шаблону: антени, фільтри, інші (labels_app/product_label.py) ──
 
-def _antenna_args(params):
+def _label_args(params):
     """sku, qty, замовлення, Digi-Key P/N (None — за джерелом замовлення), виправлення з вікна."""
-    from labels_app import antenna
+    from labels_app import product_label
     from sales.models import SalesOrder
     order = None
     order_id = str(params.get('order') or '').strip()
@@ -254,64 +264,64 @@ def _antenna_args(params):
         order = SalesOrder.objects.filter(pk=int(order_id)).first()
     dk = params.get('dk')
     show_dk = None if dk in (None, '') else str(dk).lower() in ('1', 'true', 'on')
-    edits = {f: params.get(f) for f in antenna.EDIT_FIELDS if params.get(f) is not None}
+    edits = {f: params.get(f) for f in product_label.EDIT_FIELDS if params.get(f) is not None}
     return (params.get('sku') or '').strip(), params.get('qty') or 1, order, show_dk, edits
 
 
-def _antenna_json(data, order):
+def _label_json(data, order):
     from urllib.parse import quote, urlencode
     query = {'qty': data['qty'], 'dk': int(data['show_dk'])}
     if order is not None:
         query['order'] = order.pk
     data = dict(data, lines=[[prefix, value] for prefix, value in data['lines']])
-    data['url'] = f"/labels/antenna/{quote(data['pn'])}/?{urlencode(query)}"
+    data['url'] = f"/labels/product/{quote(data['pn'])}/?{urlencode(query)}"
     if data['file']:
         data['file_url'] = f"/labels/serve/{quote(data['sku'] or data['pn'])}/?qty={data['qty']}"
     return JsonResponse({'ok': True, **data})
 
 
 @staff_member_required
-def antenna_check(request):
+def product_check(request):
     """GET ?sku=&qty=&order=[&dk=&description=&frequency=&connector=] → дані для вікна перевірки."""
-    from labels_app import antenna
-    sku, qty, order, show_dk, edits = _antenna_args(request.GET)
+    from labels_app import product_label
+    sku, qty, order, show_dk, edits = _label_args(request.GET)
     if not sku:
         return JsonResponse({'ok': False, 'error': 'sku required'}, status=400)
-    return _antenna_json(antenna.build(sku, qty, order=order, show_dk=show_dk, edits=edits), order)
+    return _label_json(product_label.build(sku, qty, order=order, show_dk=show_dk, edits=edits), order)
 
 
 @staff_member_required
 @require_POST
-def antenna_save(request):
+def product_save(request):
     """POST JSON {sku, qty, order, dk, description, frequency, connector} — людина перевірила етикетку."""
     import json as _json
-    from labels_app import antenna
+    from labels_app import product_label
     try:
         payload = _json.loads(request.body or b'{}')
     except ValueError:
         return JsonResponse({'ok': False, 'error': 'JSON required'}, status=400)
-    sku, qty, order, show_dk, edits = _antenna_args(payload)
+    sku, qty, order, show_dk, edits = _label_args(payload)
     if not sku:
         return JsonResponse({'ok': False, 'error': 'sku required'}, status=400)
-    data = antenna.build(sku, qty, order=order, show_dk=show_dk, edits=edits)
+    data = product_label.build(sku, qty, order=order, show_dk=show_dk, edits=edits)
     if not data['can_print']:
         return JsonResponse({'ok': False, 'error': next(i['text'] for i in data['issues'] if i['level'] == 'error')},
                             status=400)
-    antenna.save(sku, edits, user=request.user)
-    return _antenna_json(antenna.build(sku, qty, order=order, show_dk=show_dk), order)
+    product_label.save(sku, edits, user=request.user)
+    return _label_json(product_label.build(sku, qty, order=order, show_dk=show_dk), order)
 
 
 @staff_member_required
-def antenna_label(request, sku):
-    """Готовий .dymo антени з шаблону з актуальними даними (?qty=&order=&dk=)."""
-    from labels_app import antenna, mark
-    _sku, qty, order, show_dk, _edits = _antenna_args({**request.GET.dict(), 'sku': sku})
-    data = antenna.build(sku, qty, order=order, show_dk=show_dk)
+def product_label_file(request, sku):
+    """Готовий .dymo товару з шаблону з актуальними даними (?qty=&order=&dk=)."""
+    from labels_app import mark, product_label
+    _sku, qty, order, show_dk, _edits = _label_args({**request.GET.dict(), 'sku': sku})
+    data = product_label.build(sku, qty, order=order, show_dk=show_dk)
     if not data['can_print']:
         problems = '; '.join(i['text'] for i in data['issues'] if i['level'] == 'error')
         return HttpResponse(f'Етикетку {sku} не сформовано: {problems}', status=400,
                             content_type='text/plain; charset=utf-8')
-    xml = mark.stamp(antenna.render(data), data['origin'])
+    xml = mark.stamp(product_label.render(data), data['origin'])
     response = HttpResponse(xml.encode('utf-8'), content_type='application/octet-stream')
     response['Content-Disposition'] = f'attachment; filename="{data["pn"]}.dymo"'
     return response

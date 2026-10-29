@@ -321,7 +321,7 @@ class SalesSettings(models.Model):
     )
 
     class DymoLabelSource(models.TextChoices):
-        GENERATE = "generate", "🧩 Сформувати з шаблону з актуальними даними (антени AN…, кабелі CA-…)"
+        GENERATE = "generate", "🧩 Сформувати з шаблону з актуальними даними (антени AN…, фільтри FT…, кабелі CA-…)"
         FILE     = "file",     "📄 Готовий .dymo файл з бази, як є"
 
     dymo_label_source = models.CharField(
@@ -329,9 +329,10 @@ class SalesSettings(models.Model):
         max_length=16,
         choices=DymoLabelSource.choices,
         default=DymoLabelSource.GENERATE,
-        help_text="«Сформувати» — антени й кабелі заповнюються з шаблону: артикул, кількість із замовлення, "
-                  "опис / частота / роз'єм зі складу або DigiKey, поточний рік; перший раз — вікно перевірки. "
-                  "Решта товарів — готовий файл. "
+        help_text="Загальне правило: файлу в базі немає — етикетка будь-якого товару формується з шаблону. "
+                  "«Сформувати» — антени, фільтри й кабелі з шаблону навіть коли файл є: артикул, кількість "
+                  "із замовлення, опис / частота / роз'єм зі складу або DigiKey, поточний рік; перший раз — "
+                  "вікно перевірки. Інші товари з файлом — файл. "
                   "Правий клік на 🖨️ Друкувати — меню: «Завантажити з бази» / «Згенерувати й завантажити».",
     )
 
@@ -354,14 +355,14 @@ class SalesSettings(models.Model):
                   "E — поправлено вручну; далі дата (напр. «A 29.10.26»).",
     )
 
-    # ── Етикетка антени: вікно перевірки за замовчуванням (labels_app/antenna.py) ──
+    # ── Етикетка з шаблону (антени, фільтри, інші товари): вікно перевірки за замовчуванням (labels_app/product_label.py) ──
     class AntennaLabelSources(models.TextChoices):
         STOCK   = "stock",   "📦 Склад → 🔷 DigiKey → 📄 стара етикетка"
         FILE    = "file",    "📄 Стара етикетка → 📦 склад → 🔷 DigiKey"
         DIGIKEY = "digikey", "🔷 DigiKey → 📦 склад → 📄 стара етикетка"
 
     antenna_label_sources = models.CharField(
-        "Етикетка антени: звідки брати опис, частоту, роз'єм",
+        "Етикетка з шаблону: звідки брати опис, частоту, роз'єм",
         max_length=16,
         choices=AntennaLabelSources.choices,
         default=AntennaLabelSources.STOCK,
@@ -375,7 +376,7 @@ class SalesSettings(models.Model):
         NEVER          = "never",          "Ні (можна ввімкнути галочкою у вікні)"
 
     antenna_label_digikey = models.CharField(
-        "Етикетка антени: рядок Digi-Key P/N",
+        "Етикетка з шаблону: рядок Digi-Key P/N",
         max_length=16,
         choices=AntennaLabelDigikey.choices,
         default=AntennaLabelDigikey.DIGIKEY_ORDERS,
@@ -387,7 +388,7 @@ class SalesSettings(models.Model):
         ALWAYS = "always", "Завжди перед друком"
 
     antenna_label_window = models.CharField(
-        "Етикетка антени: коли показувати вікно перевірки",
+        "Етикетка з шаблону: коли показувати вікно перевірки",
         max_length=16,
         choices=AntennaLabelWindow.choices,
         default=AntennaLabelWindow.AUTO,
