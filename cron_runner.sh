@@ -105,6 +105,7 @@ while true; do
   # ── Кабінет покупців магазину: прострочені сесії й посилання — раз на добу ──
   if [ "$current_day" != "$last_cleanup_day" ]; then
     python manage.py shop_accounts_cleanup 2>&1 || true
+    python manage.py api_log_cleanup 2>&1 || true        # 📜 Журнал API: старші за API_LOG_DAYS
     last_cleanup_day=$current_day
   fi
 

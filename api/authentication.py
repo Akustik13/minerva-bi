@@ -18,8 +18,17 @@ class APIKeyAuthentication(BaseAuthentication):
         except APIKey.DoesNotExist:
             raise AuthenticationFailed('Невірний або неактивний токен.')
 
+        target = getattr(request, '_request', request)
+        target.api_key_seen = api_key          # для журналу — навіть якщо далі відмова
         if api_key.expires_at and api_key.expires_at < timezone.now().date():
+            target.api_log_note = 'ключ прострочений'
             raise AuthenticationFailed('Токен прострочений.')
+
+        from .key_limits import client_ip, ip_allowed
+        ip = client_ip(request)
+        if not ip_allowed(api_key, ip):
+            target.api_log_note = 'адреса не в «Дозволених IP» ключа'
+            raise AuthenticationFailed(f'Цей ключ не дозволено використовувати з адреси {ip or "?"}.')
 
         # Оновлення last_used без зайвого SELECT
         APIKey.objects.filter(pk=api_key.pk).update(last_used=timezone.now())

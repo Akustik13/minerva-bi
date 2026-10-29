@@ -66,7 +66,7 @@ def _get_app_list(self, request, app_label=None):
                       'purchaseorder', 'purchaseorderline'],
         'shipping': ['carrier', 'shippingsettings', 'packagingmaterial', 'shipment', 'orderpackaging'],
         'config':   ['systemsettings', 'documentsettings', 'notificationsettings', 'themesettings'],
-        'api':          ['apikey', 'webhook', 'webhookdelivery'],
+        'api':          ['apikey', 'apirequestlog', 'webhook', 'webhookdelivery'],
         'shop':         ['shop', 'shoplisting', 'shopproduct', 'productmedia', 'shopcustomer', 'shoppayment',
                          'shopmailtemplate', 'shopsettings'],
         'scraper_hub':  ['scrapersiteconfig', 'scraperrun', 'scraperdocument'],

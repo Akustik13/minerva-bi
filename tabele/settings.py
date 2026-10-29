@@ -87,6 +87,7 @@ SITE_ID = 1
 
 _MIDDLEWARE_BASE = [
     "api.middleware.APICorsMiddleware",   # CORS тільки для /api/v1/ (ключ у заголовку, без cookie)
+    "api.middleware.APIRequestLogMiddleware",  # журнал запитів ключів API (api/key_limits.py)
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -241,6 +242,9 @@ LOGGING = {
 }
 
 # ── Django REST Framework ─────────────────────────────────────────────────────
+# Журнал запитів ключів API (📜 Журнал API) — скільки днів зберігати (manage.py api_log_cleanup)
+API_LOG_DAYS = int(os.getenv("API_LOG_DAYS", "60"))
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "api.authentication.APIKeyAuthentication",
@@ -257,13 +261,13 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_RENDERER_CLASSES": (
         [
-            "rest_framework.renderers.JSONRenderer",
+            "api.renderers.KeyJSONRenderer",
             "rest_framework.renderers.BrowsableAPIRenderer",
         ]
         if DEBUG
-        else ["rest_framework.renderers.JSONRenderer"]
+        else ["api.renderers.KeyJSONRenderer"]   # JSON з обмеженнями ключа (поля, записів за добу)
     ),
-    "DEFAULT_THROTTLE_CLASSES": ["api.throttling.APIKeyRateThrottle"],
+    "DEFAULT_THROTTLE_CLASSES": ["api.throttling.APIKeyRateThrottle", "api.throttling.APIKeyQuotaThrottle"],
     "DEFAULT_THROTTLE_RATES": {"apikey": os.getenv("API_RATE_LIMIT", "120/min"),
                                "knowledge": os.getenv("KNOWLEDGE_RATE_LIMIT", "600/min")},
     "COERCE_DECIMAL_TO_STRING": False,

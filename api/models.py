@@ -38,6 +38,14 @@ EXPLICIT_EVENTS = {'purchase_order.updated'}
 
 
 class APIKey(models.Model):
+    LOG_ALL, LOG_CHANGES, LOG_ERRORS, LOG_OFF = 'all', 'changes', 'errors', 'off'
+    LOG_CHOICES = [
+        (LOG_ALL, 'Усі запити'),
+        (LOG_CHANGES, 'Лише зміни (POST / PATCH / DELETE) і помилки'),
+        (LOG_ERRORS, 'Лише помилки й відмови'),
+        (LOG_OFF, 'Не записувати'),
+    ]
+
     name       = models.CharField('Назва', max_length=100)
     key        = models.CharField('Ключ', max_length=64, unique=True, editable=False)
     scopes     = models.JSONField('Права доступу', default=list)
@@ -56,6 +64,28 @@ class APIKey(models.Model):
         help_text="Slug джерела (SalesSource) для замовлень, створених цим ключем, "
                   "якщо в запиті не вказано 'source'. Напр.: webshop",
     )
+
+    # ── Обмеження й журнал (api/key_limits.py) ──
+    allowed_ips = models.TextField(
+        'Дозволені IP-адреси', blank=True, default='',
+        help_text='Адреси або мережі через кому чи з нового рядка (203.0.113.5, 10.0.0.0/24). '
+                  'Порожньо — з будь-якої адреси. З іншої адреси ключ не працює (401).')
+    limit_minute = models.PositiveIntegerField(
+        'Запитів за хвилину', null=True, blank=True,
+        help_text='Порожньо — загальний ліміт сервера (API_RATE_LIMIT, зазвичай 120).')
+    limit_hour = models.PositiveIntegerField('Запитів за годину', null=True, blank=True,
+                                             help_text='Календарна година. Порожньо — без ліміту.')
+    limit_day = models.PositiveIntegerField('Запитів за добу', null=True, blank=True,
+                                            help_text='Календарна доба (Europe/Berlin). Порожньо — без ліміту.')
+    items_per_day = models.PositiveIntegerField(
+        'Різних записів за добу', null=True, blank=True,
+        help_text='Скільки різних товарів / замовлень (за артикулом або номером) ключ може побачити за добу. '
+                  'Уже переглянуті сьогодні — без обмежень, решта у списках приховується. Порожньо — без ліміту.')
+    fields = models.TextField(
+        'Лише ці поля у відповідях', blank=True, default='',
+        help_text='Напр. «sku, available» — у списках і картках записів лишаться тільки ці поля. '
+                  'Порожньо — усі поля.')
+    log_mode = models.CharField('Журнал запитів', max_length=8, choices=LOG_CHOICES, default=LOG_ALL)
 
     class Meta:
         verbose_name = 'API Ключ'
@@ -155,3 +185,35 @@ class WebhookDelivery(models.Model):
 
     def __str__(self):
         return f"{self.event} → {self.webhook}"
+
+
+class APIRequestLog(models.Model):
+    """Журнал запитів до /api/v1/: який ключ, з якої адреси, що робив, чим відповіли (api/key_limits.record)."""
+    created_at = models.DateTimeField('Коли', auto_now_add=True, db_index=True)
+    key = models.ForeignKey(APIKey, on_delete=models.SET_NULL, null=True, blank=True,
+                            related_name='request_logs', verbose_name='Ключ')
+    key_name = models.CharField('Назва ключа', max_length=100, blank=True, default='')
+    key_hint = models.CharField('Невідомий ключ', max_length=20, blank=True, default='',
+                                help_text='Початок і кінець ключа, з яким не пустили')
+    ip = models.GenericIPAddressField('IP-адреса', null=True, blank=True, db_index=True)
+    method = models.CharField('Метод', max_length=8)
+    path = models.CharField('Адреса', max_length=300)
+    query = models.CharField('Параметри', max_length=500, blank=True, default='')
+    view = models.CharField('Дія', max_length=100, blank=True, default='')
+    scope = models.CharField('Право', max_length=40, blank=True, default='')
+    status = models.PositiveSmallIntegerField('Відповідь', db_index=True)
+    code = models.CharField('Код помилки', max_length=50, blank=True, default='')
+    items = models.PositiveIntegerField('Записів', null=True, blank=True)
+    objects_text = models.CharField('Артикули / номери', max_length=300, blank=True, default='')
+    note = models.CharField('Примітка', max_length=300, blank=True, default='')
+    duration_ms = models.PositiveIntegerField('мс', default=0)
+    user_agent = models.CharField('Програма', max_length=200, blank=True, default='')
+
+    class Meta:
+        verbose_name = 'Запит API'
+        verbose_name_plural = '📜 Журнал API'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['key', '-created_at'], name='api_log_key_time')]
+
+    def __str__(self):
+        return f'{self.method} {self.path} → {self.status}'

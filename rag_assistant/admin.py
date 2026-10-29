@@ -501,7 +501,8 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
         from api.models import APIKey
         if request.method != "POST" or not request.user.has_perm("api.add_apikey"):
             return self._back()
-        key = APIKey.objects.create(name=f"RAG — база знань ({timezone.localdate():%d.%m.%Y})", scopes=FEED_SCOPES)
+        key = APIKey.objects.create(name=f"RAG — база знань ({timezone.localdate():%d.%m.%Y})", scopes=FEED_SCOPES,
+                                    log_mode=APIKey.LOG_CHANGES)   # RAG опитує стрічку постійно — журнал лише змін
         self.message_user(request, "Створено ключ для RAG. Скопіюйте його з розділу «Технічна інформація» у "
                                    "конфігурацію RAG; старий ключ, якщо він більше не потрібен, вимкніть.")
         return redirect(reverse("admin:api_apikey_change", args=[key.pk]))

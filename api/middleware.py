@@ -1,3 +1,5 @@
+import time
+
 from django.http import HttpResponse
 
 API_PREFIX = "/api/v1/"
@@ -31,4 +33,29 @@ class APICorsMiddleware:
             response = self.get_response(request)
         for k, v in self.HEADERS.items():
             response[k] = v
+        return response
+
+
+class APIRequestLogMiddleware:
+    """Журнал запитів до /api/v1/ з ключем (і спроб із невідомим ключем): хто, звідки, що, чим відповіли.
+    Що записувати — «Журнал запитів» ключа; логіка — api/key_limits.record."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if not request.path.startswith(API_PREFIX) or request.method == "OPTIONS":
+            return self.get_response(request)
+        started = time.monotonic()
+        response = self.get_response(request)
+        auth = request.META.get("HTTP_AUTHORIZATION", "")
+        key = getattr(request, "api_key_seen", None)
+        if key is None and not auth.startswith("Token "):
+            return response                       # без ключа (вебхук Stripe, сесія адмінки) — не пишемо
+        hint = ""
+        if key is None:
+            from core.secrets import mask
+            hint = mask(auth[6:].strip()) if auth[6:].strip() else "порожній"
+        from .key_limits import record
+        record(request, response, started, key=key, key_hint=hint)
         return response
