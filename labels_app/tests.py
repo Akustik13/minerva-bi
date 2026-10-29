@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from bots.models import DigiKeyConfig, DigiKeyListing
 from inventory.models import Product
-from labels_app import antenna, order_label
+from labels_app import antenna, mark, order_label
 from labels_app import views as label_views
 from labels_app.models import LabelText
 from sales.models import SalesOrder, SalesSettings
@@ -376,7 +376,7 @@ class LabelViewsTests(TestCase):
 
 
 class OrderLabelTests(TestCase):
-    """Етикетка замовлення: номер (текст і штрихкод) і всі артикули з кількістю."""
+    """Етикетка замовлення: номер, країна й усі артикули з кількістю."""
 
     def setUp(self):
         from config.models import SystemSettings
@@ -542,3 +542,89 @@ class LabelSettingsTests(TestCase):
         r = self.client.get(f"/admin/sales/salessettings/{self.settings.pk}/change/")
         self.assertContains(r, "🏷️ Етикетки DYMO")
         self.assertContains(r, "id_antenna_label_window")
+        self.assertContains(r, "id_dymo_print_preview")
+        self.assertContains(r, "id_dymo_origin_mark")
+
+
+class OriginMarkTests(TestCase):
+    """Позначка походження в куті етикетки: A — з шаблону, B — файл з бази, E — поправлено вручну."""
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+        patcher = mock.patch.object(label_views, "LABELS_DIR", self.dir)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.get_or_create(pk=1)[0]
+        ss.is_onboarding_complete = True
+        ss.save()
+        self.client.force_login(User.objects.create_user("staff", password="x", is_staff=True, is_superuser=True))
+        self.product = Product.objects.create(
+            sku="AN220213-01C", name_export="Multi-purpose UWB PCB antenna",
+            tech_attributes={"Frequency Range": "370MHz ~ 6GHz", "Termination": "SMA Female"})
+        self.today = timezone.localdate().strftime("%d.%m.%y")
+
+    def marks(self, xml):
+        root = ET.fromstring(xml)
+        return [o for o in root.iter("TextObject") if o.findtext("Name") == mark.NAME]
+
+    def mark_text(self, xml):
+        found = self.marks(xml)
+        self.assertEqual(len(found), 1)
+        return next(found[0].iter("Text")).text
+
+    def test_stamp_is_in_the_free_strip_and_replaced_not_doubled(self):
+        xml = antenna.render({"pn": "AN1", "qty": 1, "year": 2026, "lines": [("", "Antenna.")]})
+        once = mark.stamp(xml, "auto", on=True)
+        self.assertEqual(self.mark_text(once), "A " + self.today)
+        obj = self.marks(once)[0]
+        x = float(obj.find("ObjectLayout/DYMOPoint/X").text)
+        self.assertGreater(x, 3.363)                         # праворуч від усіх об'єктів наших макетів
+        self.assertAlmostEqual(x + float(obj.find("ObjectLayout/Size/Width").text), 0.2233333 + 3.203333, places=3)
+        twice = mark.stamp(once, "file", on=True)
+        self.assertEqual(self.mark_text(twice), "B " + self.today)
+        self.assertEqual(self.marks(mark.stamp(twice, "file", on=False)), [])
+        self.assertEqual(mark.stamp("<DieCutLabel/>", "file", on=True), "<DieCutLabel/>")   # старий формат — як є
+
+    def test_every_label_gets_its_mark(self):
+        (self.dir / "FT220407-01A.dymo").write_text(
+            antenna.render({"pn": "FT220407-01A", "qty": 3, "year": 2025, "lines": []}), encoding="utf-8")
+        r = self.client.get("/labels/serve/FT220407-01A/?qty=5")
+        self.assertEqual(self.mark_text(r.content), "B " + self.today)
+        self.assertIn("QTY: 5 PCS", r.content.decode())
+        r = self.client.get("/labels/serve/FT220407-01A/?qty=5&origin=auto")    # кабель, щойно з шаблону
+        self.assertEqual(self.mark_text(r.content), "A " + self.today)
+        r = self.client.get("/labels/antenna/AN220213-01C/?qty=2")
+        self.assertEqual(self.mark_text(r.content), "A " + self.today)
+        order = SalesOrder.objects.create(source="digikey", order_number="102497269")
+        from sales.models import SalesOrderLine
+        SalesOrderLine.objects.create(order=order, product=self.product, sku_raw="AN220213-01C", qty=2)
+        r = self.client.get(f"/labels/order/{order.pk}/")
+        self.assertEqual(self.mark_text(r.content), "A " + self.today)
+        ss = SalesSettings.get()
+        ss.dymo_origin_mark = False
+        ss.save()
+        self.assertEqual(self.marks(self.client.get("/labels/serve/FT220407-01A/").content), [])
+        self.assertEqual(self.marks(self.client.get("/labels/antenna/AN220213-01C/?qty=2").content), [])
+
+    def test_antenna_text_typed_by_a_person_is_marked_e(self):
+        antenna.save("AN220213-01C", {"description": "Multi-purpose UWB PCB antenna", "frequency": "0.370...6 GHz",
+                                      "connector": "SMA Female"})
+        self.assertEqual(antenna.build("AN220213-01C")["origin"], "auto")      # перевірено, але як на складі
+        antenna.save("AN220213-01C", {"description": "UWB antenna, special batch"})
+        self.assertEqual(antenna.build("AN220213-01C")["origin"], "edited")
+        r = self.client.get("/labels/antenna/AN220213-01C/?qty=2")
+        self.assertEqual(self.mark_text(r.content), "E " + self.today)
+
+    def test_preview_setting_reaches_every_page(self):
+        ss = SalesSettings.get()
+        self.assertEqual((ss.dymo_print_preview, ss.dymo_origin_mark), ("preview", True))
+        self.assertIn("PREVIEW = 'preview' !== 'direct'", self.client.get("/labels/").content.decode())
+        ss.dymo_print_preview = "direct"
+        ss.save()
+        order = SalesOrder.objects.create(source="digikey", order_number="102437554")
+        from sales.models import SalesOrderLine
+        SalesOrderLine.objects.create(order=order, product=self.product, sku_raw="AN220213-01C", qty=2)
+        for url in ("/labels/", "/admin/sales/salesorder/", f"/admin/sales/salesorder/{order.pk}/change/"):
+            self.assertContains(self.client.get(url), "PREVIEW = 'direct' !== 'direct'", msg_prefix=url)

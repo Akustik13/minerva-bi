@@ -335,6 +335,25 @@ class SalesSettings(models.Model):
                   "Правий клік на 🖨️ Друкувати — меню: «Завантажити з бази» / «Згенерувати й завантажити».",
     )
 
+    class DymoPrintPreview(models.TextChoices):
+        PREVIEW = "preview", "👁 Спершу перегляд: як виглядає, кількість копій, правки — потім друк"
+        DIRECT  = "direct",  "⚡ Одразу на принтер, 1 копія"
+
+    dymo_print_preview = models.CharField(
+        "Друк на DYMO: перегляд перед друком",
+        max_length=16,
+        choices=DymoPrintPreview.choices,
+        default=DymoPrintPreview.PREVIEW,
+        help_text="Коли етикетка йде на принтер DYMO. Перегляд малює сама служба DYMO — так, як надрукує; "
+                  "«✏️ Правки» — тексти й штрихкод лише для цього друку. Правий клік на 🖨️ — другий варіант.",
+    )
+    dymo_origin_mark = models.BooleanField(
+        "Позначка походження на етикетці",
+        default=True,
+        help_text="Дрібно, вертикально біля правого краю: A — з шаблону, B — файл з бази, "
+                  "E — поправлено вручну; далі дата (напр. «A 29.10.26»).",
+    )
+
     # ── Етикетка антени: вікно перевірки за замовчуванням (labels_app/antenna.py) ──
     class AntennaLabelSources(models.TextChoices):
         STOCK   = "stock",   "📦 Склад → 🔷 DigiKey → 📄 стара етикетка"

@@ -598,7 +598,7 @@ document.addEventListener('DOMContentLoaded', function () {
   {{ block.super }}
 </div>
 
-{% include "labels/_label_actions.html" with label_source=sv_dymo_label_source dymo_mode=sv_dymo_open_mode %}
+{% include "labels/_label_actions.html" with label_source=sv_dymo_label_source dymo_mode=sv_dymo_open_mode print_preview=sv_dymo_print_preview %}
 
 <script>
 // ── DYMO mode from server settings ───────────────────────────────────────────

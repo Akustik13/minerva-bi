@@ -77,7 +77,9 @@ def patch_dymo_qty(content: str, qty: int) -> str:
 
 @staff_member_required
 def serve_label(request, sku):
-    """Повертає dymo файл для скачування/відкриття."""
+    """Повертає dymo файл для скачування/відкриття; ?origin=auto — щойно сформований з шаблону (кабель),
+    інакше файл з бази — для позначки в куті (labels_app/mark.py)."""
+    from labels_app import mark
     # qty=0 (default when not provided) → serve raw file without modification
     qty = int(request.GET.get('qty', 0))
 
@@ -88,9 +90,10 @@ def serve_label(request, sku):
     with open(path, 'rb') as f:
         raw = f.read()
 
+    content = raw.decode('utf-8-sig')
     if qty > 0:
-        content = patch_dymo_qty(raw.decode('utf-8-sig'), qty)
-        raw = content.encode('utf-8')
+        content = patch_dymo_qty(content, qty)
+    raw = mark.stamp(content, 'auto' if request.GET.get('origin') == 'auto' else 'file').encode('utf-8')
 
     response = HttpResponse(raw, content_type='application/octet-stream')
     response['Content-Disposition'] = f'attachment; filename="{sku}.dymo"'
@@ -120,14 +123,15 @@ def label_kinds(skus) -> dict:
 
 
 def label_context() -> dict:
-    """Контекст labels/_label_actions.html: «Звідки брати етикетку DYMO» (generate / file)
-    і «Дія при натисканні 🖨️ Друкувати» (download / print — одразу на DYMO / ask)."""
+    """Контекст labels/_label_actions.html: «Звідки брати етикетку DYMO» (generate / file),
+    «Дія при натисканні 🖨️ Друкувати» (download / print — на DYMO / ask) і перегляд перед друком (preview / direct)."""
     try:
         from sales.models import SalesSettings
         settings_ = SalesSettings.get()
-        return {'label_source': settings_.dymo_label_source, 'dymo_mode': settings_.dymo_open_mode}
+        return {'label_source': settings_.dymo_label_source, 'dymo_mode': settings_.dymo_open_mode,
+                'print_preview': settings_.dymo_print_preview}
     except Exception:
-        return {'label_source': 'generate', 'dymo_mode': 'download'}
+        return {'label_source': 'generate', 'dymo_mode': 'download', 'print_preview': 'preview'}
 
 
 def label_source() -> str:
@@ -300,23 +304,24 @@ def antenna_save(request):
 @staff_member_required
 def antenna_label(request, sku):
     """Готовий .dymo антени з шаблону з актуальними даними (?qty=&order=&dk=)."""
-    from labels_app import antenna
+    from labels_app import antenna, mark
     _sku, qty, order, show_dk, _edits = _antenna_args({**request.GET.dict(), 'sku': sku})
     data = antenna.build(sku, qty, order=order, show_dk=show_dk)
     if not data['can_print']:
         problems = '; '.join(i['text'] for i in data['issues'] if i['level'] == 'error')
         return HttpResponse(f'Етикетку {sku} не сформовано: {problems}', status=400,
                             content_type='text/plain; charset=utf-8')
-    response = HttpResponse(antenna.render(data).encode('utf-8'), content_type='application/octet-stream')
+    xml = mark.stamp(antenna.render(data), data['origin'])
+    response = HttpResponse(xml.encode('utf-8'), content_type='application/octet-stream')
     response['Content-Disposition'] = f'attachment; filename="{data["pn"]}.dymo"'
     return response
 
 
 @staff_member_required
 def order_label(request, pk):
-    """Етикетка замовлення: номер (текст і штрихкод) і всі артикули з кількістю (labels_app/order_label.py)."""
+    """Етикетка замовлення: номер, країна й усі артикули з кількістю (labels_app/order_label.py)."""
     from django.shortcuts import get_object_or_404
-    from labels_app import order_label as builder
+    from labels_app import mark, order_label as builder
     from sales.models import SalesOrder
     order = get_object_or_404(SalesOrder, pk=pk)
     data = builder.build(order)
@@ -324,7 +329,8 @@ def order_label(request, pk):
         return HttpResponse(f'У замовленні {order.order_number} немає позицій з артикулом.', status=400,
                             content_type='text/plain; charset=utf-8')
     name = re.sub(r'[^\w.-]+', '_', order.order_number) or str(order.pk)
-    response = HttpResponse(builder.render(data).encode('utf-8'), content_type='application/octet-stream')
+    xml = mark.stamp(builder.render(data), 'auto')
+    response = HttpResponse(xml.encode('utf-8'), content_type='application/octet-stream')
     response['Content-Disposition'] = f'attachment; filename="Order-{name}.dymo"'
     return response
 
@@ -377,7 +383,7 @@ def generate_cable_label(request):
             'sku':          sku,
             'filename':     path.name,
             'xml':          path.read_text(encoding='utf-8'),
-            'download_url': f'/labels/serve/{sku}/?qty={qty}',
+            'download_url': f'/labels/serve/{sku}/?qty={qty}&origin=auto',
         })
     except ValueError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)

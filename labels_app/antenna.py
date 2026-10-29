@@ -483,6 +483,11 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
             issues.append(_issue("warn", f"Рядок «{prefix}{value}» довший за {LINE_MAX} символів — DYMO обріже кінець."))
 
     can_print = not any(i["level"] == "error" for i in issues)
+    # позначка в куті (labels_app/mark.py): E — на етикетці текст людини, якого немає в жодному джерелі
+    printed = [f for f in FIELDS if fields[f]["value"]] + (["digikey_pn"] if show_dk else [])
+    edited = any(fields[f]["source"] in deliberate and not any(
+        set(c["sources"]) - set(deliberate) for c in fields[f]["candidates"]
+        if _norm(c["value"]) == _norm(fields[f]["value"])) for f in printed)
     if prefs["window"] == "always":
         ready = False
     elif prefs["window"] == "errors":
@@ -496,6 +501,7 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
         "fields": fields, "lines": lines, "issues": issues, "file": old,
         "can_print": can_print,
         "ready": ready,
+        "origin": "edited" if edited else "auto",
         "checked_at": saved.checked_at.isoformat() if saved is not None and saved.checked_at else None,
         "checked_by": saved.checked_by if saved is not None else "",
     }

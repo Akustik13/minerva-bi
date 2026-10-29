@@ -170,7 +170,7 @@ class SalesSettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ('🏷️ Етикетки DYMO', {
-            'fields': ('dymo_open_mode', 'dymo_label_source',
+            'fields': ('dymo_open_mode', 'dymo_print_preview', 'dymo_origin_mark', 'dymo_label_source',
                        'antenna_label_sources', 'antenna_label_digikey', 'antenna_label_window'),
             'description': (
                 'Кнопка 🖨️ Друкувати в замовленнях, картці товару й на сторінці «Наклейки DYMO»; '
@@ -554,6 +554,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         extra_context['sv_label_open_mode']  = _ss.label_open_mode
         extra_context['sv_dymo_open_mode']   = _ss.dymo_open_mode
         extra_context['sv_dymo_label_source'] = _ss.dymo_label_source
+        extra_context['sv_dymo_print_preview'] = _ss.dymo_print_preview
 
         response = super().changelist_view(request, extra_context=extra_context)
 
