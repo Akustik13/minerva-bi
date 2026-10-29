@@ -836,6 +836,8 @@ class WorkDayAdmin(admin.ModelAdmin):
 
     @staticmethod
     def _report_project(request, b):
+        if getattr(b, "notice", ""):   # напр. прихід за сьогодні записано — далі «Пішов»
+            messages.info(request, f"⏱ {b.notice}")
         if b.status == Booking.SENT:
             span = f"{hhmm(b.start)}–{hhmm(b.stop)} · " if b.start else ""
             messages.success(request, f"✅ Записано в askDANTE: {b.date:%d.%m.%Y} · {b.dante_project} · "

@@ -243,7 +243,7 @@
   <div class="mt-bar">
     <label class="mt-muted">{% trans "Вид роботи" %}
       <select name="activity"><option value="">{% trans "як у категорії / налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}"{% if needs_activity and forloop.first and activities|length == 1 %} selected{% endif %}>{{ a }}</option>{% endfor %}</select></label>
-    {% if st.attendance_required %}<label class="mt-muted" title="{% trans "askDANTE приймає час на проєкт лише в межах приходу–відходу. Свята, відпустки, вихідні й сьогоднішній день — не заповнюються" %}">{% trans "Днів без приходу" %}
+    {% if st.attendance_required %}<label class="mt-muted" title="{% trans "askDANTE приймає час на проєкт лише в межах приходу–відходу. Свята, відпустки й вихідні не заповнюються; сьогодні — прихід до зараз, решту дня допише «Пішов»" %}">{% trans "Днів без приходу" %}
       <select name="attendance" id="mt-attendance">
         <option value="">{% trans "не записувати" %}</option>
         <option value="fixed">{% trans "спершу прихід і відхід стандартного дня" %} {{ day_times }}</option>

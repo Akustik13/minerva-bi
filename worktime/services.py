@@ -905,8 +905,9 @@ def _pick_activity(st: DanteSettings):
 
 
 NO_WORKTIME = ("У askDANTE за {day:%d.%m} немає робочого часу (прихід / відхід), а askDANTE приймає час на проєкт "
-               "лише в його межах. Спершу внесіть прихід і відхід (📅 клік на дату → «👣 З активності в Minerva» "
-               "або вручну) — або не записуйте цей день.")
+               "лише в його межах. Виберіть «Без приходу в askDANTE: спершу прихід і відхід» біля кнопки запису "
+               "(сьогодні — прихід до зараз, решту дня допише «Пішов») або внесіть їх самі (📅 клік на дату → "
+               "«👣 З активності в Minerva» або вручну) — або не записуйте цей день.")
 
 
 def has_worktime(du: DanteUser, day: datetime.date) -> bool | None:
@@ -917,14 +918,59 @@ def has_worktime(du: DanteUser, day: datetime.date) -> bool | None:
     return any(t.get("coming") for t in (wd.times or []))
 
 
+def _attendance_today(du: DanteUser, mode: str, user, st: DanteSettings, cover_from=None, cover_to=None,
+                      notes: list | None = None) -> str:
+    """Сьогодні день ще триває, а відхід askDANTE потрібен уже зараз: прихід від «Прийшов» / першої дії в Minerva /
+    стандартного приходу (і не пізніше за початок запису на проєкт) до зараз; далі Minerva вважає працівника на
+    роботі (`open_since`), і «Пішов» допише решту дня. → '' — записано, інакше причина."""
+    day = local_today()
+    now = timezone.localtime().replace(second=0, microsecond=0)
+    c = client(st)
+    with lock(du):
+        wd = refresh_days(du, day, day, c)[day]
+        if any(t.get("coming") for t in wd.times or []):
+            return ""
+        blocker = day_blocker(st, wd, day)
+        if blocker:
+            return blocker
+        opened = timezone.localtime(du.open_since) if du.open_since else None
+        if opened and opened.date() == day:
+            start = opened.time().replace(second=0, microsecond=0)
+        elif mode == DanteSettings.MODE_ACTIVITY:
+            span = activity_span(du.user, day)
+            if not span:
+                return "сьогодні ще немає дій у Minerva"
+            start = _round(span[0], st.round_minutes, up=False)
+        else:
+            start = du.times(st)[0]
+        if cover_from and cover_from < start:
+            start = cover_from
+        stop = max(_round(now, st.round_minutes, up=False), cover_to or datetime.time.min)
+        if stop <= start:
+            return f"прихід о {hhmm(start)} ще не настав"
+        b = _send(c, du, day, start, stop, Booking.CLOCK, user, "прихід до зараз — день ще триває, далі «Пішов»")
+        if b.status != Booking.SENT:
+            return b.error or "не вдалося"
+        du.open_since = timezone.make_aware(datetime.datetime.combine(day, stop))
+        du.save(update_fields=["open_since"])
+    if notes is not None:
+        notes.append(f"Прихід за сьогодні {hhmm(start)}–{hhmm(stop)} записано в askDANTE. Minerva вважає, що ви ще "
+                     "на роботі: коли підете, натисніть «Пішов» у календарі робочого часу — допише решту дня.")
+    return ""
+
+
 def ensure_attendance(du: DanteUser, day: datetime.date, mode: str, user=None,
-                      st: DanteSettings | None = None) -> str:
+                      st: DanteSettings | None = None, cover_from=None, cover_to=None,
+                      notes: list | None = None) -> str:
     """День без приходу / відходу в askDANTE → записати їх, як «🧩 Заповнити пропуски» (`fill` для одного дня:
-    стандартний день працівника або за активністю в Minerva; свята, відпустки, вихідні й день, що ще триває, —
-    ні). → '' — прихід є або записано, інакше причина."""
+    стандартний день працівника або за активністю в Minerva; свята, відпустки, вихідні — ні). Сьогодні — прихід
+    до зараз і далі «на роботі» (`_attendance_today`), щоб запис на проєкт (cover_from … cover_to) був у його межах.
+    → '' — прихід є або записано (пояснення — у notes), інакше причина."""
     st = st or DanteSettings.get()
     if has_worktime(du, day):
         return ""
+    if day == local_today():
+        return _attendance_today(du, mode, user, st, cover_from, cover_to, notes)
     result = fill(du, day, day, mode, only_dates=[day], user=user, source=Booking.FILL, st=st)
     if result["sent"]:
         return ""
@@ -992,18 +1038,20 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
         return r
 
     c = client(st)
+    notes = []
     if attendance in (DanteSettings.MODE_FIXED, DanteSettings.MODE_ACTIVITY):
         # людина вибрала: у дні без приходу спершу записати прихід / відхід (askDANTE пише час на проєкт лише в них)
         try:
             refresh_days(du, day, day, c)
         except DanteError:
             pass
-        why = ensure_attendance(du, day, attendance, user, st)
+        why = ensure_attendance(du, day, attendance, user, st, cover_from=start, cover_to=stop, notes=notes)
         if why:
             raise DanteError("bad_request", f"Прихід / відхід за {day:%d.%m} не записано: {why}. Внесіть їх вручну "
                                             "(📅 клік на дату) — або не записуйте цей день.")
     with lock(du):
-        if st.attendance_required:   # askDANTE не прийме час на проєкт без приходу / відходу дня
+        if st.attendance_required and not notes:   # askDANTE не прийме час на проєкт без приходу / відходу дня
+            # (notes — прихід за сьогодні щойно записано: читання askDANTE могло його ще не показати)
             try:
                 refresh_days(du, day, day, c)
             except DanteError:
@@ -1060,6 +1108,7 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
                 if not retry:
                     break
         booking.save()
+    booking.notice = " ".join(notes)   # що Minerva зробила ще (прихід за сьогодні) — показати людині
     if booking.status == Booking.SENT:
         try:
             sync_records(st, day, day, c)   # одразу видно в годинах; збій — підтягнеться нічним оновленням

@@ -8,7 +8,7 @@
       <label>{% trans "з" %}<input type="time" name="start" value="{{ work_mail.start|default:'' }}"></label><label>{% trans "по" %}<input type="time" name="stop" value="{{ work_mail.stop|default:'' }}"></label>
       <label>{% trans "або тривалість" %}<input type="text" name="duration" placeholder="1:30" size="6"></label>
       <label>{% trans "Вид роботи" %}<select name="activity"><option value="">{% trans "як у налаштуваннях" %}</option>{% for a in activities %}<option value="{{ a.pk }}">{{ a.name }}</option>{% endfor %}</select></label>
-      {% if st.attendance_required %}<label title="{% trans "askDANTE приймає час на проєкт лише в межах приходу–відходу" %}">{% trans "Без приходу в askDANTE" %}<select name="attendance">
+      {% if st.attendance_required %}<label title="{% trans "askDANTE приймає час на проєкт лише в межах приходу–відходу. Сьогодні — прихід до зараз, решту дня допише «Пішов» у календарі робочого часу" %}">{% trans "Без приходу в askDANTE" %}<select name="attendance">
         <option value="">{% trans "не записувати" %}</option><option value="fixed">{% trans "спершу прихід і відхід" %} {{ day_times }}</option>
         <option value="activity">{% trans "спершу за активністю в Minerva" %}</option></select></label>{% endif %}
       <label style="flex-basis:100%">{% trans "Що робили (підказка для AI)" %}<input type="text" id="mt-work-hint" value="{{ work_mail.hint|default:'' }}" placeholder="{% trans "напр. виміри антени в камері, правки PCB" %}"></label>

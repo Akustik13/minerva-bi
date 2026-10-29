@@ -277,6 +277,8 @@ def mail_time_page(model_admin, request):
             except DanteError as e:
                 messages.error(request, f"{day:%d.%m}: {e.message}")
                 continue
+            if getattr(b, "notice", ""):
+                messages.info(request, f"⏱ {b.notice}")
             if b.status == Booking.SENT:
                 done += 1
                 minutes += b.duration or 0

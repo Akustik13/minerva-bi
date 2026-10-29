@@ -148,3 +148,44 @@ class WorktimeRequiredTests(Base):
             services.book_project(self.du, self.sun, self.dp, start=datetime.time(10, 0), stop=datetime.time(10, 30),
                                   attendance=DanteSettings.MODE_FIXED)
         self.assertIn("не записано", e.exception.message)
+
+    def test_attendance_today_until_now_then_clock_out(self):
+        """Сьогодні (день ще триває): прихід — до зараз, далі «на роботі»; «Пішов» допише решту дня."""
+        from unittest import mock
+
+        from django.utils import timezone
+        st = DanteSettings.get()
+        st.attendance_required = True
+        st.save()
+        today = MON + datetime.timedelta(days=3)
+        now = timezone.make_aware(datetime.datetime.combine(today, datetime.time(16, 18)))
+        with mock.patch("django.utils.timezone.now", return_value=now), \
+                mock.patch("worktime.services.local_today", return_value=today):
+            b = services.book_project(self.du, today, self.dp, start=datetime.time(7, 30), stop=datetime.time(15, 0),
+                                      attendance=DanteSettings.MODE_FIXED)
+            self.assertEqual(b.status, Booking.SENT)
+            first = [r for r in self.fake.calls if r["date"] == today.isoformat()]
+            self.assertEqual((first[0]["start"], first[0]["stop"]), ("07:30", "16:15"))   # від початку запису, до зараз
+            self.assertIn("projectData", first[1])
+            self.assertIn("«Пішов»", b.notice)
+            self.du.refresh_from_db()
+            self.assertEqual(timezone.localtime(self.du.open_since).time(), datetime.time(16, 15))
+        later = now + datetime.timedelta(hours=1, minutes=12)
+        with mock.patch("django.utils.timezone.now", return_value=later), \
+                mock.patch("worktime.services.local_today", return_value=today):
+            out = services.clock_out(self.du)
+        self.assertEqual([(x.start, x.stop) for x in out], [(datetime.time(16, 15), datetime.time(17, 30))])
+
+    def test_attendance_today_by_activity_needs_activity(self):
+        from unittest import mock
+
+        from django.utils import timezone
+        today = MON + datetime.timedelta(days=3)
+        now = timezone.make_aware(datetime.datetime.combine(today, datetime.time(16, 18)))
+        with mock.patch("django.utils.timezone.now", return_value=now), \
+                mock.patch("worktime.services.local_today", return_value=today):
+            with self.assertRaises(DanteError) as e:
+                services.book_project(self.du, today, self.dp, start=datetime.time(9, 0), stop=datetime.time(10, 0),
+                                      attendance=DanteSettings.MODE_ACTIVITY)
+        self.assertIn("немає дій у Minerva", e.exception.message)
+        self.assertFalse([r for r in self.fake.calls if r["date"] == today.isoformat()])
