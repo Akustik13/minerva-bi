@@ -1,0 +1,113 @@
+{% extends "admin/base_site.html" %}
+{% block title %}💲 Оновлення цін DigiKey #{{ run.pk }}{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{{ history_url }}">💲 Ціни DigiKey — історія</a> › #{{ run.pk }}</div>{% endblock %}
+{% block content_title %}{% endblock %}
+{% block extrastyle %}{{ block.super }}{% include "admin/bots/digikeypricerun/_styles.html" %}{% endblock %}
+
+{% block content %}
+<div class="dp">
+  <div class="dp-head">
+    <div>
+      <h1>💲 Оновлення цін DigiKey #{{ run.pk }}</h1>
+      <p class="dp-sub"><b style="color:{{ color }}" id="dp-status">{{ run.get_status_display }}</b>
+        · {{ run.get_kind_display }} · {{ run.created_by }} · {{ run.created_at|date:"d.m.Y H:i" }}
+        · ціни в <b>{{ run.currency }}</b>{% if rules_text %} · {{ rules_text }}{% endif %}</p>
+    </div>
+    <div class="dp-head-tools">
+      {% if any_sent %}
+      <form method="post" action="{% url 'admin:bots_digikeypricerun_verify' run.pk %}">{% csrf_token %}
+        <button class="dp-btn" type="submit">🔍 Перевірити на DigiKey зараз</button></form>
+      {% endif %}
+      <a class="dp-btn" href="{{ compare_url }}">💲 До порівняння</a>
+      <a class="dp-btn" href="{{ history_url }}">📜 Історія</a>
+    </div>
+  </div>
+
+  {% if live %}
+  <div class="dp-live" id="dp-live">
+    {% if run.status == 'sent' %}🔍 Ціни надіслано. Minerva перевіряє, чи DigiKey вже показує нові: перша перевірка —
+      за {{ verify_after }} с після надсилання, далі кожні 10 хв (до {{ verify_hours }} год); результат — у Telegram / email.
+    {% else %}📤 <span id="dp-progress">{{ run.progress|default:"чекає на надсилання…" }}</span>{% endif %}
+    <small>Сторінка оновиться сама.</small>
+  </div>
+  {% endif %}
+
+  <div class="dp-tiles">
+    <div class="dp-tile static">Позицій <b>{{ run.total }}</b></div>
+    <div class="dp-tile static">Надіслано <b>{{ run.sent }}</b>{% if run.finished_at %}<small>{{ run.finished_at|date:"d.m H:i" }}</small>{% endif %}</div>
+    <div class="dp-tile static">✅ Діє на DigiKey <b class="dp-ok">{{ run.verified }}</b>{% if run.verified_at %}<small>з {{ run.verified_at|date:"d.m H:i" }}</small>{% endif %}</div>
+    <div class="dp-tile static">✋ Чекає рішення <b{% if run.held %} class="dp-warn"{% endif %}>{{ run.held }}</b></div>
+    <div class="dp-tile static">❌ Помилки / інші ціни <b{% if run.errors %} class="dp-err"{% endif %}>{{ run.errors }}</b></div>
+  </div>
+
+  <form method="post" action="{% url 'admin:bots_digikeypricerun_decide' run.pk %}" id="dp-decide">
+    {% csrf_token %}
+    <div class="dp-scroll">
+    <table class="dp-table">
+      <thead><tr>
+        <th>{% if any_held and can_change %}<input type="checkbox" id="dp-all" title="Вибрати всі, що чекають">{% endif %}</th>
+        <th>Товар</th><th>Було на DigiKey</th><th>Нові ціни</th><th>Зміна</th><th>Стан</th><th>Подробиці</th>
+      </tr></thead>
+      <tbody>
+      {% for r in rows %}
+      <tr class="dp-row">
+        <td>{% if r.line.status == 'held' and can_change %}<input type="checkbox" name="ids" value="{{ r.line.pk }}" class="dp-chk" checked>{% endif %}</td>
+        <td class="dp-prod">{% if r.listing_url %}<a href="{{ r.listing_url }}"><code>{{ r.line.sku }}</code></a>{% else %}<code>{{ r.line.sku }}</code>{% endif %}
+          <div class="dp-name">{{ r.line.title }}</div></td>
+        <td class="dp-tiers">{% for t in r.old %}<div><span>{{ t.qty }}</span> {{ t.price }}</div>{% empty %}—{% endfor %}</td>
+        <td class="dp-tiers">{% for t in r.new %}<div class="dp-{{ t.cls }}"><span>{{ t.qty }}</span> <b>{{ t.price }}</b>{% if t.pct %}<em>{{ t.pct }}</em>{% elif t.cls == 'added' %}<em></em>{% endif %}</div>{% empty %}—{% endfor %}</td>
+        <td class="dp-change">{% if r.change %}<b>{{ r.change }}</b>{% endif %}
+          {% if r.minerva %}<div class="dp-note">Minerva: {{ r.minerva }}</div>{% endif %}</td>
+        <td><b style="color:{{ r.color }}">{{ r.line.get_status_display }}</b>
+          {% if r.line.verified_at %}<div class="dp-note">діє з {{ r.line.verified_at|date:"d.m H:i" }}</div>
+          {% elif r.line.sent_at %}<div class="dp-note">надіслано {{ r.line.sent_at|date:"d.m H:i" }}</div>{% endif %}</td>
+        <td>
+          {% if r.line.error %}<div class="dp-err" style="font-size:12px">{{ r.line.error }}</div>{% endif %}
+          {% for n in r.line.notes %}<div class="dp-note">{{ n }}</div>{% endfor %}
+          {% if r.line.checks %}<div class="dp-note">перевірок на DigiKey: {{ r.line.checks }}{% if r.line.checked_at %}, остання {{ r.line.checked_at|date:"d.m H:i" }}{% endif %}</div>{% endif %}
+          {% if r.line.dk_updated_at %}<div class="dp-note">DigiKey змінив офер {{ r.line.dk_updated_at|date:"d.m.Y H:i" }}</div>{% endif %}
+        </td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="dp-emptyrow">Позицій немає.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if any_held and can_change %}
+    <div class="dp-bar">
+      <span>✋ Ці зміни чекають вашого рішення. Перед надсиланням Minerva ще раз перерахує ціни з поточних даних.</span>
+      <button class="dp-btn dp-primary" type="submit" name="decision" value="confirm"
+              onclick="return confirm('Оновити вибрані ціни на DigiKey?')">✓ Оновити вибрані на DigiKey</button>
+      <button class="dp-btn" type="submit" name="decision" value="reject"
+              onclick="return confirm('Відхилити вибрані? Ці самі ціни Minerva більше не пропонуватиме.')">✕ Відхилити</button>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<script>
+(function () {
+  const all = document.getElementById('dp-all');
+  if (all) {
+    all.checked = true;
+    all.addEventListener('change', () => document.querySelectorAll('.dp-chk').forEach(c => { c.checked = all.checked; }));
+  }
+  {% if live %}
+  const start = '{{ run.status }}';
+  const url = '{% url "admin:bots_digikeypricerun_status" run.pk %}';
+  const every = start === 'sent' ? 30000 : 3000;
+  setInterval(async () => {
+    try {
+      const r = await fetch(url, { credentials: 'same-origin' });
+      const s = await r.json();
+      const p = document.getElementById('dp-progress');
+      if (p && s.progress) p.textContent = s.progress;
+      if (s.status !== start || (start === 'sent' && s.verified !== {{ run.verified }})) location.reload();
+    } catch (e) {}
+  }, every);
+  {% endif %}
+})();
+</script>
+{% endblock %}

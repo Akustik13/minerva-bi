@@ -1,0 +1,271 @@
+{% extends "admin/base_site.html" %}
+{% block title %}💲 Ціни DigiKey ← Minerva{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="/admin/bots/digikeylisting/">DigiKey — Лістинги</a> › 💲 Ціни з Minerva</div>{% endblock %}
+{% block content_title %}{% endblock %}
+{% block extrastyle %}{{ block.super }}{% include "admin/bots/digikeypricerun/_styles.html" %}{% endblock %}
+
+{% block content %}
+<div class="dp">
+  <div class="dp-head">
+    <div>
+      <h1>💲 Ціни DigiKey ← склад Minerva</h1>
+      <p class="dp-sub">Ліворуч — що зараз на DigiKey, праворуч — що стане з базових цін Minerva за правилами нижче.
+        Вибрані рядки оновлюються на DigiKey: змінюються <b>лише ціни</b>, а кількість, назва, MOQ і строк офера
+        лишаються як є. Після оновлення Minerva сама перевіряє, що нові ціни діють на DigiKey.</p>
+    </div>
+    <div class="dp-head-tools">
+      <form method="post" action="{% url 'admin:bots_digikeypricerun_refresh' %}">{% csrf_token %}
+        <input type="hidden" name="query" value="{{ query }}">
+        <button class="dp-btn" type="submit" title="GET /offers — свіжі ціни всіх оферів">🔄 Прочитати ціни з DigiKey</button>
+      </form>
+      <a class="dp-btn" href="{{ history_url }}">📜 Історія{% if held_runs %} · ✋ чекає рішення: {{ held_runs }}{% endif %}</a>
+      <a class="dp-btn" href="{{ settings_url }}">⚙ Налаштування</a>
+    </div>
+  </div>
+
+  <div class="dp-facts">
+    <span>Валюта DigiKey: <b>{{ cur }}</b> <small>({{ currency_source }} — DigiKey API валюти не передає, звірте з supplier.digikey.com)</small></span>
+    {% for r in rates %}
+    <span>Курс: 1 {{ r.cur }} = {% if r.rate %}<b>{{ r.rate }}</b> {{ cur }}{% else %}<b class="dp-err">не задано</b>{% endif %}
+      · <a href="{{ fx_url }}">курси валют</a></span>
+    {% endfor %}
+    <span>Ціни DigiKey прочитано:
+      {% if checked_max %}<b>{{ checked_max|date:"d.m.Y H:i" }}</b>{% if checked_min and checked_min != checked_max %}
+        <small>(найстаріші — {{ checked_min|date:"d.m H:i" }})</small>{% endif %}
+      {% else %}<b class="dp-warn">ще не читались</b> <small>— порівняння з останніх збережених; натисніть «🔄 Прочитати»</small>{% endif %}</span>
+    <span>🔁 Автооновлення: <b>{{ s.get_auto_mode_display }}</b>{% if s.last_auto_at %}
+      <small>· {{ s.last_auto_at|date:"d.m H:i" }} — {{ s.last_auto_result }}</small>{% endif %}</span>
+  </div>
+
+  <form class="dp-card" method="get" id="dp-rules">
+    <div class="dp-card-title">🧮 Як рахувати ціну для DigiKey{% if custom %}<span class="dp-tag">змінено лише для цієї сторінки</span>{% endif %}</div>
+    <div class="dp-formula">Ціна DigiKey = ціна Minerva × курс × (100 + надбавка) % + фіксована добавка → округлення →
+      не нижче закупівельної + %. Свої надбавка / добавка товару (⚙ у рядку) мають пріоритет.</div>
+    <div class="dp-fields">
+      <label>Надбавка / знижка, %
+        <input name="adjust_pct" value="{{ rules_dict.adjust_pct }}" inputmode="decimal" placeholder="0">
+        <span class="dp-quick">{% for q in quick_pct %}<button type="button" data-pct="{{ q }}">{{ q }} %</button>{% endfor %}</span>
+      </label>
+      <label>Фіксована добавка за 1 шт., {{ cur }}
+        <input name="adjust_fixed" value="{{ rules_dict.adjust_fixed }}" inputmode="decimal" placeholder="0">
+      </label>
+      <label>Округлення
+        <select name="rounding">{% for v, l in rounding_choices %}<option value="{{ v }}"{% if v == rules.rounding %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+      </label>
+      <label>Ступені (кількості)
+        <select name="tiers_mode">{% for v, l in tiers_choices %}<option value="{{ v }}"{% if v == rules.tiers_mode %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+      </label>
+      <label>Не нижче закупівельної ціни + %
+        <input name="min_margin_pct" value="{{ rules_dict.min_margin_pct }}" inputmode="decimal" placeholder="вимкнено">
+      </label>
+      <label>Ціни Minerva
+        <select name="source">{% for v, l in source_choices %}<option value="{{ v }}"{% if v == rules.source %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+      </label>
+    </div>
+    <div class="dp-actions">
+      <button class="dp-btn dp-primary" type="submit">🔄 Перерахувати</button>
+      {% if custom %}<a class="dp-btn" href="?">↺ Як у налаштуваннях</a>{% endif %}
+      <small>Зараз: {{ rules_text }}</small>
+    </div>
+    {% if rules_error %}<div class="dp-error">⚠ {{ rules_error }} — показано за налаштуваннями.</div>{% endif %}
+  </form>
+  {% if custom and can_change and not rules_error %}
+  <form method="post" action="{% url 'admin:bots_digikeypricerun_save_rules' %}" class="dp-actions" style="margin:-4px 0 12px">
+    {% csrf_token %}{% for k, v in rules_dict.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <button class="dp-btn" type="submit">💾 Зберегти ці правила як стандартні (і для автооновлення)</button>
+  </form>
+  {% endif %}
+
+  <div class="dp-tiles">
+    <button type="button" class="dp-tile" data-f="diff">Різниця <b>{{ sum.differs }}</b><small>↑ дорожче {{ sum.up }} · ↓ дешевше {{ sum.down }}</small></button>
+    <button type="button" class="dp-tile" data-f="same">Однакові <b>{{ sum.same }}</b><small>нічого не робити</small></button>
+    <button type="button" class="dp-tile" data-f="problem">Не оновити <b id="dp-prob-n">0</b><small>без офера / цін / курсу</small></button>
+    <button type="button" class="dp-tile" data-f="all">Усі лістинги <b>{{ sum.total }}</b><small>DigiKey</small></button>
+    {% if can_change %}
+    <form method="post" action="{% url 'admin:bots_digikeypricerun_auto_now' %}" class="dp-tile static" style="margin:0">
+      {% csrf_token %}<input type="hidden" name="query" value="{{ query }}">
+      🔁 Як автооновлення<small style="margin:4px 0 6px">свіжі ціни DigiKey → дрібні зміни надіслати{% if s.auto_mode != 'apply' %} (зараз — лише на підтвердження){% endif %}</small>
+      <button class="dp-btn" type="submit" onclick="return confirm('Перевірити зараз так, як це робить автооновлення?')">▶ Перевірити зараз</button>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="dp-filters">
+    <span id="dp-dirs">
+      <button type="button" class="dp-chip on" data-d="">усі</button>
+      <button type="button" class="dp-chip" data-d="up">↑ дорожче</button>
+      <button type="button" class="dp-chip" data-d="down">↓ дешевше</button>
+      <button type="button" class="dp-chip" data-d="mixed">↕ по-різному</button>
+    </span>
+    <input type="search" class="dp-search" id="dp-q" placeholder="🔎 артикул або назва">
+    <small id="dp-shown"></small>
+  </div>
+
+  <form method="post" action="{% url 'admin:bots_digikeypricerun_apply' %}" id="dp-apply">
+    {% csrf_token %}
+    {% for k, v in rules_dict.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input type="hidden" name="query" value="{{ query }}">
+    <div class="dp-scroll">
+    <table class="dp-table">
+      <thead><tr>
+        <th>{% if can_change %}<input type="checkbox" id="dp-all" title="Вибрати всі видимі з різницею">{% endif %}</th>
+        <th>Товар</th><th>Зараз на DigiKey, {{ cur }}</th><th>Ціни Minerva</th><th>Стане на DigiKey, {{ cur }}</th>
+        <th>Зміна</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for v in rows %}
+      <tr class="dp-row dp-{{ v.kind }}" data-kind="{{ v.kind }}" data-dir="{{ v.dir }}" data-s="{{ v.search }}"
+          data-pk="{{ v.pk }}" data-sku="{{ v.row.sku }}" data-auto="{{ v.row.listing.price_auto|yesno:'1,0' }}"
+          data-pct="{{ v.own_pct }}" data-fixed="{{ v.own_fixed }}">
+        <td>{% if v.kind == 'diff' and can_change %}<input type="checkbox" name="ids" value="{{ v.pk }}" class="dp-chk">{% endif %}</td>
+        <td class="dp-prod">
+          <a href="{{ v.listing_url }}"><code>{{ v.row.sku }}</code></a>
+          {% if v.product_url and v.row.listing.product.sku != v.row.sku %}<small> · <a href="{{ v.product_url }}">{{ v.row.listing.product.sku }}</a></small>{% endif %}
+          <div class="dp-name">{{ v.row.title }}</div>
+          {% if v.row.state_text %}<div class="dp-state dp-{{ v.row.state }}">{{ v.row.state_text }}</div>{% endif %}
+        </td>
+        <td class="dp-tiers">{% for t in v.cells.dk %}<div{% if t.gone %} class="dp-gone" title="цього ступеня не буде"{% endif %}><span>{{ t.qty }}</span> {{ t.price }}</div>{% empty %}—{% endfor %}</td>
+        <td class="dp-tiers dp-mut">{% for t in v.cells.minerva %}<div><span>{{ t.qty }}</span> {{ t.price }}</div>{% empty %}—{% endfor %}
+          {% if v.row.minerva_currency %}<small>{{ v.row.minerva_currency }} · {{ v.row.minerva_source }}{% if v.rate %}<br>{{ v.rate }}{% endif %}</small>{% endif %}</td>
+        <td class="dp-tiers">{% for t in v.cells.new %}<div class="dp-{{ t.cls }}"><span>{{ t.qty }}</span> <b>{{ t.price }}</b>{% if t.pct %}<em>{{ t.pct }}</em>{% elif t.cls == 'added' %}<em></em>{% endif %}</div>{% empty %}—{% endfor %}</td>
+        <td class="dp-change">
+          {% if v.change %}<b class="dp-{{ v.dir }}">{% if v.dir == 'up' %}↑{% elif v.dir == 'down' %}↓{% else %}↕{% endif %} {{ v.change }}</b>
+            {% if v.max_change and v.dir == 'mixed' %}<small>до ±{{ v.max_change }}</small>{% endif %}
+          {% elif v.kind == 'same' %}<span class="dp-ok">✓ однакові</span>
+          {% elif v.kind == 'diff' %}<b>нові ступені</b>{% endif %}
+          {% for n in v.row.notes %}<div class="dp-note">{{ n }}</div>{% endfor %}
+          {% if not v.row.listing.price_auto %}<div class="dp-note">⏸ без автооновлення</div>{% endif %}
+        </td>
+        <td>{% if can_change %}<button type="button" class="dp-gear" title="Автооновлення й своя надбавка">{% if v.row.listing.price_auto %}⚙{% else %}⏸{% endif %}</button>{% endif %}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="7" class="dp-emptyrow">Лістингів DigiKey ще немає — їх створює «🔍 Перевірити нові лістинги з DigiKey».</td></tr>
+      {% endfor %}
+      <tr id="dp-none" hidden><td colspan="7" class="dp-emptyrow">Тут нічого немає — виберіть іншу плитку вгорі.</td></tr>
+      </tbody>
+    </table>
+    </div>
+    {% if can_change %}
+    <div class="dp-bar" id="dp-bar" hidden>
+      <span>Вибрано <b id="dp-n">0</b> <small id="dp-ud"></small></span>
+      <button class="dp-btn dp-primary" type="submit">✓ Оновити вибрані на DigiKey</button>
+      <small>Звіт з «було → стало» з'явиться в історії; Telegram / email — за налаштуваннями.</small>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+{% if can_change %}
+<dialog class="dp-dlg" id="dp-dlg">
+  <form method="dialog" id="dp-dlg-form">
+    <h3>⚙ <span id="dp-dlg-sku"></span></h3>
+    <label class="dp-check"><input type="checkbox" name="price_auto" value="1"> 🔁 Автооновлення ціни з Minerva</label>
+    <label>Своя надбавка / знижка, %
+      <input name="price_adjust_pct" inputmode="decimal" placeholder="як у правилах ({{ rules_dict.adjust_pct }})"></label>
+    <label>Своя фіксована добавка за 1 шт., {{ cur }}
+      <input name="price_adjust_fixed" inputmode="decimal" placeholder="як у правилах ({{ rules_dict.adjust_fixed }})"></label>
+    <div class="dp-error" id="dp-dlg-err" hidden></div>
+    <div class="dp-actions">
+      <button type="button" class="dp-btn dp-primary" id="dp-dlg-save">Зберегти</button>
+      <button type="submit" class="dp-btn" value="cancel">Скасувати</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+
+<script>
+(function () {
+  const rows = Array.from(document.querySelectorAll('.dp-row'));
+  const tiles = document.querySelectorAll('.dp-tile[data-f]');
+  const dirs = document.querySelectorAll('#dp-dirs .dp-chip');
+  const q = document.getElementById('dp-q');
+  const bar = document.getElementById('dp-bar');
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  };
+  const problems = rows.filter(r => r.dataset.kind === 'problem').length;
+  document.getElementById('dp-prob-n').textContent = problems;
+  const diffs = rows.filter(r => r.dataset.kind === 'diff').length;
+  let f = store.get('dp-filter') || (diffs ? 'diff' : 'all');
+  let d = '';
+
+  function apply() {
+    const text = (q.value || '').trim().toLowerCase();
+    let shown = 0;
+    rows.forEach(r => {
+      const ok = (f === 'all' || r.dataset.kind === f) && (!d || r.dataset.dir === d) &&
+                 (!text || r.dataset.s.includes(text));
+      r.hidden = !ok;
+      if (ok) shown++;
+      if (!ok) { const c = r.querySelector('.dp-chk'); if (c) c.checked = false; }
+    });
+    tiles.forEach(t => t.classList.toggle('on', t.dataset.f === f));
+    dirs.forEach(c => c.classList.toggle('on', c.dataset.d === d));
+    document.getElementById('dp-dirs').style.display = f === 'diff' ? '' : 'none';
+    document.getElementById('dp-none').hidden = shown > 0 || !rows.length;
+    document.getElementById('dp-shown').textContent = rows.length ? `показано ${shown} з ${rows.length}` : '';
+    count();
+  }
+  function count() {
+    if (!bar) return;
+    const sel = rows.filter(r => { const c = r.querySelector('.dp-chk'); return c && c.checked; });
+    const up = sel.filter(r => r.dataset.dir === 'up').length, down = sel.filter(r => r.dataset.dir === 'down').length;
+    document.getElementById('dp-n').textContent = sel.length;
+    document.getElementById('dp-ud').textContent = sel.length ? `(↑ ${up} · ↓ ${down}${sel.length - up - down ? ' · інші ' + (sel.length - up - down) : ''})` : '';
+    bar.hidden = !sel.length;
+  }
+  tiles.forEach(t => t.addEventListener('click', () => { f = t.dataset.f; store.set('dp-filter', f); apply(); }));
+  dirs.forEach(c => c.addEventListener('click', () => { d = c.dataset.d; apply(); }));
+  q.addEventListener('input', apply);
+  document.addEventListener('change', e => { if (e.target.classList.contains('dp-chk')) count(); });
+  const all = document.getElementById('dp-all');
+  if (all) all.addEventListener('change', () => {
+    rows.forEach(r => { const c = r.querySelector('.dp-chk'); if (c && !r.hidden) c.checked = all.checked; });
+    count();
+  });
+  document.querySelectorAll('.dp-quick button').forEach(b => b.addEventListener('click', () => {
+    const form = document.getElementById('dp-rules');
+    form.adjust_pct.value = b.dataset.pct.replace('+', '');
+    form.submit();
+  }));
+  const applyForm = document.getElementById('dp-apply');
+  applyForm.addEventListener('submit', e => {
+    const n = document.getElementById('dp-n').textContent;
+    if (!confirm(`Оновити ціни ${n} товарів на DigiKey ${document.getElementById('dp-ud').textContent}?\n` +
+                 'Змінюються лише ціни офера; потім Minerva перевірить, що вони діють.')) e.preventDefault();
+  });
+
+  const dlg = document.getElementById('dp-dlg');
+  let current = null;
+  document.querySelectorAll('.dp-gear').forEach(b => b.addEventListener('click', () => {
+    current = b.closest('tr');
+    const form = document.getElementById('dp-dlg-form');
+    document.getElementById('dp-dlg-sku').textContent = current.dataset.sku;
+    form.price_auto.checked = current.dataset.auto === '1';
+    form.price_adjust_pct.value = current.dataset.pct;
+    form.price_adjust_fixed.value = current.dataset.fixed;
+    document.getElementById('dp-dlg-err').hidden = true;
+    dlg.showModal();
+  }));
+  const save = document.getElementById('dp-dlg-save');
+  if (save) save.addEventListener('click', async () => {
+    const form = document.getElementById('dp-dlg-form');
+    const body = new FormData(form);
+    body.set('price_auto', form.price_auto.checked ? '1' : '0');
+    const err = document.getElementById('dp-dlg-err');
+    try {
+      const r = await fetch(`{% url 'admin:bots_digikeypricerun_compare' %}listing/${current.dataset.pk}/`, {
+        method: 'POST', body, credentials: 'same-origin',
+        headers: { 'X-CSRFToken': applyForm.querySelector('[name=csrfmiddlewaretoken]').value },
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data.ok) throw new Error(data.error || ('HTTP ' + r.status));
+      location.reload();
+    } catch (e) { err.textContent = '⚠ ' + e.message; err.hidden = false; }
+  });
+  apply();
+})();
+</script>
+{% endblock %}

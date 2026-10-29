@@ -70,7 +70,7 @@ def _get_app_list(self, request, app_label=None):
         'shop':         ['shop', 'shoplisting', 'shopproduct', 'productmedia', 'shopcustomer', 'shoppayment',
                          'shopmailtemplate', 'shopsettings'],
         'scraper_hub':  ['scrapersiteconfig', 'scraperrun', 'scraperdocument'],
-        'bots':      ['digikeyconfig', 'digikeylisting', 'bot', 'botlog'],
+        'bots':      ['digikeyconfig', 'digikeylisting', 'digikeypricerun', 'digikeypricesettings', 'bot', 'botlog'],
         'jlcpcb':    ['jlcconfig', 'jlcorder', 'jlcproductmapping'],
         'documents': ['documenttemplate', 'generateddocument'],
     }

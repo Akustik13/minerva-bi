@@ -78,6 +78,9 @@ while true; do
   # ── DigiKey poll staged → published — інтервал з БД (poll_interval_minutes) ──
   python manage.py poll_dk_status 2>&1 || true
 
+  # ── DigiKey ціни ← Minerva: перевірка надісланих, автооновлення (інтервал і режим — у «💲 Налаштуваннях цін DigiKey») ──
+  python manage.py dk_price_sync --if-due 2>&1 || true
+
   # ── Вебхуки API — повтори невдалих доставок (кожен цикл, ~60с) ──
   python manage.py send_webhooks 2>&1 || true
 

@@ -458,6 +458,25 @@ class DigiKeyListing(models.Model):
         help_text='Автоматично: ціна за 1 шт. з dk_prices (для сортування)'
     )
 
+    # ── Ціни з Minerva (💲 Ціни DigiKey ← Minerva, bots/services/dk_prices.py) ──
+    price_auto = models.BooleanField(
+        '🔁 Автооновлення ціни з Minerva', default=True,
+        help_text='Брати участь в автоматичному оновленні цін DigiKey з базових цін Minerva '
+                  '(якщо воно увімкнене в «💲 Налаштуваннях цін DigiKey»).'
+    )
+    price_adjust_pct = models.DecimalField(
+        'Своя надбавка / знижка, %', max_digits=7, decimal_places=2, null=True, blank=True,
+        help_text='Лише для цього товару: +10 — дорожче на 10 %, −5 — знижка 5 %. Порожньо — як у налаштуваннях.'
+    )
+    price_adjust_fixed = models.DecimalField(
+        'Своя фіксована добавка за 1 шт.', max_digits=12, decimal_places=4, null=True, blank=True,
+        help_text='Лише для цього товару, у валюті DigiKey (може бути від\'ємною). Порожньо — як у налаштуваннях.'
+    )
+    price_checked_at = models.DateTimeField(
+        'Ціни DigiKey прочитано', null=True, blank=True,
+        help_text='Коли Minerva востаннє читала ціни цього офера з DigiKey.'
+    )
+
     # ── Sync status ────────────────────────────────────────────────────────────
     sync_status    = models.CharField('Статус', max_length=20,
                                        choices=SYNC_CHOICES, default='draft')
@@ -603,6 +622,194 @@ class DigiKeyPriceLog(models.Model):
     def __str__(self):
         sign = '+' if self.delta_pct >= 0 else ''
         return f"{self.listing.product.sku} {sign}{self.delta_pct:.1f}% @ {self.applied_at:%Y-%m-%d %H:%M}"
+
+
+# ── 💲 Ціни DigiKey ← базові ціни Minerva (логіка — bots/services/dk_prices.py) ──
+
+class DigiKeyPriceSettings(models.Model):
+    """Синглтон (pk=1): як ціни Minerva стають цінами DigiKey, автооновлення, сповіщення."""
+
+    ROUNDING_CHOICES = [
+        ('none', 'Без округлення'), ('0.01', 'До 0,01'), ('0.05', 'До 0,05'), ('0.10', 'До 0,10'),
+        ('0.50', 'До 0,50'), ('1.00', 'До 1,00'), ('x.90', 'Закінчення ,90'), ('x.99', 'Закінчення ,99'),
+    ]
+    SOURCE_BASE = 'base'
+    SOURCE_BASE_OR_SALE = 'base_or_sale'
+    SOURCE_CHOICES = [
+        (SOURCE_BASE, 'Лише базові ціни (ступені) товару'),
+        (SOURCE_BASE_OR_SALE, 'Базові ціни, а без них — «Ціна продажу» товару'),
+    ]
+    TIERS_MINERVA = 'minerva'
+    TIERS_DIGIKEY = 'digikey'
+    TIERS_TEMPLATE = 'template'
+    TIERS_CHOICES = [
+        (TIERS_MINERVA, 'Як у Minerva (ступені базових цін)'),
+        (TIERS_DIGIKEY, 'Як зараз на DigiKey (ті самі кількості, ціни з Minerva)'),
+        (TIERS_TEMPLATE, 'За шаблоном ступенів магазину (знижки від ціни 1 шт.)'),
+    ]
+    AUTO_OFF = 'off'
+    AUTO_ASK = 'ask'
+    AUTO_APPLY = 'apply'
+    AUTO_CHOICES = [
+        (AUTO_OFF, 'Вимкнено — лише вручну'),
+        (AUTO_ASK, 'Знаходити різницю й питати (оновлення — після підтвердження)'),
+        (AUTO_APPLY, 'Оновлювати самостійно (великі зміни — на підтвердження)'),
+    ]
+
+    currency = models.CharField(
+        'Валюта цін на DigiKey', max_length=3, blank=True, default='',
+        help_text='DigiKey API не передає валюту: ціни офера — у валюті вашого акаунта продавця '
+                  '(supplier.digikey.com → Account). Порожньо — «Locale Currency» з налаштувань DigiKey.')
+    source = models.CharField('Звідки ціни Minerva', max_length=16, choices=SOURCE_CHOICES,
+                              default=SOURCE_BASE_OR_SALE)
+    adjust_pct = models.DecimalField(
+        'Надбавка / знижка, %', max_digits=7, decimal_places=2, default=0,
+        help_text='Від цін Minerva (після перерахунку у валюту DigiKey): +10 — на 10 % дорожче, −5 — знижка 5 %.')
+    adjust_fixed = models.DecimalField(
+        'Фіксована добавка за 1 шт.', max_digits=12, decimal_places=4, default=0,
+        help_text='У валюті DigiKey, після відсотка; може бути від\'ємною (напр. −0,50).')
+    rounding = models.CharField('Округлення', max_length=8, choices=ROUNDING_CHOICES, default='0.01')
+    tiers_mode = models.CharField('Ступені (кількості)', max_length=16, choices=TIERS_CHOICES,
+                                  default=TIERS_MINERVA)
+    min_margin_pct = models.DecimalField(
+        'Не нижче закупівельної ціни + %', max_digits=7, decimal_places=2, null=True, blank=True,
+        help_text='Запобіжник: ціна на DigiKey не опуститься нижче «Ціни закупки» товару + N %. Порожньо — вимкнено.')
+
+    auto_mode = models.CharField('Автооновлення', max_length=8, choices=AUTO_CHOICES, default=AUTO_OFF)
+    auto_interval_minutes = models.PositiveSmallIntegerField(
+        'Перевіряти кожні, хв', default=30,
+        help_text='Як часто Minerva звіряє ціни (cron: manage.py dk_price_sync --if-due).')
+    auto_delay_minutes = models.PositiveSmallIntegerField(
+        'Чекати після зміни ціни, хв', default=10,
+        help_text='Щойно змінену базову ціну не відправляти одразу — раптом її ще редагують.')
+    max_change_pct = models.DecimalField(
+        'Самостійно — лише зміни до, %', max_digits=7, decimal_places=2, default=20,
+        help_text='Більша зміна (вгору чи вниз) чекає підтвердження людини навіть в режимі «Оновлювати самостійно».')
+    auto_max_items = models.PositiveSmallIntegerField(
+        'Самостійно — не більше товарів за раз', default=50,
+        help_text='Решта — на підтвердження (захист від масової помилки, напр. неправильного курсу).')
+
+    notify_telegram = models.BooleanField('Telegram', default=True,
+                                          help_text='Що змінено, що чекає підтвердження, коли ціни на DigiKey діють.')
+    notify_email = models.BooleanField('Email-звіт', default=True)
+    notify_email_to = models.CharField(
+        'Email одержувачів (через кому)', max_length=500, blank=True, default='',
+        help_text='Порожньо — адреси із загальних налаштувань сповіщень.')
+    notify_manual = models.BooleanField('Повідомляти й про ручні оновлення', default=True)
+
+    last_auto_at = models.DateTimeField('Остання автоперевірка', null=True, blank=True)
+    last_auto_result = models.CharField('Результат автоперевірки', max_length=300, blank=True, default='')
+    cron_seen_at = models.DateTimeField('Cron звертався', null=True, blank=True)
+
+    class Meta:
+        verbose_name = '💲 Налаштування цін DigiKey'
+        verbose_name_plural = '💲 Налаштування цін DigiKey'
+
+    def __str__(self):
+        return 'Налаштування цін DigiKey'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+class DigiKeyPriceRun(models.Model):
+    """Одне оновлення цін на DigiKey (вручну або автоматично): що було, що стало, що підтвердив DigiKey."""
+
+    KIND_MANUAL, KIND_AUTO = 'manual', 'auto'
+    KIND_CHOICES = [(KIND_MANUAL, '✋ Вручну'), (KIND_AUTO, '🔁 Автоматично')]
+
+    QUEUED, SENDING, SENT, VERIFIED, PARTIAL, FAILED, HELD, NOTHING = (
+        'queued', 'sending', 'sent', 'verified', 'partial', 'failed', 'held', 'nothing')
+    STATUS_CHOICES = [
+        (QUEUED, '⏳ У черзі'),
+        (SENDING, '📤 Надсилається'),
+        (SENT, '🔍 Надіслано — перевіряємо DigiKey'),
+        (VERIFIED, '✅ Діє на DigiKey'),
+        (PARTIAL, '⚠ Частково'),
+        (FAILED, '❌ Помилка'),
+        (HELD, '✋ Чекає підтвердження'),
+        (NOTHING, '— Без змін'),
+    ]
+
+    created_at = models.DateTimeField('Створено', auto_now_add=True, db_index=True)
+    created_by = models.CharField('Хто', max_length=150, blank=True, default='')
+    kind = models.CharField('Як', max_length=8, choices=KIND_CHOICES, default=KIND_MANUAL)
+    status = models.CharField('Стан', max_length=10, choices=STATUS_CHOICES, default=QUEUED, db_index=True)
+    currency = models.CharField('Валюта DigiKey', max_length=3, blank=True, default='')
+    rules = models.JSONField('Правила', default=dict, blank=True)
+    progress = models.CharField('Хід', max_length=200, blank=True, default='')
+    started_at = models.DateTimeField('Почато', null=True, blank=True)
+    finished_at = models.DateTimeField('Надіслано', null=True, blank=True)
+    verified_at = models.DateTimeField('Перевірено на DigiKey', null=True, blank=True)
+    total = models.PositiveIntegerField('Позицій', default=0)
+    sent = models.PositiveIntegerField('Надіслано', default=0)
+    verified = models.PositiveIntegerField('Діє', default=0)
+    held = models.PositiveIntegerField('Чекає', default=0)
+    errors = models.PositiveIntegerField('Помилок', default=0)
+    notified_sent = models.BooleanField(default=False)
+    notified_verified = models.BooleanField(default=False)
+    note = models.CharField('Примітка', max_length=300, blank=True, default='')
+
+    class Meta:
+        verbose_name = '💲 Оновлення цін DigiKey'
+        verbose_name_plural = '💲 Ціни DigiKey — історія оновлень'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'Оновлення цін DigiKey #{self.pk} · {self.get_status_display()}'
+
+
+class DigiKeyPriceChange(models.Model):
+    """Зміна цін одного офера: як було на DigiKey → що надіслали → чи діє."""
+
+    HELD, QUEUED, SENT, VERIFIED, MISMATCH, ERROR, SKIPPED, REJECTED = (
+        'held', 'queued', 'sent', 'verified', 'mismatch', 'error', 'skipped', 'rejected')
+    STATUS_CHOICES = [
+        (HELD, '✋ Чекає підтвердження'),
+        (QUEUED, '⏳ У черзі'),
+        (SENT, '🔍 Надіслано'),
+        (VERIFIED, '✅ Діє на DigiKey'),
+        (MISMATCH, '⚠ На DigiKey інші ціни'),
+        (ERROR, '❌ Помилка'),
+        (SKIPPED, '— Пропущено'),
+        (REJECTED, '✕ Відхилено'),
+    ]
+    FINAL = (VERIFIED, MISMATCH, ERROR, SKIPPED, REJECTED)
+
+    run = models.ForeignKey(DigiKeyPriceRun, on_delete=models.CASCADE, related_name='lines')
+    listing = models.ForeignKey(DigiKeyListing, on_delete=models.SET_NULL, null=True, blank=True,
+                                related_name='price_changes')
+    sku = models.CharField('Артикул', max_length=100, blank=True, default='')
+    title = models.CharField('Назва', max_length=200, blank=True, default='')
+    status = models.CharField('Стан', max_length=10, choices=STATUS_CHOICES, default=QUEUED, db_index=True)
+    old_prices = models.JSONField('Було на DigiKey', default=list, blank=True)
+    new_prices = models.JSONField('Нові ціни', default=list, blank=True)
+    minerva_prices = models.JSONField('Ціни Minerva', default=list, blank=True)
+    minerva_currency = models.CharField('Валюта Minerva', max_length=3, blank=True, default='')
+    rate = models.DecimalField('Курс', max_digits=14, decimal_places=6, null=True, blank=True)
+    change_pct = models.DecimalField('Зміна (1-й ступінь), %', max_digits=9, decimal_places=2, null=True, blank=True)
+    max_change_pct = models.DecimalField('Найбільша зміна, %', max_digits=9, decimal_places=2, null=True, blank=True)
+    notes = models.JSONField('Примітки', default=list, blank=True)
+    error = models.TextField('Помилка', blank=True, default='')
+    sent_at = models.DateTimeField('Надіслано', null=True, blank=True)
+    verified_at = models.DateTimeField('Діє з', null=True, blank=True)
+    dk_updated_at = models.DateTimeField('Змінено на DigiKey (lastUpdateDateUtc)', null=True, blank=True)
+    checked_at = models.DateTimeField('Перевірено', null=True, blank=True)
+    checks = models.PositiveSmallIntegerField('Перевірок', default=0)
+
+    class Meta:
+        verbose_name = 'Зміна ціни DigiKey'
+        verbose_name_plural = 'Зміни цін DigiKey'
+        ordering = ['sku']
+
+    def __str__(self):
+        return f'{self.sku}: {self.get_status_display()}'
 
 
 class AIAnalysisLog(models.Model):

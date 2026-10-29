@@ -1956,6 +1956,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'error_log_display',
         'created_at', 'updated_at',
         'stock_qty_readonly', 'dk_attributes_table',
+        'price_checked_at',
     )
 
     fieldsets = (
@@ -1983,6 +1984,12 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         ('💰 Цінові тири (JSON)', {
             'fields': ('dk_prices',),
             'description': 'Керуй цінами через візуальний редактор нижче. JSON оновлюється автоматично.',
+        }),
+        ('💲 Ціни з Minerva', {
+            'fields': ('price_auto', ('price_adjust_pct', 'price_adjust_fixed'), 'price_checked_at'),
+            'description': 'Ціни офера з базових цін складу Minerva — сторінка '
+                           '<a href="/admin/bots/digikeypricerun/compare/">💲 Ціни DigiKey ← Minerva</a>. '
+                           'Порожні надбавка й добавка — як у «💲 Налаштуваннях цін DigiKey».',
         }),
         ('📋 Обов\'язкові атрибути DigiKey', {
             'fields': ('dk_packaging', 'dk_lifecycle_status'),
@@ -4310,3 +4317,6 @@ class AIAnalysisLogAdmin(admin.ModelAdmin):
         color = '#ef5350' if errors else '#ffa726'
         return format_html('<span style="color:{};font-weight:700">{} проблем</span>', color, n)
     local_issues_count.short_description = 'Локал. перевірки'
+
+
+from . import admin_prices  # noqa: E402,F401 — 💲 Ціни DigiKey ← склад Minerva
