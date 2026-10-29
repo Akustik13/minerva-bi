@@ -67,12 +67,19 @@ def cached(domain: str):
 
 
 # ── 🖼 Свій значок (людина вибрала): для адреси або домену, замість автоматичного; «буква» — без логотипа;
-#    стандартний значок — емодзі на кольоровому кружку (файл <ключ>.icon: «емодзі\nколір», SVG малює icon_svg) ──
+#    стандартний значок — емодзі на кольоровому кружку (файл <ключ>.icon: «емодзі\nколір», SVG малює icon_svg);
+#    зображення з редактора у вікні (вже кружок з фоном, PNG) — <ключ>.round, показується без білої рамки ──
 CUSTOM = 'custom'
 CUSTOM_MAX = 1_000_000
+UPLOAD_MAX = 15_000_000      # більший за CUSTOM_MAX або за MAX_PX файл Minerva сама зменшує до SIZE (Pillow)
+MAX_PX = 512
+SIZE = 256
+MAX_PIXELS = 40_000_000      # розмір із заголовка файла — до розпакування («бомба» з мільярдом пікселів — ні)
+PILLOW_FORMATS = ('PNG', 'JPEG', 'GIF', 'ICO', 'WEBP', 'BMP')
 KEY_RE = re.compile(r'^(?:[a-z0-9._%+-]+@)?[a-z0-9-]+(\.[a-z0-9-]+)+$')
 LETTER = 'letter'
 ICON = 'icon'
+ROUND = 'round'
 STANDARD_ICONS = ('🏢', '🏭', '🏬', '🛒', '📦', '🚚', '✈️', '🚢', '🏦', '💶', '🧾', '📑', '⚙️', '🔧', '🔬', '🧪',
                   '💡', '📡', '🔌', '🖥️', '📱', '🛰️', '🎓', '🏥', '🏛️', '⚖️', '📰', '📣', '🤝', '👤', '👥', '⭐',
                   '❤️', '🔒', '🤖', '🌐', '📬', '🏠')
@@ -118,32 +125,73 @@ def custom_map() -> dict:
         return out
     for name in names:
         key, _, ext = name.rpartition('.')
-        if not KEY_RE.match(key) or (ext not in TYPES and ext not in (LETTER, ICON)):
+        if not KEY_RE.match(key) or (ext not in TYPES and ext not in (LETTER, ICON, ROUND)):
             continue
         path = os.path.join(_custom_dir(), name)
         out[key] = (LETTER if ext == LETTER else path, int(os.path.getmtime(path)))
     return out
 
 
-def set_custom(key: str, data: bytes = b'', letter: bool = False, icon: str = '', color: str = '') -> str:
-    """Свій значок для адреси / домену (data — PNG / JPG / GIF / ICO / WEBP), icon — стандартний значок (емодзі на
-    кружку кольору color), letter — буква без логотипа, усе порожнє — назад автоматичний.
+def content_type(path: str) -> str:
+    return 'image/png' if path.endswith('.' + ROUND) else TYPES[path.rsplit('.', 1)[1]]
+
+
+def _fit(data: bytes, kind: str, png: bool = False):
+    """Великий файл (понад CUSTOM_MAX або MAX_PX), BMP або png=True → PNG не більше SIZE × SIZE (Pillow).
+    Малий PNG / JPG / GIF / ICO / WEBP лишається як є (анімація GIF теж). → (data, kind)."""
+    if len(data) > UPLOAD_MAX:
+        raise ValueError('Зображення завелике (до 15 МБ)')
+    try:
+        from io import BytesIO
+
+        from PIL import Image
+    except ImportError:          # без Pillow — лише як раніше
+        if not kind:
+            raise ValueError('Потрібне зображення PNG, JPG, GIF, ICO або WEBP')
+        if len(data) > CUSTOM_MAX:
+            raise ValueError('Зображення завелике (до 1 МБ)')
+        return data, kind
+    try:
+        img = Image.open(BytesIO(data), formats=PILLOW_FORMATS)
+        width, height = img.size
+    except Exception:
+        raise ValueError('Потрібне зображення PNG, JPG, GIF, ICO, WEBP або BMP')
+    if width * height > MAX_PIXELS:
+        raise ValueError(f'Зображення завелике ({width}×{height} пікселів)')
+    if kind and not png and len(data) <= CUSTOM_MAX and max(width, height) <= MAX_PX:
+        return data, kind
+    try:
+        img.seek(0)
+        img = img.convert('RGBA')
+        img.thumbnail((SIZE, SIZE), Image.LANCZOS)
+        out = BytesIO()
+        img.save(out, 'PNG', optimize=True)
+    except Exception:
+        raise ValueError('Не вдалося прочитати зображення')
+    return out.getvalue(), 'png'
+
+
+def set_custom(key: str, data: bytes = b'', letter: bool = False, icon: str = '', color: str = '',
+               round_: bool = False) -> str:
+    """Свій значок для адреси / домену (data — PNG / JPG / GIF / ICO / WEBP / BMP; великий — зменшується, `_fit`),
+    round_ — зображення з редактора (вже кружок, без білої рамки), icon — стандартний значок (емодзі на кружку
+    кольору color), letter — буква без логотипа, усе порожнє — назад автоматичний.
     → що тепер: 'image' | 'icon' | 'letter' | 'auto'. ValueError — не той файл / значок."""
     key = (key or '').strip().lower()
     if not KEY_RE.match(key):
         raise ValueError('Неправильна адреса або домен')
-    kind = _kind(data) if data else ''
-    if data and not kind:
-        raise ValueError('Потрібне зображення PNG, JPG, GIF, ICO або WEBP')
-    if len(data) > CUSTOM_MAX:
-        raise ValueError('Зображення завелике (до 1 МБ)')
+    kind = ''
+    if data:
+        data, kind = _fit(data, _kind(data), png=round_ and _kind(data) != 'png')
+        if round_:
+            kind = ROUND
     icon, color = (icon or '').strip(), (color or '').strip().lower()
     if icon and not _icon_ok(icon):
         raise ValueError('Виберіть значок зі списку або один емодзі')
     if icon and not COLOR_RE.match(color):
         color = STANDARD_COLORS[0]
     os.makedirs(_custom_dir(), exist_ok=True)
-    for ext in list(TYPES) + [LETTER, ICON]:
+    for ext in list(TYPES) + [LETTER, ICON, ROUND]:
         try:
             os.remove(os.path.join(_custom_dir(), f'{key}.{ext}'))
         except OSError:
@@ -164,7 +212,8 @@ def set_custom(key: str, data: bytes = b'', letter: bool = False, icon: str = ''
 
 def logo_for(address: str, custom: dict | None = None):
     """(ключ для /email/logo/<ключ>/, версія) для рядка листа: свій значок адреси → свій домену → автоматичний
-    домену; «буква» — ('', ''); версія стандартного значка починається з «i» (кружок без білої рамки)."""
+    домену; «буква» — ('', ''); версія стандартного значка й зображення з редактора починається з «i» (кружок
+    без білої рамки)."""
     custom = custom_map() if custom is None else custom
     address = (address or '').strip().lower()
     domain = domain_for(address)
@@ -174,7 +223,7 @@ def logo_for(address: str, custom: dict | None = None):
             path, mtime = custom[key]
             if path == LETTER:
                 return ('', '')
-            return (key, ('i' if path.endswith('.' + ICON) else '') + str(mtime))
+            return (key, ('i' if path.endswith(('.' + ICON, '.' + ROUND)) else '') + str(mtime))
     return (domain, '') if domain else ('', '')
 
 

@@ -72,6 +72,114 @@
 @container (max-width:200px){.em-p1-tab small{display:none}.em-p1-tab{padding:9px 2px}}
 .em-p1.collapsed .em-p1-tabs{display:none}
 .em-p1.collapsed .em-sync-area{display:none}
+
+/* ── 🎨 Вигляд пошти: класи lay-<перемикач>-<значення> на #em-app (email_assistant/layout.py) ── */
+/* ліва колонка: значки збоку (як у новому Outlook / Teams) */
+.em-app.lay-nav-rail .em-p1{display:grid;grid-template-columns:50px minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto}
+.em-app.lay-nav-rail .em-p1 > *{grid-column:2;min-width:0}
+.em-app.lay-nav-rail .em-p1 > .em-p1-tabs{grid-column:1;grid-row:1/5;flex-direction:column;justify-content:flex-start;gap:2px;
+  border-top:none;border-right:1px solid var(--border-strong);padding-top:6px}
+.em-app.lay-nav-rail .em-p1-tab{flex:0 0 auto;padding:11px 2px}
+.em-app.lay-nav-rail .em-p1-tab small{display:none}
+.em-app.lay-nav-rail .em-p1-tab.on{box-shadow:inset 3px 0 0 #1a73e8}
+.em-app.lay-nav-rail .em-p1-tab .n{right:2px}
+.em-app.lay-nav-rail .em-p1-tab .dot{left:6px}
+/* ліва колонка: усе підряд, розділи згортаються (як було раніше, як у Thunderbird / Gmail) */
+.em-app.lay-nav-stack .em-p1-tabs{display:none}
+.em-app.lay-nav-stack .em-pane{display:block}
+.em-app.lay-nav-stack .em-pane-empty{display:none}
+.em-app.lay-nav-stack .em-pane.em-more{display:none}
+.em-app.lay-nav-stack .em-pane.em-more.open{display:flex;flex-direction:column;gap:4px;padding:8px 10px;border-top:1px solid var(--border)}
+.em-more-tg{display:none!important}
+.em-app.lay-nav-stack .em-more-tg{display:flex!important}
+.em-more-tg .em-more-arr{margin-left:auto;font-size:10px;transition:transform .15s}
+.em-more-tg.open .em-more-arr{transform:rotate(180deg)}
+.em-app.lay-nav-stack .em-nav-head{cursor:pointer;user-select:none}
+.em-app.lay-nav-stack .em-nav-head > span:first-child::after{content:' ▾';font-size:10px;color:var(--text-dim)}
+.em-app.lay-nav-stack .em-nav-head.collapsed > span:first-child::after{content:' ▸'}
+.em-app.lay-nav-stack .em-nav-head.collapsed + .em-nav-body{display:none}
+/* лист під списком (Thunderbird «класичний», Outlook «знизу») */
+#em-drag-v{display:none}
+.em-app.lay-pane-below{display:grid;grid-template-columns:auto auto minmax(0,1fr);grid-template-rows:var(--p2-h,300px) auto minmax(0,1fr)}
+.em-app.lay-pane-below > .em-p1{grid-column:1;grid-row:1/4}
+.em-app.lay-pane-below > #em-drag1{grid-column:2;grid-row:1/4}
+.em-app.lay-pane-below > .em-p2{grid-column:3;grid-row:1;width:auto!important;min-height:0;border-right:none;border-bottom:1px solid var(--border-strong)}
+.em-app.lay-pane-below > #em-drag2{display:none}
+.em-app.lay-pane-below > #em-drag-v{display:block;grid-column:3;grid-row:2}
+.em-app.lay-pane-below > .em-p3{grid-column:3;grid-row:3;min-height:0}
+/* лист замість списку (Gmail): список на всю ширину, «← До списку» / Esc */
+.em-back-bar{display:none}
+.em-app.lay-pane-off > #em-drag2{display:none}
+.em-app.lay-pane-off > .em-p2{flex:1;width:auto!important;border-right:none}
+.em-app.lay-pane-off > .em-p3{display:none}
+.em-app.lay-pane-off.em-reading > .em-p2{display:none}
+.em-app.lay-pane-off.em-reading > .em-p3{display:flex}
+.em-app.lay-pane-off.em-reading .em-back-bar{display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.em-back-btn{border:1px solid var(--border-strong);background:var(--bg-input,transparent);color:var(--text);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12.5px}
+.em-back-btn:hover{border-color:#1a73e8;color:#1a73e8}
+.em-back-bar small{font-size:11px;color:var(--text-dim)}
+.em-app.lay-pane-off .em-row-sender{max-width:280px}
+.em-row.kb-cur{box-shadow:inset 3px 0 0 #f59e0b}
+/* щільність рядків */
+.em-app.lay-density-compact .em-row{padding:5px 10px;gap:6px}
+.em-app.lay-density-compact .em-avatar{width:24px;height:24px;font-size:10px}
+.em-app.lay-density-compact .em-av-logo:not(.em-av-icon){padding:2px}
+.em-app.lay-density-compact .em-row-top,.em-app.lay-density-compact .em-row-subj{margin-bottom:0}
+.em-app.lay-density-roomy .em-row{padding:14px 14px;gap:11px}
+.em-app.lay-density-roomy .em-avatar{width:40px;height:40px;font-size:15px}
+.em-app.lay-density-roomy .em-row-subj{font-size:13px;margin-bottom:4px}
+.em-app.lay-density-roomy .em-row-prev{font-size:12px}
+/* текст листа, кружок, мітки, назви вкладень у рядку */
+.em-app.lay-preview-0 .em-row-prev{display:none}
+.em-app.lay-preview-2 .em-row-prev{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35}
+.em-app.lay-avatars-off .em-row > .em-avatar{display:none}
+.em-app.lay-tags-off .em-row-meta{display:none}
+.em-row-atts{display:none}
+.em-app.lay-chips-on .em-row-atts{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.em-att-chip{display:inline-block;max-width:170px;border:1px solid var(--border-strong);border-radius:12px;padding:1px 8px;font-size:11px;
+  color:var(--text-muted);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--bg-card)}
+a.em-att-chip:hover{border-color:#1a73e8;color:#1a73e8}
+/* вкладення у відкритому листі — над текстом (Outlook) */
+.em-app.lay-att-top .em-card.expanded .em-card-collapse{display:flex;flex-direction:column}
+.em-app.lay-att-top .em-card-atts{order:-1;border-top:none;border-bottom:1px solid var(--border)}
+/* 🔗 справжня адреса посилання під курсором, як у рядку стану браузера */
+#em-link-tip{position:fixed;left:12px;bottom:12px;z-index:10000;max-width:min(680px,85vw);background:var(--bg-card);border:1px solid var(--border-strong);
+  border-radius:6px;padding:4px 10px;font-size:12px;color:var(--text-muted);box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none;display:none;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#em-link-tip b{color:var(--text)}
+#em-link-tip.warn{border-color:#f59e0b;color:#f59e0b}
+/* 🎨 вікно «Вигляд пошти» і ⌨ гарячі клавіші */
+#em-look-dlg,#em-keys-dlg{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-card);color:var(--text);
+  padding:14px 16px;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+#em-look-dlg{width:min(760px,95vw)}
+#em-keys-dlg{width:min(460px,95vw)}
+#em-look-dlg::backdrop,#em-keys-dlg::backdrop{background:rgba(0,0,0,.35)}
+#em-look-dlg .lk-head,#em-keys-dlg .lk-head{display:flex;align-items:center;gap:8px}
+#em-look-dlg .lk-x,#em-keys-dlg .lk-x{margin-left:auto;border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:15px}
+#em-look-dlg .lk-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0 12px}
+#em-look-dlg .lk-p{border:1px solid var(--border-strong);border-radius:8px;background:var(--bg-input,transparent);color:var(--text);padding:8px;
+  cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:5px;font:inherit}
+#em-look-dlg .lk-p:hover{border-color:#1a73e8}
+#em-look-dlg .lk-p.on{border-color:#1a73e8;box-shadow:0 0 0 2px rgba(26,115,232,.3)}
+#em-look-dlg .lk-p.own{cursor:default;border-style:dashed}
+#em-look-dlg .lk-p b{font-size:12.5px}
+#em-look-dlg .lk-p small{font-size:10.5px;color:var(--text-muted);line-height:1.35}
+#em-look-dlg .lk-mini{position:relative;height:54px;border:1px solid var(--border);border-radius:5px;background:var(--bg);overflow:hidden}
+#em-look-dlg .lk-mini i{position:absolute;display:block;border-radius:1px}
+#em-look-dlg .lk-mini i.nav{background:rgba(26,115,232,.22)}
+#em-look-dlg .lk-mini i.pane{background:rgba(128,128,128,.22);border-left:1px solid var(--border-strong)}
+#em-look-dlg .lk-mini i.row{height:3px;background:var(--text-dim);opacity:.55}
+#em-look-dlg table,#em-keys-dlg table{width:100%;border-collapse:collapse;font-size:12.5px}
+#em-look-dlg td,#em-keys-dlg td{padding:5px 4px;border-top:1px solid var(--border);vertical-align:middle;background:transparent;color:var(--text)}
+#em-look-dlg td:first-child{color:var(--text-muted);width:32%}
+#em-look-dlg .lk-seg{display:inline-flex;flex-wrap:wrap;gap:2px;border:1px solid var(--border-strong);border-radius:7px;padding:2px}
+#em-look-dlg .lk-seg button{border:none;background:none;color:var(--text-muted);padding:4px 9px;border-radius:5px;cursor:pointer;font-size:12px}
+#em-look-dlg .lk-seg button.on{background:#1a73e8;color:#fff}
+#em-look-dlg .lk-seg button:not(.on):hover{background:var(--bg-hover,rgba(128,128,128,.15))}
+#em-look-dlg .wc-btns,#em-keys-dlg .wc-btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+#em-keys-dlg td:first-child{white-space:nowrap;width:1%;padding-right:12px}
+#em-keys-dlg kbd{display:inline-block;min-width:16px;padding:1px 6px;border:1px solid var(--border-strong);border-bottom-width:2px;border-radius:4px;
+  font:11px/1.5 ui-monospace,Consolas,monospace;text-align:center;background:var(--bg-input,transparent);color:var(--text)}
 .em-sync-btn{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;transition:background .1s;box-sizing:border-box;overflow:hidden;white-space:nowrap}
 .em-sync-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 #sync-status{font-size:11px;color:var(--text-dim);line-height:1.4;min-height:14px}
@@ -258,9 +366,44 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 #em-logo-dlg .lg-colors{display:flex;gap:4px;align-items:center;margin-top:6px;flex-wrap:wrap}
 #em-logo-dlg .lg-colors button{width:20px;height:20px;border-radius:50%;border:2px solid var(--border-strong);cursor:pointer;padding:0}
 #em-logo-dlg .lg-colors button.on{outline:2px solid #1a73e8;outline-offset:1px}
-#em-logo-dlg .lg-prev{width:40px;height:40px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
-  font-size:22px;flex-shrink:0;border:1px solid var(--border)}
 #em-logo-dlg .lg-sec{font-size:12px;margin:10px 0 4px;color:var(--text-muted)}
+#em-logo-dlg{width:min(620px,95vw)}
+#em-logo-dlg .lg-tabs{display:flex;gap:2px;margin:10px 0 10px;border-bottom:1px solid var(--border)}
+#em-logo-dlg .lg-tabs button{border:none;background:none;color:var(--text-muted);padding:6px 10px;cursor:pointer;font-size:12.5px;
+  border-bottom:2px solid transparent;margin-bottom:-1px}
+#em-logo-dlg .lg-tabs button.on{color:#1a73e8;border-bottom-color:#1a73e8;font-weight:600}
+#em-logo-dlg .lg-body{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+#em-logo-dlg .lg-main{flex:1 1 300px;min-width:0}
+#em-logo-dlg .lg-side{flex:1 0 170px;max-width:220px}
+#em-logo-dlg .lg-drop{position:relative;width:220px;height:220px;border:2px dashed var(--border-strong);border-radius:10px;overflow:hidden;margin:0 auto}
+#em-logo-dlg .lg-drop.over{border-color:#1a73e8;box-shadow:0 0 0 3px rgba(26,115,232,.25)}
+#em-logo-dlg .lg-drop.has{border-style:solid;border-color:var(--border)}
+#em-logo-stage{display:block;width:220px;height:220px;cursor:grab;touch-action:none;outline:none}
+#em-logo-stage.drag{cursor:grabbing}
+#em-logo-stage:focus-visible{box-shadow:inset 0 0 0 2px #1a73e8}
+#em-logo-dlg .lg-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  text-align:center;padding:14px;font-size:12px;line-height:1.4;color:var(--text-muted);background:var(--bg-card)}
+#em-logo-dlg .lg-empty[hidden]{display:none}
+#em-logo-dlg .lg-tools{margin-top:8px;display:flex;flex-direction:column;gap:6px;font-size:12px}
+#em-logo-dlg .lg-tools[hidden]{display:none}
+#em-logo-dlg .lg-row{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+#em-logo-dlg .lg-row input[type=range]{flex:1;min-width:120px;accent-color:#1a73e8}
+#em-logo-dlg .lg-tool{border:1px solid var(--border-strong);background:var(--bg-input,transparent);color:var(--text);border-radius:6px;
+  padding:3px 8px;font-size:12px;cursor:pointer;line-height:1.4}
+#em-logo-dlg .lg-tool:hover{border-color:#1a73e8}
+#em-logo-dlg .lg-bgs button{width:20px;height:20px;border-radius:50%;border:2px solid var(--border-strong);cursor:pointer;padding:0;font-size:11px;line-height:1}
+#em-logo-dlg .lg-bgs button.on{outline:2px solid #1a73e8;outline-offset:1px}
+#em-logo-dlg .lg-bgs .lg-tr{background:conic-gradient(#cfd4da 25%,#f4f5f7 0 50%,#cfd4da 0 75%,#f4f5f7 0) 0 0/8px 8px}
+#em-logo-dlg .lg-bgs input[type=color]{width:26px;height:22px;padding:0;border:none;background:none;cursor:pointer}
+#em-logo-dlg .lg-mock{display:flex;flex-direction:column;gap:9px;padding:9px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+#em-logo-dlg .lg-mrow{display:flex;gap:8px;align-items:center;font-size:12px;min-width:0}
+#em-logo-dlg .lg-mrow > div:last-child{min-width:0;flex:1}
+#em-logo-dlg .lg-mrow b,#em-logo-dlg .lg-mrow small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#em-logo-dlg .lg-mrow small{color:var(--text-muted);font-size:11px}
+#em-logo-dlg .lg-mock .em-avatar.s28{width:28px;height:28px;font-size:11px}
+#em-logo-dlg .lg-mock .em-avatar.s64{width:64px;height:64px;font-size:26px;margin:2px auto 0}
+#em-logo-dlg .lg-pv[hidden]{display:none}
+#em-logo-dlg .lg-info{font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.45;word-break:break-word}
 .em-row-body{flex:1;min-width:0}
 .em-row-top{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px}
 .em-row-sender{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
@@ -388,7 +531,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 {% endblock %}
 
 {% block content %}
-<div class="em-app" id="em-app">
+{{ layout_data|json_script:"em-layout-data" }}
+<div class="em-app {{ layout_classes }}" id="em-app">
   <!-- P1 expand tab (visible when folders panel is hidden) -->
   <button id="em-p1-expand" onclick="toggleP1()" title="Показати папки">▶</button>
 
@@ -537,6 +681,12 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         </div>
       </div>
       <div class="em-pane em-more" data-pane="more">
+      <button class="em-sync-btn" onclick="emLookOpen()" title="{% trans "Шаблони Outlook / Gmail / Thunderbird, «як раніше» і свої налаштування — лише для вас" %}">
+        🎨 {% trans "Вигляд пошти…" %}
+      </button>
+      <button class="em-sync-btn" onclick="emKeysHelp()" title="{% trans "j / k, r, e, # … — як у Gmail" %}">
+        ⌨ {% trans "Гарячі клавіші" %}
+      </button>
       <button class="em-sync-btn" onclick="syncAllFolders(this)" title="{% trans "Синхронізувати всі IMAP-папки (повільно)" %}">
         📂 {% trans "Всі папки" %}
       </button>
@@ -600,6 +750,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         <span class="em-sync-meta"><span id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</span></span>
       </button>
       <div id="sync-countdown"></div>
+      <button type="button" class="em-sync-btn em-more-tg" id="em-more-tg" onclick="emMoreToggle()">⋯ {% trans "Ще: папки, налаштування, AI" %}<span class="em-more-arr">▾</span></button>
     </div>
     <nav class="em-p1-tabs" id="em-p1-tabs">
       <button type="button" class="em-p1-tab" data-pane="mail" title="{% trans "Папки: вхідні, надіслані, важливі, спам, архів, папки сервера" %}">✉️<small>{% trans "Папки" %}</small><span class="n" id="em-tab-mail-n"></span></button>
@@ -624,7 +775,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         {% if q %}<span style="font-weight:400;color:var(--text-muted)"> · "{{ q }}"</span>{% endif %}
       </span>
       <span class="em-p2-count" style="display:flex;align-items:center;gap:6px">
-        <button class="em-layout-btn" id="em-layout-btn" onclick="toggleLayout()" title="{% trans "Вертикальне / горизонтальне розміщення" %}">⬒</button>
+        <button class="em-layout-btn" id="em-layout-btn" onclick="toggleLayout()" title="{% trans "Лист праворуч / під списком" %}">⬒</button>
+        <button class="em-layout-btn" onclick="emLookOpen()" title="{% trans "🎨 Вигляд пошти: шаблони Outlook / Gmail / Thunderbird і свої налаштування" %}">🎨</button>
         <span id="em-total">{{ total }}</span>
         <select id="sort-sel" onchange="sortRows(this.value)"
                 style="font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text-muted);cursor:pointer;max-width:90px">
@@ -688,9 +840,9 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
            data-pk="{{ msg.pk }}"
            data-tpk="{{ tpk }}"
            data-ts="{{ msg.sent_at|date:'U' }}"
-           data-sender="{{ msg.sender_display|lower|escapejs }}"
-           data-subject="{{ msg.subject|lower|escapejs }}"
-           data-from="{{ msg.from_email|escapejs }}"
+           data-sender="{{ msg.sender_display|lower }}"
+           data-subject="{{ msg.subject|lower }}"
+           data-from="{{ msg.from_email }}"
            data-read="{% if msg.thread_unread %}0{% else %}{{ msg.is_read|yesno:'1,0' }}{% endif %}"
            data-pks="{{ msg.thread_pks|default:msg.pk }}"
            data-cat="{{ msg.category }}"
@@ -726,7 +878,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
                       title="{% if folder == 'trash' %}{% trans "Видалити назавжди" %}{% else %}{% trans "Видалити" %}{% endif %}">🗑️</button>
             </div>
           </div>
-          <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:40 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
+          <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:120 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
           {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag or msg.work_category_id or msg.kb_tag %}
           <div class="em-row-meta">
             {% if msg.work_category_id %}
@@ -755,7 +907,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
             {% endif %}
           </div>
           {% endif %}
-          <div class="em-row-prev">{{ msg.body_text|truncatechars:55 }}</div>
+          <div class="em-row-prev">{{ msg.body_text|truncatechars:220 }}</div>
+          {% if msg.att_chips %}<div class="em-row-atts">{% for idx, name in msg.att_chips %}<a class="em-att-chip" href="/email/message/{{ msg.pk }}/attachment/{{ idx }}/" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="{{ name }}">📎 {{ name }}</a>{% endfor %}{% if msg.att_more %}<span class="em-att-chip">+{{ msg.att_more }}</span>{% endif %}</div>{% endif %}
         </div>
 
         {% if msg.has_attachments %}<span style="font-size:12px;color:var(--text-dim);flex-shrink:0">📎</span>{% endif %}
@@ -795,10 +948,12 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 
   <!-- Drag handle 2: resize P2 -->
   <div class="em-drag" id="em-drag2" title="Потягни для зміни розміру"></div>
+  <div class="em-drag-v" id="em-drag-v" title="{% trans "Потягни — висота списку" %}"></div>
 
   <!-- ═══ Panel 3: Preview ═══ -->
   <div class="em-p3" id="em-p3">
     <button class="em-p2-toggle" id="p2-toggle" onclick="toggleP2()" title="{% trans "Згорнути/розгорнути список" %}">◀</button>
+    <div class="em-back-bar"><button type="button" class="em-back-btn" onclick="emBackToList()">← {% trans "До списку" %}</button><small>Esc · u — {% trans "назад" %} · j / k — {% trans "наступний / попередній" %}</small></div>
     <div class="em-p3-empty" id="em-p3-empty">
       <span>📩</span>
       {% trans "Виберіть лист для перегляду" %}
@@ -950,32 +1105,114 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" onclick="prAction('dante')" title="{% trans "Час на листи проєкту по днях за 30 днів; немає проєкту askDANTE — вибрати або створити" %}">⏱ {% trans "Занести в askDANTE…" %}</div>
   <div class="em-ctx-item" onclick="prAction('work')" title="{% trans "Не листи: виміри, розробка, зустріч… — з описом (AI)" %}">📝 {% trans "Інша робота на проєкт…" %}</div>{% endif %}
 </div>
+<div id="em-link-tip"></div>
+<dialog id="em-look-dlg">
+  <form method="dialog" onsubmit="return false">
+    <div class="lk-head"><b style="font-size:14px">🎨 {% trans "Вигляд пошти" %}</b>
+      <span style="font-size:11px;color:var(--text-muted)">— {% trans "лише для вас, змінюється одразу" %}</span>
+      <button type="button" class="lk-x" onclick="this.closest('dialog').close()" title="{% trans "Закрити" %}">✕</button></div>
+    <div style="font-size:12px;margin-top:8px;color:var(--text-muted)">{% trans "Готові шаблони — найвдаліше з відомих поштових програм" %}:</div>
+    <div class="lk-presets" id="em-look-presets"></div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">{% trans "Або підлаштуйте самі — шаблон стане «✏️ Свій»" %}:</div>
+    <table><tbody id="em-look-opts"></tbody></table>
+    <div class="wc-btns">
+      <button type="button" class="button" onclick="emLookSet({reset: true})">↺ {% trans "Як за замовчуванням" %}</button>
+      <button type="button" class="button" onclick="emKeysHelp()">⌨ {% trans "Які гарячі клавіші" %}</button>
+      <button type="button" class="button default" onclick="this.closest('dialog').close()">{% trans "Готово" %}</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="em-keys-dlg">
+  <form method="dialog" onsubmit="return false">
+    <div class="lk-head"><b style="font-size:14px">⌨ {% trans "Гарячі клавіші — як у Gmail" %}</b>
+      <button type="button" class="lk-x" onclick="this.closest('dialog').close()">✕</button></div>
+    <div style="font-size:11px;color:var(--text-muted);margin:6px 0 8px">{% trans "Діють, коли курсор не в полі вводу. Вимкнути — «🎨 Вигляд пошти»." %}</div>
+    <table><tbody>
+      <tr><td><kbd>j</kbd> <kbd>k</kbd></td><td>{% trans "Наступний / попередній лист" %}</td></tr>
+      <tr><td><kbd>Enter</kbd> <kbd>o</kbd></td><td>{% trans "Відкрити лист (шаблон «замість списку»)" %}</td></tr>
+      <tr><td><kbd>Esc</kbd> <kbd>u</kbd></td><td>{% trans "Назад до списку" %}</td></tr>
+      <tr><td><kbd>r</kbd> / <kbd>f</kbd></td><td>{% trans "Відповісти / переслати" %}</td></tr>
+      <tr><td><kbd>e</kbd></td><td>{% trans "В архів" %}</td></tr>
+      <tr><td><kbd>#</kbd> <kbd>Delete</kbd></td><td>{% trans "Видалити" %}</td></tr>
+      <tr><td><kbd>!</kbd></td><td>{% trans "Спам" %}</td></tr>
+      <tr><td><kbd>s</kbd></td><td>{% trans "Важливий ⭐" %}</td></tr>
+      <tr><td><kbd>Shift</kbd>+<kbd>I</kbd> / <kbd>Shift</kbd>+<kbd>U</kbd></td><td>{% trans "Прочитано / непрочитано" %}</td></tr>
+      <tr><td><kbd>x</kbd></td><td>{% trans "Вибрати лист (масові дії)" %}</td></tr>
+      <tr><td><kbd>c</kbd></td><td>{% trans "Новий лист" %}</td></tr>
+      <tr><td><kbd>/</kbd></td><td>{% trans "Пошук" %}</td></tr>
+      <tr><td><kbd>?</kbd></td><td>{% trans "Ця підказка" %}</td></tr>
+    </tbody></table>
+    <div class="wc-btns"><button type="button" class="button default" onclick="this.closest('dialog').close()">{% trans "Зрозуміло" %}</button></div>
+  </form>
+</dialog>
 <dialog id="em-logo-dlg">
-  <form method="dialog" onsubmit="return false" style="min-width:320px">
+  <form method="dialog" onsubmit="return false">
     <b style="font-size:14px">🖼 {% trans "Значок відправника" %}</b>
     <div style="font-size:12px;margin:8px 0 4px">{% trans "Для кого" %}:</div>
     <label style="display:block;font-size:12px"><input type="radio" name="em-logo-for" value="addr" checked> <span id="em-logo-addr"></span></label>
     <label style="display:block;font-size:12px" id="em-logo-dom-row"><input type="radio" name="em-logo-for" value="dom"> {% trans "весь домен" %} <span id="em-logo-dom"></span></label>
-    <div class="lg-sec">{% trans "Стандартний значок — клік, колір фону, «✓ Поставити значок»" %}:</div>
-    <div class="lg-icons" id="em-logo-icons">{% for i in sender_icons %}<button type="button" onclick="emLogoIcon(this.textContent)">{{ i }}</button>{% endfor %}</div>
-    <div class="lg-colors" id="em-logo-colors">
-      {% for c in sender_colors %}<button type="button" data-color="{{ c }}" style="background:{{ c }}" title="{{ c }}" onclick="emLogoColor('{{ c }}')"></button>{% endfor %}
-      <input type="text" id="em-logo-emoji" maxlength="8" placeholder="{% trans "або свій емодзі" %}" oninput="emLogoIcon(this.value.trim(), true)"
-             style="width:110px;margin-left:8px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input,var(--bg));color:var(--text)">
+    <div class="lg-tabs">
+      <button type="button" data-lg="icon" onclick="emLogoTab('icon')">😀 {% trans "Стандартний значок" %}</button>
+      <button type="button" data-lg="image" onclick="emLogoTab('image')">🖼 {% trans "Своє зображення" %}</button>
     </div>
-    <div style="display:flex;gap:10px;align-items:center;margin-top:8px">
-      <span class="lg-prev" id="em-logo-prev"></span>
-      <button type="button" class="button default" onclick="emLogoSave('icon')">✓ {% trans "Поставити значок" %}</button>
+    <div class="lg-body">
+      <div class="lg-main">
+        <div class="lg-pane" data-lg="icon">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">{% trans "Клік — значок, нижче — колір фону" %}:</div>
+          <div class="lg-icons" id="em-logo-icons">{% for i in sender_icons %}<button type="button" onclick="emLogoIcon(this.textContent)">{{ i }}</button>{% endfor %}</div>
+          <div class="lg-colors" id="em-logo-colors">
+            {% for c in sender_colors %}<button type="button" data-color="{{ c }}" style="background:{{ c }}" title="{{ c }}" onclick="emLogoColor('{{ c }}')"></button>{% endfor %}
+            <input type="text" id="em-logo-emoji" maxlength="8" placeholder="{% trans "або свій емодзі" %}" oninput="emLogoIcon(this.value.trim(), true)"
+                   style="width:110px;margin-left:8px;font-size:12px;padding:3px 6px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input,var(--bg));color:var(--text)">
+          </div>
+        </div>
+        <div class="lg-pane" data-lg="image" hidden>
+          <div class="lg-drop" id="em-logo-drop">
+            <canvas id="em-logo-stage" tabindex="0" title="{% trans "Тягніть — посунути · коліщатко / два пальці — збільшити · подвійний клік — вписати / заповнити · стрілки — точно" %}"></canvas>
+            <div class="lg-empty" id="em-logo-empty">
+              <div style="font-size:30px;line-height:1">🖼</div>
+              <div>{% trans "Перетягніть зображення сюди або вставте з буфера (Ctrl+V)" %}</div>
+              <button type="button" class="button" onclick="document.getElementById('em-logo-file').click()">📂 {% trans "Вибрати файл…" %}</button>
+              <button type="button" class="button" id="em-logo-cur" hidden onclick="emLogoEditCurrent()">✏️ {% trans "Підправити поточний значок" %}</button>
+            </div>
+          </div>
+          <input type="file" id="em-logo-file" accept="image/png,image/jpeg,image/gif,image/webp,image/x-icon,image/bmp,image/svg+xml,.ico,.svg,.bmp" hidden>
+          <div class="lg-tools" id="em-logo-tools" hidden>
+            <div class="lg-row" title="{% trans "Масштаб" %}">🔍 <input type="range" id="em-logo-zoom" min="0" max="1000" oninput="emLogoZoom(this.value)"></div>
+            <div class="lg-row">
+              <button type="button" class="lg-tool" onclick="emLogoFit('contain')" title="{% trans "Усе зображення в колі, нічого не обрізано" %}">⤢ {% trans "Вписати" %}</button>
+              <button type="button" class="lg-tool" onclick="emLogoFit('cover')" title="{% trans "Зображення закриває все коло, краї обрізано" %}">⬛ {% trans "Заповнити коло" %}</button>
+              <button type="button" class="lg-tool" onclick="emLogoRotate()" title="{% trans "Повернути на 90°" %}">⟳ 90°</button>
+              <button type="button" class="lg-tool" onclick="document.getElementById('em-logo-file').click()">📂 {% trans "Інший файл" %}</button>
+            </div>
+            <div class="lg-row lg-bgs" id="em-logo-bgs">{% trans "Фон" %}:
+              <button type="button" class="lg-tr" data-bg="" title="{% trans "Прозорий — видно кружок Minerva" %}" onclick="emLogoBg('')"></button>
+              <button type="button" data-bg="corner" id="em-logo-bg-corner" hidden title="{% trans "Як у кутку зображення" %}" onclick="emLogoBg('corner')">🎯</button>
+              {% for c in sender_colors %}<button type="button" data-bg="{{ c }}" style="background:{{ c }}" title="{{ c }}" onclick="emLogoBg('{{ c }}')"></button>{% endfor %}
+              <input type="color" id="em-logo-bgc" value="#ffffff" title="{% trans "Свій колір" %}" oninput="emLogoBg(this.value)">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="lg-side">
+        <div class="lg-sec" style="margin-top:0">{% trans "Як виглядатиме" %}:</div>
+        <div class="lg-mock">
+          <div class="lg-mrow"><div class="em-avatar"><span class="lg-letter"></span><img class="em-av-logo em-av-icon lg-pv" alt="" hidden></div>
+            <div><b class="lg-name"></b><small class="lg-subj"></small></div></div>
+          <div class="lg-mrow" title="{% trans "У відкритому листі" %}"><div class="em-avatar s28"><span class="lg-letter"></span><img class="em-av-logo em-av-icon lg-pv" alt="" hidden></div>
+            <div><small>{% trans "у відкритому листі" %}</small></div></div>
+          <div class="em-avatar s64"><span class="lg-letter"></span><img class="em-av-logo em-av-icon lg-pv" alt="" hidden></div>
+        </div>
+        <div class="lg-info" id="em-logo-info"></div>
+      </div>
     </div>
-    <div class="lg-sec">{% trans "Або своє зображення" %}:</div>
-    <input type="file" id="em-logo-file" accept="image/png,image/jpeg,image/gif,image/webp,image/x-icon" style="display:block;margin:4px 0 8px;font-size:12px;color:var(--text)">
     <div class="wc-btns" style="justify-content:flex-start;flex-wrap:wrap">
-      <button type="button" class="button" onclick="emLogoSave('upload')">⬆ {% trans "Поставити це зображення" %}</button>
+      <button type="button" class="button default" id="em-logo-ok" onclick="emLogoSave()">✓ {% trans "Поставити значок" %}</button>
       <button type="button" class="button" onclick="emLogoSave('letter')">🔤 {% trans "Буква замість логотипа" %}</button>
       <button type="button" class="button" onclick="emLogoSave('auto')">↺ {% trans "Автоматично (логотип сайту)" %}</button>
       <button type="button" class="button" onclick="document.getElementById('em-logo-dlg').close()">{% trans "Закрити" %}</button>
     </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">{% trans "Значок бачать усі користувачі Minerva. PNG / JPG / GIF / WEBP / ICO до 1 МБ, квадратний виглядає найкраще." %}</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">{% trans "Значок бачать усі користувачі Minerva. PNG / JPG / GIF / WEBP / ICO / BMP / SVG — великий файл Minerva зменшить сама." %}</div>
     <div id="em-logo-err" style="color:var(--err,#e57373);font-size:12px;margin-top:4px"></div>
   </form>
 </dialog>
@@ -1319,80 +1556,31 @@ var _i18n = {
     localStorage.removeItem('em-p2-w');
     localStorage.removeItem('em-p2-h');
     if (p1.classList.contains('collapsed')) { window.toggleP1(); }
-    // Exit vertical layout
-    var app = document.getElementById('em-app');
-    if (app.classList.contains('v-layout')) { toggleLayout(); }
+    document.getElementById('em-app').style.removeProperty('--p2-h');
   };
 })();
 
-/* ── Vertical layout toggle + vertical drag ── */
+/* ── Лист під списком (lay-pane-below): висоту списку тягне #em-drag-v; ⬒ — праворуч ↔ під списком ── */
 (function(){
-  var app     = document.getElementById('em-app');
-  var p2      = document.getElementById('em-p2');
-  var drag2   = document.getElementById('em-drag2');
-  var layoutBtn = document.getElementById('em-layout-btn');
-  var vDrag   = null;  // created dynamically in v-layout
-  var _vLayout = localStorage.getItem('em-v-layout') === '1';
-
-  function _applyLayout(v) {
-    app.classList.toggle('v-layout', v);
-    if (layoutBtn) layoutBtn.classList.toggle('on', v);
-
-    if (v) {
-      // Vertical: p2 stacked above p3, drag handle between them
-      var savedH = parseInt(localStorage.getItem('em-p2-h') || '280');
-      p2.style.width = '100%';
-      app.style.flexDirection = 'column';
-      // move drag2 (horizontal) out of flow; insert vertical drag
-      if (drag2) drag2.style.display = 'none';
-      if (!vDrag) {
-        vDrag = document.createElement('div');
-        vDrag.className = 'em-drag-v';
-        vDrag.title = 'Потягни для зміни висоти';
-        p2.after(vDrag);
-        // drag logic
-        vDrag.addEventListener('mousedown', function(e) {
-          e.preventDefault();
-          vDrag.classList.add('dragging');
-          var startY = e.clientY;
-          var startH = p2.offsetHeight;
-          function onMove(e) {
-            var newH = Math.max(120, Math.min(window.innerHeight * 0.7, startH + (e.clientY - startY)));
-            p2.style.height = newH + 'px';
-            app.style.setProperty('--p2-h', newH + 'px');
-          }
-          function onUp() {
-            vDrag.classList.remove('dragging');
-            localStorage.setItem('em-p2-h', p2.offsetHeight);
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-          }
-          document.addEventListener('mousemove', onMove);
-          document.addEventListener('mouseup', onUp);
-        });
-      }
-      p2.style.height = savedH + 'px';
-      app.style.setProperty('--p2-h', savedH + 'px');
-    } else {
-      // Horizontal
-      app.style.flexDirection = '';
-      p2.style.height = '';
-      app.style.removeProperty('--p2-h');
-      if (drag2) drag2.style.display = '';
-      if (vDrag) { vDrag.style.display = 'none'; }
-      // restore p2 width
-      var savedW = parseInt(localStorage.getItem('em-p2-w') || '260');
-      p2.style.width = savedW + 'px';
+  var app = document.getElementById('em-app'), p2 = document.getElementById('em-p2'), v = document.getElementById('em-drag-v');
+  try { var h = parseInt(localStorage.getItem('em-p2-h') || '0', 10); if (h) app.style.setProperty('--p2-h', h + 'px'); } catch (e) {}
+  if (v) v.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    v.classList.add('dragging');
+    var startY = e.clientY, startH = p2.offsetHeight;
+    function onMove(ev) {
+      app.style.setProperty('--p2-h', Math.max(120, Math.min(app.clientHeight - 140, startH + (ev.clientY - startY))) + 'px');
     }
-  }
-
-  _applyLayout(_vLayout);
-
-  window.toggleLayout = function() {
-    _vLayout = !_vLayout;
-    localStorage.setItem('em-v-layout', _vLayout ? '1' : '0');
-    _applyLayout(_vLayout);
-  };
+    function onUp() {
+      v.classList.remove('dragging');
+      try { localStorage.setItem('em-p2-h', p2.offsetHeight); } catch (err) {}
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  window.toggleLayout = function() { emLookSet({pane: app.classList.contains('lay-pane-below') ? 'right' : 'below'}); };
 })();
 
 /* ── Panel 2 collapse ── */
@@ -1447,8 +1635,9 @@ async function previewMsg(pk, tpk, rowEl) {
 
   window.refreshBadges && window.refreshBadges();
 
-  // Auto-collapse P2 on small screens only when no explicit preference saved
-  if (window.innerWidth < 1200 && !localStorage.getItem('em-p2-col')) {
+  // Auto-collapse P2 on small screens only when no explicit preference saved (лист праворуч — під списком і
+  // «замість списку» список і так не заважає)
+  if (window.innerWidth < 1200 && !localStorage.getItem('em-p2-col') && document.getElementById('em-app').classList.contains('lay-pane-right')) {
     window.toggleP2 && window.toggleP2();
   }
 }
@@ -1626,8 +1815,21 @@ async function _wcPost(pk, body) {
   return d;
 }
 async function _wcInfo(pk) { return (await fetch('/email/category/' + pk + '/', {credentials: 'same-origin'})).json(); }
-var _logoAddr = '';
-function emLogoDialog(addr) {
+var _logoAddr = '', _logoTab = 'icon', _logoIcon = '', _logoColor = '';
+function _logoCurrentSrc(addr) {   // значок, який зараз видно в списку або у відкритому листі: {src, round}
+  var found = null;
+  function take(img) {
+    if (!found && img && img.complete && img.naturalWidth) found = {src: img.currentSrc || img.src, round: img.classList.contains('em-av-icon')};
+  }
+  document.querySelectorAll('[data-from]').forEach(function(r) {
+    if ((r.dataset.from || '').toLowerCase() === addr) take(r.querySelector('img.em-av-logo'));
+  });
+  document.querySelectorAll('.em-card-from').forEach(function(f) {
+    if ((f.title || '').toLowerCase() === addr) { var hd = f.closest('.em-card-hd'); take(hd && hd.querySelector('img.em-av-logo')); }
+  });
+  return found;
+}
+function emLogoDialog(addr, rowEl) {
   _logoAddr = (addr || '').toLowerCase();
   if (!_logoAddr) { _showToast('⚠️ {% trans "У листа немає адреси відправника" %}'); return; }
   var dom = _logoAddr.split('@')[1] || '';
@@ -1635,35 +1837,296 @@ function emLogoDialog(addr) {
   document.getElementById('em-logo-dom').textContent = dom;
   document.getElementById('em-logo-dom-row').style.display = dom ? '' : 'none';
   document.querySelector('input[name="em-logo-for"][value="addr"]').checked = true;
-  document.getElementById('em-logo-file').value = ''; document.getElementById('em-logo-err').textContent = '';
+  document.getElementById('em-logo-err').textContent = '';
   document.getElementById('em-logo-emoji').value = '';
+  var name = rowEl && rowEl.querySelector && rowEl.querySelector('.em-row-sender'), subj = rowEl && rowEl.querySelector && rowEl.querySelector('.em-row-subj');
+  document.querySelectorAll('#em-logo-dlg .lg-letter').forEach(function(x) { x.textContent = ((name && name.textContent.trim()) || _logoAddr).charAt(0).toUpperCase(); });
+  document.querySelector('#em-logo-dlg .lg-name').textContent = (name && name.textContent.trim()) || _logoAddr;
+  document.querySelector('#em-logo-dlg .lg-subj').textContent = (subj && subj.textContent.trim()) || '{% trans "Тема листа" %}';
+  _lg.current = null;
+  _lgReset();
+  _lg.current = _logoCurrentSrc(_logoAddr);
+  document.getElementById('em-logo-cur').hidden = !_lg.current;
   emLogoIcon(''); emLogoColor((document.querySelector('#em-logo-colors [data-color]') || {dataset: {}}).dataset.color || '#1a73e8');
+  var tab = 'icon';
+  try { tab = localStorage.getItem('em-logo-tab') || 'icon'; } catch (e) {}
+  emLogoTab(tab === 'image' ? 'image' : 'icon');
   document.getElementById('em-logo-dlg').showModal();
 }
-var _logoIcon = '', _logoColor = '';
+function emLogoTab(name) {
+  _logoTab = name;
+  try { localStorage.setItem('em-logo-tab', name); } catch (e) {}
+  document.querySelectorAll('#em-logo-dlg .lg-tabs button').forEach(function(b) { b.classList.toggle('on', b.dataset.lg === name); });
+  document.querySelectorAll('#em-logo-dlg .lg-pane').forEach(function(p) { p.hidden = p.dataset.lg !== name; });
+  document.getElementById('em-logo-ok').textContent = name === 'image' ? '✓ {% trans "Поставити це зображення" %}' : '✓ {% trans "Поставити значок" %}';
+  document.getElementById('em-logo-info').hidden = name !== 'image';
+  if (name === 'icon') _lgPreview(_logoIcon ? _logoIconSrc(_logoIcon, _logoColor) : '');
+  else if (_lg.img) _lgRedraw();
+  else _lgPreview('');
+}
+function _logoIconSrc(icon, color) {   // те саме, що logos.icon_svg на сервері
+  var esc = icon.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="32" fill="' + color + '"/>'
+    + '<text x="32" y="34" text-anchor="middle" dominant-baseline="central" font-size="34" '
+    + 'font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, sans-serif">' + esc + '</text></svg>';
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
 function emLogoIcon(icon, typed) {   // стандартний значок з сітки або свій емодзі з поля
   _logoIcon = icon || '';
   if (!typed) document.getElementById('em-logo-emoji').value = '';
   document.querySelectorAll('#em-logo-icons button').forEach(function(b) { b.classList.toggle('on', b.textContent === _logoIcon); });
-  document.getElementById('em-logo-prev').textContent = _logoIcon;
+  if (_logoTab === 'icon') _lgPreview(_logoIcon ? _logoIconSrc(_logoIcon, _logoColor) : '');
 }
 function emLogoColor(color) {
   _logoColor = color;
   document.querySelectorAll('#em-logo-colors [data-color]').forEach(function(b) { b.classList.toggle('on', b.dataset.color === color); });
-  document.getElementById('em-logo-prev').style.background = color;
+  if (_logoTab === 'icon' && _logoIcon) _lgPreview(_logoIconSrc(_logoIcon, _logoColor));
 }
+function _lgPreview(src) {
+  document.querySelectorAll('#em-logo-dlg .lg-pv').forEach(function(i) {
+    if (src) { i.src = src; i.hidden = false; } else { i.hidden = true; i.removeAttribute('src'); }
+  });
+}
+
+/* ── Редактор свого зображення: кружок 256×256 PNG (як побачать у списку), фон, масштаб, положення, поворот ── */
+var LG_S = 220, LG_D = 180, LG_OUT = 256, LG_WORK = 1536, LG_FILE_MAX = 25 * 1024 * 1024;
+var _lg = {};
+function _lgReset() {
+  _lg = {img: null, raw: null, name: '', size: 0, ow: 0, oh: 0, w: 0, h: 0, z: 1, cx: .5, cy: .5, rot: 0, bg: '#ffffff', corner: '',
+         current: _lg.current || null, note: ''};
+  document.getElementById('em-logo-empty').hidden = false;
+  document.getElementById('em-logo-tools').hidden = true;
+  document.getElementById('em-logo-drop').classList.remove('has');
+  document.getElementById('em-logo-info').textContent = '';
+}
+function _lgErr(t) { document.getElementById('em-logo-err').textContent = t ? '❌ ' + t : ''; }
+function _lgKB(n) { return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' МБ' : Math.max(1, Math.round(n / 1024)) + ' КБ'; }
+function _lgLoadFile(f) {
+  _lgErr('');
+  emLogoTab('image');
+  if (!f) return;
+  if (f.size > LG_FILE_MAX) { _lgErr('{% trans "Файл завеликий — до 25 МБ" %}'); return; }
+  var url = URL.createObjectURL(f);
+  _lgLoad(url, {name: f.name || '', size: f.size, raw: f, blob: true, gif: f.type === 'image/gif'});
+}
+function emLogoEditCurrent() {   // відкривається таким, як його видно зараз
+  if (_lg.current) _lgLoad(_lg.current.src, {name: '{% trans "поточний значок" %}', size: 0, raw: null, current: _lg.current.round ? 'round' : 'framed'});
+}
+function _lgLoad(url, meta) {
+  var img = new Image();
+  img.onload = function() {
+    var w = img.naturalWidth || 512, h = img.naturalHeight || 512;
+    var work;
+    try { work = _lgWork(img, w, h); } catch (e) { work = null; }
+    if (meta.blob) URL.revokeObjectURL(url);
+    if (!work) { _lgRaw(meta); return; }
+    _lgReset();
+    _lg.img = work.src; _lg.w = work.w; _lg.h = work.h; _lg.ow = w; _lg.oh = h;
+    _lg.name = meta.name; _lg.size = meta.size; _lg.raw = meta.raw;
+    _lg.note = meta.gif ? '{% trans "анімація GIF не зберігається" %}' : '';
+    var look = _lgLook(_lg.img, _lg.w, _lg.h);
+    _lg.corner = look.corner;
+    document.getElementById('em-logo-bg-corner').hidden = !look.corner;
+    if (look.corner) document.getElementById('em-logo-bg-corner').style.background = look.corner;
+    // логотип із прозорістю — білий фон, логотип на суцільному кольорі — той самий колір і все в колі, фото — на все коло
+    _lg.bg = look.transparent ? '#ffffff' : (look.uniform ? 'corner' : '#ffffff');
+    _lg.z = _lgFitZ(!look.transparent && !look.uniform ? 'cover' : 'contain');
+    if (meta.current === 'round') { _lg.bg = ''; _lg.z = _lgFitZ('cover'); }     // уже кружок — 1:1
+    else if (meta.current) { _lg.bg = '#ffffff'; _lg.z = .75; }                   // як у списку: біла рамка 4 px із 32
+    document.getElementById('em-logo-empty').hidden = true;
+    document.getElementById('em-logo-tools').hidden = false;
+    document.getElementById('em-logo-drop').classList.add('has');
+    _lgBgMark(); _lgSyncZoom(); _lgRedraw();
+    document.getElementById('em-logo-stage').focus();
+  };
+  img.onerror = function() { if (meta.blob) URL.revokeObjectURL(url); _lgRaw(meta); };
+  img.src = url;
+}
+function _lgRaw(meta) {   // браузер не показує цей формат — файл піде як є, Minerva зменшить сама
+  _lgReset();
+  if (!meta.raw) { _lgErr('{% trans "Не вдалося відкрити зображення" %}'); return; }
+  _lg.raw = meta.raw; _lg.name = meta.name; _lg.size = meta.size;
+  _lgPreview('');
+  document.getElementById('em-logo-info').textContent = meta.name + ' · ' + _lgKB(meta.size) + ' — '
+    + '{% trans "браузер не показує цей формат: Minerva перевірить і зменшить файл сама, без редагування" %}';
+}
+function _lgWork(img, w, h) {   // великий файл — зменшуємо по кроках удвічі (якісніше), далі працюємо з копією
+  var src = img;
+  while (Math.max(w, h) > LG_WORK) {
+    var k = Math.max(.5, LG_WORK / Math.max(w, h)), nw = Math.max(1, Math.round(w * k)), nh = Math.max(1, Math.round(h * k));
+    var c = document.createElement('canvas'); c.width = nw; c.height = nh;
+    var x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, nw, nh);
+    src = c; w = nw; h = nh;
+  }
+  if (src === img) {   // SVG / ICO — одразу в растр, щоб далі все малювалось однаково
+    var c2 = document.createElement('canvas'); c2.width = w; c2.height = h;
+    c2.getContext('2d').drawImage(img, 0, 0, w, h);
+    c2.getContext('2d').getImageData(0, 0, 1, 1);   // зображення, яке не можна зберегти, — одразу помилка
+    src = c2;
+  }
+  return {src: src, w: w, h: h};
+}
+function _lgLook(src) {   // прозоре? колір кутків (однаковий — логотип на суцільному фоні)
+  try {
+    var c = document.createElement('canvas'); c.width = c.height = 16;
+    var x = c.getContext('2d'); x.drawImage(src, 0, 0, 16, 16);
+    var d = x.getImageData(0, 0, 16, 16).data, transparent = false;
+    for (var i = 3; i < d.length; i += 4) if (d[i] < 250) { transparent = true; break; }
+    var cs = [0, 15, 240, 255].map(function(p) { return [d[p * 4], d[p * 4 + 1], d[p * 4 + 2]]; });
+    var uniform = cs.every(function(q) { return Math.abs(q[0] - cs[0][0]) + Math.abs(q[1] - cs[0][1]) + Math.abs(q[2] - cs[0][2]) < 40; });
+    var hex = '#' + cs[0].map(function(v) { return ('0' + v.toString(16)).slice(-2); }).join('');
+    return {transparent: transparent, uniform: uniform, corner: transparent ? '' : hex};
+  } catch (e) { return {transparent: true, uniform: false, corner: ''}; }
+}
+function _lgFitZ(mode) {
+  var r = Math.min(_lg.w, _lg.h) / Math.max(_lg.w, _lg.h || 1);
+  return mode === 'cover' ? 1 / r : 1 / Math.sqrt(1 + r * r);
+}
+function _lgZRange() { var r = Math.min(_lg.w, _lg.h) / Math.max(_lg.w, _lg.h || 1); return [.2, Math.max(6, 3 / r)]; }
+function _lgSyncZoom() {
+  var R = _lgZRange();
+  document.getElementById('em-logo-zoom').value = Math.round(1000 * Math.log(_lg.z / R[0]) / Math.log(R[1] / R[0]));
+}
+function _lgClamp() { _lg.cx = Math.min(1.5, Math.max(-.5, _lg.cx)); _lg.cy = Math.min(1.5, Math.max(-.5, _lg.cy)); }
+function _lgZoomTo(z, px, py) {   // px, py — точка кола (0…1), що лишається на місці
+  var R = _lgZRange();
+  z = Math.min(R[1], Math.max(R[0], z));
+  var k = z / _lg.z;
+  _lg.cx = px + (_lg.cx - px) * k; _lg.cy = py + (_lg.cy - py) * k; _lg.z = z;
+  _lgClamp(); _lgRedraw();
+}
+function emLogoZoom(v) { if (!_lg.img) return; var R = _lgZRange(); _lgZoomTo(R[0] * Math.pow(R[1] / R[0], v / 1000), .5, .5); }
+function emLogoFit(mode) { if (!_lg.img) return; _lg.z = _lgFitZ(mode); _lg.cx = _lg.cy = .5; _lgSyncZoom(); _lgRedraw(); }
+function emLogoRotate() { if (!_lg.img) return; _lg.rot = (_lg.rot + 90) % 360; _lgRedraw(); }
+function emLogoBg(v) {
+  _lg.bg = v;
+  if (v && v.charAt(0) === '#') document.getElementById('em-logo-bgc').value = v;
+  _lgBgMark(); _lgRedraw();
+}
+function _lgBgMark() {
+  document.querySelectorAll('#em-logo-bgs [data-bg]').forEach(function(b) { b.classList.toggle('on', b.dataset.bg === _lg.bg); });
+}
+function _lgFill() { return _lg.bg === 'corner' ? _lg.corner : _lg.bg; }
+function _lgPaint(ctx, m, D) {   // зображення в колі діаметра D з відступом m
+  var L = Math.max(_lg.w, _lg.h), w = _lg.w / L * _lg.z * D, h = _lg.h / L * _lg.z * D;
+  ctx.save();
+  ctx.translate(m + _lg.cx * D, m + _lg.cy * D);
+  ctx.rotate(_lg.rot * Math.PI / 180);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(_lg.img, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
+function _lgExport(size) {   // кружок size × size — саме його побачать у списку листів
+  var c = document.createElement('canvas'); c.width = c.height = size;
+  var ctx = c.getContext('2d');
+  ctx.beginPath(); ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2); ctx.clip();
+  if (_lgFill()) { ctx.fillStyle = _lgFill(); ctx.fillRect(0, 0, size, size); }
+  _lgPaint(ctx, 0, size);
+  return c;
+}
+function _lgRedraw() { if (!_lg.raf) _lg.raf = requestAnimationFrame(_lgDraw); }
+function _lgDraw() {
+  _lg.raf = 0;
+  if (!_lg.img) return;
+  var c = document.getElementById('em-logo-stage'), dpr = window.devicePixelRatio || 1;
+  if (c.width !== Math.round(LG_S * dpr)) { c.width = c.height = Math.round(LG_S * dpr); }
+  var ctx = c.getContext('2d'), m = (LG_S - LG_D) / 2, R = LG_D / 2, q = 10;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  for (var y = 0; y < LG_S; y += q) for (var x = 0; x < LG_S; x += q) {   // шашки — прозоре
+    ctx.fillStyle = (x / q + y / q) % 2 ? '#cfd4da' : '#f4f5f7'; ctx.fillRect(x, y, q, q);
+  }
+  if (_lgFill()) { ctx.beginPath(); ctx.arc(LG_S / 2, LG_S / 2, R, 0, Math.PI * 2); ctx.fillStyle = _lgFill(); ctx.fill(); }
+  _lgPaint(ctx, m, LG_D);
+  ctx.beginPath(); ctx.rect(0, 0, LG_S, LG_S); ctx.arc(LG_S / 2, LG_S / 2, R, 0, Math.PI * 2, true);
+  ctx.fillStyle = 'rgba(15,20,30,.62)'; ctx.fill('evenodd');   // що поза колом — не видно
+  ctx.beginPath(); ctx.arc(LG_S / 2, LG_S / 2, R, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.5; ctx.stroke();
+  try { _lgPreview(_lgExport(128).toDataURL('image/png')); } catch (e) { _lgErr('{% trans "Це зображення браузер не дає зберегти" %}'); }
+  clearTimeout(_lg.infoT); _lg.infoT = setTimeout(_lgInfo, 250);
+}
+function _lgInfo() {
+  if (!_lg.img) return;
+  try {
+    _lgExport(LG_OUT).toBlob(function(b) {
+      if (!b) return;
+      var parts = [];
+      if (_lg.name) parts.push(_lg.name);
+      parts.push(_lg.ow + '×' + _lg.oh + (_lg.size ? ' · ' + _lgKB(_lg.size) : ''));
+      document.getElementById('em-logo-info').textContent = parts.join(' · ') + ' → {% trans "збережеться" %} '
+        + LG_OUT + '×' + LG_OUT + ' PNG · ' + _lgKB(b.size) + (_lg.note ? ' · ' + _lg.note : '');
+    }, 'image/png');
+  } catch (e) {}
+}
+(function(){   // тягнути, коліщатко, два пальці, стрілки; файл, перетягування, Ctrl+V
+  var c = document.getElementById('em-logo-stage'), drop = document.getElementById('em-logo-drop');
+  if (!c || !drop) return;
+  c.width = c.height = LG_S;
+  var pts = {};
+  function pos(e) { var r = c.getBoundingClientRect(), m = (LG_S - LG_D) / 2; return {x: (e.clientX - r.left - m) / LG_D, y: (e.clientY - r.top - m) / LG_D}; }
+  c.addEventListener('pointerdown', function(e) { if (!_lg.img) return; c.setPointerCapture(e.pointerId); pts[e.pointerId] = pos(e); c.classList.add('drag'); });
+  c.addEventListener('pointermove', function(e) {
+    if (!pts[e.pointerId]) return;
+    var p = pos(e), ids = Object.keys(pts);
+    if (ids.length === 1) {
+      _lg.cx += p.x - pts[e.pointerId].x; _lg.cy += p.y - pts[e.pointerId].y; pts[e.pointerId] = p;
+      _lgClamp(); _lgRedraw(); return;
+    }
+    var other = pts[String(ids[0]) === String(e.pointerId) ? ids[1] : ids[0]], was = pts[e.pointerId];
+    var d0 = Math.hypot(was.x - other.x, was.y - other.y), d1 = Math.hypot(p.x - other.x, p.y - other.y);
+    pts[e.pointerId] = p;
+    if (d0 > .01) { _lgZoomTo(_lg.z * d1 / d0, (p.x + other.x) / 2, (p.y + other.y) / 2); _lgSyncZoom(); }
+  });
+  function up(e) { delete pts[e.pointerId]; if (!Object.keys(pts).length) c.classList.remove('drag'); }
+  c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+  c.addEventListener('wheel', function(e) {
+    if (!_lg.img) return;
+    e.preventDefault();
+    var p = pos(e); _lgZoomTo(_lg.z * Math.exp(-e.deltaY * .0015), p.x, p.y); _lgSyncZoom();
+  }, {passive: false});
+  c.addEventListener('dblclick', function() {
+    if (!_lg.img) return;
+    emLogoFit(Math.abs(_lg.z - _lgFitZ('cover')) < .01 && Math.abs(_lg.cx - .5) < .01 && Math.abs(_lg.cy - .5) < .01 ? 'contain' : 'cover');
+  });
+  c.addEventListener('keydown', function(e) {
+    if (!_lg.img) return;
+    var st = e.shiftKey ? .05 : .01, mv = {ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st]}[e.key];
+    if (mv) { e.preventDefault(); _lg.cx += mv[0]; _lg.cy += mv[1]; _lgClamp(); _lgRedraw(); }
+    else if (e.key === '+' || e.key === '=') { e.preventDefault(); _lgZoomTo(_lg.z * 1.1, .5, .5); _lgSyncZoom(); }
+    else if (e.key === '-') { e.preventDefault(); _lgZoomTo(_lg.z / 1.1, .5, .5); _lgSyncZoom(); }
+  });
+  drop.addEventListener('dragover', function(e) { e.preventDefault(); e.stopPropagation(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', function() { drop.classList.remove('over'); });
+  drop.addEventListener('drop', function(e) {
+    e.preventDefault(); e.stopPropagation(); drop.classList.remove('over');
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) _lgLoadFile(f);
+  });
+  document.getElementById('em-logo-file').addEventListener('change', function() { var f = this.files[0]; this.value = ''; if (f) _lgLoadFile(f); });
+  document.getElementById('em-logo-dlg').addEventListener('paste', function(e) {
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image/') === 0) { e.preventDefault(); _lgLoadFile(items[i].getAsFile()); return; }
+    }
+  });
+})();
 async function emLogoSave(action) {
+  action = action || (_logoTab === 'image' ? 'upload' : 'icon');
   var dom = document.querySelector('input[name="em-logo-for"]:checked').value === 'dom';
   var fd = new FormData();
   fd.append('key', dom ? _logoAddr.split('@')[1] : _logoAddr); fd.append('action', action);
+  _lgErr('');
   if (action === 'icon') {
-    if (!_logoIcon) { document.getElementById('em-logo-err').textContent = '{% trans "Виберіть значок" %}'; return; }
+    if (!_logoIcon) { _lgErr('{% trans "Виберіть значок" %}'); return; }
     fd.append('icon', _logoIcon); fd.append('color', _logoColor);
   }
   if (action === 'upload') {
-    var f = document.getElementById('em-logo-file').files[0];
-    if (!f) { document.getElementById('em-logo-err').textContent = '{% trans "Виберіть зображення" %}'; return; }
-    fd.append('file', f);
+    if (_lg.img) {
+      var blob = null;
+      try { blob = await new Promise(function(res) { _lgExport(LG_OUT).toBlob(res, 'image/png'); }); } catch (e) {}
+      if (!blob) { _lgErr('{% trans "Це зображення браузер не дає зберегти" %}'); return; }
+      fd.append('file', blob, 'logo.png'); fd.append('round', '1');
+    } else if (_lg.raw) fd.append('file', _lg.raw);
+    else { _lgErr('{% trans "Виберіть зображення" %}'); return; }
   }
   try {
     var d = await (await fetch('/email/logo-set/', {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd})).json();
@@ -1671,7 +2134,7 @@ async function emLogoSave(action) {
     document.getElementById('em-logo-dlg').close();
     _showToast('🖼 {% trans "Значок змінено — оновлюю список" %}');
     setTimeout(function(){ location.reload(); }, 500);
-  } catch (e) { document.getElementById('em-logo-err').textContent = '❌ ' + e.message; }
+  } catch (e) { _lgErr(e.message); }
 }
 async function wcAction(action) {
   document.getElementById('em-wc-ctx').classList.remove('open');
@@ -2899,13 +3362,275 @@ function _ctxHookFrame(f) {
       d._emCtx = true;
       d.addEventListener('contextmenu', function(e) { emLetterCtx(e, f); });
       d.addEventListener('mousedown', function() { emCtxCloseAll(); });
-      d.addEventListener('keydown', function(e) { if (e.key === 'Escape') emCtxCloseAll(); });
+      d.addEventListener('keydown', function(e) { if (e.key === 'Escape') emCtxCloseAll(); _emKeys(e); });
+      d.addEventListener('click', function(e) { emLetterLink(e, d); });
+      d.addEventListener('mouseover', function(e) { emLinkTip(e, true); });
+      d.addEventListener('mouseout', function(e) { emLinkTip(e, false); });
     } catch (e) {}
   };
   f.addEventListener('load', hook);
   hook();
 }
 document.getElementById('em-p3-content').addEventListener('contextmenu', function(e) { emLetterCtx(e, null); });
+['click', 'mouseover', 'mouseout'].forEach(function(type) {   // лист без HTML — ті самі правила посилань
+  document.getElementById('em-p3-content').addEventListener(type, function(e) {
+    if (!e.target.closest || !e.target.closest('.em-card-body-text')) return;
+    if (type === 'click') emLetterLink(e, document); else emLinkTip(e, type === 'mouseover');
+  });
+});
+
+/* ── 🔗 Посилання в листі: у новій вкладці браузера (а не всередині маленького вікна листа, куди більшість сайтів
+   себе не пускає), mailto: — новий лист у Minerva, #якір — у самому листі; під курсором — справжня адреса, як у
+   рядку стану браузера; текст показує один сайт, а веде на інший — попередження (як у Thunderbird) ── */
+function _emHost(u) { try { return new URL(u).hostname.replace(/^www\./, '').toLowerCase(); } catch (e) { return ''; } }
+function _emShownHost(text) {
+  var m = (text || '').trim().match(/^(?:https?:\/\/)?(?:www\.)?([a-z0-9-]+(?:\.[a-z0-9-]+)+)(?:[\/:?#]|$)/i);
+  return m && /\.[a-z]{2,}$/i.test(m[1]) ? m[1].toLowerCase() : '';
+}
+function _emSameSite(a, b) { return a === b || a.slice(-b.length - 1) === '.' + b || b.slice(-a.length - 1) === '.' + a; }
+function _emLinkCheck(a) {   // '' — усе гаразд, інакше сайт, на який посилання веде насправді
+  var shown = _emShownHost(a.textContent), real = _emHost(a.href);
+  return shown && real && !_emSameSite(shown, real) ? real : '';
+}
+function _emMailto(href) {
+  var u;
+  try { u = new URL(href); } catch (e) { return '/email/compose/'; }
+  var q = new URLSearchParams(u.search), out = new URLSearchParams(), to = decodeURIComponent(u.pathname || '');
+  q.forEach(function(v, k) {
+    k = k.toLowerCase();
+    if (k === 'to') to = to ? to + ', ' + v : v;
+    else if ((k === 'cc' || k === 'subject' || k === 'body') && !out.get(k)) out.set(k, v);
+  });
+  if (to) out.set('to', to);
+  return '/email/compose/?' + out.toString();
+}
+function emLetterLink(e, doc) {
+  var a = e.target.closest && e.target.closest('a[href]');
+  if (!a || e.defaultPrevented || e.button > 0) return;
+  var href = (a.getAttribute('href') || '').trim();
+  if (href.charAt(0) === '#') {
+    e.preventDefault();
+    var id = decodeURIComponent(href.slice(1)), el = id && (doc.getElementById(id) || doc.getElementsByName(id)[0]);
+    if (el) el.scrollIntoView({block: 'start', behavior: 'smooth'});
+    return;
+  }
+  var proto = (a.protocol || '').toLowerCase();
+  if (proto === 'mailto:') { e.preventDefault(); emLinkTip(e, false); window.open(_emMailto(a.href), '_blank'); return; }
+  if (proto !== 'http:' && proto !== 'https:') {   // tel: … — як вирішить браузер; javascript: / data: — ні
+    if (proto === 'javascript:' || proto === 'data:' || proto === 'blob:') e.preventDefault();
+    return;
+  }
+  e.preventDefault();
+  var real = _emLinkCheck(a);
+  if (real && !confirm('⚠️ {% trans "Обережно: текст посилання показує" %} ' + _emShownHost(a.textContent) + ', {% trans "а веде воно на" %} '
+                       + real + '.\n\n{% trans "Відкрити" %} ' + a.href + ' ?')) return;
+  window.open(a.href, '_blank', 'noopener,noreferrer');
+}
+function emLinkTip(e, on) {
+  var tip = document.getElementById('em-link-tip');
+  var a = on && e.target.closest && e.target.closest('a[href]');
+  if (!tip) return;
+  if (!a || !/^(https?|mailto):/i.test(a.href)) { tip.style.display = 'none'; return; }
+  var mail = /^mailto:/i.test(a.href), real = mail ? '' : _emLinkCheck(a), b = document.createElement('b');
+  tip.textContent = '';
+  tip.className = real ? 'warn' : '';
+  if (real) tip.appendChild(document.createTextNode('⚠️ {% trans "насправді веде на" %} '));
+  b.textContent = mail ? '✉️ ' + decodeURIComponent(a.href.slice(7).split('?')[0]) : (_emHost(a.href) || a.href);
+  tip.appendChild(b);
+  if (!mail) tip.appendChild(document.createTextNode('  ' + a.href));
+  tip.style.display = 'block';
+}
+
+/* ── 🎨 Вигляд пошти (email_assistant/layout.py): шаблони й свої перемикачі, лише для себе, без перезавантаження ── */
+var _look = JSON.parse(document.getElementById('em-layout-data').textContent);
+var LOOK_LABELS = {
+  nav:     ['{% trans "Ліва колонка" %}', {tabs: '▁ {% trans "Вкладки внизу" %}', rail: '▌ {% trans "Значки збоку" %}', stack: '☰ {% trans "Усе підряд" %}'}],
+  pane:    ['{% trans "Відкритий лист" %}', {right: '▐ {% trans "Праворуч" %}', below: '▄ {% trans "Під списком" %}', off: '⛶ {% trans "Замість списку" %}'}],
+  density: ['{% trans "Рядки списку" %}', {compact: '{% trans "Щільно" %}', normal: '{% trans "Звичайно" %}', roomy: '{% trans "Просторо" %}'}],
+  preview: ['{% trans "Текст листа в списку" %}', {'0': '{% trans "Без тексту" %}', '1': '{% trans "1 рядок" %}', '2': '{% trans "2 рядки" %}'}],
+  avatars: ['{% trans "Кружок відправника" %}', {on: '{% trans "Показувати" %}', off: '{% trans "Ні" %}'}],
+  tags:    ['{% trans "Мітки: категорія, клієнт, проєкт" %}', {on: '{% trans "Показувати" %}', off: '{% trans "Ні" %}'}],
+  chips:   ['{% trans "Назви вкладень у списку" %}', {off: '{% trans "Ні" %}', on: '📎 {% trans "Показувати" %}'}],
+  att:     ['{% trans "Вкладення у відкритому листі" %}', {bottom: '{% trans "Під текстом" %}', top: '{% trans "Над текстом" %}'}],
+  keys:    ['{% trans "Гарячі клавіші" %}', {on: '{% trans "Увімкнено" %}', off: '{% trans "Вимкнено" %}'}]
+};
+function _lookPresetValues(key) {
+  var p = _look.presets.filter(function(x) { return x.key === key; })[0];
+  return p ? Object.assign({}, p.values) : null;
+}
+function _lookPresetOf(values) {
+  var hit = _look.presets.filter(function(p) {
+    return Object.keys(p.values).every(function(k) { return p.values[k] === values[k]; });
+  })[0];
+  return hit ? hit.key : 'custom';
+}
+function _lookApply(values) {
+  var app = document.getElementById('em-app');
+  Array.prototype.slice.call(app.classList).forEach(function(c) { if (c.indexOf('lay-') === 0) app.classList.remove(c); });
+  Object.keys(_look.options).forEach(function(k) { app.classList.add('lay-' + k + '-' + values[k]); });
+  if (values.pane !== 'off') app.classList.remove('em-reading');
+  document.querySelectorAll('.em-row.kb-cur').forEach(function(r) { r.classList.remove('kb-cur'); });
+  _look.values = values;
+  _look.preset = _lookPresetOf(values);
+  var lb = document.getElementById('em-layout-btn');
+  if (lb) lb.classList.toggle('on', values.pane === 'below');
+}
+function _lookMini(v) {   // схема шаблону: ліва колонка, список, лист
+  var h = '', nav = v.nav === 'rail' ? 9 : 24, L = nav + 1, list, pane = null, i;
+  h += '<i class="nav" style="left:0;top:0;bottom:0;width:' + nav + '%"></i>';
+  if (v.nav === 'tabs') h += '<i style="left:0;bottom:0;height:15%;width:' + nav + '%;background:rgba(26,115,232,.65)"></i>';
+  if (v.nav === 'rail') for (i = 0; i < 4; i++) h += '<i style="left:2.5%;width:4%;height:10%;top:' + (8 + i * 18) + '%;background:rgba(26,115,232,.8);border-radius:50%"></i>';
+  if (v.nav === 'stack') for (i = 0; i < 6; i++) h += '<i class="row" style="left:3%;width:' + (nav - 7) + '%;top:' + (8 + i * 15) + '%"></i>';
+  if (v.pane === 'right') { list = [L, 0, 33, 100]; pane = [L + 34, 0, 100 - L - 34, 100]; }
+  else if (v.pane === 'below') { list = [L, 0, 100 - L, 44]; pane = [L, 46, 100 - L, 54]; }
+  else list = [L, 0, 100 - L, 100];
+  if (pane) h += '<i class="pane" style="left:' + pane[0] + '%;top:' + pane[1] + '%;width:' + pane[2] + '%;height:' + pane[3] + '%"></i>';
+  var n = {compact: 7, normal: 5, roomy: 3}[v.density] || 5, step = list[3] / n;
+  for (i = 0; i < n; i++) {
+    h += '<i class="row" style="left:' + (list[0] + 2) + '%;width:' + (list[2] * .8) + '%;top:' + (list[1] + step * i + step * .35) + '%"></i>';
+  }
+  return '<div class="lk-mini">' + h + '</div>';
+}
+function _lookRender() {
+  var box = document.getElementById('em-look-presets'), tb = document.getElementById('em-look-opts');
+  if (!box || !tb) return;
+  box.textContent = '';
+  _look.presets.forEach(function(p) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'lk-p' + (_look.preset === p.key ? ' on' : ''); b.title = p.hint;
+    b.innerHTML = _lookMini(p.values) + '<b></b><small></small>';
+    b.querySelector('b').textContent = p.label; b.querySelector('small').textContent = p.hint;
+    b.onclick = function() { emLookSet({preset: p.key}); };
+    box.appendChild(b);
+  });
+  if (_look.preset === 'custom') {
+    var own = document.createElement('div');
+    own.className = 'lk-p on own';
+    own.innerHTML = _lookMini(_look.values) + '<b>✏️ {% trans "Свій" %}</b><small>{% trans "Ваші перемикачі нижче" %}</small>';
+    box.appendChild(own);
+  }
+  tb.textContent = '';
+  Object.keys(_look.options).forEach(function(k) {
+    var lab = LOOK_LABELS[k] || [k, {}], tr = document.createElement('tr'), td1 = document.createElement('td'), td2 = document.createElement('td');
+    var seg = document.createElement('div');
+    td1.textContent = lab[0]; seg.className = 'lk-seg';
+    _look.options[k].forEach(function(val) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = lab[1][val] || val; b.className = _look.values[k] === val ? 'on' : '';
+      b.onclick = function() { var d = {}; d[k] = val; emLookSet(d); };
+      seg.appendChild(b);
+    });
+    td2.appendChild(seg); tr.appendChild(td1); tr.appendChild(td2); tb.appendChild(tr);
+  });
+}
+async function emLookSet(data) {
+  var prev = Object.assign({}, _look.values), next;
+  if (data.reset) next = _lookPresetValues('minerva');
+  else if (data.preset) next = _lookPresetValues(data.preset);
+  else next = Object.assign({}, prev, data);
+  _lookApply(next); _lookRender();   // одразу, без очікування сервера
+  try {
+    var r = await fetch('/email/layout/', {method: 'POST', headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+                                           body: JSON.stringify(data)});
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || _i18n.помилка);
+    _lookApply(d.layout); _lookRender();
+  } catch (e) { _lookApply(prev); _lookRender(); _showToast('⚠️ ' + e.message); }
+}
+function emLookOpen() { _lookRender(); document.getElementById('em-look-dlg').showModal(); }
+function emKeysHelp() { document.getElementById('em-keys-dlg').showModal(); }
+function emMoreToggle() {   // «усе підряд»: «⋯ Ще» розгортається під розділами, як колись під «Синхронізувати»
+  var more = document.querySelector('#em-panes .em-more'), tg = document.getElementById('em-more-tg');
+  if (!more) return;
+  var open = !more.classList.contains('open');
+  more.classList.toggle('open', open); tg.classList.toggle('open', open);
+  try { localStorage.setItem('em-sync-more', open ? '1' : '0'); } catch (e) {}
+  if (open) more.scrollIntoView({block: 'nearest'});
+}
+(function() {
+  var app = document.getElementById('em-app');
+  try { if (localStorage.getItem('em-sync-more') === '1') { document.querySelector('#em-panes .em-more').classList.add('open'); document.getElementById('em-more-tg').classList.add('open'); } } catch (e) {}
+  document.querySelectorAll('.em-nav-head').forEach(function(h) {   // «усе підряд»: розділи згортаються (localStorage em-nav-<розділ>)
+    var key = 'em-nav-' + h.dataset.sec;
+    try { if (localStorage.getItem(key) === '1') h.classList.add('collapsed'); } catch (e) {}
+    h.addEventListener('click', function(e) {
+      if (!app.classList.contains('lay-nav-stack') || e.target.closest('a, button')) return;
+      h.classList.toggle('collapsed');
+      try { localStorage.setItem(key, h.classList.contains('collapsed') ? '1' : '0'); } catch (err) {}
+    });
+  });
+  try {   // старий перемикач ⬒ («вертикальне розміщення») — один раз переноситься у вигляд пошти
+    if (localStorage.getItem('em-v-layout') === '1' && _look.preset === 'minerva') emLookSet({pane: 'below'});
+    localStorage.removeItem('em-v-layout');
+  } catch (e) {}
+  _lookApply(_look.values);
+  // лист замість списку (Gmail): відкритий лист закриває список, «← До списку» / Esc / u — назад
+  var openMsg = window.previewMsg;
+  window.previewMsg = function() {
+    if (app.classList.contains('lay-pane-off')) {
+      app.classList.add('em-reading');
+      document.querySelectorAll('.em-row.kb-cur').forEach(function(r) { r.classList.remove('kb-cur'); });
+    }
+    return openMsg.apply(this, arguments);
+  };
+  window.emBackToList = function() {
+    app.classList.remove('em-reading');
+    var a = document.querySelector('#em-p2-list .em-row.active');
+    if (a) { a.classList.add('kb-cur'); a.scrollIntoView({block: 'nearest'}); }
+  };
+})();
+
+/* ── ⌨ Гарячі клавіші, як у Gmail (lay-keys-on; ? — підказка) — і коли курсор у тексті листа ── */
+function _emRows() {
+  return Array.prototype.filter.call(document.querySelectorAll('#em-p2-list .em-row'), function(r) { return r.style.display !== 'none'; });
+}
+function _emCur() { return document.querySelector('#em-p2-list .em-row.kb-cur') || document.querySelector('#em-p2-list .em-row.active'); }
+function _emOpenRow(r) { if (r) { r.click(); r.scrollIntoView({block: 'nearest'}); } }
+function _emMove(d) {
+  var app = document.getElementById('em-app'), list = _emRows(), c = _emCur(), i = c ? list.indexOf(c) : -1;
+  var n = list[Math.max(0, Math.min(list.length - 1, i + d))];
+  if (!n) return;
+  document.querySelectorAll('.em-row.kb-cur').forEach(function(r) { r.classList.remove('kb-cur'); });
+  if (app.classList.contains('lay-pane-off') && !app.classList.contains('em-reading')) { n.classList.add('kb-cur'); n.scrollIntoView({block: 'nearest'}); }
+  else _emOpenRow(n);
+}
+function _emAct(name) {
+  var r = document.querySelector('#em-p2-list .em-row.active') || _emCur();
+  if (!r) return;
+  var list = _emRows(), i = list.indexOf(r), next = list[i + 1] || list[i - 1];
+  _ctxMsg = {mode: 'list', pk: +r.dataset.pk, tpk: +r.dataset.tpk || 0, rowEl: r, from: r.dataset.from || ''};
+  ctxAction(name);
+  if (next && ['delete', 'archive', 'spam'].indexOf(name) !== -1) {   // як у Gmail — далі наступний лист
+    setTimeout(function() { if (!document.body.contains(r) || r.style.display === 'none') _emOpenRow(next); }, 700);
+  }
+}
+function _emKeys(e) {
+  var app = document.getElementById('em-app');
+  if (!app.classList.contains('lay-keys-on') || e.ctrlKey || e.metaKey || e.altKey || e.isComposing || e.defaultPrevented) return;
+  var t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''))) return;
+  if (document.querySelector('dialog[open]') || document.querySelector('#em-ctx.open, #em-wc-ctx.open, #em-pr-ctx.open, #em-nv-ctx.open')) return;
+  var k = e.key, reading = app.classList.contains('em-reading'), handled = true;
+  if (k === 'j') _emMove(1);
+  else if (k === 'k') _emMove(-1);
+  else if ((k === 'Enter' || k === 'o') && document.querySelector('#em-p2-list .em-row.kb-cur')) _emOpenRow(_emCur());
+  else if ((k === 'u' || k === 'Escape') && reading) emBackToList();
+  else if (k === 'r') _emAct('reply');
+  else if (k === 'f') _emAct('forward');
+  else if (k === 'e') _emAct('archive');
+  else if (k === '#' || k === 'Delete') _emAct('delete');
+  else if (k === '!') _emAct('spam');
+  else if (k === 's') _emAct('star');
+  else if (k === 'I') _emAct('read');
+  else if (k === 'U') _emAct('unread');
+  else if (k === 'x') { var c = _emCur(), cb = c && c.querySelector('.em-row-cb'); if (cb) cb.click(); }
+  else if (k === 'c') location.href = '/email/compose/';
+  else if (k === '/') { var q = document.getElementById('em-p2-q'); if (q) q.focus(); }
+  else if (k === '?') emKeysHelp();
+  else handled = false;
+  if (handled) e.preventDefault();
+}
+document.addEventListener('keydown', _emKeys);
 /* ⚙ Налаштувати меню: що в меню, що в «⋯ Ще» — окремо для списку й відкритого листа */
 function _ctxLabel(el) {
   if (el.dataset.label) return el.dataset.label;
@@ -3064,7 +3789,7 @@ async function ctxAction(action) {
   if (action === 'translate') { pvAiTranslate(pk); return; }
   if (action === 'history') { pvHistory(pk); return; }
   if (action === 'angebot') { pvOfferFromThread(tpk); return; }
-  if (action === 'logo') { emLogoDialog(_ctxMsg.from || ''); return; }
+  if (action === 'logo') { emLogoDialog(_ctxMsg.from || '', _ctxMsg.rowEl); return; }
   if (action === 'why') { emWhy(pk); return; }
   if (action === 'dante') { window.open('/admin/worktime/workday/from-mail/' + pk + '/', '_blank'); return; }
   if (action === 'customer') {   // «👤 Клієнт CRM з листа»: те саме вікно, одразу з формою нового клієнта

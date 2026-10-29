@@ -319,6 +319,10 @@ class EmailSettings(models.Model):
         default=dict, blank=True, verbose_name='Меню правого кліку листа',
         help_text='{"list": [...], "letter": [...]} — пункти, сховані в «⋯ Ще» (у списку й у відкритому листі); '
                   'порожньо — як за замовчуванням')
+    mail_layout = models.JSONField(
+        default=dict, blank=True, verbose_name='🎨 Вигляд пошти',
+        help_text='{перемикач: значення} — email_assistant/layout.py (шаблон Minerva / Outlook / Gmail / Thunderbird… '
+                  'або свій); порожньо — Minerva')
 
     # Auto-reply
     auto_reply_enabled = models.BooleanField(

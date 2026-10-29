@@ -89,3 +89,80 @@ class LogoTests(Base):
         es.save()
         self.assertNotContains(self.client.get('/email/'), 'class="em-av-logo"')
         self.assertEqual(self.client.get('/email/logo/acme.example/').status_code, 404)
+
+
+def _png(w, h, mode='RGB', noise=False, fmt='PNG'):
+    from io import BytesIO
+
+    from PIL import Image
+    img = Image.frombytes(mode, (w, h), os.urandom(w * h * len(mode))) if noise else Image.new(mode, (w, h), 'teal')
+    out = BytesIO()
+    img.save(out, fmt)
+    return out.getvalue()
+
+
+class CustomFitTests(Base):
+    """🖼 Свій значок: великий файл Minerva зменшує сама, зображення з редактора — кружок без білої рамки."""
+
+    def setUp(self):
+        super().setUp()
+        self.media = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media, True)
+        override = override_settings(MEDIA_ROOT=self.media)
+        override.enable()
+        self.addCleanup(override.disable)
+
+    def size_of(self, key, ext):
+        from PIL import Image
+        with Image.open(os.path.join(self.media, logos.DIR, logos.CUSTOM, f'{key}.{ext}')) as img:
+            return img.size
+
+    def test_big_dimensions_and_big_file_are_shrunk(self):
+        self.assertEqual(logos.set_custom('acme.example', _png(1200, 600)), 'image')
+        self.assertEqual(self.size_of('acme.example', 'png'), (256, 128))
+        big = _png(500, 500, 'RGBA', noise=True)                        # 500 px, але понад 1 МБ
+        self.assertGreater(len(big), logos.CUSTOM_MAX)
+        logos.set_custom('acme.example', big)
+        self.assertEqual(self.size_of('acme.example', 'png'), (256, 256))
+        small = _png(64, 64, fmt='JPEG')                                # малий файл — як є
+        logos.set_custom('acme.example', small)
+        with open(os.path.join(self.media, logos.DIR, logos.CUSTOM, 'acme.example.jpg'), 'rb') as fh:
+            self.assertEqual(fh.read(), small)
+        self.assertFalse(os.path.exists(os.path.join(self.media, logos.DIR, logos.CUSTOM, 'acme.example.png')))
+
+    def test_bmp_converted_svg_and_pixel_bomb_refused(self):
+        logos.set_custom('acme.example', _png(40, 30, fmt='BMP'))
+        self.assertEqual(self.size_of('acme.example', 'png'), (40, 30))
+        with self.assertRaises(ValueError):
+            logos.set_custom('acme.example', b'<svg xmlns="http://www.w3.org/2000/svg"/>')
+        import struct
+        import zlib
+
+        def chunk(t, d):
+            return struct.pack('>I', len(d)) + t + d + struct.pack('>I', zlib.crc32(t + d) & 0xffffffff)
+        bomb = (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 8000, 8000, 8, 6, 0, 0, 0))
+                + chunk(b'IDAT', zlib.compress(b'')) + chunk(b'IEND', b''))
+        with self.assertRaisesRegex(ValueError, '8000×8000'):
+            logos.set_custom('acme.example', bomb)
+
+    def test_editor_round_image_has_no_white_frame(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        EmailAccount.objects.filter(pk=self.account.pk).update(is_primary=True)
+        self.client.force_login(self.user)
+        r = self.client.post('/email/logo-set/', {'key': 'sales@acme.example', 'action': 'upload', 'round': '1',
+                                                  'file': SimpleUploadedFile('logo.png', _png(256, 256, 'RGBA'))}).json()
+        self.assertEqual((r['ok'], r['state']), (True, 'image'))
+        key, ver = logos.logo_for('sales@acme.example')
+        self.assertEqual(key, 'sales@acme.example')
+        self.assertTrue(ver.startswith('i'))                            # як стандартний значок — без рамки
+        got = self.client.get('/email/logo/sales@acme.example/')
+        self.assertEqual((got.status_code, got['Content-Type']), (200, 'image/png'))
+        got.close()                                                     # Windows не видаляє відкритий файл
+        logos.set_custom('sales@acme.example', _png(64, 48, fmt='JPEG'), round_=True)   # не PNG — стане PNG
+        self.assertEqual(self.size_of('sales@acme.example', 'round'), (64, 48))
+        logos.set_custom('sales@acme.example', letter=True)
+        self.assertFalse(os.path.exists(os.path.join(self.media, logos.DIR, logos.CUSTOM, 'sales@acme.example.round')))
+        self.mail('sales@acme.example', subject='Angebot')
+        page = self.client.get('/email/').content.decode()
+        for part in ('id="em-logo-stage"', 'id="em-logo-cur"', 'emLogoTab(\'image\')', 'Як виглядатиме', 'em-av-icon lg-pv"'):
+            self.assertIn(part, page)

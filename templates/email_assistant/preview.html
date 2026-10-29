@@ -533,10 +533,10 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
           <iframe src="/email/message/{{ msg.pk }}/html/"
                   class="em-body-iframe"
                   id="pv-iframe-{{ msg.pk }}"
-                  sandbox="allow-same-origin allow-popups allow-scripts"
+                  sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts"
                   onload="emResizeIframe(this)"></iframe>
           {% else %}
-          <div class="em-card-body-text">{{ msg.body_text }}</div>
+          <div class="em-card-body-text">{{ msg.body_text|urlize }}</div>
           {% endif %}
         </div>
 
@@ -545,8 +545,8 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
           {% for att in msg.attachments %}
           <div class="em-att-item"
                data-att-url="/email/message/{{ msg.pk }}/attachment/{{ forloop.counter0 }}/"
-               data-att-name="{{ att.name|escapejs }}"
-               data-att-ct="{{ att.content_type|default:''|escapejs }}"
+               data-att-name="{{ att.name }}"
+               data-att-ct="{{ att.content_type|default:'' }}"
                data-att-size="{{ att.size|default:0 }}"
                data-kb-msg="{{ msg.pk }}" data-kb-idx="{{ forloop.counter0 }}"
                onmouseenter="attTipShow(event,this)"

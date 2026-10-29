@@ -76,7 +76,8 @@ class CustomLogoTests(ProjectBase):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         from email_assistant import logos
-        png = b"\x89PNG\r\n\x1a\n" + b"0" * 40
+        from email_assistant.tests_logos import _png
+        png = _png(40, 40)                                                      # справжній PNG — Minerva його читає
         r = self.client.post("/email/logo-set/", {"key": "example.com", "action": "upload",
                                                   "file": SimpleUploadedFile("me.png", png)}).json()
         self.assertEqual((r["ok"], r["state"]), (True, "image"))

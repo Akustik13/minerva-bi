@@ -50,6 +50,26 @@ def ctx_menu_view(request):
     return JsonResponse({'ok': True, 'hidden': nav_prefs.set_ctx_hidden(es, data)})
 
 
+@staff_member_required
+@require_POST
+def layout_view(request):
+    """🎨 Вигляд пошти, лише для себе: POST {preset: ключ} | {reset: true} | {перемикач: значення, …}."""
+    from email_assistant import layout
+    from email_assistant.models import EmailSettings
+    try:
+        data = json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    try:
+        values = layout.save(EmailSettings.get_for_user(request.user), data)
+    except ValueError as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+    return JsonResponse({'ok': True, 'layout': values, 'preset': layout.preset_of(values),
+                         'classes': layout.classes(values)})
+
+
 def _mails(account, cat):
     from email_assistant.views import ALL_FOLDERS, _build_qs
     return _build_qs(account, ALL_FOLDERS).filter(work_category=cat)

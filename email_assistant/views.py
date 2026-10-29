@@ -531,6 +531,8 @@ def inbox_view(request):
     categories = nav_prefs.ordered(categories, _es, lambda r: f'kind:{r[0]}', n_of=lambda r: r[2],
                                    name_of=lambda r: r[1])
     ctx_hidden = nav_prefs.ctx_hidden(_es)
+    from email_assistant import layout as _layout
+    mail_layout = _layout.get(_es)
     if cat_filter:
         qs = qs.filter(category=cat_filter)
     if work_filter == NO_CATEGORY:
@@ -564,6 +566,7 @@ def inbox_view(request):
     _attach_quote_tags(emails)
     _attach_kb_tags(emails)
     _attach_logos(emails)
+    _attach_chips(emails)
     if search_all:
         _attach_folder_tags(account, emails)
 
@@ -591,6 +594,10 @@ def inbox_view(request):
         'account':               account,
         'email_settings':        EmailSettings.get_for_user(request.user),
         'ctx_hidden':            ctx_hidden,
+        'mail_layout':           mail_layout,
+        'layout_classes':        _layout.classes(mail_layout),
+        'layout_data':           {'values': mail_layout, 'preset': _layout.preset_of(mail_layout),
+                                  'presets': _layout.presets(), 'options': _layout.OPTIONS},
         'sender_icons':          logos.STANDARD_ICONS,
         'sender_colors':         logos.STANDARD_COLORS,
         'ai_model_choices':      EmailSettings.AI_MODEL_CHOICES,
@@ -691,6 +698,19 @@ def message_view(request, message_pk):
         'emails':   [msg],
         'last_msg': msg,
     }))
+
+
+def _attach_chips(emails, limit=3):
+    """Назви вкладень у рядку списку, як у Gmail (m.att_chips [(індекс, назва)], m.att_more) — без картинок,
+    вбудованих у текст листа (cid: підпис, логотип)."""
+    for m in emails:
+        chips = []
+        for i, a in enumerate(m.attachments or []):
+            if not isinstance(a, dict) or a.get('is_inline') or (
+                    a.get('content_id') and str(a.get('content_type') or '').startswith('image/')):
+                continue
+            chips.append((i, a.get('name') or 'file'))
+        m.att_chips, m.att_more = chips[:limit], max(0, len(chips) - limit)
 
 
 def _attach_logos(emails):
@@ -809,8 +829,15 @@ def _mail_links(emails):
         return []
 
 
+# Лист — чужий HTML: його скрипти, плагіни й форми не діють (інакше лист виконав би код від імені Minerva);
+# стилі й картинки — як є. Обробники Minerva (меню, виділення, посилання) додає сторінка ззовні — їх CSP не зупиняє.
+EMAIL_CSP = "script-src 'none'; object-src 'none'; form-action 'none'; frame-src 'none'"
+
+
 def _inject_email_css(html: str) -> str:
-    """Inject normalization CSS so email body expands fully and scrolls horizontally."""
+    """Inject normalization CSS so email body expands fully and scrolls horizontally.
+    <base target="_blank"> першим у <head> — посилання листа відкриваються в новій вкладці, а не всередині
+    маленького вікна листа (більшість сайтів туди себе не пускає — «посилання не відкривається»)."""
     css = (
         '<style>'
         'html,body{'
@@ -819,16 +846,30 @@ def _inject_email_css(html: str) -> str:
         '}'
         '</style>'
     )
+    base = '<base target="_blank">'
     lower = html.lower()
     pos = lower.rfind('</head>')
     if pos != -1:
-        return html[:pos] + css + html[pos:]
+        html = html[:pos] + css + html[pos:]
+        head = lower.find('<head')
+        end = html.find('>', head) if head != -1 else -1
+        if end != -1 and head < pos:
+            return html[:end + 1] + base + html[end + 1:]
+        return base + html
     pos = lower.find('<body')
     if pos != -1:
         end = html.find('>', pos)
         if end != -1:
-            return html[:end + 1] + css + html[end + 1:]
-    return css + html
+            return html[:end + 1] + base + css + html[end + 1:]
+    return base + css + html
+
+
+def _email_response(html: str) -> HttpResponse:
+    response = HttpResponse(html, content_type='text/html; charset=utf-8')
+    response['Content-Security-Policy'] = EMAIL_CSP
+    response['X-Content-Type-Options'] = 'nosniff'
+    response['Referrer-Policy'] = 'no-referrer'   # сайт із посилання не бачить адрес Minerva
+    return response
 
 
 @staff_member_required
@@ -844,20 +885,15 @@ def message_html_view(request, message_pk):
         if 'cid:' in html.lower():
             html = _resolve_cid_images(msg, html)
         html = _inject_email_css(html)
-        return HttpResponse(html, content_type='text/html; charset=utf-8')
-    import html as html_mod
+        return _email_response(html)
+    from django.utils.html import urlize
     body = msg.body_text or ''
     if 'BEGIN:VCALENDAR' in body:
-        return HttpResponse(
-            _render_icalendar_card(body),
-            content_type='text/html; charset=utf-8',
-        )
-    txt = html_mod.escape(body or '(Лист порожній)')
-    return HttpResponse(
-        f'<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:14px;line-height:1.7;'
-        f'white-space:pre-wrap;padding:12px;margin:0">{txt}</body></html>',
-        content_type='text/html; charset=utf-8',
-    )
+        return _email_response(_render_icalendar_card(body))
+    txt = urlize(body or '(Лист порожній)', nofollow=True, autoescape=True)   # адреси в тексті — посиланнями
+    return _email_response(
+        f'<!DOCTYPE html><html><head><base target="_blank"></head><body style="font-family:sans-serif;'
+        f'font-size:14px;line-height:1.7;white-space:pre-wrap;padding:12px;margin:0">{txt}</body></html>')
 
 
 def _render_icalendar_card(ical_text: str) -> str:
@@ -1108,6 +1144,13 @@ def compose_view(request):
             if key in ('to', 'subject') and initial.get(key):
                 continue
             initial[key] = value
+
+    if not (reply_to_pk or forward_pk or offer_pk):   # посилання mailto: з листа — ?to=&cc=&subject=&body=
+        for key in ('to', 'cc', 'subject'):
+            if request.GET.get(key):
+                initial[key] = request.GET[key][:500]
+        if request.GET.get('body'):
+            initial['body_html'] = _html.escape(request.GET['body'][:5000]).replace('\n', '<br>')
 
     if request.method == 'POST':
         return _handle_send(request, account, reply_to)
@@ -2211,7 +2254,7 @@ def sender_logo_view(request, domain):
             response['X-Content-Type-Options'] = 'nosniff'
             response['Cache-Control'] = 'private, max-age=604800'
             return response
-        response = FileResponse(open(own[0], 'rb'), content_type=logos.TYPES[own[0].rsplit('.', 1)[1]])
+        response = FileResponse(open(own[0], 'rb'), content_type=logos.content_type(own[0]))
         response['Cache-Control'] = 'private, max-age=604800'   # адреса з ?v=<час зміни>
         return response
     if logos.domain_for('x@' + domain) != domain:
@@ -2228,14 +2271,16 @@ def sender_logo_view(request, domain):
 @staff_member_required
 @require_POST
 def sender_logo_set_view(request):
-    """🖼 «Значок відправника»: POST key (адреса або домен) + file — свій / action=letter — буква / auto — назад."""
+    """🖼 «Значок відправника»: POST key (адреса або домен) + file — свій (round=1 — з редактора у вікні: кружок
+    PNG) / action=icon — стандартний / letter — буква / auto — назад. Великий файл Minerva зменшує сама."""
     from email_assistant import logos
     try:
         if request.POST.get('action') == 'upload':
             f = request.FILES.get('file')
             if f is None:
                 return JsonResponse({'ok': False, 'error': 'Виберіть зображення'})
-            state = logos.set_custom(request.POST.get('key'), f.read(logos.CUSTOM_MAX + 1))
+            state = logos.set_custom(request.POST.get('key'), f.read(logos.UPLOAD_MAX + 1),
+                                     round_=request.POST.get('round') == '1')
         elif request.POST.get('action') == 'icon':
             state = logos.set_custom(request.POST.get('key'), icon=request.POST.get('icon', ''),
                                      color=request.POST.get('color', ''))
