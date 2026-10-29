@@ -113,16 +113,16 @@
     </div>
 
     <details class="of-card">
-      <summary class="of-card-title" style="cursor:pointer;border:none;margin:0;padding:0">📋 Тексти й умови (з налаштувань Angebote — можна змінити)</summary>
+      <summary class="of-card-title" style="cursor:pointer;border:none;margin:0;padding:0">📋 Тексти й умови (з налаштувань Angebote, мовою документа — можна змінити)</summary>
       <div class="of-grid" style="margin-top:14px">
         <div class="of-field" style="grid-column:1/-1"><label class="of-label">Вступ</label>
-          <textarea class="of-input" name="intro_text" rows="2">{{ data.intro_text }}</textarea></div>
+          <textarea class="of-input" name="intro_text" data-text="intro_text" rows="2">{{ data.intro_text }}</textarea></div>
         <div class="of-field"><label class="of-label">Умови оплати</label>
-          <textarea class="of-input" name="payment_terms" rows="2">{{ data.payment_terms }}</textarea></div>
+          <textarea class="of-input" name="payment_terms" data-text="payment_terms" rows="2">{{ data.payment_terms }}</textarea></div>
         <div class="of-field"><label class="of-label">Умови поставки</label>
-          <textarea class="of-input" name="delivery_terms" rows="2">{{ data.delivery_terms }}</textarea></div>
+          <textarea class="of-input" name="delivery_terms" data-text="delivery_terms" rows="2">{{ data.delivery_terms }}</textarea></div>
         <div class="of-field" style="grid-column:1/-1"><label class="of-label">Завершення</label>
-          <textarea class="of-input" name="outro_text" rows="2">{{ data.outro_text }}</textarea></div>
+          <textarea class="of-input" name="outro_text" data-text="outro_text" rows="2">{{ data.outro_text }}</textarea></div>
       </div>
     </details>
 
@@ -141,6 +141,7 @@
 <div class="of-res" id="of-sku-res"></div>
 {{ lines|json_script:"of-lines-data" }}
 {{ price_breaks|json_script:"of-breaks" }}
+{{ texts_by_lang|json_script:"of-texts" }}
 <script>
 (function(){
   var lines = JSON.parse(document.getElementById('of-lines-data').textContent) || [];
@@ -290,6 +291,18 @@
   curEl.addEventListener('input', function(){ curTouched = true; curWhy.textContent = '✍️ вибрано вручну'; });
   curEl.addEventListener('change', rehintAll);
   ['of-price-mode', 'of-lead-mode', 'of-language'].forEach(function(id){ document.getElementById(id).addEventListener('change', rehintAll); });
+  // тексти (вступ, умови, завершення) — мовою документа: стандартні міняються разом з мовою, свої — лишаються
+  var TEXTS = JSON.parse(document.getElementById('of-texts').textContent || '{}'), langEl = document.getElementById('of-language');
+  var lastLang = langEl.value;
+  langEl.addEventListener('change', function(){
+    var was = TEXTS[lastLang] || {}, now = TEXTS[langEl.value] || {};
+    document.querySelectorAll('[data-text]').forEach(function(t){
+      var k = t.dataset.text, cur = t.value.trim();
+      var std = Object.keys(TEXTS).some(function(l){ return (TEXTS[l][k] || '').trim() === cur; });
+      if (!cur || cur === (was[k] || '').trim() || std) t.value = now[k] || '';
+    });
+    lastLang = langEl.value;
+  });
   async function autoCurrency(){
     if (curTouched) return;
     var qs = new URLSearchParams({customer: document.getElementById('of-customer').value,

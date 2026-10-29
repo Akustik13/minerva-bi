@@ -52,6 +52,16 @@ class OfferSettings(models.Model):
                                       default="Lieferung DAP, zzgl. Versandkosten. Lieferzeit wie angegeben.")
     outro_text = models.TextField("Завершення", blank=True,
                                   default="Für Rückfragen stehen wir Ihnen gerne zur Verfügung.")
+    # ті самі тексти англійською — для Angebot «English» (і другим рядком у «Deutsch + English»)
+    intro_text_en = models.TextField(
+        "Вступ (English)", blank=True,
+        default="Thank you for your inquiry. We are pleased to submit the following quotation:")
+    payment_terms_en = models.TextField("Умови оплати (English)", blank=True,
+                                        default="Payable within 14 days of invoice date without deduction.")
+    delivery_terms_en = models.TextField("Умови поставки (English)", blank=True,
+                                         default="DAP, plus shipping costs. Lead time as stated.")
+    outro_text_en = models.TextField("Завершення (English)", blank=True,
+                                     default="If you have any questions, please do not hesitate to contact us.")
     company_block = models.TextField(
         "Реквізити компанії (шапка)", blank=True, default="",
         help_text="Назва, адреса, USt-IdNr., телефон, email — кожне з нового рядка.")

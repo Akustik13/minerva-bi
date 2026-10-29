@@ -45,6 +45,27 @@ def customer_address(customer) -> str:
     return "\n".join(out)
 
 
+TEXT_FIELDS = ("intro_text", "payment_terms", "delivery_terms", "outro_text")
+UK_TEXTS = {"intro_text": "Дякуємо за запит. Пропонуємо:", "payment_terms": "Оплата протягом 14 днів після рахунку.",
+            "delivery_terms": "DAP, доставка оплачується окремо. Строки — як зазначено.",
+            "outro_text": "Якщо будуть запитання — пишіть, будь ласка."}
+
+
+def texts_for(language, s=None) -> dict:
+    """Вступ / умови / завершення мовою документа: de — тексти «Налаштувань Angebote», en — їхні English-версії,
+    Deutsch + English — обидва рядками, uk — вбудовані."""
+    s = s or OfferSettings.get()
+    de = {f: getattr(s, f) for f in TEXT_FIELDS}
+    en = {f: getattr(s, f"{f}_en") for f in TEXT_FIELDS}
+    if language == "en":
+        return en
+    if language == "de_en":
+        return {f: "\n".join(x for x in (de[f], en[f]) if x) for f in TEXT_FIELDS}
+    if language == "uk":
+        return dict(UK_TEXTS)
+    return de
+
+
 def defaults(customer=None) -> dict:
     s = OfferSettings.get()
     return {
@@ -52,8 +73,7 @@ def defaults(customer=None) -> dict:
         "price_mode": s.price_mode, "lead_mode": s.lead_mode,
         "vat_rate": s.default_vat_rate, "language": s.default_language,
         "valid_until": timezone.localdate() + timedelta(days=s.validity_days),
-        "intro_text": s.intro_text, "payment_terms": s.payment_terms, "delivery_terms": s.delivery_terms,
-        "outro_text": s.outro_text,
+        **texts_for(s.default_language, s),
         "contact_name": getattr(customer, "name", "") or "", "contact_email": getattr(customer, "email", "") or "",
         "contact_phone": getattr(customer, "phone", "") or "", "billing_address": customer_address(customer),
         **dict(zip(("signer_name", "signer_position"), last_signer())),
@@ -698,8 +718,7 @@ def quick_prefill(thread=None) -> dict:
             "currency_reason": "з «Налаштувань Angebote» — виберіть клієнта, і валюта стане за його країною"
             if s.currency_by_country else "з «Налаштувань Angebote»",
             "price_mode": s.price_mode, "lead_mode": s.lead_mode, "origin": {},
-            "shipping_cost": "0", "intro_text": s.intro_text, "payment_terms": s.payment_terms,
-            "delivery_terms": s.delivery_terms, "outro_text": s.outro_text, "source": None, "forwarded": None,
+            "shipping_cost": "0", **texts_for(s.default_language, s), "source": None, "forwarded": None,
             "lines": [dict(BLANK_ROW)]}
     if thread is None:
         return data
@@ -740,6 +759,7 @@ def quick_prefill(thread=None) -> dict:
         contact_phone=getattr(customer, "phone", "") or sig.get("phone", ""),
         billing_address=customer_address(customer) or ("\n".join(sig["lines"]) if customer is None else ""),
         language=language or s.default_language)
+    data.update(texts_for(data["language"], s))     # тексти — мовою листа (англійський запит — англійські умови)
     cur = pricing.currency_for(customer, address=data["billing_address"], email=data["contact_email"])
     data.update(currency=cur["currency"], currency_reason=cur["reason"])
     # звідки що взято — підписи під полями форми

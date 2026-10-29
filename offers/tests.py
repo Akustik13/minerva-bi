@@ -1003,3 +1003,24 @@ class OfferListAndSendTests(QuoteMailBase):
         self.assertEqual(order.source, "Sergey")
         page = self.client.get("/admin/offers/offersettings/1/change/")
         self.assertContains(page, "Sergey (Sergey)")
+
+    def test_texts_follow_document_language(self):
+        self.assertIn("Thank you for your inquiry", services.texts_for("en")["intro_text"])
+        self.assertIn("Zahlbar innerhalb", services.texts_for("de")["payment_terms"])
+        both = services.texts_for("de_en")["outro_text"]
+        self.assertIn("Für Rückfragen", both)
+        self.assertIn("please do not hesitate", both)
+        m = self.colleague_forward()                       # англійський запит — англійські умови в формі
+        data = services.quick_prefill(m.thread)
+        self.assertEqual(data["language"], "en")
+        self.assertIn("Payable within 14 days", data["payment_terms"])
+        page = self.client.get(f"/offers/quick/?thread={m.thread_id}")
+        self.assertContains(page, 'id="of-texts"')
+        self.assertContains(page, 'data-text="intro_text"')
+        offer = services.save_quick({"customer": None, "language": "en", **services.texts_for("en")},
+                                    [{"sku": "ANT-100", "qtys": "35"}], self.user)
+        from docx import Document
+        rev = services.generate_document(offer)
+        text = "\n".join(p.text for p in Document(rev.docx_file.path).paragraphs)
+        self.assertIn("Payable within 14 days", text)
+        self.assertNotIn("Zahlbar", text)

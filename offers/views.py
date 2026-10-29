@@ -146,6 +146,7 @@ def quick_view(request, pk=None):
         "title": f"Angebot {offer.display_number}" if offer else "Новий Angebot",
         "data": data, "offer": offer, "thread": thread, "languages": LANGUAGES,
         "price_modes": PRICE_MODES, "lead_modes": LEAD_MODES,
+        "texts_by_lang": {key: services.texts_for(key) for key, _label in LANGUAGES},
         "rev": services.current_revision(offer) if offer else None,
         "locked": bool(offer and offer.is_locked), "warnings": services.warnings(offer) if offer else [],
         "targets": services.send_targets(offer, request.user) if offer else [],

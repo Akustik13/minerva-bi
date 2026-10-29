@@ -342,7 +342,13 @@ class OfferSettingsAdmin(admin.ModelAdmin):
                            "інакше «Термін поставки» товару, інакше строк відвантаження DigiKey. У формі Angebot видно, "
                            "звідки кожна ціна й строк, і можна вибрати інше джерело. Позиції, яких немає ні в каталозі, "
                            "ні на DigiKey, позначаються 🏭 «виробництво / розробка» — ціну й строк вводять вручну."}),
-        ("Тексти за замовчуванням", {"fields": ["intro_text", "payment_terms", "delivery_terms", "outro_text"]}),
+        ("Тексти за замовчуванням", {
+            "fields": ["intro_text", "payment_terms", "delivery_terms", "outro_text"],
+            "description": "Deutsch — для Angebote німецькою (і першим рядком у «Deutsch + English»)."}),
+        ("Тексти за замовчуванням — English", {
+            "fields": ["intro_text_en", "payment_terms_en", "delivery_terms_en", "outro_text_en"],
+            "description": "Для Angebote англійською (і другим рядком у «Deutsch + English»). У легкій формі тексти "
+                           "міняються разом із «Мовою документа», доки їх не змінили вручну."}),
         ("Реквізити в документі", {
             "fields": ["payment_info", "company_block", "footer_text", "template"],
             "description": 'Документ будується на бланку Commercial Invoice. Завантажити шаблон, приклад документа, '
