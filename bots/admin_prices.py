@@ -97,10 +97,30 @@ def _tier_cells(row):
     }
 
 
-def _row_view(row, cur):
+def _categories():
+    """slug → назва з довідника категорій товарів."""
+    from inventory.models import ProductCategory
+    return dict(ProductCategory.objects.values_list("slug", "name"))
+
+
+def _cat_options(rows_views):
+    """Варіанти фільтра: тип DigiKey і категорія Minerva — лише ті, що є на сторінці, з кількістю."""
+    def count(key):
+        out = {}
+        for v in rows_views:
+            if v[key]:
+                out[v[key]] = out.get(v[key], 0) + 1
+        return sorted(out.items())
+    return {"dk": count("cat"), "minerva": count("pcat")}
+
+
+def _row_view(row, cur, cats=None):
     kind = "diff" if row.differs else ("same" if row.state == "ok" else "problem")
     listing = row.listing
+    slug = listing.product.category if listing.product_id else ""
     return {
+        "cat": listing.get_category_type_display(),
+        "pcat": (cats or {}).get(slug, slug) if slug else "",
         "row": row, "kind": kind, "dir": row.direction, "cells": _tier_cells(row),
         "pk": listing.pk,
         "product_url": reverse("admin:inventory_product_change", args=[listing.product_id]) if listing.product_id else "",
@@ -246,6 +266,9 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
             path("compare/save-rules/", view(self.save_rules_view), name="bots_digikeypricerun_save_rules"),
             path("compare/listing/<int:pk>/", view(self.listing_view), name="bots_digikeypricerun_listing"),
             path("compare/auto-now/", view(self.auto_now_view), name="bots_digikeypricerun_auto_now"),
+            path("offers/", view(self.offers_view), name="bots_digikeypricerun_offers"),
+            path("offers/store/", view(self.offers_store_view), name="bots_digikeypricerun_offers_store"),
+            path("offers/link/<int:pk>/", view(self.offers_link_view), name="bots_digikeypricerun_offers_link"),
             path("<int:pk>/status/", view(self.status_view), name="bots_digikeypricerun_status"),
             path("<int:pk>/verify/", view(self.verify_view), name="bots_digikeypricerun_verify"),
             path("<int:pk>/decide/", view(self.decide_view), name="bots_digikeypricerun_decide"),
@@ -273,7 +296,8 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
         listings = list(selected if selected is not None else svc.listings_qs())
         fresh = _auto_refresh(request, listings, force=selected is not None)
         rows = svc.plan(listings, rules=rules, s=s)
-        views = [_row_view(r, cur) for r in rows]
+        cats = _categories()
+        views = [_row_view(r, cur, cats) for r in rows]
         checked = [r.listing.price_checked_at for r in rows if r.listing.price_checked_at and r.state != "no_offer"]
         custom = rules.as_dict() != svc.Rules.from_settings(s).as_dict()
         held = DigiKeyPriceChange.objects.filter(status=DigiKeyPriceChange.HELD).values("run_id").distinct().count()
@@ -290,6 +314,7 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
             "auto_choices": dict(DigiKeyPriceSettings.AUTO_CHOICES), "quick_pct": QUICK_PCT,
             "can_change": _can_change(request), "held_runs": held,
             "query": request.GET.urlencode(), "flt": flt, "fresh": fresh, "stale_minutes": svc.STALE_MINUTES,
+            "cat_options": _cat_options(views), "offers_url": reverse("admin:bots_digikeypricerun_offers"),
             "settings_url": reverse("admin:bots_digikeypricesettings_changelist"),
             "history_url": reverse("admin:bots_digikeypricerun_changelist"),
             "fx_url": reverse("admin:shop_shopsettings_changelist"),
@@ -384,6 +409,72 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
         if last and timezone.now() - last.created_at < timedelta(minutes=1):
             return redirect(reverse("admin:bots_digikeypricerun_change", args=[last.pk]))
         return self._back(request)
+
+    # ── 🔍 Перевірити офери: живі дані DigiKey ↔ Minerva ──
+
+    def offers_view(self, request):
+        if not _can_view(request):
+            raise PermissionDenied
+        import json
+        s = DigiKeyPriceSettings.get()
+        cur = svc.currency(s)
+        try:
+            offers = svc._fetch_offers()
+            data = svc.reconcile(offers)
+            error = ""
+        except Exception as exc:
+            offers, data, error = [], {"rows": [], "summary": {}, "checked_at": None}, str(exc)
+        cats = _categories()
+        rows = []
+        for r in data["rows"]:
+            l, o = r["listing"], r["offer"] or {}
+            slug = l.product.category if l and l.product_id else ""
+            rows.append({**r, "sku_dk": o.get("supplierSku") or "", "title": o.get("title") or (l.dk_title if l else ""),
+                         "offer_id": o.get("id") or (l.dk_offer_id if l else ""),
+                         "live_f": [(q, svc.fmt_price(v)) for q, v in r["live"]],
+                         "local_f": [(q, svc.fmt_price(v)) for q, v in r["local"]],
+                         "cat": l.get_category_type_display() if l else "", "pcat": cats.get(slug, slug) if slug else "",
+                         "listing_url": reverse("admin:bots_digikeylisting_change", args=[l.pk]) if l else "",
+                         "search": f"{o.get('supplierSku', '')} {o.get('title', '')} {l.product.sku if l and l.product_id else ''}".lower()})
+        raw_id = request.GET.get("raw", "")
+        raw = next((o for o in offers if o.get("id") == raw_id), None)
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "🔍 Офери DigiKey ↔ Minerva", "opts": self.model._meta, "rows": rows, "sum": data["summary"],
+            "checked_at": data["checked_at"], "error": error, "cur": cur, "currency_source": svc.currency_source(s),
+            "raw": json.dumps(raw, ensure_ascii=False, indent=2) if raw else "", "raw_id": raw_id,
+            "cat_options": _cat_options(rows), "can_change": _can_change(request),
+            "compare_url": _compare_url(), "settings_url": reverse("admin:bots_digikeypricesettings_changelist"),
+        }
+        return TemplateResponse(request, "admin/bots/digikeypricerun/offers.html", context)
+
+    def offers_store_view(self, request):
+        """«🔄 Записати в Minerva»: ціни й кількість з DigiKey → лістинги (як «Прочитати ціни з DigiKey»)."""
+        if request.method != "POST" or not _can_change(request):
+            raise PermissionDenied
+        try:
+            res = svc.refresh()
+        except Exception as exc:
+            messages.error(request, f"Не вдалося прочитати офери з DigiKey: {exc}")
+        else:
+            messages.success(request, f"Записано з DigiKey: змінились ціни у {res['updated']}, без змін {res['unchanged']}.")
+        return redirect(reverse("admin:bots_digikeypricerun_offers"))
+
+    def offers_link_view(self, request, pk):
+        if request.method != "POST" or not _can_change(request):
+            raise PermissionDenied
+        listing = get_object_or_404(DigiKeyListing, pk=pk)
+        offer_id = request.POST.get("offer_id", "").strip()
+        try:
+            ok = svc.link_offer(listing, offer_id)
+        except Exception as exc:
+            messages.error(request, f"DigiKey: {exc}")
+        else:
+            if ok:
+                messages.success(request, f"🔗 {listing.get_supplier_sku()}: записано ID офера {offer_id}.")
+            else:
+                messages.warning(request, f"Офер {offer_id} не знайдено на DigiKey — нічого не змінено.")
+        return redirect(reverse("admin:bots_digikeypricerun_offers"))
 
     # ── Звіт оновлення ──
 

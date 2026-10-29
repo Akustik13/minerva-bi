@@ -463,28 +463,47 @@ def _fetch_offers() -> list:
     return fetch_offers(DigiKeyConfig.get(), max_count=5000)
 
 
-def _fetch_one(sku: str) -> dict | None:
-    """GET /offers?SupplierSku= — лише офер з точно таким артикулом; помилка DigiKey — виняток."""
+def _get_offers(params: dict) -> list:
+    """GET /offers з фільтром (ProductId, SupplierSku — swagger GetOffers); помилка DigiKey — виняток."""
     import requests as req
     from bots.models import DigiKeyConfig
     from bots.services.dk_marketplace import (_OFFERS_BASE, DKMarketplaceError, _base_url, _headers,
                                               get_marketplace_token)
     config = DigiKeyConfig.get()
-    resp = req.get(f"{_base_url(config)}{_OFFERS_BASE}/offers", params={"SupplierSku": sku, "Max": 5},
+    resp = req.get(f"{_base_url(config)}{_OFFERS_BASE}/offers", params={"Max": 20, **params},
                    headers=_headers(config, get_marketplace_token(config)), timeout=15)
     if resp.status_code >= 400:
         raise DKMarketplaceError(f"GET offers {resp.status_code}: {resp.text[:200]}")
-    want = (sku or "").strip().lower()
-    return next((o for o in resp.json().get("offers") or []
-                 if (o.get("supplierSku") or "").strip().lower() == want), None)
+    return resp.json().get("offers") or []
+
+
+def _fetch_one(listing) -> dict | None:
+    """Офер лістингу точково. Артикул продавця на DigiKey може відрізнятися від артикула Minerva
+    (напр. офер «AN050201-…» у товару «AN150202-…»), тому спершу — товар DigiKey (ProductId) і ID офера,
+    потім артикул; не знайшли — None (тоді _offers_for читає весь список)."""
+    want_id = listing.dk_offer_id
+    if listing.dk_product_id:
+        offers = _get_offers({"ProductId": listing.dk_product_id})
+        hit = next((o for o in offers if want_id and o.get("id") == want_id), None)
+        if hit or (not want_id and len(offers) == 1):
+            return hit or offers[0]
+    sku = (listing.get_supplier_sku() or "").strip()
+    if sku:
+        offers = _get_offers({"SupplierSku": sku})
+        return (next((o for o in offers if want_id and o.get("id") == want_id), None)
+                or next((o for o in offers if (o.get("supplierSku") or "").strip().lower() == sku.lower()), None))
+    return None
 
 
 def _offers_for(listings=None) -> list:
-    """Свіжі офери: кілька лістингів — точково, інакше весь список продавця."""
+    """Свіжі офери: кілька лістингів — точково, а якщо якийсь не знайшовся — весь список продавця
+    (офер міг мати інший артикул; offer_for зіставить за ID)."""
     if listings is not None:
         listings = [l for l in listings if l is not None]
         if len(listings) <= FEW:
-            return [o for o in (_fetch_one(l.get_supplier_sku()) for l in listings) if o]
+            found = [_fetch_one(l) for l in listings]
+            if all(found):
+                return found
     return _fetch_offers()
 
 
@@ -566,6 +585,18 @@ def offer_payload(offer: dict, tiers, listing=None) -> dict:
     if isinstance(payload.get("description"), str):
         payload["description"] = payload["description"][:500]
     return payload
+
+
+def direct_payload(listing, tiers) -> dict:
+    """Тіло PUT з даних лістингу Minerva — так само, як «💰 Змінити ціни» / «📦 Синхронізувати» в лістингах
+    (dk_marketplace._offer_payload: кількість — склад Minerva або «Кількість для DigiKey»), лише нові ціни."""
+    from bots.services.dk_marketplace import _offer_payload
+    saved = listing.dk_prices
+    listing.dk_prices = [{"qty": q, "price": float(p)} for q, p in tiers]
+    try:
+        return _offer_payload(listing)
+    finally:
+        listing.dk_prices = saved
 
 
 def _put_offer(offer_id: str, payload: dict) -> dict:
@@ -670,41 +701,56 @@ def push_run(run_pk):
     run = DigiKeyPriceRun.objects.get(pk=run_pk)
     lines = list(run.lines.filter(status=DigiKeyPriceChange.QUEUED).select_related("listing__product"))
     try:
-        maps = _match(_offers_for([l.listing for l in lines]))
-    except Exception as exc:
-        for line in lines:
-            line.status, line.error = DigiKeyPriceChange.ERROR, f"Не вдалося прочитати офери DigiKey: {exc}"[:2000]
-            line.save(update_fields=["status", "error"])
-        return _finish(run)
+        maps, read_error = _match(_offers_for([l.listing for l in lines])), ""
+    except Exception as exc:                       # DigiKey не віддав список — пишемо напряму за ID офера
+        maps, read_error = ({}, {}), str(exc)
     now = timezone.now()
     for i, line in enumerate(lines, 1):
         DigiKeyPriceRun.objects.filter(pk=run.pk).update(progress=f"{i} з {len(lines)}: {line.sku}")
         listing = line.listing
         new = tiers_of(line.new_prices)
-        offer = offer_for(listing, maps) if listing else None
-        if offer is None:
-            line.status, line.error = DigiKeyPriceChange.ERROR, "Офер не знайдено на DigiKey."
+        if listing is None:
+            line.status, line.error = DigiKeyPriceChange.ERROR, "Лістинг видалено."
             line.save(update_fields=["status", "error"])
             continue
-        current = tiers_of(offer.get("prices"))
+        offer = offer_for(listing, maps)
+        notes = list(line.notes or [])
+        if offer is not None:
+            current = tiers_of(offer.get("prices"))
+            offer_id, payload = offer.get("id") or listing.dk_offer_id, offer_payload(offer, new, listing)
+        elif listing.dk_offer_id:
+            # Як «💰 Змінити ціни» в лістингах: PUT за ID офера з даними лістингу, без попереднього читання
+            current = tiers_of(listing.dk_prices)
+            offer_id, payload = listing.dk_offer_id, direct_payload(listing, new)
+            notes.append("офер не прочитано" + (f" ({read_error[:120]})" if read_error else "")
+                         + " — надіслано напряму за ID офера з даними лістингу; «було» — останні відомі Minerva")
+        else:
+            line.status = DigiKeyPriceChange.ERROR
+            line.error = (f"Офер з артикулом {listing.get_supplier_sku()} не знайдено на DigiKey, а ID офера в лістингу "
+                          "немає — див. «🔍 Перевірити офери» → «🔗 Записати ID офера»."
+                          + (f" DigiKey: {read_error}" if read_error else ""))[:2000]
+            line.save(update_fields=["status", "error"])
+            continue
         line.old_prices = tiers_json(current)
-        if _key(current) == _key(new):
+        if offer is not None and _key(current) == _key(new):
             line.status = DigiKeyPriceChange.VERIFIED
-            line.notes = list(line.notes or []) + ["на DigiKey вже ці ціни"]
+            line.notes = notes + ["на DigiKey вже ці ціни"]
             line.verified_at = line.checked_at = now
             line.save(update_fields=["old_prices", "status", "notes", "verified_at", "checked_at"])
             _store(listing, current, now, offer)
             continue
         try:
-            answer = _put_offer(offer.get("id") or listing.dk_offer_id, offer_payload(offer, new, listing))
+            answer = _put_offer(offer_id, payload)
         except Exception as exc:                   # DKMarketplaceError, мережа, токен
-            line.status, line.error = DigiKeyPriceChange.ERROR, str(exc)[:2000]
-            line.save(update_fields=["old_prices", "status", "error"])
+            line.status, line.error, line.notes = DigiKeyPriceChange.ERROR, str(exc)[:2000], notes
+            line.save(update_fields=["old_prices", "status", "error", "notes"])
             continue
         line.status, line.sent_at, line.error = DigiKeyPriceChange.SENT, timezone.now(), ""
         echoed = tiers_of((answer or {}).get("prices"))
-        if echoed and _key(echoed) != _key(new):
-            line.notes = list(line.notes or []) + ["DigiKey у відповіді показав інші ціни — перевіряємо"]
+        if echoed:
+            notes.append("DigiKey прийняв нові ціни (відповідь на оновлення)" if _key(echoed) == _key(new)
+                         else "DigiKey у відповіді показав інші ціни — перевіряємо")
+        line.notes = notes
         line.save(update_fields=["old_prices", "status", "sent_at", "error", "notes"])
         _store(listing, new, now)                  # локально — нові; verify() звірить з DigiKey
         old_one, new_one = (current[0][1] if current else None), new[0][1]
@@ -1062,3 +1108,78 @@ def _send_email(ns, s, run, title, head, lines, url, kind):
                                  connection=_smtp_connection(ns))
     msg.attach_alternative(outlook_safe(body), "text/html")
     msg.send()
+
+
+# ── Звірка оферів DigiKey з Minerva («🔍 Перевірити офери») ──────────────────
+
+def reconcile(offers=None) -> dict:
+    """Живі офери DigiKey ↔ лістинги Minerva: за ID офера, інакше за артикулом. Лише читання.
+    {rows, summary}; рядок — офер і / або лістинг, ціни на DigiKey і в Minerva, проблеми."""
+    from bots.models import DigiKeyListing
+    offers = _fetch_offers() if offers is None else offers
+    by_id, by_sku = _match(offers)
+    used = set()
+    rows = []
+    for l in DigiKeyListing.objects.select_related("product").order_by("product__sku"):
+        offer, how = by_id.get(l.dk_offer_id) if l.dk_offer_id else None, "id"
+        if offer is None:
+            offer, how = by_sku.get((l.get_supplier_sku() or "").strip().lower()), "sku"
+        if offer is None and l.sync_status != l.SYNC_PUBLISHED and not l.dk_offer_id:
+            continue                                    # чернетки без офера — не про звірку
+        if offer is not None:
+            used.add(offer.get("id"))
+        rows.append(_reconcile_row(l, offer, how if offer else ""))
+    for offer in offers:
+        if offer.get("id") not in used:
+            rows.append(_reconcile_row(None, offer, ""))
+    kinds = [r["kind"] for r in rows]
+    summary = {"offers": len(offers), "ok": sum(1 for r in rows if r["kind"] == "ok" and not r["issues"]),
+               "prices": kinds.count("prices"),
+               "sku": sum(1 for r in rows if r["how"] == "sku"), "no_listing": kinds.count("no_listing"),
+               "no_offer": kinds.count("no_offer"), "total": len(rows)}
+    return {"rows": rows, "summary": summary, "checked_at": timezone.now()}
+
+
+def _reconcile_row(listing, offer, how) -> dict:
+    issues = []
+    live = tiers_of((offer or {}).get("prices"))
+    local = tiers_of(listing.dk_prices) if listing else []
+    if offer is None:
+        kind = "no_offer"
+        issues.append(f"офер {listing.dk_offer_id or '(ID немає)'} не знайдено на DigiKey")
+    elif listing is None:
+        kind = "no_listing"
+        issues.append("на DigiKey є, у Minerva лістингу немає")
+    else:
+        kind = "ok"
+        if how == "sku":
+            issues.append("знайдено лише за артикулом — ID офера в Minerva "
+                          + (f"інший ({listing.dk_offer_id})" if listing.dk_offer_id else "не записано"))
+        if listing.product_id and (offer.get("supplierSku") or "").strip().lower() != listing.product.sku.lower():
+            issues.append(f"артикул на DigiKey «{offer.get('supplierSku')}» ≠ артикул Minerva «{listing.product.sku}»")
+        if _key(live) != _key(local):
+            kind = "prices"
+            issues.append("ціни в Minerva застарілі — «🔄 Записати в Minerva»")
+        if listing.sync_status != listing.SYNC_PUBLISHED:
+            issues.append(f"у Minerva стан «{listing.get_sync_status_display()}»")
+    return {"listing": listing, "offer": offer, "how": how, "kind": kind, "live": live, "local": local,
+            "issues": issues, "updated": _parse_dt((offer or {}).get("lastUpdateDateUtc")),
+            "source": (offer or {}).get("lastUpdatedSource") or "",
+            "status": (offer or {}).get("offerStatusReason") or ("Active" if (offer or {}).get("isActive") else ""),
+            "qty": (offer or {}).get("quantityAvailable")}
+
+
+def link_offer(listing, offer_id: str) -> bool:
+    """«🔗 Записати ID офера»: лістинг, знайдений лише за артикулом, отримує ID офера з DigiKey."""
+    offers = _get_offers({"SupplierSku": listing.get_supplier_sku()}) if listing.get_supplier_sku() else []
+    offer = next((o for o in offers if o.get("id") == offer_id), None) or \
+        next((o for o in _fetch_offers() if o.get("id") == offer_id), None)
+    if offer is None:
+        return False
+    listing.dk_offer_id = offer_id
+    fields = ["dk_offer_id"]
+    if offer.get("productId") and not listing.dk_product_id:
+        listing.dk_product_id = offer["productId"]
+        fields.append("dk_product_id")
+    listing.save(update_fields=fields)
+    return True

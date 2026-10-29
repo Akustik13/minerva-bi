@@ -31,7 +31,7 @@ class FakeDigiKey:
 
     def add(self, offer_id, sku, prices, **extra):
         self.offers[offer_id] = {
-            "id": offer_id, "supplierSku": sku, "title": f"DK {sku}", "description": "desc",
+            "id": offer_id, "productId": f"p-{offer_id}", "supplierSku": sku, "title": f"DK {sku}", "description": "desc",
             "prices": [{"quantityBreak": q, "price": p} for q, p in prices], "quantityAvailable": 77,
             "minOrderQuantity": 1, "leadTimeToShip": 3, "isActive": True, "isAvailable": True,
             "maxOrderQuantity": 500, "additionalFields": [{"code": "x", "value": "y"}],
@@ -41,13 +41,19 @@ class FakeDigiKey:
         self.lists += 1
         return copy.deepcopy(list(self.offers.values()))
 
-    def one(self, sku):
+    def get(self, params):
+        """GET /offers з фільтром ProductId / SupplierSku (точний збіг)."""
         self.singles += 1
-        return next((copy.deepcopy(o) for o in self.offers.values() if o["supplierSku"] == sku), None)
+        out = [o for o in self.offers.values()
+               if ("ProductId" not in params or o["productId"] == params["ProductId"])
+               and ("SupplierSku" not in params or o["supplierSku"] == params["SupplierSku"])]
+        return copy.deepcopy(out)
 
     def put(self, offer_id, payload):
         if offer_id in self.fail:
             raise Exception(self.fail[offer_id])
+        if offer_id not in self.offers:
+            raise Exception(f"update_offer 404: offer {offer_id} not found")
         self.puts.append((offer_id, copy.deepcopy(payload)))
         if self.apply:
             self.offers[offer_id]["prices"] = payload["prices"]
@@ -68,7 +74,7 @@ class PriceBase(TestCase):
         from django.core.cache import cache
         cache.clear()
         patches = [mock.patch.object(svc, "_fetch_offers", self.dk.fetch),
-                   mock.patch.object(svc, "_fetch_one", self.dk.one),
+                   mock.patch.object(svc, "_get_offers", self.dk.get),
                    mock.patch.object(svc, "_put_offer", self.dk.put)]
         for p in patches:
             p.start()
@@ -79,8 +85,9 @@ class PriceBase(TestCase):
         return Product.objects.create(sku=sku, name=f"Name {sku}", base_prices=[
             {"min_qty": q, "unit_price": str(p)} for q, p in (prices or [])], base_price_currency=currency, **kw)
 
-    def listing(self, product, offer_id, dk_prices, status="published", **kw):
-        self.dk.add(offer_id, product.sku, dk_prices)
+    def listing(self, product, offer_id, dk_prices, status="published", dk_sku=None, **kw):
+        self.dk.add(offer_id, dk_sku or product.sku, dk_prices)
+        kw.setdefault("dk_product_id", f"p-{offer_id}")
         return DigiKeyListing.objects.create(
             product=product, dk_offer_id=offer_id, sync_status=status, dk_title=f"DK {product.sku}",
             dk_prices=[{"qty": q, "price": p} for q, p in dk_prices], **kw)
@@ -221,6 +228,9 @@ class PushTests(PriceBase):
         self.assertEqual(st, {"AN-1": "verified", "AN-2": "error", "AN-3": "error"})
         self.assertEqual(run.status, DigiKeyPriceRun.PARTIAL)
         self.assertIn("400", run.lines.get(sku="AN-2").error)
+        gone_line = run.lines.get(sku="AN-3")                              # не прочитано → PUT за ID → 404
+        self.assertIn("404", gone_line.error)
+        self.assertIn("надіслано напряму", gone_line.notes[-1])
         self.assertFalse(self.dk.puts)
         other.refresh_from_db(), gone.refresh_from_db()
         self.assertEqual(other.dk_prices[0]["price"], 4)                     # невдале — локально без змін
@@ -442,3 +452,89 @@ class ProductCardTests(PriceBase):
         self.assertContains(page, "не прочитано (down)")
         self.client.get("/admin/bots/digikeypricerun/compare/")
         self.assertEqual(self.dk.singles, 1)                                 # після збою 5 хв не пробує
+
+
+class OfferMatchTests(PriceBase):
+    """Офер DigiKey з іншим артикулом, ніж товар Minerva; DigiKey не віддав список; звірка оферів."""
+
+    def setUp(self):
+        super().setUp()
+        self.s.notify_telegram = self.s.notify_email = False
+        self.s.save()
+
+    def push(self):
+        run = svc.create_run(svc.plan(), user="anna")
+        svc.start(run)
+        run.refresh_from_db()
+        return run
+
+    def test_other_sku_found_by_offer_id(self):
+        p = self.product("AN150202-01C", [(1, "5.50")])
+        self.listing(p, "of-1", [(1, 4.89)], dk_sku="AN050201-01C", dk_product_id="")
+        run = self.push()
+        line = run.lines.get()
+        self.assertEqual(line.status, DigiKeyPriceChange.SENT, line.error)
+        self.assertEqual(self.dk.puts[0][0], "of-1")
+        self.assertEqual(self.dk.puts[0][1]["supplierSku"], "AN050201-01C")      # артикул DigiKey не змінено
+        self.assertEqual(self.dk.lists, 1)                                         # точково не знайшли → список
+        self.assertIn("прийняв нові ціни", line.notes[-1])
+        self.assertEqual(svc.verify(run, force=True)["verified"], 1)
+
+    def test_found_by_product_id_without_list(self):
+        p = self.product("AN150202-01C", [(1, "5.50")])
+        self.listing(p, "of-2", [(1, 4.89)], dk_sku="AN050201-01C")
+        self.push()
+        self.assertEqual((self.dk.singles, self.dk.lists), (1, 0))                 # GET ?ProductId= — і все
+
+    def test_direct_put_when_digikey_list_fails(self):
+        l = self.listing(self.product("AN-9", [(1, 7)]), "of-9", [(1, 6)], dk_quantity_override=12)
+        with mock.patch.object(svc, "_get_offers", side_effect=Exception("timeout")), \
+                mock.patch.object(svc, "_fetch_offers", side_effect=Exception("timeout")):
+            run = self.push()
+        line = run.lines.get()
+        self.assertEqual(line.status, DigiKeyPriceChange.SENT)
+        self.assertTrue(any("надіслано напряму" in n for n in line.notes), line.notes)
+        offer_id, payload = self.dk.puts[0]
+        self.assertEqual((offer_id, payload["prices"], payload["quantityAvailable"]),
+                         ("of-9", [{"quantityBreak": 1, "price": 7.0}], 12))      # як «💰 Змінити ціни»
+        self.assertEqual(line.old_prices, [{"qty": 1, "price": "6"}])
+        l.refresh_from_db()
+        self.assertEqual(l.dk_prices, [{"qty": 1, "price": 7.0}])
+
+    def test_reconcile_and_offers_page(self):
+        from config.models import SystemSettings
+        same = self.listing(self.product("OK-1", [(1, 5)]), "o-ok", [(1, 5)])
+        stale = self.listing(self.product("ST-1", [(1, 5)]), "o-st", [(1, 5)])
+        self.dk.offers["o-st"]["prices"] = [{"quantityBreak": 1, "price": 6}]
+        sku_only = self.listing(self.product("SK-1", [(1, 5)]), "o-sk", [(1, 5)], category_type="filter")
+        DigiKeyListing.objects.filter(pk=sku_only.pk).update(dk_offer_id="", dk_product_id="")
+        gone = self.listing(self.product("GO-1", [(1, 5)]), "o-go", [(1, 5)])
+        del self.dk.offers["o-go"]
+        self.dk.add("o-new", "NEW-1", [(1, 9)])
+        data = svc.reconcile()
+        kinds = {(r["listing"].product.sku if r["listing"] else r["offer"]["supplierSku"]): (r["kind"], r["how"])
+                 for r in data["rows"]}
+        self.assertEqual(kinds, {"OK-1": ("ok", "id"), "ST-1": ("prices", "id"), "SK-1": ("ok", "sku"),
+                                 "GO-1": ("no_offer", ""), "NEW-1": ("no_listing", "")})
+        self.assertEqual((data["summary"]["offers"], data["summary"]["sku"]), (4, 1))
+
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
+        page = self.client.get("/admin/bots/digikeypricerun/offers/")
+        self.assertContains(page, "Офери DigiKey ↔ Minerva")
+        self.assertContains(page, "Записати ID офера")
+        self.assertContains(page, "не знайдено на DigiKey")
+        self.assertContains(self.client.get("/admin/bots/digikeypricerun/offers/?raw=o-new"), "&quot;supplierSku&quot;: &quot;NEW-1&quot;")
+        self.client.post(f"/admin/bots/digikeypricerun/offers/link/{sku_only.pk}/", {"offer_id": "o-sk"})
+        sku_only.refresh_from_db()
+        self.assertEqual((sku_only.dk_offer_id, sku_only.dk_product_id), ("o-sk", "p-o-sk"))
+        self.client.post("/admin/bots/digikeypricerun/offers/store/")
+        stale.refresh_from_db()
+        self.assertEqual(stale.dk_prices, [{"qty": 1, "price": 6.0}])
+        compare = self.client.get("/admin/bots/digikeypricerun/compare/")
+        self.assertContains(compare, 'id="dp-cat"')
+        self.assertContains(compare, "RF Filter (1)")
+        self.assertContains(compare, 'data-cat="RF Filter"')
+        same.refresh_from_db()

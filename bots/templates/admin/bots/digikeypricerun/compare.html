@@ -19,6 +19,7 @@
         <input type="hidden" name="query" value="{{ query }}">
         <button class="dp-btn" type="submit" title="GET /offers — свіжі ціни всіх оферів">🔄 Прочитати ціни з DigiKey</button>
       </form>
+      <a class="dp-btn" href="{{ offers_url }}" title="Живі офери DigiKey поруч із тим, що знає Minerva">🔍 Перевірити офери</a>
       <a class="dp-btn" href="{{ history_url }}">📜 Історія{% if held_runs %} · ✋ чекає рішення: {{ held_runs }}{% endif %}</a>
       <a class="dp-btn" href="{{ settings_url }}">⚙ Налаштування</a>
     </div>
@@ -107,6 +108,12 @@
       <button type="button" class="dp-chip" data-d="down">↓ дешевше</button>
       <button type="button" class="dp-chip" data-d="mixed">↕ по-різному</button>
     </span>
+    {% if cat_options.dk|length > 1 %}<select id="dp-cat" class="dp-search" style="flex:0 1 190px" title="Тип на DigiKey">
+      <option value="">Усі типи DigiKey</option>{% for name, n in cat_options.dk %}<option value="{{ name }}">{{ name }} ({{ n }})</option>{% endfor %}
+    </select>{% endif %}
+    {% if cat_options.minerva|length > 1 %}<select id="dp-pcat" class="dp-search" style="flex:0 1 210px" title="Категорія товару в Minerva">
+      <option value="">Усі категорії Minerva</option>{% for name, n in cat_options.minerva %}<option value="{{ name }}">{{ name }} ({{ n }})</option>{% endfor %}
+    </select>{% endif %}
     <input type="search" class="dp-search" id="dp-q" placeholder="🔎 артикул або назва">
     <small id="dp-shown"></small>
   </div>
@@ -126,7 +133,7 @@
       {% for v in rows %}
       <tr class="dp-row dp-{{ v.kind }}" data-kind="{{ v.kind }}" data-dir="{{ v.dir }}" data-s="{{ v.search }}"
           data-pk="{{ v.pk }}" data-sku="{{ v.row.sku }}" data-auto="{{ v.row.listing.price_auto|yesno:'1,0' }}"
-          data-pct="{{ v.own_pct }}" data-fixed="{{ v.own_fixed }}">
+          data-pct="{{ v.own_pct }}" data-fixed="{{ v.own_fixed }}" data-cat="{{ v.cat }}" data-pcat="{{ v.pcat }}">
         <td>{% if v.kind == 'diff' and can_change %}<input type="checkbox" name="ids" value="{{ v.pk }}" class="dp-chk"{% if flt %} checked{% endif %}>{% endif %}</td>
         <td class="dp-prod">
           <a href="{{ v.listing_url }}"><code>{{ v.row.sku }}</code></a>
@@ -189,6 +196,7 @@
   const tiles = document.querySelectorAll('.dp-tile[data-f]');
   const dirs = document.querySelectorAll('#dp-dirs .dp-chip');
   const q = document.getElementById('dp-q');
+  const catSel = document.getElementById('dp-cat'), pcatSel = document.getElementById('dp-pcat');
   const bar = document.getElementById('dp-bar');
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -203,10 +211,12 @@
 
   function apply() {
     const text = (q.value || '').trim().toLowerCase();
+    const cat = catSel ? catSel.value : '', pcat = pcatSel ? pcatSel.value : '';
     let shown = 0;
     rows.forEach(r => {
       const ok = (f === 'all' || r.dataset.kind === f) && (!d || r.dataset.dir === d) &&
-                 (!text || r.dataset.s.includes(text));
+                 (!text || r.dataset.s.includes(text)) && (!cat || r.dataset.cat === cat) &&
+                 (!pcat || r.dataset.pcat === pcat);
       r.hidden = !ok;
       if (ok) shown++;
       if (!ok) { const c = r.querySelector('.dp-chk'); if (c) c.checked = false; }
@@ -229,6 +239,12 @@
   tiles.forEach(t => t.addEventListener('click', () => { f = t.dataset.f; if (!picked) store.set('dp-filter', f); apply(); }));
   dirs.forEach(c => c.addEventListener('click', () => { d = c.dataset.d; apply(); }));
   q.addEventListener('input', apply);
+  [catSel, pcatSel].forEach(sel => {
+    if (!sel) return;
+    const saved = picked ? '' : store.get(sel.id);
+    if (saved && [...sel.options].some(o => o.value === saved)) sel.value = saved;
+    sel.addEventListener('change', () => { if (!picked) store.set(sel.id, sel.value); apply(); });
+  });
   document.addEventListener('change', e => { if (e.target.classList.contains('dp-chk')) count(); });
   const all = document.getElementById('dp-all');
   if (all) all.addEventListener('change', () => {

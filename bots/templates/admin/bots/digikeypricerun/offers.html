@@ -1,0 +1,138 @@
+{% extends "admin/base_site.html" %}
+{% block title %}🔍 Офери DigiKey ↔ Minerva{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{{ compare_url }}">💲 Ціни з Minerva</a> › 🔍 Перевірити офери</div>{% endblock %}
+{% block content_title %}{% endblock %}
+{% block extrastyle %}{{ block.super }}{% include "admin/bots/digikeypricerun/_styles.html" %}{% endblock %}
+
+{% block content %}
+<div class="dp">
+  <div class="dp-head">
+    <div>
+      <h1>🔍 Офери DigiKey ↔ Minerva</h1>
+      <p class="dp-sub">Щойно прочитано з DigiKey (GET /offers): кожен офер продавця поруч із лістингом Minerva —
+        за ID офера, інакше за артикулом. Нічого не змінюється, поки не натиснете кнопку.</p>
+    </div>
+    <div class="dp-head-tools">
+      {% if can_change %}
+      <form method="post" action="{% url 'admin:bots_digikeypricerun_offers_store' %}">{% csrf_token %}
+        <button class="dp-btn dp-primary" type="submit" title="Ціни й кількість з DigiKey → лістинги Minerva">🔄 Записати в Minerva</button>
+      </form>
+      {% endif %}
+      <a class="dp-btn" href="{{ compare_url }}">💲 До порівняння</a>
+      <a class="dp-btn" href="{{ settings_url }}">⚙ Налаштування</a>
+    </div>
+  </div>
+
+  {% if error %}<div class="dp-facts" style="border-color:var(--err)"><span class="dp-err">⚠ DigiKey не відповів: {{ error }}</span></div>{% endif %}
+
+  <div class="dp-facts" style="border-color:var(--warn)">
+    <span>💱 Ціни нижче — як їх повертає DigiKey API, <b>без валюти</b>. Minerva вважає їх <b>{{ cur }}</b>
+      <small>({{ currency_source }})</small>. На сторінці офера в supplier.digikey.com ціни показані зі знаком валюти
+      (напр. «$ 4.89» — це USD): якщо там не {{ cur }}, змініть «Валюта цін на DigiKey» в <a href="{{ settings_url }}">налаштуваннях</a>,
+      інакше ціни Minerva перераховуватимуться не в ту валюту.</span>
+  </div>
+
+  {% if raw %}
+  <div class="dp-card">
+    <div class="dp-card-title">📄 Офер {{ raw_id }} — як його повертає DigiKey API <a href="?" style="font-weight:400">✕ сховати</a></div>
+    <pre style="max-height:420px;overflow:auto;font-size:12px;margin:0">{{ raw }}</pre>
+  </div>
+  {% endif %}
+
+  {% if sum %}
+  <div class="dp-tiles">
+    <button type="button" class="dp-tile" data-f="all">Оферів на DigiKey <b>{{ sum.offers }}</b><small>прочитано {{ checked_at|date:"H:i:s" }}</small></button>
+    <button type="button" class="dp-tile" data-f="ok">Збігаються <b class="dp-ok">{{ sum.ok }}</b><small>офер є, ціни й артикул ті самі</small></button>
+    <button type="button" class="dp-tile" data-f="prices">Ціни в Minerva застарілі <b{% if sum.prices %} class="dp-warn"{% endif %}>{{ sum.prices }}</b><small>«🔄 Записати в Minerva»</small></button>
+    <button type="button" class="dp-tile" data-f="sku">Лише за артикулом <b{% if sum.sku %} class="dp-warn"{% endif %}>{{ sum.sku }}</b><small>ID офера не записано / інший</small></button>
+    <button type="button" class="dp-tile" data-f="no_offer">Офера не знайдено <b{% if sum.no_offer %} class="dp-err"{% endif %}>{{ sum.no_offer }}</b><small>лістинг Minerva є</small></button>
+    <button type="button" class="dp-tile" data-f="no_listing">Немає в Minerva <b>{{ sum.no_listing }}</b><small>офер є лише на DigiKey</small></button>
+  </div>
+
+  <div class="dp-filters">
+    {% if cat_options.dk|length > 1 %}<select id="dp-cat" class="dp-search" style="flex:0 1 190px">
+      <option value="">Усі типи DigiKey</option>{% for name, n in cat_options.dk %}<option value="{{ name }}">{{ name }} ({{ n }})</option>{% endfor %}
+    </select>{% endif %}
+    {% if cat_options.minerva|length > 1 %}<select id="dp-pcat" class="dp-search" style="flex:0 1 210px">
+      <option value="">Усі категорії Minerva</option>{% for name, n in cat_options.minerva %}<option value="{{ name }}">{{ name }} ({{ n }})</option>{% endfor %}
+    </select>{% endif %}
+    <input type="search" class="dp-search" id="dp-q" placeholder="🔎 артикул або назва">
+    <small id="dp-shown"></small>
+  </div>
+
+  <div class="dp-scroll">
+  <table class="dp-table">
+    <thead><tr>
+      <th></th><th>Офер на DigiKey</th><th>Лістинг Minerva</th><th>Ціни на DigiKey зараз</th><th>Ціни в Minerva</th>
+      <th>К-сть DK</th><th>Що не так</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr class="dp-row" data-kind="{{ r.kind }}" data-how="{{ r.how }}" data-clean="{{ r.issues|yesno:'0,1' }}" data-s="{{ r.search }}" data-cat="{{ r.cat }}" data-pcat="{{ r.pcat }}">
+      <td>{% if r.kind == 'ok' and not r.issues %}<span class="dp-ok">✓</span>{% elif r.kind == 'no_offer' %}<span class="dp-err">✗</span>{% else %}<span class="dp-warn">⚠</span>{% endif %}</td>
+      <td class="dp-prod">{% if r.offer %}<code>{{ r.sku_dk }}</code>
+          <div class="dp-name">{{ r.title }}</div>
+          <div class="dp-note">{{ r.status|default:"—" }}{% if r.updated %} · змінено {{ r.updated|date:"d.m.Y H:i" }}{% endif %}{% if r.source %} ({{ r.source }}){% endif %}</div>
+          <div class="dp-note"><a href="?raw={{ r.offer_id }}">📄 JSON</a> · {{ r.offer_id|truncatechars:14 }}</div>
+        {% else %}<span class="dp-mut">—</span>{% endif %}</td>
+      <td class="dp-prod">{% if r.listing %}<a href="{{ r.listing_url }}"><code>{{ r.listing.product.sku|default:r.listing.get_supplier_sku }}</code></a>
+          <div class="dp-name">{{ r.cat }}{% if r.pcat %} · {{ r.pcat }}{% endif %}</div>
+          {% if r.how %}<div class="dp-note">зіставлено за {% if r.how == 'id' %}ID офера{% else %}артикулом{% endif %}</div>{% endif %}
+        {% else %}<span class="dp-mut">—</span>{% endif %}</td>
+      <td class="dp-tiers">{% for q, p in r.live_f %}<div><span>{{ q }}</span> {{ p }}</div>{% empty %}—{% endfor %}</td>
+      <td class="dp-tiers dp-mut">{% for q, p in r.local_f %}<div><span>{{ q }}</span> {{ p }}</div>{% empty %}—{% endfor %}
+        {% if r.listing.price_checked_at %}<small>прочитано {{ r.listing.price_checked_at|date:"d.m H:i" }}</small>{% endif %}</td>
+      <td>{{ r.qty|default_if_none:"—" }}</td>
+      <td>{% for i in r.issues %}<div class="dp-note" style="color:var(--text)">• {{ i }}</div>{% endfor %}
+        {% if r.how == 'sku' and can_change and r.listing %}
+        <form method="post" action="{% url 'admin:bots_digikeypricerun_offers_link' r.listing.pk %}" style="margin-top:6px">{% csrf_token %}
+          <input type="hidden" name="offer_id" value="{{ r.offer_id }}">
+          <button class="dp-btn" type="submit" onclick="return confirm('Записати в лістинг ID офера з DigiKey?')">🔗 Записати ID офера</button>
+        </form>{% endif %}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" class="dp-emptyrow">{% if error %}Немає даних — DigiKey не відповів.{% else %}Оферів не знайдено.{% endif %}</td></tr>
+    {% endfor %}
+    <tr id="dp-none" hidden><td colspan="7" class="dp-emptyrow">Тут нічого немає — виберіть іншу плитку.</td></tr>
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  const rows = Array.from(document.querySelectorAll('.dp-row'));
+  const tiles = document.querySelectorAll('.dp-tile[data-f]');
+  const q = document.getElementById('dp-q');
+  const catSel = document.getElementById('dp-cat'), pcatSel = document.getElementById('dp-pcat');
+  if (!q) return;
+  let f = 'all';
+  function match(r) {
+    if (f === 'all') return true;
+    if (f === 'sku') return r.dataset.how === 'sku';
+    if (f === 'ok') return r.dataset.kind === 'ok' && r.dataset.clean === '1';
+    return r.dataset.kind === f;
+  }
+  function apply() {
+    const text = (q.value || '').trim().toLowerCase();
+    const cat = catSel ? catSel.value : '', pcat = pcatSel ? pcatSel.value : '';
+    let shown = 0;
+    rows.forEach(r => {
+      const ok = match(r) && (!text || r.dataset.s.includes(text)) && (!cat || r.dataset.cat === cat) &&
+                 (!pcat || r.dataset.pcat === pcat);
+      r.hidden = !ok;
+      if (ok) shown++;
+    });
+    tiles.forEach(t => t.classList.toggle('on', t.dataset.f === f));
+    document.getElementById('dp-none').hidden = shown > 0 || !rows.length;
+    document.getElementById('dp-shown').textContent = `показано ${shown} з ${rows.length}`;
+  }
+  tiles.forEach(t => t.addEventListener('click', () => { f = t.dataset.f; apply(); }));
+  q.addEventListener('input', apply);
+  [catSel, pcatSel].forEach(sel => sel && sel.addEventListener('change', apply));
+  apply();
+})();
+</script>
+{% endblock %}
