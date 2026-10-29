@@ -154,6 +154,49 @@ class PickTests(UploadBase):
                                                            {"path": os.path.dirname(self.root)}).json()["error"])
 
 
+class SourceProjectsTests(UploadBase):
+    def test_several_projects_cards_rag_and_links(self):
+        from projects.services import create_project
+        from rag_assistant import knowledge_items
+        a = create_project(name="Transponder LTE", customer=self.client_co)
+        b = create_project(name="Indoor positioning")
+        self.write("Handbuch.pdf", PDF)
+        r = self.client.post(ADD, self.form(name="Doku", path=self.folder, customer=self.client_co.pk,
+                                            projects=[a.pk, b.pk]))
+        self.assertEqual(r.status_code, 302, r.content[:400])
+        source = KnowledgeSource.objects.get()
+        self.assertEqual(set(source.projects.all()), {a, b})
+        item = source.items.get()
+        self.assertIsNone(item.project_id)                                              # проєкти — з джерела
+        self.assertEqual({p.pk for p in knowledge_items.item_projects(item)}, {a.pk, b.pk})
+        for project in (a, b):                                                          # у картці кожного проєкту
+            self.assertEqual([i.pk for i in knowledge_items.items_for(self.user, "project", project)], [item.pk])
+        _, docs = self.documents()
+        doc = docs[f"document:{item.pk}"]["document"]
+        self.assertSchema("document", doc)
+        self.assertEqual({p["code"] for p in doc["projects"]}, {a.code, b.code})       # у RAG — обидва
+
+        page = self.client.get(f"/admin/rag_assistant/knowledgesource/{source.pk}/change/")
+        self.assertContains(page, f"/admin/projects/project/{a.pk}/change/")             # посилання на картки
+        self.assertContains(page, f"📁 {a.code} Transponder LTE")
+        self.assertContains(page, f"/admin/crm/customer/{self.client_co.pk}/change/")
+        self.assertContains(page, "admin-autocomplete")                                 # пошук за назвою
+        self.assertContains(self.client.get("/admin/rag_assistant/knowledgesource/"), f"📁 {b.code}")
+
+        data, _ = self.documents()
+        r = self.client.post(f"/admin/rag_assistant/knowledgesource/{source.pk}/change/",
+                             self.form(name="Doku", path=self.folder, projects=[b.pk]))   # без клієнта, лише b
+        self.assertEqual(r.status_code, 302, r.content[:400])
+        _, after = self.documents(data["next_after"])
+        self.assertEqual([p["code"] for p in after[f"document:{item.pk}"]["document"]["projects"]], [b.code])
+        self.assertEqual(knowledge_items.items_for(self.user, "project", a), [])
+
+        source.projects.clear()
+        self.assertEqual(knowledge_items.item_projects(KnowledgeSource.objects.get().items.get()), [])   # загальні
+        self.assertContains(self.client.get(f"/admin/rag_assistant/knowledgesource/{source.pk}/change/"),
+                            "загальні документи")
+
+
 class ScanQueueTests(UploadBase):
     def test_one_scan_at_a_time_and_rescan_after_upload(self):
         self.write("a.txt", b"one")

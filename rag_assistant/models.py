@@ -498,8 +498,10 @@ class KnowledgeSource(models.Model):
                               related_name="knowledge_sources", verbose_name="Додав")
     customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.SET_NULL,
                                  related_name="+", verbose_name="Клієнт (для всіх документів)")
-    project = models.ForeignKey("projects.Project", null=True, blank=True, on_delete=models.SET_NULL,
-                                related_name="+", verbose_name="Проєкт (для всіх документів)")
+    projects = models.ManyToManyField(
+        "projects.Project", blank=True, related_name="knowledge_sources", verbose_name="Проєкти (для всіх документів)",
+        help_text="Можна кілька; порожньо — загальні документи без проєкту. Документи джерела видно в картці "
+                  "кожного з цих проєктів, у RAG вони прив'язані до всіх")
     product = models.ForeignKey("inventory.Product", null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name="+", verbose_name="Товар (для всіх документів)")
     link_products_by_sku = models.BooleanField(

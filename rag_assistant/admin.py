@@ -581,6 +581,23 @@ from . import knowledge_items  # noqa: E402
 from .models import KnowledgeItem  # noqa: E402
 
 
+def card_links(customer=None, projects=(), order=None, product=None, empty="—"):
+    """Прив'язки посиланнями на картки: 👤 клієнт · 📁 P-… назва · 🛒 замовлення · 📦 артикул."""
+    parts = []
+    if customer is not None:
+        parts.append(("crm", "customer", customer.pk, f"👤 {customer}"))
+    for p in projects:
+        parts.append(("projects", "project", p.pk, f"📁 {p.code} {p.name}".strip()))
+    if order is not None:
+        parts.append(("sales", "salesorder", order.pk, f"🛒 {order.order_number}"))
+    if product is not None:
+        parts.append(("inventory", "product", product.pk, f"📦 {product.sku}"))
+    if not parts:
+        return empty
+    return format_html_join(" · ", '<a href="{}" target="_blank">{}</a>', (
+        (reverse(f"admin:{app}_{model}_change", args=[pk]), label) for app, model, pk, label in parts))
+
+
 @admin.register(KnowledgeItem)
 class KnowledgeItemAdmin(admin.ModelAdmin):
     """Файли й посилання бази знань (тип document). Додавати зручніше в картці клієнта / проєкту / замовлення /
@@ -588,7 +605,7 @@ class KnowledgeItemAdmin(admin.ModelAdmin):
     list_display = ["title", "kind", "links_col", "visibility", "owner", "rag_col", "created_at"]
     list_filter = ["kind", "visibility", "auto", "knowledge_source"]
     search_fields = ["title", "note", "url", "file_name", "source_key", "source_path"]
-    raw_id_fields = ["customer", "project", "order", "product", "offer"]
+    autocomplete_fields = ["customer", "project", "order", "product", "offer"]     # пошук за назвою, а не номер
     readonly_fields = ["file_name", "file_size", "content_type", "fetched_at", "fetch_error", "owner", "auto",
                        "source_key", "rag_col", "created_at", "updated_at"]
     fieldsets = [
@@ -599,7 +616,9 @@ class KnowledgeItemAdmin(admin.ModelAdmin):
     ]
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request).select_related("owner", "customer", "project", "order", "product")
+        qs = (super().get_queryset(request).select_related("owner", "customer", "project", "order", "product",
+                                                           "knowledge_source")
+              .prefetch_related("knowledge_source__projects"))
         if request.user.is_superuser:
             return qs
         return qs.filter(Q(visibility=KnowledgeItem.TEAM) | Q(owner=request.user))
@@ -632,9 +651,8 @@ class KnowledgeItemAdmin(admin.ModelAdmin):
 
     @admin.display(description="Прив'язки")
     def links_col(self, obj):
-        parts = [f"👤 {obj.customer}" if obj.customer_id else "", f"📁 {obj.project.code}" if obj.project_id else "",
-                 f"🛒 {obj.order.order_number}" if obj.order_id else "", f"📦 {obj.product.sku}" if obj.product_id else ""]
-        return " · ".join(p for p in parts if p) or "—"
+        return card_links(customer=obj.customer if obj.customer_id else None, projects=knowledge_items.item_projects(obj),
+                          order=obj.order if obj.order_id else None, product=obj.product if obj.product_id else None)
 
     @admin.display(description="У RAG")
     def rag_col(self, obj):
@@ -665,7 +683,7 @@ class KnowledgeSourceForm(forms.ModelForm):
     class Meta:
         model = KnowledgeSource
         fields = ["name", "kind", "path", "url", "follow_links", "recursive", "max_files", "max_file_mb", "rescan_hours",
-                  "enabled", "visibility", "customer", "project", "product", "link_products_by_sku"]
+                  "enabled", "visibility", "customer", "projects", "product", "link_products_by_sku"]
         widgets = {"url": forms.Textarea(attrs={
             "rows": 4, "cols": 90,
             "placeholder": "https://docs.example.com/sitemap.xml\nhttps://example.com/produkte/antenne\n"
@@ -740,16 +758,16 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
     у папку — «📤 Завантажити файли / папку» з ПК."""
     form = KnowledgeSourceForm
     change_form_template = "admin/rag_assistant/knowledgesource/change_form.html"
-    list_display = ["name", "kind", "where_col", "enabled", "docs_col", "last_col"]
+    list_display = ["name", "kind", "where_col", "links_col", "enabled", "docs_col", "last_col"]
     list_filter = ["kind", "enabled"]
-    raw_id_fields = ["customer", "project", "product"]
-    readonly_fields = ["roots_help", "upload_panel", "state_panel", "files_panel"]
+    autocomplete_fields = ["customer", "projects", "product"]      # пошук за назвою; проєктів — кілька
+    readonly_fields = ["roots_help", "upload_panel", "links_panel", "state_panel", "files_panel"]
     actions = ["scan_action"]
     fieldsets = [
         (None, {"fields": ["name", "kind", "path", "url", "follow_links", "roots_help", "enabled"]}),
         ("📤 Файли з ПК або телефона", {"fields": ["upload_panel"], "classes": ["ks-folder-only"]}),
         ("Що брати", {"fields": ["file_types_text", "recursive", "max_files", "max_file_mb", "rescan_hours"]}),
-        ("Хто бачить і до чого прив'язати", {"fields": ["visibility", "customer", "project", "product",
+        ("Хто бачить і до чого прив'язати", {"fields": ["visibility", "customer", "projects", "product", "links_panel",
                                                          "link_products_by_sku"]}),
         ("Стан", {"fields": ["state_panel", "files_panel"]}),
     ]
@@ -760,7 +778,7 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         """🔒 «лише я» — бачить лише той, хто додав (і суперкористувач)."""
-        qs = super().get_queryset(request)
+        qs = super().get_queryset(request).select_related("customer", "product").prefetch_related("projects")
         if request.user.is_superuser:
             return qs
         return qs.filter(~Q(visibility=KnowledgeSource.PRIVATE) | Q(owner=request.user))
@@ -780,6 +798,12 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
         if obj.kind == KnowledgeSource.FOLDER and not obj.path:
             obj.path, obj.managed = knowledge_sources.new_folder(obj.name), True
         super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)       # проєкти (M2M) збережено
+        obj = form.instance
+        if change and "projects" in form.changed_data:
+            knowledge_sources.touch_items(obj)                        # документи — з новими проєктами для RAG
         knowledge_sources.start_scan(obj)          # одразу після збереження — перевірити (у фоні)
         if not obj.managed or obj.items.exists():
             messages.info(request, "Перевірку джерела запущено у фоні — стан оновиться за хвилину.")
@@ -868,6 +892,21 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
             return format_html("📤 {}", obj.path) if obj.managed else obj.path
         links = knowledge_sources.links_of(obj)
         return (links[0] + (f" + ще {len(links) - 1}" if len(links) > 1 else "")) if links else "—"
+
+    @admin.display(description="Прив'язки")
+    def links_col(self, obj):
+        return card_links(customer=obj.customer, projects=list(obj.projects.all()), product=obj.product,
+                          empty="загальні")
+
+    @admin.display(description="Картки")
+    def links_panel(self, obj):
+        if not obj or not obj.pk:
+            return "Після збереження тут будуть посилання на картки клієнта, проєктів і товару."
+        return format_html(
+            "{}<div class='help'>Документи джерела видно в «📎 Документи й посилання» цих карток; у RAG вони прив'язані "
+            "до всіх вибраних проєктів. Без прив'язок — загальні документи.</div>",
+            card_links(customer=obj.customer, projects=list(obj.projects.all()), product=obj.product,
+                       empty="загальні документи — без клієнта, проєкту й товару"))
 
     @admin.display(description="Документів")
     def docs_col(self, obj):

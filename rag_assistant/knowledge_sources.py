@@ -312,10 +312,20 @@ class SkuIndex:
 
 
 def _links(source, name, skus):
-    """Прив'язки документа; артикул шукається спершу в назві файлу / сторінки, потім у шляху (назви папок)."""
+    """Прив'язки документа; артикул шукається спершу в назві файлу / сторінки, потім у шляху (назви папок).
+    Проєкти не копіюються в документ: їх бере knowledge_items.item_projects з джерела (може бути кілька)."""
     base = os.path.splitext(os.path.basename(urlparse(name).path if "://" in name else name))[0]   # «…FT220407.pdf»
     product_id = source.product_id or ((skus.find(base) or skus.find(name)) if skus else None)
-    return {"customer_id": source.customer_id, "project_id": source.project_id, "product_id": product_id}
+    return {"customer_id": source.customer_id, "project_id": None, "product_id": product_id}
+
+
+def touch_items(source) -> int:
+    """Проєкти джерела змінились → документи джерела ще раз у стрічку (нова content_version з проєктами)."""
+    from . import knowledge, knowledge_items
+    pks = list(source.items.values_list("pk", flat=True))
+    for i in range(0, len(pks), BATCH):
+        knowledge.touch_docs(knowledge_items.DOC_TYPE, pks[i:i + BATCH])
+    return len(pks)
 
 
 # ── Застосування ─────────────────────────────────────────────────────────────

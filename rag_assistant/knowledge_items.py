@@ -26,6 +26,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.db import connection
+from django.db.models import Q
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -66,8 +67,20 @@ class ItemError(Exception):
 
 # ── Доступ ───────────────────────────────────────────────────────────────────
 
+def item_projects(item) -> list:
+    """Проєкти документа: свій (додали в картці проєкту) + проєкти його «📂 Джерела знань» (кілька, для всіх
+    документів джерела). Для пачок — prefetch_related("knowledge_source__projects")."""
+    out = [item.project] if item.project_id else []
+    if item.knowledge_source_id:
+        out += [p for p in item.knowledge_source.projects.all() if p.pk != item.project_id]
+    return out
+
+
 def linked_kinds(item) -> list:
-    return [k for k, field in LINK_FIELDS.items() if getattr(item, f"{field}_id")]
+    kinds = [k for k, field in LINK_FIELDS.items() if getattr(item, f"{field}_id")]
+    if "project" not in kinds and item.knowledge_source_id and item.knowledge_source.projects.all():
+        kinds.append("project")                     # проєкти джерела знань
+    return kinds
 
 
 def can_view(user, item) -> bool:
@@ -110,8 +123,12 @@ def items_for(user, kind, obj):
     from .models import KnowledgeItem
     if kind not in LINK_FIELDS:
         return []
-    qs = (KnowledgeItem.objects.filter(**{LINK_FIELDS[kind]: obj})
-          .select_related("owner", "customer", "project", "order", "product").order_by("-created_at"))
+    cond = Q(**{LINK_FIELDS[kind]: obj})
+    if kind == "project":
+        cond |= Q(knowledge_source__projects=obj)          # документи джерел знань, прив'язаних до проєкту
+    qs = (KnowledgeItem.objects.filter(cond).distinct()
+          .select_related("owner", "customer", "project", "order", "product", "knowledge_source")
+          .prefetch_related("knowledge_source__projects").order_by("-created_at"))
     return visible(user, qs)
 
 
@@ -369,11 +386,13 @@ class Handler:
     def load(self, pks):
         from .models import KnowledgeItem
         return {i.pk: i for i in KnowledgeItem.objects.filter(pk__in=pks)
-                .select_related("owner", "customer", "project", "order", "product", "knowledge_source")}
+                .select_related("owner", "customer", "project", "order", "product", "knowledge_source")
+                .prefetch_related("knowledge_source__projects")}
 
     def admitted(self, scope):
         from .models import KnowledgeItem
-        return KnowledgeItem.objects.select_related("owner", "customer", "project", "order", "product", "knowledge_source")
+        return (KnowledgeItem.objects.select_related("owner", "customer", "project", "order", "product", "knowledge_source")
+                .prefetch_related("knowledge_source__projects"))
 
     def extras(self, items):
         cache = {}
@@ -405,8 +424,7 @@ class Handler:
             "text_truncated": len(body) > TEXT_MAX,
             "customer": {"id": item.customer_id, "name": (item.customer.company or item.customer.name or "")[:300]}
             if item.customer_id else None,
-            "projects": [{"id": item.project_id, "code": item.project.code, "name": (item.project.name or "")[:200]}]
-            if item.project_id else [],
+            "projects": [{"id": p.pk, "code": p.code, "name": (p.name or "")[:200]} for p in item_projects(item)][:50],
             "orders": [{"id": item.order_id, "number": f"{item.order.source}:{item.order.order_number}"[:200]}]
             if item.order_id else [],
             "products": [{"id": item.product_id, "sku": (item.product.sku or "")[:100]}] if item.product_id else [],
