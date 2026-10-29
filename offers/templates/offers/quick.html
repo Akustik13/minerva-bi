@@ -7,54 +7,12 @@
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; <a href="{% url 'admin:offers_offer_changelist' %}">Angebote</a>
-  &rsaquo; {{ title }}
+  &rsaquo; <a href="{% url 'offers:list' %}">огляд</a> &rsaquo; {{ title }}
 </div>
 {% endblock %}
 
 {% block extrahead %}{{ block.super }}
-<style>
-.of-wrap { padding: 24px 32px 60px; max-width: 1150px; }
-@media (max-width: 768px) { .of-wrap { padding: 16px; } }
-.of-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 18px 22px; margin-bottom: 20px; }
-.of-card-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em;
-                 margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-strong); display: flex; align-items: center; gap: 8px; }
-.of-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.of-field { display: flex; flex-direction: column; gap: 5px; position: relative; }
-.of-label { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.of-input { background: var(--bg-input); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px;
-            padding: 7px 10px; font-size: 13px; font-family: inherit; width: 100%; box-sizing: border-box; }
-.of-input:focus { border-color: var(--link-fg); outline: none; }
-.of-btn { background: var(--bg-hover); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 8px 14px;
-          font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
-.of-btn:hover { border-color: var(--link-fg); }
-.of-btn.primary { background: var(--link-fg); border-color: var(--link-fg); color: var(--bg-card); font-weight: 700; }
-.of-btn.sm { padding: 3px 9px; font-size: 12px; }
-.of-btn.danger { color: var(--err); }
-.of-muted { color: var(--text-muted); font-size: 12px; }
-.of-note { border: 1px dashed var(--err); color: var(--text); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; font-size: 13px; }
-.of-scroll { overflow-x: auto; }
-.of-lines { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
-.of-lines th { text-align: left; color: var(--text-dim); font-weight: 600; font-size: 11px; padding: 6px 4px; border-bottom: 1px solid var(--border-strong); }
-.of-lines td { padding: 4px; vertical-align: top; }
-.of-lines td.num { text-align: right; color: var(--text-muted); white-space: nowrap; font-family: monospace; padding-top: 10px; }
-.of-hint { font-size: 11px; color: var(--text-muted); padding: 0 4px 8px; }
-.of-totals { display: grid; grid-template-columns: auto 160px; gap: 6px 14px; justify-content: end; align-items: center; margin-top: 12px; font-size: 13px; color: var(--text); }
-.of-totals .big { font-size: 15px; font-weight: 700; }
-.of-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.of-origin { font-size: 11px; color: var(--text-muted); }
-.of-hint div { margin-top: 2px; }
-.of-src-stock { color: var(--ok, #16a34a); }
-.of-src-digikey { color: var(--link-fg); }
-.of-src-manual { color: var(--text-muted); }
-.of-prod { color: #d97706; }
-.of-kind { font-weight: 600; text-transform: none; letter-spacing: 0; margin-left: auto; font-size: 12px; color: var(--text); }
-.of-res { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; background: var(--bg-card); border: 1px solid var(--border-strong);
-          border-radius: 6px; max-height: 240px; overflow: auto; display: none; }
-.of-res div { padding: 6px 10px; cursor: pointer; font-size: 13px; }
-.of-res div:hover, .of-res div.on { background: var(--bg-hover); }
-#of-sku-res { position: fixed; z-index: 50; max-height: 320px; min-width: 380px; box-shadow: 0 6px 20px rgba(0,0,0,.3); }
-#of-sku-res .sub { color: var(--text-muted); font-size: 11px; }
-</style>
+{% include "offers/_styles.html" %}
 {% endblock %}
 
 {% block content %}
@@ -66,6 +24,14 @@
     {% if offer %}· <a href="{% url 'admin:offers_offer_change' offer.pk %}" style="color:var(--link-fg)">📋 повна картка</a>{% endif %}
   </p>
 
+  {% if rev and rev.docx_file %}<div class="of-card of-ready">
+    <b>📄 Документ {{ offer.display_number }} готовий:</b>
+    {% if rev.pdf_file %}<a class="of-btn primary" href="{{ rev.pdf_file.url }}" target="_blank">PDF</a>{% endif %}
+    <a class="of-btn" href="{{ rev.docx_file.url }}">DOCX</a>
+    {% for t in targets %}<a class="of-btn" href="{{ t.url }}" target="_blank" title="{{ t.hint }}">{{ t.label }}</a>{% endfor %}
+    <a class="of-btn" href="{% url 'admin:offers_offer_change' offer.pk %}">📋 Картка Angebot</a>
+    <a class="of-btn" href="{% url 'offers:list' %}">📝 Усі Angebote</a>
+  </div>{% endif %}
   {% if locked %}<div class="of-note">🔒 Цю версію вже надіслано — її не змінюють. «♻ Нова версія» — у <a href="{% url 'admin:offers_offer_change' offer.pk %}">картці</a>.</div>{% endif %}
   {% for w in warnings %}<div class="of-note">⚠️ {{ w }}</div>{% endfor %}
 
@@ -132,7 +98,7 @@
       <div class="of-card-title">📦 Позиції <span class="of-kind" id="of-kind"></span></div>
       {% if data.origin.lines %}<div class="of-origin" style="margin:-6px 0 8px">↳ {{ data.origin.lines }}</div>{% endif %}
       <div class="of-scroll"><table class="of-lines"><thead><tr>
-        <th>Pos.</th><th>Artikel</th><th>Beschreibung</th><th>Menge / ступені<br><span style="font-weight:400">35; 100</span></th>
+        <th>Pos.</th><th>Artikel</th><th>Beschreibung</th><th>Menge<br><span style="font-weight:400">кожна — рядок, ＋ ще одна</span></th>
         <th>Einzelpreis<br><span style="font-weight:400">порожньо — Minerva</span></th><th>Einh.</th><th>Lieferzeit, тижні<br><span style="font-weight:400">порожньо — Minerva</span></th>
         <th style="text-align:right">Gesamt</th><th></th>
       </tr></thead><tbody id="of-lines"></tbody></table></div>
@@ -164,44 +130,12 @@
       <button type="submit" class="of-btn primary"{% if locked %} disabled{% endif %}>📄 {% if offer %}Перегенерувати{% else %}Згенерувати{% endif %} Angebot</button>
       {% if rev and rev.pdf_file %}<a class="of-btn" href="{{ rev.pdf_file.url }}" target="_blank">PDF</a>{% endif %}
       {% if rev and rev.docx_file %}<a class="of-btn" href="{{ rev.docx_file.url }}">DOCX</a>{% endif %}
-      {% if offer and rev %}<a class="of-btn" href="/email/compose/?offer={{ offer.pk }}" target="_blank">✉️ Надіслати клієнту</a>{% endif %}
+      {% if offer and rev %}{% for t in targets %}<a class="of-btn" href="{{ t.url }}" target="_blank" title="{{ t.hint }}">{{ t.label }}</a>{% endfor %}{% endif %}
       <a class="of-btn" href="{% if offer %}{% url 'admin:offers_offer_change' offer.pk %}{% else %}{% url 'admin:offers_offer_changelist' %}{% endif %}">{% if offer %}📋 Повна картка{% else %}Скасувати{% endif %}</a>
     </div>
   </form>
 
-  <div class="of-card" id="template" style="margin-top:24px">
-    <div class="of-card-title">📄 Word шаблон Angebot</div>
-    <p style="margin:0 0 12px;color:var(--text)">
-      Зараз використовується: <b>{% if has_custom_template %}власний (завантажений){% else %}на бланку Commercial Invoice (логотип, реквізити й таблиця адрес — з бланка; бланк CI змінили — Angebot теж){% endif %}</b>.
-    </p>
-    <div class="of-actions">
-      <a class="of-btn" href="{% url 'offers:template_download' %}">⬇️ Завантажити поточний шаблон</a>
-      <a class="of-btn" href="{% url 'offers:template_sample' %}" title="Документ на тестових даних: ступені 35 / 100, Deutsch + English">👁 Приклад документа</a>
-      {% if can_template %}
-      <form method="post" action="{% url 'offers:template_upload' %}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center">
-        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
-        <input type="file" name="template" accept=".docx" required style="color:var(--text);font-size:12px">
-        <button class="of-btn" type="submit">⬆️ Завантажити свій</button>
-      </form>
-      {% if has_custom_template %}
-      <form method="post" action="{% url 'offers:template_reset' %}" onsubmit="return confirm('Повернути шаблон на бланку Commercial Invoice?')">
-        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
-        <button class="of-btn" type="submit">↩️ Бланк CI</button>
-      </form>
-      {% endif %}{% endif %}
-    </div>
-    <p class="of-muted" style="margin:12px 0 8px">
-      Як змінити оформлення: завантажте поточний шаблон, відредагуйте у Word (шрифти, розміщення, тексти), не чіпаючи змінних у {% verbatim %}<code>{{ … }}</code> і <code>{% … %}</code>{% endverbatim %}, і завантажте назад — перед збереженням шаблон перевіряється на тестових даних.
-    </p>
-    <details>
-      <summary style="cursor:pointer;color:var(--link-fg);font-size:13px">📚 Довідник змінних</summary>
-      <div class="of-scroll" style="margin-top:8px"><table class="of-lines" style="min-width:0">
-        <thead><tr><th>Змінна</th><th>Що підставляється</th><th>Приклад</th></tr></thead>
-        <tbody>{% for var, desc, ex in template_vars %}<tr><td><code>{{ var }}</code></td><td>{{ desc }}</td><td class="of-muted">{{ ex|linebreaksbr }}</td></tr>{% endfor %}</tbody>
-      </table></div>
-      <p class="of-muted" style="margin-top:8px">{% verbatim %}Рядки таблиці позицій — між окремими рядками-маркерами <code>{%tr for l in lines %}</code> і <code>{%tr endfor %}</code>. Ступінчасті ціни самі стають кількома рядками в комірках <code>{{ l.qty }}</code>, <code>{{ l.unit_price }}</code>, <code>{{ l.total }}</code> — окремої розмітки не треба. Мова підписів <code>{{ L.… }}</code> — з поля «Мова документа».{% endverbatim %}</p>
-    </details>
-  </div>
+  {% include "offers/_template_card.html" %}
 </div>
 
 <div class="of-res" id="of-sku-res"></div>
@@ -222,10 +156,26 @@
       + (w ? ' style="width:' + w + '"' : '') + '>';
   }
   function first(text){ return String(text || '').split(';')[0]; }
-  function lineTotal(l){
-    var price = first(l.prices) || (l._hint && l._hint[0] ? l._hint[0].unit_price : '');
-    var qty = num(String(l.qtys || '1').split(/[;\s,]+/)[0]);
-    return price === '' ? null : Math.round(qty * num(price) * 100) / 100;
+  // ступені позиції: кожна кількість — свій рядок (к-сть, ціна, строк); у даних — «35; 100», «20,67; 19,14», «; 3-4»
+  function parts(text){ return String(text == null ? '' : text).split(';').map(function(x){ return x.trim(); }); }
+  function tiersOf(l){
+    var Q = parts(l.qtys || '1'), P = parts(l.prices), T = parts(l.lead_time);
+    if (T.length === 1 && Q.length > 1) T = Q.map(function(){ return T[0]; });   // один строк — для всіх кількостей
+    return Q.map(function(q, i){ return {q: q, p: P[i] || '', lt: T[i] || ''}; });
+  }
+  function store(l, ts){
+    var P = ts.map(function(x){ return x.p; }), T = ts.map(function(x){ return x.lt; });
+    l.qtys = ts.map(function(x){ return x.q; }).join('; ');
+    l.prices = P.some(Boolean) ? P.join('; ') : '';
+    l.lead_time = T.some(Boolean) ? T.join('; ') : '';
+  }
+  function tierTotal(l, t, x){
+    var p = x.p || (l._hint && l._hint[t] ? l._hint[t].unit_price : '');
+    return p === '' || p == null ? null : Math.round(num(x.q) * num(p) * 100) / 100;
+  }
+  function lineTotal(l){ var ts = tiersOf(l); return tierTotal(l, 0, ts[0]); }
+  function tinp(j, t, k, v, ph){
+    return '<input class="of-input" data-l="'+j+'" data-t="'+t+'" data-k="t_'+k+'" value="'+esc(v)+'" placeholder="'+esc(ph || '')+'">';
   }
   function totals(){
     var cur = document.getElementById('of-currency').value.toUpperCase();
@@ -254,11 +204,6 @@
     var mine = (own || ownLead) ? '<div class="of-src-manual">✍️ у формі введено вручну: ' + [own ? 'ціни' : '', ownLead ? 'строк' : ''].filter(Boolean).join(' і ') + ' — у документі будуть вони, а не Minerva</div>' : '';
     return '<div>Minerva: ' + head.filter(Boolean).join(' · ') + '</div>' + rows + mine;
   }
-  function leadPlaceholder(l){
-    var leads = (l._hint || []).map(function(t){ return t.lead_time || '—'; });
-    var uniq = leads.filter(function(x, i){ return leads.indexOf(x) === i; });
-    return uniq.length > 1 ? leads.join('; ') : (uniq[0] && uniq[0] !== '—' ? uniq[0] : '4 Wochen');
-  }
   function kindSummary(){
     var used = lines.filter(function(l){ return l.sku || l.description; });
     var prod = used.filter(function(l){ return !l.sku || (l._checked && !l._found); }).length;
@@ -269,19 +214,26 @@
   function render(){
     var html = '';
     lines.forEach(function(l, j){
-      var t = lineTotal(l);
-      html += '<tr>'
-        + '<td class="num">' + (j + 1) + '</td>'
-        + '<td style="width:130px">' + inp(j, 'sku', l.sku, 'FT… — пошук') + '</td>'
-        + '<td>' + inp(j, 'description', l.description, l._name || '') + '</td>'
-        + '<td style="width:110px">' + inp(j, 'qtys', l.qtys, '35; 100') + '</td>'
-        + '<td style="width:130px">' + inp(j, 'prices', l.prices, l._hint && l._hint.length ? l._hint.map(function(x){ return x.unit_price ? price(x.unit_price) : '?'; }).join('; ') : '') + '</td>'
-        + '<td style="width:56px">' + inp(j, 'unit', l.unit || 'Stk') + '</td>'
-        + '<td style="width:130px">' + inp(j, 'lead_time', l.lead_time, leadPlaceholder(l)) + '</td>'
-        + '<td class="num">' + (t === null ? 'на запит' : money(t)) + '</td>'
-        + '<td style="white-space:nowrap"><button type="button" class="of-btn sm" onclick="ofCascade('+j+')" title="Каскад цін за шаблоном ступенів: від першої ціни — знижки за кількістю (одна кількість — ще й кількості з шаблону)">📐</button> '
-        + '<button type="button" class="of-btn sm danger" onclick="ofDelLine('+j+')" title="Видалити">✕</button></td>'
-        + '</tr><tr><td></td><td colspan="8" class="of-hint">' + hintHtml(l) + '</td></tr>';
+      tiersOf(l).forEach(function(x, t){   // кожна кількість — окремий рядок (у документі — окрема позиція)
+        var tot = tierTotal(l, t, x), h = l._hint && l._hint[t];
+        html += '<tr' + (t ? ' class="of-tier"' : '') + '>'
+          + '<td class="num">' + (t ? '' : (j + 1)) + '</td>'
+          + (t ? '<td colspan="2" class="of-tier-note">↳ та сама позиція, інша кількість</td>'
+               : '<td style="width:130px">' + inp(j, 'sku', l.sku, 'FT… — пошук') + '</td>'
+                 + '<td>' + inp(j, 'description', l.description, l._name || '') + '</td>')
+          + '<td style="width:90px">' + tinp(j, t, 'q', x.q, t ? '100' : '35') + '</td>'
+          + '<td style="width:110px">' + tinp(j, t, 'p', x.p, h && h.unit_price ? price(h.unit_price) : '') + '</td>'
+          + '<td style="width:56px">' + (t ? '' : inp(j, 'unit', l.unit || 'Stk')) + '</td>'
+          + '<td style="width:110px">' + tinp(j, t, 'lt', x.lt, h && h.lead_time ? h.lead_time : (t ? '' : '4-6')) + '</td>'
+          + '<td class="num">' + (tot === null ? 'на запит' : money(tot)) + '</td>'
+          + '<td style="white-space:nowrap">' + (t
+              ? '<button type="button" class="of-btn sm danger" onclick="ofDelTier('+j+','+t+')" title="Прибрати цю кількість">✕</button>'
+              : '<button type="button" class="of-btn sm" onclick="ofCascade('+j+')" title="Каскад цін за шаблоном ступенів: від першої ціни — знижки за кількістю (одна кількість — ще й кількості з шаблону)">📐</button> '
+                + '<button type="button" class="of-btn sm" onclick="ofAddTier('+j+')" title="Ще одна кількість цієї позиції (ступінь) — окремим рядком">＋</button> '
+                + '<button type="button" class="of-btn sm danger" onclick="ofDelLine('+j+')" title="Видалити позицію">✕</button>')
+          + '</td></tr>';
+      });
+      html += '<tr><td></td><td colspan="8" class="of-hint">' + hintHtml(l) + '</td></tr>';
     });
     body.innerHTML = html;
     totals();
@@ -308,12 +260,29 @@
   function rehintAll(){ lines.forEach(function(_l, j){ hints(j); }); }
   body.addEventListener('input', function(e){
     var el = e.target; if (el.dataset.l === undefined) return;
-    lines[el.dataset.l][el.dataset.k] = el.value;
+    var l = lines[el.dataset.l];
+    if (el.dataset.t !== undefined) {   // рядок кількості: к-сть / ціна / строк
+      var ts = tiersOf(l);
+      ts[+el.dataset.t][el.dataset.k.slice(2)] = el.value.replace(/;/g, ',');
+      store(l, ts);
+    } else l[el.dataset.k] = el.value;
   });
   body.addEventListener('change', function(e){
     var k = e.target.dataset.k, j = e.target.dataset.l;
-    if (k === 'sku' || k === 'qtys') hints(+j); else render();
+    if (k === 'sku' || k === 't_q') hints(+j); else render();
   });
+  window.ofAddTier = function(j){
+    var ts = tiersOf(lines[j]);
+    ts.push({q: '', p: '', lt: ''});
+    store(lines[j], ts); render();
+    var el = body.querySelector('[data-l="' + j + '"][data-t="' + (ts.length - 1) + '"][data-k="t_q"]');
+    if (el) el.focus();
+  };
+  window.ofDelTier = function(j, t){
+    var ts = tiersOf(lines[j]);
+    ts.splice(t, 1);
+    store(lines[j], ts); render(); hints(j);
+  };
   document.getElementById('of-shipping').addEventListener('input', totals);
   // валюта: за країною клієнта (Європа / інші), доки її не змінили вручну
   var curEl = document.getElementById('of-currency'), curWhy = document.getElementById('of-currency-why');
@@ -437,6 +406,10 @@
   document.getElementById('of-form').addEventListener('submit', function(e){
     var empty = lines.filter(function(l){ return l.sku || l.description; });
     if (!empty.length) { alert('Додайте хоча б одну позицію'); e.preventDefault(); return; }
+    lines.forEach(function(l){   // порожні кількості не надсилаємо (ціни й строки лишаються на своїх рядках)
+      var ts = tiersOf(l).filter(function(x){ return num(x.q) > 0; });
+      store(l, ts.length ? ts : [{q: '1', p: '', lt: ''}]);
+    });
     document.getElementById('lines_json').value = JSON.stringify(lines.map(function(l){
       return {sku: l.sku, description: l.description, qtys: l.qtys, prices: l.prices, unit: l.unit, lead_time: l.lead_time};
     }));

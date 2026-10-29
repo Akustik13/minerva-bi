@@ -376,7 +376,7 @@ class QuoteScanSettingsTests(QuoteMailBase):
             return self.client.post(f"/admin/offers/offersettings/1/change/", {
                 "number_prefix": "A", "validity_days": 30, "default_currency": "EUR", "default_vat_rate": "19.00",
                 "currency_by_country": "on", "currency_europe": "EUR", "currency_other": "USD",
-                "price_mode": "auto", "lead_mode": "auto",
+                "price_mode": "auto", "lead_mode": "auto", "order_source": "angebot",
                 "default_language": "de", "email_subject": "Angebot {number}", "quote_scan_depth": depth})
 
     def test_scan_old_mail_by_depth_and_switch_off(self):
@@ -897,3 +897,109 @@ class PricingSourcesTests(QuoteMailBase):
         dk = services.search_products("only")
         self.assertEqual((dk[0]["sku"], dk[0]["source"]), ("DK-ONLY", "digikey"))     # офер DigiKey без товару
         self.assertEqual(services.search_products("  "), [])
+
+    def test_each_quantity_row_own_lead_and_ready_bar(self):
+        self.ant.lead_time_days = 14
+        self.ant.save()
+        offer = services.save_quick({"customer": self.customer, "language": "en"},
+                                    [{"sku": "ANT-100", "qtys": "35; 100", "prices": "; 9,50", "lead_time": "; 3-4"}],
+                                    self.user)
+        line = offer.lines.get()
+        self.assertEqual([(t["unit_price"], t["lead_time"]) for t in line.tiers],
+                         [("12.5000", "2-3"), ("9.50", "3-4")])          # порожньо — з Minerva, введене — як є
+        row = services.quick_from_offer(offer)["lines"][0]
+        self.assertEqual((row["qtys"], row["prices"], row["lead_time"]), ("35; 100", "; 9,5", "; 3-4"))
+        services.generate_document(offer)
+        page = self.client.get(f"/offers/{offer.pk}/quick/")
+        self.assertContains(page, "готовий:")                              # PDF / DOCX — угорі сторінки
+        self.assertContains(page, "ofAddTier")
+
+
+class OfferListAndSendTests(QuoteMailBase):
+    """«📝 Angebote» (як Commercial Invoices), надіслати клієнту / колезі / іншому, запити: лічильник, оброблені,
+    «↪ Відповів колега», джерело замовлень."""
+
+    COLLEAGUE = "sergey@sevskiy.de"
+
+    def colleague_forward(self, body_extra=""):
+        body = ("Bitte Angebot machen\n\n-------- Ursprüngliche Nachricht --------\n"
+                "Von: Denys Repetynskyi <procurement10@moduletp.example>\nBetreff: Denys SL Tire\n\n"
+                "Please provide pricing and production lead times for 35 units and 100 units of ANT-100.\n")
+        return self.mail("FW: Denys SL Tire", body_extra + body, frm=self.COLLEAGUE)
+
+    def test_list_page_send_targets_and_delete(self):
+        from offers.models import Offer
+        m = self.colleague_forward()
+        offer = services.save_quick({"customer": None, "language": "en", "contact_email": "procurement10@moduletp.example"},
+                                    [{"sku": "ANT-100", "qtys": "35; 100"}], self.user, source=m, thread=m.thread)
+        services.generate_document(offer)
+        page = self.client.get("/offers/")
+        self.assertContains(page, offer.number)
+        self.assertContains(page, "(2 к-стей)")
+        self.assertContains(page, "DOCX")
+        self.assertContains(page, f"audience=colleague&amp;reply_to={m.pk}")       # ↪ колезі — у його гілку
+        self.assertContains(page, "↪ Колезі (sergey)")
+        self.assertEqual([t["key"] for t in services.send_targets(offer)], ["customer", "colleague", "other"])
+        self.assertContains(self.client.get("/offers/", {"q": "ANT-100"}), offer.number)
+        self.assertNotContains(self.client.get("/offers/", {"q": "nothing-like-this"}), offer.number)
+        # колезі: «Кому» й «Re:» з його листа, вкладення offerint — версія не стає «надісланою»
+        r = self.client.get(f"/email/compose/?offer={offer.pk}&audience=colleague&reply_to={m.pk}")
+        self.assertEqual(r.status_code, 200)
+        initial = r.context["initial"]
+        self.assertEqual(initial["to"], self.COLLEAGUE)
+        self.assertTrue(initial["subject"].startswith("Re: FW: Denys SL Tire"))
+        self.assertTrue(initial["att_refs"][0]["ref"].startswith("offerint:"))
+        self.assertIn("anbei das Angebot", initial["body_html"])
+        from email_assistant.attachments import load_ref
+        self.assertIsNotNone(load_ref(self.account, initial["att_refs"][0]["ref"]))
+        self.assertEqual(services.mark_sent_refs([r for r in [initial["att_refs"][0]["ref"]] if r.startswith("offer:")]), 0)
+        other = services.compose_initial(offer.pk, self.user, "other")
+        self.assertEqual((other["to"], other["att_refs"][0]["ref"][:9]), ("", "offerint:"))
+        customer = services.compose_initial(offer.pk, self.user)
+        self.assertEqual((customer["to"], customer["att_refs"][0]["ref"][:6]), ("procurement10@moduletp.example", "offer:"))
+        # 🗑 — лише ненадіслана
+        r = self.client.post(f"/offers/{offer.pk}/delete/")
+        self.assertRedirects(r, "/offers/", fetch_redirect_response=False)
+        self.assertFalse(Offer.objects.filter(pk=offer.pk).exists())
+
+    def test_colleague_already_answered_customer(self):
+        """«WG: AW: …» — Sergey уже відповів Denys і переслав нам: запит «↪ Відповів колега», не відкритий."""
+        from offers import detection
+        from offers.models import QuoteRequest
+        answer = ("FYI\n\nVon: Dr. Sergey Sevskiy <" + self.COLLEAGUE + ">\nGesendet: Donnerstag, 29. Oktober 2026 01:42\n"
+                  "An: 'Denys Repetynskyi Module ETP LLC' <procurement10@moduletp.example>\nBetreff: AW: Denys SL Tire\n\n"
+                  "Dear Denys,\n\nPlease find attached our quotation for the requested quantities.\n\nBest regards,\nSergey\n\n"
+                  "Von: Denys Repetynskyi <procurement10@moduletp.example>\nGesendet: Mittwoch, 28. Oktober 2026 14:24\n"
+                  "An: Dr. Sergey Sevskiy <" + self.COLLEAGUE + ">\nBetreff: Denys SL Tire\n\n"
+                  "Please provide pricing and production lead times for 35 units and 100 units of ANT-100.\n")
+        m = self.mail("WG: AW: Denys SL Tire", answer, frm=self.COLLEAGUE)
+        qr = self.qr(m)
+        self.assertEqual(qr.status, QuoteRequest.ANSWERED)
+        self.assertIn("уже відповів Dr. Sergey Sevskiy", qr.reason)
+        self.assertIn("Please find attached our quotation", qr.reason)
+        self.assertEqual(detection.explain(m)["state"], "answered")
+        self.assertIsNone(detection.for_thread(m.thread))                         # підказки «Створити Angebot» немає
+        page = self.client.get("/email/?quote=1")
+        self.assertEqual(page.context["quote_count"], 0)
+        self.assertEqual(page.context["quote_done_count"], 1)
+        self.assertContains(self.client.get("/email/?quote=all"), "WG: AW: Denys SL Tire")
+
+    def test_quote_count_matches_list_and_order_source(self):
+        from email_assistant.models import EmailMessage
+        from offers.models import OfferSettings
+        from sales.models import SalesSource
+        m = self.colleague_forward()
+        self.assertEqual(self.client.get("/email/").context["quote_count"], 1)
+        EmailMessage.objects.filter(pk=m.pk).update(is_deleted=True)               # у кошику — не рахується
+        self.assertEqual(self.client.get("/email/").context["quote_count"], 0)
+        SalesSource.objects.create(slug="Sergey", name="Sergey")
+        s = OfferSettings.get()
+        s.order_source = "Sergey"
+        s.save()
+        offer = services.new_offer(customer=self.customer, user=self.user)
+        services.add_line(offer, product=self.ant, qty=2, unit_price=D("10"))
+        services.mark_sent(services.generate_document(offer))
+        order, _skipped = services.accept(offer, self.user)
+        self.assertEqual(order.source, "Sergey")
+        page = self.client.get("/admin/offers/offersettings/1/change/")
+        self.assertContains(page, "Sergey (Sergey)")

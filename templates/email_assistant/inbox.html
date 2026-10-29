@@ -603,7 +603,9 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
       {% if cat_filter %}{% for key, label, n, unread in categories %}{% if key == cat_filter %}<span class="em-chip">{{ label }}<button onclick="emDrop('cat')">✕</button></span>{% endif %}{% endfor %}{% endif %}
       {% if project_filter %}<span class="em-chip" style="--c:#16a34a">📁 {{ project_filter.code }}<button onclick="emDrop('project')">✕</button></span>{% endif %}
       {% if customer_filter %}<span class="em-chip" style="--c:#3b82f6">👤 {{ customer_filter.name|truncatechars:28 }}<button onclick="emDrop('customer')">✕</button></span>{% endif %}
-      {% if quote_filter %}<span class="em-chip" style="--c:#c026d3">📝 {% trans "запити" %}<button onclick="emDrop('quote')">✕</button></span>{% endif %}
+      {% if quote_filter %}<span class="em-chip" style="--c:#c026d3">📝 {% if quote_all %}{% trans "запити й оброблені" %}{% else %}{% trans "запити" %}{% endif %}<button onclick="emDrop('quote')">✕</button></span>
+      <a href="#" class="em-chip" style="--c:#c026d3;opacity:.8;text-decoration:none" onclick="return emNav(event, 'quote', '{% if quote_all %}1{% else %}all{% endif %}')"
+         title="{% trans "Оброблені — по яких уже є Angebot (Продажі → 📝 Angebote)" %}">{% if quote_all %}{% trans "лише відкриті" %}{% else %}＋ {% trans "оброблені (Angebot / відповів колега)" %}: {{ quote_done_count|add:0 }}{% endif %}</a>{% endif %}
       <button class="em-p2-filter-clear" onclick="clearMailFilter()" title="{% trans "Скинути всі фільтри" %}">{% trans "✕ усе" %}</button>
       <span class="em-chips-hint">{% trans "по всіх папках" %}</span>
     </div>
@@ -1661,6 +1663,7 @@ function _whyQuoteShow() {
     'done': '✅ {% trans "Angebot створено" %}' + (q.offer ? ' ' + q.offer : '') + ': ',
     'dismissed': '✕ {% trans "Позначено «Не запит» — автоматика це рішення не змінює" %}: ',
     'found': '🟡 {% trans "Схоже на запит, але підказки ще немає (перевірка ще не проходила) — «↻ Перевірити ще раз»" %}: ',
+    'answered': '↪ {% trans "Запит уже оброблено колегою — у відкритих запитах його немає" %}: ',
     'none': '— {% trans "Не запит, бо" %} '
   }[q.state] || '';
   document.getElementById('why-quote').textContent = text + (q.reason || '');

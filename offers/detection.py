@@ -18,7 +18,7 @@ from datetime import timedelta
 from django.db import connection, transaction
 from django.utils import timezone
 
-from email_assistant.quotes import QUOTE_START_RE, forwarded, forwarded_in, new_text  # noqa: F401 — текст без цитати, спільний із поштою
+from email_assistant.quotes import QUOTE_START_RE, chain_in, forwarded, forwarded_in, new_text  # noqa: F401 — текст без цитати, спільний із поштою
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def check(msg):
     """→ ({reason, items} | None, чому не запит — зрозуміло людині; '' — запит). Для «🔍 Чому лист тут»."""
     from email_assistant.crm_link import is_own, own_addresses
 
-    from .models import Offer
+    from .models import Offer, QuoteRequest
     from .services import detect_items
     if msg.is_spam or msg.is_deleted:
         return None, "лист у спамі або видалений"
@@ -97,7 +97,14 @@ def check(msg):
                       + " (і артикулів каталогу з кількістю разом із питанням про ціну)")
     if items:
         parts.append("позиції: " + ", ".join(f"{i['sku']} × {i['qty']}" if i["qty"] else i["sku"] for i in items[:4]))
-    return {"reason": " · ".join(parts)[:255], "items": items[:30]}, ""
+    found = {"reason": " · ".join(parts)[:255], "items": items[:30]}
+    answered = fw.get("answered") if fw else None
+    if answered:   # запит уже оброблено колегою — не відкритий, а «↪ Відповів колега»
+        who = answered["name"] or answered["from"]
+        found.update(status=QuoteRequest.ANSWERED, reason=(
+            f"↪ уже відповів {who}{' · ' + answered['date'] if answered['date'] else ''}: "
+            f"«{_answer_line(answered['text'])}» · " + found["reason"])[:255])
+    return found, ""
 
 
 def forwarded_request(msg, own=None):
@@ -115,17 +122,27 @@ def _forwarded(msg, own=None):
     if not (is_own(msg.from_email, own) or msg.category == "internal"):
         return None, (f"тип співрозмовника — {labels.get(msg.category, msg.category or 'ще не визначено')}: "
                       "запити шукаються лише від клієнтів і нових контактів")
-    fw = forwarded_in(msg, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні; текст або HTML
+    chain = chain_in(msg, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні; текст або HTML
+    fw = next((b for b in chain if not is_own(b["from"], own)), None)
     if fw is None:
-        inner = forwarded_in(msg)
-        if inner is not None:
-            return None, f"переслано лише зі своїх адрес ({inner['from']}) — листа ззовні всередині не знайдено"
+        if chain:
+            return None, f"переслано лише зі своїх адрес ({chain[0]['from']}) — листа ззовні всередині не знайдено"
         where = "ні в тексті, ні в HTML-версії листа" if (msg.body_html or "").strip() else "у тексті листа (HTML-версії немає)"
         return None, f"лист від своєї адреси, і пересланого листа з «Von: / From:» та адресою не знайдено {where}"
     kind = address_category(msg.account_id, fw["from"])
     if kind not in CATEGORIES:
         return None, f"переслано від {fw['from']} — це {labels.get(kind, kind)}, а не клієнт чи новий контакт"
-    return fw, ""
+    # «WG: AW: …» — колега вже відповів цьому клієнту (наш лист йому — новіший у ланцюжку)
+    k = chain.index(fw)
+    answered = next((b for b in chain[:k] if is_own(b["from"], own) and fw["from"] in (b["to"] or "").lower()), None)
+    return dict(fw, answered=answered), ""
+
+
+def _answer_line(text) -> str:
+    """Суть відповіді колеги: перший рядок після звертання («Dear Denys,»)."""
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    body = [ln for ln in lines if not ln.endswith(",")] or lines
+    return (body[0] if body else "")[:SNIPPET]
 
 
 def explain(msg) -> dict:
@@ -134,12 +151,13 @@ def explain(msg) -> dict:
     from .models import QuoteRequest
     qr = QuoteRequest.objects.filter(message=msg).select_related("offer").first()
     if qr is not None:
-        state = {QuoteRequest.NEW: "new", QuoteRequest.DONE: "done", QuoteRequest.DISMISSED: "dismissed"}.get(
-            qr.status, "new")
+        state = {QuoteRequest.NEW: "new", QuoteRequest.DONE: "done", QuoteRequest.DISMISSED: "dismissed",
+                 QuoteRequest.ANSWERED: "answered"}.get(qr.status, "new")
         return {"state": state, "reason": qr.reason, "request_id": qr.pk,
                 "offer": qr.offer.display_number if qr.offer_id else ""}
     found, why = check(msg)
-    return {"state": "found" if found else "none", "reason": found["reason"] if found else why,
+    state = ("answered" if found.get("status") == QuoteRequest.ANSWERED else "found") if found else "none"
+    return {"state": state, "reason": found["reason"] if found else why,
             "request_id": None, "offer": ""}
 
 

@@ -328,10 +328,12 @@ def _attach_kb_tags(emails):
         m.kb_tag = tags.get(m.pk, '')
 
 
-def _quote_messages(account):
-    """Листи скриньки з відкритим запитом пропозиції — для фільтра «📝 Запити пропозицій»."""
+def _quote_messages(account, with_done=False):
+    """Листи скриньки з відкритим запитом пропозиції — для фільтра «📝 Запити пропозицій»;
+    with_done — ще й оброблені (Angebot уже створено)."""
     from offers.models import QuoteRequest
-    return QuoteRequest.objects.filter(status=QuoteRequest.NEW, message__account=account).values('message_id')
+    statuses = (QuoteRequest.NEW, QuoteRequest.DONE, QuoteRequest.ANSWERED) if with_done else (QuoteRequest.NEW,)
+    return QuoteRequest.objects.filter(status__in=statuses, message__account=account).values('message_id')
 
 
 def _category_counts(qs):
@@ -503,7 +505,8 @@ def inbox_view(request):
     cat_filter, customer_filter = _parse_mail_filter(request)
     work_filter = _parse_work_filter(request)
     project_filter = _parse_project_filter(request)
-    quote_filter = request.GET.get('quote') == '1'
+    quote_filter = request.GET.get('quote') in ('1', 'all')   # all — ще й оброблені (з Angebot)
+    quote_all = request.GET.get('quote') == 'all'
     # Пошук і фільтри «Категорія / Клієнт / Проєкт / Запити» діють по всіх папках (у Спамі й Кошику — лише в них)
     search_all = bool(q or cat_filter or work_filter or customer_filter or project_filter or quote_filter) \
         and folder not in ('spam', 'trash')
@@ -536,7 +539,8 @@ def inbox_view(request):
         from projects.services import project_messages
         qs = qs.filter(pk__in=project_messages(project_filter).values('pk'))
     if quote_filter:
-        qs = qs.filter(pk__in=_quote_messages(account))
+        qs = qs.filter(pk__in=_quote_messages(account, with_done=quote_all))
+    quote_count = counts_qs.filter(pk__in=_quote_messages(account)).count()
     # «Групувати по гілці» (⎘, cookie): один рядок на гілку — її найновіший лист у цьому списку
     grouped = request.COOKIES.get('em_group') == '1'
     if grouped:
@@ -588,7 +592,10 @@ def inbox_view(request):
         'project_filter':        project_filter,
         'open_projects':         _open_projects(),
         'quote_filter':          quote_filter,
-        'quote_count':           _quote_messages(account).count(),
+        # ті самі листи, що покаже фільтр (без Спаму, Кошика й видалених) — інакше «1», а список порожній
+        'quote_count':           quote_count,
+        'quote_all':             quote_all,
+        'quote_done_count':      counts_qs.filter(pk__in=_quote_messages(account, with_done=True)).count() - quote_count,
         'categories':            categories,
         'mail_customers':        mail_customers,
         'cust_sources':          _customer_sources(mail_customers),
@@ -1071,10 +1078,14 @@ def compose_view(request):
             ),
         }
 
-    elif offer_pk and str(offer_pk).isdigit() and request.method != 'POST':
-        # «✉️ Надіслати клієнту» з Angebot: адреса, тема, короткий текст і PDF версії як вкладення-посилання
+    if offer_pk and str(offer_pk).isdigit() and request.method != 'POST':
+        # Angebot листом: клієнту / колезі, що переслав запит (тоді ще й відповідь у його гілку) / іншому
         from offers.services import compose_initial
-        initial = compose_initial(int(offer_pk), request.user)
+        extra = compose_initial(int(offer_pk), request.user, request.GET.get('audience', 'customer'))
+        for key, value in extra.items():   # відповідь колезі: «Кому» й «Re: тема» — з його листа
+            if key in ('to', 'subject') and initial.get(key):
+                continue
+            initial[key] = value
 
     if request.method == 'POST':
         return _handle_send(request, account, reply_to)

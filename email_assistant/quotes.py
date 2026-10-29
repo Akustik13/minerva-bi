@@ -15,6 +15,8 @@ HEADER_RE = re.compile(r"^\s*\**(von|from|datum|date|gesendet|sent|an|to|cc|betr
                        r"\**\s*:\**\s*(.*)$", re.IGNORECASE)
 _QUOTED_RE = re.compile(r"^\s*(?:>\s?)+")
 SENDER_HEADERS = ("von", "from", "від", "от")
+TO_HEADERS = ("an", "to", "кому")
+DATE_HEADERS = ("gesendet", "sent", "datum", "date", "дата")
 SUBJECT_HEADERS = ("betreff", "subject", "тема")
 ADDRESS_RE = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
 
@@ -50,7 +52,20 @@ def _forward_blocks(lines):
         if address:
             yield {"from": address.group(0).lower(), "name": sender.split("<")[0].strip(' "\''),
                    "subject": next((headers[h] for h in SUBJECT_HEADERS if h in headers), ""),
+                   "to": next((headers[h] for h in TO_HEADERS if h in headers), ""),
+                   "date": next((headers[h] for h in DATE_HEADERS if h in headers), ""),
                    "text": new_text("\n".join(lines[end:]))}
+
+
+def chain_in(msg, skip=None) -> list:
+    """Усі переслані листи в листі по черзі (новіший — першим): з тексту, а якщо там немає листа, якого не
+    пропускає skip, — з HTML-версії. Для «колега вже відповів клієнту» (WG: AW: …)."""
+    text = list(_forward_blocks((msg.body_text or "").splitlines()))
+    if any(skip is None or not skip(b["from"]) for b in text) or not getattr(msg, "body_html", ""):
+        return text
+    from email_assistant.imap_client import html_to_text
+    html = list(_forward_blocks(html_to_text(msg.body_html).splitlines()))
+    return html if any(skip is None or not skip(b["from"]) for b in html) else text or html
 
 
 def forwarded_in(msg, skip=None):

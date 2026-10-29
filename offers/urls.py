@@ -5,6 +5,8 @@ from . import views
 app_name = "offers"
 
 urlpatterns = [
+    path("", views.list_view, name="list"),
+    path("<int:pk>/delete/", views.delete_view, name="delete"),
     path("quick/", views.quick_view, name="quick"),
     path("<int:pk>/quick/", views.quick_view, name="quick_edit"),
     path("api/currency/", views.currency_view, name="currency"),

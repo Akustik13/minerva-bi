@@ -148,6 +148,7 @@ def quick_view(request, pk=None):
         "price_modes": PRICE_MODES, "lead_modes": LEAD_MODES,
         "rev": services.current_revision(offer) if offer else None,
         "locked": bool(offer and offer.is_locked), "warnings": services.warnings(offer) if offer else [],
+        "targets": services.send_targets(offer, request.user) if offer else [],
         "lines": data["lines"],
     })
 
@@ -156,6 +157,55 @@ def _offer_settings_perm(request):
     from django.core.exceptions import PermissionDenied
     if not request.user.has_perm("offers.change_offersettings"):
         raise PermissionDenied
+
+
+@staff_member_required
+def list_view(request):
+    """«📝 Angebote» — як Commercial Invoices: новий (легка форма / з пошти), згенеровані з файлами й «Надіслати»,
+    Word шаблон."""
+    from django.core.exceptions import PermissionDenied
+    from django.shortcuts import render
+
+    from django.contrib import admin
+
+    from . import document
+    from .models import Offer, OfferSettings
+    if not request.user.has_perm("offers.view_offer"):
+        raise PermissionDenied
+    q, status = request.GET.get("q", "").strip(), request.GET.get("status", "")
+    status = status if status in dict(Offer.STATUS_CHOICES) else ""
+    data = services.overview(q, status, request.user)
+    statuses = [(key, label, data["counts"].get(key, 0)) for key, label in Offer.STATUS_CHOICES
+                if data["counts"].get(key)]
+    return render(request, "offers/list.html", {
+        **admin.site.each_context(request), "title": "Angebote", **data, "q": q, "status": status,
+        "statuses": statuses, "open_requests": QuoteRequest.objects.filter(status=QuoteRequest.NEW).count(),
+        "template_vars": document.TEMPLATE_VARS, "has_custom_template": bool(OfferSettings.get().template),
+        "can_template": request.user.has_perm("offers.change_offersettings"),
+        "can_add": request.user.has_perm("offers.add_offer"),
+        "can_delete": request.user.has_perm("offers.delete_offer"),
+    })
+
+
+@staff_member_required
+@require_POST
+def delete_view(request, pk):
+    """🗑 зі сторінки «📝 Angebote» — лише ненадіслана (надіслана версія незмінна, як в адмінці)."""
+    from django.contrib import messages
+    from django.core.exceptions import PermissionDenied
+    from django.shortcuts import redirect
+
+    from .models import Offer
+    offer = get_object_or_404(Offer, pk=pk)
+    if not request.user.has_perm("offers.delete_offer"):
+        raise PermissionDenied
+    if offer.is_locked:
+        messages.error(request, f"❌ {offer.display_number} уже надіслано — не видаляється (можна «🚫 Скасовано» в картці).")
+    else:
+        number = offer.display_number
+        offer.delete()
+        messages.success(request, f"🗑 Angebot {number} видалено.")
+    return redirect(reverse("offers:list"))
 
 
 @staff_member_required

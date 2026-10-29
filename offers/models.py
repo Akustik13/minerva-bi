@@ -36,6 +36,10 @@ class OfferSettings(models.Model):
         "Ціни з", max_length=10, choices=PRICE_MODES, default="auto",
         help_text="За замовчуванням для нових Angebote; у формі можна вибрати інше. Інша валюта — × курс із "
                   "«Налаштувань цін» магазину.")
+    order_source = models.CharField(
+        "Джерело замовлень з прийнятих Angebote", max_length=50, default="angebot",
+        help_text="«🤝 Прийнято → замовлення» створює замовлення в цьому джерелі (документ Angebot — у його папці "
+                  "media/orders/<джерело>/<номер>/). angebot — окреме джерело, Minerva створить його сама.")
     lead_mode = models.CharField("Строки поставки з", max_length=10, choices=LEAD_MODES, default="auto")
     default_vat_rate = models.DecimalField("ПДВ, %", max_digits=5, decimal_places=2, default=Decimal("19.00"))
     default_language = models.CharField("Мова документа", max_length=5, choices=LANGUAGES, default="de")
@@ -196,8 +200,9 @@ class Offer(models.Model):
 
 class QuoteRequest(models.Model):
     """Лист, схожий на запит пропозиції (offers/detection.py) — підказка «📝 запит» у пошті."""
-    NEW, DONE, DISMISSED = "new", "done", "dismissed"
-    STATUS_CHOICES = [(NEW, "📝 Новий запит"), (DONE, "✅ Angebot створено"), (DISMISSED, "✕ Не запит")]
+    NEW, DONE, DISMISSED, ANSWERED = "new", "done", "dismissed", "answered"
+    STATUS_CHOICES = [(NEW, "📝 Новий запит"), (DONE, "✅ Angebot створено"), (DISMISSED, "✕ Не запит"),
+                      (ANSWERED, "↪ Відповів колега")]
 
     message = models.OneToOneField("email_assistant.EmailMessage", on_delete=models.CASCADE,
                                    related_name="quote_request", verbose_name="Лист")

@@ -167,9 +167,10 @@ def set_tiers(line, tiers, leads=None) -> None:
         if price is None:
             q = pricing.quote_price(line.product, qty, offer.currency, offer.price_mode, sku=line.sku)
             price, source, note = q.unit_price, q.source, q.note
-        if leads:
-            lead, lead_note = (leads[i] if i < len(leads) and leads[i] else leads[-1]), pricing.MANUAL_LEAD
-        elif auto_lead:
+        manual = leads[i] if leads and i < len(leads) and leads[i] else ""
+        if manual:                      # строк саме цієї кількості, введений вручну
+            lead, lead_note = manual, pricing.MANUAL_LEAD
+        elif leads or auto_lead:        # порожньо — з Minerva для цієї кількості
             lq = pricing.quote_lead(line.product, qty, offer.language, offer.lead_mode, sku=line.sku)
             lead, lead_note = lq.text, lq.note
         else:
@@ -347,10 +348,13 @@ def accept(offer, user=None):
         return offer.order, []
     if offer.status not in (Offer.SENT, Offer.APPROVED, Offer.EXPIRED):
         raise OfferError("Прийняти можна надіслану (або погоджену) пропозицію.")
-    SalesSource.objects.get_or_create(slug=ORDER_SOURCE, defaults={"name": "Angebot"})
+    source = OfferSettings.get().order_source or ORDER_SOURCE   # «Налаштування Angebote»; немає такого — angebot
+    if source == ORDER_SOURCE or not SalesSource.objects.filter(slug=source).exists():
+        source = ORDER_SOURCE
+        SalesSource.objects.get_or_create(slug=ORDER_SOURCE, defaults={"name": "Angebot"})
     c = offer.customer
     order = SalesOrder.objects.create(
-        source=ORDER_SOURCE, document_type="SALE", order_number=offer.display_number,
+        source=source, document_type="SALE", order_number=offer.display_number,
         order_date=timezone.localdate(), status="received",
         client=(getattr(c, "company", "") or getattr(c, "name", "") or offer.contact_name)[:255],
         contact_name=offer.contact_name[:255], email=offer.contact_email or getattr(c, "email", ""),
@@ -516,11 +520,56 @@ _MAIL_TEXT = {
 }
 
 
-def compose_initial(offer_pk, user=None) -> dict:
-    """Початкові дані листа з Angebot: кому, тема, короткий текст, PDF поточної версії (вкладення-посилання)."""
+# Колезі (той, хто переслав запит) — коротко німецькою, документ не стає «надісланим»
+_COLLEAGUE_TEXT = ("Hallo {name},", "Hallo,",
+                   "anbei das Angebot {number} für {customer} zu der weitergeleiteten Anfrage{subject}. "
+                   "Gültig bis {valid}.")
+AUDIENCES = ("customer", "colleague", "other")
+
+
+def colleague_of(offer, user=None):
+    """Хто з колег переслав запит (FW / WG у гілці Angebot): (адреса, лист — для відповіді в ту саму гілку) або (''
+    , None). Своя скринька користувача — не колега."""
+    from email_assistant.crm_link import is_own, own_addresses
+    msg = offer.source_message
+    if msg is None or not msg.thread_id:
+        return "", None
+    own = own_addresses()
+    mine = {a.email_address.lower() for a in (user.email_accounts.all() if user is not None and
+                                              hasattr(user, "email_accounts") else [])}
+    mine.add((msg.account.email_address or "").lower())
+    for m in msg.thread.messages.filter(is_deleted=False).order_by("-sent_at"):
+        addr = (m.from_email or "").lower()
+        if addr and is_own(addr, own) and addr not in mine:
+            return addr, m
+    return "", None
+
+
+def send_targets(offer, user=None) -> list:
+    """Кому надіслати Angebot: [{key, label, to, url, hint}] — клієнту (версія стає «надісланою»), колезі, який
+    переслав запит (відповіддю в ту саму гілку, без позначки «надіслано»), іншому (адресу — у листі)."""
+    to = offer.contact_email or getattr(offer.customer, "email", "") or ""
+    out = [{"key": "customer", "label": "✉️ Клієнту", "to": to, "url": f"/email/compose/?offer={offer.pk}",
+            "hint": (to + " — " if to else "") + "версія стає «надісланою» й незмінною"}]
+    addr, msg = colleague_of(offer, user)
+    if addr:
+        out.append({"key": "colleague", "label": f"↪ Колезі ({addr.split('@')[0]})", "to": addr,
+                    "url": f"/email/compose/?offer={offer.pk}&audience=colleague&reply_to={msg.pk}",
+                    "hint": f"{addr} — переслав цей запит; відповіддю в ту саму гілку, Angebot лишається чернеткою"})
+    out.append({"key": "other", "label": "✉️ Іншому…", "to": "", "url": f"/email/compose/?offer={offer.pk}&audience=other",
+                "hint": "адресу — у листі; Angebot лишається чернеткою"})
+    return out
+
+
+def compose_initial(offer_pk, user=None, audience="customer") -> dict:
+    """Початкові дані листа з Angebot: кому, тема, короткий текст, PDF поточної версії (вкладення-посилання).
+    audience: customer — клієнту (після відправки версія «надіслана»); colleague — колезі, що переслав запит
+    (коротко, вкладення `offerint:` — без позначки «надіслано»); other — текст як клієнту, адреса порожня, теж без
+    позначки."""
     import html
     from django.shortcuts import get_object_or_404
     offer = get_object_or_404(Offer, pk=offer_pk)
+    audience = audience if audience in AUDIENCES else "customer"
     rev = generate_document(offer, user)          # надіслана версія не перезаписується
     settings_ = OfferSettings.get()
     langs = ["de", "en"] if offer.language == "de_en" else [offer.language if offer.language in _MAIL_TEXT else "de"]
@@ -530,14 +579,26 @@ def compose_initial(offer_pk, user=None) -> dict:
         hello, hello_named, body = _MAIL_TEXT[lang]
         greeting = hello_named.format(name=offer.contact_name) if offer.contact_name else hello
         paragraphs.append(f"{html.escape(greeting)}<br><br>{html.escape(body.format(number=offer.display_number, valid=valid))}")
-    subject = settings_.email_subject.format(
-        number=offer.display_number, customer=getattr(offer.customer, "company", "") or getattr(offer.customer, "name", ""))
+    customer = getattr(offer.customer, "company", "") or getattr(offer.customer, "name", "") or offer.contact_name
+    subject = settings_.email_subject.format(number=offer.display_number, customer=customer)
     att = revision_attachment(rev.pk)
+    to = offer.contact_email or getattr(offer.customer, "email", "") or ""
+    if audience == "colleague":
+        addr, msg = colleague_of(offer, user)
+        name = (msg.from_name or "").split()[0] if msg is not None and msg.from_name else ""
+        hello, hello_anon, body = _COLLEAGUE_TEXT
+        src = f" «{offer.source_message.subject}»" if offer.source_message and offer.source_message.subject else ""
+        paragraphs = [f"{html.escape(hello.format(name=name) if name else hello_anon)}<br><br>" + html.escape(body.format(
+            number=offer.display_number, customer=customer or "—", subject=src, valid=valid))]
+        to, subject = addr, f"{subject} — {customer}" if customer else subject
+    elif audience == "other":
+        to = ""
+    kind = "offer" if audience == "customer" else "offerint"   # лише лист клієнту робить версію «надісланою»
     return {
-        "to": offer.contact_email or getattr(offer.customer, "email", "") or "",
+        "to": to,
         "subject": subject,
         "body_html": "<br><br>".join(paragraphs),
-        "att_refs": [{"ref": f"offer:{rev.pk}", "name": att["name"]}] if att else [],
+        "att_refs": [{"ref": f"{kind}:{rev.pk}", "name": att["name"]}] if att else [],
     }
 
 
@@ -717,11 +778,17 @@ def quick_from_offer(offer) -> dict:
         tiers = l.tiers or [{"qty": _s(l.qty), "unit_price": _s(l.unit_price) if l.unit_price is not None else "",
                              "price_source": l.price_source}]
         prices = [manual(t) for t in tiers]
-        leads = [t.get("lead_time") or l.lead_time for t in tiers]
-        lead = "" if _lead_is_auto(l) else ("; ".join(leads) if len(set(leads)) > 1 else l.lead_time)
+
+        def manual_lead(t, line=l):
+            if t.get("lead_note") is None:      # ступені до offers 0005 — строк позиції для всіх кількостей
+                return "" if _lead_is_auto(line) else line.lead_time
+            return t.get("lead_time", "") if t["lead_note"] == pricing.MANUAL_LEAD else ""
+        leads = [manual_lead(t) for t in l.tiers] if l.tiers else ["" if _lead_is_auto(l) else l.lead_time]
+        lead = "; ".join(leads) if any(leads) else ""
         rows.append({"sku": l.sku, "description": l.description,
                      "qtys": _qtys_text(Decimal(t["qty"]) for t in tiers),
-                     "prices": "; ".join(pricing._num(p).replace(".", ",") if p else "" for p in prices).strip("; "),
+                     "prices": "; ".join(pricing._num(p).replace(".", ",") if p else "" for p in prices)
+                     if any(prices) else "",   # «; 9,5» — ціна саме другої кількості, позиції не зсуваються
                      "lead_time": lead, "unit": l.unit})
     s = OfferSettings.get()
     valid_days = (offer.valid_until - timezone.localdate()).days if offer.valid_until else s.validity_days
@@ -798,6 +865,37 @@ SEARCH_LIMIT = 15
 def _norm(text) -> str:
     """«ft-220 407» → «FT220407»: артикул без розділювачів і регістру."""
     return _SEP_RE.sub("", str(text or "")).upper()
+
+
+LIST_LIMIT = 100
+
+
+def overview(q="", status="", user=None) -> dict:
+    """Сторінка «📝 Angebote» (як Commercial Invoices): останні Angebote з файлами поточної версії, позиціями
+    (кількостей), сумою й кому надіслати; фільтр за статусом і пошук (номер, клієнт, контакт, артикул)."""
+    from django.db.models import Count, Q
+    qs = Offer.objects.select_related("customer", "project", "source_message").annotate(
+        n_lines=Count("lines", distinct=True)).order_by("-created_at")
+    if status:
+        qs = qs.filter(status=status)
+    for word in (q or "").split()[:5]:
+        qs = qs.filter(Q(number__icontains=word) | Q(customer__company__icontains=word) | Q(customer__name__icontains=word)
+                       | Q(contact_name__icontains=word) | Q(contact_email__icontains=word)
+                       | Q(lines__sku__icontains=word) | Q(lines__description__icontains=word)).distinct()
+    total = qs.count()
+    offers = list(qs[:LIST_LIMIT])
+    revs = {(r.offer_id, r.revision): r for r in OfferRevision.objects.filter(offer__in=offers)}
+    tiers = {}
+    for line in OfferLine.objects.filter(offer__in=offers).only("offer_id", "tiers"):
+        tiers[line.offer_id] = tiers.get(line.offer_id, 0) + max(1, len(line.tiers or []))
+    rows = []
+    for o in offers:
+        rows.append({"offer": o, "rev": revs.get((o.pk, o.revision)), "quantities": tiers.get(o.pk, 0),
+                     "has_tiers": tiers.get(o.pk, 0) > o.n_lines,
+                     "customer": getattr(o.customer, "company", "") or getattr(o.customer, "name", "") or o.contact_name,
+                     "country": getattr(o.customer, "country", "") or "", "targets": send_targets(o, user)})
+    counts = dict(Offer.objects.values_list("status").annotate(n=Count("id")).values_list("status", "n"))
+    return {"rows": rows, "total": total, "shown": len(rows), "counts": counts}
 
 
 def search_products(q: str, limit: int = SEARCH_LIMIT) -> list:

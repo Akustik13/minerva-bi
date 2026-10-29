@@ -1,0 +1,110 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Angebote | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; Продажі &rsaquo; Angebote
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+{% include "offers/_styles.html" %}
+<style>
+.ol-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ol-table th { text-align: left; color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; padding: 8px; border-bottom: 1px solid var(--border-strong); }
+.ol-table td { padding: 8px; border-bottom: 1px solid var(--border-strong); color: var(--text); vertical-align: middle; }
+.ol-table a { color: var(--link-fg); }
+.ol-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.ol-chip { font-size: 12px; border: 1px solid var(--border-strong); border-radius: 12px; padding: 3px 10px; color: var(--text); text-decoration: none; }
+.ol-chip.on { border-color: var(--link-fg); color: var(--link-fg); font-weight: 600; }
+.ol-send { position: relative; display: inline-block; }
+.ol-send-menu { display: none; position: absolute; right: 0; top: 100%; z-index: 30; background: var(--bg-card); border: 1px solid var(--border-strong);
+                border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.3); padding: 4px 0; min-width: 260px; }
+.ol-send.open .ol-send-menu { display: block; }
+.ol-send-menu a { display: block; padding: 6px 12px; color: var(--text); text-decoration: none; font-size: 13px; }
+.ol-send-menu a:hover { background: var(--bg-hover); }
+.ol-send-menu small { display: block; color: var(--text-muted); font-size: 11px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="of-wrap" style="max-width:1300px">
+  <h1 style="margin:0 0 6px;color:var(--text)">📝 Angebote</h1>
+  <p class="of-muted" style="margin:0 0 18px">Комерційні пропозиції клієнтам — на бланку Commercial Invoice (Quotation). Повна картка з версіями й статусами — <a href="{% url 'admin:offers_offer_changelist' %}" style="color:var(--link-fg)">📋 у списку адмінки</a>.</p>
+
+  {% if can_add %}
+  <div class="of-card">
+    <div class="of-card-title">➕ Новий Angebot</div>
+    <div class="of-actions">
+      <a class="of-btn primary" href="{% url 'offers:quick' %}">⚡ Відкрити легку форму →</a>
+      {% if open_requests %}<a class="of-btn" href="/email/?quote=1">📝 Запити пропозицій у пошті без Angebot: {{ open_requests }}</a>{% endif %}
+      <span class="of-muted">З листа — кнопка «📝 Angebot» у прев'ю листа: клієнт, адреса, артикули й кількості підставляться самі.</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="of-card">
+    <div class="of-card-title">📁 Згенеровані ({{ total }}){% if shown < total %} <span class="of-muted" style="text-transform:none;font-weight:400">— показано останні {{ shown }}</span>{% endif %}</div>
+    <form method="get" class="ol-chips">
+      <a class="ol-chip{% if not status %} on{% endif %}" href="?{% if q %}q={{ q|urlencode }}{% endif %}">Усі</a>
+      {% for key, label, n in statuses %}<a class="ol-chip{% if status == key %} on{% endif %}" href="?status={{ key }}{% if q %}&q={{ q|urlencode }}{% endif %}">{{ label }} · {{ n }}</a>{% endfor %}
+      {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+      <input class="of-input" name="q" value="{{ q }}" placeholder="🔎 номер, клієнт, контакт, артикул" style="width:260px;margin-left:auto">
+    </form>
+    {% if rows %}
+    <div class="of-scroll">
+    <table class="ol-table">
+      <thead><tr>
+        <th>№</th><th>Дата</th><th>Клієнт</th><th>Позицій</th><th>Сума нетто</th><th>Статус</th><th>Файли</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for r in rows %}{% with o=r.offer %}
+        <tr>
+          <td style="white-space:nowrap"><b><a href="{% url 'offers:quick_edit' o.pk %}">{{ o.display_number }}</a></b>
+            {% if o.request_kind != "stock" %}<div class="of-muted" title="{{ o.get_request_kind_display }}">🏭 виробництво</div>{% endif %}</td>
+          <td style="white-space:nowrap">{{ o.created_at|date:"Y-m-d" }}<div class="of-muted">до {{ o.valid_until|date:"Y-m-d"|default:"—" }}</div></td>
+          <td>{{ r.customer|default:"—" }}<div class="of-muted">{% if r.country %}{{ r.country }} · {% endif %}{{ o.contact_email }}{% if o.source_message %} · з листа «{{ o.source_message.subject|truncatechars:40 }}»{% endif %}</div></td>
+          <td>{{ o.n_lines }}{% if r.has_tiers %} <span class="of-muted">({{ r.quantities }} к-стей)</span>{% endif %}</td>
+          <td style="white-space:nowrap">{% if r.has_tiers %}<span class="of-muted" title="Ступені — варіанти кількостей, загальної суми в документі немає">ступені · </span>{% endif %}{{ o.net_total }} {{ o.currency }}</td>
+          <td style="white-space:nowrap">{{ o.get_status_display }}</td>
+          <td style="white-space:nowrap">
+            {% if r.rev.pdf_file %}<a class="of-btn sm" href="{{ r.rev.pdf_file.url }}" target="_blank">PDF</a>{% endif %}
+            {% if r.rev.docx_file %}<a class="of-btn sm" href="{{ r.rev.docx_file.url }}">DOCX</a>{% endif %}
+            {% if not r.rev %}<span class="of-muted">ще не сформовано</span>{% endif %}
+          </td>
+          <td style="white-space:nowrap;text-align:right">
+            <span class="ol-send"><button type="button" class="of-btn sm" onclick="olSend(event, this)">✉️ Надіслати ▾</button>
+              <span class="ol-send-menu">{% for t in r.targets %}<a href="{{ t.url }}" target="_blank">{{ t.label }}<small>{{ t.hint }}</small></a>{% endfor %}</span></span>
+            <a class="of-btn sm" href="{% url 'offers:quick_edit' o.pk %}">✏️ Змінити</a>
+            <a class="of-btn sm" href="{% url 'admin:offers_offer_change' o.pk %}" title="Повна картка: версії, статуси, замовлення">📋</a>
+            {% if can_delete and not o.is_locked %}
+            <form method="post" action="{% url 'offers:delete' o.pk %}" style="display:inline"
+                  onsubmit="return confirm('Видалити Angebot {{ o.display_number|escapejs }}?')">
+              {% csrf_token %}<button class="of-btn sm danger" type="submit">🗑️</button>
+            </form>{% endif %}
+          </td>
+        </tr>
+      {% endwith %}{% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+      <div class="of-muted">{% if q or status %}Нічого не знайдено.{% else %}Ще немає жодного — «⚡ Відкрити легку форму» вище або «📝 Angebot» у листі.{% endif %}</div>
+    {% endif %}
+  </div>
+
+  {% include "offers/_template_card.html" %}
+</div>
+<script>
+function olSend(ev, btn) {
+  ev.stopPropagation();
+  var box = btn.parentNode, open = box.classList.contains('open');
+  document.querySelectorAll('.ol-send.open').forEach(function(x){ x.classList.remove('open'); });
+  if (!open) box.classList.add('open');
+}
+document.addEventListener('click', function(){ document.querySelectorAll('.ol-send.open').forEach(function(x){ x.classList.remove('open'); }); });
+</script>
+{% endblock %}

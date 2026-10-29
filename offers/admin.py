@@ -218,8 +218,9 @@ class OfferAdmin(admin.ModelAdmin):
                 parts.append(format_html(btn, u("review"), "👀 На перевірку"))
             if obj.status in (Offer.DRAFT, Offer.REVIEW):
                 parts.append(format_html(btn, u("approve"), "✅ Погоджено"))
-            parts.append(format_html('<a class="button" href="{}" style="margin:0 6px 4px 0">✉️ Надіслати клієнту</a>',
-                                     f"/email/compose/?offer={obj.pk}"))
+        for t in services.send_targets(obj):   # клієнту / колезі, що переслав запит / іншому
+            parts.append(format_html('<a class="button" href="{}" title="{}" style="margin:0 6px 4px 0">{}</a>',
+                                     t["url"], t["hint"], t["label"]))
         if obj.status in (Offer.SENT, Offer.APPROVED, Offer.EXPIRED) and not obj.order_id:
             parts.append(format_html(btn, u("accept"), "🤝 Прийнято → замовлення"))
         if obj.status in (Offer.SENT, Offer.EXPIRED):
@@ -311,12 +312,28 @@ class OfferAdmin(admin.ModelAdmin):
         return self._run(request, pk, lambda o: services.accept(o, request.user), ok)
 
 
+class OfferSettingsForm(forms.ModelForm):
+    """Джерело замовлень — вибір із «Джерел замовлень» Продажів (+ angebot, якщо його ще немає)."""
+    class Meta:
+        model = OfferSettings
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from sales.models import SalesSource
+        choices = [(s.slug, f"{s.name} ({s.slug})") for s in SalesSource.objects.order_by("order", "name")]
+        if not any(slug == services.ORDER_SOURCE for slug, _n in choices):
+            choices.insert(0, (services.ORDER_SOURCE, "Angebot (angebot) — створиться при першому прийнятті"))
+        self.fields["order_source"].widget = forms.Select(choices=choices)
+
+
 @admin.register(OfferSettings)
 class OfferSettingsAdmin(admin.ModelAdmin):
+    form = OfferSettingsForm
     readonly_fields = ["quote_scan_state"]
     fieldsets = [
         ("Номер і умови", {"fields": ["number_prefix", "validity_days", "default_vat_rate", "default_language",
-                                      "email_subject"]}),
+                                      "email_subject", "order_source"]}),
         ("💶 Валюта, ціни й строки", {
             "fields": ["currency_by_country", "currency_europe", "currency_other", "default_currency", "price_mode",
                        "lead_mode"],

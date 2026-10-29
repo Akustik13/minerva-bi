@@ -92,7 +92,7 @@ def load_ref(account, ref: str):
 
     kind, _, rest = (ref or '').partition(':')
     try:
-        if kind == 'offer':   # документ версії Angebot (PDF / DOCX)
+        if kind in ('offer', 'offerint'):   # документ версії Angebot (PDF / DOCX); offerint — колезі, без «надіслано»
             from offers.services import revision_attachment
             return revision_attachment(int(rest))
         if kind == 'order':
