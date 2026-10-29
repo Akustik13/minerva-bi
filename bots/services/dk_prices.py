@@ -1001,17 +1001,41 @@ def run_url(run) -> str:
     return _abs_url(reverse("admin:bots_digikeypricerun_change", args=[run.pk]))
 
 
-def _line_text(line, cur) -> str:
-    new = tiers_of(line.new_prices)
-    old = dict(tiers_of(line.old_prices))
-    q, p = new[0] if new else (1, None)
-    if p is None:
-        return f"• <code>{html.escape(line.sku)}</code>"
-    was = old.get(q)
-    pct = f" ({fmt_signed(line.change_pct)} %)" if line.change_pct is not None else ""
-    was_text = f"{fmt_price(was)} → " if was is not None else ""
-    more = f" +{len(new) - 1} ступ." if len(new) > 1 else ""
-    return f"• <code>{html.escape(line.sku)}</code> {q} шт: {was_text}{fmt_price(p)} {cur}{pct}{more}"
+UP, DOWN, SAME, GREY, ACCENT = "#cf222e", "#1a7f37", "#57606a", "#57606a", "#0969da"
+
+
+def tier_changes(line) -> list[dict]:
+    """Кожен ступінь кількості окремо: {qty, old, new, text, color} — «23.50 → 25.65 (+9.15 %)»."""
+    old, new = dict(tiers_of(line.old_prices)), dict(tiers_of(line.new_prices))
+    out = []
+    for q in sorted(set(old) | set(new)):
+        o, n = old.get(q), new.get(q)
+        if o is not None and n is not None:
+            if n == o:
+                text, color = "без змін", SAME
+            else:
+                text = ("↑ " if n > o else "↓ ") + f"{fmt_signed((n / o - 1) * 100)} %"
+                color = UP if n > o else DOWN
+        elif n is not None:
+            text, color = "новий ступінь", ACCENT
+        else:
+            text, color = "ступінь прибрано", GREY
+        out.append({"qty": q, "old": fmt_price(o) if o is not None else "—",
+                    "new": fmt_price(n) if n is not None else "—", "text": text, "color": color})
+    return out
+
+
+def _line_text(line, cur) -> list[str]:
+    """Telegram: артикул, далі кожен ступінь окремим рядком."""
+    rows = [f"• <code>{html.escape(line.sku)}</code>"]
+    for t in tier_changes(line):
+        if t["new"] == "—":
+            rows.append(f"    {t['qty']} шт: {t['old']} {cur} · {t['text']}")
+        elif t["old"] == "—":
+            rows.append(f"    {t['qty']} шт: <b>{t['new']}</b> {cur} · {t['text']}")
+        else:
+            rows.append(f"    {t['qty']} шт: {t['old']} → <b>{t['new']}</b> {cur} · {t['text']}")
+    return rows
 
 
 def notify(run, event: str):
@@ -1052,11 +1076,18 @@ def notify(run, event: str):
             from dashboard.notifications import _send_telegram
             tg = [f"🏛️ <b>{html.escape(_get_company_name())}</b>", f"<b>{title}</b> · <i>{now}</i>",
                   f"#{run.pk} · {kind}", "", head, ""]
-            for line in shown[:TG_LINES]:
+            body, more = [], 0
+            for i, line in enumerate(shown):
                 mark = {"held": "✋ ", "error": "❌ ", "mismatch": "⚠ "}.get(line.status, "")
-                tg.append(mark + _line_text(line, cur))
-            if len(shown) > TG_LINES:
-                tg.append(f"… ще {len(shown) - TG_LINES}")
+                block = _line_text(line, cur)
+                block[0] = mark + block[0]
+                if i >= TG_LINES or len("\n".join(tg + body + block)) > 3500:   # Telegram — до 4096 символів
+                    more = len(shown) - i
+                    break
+                body += block
+            tg += body
+            if more:
+                tg.append(f"… ще {more} — у звіті")
             tg += ["", f"🔗 {url}"]
             _send_telegram(ns, "\n".join(tg))
         except Exception as exc:
@@ -1076,30 +1107,42 @@ def _send_email(ns, s, run, title, head, lines, url, kind):
         return
     cur = run.currency
     colors = {"verified": "#1a7f37", "sent": "#0969da", "held": "#9a6700", "error": "#cf222e", "mismatch": "#cf222e"}
+    td = "padding:5px 10px;font-size:13px;"
     rows = []
-    for line in lines:
-        color = colors.get(line.status, "#57606a")
+    for n, line in enumerate(lines):
+        bg = "#ffffff" if n % 2 == 0 else "#f6f8fa"
+        tiers = tier_changes(line) or [{"qty": "", "old": "—", "new": "—", "text": "", "color": GREY}]
+        span = len(tiers)
         reason = line.error or "; ".join(line.notes or [])
-        pct = "" if line.change_pct is None else f"{fmt_signed(line.change_pct)} %"
-        rows.append(
-            "<tr>"
-            f"<td style='padding:6px 8px;border-bottom:1px solid #d0d7de;font-family:Consolas,monospace'>{html.escape(line.sku)}</td>"
-            f"<td style='padding:6px 8px;border-bottom:1px solid #d0d7de'>{html.escape(line.title[:60])}</td>"
-            f"<td style='padding:6px 8px;border-bottom:1px solid #d0d7de;white-space:nowrap'>{fmt_tiers(tiers_of(line.old_prices))}</td>"
-            f"<td style='padding:6px 8px;border-bottom:1px solid #d0d7de;white-space:nowrap'><b>{fmt_tiers(tiers_of(line.new_prices))}</b></td>"
-            f"<td style='padding:6px 8px;border-bottom:1px solid #d0d7de;text-align:right'>{pct}</td>"
-            f"<td style='padding:6px 8px;border-bottom:1px solid #d0d7de;color:{color}'>{html.escape(line.get_status_display())}"
-            f"{'<br><small>' + html.escape(reason[:200]) + '</small>' if reason else ''}</td></tr>")
+        status = (f"<b style='color:{colors.get(line.status, GREY)}'>{html.escape(line.get_status_display())}</b>"
+                  + (f"<br><span style='font-size:11px;color:#57606a'>{html.escape(reason[:220])}</span>" if reason else ""))
+        product = (f"<span style='font-family:Consolas,monospace;font-weight:bold'>{html.escape(line.sku)}</span>"
+                   f"<br><span style='font-size:12px;color:#57606a'>{html.escape(line.title[:60])}</span>")
+        for i, t in enumerate(tiers):
+            top = "border-top:2px solid #d0d7de;" if i == 0 else "border-top:1px solid #eaeef2;"
+            cells = []
+            if i == 0:
+                cells.append(f"<td rowspan='{span}' valign='top' style='{td}{top}background:{bg}'>{product}</td>")
+            cells += [
+                f"<td align='right' style='{td}{top}background:{bg};white-space:nowrap;color:#57606a'>"
+                f"{t['qty']}{' шт' if t['qty'] != '' else ''}</td>",
+                f"<td align='right' style='{td}{top}background:{bg};white-space:nowrap;color:#57606a'>{t['old']}</td>",
+                f"<td align='right' style='{td}{top}background:{bg};white-space:nowrap'><b>{t['new']}</b></td>",
+                f"<td style='{td}{top}background:{bg};white-space:nowrap;color:{t['color']};font-weight:bold'>{t['text']}</td>",
+            ]
+            if i == 0:
+                cells.append(f"<td rowspan='{span}' valign='top' style='{td}{top}background:{bg}'>{status}</td>")
+            rows.append("<tr>" + "".join(cells) + "</tr>")
+    th = "padding:7px 10px;font-size:12px;color:#57606a;border-bottom:2px solid #d0d7de;background:#f6f8fa;"
     body = (
         "<div style='max-width:900px;font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1c2128'>"
         f"<h2 style='margin:0 0 6px'>{html.escape(title)}</h2>"
         f"<p style='margin:0 0 4px;color:#57606a'>{html.escape(_get_company_name())} · оновлення #{run.pk} · {html.escape(kind)} · "
         f"ціни в {html.escape(cur)}</p><p style='margin:0 0 12px'>{head}</p>"
-        "<table width='100%' style='width:100%;border-collapse:collapse;font-size:13px'>"
-        "<tr style='background:#f6f8fa'><th align='left' style='padding:6px 8px'>Артикул</th>"
-        "<th align='left' style='padding:6px 8px'>Назва</th><th align='left' style='padding:6px 8px'>Було на DigiKey</th>"
-        "<th align='left' style='padding:6px 8px'>Стало</th><th align='right' style='padding:6px 8px'>Зміна</th>"
-        "<th align='left' style='padding:6px 8px'>Стан</th></tr>"
+        "<table width='100%' cellpadding='0' cellspacing='0' style='width:100%;border-collapse:collapse'>"
+        f"<tr><th align='left' style='{th}'>Товар</th><th align='right' style='{th}'>Кількість</th>"
+        f"<th align='right' style='{th}'>Було, {html.escape(cur)}</th><th align='right' style='{th}'>Стало, {html.escape(cur)}</th>"
+        f"<th align='left' style='{th}'>Зміна</th><th align='left' style='{th}'>Стан</th></tr>"
         + "".join(rows) + "</table>"
         f"<p style='margin:14px 0 0'><a href='{html.escape(url)}'>Відкрити звіт у Minerva</a></p></div>")
     subject = f"{title.split(' ', 1)[1] if ' ' in title else title} — #{run.pk}"

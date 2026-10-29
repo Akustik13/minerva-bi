@@ -181,7 +181,12 @@ class PushTests(PriceBase):
         self.assertEqual(self.l.dk_prices[0]["price"], 10.0)
         self.assertEqual(DigiKeyPriceLog.objects.get().user, "💲 anna")
         self.assertIn("ціни оновлено", self.tg.call_args[0][1])
-        self.assertIn("AN-1", mail.outbox[0].alternatives[0][0])
+        self.assertIn("10 шт: 8.00 → <b>9.00</b> EUR · ↑ +12.5 %", self.tg.call_args[0][1])   # кожен ступінь — рядок
+        html_mail = mail.outbox[0].alternatives[0][0]
+        self.assertIn("AN-1", html_mail)
+        self.assertIn("rowspan='2'", html_mail)                              # товар на 2 ступені
+        self.assertIn("↑ +17.65 %", html_mail)
+        self.assertIn("Було, EUR", html_mail)
 
         self.assertEqual(svc.verify()["checked"], 0)                        # ще не минула хвилина
         res = svc.verify(force=True)
