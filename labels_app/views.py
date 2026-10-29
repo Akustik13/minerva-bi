@@ -306,6 +306,23 @@ def antenna_label(request, sku):
 
 
 @staff_member_required
+def order_label(request, pk):
+    """Етикетка замовлення: номер (текст і штрихкод) і всі артикули з кількістю (labels_app/order_label.py)."""
+    from django.shortcuts import get_object_or_404
+    from labels_app import order_label as builder
+    from sales.models import SalesOrder
+    order = get_object_or_404(SalesOrder, pk=pk)
+    data = builder.build(order)
+    if not data['items']:
+        return HttpResponse(f'У замовленні {order.order_number} немає позицій з артикулом.', status=400,
+                            content_type='text/plain; charset=utf-8')
+    name = re.sub(r'[^\w.-]+', '_', order.order_number) or str(order.pk)
+    response = HttpResponse(builder.render(data).encode('utf-8'), content_type='application/octet-stream')
+    response['Content-Disposition'] = f'attachment; filename="Order-{name}.dymo"'
+    return response
+
+
+@staff_member_required
 def preview_cable_label(request):
     """GET ?part_no=CA-… → JSON with parsed label fields (for modal preview)."""
     from shipping.services.dymo_label_service import parse_part_number, label_lines

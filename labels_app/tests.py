@@ -2,6 +2,7 @@ import json
 import shutil
 import tempfile
 import xml.etree.ElementTree as ET
+from decimal import Decimal
 from pathlib import Path
 from unittest import mock
 
@@ -11,7 +12,7 @@ from django.utils import timezone
 
 from bots.models import DigiKeyConfig, DigiKeyListing
 from inventory.models import Product
-from labels_app import antenna
+from labels_app import antenna, order_label
 from labels_app import views as label_views
 from labels_app.models import LabelText
 from sales.models import SalesOrder, SalesSettings
@@ -347,3 +348,71 @@ class LabelViewsTests(TestCase):
         settings_obj.save()
         r = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
         self.assertContains(r, "SOURCE = 'file'")
+
+
+class OrderLabelTests(TestCase):
+    """Етикетка замовлення: номер (текст і штрихкод) і всі артикули з кількістю."""
+
+    def setUp(self):
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.get_or_create(pk=1)[0]
+        ss.is_onboarding_complete = True
+        ss.save()
+        self.user = User.objects.create_user("staff", password="x", is_staff=True, is_superuser=True)
+        self.client.force_login(self.user)
+        self.order = SalesOrder.objects.create(source="digikey", order_number="102497269")
+
+    def add(self, sku, qty, sku_raw=None):
+        from sales.models import SalesOrderLine
+        product = Product.objects.get_or_create(sku=sku, defaults={"name": sku})[0]
+        return SalesOrderLine.objects.create(order=self.order, product=product,
+                                             sku_raw=sku if sku_raw is None else sku_raw, qty=qty)
+
+    def test_label_lists_every_sku_with_quantity(self):
+        for sku, qty in (("AN220214-01A", 5), ("AN220215-01A", 4), ("AN220213-01C", 2), ("AN220203-02A", 4)):
+            self.add(sku, qty)
+        data = order_label.build(self.order)
+        self.assertEqual(data["summary"], "4 Pos. · 15 PCS")
+        self.assertEqual(data["font_size"], 10)
+        self.assertEqual(data["lines"], ["AN220214-01A × 5", "AN220215-01A × 4", "AN220213-01C × 2", "AN220203-02A × 4"])
+        xml = order_label.render(data)
+        root = ET.fromstring(xml.encode("utf-8"))
+        texts = [t.text for t in root.iter("Text")]
+        self.assertIn("Order: 102497269", texts)
+        self.assertIn("4 Pos. · 15 PCS", texts)
+        self.assertIn("AN220214-01A × 5", texts)
+        self.assertEqual([d.text for d in root.iter("DataString") if d.text], ["102497269"])
+        self.assertEqual(root.find(".//QRCodeObject"), None)
+        self.assertNotIn("{{", xml)
+        self.assertNotIn("Copyright", xml)
+
+    def test_same_sku_is_summed_and_ordered_sku_is_used(self):
+        self.add("AN220214-01A", 2, sku_raw="AN220203-02A")
+        self.add("AN220213-01C", Decimal("1.5"))
+        self.add("AN220203-02A", 3)
+        self.assertEqual(order_label.build(self.order)["items"], [("AN220203-02A", "5"), ("AN220213-01C", "1.5")])
+
+    def test_many_lines_go_to_columns_and_smaller_font(self):
+        rows = [(f"AN2202{n:02d}-01A", 1) for n in range(12)]
+        size, lines = order_label.layout(rows)
+        self.assertLess(size, 10)
+        self.assertLess(len(lines), 12)
+        self.assertTrue(all(len(line.split("   ")) >= 2 for line in lines[:-1]))
+        size, lines = order_label.layout([(f"AN2202{n:03d}-01A-LONG", 1) for n in range(200)])
+        self.assertEqual(size, 6)
+        self.assertRegex(lines[-1], r"\+\d+ more")
+
+    def test_download_and_buttons(self):
+        self.add("AN220214-01A", 5)
+        r = self.client.get(f"/labels/order/{self.order.pk}/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('filename="Order-102497269.dymo"', r["Content-Disposition"])
+        ET.fromstring(r.content)
+        r = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
+        self.assertContains(r, 'data-svl="order"')
+        r = self.client.get("/admin/sales/salesorder/")          # картки рендеряться завжди, перемикає JS
+        self.assertContains(r, f'data-svl="order" data-order="{self.order.pk}" data-sku="102497269"')
+
+    def test_order_without_lines(self):
+        self.assertEqual(self.client.get(f"/labels/order/{self.order.pk}/").status_code, 400)
+        self.assertEqual(self.client.get("/labels/order/999999/").status_code, 404)

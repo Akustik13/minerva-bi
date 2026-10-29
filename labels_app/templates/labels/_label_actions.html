@@ -1,6 +1,7 @@
 {# Кнопки етикеток DYMO: клік — дія з «Налаштування продажів → Звідки брати етикетку DYMO», #}
 {# правий клік — меню «з бази / згенерувати»; вікно перевірки етикетки антени (labels_app/antenna.py). #}
 {# Кнопка: data-svl="antenna|cable|" data-sku data-qty | data-qty-input data-order data-file="1" data-svl-act="print|download|check" #}
+{# Етикетка замовлення: data-svl="order" data-order=<pk> data-sku=<номер замовлення> (labels_app/order_label.py) #}
 <style>
 .svl-menu{position:fixed;z-index:10001;min-width:250px;background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.45);padding:5px 0;font-size:13px}
 .svl-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--text,#c9d8e4);padding:8px 14px;cursor:pointer;font-size:13px;white-space:nowrap}
@@ -107,8 +108,14 @@
       })
       .catch(function (e) { alert('Помилка мережі: ' + e); });
   }
+  // Етикетка замовлення — завжди з даних замовлення, без вікна перевірки
+  function orderLabel(o, act) {
+    var url = '/labels/order/' + encodeURIComponent(o.order) + '/', name = 'Order-' + o.sku;
+    if (act === 'download') download(url, name); else open(url, name, 1);
+  }
   function run(o, act) {
     act = act || o.act;
+    if (o.kind === 'order') return orderLabel(o, act);
     if (act === 'check') return generate(o, 'check');
     if (o.kind && (SOURCE === 'generate' || !o.file)) return generate(o, act);
     if (o.file) return fromFile(o, act);
@@ -125,11 +132,14 @@
     // «· клік» — те, що ця кнопка робить звичайним кліком (run)
     var defGen = o.kind && (SOURCE === 'generate' || !o.file);
     var dl = o.act === 'download', chk = o.act === 'check';
-    var items = [
+    var items = o.kind === 'order' ? [
+      {t: '🖨️ Друкувати етикетку замовлення', def: !dl, f: function () { orderLabel(o, 'print'); }},
+      {t: '⬇️ Завантажити етикетку замовлення', def: dl, f: function () { orderLabel(o, 'download'); }},
+    ] : [
       {t: '📄 Завантажити з бази' + (o.file ? '' : ' — файлу немає'), dis: !o.file, def: !defGen && dl,
        f: function () { fromFile(o, 'download'); }},
     ];
-    if (o.kind) {
+    if (o.kind && o.kind !== 'order') {
       items.push({t: '🧩 Згенерувати наклейку й завантажити', def: defGen && dl,
                   f: function () { generate(o, 'download'); }});
       items.push({t: '🖨️ Згенерувати й друкувати', def: defGen && !dl && !chk, f: function () { generate(o, 'print'); }});
@@ -145,7 +155,9 @@
     });
     var foot = document.createElement('div');
     foot.className = 'svl-foot';
-    foot.innerHTML = 'Клік: ' + esc(SOURCE_TEXT) + ' · <a href="/admin/sales/salessettings/" target="_blank">змінити</a>';
+    foot.innerHTML = o.kind === 'order'
+      ? 'Номер замовлення, штрихкод і всі артикули з кількістю · друк — як <a href="/admin/sales/salessettings/" target="_blank">«🖨️ Друкувати»</a>'
+      : 'Клік: ' + esc(SOURCE_TEXT) + ' · <a href="/admin/sales/salessettings/" target="_blank">змінити</a>';
     m.appendChild(foot);
     document.body.appendChild(m);
     var x = Math.min(ev.clientX, window.innerWidth - m.offsetWidth - 8);

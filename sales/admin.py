@@ -2342,7 +2342,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '<th style="padding:10px;text-align:center">К-сть</th>'
             '<th style="padding:10px;text-align:left">Дія</th>'
             '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
-            '<div style="margin-top:12px">'
+            '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
+            + format_html(
+                '<button type="button" data-svl="order" data-order="{}" data-sku="{}" data-svl-act="print" '
+                'title="Номер замовлення, штрихкод і всі артикули з кількістю · правий клік — меню" '
+                'style="background:#1976d2;color:#fff;border:none;padding:8px 18px;'
+                'border-radius:7px;cursor:pointer;font-size:13px;font-weight:600">'
+                '🏷️ Етикетка замовлення</button>', obj.pk, obj.order_number) +
             '<button type="button" onclick="svShowAllLabels()" '
             'style="background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4);'
             'border:1px solid var(--border-color,#333);padding:8px 18px;'

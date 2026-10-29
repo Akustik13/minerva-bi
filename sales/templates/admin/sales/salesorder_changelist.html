@@ -550,6 +550,18 @@ document.addEventListener('DOMContentLoaded', function () {
         📝{% if order.internal_note %} {{ order.internal_note|truncatechars:22 }}{% endif %}
       </button>
 
+      {# Етикетка замовлення DYMO: номер + усі артикули з кількістю (labels/_label_actions.html, правий клік — меню) #}
+      {% if order.lines.all %}
+      <button type="button" data-svl="order" data-order="{{ order.pk }}" data-sku="{{ order.order_number }}"
+              data-svl-act="print"
+              title="{% trans "Етикетка замовлення: номер, штрихкод і всі артикули з кількістю · правий клік — меню" %}"
+              style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;
+                     background:var(--bg-hover);color:var(--text-dim);border:1px solid var(--border-strong);
+                     cursor:pointer;white-space:nowrap;font-family:inherit;line-height:1.3">
+        🏷️ {% trans "Етикетка замовлення" %}
+      </button>
+      {% endif %}
+
       {# Expand button — rightmost in footer #}
       <button type="button" class="sv-cex-btn" id="sv-cex-btn-{{ order.pk }}"
               onclick="svCardExpand(this, {{ order.pk }})" title="{% trans "Документи та деталі" %}">⛶</button>

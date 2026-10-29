@@ -15,4 +15,5 @@ urlpatterns = [
     path('antenna/check/',              views.antenna_check,         name='antenna_check'),
     path('antenna/save/',               views.antenna_save,          name='antenna_save'),
     path('antenna/<str:sku>/',          views.antenna_label,         name='antenna'),
+    path('order/<int:pk>/',             views.order_label,           name='order'),
 ]
