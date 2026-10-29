@@ -383,9 +383,10 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
         errors = format_html_join("", '<li><a href="{}" target="_blank">{}</a>: {}</li>',
                                   ((f"/rag/knowledge/{f.obj_id}/" if f.doc_type == "document" else f"/email/message/{f.obj_id}/",
                                     f.document_id, f.error) for f in failed if f.status_revision == f.revision))
-        return format_html('<table>{}</table>{}', table,
+        return format_html('<table>{}</table>{}<div style="margin-top:8px"><a class="button" href="{}">'
+                           '📊 Огляд бази знань — що є, що в RAG і чому ні</a></div>', table,
                            format_html('<div style="margin-top:8px"><b>Останні помилки RAG:</b><ul>{}</ul></div>', errors)
-                           if errors else "")
+                           if errors else "", reverse("admin:rag_assistant_knowledgesettings_overview"))
 
     @admin.display(description="Стан документів")
     def documents_panel(self, obj):
@@ -456,7 +457,23 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
             path("feedkey/", self.admin_site.admin_view(self.feedkey_view), name="rag_assistant_knowledgesettings_feedkey"),
             path("live/", self.admin_site.admin_view(self.live_view), name="rag_assistant_knowledgesettings_live"),
             path("pause/", self.admin_site.admin_view(self.pause_view), name="rag_assistant_knowledgesettings_pause"),
+            path("overview/", self.admin_site.admin_view(self.overview_view),
+                 name="rag_assistant_knowledgesettings_overview"),
         ] + super().get_urls()
+
+    def overview_view(self, request):
+        """«📊 Огляд бази знань»: що є, що в RAG, що чекає, що не вдалося і чому (rag_assistant/knowledge_overview.py)."""
+        from django.template.response import TemplateResponse
+
+        from . import knowledge_overview
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        return TemplateResponse(request, "admin/rag_assistant/knowledge_overview.html", {
+            **self.admin_site.each_context(request), "title": "📊 Огляд бази знань",
+            "ov": knowledge_overview.build(request.user), "opts": self.model._meta,
+            "settings_url": reverse("admin:rag_assistant_knowledgesettings_changelist"),
+            "sources_url": reverse("admin:rag_assistant_knowledgesource_changelist"),
+            "items_url": reverse("admin:rag_assistant_knowledgeitem_changelist")})
 
     def live_view(self, request):
         """JSON для живої панелі. ?probe=1 — також оновити capabilities RAG (кеш 60 с і запобіжник діють)."""
@@ -627,8 +644,16 @@ class KnowledgeItemAdmin(admin.ModelAdmin):
         return item_json(obj, None)["rag"]
 
 
+import logging  # noqa: E402
+import os  # noqa: E402
+from urllib.parse import urlparse  # noqa: E402
+
+from django.conf import settings  # noqa: E402
+
 from . import knowledge_sources  # noqa: E402
 from .models import KnowledgeSource  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeSourceForm(forms.ModelForm):
@@ -639,23 +664,60 @@ class KnowledgeSourceForm(forms.ModelForm):
 
     class Meta:
         model = KnowledgeSource
-        fields = ["name", "kind", "path", "url", "recursive", "max_files", "max_file_mb", "rescan_hours", "enabled",
-                  "visibility", "customer", "project", "product", "link_products_by_sku"]
+        fields = ["name", "kind", "path", "url", "follow_links", "recursive", "max_files", "max_file_mb", "rescan_hours",
+                  "enabled", "visibility", "customer", "project", "product", "link_products_by_sku"]
+        widgets = {"url": forms.Textarea(attrs={
+            "rows": 4, "cols": 90,
+            "placeholder": "https://docs.example.com/sitemap.xml\nhttps://example.com/produkte/antenne\n"
+                           "https://example.com/datenblatt.pdf"})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["name"].required = False
+        self.fields["name"].help_text = "Порожньо — назва папки або сайту"
+        if "path" in self.fields:
+            self.fields["path"].help_text = (
+                "Порожньо — Minerva створить свою папку (MEDIA/knowledge_sources/<назва>), а файли ви завантажите з ПК "
+                "тут же. Або шлях усередині Minerva, напр. /app/knowledge_sources/Dokumentation — лише в дозволених "
+                "коренях (список і як підключити папку NAS — нижче).")
         if self.instance and self.instance.pk:
             self.fields["file_types_text"].initial = ", ".join(self.instance.file_types or [])
 
     def clean(self):
         d = super().clean()
+        name = (d.get("name") or "").strip()
         if d.get("kind") == KnowledgeSource.FOLDER:
-            try:
-                knowledge_sources.check_folder((d.get("path") or "").strip())
-            except knowledge_sources.SourceError as e:
-                self.add_error("path", str(e))
-        elif not d.get("url"):
-            self.add_error("url", "Вкажіть адресу sitemap.xml або сторінки сайту")
+            path = (d.get("path") or "").strip()
+            if "path" not in self.fields:                     # папку створила Minerva — шлях не змінюється
+                pass
+            elif path:
+                try:
+                    knowledge_sources.check_folder(path)
+                except knowledge_sources.SourceError as e:
+                    self.add_error("path", str(e))
+                name = name or os.path.basename(path.rstrip("/\\"))
+            elif not name:
+                self.add_error("name", "Вкажіть назву — так Minerva назве свою папку для файлів")
+            else:
+                base = os.path.join(str(settings.MEDIA_ROOT), "knowledge_sources")
+                try:
+                    os.makedirs(base, exist_ok=True)
+                except OSError:
+                    pass
+                if not os.access(base, os.W_OK):
+                    self.add_error("path", f"Minerva не може писати в {base} — вкажіть готову папку")
+        else:
+            lines = list(dict.fromkeys(line.strip() for line in (d.get("url") or "").splitlines() if line.strip()))
+            bad = [u for u in lines if urlparse(u).scheme not in ("http", "https") or not urlparse(u).hostname]
+            if not lines:
+                self.add_error("url", "Вкажіть хоча б одне посилання: sitemap.xml, сторінку сайту або файл")
+            elif bad:
+                self.add_error("url", "Не схоже на адресу http(s)://…: " + ", ".join(bad[:3]))
+            elif len(lines) > LINKS_MAX:
+                self.add_error("url", f"Не більше {LINKS_MAX} посилань в одному джерелі")
+            d["url"] = "\n".join(lines)
+            name = name or (urlparse(lines[0]).hostname if lines and not bad else "")
+        d["name"] = name[:200]
         return d
 
     def save(self, commit=True):
@@ -668,46 +730,122 @@ class KnowledgeSourceForm(forms.ModelForm):
         return obj
 
 
+LINKS_MAX = 200
+FILES_SHOWN = 300
+
+
 @admin.register(KnowledgeSource)
 class KnowledgeSourceAdmin(admin.ModelAdmin):
-    """Папки й сайти, які Minerva сама обходить і передає в базу знань (rag_assistant/knowledge_sources.py)."""
+    """Папки й сайти, які Minerva сама обходить і передає в базу знань (rag_assistant/knowledge_sources.py);
+    у папку — «📤 Завантажити файли / папку» з ПК."""
     form = KnowledgeSourceForm
+    change_form_template = "admin/rag_assistant/knowledgesource/change_form.html"
     list_display = ["name", "kind", "where_col", "enabled", "docs_col", "last_col"]
     list_filter = ["kind", "enabled"]
     raw_id_fields = ["customer", "project", "product"]
-    readonly_fields = ["roots_help", "state_panel"]
+    readonly_fields = ["roots_help", "upload_panel", "state_panel", "files_panel"]
     actions = ["scan_action"]
     fieldsets = [
-        (None, {"fields": ["name", "kind", "path", "url", "roots_help", "enabled"]}),
+        (None, {"fields": ["name", "kind", "path", "url", "follow_links", "roots_help", "enabled"]}),
+        ("📤 Файли з ПК", {"fields": ["upload_panel"], "classes": ["ks-folder-only"]}),
         ("Що брати", {"fields": ["file_types_text", "recursive", "max_files", "max_file_mb", "rescan_hours"]}),
         ("Хто бачить і до чого прив'язати", {"fields": ["visibility", "customer", "project", "product",
                                                          "link_products_by_sku"]}),
-        ("Стан", {"fields": ["state_panel"]}),
+        ("Стан", {"fields": ["state_panel", "files_panel"]}),
     ]
 
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        return fields + ["path"] if obj is not None and obj.managed else fields
+
+    def get_queryset(self, request):
+        """🔒 «лише я» — бачить лише той, хто додав (і суперкористувач)."""
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(~Q(visibility=KnowledgeSource.PRIVATE) | Q(owner=request.user))
+
     def get_urls(self):
-        return [path("<int:pk>/scan/", self.admin_site.admin_view(self.scan_view),
-                     name="rag_assistant_knowledgesource_scan")] + super().get_urls()
+        view = self.admin_site.admin_view
+        return [path("<int:pk>/scan/", view(self.scan_view), name="rag_assistant_knowledgesource_scan"),
+                path("<int:pk>/upload/", view(self.upload_view), name="rag_assistant_knowledgesource_upload"),
+                path("<int:pk>/status/", view(self.status_view), name="rag_assistant_knowledgesource_status"),
+                path("<int:pk>/delete-file/", view(self.delete_file_view),
+                     name="rag_assistant_knowledgesource_delete_file")] + super().get_urls()
 
     def save_model(self, request, obj, form, change):
         if not change:
             obj.owner = request.user
+        if obj.kind == KnowledgeSource.FOLDER and not obj.path:
+            obj.path, obj.managed = knowledge_sources.new_folder(obj.name), True
         super().save_model(request, obj, form, change)
         knowledge_sources.start_scan(obj)          # одразу після збереження — перевірити (у фоні)
-        messages.info(request, "Перевірку джерела запущено у фоні — стан оновиться за хвилину.")
+        if not obj.managed or obj.items.exists():
+            messages.info(request, "Перевірку джерела запущено у фоні — стан оновиться за хвилину.")
+
+    def response_add(self, request, obj, post_url_continue=None):
+        if obj.managed and "_addanother" not in request.POST:
+            messages.success(request, f"Папку створено: {obj.path}. Тепер завантажте файли з ПК — «📤 Завантажити файли».")
+            return redirect(reverse("admin:rag_assistant_knowledgesource_change", args=[obj.pk]))
+        return super().response_add(request, obj, post_url_continue)
 
     def delete_model(self, request, obj):
         obj.delete()                               # документи джерела → tombstone (сигнал post_delete)
 
+    def _source(self, request, pk, change=True):
+        source = self.get_queryset(request).filter(pk=pk).first()
+        allowed = source is not None and (self.has_change_permission(request, source) if change
+                                          else self.has_view_permission(request, source))
+        if not allowed:
+            raise PermissionDenied
+        return source
+
     def scan_view(self, request, pk):
-        source = KnowledgeSource.objects.filter(pk=pk).first()
-        if source is None or request.method != "POST" or not self.has_change_permission(request, source):
+        source = self._source(request, pk)
+        if request.method != "POST":
             raise PermissionDenied
         if knowledge_sources.start_scan(source):
             messages.success(request, f"«{source.name}»: перевірку запущено у фоні.")
         else:
             messages.warning(request, f"«{source.name}»: перевірка вже йде.")
         return redirect(reverse("admin:rag_assistant_knowledgesource_change", args=[pk]))
+
+    def upload_view(self, request, pk):
+        """POST (multipart: file, relpath, subfolder, replace) — один файл з ПК у папку джерела;
+        {action: done} — усі файли надіслано → перевірити джерело (зараз або одразу після поточної перевірки)."""
+        source = self._source(request, pk)
+        if request.method != "POST":
+            return JsonResponse({"ok": False, "error": "Потрібен POST"}, status=405)
+        if request.POST.get("action") == "done":
+            return JsonResponse({"ok": True, "scan": knowledge_sources.request_scan(source)})
+        upload = request.FILES.get("file")
+        if upload is None:
+            return JsonResponse({"ok": False, "error": "Виберіть файл"}, status=400)
+        try:
+            result = knowledge_sources.save_upload(
+                source, upload, relpath=request.POST.get("relpath", ""), subfolder=request.POST.get("subfolder", ""),
+                replace=request.POST.get("replace") == "1")
+        except knowledge_sources.SourceError as e:
+            return JsonResponse({"ok": False, "name": upload.name, "error": str(e)})
+        logger.info("knowledge source %s: %s uploaded %s (%s)", source.pk, request.user, result["path"], result["status"])
+        return JsonResponse({"ok": True, **result})
+
+    def status_view(self, request, pk):
+        source = self._source(request, pk, change=False)
+        return JsonResponse({"running": knowledge_sources.running(source), "documents": source.items.count(),
+                             "last": source.last_scan_result, "error": source.last_error})
+
+    def delete_file_view(self, request, pk):
+        source = self._source(request, pk)
+        if request.method != "POST":
+            return JsonResponse({"ok": False, "error": "Потрібен POST"}, status=405)
+        rel = request.POST.get("path", "")
+        try:
+            removed = knowledge_sources.delete_file(source, rel)
+        except knowledge_sources.SourceError as e:
+            return JsonResponse({"ok": False, "error": str(e)})
+        logger.info("knowledge source %s: %s deleted %s", source.pk, request.user, rel)
+        return JsonResponse({"ok": True, "removed": removed})
 
     @admin.action(description="🔄 Перевірити зараз")
     def scan_action(self, request, queryset):
@@ -716,7 +854,10 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
 
     @admin.display(description="Де")
     def where_col(self, obj):
-        return obj.path if obj.kind == KnowledgeSource.FOLDER else obj.url
+        if obj.kind == KnowledgeSource.FOLDER:
+            return format_html("📤 {}", obj.path) if obj.managed else obj.path
+        links = knowledge_sources.links_of(obj)
+        return (links[0] + (f" + ще {len(links) - 1}" if len(links) > 1 else "")) if links else "—"
 
     @admin.display(description="Документів")
     def docs_col(self, obj):
@@ -736,12 +877,25 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
     def roots_help(self, obj):
         roots = format_html_join("", "<li><code>{}</code></li>", ((r,) for r in knowledge_sources.allowed_roots()))
         return format_html(
-            '<div style="max-width:760px">Minerva читає лише папки в цих коренях (файли не копіює):<ul>{}</ul>'
-            'Найпростіше — покласти або скопіювати документи в <code>knowledge_sources</code> у теці Minerva на NAS '
-            '(<code>/volume1/docker/tabele_mvp/knowledge_sources/…</code>): у Docker вона вже видна як '
+            '<div style="max-width:760px">Найпростіше — залишити «Папка» порожньою: Minerva створить свою папку, а '
+            'файли й цілі папки ви завантажите з ПК кнопками «📤» нижче.<br>Готові папки Minerva читає лише в цих '
+            'коренях (файли не копіює):<ul>{}</ul>Можна покласти документи в <code>knowledge_sources</code> у теці '
+            'Minerva на NAS (<code>/volume1/docker/tabele_mvp/knowledge_sources/…</code>): у Docker вона вже видна як '
             '<code>/app/knowledge_sources/…</code>.<br>Іншу папку NAS — змонтувати в <code>docker-compose.yml</code> '
             '(сервіси web і cron, напр. <code>- /volume1/Office/Dokumentation:/knowledge/dokumentation:ro</code>) '
             'і додати <code>MINERVA_KNOWLEDGE_ROOTS: "/knowledge"</code> у environment.</div>', roots)
+
+    @admin.display(description="Завантажити")
+    def upload_panel(self, obj):
+        if not obj or not obj.pk:
+            return "Після збереження тут можна буде завантажити файли й папки з ПК."
+        if obj.kind != KnowledgeSource.FOLDER:
+            return "—"
+        types = sorted(knowledge_sources._types(obj))
+        return render_to_string("admin/rag_assistant/knowledgesource/upload_panel.html", {
+            "source": obj, "types": types, "accept": ",".join("." + t for t in types),
+            "upload_url": reverse("admin:rag_assistant_knowledgesource_upload", args=[obj.pk]),
+            "status_url": reverse("admin:rag_assistant_knowledgesource_status", args=[obj.pk])})
 
     @admin.display(description="Стан")
     def state_panel(self, obj):
@@ -757,7 +911,25 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
             '<div>{}</div><div style="margin-top:4px">Документів: <b>{}</b> · передано в базу знань: <b>{}</b> · '
             'у RAG: <b>{}</b> · помилки / пропущено: {} / {}</div>'
             '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formmethod="post">'
-            '🔄 Перевірити зараз</button></div>',
+            '🔄 Перевірити зараз</button> <a class="button" href="{}">📊 Огляд бази знань</a></div>',
             self.last_col(obj), len(ids), sum(states.values()), states.get("indexed", 0), states.get("failed", 0),
-            states.get("skipped", 0), scan_url)
+            states.get("skipped", 0), scan_url, reverse("admin:rag_assistant_knowledgesettings_overview"))
 
+    @admin.display(description="Документи джерела")
+    def files_panel(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        from . import retrieval
+        from .models import KnowledgeDoc
+        from .views_entity import rag_text
+        items = list(obj.items.order_by("source_path")[:FILES_SHOWN])
+        docs = {d.obj_id: d for d in KnowledgeDoc.objects.filter(doc_type="document", obj_id__in=[i.pk for i in items])}
+        supported = retrieval.documents_supported()
+        rows = [{"item": i, "rag": rag_text(i, docs.get(i.pk), supported),
+                 "ok": getattr(docs.get(i.pk), "current_state", "") == "indexed" and supported,
+                 "size_kb": max(1, round(i.file_size / 1024)) if i.file_size else 0} for i in items]
+        return render_to_string("admin/rag_assistant/knowledgesource/files_panel.html", {
+            "source": obj, "rows": rows, "total": obj.items.count(), "shown": FILES_SHOWN,
+            "can_delete": obj.managed and obj.kind == KnowledgeSource.FOLDER,
+            "delete_url": reverse("admin:rag_assistant_knowledgesource_delete_file", args=[obj.pk]),
+            "all_url": reverse("admin:rag_assistant_knowledgeitem_changelist") + f"?knowledge_source__id__exact={obj.pk}"})

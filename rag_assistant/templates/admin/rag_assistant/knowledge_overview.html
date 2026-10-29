@@ -1,0 +1,158 @@
+{% extends "admin/base_site.html" %}
+{# «📊 Огляд бази знань»: дані — knowledge_overview.build(user), лише читання #}
+{% block extrastyle %}{{ block.super }}
+<style>
+  #kov { max-width: 1100px; }
+  #kov .kov-tiles { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 14px; }
+  #kov .kov-tile { flex: 1 1 180px; border: 1px solid var(--hairline-color, #ddd); border-radius: 8px; padding: 10px 14px; }
+  #kov .kov-tile .n { font-size: 26px; font-weight: 700; line-height: 1.2; }
+  #kov .kov-tile .l { color: var(--body-quiet-color, #888); font-size: 13px; }
+  #kov .kov-tile.ok .n { color: #4caf50; }
+  #kov .kov-tile.wait .n { color: #f0a020; }
+  #kov .kov-tile.bad .n { color: #e57373; }
+  #kov .kov-state { margin: 0 0 14px; line-height: 1.7; }
+  #kov .kov-state .warn { color: #e57373; font-weight: 600; }
+  #kov h2 { margin: 22px 0 6px; font-size: 18px; }
+  #kov h3 { margin: 14px 0 4px; font-size: 14px; }
+  #kov .kov-bar { height: 10px; border-radius: 5px; background: var(--darkened-bg, #eee); overflow: hidden; margin: 4px 0 8px;
+                  max-width: 520px; }
+  #kov .kov-bar > div { height: 100%; background: #4caf50; }
+  #kov table { border-collapse: collapse; margin: 4px 0 8px; }
+  #kov th, #kov td { padding: 3px 14px 3px 0; text-align: left; border: 0; border-bottom: 1px solid var(--hairline-color, #eee);
+                     vertical-align: top; }
+  #kov td.n, #kov th.n { text-align: right; white-space: nowrap; }
+  #kov .quiet { color: var(--body-quiet-color, #888); }
+  #kov .flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 4px 0 8px; }
+  #kov .flow b { font-size: 16px; }
+  #kov .flow .arr { color: var(--body-quiet-color, #888); }
+  #kov ul.kov-why { margin: 2px 0 8px; padding-left: 18px; }
+  #kov ul.kov-why li { list-style: disc; margin: 2px 0; }
+  #kov .kov-links { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+  @media (max-width: 700px) { #kov table { display: block; overflow-x: auto; } }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Головна</a> › <a href="{{ settings_url }}">🧠 База знань</a> › Огляд</div>
+{% endblock %}
+
+{% block content %}
+{% with r=ov.rag m=ov.mail d=ov.documents t=ov.totals %}
+<div id="kov">
+  <div class="kov-tiles">
+    <div class="kov-tile"><div class="n">{{ t.items }}</div><div class="l">передано в базу знань (листів {{ m.fed }} · документів {{ d.fed }})</div></div>
+    <div class="kov-tile ok"><div class="n">{{ t.indexed }}</div><div class="l">✓ у RAG — {{ t.pct }}%</div></div>
+    <div class="kov-tile wait"><div class="n">{{ t.pending }}</div><div class="l">⏳ чекають RAG</div></div>
+    <div class="kov-tile bad"><div class="n">{{ t.failed }} / {{ t.skipped }}</div><div class="l">⚠️ помилки / пропущено (немає тексту)</div></div>
+  </div>
+
+  <div class="kov-state">
+    Індексація: {% if r.enabled %}<b>увімкнена</b>{% else %}<span class="warn">вимкнена</span> — нове в RAG не йде{% endif %}
+    {% if r.paused %} · <span class="warn">⏸ пауза</span>{% endif %}
+    · назва сервера для RAG: {% if r.instance %}<code>{{ r.instance }}</code>{% else %}<span class="warn">не задано</span>{% endif %}
+    · RAG востаннє звертався: {% if r.last_call_at %}{{ r.last_call_at|date:"d.m.Y H:i" }}{% if r.silent %} <span class="warn">(давно мовчить)</span>{% endif %}{% else %}<span class="warn">ще ні</span>{% endif %}
+    · документи: {% if r.documents_supported %}RAG забирає{% else %}<span class="warn">RAG ще не забирає (потрібне оновлення RAG-ПК)</span>{% endif %}
+    <div class="quiet">Станом на {{ ov.built_at|date:"d.m.Y H:i" }}. Minerva вирішує, що передати; RAG сам забирає й звітує, що проіндексував.</div>
+  </div>
+
+  <h2>✉️ Листи</h2>
+  <div class="flow">
+    <span>у Minerva <b>{{ m.total }}</b></span><span class="arr">→</span>
+    <span>за правилами можна передати <b>{{ m.admitted }}</b></span><span class="arr">→</span>
+    <span>передано <b>{{ m.fed }}</b></span><span class="arr">→</span>
+    <span>у RAG <b>{{ m.indexed }}</b></span>
+    {% if m.pending %}<span class="quiet">· чекають {{ m.pending }}</span>{% endif %}
+    {% if m.failed or m.skipped %}<span class="quiet">· помилки {{ m.failed }} · пропущено {{ m.skipped }}</span>{% endif %}
+  </div>
+  <div class="kov-bar"><div style="width:{{ m.pct }}%"></div></div>
+  {% if m.not_admitted %}
+  <h3>Що не передається і чому</h3>
+  <ul class="kov-why">
+    {% for x in m.not_admitted %}<li>{{ x.label }} — <b>{{ x.count }}</b>{% if x.hint %} <span class="quiet">({{ x.hint }})</span>{% endif %}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <h3>За скриньками</h3>
+  <table>
+    <tr><th>Скринька</th><th>Власник</th><th class="n">Листів</th><th class="n">Можна передати</th><th class="n">Передано</th><th class="n">У RAG</th><th></th></tr>
+    {% for a in m.by_account %}
+    <tr><td>{{ a.name }}{% if not a.active %} <span class="quiet">(неактивна)</span>{% elif not a.selected %} <span class="quiet">(не вибрана)</span>{% endif %}</td>
+      <td>{{ a.owner|default:"—" }}</td><td class="n">{{ a.total }}</td><td class="n">{{ a.admitted }}</td><td class="n">{{ a.fed }}</td>
+      <td class="n">{{ a.indexed }}</td><td class="n quiet">{% if a.admitted %}{{ a.pct }}%{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="7" class="quiet">Скриньок немає</td></tr>
+    {% endfor %}
+  </table>
+
+  {% if m.by_category %}
+  <h3>За категоріями (з тих, що можна передати)</h3>
+  <table>
+    <tr><th>Категорія</th><th class="n">Можна передати</th><th class="n">У RAG</th><th></th></tr>
+    {% for c in m.by_category %}
+    <tr><td>{{ c.label }}</td><td class="n">{{ c.admitted }}</td><td class="n">{{ c.indexed }}</td><td class="n quiet">{{ c.pct }}%</td></tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  <h3>Вкладення листів</h3>
+  {% with at=m.attachments %}
+  <div>У RAG — <b>{{ at.indexed }}</b>{% if at.failed %} · помилки — {{ at.failed }}{% endif %}{% if at.unknown_docs %}
+    <span class="quiet">· листів, по яких RAG не звітував про вкладення (проіндексовано раніше): {{ at.unknown_docs }}</span>{% endif %}</div>
+  {% if at.not_indexed %}
+  <ul class="kov-why">{% for label, n in at.not_indexed %}<li>не індексуються: {{ label }} — <b>{{ n }}</b></li>{% endfor %}</ul>
+  {% endif %}
+  {% endwith %}
+
+  <h2>📎 Документи й посилання</h2>
+  {% if not d.supported %}<div class="kov-state"><span class="warn">RAG ще не забирає документи</span> — Minerva їх готує, а в пошук вони потраплять після оновлення RAG-ПК.</div>{% endif %}
+  <div class="flow">
+    <span>у Minerva <b>{{ d.total }}</b></span><span class="arr">→</span>
+    <span>передано <b>{{ d.fed }}</b></span><span class="arr">→</span>
+    <span>у RAG <b>{{ d.indexed }}</b></span>
+    {% if d.pending %}<span class="quiet">· чекають {{ d.pending }}</span>{% endif %}
+    {% if d.failed or d.skipped %}<span class="quiet">· помилки {{ d.failed }} · пропущено {{ d.skipped }}</span>{% endif %}
+  </div>
+  <div class="kov-bar"><div style="width:{{ d.pct }}%"></div></div>
+  {% if d.kinds %}
+  <table>
+    <tr><th>Вид</th><th class="n">Усього</th><th class="n">Передано</th><th class="n">У RAG</th><th class="n">Чекають</th><th class="n">Помилки / пропущено</th></tr>
+    {% for k in d.kinds %}
+    <tr><td>{{ k.label }}</td><td class="n">{{ k.total }}</td><td class="n">{{ k.fed }}</td><td class="n">{{ k.indexed }}</td>
+      <td class="n">{{ k.pending }}</td><td class="n">{{ k.failed }} / {{ k.skipped }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<div class="quiet">Документів ще немає — додайте їх у картках («📎 Документи й посилання») або через «📂 Джерела знань».</div>{% endif %}
+  {% if d.not_fed %}
+  <h3>Що не передається і чому</h3>
+  <ul class="kov-why">{% for x in d.not_fed %}<li>{{ x.label }} — <b>{{ x.count }}</b></li>{% endfor %}</ul>
+  {% endif %}
+
+  <h3>📂 Джерела знань</h3>
+  {% if d.sources %}
+  <table>
+    <tr><th>Джерело</th><th>Остання перевірка</th><th class="n">Документів</th><th class="n">Передано</th><th class="n">У RAG</th></tr>
+    {% for s in d.sources %}
+    <tr><td><a href="{% url 'admin:rag_assistant_knowledgesource_change' s.source.pk %}">{% if s.source.kind == "folder" %}📁{% else %}🌐{% endif %} {{ s.source.name }}</a>{% if not s.source.enabled %} <span class="quiet">(вимкнено)</span>{% endif %}</td>
+      <td>{% if s.source.last_error %}<span style="color:#e57373">⚠️ {{ s.source.last_error }}</span>{% else %}<span class="quiet">{{ s.source.last_scan_result|default:"ще не було" }}</span>{% endif %}</td>
+      <td class="n">{{ s.total }}</td><td class="n">{{ s.fed }}</td><td class="n">{{ s.indexed }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<div class="quiet">Джерел ще немає — папку з файлами з ПК або сайт за посиланнями можна додати в «📂 Джерела знань».</div>{% endif %}
+
+  <h2>⚠️ Останні помилки RAG</h2>
+  {% if ov.failures %}
+  <table>
+    {% for f in ov.failures %}
+    <tr><td>{{ f.kind }}</td><td>{% if f.url %}<a href="{{ f.url }}" target="_blank">{{ f.title }}</a>{% else %}{{ f.title }}{% endif %}</td>
+      <td>{{ f.state }}{% if f.error %}: {{ f.error }}{% endif %}</td><td class="quiet">{{ f.at|date:"d.m.Y H:i" }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<div class="quiet">Помилок немає.</div>{% endif %}
+
+  <div class="kov-links">
+    <a class="button" href="{{ settings_url }}">🧠 База знань — налаштування</a>
+    <a class="button" href="{{ sources_url }}">📂 Джерела знань</a>
+    <a class="button" href="{{ items_url }}">📎 Документи бази знань</a>
+  </div>
+</div>
+{% endwith %}
+{% endblock %}

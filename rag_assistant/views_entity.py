@@ -62,6 +62,23 @@ def entity_latest(request, kind, pk):
 
 # ── 📎 Документи й посилання картки (knowledge_items.py) ─────────────────────
 
+def rag_text(item, doc, supported) -> str:
+    """Стан документа в RAG людською мовою (doc — його KnowledgeDoc або None)."""
+    if item.url and not item.fetched_at and not item.fetch_error and not item.file:
+        return "⏳ Minerva завантажує сторінку…"
+    if doc is None or not doc.fed:
+        return "не в базі знань (індексацію вимкнено або немає тексту)"
+    if not supported:
+        return "чекає: RAG ще не приймає документи (потрібне оновлення RAG-ПК)"
+    rag = {"indexed": "✓ у RAG", "failed": f"✗ RAG: {doc.error or 'помилка'}", "skipped": "RAG пропустив (немає тексту)",
+           "pending": "⏳ чекає RAG", "deleted": "прибрано"}.get(doc.current_state, doc.current_state)
+    file_report = (doc.attachments or [None])[0] if doc.current_state == "indexed" else None
+    if file_report and file_report["state"] != "indexed":     # опис / сторінка в RAG, а текст файлу — ні
+        from .knowledge import ATTACHMENT_LABELS
+        rag += " · файл: " + ATTACHMENT_LABELS.get(file_report["reason"], file_report["reason"] or "не прочитано")
+    return rag
+
+
 def item_json(item, user, supported=None) -> dict:
     """Документ для блоку «📎 Документи й посилання»: що це, хто бачить, стан у RAG."""
     from django.utils import timezone
@@ -70,19 +87,7 @@ def item_json(item, user, supported=None) -> dict:
     from .models import KnowledgeDoc
     doc = KnowledgeDoc.objects.filter(doc_type=knowledge_items.DOC_TYPE, obj_id=item.pk).first()
     supported = retrieval.documents_supported() if supported is None else supported
-    if item.url and not item.fetched_at and not item.fetch_error and not item.file:
-        rag = "⏳ Minerva завантажує сторінку…"
-    elif doc is None or not doc.fed:
-        rag = "не в базі знань (індексацію вимкнено або немає тексту)"
-    elif not supported:
-        rag = "чекає: RAG ще не приймає документи (потрібне оновлення RAG-ПК)"
-    else:
-        rag = {"indexed": "✓ у RAG", "failed": f"✗ RAG: {doc.error or 'помилка'}", "skipped": "RAG пропустив (немає тексту)",
-               "pending": "⏳ чекає RAG", "deleted": "прибрано"}.get(doc.current_state, doc.current_state)
-        file_report = (doc.attachments or [None])[0] if doc.current_state == "indexed" else None
-        if file_report and file_report["state"] != "indexed":     # опис / сторінка в RAG, а текст файлу — ні
-            from .knowledge import ATTACHMENT_LABELS
-            rag += " · файл: " + ATTACHMENT_LABELS.get(file_report["reason"], file_report["reason"] or "не прочитано")
+    rag = rag_text(item, doc, supported)
     return {
         "id": item.pk, "kind": item.kind, "kind_label": item.get_kind_display(), "title": item.title, "note": item.note,
         "url": item.url, "open": f"/rag/knowledge/{item.pk}/", "file_name": item.file_name,

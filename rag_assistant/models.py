@@ -467,6 +467,7 @@ class KnowledgeSource(models.Model):
     «📂 Джерело знань» (rag_assistant/knowledge_sources.py): папка або сайт, які Minerva сама обходить за розкладом
     і передає в базу знань (KnowledgeItem kind=source; тип document для RAG). Папка — лише всередині дозволених коренів
     (knowledge_sources у проєкті, MEDIA/knowledge_sources, MINERVA_KNOWLEDGE_ROOTS); файли не копіюються.
+    Папка без шляху — Minerva створює її сама в MEDIA/knowledge_sources (managed), файли туди завантажують у браузері.
     """
     FOLDER, WEBSITE = "folder", "website"
     KINDS = [(FOLDER, "📁 папка"), (WEBSITE, "🌐 сайт")]
@@ -476,10 +477,14 @@ class KnowledgeSource(models.Model):
     name = models.CharField("Назва", max_length=200)
     kind = models.CharField("Вид", max_length=10, choices=KINDS, default=FOLDER)
     path = models.CharField("Папка", max_length=500, blank=True, default="",
-                            help_text="Шлях усередині Minerva, напр. /app/knowledge_sources/Dokumentation. "
-                                      "Лише в дозволених коренях — список і як підключити папку NAS — нижче.")
-    url = models.URLField("Сайт", max_length=1000, blank=True, default="",
-                          help_text="Адреса sitemap.xml або сторінки, з якої брати посилання того ж сайту")
+                            help_text="Шлях усередині Minerva (лише в дозволених коренях); створюючи джерело без шляху, "
+                                      "Minerva заводить свою папку в MEDIA/knowledge_sources — файли туди завантажують з ПК")
+    url = models.TextField("Посилання", blank=True, default="",
+                           help_text="По одному в рядку: sitemap.xml, сторінка сайту або файл (PDF, DOCX)")
+    follow_links = models.BooleanField(
+        "Брати й інші сторінки сайту", default=True,
+        help_text="sitemap.xml — усі його сторінки; сторінка — ще й посилання з неї на той самий сайт. "
+                  "Вимкнено — лише ці посилання")
     recursive = models.BooleanField("З підпапками", default=True)
     file_types = models.JSONField("Типи файлів", default=list, blank=True,
                                   help_text="Порожньо — pdf, docx, txt, csv, md, html, htm, xlsx")
@@ -505,6 +510,10 @@ class KnowledgeSource(models.Model):
     last_error = models.CharField(max_length=300, blank=True, default="", editable=False)
     scan_started_at = models.DateTimeField(null=True, blank=True, editable=False,
                                            help_text="Йде перевірка (порожньо — ні); старіша за годину вважається зупиненою")
+    rescan_requested = models.BooleanField(default=False, editable=False,
+                                           help_text="Під час перевірки додали файли — перевірити ще раз одразу після неї")
+    managed = models.BooleanField("Папку створила Minerva", default=False, editable=False,
+                                  help_text="Файли завантажують у браузері; видалити файл можна там же")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

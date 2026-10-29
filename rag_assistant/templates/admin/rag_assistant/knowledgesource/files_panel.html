@@ -1,0 +1,23 @@
+{# Документи джерела зі станом у RAG; 🗑 — лише в папці, яку створила Minerva (JS — change_form.html) #}
+{% if rows %}
+<table class="ks-files" id="ks-files-table" data-delete="{{ delete_url }}">
+  <thead><tr><th>{% if source.kind == "folder" %}Файл{% else %}Сторінка{% endif %}</th><th>Розмір</th><th>У базі знань</th>
+    {% if can_delete %}<th></th>{% endif %}</tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="/rag/knowledge/{{ r.item.pk }}/" target="_blank">{{ r.item.source_path }}</a>
+        {% if r.item.product_id %}<span class="ks-tag">📦 {{ r.item.product }}</span>{% endif %}
+        {% if r.item.fetch_error %}<div class="ks-err">⚠️ {{ r.item.fetch_error }}</div>{% endif %}</td>
+      <td class="ks-num">{% if r.size_kb %}{{ r.size_kb }} КБ{% else %}—{% endif %}</td>
+      <td class="{% if r.ok %}ks-in{% endif %}">{{ r.rag }}</td>
+      {% if can_delete %}<td><button type="button" class="ks-del" data-path="{{ r.item.source_path }}"
+        title="Видалити файл з папки й бази знань">🗑</button></td>{% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if total > shown %}<div class="help">Показано {{ shown }} з {{ total }} — <a href="{{ all_url }}">усі документи джерела</a></div>{% endif %}
+{% else %}
+<div class="help">Документів ще немає{% if source.kind == "folder" %} — завантажте файли з ПК вище{% endif %}.</div>
+{% endif %}
