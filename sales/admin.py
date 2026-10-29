@@ -2239,13 +2239,16 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     break
             kind = label_kinds([sku])[sku]
             if found or kind:
-                # клік / правий клік — labels/_label_actions.html (підключено в salesorder_changelist.html)
+                # клік / правий клік — labels/_label_actions.html (підключено в salesorder_changelist.html);
+                # файлу в базі немає — етикетка з шаблону: інший колір і 🧩
                 buttons.append(format_html(
                     '<button type="button" data-svl="{}" data-sku="{}" data-qty="{}" data-order="{}" data-file="{}" '
-                    'data-svl-act="print" title="Правий клік — меню: з бази / згенерувати" '
-                    'style="display:inline-block;margin:2px;background:#1976d2;color:#fff;border:none;'
+                    'data-svl-act="print" title="{} · правий клік — меню: з бази / згенерувати" '
+                    'style="display:inline-block;margin:2px;background:{};color:#fff;border:none;'
                     'padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;'
-                    'white-space:nowrap">🖨️ {}</button>', kind, sku, qty, obj.pk, '1' if found else '', sku))
+                    'white-space:nowrap">🖨️ {}{}</button>', kind, sku, qty, obj.pk, '1' if found else '',
+                    '📄 файл з бази' if found else '🧩 з шаблону — файлу в базі немає',
+                    '#1976d2' if found else '#455a64', sku, '' if found else ' 🧩'))
             else:
                 buttons.append(
                     f'<span style="display:inline-block;margin:2px;background:#bdbdbd;color:#fff;'

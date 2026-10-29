@@ -748,3 +748,24 @@ class ProductKindTests(TestCase):
         r = self.client.get("/labels/product/check/", {"sku": "FT220407-01A"})
         self.assertEqual((r.json()["kind_title"], r.json()["field_names"]["frequency"]),
                          ("фільтра", "Смуга (Pass / Stop band)"))
+
+    def test_order_list_marks_labels_without_file(self):
+        """Список замовлень: кнопка етикетки, якої немає в базі (буде з шаблону), — 🧩 і інший колір."""
+        from django.contrib.admin.sites import site
+        from sales.models import SalesOrderLine
+        (self.dir / "FT220407-01A.dymo").write_text(old_label("FT220407-01A", ["RF filter SMA."]), encoding="utf-8")
+        order = SalesOrder.objects.create(source="digikey", order_number="102437554")
+        SalesOrderLine.objects.create(order=order, product=self.adapter, sku_raw="AD-FME-M1", qty=2)
+        SalesOrderLine.objects.create(order=order, product=self.filter, sku_raw="FT220407-01A", qty=1)
+        with self.settings(LABELS_DIR=self.dir):                          # колонка шукає файли сама
+            html = site._registry[SalesOrder].label_buttons_list(order)
+        no_file = html[html.index('data-sku="AD-FME-M1"'):].split("</button>")[0]
+        with_file = html[html.index('data-sku="FT220407-01A"'):].split("</button>")[0]
+        self.assertIn("🧩 з шаблону — файлу в базі немає", no_file)
+        self.assertIn("AD-FME-M1 🧩", no_file)
+        self.assertIn("📄 файл з бази", with_file)
+        self.assertNotIn("🧩", with_file)
+        r = self.client.get("/admin/sales/salesorder/")                  # картки: кнопки будує JS з /labels/status/
+        self.assertContains(r, "if (_tmpl) a.classList.add('sv-lbl-tmpl');")
+        status = self.client.get("/labels/status/?skus=AD-FME-M1").json()["AD-FME-M1"]
+        self.assertEqual((status["found"], status["file"]), (True, False))

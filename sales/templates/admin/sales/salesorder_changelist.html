@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', function () {
 /* Label row buttons */
 .sv-lbl-btn{font-size:10px;padding:3px 10px;border-radius:4px;font-weight:600;white-space:nowrap;cursor:pointer;border:none;display:inline-block;text-decoration:none;min-width:42px;text-align:center}
 .sv-lbl-on{background:#1565c0;color:#fff!important}
+.sv-lbl-on.sv-lbl-tmpl{background:#455a64}   /* файлу в базі немає — етикетка з шаблону */
 .sv-lbl-off{background:var(--bg-input,#141f2b);color:var(--text-dim);opacity:.6;cursor:default;border:1px solid var(--border-strong)}
 .sv-lbl-add{background:rgba(46,125,50,.15);color:#4caf50!important;border:1px solid #2e7d32}
 /* Quick filter bar */
@@ -921,8 +922,12 @@ function svSetView(mode) {
             return el;
           };
           var a = _lbl(document.createElement('button'), 'print');
-          a.title = '🖨️ ' + sku + ' × ' + qty + ' · {% trans "правий клік — меню" %}';
-          a.textContent = '🖨️ {% trans "Друкувати" %}';
+          var _tmpl = !data[sku].file;   // файлу в базі немає — етикетка з шаблону (загальне правило)
+          a.title = '🖨️ ' + sku + ' × ' + qty + ' · '
+            + (_tmpl ? '{% trans "🧩 з шаблону — файлу в базі немає" %}' : '{% trans "📄 файл з бази" %}')
+            + ' · {% trans "правий клік — меню" %}';
+          a.textContent = '🖨️ {% trans "Друкувати" %}' + (_tmpl ? ' 🧩' : '');
+          if (_tmpl) a.classList.add('sv-lbl-tmpl');
           var _dl = _lbl(document.createElement('button'), 'download');
           _dl.title = '⬇️ {% trans "Скачати" %} ' + sku + ' · {% trans "правий клік — меню" %}';
           _dl.style.cssText = 'padding:2px 6px;font-size:11px;opacity:.75';
