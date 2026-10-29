@@ -2237,7 +2237,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     form          = ProductAdminForm
     actions       = ["action_set_category", "action_set_lifecycle", "action_base_editor", "action_base_from_dk",
                      "action_sale_price_from_base", "action_media_links", "action_shared_media",
-                     "bulk_sync_digikey_attrs"]
+                     "bulk_sync_digikey_attrs", "action_dk_prices"]
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
@@ -2249,6 +2249,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 self.message_user(request, f"{obj.sku}: базові ціни змінено (записано в історію).")
         from .admin_prices import apply_shop_choices   # галочки «Базові ціни → магазин» (🏪 Інтернет-магазини)
         apply_shop_choices(request, obj)
+        from bots.admin_prices import apply_after_save  # «Після «Зберегти» — одразу на DigiKey» (💲 DigiKey)
+        apply_after_save(request, obj)
+
+    @admin.action(description="💲 Ціни на DigiKey з Minerva (порівняти й оновити)…")
+    def action_dk_prices(self, request, queryset):
+        url = reverse("admin:bots_digikeypricerun_compare")
+        return redirect(f"{url}?products=" + ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)))
 
     # ── Масові дії: категорія, ціни DigiKey ──────────────────────────────────
     @admin.action(description="🏷️ Змінити категорію…")
@@ -2409,11 +2416,17 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return shop_prices_panel(obj)
     shop_listings_info.short_description = "Магазини"
 
+    @admin.display(description="DigiKey")
+    def dk_price_panel(self, obj):
+        """Зараз на DigiKey → стане з цін Minerva, «✓ Оновити на DigiKey зараз» (bots/admin_prices.py)."""
+        from bots.admin_prices import product_panel
+        return product_panel(obj)
+
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
                        "image_preview", "datasheet_link", "movement_history", "shop_listings_info",
-                       "base_prices_info", "shop_media_panel")
+                       "base_prices_info", "shop_media_panel", "dk_price_panel")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
@@ -2438,6 +2451,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         ("🏪 Інтернет-магазини", {
             "fields": ("shop_listings_info",),
             "description": "Асортимент, ціни і ступені цін кожного магазину — розділ «🏪 Інтернет-магазин».",
+        }),
+        ("💲 Ціна на DigiKey", {
+            "fields": ("dk_price_panel",),
+            "description": "Ціни офера DigiKey з базових цін Minerva за правилами «💲 Налаштувань цін DigiKey». "
+                           "Масово — дія «💲 Ціни на DigiKey з Minerva» у списку товарів.",
         }),
         ("🔗 Медіа та документи", {
             "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "datasheet_key",

@@ -27,6 +27,7 @@ class FakeDigiKey:
         self.puts = []
         self.apply = True          # False — DigiKey прийняв PUT, але GET ще показує старі ціни
         self.fail = {}
+        self.lists = self.singles = 0  # скільки разів читали весь список / один офер
 
     def add(self, offer_id, sku, prices, **extra):
         self.offers[offer_id] = {
@@ -37,7 +38,12 @@ class FakeDigiKey:
             "lastUpdateDateUtc": "2026-10-01T10:00:00Z", "lastUpdatedSource": "API", **extra}
 
     def fetch(self):
+        self.lists += 1
         return copy.deepcopy(list(self.offers.values()))
+
+    def one(self, sku):
+        self.singles += 1
+        return next((copy.deepcopy(o) for o in self.offers.values() if o["supplierSku"] == sku), None)
 
     def put(self, offer_id, payload):
         if offer_id in self.fail:
@@ -59,7 +65,10 @@ class PriceBase(TestCase):
         ss.save()
         DigiKeyConfig.objects.update_or_create(pk=1, defaults={"locale_currency": "EUR"})
         self.dk = FakeDigiKey()
+        from django.core.cache import cache
+        cache.clear()
         patches = [mock.patch.object(svc, "_fetch_offers", self.dk.fetch),
+                   mock.patch.object(svc, "_fetch_one", self.dk.one),
                    mock.patch.object(svc, "_put_offer", self.dk.put)]
         for p in patches:
             p.start()
@@ -363,3 +372,73 @@ class AdminTests(PriceBase):
         self.assertEqual(self.client.get("/admin/bots/digikeypricerun/compare/").status_code, 200)
         self.assertEqual(self.client.post("/admin/bots/digikeypricerun/compare/apply/", {"ids": [self.l.pk]}).status_code, 403)
         self.assertFalse(DigiKeyPriceRun.objects.exists())
+
+
+class ProductCardTests(PriceBase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.user = User.objects.create_superuser("adm", "adm@example.com", "p")
+        self.client.force_login(self.user)
+        self.s.notify_telegram = self.s.notify_email = False
+        self.s.save()
+        self.p = self.product("AN-1", [(1, 10)])
+        self.l = self.listing(self.p, "o1", [(1, 8)])
+
+    def test_card_panel_and_push_now(self):
+        page = self.client.get(f"/admin/inventory/product/{self.p.pk}/change/")
+        self.assertContains(page, "Ціна на DigiKey")
+        self.assertContains(page, "Зараз на DigiKey: <b>1: 8.00 EUR</b>")
+        self.assertContains(page, "З цін Minerva стане: <b>1: 10.00 EUR</b> (+25 %)")
+        self.assertContains(page, "Оновити на DigiKey зараз")
+        self.assertContains(page, "dk_push_after_save")
+        r = self.client.post("/admin/bots/digikeypricerun/compare/apply/", {"ids": [self.l.pk], "query": f"products={self.p.pk}"})
+        run = DigiKeyPriceRun.objects.get()
+        self.assertRedirects(r, f"/admin/bots/digikeypricerun/{run.pk}/change/", fetch_redirect_response=False)
+        self.assertEqual(self.dk.puts[0][1]["prices"], [{"quantityBreak": 1, "price": 10.0}])
+        self.assertEqual(self.dk.lists, 0)                                   # один товар — точковий GET
+        self.assertContains(self.client.get(f"/admin/inventory/product/{self.p.pk}/change/"),
+                            "На DigiKey ціни як у Minerva")
+
+    def test_push_after_save(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+        from bots.admin_prices import apply_after_save
+        req = RequestFactory().post("/", {"dk_push_after_save": "1"})
+        req.user, req.session = self.user, {}
+        req._messages = FallbackStorage(req)
+        Product.objects.filter(pk=self.p.pk).update(base_prices=[{"min_qty": 1, "unit_price": "11"}])
+        apply_after_save(req, self.p)
+        self.assertEqual(self.dk.puts[0][1]["prices"], [{"quantityBreak": 1, "price": 11.0}])
+        apply_after_save(req, self.p)                                        # уже однакові — нічого
+        self.assertEqual(len(self.dk.puts), 1)
+        self.assertIn("нічого не надіслано", [str(m) for m in req._messages][-1])
+
+    def test_bulk_actions_and_selected_page(self):
+        other = self.listing(self.product("AN-2", [(1, 5)]), "o2", [(1, 4)])
+        r = self.client.post("/admin/inventory/product/", {"action": "action_dk_prices",
+                                                           "_selected_action": [self.p.pk]})
+        self.assertEqual(r["Location"], f"/admin/bots/digikeypricerun/compare/?products={self.p.pk}")
+        page = self.client.get(r["Location"])
+        self.assertContains(page, "Показано лише вибрані товари (1)")
+        self.assertContains(page, 'value="%d" class="dp-chk" checked' % self.l.pk)
+        self.assertNotContains(page, "AN-2")
+        self.assertEqual((self.dk.singles, self.dk.lists), (1, 0))           # свіжі ціни — лише вибраного
+        r = self.client.post("/admin/bots/digikeylisting/", {"action": "action_dk_from_minerva",
+                                                             "_selected_action": [other.pk]})
+        self.assertEqual(r["Location"], f"/admin/bots/digikeypricerun/compare/?ids={other.pk}")
+
+    def test_full_page_reads_digikey_when_stale(self):
+        self.client.get("/admin/bots/digikeypricerun/compare/")
+        self.assertEqual(self.dk.singles, 1)                                 # ще не читались → прочитано
+        self.client.get("/admin/bots/digikeypricerun/compare/")
+        self.assertEqual(self.dk.singles, 1)                                 # свіжі — без DigiKey
+        DigiKeyListing.objects.update(price_checked_at=timezone.now() - timedelta(hours=2))
+        with mock.patch.object(svc, "_fetch_one", side_effect=Exception("down")):
+            page = self.client.get("/admin/bots/digikeypricerun/compare/", follow=True)
+        self.assertContains(page, "не прочитано (down)")
+        self.client.get("/admin/bots/digikeypricerun/compare/")
+        self.assertEqual(self.dk.singles, 1)                                 # після збою 5 хв не пробує

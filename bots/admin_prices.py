@@ -9,13 +9,14 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib import admin, messages
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 
 from .models import DigiKeyListing, DigiKeyPriceChange, DigiKeyPriceRun, DigiKeyPriceSettings
 from .services import dk_prices as svc
@@ -41,6 +42,38 @@ def _can_change(request):
 def _compare_url(query: str = "") -> str:
     url = reverse("admin:bots_digikeypricerun_compare")
     return f"{url}?{query}" if query else url
+
+
+def _pks(raw) -> list[int]:
+    return [int(x) for x in str(raw or "").replace(" ", "").split(",") if x.isdigit()][:2000]
+
+
+def _selected(request):
+    """?ids= (лістинги) / ?products= (товари) — лише вибрані; (queryset або None, опис фільтра)."""
+    ids, products = _pks(request.GET.get("ids")), _pks(request.GET.get("products"))
+    if not ids and not products:
+        return None, ""
+    qs = svc.listings_qs()
+    qs = qs.filter(pk__in=ids) if ids else qs.filter(product_id__in=products)
+    return qs, ("ids", ",".join(map(str, ids))) if ids else ("products", ",".join(map(str, products)))
+
+
+REFRESH_FAILED = "dk-prices-refresh-failed"
+
+
+def _auto_refresh(request, listings, force: bool) -> str:
+    """Свіжі ціни DigiKey перед показом: для вибраних — завжди, для всіх — коли старші за STALE_MINUTES.
+    Збій — повідомлення й 5 хв без повторів (сторінка не чекає на DigiKey знову й знову)."""
+    listings = list(listings)
+    if not listings or (not force and not svc.stale(listings)) or cache.get(REFRESH_FAILED):
+        return ""
+    try:
+        res = svc.refresh(listings)
+    except Exception as exc:
+        cache.set(REFRESH_FAILED, 1, 300)
+        messages.warning(request, f"Свіжі ціни з DigiKey не прочитано ({exc}) — показано останні збережені.")
+        return ""
+    return "щойно" + (f" · офера не знайдено: {', '.join(res['not_found'][:5])}" if res["not_found"] else "")
 
 
 # ── Відображення рядків ───────────────────────────────────────────────────────
@@ -236,7 +269,10 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
         s = DigiKeyPriceSettings.get()
         rules, error = self._rules(request, s)
         cur = svc.currency(s)
-        rows = svc.plan(rules=rules, s=s)
+        selected, flt = _selected(request)
+        listings = list(selected if selected is not None else svc.listings_qs())
+        fresh = _auto_refresh(request, listings, force=selected is not None)
+        rows = svc.plan(listings, rules=rules, s=s)
         views = [_row_view(r, cur) for r in rows]
         checked = [r.listing.price_checked_at for r in rows if r.listing.price_checked_at and r.state != "no_offer"]
         custom = rules.as_dict() != svc.Rules.from_settings(s).as_dict()
@@ -253,7 +289,7 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
             "source_choices": DigiKeyPriceSettings.SOURCE_CHOICES,
             "auto_choices": dict(DigiKeyPriceSettings.AUTO_CHOICES), "quick_pct": QUICK_PCT,
             "can_change": _can_change(request), "held_runs": held,
-            "query": request.GET.urlencode(),
+            "query": request.GET.urlencode(), "flt": flt, "fresh": fresh, "stale_minutes": svc.STALE_MINUTES,
             "settings_url": reverse("admin:bots_digikeypricesettings_changelist"),
             "history_url": reverse("admin:bots_digikeypricerun_changelist"),
             "fx_url": reverse("admin:shop_shopsettings_changelist"),
@@ -431,3 +467,83 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
             messages.success(request, f"📤 Надсилається на DigiKey: {n}." if n else
                              "Різниці вже немає — нічого не надіслано.")
         return redirect(reverse("admin:bots_digikeypricerun_change", args=[pk]))
+
+
+# ── Картка товару (inventory/admin.py → ProductAdmin) ────────────────────────
+
+def product_panel(product) -> str:
+    """Блок «💲 DigiKey» картки товару: зараз на DigiKey → стане з цін Minerva, «оновити зараз»."""
+    listing = DigiKeyListing.objects.filter(product=product).select_related("product").first() if product.pk else None
+    if listing is None:
+        return format_html('<span style="color:var(--text-muted)">Товару немає на DigiKey (лістинг не створено).</span>')
+    s = DigiKeyPriceSettings.get()
+    cur = svc.currency(s)
+    row = svc.row_for(listing, svc.Rules.from_settings(s), cur)
+    compare = _compare_url(f"products={product.pk}")
+    checked = (f" · прочитано {timezone.localtime(listing.price_checked_at):%d.%m %H:%M}"
+               if listing.price_checked_at else " · ще не читались")
+    lines = [format_html('Зараз на DigiKey: <b>{}</b><small style="color:var(--text-muted)">{}</small>',
+                         svc.fmt_tiers(row.dk, cur), checked)]
+    if row.state != "ok":
+        lines.append(format_html('<span style="color:var(--warn);font-weight:600">{}</span>', row.state_text))
+    elif row.differs:
+        change = f" ({svc.fmt_signed(row.change_pct)} %)" if row.change_pct is not None else ""
+        lines.append(format_html('З цін Minerva стане: <b>{}</b>{}', svc.fmt_tiers(row.new, cur), change))
+        lines += [format_html('<small style="color:var(--text-muted)">{}</small>', n) for n in row.notes]
+    else:
+        lines.append(format_html('<span style="color:var(--ok);font-weight:600">✓ На DigiKey ціни як у Minerva.</span>'))
+    last = listing.price_changes.select_related("run").order_by("-run__created_at").first()
+    if last:
+        lines.append(format_html('<small>Останнє оновлення <a href="{}">#{}</a>: {} · {}</small>',
+                                 reverse("admin:bots_digikeypricerun_change", args=[last.run_id]), last.run_id,
+                                 last.get_status_display(), timezone.localtime(last.run.created_at).strftime("%d.%m %H:%M")))
+    buttons = [format_html('<a class="button" href="{}">🔄 Звірити з DigiKey (свіжі ціни)</a>', compare)]
+    if row.differs:
+        buttons.append(format_html(
+            '<button type="button" class="button" data-dkp-push="{}" data-dkp-id="{}" data-dkp-text="{}">'
+            '✓ Оновити на DigiKey зараз</button>',
+            reverse("admin:bots_digikeypricerun_apply"), listing.pk,
+            f"Оновити ціни {row.sku} на DigiKey: {svc.fmt_tiers(row.new, cur)}?\n"
+            "Беруться вже збережені ціни; незбережені зміни форми — через галочку нижче й «Зберегти»."))
+    after = ""
+    if row.state not in ("staged", "no_offer"):
+        after = format_html(
+            '<label style="display:flex;gap:6px;align-items:center;margin-top:8px;width:auto;float:none;padding:0;'
+            'min-width:0;font-weight:400;color:var(--text)">'
+            '<input type="checkbox" name="dk_push_after_save" value="1"> Після «Зберегти» — одразу оновити ціну на '
+            'DigiKey (з новими базовими цінами, правила — «💲 Налаштування цін DigiKey»)</label>')
+    script = format_html(
+        "<script>document.querySelectorAll('[data-dkp-push]').forEach(function (b) {{"
+        "b.addEventListener('click', function () {{ if (!confirm(b.dataset.dkpText)) return;"
+        "var f = document.createElement('form'); f.method = 'post'; f.action = b.dataset.dkpPush;"
+        "[['csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value],"
+        "['ids', b.dataset.dkpId], ['query', 'products={}']].forEach(function (kv) {{"
+        "var i = document.createElement('input'); i.type = 'hidden'; i.name = kv[0]; i.value = kv[1]; f.appendChild(i); }});"
+        "document.body.appendChild(f); f.submit(); }}); }});</script>", product.pk)
+    return format_html('<div style="display:flex;flex-direction:column;gap:4px">{}'
+                       '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">{}</div>{}</div>{}',
+                       format_html_join("", "<div>{}</div>", ((l,) for l in lines)),
+                       format_html_join("", "{}", ((b,) for b in buttons)), after, script)
+
+
+def apply_after_save(request, product):
+    """Галочка «Після «Зберегти» — одразу на DigiKey» у картці товару (ProductAdmin.save_model)."""
+    if request.POST.get("dk_push_after_save") != "1":
+        return
+    if not _can_change(request):
+        messages.warning(request, "DigiKey: немає права змінювати лістинги — ціни не надіслано.")
+        return
+    listing = DigiKeyListing.objects.filter(product=product).select_related("product").first()
+    if listing is None:
+        return
+    s = DigiKeyPriceSettings.get()
+    cur = svc.currency(s)
+    row = svc.row_for(listing, svc.Rules.from_settings(s), cur)
+    if not row.differs:
+        messages.info(request, f"DigiKey: {row.state_text or 'ціни вже як у Minerva'} — нічого не надіслано.")
+        return
+    run = svc.create_run([row], request.user)
+    svc.start(run)
+    messages.success(request, format_html(
+        '💲 DigiKey: {} → <b>{}</b> надсилається — <a href="{}">оновлення #{}</a> (там же перевірка, що ціни діють).',
+        row.sku, svc.fmt_tiers(row.new, cur), reverse("admin:bots_digikeypricerun_change", args=[run.pk]), run.pk))

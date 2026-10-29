@@ -1944,6 +1944,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'action_bulk_activate',
         'action_bulk_deactivate',
         'action_bulk_prices',
+        'action_dk_from_minerva',
         'action_bulk_stock',
         'action_bulk_set_category',
         'action_delete_dk_offers',
@@ -2983,6 +2984,11 @@ Rules:
         self.message_user(request, msg + ".", messages.SUCCESS)
         if err:
             self.message_user(request, f"⚠️ Не вдалося оновити на DigiKey: {err} лістингів.", messages.WARNING)
+
+    @admin.action(description='💲 Ціни з Minerva (порівняти й оновити)…')
+    def action_dk_from_minerva(self, request, queryset):
+        url = reverse('admin:bots_digikeypricerun_compare')
+        return redirect(f"{url}?ids=" + ','.join(str(pk) for pk in queryset.values_list('pk', flat=True)))
 
     @admin.action(description='💰 Змінити ціни (масово)')
     def action_bulk_prices(self, request, queryset):

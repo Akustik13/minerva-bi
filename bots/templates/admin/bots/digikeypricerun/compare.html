@@ -31,14 +31,23 @@
       · <a href="{{ fx_url }}">курси валют</a></span>
     {% endfor %}
     <span>Ціни DigiKey прочитано:
-      {% if checked_max %}<b>{{ checked_max|date:"d.m.Y H:i" }}</b>{% if checked_min and checked_min != checked_max %}
+      {% if fresh %}<b class="dp-ok">{{ fresh }}</b>
+      {% elif checked_max %}<b>{{ checked_max|date:"d.m.Y H:i" }}</b>{% if checked_min and checked_min != checked_max %}
         <small>(найстаріші — {{ checked_min|date:"d.m H:i" }})</small>{% endif %}
-      {% else %}<b class="dp-warn">ще не читались</b> <small>— порівняння з останніх збережених; натисніть «🔄 Прочитати»</small>{% endif %}</span>
+      {% else %}<b class="dp-warn">ще не читались</b> <small>— порівняння з останніх збережених; натисніть «🔄 Прочитати»</small>{% endif %}
+      {% if not fresh %}<small>(старші за {{ stale_minutes }} хв сторінка читає сама)</small>{% endif %}</span>
     <span>🔁 Автооновлення: <b>{{ s.get_auto_mode_display }}</b>{% if s.last_auto_at %}
       <small>· {{ s.last_auto_at|date:"d.m H:i" }} — {{ s.last_auto_result }}</small>{% endif %}</span>
   </div>
 
+  {% if flt %}
+  <div class="dp-facts" style="border-color:var(--accent)">
+    <span>🎯 Показано лише вибрані товари ({{ rows|length }}) — {% if fresh %}ціни DigiKey щойно прочитано для них{% else %}ціни DigiKey — останні збережені{% endif %}.</span>
+    <a href="?">✕ Показати всі лістинги</a>
+  </div>
+  {% endif %}
   <form class="dp-card" method="get" id="dp-rules">
+    {% if flt %}<input type="hidden" name="{{ flt.0 }}" value="{{ flt.1 }}">{% endif %}
     <div class="dp-card-title">🧮 Як рахувати ціну для DigiKey{% if custom %}<span class="dp-tag">змінено лише для цієї сторінки</span>{% endif %}</div>
     <div class="dp-formula">Ціна DigiKey = ціна Minerva × курс × (100 + надбавка) % + фіксована добавка → округлення →
       не нижче закупівельної + %. Свої надбавка / добавка товару (⚙ у рядку) мають пріоритет.</div>
@@ -65,7 +74,7 @@
     </div>
     <div class="dp-actions">
       <button class="dp-btn dp-primary" type="submit">🔄 Перерахувати</button>
-      {% if custom %}<a class="dp-btn" href="?">↺ Як у налаштуваннях</a>{% endif %}
+      {% if custom %}<a class="dp-btn" href="?{% if flt %}{{ flt.0 }}={{ flt.1 }}{% endif %}">↺ Як у налаштуваннях</a>{% endif %}
       <small>Зараз: {{ rules_text }}</small>
     </div>
     {% if rules_error %}<div class="dp-error">⚠ {{ rules_error }} — показано за налаштуваннями.</div>{% endif %}
@@ -118,7 +127,7 @@
       <tr class="dp-row dp-{{ v.kind }}" data-kind="{{ v.kind }}" data-dir="{{ v.dir }}" data-s="{{ v.search }}"
           data-pk="{{ v.pk }}" data-sku="{{ v.row.sku }}" data-auto="{{ v.row.listing.price_auto|yesno:'1,0' }}"
           data-pct="{{ v.own_pct }}" data-fixed="{{ v.own_fixed }}">
-        <td>{% if v.kind == 'diff' and can_change %}<input type="checkbox" name="ids" value="{{ v.pk }}" class="dp-chk">{% endif %}</td>
+        <td>{% if v.kind == 'diff' and can_change %}<input type="checkbox" name="ids" value="{{ v.pk }}" class="dp-chk"{% if flt %} checked{% endif %}>{% endif %}</td>
         <td class="dp-prod">
           <a href="{{ v.listing_url }}"><code>{{ v.row.sku }}</code></a>
           {% if v.product_url and v.row.listing.product.sku != v.row.sku %}<small> · <a href="{{ v.product_url }}">{{ v.row.listing.product.sku }}</a></small>{% endif %}
@@ -188,7 +197,8 @@
   const problems = rows.filter(r => r.dataset.kind === 'problem').length;
   document.getElementById('dp-prob-n').textContent = problems;
   const diffs = rows.filter(r => r.dataset.kind === 'diff').length;
-  let f = store.get('dp-filter') || (diffs ? 'diff' : 'all');
+  const picked = {{ flt|yesno:'true,false' }};          // вибрані товари — показати всі їхні рядки
+  let f = picked ? 'all' : (store.get('dp-filter') || (diffs ? 'diff' : 'all'));
   let d = '';
 
   function apply() {
@@ -216,7 +226,7 @@
     document.getElementById('dp-ud').textContent = sel.length ? `(↑ ${up} · ↓ ${down}${sel.length - up - down ? ' · інші ' + (sel.length - up - down) : ''})` : '';
     bar.hidden = !sel.length;
   }
-  tiles.forEach(t => t.addEventListener('click', () => { f = t.dataset.f; store.set('dp-filter', f); apply(); }));
+  tiles.forEach(t => t.addEventListener('click', () => { f = t.dataset.f; if (!picked) store.set('dp-filter', f); apply(); }));
   dirs.forEach(c => c.addEventListener('click', () => { d = c.dataset.d; apply(); }));
   q.addEventListener('input', apply);
   document.addEventListener('change', e => { if (e.target.classList.contains('dp-chk')) count(); });

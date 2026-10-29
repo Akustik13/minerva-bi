@@ -37,6 +37,8 @@ VERIFY_TIMEOUT_HOURS = 24     # стільки чекаємо, доки GET по
 STUCK_MINUTES = 30            # «надсилається» довше — процес зупинився, cron продовжить
 TG_LINES = 15
 BACKGROUND = True             # тести вимикають — push_run виконується одразу
+FEW = 5                       # до стількох оферів — точкові GET ?SupplierSku=, більше — весь список
+STALE_MINUTES = 30            # сторінка порівняння сама читає ціни DigiKey, якщо вони старші
 
 
 class PriceError(Exception):
@@ -428,6 +430,13 @@ def plan(listings=None, rules: Rules | None = None, s=None) -> list[Row]:
     return sorted(rows, key=lambda r: r.sku.lower())
 
 
+def stale(listings) -> bool:
+    """Ціни якогось опублікованого офера не читались довше STALE_MINUTES."""
+    edge = timezone.now() - timedelta(minutes=STALE_MINUTES)
+    return any(l.sync_status == "published" and l.dk_offer_id and (not l.price_checked_at or l.price_checked_at < edge)
+               for l in listings)
+
+
 def summary(rows) -> dict:
     out = {"total": len(rows), "differs": 0, "up": 0, "down": 0, "same": 0, "problems": 0,
            "no_offer": 0, "no_prices": 0, "no_rate": 0}
@@ -454,6 +463,31 @@ def _fetch_offers() -> list:
     return fetch_offers(DigiKeyConfig.get(), max_count=5000)
 
 
+def _fetch_one(sku: str) -> dict | None:
+    """GET /offers?SupplierSku= — лише офер з точно таким артикулом; помилка DigiKey — виняток."""
+    import requests as req
+    from bots.models import DigiKeyConfig
+    from bots.services.dk_marketplace import (_OFFERS_BASE, DKMarketplaceError, _base_url, _headers,
+                                              get_marketplace_token)
+    config = DigiKeyConfig.get()
+    resp = req.get(f"{_base_url(config)}{_OFFERS_BASE}/offers", params={"SupplierSku": sku, "Max": 5},
+                   headers=_headers(config, get_marketplace_token(config)), timeout=15)
+    if resp.status_code >= 400:
+        raise DKMarketplaceError(f"GET offers {resp.status_code}: {resp.text[:200]}")
+    want = (sku or "").strip().lower()
+    return next((o for o in resp.json().get("offers") or []
+                 if (o.get("supplierSku") or "").strip().lower() == want), None)
+
+
+def _offers_for(listings=None) -> list:
+    """Свіжі офери: кілька лістингів — точково, інакше весь список продавця."""
+    if listings is not None:
+        listings = [l for l in listings if l is not None]
+        if len(listings) <= FEW:
+            return [o for o in (_fetch_one(l.get_supplier_sku()) for l in listings) if o]
+    return _fetch_offers()
+
+
 def _match(offers: list) -> tuple[dict, dict]:
     by_id = {o.get("id"): o for o in offers if o.get("id")}
     by_sku = {(o.get("supplierSku") or "").strip().lower(): o for o in offers if o.get("supplierSku")}
@@ -467,11 +501,12 @@ def offer_for(listing, maps) -> dict | None:
 
 def refresh(listings=None) -> dict:
     """Свіжі ціни офера з DigiKey → DigiKeyListing.dk_prices. Повертає {updated, unchanged, not_found, maps}."""
-    maps = _match(_fetch_offers())
+    listings = list(listings_qs() if listings is None else listings)
+    maps = _match(_offers_for(listings if len(listings) <= FEW else None))
     now = timezone.now()
     updated = unchanged = 0
     not_found = []
-    for listing in (listings_qs() if listings is None else listings):
+    for listing in listings:
         offer = offer_for(listing, maps)
         if offer is None:
             if listing.dk_offer_id:
@@ -635,7 +670,7 @@ def push_run(run_pk):
     run = DigiKeyPriceRun.objects.get(pk=run_pk)
     lines = list(run.lines.filter(status=DigiKeyPriceChange.QUEUED).select_related("listing__product"))
     try:
-        maps = _match(_fetch_offers())
+        maps = _match(_offers_for([l.listing for l in lines]))
     except Exception as exc:
         for line in lines:
             line.status, line.error = DigiKeyPriceChange.ERROR, f"Не вдалося прочитати офери DigiKey: {exc}"[:2000]
@@ -783,7 +818,7 @@ def verify(run=None, force: bool = False) -> dict:
     lines = list(qs)
     if not lines:
         return {"checked": 0, "verified": 0, "mismatch": 0}
-    maps = _match(_fetch_offers())
+    maps = _match(_offers_for([l.listing for l in lines]))
     verified = mismatch = 0
     runs = {}
     for line in lines:
