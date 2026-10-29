@@ -1,6 +1,7 @@
 """Email + Telegram alert service — critical stock + overdue shipping deadlines."""
 from __future__ import annotations
 
+import re
 import json
 import urllib.request
 import urllib.error
@@ -317,6 +318,40 @@ def _build_html(critical_items, overdue_orders, company_name='Minerva'):
 
 # ── Email sending ──────────────────────────────────────────────────────────────
 
+
+# ── Outlook (настільний, рушій Word): CSS-розміри картинок і max-width блоків не розуміє ─────────────────────
+_CONTAINER_RE = re.compile(r'<div style="[^"]*max-width:(\d+)px[^"]*">')
+_HIDDEN_IMG_RE = re.compile(r'<img\b(?![^>]*mso-hide)[^>]*display:none[^>]*>')   # уже сховане — не вдруге
+_FULL_TABLE_RE = re.compile(r'<table(?![^>]*\swidth=)([^>]*style="[^"]*width:100%)')
+_BODY_FONT_RE = re.compile(r'<body\b[^>]*style="[^"]*font-family:([^;"]+)')
+
+
+def outlook_safe(html: str) -> str:
+    """HTML сповіщення, який і Outlook показує як браузер: картинки для збільшення при наведенні (display:none) —
+    не для Outlook (умовний коментар mso, браузери й пошта Minerva їх бачать як раніше), лист — у таблиці
+    фіксованої ширини замість max-width, таблицям — атрибут width і шрифт листа (комірки Outlook шрифт body
+    не успадковують — був би Times)."""
+    if not html:
+        return html
+    html = _HIDDEN_IMG_RE.sub(lambda m: '<!--[if !mso]><!-->' + m.group(0).replace(
+        'style="', 'style="mso-hide:all;', 1) + '<!--<![endif]-->', html)
+    html = _FULL_TABLE_RE.sub(r'<table width="100%"\1', html)
+    font = _BODY_FONT_RE.search(html)
+    if font and '<!--[if mso]><style>' not in html:
+        css = f'<!--[if mso]><style>table,td{{font-family:{font.group(1).strip()}}}</style><![endif]-->'
+        head = html.find('</head>')
+        html = html[:head] + css + html[head:] if head >= 0 else css + html
+    m = _CONTAINER_RE.search(html)
+    if m and '<!--[if mso]><table' not in html:
+        width = m.group(1)
+        html = (html[:m.start()] + f'<!--[if mso]><table role="presentation" align="center" width="{width}" '
+                f'cellpadding="0" cellspacing="0" border="0" style="width:{width}px"><tr><td><![endif]-->'
+                + html[m.start():])
+        end = html.rfind('</body>')
+        closing = '<!--[if mso]></td></tr></table><![endif]-->'
+        html = html[:end] + closing + html[end:] if end >= 0 else html + closing
+    return html
+
 def _send_email(ns, critical_items, overdue_orders, is_test=False):
     from django.core.mail import get_connection, EmailMultiAlternatives
 
@@ -370,7 +405,7 @@ def _send_email(ns, critical_items, overdue_orders, is_test=False):
         to=recipients,
         connection=connection,
     )
-    msg.attach_alternative(html_body, 'text/html')
+    msg.attach_alternative(outlook_safe(html_body), 'text/html')
     msg.send()
 
 
@@ -916,7 +951,7 @@ def _send_event_email(ns, subject, html_body):
         to=recipients,
         connection=_smtp_connection(ns),
     )
-    msg.attach_alternative(html_body, 'text/html')
+    msg.attach_alternative(outlook_safe(html_body), 'text/html')
     msg.send()
 
 
@@ -1504,7 +1539,7 @@ def notify_dk_listings_published(promoted_listings: list):
                 to=recipients,
                 connection=_smtp_connection(ns),
             )
-            msg.attach_alternative(html, 'text/html')
+            msg.attach_alternative(outlook_safe(html), 'text/html')
             msg.send()
         except Exception:
             pass
@@ -1744,7 +1779,7 @@ def send_order_confirm_notification(order):
             cc=[a.strip() for a in cc_str.split(',') if a.strip()] if cc_str else [],
             connection=_smtp_connection(ns),
         )
-        msg.attach_alternative(html_body, 'text/html')
+        msg.attach_alternative(outlook_safe(html_body), 'text/html')
         msg.send()
         from django.utils import timezone as _tz
         from sales.models import SalesOrder
@@ -1850,7 +1885,7 @@ def send_ship_notification(order) -> bool:
             cc=[a.strip() for a in cc_str.split(',') if a.strip()] if cc_str else [],
             connection=_smtp_connection(ns),
         )
-        msg.attach_alternative(html_body, 'text/html')
+        msg.attach_alternative(outlook_safe(html_body), 'text/html')
         msg.send()
 
         from sales.models import SalesOrder

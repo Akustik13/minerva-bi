@@ -537,6 +537,8 @@ URL: `/dashboard/`
 Base queryset: `SalesOrder.objects.filter(affects_stock=True)`
 Revenue: `SalesOrderLine.objects.aggregate(Sum('total_price'))`
 
+**Листи-сповіщення в Outlook** — кожен HTML-лист `dashboard/notifications.py` іде через `outlook_safe(html)` (настільний Outlook малює рушієм Word: не розуміє `max-width`, CSS-розміри картинок і `display:none`): велике фото для збільшення при наведенні (`mv-big`, `display:none`) — у `<!--[if !mso]><!-->…<!--<![endif]-->` + `mso-hide:all` (у браузері й пошті Minerva наведення працює, в Outlook — мініатюра 60×60 з посиланням на фото), перший блок `max-width:Npx` — у MSO-таблицю шириною N, таблицям `width:100%` — атрибут `width="100%"`, шрифт body — MSO-стилем на `table,td` (інакше Times); повторний виклик нічого не змінює. Новий лист — теж через неї. Тести: `dashboard/tests_outlook.py`
+
 **Tile-сторінки:**
 - `/dashboard/analytics/` — аналітика index
 - `/dashboard/system/` — система index (кахлі: Backup, Auth, Довідник)
