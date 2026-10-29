@@ -796,6 +796,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
            title="{% trans "Забути вибір для цього контакту — категорію знову визначає система" %}">↺ {% trans "Автоматично" %}</div>
     </div>
   </div>
+  <div class="em-ctx-item" onclick="ctxAction('customer')" title="{% trans "Новий клієнт CRM з даних листа (ім'я, компанія, email, телефон, адреса з підпису) — і гілка, Angebote та проєкти до нього; або вибрати наявного" %}">👤 {% trans "Клієнт CRM з листа…" %}</div>
   <div class="em-ctx-item" onclick="ctxAction('why')" title="{% trans "До якої своєї категорії й чому, хто пише, проєкти — і швидко змінити правило" %}">🔍 {% trans "Чому лист тут — ознаки й правила…" %}</div>
   <div class="em-ctx-item" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
   {% if knowledge_available %}
@@ -915,6 +916,18 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
       <input type="text" id="why-cust-q" placeholder="{% trans "Змінити: компанія, ім'я або email…" %}" oninput="emWhyCustSearch(this.value)"
              style="margin-top:5px;width:100%;box-sizing:border-box;background:var(--bg-input,var(--bg));color:var(--text);border:1px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px">
       <div id="why-cust-res" style="display:flex;flex-direction:column;gap:2px;margin-top:3px"></div>
+      <button type="button" class="button" id="why-cust-new" onclick="emWhyNewCustomer(true)" style="margin-top:5px"></button>
+      <div id="why-cust-form" hidden style="margin-top:6px;border:1px dashed var(--border-strong);border-radius:8px;padding:8px">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:5px">{% trans "З листа (переслав колега — дані відправника оригіналу). Перевірте й допишіть — решту можна в картці клієнта." %}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">
+          {% for key, label in customer_form_fields %}<input type="text" data-cf="{{ key }}" placeholder="{{ label }}" title="{{ label }}"
+            style="background:var(--bg-input,var(--bg));color:var(--text);border:1px solid var(--border-strong);border-radius:6px;padding:5px 7px;font-size:12px">{% endfor %}
+        </div>
+        <div class="wc-btns" style="justify-content:flex-start;margin-top:6px">
+          <button type="button" class="button default" onclick="emWhyCreateCustomer()">✓ {% trans "Створити й прив'язати гілку, Angebote й проєкти" %}</button>
+          <button type="button" class="button" onclick="emWhyNewCustomer(false)">{% trans "Скасувати" %}</button>
+        </div>
+      </div>
     </div>
     <label>📁 {% trans "Проєкти гілки" %}</label>
     <div id="why-proj-box">
@@ -1696,6 +1709,32 @@ function _whyCustomerShow() {
   sg.style.display = s ? '' : 'none';
   if (s) { sg.dataset.id = s.id; sg.textContent = '👤 {% trans "За адресою" %}: ' + s.label; }
   document.getElementById('why-cust-clear').style.display = c ? '' : 'none';
+  var nb = document.getElementById('why-cust-new'), dr = _why.customer_draft;
+  nb.style.display = (!c && _why.can_add_customer) ? '' : 'none';
+  nb.textContent = '＋ {% trans "Створити клієнта CRM з листа" %}' + (dr ? ': ' + [dr.name, dr.company, dr.email].filter(Boolean).join(' · ') : '');
+  emWhyNewCustomer(false);
+}
+function emWhyNewCustomer(open) {
+  var f = document.getElementById('why-cust-form'), dr = (_why && _why.customer_draft) || {};
+  f.hidden = !open;
+  if (open) {
+    f.querySelectorAll('[data-cf]').forEach(function(i){ i.value = dr[i.dataset.cf] || ''; });
+    var first = f.querySelector('[data-cf]'); if (first) first.focus();
+  }
+}
+async function emWhyCreateCustomer() {
+  var body = {};
+  document.querySelectorAll('#why-cust-form [data-cf]').forEach(function(i){ body[i.dataset.cf] = i.value.trim(); });
+  try {
+    var r = await fetch('/email/message/' + _why.pk + '/customer/create/', {method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || _i18n.помилка);
+    _why.customer = d.customer; _why.customer_draft = null; _why.customer_suggest = null;
+    _whyCustomerShow();
+    _showToast((d.created ? '🧑 {% trans "Клієнта створено" %}: ' : '🧑 {% trans "Клієнт уже був — прив’язано" %}: ') + d.customer.label
+      + ' · {% trans "листів" %} ' + (d.mails || 0) + (d.offers ? ' · Angebote ' + d.offers : '') + (d.projects ? ' · {% trans "проєктів" %} ' + d.projects : ''));
+  } catch (e) { document.getElementById('why-err').textContent = '❌ ' + e.message; }
 }
 var _whyCustTimer = null;
 function emWhyCustSearch(q) {
@@ -2648,6 +2687,12 @@ async function ctxAction(action) {
   var {pk, tpk, rowEl} = _ctxMsg;
 
   if (action === 'why') { emWhy(pk); return; }
+  if (action === 'customer') {   // «👤 Клієнт CRM з листа»: те саме вікно, одразу з формою нового клієнта
+    await emWhy(pk);
+    if (_why && !_why.customer && _why.can_add_customer) emWhyNewCustomer(true);
+    var box = document.getElementById('why-cust-box'); if (box) box.scrollIntoView({block: 'center'});
+    return;
+  }
   if (action === 'open') {
     var url = tpk ? '/email/thread/' + tpk + '/' : '/email/message/' + pk + '/';
     window.open(url, '_blank');

@@ -129,9 +129,39 @@ def message_customer_view(request, message_pk):
         data = {}
     value = str(data.get('customer') or '')
     customer = get_object_or_404(Customer, pk=int(value)) if value.isdigit() else None
-    n = set_thread_customer(msg.thread, customer, user=request.user)
+    from email_assistant.crm_link import adopt_thread
+    done = adopt_thread(msg.thread, customer, user=request.user) if customer else \
+        {'mails': set_thread_customer(msg.thread, None, user=request.user)}
     touch(thread_id=msg.thread_id)   # клієнт гілки — у документах бази знань
-    return JsonResponse({'ok': True, 'customer': _customer_json(customer), 'mails': n})
+    return JsonResponse({'ok': True, 'customer': _customer_json(customer), **done})
+
+
+@staff_member_required
+@require_POST
+def message_customer_create_view(request, message_pk):
+    """«👤 Створити клієнта CRM з листа»: {name, company, email, phone, addr_street, addr_zip, addr_city, country}
+    (порожнє — з листа, crm_link.customer_draft) → клієнт (той самий email — наявний) і гілка, її Angebote та
+    проєкти — до нього."""
+    from email_assistant.crm_link import adopt_thread, create_customer, customer_draft
+    from email_assistant.knowledge_hook import touch
+    from email_assistant.models import EmailMessage
+    if not request.user.has_perm('crm.add_customer'):
+        return JsonResponse({'ok': False, 'error': 'Немає права створювати клієнтів CRM'}, status=403)
+    msg = get_object_or_404(EmailMessage.objects.select_related('thread'), pk=message_pk, account__user=request.user)
+    try:
+        data = json.loads(request.body or b'{}')
+    except ValueError:
+        data = {}
+    draft = customer_draft(msg) or {}
+    fields = {k: str(data.get(k) or draft.get(k) or '').strip() for k in
+              ('name', 'company', 'email', 'phone', 'addr_street', 'addr_zip', 'addr_city', 'country')}
+    if not (fields['email'] or fields['name']):
+        return JsonResponse({'ok': False, 'error': 'У листі немає адреси клієнта — введіть email або ім\'я'})
+    when = msg.sent_at.strftime('%d.%m.%Y') if msg.sent_at else ''
+    customer, created = create_customer(fields, request.user, note=f'Створено з листа «{msg.subject or ""}» {when}')
+    done = adopt_thread(msg.thread, customer, user=request.user) if msg.thread_id else {}
+    touch(thread_id=msg.thread_id)
+    return JsonResponse({'ok': True, 'created': created, 'customer': _customer_json(customer), **done})
 
 
 @staff_member_required
@@ -152,8 +182,9 @@ def message_why_view(request, message_pk):
     domain = '@' + contact.split('@', 1)[1] if '@' in contact else ''
     manual = EmailCategoryRule.objects.filter(account=msg.account, key__in=[k for k in (contact, domain) if k]).first()
     customer = msg.thread.crm_customer if msg.thread_id and msg.thread.crm_customer_id else None
-    from email_assistant.crm_link import find_customer
-    by_address = find_customer([contact]) if contact else None
+    from email_assistant.crm_link import customer_draft, find_customer
+    draft = customer_draft(msg) if customer is None else None   # переслане колегою — відправник оригіналу
+    by_address = find_customer([a for a in (contact, (draft or {}).get('email')) if a])
     open_projects = []
     try:
         from projects.models import Project
@@ -179,6 +210,8 @@ def message_why_view(request, message_pk):
         'thread': msg.thread_id,
         'customer': _customer_json(customer),
         'customer_suggest': _customer_json(by_address) if by_address and by_address != customer else None,
+        'customer_draft': draft if draft and not by_address else None,
+        'can_add_customer': request.user.has_perm('crm.add_customer'),
         'open_projects': open_projects,
         'categories': [cat_json(c) for c in _nav_ordered(request.user, MailCategory.objects.filter(is_active=True))],
         'can_change': request.user.has_perm('email_assistant.change_mailcategory'),

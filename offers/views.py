@@ -308,6 +308,40 @@ def currency_view(request):
 
 
 @staff_member_required
+@require_POST
+def customer_create_view(request):
+    """«＋ Створити клієнта CRM» з полів легкої форми: контакт, email, телефон, адреса (перший рядок — компанія) →
+    клієнт (той самий email — наявний); з листа — гілка, її Angebote й проєкти теж до нього."""
+    import json
+
+    from email_assistant.crm_link import address_fields, adopt_thread, create_customer
+
+    from .models import Offer
+    if not request.user.has_perm("crm.add_customer"):
+        return JsonResponse({"ok": False, "error": "Немає права створювати клієнтів CRM"}, status=403)
+    try:
+        data = json.loads(request.body or b"{}")
+    except ValueError:
+        data = {}
+    name = (data.get("name") or "").strip()
+    lines = [ln.strip() for ln in (data.get("address") or "").splitlines() if ln.strip()]
+    company = lines[0] if lines and lines[0] != name and not any(ch.isdigit() for ch in lines[0]) else ""
+    fields = {"name": name, "company": company, "email": data.get("email", ""), "phone": data.get("phone", ""),
+              **address_fields(lines[1:] if company else lines)}
+    if not (fields["email"] or name):
+        return JsonResponse({"ok": False, "error": "Вкажіть контактну особу або email"})
+    customer, created = create_customer(fields, request.user, note="Створено з Angebot (легка форма)")
+    if str(data.get("thread") or "").isdigit():
+        thread = _user_threads(request).filter(pk=int(data["thread"])).first()
+        if thread is not None:
+            adopt_thread(thread, customer, request.user)
+    if str(data.get("offer") or "").isdigit():
+        Offer.objects.filter(pk=int(data["offer"]), customer__isnull=True).update(customer=customer)
+    return JsonResponse({"ok": True, "created": created, "id": customer.pk, "label": customer.company or customer.name,
+                         "url": reverse("admin:crm_customer_change", args=[customer.pk])})
+
+
+@staff_member_required
 def customer_view(request, pk):
     """Клієнт CRM для легкої форми: контакт і адреса."""
     from crm.models import Customer

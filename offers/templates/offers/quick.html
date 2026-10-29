@@ -76,6 +76,11 @@
           <input class="of-input" id="of-customer-q" autocomplete="off" placeholder="компанія, ім'я або email — почніть вводити"
                  value="{% if data.customer %}{{ data.customer.company|default:data.customer.name }}{% endif %}">
           <div class="of-res" id="of-customer-res"></div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:4px">
+            <button type="button" class="of-btn sm" id="of-customer-new" onclick="ofCreateCustomer()"{% if data.customer %} hidden{% endif %}
+                    title="Новий клієнт CRM з полів нижче: контактна особа, email, телефон, адреса (перший рядок — компанія). Той самий email уже є — візьметься наявний.">＋ Створити клієнта CRM з цих даних</button>
+            <a id="of-customer-card" class="of-muted" style="color:var(--link-fg)" target="_blank"{% if data.customer %} href="{% url 'admin:crm_customer_change' data.customer.pk %}"{% else %} hidden{% endif %}>🧑 картка клієнта ↗</a>
+          </div>
           {% if data.origin.customer %}<div class="of-origin">↳ {{ data.origin.customer }}</div>{% endif %}</div>
         <div class="of-field"><label class="of-label">Контактна особа</label>
           <input class="of-input" name="contact_name" id="of-contact" value="{{ data.contact_name }}">
@@ -405,6 +410,20 @@
     }, 250);
   });
   q.addEventListener('blur', function(){ setTimeout(function(){ res.style.display = 'none'; }, 200); });
+  window.ofCreateCustomer = async function(){
+    var v = function(id){ return document.getElementById(id).value.trim(); };
+    var body = {name: v('of-contact'), email: v('of-email'), phone: v('of-phone'), address: document.getElementById('of-address').value,
+                thread: '{{ thread.pk|default:"" }}', offer: '{{ offer.pk|default:"" }}'};
+    if (!body.name && !body.email) { alert('Вкажіть контактну особу або email'); return; }
+    if (!confirm('Створити клієнта CRM: ' + [body.name, body.email].filter(Boolean).join(' · ') + '?')) return;
+    var d = await (await fetch('{% url "offers:customer_create" %}', {method: 'POST', credentials: 'same-origin',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify(body)})).json();
+    if (!d.ok) { alert('❌ ' + (d.error || '')); return; }
+    document.getElementById('of-customer').value = d.id; q.value = d.label;
+    document.getElementById('of-customer-new').hidden = true;
+    var card = document.getElementById('of-customer-card'); card.href = d.url; card.hidden = false;
+    autoCurrency();
+  };
   window.ofFillCustomer = async function(replace){
     var id = document.getElementById('of-customer').value;
     if (!id) { alert('Спершу виберіть клієнта CRM'); return; }

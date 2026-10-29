@@ -1024,3 +1024,60 @@ class OfferListAndSendTests(QuoteMailBase):
         text = "\n".join(p.text for p in Document(rev.docx_file.path).paragraphs)
         self.assertIn("Payable within 14 days", text)
         self.assertNotIn("Zahlbar", text)
+
+    def test_create_crm_customer_from_forwarded_mail(self):
+        import json as _json
+
+        from crm.models import Customer
+        from projects.models import Project
+        from projects.services import create_project, link_thread
+        body = ("Bitte Angebot machen\n\n-------- Ursprüngliche Nachricht --------\n"
+                "Von: Denys Repetynskyi Module ETP LLC <procurement10@moduletp.example>\nBetreff: Denys SL Tire\n\n"
+                "Please provide pricing and production lead times for 35 units and 100 units of ANT-100.\n\n"
+                "--\nBest regard,\nDenys Repetynskyi - supply manager Module ETP LLC\nTel: +380 44 123 45 67\n"
+                "Peremohy Ave 12\nKyiv 03057, Ukraine\n")
+        m = self.mail("FW: Denys SL Tire", body, frm=self.COLLEAGUE)
+        offer = services.save_quick({"customer": None, "language": "en"}, [{"sku": "ANT-100", "qtys": "35"}],
+                                    self.user, source=m, thread=m.thread)
+        project = create_project(name="SL Tire filters", user=self.user)
+        link_thread(project, m.thread, user=self.user)
+        why = self.client.get(f"/email/message/{m.pk}/why/").json()
+        dr = why["customer_draft"]
+        self.assertEqual((dr["name"], dr["company"], dr["email"]),
+                         ("Denys Repetynskyi", "Module ETP LLC", "procurement10@moduletp.example"))
+        self.assertEqual((dr["phone"], dr["addr_street"], dr["addr_zip"], dr["addr_city"], dr["country"]),
+                         ("+380 44 123 45 67", "Peremohy Ave 12", "03057", "Kyiv", "UA"))
+        r = self.client.post(f"/email/message/{m.pk}/customer/create/", _json.dumps({"company": "SL Tire / Module ETP"}),
+                             content_type="application/json").json()
+        self.assertTrue(r["ok"] and r["created"])
+        c = Customer.objects.get(email="procurement10@moduletp.example")
+        self.assertEqual((c.name, c.company, c.country, c.source), ("Denys Repetynskyi", "SL Tire / Module ETP", "UA", "mail"))
+        self.assertTrue(c.external_key)
+        m.thread.refresh_from_db()
+        offer.refresh_from_db()
+        self.assertEqual((m.thread.crm_customer_id, offer.customer_id, Project.objects.get(pk=project.pk).customer_id),
+                         (c.pk, c.pk, c.pk))                                  # гілка, Angebot і проєкт — до клієнта
+        self.assertEqual((r["offers"], r["projects"]), (1, 1))
+        again = self.client.post(f"/email/message/{m.pk}/customer/create/", "{}", content_type="application/json").json()
+        self.assertFalse(again["created"])                                     # той самий email — без дубля
+        self.assertEqual(Customer.objects.filter(email="procurement10@moduletp.example").count(), 1)
+        self.assertContains(self.client.get("/email/"), "Клієнт CRM з листа…")
+
+    def test_create_crm_customer_from_angebot_form(self):
+        import json as _json
+
+        from crm.models import Customer
+        m = self.colleague_forward()
+        offer = services.save_quick({"customer": None, "language": "en"}, [{"sku": "ANT-100", "qtys": "35"}],
+                                    self.user, source=m, thread=m.thread)
+        r = self.client.post("/offers/api/customer/create/", _json.dumps({
+            "name": "Sergiy Shevchuk", "email": "s.shevchuk@sl-tire.example", "phone": "+31 6 21674102",
+            "address": "SL-TIRE B.V.\nWilleskop 180A\n3421 GW Oudewater\nNetherlands",
+            "thread": m.thread_id, "offer": offer.pk}), content_type="application/json").json()
+        self.assertTrue(r["ok"] and r["created"])
+        c = Customer.objects.get(pk=r["id"])
+        self.assertEqual((c.company, c.addr_street, c.addr_zip, c.addr_city, c.country),
+                         ("SL-TIRE B.V.", "Willeskop 180A", "3421 GW", "Oudewater", "NL"))
+        offer.refresh_from_db()
+        self.assertEqual(offer.customer_id, c.pk)
+        self.assertContains(self.client.get(f"/offers/{offer.pk}/quick/"), "картка клієнта")

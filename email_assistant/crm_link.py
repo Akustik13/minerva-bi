@@ -223,6 +223,111 @@ def link_to_crm(*, user, subject, body, from_email, to_emails, cc_emails=(),
     )
 
 
+# ── «👤 Створити клієнта CRM з листа» ────────────────────────────────────────
+COMPANY_RE = re.compile(r"\b(?:GmbH|AG|KG|UG|LLC|Ltd\.?|Limited|Inc\.?|Corp\.?|B\.\s?V\.?|BV|S\.?A\.?|S\.?r\.?l\.?|"
+                        r"SRL|Oy|AB|ApS|LLP|PLC|ТОВ|ООО|ПП|ФОП)(?![\w])", re.IGNORECASE)
+_ZIP_CITY_RE = re.compile(r"^(?:[A-Z]{1,2}[- ])?(\d{4,6}(?:\s?[A-Z]{2}(?=\s))?)\s+([^\d,]{2,60})$"
+                          r"|^([^\d,]{2,60}),?\s+(\d{4,6})$")   # «3421 GW Oudewater» — індекс NL з літерами
+
+
+def address_fields(lines) -> dict:
+    """Рядки адреси (підпис листа, «Адреса» Angebot) → поля картки клієнта: вулиця, індекс і місто, країна."""
+    out = {"addr_street": "", "addr_zip": "", "addr_city": "", "country": ""}
+    try:
+        from offers.pricing import _country_in_text
+    except ImportError:
+        _country_in_text = None
+    for ln in (x.strip(" ,") for x in lines if x and x.strip()):
+        code = _country_in_text(ln) if _country_in_text else ""
+        if code and not out["country"]:
+            out["country"] = code
+            ln = re.sub(r",?\s*[^,]+$", "", ln).strip(" ,") if "," in ln else ""
+            if not ln:
+                continue
+            if not re.search(r"\d", ln) and len(ln) <= 40 and not out["addr_city"]:   # «Kyiv, Ukraine»
+                out["addr_city"] = ln
+                continue
+        m = _ZIP_CITY_RE.match(ln)
+        if m and not out["addr_zip"]:
+            out["addr_zip"], out["addr_city"] = (m.group(1), m.group(2).strip()) if m.group(1) else \
+                (m.group(4), m.group(3).strip())
+        elif not out["addr_city"] and "," in ln and re.search(r"\d{4,6}", ln):
+            city, zip_ = ln.rsplit(",", 1)[0].strip(), re.search(r"\d{4,6}", ln).group(0)
+            out["addr_city"], out["addr_zip"] = re.sub(r"\d{4,6}", "", city).strip(), zip_
+        elif not out["addr_street"] and re.search(r"\d", ln):
+            out["addr_street"] = ln[:300]
+    return out
+
+
+def customer_draft(msg) -> dict | None:
+    """Клієнт CRM з листа: переслав колега (FW / WG) — відправник пересланого листа, інакше — співрозмовник.
+    Ім'я й телефон — з підпису, компанія — з імені відправника («Denys Repetynskyi Module ETP LLC») або рядка підпису
+    з GmbH / LLC…, адреса й країна — з підпису. → {name, company, email, phone, country, addr_*} | None."""
+    from email_assistant.quotes import forwarded_in, new_text, signature
+    own = own_addresses()
+    fw = forwarded_in(msg, skip=lambda a: is_own(a, own)) if is_own(msg.from_email, own) else None
+    if fw:
+        email, display, text = fw["from"], fw["name"], fw["text"]
+    elif not is_own(msg.from_email, own):
+        email, display, text = (msg.from_email or "").lower(), msg.from_name or "", new_text(msg.body_text)
+    else:   # наш лист — клієнт серед отримувачів
+        email = next((a.lower() for a in (msg.to_emails or []) if a and not is_own(a, own)), "")
+        display, text = "", ""
+    if not email:
+        return None
+    sig = signature(text)
+    name = sig["name"] or display.strip(' "\'') or email.split("@")[0]
+    company = ""
+    if display and name and display.lower().startswith(name.lower()) and len(display) > len(name) + 1:
+        company = display[len(name):].strip(" -,|")       # «Denys Repetynskyi Module ETP LLC» → «Module ETP LLC»
+    lines = list(sig["lines"])
+    if not company:
+        line = next((ln for ln in lines if COMPANY_RE.search(ln)), "")
+        company = re.split(r"\s+[-–|]\s+", line)[-1].strip() if line else ""
+    addr = address_fields([ln for ln in lines if ln != company and not ln.lower().startswith(name.lower())])
+    return {"name": name[:255], "company": company[:255], "email": email, "phone": sig.get("phone", "")[:50], **addr}
+
+
+def create_customer(data, user=None, note=""):
+    """Новий клієнт CRM з даних листа / Angebot; клієнт з тим самим email уже є — він (без дубля).
+    → (клієнт, створено?). Ключ — Customer.save (SHA256 email + ім'я)."""
+    from crm.models import Customer
+    email = (data.get("email") or "").strip().lower()
+    existing = find_customer([email]) if email else None
+    if existing is not None:
+        return existing, False
+    fields = {k: (data.get(k) or "").strip() for k in ("name", "company", "phone", "addr_street", "addr_zip",
+                                                       "addr_city")}
+    country = (data.get("country") or "").strip().upper()
+    c = Customer.objects.create(
+        name=fields["name"] or fields["company"] or email or "—", company=fields["company"], email=email,
+        phone=fields["phone"], addr_street=fields["addr_street"], addr_zip=fields["addr_zip"],
+        addr_city=fields["addr_city"], country=country if len(country) == 2 else "", source="mail",
+        notes=note[:1000])
+    return c, True
+
+
+def adopt_thread(thread, customer, user=None) -> dict:
+    """Гілка → клієнт і все пов'язане: листи в його хронології (set_thread_customer), Angebote гілки й проєкти
+    гілки без клієнта — теж його. → {mails, offers, projects}."""
+    out = {"mails": set_thread_customer(thread, customer, user=user), "offers": 0, "projects": 0}
+    if customer is None:
+        return out
+    try:
+        from offers.models import Offer
+        out["offers"] = Offer.objects.filter(source_message__thread=thread, customer__isnull=True).update(
+            customer=customer)
+    except ImportError:
+        pass
+    try:
+        from projects.models import Project, ProjectLink
+        ids = ProjectLink.objects.filter(thread=thread, status=ProjectLink.CONFIRMED).values("project_id")
+        out["projects"] = Project.objects.filter(pk__in=ids, customer__isnull=True).update(customer=customer)
+    except ImportError:
+        pass
+    return out
+
+
 def set_thread_customer(thread, customer, user=None) -> int:
     """Клієнт гілки вручну («🔍 Чому лист тут»): гілка → клієнт, листи гілки — у його хронології (подія листа
     іншого клієнта переноситься, а якщо в нього вже є — зайва видаляється; бракує — створюється, як для нового

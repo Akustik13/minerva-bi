@@ -16,6 +16,7 @@ urlpatterns = [
     path("template/upload/", views.template_upload_view, name="template_upload"),
     path("template/reset/", views.template_reset_view, name="template_reset"),
     path("template/sample/", views.template_sample_view, name="template_sample"),
+    path("api/customer/create/", views.customer_create_view, name="customer_create"),
     path("api/customer/<int:pk>/", views.customer_view, name="customer"),
     path("api/from-thread/<int:thread_pk>/", views.from_thread_view, name="from_thread"),
     path("api/message/<int:message_pk>/rescan/", views.rescan_message_view, name="rescan_message"),

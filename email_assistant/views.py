@@ -328,6 +328,12 @@ def _attach_kb_tags(emails):
         m.kb_tag = tags.get(m.pk, '')
 
 
+# «👤 Клієнт CRM з листа» — поля форми нового клієнта (crm_link.customer_draft)
+CUSTOMER_FORM_FIELDS = [('name', 'Ім\'я'), ('company', 'Компанія'), ('email', 'Email'), ('phone', 'Телефон'),
+                        ('addr_street', 'Вулиця, будинок'), ('addr_zip', 'Індекс'), ('addr_city', 'Місто'),
+                        ('country', 'Країна (ISO 2, напр. UA)')]
+
+
 def _quote_messages(account, with_done=False):
     """Листи скриньки з відкритим запитом пропозиції — для фільтра «📝 Запити пропозицій»;
     with_done — ще й оброблені (Angebot уже створено)."""
@@ -593,6 +599,7 @@ def inbox_view(request):
         'open_projects':         _open_projects(),
         'quote_filter':          quote_filter,
         # ті самі листи, що покаже фільтр (без Спаму, Кошика й видалених) — інакше «1», а список порожній
+        'customer_form_fields':  CUSTOMER_FORM_FIELDS,
         'quote_count':           quote_count,
         'quote_all':             quote_all,
         'quote_done_count':      counts_qs.filter(pk__in=_quote_messages(account, with_done=True)).count() - quote_count,

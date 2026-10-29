@@ -72,6 +72,7 @@ urlpatterns = [
     path('sort/',                                       views_sort.sort_view,          name='sort'),
     path('category/<int:pk>/',                          views_categories.category_info_view,   name='work_category_info'),
     path('message/<int:message_pk>/customer/',          views_categories.message_customer_view, name='message_customer'),
+    path('message/<int:message_pk>/customer/create/',   views_categories.message_customer_create_view, name='message_customer_create'),
     path('customers/',                                  views_categories.customers_search_view, name='customers_search'),
     path('message/<int:message_pk>/why/',               views_categories.message_why_view,     name='message_why'),
     path('nav/',                                        views_categories.nav_pref_view,        name='nav_pref'),
