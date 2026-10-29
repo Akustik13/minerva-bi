@@ -67,7 +67,7 @@ class AntennaLabelTests(TestCase):
         self.assertIn("QTY: 2 PCS", texts)
         self.assertIn("Digi-Key P/N: 3228-AN220213-01C-ND.", texts)
         self.assertIn("Multi-purpose UWB PCB antenna.", texts)
-        self.assertIn("Frequency range: 370MHz...6GHz.", texts)
+        self.assertIn("Frequency range: 0.370...6 GHz.", texts)
         self.assertIn("Connector type: SMA Female.", texts)
         self.assertIn(f"Copyright © 2009 - {self.year} Sevskiy GmbH. ", texts)
         self.assertEqual([d.text for d in root.iter("DataString") if d.text], ["AN220213-01C", "AN220213-01C"])
@@ -133,8 +133,30 @@ class AntennaLabelTests(TestCase):
         fields = data["fields"]
         self.assertEqual((fields["description"]["value"], fields["description"]["source"]),
                          ("Multi-purpose UWB PCB antenna", "stock"))
-        self.assertEqual(fields["frequency"]["value"], "370MHz...6GHz")
-        self.assertTrue(any("🔷 DigiKey «400MHz...6GHz»" in i["text"] for i in data["issues"] if i["level"] == "warn"))
+        self.assertEqual(fields["frequency"]["value"], "0.370...6 GHz")
+        self.assertTrue(any("🔷 DigiKey «0.400...6 GHz»" in i["text"] for i in data["issues"] if i["level"] == "warn"))
+
+    def test_frequency_in_one_unit(self):
+        for raw, label in (("600MHz ~ 7.2GHz", "0.600...7.2 GHz"), ("370MHz ~ 6GHz", "0.370...6 GHz"),
+                           ("2.4GHz ~ 2.5GHz", "2.4...2.5 GHz"), ("824 ~ 960MHz", "824...960 MHz"),
+                           ("698MHz ~ 960MHz, 1.71GHz ~ 2.7GHz", "698...960 MHz, 1.71...2.7 GHz"),
+                           ("433MHz, 866MHz, 5.5GHz", "433MHz, 866MHz, 5.5GHz")):
+            self.assertEqual(antenna._fmt_frequency(raw), label, raw)
+
+    def test_mixed_units_in_old_file_are_flagged(self):
+        self.product.tech_attributes = {}
+        self.product.save()
+        self.write("AN220213-01C.dymo", old_label("AN220213-01C", [
+            "Multi-purpose UWB PCB antenna.", "Frequency range: 0.6 MHz ... 10 GHz."]))
+        issues = antenna.build("AN220213-01C")["issues"]
+        self.assertTrue(any("різні одиниці" in i["text"] for i in issues))
+
+    def test_part_number_is_not_a_description(self):
+        self.product.name_export = "3228-AN220213-01C-ND"
+        self.product.name = "AN220213-01C"
+        self.product.save()
+        self.listing(dk_title="3228-AN220213-01C-ND", dk_description="Multi-purpose UWB PCB antenna. 370 MHz.")
+        self.assertEqual(antenna.build("AN220213-01C")["fields"]["description"]["value"], "Multi-purpose UWB PCB antenna")
 
     def test_cyrillic_stock_name_is_skipped_for_digikey_title(self):
         self.product.name_export = ""
@@ -175,18 +197,64 @@ class AntennaLabelTests(TestCase):
         self.assertFalse(data["show_dk"])
         self.assertTrue(any("не опубліковано" in i["text"] for i in data["issues"]))
 
-    def test_order_line_digikey_sku_finds_product(self):
+    def test_label_is_for_the_ordered_sku(self):
+        """Скриншот 29.10: у замовленні AN220203-02A — Supplier SKU лістингу товару AN220214-01A;
+        у налаштуваннях DigiKey — UUID постачальника Marketplace, а не 3228."""
+        cfg = DigiKeyConfig.get()
+        cfg.marketplace_supplier_id = "b6629887-3d7c-5cf9-adff-0d7fd9a1b2c3"
+        cfg.save()
+        other = Product.objects.create(
+            sku="AN220214-01A", name="3228-AN220214-01A-ND", name_export="", category="antenna",
+            tech_attributes={"Frequency Range": "600MHz ~ 7.2GHz", "Termination": "SMA Female"})
+        DigiKeyListing.objects.create(product=other, dk_title="AN220203-02A", dk_description="", dk_product_id="u-2",
+                                      dk_supplier_sku="AN220203-02A",
+                                      dk_attributes={"Frequency Range": "600MHz ~ 7.2GHz"})
+        self.write("AN220203-02A.dymo", old_label("AN220203-02A", [
+            "Digi-Key P/N: 3228-AN220203-02A-ND.", "Multi-purpose UWB PCB antenna.",
+            "Frequency range: 0.650...9 GHz.", "Connector type: SMA female."], year=2026))
+        order = SalesOrder.objects.create(source="digikey", order_number="102437554")
+        data = antenna.build("AN220203-02A", 5, order=order)
+        self.assertEqual(data["pn"], "AN220203-02A")
+        self.assertEqual(data["digikey_pn"], "3228-AN220203-02A-ND")
+        self.assertEqual([p + v for p, v in data["lines"]], [
+            "Digi-Key P/N: 3228-AN220203-02A-ND.", "Multi-purpose UWB PCB antenna.",
+            "Frequency range: 0.650...9 GHz.", "Connector type: SMA female."])
+        xml = antenna.render(data)
+        self.assertNotIn("b6629887", xml)
+        self.assertNotIn("AN220214-01A", xml)
+        self.assertTrue(any("0.600...7.2 GHz" in i["text"] for i in data["issues"] if i["level"] == "warn"))
+
+    def test_uuid_vendor_falls_back_to_other_labels(self):
+        cfg = DigiKeyConfig.get()
+        cfg.marketplace_supplier_id = "b6629887-3d7c-5cf9-adff-0d7fd9a1b2c3"
+        cfg.save()
+        self.listing()
+        self.write("AN100001.dymo", old_label("AN100001", ["Digi-Key P/N: 3228-AN100001-ND.", "Some antenna."]))
+        self.assertEqual(antenna.build("AN220213-01C")["digikey_pn"], "3228-AN220213-01C-ND")
+
+    def test_digikey_pn_can_be_corrected_and_is_remembered(self):
+        self.listing()
+        data = antenna.build("AN220213-01C", edits={"digikey_pn": "3228-AN220203-02A-ND"})
+        self.assertTrue(any("не артикула AN220213-01C" in i["text"] for i in data["issues"]))
+        antenna.save("AN220213-01C", {"digikey_pn": "3228-AN220213-01C-X-ND"})
+        self.assertEqual(LabelText.objects.get(sku="AN220213-01C").digikey_pn, "3228-AN220213-01C-X-ND")
+        self.assertEqual(antenna.build("AN220213-01C")["digikey_pn"], "3228-AN220213-01C-X-ND")
+
+    def test_checked_texts_belong_to_one_sku(self):
         self.listing(dk_supplier_sku="AN220213-01C-X")
-        self.assertEqual(antenna.build("AN220213-01C-X")["pn"], "AN220213-01C")
+        antenna.save("AN220213-01C-X", {"description": "Variant antenna"})
+        self.assertEqual(antenna.build("AN220213-01C-X")["fields"]["description"]["value"], "Variant antenna")
+        self.assertEqual(antenna.build("AN220213-01C")["fields"]["description"]["value"], "Multi-purpose UWB PCB antenna")
+        self.assertEqual(LabelText.objects.get(sku="AN220213-01C-X").product, self.product)
 
     # ── перевірено людиною ────────────────────────────────────────────────────
 
     def test_save_then_ready_until_stock_changes(self):
         self.listing()
         self.assertFalse(antenna.build("AN220213-01C")["ready"])
-        antenna.save("AN220213-01C", {"frequency": "0.370...6 GHz"}, user=User(username="slava"))
-        text = LabelText.objects.get(product=self.product)
-        self.assertEqual((text.frequency, text.checked_by), ("0.370...6 GHz", "slava"))
+        antenna.save("AN220213-01C", {"frequency": "0.37...6 GHz"}, user=User(username="slava"))
+        text = LabelText.objects.get(sku="AN220213-01C")
+        self.assertEqual((text.frequency, text.checked_by), ("0.37...6 GHz", "slava"))
         data = antenna.build("AN220213-01C")
         self.assertEqual(data["fields"]["frequency"]["source"], "saved")
         self.assertTrue(data["ready"])
@@ -194,7 +262,7 @@ class AntennaLabelTests(TestCase):
         self.product.save()
         data = antenna.build("AN220213-01C")
         self.assertFalse(data["ready"])
-        self.assertTrue(any("під час перевірки було «370MHz...6GHz»" in i["text"] for i in data["issues"]))
+        self.assertTrue(any("під час перевірки було «0.370...6 GHz»" in i["text"] for i in data["issues"]))
 
     def test_deliberately_empty_connector_stays_empty(self):
         antenna.save("AN220213-01C", {"connector": ""})

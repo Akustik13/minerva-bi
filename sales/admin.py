@@ -2212,7 +2212,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
         buttons = []
         for line in obj.lines.all():
-            sku = line.product.sku if line.product else line.sku_raw
+            # етикетка — для артикула, який замовили (DigiKey: Supplier SKU може відрізнятись від товару), як у картках
+            sku = (line.sku_raw or '').strip() or (line.product.sku if line.product else '')
             qty = int(line.qty or 1)
             if not sku:
                 continue
@@ -2260,7 +2261,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         inputs_js = []
 
         for line in obj.lines.all():
-            sku = line.product.sku if line.product else line.sku_raw
+            # етикетка — для артикула, який замовили (DigiKey: Supplier SKU може відрізнятись від товару)
+            sku = (line.sku_raw or '').strip() or (line.product.sku if line.product else '')
             name = line.product.name if line.product else (line.sku_raw or '—')
             qty = int(line.qty or 1)
             if not sku:

@@ -196,23 +196,26 @@
       + '<p>Copyright © 2009 - <mark>' + esc(d.year) + '</mark> Sevskiy GmbH.</p>'
       + '<p>All rights reserved. Reproduction prohibited.</p></div>';
   }
-  var NAMES = {description: 'Опис', frequency: 'Частота', connector: "Роз'єм"};
+  var NAMES = {digikey_pn: 'Digi-Key P/N', description: 'Опис', frequency: 'Частота', connector: "Роз'єм"};
 
   function modal(o, d, act) {
     var old = document.getElementById('svl-modal'); if (old) old.remove();
     var m = document.createElement('div');
     m.id = 'svl-modal'; m.className = 'svl-modal';
     var fieldsHtml = Object.keys(NAMES).map(function (f) {
-      return '<label for="svl-f-' + f + '">' + NAMES[f] + '</label><div><input type="text" id="svl-f-' + f + '" data-f="' + f
-        + '" maxlength="200"><div class="svl-src" id="svl-s-' + f + '"></div><div class="svl-chips" id="svl-c-' + f + '"></div></div>';
+      var input = '<input type="text" id="svl-f-' + f + '" data-f="' + f + '" maxlength="200">';
+      if (f === 'digikey_pn') {   // галочка — друкувати рядок на цій етикетці (за замовчуванням — замовлення DigiKey)
+        input = '<div style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="svl-dk" title="Друкувати рядок Digi-Key P/N">'
+          + input + '</div>';
+      }
+      return '<label for="svl-f-' + f + '">' + NAMES[f] + '</label><div>' + input
+        + '<div class="svl-src" id="svl-s-' + f + '"></div><div class="svl-chips" id="svl-c-' + f + '"></div></div>';
     }).join('');
     m.innerHTML = '<div class="svl-box" role="dialog" aria-label="Етикетка антени">'
       + '<div class="svl-head"><b>🏷️ Етикетка антени · ' + esc(d.pn) + '</b><button type="button" class="svl-x" title="Закрити">✕</button></div>'
       + '<div class="svl-paper" id="svl-paper"></div>'
       + '<div class="svl-grid">'
       + '<label for="svl-qty">Кількість</label><div><input type="number" id="svl-qty" min="1" max="99999" style="max-width:120px"></div>'
-      + '<label>Digi-Key P/N</label><div><label style="display:flex;gap:8px;align-items:center;cursor:pointer">'
-      + '<input type="checkbox" id="svl-dk"> <span id="svl-dk-text"></span></label></div>'
       + fieldsHtml
       + '<label>Рік</label><div style="padding-top:6px" id="svl-year"></div>'
       + '</div><ul class="svl-issues" id="svl-issues"></ul>'
@@ -249,12 +252,15 @@
       state = d;
       box.querySelector('#svl-paper').innerHTML = paper(d);
       dkEl.checked = d.show_dk; dkEl.disabled = !d.digikey_pn;
-      box.querySelector('#svl-dk-text').textContent = d.digikey_pn
-        ? d.digikey_pn + (d.dk_reason ? ' · ' + d.dk_reason : '') : 'немає — ' + d.digikey_from;
       box.querySelector('#svl-year').innerHTML = '<b>' + esc(d.year) + '</b> <span class="svl-src">— поточний, ставиться сам</span>';
       Object.keys(NAMES).forEach(function (f) {
         var fd = d.fields[f], inp = box.querySelector('#svl-f-' + f);
-        box.querySelector('#svl-s-' + f).textContent = fd.label ? 'Зараз: ' + fd.label : '';
+        var src = fd.label ? 'Зараз: ' + fd.label : '';
+        if (f === 'digikey_pn') {
+          src = d.digikey_pn ? src + (d.dk_reason ? ' · ' + (d.show_dk ? 'друкується: ' : 'не друкується: ') + d.dk_reason : '')
+                             : 'немає — ' + (d.digikey_from || 'не вказано');
+        }
+        box.querySelector('#svl-s-' + f).textContent = src;
         var chips = box.querySelector('#svl-c-' + f);
         chips.innerHTML = '';
         fd.candidates.forEach(function (c) {
@@ -272,10 +278,9 @@
         return '<li class="' + i.level + '">' + icon + ' ' + esc(i.text) + '</li>';
       }).join('') || '<li class="info">✓ Артикул, кількість і рік перевірено — зауважень немає.</li>';
       pr.disabled = dl.disabled = !d.can_print;
-      box.querySelector('#svl-note').textContent = d.product
-        ? 'Тексти запам\'ятаються для ' + d.pn + ' — наступного разу клік друкує одразу, поки дані на складі й DigiKey не зміняться.'
-          + (d.checked_at ? ' Перевіряв: ' + (d.checked_by || '—') + ', ' + d.checked_at.slice(0, 10) + '.' : '')
-        : 'Товару немає на складі — тексти не запам\'ятаються.';
+      box.querySelector('#svl-note').textContent =
+        'Тексти запам\'ятаються для ' + d.pn + ' — наступного разу клік друкує одразу, поки дані на складі й DigiKey не зміняться.'
+        + (d.checked_at ? ' Перевіряв: ' + (d.checked_by || '—') + ', ' + d.checked_at.slice(0, 10) + '.' : '');
     }
     function recheck(delay) {
       clearTimeout(timer);
@@ -299,7 +304,6 @@
         close();
         if (action === 'download') download(d.url, d.pn); else open(d.url, d.pn, d.qty);
       };
-      if (!state.product) { done(state); return; }
       fetch('/labels/antenna/save/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
                                       body: JSON.stringify(p)})
         .then(function (r) { return r.json(); })

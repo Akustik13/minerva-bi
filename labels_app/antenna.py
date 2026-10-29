@@ -2,18 +2,23 @@
 Етикетка антени DYMO з шаблону — як для кабелів CA-* (shipping/services/dymo_label_service.py).
 
 Шаблон shipping/templates_dymo/antenna_label_template.dymo (макет AN220213-01C), змінюється лише:
-  {{PN}}   — артикул товару: рядок P/N, штрихкод, QR;
+  {{PN}}   — артикул з рядка замовлення (саме той, що замовили): рядок P/N, штрихкод, QR;
   {{QTY}}  — кількість з рядка замовлення;
   {{LINE}} — рядки над Copyright (блок <!--LINE--> повторюється): Digi-Key P/N, опис, частота, роз'єм;
   {{YEAR}} — поточний рік у Copyright.
 
-Опис, частота й роз'єм: виправлене людиною (LabelText) → склад (Product) → DigiKey (лістинг) → старий .dymo.
-Digi-Key P/N = «<Vendor ID>-<Supplier SKU>-ND» (DigiKeyConfig.marketplace_supplier_id + лістинг).
+Опис, частота, роз'єм і Digi-Key P/N: підтверджене людиною для цього артикула (LabelText) → склад (Product) →
+DigiKey (лістинг) → старий .dymo. Якщо товар знайдено лише за Supplier SKU DigiKey (у замовленні інший артикул,
+ніж у картці товару), дані складу — іншого артикула, тому старий файл артикула йде першим.
+Digi-Key P/N = «<Vendor ID>-<Supplier SKU>-ND»; Vendor ID — число (3228): marketplace_supplier_id лише якщо це
+число (для Marketplace API там UUID), інакше — з Digi-Key P/N старих етикеток.
+Частота з DigiKey — в одних одиницях: «600MHz ~ 7.2GHz» → «0.600...7.2 GHz».
 Старі файли в LABELS_DIR не змінюються — лише читаються для порівняння й як запасне джерело.
 """
 import html
 import re
 import textwrap
+from collections import Counter
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -28,6 +33,7 @@ TEXT_LINES_MAX = 4     # рядків над Copyright: блок вміщує 6 
 DESC_LINES_MAX = 2
 
 FIELDS = ("description", "frequency", "connector")
+EDIT_FIELDS = FIELDS + ("digikey_pn",)
 FREQ_KEYS = ("Frequency Range", "Frequency (Center/Band)", "Frequency", "Frequency Band")
 CONN_KEYS = ("Termination", "Connector Type", "Connector", "Connector Style")
 SOURCES = {
@@ -38,16 +44,20 @@ SOURCES = {
     "file": "📄 старий файл",
 }
 
-_FIELD_NAMES = {"description": "Опис", "frequency": "Частота", "connector": "Роз'єм"}
+_FIELD_NAMES = {"description": "Опис", "frequency": "Частота", "connector": "Роз'єм", "digikey_pn": "Digi-Key P/N"}
 
 ANTENNA_RE = re.compile(r"^AN\d{4}", re.I)
 _CYR = re.compile(r"[\u0400-\u04FF]")
 _DK_RE = re.compile(r"^(?:Digi[- ]?Key\s*)?P\s*[/I]\s*N\s*:\s*(\d{3,6}-\S+?-ND)\.?$", re.I)
+_DK_PN_RE = re.compile(r"(?<![\w-])(\d{3,6})-([A-Za-z0-9][\w.\-]*?)-ND(?![\w-])", re.I)
 _FREQ_RE = re.compile(r"^Freq(?:uency)?\.?(?:\s+range)?\s*:\s*(.+)$", re.I)
 _CONN_RE = re.compile(r"^Connector\s+type\s*:\s*(.+)$", re.I)
 _COPY_RE = re.compile(r"Copyright\b.*(\d{4})", re.I)
 _PN_RE = re.compile(r"^P/N:\s*\S+\.?$", re.I)
 _RANGE_RE = re.compile(r"\.\.\.|…|~|\d\s*-\s*\d")
+_UNIT_RANGE_RE = re.compile(
+    r"(\d+(?:[.,]\d+)?)\s*(kHz|MHz|GHz)?\s*(?:\.\.\.|…|~|-)\s*(\d+(?:[.,]\d+)?)\s*(kHz|MHz|GHz)", re.I)
+_UNITS = {"khz": ("kHz", 0.001), "mhz": ("MHz", 1.0), "ghz": ("GHz", 1000.0)}   # множник до MHz
 
 
 def is_antenna(sku, product=None) -> bool:
@@ -68,6 +78,11 @@ def _norm(value) -> str:
 
 def _sentence(value) -> str:
     return value if value.endswith((".", "!", "?")) else value + "."
+
+
+def _is_code(value) -> bool:
+    """«3228-AN220214-01A-ND», «AN220213-01C» — номер, а не опис."""
+    return " " not in value or bool(_DK_PN_RE.search(value))
 
 
 def find_product(sku):
@@ -95,13 +110,9 @@ def _listing(product):
         return None
 
 
-def _saved(product):
-    if product is None or product.pk is None:
-        return None
-    try:
-        return product.label_text
-    except ObjectDoesNotExist:
-        return None
+def _saved(pn):
+    from labels_app.models import LabelText
+    return LabelText.objects.filter(sku__iexact=pn).first() if pn else None
 
 
 # ── Старий файл етикетки ──────────────────────────────────────────────────────
@@ -183,9 +194,30 @@ def read_file(sku):
 
 # ── Джерела значень ───────────────────────────────────────────────────────────
 
+def _number(value: float, unit: str) -> str:
+    """0.65 GHz → «0.650» (як на наших етикетках), 7.2 → «7.2», 960 → «960»."""
+    if unit == "GHz" and value < 1:
+        return f"{value:.3f}"
+    return f"{value:.4f}".rstrip("0").rstrip(".")
+
+
+def _one_unit(m) -> str:
+    a, unit_a, b, unit_b = m.groups()
+    unit_a = (unit_a or unit_b).lower()
+    unit_b = unit_b.lower()
+    target, scale = max(_UNITS[unit_a], _UNITS[unit_b], key=lambda u: u[1])
+    low = float(a.replace(",", ".")) * _UNITS[unit_a][1] / scale
+    high = float(b.replace(",", ".")) * _UNITS[unit_b][1] / scale
+    return f"{_number(low, target)}...{_number(high, target)} {target}"
+
+
 def _fmt_frequency(value) -> str:
-    """DigiKey «370MHz ~ 6GHz» → «370MHz...6GHz» (як на наших етикетках)."""
-    return _clean(re.sub(r"\s*~\s*", "...", str(value or "")))
+    """DigiKey «600MHz ~ 7.2GHz» → «0.600...7.2 GHz»: кожен діапазон — в одних одиницях."""
+    return _clean(_UNIT_RANGE_RE.sub(_one_unit, str(value or "")))
+
+
+def _mixed_units(value) -> bool:
+    return any(m.group(2) and m.group(2).lower() != m.group(4).lower() for m in _UNIT_RANGE_RE.finditer(value or ""))
 
 
 def _attr(attrs, keys) -> str:
@@ -205,12 +237,14 @@ def _stock_value(field, product) -> str:
     if field == "description":
         for value in (product.name_export, product.name):
             value = _clean(value)
-            if value and not _CYR.search(value) and value.upper() != (product.sku or "").upper():
+            if value and not _CYR.search(value) and not _is_code(value):
                 return value
         return ""
     if field == "frequency":
         return _fmt_frequency(_attr(product.tech_attributes, FREQ_KEYS))
-    return _clean(_attr(product.tech_attributes, CONN_KEYS))
+    if field == "connector":
+        return _clean(_attr(product.tech_attributes, CONN_KEYS))
+    return ""
 
 
 def _digikey_value(field, listing) -> str:
@@ -218,25 +252,21 @@ def _digikey_value(field, listing) -> str:
         return ""
     if field == "description":
         title = _clean(listing.dk_title)
-        if title:
+        if title and not _is_code(title):
             return title
-        first = re.split(r"(?<=[.!?])\s", (listing.dk_description or "").strip(), maxsplit=1)[0]
-        return _clean(first)[:200]
+        first = _clean(re.split(r"(?<=[.!?])\s", (listing.dk_description or "").strip(), maxsplit=1)[0])[:200]
+        return "" if not first or _is_code(first) else first
     if field == "frequency":
         return _fmt_frequency(_attr(listing.dk_attributes, FREQ_KEYS))
-    return _clean(_attr(listing.dk_attributes, CONN_KEYS))
+    if field == "connector":
+        return _clean(_attr(listing.dk_attributes, CONN_KEYS))
+    return ""
 
 
-def _candidates(field, saved, product, listing, old, edit=None) -> list[dict]:
-    """[{source, label, value}] у порядку переваги; однакові значення з різних джерел — одним рядком."""
-    raw = []
-    if edit is not None:
-        raw.append(("edit", _clean(edit)))
-    if saved is not None:
-        raw.append(("saved", _clean(getattr(saved, field))))
-    raw.append(("stock", _stock_value(field, product)))
-    raw.append(("digikey", _digikey_value(field, listing)))
-    raw.append(("file", (old or {}).get(field) or ""))
+def _candidates(values, edit=None) -> list[dict]:
+    """values — [(джерело, значення)] у порядку переваги → [{source, label, value}];
+    однакові значення з різних джерел — одним рядком."""
+    raw = ([("edit", _clean(edit))] if edit is not None else []) + list(values)
     out, seen = [], {}
     for source, value in raw:
         if not value and source != "edit":
@@ -252,32 +282,51 @@ def _candidates(field, saved, product, listing, old, edit=None) -> list[dict]:
     return out
 
 
+_VENDOR_CACHE = {}
+
+
+def _vendor_from_files() -> str:
+    """Найчастіший числовий префікс Digi-Key P/N у старих етикетках (кеш до зміни теки)."""
+    from labels_app.views import LABELS_DIR
+    try:
+        stamp = (str(LABELS_DIR), LABELS_DIR.stat().st_mtime)
+    except OSError:
+        return ""
+    if stamp not in _VENDOR_CACHE:
+        counts = Counter()
+        for path in LABELS_DIR.glob("*.dymo"):
+            try:
+                counts.update(m.group(1) for m in _DK_PN_RE.finditer(path.read_text(encoding="utf-8-sig", errors="ignore")))
+            except OSError:
+                continue
+        _VENDOR_CACHE.clear()
+        _VENDOR_CACHE[stamp] = counts.most_common(1)[0][0] if counts else ""
+    return _VENDOR_CACHE[stamp]
+
+
 def _vendor_id(old) -> str:
+    """Числовий Vendor ID DigiKey (3228) — не UUID постачальника Marketplace."""
     try:
         from bots.models import DigiKeyConfig
         vendor = (DigiKeyConfig.get().marketplace_supplier_id or "").strip()
     except Exception:
         vendor = ""
-    if not vendor and old and old.get("digikey_pn"):
-        m = re.match(r"(\d+)-", old["digikey_pn"])
-        vendor = m.group(1) if m else ""
-    return vendor
+    if vendor.isdigit():
+        return vendor
+    m = _DK_PN_RE.search((old or {}).get("digikey_pn") or "")
+    return m.group(1) if m else _vendor_from_files()
 
 
-def _digikey_pn(sku, listing, old) -> tuple[str, str]:
-    """(Digi-Key P/N, звідки) — або ("", чому немає)."""
-    if listing is not None:
-        vendor = _vendor_id(old)
-        on_digikey = bool(listing.dk_product_id) or listing.sync_status == "published"
-        if not on_digikey:
-            return "", "лістинг DigiKey ще не опубліковано"
-        if not vendor:
-            return "", "не вказано Vendor ID у налаштуваннях DigiKey"
-        return f"{vendor}-{listing.get_supplier_sku()}-ND", "лістинг DigiKey"
-    old_pn = (old or {}).get("digikey_pn") or ""
-    if old_pn and sku and sku.upper() in old_pn.upper():
-        return old_pn, "старий файл"
-    return "", "товару немає на DigiKey"
+def _digikey_pn(listing, old) -> tuple[str, str]:
+    """(Digi-Key P/N з лістингу, "") — або ("", чому немає)."""
+    if listing is None:
+        return "", "товару немає на DigiKey"
+    if not (listing.dk_product_id or listing.sync_status == "published"):
+        return "", "лістинг DigiKey ще не опубліковано"
+    vendor = _vendor_id(old)
+    if not vendor:
+        return "", "невідомий числовий Vendor ID DigiKey (як 3228) — впишіть Digi-Key P/N"
+    return f"{vendor}-{listing.get_supplier_sku()}-ND", ""
 
 
 # ── Дані етикетки ─────────────────────────────────────────────────────────────
@@ -292,12 +341,13 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
     edits — {поле: текст} з вікна (ще не збережено); show_dk — None = за джерелом замовлення."""
     sku = (sku or "").strip()
     product = find_product(sku)
+    exact = product is not None and product.sku.upper() == sku.upper()
+    pn = product.sku if exact else sku               # на етикетці — артикул із замовлення
     listing = _listing(product)
-    saved = _saved(product)
-    old = read_file(product.sku if product is not None else sku) or (read_file(sku) if product is not None else None)
-    edits = edits or {}
+    saved = _saved(pn)
+    old = read_file(pn)
+    edits = {f: v for f, v in (edits or {}).items() if f in EDIT_FIELDS}
     year = timezone.localdate().year
-    pn = product.sku if product is not None else sku
     issues = []
 
     try:
@@ -309,28 +359,41 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
 
     if product is None:
         issues.append(_issue("warn", f"Товару {sku} немає на складі — дані лише зі старого файлу."))
-    elif sku and sku.upper() != pn.upper():
-        issues.append(_issue("info", f"У замовленні артикул {sku} — на етикетці артикул товару {pn}."))
+    elif not exact:
+        issues.append(_issue("info", f"{pn} — Supplier SKU DigiKey товару {product.sku}: на етикетці {pn}, "
+                                     f"спершу дані старої етикетки {pn}, потім DigiKey і склад."))
 
+    dk_auto, dk_why = _digikey_pn(listing, old)
+    old_dk = (old or {}).get("digikey_pn") or ""
     fields = {}
-    for field in FIELDS:
-        cands = _candidates(field, saved, product, listing, old, edits.get(field))
-        autos = _candidates(field, None, product, listing, old)
+    for field in EDIT_FIELDS:
+        if field == "digikey_pn":
+            own = pn.upper() in old_dk.upper()       # у старому файлі може бути P/N іншого артикула
+            autos_raw = [("digikey", dk_auto), ("file", old_dk if own else "")]
+            chips_raw = autos_raw + ([] if own else [("file", old_dk)])
+        else:
+            stock = ("stock", _stock_value(field, product))
+            digikey = ("digikey", _digikey_value(field, listing))
+            file = ("file", (old or {}).get(field) or "")
+            autos_raw = [stock, digikey, file] if exact else [file, digikey, stock]
+            chips_raw = autos_raw
+        saved_value = _clean(getattr(saved, field)) if saved is not None else ""
+        cands = _candidates(([("saved", saved_value)] if saved_value else []) + chips_raw, edits.get(field))
+        autos = _candidates(autos_raw)
         auto = autos[0] if autos else None
         if field in edits:
             chosen = {"source": "edit", "value": _clean(edits[field])}
-        elif saved is not None:
-            chosen = {"source": "saved", "value": _clean(getattr(saved, field))}
+        elif saved is not None and (saved_value or field != "digikey_pn"):
+            chosen = {"source": "saved", "value": saved_value}
         else:
             chosen = auto or {"source": "", "value": ""}
         fields[field] = {"value": chosen["value"], "source": chosen["source"], "label": SOURCES.get(chosen["source"], ""),
                          "auto": auto["value"] if auto else "", "candidates": cands}
         name = _FIELD_NAMES[field]
-        if chosen["source"] in ("stock", "digikey"):
+        if chosen["source"] in ("stock", "digikey", "file"):
             for other in autos[1:]:
-                if other["source"] in ("stock", "digikey"):
-                    issues.append(_issue("warn", f"{name}: {SOURCES[chosen['source']]} «{chosen['value']}», "
-                                                 f"а {SOURCES[other['source']]} «{other['value']}» — перевірте."))
+                issues.append(_issue("warn", f"{name}: {SOURCES[chosen['source']]} «{chosen['value']}», "
+                                             f"а {other['label']} «{other['value']}» — перевірте."))
         seen = (saved.seen or {}).get(field) if saved is not None and isinstance(saved.seen, dict) else None
         if chosen["source"] == "saved" and seen is not None and _norm(seen) != _norm(fields[field]["auto"]):
             issues.append(_issue("warn", f"{name}: {auto['label'] if auto else 'дані'} тепер «{fields[field]['auto']}» "
@@ -342,11 +405,14 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
     if not fields["frequency"]["value"]:
         issues.append(_issue("info" if fields["frequency"]["source"] in deliberate else "warn",
                              "Немає частоти — рядок «Frequency» не друкується."))
+    elif _mixed_units(fields["frequency"]["value"]):
+        issues.append(_issue("warn", f"Частота «{fields['frequency']['value']}»: у діапазоні різні одиниці — "
+                                     "впишіть в одних (напр. 0.650...9 GHz)."))
     if not fields["connector"]["value"]:
         issues.append(_issue("info" if fields["connector"]["source"] in deliberate else "warn",
                              "Немає роз'єму — рядок «Connector type» не друкується."))
 
-    dk_pn, dk_from = _digikey_pn(pn, listing, old)
+    dk_pn = fields["digikey_pn"]["value"]
     if show_dk is None:
         source = (getattr(order, "source", "") or "").lower()
         show_dk = bool(dk_pn) and (not order or source == "digikey")
@@ -355,18 +421,20 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
     else:
         dk_reason = "вибрано вручну"
     if show_dk and not dk_pn:
-        issues.append(_issue("warn", f"Digi-Key P/N не друкується: {dk_from}."))
+        issues.append(_issue("warn", f"Digi-Key P/N не друкується: {dk_why or 'не вказано'}."))
         show_dk = False
+    if dk_pn and not re.fullmatch(r"\d{3,6}-\S+-ND", dk_pn, re.I):
+        issues.append(_issue("warn", f"Digi-Key P/N «{dk_pn}» не схожий на номер DigiKey (3228-…-ND)."))
+    elif dk_pn and pn.upper() not in dk_pn.upper():
+        issues.append(_issue("warn", f"Digi-Key P/N {dk_pn} — не артикула {pn}, перевірте."))
 
     if old:
         if old["standard"]:
             for what, value in (("P/N", old["pn"]), ("штрихкод", old["barcode"]), ("QR", old["qr"])):
                 if value and value.upper() != pn.upper():
                     issues.append(_issue("info", f"У старому файлі {old['name']} {what}: {value} — на новій етикетці {pn}."))
-            if old["digikey_pn"] and dk_pn and old["digikey_pn"].upper() != dk_pn.upper():
-                issues.append(_issue("info", f"У старому файлі Digi-Key P/N {old['digikey_pn']} — правильний {dk_pn}."))
-            elif old["digikey_pn"] and not dk_pn and pn.upper() not in old["digikey_pn"].upper():
-                issues.append(_issue("info", f"У старому файлі Digi-Key P/N {old['digikey_pn']} іншого артикула — не друкується."))
+            if old_dk and dk_pn and old_dk.upper() != dk_pn.upper():
+                issues.append(_issue("info", f"У старому файлі Digi-Key P/N {old_dk} — на новій етикетці {dk_pn}."))
             if old["year"] and old["year"] != year:
                 issues.append(_issue("info", f"У старому файлі рік {old['year']} — на новій етикетці {year}."))
         else:
@@ -387,7 +455,7 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
     return {
         "sku": sku, "pn": pn, "qty": qty, "year": year,
         "product": ({"pk": product.pk, "name": product.name, "sku": product.sku} if product is not None else None),
-        "digikey_pn": dk_pn, "digikey_from": dk_from, "show_dk": bool(show_dk), "dk_reason": dk_reason,
+        "digikey_pn": dk_pn, "digikey_from": dk_why, "show_dk": bool(show_dk), "dk_reason": dk_reason,
         "fields": fields, "lines": lines, "issues": issues, "file": old,
         "can_print": not any(i["level"] == "error" for i in issues),
         # «тиснем і робить»: людина вже перевіряла, і з того часу немає зауважень — друк без вікна
@@ -395,7 +463,6 @@ def build(sku, qty=1, order=None, show_dk=None, edits=None) -> dict:
         "checked_at": saved.checked_at.isoformat() if saved is not None and saved.checked_at else None,
         "checked_by": saved.checked_by if saved is not None else "",
     }
-
 
 
 def label_lines(digikey_pn, description, frequency, connector) -> list[tuple[str, str]]:
@@ -426,16 +493,15 @@ def render(data) -> str:
 
 
 def save(sku, edits, user=None):
-    """Людина перевірила етикетку: запам'ятовує тексти й те, що тоді було на складі / DigiKey."""
+    """Людина перевірила етикетку артикула: запам'ятовує тексти й те, що тоді давали склад / DigiKey / файл."""
     from labels_app.models import LabelText
-    product = find_product(sku)
-    if product is None:
-        return None
-    fields = build(sku, edits={f: v for f, v in (edits or {}).items() if f in FIELDS})["fields"]
-    text, _ = LabelText.objects.get_or_create(product=product)
-    for field in FIELDS:
+    data = build(sku, edits=edits)
+    fields = data["fields"]
+    text = LabelText.objects.filter(sku__iexact=data["pn"]).first() or LabelText(sku=data["pn"])
+    text.product_id = data["product"]["pk"] if data["product"] else None
+    for field in EDIT_FIELDS:
         setattr(text, field, fields[field]["value"][:LabelText._meta.get_field(field).max_length])
-    text.seen = {field: fields[field]["auto"] for field in FIELDS}
+    text.seen = {field: fields[field]["auto"] for field in EDIT_FIELDS}
     text.checked_at = timezone.now()
     text.checked_by = getattr(user, "username", "") or ""
     text.save()

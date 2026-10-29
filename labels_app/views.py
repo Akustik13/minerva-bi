@@ -243,7 +243,7 @@ def _antenna_args(params):
         order = SalesOrder.objects.filter(pk=int(order_id)).first()
     dk = params.get('dk')
     show_dk = None if dk in (None, '') else str(dk).lower() in ('1', 'true', 'on')
-    edits = {f: params.get(f) for f in antenna.FIELDS if params.get(f) is not None}
+    edits = {f: params.get(f) for f in antenna.EDIT_FIELDS if params.get(f) is not None}
     return (params.get('sku') or '').strip(), params.get('qty') or 1, order, show_dk, edits
 
 
