@@ -142,12 +142,12 @@ def forwarded_origin(msg, thread_msgs=()):
     """
     from email_assistant.categorize import counterparts
     from email_assistant.crm_link import FREE_MAIL_DOMAINS, is_own, own_addresses
-    from email_assistant.quotes import forwarded
+    from email_assistant.quotes import forwarded_in
     own = own_addresses()
     for m in [msg] + [x for x in reversed(list(thread_msgs)) if x.pk != msg.pk]:
         if counterparts(m, own):          # є зовнішній учасник — це не внутрішнє пересилання
             return None
-        fw = forwarded(m.body_text, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні
+        fw = forwarded_in(m, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні; текст або HTML
         if fw:
             domain = fw['from'].split('@', 1)[1]
             return dict(fw, message=m, domain='' if domain in FREE_MAIL_DOMAINS else domain)

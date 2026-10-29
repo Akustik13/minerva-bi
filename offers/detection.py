@@ -18,7 +18,7 @@ from datetime import timedelta
 from django.db import connection, transaction
 from django.utils import timezone
 
-from email_assistant.quotes import QUOTE_START_RE, forwarded, new_text  # noqa: F401 — текст без цитати, спільний із поштою
+from email_assistant.quotes import QUOTE_START_RE, forwarded, forwarded_in, new_text  # noqa: F401 — текст без цитати, спільний із поштою
 
 logger = logging.getLogger(__name__)
 
@@ -115,12 +115,13 @@ def _forwarded(msg, own=None):
     if not (is_own(msg.from_email, own) or msg.category == "internal"):
         return None, (f"тип співрозмовника — {labels.get(msg.category, msg.category or 'ще не визначено')}: "
                       "запити шукаються лише від клієнтів і нових контактів")
-    fw = forwarded(msg.body_text, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні
+    fw = forwarded_in(msg, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні; текст або HTML
     if fw is None:
-        inner = forwarded(msg.body_text)
+        inner = forwarded_in(msg)
         if inner is not None:
             return None, f"переслано лише зі своїх адрес ({inner['from']}) — листа ззовні всередині не знайдено"
-        return None, "лист від своєї адреси, і пересланого листа з «Von: / From:» та адресою в ньому не знайдено"
+        where = "ні в тексті, ні в HTML-версії листа" if (msg.body_html or "").strip() else "у тексті листа (HTML-версії немає)"
+        return None, f"лист від своєї адреси, і пересланого листа з «Von: / From:» та адресою не знайдено {where}"
     kind = address_category(msg.account_id, fw["from"])
     if kind not in CATEGORIES:
         return None, f"переслано від {fw['from']} — це {labels.get(kind, kind)}, а не клієнт чи новий контакт"

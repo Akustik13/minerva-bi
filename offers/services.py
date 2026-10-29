@@ -450,8 +450,8 @@ def create_from_thread(thread, user=None) -> Offer:
     customer = thread.crm_customer or (project.customer if project else None)
     fw = None
     if source is not None and is_own(source.from_email, own):   # колега переслав лист клієнта (FW / WG)
-        from email_assistant.quotes import forwarded
-        fw = forwarded(source.body_text, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні
+        from email_assistant.quotes import forwarded_in
+        fw = forwarded_in(source, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні; текст або HTML
         if fw and customer is None:
             from email_assistant.crm_link import find_customer
             customer = find_customer([fw["from"]])
@@ -568,7 +568,7 @@ def thread_source(thread):
     """Для Angebot з листування: (вихідний лист, пересланий лист клієнта | None, клієнт, проєкт).
     Колега переслав (FW / WG) — контакт і клієнт з пересланого листа."""
     from email_assistant.crm_link import find_customer, is_own, own_addresses
-    from email_assistant.quotes import forwarded
+    from email_assistant.quotes import forwarded_in
     msgs = list(thread.messages.filter(is_deleted=False).order_by("-sent_at"))
     own = own_addresses()
     source = next((m for m in msgs if not is_own(m.from_email, own)), msgs[0] if msgs else None)
@@ -583,7 +583,7 @@ def thread_source(thread):
     customer = thread.crm_customer or (project.customer if project else None)
     fw = None
     if source is not None and is_own(source.from_email, own):
-        fw = forwarded(source.body_text, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні
+        fw = forwarded_in(source, skip=lambda a: is_own(a, own))   # «WG: FW: …» — до листа ззовні; текст або HTML
         if fw and customer is None:
             customer = find_customer([fw["from"]])
     return source, fw, customer, project

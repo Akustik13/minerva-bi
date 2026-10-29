@@ -489,6 +489,44 @@ class ForwardedQuoteRequestTests(QuoteMailBase):
         r = self.client.post(f"/offers/api/message/{own_only.pk}/rescan/").json()
         self.assertEqual((r["ok"], r["state"]), (True, "none"))
 
+    def test_forward_only_in_html_version(self):
+        """Samsung / Outlook: text/plain — лише підпис колеги, пересланий лист клієнта — лише в HTML."""
+        sig = ("Mit freundlichen Grüßen / Best regards\nSergey Sevskiy\n============================================\n"
+               "Sevskiy GmbH\nSchatzbogen 43\n81829 München\nTel.:   +49 89 38-90-72-29\n"
+               "E-Mail: sergey@sevskiy.example\n============================================\n")
+        html = ("<div>" + sig.replace("\n", "<br>") + "</div><div><br></div>"
+                "<div>-------- Ursprüngliche Nachricht --------</div>"
+                "<div>Von: Denys Repetynskyi Module ETP LLC &lt;procurement10@moduletp.example&gt; </div>"
+                "<div>Datum: 28.10.26  14:23  (GMT+01:00) </div><div>An: \"Dr. Sergey Sevskiy\" &lt;" + ME + "&gt; </div>"
+                "<div>Betreff: Denys SL Tire </div><div><br></div>"
+                "<div>Good afternoon, my name is Denys, and I’m the procurement manager at SL Tire. We’d like to place a "
+                "larger order.</div><div>Filter FT220407.</div><div>Please provide pricing and production lead times "
+                "for 35 units and 100 units.</div><div>-- <br>Best regard,<br>Denys Repetynskyi - supply manager "
+                "Module ETP LLC</div>")
+        self._uid += 1
+        m = save_message(self.account, {
+            "uid": self._uid, "message_id": f"<qr{self._uid}@x.example>", "in_reply_to": "", "references": [],
+            "subject": "FW: Denys SL Tire", "from_email": ME, "from_name": "Sergey", "to_emails": [ME], "cc_emails": [],
+            "body_text": sig, "body_html": html, "attachments": [], "is_read": False,
+            "sent_at": datetime(2026, 10, 28, 17, 20, tzinfo=dt_tz.utc)}, "INBOX")
+        qr = self.qr(m)
+        self.assertIsNotNone(qr)
+        self.assertTrue(qr.reason.startswith("переслано від procurement10@moduletp.example"), qr.reason)
+        data = services.quick_prefill(m.thread)
+        self.assertEqual((data["contact_email"], data["lines"][0]["sku"], data["lines"][0]["qtys"]),
+                         ("procurement10@moduletp.example", "FT220407", "35; 100"))
+
+    def test_forward_header_variants(self):
+        from email_assistant.quotes import forwarded
+        tail = "\nBetreff: RFQ\n\nPlease quote 35 units.\n"
+        for body in ("> -------- Original Message --------\n> From: Denys <d@client.example>" + tail.replace("\n", "\n> "),
+                     "**Von:** Denys <d@client.example>" + tail,
+                     "-------- Forwarded message --------\nVon:\nDenys <d@client.example>" + tail):
+            fw = forwarded("Hallo\n\n" + body)
+            self.assertIsNotNone(fw, body)
+            self.assertEqual((fw["from"], fw["subject"]), ("d@client.example", "RFQ"), body)
+            self.assertIn("Please quote 35 units.", fw["text"])
+
     def test_angebot_contact_and_customer_from_forwarded_sender(self):
         from crm.models import Customer
         buyer = Customer.objects.create(name="Denys", company="SL Tire", email="procurement10@moduletp.example")

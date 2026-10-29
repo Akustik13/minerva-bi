@@ -11,15 +11,18 @@ QUOTE_START_RE = re.compile(
 # Пересланий лист: «-------- Ursprüngliche Nachricht --------» / «---------- Forwarded message ---------» і заголовки
 FORWARD_RE = re.compile(r"^\s*-{2,}\s*(?:original\s+message|ursprüngliche\s+nachricht|forwarded\s+message|"
                         r"weitergeleitete\s+nachricht|пересланий\s+лист|пересланное\s+сообщение)", re.IGNORECASE)
-HEADER_RE = re.compile(r"^\s*\*?(von|from|datum|date|gesendet|sent|an|to|cc|betreff|subject|від|от|дата|кому|тема)"
-                       r"\*?\s*:\s*(.*)$", re.IGNORECASE)
+HEADER_RE = re.compile(r"^\s*\**(von|from|datum|date|gesendet|sent|an|to|cc|betreff|subject|від|от|дата|кому|тема)"
+                       r"\**\s*:\**\s*(.*)$", re.IGNORECASE)
+_QUOTED_RE = re.compile(r"^\s*(?:>\s?)+")
 SENDER_HEADERS = ("von", "from", "від", "от")
 SUBJECT_HEADERS = ("betreff", "subject", "тема")
 ADDRESS_RE = re.compile(r"[\w.+'-]+@[\w-]+(?:\.[\w-]+)+")
 
 
 def _forward_blocks(lines):
-    """Переслані листи в тексті по черзі (зовнішній — першим): {from, name, subject, text}."""
+    """Переслані листи в тексті по черзі (зовнішній — першим): {from, name, subject, text}.
+    Цитування «> » не заважає; заголовок без значення («Von:» окремим рядком, як у HTML) бере наступний рядок."""
+    lines = [_QUOTED_RE.sub("", ln) for ln in lines]
     start = 0
     while True:
         i = next((n for n in range(start, len(lines)) if FORWARD_RE.match(lines[n]) or (
@@ -28,12 +31,16 @@ def _forward_blocks(lines):
             return
         if FORWARD_RE.match(lines[i]):
             i += 1
-        headers, end = {}, i
+        headers, end, pending = {}, i, None
         while i < len(lines):   # заголовки, між якими можуть бути порожні рядки; перший інший рядок — текст листа
             m = HEADER_RE.match(lines[i])
             if m:
-                headers.setdefault(m.group(1).lower(), m.group(2).strip())
+                key, value = m.group(1).lower(), m.group(2).strip()
+                headers.setdefault(key, value)
+                pending = key if not value and not headers[key] else None
                 end = i + 1
+            elif lines[i].strip() and pending:      # «Von:» / наступний рядок — «Denys <procurement10@…>»
+                headers[pending], pending, end = lines[i].strip(), None, i + 1
             elif lines[i].strip():
                 break
             i += 1
@@ -44,6 +51,16 @@ def _forward_blocks(lines):
             yield {"from": address.group(0).lower(), "name": sender.split("<")[0].strip(' "\''),
                    "subject": next((headers[h] for h in SUBJECT_HEADERS if h in headers), ""),
                    "text": new_text("\n".join(lines[end:]))}
+
+
+def forwarded_in(msg, skip=None):
+    """Пересланий лист у листі: у тексті, а немає там — у HTML-версії (поштовик Samsung, Outlook кладуть переслане
+    лише в HTML, а text/plain — лише новий текст і підпис)."""
+    found = forwarded(msg.body_text, skip=skip)
+    if found is None and getattr(msg, "body_html", ""):
+        from email_assistant.imap_client import html_to_text
+        found = forwarded(html_to_text(msg.body_html), skip=skip)
+    return found
 
 
 def forwarded(body, skip=None):
