@@ -1,5 +1,6 @@
 {% extends "admin/change_form.html" %}
-{# «📂 Джерело знань»: поля папки / сайту за видом, «📤 Файли з ПК» (upload_panel.html) і 🗑 у «Документи джерела» #}
+{% comment %}«📂 Джерело знань»: поля папки / сайту за видом, «📂 Вибрати на сервері» з підказками шляху, «📤 Файли з ПК»
+(upload_panel.html; на «Додати» — вибране завантажується після «Зберегти») і 🗑 у «Документи джерела»{% endcomment %}
 {% block extrastyle %}{{ block.super }}
 <style>
   #ks-up { max-width: 820px; }
@@ -8,11 +9,26 @@
   #ks-up .ks-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   #ks-up .ks-hint { color: var(--body-quiet-color, #888); }
   #ks-up .ks-opts { display: flex; flex-wrap: wrap; gap: 18px; margin: 8px 0 4px; }
+  #ks-up .ks-picked { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--darkened-bg, #f4f4f4); }
+  #ks-up .ks-picked ul { margin: 4px 0 0; padding-left: 18px; }
+  #ks-up .ks-picked li { list-style: disc; overflow-wrap: anywhere; }
   #ks-up .ks-progress { margin-top: 8px; font-weight: 600; }
   #ks-up .ks-log { margin: 6px 0 0; padding-left: 18px; max-height: 260px; overflow: auto; }
   #ks-up .ks-log li { list-style: none; margin: 1px 0; overflow-wrap: anywhere; }
   #ks-up .ks-log .ks-bad { color: #e57373; }
   #ks-up .ks-log .ks-skip { color: var(--body-quiet-color, #888); }
+  .ks-pathtools { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ks-pathtools .ks-hint { color: var(--body-quiet-color, #888); }
+  #ks-browse { margin-top: 6px; max-width: 760px; border: 1px solid var(--hairline-color, #ccc); border-radius: 8px;
+               padding: 8px 10px; }
+  form .aligned .ks-pathtools, form .aligned #ks-browse { margin-left: 170px; }      /* під полем, як підказки admin */
+  @media (max-width: 1024px) { form .aligned .ks-pathtools, form .aligned #ks-browse { margin-left: 0; } }
+  #ks-browse .ks-bpath { font-family: monospace; overflow-wrap: anywhere; margin-bottom: 4px; }
+  #ks-browse ul { margin: 4px 0; padding: 0; max-height: 260px; overflow: auto; }
+  #ks-browse li { list-style: none; margin: 0; }
+  #ks-browse li a { display: block; padding: 4px 2px; overflow-wrap: anywhere; cursor: pointer; }
+  #ks-browse .ks-bbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  #ks-browse .ks-berr { color: #e57373; }
   .ks-files { border-collapse: collapse; max-width: 1000px; }
   .ks-files th, .ks-files td { padding: 3px 10px 3px 0; text-align: left; vertical-align: top; border: 0;
                                border-bottom: 1px solid var(--hairline-color, #eee); }
@@ -28,10 +44,15 @@
 {% block admin_change_form_document_ready %}{{ block.super }}
 <script>
 (function () {
-  // Поля за видом: папка — шлях, підпапки, типи; сайт — посилання
+  var MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (window.matchMedia && matchMedia('(pointer: coarse)').matches);
+  var DEFAULT_TYPES = ['pdf', 'docx', 'txt', 'csv', 'md', 'html', 'htm', 'xlsx'];
+  var nameInput = document.getElementById('id_name');
+
+  // Поля за видом: папка — шлях, підпапки, типи, файли з ПК; сайт — посилання
   var kind = document.getElementById('id_kind');
+  function isFolder() { return !kind || kind.value === 'folder'; }
   function toggle() {
-    var folder = !kind || kind.value === 'folder';
+    var folder = isFolder();
     document.querySelectorAll('.field-path, .field-recursive, .field-file_types_text, .field-max_file_mb, .field-roots_help, fieldset.ks-folder-only')
       .forEach(function (e) { e.style.display = folder ? '' : 'none'; });
     document.querySelectorAll('.field-url, .field-follow_links')
@@ -50,6 +71,116 @@
         });
       });
   }
+  function getJSON(url) {
+    return fetch(url, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).catch(function () { return null; });
+  }
+  function setName(value) {
+    if (nameInput && !nameInput.value.trim() && value) nameInput.value = value;
+  }
+
+  var box = document.getElementById('ks-up');
+  var BASE = box ? box.dataset.base : '/admin/rag_assistant/knowledgesource/';
+
+  // 📂 Папка на сервері (NAS): вибір і підказки шляху — лише в дозволених коренях (browse/)
+  var pathInput = document.getElementById('id_path');
+  if (pathInput && pathInput.tagName === 'INPUT') {
+    var tools = document.createElement('div');
+    tools.className = 'ks-pathtools';
+    tools.innerHTML = '<button type="button" class="button" id="ks-browse-btn">📂 Вибрати папку на сервері…</button>'
+      + '<span class="ks-hint">або почніть вводити шлях — Minerva підкаже папки</span>';
+    (pathInput.closest('.flex-container') || pathInput).insertAdjacentElement('afterend', tools);   // під полем, не поруч
+    var panel = document.createElement('div');
+    panel.id = 'ks-browse';
+    panel.hidden = true;
+    tools.insertAdjacentElement('afterend', panel);
+    var list = document.createElement('datalist');
+    list.id = 'ks-path-list';
+    document.body.appendChild(list);
+    pathInput.setAttribute('list', 'ks-path-list');
+    pathInput.setAttribute('autocomplete', 'off');
+
+    var show = function (path) {
+      panel.hidden = false;
+      panel.textContent = '⏳ …';
+      getJSON(BASE + 'browse/?path=' + encodeURIComponent(path || '')).then(function (j) {
+        panel.innerHTML = '';
+        if (!j || !j.ok) {
+          var err = document.createElement('div');
+          err.className = 'ks-berr';
+          err.textContent = (j && j.error) || 'Немає зв\'язку з Minerva';
+          panel.appendChild(err);
+        }
+        var head = document.createElement('div');
+        head.className = 'ks-bpath';
+        head.textContent = j && j.path ? j.path + (j.files ? '  · файлів тут: ' + j.files : '') : 'Дозволені корені:';
+        panel.appendChild(head);
+        var ul = document.createElement('ul');
+        if (j && j.path) {
+          var up = document.createElement('li'), a = document.createElement('a');
+          a.textContent = '⬆ вище';
+          a.addEventListener('click', function () { show(j.parent); });
+          up.appendChild(a);
+          ul.appendChild(up);
+        }
+        ((j && j.folders) || []).forEach(function (f) {
+          var li = document.createElement('li'), a = document.createElement('a');
+          a.textContent = '📁 ' + f.name;
+          a.addEventListener('click', function () { show(f.path); });
+          li.appendChild(a);
+          ul.appendChild(li);
+        });
+        if (j && j.ok && !j.folders.length) {
+          var none = document.createElement('li');
+          none.className = 'ks-hint';
+          none.textContent = j.path ? 'підпапок немає' : 'жоден корінь ще не створено на сервері';
+          ul.appendChild(none);
+        }
+        panel.appendChild(ul);
+        var bar = document.createElement('div');
+        bar.className = 'ks-bbar';
+        if (j && j.path) {
+          var pick = document.createElement('button');
+          pick.type = 'button';
+          pick.className = 'button';
+          pick.textContent = '✓ Вибрати цю папку';
+          pick.addEventListener('click', function () {
+            pathInput.value = j.path;
+            setName(j.path.split(/[\\/]/).filter(Boolean).pop());
+            panel.hidden = true;
+          });
+          bar.appendChild(pick);
+        }
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'button';
+        close.textContent = 'Закрити';
+        close.addEventListener('click', function () { panel.hidden = true; });
+        bar.appendChild(close);
+        panel.appendChild(bar);
+      });
+    };
+    document.getElementById('ks-browse-btn').addEventListener('click', function () {
+      show(pathInput.value.trim());
+    });
+
+    var timer = null;
+    pathInput.addEventListener('input', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        var v = pathInput.value, cut = Math.max(v.lastIndexOf('/'), v.lastIndexOf('\\'));
+        var dir = cut >= 0 ? v.slice(0, cut + 1) : '', start = (cut >= 0 ? v.slice(cut + 1) : v).toLowerCase();
+        getJSON(BASE + 'browse/?path=' + encodeURIComponent(dir.replace(/[\\/]+$/, '') || '')).then(function (j) {
+          list.innerHTML = '';
+          ((j && j.folders) || []).filter(function (f) { return !start || f.name.toLowerCase().indexOf(start) === 0 || f.path.toLowerCase().indexOf(v.toLowerCase()) === 0; })
+            .slice(0, 50).forEach(function (f) {
+              var o = document.createElement('option');
+              o.value = f.path;
+              list.appendChild(o);
+            });
+        });
+      }, 250);
+    });
+  }
 
   // 🗑 файл у папці, яку створила Minerva
   var table = document.getElementById('ks-files-table');
@@ -65,18 +196,30 @@
     });
   });
 
-  // 📤 Файли з ПК
-  var box = document.getElementById('ks-up');
+  // 📤 Файли з ПК / телефона
   if (!box) return;
-  var types = (box.dataset.types || '').split(',').filter(Boolean);
-  var maxMb = +box.dataset.maxMb || 25;
+  var NEW = !!box.dataset.new;
   var log = document.getElementById('ks-log'), prog = document.getElementById('ks-progress');
+  var picked = document.getElementById('ks-picked');
   var sub = document.getElementById('ks-sub'), replace = document.getElementById('ks-replace');
-  var form = box.closest('form'), dirty = false, busy = false;
-  var KEY = 'ks-log-' + box.dataset.upload;
+  var form = box.closest('form'), dirty = false, busy = false, pending = [];
+  var typesInput = document.getElementById('id_file_types_text'), maxInput = document.getElementById('id_max_file_mb');
+  function types() {
+    if (NEW && typesInput && typesInput.value.trim()) {
+      return typesInput.value.split(',').map(function (t) { return t.trim().toLowerCase().replace(/^\./, ''); }).filter(Boolean);
+    }
+    return NEW ? DEFAULT_TYPES : (box.dataset.types || '').split(',').filter(Boolean);
+  }
+  function maxMb() { return (NEW && maxInput && +maxInput.value) || +box.dataset.maxMb || 25; }
+  function logKey() { return 'ks-log-' + box.dataset.upload; }
+
+  if (MOBILE) {                                     // на телефоні — лише вибір файлів
+    document.getElementById('ks-pick-dir').hidden = true;
+    document.getElementById('ks-drop-hint').hidden = true;
+  }
   try {
-    var saved = sessionStorage.getItem(KEY);
-    if (saved) { log.innerHTML = saved; sessionStorage.removeItem(KEY); }
+    var saved = !NEW && sessionStorage.getItem(logKey());
+    if (saved) { log.innerHTML = saved; sessionStorage.removeItem(logKey()); }
   } catch (e) { /* без сховища — без журналу після оновлення */ }
   if (form) form.addEventListener('input', function (e) { if (!box.contains(e.target)) dirty = true; });
   sub.addEventListener('keydown', function (e) { if (e.key === 'Enter') e.preventDefault(); });   // не «Зберегти»
@@ -91,30 +234,90 @@
     return p.split('/').some(function (part) { return /^(\.|~\$|@|#)/.test(part); });
   }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function mb(bytes) {
+    return bytes < 1048576 ? Math.max(1, Math.round(bytes / 1024)) + ' КБ' : (bytes / 1048576).toFixed(1) + ' МБ';
+  }
 
   async function waitScan() {
     for (var i = 0; i < 300; i++) {
       await sleep(2000);
-      var j = await fetch(box.dataset.status, {credentials: 'same-origin'}).then(function (r) { return r.json(); })
-        .catch(function () { return null; });
+      var j = await getJSON(box.dataset.status);
       if (j && !j.running) return j;
     }
     return null;
   }
 
+  // Вибране на сторінці «Додати» — чекає «Зберегти»; назва джерела — назва папки
+  function choose(list) {
+    list = list.filter(function (x) { return !hiddenPath(x.rel || x.file.name); });
+    if (!NEW) return upload(list);
+    pending = list;
+    if (!list.length) { picked.hidden = true; return; }
+    var first = list[0].rel ? list[0].rel.split('/')[0] : '';
+    setName(first && list.every(function (x) { return x.rel && x.rel.split('/')[0] === first; }) ? first : 'Документи');
+    var size = list.reduce(function (s, x) { return s + x.file.size; }, 0);
+    picked.innerHTML = '';
+    var b = document.createElement('b');
+    b.textContent = 'Вибрано: ' + list.length + ' файл(ів), ' + mb(size) + ' — завантажаться після «Зберегти».';
+    picked.appendChild(b);
+    var ul = document.createElement('ul');
+    list.slice(0, 8).forEach(function (x) {
+      var li = document.createElement('li');
+      li.textContent = x.rel || x.file.name;
+      ul.appendChild(li);
+    });
+    if (list.length > 8) {
+      var more = document.createElement('li');
+      more.textContent = '… ще ' + (list.length - 8);
+      ul.appendChild(more);
+    }
+    picked.appendChild(ul);
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'button';
+    cancel.textContent = '✕ Скасувати вибір';
+    cancel.addEventListener('click', function () { pending = []; picked.hidden = true; });
+    picked.appendChild(cancel);
+    picked.hidden = false;
+  }
+
+  if (NEW && form) form.addEventListener('submit', async function (e) {
+    if (!pending.length || !isFolder()) return;      // без файлів — звичайне збереження
+    e.preventDefault();
+    if (busy) return;
+    busy = true;
+    prog.hidden = false;
+    prog.textContent = '⏳ Створюю джерело…';
+    var fd = new FormData(form);
+    fd.append('_continue', '1');
+    var r = await fetch(form.action || location.href, {method: 'POST', body: fd, credentials: 'same-origin'})
+      .catch(function () { return null; });
+    var m = r && r.url.match(/\/knowledgesource\/(\d+)\/change\//);
+    if (!m) {                                       // помилки у формі — показати їх звичайним способом
+      busy = false;
+      alert('Джерело не збережено — перевірте поля форми. Файли потім виберіть ще раз.');
+      HTMLFormElement.prototype.submit.call(form);
+      return;
+    }
+    box.dataset.upload = BASE + m[1] + '/upload/';
+    box.dataset.status = BASE + m[1] + '/status/';
+    box.dataset.change = BASE + m[1] + '/change/';
+    busy = false;
+    upload(pending);
+  });
+
   async function upload(list) {
     if (busy || !list.length) return;
     busy = true;
-    var todo = list.filter(function (x) { return !hiddenPath(x.rel || x.file.name); });
-    var skipped = list.length - todo.length, ok = 0, bad = 0;
+    var allowed = types(), limit = maxMb(), ok = 0, bad = 0;
     log.innerHTML = '';
     prog.hidden = false;
-    for (var n = 0; n < todo.length; n++) {
-      var x = todo[n], label = x.rel || x.file.name;
-      prog.textContent = '⏳ ' + (n + 1) + ' / ' + todo.length + ': ' + label;
+    for (var n = 0; n < list.length; n++) {
+      var x = list[n], label = x.rel || x.file.name;
+      prog.textContent = '⏳ ' + (n + 1) + ' / ' + list.length + ': ' + label;
       var ext = x.file.name.indexOf('.') >= 0 ? x.file.name.split('.').pop().toLowerCase() : '';
-      if (types.indexOf(ext) < 0) { row('ks-bad', '– ' + label + ': файли .' + (ext || '?') + ' сюди не беруться'); bad++; continue; }
-      if (x.file.size > maxMb * 1048576) { row('ks-bad', '– ' + label + ': більший за ' + maxMb + ' МБ'); bad++; continue; }
+      if (allowed.indexOf(ext) < 0) { row('ks-bad', '– ' + label + ': файли .' + (ext || '?') + ' сюди не беруться'); bad++; continue; }
+      if (x.file.size > limit * 1048576) { row('ks-bad', '– ' + label + ': більший за ' + limit + ' МБ'); bad++; continue; }
       var fd = new FormData();
       fd.append('file', x.file);
       fd.append('relpath', x.rel || '');
@@ -128,8 +331,7 @@
         } else { bad++; row('ks-bad', '⚠️ ' + label + ': ' + j.error); }
       } catch (e) { bad++; row('ks-bad', '⚠️ ' + label + ': немає зв\'язку з Minerva'); }
     }
-    if (skipped) row('ks-skip', '– пропущено прихованих і службових файлів: ' + skipped);
-    var summary = 'Завантажено ' + ok + ' з ' + todo.length + (bad ? ' · не вдалося ' + bad : '');
+    var summary = 'Завантажено ' + ok + ' з ' + list.length + (bad ? ' · не вдалося ' + bad : '');
     prog.textContent = summary;
     if (ok) {
       var done = new FormData();
@@ -140,17 +342,17 @@
       var st = await waitScan();
       summary += st ? ' · ✓ готово, документів у джерелі: ' + st.documents : '';
       prog.textContent = summary;
-      if (!dirty) {                                    // журнал переживає оновлення сторінки (sessionStorage)
-        var head = document.createElement('li'), b = document.createElement('b');
-        head.className = 'ks-ok';
-        b.textContent = summary;
-        head.appendChild(b);
-        log.insertBefore(head, log.firstChild);
-        try { sessionStorage.setItem(KEY, log.innerHTML); } catch (e) { /* без сховища — лише оновлення */ }
-        location.reload();
-      } else {
-        row('ks-skip', 'Оновіть сторінку, щоб побачити нові документи (спершу збережіть змінені поля).');
-      }
+    }
+    if (NEW || (ok && !dirty)) {                     // журнал переживає перехід на картку (sessionStorage)
+      var head = document.createElement('li'), b = document.createElement('b');
+      head.className = 'ks-ok';
+      b.textContent = summary;
+      head.appendChild(b);
+      log.insertBefore(head, log.firstChild);
+      try { sessionStorage.setItem(logKey(), log.innerHTML); } catch (e) { /* без сховища — лише перехід */ }
+      location.href = box.dataset.change;
+    } else if (ok) {
+      row('ks-skip', 'Оновіть сторінку, щоб побачити нові документи (спершу збережіть змінені поля).');
     }
     busy = false;
   }
@@ -159,11 +361,11 @@
   document.getElementById('ks-pick-files').addEventListener('click', function () { pickFiles.click(); });
   document.getElementById('ks-pick-dir').addEventListener('click', function () { pickDir.click(); });
   pickFiles.addEventListener('change', function () {
-    upload(Array.from(pickFiles.files).map(function (f) { return {file: f, rel: ''}; }));
+    choose(Array.from(pickFiles.files).map(function (f) { return {file: f, rel: ''}; }));
     pickFiles.value = '';
   });
   pickDir.addEventListener('change', function () {
-    upload(Array.from(pickDir.files).map(function (f) { return {file: f, rel: f.webkitRelativePath || ''}; }));
+    choose(Array.from(pickDir.files).map(function (f) { return {file: f, rel: f.webkitRelativePath || ''}; }));
     pickDir.value = '';
   });
 
@@ -195,10 +397,10 @@
   drop.addEventListener('drop', async function (e) {
     var entries = Array.from(e.dataTransfer.items || []).map(function (i) { return i.webkitGetAsEntry && i.webkitGetAsEntry(); })
       .filter(Boolean);
-    if (!entries.length) return upload(Array.from(e.dataTransfer.files).map(function (f) { return {file: f, rel: ''}; }));
+    if (!entries.length) return choose(Array.from(e.dataTransfer.files).map(function (f) { return {file: f, rel: ''}; }));
     var out = [];
     for (var i = 0; i < entries.length; i++) await walk(entries[i], out);
-    upload(out);
+    choose(out);
   });
   // файл, кинутий повз поле, не відкривається замість сторінки
   window.addEventListener('dragover', function (e) { e.preventDefault(); });

@@ -83,6 +83,35 @@ def check_folder(path) -> str:
     return real
 
 
+BROWSE_MAX = 300
+
+
+def browse(path="") -> dict:
+    """«📂 Вибрати на сервері»: дозволені корені (path порожній) або підпапки папки — лише в коренях, без прихованих
+    і службових (@eaDir), посилання (symlink) не показуються. → {path, parent, folders [{name, path}], files}."""
+    roots = [r for r in allowed_roots() if os.path.isdir(r)]
+    if not (path or "").strip():
+        return {"path": "", "parent": "", "folders": [{"name": r, "path": r} for r in roots], "files": 0}
+    real = check_folder(path.strip())
+    folders, files = [], 0
+    try:
+        with os.scandir(real) as entries:
+            for e in sorted(entries, key=lambda e: e.name.lower()):
+                if e.name.startswith((".", "@", "#", "~$")):
+                    continue
+                if e.is_dir(follow_symlinks=False):
+                    if len(folders) < BROWSE_MAX:
+                        folders.append({"name": e.name, "path": os.path.join(real, e.name)})
+                elif e.is_file(follow_symlinks=False):
+                    files += 1
+    except OSError as e:
+        raise SourceError(f"Папку не прочитати: {e.strerror or type(e).__name__}") from e
+    parent = os.path.dirname(real)
+    if real in roots or not any(_inside(parent, r) for r in roots):
+        parent = ""
+    return {"path": real, "parent": parent, "folders": folders, "files": files}
+
+
 def resolve(source, rel) -> str:
     """Шлях файлу джерела — лише всередині його папки й дозволених коренів; '' — якщо файлу вже немає."""
     try:
@@ -284,7 +313,7 @@ class SkuIndex:
 
 def _links(source, name, skus):
     """Прив'язки документа; артикул шукається спершу в назві файлу / сторінки, потім у шляху (назви папок)."""
-    base = os.path.basename(urlparse(name).path if "://" in name else name)
+    base = os.path.splitext(os.path.basename(urlparse(name).path if "://" in name else name))[0]   # «…FT220407.pdf»
     product_id = source.product_id or ((skus.find(base) or skus.find(name)) if skus else None)
     return {"customer_id": source.customer_id, "project_id": source.project_id, "product_id": product_id}
 

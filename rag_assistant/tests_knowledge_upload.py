@@ -53,6 +53,7 @@ class ManagedFolderTests(UploadBase):
         ok = self.upload(source, "FT-100 Datenblatt.pdf", relpath="Antennen/2026/FT-100 Datenblatt.pdf")
         self.assertEqual((ok["ok"], ok["status"], ok["path"]), (True, "added", "Antennen/2026/FT-100 Datenblatt.pdf"))
         self.assertTrue(os.path.isfile(os.path.join(source.path, "Antennen", "2026", "FT-100 Datenblatt.pdf")))
+        self.assertEqual(self.upload(source, "Pruefbericht FT-100.pdf")["status"], "added")       # артикул перед .pdf
         self.assertEqual(self.upload(source, "a.txt", b"Montage", subfolder="Notizen")["path"], "Notizen/a.txt")
         self.assertEqual(self.upload(source, "a.txt", b"Montage neu", subfolder="Notizen", replace="0")["status"], "exists")
         self.assertEqual(self.upload(source, "a.txt", b"Montage neu", subfolder="Notizen")["status"], "replaced")
@@ -70,15 +71,16 @@ class ManagedFolderTests(UploadBase):
             self.assertFalse(res["ok"], name)
             self.assertIn(why, res["error"], name)
         self.assertFalse(os.path.exists(os.path.join(self.media, "evil.pdf")))
-        self.assertEqual(sorted(n for n in os.listdir(source.path)), ["Antennen", "Notizen"])   # без .part-файлів
+        self.assertEqual(sorted(os.listdir(source.path)), ["Antennen", "Notizen", "Pruefbericht FT-100.pdf"])   # без .part
 
         r = self.client.post(f"/admin/rag_assistant/knowledgesource/{source.pk}/upload/", {"action": "done"})
         self.assertEqual(r.json(), {"ok": True, "scan": "started"})
         items = {i.source_path: i for i in source.items.all()}
-        self.assertEqual(set(items), {"Antennen/2026/FT-100 Datenblatt.pdf", "Notizen/a.txt"})
+        self.assertEqual(set(items), {"Antennen/2026/FT-100 Datenblatt.pdf", "Pruefbericht FT-100.pdf", "Notizen/a.txt"})
         self.assertEqual(items["Antennen/2026/FT-100 Datenblatt.pdf"].product_id, product.pk)
+        self.assertEqual(items["Pruefbericht FT-100.pdf"].product_id, product.pk)
         status = self.client.get(f"/admin/rag_assistant/knowledgesource/{source.pk}/status/").json()
-        self.assertEqual((status["running"], status["documents"]), (False, 2))
+        self.assertEqual((status["running"], status["documents"]), (False, 3))
         page = self.client.get(f"/admin/rag_assistant/knowledgesource/{source.pk}/change/")
         self.assertContains(page, "📤 Завантажити файли")
         self.assertContains(page, "📁 Завантажити папку")
@@ -122,6 +124,34 @@ class ManagedFolderTests(UploadBase):
         listing = self.client.get("/admin/rag_assistant/knowledgesource/")
         self.assertContains(listing, "Team")
         self.assertNotContains(listing, "Privat")
+
+
+class PickTests(UploadBase):
+    def test_add_page_offers_pickers(self):
+        page = self.client.get(ADD)
+        self.assertContains(page, "📤 Вибрати файли")                                   # одразу, ще до «Зберегти»
+        self.assertContains(page, 'data-new="1"')
+        self.assertContains(page, "завантажаться після")
+        self.assertContains(page, "📂 Вибрати папку на сервері")                        # підказка в «Де можна брати»
+
+    def test_browse_server_folders(self):
+        os.makedirs(os.path.join(self.folder, "Handbücher"))
+        os.makedirs(os.path.join(self.folder, "@eaDir"))
+        os.makedirs(os.path.join(self.folder, ".git"))
+        self.write("a.pdf", PDF)
+        roots = knowledge_sources.browse("")
+        self.assertIn(self.root, [f["path"] for f in roots["folders"]])
+        top = knowledge_sources.browse(self.root)
+        self.assertEqual(([f["name"] for f in top["folders"]], top["parent"]), (["Dokumentation"], ""))
+        inner = knowledge_sources.browse(self.folder)
+        self.assertEqual(([f["name"] for f in inner["folders"]], inner["files"], inner["parent"]),
+                         (["Handbücher"], 1, self.root))                                 # без @eaDir і .git
+        with self.assertRaises(knowledge_sources.SourceError):
+            knowledge_sources.browse(os.path.dirname(self.root))                         # поза коренями — ні
+        r = self.client.get("/admin/rag_assistant/knowledgesource/browse/", {"path": self.folder}).json()
+        self.assertEqual((r["ok"], r["folders"][0]["name"]), (True, "Handbücher"))
+        self.assertIn("поза дозволеними", self.client.get("/admin/rag_assistant/knowledgesource/browse/",
+                                                           {"path": os.path.dirname(self.root)}).json()["error"])
 
 
 class ScanQueueTests(UploadBase):

@@ -1,11 +1,12 @@
-{# «📤 Файли з ПК» у картці джерела-папки: вибір файлів / папки на ПК або перетягування; JS — change_form.html #}
-<div id="ks-up" data-upload="{{ upload_url }}" data-status="{{ status_url }}" data-max-mb="{{ source.max_file_mb }}"
-     data-types="{{ types|join:',' }}">
+{% comment %}«📤 Файли з ПК» у картці джерела-папки: вибір файлів / папки на ПК (телефоні) або перетягування; JS — change_form.html.
+new — сторінка «Додати»: вибране чекає «Зберегти» (джерело створюється, потім файли завантажуються в нього){% endcomment %}
+<div id="ks-up" data-base="{{ base_url }}" data-upload="{{ upload_url }}" data-status="{{ status_url }}" data-change="{{ change_url }}"
+     data-max-mb="{{ max_mb }}" data-types="{{ types|join:',' }}"{% if new %} data-new="1"{% endif %}>
   <div class="ks-drop" id="ks-drop">
     <div class="ks-btns">
-      <button type="button" class="button" id="ks-pick-files">📤 Завантажити файли…</button>
-      <button type="button" class="button" id="ks-pick-dir">📁 Завантажити папку…</button>
-      <span class="ks-hint">або перетягніть сюди файли чи папку з ПК</span>
+      <button type="button" class="button" id="ks-pick-files">📤 {% if new %}Вибрати{% else %}Завантажити{% endif %} файли…</button>
+      <button type="button" class="button" id="ks-pick-dir">📁 {% if new %}Вибрати{% else %}Завантажити{% endif %} папку…</button>
+      <span class="ks-hint" id="ks-drop-hint">або перетягніть сюди файли чи папку з ПК</span>
     </div>
     <input type="file" id="ks-files" multiple accept="{{ accept }}" hidden>
     <input type="file" id="ks-dir" webkitdirectory multiple hidden>
@@ -14,9 +15,16 @@
     <label>У підпапку: <input type="text" id="ks-sub" maxlength="120" placeholder="необов'язково, напр. Handbücher"></label>
     <label><input type="checkbox" id="ks-replace" checked> замінювати файли з такою самою назвою</label>
   </div>
+  {% if new %}
+  <div class="help">Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть
+    порожнім: Minerva створить свою. Після «Зберегти» Minerva створить джерело й завантажить вибране.
+    Типи: {{ types|join:", " }} · до {{ max_mb }} МБ на файл.</div>
+  {% else %}
   <div class="help">Типи: {{ types|join:", " }} · до {{ source.max_file_mb }} МБ на файл · папка
     <code>{{ source.path }}</code>{% if not source.managed %} (якщо її змонтовано «лише для читання», файли туди
     додавайте на NAS){% endif %}. Після завантаження Minerva сама передасть нове в базу знань.</div>
+  {% endif %}
+  <div id="ks-picked" class="ks-picked" hidden></div>
   <div id="ks-progress" class="ks-progress" hidden></div>
   <ul id="ks-log" class="ks-log"></ul>
 </div>

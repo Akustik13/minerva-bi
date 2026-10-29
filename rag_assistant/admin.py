@@ -747,7 +747,7 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
     actions = ["scan_action"]
     fieldsets = [
         (None, {"fields": ["name", "kind", "path", "url", "follow_links", "roots_help", "enabled"]}),
-        ("📤 Файли з ПК", {"fields": ["upload_panel"], "classes": ["ks-folder-only"]}),
+        ("📤 Файли з ПК або телефона", {"fields": ["upload_panel"], "classes": ["ks-folder-only"]}),
         ("Що брати", {"fields": ["file_types_text", "recursive", "max_files", "max_file_mb", "rescan_hours"]}),
         ("Хто бачить і до чого прив'язати", {"fields": ["visibility", "customer", "project", "product",
                                                          "link_products_by_sku"]}),
@@ -767,7 +767,8 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
 
     def get_urls(self):
         view = self.admin_site.admin_view
-        return [path("<int:pk>/scan/", view(self.scan_view), name="rag_assistant_knowledgesource_scan"),
+        return [path("browse/", view(self.browse_view), name="rag_assistant_knowledgesource_browse"),
+                path("<int:pk>/scan/", view(self.scan_view), name="rag_assistant_knowledgesource_scan"),
                 path("<int:pk>/upload/", view(self.upload_view), name="rag_assistant_knowledgesource_upload"),
                 path("<int:pk>/status/", view(self.status_view), name="rag_assistant_knowledgesource_status"),
                 path("<int:pk>/delete-file/", view(self.delete_file_view),
@@ -799,6 +800,15 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
         if not allowed:
             raise PermissionDenied
         return source
+
+    def browse_view(self, request):
+        """GET ?path= — папки на сервері для поля «Папка» (вибір і підказки шляху), лише в дозволених коренях."""
+        if not (self.has_add_permission(request) or self.has_change_permission(request)):
+            raise PermissionDenied
+        try:
+            return JsonResponse({"ok": True, **knowledge_sources.browse(request.GET.get("path", ""))})
+        except knowledge_sources.SourceError as e:
+            return JsonResponse({"ok": False, "error": str(e)})
 
     def scan_view(self, request, pk):
         source = self._source(request, pk)
@@ -878,8 +888,9 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
         roots = format_html_join("", "<li><code>{}</code></li>", ((r,) for r in knowledge_sources.allowed_roots()))
         return format_html(
             '<div style="max-width:760px">Найпростіше — залишити «Папка» порожньою: Minerva створить свою папку, а '
-            'файли й цілі папки ви завантажите з ПК кнопками «📤» нижче.<br>Готові папки Minerva читає лише в цих '
-            'коренях (файли не копіює):<ul>{}</ul>Можна покласти документи в <code>knowledge_sources</code> у теці '
+            'файли (і цілі папки з ПК) ви виберете кнопками «📤» нижче.<br>Готову папку на сервері — кнопкою '
+            '«📂 Вибрати папку на сервері…»; Minerva читає лише ці корені (файли не копіює):<ul>{}</ul>'
+            'Можна покласти документи в <code>knowledge_sources</code> у теці '
             'Minerva на NAS (<code>/volume1/docker/tabele_mvp/knowledge_sources/…</code>): у Docker вона вже видна як '
             '<code>/app/knowledge_sources/…</code>.<br>Іншу папку NAS — змонтувати в <code>docker-compose.yml</code> '
             '(сервіси web і cron, напр. <code>- /volume1/Office/Dokumentation:/knowledge/dokumentation:ro</code>) '
@@ -887,15 +898,19 @@ class KnowledgeSourceAdmin(admin.ModelAdmin):
 
     @admin.display(description="Завантажити")
     def upload_panel(self, obj):
-        if not obj or not obj.pk:
-            return "Після збереження тут можна буде завантажити файли й папки з ПК."
-        if obj.kind != KnowledgeSource.FOLDER:
+        """Кнопки вибору файлів / папки на ПК (телефоні). На сторінці «Додати» вибране чекає «Зберегти»: JS створює
+        джерело (той самий POST форми) і завантажує файли в нього."""
+        if obj is not None and obj.pk and obj.kind != KnowledgeSource.FOLDER:
             return "—"
-        types = sorted(knowledge_sources._types(obj))
+        new = obj is None or not obj.pk
+        types = sorted(knowledge_sources._types(obj) if not new else knowledge_sources.DEFAULT_TYPES)
         return render_to_string("admin/rag_assistant/knowledgesource/upload_panel.html", {
-            "source": obj, "types": types, "accept": ",".join("." + t for t in types),
-            "upload_url": reverse("admin:rag_assistant_knowledgesource_upload", args=[obj.pk]),
-            "status_url": reverse("admin:rag_assistant_knowledgesource_status", args=[obj.pk])})
+            "source": obj, "new": new, "types": types, "accept": ",".join("." + t for t in types),
+            "max_mb": KnowledgeSource._meta.get_field("max_file_mb").default if new else obj.max_file_mb,
+            "base_url": reverse("admin:rag_assistant_knowledgesource_changelist"),
+            "upload_url": "" if new else reverse("admin:rag_assistant_knowledgesource_upload", args=[obj.pk]),
+            "status_url": "" if new else reverse("admin:rag_assistant_knowledgesource_status", args=[obj.pk]),
+            "change_url": "" if new else reverse("admin:rag_assistant_knowledgesource_change", args=[obj.pk])})
 
     @admin.display(description="Стан")
     def state_panel(self, obj):
