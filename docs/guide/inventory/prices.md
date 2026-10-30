@@ -6,7 +6,7 @@ where: 📦 Склад → Товари → картка товару → «💰
 urls: /admin/inventory/product/, /admin/shop/shopsettings/
 roles: адміністратор, складник
 keywords: базові ціни, ступені цін, Staffelpreise, price breaks, ціна за кількістю, знижка за кількість, шаблон ступенів, редактор цін, ціна продажу, ціна закупки, націнка, округлення, курс валют, історія цін
-related: inventory/products, shop/catalog-prices, digikey/prices, offers/prices
+related: inventory/products, inventory/product-report, shop/catalog-prices, digikey/prices, offers/prices
 ---
 
 ## Що це
@@ -49,7 +49,8 @@ related: inventory/products, shop/catalog-prices, digikey/prices, offers/prices
 доти видно «Є незбережені зміни…».
 
 Нижче — **«Джерело та історія»**: звідки ціни («Змінено вручну: …», «DigiKey …») і останні 10 змін
-(**«Коли»**, **«Хто»**, **«Джерело»**, **«Було → стало»**, **«Примітка»**).
+(**«Коли»**, **«Хто»**, **«Джерело»**, **«Було → стало»**, **«Примітка»**). Як ціна за 1 шт змінювалась на
+графіку (разом з DigiKey і фактичною ціною продажу) — [Ціни й продажі товару](guide:inventory/product-report).
 
 ### Одразу в магазини
 

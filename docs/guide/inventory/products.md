@@ -6,7 +6,7 @@ where: 📦 Склад → Товари
 urls: /admin/inventory/product/, /admin/inventory/product/add/, /admin/inventory/product/import-excel/, /admin/inventory/productcategory/
 roles: адміністратор, складник
 keywords: товар, товари, артикул, SKU, product, Artikel, картка товару, категорія, BOM, компоненти, життєвий цикл, NRND, EOL, імпорт Excel, аліас, технічні атрибути, масові дії
-related: inventory/stock, inventory/prices, inventory/media, inventory/param-search, inventory/reorder, labels/product-labels, shop/catalog-prices, digikey/listings
+related: inventory/product-report, inventory/stock, inventory/prices, inventory/media, inventory/param-search, inventory/reorder, labels/product-labels, shop/catalog-prices, digikey/listings
 ---
 
 ## Що це
@@ -64,6 +64,10 @@ related: inventory/stock, inventory/prices, inventory/media, inventory/param-sea
 
 Угорі — згорнутий блок **«🧭 Огляд і ❓ запитання»**: «які були проблеми з цим товаром? кому продавали?» —
 відповідь із даних Minerva, листів і бази знань ([Огляд і Запитати](guide:ai/entity-help)).
+
+Під ним — блок **«📈 Ціни й продажі»**: графік ціни за 1 шт (Minerva, DigiKey, фактична ціна продажу) і продажі
+по місяцях; кнопка **«📄 Звіт по товару»** (і вгорі картки) відкриває повний звіт з підсумками, таблицями, друком
+і CSV ([Ціни й продажі товару](guide:inventory/product-report)).
 
 | Розділ | Поля |
 |---|---|

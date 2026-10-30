@@ -1,0 +1,199 @@
+{% comment %}
+Два графіки товару (inventory/services/product_report.py → chart_data): «Ціна за 1 шт» і «Продажі по місяцях».
+{% include "admin/inventory/product/_report_charts.html" with prc=r.chart prc_id="prc-1" prc_units=r.sales.total_units %}
+Малює prcDraw(елемент .prc, дані[, {print: true}]) — картка викликає при розгортанні блоку, звіт — одразу.
+Chart.js 4.4 (той самий, що на дашборді) підвантажується, лише коли графік уперше малюється.
+{% endcomment %}
+{{ prc|json_script:prc_id }}
+<div class="prc" data-json="{{ prc_id }}">
+  <div class="prc-card">
+    <div class="prc-title">💶 Ціна за 1 шт, {{ prc.symbol }}</div>
+    <div class="prc-sub">лінії — ціна, що діяла (кожен крок — зміна ціни) · точки — фактична середня ціна продажу за місяць</div>
+    <div class="prc-box">{% if prc.minerva or prc.digikey or prc.realized %}<canvas data-prc="price" role="img" aria-label="Ціна за 1 шт у часі"></canvas>{% else %}<div class="prc-empty">Цін ще немає: заповніть «Базові ціни (ступені)» або «Ціну продажу».</div>{% endif %}</div>
+  </div>
+  <div class="prc-card">
+    <div class="prc-title">📦 Продажі по місяцях</div>
+    <div class="prc-sub">стовпчики — продано штук за джерелами замовлень · лінія — виручка, {{ prc.symbol }} (права шкала)</div>
+    <div class="prc-box">{% if prc_units %}<canvas data-prc="sales" role="img" aria-label="Продажі по місяцях"></canvas>{% else %}<div class="prc-empty">За цей період продажів не було.</div>{% endif %}</div>
+  </div>
+  <div class="prc-err" hidden>Не вдалося завантажити бібліотеку графіків (Chart.js) — перевірте інтернет і оновіть сторінку.</div>
+</div>
+<style>
+  .prc { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; margin: 8px 0; }
+  .prc-card { border: 1px solid var(--border-strong, #2a3f52); border-radius: 8px; padding: 10px 12px 8px;
+              background: var(--bg-card, transparent); min-width: 0; }
+  .prc-title { font-weight: 700; font-size: 13px; color: var(--text, inherit); }
+  .prc-sub { font-size: 11px; color: var(--text-muted, #9aafbe); margin: 2px 0 6px; }
+  .prc-box { position: relative; height: 270px; }
+  .prc-empty { display: flex; align-items: center; justify-content: center; height: 100%; text-align: center;
+               color: var(--text-muted, #9aafbe); font-size: 12px; border: 1px dashed var(--border-strong, #2a3f52); border-radius: 6px; }
+  .prc-err { grid-column: 1 / -1; color: var(--err, #f85149); font-size: 12px; }
+  @media print {
+    .prc { display: block; }
+    .prc-card { break-inside: avoid; page-break-inside: avoid; margin-bottom: 10px; border-color: #bbb; background: #fff; }
+    .prc-title, .prc-sub, .prc-empty { color: #000 !important; }
+    .prc-box { height: 250px; }
+    .prc-box canvas { max-width: 100% !important; height: auto !important; }
+  }
+</style>
+<script>
+(function () {
+  if (window.prcDraw) return;
+  var LIB = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+  var waiting = [];
+
+  function load(cb) {
+    waiting.push(cb);
+    if (waiting.length > 1) return;
+    var s = document.createElement('script');
+    s.src = LIB;
+    s.onload = function () { var w = waiting; waiting = []; w.forEach(function (f) { f(); }); };
+    s.onerror = function () {
+      waiting = [];
+      document.querySelectorAll('.prc-err').forEach(function (e) { e.hidden = false; });
+    };
+    document.head.appendChild(s);
+  }
+
+  // Кольори з теми Minerva; друк — темний текст на білому
+  function palette(print) {
+    var cs = getComputedStyle(document.documentElement);
+    var v = function (k) { return cs.getPropertyValue(k).trim(); };
+    var light = print || (document.documentElement.getAttribute('data-theme') || 'dark') === 'light';
+    return {
+      text: print ? '#333333' : (v('--text-muted') || (light ? '#4b5563' : '#9aafbe')),
+      grid: print ? 'rgba(0,0,0,.12)' : (v('--border') || (light ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,.07)')),
+      bg: print ? '#ffffff' : (v('--bg-card') || (light ? '#ffffff' : '#161b22')),
+      minerva: light ? '#0969da' : '#58a6ff',
+      digikey: light ? '#cf222e' : '#ff7b72',
+      realized: light ? '#1a7f37' : '#3fb950',
+      revenue: light ? '#9a6700' : '#e3b341',
+      channels: light ? ['#0969da', '#8250df', '#1b7c83', '#bf3989'] : ['#58a6ff', '#bc8cff', '#39c5cf', '#f778ba'],
+      other: light ? '#8c959f' : '#6e7681'
+    };
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  window.prcDraw = function (root, data, opts) {
+    opts = opts || {};
+    if (!root) return;
+    if (!data) {
+      var el = document.getElementById(root.dataset.json);
+      data = el ? JSON.parse(el.textContent) : null;
+      if (!data) return;
+    }
+    if (!window.Chart) { load(function () { window.prcDraw(root, data, opts); }); return; }
+    (root._prc || []).forEach(function (c) { c.destroy(); });
+    root._prc = [];
+    var pal = palette(opts.print), sym = data.symbol, names = data.month_names;
+    var money = function (v, d) {
+      return sym + Number(v).toLocaleString('uk-UA', { minimumFractionDigits: d, maximumFractionDigits: d });
+    };
+    var num = function (v) { return Number(v).toLocaleString('uk-UA', { maximumFractionDigits: 3 }); };
+    var monthName = function (ms) { var d = new Date(ms); return names[d.getMonth()] + ' ' + pad(d.getFullYear() % 100); };
+    var dateName = function (ms) { var d = new Date(ms); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear(); };
+    var common = {
+      responsive: true, maintainAspectRatio: false, animation: opts.print ? false : undefined,
+      devicePixelRatio: opts.print ? 2 : undefined,
+      plugins: { legend: { position: 'top', labels: { color: pal.text, boxWidth: 12, padding: 10, font: { size: 11 } } } }
+    };
+    var tick = { color: pal.text, font: { size: 10 } };
+
+    var priceCanvas = root.querySelector('canvas[data-prc=price]');
+    if (priceCanvas) {
+      // перші числа місяців — підписи осі часу (через 1, 2 або 3 місяці — щоб не злипались)
+      var monthTicks = function () {
+        var d = new Date(data.x_min), out = [];
+        d = new Date(d.getFullYear(), d.getMonth(), 1);
+        if (d.getTime() < data.x_min) d.setMonth(d.getMonth() + 1);
+        var span = (data.x_max - data.x_min) / (30.44 * 864e5);
+        var step = span <= 13 ? 1 : (span <= 25 ? 2 : 3);
+        while (d.getTime() <= data.x_max) { out.push({ value: d.getTime() }); d.setMonth(d.getMonth() + step); }
+        return out;
+      };
+      var stepLine = function (label, points, color, dash) {
+        return {
+          label: label, data: points, stepped: 'before', borderColor: color, backgroundColor: color,
+          borderWidth: 2.5, borderDash: dash || [], spanGaps: false, hitRadius: 6,
+          pointRadius: function (c) { return c.raw && c.raw.c ? 3.5 : 0; }, pointHoverRadius: 5
+        };
+      };
+      var sets = [];
+      if (data.minerva.length) sets.push(stepLine(data.minerva_label, data.minerva, pal.minerva));
+      if (data.digikey.length) sets.push(stepLine('DigiKey — офер', data.digikey, pal.digikey, [6, 4]));
+      if (data.realized.length) sets.push({
+        label: 'Продано — середня ціна за місяць', data: data.realized, showLine: false,
+        borderColor: pal.realized, backgroundColor: pal.realized, pointRadius: 4.5, pointHoverRadius: 6,
+        pointBorderColor: pal.bg, pointBorderWidth: 1
+      });
+      root._prc.push(new Chart(priceCanvas, {
+        type: 'line', data: { datasets: sets },
+        options: Object.assign({}, common, {
+          interaction: { mode: 'nearest', intersect: false },
+          plugins: Object.assign({}, common.plugins, {
+            tooltip: { callbacks: {
+              title: function (items) { return items.length ? (items[0].raw.m || dateName(items[0].raw.x)) : ''; },
+              label: function (c) {
+                return ' ' + c.dataset.label + ': ' + (c.raw.y == null ? 'немає ціни / курсу' : money(c.raw.y, 2)) +
+                  (c.raw.units != null ? ' · ' + num(c.raw.units) + ' шт' : '');
+              }
+            } }
+          }),
+          scales: {
+            x: { type: 'linear', min: data.x_min, max: data.x_max, grid: { color: pal.grid },
+                 ticks: Object.assign({}, tick, { autoSkip: false, maxRotation: 0, callback: function (v) { return monthName(v); } }),
+                 afterBuildTicks: function (axis) { axis.ticks = monthTicks(); } },
+            y: { grace: '10%', grid: { color: pal.grid },
+                 ticks: Object.assign({}, tick, { callback: function (v) { return money(v, v < 10 ? 2 : 0); } }) }
+          }
+        })
+      }));
+    }
+
+    var salesCanvas = root.querySelector('canvas[data-prc=sales]');
+    if (salesCanvas) {
+      var bars = data.channels.map(function (c, i) {
+        return { type: 'bar', label: c.name, data: c.data, stack: 'units', yAxisID: 'y', order: 2, borderRadius: 3,
+                 backgroundColor: c.other ? pal.other : pal.channels[i % pal.channels.length] };
+      });
+      bars.push({ type: 'line', label: 'Виручка, ' + sym, data: data.revenue, yAxisID: 'y2', order: 1,
+                  borderColor: pal.revenue, backgroundColor: pal.revenue, borderWidth: 2, tension: 0.3,
+                  pointRadius: 2.5, pointBackgroundColor: pal.revenue, pointBorderColor: pal.bg });
+      root._prc.push(new Chart(salesCanvas, {
+        type: 'bar', data: { labels: data.labels, datasets: bars },
+        options: Object.assign({}, common, {
+          interaction: { mode: 'index', intersect: false },
+          plugins: Object.assign({}, common.plugins, {
+            // у легенді й підказці — джерела, потім виручка (як у даних, а не за порядком малювання)
+            legend: { position: 'top', labels: { color: pal.text, boxWidth: 12, padding: 10, font: { size: 11 },
+                      sort: function (a, b) { return a.datasetIndex - b.datasetIndex; } } },
+            tooltip: { itemSort: function (a, b) { return a.datasetIndex - b.datasetIndex; }, callbacks: {
+              label: function (c) {
+                return ' ' + c.dataset.label + ': ' + (c.dataset.yAxisID === 'y2' ? money(c.parsed.y, 0) : num(c.parsed.y) + ' шт');
+              },
+              footer: function (items) { var n = items.length ? data.orders[items[0].dataIndex] : 0; return n ? 'Замовлень: ' + n : ''; }
+            } }
+          }),
+          scales: {
+            x: { stacked: true, grid: { color: pal.grid }, ticks: Object.assign({}, tick, { maxRotation: 45 }) },
+            y: { stacked: true, beginAtZero: true, grid: { color: pal.grid },
+                 title: { display: true, text: 'шт', color: pal.text, font: { size: 10 } },
+                 ticks: Object.assign({}, tick, { precision: 0 }) },
+            y2: { position: 'right', beginAtZero: true, grid: { display: false },
+                  ticks: Object.assign({}, tick, { callback: function (v) { return money(v, 0); } }) }
+          }
+        })
+      }));
+    }
+  };
+
+  // Друк: графіки — темним на білому й чіткіше, після друку — знову як у темі
+  window.addEventListener('beforeprint', function () {
+    document.querySelectorAll('.prc').forEach(function (r) { if (r._prc && r._prc.length) window.prcDraw(r, null, { print: true }); });
+  });
+  window.addEventListener('afterprint', function () {
+    document.querySelectorAll('.prc').forEach(function (r) { if (r._prc && r._prc.length) window.prcDraw(r); });
+  });
+})();
+</script>
