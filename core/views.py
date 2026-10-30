@@ -25,25 +25,13 @@ def my_settings_view(request):
 
         fields_updated = []
 
-        if 'notify_email' in data:
-            profile.notify_email = bool(data['notify_email'])
-            fields_updated.append('notify_email')
-        if 'notify_telegram' in data:
-            profile.notify_telegram = bool(data['notify_telegram'])
-            fields_updated.append('notify_telegram')
+        # «Email / Telegram сповіщення» і «Записів на сторінку» прибрано: їх ніщо не читало
+        # (особисті повідомлення йдуть на Telegram ID, а що надсилати — у налаштуваннях кожної функції).
         if 'interface_language' in data:
             valid_langs = [c[0] for c in profile._meta.get_field('interface_language').choices]
             if data['interface_language'] in valid_langs:
                 profile.interface_language = data['interface_language']
                 fields_updated.append('interface_language')
-        if 'items_per_page' in data:
-            try:
-                v = int(data['items_per_page'])
-                if 5 <= v <= 500:
-                    profile.items_per_page = v
-                    fields_updated.append('items_per_page')
-            except (ValueError, TypeError):
-                pass
         if 'theme' in data:
             valid_themes = [c[0] for c in profile._meta.get_field('theme').choices]
             if data['theme'] in valid_themes:

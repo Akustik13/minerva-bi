@@ -1,6 +1,6 @@
 """
 run_profile() — orchestrates a single AutoImportProfile run:
-  1. Check if due (or force=True)
+  1. Check if due and claim the run atomically (or force=True)
   2. Load files from folder or URL
   3. For each file: hash-check, parse, call importer, archive, log
   4. Update schedule
@@ -125,14 +125,29 @@ def _call_importer(profile: AutoImportProfile, df: pd.DataFrame, dry_run: bool) 
         return {'created': 0, 'updated': 0, 'skipped': 0, 'errors': [f'Невідомий тип імпорту: {profile.import_type}']}
 
 
+def claim(profile: AutoImportProfile) -> bool:
+    """
+    Атомарно «забронювати» запуск за розкладом: next_run_at одразу зсувається на інтервал уперед, тож
+    паралельний або повторний запуск (cron + інший процес) цей профіль пропустить, а збій посеред
+    імпорту не повторюється щохвилини. Після запуску update_schedule() ставить точний час.
+    """
+    from datetime import timedelta
+    from django.db.models import Q
+    now = timezone.now()
+    nxt = now + timedelta(minutes=max(1, profile.interval_minutes or 0))
+    return AutoImportProfile.objects.filter(pk=profile.pk, enabled=True).filter(
+        Q(next_run_at__isnull=True) | Q(next_run_at__lte=now)).update(next_run_at=nxt) == 1
+
+
 def run_profile(profile_id: int, dry_run: bool = False, force: bool = False) -> list:
     """
     Run a single AutoImportProfile. Returns list of AutoImportLog instances created.
+    Without force — only when due (is_due) and after claim(); force (кнопка ▶) — завжди.
     """
     profile = AutoImportProfile.objects.get(pk=profile_id)
     logs = []
 
-    if not force and not profile.is_due():
+    if not force and (not profile.is_due() or not claim(profile)):
         return logs
 
     effective_dry = dry_run or profile.dry_run_mode

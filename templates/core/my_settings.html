@@ -119,23 +119,11 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
   {# ── Сповіщення ── #}
   <div class="ms-card">
     <h3>🔔 Сповіщення</h3>
-    <div class="ms-row">
-      <label>Email сповіщення</label>
-      <div class="ms-ctrl">
-        <label class="ms-toggle">
-          <input type="checkbox" id="notify_email" {% if profile.notify_email %}checked{% endif %}>
-          <span class="ms-slider"></span>
-        </label>
-      </div>
-    </div>
-    <div class="ms-row">
-      <label>Telegram сповіщення</label>
-      <div class="ms-ctrl">
-        <label class="ms-toggle">
-          <input type="checkbox" id="notify_telegram" {% if profile.notify_telegram %}checked{% endif %}>
-          <span class="ms-slider"></span>
-        </label>
-      </div>
+    <div class="ms-info" style="margin-bottom:10px;color:var(--text-dim,#607d8b);font-size:12px">
+      На цей Telegram ID Minerva пише вам особисто: ранковий брифінг, нагадування, чат з 🏛️ Minerva AI.
+      Порожнє поле — особистих повідомлень у Telegram немає. Що саме надсилати, налаштовується там,
+      де повідомлення виникають: брифінг і звіти — «Налаштування сповіщень» / «Налаштування брифінгу»,
+      нагадування — «📅 Календар → Сповіщення», нові листи — налаштування вашої скриньки.
     </div>
     <div class="ms-row">
       <label>Telegram ID <span style="font-size:11px;color:var(--text-dim)">(дізнатись через /myid в боті)</span></label>
@@ -156,12 +144,6 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
           <option value="de" {% if profile.interface_language == 'de' %}selected{% endif %}>Deutsch</option>
           <option value="en" {% if profile.interface_language == 'en' %}selected{% endif %}>English</option>
         </select>
-      </div>
-    </div>
-    <div class="ms-row">
-      <label>Записів на сторінку</label>
-      <div class="ms-ctrl">
-        <input type="number" id="items_per_page" value="{{ profile.items_per_page }}" min="5" max="500">
       </div>
     </div>
     <div class="ms-row">
@@ -215,10 +197,7 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
 
     var tid = document.getElementById('telegram_id').value.trim();
     var payload = {
-      notify_email:       document.getElementById('notify_email').checked,
-      notify_telegram:    document.getElementById('notify_telegram').checked,
       interface_language: document.getElementById('interface_language').value,
-      items_per_page:     parseInt(document.getElementById('items_per_page').value) || 25,
       theme:              currentTheme,
       telegram_id:        tid === '' ? null : tid,
     };

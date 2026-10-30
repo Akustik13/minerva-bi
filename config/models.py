@@ -788,7 +788,11 @@ class BriefingSettings(models.Model):
     )
     send_time = models.TimeField(
         "Час відправки", default="08:00",
-        help_text="Час по серверному поясу (Europe/Berlin). Налаштуйте cron на цей час.",
+        help_text="За часом Берліна. Розклад сервера сам надсилає брифінг у цей час (раз на день).",
+    )
+    last_sent_at = models.DateTimeField(
+        "Останній брифінг за розкладом", null=True, blank=True, editable=False,
+        help_text="Коли розклад сервера востаннє надіслав брифінг — щоб не надсилати двічі за день.",
     )
     include_orders = models.BooleanField("📦 Замовлення місяця", default=True)
     include_revenue = models.BooleanField("💰 Виручка місяця", default=True)

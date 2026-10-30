@@ -548,18 +548,21 @@ async function loadMailboxEmails() {
     const emails = d.emails || [];
     if (!emails.length) { status.textContent = d.message || _crm.no_emails; return; }
     emails.forEach(e => { _mailboxEmails[e.id] = e; });
+    // тема й текст — від зовнішніх відправників: лише як текст, не HTML
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+      c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     list.innerHTML = emails.map(e => `
       <label style="display:flex;gap:6px;align-items:flex-start;padding:4px 2px;
              cursor:pointer;border-bottom:1px solid var(--border);font-size:12px">
-        <input type="checkbox" data-mid="${e.id}" onchange="toggleMailboxEmail(${e.id})"
+        <input type="checkbox" data-mid="${Number(e.id)}" onchange="toggleMailboxEmail(${Number(e.id)})"
                style="margin-top:2px;flex-shrink:0">
         <span>
           <span style="color:${e.direction==='in'?'#4f8fff':'#9370db'}">
             ${e.direction==='in'?'←':'→'}
           </span>
-          <strong>${e.subject}</strong>
-          <span style="color:var(--text-muted)">${e.date}</span>
-          ${e.snippet ? '<br><span style="color:var(--text-dim)">'+e.snippet.substring(0,120)+'</span>' : ''}
+          <strong>${esc(e.subject)}</strong>
+          <span style="color:var(--text-muted)">${esc(e.date)}</span>
+          ${e.snippet ? '<br><span style="color:var(--text-dim)">'+esc(e.snippet.substring(0,120))+'</span>' : ''}
         </span>
       </label>`).join('');
     list.style.display = 'block';

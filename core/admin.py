@@ -464,7 +464,7 @@ class MinervaUserAdmin(_DjangoUserAdmin):
                        .values_list('company_name', flat=True).first() or 'Minerva BI')
         except Exception:
             company = 'Minerva BI'
-        system_url = 'https://sevskiy.minerva-bi.com/admin/'
+        system_url = request.build_absolute_uri('/admin/')   # адреса, з якої адміністратор зараз працює
         sent, errors = [], []
         for user in users:
             if not user.email:
@@ -848,6 +848,13 @@ class UserProfileAdmin(admin.ModelAdmin):
                 form.base_fields[field_name].widget = PasswordInput(render_value=True)
         if 'smtp_signature' in form.base_fields:
             form.base_fields['smtp_signature'].widget = RichSignatureWidget()
+        if 'ai_system_prompt' in form.base_fields:
+            form.base_fields['ai_system_prompt'].label = 'Побажання до відповідей Minerva AI'
+            form.base_fields['ai_system_prompt'].help_text = (
+                'Стиль, мова, на чому наголошувати — напр. «Відповідай німецькою, коротко, суми в EUR». '
+                'Minerva AI (WebChat, вікно 🏛️, Telegram, ранковий брифінг) додає це до своїх правил як '
+                'побажання користувача: правил, ролі в AI й доступу до даних воно не змінює. До 2000 символів.'
+            )
         return form
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -964,7 +971,7 @@ class UserProfileAdmin(admin.ModelAdmin):
             ),
         }),
         ('⚙️ Персональні налаштування', {
-            'fields': ('notify_email', 'notify_telegram', 'interface_language', 'items_per_page', 'theme'),
+            'fields': ('interface_language', 'theme'),
             'classes': ('collapse',),
             'description': 'Ці налаштування юзер може змінити самостійно на сторінці /core/my-settings/',
         }),
@@ -1004,9 +1011,13 @@ class UserProfileAdmin(admin.ModelAdmin):
             'fields': (
                 'ai_enabled', 'ai_assistant_role',
                 'telegram_id', 'telegram_username',
-                'ai_model', 'ai_temperature', 'ai_system_prompt',
+                'ai_system_prompt',
             ),
             'classes': ('collapse',),
+            'description': (
+                'Модель Minerva AI вибирає сама: швидка (Haiku) для простих запитань, потужніша (Sonnet) — '
+                'для аналітики й пошуку в інтернеті. Бюджет — у «⚙️ Налаштуваннях AI».'
+            ),
         }),
     )
 

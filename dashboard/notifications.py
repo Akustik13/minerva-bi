@@ -461,15 +461,16 @@ def run_alerts(force: bool = False, is_test: bool = False, test_channel: str | N
             'telegram': tg_result,
         }
 
-    # Anti-spam interval check
+    # Anti-spam interval check (0 у налаштуваннях = не частіше ніж раз на годину: cron перевіряє кожні 15 хв)
+    interval_hours = max(1, ns.alert_min_interval_hours or 0)
     if not force and ns.last_alert_sent:
         hours_since = (timezone.now() - ns.last_alert_sent).total_seconds() / 3600
-        if hours_since < ns.alert_min_interval_hours:
-            remaining = ns.alert_min_interval_hours - hours_since
+        if hours_since < interval_hours:
+            remaining = interval_hours - hours_since
             return {
                 'sent': False,
                 'reason': f'Занадто рано: наступне сповіщення через {remaining:.1f} год.'
-                          f' (інтервал: {ns.alert_min_interval_hours} год.)',
+                          f' (інтервал: {interval_hours} год.)',
             }
 
     critical_items = _get_critical_stock()   if ns.stock_alerts_enabled    else []

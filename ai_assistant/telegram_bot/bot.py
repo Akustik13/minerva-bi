@@ -26,7 +26,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "👋 Вітаю! Я Minerva AI — асистент системи.\n\n"
             "Твій Telegram ще не прив'язаний до жодного акаунту.\n"
             f"Telegram ID: `{tg_user.id}`\n\n"
-            "Попроси адміністратора додати цей ID до твого профілю.",
+            "Впиши його в «Мої налаштування» → «Telegram ID» або попроси адміністратора "
+            "додати цей ID до твого профілю. /myid — показати ID ще раз.",
             parse_mode='Markdown',
         )
         return
@@ -35,7 +36,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"🏛️ Слава, {name}!\n"
         "Я Minerva — твій AI-помічник. Чим можу допомогти?\n\n"
-        "Команди: /reset — нова розмова, /help — довідка"
+        "Команди: /reset — нова розмова, /myid — твій Telegram ID, /help — довідка"
     )
 
 
@@ -60,9 +61,22 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*Команди:*\n"
         "/start — привітання\n"
         "/reset — почати нову розмову\n"
+        "/myid — твій Telegram ID (для профілю Minerva)\n"
         "/help — ця довідка",
         parse_mode='Markdown',
     )
+
+
+async def cmd_myid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/myid — Telegram ID і чи прив'язаний він до акаунту Minerva (без інших даних)."""
+    from ai_assistant.telegram_bot.texts import myid_text
+    chat = update.effective_chat
+    text = await sync_to_async(myid_text)(
+        update.effective_user.id,
+        chat.id if chat else None,
+        chat.type if chat else 'private',
+    )
+    await update.message.reply_text(text, parse_mode='Markdown')
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -143,6 +157,7 @@ def run_bot():
     app.add_handler(CommandHandler('start', cmd_start))
     app.add_handler(CommandHandler('reset', cmd_reset))
     app.add_handler(CommandHandler('help', cmd_help))
+    app.add_handler(CommandHandler('myid', cmd_myid))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     logger.info("Minerva Telegram bot starting (polling)…")

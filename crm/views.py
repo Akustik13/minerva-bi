@@ -81,16 +81,23 @@ def _link_email_to_strategy(customer, subject: str, body_snippet: str, user) -> 
         pass
 
 
-def _gather_email_context(customer) -> list:
-    """Pull recent EmailMessage records for this customer directly from email_assistant."""
+def _own_messages(user):
+    """Листи лише з власних скриньок користувача (EmailAccount.user) — і для суперкористувача теж."""
+    from email_assistant.models import EmailMessage
+    return (EmailMessage.objects
+            .filter(account__user=user, is_deleted=False, is_spam=False)
+            .exclude(folder__in=(EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_TRASH,
+                                 EmailMessage.FOLDER_SPAM)))
+
+
+def _gather_email_context(customer, user) -> list:
+    """Pull recent EmailMessage records for this customer from the user's own mailboxes."""
     try:
-        from email_assistant.models import EmailMessage
         from django.db.models import Q
-        if not getattr(customer, 'email', ''):
+        if not getattr(customer, 'email', '') or not user:
             return []
-        qs = (EmailMessage.objects
+        qs = (_own_messages(user)
               .filter(Q(from_email__iexact=customer.email) | Q(to_emails__icontains=customer.email))
-              .exclude(folder='draft')
               .order_by('-sent_at')[:10])
         return [
             {
@@ -211,16 +218,15 @@ def ai_customer_analysis(request, customer_pk):
     # Direct EmailMessage context (always included when 'emails' in scope)
     email_messages_data = []
     if 'emails' in include:
-        email_messages_data = _gather_email_context(customer)
+        email_messages_data = _gather_email_context(customer, request.user)
 
     # Manually selected mailbox emails (from picker UI)
     mailbox_ids_raw = request.GET.get('mailbox_ids', '').strip()
     selected_mailbox_data = []
     if mailbox_ids_raw:
         try:
-            from email_assistant.models import EmailMessage
             ids = [int(x) for x in mailbox_ids_raw.split(',') if x.strip().isdigit()]
-            for m in EmailMessage.objects.filter(pk__in=ids).order_by('-sent_at')[:20]:
+            for m in _own_messages(request.user).filter(pk__in=ids).order_by('-sent_at')[:20]:
                 selected_mailbox_data.append({
                     'direction': '← від клієнта' if m.folder == 'inbox' else '→ до клієнта',
                     'subject': m.subject or '(без теми)',
@@ -852,7 +858,7 @@ def ai_apply_strategy(request, customer_pk):
 
 @staff_member_required
 def customer_mailbox_emails(request, customer_pk):
-    """GET: Повертає листи зі скриньки email_assistant для цього клієнта."""
+    """GET: Повертає листи з власних скриньок користувача (email_assistant) для цього клієнта."""
     from crm.models import Customer
     try:
         customer = Customer.objects.get(pk=customer_pk)
@@ -863,11 +869,9 @@ def customer_mailbox_emails(request, customer_pk):
         return JsonResponse({'emails': [], 'message': 'Клієнт не має email адреси.'})
 
     try:
-        from email_assistant.models import EmailMessage
         from django.db.models import Q
-        qs = (EmailMessage.objects
+        qs = (_own_messages(request.user)
               .filter(Q(from_email__iexact=customer.email) | Q(to_emails__icontains=customer.email))
-              .exclude(folder='draft')
               .order_by('-sent_at')[:30])
         emails = [
             {
@@ -935,7 +939,7 @@ def ai_strategy_advisor(request, customer_pk):
             entry['logs'] = logs
         steps_summary.append(entry)
 
-    email_ctx = _gather_email_context(customer)
+    email_ctx = _gather_email_context(customer, request.user)
 
     prompt = (
         f"Ти — CRM-консультант для компанії Minerva. Проаналізуй виконання стратегії для клієнта '{customer.name}'.\n\n"

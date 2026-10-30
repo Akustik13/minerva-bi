@@ -703,7 +703,9 @@ def _send_weekly(force: bool = False) -> dict:
                 if last_local.date() >= local_now.date():
                     return {"sent": False, "reason": "Вже надіслано сьогодні"}
         except Exception as exc:
+            # розклад не перевірено — не надсилати (інакше cron щохвилини надсилав би звіт знову)
             logger.error("weekly digest schedule check failed: %s", exc, exc_info=True)
+            return {"sent": False, "reason": f"Помилка перевірки розкладу: {exc}"}
 
     try:
         from config.models import SystemSettings
@@ -792,7 +794,9 @@ def _send_monthly(force: bool = False) -> dict:
                 if last_local.date() >= local_now.date():
                     return {"sent": False, "reason": "Вже надіслано сьогодні"}
         except Exception as exc:
+            # розклад не перевірено — не надсилати (інакше cron щохвилини надсилав би звіт знову)
             logger.error("monthly digest schedule check failed: %s", exc, exc_info=True)
+            return {"sent": False, "reason": f"Помилка перевірки розкладу: {exc}"}
 
     try:
         from config.models import SystemSettings
