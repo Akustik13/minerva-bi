@@ -639,3 +639,8 @@
 })();
 </script>
 {% endblock %}
+
+{% block object-tools-items %}
+{% if original.pk %}<li><a href="{% url 'admin:core_userprofile_access' original.pk %}">👁 Як бачить Minerva</a></li>{% endif %}
+{{ block.super }}
+{% endblock %}

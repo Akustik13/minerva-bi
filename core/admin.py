@@ -842,7 +842,7 @@ function mvSigClear(uid){{
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     form          = UserProfileForm
-    list_display  = ('user', 'role_badge', 'effective_access', 'ai_enabled')
+    list_display  = ('user', 'role_badge', 'effective_access', 'ai_enabled', 'preview_link')
     list_filter   = ('role', 'bundle', 'ai_enabled')
     search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name')
     readonly_fields = (
@@ -1076,17 +1076,50 @@ class UserProfileAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self._debug_view),
                 name='userprofile_debug',
             ),
+            path(
+                '<int:pk>/access/',
+                self.admin_site.admin_view(self._access_view),
+                name='core_userprofile_access',
+            ),
         ] + super().get_urls()
+
+    def _profile_for_preview(self, request, pk):
+        """Профіль для «👁 Як бачить Minerva»: адміністратор — будь-який, інший — лише свій."""
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        profile = get_object_or_404(UserProfile.objects.select_related('user'), pk=pk)
+        if not (self._is_admin(request) or profile.user_id == request.user.pk):
+            raise PermissionDenied
+        return profile
+
+    def _access_view(self, request, pk):
+        """«👁 Як бачить Minerva <людина>» — меню, дозволи, модулі, база знань, перевірка адреси (core/access_preview)."""
+        from django.template.response import TemplateResponse
+        from core import access_preview
+        profile = self._profile_for_preview(request, pk)
+        url = (request.GET.get('url') or '').strip()[:500]
+        data = access_preview.preview(profile.user)
+        return TemplateResponse(request, 'admin/core/userprofile/access_preview.html', {
+            **self.admin_site.each_context(request), 'opts': UserProfile._meta, 'original': profile,
+            'title': f'Як бачить Minerva: {profile.user.get_full_name() or profile.user.username}',
+            'p': data, 'url': url, 'check': access_preview.check_url(profile.user, url) if url else None,
+            'samples': ['/admin/sales/salesorder/', '/admin/inventory/product/add/', '/admin/crm/customer/',
+                        '/admin/core/userprofile/', '/email/', '/offers/'],
+        })
+
+    @admin.display(description='Перегляд')
+    def preview_link(self, obj):
+        return format_html('<a href="{}" title="Як бачить Minerva цей користувач">👁 Як бачить</a>',
+                           reverse('admin:core_userprofile_access', args=[obj.pk]))
 
     def _debug_view(self, request, pk):
         from django.http import JsonResponse
-        from django.contrib.auth.models import User as _User
         from core.utils import user_can
         from core.models import ModuleRegistry
         try:
-            u = _User.objects.select_related('profile').get(pk=pk)
-            p = u.profile
-        except Exception as e:
+            p = self._profile_for_preview(request, pk)      # pk профілю (як у посиланні), не користувача
+            u = p.user
+        except UserProfile.DoesNotExist as e:
             return JsonResponse({'error': str(e)}, status=404)
 
         allowed = p.get_allowed_modules()
@@ -1289,11 +1322,14 @@ class UserProfileAdmin(admin.ModelAdmin):
         if not obj or not obj.pk:
             return '—'
         return format_html(
+            '<a href="{}" style="padding:4px 12px;background:#2e7d32;color:#fff;'
+            'border-radius:6px;text-decoration:none;font-size:12px;margin-right:8px">'
+            '👁 Як бачить Minerva цей користувач</a>'
             '<a href="/admin/core/userprofile/{}/debug/" target="_blank"'
             ' style="padding:4px 12px;background:#17a2b8;color:#fff;'
             'border-radius:6px;text-decoration:none;font-size:12px">'
             '🔍 JSON діагностика прав</a>',
-            obj.pk,
+            reverse('admin:core_userprofile_access', args=[obj.pk]), obj.pk,
         )
 
 
