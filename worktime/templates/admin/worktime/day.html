@@ -82,6 +82,7 @@
   <!-- ✉️ пошта дня -->
   <div class="dy-card">
     <h3>✉️ {% trans "Пошта цього дня" %} <a class="dy-muted" href="{{ mail_url }}">{% trans "записати / описати →" %}</a></h3>
+    {% if mail_private %}<div class="dy-muted">🔒 {{ mail_private_text }}</div>{% endif %}
     {% for r in mail_rows %}
     <div class="dy-item"><span>{{ r.label }}</span><b>{{ r.dur }}</b>
       <span>→ {{ r.dp }}<div class="dy-muted">{% if r.replies %}📤 {{ r.replies }} {% endif %}{% if r.received %}📥 {{ r.received }}{% endif %}</div></span>

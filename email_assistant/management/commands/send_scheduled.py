@@ -92,8 +92,8 @@ class Command(BaseCommand):
         offer_refs = [i['ref'] for i in items if str(i.get('ref', '')).startswith('offer:')]
         try:
             if offer_refs:
-                from offers.services import mark_sent_refs
-                mark_sent_refs(offer_refs, result.get('message_id', ''))
+                from offers.services import mark_sent_refs   # «надіслано» — лише якщо власник скриньки може змінювати
+                mark_sent_refs(offer_refs, result.get('message_id', ''), user=scheduled.account.user)
         except Exception as e:
             logger.warning('send_scheduled pk=%s: Angebot не позначено надісланим: %s', scheduled.pk, e)
         attachments.remove_stored(items)

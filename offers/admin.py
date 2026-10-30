@@ -138,17 +138,26 @@ class OfferAdmin(admin.ModelAdmin):
             ro += [f.name for f in Offer._meta.fields if f.name not in ("status", "internal_notes", "id")]
         return ro
 
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        field = form.base_fields.get("status")
+        if field is not None:   # у списку — лише дозволені зі стану в базі переходи (services.manual_statuses)
+            allowed = services.manual_statuses(obj.status if obj is not None else None)
+            field.choices = [c for c in Offer.STATUS_CHOICES if c[0] in allowed]
+        return form
+
     def save_model(self, request, obj, form, change):
         if not change:
             obj.created_by = request.user
             obj.owner = obj.owner or request.user
+            if obj.status not in services.manual_statuses(None):
+                obj.status = Offer.DRAFT
         if change and "status" in form.changed_data:
             old = Offer.objects.get(pk=obj.pk).status
-            if obj.status in (Offer.SENT, Offer.ACCEPTED) and old not in Offer.LOCKED:
-                # «Надіслано» / «Прийнято» — лише через дії (документ, лист, замовлення)
+            if obj.status not in services.manual_statuses(old):
+                # «Надіслано» — після відправки листа, «Прийнято» — кнопкою, назад у чернетку — лише «Нова версія»
                 obj.status = old
-                messages.warning(request, "Статус «Надіслано» ставиться після відправки листа, «Прийнято» — "
-                                          "кнопкою «Прийнято → замовлення».")
+                messages.warning(request, services.status_hint(old))
         super().save_model(request, obj, form, change)
 
     def save_formset(self, request, form, formset, change):
@@ -276,7 +285,12 @@ class OfferAdmin(admin.ModelAdmin):
                 act("reject", self.reject_view), act("new_version", self.new_version_view)] + super().get_urls()
 
     def _run(self, request, pk, fn, ok):
+        """Дії картки (документ, на перевірку, погоджено, прийнято, відхилено, нова версія) — це зміни: лише POST і
+        лише з правом змінювати Angebot."""
+        from django.core.exceptions import PermissionDenied
         offer = get_object_or_404(Offer, pk=pk)
+        if not self.has_change_permission(request, offer):
+            raise PermissionDenied
         if request.method == "POST":
             try:
                 result = fn(offer)

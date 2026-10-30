@@ -11,6 +11,7 @@ email_assistant/spam.py — «🚫 Спам» раз і назавжди.
 Старі автоправила на весь домен поштовика («Спам: @gmail.com») надто широкі — вони не діють (`too_broad`).
 """
 import logging
+import re
 
 from email_assistant.crm_link import FREE_MAIL_DOMAINS, _addr, is_own, own_addresses
 
@@ -32,10 +33,16 @@ def _known_domain(domain: str) -> bool:
             or Supplier.objects.filter(email__iendswith='@' + domain).exists())
 
 
+# Адреса для ключа правила — без лапок, <>, пробілів і керівних символів: From: спамера може бути будь-яким
+# («a"<img src=x onerror=…>@x.com»), а ключ потім показується у списку фільтрів і стає умовою правила.
+_SAFE_ADDRESS = re.compile(r"^[\w.!#$%*+/=?^`{|}~-]+@[\w-]+(\.[\w-]+)+$")
+
+
 def sender_key(address: str, own=None) -> str:
-    """Ключ правила: адреса або @домен (див. опис модуля). '' — свою адресу спамом не позначаємо."""
+    """Ключ правила: адреса або @домен (див. опис модуля). '' — свою адресу спамом не позначаємо, а дивну
+    адресу (лапки, <>, пробіли…) — не запам'ятовуємо."""
     address = _addr(address)
-    if not address:
+    if not address or not _SAFE_ADDRESS.match(address):
         return ''
     own = own or own_addresses()
     if is_own(address, own):

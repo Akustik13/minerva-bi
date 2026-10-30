@@ -33,6 +33,8 @@ def week_ics():
 class FeedTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("anna", "a@x.y", "x", is_staff=True, is_superuser=True)
+        from calendar_app.tests_quick import public_dns
+        public_dns(self)
 
     def test_expand_rrule_exdate_override(self):
         text, base = week_ics()

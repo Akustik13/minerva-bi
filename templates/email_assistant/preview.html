@@ -2001,32 +2001,40 @@ function _tipIcon(ct) {
   return '📎';
 }
 
+// Назву й тип вкладення задає відправник листа — у HTML підказки лише екрановано
+function _attTipEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+  });
+}
+
 window.attTipShow = function(ev, el) {
   clearTimeout(_tipTimer);
   var url  = el.dataset.attUrl;
-  var name = el.dataset.attName;
+  var name = el.dataset.attName || '';
   var ct   = el.dataset.attCt || '';
+  if (!/^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i.test(ct)) ct = '';   // не «тип/підтип» — не показувати
   var size = _fmtSize(el.dataset.attSize);
   var isImg = ct.startsWith('image/');
 
   var html = '';
   if (isImg) {
     if (_tipLoaded !== url) {
-      html += '<img src="' + url + '" alt="" onerror="this.style.display=\'none\'">';
+      html += '<img src="' + _attTipEsc(url) + '" alt="" onerror="this.style.display=\'none\'">';
       _tipLoaded = url;
     } else if (_tip.querySelector('img')) {
       // already loaded — just reuse
       _tipTimer = setTimeout(function(){ _tip.style.display = 'block'; }, 80);
       return;
     } else {
-      html += '<img src="' + url + '" alt="">';
+      html += '<img src="' + _attTipEsc(url) + '" alt="">';
     }
   } else {
     html += '<div class="att-tip-icon">' + _tipIcon(ct) + '</div>';
   }
   html += '<div class="att-tip-info">'
-        + '<div class="att-tip-name">' + name.replace(/</g,'&lt;') + '</div>'
-        + '<div class="att-tip-meta">' + (ct || '{% trans "файл" %}') + (size ? ' · ' + size : '') + '</div>'
+        + '<div class="att-tip-name">' + _attTipEsc(name) + '</div>'
+        + '<div class="att-tip-meta">' + (_attTipEsc(ct) || '{% trans "файл" %}') + (size ? ' · ' + size : '') + '</div>'
         + '</div>';
 
   _tip.innerHTML = html;

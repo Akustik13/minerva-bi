@@ -1,23 +1,57 @@
 import json
 import logging
 from django import forms
-from django.contrib import admin
-from django.http import JsonResponse
+from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import path
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from .models import (EmailAccount, EmailCategoryRule, EmailMessage, EmailThread, EmailDraft, EmailSettings,
                      ScheduledEmail, EmailRule)
 
+NOT_OWN_MAILBOX = 'Лише зі своєї скриньки: ця скринька належить іншому користувачу.'
+
+
+class OwnMailboxAdminMixin:
+    """Заплановані листи й правила — лише власних скриньок (EmailAccount.user = request.user), і для суперкористувача
+    теж: вибір скриньки, список, зміна й видалення. Інакше колега міг би надіслати лист з чужої скриньки або
+    поставити правило на чужу пошту."""
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(account__user=request.user)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'account':
+            kwargs['queryset'] = EmailAccount.objects.filter(user=request.user)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and obj.account.user_id != request.user.pk:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.account.user_id != request.user.pk:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    @staticmethod
+    def _check_account(request, obj):
+        """Перевірка ще й під час запису (не лише вибором у формі)."""
+        if obj.account_id is None or obj.account.user_id != request.user.pk:
+            raise PermissionDenied(NOT_OWN_MAILBOX)
+
 
 @admin.register(EmailCategoryRule)
-class EmailCategoryRuleAdmin(admin.ModelAdmin):
+class EmailCategoryRuleAdmin(OwnMailboxAdminMixin, admin.ModelAdmin):
     """Категорії, задані правим кліком по листу; видалення повертає автовизначення."""
     list_display  = ('key', 'category', 'account', 'created_at')
-    list_filter   = ('category', 'account')
+    list_filter   = ('category', ('account', admin.RelatedOnlyFieldListFilter))
     search_fields = ('key',)
 
     def save_model(self, request, obj, form, change):
+        self._check_account(request, obj)
         obj.key = obj.key.strip().lower()
         super().save_model(request, obj, form, change)
         from .categorize import recategorize_contact
@@ -65,6 +99,8 @@ class ScheduledEmailComposeForm(forms.ModelForm):
                 attrs={'type': 'datetime-local', 'id': 'se-scheduled-at'}),
         }
 
+    request_user = None   # ставить ScheduledEmailAdmin.get_form
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         inst = self.instance
@@ -74,6 +110,34 @@ class ScheduledEmailComposeForm(forms.ModelForm):
         if not (inst and inst.pk):
             self.initial.setdefault('status', ScheduledEmail.STATUS_PENDING)
             self.initial.setdefault('trigger', 'manual')
+
+    def clean(self):
+        data = super().clean()
+        account = data.get('account')
+        if account is not None and self.request_user is not None and account.user_id != self.request_user.pk:
+            self.add_error('account', NOT_OWN_MAILBOX)
+        if self.instance and self.instance.pk:   # стан — з бази, не з прихованого поля сторінки
+            current = ScheduledEmail.objects.filter(pk=self.instance.pk).values('status', 'sent_at').first()
+            if current and scheduled_locked(current['status'], current['sent_at']):
+                raise forms.ValidationError(SCHEDULED_LOCKED)
+        return data
+
+
+SCHEDULED_LOCKED = ('Лист уже надіслано (або саме надсилається) — зміни не збережено, щоб він не пішов удруге. '
+                    'Новий лист — «✏️ Написати».')
+# Який статус людина може поставити у формі (з поточного в базі). «Надіслано» / «Помилка» ставить лише відправка.
+SCHEDULED_STATUS_TO = {
+    ScheduledEmail.STATUS_PENDING:   (ScheduledEmail.STATUS_PENDING, ScheduledEmail.STATUS_CANCELLED),
+    ScheduledEmail.STATUS_FAILED:    (ScheduledEmail.STATUS_FAILED, ScheduledEmail.STATUS_PENDING,
+                                      ScheduledEmail.STATUS_CANCELLED),
+    ScheduledEmail.STATUS_CANCELLED: (ScheduledEmail.STATUS_CANCELLED, ScheduledEmail.STATUS_PENDING),
+}
+
+
+def scheduled_locked(status, sent_at) -> bool:
+    """Надіслано або саме надсилається (бронь send_scheduled: «Очікує» + sent_at) — не змінювати."""
+    return status == ScheduledEmail.STATUS_SENT or (status == ScheduledEmail.STATUS_PENDING and sent_at is not None)
+
 
 logger = logging.getLogger('email_assistant')
 
@@ -555,12 +619,12 @@ class EmailThreadAdmin(admin.ModelAdmin):
 
 
 @admin.register(ScheduledEmail)
-class ScheduledEmailAdmin(admin.ModelAdmin):
+class ScheduledEmailAdmin(OwnMailboxAdminMixin, admin.ModelAdmin):
     form                = ScheduledEmailComposeForm
     change_form_template = 'admin/email_assistant/scheduledemail/change_form.html'
 
     list_display    = ('subject_col', 'account', 'to_col', 'att_col', 'status', 'scheduled_at', 'sent_at')
-    list_filter     = ('status', 'trigger', 'account')
+    list_filter     = ('status', 'trigger', ('account', admin.RelatedOnlyFieldListFilter))
     search_fields   = ('subject',)
     readonly_fields = ('sent_at', 'error_msg', 'created_at')
 
@@ -580,56 +644,81 @@ class ScheduledEmailAdmin(admin.ModelAdmin):
         return ', '.join(obj.to_emails[:2])
     to_col.short_description = _('Кому')
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        return qs.filter(account__user=request.user)
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        form.request_user = request.user   # clean(): скринька — лише своя
+        return form
 
     def save_model(self, request, obj, form, change):
+        """Новий лист — у чергу. Наявний — лише поки його не надіслано: стан читається з бази (не з прихованого
+        поля сторінки, відкритої ще до відправки), запис — умовним UPDATE, тож лист, який cron саме надіслав,
+        повторно в чергу не стане."""
+        self._check_account(request, obj)
         to_raw = form.cleaned_data.get('to_raw', '')
         cc_raw = form.cleaned_data.get('cc_raw', '')
         obj.to_emails = [e.strip() for e in to_raw.split(',') if e.strip()]
         obj.cc_emails = [e.strip() for e in cc_raw.split(',') if e.strip()]
         if not change:
-            obj.status  = ScheduledEmail.STATUS_PENDING
-            obj.trigger = 'manual'
+            obj.status, obj.trigger, obj.sent_at = ScheduledEmail.STATUS_PENDING, 'manual', None
+            super().save_model(request, obj, form, change)
+            return
+        current = ScheduledEmail.objects.filter(pk=obj.pk).values('status', 'sent_at', 'trigger').first()
+        if current is None or scheduled_locked(current['status'], current['sent_at']):
+            self._refuse(request, obj)
+            return
+        if obj.status not in SCHEDULED_STATUS_TO.get(current['status'], ()):
+            obj.status = current['status']
+        obj.trigger = current['trigger']
         if obj.status == ScheduledEmail.STATUS_PENDING:
-            obj.sent_at = None   # знову в черзі — зняти бронь send_scheduled
-        super().save_model(request, obj, form, change)
+            obj.sent_at = None   # знову в черзі (людина перевірила «Надіслані» після «невідомо, чи пішов»)
+        else:
+            obj.sent_at = current['sent_at']
+        fields = {f: getattr(obj, f) for f in ('account_id', 'subject', 'to_emails', 'cc_emails', 'body', 'body_html',
+                                               'scheduled_at', 'status', 'sent_at')}
+        updated = ScheduledEmail.objects.filter(pk=obj.pk, status=current['status'],
+                                                sent_at=current['sent_at']).update(**fields)
+        if not updated:   # тим часом відправка забронювала / надіслала лист
+            self._refuse(request, obj)
+
+    def _refuse(self, request, obj):
+        obj._not_saved = True
+        messages.error(request, SCHEDULED_LOCKED)
+
+    def response_change(self, request, obj):
+        if getattr(obj, '_not_saved', False):
+            return HttpResponseRedirect(request.path)
+        return super().response_change(request, obj)
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        from email_assistant.html_clean import clean_html
         from email_assistant.views import _crm_contacts
         extra_context = extra_context or {}
 
-        accounts = EmailAccount.objects.filter(is_active=True)
-        if not request.user.is_superuser:
-            accounts = accounts.filter(user=request.user)
+        accounts = EmailAccount.objects.filter(is_active=True, user=request.user)   # лише свої — як вибір у формі
 
-        extra_context['crm_contacts_json'] = json.dumps(_crm_contacts(request.user))
-        extra_context['account_sigs_json'] = json.dumps({
+        # Python-об'єкти: у шаблоні — json_script (ім'я з CRM чи текст листа не «вийдуть» зі <script>)
+        extra_context['crm_contacts'] = _crm_contacts(request.user)
+        extra_context['account_sigs'] = {
             str(a.pk): {
                 'signature':    a.signature or '',
                 'display_name': a.display_name or a.email_address,
                 'email':        a.email_address,
             }
             for a in accounts
-        })
+        }
         if object_id:
-            try:
-                obj = ScheduledEmail.objects.get(pk=object_id)
-                extra_context['existing_body_html'] = json.dumps(obj.body_html or '')
-                extra_context['existing_body_text'] = json.dumps(obj.body or '')
-            except ScheduledEmail.DoesNotExist:
-                pass
+            obj = self.get_queryset(request).filter(pk=object_id).first()
+            if obj is not None:   # HTML листа — у редактор сторінки Minerva, тож лише дозволені теги
+                extra_context['existing_body_html'] = clean_html(obj.body_html or '')
+                extra_context['existing_body_text'] = obj.body or ''
         return super().changeform_view(request, object_id, form_url, extra_context)
 
 
 @admin.register(EmailRule)
-class EmailRuleAdmin(admin.ModelAdmin):
+class EmailRuleAdmin(OwnMailboxAdminMixin, admin.ModelAdmin):
     list_display  = ('name', 'account', 'condition_field', 'condition_op',
                      'condition_value', 'action', 'is_active', 'created_at')
-    list_filter   = ('is_active', 'condition_field', 'action', 'account')
+    list_filter   = ('is_active', 'condition_field', 'action', ('account', admin.RelatedOnlyFieldListFilter))
     search_fields = ('name', 'condition_value')
     list_editable = ('is_active',)
 
@@ -645,11 +734,9 @@ class EmailRuleAdmin(admin.ModelAdmin):
         }),
     )
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        return qs.filter(account__user=request.user)
+    def save_model(self, request, obj, form, change):
+        self._check_account(request, obj)
+        super().save_model(request, obj, form, change)
 
 
 from . import admin_categories  # noqa: E402,F401 — «🏷 Свої категорії листів»

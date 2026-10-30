@@ -93,13 +93,28 @@ def attachment_bytes(account, msg, index):
     return data
 
 
+def can_attach(account, kind: str) -> bool:
+    """Документ Minerva у листі — лише якщо власник скриньки (той, хто надсилає) сам може бачити Angebote /
+    замовлення (has_perm іде за ролями Minerva, core/permissions.py). Інакше будь-хто з поштою міг би вкласти
+    чужий Angebot чи документ замовлення, просто вписавши «offer:<pk>» / «order:<pk>:<файл>»."""
+    user = getattr(account, 'user', None)
+    if user is None:
+        return False
+    perm = {'offer': 'offers.view_offer', 'offerint': 'offers.view_offer', 'order': 'sales.view_salesorder'}.get(kind)
+    return perm is None or user.has_perm(perm)
+
+
 def load_ref(account, ref: str):
-    """«order:…» / «msg:…» / «offer:…» / «draft:…» → {name, content, content_type} або None (чуже/неіснуюче — None)."""
+    """«order:…» / «msg:…» / «offer:…» / «draft:…» → {name, content, content_type} або None (чуже/неіснуюче /
+    немає права бачити — None)."""
     from email_assistant.models import EmailMessage
     from sales.models import SalesOrder
 
     kind, _, rest = (ref or '').partition(':')
     try:
+        if kind in ('offer', 'offerint', 'order') and not can_attach(account, kind):
+            logger.warning('attachment ref %s: no permission for %s', ref, getattr(account, 'user', None))
+            return None
         if kind == 'draft':   # файл / документ, уже збережений у чернетці цієї скриньки
             found = draft_item(account, ref)
             if found is None or str(found[1].get('ref', '')).startswith('draft:'):

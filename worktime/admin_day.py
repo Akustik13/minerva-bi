@@ -48,6 +48,7 @@ def day_page(model_admin, request):
 
     error = ""
     wd, plan_row, records, mail_rows, unmapped, meet_rows, log = None, None, [], [], 0, [], []
+    mail_private = False
     if du is not None:
         if st.enabled and st.configured and day <= today:
             try:   # свіжий день з askDANTE: прихід / відхід, відсутності, записи на проєкти
@@ -60,13 +61,16 @@ def day_page(model_admin, request):
         records = list(TimeRecord.objects.filter(dante_user=du, day=day).select_related("dante_project")
                        .order_by("start", "pk"))
         info = mail_time.estimate(du, day, day, st).get(day, {})
+        mail_private = not mail_time.mail_owner(du, request.user)
+        if mail_private and info:   # чужі листи — лише кількості й хвилини
+            mail_time.hide_mail(info, st.comment_lang)
         mail_rows, unmapped = info.get("rows", []), info.get("unmapped", 0)
         for r in mail_rows:
             r["dur"], r["todo_dur"] = _hm(r["minutes"]), _hm(r["to_book"])
         meet_rows = meetings.plan(du, day, day) if day <= today else []
         for r in meet_rows:
             r["dur"] = _hm(r["minutes"])
-        log = services.activity_log(du.user, day) if du.user_id else []
+        log = services.activity_log(du.user, day, viewer=request.user) if du.user_id else []
     span = services.activity_span(du.user, day) if du and du.user_id else None
     times = (wd.times if wd else None) or []
     def_start, def_stop = du.times(st) if du else (st.default_start, st.default_stop)
@@ -80,6 +84,7 @@ def day_page(model_admin, request):
         "plan": plan_row, "span": span, "def_start": hhmm(def_start), "def_stop": hhmm(def_stop),
         "records": [{"r": r, "dur": _hm(r.duration)} for r in records],
         "mail_rows": mail_rows, "unmapped": unmapped, "meet_rows": meet_rows, "log": log,
+        "mail_private": mail_private, "mail_private_text": mail_time.MAIL_PRIVATE,
         "cal_url": f"{reverse('admin:worktime_workday_changelist')}?u={du.pk if du else ''}&m={day:%Y-%m}",
         "mail_url": f"{reverse('admin:worktime_workday_mailtime')}?u={du.pk if du else ''}&from={day}&to={day}",
         "meetings_url": f"{reverse('admin:worktime_workday_meetings')}?u={du.pk if du else ''}&from={day}&to={day}",

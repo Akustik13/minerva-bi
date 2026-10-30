@@ -275,11 +275,19 @@
 
 <div id="se-suggestions"></div>
 
+{# дані — json_script, не «{{ …|safe }}» у <script>: ім'я з CRM чи текст листа з «</script>» не виконається #}
+{{ crm_contacts|json_script:"se-contacts-data" }}
+{{ account_sigs|json_script:"se-sigs-data" }}
+{% if original %}{{ existing_body_html|json_script:"se-existing-html" }}{{ existing_body_text|json_script:"se-existing-text" }}{% endif %}
 <script>
 (function(){
+  function _seData(id, dflt) {
+    var el = document.getElementById(id);
+    try { return el ? JSON.parse(el.textContent) : dflt; } catch (e) { return dflt; }
+  }
   var CSRF     = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
-  var CONTACTS = {{ crm_contacts_json|safe }};
-  var ACC_SIGS = {{ account_sigs_json|safe }};
+  var CONTACTS = _seData('se-contacts-data', []);
+  var ACC_SIGS = _seData('se-sigs-data', {});
 
   var editor   = document.getElementById('se-body-editor');
   var toField  = document.getElementById('se-to');
@@ -300,9 +308,9 @@
   }
 
   {% if original %}
-  // Editing: restore body (pre-encoded as JSON strings by changeform_view)
-  var existingHtml = {{ existing_body_html|default:'""'|safe }};
-  var existingText = {{ existing_body_text|default:'""'|safe }};
+  // Editing: restore body (HTML уже очищено в changeform_view — email_assistant/html_clean.py)
+  var existingHtml = _seData('se-existing-html', '') || '';
+  var existingText = _seData('se-existing-text', '') || '';
   if (existingHtml) {
     editor.innerHTML = existingHtml;
   } else if (existingText) {
@@ -346,12 +354,22 @@
       }).slice(0,10);
       if (!hits.length) { suggBox.style.display='none'; return; }
       _suggTarget = field;
-      suggBox.innerHTML = hits.map(function(c){
-        return '<div class="se-sugg-item" onclick="seSelectContact(\'' +
-          c.email.replace(/'/g,"\\'") + '\')">' +
-          '<strong>' + _esc(c.name||c.email) + '</strong>' +
-          (c.name ? ' <span>' + _esc(c.email) + '</span>' : '') + '</div>';
-      }).join('');
+      suggBox.innerHTML = '';
+      hits.forEach(function(c){   // елементами: лапки в імені / адресі CRM не стануть атрибутом
+        var item = document.createElement('div');
+        item.className = 'se-sugg-item';
+        var b = document.createElement('strong');
+        b.textContent = c.name || c.email;
+        item.appendChild(b);
+        if (c.name) {
+          var sp = document.createElement('span');
+          sp.textContent = c.email;
+          item.appendChild(document.createTextNode(' '));
+          item.appendChild(sp);
+        }
+        item.addEventListener('click', function(){ window.seSelectContact(c.email); });
+        suggBox.appendChild(item);
+      });
       var rect = field.getBoundingClientRect();
       suggBox.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
       suggBox.style.left = rect.left + 'px';

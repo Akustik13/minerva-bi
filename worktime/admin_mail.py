@@ -239,7 +239,11 @@ def mail_time_page(model_admin, request):
             messages.warning(request, "Виберіть проєкт askDANTE або «створити новий».")
         return redirect(back)
 
+    own = du is not None and mail_time.mail_owner(du, request.user)   # листи — лише власнику скриньок
     if request.method == "POST" and du is not None and request.POST.get("action") in ("assign", "ignore", "unignore"):
+        if not own:   # віднести / не рахувати — це дії з листами працівника
+            messages.error(request, mail_time.MAIL_PRIVATE)
+            return redirect(back)
         return _loose_action(request, du, st, back)
 
     if request.method == "POST" and du is not None:
@@ -249,6 +253,9 @@ def mail_time_page(model_admin, request):
         done = minutes = 0
         activity = DanteActivity.objects.filter(pk=request.POST.get("activity") or 0).first()
         if request.POST.get("action") == "describe":   # 📝 короткі описи AI для рядків періоду (далі — правити вручну)
+            if not own:   # опис AI — з тексту листів працівника
+                messages.error(request, mail_time.MAIL_PRIVATE)
+                return redirect(back)
             n = 0
             for day, info in mail_time.estimate(du, date_from, date_to, st).items():
                 for r in info["rows"]:
@@ -307,6 +314,8 @@ def mail_time_page(model_admin, request):
                 if not info["rows"]:
                     continue
                 info["unmapped"], info["loose"], info["ignored"] = 0, [], []
+            if not own:   # чужі листи — лише кількості й хвилини
+                mail_time.hide_mail(info, st.comment_lang)
             for r in info["rows"]:
                 r["dur"], r["booked_dur"], r["todo_dur"] = _hm(r["minutes"]), _hm(r["booked"]), _hm(r["to_book"])
                 if needs_act and not r["activity"] and r["to_book"]:   # askDANTE вимагає вид роботи, а в рядку його немає
@@ -315,8 +324,11 @@ def mail_time_page(model_admin, request):
                     r["last_activity"] = last_act[r["dp"].pk]
                     r["no_activity"] = r["last_activity"] is None
                 r["key"] = f"{day:%Y-%m-%d}|{r['dp'].pk}"
-                summary = mail_time.cached_summary(du, r, st.comment_lang)
-                r["comment"], r["ai"] = mail_time.default_comment(r, st.comment_lang, summary), bool(summary)
+                if own:
+                    summary = mail_time.cached_summary(du, r, st.comment_lang)
+                    r["comment"], r["ai"] = mail_time.default_comment(r, st.comment_lang, summary), bool(summary)
+                else:
+                    r["comment"], r["ai"] = r["private_comment"], False
                 r["sent"] = sent.get((day, r["dp"].pk), [])
                 r["no_worktime"] = worktime.get(day) is False
                 total += r["minutes"]
@@ -325,6 +337,7 @@ def mail_time_page(model_admin, request):
                          "no_worktime": worktime.get(day) is False,
                          "day_url": f"{reverse('admin:worktime_workday_day')}?u={du.pk}&d={day}",
                          "loose": info["loose"], "ignored": info["ignored"],
+                         "loose_count": info.get("loose_count", 0), "ignored_count": info.get("ignored_count", 0),
                          "ongoing": day == today})
     days.reverse()   # свіжі дні зверху
     cats = list(MailCategoryTime.objects.select_related("category", "dante_project").order_by("category__order"))
@@ -348,6 +361,7 @@ def mail_time_page(model_admin, request):
         "activities": list(DanteActivity.objects.filter(archived=False)),
         "needs_activity": st.activity_required and not st.default_activity_id,
         "show": show, "n_loose": sum(len(d["loose"]) for d in days), "n_ignored": sum(len(d["ignored"]) for d in days),
+        "mail_private": du is not None and not own, "mail_private_text": mail_time.MAIL_PRIVATE,
         "focus": focus, "focus_cat": focus_cat, "shared": shared, "can_bind": can_bind,
         "focus_proj": focus_proj, "pmap": pmap, "proj_hints": proj_hints,
         "open_work": g.get("work") == "1",

@@ -207,10 +207,12 @@ def activity_span(user, day: datetime.date):
     return min(stamps), max(stamps), len(stamps)
 
 
-def activity_log(user, day: datetime.date, limit: int = 80) -> list[dict]:
-    """👣 Що користувач робив у Minerva за день: журнал дій (вхід, створення, зміни) і надіслані листи — по часу."""
+def activity_log(user, day: datetime.date, limit: int = 80, viewer=None) -> list[dict]:
+    """👣 Що користувач робив у Minerva за день: журнал дій (вхід, створення, зміни) і надіслані листи — по часу.
+    viewer — хто дивиться: тему надісланого листа бачить лише сам власник скриньки, інший — лише «лист» і час."""
     if user is None:
         return []
+    own_mail = viewer is None or getattr(viewer, "pk", None) == user.pk
     tz = timezone.get_current_timezone()
     start = timezone.make_aware(datetime.datetime.combine(day, datetime.time.min), tz)
     end = start + datetime.timedelta(days=1)
@@ -227,7 +229,7 @@ def activity_log(user, day: datetime.date, limit: int = 80) -> list[dict]:
         for m in (EmailMessage.objects.filter(account__user=user, folder=EmailMessage.FOLDER_SENT,
                                               sent_at__gte=start, sent_at__lt=end).order_by("sent_at")[:limit]):
             out.append({"at": timezone.localtime(m.sent_at, tz), "icon": "📤", "kind": "лист",
-                        "text": m.subject or "(без теми)"})
+                        "text": (m.subject or "(без теми)") if own_mail else "надісланий лист"})
     except Exception:  # noqa: BLE001 — пошта не встановлена
         pass
     out.sort(key=lambda x: x["at"])
@@ -1092,8 +1094,14 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
     comment = (comment or "").strip()[:500]
     fixed_times = bool(start)
     recent = timezone.now() - datetime.timedelta(minutes=2)
-    if Booking.objects.filter(dante_user=du, kind=Booking.PROJECT, date=day, dante_project=dp, duration=minutes,
-                              start=start, comment=comment, status=Booking.SENT, created_at__gte=recent).exists():
+    comments = [comment] + ([comment[:249].rstrip() + "…"] if len(comment) > 250 else [])   # задовгий — обрізано
+    same = Booking.objects.filter(dante_user=du, kind=Booking.PROJECT, date=day, dante_project=dp, duration=minutes,
+                                  comment__in=comments, status=Booking.SENT, created_at__gte=recent)
+    if start:   # «з … по …» — той самий відрізок
+        same = same.filter(start=start)
+    # тривалість — будь-який відрізок: askDANTE без тривалостей Minerva записує як «з … по …» (find_slot), тож
+    # у збереженому записі start уже не порожній — фільтр start=None подвійне натискання не ловив
+    if same.exists():
         raise DanteError("bad_request", "Такий самий запис щойно вже пішов в askDANTE — оновіть сторінку.")
     def record():
         # підпроєкт askDANTE (project item) — інше поле, ніж проєкт

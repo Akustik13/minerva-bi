@@ -42,9 +42,17 @@ class DetectTests(TestCase):
         self.assertTrue(links["outlook_live"].startswith("https://outlook.live.com/"))
 
 
+def public_dns(test):
+    """Без мережі: хости календарів вважаються публічними (перевірку адрес — feeds._public — тестує tests_security)."""
+    p = mock.patch("calendar_app.feeds._public", return_value=True)
+    p.start()
+    test.addCleanup(p.stop)
+
+
 class QuickAddTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("anna", "a@x.y", "x", is_staff=True, is_superuser=True)
+        public_dns(self)
 
     def test_name_color_and_events_from_one_link(self):
         with mock.patch("calendar_app.feeds.requests.get", return_value=resp()):
@@ -76,6 +84,7 @@ class QuickAddTests(TestCase):
 class PageTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user("anna", "a@x.y", "x", is_staff=True, is_superuser=True)
+        public_dns(self)
         from config.models import SystemSettings
         ss = SystemSettings.objects.get_or_create(pk=1)[0]
         ss.is_onboarding_complete = True

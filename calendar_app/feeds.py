@@ -63,9 +63,44 @@ def parse(text: str) -> list[dict]:
     return out
 
 
+_UNTIL_RE = re.compile(r"UNTIL=(\d{8})(?:T(\d{6})(Z)?)?", re.IGNORECASE)
+
+
+def _until_like_start(rrule: str, aware: bool, tz) -> str:
+    """UNTIL у RRULE — у тому ж вигляді, що й початок (dateutil інакше відмовляє): RFC 5545 дозволяє UNTIL датою
+    (весь день, Google) або UTC-часом (Outlook). aware — початок з поясом: UNTIL → UTC (дата — кінець того дня
+    місцевого часу); без пояса (події на весь день) → місцевий час без пояса."""
+    def rep(m):
+        day, hms, z = m.group(1), m.group(2), m.group(3)
+        if aware:
+            if z:
+                return m.group(0)
+            local = datetime.datetime.strptime(day + (hms or "235959"), "%Y%m%d%H%M%S").replace(tzinfo=tz)
+            return "UNTIL=" + local.astimezone(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        if z:   # Outlook: «UNTIL=20261230T230000Z» = 31.12 00:00 за Берліном
+            utc = datetime.datetime.strptime(day + hms, "%Y%m%d%H%M%S").replace(tzinfo=datetime.timezone.utc)
+            return "UNTIL=" + utc.astimezone(tz).strftime("%Y%m%dT%H%M%S")
+        return f"UNTIL={day}T{hms or '235959'}"
+    return _UNTIL_RE.sub(rep, rrule or "")
+
+
+def _starts(e: dict, window_start: datetime.datetime, window_end: datetime.datetime) -> list:
+    """Початки повторюваної події у вікні. Весь день — розгортається в місцевих датах без пояса (UNTIL датою), потім
+    кожен початок знову з поясом."""
+    from dateutil.rrule import rrulestr
+    tz = e["start"].tzinfo
+    if e["all_day"]:
+        naive = e["start"].replace(tzinfo=None)
+        rule = rrulestr(_until_like_start(e["rrule"], False, tz), dtstart=naive)
+        found = rule.between(window_start.astimezone(tz).replace(tzinfo=None),
+                             window_end.astimezone(tz).replace(tzinfo=None), inc=True)[:MAX_OCCURRENCES]
+        return [timezone.make_aware(s, tz) for s in found]
+    rule = rrulestr(_until_like_start(e["rrule"], True, tz), dtstart=e["start"])
+    return rule.between(window_start, window_end, inc=True)[:MAX_OCCURRENCES]
+
+
 def expand(events: list[dict], window_start: datetime.datetime, window_end: datetime.datetime) -> list[dict]:
     """Події вікна: повторювані — розгорнуто (dateutil), винятки RECURRENCE-ID замінюють свої дати, EXDATE — ні."""
-    from dateutil.rrule import rrulestr
     overrides = {(e["uid"], e["recurrence_id"]) for e in events if e["recurrence_id"]}
     out = []
     for e in events:
@@ -75,17 +110,51 @@ def expand(events: list[dict], window_start: datetime.datetime, window_end: date
                 out.append({**e, "end": e["start"] + length if e["end"] else None})
             continue
         try:
-            rule = rrulestr(e["rrule"], dtstart=e["start"])
-            starts = rule.between(window_start, window_end, inc=True)[:MAX_OCCURRENCES]
+            starts = _starts(e, window_start, window_end)
         except (ValueError, TypeError) as ex:
             logger.info("rrule %s: %s", e["uid"], ex)
-            starts = [e["start"]]
+            # правило не розібрано — лише перший раз, і то якщо він у вікні (а не подія з 2019 року «сьогодні»)
+            starts = [e["start"]] if e["start"] <= window_end and e["start"] + length >= window_start else []
         skip = {x.astimezone(datetime.timezone.utc) for x in e["exdate"]}
         for s in starts:
             if s.astimezone(datetime.timezone.utc) in skip or (e["uid"], s) in overrides:
                 continue
             out.append({**e, "start": s, "end": s + length if e["end"] else None})
     return out
+
+
+MAX_REDIRECTS = 5
+NOT_PUBLIC = ("адреса календаря веде не в інтернет (локальна / приватна мережа або сам сервер) — Minerva такі "
+              "адреси не відкриває")
+
+
+def _public(host: str) -> bool:
+    """Та сама перевірка, що для логотипів відправників (email_assistant/logos.py): усі IP хоста — публічні."""
+    from email_assistant.logos import _public as public
+    return public(host)
+
+
+def _get(url: str):
+    """GET календаря: адреса людини — лише публічний інтернет, і кожна переадресація перевіряється заново
+    (інакше «календар» з https://evil.example → 302 → http://192.168.2.123/… прочитав би внутрішню мережу)."""
+    from urllib.parse import urljoin, urlparse
+    for _ in range(MAX_REDIRECTS + 1):
+        parts = urlparse(url)
+        if parts.scheme not in ("http", "https") or not parts.hostname:
+            raise ValueError("потрібна адреса https:// (або webcal://)")
+        if not _public(parts.hostname):
+            raise ValueError(NOT_PUBLIC)
+        r = requests.get(url, timeout=20, headers={"User-Agent": "Minerva-Calendar/1.0"}, stream=True,
+                         allow_redirects=False)
+        if r.status_code in (301, 302, 303, 307, 308):
+            location = r.headers.get("Location", "")
+            r.close()
+            if not location:
+                raise ValueError("переадресація без адреси")
+            url = urljoin(url, location)
+            continue
+        return r
+    raise ValueError("забагато переадресацій")
 
 
 def fetch(feed) -> int:
@@ -95,7 +164,7 @@ def fetch(feed) -> int:
     if url.lower().startswith("webcal://"):
         url = "https://" + url[9:]
     try:
-        r = requests.get(url, timeout=20, headers={"User-Agent": "Minerva-Calendar/1.0"}, stream=True)
+        r = _get(url)
         r.raise_for_status()
         raw = r.raw.read(MAX_BYTES + 1, decode_content=True)
         if len(raw) > MAX_BYTES:
