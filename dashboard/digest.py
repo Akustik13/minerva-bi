@@ -8,12 +8,17 @@ Sections (each toggleable in NotificationSettings):
   - ✅ Delivered            — reached 'delivered' status in the period
   - 🔥 Critical stock       — < 1.5 months supply
 
+Тижневий — останні 7 повних днів (до вчора), місячний — попередній повний місяць проти місяця перед ним.
+Усі значення з бази в Telegram (parse_mode=HTML) і листі — через esc().
+
 Triggered by: `python manage.py send_digest [--force]`
 """
 from __future__ import annotations
 from datetime import timedelta, date as _date
 import logging
 from django.utils import timezone
+
+from dashboard.notifications import esc, tg_cut
 
 logger = logging.getLogger(__name__)
 
@@ -40,19 +45,23 @@ def _check_holiday(today: _date, country_code: str) -> str | None:
 
 
 # ── Data collectors ────────────────────────────────────────────────────────────
+# Що чекає відправки / що продано — sales/revenue.py (те саме правило, що Дашборд): без скасованих і запитів
+# пропозицій, виручка — лише продажі у валюті Minerva. Помилка збору — у журнал (а не тихий нуль у звіті).
+
+MONTHS_UA = ['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень',
+             'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень']
+
+
+def _month_label(d) -> str:
+    return f"{MONTHS_UA[d.month - 1]} {d.year}"
+
 
 def _get_pending_shipments() -> list:
     """Orders with a shipping deadline that haven't been shipped yet."""
     try:
-        from sales.models import SalesOrder
-        today = timezone.now().date()
-        qs = (
-            SalesOrder.objects
-            .filter(affects_stock=True, shipped_at__isnull=True,
-                    shipping_deadline__isnull=False)
-            .exclude(status__in=["shipped", "delivered", "cancelled"])
-            .order_by("shipping_deadline")
-        )
+        from sales.revenue import to_ship
+        today = timezone.localdate()
+        qs = to_ship().filter(shipping_deadline__isnull=False).order_by("shipping_deadline")
         result = []
         for o in qs:
             days_left = (o.shipping_deadline - today).days
@@ -67,21 +76,16 @@ def _get_pending_shipments() -> list:
             })
         return result
     except Exception:
+        logger.exception("digest: очікують відправки — не зібрано")
         return []
 
 
 def _get_overdue_orders() -> list:
     """Orders past deadline, not shipped."""
     try:
-        from sales.models import SalesOrder
-        today = timezone.now().date()
-        qs = (
-            SalesOrder.objects
-            .filter(affects_stock=True, shipping_deadline__lt=today,
-                    shipped_at__isnull=True)
-            .exclude(status__in=["shipped", "delivered", "cancelled"])
-            .order_by("shipping_deadline")
-        )
+        from sales.revenue import to_ship
+        today = timezone.localdate()
+        qs = to_ship().filter(shipping_deadline__lt=today).order_by("shipping_deadline")
         result = []
         for o in qs:
             days_late = (today - o.shipping_deadline).days
@@ -94,16 +98,20 @@ def _get_overdue_orders() -> list:
             })
         return result
     except Exception:
+        logger.exception("digest: прострочені — не зібрано")
         return []
 
 
 def _get_new_orders_since(since_dt) -> list:
-    """Orders created since the given datetime."""
+    """Orders created since the given datetime (без скасованих і запитів пропозицій)."""
     try:
         from sales.models import SalesOrder
+        from sales.revenue import CANCELLED, NO_SHIP_TYPES
         qs = (
             SalesOrder.objects
-            .filter(affects_stock=True, order_date__gte=since_dt.date())
+            .filter(affects_stock=True, order_date__gte=timezone.localtime(since_dt).date())
+            .exclude(status=CANCELLED)
+            .exclude(document_type__in=NO_SHIP_TYPES)
             .order_by("-order_date", "-pk")[:25]
         )
         result = []
@@ -118,6 +126,7 @@ def _get_new_orders_since(since_dt) -> list:
             })
         return result
     except Exception:
+        logger.exception("digest: нові замовлення — не зібрано")
         return []
 
 
@@ -126,7 +135,7 @@ def _get_delivered_since(since_dt) -> list:
     try:
         from sales.models import SalesOrder
         # We don't have a delivered_at index, so use a generous window
-        window_start = since_dt.date() - timedelta(days=30)
+        window_start = timezone.localtime(since_dt).date() - timedelta(days=30)
         qs = (
             SalesOrder.objects
             .filter(affects_stock=True, status="delivered",
@@ -144,6 +153,7 @@ def _get_delivered_since(since_dt) -> list:
             })
         return result
     except Exception:
+        logger.exception("digest: доставлені — не зібрано")
         return []
 
 
@@ -153,83 +163,90 @@ def _get_critical_stock() -> list:
 
 
 def _get_top_products(since, until, limit: int = 10) -> list:
-    """Top products by quantity sold in [since, until] date range."""
+    """Top products by quantity sold in [since, until] date range (лише продажі; сума — у валюті Minerva)."""
     try:
         from django.db.models import Sum
+        from sales import revenue as rv
         from sales.models import SalesOrderLine
+        lines = rv.sale_lines(SalesOrderLine.objects.filter(order__order_date__range=(since, until)))
+        money = rv.line_revenue(lines, by=['product__sku'])
         rows = (
-            SalesOrderLine.objects
-            .filter(
-                order__order_date__range=(since, until),
-                order__affects_stock=True,
-            )
-            .exclude(order__status='cancelled')
+            lines.order_by()
             .values('product__sku', 'product__name')
-            .annotate(total_qty=Sum('qty'), total_rev=Sum('total_price'))
+            .annotate(total_qty=Sum('qty'))
             .order_by('-total_qty')[:limit]
         )
-        return [
-            {
+        out = []
+        for r in rows:
+            m = money.get((r['product__sku'],))
+            out.append({
                 'sku':       r['product__sku'] or '—',
                 'name':      r['product__name'] or '—',
                 'total_qty': int(r['total_qty'] or 0),
-                'total_rev': float(r['total_rev'] or 0),
-            }
-            for r in rows
-        ]
+                'total_rev': float(m.total) if m else 0.0,
+            })
+        return out
     except Exception:
+        logger.exception("digest: топ товарів — не зібрано")
         return []
 
 
 def _get_shipments_count(since, until) -> int:
-    """Count of shipped orders in [since, until] date range."""
+    """Count of shipped orders in [since, until] date range (shipped_at — дата, не дата й час)."""
     try:
         from sales.models import SalesOrder
-        return SalesOrder.objects.filter(
-            shipped_at__date__range=(since, until),
-            affects_stock=True,
-        ).count()
+        from sales.revenue import CANCELLED, NO_SHIP_TYPES
+        return (SalesOrder.objects
+                .filter(shipped_at__range=(since, until), affects_stock=True)
+                .exclude(status=CANCELLED)
+                .exclude(document_type__in=NO_SHIP_TYPES)
+                .count())
     except Exception:
+        logger.exception("digest: кількість відправлень — не пораховано")
         return 0
 
 
-def _get_monthly_revenue_comparison() -> dict:
-    """Revenue + order count: current month vs previous month."""
+def last_full_month(today) -> tuple:
+    """(перший, останній день) попереднього повного місяця відносно today."""
+    end = today.replace(day=1) - timedelta(days=1)
+    return end.replace(day=1), end
+
+
+def _get_monthly_revenue_comparison(today=None) -> dict:
+    """Виручка й кількість продажів: попередній повний місяць проти місяця перед ним.
+
+    Місячний звіт надсилається на початку місяця — поточний місяць тоді ще майже порожній, тож порівнюються
+    два завершені місяці. Виручка — sales/revenue.py (лише продажі, у валюті Minerva; без курсу — окремо)."""
     try:
-        from django.db.models import Sum
-        from sales.models import SalesOrder, SalesOrderLine
-        today = timezone.now().date()
-        # Current month
-        cur_start = today.replace(day=1)
-        # Previous month
-        prev_end = cur_start - timedelta(days=1)
-        prev_start = prev_end.replace(day=1)
+        from sales import revenue as rv
+        today = today or timezone.localdate()
+        cur_start, cur_end = last_full_month(today)
+        prev_start, prev_end = last_full_month(cur_start)
+        rates = rv.Rates()
 
         def _month_stats(start, end):
-            orders = SalesOrder.objects.filter(
-                order_date__range=(start, end), affects_stock=True,
-            ).exclude(status='cancelled')
-            count = orders.count()
-            rev = (
-                SalesOrderLine.objects
-                .filter(order__in=orders)
-                .aggregate(s=Sum('total_price'))['s'] or 0
-            )
-            return {'count': count, 'revenue': float(rev)}
+            orders = rv.sale_orders().filter(order_date__range=(start, end))
+            money = rv.revenue(orders, rates=rates)
+            return {'count': orders.count(), 'revenue': float(money.total), 'revenue_text': money.text,
+                    'missing': money.missing_text, 'label': _month_label(start)}
 
-        cur  = _month_stats(cur_start, today)
+        cur  = _month_stats(cur_start, cur_end)
         prev = _month_stats(prev_start, prev_end)
         diff_rev = cur['revenue'] - prev['revenue']
         diff_pct = (diff_rev / prev['revenue'] * 100) if prev['revenue'] else None
         return {
             'cur_start':  cur_start,
+            'cur_end':    cur_end,
             'prev_start': prev_start,
+            'prev_end':   prev_end,
             'cur':        cur,
             'prev':       prev,
             'diff_rev':   diff_rev,
             'diff_pct':   diff_pct,
+            'currency':   rates.home,
         }
     except Exception:
+        logger.exception("digest: виручка місяця — не пораховано")
         return {}
 
 
@@ -267,7 +284,7 @@ def build_digest_telegram(data: dict, company_name: str = "Minerva", period: str
     period_label = period_labels.get(period, "Звіт")
     lines = [
         f"📊 <b>Minerva — {period_label}</b>",
-        f"<i>{company_name} · {now_str}</i>",
+        f"<i>{esc(company_name)} · {now_str}</i>",
         "",
     ]
 
@@ -280,7 +297,7 @@ def build_digest_telegram(data: dict, company_name: str = "Minerva", period: str
         lines.append(f'📦 <b>Очікують відправки ({len(data["pending"])})</b>:')
         for o in data["pending"][:10]:
             lines.append(
-                f'  • <code>{o["order_number"]}</code> | {o["client"]} | '
+                f'  • <code>{esc(o["order_number"])}</code> | {esc(o["client"])} | '
                 f'⏰ {o["deadline"].strftime("%d.%m")} ({_days_label(o["days_left"])})'
             )
         if len(data["pending"]) > 10:
@@ -291,7 +308,7 @@ def build_digest_telegram(data: dict, company_name: str = "Minerva", period: str
         lines.append(f'⏰ <b>Прострочено ({len(data["overdue"])})</b>:')
         for o in data["overdue"][:5]:
             lines.append(
-                f'  • <code>{o["order_number"]}</code> | {o["client"]} | '
+                f'  • <code>{esc(o["order_number"])}</code> | {esc(o["client"])} | '
                 f'🔴 +{o["days_late"]} дн.'
             )
         lines.append("")
@@ -299,14 +316,14 @@ def build_digest_telegram(data: dict, company_name: str = "Minerva", period: str
     if data["new_orders"]:
         lines.append(f'🆕 <b>Нові замовлення ({len(data["new_orders"])})</b>:')
         for o in data["new_orders"][:8]:
-            total_part = f' — {o["total"]} {o["currency"]}'.strip() if o["total"] else ""
-            lines.append(f'  • <code>{o["order_number"]}</code> | {o["client"]}{total_part}')
+            total_part = f' — {esc(o["total"])} {esc(o["currency"])}'.rstrip() if o["total"] else ""
+            lines.append(f'  • <code>{esc(o["order_number"])}</code> | {esc(o["client"])}{total_part}')
         lines.append("")
 
     if data["delivered"]:
         lines.append(f'✅ <b>Доставлено ({len(data["delivered"])})</b>:')
         for o in data["delivered"][:8]:
-            lines.append(f'  • <code>{o["order_number"]}</code> | {o["client"]}')
+            lines.append(f'  • <code>{esc(o["order_number"])}</code> | {esc(o["client"])}')
         lines.append("")
 
     if data["stock"]:
@@ -314,7 +331,7 @@ def build_digest_telegram(data: dict, company_name: str = "Minerva", period: str
         for item in data["stock"][:5]:
             icon = "🔴" if item["is_critical"] else "⚠️"
             lines.append(
-                f'  • <code>{item["sku"]}</code> — {item["name"]} | '
+                f'  • <code>{esc(item["sku"])}</code> — {esc(item["name"])} | '
                 f'{item["stock"]} шт | {item["months_left"]} міс {icon}'
             )
         lines.append("")
@@ -328,7 +345,7 @@ def build_digest_telegram(data: dict, company_name: str = "Minerva", period: str
         lines.append(f'\n📦 <b>Топ товарів ({period_label}):</b>')
         for i, p in enumerate(data["top_products"][:limit], 1):
             lines.append(
-                f'  {i}. <code>{p["sku"]}</code> {p["name"]} | '
+                f'  {i}. <code>{esc(p["sku"])}</code> {esc(p["name"])} | '
                 f'{p["total_qty"]} шт'
             )
 
@@ -341,17 +358,16 @@ def build_digest_telegram(data: dict, company_name: str = "Minerva", period: str
         if diff_pct is not None:
             arrow = f" {'▲' if diff_pct >= 0 else '▼'}{abs(diff_pct):.1f}%"
         lines.append(
-            f'\n💰 <b>Виручка місяця:</b> {cur.get("revenue", 0):.0f}{arrow}'
+            f'\n💰 <b>Виручка за {esc(cur.get("label", ""))}:</b> {esc(cur.get("revenue_text", "—"))}{arrow}'
         )
+        if cur.get("missing"):
+            lines.append(f'   <i>{esc(cur["missing"])}</i>')
         lines.append(
-            f'   Поп. місяць: {prev.get("revenue", 0):.0f} | '
-            f'Замовлень: {cur.get("count", 0)}'
+            f'   {esc(prev.get("label", "Поп. місяць"))}: {esc(prev.get("revenue_text", "—"))} | '
+            f'Замовлень: {cur.get("count", 0)} (було {prev.get("count", 0)})'
         )
 
-    text = "\n".join(lines)
-    if len(text) > 3500:
-        text = text[:3480] + "\n<i>... (обрізано)</i>"
-    return text
+    return tg_cut("\n".join(lines))
 
 
 # ── Email HTML builder ─────────────────────────────────────────────────────────
@@ -371,11 +387,11 @@ def build_digest_email_html(data: dict, company_name: str = "Minerva", period: s
             dl_color = "#c62828" if dl <= 0 else ("#e65100" if dl <= 3 else "#2e7d32")
             rows += (
                 f'<tr style="background:{bg}">'
-                f'<td style="padding:6px 10px;font-family:monospace;color:#1565c0">{o["order_number"]}</td>'
-                f'<td style="padding:6px 10px">{o["client"]}</td>'
+                f'<td style="padding:6px 10px;font-family:monospace;color:#1565c0">{esc(o["order_number"])}</td>'
+                f'<td style="padding:6px 10px">{esc(o["client"])}</td>'
                 f'<td style="padding:6px 10px;color:#555">{o["deadline"].strftime("%d.%m.%Y")}</td>'
                 f'<td style="padding:6px 10px;font-weight:700;color:{dl_color}">{_days_label(dl)}</td>'
-                f'<td style="padding:6px 10px;color:#888;font-size:11px">{o["status"]}</td>'
+                f'<td style="padding:6px 10px;color:#888;font-size:11px">{esc(o["status"])}</td>'
                 f'</tr>'
             )
         sections += _table_section(
@@ -390,8 +406,8 @@ def build_digest_email_html(data: dict, company_name: str = "Minerva", period: s
             bg = "#fff8f8" if i % 2 == 0 else "#fff"
             rows += (
                 f'<tr style="background:{bg}">'
-                f'<td style="padding:6px 10px;font-family:monospace;color:#c62828">{o["order_number"]}</td>'
-                f'<td style="padding:6px 10px">{o["client"]}</td>'
+                f'<td style="padding:6px 10px;font-family:monospace;color:#c62828">{esc(o["order_number"])}</td>'
+                f'<td style="padding:6px 10px">{esc(o["client"])}</td>'
                 f'<td style="padding:6px 10px">{o["deadline"].strftime("%d.%m.%Y")}</td>'
                 f'<td style="padding:6px 10px;font-weight:700;color:#c62828">+{o["days_late"]} дн.</td>'
                 f'</tr>'
@@ -409,10 +425,10 @@ def build_digest_email_html(data: dict, company_name: str = "Minerva", period: s
             total_str = f'{o["total"]} {o["currency"]}'.strip() if o["total"] else "—"
             rows += (
                 f'<tr style="background:{bg}">'
-                f'<td style="padding:6px 10px;font-family:monospace;color:#1565c0">{o["order_number"]}</td>'
-                f'<td style="padding:6px 10px">{o["client"]}</td>'
-                f'<td style="padding:6px 10px;font-weight:600;color:#2e7d32">{total_str}</td>'
-                f'<td style="padding:6px 10px;color:#888;font-size:11px">{o["source"]}</td>'
+                f'<td style="padding:6px 10px;font-family:monospace;color:#1565c0">{esc(o["order_number"])}</td>'
+                f'<td style="padding:6px 10px">{esc(o["client"])}</td>'
+                f'<td style="padding:6px 10px;font-weight:600;color:#2e7d32">{esc(total_str)}</td>'
+                f'<td style="padding:6px 10px;color:#888;font-size:11px">{esc(o["source"])}</td>'
                 f'</tr>'
             )
         sections += _table_section(
@@ -427,9 +443,9 @@ def build_digest_email_html(data: dict, company_name: str = "Minerva", period: s
             bg = "#e8f5e9" if i % 2 == 0 else "#fff"
             rows += (
                 f'<tr style="background:{bg}">'
-                f'<td style="padding:6px 10px;font-family:monospace;color:#1565c0">{o["order_number"]}</td>'
-                f'<td style="padding:6px 10px">{o["client"]}</td>'
-                f'<td style="padding:6px 10px;font-size:11px;color:#888">{o["tracking"] or "—"}</td>'
+                f'<td style="padding:6px 10px;font-family:monospace;color:#1565c0">{esc(o["order_number"])}</td>'
+                f'<td style="padding:6px 10px">{esc(o["client"])}</td>'
+                f'<td style="padding:6px 10px;font-size:11px;color:#888">{esc(o["tracking"] or "—")}</td>'
                 f'</tr>'
             )
         sections += _table_section(
@@ -445,8 +461,8 @@ def build_digest_email_html(data: dict, company_name: str = "Minerva", period: s
             color = "#c62828" if item["is_critical"] else "#e65100"
             rows += (
                 f'<tr style="background:{bg}">'
-                f'<td style="padding:6px 10px;font-family:monospace">{item["sku"]}</td>'
-                f'<td style="padding:6px 10px">{item["name"]}</td>'
+                f'<td style="padding:6px 10px;font-family:monospace">{esc(item["sku"])}</td>'
+                f'<td style="padding:6px 10px">{esc(item["name"])}</td>'
                 f'<td style="padding:6px 10px;text-align:right">{item["stock"]}</td>'
                 f'<td style="padding:6px 10px;text-align:right;font-weight:700;color:{color}">'
                 f'{item["months_left"]} міс</td>'
@@ -467,8 +483,8 @@ def build_digest_email_html(data: dict, company_name: str = "Minerva", period: s
             rows += (
                 f'<tr style="background:{bg}">'
                 f'<td style="padding:5px 10px;font-weight:700;color:#888;text-align:center">{i+1}</td>'
-                f'<td style="padding:5px 10px;font-family:monospace;color:#1565c0">{p["sku"]}</td>'
-                f'<td style="padding:5px 10px">{p["name"]}</td>'
+                f'<td style="padding:5px 10px;font-family:monospace;color:#1565c0">{esc(p["sku"])}</td>'
+                f'<td style="padding:5px 10px">{esc(p["name"])}</td>'
                 f'<td style="padding:5px 10px;text-align:right;font-weight:600">{p["total_qty"]}</td>'
                 f'</tr>'
             )
@@ -498,7 +514,8 @@ def build_digest_email_html(data: dict, company_name: str = "Minerva", period: s
             arrow_str = f' <span style="color:{arrow_color};font-weight:700">{arrow}{abs(diff_pct):.1f}%</span>'
         sections += (
             f'<div style="padding:16px 24px 0">'
-            f'<h3 style="margin:0 0 8px;font-size:14px;color:#1565c0">💰 Виручка: поточний vs попередній місяць</h3>'
+            f'<h3 style="margin:0 0 8px;font-size:14px;color:#1565c0">💰 Виручка: '
+            f'{esc(cur.get("label", ""))} vs {esc(prev.get("label", ""))}</h3>'
             f'<table style="width:100%;border-collapse:collapse;font-size:13px">'
             f'<tr style="background:#e3f2fd;font-weight:600;color:#1565c0">'
             f'<td style="padding:6px 10px">Місяць</td>'
@@ -506,14 +523,19 @@ def build_digest_email_html(data: dict, company_name: str = "Minerva", period: s
             f'<td style="padding:6px 10px;text-align:right">Замовлень</td>'
             f'</tr>'
             f'<tr style="background:#f5f5f5">'
-            f'<td style="padding:6px 10px">Поточний</td>'
+            f'<td style="padding:6px 10px">{esc(cur.get("label", ""))}</td>'
             f'<td style="padding:6px 10px;text-align:right;font-weight:700">'
-            f'{cur.get("revenue", 0):.0f}{arrow_str}</td>'
+            f'{esc(cur.get("revenue_text", "—"))}{arrow_str}'
+            + (f'<br><small style="color:#888;font-weight:400">{esc(cur["missing"])}</small>'
+               if cur.get("missing") else '') +
+            f'</td>'
             f'<td style="padding:6px 10px;text-align:right">{cur.get("count", 0)}</td>'
             f'</tr>'
             f'<tr>'
-            f'<td style="padding:6px 10px;color:#888">Попередній</td>'
-            f'<td style="padding:6px 10px;text-align:right;color:#888">{prev.get("revenue", 0):.0f}</td>'
+            f'<td style="padding:6px 10px;color:#888">{esc(prev.get("label", ""))}</td>'
+            f'<td style="padding:6px 10px;text-align:right;color:#888">{esc(prev.get("revenue_text", "—"))}'
+            + (f'<br><small>{esc(prev["missing"])}</small>' if prev.get("missing") else '') +
+            f'</td>'
             f'<td style="padding:6px 10px;text-align:right;color:#888">{prev.get("count", 0)}</td>'
             f'</tr>'
             f'</table></div>'
@@ -532,7 +554,7 @@ def build_digest_email_html(data: dict, company_name: str = "Minerva", period: s
         'overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)">'
         '<div style="background:#37474f;color:#fff;padding:20px 24px">'
         f'<div style="font-size:19px;font-weight:700">📊 Minerva — {period_label}</div>'
-        f'<div style="font-size:12px;opacity:.75">{company_name} &middot; {now_str}</div>'
+        f'<div style="font-size:12px;opacity:.75">{esc(company_name)} &middot; {now_str}</div>'
         '</div>'
         + sections +
         '<div style="padding:14px 24px;border-top:1px solid #eee;font-size:12px;color:#999;margin-top:16px">'
@@ -649,6 +671,7 @@ def send_digest(force: bool = False, period: str = "daily") -> dict:
             _send_event_email(ns, subject, html)
             results["email"] = {"sent": True}
         except Exception as e:
+            logger.warning("Щоденний звіт: email не надіслано: %s", e)
             results["email"] = {"error": str(e)}
 
     if send_tg:
@@ -658,6 +681,7 @@ def send_digest(force: bool = False, period: str = "daily") -> dict:
             _send_telegram(ns, text)
             results["telegram"] = {"sent": True}
         except Exception as e:
+            logger.warning("Звіт: Telegram не надіслано: %s", e)
             results["telegram"] = {"error": str(e)}
 
     overall = results["email"].get("sent") or results["telegram"].get("sent")
@@ -713,10 +737,11 @@ def _send_weekly(force: bool = False) -> dict:
     except Exception:
         company_name = "Minerva"
 
-    today = timezone.now().date()
+    today = timezone.localdate()
+    until = today - timedelta(days=1)          # останні 7 повних днів, до вчора
     since = today - timedelta(days=7)
-    top_products    = _get_top_products(since, today, limit=5)
-    shipments_count = _get_shipments_count(since, today)
+    top_products    = _get_top_products(since, until, limit=5)
+    shipments_count = _get_shipments_count(since, until)
     data = {
         "pending":       _get_pending_shipments(),
         "overdue":       _get_overdue_orders(),
@@ -740,6 +765,7 @@ def _send_weekly(force: bool = False) -> dict:
             _send_event_email(ns, f"📊 Minerva — Тижневий звіт · {date_str}", html)
             results["email"] = {"sent": True}
         except Exception as e:
+            logger.warning("Тижневий звіт: email не надіслано: %s", e)
             results["email"] = {"error": str(e)}
 
     if send_tg:
@@ -749,6 +775,7 @@ def _send_weekly(force: bool = False) -> dict:
             _send_telegram(ns, text)
             results["telegram"] = {"sent": True}
         except Exception as e:
+            logger.warning("Звіт: Telegram не надіслано: %s", e)
             results["telegram"] = {"error": str(e)}
 
     overall = results["email"].get("sent") or results["telegram"].get("sent")
@@ -804,11 +831,11 @@ def _send_monthly(force: bool = False) -> dict:
     except Exception:
         company_name = "Minerva"
 
-    today = timezone.now().date()
-    cur_start = today.replace(day=1)
-    top_products    = _get_top_products(cur_start, today, limit=10)
-    shipments_count = _get_shipments_count(cur_start, today)
-    revenue_cmp     = _get_monthly_revenue_comparison()
+    today = timezone.localdate()
+    cur_start, cur_end = last_full_month(today)     # звіт — за попередній повний місяць
+    top_products    = _get_top_products(cur_start, cur_end, limit=10)
+    shipments_count = _get_shipments_count(cur_start, cur_end)
+    revenue_cmp     = _get_monthly_revenue_comparison(today)
     data = {
         "pending":       _get_pending_shipments(),
         "overdue":       _get_overdue_orders(),
@@ -833,6 +860,7 @@ def _send_monthly(force: bool = False) -> dict:
             _send_event_email(ns, f"📊 Minerva — Місячний звіт · {date_str}", html)
             results["email"] = {"sent": True}
         except Exception as e:
+            logger.warning("Місячний звіт: email не надіслано: %s", e)
             results["email"] = {"error": str(e)}
 
     if send_tg:
@@ -842,6 +870,7 @@ def _send_monthly(force: bool = False) -> dict:
             _send_telegram(ns, text)
             results["telegram"] = {"sent": True}
         except Exception as e:
+            logger.warning("Звіт: Telegram не надіслано: %s", e)
             results["telegram"] = {"error": str(e)}
 
     overall = results["email"].get("sent") or results["telegram"].get("sent")

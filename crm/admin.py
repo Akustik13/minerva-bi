@@ -6,7 +6,7 @@ from django.contrib import admin, messages
 from django.db.models import Sum, Count, Max
 from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import path
-from django.utils.html import format_html
+from django.utils.html import escape, format_html
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
 from .models import Customer, CustomerNote, CustomerTimeline
@@ -144,8 +144,7 @@ class RFMSegmentFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset):
         """
-        Фільтр по RFM — використовує точну логіку з моделі Customer.rfm_score()
-        ПОВІЛЬНО для великої кількості клієнтів, але точно!
+        Фільтр по RFM — та сама логіка, що Customer.rfm_score() (crm/utils.py), груповими запитами на всіх.
         """
         if not self.value():
             return queryset
@@ -169,14 +168,8 @@ class RFMSegmentFilter(admin.SimpleListFilter):
         if not target_emoji:
             return queryset
         
-        for customer in queryset:
-            try:
-                segment = customer.rfm_score()['segment']
-                if segment == target_emoji:
-                    filtered_ids.append(customer.pk)
-            except Exception:
-                continue
-        
+        scores = crm_utils.rfm_scores(queryset)
+        filtered_ids = [pk for pk, rfm in scores.items() if rfm['segment'] == target_emoji]
         return queryset.filter(pk__in=filtered_ids)
 
 
@@ -190,12 +183,8 @@ class RFMSegmentFilter(admin.SimpleListFilter):
         
         # Рахуємо сегменти
         segment_counts = {}
-        for customer in changelist.queryset:
-            try:
-                segment_key = customer.rfm_score()['segment']
-                segment_counts[segment_key] = segment_counts.get(segment_key, 0) + 1
-            except Exception:
-                continue
+        for rfm in crm_utils.rfm_scores(changelist.queryset).values():
+            segment_counts[rfm['segment']] = segment_counts.get(rfm['segment'], 0) + 1
         
         # Мапінг для відображення
         segment_map = {
@@ -872,36 +861,19 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         return JsonResponse({'is_favorite': customer.is_favorite, 'pk': pk})
 
     def get_queryset(self, request):
+        """Анотації лише для сортування колонок (за ключем клієнта, лише продажі — як RFM і «Тип»).
+        Показ — Customer.order_stats() (crm/utils.py: ключ, потім email; виручка у валюті Minerva)."""
         from django.db.models import OuterRef, Subquery, Count, Value
         from django.db.models.functions import Coalesce
-        from sales.models import SalesOrder, SalesOrderLine
+        from sales.revenue import sale_orders
 
-        # Subquery: date of the most recent order
-        last_order_subq = (
-            SalesOrder.objects.filter(customer_key=OuterRef('external_key'))
-            .order_by('-order_date').values('order_date')[:1]
-        )
-        # Subquery: total order count
-        order_count_subq = (
-            SalesOrder.objects.filter(customer_key=OuterRef('external_key'))
-            .values('customer_key').annotate(c=Count('id')).values('c')
-        )
-        # Subquery: total revenue across all lines
-        revenue_subq = (
-            SalesOrderLine.objects.filter(order__customer_key=OuterRef('external_key'))
-            .values('order__customer_key').annotate(r=Sum('total_price')).values('r')
-        )
-        # Subquery: currency of the most recent order
-        currency_subq = (
-            SalesOrder.objects.filter(customer_key=OuterRef('external_key'))
-            .order_by('-order_date').values('currency')[:1]
-        )
+        sales = sale_orders().filter(customer_key=OuterRef('external_key'))
+        last_order_subq = sales.order_by('-order_date').values('order_date')[:1]
+        order_count_subq = sales.order_by().values('customer_key').annotate(c=Count('id')).values('c')
 
         return super().get_queryset(request).annotate(
             _last_order_date=Subquery(last_order_subq),
             _orders_count=Coalesce(Subquery(order_count_subq), Value(0)),
-            _revenue=Coalesce(Subquery(revenue_subq), Value(Decimal('0'))),
-            _main_currency=Subquery(currency_subq),
         )
 
     fieldsets = (
@@ -1066,56 +1038,24 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     # admin_order_field removed - no annotation
 
     def revenue_display(self, obj):
-        """Виручка з розбивкою по валютах."""
-        from sales.models import SalesOrderLine
-        from django.db.models import Sum
-        from django.utils.html import format_html
-        
-        # Групуємо по валюті
-        lines = (
-            SalesOrderLine.objects
-            .filter(order__customer_key=obj.external_key)
-            .values('currency')
-            .annotate(total=Sum('total_price'))
-            .order_by('-total')
-        )
-        
-        if not lines:
+        """Виручка продажів у валюті Minerva (за курсами «Налаштувань цін» магазину); валюти без курсу — окремо."""
+        from sales.revenue import fmt
+        money = obj.order_stats().revenue
+        if not money:
             return "—"
-        
-        # Символи валют
-        symbols = {'USD': '$', 'EUR': '€', 'GBP': '£'}
-        
-        parts = []
-        for line in lines:
-            curr = line['currency'] or 'USD'
-            symbol = symbols.get(curr, curr)
-            amount = line['total'] or 0
-            parts.append(f"{symbol}{amount:,.2f}")
-        
-        return format_html('<b>{}</b>', ' + '.join(parts))
+        note = money.missing_text
+        return format_html('<b>{}</b>{}', fmt(money.total, money.home, 2),
+                           format_html('<br><small style="opacity:.6">{}</small>', note) if note else '')
 
     revenue_display.short_description = "Виручка"
     
     def avg_order_display(self, obj):
-        """Середній чек — використовує annotations з get_queryset()."""
-        count = getattr(obj, '_orders_count', None)
-        if count is None:
-            count = obj.total_orders()
-        if not count:
+        """Середній чек продажів у валюті Minerva (лише замовлення у валютах з курсом)."""
+        from sales.revenue import fmt
+        stats = obj.order_stats()
+        if not stats.avg:
             return "—"
-
-        revenue = getattr(obj, '_revenue', None)
-        if revenue is None:
-            revenue = obj.total_revenue()
-        if not revenue:
-            return "—"
-
-        avg = float(revenue) / int(count)
-        currency = getattr(obj, '_main_currency', None) or 'EUR'
-        symbols = {'USD': '$', 'EUR': '€', 'GBP': '£'}
-        symbol = symbols.get(currency, currency)
-        return format_html('<b>{}{}</b>', symbol, f"{avg:.2f}")
+        return format_html('<b>{}</b>', fmt(stats.avg, stats.revenue.home, 2))
 
     avg_order_display.short_description = "Середній чек"
 
@@ -1139,9 +1079,9 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     def get_changelist_instance(self, request):
         """«Тип» у рядках — тим самим підрахунком замовлень, що й фільтр «Тип клієнта» (одним запитом на сторінку)."""
         cl = super().get_changelist_instance(request)
-        counts = crm_utils.order_counts(cl.result_list)
+        crm_utils.prefetch_stats(cl.result_list)       # «Замовлень», «Виручка», RFM, «Тип» — без запитів на рядок
         for customer in cl.result_list:
-            customer._type_orders = counts.get(customer.pk, 0)
+            customer._type_orders = customer.order_stats().count
         return cl
 
     def repeat_badge(self, obj):
@@ -1422,7 +1362,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         rows = "".join(
             f"<tr style='border-bottom:1px solid rgba(128,128,128,0.15)'>"
             f"<td style='padding:8px;opacity:0.6;text-align:center'>{i+1}</td>"
-            f"<td style='padding:8px;font-weight:bold;color:#64b5f6'>{l['sku_raw'] or '—'}</td>"
+            f"<td style='padding:8px;font-weight:bold;color:#64b5f6'>{escape(l['sku_raw'] or '—')}</td>"
             f"<td style='padding:8px;text-align:right'>{int(l['total_qty'] or 0)} шт.</td>"
             f"<td style='padding:8px;text-align:right;color:#4caf50;font-weight:700'>${float(l['total_revenue'] or 0):.2f}</td>"
             f"</tr>"

@@ -103,11 +103,11 @@
       <a class="doc-btn" href="/admin/api/apikey/">🔑 API Токени</a>
       <a class="doc-btn" href="/admin/api/webhook/">📡 Вебхуки</a>
       <a class="doc-btn" href="/admin/api/webhookdelivery/">📋 Журнал вебхуків</a>
-      <a class="doc-btn" href="{% url 'api_console' %}?preset=minerva_ping">🖥 Консоль (Ping)</a>
+      {% if console_ok %}<a class="doc-btn" href="{% url 'api_console' %}?preset=minerva_ping">🖥 Консоль (Ping)</a>{% endif %}
       <a class="doc-btn" href="{% url 'api_docs_example' 'api_tester.html' %}?download=1" style="border-color:var(--accent)">🧪 Завантажити API-тестер (HTML)</a>
       <a class="doc-btn" href="{% url 'api_docs_example' 'shop_client.py' %}?download=1">⬇ shop_client.py</a>
       <a class="doc-btn" href="{% url 'api_docs_example' 'crm_purchases.py' %}?download=1">⬇ crm_purchases.py (закупівлі CRM)</a>
-      <a class="doc-btn" href="{% url 'api_console' %}?preset=minerva_purchase_create">🖥 Консоль (закупівля CRM)</a>
+      {% if console_ok %}<a class="doc-btn" href="{% url 'api_console' %}?preset=minerva_purchase_create">🖥 Консоль (закупівля CRM)</a>{% endif %}
       <a class="doc-btn" href="{% url 'api_docs_example' 'webhook_receiver.py' %}?download=1">⬇ webhook_receiver.py</a>
     </div>
   </div>

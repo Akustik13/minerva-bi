@@ -270,10 +270,12 @@
 
 <script>
 function setPreset(days) {
+  // N днів до сьогодні включно (як на сервері), дата — місцева, не UTC
   const today = new Date();
   const from  = new Date(today);
-  from.setDate(from.getDate() - days);
-  const fmt = d => d.toISOString().split('T')[0];
+  from.setDate(from.getDate() - (days - 1));
+  const pad = n => String(n).padStart(2, '0');
+  const fmt = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   document.getElementById('inp-from').value = fmt(from);
   document.getElementById('inp-to').value   = fmt(today);
   document.getElementById('filter-form').submit();
@@ -282,7 +284,7 @@ function setPreset(days) {
 (function() {
   var from = new Date('{{ date_from_str }}');
   var to   = new Date('{{ date_to_str }}');
-  var diff = Math.round((to - from) / 86400000);
+  var diff = Math.round((to - from) / 86400000) + 1;   // днів включно
   document.querySelectorAll('.pb').forEach(function(btn) {
     var m = (btn.getAttribute('onclick') || '').match(/setPreset\((\d+)\)/);
     if (m && parseInt(m[1]) === diff) btn.classList.add('active');
@@ -310,6 +312,7 @@ function setPreset(days) {
     <div class="kpi-card" style="--accent:#c9a84c">
       <div class="kpi-label">💰 Виручка</div>
       <div class="kpi-val" style="color:var(--gold-l)">{{ kpi.revenue.fmt }}</div>
+      {% if kpi.revenue.note %}<div class="kpi-sub" title="Для цих валют немає курсу в «Налаштуваннях цін» магазину — суми не додано до виручки">{{ kpi.revenue.note }}</div>{% endif %}
       {% if kpi.revenue.change is not None %}
       <div class="kpi-change {% if kpi.revenue.change >= 0 %}up{% else %}down{% endif %}">
         {% if kpi.revenue.change >= 0 %}▲{% else %}▼{% endif %}
@@ -399,7 +402,7 @@ function setPreset(days) {
   <div class="grid2">
     <div class="card">
       <div class="card-head">
-        <span class="card-title"><span class="ico">📈</span> Виручка по місяцях (€)</span>
+        <span class="card-title"><span class="ico">📈</span> Виручка по місяцях ({{ cur_sym }})</span>
         <span class="card-sub">{{ period_label }}</span>
       </div>
       <div class="card-body">
@@ -428,7 +431,7 @@ function setPreset(days) {
         <table class="t">
           <thead><tr>
             <th>#</th><th>SKU</th><th>Категорія</th>
-            <th class="r">Виручка €</th><th class="r">Кількість</th><th class="r">Замовлень</th>
+            <th class="r">Виручка {{ cur_sym }}</th><th class="r">Кількість</th><th class="r">Замовлень</th>
           </tr></thead>
           <tbody>
           {% for r in top_skus %}
@@ -437,7 +440,7 @@ function setPreset(days) {
             <td><span class="mono">{{ r.product__sku }}</span></td>
             <td><span class="badge b-blue">{{ r.product__category }}</span></td>
             <td class="r mono" style="color:var(--gold-l)">
-              {% if r.revenue %}€{{ r.revenue|floatformat:0 }}{% else %}—{% endif %}
+              {% if r.revenue %}{{ cur_sym }}{{ r.revenue|floatformat:0 }}{% else %}—{% endif %}
             </td>
             <td class="r mono">{{ r.qty_total|floatformat:0 }}</td>
             <td class="r mono" style="color:var(--accent)">{{ r.orders_cnt }}</td>
@@ -485,7 +488,7 @@ function setPreset(days) {
         <table class="t">
           <thead><tr>
             <th>Клієнт</th><th>Рег.</th>
-            <th class="r">Виручка €</th><th class="r">Зам.</th><th class="r">Шт.</th>
+            <th class="r">Виручка {{ cur_sym }}</th><th class="r">Зам.</th><th class="r">Шт.</th>
           </tr></thead>
           <tbody>
           {% for c in top_clients %}
@@ -495,7 +498,7 @@ function setPreset(days) {
             </td>
             <td><span class="badge b-gray">{{ c.shipping_region|default:"—" }}</span></td>
             <td class="r mono" style="color:var(--gold-l)">
-              {% if c.revenue %}€{{ c.revenue|floatformat:0 }}{% else %}—{% endif %}
+              {% if c.revenue %}{{ cur_sym }}{{ c.revenue|floatformat:0 }}{% else %}—{% endif %}
             </td>
             <td class="r mono">{{ c.orders }}</td>
             <td class="r mono">{{ c.units|floatformat:0|default:"—" }}</td>
@@ -598,8 +601,8 @@ function setPreset(days) {
           <thead><tr>
             <th>Кур'єр</th>
             <th class="r">Замовлень</th>
-            <th class="r">Сер. вартість €</th>
-            <th class="r">Всього €</th>
+            <th class="r">Сер. вартість {{ cur_sym }}</th>
+            <th class="r">Всього {{ cur_sym }}</th>
           </tr></thead>
           <tbody>
           {% for c in by_courier %}
@@ -614,8 +617,8 @@ function setPreset(days) {
               {{ c.shipping_courier }}
             </td>
             <td class="r mono" style="color:var(--accent)">{{ c.orders }}</td>
-            <td class="r mono">{% if c.avg_cost %}€{{ c.avg_cost|floatformat:2 }}{% else %}—{% endif %}</td>
-            <td class="r mono" style="color:var(--gold-l)">{% if c.total_cost %}€{{ c.total_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td class="r mono">{% if c.avg_cost %}{{ cur_sym }}{{ c.avg_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td class="r mono" style="color:var(--gold-l)">{% if c.total_cost %}{{ cur_sym }}{{ c.total_cost|floatformat:2 }}{% else %}—{% endif %}{% if c.missing %}<br><small style="color:var(--text-muted)">{{ c.missing }}</small>{% endif %}</td>
           </tr>
           {% empty %}
           <tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:20px">Немає даних про кур'єрів</td></tr>
@@ -636,8 +639,8 @@ function setPreset(days) {
             <th>Країна</th>
             <th>Кур'єри</th>
             <th class="r">Зам.</th>
-            <th class="r">Сер. €</th>
-            <th class="r">Всього €</th>
+            <th class="r">Сер. {{ cur_sym }}</th>
+            <th class="r">Всього {{ cur_sym }}</th>
           </tr></thead>
           <tbody>
           {% for r in shipping_by_country %}
@@ -645,8 +648,8 @@ function setPreset(days) {
             <td style="font-weight:600;white-space:nowrap">{{ r.shipping_region }}</td>
             <td style="font-size:11px;color:var(--text-muted)">{{ r.couriers|default:"—" }}</td>
             <td class="r mono" style="color:var(--accent)">{{ r.orders }}</td>
-            <td class="r mono">{% if r.avg_cost %}€{{ r.avg_cost|floatformat:2 }}{% else %}—{% endif %}</td>
-            <td class="r mono" style="color:var(--gold-l)">{% if r.total_cost %}€{{ r.total_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td class="r mono">{% if r.avg_cost %}{{ cur_sym }}{{ r.avg_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td class="r mono" style="color:var(--gold-l)">{% if r.total_cost %}{{ cur_sym }}{{ r.total_cost|floatformat:2 }}{% else %}—{% endif %}{% if r.missing %}<br><small style="color:var(--text-muted)">{{ r.missing }}</small>{% endif %}</td>
           </tr>
           {% empty %}
           <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:20px">Немає даних</td></tr>
@@ -756,6 +759,7 @@ const ORANGE = _light ? (_cv('--warn') || '#9a6700')   : '#e3b341';
 const RED    = _light ? (_cv('--err')  || '#cf222e') : '#f85149';
 const PURPLE = _light ? '#5a2c9b'                    : '#bc8cff';
 
+const CUR_SYM = {{ cur_sym_js|safe }};
 const chartMonths   = {{ chart_months|safe }};
 const chartRev      = {{ chart_rev|safe }};
 const chartOrdersM  = {{ chart_orders_m|safe }};
@@ -776,7 +780,7 @@ new Chart(document.getElementById('chartRevMonth'), {
   data: {
     labels: chartMonths,
     datasets: [{
-      label: 'Виручка €', data: chartRev,
+      label: 'Виручка ' + CUR_SYM, data: chartRev,
       backgroundColor: BLUE_A40, borderColor: BLUE,
       borderWidth: 1.5, borderRadius: 5, yAxisID: 'y', order: 2,
     }, {
@@ -796,7 +800,7 @@ new Chart(document.getElementById('chartRevMonth'), {
     },
     scales: {
       x:  { grid: { color: _gridColor }, ticks: { ..._tickCfg, maxRotation: 45 } },
-      y:  { grid: { color: _gridColor }, ticks: { ..._tickCfg, callback: v => '€'+v.toLocaleString() }, beginAtZero: true },
+      y:  { grid: { color: _gridColor }, ticks: { ..._tickCfg, callback: v => CUR_SYM+v.toLocaleString() }, beginAtZero: true },
       y2: { position: 'right', grid: { display: false }, ticks: { ..._tickCfg }, beginAtZero: true },
     }
   }

@@ -137,16 +137,18 @@
     </div>
   </div>
 
-  <!-- Console banner -->
+  <!-- Console banner (лише адміністратор Minerva) -->
+  {% if console_ok %}
   <div class="api-console-banner">
     <div>
       <strong>🖥 Developer Console</strong>
-      <p style="margin-top:4px">Відправляй запити до будь-якого API та переглядай відповіді в реальному часі.</p>
+      <p style="margin-top:4px">Запити до API цієї Minerva (/api/v1/) з вибраним ключем — відповідь одразу на сторінці.</p>
     </div>
     <a href="{% url 'api_console' %}" class="api-btn api-btn-cons" style="white-space:nowrap;font-size:13px;padding:8px 16px">
       Відкрити Console →
     </a>
   </div>
+  {% endif %}
 
   <!-- ── Section 1: Minerva REST API ── -->
   <h2 class="api-section-hdr" style="--sec-color:var(--accent)">
@@ -186,7 +188,7 @@
       <div class="api-actions">
         <a href="{% url 'api_docs' %}" class="api-btn api-btn-prim">📖 Документація</a>
         <a href="/api/v1/" class="api-btn api-btn-sec">Browsable API</a>
-        <a href="{% url 'api_console' %}" class="api-btn api-btn-cons">Console</a>
+        {% if console_ok %}<a href="{% url 'api_console' %}" class="api-btn api-btn-cons">Console</a>{% endif %}
       </div>
     </div>
 
@@ -266,7 +268,6 @@
         <a href="/admin/shipping/shipment/" class="api-btn api-btn-sec">📦 Відправлення</a>
         <a href="/admin/shipping/carrier/{{ jumingo_carrier.pk }}/api-log/" target="_blank" class="api-btn api-btn-sec">📋 Лог</a>
         {% endif %}
-        <a href="{% url 'api_console' %}?preset=jumingo" class="api-btn api-btn-cons">Console</a>
       </div>
       {% if jumingo_carrier %}
       <div id="jumingo-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
@@ -316,7 +317,6 @@
         {% if dhl_track_ok %}
         <a href="/admin/shipping/shipment/dhl-track-lookup/" class="api-btn api-btn-sec">📡 Трекінг</a>
         {% endif %}
-        <a href="{% url 'api_console' %}?preset=dhl" class="api-btn api-btn-cons">Console</a>
       </div>
       {% if dhl_carrier and dhl_carrier.api_key %}
       <div id="dhl-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
@@ -366,7 +366,6 @@
         <a href="/admin/shipping/carrier/{{ ups_carrier.pk }}/ups-log/" target="_blank" class="api-btn api-btn-sec">📋 Лог</a>
         <a href="/admin/shipping/shipment/ups-track-lookup/" class="api-btn api-btn-sec">📡 Трекінг</a>
         {% endif %}
-        <a href="{% url 'api_console' %}?preset=ups" class="api-btn api-btn-cons">Console</a>
       </div>
       {% if ups_carrier and ups_carrier.api_key %}
       <div id="ups-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
@@ -416,7 +415,6 @@
         <a href="/admin/shipping/carrier/{{ fedex_carrier.pk }}/api-log/" target="_blank" class="api-btn api-btn-sec">📋 Лог</a>
         <a href="/admin/shipping/shipment/fedex-track-lookup/" class="api-btn api-btn-sec">📡 Трекінг</a>
         {% endif %}
-        <a href="{% url 'api_console' %}?preset=fedex" class="api-btn api-btn-cons">Console</a>
       </div>
       {% if fedex_carrier and fedex_carrier.api_key %}
       <div id="fedex-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
@@ -503,7 +501,6 @@
         {% if digikey_ok %}
         <a href="/admin/bots/digikeyconfig/api-log/" target="_blank" class="api-btn api-btn-sec">📋 Лог</a>
         {% endif %}
-        <a href="{% url 'api_console' %}?preset=digikey" class="api-btn api-btn-cons">Console</a>
       </div>
     </div>
 

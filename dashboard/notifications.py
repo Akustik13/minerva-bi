@@ -1,13 +1,53 @@
 """Email + Telegram alert service — critical stock + overdue shipping deadlines."""
 from __future__ import annotations
 
-import re
+import html as _html
 import json
+import logging
+import re
 import urllib.request
 import urllib.error
 from datetime import timedelta
 
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
+
+
+def esc(value) -> str:
+    """Значення для HTML листа й Telegram (parse_mode=HTML): «R&D GmbH», «SMA <-> N» не ламають розмітку
+    (Telegram інакше відкидає все повідомлення), а в листі — не HTML-ін'єкція."""
+    return _html.escape('' if value is None else str(value), quote=True)
+
+
+TG_LIMIT = 3500          # запас до 4096 символів Telegram
+TG_CUT_NOTE = '<i>... (обрізано)</i>'
+_TG_TAG_RE = re.compile(r'<(/?)([a-z][a-z0-9-]*)\b[^>]*>', re.IGNORECASE)
+
+
+def tg_cut(text: str, limit: int = TG_LIMIT, note: str = TG_CUT_NOTE) -> str:
+    """Обрізати повідомлення Telegram (HTML) не посеред тегу чи «&amp;»: по межі рядка, відкриті теги закрити.
+    Один задовгий рядок — без розмітки (текст, екранований заново)."""
+    if len(text) <= limit:
+        return text
+    room = max(0, limit - len(note) - 64)
+    cut = text.rfind('\n', 0, room)
+    if cut <= 0:
+        out = esc(_html.unescape(re.sub(r'<[^>]+>', '', text)))[:room]
+        amp = out.rfind('&')
+        if amp != -1 and ';' not in out[amp:]:      # не лишати половину «&amp;»
+            out = out[:amp]
+        return out + '\n' + note
+    head = text[:cut]
+    stack = []
+    for m in _TG_TAG_RE.finditer(head):
+        tag = m.group(2).lower()
+        if m.group(1):
+            if tag in stack:
+                del stack[len(stack) - 1 - stack[::-1].index(tag)]
+        else:
+            stack.append(tag)
+    return head + ''.join(f'</{t}>' for t in reversed(stack)) + '\n' + note
 
 
 def _get_company_name() -> str:
@@ -68,7 +108,7 @@ def _get_overdue_orders(overdue_days: int = 0):
     try:
         from sales.models import SalesOrder
 
-        today  = timezone.now().date()
+        today  = timezone.localdate()
         cutoff = today - timedelta(days=overdue_days)
 
         qs = (
@@ -100,13 +140,13 @@ def _get_overdue_orders(overdue_days: int = 0):
 # ── Telegram builder ───────────────────────────────────────────────────────────
 
 def _build_telegram_text(critical_items, overdue_orders, company_name='Minerva'):
-    """Build Telegram HTML message (parse_mode='HTML'). Truncates at 3500 chars."""
-    now_str = timezone.now().strftime('%d.%m.%Y %H:%M')
+    """Build Telegram HTML message (parse_mode='HTML'). Truncates at 3500 chars (tg_cut). Values escaped (esc)."""
+    now_str = timezone.localtime().strftime('%d.%m.%Y %H:%M')
     total   = len(critical_items) + len(overdue_orders)
 
     lines = [
         f'🏛️ <b>Minerva — Системні сповіщення</b>',
-        f'<i>{company_name} · {now_str}</i>',
+        f'<i>{esc(company_name)} · {now_str}</i>',
         '',
     ]
 
@@ -126,7 +166,7 @@ def _build_telegram_text(critical_items, overdue_orders, company_name='Minerva')
         for item in critical_items:
             icon = '🔴' if item['is_critical'] else '⚠️'
             lines.append(
-                f'<code>{item["sku"]}</code> — {item["name"]} | '
+                f'<code>{esc(item["sku"])}</code> — {esc(item["name"])} | '
                 f'{item["stock"]} шт | <b>{item["months_left"]} міс {icon}</b>'
             )
 
@@ -135,29 +175,36 @@ def _build_telegram_text(critical_items, overdue_orders, company_name='Minerva')
         for o in overdue_orders:
             icon = '🔴' if o['days_late'] > 7 else '⚠️'
             lines.append(
-                f'#{o["order_number"]} | {o["client"]} | '
+                f'#{esc(o["order_number"])} | {esc(o["client"])} | '
                 f'{o["deadline"].strftime("%d.%m.%Y")} | '
                 f'<b>+{o["days_late"]} дн {icon}</b>'
             )
 
-    text = '\n'.join(lines)
-    if len(text) > 3500:
-        text = text[:3480] + '\n\n<i>... (обрізано)</i>'
-    return text
+    return tg_cut('\n'.join(lines))
 
 
 def _send_telegram(ns, text, chat_id_override=None):
-    """Send a message via Telegram Bot API using stdlib urllib."""
+    """Send a message via Telegram Bot API using stdlib urllib.
+
+    Задовге повідомлення обрізається (tg_cut, ліміт Telegram 4096); відмову Telegram («can't parse entities»…)
+    піднімає RuntimeError з його поясненням (без токена) — викликач записує в журнал."""
     url  = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendMessage'
     data = json.dumps({
         'chat_id':                  chat_id_override or ns.telegram_chat_id,
-        'text':                     text,
+        'text':                     tg_cut(text, 4000),
         'parse_mode':               'HTML',
         'disable_web_page_preview': True,
     }).encode('utf-8')
     req = urllib.request.Request(url, data, {'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        try:
+            detail = json.loads(e.read().decode('utf-8', 'replace')).get('description', '')
+        except Exception:
+            detail = ''
+        raise RuntimeError(f'Telegram {e.code}: {detail or e.reason}') from None
 
 
 def _send_telegram_photo(ns, photo_url, caption=''):
@@ -203,14 +250,14 @@ def _send_tg_images(ns, lines_data: list):
             _send_telegram_photo(ns, images[0])
         else:
             _send_telegram_media_group(ns, images)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning('Telegram: фото товарів не надіслано: %s', e)
 
 
 # ── Email HTML builder ─────────────────────────────────────────────────────────
 
 def _build_html(critical_items, overdue_orders, company_name='Minerva'):
-    now_str = timezone.now().strftime('%d.%m.%Y %H:%M')
+    now_str = timezone.localtime().strftime('%d.%m.%Y %H:%M')
     total   = len(critical_items) + len(overdue_orders)
 
     html = (
@@ -223,7 +270,7 @@ def _build_html(critical_items, overdue_orders, company_name='Minerva'):
         '<div style="background:#1a237e;color:#fff;padding:20px 24px">'
         '<div style="font-size:19px;font-weight:700;margin-bottom:4px">'
         f'&#9888;&#65039; Minerva &mdash; Системні сповіщення</div>'
-        f'<div style="font-size:12px;opacity:.75">{company_name} &middot; {now_str}</div>'
+        f'<div style="font-size:12px;opacity:.75">{esc(company_name)} &middot; {now_str}</div>'
         '</div>'
     )
 
@@ -265,8 +312,8 @@ def _build_html(critical_items, overdue_orders, company_name='Minerva'):
             color = '#b71c1c' if item['is_critical'] else '#e65100'
             html += (
                 f'<tr style="background:{bg}">'
-                f'<td style="padding:7px 10px;font-family:monospace;font-weight:600">{item["sku"]}</td>'
-                f'<td style="padding:7px 10px;color:#333">{item["name"]}</td>'
+                f'<td style="padding:7px 10px;font-family:monospace;font-weight:600">{esc(item["sku"])}</td>'
+                f'<td style="padding:7px 10px;color:#333">{esc(item["name"])}</td>'
                 f'<td style="padding:7px 10px;text-align:right">{item["stock"]}</td>'
                 f'<td style="padding:7px 10px;text-align:right;font-weight:700;color:{color}">'
                 f'{item["months_left"]}</td>'
@@ -295,12 +342,12 @@ def _build_html(critical_items, overdue_orders, company_name='Minerva'):
                 f'<tr style="background:{bg}">'
                 f'<td style="padding:7px 10px;font-family:monospace;font-weight:600">'
                 f'<a href="/admin/sales/salesorder/{o["pk"]}/change/" style="color:#1976d2">'
-                f'{o["order_number"]}</a></td>'
-                f'<td style="padding:7px 10px">{o["client"]}</td>'
+                f'{esc(o["order_number"])}</a></td>'
+                f'<td style="padding:7px 10px">{esc(o["client"])}</td>'
                 f'<td style="padding:7px 10px">{o["deadline"].strftime("%d.%m.%Y")}</td>'
                 f'<td style="padding:7px 10px;text-align:right;font-weight:700;color:{color}">'
                 f'{o["days_late"]} дн.</td>'
-                f'<td style="padding:7px 10px;color:#555">{o["status"]}</td>'
+                f'<td style="padding:7px 10px;color:#555">{esc(o["status"])}</td>'
                 '</tr>'
             )
         html += '</table></div>'
@@ -554,7 +601,7 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
         if not force_notify and getattr(ns, 'sync_skip_if_no_changes', True):
             return
 
-    now_str = timezone.now().strftime("%d.%m.%Y %H:%M")
+    now_str = timezone.localtime().strftime("%d.%m.%Y %H:%M")
     subject = f"⚙️ Minerva: {source} — {created} нових, {updated} оновлено"
 
     STATUS_COLORS_HEX = {
@@ -609,14 +656,14 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
                     rows += (
                         f'<tr style="background:{bg}">'
                         f'<td style="padding:7px 12px;font-family:monospace;color:#64b5f6;white-space:nowrap">'
-                        f'{ch.get("order","—")}</td>'
-                        f'<td style="padding:7px 12px;color:#c9d8e4">{ch.get("client","—")}</td>'
+                        f'{esc(ch.get("order","—"))}</td>'
+                        f'<td style="padding:7px 12px;color:#c9d8e4">{esc(ch.get("client","—"))}</td>'
                         f'<td style="padding:7px 12px;color:#607d8b;white-space:nowrap">'
-                        f'{old_lbl} →</td>'
+                        f'{esc(old_lbl)} →</td>'
                         f'<td style="padding:7px 12px;font-weight:700;color:{new_col};white-space:nowrap">'
-                        f'{new_lbl}</td>'
+                        f'{esc(new_lbl)}</td>'
                         f'<td style="padding:7px 12px;font-family:monospace;color:#9aafbe;font-size:11px">'
-                        f'{tracking or extra or ""}</td>'
+                        f'{esc(tracking or extra or "")}</td>'
                         f'</tr>'
                     )
                 detail_html = (
@@ -638,7 +685,7 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
                 '<div style="max-width:640px;margin:0 auto;background:#1e2a35;'
                 'border-radius:8px;overflow:hidden;border:1px solid #2a3f52">'
                 '<div style="background:#162030;padding:14px 20px;border-bottom:1px solid #2a3f52">'
-                f'<div style="font-size:15px;font-weight:700;color:#c9d8e4">⚙️ {source}</div>'
+                f'<div style="font-size:15px;font-weight:700;color:#c9d8e4">⚙️ {esc(source)}</div>'
                 f'<div style="font-size:11px;color:#607d8b">Minerva · {now_str}</div>'
                 '</div>'
                 f'<div style="padding:14px 20px">{summary}{detail_html}</div>'
@@ -647,13 +694,13 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
                 '</div></body></html>'
             )
             _send_event_email(ns, subject, html)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('Сповіщення «%s» email не надіслано: %s', source, e)
 
     if send_tg:
         try:
             _cname = _get_company_name()
-            lines = [f'🏛️ <b>{_cname}</b>', f'⚙️ <b>{source}</b>', f'<i>{now_str}</i>']
+            lines = [f'🏛️ <b>{esc(_cname)}</b>', f'⚙️ <b>{esc(source)}</b>', f'<i>{now_str}</i>']
             if created:
                 lines.append(f'➕ Нових: <b>{created}</b>')
             if updated:
@@ -668,19 +715,19 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
                     tracking = ch.get("tracking","")
                     extra    = ch.get("extra","")
                     line = (
-                        f'<code>{ch.get("order","—")}</code> {ch.get("client","")}\n'
-                        f'  {old_lbl} → <b>{new_lbl}</b>'
+                        f'<code>{esc(ch.get("order","—"))}</code> {esc(ch.get("client",""))}\n'
+                        f'  {esc(old_lbl)} → <b>{esc(new_lbl)}</b>'
                     )
                     if tracking:
-                        line += f'\n  🔍 <code>{tracking}</code>'
+                        line += f'\n  🔍 <code>{esc(tracking)}</code>'
                     if extra:
-                        line += f'\n  🔌 <i>{extra}</i>'
+                        line += f'\n  🔌 <i>{esc(extra)}</i>'
                     lines.append(line)
                 if len(changes) > 20:
                     lines.append(f'<i>... і ще {len(changes)-20}</i>')
             _send_telegram(ns, '\n'.join(lines))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('Сповіщення «%s» у Telegram не надіслано: %s', source, e)
 
 
 def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
@@ -700,7 +747,7 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
     }
     mode_label = MODE_LABELS.get(mode, mode)
     client = sale.client or sale.email or '—'
-    now_str = timezone.now().strftime('%d.%m.%Y %H:%M')
+    now_str = timezone.localtime().strftime('%d.%m.%Y %H:%M')
 
     # Country label
     _COUNTRY_NAMES = {
@@ -813,43 +860,43 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
     if send_tg:
         try:
             _cname = _get_company_name()
-            tg = [f'🏛️ <b>{_cname}</b>']
+            tg = [f'🏛️ <b>{esc(_cname)}</b>']
             tg.append(f'✅ <b>DigiKey: авто-підтверджено</b> · <i>{now_str}</i>')
             tg.append('')
-            tg.append(f'📋 <code>{sale.order_number}</code> · digikey')
-            tg.append(f'👤 <b>{client}</b>')
+            tg.append(f'📋 <code>{esc(sale.order_number)}</code> · digikey')
+            tg.append(f'👤 <b>{esc(client)}</b>')
             if _inc_crm and crm_orders is not None:
                 tg.append(f'   📊 Замовлень всього: <b>{crm_orders}</b>')
             if destination:
-                tg.append(f'📍 {destination}')
+                tg.append(f'📍 {esc(destination)}')
             if _inc_deadline and deadline_str:
                 dl_warn = ' ⚠️' if days_left is not None and days_left <= 2 else ''
                 tg.append(f'📦 Дедлайн: <b>{deadline_str}</b> ({days_left_str}){dl_warn}')
             if _inc_total and total_str:
-                tg.append(f'💰 <b>{total_str}</b>')
-            tg.append(f'🤖 <i>Підтверджено автоматично ({mode_label})</i>')
+                tg.append(f'💰 <b>{esc(total_str)}</b>')
+            tg.append(f'🤖 <i>Підтверджено автоматично ({esc(mode_label)})</i>')
 
             if lines_data:
                 tg.append('')
                 tg.append('📦 <b>Товари:</b>')
                 for ld in lines_data:
-                    name_part = f' — {ld["name"]}' if ld['name'] not in ('—', '', None) else ''
+                    name_part = f' — {esc(ld["name"])}' if ld['name'] not in ('—', '', None) else ''
                     qty_val = ld["qty"] or 0
                     qty_str = str(int(qty_val)) if qty_val and float(qty_val) == int(float(qty_val)) else str(qty_val)
-                    curr = ld.get('currency', '')
-                    line_lines = [f'• <code>{ld["sku"]}</code>{name_part}']
+                    curr = esc(ld.get('currency', ''))
+                    line_lines = [f'• <code>{esc(ld["sku"])}</code>{name_part}']
                     line_lines.append(f'   📦 × <b>{qty_str} шт</b>')
                     if ld.get('unit_price'):
                         line_lines.append(f'   💵 {ld["unit_price"]:.2f} {curr}/шт'.strip())
                     if _inc_ds and ld.get('datasheet'):
-                        line_lines.append(f'   📄 <a href="{ld["datasheet"]}">Datasheet</a>')
+                        line_lines.append(f'   📄 <a href="{esc(ld["datasheet"])}">Datasheet</a>')
                     tg.append('\n'.join(line_lines))
 
             _send_telegram(ns, '\n'.join(tg))
             if _inc_images:
                 _send_tg_images(ns, lines_data)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('DigiKey авто-підтвердження %s: Telegram не надіслано: %s', sale.order_number, e)
 
     if send_email:
         try:
@@ -857,17 +904,17 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
             if lines_data:
                 rows = ''
                 for ld in lines_data:
-                    ds = ld.get('datasheet', '')
+                    ds = esc(ld.get('datasheet', ''))
                     sku_cell = (
                         f'<a href="{ds}" style="color:#1565c0;font-family:monospace;font-size:12px;'
-                        f'text-decoration:none">{ld["sku"]} 📄</a>'
+                        f'text-decoration:none">{esc(ld["sku"])} 📄</a>'
                         if ds else
-                        f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{ld["sku"]}</span>'
+                        f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{esc(ld["sku"])}</span>'
                     )
                     img_url = ld.get('image', '')
                     img_cell = (
                         f'<td style="padding:5px 8px;text-align:center;width:44px">'
-                        f'<img src="{img_url}" width="38" height="38" style="object-fit:cover;'
+                        f'<img src="{esc(img_url)}" width="38" height="38" style="object-fit:cover;'
                         f'border-radius:4px;display:block;margin:auto" onerror="this.style.display=\'none\'">'
                         f'</td>'
                         if img_url and img_url.startswith('http') else
@@ -877,8 +924,8 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
                         f'<tr style="border-bottom:1px solid #eee">'
                         f'{img_cell}'
                         f'<td style="padding:5px 8px">{sku_cell}</td>'
-                        f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
-                        f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
+                        f'<td style="padding:5px 8px;font-size:13px;color:#333">{esc(ld["name"])}</td>'
+                        f'<td style="padding:5px 8px;text-align:center;color:#555">{esc(ld["qty"])}</td>'
                         f'</tr>'
                     )
                 lines_html = (
@@ -893,7 +940,7 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
                 )
             extra = (
                 f'<br><b>🤖 Підтверджено:</b> автоматично системою'
-                f' <span style="color:#555;font-size:12px">({mode_label})</span>'
+                f' <span style="color:#555;font-size:12px">({esc(mode_label)})</span>'
                 f'<br><b>Статус:</b> → <b style="color:#f57c00">В обробці</b>'
             )
             if lines_html:
@@ -902,8 +949,8 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
                 sale, '✅ DigiKey: авто-підтверджено', '#2e7d32', extra
             )
             _send_event_email(ns, f'✅ DigiKey авто-підтверджено: {sale.order_number}', html)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('DigiKey авто-підтвердження %s: email не надіслано: %s', sale.order_number, e)
 
 
 STATUS_LABELS = {
@@ -972,8 +1019,9 @@ def _abs_url(url: str) -> str:
 
 
 def _order_email_html(order, title, color, body_extra='', show_total: bool = True):
-    """Compact HTML email block for a single order event."""
-    now_str = timezone.now().strftime('%d.%m.%Y %H:%M')
+    """Compact HTML email block for a single order event (title, номер, клієнт, джерело — екрановані;
+    body_extra — уже готовий HTML викликача, значення в ньому екранує викликач)."""
+    now_str = timezone.localtime().strftime('%d.%m.%Y %H:%M')
     client  = order.client or order.email or '—'
     total   = ''
     if show_total:
@@ -981,7 +1029,7 @@ def _order_email_html(order, title, color, body_extra='', show_total: bool = Tru
             from django.db.models import Sum
             t = order.lines.aggregate(s=Sum('total_price'))['s']
             if t:
-                total = f'<br><span style="color:#aaa">Сума: <b>{t}</b></span>'
+                total = f'<br><span style="color:#aaa">Сума: <b>{esc(t)} {esc(order.currency or "")}</b></span>'
         except Exception:
             pass
     return (
@@ -990,13 +1038,13 @@ def _order_email_html(order, title, color, body_extra='', show_total: bool = Tru
         '<div style="max-width:580px;margin:0 auto;background:#fff;border-radius:8px;'
         'overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)">'
         f'<div style="background:{color};color:#fff;padding:16px 24px">'
-        f'<div style="font-size:17px;font-weight:700">{title}</div>'
+        f'<div style="font-size:17px;font-weight:700">{esc(title)}</div>'
         f'<div style="font-size:12px;opacity:.75">Minerva · {now_str}</div>'
         '</div>'
         '<div style="padding:16px 24px;font-size:14px;color:#333">'
-        f'<b>Замовлення:</b> <code>{order.order_number}</code><br>'
-        f'<b>Клієнт:</b> {client}<br>'
-        f'<b>Джерело:</b> {order.source}'
+        f'<b>Замовлення:</b> <code>{esc(order.order_number)}</code><br>'
+        f'<b>Клієнт:</b> {esc(client)}<br>'
+        f'<b>Джерело:</b> {esc(order.source)}'
         f'{total}'
         f'{body_extra}'
         '</div>'
@@ -1158,19 +1206,19 @@ def notify_new_order(order, is_test: bool = False):
                         )
                     else:
                         stock_cell = '—'
-                    ds = ld.get('datasheet', '') if _inc_ds else ''
+                    ds = esc(ld.get('datasheet', '')) if _inc_ds else ''
                     sku_cell = (
                         f'<a href="{ds}" style="color:#1565c0;font-family:monospace;font-size:12px;'
-                        f'text-decoration:none" title="📄 Datasheet">{ld["sku"]} 📄</a>'
+                        f'text-decoration:none" title="📄 Datasheet">{esc(ld["sku"])} 📄</a>'
                         if ds else
-                        f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{ld["sku"]}</span>'
+                        f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{esc(ld["sku"])}</span>'
                     )
-                    curr = ld.get('currency', '')
+                    curr = esc(ld.get('currency', ''))
                     unit_str     = f'{ld["unit_price"]:.2f} {curr}'.strip() if ld.get('unit_price') else '—'
                     total_str_ld = f'{ld["line_total"]:.2f} {curr}'.strip() if ld.get('line_total') else '—'
                     qty_val_e = ld["qty"] or 0
                     qty_disp  = str(int(qty_val_e)) if float(qty_val_e) == int(float(qty_val_e)) else str(qty_val_e)
-                    img_url = _abs_url(ld.get('image', ''))
+                    img_url = esc(_abs_url(ld.get('image', '')))
                     if img_url:
                         img_cell = (
                             f'<td style="padding:4px 8px;width:72px;vertical-align:middle">'
@@ -1230,11 +1278,11 @@ def notify_new_order(order, is_test: bool = False):
             # ── Extra block ───────────────────────────────────────────────────
             meta = ''
             if _inc_total and total_str:
-                meta += f'<br><b>💰 Сума:</b> <b style="color:#1565c0">{total_str}</b>'
+                meta += f'<br><b>💰 Сума:</b> <b style="color:#1565c0">{esc(total_str)}</b>'
             if _inc_crm and crm_orders is not None:
                 meta += f'<br><b>📊 Замовлень від клієнта:</b> <b style="color:#1565c0">{crm_orders}</b>'
             if destination:
-                meta += f'<br><b>📍 Куди:</b> {destination}'
+                meta += f'<br><b>📍 Куди:</b> {esc(destination)}'
             if _inc_deadline and deadline_str:
                 dl_color = '#c62828' if days_left is not None and days_left <= 2 else '#2e7d32'
                 meta += (
@@ -1248,29 +1296,29 @@ def notify_new_order(order, is_test: bool = False):
             title = '🆕 Нове замовлення'
             html = _order_email_html(order, title, '#1565c0', extra, show_total=False)
             _send_event_email(ns, subject, html)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('Нове замовлення %s: email не надіслано: %s', order.order_number, e)
 
     if send_tg:
         try:
             _cname = _get_company_name()
-            now_str = timezone.now().strftime('%d.%m.%Y %H:%M')
-            tg = [f'🏛️ <b>{_cname}</b>']
+            now_str = timezone.localtime().strftime('%d.%m.%Y %H:%M')
+            tg = [f'🏛️ <b>{esc(_cname)}</b>']
             tg.append(f'🆕 <b>Нове замовлення</b> · <i>{now_str}</i>')
             tg.append('')
 
             # ── Order info ─────────────────────────────────────────────────
-            tg.append(f'📋 <code>{order.order_number}</code> · {order.source}')
-            tg.append(f'👤 <b>{client}</b>')
+            tg.append(f'📋 <code>{esc(order.order_number)}</code> · {esc(order.source)}')
+            tg.append(f'👤 <b>{esc(client)}</b>')
             if _inc_crm and crm_orders is not None:
                 tg.append(f'   📊 Замовлень всього: <b>{crm_orders}</b>')
             if destination:
-                tg.append(f'📍 {destination}')
+                tg.append(f'📍 {esc(destination)}')
             if _inc_deadline and deadline_str:
                 dl_warn = ' ⚠️' if days_left is not None and days_left <= 2 else ''
                 tg.append(f'📦 Дедлайн: <b>{deadline_str}</b> ({days_left_str}){dl_warn}')
             if _inc_total and total_str:
-                tg.append(f'💰 <b>{total_str}</b>')
+                tg.append(f'💰 <b>{esc(total_str)}</b>')
 
             # ── Products ───────────────────────────────────────────────────
             if lines_data:
@@ -1279,11 +1327,11 @@ def notify_new_order(order, is_test: bool = False):
                 for ld in lines_data:
                     icon = ('✅' if _inc_stock and ld['in_stock'] is True else
                             ('❌' if _inc_stock and ld['in_stock'] is False else '•'))
-                    curr = ld.get('currency', '')
-                    name_part = f' — {ld["name"]}' if ld['name'] not in ('—', '', None) else ''
+                    curr = esc(ld.get('currency', ''))
+                    name_part = f' — {esc(ld["name"])}' if ld['name'] not in ('—', '', None) else ''
                     qty_val = ld["qty"] or 0
                     qty_str = str(int(qty_val)) if float(qty_val) == int(float(qty_val)) else str(qty_val)
-                    lines = [f'{icon} <code>{ld["sku"]}</code>{name_part}']
+                    lines = [f'{icon} <code>{esc(ld["sku"])}</code>{name_part}']
                     lines.append(f'   📦 × <b>{qty_str} шт</b>')
                     if ld.get('unit_price'):
                         lines.append(f'   💵 {ld["unit_price"]:.2f} {curr}/шт'.strip())
@@ -1292,14 +1340,14 @@ def notify_new_order(order, is_test: bool = False):
                     elif _inc_stock and ld['in_stock'] is False:
                         lines.append(f'   🏪 склад: <b>{ld["stock"]} шт</b> ❌')
                     if _inc_ds and ld.get('datasheet'):
-                        lines.append(f'   📄 <a href="{ld["datasheet"]}">Datasheet</a>')
+                        lines.append(f'   📄 <a href="{esc(ld["datasheet"])}">Datasheet</a>')
                     tg.append('\n'.join(lines))
 
             _send_telegram(ns, '\n'.join(tg))
             if _inc_images:
                 _send_tg_images(ns, lines_data)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('Нове замовлення %s: Telegram не надіслано: %s', order.order_number, e)
 
 
 def notify_status_change(order, old_status, new_status):
@@ -1357,26 +1405,26 @@ def notify_status_change(order, old_status, new_status):
 
     if send_email:
         try:
-            extra = f'<br><b>Статус:</b> {old_label} → <b>{new_label}</b>'
+            extra = f'<br><b>Статус:</b> {esc(old_label)} → <b>{esc(new_label)}</b>'
             if is_dk_manual:
                 extra += '<br><b>✋ Підтверджено:</b> вручну на DigiKey'
             if new_status == 'shipped' and order.tracking_number:
-                extra += f'<br><b>Трекінг:</b> <code>{order.tracking_number}</code>'
+                extra += f'<br><b>Трекінг:</b> <code>{esc(order.tracking_number)}</code>'
             if prod_lines_data:
                 rows = ''
                 for ld in prod_lines_data:
-                    ds = ld.get('datasheet', '')
+                    ds = esc(ld.get('datasheet', ''))
                     sku_cell = (
                         f'<a href="{ds}" style="color:#1565c0;font-family:monospace;font-size:12px;'
-                        f'text-decoration:none">{ld["sku"]} 📄</a>'
+                        f'text-decoration:none">{esc(ld["sku"])} 📄</a>'
                         if ds else
-                        f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{ld["sku"]}</span>'
+                        f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{esc(ld["sku"])}</span>'
                     )
                     rows += (
                         f'<tr style="border-bottom:1px solid #eee">'
                         f'<td style="padding:5px 8px">{sku_cell}</td>'
-                        f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
-                        f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
+                        f'<td style="padding:5px 8px;font-size:13px;color:#333">{esc(ld["name"])}</td>'
+                        f'<td style="padding:5px 8px;text-align:center;color:#555">{esc(ld["qty"])}</td>'
                         f'</tr>'
                     )
                 extra += (
@@ -1390,37 +1438,37 @@ def notify_status_change(order, old_status, new_status):
                 )
             html = _order_email_html(order, f'🔄 {new_label}', color, extra)
             _send_event_email(ns, subject, html)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('Статус %s: email не надіслано: %s', order.order_number, e)
 
     if send_tg:
         try:
             _cname = _get_company_name()
             lines = [
-                f'🏛️ <b>{_cname}</b>',
+                f'🏛️ <b>{esc(_cname)}</b>',
                 f'🔄 <b>Зміна статусу</b>',
-                f'<code>{order.order_number}</code> · {order.source}',
-                f'Клієнт: {client}',
-                f'Статус: {old_label} → <b>{new_label}</b>',
+                f'<code>{esc(order.order_number)}</code> · {esc(order.source)}',
+                f'Клієнт: {esc(client)}',
+                f'Статус: {esc(old_label)} → <b>{esc(new_label)}</b>',
             ]
             src = getattr(order, 'status_source', '') or ''
             if src:
-                lines.append(f'🔌 Джерело: <i>{src}</i>')
+                lines.append(f'🔌 Джерело: <i>{esc(src)}</i>')
             if is_dk_manual:
                 lines.append('✋ Підтверджено вручну на DigiKey')
             if new_status == 'shipped' and order.tracking_number:
-                lines.append(f'Трекінг: <code>{order.tracking_number}</code>')
+                lines.append(f'Трекінг: <code>{esc(order.tracking_number)}</code>')
             if prod_lines_data:
                 lines.append('')
                 lines.append('📋 <b>Товари:</b>')
                 for ld in prod_lines_data:
-                    line_txt = f'• <code>{ld["sku"]}</code> {ld["name"]} × {ld["qty"]}'
+                    line_txt = f'• <code>{esc(ld["sku"])}</code> {esc(ld["name"])} × {esc(ld["qty"])}'
                     if ld.get('datasheet'):
-                        line_txt += f'\n  <a href="{ld["datasheet"]}">📄 Datasheet</a>'
+                        line_txt += f'\n  <a href="{esc(ld["datasheet"])}">📄 Datasheet</a>'
                     lines.append(line_txt)
             _send_telegram(ns, '\n'.join(lines))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('Статус %s: Telegram не надіслано: %s', order.order_number, e)
 
 
 # ── DigiKey listing published notification ────────────────────────────────────
@@ -1452,7 +1500,7 @@ def notify_dk_listings_published(promoted_listings: list):
     if not send_tg and not send_email:
         return
 
-    now_str   = timezone.now().strftime('%d.%m.%Y %H:%M')
+    now_str   = timezone.localtime().strftime('%d.%m.%Y %H:%M')
     _cname    = _get_company_name()
     count     = len(promoted_listings)
 
@@ -1467,7 +1515,7 @@ def notify_dk_listings_published(promoted_listings: list):
     if send_tg:
         try:
             tg = [
-                f'🏛️ <b>{_cname}</b>',
+                f'🏛️ <b>{esc(_cname)}</b>',
                 f'✅ <b>DigiKey: лістинг затверджено</b> · <i>{now_str}</i>',
                 '',
                 f'Затверджено: <b>{count}</b> лістинг{"ів" if count > 1 else ""}',
@@ -1475,14 +1523,14 @@ def notify_dk_listings_published(promoted_listings: list):
                 '📋 <b>Товари:</b>',
             ]
             for item in sku_lines:
-                name_part = f' — {item["name"]}' if item['name'] else ''
-                tg.append(f'• <code>{item["sku"]}</code>{name_part}')
-                tg.append(f'  Offer ID: <code>{item["offer"]}</code>')
+                name_part = f' — {esc(item["name"])}' if item['name'] else ''
+                tg.append(f'• <code>{esc(item["sku"])}</code>{name_part}')
+                tg.append(f'  Offer ID: <code>{esc(item["offer"])}</code>')
             tg.append('')
             tg.append(f'🔗 Статус: <b>⏳ Staged → ✅ Published</b>')
             _send_telegram(ns, '\n'.join(tg))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('DigiKey лістинги: Telegram не надіслано: %s', e)
 
     if send_email:
         try:
@@ -1498,9 +1546,9 @@ def notify_dk_listings_published(promoted_listings: list):
                 bg = '#f9f9f9' if i % 2 == 0 else '#fff'
                 rows += (
                     f'<tr style="background:{bg}">'
-                    f'<td style="padding:8px 12px;font-family:monospace;font-weight:600;color:#1565c0">{item["sku"]}</td>'
-                    f'<td style="padding:8px 12px;color:#333">{item["name"] or "—"}</td>'
-                    f'<td style="padding:8px 12px;font-family:monospace;font-size:12px;color:#607d8b">{item["offer"]}</td>'
+                    f'<td style="padding:8px 12px;font-family:monospace;font-weight:600;color:#1565c0">{esc(item["sku"])}</td>'
+                    f'<td style="padding:8px 12px;color:#333">{esc(item["name"] or "—")}</td>'
+                    f'<td style="padding:8px 12px;font-family:monospace;font-size:12px;color:#607d8b">{esc(item["offer"])}</td>'
                     f'</tr>'
                 )
 
@@ -1511,7 +1559,7 @@ def notify_dk_listings_published(promoted_listings: list):
                 'overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)">'
                 '<div style="background:#2e7d32;color:#fff;padding:16px 24px">'
                 f'<div style="font-size:17px;font-weight:700">✅ DigiKey: лістинги затверджено</div>'
-                f'<div style="font-size:12px;opacity:.75">{_cname} · {now_str}</div>'
+                f'<div style="font-size:12px;opacity:.75">{esc(_cname)} · {now_str}</div>'
                 '</div>'
                 '<div style="padding:16px 24px">'
                 f'<p style="margin:0 0 12px;font-size:14px;color:#333">'
@@ -1542,8 +1590,8 @@ def notify_dk_listings_published(promoted_listings: list):
             )
             msg.attach_alternative(outlook_safe(html), 'text/html')
             msg.send()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('DigiKey лістинги: email не надіслано: %s', e)
 
 
 # ── Shipment status notifications ─────────────────────────────────────────────
@@ -1639,23 +1687,23 @@ def notify_shipment_status(shipment, old_status, new_status):
         try:
             _cname  = _get_company_name()
             from django.utils import timezone as _tz
-            now_str = _tz.now().strftime('%d.%m.%Y %H:%M')
+            now_str = _tz.localtime().strftime('%d.%m.%Y %H:%M')
             subject = f'{"🏭 JLCPCB" if jlc_info else "📦"} Відправлення #{shipment.pk}: {new_label}'
-            rows = f'<br><b>Статус:</b> {old_label} → <b style="color:{color}">{new_label}</b>'
+            rows = f'<br><b>Статус:</b> {esc(old_label)} → <b style="color:{color}">{esc(new_label)}</b>'
             if jlc_info:
-                rows += f'<br><b>🏭 JLCPCB замовлення:</b> <code>{jlc_info}</code>'
+                rows += f'<br><b>🏭 JLCPCB замовлення:</b> <code>{esc(jlc_info)}</code>'
             if order_num:
-                rows += f'<br><b>Замовлення:</b> {order_num}'
-            rows += f'<br><b>Отримувач:</b> {recipient}'
+                rows += f'<br><b>Замовлення:</b> {esc(order_num)}'
+            rows += f'<br><b>Отримувач:</b> {esc(recipient)}'
             if country:
-                rows += f'<br><b>Країна:</b> {country}'
-            rows += f'<br><b>Перевізник:</b> {carrier}'
+                rows += f'<br><b>Країна:</b> {esc(country)}'
+            rows += f'<br><b>Перевізник:</b> {esc(carrier)}'
             if tracking:
                 rows += (f'<br><b>Трекінг:</b> '
-                         f'<code style="font-family:monospace">{tracking}</code>')
+                         f'<code style="font-family:monospace">{esc(tracking)}</code>')
             clabel = getattr(shipment, 'carrier_status_label', '') or ''
             if clabel:
-                rows += f'<br><b>Статус перевізника:</b> {clabel}'
+                rows += f'<br><b>Статус перевізника:</b> {esc(clabel)}'
             eta = getattr(shipment, 'carrier_eta', None)
             if eta:
                 rows += f'<br><b>Очікувана доставка:</b> {eta.strftime("%d.%m.%Y")}'
@@ -1663,42 +1711,42 @@ def notify_shipment_status(shipment, old_status, new_status):
                 f'<div style="font-family:sans-serif;max-width:560px;margin:0 auto;'
                 f'border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">'
                 f'<div style="background:{color};padding:16px 20px">'
-                f'<span style="color:#fff;font-size:18px;font-weight:700">📦 {new_label}</span>'
+                f'<span style="color:#fff;font-size:18px;font-weight:700">📦 {esc(new_label)}</span>'
                 f'</div>'
                 f'<div style="padding:20px;background:#fafafa">'
-                f'<p style="margin:0 0 4px;font-size:13px;color:#555">{_cname} · {now_str}</p>'
+                f'<p style="margin:0 0 4px;font-size:13px;color:#555">{esc(_cname)} · {now_str}</p>'
                 f'<hr style="border:none;border-top:1px solid #e0e0e0;margin:10px 0">'
                 f'<p style="font-size:14px;line-height:1.8;margin:0">{rows}</p>'
                 f'</div></div>'
             )
             _send_event_email(ns, subject, html)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('Відправлення #%s: email не надіслано: %s', shipment.pk, e)
 
     if send_tg:
         try:
             _cname  = _get_company_name()
             from django.utils import timezone as _tz
-            now_str = _tz.now().strftime('%d.%m.%Y %H:%M')
+            now_str = _tz.localtime().strftime('%d.%m.%Y %H:%M')
             lines = [
-                f'🏛️ <b>{_cname}</b>',
+                f'🏛️ <b>{esc(_cname)}</b>',
                 f'📦 <b>Відправлення #{shipment.pk}</b> · <i>{now_str}</i>',
                 '',
-                f'Статус: {old_label} → <b>{new_label}</b>',
+                f'Статус: {esc(old_label)} → <b>{esc(new_label)}</b>',
             ]
             if jlc_info:
-                lines.append(f'🏭 JLCPCB: <code>{jlc_info}</code>')
+                lines.append(f'🏭 JLCPCB: <code>{esc(jlc_info)}</code>')
             if order_num:
-                lines.append(f'🛒 Замовлення: <code>{order_num}</code>')
-            lines.append(f'👤 {recipient}')
+                lines.append(f'🛒 Замовлення: <code>{esc(order_num)}</code>')
+            lines.append(f'👤 {esc(recipient)}')
             if country:
-                lines.append(f'📍 {country}')
-            lines.append(f'🚚 {carrier}')
+                lines.append(f'📍 {esc(country)}')
+            lines.append(f'🚚 {esc(carrier)}')
             if tracking:
-                lines.append(f'🔎 Трекінг: <code>{tracking}</code>')
+                lines.append(f'🔎 Трекінг: <code>{esc(tracking)}</code>')
             clabel = getattr(shipment, 'carrier_status_label', '') or ''
             if clabel:
-                lines.append(f'ℹ️ {clabel}')
+                lines.append(f'ℹ️ {esc(clabel)}')
             eta = getattr(shipment, 'carrier_eta', None)
             if eta:
                 lines.append(f'📅 ETA: <b>{eta.strftime("%d.%m.%Y")}</b>')
@@ -1706,8 +1754,8 @@ def notify_shipment_status(shipment, old_status, new_status):
                 _send_telegram(ns, '\n'.join(lines), chat_id_override=jlc_tg_chat)
             else:
                 _send_telegram(ns, '\n'.join(lines))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('Відправлення #%s: Telegram не надіслано: %s', shipment.pk, e)
 
 
 def send_order_confirm_notification(order):
@@ -1753,15 +1801,16 @@ def send_order_confirm_notification(order):
         items_lines.append(f'• {sku} — {qty} pcs.')
     items_str = '\n'.join(items_lines) if items_lines else '—'
 
-    def _render(tmpl):
+    def _render(tmpl, e=lambda v: v):
         return (tmpl
-                .replace('{order_number}', order.order_number or '')
-                .replace('{customer_name}', customer_name)
-                .replace('{order_date}', order_date)
-                .replace('{items}', items_str))
+                .replace('{order_number}', e(order.order_number or ''))
+                .replace('{customer_name}', e(customer_name))
+                .replace('{order_date}', e(order_date))
+                .replace('{items}', e(items_str)))
 
     subject   = _render(getattr(ns, 'order_confirm_notify_subject', '') or '')
     body_text = _render(getattr(ns, 'order_confirm_notify_body', '') or '')
+    body_html = _render(getattr(ns, 'order_confirm_notify_body', '') or '', esc)
     cc_str    = (getattr(ns, 'order_confirm_notify_cc', '') or '').strip()
     from_email = (ns.email_from or ns.email_host_user or '').strip()
 
@@ -1771,7 +1820,7 @@ def send_order_confirm_notification(order):
     try:
         from django.core.mail import EmailMultiAlternatives
         html_body = ('<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">'
-                     + body_text.replace('\n', '<br>') + '</body></html>')
+                     + body_html.replace('\n', '<br>') + '</body></html>')
         msg = EmailMultiAlternatives(
             subject=subject,
             body=body_text,
@@ -1786,7 +1835,8 @@ def send_order_confirm_notification(order):
         from sales.models import SalesOrder
         SalesOrder.objects.filter(pk=order.pk).update(order_confirm_sent_at=_tz.now())
         return True
-    except Exception:
+    except Exception as e:
+        logger.warning('Підтвердження замовлення %s клієнту не надіслано: %s', order.order_number, e)
         return False
 
 
@@ -1856,10 +1906,10 @@ def send_ship_notification(order) -> bool:
         'ship_address':    ship_address,
     }
 
-    def _render(tpl):
+    def _render(tpl, values=ctx):
         try:
-            return (tpl or '').format(**ctx)
-        except KeyError:
+            return (tpl or '').format(**values)
+        except (KeyError, IndexError, ValueError):
             return tpl or ''
 
     body_tpl = ns.customer_notify_body if is_eu else (
@@ -1867,6 +1917,7 @@ def send_ship_notification(order) -> bool:
     )
     subject   = _render(ns.customer_notify_subject)
     body_text = _render(body_tpl)
+    body_html = _render(body_tpl, {k: esc(v) for k, v in ctx.items()})
     cc_str    = (getattr(ns, 'customer_notify_cc', '') or '').strip()
     from_email = (ns.email_from or ns.email_host_user or '').strip()
 
@@ -1877,7 +1928,7 @@ def send_ship_notification(order) -> bool:
         from django.core.mail import EmailMultiAlternatives
         from django.utils import timezone as _tz
         html_body = ('<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">'
-                     + body_text.replace('\n', '<br>') + '</body></html>')
+                     + body_html.replace('\n', '<br>') + '</body></html>')
         msg = EmailMultiAlternatives(
             subject=subject,
             body=body_text,
@@ -1892,5 +1943,6 @@ def send_ship_notification(order) -> bool:
         from sales.models import SalesOrder
         SalesOrder.objects.filter(pk=order.pk).update(ship_notify_sent_at=_tz.now())
         return True
-    except Exception:
+    except Exception as e:
+        logger.warning('Лист клієнту про відправку %s не надіслано: %s', order.order_number, e)
         return False

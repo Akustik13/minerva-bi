@@ -94,10 +94,8 @@ def system_index(request):
         context['api_key_count'] = 0
 
     try:
-        from sales.models import SalesOrder
-        context['unshipped_count'] = SalesOrder.objects.filter(
-            affects_stock=True, shipped_at__isnull=True
-        ).count()
+        from sales.revenue import to_ship   # без скасованих і запитів пропозицій
+        context['unshipped_count'] = to_ship().count()
     except Exception:
         context['unshipped_count'] = 0
 
@@ -175,10 +173,8 @@ def widget_data_api(request):
         data['new_orders']        = SalesOrder.objects.filter(status='received').count()
         data['processing_orders'] = SalesOrder.objects.filter(status='processing').count()
         data['sales_today']       = SalesOrder.objects.filter(order_date=today).count()
-        data['unshipped']         = SalesOrder.objects.filter(
-            affects_stock=True, shipped_at__isnull=True,
-            status__in=['received', 'processing']
-        ).count()
+        from sales.revenue import to_ship
+        data['unshipped']         = to_ship().count()
     except Exception:
         data['new_orders'] = 0
         data['processing_orders'] = 0

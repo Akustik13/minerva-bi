@@ -213,7 +213,7 @@
   <!-- Dev banner -->
   <div class="con-devbadge">
     <span style="font-size:14px">🛠</span>
-    <span><b>Developer Mode</b> — цей інструмент тільки для розробки. Запити виконуються через сервер Minerva (обходить CORS). Буде прихований для кінцевих користувачів.</span>
+    <span><b>Developer Mode</b> — лише для адміністратора Minerva. Запити йдуть тільки до API цієї Minerva (<code>{{ api_prefix }}</code>): сервер виконує їх сам і сам підставляє вибраний ключ — повний ключ у браузер не потрапляє. Інші адреси й зовнішні API консоль не відкриває.</span>
   </div>
 
   <!-- ── Left: Request Builder ── -->
@@ -239,12 +239,6 @@
         <span class="con-preset" onclick="loadPreset('minerva_purchase_track')">🚛 Трек закупівлі</span>
         <span class="con-preset" onclick="loadPreset('minerva_purchase_delivered')">✅ Доставлено</span>
         <span class="con-preset" onclick="loadPreset('minerva_purchases_open')">📋 Очікуються</span>
-        <span class="con-preset" onclick="loadPreset('dhl_test')">🟡 DHL Test</span>
-        <span class="con-preset" onclick="loadPreset('dhl_rates')">🟡 DHL Rates</span>
-        <span class="con-preset" onclick="loadPreset('dhl_tracking')">📡 DHL Track</span>
-        <span class="con-preset" onclick="loadPreset('digikey_token')">🛒 DigiKey Token</span>
-        <span class="con-preset" onclick="loadPreset('digikey_orders')">🛒 DigiKey Orders</span>
-        <span class="con-preset" onclick="loadPreset('jumingo_rates')">📦 Jumingo Rates</span>
       </div>
 
       <!-- Method + URL -->
@@ -258,7 +252,7 @@
           <option>DELETE</option>
           <option>HEAD</option>
         </select>
-        <input type="text" id="con-url" class="con-input" placeholder="https://api.example.com/endpoint"
+        <input type="text" id="con-url" class="con-input" placeholder="/api/v1/ping/"
                style="font-family:monospace" autocomplete="off" spellcheck="false">
       </div>
 
@@ -266,9 +260,8 @@
       <label class="con-label">Авторизація</label>
       <select id="con-auth-type" class="con-select" onchange="updateAuthFields()">
         <option value="">None</option>
-        <option value="bearer">Bearer Token</option>
-        <option value="token">Token (DRF / Minerva)</option>
-        <option value="basic">Basic Auth</option>
+        <option value="key">🔑 Ключ Minerva (сервер підставить)</option>
+        <option value="token">Token вручну</option>
       </select>
       <div id="con-auth-fields" class="con-auth-fields"></div>
 
@@ -283,11 +276,6 @@
                 placeholder='{"key": "value"}'
                 spellcheck="false"></textarea>
 
-      <!-- Timeout -->
-      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
-        <label class="con-label" style="margin:0;white-space:nowrap">Timeout (с):</label>
-        <input type="number" id="con-timeout" class="con-input" value="15" min="1" max="60" style="width:70px">
-      </div>
 
       <!-- Send -->
       <button id="con-send-btn" class="con-send" onclick="sendRequest()">
@@ -322,52 +310,44 @@
 
 </div>
 
-<!-- Django data for presets -->
+<!-- Django data for presets: лише id, назва й замаскований ключ (json_script — дані, не код) -->
+{{ console_keys|json_script:"con-keys" }}
 <script>
 const DJANGO_DATA = {
-  activeTokens: {{ active_tokens|safe }},
-  digikey: {
-    client_id:     "{{ digikey.client_id|default:'' }}",
-    client_secret: "{{ digikey.client_secret|default:'' }}",
-    account_id:    "{{ digikey.account_id|default:'' }}",
-    use_sandbox:   {{ digikey.use_sandbox|yesno:"true,false" }},
-  },
+  keys:      JSON.parse(document.getElementById('con-keys').textContent),
   csrfToken: "{{ csrf_token }}",
   proxyUrl:  "{% url 'api_proxy' %}",
 };
+const FIRST_KEY = DJANGO_DATA.keys.length ? DJANGO_DATA.keys[0].id : '';
 
-// ── Presets ────────────────────────────────────────────────────────────────
+// ── Presets (лише API цієї Minerva) ─────────────────────────────────────────
 
 const PRESETS = {
   minerva_orders: {
     method:  'GET',
     url:     window.location.origin + '/api/v1/orders/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json' },
     body:    '',
   },
   minerva_products: {
     method:  'GET',
     url:     window.location.origin + '/api/v1/products/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json' },
     body:    '',
   },
   minerva_ping: {
     method:  'GET',
     url:     window.location.origin + '/api/v1/ping/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json' },
     body:    '',
   },
   minerva_stock: {
     method:  'GET',
     url:     window.location.origin + '/api/v1/stock/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json' },
     body:    '',
     params:  '?in_stock=true&ordering=sku',
@@ -375,16 +355,14 @@ const PRESETS = {
   minerva_stock_check: {
     method:  'POST',
     url:     window.location.origin + '/api/v1/stock/check/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
     body:    JSON.stringify({ items: [{ sku: 'YOUR-SKU', qty: 1 }] }, null, 2),
   },
   minerva_movement: {
     method:  'POST',
     url:     window.location.origin + '/api/v1/stock-movements/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
     body:    JSON.stringify({ sku: 'YOUR-SKU', tx_type: 'Incoming', qty: 10,
                               ref_doc: 'Lieferung 123', external_key: 'grn-123-1' }, null, 2),
@@ -392,8 +370,7 @@ const PRESETS = {
   minerva_order_create: {
     method:  'POST',
     url:     window.location.origin + '/api/v1/orders/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
     body:    JSON.stringify({
       source: 'webshop', order_number: 'TEST-1001', currency: 'EUR',
@@ -406,8 +383,7 @@ const PRESETS = {
   minerva_shipments: {
     method:  'GET',
     url:     window.location.origin + '/api/v1/shipments/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json' },
     body:    '',
     params:  '?order_number=TEST-1001',
@@ -415,8 +391,7 @@ const PRESETS = {
   minerva_purchase_create: {
     method:  'POST',
     url:     window.location.origin + '/api/v1/purchase-orders/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
     body:    JSON.stringify({
       external_id: 'B-TEST-1', supplier: { name: 'Acme Components GmbH', email: 'sales@acme.example', country: 'DE' },
@@ -427,8 +402,7 @@ const PRESETS = {
   minerva_purchase_track: {
     method:  'POST',
     url:     window.location.origin + '/api/v1/purchase-orders/ext:B-TEST-1/shipments/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
     body:    JSON.stringify({ tracking_number: '1Z999AA10123456784', carrier: 'UPS',
                               status: 'in_transit', expected_date: '2026-11-03' }, null, 2),
@@ -436,83 +410,17 @@ const PRESETS = {
   minerva_purchase_delivered: {
     method:  'POST',
     url:     window.location.origin + '/api/v1/purchase-orders/ext:B-TEST-1/deliveries/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
     body:    JSON.stringify({ delivery_id: 'LS-1', lines: [{ line_id: '1', qty: 4 }] }, null, 2),
   },
   minerva_purchases_open: {
     method:  'GET',
     url:     window.location.origin + '/api/v1/purchase-orders/',
-    auth:    'token',
-    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    auth:    'key',
     headers: { 'Accept': 'application/json' },
     body:    '',
     params:  '?open=1',
-  },
-  dhl_test: {
-    method:  'GET',
-    url:     'https://express.api.dhl.com/mydhlapi/test/rates',
-    auth:    'basic',
-    user:    '',
-    pass:    '',
-    headers: { 'Accept': 'application/json' },
-    body:    '',
-    params:  '?accountNumber=&originCountryCode=DE&originPostalCode=60311&originCityName=Frankfurt&destinationCountryCode=PL&destinationPostalCode=00-001&destinationCityName=Warsaw&weight=1&length=20&width=15&height=10&plannedShippingDateAndTime=2026-03-11T09:00:00 GMT%2B01:00&isCustomsDeclarable=false&unitOfMeasurement=metric',
-  },
-  dhl_rates: {
-    method:  'GET',
-    url:     'https://express.api.dhl.com/mydhlapi/rates',
-    auth:    'basic',
-    user:    '',
-    pass:    '',
-    headers: { 'Accept': 'application/json' },
-    body:    '',
-    params:  '?accountNumber=&originCountryCode=DE&originPostalCode=60311&originCityName=Frankfurt&destinationCountryCode=PL&destinationPostalCode=00-001&destinationCityName=Warsaw&weight=1&length=20&width=15&height=10&plannedShippingDateAndTime=2026-03-11T09:00:00 GMT%2B01:00&isCustomsDeclarable=false&unitOfMeasurement=metric',
-  },
-  dhl_tracking: {
-    method:  'GET',
-    url:     'https://express.api.dhl.com/mydhlapi/shipments/TRACKING_NUMBER/tracking',
-    auth:    'basic',
-    user:    '',
-    pass:    '',
-    headers: { 'Accept': 'application/json' },
-    body:    '',
-    params:  '?trackingView=allCheckpoints',
-  },
-  digikey_token: {
-    method:  'POST',
-    url:     (DJANGO_DATA.digikey.use_sandbox ? 'https://sandbox-api.digikey.com' : 'https://api.digikey.com') + '/v1/oauth2/token',
-    auth:    '',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body:    `client_id=${DJANGO_DATA.digikey.client_id}&client_secret=${DJANGO_DATA.digikey.client_secret}&grant_type=client_credentials`,
-  },
-  digikey_orders: {
-    method:  'GET',
-    url:     (DJANGO_DATA.digikey.use_sandbox ? 'https://sandbox-api.digikey.com' : 'https://api.digikey.com') + '/orderstatus/v4/orders?PageNumber=1&PageSize=5',
-    auth:    'bearer',
-    token:   '',  // filled manually after getting token
-    headers: {
-      'X-DIGIKEY-Client-Id':       DJANGO_DATA.digikey.client_id,
-      'X-DIGIKEY-Locale-Language': 'en',
-      'X-DIGIKEY-Locale-Currency': 'USD',
-      'X-DIGIKEY-Locale-Site':     'US',
-      'X-DIGIKEY-Account-Id':      DJANGO_DATA.digikey.account_id,
-    },
-    body: '',
-  },
-  jumingo_rates: {
-    method:  'POST',
-    url:     'https://api.jumingo.com/v1/shipment-rates',
-    auth:    'bearer',
-    token:   '',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body:    JSON.stringify({
-      sender:    { country: "DE", zip: "60311", city: "Frankfurt" },
-      recipient: { country: "PL", zip: "00-001", city: "Warsaw" },
-      parcel:    { weight: 1.0, length: 20, width: 15, height: 10 },
-      settings:  { mode: "cheapest" },
-    }, null, 2),
   },
 };
 
@@ -533,17 +441,10 @@ function loadPreset(name) {
 
   updateAuthFields();
 
-  // Fill auth credential fields
+  // Ключ — перший активний зі списку (його можна змінити)
   setTimeout(() => {
-    if (p.auth === 'basic') {
-      const u = document.getElementById('auth-user');
-      const pw = document.getElementById('auth-pass');
-      if (u) u.value = p.user || '';
-      if (pw) pw.value = p.pass || '';
-    } else if (p.auth === 'bearer' || p.auth === 'token') {
-      const t = document.getElementById('auth-token');
-      if (t) t.value = p.token || '';
-    }
+    const k = document.getElementById('auth-key');
+    if (k && p.auth === 'key' && FIRST_KEY !== '') k.value = String(FIRST_KEY);
   }, 10);
 }
 
@@ -552,14 +453,16 @@ function loadPreset(name) {
 function updateAuthFields() {
   const type = document.getElementById('con-auth-type').value;
   const cont = document.getElementById('con-auth-fields');
-  if (type === 'basic') {
-    cont.innerHTML = `
-      <div class="con-row" style="margin-top:6px;gap:6px">
-        <input id="auth-user" class="con-input" placeholder="Username / API Key" style="font-size:11.5px">
-        <input id="auth-pass" class="con-input" placeholder="Password / API Secret" type="password" style="font-size:11.5px">
-      </div>`;
-  } else if (type === 'bearer' || type === 'token') {
-    cont.innerHTML = `<input id="auth-token" class="con-input" placeholder="Token..." style="margin-top:6px;font-size:11.5px">`;
+  if (type === 'key') {
+    if (!DJANGO_DATA.keys.length) {
+      cont.innerHTML = '<div style="margin-top:6px;font-size:11.5px;color:#ff9800">Немає активних ключів — створіть у <a href="/admin/api/apikey/">🔑 API Токени</a></div>';
+      return;
+    }
+    const opts = DJANGO_DATA.keys.map(k =>
+      `<option value="${escHtml(k.id)}">${escHtml(k.name)} — ${escHtml(k.masked)}</option>`).join('');
+    cont.innerHTML = `<select id="auth-key" class="con-select" style="margin-top:6px;font-size:11.5px">${opts}</select>`;
+  } else if (type === 'token') {
+    cont.innerHTML = `<input id="auth-token" class="con-input" type="password" autocomplete="off" placeholder="Token..." style="margin-top:6px;font-size:11.5px">`;
   } else {
     cont.innerHTML = '';
   }
@@ -595,19 +498,14 @@ async function sendRequest() {
   const url    = document.getElementById('con-url').value.trim();
   const method = document.getElementById('con-method').value;
   const body   = document.getElementById('con-body').value.trim();
-  const to     = parseInt(document.getElementById('con-timeout').value) || 15;
 
   if (!url) { alert('Введіть URL'); return; }
 
   const authType = document.getElementById('con-auth-type').value;
   const auth = {};
-  if (authType === 'basic') {
-    auth.type = 'basic';
-    auth.user = (document.getElementById('auth-user')?.value || '').trim();
-    auth.pass = (document.getElementById('auth-pass')?.value || '').trim();
-  } else if (authType === 'bearer') {
-    auth.type  = 'bearer';
-    auth.token = (document.getElementById('auth-token')?.value || '').trim();
+  if (authType === 'key') {
+    auth.type   = 'key';
+    auth.key_id = document.getElementById('auth-key')?.value || '';
   } else if (authType === 'token') {
     auth.type  = 'token';
     auth.token = (document.getElementById('auth-token')?.value || '').trim();
@@ -624,7 +522,7 @@ async function sendRequest() {
         'Content-Type': 'application/json',
         'X-CSRFToken':  DJANGO_DATA.csrfToken,
       },
-      body: JSON.stringify({ url, method, headers: getHeaders(), body, auth, timeout: to }),
+      body: JSON.stringify({ url, method, headers: getHeaders(), body, auth }),
     });
     const data = await resp.json();
     renderResponse(data, url, method);

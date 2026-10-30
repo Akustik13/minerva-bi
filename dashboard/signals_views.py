@@ -21,7 +21,7 @@ def _collect_signals():
     """Збирає всі сигнали з усіх модулів. Повертає список dict."""
     signals = []
     now = timezone.now()
-    today = now.date()
+    today = timezone.localdate()
 
     # ── 1. СКЛАД: товари що закінчуються ───────────────────────────────────
     try:
@@ -78,12 +78,14 @@ def _collect_signals():
         })
 
     # ── 2. ПРОДАЖІ: замовлення не відправлені давно ─────────────────────────
+    # Лише ті, що справді чекають відправки (sales.revenue.to_ship): без скасованих, відправлених,
+    # доставлених і запитів пропозицій.
     try:
         from sales.models import SalesOrder
+        from sales.revenue import to_ship, NO_SHIP_TYPES, CANCELLED
 
         # Не відправлені більше 7 днів
-        overdue_7 = SalesOrder.objects.filter(
-            shipped_at__isnull=True,
+        overdue_7 = to_ship().filter(
             order_date__isnull=False,
             order_date__lt=today - timedelta(days=7),
         ).order_by('order_date')[:10]
@@ -104,11 +106,11 @@ def _collect_signals():
             })
 
         # Замовлення без tracking більше 3 днів після дати
-        no_tracking = SalesOrder.objects.filter(
+        no_tracking = (SalesOrder.objects.filter(
             shipped_at__isnull=False,
             tracking_number='',
             shipped_at__lt=today - timedelta(days=3),
-        ).order_by('-shipped_at')[:5]
+        ).exclude(status=CANCELLED).exclude(document_type__in=NO_SHIP_TYPES).order_by('-shipped_at')[:5])
 
         for order in no_tracking:
             signals.append({
@@ -131,32 +133,30 @@ def _collect_signals():
         })
 
     # ── 3. CRM: клієнти що замовчали ────────────────────────────────────────
+    # Продажі й виручка клієнта — crm/utils.order_stats (як RFM: лише продажі, сума у валюті Minerva),
+    # одним махом на всіх клієнтів.
     try:
         from crm.models import Customer
+        from crm import utils as crm_utils
 
-        for customer in Customer.objects.all():
-            last_order = customer.sales_orders.order_by('-order_date').first()
-            if not last_order or not last_order.order_date:
+        customers = list(Customer.objects.only('pk', 'name', 'company', 'email', 'external_key'))
+        stats = crm_utils.order_stats(customers)
+        for customer in customers:
+            st = stats.get(customer.pk)
+            if not st or not st.last:
                 continue
-
-            last_date = last_order.order_date
-            if hasattr(last_date, 'date'):
-                last_date = last_date.date()
-
+            last_date = st.last.date() if hasattr(st.last, 'date') and callable(st.last.date) else st.last
             days_silent = (today - last_date).days
-            order_count = customer.sales_orders.count()
 
             # Активний клієнт (2+ замовлень) мовчить 90+ днів
-            if order_count >= 2 and days_silent >= 90:
-                revenue = customer.sales_orders.aggregate(
-                    t=Sum('lines__total_price'))['t'] or 0
+            if st.count >= 2 and days_silent >= 90:
                 signals.append({
                     'type': 'warning' if days_silent < 180 else 'info',
                     'module': 'CRM',
                     'icon': '😴' if days_silent < 180 else '💤',
-                    'title': f'Клієнт мовчить {days_silent} днів: {customer.name}',
-                    'body': f'Замовлень: {order_count} | '
-                            f'Виручка: €{float(revenue):.0f} | '
+                    'title': f'Клієнт мовчить {days_silent} днів: {customer.company or customer.name}',
+                    'body': f'Замовлень: {st.count} | '
+                            f'Виручка: {st.revenue.full_text} | '
                             f'Останнє: {last_date}',
                     'action': 'Написати клієнту',
                     'action_url': f'/admin/crm/customer/{customer.pk}/change/',
