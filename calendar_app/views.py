@@ -23,6 +23,13 @@ EVENT_TYPE_LABELS = {
 }
 
 
+def _js_json(value) -> str:
+    """JSON для вставки прямо в <script> («{{ …|safe }}»): <, >, & — як \\u003c…, тож назва з «</script>» не
+    закриє скрипт сторінки."""
+    return (json.dumps(value, ensure_ascii=False)
+            .replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026'))
+
+
 def _event_display(ev, custom_cats_map):
     """Attach display_color / display_type_key / display_label to an event object."""
     if ev.custom_category_id and ev.custom_category_id in custom_cats_map:
@@ -109,9 +116,9 @@ def calendar_view(request):
         'next_year':          next_year,
         'next_month':         next_month,
         'show_done':          show_done,
-        'event_colors_json':  json.dumps(EVENT_COLORS),
-        'event_labels_json':  json.dumps(EVENT_TYPE_LABELS),
-        'custom_cats_json':   json.dumps(custom_cats),
+        'event_colors_json':  _js_json(EVENT_COLORS),
+        'event_labels_json':  _js_json(EVENT_TYPE_LABELS),
+        'custom_cats_json':   _js_json(custom_cats),
         'wt':                 wt,
         'wt_days':            wt['days'] if wt else {},
         'invites':            _invites(request.user),
@@ -221,8 +228,9 @@ def event_detail_api(request, pk):
         'type_key':     type_key,
         'type_label':   type_label,
         'color':        color,
-        'start':        ev.start_at.strftime('%d.%m.%Y %H:%M'),
-        'end':          ev.end_at.strftime('%d.%m.%Y %H:%M') if ev.end_at else '',
+        # у базі — UTC; у вікні — місцевий час (Europe/Berlin), як у сітці календаря
+        'start':        timezone.localtime(ev.start_at).strftime('%d.%m.%Y %H:%M'),
+        'end':          timezone.localtime(ev.end_at).strftime('%d.%m.%Y %H:%M') if ev.end_at else '',
         'all_day':      ev.all_day,
         'is_done':      ev.is_done,
         'customer':     str(ev.crm_customer) if ev.crm_customer_id else '',
@@ -413,7 +421,7 @@ def pending_push_view(request):
                 'id':    ev.pk,
                 'title': ev.title,
                 'type':  ev.event_type,
-                'start': ev.start_at.strftime('%d.%m.%Y %H:%M'),
+                'start': timezone.localtime(ev.start_at).strftime('%d.%m.%Y %H:%M'),
             })
             pks.append(ev.pk)
 

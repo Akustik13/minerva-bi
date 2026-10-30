@@ -285,7 +285,7 @@ class ScheduledAttachmentTests(Base):
                     patch('offers.services.mark_sent_refs') as mark:
                 self.run_due()
         self.assertEqual(send.call_args.kwargs['attachments'][0]['content'], b'%PDF-offer')
-        mark.assert_called_once_with(['offer:7'], '<s3@x>')
+        mark.assert_called_once_with(['offer:7'], '<s3@x>', user=self.account.user)   # право — mark_sent_refs
 
     def test_json_schedule_still_works(self):
         when = (timezone.localtime() + timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M')

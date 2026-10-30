@@ -162,6 +162,7 @@
 {% elif not days %}
 <div class="mt-card">✨ {% trans "За цей період немає листів своїх категорій чи проєктів з askDANTE." %}</div>
 {% else %}
+{% if mail_private %}<div class="mt-card mt-muted">🔒 {{ mail_private_text }}</div>{% endif %}
 <form method="post" onsubmit="return mtConfirm(event)">
   {% csrf_token %}
   <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="from" value="{{ date_from|date:'Y-m-d' }}"><input type="hidden" name="to" value="{{ date_to|date:'Y-m-d' }}"><input type="hidden" name="show" value="{{ show }}">{% if focus_cat %}<input type="hidden" name="cat" value="{{ focus_cat.pk }}">{% endif %}{% if focus_proj %}<input type="hidden" name="proj" value="{{ focus_proj.pk }}">{% endif %}
@@ -201,6 +202,8 @@
       </div>
     </div>
     {% endfor %}
+    {% if mail_private and show == "all" and d.loose_count %}<div class="mt-loose mt-muted">{% trans "Без категорії / проєкту askDANTE" %}: {{ d.loose_count }}</div>
+    {% elif mail_private and show == "ignored" and d.ignored_count %}<div class="mt-loose mt-muted">{% trans "Проігноровані" %}: {{ d.ignored_count }}</div>{% endif %}
     {% if show == "all" and d.loose or show == "ignored" and d.ignored %}
     <div class="mt-loose">
       <div class="mt-muted">{% if show == "all" %}{% trans "Без категорії / проєкту askDANTE — виберіть і віднесіть до категорії або 🙈 не рахуйте:" %}{% else %}{% trans "Проігноровані — не рахуються:" %}{% endif %}</div>
@@ -250,7 +253,7 @@
         <option value="">{% trans "не записувати" %}</option>
         <option value="fixed">{% trans "спершу прихід і відхід стандартного дня" %} {{ day_times }}</option>
         <option value="activity">{% trans "спершу прихід і відхід за активністю в Minerva" %}</option></select></label>{% endif %}
-    <button class="button" name="action" value="describe" title="{% trans "Одне речення про суть листів кожного рядка — потім можна виправити" %}">📝 {% trans "Описати листи (AI)" %}</button>
+    {% if not mail_private %}<button class="button" name="action" value="describe" title="{% trans "Одне речення про суть листів кожного рядка — потім можна виправити" %}">📝 {% trans "Описати листи (AI)" %}</button>{% endif %}
     <button class="button default" type="submit" name="action" value="book"{% if not st.enabled %} disabled{% endif %}>✓ {% trans "Записати вибране в askDANTE" %}</button>
     <span class="mt-muted">{% trans "Записи askDANTE через API не виправляються й не видаляються — перевірте опис перед записом (виправити потім — «♻ Перезаписати»). Записане не дублюється: наступного разу піде лише різниця." %}</span>
   </div>

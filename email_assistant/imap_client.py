@@ -130,6 +130,16 @@ def parse_addresses(*headers) -> list:
     return [addr.lower() for _, addr in getaddresses([str(h) for h in headers if h]) if '@' in addr]
 
 
+_CONTENT_TYPE_RE = re.compile(r"^[a-z0-9][a-z0-9!#$&^_.+-]{0,63}/[a-z0-9][a-z0-9!#$&^_.+-]{0,126}$")
+
+
+def safe_content_type(value) -> str:
+    """Тип вкладення лише у вигляді «тип/підтип» (його задає відправник листа: «image/<svg onload=…>» — теж
+    «тип»); інше → application/octet-stream."""
+    ct = str(value or '').split(';')[0].strip().lower()
+    return ct if _CONTENT_TYPE_RE.match(ct) else 'application/octet-stream'
+
+
 def _get_attachments(msg) -> list:
     attachments = []
     for part in msg.walk():
@@ -139,7 +149,7 @@ def _get_attachments(msg) -> list:
             if filename:
                 attachments.append({
                     'name':         filename,
-                    'content_type': part.get_content_type(),
+                    'content_type': safe_content_type(part.get_content_type()),
                     'size':         len(part.get_payload(decode=True) or b''),
                 })
     return attachments
@@ -158,7 +168,7 @@ def _get_attachments_raw(msg) -> list:
                 data = part.get_payload(decode=True) or b''
                 attachments.append({
                     'name':         filename,
-                    'content_type': part.get_content_type(),
+                    'content_type': safe_content_type(part.get_content_type()),
                     'size':         len(data),
                     '_data':        data,
                     'content_id':   cid,
@@ -181,7 +191,7 @@ def _get_attachments_raw(msg) -> list:
             data = part.get_payload(decode=True) or b''
             attachments.append({
                 'name':         filename,
-                'content_type': part.get_content_type(),
+                'content_type': safe_content_type(part.get_content_type()),
                 'size':         len(data),
                 '_data':        data,
                 'content_id':   cid,
@@ -199,7 +209,7 @@ def persist_attachments(account_pk, imap_uid, folder_name, attachments: list) ->
     saved = []
     for i, att in enumerate(attachments):
         data = att.pop('_data', None)
-        clean = {'name': att['name'], 'content_type': att['content_type'], 'size': att['size']}
+        clean = {'name': att['name'], 'content_type': safe_content_type(att['content_type']), 'size': att['size']}
         if data:
             try:
                 abs_dir = os.path.join(settings.MEDIA_ROOT, rel_dir)

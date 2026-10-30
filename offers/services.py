@@ -326,6 +326,30 @@ def new_version(offer, user=None) -> Offer:
     return offer
 
 
+# Статус у списку картки Angebot (людина вручну): зі стану в базі — лише сюди. «Надіслано» ставить відправка листа
+# (mark_sent), «Прийнято» — accept() (замовлення), назад у роботу з надісланої — лише new_version(): інакше
+# надіслана версія «розблокувалась» би й документ, який бачив клієнт, можна було б переписати.
+_OPEN_STATUSES = (Offer.DRAFT, Offer.REVIEW, Offer.APPROVED, Offer.CANCELLED)
+MANUAL_STATUSES = {
+    None: _OPEN_STATUSES, Offer.DRAFT: _OPEN_STATUSES, Offer.REVIEW: _OPEN_STATUSES, Offer.APPROVED: _OPEN_STATUSES,
+    Offer.SENT: (Offer.SENT, Offer.REJECTED, Offer.EXPIRED, Offer.CANCELLED),
+    Offer.EXPIRED: (Offer.EXPIRED, Offer.REJECTED, Offer.CANCELLED),
+    Offer.REJECTED: (Offer.REJECTED,), Offer.CANCELLED: (Offer.CANCELLED,), Offer.ACCEPTED: (Offer.ACCEPTED,),
+}
+
+
+def manual_statuses(current) -> tuple:
+    """Які статуси можна вибрати вручну, коли зараз `current` (None — нова пропозиція)."""
+    return MANUAL_STATUSES.get(current, (current,))
+
+
+def status_hint(current) -> str:
+    if current in Offer.LOCKED:
+        return ("Надіслану пропозицію не повертають у роботу — для змін «♻ Нова версія»; «Прийнято» — кнопкою "
+                "«🤝 Прийнято → замовлення».")
+    return "Статус «Надіслано» ставиться після відправки листа, «Прийнято» — кнопкою «Прийнято → замовлення»."
+
+
 def set_status(offer, status, user=None) -> Offer:
     allowed = {
         Offer.REVIEW: (Offer.DRAFT, Offer.APPROVED),
@@ -590,7 +614,10 @@ def compose_initial(offer_pk, user=None, audience="customer") -> dict:
     from django.shortcuts import get_object_or_404
     offer = get_object_or_404(Offer, pk=offer_pk)
     audience = audience if audience in AUDIENCES else "customer"
-    rev = generate_document(offer, user)          # надіслана версія не перезаписується
+    if user is None or user.has_perm("offers.change_offer"):
+        rev = generate_document(offer, user)      # надіслана версія не перезаписується
+    else:   # лише перегляд: документ не формуємо (це зміна) — вкладається вже сформований, якщо є
+        rev = current_revision(offer)
     settings_ = OfferSettings.get()
     langs = ["de", "en"] if offer.language == "de_en" else [offer.language if offer.language in _MAIL_TEXT else "de"]
     valid = offer.valid_until.strftime("%d.%m.%Y") if offer.valid_until else "—"
@@ -601,7 +628,7 @@ def compose_initial(offer_pk, user=None, audience="customer") -> dict:
         paragraphs.append(f"{html.escape(greeting)}<br><br>{html.escape(body.format(number=offer.display_number, valid=valid))}")
     customer = getattr(offer.customer, "company", "") or getattr(offer.customer, "name", "") or offer.contact_name
     subject = settings_.email_subject.format(number=offer.display_number, customer=customer)
-    att = revision_attachment(rev.pk)
+    att = revision_attachment(rev.pk) if rev is not None else None
     to = offer.contact_email or getattr(offer.customer, "email", "") or ""
     if audience == "colleague":
         addr, msg = colleague_of(offer, user)
@@ -622,8 +649,13 @@ def compose_initial(offer_pk, user=None, audience="customer") -> dict:
     }
 
 
-def mark_sent_refs(refs, message_id="") -> int:
-    """Лист із документом Angebot надіслано → позначити відповідні версії надісланими."""
+def mark_sent_refs(refs, message_id="", user=None) -> int:
+    """Лист із документом Angebot надіслано → позначити відповідні версії надісланими.
+    user — хто надіслав: «надісланою» (і незмінною) версію робить лише той, хто може змінювати Angebote; інакше лист
+    пішов, але статус Angebot не чіпаємо (чужу чернетку не заблокувати, вклавши її документ)."""
+    if user is not None and not user.has_perm("offers.change_offer"):
+        logger.warning("offer refs %s: %s cannot change offers — not marked sent", refs, user)
+        return 0
     n = 0
     for ref in refs:
         _, _, pk = ref.partition(":")

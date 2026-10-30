@@ -245,9 +245,10 @@
 </div>
 <div id="suggestions"></div>
 
+{{ crm_contacts|json_script:"em-compose-contacts" }}
 <script>
 const CSRF     = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
-const CONTACTS = {{ crm_contacts|safe }};
+const CONTACTS = JSON.parse(document.getElementById('em-compose-contacts').textContent || '[]');
 const toField  = document.getElementById('to-field');
 const ccField  = document.getElementById('cc-field');
 const suggBox  = document.getElementById('suggestions');
@@ -286,14 +287,22 @@ function _setupAutocomplete(field) {
     }).slice(0, 10);
     if (!hits.length) { suggBox.style.display = 'none'; return; }
     _suggTarget = field;
-    suggBox.innerHTML = hits.map(function(c){
-      return '<div class="sugg-item" onclick="selectContact(\'' +
-        c.email.replace(/'/g,"\\'") + '\',\'' +
-        (c.name||'').replace(/'/g,"\\'") + '\')">' +
-        '<strong>' + _esc(c.name || c.email) + '</strong>' +
-        (c.name ? ' <span>' + _esc(c.email) + '</span>' : '') +
-        '</div>';
-    }).join('');
+    suggBox.innerHTML = '';
+    hits.forEach(function(c){   // елементами, не рядком HTML: ім'я з CRM (лапки, <…>) — лише текст
+      var item = document.createElement('div');
+      item.className = 'sugg-item';
+      var b = document.createElement('strong');
+      b.textContent = c.name || c.email;
+      item.appendChild(b);
+      if (c.name) {
+        var sp = document.createElement('span');
+        sp.textContent = c.email;
+        item.appendChild(document.createTextNode(' '));
+        item.appendChild(sp);
+      }
+      item.addEventListener('click', function(){ selectContact(c.email, c.name || ''); });
+      suggBox.appendChild(item);
+    });
     var rect = field.getBoundingClientRect();
     suggBox.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
     suggBox.style.left = rect.left + 'px';

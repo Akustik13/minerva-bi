@@ -623,7 +623,8 @@ function _makeCatBtn(typeKey, color, label, isDeletable, catId) {
   var btn = document.createElement('button');
   btn.className = 'cal-cat-btn active';
   btn.dataset.type = typeKey;
-  btn.innerHTML = '<span class="cal-chip-dot" style="background:' + color + '"></span>' + label
+  if (!/^(#[0-9a-f]{3,8}|[a-z]{3,20})$/i.test(String(color || ''))) color = '#607d8b';   // лише колір, не CSS / HTML
+  btn.innerHTML = '<span class="cal-chip-dot" style="background:' + color + '"></span>' + _blkEsc(label)
     + (isDeletable ? '<span class="cal-cat-del" title="Видалити категорію">✕</span>' : '');
   btn.style.background = color;
   btn.style.borderColor = color;
@@ -1032,10 +1033,11 @@ async function showEventPopup(ev, pk) {
     var d = await r.json();
     _popupDone = d.is_done;
     document.getElementById('cal-popup-title').textContent = d.title;
-    var meta = '📅 ' + d.start + (d.end?' → '+d.end:'') + '<br>';
-    if (d.customer)     meta += '👤 ' + d.customer + '<br>';
-    if (d.source_email) meta += '📧 <a href="' + d.source_email.url + '" target="_blank" style="color:var(--link-fg)">' + (d.source_email.subject||'Відкрити лист') + '</a><br>';
-    if (d.description)  meta += '<br>' + d.description;
+    // клієнт, тема листа й опис приходять з листів / ICS — у HTML лише екрановано (_blkEsc)
+    var meta = '📅 ' + _blkEsc(d.start) + (d.end ? ' → ' + _blkEsc(d.end) : '') + '<br>';
+    if (d.customer)     meta += '👤 ' + _blkEsc(d.customer) + '<br>';
+    if (d.source_email) meta += '📧 <a href="/email/message/' + (parseInt(d.source_email.pk, 10) || 0) + '/" target="_blank" style="color:var(--link-fg)">' + _blkEsc(d.source_email.subject || 'Відкрити лист') + '</a><br>';
+    if (d.description)  meta += '<br>' + _blkEsc(d.description).replace(/\n/g, '<br>');
     document.getElementById('cal-popup-meta').innerHTML = meta;
     var pm = document.getElementById('cal-popup-mail');
     if (d.sender && d.sender.address) {

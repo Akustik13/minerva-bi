@@ -4118,11 +4118,14 @@ function loadSpamFilters() {
         list.innerHTML = '<div style="font-size:12px;color:var(--text-dim)">{% trans "Фільтрів ще немає." %}</div>';
         return;
       }
+      // адреса й назва правила походять з листа спамера — лише екрановано
+      var esc = function(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); };
       list.innerHTML = spam.map(function(r){
         return '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;background:var(--bg-input);font-size:12px">'
-             + '<span style="flex:1;color:var(--text);font-family:monospace">' + r.condition_value + '</span>'
-             + '<span style="color:var(--text-dim);font-size:11px">' + r.name + '</span>'
-             + '<button onclick="deleteSpamFilter(' + r.id + ',this)" title="{% trans "Видалити фільтр" %}"'
+             + '<span style="flex:1;color:var(--text);font-family:monospace">' + esc(r.condition_value) + '</span>'
+             + '<span style="color:var(--text-dim);font-size:11px">' + esc(r.name) + '</span>'
+             + '<button onclick="deleteSpamFilter(' + (parseInt(r.id, 10) || 0) + ',this)" title="{% trans "Видалити фільтр" %}"'
              + ' style="border:none;background:none;cursor:pointer;color:var(--text-dim);padding:2px 5px;border-radius:4px;font-size:13px">🗑️</button>'
              + '</div>';
       }).join('');

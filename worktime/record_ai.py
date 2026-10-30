@@ -38,14 +38,18 @@ def _tree_ids(dp) -> list:
     return ids
 
 
-def material(du: DanteUser, day: datetime.date, dp, days_before: int = DAYS_BEFORE) -> list[str]:
-    """Тексти (лист / зустріч) для опису роботи по проєкту — вже без цитат, з датою; свіжі останніми."""
+def material(du: DanteUser, day: datetime.date, dp, days_before: int = DAYS_BEFORE,
+             with_mail: bool = True) -> list[str]:
+    """Тексти (лист / зустріч) для опису роботи по проєкту — вже без цитат, з датою; свіжі останніми.
+    with_mail=False — без листів (опис просить не власник скриньок працівника): лише назви зустрічей."""
     from django.db.models import Q
     from email_assistant.models import EmailAccount, EmailMessage
     from email_assistant.quotes import new_text
     if du.user_id is None or dp is None:
         return []
     tz = timezone.get_current_timezone()
+    if not with_mail:
+        return _meetings(du, day, tz, with_text=False)
     start = timezone.make_aware(datetime.datetime.combine(day - datetime.timedelta(days=days_before),
                                                           datetime.time.min), tz)
     end = timezone.make_aware(datetime.datetime.combine(day + datetime.timedelta(days=1), datetime.time.min), tz)
@@ -77,15 +81,25 @@ def material(du: DanteUser, day: datetime.date, dp, days_before: int = DAYS_BEFO
         who = "Outgoing" if m.folder == EmailMessage.FOLDER_SENT else "Incoming"
         text = re.sub(r"\s+", " ", new_text(m.body_text or ""))[:900]
         out.append(f"[{who} e-mail {when:%d.%m %H:%M}] Subject: {m.subject}\n{text}")
+    return out + _meetings(du, day, tz)
+
+
+def _meetings(du, day, tz, with_text: bool = True) -> list[str]:
+    """Зустрічі календаря Minerva цього дня. with_text=False — лише назви, без подій з листа (їхній опис і назва —
+    з листа працівника)."""
     try:
         from calendar_app.models import CalendarEvent
-        d0 = timezone.make_aware(datetime.datetime.combine(day, datetime.time.min), tz)
-        for ev in CalendarEvent.objects.filter(user_id=du.user_id, start_at__gte=d0,
-                                               start_at__lt=d0 + datetime.timedelta(days=1)).order_by("start_at")[:6]:
-            at = timezone.localtime(ev.start_at)
-            out.append(f"[Calendar {at:%d.%m %H:%M}] {ev.title}\n{(ev.description or '')[:300]}")
     except ImportError:
-        pass
+        return []
+    d0 = timezone.make_aware(datetime.datetime.combine(day, datetime.time.min), tz)
+    events = CalendarEvent.objects.filter(user_id=du.user_id, start_at__gte=d0,
+                                          start_at__lt=d0 + datetime.timedelta(days=1)).order_by("start_at")
+    if not with_text:
+        events = events.filter(email_message__isnull=True)
+    out = []
+    for ev in events[:6]:
+        at = timezone.localtime(ev.start_at)
+        out.append(f"[Calendar {at:%d.%m %H:%M}] {ev.title}" + (f"\n{(ev.description or '')[:300]}" if with_text else ""))
     return out
 
 
@@ -125,12 +139,17 @@ def describe(du: DanteUser, day: datetime.date, dp, start=None, stop=None, curre
     """Детальний опис запису від AI. → {"text", "sources"} або DanteError з поясненням.
     message — запис «з листа»: опис саме за цим листом, наприкінці — що надіслали (вкладення)."""
     from email_assistant import ai_helper
+    from .mail_time import mail_owner
     st = DanteSettings.get()
     lang = lang or st.comment_lang
-    data = material(du, day, dp)
-    if message is not None:
+    own = mail_owner(du, user)   # листи працівника йдуть в AI лише на його власне прохання
+    data = material(du, day, dp, with_mail=own)
+    if message is not None:   # лист «з листа» — завжди зі скриньки того, хто просить (views: account__user)
         data = [mail_material(message)] + [d for d in data if f"Subject: {message.subject}\n" not in d][:MAX_MAILS - 1]
     if not data and not (hint or current).strip():
+        if not own:
+            raise DanteError("forbidden", "Опис з листів працівника робить лише він сам (власник скриньки). Напишіть "
+                                          "у полі «Що робили» кілька слів — AI оформить опис лише з них.")
         raise DanteError("bad_request", "Немає листів чи зустрічей по цьому проєкту за ці дні — напишіть у полі "
                                         "«Що робили» кілька слів, і AI оформить опис.")
     span = f"{services.hhmm(start)}–{services.hhmm(stop)}" if start and stop else "time not set"

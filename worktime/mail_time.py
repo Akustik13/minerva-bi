@@ -357,6 +357,33 @@ def default_comment(r, lang: str = "de", summary: str = "") -> str:
     return (head + body + tail)[:COMMENT_MAX]
 
 
+def private_comment(r, lang: str = "de") -> str:
+    """Опис без вмісту листів — «E-Mails DigiKey (2 Antworten, 3 E-Mails)»: для того, хто записує час іншого
+    працівника (теми, співрозмовники й текст листів — лише власнику скриньки)."""
+    w = WORDS.get(lang, WORDS["de"])
+    counts = _counts(r, lang)
+    return (_plain(f"{w['prefix']} {r['label']}") + (f" ({counts})" if counts else ""))[:COMMENT_MAX]
+
+
+def mail_owner(du, user) -> bool:
+    """Чи `user` — власник скриньок працівника `du` (user None — автоматичний запуск від імені самого працівника)."""
+    return user is None or (du.user_id is not None and du.user_id == getattr(user, "pk", None))
+
+
+MAIL_PRIVATE = ("Листи працівника (теми, співрозмовники, текст і опис AI з них) бачить і змінює лише він сам — "
+                "вам видно лише кількість листів і хвилини.")
+
+
+def hide_mail(info: dict, lang: str = "de") -> dict:
+    """День з estimate() для не-власника скриньки: лише кількості й хвилини (без тем, співрозмовників, описів)."""
+    info["loose_count"], info["ignored_count"] = len(info.get("loose") or []), len(info.get("ignored") or [])
+    info["loose"], info["ignored"] = [], []
+    for r in info.get("rows", []):
+        r["subjects"], r["topics"], r["refs"] = [], [], {}
+        r["private_comment"] = private_comment(r, lang)
+    return info
+
+
 def _cache_key(du, r, lang) -> str:
     digest = hashlib.sha1(",".join(map(str, sorted(r["ids"]))).encode()).hexdigest()[:12]
     return f"wt-mail-desc:{du.pk}:{r['day']}:{r['dp'].pk}:{digest}:{lang}"
@@ -418,16 +445,21 @@ def comment_for(du, r, st: DanteSettings, user=None) -> str:
 def book(du: DanteUser, day: datetime.date, dp_pk: int, user=None, source: str = Booking.MAIL,
          st: DanteSettings | None = None, activity=None, comment: str | None = None,
          attendance: str = "") -> Booking:
-    """Записати в askDANTE оцінку дня по проєкту (лише ще не записану різницю)."""
+    """Записати в askDANTE оцінку дня по проєкту (лише ще не записану різницю).
+    Без свого опису — опис з листів (теми / AI), але лише коли записує сам власник скриньок (або cron від його
+    імені); інший (адміністратор) — лише кількості («E-Mails DigiKey (2 Antworten)»)."""
     st = st or DanteSettings.get()
     if day > services.local_today():
         raise DanteError("bad_request", "Час за майбутній день записувати не можна.")
     r = next((x for x in estimate(du, day, day, st).get(day, {}).get("rows", []) if x["dp"].pk == int(dp_pk)), None)
     if r is None or r["to_book"] <= 0:
         raise DanteError("bad_request", "Цей час на пошту вже записано в askDANTE.")
+    if comment and comment.strip():
+        text = _plain(comment)[:COMMENT_MAX]
+    else:
+        text = comment_for(du, r, st, user) if mail_owner(du, user) else private_comment(r, st.comment_lang)
     booking = services.book_project(du, day, r["dp"], minutes=r["to_book"], activity=r["activity"] or activity,
-                                    comment=_plain(comment)[:COMMENT_MAX] if comment and comment.strip()
-                                    else comment_for(du, r, st, user),
+                                    comment=text,
                                     user=user, source=source, st=st, prefer=r["first"], attendance=attendance)
     if booking.status == Booking.SENT:
         entry, _ = MailTimeEntry.objects.get_or_create(dante_user=du, day=day, dante_project=r["dp"])

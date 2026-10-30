@@ -1101,14 +1101,10 @@ def _resolve_cid_images(msg_obj, html: str) -> str:
 
 
 def _sanitize_quote_html(raw_html):
-    import re as _re
-    if not raw_html:
-        return ''
-    raw_html = _re.sub(r'<script[^>]*>.*?</script>', '', raw_html, flags=_re.IGNORECASE | _re.DOTALL)
-    raw_html = _re.sub(r'<style[^>]*>.*?</style>',   '', raw_html, flags=_re.IGNORECASE | _re.DOTALL)
-    raw_html = _re.sub(r'<link\b[^>]*/?>',           '', raw_html, flags=_re.IGNORECASE)
-    raw_html = _re.sub(r'<meta\b[^>]*/?>',           '', raw_html, flags=_re.IGNORECASE)
-    return raw_html.strip()
+    """Чужий HTML (цитата, чернетка) у формі листа — лише дозволені теги й атрибути (email_assistant/html_clean.py):
+    форма — сторінка Minerva без CSP, `<img onerror>` / `<svg onload>` з листа виконались би від імені користувача."""
+    from email_assistant.html_clean import clean_html
+    return clean_html(raw_html)
 
 
 def _build_quote_html(header_html, source_html, fallback_text):
@@ -1191,7 +1187,11 @@ def compose_view(request):
         }
 
     if offer_pk and str(offer_pk).isdigit() and request.method != 'POST':
-        # Angebot листом: клієнту / колезі, що переслав запит (тоді ще й відповідь у його гілку) / іншому
+        # Angebot листом: клієнту / колезі, що переслав запит (тоді ще й відповідь у його гілку) / іншому.
+        # Лише з правом бачити Angebote; документ формується (це зміна) — лише з правом змінювати (compose_initial)
+        if not request.user.has_perm('offers.view_offer'):
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied('Немає доступу до Angebote')
         from offers.services import compose_initial
         extra = compose_initial(int(offer_pk), request.user, request.GET.get('audience', 'customer'))
         for key, value in extra.items():   # відповідь колезі: «Кому» й «Re: тема» — з його листа
@@ -1218,7 +1218,7 @@ def compose_view(request):
         'reply_to':     reply_to,
         'initial':      initial,
         'signature':    sig,
-        'crm_contacts': json.dumps(_crm_contacts(request.user)),
+        'crm_contacts': _crm_contacts(request.user),   # json_script у шаблоні — ім'я з CRM не «вийде» зі <script>
     }))
 
 
@@ -1302,7 +1302,7 @@ def _handle_send(request, account, reply_to=None):
         offer_refs = [r for r in request.POST.getlist('att_ref') if r.startswith('offer:')]
         if offer_refs:   # надіслано документ Angebot → версія «надіслана» (незмінна)
             from offers.services import mark_sent_refs
-            mark_sent_refs(offer_refs, result.get('message_id', ''))
+            mark_sent_refs(offer_refs, result.get('message_id', ''), user=request.user)
         if request.POST.get('draft_pk'):   # лист із чернетки пішов — чернетка (і її файли) більше не потрібна
             from email_assistant import drafts as _drafts
             _drafts.discard(account, request.POST['draft_pk'])
@@ -2124,10 +2124,36 @@ def schedule_email_api(request):
 
 # ── Attachment serving ─────────────────────────────────────────────────────
 
+# Вкладення — чужий файл з адреси Minerva: у вкладці браузера (inline) — лише формати, що не виконують код.
+# text/html, image/svg+xml, XML, JS і решта — лише завантаженням; текст — завжди як text/plain.
+INLINE_TYPES = frozenset({'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/plain'})
+ATTACHMENT_CSP = "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'"
+# Виняток — PDF у вкладці: Chrome / Edge не показують PDF у документі з sandbox («заблоковано Chrome»), а PDF з
+# явним типом і nosniff HTML-ом не стане; переглядач PDF працює окремо від сторінок Minerva.
+
+
 def _is_previewable(content_type: str) -> bool:
-    return (content_type.startswith('image/') or
-            content_type == 'application/pdf' or
-            content_type.startswith('text/'))
+    return (content_type or '').split(';')[0].strip().lower() in INLINE_TYPES
+
+
+def _attachment_response(data, name, content_type, force_download=False):
+    """Відповідь з вкладенням листа: тип — лише з безпечного переліку для перегляду, решта — завантаженням;
+    nosniff і CSP sandbox — браузер не вгадує HTML і нічого не виконує від імені Minerva."""
+    from django.utils.http import content_disposition_header
+    from email_assistant.imap_client import safe_content_type
+    ctype = safe_content_type(content_type)
+    inline = not force_download and _is_previewable(ctype)
+    if ctype == 'text/plain':
+        ctype = 'text/plain; charset=utf-8'
+    elif not inline:
+        ctype = 'application/octet-stream'
+    resp = HttpResponse(data, content_type=ctype)
+    resp['Content-Disposition'] = content_disposition_header(not inline, name or 'attachment')
+    resp['X-Content-Type-Options'] = 'nosniff'
+    if not (inline and ctype == 'application/pdf'):
+        resp['Content-Security-Policy'] = ATTACHMENT_CSP
+    resp['Referrer-Policy'] = 'no-referrer'
+    return resp
 
 
 @staff_member_required
@@ -2153,10 +2179,7 @@ def attachment_download_view(request, message_pk, index):
         logger.warning('attachment fetch msg=%s idx=%s: %s', message_pk, index, e)
         data = None
     if data:
-        disp = 'attachment' if force_dl else ('inline' if _is_previewable(content_type) else 'attachment')
-        resp = HttpResponse(data, content_type=content_type)
-        resp['Content-Disposition'] = f'{disp}; filename="{name}"'
-        return resp
+        return _attachment_response(data, name, content_type, force_download=force_dl)
 
     return HttpResponse('Файл не знайдено. Пересинхронізуйте пошту.', status=404)
 
@@ -2615,10 +2638,9 @@ def create_task_from_email(request, message_pk):
             raise ValueError
         if tz.is_naive(dt):
             dt = tz.make_aware(dt)
-    except Exception:
-        dt = tz.now().replace(hour=9, minute=0, second=0, microsecond=0)
-        from datetime import timedelta
-        dt += timedelta(days=1)
+    except Exception:   # без дати — завтра о 09:00 за місцевим часом (не UTC)
+        from datetime import datetime as _dt, time as _time, timedelta
+        dt = tz.make_aware(_dt.combine(tz.localdate() + timedelta(days=1), _time(9, 0)))
 
     ev = CalendarEvent.objects.create(
         user=request.user,
@@ -2630,7 +2652,7 @@ def create_task_from_email(request, message_pk):
         remind_minutes_before=60,
     )
     return JsonResponse({'ok': True, 'event_id': ev.pk, 'title': ev.title,
-                         'start': ev.start_at.strftime('%d.%m.%Y %H:%M')})
+                         'start': tz.localtime(ev.start_at).strftime('%d.%m.%Y %H:%M')})
 
 
 @staff_member_required

@@ -107,6 +107,8 @@ def quick_view(request, pk=None):
     from django.shortcuts import redirect, render
 
     from .models import LANGUAGES, LEAD_MODES, PRICE_MODES, Offer
+    if not request.user.has_perm("offers.view_offer"):   # і перегляд: дані клієнта, ціни, документи
+        raise PermissionDenied
     offer = get_object_or_404(Offer, pk=pk) if pk else None
     thread = None
     tpk = request.POST.get("thread") or request.GET.get("thread")
@@ -281,9 +283,16 @@ def template_sample_view(request):
     return response
 
 
+def _need(request, perm):
+    from django.core.exceptions import PermissionDenied
+    if not request.user.has_perm(perm):
+        raise PermissionDenied
+
+
 @staff_member_required
 def price_view(request):
     """Ціни Minerva для артикула й кількостей (підказка в легкій формі)."""
+    _need(request, "offers.view_offer")
     g = request.GET
     return JsonResponse(services.price_hints(g.get("sku", ""), g.get("qtys", ""), g.get("currency", "EUR"),
                                              g.get("price_mode", "auto"), g.get("lead_mode", "auto"),
@@ -293,6 +302,7 @@ def price_view(request):
 @staff_member_required
 def products_view(request):
     """Пошук артикула зі складу для легкої форми: ?q=FT → товари (і офери DigiKey), що підходять."""
+    _need(request, "offers.view_offer")
     return JsonResponse({"results": services.search_products(request.GET.get("q", ""))})
 
 
@@ -302,6 +312,7 @@ def currency_view(request):
     from crm.models import Customer
 
     from . import pricing
+    _need(request, "offers.view_offer")
     g = request.GET
     customer = Customer.objects.filter(pk=g["customer"]).first() if str(g.get("customer") or "").isdigit() else None
     return JsonResponse(pricing.currency_for(customer, address=g.get("address", ""), email=g.get("email", "")))
@@ -345,6 +356,7 @@ def customer_create_view(request):
 def customer_view(request, pk):
     """Клієнт CRM для легкої форми: контакт і адреса."""
     from crm.models import Customer
+    _need(request, "crm.view_customer")
     c = get_object_or_404(Customer, pk=pk)
     return JsonResponse({"id": c.pk, "label": c.company or c.name, "name": c.name or "", "email": c.email or "",
                          "phone": c.phone or "",
