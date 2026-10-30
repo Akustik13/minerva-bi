@@ -203,7 +203,7 @@ class WebhookTests(APITestBase):
         self.sent = []
 
     def fake_post(self, code=200):
-        def _post(url, data, headers, timeout):
+        def _post(url, data, headers, timeout, **kw):
             self.sent.append({"url": url, "body": data.decode(), "headers": headers})
             return _Resp(code)
         return mock.patch("requests.post", side_effect=_post)
@@ -387,7 +387,7 @@ class ShopTests(APITestBase):
         Webhook.objects.create(name="shop", url="https://shop.example/hook", events=["stock.changed"])
         webhooks._local.stock_ids = None  # flush з setUp чекає на commit зовнішньої транзакції тесту
         sent = []
-        with mock.patch("requests.post", side_effect=lambda url, data, headers, timeout:
+        with mock.patch("requests.post", side_effect=lambda url, data, headers, timeout, **kw:
                         sent.append(data) or _Resp(200)), self.captureOnCommitCallbacks(execute=True):
             self.listing.price = Decimal("79.00")
             self.listing.save()

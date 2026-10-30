@@ -201,7 +201,7 @@ class PurchaseWebhookTests(PurchaseBase):
     def test_only_explicit_subscribers_get_purchase_events(self):
         sent = []
 
-        def _post(url, data, headers, timeout):
+        def _post(url, data, headers, timeout, **kw):
             sent.append((url, json.loads(data.decode())))
             return _Resp()
         Webhook.objects.create(name="shop", url="https://shop.example/hook")                 # «усі події»

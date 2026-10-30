@@ -272,6 +272,27 @@ class ShopAssistantView(APIView):
         return Response(assistant.public_config(shop, key))
 
 
+# ── Ключ сайту магазину ───────────────────────────────────────────────────────
+
+# Поля замовлення, які сайт магазину може змінити (PATCH /orders/{id}/ — після онлайн-оплати, README 7):
+# суми, позиції, склад і статус доставки веде лише Minerva.
+SHOP_ORDER_FIELDS = ("payment_status", "payment_reference", "payment_method")
+
+
+def _bound_shop(request):
+    """Магазин, до якого прив'язано ключ запиту (поле «Магазин» або «Джерело замовлень» = код магазину); інакше None.
+    Такий ключ — ключ сайту: бачить лише свій магазин, навіть якщо в нього права orders / products."""
+    key = request.auth if isinstance(request.auth, APIKey) else None
+    if key is None:
+        return None
+    from shop.models import Shop
+    if key.shop_id:
+        return Shop.objects.filter(pk=key.shop_id).first()
+    if key.default_source:
+        return Shop.objects.filter(slug=key.default_source).first()
+    return None
+
+
 # ── Товари ────────────────────────────────────────────────────────────────────
 
 class ProductViewSet(NoDeleteMixin, viewsets.ModelViewSet):
@@ -288,6 +309,9 @@ class ProductViewSet(NoDeleteMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Product.objects.all().order_by("sku")
+        shop = _bound_shop(self.request)
+        if shop is not None:     # ключ сайту — лише товари, видимі в його магазині (каталог — /shop/products/)
+            qs = qs.filter(shop_listings__shop=shop, shop_listings__is_visible=True).distinct()
         # Фільтри in_stock/low_stock/changed_since потребують анотацій
         if self.request.method == "GET":
             qs = stock_service.annotate_stock(qs)
@@ -295,6 +319,11 @@ class ProductViewSet(NoDeleteMixin, viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         return ProductWithStockSerializer if self._with_stock() else ProductSerializer
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["public_only"] = _bound_shop(self.request) is not None   # без закупівельних цін і внутрішніх приміток
+        return ctx
 
 
 # ── Замовлення ────────────────────────────────────────────────────────────────
@@ -320,9 +349,26 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        shop = _bound_shop(self.request)
+        if shop is not None:     # ключ сайту бачить і змінює лише замовлення свого магазину
+            qs = qs.filter(source=shop.slug)
         if self.action in ("retrieve", "cancel"):
             return qs.prefetch_related("lines__product", "shipments__carrier")
         return qs
+
+    def update(self, request, *args, **kwargs):
+        if _bound_shop(request) is None:
+            return super().update(request, *args, **kwargs)
+        # ключ сайту: лише поля оплати; решту відкидаємо (не помилка — старі сайти можуть слати зайве)
+        data = request.data if hasattr(request.data, "items") else {}
+        allowed = {k: v for k, v in data.items() if k in SHOP_ORDER_FIELDS}
+        ignored = sorted(k for k in data.keys() if k not in SHOP_ORDER_FIELDS)
+        order = self.get_object()
+        s = SalesOrderDetailSerializer(order, data=allowed, partial=True, context=self.get_serializer_context())
+        s.is_valid(raise_exception=True)
+        self.perform_update(s)
+        extra = {"ignored_fields": ignored} if ignored else {}
+        return Response(self._detail(order, **extra))
 
     def _detail(self, order, **extra):
         order = SalesOrder.objects.prefetch_related(
@@ -410,9 +456,16 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                 if not (listing and product.is_active):
                     errors.append({"line": i, "sku": raw, "error": "Товар недоступний в інтернет-магазині"})
                     continue
-                from shop.services import regular_price_breaks
-                if not regular_price_breaks(listing):
+                from shop.services import regular_price_breaks, unit_price_for
+                breaks = regular_price_breaks(listing)
+                if not breaks:
                     errors.append({"line": i, "sku": raw, "error": "Ціна не задана — товар лише за запитом"})
+                    continue
+                if unit_price_for(listing, ln["qty"]) is None:     # менше за мінімальну кількість першої ціни
+                    first = min(b["min_qty"] for b in breaks) if isinstance(breaks[0], dict) else None
+                    errors.append({"line": i, "sku": raw, "code": "below_min_qty",
+                                   "error": f"Мінімальна кількість для ціни — {first:g}" if first is not None
+                                   else "Для цієї кількості ціни немає"})
                     continue
                 listings[product.pk] = listing
             resolved.append((product, raw, ln))
@@ -565,7 +618,18 @@ class WebhookViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         key = self.request.auth if isinstance(self.request.auth, APIKey) else None
-        serializer.save(api_key=key)
+        shop = _bound_shop(self.request)
+        if shop is not None:     # ключ сайту — лише події свого магазину
+            serializer.save(api_key=key, order_sources=shop.slug)
+        else:
+            serializer.save(api_key=key)
+
+    def perform_update(self, serializer):
+        shop = _bound_shop(self.request)
+        if shop is not None:
+            serializer.save(order_sources=shop.slug)
+        else:
+            serializer.save()
 
     @action(detail=True, methods=["post"])
     def test(self, request, pk=None):

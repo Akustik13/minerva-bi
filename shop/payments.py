@@ -169,6 +169,9 @@ def check_return_url(shop: Shop, url) -> str:
             or len(url) > 1000:
         raise PaymentError(400, "invalid_return_url", "Некоректна адреса повернення.")
     allowed = urlsplit(shop.url).hostname if shop.url else None
+    if not allowed and not local:     # без «Адреса сайту» повернення з Stripe могло б вести куди завгодно
+        raise PaymentError(400, "return_url_not_allowed",
+                           "У магазині не вказано «Адреса сайту» — адресу повернення з оплати неможливо перевірити.")
     if allowed and parts.hostname != allowed and not local:
         raise PaymentError(400, "return_url_not_allowed",
                            f"Адреса повернення ({parts.hostname}) не збігається з «Адреса сайту» магазину ({allowed}).")
@@ -202,7 +205,14 @@ def start_checkout(shop: Shop, order, success_url, cancel_url, lang: str = "de")
         raise PaymentError(409, "amount_too_small", "Сума замовлення замала для онлайн-оплати.")
     lang = lang if lang in ("de", "en") else "de"
     with transaction.atomic():
-        SalesOrder.objects.select_for_update().filter(pk=order.pk).first()  # одночасні кліки — по черзі
+        locked = SalesOrder.objects.select_for_update().filter(pk=order.pk).first()  # одночасні кліки — по черзі
+        if locked is None or locked.status == "cancelled":   # стан — з заблокованого рядка, не з запиту
+            raise PaymentError(409, "not_payable", "Це замовлення не оплачується онлайн.")
+        if locked.payment_status == "paid" or order.shop_payments.filter(status=ShopPayment.PAID).exists():
+            raise PaymentError(409, "already_paid", "Замовлення вже оплачено.")
+        if order.shop_payments.filter(status=ShopPayment.PROCESSING).exists():   # SEPA тощо ще йде — не вдруге
+            raise PaymentError(409, "payment_processing",
+                               "Оплата цього замовлення вже обробляється (напр. SEPA) — дочекайтесь результату.")
         now = timezone.now()
         reuse = (order.shop_payments.filter(status=ShopPayment.OPEN, amount=gross, currency=currency,
                                             expires_at__gt=now + REUSE_MARGIN).order_by("-created_at").first())
@@ -482,7 +492,10 @@ def handle_webhook(shop: Shop, payload: bytes, signature: str) -> str:
         elif kind == "checkout.session.async_payment_failed":
             payment.status, payment.last_event = ShopPayment.FAILED, kind
             payment.save(update_fields=["status", "last_event", "updated_at"])
-            _set_order_payment(payment.order, "failed")
+            others = payment.order.shop_payments.exclude(pk=payment.pk).filter(
+                status__in=(ShopPayment.PAID, ShopPayment.PROCESSING))
+            if not others.exists():          # інша оплата цього замовлення пройшла / ще йде — стан не псуємо
+                _set_order_payment(payment.order, "failed")
         return kind
 
     if kind == "charge.refunded":

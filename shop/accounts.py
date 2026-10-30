@@ -149,9 +149,12 @@ def check_link(shop: Shop, link, lang: str = "") -> str:
     if not parts.hostname or parts.scheme not in ("https", "http") or (parts.scheme == "http" and not local) \
             or parts.fragment or len(link) > 300:
         raise AccountError(400, "invalid_link", "Некоректна адреса сторінки кабінету.")
-    if shop.url:
-        allowed = urlsplit(shop.url).hostname
-        if allowed and parts.hostname != allowed and not local:
+    allowed = urlsplit(shop.url).hostname if shop.url else None
+    if not allowed and not local:     # без «Адреса сайту» посилання з листа могло б вести куди завгодно
+        raise AccountError(400, "link_not_allowed",
+                           "У магазині не вказано «Адреса сайту» — посилання в листах кабінету неможливо перевірити.")
+    if allowed:
+        if parts.hostname != allowed and not local:
             # видно в адмінці: що саме надсилає сайт і що вписати в «Адреса сайту»
             note = f"{timezone.localtime():%d.%m.%Y %H:%M} {link}"[:400]
             Shop.objects.filter(pk=shop.pk).update(account_link_error=note)
@@ -681,7 +684,8 @@ def record_order(order, shop: Shop, *, session_token=None, vat_rate=None, billin
         "requested": requested, "lang": _lang(lang) if lang else "",
     })
     if customer is not None:
-        _fill_profile_from_order(customer, order, billing)
+        if session_token:   # профіль — лише із замовлення, оформленого з входом (не з чужого email у гостьовому)
+            _fill_profile_from_order(customer, order, billing)
         link_crm(customer)
         if session_token and customer.cart:  # каса надсилає весь кошик — після замовлення він порожній
             customer.cart, customer.cart_updated_at = {}, timezone.now()

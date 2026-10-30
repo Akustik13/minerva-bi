@@ -285,3 +285,9 @@ KNOWLEDGE_SOURCE_ROOTS = [p.strip() for p in os.getenv("MINERVA_KNOWLEDGE_ROOTS"
 # Хуки ModuleAccessMiddleware {розділ: функція}: розділ відкривається (і видно в меню), якщо хук повернув True
 # (права на базу знань — rag_assistant/access.py)
 MODULE_ACCESS_HOOKS = {"rag_assistant": "rag_assistant.access.module_access"}
+
+# Звідки приймати X-Real-IP / X-Forwarded-For (core.utils.client_ip): наш зворотний проксі — DSM на тому самому NAS
+# і мережі Docker. Запит напряму на порт Minerva з інших адрес — лише REMOTE_ADDR (заголовки підробляються).
+TRUSTED_PROXIES = [n.strip() for n in os.getenv(
+    "MINERVA_TRUSTED_PROXIES",
+    "127.0.0.0/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7").replace(";", ",").split(",") if n.strip()]

@@ -261,6 +261,15 @@ class ProductSerializer(serializers.ModelSerializer):
                   "image_url", "datasheet_url", "tech_attributes", "compliance", "base_prices",
                   "updated_at"]
 
+    INTERNAL_FIELDS = ("purchase_price", "reorder_point", "notes")   # не для ключа сайту магазину
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        if self.context.get("public_only"):
+            for name in self.INTERNAL_FIELDS:
+                data.pop(name, None)
+        return data
+
     def get_tech_attributes(self, obj):
         return split_attributes(obj.tech_attributes)[0]
 
@@ -453,18 +462,40 @@ class WebhookSerializer(serializers.ModelSerializer):
     def validate_url(self, v):
         if not v.lower().startswith(("https://", "http://")):
             raise serializers.ValidationError("Лише http(s) URL.")
+        from .webhooks import unsafe_target
+        problem = unsafe_target(v, allow_private=False)     # ключ API — лише публічні адреси (без SSRF у мережу NAS)
+        if problem:
+            raise serializers.ValidationError(problem)
         return v
 
     def validate_events(self, v):
+        from .webhooks import event_scope
         request = self.context.get("request")
         key = getattr(request, "auth", None)
-        if "purchase_order.updated" in v and hasattr(key, "has_scope") and not key.has_scope("purchases:read"):
-            raise serializers.ValidationError("Подія purchase_order.updated — лише для ключа з правом purchases:read.")
+        if not hasattr(key, "has_scope"):
+            return v
+        shop_key = bool(getattr(key, "shop_id", None) or getattr(key, "default_source", ""))
+        for event in v or []:            # «усі події» (порожньо) — лише ті, на які ключ має право (webhooks.emit)
+            scope = event_scope(event, shop_key)
+            if scope and not key.has_scope(scope):
+                raise serializers.ValidationError(f"Подія {event} — лише для ключа з правом {scope}.")
         return v
+
+    def to_representation(self, obj):
+        data = super().to_representation(obj)
+        request = self.context.get("request")
+        key = getattr(request, "auth", None)
+        # секрет підпису — лише ключу, що створив вебхук (сесія адмінки його не бачить — є в картці вебхука)
+        if not (hasattr(key, "has_scope") and obj.api_key_id == key.pk):
+            from core.secrets import mask
+            data["secret"] = mask(obj.secret)
+        return data
 
 
 class WebhookDeliverySerializer(serializers.ModelSerializer):
+    """Тіло відповіді отримувача ключу не віддається (інакше вебхук читав би чужі адреси) — лише код і стан;
+    текст помилки видно в адмінці."""
     class Meta:
         model  = WebhookDelivery
-        fields = ["id", "event", "status", "attempts", "response_code", "response_body",
+        fields = ["id", "event", "status", "attempts", "response_code",
                   "next_attempt_at", "created_at", "delivered_at", "payload"]

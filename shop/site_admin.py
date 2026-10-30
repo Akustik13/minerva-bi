@@ -118,6 +118,7 @@ def pair(code: str, site_url: str, minerva_url: str) -> dict:
         url=f"{origin}/api/shop/webhook.php")
     hook.name, hook.is_active, hook.secret = f"Сайт {host}", True, _webhook_secret()
     hook.events = hook.events or ["stock.changed"]
+    hook.api_key, hook.order_sources = key, shop.slug     # події лише цього магазину (api/webhooks._payload_for)
     hook.save()
     p.used_at, p.site_url, p.api_key = timezone.now(), origin, key
     p.save(update_fields=["used_at", "site_url", "api_key"])

@@ -1,6 +1,6 @@
 """Журнал запитів і обмеження ключів API (/api/v1/). Логіка лише тут:
 
-  client_ip     адреса клієнта за проксі DSM: X-Real-IP → останній X-Forwarded-For → REMOTE_ADDR
+  client_ip     адреса клієнта: від проксі DSM (TRUSTED_PROXIES) — X-Real-IP → останній X-Forwarded-For, інакше REMOTE_ADDR
   ip_allowed    «Дозволені IP-адреси» ключа (адреси й мережі CIDR)
   check_quota   «Запитів за годину / добу» (лічильники в спільному кеші, вікна — календарна година / доба)
   shape         відповідь для ключа: лише дозволені поля, «різних записів за добу» (вже бачене — завжди)
@@ -34,31 +34,11 @@ def _cache():
 
 # ── Адреса ────────────────────────────────────────────────────────────────────
 
-def _valid_ip(value: str) -> str | None:
-    value = (value or "").strip()
-    if value.startswith("[") and "]" in value:            # [IPv6]:порт
-        value = value[1:value.index("]")]
-    elif value.count(":") == 1:                           # IPv4:порт
-        value = value.split(":")[0]
-    try:
-        return str(ipaddress.ip_address(value))
-    except ValueError:
-        return None
-
-
 def client_ip(request) -> str | None:
-    """Хто звернувся. За зворотним проксі DSM справжня адреса — у X-Real-IP, інакше останній елемент
-    X-Forwarded-For (той, кого бачив проксі; перші клієнт може підробити), інакше REMOTE_ADDR."""
-    meta = request.META
-    real = _valid_ip(meta.get("HTTP_X_REAL_IP", ""))
-    if real:
-        return real
-    chain = [p for p in (meta.get("HTTP_X_FORWARDED_FOR", "") or "").split(",") if p.strip()]
-    if chain:
-        last = _valid_ip(chain[-1])
-        if last:
-            return last
-    return _valid_ip(meta.get("REMOTE_ADDR", ""))
+    """Хто звернувся — те саме правило, що для журналу аудиту (`core.utils.client_ip`): заголовки X-Real-IP /
+    X-Forwarded-For — лише від нашого проксі (`settings.TRUSTED_PROXIES`), інакше REMOTE_ADDR."""
+    from core.utils import client_ip as _client_ip
+    return _client_ip(request)
 
 
 def parse_networks(text: str) -> list:
@@ -108,17 +88,25 @@ def check_quota(key, now: float | None = None) -> tuple[bool, int, str]:
     використання), лише якщо його пропущено; перевіряє ті вікна, де в ключа є ліміт."""
     now = now or time.time()
     cache = _cache()
-    plan = []
+    counted = []
     for field, tag, span, label in WINDOWS:
         limit = getattr(key, field, None)
         bucket, left = _bucket(span, now)
         name = f"apiq:{key.pk}:{tag}:{bucket}"
-        used = cache.get(name) or 0
-        if limit and used >= limit:
+        cache.add(name, 0, span + 60)
+        try:
+            used = cache.incr(name)              # атомарно: паралельні запити не проскочать разом за ліміт
+        except ValueError:                       # ключ щойно зник із кешу
+            cache.set(name, 1, span + 60)
+            used = 1
+        counted.append(name)
+        if limit and used > limit:
+            for done in counted:                 # відхилений запит не рахується
+                try:
+                    cache.decr(done)
+                except ValueError:
+                    pass
             return False, left, f"Ліміт ключа: {limit} запитів {label} — вичерпано."
-        plan.append((name, used, span))
-    for name, used, span in plan:
-        cache.set(name, used + 1, span + 60)
     return True, 0, ""
 
 
@@ -151,6 +139,8 @@ def _items(data):
     """(записи, як повернути змінений список, чи це один запис) — або (None, …) для інших відповідей."""
     if isinstance(data, dict) and isinstance(data.get("results"), list):
         return data["results"], "page", False
+    if isinstance(data, dict) and isinstance(data.get("items"), list)             and all(isinstance(i, dict) for i in data["items"]):
+        return data["items"], "items", False              # POST /stock/check/ та інші {"items": […]}
     if isinstance(data, list) and all(isinstance(i, dict) for i in data):
         return data, "list", False
     if isinstance(data, dict) and _ident(data) is not None:
@@ -215,7 +205,7 @@ def shape(key, data, request=None, response=None):
     if kind == "list":
         return items
     out = dict(data)
-    out["results"] = items
+    out["items" if kind == "items" else "results"] = items
     if limit:
         out["quota"] = {"items_per_day": limit, "used": len(known), "hidden": hidden}
     return out

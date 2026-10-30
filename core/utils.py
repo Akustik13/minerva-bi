@@ -18,28 +18,55 @@ def clear_current_user():
     _current_user_local.user = None
 
 
-def client_ip(request):
-    """IP людини для журналу аудиту. За зворотним проксі DSM — X-Real-IP, інакше ОСТАННІЙ елемент X-Forwarded-For
-    (той, кого бачив проксі; перші клієнт може підробити), інакше REMOTE_ADDR. Те саме правило — api/key_limits.py."""
+def _valid_ip(value):
+    """«1.2.3.4», «1.2.3.4:5678», «[::1]:80» → адреса без порту; не адреса — None."""
     import ipaddress
+    value = (value or '').strip()
+    if value.startswith('[') and ']' in value:            # [IPv6]:порт
+        value = value[1:value.index(']')]
+    elif value.count(':') == 1:                           # IPv4:порт
+        value = value.split(':')[0]
+    try:
+        return str(ipaddress.ip_address(value)) if value else None
+    except ValueError:
+        return None
 
-    def valid(value):
-        value = (value or '').strip()
+
+def _from_proxy(addr) -> bool:
+    """REMOTE_ADDR — наш зворотний проксі (settings.TRUSTED_PROXIES: за замовчуванням локальні й приватні мережі —
+    DSM-проксі і Docker)? Лише тоді заголовки X-Real-IP / X-Forwarded-For чогось варті."""
+    import ipaddress
+    from django.conf import settings
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    for net in getattr(settings, 'TRUSTED_PROXIES', ()):
         try:
-            return str(ipaddress.ip_address(value)) if value else None
+            if ip in ipaddress.ip_network(net, strict=False):
+                return True
         except ValueError:
-            return None
+            continue
+    return False
 
+
+def client_ip(request):
+    """IP людини (журнал аудиту, обмеження ключів API). Від нашого проксі (`TRUSTED_PROXIES`) — X-Real-IP, інакше
+    ОСТАННІЙ елемент X-Forwarded-For (той, кого бачив проксі; перші клієнт може підробити); від будь-кого іншого —
+    лише REMOTE_ADDR: заголовки, надіслані напряму на порт Minerva, підробляються."""
     if request is None:
         return None
     meta = request.META
-    real = valid(meta.get('HTTP_X_REAL_IP'))
+    remote = _valid_ip(meta.get('REMOTE_ADDR'))
+    if remote is None or not _from_proxy(remote):
+        return remote
+    real = _valid_ip(meta.get('HTTP_X_REAL_IP'))
     if real:
         return real
     chain = [p for p in (meta.get('HTTP_X_FORWARDED_FOR') or '').split(',') if p.strip()]
-    if chain and valid(chain[-1]):
-        return valid(chain[-1])
-    return valid(meta.get('REMOTE_ADDR'))
+    if chain and _valid_ip(chain[-1]):
+        return _valid_ip(chain[-1])
+    return remote
 
 
 def is_minerva_admin(user) -> bool:

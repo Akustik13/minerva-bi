@@ -11,6 +11,7 @@ from django.shortcuts import render
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve as _static_serve
+from tabele.media import media as _media
 from django.views.decorators.clickjacking import xframe_options_exempt as _xfo_exempt
 from tabele import views as root_views
 import tabele.admin  # noqa: F401 — застосовує кастомний порядок сайдбару
@@ -124,9 +125,8 @@ urlpatterns = [
     path("api/v1/", include("api.urls")),
     path("api-auth/", include("rest_framework.urls")),
 ] + [
-    # Serve media files in both DEBUG and production (no nginx in stack)
-    # xframe_options_exempt: allows PDFs to be embedded in iframes (same-origin preview)
-    path('media/<path:path>', _xfo_exempt(_static_serve), {'document_root': settings.MEDIA_ROOT}),
+    # Serve media files in both DEBUG and production (no nginx in stack) — з перевіркою доступу (tabele/media.py)
+    path('media/<path:path>', _media),
 ]
 
 handler403 = 'core.views.custom_403_view'
