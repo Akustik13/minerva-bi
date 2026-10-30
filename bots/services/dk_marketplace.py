@@ -1545,8 +1545,8 @@ def refresh_offer_prices(products=None) -> dict:
             not_found.append(listing.product.sku)
             continue
         fields = []
-        from bots.services.dk_publish import note_offer
-        note_offer(listing, offer)
+        from bots.services.dk_publish import sync_offer
+        sync_offer(listing, offer)
         tiers = _parse_dk_price_tiers(offer.get('prices') or [])
         if tiers and tiers != (listing.dk_prices or []):
             listing.dk_prices = tiers

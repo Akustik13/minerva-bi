@@ -2208,7 +2208,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     form          = ProductAdminForm
     actions       = ["action_set_category", "action_set_lifecycle", "action_base_editor", "action_base_from_dk",
                      "action_sale_price_from_base", "action_media_links", "action_shared_media",
-                     "bulk_sync_digikey_attrs", "action_dk_prices"]
+                     "bulk_sync_digikey_attrs", "action_dk_prices", "action_dk_from_stock"]
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
@@ -2227,6 +2227,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     def action_dk_prices(self, request, queryset):
         url = reverse("admin:bots_digikeypricerun_compare")
         return redirect(f"{url}?products=" + ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)))
+
+    @admin.action(description="🔷 Опублікувати на DigiKey (картка зі складу)…")
+    def action_dk_from_stock(self, request, queryset):
+        url = reverse("admin:bots_digikeylisting_from_stock")
+        return redirect(f"{url}?ids=" + ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)[:30]))
 
     # ── Масові дії: категорія, ціни DigiKey ──────────────────────────────────
     @admin.action(description="🏷️ Змінити категорію…")

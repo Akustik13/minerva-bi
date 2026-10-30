@@ -39,6 +39,7 @@ OFFER_REASONS = {
     "NoActiveShippingMethods": "немає активних способів доставки",
     "ProductInactivated": "товар деактивовано в DigiKey",
     "ProductNotWebDisplayed": "товар ще не показується на сайті DigiKey",
+    "NotFound": "офера немає на DigiKey (видалено?) — «🔄 Етапи з DigiKey» ще раз або «📦 Створити Offer»",
 }
 
 # Ліміти зі специфікації (UpsertProductStaged, NewOffer / UpdateOffer)
@@ -121,6 +122,61 @@ def note_offer(listing, offer: dict, save=True) -> bool:
     return changed
 
 
+BEFORE_OFFER = ("card", "checked", "sent", "approved")
+
+
+def sync_offer(listing, offer: dict, save=True) -> bool:
+    """Етапи вже виставленого лістингу за офером DigiKey (GET /offers): «офер» — справжня дата створення
+    (createDateUtc), кроки до нього не пізніше за неї (картку, скопійовану з DigiKey, могли створити вже після
+    офера; міграція bots 0038 ставила дату останньої синхронізації), «на DigiKey» — якщо офер активний."""
+    if not offer:
+        return False
+    events = dict(listing.pub_events or {})
+    before = dict(events)
+    created = _parse(offer.get("createDateUtc"))
+    if created:
+        events["offer"] = created.isoformat()
+        for key in BEFORE_OFFER:
+            at = _parse(events.get(key))
+            if at is None and key != "checked" or at is not None and at > created:
+                events[key] = created.isoformat()
+    reason = offer.get("offerStatusReason") or ""
+    events["offer_status"] = reason
+    if offer.get("isActive") and reason == "Active" and not events.get("live"):
+        events["live"] = (created or _now()).isoformat()
+    events["dk_dates"] = True
+    if events == before:
+        return False
+    listing.pub_events = events
+    if save and listing.pk:
+        type(listing).objects.filter(pk=listing.pk).update(pub_events=events)
+    return True
+
+
+def sync_stages(listings=None, offers=None) -> dict:
+    """«🔄 Етапи з DigiKey»: один GET /offers на всіх, кожен лістинг — sync_offer; лістинг з ID офера, якого
+    на DigiKey вже немає, — причина «NotFound». {total, updated, not_found: [sku], without_offer}."""
+    from bots.models import DigiKeyConfig, DigiKeyListing
+    if offers is None:
+        from bots.services.dk_marketplace import fetch_offers
+        offers = fetch_offers(DigiKeyConfig.get(), max_count=5000)
+    by_id = {o.get("id"): o for o in offers if o.get("id")}
+    by_sku = {(o.get("supplierSku") or "").strip(): o for o in offers if o.get("supplierSku")}
+    qs = listings if listings is not None else DigiKeyListing.objects.select_related("product")
+    out = {"total": 0, "updated": 0, "not_found": [], "without_offer": 0}
+    for listing in qs:
+        out["total"] += 1
+        offer = by_id.get(listing.dk_offer_id) or by_sku.get(listing.get_supplier_sku())
+        if offer:
+            out["updated"] += sync_offer(listing, offer)
+        elif listing.dk_offer_id:
+            out["not_found"].append(listing.get_supplier_sku())
+            out["updated"] += mark(listing, None, offer_status="NotFound")
+        else:
+            out["without_offer"] += 1
+    return out
+
+
 def _parse(value):
     from django.utils.dateparse import parse_datetime
     if not value:
@@ -185,6 +241,7 @@ def roadmap(listing, config=None) -> dict:
             "stage": steps[last_done]["key"],
             "source": SOURCES.get(listing.card_source, ""), "problems": todo,
             "offer_status": OFFER_REASONS.get(reason, reason) if reason else "",
+            "dk_dates": bool(events.get("dk_dates")),
             "done": sum(1 for s in steps if s["state"] == "done"), "count": len(steps)}
 
 

@@ -582,7 +582,11 @@ def product_panel(product) -> str:
     """Блок «💲 DigiKey» картки товару: зараз на DigiKey → стане з цін Minerva, «оновити зараз»."""
     listing = DigiKeyListing.objects.filter(product=product).select_related("product").first() if product.pk else None
     if listing is None:
-        return format_html('<span style="color:var(--text-muted)">Товару немає на DigiKey (лістинг не створено).</span>')
+        if not product.pk:
+            return format_html('<span style="color:var(--text-muted)">Товару немає на DigiKey (лістинг не створено).</span>')
+        from bots.admin_from_stock import product_link
+        return format_html('<span style="color:var(--text-muted)">Товару немає на DigiKey (лістинг не створено).</span>'
+                           ' <a class="button" href="{}">🔷 Створити картку DigiKey зі складу</a>', product_link(product))
     s = DigiKeyPriceSettings.get()
     cur = svc.currency(s)
     row = svc.row_for(listing, svc.Rules.from_settings(s), cur)

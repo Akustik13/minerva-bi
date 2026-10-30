@@ -35,6 +35,7 @@
     {% if rm.source %}<span class="pr-muted">картка: {{ rm.source }}</span>{% endif %}
     {% if rm.total %}<span class="pr-muted">від картки до DigiKey: <b>{{ rm.total }}</b></span>{% endif %}
     {% if rm.offer_status %}<span class="pr-muted">офер на DigiKey: {{ rm.offer_status }}</span>{% endif %}
+    {% if rm.dk_dates %}<span class="pr-muted" title="Дата офера — createDateUtc з DigiKey; кроки до нього — не пізніше">дати звірено з DigiKey</span>{% endif %}
   </div>
   <div class="pr-track">
     <div class="pr-fill" style="width: calc((100% - 36px) * {{ rm.fill }})"></div>

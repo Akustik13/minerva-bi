@@ -16,6 +16,10 @@
   {% if not forloop.last %}<span style="opacity:.5">→</span>{% endif %}
   {% endfor %}
   {% if request.GET.pub_stage %}<a href="?" style="margin-left:6px">✕ усі</a>{% endif %}
+  <form method="post" action="{% url 'admin:bots_digikeylisting_pub_sync' %}" style="margin:0 0 0 auto"
+        onsubmit="return confirm('Прочитати офери з DigiKey й оновити етапи всіх лістингів (дата офера, чи показується)? На DigiKey нічого не змінюється.')">
+    {% csrf_token %}<button type="submit" class="button" style="font-size:12px;padding:4px 10px">🔄 Етапи з DigiKey</button>
+  </form>
 </div>
 {% endif %}
 
@@ -26,6 +30,12 @@
      style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;background:#c62828;
             color:#fff;border-radius:5px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">
     ➕ Додати лістинг
+  </a>
+  <a href="{% url 'admin:bots_digikeylisting_from_stock' %}"
+     style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;background:rgba(59,130,246,.2);
+            color:#7fb3ff;border:1px solid rgba(59,130,246,.45);border-radius:5px;font-size:13px;
+            font-weight:600;text-decoration:none;white-space:nowrap">
+    🔷 Зі складу на DigiKey
   </a>
   <a href="{{ check_new_url }}"
      style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;background:#00695c;

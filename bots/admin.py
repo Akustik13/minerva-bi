@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.urls import reverse, path
 from django.shortcuts import redirect, render
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing, BotTask, DigiKeyPriceLog, AIAnalysisLog
@@ -2360,9 +2361,37 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             ], ensure_ascii=False)
         return super().changeform_view(request, object_id, form_url, extra_context)
 
+    def from_stock_view(self, request):
+        from bots.admin_from_stock import view
+        return view(request, self)
+
+    def pub_sync_view(self, request):
+        """«🔄 Етапи з DigiKey»: GET /offers → справжні дати офера й стан показу для всіх лістингів."""
+        from bots.services.dk_publish import sync_stages
+        if request.method != "POST" or not self.has_change_permission(request):
+            raise PermissionDenied
+        try:
+            res = sync_stages()
+        except Exception as exc:  # noqa: BLE001 — мережа / токен
+            messages.error(request, f"Не вдалося прочитати офери з DigiKey: {exc}")
+        else:
+            text = (f"Етапи звірено з DigiKey: лістингів {res['total']}, оновлено {res['updated']}, "
+                    f"без офера {res['without_offer']}.")
+            if res["not_found"]:
+                text += f" Офер не знайдено на DigiKey: {', '.join(res['not_found'][:10])}" + (
+                    f" … ще {len(res['not_found']) - 10}" if len(res["not_found"]) > 10 else "")
+            messages.success(request, text)
+        return redirect(reverse("admin:bots_digikeylisting_changelist"))
+
     def get_urls(self):
         urls = super().get_urls()
         custom = [
+            path('from-stock/',
+                 self.admin_site.admin_view(self.from_stock_view),
+                 name='bots_digikeylisting_from_stock'),
+            path('pub-sync/',
+                 self.admin_site.admin_view(self.pub_sync_view),
+                 name='bots_digikeylisting_pub_sync'),
             path('<int:pk>/publish/',
                  self.admin_site.admin_view(self.publish_view),
                  name='bots_digikeylisting_publish'),

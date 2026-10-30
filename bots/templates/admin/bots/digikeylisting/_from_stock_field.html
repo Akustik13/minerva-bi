@@ -1,0 +1,16 @@
+{% comment %}Поле, якого бракує DigiKey (from_stock.html): список значень DigiKey — вибір, інакше текст з підказками
+значень наших схожих лістингів.{% endcomment %}
+<div class="fs-field{% if req %} fs-req{% endif %}">
+  <label for="p{{ pk }}-f-{{ m.code }}">{{ m.name }}</label>
+  {% if m.values %}
+    <select id="p{{ pk }}-f-{{ m.code }}" name="p{{ pk }}-f-{{ m.code }}">
+      <option value="">— вибрати —</option>
+      {% for v in m.values %}<option value="{{ v }}">{{ v }}</option>{% endfor %}
+    </select>
+  {% else %}
+    <input type="text" id="p{{ pk }}-f-{{ m.code }}" name="p{{ pk }}-f-{{ m.code }}"
+           {% if m.examples %}list="dl-{{ pk }}-{{ m.code }}" placeholder="напр. {{ m.examples.0 }}"{% endif %}>
+    {% if m.examples %}<datalist id="dl-{{ pk }}-{{ m.code }}">{% for v in m.examples %}<option value="{{ v }}">{% endfor %}</datalist>{% endif %}
+  {% endif %}
+  <small>{% if m.hint %}{{ m.hint }}{% elif req %}обов'язкове поле DigiKey{% else %}код {{ m.code }}{% endif %}</small>
+</div>

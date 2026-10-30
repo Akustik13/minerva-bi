@@ -1,0 +1,213 @@
+{% extends "admin/base_site.html" %}
+{% comment %}🔷 На DigiKey зі складу (bots/admin_from_stock.py): вибір товарів без лістингу, чернетка картки
+з даних складу, поля, яких бракує DigiKey, створення лістингів (і за галочкою — одразу на DigiKey).{% endcomment %}
+
+{% block title %}На DigiKey зі складу — Minerva{% endblock %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+  .fs-wrap { max-width: 1100px; }
+  .fs-box { margin: 0 0 14px; padding: 14px 18px; border: 1px solid var(--border-strong, #243347);
+            border-radius: 8px; background: var(--bg-card, #1a2535); }
+  .fs-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .fs-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 10px; }
+  .fs-head h3 { margin: 0; font-size: 15px; }
+  .fs-badge { padding: 2px 9px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  .fs-ok { background: rgba(46, 157, 91, .18); color: #4cc38a; }
+  .fs-todo { background: rgba(245, 165, 36, .18); color: #f5a524; }
+  .fs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; }
+  .fs-grid label, .fs-field label { display: block; font-size: 12px; font-weight: 600; margin: 0 0 3px;
+                                    float: none; width: auto; padding: 0; }
+  .fs-grid input[type=text], .fs-grid textarea, .fs-grid select,
+  .fs-field input[type=text], .fs-field select { width: 100%; box-sizing: border-box; }
+  .fs-grid textarea { min-height: 70px; }
+  .fs-full { grid-column: 1 / -1; }
+  .fs-sec { margin: 14px 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+            color: var(--body-quiet-color, #8aa0b4); }
+  .fs-need { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px 16px; }
+  .fs-field small { display: block; margin-top: 2px; color: var(--body-quiet-color, #8aa0b4); font-size: 11px; }
+  .fs-req label::after { content: " *"; color: #e5484d; }
+  .fs-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .fs-table td, .fs-table th { padding: 4px 8px; border-bottom: 1px solid var(--hairline-color, #2b3c52);
+                               text-align: left; vertical-align: middle; }
+  .fs-table input { width: 100%; box-sizing: border-box; font-size: 12px; }
+  .fs-src { color: var(--body-quiet-color, #8aa0b4); }
+  .fs-notes { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: #f5a524; }
+  .fs-tiers span { display: inline-block; margin: 0 6px 4px 0; padding: 2px 8px; border-radius: 6px;
+                   background: var(--darkened-bg, rgba(255, 255, 255, .05)); font-size: 12px; }
+  .fs-bar { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+            padding: 12px 18px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); box-shadow: 0 -4px 12px rgba(0, 0, 0, .25); }
+  .fs-bar label { float: none; width: auto; padding: 0; display: flex; gap: 6px; align-items: center; }
+  .fs-pick td { padding: 5px 8px; }
+  @media (max-width: 760px) { .fs-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fs-wrap">
+<h1 style="font-size:20px;margin:0 0 6px">🔷 На DigiKey зі складу</h1>
+<p class="fs-muted" style="margin:0 0 14px">
+  Minerva складає картку DigiKey з даних товару: назва, опис, виробник, фото й даташит, ціни за правилами
+  «💲 Ціни DigiKey ← Minerva», параметри з технічних атрибутів. Чого бракує — впишіть нижче: це збережеться
+  й у товар, наступного разу питати не будемо.
+  <a href="{% url 'admin:bots_digikeylisting_changelist' %}">← до лістингів</a>
+</p>
+
+{% if picker %}
+  <form method="get" class="fs-box" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <input type="text" name="q" value="{{ q }}" placeholder="Артикул або назва…" style="min-width:260px">
+    <button class="button" type="submit">🔎 Знайти</button>
+    <span class="fs-muted">Товарів складу без лістингу DigiKey: {{ total }}{% if total > limit %} (показано {{ limit }}){% endif %}</span>
+  </form>
+  <form method="get" class="fs-box">
+    {% if products %}
+    <table class="fs-table fs-pick">
+      <thead><tr><th style="width:28px"><input type="checkbox" onclick="document.querySelectorAll('.fs-pk').forEach(function (c) { c.checked = this.checked; }, this)"></th>
+        <th>Артикул</th><th>Назва</th><th>Категорія</th><th>Ціна</th></tr></thead>
+      <tbody>
+      {% for p in products %}
+        <tr><td><input class="fs-pk" type="checkbox" name="ids" value="{{ p.pk }}"></td>
+          <td><b>{{ p.sku }}</b></td><td>{{ p.name_export|default:p.name }}</td><td>{{ p.category }}</td>
+          <td>{% if p.base_prices %}базові ціни{% elif p.sale_price %}{{ p.sale_price|floatformat:2 }}{% else %}<span style="color:#f5a524">немає</span>{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div style="margin-top:12px"><button class="button default" type="submit">Далі: скласти картки →</button></div>
+    {% else %}
+      <p class="fs-muted">Нічого не знайдено.</p>
+    {% endif %}
+  </form>
+{% else %}
+
+  <div class="fs-box" style="display:flex;gap:10px 16px;flex-wrap:wrap;align-items:center">
+    <div style="flex:1 1 360px">
+      <b>Поля товару DigiKey</b> —
+      {% if fields_state.known %}
+        отримано {{ fields_state.count }}, обов'язкових {{ fields_state.required }}.
+      {% else %}
+        <span style="color:#f5a524">ще не отримано з DigiKey</span> — Minerva питає лише пакування, життєвий цикл
+        і параметри, які мають наші схожі лістинги.
+      {% endif %}
+      <div class="fs-muted">Параметри категорії — як у наших лістингів тієї самої категорії DigiKey (окремого
+        шаблону категорії DigiKey через API не дає).</div>
+    </div>
+    {% if can_add %}
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="ids" value="{{ ids }}"><input type="hidden" name="action" value="refresh_fields">
+      <button class="button" type="submit">🔄 Запитати поля в DigiKey</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% for row in listed %}
+    <div class="fs-box" style="padding:10px 18px">
+      <b>{{ row.product.sku }}</b> — уже є картка DigiKey ({{ row.roadmap.current_step.icon }}
+      {{ row.roadmap.current_step.label }}).
+      <a href="{% url 'admin:bots_digikeylisting_change' row.listing.pk %}">Відкрити →</a>
+    </div>
+  {% endfor %}
+
+  {% if cards %}
+  <form method="post" id="fs-form">{% csrf_token %}
+    <input type="hidden" name="ids" value="{{ ids }}">
+    {% for c in cards %}
+    {% with p=c.product f=c.fields pk=c.product.pk %}
+    <div class="fs-box">
+      <div class="fs-head">
+        <label style="float:none;width:auto;padding:0;display:flex;gap:6px;align-items:center">
+          <input type="checkbox" name="p{{ pk }}-on" value="1" checked> <h3>{{ p.sku }}</h3>
+        </label>
+        <a href="{% url 'admin:inventory_product_change' pk %}" class="fs-muted" target="_blank">{{ p.name|default:"" }}</a>
+        {% if c.ready %}<span class="fs-badge fs-ok">✓ можна надсилати</span>
+        {% else %}<span class="fs-badge fs-todo">потрібно заповнити: {{ c.required|length|add:0 }}{% if not f.dk_category_id %} + категорія{% endif %}{% if not f.dk_prices %} + ціни{% endif %}</span>{% endif %}
+      </div>
+
+      <div class="fs-grid">
+        <div><label for="p{{ pk }}-title">Назва на DigiKey (до {{ title_max }})</label>
+          <input type="text" id="p{{ pk }}-title" name="p{{ pk }}-title" maxlength="{{ title_max }}" value="{{ f.dk_title }}"></div>
+        <div><label for="p{{ pk }}-cat">Категорія DigiKey</label>
+          <select id="p{{ pk }}-cat" name="p{{ pk }}-cat">
+            <option value="">— вибрати —</option>
+            {% for cid, cname, n in categories %}
+              <option value="{{ cid }}"{% if cid == f.dk_category_id %} selected{% endif %}>{{ cname }} · {{ n }} лістинг.</option>
+            {% endfor %}
+          </select>
+          <small class="fs-muted">{{ c.draft.category.reason }}</small></div>
+        <div><label for="p{{ pk }}-mfr">Виробник (до {{ mfr_max }})</label>
+          <input type="text" id="p{{ pk }}-mfr" name="p{{ pk }}-mfr" maxlength="{{ mfr_max }}" value="{{ f.dk_manufacturer }}"></div>
+        <div><label>Ціни для DigiKey (MOQ {{ f.dk_min_order_qty }}, відвантаження {{ f.dk_lead_time_days }} дн)</label>
+          <div class="fs-tiers">{% for t in f.dk_prices %}<span>{{ t.qty }}+ · {{ t.price }}</span>{% empty %}<span style="color:#f5a524">немає</span>{% endfor %}</div></div>
+        <div class="fs-full"><label for="p{{ pk }}-desc">Опис (до {{ desc_max }})</label>
+          <textarea id="p{{ pk }}-desc" name="p{{ pk }}-desc" maxlength="{{ desc_max }}">{{ f.dk_description }}</textarea></div>
+        <div class="fs-full fs-muted">
+          Фото: {% if f.dk_image_url %}<a href="{{ f.dk_image_url }}" target="_blank" rel="noopener">є</a>{% else %}немає{% endif %} ·
+          даташит: {% if f.dk_datasheet_url %}<a href="{{ f.dk_datasheet_url }}" target="_blank" rel="noopener">є</a>{% else %}немає{% endif %} ·
+          Supplier SKU: {{ f.dk_supplier_sku }}
+        </div>
+      </div>
+
+      {% if c.required %}
+        <div class="fs-sec">Потрібно DigiKey — впишіть</div>
+        <div class="fs-need">
+          {% for m in c.required %}{% include "admin/bots/digikeylisting/_from_stock_field.html" with m=m pk=pk req=True %}{% endfor %}
+        </div>
+      {% endif %}
+
+      {% if c.filled %}
+        <div class="fs-sec">Заповнено автоматично</div>
+        <table class="fs-table">
+          <thead><tr><th>Поле</th><th>Значення</th><th>Звідки</th><th style="width:30%">Змінити</th></tr></thead>
+          <tbody>
+          {% for r in c.filled %}
+            <tr><td>{{ r.name }} <span class="fs-muted">{{ r.code }}</span></td><td><b>{{ r.value }}</b></td>
+              <td class="fs-src">{{ r.source }}</td>
+              <td>{% if r.values %}<select name="p{{ pk }}-f-{{ r.code }}"><option value="">— як є —</option>{% for v in r.values %}<option value="{{ v }}"{% if r.given and v == r.value %} selected{% endif %}>{{ v }}</option>{% endfor %}</select>
+                  {% else %}<input type="text" name="p{{ pk }}-f-{{ r.code }}" placeholder="{{ r.value }}"{% if r.given %} value="{{ r.value }}"{% endif %}>{% endif %}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+
+      {% if c.optional %}
+        <details style="margin-top:10px"{% if c.given %} open{% endif %}>
+          <summary class="fs-sec" style="cursor:pointer;display:list-item">Ще параметри, як у наших схожих лістингах ({{ c.optional|length }}) — за бажанням</summary>
+          <div class="fs-need" style="margin-top:8px">
+            {% for m in c.optional %}{% include "admin/bots/digikeylisting/_from_stock_field.html" with m=m pk=pk req=False %}{% endfor %}
+          </div>
+        </details>
+      {% endif %}
+
+      {% if c.draft.notes %}<ul class="fs-notes">{% for n in c.draft.notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+    </div>
+    {% endwith %}
+    {% endfor %}
+
+    <div class="fs-bar">
+      <button class="button" type="submit" name="action" value="preview">🔄 Перерахувати з введеним</button>
+      {% if can_add %}
+        <button class="button default" type="submit" name="action" value="create" id="fs-create">✓ Створити картки</button>
+        <label><input type="checkbox" name="publish" value="1" id="fs-publish"> 🚀 одразу надіслати на DigiKey</label>
+      {% endif %}
+      <span class="fs-muted">Інша категорія — інший набір полів: змініть і натисніть «Перерахувати».</span>
+    </div>
+  </form>
+  <script>
+    (function () {
+      var btn = document.getElementById('fs-create'), pub = document.getElementById('fs-publish');
+      if (!btn) return;
+      btn.addEventListener('click', function (e) {
+        var n = document.querySelectorAll('#fs-form input[name$="-on"]:checked').length;
+        var text = pub && pub.checked
+          ? 'Створити карток: ' + n + ' і одразу надіслати їх на DigiKey?\nDigiKey перевіряє товар 1–3 робочі дні.'
+          : 'Створити карток DigiKey: ' + n + '? (на DigiKey поки нічого не піде)';
+        if (!confirm(text)) e.preventDefault();
+      });
+    })();
+  </script>
+  {% elif not listed %}
+    <p class="fs-muted">Товари не знайдено.</p>
+  {% endif %}
+{% endif %}
+</div>
+{% endblock %}
