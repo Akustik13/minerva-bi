@@ -1,0 +1,131 @@
+{% extends "admin/base_site.html" %}
+{% comment %}«👁 Як бачить Minerva <людина>» (core/access_preview.py): меню, дозволи, модулі, база знань, перевірка
+адреси. Лише читання — нічого не відкривається й не виконується від імені людини.{% endcomment %}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block content %}
+<style>
+  .ap { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; align-items: start; }
+  .ap-box { padding: 14px 16px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); margin-bottom: 14px; }
+  .ap-box h3 { margin: 0 0 10px; font-size: 14px; }
+  .ap-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .ap-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+  .ap-chip { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; margin: 2px 4px 2px 0;
+             background: var(--darkened-bg, rgba(127, 127, 127, .1)); }
+  .ap-yes { background: rgba(46, 157, 91, .18); color: #4cc38a; }
+  .ap-no { background: rgba(229, 72, 77, .14); color: #e5484d; text-decoration: line-through; }
+  .ap-menu details { border-bottom: 1px solid var(--hairline-color, #2b3c52); padding: 4px 0; }
+  .ap-menu summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 4px 0; }
+  .ap-menu ul { list-style: none; margin: 4px 0 6px; padding: 0 0 0 10px; }
+  .ap-menu li { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 2px 0; }
+  .ap-perm { white-space: nowrap; font-size: 12px; letter-spacing: 1px; }
+  .ap-perm .off { opacity: .2; }
+  .ap-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .ap-table td, .ap-table th { padding: 5px 8px; border-bottom: 1px solid var(--hairline-color, #2b3c52);
+                               text-align: left; vertical-align: top; }
+  .ap-table tr.off td { opacity: .55; }
+  .ap-check { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ap-check input[type=text] { flex: 1 1 320px; }
+  .ap-res { margin-top: 10px; padding: 10px 12px; border-radius: 6px; border-left: 4px solid #3b82f6;
+            background: var(--darkened-bg, rgba(127, 127, 127, .08)); }
+  .ap-res.no { border-left-color: #e5484d; } .ap-res.edit { border-left-color: #2e9d5b; }
+  .ap-res.view { border-left-color: #f5a524; }
+  @media (max-width: 900px) { .ap { grid-template-columns: 1fr; } }
+</style>
+
+<div class="ap-box ap-head">
+  <div>
+    <b style="font-size:15px">{{ p.user.get_full_name|default:p.user.username }}</b>
+    <span class="ap-muted">{{ p.user.username }}{% if p.user.email %} · {{ p.user.email }}{% endif %}</span>
+  </div>
+  {% if p.profile %}<span class="ap-chip">Роль: {{ p.profile.get_role_display }}</span>{% endif %}
+  <span class="ap-chip">Модулі: {{ p.source }}</span>
+  {% if p.superuser %}<span class="ap-chip ap-yes">суперкористувач Django — бачить усе</span>
+  {% elif p.admin %}<span class="ap-chip ap-yes">адміністратор Minerva — бачить усе</span>{% endif %}
+  {% if not p.can_login %}<span class="ap-chip ap-no">не може увійти (неактивний або не співробітник)</span>{% endif %}
+  <a href="{% url 'admin:core_userprofile_change' original.pk %}" style="margin-left:auto">← до профілю</a>
+</div>
+<p class="ap-muted" style="margin:-6px 0 12px">Так Minerva виглядає для цієї людини. Лише перегляд доступів: її
+  пошту, розмови й особисті документи ця сторінка не показує й нічого не виконує від її імені. Змінили роль або
+  модулі в профілі — збережіть і відкрийте цю сторінку знову.</p>
+
+<div class="ap">
+  <div>
+    <div class="ap-box ap-menu">
+      <h3>🧭 Меню, яке вона бачить</h3>
+      {% if p.menu %}
+        <div class="ap-muted" style="margin-bottom:6px">{{ p.menu|length }} розділів · {{ p.models_count }} сторінок,
+          змінювати може на {{ p.edit_count }}. Значки: 👁 перегляд · ➕ створення · ✏️ зміна · 🗑 видалення.</div>
+        {% for app in p.menu %}
+        <details{% if forloop.counter <= 3 %} open{% endif %}>
+          <summary>{{ app.name }} <span class="ap-muted">({{ app.models|length }})</span></summary>
+          <ul>
+            {% for m in app.models %}
+            <li><span>{{ m.name }}{% if m.read_only %} <span class="ap-muted">· лише перегляд</span>{% endif %}</span>
+              <span class="ap-perm">{% for a, ok in m.perms.items %}<span class="{% if not ok %}off{% endif %}" title="{{ a }}">{% if a == 'view' %}👁{% elif a == 'add' %}➕{% elif a == 'change' %}✏️{% else %}🗑{% endif %}</span>{% endfor %}</span></li>
+            {% endfor %}
+          </ul>
+        </details>
+        {% endfor %}
+      {% else %}<div class="ap-muted">Меню порожнє.</div>{% endif %}
+    </div>
+
+    <div class="ap-box">
+      <h3>🔗 Сторінки поза меню адмінки</h3>
+      {% for pg in p.pages %}<span class="ap-chip {% if pg.allowed %}ap-yes{% else %}ap-no{% endif %}">{{ pg.label }}</span>{% endfor %}
+    </div>
+  </div>
+
+  <div>
+    <div class="ap-box">
+      <h3>🔍 Чи відкриє вона цю адресу?</h3>
+      <form method="get" class="ap-check">
+        <input type="text" name="url" value="{{ url }}" placeholder="вставте адресу Minerva, напр. /admin/sales/salesorder/">
+        <button class="button" type="submit">Перевірити</button>
+      </form>
+      <div class="ap-muted" style="margin-top:6px">Приклади:
+        {% for s in samples %}<a href="?url={{ s|urlencode }}">{{ s }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</div>
+      {% if check %}
+      <div class="ap-res {{ check.level }}">
+        <b>{% if check.level == 'edit' %}✅{% elif check.level == 'view' %}👁{% else %}⛔{% endif %} {{ check.path }}</b> — {{ check.text }}
+        {% if check.steps %}<ul style="margin:6px 0 0;padding-left:18px">
+          {% for name, ok, why in check.steps %}<li>{% if ok %}✓{% else %}✗{% endif %} {{ name }}: {{ why }}</li>{% endfor %}
+        </ul>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="ap-box">
+      <h3>⭐ Особливі права</h3>
+      {% for s in p.special %}<span class="ap-chip {% if s.value %}ap-yes{% else %}ap-no{% endif %}">{{ s.label }}</span>{% endfor %}
+    </div>
+
+    {% if p.knowledge %}
+    <div class="ap-box">
+      <h3>🧠 База знань і RAG</h3>
+      <table class="ap-table">
+        {% for k in p.knowledge %}<tr class="{% if not k.value %}off{% endif %}">
+          <td>{% if k.value %}✅{% else %}⛔{% endif %} {{ k.label }}</td><td class="ap-muted">{{ k.source }}</td></tr>{% endfor %}
+      </table>
+    </div>
+    {% endif %}
+
+    {% if p.modules %}
+    <div class="ap-box">
+      <h3>🧩 Модулі й що в них можна</h3>
+      <table class="ap-table">
+        <thead><tr><th>Модуль</th><th>Доступ</th><th>Що можна</th></tr></thead>
+        <tbody>
+        {% for m in p.modules %}<tr class="{% if not m.allowed %}off{% endif %}">
+          <td>{{ m.name }} <span class="ap-muted">{{ m.app }}</span></td>
+          <td>{% if m.allowed %}✅{% else %}⛔{% endif %} <span class="ap-muted">{{ m.why }}</span></td>
+          <td>{% if m.allowed %}{{ m.ops|join:", "|default:"—" }}{% endif %}</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -28,11 +28,23 @@ class AuditableMixin:
             return False
         return not self._minerva_model_denied(request)
 
+    # Створити / змінити — лише з операцією ролі в модулі (core/utils.ROLE_OPERATIONS / module_operations), як
+    # у решти адмінки (tabele/admin._mv_has_*): раніше будь-який співробітник міг змінювати замовлення, товари,
+    # клієнтів навіть з роллю «лише перегляд». Помилка перевірки — закрито.
+    def _minerva_operation(self, request, operation):
+        if not self._minerva_staff_ok(request):
+            return False
+        try:
+            from core.utils import user_has_operation
+            return user_has_operation(request.user, self.opts.app_label, operation)
+        except Exception:  # noqa: BLE001
+            return False
+
     def has_add_permission(self, request):
-        return self._minerva_staff_ok(request)
+        return self._minerva_operation(request, 'add')
 
     def has_change_permission(self, request, obj=None):
-        return self._minerva_staff_ok(request)
+        return self._minerva_operation(request, 'change')
 
     def _minerva_model_denied(self, request):
         """Return True if this model is in the user's denied_models list."""
