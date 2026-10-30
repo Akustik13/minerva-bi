@@ -325,3 +325,68 @@ class ConfirmTemplatesTests(TestCase):
             html = (TEMPLATES / f"{name}_confirm.html").read_text(encoding="utf-8")
             self.assertIn(f"getElementById('{name}-confirm-form').addEventListener('submit', function(e){{", html)
             self.assertIn("if (this.dataset.sent) { e.preventDefault(); return; }", html, name)
+
+
+class FedExOrderTrackingTests(BookingBase):
+    carrier_type = "fedex"
+
+    @mock.patch.object(FedExClient, "create_shipment", return_value=FEDEX_RESULT)
+    def test_tracking_and_courier_copied_to_order(self, create):
+        self.client.post(self.urls["fedex"][0], {"service_code": "FEDEX_PRIORITY"})
+        self.order.refresh_from_db()
+        self.assertEqual((self.order.tracking_number, self.order.shipping_courier), ("794600000000", "FedEx"))
+
+
+class FakeJumingo:
+    def __init__(self, methods=("invoice",), order=None):
+        self.methods, self.order, self.booked = list(methods), order, 0
+
+    def cart_total(self, shipment_id):
+        return {"paymentMethods": self.methods}
+
+    def book_order(self, shipment_id, method):
+        self.booked += 1
+        return self.order if self.order is not None else {"orderNumber": f"JO-{self.booked}"}
+
+    def get_order_documents(self, number):
+        return {"labels": {}}
+
+
+class JumingoBookingTests(BookingBase):
+    carrier_type = "jumingo"
+
+    def setUp(self):
+        super().setUp()
+        Shipment.objects.filter(pk=self.shipment.pk).update(selected_tariff_id="T1", carrier_shipment_id="J1")
+        self.book_url = f"/admin/shipping/shipment/{self.shipment.pk}/book/"
+
+    def test_link_shows_confirmation_and_books_nothing(self):
+        fake = FakeJumingo()
+        with mock.patch("shipping.admin.get_service", return_value=fake):
+            r = self.client.get(self.book_url)
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Підтвердити й замовити")
+        self.assertContains(r, "csrfmiddlewaretoken")
+        self.assertEqual((fake.booked, self.reload().status), (0, Shipment.Status.DRAFT))
+
+    def test_post_books_once_second_post_refused(self):
+        fake = FakeJumingo()
+        with mock.patch("shipping.admin.get_service", return_value=fake):
+            self.client.post(self.book_url)
+            r = self.client.post(self.book_url)
+        self.assertEqual(fake.booked, 1)
+        shipment = self.reload()
+        self.assertEqual((shipment.jumingo_order_number, shipment.status), ("JO-1", Shipment.Status.LABEL_READY))
+        self.assertTrue(any("уже замовлене" in m for m in self.messages(r)))
+
+    def test_refusal_and_crash_return_shipment_to_error(self):
+        with mock.patch("shipping.admin.get_service", return_value=FakeJumingo(order={"error": "kein Guthaben"})):
+            self.client.post(self.book_url)
+        self.assertEqual(self.reload().status, Shipment.Status.ERROR)
+        broken = FakeJumingo()
+        broken.book_order = mock.Mock(side_effect=ConnectionError("timeout"))
+        with mock.patch("shipping.admin.get_service", return_value=broken):
+            self.client.post(self.book_url)
+        shipment = self.reload()
+        self.assertEqual(shipment.status, Shipment.Status.ERROR)
+        self.assertIn("timeout", shipment.error_message)

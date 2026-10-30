@@ -20,7 +20,7 @@ PUBLIC = ("products/", "thumbs/", "shop_media/", "config/", "accounting/logos/")
 MODULES = (                          # тека → розділ Minerva (перший збіг)
     ("orders/", "sales"), ("offers/", "offers"), ("accounting/", "accounting"),
     ("invoices/", "shipping"), ("packing_lists/", "shipping"), ("commercial_invoices/", "shipping"),
-    ("shipments/", "shipping"), ("generated_documents/", "documents"), ("document_templates/", "documents"),
+    ("shipments/", "shipping"), ("shipping/", "shipping"), ("generated_documents/", "documents"), ("document_templates/", "documents"),
     ("scraper/", "scraper_hub"), ("rfq_diagrams/", "inventory"),
 )
 ADMIN_ONLY = ("knowledge/", "knowledge_sources/")

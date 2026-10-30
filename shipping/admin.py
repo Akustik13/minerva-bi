@@ -4992,6 +4992,21 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             shipment.label_url = result['label_url'][:500]
             shipment.save(update_fields=['label_url'])
 
+        order = shipment.order                 # трек-номер і перевізник у замовлення — як UPS / DHL
+        if order:
+            order_fields = []
+            if _should_set_order_tn(order, shipment.tracking_number):
+                order.tracking_number = shipment.tracking_number
+                order_fields.append('tracking_number')
+            if not order.shipping_courier:
+                order.shipping_courier = 'FedEx'
+                order_fields.append('shipping_courier')
+            if order.status == 'received':
+                order.status = 'processing'
+                order_fields.append('status')
+            if order_fields:
+                order.save(update_fields=order_fields)
+
         svc_name = FEDEX_SERVICES.get(service_code, service_code)
         messages.success(
             request,
@@ -5910,13 +5925,60 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Бронювання через API (Variant 3) ─────────────────────────────────────
 
     def book_view(self, request, shipment_id):
-        """POST /v1/orders → отримує label → оновлює Shipment."""
+        """GET — сторінка підтвердження (посилання саме нічого не замовляє); POST /v1/orders → label → Shipment.
+        Оформлюється лише раз (атомарне захоплення, як UPS / DHL / FedEx): подвійне натискання чи друга вкладка
+        не створять друге платне замовлення в Jumingo."""
         shipment = get_object_or_404(Shipment, pk=shipment_id)
 
         if not shipment.selected_tariff_id:
             messages.error(request, "❌ Спочатку оберіть тариф.")
             return redirect(reverse("admin:shipping_shipment_rates", args=[shipment.pk]))
+        if shipment.jumingo_order_number:
+            messages.warning(request, f"⚠️ Відправлення #{shipment.pk} уже замовлене в Jumingo "
+                                      f"(#{shipment.jumingo_order_number}) — повторно не замовляємо.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+        if request.method != "POST":
+            return self._jumingo_confirm(request, shipment)
+        claimed = Shipment.objects.filter(
+            pk=shipment.pk, jumingo_order_number="", tracking_number="", status__in=self.BOOKABLE,
+        ).update(status=Shipment.Status.SUBMITTED, error_message="")
+        if not claimed:
+            return self._booking_refused(request, shipment, "Jumingo")
+        shipment.status = Shipment.Status.SUBMITTED
+        try:
+            return self._jumingo_book(request, shipment)
+        except Exception as exc:  # noqa: BLE001 — зв'язок обірвався: можна повторити, але спершу перевірити в Jumingo
+            logger.exception("Jumingo booking failed for shipment %s", shipment.pk)
+            self._jumingo_failed(shipment, f"Збій під час замовлення: {exc}")
+            messages.error(request, f"❌ Збій під час замовлення в Jumingo: {exc}. Перш ніж замовляти знову, "
+                                    f"перевірте в Jumingo, чи замовлення не створено.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
 
+    @staticmethod
+    def _jumingo_failed(shipment, text):
+        Shipment.objects.filter(pk=shipment.pk, status=Shipment.Status.SUBMITTED).update(
+            status=Shipment.Status.ERROR, error_message=str(text)[:2000])
+
+    def _jumingo_confirm(self, request, shipment):
+        from django.http import HttpResponse
+        from django.template import RequestContext, Template
+        page = Template(
+            '{% extends "admin/base_site.html" %}{% block content %}'
+            '<h1>⚡ Замовити відправлення #{{ s.pk }} через Jumingo API</h1>'
+            '<p>Тариф: <b>{{ s.selected_tariff_id }}</b>'
+            '{% if s.carrier_price %} · {{ s.carrier_price }} {{ s.carrier_currency }}{% endif %}. '
+            'Jumingo створить платне замовлення й етикетку — один раз.</p>'
+            '<form method="post">{% csrf_token %}'
+            '<button type="submit" class="button default" '
+            'onclick="this.disabled=true;this.textContent=\'⏳ Замовляється…\';this.form.submit()">'
+            '✅ Підтвердити й замовити</button> '
+            '<a class="button" href="{{ back }}">Скасувати</a></form>{% endblock %}')
+        ctx = RequestContext(request, {**self.admin_site.each_context(request), "s": shipment,
+                                       "title": "Замовлення через Jumingo",
+                                       "back": reverse("admin:shipping_shipment_change", args=[shipment.pk])})
+        return HttpResponse(page.render(ctx))
+
+    def _jumingo_book(self, request, shipment):
         service = get_service(shipment.carrier)
 
         # Отримати доступні методи оплати
@@ -5960,6 +6022,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     f"❌ Немає доступних методів оплати. Оплатіть вручну на Jumingo. "
                     f"({err_detail or _json.dumps(cart, ensure_ascii=False)[:200]})",
                 )
+            self._jumingo_failed(shipment, "Немає доступного методу оплати в Jumingo")
             return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
 
         # Оформити замовлення
@@ -5967,6 +6030,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         if not order_data.get("success", True) or order_data.get("error"):
             messages.error(request, f"❌ Помилка бронювання: {order_data.get('error', order_data)}")
+            self._jumingo_failed(shipment, f"Помилка бронювання: {order_data.get('error', order_data)}")
             return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
 
         order_number = order_data.get("orderNumber", "")
@@ -5988,8 +6052,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 messages.success(request, f"✅ Замовлення #{order_number} оформлено!")
 
         elif return_url:
-            # Потрібна зовнішня оплата (PayPal тощо)
+            # Потрібна зовнішня оплата (PayPal тощо): замовлення ще не оплачене — відправлення знову можна оформити
             messages.info(request, f"ℹ️ Перейдіть за посиланням для оплати: {return_url}")
+            self._jumingo_failed(shipment, f"Потрібна оплата за посиланням Jumingo: {return_url}")
+        else:
+            self._jumingo_failed(shipment, f"Jumingo не повернув номер замовлення: {order_data}")
 
         return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
 
