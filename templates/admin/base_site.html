@@ -16,6 +16,7 @@
 })();
 </script>
 <script src="/static/admin/js/mv_contrast.js?v=2" defer></script>
+{% if user.is_authenticated and user.is_staff %}<script src="/static/admin/js/mv_show.js?v=1" defer></script>{% endif %}
 {% if MV_UI_DICT %}{# інтерфейс іншою мовою (core/ui_text): сторінку видно, щойно переклад готовий (не довше 1,5 с) #}
 <style>html.mv-tr-pending body{visibility:hidden}</style>
 <script>document.documentElement.classList.add('mv-tr-pending');setTimeout(function(){document.documentElement.classList.remove('mv-tr-pending')},1500);</script>
@@ -639,6 +640,29 @@ html[data-mv-motion="reduce"] *, html[data-mv-motion="reduce"] *::before, html[d
     transition-duration: .001ms !important; scroll-behavior: auto !important;
   }
 }
+
+/* ── 📍 Показати / 🧭 по кроках (static/admin/js/mv_show.js — з відповідей гіда у віконці «Minerva») ── */
+.mv-show-ring { position: fixed; z-index: 10050; pointer-events: none; border-radius: 10px;
+  border: 3px solid var(--focus-ring, #ffd166); box-shadow: 0 0 0 4px rgba(0,0,0,.45), 0 0 22px 4px var(--focus-ring, #ffd166);
+  animation: mvShowPulse 1.4s ease-in-out infinite; }
+@keyframes mvShowPulse { 50% { box-shadow: 0 0 0 4px rgba(0,0,0,.45), 0 0 6px 1px var(--focus-ring, #ffd166); } }
+.mv-show-bubble { position: fixed; z-index: 10051; max-width: 340px; padding: 10px 30px 10px 12px; border-radius: 10px;
+  background: var(--tip-bg, #1a2535); color: var(--tip-text, #e6edf3); border: 2px solid var(--focus-ring, #ffd166);
+  box-shadow: 0 8px 26px rgba(0,0,0,.4); font-size: 13px; line-height: 1.45; }
+.mv-show-bubble b { display: block; margin-bottom: 3px; }
+.mv-show-bubble button { position: absolute; top: 4px; right: 6px; border: 0; background: none; color: inherit;
+  font-size: 14px; cursor: pointer; }
+#mv-show-bar { position: fixed; z-index: 10052; left: 50%; bottom: 18px; transform: translateX(-50%);
+  display: flex; gap: 10px; align-items: center; max-width: min(760px, calc(100vw - 32px)); padding: 10px 14px;
+  border-radius: 12px; background: var(--tip-bg, #1a2535); color: var(--tip-text, #e6edf3);
+  border: 2px solid var(--focus-ring, #ffd166); box-shadow: 0 10px 30px rgba(0,0,0,.45); font-size: 13px; }
+#mv-show-bar span { flex: 1; min-width: 0; }
+#mv-show-bar button { border: 1px solid var(--border-strong, #2a3f52); background: none; color: inherit; font: inherit;
+  padding: 4px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+#mv-show-bar button.next { background: var(--accent-2, #2196f3); border-color: transparent; color: #fff; }
+.mv-show-toast { position: fixed; z-index: 10053; top: 70px; left: 50%; transform: translateX(-50%); padding: 8px 14px;
+  border-radius: 8px; background: var(--tip-bg, #1a2535); color: var(--tip-text, #e6edf3);
+  border: 1px solid var(--warn, #e3b341); font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.35); }
 
 /* ── Light + Custom theme: enforce sidebar vars (override Django admin defaults) ── */
 [data-theme="light"] #nav-sidebar,

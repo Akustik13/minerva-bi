@@ -187,11 +187,30 @@ class RagMessageInline(admin.TabularInline):
         return False
 
 
+class GuideGapFilter(admin.SimpleListFilter):
+    """Розмови, де 📚 гід не знайшов відповіді («У гіді цього немає…» або збій) — чого бракує в гіді."""
+    title = "📚 Гід"
+    parameter_name = "guide_gap"
+
+    def lookups(self, request, model_admin):
+        return [("gap", "🕳 Гід не знайшов відповіді")]
+
+    def queryset(self, request, queryset):
+        if self.value() != "gap":
+            return queryset
+        from django.db.models import Exists, OuterRef, Q
+
+        from guide.assistant import NOT_IN_GUIDE
+        gaps = RagMessage.objects.filter(conversation=OuterRef("pk"), mode=RagMessage.GUIDE).filter(
+            Q(content__startswith=NOT_IN_GUIDE) | Q(status=RagMessage.FAILED))
+        return queryset.filter(Exists(gaps))
+
+
 @admin.register(RagConversation)
 class RagConversationAdmin(RightsMixin, admin.ModelAdmin):
     view_rights = change_rights = ("guide", "products", "manage")   # свої розмови (чужі — лише суперадміну)
     list_display = ["title", "user", "messages_count", "updated_at"]
-    list_filter = ["user"]
+    list_filter = [GuideGapFilter, "user"]
     search_fields = ["title", "messages__content"]
     readonly_fields = ["user", "title", "created_at", "updated_at"]
     inlines = [RagMessageInline]

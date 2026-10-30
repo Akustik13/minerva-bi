@@ -49,6 +49,8 @@ class AccessPreviewTests(TestCase):
         self.assertIn("не має доступу", res["text"])
         self.assertEqual(access_preview.check_url(self.root, "/admin/inventory/product/add/")["level"], "edit")
         self.assertEqual(access_preview.check_url(self.ro, "/nope/zzz/")["text"], "Такої адреси в Minerva немає.")
+        # адмінка Django «ловить» будь-яку /admin/… — це не сторінка, навіть для адміністратора
+        self.assertFalse(access_preview.check_url(self.root, "/admin/nema/takoyi/")["ok"])
 
     def test_preview_does_not_leak_into_the_real_user(self):
         access_preview.preview(self.ro)

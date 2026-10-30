@@ -325,7 +325,8 @@ def ask(request, pk):
         if not c.title:
             c.title = question[:120]
         c.save(update_fields=["title", "updated_at"])
-        guide_assistant.start(bot_msg.pk, question, page, history, request.user.pk)
+        guide_assistant.start(bot_msg.pk, question, page, history, request.user.pk,
+                              guide_assistant.clean_ui(body.get("ui")))
         return JsonResponse({"user": _msg(user_msg), "assistant": _msg(bot_msg), "conversation": _conv(c)},
                             status=202)
     if not has(request.user, "products"):

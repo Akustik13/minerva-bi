@@ -97,3 +97,66 @@ class GuideWidgetTests(TestCase):
         self.assertEqual(r.status_code, 202, r.content[:300])
         m = RagMessage.objects.get(pk=r.json()["assistant"]["id"])
         self.assertEqual((m.mode, m.rag_job_id), (RagMessage.PRODUCTS, "job-1"))
+
+
+class ShowAndTourTests(GuideWidgetTests):
+    """«📍 Показати» і «🧭 Провести по кроках»: адреси лише ті, що людина відкриє; знімок сторінки — у запиті."""
+
+    def test_show_links_rewritten_and_checked(self):
+        text = ('Ось де: [📍 Показати «Додати»](show:/admin/inventory/product/ "📥 Імпорт з Excel") і '
+                '[📍 Тут](show:/admin/nema/takoyi/ "Кнопка") та [гід](/guide/) і [мертве](/admin/nema/)')
+        out = assistant.clean_actions(text, self.user, "/admin/")
+        self.assertIn("(show:/admin/inventory/product/#%F0%9F%93%A5%20%D0%86%D0%BC%D0%BF", out)
+        self.assertIn("📍 Тут", out)
+        self.assertNotIn("show:/admin/nema/", out)                    # такої сторінки немає — лише текст
+        self.assertIn("[гід](/guide/)", out)
+        self.assertNotIn("(/admin/nema/)", out)
+
+    def test_show_on_current_page_and_pages_user_cannot_open(self):
+        out = assistant.clean_actions('[📍 Зберегти](show: "Зберегти")', self.user, "/admin/inventory/product/")
+        self.assertIn("show:/admin/inventory/product/#", out)         # без адреси — поточна сторінка
+        clerk = User.objects.create_user("clerk", "c@x.y", "p", is_staff=True)
+        from core.models import UserProfile
+        UserProfile.objects.filter(user=clerk).update(role="readonly", allowed_modules=["dashboard"])
+        clerk = User.objects.get(pk=clerk.pk)
+        out = assistant.clean_actions('[📍 Ключі](show:/admin/api/apikey/ "Додати")', clerk, "/dashboard/")
+        self.assertNotIn("show:", out)                                # туди їй не можна — без кнопки
+
+    def test_tour_block_keeps_only_allowed_steps(self):
+        text = ("Кроки:\n```tour\n/admin/inventory/product/ | 📥 Імпорт з Excel | Відкрийте імпорт\n"
+                "/admin/nema/ | Щось | ні\n | Зберегти | на цій сторінці\n```\nГотово.")
+        out = assistant.clean_actions(text, self.user, "/admin/sales/salesorder/")
+        self.assertIn("```tour\n/admin/inventory/product/ | 📥 Імпорт з Excel | Відкрийте імпорт\n"
+                      "/admin/sales/salesorder/ | Зберегти | на цій сторінці\n```", out)
+        self.assertNotIn("/admin/nema/", out)
+        self.assertEqual(assistant.clean_actions("```tour\n/admin/nema/ | X | y\n```", self.user), "")
+
+    def test_page_snapshot_goes_into_request_and_answer_cleaned(self):
+        reply = fake_response('Тут список товарів. [📍 Імпорт](show:/admin/inventory/product/ "📥 Імпорт з Excel")')
+        ui = ["📥 Імпорт з Excel", "Додати товар", "x" * 300, "Додати товар"] + [f"b{i}" for i in range(200)]
+        with patch("guide.assistant._call", return_value=reply) as call:
+            r = self.ask("❓ Що на цій сторінці й що тут можна зробити?", page="/admin/inventory/product/?q=a",
+                         ui=ui)
+        m = RagMessage.objects.get(pk=r.json()["assistant"]["id"])
+        self.assertEqual(m.status, RagMessage.DONE)
+        self.assertIn("(show:/admin/inventory/product/#", m.content)
+        payload = call.call_args.args[1]
+        self.assertIn("ЕЛЕМЕНТИ ПОТОЧНОЇ СТОРІНКИ", payload)
+        self.assertIn("📥 Імпорт з Excel · Додати товар", payload)
+        self.assertEqual(len(assistant.clean_ui(ui)), assistant.MAX_UI)
+        self.assertTrue(all(len(x) <= 80 for x in assistant.clean_ui(ui)))
+        self.assertIn("show:/адреса/", call.call_args.args[0] if False else assistant.INSTRUCTIONS)
+
+
+class GuideGapTests(GuideWidgetTests):
+    def test_gap_filter_lists_unanswered(self):
+        gap = RagConversation.objects.create(user=self.user, title="Як налаштувати телепорт?")
+        RagMessage.objects.create(conversation=gap, role=RagMessage.ROLE_ASSISTANT, status=RagMessage.DONE,
+                                  mode=RagMessage.GUIDE, content=assistant.NOT_IN_GUIDE + ". Найближче — …")
+        ok = RagConversation.objects.create(user=self.user, title="Як додати товар?")
+        RagMessage.objects.create(conversation=ok, role=RagMessage.ROLE_ASSISTANT, status=RagMessage.DONE,
+                                  mode=RagMessage.GUIDE, content="Відкрийте «Товари» → «Додати».")
+        r = self.client.get("/admin/rag_assistant/ragconversation/?guide_gap=gap")
+        self.assertContains(r, "Як налаштувати телепорт?")
+        self.assertNotContains(r, "Як додати товар?")
+        self.assertIn("«У гіді цього немає.»", assistant.INSTRUCTIONS)

@@ -261,6 +261,11 @@ def preview(user, draft=None) -> dict:
     return data
 
 
+def is_catch_all(match) -> bool:
+    """Збіг лише з «усе інше» адмінки (catch_all_view → 404 / додати «/») — такої сторінки немає."""
+    return getattr(match.func, "__name__", "") == "catch_all_view"
+
+
 def check_url(user, url: str, draft=None) -> dict:
     """Чи відкриє людина адресу Minerva і що зможе там зробити: {ok, level, text, steps: [(крок, ✓/✗, пояснення)]}."""
     from urllib.parse import urlparse
@@ -275,6 +280,8 @@ def check_url(user, url: str, draft=None) -> dict:
     try:
         match = resolve(path)
     except Resolver404:
+        match = None
+    if match is None or is_catch_all(match):     # адмінка Django ловить будь-яку /admin/… — це не сторінка
         return {"ok": False, "level": "no", "path": path, "text": "Такої адреси в Minerva немає.", "steps": steps}
     if path.startswith("/admin/"):
         from core.middleware import ModuleAccessMiddleware

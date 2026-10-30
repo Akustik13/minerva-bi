@@ -25,6 +25,11 @@
 [data-theme="hc-dark"] #rg-panel { --rg-bg: #000000; --rg-head: #0a0a0a; --rg-bubble: #161616; --rg-text: #ffffff;
   --rg-strong: #ffffff; --rg-muted: #e0e0e0; --rg-dim: #cfcfcf; --rg-link: #8cd3ff; --rg-border: #ffffff;
   --rg-border-strong: #ffffff; }
+.rg-show { display: inline-flex; align-items: center; gap: 4px; margin: 2px 4px 2px 0; padding: 2px 9px;
+  border-radius: 12px; border: 1px solid var(--rg-accent); background: transparent; color: var(--rg-link);
+  font: inherit; font-size: 13px; cursor: pointer; }
+.rg-show:hover { background: var(--rg-accent); color: #fff; }
+.rg-tour { display: flex; margin: 8px 0; padding: 6px 12px; font-weight: 600; background: var(--rg-accent); color: #fff; }
 #rg-pill { position: fixed; bottom: 24px; right: 88px; z-index: 10000; display: none; align-items: center; gap: 10px;
   height: 52px; padding: 4px 18px 4px 4px; border-radius: 30px; border: 1px solid rgba(0,0,0,.08); cursor: pointer;
   background: #fff; color: #1d2b3a; font: 600 15px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -209,7 +214,10 @@ a.rg-link { color: var(--rg-link); text-decoration: underline; }
     while ((m = re.exec(text))) {
       if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
       var t = m[0], node, link = t.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
-      if (link) {
+      if (link && link[2].indexOf('show:') === 0) {
+        node = showButton(link[1], link[2].slice(5));
+      }
+      else if (link) {
         var href = safeHref(link[2]);
         node = href ? el('a', 'rg-link') : el('span');
         if (href) { node.href = href; if (href[0] !== '/') { node.target = '_blank'; node.rel = 'noopener noreferrer'; } }
@@ -223,12 +231,37 @@ a.rg-link { color: var(--rg-link); text-decoration: underline; }
     }
     if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
   }
+  // «📍 Показати» / «🧭 Провести по кроках» (static/admin/js/mv_show.js): віконце ховається, щоб не закривати показане
+  function showButton(label, spec) {
+    var hash = spec.indexOf('#'), path = hash >= 0 ? spec.slice(0, hash) : spec, target = '';
+    try { target = decodeURIComponent(hash >= 0 ? spec.slice(hash + 1) : ''); } catch (e) { target = ''; }
+    var b = el('button', 'rg-show'); b.type = 'button'; inline(label, b);
+    b.title = 'Відкрити сторінку й підсвітити «' + target + '»';
+    b.onclick = function () { if (!window.MVShow) return; closePanel(); window.MVShow.go(path || '', target); };
+    return b;
+  }
+  function tourButton(steps) {
+    var b = el('button', 'rg-show rg-tour', '🧭 Провести по кроках (' + steps.length + ')'); b.type = 'button';
+    b.onclick = function () { if (!window.MVShow) return; closePanel(); window.MVShow.tour(steps); };
+    return b;
+  }
   function markdown(src, onCite) {
     var root = el('div'), lines = String(src || '').replace(/\r/g, '').split('\n'), i = 0, list = null, para = [];
     function flush() { if (para.length) { var p = el('p'); inline(para.join(' '), p, onCite); root.appendChild(p); para = []; } list = null; }
     function cells(l) { return l.trim().replace(/^\||\|$/g, '').split('|').map(function (c) { return c.trim(); }); }
     while (i < lines.length) {
       var l = lines[i];
+      if (/^\s*```tour\s*$/.test(l)) {                 // кроки: «адреса | елемент | що зробити» у кожному рядку
+        flush(); var steps = []; i++;
+        while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) {
+          var pc = lines[i].split('|').map(function (x) { return x.trim(); });
+          if (pc.length >= 2 && (!pc[0] || safeHref(pc[0]))) steps.push({ url: pc[0], target: pc[1], say: pc[2] || '' });
+          i++;
+        }
+        i++;
+        if (steps.length) root.appendChild(tourButton(steps));
+        continue;
+      }
       if (/^\s*\|.*\|\s*$/.test(l) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
         flush(); var wrap = el('div', 'rg-tbl'), tbl = el('table'), tr = el('tr');
         cells(l).forEach(function (c) { var th = el('th'); inline(c, th, onCite); tr.appendChild(th); }); tbl.appendChild(tr); i += 2;
@@ -395,7 +428,7 @@ a.rg-link { color: var(--rg-link); text-decoration: underline; }
     if (state.products) can.push('характеристики товарів, даташити й наявність на складі');
     box.appendChild(el('div', null, 'Привіт! Я ' + state.name + ' — допоможу: ' + can.join('; ') + '. Просто запитайте — я сама зрозумію, про що.'));
     var hints = el('div', 'rg-hints'), examples = [];
-    if (state.guide) examples.push('Як додати даташити в базу знань?', 'Як створити Angebot з листа?');
+    if (state.guide) examples.push('❓ Що на цій сторінці й що тут можна зробити?', 'Як створити Angebot з листа?');
     if (state.products) examples.push('Які антени підтримують Bluetooth і є на складі?', 'Яка потужність AN050201-01C-175-MHF1?');
     examples.slice(0, 4)
       .forEach(function (q) { var b = el('button', null, q); b.type = 'button'; b.onclick = function () { input.value = q; send(); }; hints.appendChild(b); });
@@ -465,12 +498,26 @@ a.rg-link { color: var(--rg-link); text-decoration: underline; }
       state.convs.unshift(d.conversation); msgsEl.innerHTML = ''; return state.conv;
     });
   }
+  function snapshot() {
+    var out = [], seen = {}, sel = '.object-tools a, .submit-row input, .submit-row a, .submit-row button, ' +
+      '#content-main h2, #content-main h3, #content h1, fieldset legend, .module > h2, label, [role=tab], .tabs a, ' +
+      '#changelist-filter h3, #content-main button, #content-main .button, #content-main summary, .actions select option';
+    document.querySelectorAll(sel).forEach(function (e) {
+      if (out.length >= 150 || e.closest('#rg-panel, #result_list, .results, tbody, [translate="no"], .notranslate')) return;
+      if (e.matches('h1') && document.querySelector('#content form')) return;   // у картці h1 — назва запису (дані)
+      var t = (e.tagName === 'INPUT' ? e.value : e.innerText || '').replace(/\s+/g, ' ').trim();
+      if (!t || t.length > 80 || seen[t]) return;
+      seen[t] = 1; out.push(t);
+    });
+    return out;
+  }
   function send(retry, mode) {
     var q = input.value.trim();
     if (!q || state.pending || (state.sending && !retry)) return;
     state.sending = true; setBusy(true);
     ensureConv().then(function (cid) {      // page — де зараз людина: гід бере сторінку про неї
-      return api('conversations/' + cid + '/ask/', { method: 'POST', body: { question: q, page: location.pathname, mode: mode || '' } });
+      return api('conversations/' + cid + '/ask/', { method: 'POST',
+        body: { question: q, page: location.pathname + location.search, mode: mode || '', ui: snapshot() } });
     }).then(function (d) {
       if (d._status === 429 && (retry || 0) < 40) {   // зайнято іншим запитом — запит не прийнято, повторюємо
         showWait('Помічник зайнятий іншим запитом — зачекайте, надішлю автоматично…');
