@@ -118,7 +118,7 @@ class MySettingsTests(TestCase):
             "theme": "light", "interface_language": "de", "telegram_id": "777"}),
             content_type="application/json")
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(sorted(r.json()["updated"]), ["interface_language", "telegram_id", "theme"])
+        self.assertEqual(sorted(r.json()["updated"]), ["interface_language", "telegram_id", "theme", "ui_prefs"])
         self.profile.refresh_from_db()
         self.assertEqual((self.profile.theme, self.profile.telegram_id), ("light", 777))
         self.assertEqual(self.profile.items_per_page, 25)          # не змінилось — поле ніщо не читає

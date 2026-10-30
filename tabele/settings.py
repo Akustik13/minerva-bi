@@ -122,6 +122,7 @@ TEMPLATES = [
             "django.template.context_processors.i18n",
             "core.context_processors.user_modules",
             "core.context_processors.language_context",
+            "core.context_processors.ui_context",
         ]},
     }
 ]

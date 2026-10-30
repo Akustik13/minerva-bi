@@ -12,13 +12,19 @@
 }
 #rg-panel.rg-light {
   --rg-bg: #ffffff; --rg-head: #f3f6fa; --rg-bubble: #f1f5f9; --rg-input: #ffffff; --rg-soft: #f7f9fc;
-  --rg-text: #1f2937; --rg-strong: #0f172a; --rg-muted: #556274; --rg-dim: #8392a5;
+  --rg-text: #1f2937; --rg-strong: #0f172a; --rg-muted: #556274; --rg-dim: #5f6b7a;
   --rg-border: #dde4ec; --rg-border-strong: #c7d2df; --rg-accent: #2563eb; --rg-link: #1d4ed8;
   --rg-user: #2563eb; --rg-user-text: #ffffff; --rg-th: #e3ebf6; --rg-th-text: #0f172a;
   --rg-cite: #dbeafe; --rg-cite-text: #1e3a8a; --rg-code: #eef2f7;
   --rg-ok: #2e7d32; --rg-no: #6b7280; --rg-warn: #b45309; --rg-err: #dc2626; --rg-shadow: rgba(15,23,42,.18);
 }
 
+/* ♿ Контраст (core/ui_prefs.py): ≥ 7 : 1 */
+[data-theme="hc-light"] #rg-panel.rg-light { --rg-text: #000000; --rg-strong: #000000; --rg-muted: #1f1f1f;
+  --rg-dim: #333333; --rg-link: #0033cc; --rg-border: #000000; --rg-border-strong: #000000; --rg-head: #f2f2f2; }
+[data-theme="hc-dark"] #rg-panel { --rg-bg: #000000; --rg-head: #0a0a0a; --rg-bubble: #161616; --rg-text: #ffffff;
+  --rg-strong: #ffffff; --rg-muted: #e0e0e0; --rg-dim: #cfcfcf; --rg-link: #8cd3ff; --rg-border: #ffffff;
+  --rg-border-strong: #ffffff; }
 #rg-pill { position: fixed; bottom: 24px; right: 88px; z-index: 10000; display: none; align-items: center; gap: 10px;
   height: 52px; padding: 4px 18px 4px 4px; border-radius: 30px; border: 1px solid rgba(0,0,0,.08); cursor: pointer;
   background: #fff; color: #1d2b3a; font: 600 15px/1 system-ui, -apple-system, "Segoe UI", sans-serif;

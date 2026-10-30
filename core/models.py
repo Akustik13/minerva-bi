@@ -204,8 +204,14 @@ class UserProfile(models.Model):
     items_per_page     = models.PositiveIntegerField(default=25, verbose_name='Записів на сторінку')
     theme              = models.CharField(
         max_length=20,
-        choices=[('dark', 'Темна'), ('light', 'Світла'), ('minerva', 'Minerva'), ('auto', 'Авто')],
+        choices=[('dark', 'Темна'), ('light', 'Світла'), ('minerva', 'Minerva'),
+                 ('hc-dark', 'Контраст — темна'), ('hc-light', 'Контраст — світла'),
+                 ('custom', 'Власна'), ('auto', 'Авто')],
         default='dark', verbose_name='Тема',
+    )
+    ui_prefs           = models.JSONField(
+        default=dict, blank=True, verbose_name='Тема й доступність',
+        help_text='Особисто: тема, шрифт, розмір тексту, фокус, контраст — core/ui_prefs.py',
     )
     created_at         = models.DateTimeField(auto_now_add=True, verbose_name='Дата створення')
     created_by         = models.ForeignKey(

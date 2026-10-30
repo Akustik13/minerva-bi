@@ -592,6 +592,24 @@ tabele_mvp/
 - Collapse стан зберігається в `localStorage` (`mg-{id}`)
 - Tooltip `.mtip` → `#mtip-float` floating div
 
+**♿ Теми й доступність** (core 0015) — вибір людини лише `core/ui_prefs.py` (`THEMES`, `OPTIONS` → атрибути
+`<html>`: `data-mv-fix-contrast`, `-font`, `-size`, `-focus`, `-links`, `-motion`; `clean` пропускає лише відомі
+значення), `UserProfile.ui_prefs` (тема пишеться й у старе `theme`) — «Мої налаштування» → «♿ Доступність» і
+перемикач тем у меню (`POST /core/my-settings/ {ui: {theme}}`), однаково на всіх пристроях; у `<head>` —
+`core.context_processors.ui_context` → `MV_UI_JSON` (тема з профілю, не вибрана — localStorage `mv-theme`).
+Теми `dark` / `light` / `minerva` / `hc-dark` / `hc-light` (♿ ≥ 7 : 1) / `custom` — змінні в `base_site.html`.
+⚠️ base.css Django задає світлі змінні селектором `html[data-theme="light"]`, dark_mode.css — `html[data-theme="dark"]`:
+вони сильніші за `[data-theme="…"]`, тому світлий блок Minerva — `html[data-theme="light"]` (інакше акцент був
+жовтий #f5dd5d), а змінні, яких Django немає в темній темі, — окремим блоком. Правила «світла + власна» для
+карток і меню діють і для `hc-*` (`[data-theme^="hc-"]`). **Читабельність у кожній темі** —
+`static/admin/js/mv_contrast.js` (підключено в base_site, `?v=` при зміні): кожен текст проти справжнього фону
+(предки, напівпрозорі шари, градієнти), не вистачає 4,5 : 1 (великий і значки без літер — 3 : 1, `hc-*` — 7 : 1)
+→ колір тексту темніший / світліший того самого відтінку (inline `!important`, повертається при зміні теми);
+після змін DOM — MutationObserver; емодзі, градієнтний текст, напівпрозоре (< 0,6) — не міряються;
+`data-mv-contrast="off"` — не чіпати; `MVContrast.report()` / `.summary()` у консолі — перевірка сторінки.
+Нові кольори — змінними теми; вшитий колір під темну тему скрипт виправить, але краще не додавати.
+Тести: `core/tests_ui_prefs.py`
+
 **Sidebar групи і URL-маппінг:**
 ```
 Аналітика  → /dashboard/, /dashboard/signals/

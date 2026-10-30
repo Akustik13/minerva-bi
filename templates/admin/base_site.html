@@ -1,15 +1,21 @@
 {% extends "admin/base.html" %}
 
 {% block extrahead %}{{ block.super }}
-<script>/* Anti-flash: apply saved theme before first paint.
+<script>/* Anti-flash: тема й доступність до першого малювання (core/ui_prefs.py).
+   Тема зі «Моїх налаштувань» однакова на всіх пристроях; не вибрана там — як у цьому браузері.
    Also sync Django's own 'theme' key so standard admin elements follow. */
 (function(){
-  var t = localStorage.getItem('mv-theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', t);
-  /* Sync Django admin: dark/minerva/custom → 'dark'; light → 'light' */
-  localStorage.setItem('theme', t === 'light' ? 'light' : 'dark');
+  var ui = {{ MV_UI_JSON|default:'{}'|safe }}, root = document.documentElement, attrs = ui.attrs || {};
+  var t = ui.theme || localStorage.getItem('mv-theme') || ui.legacy || 'dark';
+  if (t === 'auto') t = window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+  root.setAttribute('data-theme', t);
+  for (var k in attrs) root.setAttribute(k, attrs[k]);
+  if (ui.theme) localStorage.setItem('mv-theme', t);
+  /* Sync Django admin: dark/minerva/custom/hc-dark → 'dark'; light/hc-light → 'light' */
+  localStorage.setItem('theme', (t === 'light' || t === 'hc-light') ? 'light' : 'dark');
 })();
 </script>
+<script src="/static/admin/js/mv_contrast.js?v=2" defer></script>
 <script>window.MINERVA_LANG = '{{ CURRENT_LANGUAGE|default:"uk" }}';</script>
 <script src="/static/admin/js/i18n_minerva.js"></script>
 <!-- PWA -->
@@ -47,7 +53,7 @@
   --bg-hover:  #1e2a35;
   --text:        #e6edf3;
   --text-muted:  #9aafbe;
-  --text-dim:    #607d8b;
+  --text-dim:    #8296a5;   /* було #607d8b — 4,2 : 1 на фоні сторінки */
   --border:        rgba(255,255,255,.07);
   --border-2:      rgba(255,255,255,.12);
   --border-strong: #2a3f52;
@@ -72,7 +78,7 @@
   --sb-text-muted:      #7a9ab0;
   --sb-border:          #1e2d3d;
   --sb-border-accent:   #2a4a6a;
-  --sb-arrow:           #3a5570;
+  --sb-arrow:           #7590a8;   /* було #3a5570 — 2,4 : 1 */
   --sb-handle:          #2a3f52;
   --sb-handle-hover:    #607d8b;
   --sb-link:            #9aafbe;
@@ -88,10 +94,10 @@
   /* Footer (stays dark in all themes) */
   --footer-bg:         #1a1a1a;
   --footer-border:     rgba(255,255,255,.08);
-  --footer-text:       rgba(255,255,255,.28);
-  --footer-link:       rgba(255,255,255,.35);
-  --footer-link-hover: rgba(255,255,255,.65);
-  --footer-strong:     rgba(255,255,255,.45);
+  --footer-text:       rgba(255,255,255,.62);   /* було .28 — 3,2 : 1 */
+  --footer-link:       rgba(255,255,255,.72);
+  --footer-link-hover: rgba(255,255,255,.92);
+  --footer-strong:     rgba(255,255,255,.8);
   /* ── Django admin CSS variable overrides for Dark theme ──
      Removes the default Django teal/blue (#417690) from header,
      breadcrumbs, buttons, links — replaced with our dark steel palette */
@@ -103,7 +109,7 @@
   --header-link-color:  #9aafbe;
   --header-branding-link-color: #c9d8e4;
   --breadcrumbs-bg:     #111d2b;
-  --breadcrumbs-fg:     #9aafbe;
+  --breadcrumbs-fg:     #c9d8e4;   /* було #9aafbe — 4,1 : 1 на смузі Django */
   --breadcrumbs-link-fg: #7ab3cc;
   --module-bg:          #161b22;
   --module-header-color: #c9d8e4;
@@ -139,7 +145,9 @@
 }
 
 /* ── Light ──────────────────────────────────────── */
-[data-theme="light"] {
+/* html[…] — бо base.css Django задає світлі змінні селектором html[data-theme="light"]: без цього діяли його
+   кольори (акцент — жовтий #f5dd5d на білому, посилання #417893), а не ці */
+html[data-theme="light"] {
   --bg-app:    #f0f4f8;
   --bg-card:   #ffffff;
   --bg-card-2: #f7f9fb;
@@ -147,18 +155,18 @@
   --bg-hover:  #e8edf2;
   --text:       #1c2128;
   --text-muted: #4b5563;
-  --text-dim:   #6b7280;
+  --text-dim:   #5b636e;    /* було #6b7280 — 4,4 : 1 на фоні сторінки */
   --border:        rgba(0,0,0,.08);
   --border-2:      rgba(0,0,0,.12);
   --border-strong: #d0d7de;
-  --accent:          #0969da;
+  --accent:          #0860c9;   /* було #0969da — 4,4 : 1 на сірому (--bg-hover) */
   --accent-2:        #0550ae;
   --accent-subtle:   rgba(9,105,218,.12);
   --accent-muted:    rgba(9,105,218,.3);
   --accent2-hover:   rgba(5,80,174,.06);
   --accent2-subtle:  rgba(5,80,174,.1);
   --accent2-muted:   rgba(5,80,174,.25);
-  --gold:   #c9a84c;
+  --gold:   #8a6a12;        /* було #c9a84c — 2,2 : 1 на білому */
   --gold-l: #7c5c00;
   --ok:   #1a7f37;
   --warn: #9a6700;
@@ -172,7 +180,7 @@
   --sb-text-muted:      #57606a;
   --sb-border:          rgba(0,0,0,.09);
   --sb-border-accent:   rgba(9,105,218,.35);
-  --sb-arrow:           #8c959f;
+  --sb-arrow:           #5f6a76;   /* було #8c959f — 2,6 : 1 */
   --sb-handle:          rgba(0,0,0,.12);
   --sb-handle-hover:    #0969da;
   --sb-link:            #0550ae;
@@ -181,15 +189,16 @@
   --sb-pinned-bg:       #e8ecf0;
   --sb-pinned-text:     #0969da;
   /* ── Django admin vars (light theme) ── */
-  --header-bg:          #2980b9;
+  --header-bg:          #1f5f8b;   /* було #2980b9 — білий текст 4 : 1 */
   --header-color:       #ffffff;
-  --header-link-color:  rgba(255,255,255,.85);
+  --header-link-color:  rgba(255,255,255,.9);
   --header-branding-link-color: #ffffff;
   --breadcrumbs-bg:     #eef1f5;
   --breadcrumbs-fg:     #57606a;
   --breadcrumbs-link-fg: #0969da;
   --body-bg:            #f0f4f8;
   --body-fg:            #1c2128;
+  --body-quiet-color:   #57606a;
   --module-bg:          #ffffff;
   --module-header-color: #1c2128;
   --module-header-table-link-color: #0969da;
@@ -213,12 +222,13 @@
   --link-selected-fg:   #0969da;
   --object-tools-bg:    #0969da;
   --object-tools-hover-bg: #0550ae;
-  --button-bg:          #eef1f5;
-  --button-hover-bg:    #dde3ea;
+  --button-fg:          #ffffff;
+  --button-bg:          #4b5563;   /* текст кнопок Django білий — фон темний (було #eef1f5) */
+  --button-hover-bg:    #374151;
   --default-button-bg:  #0969da;
   --default-button-hover-bg: #0550ae;
-  --close-button-bg:    #eef1f5;
-  --close-button-hover-bg: #dde3ea;
+  --close-button-bg:    #57606a;
+  --close-button-hover-bg: #374151;
   --delete-button-bg:   #cf222e;
   --delete-button-hover-bg: #a40e26;
   /* ── Tooltip (light) ── */
@@ -229,7 +239,7 @@
   /* Footer — light */
   --footer-bg:          #eef1f5;
   --footer-border:      rgba(0,0,0,.1);
-  --footer-text:        rgba(0,0,0,.38);
+  --footer-text:        rgba(0,0,0,.66);   /* було .38 — 2,6 : 1 */
   --footer-link:        #57606a;
   --footer-link-hover:  #0969da;
   --footer-strong:      #24292f;
@@ -244,7 +254,7 @@
   --bg-hover:  #1e2a50;
   --text:       #e8d5a3;
   --text-muted: #a89060;
-  --text-dim:   #705e3a;
+  --text-dim:   #a38d5c;    /* було #705e3a — 3 : 1 */
   --border:        rgba(201,168,76,.12);
   --border-2:      rgba(201,168,76,.2);
   --border-strong: rgba(201,168,76,.3);
@@ -269,7 +279,7 @@
   --sb-text-muted:      #a89060;
   --sb-border:          rgba(201,168,76,.2);
   --sb-border-accent:   rgba(201,168,76,.4);
-  --sb-arrow:           rgba(201,168,76,.35);
+  --sb-arrow:           rgba(201,168,76,.75);   /* було .35 — 2 : 1 */
   --sb-handle:          rgba(201,168,76,.2);
   --sb-handle-hover:    #c9a84c;
   --sb-link:            #a89060;
@@ -285,10 +295,10 @@
   /* Footer */
   --footer-bg:         #0a0e1a;
   --footer-border:     rgba(201,168,76,.12);
-  --footer-text:       rgba(232,213,163,.4);
-  --footer-link:       rgba(232,213,163,.5);
-  --footer-link-hover: rgba(232,213,163,.85);
-  --footer-strong:     rgba(232,213,163,.65);
+  --footer-text:       rgba(232,213,163,.7);   /* було .4 — 3 : 1 */
+  --footer-link:       rgba(232,213,163,.78);
+  --footer-link-hover: rgba(232,213,163,.95);
+  --footer-strong:     rgba(232,213,163,.88);
   /* ── Django admin CSS variable overrides for Minerva ── */
   --body-bg: #0a0e1a;
   --body-fg: #e8d5a3;
@@ -327,6 +337,303 @@
   --changelist-even-row-bg: #1a2445;
 }
 
+/* ── Змінні Django, яких теми Minerva не задавали: Minerva, «Контраст» і власна тема брали їх зі світлого
+   набору Django на ПК зі світлим режимом Windows / macOS (світлі фони повідомлень під світлим текстом,
+   «тихий» текст #666 на темному) і з темного — на ПК з темним режимом. Темну й світлу теми Django
+   доповнює сам (html[data-theme="dark|light"]), тут — лише те, чого там немає. ── */
+:root, [data-theme="dark"] {   /* решту (повідомлення, «тихий» текст) задає dark_mode.css Django */
+  color-scheme: dark;
+  --button-fg: #ffffff;
+  --object-tools-fg: #ffffff;
+  --header-branding-color: #e6edf3;
+  --focus-ring: #ffd166;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --focus-ring: #0b4fb3;
+}
+[data-theme="minerva"] {
+  color-scheme: dark;
+  --body-quiet-color: #a89060;
+  --body-medium-color: #e8d5a3;
+  --body-loud-color: #fff4d6;
+  --error-fg: #f87171;
+  --primary-fg: #fff4d6;
+  --button-fg: #fff4d6;
+  --object-tools-fg: #fff4d6;
+  --header-branding-color: #e8d5a3;
+  --message-success-bg: #10301d;
+  --message-warning-bg: #3a2c06;
+  --message-error-bg: #451616;
+  --focus-ring: #ffe08a;
+}
+
+/* ── ♿ Контраст — темна: чорний фон, білий текст, жовтий акцент; кожна пара ≥ 7 : 1 (WCAG AAA) ── */
+[data-theme="hc-dark"] {
+  color-scheme: dark;
+  --bg-app:    #000000;
+  --bg-card:   #0a0a0a;
+  --bg-card-2: #161616;
+  --bg-input:  #000000;
+  --bg-hover:  #262626;
+  --text:       #ffffff;
+  --text-muted: #e8e8e8;
+  --text-dim:   #cfcfcf;
+  --border:        rgba(255,255,255,.45);
+  --border-2:      rgba(255,255,255,.6);
+  --border-strong: #ffffff;
+  --accent:          #ffd60a;
+  --accent-2:        #ffe066;
+  --accent-subtle:   rgba(255,214,10,.2);
+  --accent-muted:    rgba(255,214,10,.45);
+  --accent2-hover:   rgba(255,214,10,.12);
+  --accent2-subtle:  rgba(255,214,10,.2);
+  --accent2-muted:   rgba(255,214,10,.45);
+  --gold:   #ffd60a;
+  --gold-l: #ffe680;
+  --ok:   #5cf28a;
+  --warn: #ffd60a;
+  --err:  #ff8a80;
+  --sb-bg:              #000000;
+  --sb-head-bg:         #0a0a0a;
+  --sb-head-text:       #ffffff;
+  --sb-head-hover-text: #ffd60a;
+  --sb-text:            #ffffff;
+  --sb-text-muted:      #e0e0e0;
+  --sb-border:          rgba(255,255,255,.45);
+  --sb-border-accent:   #ffd60a;
+  --sb-arrow:           #e0e0e0;
+  --sb-handle:          rgba(255,255,255,.5);
+  --sb-handle-hover:    #ffd60a;
+  --sb-link:            #ffffff;
+  --sb-link-hover-text: #ffd60a;
+  --sb-link-hover-bg:   rgba(255,214,10,.12);
+  --sb-pinned-bg:       #000000;
+  --sb-pinned-text:     #ffd60a;
+  --tip-bg:     #000000;
+  --tip-border: #ffffff;
+  --tip-text:   #ffffff;
+  --tip-accent: #ffd60a;
+  --footer-bg:         #000000;
+  --footer-border:     rgba(255,255,255,.5);
+  --footer-text:       #e0e0e0;
+  --footer-link:       #ffffff;
+  --footer-link-hover: #ffd60a;
+  --footer-strong:     #ffffff;
+  --primary: #0a3d91;
+  --secondary: #0a3d91;
+  --primary-fg: #ffffff;
+  --header-bg: #000000;
+  --header-color: #ffffff;
+  --header-link-color: #ffffff;
+  --header-branding-color: #ffffff;
+  --header-branding-link-color: #ffffff;
+  --breadcrumbs-bg: #0a0a0a;
+  --breadcrumbs-fg: #ffffff;
+  --breadcrumbs-link-fg: #ffd60a;
+  --body-bg: #000000;
+  --body-fg: #ffffff;
+  --body-quiet-color: #e0e0e0;
+  --body-medium-color: #f0f0f0;
+  --body-loud-color: #ffffff;
+  --module-bg: #0a0a0a;
+  --module-header-color: #ffffff;
+  --module-header-table-link-color: #ffd60a;
+  --darkened-bg: #161616;
+  --selected-bg: #262626;
+  --selected-row: rgba(255,214,10,.16);
+  --border-color: #ffffff;
+  --hairline-color: rgba(255,255,255,.4);
+  --link-fg: #8cd3ff;
+  --link-hover-color: #ffd60a;
+  --link-selected-fg: #ffd60a;
+  --error-fg: #ff8a80;
+  --message-success-bg: #003d17;
+  --message-warning-bg: #3d3000;
+  --message-error-bg: #4d0000;
+  --button-fg: #ffffff;
+  --button-bg: #262626;
+  --button-hover-bg: #3d3d3d;
+  --default-button-bg: #0a3d91;
+  --default-button-hover-bg: #0d4fbd;
+  --close-button-bg: #262626;
+  --close-button-hover-bg: #3d3d3d;
+  --delete-button-bg: #a00000;
+  --delete-button-hover-bg: #c00000;
+  --object-tools-fg: #ffffff;
+  --object-tools-bg: #262626;
+  --object-tools-hover-bg: #3d3d3d;
+  --input-bg: #000000;
+  --input-fg: #ffffff;
+  --input-border: #ffffff;
+  --form-input-bg: #000000;
+  --nav-sidebar-input-color: #ffffff;
+  --nav-sidebar-input-border-color: #ffffff;
+  --changelist-even-row-bg: #121212;
+  --changelist-selected-bg: rgba(255,214,10,.16);
+  --focus-ring: #ffd60a;
+}
+/* ── ♿ Контраст — світла: білий фон, чорний текст, темно-синій акцент; кожна пара ≥ 7 : 1 ── */
+[data-theme="hc-light"] {
+  color-scheme: light;
+  --bg-app:    #ffffff;
+  --bg-card:   #ffffff;
+  --bg-card-2: #f2f2f2;
+  --bg-input:  #ffffff;
+  --bg-hover:  #e6e6e6;
+  --text:       #000000;
+  --text-muted: #1f1f1f;
+  --text-dim:   #333333;
+  --border:        rgba(0,0,0,.5);
+  --border-2:      rgba(0,0,0,.65);
+  --border-strong: #000000;
+  --accent:          #0033cc;
+  --accent-2:        #002299;
+  --accent-subtle:   rgba(0,51,204,.1);
+  --accent-muted:    rgba(0,51,204,.35);
+  --accent2-hover:   rgba(0,51,204,.06);
+  --accent2-subtle:  rgba(0,51,204,.1);
+  --accent2-muted:   rgba(0,51,204,.35);
+  --gold:   #6b4e00;
+  --gold-l: #5a4100;
+  --ok:   #00591d;
+  --warn: #6b4500;
+  --err:  #a30000;
+  --sb-bg:              #ffffff;
+  --sb-head-bg:         #f2f2f2;
+  --sb-head-text:       #000000;
+  --sb-head-hover-text: #0033cc;
+  --sb-text:            #000000;
+  --sb-text-muted:      #1f1f1f;
+  --sb-border:          rgba(0,0,0,.5);
+  --sb-border-accent:   #0033cc;
+  --sb-arrow:           #1f1f1f;
+  --sb-handle:          rgba(0,0,0,.5);
+  --sb-handle-hover:    #0033cc;
+  --sb-link:            #001a80;
+  --sb-link-hover-text: #000000;
+  --sb-link-hover-bg:   rgba(0,51,204,.1);
+  --sb-pinned-bg:       #f2f2f2;
+  --sb-pinned-text:     #0033cc;
+  --tip-bg:     #ffffff;
+  --tip-border: #000000;
+  --tip-text:   #000000;
+  --tip-accent: #0033cc;
+  --footer-bg:          #f2f2f2;
+  --footer-border:      rgba(0,0,0,.5);
+  --footer-text:        #1f1f1f;
+  --footer-link:        #001a80;
+  --footer-link-hover:  #000000;
+  --footer-strong:      #000000;
+  --primary: #0033cc;
+  --secondary: #002299;
+  --primary-fg: #ffffff;
+  --header-bg: #000000;
+  --header-color: #ffffff;
+  --header-link-color: #ffffff;
+  --header-branding-color: #ffffff;
+  --header-branding-link-color: #ffffff;
+  --breadcrumbs-bg: #f2f2f2;
+  --breadcrumbs-fg: #000000;
+  --breadcrumbs-link-fg: #0033cc;
+  --body-bg: #ffffff;
+  --body-fg: #000000;
+  --body-quiet-color: #1f1f1f;
+  --body-medium-color: #111111;
+  --body-loud-color: #000000;
+  --module-bg: #ffffff;
+  --module-header-color: #000000;
+  --module-header-table-link-color: #0033cc;
+  --darkened-bg: #f2f2f2;
+  --selected-bg: #e0e8ff;
+  --selected-row: #fff3b0;
+  --border-color: #000000;
+  --hairline-color: rgba(0,0,0,.45);
+  --link-fg: #0033cc;
+  --link-hover-color: #001a66;
+  --link-selected-fg: #001a66;
+  --error-fg: #a30000;
+  --message-success-bg: #d6f5dd;
+  --message-warning-bg: #fff3b0;
+  --message-error-bg: #ffe0e0;
+  --button-fg: #ffffff;
+  --button-bg: #1a1a1a;
+  --button-hover-bg: #3d3d3d;
+  --default-button-bg: #0033cc;
+  --default-button-hover-bg: #002299;
+  --close-button-bg: #1a1a1a;
+  --close-button-hover-bg: #3d3d3d;
+  --delete-button-bg: #a30000;
+  --delete-button-hover-bg: #800000;
+  --object-tools-fg: #ffffff;
+  --object-tools-bg: #1a1a1a;
+  --object-tools-hover-bg: #3d3d3d;
+  --input-bg: #ffffff;
+  --input-fg: #000000;
+  --input-border: #000000;
+  --form-input-bg: #ffffff;
+  --nav-sidebar-input-color: #000000;
+  --nav-sidebar-input-border-color: #000000;
+  --changelist-even-row-bg: #f5f5f5;
+  --changelist-selected-bg: #e0e8ff;
+  --focus-ring: #0033cc;
+}
+/* У темах «♿ Контраст» межі товщі, посилання завжди підкреслені, поля вводу з рамкою */
+[data-theme^="hc-"] .minerva-name, [data-theme^="hc-"] .mv-m-text, [data-theme^="hc-"] .mv-m-sep {
+  background: none !important; -webkit-text-fill-color: #ffffff !important; color: #ffffff !important; opacity: 1 !important;
+}
+[data-theme^="hc-"] .minerva-tagline { color: #ffffff !important; }
+[data-theme^="hc-"] #content a:not(.button):not([role=button]):not(.btn):not(.mv-tile),
+[data-theme^="hc-"] .help a { text-decoration: underline !important; text-underline-offset: 2px; }
+[data-theme^="hc-"] input:not([type=checkbox]):not([type=radio]), [data-theme^="hc-"] select,
+[data-theme^="hc-"] textarea { border: 2px solid var(--input-border) !important; }
+[data-theme^="hc-"] .module, [data-theme^="hc-"] fieldset.module,
+[data-theme^="hc-"] #changelist-filter { border: 1px solid var(--border-strong) !important; }
+[data-theme^="hc-"] #content, [data-theme^="hc-"] #content-main { background: var(--bg-app); color: var(--text); }
+
+/* ── ♿ Доступність — «Мої налаштування» (core/ui_prefs.py → атрибути <html>) ── */
+/* Рамка фокусу при роботі з клавіатури — завжди (WCAG 2.4.7 / 2.4.11): двоколірна, видно на будь-якому фоні */
+:focus-visible {
+  outline: 3px solid var(--focus-ring, #ffd166) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 5px rgba(0,0,0,.55) !important;
+}
+html[data-mv-focus="always"] :focus {
+  outline: 3px solid var(--focus-ring, #ffd166) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 0 0 5px rgba(0,0,0,.55) !important;
+}
+html[data-mv-links="underline"] #content a:not(.button):not([role=button]):not(.btn):not(.mv-tile),
+html[data-mv-links="underline"] #nav-sidebar a { text-decoration: underline !important; text-underline-offset: 2px; }
+/* Шрифт, легкий для читання (у т. ч. при дислексії): Atkinson Hyperlegible, якщо встановлено на ПК, інакше
+   Verdana / Tahoma — широкі літери, які не плутаються (I l 1, O 0); трохи більші інтервали */
+html[data-mv-font="readable"] {
+  --font-family-primary: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", Verdana, Tahoma, "Segoe UI", sans-serif;
+}
+html[data-mv-font="readable"] body {
+  font-family: var(--font-family-primary) !important;
+  letter-spacing: .012em; word-spacing: .06em; line-height: 1.55;
+}
+html[data-mv-font="readable"] input, html[data-mv-font="readable"] select,
+html[data-mv-font="readable"] textarea, html[data-mv-font="readable"] button { font-family: inherit; }
+html[data-mv-font="readable"] em, html[data-mv-font="readable"] i:not([class]) { font-style: normal; font-weight: 600; }
+/* Розмір тексту — масштаб усієї сторінки (у Minerva багато розмірів у px, тож font-size їх не змінив би) */
+html[data-mv-size="112"] body { zoom: 1.12; }
+html[data-mv-size="125"] body { zoom: 1.25; }
+html[data-mv-size="150"] body { zoom: 1.5; }
+/* Менше анімацій: вибрано в налаштуваннях або так налаштована система */
+html[data-mv-motion="reduce"] *, html[data-mv-motion="reduce"] *::before, html[data-mv-motion="reduce"] *::after {
+  animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+  transition-duration: .001ms !important; scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-mv-motion="full"]) *, html:not([data-mv-motion="full"]) *::before,
+  html:not([data-mv-motion="full"]) *::after {
+    animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important; scroll-behavior: auto !important;
+  }
+}
+
 /* ── Light + Custom theme: enforce sidebar vars (override Django admin defaults) ── */
 [data-theme="light"] #nav-sidebar,
 [data-theme="light"] #nav-sidebar .module,
@@ -338,39 +645,39 @@
 [data-theme="light"] .mg-content,
 [data-theme="light"] .mg-content .module,
 [data-theme="light"] .mg-pinned,
-[data-theme="custom"] #nav-sidebar,
-[data-theme="custom"] #nav-sidebar .module,
-[data-theme="custom"] #nav-sidebar .module > table,
-[data-theme="custom"] #nav-sidebar caption,
-[data-theme="custom"] #nav-sidebar td,
-[data-theme="custom"] #nav-sidebar th,
-[data-theme="custom"] .mg-group,
-[data-theme="custom"] .mg-content,
-[data-theme="custom"] .mg-content .module,
-[data-theme="custom"] .mg-pinned {
+[data-theme="custom"] #nav-sidebar, [data-theme^="hc-"] #nav-sidebar,
+[data-theme="custom"] #nav-sidebar .module, [data-theme^="hc-"] #nav-sidebar .module,
+[data-theme="custom"] #nav-sidebar .module > table, [data-theme^="hc-"] #nav-sidebar .module > table,
+[data-theme="custom"] #nav-sidebar caption, [data-theme^="hc-"] #nav-sidebar caption,
+[data-theme="custom"] #nav-sidebar td, [data-theme^="hc-"] #nav-sidebar td,
+[data-theme="custom"] #nav-sidebar th, [data-theme^="hc-"] #nav-sidebar th,
+[data-theme="custom"] .mg-group, [data-theme^="hc-"] .mg-group,
+[data-theme="custom"] .mg-content, [data-theme^="hc-"] .mg-content,
+[data-theme="custom"] .mg-content .module, [data-theme^="hc-"] .mg-content .module,
+[data-theme="custom"] .mg-pinned, [data-theme^="hc-"] .mg-pinned {
   background: var(--sb-bg) !important;
   color: var(--sb-text) !important;
   border-color: var(--sb-border) !important;
 }
 /* .mg-header (sidebar group buttons) use --sb-head-bg independently */
 [data-theme="light"] .mg-header,
-[data-theme="custom"] .mg-header {
+[data-theme="custom"] .mg-header, [data-theme^="hc-"] .mg-header {
   background: var(--sb-head-bg) !important;
   border-left-color: var(--sb-border-accent) !important;
   color: var(--sb-head-text) !important;
   border-color: var(--sb-border) !important;
 }
-[data-theme="light"] #nav-sidebar a,  [data-theme="custom"] #nav-sidebar a  { color: var(--sb-link) !important; }
+[data-theme="light"] #nav-sidebar a,  [data-theme="custom"] #nav-sidebar a, [data-theme^="hc-"] #nav-sidebar a  { color: var(--sb-link) !important; }
 [data-theme="light"] .mg-header:hover,
-[data-theme="custom"] .mg-header:hover {
+[data-theme="custom"] .mg-header:hover, [data-theme^="hc-"] .mg-header:hover {
   filter: brightness(1.08);
   color: var(--sb-head-hover-text) !important;
 }
-[data-theme="light"] .mg-arrow,    [data-theme="custom"] .mg-arrow    { color: var(--sb-arrow) !important; }
-[data-theme="light"] .mg-pinned,   [data-theme="custom"] .mg-pinned   { background: var(--sb-pinned-bg) !important; }
-[data-theme="light"] .mg-pinned a, [data-theme="custom"] .mg-pinned a { color: var(--sb-pinned-text) !important; }
+[data-theme="light"] .mg-arrow,    [data-theme="custom"] .mg-arrow, [data-theme^="hc-"] .mg-arrow    { color: var(--sb-arrow) !important; }
+[data-theme="light"] .mg-pinned,   [data-theme="custom"] .mg-pinned, [data-theme^="hc-"] .mg-pinned   { background: var(--sb-pinned-bg) !important; }
+[data-theme="light"] .mg-pinned a, [data-theme="custom"] .mg-pinned a, [data-theme^="hc-"] .mg-pinned a { color: var(--sb-pinned-text) !important; }
 [data-theme="light"] #nav-sidebar input[type=text],
-[data-theme="custom"] #nav-sidebar input[type=text] {
+[data-theme="custom"] #nav-sidebar input[type=text], [data-theme^="hc-"] #nav-sidebar input[type=text] {
   background: var(--bg-input) !important;
   color: var(--sb-text) !important;
   border-color: var(--sb-border) !important;
@@ -517,7 +824,7 @@
   margin-left: auto; font-size: 10px;
   background: var(--accent2-subtle);
   border: 1px solid var(--accent2-muted);
-  color: var(--accent); border-radius: 10px;
+  color: var(--sb-link); border-radius: 10px;   /* було var(--accent) — 2,9 : 1 у темній, 3,8 : 1 у світлій */
   padding: 1px 7px; font-weight: 700; letter-spacing: .4px;
 }
 
@@ -629,8 +936,8 @@
 /* ── Light + Custom theme: force content area + common custom card classes ── */
 [data-theme="light"] #content,
 [data-theme="light"] #content-main,
-[data-theme="custom"] #content,
-[data-theme="custom"] #content-main {
+[data-theme="custom"] #content, [data-theme^="hc-"] #content,
+[data-theme="custom"] #content-main, [data-theme^="hc-"] #content-main {
   background: var(--bg-app);
   color: var(--text);
 }
@@ -645,95 +952,98 @@
 [data-theme="light"] .kpi-card,
 [data-theme="light"] .card,
 [data-theme="light"] .dash-card,
-[data-theme="custom"] .mv-tile,
-[data-theme="custom"] .ie-card,
-[data-theme="custom"] .imp-card,
-[data-theme="custom"] .sys-tile,
-[data-theme="custom"] .ah-card,
-[data-theme="custom"] .bots-card,
-[data-theme="custom"] .info-card,
-[data-theme="custom"] .kpi-card,
-[data-theme="custom"] .card,
-[data-theme="custom"] .dash-card,
-[data-theme="custom"] .t-tile,
+[data-theme="custom"] .mv-tile, [data-theme^="hc-"] .mv-tile,
+[data-theme="custom"] .ie-card, [data-theme^="hc-"] .ie-card,
+[data-theme="custom"] .imp-card, [data-theme^="hc-"] .imp-card,
+[data-theme="custom"] .sys-tile, [data-theme^="hc-"] .sys-tile,
+[data-theme="custom"] .ah-card, [data-theme^="hc-"] .ah-card,
+[data-theme="custom"] .bots-card, [data-theme^="hc-"] .bots-card,
+[data-theme="custom"] .info-card, [data-theme^="hc-"] .info-card,
+[data-theme="custom"] .kpi-card, [data-theme^="hc-"] .kpi-card,
+[data-theme="custom"] .card, [data-theme^="hc-"] .card,
+[data-theme="custom"] .dash-card, [data-theme^="hc-"] .dash-card,
+[data-theme="custom"] .t-tile, [data-theme^="hc-"] .t-tile,
 [data-theme="light"] .t-tile {
   background: var(--bg-card) !important;
   border-color: var(--border-strong) !important;
   color: var(--text) !important;
 }
 [data-theme="light"] .mv-tile:hover,
-[data-theme="custom"] .mv-tile:hover {
+[data-theme="custom"] .mv-tile:hover, [data-theme^="hc-"] .mv-tile:hover {
   background: var(--bg-hover) !important;
   box-shadow: 0 4px 16px rgba(0,0,0,.1) !important;
 }
 /* Tile text elements */
-[data-theme="light"] .mv-tile-name,  [data-theme="custom"] .mv-tile-name  { color: var(--text) !important; }
-[data-theme="light"] .mv-tile-sub,   [data-theme="custom"] .mv-tile-sub   { color: var(--text-muted) !important; }
-[data-theme="light"] .mv-tile-detail,[data-theme="custom"] .mv-tile-detail { color: var(--text-dim) !important; }
+[data-theme="light"] .mv-tile-name,  [data-theme="custom"] .mv-tile-name, [data-theme^="hc-"] .mv-tile-name  { color: var(--text) !important; }
+[data-theme="light"] .mv-tile-sub,   [data-theme="custom"] .mv-tile-sub, [data-theme^="hc-"] .mv-tile-sub   { color: var(--text-muted) !important; }
+[data-theme="light"] .mv-tile-detail,[data-theme="custom"] .mv-tile-detail, [data-theme^="hc-"] .mv-tile-detail { color: var(--text-dim) !important; }
 /* Recent activity cards */
 [data-theme="light"] .mv-recent-card,
-[data-theme="custom"] .mv-recent-card {
+[data-theme="custom"] .mv-recent-card, [data-theme^="hc-"] .mv-recent-card {
   background: var(--bg-card-2) !important;
   border-color: var(--border-strong) !important;
 }
-[data-theme="light"] .mv-recent-body a,  [data-theme="custom"] .mv-recent-body a  { color: var(--accent) !important; }
-[data-theme="light"] .mv-recent-obj,     [data-theme="custom"] .mv-recent-obj     { color: var(--text-muted) !important; }
-[data-theme="light"] .mv-recent-model,   [data-theme="custom"] .mv-recent-model   { color: var(--text-dim) !important; }
-[data-theme="light"] .mv-empty,          [data-theme="custom"] .mv-empty          { color: var(--text-muted) !important; }
+[data-theme="light"] .mv-recent-body a,  [data-theme="custom"] .mv-recent-body a, [data-theme^="hc-"] .mv-recent-body a  { color: var(--accent) !important; }
+[data-theme="light"] .mv-recent-obj,     [data-theme="custom"] .mv-recent-obj, [data-theme^="hc-"] .mv-recent-obj     { color: var(--text-muted) !important; }
+[data-theme="light"] .mv-recent-model,   [data-theme="custom"] .mv-recent-model, [data-theme^="hc-"] .mv-recent-model   { color: var(--text-dim) !important; }
+[data-theme="light"] .mv-empty,          [data-theme="custom"] .mv-empty, [data-theme^="hc-"] .mv-empty          { color: var(--text-muted) !important; }
 /* Section headers */
-[data-theme="light"] .mv-section-hdr,    [data-theme="custom"] .mv-section-hdr    { color: var(--text) !important; }
-[data-theme="light"] .mv-dash,           [data-theme="custom"] .mv-dash           { background: var(--bg-app) !important; }
+[data-theme="light"] .mv-section-hdr,    [data-theme="custom"] .mv-section-hdr, [data-theme^="hc-"] .mv-section-hdr    { color: var(--text) !important; }
+[data-theme="light"] .mv-dash,           [data-theme="custom"] .mv-dash, [data-theme^="hc-"] .mv-dash           { background: var(--bg-app) !important; }
 /* Status bar chips */
-[data-theme="light"] .sys-status-bar,    [data-theme="custom"] .sys-status-bar    { background: var(--bg-card-2) !important; border-color: var(--border-strong) !important; }
-[data-theme="light"] .sys-status-item,   [data-theme="custom"] .sys-status-item   { border-color: var(--border-strong) !important; color: var(--text) !important; }
+[data-theme="light"] .sys-status-bar,    [data-theme="custom"] .sys-status-bar, [data-theme^="hc-"] .sys-status-bar    { background: var(--bg-card-2) !important; border-color: var(--border-strong) !important; }
+[data-theme="light"] .sys-status-item,   [data-theme="custom"] .sys-status-item, [data-theme^="hc-"] .sys-status-item   { border-color: var(--border-strong) !important; color: var(--text) !important; }
 /* Generic text fix */
 [data-theme="light"] .ie-card *,
 [data-theme="light"] .imp-card *,
 [data-theme="light"] .sys-tile *,
 [data-theme="light"] .card *,
-[data-theme="custom"] .ie-card *,
-[data-theme="custom"] .imp-card *,
-[data-theme="custom"] .sys-tile *,
-[data-theme="custom"] .card * { color: var(--text); }
+[data-theme="custom"] .ie-card *, [data-theme^="hc-"] .ie-card *,
+[data-theme="custom"] .imp-card *, [data-theme^="hc-"] .imp-card *,
+[data-theme="custom"] .sys-tile *, [data-theme^="hc-"] .sys-tile *,
+[data-theme="custom"] .card *, [data-theme^="hc-"] .card * { color: var(--text); }
 
 /* ── Light + Custom theme: ensure content area text is readable ── */
 [data-theme="light"] #content-main,
 [data-theme="light"] .results,
 [data-theme="light"] .results td,
 [data-theme="light"] .results th,
-[data-theme="custom"] #content-main,
-[data-theme="custom"] .results,
-[data-theme="custom"] .results td,
-[data-theme="custom"] .results th { color: var(--text); }
+[data-theme="custom"] #content-main, [data-theme^="hc-"] #content-main,
+[data-theme="custom"] .results, [data-theme^="hc-"] .results,
+[data-theme="custom"] .results td, [data-theme^="hc-"] .results td,
+[data-theme="custom"] .results th, [data-theme^="hc-"] .results th { color: var(--text); }
 [data-theme="light"] #changelist-filter,
 [data-theme="light"] #changelist-filter h2,
 [data-theme="light"] #changelist-filter h3,
 [data-theme="light"] #changelist-filter li,
-[data-theme="custom"] #changelist-filter,
-[data-theme="custom"] #changelist-filter h2,
-[data-theme="custom"] #changelist-filter h3,
-[data-theme="custom"] #changelist-filter li { color: var(--text); }
-[data-theme="light"] .help,   [data-theme="custom"] .help   { color: var(--text-muted) !important; }
-[data-theme="light"] .help-tooltip, [data-theme="custom"] .help-tooltip { color: var(--text-muted) !important; }
+[data-theme="custom"] #changelist-filter, [data-theme^="hc-"] #changelist-filter,
+[data-theme="custom"] #changelist-filter h2, [data-theme^="hc-"] #changelist-filter h2,
+[data-theme="custom"] #changelist-filter h3, [data-theme^="hc-"] #changelist-filter h3,
+[data-theme="custom"] #changelist-filter li, [data-theme^="hc-"] #changelist-filter li { color: var(--text); }
+/* заголовок фільтра — на смузі кольору шапки (--header-bg): текстом шапки, а не основним (був темний на синьому) */
+[data-theme="light"] #changelist-filter h2, [data-theme="custom"] #changelist-filter h2,
+[data-theme^="hc-"] #changelist-filter h2 { color: var(--header-color); }
+[data-theme="light"] .help,   [data-theme="custom"] .help, [data-theme^="hc-"] .help   { color: var(--text-muted) !important; }
+[data-theme="light"] .help-tooltip, [data-theme="custom"] .help-tooltip, [data-theme^="hc-"] .help-tooltip { color: var(--text-muted) !important; }
 /* Select dropdowns */
 [data-theme="light"] select option,
-[data-theme="custom"] select option { background: var(--bg-input); color: var(--text); }
+[data-theme="custom"] select option, [data-theme^="hc-"] select option { background: var(--bg-input); color: var(--text); }
 
 /* ── Light + Custom theme: import tiles — same style as other tiles (no tint) ── */
 [data-theme="light"] .sal-tile-import,
 [data-theme="light"] .inv-tile-import,
 [data-theme="light"] [class*="-tile-import"],
-[data-theme="custom"] .sal-tile-import,
-[data-theme="custom"] .inv-tile-import,
-[data-theme="custom"] [class*="-tile-import"] {
+[data-theme="custom"] .sal-tile-import, [data-theme^="hc-"] .sal-tile-import,
+[data-theme="custom"] .inv-tile-import, [data-theme^="hc-"] .inv-tile-import,
+[data-theme="custom"] [class*="-tile-import"], [data-theme^="hc-"] [class*="-tile-import"] {
   background: var(--bg-card) !important;
 }
 [data-theme="light"] .sal-tile-import:hover,
 [data-theme="light"] .inv-tile-import:hover,
 [data-theme="light"] [class*="-tile-import"]:hover,
-[data-theme="custom"] .sal-tile-import:hover,
-[data-theme="custom"] .inv-tile-import:hover,
-[data-theme="custom"] [class*="-tile-import"]:hover {
+[data-theme="custom"] .sal-tile-import:hover, [data-theme^="hc-"] .sal-tile-import:hover,
+[data-theme="custom"] .inv-tile-import:hover, [data-theme^="hc-"] .inv-tile-import:hover,
+[data-theme="custom"] [class*="-tile-import"]:hover, [data-theme^="hc-"] [class*="-tile-import"]:hover {
   background: var(--bg-hover) !important;
 }
 
@@ -1520,7 +1830,9 @@ document.addEventListener('DOMContentLoaded', function(){
   var swHtml =
     '<button data-t="dark"    title="Темна">🌙</button>' +
     '<button data-t="light"   title="Світла">☀️</button>' +
-    '<button data-t="minerva" title="Minerva">⚜️</button>';
+    '<button data-t="minerva" title="Minerva">⚜️</button>' +
+    '<button data-t="hc-dark"  title="♿ Контраст — темна (≥ 7 : 1)" aria-label="Висока контрастність, темна">◐</button>' +
+    '<button data-t="hc-light" title="♿ Контраст — світла (≥ 7 : 1)" aria-label="Висока контрастність, світла">◑</button>';
   if (window.MV_HAS_CUSTOM_THEME) {
     swHtml += '<button data-t="custom" title="Власна 🎨">🎨</button>';
   }
@@ -1535,18 +1847,30 @@ document.addEventListener('DOMContentLoaded', function(){
   }
   sidebar.appendChild(themeSw);
 
-  var _curTheme = localStorage.getItem('mv-theme') || 'dark';
+  var _curTheme = document.documentElement.getAttribute('data-theme') || localStorage.getItem('mv-theme') || 'dark';
+  themeSw.setAttribute('role', 'group');
+  themeSw.setAttribute('aria-label', 'Тема оформлення');
   themeSw.querySelectorAll('button').forEach(function(btn){
+    btn.type = 'button';
+    btn.setAttribute('aria-pressed', btn.dataset.t === _curTheme ? 'true' : 'false');
     if (btn.dataset.t === _curTheme) btn.classList.add('mv-active');
     btn.addEventListener('click', function(){
       var t = btn.dataset.t;
       document.documentElement.setAttribute('data-theme', t);
       localStorage.setItem('mv-theme', t);
       /* Sync Django admin's own theme key so standard elements follow */
-      localStorage.setItem('theme', t === 'light' ? 'light' : 'dark');
+      localStorage.setItem('theme', (t === 'light' || t === 'hc-light') ? 'light' : 'dark');
       themeSw.querySelectorAll('button').forEach(function(b){
         b.classList.toggle('mv-active', b.dataset.t === t);
+        b.setAttribute('aria-pressed', b.dataset.t === t ? 'true' : 'false');
       });
+      /* у профіль — та сама тема на інших пристроях (core/ui_prefs.py) */
+      var csrf = (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || '';
+      fetch('/core/my-settings/', {
+        method: 'POST', credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf},
+        body: JSON.stringify({ui: {theme: t}})
+      }).catch(function(){});
     });
   });
 
@@ -1621,7 +1945,7 @@ document.addEventListener('DOMContentLoaded', function(){
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
   .minerva-tagline {
-    font-size: 10px; color: rgba(255,255,255,.38); font-weight: 500;
+    font-size: 10px; color: rgba(255,255,255,.78); font-weight: 500;
     letter-spacing: 1.2px; text-transform: uppercase; display: block;
   }
 </style>
@@ -1642,7 +1966,7 @@ document.addEventListener('DOMContentLoaded', function(){
    style="display:inline-flex;align-items:center;gap:4px;
           padding:2px 8px;border-radius:5px;text-decoration:none;
           background:transparent;border:1px solid var(--border-strong);
-          font-size:12px;font-weight:600;color:var(--text-muted);
+          font-size:12px;font-weight:600;color:var(--header-link-color);
           line-height:1;transition:all .15s;white-space:nowrap;vertical-align:middle">
   <span style="font-size:13px;line-height:1">🛒</span>
   <span id="mv-cart-badge" style="display:none;background:#2e7d32;color:#fff;
@@ -1651,7 +1975,7 @@ document.addEventListener('DOMContentLoaded', function(){
 <div id="mv-lang-sw" style="position:relative;display:inline-flex;align-items:center;vertical-align:middle">
   <button type="button" onclick="mvToggleLang(event)"
     style="padding:2px 8px;border-radius:5px;font-size:12px;border:1px solid var(--border-strong);
-           background:transparent;cursor:pointer;color:var(--text-muted)">
+           background:transparent;cursor:pointer;color:var(--header-link-color)">
     🌐 {{ CURRENT_LANGUAGE|upper }}
   </button>
   <div id="mv-lang-menu" style="display:none;position:absolute;top:30px;right:0;
@@ -1887,6 +2211,9 @@ window.addEventListener('appinstalled', function() {
 [data-theme="minerva"] .mv-cp-msg.user .mv-cp-bubble {
   background: #c9a84c; color: #0a0e1a;
 }
+/* ♿ Контраст: насичений синій → білий текст (≥ 7 : 1) */
+[data-theme="hc-dark"] .mv-cp-msg.user .mv-cp-bubble { background: #0a3d91; color: #ffffff; }
+[data-theme="hc-light"] .mv-cp-msg.user .mv-cp-bubble { background: #0033cc; color: #ffffff; }
 .mv-cp-msg.bot .mv-cp-bubble {
   background: var(--bg-hover); color: var(--text);
   border: 1px solid var(--border); border-radius: 3px 12px 12px 12px;

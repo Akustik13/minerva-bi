@@ -5,12 +5,6 @@
 
 {% block extrahead %}
 {{ block.super }}
-<script>
-(function(){
-  var t = localStorage.getItem('mv-theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', t);
-})();
-</script>
 <style>
 .ms-page { max-width: 720px; margin: 24px auto; padding: 0 16px; }
 .ms-card {
@@ -84,7 +78,14 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
   border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
   cursor: pointer; transition: border-color .15s, background .15s;
 }
-.ms-theme-btn.active { border-color: var(--accent, #58a6ff); background: var(--accent, #58a6ff)22; color: var(--accent, #58a6ff); }
+.ms-theme-btn.active { border: 2px solid var(--accent, #58a6ff); background: var(--accent-subtle); color: var(--text); }
+.ms-theme-btn.active::after { content: ' ✓'; }
+.ms-a11y-row { align-items: flex-start; }
+.ms-a11y-row label { padding-top: 6px; }
+.ms-a11y-note { font-size: 12px; color: var(--text-muted); margin: -4px 0 10px; line-height: 1.5; }
+.ms-sample { margin-top: 12px; padding: 12px 14px; border: 1px dashed var(--border-strong); border-radius: 8px;
+  font-size: 13px; color: var(--text); background: var(--bg-card-2); line-height: 1.5; }
+.ms-sample a { color: var(--link-fg); }
 </style>
 {% endblock %}
 
@@ -146,14 +147,42 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
         </select>
       </div>
     </div>
-    <div class="ms-row">
-      <label>Тема оформлення</label>
-      <div class="ms-ctrl ms-theme-btns" id="theme-btns">
-        <button class="ms-theme-btn" data-theme="dark">🌙 Темна</button>
-        <button class="ms-theme-btn" data-theme="light">☀️ Світла</button>
-        <button class="ms-theme-btn" data-theme="minerva">⚜️ Minerva</button>
-        <button class="ms-theme-btn" data-theme="auto">🔁 Авто</button>
+    <div class="ms-row ms-a11y-row">
+      <label id="theme-label">Тема оформлення</label>
+      <div class="ms-ctrl ms-theme-btns" id="theme-btns" role="group" aria-labelledby="theme-label" style="max-width:420px">
+        {% for code, label in themes %}
+        <button type="button" class="ms-theme-btn" data-theme="{{ code }}">{{ label }}</button>
+        {% endfor %}
       </div>
+    </div>
+    <div class="ms-a11y-note">
+      Тема зберігається у вашому профілі — однакова на всіх комп'ютерах і телефоні. «♿ Контраст» — чорне на білому
+      або біле на чорному, кожен текст щонайменше 7 : 1 (найвищий рівень WCAG — AAA).
+    </div>
+  </div>
+
+  {# ── Доступність ── #}
+  <div class="ms-card" id="a11y">
+    <h3>♿ Доступність</h3>
+    <div class="ms-a11y-note">
+      Діє одразу — подивіться на зразок унизу; «💾 Зберегти» — щоб так було завжди й на інших пристроях.
+    </div>
+    {% for opt in ui_options %}
+    <div class="ms-row ms-a11y-row">
+      <label for="ui-{{ opt.key }}">{{ opt.title }}</label>
+      <div class="ms-ctrl" style="max-width:360px">
+        <select id="ui-{{ opt.key }}" data-ui="{{ opt.key }}" data-attr="{{ opt.attr }}">
+          {% for value, text in opt.values %}
+          <option value="{{ value }}" {% if value == opt.current %}selected{% endif %}>{{ text }}</option>
+          {% endfor %}
+        </select>
+        {% if opt.hint %}<div class="ms-a11y-note" style="margin:6px 0 0">{{ opt.hint }}</div>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    <div class="ms-sample" aria-label="Зразок тексту">
+      <strong>Зразок:</strong> Замовлення 102497269 — 5 шт. AN220214-01A, відправлено 30.10.2026.
+      Il1 O0 rn m — <a href="#a11y">посилання</a>. Натисніть Tab — побачите рамку фокусу.
     </div>
   </div>
 
@@ -170,21 +199,32 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
 
 <script>
 (function(){
-  var currentTheme = '{{ profile.theme|default:"dark" }}';
+  var currentTheme = '{{ current_theme|escapejs }}';
 
   // Init theme buttons
   document.querySelectorAll('.ms-theme-btn').forEach(function(btn){
+    btn.setAttribute('aria-pressed', btn.dataset.theme === currentTheme ? 'true' : 'false');
     if (btn.dataset.theme === currentTheme) btn.classList.add('active');
     btn.addEventListener('click', function(){
       currentTheme = this.dataset.theme;
-      document.querySelectorAll('.ms-theme-btn').forEach(function(b){ b.classList.remove('active'); });
-      this.classList.add('active');
+      document.querySelectorAll('.ms-theme-btn').forEach(function(b){
+        b.classList.toggle('active', b === btn);
+        b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
+      });
       // Apply theme immediately for preview
       var t = currentTheme === 'auto'
         ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
         : currentTheme;
       document.documentElement.setAttribute('data-theme', t);
-      if (currentTheme !== 'auto') localStorage.setItem('mv-theme', currentTheme);
+      localStorage.setItem('mv-theme', t);
+      localStorage.setItem('theme', (t === 'light' || t === 'hc-light') ? 'light' : 'dark');
+    });
+  });
+
+  // ♿ Доступність — одразу на сторінці (атрибути <html>, CSS у base_site.html)
+  document.querySelectorAll('select[data-ui]').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      document.documentElement.setAttribute(sel.dataset.attr, sel.value);
     });
   });
 
@@ -196,9 +236,11 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
     status.textContent = 'Збереження…';
 
     var tid = document.getElementById('telegram_id').value.trim();
+    var ui = {theme: currentTheme};
+    document.querySelectorAll('select[data-ui]').forEach(function(sel){ ui[sel.dataset.ui] = sel.value; });
     var payload = {
       interface_language: document.getElementById('interface_language').value,
-      theme:              currentTheme,
+      ui:                 ui,
       telegram_id:        tid === '' ? null : tid,
     };
 
@@ -216,8 +258,6 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
       if (data.ok){
         status.style.color = 'var(--ok,#3fb950)';
         status.textContent = '✅ Збережено';
-        // persist theme to localStorage
-        if (currentTheme !== 'auto') localStorage.setItem('mv-theme', currentTheme);
         setTimeout(function(){ status.textContent = ''; }, 3000);
       } else {
         status.style.color = 'var(--err,#f85149)';

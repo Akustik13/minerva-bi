@@ -32,11 +32,13 @@ def my_settings_view(request):
             if data['interface_language'] in valid_langs:
                 profile.interface_language = data['interface_language']
                 fields_updated.append('interface_language')
+        # тема й доступність — core/ui_prefs.py (лише відомі значення; тема пишеться й у старе поле theme)
+        ui = dict(data.get('ui') or {}) if isinstance(data.get('ui'), dict) else {}
         if 'theme' in data:
-            valid_themes = [c[0] for c in profile._meta.get_field('theme').choices]
-            if data['theme'] in valid_themes:
-                profile.theme = data['theme']
-                fields_updated.append('theme')
+            ui['theme'] = data['theme']
+        if ui:
+            from core import ui_prefs
+            fields_updated += ui_prefs.save(profile, ui)
         if 'telegram_id' in data:
             val = data['telegram_id']
             if val == '' or val is None:
@@ -60,11 +62,16 @@ def my_settings_view(request):
     else:
         modules_display = ', '.join(modules) if modules else 'Немає доступу'
 
+    from core import ui_prefs
+    ui = ui_prefs.prefs_of(profile)
     context = {
         'profile': profile,
         'modules_display': modules_display,
         'modules_is_all': modules == '__all__',
         'title': 'Мої налаштування',
+        'themes': [(k, v) for k, v in ui_prefs.THEMES.items() if k != 'custom'],
+        'current_theme': ui['theme'] or profile.theme or 'dark',
+        'ui_options': ui_prefs.options_for(ui),
     }
     return render(request, 'core/my_settings.html', context)
 
