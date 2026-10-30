@@ -36,6 +36,11 @@
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="96x96" href="/static/icons/icon-96.png">
 <link rel="stylesheet" href="/static/admin/css/mobile.css">
+{% if MV_MOBILE_JSON %}{# 📱 телефон: нижня панель, меню «Ще», списки картками (core/mobile_nav.py) #}
+<script id="mv-mobile-config" type="application/json">{{ MV_MOBILE_JSON|safe }}</script>
+<link rel="stylesheet" href="/static/admin/css/mv_mobile.css?v=4">
+<script src="/static/admin/js/mv_mobile.js?v=3" defer></script>
+{% endif %}
 <style>
 /* Emoji fallback font stack for country flags (shown via onerror on flagcdn.com img) */
 .mv-flag-emoji {

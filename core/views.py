@@ -165,6 +165,20 @@ def panel_prefs_view(request, model):
     return JsonResponse({'ok': True, 'prefs': side_panel.save_prefs(request.user, panel, data)})
 
 
+@staff_member_required
+@require_http_methods(['POST'])
+def mobile_nav_view(request):
+    """📱 Закріплені розділи нижньої панелі телефона (core/mobile_nav.py): {pinned: [...]} або {pinned: null} — як було."""
+    from core import mobile_nav
+    try:
+        data = json.loads(request.body or b"{}")
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    return JsonResponse({'ok': True, 'pinned': mobile_nav.save(request.user, data.get('pinned'))})
+
+
 def custom_403_view(request, exception=None):
     return render(request, 'core/access_denied.html', {
         'title': 'Доступ обмежено',

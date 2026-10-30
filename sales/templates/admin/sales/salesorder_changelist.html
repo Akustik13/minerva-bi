@@ -817,8 +817,10 @@ function svCheckAll(master) {
   svCardCheckChange();
 }
 
+// телефон — свій вибір і за замовчуванням картки (static/admin/js/mv_mobile.js)
+var SV_VIEW_KEY = window.matchMedia('(max-width: 768px)').matches ? 'salesorder_view_phone' : 'salesorder_view';
 function svSetView(mode) {
-  localStorage.setItem('salesorder_view', mode);
+  localStorage.setItem(SV_VIEW_KEY, mode);
   var isCards = mode === 'cards';
   document.getElementById('sv-cards').style.display = isCards ? 'block' : 'none';
   document.getElementById('sv-table').style.display = isCards ? 'none' : 'block';
@@ -852,7 +854,7 @@ function svSetView(mode) {
     clone.style.border = 'none';
     actArea.appendChild(clone);
   }
-  svSetView(localStorage.getItem('salesorder_view') || 'table');
+  svSetView(localStorage.getItem(SV_VIEW_KEY) || (SV_VIEW_KEY === 'salesorder_view' ? 'table' : 'cards'));
 })();
 
 // ── Country flag: img from flagcdn.com + emoji fallback ──────────────────────

@@ -1,0 +1,189 @@
+/* 📱 Телефон (≤ 768 px): нижня панель, меню «Ще», списки картками, фільтри знизу (static/admin/js/mv_mobile.js,
+   core/mobile_nav.py). Кольори — змінні теми; на ширшому екрані нічого з цього не діє. */
+#mv-bnav, #mv-more, .mvf-btn, .mvf-head, .mvf-shade, .mvc-more { display: none; }
+
+@media (max-width: 768px) {
+  :root { --mv-bnav-h: calc(60px + env(safe-area-inset-bottom, 0px)); }
+  #container { overflow-x: clip; max-width: 100vw; }
+  /* форма: без власної прокрутки вбік, інакше «Зберегти» не тримається внизу екрана (sticky); таблиці inline —
+     прокручуються самі */
+  body.change-form #content-main { overflow-x: visible !important; }
+  body.change-form .inline-group .tabular { overflow-x: auto; }
+
+  /* ── шапка: коротка, акаунт — у «☰ Ще» ── */
+  #header { padding: 8px 12px !important; gap: 8px !important; min-height: 52px; box-sizing: border-box; }
+  .minerva-tagline { display: none !important; }
+  .minerva-logo { width: 32px !important; height: 32px !important; font-size: 17px !important; }
+  .minerva-name { font-size: 17px !important; }
+  body.mv-has-bnav #user-tools { display: none !important; }
+  body.mv-has-bnav #branding { padding-left: 0 !important; }
+  body.mv-has-bnav #mob-menu-btn { display: none !important; }
+  body.mv-has-bnav.change-form #mob-menu-btn { display: flex !important; }
+  body.mv-has-bnav.change-form #branding { padding-left: 44px !important; }
+  #mob-menu-btn { min-width: 44px; min-height: 44px; top: 4px !important; }
+  div.breadcrumbs { white-space: nowrap; overflow-x: auto; padding: 8px 12px !important; font-size: 13px;
+    scrollbar-width: none; }
+  div.breadcrumbs::-webkit-scrollbar { display: none; }
+
+  /* ── нижня панель ── */
+  #mv-bnav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9990; display: flex; box-sizing: border-box;
+    height: var(--mv-bnav-h); padding: 0 4px env(safe-area-inset-bottom, 0px);
+    background: var(--sb-bg, var(--bg-card)); border-top: 1px solid var(--border-strong);
+    box-shadow: 0 -6px 18px rgba(0,0,0,.18); }
+  .mvb-item { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; padding: 6px 2px; border: 0; background: none; cursor: pointer; font: inherit; font-size: 11px;
+    color: var(--sb-link, var(--text-muted)) !important; text-decoration: none !important; -webkit-tap-highlight-color: transparent; }
+  .mvb-ico { font-size: 20px; line-height: 1; padding: 3px 14px; border-radius: 999px; }
+  .mvb-lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .mvb-item.on { color: var(--sb-link-hover-text, var(--text)) !important; }
+  .mvb-item.on .mvb-ico { background: var(--accent-subtle, rgba(88,166,255,.18)); }
+  body.mv-has-bnav { padding-bottom: var(--mv-bnav-h); }
+  body.change-form #mv-bnav, html.mv-typing #mv-bnav { display: none; }
+  body.change-form.mv-has-bnav, html.mv-typing body.mv-has-bnav { padding-bottom: 0; }
+  body.mv-has-bnav:not(.change-form) #mv-fab { bottom: calc(var(--mv-bnav-h) + 12px) !important; right: 14px !important;
+    width: 46px !important; height: 46px !important; font-size: 20px !important; }
+  body.mv-has-bnav:not(.change-form) #rg-pill { bottom: calc(var(--mv-bnav-h) + 12px) !important; right: 68px !important;
+    height: 46px !important; }
+  body.mv-has-bnav:not(.change-form) #rg-pill img, body.change-form #rg-pill img { width: 38px !important; height: 38px !important; }
+  #rg-pill .rg-name { display: none; }
+  #rg-pill { padding: 4px !important; width: 46px; justify-content: center; }
+  #rg-pill .rg-dot { left: 34px !important; }
+  body.change-form #mv-fab { bottom: calc(var(--mv-submit-h, 64px) + 12px) !important; right: 14px !important;
+    width: 46px !important; height: 46px !important; font-size: 20px !important; }
+  body.change-form #rg-pill { bottom: calc(var(--mv-submit-h, 64px) + 12px) !important; right: 68px !important;
+    height: 46px !important; }
+  body.mv-has-bnav:not(.change-form) #cal-ai-btn { bottom: calc(var(--mv-bnav-h) + 66px) !important; right: 14px !important;
+    width: 46px !important; height: 46px !important; }
+  body.mv-has-bnav:not(.change-form) #mv-show-bar, body.mv-has-bnav:not(.change-form) #pv-toast {
+    bottom: calc(var(--mv-bnav-h) + 12px) !important; }
+  html.mv-typing #mv-fab, html.mv-typing #rg-pill, html.mv-typing #cal-ai-btn { display: none !important; }
+  .em-app { height: calc(100dvh - 112px - var(--mv-bnav-h)) !important; }
+
+  /* ── меню «Ще» ── */
+  #mv-more { position: fixed; inset: 0; z-index: 10020; }
+  html.mv-sheet-open #mv-more { display: block; }
+  html.mv-sheet-open, html.mv-filters-open { overflow: hidden; }
+  .mvm-shade { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+  .mvm-box { position: absolute; left: 0; right: 0; bottom: 0; max-height: 86vh; overflow-y: auto; box-sizing: border-box;
+    padding: 4px 16px calc(18px + env(safe-area-inset-bottom, 0px)); border-radius: 18px 18px 0 0;
+    background: var(--bg-card); color: var(--text); box-shadow: 0 -10px 40px rgba(0,0,0,.45); }
+  .mvm-box::before { content: ''; display: block; width: 40px; height: 4px; margin: 6px auto 2px; border-radius: 4px;
+    background: var(--border-strong); }
+  .mvm-head { display: flex; align-items: center; justify-content: space-between; }
+  .mvm-title { font-size: 17px; font-weight: 700; }
+  .mvm-x { width: 44px; height: 44px; border: 0; border-radius: 10px; background: none; color: inherit; font-size: 20px;
+    cursor: pointer; }
+  .mvm-note { min-height: 18px; margin: 0 0 10px; font-size: 13px; color: var(--text-muted); }
+  .mvm-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .mvm-tile { position: relative; border: 1px solid var(--border-strong); border-radius: 14px; }
+  .mvm-tile.here { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .mvm-link { display: flex; flex-direction: column; align-items: center; gap: 5px; min-height: 78px; box-sizing: border-box;
+    padding: 16px 6px 10px; color: var(--text) !important; text-decoration: none !important; }
+  .mvm-ico { font-size: 24px; line-height: 1; }
+  .mvm-lbl { font-size: 12.5px; font-weight: 600; text-align: center; overflow-wrap: anywhere; }
+  .mvm-star { position: absolute; top: 0; right: 0; width: 44px; height: 40px; border: 0; border-radius: 0 14px 0 12px;
+    background: none; color: var(--text-muted); font-size: 18px; line-height: 1; cursor: pointer; }
+  .mvm-star.on { color: var(--warn, #e3b341); }
+  .mvm-row { display: flex; gap: 8px; margin: 12px 0 0; }
+  .mvm-wide { flex: 1; min-height: 46px; border: 0; border-radius: 12px; cursor: pointer; font: inherit; font-size: 14px;
+    font-weight: 700; background: var(--default-button-bg, #1565c0); color: var(--button-fg, #fff); }
+  .mvm-soft { flex: 0 0 auto; padding: 0 14px; border: 1px solid var(--border-strong); background: transparent;
+    color: var(--text); }
+  .mvm-sub { margin: 16px 0 8px; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--text-muted); }
+  .mvm-links { display: flex; flex-wrap: wrap; gap: 8px; }
+  .mvm-chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; box-sizing: border-box;
+    border: 1px solid var(--border-strong); border-radius: 12px; background: transparent; cursor: pointer; font: inherit;
+    font-size: 14px; color: var(--text) !important; text-decoration: none !important; }
+  .mvm-logout { display: block; margin: 8px 0 0; }
+
+  /* ── форма: «Зберегти» + «⋯» в один рядок ── */
+  .submit-row.mv-sr { flex-direction: row !important; flex-wrap: wrap; align-items: stretch; }
+  .submit-row.mv-sr > * { margin: 0 !important; }
+  .submit-row.mv-sr > input.default, .submit-row.mv-sr > button.default { flex: 1 1 0 !important; width: auto !important; }
+  .submit-row.mv-sr .mv-sr-extra { display: none !important; }
+  .submit-row.mv-sr.mv-sr-open .mv-sr-extra { display: flex !important; flex: 1 1 100% !important; order: -1;
+    align-items: center; justify-content: center; min-height: 44px; box-sizing: border-box; }
+  .mv-sr-btn { flex: 0 0 52px; min-height: 44px; border: 1px solid var(--border-strong); border-radius: 6px;
+    background: var(--bg-card); color: var(--text); font-size: 18px; cursor: pointer; }
+
+  /* ── повне меню (бокове) — пункти під палець ── */
+  #nav-sidebar .mg-link, #nav-sidebar .mg-header { min-height: 44px; box-sizing: border-box; }
+  #nav-sidebar .mg-link { font-size: 14.5px; }
+  html #nav-sidebar { display: block !important; z-index: 10030 !important; }   /* Django ховає його < 768 px */
+  html #sidebar-overlay { z-index: 10025 !important; }
+
+  /* ── списки адмінки — картками ── */
+  .results { overflow: visible !important; }
+  #result_list { display: block; width: 100% !important; min-width: 0 !important; border: 0 !important;
+    background: transparent !important; }
+  #result_list thead { display: none; }
+  #result_list tbody { display: flex; flex-direction: column; gap: 10px; }
+  #result_list tbody tr { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; padding: 10px 14px;
+    border: 1px solid var(--border-strong); border-radius: 14px; background: var(--bg-card) !important; cursor: pointer; }
+  #result_list tbody tr > td, #result_list tbody tr > th { grid-column: 1 / -1; display: flex; justify-content: space-between;
+    align-items: baseline; gap: 12px; min-width: 0; padding: 4px 0 !important; border: 0 !important;
+    background: transparent !important; text-align: right; white-space: normal !important; overflow-wrap: anywhere;
+    font-size: 14px; }
+  #result_list tbody tr > [data-label]::before { content: attr(data-label); flex: 0 0 auto; max-width: 48%;
+    text-align: left; font-size: 12.5px; font-weight: 400; color: var(--text-muted); }
+  #result_list tbody td.action-checkbox { grid-column: 1; grid-row: 1; align-items: center; padding: 0 !important; }
+  #result_list tbody td.action-checkbox input { width: 22px; height: 22px; margin: 0; }
+  #result_list tbody .mvc-title { grid-column: 2; grid-row: 1; justify-content: flex-start; text-align: left;
+    font-size: 16px; font-weight: 700; padding: 2px 0 6px !important; }
+  #result_list tbody tr:not(:has(> .action-checkbox)) .mvc-title { grid-column: 1 / -1; }
+  #result_list tbody .mvc-title::before { display: none; }
+  #result_list tbody .mvc-empty, #result_list tbody .mvc-extra { display: none !important; }
+  #result_list tbody tr.mvc-open .mvc-extra { display: flex !important; }
+  #result_list tbody .mvc-more { display: flex; justify-content: flex-start; }
+  .mvc-more-btn { min-height: 44px; padding: 0; border: 0; background: none; cursor: pointer; font: inherit;
+    font-weight: 600; color: var(--link-fg, var(--accent)); }
+  #result_list tbody tr.selected { border-color: var(--accent); }
+
+  /* ── фільтри — кнопкою, знизу ── */
+  .mvf-btn { display: block; width: 100%; min-height: 44px; margin: 0 0 8px; border: 1px solid var(--border-strong);
+    border-radius: 10px; background: var(--bg-card); color: var(--text); font: inherit; font-size: 15px; font-weight: 600;
+    cursor: pointer; }
+  #changelist-filter { display: none !important; }
+  html.mv-filters-open #changelist-filter { display: block !important; position: fixed !important; left: 0; right: 0;
+    top: auto !important; bottom: 0; z-index: 10022; width: auto !important; max-height: 82vh; overflow-y: auto;
+    margin: 0 !important; box-sizing: border-box; padding: 0 14px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: 18px 18px 0 0 !important; background: var(--bg-card) !important; box-shadow: 0 -10px 40px rgba(0,0,0,.45); }
+  .mvf-head { display: flex; position: sticky; top: 0; z-index: 1; align-items: center; justify-content: space-between;
+    padding: 6px 0; font-size: 16px; background: var(--bg-card); }
+  html.mv-filters-open .mvf-shade { display: block; position: fixed; inset: 0; z-index: 10021; background: rgba(0,0,0,.5); }
+  #changelist-filter li a, #changelist-filter details > summary { display: block; min-height: 44px; box-sizing: border-box;
+    padding: 11px 10px !important; }
+
+  /* ── верх списку: заголовок, кнопки, пошук, дати — компактно, без виходу за край ── */
+  #content h1 { font-size: 19px !important; line-height: 1.3; margin: 2px 0 10px !important; }
+  ul.object-tools { display: flex !important; flex-wrap: wrap; gap: 8px; margin: 0 0 10px !important; padding: 0 !important; }
+  ul.object-tools li { float: none !important; margin: 0 !important; }
+  ul.object-tools a { padding: 0 12px !important; font-size: 13px !important; text-transform: none !important;
+    letter-spacing: 0 !important; margin: 0 !important; }
+  ul.object-tools a.addlink { padding-right: 30px !important; }
+  #changelist #toolbar { padding: 8px !important; }
+  #changelist-search > div { display: flex !important; align-items: center; gap: 8px; flex-wrap: nowrap; }
+  #changelist #toolbar form #searchbar { flex: 1 1 0; width: 0 !important; min-width: 0; height: auto !important;
+    min-height: 44px; }
+  #changelist #toolbar form input[type="submit"] { flex: 0 0 auto; height: auto !important; min-height: 44px; }
+  .toplinks, .sv-qf-bar { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto; white-space: nowrap;
+    scrollbar-width: none; }
+  .toplinks { gap: 4px 16px; padding-bottom: 6px !important; }
+  .toplinks > * { flex: 0 0 auto; }
+  .toplinks::-webkit-scrollbar, .sv-qf-bar::-webkit-scrollbar { display: none; }
+  .sv-qf-bar > * { flex: 0 0 auto; }
+  .actions { flex-wrap: wrap; max-width: 100%; }
+  .actions label { display: flex; flex: 1 1 100%; align-items: center; gap: 8px; min-width: 0; }
+  .actions select { flex: 1 1 auto; width: auto !important; min-width: 0; max-width: 100%; }
+  .actions select { min-width: 140px; }
+  div:has(> #sv-actions-area), #sv-actions-area, #sv-actions-area > .actions { flex: 1 1 100% !important; min-width: 0; max-width: 100%; flex-wrap: wrap; }
+
+  /* ── кнопки й посилання під палець ── */
+  #content .button, #content input[type="submit"], #content input[type="button"], .object-tools a { min-height: 44px;
+    box-sizing: border-box; }
+  .object-tools a { display: inline-flex !important; align-items: center; }
+  .paginator a, .paginator .this-page { display: inline-flex; align-items: center; justify-content: center;
+    min-width: 44px; min-height: 44px; box-sizing: border-box; }
+  .actions button, .actions select { min-height: 44px; }
+}

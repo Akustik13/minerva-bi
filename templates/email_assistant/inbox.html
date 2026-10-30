@@ -1534,7 +1534,10 @@ var _i18n = {
   var drag1     = document.getElementById('em-drag1');
   var btn       = document.getElementById('p1-toggle');
   var expandTab = document.getElementById('em-p1-expand');
-  var collapsed = localStorage.getItem('em-p1-col') === '1';
+  /* телефон — свій вибір, за замовчуванням папки згорнуто (▶ — показати), щоб список листів був на всю ширину */
+  var P1_KEY = window.matchMedia('(max-width: 768px)').matches ? 'em-p1-col-phone' : 'em-p1-col';
+  var p1Saved = localStorage.getItem(P1_KEY);
+  var collapsed = p1Saved === null ? P1_KEY === 'em-p1-col-phone' : p1Saved === '1';
 
   function _applyP1(c) {
     p1.classList.toggle('collapsed', c);
@@ -1547,7 +1550,7 @@ var _i18n = {
   window.toggleP1 = function() {
     collapsed = !collapsed;
     _applyP1(collapsed);
-    localStorage.setItem('em-p1-col', collapsed ? '1' : '0');
+    localStorage.setItem(P1_KEY, collapsed ? '1' : '0');
   };
 })();
 
@@ -3541,8 +3544,10 @@ function _lookPresetOf(values) {
 function _lookApply(values) {
   var app = document.getElementById('em-app');
   Array.prototype.slice.call(app.classList).forEach(function(c) { if (c.indexOf('lay-') === 0) app.classList.remove(c); });
-  Object.keys(_look.options).forEach(function(k) { app.classList.add('lay-' + k + '-' + values[k]); });
-  if (values.pane !== 'off') app.classList.remove('em-reading');
+  var shown = Object.assign({}, values);
+  if (window.matchMedia('(max-width: 768px)').matches) shown.pane = 'off';   // телефон: лист замість списку (вибір на ПК не змінюється)
+  Object.keys(_look.options).forEach(function(k) { app.classList.add('lay-' + k + '-' + shown[k]); });
+  if (shown.pane !== 'off') app.classList.remove('em-reading');
   document.querySelectorAll('.em-row.kb-cur').forEach(function(r) { r.classList.remove('kb-cur'); });
   _look.values = values;
   _look.preset = _lookPresetOf(values);

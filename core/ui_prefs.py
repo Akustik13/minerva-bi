@@ -97,8 +97,8 @@ def page_config(profile) -> str:
 
 
 def save(profile, data) -> list:
-    """Записати вибране; повертає змінені поля профілю."""
-    new = dict(clean(getattr(profile, "ui_prefs", None) or {}))
+    """Записати вибране; повертає змінені поля профілю. Інше в `ui_prefs` (панелі, нижня панель телефона) лишається."""
+    new = dict(getattr(profile, "ui_prefs", None) or {})
     new.update(clean(data))
     fields = []
     if new != (profile.ui_prefs or {}):
