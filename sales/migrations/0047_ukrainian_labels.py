@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('inventory', '0042_ukrainian_labels_low_stock_help'),
-        ('sales', '0045_label_settings_all_products'),
+        ('sales', '0046_dymo_open_mode_dymo_connect'),
     ]
 
     operations = [
