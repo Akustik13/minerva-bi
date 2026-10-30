@@ -24,6 +24,27 @@ FIELDS = [
 ]
 
 
+CATALOG = {"Categories": [
+    {"CategoryId": 12, "Name": "RF and Wireless", "ProductCount": 900, "Children": [
+        {"CategoryId": 855, "Name": "RF Filters", "ProductCount": 300, "Children": []},
+        {"CategoryId": 875, "Name": "RF Antennas", "ProductCount": 500, "Children": []}]},
+    {"CategoryId": 20, "Name": "Connectors, Interconnects", "ProductCount": 80, "Children": [
+        {"CategoryId": 374, "Name": "Coaxial Connector (RF) Adapters", "ProductCount": 80, "Children": []}]}]}
+PARAMS = {"FilterOptions": {"ParametricFilters": [
+    {"ParameterId": 2083, "ParameterName": "Connector Type", "ParameterType": "String",
+     "FilterValues": [{"ValueName": "SMA", "ProductCount": 40}, {"ValueName": "N-Type", "ProductCount": 90}]},
+    {"ParameterId": 69, "ParameterName": "Mounting Type", "ParameterType": "String",
+     "FilterValues": [{"ValueName": "Free Hanging (In-Line)", "ProductCount": 5}]},
+    {"ParameterId": -1, "ParameterName": "Manufacturer", "FilterValues": []}]}}
+
+
+def fake_ps(method, path, body=None):
+    if path.endswith("/search/categories"):
+        return CATALOG
+    assert body["FilterOptionsRequest"]["CategoryFilter"] == [{"Id": "374"}], body
+    return PARAMS
+
+
 class FromStockBase(TestCase):
     def setUp(self):
         cache.clear()
@@ -44,6 +65,9 @@ class FromStockBase(TestCase):
         self.fetch = mock.patch("bots.services.dk_marketplace.fetch_custom_fields", return_value=FIELDS)
         self.fetch.start()
         self.addCleanup(self.fetch.stop)
+        self.ps = mock.patch("bots.services.dk_from_stock._ps", side_effect=fake_ps)   # ProductSearch v4
+        self.ps_calls = self.ps.start()
+        self.addCleanup(self.ps.stop)
 
 
 class DraftTests(FromStockBase):
@@ -187,3 +211,69 @@ class StageSyncTests(FromStockBase):
             r = self.client.post("/admin/bots/digikeylisting/pub-sync/")
         self.assertEqual((r.status_code, m.call_count), (302, 1))
         self.assertEqual(self.client.get("/admin/bots/digikeylisting/pub-sync/").status_code, 403)
+
+
+class CatalogTests(FromStockBase):
+    def setUp(self):
+        super().setUp()
+        self.adapter = Product.objects.create(sku="AD-SMA-N", name="SMA-Stecker auf N-Buchse Adapter",
+                                              category="adapters", sale_price="7.90")
+
+    def test_categories_tree_and_params_from_digikey(self):
+        cats = {c["id"]: c for c in svc.dk_categories()}
+        self.assertEqual(cats["855"]["path"], "RF and Wireless › RF Filters")
+        self.assertFalse(cats["12"]["leaf"])
+        params = {p["code"]: p for p in svc.category_params("374")}
+        self.assertEqual(params["2083"]["values"], ["N-Type", "SMA"])          # частіші — першими
+        self.assertNotIn("-1", params)
+        svc.category_params("374")
+        self.assertEqual(self.ps_calls.call_count, 2)                         # далі — з кешу
+        self.assertEqual(svc.category_params("Filters"), [])                  # не ID каталогу — не питаємо
+
+    def test_connector_goes_to_catalog_category_with_its_params(self):
+        svc.dk_categories()
+        d = svc.build_draft(self.adapter)
+        self.assertEqual((d["fields"]["dk_category_id"], d["fields"]["category_type"]), ("374", "connector"))
+        self.assertIn("каталог DigiKey", d["category"]["reason"])
+        rows = {r["code"]: r for r in d["rows"]}
+        self.assertEqual(rows["2083"]["name"], "Connector Type")
+        self.assertEqual(rows["2083"]["examples"][:2], ["N-Type", "SMA"])
+        self.assertTrue(rows["2083"]["from_catalog"])
+
+    def test_digikey_down_falls_back_without_breaking(self):
+        self.ps.stop()
+        with mock.patch("bots.services.dk_from_stock._ps", side_effect=RuntimeError("offline")) as m:
+            self.assertEqual(svc.dk_categories(), [])
+            self.assertEqual(svc.dk_categories(), [])
+            self.assertEqual(m.call_count, 1)                                 # 5 хв без повторних спроб
+            self.assertIn("offline", svc.catalog_state()["down"])
+            self.assertEqual(svc.build_draft(self.adapter)["fields"]["dk_category_id"], "")
+        self.ps.start()
+
+    def test_prices_typed_on_the_page(self):
+        self.assertEqual(svc.parse_prices("1: 12,50; 10: 11,20\n50 9.9"),
+                         [{"qty": 1, "price": "12.5"}, {"qty": 10, "price": "11.2"}, {"qty": 50, "price": "9.9"}])
+        with self.assertRaises(ValueError):
+            svc.parse_prices("ten: 5")
+        self.adapter.sale_price = None
+        self.adapter.save()
+        self.assertEqual(svc.build_draft(self.adapter)["fields"]["dk_prices"], [])
+        d = svc.build_draft(self.adapter, overrides={"dk_prices": "1: 9,90"})
+        self.assertEqual(d["fields"]["dk_prices"], [{"qty": 1, "price": "9.9"}])
+        self.assertIn("ціни вписано вручну", d["notes"])
+
+    def test_page_offers_catalog_categories_and_price_input(self):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+        url = "/admin/bots/digikeylisting/from-stock/"
+        r = self.client.get(url, {"ids": self.adapter.pk})
+        self.assertContains(r, 'optgroup label="Каталог DigiKey — RF and Wireless"')
+        self.assertContains(r, "Connector Type")
+        self.assertContains(r, f'name="p{self.adapter.pk}-prices"')
+        pk = self.adapter.pk
+        r = self.client.post(url, {"ids": str(pk), "action": "create", f"p{pk}-on": "1", f"p{pk}-cat": "855",
+                                   f"p{pk}-prices": "1: 8,50; 10: 7,90", f"p{pk}-f-rohsStatus": "Non-RoHS"})
+        listing = DigiKeyListing.objects.get(product=self.adapter)
+        self.assertEqual((listing.dk_category_id, listing.dk_category_name), ("855", "RF Filters"))
+        self.assertEqual(listing.dk_prices, [{"qty": 1, "price": "8.5"}, {"qty": 10, "price": "7.9"}])

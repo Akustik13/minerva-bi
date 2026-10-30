@@ -7,6 +7,11 @@ bots/services/dk_from_stock.py — 📦 → 🔷 картка DigiKey Marketplac
   • параметри категорії — числові коди, які вже мають наші лістинги в тій самій категорії DigiKey
     (`category_codes`: dk_attributes + поля фільтра fa_*), — DigiKey не дає шаблону категорії через API,
     тож «як у схожих товарів».
+  • категорії й параметри категорії — з каталогу DigiKey (ProductSearch v4, той самий ключ, що пошук товарів):
+    `dk_categories` — дерево `/search/categories`, `category_params` — параметри категорії з найчастішими значеннями
+    (`/search/keyword` з фільтром категорії → FilterOptions.ParametricFilters; ParameterId = числовий код
+    additionalFields Marketplace: 16 Package / Case, 69 Mounting Type…). Кеш на тиждень; DigiKey не відповідає —
+    як раніше, лише з наших лістингів (`ps_down` — 5 хв без повторів).
 Шаблон (`template`) = обов'язкові поля DigiKey + пакування й життєвий цикл + параметри категорії. `autofill` бере
 значення з товару (tech_attributes за назвою поля й синонімами, статус життєвого циклу, пакування як у наших
 лістингів) і повертає, чого бракує. `build_draft` — уся картка (назва ≤ 50, опис ≤ 2048, виробник, фото / даташит,
@@ -22,6 +27,17 @@ logger = logging.getLogger(__name__)
 
 FIELDS_CACHE_KEY = "dk-product-field-defs"
 FIELDS_TTL = 24 * 3600
+CATEGORIES_KEY = "dk-ps-categories"
+PARAMS_KEY = "dk-ps-params:{}"
+CATALOG_TTL = 7 * 24 * 3600
+PS_DOWN_KEY, PS_DOWN_SECONDS = "dk-ps-down", 300
+PARAM_VALUES = 25
+CATEGORIES_PATH = "/products/v4/search/categories"
+# вид товару → назва категорії-листка в каталозі DigiKey
+KIND_CATEGORIES = {"filter": ["RF Filters"], "antenna": ["RF Antennas"],
+                   "cable": ["Coaxial Cables (RF)", "RF Cable Assemblies"],
+                   "connector": ["Coaxial Connector (RF) Adapters", "Coaxial Connectors (RF)"]}
+CONNECTOR_WORDS = ("stecker", "connector", "adapter", "buchse", "kupplung", "jack", "plug", "роз'єм", "перехідник")
 LIFECYCLE = {"active": "Active", "nrnd": "Not For New Designs", "discontinued": "Obsolete"}
 DEFAULT_PACKAGING = "Bulk"
 COMMON = ("packaging", "productLifecycleStatus")
@@ -101,6 +117,113 @@ def fields_state() -> dict:
     return {"known": bool(defs), "count": len(defs), "required": sum(1 for d in defs.values() if d["required"])}
 
 
+# ── Каталог DigiKey (ProductSearch v4) ───────────────────────────────────────
+
+def _ps(method, path, body=None):
+    """Запит до ProductSearch v4 (OAuth client credentials з налаштувань DigiKey)."""
+    import requests
+
+    from bots.models import DigiKeyConfig
+    from bots.services.digikey import _base_url, _headers, get_token
+    config = DigiKeyConfig.get()
+    if not (config.client_id and config.client_secret):
+        raise RuntimeError("ProductSearch DigiKey не налаштовано (Client ID / Secret у налаштуваннях DigiKey)")
+    token = get_token(config)
+    call = requests.post if method == "post" else requests.get
+    resp = call(f"{_base_url(config)}{path}", headers=_headers(config, token), timeout=20,
+                **({"json": body} if body is not None else {}))
+    resp.raise_for_status()
+    return resp.json()
+
+
+def _ps_cached(key, fetch, refresh):
+    """Кеш на тиждень; збій — останнє збережене, і 5 хв без нових спроб (refresh — помилка назовні)."""
+    cached = _cache().get(key)
+    if cached is not None and not refresh:
+        return cached
+    if not refresh and _cache().get(PS_DOWN_KEY):
+        return cached or []
+    try:
+        value = fetch()
+    except Exception as exc:  # noqa: BLE001 — мережа, ключ ProductSearch
+        logger.warning("DK ProductSearch %s: %s", key, exc)
+        _cache().set(PS_DOWN_KEY, str(exc)[:200], PS_DOWN_SECONDS)
+        if refresh:
+            raise
+        return cached or []
+    _cache().set(key, value, CATALOG_TTL)
+    _cache().delete(PS_DOWN_KEY)
+    return value
+
+
+def dk_categories(refresh=False) -> list:
+    """[{id, name, path, top, leaf, count}] — усі категорії каталогу DigiKey (дерево в один список)."""
+    def fetch():
+        out = []
+
+        def walk(nodes, path):
+            for c in nodes or []:
+                name = str(c.get("Name") or "").strip()
+                if not name or c.get("CategoryId") is None:
+                    continue
+                trail = path + [name]
+                children = c.get("Children") or []
+                out.append({"id": str(c["CategoryId"]), "name": name, "path": " › ".join(trail), "top": trail[0],
+                            "leaf": not children, "count": int(c.get("ProductCount") or 0)})
+                walk(children, trail)
+        walk(_ps("get", CATEGORIES_PATH).get("Categories"), [])
+        return out
+    return _ps_cached(CATEGORIES_KEY, fetch, refresh)
+
+
+def category_params(category_id, refresh=False) -> list:
+    """[{code, name, type, values}] — параметри категорії каталогу DigiKey і найчастіші значення (за кількістю
+    товарів). Лише для числових ID категорій каталогу."""
+    category_id = str(category_id or "").strip()
+    if not category_id.isdigit():
+        return []
+
+    def fetch():
+        from bots.services.digikey import KEYWORD_SEARCH_PATH
+        data = _ps("post", KEYWORD_SEARCH_PATH, {
+            "Keywords": "", "Limit": 1, "Offset": 0,
+            "FilterOptionsRequest": {"CategoryFilter": [{"Id": category_id}]}})
+        out = []
+        for p in (data.get("FilterOptions") or {}).get("ParametricFilters") or []:
+            code = p.get("ParameterId")
+            if not isinstance(code, int) or code <= 0:
+                continue
+            values = sorted(p.get("FilterValues") or [], key=lambda v: -(v.get("ProductCount") or 0))
+            out.append({"code": str(code), "name": str(p.get("ParameterName") or code), "type": p.get("ParameterType")
+                        or "", "values": [str(v["ValueName"]) for v in values[:PARAM_VALUES]
+                                          if v.get("ValueName") not in (None, "", "-")]})
+        return out
+    return _ps_cached(PARAMS_KEY.format(category_id), fetch, refresh)
+
+
+def catalog_state() -> dict:
+    cats = _cache().get(CATEGORIES_KEY) or []
+    return {"categories": len(cats), "down": _cache().get(PS_DOWN_KEY) or ""}
+
+
+def _catalog_by_id() -> dict:
+    return {c["id"]: c for c in (_cache().get(CATEGORIES_KEY) or [])}
+
+
+def category_choices() -> dict:
+    """Вибір категорії на сторінці: ваші (з лістингів) і каталог DigiKey (листки, згруповані за розділом)."""
+    catalog = _catalog_by_id()
+    ours = [{"id": cid, "name": catalog[cid]["path"] if cid in catalog else name, "n": n, "known": cid in catalog}
+            for cid, name, n in known_categories()]
+    groups = {}
+    for c in catalog.values():
+        if c["leaf"]:
+            groups.setdefault(c["top"], []).append(c)
+    return {"ours": ours, "groups": [(top, sorted(items, key=lambda c: c["path"]))
+                                     for top, items in sorted(groups.items())],
+            "matched": sum(1 for o in ours if o["known"])}
+
+
 def _listing_codes(listing) -> dict:
     """{числовий код: value} параметрів лістингу, як їх надсилаємо в DigiKey."""
     try:
@@ -136,18 +259,22 @@ def template(dk_category_id, defs=None) -> list:
     """[{code, name, required, values, examples, type}] — обов'язкові поля DigiKey, пакування й життєвий цикл,
     параметри категорії (як у наших схожих лістингів)."""
     defs = field_defs() if defs is None else defs
+    params = {p["code"]: p for p in category_params(dk_category_id)}       # каталог DigiKey
     rows, seen = [], set()
     required = [c for c, d in defs.items() if d["required"] and c not in COMMON]
-    for code in list(COMMON) + required + category_codes(dk_category_id):
+    for code in list(COMMON) + required + category_codes(dk_category_id) + list(params):
         if code in seen:
             continue
         seen.add(code)
-        d = defs.get(code, {})
-        name = d.get("name") or COMMON_NAMES.get(code) or FILTER_NAMES.get(code) or f"Параметр {code}"
+        d, p = defs.get(code, {}), params.get(code, {})
+        name = (d.get("name") or p.get("name") or COMMON_NAMES.get(code) or FILTER_NAMES.get(code)
+                or f"Параметр {code}")
+        examples = [] if d.get("values") else list(dict.fromkeys(
+            category_examples(dk_category_id, code) + (p.get("values") or [])))[:PARAM_VALUES]
         rows.append({"code": code, "name": name, "type": d.get("type") or "Text",
                      "required": bool(d.get("required")) or code in COMMON,
-                     "values": d.get("values") or [],
-                     "examples": [] if d.get("values") else category_examples(dk_category_id, code)})
+                     "values": d.get("values") or [], "examples": examples,
+                     "from_catalog": bool(p) and code not in defs})
     return rows
 
 
@@ -271,17 +398,30 @@ def guess_category(product) -> dict:
     from bots.models import DigiKeyListing
     from labels_app.product_label import kind_of
     kind = kind_of(product.sku, product.category or "")
-    category_type = kind if kind in ("filter", "antenna", "cable") else "other"
+    text = " ".join([product.sku, product.name or "", product.name_export or "", product.category or ""]).lower()
+    if kind not in ("filter", "antenna", "cable") and any(w in text for w in CONNECTOR_WORDS):
+        kind = "connector"
+    category_type = kind if kind in ("filter", "antenna", "cable", "connector") else "other"
+    catalog = _catalog_by_id()
+    by_name = {c["name"].lower(): c for c in catalog.values() if c["leaf"]}
+    from_catalog = next((by_name[n.lower()] for n in KIND_CATEGORIES.get(category_type, []) if n.lower() in by_name),
+                        None)
     listed = DigiKeyListing.objects.exclude(dk_category_id="")
     for label, qs in (("як у товарів тієї ж категорії складу", listed.filter(product__category=product.category)),
                       ("як у товарів того ж виду", listed.filter(category_type=category_type))):
         row = (qs.values("dk_category_id", "dk_category_name", "category_type").annotate(n=Count("pk"))
                .order_by("-n").first())
+        known = catalog.get(row["dk_category_id"]) if row else None
+        if row and from_catalog and known is not None and not known["leaf"]:
+            break                                   # у лістингів лише розділ («RF and Wireless») — точніше з каталогу
         if row:
             return {"dk_category_id": row["dk_category_id"], "dk_category_name": row["dk_category_name"] or "",
                     "category_type": row["category_type"] or category_type, "reason": label}
+    if from_catalog:
+        return {"dk_category_id": from_catalog["id"], "dk_category_name": from_catalog["name"],
+                "category_type": category_type, "reason": f"за видом товару — каталог DigiKey: {from_catalog['path']}"}
     return {"dk_category_id": "", "dk_category_name": "", "category_type": category_type,
-            "reason": "схожих товарів на DigiKey ще немає — вкажіть категорію"}
+            "reason": "схожих товарів на DigiKey ще немає — виберіть категорію з каталогу DigiKey"}
 
 
 def _prices(product, moq=1) -> tuple:
@@ -303,6 +443,32 @@ def _prices(product, moq=1) -> tuple:
     return dk_prices.tiers_json(new), "; ".join(notes)
 
 
+def parse_prices(text) -> list:
+    """«1: 12,50; 10: 11,20» (або рядками, «10 11.20») → [{qty, price}] за зростанням; помилка — ValueError."""
+    from decimal import Decimal, InvalidOperation
+
+    from bots.services.dk_prices import MAX_TIERS, tiers_json
+    tiers = {}
+    for part in re.split(r"[;\n]+", str(text or "")):
+        part = part.strip()
+        if not part:
+            continue
+        m = re.match(r"^(\d+)\s*(?:[:=x×]|шт\.?|pcs)?\s*([\d.,]+)$", part)
+        if not m:
+            raise ValueError(f"«{part}» — потрібно «кількість: ціна», напр. «10: 11,20»")
+        try:
+            price = Decimal(m.group(2).replace(",", "."))
+        except InvalidOperation:
+            raise ValueError(f"«{part}» — ціна не число") from None
+        qty = int(m.group(1))
+        if qty < 1 or price <= 0:
+            raise ValueError(f"«{part}» — кількість ≥ 1 і ціна > 0")
+        tiers[qty] = price
+    if len(tiers) > MAX_TIERS:
+        raise ValueError(f"DigiKey приймає до {MAX_TIERS} ступенів")
+    return tiers_json(sorted(tiers.items()))
+
+
 def build_draft(product, given=None, overrides=None) -> dict:
     """Чернетка картки DigiKey з товару складу: {fields, attrs, sources, missing, notes, category, rows}."""
     from bots.models import DigiKeyListing
@@ -310,8 +476,13 @@ def build_draft(product, given=None, overrides=None) -> dict:
     notes = []
     cat = guess_category(product)
     if overrides.get("dk_category_id"):
-        name = dict((c, n) for c, n, _ in known_categories()).get(overrides["dk_category_id"], "")
-        cat.update(dk_category_id=overrides["dk_category_id"].strip(), dk_category_name=name, reason="вказано вручну")
+        cid = overrides["dk_category_id"].strip()
+        from_catalog = _catalog_by_id().get(cid)
+        name = dict((c, n) for c, n, _ in known_categories()).get(cid) or (from_catalog or {}).get("name", "")
+        reason = "вказано вручну"
+        if from_catalog and cid not in dict((c, n) for c, n, _ in known_categories()):
+            reason += " — з каталогу DigiKey, ваших лістингів у ній ще немає"
+        cat.update(dk_category_id=cid, dk_category_name=name, reason=reason)
     base = product.name_export or product.name or product.sku
     title, cut = _cut(overrides.get("dk_title") or base, TITLE_MAX)
     if cut:
@@ -326,6 +497,11 @@ def build_draft(product, given=None, overrides=None) -> dict:
             manufacturer = common.most_common(1)[0][0]
             notes.append(f"виробник — як у наших лістингів ({manufacturer})")
     prices, price_note = _prices(product)
+    if overrides.get("dk_prices"):
+        try:
+            prices, price_note = parse_prices(overrides["dk_prices"]), "ціни вписано вручну"
+        except ValueError as exc:
+            prices, price_note = [], f"ціни: {exc}"
     if price_note:
         notes.append(price_note)
     rows = template(cat["dk_category_id"])

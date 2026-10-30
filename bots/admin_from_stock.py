@@ -22,7 +22,7 @@ from bots.services import dk_publish
 PICK_LIMIT = 60
 MAX_PRODUCTS = 30
 ID_FIELDS = (("dk_title", "title"), ("dk_description", "desc"), ("dk_manufacturer", "mfr"),
-             ("dk_category_id", "cat"))
+             ("dk_category_id", "cat"), ("dk_prices", "prices"))
 
 
 def _ids(request) -> list:
@@ -62,9 +62,13 @@ def _card(product, given, overrides):
     filled = [{**r, "value": draft["attrs"].get(r["code"]) or common.get(r["code"], ""),
                "source": draft["sources"][r["code"]], "given": r["code"] in given}
               for r in draft["rows"] if r["code"] in draft["sources"]]
-    return {"product": product, "draft": draft, "fields": draft["fields"], "required": required,
-            "optional": optional, "filled": filled, "given": given, "ready": not required and
-            bool(draft["fields"]["dk_category_id"]) and bool(draft["fields"]["dk_prices"])}
+    f = draft["fields"]
+    todo = ([f"{len(required)} пол." if len(required) > 1 else required[0]["name"]] if required else []) + \
+        (["категорія"] if not f["dk_category_id"] else []) + (["ціни"] if not f["dk_prices"] else [])
+    listed_ids = {o["id"] for o in svc.category_choices()["ours"]}
+    return {"product": product, "draft": draft, "fields": f, "required": required, "optional": optional,
+            "filled": filled, "given": given, "ready": not todo, "todo": todo,
+            "prices_text": overrides.get("dk_prices", ""), "cat_listed": f["dk_category_id"] in listed_ids}
 
 
 def view(request, model_admin):
@@ -84,6 +88,12 @@ def view(request, model_admin):
                                       f"({sum(1 for d in defs.values() if d['required'])} обов'язкових).")
         except Exception as exc:  # noqa: BLE001
             messages.error(request, f"Не вдалося отримати поля з DigiKey: {exc}")
+        try:
+            cats = svc.dk_categories(refresh=True)
+            messages.success(request, f"Каталог DigiKey: категорій {len(cats)} "
+                                      f"(для товару — {sum(1 for c in cats if c['leaf'])}).")
+        except Exception as exc:  # noqa: BLE001
+            messages.error(request, f"Не вдалося отримати категорії з каталогу DigiKey (ProductSearch): {exc}")
         return redirect(f"{request.path}?ids={','.join(map(str, ids))}")
 
     from inventory.models import Product
@@ -111,6 +121,7 @@ def view(request, model_admin):
             return redirect(reverse("admin:bots_digikeylisting_changelist") + "?card_source=stock")
         return redirect(f"{request.path}?ids={','.join(map(str, ids))}")
 
+    svc.dk_categories()                       # каталог DigiKey: з кешу, раз на тиждень — з DigiKey
     cards, listed = [], []
     for pk in ids:
         product = products.get(pk)
@@ -125,9 +136,16 @@ def view(request, model_admin):
     return TemplateResponse(request, "admin/bots/digikeylisting/from_stock.html", {
         **model_admin.admin_site.each_context(request), "opts": DigiKeyListing._meta,
         "title": "🔷 На DigiKey зі складу", "cards": cards, "listed": listed, "ids": ",".join(map(str, ids)),
-        "fields_state": svc.fields_state(), "categories": svc.known_categories(), "can_add": can_add,
+        "fields_state": svc.fields_state(), "catalog": svc.catalog_state(), "choices": svc.category_choices(),
+        "can_add": can_add,
         "title_max": svc.TITLE_MAX, "desc_max": svc.DESC_MAX, "mfr_max": svc.MANUFACTURER_MAX,
+        "dk_currency": _dk_currency(),
     })
+
+
+def _dk_currency():
+    from bots.services.dk_prices import currency
+    return currency()
 
 
 def _publish(request, listing):

@@ -85,16 +85,19 @@
       {% if fields_state.known %}
         отримано {{ fields_state.count }}, обов'язкових {{ fields_state.required }}.
       {% else %}
-        <span style="color:#f5a524">ще не отримано з DigiKey</span> — Minerva питає лише пакування, життєвий цикл
-        і параметри, які мають наші схожі лістинги.
+        <span style="color:#f5a524">ще не отримано з DigiKey</span> — Minerva питає лише пакування й життєвий цикл.
       {% endif %}
-      <div class="fs-muted">Параметри категорії — як у наших лістингів тієї самої категорії DigiKey (окремого
-        шаблону категорії DigiKey через API не дає).</div>
+      <b style="margin-left:8px">Каталог категорій DigiKey</b> —
+      {% if catalog.categories %}{{ catalog.categories }} категорій{% if choices.ours %}; ваших категорій з лістингів
+        знайдено в каталозі: {{ choices.matched }} з {{ choices.ours|length }}{% endif %}.
+      {% else %}<span style="color:#f5a524">ще не отримано</span>{% if catalog.down %} ({{ catalog.down }}){% endif %}.{% endif %}
+      <div class="fs-muted">Параметри категорії й їхні найчастіші значення — з каталогу DigiKey (той самий ключ, що
+        пошук товарів DigiKey) і з ваших лістингів цієї категорії. Каталог оновлюється сам раз на тиждень.</div>
     </div>
     {% if can_add %}
     <form method="post">{% csrf_token %}
       <input type="hidden" name="ids" value="{{ ids }}"><input type="hidden" name="action" value="refresh_fields">
-      <button class="button" type="submit">🔄 Запитати поля в DigiKey</button>
+      <button class="button" type="submit">🔄 Запитати поля й категорії в DigiKey</button>
     </form>
     {% endif %}
   </div>
@@ -119,24 +122,33 @@
         </label>
         <a href="{% url 'admin:inventory_product_change' pk %}" class="fs-muted" target="_blank">{{ p.name|default:"" }}</a>
         {% if c.ready %}<span class="fs-badge fs-ok">✓ можна надсилати</span>
-        {% else %}<span class="fs-badge fs-todo">потрібно заповнити: {{ c.required|length|add:0 }}{% if not f.dk_category_id %} + категорія{% endif %}{% if not f.dk_prices %} + ціни{% endif %}</span>{% endif %}
+        {% else %}<span class="fs-badge fs-todo">ще потрібно: {{ c.todo|join:", " }}</span>{% endif %}
       </div>
 
       <div class="fs-grid">
         <div><label for="p{{ pk }}-title">Назва на DigiKey (до {{ title_max }})</label>
           <input type="text" id="p{{ pk }}-title" name="p{{ pk }}-title" maxlength="{{ title_max }}" value="{{ f.dk_title }}"></div>
         <div><label for="p{{ pk }}-cat">Категорія DigiKey</label>
-          <select id="p{{ pk }}-cat" name="p{{ pk }}-cat">
+          {% if choices.groups %}<input type="search" class="fs-catq" data-for="p{{ pk }}-cat"
+                 placeholder="🔎 пошук категорії: filter, antenna, coaxial…" style="width:100%;box-sizing:border-box;margin-bottom:4px">{% endif %}
+          <select id="p{{ pk }}-cat" name="p{{ pk }}-cat" class="fs-cat">
             <option value="">— вибрати —</option>
-            {% for cid, cname, n in categories %}
-              <option value="{{ cid }}"{% if cid == f.dk_category_id %} selected{% endif %}>{{ cname }} · {{ n }} лістинг.</option>
-            {% endfor %}
+            {% if f.dk_category_id and not c.cat_listed %}<option value="{{ f.dk_category_id }}" selected>{{ f.dk_category_name|default:f.dk_category_id }}</option>{% endif %}
+            {% if choices.ours %}<optgroup label="Ваші категорії (як у лістингах)">
+              {% for o in choices.ours %}<option value="{{ o.id }}"{% if o.id == f.dk_category_id %} selected{% endif %}>{{ o.name }} · {{ o.n }} лістинг.</option>{% endfor %}
+            </optgroup>{% endif %}
+            {% for top, items in choices.groups %}<optgroup label="Каталог DigiKey — {{ top }}">
+              {% for it in items %}<option value="{{ it.id }}">{{ it.name }} · {{ it.count }} тов. на DigiKey</option>{% endfor %}
+            </optgroup>{% endfor %}
           </select>
-          <small class="fs-muted">{{ c.draft.category.reason }}</small></div>
+          <small class="fs-muted">{{ c.draft.category.reason }}{% if f.dk_category_id %} · ID {{ f.dk_category_id }}{% endif %}</small></div>
         <div><label for="p{{ pk }}-mfr">Виробник (до {{ mfr_max }})</label>
           <input type="text" id="p{{ pk }}-mfr" name="p{{ pk }}-mfr" maxlength="{{ mfr_max }}" value="{{ f.dk_manufacturer }}"></div>
-        <div><label>Ціни для DigiKey (MOQ {{ f.dk_min_order_qty }}, відвантаження {{ f.dk_lead_time_days }} дн)</label>
-          <div class="fs-tiers">{% for t in f.dk_prices %}<span>{{ t.qty }}+ · {{ t.price }}</span>{% empty %}<span style="color:#f5a524">немає</span>{% endfor %}</div></div>
+        <div><label for="p{{ pk }}-prices">Ціни для DigiKey, {{ dk_currency }} (MOQ {{ f.dk_min_order_qty }}, відвантаження {{ f.dk_lead_time_days }} дн)</label>
+          <div class="fs-tiers">{% for t in f.dk_prices %}<span>{{ t.qty }}+ · {{ t.price }}</span>{% empty %}<span style="color:#f5a524">немає</span>{% endfor %}</div>
+          <input type="text" id="p{{ pk }}-prices" name="p{{ pk }}-prices" value="{{ c.prices_text }}"
+                 placeholder="{% if f.dk_prices %}інакше: {% endif %}1: 12,50; 10: 11,20; 50: 9,90" style="width:100%;box-sizing:border-box">
+          <small class="fs-muted">{% if c.prices_text %}вписано вручну{% elif f.dk_prices %}за правилами «💲 Ціни DigiKey ← Minerva»; щоб інакше — впишіть «кількість: ціна; …»{% else %}на складі цін немає — впишіть «кількість: ціна; …»{% endif %}</small></div>
         <div class="fs-full"><label for="p{{ pk }}-desc">Опис (до {{ desc_max }})</label>
           <textarea id="p{{ pk }}-desc" name="p{{ pk }}-desc" maxlength="{{ desc_max }}">{{ f.dk_description }}</textarea></div>
         <div class="fs-full fs-muted">
@@ -188,10 +200,32 @@
         <button class="button default" type="submit" name="action" value="create" id="fs-create">✓ Створити картки</button>
         <label><input type="checkbox" name="publish" value="1" id="fs-publish"> 🚀 одразу надіслати на DigiKey</label>
       {% endif %}
-      <span class="fs-muted">Інша категорія — інший набір полів: змініть і натисніть «Перерахувати».</span>
+      <span class="fs-muted">Інша категорія — інший набір полів: після вибору сторінка перерахується сама.</span>
     </div>
   </form>
   <script>
+    (function () {                      // пошук категорії й перерахунок полів одразу після вибору
+      document.querySelectorAll('.fs-catq').forEach(function (q) {
+        var sel = document.getElementById(q.dataset.for);
+        q.addEventListener('input', function () {
+          var words = q.value.toLowerCase().split(/\s+/).filter(Boolean), first = null;
+          sel.querySelectorAll('option').forEach(function (o) {
+            var hit = !o.value || words.every(function (w) {
+              return (o.textContent + ' ' + o.parentNode.label).toLowerCase().indexOf(w) >= 0; });
+            o.hidden = !hit; if (hit && o.value && !first) first = o;
+          });
+          sel.querySelectorAll('optgroup').forEach(function (g) {
+            g.hidden = !Array.prototype.some.call(g.children, function (o) { return !o.hidden; }); });
+          if (words.length) sel.size = 8; else sel.removeAttribute('size');
+        });
+      });
+      document.querySelectorAll('.fs-cat').forEach(function (sel) {
+        sel.addEventListener('change', function () {
+          var b = document.querySelector('#fs-form button[value=preview]');
+          if (b) { sel.removeAttribute('size'); b.click(); }
+        });
+      });
+    })();
     (function () {
       var btn = document.getElementById('fs-create'), pub = document.getElementById('fs-publish');
       if (!btn) return;
