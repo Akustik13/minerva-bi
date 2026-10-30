@@ -179,6 +179,27 @@ def mobile_nav_view(request):
     return JsonResponse({'ok': True, 'pinned': mobile_nav.save(request.user, data.get('pinned'))})
 
 
+@staff_member_required
+@require_http_methods(['POST'])
+def main_menu_view(request):
+    """🧭 Меню на ПК (core/main_menu.py): режим, «Мої», сторінка з повного меню, значки, фільтри, «як було»."""
+    from core import main_menu
+    try:
+        data = json.loads(request.body or b"{}")
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    before = main_menu.prefs(request.user)
+    prefs = main_menu.save(request.user, data)
+    pin = data.get('pin_link')
+    refused = bool(isinstance(pin, dict) and ('url:' + str(pin.get('href', '')).strip()) not in prefs['pinned']
+                   and len(before['pinned']) < main_menu.MAX_PINNED)
+    return JsonResponse({'ok': not refused, 'prefs': prefs,
+                         'error': 'Цю сторінку не можна закріпити: її немає в Minerva або вона для вас закрита.'
+                         if refused else ''})
+
+
 def custom_403_view(request, exception=None):
     return render(request, 'core/access_denied.html', {
         'title': 'Доступ обмежено',

@@ -39,11 +39,14 @@ def ui_context(request):
         out['MV_UI_JSON'] = ui_prefs.page_config(profile)
     except Exception:
         out['MV_UI_JSON'] = ui_prefs.page_config(None)
-    # 📱 нижня панель телефона (core/mobile_nav.py): розділи, до яких людина має доступ, і закріплене нею
+    # 📱 нижня панель телефона (core/mobile_nav.py) і 🧭 меню ПК у новому вигляді (core/main_menu.py):
+    # розділи, до яких людина має доступ, і закріплене нею
     if profile is not None:
         try:
-            from core import mobile_nav
-            out['MV_MOBILE_JSON'] = mobile_nav.page_config(request.user)
+            from core import main_menu, mobile_nav
+            allowed = mobile_nav.available(request.user)
+            out['MV_MOBILE_JSON'] = mobile_nav.page_config(request.user, allowed)
+            out['MV_MENU_JSON'] = main_menu.page_config(request.user, allowed)
         except Exception:
             pass
     # переклад інтерфейсу іншою мовою (core/ui_text): версія словника, якщо для мови вже є переклади

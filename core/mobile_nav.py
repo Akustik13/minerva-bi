@@ -1,4 +1,5 @@
 """📱 Нижня панель на телефоні (static/admin/js/mv_mobile.js): розділи, які людина бачить і може закріпити внизу.
+Той самий перелік — «Просте» меню на ПК (core/main_menu.py).
 
 Що можна закріпити — лише `ITEMS` (адреса, право). Людині показуються лише ті, до яких у неї є доступ
 (`available`: право моделі за ролями Minerva або доступ до модуля — як у меню). Вибір — до `MAX_PINNED` розділів
@@ -25,6 +26,8 @@ ITEMS = {
     "worktime":  ("⏱", "Робочий час", "/admin/worktime/workday/", "worktime.view_workday"),
     "signals":   ("🚨", "Сигнали", "/dashboard/signals/", "module:dashboard"),
     "dashboard": ("📊", "Дашборд", "/dashboard/", "module:dashboard"),
+    "settings":  ("⚙️", "Мої налаштування", "/core/my-settings/", None),
+    "guide":     ("📚", "Гід по Minerva", "/guide/", None),
 }
 
 DEFAULT = ["home", "orders", "stock", "mail"]
@@ -97,11 +100,13 @@ def save(user, keys) -> list:
     return pinned(user, allowed)
 
 
-def page_config(user) -> str:
+def page_config(user, allowed=None) -> str:
     """JSON для сторінки (json_script не потрібен: лише відомі значення з `ITEMS`)."""
-    allowed = available(user)
+    allowed = available(user) if allowed is None else allowed
     if not allowed:
         return ""
-    items = [{"key": k, "icon": ITEMS[k][0], "label": ITEMS[k][1], "href": ITEMS[k][2]} for k in allowed]
+    from core import main_menu
+    icons = main_menu.icons_of(user)                       # свої значки (правий клік у меню на ПК)
+    items = [{"key": k, "icon": icons.get(k) or ITEMS[k][0], "label": ITEMS[k][1], "href": ITEMS[k][2]} for k in allowed]
     return json.dumps({"items": items, "pinned": pinned(user, allowed), "max": MAX_PINNED,
                        "saveUrl": "/core/mobile-nav/"}, ensure_ascii=False).replace("<", "\\u003c")

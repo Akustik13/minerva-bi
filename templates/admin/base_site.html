@@ -41,6 +41,11 @@
 <link rel="stylesheet" href="/static/admin/css/mv_mobile.css?v=4">
 <script src="/static/admin/js/mv_mobile.js?v=3" defer></script>
 {% endif %}
+{% if MV_MENU_JSON %}{# 🧭 ПК, новий вигляд: меню «Просте / Повне», пошук усюди, фільтри (core/main_menu.py) #}
+<script id="mv-menu-config" type="application/json">{{ MV_MENU_JSON|safe }}</script>
+<link rel="stylesheet" href="/static/admin/css/mv_desktop.css?v=1">
+<script src="/static/admin/js/mv_desktop.js?v=1" defer></script>
+{% endif %}
 <style>
 /* Emoji fallback font stack for country flags (shown via onerror on flagcdn.com img) */
 .mv-flag-emoji {

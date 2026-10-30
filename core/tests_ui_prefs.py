@@ -72,6 +72,7 @@ class SettingsPageTests(TestCase):
         ui = _page_ui(self.client.get("/admin/").content.decode())
         self.assertEqual(ui["theme"], "hc-light")
         self.assertEqual(ui["attrs"], {
+            "data-mv-design": "new",                                 # вигляд ПК — за замовчуванням новий
             "data-mv-fix-contrast": "0", "data-mv-font": "readable", "data-mv-size": "125",
             "data-mv-focus": "always", "data-mv-links": "underline", "data-mv-motion": "reduce"})
 
