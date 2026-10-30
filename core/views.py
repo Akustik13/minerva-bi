@@ -116,6 +116,55 @@ def ui_dict_view(request, lang):
     return response
 
 
+def _panel_admin(request, model):
+    """(панель, ModelAdmin) для моделі «app.model», якщо людина бачить її список; інакше 404 / 403."""
+    from django.apps import apps
+    from django.contrib import admin
+    from django.core.exceptions import PermissionDenied
+    from django.http import Http404
+    from core import side_panel
+    panel = side_panel.get(model)
+    if panel is None:
+        raise Http404
+    try:
+        model_cls = apps.get_model(model)
+    except (LookupError, ValueError):
+        raise Http404
+    ma = admin.site._registry.get(model_cls)
+    opts = model_cls._meta
+    # адреса поза /admin/ — ModuleAccessMiddleware її не закриває, тож право моделі за ролями Minerva (модуль,
+    # заборонені моделі), як на власних сторінках модулів, плюс права адмінки моделі
+    if (ma is None or not request.user.has_perm(f"{opts.app_label}.view_{opts.model_name}")
+            or not (ma.has_view_permission(request) or ma.has_change_permission(request))):
+        raise PermissionDenied
+    return panel, ma
+
+
+@staff_member_required
+def panel_view(request, model, pk):
+    """📌 Панель праворуч (core/side_panel.py): HTML вибраних людиною блоків запису."""
+    from django.http import Http404, HttpResponse
+    from core import side_panel
+    panel, ma = _panel_admin(request, model)
+    obj = ma.get_queryset(request).filter(pk=pk).first()         # ті самі обмеження, що в списку
+    if obj is None:
+        raise Http404
+    return HttpResponse(side_panel.render(panel, obj, request), content_type="text/html; charset=utf-8")
+
+
+@staff_member_required
+@require_http_methods(['POST'])
+def panel_prefs_view(request, model):
+    """Вибір людини для панелі: блоки, порядок, швидкі дії, ширина, увімкнено (правий клік / ⚙ на панелі)."""
+    from core import side_panel
+    panel, _ma = _panel_admin(request, model)
+    try:
+        data = json.loads(request.body or b"{}")
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    return JsonResponse({'ok': True, 'prefs': side_panel.save_prefs(request.user, panel, data)})
+
+
 def custom_403_view(request, exception=None):
     return render(request, 'core/access_denied.html', {
         'title': 'Доступ обмежено',

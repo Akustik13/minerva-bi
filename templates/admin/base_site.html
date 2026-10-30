@@ -17,6 +17,7 @@
 </script>
 <script src="/static/admin/js/mv_contrast.js?v=2" defer></script>
 {% if user.is_authenticated and user.is_staff %}<script src="/static/admin/js/mv_show.js?v=1" defer></script>{% endif %}
+{% load side_panel_tags %}{% if cl %}{% side_panel_config cl %}{% endif %}{# 📌 панель праворуч у списку (core/side_panel.py) #}
 {% if MV_UI_DICT %}{# інтерфейс іншою мовою (core/ui_text): сторінку видно, щойно переклад готовий (не довше 1,5 с) #}
 <style>html.mv-tr-pending body{visibility:hidden}</style>
 <script>document.documentElement.classList.add('mv-tr-pending');setTimeout(function(){document.documentElement.classList.remove('mv-tr-pending')},1500);</script>
