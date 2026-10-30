@@ -107,7 +107,7 @@ class OrderTests(EntityHelpBase):
         self.assertIn("FT220407 × 35", card)
         self.assertIn("вільно -21", card)                                # замовлення вже списало 35 із 14
         self.assertIn("очікується 100", card)
-        self.assertIn("під це замовлення вже списано 35 → бракує 21", card)
+        self.assertIn("під це замовлення вже враховано 35 → бракує 21", card)
         mail_src = next(s for s in b["sources"] if s["kind"] == "mail")
         self.assertEqual(mail_src["url"], f"/email/message/{mail.pk}/")
         self.assertIn("SL-0921 ist unterwegs", mail_src["text"])       # згадка лише в цитаті — фрагмент навколо неї

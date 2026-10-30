@@ -259,32 +259,21 @@ def _minerva_customer(src, customer) -> list:
     return detail
 
 
-def _taken(order) -> dict:
-    """Скільки по кожному рядку вже списано / зарезервовано зі складу під це замовлення: {pk рядка: к-сть}."""
-    from inventory.models import InventoryTransaction
-    prefix = f"so:{order.source}:{order.order_number}:line:"
-    out = {}
-    for key, qty in InventoryTransaction.objects.filter(external_key__startswith=prefix).values_list("external_key", "qty"):
-        line_pk = key[len(prefix):].split(":", 1)[0]
-        if line_pk.isdigit():
-            out[int(line_pk)] = out.get(int(line_pk), 0) - qty
-    return {pk: q for pk, q in out.items() if q > 0}
-
-
 def _minerva_order(src, order) -> list:
-    lines = list(order.lines.select_related("product")[:ORDER_LINES])
+    from inventory.services.stock import annotate_line_held, line_held
+    lines = list(annotate_line_held(order.lines.select_related("product", "order"))[:ORDER_LINES])
     stock = _stock_rows([l.product for l in lines if l.product_id])
-    taken = _taken(order)
     rows = []
     for l in lines:
         sku = l.product.sku if l.product_id else l.sku_raw
         row = f"{sku} × {_num(l.qty)}" + (f" = {_num(l.total_price)} {l.currency or ''}".rstrip() if l.total_price else "")
         p = stock.get(l.product_id)
         if p is not None:
-            # вільний залишок уже зменшено на те, що списали під це замовлення, — порівнюємо з тим, що було до нього
-            done = taken.get(l.pk, 0)
+            # «доступно» вже зменшено на те, що тримає це замовлення (списано / резерв / бронь до руху складу,
+            # inventory/services/stock.line_held), — порівнюємо з тим, що було б вільно без нього
+            done = line_held(l)
             short = max(l.qty - (p._available + done), 0) if l.qty else 0
-            row += (f" · {_stock_line(p)}" + (f" · під це замовлення вже списано {_num(done)}" if done else "")
+            row += (f" · {_stock_line(p)}" + (f" · під це замовлення вже враховано {_num(done)}" if done else "")
                     + (f" → бракує {_num(short)}" if short else " → вистачає"))
         rows.append(row)
     address = ", ".join(x for x in [order.addr_street, order.addr_zip, order.addr_city, order.addr_country] if x)
