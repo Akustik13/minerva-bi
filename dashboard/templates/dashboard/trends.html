@@ -171,19 +171,19 @@
           {% if yoy_growth > 0 %}▲{% elif yoy_growth < 0 %}▼{% endif %}{{ yoy_growth|floatformat:1 }}%
         {% else %}—{% endif %}
       </div>
-      <div class="tr-kpi-sub" title="Порівняння Січень–{{ yoy_ytd_label }} обох років (YTD)">{{ year_to }} vs {{ yoy_vs_year }} (Січ–{{ yoy_ytd_label }})</div>
+      <div class="tr-kpi-sub" title="Однакові відрізки обох років: 1 січня – {{ yoy_ytd_label }} (YTD)">{{ year_to }} vs {{ yoy_vs_year }} (1 Січ–{{ yoy_ytd_label }})</div>
     </div>
 
     <div class="tr-kpi">
       <div class="tr-kpi-label">{{ year_to }} рік</div>
-      <div class="tr-kpi-val">€{{ curr_year_total|floatformat:0 }}</div>
-      <div class="tr-kpi-sub">{{ year_to }}, усього виручки</div>
+      <div class="tr-kpi-val">{{ cur_sym }}{{ curr_year_total|floatformat:0 }}</div>
+      <div class="tr-kpi-sub">{{ year_to }}, усього виручки{% if missing_note %}<br><span title="Для цих валют немає курсу в «Налаштуваннях цін» магазину — суми не додано">{{ missing_note }}</span>{% endif %}</div>
     </div>
 
     <div class="tr-kpi ok">
       <div class="tr-kpi-label">Кращий місяць</div>
       <div class="tr-kpi-val">
-        {% if best_month %}€{{ best_month.1|floatformat:0 }}{% else %}—{% endif %}
+        {% if best_month %}{{ cur_sym }}{{ best_month.1|floatformat:0 }}{% else %}—{% endif %}
       </div>
       <div class="tr-kpi-sub">
         {% if best_month %}{{ best_month.0 }}{% endif %}
@@ -193,7 +193,7 @@
     <div class="tr-kpi warn">
       <div class="tr-kpi-label">Гірший місяць</div>
       <div class="tr-kpi-val">
-        {% if worst_month %}€{{ worst_month.1|floatformat:0 }}{% else %}—{% endif %}
+        {% if worst_month %}{{ cur_sym }}{{ worst_month.1|floatformat:0 }}{% else %}—{% endif %}
       </div>
       <div class="tr-kpi-sub">
         {% if worst_month %}{{ worst_month.0 }}{% endif %}
@@ -202,7 +202,7 @@
 
     <div class="tr-kpi">
       <div class="tr-kpi-label">Сер. місяць</div>
-      <div class="tr-kpi-val">€{{ avg_monthly|floatformat:0 }}</div>
+      <div class="tr-kpi-val">{{ cur_sym }}{{ avg_monthly|floatformat:0 }}</div>
       <div class="tr-kpi-sub">в обраному діапазоні {{ year_from }}–{{ year_to }}</div>
     </div>
 
@@ -212,7 +212,7 @@
   <h2 class="tr-hdr"><span>📊</span> Виручка рік до року</h2>
   <div class="tr-charts-2col">
     <div class="tr-chart-box">
-      <h3>Виручка по місяцях (€) — {{ year_from }}–{{ year_to }}</h3>
+      <h3>Виручка по місяцях ({{ cur_sym }}) — {{ year_from }}–{{ year_to }}</h3>
       <canvas id="yoyChart"></canvas>
     </div>
     <div class="tr-chart-box">
@@ -236,7 +236,7 @@
         <tr>
           <th>Рік</th>
           <th>Квартал</th>
-          <th class="num">Виручка (€)</th>
+          <th class="num">Виручка ({{ cur_sym }})</th>
           <th class="num">Замовлень</th>
           <th class="num">Δ% до пр. року</th>
         </tr>
@@ -255,7 +255,7 @@
               {% if r.is_future %}
                 <span class="tr-delta-nil">—</span>
               {% elif r.revenue > 0 %}
-                €{{ r.revenue|floatformat:0 }}
+                {{ cur_sym }}{{ r.revenue|floatformat:0 }}
               {% elif r.orders > 0 %}
                 <span class="tr-delta-nil" title="Ціни відсутні в БД">—</span>
               {% else %}
@@ -310,7 +310,7 @@
   <h2 class="tr-hdr" style="margin-top:4px"><span>📦</span> Товари і склад</h2>
   <div class="tr-charts-2col">
     <div class="tr-chart-box">
-      <h3>Виручка по категоріях (€) — по роках</h3>
+      <h3>Виручка по категоріях ({{ cur_sym }}) — по роках</h3>
       <canvas id="catChart"></canvas>
     </div>
     <div class="tr-chart-box" style="overflow:auto;padding:0">
@@ -365,6 +365,7 @@
   const tickCfg = { color: muted, font: { size: 10 } };
 
   /* ── Data from Django (|safe prevents Django HTML-escaping JSON quotes) ── */
+  const CUR_SYM     = {{ cur_sym_js|safe }};
   const months      = {{ months_labels|safe }};
   const yoyDs       = {{ yoy_datasets|safe }};
   const currSmooth  = {{ curr_rev_smooth|safe }};
@@ -410,7 +411,7 @@
             label: (ctx) => {
               const v = ctx.raw;
               if (v == null) return null;
-              return ` ${ctx.dataset.label}: €${v.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`;
+              return ` ${ctx.dataset.label}: ${CUR_SYM}${v.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`;
             },
           },
         },
@@ -419,7 +420,7 @@
         x: { grid: gridCfg, ticks: tickCfg },
         y: {
           grid: gridCfg,
-          ticks: { ...tickCfg, callback: (v) => '€' + v.toLocaleString('de-DE', { notation: 'compact' }) },
+          ticks: { ...tickCfg, callback: (v) => CUR_SYM + v.toLocaleString('de-DE', { notation: 'compact' }) },
           beginAtZero: true,
         },
       },
@@ -591,13 +592,13 @@
         legend: { labels: { color: muted, font: { size: 11 } } },
         tooltip: {
           callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: €${(ctx.raw || 0).toLocaleString('de-DE', { maximumFractionDigits: 0 })}`,
+            label: ctx => ` ${ctx.dataset.label}: ${CUR_SYM}${(ctx.raw || 0).toLocaleString('de-DE', { maximumFractionDigits: 0 })}`,
           },
         },
       },
       scales: {
         x: { grid: gridCfg, ticks: { ...tickCfg, maxRotation: 30 } },
-        y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => '€' + v.toLocaleString('de-DE', { notation: 'compact' }) }, beginAtZero: true },
+        y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => CUR_SYM + v.toLocaleString('de-DE', { notation: 'compact' }) }, beginAtZero: true },
       },
     },
   });
@@ -612,7 +613,7 @@
     const vals = years.map(y => (skuData[sku] || {})[y] || 0);
     const tr = document.createElement('tr');
     tr.innerHTML = `<td style="font-family:monospace;font-size:11px">${sku || '—'}</td>`
-      + vals.map(v => `<td class="num" style="font-size:11px">${v > 0 ? '€' + v.toLocaleString('de-DE', { maximumFractionDigits: 0 }) : '—'}</td>`).join('');
+      + vals.map(v => `<td class="num" style="font-size:11px">${v > 0 ? CUR_SYM + v.toLocaleString('de-DE', { maximumFractionDigits: 0 }) : '—'}</td>`).join('');
     tbody.appendChild(tr);
   });
 

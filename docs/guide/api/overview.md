@@ -94,7 +94,8 @@ curl -H "Authorization: Token $MINERVA_KEY" {{base_url}}/api/v1/ping/
   **«⬇ crm_purchases.py (закупівлі CRM)»**, **«⬇ webhook_receiver.py»**.
 - [Усі адреси API з прикладами](guide:api/endpoints) — список прямо з коду Minerva, з прикладами curl і Python.
 - [🔌 API Інтеграції](/dashboard/api/) — огляд: скільки активних ключів, основні адреси, інші інтеграції
-  (перевізники, DigiKey) і кнопки **«Відкрити документацію →»**, **«Відкрити Console →»**.
+  (перевізники, DigiKey) і кнопки **«Відкрити документацію →»**, **«Відкрити Console →»** (консоль — лише для
+  адміністратора Minerva).
 
 ## Безпека — коротко
 

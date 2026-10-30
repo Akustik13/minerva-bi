@@ -85,68 +85,60 @@ class Customer(models.Model):
         super().save(*args, **kwargs)
 
     # ---- Аналітичні властивості ----
+    # Лише продажі (crm/utils.py: sales.revenue.sale_orders — без запитів пропозицій, скасованих і тестових),
+    # суми — у валюті Minerva. Сторінка списку рахує їх одним махом (crm_utils.prefetch_stats → _order_stats).
+
+    def order_stats(self):
+        """OrderStats клієнта (crm/utils.py), кешується на об'єкті."""
+        cached = getattr(self, "_order_stats", None)
+        if cached is None:
+            from crm import utils as crm_utils
+            cached = crm_utils.order_stats([self]).get(self.pk)
+            if cached is None:
+                from sales.revenue import home_currency
+                cached = crm_utils.OrderStats(home_currency())
+            self._order_stats = cached
+        return cached
 
     def total_orders(self) -> int:
-        # Use annotation if pre-loaded by admin get_queryset()
-        if hasattr(self, '_orders_count') and self._orders_count is not None:
-            return int(self._orders_count)
-        from sales.models import SalesOrder
-        return SalesOrder.objects.filter(customer_key=self.external_key).count()
+        return self.order_stats().count
 
     def total_revenue(self) -> Decimal:
-        """Сума всіх продажів (з SalesOrderLine)."""
-        # Use annotation if pre-loaded by admin get_queryset()
-        if hasattr(self, '_revenue') and self._revenue is not None:
-            return Decimal(str(self._revenue))
-        from sales.models import SalesOrderLine
-        result = (
-            SalesOrderLine.objects
-            .filter(order__customer_key=self.external_key)
-            .aggregate(rev=Sum("total_price"))
-        )
-        return result["rev"] or Decimal("0")
+        """Сума продажів у валюті Minerva (валюти без курсу не додано)."""
+        return self.order_stats().revenue.total
 
     def avg_order_value(self) -> Decimal:
-        total = self.total_orders()
-        if total == 0:
-            return Decimal("0")
-        return (self.total_revenue() / total).quantize(Decimal("0.01"))
+        return self.order_stats().avg
+
+    def _sale_lines(self):
+        from sales.models import SalesOrderLine
+        from sales.revenue import sale_lines
+        return sale_lines(SalesOrderLine.objects.filter(order__customer_key=self.external_key))
 
     def top_products(self, limit: int = 5) -> list:
-        """Топ N товарів за виручкою: [{sku_raw, total_qty, total_revenue}, ...]"""
-        from sales.models import SalesOrderLine
+        """Топ N товарів за виручкою (у валюті Minerva): [{sku_raw, total_qty, total_revenue}, ...]"""
         from django.db.models import Sum
-        return list(
-            SalesOrderLine.objects
-            .filter(order__customer_key=self.external_key)
-            .values("sku_raw")
-            .annotate(total_qty=Sum("qty"), total_revenue=Sum("total_price"))
-            .order_by("-total_revenue")[:limit]
-        )
+        from sales.revenue import line_revenue
+        lines = self._sale_lines()
+        money = line_revenue(lines, by=["sku_raw"])
+        rows = list(lines.order_by().values("sku_raw").annotate(total_qty=Sum("qty")))
+        for r in rows:
+            m = money.get((r["sku_raw"],))
+            r["total_revenue"] = m.total if m else Decimal("0")
+        rows.sort(key=lambda r: -r["total_revenue"])
+        return rows[:limit]
 
     def card_stats(self) -> dict:
-        """Всі дані для картки CRM — 2 запити замість 5+.
-        Повертає: count, rev (рядок з валютою), avg, last, days, recency_cls
-        """
-        from sales.models import SalesOrder, SalesOrderLine
-        from django.db.models import Sum, Max, Count
-        from django.utils import timezone
+        """Дані для картки CRM: count, rev (сума у валюті Minerva + без курсу), avg, last, days, recency_cls, sym."""
+        from sales.revenue import fmt, symbol
 
-        SYMBOLS = {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "Fr"}
-
-        # Query 1: кількість замовлень + дата останнього
-        agg = (
-            SalesOrder.objects
-            .filter(customer_key=self.external_key)
-            .aggregate(count=Count("id"), last=Max("order_date"))
-        )
-        count = agg["count"] or 0
-        last  = agg["last"]
-
+        stats = self.order_stats()
+        count = stats.count
+        last = stats.last
         days = None
         if last:
-            ld   = last.date() if hasattr(last, "date") else last
-            days = (timezone.now().date() - ld).days
+            ld = last.date() if hasattr(last, "date") and callable(last.date) else last
+            days = (timezone.localdate() - ld).days
 
         # Recency CSS class: green/amber/orange/red
         if days is None:
@@ -160,38 +152,15 @@ class Customer(models.Model):
         else:
             recency_cls = "crm-rec-old"
 
-        # Query 2: виручка по валютах
-        rev_rows = list(
-            SalesOrderLine.objects
-            .filter(order__customer_key=self.external_key)
-            .values("currency")
-            .annotate(total=Sum("total_price"))
-            .order_by("-total")
-        )
-
-        def _fmt(total, currency):
-            sym = SYMBOLS.get(currency or "EUR", (currency or "") + "\u00a0")
-            return f"{sym}{float(total or 0):,.0f}"
-
-        if rev_rows:
-            main       = rev_rows[0]
-            main_total = float(main["total"] or 0)
-            main_curr  = main["currency"] or "EUR"
-            main_sym   = SYMBOLS.get(main_curr, main_curr + "\u00a0")
-            rev_str    = " + ".join(_fmt(p["total"], p["currency"]) for p in rev_rows[:2])
-            avg_str    = _fmt(main_total / count, main_curr) if count else "—"
-        else:
-            main_sym = "€"
-            rev_str = avg_str = "—"
-
+        money = stats.revenue
         return {
             "count":       count,
-            "rev":         rev_str,
-            "avg":         avg_str,
+            "rev":         money.full_text if money else "—",
+            "avg":         fmt(stats.avg, money.home) if stats.avg else "—",
             "last":        last,
             "days":        days,
             "recency_cls": recency_cls,
-            "sym":         main_sym,   # символ валюти для топ-товарів
+            "sym":         symbol(money.home),   # символ валюти для топ-товарів
         }
 
     def active_strategy_card(self) -> dict | None:
@@ -227,96 +196,33 @@ class Customer(models.Model):
             return None
 
     def last_order_date(self):
-        # Use annotation if pre-loaded by admin get_queryset()
-        if hasattr(self, '_last_order_date') and self._last_order_date is not None:
-            return self._last_order_date
-        from sales.models import SalesOrder
-        result = SalesOrder.objects.filter(
-            customer_key=self.external_key
-        ).aggregate(last=Max("order_date"))
-        return result["last"]
+        return self.order_stats().last
 
     def first_order_date(self):
-        from sales.models import SalesOrder
-        result = SalesOrder.objects.filter(
-            customer_key=self.external_key
-        ).aggregate(first=Min("order_date"))
+        from sales.revenue import sale_orders
+        result = sale_orders().filter(customer_key=self.external_key).aggregate(first=Min("order_date"))
         return result["first"]
 
     def days_since_last_order(self) -> int | None:
         last = self.last_order_date()
         if not last:
             return None
-        if hasattr(last, "date"):
+        if hasattr(last, "date") and callable(last.date):
             last = last.date()
-        return (timezone.now().date() - last).days
+        return (timezone.localdate() - last).days
 
     def is_repeat_customer(self) -> bool:
-        return self.total_orders() > 1
+        from crm import utils as crm_utils
+        return crm_utils.is_repeat(self.total_orders())
 
     def rfm_score(self) -> dict:
-        """RFM аналіз."""
-        days = self.days_since_last_order()
-        
-        if days is None:
-            r = 1
-        elif days <= 30:
-            r = 5
-        elif days <= 60:
-            r = 4
-        elif days <= 120:
-            r = 3
-        elif days <= 365:
-            r = 2
-        else:
-            r = 1
-
-        freq = self.total_orders()
-        if freq >= 10:
-            f = 5
-        elif freq >= 5:
-            f = 4
-        elif freq >= 3:
-            f = 3
-        elif freq >= 2:
-            f = 2
-        else:
-            f = 1
-
-        rev = float(self.total_revenue())
-        if rev >= 5000:
-            m = 5
-        elif rev >= 1000:
-            m = 4
-        elif rev >= 500:
-            m = 3
-        elif rev >= 100:
-            m = 2
-        else:
-            m = 1
-
-        score = r + f + m
-        
-        return {
-            "R": r, "F": f, "M": m, "score": score,
-            "segment": self._rfm_segment(r, f, m)
-        }
+        """RFM аналіз — логіка лише в crm/utils.py."""
+        from crm import utils as crm_utils
+        return crm_utils.rfm_score(self)
 
     def _rfm_segment(self, r, f, m):
-        if r >= 4 and f >= 4 and m >= 4:
-            return "🏆 Champions"
-        elif r >= 3 and f >= 3:
-            return "💎 Loyal"
-        elif r >= 4:
-            return "⭐ Potential"
-        elif f >= 4:
-            return "🔄 Regular"
-        elif r <= 2 and f >= 2:
-            return "😴 At Risk"
-        elif r <= 2 and f <= 2:
-            return "💤 Hibernating"
-        else:
-            return "🆕 New"
+        from crm import utils as crm_utils
+        return crm_utils.rfm_segment(r, f, m)
 
 
 class CustomerNote(models.Model):

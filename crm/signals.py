@@ -82,13 +82,18 @@ def auto_sync_customer(sender, instance, created, **kwargs):
         customer.company = ship_company or client
         customer.save(update_fields=['company'])
 
-    # Оновлюємо SalesOrder з customer_key
+    # Оновлюємо SalesOrder з customer_key — і в базі, і на самому об'єкті: наступний обробник post_save
+    # (create_order_timeline_event) бачить ключ уже зараз, а повторний save() об'єкта не затре ключ порожнім
     sender.objects.filter(pk=instance.pk).update(customer_key=key)
+    instance.customer_key = key
 
 
 @receiver(post_save, sender='sales.SalesOrder')
 def create_order_timeline_event(sender, instance, created, **kwargs):
-    """При створенні замовлення — автоматично додати запис в хронологію клієнта."""
+    """При створенні замовлення — автоматично додати запис в хронологію клієнта.
+
+    Має стояти ПІСЛЯ auto_sync_customer (той ставить instance.customer_key новому замовленню); одна подія на
+    замовлення — повторно не створюється."""
     if not created or not instance.customer_key:
         return
     try:
@@ -97,12 +102,18 @@ def create_order_timeline_event(sender, instance, created, **kwargs):
             external_key=instance.customer_key).first()
         if not customer:
             return
+        if CustomerTimeline.objects.filter(customer=customer, event_type='order',
+                                           related_order_id=instance.pk).exists():
+            return
+        parts = []
+        if instance.total_price is not None:
+            parts.append(f'Сума: {float(instance.total_price):.2f} {instance.currency or ""}'.strip())
+        parts.append(f'Статус: {instance.get_status_display()}')
         CustomerTimeline.objects.create(
             customer=customer,
             event_type='order',
             title=f'Замовлення #{instance.order_number}',
-            body=(f'Сума: €{float(instance.total_price or 0):.2f} '
-                  f'| Статус: {instance.status}'),
+            body=' | '.join(parts),
             related_order_id=instance.pk,
         )
     except Exception as e:
