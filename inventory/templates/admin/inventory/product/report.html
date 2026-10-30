@@ -1,0 +1,199 @@
+{% extends "admin/base_site.html" %}
+{# «📄 Звіт по товару» (inventory/admin_report.py → services/product_report.build): KPI, графіки, таблиці; друкується #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:inventory_product_changelist' %}">Товари</a> &rsaquo;
+  <a href="{{ change_url }}">{{ original.sku }}</a> &rsaquo; 📄 Звіт по товару
+</div>
+{% endblock %}
+{% block content %}
+{% with k=r.kpis s=r.sales p=r.prices sym=r.symbol %}
+<div id="prr">
+<style>
+  #prr { --line: var(--border-strong, #2a3f52); --muted: var(--text-muted, #9aafbe); max-width: 1240px; }
+  #prr h1 { margin: 0 0 2px; font-size: 20px; }
+  #prr h2 { margin: 22px 0 6px; font-size: 15px; background: none; color: var(--text, inherit); padding: 0; }
+  #prr .prr-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: flex-end; justify-content: space-between; }
+  #prr .prr-name { color: var(--muted); font-size: 13px; }
+  #prr .prr-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  #prr .prr-tools a, #prr .prr-tools button { font-size: 12px; padding: 5px 11px; border: 1px solid var(--line); border-radius: 5px;
+    background: var(--bg-card, transparent); color: var(--text, inherit); text-decoration: none; cursor: pointer; white-space: nowrap; }
+  #prr .prr-tools a.on { border-color: var(--accent, #58a6ff); color: var(--accent, #58a6ff); font-weight: 700; }
+  #prr .prr-muted { color: var(--muted); font-size: 12px; }
+  #prr .prr-notes { margin: 10px 0; padding: 8px 12px 8px 28px; border-left: 3px solid var(--warn, #e3b341); font-size: 12px;
+    background: rgba(227,179,65,.08); border-radius: 4px; }
+  #prr .prr-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 12px 0; }
+  #prr .prr-kpi { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--bg-card, transparent); }
+  #prr .prr-kpi-l { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+  #prr .prr-kpi-v { font-size: 21px; font-weight: 800; margin: 3px 0 1px; color: var(--text, inherit); }
+  #prr .prr-kpi-s { font-size: 11px; color: var(--muted); }
+  #prr .up { color: var(--ok, #3fb950); } #prr .down { color: var(--err, #f85149); }
+  #prr table.prr-t { border-collapse: collapse; width: 100%; font-size: 12px; }
+  #prr .prr-t th { text-align: left; padding: 6px 8px; font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .3px; border-bottom: 2px solid var(--line); white-space: nowrap; background: none; }
+  #prr .prr-t td { padding: 5px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  #prr .prr-t .r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #prr .prr-t tr.zero td { color: var(--text-dim, #607d8b); }
+  #prr .prr-t tfoot td { font-weight: 700; border-top: 2px solid var(--line); border-bottom: 0; }
+  #prr .prr-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 0 22px; }
+  #prr .prr-wrap { overflow-x: auto; }
+  @media (max-width: 600px) { #prr .prr-two { grid-template-columns: 1fr; } }
+  @media print {
+    #header, #nav-sidebar, .breadcrumbs, #footer, .messagelist, #toggle-nav-sidebar, .prr-tools, .no-print { display: none !important; }
+    #main, #content, .main, .colM { margin: 0 !important; padding: 0 !important; width: auto !important; max-width: none !important; }
+    body, #container, #content, #prr, #prr * { background: #fff !important; color: #000 !important; box-shadow: none !important; }
+    #prr .prr-kpi, #prr .prr-t td, #prr .prr-t th { border-color: #bbb !important; }
+    #prr .prr-two { display: block; }
+    #prr h2 { break-after: avoid; page-break-after: avoid; }
+    #prr table { break-inside: auto; } #prr tr { break-inside: avoid; page-break-inside: avoid; }
+    #prr a { text-decoration: none; }
+  }
+</style>
+
+<div class="prr-head">
+  <div>
+    <h1>📄 {{ original.sku }}</h1>
+    <div class="prr-name">{{ original.name|default:"" }}{% if original.manufacturer %} · {{ original.manufacturer }}{% endif %}
+      · звіт на {{ r.today|date:"d.m.Y" }} · останні {{ r.months }} міс. · суми в {{ r.home }}</div>
+  </div>
+  <div class="prr-tools">
+    <span class="prr-muted">Період:</span>
+    {% for m in month_choices %}<a href="?months={{ m }}" class="{% if m == r.months %}on{% endif %}">{{ m }} міс</a>{% endfor %}
+    <button type="button" onclick="window.print()">🖨 Друк</button>
+    <a href="{{ csv_url }}">⬇ CSV</a>
+    <a href="{{ change_url }}">← Картка товару</a>
+  </div>
+</div>
+
+{% if r.notes %}<ul class="prr-notes">{% for n in r.notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+
+<div class="prr-kpis">
+  <div class="prr-kpi">
+    <div class="prr-kpi-l">📦 Продано за 12 міс</div>
+    <div class="prr-kpi-v">{{ k.units_12|floatformat:"-2" }} шт</div>
+    <div class="prr-kpi-s">{% if k.units_pct is not None %}<span class="{% if k.units_pct >= 0 %}up{% else %}down{% endif %}">{% if k.units_pct >= 0 %}▲{% else %}▼{% endif %} {% if k.units_pct > 0 %}+{% endif %}{{ k.units_pct|floatformat:1 }}%</span> · {% endif %}
+      попередні 12 міс: {{ k.units_prev|floatformat:"-2" }} шт · замовлень: {{ k.orders_12 }}</div>
+  </div>
+  <div class="prr-kpi">
+    <div class="prr-kpi-l">💰 Виручка за 12 міс</div>
+    <div class="prr-kpi-v">{{ k.revenue_12.text }}</div>
+    <div class="prr-kpi-s">{% if k.revenue_pct is not None %}<span class="{% if k.revenue_pct >= 0 %}up{% else %}down{% endif %}">{% if k.revenue_pct >= 0 %}▲{% else %}▼{% endif %} {% if k.revenue_pct > 0 %}+{% endif %}{{ k.revenue_pct|floatformat:1 }}%</span> · {% endif %}
+      попередні: {{ k.revenue_prev.text }}{% if k.revenue_12.missing_text %}<br>{{ k.revenue_12.missing_text }}{% endif %}</div>
+  </div>
+  <div class="prr-kpi">
+    <div class="prr-kpi-l">🎯 Сер. ціна продажу</div>
+    <div class="prr-kpi-v">{% if k.avg_price %}{{ sym }}{{ k.avg_price|floatformat:2 }}{% else %}—{% endif %}</div>
+    <div class="prr-kpi-s">за 1 шт, 12 міс{% if k.avg_price_prev %} · попередні: {{ sym }}{{ k.avg_price_prev|floatformat:2 }}{% endif %}</div>
+  </div>
+  <div class="prr-kpi">
+    <div class="prr-kpi-l">🏷 Ціна зараз, 1 шт</div>
+    <div class="prr-kpi-v">{% if p.minerva.now %}{{ sym }}{{ p.minerva.now|floatformat:2 }}{% else %}—{% endif %}</div>
+    <div class="prr-kpi-s">{{ p.minerva.label }}{% if p.digikey %} · DigiKey: {% if p.digikey.now %}{{ sym }}{{ p.digikey.now|floatformat:2 }}{% else %}—{% endif %}{% endif %}</div>
+  </div>
+  <div class="prr-kpi">
+    <div class="prr-kpi-l">👥 Клієнтів</div>
+    <div class="prr-kpi-v">{{ k.customers }}</div>
+    <div class="prr-kpi-s">купували за {{ r.months }} міс</div>
+  </div>
+  <div class="prr-kpi">
+    <div class="prr-kpi-l">🏬 На складі</div>
+    <div class="prr-kpi-v">{{ k.stock.on_hand|floatformat:"-2" }} шт</div>
+    <div class="prr-kpi-s">вільно {{ k.stock.available|floatformat:"-2" }}{% if k.stock.incoming %} · очікується {{ k.stock.incoming|floatformat:"-2" }}{% endif %}
+      {% if k.stock.months_left is not None %}<br>вистачить ≈ {{ k.stock.months_left }} міс{% endif %}{% if k.stock.status_text %}<br>{{ k.stock.status_text }}{% endif %}</div>
+  </div>
+</div>
+
+{% include "admin/inventory/product/_report_charts.html" with prc=r.chart prc_id="prr-chart-data" prc_units=s.total_units %}
+
+<div class="prr-two">
+  <div>
+    <h2>💲 Ступені цін зараз — Minerva і DigiKey</h2>
+    {% with t=k.tiers %}
+    {% if t.rows %}
+    <div class="prr-wrap"><table class="prr-t">
+      <thead><tr><th class="r">Від, шт</th><th class="r">Minerva, {{ t.minerva_currency }}</th>
+        {% if t.has_digikey %}<th class="r">DigiKey, {{ t.digikey_currency }}</th><th class="r">DigiKey vs Minerva</th>{% endif %}</tr></thead>
+      <tbody>{% for row in t.rows %}<tr>
+        <td class="r">{{ row.qty }}</td>
+        <td class="r">{% if row.minerva is not None %}{% if not row.minerva_break %}<span class="prr-muted">↳ </span>{% endif %}{{ row.minerva_text }}{% if t.minerva_currency != r.home and row.minerva_home is not None %} <span class="prr-muted">≈ {{ sym }}{{ row.minerva_home|floatformat:2 }}</span>{% endif %}{% else %}—{% endif %}</td>
+        {% if t.has_digikey %}
+        <td class="r">{% if row.digikey is not None %}{% if not row.digikey_break %}<span class="prr-muted">↳ </span>{% endif %}{{ row.digikey_text }}{% if t.digikey_currency != r.home and row.digikey_home is not None %} <span class="prr-muted">≈ {{ sym }}{{ row.digikey_home|floatformat:2 }}</span>{% endif %}{% else %}—{% endif %}</td>
+        <td class="r">{% if row.diff_pct is not None %}<span class="{% if row.diff_pct >= 0 %}up{% else %}down{% endif %}">{% if row.diff_pct > 0 %}+{% endif %}{{ row.diff_pct|floatformat:1 }}%</span>{% else %}—{% endif %}</td>
+        {% endif %}
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    <div class="prr-muted">Minerva — {{ t.minerva_label }}; «↳» — для цієї кількості діє ціна меншого ступеня.
+      {% if t.minerva_rate_missing or t.digikey_rate_missing %}Для деяких валют немає курсу — різницю не пораховано.{% endif %}</div>
+    {% else %}<p class="prr-muted">Цін за кількістю ще немає.</p>{% endif %}
+    {% endwith %}
+  </div>
+  <div>
+    <h2>👥 Найбільші клієнти за {{ r.months }} міс</h2>
+    {% if k.top_customers %}
+    <div class="prr-wrap"><table class="prr-t">
+      <thead><tr><th>Клієнт</th><th class="r">Штук</th><th class="r">Замовлень</th><th class="r">Виручка</th><th class="r">Останнє</th></tr></thead>
+      <tbody>{% for c in k.top_customers %}<tr>
+        <td>{% if c.customer %}<a href="{% url 'admin:crm_customer_change' c.customer.pk %}">{{ c.name }}</a>{% else %}{{ c.name }}{% endif %}</td>
+        <td class="r">{{ c.units|floatformat:"-2" }}</td><td class="r">{{ c.orders }}</td>
+        <td class="r">{{ c.revenue.text }}{% if c.revenue.missing_text %}<br><span class="prr-muted">{{ c.revenue.missing_text }}</span>{% endif %}</td>
+        <td class="r">{{ c.last|date:"d.m.Y"|default:"—" }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<p class="prr-muted">За цей період продажів не було.</p>{% endif %}
+  </div>
+</div>
+
+<h2>📅 Продажі по місяцях</h2>
+<div class="prr-wrap"><table class="prr-t">
+  <thead><tr><th>Місяць</th><th class="r">Штук</th>{% for c in s.channels %}<th class="r" {% if c.sources %}title="{{ c.sources|join:', ' }}"{% endif %}>{{ c.name }}</th>{% endfor %}
+    <th class="r">Замовлень</th><th class="r">Виручка</th><th class="r">Сер. ціна</th></tr></thead>
+  <tbody>{% for row in s.rows reversed %}<tr class="{% if not row.units %}zero{% endif %}">
+    <td>{{ row.label }}</td><td class="r">{{ row.units|floatformat:"-2" }}</td>
+    {% for v in row.channels %}<td class="r">{{ v|floatformat:"-2" }}</td>{% endfor %}
+    <td class="r">{{ row.orders }}</td>
+    <td class="r">{{ row.revenue.text }}{% if row.revenue.missing_text %}<br><span class="prr-muted">{{ row.revenue.missing_text }}</span>{% endif %}</td>
+    <td class="r">{% if row.avg_price is not None %}{{ sym }}{{ row.avg_price|floatformat:2 }}{% else %}—{% endif %}</td>
+  </tr>{% endfor %}</tbody>
+  <tfoot><tr><td>Разом</td><td class="r">{{ s.total_units|floatformat:"-2" }}</td>{% for c in s.channels %}<td class="r">{{ c.total|floatformat:"-2" }}</td>{% endfor %}
+    <td class="r">{{ s.total_orders }}</td><td class="r">{{ s.total_revenue.text }}{% if s.total_revenue.missing_text %}<br><span class="prr-muted">{{ s.total_revenue.missing_text }}</span>{% endif %}</td><td></td></tr></tfoot>
+</table></div>
+<div class="prr-muted">Лише продажі: тип «Sale», не скасовані, «Впливає на склад» (без запитів пропозицій, зразків і тестового магазину). Сер. ціна — виручка рядків з ціною ÷ їхні штуки.</div>
+
+<h2>🕑 Історія цін за 1 шт</h2>
+{% if p.events %}
+<div class="prr-wrap"><table class="prr-t">
+  <thead><tr><th>Коли</th><th>Де</th><th class="r">Було</th><th class="r">Стало</th><th class="r">Зміна</th><th>Хто</th><th>Примітка</th></tr></thead>
+  <tbody>{% for e in p.events %}<tr>
+    <td style="white-space:nowrap">{{ e.at|date:"d.m.Y H:i" }}</td><td>{{ e.where }}</td>
+    <td class="r">{% if e.old is not None %}{{ e.old_text }} {{ e.currency }}{% else %}—{% endif %}</td>
+    <td class="r">{% if e.new is not None %}{{ e.new_text }} {{ e.currency }}{% if e.currency != r.home and e.home_new is not None %}<br><span class="prr-muted">≈ {{ sym }}{{ e.home_new|floatformat:2 }}</span>{% endif %}{% else %}—{% endif %}</td>
+    <td class="r">{% if e.change_pct is not None %}<span class="{% if e.change_pct >= 0 %}up{% else %}down{% endif %}">{% if e.change_pct > 0 %}+{% endif %}{{ e.change_pct|floatformat:1 }}%</span>{% else %}—{% endif %}</td>
+    <td>{{ e.who|default:"—" }}</td><td class="prr-muted">{{ e.note }}</td>
+  </tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<p class="prr-muted">За цей період ціни за 1 шт не змінювались (або історії змін ще немає).</p>{% endif %}
+
+<h2>🧾 Останні замовлення з цим товаром</h2>
+{% if r.orders %}
+<div class="prr-wrap"><table class="prr-t">
+  <thead><tr><th>Дата</th><th>Замовлення</th><th>Джерело</th><th>Клієнт</th><th>Статус</th><th class="r">Штук</th><th class="r">Ціна за шт</th><th class="r">Сума</th></tr></thead>
+  <tbody>{% for o in r.orders %}<tr>
+    <td style="white-space:nowrap">{{ o.order.order_date|date:"d.m.Y"|default:"—" }}</td>
+    <td><a href="{% url 'admin:sales_salesorder_change' o.order.pk %}">{{ o.order.order_number }}</a></td>
+    <td>{{ o.source }}</td><td>{{ o.client }}</td><td>{{ o.order.get_status_display }}</td>
+    <td class="r">{{ o.units|floatformat:"-2" }}</td>
+    <td class="r">{% if o.unit_price is not None %}{{ sym }}{{ o.unit_price|floatformat:2 }}{% else %}—{% endif %}</td>
+    <td class="r">{{ o.amount.text }}{% if o.orig and o.amount.missing_text %}<br><span class="prr-muted">{{ o.orig }}</span>{% endif %}</td>
+  </tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<p class="prr-muted">Продажів цього товару ще не було.</p>{% endif %}
+<p class="prr-muted">Ціни й суми в {{ r.home }} — за поточним курсом «Інтернет-магазин → Налаштування цін → Курси валют».</p>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () { window.prcDraw && window.prcDraw(document.querySelector('#prr .prc')); });
+</script>
+{% endwith %}
+{% endblock %}

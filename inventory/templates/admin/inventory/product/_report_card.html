@@ -1,0 +1,59 @@
+{% comment %}
+«📈 Ціни й продажі» вгорі картки товару (inventory/admin_report.card_context → product_report.build(tables=False)).
+Згорнуто / розгорнуто — localStorage prw-open; графіки малюються при першому розгортанні.
+{% endcomment %}
+<details class="prw" id="prw-{{ original.pk }}">
+<style>
+  .prw { max-width: 1180px; margin: 10px 0 14px; padding: 8px 12px; border: 1px solid var(--border-strong, #2a3f52);
+         border-radius: 8px; background: var(--bg-card, transparent); color: var(--text, inherit); font-size: 13px; }
+  .prw > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; list-style: none; }
+  .prw > summary::-webkit-details-marker { display: none; }
+  .prw > summary::before { content: '▸'; color: var(--text-muted, #9aafbe); }
+  .prw[open] > summary::before { content: '▾'; }
+  .prw-sub { color: var(--text-muted, #9aafbe); font-size: 12px; }
+  .prw-up { color: var(--ok, #3fb950); } .prw-down { color: var(--err, #f85149); }
+  .prw-links { margin-left: auto; display: flex; gap: 6px; }
+  .prw-links a { font-size: 12px; padding: 3px 9px; border: 1px solid var(--border-strong, #2a3f52); border-radius: 5px;
+                 text-decoration: none; white-space: nowrap; }
+  .prw-notes { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--warn, #e3b341); }
+</style>
+  <summary>
+    <b>📈 Ціни й продажі</b>
+    {% if pr.error %}
+      <span class="prw-sub">не вдалося побудувати графіки — відкрийте звіт або спробуйте пізніше</span>
+    {% else %}{% with k=pr.kpis %}
+      <span class="prw-sub">за 12 міс: <b>{{ k.units_12|floatformat:"-2" }} шт</b>{% if k.units_pct is not None %}
+        <span class="{% if k.units_pct >= 0 %}prw-up{% else %}prw-down{% endif %}">{% if k.units_pct >= 0 %}▲{% else %}▼{% endif %} {% if k.units_pct > 0 %}+{% endif %}{{ k.units_pct|floatformat:1 }}%</span>{% endif %}
+        · {{ k.revenue_12.text }}{% if k.avg_price %} · сер. ціна {{ pr.symbol }}{{ k.avg_price|floatformat:2 }}{% endif %}
+        {% if pr.prices.minerva.now %} · Minerva 1 шт {{ pr.symbol }}{{ pr.prices.minerva.now|floatformat:2 }}{% endif %}
+        {% if pr.prices.digikey.now %} · DigiKey {{ pr.symbol }}{{ pr.prices.digikey.now|floatformat:2 }}{% endif %}
+      </span>
+    {% endwith %}{% endif %}
+    <span class="prw-links">
+      <a href="{% url 'admin:inventory_product_report' original.pk %}">📄 Звіт по товару</a>
+    </span>
+  </summary>
+  {% if not pr.error %}
+    {% if pr.notes %}<ul class="prw-notes">{% for n in pr.notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+    {% include "admin/inventory/product/_report_charts.html" with prc=pr.chart prc_id="prw-chart-data" prc_units=pr.sales.total_units %}
+    <div class="prw-sub">Останні {{ pr.months }} міс., ціни — у {{ pr.home }} за поточним курсом «Налаштувань цін». Таблиці, клієнти й замовлення — у «📄 Звіт по товару».</div>
+  {% endif %}
+</details>
+<script>
+(function () {
+  var box = document.getElementById('prw-{{ original.pk }}');
+  if (!box) return;
+  var KEY = 'prw-open', drawn = false;
+  function draw() {
+    if (drawn || !box.open || !window.prcDraw) return;
+    drawn = true;
+    window.prcDraw(box.querySelector('.prc'));
+  }
+  try { if (localStorage.getItem(KEY) === '1') box.open = true; } catch (e) {}
+  box.addEventListener('toggle', function () {
+    try { localStorage.setItem(KEY, box.open ? '1' : '0'); } catch (e) {}
+    draw();
+  });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', draw); else draw();
+})();
+</script>

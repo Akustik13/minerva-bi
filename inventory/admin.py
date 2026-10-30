@@ -2581,6 +2581,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     )
             except Exception:
                 pass
+            if request.method == "GET":     # «📈 Ціни й продажі» — графіки над формою (admin_report.py)
+                product = Product.objects.filter(pk=object_id).first() if str(object_id).isdigit() else None
+                if product is not None and self.has_view_permission(request, product):
+                    from .admin_report import card_context
+                    extra_context["product_report"] = card_context(product)
         return super().changeform_view(request, object_id, form_url, extra_context)
 
     def get_form(self, request, obj=None, **kwargs):
@@ -3380,6 +3385,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                  name="inventory_product_serve_datasheet"),
             path("<int:pk>/thumb/", self.admin_site.admin_view(self._thumb_view),
                  name="inventory_product_thumb"),
+            path("<int:pk>/report/", self.admin_site.admin_view(self._report_view),
+                 name="inventory_product_report"),
+            path("<int:pk>/report/csv/", self.admin_site.admin_view(self._report_csv_view),
+                 name="inventory_product_report_csv"),
             path("base-prices/", self.admin_site.admin_view(self._base_prices_editor_view),
                  name="inventory_product_base_prices"),
             path("base-prices/template/", self.admin_site.admin_view(self._base_prices_template_view),
@@ -3403,6 +3412,14 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         resp = HttpResponse(data, content_type="image/jpeg")
         resp["Cache-Control"] = "private, max-age=604800"   # адреса з ?v= змінюється разом з фото
         return resp
+
+    def _report_view(self, request, pk):
+        from .admin_report import report_view   # «📄 Звіт по товару»: ціни й продажі (services/product_report.py)
+        return report_view(self, request, pk)
+
+    def _report_csv_view(self, request, pk):
+        from .admin_report import report_csv_view
+        return report_csv_view(self, request, pk)
 
     def _base_prices_editor_view(self, request):
         from .admin_prices import editor_view
