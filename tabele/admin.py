@@ -282,6 +282,7 @@ def _hide_secrets(form):
         if legacy and isinstance(stored, str):
             field.widget.attrs["placeholder"] = placeholder(stored, empty="")
             field.widget.attrs.setdefault("autocomplete", "new-password")
+            field.widget.attrs.setdefault("size", "60")             # підказку з маскою видно повністю
             if stored and not field.help_text:
                 field.help_text = "Порожньо — залишити збережене."
 
