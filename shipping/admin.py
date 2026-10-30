@@ -11,7 +11,7 @@ from core.mixins import AuditableMixin
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path, reverse
-from django.utils.html import format_html, escape, mark_safe
+from django.utils.html import format_html, format_html_join, escape, mark_safe
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -6432,22 +6432,28 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         items    = data.get("customs_line_items") or data.get("articles") or []
         if not items:
             return format_html('<span style="color:#607d8b">Порожньо</span>')
-        rows = ""
         total = 0.0
+        cells = []
         for it in items:
             val = it.get("value", 0) or 0
-            total += float(val)
-            rows += (
-                f'<tr style="border-bottom:1px solid #1e2d3e">'
-                f'<td style="padding:5px 8px;color:#c9d8e4">{it.get("description","")}</td>'
-                f'<td style="padding:5px 8px;color:#9aafbe;text-align:center">{it.get("quantity","")}</td>'
-                f'<td style="padding:5px 8px;color:#80cbc4;font-family:monospace">{it.get("customs_number","")}</td>'
-                f'<td style="padding:5px 8px;color:#9aafbe;text-align:center">{it.get("origin_country","")}</td>'
-                f'<td style="padding:5px 8px;color:#9aafbe;text-align:right">{it.get("weight","")}</td>'
-                f'<td style="padding:5px 8px;color:#4caf50;text-align:right;font-weight:700">'
-                f'{val} {it.get("currency","")}</td>'
-                f'</tr>'
-            )
+            try:
+                total += float(val)
+            except (TypeError, ValueError):
+                pass
+            cells.append((it.get("description", ""), it.get("quantity", ""), it.get("customs_number", ""),
+                          it.get("origin_country", ""), it.get("weight", ""), val, it.get("currency", "")))
+        # значення з артикулів — екрановані (format_html_join), сума — рядком (format_html не форматує числа)
+        rows = format_html_join(
+            "",
+            '<tr style="border-bottom:1px solid #1e2d3e">'
+            '<td style="padding:5px 8px;color:#c9d8e4">{}</td>'
+            '<td style="padding:5px 8px;color:#9aafbe;text-align:center">{}</td>'
+            '<td style="padding:5px 8px;color:#80cbc4;font-family:monospace">{}</td>'
+            '<td style="padding:5px 8px;color:#9aafbe;text-align:center">{}</td>'
+            '<td style="padding:5px 8px;color:#9aafbe;text-align:right">{}</td>'
+            '<td style="padding:5px 8px;color:#4caf50;text-align:right;font-weight:700">{} {}</td></tr>',
+            cells,
+        )
         return format_html(
             '<div style="font-size:12px">'
             '<div style="color:#607d8b;margin-bottom:6px">Тип: <b style="color:#c9d8e4">{}</b></div>'
@@ -6460,9 +6466,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             '<th style="padding:5px 8px;color:#9aafbe;text-align:right">Вага кг</th>'
             '<th style="padding:5px 8px;color:#9aafbe;text-align:right">Вартість</th>'
             '</tr></thead><tbody>{}</tbody></table>'
-            '<div style="text-align:right;color:#4caf50;font-weight:700;margin-top:6px">Всього: {:.2f}</div>'
+            '<div style="text-align:right;color:#4caf50;font-weight:700;margin-top:6px">Всього: {}</div>'
             '</div>',
-            inv_type, format_html(rows), total,
+            inv_type, rows, f"{total:.2f}",
         )
     customs_articles_panel.short_description = _("Митні артикули")
 

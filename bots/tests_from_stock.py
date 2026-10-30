@@ -201,6 +201,21 @@ class StageSyncTests(FromStockBase):
         self.assertIn("офера немає на DigiKey", rm["offer_status"])
         self.assertEqual(dk_publish.sync_stages(offers=offers)["updated"], 0)   # повтор нічого не змінює
 
+    def test_list_action_for_selected(self):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("root2", "r2@x.y", "p"))
+        listing = DigiKeyListing.objects.get(product__sku="FT220401")
+        DigiKeyListing.objects.filter(pk=listing.pk).update(dk_offer_id="o-1")
+        live = [{"id": "o-1", "supplierSku": "FT220401", "createDateUtc": "2025-03-01T08:00:00Z",
+                 "isActive": True, "offerStatusReason": "Active"}]
+        with mock.patch("bots.services.dk_prices._offers_for", return_value=live) as fetch:
+            r = self.client.post("/admin/bots/digikeylisting/", {"action": "action_pub_sync",
+                                                                 "_selected_action": [listing.pk]})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual([l.pk for l in fetch.call_args[0][0]], [listing.pk])   # лише вибрані
+        self.assertTrue(DigiKeyListing.objects.get(pk=listing.pk).pub_events["live"].startswith("2025-03-01"))
+
     def test_button_on_list(self):
         from config.models import SystemSettings
         SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})

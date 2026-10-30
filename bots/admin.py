@@ -1971,6 +1971,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'action_bulk_prices',
         'action_dk_from_minerva',
         'action_dk_diff',
+        'action_pub_sync',
         'action_lead_times',
         'action_bulk_stock',
         'action_bulk_set_category',
@@ -3105,6 +3106,22 @@ Rules:
         self.message_user(request, msg + ".", messages.SUCCESS)
         if err:
             self.message_user(request, f"⚠️ Не вдалося оновити на DigiKey: {err} лістингів.", messages.WARNING)
+
+    @admin.action(description='🔄 Етапи з DigiKey (вибрані)')
+    def action_pub_sync(self, request, queryset):
+        """Дорожня карта вибраних: дата офера, чи показує DigiKey і чому ні (як «🔄 Етапи з DigiKey» над списком)."""
+        from bots.services.dk_publish import sync_stages
+        try:
+            res = sync_stages(queryset.select_related('product')[:500])
+        except Exception as exc:  # noqa: BLE001 — мережа / токен
+            self.message_user(request, f"Не вдалося прочитати офери з DigiKey: {exc}", messages.ERROR)
+            return None
+        text = (f"Етапи звірено з DigiKey: лістингів {res['total']}, оновлено {res['updated']}, "
+                f"без офера {res['without_offer']}.")
+        if res["not_found"]:
+            text += f" Офер не знайдено: {', '.join(res['not_found'][:10])}"
+        self.message_user(request, text, messages.SUCCESS)
+        return None
 
     @admin.action(description='🔍 Що бачить DigiKey (звірити вибрані)…')
     def action_dk_diff(self, request, queryset):
@@ -4364,16 +4381,16 @@ class DigiKeyPriceLogAdmin(admin.ModelAdmin):
     listing_sku.admin_order_field = 'listing__product__sku'
 
     def delta_pct_badge(self, obj):
-        d      = obj.delta_pct
-        sign   = '+' if d >= 0 else ''
+        d      = obj.delta_pct or 0
         color  = '#2e7d32' if d >= 0 else '#c62828'
         bg     = 'rgba(46,125,50,.15)' if d >= 0 else 'rgba(198,40,40,.15)'
         border = '#2e7d32' if d >= 0 else '#c62828'
+        # число форматуємо до format_html: він екранує аргументи в рядки, і «{:.1f}» падав (500 у списку)
         return format_html(
             '<span style="color:{};background:{};border:1px solid {};'
             'border-radius:4px;padding:1px 7px;font-size:12px;font-weight:700">'
-            '{}{:.1f}%</span>',
-            color, bg, border, sign, d,
+            '{}%</span>',
+            color, bg, border, f"{d:+.1f}",
         )
     delta_pct_badge.short_description = 'Зміна'
     delta_pct_badge.admin_order_field = 'delta_pct'
@@ -4385,8 +4402,10 @@ class DigiKeyPriceLogAdmin(admin.ModelAdmin):
             return '—'
         parts = []
         for o, n in zip(old[:3], new[:3]):
-            op = float(o.get('price', 0))
-            np_ = float(n.get('price', 0))
+            try:
+                op, np_ = float(o.get('price') or 0), float(n.get('price') or 0)
+            except (TypeError, ValueError, AttributeError):
+                continue
             parts.append(f'{op:.2f}→{np_:.2f}')
         if len(old) > 3:
             parts.append('…')

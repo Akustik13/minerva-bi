@@ -180,7 +180,12 @@ def sync_stages(listings=None, offers=None) -> dict:
     """«🔄 Етапи з DigiKey»: один GET /offers на всіх, кожен лістинг — sync_offer; лістинг з ID офера, якого
     на DigiKey вже немає, — причина «NotFound». {total, updated, not_found: [sku], without_offer}."""
     from bots.models import DigiKeyConfig, DigiKeyListing
-    if offers is None:
+    if listings is not None:
+        listings = list(listings)
+    if offers is None and listings is not None:          # кілька вибраних — точково (до 5), інакше весь список
+        from bots.services.dk_prices import _offers_for
+        offers = _offers_for(listings)
+    elif offers is None:
         from bots.services.dk_marketplace import fetch_offers
         offers = fetch_offers(DigiKeyConfig.get(), max_count=5000)
     by_id = {o.get("id"): o for o in offers if o.get("id")}
