@@ -30,7 +30,8 @@ def handle_status_change_and_assembly(sender, instance, created, **kwargs):
         new_status = instance.status
 
         # Перевірка: чи статус змінився на "shipped"
-        if old_status != 'shipped' and new_status == 'shipped':
+        # «Не впливає на склад» — компоненти теж не списуються (як і сам товар)
+        if old_status != 'shipped' and new_status == 'shipped' and instance.affects_stock:
             _process_assembly_deductions(instance)
     except Exception as e:
         import logging
@@ -53,6 +54,12 @@ def _process_assembly_deductions(order):
     for line in lines:
         product = line.product
         if not product or product.bom_type != Product.BomType.KEY:
+            continue
+
+        # Уже списано під це замовлення (знову «Відправлено») — нічого не робимо
+        from inventory.models import InventoryTransaction
+        if InventoryTransaction.objects.filter(
+                external_key__startswith=f"bom_deduction_{product.id}_{order.pk}_").exists():
             continue
 
         # Перевірити чи можна зібрати

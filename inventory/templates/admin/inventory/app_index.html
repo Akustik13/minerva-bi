@@ -165,7 +165,7 @@
     <div class="inv-stats">
       <a href="/admin/inventory/reorderproxy/" class="inv-stat">
         <div class="inv-stat-val" style="color:#f44336">{{ inventory_stats.critical }}</div>
-        <div class="inv-stat-lbl">⚠️ {% trans "Нижче reorder point" %}</div>
+        <div class="inv-stat-lbl">⚠️ {% trans "Нижче точки дозамовлення" %}</div>
       </a>
       <a href="/admin/inventory/purchaseorder/" class="inv-stat">
         <div class="inv-stat-val" style="color:#ff9800">{{ inventory_stats.active_po }}</div>
@@ -257,17 +257,17 @@
       <span class="inv-tile-name">{% trans "Всі транзакції" %}</span>
       <span class="inv-tile-sub">{% trans "Прихід · витрата · коригування" %}</span>
     </a>
-    <a href="/admin/inventory/inventorytransaction/?tx_type=RECEIPT" class="inv-tile" style="--ta:#4caf50" data-tile-id="receipt">
+    <a href="/admin/inventory/inventorytransaction/?tx_type__exact=Incoming" class="inv-tile" style="--ta:#4caf50" data-tile-id="receipt">
       <span class="inv-tile-icon">📥</span>
       <span class="inv-tile-name">{% trans "Прихід" %}</span>
       <span class="inv-tile-sub">{% trans "Отримані товари" %}</span>
     </a>
-    <a href="/admin/inventory/inventorytransaction/?tx_type=SHIPMENT" class="inv-tile" style="--ta:#f44336" data-tile-id="shipment">
+    <a href="/admin/inventory/inventorytransaction/?tx_type__exact=Outgoing" class="inv-tile" style="--ta:#f44336" data-tile-id="shipment">
       <span class="inv-tile-icon">📤</span>
       <span class="inv-tile-name">{% trans "Витрата" %}</span>
       <span class="inv-tile-sub">{% trans "Відвантажені товари" %}</span>
     </a>
-    <a href="/admin/inventory/inventorytransaction/?tx_type=ADJUSTMENT" class="inv-tile" style="--ta:#9c27b0" data-tile-id="adjustment">
+    <a href="/admin/inventory/inventorytransaction/?tx_type__exact=Adjustment" class="inv-tile" style="--ta:#9c27b0" data-tile-id="adjustment">
       <span class="inv-tile-icon">⚖️</span>
       <span class="inv-tile-name">{% trans "Коригування" %}</span>
       <span class="inv-tile-sub">{% trans "Ревізія · інвентаризація" %}</span>

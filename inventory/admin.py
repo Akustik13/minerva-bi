@@ -24,7 +24,7 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
 
-from .forms import ExcelUploadForm, SetStockForm
+from .forms import ExcelUploadForm, InventoryTransactionForm, SetStockForm
 from .models import (
     Product, ProductAlias, Location,
     InventoryTransaction, ProductComponent,
@@ -76,31 +76,44 @@ def _get_stock(product, for_sale=True):
 
 
 def _get_monthly_sales(product, months=3):
+    """Середні продажі за місяць: замовлення, що впливають на склад, без скасованих."""
     try:
-        from sales.models import SalesOrderLine
-        since = timezone.now() - timedelta(days=30 * months)
-        result = SalesOrderLine.objects.filter(
-            product=product,
-            order__order_date__gte=since,
-        ).aggregate(total=Sum('qty'))
-        total = float(result['total'] or 0)
-        return total / months
+        from inventory.services.stock import monthly_sales_qs
+        since = (timezone.now() - timedelta(days=30 * months)).date()
+        result = monthly_sales_qs(since).filter(product=product).aggregate(total=Sum('qty'))
+        return float(result['total'] or 0) / months
     except Exception:
         return 0
 
 
-def _reorder(product, stock=None, sales_period_total=None, period_days=90):
-    """Повертає dict з аналізом reorder.
-    stock: optional pre-computed stock (from queryset annotation)
-    sales_period_total: optional pre-computed sales qty for `period_days`
-    period_days: length of the sales period in days (default 90 = 3 months)
+def _confirmed_incoming(product):
+    """Уже замовлено в постачальників і ще не отримано (закупівлі Ordered / Partial, без чернеток-кошика)."""
+    from django.db.models import F
+    from inventory.services.stock import CONFIRMED_PO_STATUSES
+    q = (PurchaseOrderLine.objects
+         .filter(product=product, purchase_order__status__in=CONFIRMED_PO_STATUSES)
+         .aggregate(t=Sum(F('qty_ordered') - F('qty_received')))['t'])
+    return max(0.0, float(q or 0))
+
+
+def _reorder(product, stock=None, sales_period_total=None, period_days=90, reserved=None, incoming=None):
+    """Аналіз «що замовити» для товару — формула в inventory/services/stock.reorder_advice.
+
+    stock / reserved / incoming — готові числа з анотацій queryset (інакше рахуються тут):
+      stock    — на складі (on_hand), reserved — резерв (stock service), incoming — уже замовлено
+    sales_period_total — продано за period_days днів (90 = 3 міс).
+    Повертає reorder_advice + stock (на складі), reserved, available.
     """
-    if stock is None:
-        stock = _get_stock(product)
-    else:
-        stock = float(stock)
-    # Від'ємний stock = борг — для розрахунків вважаємо 0
-    stock_calc = max(0.0, stock)
+    from inventory.services import stock as stock_service
+    if stock is None or reserved is None:
+        row = stock_service.annotate_stock(Product.objects.filter(pk=product.pk)).first()
+        if stock is None:
+            stock = row._on_hand if row else 0
+        if reserved is None:
+            reserved = row._reserved if row else 0
+    stock, reserved = float(stock), float(reserved)
+    if incoming is None:
+        incoming = _confirmed_incoming(product)
 
     if sales_period_total is not None:
         months = max(1, period_days) / 30.0
@@ -108,28 +121,60 @@ def _reorder(product, stock=None, sales_period_total=None, period_days=90):
     else:
         monthly = _get_monthly_sales(product, months=3)
     if monthly <= 0:
-        monthly = _get_monthly_sales(product, months=24)
-        if monthly <= 0:
-            return {'stock': stock, 'monthly': 0,
-                    'months_left': None, 'reorder_qty': 0, 'status': 'no_sales'}
-        monthly = monthly / 6
+        # не було продажів за період — продажі за 2 роки з меншою вагою
+        monthly = _get_monthly_sales(product, months=24) / 6
 
-    months_left = stock_calc / monthly if monthly > 0 else 999
-    target = monthly * 3 * 1.2
-    reorder_qty = max(0, target - stock_calc)
-    reorder_qty = round(reorder_qty / 10) * 10 if reorder_qty > 10 else round(reorder_qty)
+    d = stock_service.reorder_advice(available=stock - reserved, monthly=monthly,
+                                     reorder_point=product.reorder_point, incoming=incoming)
+    d.update(stock=stock, reserved=reserved, available=stock - reserved, incoming=float(incoming or 0))
+    return d
 
-    if stock <= 0 and monthly > 0: status = 'critical'
-    elif months_left <= 0.5:       status = 'critical'
-    elif months_left <= 1.5:       status = 'warning'
-    elif months_left <= 3:         status = 'low'
-    else:                          status = 'ok'
 
-    return {
-        'stock': stock, 'monthly': round(monthly, 1),
-        'months_left': round(months_left, 1) if stock >= 0 else 0.0,
-        'reorder_qty': int(reorder_qty), 'status': status,
-    }
+def _reorder_from_annotations(obj, period_days=90, sales_attr='_sales_period'):
+    """_reorder з анотацій списку (ReorderProxy / Product) — без запитів на кожен рядок."""
+    s = getattr(obj, '_stock_total', None)
+    s_per = getattr(obj, sales_attr, None)
+    return _reorder(
+        obj,
+        stock=float(s) if s is not None else None,
+        sales_period_total=float(s_per) if s_per is not None else None,
+        period_days=period_days,
+        reserved=getattr(obj, '_reserved_total', None),
+        incoming=getattr(obj, '_confirmed_incoming', None),
+    )
+
+
+def _annotate_reorder(qs, since, source_slug=''):
+    """Анотації для аналізу запасів: _stock_total (на складі), _reserved_total (резерв), _available,
+    _sales_period (продано з since, без скасованих), _confirmed_incoming (уже замовлено), кошик і замовлене."""
+    from django.db.models import F, OuterRef, Subquery, Value
+    from django.db.models.functions import Coalesce
+    from inventory.services.stock import CONFIRMED_PO_STATUSES, annotate_stock, monthly_sales_qs
+
+    sales_qs = monthly_sales_qs(since).filter(product=OuterRef('pk'))
+    if source_slug and source_slug != 'all':
+        sales_qs = sales_qs.filter(order__source=source_slug)
+    sales_subq = sales_qs.values('product').annotate(t=Sum('qty')).values('t')
+    confirmed_subq = (
+        PurchaseOrderLine.objects.filter(product=OuterRef('pk'), purchase_order__status__in=CONFIRMED_PO_STATUSES)
+        .values('product').annotate(t=Sum(F('qty_ordered') - F('qty_received'))).values('t')
+    )
+    cart_subq = (
+        PurchaseOrderLine.objects.filter(product=OuterRef('pk'), purchase_order__status='draft')
+        .values('product').annotate(t=Sum('qty_ordered')).values('t')
+    )
+    ordered_subq = (
+        PurchaseOrderLine.objects.filter(product=OuterRef('pk'), purchase_order__status__in=CONFIRMED_PO_STATUSES)
+        .values('product').annotate(t=Sum('qty_ordered')).values('t')
+    )
+    return annotate_stock(qs).annotate(
+        _stock_total=F('_on_hand'),
+        _reserved_total=F('_reserved'),
+        _sales_period=Coalesce(Subquery(sales_subq), Value(Decimal('0'))),
+        _confirmed_incoming=Coalesce(Subquery(confirmed_subq), Value(Decimal('0'))),
+        _in_cart_qty=Coalesce(Subquery(cart_subq), Value(Decimal('0'))),
+        _ordered_qty=Coalesce(Subquery(ordered_subq), Value(Decimal('0'))),
+    )
 
 
 # ── Фільтри аналізу ───────────────────────────────────────────────────────────
@@ -184,7 +229,11 @@ class ReorderStatusFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         if not self.value():
             return queryset
-        pks = [p.pk for p in queryset if _reorder(p)['status'] == self.value()]
+        days = max(7, min(365, int(request.GET.get('analysis_period') or 90)))
+        if '_stock_total' not in queryset.query.annotations:
+            since = (timezone.now() - timedelta(days=days)).date()
+            queryset = _annotate_reorder(queryset, since, (request.GET.get('sales_source') or '').strip())
+        pks = [p.pk for p in queryset if _reorder_from_annotations(p, days)['status'] == self.value()]
         return queryset.filter(pk__in=pks)
 
 
@@ -252,7 +301,6 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         from . import thumbs
         from shop.badges import badges as shop_badges, dk_listing as shop_dk_listing
 
-        DONE_STATUSES = {'shipped', 'delivered', 'cancelled'}
         PO_ACTIVE = ['draft', 'ordered', 'partial']
 
         # All active products (+ магазини — бейджі під назвою)
@@ -273,39 +321,30 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         product_pks = [p.pk for p in products]
 
-        # Stock map
-        stock_map = defaultdict(float)
-        for s in (InventoryTransaction.objects
-                  .filter(product_id__in=product_pks)
-                  .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
-                  .values('product_id').annotate(t=Sum('qty'))):
-            stock_map[s['product_id']] = float(s['t'] or 0)
 
-        # Reserved qty + details
-        reserved_map = defaultdict(float)
+        # Резерв і «Доступно» — inventory/services/stock.py (ті самі числа, що в API й аналізі запасів):
+        # резерви + ще не списані відкриті замовлення; уже списані замовлення в «Резерв» не входять
+        from inventory.services import stock as stock_service
+        stock_rows = stock_service.stock_map(product_pks)
+        reserved_map = defaultdict(float, {pk: float(p._reserved) for pk, p in stock_rows.items()})
         reservations_detail = defaultdict(list)
-        try:
-            from sales.models import SalesOrderLine
-            for l in (SalesOrderLine.objects
-                      .filter(product_id__in=product_pks, order__affects_stock=True)
-                      .exclude(order__status__in=DONE_STATUSES)
-                      .select_related('order')
-                      .order_by('product_id', 'order__order_date')):
-                pk = l.product_id
-                reserved_map[pk] += float(l.qty)
-                o = l.order
-                reservations_detail[pk].append({
-                    'order_number':     o.order_number,
-                    'order_pk':         o.pk,
-                    'qty':              float(l.qty),
-                    'client':           o.client or o.ship_name or o.email or f'#{o.order_number}',
-                    'status':           o.get_status_display(),
-                    'shipping_deadline': o.shipping_deadline,
-                    'status_raw':   o.status,
-                    'order_date':   o.order_date,
-                })
-        except Exception:
-            pass
+        STATE_LABELS = {'reserved': _('🔒 резерв'), 'pending': _('⏳ ще не списано'),
+                        'deducted': _('✓ уже списано')}
+        for l, state in stock_service.open_order_lines(product_pks):
+            o = l.order
+            reservations_detail[l.product_id].append({
+                'order_number':     o.order_number,
+                'order_pk':         o.pk,
+                'qty':              float(l.qty),
+                'client':           o.client or o.ship_name or o.email or f'#{o.order_number}',
+                'status':           o.get_status_display(),
+                'shipping_deadline': o.shipping_deadline,
+                'status_raw':   o.status,
+                'order_date':   o.order_date,
+                'state':        state,
+                'state_label':  STATE_LABELS[state],
+                'in_reserved':  state != 'deducted',
+            })
 
         # Incoming PO qty + details (split: draft=cart, ordered/partial=confirmed)
         incoming_map = defaultdict(float)
@@ -354,7 +393,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         rows = []
         for p in products:
             pk = p.pk
-            stock    = stock_map[pk]
+            stock    = float(stock_rows[pk]._on_hand) if pk in stock_rows else 0.0
             reserved = reserved_map[pk]
             incoming = incoming_map[pk]
             po_items = incoming_detail[pk]
@@ -778,66 +817,13 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra)
 
     def get_queryset(self, request):
-        from django.db.models import OuterRef, Subquery, Value
-        from django.db.models.functions import Coalesce
-        from django.utils import timezone
-        from datetime import timedelta
         try:
-            from sales.models import SalesOrderLine
-
             days = max(7, min(365, int(request.GET.get('analysis_period') or 90)))
-            since = (timezone.now() - timedelta(days=days)).date()
-            source_slug = (request.GET.get('sales_source') or '').strip()
-
-            stock_subq = (
-                InventoryTransaction.objects.filter(product=OuterRef('pk'))
-                .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
-                .values('product').annotate(t=Sum('qty')).values('t')
-            )
-
-            reserved_subq = (
-                SalesOrderLine.objects.filter(
-                    product=OuterRef('pk'),
-                    order__affects_stock=True,
-                ).exclude(
-                    order__status__in=['shipped', 'delivered', 'cancelled']
-                ).values('product').annotate(t=Sum('qty')).values('t')
-            )
-
-            sales_qs = SalesOrderLine.objects.filter(
-                product=OuterRef('pk'),
-                order__order_date__gte=since,
-                order__affects_stock=True,
-            )
-            if source_slug and source_slug != 'all':
-                sales_qs = sales_qs.filter(order__source__slug=source_slug)
-            sales_subq = sales_qs.values('product').annotate(t=Sum('qty')).values('t')
-
-            cart_subq = (
-                PurchaseOrderLine.objects.filter(
-                    product=OuterRef('pk'),
-                    purchase_order__status='draft',
-                ).values('product').annotate(t=Sum('qty_ordered')).values('t')
-            )
-            ordered_subq = (
-                PurchaseOrderLine.objects.filter(
-                    product=OuterRef('pk'),
-                    purchase_order__status__in=['ordered', 'partial'],
-                ).values('product').annotate(t=Sum('qty_ordered')).values('t')
-            )
-
-            return (
-                super().get_queryset(request).filter(is_active=True)
-                .annotate(
-                    _stock_total=Coalesce(Subquery(stock_subq), Value(Decimal('0'))),
-                    _reserved_total=Coalesce(Subquery(reserved_subq), Value(Decimal('0'))),
-                    _sales_period=Coalesce(Subquery(sales_subq), Value(Decimal('0'))),
-                    _in_cart_qty=Coalesce(Subquery(cart_subq), Value(Decimal('0'))),
-                    _ordered_qty=Coalesce(Subquery(ordered_subq), Value(Decimal('0'))),
-                )
-            )
-        except Exception:
-            return super().get_queryset(request).filter(is_active=True)
+        except (TypeError, ValueError):
+            days = 90
+        since = (timezone.now() - timedelta(days=days)).date()
+        source_slug = (request.GET.get('sales_source') or '').strip()
+        return _annotate_reorder(super().get_queryset(request).filter(is_active=True), since, source_slug)
 
     def name_col(self, obj):
         n = obj.name
@@ -846,15 +832,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
     def _get_reorder_cached(self, obj):
         if not hasattr(obj, '_reorder_cache'):
-            s      = getattr(obj, '_stock_total', None)
-            s_per  = getattr(obj, '_sales_period', None)
-            days   = getattr(self, '_analysis_days', 90)
-            obj._reorder_cache = _reorder(
-                obj,
-                stock=float(s) if s is not None else None,
-                sales_period_total=float(s_per) if s_per is not None else None,
-                period_days=days,
-            )
+            obj._reorder_cache = _reorder_from_annotations(obj, getattr(self, '_analysis_days', 90))
         return obj._reorder_cache
 
     def stock_col(self, obj):
@@ -876,15 +854,14 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     reserved_col.admin_order_field = '_reserved_total'
 
     def available_col(self, obj):
-        s = float(getattr(obj, '_stock_total', None) or 0)
-        r = float(getattr(obj, '_reserved_total', None) or 0)
-        avail = s - r
+        avail = float(getattr(obj, '_available', None) or 0)
         if avail <= 0:
             return format_html('<b style="color:#f44336">{}</b>', int(avail))
         elif avail < 5:
             return format_html('<span style="color:#ff9800">{}</span>', int(avail))
         return format_html('<span style="color:#4caf50">{}</span>', int(avail))
     available_col.short_description = _("Доступно")
+    available_col.admin_order_field = '_available'
 
     def history_toggle_btn(self, obj):
         return format_html(
@@ -971,7 +948,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         added, skipped = 0, 0
         for product in queryset:
-            d = _reorder(product)
+            d = _reorder_from_annotations(product, getattr(self, '_analysis_days', 90))
             if not d['reorder_qty']:
                 skipped += 1
                 continue
@@ -1013,7 +990,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         added = 0
         for product in queryset:
-            d = _reorder(product)
+            d = _reorder_from_annotations(product, getattr(self, '_analysis_days', 90))
             qty = d['reorder_qty'] or 1
             line, created = PurchaseOrderLine.objects.get_or_create(
                 purchase_order=po,
@@ -1834,6 +1811,7 @@ class LocationAdmin(admin.ModelAdmin):
 
 @admin.register(InventoryTransaction)
 class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
+    form = InventoryTransactionForm   # знак qty за типом руху (Outgoing / Резерв — мінус, Incoming — плюс)
     list_display  = ("date_col", "tx_type_badge", "product_link", "qty_col",
                      "balance_col", "ref_doc_link", "location", "performer_col")
     search_fields = ("product__sku", "ref_doc", "external_key")
@@ -1877,21 +1855,27 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
 
     @admin.action(description=_("🔒 Змінити тип → Резерв"))
     def mark_as_reserved(self, request, queryset):
-        updated = queryset.update(tx_type=InventoryTransaction.TxType.RESERVED)
+        from django.db.models import F
+        from django.db.models.functions import Abs
+        updated = queryset.update(tx_type=InventoryTransaction.TxType.RESERVED, qty=-Abs(F("qty")))
         self.message_user(request,
                           _("Змінено %(n)d транзакцій → Резерв.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
     @admin.action(description=_("🔓 Змінити тип → Списання (Outgoing)"))
     def release_reservations(self, request, queryset):
-        updated = queryset.update(tx_type=InventoryTransaction.TxType.OUTGOING)
+        from django.db.models import F
+        from django.db.models.functions import Abs
+        updated = queryset.update(tx_type=InventoryTransaction.TxType.OUTGOING, qty=-Abs(F("qty")))
         self.message_user(request,
                           _("Змінено %(n)d транзакцій → Списання.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
     @admin.action(description=_("▲ Змінити тип → Прихід (Incoming)"))
     def mark_as_incoming(self, request, queryset):
-        updated = queryset.update(tx_type=InventoryTransaction.TxType.INCOMING)
+        from django.db.models import F
+        from django.db.models.functions import Abs
+        updated = queryset.update(tx_type=InventoryTransaction.TxType.INCOMING, qty=Abs(F("qty")))
         self.message_user(request,
                           _("Змінено %(n)d транзакцій → Прихід.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
@@ -2618,50 +2602,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return form
 
     def get_queryset(self, request):
-        """Annotate stock, incoming and 3-month sales totals to avoid N+1 queries."""
-        from django.db.models import OuterRef, Subquery, ExpressionWrapper, DecimalField, Value
-        from django.db.models.functions import Coalesce
-        from django.utils import timezone
-        from datetime import timedelta
-        try:
-            from sales.models import SalesOrderLine
-            since_3m = (timezone.now() - timedelta(days=90)).date()
-            stock_subq = (
-                InventoryTransaction.objects.filter(product=OuterRef('pk'))
-                .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
-                .values('product').annotate(t=Sum('qty')).values('t')
-            )
-            reserved_subq = (
-                InventoryTransaction.objects.filter(
-                    product=OuterRef('pk'),
-                    tx_type=InventoryTransaction.TxType.RESERVED,
-                ).values('product').annotate(t=Sum('qty')).values('t')
-            )
-            incoming_subq = (
-                PurchaseOrderLine.objects
-                .filter(product=OuterRef('pk'),
-                        purchase_order__status__in=['draft', 'ordered', 'partial'])
-                .values('product')
-                .annotate(i=ExpressionWrapper(
-                    Sum('qty_ordered') - Sum('qty_received'),
-                    output_field=DecimalField(max_digits=18, decimal_places=3),
-                ))
-                .values('i')
-            )
-            sales_subq = (
-                SalesOrderLine.objects.filter(
-                    product=OuterRef('pk'),
-                    order__order_date__gte=since_3m,
-                ).values('product').annotate(t=Sum('qty')).values('t')
-            )
-            return super().get_queryset(request).prefetch_related("shop_listings__shop").select_related("dk_listing").annotate(
-                _stock_total=Coalesce(Subquery(stock_subq), Value(Decimal('0'))),
-                _reserved_total=Coalesce(Subquery(reserved_subq), Value(Decimal('0'))),
-                _incoming_total=Coalesce(Subquery(incoming_subq), Value(Decimal('0'))),
-                _sales_3m=Coalesce(Subquery(sales_subq), Value(Decimal('0'))),
-            )
-        except Exception:
-            return super().get_queryset(request)
+        """Залишок, резерв, очікуване й продажі за 3 міс — анотаціями (без N+1), ті самі, що в аналізі запасів."""
+        from django.db.models import F
+        since_3m = (timezone.now() - timedelta(days=90)).date()
+        qs = super().get_queryset(request).prefetch_related("shop_listings__shop").select_related("dk_listing")
+        return _annotate_reorder(qs, since_3m).annotate(_incoming_total=F('_incoming'), _sales_3m=F('_sales_period'))
 
     def changelist_view(self, request, extra_context=None):
         """Pre-load labels dir listing once per request to avoid per-row filesystem scans."""
@@ -2702,16 +2647,16 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         if hasattr(obj, '_reserved_total'):
             r = obj._reserved_total
         else:
-            r = (InventoryTransaction.objects
-                 .filter(product=obj, tx_type=InventoryTransaction.TxType.RESERVED)
-                 .aggregate(t=Sum("qty")).get("t")) or Decimal("0")
-        if r and r < 0:
-            val = abs(r)
+            from inventory.services.stock import annotate_stock
+            row = annotate_stock(Product.objects.filter(pk=obj.pk)).first()
+            r = row._reserved if row else Decimal("0")
+        if r and r > 0:
+            val = r
             if obj.unit_type == Product.UnitType.PIECE:
                 val = int(val)
             return format_html(
                 '<span style="color:#FFB300;font-weight:700" title="{}">🔒 {}</span>',
-                _("Зарезервовано під замовлення"), val,
+                _("Обіцяно відкритим замовленням і ще не списано (резерви й незаписані замовлення)"), val,
             )
         return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
     reserved_qty.short_description = _("🔒 Резерв")
@@ -2719,13 +2664,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     def _get_reorder_cached(self, obj):
         """Return _reorder() result, cached on obj to avoid duplicate calls per row."""
         if not hasattr(obj, '_reorder_cache'):
-            s = getattr(obj, '_stock_total', None)
-            s3m = getattr(obj, '_sales_3m', None)
-            obj._reorder_cache = _reorder(
-                obj,
-                stock=float(s) if s is not None else None,
-                sales_period_total=float(s3m) if s3m is not None else None,
-            )
+            obj._reorder_cache = _reorder_from_annotations(obj, 90, sales_attr='_sales_3m')
         return obj._reorder_cache
 
     def stock_badge(self, obj):
@@ -2768,8 +2707,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         color, msg = status_cfg.get(d['status'], ('#607d8b', '—'))
 
         on_hand = int(d['stock'])
-        reserved = int(abs(getattr(obj, '_reserved_total', None) or 0))
-        available = on_hand - reserved
+        reserved = int(d['reserved'])
+        available = int(d['available'])
         avail_color = '#f44336' if available <= 0 else ('#ff9800' if available < 5 else '#4caf50')
         pcs = str(_("шт."))
         avail_html = f"<b style='color:{avail_color}'>{available} {pcs}</b>"
@@ -2784,6 +2723,12 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
              f"{d['monthly']}/{str(_('міс'))} ({str(_('останні 3 міс'))})" if d['monthly'] else "—"),
             (str(_("Вистачить на")),
              f"{d['months_left']} {str(_('міс'))}" if d['months_left'] is not None else "—"),
+            (str(_("Точка дозамовлення")),
+             (f"{obj.reorder_point} {pcs}" + (f" — <b style='color:#ff9800'>{str(_('доступно не більше'))}</b>"
+                                              if d.get('below_reorder_point') else ""))
+             if obj.reorder_point else "—"),
+            (str(_("Уже замовлено (закупівлі)")),
+             f"{int(d['incoming'])} {pcs}" if d.get('incoming') else "—"),
             (str(_("Рекомендовано замовити")),
              f"<b style='color:#2196f3'>{d['reorder_qty']} {pcs}</b>" if d['reorder_qty'] else str(_("Не потрібно"))),
         ]
@@ -4456,23 +4401,13 @@ def _get_inventory_stats():
         from django.db.models.functions import Coalesce
         from decimal import Decimal
 
+        from inventory.services.stock import annotate_stock
+
         today = date.today()
 
-        # Products below reorder point (fast subquery)
-        stock_subq = (
-            InventoryTransaction.objects
-            .filter(product=OuterRef("pk"))
-            .values("product")
-            .annotate(total=Sum("qty"))
-            .values("total")
-        )
-        critical = (
-            Product.objects
-            .filter(is_active=True, reorder_point__gt=0)
-            .annotate(stock=Coalesce(Subquery(stock_subq), Value(Decimal("0"))))
-            .filter(stock__lt=F("reorder_point"))
-            .count()
-        )
+        # Доступно ≤ точки дозамовлення — як low_stock в API й фільтр «Критичні» огляду складу
+        active = annotate_stock(Product.objects.filter(is_active=True))
+        critical = active.filter(reorder_point__gt=0, _available__lte=F("reorder_point")).count()
 
         # Active purchase orders (not yet fully received)
         active_po = PurchaseOrder.objects.filter(
@@ -4487,14 +4422,8 @@ def _get_inventory_stats():
         # Total active products
         active_products = Product.objects.filter(is_active=True).count()
 
-        # Out of stock: active products with total stock <= 0
-        out_of_stock = (
-            Product.objects
-            .filter(is_active=True)
-            .annotate(stock=Coalesce(Subquery(stock_subq), Value(Decimal("0"))))
-            .filter(stock__lte=0)
-            .count()
-        )
+        # Немає на складі: фізичний залишок (без резервів) <= 0
+        out_of_stock = active.filter(_on_hand__lte=0).count()
 
         # In-stock OK: active products that are neither critical nor out of stock
         in_stock_ok = max(0, active_products - critical - out_of_stock)

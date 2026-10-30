@@ -113,6 +113,16 @@ _SOURCE_TIPS = {
 }
 
 
+def source_choices(current=""):
+    """Вибір «Source» у картці замовлення: джерела з довідника + поточне значення замовлення, навіть якщо
+    його в довіднику немає — інакше браузер покаже перше джерело і «Зберегти» тихо змінить джерело."""
+    choices = list(SalesSource.objects.order_by("order", "name").values_list("slug", "name"))
+    current = (current or "").strip() if isinstance(current, str) else ""
+    if choices and current and current not in {slug for slug, _ in choices}:
+        choices.insert(0, (current, f"{current} — немає в довіднику джерел"))
+    return choices
+
+
 def _mtip_sales(field_key):
     title, body = _SOURCE_TIPS.get(field_key, ("", ""))
     body_html = body.replace("\n", "<br>")
@@ -237,20 +247,7 @@ class SalesOrderLineInline(admin.TabularInline):
             if obj.sku_raw:
                 return format_html('<span style="color:#ff9800">⚠️ {} не в базі</span>', obj.sku_raw)
             return "—"
-        from inventory.models import InventoryTransaction, Location
-        # Лічимо тільки готові товари: FINISHED або OTHER склади
-        query = InventoryTransaction.objects.filter(
-            product=obj.product
-        ).exclude(
-            tx_type=InventoryTransaction.TxType.RESERVED
-        ).filter(
-            location__location_type__in=[
-                Location.LocationType.FINISHED,
-                Location.LocationType.OTHER
-            ]
-        )
-        result = query.aggregate(total=Sum('qty'))
-        stock = float(result['total'] or 0)
+        stock = float(_line_cover(obj)["free"])
         needed = float(obj.qty or 0)
         if stock <= 0:
             return format_html('<span style="background:#f44336;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">🚫 Немає (0)</span>')
@@ -258,6 +255,21 @@ class SalesOrderLineInline(admin.TabularInline):
             return format_html('<span style="background:#ff9800;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">⚠️ {} / {}</span>', int(stock), int(needed))
         return format_html('<span style="background:#4caf50;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">✅ {} шт.</span>', int(stock))
     stock_status.short_description = "На складі"
+
+
+def _line_cover(line):
+    """Доступно для позиції: доступно на складі + те, що вже взяло це замовлення (кеш на замовленні)."""
+    from inventory.services import stock as stock_service
+    order = line.order
+    cover = getattr(order, "_stock_cover", None)
+    if cover is None:
+        cover = order._stock_cover = stock_service.order_lines_cover(order)
+    if line.pk in cover:
+        return cover[line.pk]
+    if not line.product_id:
+        return {"available": Decimal("0"), "held": Decimal("0"), "free": Decimal("0")}
+    a = stock_service.get_available(line.product)
+    return {"available": a, "held": Decimal("0"), "free": a}
 
 
 def _base_qs():
@@ -567,39 +579,26 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 from .models import SalesOrderLine
                 from django.db.models import Sum
                 try:
-                    from inventory.models import InventoryTransaction
+                    from inventory.services import stock as stock_service
                     order_pks = [o.pk for o in cl.result_list]
-                    line_data = list(
-                        SalesOrderLine.objects.filter(
-                            order_id__in=order_pks, product_id__isnull=False
-                        ).values('order_id', 'product_id', 'qty')
-                    )
+                    line_objs = list(stock_service.annotate_line_held(
+                        SalesOrderLine.objects.filter(order_id__in=order_pks, product_id__isnull=False)
+                        .select_related('order')).order_by('pk'))
+                    line_data = [{'order_id': l.order_id, 'product_id': l.product_id, 'qty': l.qty}
+                                 for l in line_objs]
                     product_ids = list({lp['product_id'] for lp in line_data})
-                    stock_map = {}
-                    if product_ids:
-                        from inventory.models import Location
-                        # Лічимо тільки готові товари: FINISHED або OTHER склади
-                        rows = (
-                            InventoryTransaction.objects
-                            .filter(product_id__in=product_ids)
-                            .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
-                            .filter(
-                                location__location_type__in=[
-                                    Location.LocationType.FINISHED,
-                                    Location.LocationType.OTHER
-                                ]
-                            )
-                            .values('product_id')
-                            .annotate(total=Sum('qty'))
-                        )
-                        stock_map = {r['product_id']: max(0, int(r['total'] or 0)) for r in rows}
+                    # «Склад зараз» = доступно (на складі − резерв) + те, що вже взяло це замовлення:
+                    # списане чи заброньоване під нього не рахується як нестача
+                    avail = {pid: p._available for pid, p in stock_service.stock_map(product_ids).items()}
                     order_stock = {}
-                    for lp in line_data:
-                        oid = str(lp['order_id'])
-                        order_stock.setdefault(oid, []).append({
-                            'pid':   lp['product_id'],
-                            'need':  int(lp['qty'] or 0),
-                            'stock': stock_map.get(lp['product_id'], 0),
+                    for l in line_objs:
+                        free = avail.get(l.product_id, 0)
+                        if l.order.status not in ('shipped', 'delivered'):
+                            free += stock_service.line_held(l)
+                        order_stock.setdefault(str(l.order_id), []).append({
+                            'pid':   l.product_id,
+                            'need':  int(l.qty or 0),
+                            'stock': max(0, int(free)),
                         })
                     response.context_data['sv_order_stock_json'] = _json.dumps(order_stock)
                     self._stock_cache = order_stock  # per-request cache for stock_warning()
@@ -697,24 +696,39 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     # ── Actions: Статус ───────────────────────────────────────────────────────
 
+    def _set_status(self, request, queryset, status):
+        """Масова зміна статусу — кожне замовлення зберігається окремо, тож склад реагує так само, як у
+        картці (inventory/services/stock.py: скасування повертає товар, «Відправлено» списує…)."""
+        n = 0
+        pks = list(queryset.values_list("pk", flat=True))
+        with transaction.atomic():
+            for order in SalesOrder.objects.filter(pk__in=pks).order_by("pk"):
+                if order.status != status:
+                    order.status = status
+                    order._skip_status_notification = True   # як і раніше: масова зміна — без сповіщень про статус
+                    order.save(update_fields=["status"])
+                    n += 1
+        return n
+
     def action_set_status_received(self, request, queryset):
-        n = queryset.update(status="received")
+        n = self._set_status(request, queryset, "received")
         self.message_user(request, f"📥 Статус «Отримано» встановлено для {n} замовлень.")
     action_set_status_received.short_description = "📥 Статус → Отримано"
 
     def action_set_status_processing(self, request, queryset):
-        n = queryset.update(status="processing")
+        n = self._set_status(request, queryset, "processing")
         self.message_user(request, f"⚙️ Статус «В обробці» встановлено для {n} замовлень.")
     action_set_status_processing.short_description = "⚙️ Статус → В обробці"
 
     def action_set_status_shipped(self, request, queryset):
-        n = queryset.update(status="shipped")
+        n = self._set_status(request, queryset, "shipped")
         self.message_user(request, f"🚀 Статус «Відправлено» встановлено для {n} замовлень.")
     action_set_status_shipped.short_description = "🚀 Статус → Відправлено"
 
     def action_set_status_cancelled(self, request, queryset):
-        n = queryset.update(status="cancelled")
-        self.message_user(request, f"❌ Статус «Скасовано» встановлено для {n} замовлень.")
+        n = self._set_status(request, queryset, "cancelled")
+        self.message_user(request, f"❌ Статус «Скасовано» встановлено для {n} замовлень — "
+                                   f"їхній товар повернуто на склад.")
     action_set_status_cancelled.short_description = "❌ Статус → Скасовано"
 
     # ── Actions: Валюта продажу ───────────────────────────────────────────────
@@ -825,8 +839,24 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         if "apply" in request.POST:
             slug = request.POST.get("source_slug", "").strip()
             if slug:
-                n = queryset.update(source=slug)
+                # по одному: рухи складу замовлення переходять на новий ключ (stock.rekey_order у сигналі)
+                n, busy = 0, []
+                pks = list(queryset.values_list("pk", flat=True))
+                with transaction.atomic():
+                    for order in SalesOrder.objects.filter(pk__in=pks).order_by("pk"):
+                        if order.source == slug:
+                            continue
+                        if SalesOrder.objects.filter(source=slug, order_number=order.order_number).exists():
+                            busy.append(order.order_number)
+                            continue
+                        order.source = slug
+                        order.save(update_fields=["source"])
+                        n += 1
                 self.message_user(request, f"📦 Джерело «{slug}» встановлено для {n} замовлень.")
+                if busy:
+                    from django.contrib import messages as _msg
+                    self.message_user(request, f"⚠️ У джерелі «{slug}» вже є замовлення з номерами: "
+                                               f"{', '.join(busy[:20])} — їх не перенесено.", _msg.WARNING)
             return None
 
         sources = SalesSource.objects.all()
@@ -1831,12 +1861,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         form = super().get_form(request, obj, **kwargs)
 
         # Динамічний dropdown для поля source
-        sources = list(SalesSource.objects.order_by("order", "name").values_list("slug", "name"))
-        if sources:
-            form.base_fields["source"].widget = forms.Select(
-                choices=sources,
-                attrs={"style": "max-width:300px"},
-            )
+        if "source" in form.base_fields:
+            choices = source_choices(obj.source if obj is not None else "")
+            if choices:
+                form.base_fields["source"].widget = forms.Select(
+                    choices=choices,
+                    attrs={"style": "max-width:300px"},
+                )
 
         # Пріоритет: session → settings.LOCAL_DOCS_BASE_PATH → ''
         saved = request.session.get('local_base_path', '')
@@ -2379,21 +2410,21 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Склад ──────────────────────────────────────────────────────────────────
 
     def stock_summary(self, obj):
-        from inventory.models import InventoryTransaction
+        from inventory.services import stock as stock_service
         if not obj.pk:
             return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
         lines = obj.lines.all()
         if not lines:
             return "Немає позицій"
+        # доступно + те, що вже взяло це замовлення (його списання / резерв не рахуються як нестача)
+        cover = stock_service.order_lines_cover(obj)
         rows, has_problems = [], False
         for line in lines:
             sku = line.product.sku if line.product else line.sku_raw
             name = line.product.name if line.product else "— SKU не знайдено —"
             needed = float(line.qty or 0)
             if line.product:
-                result = InventoryTransaction.objects.filter(
-                    product=line.product).aggregate(total=Sum('qty'))
-                stock = float(result['total'] or 0)
+                stock = float(cover.get(line.pk, {}).get("free", 0))
                 if stock <= 0:
                     s = "🚫 НЕМАЄ"
                     row_style = "border-left:4px solid #f44336"
@@ -2656,17 +2687,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
         product_ids = [l.product_id for l in lines if l.product_id]
 
-        # Batch stock query
-        stock_map = {}
-        if product_ids:
-            for row in (
-                InventoryTransaction.objects
-                .filter(product_id__in=product_ids)
-                .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
-                .values('product_id')
-                .annotate(total=Sum('qty'))
-            ):
-                stock_map[row['product_id']] = max(0, int(row['total'] or 0))
+        # Доступно для позиції = доступно на складі + те, що вже взяло це замовлення (stock service)
+        from inventory.services import stock as stock_service
+        cover = stock_service.order_lines_cover(order)
+        line_free = {pk: max(0, int(c["free"])) for pk, c in cover.items()}
 
         # Batch active PO query — aggregate ordered qty + earliest expected_date per product
         po_map = {}  # product_id → {qty_ordered, expected_date}
@@ -2703,7 +2727,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 })
                 continue
             p = line.product
-            stock  = stock_map.get(p.pk, 0)
+            stock  = line_free.get(line.pk, 0)
             needed = int(line.qty or 0)
             short  = max(0, needed - stock)
             if stock >= needed:
@@ -3352,157 +3376,39 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     def sync_inventory_view(self, request, pk):
         """
-        GET  → повертає список розбіжностей між рядками замовлення і транзакціями складу.
-        POST → виправляє розбіжності (Adjustment reversal + нова транзакція).
+        GET  → розбіжності між позиціями замовлення і рухами складу (inventory/services/stock.py).
+        POST → виправляє їх тим самим сервісом, що й збереження замовлення (без подвійного повернення).
         """
         from django.http import JsonResponse
-        from inventory.models import InventoryTransaction, InventorySettings, Location
+        from inventory.services import stock as stock_service
 
         order = get_object_or_404(SalesOrder, pk=pk)
 
-        if not order.affects_stock:
+        cancelled = order.status == "cancelled"
+        if not cancelled and not order.affects_stock:
             return JsonResponse({'ok': False, 'error': 'Замовлення не впливає на склад (affects_stock=False)'})
-
-        lines = list(order.lines.select_related('product').all())
-        if not lines:
+        if not cancelled and not order.lines.exists():
             return JsonResponse({'ok': False, 'error': 'Замовлення не має рядків'})
 
-        # Збираємо всі транзакції цього замовлення одним запитом
-        prefix = f"so:{order.source}:{order.order_number}:line:"
-        all_txs = list(InventoryTransaction.objects.filter(
-            external_key__startswith=prefix
-        ).select_related('product'))
-        # Групуємо: line_pk → [tx, ...]
-        tx_by_line: dict = {}
-        for tx in all_txs:
-            # external_key format: so:{src}:{num}:line:{line_pk}:{uuid}
-            parts = tx.external_key.split(':')
-            try:
-                line_pk = int(parts[4])
-            except (IndexError, ValueError):
-                continue
-            tx_by_line.setdefault(line_pk, []).append(tx)
-
-        mismatches = []
-        for line in lines:
-            txs = tx_by_line.get(line.pk, [])
-            if not txs:
-                # Немає транзакції — можливо списання ще не відбулось (deduct_on=shipped/delivered і ще не відправлено)
-                continue
-            for tx in txs:
-                tx_product_id = tx.product_id
-                tx_qty        = abs(tx.qty)
-                line_qty      = abs(line.qty)
-                product_mismatch = (tx_product_id != line.product_id)
-                qty_mismatch     = (tx_qty != line_qty)
-                if product_mismatch or qty_mismatch:
-                    mismatches.append({
-                        'line_pk':      line.pk,
-                        'line_sku':     line.product.sku if line.product else '?',
-                        'line_qty':     float(line_qty),
-                        'tx_sku':       tx.product.sku if tx.product else '?',
-                        'tx_qty':       float(tx_qty),
-                        'tx_type':      tx.tx_type,
-                        'tx_pk':        tx.pk,
-                        'product_diff': product_mismatch,
-                        'qty_diff':     qty_mismatch,
-                    })
-
+        # скасоване — що воно ще тримає (скасоване до жовтня 2026 товар не повертало); інше — позиції ↔ рухи
+        mismatches = stock_service.order_stock_issues(order)
         if request.method == 'GET':
             return JsonResponse({'ok': True, 'mismatches': mismatches, 'order': str(order)})
 
-        # ── POST: виправляємо ──────────────────────────────────────────────────
-        from django.utils import timezone as tz
         if not mismatches:
             return JsonResponse({'ok': True, 'fixed': 0, 'message': 'Розбіжностей не знайдено'})
-
         try:
-            settings = InventorySettings.get()
-            loc_code = settings.default_location or "MAIN"
-            location, created = Location.objects.get_or_create(
-                code=loc_code,
-                defaults={
-                    "name": "Основний склад",
-                    "location_type": Location.LocationType.FINISHED,
-                    "is_active": True,
-                }
-            )
-            # Гарантуємо FINISHED тип для списання готової продукції
-            if not created and location.location_type != Location.LocationType.FINISHED:
-                location.location_type = Location.LocationType.FINISHED
-                location.save(update_fields=['location_type'])
+            if cancelled:
+                n = stock_service.release_order_stock(order, performed_by=request.user)
+                changes = [f"повернуто на склад: {n}"] if n else []
+            else:
+                changes = stock_service.sync_order(order, performed_by=request.user)
         except Exception as e:
-            return JsonResponse({'ok': False, 'error': f'Помилка отримання локації: {e}'})
-
-        performer = request.user if request.user.is_authenticated else None
-
-        use_reservation = getattr(settings, 'use_reservation', False)
-        out_type = (InventoryTransaction.TxType.RESERVED if use_reservation
-                    else InventoryTransaction.TxType.OUTGOING)
-
-        # Build line lookup and tx_product_id lookup from collected data
-        line_by_pk = {l.pk: l for l in lines}
-        tx_product_by_line = {}
-        for tx in all_txs:
-            parts = tx.external_key.split(':')
-            try:
-                line_pk = int(parts[4])
-                tx_product_by_line.setdefault(line_pk, tx.product_id)
-            except (IndexError, ValueError):
-                pass
-
-        fixed = 0
-        errors = []
-        for m in mismatches:
-            line_pk = m['line_pk']
-            line_obj = line_by_pk.get(line_pk)
-            if not line_obj:
-                continue
-            try:
-                old_product_id = tx_product_by_line.get(line_pk)
-                old_qty = Decimal(str(m['tx_qty']))
-
-                # 1. Reversal Adjustment для старого товару (+qty)
-                if old_product_id and old_qty > 0:
-                    InventoryTransaction.objects.create(
-                        external_key=f"so-adj:{order.source}:{order.order_number}:line:{line_pk}:rev:{uuid.uuid4()}",
-                        tx_type=InventoryTransaction.TxType.ADJUSTMENT,
-                        qty=old_qty,
-                        product_id=old_product_id,
-                        location=location,
-                        ref_doc=(f"Sync: {m['tx_sku']} → {m['line_sku']}"
-                                 f" | SO-{order.source}:{order.order_number}"),
-                        tx_date=tz.now(),
-                        performed_by=performer,
-                    )
-
-                # 2. Видаляємо старі транзакції рядка
-                InventoryTransaction.objects.filter(
-                    external_key__startswith=f"so:{order.source}:{order.order_number}:line:{line_pk}:"
-                ).delete()
-
-                # 3. Нова транзакція для правильного товару (-qty)
-                if line_obj.product_id and line_obj.qty > 0:
-                    InventoryTransaction.objects.create(
-                        external_key=f"so:{order.source}:{order.order_number}:line:{line_pk}:{uuid.uuid4()}",
-                        tx_type=out_type,
-                        qty=-abs(line_obj.qty),
-                        product=line_obj.product,
-                        location=location,
-                        ref_doc=f"SO-{order.source}:{order.order_number}",
-                        tx_date=order.order_date or tz.now(),
-                        performed_by=performer,
-                    )
-                fixed += 1
-            except Exception as e:
-                errors.append(f"Рядок {line_pk}: {e}")
-
-        if errors:
-            return JsonResponse({'ok': False, 'fixed': fixed, 'errors': errors})
+            return JsonResponse({'ok': False, 'fixed': 0, 'errors': [str(e)]})
         return JsonResponse({
             'ok': True,
-            'fixed': fixed,
-            'message': f'Скориговано {fixed} транзакцій',
+            'fixed': len(changes),
+            'message': f'Скориговано: {len(changes)}' + (' — ' + '; '.join(changes) if changes else ''),
         })
 
     # ── PDF document views ─────────────────────────────────────────────────────
@@ -3784,44 +3690,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         from collections import defaultdict
         from datetime import datetime
 
-        # ── Поля БД для маппінгу ──────────────────────────────────────────────
-        ORDER_FIELDS = [
-            ("order_number",      "Номер замовлення * (ключ)"),
-            ("source",            "Джерело (digikey/nova_post/manual)"),
-            ("order_date",        "Дата замовлення"),
-            ("shipped_at",        "Дата відправки"),
-            ("shipping_deadline", "Дедлайн відправки"),
-            ("shipping_courier",  "Кур'єр"),
-            ("tracking_number",   "Трекінг номер"),
-            ("lieferschein_nr",   "Lieferschein Nr"),
-            ("shipping_region",   "Регіон доставки"),
-            ("shipping_address",  "Адреса доставки (legacy)"),
-            ("addr_street",       "Вулиця, будинок"),
-            ("addr_city",         "Місто"),
-            ("addr_zip",          "Поштовий індекс"),
-            ("addr_state",        "Штат / провінція (ISO-2: CA/NY/TX)"),
-            ("addr_country",      "Країна (ISO-2: DE/UA/PL)"),
-            ("client",            "Клієнт / Компанія (білінг)"),
-            ("contact_name",      "Контактна особа (білінг)"),
-            ("phone",             "Телефон (білінг)"),
-            ("email",             "Email (білінг)"),
-            ("ship_name",         "Ім'я отримувача посилки"),
-            ("ship_company",      "Компанія отримувача"),
-            ("ship_phone",        "Телефон доставки"),
-            ("ship_email",        "Email доставки"),
-            ("currency",          "Валюта замовлення"),
-            ("shipping_cost",     "Вартість доставки"),
-            ("shipping_currency", "Валюта доставки"),
-            ("status",            "Статус"),
-            ("document_type",     "Тип документу"),
-        ]
-        LINE_FIELDS = [
-            ("sku_raw",         "SKU товару (рядок)"),
-            ("qty",             "Кількість (рядок)"),
-            ("unit_price",      "Ціна за одиницю"),
-            ("total_price_line","Загальна сума рядка"),
-            ("currency_line",   "Валюта рядка"),
-        ]
+        # ── Поля БД для маппінгу й авто-маппінг — sales/importing.py ─────────────
+        from sales import importing
+        ORDER_FIELDS, LINE_FIELDS = importing.ORDER_FIELDS, importing.LINE_FIELDS
         ALL_DB_FIELDS = ORDER_FIELDS + LINE_FIELDS
         ORDER_FIELD_KEYS = {k for k, _ in ORDER_FIELDS}
         LINE_FIELD_KEYS  = {k for k, _ in LINE_FIELDS}
@@ -3923,11 +3794,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 sheet_data[sname] = header_cols
             wb.close()
 
+            auto_map = {name: importing.guess_mapping(cols) for name, cols in sheet_data.items()}
             return render(request, "admin/sales/import_excel.html", {
                 **ctx_base,
                 "step": 2,
                 "sheet_names": wb.sheetnames,
                 "sheet_data_json": json.dumps(sheet_data, ensure_ascii=False),
+                "auto_map_json": json.dumps(auto_map, ensure_ascii=False),
                 "first_sheet": wb.sheetnames[0] if wb.sheetnames else "",
                 "first_cols": sheet_data.get(wb.sheetnames[0], []) if wb.sheetnames else [],
                 "file_name": uploaded.name,
@@ -3954,6 +3827,15 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                         mappings[int(key[4:])] = val
                     except ValueError:
                         pass
+
+            dups = importing.duplicate_fields(mappings)
+            if dups:
+                from django.contrib import messages as _msg
+                _msg.error(request, "Одне поле вибрано для кількох колонок: " + "; ".join(
+                    f"«{importing.FIELD_LABELS.get(f, f)}» — колонки "
+                    + ", ".join(importing.column_letter(i) for i in cols)
+                    for f, cols in dups.items()) + ". Виберіть для кожного поля одну колонку.")
+                return redirect(reverse("admin:sales_salesorder_import"))
 
             if not any(v == "order_number" for v in mappings.values()):
                 from django.contrib import messages as _msg
@@ -4036,72 +3918,76 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             wb.close()
 
             # ── Зберігаємо в БД ───────────────────────────────────────────────
-            from inventory.models import Product, ProductAlias
+            # Кожне замовлення — у власному savepoint: помилка (невідомий артикул, дубль номера…) скасовує
+            # лише це замовлення, решта імпортується (на PostgreSQL помилка без savepoint зупиняє все).
             from crm.models import Customer
+            from inventory.services.stock import resolve_sku
 
+            stats["failed_orders"] = 0
             with transaction.atomic():
                 for order_key, data in orders_data.items():
+                    hdr = data["header"]
+                    source = (hdr.get("source") or default_source).strip() or default_source
+                    hdr["source"] = source
+                    unknown = sorted({ln["sku"] for ln in data["lines"] if resolve_sku(ln["sku"]) is None})
+                    if unknown:
+                        stats["errors"].append(
+                            f"Замовлення {order_key}: артикулів немає в каталозі Minerva — "
+                            f"{', '.join(unknown)}. Замовлення не імпортовано: додайте товар або аліас "
+                            f"(Склад → Товари) і запустіть імпорт ще раз.")
+                        stats["failed_orders"] += 1
+                        continue
+                    existing = SalesOrder.objects.filter(source=source, order_number=order_key).first()
+                    if existing and conflict_mode == "skip":
+                        stats["skipped"] += 1
+                        continue
                     try:
-                        hdr = data["header"]
-                        existing = SalesOrder.objects.filter(
-                            order_number=order_key).first()
+                        with transaction.atomic():
+                            # Customer
+                            email = hdr.get("email", "")
+                            client = hdr.get("client", "")
+                            if email or client:
+                                cust_key = Customer.generate_key(
+                                    email or client, client or email)
+                                hdr["customer_key"] = cust_key
+                                Customer.objects.get_or_create(
+                                    external_key=cust_key,
+                                    defaults={
+                                        "name": client or (email.split("@")[0] if email else ""),
+                                        "email": email,
+                                        "phone": hdr.get("phone", ""),
+                                        "country": (hdr.get("addr_country") or hdr.get("shipping_region") or "")[:2],
+                                        "source": source,
+                                    },
+                                )
 
-                        if existing and conflict_mode == "skip":
-                            stats["skipped"] += 1
-                            continue
+                            if existing:
+                                for k, v in hdr.items():
+                                    setattr(existing, k, v)
+                                existing.save()
+                                existing.lines.all().delete()
+                                order = existing
+                            else:
+                                order = SalesOrder.objects.create(**hdr)
 
-                        # Customer
-                        email = hdr.get("email", "")
-                        client = hdr.get("client", "")
-                        if email or client:
-                            cust_key = Customer.generate_key(
-                                email or client, client or email)
-                            hdr["customer_key"] = cust_key
-                            Customer.objects.get_or_create(
-                                external_key=cust_key,
-                                defaults={
-                                    "name": client or (email.split("@")[0] if email else ""),
-                                    "email": email,
-                                    "phone": hdr.get("phone", ""),
-                                    "country": (hdr.get("addr_country") or hdr.get("shipping_region") or "")[:2],
-                                    "source": hdr.get("source", default_source),
-                                },
-                            )
-
-                        if existing:
-                            for k, v in hdr.items():
-                                setattr(existing, k, v)
-                            existing.save()
-                            existing.lines.all().delete()
-                            order = existing
-                            stats["updated"] += 1
-                        else:
-                            order = SalesOrder.objects.create(**hdr)
-                            stats["created"] += 1
-
-                        for line in data["lines"]:
-                            product = (
-                                Product.objects.filter(sku=line["sku"]).first()
-                                or ProductAlias.objects.filter(alias=line["sku"])
-                                          .select_related("product")
-                                          .first()
-                                and ProductAlias.objects.filter(alias=line["sku"])
-                                          .select_related("product")
-                                          .first().product
-                            )
-                            SalesOrderLine.objects.create(
-                                order=order,
-                                product=product,
-                                sku_raw=line["sku"],
-                                qty=line["qty"],
-                                unit_price=line["unit_price"],
-                                total_price=line["total_price"],
-                                currency=line["currency"],
-                            )
-                            stats["lines_created"] += 1
-
+                            n_lines = 0
+                            for line in data["lines"]:
+                                SalesOrderLine.objects.create(
+                                    order=order,
+                                    product=resolve_sku(line["sku"]),
+                                    sku_raw=line["sku"],
+                                    qty=line["qty"],
+                                    unit_price=line["unit_price"],
+                                    total_price=line["total_price"],
+                                    currency=line["currency"],
+                                )
+                                n_lines += 1
                     except Exception as e:
-                        stats["errors"].append(f"Замовлення {order_key}: {e}")
+                        stats["errors"].append(f"Замовлення {order_key}: {e} — замовлення не імпортовано.")
+                        stats["failed_orders"] += 1
+                        continue
+                    stats["updated" if existing else "created"] += 1
+                    stats["lines_created"] += n_lines
 
                 if dry_run:
                     transaction.set_rollback(True)

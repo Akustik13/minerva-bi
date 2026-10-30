@@ -51,12 +51,12 @@ class Product(models.Model):
     """
 
     class Kind(models.TextChoices):
-        FINISHED = "finished", "Finished (sellable)"
-        COMPONENT = "component", "Component (used for assembly)"
+        FINISHED = "finished", "Готовий товар (для продажу)"
+        COMPONENT = "component", "Компонент (для складання)"
 
     class BomType(models.TextChoices):
-        NONE = "none", "No BOM"
-        KEY = "key", "Key components (simple BOM)"
+        NONE = "none", "Без BOM"
+        KEY = "key", "Ключові компоненти (простий BOM)"
 
     class UnitType(models.TextChoices):
         """Визначає тип одиниці виміру товару"""
@@ -66,9 +66,9 @@ class Product(models.Model):
         LITER = "liter", "Літри (дробні числа)"
         SET = "set", "Комплекти (цілі числа)"
 
-    sku = models.CharField(max_length=255, unique=True)
-    sku_short = models.CharField(max_length=255, blank=True, default="")
-    name = models.CharField(max_length=255, blank=True, default="")
+    sku = models.CharField("Артикул (SKU)", max_length=255, unique=True)
+    sku_short = models.CharField("Короткий артикул", max_length=255, blank=True, default="")
+    name = models.CharField("Назва", max_length=255, blank=True, default="")
     name_export = models.CharField(
         "Назва (EN/DE) для документів", max_length=255, blank=True, default="",
         help_text="Англійська або німецька назва — друкується у Packing List, Proforma та CN23. "
@@ -92,20 +92,23 @@ class Product(models.Model):
         help_text="Показується на сайті біля NRND / EOL товару як «Nachfolger».",
     )
     kind = models.CharField(
+        "Тип товару",
         max_length=20,
         choices=Kind.choices,
         default=Kind.FINISHED,
-        help_text="Finished = готовий виріб для продажу; Component = запчастина для складання в БОМ"
+        help_text="Готовий товар — виріб для продажу; компонент — запчастина для складання за BOM"
     )
     bom_type = models.CharField(
+        "BOM (комплектація)",
         max_length=20,
         choices=BomType.choices,
         default=BomType.NONE,
-        help_text="Key = має список компонентів (БОМ); None = простий товар без розбірки"
+        help_text="Ключові компоненти — товар має список компонентів (BOM); без BOM — простий товар"
     )
     
     # НОВЕ ПОЛЕ: тип одиниці виміру
     unit_type = models.CharField(
+        "Одиниця виміру",
         max_length=20, 
         choices=UnitType.choices, 
         default=UnitType.PIECE,
@@ -120,7 +123,7 @@ class Product(models.Model):
     reorder_point  = models.PositiveIntegerField("Точка дозамовлення", default=0,
                                                  help_text="При залишку нижче цього значення — дозамовити")
     lead_time_days = models.PositiveSmallIntegerField("Термін поставки (дні)", null=True, blank=True)
-    notes = models.TextField(blank=True, default="")
+    notes = models.TextField("Нотатки", blank=True, default="")
     # ── Базові ціни за кількістю (ступені) — власні ціни Minerva ──
     # Початково можуть бути імпортовані з DigiKey; далі змінюються вручну. Кожна зміна — у ProductPriceHistory.
     base_prices = models.JSONField(
@@ -135,7 +138,8 @@ class Product(models.Model):
         "Технічні атрибути", default=dict, blank=True,
         help_text="Технічні параметри компонента (частота, смуга, тип тощо). Синхронізується з DigiKey лістингом."
     )
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField("Активний", default=True,
+                                    help_text="Неактивний товар не показується в аналізі запасів і огляді складу.")
 
     # ── Інтернет-магазин (сайт, API /api/v1/shop/products/) ──
     shop_visible = models.BooleanField(
@@ -172,6 +176,10 @@ class Product(models.Model):
         help_text="Порожньо — артикул товару; однакове значення в кількох товарах = один спільний даташит.")
     updated_at    = models.DateTimeField("Змінено", auto_now=True, db_index=True,
                                          help_text="Будь-яка зміна картки товару (для API changed_since / RAG).")
+
+    class Meta:
+        verbose_name = "Товар"
+        verbose_name_plural = "Товари"
 
     def __str__(self) -> str:
         return self.sku
@@ -224,8 +232,12 @@ class Product(models.Model):
 
 
 class ProductAlias(models.Model):
-    alias = models.CharField(max_length=255, unique=True)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    alias = models.CharField("Аліас (інший артикул)", max_length=255, unique=True)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="Товар")
+
+    class Meta:
+        verbose_name = "Аліас артикула"
+        verbose_name_plural = "Аліаси артикулів"
 
     def __str__(self) -> str:
         return self.alias
@@ -237,8 +249,8 @@ class Location(models.Model):
         COMPONENTS = "components", "Компоненти & Матеріали 🔧"
         OTHER = "other", "Інше (загальний склад)"
 
-    code = models.CharField(max_length=50, unique=True)
-    name = models.CharField(max_length=255, blank=True, default="")
+    code = models.CharField("Код", max_length=50, unique=True)
+    name = models.CharField("Назва", max_length=255, blank=True, default="")
     location_type = models.CharField(
         "Тип складу",
         max_length=20,
@@ -258,19 +270,21 @@ class Location(models.Model):
 
 class InventoryTransaction(models.Model):
     class TxType(models.TextChoices):
-        INCOMING   = "Incoming",   "Incoming"
-        OUTGOING   = "Outgoing",   "Outgoing"
-        ADJUSTMENT = "Adjustment", "Adjustment"
+        INCOMING   = "Incoming",   "Прихід (Incoming)"
+        OUTGOING   = "Outgoing",   "Витрата (Outgoing)"
+        ADJUSTMENT = "Adjustment", "Коригування (Adjustment)"
         RESERVED   = "Reserved",   "Резерв"
 
-    tx_type = models.CharField(max_length=20, choices=TxType.choices)
-    qty = models.DecimalField(max_digits=18, decimal_places=3)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    location = models.ForeignKey(Location, on_delete=models.CASCADE)
-    ref_doc = models.CharField(max_length=255, blank=True, default="")
-    external_key = models.CharField(max_length=255, unique=True)
-    tx_date = models.DateTimeField(default=timezone.now)
-    created_at = models.DateTimeField(auto_now_add=True)
+    tx_type = models.CharField("Тип руху", max_length=20, choices=TxType.choices)
+    qty = models.DecimalField("Кількість", max_digits=18, decimal_places=3)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="Товар")
+    location = models.ForeignKey(Location, on_delete=models.CASCADE, verbose_name="Локація")
+    ref_doc = models.CharField("Документ / підстава", max_length=255, blank=True, default="",
+                               help_text="Напр. «Брак 29.10» або «Повернення 102497269».")
+    external_key = models.CharField("Ключ руху", max_length=255, unique=True,
+                                    help_text="Унікальний ключ: повтор з тим самим ключем не створює другий рух.")
+    tx_date = models.DateTimeField("Дата руху", default=timezone.now)
+    created_at = models.DateTimeField("Записано", auto_now_add=True)
     performed_by = models.ForeignKey(
         "auth.User",
         null=True, blank=True,
@@ -280,6 +294,8 @@ class InventoryTransaction(models.Model):
     )
 
     class Meta:
+        verbose_name = "Рух складу"
+        verbose_name_plural = "Транзакції (рухи складу)"
         indexes = [
             models.Index(fields=["product", "location"]),
             models.Index(fields=["tx_type"]),
@@ -507,7 +523,9 @@ class InventorySettings(models.Model):
     low_stock_alert_enabled = models.BooleanField(
         "Попередження про низький залишок",
         default=True,
-        help_text="Показувати попередження в інтерфейсі для товарів нижче точки дозамовлення.",
+        help_text="Попередження в інтерфейсі: сторінка «Сигнали» (і лічильник у меню) та картка «Критичний склад» "
+                  "на дашборді — товари, яких вистачить менш ніж на 1,5 місяця або доступно не більше «Точки "
+                  "дозамовлення». Листи про критичний залишок — окремо, у налаштуваннях сповіщень.",
     )
     use_reservation = models.BooleanField(
         "Бронювати замовлення (не списувати одразу)",

@@ -3,7 +3,7 @@
 
 {% block object-tools-items %}
   {% if original and original.pk %}
-    {% if original.affects_stock %}
+    {% if original.affects_stock or original.status == "cancelled" %}
     <li>
       <button type="button" id="sv-sync-inv-btn"
               onclick="svSyncInventory({{ original.pk }})"
@@ -1135,6 +1135,7 @@ document.addEventListener('DOMContentLoaded',function(){
         }
         // Будуємо текст підтвердження
         var lines = mm.map(function(m) {
+          if (m.text) return '• ' + m.text;
           var parts = [];
           if (m.product_diff) parts.push('SKU: ' + m.tx_sku + ' → ' + m.line_sku);
           if (m.qty_diff)     parts.push('к-сть: ' + m.tx_qty + ' → ' + m.line_qty);

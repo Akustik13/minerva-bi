@@ -507,15 +507,14 @@ class DigiKeyListing(models.Model):
         return self.dk_supplier_sku or (self.product.sku if self.product_id else '')
 
     def get_stock_qty(self):
-        """Поточний залишок на складі (з InventoryTransaction)."""
+        """Скільки можна продати: «Доступно» складу (на складі − резерв, inventory/services/stock.py) — так само,
+        як API /stock/ і Angebote; резерви й ще не списані замовлення на DigiKey не потрапляють."""
         if not self.product_id:
             return 0
-        from django.db.models import Sum
-        from inventory.models import InventoryTransaction
-        result = InventoryTransaction.objects.filter(
-            product_id=self.product_id
-        ).aggregate(total=Sum('qty'))
-        return max(0, int(result['total'] or 0))
+        from inventory.models import Product
+        from inventory.services.stock import annotate_stock
+        row = annotate_stock(Product.objects.filter(pk=self.product_id)).first()
+        return max(0, int(row._available)) if row else 0
 
     def get_dk_quantity(self):
         """Кількість для передачі на DigiKey: override якщо задано, інакше склад."""

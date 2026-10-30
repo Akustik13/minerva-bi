@@ -569,10 +569,17 @@ function setPreset(days) {
           </div>
         </div>
         {% empty %}
+        {% if stock_alerts_off %}
+        <div style="text-align:center;padding:30px;color:var(--text-dim)">
+          <div style="font-size:13px;font-weight:600">Попередження про низький залишок вимкнено</div>
+          <a href="/admin/inventory/inventorysettings/" style="font-size:11px;color:var(--accent)">⚙️ Налаштування складу</a>
+        </div>
+        {% else %}
         <div style="text-align:center;padding:30px;color:var(--ok)">
           <div style="font-size:32px;margin-bottom:8px">✅</div>
           <div style="font-size:13px;font-weight:600">Запасів достатньо</div>
         </div>
+        {% endif %}
         {% endfor %}
         {% if critical_stock %}
         <a href="/admin/inventory/reorderproxy/?reorder_status=critical"

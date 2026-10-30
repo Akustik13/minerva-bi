@@ -26,12 +26,17 @@ class SalesOrder(models.Model):
         ("SALE", "Sale"), ("SAMPLE", "Sample"), ("TRANSFER", "Transfer"),
         ("WARRANTY", "Warranty"), ("QUOTE", "Запит пропозиції"), ("OTHER", "Other"),
     ]
-    source          = models.CharField(max_length=32, default="digikey")
-    document_type   = models.CharField(max_length=16, choices=DOCUMENT_TYPE_CHOICES, default="SALE")
-    affects_stock   = models.BooleanField(default=True)
-    order_number    = models.CharField(max_length=64)
-    order_date      = models.DateField(null=True, blank=True)
-    shipped_at      = models.DateField(null=True, blank=True)
+    source          = models.CharField("Джерело", max_length=32, default="digikey",
+                                       help_text="Код джерела з довідника «Джерела замовлень».")
+    document_type   = models.CharField("Тип документа", max_length=16, choices=DOCUMENT_TYPE_CHOICES,
+                                       default="SALE")
+    affects_stock   = models.BooleanField(
+        "Впливає на склад", default=True,
+        help_text="Товар списується зі складу, замовлення входить у статистику дашборду. "
+                  "Вимкнено — лише облік (зразки, тест).")
+    order_number    = models.CharField("Номер замовлення", max_length=64)
+    order_date      = models.DateField("Дата замовлення", null=True, blank=True)
+    shipped_at      = models.DateField("Дата відправки", null=True, blank=True)
     delivered_at        = models.DateTimeField("Фактична доставка", null=True, blank=True)
     order_confirm_sent_at = models.DateTimeField(
         "📥 Підтвердження замовлення надіслано", null=True, blank=True,
@@ -41,15 +46,15 @@ class SalesOrder(models.Model):
         "📧 Повідомлення клієнту надіслано", null=True, blank=True,
         help_text="Дата/час надсилання email-сповіщення про відправку"
     )
-    shipping_courier   = models.CharField(max_length=64,  blank=True, default="")
-    tracking_number    = models.CharField(max_length=128, blank=True, default="")
-    lieferschein_nr    = models.CharField(max_length=64,  blank=True, default="")
-    shipping_region    = models.CharField(max_length=32,  blank=True, default="")
-    shipping_address   = models.TextField(blank=True, default="")
-    client          = models.CharField(max_length=255, blank=True, default="")
+    shipping_courier   = models.CharField("Кур'єр", max_length=64,  blank=True, default="")
+    tracking_number    = models.CharField("Трек-номер", max_length=128, blank=True, default="")
+    lieferschein_nr    = models.CharField("Lieferschein Nr", max_length=64,  blank=True, default="")
+    shipping_region    = models.CharField("Регіон доставки", max_length=32,  blank=True, default="")
+    shipping_address   = models.TextField("Адреса доставки (текстом)", blank=True, default="")
+    client          = models.CharField("Клієнт / компанія", max_length=255, blank=True, default="")
     contact_name    = models.CharField(max_length=255, blank=True, default="", verbose_name="Контактна особа")
-    phone           = models.CharField(max_length=64,  blank=True, default="")
-    email           = models.EmailField(blank=True, default="")
+    phone           = models.CharField("Телефон", max_length=64,  blank=True, default="")
+    email           = models.EmailField("Email", blank=True, default="")
 
     # --- CRM зв'язок ---
     customer_key = models.CharField(
@@ -78,7 +83,7 @@ class SalesOrder(models.Model):
     ship_email   = models.EmailField("Email доставки", blank=True, default="",
                                      help_text="Якщо порожньо — береться з «Email».")
 
-    shipping_deadline  = models.DateField(null=True, blank=True)
+    shipping_deadline  = models.DateField("Дедлайн відправки", null=True, blank=True)
     # ── Загальна сума замовлення ──
     STATUS_CHOICES = [
         ("received",   "Отримано"),
@@ -87,7 +92,7 @@ class SalesOrder(models.Model):
         ("delivered",  "Доставлено"),
         ("cancelled",  "Скасовано"),
     ]
-    status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default="received")
+    status          = models.CharField("Статус", max_length=20, choices=STATUS_CHOICES, default="received")
     # ── Оплата (інтернет-магазин; розширюється під онлайн-оплату) ──
     PAYMENT_METHOD_CHOICES = [
         ("",           "—"),
@@ -117,7 +122,7 @@ class SalesOrder(models.Model):
         "Джерело статусу", max_length=100, blank=True, default="",
         help_text="Яке API або дія останньо змінила статус замовлення (заповнюється автоматично)"
     )
-    total_price     = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
+    total_price     = models.DecimalField("Сума замовлення", max_digits=18, decimal_places=2, null=True, blank=True)
     currency        = models.CharField(max_length=8, blank=True, default="USD", verbose_name="Валюта продажу")
     shipping_cost   = models.DecimalField("Вартість доставки", max_digits=10, decimal_places=2, default=0)
     shipping_currency = models.CharField(max_length=8, blank=True, default="EUR", verbose_name="Валюта доставки")
@@ -142,6 +147,8 @@ class SalesOrder(models.Model):
     )
 
     class Meta:
+        verbose_name = "Замовлення"
+        verbose_name_plural = "Замовлення"
         unique_together = [("source", "order_number")]
         indexes = [
             models.Index(fields=["order_date"]),
@@ -202,14 +209,19 @@ class SalesOrder(models.Model):
 
 
 class SalesOrderLine(models.Model):
-    order       = models.ForeignKey(SalesOrder, on_delete=models.CASCADE, related_name="lines")
-    product     = models.ForeignKey(Product, on_delete=models.PROTECT)
-    sku_raw     = models.CharField(max_length=128, blank=True, default="")
-    qty         = models.DecimalField(max_digits=12, decimal_places=3)
+    order       = models.ForeignKey(SalesOrder, on_delete=models.CASCADE, related_name="lines",
+                                    verbose_name="Замовлення")
+    product     = models.ForeignKey(Product, on_delete=models.PROTECT, verbose_name="Товар")
+    sku_raw     = models.CharField("Артикул з джерела", max_length=128, blank=True, default="")
+    qty         = models.DecimalField("Кількість", max_digits=12, decimal_places=3)
     # ── Ціни ──
-    unit_price  = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
-    total_price = models.DecimalField(max_digits=18, decimal_places=4,  null=True, blank=True)
+    unit_price  = models.DecimalField("Ціна за од.", max_digits=18, decimal_places=4, null=True, blank=True)
+    total_price = models.DecimalField("Сума", max_digits=18, decimal_places=4,  null=True, blank=True)
     currency    = models.CharField(max_length=8, blank=True, default="USD", verbose_name="Валюта")
+
+    class Meta:
+        verbose_name = "Позиція замовлення"
+        verbose_name_plural = "Позиції замовлення"
 
     def __str__(self):
         return f"{self.order} {self.qty} {self.product.sku}"

@@ -283,13 +283,14 @@ optgroup { font-weight: bold; color: var(--accent); }
 </div>
 
 <script>
-var _IE_MSG_NOT_IMPORTED = '{% trans "— не імпортувати —" %}';
-var _IE_MSG_EMPTY_COL = '{% trans "пуста" %}';
-var _IE_MSG_REQUIRED_LABEL = "{% trans "Обов\'язкові" %}:";
-var _IE_MSG_RECOMMENDED_LABEL = "{% trans "Рекомендовані" %}:";
-var _IE_MSG_MISSING_REQUIRED = '{% trans "Обов\'язкові поля не замаплені" %}:\n';
-var _IE_ORDER_LABEL = '📋 {% trans "Замовлення" %}';
-var _IE_LINE_LABEL  = '📦 {% trans "Рядок товару" %}';
+// Тексти — через escapejs: апостроф в «Обов'язкові» ламав увесь скрипт (маппінг не показувався)
+var _IE_MSG_NOT_IMPORTED = '{% filter escapejs %}{% trans "— не імпортувати —" %}{% endfilter %}';
+var _IE_MSG_EMPTY_COL = '{% filter escapejs %}{% trans "пуста" %}{% endfilter %}';
+var _IE_MSG_REQUIRED_LABEL = '{% filter escapejs %}{% trans "Обов\'язкові" %}{% endfilter %}:';
+var _IE_MSG_RECOMMENDED_LABEL = '{% filter escapejs %}{% trans "Рекомендовані" %}{% endfilter %}:';
+var _IE_MSG_MISSING_REQUIRED = '{% filter escapejs %}{% trans "Обов\'язкові поля не замаплені" %}{% endfilter %}:\n';
+var _IE_ORDER_LABEL = '📋 {% filter escapejs %}{% trans "Замовлення" %}{% endfilter %}';
+var _IE_LINE_LABEL  = '📦 {% filter escapejs %}{% trans "Рядок товару" %}{% endfilter %}';
 
 const SHEET_DATA = {{ sheet_data_json|safe }};
 
@@ -300,6 +301,9 @@ const LINE_FIELDS = [
   {% for field, label in line_fields %}["{{ field }}", "{{ label }}"],{% endfor %}
 ];
 
+// Авто-маппінг рахує сервер (sales/importing.py: точний збіг → цілі слова → початок слова; одне поле —
+// одна колонка). AUTO_HINTS лишились як запасний варіант для старих сторінок без AUTO_MAP.
+const AUTO_MAP = {{ auto_map_json|default:"{}"|safe }};
 const AUTO_HINTS = {
   "order_number":      ["order", "замовлення", "sales order", "order_number", "so#", "so ", "№"],
   "source":            ["source", "джерело"],
@@ -335,7 +339,9 @@ const AUTO_HINTS = {
   "currency_line":     ["line currency", "curr line"],
 };
 
-function guessField(colName) {
+function guessField(colName, sheetName, idx) {
+  const m = AUTO_MAP[sheetName];
+  if (m && idx < m.length) return m[idx];
   const cn = colName.toLowerCase().trim();
   for (const [field, hints] of Object.entries(AUTO_HINTS)) {
     for (const h of hints) {
@@ -343,6 +349,20 @@ function guessField(colName) {
     }
   }
   return "--";
+}
+
+// Одне поле — лише одна колонка: вибір поля в іншій колонці знімає його звідти
+function onMapChange(sel) {
+  if (sel.value !== '--') {
+    document.querySelectorAll('#mappingBody select').forEach(s => {
+      if (s !== sel && s.value === sel.value) {
+        s.value = '--';
+        s.style.outline = '2px solid var(--warn)';
+        setTimeout(() => { s.style.outline = ''; }, 1500);
+      }
+    });
+  }
+  updateReqStatus();
 }
 
 // Required / recommended fields
@@ -402,12 +422,12 @@ function renderMappingRows(sheetName) {
   const cText = cs.getPropertyValue('--text').trim();
   cols.forEach((col, idx) => {
     if (col === "" && idx > cols.findLastIndex(c => c !== "")) return;
-    const guessed = col ? guessField(String(col)) : "--";
+    const guessed = col ? guessField(String(col), sheetName, idx) : "--";
     tbody.innerHTML += `
       <tr>
         <td style="color:${cDim};font-size:11px">${String.fromCharCode(65 + idx)}</td>
         <td style="font-weight:bold;color:${col ? cText : cDim}">${col || `<em>${_IE_MSG_EMPTY_COL}</em>`}</td>
-        <td><select name="col_${idx}" onchange="updateReqStatus()">${buildOptions(guessed)}</select></td>
+        <td><select name="col_${idx}" onchange="onMapChange(this)">${buildOptions(guessed)}</select></td>
       </tr>`;
   });
   updateReqStatus();
@@ -425,7 +445,7 @@ function applyAutoMap() {
   const cols = SHEET_DATA[sheetName] || [];
   document.querySelectorAll('#mappingBody select').forEach((sel, idx) => {
     const col = cols[idx];
-    sel.value = col ? guessField(String(col)) : '--';
+    sel.value = col ? guessField(String(col), sheetName, idx) : '--';
   });
   updateReqStatus();
 }

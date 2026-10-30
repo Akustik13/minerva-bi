@@ -24,52 +24,35 @@ def _collect_signals():
     today = now.date()
 
     # ── 1. СКЛАД: товари що закінчуються ───────────────────────────────────
+    # Ті самі числа й формула, що в «📊 Аналіз запасів» (inventory/services/stock.py: low_stock_items,
+    # reorder_advice). «Попередження про низький залишок» вимкнено в налаштуваннях складу — розділу немає.
     try:
-        from inventory.models import Product, InventoryTransaction, PurchaseOrderLine, PurchaseOrder
-        from sales.models import SalesOrderLine
+        from inventory.services.stock import low_stock_items
 
-        for product in Product.objects.filter(is_active=True):
-            # Поточний залишок
-            stock_result = InventoryTransaction.objects.filter(
-                product=product).aggregate(total=Sum('qty'))
-            stock = float(stock_result['total'] or 0)
-
-            # Середні продажі за 3 місяці
-            since_3m = now - timedelta(days=90)
-            sold = SalesOrderLine.objects.filter(
-                product=product,
-                order__order_date__gte=since_3m,
-            ).aggregate(total=Sum('qty'))
-            monthly = float(sold['total'] or 0) / 3
-
-            if monthly <= 0:
-                continue
-
-            months_left = stock / monthly if monthly > 0 else 999
-
-            if months_left <= 0.5:
-                signals.append({
-                    'type': 'critical',
-                    'module': 'Склад',
-                    'icon': '🔥',
-                    'title': f'КРИТИЧНО: {product.sku}',
-                    'body': f'Залишок {int(stock)} шт. — вистачить менше 2 тижнів '
-                            f'(продажі ~{round(monthly,1)}/міс)',
-                    'action': f'Замовити ~{int(monthly*3*1.2 - stock)} шт.',
-                    'action_url': f'/admin/inventory/purchaseorder/add/?product={product.pk}',
-                    'age_days': 0,
-                })
-            elif months_left <= 1.5:
-                signals.append({
-                    'type': 'warning',
-                    'module': 'Склад',
-                    'icon': '⚠️',
-                    'title': f'Мало запасів: {product.sku}',
-                    'body': f'Залишок {int(stock)} шт. — вистачить {round(months_left,1)} міс.',
-                    'action': f'Замовити ~{int(monthly*3*1.2 - stock)} шт.',
-                    'action_url': f'/admin/inventory/purchaseorder/add/?product={product.pk}',
-                    'age_days': 0,
-                })
+        for d in low_stock_items():
+            rp_note = (f' Точка дозамовлення {d["reorder_point"]} шт.' if d['below_reorder_point'] else '')
+            if d['status'] == 'critical':
+                kind, icon, title = 'critical', '🔥', f'КРИТИЧНО: {d["sku"]}'
+            elif d['below_reorder_point'] and not d['monthly']:
+                kind, icon, title = 'warning', '⚠️', f'Нижче точки дозамовлення: {d["sku"]}'
+            else:
+                kind, icon, title = 'warning', '⚠️', f'Мало запасів: {d["sku"]}'
+            months = (f' — вистачить {d["months_left"]} міс. (продажі ~{d["monthly"]}/міс)'
+                      if d['months_left'] is not None else '')
+            body = f'Доступно {int(d["available"])} шт.{months}.{rp_note}'
+            if d['incoming']:
+                body += f' Уже замовлено: {int(d["incoming"])} шт.'
+            signals.append({
+                'type': kind,
+                'module': 'Склад',
+                'icon': icon,
+                'title': title,
+                'body': body,
+                'action': f'Замовити ~{d["reorder_qty"]} шт.' if d['reorder_qty'] else 'Уже замовлено достатньо',
+                'action_url': (f'/admin/inventory/purchaseorder/add/?product={d["pk"]}&qty={d["reorder_qty"]}'
+                               if d['reorder_qty'] else f'/admin/inventory/product/{d["pk"]}/change/'),
+                'age_days': 0,
+            })
     except Exception as e:
         signals.append({
             'type': 'info', 'module': 'Система', 'icon': '⚙️',
