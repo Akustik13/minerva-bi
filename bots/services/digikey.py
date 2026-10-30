@@ -1272,21 +1272,16 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
 # ── Marketplace: авто-підтвердження ──────────────────────────────────────────
 
 def _check_stock_for_order(sale) -> bool:
-    """Повертає True якщо всі рядки замовлення є на складі в достатній кількості."""
-    from django.db.models import Sum
-    from inventory.models import InventoryTransaction
+    """True, якщо товару вистачає на всі рядки замовлення: «Доступно» складу + те, що вже взяло саме це
+    замовлення (його списання / резерв / бронь — не нестача), як картка замовлення (stock.order_lines_cover).
+    Рядок без товару або замовлення без рядків — не підтверджувати."""
+    from inventory.services import stock as stock_service
 
-    for line in sale.lines.select_related("product"):
-        if not line.product:
-            return False  # невідомий товар — не підтверджувати
-        stock = (
-            InventoryTransaction.objects
-            .filter(product=line.product)
-            .aggregate(total=Sum("quantity"))["total"] or 0
-        )
-        if stock < line.qty:
-            return False
-    return True
+    lines = list(sale.lines.all())
+    if not lines or any(not line.product_id for line in lines):
+        return False
+    cover = stock_service.order_lines_cover(sale)
+    return all(line.pk in cover and cover[line.pk]["free"] >= line.qty for line in lines)
 
 
 def _maybe_auto_confirm(config, order_id: str, sale, change_entry: dict = None, raw_order: dict = None) -> None:

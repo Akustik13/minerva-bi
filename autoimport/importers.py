@@ -290,6 +290,8 @@ def import_sales(df: pd.DataFrame, source: str = 'auto', conflict_strategy: str 
     last_source       = source
     last_status       = 'received'
     last_affects      = True
+    created_now       = set()   # замовлення, створені цим імпортом (решта їхніх рядків — теж позиції)
+    used_lines        = {}      # pk замовлення → позиції, які вже зайняли рядки цього файлу
 
     with transaction.atomic():
         sp = transaction.savepoint()
@@ -384,6 +386,9 @@ def import_sales(df: pd.DataFrame, source: str = 'auto', conflict_strategy: str 
                 )
                 if so_created:
                     result['created'] += 1
+                    created_now.add(so.pk)
+                elif so.pk in created_now:
+                    pass   # наступний рядок замовлення, яке створив цей самий імпорт — додаємо його позицію
                 elif conflict_strategy == 'update':
                     changed = False
                     if last_ship_date and so.shipped_at is None:
@@ -407,12 +412,22 @@ def import_sales(df: pd.DataFrame, source: str = 'auto', conflict_strategy: str 
                     result['skipped'] += 1
                     continue
 
-                if not SalesOrderLine.objects.filter(order=so, product=product, qty=qty).exists():
+                # Позиція — за товаром (не за товаром і кількістю): повторний імпорт зі зміненою кількістю
+                # виправляє ту саму позицію (склад — на різницю), а не додає другу й не списує двічі.
+                # Кілька рядків одного товару в замовленні — кожен свою позицію, по порядку.
+                taken = used_lines.setdefault(so.pk, set())
+                line = (SalesOrderLine.objects.filter(order=so, product=product)
+                        .exclude(pk__in=taken).order_by('pk').first())
+                if line is None:
                     unit_price = _to_decimal(row.get(price_col)) if price_col else None
-                    SalesOrderLine.objects.create(
+                    line = SalesOrderLine.objects.create(
                         order=so, product=product, sku_raw=sku_raw, qty=qty,
                         unit_price=unit_price, currency=last_currency,
                     )
+                elif line.qty != qty:
+                    line.qty = qty
+                    line.save(update_fields=['qty'])
+                taken.add(line.pk)
             else:
                 result['created'] += 1
 

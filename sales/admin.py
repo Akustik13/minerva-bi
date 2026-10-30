@@ -588,13 +588,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                                  for l in line_objs]
                     product_ids = list({lp['product_id'] for lp in line_data})
                     # «Склад зараз» = доступно (на складі − резерв) + те, що вже взяло це замовлення:
-                    # списане чи заброньоване під нього не рахується як нестача
+                    # списане чи заброньоване під нього не рахується як нестача (stock.line_cover_held —
+                    # так само, як картка замовлення)
                     avail = {pid: p._available for pid, p in stock_service.stock_map(product_ids).items()}
                     order_stock = {}
                     for l in line_objs:
-                        free = avail.get(l.product_id, 0)
-                        if l.order.status not in ('shipped', 'delivered'):
-                            free += stock_service.line_held(l)
+                        free = avail.get(l.product_id, 0) + stock_service.line_cover_held(l)
                         order_stock.setdefault(str(l.order_id), []).append({
                             'pid':   l.product_id,
                             'need':  int(l.qty or 0),
@@ -820,13 +819,24 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     # ── Actions: Впливає на склад ─────────────────────────────────────────────
 
+    def _set_affects_stock(self, queryset, value):
+        """По одному (save(update_fields)), як масові дії статусу: склад реагує в сигналі — вимкнули «Впливає на
+        склад» → резерви знімаються, увімкнули → бронь / списання за статусом (inventory/services/stock)."""
+        n = 0
+        with transaction.atomic():
+            for order in queryset.exclude(affects_stock=value).order_by("pk"):
+                order.affects_stock = value
+                order.save(update_fields=["affects_stock"])
+                n += 1
+        return n
+
     def action_set_affects_stock_yes(self, request, queryset):
-        n = queryset.update(affects_stock=True)
+        n = self._set_affects_stock(queryset, True)
         self.message_user(request, f"✅ «Впливає на склад» увімкнено для {n} замовлень.")
     action_set_affects_stock_yes.short_description = "✅ Склад → Впливає"
 
     def action_set_affects_stock_no(self, request, queryset):
-        n = queryset.update(affects_stock=False)
+        n = self._set_affects_stock(queryset, False)
         self.message_user(request, f"⬜ «Впливає на склад» вимкнено для {n} замовлень.")
     action_set_affects_stock_no.short_description = "⬜ Склад → Не впливає"
 
@@ -3398,13 +3408,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         order = get_object_or_404(SalesOrder, pk=pk)
 
         cancelled = order.status == "cancelled"
-        if not cancelled and not order.affects_stock:
-            return JsonResponse({'ok': False, 'error': 'Замовлення не впливає на склад (affects_stock=False)'})
         if not cancelled and not order.lines.exists():
             return JsonResponse({'ok': False, 'error': 'Замовлення не має рядків'})
 
-        # скасоване — що воно ще тримає (скасоване до жовтня 2026 товар не повертало); інше — позиції ↔ рухи
+        # скасоване — що воно ще тримає (скасоване до жовтня 2026 товар не повертало); «не впливає на склад» —
+        # резерви, що ще тримаються; інше — позиції ↔ рухи (і компоненти BOM)
         mismatches = stock_service.order_stock_issues(order)
+        if not cancelled and not order.affects_stock and not mismatches:
+            return JsonResponse({'ok': False, 'error': 'Замовлення не впливає на склад (affects_stock=False)'})
         if request.method == 'GET':
             return JsonResponse({'ok': True, 'mismatches': mismatches, 'order': str(order)})
 

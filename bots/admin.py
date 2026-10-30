@@ -3891,8 +3891,7 @@ Rules:
 
     def inventory_check_view(self, request):
         """Show inventory status for all DigiKey listings (grouped by category)."""
-        from django.db.models import Sum
-        from inventory.models import InventoryTransaction, Product
+        from inventory.models import Product
 
         qs = list(
             DigiKeyListing.objects
@@ -3925,17 +3924,12 @@ Rules:
             except Exception:
                 pass
 
-        # Batch-fetch stock
+        # Залишок — те саме число, що йде на DigiKey (DigiKeyListing.get_stock_qty): «Доступно» складу
+        # (на складі − резерв і ще не списані замовлення), не менше 0; одним запитом для всіх товарів
         stock_map = {}
         if product_ids:
-            rows = (
-                InventoryTransaction.objects
-                .filter(product_id__in=product_ids)
-                .exclude(tx_type='reserved')
-                .values('product_id')
-                .annotate(total=Sum('qty'))
-            )
-            stock_map = {r['product_id']: float(r['total'] or 0) for r in rows}
+            from inventory.services.stock import stock_map as _stock_map
+            stock_map = {pk: max(0, int(p._available)) for pk, p in _stock_map(product_ids).items()}
 
         items = []
         for listing in qs:

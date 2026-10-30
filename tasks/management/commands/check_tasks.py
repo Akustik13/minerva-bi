@@ -1,6 +1,5 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from django.db.models import Sum
 
 
 class Command(BaseCommand):
@@ -12,18 +11,18 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('check_tasks: готово'))
 
     def _check_stock(self):
-        from inventory.models import Product, InventoryTransaction
+        """Критичний склад — як «⚠️ Критичні» в огляді складу: «Доступно» (на складі − резерв і ще не списані
+        замовлення, inventory/services/stock.annotate_stock) не більше «Точки дозамовлення»."""
+        from inventory.models import Product
+        from inventory.services.stock import annotate_stock
         from tasks.models import Task
 
         created = 0
-        products = Product.objects.filter(reorder_point__gt=0)
+        products = annotate_stock(Product.objects.filter(reorder_point__gt=0))
         for product in products:
-            stock_result = InventoryTransaction.objects.filter(
-                product=product
-            ).aggregate(total=Sum('qty'))
-            stock = float(stock_result['total'] or 0)
+            stock = float(product._available)
 
-            if stock < product.reorder_point:
+            if stock <= product.reorder_point:
                 _, was_created = Task.objects.get_or_create(
                     product=product,
                     task_type=Task.TaskType.STOCK_ALERT,
@@ -33,7 +32,7 @@ class Command(BaseCommand):
                         description=(
                             f'Товар: {product.name}\n'
                             f'SKU: {product.sku}\n'
-                            f'Залишок: {stock:.0f} | Мінімум: {product.reorder_point}'
+                            f'Доступно: {stock:.0f} | Точка дозамовлення: {product.reorder_point}'
                         ),
                         priority=Task.Priority.HIGH,
                         notify_email=True,
