@@ -139,12 +139,14 @@ def _get_app_list(self, request, app_label=None):
             ]
         else:
             from core.middleware import with_hooks
-            allowed = with_hooks(request.user, profile.get_allowed_modules()) if profile else '__all__'
+            # без профілю — нічого, як і ModuleAccessMiddleware; «config» — лише з модулем (проміжний шар
+            # відкриває без модуля тільки core / auth)
+            allowed = with_hooks(request.user, profile.get_allowed_modules()) if profile else []
             denied_models = set(getattr(profile, 'denied_models', None) or [])
 
             app_list = [
                 a for a in app_list
-                if a["app_label"] in always_show
+                if a["app_label"] in (always_show - {"config"})
                 or (
                     ModuleRegistry.check_active(a["app_label"])
                     and (allowed == '__all__' or a["app_label"] in allowed)
