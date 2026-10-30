@@ -13,6 +13,10 @@ python manage.py migrate --noinput
 echo "🗂️  Collecting static files..."
 python manage.py collectstatic --noinput --clear
 
+# Переклади Django (locale/*/LC_MESSAGES/django.po → .mo): без .mo {% trans %} і gettext не перекладають
+echo "🌐 Compiling translations..."
+python manage.py compilemessages --ignore=venv --ignore=staticfiles --ignore=node_modules >/dev/null   || echo "⚠️  compilemessages failed — interface stays in Ukrainian"
+
 echo "👤 Creating superuser if needed..."
 python manage.py shell -c "
 from django.contrib.auth import get_user_model

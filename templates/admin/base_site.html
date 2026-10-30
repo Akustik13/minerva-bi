@@ -16,6 +16,12 @@
 })();
 </script>
 <script src="/static/admin/js/mv_contrast.js?v=2" defer></script>
+{% if MV_UI_DICT %}{# інтерфейс іншою мовою (core/ui_text): сторінку видно, щойно переклад готовий (не довше 1,5 с) #}
+<style>html.mv-tr-pending body{visibility:hidden}</style>
+<script>document.documentElement.classList.add('mv-tr-pending');setTimeout(function(){document.documentElement.classList.remove('mv-tr-pending')},1500);</script>
+<script src="/core/ui-dict/{{ MV_UI_DICT.lang }}.js?v={{ MV_UI_DICT.ver|urlencode }}" defer></script>
+<script src="/static/admin/js/mv_translate.js?v=3" defer></script>
+{% endif %}
 <script>window.MINERVA_LANG = '{{ CURRENT_LANGUAGE|default:"uk" }}';</script>
 <script src="/static/admin/js/i18n_minerva.js"></script>
 <!-- PWA -->
@@ -1339,6 +1345,7 @@ window.MV_GROUPS = [
       { href:'/dashboard/import/',                            icon:'📤', label:'Імпорт даних',        app:'config' },
       { href:'/dashboard/help/',                              icon:'📖', label:'Довідник',            app:'config' },
       { href:'/core/my-settings/',                            icon:'👤', label:'Мої налаштування' },
+      { href:'/admin/core/uitext/',                           icon:'🌐', label:'Переклади інтерфейсу', app:'core', model:'UIText' },
       { href:'/admin/backup/',                                icon:'💾', label:'Резервні копії',      app:'backup' },
       { href:'/admin/auth/user/',                             icon:'👥', label:'Користувачі',         app:'auth', model:'User' },
     ], apps:['autoimport','config','backup','auth'] },

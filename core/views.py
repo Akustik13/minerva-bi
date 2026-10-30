@@ -100,6 +100,22 @@ def set_language_view(request, lang_code):
     return response
 
 
+def ui_dict_view(request, lang):
+    """Словник перекладу інтерфейсу для браузера (core/ui_text/catalog.py). З ?v=<версія> — кешується надовго:
+    нова версія словника = нова адреса."""
+    from django.http import HttpResponse
+    from core.ui_text import catalog
+    if not (request.user.is_authenticated and request.user.is_staff):
+        body, cache = "window.MV_UI_DICT=null;", "no-store"
+    else:
+        body = catalog.as_js(lang)
+        cache = ("private, max-age=31536000, immutable" if request.GET.get("v") == catalog.version()
+                 else "private, no-cache")
+    response = HttpResponse(body, content_type="application/javascript; charset=utf-8")
+    response["Cache-Control"] = cache
+    return response
+
+
 def custom_403_view(request, exception=None):
     return render(request, 'core/access_denied.html', {
         'title': 'Доступ обмежено',

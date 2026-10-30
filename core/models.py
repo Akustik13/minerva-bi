@@ -572,3 +572,30 @@ class TenantAccount(models.Model):
         if not end:
             return None
         return (end - timezone.now().date()).days
+
+
+class UIText(models.Model):
+    """Напис інтерфейсу Minerva (каталог для перекладу) і його переклади — логіка лише core/ui_text.
+
+    Каталог збирає core.ui_text.extract з коду (шаблони, Python, JS); переклади — {мова: {text, by: ai|human,
+    model, at}}. Сторінки перекладає браузер (static/admin/js/mv_translate.js) за словником
+    core.ui_text.dictionary; людські правки AI не перезаписує."""
+    key = models.CharField('Ключ', max_length=40, unique=True, help_text='SHA-1 напису')
+    source = models.TextField('Напис (українською)')
+    where = models.CharField('Де в коді', max_length=300, blank=True, default='')
+    uses = models.PositiveIntegerField('Разів у коді', default=0)
+    active = models.BooleanField('Є в коді зараз', default=True, db_index=True)
+    translations = models.JSONField('Переклади', default=dict, blank=True)
+    created_at = models.DateTimeField('Знайдено', auto_now_add=True)
+    updated_at = models.DateTimeField('Змінено', auto_now=True)
+
+    class Meta:
+        verbose_name = '🌐 Напис інтерфейсу'
+        verbose_name_plural = '🌐 Переклади інтерфейсу'
+        ordering = ['source']
+
+    def __str__(self):
+        return self.source[:80]
+
+    def text(self, lang):
+        return ((self.translations or {}).get(lang) or {}).get('text', '')

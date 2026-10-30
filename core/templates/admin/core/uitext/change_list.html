@@ -1,0 +1,85 @@
+{% extends "admin/change_list.html" %}
+{% comment %}🌐 Переклади інтерфейсу (core/admin_ui_text.py, core/ui_text): каталог написів, AI-переклад з оцінкою
+вартості, хід перекладу (опитування …/status/ кожні 3 с, поки йде).{% endcomment %}
+
+{% block content %}
+<style>
+  .ut { padding: 14px 16px; margin-bottom: 14px; border: 1px solid var(--border-strong); border-radius: 8px;
+        background: var(--bg-card); }
+  .ut h3 { margin: 0 0 8px; font-size: 14px; }
+  .ut-row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .ut-num b { font-size: 18px; }
+  .ut-muted { color: var(--text-muted); font-size: 12px; }
+  .ut table { border-collapse: collapse; font-size: 12.5px; margin: 6px 0; }
+  .ut td, .ut th { padding: 4px 10px; border-bottom: 1px solid var(--hairline-color); text-align: left; }
+  .ut-bar { height: 8px; border-radius: 4px; background: var(--darkened-bg); overflow: hidden; margin: 6px 0; max-width: 520px; }
+  .ut-bar i { display: block; height: 100%; background: #2e9d5b; }
+</style>
+
+<div class="ut">
+  <h3>🌐 Переклади інтерфейсу Minerva</h3>
+  <p class="ut-muted" style="margin:0 0 10px">Каталог — усі написи інтерфейсу з коду Minerva (кнопки, заголовки,
+    підказки, повідомлення). Переклад робиться <b>один раз</b> (і потім лише для нових написів після оновлень); коли
+    людина вибирає 🌐 EN / DE, сторінки перекладаються зі словника — без AI й без витрат. Дані (листи, товари,
+    клієнти, нотатки) не перекладаються. Російська не перекладається.</p>
+  <div class="ut-row">
+    <span class="ut-num">Написів у каталозі: <b>{{ ui_counts.total }}</b></span>
+    {% for lang, name in ui_targets.items %}<span class="ut-num">{{ name }}: бракує <b id="ut-miss-{{ lang }}">{% for k, v in ui_counts.missing.items %}{% if k == lang %}{{ v }}{% endif %}{% endfor %}</b>{% for k, v in ui_counts.human.items %}{% if k == lang and v %} · ✋ виправлено {{ v }}{% endif %}{% endfor %}</span>{% endfor %}
+    <form method="post" action="{% url 'admin:core_uitext_collect' %}" style="margin:0">{% csrf_token %}
+      <button class="button" type="submit" title="Пройти код Minerva й оновити каталог: нові написи, зниклі">🔄 Зібрати написи з коду</button></form>
+  </div>
+</div>
+
+<div class="ut">
+  <h3>🤖 Перекласти відсутнє (AI)</h3>
+  {% if ui_state.status == 'running' or ui_state.status == 'queued' %}
+    <div id="ut-progress">
+      <b>Перекладається…</b> <span id="ut-done">{{ ui_state.done|default:0 }}</span> з <span id="ut-total">{{ ui_state.total|default:0 }}</span>
+      · модель {{ ui_state.model }}
+      <div class="ut-bar"><i id="ut-fill" style="width:0"></i></div>
+      <span class="ut-muted" id="ut-note">{{ ui_state.problem }}</span>
+    </div>
+  {% else %}
+    {% if ui_state.status == 'done' %}<p>✅ Останній переклад: збережено <b>{{ ui_state.saved }}</b>{% if ui_state.rejected %}, відхилено перевіркою {{ ui_state.rejected }} (спробує ще раз наступного разу){% endif %} · {{ ui_state.model }} · ≈ ${{ ui_state.usd }} · {{ ui_state.finished_at|slice:":16" }}</p>
+    {% elif ui_state.status == 'failed' %}<p style="color:var(--err)">⚠️ Переклад зупинився: {{ ui_state.problem }}</p>{% endif %}
+    {% with e=ui_estimates.0 %}
+    {% if e.phrases %}
+    <p>Без перекладу: <b>{{ e.phrases }}</b> написів → {{ e.langs|join:", " }} · {{ e.batches }} запитів до Claude.
+      Оцінка (рахунок API Anthropic, ключ — «Minerva AI → Налаштування»):</p>
+    <table><tr><th>Модель</th><th>≈ токенів (запит / відповідь)</th><th>≈ вартість</th></tr>
+      {% for x in ui_estimates %}<tr><td>{{ x.label }}</td><td>{{ x.tokens_in }} / {{ x.tokens_out }}</td><td><b>${{ x.usd }}</b></td></tr>{% endfor %}
+    </table>
+    <form method="post" action="{% url 'admin:core_uitext_translate' %}" class="ut-row" id="ut-go">{% csrf_token %}
+      <select name="model">{% for x in ui_estimates %}<option value="{{ x.model }}"{% if x.model == ui_default_model %} selected{% endif %}>{{ x.label }} — ≈ ${{ x.usd }}</option>{% endfor %}</select>
+      <button class="button default" type="submit">🤖 Перекласти {{ e.phrases }} написів</button>
+      <span class="ut-muted">Оцінка приблизна; справжню вартість видно після перекладу. Людські правки AI не змінює.</span>
+    </form>
+    {% else %}<p class="ut-muted">Усе перекладено. Нові написи з'являються після оновлення Minerva — «🔄 Зібрати написи з коду».</p>{% endif %}
+    {% endwith %}
+  {% endif %}
+</div>
+{{ block.super }}
+<script>
+(function () {
+  var form = document.getElementById('ut-go');
+  if (form) form.addEventListener('submit', function (e) {
+    var opt = form.model.options[form.model.selectedIndex].text;
+    if (!confirm('Запустити переклад через Claude API?\n' + opt + '\nГроші спишуться з рахунку API Anthropic.')) e.preventDefault();
+  });
+  var box = document.getElementById('ut-progress');
+  if (!box) return;
+  function tick() {
+    fetch('{% url "admin:core_uitext_status" %}', {credentials: 'same-origin'}).then(function (r) { return r.json(); })
+      .then(function (d) {
+        var s = d.state || {};
+        document.getElementById('ut-done').textContent = s.done || 0;
+        document.getElementById('ut-total').textContent = s.total || 0;
+        document.getElementById('ut-fill').style.width = (s.total ? Math.round(100 * (s.done || 0) / s.total) : 0) + '%';
+        document.getElementById('ut-note').textContent = s.problem || '';
+        if (s.status === 'running' || s.status === 'queued') setTimeout(tick, 3000); else location.reload();
+      }).catch(function () { setTimeout(tick, 6000); });
+  }
+  tick();
+})();
+</script>
+{% endblock %}

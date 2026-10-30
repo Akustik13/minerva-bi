@@ -1560,3 +1560,6 @@ class TenantAccountAdmin(admin.ModelAdmin):
         return format_html(
             '<div style="font-size:13px;line-height:1.8">{}</div>',
             format_html('<br>'.join(lines)))
+
+
+from . import admin_ui_text  # noqa: E402,F401 — 🌐 Переклади інтерфейсу

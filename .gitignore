@@ -100,3 +100,6 @@ dashboard/templates/dashboard/views1.py
 C/
 python
 C:
+
+# скомпільовані переклади Django — entrypoint.sh робить compilemessages
+*.mo

@@ -34,10 +34,22 @@ def ui_context(request):
             profile = request.user.profile
         except Exception:
             profile = None
+    out = {}
     try:
-        return {'MV_UI_JSON': ui_prefs.page_config(profile)}
+        out['MV_UI_JSON'] = ui_prefs.page_config(profile)
     except Exception:
-        return {'MV_UI_JSON': ui_prefs.page_config(None)}
+        out['MV_UI_JSON'] = ui_prefs.page_config(None)
+    # переклад інтерфейсу іншою мовою (core/ui_text): версія словника, якщо для мови вже є переклади
+    if profile is not None:
+        try:
+            from core.ui_text import catalog
+            lang = (getattr(request, 'LANGUAGE_CODE', '') or '')[:2]
+            info = catalog.page_info(lang)
+            if info:
+                out['MV_UI_DICT'] = {'lang': lang, 'ver': info['ver']}
+        except Exception:
+            pass
+    return out
 
 
 def language_context(request):
