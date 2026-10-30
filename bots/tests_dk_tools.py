@@ -169,6 +169,19 @@ class LeadTimeTests(ToolsBase):
         self.assertEqual(DigiKeyListing.objects.get(pk=self.listing.pk).dk_lead_time_days, 14)
 
 
+class OfferTitleTests(ToolsBase):
+    def test_digikey_part_number_is_not_a_title_difference(self):
+        from bots.services.dk_marketplace import _offer_payload, offer_title
+        self.assertEqual(offer_title("3228-AN110503-02C-175-MHF1-ND"), "AN110503-02C-175-MHF1")
+        self.assertEqual(offer_title("SMA Filter 2.4 GHz"), "SMA Filter 2.4 GHz")
+        self.assertEqual(offer_title("AN-ND"), "AN-ND")
+        DigiKeyListing.objects.filter(pk=self.listing.pk).update(dk_title="3228-FT220407-ND")
+        listing = DigiKeyListing.objects.get(pk=self.listing.pk)
+        rows = {r["key"]: r for r in dk_view.offer_rows(listing, offer(title="FT220407"))}
+        self.assertEqual((rows["title"]["state"], rows["title"]["minerva"]), ("same", "FT220407"))
+        self.assertEqual(_offer_payload(listing)["title"], "FT220407")         # офер не отримає номер DigiKey
+
+
 class SelectivePushTests(ToolsBase):
     def test_numeric_parameters_the_api_does_not_return_are_not_differences(self):
         product = {"_id": "p-1", "categoryId": "855", "description": "Band-pass", "manufacturer": "Sevskiy",

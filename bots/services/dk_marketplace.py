@@ -9,6 +9,7 @@ Auth: OAuth 2.0 3-legged (marketplace_access_token у DigiKeyConfig).
       Refresh: POST /v1/oauth2/token  grant_type=refresh_token
 """
 import logging
+import re
 from datetime import timedelta
 
 logger = logging.getLogger(__name__)
@@ -229,6 +230,18 @@ PRESERVE_OFFER_FIELDS = ("maxOrderQuantity", "incrementQuantity", "returnsAccept
                          "dateCodeProvided", "availableStartDateUtc", "availableEndDateUtc")
 
 
+_DK_PN_RE = re.compile(r"^\d{2,6}-(.+)-ND$")
+
+
+def offer_title(title) -> str:
+    """Назва офера без DigiKey Part Number: «3228-AN110503-02C-175-MHF1-ND» → «AN110503-02C-175-MHF1».
+    DigiKey сам присвоює товару назву = свій номер (префікс постачальника + «-ND»); її стягують у «Назва (DK)»,
+    а в офера назва — без них. Порівнюємо й надсилаємо без префікса й суфікса."""
+    title = " ".join(str(title or "").split())
+    m = _DK_PN_RE.match(title)
+    return m.group(1) if m else title
+
+
 def _offer_payload(listing) -> dict:
     stock  = listing.get_dk_quantity()
     prices = listing.get_prices_api()
@@ -236,7 +249,7 @@ def _offer_payload(listing) -> dict:
         raise DKMarketplaceError("Цінові тири не заповнені (dk_prices порожній)")
     return {
         "supplierSku":       listing.get_supplier_sku(),
-        "title":             listing.dk_title.strip(),
+        "title":             offer_title(listing.dk_title),
         "description":       listing.dk_description[:500],
         "isActive":          listing.dk_is_active,
         "isAvailable":       True,
@@ -1106,7 +1119,7 @@ def pull_product_fields(listing) -> dict:
             changed.append(field)
 
     # ── Core product fields ────────────────────────────────────────────────
-    _set('dk_title',         (prod.get('title') or ''),        max_len=50)
+    _set('dk_title',         offer_title(prod.get('title') or ''), max_len=50)   # без «3228-…-ND»
     _set('dk_description',   (prod.get('description') or ''),  max_len=2048)
     _set('dk_manufacturer',  (prod.get('manufacturer') or ''), max_len=50)
     _set('dk_image_url',     prod.get('imageUrl') or '')

@@ -59,14 +59,16 @@ def _row(key, label, minerva, dk, same, show_m=None, show_d=None, group="offer")
 
 
 def offer_rows(listing, offer) -> list:
-    """Поля офера: що відправила б Minerva (як `_offer_payload`) і що на DigiKey."""
+    """Поля офера: що відправила б Minerva (як `_offer_payload`) і що на DigiKey. Назва — без DigiKey Part
+    Number («3228-…-ND» DigiKey присвоює сам, `dk_marketplace.offer_title`)."""
+    from bots.services.dk_marketplace import offer_title
     o = offer or {}
     have = offer is not None
     m_tiers, d_tiers = _tiers(listing.dk_prices), _tiers(o.get("prices")) if have else None
     m_qty = listing.get_dk_quantity()
     rows = [
-        _row("title", "Назва", _txt(listing.dk_title), _txt(o.get("title")) if have else None,
-             _txt(listing.dk_title) == _txt(o.get("title"))),
+        _row("title", "Назва", offer_title(listing.dk_title), _txt(o.get("title")) if have else None,
+             offer_title(listing.dk_title).lower() == offer_title(o.get("title")).lower()),
         _row("supplierSku", "Артикул (Supplier SKU)", listing.get_supplier_sku(),
              _txt(o.get("supplierSku")) if have else None,
              _txt(listing.get_supplier_sku()).lower() == _txt(o.get("supplierSku")).lower()),
