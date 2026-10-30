@@ -109,10 +109,11 @@
 →
 ```json
 {"ok": false, "items": [
-  {"sku": "AMP-100", "product_sku": "AMP-100", "found": true, "requested": 2, "available": 8, "ok": true},
-  {"sku": "CABLE-M", "product_sku": "CABLE-M", "found": true, "requested": 5.5, "available": 3, "ok": false}
+  {"sku": "AMP-100", "product_sku": "AMP-100", "found": true, "requested": 2, "requested_total": 2, "available": 8, "ok": true},
+  {"sku": "CABLE-M", "product_sku": "CABLE-M", "found": true, "requested": 5.5, "requested_total": 5.5, "available": 3, "ok": false}
 ]}
 ```
+Той самий товар під різними артикулами (артикул і його аліас) перевіряється разом: `requested_total` — скільки цього товару в кошику всього, `ok` — чи вистачає «Доступно» на всіх.
 
 ### `POST /stock-movements/` — прихід / списання / коригування
 ```json
@@ -336,7 +337,7 @@
 | `GET /orders/?status=shipped&date_from=2026-10-01` | фільтри: `status`, `source`, `email`, `date_from`, `date_to` |
 | `GET /orders/{id}/` | деталі + рядки + відправлення з трекінгом |
 | `PATCH /orders/{id}/` | змінити поля, напр. `{"status": "processing"}` |
-| `POST /orders/{id}/cancel/` | скасувати; товар повертається на склад так само, як при скасуванні в Minerva (`{"restock": false}` — списаний товар не повертати, резерв знімається завжди). Повтор нічого не повертає вдруге. Відправлені/доставлені — `409` |
+| `POST /orders/{id}/cancel/` | скасувати; товар повертається на склад так само, як при скасуванні в Minerva (`{"restock": false}` — списаний товар не повертати, резерв знімається завжди; таке списання позначається `so-writeoff:` і «🔄 Синхронізувати склад» чи видалення замовлення його вже не повертають). Повтор нічого не повертає вдруге. Відправлені/доставлені — `409` |
 
 Статуси: `received` → `processing` → `shipped` → `delivered`, або `cancelled`.
 

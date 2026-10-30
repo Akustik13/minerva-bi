@@ -114,7 +114,11 @@ def setup_sales_signals():
       - позицію або замовлення видалено → release_line_stock / release_order_stock (товар повертається,
         як при скасуванні; компоненти BOM замовлення — теж)
       - змінились джерело чи номер → rekey_order (рухи переходять на новий ключ)
-      - перемикач «Впливає на склад» сам склад не рухає (наступна подія — за правилами вище)
+      - перемикач «Впливає на склад»: вимкнули — резерви знімаються (уже списане лишається), увімкнули — за
+        правилами вище (stock.order_saved)
+    Компоненти BOM списує той самий sync_order (разом із позицією), окремого сигналу немає.
+    Збереження лише інших полів (save(update_fields=["internal_note"]) тощо) склад не чіпає й не перебиває
+    попередній стан зовнішнього збереження: стан — стек, pre_save кладе, post_save знімає.
     """
     from sales.models import SalesOrder, SalesOrderLine
 
@@ -132,23 +136,32 @@ def setup_sales_signals():
                        dispatch_uid="inventory_salesorder_release", weak=False)
 
 
-def _capture_sales_order_old_state(sender, instance, **kwargs):
-    """Попередній статус, джерело й номер — для перевірки в post_save."""
-    old = (sender.objects.filter(pk=instance.pk).values("status", "source", "order_number").first()
-           if instance.pk else None)
-    instance._old_status = old["status"] if old else None
-    instance._old_stock_key = (old["source"], old["order_number"]) if old else None
+_STOCK_FIELDS = ("status", "affects_stock", "source", "order_number")
 
 
-def _salesorder_post_save(sender, instance, created, **kwargs):
+def _touches_stock(update_fields):
+    return update_fields is None or bool(set(_STOCK_FIELDS).intersection(update_fields))
+
+
+def _capture_sales_order_old_state(sender, instance, update_fields=None, **kwargs):
+    """Попередній статус, «Впливає на склад», джерело й номер — для post_save. Власний стек на об'єкті:
+    вкладене збереження (інший сигнал post_save зберіг замовлення ще раз) не перебиває стан зовнішнього."""
+    if not _touches_stock(update_fields):
+        return
+    old = (sender.objects.filter(pk=instance.pk).values(*_STOCK_FIELDS).first() if instance.pk else None)
+    instance.__dict__.setdefault("_stock_old_states", []).append(old)
+
+
+def _salesorder_post_save(sender, instance, created, update_fields=None, **kwargs):
     from inventory.services import stock
+    if not _touches_stock(update_fields):
+        return
+    states = instance.__dict__.get("_stock_old_states") or []
+    old = states.pop() if states else None
     if getattr(instance, "_skip_stock_signal", False):
         return
     try:
-        old_key = getattr(instance, "_old_stock_key", None)
-        if old_key and old_key != (instance.source, instance.order_number):
-            stock.rekey_order(instance, *old_key)
-        changes = stock.order_status_changed(instance, getattr(instance, "_old_status", None))
+        changes = stock.order_saved(instance, old)
         if changes:
             logger.info("Inventory: order %s:%s — %s", instance.source, instance.order_number, "; ".join(changes))
     except Exception:

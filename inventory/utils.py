@@ -1,8 +1,7 @@
 """Утиліти для роботи з БОМ та складом."""
 from decimal import Decimal
 from django.db.models import Sum
-from .models import Product, ProductComponent, InventoryTransaction, Location
-from django.utils import timezone
+from .models import Product, ProductComponent, InventoryTransaction
 
 
 def get_product_stock(product, location=None):
@@ -77,82 +76,8 @@ def get_bom_analysis(product):
     return analysis
 
 
-def deduct_components_for_assembly(product, qty, ref_doc="", order_pk=None):
-    """
-    Вилучити компоненти зі складу для збирання.
-
-    Args:
-        product: готовий товар з BOM
-        qty: кількість готових товарів для збирання
-        ref_doc: посилання (номер замовлення)
-        order_pk: PK замовлення
-
-    Returns:
-        dict з результатом: {'ok': bool, 'error': str, 'transactions': [ids]}
-    """
-    if product.bom_type != Product.BomType.KEY:
-        return {'ok': False, 'error': 'Товар не має BOM'}
-
-    components = ProductComponent.objects.filter(
-        parent=product,
-        optional=False
-    ).select_related('component')
-
-    if not components.exists():
-        return {'ok': False, 'error': 'BOM пусто'}
-
-    if order_pk:
-        keys = [f"bom_deduction_{product.id}_{order_pk}_{c.component.id}" for c in components]
-        if InventoryTransaction.objects.filter(external_key__in=keys).count() == len(keys):
-            return {'ok': True, 'transactions': [], 'already': True}
-
-    # Перевірка: чи достатньо компонентів
-    for comp in components:
-        stock = get_product_stock(comp.component)
-        needed = Decimal(str(comp.qty_per)) * Decimal(str(qty))
-        if stock < needed:
-            return {
-                'ok': False,
-                'error': f'Недостатньо {comp.component.sku}: є {float(stock)}, потрібно {float(needed)}'
-            }
-
-    # Вилучення компонентів
-    transactions = []
-    try:
-        # Знайти склад компонентів або інший
-        comp_location = Location.objects.filter(
-            location_type=Location.LocationType.COMPONENTS,
-            is_active=True
-        ).first() or Location.objects.filter(
-            is_active=True
-        ).first()
-
-        if not comp_location:
-            return {'ok': False, 'error': 'Не знайдено активного складу'}
-
-        for comp in components:
-            qty_to_deduct = Decimal(str(comp.qty_per)) * Decimal(str(qty))
-
-            # Створити транзакцію вилучення
-            external_key = f"bom_deduction_{product.id}_{order_pk}_{comp.component.id}"
-            if order_pk and InventoryTransaction.objects.filter(external_key=external_key).exists():
-                continue   # уже списано під це замовлення (повторне «Відправлено») — без дубля й помилки ключа
-
-            tx = InventoryTransaction.objects.create(
-                tx_type=InventoryTransaction.TxType.OUTGOING,
-                product=comp.component,
-                location=comp_location,
-                qty=-qty_to_deduct,  # від'ємна для вилучення
-                ref_doc=ref_doc or f"BOM для {product.sku}",
-                external_key=external_key,
-                tx_date=timezone.now(),
-            )
-            transactions.append(tx.id)
-
-        return {'ok': True, 'transactions': transactions}
-
-    except Exception as e:
-        return {'ok': False, 'error': str(e)}
+# Списання компонентів BOM під замовлення — лише inventory/services/stock.py (sync_order: разом із позицією,
+# за order_target; скасування / видалення повертають). Окремої функції списання тут більше немає.
 
 
 def get_assembly_status(product, qty):

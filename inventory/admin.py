@@ -87,13 +87,10 @@ def _get_monthly_sales(product, months=3):
 
 
 def _confirmed_incoming(product):
-    """Уже замовлено в постачальників і ще не отримано (закупівлі Ordered / Partial, без чернеток-кошика)."""
-    from django.db.models import F
-    from inventory.services.stock import CONFIRMED_PO_STATUSES
-    q = (PurchaseOrderLine.objects
-         .filter(product=product, purchase_order__status__in=CONFIRMED_PO_STATUSES)
-         .aggregate(t=Sum(F('qty_ordered') - F('qty_received')))['t'])
-    return max(0.0, float(q or 0))
+    """Уже замовлено в постачальників і ще не отримано (закупівлі Ordered / Partial, без чернеток-кошика);
+    кожна позиція — не менше 0 (stock.po_open_qty)."""
+    from inventory.services.stock import CONFIRMED_PO_STATUSES, incoming_qty
+    return float(incoming_qty(product, CONFIRMED_PO_STATUSES))
 
 
 def _reorder(product, stock=None, sales_period_total=None, period_days=90, reserved=None, incoming=None):
@@ -149,16 +146,15 @@ def _annotate_reorder(qs, since, source_slug=''):
     _sales_period (продано з since, без скасованих), _confirmed_incoming (уже замовлено), кошик і замовлене."""
     from django.db.models import F, OuterRef, Subquery, Value
     from django.db.models.functions import Coalesce
-    from inventory.services.stock import CONFIRMED_PO_STATUSES, annotate_stock, monthly_sales_qs
+    from inventory.services.stock import (
+        CONFIRMED_PO_STATUSES, annotate_stock, incoming_subquery, monthly_sales_qs,
+    )
 
     sales_qs = monthly_sales_qs(since).filter(product=OuterRef('pk'))
     if source_slug and source_slug != 'all':
         sales_qs = sales_qs.filter(order__source=source_slug)
     sales_subq = sales_qs.values('product').annotate(t=Sum('qty')).values('t')
-    confirmed_subq = (
-        PurchaseOrderLine.objects.filter(product=OuterRef('pk'), purchase_order__status__in=CONFIRMED_PO_STATUSES)
-        .values('product').annotate(t=Sum(F('qty_ordered') - F('qty_received'))).values('t')
-    )
+    confirmed_subq = incoming_subquery(CONFIRMED_PO_STATUSES)   # кожна позиція — не менше 0
     cart_subq = (
         PurchaseOrderLine.objects.filter(product=OuterRef('pk'), purchase_order__status='draft')
         .values('product').annotate(t=Sum('qty_ordered')).values('t')
@@ -758,7 +754,6 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         """AJAX POST: позначити отримання товару по рядку PO."""
         import json
         from django.http import JsonResponse
-        from django.utils import timezone
 
         if request.method != 'POST':
             return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
@@ -779,17 +774,9 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         line.qty_received = new_received
         line.save()  # triggers update_inventory_on_purchase_receipt signal
 
-        # Update PO status
-        all_lines = list(po.lines.all())
-        total_ordered  = sum(l.qty_ordered  for l in all_lines)
-        total_received = sum(l.qty_received for l in all_lines)
-        if total_received >= total_ordered:
-            po.status = PurchaseOrder.Status.RECEIVED
-            if not po.received_date:
-                po.received_date = timezone.now().date()
-        elif total_received > 0:
-            po.status = PurchaseOrder.Status.PARTIAL
-        po.save(update_fields=['status', 'received_date'])
+        # Стан закупівлі — з позицій, кожна не більше замовленого: переотримана позиція не закриває решту
+        from inventory.services.purchases import refresh_status
+        refresh_status(po)
 
         return JsonResponse({
             'ok':          True,
@@ -2749,12 +2736,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         if hasattr(obj, '_incoming_total'):
             val = obj._incoming_total
         else:
-            q = (PurchaseOrderLine.objects
-                 .filter(product=obj,
-                         purchase_order__status__in=['draft', 'ordered', 'partial'])
-                 .aggregate(inc=Sum("qty_ordered") - Sum("qty_received"))
-                 .get("inc"))
-            val = q or Decimal("0")
+            from inventory.services.stock import incoming_qty   # позиції draft / ordered / partial, кожна ≥ 0
+            val = incoming_qty(obj)
         if obj.unit_type == Product.UnitType.PIECE:
             return int(val)
         return val

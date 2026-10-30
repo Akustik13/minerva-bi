@@ -141,6 +141,21 @@ class PurchaseAPITests(PurchaseBase):
         r = self.client.patch(URL + "ext:B-2026-0042/", {"lines": [{"line_id": "1", "qty": 5}]}, format="json")
         self.assertEqual((r.status_code, r.json()["code"]), (409, "qty_below_received"))
 
+    def test_received_line_keeps_its_sku_and_over_receipt_keeps_incoming_positive(self):
+        self.post()
+        r = self.client.post(URL + "ext:B-2026-0042/deliveries/", {"delivery_id": "D-1", "allow_over": True,
+                             "lines": [{"line_id": "1", "qty": 12}]}, format="json")
+        self.assertEqual((r.status_code, r.json()["status"]), (201, "partial"))   # позиція 2 ще не прийшла
+        self.assertEqual((self.stock()["on_hand"], self.stock()["incoming"]), (12, 0))   # не −2
+        r = self.client.patch(URL + "ext:B-2026-0042/", {"lines": [{"line_id": "1", "sku": "CABLE-M", "qty": 12}]},
+                              format="json")
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "line_received"))
+        self.assertEqual(self.stock()["on_hand"], 12)                             # отримане лишилось при AMP-100
+        self.assertEqual(self.client.get(URL + "ext:B-2026-0042/").json()["lines"][0]["sku"], "AMP-100")
+        r = self.client.patch(URL + "ext:B-2026-0042/", {"lines": [{"line_id": "2", "sku": "AMP-100", "qty": 3}]},
+                              format="json")
+        self.assertEqual(r.status_code, 200, r.content)                           # не отримана — можна
+
     def test_arrived_mode_marks_only(self):
         s = InventorySettings.get()
         s.api_delivery_mode = InventorySettings.API_DELIVERY_ARRIVED

@@ -224,6 +224,14 @@ def _apply_lines(po: PurchaseOrder, items: list, strict: bool) -> list:
             raise PurchaseError(f"lines[{i}]: кількість {qty} менша за вже отриману {line.qty_received}.",
                                 code="qty_below_received", status=409,
                                 details={"sku": sku or line.external_sku, "qty_received": str(line.qty_received)})
+        elif line.product_id and line.qty_received > 0 and line.product_id != (product.pk if product else None):
+            # отримане вже на складі під старим товаром — зміна артикула лишила б його там (і «очікується» — на
+            # новому); виправлення — новою позицією з іншим line_id або коригуванням складу в Minerva
+            old_sku = line.product.sku
+            raise PurchaseError(
+                f"lines[{i}]: позицію вже отримано ({line.qty_received} шт. «{old_sku}») — артикул змінити не можна. "
+                f"Іншу позицію передайте з новим line_id.", code="line_received", status=409,
+                details={"sku": sku, "received_sku": old_sku, "qty_received": str(line.qty_received)})
         line.product = product
         line.qty_ordered = qty
         line.external_line_id = line_id or line.external_line_id
