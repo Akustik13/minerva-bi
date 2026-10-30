@@ -55,8 +55,8 @@
         <td>{% if r.line.status == 'held' and can_change %}<input type="checkbox" name="ids" value="{{ r.line.pk }}" class="dp-chk" checked>{% endif %}</td>
         <td class="dp-prod">{% if r.listing_url %}<a href="{{ r.listing_url }}"><code>{{ r.line.sku }}</code></a>{% else %}<code>{{ r.line.sku }}</code>{% endif %}
           <div class="dp-name">{{ r.line.title }}</div></td>
-        <td class="dp-tiers">{% for t in r.old %}<div><span>{{ t.qty }}</span> {{ t.price }}</div>{% empty %}—{% endfor %}</td>
-        <td class="dp-tiers">{% for t in r.new %}<div class="dp-{{ t.cls }}"><span>{{ t.qty }}</span> <b>{{ t.price }}</b>{% if t.pct %}<em>{{ t.pct }}</em>{% elif t.cls == 'added' %}<em></em>{% endif %}</div>{% empty %}—{% endfor %}</td>
+        <td class="dp-tiers">{% for t in r.old %}<div{% if t.gone %} class="dp-gone" title="{{ t.title }}"{% endif %}><span>{{ t.qty }}</span> {{ t.price }}</div>{% empty %}—{% endfor %}</td>
+        <td class="dp-tiers">{% for t in r.new %}<div class="dp-{{ t.cls }}{% if t.dir %} dp-{{ t.dir }}{% endif %}"{% if t.title %} title="{{ t.title }}"{% endif %}><span>{{ t.qty }}</span> <b>{{ t.price }}</b>{% if t.pct %}<em>{{ t.pct }}</em>{% elif t.cls == 'added' %}<em></em>{% endif %}</div>{% empty %}—{% endfor %}</td>
         <td class="dp-change">{% if r.change %}<b>{{ r.change }}</b>{% endif %}
           {% if r.minerva %}<div class="dp-note">Minerva: {{ r.minerva }}</div>{% endif %}</td>
         <td><b style="color:{{ r.color }}">{{ r.line.get_status_display }}</b>

@@ -1,5 +1,5 @@
-﻿"""
-bots/views.py вЂ” OAuth2 callback + Webhook РґР»СЏ DigiKey Marketplace
+"""
+bots/views.py — OAuth2 callback + Webhook для DigiKey Marketplace
 """
 import hashlib
 import hmac
@@ -29,23 +29,53 @@ def _match_carrier_id(shipping_courier, carriers):
     return None
 
 
+CONFIG_URL = "/admin/bots/digikeyconfig/1/change/"
+
+
+def _oauth_refused(request, reason: str, status: int):
+    """Сторінка «авторизацію не прийнято» — токени Marketplace не змінено."""
+    from django.shortcuts import render
+    return render(request, "bots/digikey_oauth_error.html", {
+        "reason": reason, "config_url": CONFIG_URL,
+        "login_url": f"/admin/login/?next={CONFIG_URL}",
+        "anonymous": not request.user.is_authenticated,
+    }, status=status)
+
+
+@require_http_methods(["GET"])
 def digikey_oauth_callback(request):
     """
-    РћР±СЂРѕР±Р»СЏС” redirect РІС–Рґ DigiKey РїС–СЃР»СЏ Р°РІС‚РѕСЂРёР·Р°С†С–С— РєРѕСЂРёСЃС‚СѓРІР°С‡Р°.
-    URL: /bots/digikey/oauth-callback/
-    РџР°СЂР°РјРµС‚СЂРё: ?code=... Р°Р±Рѕ ?error=...
+    Повернення з DigiKey після «🔑 Авторизувати» (3-legged OAuth Marketplace).
+    URL: /bots/digikey/oauth-callback/?code=…&state=… або ?error=…
+    code обмінюється на токени лише для людини, що почала авторизацію в цьому ж браузері (state з сесії,
+    bots/oauth.py) і може змінювати налаштування DigiKey; інакше — сторінка з поясненням, токени не змінюються.
     """
+    from bots import oauth
+
+    if not request.user.is_authenticated:
+        return _oauth_refused(request, "Увійдіть у Minerva й натисніть «🔑 Авторизувати» на сторінці DigiKey ще раз.", 403)
+    if not oauth.can_authorize(request.user):
+        oauth.forget(request.session)
+        return _oauth_refused(request, "Авторизувати DigiKey Marketplace може лише той, хто має право змінювати "
+                                       "налаштування DigiKey (адміністратор).", 403)
+
     error = request.GET.get("error")
-    code  = request.GET.get("code")
-
-    if error:
+    if error:                     # DigiKey може не повертати state з помилкою; токени тут не змінюються
+        oauth.forget(request.session)
         request.session["digikey_oauth_error"] = (
-            f"DigiKey РїРѕРІРµСЂРЅСѓРІ РїРѕРјРёР»РєСѓ: {error} вЂ” {request.GET.get('error_description', '')}"
+            f"DigiKey повернув помилку: {error} — {request.GET.get('error_description', '')}"[:300]
         )
-        return redirect("/admin/bots/digikeyconfig/1/change/")
+        return redirect(CONFIG_URL)
 
+    problem = oauth.check_state(request.session, request.GET.get("state", ""))
+    if problem:
+        logger.warning("DigiKey OAuth callback: state %s, user=%s — code не обмінюється",
+                       problem, request.user.get_username())
+        return _oauth_refused(request, oauth.REASONS[problem] + " Натисніть «🔑 Авторизувати» ще раз.", 400)
+
+    code = request.GET.get("code")
     if not code:
-        return HttpResponse("Missing code parameter", status=400)
+        return _oauth_refused(request, "DigiKey не передав код авторизації. Натисніть «🔑 Авторизувати» ще раз.", 400)
 
     from bots.models import DigiKeyConfig
     from bots.services.digikey import exchange_code_for_tokens, DigiKeyAPIError
@@ -82,10 +112,10 @@ def digikey_oauth_callback(request):
     except Exception as e:
         request.session["digikey_oauth_error"] = f"{type(e).__name__}: {e}"
 
-    return redirect("/admin/bots/digikeyconfig/1/change/")
+    return redirect(CONFIG_URL)
 
 
-# в”Ђв”Ђ DigiKey Webhook в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+# ── DigiKey Webhook ───────────────────────────────────────────────────────────
 
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
@@ -93,25 +123,25 @@ def digikey_webhook(request):
     """
     /bots/digikey/webhook/
 
-    GET  вЂ” РІРµСЂРёС„С–РєР°С†С–Р№РЅРёР№ challenge РІС–Рґ DigiKey РїСЂРё СЂРµС”СЃС‚СЂР°С†С–С—:
-           ?challenge=<string> в†’ РїРѕРІРµСЂС‚Р°С”РјРѕ С‚РѕР№ СЃР°РјРёР№ СЂСЏРґРѕРє.
+    GET  — верифікаційний challenge від DigiKey при реєстрації:
+           ?challenge=<string> → повертаємо той самий рядок.
 
-    POST вЂ” РїРѕРґС–СЏ РїСЂРѕ РЅРѕРІРµ/Р·РјС–РЅРµРЅРµ Р·Р°РјРѕРІР»РµРЅРЅСЏ.
-           РџС–РґРїРёСЃ: Р·Р°РіРѕР»РѕРІРѕРє X-DigiKey-Signature (HMAC-SHA256 hex).
-           РЎРёРЅС…СЂРѕРЅС–Р·Р°С†С–СЏ Р·Р°РїСѓСЃРєР°С”С‚СЊСЃСЏ Сѓ С„РѕРЅРѕРІРѕРјСѓ РїРѕС‚РѕС†С– вЂ” РІС–РґРїРѕРІС–РґР°С”РјРѕ 200 РѕРґСЂР°Р·Сѓ.
+    POST — подія про нове/змінене замовлення.
+           Підпис: заголовок X-DigiKey-Signature (HMAC-SHA256 hex).
+           Синхронізація запускається у фоновому потоці — відповідаємо 200 одразу.
     """
     from bots.models import DigiKeyConfig
 
     config = DigiKeyConfig.get()
 
-    # в”Ђв”Ђ GET verification challenge в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    # ── GET verification challenge ────────────────────────────────────────────
     if request.method == "GET":
         challenge = request.GET.get("challenge", "")
         if challenge:
             return HttpResponse(challenge, content_type="text/plain")
         return HttpResponse("DigiKey webhook endpoint OK", content_type="text/plain")
 
-    # в”Ђв”Ђ POST: validate HMAC signature в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    # ── POST: validate HMAC signature ─────────────────────────────────────────
     if config.webhook_secret:
         sig_header = request.headers.get("X-DigiKey-Signature", "")
         expected = hmac.new(
@@ -123,7 +153,7 @@ def digikey_webhook(request):
             logger.warning("DigiKey webhook: invalid HMAC signature")
             return HttpResponse("Forbidden", status=403)
 
-    # в”Ђв”Ђ Parse payload в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    # ── Parse payload ─────────────────────────────────────────────────────────
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
@@ -145,7 +175,7 @@ def digikey_webhook(request):
     if not config.webhook_enabled:
         return HttpResponse("OK", status=200)
 
-    # в”Ђв”Ђ Sync Сѓ С„РѕРЅРѕРІРѕРјСѓ РїРѕС‚РѕС†С– вЂ” РЅРµ Р±Р»РѕРєСѓС”РјРѕ DigiKey в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    # ── Sync у фоновому потоці — не блокуємо DigiKey ─────────────────────────
     import threading
 
     def _sync():
@@ -172,8 +202,8 @@ from django.shortcuts import get_object_or_404
 def digikey_packlist(request, order_pk):
     """
     GET /bots/digikey/packlist/<order_pk>/
-    Р“РµРЅРµСЂСѓС” PDF РїР°РєСѓРІР°Р»СЊРЅРѕРіРѕ Р»РёСЃС‚Р° Сѓ С„РѕСЂРјР°С‚С– DigiKey, РІРёРєРѕСЂРёСЃС‚РѕРІСѓСЋС‡Рё
-    Р¶РёРІС– РґР°РЅС– Р· Marketplace API (РЅРµ Р· Р»РѕРєР°Р»СЊРЅРѕС— Р‘Р”).
+    Генерує PDF пакувального листа у форматі DigiKey, використовуючи
+    живі дані з Marketplace API (не з локальної БД).
     """
     from sales.models import SalesOrder
     from bots.models import DigiKeyConfig
@@ -181,7 +211,7 @@ def digikey_packlist(request, order_pk):
     order  = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
     config = DigiKeyConfig.get()
 
-    # в”Ђв”Ђ Fetch live order data from DigiKey Marketplace API в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    # ── Fetch live order data from DigiKey Marketplace API ────────────────────
     api_order = {}
     fetch_error = None
     try:
@@ -193,16 +223,16 @@ def digikey_packlist(request, order_pk):
 
     if not api_order:
         return HttpResponse(
-            f"<h3>РќРµ РІРґР°Р»РѕСЃСЏ РѕС‚СЂРёРјР°С‚Рё РґР°РЅС– Р·Р°РјРѕРІР»РµРЅРЅСЏ Р· DigiKey API</h3>"
+            f"<h3>Не вдалося отримати дані замовлення з DigiKey API</h3>"
             f"<p>Order: <b>{order.order_number}</b></p>"
-            f"<pre>{fetch_error or 'РџРѕСЂРѕР¶РЅСЏ РІС–РґРїРѕРІС–РґСЊ API'}</pre>"
-            f"<p>РџРµСЂРµРєРѕРЅР°Р№СЃСЏ С‰Рѕ Marketplace Р°РІС‚РѕСЂРёР·РѕРІР°РЅРёР№ "
+            f"<pre>{fetch_error or 'Порожня відповідь API'}</pre>"
+            f"<p>Переконайся що Marketplace авторизований "
             f"(<a href='/admin/bots/digikeyconfig/1/change/'>DigiKey Config</a>).</p>",
             content_type="text/html; charset=utf-8",
             status=502,
         )
 
-    # в”Ђв”Ђ Supplier address from AccountingSettings (our registered data) в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    # ── Supplier address from AccountingSettings (our registered data) ─────────
     supplier = {"name": "Supplier", "street": "", "city_zip": "", "country": ""}
     try:
         from accounting.models import CompanySettings
@@ -217,14 +247,14 @@ def digikey_packlist(request, order_pk):
     except Exception:
         pass
 
-    # в”Ђв”Ђ Generate PDF в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ
+    # ── Generate PDF ──────────────────────────────────────────────────────────
     try:
         from bots.services.digikey_pdf import generate_digikey_packing_list
         buf       = generate_digikey_packing_list(api_order, supplier)
         pdf_bytes = buf.getvalue()
     except Exception as e:
         return HttpResponse(
-            f"<h3>РџРѕРјРёР»РєР° РіРµРЅРµСЂР°С†С–С— PDF</h3><pre>{type(e).__name__}: {e}</pre>",
+            f"<h3>Помилка генерації PDF</h3><pre>{type(e).__name__}: {e}</pre>",
             content_type="text/html; charset=utf-8",
             status=500,
         )
@@ -363,8 +393,8 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
 @staff_member_required
 def digikey_ship_order(request, order_pk):
     """
-    GET  /bots/digikey/ship/<order_pk>/  вЂ” С„РѕСЂРјР° РїС–РґС‚РІРµСЂРґР¶РµРЅРЅСЏ РІС–РґРїСЂР°РІР»РµРЅРЅСЏ
-    POST                                 вЂ” РІРёРєР»РёРє ShipOrder API в†’ РѕРЅРѕРІР»РµРЅРЅСЏ СЃС‚Р°С‚СѓСЃСѓ
+    GET  /bots/digikey/ship/<order_pk>/  — форма підтвердження відправлення
+    POST                                 — виклик ShipOrder API → оновлення статусу
     """
     from django.contrib import messages as msg
     from django.shortcuts import render, redirect
@@ -399,7 +429,7 @@ def digikey_ship_order(request, order_pk):
 
         return redirect(f"/admin/sales/salesorder/{order_pk}/change/")
 
-    # GET вЂ” РїРѕРєР°Р·Р°С‚Рё С„РѕСЂРјСѓ; РїС–РґС‚СЏРіСѓС”РјРѕ СЃРїРёСЃРѕРє carriers С– РґРµС‚Р°Р»С– Р·Р°РјРѕРІР»РµРЅРЅСЏ Р· DigiKey API
+    # GET — показати форму; підтягуємо список carriers і деталі замовлення з DigiKey API
     carriers      = []
     order_details = []
     has_token = bool(config.marketplace_access_token)

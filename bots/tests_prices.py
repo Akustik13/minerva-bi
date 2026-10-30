@@ -545,3 +545,114 @@ class OfferMatchTests(PriceBase):
         self.assertContains(compare, "RF Filter (1)")
         self.assertContains(compare, 'data-cat="RF Filter"')
         same.refresh_from_db()
+
+
+class TierSafetyTests(PriceBase):
+    """Запобіжник автооновлення бачить нові й прибрані ступені: ціна кожної кількості — проти ціни DigiKey,
+    що зараз діє на цю кількість (а не лише ступені, що є з обох боків)."""
+
+    def setUp(self):
+        super().setUp()
+        self.s.auto_mode, self.s.max_change_pct, self.s.notify_telegram, self.s.notify_email = "apply", D("20"), False, False
+        self.s.save()
+
+    def test_changes_compare_every_quantity(self):
+        self.assertEqual(svc._changes([(1, D("10"))], [(1, D("10")), (100, D("0.10"))]),
+                         (D("0.00"), D("99.00"), 100))                     # новий ступінь: 100 шт по 10 → 0.10
+        self.assertEqual(svc._changes([(1, D("10")), (10, D("9"))], [(1, D("10"))]),
+                         (D("0.00"), D("11.11"), 10))                      # прибраний: 10 шт по 9 → по 10
+        self.assertEqual(svc._changes([(1, D("10")), (10, D("9"))], [(1, D("10")), (100, D("9"))]),
+                         (D("0.00"), D("11.11"), 10))                      # пересунутий 10 → 100
+        self.assertEqual(svc._changes([], [(1, D("10"))]), (None, None, None))
+        l = self.listing(self.product("T-1", [(1, 10), (100, "0.10")]), "t1", [(1, 10)])
+        r = self.row(l)
+        self.assertEqual(r.new, [(1, D("10.00")), (100, D("0.10"))])
+        self.assertEqual((r.change_pct, r.max_change_pct, r.max_change_qty, r.direction),
+                         (D("0.00"), D("99.00"), 100, "down"))
+        self.assertEqual(svc.change_where(r), " (100 шт — новий ступінь)")
+        same_price = self.listing(self.product("T-9", [(1, 10), (50, 10)]), "t9", [(1, 10)])
+        self.assertEqual(self.row(same_price).direction, "tiers")        # кількості інші, ціни ті самі
+
+    def test_auto_holds_wrong_new_or_removed_tier(self):
+        self.listing(self.product("T-1", [(1, 10), (100, "0.10")]), "t1", [(1, 10)])     # 100 шт: −99 %
+        self.listing(self.product("T-2", [(1, 10), (100, 9)]), "t2", [(1, 10)])           # 100 шт: −10 %
+        self.listing(self.product("T-3", [(1, 10)]), "t3", [(1, 10), (10, 5)])            # 10 шт: 5 → 10, +100 %
+        svc.auto()
+        run = DigiKeyPriceRun.objects.get()
+        self.assertEqual(dict(run.lines.values_list("sku", "status")), {"T-1": "held", "T-2": "sent", "T-3": "held"})
+        self.assertIn("зміна 99 % > 20 % (100 шт — новий ступінь)", run.lines.get(sku="T-1").notes[-1])
+        self.assertIn("зміна 100 % > 20 % (10 шт — ступінь прибрано)", run.lines.get(sku="T-3").notes[-1])
+        self.assertEqual(run.lines.get(sku="T-1").max_change_pct, D("99.00"))
+        self.assertEqual([p[0] for p in self.dk.puts], ["t2"])                       # лише в межах 20 %
+
+    def test_page_and_report_show_new_tier_change(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("adm", "adm@example.com", "p"))
+        p = self.product("T-1", [(1, 10), (100, "0.10")])
+        self.listing(p, "t1", [(1, 10)])
+        page = self.client.get("/admin/bots/digikeypricerun/compare/")
+        self.assertContains(page, '<div class="dp-added dp-down" title="новий ступінь; зараз на DigiKey 100 шт — по 10.00">')
+        self.assertContains(page, "<em>−99 %</em>")
+        self.assertContains(page, "до ±99 % (100 шт)")
+        self.assertContains(self.client.get(f"/admin/inventory/product/{p.pk}/change/"),
+                            "(+0 %, до ±99 % для 100 шт)")
+        line = DigiKeyPriceChange(old_prices=[{"qty": 1, "price": "10"}, {"qty": 10, "price": "9"}],
+                                  new_prices=[{"qty": 1, "price": "10"}, {"qty": 100, "price": "0.1"}])
+        self.assertEqual([t["text"] for t in svc.tier_changes(line)],
+                         ["без змін", "ступінь прибрано · стане 10.00 (+11.11 %)", "новий ступінь · −98.89 % від 9.00"])
+
+
+class HeartbeatTests(PriceBase):
+    """Довге надсилання подає ознаку роботи після кожної позиції — cron не надсилає його вдруге."""
+
+    def setUp(self):
+        super().setUp()
+        self.s.notify_telegram = self.s.notify_email = False
+        self.s.save()
+
+    def sending(self, started, beat):
+        run = svc.create_run(svc.plan(), user="anna")
+        DigiKeyPriceRun.objects.filter(pk=run.pk).update(status=DigiKeyPriceRun.SENDING, started_at=started,
+                                                         heartbeat_at=beat)
+        return run
+
+    def test_long_run_with_heartbeat_is_not_resent(self):
+        self.listing(self.product("H-1", [(1, 6)]), "h1", [(1, 5)])
+        now = timezone.now()
+        run = self.sending(now - timedelta(hours=2), now - timedelta(minutes=1))     # почато давно, але працює
+        self.assertEqual(svc.resume_stuck(), 0)
+        self.assertIsNone(svc.push_run(run.pk))
+        self.assertFalse(self.dk.puts)
+        DigiKeyPriceRun.objects.filter(pk=run.pk).update(heartbeat_at=now - timedelta(minutes=svc.STUCK_MINUTES + 1))
+        self.assertEqual(svc.resume_stuck(), 1)                                      # процес справді зупинився
+        self.assertEqual(len(self.dk.puts), 1)
+        run.refresh_from_db()
+        self.assertEqual(run.status, DigiKeyPriceRun.SENT)
+        self.assertGreaterEqual(run.heartbeat_at, run.started_at)
+        self.assertEqual(DigiKeyPriceLog.objects.count(), 1)
+
+    def test_old_run_without_heartbeat_is_resumed(self):
+        self.listing(self.product("H-1", [(1, 6)]), "h1", [(1, 5)])
+        self.sending(timezone.now() - timedelta(minutes=svc.STUCK_MINUTES + 1), None)
+        self.assertEqual(svc.resume_stuck(), 1)
+        self.assertEqual(len(self.dk.puts), 1)
+
+    def test_taken_over_run_stops_before_next_put(self):
+        self.listing(self.product("L-1", [(1, 6)]), "l1", [(1, 5)])
+        self.listing(self.product("L-2", [(1, 6)]), "l2", [(1, 5)])
+        run = svc.create_run(svc.plan(), user="anna")
+        put = self.dk.put
+
+        def put_then_taken(offer_id, payload):            # під час PUT оновлення забрав інший процес (cron)
+            out = put(offer_id, payload)
+            DigiKeyPriceRun.objects.filter(pk=run.pk).update(started_at=timezone.now() + timedelta(seconds=5))
+            return out
+
+        with mock.patch.object(svc, "_put_offer", put_then_taken):
+            self.assertIsNone(svc.push_run(run.pk))
+        self.assertEqual(len(self.dk.puts), 1)                                       # другий PUT не пішов
+        self.assertEqual(sorted(run.lines.values_list("status", flat=True)), ["queued", "sent"])
+        self.assertEqual(DigiKeyPriceLog.objects.count(), 1)

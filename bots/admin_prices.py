@@ -78,23 +78,43 @@ def _auto_refresh(request, listings, force: bool) -> str:
 
 # ── Відображення рядків ───────────────────────────────────────────────────────
 
+def _cells(dk, new):
+    """Ступені «зараз на DigiKey» і «стане» з % для кожної кількості — як svc.tier_compare (його ж бачить запобіжник
+    автооновлення): новий ступінь — % до ціни DigiKey, що зараз діє на цю кількість, прибраний — підказка, скільки
+    стане. new None — нових цін немає."""
+    eff = {c["qty"]: c for c in svc.tier_compare(dk, new)}
+    old, new_q = dict(dk), {q for q, _ in new or []}
+
+    def pct(c):
+        return f"{svc.fmt_signed(c['pct'])} %" if c and c["pct"] is not None and c["new"] != c["old"] else ""
+
+    cells = []
+    for q, p in new or []:
+        c, was = eff.get(q), old.get(q)
+        cell = {"qty": q, "price": svc.fmt_price(p), "pct": pct(c), "dir": "", "title": ""}
+        if was is not None:
+            cell["cls"] = "same" if was == p else ("up" if p > was else "down")
+        else:
+            cell["cls"] = "added"
+            if cell["pct"]:
+                cell["dir"] = "up" if c["new"] > c["old"] else "down"
+                cell["title"] = f"новий ступінь; зараз на DigiKey {q} шт — по {svc.fmt_price(c['old'])}"
+        cells.append(cell)
+    dk_cells = []
+    for q, p in dk:
+        gone = new is not None and q not in new_q
+        title = ""
+        if gone:
+            title = "цього ступеня не буде"
+            if pct(eff.get(q)):
+                title += f" — {q} шт стане по {svc.fmt_price(eff[q]['new'])} ({pct(eff[q])})"
+        dk_cells.append({"qty": q, "price": svc.fmt_price(p), "gone": gone, "title": title})
+    return {"dk": dk_cells, "new": cells}
+
+
 def _tier_cells(row):
     """Для шаблону: ступені «зараз», «Minerva», «стане» з % для кожної кількості."""
-    old = dict(row.dk)
-    new = []
-    for q, p in row.new or []:
-        was = old.get(q)
-        pct = None if not was else (p / was - 1) * 100
-        cls = "same" if was == p else ("up" if was is not None and p > was else
-                                       "down" if was is not None else "added")
-        new.append({"qty": q, "price": svc.fmt_price(p),
-                    "pct": "" if pct is None or was == p else f"{svc.fmt_signed(pct)} %", "cls": cls})
-    gone = [q for q in old if row.new is not None and q not in dict(row.new)]
-    return {
-        "dk": [{"qty": q, "price": svc.fmt_price(p), "gone": q in gone} for q, p in row.dk],
-        "minerva": [{"qty": q, "price": svc.fmt_price(p)} for q, p in row.minerva],
-        "new": new,
-    }
+    return {**_cells(row.dk, row.new), "minerva": [{"qty": q, "price": svc.fmt_price(p)} for q, p in row.minerva]}
 
 
 def _categories():
@@ -125,8 +145,11 @@ def _row_view(row, cur, cats=None):
         "pk": listing.pk,
         "product_url": reverse("admin:inventory_product_change", args=[listing.product_id]) if listing.product_id else "",
         "listing_url": reverse("admin:bots_digikeylisting_change", args=[listing.pk]),
-        "change": "" if row.change_pct is None else f"{svc.fmt_signed(row.change_pct)} %",
-        "max_change": "" if row.max_change_pct is None else f"{svc.fmt_num(row.max_change_pct)} %",
+        "change": "" if not row.change_pct else f"{svc.fmt_signed(row.change_pct)} %",     # 1-й ступінь
+        # найбільша зміна (і на новому / прибраному ступені) — коли вона більша, ніж на 1-му ступені
+        "max_change": "" if row.max_change_pct is None or (
+            row.change_pct is not None and row.max_change_pct <= abs(row.change_pct))
+        else f"{svc.fmt_num(row.max_change_pct)} % ({row.max_change_qty} шт)",
         "rate": "" if row.rate in (None, Decimal(1)) else f"1 {row.minerva_currency} = {svc.fmt_num(row.rate) if row.rate >= 1 else format(row.rate.normalize(), 'f')} {cur}",
         "search": f"{row.sku} {row.title} {listing.product.sku if listing.product_id else ''}".lower(),
         "own_pct": "" if listing.price_adjust_pct is None else svc.fmt_num(listing.price_adjust_pct),
@@ -485,16 +508,9 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
         lines = list(run.lines.select_related("listing__product"))
         rows = []
         for line in lines:
-            old = dict(svc.tiers_of(line.old_prices))
-            new = []
-            for q, p in svc.tiers_of(line.new_prices):
-                was = old.get(q)
-                new.append({"qty": q, "price": svc.fmt_price(p),
-                            "pct": f"{svc.fmt_signed((p / was - 1) * 100)} %" if was and was != p else "",
-                            "cls": "same" if was == p else ("up" if was and p > was else "down" if was else "added")})
+            cells = _cells(svc.tiers_of(line.old_prices), svc.tiers_of(line.new_prices))
             rows.append({
-                "line": line, "new": new,
-                "old": [{"qty": q, "price": svc.fmt_price(p)} for q, p in svc.tiers_of(line.old_prices)],
+                "line": line, "new": cells["new"], "old": cells["dk"],
                 "minerva": svc.fmt_tiers(svc.tiers_of(line.minerva_prices), line.minerva_currency),
                 "change": "" if line.change_pct is None else f"{svc.fmt_signed(line.change_pct)} %",
                 "color": STATUS_COLORS.get(line.status, "inherit"),
@@ -578,7 +594,11 @@ def product_panel(product) -> str:
     if row.state != "ok":
         lines.append(format_html('<span style="color:var(--warn);font-weight:600">{}</span>', row.state_text))
     elif row.differs:
-        change = f" ({svc.fmt_signed(row.change_pct)} %)" if row.change_pct is not None else ""
+        change = ""
+        if row.change_pct is not None:
+            bigger = row.max_change_pct is not None and row.max_change_pct > abs(row.change_pct)
+            change = (f" ({svc.fmt_signed(row.change_pct)} %"
+                      + (f", до ±{svc.fmt_num(row.max_change_pct)} % для {row.max_change_qty} шт" if bigger else "") + ")")
         lines.append(format_html('З цін Minerva стане: <b>{}</b>{}', svc.fmt_tiers(row.new, cur), change))
         lines += [format_html('<small style="color:var(--text-muted)">{}</small>', n) for n in row.notes]
     else:

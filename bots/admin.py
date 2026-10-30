@@ -425,9 +425,16 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         return redirect(reverse("admin:bots_digikeyconfig_change", args=[1]))
 
     def oauth_start_view(self, request):
-        """Починає 3-legged OAuth flow — редіректить на DigiKey authorization URL."""
+        """Починає 3-legged OAuth flow — редіректить на DigiKey authorization URL з випадковим state (bots/oauth.py):
+        callback прийме code лише з цим state, у цьому браузері й від людини, що може змінювати налаштування DigiKey."""
+        from bots import oauth
         from bots.services.digikey import build_authorize_url
         config = DigiKeyConfig.get()
+
+        if not oauth.can_authorize(request.user):
+            messages.error(request, "❌ Авторизувати DigiKey Marketplace може лише той, хто має право змінювати "
+                                    "налаштування DigiKey (адміністратор).")
+            return redirect(reverse("admin:bots_digikeyconfig_change", args=[1]))
 
         if not config.client_id:
             messages.error(request, "❌ Заповніть Client ID перед авторизацією.")
@@ -442,7 +449,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         )
         request.session["digikey_oauth_redirect_uri"] = redirect_uri
 
-        auth_url = build_authorize_url(config, redirect_uri)
+        auth_url = build_authorize_url(config, redirect_uri, state=oauth.new_state(request.session))
         return redirect(auth_url)
 
     def reconcile_view(self, request):
