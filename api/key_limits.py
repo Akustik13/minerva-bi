@@ -4,8 +4,13 @@
   ip_allowed    «Дозволені IP-адреси» ключа (адреси й мережі CIDR)
   check_quota   «Запитів за годину / добу» (лічильники в спільному кеші, вікна — календарна година / доба)
   shape         відповідь для ключа: лише дозволені поля, «різних записів за добу» (вже бачене — завжди)
-  record        рядок журналу APIRequestLog (api/middleware.APIRequestLogMiddleware) — за «Журналом» ключа
+  record        рядок журналу APIRequestLog (api/middleware.APIRequestLogMiddleware) — за «Журналом» ключа:
+                усі артикули / номери відповіді (object_ids, до OBJECTS_MAX), для змін — назви полів тіла й результат
   usage         що ключ використав зараз (для картки ключа)
+  is_preview    запит «👁 Приклад даних» з картки ключа (api/key_insight.preview): атрибут PREVIEW_ATTR ставить лише
+                сама Minerva на свій внутрішній запит — заголовком чи параметром адреси його не задати. Такий запит
+                не рахується в ліміти й «різних записів за добу», не оновлює last_used, не пише журнал, «Дозволені IP»
+                не перевіряються (перегляд іде з Minerva, а не з адреси програми)
 
 Хвилинний ліміт — api/throttling.APIKeyRateThrottle (свій у ключа або API_RATE_LIMIT).
 """
@@ -24,12 +29,22 @@ logger = logging.getLogger(__name__)
 
 SECRET_PARAMS = ("token", "key", "secret", "password", "session", "sig", "signature", "code")
 IDENT_FIELDS = ("sku", "id", "code", "order_number")
+# що записати в журнал про запис відповіді: артикул, номер замовлення, код (закупівля, локація), інакше id
+LABEL_FIELDS = ("sku", "order_number", "code", "id")
+OBJECTS_MAX = 2000                  # артикулів / номерів в одному рядку журналу (решта — лише в «Записів»)
 LOG_DAYS = int(getattr(settings, "API_LOG_DAYS", 60) or 60)
+PREVIEW_ATTR = "_minerva_key_preview"
 
 
 def _cache():
     from core.shared_cache import cache
     return cache
+
+
+def is_preview(request) -> bool:
+    """Запит «👁 Приклад даних» (api/key_insight.preview) — лише атрибут, який Minerva ставить сама."""
+    target = getattr(request, "_request", request)
+    return getattr(target, PREVIEW_ATTR, False) is True
 
 
 # ── Адреса ────────────────────────────────────────────────────────────────────
@@ -135,6 +150,17 @@ def _ident(item: dict):
     return None
 
 
+def label(item) -> str | None:
+    """Запис відповіді для журналу: «sku:AMP-100», «order_number:WS-1001», «code:PO-12», «id:5»."""
+    if not isinstance(item, dict):
+        return None
+    for name in LABEL_FIELDS:
+        value = item.get(name)
+        if value not in (None, "") and not isinstance(value, (dict, list)):
+            return f"{name}:{str(value)[:100]}"
+    return None
+
+
 def _items(data):
     """(записи, як повернути змінений список, чи це один запис) — або (None, …) для інших відповідей."""
     if isinstance(data, dict) and isinstance(data.get("results"), list):
@@ -179,7 +205,8 @@ def shape(key, data, request=None, response=None):
                 kept.append(item)
             else:
                 hidden += 1
-        cache.set(name, seen, 2 * 86400)
+        if not is_preview(request):                         # «👁 Приклад даних» — лише показати, не рахувати
+            cache.set(name, seen, 2 * 86400)
         if response is not None:
             response["X-Items-Per-Day"] = str(limit)
             response["X-Items-Remaining"] = str(max(0, limit - len(known)))
@@ -190,16 +217,19 @@ def shape(key, data, request=None, response=None):
                 response.status_code = 429
             _note(request, note)
             if request is not None:
-                getattr(request, "_request", request).api_log_sent = (0, [])
+                target = getattr(request, "_request", request)
+                target.api_log_sent = (0, [])
+                target.api_log_code = "daily_items_limit"          # журнал: код відмови, як у відповіді
             return {"detail": f"Ліміт ключа: {limit} різних записів за добу вичерпано. Уже переглянуті сьогодні "
                               "записи доступні й далі; нові — завтра.", "code": "daily_items_limit",
                     "items_per_day": limit}
         items = kept
+    sent = [label(i) for i in items]                        # до «Лише ці поля»: які записи, навіть без їхніх номерів
     if fields:
         items = [{k: v for k, v in item.items() if k in fields} for item in items]
     _note(request, note)
     if request is not None:                                 # журнал — те, що ключ справді отримав
-        getattr(request, "_request", request).api_log_sent = (len(items), [_ident(i) for i in items])
+        getattr(request, "_request", request).api_log_sent = (len(items), sent)
     if kind == "one":
         return items[0]
     if kind == "list":
@@ -240,21 +270,81 @@ def should_log(key, method: str, status: int) -> bool:
     return True
 
 
+def _short(labels) -> str:
+    """Перші 10 артикулів / номерів для колонки «Що» («AMP-100, CABLE-M … +159»)."""
+    values = [i.split(":", 1)[1] for i in labels if i]
+    return (", ".join(values[:10]) + (f" … +{len(values) - 10}" if len(values) > 10 else ""))[:300]
+
+
 def _summary(data):
-    """(скільки записів, перші артикули / номери, код помилки)."""
+    """(скільки записів, усі записи «вид:значення», код помилки)."""
     items, _kind, _single = _items(data)
     code = ""
     if isinstance(data, dict):
         code = str(data.get("code") or "")[:50]
     if items is None:
-        return None, "", code
-    idents = []
-    for item in items:
-        ident = _ident(item)
-        if ident:
-            idents.append(ident.split(":", 1)[1])
-    text = ", ".join(idents[:10]) + (f" … +{len(idents) - 10}" if len(idents) > 10 else "")
-    return len(items), text[:300], code
+        return None, [], code
+    return len(items), [i for i in (label(item) for item in items) if i], code
+
+
+# Що з відповіді на зміну (POST / PATCH / PUT / DELETE) записати в журнал — без тіла запиту (лише назви його полів)
+# і без імен людей: номери, статуси, рух складу, адреса вебхука
+RESULT_FIELDS = ("order_number", "source", "status", "created", "tx_type", "sku", "qty", "location", "available_after",
+                 "payment_status", "payment_method", "ignored_fields", "restocked_transactions", "url", "events",
+                 "is_active", "code", "external_id", "warnings", "duplicate", "account_linked")
+RESULT_TEXT_MAX = 120
+
+
+def _plain(value):
+    """Значення для JSON журналу: Decimal → «12.5», дата → ISO, рядок — до RESULT_TEXT_MAX."""
+    from datetime import date
+    from decimal import Decimal
+    if isinstance(value, Decimal):
+        return format(value.normalize(), "f")
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
+    if isinstance(value, str):
+        return value[:RESULT_TEXT_MAX]
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return str(value)[:RESULT_TEXT_MAX]
+
+
+def _body_fields(request) -> list | int | None:
+    """Назви полів тіла запиту (значення не пишуться); список записів — їх кількість. Лише вже прочитане DRF тіло."""
+    from rest_framework.request import Empty
+    data = getattr(request, "_full_data", Empty)
+    if data is Empty:
+        return None
+    if isinstance(data, list):
+        return len(data)
+    if hasattr(data, "keys"):
+        return sorted(str(k)[:60] for k in data.keys())[:40]
+    return None
+
+
+def _result(drf_request, data, status: int) -> dict | None:
+    """Зміна: які поля надіслав ключ і що Minerva відповіла (номер, статус, рух складу…)."""
+    out = {}
+    fields = _body_fields(drf_request) if drf_request is not None else None
+    if fields:
+        out["fields"] = fields
+    if status < 400 and isinstance(data, dict):
+        for name in RESULT_FIELDS:
+            if name not in data:
+                continue
+            value = data[name]
+            if isinstance(value, list):
+                value = [_plain(v) for v in value[:20]] if name != "restocked_transactions" else len(value)
+            elif isinstance(value, dict):
+                continue
+            out[name] = _plain(value)
+        rows = data.get("results") if isinstance(data.get("results"), list) else []
+        counted = [r for r in rows[:50] if isinstance(r, dict) and "delta" in r]
+        if counted:                                          # POST /stock/count/ — було → стало по кожному товару
+            out["counts"] = [{k: _plain(r.get(k)) for k in ("sku", "location", "previous", "counted", "delta")}
+                             for r in counted]
+    return out or None
 
 
 def record(request, response, started: float, key=None, key_hint: str = ""):
@@ -265,12 +355,12 @@ def record(request, response, started: float, key=None, key_hint: str = ""):
         if key is not None and not should_log(key, request.method, status):
             return None
         data = getattr(response, "data", None)
-        items, objects, code = _summary(data) if data is not None else (None, "", "")
+        items, labels, code = _summary(data) if data is not None else (None, [], "")
         sent = getattr(request, "api_log_sent", None)
-        if sent is not None:
-            idents = [i.split(":", 1)[1] for i in sent[1] if i]
-            items = sent[0]
-            objects = (", ".join(idents[:10]) + (f" … +{len(idents) - 10}" if len(idents) > 10 else ""))[:300]
+        if sent is not None:                                # обмеження ключа — те, що він справді отримав
+            items, labels = sent[0], [i for i in sent[1] if i]
+        code = getattr(request, "api_log_code", "") or code
+        objects = _short(labels)
         note = getattr(request, "api_log_note", "") or ""
         view = ""
         ctx = getattr(response, "renderer_context", None) or {}
@@ -284,11 +374,14 @@ def record(request, response, started: float, key=None, key_hint: str = ""):
             scope = ""
         if not note and status >= 400 and isinstance(data, dict) and data.get("detail"):
             note = str(data["detail"])                      # пояснення відмови — у примітку, код — коротким
+        result = None
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            result = _result(ctx.get("request"), data, status)
         return APIRequestLog.objects.create(
             key=key, key_name=(key.name if key is not None else "")[:100], key_hint=key_hint[:20],
             ip=client_ip(request), method=request.method[:8], path=request.path[:300], query=_query(request),
             view=view[:100], scope=scope[:40], status=status, code=code, items=items, objects_text=objects,
-            note=note[:300],
+            object_ids=labels[:OBJECTS_MAX] if status < 400 else [], result=result, note=note[:300],
             duration_ms=int((time.monotonic() - started) * 1000),
             user_agent=(request.META.get("HTTP_USER_AGENT", "") or "")[:200])
     except Exception:

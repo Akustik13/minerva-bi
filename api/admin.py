@@ -1,5 +1,10 @@
 from django import forms
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseNotAllowed, JsonResponse
+from django.shortcuts import get_object_or_404
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
 from django.utils.html import format_html
 from django.contrib import messages
 from django.utils import timezone
@@ -53,7 +58,7 @@ class APIKeyAdmin(admin.ModelAdmin):
                      'last_used', 'activity_col', 'limits_col', 'expires_at', 'created_at']
     list_filter   = ['is_active']
     search_fields = ['name']
-    readonly_fields = ['key_display', 'created_at', 'last_used', 'usage_display', 'activity_panel']
+    readonly_fields = ['key_display', 'created_at', 'last_used', 'usage_display', 'activity_panel', 'insight_panel']
 
     fieldsets = [
         ('Загальне', {
@@ -62,6 +67,9 @@ class APIKeyAdmin(admin.ModelAdmin):
         ('Права доступу', {
             'fields': ['scopes_input'],
             'description': 'Оберіть які операції дозволені для цього ключа.',
+        }),
+        ('🔍 Що бачить і що може змінити цей ключ', {
+            'fields': ['insight_panel'],
         }),
         ('🛡 Обмеження', {
             'fields': ['allowed_ips', ('limit_minute', 'limit_hour', 'limit_day'), 'items_per_day', 'fields',
@@ -167,13 +175,101 @@ class APIKeyAdmin(admin.ModelAdmin):
             (timezone.localtime(r.created_at).strftime('%d.%m %H:%M:%S'), r.ip or '—', r.method, r.path,
              r.status, r.objects_text or r.note or '') for r in st['recent']))
         return format_html(
-            '<div>Сьогодні: <b>{}</b> запитів{} · за 7 днів: <b>{}</b> · <a href="{}">📜 увесь журнал ключа</a></div>'
+            '<div>Сьогодні: <b>{}</b> запитів{} · за 7 днів: <b>{}</b> · <a href="{}">📜 увесь журнал ключа</a> · '
+            '<a href="{}">📊 Аналіз журналу ключа</a></div>'
             '<div style="margin-top:4px">Адреси за 7 днів: {}</div>'
             '<div style="margin-top:4px">Найчастіше: {}</div>'
             '<table style="margin-top:8px;font-size:12px"><tr><th>Коли</th><th>IP</th><th>Запит</th><th>Код</th>'
             '<th>Що</th></tr>{}</table>',
             st['today'], format_html(', помилок <b style="color:var(--err)">{}</b>', st['today_errors'])
-            if st['today_errors'] else '', st['week'], url, ips, top, recent)
+            if st['today_errors'] else '', st['week'], url,
+            reverse('admin:api_apirequestlog_analysis') + f'?key={obj.pk}', ips, top, recent)
+
+    @admin.display(description='Можливості ключа')
+    def insight_panel(self, obj):
+        if not obj.pk:
+            return '— після збереження —'
+        from .key_insight import capabilities, summary
+        sm = summary(capabilities(obj, detail=False))
+        writes = ', '.join(sm['write_paths'][:6]) + (f' … +{len(sm["write_paths"]) - 6}' if len(sm['write_paths']) > 6 else '')
+        return format_html(
+            '<div>Читає адрес: <b>{}</b> · змінює: <b>{}</b>{} · заборонено правами: {}</div>'
+            '<div style="margin-top:8px"><a class="button" href="{}">🔍 Таблиця можливостей, приклад даних і симуляція</a> '
+            '<a class="button" href="{}">📊 Аналіз журналу ключа</a></div>',
+            sm['read'], sm['write'], format_html(' <small>({})</small>', writes) if writes else '', sm['denied'],
+            reverse('admin:api_apikey_insight', args=[obj.pk]),
+            reverse('admin:api_apirequestlog_analysis') + f'?key={obj.pk}')
+
+    # ── 🔍 Що бачить і що може змінити ключ (api/key_insight.py) ──
+
+    def get_urls(self):
+        view = self.admin_site.admin_view
+        return [
+            path('<int:pk>/insight/', view(self.insight_view), name='api_apikey_insight'),
+            path('<int:pk>/insight/preview/', view(self.preview_view), name='api_apikey_preview'),
+            path('<int:pk>/insight/simulate/', view(self.simulate_view), name='api_apikey_simulate'),
+        ] + super().get_urls()
+
+    def insight_view(self, request, pk):
+        from . import key_insight as ki
+        key = get_object_or_404(APIKey, pk=pk)
+        if not self.has_view_permission(request, key):
+            raise PermissionDenied
+        ctx = ki.KeyContext(key)
+        rows = ki.capabilities(key, ctx)
+        can_run = self.has_change_permission(request, key)
+        context = {
+            **self.admin_site.each_context(request), 'opts': self.model._meta, 'key': key,
+            'title': f'🔍 Що бачить і що може змінити ключ «{key.name}»',
+            'restrictions': ki.restrictions(key, ctx), 'groups': ki.grouped(rows), 'sum': ki.summary(rows),
+            'can_run': can_run, 'preview_max': ki.PREVIEW_MAX_ROWS, 'preview_rows': ki.PREVIEW_ROWS,
+            'preview_choices': [r for r in rows if r['preview'] and r['access'] == 'allowed'],
+            'simulate_choices': [r for r in rows if r['simulate'] and r['access'] == 'allowed'],
+            'examples': ki.examples(rows),
+            'change_url': reverse('admin:api_apikey_change', args=[key.pk]),
+            'log_url': reverse('admin:api_apirequestlog_changelist') + f'?key__id__exact={key.pk}',
+            'analysis_url': reverse('admin:api_apirequestlog_analysis') + f'?key={key.pk}',
+        }
+        return TemplateResponse(request, 'admin/api/apikey/insight.html', context)
+
+    def _run_as_key(self, request, pk):
+        """Запуск від імені ключа — лише POST і лише з правом змінювати ключі API."""
+        if request.method != 'POST':
+            return None, HttpResponseNotAllowed(['POST'])
+        key = get_object_or_404(APIKey, pk=pk)
+        if not self.has_change_permission(request, key):
+            raise PermissionDenied
+        return key, None
+
+    @staticmethod
+    def _audit(request, key, what, target):
+        """Хто дивився дані як ключ — у журнал аудиту Minerva (журнал API — лише дії самих програм)."""
+        try:
+            from core.models import AuditLog
+            AuditLog.log(AuditLog.Action.VIEW, module='api', model_name='apikey', object_id=key.pk,
+                         object_repr=key.name, extra={'what': what, 'path': target[:300]}, request=request)
+        except Exception:  # noqa: BLE001 — аудит не ламає сторінку
+            pass
+
+    def preview_view(self, request, pk):
+        key, refused = self._run_as_key(request, pk)
+        if refused:
+            return refused
+        from .key_insight import preview
+        target = request.POST.get('path', '')
+        result = preview(request, key, target, request.POST.get('query', ''))
+        self._audit(request, key, '👁 Приклад даних як ключ', result.get('url') or target)
+        return JsonResponse(result, json_dumps_params={'ensure_ascii': False})
+
+    def simulate_view(self, request, pk):
+        key, refused = self._run_as_key(request, pk)
+        if refused:
+            return refused
+        from .key_insight import simulate
+        target = request.POST.get('path', '')
+        result = simulate(key, request.POST.get('method', ''), target, request.POST.get('body', ''))
+        self._audit(request, key, '🧪 Симуляція запиту ключа (без запису)', f"{request.POST.get('method', '')} {target}")
+        return JsonResponse(result, json_dumps_params={'ensure_ascii': False})
 
     def scopes_display(self, obj):
         if not obj.scopes:
@@ -323,18 +419,99 @@ class WriteFilter(admin.SimpleListFilter):
 
 @admin.register(APIRequestLog)
 class APIRequestLogAdmin(admin.ModelAdmin):
-    list_display = ['created_at', 'key_col', 'ip', 'request_col', 'status_col', 'what_col', 'duration_ms']
+    list_display = ['created_at', 'key_col', 'plain_col', 'ip', 'request_col', 'status_col', 'what_col',
+                    'duration_ms']
     list_filter = [('key', admin.RelatedOnlyFieldListFilter), StatusClassFilter, WriteFilter, 'method']
     search_fields = ['ip', 'path', 'objects_text', 'key_name', 'key_hint', 'code', 'note', 'user_agent']
     date_hierarchy = 'created_at'
     list_per_page = 100
     list_select_related = ['key']
+    readonly_fields = ['created_at', 'plain_display', 'objects_display', 'result_display']
+    fieldsets = [
+        ('Що сталося', {'fields': ['plain_display']}),
+        ('Хто й звідки', {'fields': ['created_at', 'key', 'key_name', 'key_hint', 'ip', 'user_agent']}),
+        ('Запит', {'fields': ['method', 'path', 'query', 'view', 'scope']}),
+        ('Відповідь', {'fields': ['status', 'code', 'items', 'objects_display', 'result_display', 'note',
+                                  'duration_ms']}),
+    ]
 
     def has_add_permission(self, request):
         return False
 
     def has_change_permission(self, request, obj=None):
         return False
+
+    def changelist_view(self, request, extra_context=None):
+        key = request.GET.get('key__id__exact', '')
+        query = f'key={key}' if key.isdigit() else ''
+        return super().changelist_view(request, {'analysis_query': query, **(extra_context or {})})
+
+    @admin.display(description='Що сталося')
+    def plain_col(self, obj):
+        from .log_analysis import plain_line
+        return format_html('<div style="min-width:240px;max-width:420px;white-space:normal">{}</div>', plain_line(obj))
+
+    @admin.display(description='Що сталося')
+    def plain_display(self, obj):
+        from .log_analysis import plain_line
+        return format_html('<b>{}</b>', plain_line(obj))
+
+    @admin.display(description='Усі записи відповіді')
+    def objects_display(self, obj):
+        """Кожен запис, який ключ отримав, — з посиланням на товар / замовлення в Minerva."""
+        from django.utils.html import format_html_join
+        from .log_analysis import record_links
+        records = record_links(obj)
+        if not records:
+            return obj.objects_text or '—'
+        more = (obj.items or 0) - len(records)
+        return format_html(
+            '<div style="max-height:260px;overflow:auto;line-height:1.7">{}</div>{}',
+            format_html_join(', ', '{}', ((format_html('<a href="{}">{}</a>', r['url'], r['value'])
+                                           if r['url'] else r['value'],) for r in records)),
+            format_html('<div style="margin-top:4px"><small>ще {} записів не збережено (ліміт {})</small></div>',
+                        more, len(records)) if more > 0 and obj.object_ids else '')
+
+    @admin.display(description='Що змінилось')
+    def result_display(self, obj):
+        if not obj.result:
+            return '—'
+        return format_html('<pre style="margin:0;font-size:12px;white-space:pre-wrap">{}</pre>',
+                           json.dumps(obj.result, ensure_ascii=False, indent=2))
+
+    # ── 📊 Аналіз журналу (api/log_analysis.py) ──
+
+    def get_urls(self):
+        view = self.admin_site.admin_view
+        return [path('analysis/', view(self.analysis_view), name='api_apirequestlog_analysis')] + super().get_urls()
+
+    def analysis_view(self, request):
+        from . import log_analysis as la
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        params = request.GET
+        start, end, days = la.period(params)
+        qs = la.filtered(params)
+        key = params.get('key', '')
+        if params.get('export') == 'csv':
+            name = f"api-log-{key or 'all'}-{start:%Y%m%d}-{end:%Y%m%d}.csv"
+            return la.csv_response(qs, name)
+        keys = list(APIKey.objects.order_by('name').values('pk', 'name', 'is_active'))
+        selected = next((k for k in keys if str(k['pk']) == key), None)
+        export = request.GET.copy()
+        export['export'] = 'csv'
+        context = {
+            **self.admin_site.each_context(request), 'opts': self.model._meta,
+            'title': '📊 Аналіз журналу API' + (f" — {selected['name']}" if selected else ''),
+            'keys': keys, 'key': key, 'selected': selected, 'start': start, 'end': end, 'days': days,
+            'periods': la.PERIODS, 'st': params.get('st', ''), 'rw': params.get('rw', ''),
+            'a': la.analyse(qs, start, end), 'csv_url': '?' + export.urlencode(),
+            'log_url': reverse('admin:api_apirequestlog_changelist') + (f'?key__id__exact={key}' if key.isdigit() else ''),
+            'key_url': reverse('admin:api_apikey_change', args=[key]) if selected else '',
+            'insight_url': reverse('admin:api_apikey_insight', args=[key]) if selected else '',
+            'records_show': la.RECORDS_SHOW, 'scan_max': la.RECORDS_SCAN_MAX,
+        }
+        return TemplateResponse(request, 'admin/api/apirequestlog/analysis.html', context)
 
     @admin.display(description='Ключ', ordering='key_name')
     def key_col(self, obj):

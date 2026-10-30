@@ -11,6 +11,9 @@ class APIKeyRateThrottle(SimpleRateThrottle):
     scope = 'apikey'
 
     def allow_request(self, request, view):
+        from .key_limits import is_preview
+        if is_preview(request):
+            return True                          # «👁 Приклад даних» — не рахується в ліміт ключа
         key = request.auth if isinstance(request.auth, APIKey) else None
         if key is not None and key.limit_minute:
             self.num_requests, self.duration = key.limit_minute, 60
@@ -29,7 +32,9 @@ class APIKeyQuotaThrottle(BaseThrottle):
         key = request.auth if isinstance(request.auth, APIKey) else None
         if key is None or not (key.limit_hour or key.limit_day):
             return True
-        from .key_limits import check_quota
+        from .key_limits import check_quota, is_preview
+        if is_preview(request):
+            return True
         ok, wait, text = check_quota(key)
         if not ok:
             getattr(request, '_request', request).api_log_note = text

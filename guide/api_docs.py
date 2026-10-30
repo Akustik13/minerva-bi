@@ -123,7 +123,8 @@ def _methods(callback):
 
 
 def endpoints(prefix: str = "") -> list:
-    """[{path, methods: [{method, action, scope, summary, body}]}] для /api/v1/<prefix>…."""
+    """[{path, view, cls, methods: [{method, action, scope, summary, body}]}] для /api/v1/<prefix>….
+    cls — клас в'юшки (ним користується api/key_insight.py: права, поля, що робить запис для конкретного ключа)."""
     from api import urls as api_urls
     from api.permissions import HasAPIKeyScope
     out, seen = [], set()
@@ -151,7 +152,7 @@ def endpoints(prefix: str = "") -> list:
                 or (action.replace("_", " ") if is_viewset else _first_line(cls.__doc__))
             methods.append({"method": method.upper(), "action": action, "scope": scope, "summary": summary,
                             "body": body})
-        out.append({"path": PREFIX + route, "view": cls.__name__, "methods": methods})
+        out.append({"path": PREFIX + route, "view": cls.__name__, "cls": cls, "methods": methods})
     return out
 
 

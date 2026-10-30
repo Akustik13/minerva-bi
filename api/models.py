@@ -205,6 +205,14 @@ class APIRequestLog(models.Model):
     code = models.CharField('Код помилки', max_length=50, blank=True, default='')
     items = models.PositiveIntegerField('Записів', null=True, blank=True)
     objects_text = models.CharField('Артикули / номери', max_length=300, blank=True, default='')
+    object_ids = models.JSONField(
+        'Усі записи відповіді', default=list, blank=True,
+        help_text='«sku:AMP-100», «order_number:WS-1001», «code:PO-12», «id:5» — кожен запис, який ключ отримав '
+                  '(до 2000; більше — лише кількість у «Записів»)')
+    result = models.JSONField(
+        'Що змінилось', null=True, blank=True,
+        help_text='Для POST / PATCH / PUT / DELETE: назви полів тіла запиту (без значень) і що відповіла Minerva — '
+                  'номер, статус, рух складу')
     note = models.CharField('Примітка', max_length=300, blank=True, default='')
     duration_ms = models.PositiveIntegerField('мс', default=0)
     user_agent = models.CharField('Програма', max_length=200, blank=True, default='')
