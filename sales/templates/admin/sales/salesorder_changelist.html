@@ -615,11 +615,7 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
   };
   window.svDymoPrint=function(url,sku){window.svLabel.print(url,sku);};
   window.svDymoOpen=function(url,sku,qty){window.svLabel.open(url,sku,qty);};
-  window.svCaGenThenOpen=function(u,s,q){
-    fetch('/labels/generate/',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({part_no:s,qty:parseInt(q)||1})
-    }).then(function(){svDymoOpen(u,s,q);}).catch(function(){svDymoOpen(u,s,q);});
-  };
+  // (svCaGenThenOpen прибрано: перед друком він перезаписував щойно завантажений файл кабелю шаблоном)
 })();
 
 // ── Quick filter bar ─────────────────────────────────────────────────────────
@@ -976,7 +972,8 @@ function svSetView(mode) {
                   a.title = '🖨️ ' + sku + ' × ' + qty;
                   a.className = 'sv-lbl-btn sv-lbl-on';
                   a.textContent = '🖨️ {% trans "Друкувати" %}';
-                  (function(u,s,q){a.onclick=function(){(s.toUpperCase().startsWith('CA-')?svCaGenThenOpen:svDymoOpen)(u,s,q);};}(_lurl2,sku,qty));
+                  // щойно завантажений файл друкується як є (і кабель CA-… — шаблон його не перезаписує)
+                  (function(u,s,q){a.onclick=function(){svDymoOpen(u,s,q);};}(_lurl2,sku,qty));
                   var _dl2 = document.createElement('button');
                   _dl2.type = 'button';
                   _dl2.title = '⬇️ {% trans "Скачати" %} ' + sku;

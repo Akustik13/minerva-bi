@@ -334,7 +334,12 @@
         <input type="hidden" name="pickup_location" id="fld_pickup_location" value="reception">
       </form>
       <script>
-      document.getElementById('dhl-confirm-form').addEventListener('submit', function(){
+      document.getElementById('dhl-confirm-form').addEventListener('submit', function(e){
+        // Друге натискання не надсилаємо (сервер теж не оформить відправлення вдруге)
+        if (this.dataset.sent) { e.preventDefault(); return; }
+        this.dataset.sent = '1';
+        var _btn = document.querySelector('button[form="dhl-confirm-form"]');
+        if (_btn) { _btn.disabled = true; _btn.textContent = '⏳ {% trans "Оформлюється…" %}'; }
         var isPickup = document.getElementById('pt_pickup').checked;
         document.getElementById('fld_pickup_type').value     = isPickup ? 'pickup' : 'dropoff';
         document.getElementById('fld_pickup_date').value     = document.getElementById('inp_pickup_date').value;

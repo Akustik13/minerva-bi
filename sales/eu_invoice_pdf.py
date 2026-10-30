@@ -586,8 +586,5 @@ def generate_eu_invoice(
     return buf.getvalue()
 
 
-def get_next_invoice_number() -> int:
-    from django.db.models import Max
-    from sales.models import SalesOrder
-    result = SalesOrder.objects.aggregate(m=Max("eu_invoice_number"))["m"]
-    return (result or 0) + 1
+# Номери рахунків — sales/eu_invoice_numbers.py (без reportlab); ім'я лишається для старих імпортів
+from sales.eu_invoice_numbers import get_next_invoice_number  # noqa: E402,F401

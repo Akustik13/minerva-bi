@@ -1085,7 +1085,7 @@ document.addEventListener('DOMContentLoaded',function(){
       if(!this.files.length)return;
       var formData=new FormData();
       formData.append('labels',this.files[0]);
-      var csrf=(document.querySelector('[name=csrfmiddlewaretoken]')||{}).value||'';
+      var csrf=(document.querySelector('[name=csrfmiddlewaretoken]')||{}).value||(document.cookie.match(/csrftoken=([^;]+)/)||[])[1]||'';
       if(resultEl)resultEl.innerHTML='<span style="color:#ff9800">⏳ Завантаження...</span>';
       fetch('/labels/upload/',{method:'POST',headers:{'X-CSRFToken':csrf},body:formData})
       .then(function(r){return r.json();})

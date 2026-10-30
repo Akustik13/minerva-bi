@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 
-from django.db import models
-from django.db.models import Sum, F
+from django.db import models, transaction
+from django.db.models import Sum
 
 
 # ── CompanySettings (Singleton) ────────────────────────────────────────────────
@@ -144,14 +144,30 @@ class Invoice(models.Model):
         return self.number or f"Invoice #{self.pk}"
 
     def save(self, *args, **kwargs):
-        if not self.number:
-            cfg = CompanySettings.get()
-            self.number = f"{cfg.invoice_prefix}-{date.today().year}-{cfg.next_number:04d}"
-            # Atomic increment — уникаємо race condition
-            CompanySettings.objects.filter(pk=1).update(
-                next_number=F("next_number") + 1
-            )
-        super().save(*args, **kwargs)
+        if self.number:
+            return super().save(*args, **kwargs)
+        # Номер видається під блокуванням рядка налаштувань: два одночасні збереження чекають одне одного,
+        # а не читають той самий next_number (тоді друге падало на unique). Номер, уже зайнятий (лічильник
+        # змінили назад), пропускається; не збереглось — лічильник відкочується разом із рахунком.
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = {*kwargs["update_fields"], "number"}
+        CompanySettings.get()                                    # рядок-замок має існувати
+        try:
+            with transaction.atomic():
+                cfg = CompanySettings.objects.select_for_update().get(pk=1)
+                n = cfg.next_number
+                while Invoice.objects.filter(number=self._format_number(cfg.invoice_prefix, n)).exists():
+                    n += 1
+                self.number = self._format_number(cfg.invoice_prefix, n)
+                CompanySettings.objects.filter(pk=1).update(next_number=n + 1)
+                super().save(*args, **kwargs)
+        except Exception:
+            self.number = ""                                     # номер не видано — наступне збереження візьме новий
+            raise
+
+    @staticmethod
+    def _format_number(prefix: str, n: int) -> str:
+        return f"{prefix}-{date.today().year}-{n:04d}"
 
     # ── Обчислювані поля ──────────────────────────────────────────────────────
 

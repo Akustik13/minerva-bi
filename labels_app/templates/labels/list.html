@@ -175,6 +175,14 @@
       </table>
     </div>
 
+    <label style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;
+                  color:var(--text);cursor:pointer">
+      <input type="checkbox" id="genSave" checked> 💾 Зберегти файл у базі етикеток
+    </label>
+    <p style="margin:4px 0 0 24px;font-size:11px;color:var(--text-dim)">
+      Лише для кабелів. Без галочки етикетка складається з шаблону й лише завантажується. Файл цього артикула,
+      що вже є в базі (можливо, виправлений вручну), замінюється тільки після підтвердження.</p>
+
     <div id="genError" style="display:none;margin-top:12px;padding:8px 12px;
          background:rgba(198,40,40,.15);border:1px solid var(--err,#c62828);border-radius:6px;
          color:var(--err,#c62828);font-size:13px"></div>
@@ -215,6 +223,7 @@ function closeGenModal() {
   document.getElementById('genError').style.display = 'none';
   document.getElementById('genPartNo').value = '';
   document.getElementById('genQty').value = '1';
+  document.getElementById('genSave').checked = true;
   _previewOk = false;
   document.getElementById('genBtn').disabled = true;
   document.getElementById('genBtn').style.opacity = '.5';
@@ -288,18 +297,36 @@ function doGenerate() {
   btn.textContent = '⏳ Генерація...';
   btn.disabled = true;
 
-  fetch('/labels/generate/', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-    body: JSON.stringify({ part_no: pn, qty: qty }),
-  })
-  .then(function (r) { return r.json(); })
+  // «💾 Зберегти файл у базі» — файл пишеться лише з галочкою; наявний (міг бути виправлений вручну) —
+  // тільки після підтвердження. Без галочки етикетка складається з шаблону й лише завантажується.
+  var save = document.getElementById('genSave').checked;
+  function send(overwrite) {
+    return fetch('/labels/generate/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+      body: JSON.stringify({ part_no: pn, qty: qty, save: save, overwrite: !!overwrite }),
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.exists && !overwrite) {
+        if (confirm('Файл ' + d.filename + ' уже є в базі етикеток — можливо, його виправляли вручну.\n\n'
+                    + 'Замінити його етикеткою з шаблону?\n(Скасувати — лише завантажити, файл у базі не зміниться.)')) {
+          return send(true);
+        }
+        save = false;
+        return send(false);
+      }
+      return d;
+    });
+  }
+  send(false)
   .then(function (d) {
     btn.textContent = '🖨️ Згенерувати та завантажити';
     btn.disabled = false;
     if (d.ok) {
       window.location.href = d.download_url;
-      setTimeout(function () { location.reload(); }, 1200);
+      if (d.saved) setTimeout(function () { location.reload(); }, 1200);
+      else closeGenModal();
     } else {
       var errEl = document.getElementById('genError');
       errEl.textContent = '❌ ' + (d.error || 'Невідома помилка');

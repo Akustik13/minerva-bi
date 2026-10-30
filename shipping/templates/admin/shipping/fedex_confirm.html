@@ -244,6 +244,15 @@
         {% csrf_token %}
         <input type="hidden" name="service_code" value="{{ service_code }}">
       </form>
+      <script>
+      document.getElementById('fedex-confirm-form').addEventListener('submit', function(e){
+        // Друге натискання не надсилаємо (сервер теж не оформить відправлення вдруге)
+        if (this.dataset.sent) { e.preventDefault(); return; }
+        this.dataset.sent = '1';
+        var _btn = document.querySelector('button[form="fedex-confirm-form"]');
+        if (_btn) { _btn.disabled = true; _btn.textContent = '⏳ {% trans "Оформлюється…" %}'; }
+      });
+      </script>
     </div>
   </div>
 
