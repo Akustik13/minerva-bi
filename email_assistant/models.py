@@ -171,6 +171,8 @@ class EmailMessage(models.Model):
     is_read     = models.BooleanField(default=False)
     is_starred  = models.BooleanField(default=False)
     is_deleted  = models.BooleanField(default=False)
+    # Папка, з якої лист пішов у Кошик (inbox / sent / spam) — «↩ Відновити» повертає його саме туди
+    trashed_from = models.CharField(max_length=20, blank=True, default='', verbose_name='Папка до Кошика')
     is_spam     = models.BooleanField(default=False, db_index=True, verbose_name='Спам')
     attachments = models.JSONField(default=list)
     ai_summary      = models.TextField(blank=True)
@@ -224,6 +226,17 @@ class EmailMessage(models.Model):
 
 
 class EmailDraft(models.Model):
+    """Чернетка листа (email_assistant/drafts.py): «💾 Зберегти» в новому листі, AI-автовідповідь у режимі
+    «чернетка», лист на нове замовлення. Видно в скриньці — «📝 Чернетки»; надіслана — видаляється."""
+    SOURCE_MANUAL     = 'manual'
+    SOURCE_AUTO_REPLY = 'auto_reply'
+    SOURCE_ORDER      = 'order'
+    SOURCE_CHOICES = [
+        (SOURCE_MANUAL,     '✏️ Збережено вручну'),
+        (SOURCE_AUTO_REPLY, '🤖 AI-автовідповідь'),
+        (SOURCE_ORDER,      '🛒 Нове замовлення'),
+    ]
+
     account    = models.ForeignKey(EmailAccount, on_delete=models.CASCADE, related_name='drafts')
     reply_to   = models.ForeignKey(EmailMessage, null=True, blank=True, on_delete=models.SET_NULL, related_name='replies')
     subject    = models.CharField(max_length=500, blank=True)
@@ -231,13 +244,22 @@ class EmailDraft(models.Model):
     cc_emails  = models.JSONField(default=list)
     bcc_emails = models.JSONField(default=list)
     body       = models.TextField(blank=True)
+    body_html  = models.TextField(blank=True, verbose_name='HTML',
+                                  help_text='Текст із форми листа разом із підписом і цитатою; порожньо — лише текст (AI)')
+    # [{file, name, content_type, size}] — файл з комп'ютера в MEDIA; [{ref, name}] — документ Minerva (attachments.py)
     attachments = models.JSONField(default=list)
+    source     = models.CharField(max_length=20, choices=SOURCE_CHOICES, default=SOURCE_MANUAL,
+                                  verbose_name='Звідки')
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'Чернетка'
+        verbose_name_plural = 'Чернетки'
         ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'{self.subject[:50] or "(без теми)"} → {", ".join(self.to_emails[:2])}'
 
 
 class EmailSettings(models.Model):
@@ -376,6 +398,11 @@ class ScheduledEmail(models.Model):
     cc_emails    = models.JSONField(default=list, verbose_name='Копія')
     body         = models.TextField(blank=True, verbose_name='Текст')
     body_html    = models.TextField(blank=True, verbose_name='HTML')
+    # Як у чернетці: файли з комп'ютера збережено в MEDIA, документи Minerva (order:/msg:/offer:) читаються
+    # під час відправки (email_assistant/attachments.py)
+    attachments  = models.JSONField(default=list, blank=True, verbose_name='Вкладення')
+    reply_to     = models.ForeignKey(EmailMessage, null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name='scheduled_replies', verbose_name='Відповідь на лист')
     scheduled_at = models.DateTimeField(verbose_name='Час відправки', db_index=True)
     status       = models.CharField(max_length=20, choices=STATUS_CHOICES,
                                     default=STATUS_PENDING, db_index=True,
@@ -494,6 +521,8 @@ class EmailRule(models.Model):
             if not msg.is_starred:
                 msg.is_starred = True; changed.append('is_starred')
         elif self.action == self.ACTION_TRASH:
+            if msg.folder != EmailMessage.FOLDER_TRASH:
+                msg.trashed_from = msg.folder; changed.append('trashed_from')   # «↩ Відновити» — сюди
             msg.folder = EmailMessage.FOLDER_TRASH; changed.append('folder')
         elif self.action == self.ACTION_ADD_CALENDAR:
             try:

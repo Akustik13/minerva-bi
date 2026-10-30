@@ -1,7 +1,7 @@
 """email_assistant/signals.py — cross-app triggers for email events."""
 import logging
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 logger = logging.getLogger('email_assistant')
@@ -56,11 +56,20 @@ def order_email_draft(sender, instance, created, **kwargs):
             subject=subject,
             to_emails=[customer.email],
             body=body,
+            source=EmailDraft.SOURCE_ORDER,
         )
         logger.info('Order draft created for order pk=%s customer=%s', instance.pk, customer.email)
 
     except Exception as exc:
         logger.error('order_email_draft signal error: %s', exc)
+
+
+@receiver(post_delete, sender='email_assistant.EmailDraft')
+@receiver(post_delete, sender='email_assistant.ScheduledEmail')
+def remove_stored_attachments(sender, instance, **kwargs):
+    """Чернетку / запланований лист видалено (надіслано, «🗑», адмінка, скринька) — їхні файли з MEDIA теж."""
+    from email_assistant.attachments import remove_stored
+    remove_stored(instance.attachments or [])
 
 
 @receiver(post_save, sender='email_assistant.EmailMessage')

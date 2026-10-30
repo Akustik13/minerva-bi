@@ -559,7 +559,7 @@ class ScheduledEmailAdmin(admin.ModelAdmin):
     form                = ScheduledEmailComposeForm
     change_form_template = 'admin/email_assistant/scheduledemail/change_form.html'
 
-    list_display    = ('subject_col', 'account', 'to_col', 'status', 'scheduled_at', 'sent_at')
+    list_display    = ('subject_col', 'account', 'to_col', 'att_col', 'status', 'scheduled_at', 'sent_at')
     list_filter     = ('status', 'trigger', 'account')
     search_fields   = ('subject',)
     readonly_fields = ('sent_at', 'error_msg', 'created_at')
@@ -567,6 +567,14 @@ class ScheduledEmailAdmin(admin.ModelAdmin):
     def subject_col(self, obj):
         return obj.subject[:60]
     subject_col.short_description = _('Тема')
+
+    def att_col(self, obj):
+        """Вкладення листа (з «✏️ Написати» → «⏰ Пізніше»): назви файлів у підказці."""
+        names = [i.get('name') or '' for i in obj.attachments or [] if isinstance(i, dict)]
+        if not names:
+            return '—'
+        return format_html('<span title="{}">📎 {}</span>', ', '.join(names), len(names))
+    att_col.short_description = '📎'
 
     def to_col(self, obj):
         return ', '.join(obj.to_emails[:2])

@@ -296,6 +296,7 @@ class Command(BaseCommand):
                 subject=subject,
                 to_emails=to_emails,
                 body=reply_text,
+                source=EmailDraft.SOURCE_AUTO_REPLY,
             )
             logger.info('Auto-reply draft created for uid=%s', em.imap_uid)
         else:
@@ -304,6 +305,7 @@ class Command(BaseCommand):
                 subject=subject,
                 to_emails=to_emails,
                 body=reply_text,
+                reply_to=em,
                 scheduled_at=timezone.now(),
                 trigger='auto_reply',
             )

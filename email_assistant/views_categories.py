@@ -292,7 +292,9 @@ def category_action_view(request, pk):
         msgs = list(_mails(account, cat))   # без Спаму й Кошика — як лічильник у колонці
         _imap_bg_many(account, [(default_imap_folder(account, m), m.imap_uid) for m in msgs if m.imap_uid], 'trash')
         pks = [m.pk for m in msgs]
-        EmailMessage.objects.filter(pk__in=pks).update(folder=EmailMessage.FOLDER_TRASH)
+        from django.db.models import F
+        EmailMessage.objects.filter(pk__in=pks).update(   # trashed_from — куди «↩ Відновити» поверне
+            folder=EmailMessage.FOLDER_TRASH, trashed_from=F('folder'))
         from email_assistant.knowledge_hook import touch
         touch(pks)   # масовий .update() без сигналів → база знань
         return JsonResponse({'ok': True, 'moved': len(pks)})

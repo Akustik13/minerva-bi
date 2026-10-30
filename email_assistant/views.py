@@ -151,7 +151,8 @@ def _save_contacts(user, recipients: list):
             pass
 
 
-_STANDARD_FOLDERS = {'inbox', 'sent', 'starred', 'spam', 'archived', 'trash'}
+_STANDARD_FOLDERS = {'inbox', 'sent', 'drafts', 'starred', 'spam', 'archived', 'trash'}
+DRAFTS_FOLDER = 'drafts'   # «📝 Чернетки» — не листи, а EmailDraft (drafts.py)
 
 
 def _page_range(page, total_pages):
@@ -415,6 +416,14 @@ def _attach_folder_tags(account, emails):
             m.folder_tag = '📥 Вхідні'
 
 
+def _attach_trash_tags(account, emails):
+    """У Кошику — куди «↩ Відновити» поверне лист."""
+    from email_assistant.sync import trash_origin
+    labels = {key: f'{icon} {label}' for key, label, icon in FOLDERS}
+    for m in emails:
+        m.folder_tag = '↩ ' + labels.get(trash_origin(account, m), '📥 Вхідні')
+
+
 def _group_by_thread(qs):
     """Залишити по одному листу на гілку — найновіший серед листів поточного списку."""
     from django.db.models import OuterRef, Q, Subquery
@@ -488,6 +497,7 @@ def _open_projects():
 FOLDERS = [
     ('inbox',    'Вхідні',    '📥'),
     ('sent',     'Надіслані', '📤'),
+    ('drafts',   'Чернетки',  '📝'),
     ('starred',  'Важливі',   '⭐'),
     ('spam',     'Спам',      '🚫'),
     ('archived', 'Архів',     '📦'),
@@ -513,11 +523,14 @@ def inbox_view(request):
     project_filter = _parse_project_filter(request)
     quote_filter = request.GET.get('quote') in ('1', 'all')   # all — ще й оброблені (з Angebot)
     quote_all = request.GET.get('quote') == 'all'
+    # «📝 Чернетки»: список чернеток замість листів (пошук — по чернетках); фільтр лівої колонки — знову листи
+    drafts_view = folder == DRAFTS_FOLDER and not (cat_filter or work_filter or customer_filter or project_filter
+                                                   or quote_filter)
     # Пошук і фільтри «Категорія / Клієнт / Проєкт / Запити» діють по всіх папках (у Спамі й Кошику — лише в них)
     search_all = bool(q or cat_filter or work_filter or customer_filter or project_filter or quote_filter) \
-        and folder not in ('spam', 'trash')
+        and folder not in ('spam', 'trash') and not drafts_view
     qs = _build_qs(account, ALL_FOLDERS if search_all else folder, q)
-    counts_qs = qs if folder in ('spam', 'trash') else _build_qs(account, ALL_FOLDERS, q)
+    counts_qs = qs if folder in ('spam', 'trash') else _build_qs(account, ALL_FOLDERS, '' if drafts_view else q)
     categories, mail_customers = _category_counts(counts_qs)
     from email_assistant.work_categories import counts as _work_counts
     work_categories = _work_counts(counts_qs)
@@ -554,8 +567,20 @@ def inbox_view(request):
     grouped = request.COOKIES.get('em_group') == '1'
     if grouped:
         qs = _group_by_thread(qs)
-    total = qs.count()
-    start = (page - 1) * per_page
+    from email_assistant import drafts as _drafts
+    drafts = []
+    if drafts_view:
+        qs = qs.none()
+        dqs = _drafts.for_account(account, q)
+        total = dqs.count()
+        start = (page - 1) * per_page
+        drafts = list(dqs[start:start + per_page])
+        for d in drafts:
+            d.preview = _drafts.preview(d)
+            d.n_attachments = len(d.attachments or [])
+    else:
+        total = qs.count()
+        start = (page - 1) * per_page
     # rename key to `emails` to avoid shadowing Django messages framework
     emails = list(qs.select_related('thread', 'thread__crm_customer', 'work_category')[start:start + per_page])
     if grouped:
@@ -569,6 +594,8 @@ def inbox_view(request):
     _attach_chips(emails)
     if search_all:
         _attach_folder_tags(account, emails)
+    elif folder == 'trash':
+        _attach_trash_tags(account, emails)
 
     from email_assistant.models import EmailThread as _ET
     _archived_ids = _ET.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
@@ -634,6 +661,9 @@ def inbox_view(request):
         'category_choices':      EmailMessage.CATEGORY_CHOICES,
         'search_all':            search_all,
         'emails':                emails,
+        'drafts_view':           drafts_view,
+        'drafts':                drafts,
+        'drafts_count':          _drafts.count(account),
         'folder':                folder,
         'folders':               FOLDERS,
         'q':                     q,
@@ -1100,10 +1130,32 @@ def compose_view(request):
     reply_to_pk = request.GET.get('reply_to')
     forward_pk  = request.GET.get('forward')
     offer_pk    = request.GET.get('offer')
+    draft_pk    = request.GET.get('draft')
     reply_to    = None
     initial     = {}
+    draft       = None
 
-    if reply_to_pk:
+    if draft_pk and request.method != 'POST':
+        # «📝 Чернетки» → лист у формі: кому, копія, тема, текст, вкладення; відповідь — на свій лист
+        from email_assistant import drafts as _drafts
+        draft = _drafts.get(account, draft_pk)
+        if draft is None:
+            from django.http import Http404
+            raise Http404('Чернетку не знайдено')
+        reply_to = draft.reply_to if draft.reply_to and draft.reply_to.account_id == account.pk else None
+        initial = {'to': ', '.join(draft.to_emails or []), 'cc': ', '.join(draft.cc_emails or []),
+                   'subject': draft.subject, 'att_refs': _drafts.chips(draft)}
+        if draft.body_html:   # збережено з форми листа — разом із підписом і цитатою
+            initial['draft_html'] = _sanitize_quote_html(draft.body_html)
+        else:                 # AI-чернетка (автовідповідь, нове замовлення) — лише текст; підпис і цитата — як завжди
+            initial['body_html'] = _drafts.text_html(draft.body)
+            if reply_to is not None:
+                initial['quote'] = (f'\n\n--- Оригінальний лист ---\nВід: {reply_to.from_email}\n'
+                                    f'{reply_to.body_text[:2000]}')
+                initial['quote_html'] = _build_quote_html(
+                    f'--- Оригінальний лист від {_html.escape(reply_to.from_email)} ---',
+                    reply_to.body_html, reply_to.body_text)
+    elif reply_to_pk:
         from email_assistant.models import EmailMessage
         reply_to = get_object_or_404(EmailMessage, pk=reply_to_pk, account=account)
         subj = _reply_subject(reply_to.subject)
@@ -1145,7 +1197,7 @@ def compose_view(request):
                 continue
             initial[key] = value
 
-    if not (reply_to_pk or forward_pk or offer_pk):   # посилання mailto: з листа — ?to=&cc=&subject=&body=
+    if not (reply_to_pk or forward_pk or offer_pk or draft):   # посилання mailto: з листа — ?to=&cc=&subject=&body=
         for key in ('to', 'cc', 'subject'):
             if request.GET.get(key):
                 initial[key] = request.GET[key][:500]
@@ -1158,8 +1210,9 @@ def compose_view(request):
     sig = _get_signature(account)
 
     return render(request, 'email_assistant/compose.html', _ctx(request, {
-        'title':        'Новий лист' if not reply_to else 'Відповідь',
+        'title':        ('Чернетка' if draft else 'Новий лист') if not reply_to else 'Відповідь',
         'account':      account,
+        'draft':        draft,
         'reply_to':     reply_to,
         'initial':      initial,
         'signature':    sig,
@@ -1198,10 +1251,12 @@ def _handle_send(request, account, reply_to=None):
         attachments.append({'name': f.name, 'content': f.read(), 'content_type': f.content_type})
     # Документи замовлення / вкладення з гілки — браузер передає лише посилання, файли читаємо тут
     from email_assistant.attachments import load_ref
-    for ref in request.POST.getlist('att_ref'):
+    refs, names = request.POST.getlist('att_ref'), request.POST.getlist('att_ref_name')
+    for i, ref in enumerate(refs):   # draft:<pk>:<i> — файл, збережений у чернетці (attachments.load_ref)
         att = load_ref(account, ref)
         if att is None:
-            return JsonResponse({'ok': False, 'error': f'Вкладення недоступне: {ref.split(":")[-1]}'})
+            name = (names[i] if len(names) == len(refs) else '') or ref.split(":")[-1]
+            return JsonResponse({'ok': False, 'error': f'Вкладення недоступне: {name}'})
         attachments.append(att)
 
     result = SMTPClient(account).send(
@@ -1246,6 +1301,9 @@ def _handle_send(request, account, reply_to=None):
         if offer_refs:   # надіслано документ Angebot → версія «надіслана» (незмінна)
             from offers.services import mark_sent_refs
             mark_sent_refs(offer_refs, result.get('message_id', ''))
+        if request.POST.get('draft_pk'):   # лист із чернетки пішов — чернетка (і її файли) більше не потрібна
+            from email_assistant import drafts as _drafts
+            _drafts.discard(account, request.POST['draft_pk'])
 
     return JsonResponse(result)
 
@@ -1319,6 +1377,48 @@ def send_api(request):
             pass
 
     return _handle_send(request, account, reply_to)
+
+
+def _form_reply_to(request, account):
+    """Лист, на який відповідає форма (reply_to_pk) — лише з цієї скриньки."""
+    from email_assistant.models import EmailMessage
+    pk = request.POST.get('reply_to_pk')
+    if not (pk and str(pk).isdigit()):
+        return None
+    return EmailMessage.objects.filter(pk=int(pk), account=account).first()
+
+
+@staff_member_required
+@require_POST
+def draft_save_view(request):
+    """«💾 Зберегти» у формі листа: нова чернетка або та сама (draft_pk) — лист НЕ надсилається."""
+    from email_assistant import drafts as _drafts
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'ok': False, 'error': 'Email акаунт не налаштований'})
+    draft = _drafts.get(account, request.POST.get('draft_pk'))   # видалена в іншій вкладці — нова чернетка
+    try:
+        draft = _drafts.save(
+            account, draft=draft,
+            to=request.POST.get('to', ''), cc=request.POST.get('cc', ''),
+            subject=request.POST.get('subject', ''), body=request.POST.get('body', ''),
+            body_html=request.POST.get('body_html', '').strip(), reply_to=_form_reply_to(request, account),
+            refs=request.POST.getlist('att_ref'), names=request.POST.getlist('att_ref_name'),
+            files=request.FILES.getlist('attachments'))
+    except ValueError as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+    return JsonResponse({'ok': True, 'draft_pk': draft.pk, 'attachments': _drafts.chips(draft),
+                         'saved_at': timezone.localtime(draft.updated_at).strftime('%H:%M')})
+
+
+@staff_member_required
+@require_POST
+def draft_delete_view(request, draft_pk):
+    """🗑 у «📝 Чернетках» — лише своя чернетка (скринька користувача)."""
+    from email_assistant import drafts as _drafts
+    if not _drafts.discard(_get_account(request), draft_pk):
+        return JsonResponse({'ok': False, 'error': 'Чернетку не знайдено'}, status=404)
+    return JsonResponse({'ok': True})
 
 
 @staff_member_required
@@ -1761,7 +1861,9 @@ def unread_count_view(request):
     inbox = base.filter(folder='inbox').filter(_inbox_q(account)).exclude(thread_id__in=archived_ids).count()
     starred = base.filter(is_starred=True).count()
     spam    = base.filter(is_spam=True).count()
-    return JsonResponse({'count': inbox, 'inbox': inbox, 'starred': starred, 'spam': spam})
+    from email_assistant import drafts as _drafts
+    return JsonResponse({'count': inbox, 'inbox': inbox, 'starred': starred, 'spam': spam,
+                         'drafts': _drafts.count(account)})
 
 
 @staff_member_required
@@ -1789,8 +1891,9 @@ def delete_message_view(request, message_pk):
         # Папка на сервері — та, де лежить саме цей лист (UID унікальний лише в межах папки)
         from email_assistant.sync import default_imap_folder
         imap_folder = default_imap_folder(account, msg)
+        msg.trashed_from = msg.folder   # «↩ Відновити» поверне саме сюди
         msg.folder = EmailMessage.FOLDER_TRASH
-        msg.save(update_fields=['folder'])
+        msg.save(update_fields=['folder', 'trashed_from'])
         if msg.imap_uid and imap_folder:
             _imap_bg(account.pk, imap_folder, msg.imap_uid, 'trash')
 
@@ -1800,13 +1903,18 @@ def delete_message_view(request, message_pk):
 @staff_member_required
 @require_POST
 def restore_message_view(request, message_pk):
+    """«↩ Відновити» лист із Кошика — у папку, з якої його видалили (sync.restore_from_trash)."""
     from email_assistant.models import EmailMessage
+    from email_assistant.sync import restore_from_trash
     account = _get_account(request)
     msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
-    msg.folder = EmailMessage.FOLDER_INBOX
-    msg.is_deleted = False
-    msg.save(update_fields=['folder', 'is_deleted'])
-    return JsonResponse({'ok': True})
+    return JsonResponse(_restored_response(restore_from_trash(account, [msg])))
+
+
+def _restored_response(restored: dict) -> dict:
+    labels = {key: f'{icon} {label}' for key, label, icon in FOLDERS}
+    return {'ok': True, 'restored': sum(restored.values()),
+            'folders': [{'folder': f, 'label': labels.get(f, f), 'n': n} for f, n in restored.items()]}
 
 
 @staff_member_required
@@ -1937,26 +2045,37 @@ def ai_generate_email(request):
 @staff_member_required
 @require_POST
 def schedule_email_api(request):
-    """Schedule an email for future delivery."""
+    """«⏰ Пізніше»: лист у чергу send_scheduled. Форма листа (multipart, як «Відправити») — разом із вкладеннями:
+    файли з комп'ютера зберігаються в MEDIA, документи Minerva (order:/msg:/offer:) — посиланням, файл читається
+    під час відправки; файли чернетки (draft:) копіюються, а сама чернетка прибирається. JSON — без вкладень."""
     import json as _json
     from django.utils.dateparse import parse_datetime
     from django.utils import timezone
+    from email_assistant import attachments
     from email_assistant.models import ScheduledEmail
 
     account = _get_account(request)
     if not account:
         return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
 
-    try:
-        data = _json.loads(request.body or b'{}')
-    except ValueError:
-        return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+    is_json = (request.content_type or '').startswith('application/json')
+    if is_json:
+        try:
+            data = _json.loads(request.body or b'{}')
+        except ValueError:
+            return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+        reply_to = None
+    else:
+        data = request.POST
+        reply_to = _form_reply_to(request, account)
 
-    to_raw       = data.get('to', '').strip()
-    subject      = data.get('subject', '').strip()
-    body         = data.get('body', '')
-    body_html    = data.get('body_html', '')
-    scheduled_at = data.get('scheduled_at', '')
+    to_raw       = (data.get('to') or '').strip()
+    subject      = (data.get('subject') or '').strip()
+    if not subject and reply_to:   # як у «Відправити»: відповідь без теми — тема листа, на який відповідаємо
+        subject = _reply_subject(reply_to.subject)
+    body         = data.get('body') or ''
+    body_html    = (data.get('body_html') or '').strip()
+    scheduled_at = data.get('scheduled_at') or ''
 
     if not to_raw or not subject or not scheduled_at:
         return JsonResponse({'ok': False,
@@ -1972,19 +2091,31 @@ def schedule_email_api(request):
                              'error': 'Час відправки має бути в майбутньому'})
 
     to_list   = [e.strip() for e in to_raw.split(',') if e.strip()]
-    cc_list   = [e.strip() for e in data.get('cc', '').split(',') if e.strip()]
+    cc_list   = [e.strip() for e in (data.get('cc') or '').split(',') if e.strip()]
+
+    items = []
+    if not is_json:
+        items, error = attachments.from_form(account, request.POST.getlist('att_ref'),
+                                             request.POST.getlist('att_ref_name'),
+                                             request.FILES.getlist('attachments'), check=True)
+        if error:
+            return JsonResponse({'ok': False, 'error': error})
 
     scheduled = ScheduledEmail.objects.create(
         account=account, subject=subject,
         to_emails=to_list, cc_emails=cc_list,
-        body=body, body_html=body_html,
+        body=body, body_html=body_html, attachments=items, reply_to=reply_to,
         scheduled_at=dt, trigger='manual',
     )
     _save_contacts(request.user, to_list + cc_list)
+    if not is_json and request.POST.get('draft_pk'):   # чернетку заплановано — у листа свої копії файлів
+        from email_assistant import drafts as _drafts
+        _drafts.discard(account, request.POST['draft_pk'])
 
     return JsonResponse({
         'ok':          True,
         'id':          scheduled.pk,
+        'attachments': len(items),
         'scheduled_at': dt.strftime('%d.%m.%Y %H:%M'),
     })
 
@@ -2383,7 +2514,7 @@ def bulk_action_view(request):
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
     action = data.get('action', '')
     pks = [int(p) for p in (data.get('pks') or []) if str(p).isdigit()]
-    if not pks or action not in ('read', 'unread', 'delete', 'archive', 'spam', 'unspam'):
+    if not pks or action not in ('read', 'unread', 'delete', 'archive', 'spam', 'unspam', 'restore'):
         return JsonResponse({'ok': False, 'error': 'Невірні параметри'})
     msgs = EmailMessage.objects.filter(pk__in=pks, account=account)
     if action in ('read', 'unread'):
@@ -2395,7 +2526,12 @@ def bulk_action_view(request):
         _imap_bg_many(account, [(default_imap_folder(account, m), m.imap_uid)
                                 for m in to_trash if m.imap_uid], 'trash')
         msgs.filter(folder=EmailMessage.FOLDER_TRASH).update(is_deleted=True)
-        EmailMessage.objects.filter(pk__in=[m.pk for m in to_trash]).update(folder=EmailMessage.FOLDER_TRASH)
+        from django.db.models import F
+        EmailMessage.objects.filter(pk__in=[m.pk for m in to_trash]).update(   # trashed_from — стара папка
+            folder=EmailMessage.FOLDER_TRASH, trashed_from=F('folder'))
+    elif action == 'restore':   # «↩ Відновити» з Кошика — кожен лист у свою папку
+        from email_assistant.sync import restore_from_trash
+        return JsonResponse(_restored_response(restore_from_trash(account, list(msgs))))
     elif action == 'spam':
         from email_assistant import spam
         result = spam.mark(account, list(msgs))

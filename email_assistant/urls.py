@@ -18,6 +18,9 @@ urlpatterns = [
     # Compose
     path('compose/',                                     views.compose_view,         name='compose'),
     path('send/',                                        views.send_api,             name='send_api'),
+    # Чернетки (drafts.py): «💾 Зберегти» не надсилає; «📝 Чернетки» в скриньці — ?folder=drafts
+    path('draft/save/',                                  views.draft_save_view,      name='draft_save'),
+    path('draft/<int:draft_pk>/delete/',                 views.draft_delete_view,    name='draft_delete'),
     # Sync & counts
     path('sync/',                                        views.sync_now,             name='sync_now'),
     path('unread-count/',                                views.unread_count_view,    name='unread_count'),
