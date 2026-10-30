@@ -216,3 +216,78 @@ class DigiKeyPhotoCopyTests(Base):
         self.l.dk_image_url = dk                                                # стягнуте з DigiKey
         image = dk_media.rows([self.l])[0]["items"][0]
         self.assertEqual((image["action"], image["pick"]), ("dkcopy", False))
+
+
+class ImageOnceTests(Base):
+    """Фото йде на DigiKey на першій публікації або з «🖼 Оновити фото на DigiKey»; інакше — копія DigiKey."""
+
+    COPY = "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8926/MFG_3228_AN-1.jpg"
+
+    def upsert(self):
+        from bots.services import dk_marketplace
+        self.cfg.marketplace_supplier_id = "11111111-2222-3333-4444-555555555555"
+        sent = {}
+
+        def post(url, json=None, **kw):
+            sent.update(json)
+            return mock.Mock(status_code=200, json=lambda: {"_id": "staged-1"}, raise_for_status=lambda: None)
+        with mock.patch.object(dk_marketplace, "get_marketplace_token", return_value="t"), \
+                mock.patch("requests.post", side_effect=post):
+            dk_marketplace.upsert_product(self.cfg, self.l)
+        self.l.refresh_from_db()
+        return sent["imageUrl"]
+
+    def published(self, **kw):
+        DigiKeyListing.objects.filter(pk=self.l.pk).update(dk_offer_id="offer-1", **kw)
+        self.l.refresh_from_db()
+
+    def test_first_publication_sends_our_link(self):
+        self.assertEqual(self.upsert(), "https://old.example.com/AN-1.jpg")
+
+    def test_published_keeps_digikey_copy(self):
+        self.published(dk_image_on_dk=self.COPY)
+        self.assertEqual(self.upsert(), self.COPY)                       # опис / даташит — фото не чіпаємо
+        self.assertEqual(self.l.dk_image_on_dk, self.COPY)
+
+    def test_published_reads_current_photo_from_digikey_once(self):
+        self.published()
+        with mock.patch("bots.services.dk_marketplace.fetch_product_by_sku",
+                        return_value={"imageUrl": self.COPY}) as fetch:
+            self.assertEqual(self.upsert(), self.COPY)
+            self.assertEqual(self.upsert(), self.COPY)
+        self.assertEqual(fetch.call_count, 1)                             # далі — запам'ятована адреса
+
+    def test_update_flag_sends_our_link_once(self):
+        self.published(dk_image_on_dk=self.COPY, dk_image_update=True)
+        self.assertEqual(self.upsert(), "https://old.example.com/AN-1.jpg")
+        self.assertEqual((self.l.dk_image_update, self.l.dk_image_on_dk), (False, ""))
+        with mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value={"imageUrl": self.COPY}):
+            self.assertEqual(self.upsert(), self.COPY)                    # наступного разу — знову копія DigiKey
+
+    def test_compare_page_picks(self):
+        self.published(dk_image_on_dk=self.COPY)
+        dk_media.apply({self.l.pk: {"datasheet"}})
+        self.l.refresh_from_db()
+        self.assertFalse(self.l.dk_image_update)                          # лише даташит — фото не піде
+        dk_media.apply({self.l.pk: {"image"}})
+        self.l.refresh_from_db()
+        self.assertTrue(self.l.dk_image_update)
+
+    def test_changing_photo_link_in_card_ticks_update(self):
+        from django.contrib.admin.sites import site
+        from django.test import RequestFactory
+        admin = site._registry[DigiKeyListing]
+        request = RequestFactory().post("/")
+        request.user = User.objects.create_superuser("root3", "r3@x.y", "p")
+        with mock.patch.object(admin, "message_user"), mock.patch("bots.admin.messages"):
+            self.l.dk_image_url = "https://new.example.com/AN-1.jpg"
+            form = mock.Mock(changed_data=["dk_image_url"])
+            admin.save_model(request, self.l, form, True)
+        self.l.refresh_from_db()
+        self.assertTrue(self.l.dk_image_update)
+
+    def test_what_digikey_sees_treats_copy_as_same(self):
+        from bots.services import dk_view
+        rows = {r["key"]: r for r in dk_view.product_rows(self.l, {"imageUrl": self.COPY, "additionalFields": []})}
+        self.assertEqual(rows["imageUrl"]["state"], "same")
+        self.assertIn("копія DigiKey", rows["imageUrl"]["dk"])

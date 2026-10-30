@@ -178,6 +178,43 @@ def on_digikey(product: dict | None) -> dict:
     return {IMAGE: (product.get("imageUrl") or "").strip(), DATASHEET: sheet}
 
 
+def image_for_upsert(listing, cfg=None) -> tuple[str, bool]:
+    """Яке фото надіслати в upsert і чи це наше посилання (True), чи фото, що вже стоїть на DigiKey (False).
+    Фото йде на DigiKey, поки товар не затверджено (перша публікація), або з `dk_image_update` («🖼 Оновити фото
+    на DigiKey»). Інакше — та сама адреса, що на DigiKey (його копія), щоб надсилання опису / даташита / параметрів
+    не міняло фото: `dk_image_on_dk`, «Фото (URL)» з сервера DigiKey, або свіжий GET товару."""
+    from bots.services.dk_publish import was_published
+    card = (listing.dk_image_url or "").strip()
+    if listing.dk_image_update or not was_published(listing):
+        return card, True
+    keep = (listing.dk_image_on_dk or "").strip() or (card if dk_hosted(card) else "")
+    if not keep:
+        try:
+            from bots.services.dk_marketplace import fetch_product_by_sku
+            prod = fetch_product_by_sku(cfg or config(), listing.get_supplier_sku(), listing.dk_product_id or "")
+            keep = ((prod or {}).get("imageUrl") or "").strip()
+        except Exception as exc:  # noqa: BLE001 — не прочитали: фото DigiKey не відомо
+            logger.warning("DK image keep %s: %s", listing.get_supplier_sku(), exc)
+        if keep:
+            remember_on_dk(listing, keep)
+    return (keep or card), not keep          # на DigiKey фото немає — наше його заповнить
+
+
+def after_upsert(listing, sent_ours: bool) -> None:
+    """Надіслали наше фото — галочку знято, а стара копія DigiKey вже не та (DigiKey зробить нову)."""
+    if sent_ours and (listing.dk_image_update or listing.dk_image_on_dk):
+        type(listing).objects.filter(pk=listing.pk).update(dk_image_update=False, dk_image_on_dk="")
+        listing.dk_image_update, listing.dk_image_on_dk = False, ""
+
+
+def remember_on_dk(listing, url: str) -> None:
+    """Яке фото показує DigiKey (з товару DigiKey) — його й надсилати, коли фото не оновлюємо."""
+    url = (url or "").strip()[:500]
+    if url and listing.pk and listing.dk_image_on_dk != url:
+        type(listing).objects.filter(pk=listing.pk).update(dk_image_on_dk=url)
+        listing.dk_image_on_dk = url
+
+
 def dk_hosted(url: str) -> bool:
     """Фото на сервері DigiKey (mm.digikey.com…) — DigiKey копіює надіслане фото до себе й показує свою копію."""
     from urllib.parse import urlparse
@@ -262,6 +299,9 @@ def apply(picks: dict, cfg=None) -> tuple[int, list]:
             if url and getattr(listing, FIELD[kind]) != url:
                 setattr(listing, FIELD[kind], url)
                 fields.append(FIELD[kind])
+        if IMAGE in picks[listing.pk] and listing.dk_product_id and not listing.dk_image_update:
+            listing.dk_image_update = True          # фото вибрали — воно піде на DigiKey (інакше — ні)
+            fields.append("dk_image_update")
         if fields:
             listing.save(update_fields=fields)
             changed += len(fields)
@@ -321,6 +361,8 @@ def check(listing_ids, user="") -> dict:
     done = []
     for listing in listings:
         dk = on_digikey(products.get(listing.pk)) if products is not None else None
+        if dk and dk.get(IMAGE):
+            remember_on_dk(listing, dk[IMAGE])
         done.append({"listing": listing, "found": products is not None and products.get(listing.pk) is not None,
                      "items": [row(listing, kind, None if dk is None else dk.get(kind, ""), checked, cfg)
                                for kind in KINDS]})

@@ -104,7 +104,17 @@ def _headers(config, token: str) -> dict:
 # ── Products API ─────────────────────────────────────────────────────────────
 
 def upsert_product(config, listing) -> str:
-    """Stage or update a product. Returns DK Product UUID (_id)."""
+    """Stage or update a product. Returns DK Product UUID (_id).
+    Фото — `dk_media.image_for_upsert`: наше посилання лише на першій публікації або з «🖼 Оновити фото на
+    DigiKey»; інакше — те, що вже на DigiKey (його копія), щоб зміна опису чи даташита не міняла фото."""
+    from bots.services.dk_media import after_upsert, image_for_upsert
+    image, ours = image_for_upsert(listing)
+    product_id = _upsert_product(config, listing, image)
+    after_upsert(listing, ours)
+    return product_id
+
+
+def _upsert_product(config, listing, image) -> str:
     import requests as req
 
     token = get_marketplace_token(config)
@@ -129,7 +139,7 @@ def upsert_product(config, listing) -> str:
         "categoryId":       listing.dk_category_id,
         "description":      listing.dk_description,
         "manufacturer":     listing.dk_manufacturer or "",
-        "imageUrl":         listing.dk_image_url or "",
+        "imageUrl":         image or "",
         "additionalFields": additional_fields,
     }
     if listing.dk_product_id:
@@ -1172,6 +1182,9 @@ def pull_product_fields(listing) -> dict:
     _set('dk_description',   (prod.get('description') or ''),  max_len=2048)
     _set('dk_manufacturer',  (prod.get('manufacturer') or ''), max_len=50)
     _set('dk_image_url',     prod.get('imageUrl') or '')
+    if prod.get('imageUrl'):
+        from bots.services.dk_media import remember_on_dk
+        remember_on_dk(listing, prod.get('imageUrl'))
     _set('dk_category_id',   str(prod.get('categoryId') or ''))
 
     # ── Category name from Marketplace API ────────────────────────────────────

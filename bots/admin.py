@@ -2002,7 +2002,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'error_log_display',
         'created_at', 'updated_at',
         'stock_qty_readonly', 'dk_attributes_table',
-        'price_checked_at', 'media_rule_panel',
+        'price_checked_at', 'media_rule_panel', 'dk_image_on_dk',
     )
 
     fieldsets = (
@@ -2013,7 +2013,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             'fields': (
                 'dk_category_id', 'dk_category_name',
                 'dk_title', 'dk_description',
-                'dk_manufacturer', 'dk_image_url', 'dk_datasheet_url', 'media_rule_panel',
+                'dk_manufacturer', 'dk_image_url', 'dk_image_update', 'dk_image_on_dk', 'dk_datasheet_url',
+                'media_rule_panel',
             ),
             'description': (
                 'Натисни <b>📥 Стягнути поля з DigiKey</b> вище — всі поля заповнюються автоматично.'
@@ -2145,6 +2146,13 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             obj.card_source, obj.pub_events = 'copy', {}       # дорожня карта копії — з початку
         elif not change and not obj.card_source:
             obj.card_source = 'stock'                           # нова картка в Minerva
+
+        # змінили «Фото (URL)» опублікованого товару — значить, фото треба оновити на DigiKey (галочку можна зняти)
+        changed = getattr(form, 'changed_data', None) or []
+        if change and 'dk_image_url' in changed and 'dk_image_update' not in changed and obj.dk_product_id:
+            obj.dk_image_update = True
+            messages.info(request, '🖼 «Фото (URL)» змінено — фото піде на DigiKey під час наступного надсилання '
+                                   'картки товару (галочка «🖼 Оновити фото на DigiKey»).')
 
         # Auto-create inventory Product when checkbox is checked on add form
         if not change and not obj.product_id and request.POST.get('_create_product'):

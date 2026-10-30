@@ -95,8 +95,13 @@ def product_rows(listing, product) -> list:
     p = product or {}
     have = product is not None
     rows = []
+    from bots.services.dk_media import dk_hosted
     for key, label, minerva_fn, dk_key in PRODUCT_ROWS:
         m, d = _txt(minerva_fn(listing)), _txt(p.get(dk_key)) if have else None
+        if key == "imageUrl" and have and d and m != d and dk_hosted(d):
+            # DigiKey показує свою копію фото — адреса інша завжди; фото йде лише з «🖼 Оновити фото на DigiKey»
+            rows.append(_row(key, label, m, d, True, group="product", show_d=f"{d} — копія DigiKey"))
+            continue
         rows.append(_row(key, label, m, d, have and m == d, group="product"))
     mine = {str(a["code"]): _txt(a.get("value")) for a in listing.get_all_attributes_api()}
     theirs = {str(k): _txt(v) for k, v in _build_attributes_dict(p.get("additionalFields") or []).items()} \

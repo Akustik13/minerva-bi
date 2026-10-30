@@ -423,6 +423,14 @@ class DigiKeyListing(models.Model):
                                        help_text='Пряме посилання на зображення товару')
     dk_datasheet_url = models.URLField('Datasheet (URL)', blank=True, default='',
                                         help_text='Пряме посилання на datasheet')
+    dk_image_update = models.BooleanField(
+        '🖼 Оновити фото на DigiKey', default=False,
+        help_text='Фото йде на DigiKey під час першої публікації; далі DigiKey показує свою копію (mm.digikey.com). '
+                  'Галочка — при наступному надсиланні картки DigiKey отримає «Фото (URL)» і зробить нову копію; '
+                  'ставиться сама, коли змінюєте посилання. Без неї фото на DigiKey не змінюється.')
+    dk_image_on_dk = models.CharField(
+        'Фото на DigiKey зараз', max_length=500, blank=True, default='',
+        help_text='Адреса, яку показує DigiKey (зазвичай його копія) — Minerva бере її з DigiKey.')
 
     # ── Offer fields ───────────────────────────────────────────────────────────
     dk_offer_id      = models.CharField('DK Offer ID', max_length=36, blank=True, default='',
