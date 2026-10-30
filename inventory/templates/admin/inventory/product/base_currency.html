@@ -1,0 +1,87 @@
+{% extends "admin/base_site.html" %}
+{# 💱 Базові ціни → валюта Minerva (inventory/admin_currency.py) #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{{ back_url }}">Товари</a> &rsaquo; {{ title }}
+</div>
+{% endblock %}
+{% block content %}
+<style>
+  #bcc { max-width: 1100px; }
+  #bcc .bcc-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; padding: 14px 16px; margin: 0 0 14px; }
+  #bcc .bcc-muted { color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+  #bcc table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  #bcc th { text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px;
+    padding: 6px 8px; border-bottom: 2px solid var(--border-strong); }
+  #bcc td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  #bcc td.num { text-align: right; font-family: monospace; white-space: nowrap; }
+  #bcc input.bcc-rate { width: 110px; text-align: right; padding: 5px 8px; font-size: 14px; }
+  #bcc .bcc-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+</style>
+<div id="bcc">
+  <div class="bcc-card">
+    <p style="margin:0 0 6px">Валюта Minerva — <b>{{ home }}</b>: базові ціни на складі тримаються в ній, а DigiKey,
+      магазини й Angebote перераховують їх у свою валюту за курсом.</p>
+    <p class="bcc-muted" style="margin:0">Курс підставлено той самий, яким Minerva рахує ціни для DigiKey
+      ({{ dk_rate_source }}), — тоді після переведення ціни на DigiKey лишаться такими самими. Можна вписати свій.
+      Ціни переводяться точно, до 4 знаків (230,8154 €): саме тоді зворотний перерахунок для DigiKey дає ту саму ціну.
+      Округлити до центів можна галочкою нижче або згодом у редакторі базових цін («Округлення») — тоді ціни на
+      DigiKey можуть зрушити на цент. Кожна зміна записується в історію товару
+      («Переведено з … в {{ home }} за курсом …»).</p>
+  </div>
+
+  {% if not total %}
+    <div class="bcc-card">✓ Усі {% if ids %}вибрані {% endif %}товари з базовими цінами вже в {{ home }} — переводити нічого.</div>
+  {% else %}
+  <form method="post" class="bcc-card">{% csrf_token %}
+    <input type="hidden" name="ids" value="{{ ids }}">
+    <table>
+      <thead><tr><th>Валюта</th><th>Товарів</th><th>Курс: 1 одиниця = … {{ home }}</th><th>Для порівняння</th></tr></thead>
+      <tbody>
+      {% for g in groups %}
+        <tr>
+          <td><b>{{ g.cur }}</b></td>
+          <td>{{ g.count }}</td>
+          <td><input class="bcc-rate" type="text" name="rate_{{ g.cur }}" value="{{ g.rate }}" inputmode="decimal"
+                     aria-label="Курс {{ g.cur }} → {{ home }}" {% if not g.rate %}placeholder="немає курсу"{% endif %}>
+              <span class="bcc-muted">1 {{ g.cur }} = ? {{ home }}</span></td>
+          <td class="bcc-muted">{% for h in g.hints %}{{ h }}{% if not forloop.last %}<br>{% endif %}{% empty %}—{% endfor %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p style="margin:10px 0 0">
+      <label><input type="checkbox" name="cents" value="1" {% if cents %}checked{% endif %}> Округлити до центів
+        <span class="bcc-muted">(ціни на DigiKey можуть змінитися на 1 цент)</span></label></p>
+    <p style="margin:8px 0 0"><button type="submit" name="action" value="preview" class="button">🔄 Перерахувати перегляд</button>
+      <span class="bcc-muted">— показати нижче ціни з курсом і округленням, які ви вибрали</span></p>
+
+    <h3 style="margin:16px 0 6px">Що стане (ціна за 1 шт.)</h3>
+    <table>
+      <thead><tr><th>Артикул</th><th>Назва</th><th>Ступенів</th><th class="num">Було</th><th class="num">Стане</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><a href="{{ r.url }}">{{ r.sku }}</a></td>
+          <td>{{ r.name }}</td>
+          <td>{{ r.tiers }}</td>
+          <td class="num">{{ r.was }} {{ r.cur }}</td>
+          <td class="num">{% if r.will %}<b>{{ r.will }} {{ home }}</b>{% else %}<span style="color:var(--err)">немає курсу</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if more %}<p class="bcc-muted">… і ще {{ more }} товарів — за тими самими курсами.</p>{% endif %}
+
+    <div class="bcc-actions">
+      <label><input type="checkbox" name="confirm" value="1"> Так, перевести базові ціни {{ total }} товарів у {{ home }}</label>
+      <input type="text" name="note" maxlength="120" placeholder="Примітка в історію (необов'язково)" style="min-width:260px">
+      <button type="submit" name="action" value="convert" class="button default">💱 Перевести в {{ home }}</button>
+      <a href="{{ back_url }}">Скасувати</a>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

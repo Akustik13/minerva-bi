@@ -1,8 +1,10 @@
-"""Базові ціни товару (ступені за кількістю): нормалізація, зміна з історією, імпорт з DigiKey."""
+"""Базові ціни товару (ступені за кількістю): нормалізація, зміна з історією, імпорт з DigiKey, переведення у
+валюту Minerva. Базові ціни тримаються у валюті Minerva (`offers.pricing.home_currency`, EUR): DigiKey, магазин і
+Angebote перераховують їх у свою валюту за курсом."""
 from __future__ import annotations
 
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.utils import timezone
 
@@ -52,6 +54,65 @@ def format_text(rows) -> str:
     return "\n".join(f'{r["min_qty"]}: {r["unit_price"]}' for r in normalize(rows))
 
 
+def home_currency() -> str:
+    from offers.pricing import home_currency as _home
+    return _home()
+
+
+def rate_to_home(src: str, home: str | None = None) -> Decimal | None:
+    """Курс src → валюта Minerva (1 src = N home) — той самий, яким ціни Minerva стають цінами DigiKey
+    («💲 Налаштування цін DigiKey» → «Курс для цін DigiKey»), тож після переведення ціни на DigiKey не зрушать.
+    None — курсу немає."""
+    home = (home or home_currency()).upper()
+    src = (src or home).upper()
+    if src == home:
+        return Decimal(1)
+    try:
+        from bots.services.dk_prices import fx
+        return fx(src, home)
+    except ImportError:
+        from offers.pricing import fx
+        return fx(src, home)
+
+
+def converted(price, rate, cents: bool = False) -> Decimal:
+    """Ціна × курс. За замовчуванням — 4 знаки (точність базових цін): тоді зворотний перерахунок для DigiKey дає ту
+    саму ціну (268,39 $ → 230,8154 € → 268,39 $; з центами 230,82 € → 268,40 $). `cents` — від 1 до центів."""
+    value = Decimal(str(price)) * Decimal(str(rate))
+    q = Decimal("0.01") if cents and value >= 1 else _Q
+    return value.quantize(q, rounding=ROUND_HALF_UP).normalize()
+
+
+def rate_text(rate) -> str:
+    return format(Decimal(str(rate)).quantize(Decimal("0.000001")).normalize(), "f")
+
+
+def convert(product, to: str, rate, *, user=None, note: str = "", cents: bool = False) -> bool:
+    """Базові ціни товару → валюта `to` за курсом (1 стара валюта = `rate` нової), з історією
+    «Переведено з USD в EUR за курсом 0.86». `cents` — округлити до центів (ціни DigiKey можуть зрушити на цент).
+    False — немає цін або вже в цій валюті."""
+    rows = normalize(product.base_prices)
+    src = (product.base_price_currency or "EUR").upper()
+    to = (to or "").upper()
+    if not rows or src == to:
+        return False
+    rate = Decimal(str(rate))
+    if rate <= 0:
+        raise ValueError("Курс має бути більшим за 0")
+    new = [{"min_qty": r["min_qty"], "unit_price": format(converted(r["unit_price"], rate, cents), "f")} for r in rows]
+    label = f"Переведено з {src} в {to} за курсом {rate_text(rate)}" + (", до центів" if cents else "")
+    return set_base_prices(product, new, source="manual", user=user, currency=to, source_label=label[:200],
+                           note=(f"{label} · {note}" if note else label)[:255])
+
+
+def not_home(qs=None, home: str | None = None):
+    """Товари з базовими цінами не у валюті Minerva (список, бо «є ціни» — JSON)."""
+    from inventory.models import Product
+    home = (home or home_currency()).upper()
+    qs = Product.objects.all() if qs is None else qs
+    return [p for p in qs.exclude(base_price_currency__iexact=home).order_by("sku") if normalize(p.base_prices)]
+
+
 def digikey_source_label(listing) -> str:
     parts = ["DigiKey"]
     if listing.dk_offer_id:
@@ -88,7 +149,8 @@ def set_base_prices(product, rows, *, source: str = "manual", user=None, currenc
 
 
 def import_from_digikey(product, user=None) -> bool | None:
-    """Базові ціни ← ціни офера DigiKey (DigiKeyListing.dk_prices). None — у DigiKey цін немає."""
+    """Базові ціни ← ціни офера DigiKey (DigiKeyListing.dk_prices), переведені у валюту Minerva за курсом для
+    цін DigiKey (`rate_to_home`); курсу немає — у валюті DigiKey з приміткою. None — у DigiKey цін немає."""
     from django.core.exceptions import ObjectDoesNotExist
     try:
         listing = product.dk_listing
@@ -98,9 +160,20 @@ def import_from_digikey(product, user=None) -> bool | None:
     if not rows:
         return None
     try:
-        from bots.models import DigiKeyConfig
-        currency = DigiKeyConfig.get().locale_currency or "USD"
+        from bots.services.dk_prices import currency as dk_currency   # як «Валюта цін на DigiKey»
+        currency = dk_currency() or "USD"
     except Exception:
         currency = "USD"
+    label = digikey_source_label(listing)
+    home = home_currency()
+    if currency.upper() != home:
+        rate = rate_to_home(currency, home)
+        if rate:
+            rows = [{"min_qty": r["min_qty"], "unit_price": format(converted(r["unit_price"], rate), "f")}
+                    for r in rows]
+            label += f" · {currency} → {home} за курсом {rate_text(rate)}"
+            currency = home
+        else:
+            label += f" · у {currency}: немає курсу {currency} → {home}"
     return set_base_prices(product, rows, source="digikey", user=user, currency=currency,
-                           source_label=digikey_source_label(listing))
+                           source_label=label[:200])

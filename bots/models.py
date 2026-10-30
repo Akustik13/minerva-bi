@@ -659,6 +659,12 @@ class DigiKeyPriceSettings(models.Model):
         (TIERS_DIGIKEY, 'Як зараз на DigiKey (ті самі кількості, ціни з Minerva)'),
         (TIERS_TEMPLATE, 'За шаблоном ступенів магазину (знижки від ціни 1 шт.)'),
     ]
+    FX_RATES, FX_MANUAL, FX_ONLINE = 'rates', 'manual', 'online'
+    FX_CHOICES = [
+        (FX_RATES, 'Як у «Курсах валют» Minerva (той самий курс, що для магазину)'),
+        (FX_MANUAL, 'Свій курс для DigiKey — вписую вручну'),
+        (FX_ONLINE, 'Онлайн — актуальний курс ЄЦБ (оновлюється щодня)'),
+    ]
     AUTO_OFF = 'off'
     AUTO_ASK = 'ask'
     AUTO_APPLY = 'apply'
@@ -674,6 +680,15 @@ class DigiKeyPriceSettings(models.Model):
                   '(supplier.digikey.com → Account). Порожньо — «Locale Currency» з налаштувань DigiKey.')
     source = models.CharField('Звідки ціни Minerva', max_length=16, choices=SOURCE_CHOICES,
                               default=SOURCE_BASE_OR_SALE)
+    fx_source = models.CharField(
+        'Курс для цін DigiKey', max_length=8, choices=FX_CHOICES, default=FX_RATES,
+        help_text='Ціни Minerva (EUR) → валюта DigiKey. «Свій» — поле нижче; «Онлайн» — довідковий курс '
+                  'Європейського центрального банку, Minerva бере його сама (не вдалось — останній збережений).')
+    fx_manual_rate = models.DecimalField(
+        'Свій курс: 1 валюта Minerva = … валюти DigiKey', max_digits=12, decimal_places=6, null=True, blank=True,
+        help_text='Напр. 1 EUR = 1,16 USD → 1.16. Діє, коли вибрано «Свій курс для DigiKey».')
+    fx_online = models.JSONField('Останній онлайн-курс', default=dict, blank=True,
+                                 help_text='Що Minerva востаннє отримала від ЄЦБ: дата й курси.')
     adjust_pct = models.DecimalField(
         'Надбавка / знижка, %', max_digits=7, decimal_places=2, default=0,
         help_text='Від цін Minerva (після перерахунку у валюту DigiKey): +10 — на 10 % дорожче, −5 — знижка 5 %.')
@@ -699,6 +714,10 @@ class DigiKeyPriceSettings(models.Model):
         help_text='Більша зміна (вгору чи вниз) чекає підтвердження людини навіть в режимі «Оновлювати самостійно». '
                   'Рахується для кожної кількості: новий ступінь — від ціни DigiKey, що зараз діє на цю кількість, '
                   'прибраний — до нової ціни для неї.')
+    auto_min_change_pct = models.DecimalField(
+        'Не оновлювати зміни, менші за, %', max_digits=7, decimal_places=2, default=0,
+        help_text='Автооновлення пропускає дрібні різниці — напр. щоденні коливання онлайн-курсу (раджу 1–2 %). '
+                  'На сторінці порівняння їх видно, оновити можна вручну. 0 — будь-яку різницю.')
     auto_max_items = models.PositiveSmallIntegerField(
         'Самостійно — не більше товарів за раз', default=50,
         help_text='Решта — на підтвердження (захист від масової помилки, напр. неправильного курсу).')

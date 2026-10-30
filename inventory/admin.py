@@ -18,6 +18,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
 
 from . import param_filters, thumbs
+from .admin_currency import BaseCurrencyFilter
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
@@ -2202,12 +2203,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     )
     search_fields = ("sku", "sku_short", "name")
     list_filter   = ("category", ProductShopFilter, thumbs.MediaFilter, "lifecycle_status", "kind", "bom_type",
-                     "is_active", param_filters.ParamFilter)   # параметри — останнім (решта фільтрів уже застосована)
+                     "is_active", BaseCurrencyFilter,
+                     param_filters.ParamFilter)   # параметри — останнім (решта фільтрів уже застосована)
     list_per_page = 50
     autocomplete_fields = ("successor",)
     form          = ProductAdminForm
     actions       = ["action_set_category", "action_set_lifecycle", "action_base_editor", "action_base_from_dk",
-                     "action_sale_price_from_base", "action_media_links", "action_shared_media",
+                     "action_base_to_home", "action_sale_price_from_base", "action_media_links", "action_shared_media",
                      "bulk_sync_digikey_attrs", "action_dk_prices", "action_dk_from_stock"]
 
     def save_model(self, request, obj, form, change):
@@ -2273,6 +2275,12 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         """Сторінка-таблиця: інструменти як у картці, правка кожного товару, застосування в магазинах."""
         ids = ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)[:1000])
         return redirect(reverse("admin:inventory_product_base_prices") + "?ids=" + ids)
+
+    @admin.action(description="💱 Базові ціни → EUR (валюта Minerva)…")
+    def action_base_to_home(self, request, queryset):
+        """Сторінка переведення: курс для кожної валюти (як для DigiKey), «було → стане», історія."""
+        from .admin_currency import page_url
+        return redirect(page_url(list(queryset.values_list("pk", flat=True)[:5000])))
 
     @admin.action(description="🔗 Посилання на фото й даташити за правилом…")
     def action_media_links(self, request, queryset):
@@ -3393,6 +3401,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                  name="inventory_product_base_prices"),
             path("base-prices/template/", self.admin_site.admin_view(self._base_prices_template_view),
                  name="inventory_product_base_prices_template"),
+            path("base-currency/", self.admin_site.admin_view(self._base_currency_view),
+                 name="inventory_product_base_currency"),
             path('dk-sync-status/', self.admin_site.admin_view(self._dk_sync_status_view),
                  name='inventory_product_dk_sync_status'),
             path('dk-sync-cancel/', self.admin_site.admin_view(self._dk_sync_cancel_view),
@@ -3428,6 +3438,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     def _base_prices_template_view(self, request):
         from .admin_prices import template_view
         return template_view(self, request)
+
+    def _base_currency_view(self, request):
+        from .admin_currency import currency_view
+        return currency_view(self, request)
 
     def serve_datasheet_view(self, request, pk):
         """Serve product datasheet file via Django (bypasses Synology/nginx media routing)."""

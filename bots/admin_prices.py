@@ -170,10 +170,15 @@ def _rates(rows, cur):
 
 @admin.register(DigiKeyPriceSettings)
 class DigiKeyPriceSettingsAdmin(admin.ModelAdmin):
-    readonly_fields = ("tools", "auto_state")
+    readonly_fields = ("tools", "auto_state", "fx_now")
     fieldsets = (
         (None, {"fields": ("tools",)}),
         ("💱 Валюта й ціни Minerva", {"fields": ("currency", "source")}),
+        ("💱 Курс: ціни Minerva → валюта DigiKey", {
+            "fields": ("fx_source", "fx_manual_rate", "fx_now"),
+            "description": "Ціни на складі — у валюті Minerva; на DigiKey вони йдуть у валюті акаунта продавця. "
+                           "Курс — свій (вписуєте вручну) або онлайн (довідковий курс Європейського центрального "
+                           "банку, Minerva бере його сама щодня)."}),
         ("🧮 Правила за замовчуванням", {
             "fields": (("adjust_pct", "adjust_fixed"), ("rounding", "tiers_mode"), "min_margin_pct"),
             "description": "Ціна DigiKey = ціна Minerva × курс × (100 + надбавка) % + фіксована добавка → "
@@ -181,7 +186,7 @@ class DigiKeyPriceSettingsAdmin(admin.ModelAdmin):
                            "(⚙ у рядку порівняння або в картці лістингу)."}),
         ("🔁 Автооновлення", {
             "fields": ("auto_mode", ("auto_interval_minutes", "auto_delay_minutes"),
-                       ("max_change_pct", "auto_max_items"), "auto_state"),
+                       ("max_change_pct", "auto_max_items"), "auto_min_change_pct", "auto_state"),
             "description": "Minerva звіряє ціни з cron (manage.py dk_price_sync --if-due). Самостійно надсилаються "
                            "лише невеликі зміни; великі й масові — на підтвердження, з повідомленням."}),
         ("🔔 Сповіщення", {"fields": (("notify_telegram", "notify_email"), "notify_email_to", "notify_manual")}),
@@ -197,17 +202,73 @@ class DigiKeyPriceSettingsAdmin(admin.ModelAdmin):
         obj = DigiKeyPriceSettings.get()
         return redirect(reverse("admin:bots_digikeypricesettings_change", args=[obj.pk]))
 
+    def get_urls(self):
+        from django.urls import path
+        return [path("fx-refresh/", self.admin_site.admin_view(self.fx_refresh_view),
+                     name="bots_digikeypricesettings_fx_refresh")] + super().get_urls()
+
+    def fx_refresh_view(self, request):
+        """«🔄 Оновити онлайн-курс зараз» — свіжі курси ЄЦБ у налаштування (лише читання публічних курсів)."""
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        data = svc.online_rates(force=True)
+        s = DigiKeyPriceSettings.get()
+        if data and (s.fx_online or {}).get("date") == data.get("date"):
+            self.message_user(request, f"Курс ЄЦБ отримано: {svc.rate_source_text(s)}.", messages.SUCCESS)
+        else:
+            self.message_user(request, "Не вдалося отримати курс ЄЦБ (мережа або сайт ЄЦБ) — діє останній "
+                                       "збережений.", messages.WARNING)
+        return redirect(reverse("admin:bots_digikeypricesettings_change", args=[s.pk]) + "#fieldset-0-2")
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if obj.fx_source == obj.FX_ONLINE and "fx_source" in form.changed_data:
+            if not svc.online_rates(obj, force=True):
+                self.message_user(request, "Онлайн-курс ЄЦБ зараз не отримано — Minerva спробує ще раз сама; "
+                                           "доти ціни DigiKey без курсу не рахуються.", messages.WARNING)
+        if obj.fx_source == obj.FX_MANUAL and not obj.fx_manual_rate:
+            self.message_user(request, "Вибрано «Свій курс», але курс не вписано — діє «Курси валют» Minerva.",
+                              messages.WARNING)
+
+    @admin.display(description="Зараз діє")
+    def fx_now(self, obj):
+        home, cur = svc.home_currency(), svc.currency(obj)
+        if home == cur:
+            return f"Валюта Minerva й DigiKey однакова ({cur}) — курс не потрібен."
+        rate = svc.fx(home, cur, obj)
+        value = (format_html("<b>1 {} = {} {}</b>", home, format(rate.quantize(Decimal("0.0001")).normalize(), "f"), cur)
+                 if rate else format_html('<b style="color:var(--err)">курсу {} → {} немає</b>', home, cur))
+        refresh = ""
+        if obj.fx_source == obj.FX_ONLINE:
+            refresh = format_html(' <a class="button" href="{}">🔄 Оновити онлайн-курс зараз</a>',
+                                  reverse("admin:bots_digikeypricesettings_fx_refresh"))
+        return format_html("{} · {}{}", value, svc.rate_source_text(obj), refresh)
+
     @admin.display(description="Сторінки")
     def tools(self, obj):
         cur = svc.currency(obj)
-        return format_html(
+        main = format_html(
             '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
             '<a class="button" href="{}">💲 Порівняти й оновити ціни</a>'
             '<a class="button" href="{}">📜 Історія оновлень</a>'
-            '<span style="color:var(--text-muted)">Ціни на DigiKey зараз рахуються в <b>{}</b> ({}) · курси — '
-            '<a href="{}">Налаштування цін магазину → Курси валют</a></span></div>',
+            '<span style="color:var(--text-muted)">Ціни на DigiKey зараз рахуються в <b>{}</b> ({}) · курс — {}'
+            '</span></div>',
             _compare_url(), reverse("admin:bots_digikeypricerun_changelist"), cur, svc.currency_source(obj),
-            reverse("admin:shop_shopsettings_changelist"))
+            svc.rate_source_text(obj))
+        return format_html("{}{}", main, self._not_home_hint())   # «+» з порожнім рядком дав би не-безпечний str
+
+    @staticmethod
+    def _not_home_hint():
+        """Базові ціни мають бути у валюті Minerva — скільки товарів ще в іншій (і куди перейти)."""
+        from inventory.admin_currency import page_url
+        from inventory.services.base_prices import home_currency, not_home
+        n = len(not_home())
+        if not n:
+            return ""
+        return format_html(
+            '<div style="margin-top:8px;color:var(--warn)">⚠ Базові ціни {} товарів не у валюті Minerva ({}). '
+            '<a href="{}">💱 Перевести в {}</a></div>',
+            n, home_currency(), page_url(), home_currency())
 
     @admin.display(description="Стан")
     def auto_state(self, obj):
@@ -340,7 +401,9 @@ class DigiKeyPriceRunAdmin(admin.ModelAdmin):
             "cat_options": _cat_options(views), "offers_url": reverse("admin:bots_digikeypricerun_offers"),
             "settings_url": reverse("admin:bots_digikeypricesettings_changelist"),
             "history_url": reverse("admin:bots_digikeypricerun_changelist"),
-            "fx_url": reverse("admin:shop_shopsettings_changelist"),
+            "fx_url": (reverse("admin:shop_shopsettings_changelist") if s.fx_source == s.FX_RATES
+                       else reverse("admin:bots_digikeypricesettings_changelist")),
+            "fx_src": svc.rate_source_text(s),
         }
         return TemplateResponse(request, "admin/bots/digikeypricerun/compare.html", context)
 

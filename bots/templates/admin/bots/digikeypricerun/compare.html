@@ -30,7 +30,7 @@
     <span>Валюта DigiKey: <b>{{ cur }}</b> <small>({{ currency_source }} — DigiKey API валюти не передає, звірте з supplier.digikey.com)</small></span>
     {% for r in rates %}
     <span>Курс: 1 {{ r.cur }} = {% if r.rate %}<b>{{ r.rate }}</b> {{ cur }}{% else %}<b class="dp-err">не задано</b>{% endif %}
-      · <a href="{{ fx_url }}">курси валют</a></span>
+      · <a href="{{ fx_url }}">{{ fx_src }}</a></span>
     {% endfor %}
     <span>Ціни DigiKey прочитано:
       {% if fresh %}<b class="dp-ok">{{ fresh }}</b>

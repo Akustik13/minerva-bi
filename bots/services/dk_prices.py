@@ -73,10 +73,63 @@ def currency_source(s=None) -> str:
     return "«💲 Налаштування цін DigiKey»" if s.currency else "DigiKey → Locale Currency"
 
 
-def fx(src: str, dst: str) -> Decimal | None:
-    """Курс src → dst за «Налаштуваннями цін магазину → Курси валют» (той самий, що для веб-магазину)."""
+def fx(src: str, dst: str, s=None) -> Decimal | None:
+    """Курс src → dst для цін DigiKey (1 src = N dst) за «Курсом для цін DigiKey» (`fx_source`):
+    «Курси валют» Minerva (той самий, що для магазину) / свій (1 валюта Minerva = N валюти DigiKey; інші валюти —
+    через валюту Minerva за «Курсами валют») / онлайн ЄЦБ (`online_rates`). None — курсу немає."""
     from offers.pricing import fx as _fx
+    src, dst = (src or "").upper(), (dst or "").upper()
+    if not src or not dst or src == dst:
+        return Decimal(1)
+    s = s or settings()
+    if s.fx_source == s.FX_ONLINE:
+        from core import fx_online
+        return fx_online.cross(online_rates(s), src, dst)
+    if s.fx_source == s.FX_MANUAL and s.fx_manual_rate:
+        home, dk = home_currency(), currency(s)
+
+        def per_home(cur):                       # 1 валюта Minerva = N cur
+            if cur == home:
+                return Decimal(1)
+            if cur == dk:
+                return Decimal(s.fx_manual_rate)
+            return _fx(home, cur)
+        a, b = per_home(src), per_home(dst)
+        return None if a is None or b is None or a == 0 else b / a
     return _fx(src, dst)
+
+
+def online_rates(s=None, force: bool = False) -> dict | None:
+    """Курси ЄЦБ: свіжі (кеш кілька годин), не вдалось — останні збережені в налаштуваннях (`fx_online`)."""
+    from core import fx_online
+    from bots.models import DigiKeyPriceSettings as S
+    s = s or settings()
+    data = fx_online.latest(force=force)
+    if not data:
+        return s.fx_online or None
+    if force or (s.fx_online or {}).get("date") != data["date"]:
+        stored = dict(data, checked_at=timezone.now().isoformat())
+        S.objects.filter(pk=1).update(fx_online=stored)
+        s.fx_online = stored
+    return data
+
+
+def rate_source_text(s=None) -> str:
+    """Звідки курс для DigiKey — людською мовою (сторінка порівняння, налаштування, звіт)."""
+    s = s or settings()
+    if s.fx_source == s.FX_ONLINE:
+        data = s.fx_online or {}
+        if data.get("date"):
+            return f"онлайн ЄЦБ на {_ddmmyyyy(data['date'])}"
+        return "онлайн ЄЦБ — ще не отримано"
+    if s.fx_source == s.FX_MANUAL:
+        return "свій курс для DigiKey" if s.fx_manual_rate else "свій курс не вписано — «Курси валют»"
+    return "«Курси валют» Minerva"
+
+
+def _ddmmyyyy(iso: str) -> str:
+    y, m, d = (iso or "")[:10].split("-") if len(iso or "") >= 10 else ("", "", "")
+    return f"{d}.{m}.{y}" if y else iso
 
 
 def home_currency() -> str:
@@ -969,6 +1022,12 @@ def _suppressed(row) -> bool:
                L.objects.filter(listing=row.listing, status__in=(L.HELD, L.REJECTED)).only("new_prices"))
 
 
+def _tiny(row, s) -> bool:
+    """Різниця менша за «Не оновлювати зміни, менші за, %» — автооновлення її пропускає."""
+    limit = s.auto_min_change_pct or 0
+    return bool(limit) and row.max_change_pct is not None and abs(row.max_change_pct) < limit
+
+
 def auto(force: bool = False) -> str:
     """Знайти різницю між цінами Minerva й DigiKey і оновити (або запитати) — для cron. Повертає підсумок."""
     from bots.models import DigiKeyPriceChange as L, DigiKeyPriceRun as R, DigiKeyPriceSettings as S
@@ -981,14 +1040,14 @@ def auto(force: bool = False) -> str:
     quiet = now - timedelta(minutes=s.auto_delay_minutes or 0)
     listings = [l for l in listings_qs().filter(price_auto=True, sync_status="published").exclude(dk_offer_id="")
                 if not (l.product.base_prices_updated_at and l.product.base_prices_updated_at > quiet)]
-    candidates = [r.listing for r in plan(listings, rules, s) if r.differs]
+    candidates = [r.listing for r in plan(listings, rules, s) if r.differs and not _tiny(r, s)]
     if not candidates:
         return _auto_result("без змін")
     try:
         refresh(candidates)
     except Exception as exc:
         return _auto_result(f"не вдалося прочитати офери DigiKey: {exc}"[:300])
-    rows = [r for r in plan(candidates, rules, s) if r.differs and not _suppressed(r)]
+    rows = [r for r in plan(candidates, rules, s) if r.differs and not _tiny(r, s) and not _suppressed(r)]
     if not rows:
         return _auto_result("різниця вже чекає рішення або відхилена")
     run = R.objects.create(created_by="Minerva (авто)", kind=R.KIND_AUTO, currency=currency(s),
