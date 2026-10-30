@@ -176,3 +176,61 @@ class AdminRoadmapTests(PublishBase):
         self.assertEqual(list(r.context["cl"].result_list), [self.listing])
         self.assertEqual(list(self.client.get("/admin/bots/digikeylisting/?pub_stage=live")
                               .context["cl"].result_list), [])
+
+
+class StepDetailsTests(AdminRoadmapTests):
+    """Клік по кроку карти: звідки дата, ID, помилка DigiKey, кнопки дій."""
+
+    def test_approved_but_offer_refused_shows_error_and_create_offer(self):
+        # як AN120202-01A: авто-перевірка знайшла товар затвердженим, POST /offers відмовив, стан — «очікує»
+        DigiKeyListing.objects.filter(pk=self.listing.pk).update(
+            sync_status="staged", dk_product_id="prod-1", last_error="create_offer 400: {'detail': 'MOQ too high'}")
+        dk_publish.mark(self.reload(), "sent")
+        dk_publish.mark(self.reload(), "approved")
+        rm = dk_publish.roadmap(self.reload(), detail=True)
+        offer = rm["steps"][4]
+        self.assertEqual((rm["current"], offer["state"], offer["open"]), ("offer", "error", True))
+        self.assertIn("MOQ too high", offer["error"])
+        self.assertIn(("DK Product ID", "prod-1"), rm["steps"][3]["facts"])
+        self.assertEqual(rm["steps"][3]["how"], dk_publish.SRC_TEXT["minerva"])
+        urls = [a.get("url", "") for a in offer["actions"]]
+        self.assertIn(f"/admin/bots/digikeylisting/{self.listing.pk}/create-offer/", urls)
+        r = self.client.get(f"/admin/bots/digikeylisting/{self.listing.pk}/change/")
+        self.assertContains(r, "DigiKey відповів")
+        self.assertContains(r, f'data-pr-post="/admin/bots/digikeylisting/{self.listing.pk}/create-offer/"')
+        self.assertContains(r, 'data-pr-step="offer"')
+
+    def test_missing_fields_link_to_form_fields(self):
+        DigiKeyListing.objects.filter(pk=self.listing.pk).update(dk_category_id="", dk_title="")
+        rm = dk_publish.roadmap(self.reload(), detail=True)
+        anchors = {a.get("anchor") for a in rm["steps"][1]["actions"]}
+        self.assertTrue({"id_dk_category_id", "id_dk_title"} <= anchors)
+
+    def test_dates_from_digikey_and_offer_not_linked(self):
+        offer = {"id": "o-9", "supplierSku": "FT220407", "createDateUtc": "2025-05-01T08:00:00Z",
+                 "isActive": True, "offerStatusReason": "QuantityAvailableLessThanMOQ"}
+        dk_publish.sync_offer(self.reload(), offer)
+        rm = dk_publish.roadmap(self.reload(), detail=True)
+        self.assertEqual(rm["steps"][4]["how"], dk_publish.SRC_TEXT["digikey"])
+        self.assertEqual(rm["steps"][0]["how"], dk_publish.SRC_TEXT["digikey_clamp"])
+        self.assertIn(("На DigiKey є офер з цим артикулом", "o-9"), rm["steps"][4]["facts"])
+        live = rm["steps"][5]
+        self.assertEqual(live["state"], "warn")
+        self.assertIn("оновіть залишок", live["text"])
+        self.assertTrue(any(a.get("url", "").endswith("/sync-qty/") for a in live["actions"]))
+
+    def test_view_only_user_sees_no_action_buttons(self):
+        from core.models import UserProfile
+        u = User.objects.create_user("ro", "ro@x.y", "p", is_staff=True)
+        UserProfile.objects.update_or_create(user=u, defaults={"role": "readonly"})
+        self.client.force_login(u)
+        r = self.client.get(f"/admin/bots/digikeylisting/{self.listing.pk}/change/")
+        if r.status_code == 200:
+            self.assertNotContains(r, "data-pr-post=")
+
+    def test_stage_sync_from_card_returns_to_card(self):
+        with mock.patch("bots.services.dk_publish.sync_stages",
+                        return_value={"total": 1, "updated": 0, "not_found": [], "without_offer": 0}) as m:
+            r = self.client.post(f"/admin/bots/digikeylisting/pub-sync/?pk={self.listing.pk}")
+        self.assertRedirects(r, f"/admin/bots/digikeylisting/{self.listing.pk}/change/", fetch_redirect_response=False)
+        self.assertEqual([l.pk for l in m.call_args[0][0]], [self.listing.pk])

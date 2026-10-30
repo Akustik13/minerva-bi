@@ -2219,7 +2219,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
         obj = self.get_object(request, object_id)
         if obj is not None:
-            extra_context['pub_roadmap'] = roadmap(obj)
+            extra_context['pub_roadmap'] = roadmap(obj, detail=True)
+            extra_context['pub_can_act'] = self.has_change_permission(request, obj)
         return super().change_view(request, object_id, form_url, extra_context)
 
     @admin.display(description='🧭 Публікація')
@@ -2370,8 +2371,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         from bots.services.dk_publish import sync_stages
         if request.method != "POST" or not self.has_change_permission(request):
             raise PermissionDenied
+        one = DigiKeyListing.objects.filter(pk=request.GET.get("pk") or 0).first()
         try:
-            res = sync_stages()
+            res = sync_stages([one] if one else None)
         except Exception as exc:  # noqa: BLE001 — мережа / токен
             messages.error(request, f"Не вдалося прочитати офери з DigiKey: {exc}")
         else:
@@ -2381,6 +2383,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 text += f" Офер не знайдено на DigiKey: {', '.join(res['not_found'][:10])}" + (
                     f" … ще {len(res['not_found']) - 10}" if len(res["not_found"]) > 10 else "")
             messages.success(request, text)
+        if one:
+            return redirect(reverse("admin:bots_digikeylisting_change", args=[one.pk]))
         return redirect(reverse("admin:bots_digikeylisting_changelist"))
 
     def get_urls(self):

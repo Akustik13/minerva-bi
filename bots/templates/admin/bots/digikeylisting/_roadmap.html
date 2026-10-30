@@ -1,5 +1,6 @@
 {% comment %}🧭 Дорожня карта публікації лістингу на DigiKey (bots/services/dk_publish.roadmap): крапки зі смужкою,
-дата й тривалість кожного кроку, поточний крок і що зробити далі.{% endcomment %}
+дата й тривалість кожного кроку. Клік по кроку — панель: що це, звідки дата, ID, помилка DigiKey, що зробити
+(кнопки). Карта стоїть усередині форми картки, тож POST-кнопки створюють окрему форму в <body> (data-pr-post).{% endcomment %}
 <style>
   .pr-box { margin: 0 0 16px; padding: 12px 16px; border: 1px solid var(--border-strong, #243347);
             border-radius: 8px; background: var(--bg-card, #1a2535); }
@@ -13,12 +14,17 @@
              transition: width .3s; }
   .pr-step { position: relative; z-index: 1; flex: 1 1 0; display: flex; flex-direction: column; align-items: center;
              text-align: center; min-width: 0; }
+  button.pr-step { cursor: pointer; background: none; border: 0; padding: 0 2px 4px; color: inherit; font: inherit;
+                   border-radius: 8px; }
+  button.pr-step:hover .pr-label, .pr-step.pr-sel .pr-label { text-decoration: underline; }
+  button.pr-step:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
   .pr-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
             font-size: 13px; background: var(--bg-card, #1a2535); border: 3px solid var(--hairline-color, #2b3c52); }
   .pr-done .pr-dot { background: #2e9d5b; border-color: #2e9d5b; color: #fff; }
   .pr-current .pr-dot { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, .25); }
   .pr-error .pr-dot { border-color: #e5484d; background: #3a1418; }
   .pr-warn .pr-dot { border-color: #f5a524; background: #3a2a0c; }
+  .pr-sel .pr-dot { transform: scale(1.12); }
   .pr-label { margin-top: 6px; font-size: 12px; font-weight: 600; }
   .pr-at { font-size: 11px; color: var(--body-quiet-color, #8aa0b4); white-space: nowrap; }
   .pr-span { font-size: 11px; color: #2e9d5b; }
@@ -26,7 +32,22 @@
              background: rgba(59, 130, 246, .12); }
   .pr-hint.pr-bad { background: rgba(229, 72, 77, .14); }
   .pr-hint.pr-wrn { background: rgba(245, 165, 36, .14); }
-  @media (max-width: 700px) { .pr-at, .pr-span { display: none; } .pr-label { font-size: 11px; } }
+  .pr-panel { margin-top: 10px; padding: 10px 14px; border-radius: 8px; font-size: 12.5px; line-height: 1.5;
+              background: var(--darkened-bg, rgba(127, 127, 127, .07)); border-left: 4px solid #3b82f6; }
+  .pr-panel.pr-p-done { border-left-color: #2e9d5b; }
+  .pr-panel.pr-p-error { border-left-color: #e5484d; }
+  .pr-panel.pr-p-warn { border-left-color: #f5a524; }
+  .pr-panel.pr-p-todo { border-left-color: var(--hairline-color, #2b3c52); }
+  .pr-panel h4 { margin: 0 0 4px; font-size: 13px; }
+  .pr-panel dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 6px 0 0; }
+  .pr-panel dt { color: var(--body-quiet-color, #8aa0b4); }
+  .pr-panel dd { margin: 0; word-break: break-word; }
+  .pr-err { margin-top: 4px; padding: 6px 10px; border-radius: 6px; background: rgba(229, 72, 77, .14);
+            white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, monospace; font-size: 11.5px; }
+  .pr-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pr-acts a, .pr-acts button { font-size: 12px; }
+  @media (max-width: 700px) { .pr-at, .pr-span { display: none; } .pr-label { font-size: 11px; }
+                              .pr-panel dl { grid-template-columns: 1fr; } }
 </style>
 <div class="pr-box" id="pub-roadmap">
   <div class="pr-head">
@@ -36,22 +57,91 @@
     {% if rm.total %}<span class="pr-muted">від картки до DigiKey: <b>{{ rm.total }}</b></span>{% endif %}
     {% if rm.offer_status %}<span class="pr-muted">офер на DigiKey: {{ rm.offer_status }}</span>{% endif %}
     {% if rm.dk_dates %}<span class="pr-muted" title="Дата офера — createDateUtc з DigiKey; кроки до нього — не пізніше">дати звірено з DigiKey</span>{% endif %}
+    {% if rm.steps.0.meaning %}<span class="pr-muted">· клікніть крок — що зроблено й що далі</span>{% endif %}
   </div>
   <div class="pr-track">
     <div class="pr-fill" style="width: calc((100% - 36px) * {{ rm.fill }})"></div>
     {% for s in rm.steps %}
-    <div class="pr-step pr-{{ s.state }}" title="{{ s.label }}{% if s.at %} — {{ s.at }}{% endif %}{% if s.hint %}: {{ s.hint }}{% endif %}">
-      <div class="pr-dot">{% if s.state == 'done' %}✓{% else %}{{ s.icon }}{% endif %}</div>
-      <div class="pr-label">{{ s.label }}</div>
-      <div class="pr-at">{{ s.at|default:"·" }}</div>
-      <div class="pr-span">{% if s.span %}+{{ s.span }}{% endif %}</div>
-    </div>
+    {% if s.meaning %}<button type="button" class="pr-step pr-{{ s.state }}{% if s.open %} pr-sel{% endif %}"
+            data-pr-step="{{ s.key }}" aria-expanded="{% if s.open %}true{% else %}false{% endif %}"
+            title="{{ s.label }}{% if s.at %} — {{ s.at }}{% endif %}{% if s.hint %}: {{ s.hint }}{% endif %}">
+    {% else %}<div class="pr-step pr-{{ s.state }}"
+            title="{{ s.label }}{% if s.at %} — {{ s.at }}{% endif %}{% if s.hint %}: {{ s.hint }}{% endif %}">{% endif %}
+      <span class="pr-dot">{% if s.state == 'done' %}✓{% else %}{{ s.icon }}{% endif %}</span>
+      <span class="pr-label">{{ s.label }}</span>
+      <span class="pr-at">{{ s.at|default:"·" }}</span>
+      <span class="pr-span">{% if s.span %}+{{ s.span }}{% endif %}</span>
+    {% if s.meaning %}</button>{% else %}</div>{% endif %}
     {% endfor %}
   </div>
-  {% if rm.current_step %}
+  {% if rm.current_step and not rm.current_step.meaning %}
   <div class="pr-hint{% if rm.current_step.state == 'error' %} pr-bad{% elif rm.current_step.state == 'warn' %} pr-wrn{% endif %}">
     <b>Зараз: {{ rm.current_step.label }}.</b>
     {% if rm.current_step.hint %}{{ rm.current_step.hint }}{% else %}{{ rm.next }}{% endif %}
   </div>
   {% endif %}
+  {% for s in rm.steps %}{% if s.meaning %}
+  <div class="pr-panel pr-p-{{ s.state }}" data-pr-panel="{{ s.key }}"{% if not s.open %} hidden{% endif %}>
+    <h4>{{ s.icon }} {{ s.label }} —
+      {% if s.state == 'done' %}пройдено{% elif s.state == 'error' %}DigiKey відмовив{% elif s.state == 'warn' %}є, але DigiKey не показує{% elif s.state == 'current' %}зараз тут{% else %}ще попереду{% endif %}</h4>
+    <div>{{ s.meaning }}</div>
+    <dl>
+      {% if s.at %}<dt>Коли</dt><dd>{{ s.at }}{% if s.span %} (+{{ s.span }} після попереднього кроку){% endif %}</dd>
+      <dt>Звідки дата</dt><dd>{{ s.how }}</dd>{% endif %}
+      {% for name, value in s.facts %}<dt>{{ name }}</dt><dd>{{ value }}</dd>{% endfor %}
+    </dl>
+    {% if s.error %}<div style="margin-top:6px"><b>DigiKey відповів:</b></div><div class="pr-err">{{ s.error }}</div>{% endif %}
+    {% if s.state == 'current' or s.state == 'error' or s.state == 'warn' %}
+      {% if s.text %}<div style="margin-top:6px"><b>Що далі:</b> {{ s.text }}</div>
+      {% elif s.hint and not s.error %}<div style="margin-top:6px"><b>Що далі:</b> {{ s.hint }}</div>
+      {% elif rm.next and s.key == rm.current %}<div style="margin-top:6px"><b>Що далі:</b> {{ rm.next }}</div>{% endif %}
+    {% endif %}
+    {% if s.actions %}<div class="pr-acts">
+      {% for a in s.actions %}
+        {% if a.post %}{% if pub_can_act %}<button type="button" class="button" data-pr-post="{{ a.url }}"{% if a.confirm %} data-pr-confirm="{{ a.confirm }}"{% endif %}>{{ a.label }}</button>{% endif %}
+        {% elif a.url %}<a class="button" href="{{ a.url }}"{% if a.external %} target="_blank" rel="noopener"{% endif %}>{{ a.label }}</a>
+        {% elif a.anchor %}<a class="button" href="#{{ a.anchor }}" data-pr-anchor="{{ a.anchor }}">{{ a.label }}</a>
+        {% else %}<span class="pr-muted">{{ a.label }}</span>{% endif %}
+      {% endfor %}
+    </div>{% endif %}
+  </div>
+  {% endif %}{% endfor %}
 </div>
+<script>
+(function () {
+  var box = document.getElementById('pub-roadmap');
+  if (!box) return;
+  box.addEventListener('click', function (e) {
+    var step = e.target.closest('[data-pr-step]');
+    if (step) {                         // крок: показати / сховати його панель
+      var panel = box.querySelector('[data-pr-panel="' + step.dataset.prStep + '"]');
+      if (!panel) return;
+      var show = panel.hidden;
+      box.querySelectorAll('[data-pr-panel]').forEach(function (p) { p.hidden = true; });
+      box.querySelectorAll('[data-pr-step]').forEach(function (b) {
+        b.classList.remove('pr-sel'); b.setAttribute('aria-expanded', 'false');
+      });
+      if (show) { panel.hidden = false; step.classList.add('pr-sel'); step.setAttribute('aria-expanded', 'true'); }
+      return;
+    }
+    var anchor = e.target.closest('[data-pr-anchor]');
+    if (anchor) {                       // поле картки: прокрутити й поставити курсор
+      var field = document.getElementById(anchor.dataset.prAnchor);
+      if (field) { e.preventDefault(); field.scrollIntoView({ behavior: 'smooth', block: 'center' }); field.focus(); }
+      return;
+    }
+    var post = e.target.closest('[data-pr-post]');
+    if (post) {                         // окрема форма: карта стоїть усередині форми картки
+      if (post.dataset.prConfirm && !confirm(post.dataset.prConfirm)) return;
+      var token = document.querySelector('[name=csrfmiddlewaretoken]');
+      var f = document.createElement('form');
+      f.method = 'post'; f.action = post.dataset.prPost;
+      if (token) {
+        var i = document.createElement('input');
+        i.type = 'hidden'; i.name = 'csrfmiddlewaretoken'; i.value = token.value; f.appendChild(i);
+      }
+      document.body.appendChild(f); post.disabled = true; f.submit();
+    }
+  });
+})();
+</script>
