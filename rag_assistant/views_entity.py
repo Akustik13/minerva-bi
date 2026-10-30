@@ -101,10 +101,16 @@ def item_json(item, user, supported=None) -> dict:
 
 @require_http_methods(["GET", "POST"])
 def entity_documents(request, kind, pk):
-    """GET — документи картки, які бачить користувач; POST (multipart: file або url, title, note, private) — додати."""
+    """GET — документи картки, які бачить користувач; POST (multipart: file або url, title, note, private) — додати
+    (право «📎 Документи й посилання», rag_assistant/access.py)."""
     from . import knowledge_items, retrieval
+    from .access import has
     obj = _entity(request, kind, pk)
+    can_add = has(request.user, "documents")
     if request.method == "POST":
+        if not can_add:
+            return JsonResponse({"ok": False, "error": "Немає права додавати документи в базу знань — його надає "
+                                                       "адміністратор."}, status=403)
         links = {kind: obj}
         if kind == "order" and obj is not None:              # документ замовлення — і в картці клієнта
             customer = entity_help._order_customer(obj)
@@ -124,7 +130,7 @@ def entity_documents(request, kind, pk):
     supported = retrieval.documents_supported()
     items = knowledge_items.items_for(request.user, kind, obj)
     return JsonResponse({"ok": True, "items": [item_json(i, request.user, supported) for i in items],
-                         "supported": supported})
+                         "supported": supported, "can_add": can_add})
 
 
 @require_POST
@@ -142,6 +148,9 @@ def knowledge_item_action(request, pk, action):
         return JsonResponse({"ok": True, "item": item_json(item, request.user)})
     if not knowledge_items.can_change(request.user, item):
         return JsonResponse({"ok": False, "error": "Змінити може той, хто додав документ, або адміністратор"}, status=403)
+    from .access import has
+    if not has(request.user, "documents"):
+        return JsonResponse({"ok": False, "error": "Немає права на документи бази знань"}, status=403)
     if action == "delete":
         knowledge_items.delete(item)
         return JsonResponse({"ok": True, "deleted": True})

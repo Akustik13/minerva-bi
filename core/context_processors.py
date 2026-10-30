@@ -12,8 +12,9 @@ def user_modules(request):
     if not hasattr(request, 'user') or not request.user.is_authenticated:
         return {'allowed_modules_json': '"__all__"', 'user_role': ''}
     try:
+        from core.middleware import with_hooks
         profile = request.user.profile
-        modules = profile.get_allowed_modules()
+        modules = with_hooks(request.user, profile.get_allowed_modules())
         denied  = profile.denied_models or []
         return {
             'allowed_modules_json': json.dumps(modules),

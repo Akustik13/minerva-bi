@@ -1,0 +1,85 @@
+{% extends "admin/base_site.html" %}
+{% comment %}🔐 Доступ до бази знань і RAG: люди × права (rag_assistant/access.py, KnowledgeSettingsAdmin.access_view){% endcomment %}
+{% block title %}Доступ до бази знань і RAG | Minerva{% endblock %}
+{% block extrastyle %}{{ block.super }}
+<style>
+  #ka { max-width: 1200px; }
+  #ka .ka-muted { color: var(--body-quiet-color, #888); }
+  #ka table { border-collapse: collapse; margin: 6px 0 14px; }
+  #ka th, #ka td { padding: 4px 10px; border: 0; border-bottom: 1px solid var(--hairline-color, #e5e5e5);
+                   text-align: left; vertical-align: middle; }
+  #ka th.ka-r, #ka td.ka-r { text-align: center; white-space: nowrap; }
+  #ka th.ka-r { font-size: 12px; max-width: 120px; white-space: normal; }
+  #ka select { font-size: 12px; padding: 2px 4px; }
+  #ka select.ka-over { border: 2px solid var(--primary, #417690); font-weight: 600; }
+  #ka .ka-yes { color: #4caf50; font-weight: 600; }
+  #ka .ka-no { color: #e57373; }
+  #ka dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 6px 0 14px; max-width: 980px; }
+  #ka dt { font-weight: 600; }
+  #ka dd { margin: 0; }
+  #ka .ka-scroll { overflow-x: auto; max-width: 100%; }
+</style>
+{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:rag_assistant_knowledgesettings_changelist' %}">🧠 База знань</a> &rsaquo; 🔐 Доступ</div>
+{% endblock %}
+{% block content %}
+<div id="ka">
+  <p class="ka-muted">Хто може користуватись помічником «Minerva», пошуком у базі знань, додавати документи й керувати
+    базою знань. За замовчуванням — <b>за роллю</b> (таблиця внизу); для окремої людини можна дозволити ✓ або заборонити ✗.
+    Суперкористувач і ролі «Суперадмін» / «Адміністратор» мають усе. Пошук RAG і так повертає лише дані, які людина бачить
+    (свої скриньки, документи за видимістю) — право вирішує, чи можна шукати взагалі.</p>
+
+  <dl>
+    {% for key, label, help in rights %}<dt>{{ label }}</dt><dd>{{ help }}</dd>{% endfor %}
+  </dl>
+
+  <form method="post">{% csrf_token %}
+    <div class="ka-scroll"><table>
+      <thead><tr><th>Користувач</th><th>Роль</th>
+        {% for key, label, help in rights %}<th class="ka-r" title="{{ help }}">{{ label }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <td><b>{{ row.user.get_full_name|default:row.user.username }}</b> <span class="ka-muted">{{ row.user.username }}</span></td>
+          <td>{{ row.role }}</td>
+          {% for c in row.cells %}
+          <td class="ka-r">
+            {% if row.admin %}<span class="ka-yes" title="Адміністратор — усі права">✓</span>
+            {% elif can_grant %}
+              <select name="r_{{ row.user.pk }}_{{ c.key }}" class="{% if c.source == 'override' %}ka-over{% endif %}">
+                <option value=""{% if c.source == 'role' %} selected{% endif %}>за роллю ({% if c.role_default %}✓{% else %}✗{% endif %})</option>
+                <option value="1"{% if c.source == 'override' and c.value %} selected{% endif %}>✓ дозволено</option>
+                <option value="0"{% if c.source == 'override' and not c.value %} selected{% endif %}>✗ заборонено</option>
+              </select>
+            {% else %}
+              {% if c.value %}<span class="ka-yes">✓</span>{% else %}<span class="ka-no">✗</span>{% endif %}
+              {% if c.source == 'override' %}<span class="ka-muted">(вручну)</span>{% endif %}
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% if can_grant %}
+    <button type="submit" class="button default">💾 Зберегти права</button>
+    <span class="ka-muted">Кожна зміна — у <a href="{% url 'admin:core_auditlog_changelist' %}">📋 Журналі аудиту</a>.</span>
+    {% else %}
+    <p class="ka-muted">Змінювати права може суперкористувач або той, хто «Може керувати юзерами».</p>
+    {% endif %}
+  </form>
+
+  <h2>Права за ролями (за замовчуванням)</h2>
+  <div class="ka-scroll"><table>
+    <thead><tr><th>Роль</th>{% for key, label, help in rights %}<th class="ka-r">{{ label }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for r in role_table %}
+      <tr><td>{{ r.role }}</td>{% for v in r.cells %}<td class="ka-r">{% if v %}<span class="ka-yes">✓</span>{% else %}<span class="ka-no">✗</span>{% endif %}</td>{% endfor %}</tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  <p class="ka-muted">Ролі людей — <a href="{% url 'admin:core_userprofile_changelist' %}">👤 Ролі користувачів</a>.</p>
+</div>
+{% endblock %}

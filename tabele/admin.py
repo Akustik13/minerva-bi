@@ -9,6 +9,16 @@ CSRF_TRUSTED_ORIGINS = [
     'http://192.168.2.123:8000',
 ]
 
+def _can_open(site, request, model_dict) -> bool:
+    model_admin = site._registry.get(model_dict.get("model"))
+    if model_admin is None:
+        return True
+    try:
+        return bool(model_admin.has_view_permission(request) or model_admin.has_change_permission(request))
+    except Exception:
+        return True
+
+
 def _get_app_list(self, request, app_label=None):
     """Кастомний порядок секцій та моделей у сайдбарі Django Admin."""
     # Bypass Django's model-permission check — Minerva uses its own module system.
@@ -128,7 +138,8 @@ def _get_app_list(self, request, app_label=None):
                 or ModuleRegistry.check_active(a["app_label"])
             ]
         else:
-            allowed = profile.get_allowed_modules() if profile else '__all__'
+            from core.middleware import with_hooks
+            allowed = with_hooks(request.user, profile.get_allowed_modules()) if profile else '__all__'
             denied_models = set(getattr(profile, 'denied_models', None) or [])
 
             app_list = [
@@ -139,6 +150,12 @@ def _get_app_list(self, request, app_label=None):
                     and (allowed == '__all__' or a["app_label"] in allowed)
                 )
             ]
+
+            # Моделі, яких людина не відкриє (власні права адмінки — напр. бази знань), — не в меню:
+            # список будувався «як суперкористувач», тож перевіряємо справжні права перегляду
+            for app in app_list:
+                app["models"] = [m for m in app["models"] if _can_open(self, request, m)]
+            app_list = [a for a in app_list if a["models"]]
 
             # Filter denied sub-models within allowed apps
             if denied_models:

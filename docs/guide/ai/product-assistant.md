@@ -4,9 +4,9 @@ order: 20
 summary: Кнопка «Minerva» з аватаркою — відповідає про товари за даташитами (RAG) і каталогом та складом Minerva, з джерелами.
 where: 🏛️ Minerva AI → 📚 Помічник по продукції
 urls: /admin/rag_assistant/ragsettings/, /admin/rag_assistant/ragconversation/
-roles: усі співробітники з доступом до помічника; налаштування — адміністратор
+roles: з правом «📦 Помічник по продукції» (менеджер, складник — за роллю); налаштування — адміністратор
 keywords: помічник по продукції, Minerva, RAG, даташит, datasheet, характеристики, наявність, товар, антена, фільтр, RAG-ПК, Produktassistent, product assistant
-related: start/assistants, ai/minerva-ai, ai/knowledge-base, inventory/products, shop/assistant-search
+related: start/assistants, ai/minerva-ai, ai/knowledge-base, inventory/products, shop/assistant-search, ai/knowledge-access
 ---
 
 ## Що це

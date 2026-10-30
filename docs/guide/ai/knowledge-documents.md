@@ -4,9 +4,9 @@ order: 50
 summary: Файли й посилання, прив'язані до клієнта, проєкту, замовлення чи товару, — їх знаходять «❓ Запитати», огляди й пошук RAG.
 where: Картка клієнта / проєкту / замовлення / товару → «📎 Документи й посилання · 📥 Додати»; 🏛️ Minerva AI → 📎 Документи бази знань
 urls: /admin/rag_assistant/knowledgeitem/, /admin/rag_assistant/knowledgesettings/
-roles: усі співробітники (свої документи); адміністратор — автоматичні документи
+roles: з правом «📎 Документи й посилання» (менеджер — за роллю); адміністратор — автоматичні документи
 keywords: документ, посилання, файл, PDF, DOCX, база знань, RAG, додати документ, прикріпити, даташит, Angebot, документи замовлення, лише я, Dokument, link
-related: ai/knowledge-base, ai/knowledge-sources, ai/entity-help, ai/knowledge-overview
+related: ai/knowledge-base, ai/knowledge-sources, ai/entity-help, ai/knowledge-overview, ai/knowledge-access
 ---
 
 ## Що це

@@ -374,6 +374,8 @@ def _rag(src, user, msg, ctx, wish, customer, projects, seen=(), dedup=None, wid
         return 'skipped', 'RAG не підключено', ''
     if not retrieval.available():
         return 'skipped', 'RAG не налаштований', ''
+    if not retrieval.available_for(user):
+        return 'skipped', 'немає права на пошук у базі знань', ''
     # запитання менеджера («які були проблеми з цим фільтром?») — про всіх клієнтів, тож без фільтра клієнта й проєкту
     customer_id = retrieval.customer_filter(ctx) if customer is not None and not everywhere else None
     project_id = (projects[0].pk if len(projects) == 1 and not customer_id and not ctx.get('customer_from_origin')

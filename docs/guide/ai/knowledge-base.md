@@ -6,7 +6,7 @@ where: 🏛️ Minerva AI → 🧠 База знань (пошта → RAG)
 urls: /admin/rag_assistant/knowledgesettings/, /admin/rag_assistant/knowledgesettings/overview/
 roles: адміністратор
 keywords: база знань, RAG, RAG-ПК, індексація, пошта, пошук, приватний пошук, sevskiy-prod, ключ RAG, пауза, переіндексувати, Wissensdatenbank, knowledge base
-related: ai/knowledge-overview, ai/knowledge-marks, ai/knowledge-documents, ai/knowledge-sources, mail/history, ai/entity-help
+related: ai/knowledge-overview, ai/knowledge-marks, ai/knowledge-documents, ai/knowledge-sources, mail/history, ai/entity-help, ai/knowledge-access
 ---
 
 ## Що це

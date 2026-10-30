@@ -385,7 +385,7 @@ def _rag_block(project, user, facts, refs, seen_documents=()) -> str:
         from email_assistant.reply_brief import Sources, rag_sources
         from rag_assistant import retrieval
         from rag_assistant.entity_help import build_query
-        if not retrieval.available():
+        if not retrieval.available_for(user):
             return ""
         src = Sources()
         threads = list(dict.fromkeys(x["msg"].thread_id for x in facts["messages"] if x["msg"].thread_id))

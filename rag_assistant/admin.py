@@ -8,8 +8,34 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
+from . import access
 from .client import RagClient, RagError
 from .models import RagConversation, RagMessage, RagSettings
+
+
+class RightsMixin:
+    """Сторінки бази знань і помічника: перегляд / зміна — за правами rag_assistant/access.py (поверх модуля).
+    view_rights — будь-яке з них відкриває перегляд, change_rights — зміну, додавання й видалення."""
+    view_rights = ("manage",)
+    change_rights = ("manage",)
+
+    def _right(self, request, rights) -> bool:
+        return any(access.has(request.user, r) for r in rights)
+
+    def has_module_permission(self, request):
+        return self._right(request, self.view_rights)
+
+    def has_view_permission(self, request, obj=None):
+        return self._right(request, self.view_rights)
+
+    def has_change_permission(self, request, obj=None):
+        return self._right(request, self.change_rights)
+
+    def has_add_permission(self, request):
+        return self._right(request, self.change_rights)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._right(request, self.change_rights)
 
 
 class RagSettingsForm(forms.ModelForm):
@@ -38,7 +64,7 @@ class RagSettingsForm(forms.ModelForm):
 
 
 @admin.register(RagSettings)
-class RagSettingsAdmin(admin.ModelAdmin):
+class RagSettingsAdmin(RightsMixin, admin.ModelAdmin):
     form = RagSettingsForm
     fieldsets = [
         (None, {"fields": ["enabled", "name"]}),
@@ -58,12 +84,14 @@ class RagSettingsAdmin(admin.ModelAdmin):
     readonly_fields = ["key_status", "check_status", "pc_panel"]
 
     def has_add_permission(self, request):
-        return not RagSettings.objects.exists()
+        return super().has_add_permission(request) and not RagSettings.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False
 
     def changelist_view(self, request, extra_context=None):
+        if not self.has_view_or_change_permission(request):
+            raise PermissionDenied
         return redirect(reverse("admin:rag_assistant_ragsettings_change", args=[RagSettings.get().pk]))
 
     @admin.display(description="Збережений ключ")
@@ -160,7 +188,8 @@ class RagMessageInline(admin.TabularInline):
 
 
 @admin.register(RagConversation)
-class RagConversationAdmin(admin.ModelAdmin):
+class RagConversationAdmin(RightsMixin, admin.ModelAdmin):
+    view_rights = change_rights = ("guide", "products", "manage")   # свої розмови (чужі — лише суперадміну)
     list_display = ["title", "user", "messages_count", "updated_at"]
     list_filter = ["user"]
     search_fields = ["title", "messages__content"]
@@ -273,7 +302,7 @@ class KnowledgeSettingsForm(forms.ModelForm):
 
 
 @admin.register(KnowledgeSettings)
-class KnowledgeSettingsAdmin(admin.ModelAdmin):
+class KnowledgeSettingsAdmin(RightsMixin, admin.ModelAdmin):
     form = KnowledgeSettingsForm
     readonly_fields = ["live_panel", "status_panel", "connection_help", "key_status", "feed_keys", "search_status",
                        "documents_panel"]
@@ -299,12 +328,14 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
     ]
 
     def has_add_permission(self, request):
-        return not KnowledgeSettings.objects.exists()
+        return super().has_add_permission(request) and not KnowledgeSettings.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False
 
     def changelist_view(self, request, extra_context=None):
+        if not self.has_view_or_change_permission(request):
+            raise PermissionDenied
         return redirect(reverse("admin:rag_assistant_knowledgesettings_change", args=[KnowledgeSettings.get().pk]))
 
     def save_model(self, request, obj, form, change):
@@ -384,9 +415,11 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
                                   ((f"/rag/knowledge/{f.obj_id}/" if f.doc_type == "document" else f"/email/message/{f.obj_id}/",
                                     f.document_id, f.error) for f in failed if f.status_revision == f.revision))
         return format_html('<table>{}</table>{}<div style="margin-top:8px"><a class="button" href="{}">'
-                           '📊 Огляд бази знань — що є, що в RAG і чому ні</a></div>', table,
+                           '📊 Огляд бази знань — що є, що в RAG і чому ні</a> <a class="button" href="{}">'
+                           '🔐 Доступ — хто може користуватись базою знань і RAG</a></div>', table,
                            format_html('<div style="margin-top:8px"><b>Останні помилки RAG:</b><ul>{}</ul></div>', errors)
-                           if errors else "", reverse("admin:rag_assistant_knowledgesettings_overview"))
+                           if errors else "", reverse("admin:rag_assistant_knowledgesettings_overview"),
+                           reverse("admin:rag_assistant_knowledgesettings_access"))
 
     @admin.display(description="Стан документів")
     def documents_panel(self, obj):
@@ -459,7 +492,49 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
             path("pause/", self.admin_site.admin_view(self.pause_view), name="rag_assistant_knowledgesettings_pause"),
             path("overview/", self.admin_site.admin_view(self.overview_view),
                  name="rag_assistant_knowledgesettings_overview"),
+            path("access/", self.admin_site.admin_view(self.access_view), name="rag_assistant_knowledgesettings_access"),
         ] + super().get_urls()
+
+    def access_view(self, request):
+        """«🔐 Доступ до бази знань і RAG»: люди × права (за роллю / ✓ дозволено / ✗ заборонено). Змінювати —
+        суперкористувач або «Може керувати юзерами» (access.can_grant), кожна зміна — у журналі аудиту."""
+        from django.template.response import TemplateResponse
+        can_grant = access.can_grant(request.user)
+        if not (can_grant or access.has(request.user, "manage")):
+            raise PermissionDenied
+        users = list(access.staff_users())
+        if request.method == "POST":
+            if not can_grant:
+                raise PermissionDenied
+            ip = request.META.get("REMOTE_ADDR")
+            changed = 0
+            for u in users:
+                if u.is_superuser:
+                    continue
+                values = {}
+                for key in access.RIGHT_KEYS:
+                    raw = request.POST.get(f"r_{u.pk}_{key}")
+                    if raw is None:
+                        continue
+                    values[key] = {"1": True, "0": False}.get(raw)           # "" — за роллю
+                before = access.overrides(u)
+                after = access.set_rights(u, values, request.user, ip=ip)
+                changed += after != before
+            messages.success(request, f"Права збережено (змінено людей: {changed}). Зміни — у журналі аудиту.")
+            return redirect(reverse("admin:rag_assistant_knowledgesettings_access"))
+        rows = []
+        for u in users:
+            profile = getattr(u, "profile", None)
+            state = access.rights_of(u)
+            rows.append({"user": u, "role": profile.get_role_display() if profile else "—",
+                         "admin": u.is_superuser or bool(profile and profile.role in access.ADMIN_ROLES),
+                         "cells": [{"key": k, **state[k]} for k in access.RIGHT_KEYS]})
+        from core.models import UserProfile
+        role_table = [{"role": label, "cells": [access.role_default(code, k) for k in access.RIGHT_KEYS]}
+                      for code, label in UserProfile.Role.choices]
+        return TemplateResponse(request, "admin/rag_assistant/knowledge_access.html", {
+            **self.admin_site.each_context(request), "title": "🔐 Доступ до бази знань і RAG", "opts": self.model._meta,
+            "rights": access.RIGHTS, "rows": rows, "role_table": role_table, "can_grant": can_grant})
 
     def overview_view(self, request):
         """«📊 Огляд бази знань»: що є, що в RAG, що чекає, що не вдалося і чому (rag_assistant/knowledge_overview.py)."""
@@ -546,7 +621,7 @@ DOC_TYPES_FOR_ADMIN = knowledge.DOC_TYPES
 
 
 @admin.register(KnowledgeDoc)
-class KnowledgeDocAdmin(admin.ModelAdmin):
+class KnowledgeDocAdmin(RightsMixin, admin.ModelAdmin):
     list_display = ["document_id_col", "revision", "fed", "state_col", "chunks", "error", "last_status_at"]
     list_filter = ["doc_type", "fed", "state"]
     actions = ["resend_action"]
@@ -600,9 +675,10 @@ def card_links(customer=None, projects=(), order=None, product=None, empty="—"
 
 
 @admin.register(KnowledgeItem)
-class KnowledgeItemAdmin(admin.ModelAdmin):
+class KnowledgeItemAdmin(RightsMixin, admin.ModelAdmin):
     """Файли й посилання бази знань (тип document). Додавати зручніше в картці клієнта / проєкту / замовлення /
     товару («📎 Документи й посилання»); тут — увесь список, пошук, зміна прив'язок і видимості."""
+    view_rights = change_rights = ("documents", "manage")
     list_display = ["title", "kind", "links_col", "visibility", "owner", "rag_col", "created_at"]
     list_filter = ["kind", "visibility", "auto", "knowledge_source"]
     search_fields = ["title", "note", "url", "file_name", "source_key", "source_path"]
@@ -622,7 +698,7 @@ class KnowledgeItemAdmin(admin.ModelAdmin):
               .prefetch_related("knowledge_source__projects"))
         if request.user.is_superuser:
             return qs
-        return qs.filter(Q(visibility=KnowledgeItem.TEAM) | Q(owner=request.user))
+        return qs.filter(knowledge_items.visible_q(request.user))        # як у картках: 🔒 свої + 👥 за правами
 
     def has_change_permission(self, request, obj=None):
         if obj is not None and not knowledge_items.can_change(request.user, obj) and not request.user.is_superuser:
@@ -754,9 +830,10 @@ FILES_SHOWN = 300
 
 
 @admin.register(KnowledgeSource)
-class KnowledgeSourceAdmin(admin.ModelAdmin):
+class KnowledgeSourceAdmin(RightsMixin, admin.ModelAdmin):
     """Папки й сайти, які Minerva сама обходить і передає в базу знань (rag_assistant/knowledge_sources.py);
     у папку — «📤 Завантажити файли / папку» з ПК."""
+    view_rights = change_rights = ("sources", "manage")
     form = KnowledgeSourceForm
     change_form_template = "admin/rag_assistant/knowledgesource/change_form.html"
     list_display = ["name", "kind", "where_col", "links_col", "enabled", "docs_col", "last_col"]

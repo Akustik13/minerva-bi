@@ -119,6 +119,28 @@ def visible(user, qs):
     return [i for i in qs if can_view(user, i)]
 
 
+def visible_q(user):
+    """Те саме правило, що can_view, — умовою для списків (адмінка «📎 Документи бази знань»)."""
+    from django.db.models import Exists, OuterRef
+
+    from .models import KnowledgeItem, KnowledgeSource
+    if not (user and user.is_authenticated and user.is_active):
+        return Q(pk__in=[])
+    own = Q(visibility=KnowledgeItem.PRIVATE, owner=user)
+    if not user.is_staff:
+        return own
+    source_projects = Exists(KnowledgeSource.projects.through.objects.filter(
+        knowledgesource_id=OuterRef("knowledge_source_id")))
+    no_links = Q(customer__isnull=True, project__isnull=True, order__isnull=True, product__isnull=True) & ~source_projects
+    linked = Q()
+    for kind, field in LINK_FIELDS.items():
+        if user.has_perm(PERMS[kind]):
+            linked |= Q(**{f"{field}__isnull": False})
+            if kind == "project":
+                linked |= source_projects
+    return own | (Q(visibility=KnowledgeItem.TEAM) & (no_links | linked))
+
+
 def items_for(user, kind, obj):
     from .models import KnowledgeItem
     if kind not in LINK_FIELDS:

@@ -487,6 +487,8 @@ def _rag(src, user, kind, obj, question, seen, threads, dedup, seen_documents=()
         return "skipped", "RAG не підключено", ""
     if not retrieval.available():
         return "skipped", "RAG не налаштований", ""
+    if not retrieval.available_for(user):
+        return "skipped", "немає права на пошук у базі знань", ""
     from email_assistant.reply_brief import rag_sources
     customer_id = obj.pk if kind == "customer" else (obj.customer_id if kind == "project" else None)
     scope = (f"клієнта {obj.company or obj.name}" if kind == "customer"

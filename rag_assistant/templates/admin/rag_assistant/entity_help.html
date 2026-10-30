@@ -226,6 +226,12 @@ eh_review=False — лише «❓ Запитати» (проєкт: огляд 
       .then(function (b) {
         if (!b || b.ok === false) return;
         renderDocs(b.items || []);
+        if (b.can_add === false) {                       // немає права «📎 Документи й посилання» — лише перегляд
+          var add = docs.querySelector('.ehw-add');
+          if (add) add.innerHTML = '<span class="ehw-sub">Додавати документи може той, кому адміністратор дав право «📎 Документи й посилання».</span>';
+          var sum = docs.querySelector('summary');
+          if (sum) sum.lastChild.textContent = sum.lastChild.textContent.replace(' · 📥 Додати', '');
+        }
         // сторінку за посиланням Minerva забирає у фоні — оновити стан, доки йде
         if ((b.items || []).some(function (d) { return d.rag.indexOf('завантажує') >= 0; }) && (again || 0) < 10)
           setTimeout(function () { loadDocs((again || 0) + 1); }, 2000);

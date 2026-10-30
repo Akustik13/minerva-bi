@@ -4,9 +4,9 @@ order: 60
 summary: Папки й сайти, з яких Minerva сама наповнює базу знань — файли з ПК чи телефона, готові папки NAS, сторінки сайтів.
 where: Система → Minerva AI → 📂 Джерела знань
 urls: /admin/rag_assistant/knowledgesource/, /admin/rag_assistant/knowledgesource/add/
-roles: адміністратор, менеджер
+roles: адміністратор, з правом «📂 Джерела знань»
 keywords: джерело знань, папка, файли, завантажити, документація, даташит, сайт, sitemap, посилання, NAS, RAG, база знань, Wissensquelle
-related: ai/knowledge-base, ai/knowledge-documents, ai/knowledge-overview
+related: ai/knowledge-base, ai/knowledge-documents, ai/knowledge-overview, ai/knowledge-access
 ---
 
 ## Що це

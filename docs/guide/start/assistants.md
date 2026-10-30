@@ -6,7 +6,7 @@ where: Кнопки внизу праворуч на кожній сторінц
 urls: /guide/, /ai/
 roles: усі
 keywords: помічник, асистент, AI, ШІ, чат, гід, довідка, допомога, Minerva AI, бот, Telegram, даташит, як зробити, де знайти, питання, Hilfe, Assistent, assistant, help
-related: ai/minerva-ai, ai/product-assistant, ai/entity-help, start/navigation
+related: ai/minerva-ai, ai/product-assistant, ai/entity-help, start/navigation, ai/knowledge-access
 ---
 
 ## Коротко
@@ -99,9 +99,10 @@ Staff — ще замовлення, клієнти й продажі, Manager �
 - **🏛️ Minerva AI:** адміністратор вмикає **«AI увімкнено»** у вашому профілі й вибирає **«Роль в AI
   асистенті»** ([Користувачі, ролі й доступ](guide:system/users-roles)); ключ Anthropic і бюджет — у
   [Налаштування AI](/admin/strategy/aisettings/).
-- **«Minerva»:** ваша роль має доступ до модуля «Помічник по продукції (RAG)» (адміністратори — завжди);
-  відповіді про товари — коли налаштовано [Помічник по продукції](/admin/rag_assistant/ragsettings/),
-  відповіді з гіда — коли є ключ Anthropic у налаштуваннях AI.
+- **«Minerva»:** у вас є право «📚 Гід» і / або «📦 Помічник по продукції» ([Доступ до бази знань і RAG](guide:ai/knowledge-access);
+  менеджер — обидва за роллю, адміністратори — завжди); відповіді про товари — коли налаштовано
+  [Помічник по продукції](/admin/rag_assistant/ragsettings/), відповіді з гіда — коли є ключ Anthropic у
+  налаштуваннях AI.
 - Витрати обох рахуються в місячний бюджет AI ([Бюджет AI](/admin/ai_assistant/aibudgetlog/)).
 
 ## Часті питання та проблеми
