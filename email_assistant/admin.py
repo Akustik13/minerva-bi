@@ -374,9 +374,9 @@ class EmailAccountAdmin(admin.ModelAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        for f in ('imap_password', 'smtp_password'):
+        for f in ('imap_password', 'smtp_password'):      # пароль не показується; порожнє — лишити (tabele/admin.py)
             if f in form.base_fields:
-                form.base_fields[f].widget.input_type = 'password'
+                form.base_fields[f].widget = forms.PasswordInput(render_value=True)
         return form
 
     def last_sync_col(self, obj):

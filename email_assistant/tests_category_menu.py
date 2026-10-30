@@ -91,6 +91,8 @@ class CategoryMenuTests(MenuBase):
 
     def test_without_rights_only_own_view_actions(self):
         clerk = get_user_model().objects.create_user("clerk", "clerk@x.example", "x", is_staff=True)
+        clerk.profile.module_operations = {"email_assistant": ["view"]}      # пошта — лише перегляд
+        clerk.profile.save()
         self.client.force_login(clerk)
         self.assertEqual(self.post("save", name="X").status_code, 403)
         self.assertEqual(self.post("delete").status_code, 403)

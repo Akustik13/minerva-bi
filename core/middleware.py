@@ -164,8 +164,12 @@ class ModuleAccessMiddleware:
                     }
 
             return False, _empty
-        except Exception:
-            return False, _empty  # fail open
+        except Exception:  # немає профілю Minerva або помилка перевірки — закрито (суперкористувача пропущено вище)
+            return True, {
+                'app_label': app_label,
+                'module_disabled': False,
+                'reason': 'Не вдалося перевірити ваш доступ (немає профілю Minerva?) — зверніться до адміністратора.',
+            }
 
 
 class UserLanguageMiddleware:

@@ -506,7 +506,8 @@ class KnowledgeSettingsAdmin(RightsMixin, admin.ModelAdmin):
         if request.method == "POST":
             if not can_grant:
                 raise PermissionDenied
-            ip = request.META.get("REMOTE_ADDR")
+            from core.utils import client_ip
+            ip = client_ip(request)
             changed = 0
             for u in users:
                 if u.is_superuser:

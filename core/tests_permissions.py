@@ -24,8 +24,10 @@ class HasPermTests(TestCase):
         self.assertTrue(olga.has_perm("crm.add_customer"))          # ROLE_OPERATIONS: crm view/add/change/export
         self.assertTrue(olga.has_perm("crm.change_customer"))
         self.assertFalse(olga.has_perm("crm.delete_customer"))      # операції немає, «Може видаляти» — ні
-        self.assertTrue(olga.has_perm("projects.view_project"))    # модуль ролі — перегляд
-        self.assertFalse(olga.has_perm("projects.change_project"))  # операцій для модуля в ролі немає — лише перегляд
+        self.assertTrue(olga.has_perm("projects.change_project"))   # проєкти, Angebote, пошта — робота менеджера
+        self.assertTrue(olga.has_perm("offers.add_offer"))
+        self.assertFalse(olga.has_perm("offers.delete_offer"))
+        self.assertFalse(olga.has_perm("shop.view_shop"))           # модуля немає в ролі
         self.assertFalse(olga.has_perm("inventory.view_product"))  # модуля немає в ролі
         self.assertTrue(olga.has_module_perms("crm"))
         self.assertFalse(olga.has_module_perms("inventory"))

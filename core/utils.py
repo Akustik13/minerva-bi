@@ -18,6 +18,30 @@ def clear_current_user():
     _current_user_local.user = None
 
 
+def client_ip(request):
+    """IP людини для журналу аудиту. За зворотним проксі DSM — X-Real-IP, інакше ОСТАННІЙ елемент X-Forwarded-For
+    (той, кого бачив проксі; перші клієнт може підробити), інакше REMOTE_ADDR. Те саме правило — api/key_limits.py."""
+    import ipaddress
+
+    def valid(value):
+        value = (value or '').strip()
+        try:
+            return str(ipaddress.ip_address(value)) if value else None
+        except ValueError:
+            return None
+
+    if request is None:
+        return None
+    meta = request.META
+    real = valid(meta.get('HTTP_X_REAL_IP'))
+    if real:
+        return real
+    chain = [p for p in (meta.get('HTTP_X_FORWARDED_FOR') or '').split(',') if p.strip()]
+    if chain and valid(chain[-1]):
+        return valid(chain[-1])
+    return valid(meta.get('REMOTE_ADDR'))
+
+
 def is_minerva_admin(user) -> bool:
     """
     True if user is Django superuser OR has superadmin/admin Minerva role.
@@ -123,6 +147,13 @@ ROLE_OPERATIONS = {
         'dashboard':  ['view'],
         'faq':        ['view'],
         'labels_app': ['view', 'add'],
+        # модулі ролі, у яких менеджер працює щодня (раніше — лише перегляд, бо їх не було в цьому списку)
+        'email_assistant': ['view', 'add', 'change'],
+        'projects':        ['view', 'add', 'change'],
+        'offers':          ['view', 'add', 'change', 'export'],
+        'calendar_app':    ['view', 'add', 'change'],
+        'worktime':        ['view', 'add', 'change'],
+        'documents':       ['view', 'add', 'change'],
     },
     'warehouse': {
         'inventory':  ['view', 'add', 'change', 'import'],
@@ -130,6 +161,8 @@ ROLE_OPERATIONS = {
         'labels_app': ['view', 'add'],
         'dashboard':  ['view'],
         'faq':        ['view'],
+        'tasks':      ['view', 'add', 'change'],
+        'calendar_app': ['view', 'add', 'change'],
     },
     'accountant': {
         'sales':      ['view', 'export'],
@@ -201,7 +234,7 @@ def user_has_operation(user, app_label: str, operation: str) -> bool:
             return True
         return operation in (ops or [])
     except Exception:
-        return True  # fail open
+        return False  # немає профілю / помилка — закрито (суперкористувача перевірено вище)
 
 
 def apply_role_defaults(profile) -> None:
