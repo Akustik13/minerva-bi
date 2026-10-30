@@ -60,6 +60,7 @@ tabele_mvp/
 - `SalesOrder` — замовлення, поля: `source`, `status`, `shipping_deadline`, `shipped_at`, `affects_stock`, `order_date`
 - `SalesOrderLine` — рядки: SKU, QTY, `total_price` (використовується в dashboard revenue)
 - `SalesSource` — словник джерел (slug-based)
+- **Виручка для звітів** — лише `sales/revenue.py`: `sale_orders()` (SALE, не скасоване, `affects_stock`), `to_ship()` (без скасованих / відправлених / доставлених / QUOTE; зразки — так), сума замовлення `total_price` → рядки (`line_amount`), перерахунок у валюту Minerva `offers.pricing.fx` (`Rates`, `Money`: `total` + `missing` «+ $1,000 без курсу»), `revenue(orders, by=…)`, `line_revenue`, `converted` — групування в БД, курс у Python. Користуються дашборд, тенденції, сигнали, дайджести, RFM
 - Номер EU Invoice (`SalesOrder.eu_invoice_number`) — лише `sales/eu_invoice_numbers.py`: `assign_invoice_number` під `select_for_update` рядка `SalesSettings` (у замовлення вже є — той самий, номер з форми — лише вільний, інакше `InvoiceNumberTaken` → 409), `get_next_invoice_number` — лише підказка; унікального обмеження в БД немає навмисно (давні повтори на робочій базі зупинили б міграцію). Тести: `sales/tests_eu_invoice.py`
 - `accounting.Invoice.number` — `INV-<рік>-NNNN`, у `save` під `select_for_update` `CompanySettings` (зайнятий номер пропускається, збій збереження — лічильник відкочується). Тести: `accounting/tests.py`
 - Імпорт Excel — поля й авто-маппінг ТІЛЬКИ `sales/importing.py` (`guess_mapping`: точний збіг → ціле слово → початок слова, одне поле на колонку; `duplicate_fields`), кожне замовлення — свій savepoint, невідомий артикул (`stock.resolve_sku`) пропускає лише це замовлення; JS-тексти шаблону — `escapejs`. Вибір «Джерело» — `sales.admin.source_choices` (код поза довідником лишається вибраним). Тести: `python manage.py test sales --settings=tabele.settings_test`
@@ -68,6 +69,7 @@ tabele_mvp/
 - `Customer` — RFM scores (R/F/M), segment, status
 - Дедуплікація: `external_key` = SHA256, метод `Customer.generate_key()`
 - Auto-sync через **Django signals** при збереженні SalesOrder
+- RFM, «Тип», замовлення й виручка клієнта — лише `crm/utils.py` (`order_stats`, `prefetch_stats`, `rfm_from`, `rfm_scores`; `Customer.rfm_score()` викликає їх): лише `sale_orders()`, M у валюті Minerva. `auto_sync_customer` ставить `instance.customer_key`, тож `create_order_timeline_event` створює подію (одну на замовлення). Тести: `crm/tests_rfm.py`
 - «Тип клієнта» (фільтр і колонка «Тип») — `crm/utils.order_counts` (замовлення: `customer_key` = `external_key`, без відомого ключа CRM — за email; два згруповані запити), `REPEAT_MIN_ORDERS` = 2, `repeat_customer_ids`; колонка — `CustomerAdmin.get_changelist_instance` → `_type_orders`. «Замовлень», виручка й RFM — і далі лише за ключем. Тести: `crm/tests.py`
 - Злиття дублів — лише `crm/merge.py` (`merge_customers`, `summary`, `MergeError`): одна транзакція; замовлення за ключем і за email; кожен FK / OneToOne на Customer через `_meta.get_fields(include_hidden=True)` (і `related_name="+"`) та M2M; `EntityHelp` kind=customer; після commit — файли `media/customers/<pk>/` (збіг назв → «X (2).pdf») і `knowledge_hook.touch` / `knowledge_items.touch`; унікальний зв'язок, який переможець уже має (Kundennummer), → без клієнта, `kept`. Ним користуються «🔀 Злити», «⚡ Злити всі», `manage.py merge_duplicate_customers`
 - «📬 Листи зі скриньки» в картці клієнта (і AI-аналіз, вибрані `mailbox_ids`) — `crm/views._own_messages`: лише власні скриньки (`account__user`), і для суперкористувача; тема — текстом (екранується). Тести: `crm/tests_mailbox_privacy.py`
@@ -594,8 +596,11 @@ AI та Боти → /admin/bots/
 
 URL: `/dashboard/`
 Фільтри: `date_from`, `date_to`, `source`, `category` + JS-пресети 30/60/90/365д
-Base queryset: `SalesOrder.objects.filter(affects_stock=True)`
-Revenue: `SalesOrderLine.objects.aggregate(Sum('total_price'))`
+Base queryset: `sales.revenue.sale_orders()` (SALE, не скасоване, `affects_stock`); виручка у валюті Minerva (`cur_sym`), без курсу — `kpi.revenue.note`; період N днів включно + попередній такої ж довжини (`period_bounds`, `timezone.localdate()`); YoY — `ytd_spans`; JSON графіків — `_js`; критичний склад — `stock.low_stock_items` (ті самі числа, що сигнали й листи `notifications._get_critical_stock`). Довідка — `docs/guide/sales/dashboard.md`. Тести: `dashboard/tests_revenue.py`, `dashboard/tests_stock_notifications.py`
+
+**Консоль API** `/dashboard/api/console/` і `api/proxy/` — лише `is_minerva_admin`; ключі в сторінці замасковані (`console_keys`, `json_script`), ключ за `key_id` додає сервер; проксі — лише `/api/v1/` цієї Minerva (`own_api_target`), виконується в процесі (`_dispatch_internal`, без мережі). Тести: `dashboard/tests_console.py`
+
+Сповіщення й дайджести: усі значення через `notifications.esc()`, Telegram — `tg_cut()`; помилки відправлення — `logger.warning`. Місячний дайджест — попередній повний місяць проти місяця перед ним (`digest.last_full_month`), тижневий — 7 повних днів до вчора. «Є на складі» в листі про нове замовлення — `stock.order_lines_cover` (своє списання не нестача). Тести: `dashboard/tests_digest.py`
 
 **Листи-сповіщення в Outlook** — кожен HTML-лист `dashboard/notifications.py` іде через `outlook_safe(html)` (настільний Outlook малює рушієм Word: не розуміє `max-width`, CSS-розміри картинок і `display:none`): велике фото для збільшення при наведенні (`mv-big`, `display:none`) — у `<!--[if !mso]><!-->…<!--<![endif]-->` + `mso-hide:all` (у браузері й пошті Minerva наведення працює, в Outlook — мініатюра 60×60 з посиланням на фото), перший блок `max-width:Npx` — у MSO-таблицю шириною N, таблицям `width:100%` — атрибут `width="100%"`, шрифт body — MSO-стилем на `table,td` (інакше Times); повторний виклик нічого не змінює. Новий лист — теж через неї. Тести: `dashboard/tests_outlook.py`
 

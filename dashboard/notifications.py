@@ -61,45 +61,26 @@ def _get_company_name() -> str:
 # ── Data collection ────────────────────────────────────────────────────────────
 
 def _get_critical_stock():
-    """Products with < 1.5 months supply based on 90-day average consumption."""
+    """Товари, які пора дозамовити, — ті самі, що на дашборді й сторінці сигналів
+    (inventory/services/stock.low_stock_items: доступно з резервом і відкритими замовленнями, без скасованих продажів,
+    точка дозамовлення, уже замовлене). Вимкнено «Попередження про низький залишок» — порожньо."""
     try:
-        from django.db.models import Sum
-        from inventory.models import Product, InventoryTransaction
-        from sales.models import SalesOrderLine
-
-        since_3m = timezone.now() - timedelta(days=90)
+        from inventory.services.stock import low_stock_items
         items = []
-
-        for p in Product.objects.filter(is_active=True).only(
-            'pk', 'sku', 'name', 'reorder_point',
-        ):
-            stock = float(
-                InventoryTransaction.objects.filter(product=p)
-                .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
-                .aggregate(t=Sum('qty'))['t'] or 0
-            )
-            sold = float(
-                SalesOrderLine.objects.filter(
-                    product=p,
-                    order__order_date__gte=since_3m.date(),
-                    order__affects_stock=True,
-                ).aggregate(t=Sum('qty'))['t'] or 0
-            )
-            monthly = sold / 3
-            if monthly > 0:
-                months_left = max(0.0, stock / monthly)
-                if months_left < 1.5:
-                    items.append({
-                        'pk':          p.pk,
-                        'sku':         p.sku,
-                        'name':        p.name,
-                        'stock':       round(stock, 1),
-                        'monthly':     round(monthly, 1),
-                        'months_left': round(months_left, 2),
-                        'is_critical': months_left < 0.5,
-                    })
-        return sorted(items, key=lambda x: x['months_left'])
+        for d in low_stock_items():
+            months = d.get('months_left')
+            items.append({
+                'pk':          d['pk'],
+                'sku':         d['sku'],
+                'name':        d['name'],
+                'stock':       round(d['available'], 1),
+                'monthly':     round(float(d.get('monthly') or 0), 1),
+                'months_left': round(months, 2) if months is not None else '—',
+                'is_critical': d['status'] == 'critical',
+            })
+        return items
     except Exception:
+        logger.exception('critical stock for notifications failed')
         return []
 
 
@@ -1083,7 +1064,11 @@ def notify_new_order(order, is_test: bool = False):
         order_lines = list(order.lines.select_related('product').all())
     except Exception:
         order_lines = []
-    from django.db.models import Sum as _LSum
+    try:   # «є на складі»: доступно + те, що вже тримає це замовлення (своє списання — не нестача)
+        from inventory.services.stock import order_lines_cover
+        cover = order_lines_cover(order)
+    except Exception:
+        cover = {}
     for line in order_lines:
         try:
             product = getattr(line, 'product', None)
@@ -1091,9 +1076,9 @@ def notify_new_order(order, is_test: bool = False):
                 product = _LP.objects.filter(sku=line.sku_raw).first()
             stock    = 0
             in_stock = None
-            if product and _IT:
-                stock    = int(_IT.objects.filter(product=product).aggregate(t=_LSum('qty'))['t'] or 0)
-                in_stock = stock >= (line.qty or 0)
+            if line.pk in cover:
+                stock    = int(cover[line.pk]['free'])
+                in_stock = cover[line.pk]['free'] >= (line.qty or 0)
             img = ''
             if product:
                 # Prefer external image_url (reachable by email clients + Telegram)
