@@ -361,6 +361,9 @@ def step_details(listing, steps, events, todo, error, current):
         elif key == "offer":
             if listing.dk_offer_id:
                 facts.append(("DK Offer ID", listing.dk_offer_id))
+            if events.get("offer_linked"):
+                facts.append(("Як з'явився", "офер уже був на DigiKey — Minerva прив'язала його (ціни й залишок "
+                                             "взято з DigiKey, там нічого не змінено)"))
             if events.get("found_offer"):
                 facts.append(("На DigiKey є офер з цим артикулом", events["found_offer"]))
                 actions.append({"label": "🔗 Звірити офери й записати ID",

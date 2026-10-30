@@ -178,6 +178,50 @@ class AdminRoadmapTests(PublishBase):
                               .context["cl"].result_list), [])
 
 
+class ExistingOfferTests(PublishBase):
+    """DigiKey: «An offer already exists for this product» — прив'язати наявний офер, а не падати."""
+
+    def test_existing_offer_is_linked_instead_of_error(self):
+        fake = FakeMarketplace(approved=True)
+        existing = {"id": "offer-old", "productId": "prod-1", "supplierSku": "FT220407", "isActive": True,
+                    "offerStatusReason": "Active", "createDateUtc": "2026-07-01T09:00:00Z", "quantityAvailable": 7,
+                    "prices": [{"quantityBreak": 1, "price": 21.5}]}
+
+        def post(url, json=None, **kw):
+            fake.calls.append(("POST", url, json))
+            if url.endswith("/offers"):
+                return _Resp(400, {"title": "Bad Request", "detail": "An offer already exists for this product.",
+                                   "errors": {"inner": ["Product 'prod-1' already has an offer."]}})
+            return _Resp(200, {"_id": "staged-1"})
+
+        def get(url, params=None, **kw):
+            fake.calls.append(("GET", url, params))
+            if url.endswith("/offers") and (params or {}).get("ProductId") == "prod-1":
+                return _Resp(200, {"offers": [existing]})
+            return FakeMarketplace.get(fake, url, params=params, **kw)
+
+        fake.post, fake.get = post, get
+        self.use(fake)
+        DigiKeyListing.objects.filter(pk=self.listing.pk).update(dk_product_id="prod-1", sync_status="staged",
+                                                                 last_error="create_offer 400: already")
+        mp.create_offer_for_listing(self.reload())
+        listing = self.reload()
+        self.assertEqual((listing.dk_offer_id, listing.sync_status, listing.last_error),
+                         ("offer-old", "published", ""))
+        self.assertEqual((listing.dk_prices, listing.dk_quantity_available), ([{"qty": 1, "price": 21.5}], 7))
+        rm = dk_publish.roadmap(listing, detail=True)
+        self.assertEqual(rm["steps"][4]["state"], "done")
+        self.assertTrue(any("уже був на DigiKey" in v for _k, v in rm["steps"][4]["facts"]))
+        self.assertFalse([c for c in fake.calls if c[0] == "PUT"])      # на DigiKey нічого не змінено
+
+    def test_other_400_still_raises(self):
+        fake = FakeMarketplace(approved=False)
+        self.use(fake)
+        DigiKeyListing.objects.filter(pk=self.listing.pk).update(dk_product_id="staged-1")
+        with self.assertRaises(mp.DKMarketplaceError):
+            mp.create_offer_for_listing(self.reload())
+
+
 class StepDetailsTests(AdminRoadmapTests):
     """Клік по кроку карти: звідки дата, ID, помилка DigiKey, кнопки дій."""
 

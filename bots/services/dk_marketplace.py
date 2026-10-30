@@ -267,6 +267,9 @@ def create_offer(config, listing) -> str:
         body = {}
         try: body = e.response.json()
         except Exception: pass
+        existing = _adopt_existing_offer(listing, body)
+        if existing:
+            return existing
         raise DKMarketplaceError(
             f"create_offer {e.response.status_code}: {body}"
         ) from e
@@ -278,6 +281,47 @@ def create_offer(config, listing) -> str:
     mark(listing, "approved")                 # офер прийнято — товар уже затверджено
     note_offer(listing, data)
     return offer_id
+
+
+def _adopt_existing_offer(listing, body) -> str:
+    """DigiKey відповів «An offer already exists for this product»: офер є (створений на supplier.digikey.com або
+    попередньою спробою, відповідь на яку загубилась), а в лістингу його ID немає. Другий не створюємо — знаходимо
+    наявний (GET /offers?ProductId=) і прив'язуємо: ID, ціни й залишок — як на DigiKey (нічого там не змінюємо).
+    Повертає ID офера або '' (не та помилка / офер не знайдено — тоді показується відмова DigiKey)."""
+    import json
+    text = json.dumps(body, ensure_ascii=False).lower() if body else ""
+    if "already" not in text or "offer" not in text or not listing.dk_product_id:
+        return ""
+    from bots.services.dk_prices import _get_offers
+    try:
+        offers = _get_offers({"ProductId": listing.dk_product_id})
+    except Exception as exc:  # noqa: BLE001 — не знайшли: показуємо відмову DigiKey як є
+        logger.warning("DK adopt offer %s: %s", listing.get_supplier_sku(), exc)
+        return ""
+    sku = listing.get_supplier_sku()
+    offer = next((o for o in offers if (o.get("supplierSku") or "").strip() == sku), None) \
+        or (offers[0] if len(offers) == 1 else None)
+    if not offer or not offer.get("id"):
+        return ""
+    fields = ["dk_offer_id"]
+    listing.dk_offer_id = offer["id"]
+    tiers = _parse_dk_price_tiers(offer.get("prices") or [])
+    if tiers:
+        listing.dk_prices = tiers
+        fields.append("dk_prices")
+    if offer.get("quantityAvailable") is not None:
+        try:
+            listing.dk_quantity_available = int(offer["quantityAvailable"])
+            fields.append("dk_quantity_available")
+        except (TypeError, ValueError):
+            pass
+    listing.save(update_fields=fields)
+    from bots.services.dk_publish import mark, note_offer
+    mark(listing, "approved")
+    note_offer(listing, offer)
+    mark(listing, None, offer_linked=offer["id"])
+    logger.info("DK create_offer: офер %s уже був — прив'язано до %s", offer["id"], sku)
+    return offer["id"]
 
 
 def update_offer(config, listing) -> None:
