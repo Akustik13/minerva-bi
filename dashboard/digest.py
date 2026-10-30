@@ -600,8 +600,9 @@ def send_digest(force: bool = False, period: str = "daily") -> dict:
     if not ns.digest_enabled and not force:
         return {"sent": False, "reason": "Digest вимкнено"}
 
-    send_email = ns.email_enabled and ns.digest_email
-    send_tg    = ns.telegram_enabled and ns.digest_telegram
+    from dashboard.notifications import channels, targeted
+    send_email, send_tg = channels(ns, ns.email_enabled and ns.digest_email,
+                                   ns.telegram_enabled and ns.digest_telegram)
     if not send_email and not send_tg:
         return {"sent": False, "reason": "Жоден канал не налаштований (email / Telegram)"}
 
@@ -685,7 +686,7 @@ def send_digest(force: bool = False, period: str = "daily") -> dict:
             results["telegram"] = {"error": str(e)}
 
     overall = results["email"].get("sent") or results["telegram"].get("sent")
-    if overall:
+    if overall and not targeted():          # надіслане лише вибраним розклад не зсуває
         from config.models import NotificationSettings as NS
         NS.objects.filter(pk=1).update(digest_last_sent=timezone.now())
 
@@ -703,8 +704,9 @@ def _send_weekly(force: bool = False) -> dict:
     if not ns.weekly_digest_enabled and not force:
         return {"sent": False, "reason": "Тижневий звіт вимкнено"}
 
-    send_email = ns.email_enabled and ns.digest_email
-    send_tg    = ns.telegram_enabled and ns.digest_telegram
+    from dashboard.notifications import channels, targeted
+    send_email, send_tg = channels(ns, ns.email_enabled and ns.digest_email,
+                                   ns.telegram_enabled and ns.digest_telegram)
     if not send_email and not send_tg:
         return {"sent": False, "reason": "Жоден канал не налаштований (email / Telegram)"}
 
@@ -779,7 +781,7 @@ def _send_weekly(force: bool = False) -> dict:
             results["telegram"] = {"error": str(e)}
 
     overall = results["email"].get("sent") or results["telegram"].get("sent")
-    if overall:
+    if overall and not targeted():          # надіслане лише вибраним розклад не зсуває
         from config.models import NotificationSettings as NS
         NS.objects.filter(pk=1).update(weekly_digest_last_sent=timezone.now())
 
@@ -797,8 +799,9 @@ def _send_monthly(force: bool = False) -> dict:
     if not ns.monthly_digest_enabled and not force:
         return {"sent": False, "reason": "Місячний звіт вимкнено"}
 
-    send_email = ns.email_enabled and ns.digest_email
-    send_tg    = ns.telegram_enabled and ns.digest_telegram
+    from dashboard.notifications import channels, targeted
+    send_email, send_tg = channels(ns, ns.email_enabled and ns.digest_email,
+                                   ns.telegram_enabled and ns.digest_telegram)
     if not send_email and not send_tg:
         return {"sent": False, "reason": "Жоден канал не налаштований (email / Telegram)"}
 
@@ -874,7 +877,7 @@ def _send_monthly(force: bool = False) -> dict:
             results["telegram"] = {"error": str(e)}
 
     overall = results["email"].get("sent") or results["telegram"].get("sent")
-    if overall:
+    if overall and not targeted():          # надіслане лише вибраним розклад не зсуває
         from config.models import NotificationSettings as NS
         NS.objects.filter(pk=1).update(monthly_digest_last_sent=timezone.now())
 

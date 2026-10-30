@@ -1,0 +1,51 @@
+{% extends "admin/base_site.html" %}
+{% comment %}«Надіслати зараз» — вікно «Кому» (config/admin_send.py): адреси з налаштувань підставлені, людина
+міняє їх або вписує свою; Telegram — так / ні.{% endcomment %}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block content %}
+<style>
+  .sn-box { max-width: 720px; padding: 16px 20px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); }
+  .sn-box label { display: block; float: none; width: auto; padding: 0; font-weight: 600; margin: 14px 0 4px; }
+  .sn-box textarea { width: 100%; box-sizing: border-box; min-height: 64px; font-size: 13px; }
+  .sn-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .sn-err { margin: 10px 0 0; padding: 8px 12px; border-radius: 6px; background: rgba(229, 72, 77, .14); }
+  .sn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+  .sn-chk { display: flex !important; gap: 8px; align-items: center; font-weight: 400 !important; }
+</style>
+<form method="post" class="sn-box">{% csrf_token %}
+  <div>{{ about }}</div>
+  {% if preview %}<div class="sn-muted" style="margin-top:6px">{{ preview }}</div>{% endif %}
+
+  <label for="sn-to">Кому (email)</label>
+  <textarea id="sn-to" name="to" placeholder="адреса@фірма.de, ще@адреса.com">{{ to }}</textarea>
+  <div class="sn-row">
+    {% if my_email %}<button type="button" class="button" data-sn-set="{{ my_email }}">👤 Лише мені ({{ my_email }})</button>{% endif %}
+    {% if configured %}<button type="button" class="button" data-sn-set="{{ configured }}">↺ Як у налаштуваннях</button>{% endif %}
+    <button type="button" class="button" data-sn-set="">✕ Очистити</button>
+  </div>
+  <div class="sn-muted" style="margin-top:4px">Підставлено адреси з «Кому (email)» налаштувань сповіщень. Змініть
+    або впишіть свою; кілька — через кому. Надсилається лише цим адресам — решта команди нічого не отримає, і
+    розклад автоматичних листів не зсувається.</div>
+
+  {% if tg_allowed %}
+  <label class="sn-chk"><input type="checkbox" name="telegram" value="1"{% if telegram %} checked{% endif %}{% if not tg_ready %} disabled{% endif %}>
+    📱 Також у Telegram{% if not tg_ready %} <span class="sn-muted">(бот або чат не налаштовані)</span>{% endif %}</label>
+  {% endif %}
+
+  {% if error %}<div class="sn-err">{{ error }}</div>{% endif %}
+  <div class="sn-row" style="margin-top:16px">
+    {% if can_send %}<button type="submit" class="button default">📤 Надіслати</button>{% endif %}
+    <a href="{{ back_url }}">← до налаштувань сповіщень</a>
+  </div>
+</form>
+<script>
+  document.querySelectorAll('[data-sn-set]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var to = document.getElementById('sn-to'); to.value = b.dataset.snSet; to.focus();
+    });
+  });
+</script>
+{% endblock %}

@@ -483,7 +483,8 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
             "fields": ("alert_actions",),
             "description": (
                 "Тест перевіряє SMTP без реальних даних. "
-                "'Надіслати зараз' — ігнорує інтервал і перевіряє реальні алерти."
+                "'Надіслати зараз' — ігнорує інтервал і перевіряє реальні алерти. "
+                "Спершу Minerva спитає, кому надіслати: адреси з налаштувань підставлені, їх можна змінити."
             ),
         }),
     ]
@@ -570,36 +571,14 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         obj = NotificationSettings.get()
         return redirect(reverse("admin:config_notificationsettings_change", args=[obj.pk]))
 
+    # «Надіслати …» — спершу вікно «Кому» (config/admin_send.py): адреси з налаштувань, можна змінити
     def _test_email(self, request, pk):
-        from django.contrib import messages
-        from dashboard.notifications import run_alerts
-        result = run_alerts(is_test=True, test_channel='email')
-        if result.get('sent'):
-            messages.success(request, "✅ Тестовий email надіслано! Перевірте поштову скриньку.")
-        else:
-            err = (
-                result.get('email', {}).get('error')
-                or result.get('error')
-                or result.get('reason')
-                or '?'
-            )
-            messages.error(request, f"❌ Email помилка: {err}")
-        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+        from config.admin_send import send_now_view
+        return send_now_view(self, request, "test")
 
     def _send_now(self, request, pk):
-        from django.contrib import messages
-        from dashboard.notifications import run_alerts
-        result = run_alerts(force=True)
-        if result.get('sent'):
-            messages.success(request, (
-                f"✅ Надіслано: {result.get('critical', 0)} critical stock, "
-                f"{result.get('overdue', 0)} overdue orders"
-            ))
-        elif result.get('ok'):
-            messages.info(request, f"ℹ️ {result.get('reason', 'Немає алертів для надсилання')}")
-        else:
-            messages.error(request, f"❌ Помилка: {result.get('error') or result.get('reason', '?')}")
-        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+        from config.admin_send import send_now_view
+        return send_now_view(self, request, "alerts")
 
     def _test_telegram(self, request, pk):
         from django.contrib import messages
@@ -938,23 +917,8 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
     dk_confirm_preview.short_description = "Приклад повідомлення"
 
     def _send_digest(self, request, pk):
-        from django.contrib import messages
-        from dashboard.digest import send_digest
-        result = send_digest(force=True)
-        if result.get("sent"):
-            parts = []
-            if result.get("email", {}).get("sent"):
-                parts.append("Email ✓")
-            if result.get("telegram", {}).get("sent"):
-                parts.append("Telegram ✓")
-            for ch, info in result.items():
-                if isinstance(info, dict) and info.get("error"):
-                    parts.append(f"{ch}: {info['error']}")
-            messages.success(request, f"✅ Звіт надіслано: {', '.join(parts)}")
-        else:
-            err = result.get("reason") or result.get("error") or "?"
-            messages.error(request, f"❌ Помилка: {err}")
-        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+        from config.admin_send import send_now_view
+        return send_now_view(self, request, "daily")
 
     def digest_actions(self, obj):
         if not obj or not obj.pk:
@@ -993,24 +957,12 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
 
     def _send_weekly_digest(self, request, pk):
-        from django.contrib import messages
-        from dashboard.digest import send_digest
-        result = send_digest(force=True, period='weekly')
-        if result.get("sent"):
-            messages.success(request, "✅ Тижневий звіт надіслано!")
-        else:
-            messages.error(request, f"❌ {result.get('reason') or result.get('error') or '?'}")
-        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+        from config.admin_send import send_now_view
+        return send_now_view(self, request, "weekly")
 
     def _send_monthly_digest(self, request, pk):
-        from django.contrib import messages
-        from dashboard.digest import send_digest
-        result = send_digest(force=True, period='monthly')
-        if result.get("sent"):
-            messages.success(request, "✅ Місячний звіт надіслано!")
-        else:
-            messages.error(request, f"❌ {result.get('reason') or result.get('error') or '?'}")
-        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+        from config.admin_send import send_now_view
+        return send_now_view(self, request, "monthly")
 
     def imap_actions(self, obj):
         if not obj or not obj.pk:

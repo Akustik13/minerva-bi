@@ -1,12 +1,14 @@
 """Email + Telegram alert service — critical stock + overdue shipping deadlines."""
 from __future__ import annotations
 
+import contextvars
 import html as _html
 import json
 import logging
 import re
 import urllib.request
 import urllib.error
+from contextlib import contextmanager
 from datetime import timedelta
 
 from django.utils import timezone
@@ -380,11 +382,69 @@ def outlook_safe(html: str) -> str:
         html = html[:end] + closing + html[end:] if end >= 0 else html + closing
     return html
 
+# ── «Надіслати зараз» лише вибраним (config/admin.py → send_now_view) ──────────
+
+_ONLY = contextvars.ContextVar('minerva_send_only', default=None)
+MAX_RECIPIENTS = 20
+
+
+@contextmanager
+def send_only_to(emails, telegram: bool):
+    """У межах with попередження й звіти йдуть лише на emails (замість «Кому (email)» налаштувань) і в Telegram —
+    лише якщо telegram. Розклад (last_sent) такі надсилання не зсувають — команда отримає своє як завжди."""
+    token = _ONLY.set({'emails': list(emails), 'telegram': bool(telegram)})
+    try:
+        yield
+    finally:
+        _ONLY.reset(token)
+
+
+def targeted() -> bool:
+    return _ONLY.get() is not None
+
+
+def configured_recipients(ns) -> list:
+    return [e.strip() for e in (ns.email_to or '').replace(';', ',').split(',') if e.strip()]
+
+
+def recipients(ns) -> list:
+    only = _ONLY.get()
+    return list(only['emails']) if only is not None else configured_recipients(ns)
+
+
+def channels(ns, email_on: bool, tg_on: bool) -> tuple:
+    """(email, telegram) з урахуванням send_only_to: вибране людиною — якщо канал налаштований (SMTP / бот)."""
+    only = _ONLY.get()
+    if only is None:
+        return email_on, tg_on
+    return (bool(only['emails']) and bool(ns.email_host),
+            only['telegram'] and bool(ns.telegram_bot_token) and bool(ns.telegram_chat_id))
+
+
+def parse_recipients(text) -> tuple:
+    """«a@x.de, b@y.com; c@z» (кома, крапка з комою, рядки, пробіли) → (адреси без повторів, неправильні)."""
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+    good, bad = [], []
+    for raw in re.split(r'[,;\s]+', str(text or '')):
+        email = raw.strip().strip('<>').strip()
+        if not email:
+            continue
+        try:
+            validate_email(email)
+        except ValidationError:
+            bad.append(email)
+            continue
+        if email.lower() not in {g.lower() for g in good}:
+            good.append(email)
+    return good, bad
+
+
 def _send_email(ns, critical_items, overdue_orders, is_test=False):
     from django.core.mail import get_connection, EmailMultiAlternatives
 
-    recipients = [e.strip() for e in (ns.email_to or '').split(',') if e.strip()]
-    if not recipients:
+    recipients_ = recipients(ns)
+    if not recipients_:
         raise ValueError("Немає отримувачів (поле email_to порожнє)")
 
     # Subject
@@ -430,7 +490,7 @@ def _send_email(ns, critical_items, overdue_orders, is_test=False):
         subject=subject,
         body=plain,
         from_email=from_email,
-        to=recipients,
+        to=recipients_,
         connection=connection,
     )
     msg.attach_alternative(outlook_safe(html_body), 'text/html')
@@ -450,14 +510,13 @@ def run_alerts(force: bool = False, is_test: bool = False, test_channel: str | N
     except Exception as e:
         return {'sent': False, 'error': str(e)}
 
-    email_active = ns.email_enabled and bool(
-        [e.strip() for e in (ns.email_to or '').split(',') if e.strip()]
-    )
+    email_active = ns.email_enabled and bool(configured_recipients(ns))
     tg_active = (
         ns.telegram_enabled
         and bool(ns.telegram_bot_token)
         and bool(ns.telegram_chat_id)
     )
+    email_active, tg_active = channels(ns, email_active, tg_active)
     if not email_active and not tg_active:
         return {'sent': False, 'reason': 'Жоден канал сповіщень не налаштований (email / Telegram)'}
 
@@ -535,7 +594,7 @@ def run_alerts(force: bool = False, is_test: bool = False, test_channel: str | N
             tg_result = {'error': str(e)}
 
     overall_sent = email_result.get('sent', False) or tg_result.get('sent', False)
-    if overall_sent:
+    if overall_sent and not targeted():        # надіслане лише вибраним розклад команди не зсуває
         ns.last_alert_sent = timezone.now()
         ns.save(update_fields=['last_alert_sent'])
 
@@ -967,17 +1026,17 @@ def _smtp_connection(ns):
 
 
 def _send_event_email(ns, subject, html_body):
-    """Send a simple event email via SMTP."""
+    """Send a simple event email via SMTP (адреси — recipients: «Кому (email)» або вибрані в «Надіслати зараз»)."""
     from django.core.mail import EmailMultiAlternatives
-    recipients = [e.strip() for e in (ns.email_to or '').split(',') if e.strip()]
-    if not recipients:
+    to = recipients(ns)
+    if not to:
         return
     from_email = (ns.email_from or ns.email_host_user or 'noreply@minerva.local').strip()
     msg = EmailMultiAlternatives(
         subject=subject,
         body='',
         from_email=from_email,
-        to=recipients,
+        to=to,
         connection=_smtp_connection(ns),
     )
     msg.attach_alternative(outlook_safe(html_body), 'text/html')
