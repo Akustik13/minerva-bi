@@ -2,11 +2,14 @@
 
 Usage:
     python manage.py send_alerts            # skip if sent recently
+    python manage.py send_alerts --if-due   # cron: as above + pause after a failed attempt, quiet if nothing to do
     python manage.py send_alerts --force    # always send (ignores interval)
     python manage.py send_alerts --test     # test SMTP only (no real alerts)
 
-Docker / cron example (every 12 hours):
-    0 */12 * * * docker-compose exec -T web python manage.py send_alerts
+Розклад сервера (cron_runner.sh) запускає `send_alerts --if-due` кожні 15 хв: попередження йдуть не частіше,
+ніж «Мінімальний інтервал між надсиланнями (год)» з «Налаштувань сповіщень» (last_alert_sent), лише коли
+є критичний склад / прострочені замовлення і ввімкнено відповідні галочки. Невдала спроба — повтор не раніше
+ніж за 30 хв і не більше 3 разів на день (dashboard/schedule_guard.py).
 """
 from django.core.management.base import BaseCommand
 
@@ -23,9 +26,30 @@ class Command(BaseCommand):
             '--test', action='store_true',
             help='Send a test email to verify SMTP settings (no real alerts)',
         )
+        parser.add_argument(
+            '--if-due', action='store_true',
+            help='For cron: respect the interval, pause after a failed attempt, print only sent / errors',
+        )
 
     def handle(self, *args, **options):
+        from dashboard import schedule_guard
         from dashboard.notifications import run_alerts
+
+        if options['if_due']:
+            if not schedule_guard.may_try('alerts'):
+                return
+            result = run_alerts()
+            if result.get('sent'):
+                schedule_guard.clear('alerts')
+                self.stdout.write(self.style.SUCCESS(
+                    f"✅ Alert sent: {result.get('critical', 0)} critical stock, "
+                    f"{result.get('overdue', 0)} overdue orders"
+                ))
+            elif schedule_guard.channel_errors(result):
+                schedule_guard.note_failure('alerts')
+                self.stdout.write(self.style.WARNING(
+                    f"⚠️  Not sent: {'; '.join(schedule_guard.channel_errors(result))}"))
+            return
 
         result = run_alerts(force=options['force'], is_test=options['test'])
 

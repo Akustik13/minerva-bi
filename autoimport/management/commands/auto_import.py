@@ -6,6 +6,10 @@ Usage:
     python manage.py auto_import --profile 1          # run specific profile
     python manage.py auto_import --all --force        # ignore schedule, run now
     python manage.py auto_import --all --dry-run      # preview without DB writes
+
+Розклад сервера (cron_runner.sh) запускає `auto_import --all --verbosity 0` щохвилини: кожен профіль
+іде лише коли настав його «Наступний запуск» (інтервал профілю), запуск бронюється атомарно
+(runner.claim) — двічі одночасно не імпортується. З --verbosity 0 у журнал — лише запущені профілі.
 """
 from django.core.management.base import BaseCommand
 
@@ -40,8 +44,10 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR('Вкажіть --all або --profile <ID>'))
             return
 
+        quiet = options.get('verbosity', 1) < 1
         if not profile_ids:
-            self.stdout.write('Немає активних профілів для запуску.')
+            if not quiet:
+                self.stdout.write('Немає активних профілів для запуску.')
             return
 
         for pid in profile_ids:
@@ -52,7 +58,8 @@ class Command(BaseCommand):
                 continue
 
             if not force and not profile.is_due():
-                self.stdout.write(f'[SKIP] {profile.name} — ще не час (next: {profile.next_run_at})')
+                if not quiet:
+                    self.stdout.write(f'[SKIP] {profile.name} — ще не час (next: {profile.next_run_at})')
                 continue
 
             mode = 'DRY-RUN' if (dry_run or profile.dry_run_mode) else 'RUN'
@@ -61,7 +68,8 @@ class Command(BaseCommand):
             logs = run_profile(pid, dry_run=dry_run, force=force)
 
             if not logs:
-                self.stdout.write('  → Немає файлів для обробки')
+                if not quiet:
+                    self.stdout.write('  → Немає файлів для обробки')
                 continue
 
             for log in logs:

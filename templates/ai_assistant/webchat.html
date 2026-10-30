@@ -189,16 +189,19 @@ async function mvLoadEmails() {
     const emails = d.emails || [];
     if (!emails.length) { list.innerHTML = '<div style="padding:6px 10px;color:var(--text-muted)">Листів не знайдено.</div>'; return; }
     emails.forEach(e => { _mvEmails[e.id] = e; });
+    // тема й текст — від зовнішніх відправників: лише як текст, не HTML
+    const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+      c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     list.innerHTML = emails.map(e => `
       <label style="display:flex;gap:6px;align-items:flex-start;padding:4px 10px;
              cursor:pointer;border-bottom:1px solid var(--border)">
-        <input type="checkbox" data-mid="${e.id}" onchange="mvToggleEmail(${e.id})" style="margin-top:2px;flex-shrink:0">
+        <input type="checkbox" data-mid="${Number(e.id)}" onchange="mvToggleEmail(${Number(e.id)})" style="margin-top:2px;flex-shrink:0">
         <span>
           <span style="color:${e.direction==='in'?'#4f8fff':'#9370db'}">${e.direction==='in'?'←':'→'}</span>
-          <strong style="color:var(--text)">${e.subject}</strong>
-          ${e.customer ? '<span style="color:var(--text-muted)"> · '+e.customer+'</span>' : ''}
-          <span style="color:var(--text-dim);font-size:11px"> ${e.date}</span>
-          ${e.snippet ? '<br><span style="color:var(--text-dim)">'+e.snippet.substring(0,100)+'</span>' : ''}
+          <strong style="color:var(--text)">${esc(e.subject)}</strong>
+          ${e.customer ? '<span style="color:var(--text-muted)"> · '+esc(e.customer)+'</span>' : ''}
+          <span style="color:var(--text-dim);font-size:11px"> ${esc(e.date)}</span>
+          ${e.snippet ? '<br><span style="color:var(--text-dim)">'+esc(e.snippet.substring(0,100))+'</span>' : ''}
         </span>
       </label>`).join('');
     mvUpdateEmailStatus();

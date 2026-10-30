@@ -101,20 +101,27 @@ def email_threads_view(request):
     """
     GET /ai/emails/ — повертає список недавніх листів зі скриньки поточного юзера.
     Використовується в webchat для додавання листів до контексту аналізу.
+    Лише власні скриньки (EmailAccount.user = request.user) — і для суперкористувача теж;
+    без чернеток, кошика, спаму й видалених.
     """
     try:
+        from django.db.models import F
         from email_assistant.models import EmailMessage
         qs = (EmailMessage.objects
+              .filter(account__user=request.user, is_deleted=False, is_spam=False)
+              .exclude(folder__in=(EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_TRASH,
+                                   EmailMessage.FOLDER_SPAM))
               .select_related('thread')
-              .exclude(folder='draft')
-              .order_by('-sent_at')[:40])
+              .order_by(F('sent_at').desc(nulls_last=True), '-pk')[:40])
 
         emails = []
         for m in qs:
             from_addr = m.from_email or ''
-            to_list   = m.to_emails or ''
+            to_list   = m.to_emails or []          # JSONField — список адрес (старі записи — рядок)
+            if isinstance(to_list, str):
+                to_list = to_list.split(',')
             # Customer name: try to find from from/to based on direction
-            customer_hint = from_addr if m.folder == 'inbox' else to_list.split(',')[0].strip()
+            customer_hint = from_addr if m.folder == 'inbox' else str(to_list[0] if to_list else '').strip()
 
             emails.append({
                 'id':        m.pk,
@@ -127,7 +134,7 @@ def email_threads_view(request):
         return JsonResponse({'emails': emails})
     except Exception as e:
         logger.exception("email_threads_view error: %s", e)
-        return JsonResponse({'emails': [], 'error': str(e)})
+        return JsonResponse({'emails': [], 'error': 'Не вдалося завантажити листи'})
 
 
 _DIAGNOSTIC_COMMANDS = [

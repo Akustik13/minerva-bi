@@ -15,7 +15,8 @@ REMINDER_INTERVAL="${REMINDER_INTERVAL:-900}"
 EMAIL_SYNC_INTERVAL="${EMAIL_SYNC_INTERVAL:-300}"
 SCHEDULED_INTERVAL="${SCHEDULED_INTERVAL:-120}"
 CALENDAR_REMINDER_INTERVAL="${CALENDAR_REMINDER_INTERVAL:-120}"
-BRIEFING_HOUR="${BRIEFING_HOUR:-08}"
+# BRIEFING_HOUR — лише запасний: година брифінгу береться з «Налаштувань брифінгу» → «Час відправки»
+export BRIEFING_HOUR="${BRIEFING_HOUR:-08}"
 
 echo "⏳ Waiting for PostgreSQL..."
 until pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" \
@@ -31,9 +32,12 @@ echo "   poll_dk_status          interval controlled by DigiKeyConfig.poll_inter
 echo "   send_webhooks           every loop (~60s) — retries of API webhooks"
 echo "   check_stripe_payments   every loop — polls Stripe only while no webhook arrives (interval per shop)"
 echo "   index_shop_media        every 5 min — product photos / datasheets for the shop site (when enabled)"
-echo "   send_digest             time/frequency controlled by NotificationSettings in DB"
-echo "   morning_briefing        daily at ${BRIEFING_HOUR}:00"
+echo "   send_digest             daily / weekly / monthly — day & time from NotificationSettings in DB, once per day"
+echo "   morning_briefing        daily at BriefingSettings.send_time (env BRIEFING_HOUR only as fallback)"
+echo "   auto_import             every loop — profiles whose next run is due (interval per profile)"
+echo "   send_alerts             every ${REMINDER_INTERVAL}s — critical stock / overdue, min interval from NotificationSettings"
 echo "   shop_accounts_cleanup   daily — expired shop customer sessions / links"
+echo "   expire_offers           daily — sent Angebote past their validity → expired"
 echo "   worktime_autofill       daily after hour from DanteSettings — empty work days in askDANTE (when enabled)"
 echo "   worktime_sync           daily after the same hour — askDANTE time records and month balances"
 echo "   worktime_reports        askDANTE work-time reports by e-mail (schedule in Minerva)"
@@ -53,7 +57,6 @@ LAST_REMINDER=0
 LAST_EMAIL_SYNC=0
 LAST_SCHEDULED=0
 LAST_CALENDAR=0
-last_briefing_day=""
 last_cleanup_day=""
 
 while true; do
@@ -90,22 +93,21 @@ while true; do
   # ── Фото й даташити для сайту: нові / змінені / давно не перевірені (сам стежить за інтервалом) ──
   python manage.py index_shop_media --if-due 2>&1 || true
 
-  # ── Digest report — час і частота керуються в NotificationSettings ──
-  python manage.py send_digest 2>&1 || true
+  # ── Звіти: щоденний, тижневий, місячний — день і час у NotificationSettings, кожен раз на день ──
+  python manage.py send_digest --period all --verbosity 0 2>&1 || true
 
-  # ── Ранковий брифінг — щоденно о BRIEFING_HOUR:00 ───────
-  current_hour=$(date +%H)
+  # ── Ранковий брифінг — у «Час відправки» з BriefingSettings, раз на день (стан — last_sent_at у БД) ──
+  python manage.py morning_briefing --if-due 2>&1 || true
+
+  # ── Авто-імпорт: профілі, яким настав «Наступний запуск» (інтервал — у профілі) ──
+  python manage.py auto_import --all --verbosity 0 2>&1 || true
+
+  # ── Раз на добу: кабінет покупців магазину, журнал API, прострочені Angebote ──
   current_day=$(date +%Y-%m-%d)
-  if [ "$current_hour" = "$BRIEFING_HOUR" ] && [ "$current_day" != "$last_briefing_day" ]; then
-    echo "[$(date '+%H:%M:%S')] Running morning_briefing..."
-    python manage.py morning_briefing 2>&1 || true
-    last_briefing_day=$current_day
-  fi
-
-  # ── Кабінет покупців магазину: прострочені сесії й посилання — раз на добу ──
   if [ "$current_day" != "$last_cleanup_day" ]; then
     python manage.py shop_accounts_cleanup 2>&1 || true
     python manage.py api_log_cleanup 2>&1 || true        # 📜 Журнал API: старші за API_LOG_DAYS
+    python manage.py expire_offers 2>&1 || true          # 📝 Angebote: строк дії минув → «Прострочено»
     last_cleanup_day=$current_day
   fi
 
@@ -133,6 +135,7 @@ while true; do
   # ── Нагадування — кожні REMINDER_INTERVAL секунд ────────
   if [ $((NOW - LAST_REMINDER)) -ge "$REMINDER_INTERVAL" ]; then
     python manage.py send_reminders 2>&1 || true
+    python manage.py send_alerts --if-due 2>&1 || true   # критичний склад / прострочені: інтервал у NotificationSettings
     python manage.py fetch_emails 2>&1 || true
     python manage.py auto_advance_strategies 2>&1 || true
     LAST_REMINDER=$(date +%s)

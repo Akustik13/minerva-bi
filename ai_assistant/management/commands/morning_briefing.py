@@ -1,24 +1,87 @@
 """
 ai_assistant/management/commands/morning_briefing.py
 Надіслати ранковий брифінг кожному юзеру у Telegram.
+
+    python manage.py morning_briefing            # зараз (кнопка «📤 Тестова відправка»)
+    python manage.py morning_briefing --if-due   # з cron кожну хвилину: раз на день у «Час відправки»
+                                                 # з «Налаштувань брифінгу» (env BRIEFING_HOUR — лише запасний)
 """
+import datetime
 import logging
+import os
 
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 from django.utils import timezone
 
 logger = logging.getLogger('ai_assistant')
 
+# Сервер не працював у «Час відправки» — брифінг ще піде протягом стількох годин; пізніше — уже завтра
+CATCH_UP_HOURS = 3
+
+
+def send_time_of(bs) -> datetime.time:
+    """«Час відправки» з BriefingSettings; якщо його немає — година з env BRIEFING_HOUR (за замовчуванням 08)."""
+    t = getattr(bs, 'send_time', None)
+    if isinstance(t, str):   # щойно створений рядок налаштувань: default "08:00" ще не перетворено
+        try:
+            t = datetime.time.fromisoformat(t)
+        except ValueError:
+            t = None
+    if t:
+        return t
+    try:
+        hour = int(os.environ.get('BRIEFING_HOUR', '8'))
+    except (TypeError, ValueError):
+        hour = 8
+    return datetime.time(min(max(hour, 0), 23), 0)
+
+
+def briefing_due(bs, now=None):
+    """(чи час надсилати, причина) — за часом Берліна (TIME_ZONE): після «Часу відправки», лише раз на день."""
+    if not bs.enabled:
+        return False, 'Брифінг вимкнено в налаштуваннях.'
+    local = timezone.localtime(now or timezone.now())
+    t = send_time_of(bs)
+    start = local.replace(hour=t.hour, minute=t.minute, second=0, microsecond=0)
+    if local < start:
+        return False, f'Ще не час (налаштовано {t:%H:%M}).'
+    if bs.last_sent_at and timezone.localtime(bs.last_sent_at).date() >= local.date():
+        return False, 'Сьогодні вже надіслано.'
+    if local >= start + datetime.timedelta(hours=CATCH_UP_HOURS):
+        return False, f'Пропущено: сервер не працював о {t:%H:%M} — наступний брифінг завтра.'
+    return True, ''
+
+
+def claim_today(now=None) -> bool:
+    """Атомарно позначити «сьогодні надіслано» ДО відправки: другий запуск (паралельний чи повторний) — ні."""
+    from config.models import BriefingSettings
+    now = now or timezone.now()
+    day_start = timezone.localtime(now).replace(hour=0, minute=0, second=0, microsecond=0)
+    return BriefingSettings.objects.filter(pk=1).filter(
+        Q(last_sent_at__isnull=True) | Q(last_sent_at__lt=day_start)).update(last_sent_at=now) == 1
+
 
 class Command(BaseCommand):
     help = 'Надіслати ранковий брифінг кожному юзеру в Telegram'
+
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--if-due', action='store_true',
+            help='Лише в «Час відправки» з налаштувань брифінгу і не частіше ніж раз на день (для cron)')
 
     def handle(self, *args, **options):
         from core.models import UserProfile
         from config.models import BriefingSettings
 
         bs = BriefingSettings.get()
-        if not bs.enabled:
+        if options.get('if_due'):
+            ok, reason = briefing_due(bs)
+            if not ok:
+                if options.get('verbosity', 1) > 1:
+                    self.stdout.write(reason)
+                return
+        elif not bs.enabled:
             self.stdout.write('Брифінг вимкнено в налаштуваннях.')
             return
 
@@ -26,6 +89,12 @@ class Command(BaseCommand):
                     .filter(telegram_id__isnull=False)
                     .exclude(telegram_id=0)
                     .select_related('user'))
+
+        if options.get('if_due'):
+            if not profiles.exists():
+                return   # за розкладом без отримувачів AI не викликається
+            if not claim_today():
+                return   # інший запуск уже надсилає сьогоднішній брифінг
 
         if not profiles.exists():
             self.stdout.write('Немає юзерів з Telegram ID — виводимо брифінг в stdout')

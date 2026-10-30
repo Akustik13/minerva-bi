@@ -6,51 +6,21 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from config.models import (
-    ALL_MODULES, SystemSettings, DocumentSettings,
+    SystemSettings, DocumentSettings,
     NotificationSettings, ThemeSettings, BriefingSettings,
 )
 
 
-# ── SystemSettings form — checkboxes for enabled_modules ─────────────────────
+# ── SystemSettings form ───────────────────────────────────────────────────────
+# «Активні модулі» (SystemSettings.enabled_modules) тут більше не редагуються: їх ніщо не читало,
+# а модулі вмикає й вимикає лише 🧩 Реєстр модулів (core.ModuleRegistry). Поле лишається в моделі —
+# майстер першого запуску запам'ятовує в ньому, для яких модулів підготувати приклади.
 
 class SystemSettingsForm(forms.ModelForm):
-
-    enabled_modules_choice = forms.MultipleChoiceField(
-        choices=[],   # populated in __init__ from ModuleRegistry or ALL_MODULES
-        widget=forms.CheckboxSelectMultiple,
-        required=False,
-        label='Активні модулі',
-        help_text='Відмічені модулі відображаються у бічному меню та доступні для роботи',
-    )
 
     class Meta:
         model = SystemSettings
         exclude = ['enabled_modules']
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Build choices from ModuleRegistry (non-core), fallback to ALL_MODULES
-        try:
-            from core.models import ModuleRegistry
-            qs = ModuleRegistry.objects.exclude(tier='core').order_by('order', 'name')
-            choices = [(m.app_label, m.name) for m in qs]
-        except Exception:
-            choices = [(m, m) for m in ALL_MODULES]
-
-        self.fields['enabled_modules_choice'].choices = choices
-
-        # Pre-select currently enabled modules
-        current = []
-        if self.instance and self.instance.pk:
-            current = self.instance.enabled_modules or []
-        self.fields['enabled_modules_choice'].initial = current
-
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-        instance.enabled_modules = list(self.cleaned_data.get('enabled_modules_choice', []))
-        if commit:
-            instance.save()
-        return instance
 
 
 class ColorPickerWidget(widgets.TextInput):
@@ -84,6 +54,7 @@ class ColorPickerWidget(widgets.TextInput):
 @admin.register(SystemSettings)
 class SystemSettingsAdmin(admin.ModelAdmin):
     form = SystemSettingsForm
+    readonly_fields = ("modules_registry",)
 
     def changelist_view(self, request, extra_context=None):
         obj, _ = SystemSettings.objects.get_or_create(pk=1, defaults={
@@ -91,15 +62,40 @@ class SystemSettingsAdmin(admin.ModelAdmin):
         })
         return redirect(reverse("admin:config_systemsettings_change", args=[obj.pk]))
 
+    @admin.display(description="Модулі")
+    def modules_registry(self, obj):
+        """Лише показ: які модулі зараз увімкнені в 🧩 Реєстрі модулів, і посилання туди."""
+        from django.utils.html import format_html_join
+        from django.utils.safestring import mark_safe
+        from core.models import ModuleRegistry
+        url = reverse("admin:core_moduleregistry_changelist")
+        rows = list(ModuleRegistry.objects.exclude(tier=ModuleRegistry.Tier.CORE)
+                    .order_by("order", "name").values_list("name", "is_active"))
+        on = [n for n, active in rows if active]
+        off = [n for n, active in rows if not active]
+        parts = []
+        if on:
+            parts.append(format_html("✅ {}", ", ".join(on)))
+        if off:
+            parts.append(format_html("⛔ вимкнено: {}", ", ".join(off)))
+        if not rows:
+            parts.append("модулі ще не зареєстровано — усі працюють")
+        return format_html(
+            '{}<div style="margin-top:6px"><a href="{}">🧩 Реєстр модулів →</a> — '
+            'там модуль вмикають і вимикають для всіх.</div>',
+            format_html_join(mark_safe("<br>"), "{}", ((p,) for p in parts)), url,
+        )
+
     fieldsets = [
         ("🏢 Компанія", {
             "fields": ("company_name", "logo", "default_currency", "timezone"),
         }),
-        ("📦 Активні модулі", {
-            "fields": ("enabled_modules_choice", "accounting_level"),
+        ("📦 Модулі", {
+            "fields": ("modules_registry", "accounting_level"),
             "description": (
-                "Оберіть модулі які активні у системі. "
-                "Базові модулі (Ядро, Налаштування, Авторизація) завжди увімкнені."
+                "Які модулі працюють, вирішує лише 🧩 Реєстр модулів (Система → Безпека): "
+                "вимкнений там модуль зникає з меню й не відкривається ні в кого. "
+                "Окремим співробітникам модулі відкривають роль, пакет або ручний список у профілі."
             ),
         }),
         ("💰 Фінанси", {
@@ -396,13 +392,16 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "deadline_alerts_enabled",
                 "deadline_overdue_days",
             ),
-            "description": "Запускаються автоматично через cron (send_alerts).",
+            "description": (
+                "Розклад сервера Minerva перевіряє їх сам кожні 15 хв (<code>send_alerts --if-due</code>) "
+                "і надсилає, лише коли є що повідомити, — не частіше за «Мінімальний інтервал»."
+            ),
         }),
         ("⏱️ Розклад", {
             "fields": ("alert_min_interval_hours", "last_alert_sent"),
             "description": (
-                "Для автоматичного надсилання додайте cron: "
-                "<code>0 */12 * * * docker-compose exec -T web python manage.py send_alerts</code>"
+                "Між автоматичними попередженнями минає щонайменше стільки годин (0 = 1 год). "
+                "Невдала спроба (помилка SMTP / Telegram) повторюється не раніше ніж за 30 хв, до 3 разів на день."
             ),
         }),
         ("📱 Telegram", {
@@ -428,8 +427,8 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "digest_actions",
             ),
             "description": (
-                "Зведений звіт за обраним розкладом. "
-                "Cron: <code>0 8 * * * docker-compose exec -T web python manage.py send_digest</code>\n\n"
+                "Зведений звіт за обраним розкладом. Розклад сервера сам перевіряє час щохвилини "
+                "(<code>send_digest --period all</code>) і надсилає звіт раз на день.\n\n"
                 "<b>Що включає (Telegram приклад):</b>\n"
                 "📊 Minerva — Щоденний звіт · 10.06.2026 08:00\n\n"
                 "📦 Очікують відправки (3):\n"
@@ -452,9 +451,8 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "weekly_digest_actions",
             ),
             "description": (
-                "Надсилається раз на тиждень у обраний день. "
-                "Cron запускати щодня — система сама перевіряє чи сьогодні потрібний день. "
-                "Cron: <code>0 8 * * * docker-compose exec -T web python manage.py send_digest</code>\n\n"
+                "Надсилається раз на тиждень у обраний день і час — розклад сервера перевіряє це сам "
+                "(<code>send_digest --period all</code>).\n\n"
                 "<b>Що включає (додатково до щоденного):</b>\n"
                 "🚚 Відправлень за тиждень: 12\n\n"
                 "📦 Топ товарів (Тижневий звіт):\n"
@@ -472,9 +470,8 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "monthly_digest_actions",
             ),
             "description": (
-                "Надсилається раз на місяць у обраний день. "
-                "Cron запускати щодня — система перевіряє чи це потрібний день місяця. "
-                "Cron: <code>0 8 * * * docker-compose exec -T web python manage.py send_digest</code>\n\n"
+                "Надсилається раз на місяць у обраний день і час — розклад сервера перевіряє це сам "
+                "(<code>send_digest --period all</code>).\n\n"
                 "<b>Що включає (додатково):</b>\n"
                 "💰 Виручка місяця: 4 820 ▲12.3%\n"
                 "   Попередній місяць: 4 292 | Замовлень: 37\n\n"
@@ -1357,14 +1354,16 @@ def integrations_hub_view(request):
 
 @admin.register(BriefingSettings)
 class BriefingSettingsAdmin(admin.ModelAdmin):
-    readonly_fields = ("briefing_actions",)
+    readonly_fields = ("briefing_actions", "last_sent_at")
 
     fieldsets = [
         ("⏰ Розклад", {
-            "fields": ("enabled", "send_time"),
+            "fields": ("enabled", "send_time", "last_sent_at"),
             "description": (
-                "Налаштуйте cron на відповідний час: "
-                "<code>0 8 * * * docker-compose exec -T web python manage.py morning_briefing</code>"
+                "Розклад сервера Minerva (cron_runner.sh → <code>morning_briefing --if-due</code>) щохвилини "
+                "перевіряє цей час і надсилає брифінг раз на день — у «Час відправки» за часом Берліна "
+                "(якщо сервер у цей час не працював — ще протягом 3 годин). "
+                "«📤 Тестова відправка» нижче надсилає одразу й розкладу не змінює."
             ),
         }),
         ("📋 Що включати у брифінг", {
