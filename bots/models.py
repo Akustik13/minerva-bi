@@ -140,6 +140,24 @@ class DigiKeyConfig(models.Model):
     )
 
     # ── Інвойс / EU ───────────────────────────────────────────────────────────
+    # ── 🖼 Фото й даташити для DigiKey (bots/services/dk_media.py) ──
+    MEDIA_STOCK, MEDIA_RULE = 'stock', 'rule'
+    MEDIA_CHOICES = [
+        (MEDIA_STOCK, 'Як на складі — посилання товару (а без нього — правило «Налаштувань складу»)'),
+        (MEDIA_RULE, 'Свої правила для DigiKey (нижче)'),
+    ]
+    media_source = models.CharField(
+        'Звідки фото й даташити для DigiKey', max_length=8, choices=MEDIA_CHOICES, default=MEDIA_STOCK,
+        help_text='Ті самі посилання, що для магазинів, або свої правила саме для DigiKey.')
+    media_image_template = models.CharField(
+        'Правило: фото для DigiKey', max_length=500, blank=True, default='',
+        help_text='{key} — артикул товару (або «Фото: спільний файл»); досить початку адреси — '
+                  'Minerva допише {key}.jpg. Напр. https://docs.sevskiy.com/pictures/download.php?file={key}.jpg')
+    media_datasheet_template = models.CharField(
+        'Правило: даташит для DigiKey', max_length=500, blank=True, default='',
+        help_text='{key} — артикул товару (або «Даташит: спільний файл»); досить початку адреси — '
+                  'Minerva допише {key}.pdf.')
+
     auto_invoice_eu = models.BooleanField(
         "Авто-генерація інвойсу для ЄС", default=False,
         help_text=(
@@ -162,8 +180,25 @@ class DigiKeyConfig(models.Model):
     def __str__(self):
         return "DigiKey API"
 
+    def clean(self):
+        """Правила фото й даташитів для DigiKey — http(s)://…, як правила «Налаштувань складу»."""
+        super().clean()
+        from django.core.exceptions import ValidationError
+        from inventory.models import validate_url_template
+        errors = {}
+        for name in ("media_image_template", "media_datasheet_template"):
+            try:
+                validate_url_template((getattr(self, name) or "").strip())
+            except ValidationError as exc:
+                errors[name] = exc.messages
+        if errors:
+            raise ValidationError(errors)
+
     def save(self, *args, **kwargs):
         self.pk = 1
+        from inventory.models import complete_url_template   # «…?file=» → «…?file={key}.pdf», як на складі
+        self.media_datasheet_template = complete_url_template((self.media_datasheet_template or "").strip(), ".pdf")
+        self.media_image_template = complete_url_template((self.media_image_template or "").strip(), ".jpg")
         # Якщо змінились credentials або режим sandbox — скидаємо кеш токена
         if self.pk:
             try:

@@ -506,13 +506,14 @@ def build_draft(product, given=None, overrides=None) -> dict:
         notes.append(price_note)
     rows = template(cat["dk_category_id"])
     values, sources, missing = autofill(product, rows, given)
-    image = _public(product.image_display_url)
-    datasheet = _public(product.datasheet_display_url)
+    from bots.services.dk_media import target as media_target   # «🖼 Фото й даташити для DigiKey»
+    image = media_target(product, "image", product.sku)
+    datasheet = media_target(product, "datasheet", product.sku)
     fields = {
         "dk_supplier_sku": product.sku[:SKU_MAX], "dk_title": title, "dk_description": description,
         "dk_manufacturer": manufacturer[:MANUFACTURER_MAX], "dk_category_id": cat["dk_category_id"],
         "dk_category_name": cat["dk_category_name"], "category_type": cat["category_type"],
-        "dk_image_url": image if len(image) <= 200 else "", "dk_datasheet_url": datasheet if len(datasheet) <= 200 else "",
+        "dk_image_url": image, "dk_datasheet_url": datasheet,
         "dk_prices": prices, "dk_min_order_qty": 1,
         "dk_lead_time_days": product.lead_time_days or DigiKeyListing._meta.get_field("dk_lead_time_days").default,
         "dk_packaging": values.get("packaging", DEFAULT_PACKAGING),

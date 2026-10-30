@@ -6,7 +6,7 @@ where: 🛒 DigiKey → Лістинги (підключення — 🛒 DigiKe
 urls: /admin/bots/digikeylisting/, /admin/bots/digikeylisting/add/, /admin/bots/digikeylisting/from-stock/, /admin/bots/digikeylisting/dk-diff/, /admin/bots/digikeylisting/lead-times/, /admin/bots/digikeyconfig/
 roles: адміністратор, менеджер
 keywords: DigiKey, Marketplace, лістинг, listing, що бачить DigiKey, звірка, не дійшло, строк відвантаження, lead time, leadTimeToShip, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
-related: digikey/prices, digikey/orders, inventory/products, shop/catalog-prices
+related: digikey/prices, digikey/media, digikey/orders, inventory/products, shop/catalog-prices
 ---
 
 ## Що це

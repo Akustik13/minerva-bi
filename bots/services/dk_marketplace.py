@@ -112,6 +112,9 @@ def upsert_product(config, listing) -> str:
 
     # Build additionalFields for all category types
     additional_fields = listing.get_all_attributes_api()
+    # даташит — лише полем DigiKey для нього, якщо воно є (окремого поля в Products API немає)
+    from bots.services.dk_media import add_datasheet
+    add_datasheet(additional_fields, listing)
 
     if not config.marketplace_supplier_id:
         raise DKMarketplaceError(
@@ -912,6 +915,31 @@ def fetch_product_by_sku(config, supplier_sku: str,
             return products[0]
 
     return None
+
+
+def fetch_own_products(config, max_count: int = 5000) -> list:
+    """Усі свої товари DigiKey (GET /products?SupplierIds=…, сторінками по 100) — для звірки фото й даташитів."""
+    import requests as req
+
+    supplier = (getattr(config, 'marketplace_supplier_id', '') or '').strip()
+    if not (len(supplier) == 36 and supplier.count('-') == 4):
+        raise DKMarketplaceError("Marketplace Vendor UUID не вказано — свої товари DigiKey не прочитати.")
+    token = get_marketplace_token(config)
+    out, offset, page = [], 0, 100
+    while len(out) < max_count:
+        resp = req.get(f"{_base_url(config)}{_PRODUCTS_BASE}/products",
+                       params={'SupplierIds': supplier, 'Offset': offset, 'Max': page},
+                       headers=_headers(config, token), timeout=20)
+        try:
+            resp.raise_for_status()
+        except req.HTTPError as e:
+            raise DKMarketplaceError(f"fetch_own_products {e.response.status_code}") from e
+        batch = resp.json().get('products', []) or []
+        out += batch
+        if len(batch) < page:
+            break
+        offset += page
+    return out[:max_count]
 
 
 def fetch_offer_by_sku(config, supplier_sku: str, offer_id: str = '') -> dict | None:

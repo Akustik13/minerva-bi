@@ -1,0 +1,123 @@
+{% extends "admin/base_site.html" %}
+{% comment %}«🖼 Фото й даташити на DigiKey» (bots/admin_dk_media.media_view): на DigiKey зараз → у картці лістингу →
+за правилом; перевірка й надсилання — у фоні (bots/services/dk_media.py), хід — media/status/.{% endcomment %}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block content %}
+<style>
+  .dm-box { margin: 0 0 14px; padding: 14px 18px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); }
+  .dm-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .dm-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .dm-table { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: fixed; }
+  .dm-table th, .dm-table td { padding: 5px 8px; border-bottom: 1px solid var(--hairline-color, #2b3c52); text-align: left;
+            vertical-align: top; }
+  .dm-table td.dm-url { word-break: break-all; font-family: monospace; font-size: 11.5px; }
+  .dm-table tr.dm-first td { border-top: 2px solid var(--border-strong, #243347); }
+  .dm-act { white-space: nowrap; font-weight: 600; }
+  .dm-act.same { color: var(--ok, #3fb950); font-weight: 400; }
+  .dm-act.fill, .dm-act.replace, .dm-act.push { color: var(--accent, #58a6ff); }
+  .dm-act.keep, .dm-act.broken { color: var(--err, #f85149); }
+  .dm-act.none { color: var(--body-quiet-color, #8aa0b4); font-weight: 400; }
+  .dm-err { color: var(--err, #f85149); font-size: 11.5px; }
+  .dm-bar { position: sticky; bottom: 0; padding: 12px 18px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); box-shadow: 0 -4px 12px rgba(0, 0, 0, .25); }
+  .dm-bar label { float: none; width: auto; padding: 0; display: inline-flex; gap: 6px; align-items: center; }
+</style>
+
+<div class="dm-box">
+  <div>Фото й даташити товарів на DigiKey: <b>що там зараз</b>, <b>що в картці лістингу</b> Minerva і <b>яке посилання
+    за правилом</b> («{{ source }}» — <a href="{{ settings_url }}">⚙ змінити</a>). Позначте рядки → посилання запишуться
+    в картки лістингів, а з галочкою — підуть і на DigiKey (фото — полем товару «imageUrl»; DigiKey перевіряє зміни
+    товару окремо, Products → Pending).</div>
+  <div class="dm-muted" style="margin-top:6px">
+    {% if sheet %}📄 Даташит DigiKey приймає в полі «{{ sheet.name }}» ({{ sheet.code }}) — надсилається разом з карткою.
+    {% else %}📄 Поля даташита DigiKey Minerva не знає: даташит записується в картку лістингу, але на DigiKey не йде.
+      Запитайте поля DigiKey: «🔷 Зі складу на DigiKey» → «🔄 Запитати поля в DigiKey».{% endif %}
+  </div>
+  <form method="get" class="dm-row" style="margin-top:10px">
+    <input type="text" name="q" value="{{ q }}" placeholder="артикул або назва">
+    <label style="float:none;width:auto;padding:0"><input type="checkbox" name="published" value="1"{% if published_only %} checked{% endif %}> лише вже на DigiKey</label>
+    {% if ids %}<input type="hidden" name="ids" value="{{ ids }}">{% endif %}
+    <button class="button" type="submit">Показати</button>
+  </form>
+  <div class="dm-muted" style="margin-top:6px">Лістингів: {{ total }}{% if total > limit %} (показано {{ limit }}){% endif %} ·
+    треба змінити: {{ differ }}{% if not has_report %} · на DigiKey ще не читали — натисніть «🔍 Прочитати з DigiKey і перевірити»{% endif %}</div>
+</div>
+
+<div class="dm-box" id="dm-state"{% if not state.started %} hidden{% endif %}>
+  {% if state.mode == "push" %}
+    <b>Надсилання карток на DigiKey</b> — <span id="dm-progress">{% if state.running %}йде: {{ state.done }} з {{ state.total }}{% else %}готово{% endif %}</span>:
+    надіслано {{ state.ok }}, помилок {{ state.errors|length }}.
+    {% if state.no_datasheet %}<div class="dm-muted">Даташити не надіслано — поля даташита DigiKey Minerva не знає.</div>{% endif %}
+    <ul class="dm-muted" style="margin:6px 0 0">{% for sku, e in state.errors %}<li>{{ sku }}: {{ e }}</li>{% endfor %}</ul>
+  {% else %}
+    <b>Перевірка</b> — <span id="dm-progress">{% if state.running %}йде: перевірено посилань {{ state.done }} з {{ state.total_links }}{% else %}готово {{ state.finished|slice:":16"|cut:"T"|default:"" }}{% endif %}</span>
+    {% if state.error %}<div class="dm-err">{{ state.error }}</div>{% endif %}
+  {% endif %}
+</div>
+
+<form method="post" id="dm-form">{% csrf_token %}
+  {% if ids %}<input type="hidden" name="ids" value="{{ ids }}">{% endif %}
+  <div class="dm-box">
+    <table class="dm-table">
+      <thead><tr>
+        <th style="width:28px"><input type="checkbox" id="dm-all" title="усі, що треба змінити"></th>
+        <th style="width:16%">Артикул</th><th style="width:7%"></th>
+        <th>На DigiKey зараз</th><th>У картці лістингу</th><th>За правилом</th><th style="width:15%">Що зробити</th></tr></thead>
+      <tbody>
+      {% for r in rows %}{% for it in r.items %}
+        <tr class="{% if forloop.first %}dm-first{% endif %}">
+          <td>{% if it.action != "same" and it.action != "none" %}<input type="checkbox" name="pick" value="{{ r.listing.pk }}:{{ it.kind }}" class="dm-pick"{% if it.pick %} checked data-pick="1"{% endif %}>{% endif %}</td>
+          <td>{% if forloop.first %}<a href="{% url 'admin:bots_digikeylisting_change' r.listing.pk %}">{{ r.listing.get_supplier_sku }}</a>
+            {% if not r.published %}<div class="dm-muted">ще не на DigiKey</div>{% elif r.checked and not r.found %}<div class="dm-muted">товар не знайдено на DigiKey</div>{% endif %}{% endif %}</td>
+          <td>{% if it.kind == "image" %}🖼{% else %}📄{% endif %} {{ it.label }}</td>
+          <td class="dm-url">{% if it.dk is None %}<span class="dm-muted">не читали</span>{% elif it.dk %}{{ it.dk }}{% if it.dk_same %} ✓{% endif %}{% else %}<span class="dm-muted">немає</span>{% endif %}</td>
+          <td class="dm-url">{{ it.card|default:"—" }}{% if it.card_error %}<div class="dm-err">✗ {{ it.card_error }}</div>{% elif it.card_error == "" %} ✓{% endif %}</td>
+          <td class="dm-url">{{ it.new|default:"—" }}{% if it.how %}<div class="dm-muted">{{ it.how }}</div>{% endif %}
+            {% if it.new_error %}<div class="dm-err">✗ {{ it.new_error }}</div>{% elif it.new_error == "" %} ✓{% endif %}</td>
+          <td><span class="dm-act {{ it.action }}">{{ it.action_text }}</span></td>
+        </tr>
+      {% endfor %}{% empty %}<tr><td colspan="7" class="dm-muted">Нічого не знайдено.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if can_change and rows %}
+  <div class="dm-bar dm-row">
+    <button class="button" type="submit" name="action" value="check" formnovalidate>🔍 Прочитати з DigiKey і перевірити</button>
+    <span>Вибрано: <b id="dm-n">0</b></span>
+    <label><input type="checkbox" name="push" value="1" checked> одразу на DigiKey (товари, вже створені там)</label>
+    <button class="button default" type="submit" name="action" value="apply" id="dm-apply">✓ Записати вибрані в картки</button>
+  </div>
+  {% endif %}
+</form>
+<script>
+(function () {
+  var picks = document.querySelectorAll('.dm-pick'), n = document.getElementById('dm-n');
+  function count() { if (n) n.textContent = document.querySelectorAll('.dm-pick:checked').length; }
+  picks.forEach(function (c) { c.addEventListener('change', count); });
+  count();
+  var all = document.getElementById('dm-all');
+  if (all) all.addEventListener('change', function () { picks.forEach(function (c) { c.checked = all.checked; }); count(); });
+  var apply = document.getElementById('dm-apply');
+  if (apply) apply.addEventListener('click', function (e) {
+    var k = document.querySelectorAll('.dm-pick:checked').length, form = document.getElementById('dm-form');
+    if (!k) { e.preventDefault(); alert('Позначте рядки галочкою.'); return; }
+    var push = form.push && form.push.checked ? ' і надіслати на DigiKey (DigiKey перевіряє зміни товару окремо)' : '';
+    if (!confirm('Записати ' + k + ' посилань у картки лістингів' + push + '?')) e.preventDefault();
+  });
+  {% if state.running %}
+  var timer = setInterval(function () {
+    fetch('{% url "admin:bots_digikeylisting_media_status" %}', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); }).then(function (s) {
+        var p = document.getElementById('dm-progress');
+        if (p && s.running) p.textContent = s.mode === 'push' ? 'йде: ' + s.done + ' з ' + s.total
+          : 'йде: перевірено посилань ' + s.done + ' з ' + (s.total_links || '…');
+        if (!s.running) { clearInterval(timer); location.reload(); }
+      }).catch(function () {});
+  }, 2000);
+  {% endif %}
+})();
+</script>
+{% endblock %}

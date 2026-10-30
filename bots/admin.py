@@ -118,6 +118,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         "messages_panel",
         "oauth_url_display",
         "webhook_url_display",
+        "media_panel",
     )
 
     fieldsets = (
@@ -213,6 +214,15 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         ("🔌 Дії", {
             "fields": ("action_buttons", "task_status_panel"),
         }),
+        ("🖼 Фото й даташити для DigiKey", {
+            "fields": ("media_source", "media_image_template", "media_datasheet_template", "media_panel"),
+            "description": (
+                "Які посилання на фото й даташит отримують товари на DigiKey — під час публікації зі складу й "
+                "звірки «🖼 Фото й даташити». <b>Як на складі</b> — ті самі посилання, що для магазинів "
+                "(«Налаштування складу» → правило посилань); <b>свої правила</b> — окремо для DigiKey. "
+                "Фото DigiKey приймає полем товару, даташит — лише додатковим полем DigiKey, якщо воно є."
+            ),
+        }),
         ("🔮 Webhook", {
             "fields": ("webhook_enabled", "webhook_secret"),
             "description": (
@@ -231,6 +241,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             "classes": ("collapse",),
         }),
     )
+
+    @admin.display(description="Посилання за правилом")
+    def media_panel(self, obj):
+        from bots.admin_dk_media import config_panel
+        return config_panel(obj)
 
     def get_form(self, request, obj=None, **kwargs):
         from django.forms import PasswordInput
@@ -1971,6 +1986,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'action_bulk_prices',
         'action_dk_from_minerva',
         'action_dk_diff',
+        'action_dk_media',
         'action_pub_sync',
         'action_lead_times',
         'action_bulk_stock',
@@ -1985,7 +2001,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'error_log_display',
         'created_at', 'updated_at',
         'stock_qty_readonly', 'dk_attributes_table',
-        'price_checked_at',
+        'price_checked_at', 'media_rule_panel',
     )
 
     fieldsets = (
@@ -1996,7 +2012,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             'fields': (
                 'dk_category_id', 'dk_category_name',
                 'dk_title', 'dk_description',
-                'dk_manufacturer', 'dk_image_url', 'dk_datasheet_url',
+                'dk_manufacturer', 'dk_image_url', 'dk_datasheet_url', 'media_rule_panel',
             ),
             'description': (
                 'Натисни <b>📥 Стягнути поля з DigiKey</b> вище — всі поля заповнюються автоматично.'
@@ -2386,6 +2402,15 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         from bots.admin_dk_tools import lead_status_view
         return lead_status_view(request, self)
 
+    # «🖼 Фото й даташити на DigiKey» — bots/admin_dk_media.py
+    def dk_media_view(self, request):
+        from bots.admin_dk_media import media_view
+        return media_view(request, self)
+
+    def dk_media_status_view(self, request):
+        from bots.admin_dk_media import media_status_view
+        return media_status_view(request, self)
+
     def pub_sync_view(self, request):
         """«🔄 Етапи з DigiKey»: GET /offers → справжні дати офера й стан показу для всіх лістингів."""
         from bots.services.dk_publish import sync_stages
@@ -2428,6 +2453,12 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('lead-times/status/',
                  self.admin_site.admin_view(self.lead_status_view),
                  name='bots_digikeylisting_lead_status'),
+            path('media/',
+                 self.admin_site.admin_view(self.dk_media_view),
+                 name='bots_digikeylisting_media'),
+            path('media/status/',
+                 self.admin_site.admin_view(self.dk_media_status_view),
+                 name='bots_digikeylisting_media_status'),
             path('<int:pk>/publish/',
                  self.admin_site.admin_view(self.publish_view),
                  name='bots_digikeylisting_publish'),
@@ -3122,6 +3153,17 @@ Rules:
             text += f" Офер не знайдено: {', '.join(res['not_found'][:10])}"
         self.message_user(request, text, messages.SUCCESS)
         return None
+
+    @admin.display(description='Фото й даташит за правилом')
+    def media_rule_panel(self, obj):
+        """Посилання за правилом «🖼 Фото й даташити для DigiKey», «⇢ підставити», звірка (bots/admin_dk_media.py)."""
+        from bots.admin_dk_media import listing_panel
+        return listing_panel(obj)
+
+    @admin.action(description='🖼 Фото й даташити: звірити з DigiKey…')
+    def action_dk_media(self, request, queryset):
+        from bots.admin_dk_media import page_url
+        return redirect(page_url(list(queryset.values_list('pk', flat=True)[:300])))
 
     @admin.action(description='🔍 Що бачить DigiKey (звірити вибрані)…')
     def action_dk_diff(self, request, queryset):
