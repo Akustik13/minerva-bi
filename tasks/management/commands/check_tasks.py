@@ -51,15 +51,18 @@ class Command(BaseCommand):
         self.stdout.write(f'  Склад: нових задач {created}')
 
     def _check_deadlines(self):
-        from sales.models import SalesOrder
+        from sales.revenue import to_ship
         from tasks.models import Task
 
         today = timezone.now().date()
-        overdue = SalesOrder.objects.filter(
-            affects_stock=True,
-            shipping_deadline__lt=today,
-            shipped_at__isnull=True,
-        )
+        # лише ті, що ще чекають відправки (без доставлених / відправлених / скасованих / Angebote)
+        overdue = to_ship().filter(shipping_deadline__lt=today)
+        # нагадування про замовлення, яке вже відправили, доставили чи скасували, — виконано само
+        closed = (Task.objects.filter(task_type=Task.TaskType.DEADLINE_ALERT,
+                                      status__in=[Task.Status.PENDING, Task.Status.IN_PROGRESS], order__isnull=False)
+                  .exclude(order__in=to_ship()).update(status=Task.Status.DONE))
+        if closed:
+            self.stdout.write(f'  Дедлайни: закрито нагадувань про вже відправлені / закриті замовлення: {closed}')
 
         created = 0
         for order in overdue:

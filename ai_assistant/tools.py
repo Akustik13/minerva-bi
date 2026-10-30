@@ -413,14 +413,10 @@ def _get_sales_analytics(inp, profile):
 
 def _get_financial_overview(inp, profile):
     from django.utils import timezone
-    from sales.models import SalesOrder
+    from sales.revenue import to_ship
 
     today = timezone.now().date()
-    overdue = SalesOrder.objects.filter(
-        shipping_deadline__lt=today,
-        affects_stock=True,
-        shipped_at__isnull=True,
-    ).exclude(status__in=['delivered', 'shipped', 'cancelled'])
+    overdue = to_ship().filter(shipping_deadline__lt=today)
 
     return {
         "overdue_orders": [

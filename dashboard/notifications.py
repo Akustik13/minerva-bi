@@ -87,22 +87,15 @@ def _get_critical_stock():
 
 
 def _get_overdue_orders(overdue_days: int = 0):
-    """SalesOrders that are past their shipping_deadline and not yet shipped."""
+    """Замовлення з минулим строком відправки, які ще чекають відправки — sales.revenue.to_ship (без
+    відправлених, доставлених, скасованих і Angebote; ті самі, що на дашборді й у звітах)."""
     try:
-        from sales.models import SalesOrder
+        from sales.revenue import to_ship
 
         today  = timezone.localdate()
         cutoff = today - timedelta(days=overdue_days)
 
-        qs = (
-            SalesOrder.objects.filter(
-                shipping_deadline__lte=cutoff,
-                shipped_at__isnull=True,
-                affects_stock=True,
-            )
-            .exclude(status__in=['shipped', 'cancelled'])
-            .order_by('shipping_deadline')
-        )
+        qs = to_ship().filter(shipping_deadline__lte=cutoff).order_by('shipping_deadline')
 
         orders = []
         for o in qs:
