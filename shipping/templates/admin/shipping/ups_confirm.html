@@ -472,7 +472,7 @@
         Minerva викличе <b style="color:var(--text)">UPS REST API</b> і
         <b style="color:var(--text)">створить реальне відправлення</b> у системі UPS.
         Буде списано кошти з акаунту{% endblocktrans %} <b>{{ shipment.carrier.connection_uuid|default:"UPS" }}</b>.
-        {% trans "Скасувати можна через кнопку «Void» на сторінці відправлення." %}
+        {% trans "Поки кур'єр не забрав посилку, скасувати можна в картці відправлення: «🗑️ Void — скасувати в UPS»." %}
       </p>
       <form method="post" action="{{ confirm_url }}" id="ups-confirm-form" enctype="multipart/form-data">
         {% csrf_token %}

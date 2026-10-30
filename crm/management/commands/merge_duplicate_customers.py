@@ -6,10 +6,9 @@ crm/management/commands/merge_duplicate_customers.py
 
 Для кожної групи:
   - обирає primary (найбільше пов'язаних SalesOrder → customer_key)
-  - переносить усі FK-зв'язки (CustomerTimeline, CustomerNote, CustomerStrategy,
-    Task, Invoice) на primary
-  - перезаписує SalesOrder.customer_key зі старих ключів на новий B2B-ключ
-  - оновлює external_key primary на новий B2B-ключ (SHA256('b2b:<company>'))
+  - зливає дублікатів у primary — crm/merge.py: замовлення й УСІ зв'язки з Customer (нотатки, хронологія,
+    стратегії, задачі, рахунки, проєкти, пошта, Angebote, база знань, календар, askDANTE…), файли картки
+  - переводить primary і всі його замовлення на новий B2B-ключ (SHA256('b2b:<company>'))
   - видаляє дублікати
 
 Використання:
@@ -123,7 +122,6 @@ class Command(BaseCommand):
             primary = max(customers, key=lambda c: key_counts.get(c.external_key, 0))
 
         duplicates = [c for c in customers if c.pk != primary.pk]
-        old_keys   = [c.external_key for c in duplicates]
 
         self.stdout.write(
             f'\n  Company: "{company_name}" | {len(customers)} записів'
@@ -139,64 +137,26 @@ class Command(BaseCommand):
         if dry_run:
             return 1, len(duplicates)
 
+        from crm.merge import merge_customers, summary
+
         with transaction.atomic():
-            # --- Переносимо FK-зв'язки ---
-            from crm.models import CustomerTimeline, CustomerNote
-            CustomerTimeline.objects.filter(
-                customer__in=duplicates
-            ).update(customer=primary)
+            # --- Усі зв'язки дублікатів (замовлення, нотатки, проєкти, пошта, задачі, рахунки…) → primary ---
+            stats = merge_customers(primary, duplicates)
 
-            CustomerNote.objects.filter(
-                customer__in=duplicates
-            ).update(customer=primary)
-
-            # strategy
-            try:
-                from strategy.models import CustomerStrategy
-                CustomerStrategy.objects.filter(
-                    customer__in=duplicates
-                ).update(customer=primary)
-            except Exception:
-                pass
-
-            # tasks
-            try:
-                from tasks.models import Task
-                Task.objects.filter(
-                    customer__in=duplicates
-                ).update(customer=primary)
-            except Exception:
-                pass
-
-            # accounting
-            try:
-                from accounting.models import Invoice
-                Invoice.objects.filter(
-                    customer__in=duplicates
-                ).update(customer=primary)
-            except Exception:
-                pass
-
-            # --- Перезаписуємо SalesOrder.customer_key ---
-            if old_keys:
+            # --- primary переходить на B2B-ключ разом з усіма своїми замовленнями ---
+            if primary.external_key != new_key:
                 updated = SalesOrder.objects.filter(
-                    customer_key__in=old_keys
+                    customer_key=primary.external_key
                 ).update(customer_key=new_key)
+                primary.external_key = new_key
+                primary.save(update_fields=['external_key'])
                 self.stdout.write(
-                    f'  SalesOrder.customer_key оновлено: {updated} записів'
+                    f'  SalesOrder.customer_key → B2B-ключ: {updated} записів'
                 )
-
-            # --- Оновлюємо primary external_key на B2B-ключ ---
-            primary.external_key = new_key
-            primary.save(update_fields=['external_key'])
-
-            # --- Видаляємо дублікати ---
-            dup_pks = [d.pk for d in duplicates]
-            Customer.objects.filter(pk__in=dup_pks).delete()
 
             self.stdout.write(
                 self.style.SUCCESS(
-                    f'  ✓ Видалено {len(duplicates)} дублікатів, primary pk={primary.pk}'
+                    f'  ✓ Видалено {stats["deleted"]} дублікатів, primary pk={primary.pk} · {summary(stats)}'
                 )
             )
 

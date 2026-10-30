@@ -306,7 +306,7 @@ class SalesSettings(models.Model):
 
     class DymoOpenMode(models.TextChoices):
         DOWNLOAD = "download", "⬇️ Завантажити .dymo файл"
-        PRINT    = "print",    "🖨️ Надрукувати через DYMO Label Software (localhost)"
+        PRINT    = "print",    "🖨️ Друкувати на DYMO (служба DYMO Connect на цьому ПК)"
         ASK      = "ask",      "❓ Запитувати щоразу"
 
     dymo_open_mode = models.CharField(
@@ -315,8 +315,9 @@ class SalesSettings(models.Model):
         choices=DymoOpenMode.choices,
         default=DymoOpenMode.DOWNLOAD,
         help_text="«Завантажити» — зберігає .dymo файл у Downloads; "
-                  "«Через DYMO» — надсилає на принтер через DYMO Label Software (localhost:41951) — "
-                  "програма має бути встановлена і запущена; "
+                  "«Друкувати на DYMO» — друкує через службу DYMO Connect на цьому ПК (127.0.0.1:41951; "
+                  "перегляд перед друком — «Друк на DYMO: перегляд перед друком») — DYMO Connect має бути "
+                  "встановлена й запущена; "
                   "«Запитувати» — показує діалог вибору щоразу.",
     )
 

@@ -60,6 +60,17 @@ class UPSError(Exception):
         self.response = response
 
 
+def void_result(resp) -> dict:
+    """Відповідь UPS Void → {ok, status}. Успіх — SummaryResult.Status.Code «1» (Voided); старі / скорочені
+    відповіді без SummaryResult — за Response.ResponseStatus.Code «1»."""
+    body = (resp or {}).get('VoidShipmentResponse') or {}
+    summary = ((body.get('SummaryResult') or {}).get('Status')) or {}
+    status = ((body.get('Response') or {}).get('ResponseStatus')) or {}
+    code = str(summary.get('Code') or status.get('Code') or '')
+    text = summary.get('Description') or status.get('Description') or ''
+    return {'ok': code == '1', 'status': text or (f'код {code}' if code else 'немає відповіді UPS')}
+
+
 def _get_ups_carrier():
     """Знайти активний UPS Carrier з credentials."""
     from shipping.models import Carrier
