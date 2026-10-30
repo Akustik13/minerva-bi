@@ -59,12 +59,31 @@ def diff_view(request, model_admin):
 
 
 def push_view(request, model_admin, pk):
-    """«📤 Надіслати офер з Minerva»: PUT офера з даними лістингу (ціни, залишок, MOQ, строк, назва)."""
+    """Оновити на DigiKey: what=fields — лише вибрані поля офера (fields), what=product — товар (на перевірку
+    DigiKey), інакше — увесь офер з даними лістингу (ціни, залишок, MOQ, строк, назва)."""
     if request.method != "POST" or not model_admin.has_change_permission(request):
         raise PermissionDenied
     from bots.models import DigiKeyConfig
     from bots.services.dk_marketplace import update_offer
     listing = get_object_or_404(DigiKeyListing.objects.select_related("product"), pk=pk)
+    back = redirect(reverse("admin:bots_digikeylisting_dk_diff") + f"?pk={listing.pk}")
+    what = request.POST.get("what", "")
+    if what == "fields":
+        try:
+            done = dk_view.push_offer_fields(listing, request.POST.getlist("fields"))
+            messages.success(request, f"{listing.get_supplier_sku()}: на DigiKey оновлено — "
+                                      f"{', '.join(dk_view.PUSHABLE[f] for f in done)}. Нижче те, що DigiKey повертає тепер.")
+        except Exception as exc:  # noqa: BLE001
+            messages.error(request, f"{listing.get_supplier_sku()}: не оновлено — {exc}")
+        return back
+    if what == "product":
+        try:
+            dk_view.push_product(listing)
+            messages.success(request, f"{listing.get_supplier_sku()}: товар надіслано — DigiKey перевірить зміни "
+                                      "(на supplier.digikey.com: Products → Pending); до того діє затверджена версія.")
+        except Exception as exc:  # noqa: BLE001
+            messages.error(request, f"{listing.get_supplier_sku()}: DigiKey не прийняв товар — {exc}")
+        return back
     if not listing.dk_offer_id:
         messages.error(request, "У лістингу немає ID офера — спершу «📦 Створити Offer» або «🔗 Звірити офери».")
     else:

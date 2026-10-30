@@ -89,7 +89,8 @@ class DkViewTests(ToolsBase):
                 mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=None):
             r = self.client.get(url, {"pk": self.listing.pk})
         self.assertContains(r, "Строк відвантаження, дн")
-        self.assertContains(r, "📤 Надіслати офер з Minerva")
+        self.assertContains(r, "📤 Оновити вибране на DigiKey")
+        self.assertContains(r, "📤 Надіслати весь офер з Minerva")
         self.assertContains(r, "вручну на supplier.digikey.com")
         with mock.patch("bots.services.dk_prices._offers_for", return_value=[offer(title="Old title")]):
             r = self.client.get(url, {"all": "1"})
@@ -166,3 +167,46 @@ class LeadTimeTests(ToolsBase):
         self.assertEqual(self.client.get(url + "status/").json()["ok"], 2)
         r = self.client.post(url, {"pick": [self.listing.pk], "days": "999"})
         self.assertEqual(DigiKeyListing.objects.get(pk=self.listing.pk).dk_lead_time_days, 14)
+
+
+class SelectivePushTests(ToolsBase):
+    def test_numeric_parameters_the_api_does_not_return_are_not_differences(self):
+        product = {"_id": "p-1", "categoryId": "855", "description": "Band-pass", "manufacturer": "Sevskiy",
+                   "imageUrl": "", "additionalFields": [{"code": "packaging", "value": "Bulk"},
+                                                        {"code": "productLifecycleStatus", "value": "Active"}]}
+        rows = {r["key"]: r for r in dk_view.product_rows(self.listing, product)}
+        self.assertEqual(rows["attr:139"]["state"], "unknown")
+        self.assertEqual(dk_view.summary(list(rows.values()))["diff"], 0)
+
+    def test_only_selected_offer_fields_change(self):
+        puts = []
+        live = offer(quantityAvailable=38, leadTimeToShip=25, title="Old title",
+                     prices=[{"quantityBreak": 1, "price": 21.0}])
+        with mock.patch("bots.services.dk_prices._fetch_one", return_value=live), \
+                mock.patch("bots.services.dk_prices._put_offer", side_effect=lambda oid, body: puts.append(body)):
+            done = dk_view.push_offer_fields(self.listing, ["quantityAvailable", "supplierSku", "bogus"])
+        self.assertEqual(done, ["quantityAvailable"])
+        body = puts[0]
+        self.assertEqual(body["quantityAvailable"], 40)                       # із Minerva
+        self.assertEqual((body["title"], body["leadTimeToShip"]), ("Old title", 25))   # як на DigiKey
+        self.assertEqual(body["prices"], [{"quantityBreak": 1, "price": 21.0}])
+
+    def test_product_push_is_tracked_as_pending(self):
+        with mock.patch("bots.services.dk_marketplace.upsert_product", return_value="staged-7"):
+            dk_view.push_product(self.listing)
+        events = DigiKeyListing.objects.get(pk=self.listing.pk).pub_events
+        self.assertEqual(events["update_staged_id"], "staged-7")             # офер є — це зміни (Pending)
+
+    def test_page_checkboxes_and_post(self):
+        self.admin()
+        url = "/admin/bots/digikeylisting/dk-diff/"
+        live = offer(quantityAvailable=38)
+        with mock.patch("bots.services.dk_prices._fetch_one", return_value=live), \
+                mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=None):
+            r = self.client.get(url, {"pk": self.listing.pk})
+        self.assertContains(r, 'name="fields" value="quantityAvailable" checked')
+        self.assertNotContains(r, 'name="fields" value="title"')              # однакове — без галочки
+        with mock.patch("bots.services.dk_prices._fetch_one", return_value=live), \
+                mock.patch("bots.services.dk_prices._put_offer") as put:
+            r = self.client.post(f"{url}push/{self.listing.pk}/", {"what": "fields", "fields": ["quantityAvailable"]})
+        self.assertEqual((r.status_code, put.call_count), (302, 1))

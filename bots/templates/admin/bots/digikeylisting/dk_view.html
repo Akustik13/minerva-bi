@@ -16,6 +16,7 @@
   .dv-table td.v { word-break: break-word; max-width: 420px; }
   .dv-diff td { background: rgba(245, 165, 36, .10); }
   .dv-missing td { background: rgba(229, 72, 77, .10); }
+  .dv-unknown td { opacity: .7; }
   .dv-chip { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; margin: 0 4px 2px 0; }
   .dv-ok { background: rgba(46, 157, 91, .18); color: #4cc38a; }
   .dv-warn { background: rgba(245, 165, 36, .18); color: #f5a524; }
@@ -53,15 +54,24 @@
 
   <div class="dv-box">
     <h3>💲 Офер (ціни, залишок, MOQ, строк)</h3>
-    <table class="dv-table">
-      <thead><tr><th>Поле</th><th>Minerva надсилає</th><th>На DigiKey зараз</th><th></th></tr></thead>
-      <tbody>{% for r in v.offer_rows %}{% include "admin/bots/digikeylisting/_dk_view_row.html" %}{% endfor %}</tbody>
-    </table>
+    <form method="post" action="{% url 'admin:bots_digikeylisting_dk_push' l.pk %}" id="dv-fields">
+      {% csrf_token %}<input type="hidden" name="what" value="fields">
+      <table class="dv-table">
+        <thead><tr>{% if can_change and v.offer_sum.pushable %}<th style="width:26px"></th>{% endif %}<th>Поле</th><th>Minerva надсилає</th><th>На DigiKey зараз</th><th></th></tr></thead>
+        <tbody>{% for r in v.offer_rows %}{% include "admin/bots/digikeylisting/_dk_view_row.html" with pick=v.offer_sum.pushable %}{% endfor %}</tbody>
+      </table>
+      {% if can_change and v.offer_sum.pushable %}
+      <div class="dv-acts">
+        <button class="button default" type="submit">📤 Оновити вибране на DigiKey</button>
+        <span class="dv-muted">Лише позначені поля беруться з Minerva; решта офера лишається такою, як на DigiKey зараз.</span>
+      </div>
+      {% endif %}
+    </form>
     {% if can_change and l.dk_offer_id %}
     <div class="dv-acts">
       <form method="post" action="{% url 'admin:bots_digikeylisting_dk_push' l.pk %}"
-            onsubmit="return confirm('Надіслати на DigiKey офер з даних Minerva: назва, ціни, залишок, MOQ, строк, активний?')">
-        {% csrf_token %}<button class="button default" type="submit">📤 Надіслати офер з Minerva</button>
+            onsubmit="return confirm('Надіслати на DigiKey увесь офер з даних Minerva: назва, ціни, залишок, MOQ, строк, активний?')">
+        {% csrf_token %}<button class="button" type="submit">📤 Надіслати весь офер з Minerva</button>
       </form>
       <span class="dv-muted">Після надсилання ця сторінка покаже, що DigiKey повертає тепер — так видно, що дані дійшли.</span>
     </div>
@@ -82,8 +92,19 @@
       </table>
     </details>
     {% endif %}
-    <div class="dv-muted" style="margin-top:8px">Товар (опис, категорію, параметри) DigiKey змінює лише після перевірки: зміни надсилає
-      «🚀 Опублікувати» в картці лістингу, і DigiKey знову перевіряє товар.</div>
+    {% if v.product_sum.unknown %}<div class="dv-muted" style="margin-top:8px">Числові параметри (частота, тип, розміри…) DigiKey через API не повертає —
+      «API не віддає» тут не помилка; що зараз на DigiKey, видно на сторінці товару на digikey.com.</div>{% endif %}
+    <div class="dv-muted" style="margin-top:8px">Товар (опис, категорію, параметри) DigiKey змінює лише після перевірки — надсилається цілком,
+      і до затвердження діє теперішня версія (на supplier.digikey.com: Products → Pending).</div>
+    {% if can_change and v.product and v.product_sum.diff %}
+    <div class="dv-acts">
+      <form method="post" action="{% url 'admin:bots_digikeylisting_dk_push' l.pk %}"
+            onsubmit="return confirm('Надіслати товар з даних Minerva на перевірку DigiKey? До затвердження діє теперішня версія.')">
+        {% csrf_token %}<input type="hidden" name="what" value="product">
+        <button class="button" type="submit">📤 Надіслати зміни товару на перевірку DigiKey</button>
+      </form>
+    </div>
+    {% endif %}
   </div>
   {% endwith %}
 

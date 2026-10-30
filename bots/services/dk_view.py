@@ -4,8 +4,13 @@ bots/services/dk_view.py — «🔍 Що бачить DigiKey»: що зараз
 
 Офер (Offers v1) — назва, артикул, ціни, залишок, MOQ, строк відвантаження, активний (ті самі поля, що
 `dk_marketplace._offer_payload`); товар (Products v1) — категорія, опис, виробник, фото, параметри
-(`get_all_attributes_api`). Рядок: same — збігається / diff — різниця / missing — на DigiKey немає.
-Один лістинг — `live` (офер і товар точково); багато — `bulk` (лише офери, один список).
+(`get_all_attributes_api`). Рядок: same — збігається / diff — різниця / missing — на DigiKey немає /
+unknown — DigiKey цього через API не віддає (числові параметри категорії: GET /products повертає лише службові
+коди, а на сайті DigiKey вони є). Один лістинг — `live` (офер і товар точково); багато — `bulk` (лише офери).
+
+Оновити лише вибране: `push_offer_fields` — свіжий офер з DigiKey (`dk_prices._fetch_one`) → PUT з усім, як на
+DigiKey, і лише вибраними полями (`PUSHABLE`) з Minerva; `push_product` — товар цілком (`upsert_product`), DigiKey
+перевіряє зміни окремо (Products → Pending, `dk_publish.note_update_sent`).
 """
 import logging
 from decimal import Decimal, InvalidOperation
@@ -19,6 +24,9 @@ PRODUCT_ROWS = [
     ("imageUrl", "Фото (адреса)", lambda l: l.dk_image_url, "imageUrl"),
 ]
 SERVICE_CODES = ("packaging", "productLifecycleStatus")
+# поля офера, які можна оновити вибірково (артикул — ні: за ним DigiKey знаходить офер)
+PUSHABLE = {"title": "назва", "prices": "ціни", "quantityAvailable": "залишок", "minOrderQuantity": "MOQ",
+            "leadTimeToShip": "строк відвантаження", "isActive": "активний"}
 
 
 def _txt(value) -> str:
@@ -45,6 +53,7 @@ def _fmt_tiers(tiers) -> str:
 def _row(key, label, minerva, dk, same, show_m=None, show_d=None, group="offer"):
     state = "missing" if dk is None else ("same" if same else "diff")
     return {"key": key, "label": label, "group": group, "state": state,
+            "pushable": group == "offer" and key in PUSHABLE and state == "diff",
             "minerva": show_m if show_m is not None else ("—" if minerva in (None, "") else minerva),
             "dk": "— немає на DigiKey —" if dk is None else (show_d if show_d is not None else (dk if dk != "" else "—"))}
 
@@ -90,8 +99,14 @@ def product_rows(listing, product) -> list:
     mine = {str(a["code"]): _txt(a.get("value")) for a in listing.get_all_attributes_api()}
     theirs = {str(k): _txt(v) for k, v in _build_attributes_dict(p.get("additionalFields") or []).items()} \
         if have else {}
+    numeric_back = any(c.isdigit() for c in theirs)       # API віддає числові параметри? (зазвичай — ні)
     for code in sorted(set(mine) | (set(theirs) & (set(mine) | set(SERVICE_CODES))), key=lambda c: (not c.isdigit(), c)):
         m, d = mine.get(code, ""), theirs.get(code) if have else None
+        if have and code.isdigit() and not numeric_back:
+            row = _row(f"attr:{code}", f"Параметр {code}", m, "", True, group="attrs")
+            row.update(state="unknown", dk="API не віддає — дивіться сторінку товару на digikey.com")
+            rows.append(row)
+            continue
         if have and code not in theirs:
             d = ""
         rows.append(_row(f"attr:{code}", f"Параметр {code}", m, d, have and m.lower() == (d or "").lower(),
@@ -102,7 +117,9 @@ def product_rows(listing, product) -> list:
 def summary(rows) -> dict:
     return {"diff": sum(1 for r in rows if r["state"] == "diff"),
             "missing": sum(1 for r in rows if r["state"] == "missing"),
-            "same": sum(1 for r in rows if r["state"] == "same")}
+            "same": sum(1 for r in rows if r["state"] == "same"),
+            "unknown": sum(1 for r in rows if r["state"] == "unknown"),
+            "pushable": sum(1 for r in rows if r.get("pushable"))}
 
 
 def live(listing) -> dict:
@@ -138,6 +155,40 @@ def live(listing) -> dict:
 def _pending(listing):
     from bots.services.dk_publish import pending_update
     return pending_update(listing.pub_events)
+
+
+def push_offer_fields(listing, fields) -> list:
+    """Оновити на DigiKey лише вибрані поля офера (решта — як на DigiKey зараз). Повертає оновлені поля."""
+    from bots.services.dk_marketplace import DKMarketplaceError, _offer_payload
+    from bots.services.dk_prices import _fetch_one, _put_offer, offer_payload, tiers_of
+    fields = [f for f in fields if f in PUSHABLE]
+    if not fields:
+        raise DKMarketplaceError("Не вибрано, що оновлювати.")
+    offer = _fetch_one(listing)
+    if not offer or not offer.get("id"):
+        raise DKMarketplaceError("Офер на DigiKey не прочитано — оновити вибіркою не можна.")
+    body = offer_payload(offer, tiers_of(offer.get("prices")), listing)
+    mine = _offer_payload(listing)
+    for f in fields:
+        body[f] = mine[f]
+    _put_offer(offer["id"], body)
+    if "prices" in fields:                                  # локальна копія цін DigiKey — як тепер на DigiKey
+        listing.dk_prices = [{"qty": int(p["quantityBreak"]), "price": p["price"]} for p in mine["prices"]]
+        listing.save(update_fields=["dk_prices"])
+    return fields
+
+
+def push_product(listing) -> str:
+    """Надіслати товар (опис, категорію, виробника, фото, параметри) — DigiKey перевіряє зміни окремо."""
+    from bots.models import DigiKeyConfig
+    from bots.services.dk_marketplace import upsert_product
+    from bots.services.dk_publish import mark, note_update_sent, was_published
+    published = was_published(listing)
+    staged = upsert_product(DigiKeyConfig.get(), listing)
+    mark(listing, "sent", staged_id=staged)
+    if published:
+        note_update_sent(listing, staged)
+    return staged
 
 
 def bulk(listings) -> list:
