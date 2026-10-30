@@ -684,7 +684,9 @@ class DigiKeyPriceSettings(models.Model):
         help_text='Щойно змінену базову ціну не відправляти одразу — раптом її ще редагують.')
     max_change_pct = models.DecimalField(
         'Самостійно — лише зміни до, %', max_digits=7, decimal_places=2, default=20,
-        help_text='Більша зміна (вгору чи вниз) чекає підтвердження людини навіть в режимі «Оновлювати самостійно».')
+        help_text='Більша зміна (вгору чи вниз) чекає підтвердження людини навіть в режимі «Оновлювати самостійно». '
+                  'Рахується для кожної кількості: новий ступінь — від ціни DigiKey, що зараз діє на цю кількість, '
+                  'прибраний — до нової ціни для неї.')
     auto_max_items = models.PositiveSmallIntegerField(
         'Самостійно — не більше товарів за раз', default=50,
         help_text='Решта — на підтвердження (захист від масової помилки, напр. неправильного курсу).')
@@ -745,6 +747,9 @@ class DigiKeyPriceRun(models.Model):
     rules = models.JSONField('Правила', default=dict, blank=True)
     progress = models.CharField('Хід', max_length=200, blank=True, default='')
     started_at = models.DateTimeField('Почато', null=True, blank=True)
+    heartbeat_at = models.DateTimeField(
+        'Остання ознака роботи', null=True, blank=True,
+        help_text='Процес надсилання оновлює після кожної позиції; довго без оновлення — процес зупинився, cron продовжить.')
     finished_at = models.DateTimeField('Надіслано', null=True, blank=True)
     verified_at = models.DateTimeField('Перевірено на DigiKey', null=True, blank=True)
     total = models.PositiveIntegerField('Позицій', default=0)

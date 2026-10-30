@@ -321,23 +321,26 @@ class Row:
     rules: Rules | None = None
     change_pct: Decimal | None = None
     max_change_pct: Decimal | None = None
+    max_change_qty: int | None = None          # кількість, на якій найбільша зміна (див. tier_compare)
 
     @property
     def differs(self) -> bool:
         return self.state == "ok" and self.new is not None and _key(self.new) != _key(self.dk)
 
     @property
+    def compare(self) -> list[dict]:
+        return tier_compare(self.dk, self.new)
+
+    @property
     def direction(self) -> str:
+        """up · down · mixed — за ціною кожної кількості (нові й прибрані ступені теж); tiers — змінились лише
+        кількості, ціни для покупця ті самі; new — на DigiKey цін немає."""
         if not self.differs:
             return "same"
         if self.change_pct is None:
             return "new"
-        ups = downs = 0
-        old = dict(self.dk)
-        for q, p in self.new:
-            if q in old:
-                ups += p > old[q]
-                downs += p < old[q]
+        pcts = [c["pct"] for c in self.compare if c["pct"] is not None]
+        ups, downs = any(p > 0 for p in pcts), any(p < 0 for p in pcts)
         if ups and downs:
             return "mixed"
         if ups:
@@ -356,14 +359,42 @@ STATE_TEXT = {
 }
 
 
-def _changes(dk, new) -> tuple[Decimal | None, Decimal | None]:
-    old = dict(dk)
-    pcts = [(q, (p / old[q] - 1) * 100) for q, p in new if q in old and old[q] > 0]
-    if not pcts:
-        return None, None
-    first = pcts[0][1].quantize(Decimal("0.01"))
-    biggest = max((abs(p) for _, p in pcts)).quantize(Decimal("0.01"))
-    return first, biggest
+def tier_compare(dk, new) -> list[dict]:
+    """Ціна для покупця в кожній кількості, де ступінь є хоч з одного боку: скільки діє зараз на DigiKey → скільки
+    стане. Новий або пересунутий ступінь порівнюється з ціною DigiKey, що діє на цю кількість (DigiKey 1: 10.00,
+    стане ще й 100: 0.10 → для 100 шт −99 %), прибраний — з новою ціною для цієї кількості.
+    [{qty, old, new, pct, kind}]: old / new — ціни, що діють на qty; kind — same · changed · added · gone;
+    pct None — на DigiKey ціна 0. Немає цін з якогось боку — []."""
+    dk, new = list(dk or []), list(new or [])
+    if not dk or not new:
+        return []
+    old_q, new_q = {q for q, _ in dk}, {q for q, _ in new}
+    out = []
+    for q in sorted(old_q | new_q):
+        o, n = _price_at(dk, q), _price_at(new, q)
+        kind = ("added" if q not in old_q else "gone" if q not in new_q
+                else "same" if n == o else "changed")
+        out.append({"qty": q, "old": o, "new": n, "pct": (n / o - 1) * 100 if o > 0 else None, "kind": kind})
+    return out
+
+
+def _changes(dk, new) -> tuple[Decimal | None, Decimal | None, int | None]:
+    """(зміна 1-го нового ступеня, найбільша зміна за модулем, кількість з найбільшою) — за tier_compare, тож
+    запобіжник автооновлення бачить і нові / прибрані ступені, а не лише ті, що є з обох боків."""
+    rows = [c for c in tier_compare(dk, new) if c["pct"] is not None]
+    if not rows:
+        return None, None, None
+    first = next((c["pct"] for c in rows if c["qty"] == new[0][0]), rows[0]["pct"])
+    top = max(rows, key=lambda c: abs(c["pct"]))
+    return first.quantize(Decimal("0.01")), abs(top["pct"]).quantize(Decimal("0.01")), top["qty"]
+
+
+def change_where(row) -> str:
+    """« (100 шт — новий ступінь)» — де найбільша зміна, якщо це не ступінь, що є з обох боків."""
+    hit = next((c for c in row.compare if c["qty"] == row.max_change_qty), None)
+    if hit is None or hit["kind"] not in ("added", "gone"):
+        return ""
+    return f" ({hit['qty']} шт — {'новий ступінь' if hit['kind'] == 'added' else 'ступінь прибрано'})"
 
 
 def _cached(cache, key, fn):
@@ -410,7 +441,7 @@ def row_for(listing, rules: Rules, dk_currency: str, dk_tiers=None, cache: dict 
         return row
     if rules.own:
         row.notes.insert(0, rules.own)
-    row.change_pct, row.max_change_pct = _changes(row.dk, row.new)
+    row.change_pct, row.max_change_pct, row.max_change_qty = _changes(row.dk, row.new)
     return row
 
 
@@ -683,20 +714,39 @@ def start(run):
     threading.Thread(target=work, name=f"dk-prices-{run.pk}", daemon=True).start()
 
 
-def _claim(run_pk) -> bool:
-    """Один процес на оновлення: QUEUED (або завислий SENDING) → SENDING."""
+def _stuck(now=None):
+    """«Надсилається», але процес STUCK_MINUTES не подавав ознак роботи (heartbeat_at; старі записи — started_at)."""
+    from django.db.models import Q
+    from bots.models import DigiKeyPriceRun as R
+    edge = (now or timezone.now()) - timedelta(minutes=STUCK_MINUTES)
+    return Q(status=R.SENDING) & (Q(heartbeat_at__lt=edge) | Q(heartbeat_at__isnull=True, started_at__lt=edge))
+
+
+def _claim(run_pk):
+    """Один процес на оновлення: QUEUED (або завислий SENDING) → SENDING. Повертає мітку захоплення (started_at) —
+    нею процес у _beat перевіряє, що оновлення досі його; не захопили — None."""
     from django.db.models import Q
     from bots.models import DigiKeyPriceRun
     now = timezone.now()
-    stuck = Q(status=DigiKeyPriceRun.SENDING, started_at__lt=now - timedelta(minutes=STUCK_MINUTES))
-    return bool(DigiKeyPriceRun.objects.filter(Q(status=DigiKeyPriceRun.QUEUED) | stuck, pk=run_pk)
-                .update(status=DigiKeyPriceRun.SENDING, started_at=now, progress="читаю офери з DigiKey…"))
+    taken = (DigiKeyPriceRun.objects.filter(Q(status=DigiKeyPriceRun.QUEUED) | _stuck(now), pk=run_pk)
+             .update(status=DigiKeyPriceRun.SENDING, started_at=now, heartbeat_at=now,
+                     progress="читаю офери з DigiKey…"))
+    return now if taken else None
+
+
+def _beat(run_pk, lease, progress: str) -> bool:
+    """Ознака роботи після кожної позиції (heartbeat_at + хід). False — оновлення вже продовжив інший процес
+    (cron вважав це завислим): тоді далі не надсилати, щоб не було повторних PUT і дублів у журналі цін."""
+    from bots.models import DigiKeyPriceRun
+    return bool(DigiKeyPriceRun.objects.filter(pk=run_pk, started_at=lease)
+                .update(heartbeat_at=timezone.now(), progress=progress[:200]))
 
 
 def push_run(run_pk):
     """Надсилає позиції «у черзі»: свіжий офер з DigiKey → PUT лише з новими prices → «надіслано»."""
     from bots.models import DigiKeyPriceChange, DigiKeyPriceLog, DigiKeyPriceRun
-    if not _claim(run_pk):
+    lease = _claim(run_pk)
+    if lease is None:
         return None
     run = DigiKeyPriceRun.objects.get(pk=run_pk)
     lines = list(run.lines.filter(status=DigiKeyPriceChange.QUEUED).select_related("listing__product"))
@@ -706,7 +756,9 @@ def push_run(run_pk):
         maps, read_error = ({}, {}), str(exc)
     now = timezone.now()
     for i, line in enumerate(lines, 1):
-        DigiKeyPriceRun.objects.filter(pk=run.pk).update(progress=f"{i} з {len(lines)}: {line.sku}")
+        if not _beat(run.pk, lease, f"{i} з {len(lines)}: {line.sku}"):
+            logger.warning("dk_prices push_run #%s: оновлення продовжив інший процес — зупиняюсь", run.pk)
+            return None
         listing = line.listing
         new = tiers_of(line.new_prices)
         if listing is None:
@@ -947,9 +999,9 @@ def auto(force: bool = False) -> str:
         if s.auto_mode != S.AUTO_APPLY:
             why = "режим «питати»"
         elif row.max_change_pct is None:
-            why = "на DigiKey інші ступені — порівняти неможливо"
-        elif row.max_change_pct > s.max_change_pct:
-            why = f"зміна {fmt_num(row.max_change_pct)} % > {fmt_num(s.max_change_pct)} %"
+            why = "на DigiKey немає цін — порівняти неможливо"
+        elif row.max_change_pct > s.max_change_pct:      # кожна кількість, і нові / прибрані ступені
+            why = f"зміна {fmt_num(row.max_change_pct)} % > {fmt_num(s.max_change_pct)} %{change_where(row)}"
         elif i >= s.auto_max_items:
             why = f"більше {s.auto_max_items} товарів за раз"
         lines.append(_line_from_row(run, row, L.HELD if why else L.QUEUED,
@@ -972,13 +1024,15 @@ def _auto_result(text: str) -> str:
 
 
 def resume_stuck() -> int:
-    """Оновлення, що зависли «у черзі» / «надсилається» (процес сайту перезапустився), — дослати з cron."""
+    """Оновлення, що зависли «у черзі» / «надсилається» (процес сайту перезапустився), — дослати з cron.
+    «Надсилається» вважається завислим лише без ознак роботи STUCK_MINUTES (heartbeat_at після кожної позиції),
+    тож довге оновлення, що ще йде, не надсилається вдруге."""
     from django.db.models import Q
     from bots.models import DigiKeyPriceRun as R
-    old = timezone.now() - timedelta(minutes=5)
-    stuck = timezone.now() - timedelta(minutes=STUCK_MINUTES)
+    now = timezone.now()
+    old = now - timedelta(minutes=5)
     n = 0
-    for run in R.objects.filter(Q(status=R.QUEUED, created_at__lt=old) | Q(status=R.SENDING, started_at__lt=stuck)):
+    for run in R.objects.filter(Q(status=R.QUEUED, created_at__lt=old) | _stuck(now)):
         if push_run(run.pk) is not None:
             n += 1
     return n
@@ -1005,11 +1059,16 @@ UP, DOWN, SAME, GREY, ACCENT = "#cf222e", "#1a7f37", "#57606a", "#57606a", "#096
 
 
 def tier_changes(line) -> list[dict]:
-    """Кожен ступінь кількості окремо: {qty, old, new, text, color} — «23.50 → 25.65 (+9.15 %)»."""
-    old, new = dict(tiers_of(line.old_prices)), dict(tiers_of(line.new_prices))
+    """Кожен ступінь кількості окремо: {qty, old, new, text, color} — «23.50 → 25.65 (+9.15 %)»; новий ступінь —
+    з % до ціни DigiKey, що діяла на цю кількість, прибраний — з ціною, що діятиме (як tier_compare)."""
+    old_tiers, new_tiers = tiers_of(line.old_prices), tiers_of(line.new_prices)
+    old, new = dict(old_tiers), dict(new_tiers)
+    eff = {c["qty"]: c for c in tier_compare(old_tiers, new_tiers)}
     out = []
     for q in sorted(set(old) | set(new)):
         o, n = old.get(q), new.get(q)
+        c = eff.get(q)
+        moved = c is not None and c["pct"] is not None and c["new"] != c["old"]
         if o is not None and n is not None:
             if n == o:
                 text, color = "без змін", SAME
@@ -1018,8 +1077,12 @@ def tier_changes(line) -> list[dict]:
                 color = UP if n > o else DOWN
         elif n is not None:
             text, color = "новий ступінь", ACCENT
+            if moved:
+                text += f" · {fmt_signed(c['pct'])} % від {fmt_price(c['old'])}"
         else:
             text, color = "ступінь прибрано", GREY
+            if moved:
+                text += f" · стане {fmt_price(c['new'])} ({fmt_signed(c['pct'])} %)"
         out.append({"qty": q, "old": fmt_price(o) if o is not None else "—",
                     "new": fmt_price(n) if n is not None else "—", "text": text, "color": color})
     return out

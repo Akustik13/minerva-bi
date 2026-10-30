@@ -141,13 +141,13 @@
           <div class="dp-name">{{ v.row.title }}</div>
           {% if v.row.state_text %}<div class="dp-state dp-{{ v.row.state }}">{{ v.row.state_text }}</div>{% endif %}
         </td>
-        <td class="dp-tiers">{% for t in v.cells.dk %}<div{% if t.gone %} class="dp-gone" title="цього ступеня не буде"{% endif %}><span>{{ t.qty }}</span> {{ t.price }}</div>{% empty %}—{% endfor %}</td>
+        <td class="dp-tiers">{% for t in v.cells.dk %}<div{% if t.gone %} class="dp-gone" title="{{ t.title }}"{% endif %}><span>{{ t.qty }}</span> {{ t.price }}</div>{% empty %}—{% endfor %}</td>
         <td class="dp-tiers dp-mut">{% for t in v.cells.minerva %}<div><span>{{ t.qty }}</span> {{ t.price }}</div>{% empty %}—{% endfor %}
           {% if v.row.minerva_currency %}<small>{{ v.row.minerva_currency }} · {{ v.row.minerva_source }}{% if v.rate %}<br>{{ v.rate }}{% endif %}</small>{% endif %}</td>
-        <td class="dp-tiers">{% for t in v.cells.new %}<div class="dp-{{ t.cls }}"><span>{{ t.qty }}</span> <b>{{ t.price }}</b>{% if t.pct %}<em>{{ t.pct }}</em>{% elif t.cls == 'added' %}<em></em>{% endif %}</div>{% empty %}—{% endfor %}</td>
+        <td class="dp-tiers">{% for t in v.cells.new %}<div class="dp-{{ t.cls }}{% if t.dir %} dp-{{ t.dir }}{% endif %}"{% if t.title %} title="{{ t.title }}"{% endif %}><span>{{ t.qty }}</span> <b>{{ t.price }}</b>{% if t.pct %}<em>{{ t.pct }}</em>{% elif t.cls == 'added' %}<em></em>{% endif %}</div>{% empty %}—{% endfor %}</td>
         <td class="dp-change">
-          {% if v.change %}<b class="dp-{{ v.dir }}">{% if v.dir == 'up' %}↑{% elif v.dir == 'down' %}↓{% else %}↕{% endif %} {{ v.change }}</b>
-            {% if v.max_change and v.dir == 'mixed' %}<small>до ±{{ v.max_change }}</small>{% endif %}
+          {% if v.kind == 'diff' and v.change or v.kind == 'diff' and v.max_change %}<b class="dp-{{ v.dir }}">{% if v.dir == 'up' %}↑{% elif v.dir == 'down' %}↓{% else %}↕{% endif %} {{ v.change }}</b>
+            {% if v.max_change %}<small title="найбільша зміна ціни для однієї кількості (і на новому чи прибраному ступені) — її перевіряє запобіжник автооновлення">до ±{{ v.max_change }}</small>{% endif %}
           {% elif v.kind == 'same' %}<span class="dp-ok">✓ однакові</span>
           {% elif v.kind == 'diff' %}<b>нові ступені</b>{% endif %}
           {% for n in v.row.notes %}<div class="dp-note">{{ n }}</div>{% endfor %}

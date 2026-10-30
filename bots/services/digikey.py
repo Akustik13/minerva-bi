@@ -486,17 +486,20 @@ def get_orders_by_po_number(config, po_number: str, limit: int = 100) -> dict:
 
 # ── Marketplace 3-legged OAuth ───────────────────────────────────────────────
 
-def build_authorize_url(config, redirect_uri: str) -> str:
-    """Повертає URL для авторизації користувача (3-legged OAuth)."""
+def build_authorize_url(config, redirect_uri: str, state: str = "") -> str:
+    """Повертає URL для авторизації користувача (3-legged OAuth). state — випадкове значення з сесії
+    (bots/oauth.py): DigiKey повертає його в callback, Minerva звіряє, щоб чужий code не замінив токени."""
     from urllib.parse import urlencode
     base = _PROD_BASE  # авторизація завжди через production URL
-    params = urlencode({
+    query = {
         "response_type": "code",
         "client_id":     config.client_id,
         "redirect_uri":  redirect_uri,
         "scope":         "openid",
-    })
-    return f"{base}{AUTHORIZE_PATH}?{params}"
+    }
+    if state:
+        query["state"] = state
+    return f"{base}{AUTHORIZE_PATH}?{urlencode(query)}"
 
 
 def exchange_code_for_tokens(config, code: str, redirect_uri: str) -> dict:
