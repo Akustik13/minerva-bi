@@ -1,0 +1,56 @@
+{% comment %}🧭 Дорожня карта публікації лістингу на DigiKey (bots/services/dk_publish.roadmap): крапки зі смужкою,
+дата й тривалість кожного кроку, поточний крок і що зробити далі.{% endcomment %}
+<style>
+  .pr-box { margin: 0 0 16px; padding: 12px 16px; border: 1px solid var(--border-strong, #243347);
+            border-radius: 8px; background: var(--bg-card, #1a2535); }
+  .pr-head { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; margin-bottom: 10px; font-size: 13px; }
+  .pr-head b { font-size: 14px; }
+  .pr-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .pr-track { position: relative; display: flex; justify-content: space-between; padding: 0 6px; }
+  .pr-track::before { content: ""; position: absolute; left: 18px; right: 18px; top: 13px; height: 4px;
+                      background: var(--hairline-color, #2b3c52); border-radius: 2px; }
+  .pr-fill { position: absolute; left: 18px; top: 13px; height: 4px; background: #2e9d5b; border-radius: 2px;
+             transition: width .3s; }
+  .pr-step { position: relative; z-index: 1; flex: 1 1 0; display: flex; flex-direction: column; align-items: center;
+             text-align: center; min-width: 0; }
+  .pr-dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 13px; background: var(--bg-card, #1a2535); border: 3px solid var(--hairline-color, #2b3c52); }
+  .pr-done .pr-dot { background: #2e9d5b; border-color: #2e9d5b; color: #fff; }
+  .pr-current .pr-dot { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, .25); }
+  .pr-error .pr-dot { border-color: #e5484d; background: #3a1418; }
+  .pr-warn .pr-dot { border-color: #f5a524; background: #3a2a0c; }
+  .pr-label { margin-top: 6px; font-size: 12px; font-weight: 600; }
+  .pr-at { font-size: 11px; color: var(--body-quiet-color, #8aa0b4); white-space: nowrap; }
+  .pr-span { font-size: 11px; color: #2e9d5b; }
+  .pr-hint { margin-top: 10px; font-size: 12px; padding: 6px 10px; border-radius: 6px;
+             background: rgba(59, 130, 246, .12); }
+  .pr-hint.pr-bad { background: rgba(229, 72, 77, .14); }
+  .pr-hint.pr-wrn { background: rgba(245, 165, 36, .14); }
+  @media (max-width: 700px) { .pr-at, .pr-span { display: none; } .pr-label { font-size: 11px; } }
+</style>
+<div class="pr-box" id="pub-roadmap">
+  <div class="pr-head">
+    <b>🧭 Публікація на DigiKey</b>
+    <span class="pr-muted">крок {{ rm.done }} з {{ rm.count }}</span>
+    {% if rm.source %}<span class="pr-muted">картка: {{ rm.source }}</span>{% endif %}
+    {% if rm.total %}<span class="pr-muted">від картки до DigiKey: <b>{{ rm.total }}</b></span>{% endif %}
+    {% if rm.offer_status %}<span class="pr-muted">офер на DigiKey: {{ rm.offer_status }}</span>{% endif %}
+  </div>
+  <div class="pr-track">
+    <div class="pr-fill" style="width: calc((100% - 36px) * {{ rm.fill }})"></div>
+    {% for s in rm.steps %}
+    <div class="pr-step pr-{{ s.state }}" title="{{ s.label }}{% if s.at %} — {{ s.at }}{% endif %}{% if s.hint %}: {{ s.hint }}{% endif %}">
+      <div class="pr-dot">{% if s.state == 'done' %}✓{% else %}{{ s.icon }}{% endif %}</div>
+      <div class="pr-label">{{ s.label }}</div>
+      <div class="pr-at">{{ s.at|default:"·" }}</div>
+      <div class="pr-span">{% if s.span %}+{{ s.span }}{% endif %}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% if rm.current_step %}
+  <div class="pr-hint{% if rm.current_step.state == 'error' %} pr-bad{% elif rm.current_step.state == 'warn' %} pr-wrn{% endif %}">
+    <b>Зараз: {{ rm.current_step.label }}.</b>
+    {% if rm.current_step.hint %}{{ rm.current_step.hint }}{% else %}{{ rm.next }}{% endif %}
+  </div>
+  {% endif %}
+</div>

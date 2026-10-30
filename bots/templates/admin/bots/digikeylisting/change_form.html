@@ -5,6 +5,8 @@
    Submit area — contains both view-bar and edit action-bar
    Hidden/shown via CSS based on body.dk-view / body.dk-edit class
 ═══════════════════════════════════════════════════════════════════════════ #}
+{% block form_top %}{% if pub_roadmap %}{% include "admin/bots/digikeylisting/_roadmap.html" with rm=pub_roadmap %}{% endif %}{{ block.super }}{% endblock %}
+
 {% block submit_buttons_bottom %}
 
   {# Django's own Save / Delete row — only in edit mode #}

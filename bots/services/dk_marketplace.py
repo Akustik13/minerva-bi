@@ -211,7 +211,23 @@ def upsert_product(config, listing) -> str:
     return product_id
 
 
+def approved_product(config, listing) -> dict | None:
+    """Товар нашого постачальника в DigiKey (GET /products) — є, коли PIM його затвердив. Справжній `_id` для
+    POST /offers (staged-запис з /products/stage/upsert — інший об'єкт)."""
+    try:
+        return fetch_product_by_sku(config, listing.get_supplier_sku(), product_id='')
+    except DKMarketplaceError as exc:
+        logger.warning("DK approved_product %s: %s", listing.get_supplier_sku(), exc)
+        return None
+
+
 # ── Offers API ───────────────────────────────────────────────────────────────
+
+# Поля офера, які PUT /offers/{id} (UpdateOffer — офер замінюється цілком) інакше скинув би: Minerva ними не
+# керує, їх налаштовують на supplier.digikey.com — беремо зі свіжого GET /offers.
+PRESERVE_OFFER_FIELDS = ("maxOrderQuantity", "incrementQuantity", "returnsAccepted", "logisticClassCode",
+                         "dateCodeProvided", "availableStartDateUtc", "availableEndDateUtc")
+
 
 def _offer_payload(listing) -> dict:
     stock  = listing.get_dk_quantity()
@@ -258,6 +274,9 @@ def create_offer(config, listing) -> str:
     data     = resp.json()
     offer_id = data.get("id") or ""
     logger.info("DK create_offer OK offer_id=%s", offer_id)
+    from bots.services.dk_publish import mark, note_offer
+    mark(listing, "approved")                 # офер прийнято — товар уже затверджено
+    note_offer(listing, data)
     return offer_id
 
 
@@ -272,7 +291,13 @@ def update_offer(config, listing) -> None:
     url   = f"{_base_url(config)}{_OFFERS_BASE}/offers/{listing.dk_offer_id}"
 
     logger.info("DK update_offer offer_id=%s", listing.dk_offer_id)
-    resp = req.put(url, json=_offer_payload(listing), headers=_headers(config, token), timeout=30)
+    payload = _offer_payload(listing)
+    fresh = fetch_offer_by_sku(config, listing.get_supplier_sku(), offer_id=listing.dk_offer_id)
+    if fresh and fresh.get("id") == listing.dk_offer_id:
+        for key in PRESERVE_OFFER_FIELDS:
+            if fresh.get(key) is not None:
+                payload.setdefault(key, fresh[key])
+    resp = req.put(url, json=payload, headers=_headers(config, token), timeout=30)
     try:
         resp.raise_for_status()
     except req.HTTPError as e:
@@ -283,6 +308,11 @@ def update_offer(config, listing) -> None:
             f"update_offer {e.response.status_code}: {body}"
         ) from e
     logger.info("DK update_offer OK")
+    try:
+        from bots.services.dk_publish import note_offer
+        note_offer(listing, resp.json())
+    except ValueError:
+        pass
 
 
 def delete_offer(config, offer_id: str) -> None:
@@ -321,16 +351,21 @@ def publish_listing(listing) -> str:
     from django.utils import timezone
     from bots.models import DigiKeyConfig
 
+    from bots.services.dk_publish import mark, problems
+
     config = DigiKeyConfig.get()
-    if not listing.dk_category_id:
-        raise DKMarketplaceError("DK Category ID не заповнено")
-    if not listing.dk_title:
-        raise DKMarketplaceError("Назва (DK Title) не заповнена")
-    if not listing.dk_description:
-        raise DKMarketplaceError("Опис (DK Description) не заповнений")
+    todo = problems(listing, config)          # ті самі ліміти, що в API DigiKey — до відправки, а не 400 від них
+    if todo:
+        raise DKMarketplaceError("Не заповнено для публікації: " + "; ".join(todo))
+    mark(listing, "checked")
 
     try:
         product_id = upsert_product(config, listing)
+        mark(listing, "sent", staged_id=product_id)
+        found = approved_product(config, listing)
+        if found and found.get("_id"):        # товар уже затверджено — офер на справжній productId
+            product_id = found["_id"]
+            mark(listing, "approved")
         listing.dk_product_id = product_id
 
         # Try offer immediately — works if product already approved
@@ -411,6 +446,14 @@ def check_staged_listing(listing) -> str:
     if not listing.dk_product_id:
         raise DKMarketplaceError("Product ID відсутній — спочатку опублікуй продукт.")
 
+    from bots.services.dk_publish import mark
+    found = approved_product(config, listing)
+    if found and found.get("_id"):
+        mark(listing, "approved")
+        if found["_id"] != listing.dk_product_id:   # staged-запис → справжній товар DigiKey
+            listing.dk_product_id = found["_id"]
+            type(listing).objects.filter(pk=listing.pk).update(dk_product_id=found["_id"])
+
     try:
         if listing.dk_offer_id:
             update_offer(config, listing)
@@ -429,10 +472,15 @@ def check_staged_listing(listing) -> str:
 
     except DKMarketplaceError as exc:
         msg = str(exc).lower()
-        # DigiKey rejects offer creation while product is still in review queue
-        if any(kw in msg for kw in ('not approved', 'pending', 'review', 'staged',
-                                    'not found', 'does not exist', '404', '400')):
+        # DigiKey rejects offer creation while product is still in review queue — але якщо товар уже
+        # затверджено (є в GET /products), помилка офера справжня: показати в картці, не ховати «в черзі»
+        if not found and any(kw in msg for kw in ('not approved', 'pending', 'review', 'staged',
+                                                  'not found', 'does not exist', '404', '400')):
             return 'staged'
+        from django.utils import timezone as _tz
+        listing.last_error, listing.last_error_at = str(exc)[:2000], _tz.now()
+        type(listing).objects.filter(pk=listing.pk).update(last_error=listing.last_error,
+                                                           last_error_at=listing.last_error_at)
         raise
 
 
@@ -735,7 +783,11 @@ def create_listings_from_offers(
             dk_prices        = prices_list,
             sync_status      = DigiKeyListing.SYNC_PUBLISHED,
             last_synced_at   = timezone.now(),
+            card_source      = 'digikey',
         )
+        from bots.services.dk_publish import mark, note_offer
+        mark(listing, "approved")
+        note_offer(listing, offer)
         try:
             pull_product_fields(listing)
         except Exception as pull_exc:
@@ -768,9 +820,11 @@ def fetch_product_by_sku(config, supplier_sku: str,
 
     token = get_marketplace_token(config)
 
+    supplier = (getattr(config, 'marketplace_supplier_id', '') or '').strip()
+    own = {'SupplierIds': supplier} if len(supplier) == 36 and supplier.count('-') == 4 else {}
     for params in (
-        ({'BusinessIds': product_id, 'Max': 1} if product_id else None),
-        {'PartNumber': supplier_sku, 'Max': 5},
+        ({'BusinessIds': product_id, 'Max': 1, **own} if product_id else None),
+        {'PartNumber': supplier_sku, 'Max': 5, **own},   # інакше — товар іншого продавця з тим самим номером
     ):
         if params is None:
             continue
@@ -810,7 +864,7 @@ def fetch_offer_by_sku(config, supplier_sku: str, offer_id: str = '') -> dict | 
     token = get_marketplace_token(config)
     resp  = req.get(
         f"{_base_url(config)}{_OFFERS_BASE}/offers",
-        params={'SupplierSku': supplier_sku, 'Max': 1},
+        params={'SupplierSku': supplier_sku, 'Max': 20},
         headers=_headers(config, token),
         timeout=15,
     )
@@ -818,7 +872,12 @@ def fetch_offer_by_sku(config, supplier_sku: str, offer_id: str = '') -> dict | 
         logger.warning("fetch_offer_by_sku %s: HTTP %s", supplier_sku, resp.status_code)
         return None
     offers = resp.json().get('offers', [])
-    return offers[0] if offers else None
+    if offer_id:
+        same = [o for o in offers if o.get('id') == offer_id]
+        if same:
+            return same[0]
+    exact = [o for o in offers if (o.get('supplierSku') or '') == supplier_sku]
+    return (exact or offers or [None])[0]
 
 
 def _additional_field_str(field: dict) -> str:
@@ -1414,7 +1473,13 @@ def scan_missing_listings(
                 dk_prices        = prices_list,
                 sync_status      = new_status,
                 last_synced_at   = timezone.now(),
+                card_source      = 'digikey',
             )
+            from bots.services.dk_publish import mark, note_offer
+            if product_id:
+                mark(listing, "approved")
+            if offer:
+                note_offer(listing, offer)
             created += 1
             created_listing_skus.append(sku)
             logger.info("DK scan: created listing SKU=%s status=%s", sku, new_status)
@@ -1480,6 +1545,8 @@ def refresh_offer_prices(products=None) -> dict:
             not_found.append(listing.product.sku)
             continue
         fields = []
+        from bots.services.dk_publish import note_offer
+        note_offer(listing, offer)
         tiers = _parse_dk_price_tiers(offer.get('prices') or [])
         if tiers and tiers != (listing.dk_prices or []):
             listing.dk_prices = tiers

@@ -487,6 +487,12 @@ class DigiKeyListing(models.Model):
         'Журнал помилок', default=list, blank=True,
         help_text='Автоматично: хронологія помилок синхронізації (макс. 20)'
     )
+    CARD_SOURCES = [('', '—'), ('digikey', 'Копія з DigiKey'), ('stock', 'Зі складу Minerva'),
+                    ('copy', 'Копія лістингу'), ('file', 'З таблиці')]
+    card_source = models.CharField('Звідки картка', max_length=10, choices=CARD_SOURCES, blank=True, default='')
+    pub_events = models.JSONField(
+        'Етапи публікації', default=dict, blank=True,
+        help_text='Автоматично: коли вперше пройдено кожен крок публікації (bots/services/dk_publish.py)')
     ignored_quality_fields = models.JSONField(
         'Ігноровані поля перевірок', default=list, blank=True,
         help_text='Поля, для яких локальні попередження вимкнено вручну'

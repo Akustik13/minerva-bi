@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.urls import reverse, path
 from django.shortcuts import redirect, render
 from django.contrib import messages
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing, BotTask, DigiKeyPriceLog, AIAnalysisLog
 
@@ -1928,6 +1928,23 @@ def _local_quality_checks(listing, ignored_fields=None) -> list:
 
 # ── DigiKey Marketplace Listings ──────────────────────────────────────────────
 
+class PublishStageFilter(admin.SimpleListFilter):
+    """🧭 Етап публікації (останній пройдений крок дорожньої карти, bots/services/dk_publish.py)."""
+    title = '🧭 Етап публікації'
+    parameter_name = 'pub_stage'
+
+    def lookups(self, request, model_admin):
+        from bots.services.dk_publish import STAGES
+        return [(k, f'{i} {l}') for k, i, l in STAGES]
+
+    def queryset(self, request, queryset):
+        from bots.services.dk_publish import stage_of
+        if not self.value():
+            return queryset
+        pks = [pk for pk, ev in queryset.values_list('pk', 'pub_events') if stage_of(ev) == self.value()]
+        return queryset.filter(pk__in=pks)
+
+
 @admin.register(DigiKeyListing)
 class DigiKeyListingAdmin(admin.ModelAdmin):
     change_form_template = 'admin/bots/digikeylisting/change_form.html'
@@ -1937,9 +1954,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
     list_display   = ('product_sku_link', 'dk_title', 'category_type',
                       'stock_qty_display', 'dk_qty_display', 'price_min_display',
-                      'sync_status_badge', 'price_delta_badge',
+                      'sync_status_badge', 'pub_col', 'price_delta_badge',
                       'last_synced_at', 'publish_btn')
-    list_filter    = ('sync_status', 'category_type', 'dk_is_active')
+    list_filter    = ('sync_status', PublishStageFilter, 'category_type', 'dk_is_active', 'card_source')
     search_fields  = ('product__sku', 'dk_title', 'dk_supplier_sku')
     autocomplete_fields = ('product',)
     actions        = [
@@ -2104,6 +2121,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             obj.last_error     = ''
             obj.last_synced_at = None
             obj.product        = None  # copy is unlinked — bind to inventory later
+            obj.card_source, obj.pub_events = 'copy', {}       # дорожня карта копії — з початку
+        elif not change and not obj.card_source:
+            obj.card_source = 'stock'                           # нова картка в Minerva
 
         # Auto-create inventory Product when checkbox is checked on add form
         if not change and not obj.product_id and request.POST.get('_create_product'):
@@ -2133,6 +2153,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 messages.success(request, f'📦 Товар «{base_sku}» автоматично створено на складі.')
 
         super().save_model(request, obj, form, change)
+        from bots.services.dk_publish import mark, problems
+        if not problems(obj):                                   # усе обов'язкове вперше заповнено
+            mark(obj, "checked")
 
     def response_change(self, request, obj):
         if '_dk_save_and_publish' in request.POST:
@@ -2190,8 +2213,36 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
     # ── changelist_view: inject pull-task toolbar context ─────────────────────
 
-    def changelist_view(self, request, extra_context=None):
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        from bots.services.dk_publish import roadmap
         extra_context = extra_context or {}
+        obj = self.get_object(request, object_id)
+        if obj is not None:
+            extra_context['pub_roadmap'] = roadmap(obj)
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    @admin.display(description='🧭 Публікація')
+    def pub_col(self, obj):
+        """Мініатюра дорожньої карти: крапки кроків (зелені — пройдено, синя — поточний, червона — помилка)."""
+        from bots.models import DigiKeyConfig
+        from bots.services.dk_publish import roadmap
+        if getattr(self, '_pub_cfg', None) is None:          # одне налаштування на весь список
+            self._pub_cfg = DigiKeyConfig.get()
+        rm = roadmap(obj, self._pub_cfg)
+        colors = {'done': '#2e9d5b', 'current': '#3b82f6', 'error': '#e5484d', 'warn': '#f5a524', 'todo': '#3a4a5e'}
+        tip = ' · '.join(f"{s['icon']} {s['label']}{' ' + s['at'] if s['at'] else ''}" for s in rm['steps'])
+        dots = format_html_join('', '<span style="display:inline-block;width:9px;height:9px;border-radius:50%;'
+                                    'margin-right:3px;background:{}"></span>',
+                                ((colors[s['state']],) for s in rm['steps']))
+        cur = rm['current_step']
+        return format_html('<span title="{}" style="white-space:nowrap">{} <small>{}</small></span>', tip, dots,
+                           cur['label'] if cur else '✓')
+
+    def changelist_view(self, request, extra_context=None):
+        from bots.services.dk_publish import summary
+        extra_context = extra_context or {}
+        extra_context['pub_summary'] = summary(DigiKeyListing.objects.all())
+        self._pub_cfg = None
         extra_context['pull_task_status_url']    = reverse('admin:bots_digikeylisting_pull_task_status')
         extra_context['pull_task_cancel_url']    = reverse('admin:bots_digikeylisting_pull_task_cancel')
         extra_context['check_new_url']           = reverse('admin:bots_digikeylisting_check_new')
@@ -3869,6 +3920,7 @@ Rules:
                             product=product,
                             dk_supplier_sku=sku,
                             sync_status=DigiKeyListing.SYNC_DRAFT,
+                            card_source='file',
                             category_type=r.get('format', 'other') if r.get('format') in ('filter', 'cable', 'antenna', 'connector') else 'other',
                         )
 
