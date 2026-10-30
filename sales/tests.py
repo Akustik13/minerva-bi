@@ -4,12 +4,14 @@
 """
 import io
 import uuid
+from datetime import datetime
 from decimal import Decimal as D
 
 import openpyxl
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.utils import timezone
 
 from inventory.models import InventorySettings, InventoryTransaction, Location, Product
 from inventory.services import stock
@@ -56,9 +58,10 @@ class AdminBase(TestCase):
         self.loc = Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
         self.p = Product.objects.create(sku="FT220407", name="Filter")
         self.q = Product.objects.create(sku="AN220213", name="Antenna")
-        for prod in (self.p, self.q):
+        for prod in (self.p, self.q):            # склад ведеться з початку року — раніше за замовлення тестів
             InventoryTransaction.objects.create(tx_type="Incoming", qty=50, product=prod, location=self.loc,
-                                                external_key=f"in:{uuid.uuid4()}")
+                                                external_key=f"in:{uuid.uuid4()}",
+                                                tx_date=timezone.make_aware(datetime(2026, 1, 1)))
 
 
 class ImportTests(AdminBase):

@@ -6,6 +6,7 @@
 """
 import json
 import uuid
+from datetime import date, datetime
 from decimal import Decimal as D
 from io import StringIO
 from types import SimpleNamespace
@@ -13,6 +14,7 @@ from unittest import mock
 
 import pandas as pd
 from django.core.management import call_command
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from inventory.models import (
@@ -522,3 +524,67 @@ class CheckAvailabilityAliasTests(StockBase):
         self.assertEqual([r["requested_total"] for r in res], [25, 25])
         res = stock.check_availability([{"sku": "FT220407", "qty": 15}, {"sku": "FT-ALIAS", "qty": 5}])
         self.assertEqual([r["ok"] for r in res], [True, True])
+
+
+# ── 16. Відправлені до обліку складу (замовлення 2025, залишок уведено інвентаризацією 2026) ──
+
+class ShippedBeforeTrackingTests(StockBase):
+    """Відправлене замовлення без руху складу — не «ще не списано»: товар уже пішов. Склад товару почали вести
+    24.02.2026 (інвентаризація), замовлення 2025 року відправлені раніше — у залишку їх уже немає."""
+
+    def setUp(self):
+        super().setUp()
+        self.mode("shipped")
+        self.p = Product.objects.create(sku="AN220203-02A", name="Antenna")
+        InventoryTransaction.objects.create(tx_type=TX.ADJUSTMENT, qty=12, product=self.p, location=self.loc,
+                                            external_key=f"test:count:{uuid.uuid4()}",
+                                            tx_date=timezone.make_aware(datetime(2026, 2, 24, 16, 14)))
+
+    def old_order(self, qty, day, status="shipped"):
+        self._n += 1
+        o = SalesOrder.objects.create(source="digikey", order_number=f"9{self._n:07d}", status=status,
+                                      affects_stock=True, order_date=date(2025, 1, day))
+        SalesOrderLine.objects.create(order=o, product=self.p, sku_raw=self.p.sku, qty=qty)
+        return o
+
+    def test_old_shipped_orders_are_not_reserved_anywhere(self):
+        old = [self.old_order(4, 21), self.old_order(2, 9)]
+        self.assertEqual(self.nums(self.p), (12, 0, 12))           # було 12 / 6 / 6
+        self.assertEqual(stock.open_order_lines([self.p.pk]), [])
+        self.assertEqual(stock.location_breakdown(self.p)[0]["reserved"], 0)
+        for o in old:
+            self.assertEqual(stock.order_stock_issues(o), [])      # «Синхронізувати» не пропонує списати
+            self.assertEqual(stock.sync_order(o), [])
+            cover = stock.order_lines_cover(o)[o.lines.get().pk]
+            self.assertEqual(cover["held"], 0)
+        self.assertFalse(InventoryTransaction.objects.filter(external_key__startswith="so:").exists())
+        self.assertEqual(self.nums(self.p), (12, 0, 12))
+
+    def test_open_order_still_reserved_and_shipping_now_deducts(self):
+        o = self.old_order(3, 5, status="received")                # ще чекає відправки — бронь
+        self.assertEqual(self.nums(self.p), (12, 3, 9))
+        self.assertEqual([state for _l, state in stock.open_order_lines([self.p.pk])], ["pending"])
+        self.set_status(o, "shipped")                              # відправляють зараз — списується
+        self.assertEqual(self.nums(self.p), (9, 0, 9))
+
+    def test_recent_shipped_without_movement_is_offered_for_sync(self):
+        o = self.order((self.p, 2), status="received")
+        InventoryTransaction.objects.filter(external_key__startswith="so:").delete()
+        SalesOrder.objects.filter(pk=o.pk).update(status="shipped")   # списання пропущене
+        o.refresh_from_db()
+        self.assertEqual(self.nums(self.p), (12, 0, 12))
+        self.assertEqual(len(stock.order_stock_issues(o)), 1)
+        stock.sync_order(o)
+        self.assertEqual(self.nums(self.p), (10, 0, 10))
+
+    def test_delivered_mode_counts_only_shipments_after_tracking(self):
+        self.mode("delivered")
+        self.old_order(4, 21)
+        self.assertEqual(self.nums(self.p), (12, 0, 12))
+        self.set_status(self.order((self.p, 5)), "shipped")
+        self.assertEqual(self.nums(self.p), (12, 5, 7))
+
+    def test_creation_mode_old_shipped_not_reserved(self):
+        self.mode("creation")
+        self.old_order(4, 21)
+        self.assertEqual(self.nums(self.p), (12, 0, 12))

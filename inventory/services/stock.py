@@ -8,6 +8,9 @@
               + позиції відкритих замовлень (affects_stock, статус не «Скасовано» / «Доставлено»),
                 під які рух складу ще не записано (списання при «Відправлено» / «Доставлено»)
               Замовлення, вже списані (Outgoing), сюди не входять — їх уже немає в on_hand.
+              Відправлене замовлення без руху — не бронь: товар фізично пішов (історія до обліку складу в
+              Minerva або пропущене списання); виняток — режим «списувати при Доставлено», де відправлене
+              ще в on_hand, і то лише коли склад товару вже вели на дату відправки (pending_order_lines).
   available = on_hand − reserved (можна продати)
   incoming  = Σ max(0, qty_ordered − qty_received) у відкритих закупівлях (переотримана позиція — 0, не мінус)
 
@@ -35,7 +38,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import (
-    CharField, DecimalField, Exists, F, Func, Max, OuterRef, Q, Subquery, Sum, Value,
+    CharField, DecimalField, Exists, F, Func, Max, Min, OuterRef, Q, Subquery, Sum, Value,
 )
 from django.db.models.functions import Cast, Coalesce, Greatest
 from django.utils import timezone
@@ -87,15 +90,45 @@ def _line_held_txs():
     )
 
 
-def pending_order_lines():
+def _ships_late(settings=None):
+    """Режим «списувати при Доставлено»: відправлене замовлення ще в on_hand, доки його не доставлено."""
+    s = settings or InventorySettings.get()
+    return not s.use_reservation and s.deduct_on == InventorySettings.DeductOn.DELIVERED
+
+
+def pending_order_lines(settings=None):
     """Позиції відкритих замовлень (affects_stock, не скасовані й не доставлені), під які ще не записано
     жодного руху складу — товар обіцяно, але він ще в on_hand (режими «списувати при Відправлено /
-    Доставлено» або замовлення, внесене до зміни налаштувань)."""
+    Доставлено» або замовлення, внесене до зміни налаштувань).
+
+    Відправлені без руху — не бронь: товар уже пішов, а склад або ще не вели (замовлення 2025 року, залишок
+    уведено пізніше інвентаризацією), або списання пропущене («🔄 Синхронізувати склад»). Лише в режимі
+    «при Доставлено» відправлене ще рахується — якщо на дату відправки склад товару вже вели."""
     from sales.models import SalesOrderLine
-    return (SalesOrderLine.objects
-            .filter(order__affects_stock=True, qty__gt=0, product__isnull=False)
-            .exclude(order__status__in=NOT_PENDING_STATUSES)
-            .filter(~Exists(_line_held_txs())))
+    qs = (SalesOrderLine.objects
+          .filter(order__affects_stock=True, qty__gt=0, product__isnull=False)
+          .exclude(order__status__in=NOT_PENDING_STATUSES)
+          .filter(~Exists(_line_held_txs())))
+    shipped = Q(order__status__in=SHIPPED_STATUSES)
+    if not _ships_late(settings):
+        return qs.exclude(shipped)
+    tracked = (InventoryTransaction.objects.filter(product_id=OuterRef("product_id"))
+               .exclude(tx_type=TX.RESERVED)
+               .filter(tx_date__date__lte=Coalesce(OuterRef("order__shipped_at"), OuterRef("order__order_date"))))
+    return qs.filter(~shipped | Exists(tracked))
+
+
+def shipped_before_tracking(order, product_id) -> bool:
+    """Відправлено раніше, ніж склад цього товару почали вести в Minerva (перший рух — пізніше за відправку,
+    напр. інвентаризація 2026 року, а замовлення — 2025): у залишку цього товару вже немає, списувати нічого."""
+    if order.status not in SHIPPED_STATUSES or not product_id:
+        return False
+    when = order.shipped_at or order.order_date
+    if not when:
+        return False
+    first = (InventoryTransaction.objects.filter(product_id=product_id).exclude(tx_type=TX.RESERVED)
+             .exclude(external_key__startswith=order_prefix(order)).aggregate(t=Min("tx_date"))["t"])
+    return first is not None and when < timezone.localdate(first)
 
 
 def _default_location_code():
@@ -262,7 +295,8 @@ def line_held(line):
     if held > 0:
         return held
     o = line.order
-    if o.affects_stock and o.status not in NOT_PENDING_STATUSES and line.product_id and (line.qty or 0) > 0:
+    if (o.affects_stock and o.status not in NOT_PENDING_STATUSES and line.product_id and (line.qty or 0) > 0
+            and (o.status not in SHIPPED_STATUSES or _ships_late())):
         return line.qty
     return Decimal("0")
 
@@ -293,18 +327,23 @@ def order_lines_cover(order):
 def open_order_lines(product_ids):
     """Позиції незакритих замовлень товарів зі станом для огляду складу:
     reserved — 🔒 резерв, pending — ще не списано (рахується в «Резерв»), deducted — уже списано зі складу.
-    Відправлені й уже списані замовлення не показуються."""
+    Відправлені й уже списані замовлення не показуються, як і відправлені без руху, які не бронюють товар
+    (pending_order_lines: історія до обліку складу)."""
     from sales.models import SalesOrderLine
+    product_ids = list(product_ids)
     qs = (SalesOrderLine.objects
-          .filter(product_id__in=list(product_ids), order__affects_stock=True, qty__gt=0)
+          .filter(product_id__in=product_ids, order__affects_stock=True, qty__gt=0)
           .exclude(order__status__in=NOT_PENDING_STATUSES)
           .annotate(_held_type=Subquery(_line_held_txs().values("tx_type")[:1]))
           .select_related("order")
           .order_by("product_id", "order__order_date", "pk"))
+    pending = set(pending_order_lines().filter(product_id__in=product_ids).values_list("pk", flat=True))
     out = []
     for line in qs:
         state = {TX.RESERVED: "reserved", TX.OUTGOING: "deducted"}.get(line._held_type, "pending")
         if state == "deducted" and line.order.status in SHIPPED_STATUSES:
+            continue
+        if state == "pending" and line.pk not in pending:
             continue
         out.append((line, state))
     return out
@@ -768,8 +807,10 @@ def _release_reservations(order):
     return changes
 
 
-def sync_order(order, *, settings=None, performed_by=None):
+def sync_order(order, *, settings=None, performed_by=None, shipping_now=False):
     """Позиції замовлення → рухи складу (подія: позицію додано / змінено, статус змінився, «Синхронізувати»).
+    Відправлене без руху, яке відправили раніше, ніж почали вести склад товару (shipped_before_tracking), —
+    історія: не списується; shipping_now — статус щойно змінився (відправляють зараз), тоді списується.
 
     Позиція без руху отримує рух за order_target; рух із іншим товаром чи кількістю виправляється на місці
     (повернення старого й списання нового — один рух, без подвійного повернення); резерв стає списанням,
@@ -804,7 +845,7 @@ def sync_order(order, *, settings=None, performed_by=None):
                     changes.append(f"{sku}: рух прибрано (кількість 0)")
                 continue
             if not txs:
-                if target is None:
+                if target is None or (not shipping_now and shipped_before_tracking(order, line.product_id)):
                     continue
                 location = location or order_location(s)
                 InventoryTransaction.objects.create(
@@ -999,7 +1040,7 @@ def order_status_changed(order, old_status, *, performed_by=None):
         return [f"повернуто на склад: {n}"] if n else []
     if old_status == CANCELLED:
         return restore_order_stock(order, performed_by)
-    return sync_order(order, performed_by=performed_by)
+    return sync_order(order, performed_by=performed_by, shipping_now=old_status is not None)
 
 
 def order_saved(order, old, *, performed_by=None):
@@ -1072,7 +1113,8 @@ def order_stock_issues(order, settings=None):
         sku = line.product.sku if line.product_id else (line.sku_raw or "?")
         base = {"line_pk": line.pk, "line_sku": sku, "line_qty": float(want)}
         if not txs:
-            if target is not None and line.product_id and want > 0:
+            if (target is not None and line.product_id and want > 0
+                    and not shipped_before_tracking(order, line.product_id)):
                 issues.append({**base, "tx_sku": "—", "tx_qty": 0, "tx_type": "", "product_diff": False,
                                "qty_diff": True, "text": f"{sku}: не записано на складі ({_label(target)} {_num(want)})"})
             continue
