@@ -120,6 +120,9 @@ def live(listing) -> dict:
                                        product_id=listing.dk_product_id or "")
     except Exception as exc:  # noqa: BLE001
         errors.append(f"товар: {exc}")
+    if product:
+        from bots.services.dk_publish import note_product
+        note_product(listing, product)                  # повторно надіслані зміни DigiKey уже прийняв?
     o_rows, p_rows = offer_rows(listing, offer), product_rows(listing, product)
     return {"listing": listing, "offer": offer, "product": product, "errors": errors,
             "offer_rows": o_rows, "product_rows": [r for r in p_rows if r["group"] == "product"],
@@ -127,7 +130,14 @@ def live(listing) -> dict:
             "offer_sum": summary(o_rows), "product_sum": summary(p_rows),
             "updated": (offer or {}).get("lastUpdateDateUtc") or "", "source": (offer or {}).get("lastUpdatedSource") or "",
             "status": (offer or {}).get("offerStatusReason") or "",
-            "web": (product or {}).get("webDisplay"), "product_active": (product or {}).get("isActive")}
+            "web": (product or {}).get("webDisplay"), "product_active": (product or {}).get("isActive"),
+            "product_created": (product or {}).get("createDateUtc") or "",
+            "product_updated": (product or {}).get("lastUpdateDateUtc") or "", "pending": _pending(listing)}
+
+
+def _pending(listing):
+    from bots.services.dk_publish import pending_update
+    return pending_update(listing.pub_events)
 
 
 def bulk(listings) -> list:

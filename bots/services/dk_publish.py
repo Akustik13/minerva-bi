@@ -10,6 +10,10 @@ bots/services/dk_publish.py — 🧭 Дорожня карта публікац�
   live        🟢 На DigiKey (офер isActive і offerStatusReason = Active)
 
 Коли крок уперше пройдено — DigiKeyListing.pub_events {крок: ISO-час}; повторне проходження не перезаписує.
+Повторне надсилання вже затвердженого товару («🚀 Опублікувати» ще раз, «Зберегти й опублікувати», масова
+публікація) — зміна товару, яку DigiKey перевіряє окремо (у порталі «Products → Pending»), а опублікований товар
+і офер тим часом діють як були: `note_update_sent` → pub_events update_sent / update_staged_id, `note_product`
+(GET /products: lastUpdateDateUtc новіший) → update_done. Список Pending API DigiKey не віддає.
 Стан офера DigiKey (offerStatusReason) — pub_events["offer_status"]: «QuantityAvailableLessThanMOQ» тощо
 показуються на дорожній карті як причина, чому офер не видно.
 """
@@ -188,12 +192,53 @@ def sync_stages(listings=None, offers=None) -> dict:
         offer = by_id.get(listing.dk_offer_id) or by_sku.get(listing.get_supplier_sku())
         if offer:
             out["updated"] += sync_offer(listing, offer)
+            events = listing.pub_events or {}
+            if events.get("update_sent") and not events.get("update_done"):   # чи прийняв DigiKey надіслані зміни
+                try:
+                    from bots.services.dk_marketplace import fetch_product_by_sku
+                    product = fetch_product_by_sku(DigiKeyConfig.get(), listing.get_supplier_sku(),
+                                                   product_id=listing.dk_product_id or "")
+                    out["updated"] += note_product(listing, product or {})
+                except Exception:  # noqa: BLE001 — етапи офера вже записано
+                    pass
         elif listing.dk_offer_id:
             out["not_found"].append(listing.get_supplier_sku())
             out["updated"] += mark(listing, None, offer_status="NotFound")
         else:
             out["without_offer"] += 1
     return out
+
+
+def was_published(listing) -> bool:
+    """Товар уже затверджено DigiKey (є офер або крок «затверджено») — нове надсилання буде зміною, не новим товаром."""
+    events = listing.pub_events or {}
+    return bool(listing.dk_offer_id or events.get("approved"))
+
+
+def note_update_sent(listing, staged_id="", when=None) -> bool:
+    """Зміни вже опублікованого товару надіслано — чекають перевірки DigiKey (Products → Pending)."""
+    return mark(listing, None, update_sent=(when or _now()).isoformat(), update_staged_id=staged_id or "",
+                update_done="")
+
+
+def note_product(listing, product: dict, save=True) -> bool:
+    """Товар з GET /products: оновлено після нашого повторного надсилання — DigiKey прийняв зміни."""
+    events = listing.pub_events or {}
+    sent, updated = _parse(events.get("update_sent")), _parse((product or {}).get("lastUpdateDateUtc"))
+    if not sent or events.get("update_done") or not updated or updated < sent:
+        return False
+    return mark(listing, None, save=save, update_done=updated.isoformat())
+
+
+def pending_update(events) -> dict | None:
+    """{sent, done, staged_id} для дорожньої карти, або None — повторних надсилань не було."""
+    sent = _parse((events or {}).get("update_sent"))
+    if not sent:
+        return None
+    done = _parse(events.get("update_done"))
+    return {"sent": timezone.localtime(sent).strftime("%d.%m.%y %H:%M"),
+            "done": timezone.localtime(done).strftime("%d.%m.%y %H:%M") if done else "",
+            "staged_id": events.get("update_staged_id") or ""}
 
 
 def _parse(value):
@@ -264,6 +309,7 @@ def roadmap(listing, config=None, detail=False) -> dict:
             "source": SOURCES.get(listing.card_source, ""), "problems": todo,
             "offer_status": OFFER_REASONS.get(reason, reason) if reason else "",
             "dk_dates": bool(events.get("dk_dates")),
+            "update": pending_update(events),
             "done": sum(1 for s in steps if s["state"] == "done"), "count": len(steps)}
 
 
@@ -348,6 +394,11 @@ def step_details(listing, steps, events, todo, error, current):
         elif key == "sent":
             if events.get("staged_id"):
                 facts.append(("ID чернетки DigiKey (staged)", events["staged_id"]))
+            upd = pending_update(events)
+            if upd:
+                facts.append(("Повторне надсилання (зміни товару)", upd["sent"] + (
+                    f" — DigiKey прийняв зміни {upd['done']}" if upd["done"] else
+                    " — DigiKey ще перевіряє (у порталі: Products → Pending); опублікований товар і офер діють як були")))
             if s["state"] in ("current", "error"):
                 actions.append({"label": "🚀 Опублікувати на DigiKey", "url": url("publish"), "post": True,
                                 "confirm": "Надіслати товар на DigiKey на перевірку?"})

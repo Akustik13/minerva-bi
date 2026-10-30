@@ -57,6 +57,8 @@
     {% if rm.total %}<span class="pr-muted">від картки до DigiKey: <b>{{ rm.total }}</b></span>{% endif %}
     {% if rm.offer_status %}<span class="pr-muted">офер на DigiKey: {{ rm.offer_status }}</span>{% endif %}
     {% if rm.dk_dates %}<span class="pr-muted" title="Дата офера — createDateUtc з DigiKey; кроки до нього — не пізніше">дати звірено з DigiKey</span>{% endif %}
+    {% if rm.update and not rm.update.done %}<span class="pr-muted" style="color:#f5a524" title="Повторне надсилання вже опублікованого товару DigiKey перевіряє окремо (у порталі: Products → Pending). Опублікований товар і офер тим часом діють як були.">📤 зміни товару надіслано {{ rm.update.sent }} — DigiKey ще перевіряє</span>
+    {% elif rm.update %}<span class="pr-muted" title="Надіслано {{ rm.update.sent }}">✓ зміни товару прийнято {{ rm.update.done }}</span>{% endif %}
     {% if rm.steps.0.meaning %}<span class="pr-muted">· клікніть крок — що зроблено й що далі</span>
     <a href="{% url 'admin:bots_digikeylisting_dk_diff' %}?pk={{ original.pk }}" style="margin-left:auto;font-size:12px"
        title="Наживо: що зараз зберігає DigiKey, поле за полем проти Minerva">🔍 Що бачить DigiKey</a>{% endif %}

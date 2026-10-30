@@ -43,8 +43,11 @@
       Minerva. На DigiKey нічого не змінено.
       {% if v.updated %}Офер востаннє змінено на DigiKey: {{ v.updated }}{% if v.source %} ({{ v.source }}{% if v.source == "Manual" %} — вручну на supplier.digikey.com{% elif v.source == "API" %} — через API, напр. Minerva{% endif %}){% endif %}.{% endif %}
       {% if v.status %}Стан офера: {{ v.status }}.{% endif %}
-      {% if v.product %}Товар на сайті DigiKey: {% if v.web %}показується{% else %}ще не показується{% endif %}{% if v.product_active is False %}, деактивовано{% endif %}.{% endif %}
+      {% if v.product %}Товар на сайті DigiKey: {% if v.web %}показується{% else %}ще не показується{% endif %}{% if v.product_active is False %}, деактивовано{% endif %}{% if v.product_updated %}; затверджена версія товару — від {{ v.product_updated|slice:":10" }}{% endif %}.{% endif %}
     </div>
+    {% if v.pending %}<div class="dv-chip {% if v.pending.done %}dv-ok{% else %}dv-warn{% endif %}" style="margin-top:6px">
+      {% if v.pending.done %}✓ Зміни товару, надіслані {{ v.pending.sent }}, DigiKey прийняв {{ v.pending.done }}
+      {% else %}📤 Зміни товару надіслано {{ v.pending.sent }} — DigiKey ще перевіряє (у порталі: Products → Pending). Нижче — затверджена версія, яку бачать покупці.{% endif %}</div>{% endif %}
     {% for e in v.errors %}<div class="dv-chip dv-bad" style="margin-top:6px">{{ e }}</div>{% endfor %}
   </div>
 

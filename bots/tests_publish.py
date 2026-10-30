@@ -178,6 +178,41 @@ class AdminRoadmapTests(PublishBase):
                               .context["cl"].result_list), [])
 
 
+class PendingUpdateTests(PublishBase):
+    """Повторне надсилання вже опублікованого товару — DigiKey тримає зміни в «Products → Pending»."""
+
+    def test_republish_is_tracked_until_digikey_accepts(self):
+        self.use(FakeMarketplace(approved=True))
+        mp.publish_listing(self.listing)                       # перша публікація — не «зміни»
+        listing = self.reload()
+        self.assertIsNone(dk_publish.roadmap(listing)["update"])
+        mp.publish_listing(listing)                            # «🚀 Опублікувати» ще раз
+        listing = self.reload()
+        rm = dk_publish.roadmap(listing, detail=True)
+        self.assertTrue(rm["update"]["sent"])
+        self.assertEqual(rm["update"]["done"], "")
+        sent = dict(rm["steps"][2]["facts"])["Повторне надсилання (зміни товару)"]
+        self.assertIn("Products → Pending", sent)
+        old = {"lastUpdateDateUtc": "2025-03-06T14:26:00Z"}
+        self.assertFalse(dk_publish.note_product(listing, old))          # затверджена версія — старіша
+        self.assertTrue(dk_publish.note_product(listing, {"lastUpdateDateUtc": "2099-01-01T00:00:00Z"}))
+        self.assertTrue(dk_publish.roadmap(self.reload())["update"]["done"])
+
+    def test_stage_sync_checks_pending_product(self):
+        DigiKeyListing.objects.filter(pk=self.listing.pk).update(dk_offer_id="offer-1", dk_product_id="prod-1")
+        dk_publish.note_update_sent(self.reload(), "staged-9")
+        offers = [{"id": "offer-1", "supplierSku": "FT220407", "isActive": True, "offerStatusReason": "Active",
+                   "createDateUtc": "2025-03-06T14:26:00Z"}]
+        with mock.patch("bots.services.dk_marketplace.fetch_product_by_sku",
+                        return_value={"_id": "prod-1", "lastUpdateDateUtc": "2099-01-01T00:00:00Z"}) as fp:
+            dk_publish.sync_stages(offers=offers)
+        self.assertEqual(fp.call_count, 1)
+        self.assertTrue(dk_publish.pending_update(self.reload().pub_events)["done"])
+        with mock.patch("bots.services.dk_marketplace.fetch_product_by_sku") as fp:
+            dk_publish.sync_stages(offers=offers)             # прийнято — більше не питаємо
+        fp.assert_not_called()
+
+
 class ExistingOfferTests(PublishBase):
     """DigiKey: «An offer already exists for this product» — прив'язати наявний офер, а не падати."""
 

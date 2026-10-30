@@ -402,10 +402,14 @@ def publish_listing(listing) -> str:
     if todo:
         raise DKMarketplaceError("Не заповнено для публікації: " + "; ".join(todo))
     mark(listing, "checked")
+    from bots.services.dk_publish import note_update_sent, was_published
+    update = was_published(listing)           # уже затверджений товар — це зміни (DigiKey: Products → Pending)
 
     try:
         product_id = upsert_product(config, listing)
         mark(listing, "sent", staged_id=product_id)
+        if update:
+            note_update_sent(listing, product_id)
         found = approved_product(config, listing)
         if found and found.get("_id"):        # товар уже затверджено — офер на справжній productId
             product_id = found["_id"]
@@ -490,10 +494,11 @@ def check_staged_listing(listing) -> str:
     if not listing.dk_product_id:
         raise DKMarketplaceError("Product ID відсутній — спочатку опублікуй продукт.")
 
-    from bots.services.dk_publish import mark
+    from bots.services.dk_publish import mark, note_product
     found = approved_product(config, listing)
     if found and found.get("_id"):
         mark(listing, "approved")
+        note_product(listing, found)
         if found["_id"] != listing.dk_product_id:   # staged-запис → справжній товар DigiKey
             listing.dk_product_id = found["_id"]
             type(listing).objects.filter(pk=listing.pk).update(dk_product_id=found["_id"])
