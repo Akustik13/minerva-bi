@@ -4,7 +4,8 @@ email_assistant/sync.py — спільна логіка синхронізаці
 - save_message: один шлях збереження листа (гілка, вкладення, лічильники гілки);
 - sync_folder: нові листи будь-якої папки сервера за UID — без вікна «останні N днів»;
 - pull_read_flags: прочитане на сервері (телефон, веб-пошта) → прочитане в Minerva;
-- set_read: прочитане в Minerva → прапорець \\Seen на сервері (у ту папку, де лежить лист).
+- set_read: прочитане в Minerva → прапорець \\Seen на сервері (у ту папку, де лежить лист);
+- trash_origin / restore_from_trash: «↩ Відновити» з Кошика — у папку, з якої лист видалили (trashed_from).
 """
 import logging
 import re
@@ -45,6 +46,42 @@ def folder_messages(account, imap_folder: str):
     if imap_folder.lower() == (account.imap_folder_inbox or 'INBOX').lower():
         return qs.filter(Q(imap_folder_name='') | Q(imap_folder_name__iexact=imap_folder), folder='inbox')
     return qs.filter(imap_folder_name=imap_folder)
+
+
+def trash_origin(account, em) -> str:
+    """Куди «↩ Відновити» лист із Кошика: папка, з якої його видалили (trashed_from); листи, видалені раніше,
+    — за папкою сервера, як її визначила синхронізація."""
+    from email_assistant.models import EmailMessage
+    if em.trashed_from in (EmailMessage.FOLDER_INBOX, EmailMessage.FOLDER_SENT, EmailMessage.FOLDER_SPAM):
+        return em.trashed_from
+    if em.is_spam:
+        return EmailMessage.FOLDER_SPAM
+    name = em.imap_folder_name or ''
+    if name.startswith('minerva:'):   # надіслано з Minerva, копія з «Надісланих» ще не синхронізована
+        return EmailMessage.FOLDER_SENT
+    if name and not name.startswith('eml:'):
+        return folder_type_for(account, name)
+    own = (account.email_address or '').lower()
+    if not name and own and (em.from_email or '').lower() == own:
+        return EmailMessage.FOLDER_SENT
+    return EmailMessage.FOLDER_INBOX
+
+
+def restore_from_trash(account, messages) -> dict:
+    """«↩ Відновити»: листи з Кошика — назад у свою папку (лише в Minerva; на сервері лист лишається в його
+    Кошику). Інші листи (не в Кошику, видалені назавжди) не чіпаються. → {папка: кількість}."""
+    from email_assistant.models import EmailMessage
+    by_folder = defaultdict(list)
+    for em in messages:
+        if em.account_id == account.pk and em.folder == EmailMessage.FOLDER_TRASH and not em.is_deleted:
+            by_folder[trash_origin(account, em)].append(em.pk)
+    for folder, pks in by_folder.items():
+        EmailMessage.objects.filter(pk__in=pks).update(folder=folder, trashed_from='', is_deleted=False)
+    pks = [pk for group in by_folder.values() for pk in group]
+    if pks:
+        from email_assistant.knowledge_hook import touch
+        touch(pks)   # масовий .update() без сигналів → база знань
+    return {folder: len(pks) for folder, pks in by_folder.items()}
 
 
 def folders_to_sync(folders) -> list:

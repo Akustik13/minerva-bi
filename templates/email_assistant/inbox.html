@@ -445,6 +445,14 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 .em-read-dot{width:9px;height:9px;border-radius:50%;border:2px solid #1a73e8;box-sizing:border-box}
 .em-row.unread .em-read-dot{background:#1a73e8}
 @media (hover:none){.em-row-acts{display:none!important}}
+/* «📝 Чернетки»: рядок чернетки — клік відкриває її у «✏️ Написати» */
+.em-drow{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;position:relative;min-width:0;text-decoration:none;color:inherit}
+.em-drow:hover{background:var(--bg-hover,#1e2d40)}
+.em-drow:hover .em-row-acts{display:flex}
+.em-drow:hover .em-row-date{display:none}
+.em-drow .em-avatar{background:linear-gradient(135deg,#6d28d9,#a78bfa)}
+.em-app.lay-density-compact .em-drow{padding:5px 10px;gap:6px}
+.em-app.lay-preview-0 .em-drow .em-row-prev{display:none}
 
 /* Checkbox */
 .em-row-check{width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#1a73e8;margin-top:3px}
@@ -569,6 +577,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
             <span class="em-badge" id="badge-starred"{% if not unread_counts.starred %} style="display:none"{% endif %}>{{ unread_counts.starred|default:0 }}</span>
           {% elif fkey == 'spam' %}
             <span class="em-badge" id="badge-spam"{% if not unread_counts.spam %} style="display:none"{% endif %}>{{ unread_counts.spam|default:0 }}</span>
+          {% elif fkey == 'drafts' %}
+            <span class="em-badge em-badge-drafts" id="badge-drafts" title="{% trans "Чернеток" %}"{% if not drafts_count %} style="display:none"{% endif %}>{{ drafts_count|default:0 }}</span>
           {% endif %}
         {% endwith %}
       </a>
@@ -770,7 +780,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
       <span class="em-p2-title">
         {% if search_all %}🔎 {% trans "Усі папки" %}{% else %}
         {% for fkey,flabel,ficon in folders %}{% if folder == fkey %}{{ ficon }} {{ flabel }}{% endif %}{% endfor %}
-        {% if not folder in "inbox sent starred spam archived trash" %}📁 {{ folder_label }}{% endif %}
+        {% if not folder in "inbox sent drafts starred spam archived trash" %}📁 {{ folder_label }}{% endif %}
         {% endif %}
         {% if q %}<span style="font-weight:400;color:var(--text-muted)"> · "{{ q }}"</span>{% endif %}
       </span>
@@ -825,11 +835,37 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
       <button class="em-bulk-btn" onclick="bulkAction('unread')" title="{% trans "Позначити непрочитаним" %}">📩</button>
       <button class="em-bulk-btn" onclick="bulkAction('archive')" title="{% trans "В архів" %}">📦</button>
       <button class="em-bulk-btn" onclick="bulkAction('spam')" title="{% trans "Спам" %}">🚫</button>
-      <button class="em-bulk-btn danger" onclick="bulkAction('delete')" title="{% trans "Видалити" %}">🗑️</button>
+      {% if folder == 'trash' %}<button class="em-bulk-btn" onclick="bulkAction('restore')" title="{% trans "Відновити — кожен лист у папку, з якої його видалили" %}">↩</button>{% endif %}
+      <button class="em-bulk-btn danger" onclick="bulkAction('delete')" title="{% if folder == 'trash' %}{% trans "Видалити назавжди" %}{% else %}{% trans "Видалити" %}{% endif %}">🗑️</button>
     </div>
 
     <div class="em-p2-list" id="em-p2-list">
-      {% if not emails %}
+      {% if drafts_view %}
+      {% if not drafts %}<div class="em-empty-list">📝 {% if q %}{% trans "Чернеток не знайдено" %}{% else %}{% trans "Чернеток немає — «💾 Зберегти» в новому листі" %}{% endif %}</div>{% endif %}
+      {% for d in drafts %}
+      <div class="em-drow" id="draft-{{ d.pk }}" data-href="{% url 'email_assistant:compose' %}?draft={{ d.pk }}" role="link" tabindex="0"
+           onclick="location.href=this.dataset.href" onkeydown="if(event.key==='Enter')location.href=this.dataset.href"
+           title="{% trans "Відкрити чернетку — дописати, відправити або запланувати" %}">
+        <div class="em-avatar">📝</div>
+        <div class="em-row-body">
+          <div class="em-row-top">
+            <span class="em-row-sender">{% if d.to_emails %}{% trans "Кому" %}: {{ d.to_emails|join:", "|truncatechars:40 }}{% else %}{% trans "(без адресата)" %}{% endif %}</span>
+            <span class="em-row-date">{{ d.updated_at|date:"d.m H:i" }}</span>
+            <div class="em-row-acts" onclick="event.stopPropagation()">
+              <button type="button" class="em-row-act danger" onclick="draftDelete(event, {{ d.pk }})" title="{% trans "Видалити чернетку" %}">🗑️</button>
+            </div>
+          </div>
+          <div class="em-row-subj">{% if d.subject %}{{ d.subject|truncatechars:120 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
+          <div class="em-row-meta">
+            <span class="em-tag" style="cursor:default" title="{% trans "Звідки чернетка" %}">{{ d.get_source_display }}</span>
+            {% if d.reply_to_id %}<span class="em-tag" style="cursor:default;--c:#3b82f6" title="{% trans "Відповідь на лист" %}: {{ d.reply_to.subject }}">↩ {% trans "відповідь" %}</span>{% endif %}
+            {% if d.n_attachments %}<span class="em-tag" style="cursor:default;--c:#64748b">📎 {{ d.n_attachments }}</span>{% endif %}
+          </div>
+          <div class="em-row-prev">{{ d.preview }}</div>
+        </div>
+      </div>
+      {% endfor %}
+      {% elif not emails %}
       <div class="em-empty-list">📭 {% trans "Листів немає" %}</div>
       {% endif %}
 
@@ -873,6 +909,9 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
               {% if folder != 'trash' %}
               <button class="em-row-act" onclick="rowSpam(event, {{ msg.pk }})"
                       title="{% if folder == 'spam' %}{% trans "Не спам" %}{% else %}{% trans "Спам" %}{% endif %}">{% if folder == 'spam' %}✅{% else %}🚫{% endif %}</button>
+              {% else %}
+              <button class="em-row-act" onclick="rowRestore(event, {{ msg.pk }})"
+                      title="{% trans "Відновити" %}{% if msg.folder_tag %} — {{ msg.folder_tag|slice:'2:' }}{% endif %}">↩</button>
               {% endif %}
               <button class="em-row-act danger" onclick="rowDelete(event, {{ msg.pk }})"
                       title="{% if folder == 'trash' %}{% trans "Видалити назавжди" %}{% else %}{% trans "Видалити" %}{% endif %}">🗑️</button>
@@ -885,7 +924,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
             <button class="em-tag wcat" style="--c:{{ msg.work_category.color }}" onclick="filterMailBy(event, 'wcat', {{ msg.work_category_id }})"
                     title="{% trans "Своя категорія" %}: {{ msg.work_category.name }} — {% trans "показати всі її листи" %}">{% if email_settings.nav_icons %}{{ msg.work_category.label }}{% else %}{{ msg.work_category.name }}{% endif %}</button>
             {% endif %}
-            {% if msg.folder_tag %}<span class="em-tag fold" title="{% trans "Папка" %}">{{ msg.folder_tag }}</span>{% endif %}
+            {% if msg.folder_tag %}<span class="em-tag fold" title="{% if folder == 'trash' and not search_all %}{% trans "Куди поверне «↩ Відновити»" %}{% else %}{% trans "Папка" %}{% endif %}">{{ msg.folder_tag }}</span>{% endif %}
             {% if msg.kb_tag == 'in' %}<span class="em-tag kb" title="{% trans "У базі знань RAG — знаходиться пошуком" %}">🧠</span>
             {% elif msg.kb_tag == 'wait' %}<span class="em-tag kb kb-wait" title="{% trans "Передано в базу знань, RAG ще не обробив" %}">⏳🧠</span>
             {% elif msg.kb_tag == 'fail' %}<span class="em-tag kb kb-fail" title="{% trans "RAG не зміг обробити — відкрийте лист: «🔄 Передати ще раз»" %}">⚠️🧠</span>{% endif %}
@@ -1031,7 +1070,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" data-k="task" data-g="tools" onclick="ctxAction('task')">📅 {% trans "Завдання в календар" %}</div>
   <div class="em-ctx-item" data-k="spam" data-g="danger" onclick="ctxAction('spam')">🚫 {% trans "Спам" %}</div>
   <div class="em-ctx-item" data-k="archive" data-g="danger" onclick="ctxAction('archive')">📦 {% trans "Архів" %}</div>
-  <div class="em-ctx-item danger" data-k="delete" data-g="danger" onclick="ctxAction('delete')">🗑️ {% trans "Видалити" %}</div>
+  {% if folder == 'trash' %}<div class="em-ctx-item" data-k="restore" data-g="danger" onclick="ctxAction('restore')" title="{% trans "Повернути лист у папку, з якої його видалили" %}">↩ {% trans "Відновити" %}</div>{% endif %}
+  <div class="em-ctx-item danger" data-k="delete" data-g="danger" onclick="ctxAction('delete')">🗑️ {% if folder == 'trash' %}{% trans "Видалити назавжди" %}{% else %}{% trans "Видалити" %}{% endif %}</div>
   <div class="em-ctx-item has-sub" id="em-ctx-more" onclick="if(!event.target.closest('.em-ctx-sub'))event.stopPropagation()">
     ⋯ {% trans "Ще" %} <span class="em-ctx-arrow">▸</span>
     <div class="em-ctx-sub" id="em-ctx-more-sub"></div>
@@ -2849,11 +2889,45 @@ async function deleteMsg(ev, pk) {
   }
 }
 
+// «↩ Відновити» з Кошика — кожен лист у папку, з якої його видалили (у режимі гілок — уся гілка)
+function _restoredText(d) {
+  var where = (d.folders || []).map(function(f) { return f.label + (d.folders.length > 1 ? ' (' + f.n + ')' : ''); });
+  return '↩ {% trans "Відновлено" %}' + (where.length ? ': ' + where.join(', ') : '');
+}
 async function restoreMsg(ev, pk) {
   ev.stopPropagation();
   var r = await fetch('/email/message/' + pk + '/restore/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
   var d = await r.json();
-  if (d.ok) { var row = document.getElementById('row-' + pk); if (row) row.remove(); window.refreshBadges && window.refreshBadges(); }
+  if (d.ok) {
+    var row = document.getElementById('row-' + pk);
+    if (row) row.remove();
+    if (_activeRow === row) { _activeRow = null; resetPreview(); }
+    _showToast(_restoredText(d));
+    window.refreshBadges && window.refreshBadges();
+  }
+}
+async function rowRestore(ev, pk) {
+  var row = document.getElementById('row-' + pk);
+  if (!row || _rowPks(row).length < 2) return restoreMsg(ev, pk);
+  ev.stopPropagation();
+  var d;
+  try { d = await _rowBulk(row, 'restore'); } catch(e) { return; }
+  if (!d.ok) return;
+  row.remove();
+  if (_activeRow === row) { _activeRow = null; resetPreview(); }
+  _showToast(_restoredText(d));
+  window.refreshBadges && window.refreshBadges();
+}
+async function draftDelete(ev, pk) {
+  ev.preventDefault(); ev.stopPropagation();
+  if (!confirm('{% trans "Видалити цю чернетку? Лист не надсилається." %}')) return;
+  try {
+    var r = await fetch('/email/draft/' + pk + '/delete/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    if (!(await r.json()).ok) return;
+  } catch(e) { return; }
+  var row = document.getElementById('draft-' + pk);
+  if (row) row.remove();
+  window.refreshBadges && window.refreshBadges();
 }
 
 async function archiveThread(ev, tpk) {
@@ -3816,6 +3890,8 @@ async function ctxAction(action) {
     if (tpk) archiveThread({stopPropagation:function(){}}, tpk);
   } else if (action === 'delete') {
     deleteMsg({stopPropagation:function(){}}, pk);
+  } else if (action === 'restore') {
+    rowRestore({stopPropagation:function(){}}, pk);
   } else if (action === 'project') {
     // відкрити лист у прев'ю і одразу панель «📁 До проєкту»
     if (!tpk) { _showToast('⚠️ {% trans "Лист без гілки листування" %}'); return; }
@@ -3965,6 +4041,7 @@ window.refreshBadges = async function() {
     _setBadge('badge-inbox',   d.inbox   || 0);
     _setBadge('badge-starred', d.starred || 0);
     _setBadge('badge-spam',    d.spam    || 0);
+    _setBadge('badge-drafts',  d.drafts  || 0);
     if (_p2UnreadOnly) _applyP2Visibility();
     return d.inbox || 0;
   } catch(e) { return null; }
@@ -4128,7 +4205,8 @@ window.bulkAction = async function(action) {
     var d = await r.json();
     if (!d.ok) return;
     if (action === 'spam') _showToast(_spamText(d));
-    if (action === 'delete' || action === 'archive' || action === 'spam') {
+    if (action === 'restore') _showToast(_restoredText(d));
+    if (action === 'delete' || action === 'archive' || action === 'spam' || action === 'restore') {
       pks.forEach(function(pk) {
         var row = document.getElementById('row-' + pk);
         if (row) row.remove();

@@ -6,16 +6,24 @@ email_assistant/attachments.py — вкладення для листа-відп
     інвойси, пакувальні листи, CN23…);
   - вкладення з листів цієї гілки (з диска або, якщо ще не збережені, з IMAP).
 Браузер передає лише посилання «order:<pk>:<ім'я файлу>» / «msg:<pk>:<індекс>», файли читає сервер.
+
+Чернетки (EmailDraft) і заплановані листи (ScheduledEmail) зберігають вкладення списком записів:
+  - {file, name, content_type, size} — файл з комп'ютера, збережений у MEDIA_ROOT/email_outbox/<uuid>/;
+  - {ref, name} — документ Minerva («order:…», «msg:…», «offer:…»), файл читається лише під час відправки.
+Файл чернетки у формі листа — посилання «draft:<pk>:<індекс>» (лише чернетки цієї скриньки).
 """
 import logging
 import mimetypes
 import os
+import re
+import uuid
 
 from django.conf import settings
 
 logger = logging.getLogger('email_assistant')
 
 MAX_ORDER_DOCS = 20
+OUTBOX_DIR = 'email_outbox'   # MEDIA_ROOT/email_outbox/<uuid>/<файл> — вкладення чернеток і запланованих листів
 
 
 def order_dir(order) -> str:
@@ -86,12 +94,17 @@ def attachment_bytes(account, msg, index):
 
 
 def load_ref(account, ref: str):
-    """«order:…» / «msg:…» → {name, content, content_type} або None (чуже/неіснуюче — None)."""
+    """«order:…» / «msg:…» / «offer:…» / «draft:…» → {name, content, content_type} або None (чуже/неіснуюче — None)."""
     from email_assistant.models import EmailMessage
     from sales.models import SalesOrder
 
     kind, _, rest = (ref or '').partition(':')
     try:
+        if kind == 'draft':   # файл / документ, уже збережений у чернетці цієї скриньки
+            found = draft_item(account, ref)
+            if found is None or str(found[1].get('ref', '')).startswith('draft:'):
+                return None
+            return load_item(account, found[1])
         if kind in ('offer', 'offerint'):   # документ версії Angebot (PDF / DOCX); offerint — колезі, без «надіслано»
             from offers.services import revision_attachment
             return revision_attachment(int(rest))
@@ -122,6 +135,154 @@ def load_ref(account, ref: str):
     except (ValueError, IndexError, OSError) as e:
         logger.warning('attachment ref %s: %s', ref, e)
     return None
+
+
+# ── Вкладення чернеток і запланованих листів ─────────────────────────────────────────────────
+
+def safe_name(name) -> str:
+    """Ім'я файлу без шляху й службових символів (для диска)."""
+    name = os.path.basename(str(name or '').replace('\\', '/')).strip()
+    name = re.sub(r'[\x00-\x1f<>:"/\\|?*]', '_', name).strip(' .')
+    return name[:150] or 'attachment'
+
+
+def store_file(name, content: bytes, content_type: str = '') -> dict:
+    """Зберегти файл у MEDIA_ROOT/email_outbox/<uuid>/ → запис вкладення."""
+    display = os.path.basename(str(name or '').replace('\\', '/')).strip()[:255] or 'attachment'
+    rel = f'{OUTBOX_DIR}/{uuid.uuid4().hex}/{safe_name(display)}'
+    path = os.path.join(str(settings.MEDIA_ROOT), *rel.split('/'))
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'wb') as fh:
+        fh.write(content)
+    return {'file': rel, 'name': display, 'size': len(content),
+            'content_type': content_type or mimetypes.guess_type(display)[0] or 'application/octet-stream'}
+
+
+def store_upload(f) -> dict:
+    return store_file(f.name, f.read(), getattr(f, 'content_type', '') or '')
+
+
+def _stored_path(item):
+    """Абсолютний шлях збереженого файлу — лише всередині MEDIA_ROOT/email_outbox."""
+    rel = str((item or {}).get('file') or '')
+    if not rel:
+        return None
+    root = os.path.realpath(os.path.join(str(settings.MEDIA_ROOT), OUTBOX_DIR))
+    path = os.path.realpath(os.path.join(str(settings.MEDIA_ROOT), *rel.split('/')))
+    return path if path.startswith(root + os.sep) else None
+
+
+def stored_bytes(item):
+    path = _stored_path(item)
+    if not path or not os.path.isfile(path):
+        return None
+    with open(path, 'rb') as fh:
+        return fh.read()
+
+
+def copy_stored(item):
+    """Копія збереженого файлу (чернетку заплановано — у листа свій файл, чернетка видаляється)."""
+    content = stored_bytes(item)
+    return None if content is None else store_file(item.get('name'), content, item.get('content_type', ''))
+
+
+def remove_stored(items, keep=()):
+    """Видалити збережені файли записів (крім тих, що лишаються в `keep`)."""
+    kept = {i.get('file') for i in keep or () if isinstance(i, dict) and i.get('file')}
+    for item in items or ():
+        if not isinstance(item, dict) or not item.get('file') or item['file'] in kept:
+            continue
+        path = _stored_path(item)
+        if not path:
+            continue
+        try:
+            if os.path.isfile(path):
+                os.remove(path)
+            os.rmdir(os.path.dirname(path))   # тека <uuid> — лише якщо порожня
+        except OSError:
+            pass
+
+
+def draft_item(account, ref):
+    """«draft:<pk>:<індекс>» → (чернетка, запис вкладення) — лише з чернеток цієї скриньки; інакше None."""
+    from email_assistant.models import EmailDraft
+    kind, _, rest = (ref or '').partition(':')
+    pk, _, index = rest.partition(':')
+    if kind != 'draft' or not pk.isdigit() or not index.isdigit() or account is None:
+        return None
+    draft = EmailDraft.objects.filter(pk=int(pk), account=account).first()
+    items = (draft.attachments or []) if draft else []
+    if int(index) >= len(items) or not isinstance(items[int(index)], dict):
+        return None
+    return draft, items[int(index)]
+
+
+def load_item(account, item):
+    """Запис вкладення чернетки / запланованого листа → {name, content, content_type} або None."""
+    if not isinstance(item, dict):
+        return None
+    if item.get('file'):
+        content = stored_bytes(item)
+        if content is None:
+            return None
+        return {'name': item.get('name') or 'attachment', 'content': content,
+                'content_type': item.get('content_type') or 'application/octet-stream'}
+    if item.get('ref'):
+        return load_ref(account, item['ref'])
+    return None
+
+
+def load_items(account, items):
+    """Усі вкладення для відправки: (список, '') або ([], ім'я недоступного) — без файлу лист не йде."""
+    out = []
+    for item in items or ():
+        att = load_item(account, item)
+        if att is None:
+            name = item.get('name') if isinstance(item, dict) else ''
+            return [], name or str((item or {}).get('ref', '')).rsplit(':', 1)[-1] or 'attachment'
+        out.append(att)
+    return out, ''
+
+
+def from_form(account, refs, names, files, draft=None, check=False):
+    """Вкладення форми листа → записи для чернетки / запланованого листа: (записи, '') або ([], помилка).
+
+    refs — att_ref (документи Minerva й «draft:<pk>:<i>» — уже збережене в чернетці), names — їхні назви з форми
+    (у тому самому порядку; лише для показу), files — нові файли з комп'ютера (зберігаються в MEDIA).
+    draft — чернетка, яку оновлюємо: її файли лишаються на місці; файли іншої чернетки копіюються.
+    check — одразу перевірити документи Minerva (запланований лист: людина бачить помилку зараз, а не вночі)."""
+    names = list(names or [])
+    plan = []
+    for i, ref in enumerate(refs or []):
+        ref = (ref or '').strip()
+        if not ref:
+            continue
+        name = (names[i] if len(names) == len(refs) else '') or ref.rsplit(':', 1)[-1]
+        if ref.startswith('draft:'):
+            found = draft_item(account, ref)
+            if found is None:
+                return [], f'Вкладення недоступне: {name}'
+            src, item = found
+            plan.append(('keep' if draft is not None and src.pk == draft.pk else 'copy', dict(item)))
+            continue
+        if check:
+            att = load_ref(account, ref)
+            if att is None:
+                return [], f'Вкладення недоступне: {name}'
+            name = att['name']
+        plan.append(('ref', {'ref': ref, 'name': os.path.basename(str(name))[:255] or 'attachment'}))
+    out, copies = [], []
+    for how, item in plan:
+        if how == 'copy' and item.get('file'):
+            copy = copy_stored(item)
+            if copy is None:
+                remove_stored(copies)
+                return [], f'Вкладення недоступне: {item.get("name") or "attachment"}'
+            copies.append(copy)
+            item = copy
+        out.append(item)
+    out += [store_upload(f) for f in files or ()]
+    return out, ''
 
 
 def reply_options(emails, links) -> dict:

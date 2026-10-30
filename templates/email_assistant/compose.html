@@ -32,6 +32,8 @@
 .em-att-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); border-color:#1a73e8; }
 .em-att-list { font-size:12px; color:var(--text-muted); margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; }
 .em-att-chip { padding:3px 10px; border-radius:12px; background:var(--bg-input); border:1px solid var(--border-strong); display:inline-flex; align-items:center; gap:4px; }
+.em-att-x { border:none; background:none; cursor:pointer; color:var(--text-dim); padding:0 0 0 2px; font-size:11px; line-height:1; }
+.em-att-x:hover { color:var(--err,#e53935); }
 /* AI panel */
 #ai-panel {
   padding:12px 18px;
@@ -101,13 +103,16 @@
 {% block content %}
 <div class="em-compose">
   <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
-    <a href="{% url 'email_assistant:inbox' %}" style="color:var(--text-muted);text-decoration:none;font-size:13px">← {% trans "Вхідні" %}</a>
+    <a href="{% url 'email_assistant:inbox' %}{% if draft %}?folder=drafts{% endif %}" style="color:var(--text-muted);text-decoration:none;font-size:13px">← {% if draft %}📝 {% trans "Чернетки" %}{% else %}{% trans "Вхідні" %}{% endif %}</a>
     <h2 style="font-size:18px;color:var(--text)">{{ title }}</h2>
+    {% if draft %}<span style="font-size:12px;color:var(--text-muted)">{{ draft.get_source_display }} · {% trans "збережено" %} {{ draft.updated_at|date:"d.m.Y H:i" }}</span>{% endif %}
   </div>
 
   <div class="em-compose-card">
     <form id="compose-form" enctype="multipart/form-data">
       {% if reply_to %}<input type="hidden" name="reply_to_pk" value="{{ reply_to.pk }}">{% endif %}
+      <!-- чернетка листа: «💾 Зберегти» оновлює саму її, після «Відправити» / «Запланувати» її прибирає сервер -->
+      <input type="hidden" name="draft_pk" id="draft-pk" value="{{ draft.pk|default:'' }}">
       {% csrf_token %}
 
       <div class="em-field">
@@ -177,7 +182,7 @@
         </div>
 
         <div id="body-editor" class="em-body-editor" contenteditable="true"
-             placeholder="Текст листа...">{% if signature and account.signature_position == 'after_reply' and initial.quote %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div><br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% elif initial.quote %}<br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% if signature %}<br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% else %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}{% if signature %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% endif %}</div>
+             placeholder="Текст листа...">{% if initial.draft_html %}{{ initial.draft_html|safe }}{% elif signature and account.signature_position == 'after_reply' and initial.quote %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div><br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% elif initial.quote %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}<br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% if signature %}<br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% else %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}{% if signature %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% endif %}</div>
       </div>
 
       <textarea name="body"      id="body-hidden"      style="display:none"></textarea>
@@ -191,14 +196,11 @@
         <input type="file" id="att-input" name="attachments" multiple
                style="display:none" onchange="showFiles(this)">
         <div id="files-list" class="em-att-list"></div>
-        {% if initial.att_refs %}
-        <div class="em-att-list" style="margin-top:6px">
+        <div class="em-att-list" id="ref-list" style="margin-top:6px">
           {% for a in initial.att_refs %}
-          <input type="hidden" name="att_ref" value="{{ a.ref }}">
-          <span class="em-att-chip" title="{% trans "Документ Minerva — додається на сервері" %}">📎 {{ a.name }}</span>
+          <span class="em-att-chip" title="{% trans "Документ Minerva або файл чернетки — додається на сервері" %}"><input type="hidden" name="att_ref" value="{{ a.ref }}"><input type="hidden" name="att_ref_name" value="{{ a.name }}">📎 {{ a.name }} <button type="button" class="em-att-x" onclick="this.parentNode.remove()" title="{% trans "Прибрати" %}">✕</button></span>
           {% endfor %}
         </div>
-        {% endif %}
       </div>
 
       <!-- Footer -->
@@ -210,7 +212,10 @@
                 onclick="toggleSchedule()" title="{% trans "Відправити пізніше" %}">
           ⏰ {% trans "Пізніше" %}
         </button>
-        <button type="button" class="em-sec-btn" onclick="saveDraft()">💾 {% trans "Зберегти" %}</button>
+        <button type="button" class="em-sec-btn" id="draft-save-btn" onclick="saveDraft()"
+                title="{% trans "Зберегти як чернетку (📝 Чернетки в скриньці) — лист не надсилається" %}">💾 {% trans "Зберегти" %}</button>
+        <button type="button" class="em-sec-btn" id="draft-del-btn" onclick="deleteDraft()"{% if not draft %} style="display:none"{% endif %}
+                title="{% trans "Видалити цю чернетку" %}">🗑 {% trans "Чернетку" %}</button>
         <div id="send-status" style="font-size:12px;color:var(--text-muted);flex:1"></div>
 
         <!-- Schedule row -->
@@ -437,27 +442,19 @@ async function sendNow() {
 }
 
 async function scheduleEmail(dtVal) {
-  var body = _getBodyPayload();
+  _getBodyPayload();
   var status = document.getElementById('send-status');
   var btn    = document.getElementById('send-btn');
   btn.disabled = true; btn.style.opacity = '.5';
   status.textContent = 'Планую відправку...'; status.style.color = 'var(--text-muted)';
+  // та сама форма, що й «Відправити»: кому, копія, тема, текст, відповідь на лист і вкладення
+  var data = new FormData(document.getElementById('compose-form'));
+  data.append('scheduled_at', dtVal);
   try {
-    var r = await fetch('/email/schedule/', {
-      method: 'POST',
-      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        to:           document.getElementById('to-field').value,
-        cc:           document.getElementById('cc-field').value,
-        subject:      document.getElementById('subject-field').value,
-        body:         body.text,
-        body_html:    body.html,
-        scheduled_at: dtVal,
-      }),
-    });
+    var r = await fetch('/email/schedule/', {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: data});
     var d = await r.json();
     if (d.ok) {
-      status.textContent = '✓ Заплановано на ' + d.scheduled_at;
+      status.textContent = '✓ Заплановано на ' + d.scheduled_at + (d.attachments ? ' · 📎 ' + d.attachments : '');
       status.style.color = 'var(--ok,#2e7d32)';
       setTimeout(function(){ window.location = '/email/'; }, 1500);
     } else {
@@ -516,20 +513,68 @@ function dismissGrammar() {
   _grammarCorrected = '';
 }
 
-function saveDraft() {
-  var body = _getBodyPayload();
-  var status = document.getElementById('send-status');
-  status.textContent = 'Зберігаю чернетку...'; status.style.color = 'var(--text-muted)';
-  fetch('/email/send/', {
-    method: 'POST',
-    headers: {'X-CSRFToken': CSRF},
-    body: new FormData(document.getElementById('compose-form')),
-  }).then(function(r){ return r.json(); }).then(function(d){
-    status.textContent = d.ok ? '💾 Збережено' : ('✗ ' + d.error);
-    status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
-  }).catch(function(){
-    status.textContent = '✗ Помилка'; status.style.color = 'var(--err,#e53935)';
+/* ── 💾 Чернетка: зберегти (та сама чернетка при повторному збереженні) — лист НЕ надсилається ── */
+function _renderRefs(items) {
+  var box = document.getElementById('ref-list');
+  box.innerHTML = '';
+  (items || []).forEach(function(a) {
+    var chip = document.createElement('span');
+    chip.className = 'em-att-chip';
+    chip.title = '{% trans "Документ Minerva або файл чернетки — додається на сервері" %}';
+    [['att_ref', a.ref], ['att_ref_name', a.name]].forEach(function(f) {
+      var inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = f[0]; inp.value = f[1] || '';
+      chip.appendChild(inp);
+    });
+    chip.appendChild(document.createTextNode('📎 ' + (a.name || '') + ' '));
+    var x = document.createElement('button');
+    x.type = 'button'; x.className = 'em-att-x'; x.textContent = '✕'; x.title = '{% trans "Прибрати" %}';
+    x.onclick = function() { chip.remove(); };
+    chip.appendChild(x);
+    box.appendChild(chip);
   });
+}
+async function saveDraft() {
+  _getBodyPayload();
+  var status = document.getElementById('send-status');
+  var btn = document.getElementById('draft-save-btn');
+  btn.disabled = true;
+  status.textContent = 'Зберігаю чернетку...'; status.style.color = 'var(--text-muted)';
+  try {
+    var r = await fetch('/email/draft/save/', {
+      method: 'POST', headers: {'X-CSRFToken': CSRF}, body: new FormData(document.getElementById('compose-form')),
+    });
+    var d = await r.json();
+    if (d.ok) {
+      document.getElementById('draft-pk').value = d.draft_pk;
+      // файли вже в чернетці — далі вони йдуть посиланням, а не завантажуються вдруге
+      _renderRefs(d.attachments);
+      var inp = document.getElementById('att-input');
+      inp.value = ''; document.getElementById('files-list').innerHTML = '';
+      document.getElementById('draft-del-btn').style.display = '';
+      status.innerHTML = '';
+      status.appendChild(document.createTextNode('💾 Чернетку збережено о ' + d.saved_at + ' · '));
+      var a = document.createElement('a');
+      a.href = '/email/?folder=drafts'; a.textContent = '📝 Чернетки';
+      status.appendChild(a);
+      status.style.color = 'var(--ok,#2e7d32)';
+    } else {
+      status.textContent = '✗ ' + (d.error || 'Помилка');
+      status.style.color = 'var(--err,#e53935)';
+    }
+  } catch (e) {
+    status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)';
+  }
+  btn.disabled = false;
+}
+async function deleteDraft() {
+  var pk = document.getElementById('draft-pk').value;
+  if (!pk || !confirm('Видалити цю чернетку? Лист не надсилається.')) return;
+  try {
+    var r = await fetch('/email/draft/' + pk + '/delete/', {method: 'POST', headers: {'X-CSRFToken': CSRF}});
+    var d = await r.json();
+    if (d.ok || r.status === 404) window.location = '/email/?folder=drafts';
+  } catch (e) {}
 }
 </script>
 {% endblock %}
