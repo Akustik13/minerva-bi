@@ -1,0 +1,116 @@
+{% extends "admin/base_site.html" %}
+{% comment %}«🔍 Що бачить DigiKey» (bots/admin_dk_tools.py): один лістинг (v) — офер і товар наживо, поле за полем;
+або звірка оферів багатьох (bulk).{% endcomment %}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block content %}
+<style>
+  .dv-box { margin: 0 0 14px; padding: 14px 18px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); }
+  .dv-box h3 { margin: 0 0 8px; font-size: 14px; }
+  .dv-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .dv-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .dv-table th, .dv-table td { padding: 5px 8px; border-bottom: 1px solid var(--hairline-color, #2b3c52);
+                               text-align: left; vertical-align: top; }
+  .dv-table td.v { word-break: break-word; max-width: 420px; }
+  .dv-diff td { background: rgba(245, 165, 36, .10); }
+  .dv-missing td { background: rgba(229, 72, 77, .10); }
+  .dv-chip { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; margin: 0 4px 2px 0; }
+  .dv-ok { background: rgba(46, 157, 91, .18); color: #4cc38a; }
+  .dv-warn { background: rgba(245, 165, 36, .18); color: #f5a524; }
+  .dv-bad { background: rgba(229, 72, 77, .16); color: #e5484d; }
+  .dv-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  .dv-acts form { margin: 0; }
+</style>
+
+{% if v %}
+  {% with l=v.listing %}
+  <div class="dv-box">
+    <div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center">
+      <b style="font-size:15px">{{ l.get_supplier_sku }}</b>
+      <span class="dv-muted">{{ l.dk_title }}</span>
+      {% if v.offer %}
+        <span class="dv-chip {% if v.offer_sum.diff %}dv-warn{% else %}dv-ok{% endif %}">офер: {% if v.offer_sum.diff %}розбіжностей {{ v.offer_sum.diff }}{% else %}як у Minerva{% endif %}</span>
+      {% else %}<span class="dv-chip dv-bad">офера на DigiKey не знайдено</span>{% endif %}
+      {% if v.product %}
+        <span class="dv-chip {% if v.product_sum.diff %}dv-warn{% else %}dv-ok{% endif %}">товар: {% if v.product_sum.diff %}розбіжностей {{ v.product_sum.diff }}{% else %}як у Minerva{% endif %}</span>
+      {% else %}<span class="dv-chip dv-bad">товару на DigiKey не знайдено</span>{% endif %}
+      <a href="{{ back }}" style="margin-left:auto">← до лістингу</a>
+    </div>
+    <div class="dv-muted" style="margin-top:6px">
+      Наживо з DigiKey (Marketplace API), щойно: так DigiKey зараз зберігає ваш товар і офер. Ліворуч — що відправила б
+      Minerva. На DigiKey нічого не змінено.
+      {% if v.updated %}Офер востаннє змінено на DigiKey: {{ v.updated }}{% if v.source %} ({{ v.source }}{% if v.source == "Manual" %} — вручну на supplier.digikey.com{% elif v.source == "API" %} — через API, напр. Minerva{% endif %}){% endif %}.{% endif %}
+      {% if v.status %}Стан офера: {{ v.status }}.{% endif %}
+      {% if v.product %}Товар на сайті DigiKey: {% if v.web %}показується{% else %}ще не показується{% endif %}{% if v.product_active is False %}, деактивовано{% endif %}.{% endif %}
+    </div>
+    {% for e in v.errors %}<div class="dv-chip dv-bad" style="margin-top:6px">{{ e }}</div>{% endfor %}
+  </div>
+
+  <div class="dv-box">
+    <h3>💲 Офер (ціни, залишок, MOQ, строк)</h3>
+    <table class="dv-table">
+      <thead><tr><th>Поле</th><th>Minerva надсилає</th><th>На DigiKey зараз</th><th></th></tr></thead>
+      <tbody>{% for r in v.offer_rows %}{% include "admin/bots/digikeylisting/_dk_view_row.html" %}{% endfor %}</tbody>
+    </table>
+    {% if can_change and l.dk_offer_id %}
+    <div class="dv-acts">
+      <form method="post" action="{% url 'admin:bots_digikeylisting_dk_push' l.pk %}"
+            onsubmit="return confirm('Надіслати на DigiKey офер з даних Minerva: назва, ціни, залишок, MOQ, строк, активний?')">
+        {% csrf_token %}<button class="button default" type="submit">📤 Надіслати офер з Minerva</button>
+      </form>
+      <span class="dv-muted">Після надсилання ця сторінка покаже, що DigiKey повертає тепер — так видно, що дані дійшли.</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="dv-box">
+    <h3>📦 Товар (категорія, опис, виробник, фото)</h3>
+    <table class="dv-table">
+      <thead><tr><th>Поле</th><th>Minerva надсилає</th><th>На DigiKey зараз</th><th></th></tr></thead>
+      <tbody>{% for r in v.product_rows %}{% include "admin/bots/digikeylisting/_dk_view_row.html" %}{% endfor %}</tbody>
+    </table>
+    {% if v.attr_rows %}
+    <details style="margin-top:10px"{% if v.product_sum.diff %} open{% endif %}>
+      <summary style="cursor:pointer;font-weight:600">Параметри товару ({{ v.attr_rows|length }})</summary>
+      <table class="dv-table" style="margin-top:6px">
+        <tbody>{% for r in v.attr_rows %}{% include "admin/bots/digikeylisting/_dk_view_row.html" %}{% endfor %}</tbody>
+      </table>
+    </details>
+    {% endif %}
+    <div class="dv-muted" style="margin-top:8px">Товар (опис, категорію, параметри) DigiKey змінює лише після перевірки: зміни надсилає
+      «🚀 Опублікувати» в картці лістингу, і DigiKey знову перевіряє товар.</div>
+  </div>
+  {% endwith %}
+
+{% else %}
+  <div class="dv-box">
+    <div>Звірка оферів: що зараз на DigiKey (назва, ціни, залишок, MOQ, строк, активний) проти даних Minerva. Читає
+      ваші офери з DigiKey (один запит на всіх), нічого не змінює. Товар (опис, параметри) — у звірці одного лістингу.</div>
+    <div class="dv-acts">
+      <a class="button" href="?all=1">🔍 Звірити всі лістинги з офером</a>
+      {% if asked %}<a class="button" href="?{% if ids %}ids={{ ids }}&{% else %}all=1&{% endif %}only=diff">Лише з розбіжностями</a>{% endif %}
+      <a href="{% url 'admin:bots_digikeylisting_changelist' %}">← до лістингів</a>
+    </div>
+    {% if error %}<div class="dv-chip dv-bad" style="margin-top:8px">{{ error }}</div>{% endif %}
+  </div>
+  {% if rows %}
+  <div class="dv-box">
+    <div class="dv-muted" style="margin-bottom:8px">Лістингів: {{ rows|length }}{% if rows|length >= limit %} (перші {{ limit }}){% endif %} · з розбіжностями: {{ differ }}</div>
+    <table class="dv-table">
+      <thead><tr><th>Артикул</th><th>Назва</th><th>На DigiKey</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}<tr class="{% if not r.offer %}dv-missing{% elif r.sum.diff %}dv-diff{% endif %}">
+        <td><a href="{% url 'admin:bots_digikeylisting_change' r.listing.pk %}">{{ r.listing.get_supplier_sku }}</a></td>
+        <td>{{ r.listing.dk_title }}</td>
+        <td>{% if not r.offer %}<span class="dv-chip dv-bad">офера немає</span>
+            {% elif r.sum.diff %}<span class="dv-chip dv-warn">інакше: {{ r.diff_keys|join:", " }}</span>
+            {% else %}<span class="dv-chip dv-ok">✓ як у Minerva</span>{% endif %}</td>
+        <td><a href="?pk={{ r.listing.pk }}">детально →</a></td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif asked and not error %}<div class="dv-box">Немає лістингів для звірки.</div>{% endif %}
+{% endif %}
+{% endblock %}

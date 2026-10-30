@@ -477,6 +477,8 @@
 .mg-link.mg-gold { color: var(--gold-l); } .mg-link.mg-gold:hover { color: #f5e9c0; }
 .mg-link-head { padding: 7px 16px 3px 20px; color: var(--sb-link); font-size: 13px; opacity: .75; cursor: default; }
 .mg-link.mg-sub { padding-left: 36px; font-size: 12.5px; }
+.mg-more > summary { list-style: none; cursor: pointer; opacity: .7; }
+.mg-more > summary::-webkit-details-marker { display: none; }
 .mg-link.mg-sub::before { content: '↳'; margin-right: 6px; opacity: .5; }
 
 /* ── Sub-module collapse arrow ── */
@@ -979,20 +981,44 @@ window.MV_GROUPS = [
       { href:'/admin/documents/documenttemplate/', icon:'📋', label:'Шаблони',   app:'documents', model:'DocumentTemplate' },
       { href:'/admin/documents/generateddocument/', icon:'📁', label:'Архів документів', app:'documents', model:'GeneratedDocument' },
     ], apps:['documents'] },
-  { id:'bots', icon:'🤖', label:'🤖 API та скрипти', href:'/dashboard/bots/',
+  /* DigiKey Marketplace — усе в одній групі (раніше було розкидано по «API та скрипти») */
+  { id:'digikey', icon:'🛒', label:'🛒 DigiKey', href:'/admin/bots/digikeylisting/', after:'documents',
     links:[
-      { href:'/admin/bots/digikeyconfig/', icon:'🛒', label:'DigiKey',           app:'bots',        model:'DigiKeyConfig' },
-      { href:'/admin/bots/digikeypricerun/compare/', icon:'💲', label:'Ціни DigiKey ← Minerva', app:'bots', model:'DigiKeyPriceRun' },
-      { href:'/admin/jlcpcb/jlcorder/',   icon:'🔬', label:'JLCPCB',            app:'jlcpcb',      model:'JLCOrder' },
-      { href:'/admin/bots/bot/',           icon:'🤖', label:'Боти та скрипти',   app:'bots',        model:'Bot' },
-      { href:'/admin/bots/botlog/',        icon:'📋', label:'Лог ботів',         app:'bots',        model:'BotLog' },
-      { href:'/admin/api/apikey/',         icon:'🔑', label:'API Токени',        app:'api',         model:'APIKey' },
-      { href:'/admin/api/apirequestlog/',  icon:'📜', label:'Журнал API',        app:'api',         model:'APIRequestLog' },
-      { href:'/admin/api/webhook/',        icon:'📡', label:'Вебхуки',           app:'api',         model:'Webhook' },
-      { href:'/admin/scraper_hub/scrapersiteconfig/', icon:'📥', label:'Scraper рахунків',    app:'scraper_hub' },
-      { href:'/admin/scraper_hub/scraperdocument/',   icon:'🧾', label:'Завантажені рахунки', app:'scraper_hub', model:'ScraperDocument' },
-      { href:'/dashboard/api/',            icon:'🔌', label:'API Інтеграції' },
-      { href:'/dashboard/api/docs/',       icon:'📖', label:'Документація API' },
+      { href:'/admin/bots/digikeylisting/',             icon:'📦', label:'Лістинги',                 app:'bots', model:'DigiKeyListing' },
+      { href:'/admin/bots/digikeylisting/from-stock/',  icon:'🔷', label:'Зі складу на DigiKey',      app:'bots', model:'DigiKeyListing' },
+      { href:'/admin/bots/digikeylisting/dk-diff/',     icon:'🔍', label:'Що бачить DigiKey (звірка)', app:'bots', model:'DigiKeyListing' },
+      { href:'/admin/bots/digikeypricerun/compare/',    icon:'💲', label:'Ціни ← Minerva',            app:'bots', model:'DigiKeyPriceRun' },
+      { href:'/admin/bots/digikeylisting/lead-times/',  icon:'⏱', label:'Строки відвантаження',      app:'bots', model:'DigiKeyListing' },
+      { href:'/admin/bots/digikeypricerun/offers/',     icon:'🔗', label:'Офери: звірка ID',          app:'bots', model:'DigiKeyPriceRun' },
+      { href:'/admin/bots/digikeypricerun/',            icon:'📜', label:'Історія оновлень цін',      app:'bots', model:'DigiKeyPriceRun' },
+      { href:'/admin/sales/salesorder/?source=digikey', icon:'🧾', label:'Замовлення DigiKey',        app:'sales' },
+      { href:'/invoices/',                              icon:'🧾', label:'Інвойси DigiKey',           app:'shipping' },
+      { heading:true,                                   icon:'⚙️', label:'Налаштування',             app:'bots' },
+      { href:'/admin/bots/digikeyconfig/',              icon:'🔌', label:'Підключення DigiKey',       app:'bots', model:'DigiKeyConfig', cls:'mg-sub' },
+      { href:'/admin/bots/digikeypricesettings/',       icon:'💲', label:'Правила цін',               app:'bots', model:'DigiKeyPriceSettings', cls:'mg-sub' },
+      { href:'/admin/bots/digikeypricelog/',            icon:'📝', label:'Лог змін цін',              app:'bots', model:'DigiKeyPriceLog', cls:'mg-sub' },
+      { href:'/admin/bots/aianalysislog/',              icon:'🧠', label:'AI-аналізи лістингів',      app:'bots', model:'AIAnalysisLog', cls:'mg-sub' },
+    ], apps:[] },
+  { id:'bots', icon:'🤖', label:'🤖 API та скрипти', href:'/dashboard/bots/', more:true,
+    links:[
+      { heading:true,                      icon:'🔑', label:'REST API',          app:'api' },
+      { href:'/admin/api/apikey/',         icon:'🔑', label:'API ключі',         app:'api',         model:'APIKey', cls:'mg-sub' },
+      { href:'/admin/api/apirequestlog/',  icon:'📜', label:'Журнал API',        app:'api',         model:'APIRequestLog', cls:'mg-sub' },
+      { href:'/admin/api/webhook/',        icon:'📡', label:'Вебхуки',           app:'api',         model:'Webhook', cls:'mg-sub' },
+      { href:'/admin/api/webhookdelivery/', icon:'📬', label:'Журнал вебхуків',  app:'api',         model:'WebhookDelivery', cls:'mg-sub' },
+      { href:'/dashboard/api/',            icon:'🔌', label:'API Інтеграції',    cls:'mg-sub' },
+      { href:'/dashboard/api/docs/',       icon:'📖', label:'Документація API',  cls:'mg-sub' },
+      { heading:true,                      icon:'🤖', label:'Скрипти',           app:'bots' },
+      { href:'/admin/bots/bot/',           icon:'🤖', label:'Боти та скрипти',   app:'bots',        model:'Bot', cls:'mg-sub' },
+      { href:'/admin/bots/botlog/',        icon:'📋', label:'Лог ботів',         app:'bots',        model:'BotLog', cls:'mg-sub' },
+      { href:'/admin/bots/bot/ai-info/',   icon:'🧠', label:'AI (штучний інтелект)', app:'bots', cls:'mg-sub' },
+      { heading:true,                      icon:'🔬', label:'JLCPCB',            app:'jlcpcb' },
+      { href:'/admin/jlcpcb/jlcorder/',    icon:'🔬', label:'Замовлення',        app:'jlcpcb',      model:'JLCOrder', cls:'mg-sub' },
+      { href:'/admin/jlcpcb/jlcproductmapping/', icon:'🔗', label:'Прив\'язки JLC → товар', app:'jlcpcb', model:'JLCProductMapping', cls:'mg-sub' },
+      { href:'/admin/jlcpcb/jlcconfig/',   icon:'⚙️', label:'Налаштування',      app:'jlcpcb',      model:'JLCConfig', cls:'mg-sub' },
+      { heading:true,                      icon:'📥', label:'Scraper рахунків',  app:'scraper_hub' },
+      { href:'/admin/scraper_hub/scrapersiteconfig/', icon:'📥', label:'Сайти', app:'scraper_hub', cls:'mg-sub' },
+      { href:'/admin/scraper_hub/scraperdocument/',   icon:'🧾', label:'Рахунки', app:'scraper_hub', model:'ScraperDocument', cls:'mg-sub' },
     ], apps:['bots','api','jlcpcb','scraper_hub'] },
   { id:'system', icon:'⚙️', label:'⚙️ Система', href:'/dashboard/system/',
     links:[
@@ -1153,13 +1179,13 @@ document.addEventListener('DOMContentLoaded', function(){
   /* Sort GROUPS by saved order */
   var _savedOrder = _loadOrder();
   if (_savedOrder.length) {
-    GROUPS.sort(function(a, b){
-      var ai = _savedOrder.indexOf(a.id);
-      var bi = _savedOrder.indexOf(b.id);
-      if (ai === -1) ai = 999;
-      if (bi === -1) bi = 999;
-      return ai - bi;
-    });
+    var _pos = function(g){
+      var i = _savedOrder.indexOf(g.id);
+      if (i !== -1) return i;
+      var j = g.after ? _savedOrder.indexOf(g.after) : -1;   // новий розділ — поруч із тим, після якого він стоїть
+      return j !== -1 ? j + 0.5 : 999;
+    };
+    GROUPS.sort(function(a, b){ return _pos(a) - _pos(b); });
   }
 
   /* Collect app modules */
@@ -1231,6 +1257,12 @@ document.addEventListener('DOMContentLoaded', function(){
     '/admin/documents/': 'documents',
     '/documents/':       'documents',
     '/admin/bots/':      'bots',
+    '/admin/bots/digikeyconfig/':        'digikey',
+    '/admin/bots/digikeylisting/':       'digikey',
+    '/admin/bots/digikeypricerun/':      'digikey',
+    '/admin/bots/digikeypricesettings/': 'digikey',
+    '/admin/bots/digikeypricelog/':      'digikey',
+    '/admin/bots/aianalysislog/':        'digikey',
     '/admin/jlcpcb/':   'bots',
     '/admin/api/':       'bots',
     '/api/v1/':          'bots',
@@ -1289,7 +1321,11 @@ document.addEventListener('DOMContentLoaded', function(){
     if (grp.adminOnly && USER_ROLE !== 'superadmin') return;
     if (grp.roles && grp.roles.indexOf(USER_ROLE) === -1) return;
     var appsFound    = (grp.apps || []).filter(function(a){ return !!mods[a] && _moduleAllowed(a); });
-    var linksToShow  = (grp.links || []).filter(_linkAllowed);
+    var linksToShow  = (grp.links || []).filter(_linkAllowed).filter(function(lnk, i, arr){
+      if (!lnk.heading) return true;
+      var next = arr[i + 1];
+      return !!next && !next.heading;
+    });
     if (!linksToShow.length && !appsFound.length) return;
 
     var collapsed;
@@ -1352,11 +1388,22 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 
     // Always append full app modules below curated links so nothing disappears
+    // (grp.more — згорнуто в «⋯ Усі сторінки розділу», щоб меню не розповзалось)
+    var modsHost = content;
+    if (grp.more && appsFound.length && linksToShow.length) {
+      var more = document.createElement('details');
+      more.className = 'mg-more';
+      more.open = localStorage.getItem('mg-more-' + grp.id) === '1';
+      more.innerHTML = '<summary class="mg-link">⋯ Усі сторінки розділу</summary>';
+      more.addEventListener('toggle', function(){ localStorage.setItem('mg-more-' + grp.id, more.open ? '1' : '0'); });
+      content.appendChild(more);
+      modsHost = more;
+    }
     appsFound.forEach(function(name){
       var modEl = mods[name];
       if (!modEl) return;
       if (appsFound.length > 1) makeModCollapsible(modEl);
-      content.appendChild(modEl);
+      modsHost.appendChild(modEl);
     });
 
     group.appendChild(content);

@@ -1,0 +1,4 @@
+<tr class="{% if r.state == 'diff' %}dv-diff{% elif r.state == 'missing' %}dv-missing{% endif %}">
+  <td>{{ r.label }}</td><td class="v">{{ r.minerva }}</td><td class="v">{{ r.dk }}</td>
+  <td>{% if r.state == 'same' %}✓{% elif r.state == 'diff' %}<span title="На DigiKey інакше, ніж у Minerva">≠</span>{% else %}—{% endif %}</td>
+</tr>

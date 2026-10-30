@@ -2,7 +2,7 @@
 title: Ціни DigiKey ← Minerva
 order: 20
 summary: Як ціни оферів на DigiKey Marketplace рахуються з базових цін складу Minerva — порівняння «зараз → стане», оновлення вибраних, перевірка, що нові ціни діють, автооновлення й історія.
-where: 🤖 API та скрипти → 💲 Ціни DigiKey ← Minerva
+where: 🛒 DigiKey → 💲 Ціни ← Minerva
 urls: /admin/bots/digikeypricerun/compare/, /admin/bots/digikeypricerun/, /admin/bots/digikeypricesettings/, /admin/bots/digikeypricerun/offers/
 roles: адміністратор, менеджер
 keywords: ціни DigiKey, оновити ціни на DigiKey, базові ціни, надбавка, націнка, округлення, ступені, price breaks, курс валют, автооновлення, підтвердження, історія цін, офер, валюта DigiKey, Preise DigiKey
@@ -28,7 +28,7 @@ DigiKey уже показує нові ціни, і повідомляє в Tele
 
 ## Де знайти
 
-- **🤖 API та скрипти → 💲 Ціни DigiKey ← Minerva** — [сторінка порівняння](/admin/bots/digikeypricerun/compare/);
+- **🛒 DigiKey → 💲 Ціни ← Minerva** — [сторінка порівняння](/admin/bots/digikeypricerun/compare/);
 - у [списку лістингів](/admin/bots/digikeylisting/) — кнопка **«💲 Ціни з Minerva»** і дія **«💲 Ціни з Minerva
   (порівняти й оновити)…»** для вибраних;
 - у [списку товарів](/admin/inventory/product/) — дія **«💲 Ціни на DigiKey з Minerva (порівняти й оновити)…»**;

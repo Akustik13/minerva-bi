@@ -1,0 +1,102 @@
+{% extends "admin/base_site.html" %}
+{% comment %}«⏱ Строки відвантаження DigiKey» (bots/admin_dk_tools.lead_view): вибрати лістинги → новий строк;
+«одразу на DigiKey» — лише leadTimeToShip (bots/services/dk_lead.py), хід — status/.{% endcomment %}
+
+{% block title %}{{ title }} — Minerva{% endblock %}
+
+{% block content %}
+<style>
+  .lt-box { margin: 0 0 14px; padding: 14px 18px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); }
+  .lt-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
+  .lt-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .lt-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .lt-table th, .lt-table td { padding: 5px 8px; border-bottom: 1px solid var(--hairline-color, #2b3c52); text-align: left; }
+  .lt-diff td { background: rgba(245, 165, 36, .10); }
+  .lt-bar { position: sticky; bottom: 0; padding: 12px 18px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
+            background: var(--bg-card, #1a2535); box-shadow: 0 -4px 12px rgba(0, 0, 0, .25); }
+  .lt-bar label { float: none; width: auto; padding: 0; display: inline-flex; gap: 6px; align-items: center; }
+</style>
+
+<div class="lt-box">
+  <div>Строк відвантаження — скільки днів DigiKey показує покупцям до відправки (поле офера <code>leadTimeToShip</code>).
+    Тут можна змінити його багатьом лістингам одразу: у Minerva, а з галочкою — і на DigiKey (надсилається лише строк;
+    ціни, залишок і MOQ на DigiKey лишаються як є).</div>
+  <form method="get" class="lt-row" style="margin-top:10px">
+    <input type="text" name="q" value="{{ q }}" placeholder="артикул або назва">
+    <select name="cat"><option value="">усі види</option>{% for v, label in cats %}<option value="{{ v }}"{% if v == cat %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+    <label style="float:none;width:auto;padding:0"><input type="checkbox" name="offer" value="1"{% if offer_only %} checked{% endif %}> лише з офером</label>
+    {% if ids %}<input type="hidden" name="ids" value="{{ ids }}">{% endif %}
+    <button class="button" type="submit">Показати</button>
+    <button class="button" type="submit" name="live" value="1">🔄 Прочитати строки з DigiKey</button>
+    <a href="{% url 'admin:bots_digikeylisting_dk_diff' %}">🔍 Що бачить DigiKey</a>
+  </form>
+  {% if error %}<div style="margin-top:8px;color:#e5484d">{{ error }}</div>{% endif %}
+  <div class="lt-muted" style="margin-top:6px">Лістингів: {{ total }}{% if total > limit %} (показано {{ limit }}){% endif %}{% if live %} · строк на DigiKey інакше, ніж у Minerva: {{ differ }}{% endif %}</div>
+</div>
+
+<div class="lt-box" id="lt-state"{% if not state.started %} hidden{% endif %}>
+  <b>Надсилання строків на DigiKey</b> — <span id="lt-progress">{% if state.running %}йде: {{ state.done }} з {{ state.total }}{% else %}готово{% endif %}</span>:
+  надіслано <span id="lt-ok">{{ state.ok }}</span>, уже такий строк <span id="lt-same">{{ state.same }}</span>,
+  помилок <span id="lt-err">{{ state.errors|length }}</span>.
+  <ul id="lt-errors" class="lt-muted" style="margin:6px 0 0">{% for sku, e in state.errors %}<li>{{ sku }}: {{ e }}</li>{% endfor %}</ul>
+</div>
+
+<form method="post" id="lt-form">{% csrf_token %}
+  <div class="lt-box">
+    <table class="lt-table">
+      <thead><tr>
+        <th style="width:28px"><input type="checkbox" id="lt-all" title="усі"></th>
+        <th>Артикул</th><th>Назва</th><th>Строк у Minerva, дн</th><th>На DigiKey, дн</th><th>Офер</th></tr></thead>
+      <tbody>
+      {% for r in rows %}<tr class="{% if r.differs %}lt-diff{% endif %}">
+        <td><input type="checkbox" name="pick" value="{{ r.listing.pk }}" class="lt-pick"{% if r.differs %} data-differs="1"{% endif %}></td>
+        <td><a href="{% url 'admin:bots_digikeylisting_change' r.listing.pk %}">{{ r.listing.get_supplier_sku }}</a></td>
+        <td>{{ r.listing.dk_title }}</td>
+        <td><b>{{ r.minerva }}</b></td>
+        <td>{% if not r.read %}<span class="lt-muted">—</span>{% elif r.dk is None %}<span class="lt-muted">офера немає</span>{% else %}{{ r.dk }}{% if r.differs %} ≠{% endif %}{% endif %}</td>
+        <td>{% if r.has_offer %}✓{% else %}<span class="lt-muted">немає</span>{% endif %}</td></tr>
+      {% empty %}<tr><td colspan="6" class="lt-muted">Нічого не знайдено.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if can_change and rows %}
+  <div class="lt-bar lt-row">
+    <span>Вибрано: <b id="lt-n">0</b></span>
+    {% if live and differ %}<button class="button" type="button" id="lt-pick-diff">Вибрати всі з різницею ({{ differ }})</button>{% endif %}
+    <label>Новий строк, днів <input type="number" name="days" min="0" max="365" required style="width:80px"></label>
+    <label><input type="checkbox" name="push" value="1" checked> одразу надіслати на DigiKey (лише строк)</label>
+    <button class="button default" type="submit">✓ Застосувати до вибраних</button>
+  </div>
+  {% endif %}
+</form>
+<script>
+(function () {
+  var picks = document.querySelectorAll('.lt-pick'), n = document.getElementById('lt-n');
+  function count() { if (n) n.textContent = document.querySelectorAll('.lt-pick:checked').length; }
+  picks.forEach(function (c) { c.addEventListener('change', count); });
+  var all = document.getElementById('lt-all');
+  if (all) all.addEventListener('change', function () { picks.forEach(function (c) { c.checked = all.checked; }); count(); });
+  var diff = document.getElementById('lt-pick-diff');
+  if (diff) diff.addEventListener('click', function () { picks.forEach(function (c) { c.checked = c.dataset.differs === '1'; }); count(); });
+  var form = document.getElementById('lt-form');
+  if (form) form.addEventListener('submit', function (e) {
+    var k = document.querySelectorAll('.lt-pick:checked').length, days = form.days.value;
+    var push = form.push && form.push.checked ? ' і надіслати на DigiKey' : '';
+    if (!k) { e.preventDefault(); alert('Позначте лістинги галочкою.'); return; }
+    if (!confirm('Строк ' + days + ' дн для ' + k + ' лістингів у Minerva' + push + '?')) e.preventDefault();
+  });
+  {% if state.running %}
+  var timer = setInterval(function () {               // хід надсилання
+    fetch('{% url "admin:bots_digikeylisting_lead_status" %}', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); }).then(function (s) {
+        document.getElementById('lt-progress').textContent = s.running ? 'йде: ' + s.done + ' з ' + s.total : 'готово';
+        document.getElementById('lt-ok').textContent = s.ok; document.getElementById('lt-same').textContent = s.same;
+        document.getElementById('lt-err').textContent = (s.errors || []).length;
+        if (!s.running) { clearInterval(timer); location.reload(); }
+      }).catch(function () {});
+  }, 2000);
+  {% endif %}
+})();
+</script>
+{% endblock %}

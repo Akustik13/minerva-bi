@@ -1970,6 +1970,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'action_bulk_deactivate',
         'action_bulk_prices',
         'action_dk_from_minerva',
+        'action_dk_diff',
+        'action_lead_times',
         'action_bulk_stock',
         'action_bulk_set_category',
         'action_delete_dk_offers',
@@ -2366,6 +2368,23 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         from bots.admin_from_stock import view
         return view(request, self)
 
+    # «🔍 Що бачить DigiKey» і «⏱ Строки відвантаження» — bots/admin_dk_tools.py
+    def dk_diff_view(self, request):
+        from bots.admin_dk_tools import diff_view
+        return diff_view(request, self)
+
+    def dk_push_view(self, request, pk):
+        from bots.admin_dk_tools import push_view
+        return push_view(request, self, pk)
+
+    def lead_times_view(self, request):
+        from bots.admin_dk_tools import lead_view
+        return lead_view(request, self)
+
+    def lead_status_view(self, request):
+        from bots.admin_dk_tools import lead_status_view
+        return lead_status_view(request, self)
+
     def pub_sync_view(self, request):
         """«🔄 Етапи з DigiKey»: GET /offers → справжні дати офера й стан показу для всіх лістингів."""
         from bots.services.dk_publish import sync_stages
@@ -2396,6 +2415,18 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('pub-sync/',
                  self.admin_site.admin_view(self.pub_sync_view),
                  name='bots_digikeylisting_pub_sync'),
+            path('dk-diff/',
+                 self.admin_site.admin_view(self.dk_diff_view),
+                 name='bots_digikeylisting_dk_diff'),
+            path('dk-diff/push/<int:pk>/',
+                 self.admin_site.admin_view(self.dk_push_view),
+                 name='bots_digikeylisting_dk_push'),
+            path('lead-times/',
+                 self.admin_site.admin_view(self.lead_times_view),
+                 name='bots_digikeylisting_lead_times'),
+            path('lead-times/status/',
+                 self.admin_site.admin_view(self.lead_status_view),
+                 name='bots_digikeylisting_lead_status'),
             path('<int:pk>/publish/',
                  self.admin_site.admin_view(self.publish_view),
                  name='bots_digikeylisting_publish'),
@@ -3074,6 +3105,16 @@ Rules:
         self.message_user(request, msg + ".", messages.SUCCESS)
         if err:
             self.message_user(request, f"⚠️ Не вдалося оновити на DigiKey: {err} лістингів.", messages.WARNING)
+
+    @admin.action(description='🔍 Що бачить DigiKey (звірити вибрані)…')
+    def action_dk_diff(self, request, queryset):
+        url = reverse('admin:bots_digikeylisting_dk_diff')
+        return redirect(f"{url}?ids=" + ','.join(str(pk) for pk in queryset.values_list('pk', flat=True)[:300]))
+
+    @admin.action(description='⏱ Строк відвантаження (масово)…')
+    def action_lead_times(self, request, queryset):
+        url = reverse('admin:bots_digikeylisting_lead_times')
+        return redirect(f"{url}?ids=" + ','.join(str(pk) for pk in queryset.values_list('pk', flat=True)[:300]))
 
     @admin.action(description='💲 Ціни з Minerva (порівняти й оновити)…')
     def action_dk_from_minerva(self, request, queryset):

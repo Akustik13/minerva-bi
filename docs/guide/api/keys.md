@@ -2,7 +2,7 @@
 title: Ключі API — права, обмеження, журнал
 order: 20
 summary: Як створити ключ API для сайту, CRM чи партнера, дати йому лише потрібні права, обмежити IP, ліміти й поля і бачити кожен його запит.
-where: 🤖 API та скрипти → 🔑 API Токени
+where: 🤖 API та скрипти → REST API → 🔑 API ключі
 urls: /admin/api/apikey/, /admin/api/apikey/add/, /admin/api/apirequestlog/
 roles: адміністратор
 keywords: ключ API, токен, API key, token, scopes, права, обмеження, IP, ліміт, rate limit, 401, 403, 429, журнал API, хто звертався, Schlüssel

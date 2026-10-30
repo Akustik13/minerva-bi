@@ -2,7 +2,7 @@
 title: Замовлення й рахунки DigiKey
 order: 30
 summary: Як замовлення з DigiKey Marketplace потрапляють у Продажі, як їх підтвердити й відправити з трек-номером на DigiKey, Pack List, звірка з DigiKey, повідомлення покупців і інвойси для ЄС.
-where: 🤖 API та скрипти → 🛒 DigiKey → 🛒 Замовлення; 🚚 Доставка → Інвойси → DigiKey
+where: 🛒 DigiKey → Замовлення DigiKey / Налаштування → Підключення DigiKey → 🛒 Замовлення; 🚚 Доставка → Інвойси → DigiKey
 urls: /admin/bots/digikeyconfig/, /admin/bots/digikeyconfig/marketplace-orders/, /admin/sales/salesorder/?source=digikey, /invoices/
 roles: адміністратор, менеджер
 keywords: DigiKey замовлення, Marketplace order, підтвердити замовлення, accept, відправити, ship, трек-номер, Confirm Shipment, Pack List, packlist, звірка, reconcile, Messages Hub, повідомлення покупців, інвойс DigiKey, Supplier Invoice Number, VAT invoice, ЄС, Rechnung

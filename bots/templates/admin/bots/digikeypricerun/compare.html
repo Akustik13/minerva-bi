@@ -20,6 +20,7 @@
         <button class="dp-btn" type="submit" title="GET /offers — свіжі ціни всіх оферів">🔄 Прочитати ціни з DigiKey</button>
       </form>
       <a class="dp-btn" href="{{ offers_url }}" title="Живі офери DigiKey поруч із тим, що знає Minerva">🔍 Перевірити офери</a>
+      <a class="dp-btn" href="{% url 'admin:bots_digikeylisting_lead_times' %}" title="Строки відвантаження багатьох лістингів одразу">⏱ Строки відвантаження</a>
       <a class="dp-btn" href="{{ history_url }}">📜 Історія{% if held_runs %} · ✋ чекає рішення: {{ held_runs }}{% endif %}</a>
       <a class="dp-btn" href="{{ settings_url }}">⚙ Налаштування</a>
     </div>

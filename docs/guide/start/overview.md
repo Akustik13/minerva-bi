@@ -37,7 +37,8 @@ CRM, прийнятий Angebot стає замовленням, замовле�
 | **📅 Календар** | [календар](/calendar/), зустрічі й терміни з пошти, Google / Outlook | [Календар](guide:calendar/overview) |
 | **⏱ Робочий час** | прихід / відхід і час на проєкти в askDANTE | [Робочий час](guide:worktime/calendar) |
 | **🏛️ Minerva AI** | [чат з AI](/ai/) про ваші дані, помічник по продукції, база знань | [Хто допомагає](guide:start/assistants) |
-| **🤖 API та скрипти** | DigiKey Marketplace, ключі API, вебхуки, боти | [DigiKey](guide:digikey/listings), [API](guide:api/overview) |
+| **🛒 DigiKey** | DigiKey Marketplace: лістинги, ціни, строки, що бачить DigiKey, замовлення | [DigiKey](guide:digikey/listings) |
+| **🤖 API та скрипти** | ключі API, журнал, вебхуки, боти, JLCPCB, Scraper рахунків | [API](guide:api/overview) |
 | **⚙️ Система**, **🔐 Безпека** | користувачі, налаштування, сповіщення, імпорт, резервні копії, журнал аудиту | розділ «Система й безпека» |
 
 Ще є **💰 Бухгалтерія** (рахунки, платежі, реквізити фірми), **✅ Задачі** і **📄 Документи** (шаблони

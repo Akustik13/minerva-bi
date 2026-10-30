@@ -2,10 +2,10 @@
 title: Лістинги DigiKey Marketplace
 order: 10
 summary: Ваші товари на DigiKey Marketplace у Minerva — лістинг (продукт + офер), публікація й затвердження, стягування даних з DigiKey, залишки, атрибути, масові дії й підключення API.
-where: 🤖 API та скрипти → DigiKey — Лістинги (налаштування — 🤖 API та скрипти → 🛒 DigiKey)
-urls: /admin/bots/digikeylisting/, /admin/bots/digikeylisting/add/, /admin/bots/digikeylisting/from-stock/, /admin/bots/digikeyconfig/
+where: 🛒 DigiKey → Лістинги (підключення — 🛒 DigiKey → Налаштування → Підключення DigiKey)
+urls: /admin/bots/digikeylisting/, /admin/bots/digikeylisting/add/, /admin/bots/digikeylisting/from-stock/, /admin/bots/digikeylisting/dk-diff/, /admin/bots/digikeylisting/lead-times/, /admin/bots/digikeyconfig/
 roles: адміністратор, менеджер
-keywords: DigiKey, Marketplace, лістинг, listing, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
+keywords: DigiKey, Marketplace, лістинг, listing, що бачить DigiKey, звірка, не дійшло, строк відвантаження, lead time, leadTimeToShip, зі складу, обов'язкові поля, RoHS, етапи з DigiKey, офер, offer, Supplier SKU, опублікувати, staged, затвердження, стягнути з DigiKey, залишок на DigiKey, атрибути DigiKey, additionalFields, MOQ, Excel, OAuth
 related: digikey/prices, digikey/orders, inventory/products, shop/catalog-prices
 ---
 
@@ -24,8 +24,11 @@ DigiKey Marketplace — майданчик, де ваші товари прод�
 
 ## Де знайти
 
-- Меню **🤖 API та скрипти** → розділ **«AI та APIs»** → [DigiKey — Лістинги](/admin/bots/digikeylisting/);
-- налаштування й підключення API — **🤖 API та скрипти → 🛒 DigiKey** ([DigiKey — Конфігурація](/admin/bots/digikeyconfig/)).
+- Меню **🛒 DigiKey** — усе про DigiKey в одному місці: [Лістинги](/admin/bots/digikeylisting/),
+  [Зі складу на DigiKey](/admin/bots/digikeylisting/from-stock/), [Що бачить DigiKey](/admin/bots/digikeylisting/dk-diff/),
+  [Ціни ← Minerva](/admin/bots/digikeypricerun/compare/), [Строки відвантаження](/admin/bots/digikeylisting/lead-times/),
+  звірка ID оферів, історія цін, замовлення й інвойси DigiKey, а внизу **«Налаштування»** — підключення
+  ([DigiKey — Конфігурація](/admin/bots/digikeyconfig/)), правила цін, лог змін цін, AI-аналізи.
 
 ## Підключення (один раз, адміністратор)
 
@@ -185,6 +188,38 @@ DigiKey тощо. Праворуч угорі — «від картки до Dig
 його DigiKey і чому ні; кроки до офера ставить не пізніше за нього. На дорожній карті з'явиться «дати звірено з
 DigiKey». Якщо офера з таким ID на DigiKey уже немає — жовта крапка «офера немає на DigiKey». Те саме Minerva
 робить і щоразу, коли оновлює ціни й залишки з DigiKey.
+
+## 🔍 Що бачить DigiKey
+
+Буває, здається, що дані передано, а на DigiKey інше. **«🔍 Що бачить DigiKey»** читає з DigiKey просто зараз, що
+там зберігається, і ставить поруч із тим, що надсилає Minerva — поле за полем (на DigiKey нічого не змінюється):
+
+- **один лістинг** — посилання **«🔍 Що бачить DigiKey»** на дорожній карті картки: **офер** (назва, артикул,
+  ціни, залишок, MOQ, строк відвантаження, активний) і **товар** (категорія, опис, виробник, фото, параметри);
+  рядки з різницею підсвічено, «—» — на DigiKey цього немає. Видно й коли офер востаннє змінювали на DigiKey і ким:
+  **Manual** — вручну на supplier.digikey.com, **API** — через API (напр. Minerva). **«📤 Надіслати офер з
+  Minerva»** — надіслати офер ще раз і одразу побачити, що DigiKey повертає тепер;
+- **багато** — меню [🛒 DigiKey → Що бачить DigiKey](/admin/bots/digikeylisting/dk-diff/) → **«🔍 Звірити всі
+  лістинги з офером»** (або дія **«🔍 Що бачить DigiKey (звірити вибрані)…»** у списку): біля кожного — «✓ як у
+  Minerva» або що саме інакше («інакше: Ціни, Залишок»), **«Лише з розбіжностями»**, **«детально →»**.
+
+> ℹ️ Опис, категорію й параметри **товару** DigiKey змінює лише після перевірки: їх надсилає **«🚀 Опублікувати»**,
+> і DigiKey знову перевіряє товар. Офер (ціни, залишок, строк) змінюється одразу.
+
+## ⏱ Строки відвантаження
+
+[🛒 DigiKey → Строки відвантаження](/admin/bots/digikeylisting/lead-times/) (або кнопка на сторінці **«💲 Ціни ←
+Minerva»**, дія **«⏱ Строк відвантаження (масово)…»** у списку) — скільки днів DigiKey показує покупцям до
+відправки, для багатьох лістингів одразу:
+
+1. фільтр — артикул / назва, вид, **«лише з офером»**; **«🔄 Прочитати строки з DigiKey»** — поруч строк, який
+   зараз на DigiKey (різниця підсвічена, **«Вибрати всі з різницею»**);
+2. позначте лістинги, впишіть **«Новий строк, днів»**;
+3. **«одразу надіслати на DigiKey (лише строк)»** — на DigiKey змінюється тільки строк: ціни, залишок і MOQ
+   лишаються такими, як там зараз; без галочки — лише в Minerva (піде з наступним оновленням офера);
+4. **«✓ Застосувати до вибраних»** — хід видно на сторінці («надіслано / уже такий строк / помилок»).
+
+Окрема сторінка, а не частина «💲 Ціни ← Minerva»: там розрахунок цін за правилами, тут — просте масове значення.
 
 ## Картка лістингу
 
