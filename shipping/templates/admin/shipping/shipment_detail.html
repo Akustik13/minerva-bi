@@ -383,7 +383,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
   {% elif shipment.status == "cancelled" %}
   <div class="sd-info-block" style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-    <span>🚫 {% trans "Відправлення скасовано." %}</span>
+    <span>🚫 {% if ups_void_info %}{% trans "Відправлення скасовано в UPS (Void)" %} {{ ups_void_info.at }} · {{ ups_void_info.id }}.{% else %}{% trans "Відправлення скасовано." %}{% endif %}</span>
     <form method="post" action="{% url 'admin:shipping_shipment_clone' shipment.pk %}" style="margin:0;flex-shrink:0">
       {% csrf_token %}
       <button type="submit"
@@ -1069,7 +1069,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
               <form method="post" action="{{ a.url }}" style="margin:0">
                 {% csrf_token %}
                 <button type="submit"
-                  onclick="return confirm('{{ a.confirm }}')"
+                  onclick="return confirm('{{ a.confirm|escapejs }}')"
                   class="sd-btn sd-btn-{{ a.cls }}" style="width:100%;border:none;cursor:pointer">
                   {{ a.label }}
                 </button>
@@ -1121,6 +1121,24 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           </div>
           {% endif %}
 
+          <!-- UPS Void -->
+          {% if ups_void_id %}
+          <div class="sd-divider" id="ups-void">
+            <div class="sd-section-label" style="color:var(--err)">🗑️ {% trans "Скасувати в UPS (Void)" %}</div>
+            <form method="post" action="{% url 'admin:shipping_shipment_ups_void' shipment.pk %}">
+              {% csrf_token %}
+              <button type="submit"
+                onclick="return confirm('{% trans "Скасувати відправлення" %} {{ ups_void_id }} {% trans "в UPS (Void)?" %}\n\n{% trans "Етикетка стане недійсною, UPS не нараховуватиме вартість." %}\n{% trans "Можливо лише поки кур’єр не забрав посилку." %}\n\n{% trans "Продовжити?" %}')"
+                class="sd-btn-dhl-cancel">
+                🗑️ {% trans "Void — скасувати в UPS" %} ({{ ups_void_id }})
+              </button>
+            </form>
+            <div class="sd-section-note">
+              {% trans "Викликає UPS Void API. Тільки до передачі кур'єру; замовлений забір UPS скасовується окремо." %}
+            </div>
+          </div>
+          {% endif %}
+
           <!-- DHL Cancel -->
           {% if shipment.carrier.carrier_type == "dhl" and shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
           <div class="sd-divider">
@@ -1128,7 +1146,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             <form method="post" action="{% url 'admin:shipping_shipment_dhl_cancel' shipment.pk %}">
               {% csrf_token %}
               <button type="submit"
-                onclick="return confirm('{% trans "Скасувати відправлення" %} {{ shipment.tracking_number }} {% trans "у DHL?" %}\n\n{% trans "Це можливо тільки якщо кур\'єр ще не забрав посилку." %}\n\n{% trans "Продовжити?" %}')"
+                onclick="return confirm('{% trans "Скасувати відправлення" %} {{ shipment.tracking_number }} {% trans "у DHL?" %}\n\n{% trans "Це можливо тільки якщо кур’єр ще не забрав посилку." %}\n\n{% trans "Продовжити?" %}')"
                 class="sd-btn-dhl-cancel">
                 🗑️ {% trans "Скасувати в DHL API" %} ({{ shipment.tracking_number }})
               </button>

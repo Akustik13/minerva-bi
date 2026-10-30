@@ -461,8 +461,22 @@ class OrderLabelTests(TestCase):
         ET.fromstring(r.content)
         r = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
         self.assertContains(r, 'data-svl="order"')
+        self.assertContains(r, "Номер замовлення, країна доставки й усі артикули з кількістю")
         r = self.client.get("/admin/sales/salesorder/")          # картки рендеряться завжди, перемикає JS
         self.assertContains(r, f'data-svl="order" data-order="{self.order.pk}" data-sku="102497269"')
+        self.assertContains(r, "Етикетка замовлення: номер, країна доставки й усі артикули з кількістю")
+
+    def test_order_label_tooltips_do_not_promise_a_barcode(self):
+        """На етикетці замовлення штрихкода немає — підказки кнопок його не обіцяють."""
+        self.add("AN220214-01A", 5)
+        for url in (f"/admin/sales/salesorder/{self.order.pk}/change/", "/admin/sales/salesorder/"):
+            html = self.client.get(url).content.decode()
+            buttons = html.split('data-svl="order"')[1:]
+            self.assertTrue(buttons, url)
+            for chunk in buttons:
+                button = chunk[:chunk.index(">")]
+                self.assertIn("title=", button, url)
+                self.assertNotIn("штрихкод", button, url)
 
     def test_order_without_lines(self):
         self.assertEqual(self.client.get(f"/labels/order/{self.order.pk}/").status_code, 400)
@@ -548,6 +562,25 @@ class LabelSettingsTests(TestCase):
         self.assertContains(r, "id_antenna_label_window")
         self.assertContains(r, "id_dymo_print_preview")
         self.assertContains(r, "id_dymo_origin_mark")
+
+    def test_print_option_names_dymo_connect(self):
+        """Друк іде через службу DYMO Connect — підпис варіанта без старої DYMO Label Software; значення те саме."""
+        self.assertEqual(SalesSettings.DymoOpenMode.PRINT.value, "print")
+        label = SalesSettings.DymoOpenMode.PRINT.label
+        self.assertIn("DYMO Connect", label)
+        field = SalesSettings._meta.get_field("dymo_open_mode")
+        for text in (label, field.help_text):
+            self.assertNotIn("DYMO Label Software", text)
+            self.assertNotIn("localhost", text)
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.get_or_create(pk=1)[0]
+        ss.is_onboarding_complete = True
+        ss.save()
+        self.client.force_login(User.objects.create_user("staff", password="x", is_staff=True, is_superuser=True))
+        r = self.client.get(f"/admin/sales/salessettings/{self.settings.pk}/change/")
+        self.assertContains(r, '<option value="print">🖨️ Друкувати на DYMO (служба DYMO Connect на цьому ПК)</option>',
+                            html=True)
+        self.assertNotContains(r, "DYMO Label Software")
 
 
 class OriginMarkTests(TestCase):

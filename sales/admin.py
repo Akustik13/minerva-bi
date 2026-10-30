@@ -882,7 +882,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         }),
         ("🏷️ Етикетки DYMO", {
             "fields": ("label_buttons_detail",),
-            "description": "Натисніть кнопку — файл завантажиться і відкриється в DYMO Label Software",
+            "description": "Клік на 🖨️ — як у «Продажі → Налаштування → 🏷️ Етикетки DYMO»: завантажити .dymo "
+                           "або одразу надрукувати через службу DYMO Connect; правий клік — інші варіанти",
         }),
         
         ("📦 Пакування", {
@@ -2360,7 +2361,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">'
             + format_html(
                 '<button type="button" data-svl="order" data-order="{}" data-sku="{}" data-svl-act="print" '
-                'title="Номер замовлення, штрихкод і всі артикули з кількістю · правий клік — меню" '
+                'title="Номер замовлення, країна доставки й усі артикули з кількістю · правий клік — меню" '
                 'style="background:#1976d2;color:#fff;border:none;padding:8px 18px;'
                 'border-radius:7px;cursor:pointer;font-size:13px;font-weight:600">'
                 '🏷️ Етикетка замовлення</button>', obj.pk, obj.order_number) +

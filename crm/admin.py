@@ -3,7 +3,6 @@ import re as _re
 from collections import defaultdict
 from decimal import Decimal
 from django.contrib import admin, messages
-from django.db import transaction
 from django.db.models import Sum, Count, Max
 from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import path
@@ -11,6 +10,7 @@ from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
 from .models import Customer, CustomerNote, CustomerTimeline
+from . import merge as crm_merge, utils as crm_utils
 from sales.models import SalesOrder, SalesOrderLine
 from core.mixins import AuditableMixin
 
@@ -79,47 +79,12 @@ def _fetch_order_counts(customers) -> dict:
     }
 
 def _do_merge(winner_id: int, all_ids: list[int]) -> dict:
-    """Atomically merge losers into winner. Returns stats dict."""
-    from strategy.models import CustomerStrategy
+    """Злити дублікатів у winner (crm/merge.py — усі зв'язки переходять до основного). Повертає статистику."""
     customers = list(Customer.objects.filter(pk__in=all_ids))
     winner = next((c for c in customers if c.pk == winner_id), None)
     if not winner:
         raise ValueError(f"Winner pk={winner_id} not found")
-    losers = [c for c in customers if c.pk != winner_id]
-    loser_pks = [c.pk for c in losers]
-    loser_keys = [c.external_key for c in losers]
-
-    with transaction.atomic():
-        orders_moved = SalesOrder.objects.filter(
-            customer_key__in=loser_keys
-        ).update(customer_key=winner.external_key)
-
-        notes_moved = CustomerNote.objects.filter(
-            customer__pk__in=loser_pks
-        ).update(customer=winner)
-        CustomerTimeline.objects.filter(customer__pk__in=loser_pks).update(customer=winner)
-        CustomerStrategy.objects.filter(customer__pk__in=loser_pks).update(customer=winner)
-
-        changed = False
-        extra_notes = []
-        for loser in losers:
-            for field in ("email", "phone", "company", "country",
-                          "addr_street", "addr_city", "addr_zip", "shipping_address", "source"):
-                if not getattr(winner, field) and getattr(loser, field):
-                    setattr(winner, field, getattr(loser, field))
-                    changed = True
-            if loser.notes:
-                extra_notes.append(loser.notes)
-        if extra_notes:
-            sep = "\n\n---\n"
-            winner.notes = (winner.notes + sep if winner.notes else "") + sep.join(extra_notes)
-            changed = True
-        if changed:
-            winner.save()
-
-        Customer.objects.filter(pk__in=loser_pks).delete()
-
-    return {"orders": orders_moved, "notes": notes_moved, "deleted": len(loser_pks), "winner": winner}
+    return crm_merge.merge_customers(winner, [c for c in customers if c.pk != winner_id])
 
 
 class CustomerNoteInline(admin.TabularInline):
@@ -145,6 +110,7 @@ class CustomerTimelineInline(admin.TabularInline):
 
 # ── Фільтр: постійні клієнти ──────────────────────────────────────────────────
 class RepeatCustomerFilter(admin.SimpleListFilter):
+    """За замовленнями клієнта (crm/utils.order_counts): від 2 — постійний, 0–1 — новий (як колонка «Тип»)."""
     title = "Тип клієнта"
     parameter_name = "repeat"
 
@@ -152,12 +118,12 @@ class RepeatCustomerFilter(admin.SimpleListFilter):
         return [("yes", "✅ Постійні"), ("no", "🔸 Нові")]
 
     def queryset(self, request, queryset):
-        qs = queryset.annotate(order_count=Count("id"))
+        if self.value() not in ("yes", "no"):
+            return queryset
+        repeat = crm_utils.repeat_customer_ids()
         if self.value() == "yes":
-            return qs.filter(order_count__gt=1)
-        if self.value() == "no":
-            return qs.filter(order_count=1)
-        return queryset
+            return queryset.filter(pk__in=repeat)
+        return queryset.exclude(pk__in=repeat)
 
 
 # ── Фільтр: RFM сегмент ──────────────────────────────────────────────────────
@@ -486,9 +452,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Merge view ────────────────────────────────────────────────────────────
 
     def merge_view(self, request):
-        """GET: preview злиття. POST: виконати злиття."""
-        from strategy.models import CustomerStrategy
-
+        """GET: preview злиття. POST: виконати злиття (crm/merge.py)."""
         # --- Parse IDs ---
         raw = request.GET.get("ids", "") or request.POST.get("ids", "")
         try:
@@ -549,49 +513,14 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 return redirect("admin:crm_customer_changelist")
 
             losers = [c for c in customers if c.pk != winner_id]
-            loser_pks = [c.pk for c in losers]
-            loser_keys = [c.external_key for c in losers]
 
-            with transaction.atomic():
-                # 1. Перепризначити замовлення
-                orders_moved = SalesOrder.objects.filter(
-                    customer_key__in=loser_keys
-                ).update(customer_key=winner.external_key)
-
-                # 2. Перепризначити нотатки, таймлайн, стратегії
-                notes_moved = CustomerNote.objects.filter(
-                    customer__pk__in=loser_pks
-                ).update(customer=winner)
-                CustomerTimeline.objects.filter(
-                    customer__pk__in=loser_pks
-                ).update(customer=winner)
-                CustomerStrategy.objects.filter(
-                    customer__pk__in=loser_pks
-                ).update(customer=winner)
-
-                # 3. Заповнити порожні поля переможця даними від дублікатів
-                changed = False
-                extra_notes = []
-                for loser in losers:
-                    for field in ("email", "phone", "company", "country",
-                                  "addr_street", "addr_city", "addr_zip",
-                                  "shipping_address", "source"):
-                        if not getattr(winner, field) and getattr(loser, field):
-                            setattr(winner, field, getattr(loser, field))
-                            changed = True
-                    if loser.notes:
-                        extra_notes.append(loser.notes)
-
-                if extra_notes:
-                    sep = "\n\n---\n"
-                    winner.notes = (winner.notes + sep if winner.notes else "") + sep.join(extra_notes)
-                    changed = True
-
-                if changed:
-                    winner.save()
-
-                # 4. Видалити дублікати
-                Customer.objects.filter(pk__in=loser_pks).delete()
+            # Усе, що посилається на дублікатів (замовлення, нотатки, проєкти, пошта, Angebote, задачі, рахунки…),
+            # переходить до основного в одній транзакції — crm/merge.py
+            try:
+                stats = crm_merge.merge_customers(winner, losers)
+            except crm_merge.MergeError as e:
+                self.message_user(request, f"❌ {e}", messages.ERROR)
+                return redirect(f"?ids={raw}")
 
             dup_warn = ""
             if duplicate_order_numbers:
@@ -603,7 +532,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             self.message_user(
                 request,
                 f"✅ Злито {len(losers)} дублікат(и) → «{winner}». "
-                f"Замовлень перенесено: {orders_moved}. Нотаток: {notes_moved}.{dup_warn}",
+                f"{crm_merge.summary(stats)}.{dup_warn}",
                 messages.SUCCESS if not dup_warn else messages.WARNING,
             )
             return redirect(f"../{ winner.pk }/change/")
@@ -1207,9 +1136,19 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     last_order_display.short_description = "Останнє замовлення"
     last_order_display.admin_order_field = "_last_order_date"
 
+    def get_changelist_instance(self, request):
+        """«Тип» у рядках — тим самим підрахунком замовлень, що й фільтр «Тип клієнта» (одним запитом на сторінку)."""
+        cl = super().get_changelist_instance(request)
+        counts = crm_utils.order_counts(cl.result_list)
+        for customer in cl.result_list:
+            customer._type_orders = counts.get(customer.pk, 0)
+        return cl
+
     def repeat_badge(self, obj):
-        cnt = getattr(obj, "_orders_count", obj.total_orders())
-        if cnt and int(cnt) > 1:
+        cnt = getattr(obj, "_type_orders", None)
+        if cnt is None:
+            cnt = crm_utils.order_counts([obj]).get(obj.pk, 0)
+        if crm_utils.is_repeat(cnt):
             return format_html('<span style="color:#4caf50;font-weight:bold;white-space:nowrap">✅ Постійний</span>')
         return format_html('<span style="color:#ff9800;white-space:nowrap">🔸 Новий</span>')
     repeat_badge.short_description = "Тип"

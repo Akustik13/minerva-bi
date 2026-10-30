@@ -3060,6 +3060,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 "account_owner":    rv.get("accountOwner", ""),
             }
 
+        # ── UPS Void: чи можна скасувати в UPS і коли скасовано (рядок UPS_VOID у нотатках) ──
+        ups_void_id = self._ups_void_id(shipment)
+        ups_void_info = None
+        _vm = _re.search(r'UPS_VOID \| ([^|\n]+?) \| ID:(\S+)', notes)
+        if _vm:
+            ups_void_info = {'at': _vm.group(1).strip(), 'id': _vm.group(2)}
+
         # A4 label URL (only if GIF source exists)
         import os as _os
         from django.conf import settings as django_settings
@@ -3093,6 +3100,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "status_choices":            status_choices,
             "carrier_tracking":          carrier_tracking,
             "pickup_info":               pickup_info,
+            "ups_void_id":               ups_void_id,
+            "ups_void_info":             ups_void_info,
             "customs_display":           customs_display,
             "raw_request":               _to_str(shipment.raw_request),
             "raw_response":              _to_str(shipment.raw_response),
@@ -4576,30 +4585,74 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'title':           f'UPS Трекінг — {tracking}',
         })
 
+    # Void можливий, поки UPS не забрав посилку (UPS сам відмовить, якщо вже забрав)
+    UPS_VOIDABLE = (Shipment.Status.SUBMITTED, Shipment.Status.LABEL_READY, Shipment.Status.IN_TRANSIT)
+
+    @classmethod
+    def _ups_void_id(cls, shipment) -> str:
+        """ID для UPS Void (ShipmentIdentificationNumber, 1Z…) або '' — якщо Void для відправлення недоступний."""
+        if not (shipment.carrier and shipment.carrier.carrier_type == 'ups'):
+            return ''
+        if shipment.status not in cls.UPS_VOIDABLE:
+            return ''
+        return (shipment.carrier_shipment_id or shipment.tracking_number or '').strip()
+
     def ups_void_view(self, request, shipment_id):
-        """Анулювати відправлення UPS."""
-        from .ups_client import UPSClient, UPSError
+        """POST — скасувати відправлення в UPS (Void: DELETE /api/shipments/v2409/void/cancel/{1Z…}).
 
+        Успіх — статус «Скасовано» і рядок «UPS_VOID | дата | ID:…» у нотатках (видно в картці); запит і
+        відповідь UPS — у «📋 UPS Лог» перевізника. Відмова UPS — статус не змінюється, причина в повідомленні."""
+        from django.core.exceptions import PermissionDenied
+        from .ups_client import UPSClient, UPSError, void_result
+
+        detail = reverse('admin:shipping_shipment_detail', args=[shipment_id])
         if request.method != 'POST':
-            return redirect(reverse('admin:shipping_shipment_change', args=[shipment_id]))
+            return redirect(detail)
+        if not self.has_change_permission(request):
+            raise PermissionDenied
 
-        shipment    = get_object_or_404(Shipment, pk=shipment_id)
-        shipment_id_ups = shipment.carrier_shipment_id or shipment.tracking_number
-
-        if not shipment_id_ups:
-            messages.error(request, '❌ Carrier Shipment ID не вказано.')
-            return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        if not (shipment.carrier and shipment.carrier.carrier_type == 'ups'):
+            messages.error(request, '❌ «Void» — лише для відправлень UPS.')
+            return redirect(detail)
+        if shipment.status == Shipment.Status.CANCELLED:
+            messages.info(request, f'ℹ️ Відправлення #{shipment.pk} вже скасовано.')
+            return redirect(detail)
+        if shipment.status not in self.UPS_VOIDABLE:
+            messages.error(request, f'❌ Відправлення зі статусом «{shipment.get_status_display()}» '
+                                    'скасувати в UPS не можна.')
+            return redirect(detail)
+        ups_id = self._ups_void_id(shipment)
+        if not ups_id:
+            messages.error(request, '❌ Немає номера відправлення UPS (1Z…) — в UPS нічого не створено, '
+                                    'скасовувати нічого. Статус у Minerva — «🔧 Статус вручну».')
+            return redirect(detail)
 
         try:
-            client = UPSClient()
-            client.void_shipment(shipment_id_ups)
-            shipment.status = Shipment.Status.CANCELLED
-            shipment.save(update_fields=['status'])
-            messages.success(request, f'✅ UPS відправлення анульовано. #{shipment.pk} → Скасовано.')
+            client = UPSClient(carrier=shipment.carrier)
+            result = void_result(client.void_shipment(ups_id))
         except UPSError as e:
-            messages.error(request, f'❌ UPS Void: {e}')
+            messages.error(request, f'❌ UPS не скасував відправлення {ups_id}: {e}. Якщо кур\'єр уже забрав '
+                                    'посилку, Void неможливий; статус у Minerva — «🔧 Статус вручну».')
+            return redirect(detail)
+        if not result['ok']:
+            messages.error(request, f'❌ UPS не підтвердив скасування {ups_id}: {result["status"]}. '
+                                    'Статус відправлення не змінено — перевірте в «📋 UPS Лог» перевізника.')
+            return redirect(detail)
 
-        return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+        stamp = timezone.localtime().strftime('%d.%m.%Y %H:%M')
+        shipment.status = Shipment.Status.CANCELLED
+        shipment.notes = ((shipment.notes.rstrip() + '\n') if shipment.notes else '') + \
+            f'UPS_VOID | {stamp} | ID:{ups_id}'
+        shipment.save(update_fields=['status', 'notes'])
+        messages.success(request, f'✅ Відправлення {ups_id} скасовано в UPS (Void): {result["status"]}. '
+                                  f'#{shipment.pk} → Скасовано.')
+        import re as _re
+        pickup = _re.search(r'UPS_PICKUP \| PRN:([^\s|]+)', shipment.notes)
+        if pickup and pickup.group(1) != '-':
+            messages.warning(request, f'⚠️ Забір кур\'єром UPS (PRN {pickup.group(1)}) Void не скасовує — '
+                                      'якщо він уже не потрібен, натисніть «❌ Скасувати забір UPS».')
+        return redirect(detail)
 
     # ── UPS Pickup standalone (Abholung для вже існуючого відправлення) ────────
 
