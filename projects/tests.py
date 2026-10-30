@@ -314,10 +314,14 @@ class OverviewTests(ProjectsBase):
         from django.contrib.auth.models import Permission
         url = f"/projects/api/project/{self.project.pk}/overview/"
         stranger = User.objects.create_user("stranger", "s2@x.y", "p", is_staff=True)
+        stranger.profile.role = "warehouse"                  # роль без модуля «Проєкти»
+        stranger.profile.save()
         self.client.force_login(stranger)
         self.assertEqual(self.client.get(url).status_code, 404)              # без доступу до проєктів
         viewer = User.objects.create_user("viewer", "v@x.y", "p", is_staff=True)
         viewer.user_permissions.add(Permission.objects.get(codename="view_project"))
+        viewer.profile.module_operations = {"projects": ["view"]}          # проєкти — лише перегляд
+        viewer.profile.save()
         self.client.force_login(viewer)
         state = self.client.get(url).json()
         self.assertEqual((state["project"]["code"], state["can_change"], state["overview"]),

@@ -4,9 +4,9 @@ order: 70
 summary: Одна сторінка про все в базі знань — скільки листів і документів передано, що вже в RAG, що чекає, що не передається й чому.
 where: 🏛️ Minerva AI → 📊 Огляд бази знань
 urls: /admin/rag_assistant/knowledgesettings/overview/
-roles: адміністратор, менеджер (з правом бачити налаштування бази знань)
+roles: адміністратор, з правом «🧠 Керування базою знань»
 keywords: огляд бази знань, стан RAG, проіндексовано, чекають, помилки, чому не в RAG, статистика, база знань, скриньки, категорії, вкладення, Übersicht
-related: ai/knowledge-base, ai/knowledge-marks, ai/knowledge-documents, ai/knowledge-sources
+related: ai/knowledge-base, ai/knowledge-marks, ai/knowledge-documents, ai/knowledge-sources, ai/knowledge-access
 ---
 
 ## Що це

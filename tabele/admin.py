@@ -9,6 +9,16 @@ CSRF_TRUSTED_ORIGINS = [
     'http://192.168.2.123:8000',
 ]
 
+def _can_open(site, request, model_dict) -> bool:
+    model_admin = site._registry.get(model_dict.get("model"))
+    if model_admin is None:
+        return True
+    try:
+        return bool(model_admin.has_view_permission(request) or model_admin.has_change_permission(request))
+    except Exception:
+        return True
+
+
 def _get_app_list(self, request, app_label=None):
     """Кастомний порядок секцій та моделей у сайдбарі Django Admin."""
     # Bypass Django's model-permission check — Minerva uses its own module system.
@@ -128,7 +138,8 @@ def _get_app_list(self, request, app_label=None):
                 or ModuleRegistry.check_active(a["app_label"])
             ]
         else:
-            allowed = profile.get_allowed_modules() if profile else '__all__'
+            from core.middleware import with_hooks
+            allowed = with_hooks(request.user, profile.get_allowed_modules()) if profile else '__all__'
             denied_models = set(getattr(profile, 'denied_models', None) or [])
 
             app_list = [
@@ -139,6 +150,12 @@ def _get_app_list(self, request, app_label=None):
                     and (allowed == '__all__' or a["app_label"] in allowed)
                 )
             ]
+
+            # Моделі, яких людина не відкриє (власні права адмінки — напр. бази знань), — не в меню:
+            # список будувався «як суперкористувач», тож перевіряємо справжні права перегляду
+            for app in app_list:
+                app["models"] = [m for m in app["models"] if _can_open(self, request, m)]
+            app_list = [a for a in app_list if a["models"]]
 
             # Filter denied sub-models within allowed apps
             if denied_models:
@@ -214,7 +231,7 @@ def _mv_has_change_permission(self, request, obj=None):
         from core.utils import user_has_operation
         return user_has_operation(u, self.opts.app_label, 'change')
     except Exception:
-        return True
+        return bool(u.is_superuser)
 
 
 def _mv_has_add_permission(self, request):
@@ -225,10 +242,85 @@ def _mv_has_add_permission(self, request):
         from core.utils import user_has_operation
         return user_has_operation(u, self.opts.app_label, 'add')
     except Exception:
-        return True
+        return bool(u.is_superuser)
 
 
 admin.ModelAdmin.has_module_permission = _mv_has_module_permission
 admin.ModelAdmin.has_view_permission   = _mv_has_view_permission
 admin.ModelAdmin.has_change_permission = _mv_has_change_permission
 admin.ModelAdmin.has_add_permission    = _mv_has_add_permission
+
+
+# ── Ключі й паролі у формах адмінки ──────────────────────────────────────────
+# Поле-пароль (PasswordInput) ніколи не підставляє збережене значення в сторінку: замість нього підказка
+# «збережено: sk-a••••••••wxyz — введіть новий, щоб замінити» (core/secrets.py). Старі форми з render_value=True
+# покладались на те, що браузер надішле значення назад, — тепер порожнє поле лишає збережене. Людям лише
+# з переглядом (поля «тільки читання») ключі й паролі показуються замаскованими.
+import re as _re
+
+from django import forms as _forms
+from django.contrib.admin import helpers as _helpers
+
+SECRET_NAME_RE = _re.compile(r"(password|secret|api_key|apikey|token|license_key|access_key|private_key|"
+                             r"assistant_key)$", _re.I)
+
+
+def _secret_fields(form, legacy_only=False):
+    for name, field in form.fields.items():
+        widget = field.widget
+        if isinstance(widget, _forms.PasswordInput) and (widget.render_value or not legacy_only):
+            yield name, field
+
+
+def _hide_secrets(form):
+    from core.secrets import placeholder
+    instance = getattr(form, "instance", None)
+    for name, field in _secret_fields(form):
+        stored = getattr(instance, name, "") if instance is not None and instance.pk else ""
+        legacy = field.widget.render_value
+        field.widget.render_value = False
+        if legacy and isinstance(stored, str):
+            field.widget.attrs["placeholder"] = placeholder(stored, empty="")
+            field.widget.attrs.setdefault("autocomplete", "new-password")
+            field.widget.attrs.setdefault("size", "60")             # підказку з маскою видно повністю
+            if stored and not field.help_text:
+                field.help_text = "Порожньо — залишити збережене."
+
+
+_mv_orig_render_change_form = admin.ModelAdmin.render_change_form
+_mv_orig_save_form = admin.ModelAdmin.save_form
+
+
+def _mv_render_change_form(self, request, context, *args, **kwargs):
+    form = getattr(context.get("adminform"), "form", None)
+    if form is not None:
+        _hide_secrets(form)
+    return _mv_orig_render_change_form(self, request, context, *args, **kwargs)
+
+
+def _mv_save_form(self, request, form, change):
+    if change:                                   # поле не показувало збережене — порожнє означає «не змінювати»
+        for name, _field in _secret_fields(form, legacy_only=True):
+            old = form.initial.get(name)
+            if old and not form.cleaned_data.get(name):
+                form.cleaned_data[name] = old
+                setattr(form.instance, name, old)
+    return _mv_orig_save_form(self, request, form, change)
+
+
+_mv_orig_readonly_contents = _helpers.AdminReadonlyField.contents
+
+
+def _mv_readonly_contents(self):
+    name = self.field.get("field")
+    if isinstance(name, str) and SECRET_NAME_RE.search(name):
+        value = getattr(getattr(self.form, "instance", None), name, None)
+        if isinstance(value, str):
+            from core.secrets import mask
+            return mask(value) or self.empty_value_display
+    return _mv_orig_readonly_contents(self)
+
+
+admin.ModelAdmin.render_change_form = _mv_render_change_form
+admin.ModelAdmin.save_form = _mv_save_form
+_helpers.AdminReadonlyField.contents = _mv_readonly_contents

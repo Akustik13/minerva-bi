@@ -281,3 +281,7 @@ MINERVA_INSTANCE_ID = os.getenv("MINERVA_INSTANCE_ID", "")
 # шляхи через кому, напр. MINERVA_KNOWLEDGE_ROOTS=/knowledge (rag_assistant/knowledge_sources.py)
 KNOWLEDGE_SOURCE_ROOTS = [p.strip() for p in os.getenv("MINERVA_KNOWLEDGE_ROOTS", "").replace(";", ",").split(",")
                           if p.strip()]
+
+# Хуки ModuleAccessMiddleware {розділ: функція}: розділ відкривається (і видно в меню), якщо хук повернув True
+# (права на базу знань — rag_assistant/access.py)
+MODULE_ACCESS_HOOKS = {"rag_assistant": "rag_assistant.access.module_access"}

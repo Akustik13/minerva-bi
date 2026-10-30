@@ -19,9 +19,14 @@ HTML = (b"<html><head><title>Application note SMA</title></head><body><h1>SMA</h
         b"<p>Torque for SMA connectors: 0.56 Nm.</p></body></html>")
 
 
-def staff(username, *perms):
+def staff(username, *perms, role=None):
+    """Співробітник з правами Django perms; role — роль Minerva (без неї — менеджер, як створює core.signals).
+    «Без права бачити картку» — роль без модуля (readonly: лише дашборд і FAQ)."""
     user = User.objects.create_user(username, f"{username}@x.y", "p", is_staff=True)
     user.user_permissions.add(*Permission.objects.filter(codename__in=perms))
+    if role:
+        user.profile.role = role
+        user.profile.save()
     return User.objects.get(pk=user.pk)
 
 
@@ -54,7 +59,7 @@ class DocumentFeedTests(ItemsMixin, KnowledgeBase):
 
     def test_new_rag_gets_document_with_file_access_and_bytes(self):
         viewer = staff("mila", "view_customer")
-        staff("nobody")                                     # без права бачити клієнта — не в access
+        staff("nobody", role="readonly")                    # без права бачити клієнта — не в access
         item = self.upload(links={"customer": self.client_co}, note="Messprotokoll")
         data = self.changes(types="email,document")
         events = [i for i in data["items"] if i["document_type"] == "document"]
@@ -161,7 +166,7 @@ class CardDocumentsTests(ItemsMixin, EntityHelpBase):
         self.assertEqual(ids, [team.pk])
         self.assertEqual(self.client.get(f"/rag/knowledge/{private.pk}/").status_code, 404)
         self.assertEqual(self.client.post(f"/rag/api/knowledge/{team.pk}/delete/").status_code, 403)   # не власник
-        self.client.force_login(staff("nobody"))
+        self.client.force_login(staff("nobody", role="readonly"))
         self.assertEqual(self.client.get(f"/rag/api/entity/customer/{self.client_c.pk}/documents/").status_code, 404)
         self.assertEqual(self.client.get(f"/rag/knowledge/{team.pk}/").status_code, 404)
 
@@ -199,7 +204,7 @@ class CardDocumentsTests(ItemsMixin, EntityHelpBase):
             result = {"source_instance_id": "test-suite", "generation": gen, "user_id": self.user.pk, "hits": [hit]}
             kept, dropped = retrieval.verify_hits(self.user, result)
             self.assertEqual((len(kept), dropped, kept[0]["kind"], kept[0]["url"]), (1, 0, "document", f"/rag/knowledge/{item.pk}/"))
-            other = staff("nobody")
+            other = staff("nobody", role="readonly")
             self.assertEqual(retrieval.verify_hits(other, dict(result, user_id=other.pk)), ([], 1))
             with patch("rag_assistant.retrieval._submit"):
                 job = retrieval.start(self.user, "Prüfbericht", customer_id=self.client_c.pk)

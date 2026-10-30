@@ -938,10 +938,11 @@ window.MV_GROUPS = [
       { href:'/admin/ai_assistant/aibudgetlog/',           icon:'💰', label:'Бюджет AI',          app:'ai_assistant', model:'AIBudgetLog' },
       { href:'/admin/strategy/aisettings/',                icon:'⚙️', label:'Налаштування AI',    app:'strategy',     model:'AISettings' },
       { href:'/ai/diagnostic/',                            icon:'🔧', label:'Діагностика',        app:'ai_assistant' },
-      { href:'/admin/rag_assistant/ragsettings/',          icon:'📚', label:'Помічник по продукції', app:'rag_assistant' },
+      { href:'/admin/rag_assistant/ragsettings/',          icon:'📚', label:'Помічник по продукції', app:'rag_assistant', model:'RagSettings' },
       { href:'/admin/rag_assistant/ragconversation/',      icon:'🗂️', label:'Розмови помічника',  app:'rag_assistant', model:'RagConversation' },
       { href:'/admin/rag_assistant/knowledgesettings/',    icon:'🧠', label:'База знань (пошта → RAG)', app:'rag_assistant', model:'KnowledgeSettings' },
       { href:'/admin/rag_assistant/knowledgesettings/overview/', icon:'📊', label:'Огляд бази знань', app:'rag_assistant', model:'KnowledgeSettings' },
+      { href:'/admin/rag_assistant/knowledgesettings/access/',   icon:'🔐', label:'Доступ до бази знань і RAG', app:'rag_assistant', model:'KnowledgeSettings' },
       { href:'/admin/rag_assistant/knowledgesource/',      icon:'📂', label:'Джерела знань', app:'rag_assistant', model:'KnowledgeSource' },
       { href:'/admin/rag_assistant/knowledgeitem/',        icon:'📎', label:'Документи бази знань', app:'rag_assistant', model:'KnowledgeItem' },
     ], apps:['ai_assistant', 'rag_assistant'] },
@@ -1140,6 +1141,8 @@ document.addEventListener('DOMContentLoaded', function(){
   function _linkAllowed(lnk) {
     if (!lnk.app) return true;
     if (modsAvailable && !mods[lnk.app]) return false;      // app absent from user's admin (skip on non-admin pages)
+    if (modsAvailable && lnk.model && mods[lnk.app].querySelector('tr[class*="model-"]')
+        && !mods[lnk.app].querySelector('tr.model-' + lnk.model.toLowerCase())) return false;  // model not viewable
     if (!_moduleAllowed(lnk.app)) return false;             // app not in user's allowed_modules
     if (lnk.model && DENIED_MODELS.indexOf(lnk.app + ':' + lnk.model) !== -1) return false;
     return true;

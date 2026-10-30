@@ -529,3 +529,23 @@ class KnowledgeSource(models.Model):
     def __str__(self):
         return self.name
 
+
+class KnowledgeAccess(models.Model):
+    """
+    🔐 Ручні права людини на базу знань і RAG (rag_assistant/access.py): {право: true | false}; немає ключа — за
+    роллю. Права: guide, products, search, documents, sources, manage. Змінюють — на сторінці
+    «🔐 Доступ до бази знань і RAG» (суперкористувач або «Може керувати юзерами»), кожна зміна — у журналі аудиту.
+    """
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="knowledge_access",
+                                verbose_name="Користувач")
+    rights = models.JSONField("Права (перевизначення)", default=dict, blank=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+", verbose_name="Змінив")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Доступ до бази знань"
+        verbose_name_plural = "🔐 Доступ до бази знань і RAG"
+
+    def __str__(self):
+        return f"{self.user} · {self.rights}"

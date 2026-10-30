@@ -589,23 +589,33 @@ class UserProfileForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Поля доступу є лише в адміністратора (UserProfileAdmin.get_readonly_fields / get_form)
         # Set querysets at request time (not at class definition / import time)
-        self.fields['bundle'].queryset = ModuleBundle.objects.all().order_by('name')
-        self.fields['bundle'].empty_label = '— без пакету (використовувати роль) —'
-        self.fields['modules_override'].queryset = ModuleRegistry.objects.order_by('order', 'name')
-        if self.instance.pk and self.instance.allowed_modules:
-            self.fields['modules_override'].initial = (
-                ModuleRegistry.objects.filter(app_label__in=self.instance.allowed_modules)
-            )
+        if 'bundle' in self.fields:
+            self.fields['bundle'].queryset = ModuleBundle.objects.all().order_by('name')
+            self.fields['bundle'].empty_label = '— без пакету (використовувати роль) —'
+        if 'modules_override' in self.fields:
+            self.fields['modules_override'].queryset = ModuleRegistry.objects.order_by('order', 'name')
+            if self.instance.pk and self.instance.allowed_modules:
+                self.fields['modules_override'].initial = (
+                    ModuleRegistry.objects.filter(app_label__in=self.instance.allowed_modules)
+                )
         # Render denied_models as hidden input — UI managed by JS
-        self.fields['denied_models'].widget  = forms.HiddenInput()
-        self.fields['denied_models'].required = False
+        if 'denied_models' in self.fields:
+            self.fields['denied_models'].widget  = forms.HiddenInput()
+            self.fields['denied_models'].required = False
         # Render module_operations as hidden input — UI managed by JS
-        self.fields['module_operations'].widget   = forms.HiddenInput()
-        self.fields['module_operations'].required = False
+        if 'module_operations' in self.fields:
+            self.fields['module_operations'].widget   = forms.HiddenInput()
+            self.fields['module_operations'].required = False
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        if 'modules_override' not in self.fields:          # не адміністратор — ручний список модулів не змінюється
+            if commit:
+                instance.save()
+                self.save_m2m()
+            return instance
         selected = self.cleaned_data.get('modules_override', [])
         if selected:
             # Explicit list selected → use it
@@ -843,6 +853,8 @@ class UserProfileAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         from django.forms import PasswordInput
         form = super().get_form(request, obj, **kwargs)
+        if not self._is_admin(request):
+            form.base_fields.pop('modules_override', None)
         for field_name in ('imap_password', 'smtp_password'):
             if field_name in form.base_fields:
                 form.base_fields[field_name].widget = PasswordInput(render_value=True)
@@ -856,6 +868,41 @@ class UserProfileAdmin(admin.ModelAdmin):
                 'побажання користувача: правил, ролі в AI й доступу до даних воно не змінює. До 2000 символів.'
             )
         return form
+
+    # Не-адміністратор бачить лише свій профіль (паролі пошти колег, ролі й доступ — не його справа)
+    # і не може змінити собі роль, модулі чи дозволи — лише особисті налаштування.
+    ACCESS_FIELDS = ('user', 'role', 'notes', 'bundle', 'denied_models', 'module_operations',
+                     'can_delete', 'can_export', 'can_import', 'can_view_audit', 'can_manage_users',
+                     'ai_enabled', 'ai_assistant_role', 'ai_daily_limit_usd')
+
+    @staticmethod
+    def _is_admin(request):
+        from core.utils import is_minerva_admin, user_can
+        return is_minerva_admin(request.user) or user_can(request.user, 'manage_users')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs if self._is_admin(request) else qs.filter(user=request.user)
+
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if not self._is_admin(request):
+            names = {f.name for f in UserProfile._meta.get_fields()}
+            ro += [f for f in self.ACCESS_FIELDS if f in names and f not in ro]
+        return ro
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if self._is_admin(request):
+            return fieldsets
+        return [(title, {**opts, 'fields': tuple(f for f in opts['fields'] if f != 'modules_override')})
+                for title, opts in fieldsets]
+
+    def has_add_permission(self, request):
+        return self._is_admin(request) and super().has_add_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self._is_admin(request) and super().has_delete_permission(request, obj)
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'bundle':

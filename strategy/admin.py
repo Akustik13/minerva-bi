@@ -42,16 +42,24 @@ class AISettingsAdmin(admin.ModelAdmin):
         return form
 
     def has_add_permission(self, request):
+        from core.utils import is_minerva_admin
         try:
-            return not AISettings.objects.exists()
+            return is_minerva_admin(request.user) and not AISettings.objects.exists()
         except Exception:
-            return True
+            return False
+
+    # ключ Anthropic, токен Telegram-бота, бюджет і дозволи AI — лише адміністраторам (не всім з модулем «Стратегії»)
+    def has_module_permission(self, request):
+        from core.utils import is_minerva_admin
+        return is_minerva_admin(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        from core.utils import is_minerva_admin
+        return is_minerva_admin(request.user)
 
     def has_change_permission(self, request, obj=None):
         from core.utils import is_minerva_admin
-        if is_minerva_admin(request.user):
-            return True
-        return super().has_change_permission(request, obj)
+        return is_minerva_admin(request.user)
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -60,6 +68,9 @@ class AISettingsAdmin(admin.ModelAdmin):
         from django.http import HttpResponseRedirect
         from django.urls import reverse as _reverse
         from django.contrib import messages
+        from django.core.exceptions import PermissionDenied
+        if not self.has_view_or_change_permission(request):
+            raise PermissionDenied
         try:
             obj, _ = AISettings.objects.get_or_create(pk=1)
         except Exception:

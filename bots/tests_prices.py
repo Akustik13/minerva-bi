@@ -381,7 +381,9 @@ class AdminTests(PriceBase):
         from django.contrib.auth.models import Permission
         u = User.objects.create_user("v", "v@example.com", "p", is_staff=True)
         u.user_permissions.add(Permission.objects.get(codename="view_digikeylisting"))
-        u.profile.role = "admin"          # модуль bots відкрито; права Django — лише перегляд
+        u.profile.role = "manager"        # модуль bots відкрито вручну, операції — лише перегляд
+        u.profile.allowed_modules = ["bots"]
+        u.profile.module_operations = {"bots": ["view"]}
         u.profile.save()
         self.client.force_login(u)
         self.assertEqual(self.client.get("/admin/bots/digikeypricerun/compare/").status_code, 200)

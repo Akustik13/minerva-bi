@@ -88,6 +88,15 @@ def available(s=None) -> bool:
     return not not_configured_reason(s)
 
 
+NO_SEARCH_RIGHT = "Немає права на пошук у базі знань — його надає адміністратор («🔐 Доступ до бази знань і RAG»)"
+
+
+def available_for(user, s=None) -> bool:
+    """RAG налаштований і людина має право «🔎 Пошук у базі знань» — тоді кнопки пошуку видно."""
+    from .access import has
+    return available(s) and has(user, "search")
+
+
 def breaker_until(s=None):
     s = s or _settings()
     return s.rag_down_until if s.rag_down_until and s.rag_down_until > timezone.now() else None
@@ -217,8 +226,11 @@ def start(user, query, *, purpose="history", thread=None, customer_id=None, proj
                        idempotency_key=f"minerva:{user.pk}:{uuid.uuid4().hex}")
     reason = not_configured_reason(s)
     until = breaker_until(s)
+    from .access import has
     if reason:
         job.status, job.message = RetrievalJob.UNAVAILABLE, f"RAG не налаштований: {reason}"
+    elif not has(user, "search"):
+        job.status, job.message = RetrievalJob.UNAVAILABLE, NO_SEARCH_RIGHT
     elif not filters["mailbox_ids"]:
         job.status, job.message = RetrievalJob.UNAVAILABLE, "Ваші скриньки не підключені до бази знань"
     elif not body["query"]:

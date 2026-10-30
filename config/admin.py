@@ -247,7 +247,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):
         from django.forms import PasswordInput
         form = super().get_form(request, obj, **kwargs)
-        for field_name in ('email_host_password', 'telegram_bot_token'):
+        for field_name in ('email_host_password', 'telegram_bot_token', 'imap_password'):
             if field_name in form.base_fields:
                 form.base_fields[field_name].widget = PasswordInput(render_value=True)
         if 'order_confirm_notify_sources' in form.base_fields:

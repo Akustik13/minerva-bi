@@ -147,8 +147,11 @@ class RagAssistantTests(TestCase):
         self.client.force_login(other)
         self.assertEqual(self.client.get(f"/rag/api/conversations/{cid}/").status_code, 404)
         self.assertEqual(self.client.post(f"/rag/api/conversations/{cid}/delete/").status_code, 404)
-        plain = User.objects.create_user("eve", "e@x.y", "p")
+        plain = User.objects.create_user("eve", "e@x.y", "p")                 # менеджер: гід і продукція — за роллю
         self.client.force_login(plain)
+        self.assertEqual(self.client.get("/rag/api/state/").status_code, 200)
+        from rag_assistant import access
+        access.set_rights(plain, {"guide": False, "products": False}, other)   # обидва заборонено — віконця немає
         self.assertEqual(self.client.get("/rag/api/state/").status_code, 403)
 
     def test_admin_check_connection(self):

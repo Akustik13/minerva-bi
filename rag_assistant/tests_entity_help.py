@@ -156,6 +156,8 @@ class AccessTests(EntityHelpBase):
         self.ai.letter = "ok"
         b = self.run_help("product", self.filter, "answer", question="?", rag=False)
         other = User.objects.create_user("mila", "m@x.y", "p", is_staff=True)
+        other.profile.role = "readonly"                     # роль без складу й продажів (лише дашборд і FAQ)
+        other.profile.save()
         self.client.force_login(other)
         self.assertEqual(self.client.get(f"/rag/api/entity/help/{b['id']}/").status_code, 404)        # чужий запис
         self.assertEqual(self.client.get(f"/rag/api/entity/product/{self.filter.pk}/latest/").status_code, 404)   # без права

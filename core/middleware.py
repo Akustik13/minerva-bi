@@ -27,6 +27,31 @@ def _url_to_operation(parts: list) -> str:
     return 'view'
 
 
+def _hooks() -> dict:
+    from django.conf import settings
+    return getattr(settings, 'MODULE_ACCESS_HOOKS', None) or {}
+
+
+def hook_allows(user, app_label) -> bool:
+    """settings.MODULE_ACCESS_HOOKS {app_label: функція (user, app_label)}: True відкриває розділ, None — не вирішує."""
+    from django.utils.module_loading import import_string
+    path = _hooks().get(app_label)
+    if not path:
+        return False
+    try:
+        return import_string(path)(user, app_label) is True
+    except Exception:  # noqa: BLE001 — хук не ламає перевірку доступу (закрито за замовчуванням)
+        return False
+
+
+def with_hooks(user, allowed):
+    """Модулі ролі (список або '__all__') + розділи, які людині відкрили хуки модулів (меню, список розділів)."""
+    if allowed == '__all__':
+        return allowed
+    extra = [app for app in _hooks() if app not in allowed and hook_allows(user, app)]
+    return list(allowed) + extra if extra else allowed
+
+
 class ModuleAccessMiddleware:
     """
     Block access to disabled modules.
@@ -90,8 +115,10 @@ class ModuleAccessMiddleware:
             if profile.role in ('superadmin', 'admin'):
                 return False, _empty
             allowed = profile.get_allowed_modules()
-            # Layer 2: app-level
-            if allowed != '__all__' and app_label not in allowed:
+            # Layer 2: app-level (хуки модулів — напр. права на базу знань — можуть відкрити свій розділ;
+            # тоді й дії в ньому вирішують права того модуля, а не Layer 4)
+            hooked = allowed != '__all__' and app_label not in allowed and hook_allows(user, app_label)
+            if allowed != '__all__' and app_label not in allowed and not hooked:
                 return True, {
                     'app_label': app_label,
                     'module_disabled': False,
@@ -118,7 +145,7 @@ class ModuleAccessMiddleware:
                         }
 
             # Layer 4: operation-level (only if explicit module_operations set)
-            if profile.module_operations is not None:
+            if profile.module_operations is not None and not hooked:
                 operation = _url_to_operation(parts)
                 ops = profile.get_allowed_operations(app_label)
                 if ops != '__all__' and operation not in (ops or []):
@@ -137,8 +164,12 @@ class ModuleAccessMiddleware:
                     }
 
             return False, _empty
-        except Exception:
-            return False, _empty  # fail open
+        except Exception:  # немає профілю Minerva або помилка перевірки — закрито (суперкористувача пропущено вище)
+            return True, {
+                'app_label': app_label,
+                'module_disabled': False,
+                'reason': 'Не вдалося перевірити ваш доступ (немає профілю Minerva?) — зверніться до адміністратора.',
+            }
 
 
 class UserLanguageMiddleware:

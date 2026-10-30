@@ -6,7 +6,7 @@ where: Картка клієнта, замовлення, товару → «�
 urls: /admin/crm/customer/, /admin/sales/salesorder/, /admin/inventory/product/, /admin/projects/project/
 roles: усі, хто бачить картку
 keywords: огляд, запитати, запитання про клієнта, що обіцяли, обіцянки, відкриті питання, наступна дія, AI, джерела, картка клієнта, картка товару, картка замовлення, проєкт, Überblick, frage
-related: ai/knowledge-documents, ai/knowledge-base, crm/customers, sales/orders, inventory/products, crm/project-overview
+related: ai/knowledge-documents, ai/knowledge-base, crm/customers, sales/orders, inventory/products, crm/project-overview, ai/knowledge-access
 ---
 
 ## Що це

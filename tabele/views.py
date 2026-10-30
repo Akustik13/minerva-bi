@@ -132,8 +132,8 @@ def register_view(request):
             _send_verification_email(user, tenant, token, s)
 
             # Log registration — IP extracted via X-Forwarded-For in AuditLog.log()
-            xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
-            ip = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR', '')
+            from core.utils import client_ip
+            ip = client_ip(request) or ''
             AuditLog.log(
                 action='create',
                 module='registration',

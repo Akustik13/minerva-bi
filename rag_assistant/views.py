@@ -27,7 +27,8 @@ GUIDE_LIMIT = timedelta(minutes=3)
 # ── Доступ ───────────────────────────────────────────────────────────────────
 
 def has_access(user) -> bool:
-    """Активний співробітник + модуль увімкнений + роль має доступ (як ModuleAccessMiddleware)."""
+    """Активний співробітник + модуль увімкнений у реєстрі + право «📚 гід» або «📦 продукція» (access.py)."""
+    from .access import has
     if not (user and user.is_authenticated and user.is_active and user.is_staff):
         return False
     try:
@@ -36,16 +37,18 @@ def has_access(user) -> bool:
             return False
     except Exception:
         pass
-    if user.is_superuser:
-        return True
-    try:
-        profile = user.profile
-        if profile.role in ("superadmin", "admin"):
-            return True
-        allowed = profile.get_allowed_modules()
-        return allowed == "__all__" or APP_LABEL in (allowed or [])
-    except Exception:
-        return True
+    return has(user, "guide") or has(user, "products")
+
+
+def _ready(user, st=None) -> tuple:
+    """(📦 продукція, 📚 гід) — що працює для цієї людини: налаштовано на сервері й є право."""
+    from guide import assistant as guide_assistant
+
+    from .access import has
+    st = st or RagSettings.get()
+    products = bool(st.enabled and st.configured) and has(user, "products")
+    guide = has(user, "guide") and guide_assistant.available()
+    return products, guide
 
 
 def _guard(view):
@@ -248,12 +251,14 @@ def avatar(request):
 @require_GET
 @_guard
 def state(request):
-    """Віконце показується, коли працює хоча б одне: помічник по продукції (RAG) або 📚 гід по Minerva."""
-    from guide import assistant as guide_assistant
+    """Віконце показується, коли працює хоча б одне, на яке в людини є право: помічник по продукції (RAG) або
+    📚 гід по Minerva (rag_assistant/access.py)."""
     st = RagSettings.get()
     convs = RagConversation.objects.filter(user=request.user)[:30]
-    products, guide = bool(st.enabled and st.configured), guide_assistant.available()
-    return JsonResponse({"enabled": st.enabled or guide, "configured": products or guide, "products": products,
+    products, guide = _ready(request.user, st)
+    from .access import has
+    shown = products or guide or (st.enabled and has(request.user, "products"))   # увімкнено, але не налаштовано
+    return JsonResponse({"enabled": shown, "configured": products or guide, "products": products,
                          "guide": guide, "name": st.name, "conversations": [_conv(c) for c in convs]})
 
 
@@ -290,8 +295,10 @@ def ask(request, pk):
     if not 1 <= len(question) <= 3000:
         return JsonResponse({"error": "Запитання — від 1 до 3000 символів."}, status=400)
     from guide import assistant as guide_assistant
+
+    from .access import has
     st = RagSettings.get()
-    products_ready = bool(st.enabled and st.configured)
+    products_ready, guide_ready = _ready(request.user, st)
     if c.messages.filter(status=RagMessage.PENDING).exists():
         return JsonResponse({"error": "Дочекайтеся відповіді на попереднє запитання."}, status=409)
     history = [{"role": m.role, "content": m.content[:3000]}
@@ -303,10 +310,12 @@ def ask(request, pk):
         last = c.messages.filter(role=RagMessage.ROLE_ASSISTANT).order_by("-created_at", "-pk").first()
         mode, reason = guide_assistant.route(question, page, rag_ready=products_ready,
                                              previous=last.mode if last else "")
-        if mode == RagMessage.GUIDE and products_ready and not guide_assistant.available():
-            mode = RagMessage.PRODUCTS                                   # гід вимкнений — як раніше, усе в RAG
+        if mode == RagMessage.GUIDE and products_ready and not guide_ready:
+            mode = RagMessage.PRODUCTS                  # гід вимкнений або немає права — як раніше, усе в RAG
     if mode == RagMessage.GUIDE:
-        if not guide_assistant.available():
+        if not has(request.user, "guide"):
+            return JsonResponse({"error": "Немає права на 📚 гід у віконці — його надає адміністратор."}, status=403)
+        if not guide_ready:
             return JsonResponse({"error": "Гід по Minerva недоступний: немає ключа Anthropic у налаштуваннях AI."},
                                 status=503)
         user_msg = RagMessage.objects.create(conversation=c, role=RagMessage.ROLE_USER, content=question)
@@ -319,6 +328,9 @@ def ask(request, pk):
         guide_assistant.start(bot_msg.pk, question, page, history, request.user.pk)
         return JsonResponse({"user": _msg(user_msg), "assistant": _msg(bot_msg), "conversation": _conv(c)},
                             status=202)
+    if not has(request.user, "products"):
+        return JsonResponse({"error": "Немає права на 📦 помічника по продукції — його надає адміністратор."},
+                            status=403)
     if not products_ready:
         return JsonResponse({"error": "Помічник по продукції вимкнений або не налаштований."}, status=503)
     try:
