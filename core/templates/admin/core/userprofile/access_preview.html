@@ -1,30 +1,32 @@
 {% extends "admin/base_site.html" %}
 {% comment %}«👁 Як бачить Minerva <людина>» (core/access_preview.py): меню, дозволи, модулі, база знань, перевірка
-адреси. Лише читання — нічого не відкривається й не виконується від імені людини.{% endcomment %}
+адреси. Нічого не відкривається й не виконується від імені людини. «✏️ Змінити доступ» (core/access_editor.py):
+кліки й правий клік змінюють чернетку, сторінка одразу перемальовується з неї (POST action=preview, замінюється
+#ap-root), «💾 Зберегти» — POST action=save.{% endcomment %}
 
 {% block title %}{{ title }} — Minerva{% endblock %}
 
 {% block content %}
 <style>
-  .ap { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; align-items: start; }
+  .ap { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 16px; align-items: start; }
   .ap-box { padding: 14px 16px; border: 1px solid var(--border-strong, #243347); border-radius: 8px;
             background: var(--bg-card, #1a2535); margin-bottom: 14px; }
   .ap-box h3 { margin: 0 0 10px; font-size: 14px; }
   .ap-muted { color: var(--body-quiet-color, #8aa0b4); font-size: 12px; }
   .ap-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
   .ap-chip { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 12px; margin: 2px 4px 2px 0;
-             background: var(--darkened-bg, rgba(127, 127, 127, .1)); }
+             background: var(--darkened-bg, rgba(127, 127, 127, .1)); border: 0; font: inherit; color: inherit; }
   .ap-yes { background: rgba(46, 157, 91, .18); color: #4cc38a; }
   .ap-no { background: rgba(229, 72, 77, .14); color: #e5484d; text-decoration: line-through; }
   .ap-menu details { border-bottom: 1px solid var(--hairline-color, #2b3c52); padding: 4px 0; }
   .ap-menu summary { cursor: pointer; font-weight: 600; font-size: 13px; padding: 4px 0; }
   .ap-menu ul { list-style: none; margin: 4px 0 6px; padding: 0 0 0 10px; }
-  .ap-menu li { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 2px 0; }
+  .ap-menu li { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 2px 0; align-items: center; }
   .ap-perm { white-space: nowrap; font-size: 12px; letter-spacing: 1px; }
   .ap-perm .off { opacity: .2; }
   .ap-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   .ap-table td, .ap-table th { padding: 5px 8px; border-bottom: 1px solid var(--hairline-color, #2b3c52);
-                               text-align: left; vertical-align: top; }
+                               text-align: left; vertical-align: middle; }
   .ap-table tr.off td { opacity: .55; }
   .ap-check { display: flex; gap: 8px; flex-wrap: wrap; }
   .ap-check input[type=text] { flex: 1 1 320px; }
@@ -32,8 +34,35 @@
             background: var(--darkened-bg, rgba(127, 127, 127, .08)); }
   .ap-res.no { border-left-color: #e5484d; } .ap-res.edit { border-left-color: #2e9d5b; }
   .ap-res.view { border-left-color: #f5a524; }
+  /* редактор */
+  .ap-seg { display: inline-flex; border: 1px solid var(--hairline-color, #2b3c52); border-radius: 8px; overflow: hidden; }
+  .ap-seg button { border: 0; background: none; color: inherit; font: inherit; font-size: 12px; padding: 2px 8px;
+                   cursor: pointer; white-space: nowrap; }
+  .ap-seg button + button { border-left: 1px solid var(--hairline-color, #2b3c52); }
+  .ap-seg button.on { background: #3b82f6; color: #fff; }
+  .ap-seg button.on[data-level=hidden] { background: #e5484d; }
+  .ap-seg button.on[data-level=view] { background: #b7791f; }
+  .ap-seg button.on[data-level=work] { background: #2e9d5b; }
+  .ap-seg.small button { padding: 1px 5px; font-size: 11px; }
+  .ap-x { border: 0; background: none; cursor: pointer; font-size: 12px; opacity: .45; padding: 0 2px; color: inherit; }
+  .ap-x:hover { opacity: 1; }
+  .ap-bar { position: sticky; top: 0; z-index: 20; margin-bottom: 14px; padding: 10px 16px; border-radius: 8px;
+            border: 2px solid #3b82f6; background: var(--bg-card, #1a2535); box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
+  .ap-bar ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; }
+  .ap-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ap-ctx { position: fixed; z-index: 1000; min-width: 220px; padding: 4px; border-radius: 8px; display: none;
+            border: 1px solid var(--border-strong, #243347); background: var(--bg-card, #1a2535);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, .35); font-size: 13px; }
+  .ap-ctx button { display: block; width: 100%; text-align: left; border: 0; background: none; color: inherit;
+                   font: inherit; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+  .ap-ctx button:hover { background: rgba(59, 130, 246, .15); }
+  .ap-ctx .t { padding: 4px 10px; font-size: 11px; opacity: .6; }
+  #ap-root.ap-busy { opacity: .6; pointer-events: none; }
   @media (max-width: 900px) { .ap { grid-template-columns: 1fr; } }
 </style>
+
+<div id="ap-root" data-edit="{% if editing %}1{% else %}0{% endif %}">
+{{ draft_json|json_script:"ap-draft" }}
 
 <div class="ap-box ap-head">
   <div>
@@ -45,11 +74,37 @@
   {% if p.superuser %}<span class="ap-chip ap-yes">суперкористувач Django — бачить усе</span>
   {% elif p.admin %}<span class="ap-chip ap-yes">адміністратор Minerva — бачить усе</span>{% endif %}
   {% if not p.can_login %}<span class="ap-chip ap-no">не може увійти (неактивний або не співробітник)</span>{% endif %}
-  <a href="{% url 'admin:core_userprofile_change' original.pk %}" style="margin-left:auto">← до профілю</a>
+  <span style="margin-left:auto;display:flex;gap:10px;align-items:center">
+    {% if not editing and not why_not %}<a class="button" href="?edit=1">✏️ Змінити доступ</a>{% endif %}
+    <a href="{% url 'admin:core_userprofile_change' original.pk %}">← до профілю</a>
+  </span>
 </div>
+
+{% if editing %}
+<div class="ap-bar">
+  <div class="ap-row">
+    <b>✏️ Зміна доступу</b>
+    <span class="ap-muted">Клікайте рівні розділів, 🚫 біля сторінок, особливі права; правий клік — те саме меню. Сторінка
+      одразу показує, як буде. Нічого не збережено, доки не натиснете «💾 Зберегти».</span>
+  </div>
+  <div class="ap-row" style="margin-top:8px">
+    <select id="ap-copy" title="Взяти права іншої людини як основу">
+      <option value="">📋 Скопіювати права з…</option>
+      {% for o in others %}<option value="{{ o.pk }}">{{ o.user.get_full_name|default:o.user.username }} · {{ o.get_role_display }}</option>{% endfor %}
+    </select>
+    <button type="button" class="button" data-ap-reset>↺ Як у ролі / пакеті</button>
+    <span style="margin-left:auto"></span>
+    <button type="button" class="button default" data-ap-save{% if not changes %} disabled{% endif %}>💾 Зберегти{% if changes %} ({{ changes|length }}){% endif %}</button>
+    <a class="button" href="?">✕ Скасувати</a>
+  </div>
+  {% if changes %}<ul>{% for c in changes %}<li>{{ c }}</li>{% endfor %}</ul>
+  {% else %}<div class="ap-muted" style="margin-top:6px">Змін ще немає.</div>{% endif %}
+</div>
+{% elif why_not and request.GET.edit %}<div class="ap-box" style="border-color:#f5a524">{{ why_not }}</div>
+{% else %}
 <p class="ap-muted" style="margin:-6px 0 12px">Так Minerva виглядає для цієї людини. Лише перегляд доступів: її
-  пошту, розмови й особисті документи ця сторінка не показує й нічого не виконує від її імені. Змінили роль або
-  модулі в профілі — збережіть і відкрийте цю сторінку знову.</p>
+  пошту, розмови й особисті документи ця сторінка не показує й нічого не виконує від її імені.</p>
+{% endif %}
 
 <div class="ap">
   <div>
@@ -59,11 +114,14 @@
         <div class="ap-muted" style="margin-bottom:6px">{{ p.menu|length }} розділів · {{ p.models_count }} сторінок,
           змінювати може на {{ p.edit_count }}. Значки: 👁 перегляд · ➕ створення · ✏️ зміна · 🗑 видалення.</div>
         {% for app in p.menu %}
-        <details{% if forloop.counter <= 3 %} open{% endif %}>
-          <summary>{{ app.name }} <span class="ap-muted">({{ app.models|length }})</span></summary>
+        <details{% if forloop.counter <= 3 or editing %} open{% endif %} data-ap-app="{% if app.editable %}{{ app.app }}{% endif %}">
+          <summary>{{ app.name }} <span class="ap-muted">({{ app.models|length }})</span>
+            {% if editing and app.editable %}<span class="ap-seg small" style="float:right">{% for k, icon, label in levels %}<button type="button" data-ap-level="{{ k }}" data-app="{{ app.app }}" title="{{ label }}" class="{% if app.level == k %}on{% endif %}">{{ icon }}</button>{% endfor %}</span>{% endif %}
+          </summary>
           <ul>
             {% for m in app.models %}
-            <li><span>{{ m.name }}{% if m.read_only %} <span class="ap-muted">· лише перегляд</span>{% endif %}</span>
+            <li data-ap-page="{{ m.key }}" data-app="{% if app.editable %}{{ app.app }}{% endif %}">
+              <span>{% if editing %}<button type="button" class="ap-x" data-ap-hide="{{ m.key }}" title="Сховати цю сторінку">🚫</button>{% endif %}{{ m.name }}{% if m.read_only %} <span class="ap-muted">· лише перегляд</span>{% endif %}</span>
               <span class="ap-perm">{% for a, ok in m.perms.items %}<span class="{% if not ok %}off{% endif %}" title="{{ a }}">{% if a == 'view' %}👁{% elif a == 'add' %}➕{% elif a == 'change' %}✏️{% else %}🗑{% endif %}</span>{% endfor %}</span></li>
             {% endfor %}
           </ul>
@@ -71,6 +129,16 @@
         {% endfor %}
       {% else %}<div class="ap-muted">Меню порожнє.</div>{% endif %}
     </div>
+
+    {% if p.hidden %}
+    <div class="ap-box">
+      <h3>🚫 Сховані сторінки</h3>
+      {% for h in p.hidden %}<div class="ap-row" style="justify-content:space-between;font-size:12.5px;padding:2px 0">
+        <span>{{ h.name }} <span class="ap-muted">{{ h.key }}</span></span>
+        {% if editing %}<button type="button" class="button" data-ap-show="{{ h.key }}" style="font-size:11px;padding:2px 8px">👁 Показати</button>{% endif %}
+      </div>{% endfor %}
+    </div>
+    {% endif %}
 
     <div class="ap-box">
       <h3>🔗 Сторінки поза меню адмінки</h3>
@@ -81,12 +149,13 @@
   <div>
     <div class="ap-box">
       <h3>🔍 Чи відкриє вона цю адресу?</h3>
-      <form method="get" class="ap-check">
+      <form method="get" class="ap-check" id="ap-check">
         <input type="text" name="url" value="{{ url }}" placeholder="вставте адресу Minerva, напр. /admin/sales/salesorder/">
+        {% if editing %}<input type="hidden" name="edit" value="1">{% endif %}
         <button class="button" type="submit">Перевірити</button>
       </form>
       <div class="ap-muted" style="margin-top:6px">Приклади:
-        {% for s in samples %}<a href="?url={{ s|urlencode }}">{{ s }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</div>
+        {% for s in samples %}<a href="?url={{ s|urlencode }}{% if editing %}&edit=1{% endif %}" data-ap-sample="{{ s }}">{{ s }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</div>
       {% if check %}
       <div class="ap-res {{ check.level }}">
         <b>{% if check.level == 'edit' %}✅{% elif check.level == 'view' %}👁{% else %}⛔{% endif %} {{ check.path }}</b> — {{ check.text }}
@@ -99,7 +168,8 @@
 
     <div class="ap-box">
       <h3>⭐ Особливі права</h3>
-      {% for s in p.special %}<span class="ap-chip {% if s.value %}ap-yes{% else %}ap-no{% endif %}">{{ s.label }}</span>{% endfor %}
+      {% for s in p.special %}{% if editing %}<button type="button" class="ap-chip {% if s.value %}ap-yes{% else %}ap-no{% endif %}" data-ap-special="{{ s.key }}" data-value="{% if s.value %}1{% else %}0{% endif %}" title="Клік — {% if s.value %}заборонити{% else %}дозволити{% endif %}; правий клік — «за роллю»{% if s.own is None %} (зараз — за роллю){% endif %}" style="cursor:pointer">{{ s.label }}</button>{% else %}<span class="ap-chip {% if s.value %}ap-yes{% else %}ap-no{% endif %}">{{ s.label }}</span>{% endif %}{% endfor %}
+      {% if editing %}<div class="ap-muted" style="margin-top:4px">«🗑 + видаляє» в розділі діє лише разом з «🗑 Видаляти записи».</div>{% endif %}
     </div>
 
     {% if p.knowledge %}
@@ -109,6 +179,7 @@
         {% for k in p.knowledge %}<tr class="{% if not k.value %}off{% endif %}">
           <td>{% if k.value %}✅{% else %}⛔{% endif %} {{ k.label }}</td><td class="ap-muted">{{ k.source }}</td></tr>{% endfor %}
       </table>
+      <div class="ap-muted" style="margin-top:6px">Ці права — на сторінці <a href="{% url 'admin:rag_assistant_knowledgesettings_access' %}">🔐 Доступ до бази знань і RAG</a>.</div>
     </div>
     {% endif %}
 
@@ -116,16 +187,133 @@
     <div class="ap-box">
       <h3>🧩 Модулі й що в них можна</h3>
       <table class="ap-table">
-        <thead><tr><th>Модуль</th><th>Доступ</th><th>Що можна</th></tr></thead>
+        <thead><tr><th>Модуль</th><th>Доступ</th><th>{% if editing %}Рівень{% else %}Що можна{% endif %}</th></tr></thead>
         <tbody>
-        {% for m in p.modules %}<tr class="{% if not m.allowed %}off{% endif %}">
+        {% for m in p.modules %}<tr class="{% if not m.allowed %}off{% endif %}" data-ap-app="{% if not m.fixed %}{{ m.app }}{% endif %}">
           <td>{{ m.name }} <span class="ap-muted">{{ m.app }}</span></td>
           <td>{% if m.allowed %}✅{% else %}⛔{% endif %} <span class="ap-muted">{{ m.why }}</span></td>
-          <td>{% if m.allowed %}{{ m.ops|join:", "|default:"—" }}{% endif %}</td></tr>{% endfor %}
+          <td>{% if editing and not m.fixed and m.active %}
+                <span class="ap-seg">{% for k, icon, label in levels %}<button type="button" data-ap-level="{{ k }}" data-app="{{ m.app }}" class="{% if m.level == k %}on{% endif %}">{{ icon }} {{ label }}</button>{% endfor %}</span>
+                {% if m.level != 'hidden' %}{% for op in extra_ops %}<label style="float:none;width:auto;padding:0;margin-left:8px;font-size:12px;display:inline-flex;gap:3px;align-items:center"><input type="checkbox" data-ap-extra="{{ op }}" data-app="{{ m.app }}"{% if op in m.extra %} checked{% endif %}>{% if op == 'export' %}📤 експорт{% else %}📥 імпорт{% endif %}</label>{% endfor %}{% endif %}
+              {% elif m.allowed %}{{ m.ops|join:", "|default:"—" }}{% endif %}</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>
     {% endif %}
   </div>
 </div>
+</div>
+
+<form method="post" id="ap-form" style="display:none">{% csrf_token %}
+  <input type="hidden" name="action" value="preview"><input type="hidden" name="draft" value="{}">
+  <input type="hidden" name="url" value="{{ url }}"><input type="hidden" name="source" value="">
+</form>
+<div class="ap-ctx" id="ap-ctx"></div>
+
+<script>
+(function () {
+  var form = document.getElementById('ap-form'), ctx = document.getElementById('ap-ctx');
+  var LEVELS = [['hidden', '🚫 Сховати розділ'], ['view', '👁 Лише перегляд'], ['work', '✏️ Працює (створює й змінює)'],
+                ['delete', '🗑 + видаляє']];
+  function root() { return document.getElementById('ap-root'); }
+  function editing() { return root().dataset.edit === '1'; }
+  function draft() {
+    var el = document.getElementById('ap-draft');
+    var d = el ? JSON.parse(el.textContent || '{}') : {};
+    ['modules', 'extra', 'pages', 'special'].forEach(function (k) { d[k] = d[k] || {}; });
+    return d;
+  }
+  function post(action, d, extra) {
+    var fd = new FormData(form);
+    fd.set('action', action); fd.set('draft', JSON.stringify(d));
+    Object.keys(extra || {}).forEach(function (k) { fd.set(k, extra[k]); });
+    return fetch(location.pathname, { method: 'POST', body: fd, credentials: 'same-origin' });
+  }
+  function refresh(d) {                       // сторінка з чернетки — як буде після «Зберегти»
+    root().classList.add('ap-busy');
+    post('preview', d).then(function (r) { return r.text(); }).then(function (html) {
+      var doc = new DOMParser().parseFromString(html, 'text/html');
+      var fresh = doc.getElementById('ap-root');
+      if (fresh) root().replaceWith(fresh);
+    }).catch(function () { root().classList.remove('ap-busy'); alert('Не вдалося перерахувати — спробуйте ще раз.'); });
+  }
+  function change(fn) { var d = draft(); fn(d); refresh(d); }
+  function setLevel(app, lvl) { change(function (d) { d.modules[app] = lvl; }); }
+  function setPage(key, hide) { change(function (d) { d.pages[key] = hide; }); }
+  function setSpecial(key, val) { change(function (d) { d.special[key] = val; }); }
+
+  document.addEventListener('click', function (e) {
+    if (!editing()) return;
+    var b;
+    if ((b = e.target.closest('[data-ap-level]'))) { e.preventDefault(); setLevel(b.dataset.app, b.dataset.apLevel); return; }
+    if ((b = e.target.closest('[data-ap-hide]'))) { e.preventDefault(); setPage(b.dataset.apHide, true); return; }
+    if ((b = e.target.closest('[data-ap-show]'))) { setPage(b.dataset.apShow, false); return; }
+    if ((b = e.target.closest('[data-ap-special]'))) { setSpecial(b.dataset.apSpecial, b.dataset.value !== '1'); return; }
+    if (e.target.closest('[data-ap-reset]')) {
+      if (confirm('Скинути все до ролі / пакета: ручні модулі, операції, сховані сторінки й особливі права?'))
+        refresh({ reset: true });
+      return;
+    }
+    if (e.target.closest('[data-ap-save]')) {
+      if (!confirm('Зберегти зміни доступу?')) return;
+      form.action.value = 'save'; form.draft.value = JSON.stringify(draft()); form.submit();
+    }
+  });
+  document.addEventListener('change', function (e) {
+    if (!editing()) return;
+    var c = e.target.closest('[data-ap-extra]');
+    if (c) {
+      var app = c.dataset.app, ops = [];
+      document.querySelectorAll('[data-ap-extra][data-app="' + app + '"]').forEach(function (x) { if (x.checked) ops.push(x.dataset.apExtra); });
+      change(function (d) { d.extra[app] = ops; });
+      return;
+    }
+    if (e.target.id === 'ap-copy' && e.target.value) {
+      post('copy', {}, { source: e.target.value }).then(function (r) { return r.json(); })
+        .then(function (res) { if (res.draft) refresh(res.draft); });
+    }
+  });
+  document.addEventListener('submit', function (e) {          // перевірка адреси — з урахуванням чернетки
+    if (!editing() || e.target.id !== 'ap-check') return;
+    e.preventDefault();
+    form.url.value = e.target.url.value; refresh(draft());
+  });
+
+  // правий клік: рівень розділу, сховати сторінку, особливе право «за роллю»
+  function menu(x, y, title, items) {
+    ctx.innerHTML = '<div class="t">' + title + '</div>';
+    items.forEach(function (it) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = it[0];
+      b.addEventListener('click', function () { hide(); it[1](); }); ctx.appendChild(b);
+    });
+    ctx.style.display = 'block';
+    ctx.style.left = Math.min(x, innerWidth - ctx.offsetWidth - 8) + 'px';
+    ctx.style.top = Math.min(y, innerHeight - ctx.offsetHeight - 8) + 'px';
+  }
+  function hide() { ctx.style.display = 'none'; }
+  document.addEventListener('contextmenu', function (e) {
+    if (!editing()) return;
+    var sp = e.target.closest('[data-ap-special]');
+    if (sp) {
+      e.preventDefault();
+      var key = sp.dataset.apSpecial;
+      menu(e.clientX, e.clientY, sp.textContent.trim(), [
+        ['✅ Дозволити', function () { setSpecial(key, true); }], ['⛔ Заборонити', function () { setSpecial(key, false); }],
+        ['↺ За роллю', function () { setSpecial(key, null); }]]);
+      return;
+    }
+    var page = e.target.closest('[data-ap-page]'), box = e.target.closest('[data-ap-app]');
+    var app = (page && page.dataset.app) || (box && box.dataset.apApp);
+    if (!page && !app) return;
+    e.preventDefault();
+    var items = [];
+    if (page) items.push(['🚫 Сховати цю сторінку', function () { setPage(page.dataset.apPage, true); }]);
+    if (app) LEVELS.forEach(function (l) { items.push([(page ? 'Розділ: ' : '') + l[1], function () { setLevel(app, l[0]); }]); });
+    menu(e.clientX, e.clientY, page ? page.querySelector('span').textContent.replace('🚫', '').trim() : app, items);
+  });
+  document.addEventListener('click', function (e) { if (!e.target.closest('#ap-ctx')) hide(); }, true);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
+  addEventListener('scroll', hide, true);
+})();
+</script>
 {% endblock %}

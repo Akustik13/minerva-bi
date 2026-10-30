@@ -34,10 +34,17 @@ PAGES = [
 ALWAYS = frozenset({"core", "auth", "faq", "admin", "authtoken", "dashboard"})
 
 
-def _fresh(user):
-    """Свіжий об'єкт людини з бази — кеші прав і тимчасові прапорці не перетікають у справжню сесію."""
+def _fresh(user, draft=None):
+    """Свіжий об'єкт людини з бази — кеші прав і тимчасові прапорці не перетікають у справжню сесію. draft —
+    чернетка «✏️ Змінити доступ» (core/access_editor), накладена на профіль лише в пам'яті."""
     from django.contrib.auth.models import User
-    return User.objects.select_related("profile").get(pk=user.pk)
+    fresh = User.objects.select_related("profile").get(pk=user.pk)
+    if draft:
+        from core.access_editor import apply
+        profile = _profile(fresh)
+        if profile is not None:
+            apply(profile, draft)
+    return fresh
 
 
 def _request(user, path="/admin/"):
@@ -91,8 +98,14 @@ def module_rows(user) -> list:
             got = profile.get_allowed_operations(m.app_label)
             ops = [OP_LABELS.get(o, o) for o in (["view", "add", "change", "delete", "export", "import"]
                                                  if got == "__all__" else got or [])]
+        level, extra = "hidden", []
+        if profile is not None and m.app_label not in ALWAYS and (in_role or hooked):
+            from core.access_editor import EXTRA_OPS, level_of
+            got = profile.get_allowed_operations(m.app_label)
+            level = level_of(got) if in_role else "hidden"
+            extra = [o for o in EXTRA_OPS if got == "__all__" or o in (got or [])] if in_role else []
         rows.append({"app": m.app_label, "name": m.name, "active": m.is_active, "allowed": ok, "why": why,
-                     "ops": ops})
+                     "ops": ops, "fixed": m.app_label in ALWAYS, "level": level, "extra": extra})
     return rows
 
 
@@ -111,6 +124,7 @@ def menu(user) -> list:
                 except Exception:  # noqa: BLE001
                     perms[action] = False
             models.append({"name": str(m["name"]), "url": m.get("admin_url") or "", "perms": perms,
+                           "key": f'{app["app_label"]}:{m.get("object_name", "")}',
                            "read_only": perms["view"] and not (perms["add"] or perms["change"] or perms["delete"])})
         if models:
             out.append({"name": str(app["name"]), "app": app["app_label"], "models": models})
@@ -139,29 +153,50 @@ def pages(user) -> list:
     return out
 
 
-def preview(user) -> dict:
-    """Усе для сторінки «👁 Як бачить Minerva»."""
-    user = _fresh(user)
+def hidden_pages(profile) -> list:
+    """Сховані сторінки (denied_models) з назвами — щоб повернути їх у редакторі."""
+    from django.apps import apps
+    out = []
+    for key in sorted(profile.denied_models or []) if profile else []:
+        app, _, model = key.partition(":")
+        try:
+            name = str(apps.get_model(app, model)._meta.verbose_name_plural)
+        except (LookupError, ValueError):
+            name = model
+        out.append({"key": key, "name": name, "app": app})
+    return out
+
+
+def preview(user, draft=None) -> dict:
+    """Усе для сторінки «👁 Як бачить Minerva» (draft — як було б після «💾 Зберегти»)."""
+    user = _fresh(user, draft)
     profile = _profile(user)
     can_login = user.is_active and user.is_staff
     data = {
         "user": user, "profile": profile, "can_login": can_login, "admin": is_minerva_admin(user),
         "superuser": user.is_superuser, "source": _source(profile),
-        "special": [{"label": label, "value": user_can(user, key)} for key, label in SPECIAL],
+        "special": [{"key": key, "label": label, "value": user_can(user, key),
+                     "own": getattr(profile, f"can_{key}", None) if profile else None} for key, label in SPECIAL],
     }
     if not can_login:
         data.update(menu=[], modules=[], knowledge=[], pages=[])
         return data
-    data.update(menu=menu(user), modules=module_rows(user), knowledge=knowledge_rights(user), pages=pages(user))
+    data.update(menu=menu(user), modules=module_rows(user), knowledge=knowledge_rights(user), pages=pages(user),
+                hidden=hidden_pages(profile))
+    levels = {m["app"]: m for m in data["modules"]}
+    for app in data["menu"]:                       # рівень розділу — для перемикача в меню (редактор)
+        row = levels.get(app["app"])
+        app["level"] = row["level"] if row else ""
+        app["editable"] = bool(row) and not row["fixed"]
     data["models_count"] = sum(len(a["models"]) for a in data["menu"])
     data["edit_count"] = sum(1 for a in data["menu"] for m in a["models"] if not m["read_only"])
     return data
 
 
-def check_url(user, url: str) -> dict:
+def check_url(user, url: str, draft=None) -> dict:
     """Чи відкриє людина адресу Minerva і що зможе там зробити: {ok, level, text, steps: [(крок, ✓/✗, пояснення)]}."""
     from urllib.parse import urlparse
-    user = _fresh(user)
+    user = _fresh(user, draft)
     path = urlparse((url or "").strip()).path or "/"
     if not path.startswith("/"):
         path = "/" + path

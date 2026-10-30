@@ -1093,18 +1093,55 @@ class UserProfileAdmin(admin.ModelAdmin):
         return profile
 
     def _access_view(self, request, pk):
-        """«👁 Як бачить Minerva <людина>» — меню, дозволи, модулі, база знань, перевірка адреси (core/access_preview)."""
+        """«👁 Як бачить Minerva <людина>» — меню, дозволи, модулі, база знань, перевірка адреси (core/access_preview);
+        «✏️ Змінити доступ» — POST {action: preview | save | copy, draft} (core/access_editor)."""
+        import json
+        from django.contrib import messages
+        from django.core.exceptions import PermissionDenied
+        from django.http import JsonResponse
+        from django.shortcuts import redirect
         from django.template.response import TemplateResponse
-        from core import access_preview
+        from core import access_editor, access_preview
+        from core.utils import client_ip
         profile = self._profile_for_preview(request, pk)
-        url = (request.GET.get('url') or '').strip()[:500]
-        data = access_preview.preview(profile.user)
+        why_not = access_editor.can_edit(request.user, profile)
+        draft, action = {}, ''
+        if request.method == 'POST':
+            action = request.POST.get('action', '')
+            try:
+                draft = access_editor.clean(json.loads(request.POST.get('draft') or '{}'))
+            except ValueError:
+                draft = {}
+            if why_not:
+                raise PermissionDenied
+            if action == 'copy':
+                src = UserProfile.objects.filter(pk=request.POST.get('source') or 0).first()
+                if src is None:
+                    return JsonResponse({'error': 'Профіль не знайдено.'}, status=404)
+                return JsonResponse({'draft': access_editor.draft_from(src)})
+            if action == 'save':
+                try:
+                    lines = access_editor.save(profile, draft, request.user, client_ip(request))
+                except access_editor.AccessError as exc:
+                    messages.error(request, str(exc))
+                else:
+                    messages.success(request, ('✅ Доступ змінено: ' + '; '.join(lines)) if lines
+                                     else 'Нічого не змінено.')
+                return redirect(reverse('admin:core_userprofile_access', args=[profile.pk]))
+        url = (request.POST.get('url') or request.GET.get('url') or '').strip()[:500]
+        data = access_preview.preview(profile.user, draft)
+        editing = not why_not and (request.GET.get('edit') == '1' or action == 'preview')
         return TemplateResponse(request, 'admin/core/userprofile/access_preview.html', {
             **self.admin_site.each_context(request), 'opts': UserProfile._meta, 'original': profile,
             'title': f'Як бачить Minerva: {profile.user.get_full_name() or profile.user.username}',
-            'p': data, 'url': url, 'check': access_preview.check_url(profile.user, url) if url else None,
+            'p': data, 'url': url, 'check': access_preview.check_url(profile.user, url, draft) if url else None,
             'samples': ['/admin/sales/salesorder/', '/admin/inventory/product/add/', '/admin/crm/customer/',
                         '/admin/core/userprofile/', '/email/', '/offers/'],
+            'editing': editing, 'why_not': why_not, 'draft_json': draft,
+            'changes': access_editor.summary(profile, draft) if draft else [],
+            'levels': access_editor.LEVELS, 'extra_ops': access_editor.EXTRA_OPS,
+            'others': UserProfile.objects.exclude(pk=profile.pk).select_related('user').order_by('user__username')
+            if editing else [],
         })
 
     @admin.display(description='Перегляд')
