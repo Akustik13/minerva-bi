@@ -132,7 +132,9 @@ def summary(profile, draft) -> list:
             add, rem = sorted(eb - ea), sorted(ea - eb)
             lines.append(f"{names.get(app, app)}: " + ", ".join([f"+ {x}" for x in add] + [f"− {x}" for x in rem]))
     hidden, shown = set(after["pages"]) - set(before["pages"]), set(before["pages"]) - set(after["pages"])
-    lines += [f"🚫 сховати сторінку {p}" for p in sorted(hidden)] + [f"👁 показати сторінку {p}" for p in sorted(shown)]
+    from core.access_preview import page_label
+    lines += [f"🚫 сховати сторінку «{page_label(p)}»" for p in sorted(hidden, key=page_label)]
+    lines += [f"👁 показати сторінку «{page_label(p)}»" for p in sorted(shown, key=page_label)]
     for key in SPECIAL:
         a, b = before["special"][key], after["special"][key]
         if a != b:

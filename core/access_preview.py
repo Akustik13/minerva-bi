@@ -109,13 +109,39 @@ def module_rows(user) -> list:
     return rows
 
 
-def menu(user) -> list:
-    """Меню адмінки, як його бачить людина: [{name, app, models: [{name, url, perms: {дія: bool}}]}]."""
+def _app_list(user, without_hidden_pages=False):
+    """Меню адмінки людини; without_hidden_pages — яким воно було б без схованих сторінок (denied_models), щоб
+    показати їх на своєму місці закресленими. Профіль змінюється лише в пам'яті й одразу повертається."""
     request = _request(user)
+    profile = _profile(user)
+    if not without_hidden_pages or profile is None or not profile.denied_models:
+        return admin.site.get_app_list(request)
+    denied = profile.denied_models
+    profile.denied_models = []
+    try:
+        return admin.site.get_app_list(request)
+    finally:
+        profile.denied_models = denied
+
+
+def menu(user) -> list:
+    """Меню адмінки, як його бачить людина: [{name, app, models: [{name, url, perms: {дія: bool}, hidden}]}].
+    Сховані сторінки (denied_models) — на своєму місці з hidden=True і без прав: людина їх не бачить."""
+    request = _request(user)
+    profile = _profile(user)
+    denied = {d.lower() for d in (getattr(profile, "denied_models", None) or [])}
+    shown = {f'{a["app_label"]}:{m.get("object_name", "")}'.lower()
+             for a in admin.site.get_app_list(request) for m in a["models"]}
     out = []
-    for app in admin.site.get_app_list(request):
+    for app in _app_list(user, without_hidden_pages=bool(denied)):
         models = []
         for m in app["models"]:
+            key = f'{app["app_label"]}:{m.get("object_name", "")}'
+            if key.lower() not in shown:
+                if key.lower() in denied:
+                    models.append({"name": str(m["name"]), "url": m.get("admin_url") or "", "key": key,
+                                   "perms": {a: False for a in ACTIONS}, "read_only": False, "hidden": True})
+                continue
             model_admin = admin.site._registry.get(m.get("model"))
             perms = {}
             for action in ACTIONS:
@@ -123,11 +149,13 @@ def menu(user) -> list:
                     perms[action] = bool(getattr(model_admin, f"has_{action}_permission")(request))
                 except Exception:  # noqa: BLE001
                     perms[action] = False
-            models.append({"name": str(m["name"]), "url": m.get("admin_url") or "", "perms": perms,
-                           "key": f'{app["app_label"]}:{m.get("object_name", "")}',
-                           "read_only": perms["view"] and not (perms["add"] or perms["change"] or perms["delete"])})
+            models.append({"name": str(m["name"]), "url": m.get("admin_url") or "", "perms": perms, "key": key,
+                           "read_only": perms["view"] and not (perms["add"] or perms["change"] or perms["delete"]),
+                           "hidden": False})
         if models:
-            out.append({"name": str(app["name"]), "app": app["app_label"], "models": models})
+            visible = [m for m in models if not m["hidden"]]
+            out.append({"name": str(app["name"]), "app": app["app_label"], "models": models,
+                        "shown": len(visible), "edit": sum(1 for m in visible if not m["read_only"])})
     return out
 
 
@@ -153,18 +181,57 @@ def pages(user) -> list:
     return out
 
 
+def section_name(app: str) -> str:
+    """Назва розділу, як у меню адмінки (назва застосунку), інакше — з реєстру модулів."""
+    from django.apps import apps
+    try:
+        return str(apps.get_app_config(app).verbose_name)
+    except LookupError:
+        from core.models import ModuleRegistry
+        return ModuleRegistry.objects.filter(app_label=app).values_list("name", flat=True).first() or app
+
+
+def page_label(key: str) -> str:
+    """«shop:ShopListing» → «Інтернет-магазин → Асортимент» (як у меню)."""
+    from django.apps import apps
+    from django.utils.text import capfirst
+    app, _, model = (key or "").partition(":")
+    try:
+        name = capfirst(str(apps.get_model(app, model)._meta.verbose_name_plural))
+    except (LookupError, ValueError):
+        name = model
+    return f"{section_name(app)} → {name}"
+
+
 def hidden_pages(profile) -> list:
     """Сховані сторінки (denied_models) з назвами — щоб повернути їх у редакторі."""
-    from django.apps import apps
     out = []
     for key in sorted(profile.denied_models or []) if profile else []:
         app, _, model = key.partition(":")
-        try:
-            name = str(apps.get_model(app, model)._meta.verbose_name_plural)
-        except (LookupError, ValueError):
-            name = model
-        out.append({"key": key, "name": name, "app": app})
+        label = page_label(key)
+        out.append({"key": key, "name": label.split(" → ", 1)[-1], "label": label, "app": app})
     return out
+
+
+def overview(data) -> dict:
+    """Підсумок «що людина бачить, а що від неї сховано» — явно, двома стовпцями:
+    {visible: [{name, shown, total, edit}], hidden_sections: [назва], hidden_pages: [{key, label}],
+     pages_on: [назва], pages_off: [назва], off_for_all: [назва]}."""
+    visible = [{"name": a["name"], "shown": a["shown"], "total": len(a["models"]), "edit": a["edit"]}
+               for a in data.get("menu", []) if a["shown"]]
+    hidden_pages = [{"key": m["key"], "label": f'{a["name"]} → {m["name"]}'}
+                    for a in data.get("menu", []) for m in a["models"] if m["hidden"]]
+    modules = data.get("modules", [])
+    return {
+        "visible": visible,
+        "hidden_sections": [m["name"] for m in modules if m["active"] and not m["allowed"] and not m["fixed"]],
+        "hidden_pages": hidden_pages,
+        "pages_on": [p["label"] for p in data.get("pages", []) if p["allowed"]],
+        "pages_off": [p["label"] for p in data.get("pages", []) if not p["allowed"]],
+        "off_for_all": [m["name"] for m in modules if not m["active"]],
+        "shown_count": sum(v["shown"] for v in visible),
+        "hidden_count": len(hidden_pages),
+    }
 
 
 def preview(user, draft=None) -> dict:
@@ -188,8 +255,9 @@ def preview(user, draft=None) -> dict:
         row = levels.get(app["app"])
         app["level"] = row["level"] if row else ""
         app["editable"] = bool(row) and not row["fixed"]
-    data["models_count"] = sum(len(a["models"]) for a in data["menu"])
-    data["edit_count"] = sum(1 for a in data["menu"] for m in a["models"] if not m["read_only"])
+    data["models_count"] = sum(a["shown"] for a in data["menu"])
+    data["edit_count"] = sum(a["edit"] for a in data["menu"])
+    data["overview"] = overview(data)
     return data
 
 

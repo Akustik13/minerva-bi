@@ -42,8 +42,17 @@ class DraftTests(EditorBase):
         self.assertTrue(order["read_only"])                                 # продажі — лише перегляд
         product = next(m for m in apps["inventory"]["models"] if m["url"].endswith("/product/"))
         self.assertFalse(product["perms"]["change"])
-        self.assertNotIn("inventory:Supplier", [m["key"] for m in apps["inventory"]["models"]])
+        # схована сторінка лишається на своєму місці, закреслена й без прав — людина її не бачить
+        supplier = next(m for m in apps["inventory"]["models"] if m["key"] == "inventory:Supplier")
+        self.assertTrue(supplier["hidden"])
+        self.assertFalse(any(supplier["perms"].values()))
+        self.assertEqual(apps["inventory"]["shown"], len(apps["inventory"]["models"]) - 1)
         self.assertEqual([h["key"] for h in data["hidden"]], ["inventory:Supplier"])
+        o = data["overview"]                                                # підсумок «видно / сховано»
+        self.assertIn(apps["sales"]["name"], [v["name"] for v in o["visible"]])
+        self.assertEqual([h["key"] for h in o["hidden_pages"]], ["inventory:Supplier"])
+        self.assertEqual(o["hidden_pages"][0]["label"], f'{apps["inventory"]["name"]} → {supplier["name"]}')
+        self.assertTrue(o["hidden_sections"])                               # розділи поза роллю складу
         self.assertEqual(access_preview.check_url(self.wh, "/admin/sales/salesorder/", draft)["level"], "view")
         self.wh.profile.refresh_from_db()
         self.assertIsNone(self.wh.profile.allowed_modules)                 # у базі — як було
@@ -110,6 +119,33 @@ class EditorPageTests(EditorBase):
         r = self.client.post(self.url, {"action": "save", "draft": json.dumps(draft)})
         self.assertEqual(r.status_code, 302)
         self.assertEqual(UserProfile.objects.get(pk=self.wh.profile.pk).module_operations["inventory"], ["view", "import"])
+
+    def test_hidden_page_struck_in_place_and_in_overview(self):
+        self.client.force_login(self.root)
+        draft = {"pages": {"inventory:Supplier": True}}
+        r = self.client.post(self.url, {"action": "preview", "draft": json.dumps(draft)})
+        html = r.content.decode()
+        # зміни — назвами, як у меню, а не «inventory:Supplier»
+        label = access_preview.page_label("inventory:Supplier")
+        self.assertIn(f"🚫 сховати сторінку «{label}»", html)
+        self.assertRegex(label, r"^\S.* → [A-ZА-ЯІЇЄ]")                      # «Розділ → Сторінка», як у меню
+        self.assertNotIn("сховати сторінку inventory:Supplier", html)
+        # у меню — на своєму місці, закреслена, з позначкою й кнопкою «👁 Показати»
+        self.assertIn('data-ap-page="inventory:Supplier" data-hidden="1"', html)
+        self.assertIn('class="ap-hidden"', html)
+        self.assertIn("🚫 сховано", html)
+        self.assertIn('data-ap-show="inventory:Supplier"', html)
+        self.assertIn('data-ap-hide="inventory:Product"', html)              # видима — «🚫 Сховати»
+        # підсумок: що видно, що сховано
+        self.assertIn("📋 Підсумок", html)
+        self.assertIn("✅ Видно:", html)
+        self.assertIn("🚫 Сховано:", html)
+        self.assertIn("1 окремих сторінок", html)
+        # без редактора — так само закреслено, але без кнопок
+        UserProfile.objects.filter(pk=self.wh.profile.pk).update(denied_models=["inventory:Supplier"])
+        html = self.client.get(self.url).content.decode()
+        self.assertIn('class="ap-hidden"', html)
+        self.assertNotIn("data-ap-show=", html)
 
     def test_not_allowed_to_edit(self):
         self.client.force_login(self.wh)                                   # свій профіль — лише перегляд

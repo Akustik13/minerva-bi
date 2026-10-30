@@ -28,6 +28,26 @@
   .ap-table td, .ap-table th { padding: 5px 8px; border-bottom: 1px solid var(--hairline-color, #2b3c52);
                                text-align: left; vertical-align: middle; }
   .ap-table tr.off td { opacity: .55; }
+  .ap-table tr.off td:first-child { text-decoration: line-through; }
+  /* сховане людині — закреслено й з позначкою, на своєму місці */
+  .ap-menu li.ap-hidden .ap-pname { text-decoration: line-through; opacity: .55; }
+  .ap-off-tag { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 9px; font-size: 11px;
+                font-weight: 600; background: rgba(229, 72, 77, .14); color: #e5484d; white-space: nowrap; }
+  .ap-on-tag { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 9px; font-size: 11px;
+               background: rgba(46, 157, 91, .16); color: #2e9d5b; white-space: nowrap; }
+  .ap-tgl { border: 1px solid var(--hairline-color, #2b3c52); background: none; color: inherit; font: inherit;
+            font-size: 11px; padding: 0 6px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  .ap-tgl.hide { opacity: .35; } .ap-menu li:hover .ap-tgl.hide, .ap-tgl.hide:focus-visible { opacity: 1; }
+  .ap-tgl.show { border-color: #2e9d5b; color: #2e9d5b; }
+  .ap-sum { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ap-sum > div { padding: 10px 12px; border-radius: 8px; border-left: 4px solid #2e9d5b;
+                  background: var(--darkened-bg, rgba(127, 127, 127, .08)); }
+  .ap-sum > div.off { border-left-color: #e5484d; }
+  .ap-sum h4 { margin: 0 0 6px; font-size: 13px; }
+  .ap-sum .ap-chip { margin: 2px 4px 2px 0; }
+  .ap-sum .ap-no { text-decoration: line-through; }
+  .ap-sum small { display: block; margin: 6px 0 2px; font-size: 11px; opacity: .75; }
+  @media (max-width: 900px) { .ap-sum { grid-template-columns: 1fr; } }
   .ap-check { display: flex; gap: 8px; flex-wrap: wrap; }
   .ap-check input[type=text] { flex: 1 1 320px; }
   .ap-res { margin-top: 10px; padding: 10px 12px; border-radius: 6px; border-left: 4px solid #3b82f6;
@@ -106,39 +126,53 @@
   пошту, розмови й особисті документи ця сторінка не показує й нічого не виконує від її імені.</p>
 {% endif %}
 
+{% if p.can_login and p.overview %}{% with o=p.overview %}
+<div class="ap-box">
+  <h3>📋 Підсумок — що {{ p.user.get_full_name|default:p.user.username }} бачить, а що сховано{% if editing and changes %} <span class="ap-muted">(як буде після «💾 Зберегти»)</span>{% endif %}</h3>
+  <div class="ap-sum">
+    <div>
+      <h4>✅ Видно: {{ o.visible|length }} розділів · {{ o.shown_count }} сторінок</h4>
+      {% for v in o.visible %}<span class="ap-chip ap-yes" title="Змінювати може на {{ v.edit }} з {{ v.shown }}">{{ v.name }} · {{ v.shown }}{% if v.shown != v.total %} з {{ v.total }}{% endif %}{% if not v.edit %} · 👁 лише перегляд{% endif %}</span>{% empty %}<span class="ap-muted">нічого</span>{% endfor %}
+      {% if o.pages_on %}<small>Поза меню адмінки</small>{% for x in o.pages_on %}<span class="ap-chip ap-yes">{{ x }}</span>{% endfor %}{% endif %}
+    </div>
+    <div class="off">
+      <h4>🚫 Сховано: {{ o.hidden_sections|length }} розділів · {{ o.hidden_count }} окремих сторінок</h4>
+      {% if o.hidden_sections %}<small>Розділи цілком</small>{% for x in o.hidden_sections %}<span class="ap-chip ap-no">{{ x }}</span>{% endfor %}{% endif %}
+      {% if o.hidden_pages %}<small>Окремі сторінки у видимих розділах</small>{% for h in o.hidden_pages %}{% if editing %}<button type="button" class="ap-chip ap-no" data-ap-show="{{ h.key }}" title="Клік — показати цю сторінку" style="cursor:pointer">{{ h.label }}</button>{% else %}<span class="ap-chip ap-no">{{ h.label }}</span>{% endif %}{% endfor %}{% endif %}
+      {% if o.pages_off %}<small>Поза меню адмінки</small>{% for x in o.pages_off %}<span class="ap-chip ap-no">{{ x }}</span>{% endfor %}{% endif %}
+      {% if not o.hidden_sections and not o.hidden_pages and not o.pages_off %}<span class="ap-muted">нічого — бачить усе, що є в її модулях</span>{% endif %}
+      {% if o.off_for_all %}<small>Вимкнено для всіх («Модулі»)</small><span class="ap-muted">{{ o.off_for_all|join:", " }}</span>{% endif %}
+    </div>
+  </div>
+</div>
+{% endwith %}{% endif %}
+
 <div class="ap">
   <div>
     <div class="ap-box ap-menu">
       <h3>🧭 Меню, яке вона бачить</h3>
       {% if p.menu %}
-        <div class="ap-muted" style="margin-bottom:6px">{{ p.menu|length }} розділів · {{ p.models_count }} сторінок,
-          змінювати може на {{ p.edit_count }}. Значки: 👁 перегляд · ➕ створення · ✏️ зміна · 🗑 видалення.</div>
+        <div class="ap-muted" style="margin-bottom:6px">{{ p.models_count }} сторінок, змінювати може на {{ p.edit_count }}{% if p.overview.hidden_count %} · <span style="color:#e5484d">закреслені ({{ p.overview.hidden_count }}) — сховано, людина їх не бачить</span>{% endif %}.
+          Значки: 👁 перегляд · ➕ створення · ✏️ зміна · 🗑 видалення.{% if editing %} Біля сторінки: «🚫 Сховати» / «👁 Показати».{% endif %}</div>
         {% for app in p.menu %}
         <details{% if forloop.counter <= 3 or editing %} open{% endif %} data-ap-app="{% if app.editable %}{{ app.app }}{% endif %}">
-          <summary>{{ app.name }} <span class="ap-muted">({{ app.models|length }})</span>
+          <summary>{{ app.name }} <span class="ap-muted">({% if app.shown == app.models|length %}{{ app.shown }}{% elif app.shown %}видно {{ app.shown }} з {{ app.models|length }}{% else %}усі сховано{% endif %})</span>
             {% if editing and app.editable %}<span class="ap-seg small" style="float:right">{% for k, icon, label in levels %}<button type="button" data-ap-level="{{ k }}" data-app="{{ app.app }}" title="{{ label }}" class="{% if app.level == k %}on{% endif %}">{{ icon }}</button>{% endfor %}</span>{% endif %}
           </summary>
           <ul>
             {% for m in app.models %}
-            <li data-ap-page="{{ m.key }}" data-app="{% if app.editable %}{{ app.app }}{% endif %}">
-              <span>{% if editing %}<button type="button" class="ap-x" data-ap-hide="{{ m.key }}" title="Сховати цю сторінку">🚫</button>{% endif %}{{ m.name }}{% if m.read_only %} <span class="ap-muted">· лише перегляд</span>{% endif %}</span>
-              <span class="ap-perm">{% for a, ok in m.perms.items %}<span class="{% if not ok %}off{% endif %}" title="{{ a }}">{% if a == 'view' %}👁{% elif a == 'add' %}➕{% elif a == 'change' %}✏️{% else %}🗑{% endif %}</span>{% endfor %}</span></li>
+            <li data-ap-page="{{ m.key }}" data-hidden="{% if m.hidden %}1{% else %}0{% endif %}" data-app="{% if app.editable %}{{ app.app }}{% endif %}" class="{% if m.hidden %}ap-hidden{% endif %}">
+              <span><span class="ap-pname">{{ m.name }}</span>{% if m.hidden %}<span class="ap-off-tag">🚫 сховано</span>{% elif m.read_only %} <span class="ap-muted">· лише перегляд</span>{% endif %}</span>
+              <span style="display:inline-flex;gap:6px;align-items:center">
+                {% if not m.hidden %}<span class="ap-perm">{% for a, ok in m.perms.items %}<span class="{% if not ok %}off{% endif %}" title="{{ a }}">{% if a == 'view' %}👁{% elif a == 'add' %}➕{% elif a == 'change' %}✏️{% else %}🗑{% endif %}</span>{% endfor %}</span>{% endif %}
+                {% if editing %}{% if m.hidden %}<button type="button" class="ap-tgl show" data-ap-show="{{ m.key }}" title="Повернути сторінку в меню">👁 Показати</button>{% else %}<button type="button" class="ap-tgl hide" data-ap-hide="{{ m.key }}" title="Сховати цю сторінку від людини">🚫 Сховати</button>{% endif %}{% endif %}
+              </span></li>
             {% endfor %}
           </ul>
         </details>
         {% endfor %}
       {% else %}<div class="ap-muted">Меню порожнє.</div>{% endif %}
     </div>
-
-    {% if p.hidden %}
-    <div class="ap-box">
-      <h3>🚫 Сховані сторінки</h3>
-      {% for h in p.hidden %}<div class="ap-row" style="justify-content:space-between;font-size:12.5px;padding:2px 0">
-        <span>{{ h.name }} <span class="ap-muted">{{ h.key }}</span></span>
-        {% if editing %}<button type="button" class="button" data-ap-show="{{ h.key }}" style="font-size:11px;padding:2px 8px">👁 Показати</button>{% endif %}
-      </div>{% endfor %}
-    </div>
-    {% endif %}
 
     <div class="ap-box">
       <h3>🔗 Сторінки поза меню адмінки</h3>
@@ -247,7 +281,7 @@
     var b;
     if ((b = e.target.closest('[data-ap-level]'))) { e.preventDefault(); setLevel(b.dataset.app, b.dataset.apLevel); return; }
     if ((b = e.target.closest('[data-ap-hide]'))) { e.preventDefault(); setPage(b.dataset.apHide, true); return; }
-    if ((b = e.target.closest('[data-ap-show]'))) { setPage(b.dataset.apShow, false); return; }
+    if ((b = e.target.closest('[data-ap-show]'))) { e.preventDefault(); setPage(b.dataset.apShow, false); return; }
     if ((b = e.target.closest('[data-ap-special]'))) { setSpecial(b.dataset.apSpecial, b.dataset.value !== '1'); return; }
     if (e.target.closest('[data-ap-reset]')) {
       if (confirm('Скинути все до ролі / пакета: ручні модулі, операції, сховані сторінки й особливі права?'))
@@ -307,9 +341,14 @@
     if (!page && !app) return;
     e.preventDefault();
     var items = [];
-    if (page) items.push(['🚫 Сховати цю сторінку', function () { setPage(page.dataset.apPage, true); }]);
+    if (page) {
+      var hidden = page.dataset.hidden === '1';
+      items.push([hidden ? '👁 Показати цю сторінку' : '🚫 Сховати цю сторінку',
+                  function () { setPage(page.dataset.apPage, !hidden); }]);
+    }
     if (app) LEVELS.forEach(function (l) { items.push([(page ? 'Розділ: ' : '') + l[1], function () { setLevel(app, l[0]); }]); });
-    menu(e.clientX, e.clientY, page ? page.querySelector('span').textContent.replace('🚫', '').trim() : app, items);
+    var pn = page && page.querySelector('.ap-pname');
+    menu(e.clientX, e.clientY, pn ? pn.textContent.trim() : app, items);
   });
   document.addEventListener('click', function (e) { if (!e.target.closest('#ap-ctx')) hide(); }, true);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') hide(); });
