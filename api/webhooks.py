@@ -277,6 +277,30 @@ def _order_post_save(sender, instance, created, **kwargs):
         _send("order.created")
     elif old and old != instance.status:
         _send("order.status_changed", old)
+        _queue_order_products(instance)
+
+
+# «available» залежить і від відкритих замовлень, які ще не списані (inventory/services/stock.py → reserved):
+# нова / змінена / видалена позиція чи новий статус змінюють залишок без руху складу — теж stock.changed.
+
+def _queue_order_products(order):
+    for pid in set(order.lines.values_list("product_id", flat=True)):
+        if pid:
+            _queue_stock(pid)
+
+
+def _order_line_post_save(sender, instance, created, **kwargs):
+    old_pid = getattr(instance, "_old_product_id", None)
+    if created or old_pid != instance.product_id or getattr(instance, "_old_qty", None) != instance.qty:
+        if instance.product_id:
+            _queue_stock(instance.product_id)
+        if old_pid and old_pid != instance.product_id:
+            _queue_stock(old_pid)
+
+
+def _order_line_post_delete(sender, instance, **kwargs):
+    if instance.product_id:
+        _queue_stock(instance.product_id)
 
 
 def _shipment_pre_save(sender, instance, **kwargs):
@@ -391,7 +415,7 @@ _incoming_pre_save = _capture(_INCOMING_FIELDS)
 def connect_signals():
     from inventory.models import (IncomingShipment, InventoryTransaction, Product, PurchaseOrder,
                                   PurchaseOrderLine, PurchaseReceipt)
-    from sales.models import SalesOrder
+    from sales.models import SalesOrder, SalesOrderLine
     from shipping.models import Shipment
 
     post_save.connect(_on_tx_change, sender=InventoryTransaction, dispatch_uid="wh_tx_save")
@@ -400,6 +424,8 @@ def connect_signals():
     post_save.connect(_product_post_save, sender=Product, dispatch_uid="wh_product_post")
     pre_save.connect(_order_pre_save, sender=SalesOrder, dispatch_uid="wh_order_pre")
     post_save.connect(_order_post_save, sender=SalesOrder, dispatch_uid="wh_order_post")
+    post_save.connect(_order_line_post_save, sender=SalesOrderLine, dispatch_uid="wh_order_line_post")
+    post_delete.connect(_order_line_post_delete, sender=SalesOrderLine, dispatch_uid="wh_order_line_delete")
     pre_save.connect(_shipment_pre_save, sender=Shipment, dispatch_uid="wh_ship_pre")
     post_save.connect(_shipment_post_save, sender=Shipment, dispatch_uid="wh_ship_post")
     pre_save.connect(_po_pre_save, sender=PurchaseOrder, dispatch_uid="wh_po_pre")

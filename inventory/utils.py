@@ -101,6 +101,11 @@ def deduct_components_for_assembly(product, qty, ref_doc="", order_pk=None):
     if not components.exists():
         return {'ok': False, 'error': 'BOM пусто'}
 
+    if order_pk:
+        keys = [f"bom_deduction_{product.id}_{order_pk}_{c.component.id}" for c in components]
+        if InventoryTransaction.objects.filter(external_key__in=keys).count() == len(keys):
+            return {'ok': True, 'transactions': [], 'already': True}
+
     # Перевірка: чи достатньо компонентів
     for comp in components:
         stock = get_product_stock(comp.component)
@@ -130,6 +135,8 @@ def deduct_components_for_assembly(product, qty, ref_doc="", order_pk=None):
 
             # Створити транзакцію вилучення
             external_key = f"bom_deduction_{product.id}_{order_pk}_{comp.component.id}"
+            if order_pk and InventoryTransaction.objects.filter(external_key=external_key).exists():
+                continue   # уже списано під це замовлення (повторне «Відправлено») — без дубля й помилки ключа
 
             tx = InventoryTransaction.objects.create(
                 tx_type=InventoryTransaction.TxType.OUTGOING,

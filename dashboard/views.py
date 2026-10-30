@@ -367,25 +367,21 @@ def dashboard(request):
             o['days_waiting'] = 0
 
     # ── Критичний склад ────────────────────────────────────────────────────────
+    # Ті самі числа, що «📊 Аналіз запасів» і сигнали (inventory/services/stock.py); вимикається
+    # «Попередження про низький залишок» у налаштуваннях складу
     critical_stock = []
+    stock_alerts_off = False
     try:
-        from inventory.models import Product, InventoryTransaction
-        since3m = now - timedelta(days=90)
-        for p in Product.objects.filter(is_active=True):
-            stock = float(InventoryTransaction.objects.filter(
-                product=p).aggregate(t=Sum('qty'))['t'] or 0)
-            sold = float(SalesOrderLine.objects.filter(
-                product=p, order__order_date__gte=since3m.date()
-            ).aggregate(t=Sum('qty'))['t'] or 0)
-            monthly = sold / 3
-            if monthly > 0:
-                months_left = max(0, stock / monthly)
-                if months_left < 1.5:
-                    critical_stock.append({
-                        'sku': p.sku, 'stock': int(stock),
-                        'monthly': round(monthly, 1),
-                        'months': round(months_left, 1),
-                    })
+        from inventory.models import InventorySettings
+        from inventory.services.stock import low_stock_items
+        stock_alerts_off = not InventorySettings.get().low_stock_alert_enabled
+        for d in low_stock_items():
+            if d['months_left'] is not None and d['months_left'] < 1.5:
+                critical_stock.append({
+                    'sku': d['sku'], 'stock': int(d['available']),
+                    'monthly': d['monthly'],
+                    'months': d['months_left'],
+                })
         critical_stock.sort(key=lambda x: x['months'])
         critical_stock = critical_stock[:8]
     except Exception:
@@ -481,6 +477,7 @@ def dashboard(request):
         'by_source':            by_source,
         'unshipped_list':       unshipped_list,
         'critical_stock':       critical_stock,
+        'stock_alerts_off':     stock_alerts_off,
         'shipping_kpi':         shipping_kpi,
         # Доставка
         'by_courier':           by_courier,
