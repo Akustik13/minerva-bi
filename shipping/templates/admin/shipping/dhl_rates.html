@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load i18n %}
+{% load i18n l10n %}
 {% block title %}{{ title }} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
@@ -129,18 +129,36 @@
   _pickupCb.addEventListener('change', () => {
     _pickupDetails.style.display = _pickupCb.checked ? 'flex' : 'none';
   });
-  function _bookUrl(base) {
-    const pickup   = _pickupCb.checked ? '1' : '0';
-    const close    = document.getElementById('pickup_close').value || '18:00';
-    const loc      = document.getElementById('pickup_location').value || 'reception';
-    const customs  = document.getElementById('customs_requested').checked ? '1' : '0';
-    return base
-      + '&pickup=' + pickup
-      + '&pickup_close=' + encodeURIComponent(close)
-      + '&pickup_location=' + encodeURIComponent(loc)
-      + '&customs=' + customs;
+  // «🚀 Оформити» — POST-форма (CSRF): посилання чи «Назад» у браузері нічого не оформлюють,
+  // а друге натискання сервер відхилить (відправлення вже «Передано перевізнику»)
+  function _dhlBook(a) {
+    const form = document.getElementById('dhl-book-form');
+    if (form.dataset.sent) return false;
+    const d = a.dataset;
+    const msg = '{% trans "Оформити DHL" %} ' + d.name + ' {% trans "за" %} ' + d.priceText + '?\n\n'
+      + (_pickupCb.checked ? '✅ {{ _("Кур'єр буде замовлений.")|escapejs }}' : '📦 {{ _("Без кур'єра — відвезти самостійно.")|escapejs }}') + '\n'
+      + (document.getElementById('customs_requested').checked ? '🛃 {% trans "Митна декларація включена." %}' : '⬜ {% trans "Без митної декларації." %}');
+    if (!confirm(msg)) return false;
+    form.elements.product_code.value    = d.code;
+    form.elements.product_name.value    = d.name;
+    form.elements.price.value           = d.price;
+    form.elements.pickup.value          = _pickupCb.checked ? '1' : '0';
+    form.elements.pickup_close.value    = document.getElementById('pickup_close').value || '18:00';
+    form.elements.pickup_location.value = document.getElementById('pickup_location').value || 'reception';
+    form.elements.customs.value         = document.getElementById('customs_requested').checked ? '1' : '0';
+    form.dataset.sent = '1';
+    document.querySelectorAll('.btn-book').forEach(function (b) { b.style.opacity = '.5'; b.style.pointerEvents = 'none'; });
+    a.textContent = '⏳ {% trans "Оформлюється…" %}';
+    form.submit();
+    return false;
   }
   </script>
+  <form method="post" action="{% url 'admin:shipping_shipment_dhl_book' shipment.pk %}" id="dhl-book-form" style="display:none">
+    {% csrf_token %}
+    <input type="hidden" name="product_code"><input type="hidden" name="product_name"><input type="hidden" name="price">
+    <input type="hidden" name="pickup"><input type="hidden" name="pickup_close"><input type="hidden" name="pickup_location">
+    <input type="hidden" name="customs">
+  </form>
 
   {% if dhl_error %}
   <div class="dhl-error">
@@ -193,8 +211,9 @@
           {% if p.price is not None %}
           <a class="btn-book"
              href="#"
-             data-base-url="{% url 'admin:shipping_shipment_dhl_book' shipment.pk %}?product_code={{ p.code }}&product_name={{ p.name|urlencode }}&price={{ p.price }}"
-             onclick="var u=_bookUrl(this.dataset.baseUrl);var msg='{% trans "Оформити DHL" %} {{ p.name }} {% trans "за" %} {{ p.price|floatformat:2 }} {{ p.currency }}?\n\n'+(document.getElementById('pickup_requested').checked?'✅ {% trans "Кур\'єр буде замовлений." %}':'📦 {% trans "Без кур\'єра — відвезти самостійно." %}')+'\n'+(document.getElementById('customs_requested').checked?'🛃 {% trans "Митна декларація включена." %}':'⬜ {% trans "Без митної декларації." %}');return confirm(msg)?(location.href=u,false):false">
+             data-code="{{ p.code }}" data-name="{{ p.name }}" data-price="{{ p.price|unlocalize }}"
+             data-price-text="{{ p.price|floatformat:2 }} {{ p.currency }}"
+             onclick="return _dhlBook(this)">
             🚀 {% trans "Оформити" %}
           </a>
           {% endif %}

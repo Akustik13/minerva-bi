@@ -485,7 +485,12 @@
         <input type="hidden" name="delivery_date" value="{{ delivery_date }}">
       </form>
       <script>
-      document.getElementById('ups-confirm-form').addEventListener('submit', function(){
+      document.getElementById('ups-confirm-form').addEventListener('submit', function(e){
+        // Друге натискання не надсилаємо (сервер теж не оформить відправлення вдруге)
+        if (this.dataset.sent) { e.preventDefault(); return; }
+        this.dataset.sent = '1';
+        var _btn = document.querySelector('button[form="ups-confirm-form"]');
+        if (_btn) { _btn.disabled = true; _btn.textContent = '⏳ {% trans "Оформлюється…" %}'; }
         var isPickup = document.getElementById('pt_pickup').checked;
         document.getElementById('fld_pickup_type').value  = isPickup ? 'pickup' : 'dropoff';
         document.getElementById('fld_pickup_date').value  = document.getElementById('inp_pickup_date').value;

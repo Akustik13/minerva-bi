@@ -4095,9 +4095,60 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'raw_response': _json.dumps(raw_resp, ensure_ascii=False, indent=2) if raw_resp else '',
         })
 
+    # ── Оформлення у перевізника (UPS / DHL / FedEx): лише POST і лише один раз ──
+    # Кожне оформлення — платна етикетка. Оформлюється лише відправлення без трек-номера в цих станах;
+    # на час звернення до перевізника воно атомарно стає «📤 Передано перевізнику» — другий запит
+    # (подвійний клік, «Назад» і ще раз, друга вкладка) цього стану вже не застане й до перевізника не дійде.
+    BOOKABLE = (Shipment.Status.DRAFT, Shipment.Status.ERROR)
+
+    @classmethod
+    def _claim_booking(cls, shipment) -> bool:
+        """True — це відправлення оформлює саме цей запит (UPDATE … WHERE: з двох одночасних виграє один)."""
+        claimed = Shipment.objects.filter(
+            pk=shipment.pk, tracking_number='', status__in=cls.BOOKABLE,
+        ).update(status=Shipment.Status.SUBMITTED, error_message='')
+        if claimed:
+            shipment.status, shipment.error_message = Shipment.Status.SUBMITTED, ''
+        return bool(claimed)
+
+    def _booking_refused(self, request, shipment, carrier_name):
+        """Відправлення вже оформлене / оформлюється — до перевізника не звертаємось, кажемо, що з ним зараз."""
+        shipment.refresh_from_db()
+        if shipment.tracking_number:
+            messages.warning(request, (
+                f'⚠️ Відправлення #{shipment.pk} уже оформлене в {carrier_name}: трекінг {shipment.tracking_number}. '
+                f'Повторно не оформлюємо — друга платна етикетка не потрібна.'))
+        elif shipment.status == Shipment.Status.SUBMITTED:
+            messages.warning(request, (
+                f'⏳ Відправлення #{shipment.pk} саме оформлюється в {carrier_name} (або оформлення перервалось). '
+                f'Повторно не надсилаємо, щоб не створити другу платну етикетку. Якщо за кілька хвилин трекінгу '
+                f'немає — перевірте в {carrier_name}, чи відправлення створено; не створено — у картці '
+                f'«🔧 Статус вручну» → «Помилка» й оформіть знову.'))
+        else:
+            messages.warning(request, (
+                f'⚠️ Відправлення #{shipment.pk} у стані «{shipment.get_status_display()}» — оформити в '
+                f'{carrier_name} можна лише чернетку або відправлення з помилкою. Нове відправлення з тими самими '
+                f'даними — «🔁 Повторити відправлення».'))
+        return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+    def _booking_needs_post(self, request, confirm_name, shipment_id):
+        """Адреса оформлення, відкрита посиланням (GET): нічого не оформлюємо — на сторінку перевірки."""
+        messages.warning(request, '⚠️ Оформлення — лише кнопкою «Підтвердити і відправити» на сторінці '
+                                  'перевірки. Перевірте дані й натисніть її.')
+        query = request.GET.urlencode()
+        return redirect(reverse(confirm_name, args=[shipment_id]) + (f'?{query}' if query else ''))
+
+    @staticmethod
+    def _booking_param(request, key, default=''):
+        """Параметр оформлення: з форми (POST), інакше з адреси сторінки перевірки."""
+        value = request.POST.get(key)
+        if value is None:
+            value = request.GET.get(key, default)
+        return value
+
     def ups_confirm_view(self, request, shipment_id):
-        """GET — Preview даних перед відправкою через UPS API.
-           POST — redirect to ups_book_view (actual API call)."""
+        """GET — перегляд даних перед відправкою через UPS API.
+           POST — оформлення в UPS (`_ups_book`), лише один раз для відправлення (`_claim_booking`)."""
         from .ups_client import UPSClient, UPSError, UPS_SERVICES
 
         shipment = get_object_or_404(Shipment, pk=shipment_id)
@@ -4115,24 +4166,30 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         rate_ref      = request.POST.get('rate_ref')      or request.GET.get('rate_ref', '')
         delivery_date = request.POST.get('delivery_date') or request.GET.get('delivery_date', '')
 
-        # POST — підтверджено, передаємо на ups_book_view
+        # POST — підтверджено: оформлюємо в UPS
         if request.method == 'POST':
             from urllib.parse import urlencode
+            back = (reverse('admin:shipping_shipment_ups_confirm', args=[shipment.pk]) + '?' + urlencode({
+                'service_code': service_code, 'rate_price': rate_price, 'rate_currency': rate_currency,
+                'rate_source': rate_source, 'rate_ref': rate_ref, 'delivery_date': delivery_date}))
             use_custom = request.POST.get('use_custom_invoice') == '1'
             pdf = request.FILES.get('custom_invoice_pdf')
             if use_custom:
-                if pdf:
-                    if not pdf.name.lower().endswith('.pdf'):
-                        messages.error(request, '❌ Власний інвойс має бути PDF-файлом.')
-                        return redirect(request.get_full_path())
-                    shipment.custom_invoice_pdf = pdf
-                elif not shipment.custom_invoice_pdf:
+                if pdf and not pdf.name.lower().endswith('.pdf'):
+                    messages.error(request, '❌ Власний інвойс має бути PDF-файлом.')
+                    return redirect(back)
+                if not pdf and not shipment.custom_invoice_pdf:
                     messages.error(request, '❌ Позначено «Свій інвойс», але PDF не завантажено.')
-                    return redirect(request.get_full_path())
+                    return redirect(back)
+            # Спершу «бронюємо» відправлення, потім пишемо інвойс: другий запит не перезапише ups_document_id
+            if not self._claim_booking(shipment):
+                return self._booking_refused(request, shipment, 'UPS')
+            if use_custom and pdf:
+                shipment.custom_invoice_pdf = pdf
             shipment.use_custom_invoice = use_custom
             shipment.ups_document_id = ''
             shipment.save(update_fields=['use_custom_invoice', 'custom_invoice_pdf', 'ups_document_id'])
-            qs = urlencode({
+            return self._ups_book(request, shipment, {
                 'service_code':       service_code,
                 'pickup_type':        request.POST.get('pickup_type', 'dropoff'),
                 'pickup_date':        request.POST.get('pickup_date', ''),
@@ -4141,11 +4198,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 'pickup_point':       request.POST.get('pickup_point', 'RECEPTION'),
                 'terms_of_shipment':  request.POST.get('terms_of_shipment', 'DAP'),
                 'package_weight_kg':  request.POST.get('package_weight_kg', ''),
-                'delivery_date':      request.POST.get('delivery_date', ''),
+                'delivery_date':      delivery_date,
             })
-            return redirect(
-                reverse('admin:shipping_shipment_ups_book', args=[shipment.pk]) + f'?{qs}'
-            )
+
+        # Уже оформлене / оформлюється — сторінка перевірки не потрібна
+        if shipment.tracking_number or shipment.status not in self.BOOKABLE:
+            return self._booking_refused(request, shipment, 'UPS')
 
         # GET — будуємо превью
         try:
@@ -4320,20 +4378,27 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
     def ups_book_view(self, request, shipment_id):
-        """Оформити відправлення через UPS."""
+        """Оформити відправлення через UPS — лише POST (CSRF) з тими самими полями, що й сторінка перевірки;
+        посилання (GET) нічого не оформлює."""
+        if request.method != 'POST':
+            return self._booking_needs_post(request, 'admin:shipping_shipment_ups_confirm', shipment_id)
+        return self.ups_confirm_view(request, shipment_id)
+
+    def _ups_book(self, request, shipment, params):
+        """Виклик UPS для відправлення, яке цей запит уже «забронював» (`_claim_booking`)."""
         import base64 as _b64
         import os
         from django.conf import settings as django_settings
         from .ups_client import UPSClient, UPSError
 
         import json as _json
-        shipment     = get_object_or_404(Shipment, pk=shipment_id)
-        service_code = request.GET.get('service_code', '11')
+        service_code = (params.get('service_code') or '11').strip() or '11'
 
-        terms_of_shipment  = request.GET.get('terms_of_shipment', 'DAP').strip()
-        package_weight_raw = request.GET.get('package_weight_kg', '').strip()
-        delivery_date_raw  = request.GET.get('delivery_date', '').strip()
+        terms_of_shipment  = (params.get('terms_of_shipment') or 'DAP').strip()
+        package_weight_raw = (params.get('package_weight_kg') or '').strip()
+        delivery_date_raw  = (params.get('delivery_date') or '').strip()
 
+        client, packages = None, []
         try:
             client   = UPSClient(carrier=shipment.carrier)
             to_addr  = self._ups_extract_address(shipment)
@@ -4377,12 +4442,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 duties_billing=duties_billing,
                 custom_document_id=custom_doc_id,
             )
-            # Зберігаємо реальний UPS payload для дебагу
-            shipment.raw_request = getattr(client, '_last_payload', {'packages': packages})
-            shipment.save(update_fields=['raw_request'])
-        except UPSError as e:
+        except Exception as e:
+            # UPS відмовив або не відповів — знову «❌ Помилка»: виправити й оформити ще раз
+            unexpected = not isinstance(e, UPSError)
+            if unexpected:
+                logger.exception('UPS booking failed for shipment %s', shipment.pk)
             shipment.status        = Shipment.Status.ERROR
-            shipment.error_message = str(e)
+            shipment.error_message = f'{type(e).__name__}: {e}' if unexpected else str(e)
             # Зберігаємо payload що викликав помилку
             shipment.raw_request = getattr(client, '_last_payload', {'packages': packages})
             # Зберігаємо UPS error response як dict
@@ -4391,11 +4457,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             except (ValueError, TypeError):
                 shipment.raw_response = {'raw': str(getattr(e, 'response', ''))}
             shipment.save(update_fields=['status', 'error_message', 'raw_response', 'raw_request'])
-            messages.error(request, f'❌ UPS: {e}')
+            messages.error(request, f'❌ UPS: {shipment.error_message}')
+            if unexpected:
+                messages.warning(request, '⚠️ Перш ніж оформлювати знову, перевірте в UPS, чи відправлення '
+                                          'не створено (зв\'язок міг обірватись уже після бронювання).')
             return redirect(reverse('admin:shipping_shipment_detail', args=[shipment.pk]) + '#debug')
 
-        # Зберегти трекінг + сервіс
-        update_fields = []
+        # Зберегти трекінг + сервіс (і реальний UPS payload для дебагу)
+        shipment.raw_request = getattr(client, '_last_payload', {'packages': packages})
+        update_fields = ['raw_request']
         if result['tracking_number']:
             shipment.tracking_number = result['tracking_number']
             update_fields.append('tracking_number')
@@ -4491,13 +4561,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 order.save(update_fields=order_fields)
 
         # ── Pickup scheduling (якщо обрано кур'єр) ──────────────────────────
-        pickup_type  = request.GET.get('pickup_type', 'dropoff')
+        pickup_type  = params.get('pickup_type') or 'dropoff'
         pickup_msg   = ''
         if pickup_type == 'pickup':
-            pickup_date  = request.GET.get('pickup_date', '')
-            pickup_ready = request.GET.get('pickup_ready', '0900')
-            pickup_close = request.GET.get('pickup_close', '1800')
-            pickup_point = request.GET.get('pickup_point', 'RECEPTION')
+            pickup_date  = params.get('pickup_date') or ''
+            pickup_ready = params.get('pickup_ready') or '0900'
+            pickup_close = params.get('pickup_close') or '1800'
+            pickup_point = params.get('pickup_point') or 'RECEPTION'
             if pickup_date:
                 try:
                     pickup_result = client.schedule_pickup(
@@ -4801,8 +4871,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # ── FedEx Confirm / Book ──────────────────────────────────────────────────
 
     def fedex_confirm_view(self, request, shipment_id):
-        """GET — Preview даних перед відправкою через FedEx API.
-           POST — redirect to fedex_book_view."""
+        """GET — перегляд даних перед відправкою через FedEx API.
+           POST — оформлення у FedEx (`_fedex_book`), лише один раз для відправлення (`_claim_booking`)."""
         from .fedex_client import FedExClient, FedExError, FEDEX_SERVICES
 
         shipment = get_object_or_404(Shipment, pk=shipment_id)
@@ -4812,10 +4882,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         service_name = FEDEX_SERVICES.get(service_code, service_code)
 
         if request.method == 'POST':
-            return redirect(
-                reverse('admin:shipping_shipment_fedex_book', args=[shipment.pk])
-                + f'?service_code={service_code}'
-            )
+            if not self._claim_booking(shipment):
+                return self._booking_refused(request, shipment, 'FedEx')
+            return self._fedex_book(request, shipment, service_code)
+
+        # Уже оформлене / оформлюється — сторінка перевірки не потрібна
+        if shipment.tracking_number or shipment.status not in self.BOOKABLE:
+            return self._booking_refused(request, shipment, 'FedEx')
 
         shipper  = self._ups_extract_shipper(shipment)
         to_addr  = self._ups_extract_address(shipment)
@@ -4846,21 +4919,25 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         return render(request, 'admin/shipping/fedex_confirm.html', context)
 
     def fedex_book_view(self, request, shipment_id):
-        """Оформлює відправлення через FedEx API → зберігає трекінг і label."""
+        """Оформлює відправлення через FedEx API — лише POST (CSRF) з полями сторінки перевірки;
+        посилання (GET) нічого не оформлює."""
+        if request.method != 'POST':
+            return self._booking_needs_post(request, 'admin:shipping_shipment_fedex_confirm', shipment_id)
+        return self.fedex_confirm_view(request, shipment_id)
+
+    def _fedex_book(self, request, shipment, service_code):
+        """Виклик FedEx для відправлення, яке цей запит уже «забронював» → трекінг і етикетка."""
         import base64 as _b64
         import os
+        from django.conf import settings as django_settings
         from .fedex_client import FedExClient, FedExError, FEDEX_SERVICES
 
-        shipment     = get_object_or_404(Shipment, pk=shipment_id)
-        service_code = (request.GET.get('service_code') or 'FEDEX_PRIORITY').strip() or 'FEDEX_PRIORITY'
-
-        shipper  = self._ups_extract_shipper(shipment)
-        to_addr  = self._ups_extract_address(shipment)
-        packages = self._ups_extract_packages(shipment)
-        customs  = self._ups_extract_customs(shipment)
-        is_intl  = (to_addr.get('country', 'DE').upper() != (shipper.get('country') or 'DE').upper())
-
         try:
+            shipper  = self._ups_extract_shipper(shipment)
+            to_addr  = self._ups_extract_address(shipment)
+            packages = self._ups_extract_packages(shipment)
+            customs  = self._ups_extract_customs(shipment)
+            is_intl  = (to_addr.get('country', 'DE').upper() != (shipper.get('country') or 'DE').upper())
             client = FedExClient(carrier=shipment.carrier)
             result = client.create_shipment(
                 to_address   = to_addr,
@@ -4870,37 +4947,50 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 customs_info = customs if is_intl else None,
                 reference    = str(shipment.reference or shipment.pk),
             )
-        except FedExError as e:
-            messages.error(request, f'❌ FedEx API: {e}')
-            return redirect(reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk]))
         except Exception as e:
-            messages.error(request, f'❌ Помилка: {type(e).__name__}: {e}')
+            # FedEx відмовив або не відповів — знову «❌ Помилка»: виправити й оформити ще раз
+            known = isinstance(e, FedExError)
+            if not known:
+                logger.exception('FedEx booking failed for shipment %s', shipment.pk)
+            shipment.status        = Shipment.Status.ERROR
+            shipment.error_message = str(e) if known else f'{type(e).__name__}: {e}'
+            shipment.save(update_fields=['status', 'error_message'])
+            messages.error(request, f'❌ FedEx API: {e}' if known else f'❌ Помилка: {type(e).__name__}: {e}')
+            if not known:
+                messages.warning(request, '⚠️ Перш ніж оформлювати знову, перевірте у FedEx, чи відправлення '
+                                          'не створено (зв\'язок міг обірватись уже після бронювання).')
             return redirect(reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk]))
 
-        # Зберігаємо результат
+        # Зберігаємо результат (раніше статус LABEL_CREATED і поле label_pdf, яких немає, — збій уже після
+        # бронювання: трекінг не зберігався, а повторне натискання створювало другу етикетку)
         shipment.tracking_number     = result.get('tracking_number') or result.get('master_tracking') or ''
         shipment.carrier_shipment_id = result.get('master_tracking') or result.get('tracking_number') or ''
         shipment.carrier_price       = result.get('total_charge') or shipment.carrier_price
         shipment.carrier_currency    = result.get('currency', 'EUR')
-        shipment.status              = Shipment.Status.LABEL_CREATED
+        shipment.status              = Shipment.Status.LABEL_READY
+        shipment.save(update_fields=[
+            'tracking_number', 'carrier_shipment_id', 'carrier_price', 'carrier_currency', 'status',
+        ])
 
-        # Зберігаємо PDF-етикетку
+        # Зберігаємо PDF-етикетку (як UPS: media/shipping/labels/ + копії в документи замовлення)
         label_b64 = result.get('label_base64', '')
         if label_b64:
             try:
-                label_dir  = os.path.join('media', 'labels', 'fedex')
+                label_dir = os.path.join(django_settings.MEDIA_ROOT, 'shipping', 'labels')
                 os.makedirs(label_dir, exist_ok=True)
-                label_path = os.path.join(label_dir, f'fedex_{shipment.pk}.pdf')
-                with open(label_path, 'wb') as f:
+                fname = f'fedex_{shipment.pk}_{shipment.tracking_number or "label"}.pdf'
+                fpath = os.path.join(label_dir, fname)
+                with open(fpath, 'wb') as f:
                     f.write(_b64.b64decode(label_b64))
-                shipment.label_pdf = label_path
-            except Exception:
-                pass
-
-        shipment.save(update_fields=[
-            'tracking_number', 'carrier_shipment_id',
-            'carrier_price', 'carrier_currency', 'status', 'label_pdf',
-        ])
+                shipment.label_url = f'{django_settings.MEDIA_URL}shipping/labels/{fname}'
+                shipment.save(update_fields=['label_url'])
+                _copy_shipment_file_local(fpath, shipment)
+                _copy_shipment_file_to_order_docs(fpath, shipment)
+            except Exception as exc:
+                logger.warning('FedEx label save failed: %s', exc)
+        elif result.get('label_url'):
+            shipment.label_url = result['label_url'][:500]
+            shipment.save(update_fields=['label_url'])
 
         svc_name = FEDEX_SERVICES.get(service_code, service_code)
         messages.success(
@@ -5991,37 +6081,50 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # ── DHL Confirm (preview before API call) ────────────────────────────────
 
     def dhl_confirm_view(self, request, shipment_id):
-        """GET — Preview даних перед відправкою через DHL API.
-           POST — redirect to dhl_book_view (actual API call)."""
+        """GET — перегляд даних перед відправкою через DHL API.
+           POST — оформлення в DHL (`_dhl_book`), лише один раз для відправлення (`_claim_booking`);
+           продукт — з адреси сторінки перевірки або з форми («🚀 Оформити» на сторінці тарифів DHL)."""
         from urllib.parse import urlencode
 
         shipment = get_object_or_404(Shipment, pk=shipment_id)
         back_url = reverse('admin:shipping_shipment_change', args=[shipment.pk])
 
-        product_code = request.GET.get('product_code', '').strip()
-        product_name = request.GET.get('product_name', product_code).strip()
-        price_str    = request.GET.get('price', '0')
+        def param(key, default=''):
+            return (self._booking_param(request, key, default) or default).strip()
+
+        product_code = param('product_code')
+        product_name = param('product_name', product_code)
+        price_str    = param('price', '0')
 
         if not product_code:
             messages.error(request, '❌ Не передано product_code.')
             return redirect(back_url)
 
-        # POST — підтверджено, передаємо на dhl_book_view зі збереженими GET-параметрами
+        # POST — підтверджено: оформлюємо в DHL
         if request.method == 'POST':
-            pickup_type = request.POST.get('pickup_type', 'dropoff')
-            qs = urlencode({
-                'product_code':   product_code,
-                'product_name':   product_name,
-                'price':          price_str,
-                'pickup':         '1' if pickup_type == 'pickup' else '0',
-                'pickup_date':    request.POST.get('pickup_date', ''),
-                'pickup_ready':   request.POST.get('pickup_ready', '09:00'),
-                'pickup_close':   request.POST.get('pickup_close', '18:00'),
-                'pickup_location':request.POST.get('pickup_location', 'reception'),
+            dhl_carrier = Carrier.objects.filter(carrier_type="dhl", is_active=True).first()
+            if not dhl_carrier:
+                messages.error(request, "❌ Немає активного DHL перевізника.")
+                return redirect(back_url)
+            if not self._claim_booking(shipment):
+                return self._booking_refused(request, shipment, 'DHL')
+            customs = self._booking_param(request, 'customs', None)
+            return self._dhl_book(request, shipment, dhl_carrier, {
+                'product_code':    product_code,
+                'product_name':    product_name,
+                'price':           price_str,
+                # сторінка перевірки — pickup_type, сторінка тарифів — pickup=1
+                'pickup':          (param('pickup_type') == 'pickup' or param('pickup') == '1'),
+                'pickup_date':     param('pickup_date'),
+                'pickup_ready':    param('pickup_ready', '09:00'),
+                'pickup_close':    param('pickup_close', '18:00'),
+                'pickup_location': param('pickup_location', 'reception'),
+                'customs':         None if customs in (None, '') else customs == '1',
             })
-            return redirect(
-                reverse('admin:shipping_shipment_dhl_book', args=[shipment.pk]) + f'?{qs}'
-            )
+
+        # Уже оформлене / оформлюється — сторінка перевірки не потрібна
+        if shipment.tracking_number or shipment.status not in self.BOOKABLE:
+            return self._booking_refused(request, shipment, 'DHL')
 
         # GET — будуємо превью
         shipper  = self._ups_extract_shipper(shipment)
@@ -6071,45 +6174,39 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # ── DHL Book (POST /shipments) ────────────────────────────────────────────
 
     def dhl_book_view(self, request, shipment_id):
-        """Оформлює відправлення через DHL POST /shipments → зберігає трекінг і label."""
+        """Оформлює відправлення через DHL POST /shipments — лише POST (CSRF): сторінка перевірки або
+        «🚀 Оформити» на сторінці тарифів DHL; посилання (GET) нічого не оформлює."""
+        if request.method != "POST":
+            return self._booking_needs_post(request, "admin:shipping_shipment_dhl_confirm", shipment_id)
+        return self.dhl_confirm_view(request, shipment_id)
+
+    def _dhl_book(self, request, shipment, dhl_carrier, params):
+        """Виклик DHL для відправлення, яке цей запит уже «забронював» → трекінг і label."""
         import os
         from django.conf import settings
         from .services.dhl import create_shipment as dhl_create
 
-        shipment = get_object_or_404(Shipment, pk=shipment_id)
-
-        dhl_carrier = Carrier.objects.filter(carrier_type="dhl", is_active=True).first()
-        if not dhl_carrier:
-            messages.error(request, "❌ Немає активного DHL перевізника.")
-            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
-
-        product_code    = request.GET.get("product_code", "").strip()
-        product_name    = request.GET.get("product_name", product_code).strip()
-        price_str       = request.GET.get("price", "0")
-        request_pickup  = request.GET.get("pickup", "0") == "1"
-        pickup_date     = request.GET.get("pickup_date", "").strip()
-        pickup_ready    = request.GET.get("pickup_ready", "09:00").strip() or "09:00"
-        pickup_close    = request.GET.get("pickup_close", "18:00").strip() or "18:00"
-        pickup_location = request.GET.get("pickup_location", "reception").strip() or "reception"
-        customs_param   = request.GET.get("customs")
-        include_customs = None if customs_param is None else (customs_param == "1")
-
-        if not product_code:
-            messages.error(request, "❌ Не передано product_code.")
-            return redirect(reverse("admin:shipping_shipment_dhl_rates", args=[shipment.pk]))
-
+        product_code = params["product_code"]
+        product_name = params["product_name"] or product_code
         try:
-            price_f = float(price_str)
+            price_f = float(params["price"])
         except (ValueError, TypeError):
             price_f = 0.0
 
-        result = dhl_create(dhl_carrier, shipment, product_code, product_name, price_f,
-                            request_pickup=request_pickup,
-                            pickup_date=pickup_date,
-                            pickup_ready_time=pickup_ready,
-                            pickup_close_time=pickup_close,
-                            pickup_location=pickup_location,
-                            include_customs=include_customs)
+        try:
+            result = dhl_create(dhl_carrier, shipment, product_code, product_name, price_f,
+                                request_pickup=params["pickup"],
+                                pickup_date=params["pickup_date"],
+                                pickup_ready_time=params["pickup_ready"] or "09:00",
+                                pickup_close_time=params["pickup_close"] or "18:00",
+                                pickup_location=params["pickup_location"] or "reception",
+                                include_customs=params["customs"])
+        except Exception as e:
+            # Збій до відповіді DHL — «❌ Помилка», як і відмова DHL: виправити й оформити ще раз
+            logger.exception("DHL booking failed for shipment %s", shipment.pk)
+            result = {"success": False, "error": f"{type(e).__name__}: {e}"}
+            messages.warning(request, "⚠️ Перш ніж оформлювати знову, перевірте в DHL, чи відправлення "
+                                      "не створено (зв'язок міг обірватись уже після бронювання).")
 
         shipment.raw_request  = result.get("raw_request")
         shipment.raw_response = result.get("raw_response")

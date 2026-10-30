@@ -11,7 +11,6 @@ from datetime import datetime
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib.admin.views.decorators import staff_member_required
 
@@ -77,8 +76,9 @@ def patch_dymo_qty(content: str, qty: int) -> str:
 
 @staff_member_required
 def serve_label(request, sku):
-    """Повертає dymo файл для скачування/відкриття; ?origin=auto — щойно сформований з шаблону (кабель),
-    інакше файл з бази — для позначки в куті (labels_app/mark.py)."""
+    """Повертає dymo файл для скачування/відкриття; ?origin=auto — позначка «з шаблону» (сторінки, відкриті до
+    оновлення: кабель з шаблону тепер — /labels/cable/<артикул>/ без файлу), інакше файл з бази — для позначки
+    в куті (labels_app/mark.py)."""
     from labels_app import mark
     # qty=0 (default when not provided) → serve raw file without modification
     qty = int(request.GET.get('qty', 0))
@@ -161,9 +161,8 @@ def label_status(request):
 
 
 @staff_member_required
-@csrf_exempt
 def upload_label(request):
-    """Завантаження нової або оновленої етикетки на сервер."""
+    """Завантаження нової або оновленої етикетки на сервер (POST з X-CSRFToken)."""
     if request.method != 'POST':
         return JsonResponse({'error': 'POST only'}, status=405)
     
@@ -208,9 +207,8 @@ def upload_label(request):
 
 
 @staff_member_required
-@csrf_exempt
 def delete_label(request, sku):
-    """DELETE (або POST) — видаляє .dymo файл для SKU."""
+    """DELETE (або POST) з X-CSRFToken — видаляє .dymo файл для SKU."""
     if request.method not in ('POST', 'DELETE'):
         return JsonResponse({'error': 'POST/DELETE only'}, status=405)
     path = get_label_path(sku)
@@ -361,10 +359,21 @@ def preview_cable_label(request):
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
 
 
+def _qty(value) -> int:
+    try:
+        return max(1, int(value or 1))
+    except (ValueError, TypeError):
+        return 1
+
+
 @staff_member_required
-@csrf_exempt
 def generate_cable_label(request):
-    """POST {part_no, qty} → generate .dymo, return JSON with download_url."""
+    """POST {part_no, qty[, save, overwrite]} (X-CSRFToken) → етикетка кабелю з шаблону: JSON з xml і download_url.
+
+    Для друку файл не пишеться — download_url віддає щойно складену етикетку (`cable_label_file`).
+    save — людина просить зберегти файл у базі етикеток: наявний файл цього артикула (його могли виправити
+    вручну) без overwrite не перезаписується → 409 {exists, filename}."""
+    from urllib.parse import quote
     from shipping.services.dymo_label_service import DymoLabelService
     import json as _json
 
@@ -377,25 +386,43 @@ def generate_cable_label(request):
         data = {}
 
     part_no = (data.get('part_no') or request.POST.get('part_no') or '').strip()
-    try:
-        qty = int(data.get('qty') or request.POST.get('qty') or 1)
-    except (ValueError, TypeError):
-        qty = 1
+    qty = _qty(data.get('qty') or request.POST.get('qty'))
 
     if not part_no:
         return JsonResponse({'ok': False, 'error': 'part_no required'}, status=400)
 
     try:
-        path = DymoLabelService.generate(part_no, qty)
-        sku  = path.stem
-        return JsonResponse({
-            'ok':           True,
-            'sku':          sku,
-            'filename':     path.name,
-            'xml':          path.read_text(encoding='utf-8'),
-            'download_url': f'/labels/serve/{sku}/?qty={qty}&origin=auto',
-        })
+        xml = DymoLabelService.build(part_no, qty)
     except ValueError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
     except Exception as exc:
         return JsonResponse({'ok': False, 'error': f'Generation failed: {exc}'}, status=500)
+
+    result = {'ok': True, 'sku': part_no, 'xml': xml, 'saved': False,
+              'download_url': f'/labels/cable/{quote(part_no)}/?qty={qty}'}
+    if data.get('save'):
+        existing = get_label_path(part_no)
+        if existing and not data.get('overwrite'):
+            return JsonResponse({'ok': False, 'exists': True, 'filename': existing.name,
+                                 'error': f'Файл {existing.name} уже є в базі етикеток (його могли виправити '
+                                          f'вручну) — без підтвердження не перезаписується.'}, status=409)
+        LABELS_DIR.mkdir(parents=True, exist_ok=True)
+        target = existing or LABELS_DIR / DymoLabelService.file_name(part_no)   # «… Alt.dymo» — той самий файл
+        path = DymoLabelService.generate(part_no, qty, output_path=target, overwrite=True)
+        result.update(saved=True, filename=path.name, replaced=bool(existing))
+    return JsonResponse(result)
+
+
+@staff_member_required
+def cable_label_file(request, part_no):
+    """Готовий .dymo кабелю з шаблону (?qty=) — у пам'яті, файли в базі етикеток не змінюються."""
+    from labels_app import mark
+    from shipping.services.dymo_label_service import DymoLabelService
+    try:
+        xml = DymoLabelService.build(part_no, _qty(request.GET.get('qty')))
+    except ValueError as exc:
+        return HttpResponse(f'Етикетку {part_no} не сформовано: {exc}', status=400,
+                            content_type='text/plain; charset=utf-8')
+    response = HttpResponse(mark.stamp(xml, 'auto').encode('utf-8'), content_type='application/octet-stream')
+    response['Content-Disposition'] = f'attachment; filename="{DymoLabelService.file_name(part_no)}"'
+    return response

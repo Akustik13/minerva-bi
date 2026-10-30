@@ -2956,7 +2956,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def eu_invoice_suggest_view(self, request, pk):
         """GET — повертає запропонований номер рахунку та поточні VAT IDs."""
         from django.http import JsonResponse
-        from .eu_invoice_pdf import get_next_invoice_number
+        from .eu_invoice_numbers import get_next_invoice_number
         order = get_object_or_404(SalesOrder, pk=pk)
         try:
             from config.models import SystemSettings
@@ -2978,6 +2978,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         import json as _json
         from datetime import date as _date
         from decimal import Decimal as _Dec, InvalidOperation
+        from .eu_invoice_numbers import InvoiceNumberTaken, assign_invoice_number
         from .eu_invoice_pdf import generate_eu_invoice
 
         if request.method != "POST":
@@ -2996,7 +2997,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             except InvalidOperation:
                 return _Dec(default)
 
-        invoice_number  = int(body.get("invoice_number", 1))
+        requested = body.get("invoice_number")
+        try:
+            requested = int(requested) if requested not in (None, "") else None
+        except (TypeError, ValueError):
+            return JsonResponse({"error": "Номер рахунку має бути цілим числом"}, status=400)
+        if requested is not None and requested < 1:
+            return JsonResponse({"error": "Номер рахунку має бути більшим за 0"}, status=400)
         invoice_date_s  = body.get("invoice_date", "") or str(_date.today())
         buyer_name      = (body.get("buyer_name") or "").strip()
         buyer_address   = (body.get("buyer_address") or "").strip()
@@ -3012,13 +3019,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception:
             invoice_date = _date.today()
 
+        # Номер видає сервер під блокуванням (assign_invoice_number): у замовлення вже є — той самий,
+        # номер з форми — лише вільний; «максимум + 1» з браузера двом замовленням не дістанеться
+        try:
+            invoice_number = assign_invoice_number(order, requested)
+        except InvoiceNumberTaken as exc:
+            return JsonResponse({"error": str(exc), "taken_by": exc.order.order_number}, status=409)
+
         # Save back to order
-        order.eu_invoice_number = invoice_number
         order.eu_invoice_date   = invoice_date
         order.buyer_vat_id      = buyer_vat_id
         order.ship_vat_id       = ship_vat_id
-        order.save(update_fields=["eu_invoice_number", "eu_invoice_date",
-                                  "buyer_vat_id", "ship_vat_id"])
+        order.save(update_fields=["eu_invoice_date", "buyer_vat_id", "ship_vat_id"])
 
         # Fetch fresh DigiKey Marketplace API data if this is a DigiKey order
         dk_order_data = None
@@ -3065,6 +3077,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["X-Invoice-Number"] = str(invoice_number)    # виданий номер (форма могла пропонувати інший)
         return response
 
     def notify_customer_view(self, request, pk):

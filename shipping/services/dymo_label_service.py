@@ -1,8 +1,9 @@
 """
 DYMO label generator for RF coaxial cables.
 
-Reads cable_label_template.dymo, substitutes variable fields via str.replace(),
-writes the result to LABELS_DIR (settings.LABELS_DIR / media/labels/).
+Reads cable_label_template.dymo, substitutes variable fields via str.replace().
+Друк з шаблону — у пам'яті (`build`, /labels/cable/<артикул>/); файл у LABELS_DIR пишеться лише на
+прохання людини (`generate`) і наявного файлу (виправленого вручну) без overwrite не перезаписує.
 
 Template placeholders (exact strings in the XML):
   'Qty: 112 PCS '                              ← qty line (trailing space preserved)
@@ -76,37 +77,48 @@ class DymoLabelService:
     ]
 
     @classmethod
-    def generate(cls, part_no: str, qty: int, output_path: Path = None) -> Path:
-        """
-        Generate a .dymo label file for one cable part number.
-
-        Reads template, substitutes all variable fields, saves to LABELS_DIR.
-        Returns the Path of the saved file.
-        """
+    def build(cls, part_no: str, qty: int) -> str:
+        """XML етикетки кабелю з шаблону — у пам'яті, без файлу (друк, перегляд, завантаження).
+        ValueError — артикул не за схемою CA-<роз'єм>-MC<діаметр>-<довжина>-<роз'єм>."""
         parsed = parse_part_number(part_no)
         lines  = label_lines(parsed, qty)
 
         xml = cls.TEMPLATE_PATH.read_text(encoding='utf-8')
         for placeholder, key in cls._REPLACEMENTS:
             xml = xml.replace(placeholder, lines[key])
+        return xml
+
+    @staticmethod
+    def file_name(part_no: str) -> str:
+        return part_no.replace('/', '_').replace('\\', '_') + '.dymo'
+
+    @classmethod
+    def generate(cls, part_no: str, qty: int, output_path: Path = None, overwrite: bool = False) -> Path:
+        """Зберегти етикетку кабелю файлом у LABELS_DIR — лише коли людина просить «💾 Зберегти».
+
+        Файл з такою назвою вже є (його могли виправити вручну в DYMO) — не перезаписується без
+        overwrite=True: FileExistsError. Для друку з шаблону файл не потрібен — `build`."""
+        xml = cls.build(part_no, qty)
 
         labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
         labels_dir.mkdir(parents=True, exist_ok=True)
 
-        safe_name = part_no.replace('/', '_').replace('\\', '_')
-        out = output_path or (labels_dir / f'{safe_name}.dymo')
+        out = output_path or (labels_dir / cls.file_name(part_no))
+        if out.exists() and not overwrite:
+            raise FileExistsError(str(out))
         out.write_text(xml, encoding='utf-8')
         return out
 
     @classmethod
     def generate_for_order(cls, order_items: list) -> list:
         """
-        Generate labels for all CA-* positions in an order.
+        Етикетки для всіх позицій CA-* замовлення — з шаблону, без файлів у LABELS_DIR.
 
         order_items: [{'part_no': 'CA-MHF1-MC1.13-175-MHF4', 'qty': 20}, ...]
         Returns:     [{'part_no', 'qty', 'download_url'} | {'part_no', 'qty', 'error'}, ...]
         Silently skips items whose part_no doesn't start with 'CA-'.
         """
+        from urllib.parse import quote
         results = []
         for item in order_items:
             part_no = (item.get('part_no') or '').strip()
@@ -114,13 +126,11 @@ class DymoLabelService:
             if not part_no.upper().startswith('CA-'):
                 continue
             try:
-                path = cls.generate(part_no, qty)
-                sku  = path.stem
+                parse_part_number(part_no)
                 results.append({
                     'part_no':      part_no,
                     'qty':          qty,
-                    'label_path':   str(path),
-                    'download_url': f'/labels/serve/{sku}/?qty={qty}',
+                    'download_url': f'/labels/cable/{quote(part_no)}/?qty={qty}',
                 })
             except Exception as exc:
                 results.append({'part_no': part_no, 'qty': qty, 'error': str(exc)})
