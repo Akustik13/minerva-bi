@@ -48,6 +48,9 @@ class APIRequestLogMiddleware:
             return self.get_response(request)
         started = time.monotonic()
         response = self.get_response(request)
+        from .key_limits import is_preview
+        if is_preview(request):
+            return response                       # «👁 Приклад даних» з картки ключа — не дія програми, не пишемо
         auth = request.META.get("HTTP_AUTHORIZATION", "")
         key = getattr(request, "api_key_seen", None)
         if key is None and not auth.startswith("Token "):

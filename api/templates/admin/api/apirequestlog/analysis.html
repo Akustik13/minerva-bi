@@ -1,0 +1,191 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{{ log_url }}">📜 Журнал API</a> › 📊 Аналіз</div>{% endblock %}
+{% block content_title %}{% endblock %}
+{% block extrastyle %}{{ block.super }}{% include "admin/api/_insight_styles.html" %}{% endblock %}
+
+{% block content %}
+<div class="ki">
+  <div class="ki-head">
+    <div>
+      <h1>{{ title }}</h1>
+      <p class="ki-sub">{{ start|date:"d.m.Y" }} – {{ end|date:"d.m.Y" }} ({{ days }} дн.). Хто й що робив через API,
+        скільки даних отримав, які саме товари й замовлення, що змінював і де отримав відмову. Записи журналу
+        зберігаються 60 днів.</p>
+    </div>
+    <div class="ki-tools">
+      <a class="ki-btn" href="{{ csv_url }}">⬇ CSV</a>
+      <a class="ki-btn" href="{{ log_url }}">📜 Журнал</a>
+      {% if selected %}<a class="ki-btn" href="{{ insight_url }}">🔍 Що бачить ключ</a>
+      <a class="ki-btn" href="{{ key_url }}">⚙ Картка ключа</a>{% endif %}
+    </div>
+  </div>
+
+  <form class="ki-form ki-card" method="get">
+    <label>Ключ
+      <select name="key">
+        <option value="">Усі ключі</option>
+        {% for k in keys %}<option value="{{ k.pk }}"{% if key == k.pk|stringformat:"s" %} selected{% endif %}>{{ k.name }}{% if not k.is_active %} (вимкнений){% endif %}</option>{% endfor %}
+        <option value="unknown"{% if key == "unknown" %} selected{% endif %}>Невідомі ключі (401)</option>
+      </select></label>
+    <label>Період
+      <span class="ki-filters" style="margin:0">{% for n in periods %}
+        <a class="ki-chip{% if days == n and not request.GET.from %} on{% endif %}" href="?key={{ key }}&amp;days={{ n }}&amp;st={{ st }}&amp;rw={{ rw }}">{% if n == 1 %}сьогодні{% else %}{{ n }} днів{% endif %}</a>{% endfor %}
+      </span></label>
+    <label>Від<input type="date" name="from" value="{{ start|date:'Y-m-d' }}"></label>
+    <label>До<input type="date" name="to" value="{{ end|date:'Y-m-d' }}"></label>
+    <label>Відповідь
+      <select name="st">
+        <option value="">Усі</option>
+        <option value="ok"{% if st == "ok" %} selected{% endif %}>✅ Успішні</option>
+        <option value="err"{% if st == "err" %} selected{% endif %}>⚠ Помилки й відмови</option>
+        <option value="401"{% if st == "401" %} selected{% endif %}>🔒 401</option>
+        <option value="403"{% if st == "403" %} selected{% endif %}>⛔ 403</option>
+        <option value="429"{% if st == "429" %} selected{% endif %}>⏳ 429</option>
+        <option value="5xx"{% if st == "5xx" %} selected{% endif %}>❌ 5xx</option>
+      </select></label>
+    <label>Що робив
+      <select name="rw">
+        <option value="">Усе</option>
+        <option value="read"{% if rw == "read" %} selected{% endif %}>👁 Читання</option>
+        <option value="write"{% if rw == "write" %} selected{% endif %}>✏️ Зміни</option>
+      </select></label>
+    <button class="ki-btn ki-primary" type="submit">Показати</button>
+  </form>
+
+  <div class="ki-tiles">
+    <div class="ki-tile">Запитів <b>{{ a.totals.n }}</b><small>{% if a.totals.keys > 1 %}ключів: {{ a.totals.keys }}{% else %}&nbsp;{% endif %}</small></div>
+    <div class="ki-tile">👁 Читання <b>{{ a.totals.reads }}</b><small>GET</small></div>
+    <div class="ki-tile">✏️ Зміни <b{% if a.totals.writes %} class="ki-warn"{% endif %}>{{ a.totals.writes }}</b><small>POST / PATCH / PUT / DELETE</small></div>
+    <div class="ki-tile">⚠ Помилки <b{% if a.totals.errors %} class="ki-err"{% endif %}>{{ a.totals.errors }}</b><small>з них відмов 401 / 403 / 429: {{ a.totals.denied }}</small></div>
+    <div class="ki-tile">📦 Записів віддано <b>{{ a.totals.sent }}</b><small>сума по всіх читаннях</small></div>
+    <div class="ki-tile">🔢 Різних записів <b>{{ a.records.total }}</b><small>товарів, замовлень…</small></div>
+    <div class="ki-tile">🌐 IP-адрес <b>{{ a.totals.ips }}</b><small>&nbsp;</small></div>
+    <div class="ki-tile">⏱ Сер. час <b>{{ a.totals.avg_ms }}</b><small>мс</small></div>
+  </div>
+
+  <div class="ki-card">
+    <div class="ki-card-title">📈 Запити по днях</div>
+    <div class="ki-chart"><canvas id="la-chart"></canvas></div>
+  </div>
+
+  <div class="ki-card" id="records">
+    <div class="ki-card-title">📦 Які записи отримано</div>
+    <p class="ki-sub">Кожен товар / замовлення, який ключ отримав, і в скількох запитах{% if a.records.by_entity %}:
+      {% for name, n in a.records.by_entity %}{{ name }} — {{ n }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}.
+      {% if a.records.limited %}Пораховано за останніми {{ scan_max }} запитами періоду.{% endif %}
+      {% if a.records.total > records_show %}Показано перші {{ records_show }} з {{ a.records.total }} (найчастіші).{% endif %}</p>
+    {% if a.records.rows %}
+    <div class="ki-filters"><input type="search" class="ki-search" id="la-rq" placeholder="🔎 артикул або номер"></div>
+    <div class="ki-scroll" style="max-height:420px;overflow:auto"><table class="ki-table" id="la-records">
+      <thead><tr><th>Запис</th><th>Що це</th><th class="num">Запитів</th><th>Востаннє</th></tr></thead>
+      <tbody>{% for r in a.records.rows %}
+        <tr data-q="{{ r.value|lower }}"><td>{% if r.url %}<a href="{{ r.url }}"><code>{{ r.value }}</code></a>{% else %}<code>{{ r.value }}</code>{% endif %}</td>
+          <td>{{ r.entity_text }}</td><td class="num">{{ r.n }}</td><td>{{ r.last|date:"d.m H:i" }}</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% else %}<p class="ki-mut">Записів за період немає.</p>{% endif %}
+  </div>
+
+  <div class="ki-card" id="writes">
+    <div class="ki-card-title">✏️ Що змінювалось — {{ a.writes_total }}</div>
+    {% if a.writes %}
+    <div class="ki-scroll" style="max-height:420px;overflow:auto"><table class="ki-table">
+      <thead><tr><th>Коли</th><th>Що сталося</th><th>Код</th><th>IP</th></tr></thead>
+      <tbody>{% for w in a.writes %}
+        <tr><td style="white-space:nowrap"><a href="{% url 'admin:api_apirequestlog_change' w.pk %}">{{ w.created_at|date:"d.m H:i:s" }}</a></td>
+          <td>{{ w.plain }}</td><td><b class="{% if w.status >= 400 %}ki-err{% else %}ki-ok{% endif %}">{{ w.status }}</b></td>
+          <td><code>{{ w.ip|default:"—" }}</code></td></tr>{% endfor %}
+      </tbody></table></div>
+    {% if a.writes_total > a.writes|length %}<p class="ki-note">Показано останні {{ a.writes|length }} — усі зміни у CSV або в журналі з фільтром «✏️ Зміни».</p>{% endif %}
+    {% else %}<p class="ki-mut">Змін за період не було — лише читання.</p>{% endif %}
+  </div>
+
+  <div class="ki-grid2">
+    <div class="ki-card">
+      <div class="ki-card-title">⚠ Відмови й помилки</div>
+      {% if a.errors %}<table class="ki-table">
+        <thead><tr><th>Код</th><th>Чому</th><th class="num">Разів</th><th>Востаннє</th></tr></thead>
+        <tbody>{% for e in a.errors %}<tr><td><b class="ki-err">{{ e.status }}</b>{% if e.code %} <small>{{ e.code }}</small>{% endif %}</td>
+          <td>{{ e.text|default:"—" }}</td><td class="num">{{ e.n }}</td><td>{{ e.last|date:"d.m H:i" }}</td></tr>{% endfor %}</tbody>
+      </table>{% else %}<p class="ki-mut">Відмов не було.</p>{% endif %}
+    </div>
+    <div class="ki-card">
+      <div class="ki-card-title">🔌 Що найчастіше робив</div>
+      {% if a.endpoints %}<table class="ki-table">
+        <thead><tr><th>Дія</th><th class="num">Запитів</th><th class="num">Помилок</th><th class="num">Записів</th><th class="num">мс сер. / макс.</th></tr></thead>
+        <tbody>{% for e in a.endpoints %}<tr><td><code class="ki-m ki-m-{{ e.method|lower }}">{{ e.method }}</code> {{ e.what|default:e.view|default:"—" }}<div class="ki-note">{{ e.view }} · напр. {{ e.path }}</div></td>
+          <td class="num">{{ e.n }}</td><td class="num">{{ e.errors }}</td><td class="num">{{ e.sent|default:"—" }}</td>
+          <td class="num">{{ e.avg_ms }} / {{ e.max_ms }}</td></tr>{% endfor %}</tbody>
+      </table>{% else %}<p class="ki-mut">—</p>{% endif %}
+    </div>
+    <div class="ki-card">
+      <div class="ki-card-title">🌐 IP-адреси</div>
+      {% if a.ips %}<table class="ki-table">
+        <thead><tr><th>IP</th><th class="num">Запитів</th><th class="num">Помилок</th><th class="num">Ключів</th><th>Перший / останній</th></tr></thead>
+        <tbody>{% for i in a.ips %}<tr><td><code>{{ i.ip }}</code></td><td class="num">{{ i.n }}</td><td class="num">{{ i.errors }}</td>
+          <td class="num">{{ i.keys }}</td><td>{{ i.first|date:"d.m H:i" }} – {{ i.last|date:"d.m H:i" }}</td></tr>{% endfor %}</tbody>
+      </table>{% else %}<p class="ki-mut">—</p>{% endif %}
+    </div>
+    <div class="ki-card">
+      <div class="ki-card-title">🧩 Програми (User-Agent)</div>
+      {% if a.agents %}<table class="ki-table">
+        <thead><tr><th>Програма</th><th class="num">Запитів</th><th>Востаннє</th></tr></thead>
+        <tbody>{% for g in a.agents %}<tr><td style="overflow-wrap:anywhere">{{ g.user_agent|default:"— (не вказано)" }}</td>
+          <td class="num">{{ g.n }}</td><td>{{ g.last|date:"d.m H:i" }}</td></tr>{% endfor %}</tbody>
+      </table>{% else %}<p class="ki-mut">—</p>{% endif %}
+    </div>
+    <div class="ki-card">
+      <div class="ki-card-title">🐢 Найдовші запити</div>
+      {% if a.slowest %}<table class="ki-table"><tbody>{% for r in a.slowest %}
+        <tr><td class="num"><b>{{ r.duration_ms }}</b> мс</td><td><a href="{% url 'admin:api_apirequestlog_change' r.pk %}">{{ r.created_at|date:"d.m H:i" }}</a> · {{ r.plain }}</td></tr>{% endfor %}
+      </tbody></table>{% else %}<p class="ki-mut">—</p>{% endif %}
+    </div>
+    <div class="ki-card">
+      <div class="ki-card-title">📦 Найбільші відповіді</div>
+      {% if a.largest %}<table class="ki-table"><tbody>{% for r in a.largest %}
+        <tr><td class="num"><b>{{ r.items }}</b></td><td><a href="{% url 'admin:api_apirequestlog_change' r.pk %}">{{ r.created_at|date:"d.m H:i" }}</a> · {{ r.plain }}</td></tr>{% endfor %}
+      </tbody></table>{% else %}<p class="ki-mut">—</p>{% endif %}
+    </div>
+  </div>
+</div>
+{{ a.days|json_script:"la-days" }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function () {
+  var q = document.getElementById('la-rq');
+  if (q) q.addEventListener('input', function () {
+    var t = q.value.trim().toLowerCase();
+    document.querySelectorAll('#la-records tbody tr').forEach(function (tr) {
+      tr.hidden = t && tr.dataset.q.indexOf(t) < 0;
+    });
+  });
+  if (typeof Chart === 'undefined') return;
+  var days = JSON.parse(document.getElementById('la-days').textContent), css = getComputedStyle(document.documentElement);
+  function v(name, fallback) { return (css.getPropertyValue(name) || '').trim() || fallback; }
+  var text = v('--text-muted', '#888');
+  new Chart(document.getElementById('la-chart'), {
+    data: {
+      labels: days.map(function (d) { return d.day; }),
+      datasets: [
+        {type: 'bar', label: 'Читання', data: days.map(function (d) { return d.reads; }), backgroundColor: v('--ok', '#43a047'), stack: 'q'},
+        {type: 'bar', label: 'Зміни', data: days.map(function (d) { return d.writes; }), backgroundColor: v('--warn', '#f9a825'), stack: 'q'},
+        {type: 'bar', label: 'Помилки', data: days.map(function (d) { return d.errors; }), backgroundColor: v('--err', '#e53935'), stack: 'q'},
+        {type: 'line', label: 'Записів віддано', data: days.map(function (d) { return d.sent; }), borderColor: v('--accent', '#4f8cff'),
+         backgroundColor: v('--accent', '#4f8cff'), yAxisID: 'y2', tension: .25, pointRadius: 2}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, interaction: {mode: 'index', intersect: false},
+      plugins: {legend: {labels: {color: text}}},
+      scales: {
+        x: {stacked: true, ticks: {color: text}},
+        y: {stacked: true, beginAtZero: true, ticks: {color: text, precision: 0}, title: {display: true, text: 'запитів', color: text}},
+        y2: {position: 'right', beginAtZero: true, grid: {drawOnChartArea: false}, ticks: {color: text, precision: 0},
+             title: {display: true, text: 'записів', color: text}}
+      }
+    }
+  });
+})();
+</script>
+{% endblock %}

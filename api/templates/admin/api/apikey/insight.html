@@ -1,0 +1,271 @@
+{% extends "admin/base_site.html" %}
+{% block title %}🔍 {{ key.name }} — що бачить і що може змінити{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{% url 'admin:api_apikey_changelist' %}">API Ключі</a> › <a href="{{ change_url }}">{{ key.name }}</a> ›
+  🔍 Що бачить і що може змінити</div>{% endblock %}
+{% block content_title %}{% endblock %}
+{% block extrastyle %}{{ block.super }}{% include "admin/api/_insight_styles.html" %}{% endblock %}
+
+{% block content %}
+<div class="ki">
+  <div class="ki-head">
+    <div>
+      <h1>🔍 Що бачить і що може змінити ключ «{{ key.name }}»</h1>
+      <p class="ki-sub">Таблиця складена з коду Minerva: кожна адреса API, чи дозволена вона цьому ключу, які поля він
+        отримує й які може змінити. Нижче — «👁 Приклад даних» (що ключ отримав би зараз) і «🧪 Що змінить запит»
+        (перевірка тіла без запису).</p>
+    </div>
+    <div class="ki-tools">
+      <a class="ki-btn" href="{{ change_url }}">⚙ Картка ключа</a>
+      <a class="ki-btn" href="{{ log_url }}">📜 Журнал ключа</a>
+      <a class="ki-btn" href="{{ analysis_url }}">📊 Аналіз журналу</a>
+    </div>
+  </div>
+
+  <div class="ki-tiles">
+    <div class="ki-tile">Читає адрес <b>{{ sum.read }}</b><small>GET і перевірки</small></div>
+    <div class="ki-tile">Змінює адрес <b{% if sum.write %} class="ki-warn"{% endif %}>{{ sum.write }}</b><small>POST / PATCH / PUT / DELETE</small></div>
+    <div class="ki-tile">Заборонено правами <b>{{ sum.denied }}</b><small>відповідь 403</small></div>
+  </div>
+
+  <div class="ki-card">
+    <div class="ki-card-title">🛡 Права й обмеження ключа</div>
+    <ul class="ki-restr">{% for r in restrictions %}
+      <li class="ki-{{ r.level }}"><span>{{ r.icon }}</span> <b>{{ r.title }}.</b> {{ r.text }}</li>{% endfor %}
+    </ul>
+  </div>
+
+  <div class="ki-filters" id="ki-filters">
+    <button type="button" class="ki-chip on" data-f="all">Усі адреси</button>
+    <button type="button" class="ki-chip" data-f="allowed">✅ Дозволені</button>
+    <button type="button" class="ki-chip" data-f="write">✏️ Що може змінити</button>
+    <button type="button" class="ki-chip" data-f="denied">⛔ Заборонені</button>
+    <input type="search" id="ki-q" class="ki-search" placeholder="🔎 адреса, поле або опис">
+  </div>
+
+  {% for title, rows in groups %}
+  <div class="ki-group">
+    <h2>{{ title }}</h2>
+    <div class="ki-scroll"><table class="ki-table">
+      <thead><tr><th>Запит</th><th>Що робить</th><th>Цьому ключу</th><th>Дані</th></tr></thead>
+      <tbody>{% for r in rows %}
+        <tr class="ki-row" data-access="{{ r.access }}" data-kind="{{ r.kind }}"
+            data-q="{{ r.method }} {{ r.path }} {{ r.summary }} {{ r.returns.fields|join:' ' }} {{ r.accepts.fields|join:' ' }}">
+          <td class="ki-req"><code class="ki-m ki-m-{{ r.method|lower }}">{{ r.method }}</code> <code>{{ r.path }}</code>
+            {% if r.scope %}<div class="ki-scope">🔑 {{ r.scope }}</div>{% endif %}</td>
+          <td>{{ r.summary }}{% if r.effect %}<div class="ki-effect">✏️ {{ r.effect }}</div>{% endif %}</td>
+          <td class="ki-acc ki-acc-{{ r.access }}">
+            {% if r.access == "allowed" %}✅{% elif r.access == "denied" %}⛔{% elif r.access == "unsupported" %}🚫{% else %}🔓{% endif %}
+            {{ r.access_text }}
+            {% if r.access == "allowed" %}{% for n in r.notes %}<div class="ki-note">{{ n }}</div>{% endfor %}{% endif %}
+            {% if can_run and r.access == "allowed" %}
+              {% if r.preview %}<button type="button" class="ki-mini" data-pv="{{ r.path }}" title="Показати, що ключ отримає зараз">👁 приклад</button>{% endif %}
+              {% if r.simulate %}<button type="button" class="ki-mini" data-sim="{{ r.method }} {{ r.path }}" title="Перевірити тіло запиту без запису">🧪 перевірити</button>{% endif %}
+            {% endif %}
+          </td>
+          <td class="ki-data">
+            {% if r.returns %}
+              {% if r.returns.text %}Повертає: {{ r.returns.text }}
+              {% elif r.returns.fields %}<details><summary>Повертає поля: {{ r.returns.fields|length }}{% if r.returns.total != r.returns.fields|length %} з {{ r.returns.total }}{% endif %}</summary>
+                <div class="ki-fields">{{ r.returns.fields|join:", " }}</div></details>
+              {% elif r.returns.total %}<span class="ki-warn">Записи прийдуть без полів</span>{% else %}<span class="ki-mut">—</span>{% endif %}
+              {% for n in r.returns.notes %}<div class="ki-note">{{ n }}</div>{% endfor %}
+            {% elif r.accepts %}
+              {% if r.accepts.text %}Приймає: {{ r.accepts.text }}
+              {% elif r.accepts.fields %}<details><summary>Приймає поля: {{ r.accepts.fields|length }}</summary>
+                <div class="ki-fields">{{ r.accepts.fields|join:", " }}</div></details>
+              {% else %}<span class="ki-mut">—</span>{% endif %}
+              {% for n in r.accepts.notes %}<div class="ki-note">{{ n }}</div>{% endfor %}
+            {% endif %}
+            {% if r.access == "allowed" and r.method != "GET" and not r.simulate and r.no_simulate %}<div class="ki-note">🧪 не перевіряється: {{ r.no_simulate }}</div>{% endif %}
+          </td>
+        </tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </div>
+  {% endfor %}
+
+  {% if can_run %}
+  <div class="ki-card" id="ki-preview" style="margin-top:18px">
+    <div class="ki-card-title">👁 Приклад даних — що ключ отримав би зараз</div>
+    <p class="ki-sub">Minerva виконує GET як цей ключ — з його правами, магазином, «Лише ці поля» й «Різних записів за
+      добу». Перегляд не рахується в ліміти й лічильники, не змінює «Останнє використання» й не пишеться в журнал API
+      (лише в журнал аудиту Minerva — хто дивився). Секрети у відповіді замасковано.</p>
+    {% if preview_choices %}
+    <form class="ki-form" id="ki-pv-form" method="post" action="{% url 'admin:api_apikey_preview' key.pk %}">{% csrf_token %}
+      <label>Адреса
+        <select id="ki-pv-tpl">{% for r in preview_choices %}
+          <option value="{{ r.path }}" data-params="{{ r.params|join:',' }}">GET {{ r.path }} — {{ r.summary }}</option>{% endfor %}
+        </select></label>
+      <label id="ki-pv-pwrap" hidden><span id="ki-pv-pname">Значення</span><input id="ki-pv-param" placeholder="AMP-100"></label>
+      <label>Параметри адреси<input name="query" id="ki-pv-query" placeholder="with_stock=1&amp;search=AMP" size="28"></label>
+      <label>Записів<input type="number" id="ki-pv-size" min="1" max="{{ preview_max }}" value="{{ preview_rows }}" style="width:70px"></label>
+      <button class="ki-btn ki-primary" type="submit">👁 Показати</button>
+    </form>
+    <div class="ki-out" id="ki-pv-out"></div>
+    {% else %}<p class="ki-mut">Ключ не має права читати жодну з адрес, які показує перегляд.</p>{% endif %}
+  </div>
+
+  <div class="ki-card" id="ki-sim">
+    <div class="ki-card-title">🧪 Що змінить запит — перевірка без запису</div>
+    <p class="ki-sub">Виберіть адресу, вставте тіло JSON, яке надсилає програма, — Minerva перевірить його тим самим
+      серіалізатором, що й справжній запит, прочитає потрібне з бази (товар за артикулом, залишок, наявне замовлення) і
+      скаже, що сталося б. Нічого не записується: перевірка йде в транзакції, яка завжди відкочується.</p>
+    {% if simulate_choices %}
+    <form class="ki-form" id="ki-sim-form" method="post" action="{% url 'admin:api_apikey_simulate' key.pk %}">{% csrf_token %}
+      <label>Запит
+        <select id="ki-sim-tpl">{% for r in simulate_choices %}
+          <option value="{{ r.method }} {{ r.path }}" data-params="{{ r.params|join:',' }}">{{ r.method }} {{ r.path }} — {{ r.summary }}</option>{% endfor %}
+        </select></label>
+      <label id="ki-sim-pwrap" hidden><span id="ki-sim-pname">Значення</span><input id="ki-sim-param" placeholder="12"></label>
+      <label class="ki-wide">Тіло запиту (JSON)<textarea name="body" id="ki-sim-body" rows="10" spellcheck="false"></textarea></label>
+      <button class="ki-btn ki-primary" type="submit">🧪 Перевірити</button>
+    </form>
+    <div class="ki-out" id="ki-sim-out"></div>
+    {% else %}<p class="ki-mut">Ключ не може змінювати нічого, що перевіряється без запису.</p>{% endif %}
+  </div>
+  {{ examples|json_script:"ki-examples" }}
+  {% else %}
+  <div class="ki-card ki-mut" style="margin-top:18px">👁 Приклад даних і 🧪 перевірка запитів — лише для тих, хто може
+    змінювати ключі API.</div>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  // фільтри таблиці
+  var mode = 'all', q = document.getElementById('ki-q');
+  function apply() {
+    var text = (q.value || '').toLowerCase();
+    document.querySelectorAll('.ki-row').forEach(function (tr) {
+      var ok = mode === 'all' || (mode === 'allowed' && tr.dataset.access === 'allowed')
+        || (mode === 'denied' && tr.dataset.access === 'denied')
+        || (mode === 'write' && tr.dataset.access === 'allowed' && tr.dataset.kind === 'write');
+      if (ok && text) ok = tr.dataset.q.toLowerCase().indexOf(text) >= 0;
+      tr.hidden = !ok;
+    });
+    document.querySelectorAll('.ki-group').forEach(function (g) {
+      g.hidden = !g.querySelector('.ki-row:not([hidden])');
+    });
+  }
+  document.querySelectorAll('#ki-filters .ki-chip').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#ki-filters .ki-chip').forEach(function (x) { x.classList.toggle('on', x === b); });
+      mode = b.dataset.f;
+      apply();
+    });
+  });
+  q.addEventListener('input', apply);
+
+  function el(tag, text, cls) {
+    var e = document.createElement(tag);
+    if (text != null) e.textContent = text;
+    if (cls) e.className = cls;
+    return e;
+  }
+  function list(items, title) {
+    var box = document.createElement('div');
+    if (!items || !items.length) return box;
+    if (title) box.appendChild(el('div', title, 'ki-note'));
+    var ul = document.createElement('ul');
+    items.forEach(function (t) { ul.appendChild(el('li', t)); });
+    box.appendChild(ul);
+    return box;
+  }
+  // шаблон адреси {sku} / {pk} → значення з поля
+  function setupParams(select, wrap, nameEl) {
+    function show() {
+      var opt = select.options[select.selectedIndex];
+      var params = opt && opt.dataset.params ? opt.dataset.params.split(',') : [];
+      wrap.hidden = !params.length;
+      nameEl.textContent = params.length ? 'Значення {' + params[0] + '}' : '';
+    }
+    select.addEventListener('change', show);
+    show();
+  }
+  function fill(template, value) {
+    return template.replace(/\{\w+\}/, value.trim());
+  }
+  function post(form, data, out, render) {
+    var fd = new FormData();
+    fd.append('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
+    Object.keys(data).forEach(function (k) { fd.append(k, data[k]); });
+    out.textContent = '⏳ …';
+    fetch(form.action, {method: 'POST', body: fd, credentials: 'same-origin'})
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (d) { out.textContent = ''; render(d, out); })
+      .catch(function (e) { out.textContent = '⚠ ' + e.message; });
+  }
+
+  // 👁 Приклад даних
+  var pvForm = document.getElementById('ki-pv-form');
+  if (pvForm) {
+    var pvTpl = document.getElementById('ki-pv-tpl'), pvParam = document.getElementById('ki-pv-param');
+    setupParams(pvTpl, document.getElementById('ki-pv-pwrap'), document.getElementById('ki-pv-pname'));
+    pvForm.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var tpl = pvTpl.value;
+      if (/\{\w+\}/.test(tpl) && !pvParam.value.trim()) { pvParam.focus(); return; }
+      var query = document.getElementById('ki-pv-query').value.trim().replace(/^\?/, '');
+      var size = document.getElementById('ki-pv-size').value;
+      query = (query ? query + '&' : '') + 'page_size=' + encodeURIComponent(size);
+      post(pvForm, {path: fill(tpl, pvParam.value), query: query}, document.getElementById('ki-pv-out'), function (d, out) {
+        if (d.error) { out.appendChild(el('div', '⚠ ' + d.error, 'ki-verdict bad')); return; }
+        var head = 'Відповідь ' + d.status + ' · GET ' + d.url;
+        if (d.shown != null) head += ' · записів показано: ' + d.shown + (d.total != null ? ' з ' + d.total : '');
+        out.appendChild(el('div', head, 'ki-verdict ' + (d.ok ? 'ok' : 'bad')));
+        if (d.fields && d.fields.length) out.appendChild(el('div', 'Поля запису: ' + d.fields.join(', '), 'ki-note'));
+        out.appendChild(list(d.notes));
+        out.appendChild(el('pre', d.json + (d.truncated ? '\n…' : '')));
+      });
+    });
+    document.querySelectorAll('[data-pv]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        pvTpl.value = b.dataset.pv;
+        pvTpl.dispatchEvent(new Event('change'));
+        document.getElementById('ki-preview').scrollIntoView({behavior: 'smooth'});
+      });
+    });
+  }
+
+  // 🧪 Що змінить запит
+  var simForm = document.getElementById('ki-sim-form');
+  if (simForm) {
+    var examples = JSON.parse(document.getElementById('ki-examples').textContent || '{}');
+    var simTpl = document.getElementById('ki-sim-tpl'), simBody = document.getElementById('ki-sim-body'),
+        simParam = document.getElementById('ki-sim-param');
+    function example() {
+      var ex = examples[simTpl.value];
+      simBody.value = ex ? JSON.stringify(ex, null, 2) : '';
+    }
+    setupParams(simTpl, document.getElementById('ki-sim-pwrap'), document.getElementById('ki-sim-pname'));
+    simTpl.addEventListener('change', example);
+    example();
+    simForm.addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      var parts = simTpl.value.split(' '), tpl = parts[1];
+      if (/\{\w+\}/.test(tpl) && !simParam.value.trim()) { simParam.focus(); return; }
+      post(simForm, {method: parts[0], path: fill(tpl, simParam.value), body: simBody.value},
+           document.getElementById('ki-sim-out'), function (d, out) {
+        var cls = d.ok === true ? 'ok' : (d.ok === false ? 'bad' : 'na');
+        out.appendChild(el('div', (d.status ? d.status + ' · ' : '') + d.verdict, 'ki-verdict ' + cls));
+        if (d.effect) out.appendChild(el('div', '✏️ ' + d.effect, 'ki-note'));
+        out.appendChild(list(d.effects, 'Що сталося б:'));
+        out.appendChild(list(d.errors, 'Помилки:'));
+        out.appendChild(list(d.notes));
+      });
+    });
+    document.querySelectorAll('[data-sim]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        simTpl.value = b.dataset.sim;
+        simTpl.dispatchEvent(new Event('change'));
+        document.getElementById('ki-sim').scrollIntoView({behavior: 'smooth'});
+      });
+    });
+  }
+})();
+</script>
+{% endblock %}

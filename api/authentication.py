@@ -24,7 +24,10 @@ class APIKeyAuthentication(BaseAuthentication):
             target.api_log_note = 'ключ прострочений'
             raise AuthenticationFailed('Токен прострочений.')
 
-        from .key_limits import client_ip, ip_allowed
+        from .key_limits import client_ip, ip_allowed, is_preview
+        if is_preview(request):
+            # «👁 Приклад даних» з картки ключа: запит іде з самої Minerva — адреса програми й last_used ні до чого
+            return (api_key, api_key)
         ip = client_ip(request)
         if not ip_allowed(api_key, ip):
             target.api_log_note = 'адреса не в «Дозволених IP» ключа'
