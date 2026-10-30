@@ -141,6 +141,30 @@ def currency_view(model_admin, request):
     })
 
 
+def card_config(product_id=None) -> dict:
+    """Для редактора базових цін у картці товару: валюта Minerva, курс для DigiKey (EUR → USD), курси «до валюти
+    Minerva» тим самим правилом, що для DigiKey (кнопка «Конвертувати» й «≈»), адреса переведення товару."""
+    home = bp.home_currency()
+    out = {"minerva": home, "to_minerva": {}, "dk": None, "convert_url": page_url([product_id]) if product_id else ""}
+    current = None
+    if product_id:
+        current = Product.objects.filter(pk=product_id).values_list("base_price_currency", flat=True).first()
+    try:
+        from bots.services import dk_prices
+        s = dk_prices.settings()
+        dk = dk_prices.currency(s)
+        if dk != home:
+            r = dk_prices.fx(home, dk, s)
+            out["dk"] = {"currency": dk, "rate": float(r) if r else None, "source": dk_prices.rate_source_text(s)}
+        for cur in {dk, (current or home).upper()} - {home}:
+            r = bp.rate_to_home(cur, home)
+            if r:
+                out["to_minerva"][cur] = float(r)
+    except Exception:  # noqa: BLE001 — без DigiKey картка працює з «Курсами валют»
+        pass
+    return out
+
+
 def _dk_rate_source() -> str:
     try:
         from bots.services.dk_prices import rate_source_text

@@ -2577,8 +2577,9 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         extra_context = extra_context or {}
+        from .admin_currency import card_config
         from .admin_prices import editor_config
-        extra_context["bp_config"] = editor_config()
+        extra_context["bp_config"] = {**editor_config(), **card_config(object_id)}
         if object_id:
             try:
                 from bots.models import DigiKeyListing

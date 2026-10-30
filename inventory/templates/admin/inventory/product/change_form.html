@@ -250,6 +250,10 @@ document.addEventListener('DOMContentLoaded', function() {
 .inv-bp-cv { color: var(--text-muted, #9aafbe); font-size: 12px; text-align: right; white-space: nowrap; min-width: 90px; }
 .inv-bp-foot { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--text-muted, #9aafbe); }
 .inv-bp-dirty { color: #ffb74d; font-weight: 600; }
+.inv-bp-warn { margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--warn, #e3b341); border-radius: 6px;
+  background: rgba(227,179,65,.08); font-size: 13px; line-height: 1.5; }
+.inv-bp-warn a { font-weight: 700; margin: 0 6px; }
+.inv-bp-warn .inv-bp-muted { color: var(--text-muted, #9aafbe); font-size: 12px; }
 </style>
 {{ bp_config|json_script:"bp-config" }}
 <script>
@@ -262,6 +266,9 @@ document.addEventListener('DOMContentLoaded', function () {
   var cfg = {}; try { cfg = JSON.parse(cfgEl ? cfgEl.textContent : '{}') || {}; } catch (e) {}
   var rates = cfg.fx_rates || {}, home = (cfg.home || 'EUR').toUpperCase();
   rates[home] = 1;
+  /* Валюта Minerva (EUR) і курси, як для DigiKey (inventory/admin_currency.card_config): базові ціни
+     тримаються в EUR, DigiKey отримує їх за «Курсом для цін DigiKey» */
+  var minerva = (cfg.minerva || home).toUpperCase(), toMinerva = cfg.to_minerva || {}, dk = cfg.dk || null;
   var curInp = document.querySelector('input[name="base_currency"]');
   var buyInp = document.getElementById('id_purchase_price');
 
@@ -280,6 +287,8 @@ document.addEventListener('DOMContentLoaded', function () {
   function rate(from, to) {
     from = (from || '').toUpperCase(); to = (to || '').toUpperCase();
     if (from === to) return 1;
+    if (to === minerva && toMinerva[from]) return toMinerva[from];          // той самий курс, що для DigiKey
+    if (from === minerva && dk && dk.currency === to && dk.rate) return dk.rate;
     var a = rates[from], b = rates[to];
     return a && b ? a / b : null;
   }
@@ -299,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function () {
       '<span class="inv-bp-tool"><button type="button" class="b-tpl" title="Ступені від ціни за 1 шт. за шаблоном «Налаштування цін»">Знижки за шаблоном</button></span>' +
       '<span class="inv-bp-tool">Округлення <select class="t-rnd">' + rOpts + '</select><button type="button" class="b-rnd">Округлити</button></span>' +
       '<span class="inv-bp-sep"></span>' +
-      '<span class="inv-bp-tool">Конвертувати в <input type="text" class="cur t-to" maxlength="3" value="' + home + '"> курс <input type="text" class="t-rate"> <button type="button" class="b-conv">Конвертувати</button></span>' +
+      '<span class="inv-bp-tool">Конвертувати в <input type="text" class="cur t-to" maxlength="3" value="' + minerva + '"> курс <input type="text" class="t-rate"> <button type="button" class="b-conv" title="Ціни × курс, до 4 знаків (округлити — «Округлити»). До ' + minerva + ' — курс як для DigiKey">Конвертувати</button></span>' +
     '</div>' +
     '<table class="inv-bp-table"><thead><tr><th>Від кількості, шт.</th><th>Ціна за шт.</th><th>Знижка від 1 шт., %</th>' +
       '<th class="h-cv" style="text-align:right">≈ у ' + home + '</th><th style="width:36px"></th></tr></thead><tbody></tbody></table>' +
@@ -307,6 +316,17 @@ document.addEventListener('DOMContentLoaded', function () {
       '<button type="button" class="inv-bp-btn b-undo" title="Повернути ціни, як були при відкритті сторінки">↶ Скасувати зміни</button>' +
       '<span class="bp-state">Порядок за кількістю — автоматично при збереженні</span></div>';
   ta.parentNode.insertBefore(wrap, ta);
+  var startCur = curInp ? (curInp.value || '').toUpperCase() : minerva;
+  if (startCur && startCur !== minerva && ta.value.trim()) {   // ціни на складі мають бути у валюті Minerva
+    var warn = document.createElement('div'), r0 = toMinerva[startCur];
+    warn.className = 'inv-bp-warn';
+    warn.innerHTML = '⚠ Ціни в <b>' + startCur + '</b> — на складі мають бути в <b>' + minerva + '</b> (валюта Minerva): ' +
+      'DigiKey, магазини й Angebote перераховують їх у свою валюту самі.' +
+      (cfg.convert_url ? '<a href="' + cfg.convert_url + '">💱 Перевести в ' + minerva + '</a>' : '') +
+      (r0 ? '<span class="inv-bp-muted">курс як для DigiKey: 1 ' + startCur + ' = ' + fmt(r0) + ' ' + minerva +
+        (dk && dk.source ? ' (' + dk.source + ')' : '') + ' — ціни на DigiKey не зміняться</span>' : '');
+    wrap.insertBefore(warn, wrap.firstChild);
+  }
   var body = wrap.querySelector('tbody'), $ = function (c) { return wrap.querySelector(c); };
   var initial = ta.value, initialCur = curInp ? curInp.value : '';
 
@@ -349,8 +369,16 @@ document.addEventListener('DOMContentLoaded', function () {
   // ── Синхронізація: знижки, ≈ у валюті магазину, textarea ──
   function sync(keepDiscount) {
     var b = basePrice(), list = [];
-    var r = rate(curInp ? curInp.value : home, home);
-    $('.h-cv').textContent = r === 1 ? '' : '≈ у ' + home + (r ? ' (курс ' + fmt(r) + ')' : ' (немає курсу)');
+    var cur = (curInp ? curInp.value : home).toUpperCase();
+    var r = rate(cur, home), cvCur = home;
+    if (r === 1 && dk && dk.currency !== cur && cur === minerva) {   // ціни вже в EUR — що отримає DigiKey
+      r = dk.rate || null; cvCur = dk.currency;
+      $('.h-cv').textContent = '≈ на DigiKey, ' + cvCur + (r ? ' (курс ' + fmt(r) + ')' : ' (немає курсу)');
+      $('.h-cv').title = 'До надбавки й округлення правил DigiKey · ' + (dk.source || '');
+    } else {
+      $('.h-cv').textContent = r === 1 ? '' : '≈ у ' + home + (r ? ' (курс ' + fmt(r) + ')' : ' (немає курсу)');
+      $('.h-cv').title = '';
+    }
     rows().forEach(function (x) {
       var qn = num(x.q.value), pn = num(x.p.value);
       x.q.classList.toggle('is-bad', x.q.value.trim() !== '' && !(qn >= 1 && Math.floor(qn) === qn));
@@ -359,7 +387,7 @@ document.addEventListener('DOMContentLoaded', function () {
         x.d.value = b > 0 && pn > 0 && qn > 1 ? (Math.round((1 - pn / b) * 1000) / 10).toString().replace('.', ',') : '';
       }
       x.d.disabled = qn === 1;
-      x.tr.querySelector('.inv-bp-cv').textContent = r && r !== 1 && pn > 0 ? money(pn * r) + ' ' + home : '';
+      x.tr.querySelector('.inv-bp-cv').textContent = r && r !== 1 && pn > 0 ? money(pn * r) + ' ' + cvCur : '';
       if (x.p.value.trim()) list.push({ q: x.q.value.trim(), p: x.p.value.trim().replace(',', '.'), qn: qn });
     });
     list.sort(function (a, c) { return (a.qn || 0) - (c.qn || 0); });
@@ -414,7 +442,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var to = $('.t-to').value.trim().toUpperCase(), r = num($('.t-rate').value);
     if (!/^[A-Z]{3}$/.test(to)) return $('.t-to').focus();
     if (!(r > 0)) { alert('Вкажіть курс: 1 ' + (curInp ? curInp.value : '') + ' = ? ' + to); return $('.t-rate').focus(); }
-    eachPrice(function (p) { return p * r; });
+    eachPrice(function (p) { return p * r; }, true);   // 4 знаки: зворотний перерахунок для DigiKey дає ту саму ціну
     if (curInp) curInp.value = to;
     sync();
   });

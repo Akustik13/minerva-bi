@@ -145,3 +145,34 @@ class PageTests(Base):
         self.assertIn(r.status_code, (302, 403))
         self.usd.refresh_from_db()
         self.assertEqual(self.usd.base_price_currency, "USD")
+
+
+class CardTests(Base):
+    """Картка товару: валюта Minerva, курс як для DigiKey, переведення одного товару."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+        self.usd = self.product("U-1", [(1, 279)])
+        self.eur = self.product("E-1", [(1, 10)], "EUR")
+
+    def config(self, product):
+        import json
+        import re
+        html = self.client.get(f"/admin/inventory/product/{product.pk}/change/").content.decode()
+        return json.loads(re.search(r'<script id="bp-config" type="application/json">(.*?)</script>', html, re.S).group(1))
+
+    def test_usd_product_gets_digikey_rate_and_convert_link(self):
+        cfg = self.config(self.usd)
+        self.assertEqual(cfg["minerva"], "EUR")
+        self.assertEqual(cfg["to_minerva"], {"USD": 0.86})            # як dk_prices.fx — ціни DigiKey не зрушать
+        self.assertEqual(cfg["convert_url"], f"/admin/inventory/product/base-currency/?ids={self.usd.pk}")
+        self.assertEqual(cfg["dk"]["currency"], "USD")
+        self.assertAlmostEqual(cfg["dk"]["rate"], 1 / 0.86, places=6)
+
+    def test_rate_follows_digikey_manual_rate(self):
+        s = DigiKeyPriceSettings.get()
+        s.fx_source, s.fx_manual_rate = DigiKeyPriceSettings.FX_MANUAL, D("1.25")
+        s.save()
+        cfg = self.config(self.eur)
+        self.assertEqual((cfg["dk"]["rate"], cfg["dk"]["source"]), (1.25, "свій курс для DigiKey"))
