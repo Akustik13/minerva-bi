@@ -37,6 +37,13 @@ class DanteSettings(models.Model):
         help_text="Відмічено «Прийшов» (або Minerva записала прихід за сьогодні до зараз), а «Пішов» не натиснули — "
                   "після стандартного відходу працівника Minerva сама запише в askDANTE решту дня до нього. "
                   "«Прийшов» уже після відходу (вечірня робота) не закривається.")
+    auto_day = models.BooleanField(
+        "Робочий день сам — відкрити й закрити", default=True,
+        help_text="Працівникам з «Автозаповненням»: о стандартному приході Minerva відкриває робочий день (як "
+                  "«Прийшов»), якщо в askDANTE за сьогодні нічого немає й день робочий (не вихідний, не свято, не "
+                  "відпустка); о стандартному відході записує його в askDANTE («Пішов» автоматично). Внесене вручну "
+                  "— не чіпається. Відмітку «Kommen» з askDANTE без «Gehen» Minerva закрити не може (API askDANTE "
+                  "приймає лише готові записи) — надсилає нагадування.")
 
     autofill_mode = models.CharField("Автозаповнення", max_length=10, choices=MODES, default=MODE_OFF,
                                      help_text="Щодня заповнює порожні робочі дні працівників, яким увімкнено "
@@ -154,6 +161,13 @@ class DanteUser(models.Model):
     report_email = models.CharField("Email для звіту", max_length=254, blank=True, default="",
                                     help_text="Заповнено — працівник отримує свою частину звіту поштою "
                                               "(якщо в звіті увімкнено «Кожному працівнику»).")
+    # «Робочий день сам» (services.auto_day): за який день Minerva вже вирішила, відкривати чи ні, і чому
+    day_opened = models.DateField("Робочий день сам: перевірено за", null=True, blank=True, editable=False)
+    day_note = models.CharField("Робочий день сам: що вирішено", max_length=255, blank=True, default="",
+                                editable=False)
+    day_closed = models.DateField("Кінець дня перевірено за", null=True, blank=True, editable=False)
+    stamps_reminded = models.JSONField(default=list, blank=True, editable=False,
+                                       help_text="Відкриті відмітки askDANTE, про які вже нагадано («дата час»).")
 
     class Meta:
         verbose_name = "Працівник askDANTE"

@@ -3,7 +3,8 @@
     python manage.py worktime_autofill --if-due    # з cron: раз на добу після «Запуск о годині», лише якщо увімкнено
     python manage.py worktime_autofill --dry-run   # що записалось би, без запису
 
-З --if-due (кожен цикл cron) ще й «Пішов» автоматично після стандартного відходу (services.auto_clock_out).
+З --if-due (кожен цикл cron) ще й «Робочий день сам» (services.auto_day — відкрити о приході), «Пішов» автоматично
+після стандартного відходу (services.auto_clock_out) і нагадування про відмітку askDANTE без «Gehen» (services.day_end).
 """
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -23,10 +24,16 @@ class Command(BaseCommand):
         st = DanteSettings.get()
         if opts["if_due"]:   # виклик із cron — відмітка «cron живий» для сторінки налаштувань
             DanteSettings.objects.filter(pk=st.pk).update(cron_seen_at=timezone.now())
-            # забули «Пішов» — після стандартного відходу (кожен цикл cron, не раз на добу)
+            # «Робочий день сам»: о стандартному приході відкрити день (кожен цикл cron, не раз на добу)
+            for line in services.auto_day(st):
+                self.stdout.write(f"worktime_autofill: робочий день сам — {line}")
+            # забули «Пішов» / день відкрила Minerva — після стандартного відходу
             for b in services.auto_clock_out(st):
                 self.stdout.write(f"worktime_autofill: «Пішов» автоматично {b.dante_user} {b.date} "
                                   f"{services.hhmm(b.start)}–{services.hhmm(b.stop)} · {b.status} {b.error}".rstrip())
+            # кінець дня: відмітка «Kommen» askDANTE без «Gehen» — нагадування (закрити її Minerva не може)
+            for line in services.day_end(st):
+                self.stdout.write(f"worktime_autofill: кінець дня — {line}")
         if opts["if_due"] and not services.autofill_due(st):
             return
         if st.autofill_mode == DanteSettings.MODE_OFF:

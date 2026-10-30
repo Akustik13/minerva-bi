@@ -6,6 +6,7 @@ import datetime
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
 from . import mail_time, meetings, services
 from .client import DanteError, hhmm
@@ -82,6 +83,10 @@ def day_page(model_admin, request):
         "times": times, "day_minutes": _hm(wd.minutes) if wd else "", "target": _hm(wd.target_minutes) if wd and
         wd.target_minutes else "", "absences": services.absences_text(wd), "blocker": services.day_blocker(st, wd, day),
         "plan": plan_row, "span": span, "def_start": hhmm(def_start), "def_stop": hhmm(def_stop),
+        "open_stamps": services.open_stamps(st, du, [wd]) if du and wd else [], "dante_url": st.base_url,
+        "open_since": timezone.localtime(du.open_since) if du and du.open_since
+        and timezone.localtime(du.open_since).date() == day else None,
+        "auto_out": services.clock_out_at(du, st) if du else None,
         "records": [{"r": r, "dur": _hm(r.duration)} for r in records],
         "mail_rows": mail_rows, "unmapped": unmapped, "meet_rows": meet_rows, "log": log,
         "mail_private": mail_private, "mail_private_text": mail_time.MAIL_PRIVATE,

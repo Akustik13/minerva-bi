@@ -117,7 +117,7 @@ button.wt-rec:hover{text-decoration:underline}
     {% csrf_token %}
     <input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="m" value="{{ cur_m }}">
     {% if open_since %}
-      <span class="big">▶ {% trans "Прийшов о" %} {{ open_since|time:"H:i" }}</span>
+      <span class="big">▶ {% if auto_day.today == "відкрито автоматично" %}{% trans "Робочий день відкрито о" %}{% else %}{% trans "Прийшов о" %}{% endif %} {{ open_since|time:"H:i" }}</span>
       <span class="wt-muted">{% trans "минуло" %} {{ open_duration }}{% if auto_out %} · {% trans "не натиснете «Пішов» — Minerva відмітить його сама о" %} {{ auto_out|time:"H:i" }}{% endif %}</span>
       <button class="button default" name="action" value="clock_out">⏹ {% trans "Пішов — записати в askDANTE" %}</button>
       <button class="button" name="action" value="clock_cancel" onclick="return confirm('{% trans "Скасувати відмітку «Прийшов»? В askDANTE нічого не записано." %}')">✖ {% trans "Скасувати" %}</button>
@@ -126,8 +126,17 @@ button.wt-rec:hover{text-decoration:underline}
       <span class="wt-muted">{% trans "askDANTE приймає лише готовий запис, тож він піде, коли натиснете «Пішов». Через північ — два записи." %}</span>
     {% endif %}
   </form>
+  <div class="wt-muted" style="margin-top:6px">🤖 {% trans "Робочий день сам" %}:
+    {% if auto_day.on %}{% blocktrans with opens=auto_day.opens closes=auto_day.closes %}відкривається о {{ opens }} і записується в askDANTE о {{ closes }}, якщо за день нічого не внесено вручну{% endblocktrans %}{% if auto_day.today %} · {% trans "сьогодні" %}: <b>{{ auto_day.today }}</b>{% endif %}
+    {% else %}{% trans "не діє" %} — {{ auto_day.why_off }}{% if not du.autofill %} · <a href="{{ du_url }}">{% trans "картка працівника" %}</a>{% endif %}{% endif %}
+  </div>
 </div>
 {% endif %}
+{% for s in open_stamps %}
+  <div class="wt-card wt-warn">⚠️ {% blocktrans with day=s.date|date:"d.m.Y" coming=s.coming %}В askDANTE відкрита відмітка «Kommen» {{ day }} з {{ coming }} без «Gehen».{% endblocktrans %}
+    {% trans "Minerva не може закрити її сама: API askDANTE приймає лише готові записи «з … по …» і не змінює наявні." %}
+    <a href="{{ dante_url }}" target="_blank" rel="noopener">{% trans "Відкрити askDANTE ↗" %}</a> — {% trans "відмітьте відхід або виправте день." %}</div>
+{% endfor %}
 
 <div class="wt-totals">
   <span>{% trans "Відпрацьовано" %}: <b>{{ totals.hours }}</b></span>

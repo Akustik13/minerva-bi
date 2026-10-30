@@ -133,7 +133,7 @@ class DanteSettingsAdmin(admin.ModelAdmin):
                            "askDANTE — головний облік часу: Minerva лише читає дні й дописує туди, де порожньо. "
                            "Записи askDANTE через API не виправляються й не видаляються — помилки правити в askDANTE.",
         }),
-        ("Робочий день", {"fields": ["default_start", "default_stop", "workdays", "auto_clock_out"]}),
+        ("Робочий день", {"fields": ["default_start", "default_stop", "workdays", "auto_clock_out", "auto_day"]}),
         ("Автозаповнення (щодня)", {
             "fields": ["autofill_mode", "autofill_since", "autofill_lookback_days", "autofill_hour",
                        "activity_fallback", "round_minutes", "min_activity_minutes", "autofill_status"],
@@ -669,6 +669,10 @@ class WorkDayAdmin(admin.ModelAdmin):
             "open_since": timezone.localtime(du.open_since) if du.open_since else None,
             "open_duration": _duration((timezone.now() - du.open_since).total_seconds() // 60) if du.open_since else "",
             "auto_out": services.clock_out_at(du, st),
+            "auto_day": services.auto_day_state(st, du),
+            "open_stamps": services.open_stamps(st, du, cached.values()),
+            "dante_url": st.base_url,
+            "du_url": reverse("admin:worktime_danteuser_change", args=[du.pk]),
             "modes": [m for m in DanteSettings.MODES if m[0] != DanteSettings.MODE_OFF],
         })
         ctx.update(self._preview(request, st, du, today))

@@ -48,6 +48,10 @@
       {% if day_minutes %}<span class="dy-muted">{% trans "разом" %} {{ day_minutes }}{% if target %} · {% trans "норма" %} {{ target }}{% endif %}</span>{% endif %}</h3>
     <div>{% for t in times %}<span class="dy-t">{{ t.coming }}–{{ t.leaving|default:"…" }}</span>{% empty %}<span class="dy-muted">{% if blocker %}{{ blocker }}{% else %}{% trans "ще немає" %}{% endif %}</span>{% endfor %}
       {% if absences %}<span class="dy-muted"> · {{ absences }}</span>{% endif %}</div>
+    {% if open_since %}<div class="dy-muted" style="margin-top:6px">▶ {% blocktrans with t=open_since|time:"H:i" %}У Minerva відкрито з {{ t }} (ще не в askDANTE){% endblocktrans %}{% if auto_out %} — {% blocktrans with t=auto_out|time:"H:i" %}о {{ t }} Minerva запише день в askDANTE сама{% endblocktrans %}{% endif %}</div>{% endif %}
+    {% for s in open_stamps %}<div class="dy-warn" style="margin-top:6px">⚠️ {% blocktrans with coming=s.coming %}В askDANTE відкрита відмітка «Kommen» з {{ coming }} без «Gehen».{% endblocktrans %}
+      {% trans "Minerva не може закрити її сама: API askDANTE приймає лише готові записи «з … по …» і не змінює наявні." %}
+      <a href="{{ dante_url }}" target="_blank" rel="noopener">{% trans "Відкрити askDANTE ↗" %}</a></div>{% endfor %}
     {% if st.enabled and day <= today %}
     <form method="post" class="dy-row" style="margin-top:8px" onsubmit="return confirm('{% trans "Записати прихід і відхід в askDANTE? Записи через API не видаляються." %}')">
       {% csrf_token %}<input type="hidden" name="u" value="{{ du.pk }}"><input type="hidden" name="d" value="{{ day|date:'Y-m-d' }}">

@@ -547,10 +547,15 @@ def auto_clock_out(st: DanteSettings | None = None) -> list[Booking]:
         at = clock_out_at(du, st)
         if at is None or now < at:
             continue
+        auto = du.day_note == DAY_OPENED and du.day_opened == timezone.localtime(du.open_since).date()
         try:
             done = clock_out(du, until=at, source=Booking.AUTO, reason="«Пішов» автоматично — стандартний відхід")
         except DanteError as e:   # до запису не дійшло (читання дня, перекриття, задовго)
             if e.code != "bad_request":   # askDANTE недоступний / інший запис саме йде — наступного разу
+                continue
+            if auto and e.message.startswith("Перекривається"):   # день відкрила Minerva, а людина внесла своє
+                clock_cancel(du)
+                DanteUser.objects.filter(pk=du.pk).update(day_note=f"{DAY_MANUAL} ({e.message})"[:255])
                 continue
             done = [Booking.objects.create(dante_user=du, date=timezone.localtime(du.open_since).date(),
                                            kind=Booking.WORK, source=Booking.AUTO, status=Booking.FAILED,
@@ -559,6 +564,157 @@ def auto_clock_out(st: DanteSettings | None = None) -> list[Booking]:
         du.refresh_from_db(fields=["open_since"])
         if du.open_since and any(b.status != Booking.SENT for b in done):
             clock_cancel(du)
+    return out
+
+
+# ── «Робочий день сам» (cron) ────────────────────────────────────
+DAY_OPENED = "відкрито автоматично"
+DAY_MANUAL = "внесено вручну — Minerva не втручається"
+STAMPS_KEEP = 30
+
+
+def _at(day: datetime.date, t: datetime.time) -> datetime.datetime:
+    return timezone.make_aware(datetime.datetime.combine(day, t))
+
+
+def auto_day_state(st: DanteSettings, du: DanteUser) -> dict:
+    """Для календаря: чи діє «Робочий день сам» для працівника, о котрій відкривається й закривається і що
+    вирішено сьогодні. {on, why_off, opens, closes, today}"""
+    start, stop = du.times(st)
+    why = ""
+    if not st.auto_day:
+        why = "вимкнено в налаштуваннях askDANTE"
+    elif not st.auto_clock_out:
+        why = "у налаштуваннях вимкнено «Пішов» автоматично — без нього день не закриється"
+    elif not du.autofill:
+        why = "для вас не увімкнено «Автозаповнення» (картка працівника askDANTE)"
+    elif not (st.enabled and st.configured):
+        why = "askDANTE не підключено"
+    return {"on": not why, "why_off": why, "opens": hhmm(start), "closes": hhmm(stop),
+            "today": du.day_note if du.day_opened == local_today() else ""}
+
+
+def auto_day(st: DanteSettings | None = None, now=None) -> list[str]:
+    """Cron (кожен цикл): «Робочий день сам» (`DanteSettings.auto_day`, працівники з «Автозаповненням»). Від
+    стандартного приходу до відходу — один раз за день свіже читання askDANTE: робочий день без жодного запису →
+    Minerva відкриває день (`open_since` = стандартний прихід, як «Прийшов»), закриває його `auto_clock_out` о
+    відході. Уже є записи чи відмітка askDANTE, вихідний, свято, відпустка, «Прийшов» у Minerva — нічого не робить
+    (причина — `day_note`). → що вирішено."""
+    st = st or DanteSettings.get()
+    if not (st.enabled and st.configured and st.auto_day and st.auto_clock_out):
+        return []
+    now = timezone.localtime(now) if now else timezone.localtime()
+    today, out = now.date(), []
+    for du in DanteUser.objects.filter(autofill=True, archived=False).exclude(day_opened=today):
+        start, stop = du.times(st)
+        if now < _at(today, start):
+            continue
+        if stop != datetime.time(0, 0) and stop > start and now >= _at(today, stop):
+            note = "Minerva не працювала до кінця дня — «🧩 Заповнити пропуски» або автозаповнення завтра"
+        elif du.open_since:
+            note = f"відмічено «Прийшов» {timezone.localtime(du.open_since):%d.%m %H:%M}"
+        else:
+            try:
+                days = refresh_days(du, today, today)
+            except DanteError:
+                continue   # askDANTE недоступний — наступного циклу
+            blocker = day_blocker(st, days[today], today)
+            if not blocker and days.attendance_error:
+                blocker = "свята й відпустки askDANTE не прочитано — день не відкрито"
+            if blocker.startswith("вже є"):
+                blocker = f"{blocker} — {DAY_MANUAL}"
+            note = blocker
+            if not blocker:
+                du.open_since, note = _at(today, start), DAY_OPENED
+        du.day_opened, du.day_note = today, note[:255]
+        du.save(update_fields=["open_since", "day_opened", "day_note"])
+        out.append(f"{du}: {note}")
+    return out
+
+
+def open_stamps(st: DanteSettings, du: DanteUser, days, now=None) -> list[dict]:
+    """Відмітки «Kommen» askDANTE без «Gehen» (термінал, додаток, веб askDANTE — Minerva пише лише готові записи),
+    які вже мали б бути закриті: за минулі дні — усі, за сьогодні — після стандартного відходу.
+    days — WorkDay (кеш). → [{date, coming, key}]"""
+    now = timezone.localtime(now) if now else timezone.localtime()
+    stop = du.times(st)[1]
+    out = []
+    for wd in sorted(days, key=lambda w: w.date):
+        if wd.date > now.date():
+            continue
+        if wd.date == now.date() and (stop == datetime.time(0, 0) or now < _at(wd.date, stop)):
+            continue
+        for t in wd.times or []:
+            if t.get("coming") and not t.get("leaving"):
+                out.append({"date": wd.date, "coming": t["coming"], "key": f"{wd.date.isoformat()} {t['coming']}"})
+    return out
+
+
+def remind_open_stamps(st: DanteSettings, du: DanteUser, stamps: list[dict]) -> str:
+    """Нагадування працівнику про відкриту відмітку askDANTE: email («Email для звіту» → пошта користувача Minerva
+    → логін askDANTE) і Telegram (Telegram ID у профілі й бот у «Налаштування → Сповіщення»). → '' або що не
+    вдалося."""
+    from html import escape
+
+    from . import reports
+    when = [f"{s['date']:%d.%m.%Y} з {s['coming']}" for s in stamps]
+    url = (st.base_url or "https://my.askdante.com").rstrip("/")
+    why = ("Minerva не може закрити її сама: API askDANTE приймає лише готові записи «з … по …», а змінювати чи "
+           "доповнювати наявні не дозволяє.")
+    subject = "askDANTE: не відмічено «Gehen» — " + ", ".join(when)
+    text = ("В askDANTE відкрита відмітка «Kommen» без «Gehen»:\n" + "\n".join(f"• {w}" for w in when)
+            + f"\n\n{why} Відкрийте askDANTE і відмітьте відхід або виправте день: {url}\n\n"
+            "Minerva закриває робочий день сама лише тоді, коли в askDANTE за день нічого не внесено вручну.")
+    html = ("<p>В askDANTE відкрита відмітка «Kommen» без «Gehen»:</p><ul>"
+            + "".join(f"<li><b>{escape(w)}</b></li>" for w in when)
+            + f"</ul><p>{escape(why)}</p><p><a href=\"{escape(url)}\">Відкрити askDANTE</a> і відмітити відхід або "
+            "виправити день.</p><p style=\"color:#666\">Minerva закриває робочий день сама лише тоді, коли в askDANTE "
+            "за день нічого не внесено вручну.</p>")
+    errors = []
+    to = next((a for a in (du.report_email, getattr(du.user, "email", ""), du.email) if a and "@" in a), "")
+    err = reports.deliver(None, [to] if to else [], subject, text, html)
+    if err:
+        errors.append(f"пошта: {err}")
+    chat = getattr(getattr(du.user, "profile", None), "telegram_id", None) if du.user_id else None
+    if chat:
+        try:
+            from config.models import NotificationSettings
+            from dashboard.notifications import _send_telegram
+            ns = NotificationSettings.get()
+            if ns.telegram_bot_token:
+                _send_telegram(ns, "⏱ <b>askDANTE: не відмічено «Gehen»</b>\n" + "\n".join(f"• {escape(w)}" for w in when)
+                               + f"\n\n{escape(why)}\n<a href=\"{escape(url)}\">Відкрити askDANTE</a>",
+                               chat_id_override=chat)
+        except Exception as e:  # noqa: BLE001 — нагадування не має зупиняти cron
+            errors.append(f"Telegram: {str(e)[:120]}")
+    return "; ".join(errors)
+
+
+def day_end(st: DanteSettings | None = None, now=None) -> list[str]:
+    """Cron (кожен цикл, після `auto_clock_out`): після стандартного відходу працівника з «Автозаповненням» — один
+    раз за день свіже читання askDANTE за вчора й сьогодні; відкрита відмітка «Kommen» без «Gehen» →
+    `remind_open_stamps` (раз на відмітку, `DanteUser.stamps_reminded`). → що зроблено."""
+    st = st or DanteSettings.get()
+    if not (st.enabled and st.configured and st.auto_day):
+        return []
+    now = timezone.localtime(now) if now else timezone.localtime()
+    today, out = now.date(), []
+    for du in DanteUser.objects.filter(autofill=True, archived=False).exclude(day_closed=today):
+        stop = du.times(st)[1]
+        if stop == datetime.time(0, 0) or now < _at(today, stop):
+            continue
+        try:
+            days = refresh_days(du, today - datetime.timedelta(days=1), today)
+        except DanteError:
+            continue
+        reminded = list(du.stamps_reminded or [])
+        stamps = [s for s in open_stamps(st, du, days.values(), now) if s["key"] not in reminded]
+        if stamps:
+            err = remind_open_stamps(st, du, stamps)
+            reminded += [s["key"] for s in stamps]
+            out.append(f"{du}: нагадано про {', '.join(s['key'] for s in stamps)}" + (f" ({err})" if err else ""))
+        du.day_closed, du.stamps_reminded = today, reminded[-STAMPS_KEEP:]
+        du.save(update_fields=["day_closed", "stamps_reminded"])
     return out
 
 
@@ -1115,6 +1271,8 @@ def book_project(du: DanteUser, day: datetime.date, dp: DanteProject, minutes: i
         return r
 
     c = client(st)
+    if not attendance and day == local_today() and du.open_since and timezone.localtime(du.open_since).date() == day:
+        attendance = DanteSettings.MODE_FIXED   # «Прийшов» / день відкрила Minerva — прихід відомий, askDANTE ще ні
     if attendance in (DanteSettings.MODE_FIXED, DanteSettings.MODE_ACTIVITY):
         # людина вибрала: у дні без приходу спершу записати прихід / відхід (askDANTE пише час на проєкт лише в них)
         try:
