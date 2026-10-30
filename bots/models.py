@@ -157,6 +157,10 @@ class DigiKeyConfig(models.Model):
         'Правило: даташит для DigiKey', max_length=500, blank=True, default='',
         help_text='{key} — артикул товару (або «Даташит: спільний файл»); досить початку адреси — '
                   'Minerva допише {key}.pdf.')
+    media_datasheet_code = models.CharField(
+        'Код поля «Datasheet URL» на DigiKey', max_length=100, blank=True, default='',
+        help_text='Minerva бере його сама з товарів DigiKey («📥 Стягнути поля», звірка фото й даташитів). '
+                  'Порожньо — даташит на DigiKey не надсилається.')
 
     auto_invoice_eu = models.BooleanField(
         "Авто-генерація інвойсу для ЄС", default=False,

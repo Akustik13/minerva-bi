@@ -32,9 +32,11 @@
     в картки лістингів, а з галочкою — підуть і на DigiKey (фото — полем товару «imageUrl»; DigiKey перевіряє зміни
     товару окремо, Products → Pending).</div>
   <div class="dm-muted" style="margin-top:6px">
-    {% if sheet %}📄 Даташит DigiKey приймає в полі «{{ sheet.name }}» ({{ sheet.code }}) — надсилається разом з карткою.
-    {% else %}📄 Поля даташита DigiKey Minerva не знає: даташит записується в картку лістингу, але на DigiKey не йде.
-      Запитайте поля DigiKey: «🔷 Зі складу на DigiKey» → «🔄 Запитати поля в DigiKey».{% endif %}
+    {% if sheet %}📄 Даташит іде на DigiKey у поле «{{ sheet.name }}» ({{ sheet.code }}) — разом з карткою товару.
+    {% else %}📄 Поля «Datasheet URL» DigiKey Minerva ще не знає: даташит записується в картку лістингу, але на DigiKey
+      не йде. Натисніть «🔍 Прочитати з DigiKey і перевірити» — Minerva візьме код поля з ваших товарів на DigiKey
+      (або «📥 Стягнути поля з DigiKey» у картці лістингу).{% endif %}
+    · 🖼 Фото DigiKey копіює до себе (mm.digikey.com), тож адреса там завжди інша — фото надсилається лише вибраним.
   </div>
   <form method="get" class="dm-row" style="margin-top:10px">
     <input type="text" name="q" value="{{ q }}" placeholder="артикул або назва">
@@ -73,7 +75,7 @@
           <td>{% if forloop.first %}<a href="{% url 'admin:bots_digikeylisting_change' r.listing.pk %}">{{ r.listing.get_supplier_sku }}</a>
             {% if not r.published %}<div class="dm-muted">ще не на DigiKey</div>{% elif r.checked and not r.found %}<div class="dm-muted">товар не знайдено на DigiKey</div>{% endif %}{% endif %}</td>
           <td>{% if it.kind == "image" %}🖼{% else %}📄{% endif %} {{ it.label }}</td>
-          <td class="dm-url">{% if it.dk is None %}<span class="dm-muted">не читали</span>{% elif it.dk %}{{ it.dk }}{% if it.dk_same %} ✓{% endif %}{% else %}<span class="dm-muted">немає</span>{% endif %}</td>
+          <td class="dm-url">{% if it.dk is None %}<span class="dm-muted">не читали</span>{% elif it.dk %}{{ it.dk }}{% if it.dk_same %} ✓{% elif it.dk_copy %}<div class="dm-muted">копія фото на сервері DigiKey</div>{% endif %}{% else %}<span class="dm-muted">немає</span>{% endif %}</td>
           <td class="dm-url">{{ it.card|default:"—" }}{% if it.card_error %}<div class="dm-err">✗ {{ it.card_error }}</div>{% elif it.card_error == "" %} ✓{% endif %}</td>
           <td class="dm-url">{{ it.new|default:"—" }}{% if it.how %}<div class="dm-muted">{{ it.how }}</div>{% endif %}
             {% if it.new_error %}<div class="dm-err">✗ {{ it.new_error }}</div>{% elif it.new_error == "" %} ✓{% endif %}</td>

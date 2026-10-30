@@ -149,7 +149,7 @@ class PageTests(Base):
         self.assertContains(card, 'data-url="https://img.example.com/AN-1.png"')
         settings = self.client.get(f"/admin/bots/digikeyconfig/{self.cfg.pk}/change/")
         self.assertContains(settings, "Звірити фото й даташити на DigiKey")
-        self.assertContains(settings, "Поля даташита DigiKey Minerva не знає")
+        self.assertContains(settings, "Поля «Datasheet URL» DigiKey Minerva ще не знає")
 
     def test_view_only_user_cannot_apply(self):
         viewer = User.objects.create_user("vera", "v@x.y", "p", is_staff=True)
@@ -158,3 +158,61 @@ class PageTests(Base):
         self.assertIn(r.status_code, (302, 403))
         self.l.refresh_from_db()
         self.assertEqual(self.l.dk_image_url, "https://old.example.com/AN-1.jpg")
+
+
+class DatasheetCodeTests(Base):
+    """Поле «Datasheet URL» DigiKey: код — з товарів DigiKey, відмова DigiKey — повтор без нього."""
+
+    def test_code_learned_from_digikey_product_and_pulled_attributes(self):
+        self.assertIsNone(dk_media.datasheet_field())
+        product = {"imageUrl": "", "additionalFields": [{"code": "datasheetUrl", "value": "https://a/x.pdf"}]}
+        self.assertEqual(dk_media.on_digikey(product)["datasheet"], "https://a/x.pdf")
+        self.assertEqual(DigiKeyConfig.get().media_datasheet_code, "datasheetUrl")
+        self.assertEqual(dk_media.datasheet_field()["code"], "datasheetUrl")
+        DigiKeyConfig.objects.filter(pk=1).update(media_datasheet_code="")
+        dk_media.learn_from_attributes({"139": "433 MHz", "datasheetUrl": "https://a/x.pdf"})
+        self.assertEqual(DigiKeyConfig.get().media_datasheet_code, "datasheetUrl")
+
+    def test_new_value_replaces_old_pulled_one(self):
+        DigiKeyConfig.objects.filter(pk=1).update(media_datasheet_code="datasheetUrl")
+        self.l.dk_datasheet_url = "https://docs.example.com/new.pdf"
+        fields = dk_media.add_datasheet([{"code": "datasheetUrl", "type": "String", "value": "https://old/x.pdf"}],
+                                        self.l)
+        self.assertEqual(fields, [{"code": "datasheetUrl", "type": "String", "value": "https://docs.example.com/new.pdf"}])
+
+    def test_rejected_field_is_dropped_and_forgotten(self):
+        from bots.services import dk_marketplace
+        DigiKeyConfig.objects.filter(pk=1).update(media_datasheet_code="datasheetUrl")
+        self.cfg = DigiKeyConfig.get()
+        self.cfg.marketplace_supplier_id = "11111111-2222-3333-4444-555555555555"
+        self.l.dk_datasheet_url = "https://docs.example.com/AN-1.pdf"
+        self.l.dk_attributes = {"139": "433 MHz"}
+        calls = []
+
+        def post(url, json=None, **kw):
+            calls.append([f["code"] for f in json["additionalFields"]])
+            if len(calls) == 1:
+                err = mock.Mock(status_code=400, json=lambda: {"detail": "Unknown field code: datasheetUrl"})
+                import requests
+                raise_ = requests.HTTPError(response=err)
+                return mock.Mock(status_code=400, raise_for_status=mock.Mock(side_effect=raise_))
+            return mock.Mock(status_code=200, json=lambda: {"_id": "staged-2"}, raise_for_status=lambda: None)
+        with mock.patch.object(dk_marketplace, "get_marketplace_token", return_value="t"),                 mock.patch("requests.post", side_effect=post):
+            self.assertEqual(dk_marketplace.upsert_product(self.cfg, self.l), "staged-2")
+        self.assertEqual(len(calls), 2)
+        self.assertIn("datasheetUrl", calls[0])
+        self.assertEqual(calls[1], [c for c in calls[0] if c != "datasheetUrl"])  # решта параметрів лишились
+        self.assertIn("139", calls[1])
+        self.assertEqual(DigiKeyConfig.get().media_datasheet_code, "")
+
+
+class DigiKeyPhotoCopyTests(Base):
+    def test_digikey_hosted_photo_is_not_a_difference(self):
+        dk = "https://mm.digikey.com/Volume0/opasdata/d220001/medias/images/8926/MFG_3228_AN-1.jpg"
+        products = {self.l.pk: {"imageUrl": dk, "additionalFields": []}}
+        self.l.dk_image_url = "https://img.example.com/AN-1.png"                # як за правилом
+        image = dk_media.rows([self.l], products)[0]["items"][0]
+        self.assertEqual((image["action"], image["pick"], image["dk_copy"]), ("dkcopy", False, True))
+        self.l.dk_image_url = dk                                                # стягнуте з DigiKey
+        image = dk_media.rows([self.l])[0]["items"][0]
+        self.assertEqual((image["action"], image["pick"]), ("dkcopy", False))

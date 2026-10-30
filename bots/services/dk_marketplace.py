@@ -170,6 +170,27 @@ def upsert_product(config, listing) -> str:
             logger.info("DK upsert_product (retry) OK product_id=%s", product_id)
             return product_id
 
+        # Поле даташита, якого DigiKey не прийняв, — повторити без нього й більше не надсилати
+        from bots.services.dk_media import datasheet_field, forget_code
+        sheet = datasheet_field()
+        if (e.response.status_code == 400 and sheet and sheet['code'].lower() in detail.lower()
+                and any(f.get('code') == sheet['code'] for f in payload.get('additionalFields') or [])):
+            logger.warning("DK upsert_product: datasheet field %s rejected, retrying without it", sheet['code'])
+            forget_code(sheet['code'])
+            payload = {**payload, 'additionalFields': [f for f in payload['additionalFields']
+                                                       if f.get('code') != sheet['code']]}
+            resp = req.post(url, json=payload, headers=_headers(config, token), timeout=30)
+            try:
+                resp.raise_for_status()
+                data = resp.json()
+                return data.get("_id") or data.get("id") or ""
+            except req.HTTPError as e_ds:
+                e = e_ds
+                body = {}
+                try: body = e.response.json()
+                except Exception: pass
+                detail = str(body.get('detail', '')) + str(body.get('errors', ''))
+
         # If DK rejects additionalFields codes — stage without attributes so the
         # product at least enters the PIM queue; attributes can be corrected manually.
         if (e.response.status_code == 400
@@ -1186,6 +1207,8 @@ def pull_product_fields(listing) -> dict:
     # Layer 2: Marketplace API additionalFields (code-based: packaging, hts…)
     # Layer 3: ProductSearch Parameters (human-readable: Antenna Type, Gain…)
     merged_attrs = dict(listing.dk_attributes or {})
+    from bots.services.dk_media import learn_from_attributes   # «Datasheet URL» DigiKey — його код
+    learn_from_attributes(attrs_dict)
     merged_attrs.update(attrs_dict)
     if tech.get('params'):
         merged_attrs.update(tech['params'])

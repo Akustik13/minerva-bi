@@ -114,10 +114,11 @@ def config_panel(cfg) -> str:
                              (("🖼" if k == "image" else "📄", dk_media.LABEL[k].capitalize(), ex[k][0] or "—",
                                f"({ex[k][1]})" if ex[k][1] else "") for k in dk_media.KINDS))
     sheet = dk_media.datasheet_field()
-    sheet_text = (format_html("Даташит DigiKey приймає в полі «{}» ({}) — Minerva надсилає його разом з карткою.",
+    sheet_text = (format_html("Даташит іде на DigiKey у поле «{}» ({}) — разом з карткою товару.",
                               sheet["name"], sheet["code"]) if sheet else
-                  format_html("Поля даташита DigiKey Minerva не знає — даташит лишається в Minerva. "
-                              "Запитайте поля: «🔷 Зі складу на DigiKey» → «🔄 Запитати поля в DigiKey»."))
+                  format_html("Поля «Datasheet URL» DigiKey Minerva ще не знає — даташит лишається в Minerva. "
+                              "На сторінці звірки натисніть «🔍 Прочитати з DigiKey і перевірити»: Minerva візьме "
+                              "код поля з ваших товарів на DigiKey."))
     return format_html(
         '<div id="dk-media">{}<p style="margin:6px 0 0">Приклад для першого лістингу. {}</p>'
         '<p style="margin:8px 0 0"><a class="button" href="{}">🔗 Звірити фото й даташити на DigiKey →</a></p></div>',

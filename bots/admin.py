@@ -215,7 +215,8 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             "fields": ("action_buttons", "task_status_panel"),
         }),
         ("🖼 Фото й даташити для DigiKey", {
-            "fields": ("media_source", "media_image_template", "media_datasheet_template", "media_panel"),
+            "fields": ("media_source", "media_image_template", "media_datasheet_template", "media_datasheet_code",
+                       "media_panel"),
             "description": (
                 "Які посилання на фото й даташит отримують товари на DigiKey — під час публікації зі складу й "
                 "звірки «🖼 Фото й даташити». <b>Як на складі</b> — ті самі посилання, що для магазинів "

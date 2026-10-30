@@ -37,6 +37,7 @@ STATE_KEY, LOCK_KEY = "dk-media", "dk-media-lock"
 LOCK_SECONDS = 30 * 60
 
 SAME, FILL, REPLACE, KEEP, BROKEN, PUSH, NONE = "same", "fill", "replace", "keep", "broken", "push", "none"
+DKCOPY = "dkcopy"
 ACTION_TEXT = {
     SAME: "без змін",
     FILL: "заповнити",
@@ -45,6 +46,7 @@ ACTION_TEXT = {
     BROKEN: "нове не відповідає",
     PUSH: "на DigiKey інше — надіслати",
     NONE: "немає посилання за правилом",
+    DKCOPY: "на DigiKey — їхня копія фото; надіслати, лише якщо фото змінилось",
 }
 
 
@@ -104,21 +106,58 @@ def example(cfg=None) -> dict:
 
 # ── Даташит на DigiKey — лише додатковим полем ───────────────────────────────
 
+def _is_sheet(code, name="") -> bool:
+    return "datasheet" in f"{code} {name}".lower().replace(" ", "").replace("_", "")
+
+
 def datasheet_field() -> dict | None:
-    """Поле DigiKey для даташита з останнього отриманого списку полів (без мережі): {code, name, type} або None."""
+    """Поле «Datasheet URL» DigiKey (без мережі): зі списку полів Custom v1 або код, який Minerva вже бачила в
+    товарах DigiKey (`DigiKeyConfig.media_datasheet_code`) → {code, name, type} або None."""
     from bots.services.dk_from_stock import FIELDS_CACHE_KEY
     defs = _cache().get(FIELDS_CACHE_KEY) or {}
-    found = [d for c, d in defs.items() if "datasheet" in f"{c} {d.get('name', '')}".lower().replace(" ", "")]
+    found = [d for c, d in defs.items() if _is_sheet(c, d.get("name", ""))]
     found.sort(key=lambda d: d.get("type") != "Link")
-    return found[0] if found else None
+    if found:
+        return found[0]
+    code = (config().media_datasheet_code or "").strip()
+    return {"code": code, "name": "Datasheet URL", "type": "Link"} if code else None
+
+
+def learn_code(code: str) -> None:
+    """Код поля даташита, який DigiKey сам повернув у товарі, — запам'ятати (тепер його можна надсилати)."""
+    from bots.models import DigiKeyConfig
+    code = (code or "").strip()[:100]
+    if code and config().media_datasheet_code != code:
+        DigiKeyConfig.objects.filter(pk=1).update(media_datasheet_code=code)
+
+
+def forget_code(code: str) -> None:
+    """DigiKey не прийняв поле — більше не надсилати його."""
+    from bots.models import DigiKeyConfig
+    DigiKeyConfig.objects.filter(pk=1, media_datasheet_code=code).update(media_datasheet_code="")
+
+
+def learn_from_attributes(attrs: dict) -> None:
+    """Стягнуті з DigiKey додаткові поля товару ({код: значення}) — серед них код поля даташита."""
+    code = next((c for c in (attrs or {}) if not str(c).isdigit() and _is_sheet(c)), "")
+    if code:
+        learn_code(str(code))
 
 
 def add_datasheet(additional_fields: list, listing) -> list:
-    """Даташит лістингу — у додаткові поля для upsert, якщо DigiKey має таке поле (і його там ще немає)."""
+    """Даташит лістингу — у додаткові поля для upsert, якщо Minerva знає поле DigiKey для нього; значення з
+    картки лістингу замінює старе (стягнуте колись у dk_attributes)."""
+    if not datasheet_field():
+        learn_from_attributes(listing.dk_attributes)
     field = datasheet_field()
     url = (listing.dk_datasheet_url or "").strip()
-    if field and url and all(a.get("code") != field["code"] for a in additional_fields):
-        additional_fields.append({"code": field["code"], "type": "String", "value": url})
+    if not (field and url):
+        return additional_fields
+    for a in additional_fields:
+        if a.get("code") == field["code"]:
+            a["value"] = url
+            return additional_fields
+    additional_fields.append({"code": field["code"], "type": "String", "value": url})
     return additional_fields
 
 
@@ -129,11 +168,21 @@ def on_digikey(product: dict | None) -> dict:
         return {}
     attrs = {str(f.get("code")): _additional_field_str(f) for f in product.get("additionalFields") or []}
     field = datasheet_field()
-    if field:
-        sheet = attrs.get(field["code"], "")
+    if field and field["code"] in attrs:
+        sheet = attrs[field["code"]]
     else:
-        sheet = next((v for c, v in attrs.items() if "datasheet" in c.lower()), "")
+        code = next((c for c in attrs if not c.isdigit() and _is_sheet(c)), "")
+        sheet = attrs.get(code, "")
+        if code:
+            learn_code(code)                 # DigiKey сам назвав поле — тепер Minerva може його надсилати
     return {IMAGE: (product.get("imageUrl") or "").strip(), DATASHEET: sheet}
+
+
+def dk_hosted(url: str) -> bool:
+    """Фото на сервері DigiKey (mm.digikey.com…) — DigiKey копіює надіслане фото до себе й показує свою копію."""
+    from urllib.parse import urlparse
+    host = (urlparse(url or "").hostname or "").lower()
+    return host == "digikey.com" or host.endswith(".digikey.com")
 
 
 def live_products(listings) -> dict:
@@ -166,12 +215,15 @@ def row(listing, kind, dk: str | None = None, checked=None, cfg=None) -> dict:
         action, pick = NONE, False
     else:
         action, pick = media_links.decide(card, new, new_error, card_error)
-        if action == SAME and dk is not None and dk != card and new_error in (None, ""):
+        if kind == IMAGE and (dk_hosted(dk) or dk_hosted(card)) and action not in (KEEP, BROKEN):
+            # DigiKey показує свою копію фото (mm.digikey.com): адреса інша завжди — за це не надсилаємо
+            action, pick = DKCOPY, False
+        elif action == SAME and dk is not None and dk != card and new_error in (None, ""):
             action, pick = PUSH, True
     return {"pk": listing.pk, "kind": kind, "label": LABEL[kind], "card": card, "card_error": card_error,
             "new": new, "new_error": new_error, "how": how, "dk": dk, "action": action,
             "action_text": ACTION_TEXT.get(action, action), "pick": pick,
-            "dk_same": dk is not None and dk == (new or card)}
+            "dk_same": dk is not None and dk == (new or card), "dk_copy": kind == IMAGE and dk_hosted(dk)}
 
 
 def rows(listings, products=None, check=False, cfg=None) -> list:
