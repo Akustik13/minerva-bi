@@ -522,14 +522,14 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                                        f"скасування неможливе.", "code": "already_shipped"},
                             status=status.HTTP_409_CONFLICT)
         restock = str(request.data.get("restock", "true")).lower() not in ("0", "false", "no")
-        released = 0
         with transaction.atomic():
             if order.status != "cancelled":
                 order.status = "cancelled"
                 order.status_source = _key_label(request)
+                order._skip_stock_signal = True   # склад — нижче, з урахуванням restock
                 order.save(update_fields=["status", "status_source"])
-            if restock and order.affects_stock:
-                released = stock_service.release_order_stock(order)
+            # той самий сервіс, що й скасування в адмінці; restock=false — лише зняти резерв
+            released = stock_service.release_order_stock(order, restock=restock)
         return Response(self._detail(order, restocked_transactions=released))
 
 

@@ -1,5 +1,4 @@
 from decimal import Decimal
-from django.db import models as django_models
 
 # ── Tool schemas for Anthropic API ────────────────────────────────────────────
 
@@ -205,29 +204,18 @@ def _safe_result(obj):
 
 def _stock_map_for_products(product_ids=None):
     """
-    Returns {product_id: float_stock} computed from InventoryTransaction.
-    Stock = sum(Incoming) - sum(Outgoing) + sum(Adjustment).
+    {product_id: доступно} — «Доступно» складу (на складі − резерв) з inventory/services/stock.py,
+    ті самі числа, що в API /stock/ і огляді складу. (Раніше витрата, яка зберігається з мінусом,
+    ще раз віднімалась мінусом — продаж збільшував залишок.)
     If product_ids is None, returns map for all products.
     """
-    from django.db.models import Sum, F, Value
-    from inventory.models import InventoryTransaction
+    from inventory.models import Product
+    from inventory.services.stock import annotate_stock
 
-    qs = InventoryTransaction.objects.all()
+    qs = Product.objects.all()
     if product_ids is not None:
-        qs = qs.filter(product_id__in=product_ids)
-
-    rows = qs.values('product_id').annotate(
-        stock=Sum(
-            django_models.Case(
-                django_models.When(tx_type='Incoming',   then=django_models.F('qty')),
-                django_models.When(tx_type='Outgoing',   then=-django_models.F('qty')),
-                django_models.When(tx_type='Adjustment', then=django_models.F('qty')),
-                default=Value(0),
-                output_field=django_models.DecimalField(),
-            )
-        )
-    )
-    return {r['product_id']: float(r['stock'] or 0) for r in rows}
+        qs = qs.filter(pk__in=product_ids)
+    return {p.pk: float(p._available) for p in annotate_stock(qs)}
 
 
 # ── Tool handlers ─────────────────────────────────────────────────────────────

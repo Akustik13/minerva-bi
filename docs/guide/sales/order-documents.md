@@ -2,7 +2,7 @@
 title: Документи замовлення
 order: 20
 summary: Папка документів замовлення — завантажені файли, PDF одним кліком (пакувальний лист, Auftragsbestätigung, Proforma, CN23), Word-шаблони й етикетки.
-where: 🛒 Продажі → Sales orders → картка замовлення → «📄 Документи замовлення»
+where: 🛒 Продажі → Замовлення → картка замовлення → «📄 Документи замовлення»
 urls: /admin/sales/salesorder/, /admin/config/documentsettings/, /admin/documents/documenttemplate/
 roles: адміністратор, менеджер
 keywords: документи, папка замовлення, PDF, Auftragsbestätigung, Order Confirmation, OC, Proforma, PI, пакувальний лист, Packing List, Lieferschein, CN23, митна декларація, Zoll, завантажити файл, Word шаблон, рахунок, Rechnung

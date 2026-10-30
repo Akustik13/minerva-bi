@@ -2163,14 +2163,13 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         except Exception:
             pass
         try:
-            from inventory.models import InventoryTransaction
+            from inventory.models import Product
+            from inventory.services.stock import annotate_stock
             _out = DecimalField(max_digits=18, decimal_places=3)
+            # сортування колонки «Склад» — за «Доступно», як показує get_stock_qty()
             stock_subq = (
-                InventoryTransaction.objects
-                .filter(product_id=OuterRef('product_id'))
-                .values('product_id')
-                .annotate(total=Sum('qty'))
-                .values('total')[:1]
+                annotate_stock(Product.objects.filter(pk=OuterRef('product_id')))
+                .values('_available')[:1]
             )
             qs = qs.annotate(
                 _stock_qty=Coalesce(
@@ -3614,10 +3613,8 @@ Rules:
         product = Product.objects.filter(sku=sku).first()
         if not product:
             return JsonResponse({'found': False})
-        qty_result = InventoryTransaction.objects.filter(
-            product_id=product.pk
-        ).aggregate(total=Sum('qty'))
-        qty = max(0, int(qty_result['total'] or 0))
+        from inventory.services.stock import get_available
+        qty = max(0, int(get_available(product)))
         return JsonResponse({
             'found': True,
             'qty': qty,

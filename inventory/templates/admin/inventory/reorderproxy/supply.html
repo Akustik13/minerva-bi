@@ -312,7 +312,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-has-img="{% if row.thumb_url %}1{% endif %}" data-has-ds="{% if row.ds_href %}1{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
-    {% elif stock <= p.reorder_point and p.reorder_point > 0 %}{% with state="critical" %}
+    {% elif net <= p.reorder_point and p.reorder_point > 0 %}{% with state="critical" %}
       <tr class="sv-main-row" data-pk="{{ p.pk }}" data-state="{{ state }}"
           data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
           data-cat="{{ p.category|lower }}"
@@ -365,9 +365,9 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
         <td style="text-align:right">
           {% if stock <= 0 %}
             <span class="sv-num sv-zero">🚫 {{ stock|floatformat:"0" }}</span>
-          {% elif stock <= p.reorder_point and p.reorder_point > 0 %}
+          {% elif net <= p.reorder_point and p.reorder_point > 0 %}
             <span class="sv-num sv-crit">⚠️ {{ stock|floatformat:"0" }}</span>
-          {% elif stock < p.reorder_point|add:10 and p.reorder_point > 0 %}
+          {% elif net < p.reorder_point|add:10 and p.reorder_point > 0 %}
             <span class="sv-num sv-warn">{{ stock|floatformat:"0" }}</span>
           {% else %}
             <span class="sv-num sv-ok">{{ stock|floatformat:"0" }}</span>
@@ -468,6 +468,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
               <!-- Reservations -->
               <div class="sv-detail-section">
                 <h4>📋 {% trans "Резервації (незакриті замовлення)" %}</h4>
+                <p class="sv-sub-empty" style="margin:0 0 6px">{% trans "У «Резерв» рахуються 🔒 резерви й ⏳ ще не списані замовлення; ✓ уже списані вже відняті від «На складі»." %}</p>
                 {% if row.reservations %}
                 <table class="sv-sub-table">
                   <tr>
@@ -475,6 +476,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "№ ЗАМ." %}</td>
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700;text-align:right">{% trans "К-СТЬ" %}</td>
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "СТАТУС" %}</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "СКЛАД" %}</td>
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "ТЕРМІН ВІДГРУЗКИ" %}</td>
                   </tr>
                   {% for res in row.reservations %}
@@ -485,7 +487,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                          target="_blank">{{ res.client|truncatechars:30 }}</a>
                     </td>
                     <td style="font-family:monospace;font-size:11px">{{ res.order_number }}</td>
-                    <td style="text-align:right;font-weight:700;color:#ef5350">{{ res.qty|floatformat:"0" }}</td>
+                    <td style="text-align:right;font-weight:700;{% if res.in_reserved %}color:#ef5350{% else %}color:var(--text-dim){% endif %}">{{ res.qty|floatformat:"0" }}</td>
                     <td>
                       {% if res.status_raw == "received" or res.status_raw == "processing" %}
                         <span class="sv-badge sv-badge-prc">{{ res.status }}</span>
@@ -493,6 +495,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                         <span class="sv-badge sv-badge-ord">{{ res.status }}</span>
                       {% endif %}
                     </td>
+                    <td style="font-size:11px;white-space:nowrap">{{ res.state_label }}</td>
                     <td style="font-size:11px">
                       {% if res.shipping_deadline %}
                         {% with dl=res.shipping_deadline %}
@@ -688,7 +691,7 @@ var _svi = {
     var reserved = parseFloat(r.dataset.reserved || 0);
     var incoming = parseFloat(r.dataset.incoming || 0);
     if (stock <= 0)                        cntEmpty++;
-    if (stock <= reorder && reorder > 0)   cntCrit++;
+    if (parseFloat(r.dataset.avail || 0) <= reorder && reorder > 0)   cntCrit++;
     if (reserved > 0)                      cntRes++;
     if (incoming > 0)                      cntInc++;
   });
@@ -763,7 +766,7 @@ var _svi = {
     var incoming = parseFloat(r.dataset.incoming || 0);
     var filterOk = true;
     if      (activeFilter === 'empty')    filterOk = stock <= 0;
-    else if (activeFilter === 'critical') filterOk = stock <= reorder && reorder > 0;
+    else if (activeFilter === 'critical') filterOk = parseFloat(r.dataset.avail || 0) <= reorder && reorder > 0;
     else if (activeFilter === 'reserved') filterOk = reserved > 0;
     else if (activeFilter === 'incoming') filterOk = incoming > 0;
     else if (activeFilter === 'noimg')    filterOk = !r.dataset.hasImg;
