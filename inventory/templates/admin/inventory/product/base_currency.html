@@ -22,15 +22,20 @@
   #bcc .bcc-pick { background: none; border: 1px dashed var(--border-strong); border-radius: 4px; color: var(--text);
     padding: 2px 8px; margin: 2px 0; cursor: pointer; font-size: 12px; text-align: left; }
   #bcc .bcc-pick:hover { border-color: var(--accent); }
+  #bcc .bcc-same { display: flex; gap: 6px; align-items: baseline; margin-top: 4px; font-weight: 600; cursor: pointer; }
+  #bcc .bcc-same span { font-weight: 400; }
+  #bcc input.bcc-rate[readonly] { background: var(--bg-hover); color: var(--text-muted); }
+  #bcc .bcc-shift { color: var(--warn); font-size: 12px; }
 </style>
 <div id="bcc">
   <div class="bcc-card">
     <p style="margin:0 0 6px">Валюта Minerva — <b>{{ home }}</b>: базові ціни на складі тримаються в ній, а DigiKey,
       магазини й Angebote перераховують їх у свою валюту за курсом.</p>
-    <p class="bcc-muted" style="margin:0">Курс підставлено той самий, яким Minerva рахує ціни для DigiKey
-      ({{ dk_rate_source }}), — тоді після переведення ціни на DigiKey лишаться такими самими. Можна вписати свій
-      або клікнути курс «Для порівняння» (🌐 ЄЦБ — сьогоднішній довідковий курс): у кожного товару в історії буде
-      записано, з якої валюти в яку, за яким курсом і звідки курс.
+    <p class="bcc-muted" style="margin:0">Галочка «однаковий курс з DigiKey» (стоїть за замовчуванням) — курс той
+      самий, яким Minerva рахує ціни для DigiKey ({{ dk_rate_source }}): після переведення ціни на DigiKey лишаться
+      такими самими. Зніміть її, щоб вписати свій курс або клікнути курс «Для порівняння» (🌐 ЄЦБ — сьогоднішній
+      довідковий курс), — тоді під курсом видно, на скільки зміняться ціни на DigiKey. У кожного товару в історії
+      буде записано, з якої валюти в яку, за яким курсом і звідки курс.
       Ціни переводяться точно, до 4 знаків (230,8154 €): саме тоді зворотний перерахунок для DigiKey дає ту саму ціну.
       Округлити до центів можна галочкою нижче або згодом у редакторі базових цін («Округлення») — тоді ціни на
       DigiKey можуть зрушити на цент. Кожна зміна записується в історію товару
@@ -51,10 +56,14 @@
           <td>{{ g.count }}</td>
           <td><span class="bcc-muted">1 {{ g.cur }} =</span>
               <input class="bcc-rate" type="text" name="rate_{{ g.cur }}" value="{{ g.rate }}" inputmode="decimal"
-                     data-cur="{{ g.cur }}" aria-label="Курс {{ g.cur }} → {{ home }}" {% if not g.rate %}placeholder="немає курсу"{% endif %}>
+                     data-cur="{{ g.cur }}" aria-label="Курс {{ g.cur }} → {{ home }}" {% if not g.rate %}placeholder="немає курсу"{% endif %}{% if g.same %} readonly{% endif %}>
               <span class="bcc-muted">{{ home }}</span>
               <input type="hidden" name="origin_{{ g.cur }}" value="{{ g.origin }}">
-              {% if g.inverse %}<div class="bcc-muted">1 {{ home }} = {{ g.inverse }} {{ g.cur }}{% if g.origin %} · {{ g.origin }}{% endif %}</div>{% endif %}</td>
+              {% if g.default %}<div><label class="bcc-same"><input type="checkbox" class="bcc-same-cb" name="same_{{ g.cur }}" value="1"
+                     data-cur="{{ g.cur }}" data-rate="{{ g.default }}"{% if g.same %} checked{% endif %}> однаковий курс з DigiKey
+                <span class="bcc-muted">(1 {{ g.cur }} = {{ g.default }} {{ home }} — ціни на DigiKey не зміняться)</span></label></div>{% endif %}
+              {% if g.inverse %}<div class="bcc-muted">1 {{ home }} = {{ g.inverse }} {{ g.cur }}{% if g.origin %} · {{ g.origin }}{% endif %}</div>{% endif %}
+              <div class="bcc-shift" data-cur="{{ g.cur }}">{% if g.shift %}⚠ Не той курс, що для DigiKey: ціни на DigiKey після «💲 Ціни на DigiKey» зміняться на {{ g.shift }}{% endif %}</div></td>
           <td class="bcc-muted">{% for h in g.hints %}<button type="button" class="bcc-pick" data-cur="{{ g.cur }}" data-rate="{{ h.rate }}"
                 data-origin="{{ h.origin }}">{{ h.origin }}: 1 {{ g.cur }} = {{ h.rate }} {{ home }}</button>{% if not forloop.last %}<br>{% endif %}{% empty %}—{% endfor %}</td>
         </tr>
@@ -94,20 +103,44 @@
   {% endif %}
 </div>
 <script>
-/* Клік на курс «Для порівняння» — підставити його й запам'ятати, звідки він (піде в історію); вписали свій — «вписано вручну». */
+/* Галочка «однаковий курс з DigiKey» — курс той, що для DigiKey, і не редагується; зняли — свій курс або клік на курс
+   «Для порівняння» (запам'ятовується, звідки він, — піде в історію) і під курсом — на скільки зміняться ціни на DigiKey. */
 document.addEventListener('DOMContentLoaded', function () {
   var root = document.getElementById('bcc');
   if (!root) return;
+  function q(sel, cur) { return root.querySelector(sel + '[data-cur="' + cur + '"]'); }
   function origin(cur) { return root.querySelector('input[name="origin_' + cur + '"]'); }
+  function num(v) { return Number(String(v || '').trim().replace(',', '.')); }
+  function shift(cur) {
+    var inp = q('input.bcc-rate', cur), same = q('input.bcc-same-cb', cur), el = q('.bcc-shift', cur);
+    if (!inp || !el) return;
+    inp.readOnly = !!(same && same.checked);
+    var r = num(inp.value), d = same ? num(same.dataset.rate) : 0;
+    var p = r > 0 && d > 0 && !(same && same.checked) ? Math.round((r / d - 1) * 1000) / 10 : 0;
+    el.textContent = Math.abs(p) >= 0.1 ? '⚠ Не той курс, що для DigiKey: ціни на DigiKey після «💲 Ціни на DigiKey» зміняться на ' +
+      (p > 0 ? '+' : '−') + String(Math.abs(p)).replace('.', ',') + ' %' : '';
+  }
   root.addEventListener('click', function (e) {
     var b = e.target.closest('.bcc-pick');
     if (!b) return;
-    var inp = root.querySelector('input.bcc-rate[data-cur="' + b.dataset.cur + '"]');
-    if (inp) { inp.value = b.dataset.rate; }
-    if (origin(b.dataset.cur)) origin(b.dataset.cur).value = b.dataset.origin;
+    var cur = b.dataset.cur, inp = q('input.bcc-rate', cur), same = q('input.bcc-same-cb', cur);
+    if (same) same.checked = false;
+    if (inp) inp.value = b.dataset.rate;
+    if (origin(cur)) origin(cur).value = b.dataset.origin;
+    shift(cur);
+  });
+  root.addEventListener('change', function (e) {
+    var cb = e.target.closest('.bcc-same-cb');
+    if (!cb) return;
+    var cur = cb.dataset.cur, inp = q('input.bcc-rate', cur);
+    if (cb.checked && inp) { inp.value = cb.dataset.rate; if (origin(cur)) origin(cur).value = ''; }
+    shift(cur);
+    if (!cb.checked && inp) inp.focus();
   });
   root.addEventListener('input', function (e) {
-    if (e.target.classList.contains('bcc-rate') && origin(e.target.dataset.cur)) origin(e.target.dataset.cur).value = 'вписано вручну';
+    if (!e.target.classList.contains('bcc-rate')) return;
+    if (origin(e.target.dataset.cur)) origin(e.target.dataset.cur).value = 'вписано вручну';
+    shift(e.target.dataset.cur);
   });
 });
 </script>

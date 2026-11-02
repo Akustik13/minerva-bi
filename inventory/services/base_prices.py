@@ -100,11 +100,13 @@ def fx_details(src: str, dst: str, rate, origin: str = "") -> dict:
     return out
 
 
-_FX_RE = re.compile(r"^([A-Z]{3})>([A-Z]{3}):(\d+(?:\.\d+)?)(?::(.{0,60}))?$")
+_FX_RE = re.compile(r"^([A-Z]{3})>([A-Z]{3}):(\d+(?:\.\d+)?)(?:@(\d+))?(?::(.{0,60}))?$")
 
 
 def parse_fx(raw: str) -> dict | None:
-    """Позначка конвертера картки «USD>EUR:0.86:ЄЦБ на 30.10.2026» → `fx_details`; інше — None."""
+    """Позначка конвертера картки «USD>EUR:0.86:ЄЦБ на 30.10.2026» → `fx_details`; «USD>EUR:0.86@<запис>:…» —
+    переведено заново з цін до переведення `<запис>` історії (галочка «однаковий курс з DigiKey», `redo_of`
+    перевіряє `set_base_prices`); інше — None."""
     m = _FX_RE.match((raw or "").strip())
     if not m:
         return None
@@ -112,7 +114,12 @@ def parse_fx(raw: str) -> dict | None:
         rate = Decimal(m.group(3))
     except InvalidOperation:
         return None
-    return fx_details(m.group(1), m.group(2), rate, (m.group(4) or "").strip()) if rate > 0 else None
+    if rate <= 0:
+        return None
+    out = fx_details(m.group(1), m.group(2), rate, (m.group(5) or "").strip())
+    if m.group(4):
+        out["redo_of"] = int(m.group(4))
+    return out
 
 
 def convert(product, to: str, rate, *, user=None, note: str = "", cents: bool = False, origin: str = "") -> bool:
@@ -165,10 +172,15 @@ def set_base_prices(product, rows, *, source: str = "manual", user=None, currenc
     if new == old and currency == product.base_price_currency:
         return False
     details = {"old_currency": old_currency, **(details or {})}
+    redo_of = details.pop("redo_of", None)
+    if redo_of:   # «однаковий курс з DigiKey»: ті самі ціни до переведення — заново, іншим курсом
+        last = last_conversion(product)
+        if last and last["pk"] == redo_of and last["from"] == details.get("rate_from"):
+            details["redo"] = {"rate": last["rate"], "prices": last["rows"]}
     if details.get("rate") and details.get("rate_to") != currency:
-        details = {k: v for k, v in details.items() if not k.startswith("rate")}   # перевели не в цю валюту
+        details = {k: v for k, v in details.items() if not k.startswith(("rate", "redo"))}   # перевели не в цю валюту
     if details.get("rate") and not source_label and source == "manual":
-        source_label = (f"Переведено з {details['rate_from']} в {currency} за курсом "
+        source_label = (f"Переведено {'заново ' if details.get('redo') else ''}з {details['rate_from']} в {currency} за курсом "
                         f"{rate_label(details['rate_from'], currency, details['rate'])}"
                         + (f" ({details['rate_origin']})" if details.get("rate_origin") else ""))
     who = (user.get_username() if user is not None and getattr(user, "is_authenticated", False) else "") or "система"
@@ -225,6 +237,34 @@ def import_from_digikey(product, user=None) -> bool | None:
                            source_label=label[:200], details=details)
 
 
+def last_conversion(product) -> dict | None:
+    """Останнє переведення цін товару в їхню теперішню валюту, якщо ціни відтоді не змінювали: з якої валюти, за
+    яким курсом (і звідки курс), ціни до переведення. Картка за ним бачить, що переведено не за курсом DigiKey, і
+    пропонує перевести заново (`parse_fx` «…@<pk>»). None — останній запис історії не переведення."""
+    h = product.price_history.order_by("-created_at", "-pk").first() if product.pk else None
+    if h is None:
+        return None
+    d = h.details or {}
+    rate, src = d.get("rate"), (d.get("rate_from") or "").upper()
+    cur = (product.base_price_currency or "").upper()
+    if (not rate or not src or (d.get("rate_to") or "").upper() != cur or (h.currency or "").upper() != cur
+            or normalize(h.new_prices) != normalize(product.base_prices)):
+        return None
+    redo, read = d.get("redo") or {}, d.get("read") or {}
+    if redo.get("prices"):
+        before = redo["prices"]
+    elif read.get("prices") and (read.get("currency") or "").upper() == src:
+        before = read["prices"]
+    elif (d.get("old_currency") or "").upper() == src:
+        before = h.old_prices
+    else:
+        return None
+    rows = normalize(before)
+    if not rows:
+        return None
+    return {"pk": h.pk, "from": src, "rate": rate_text(rate), "origin": d.get("rate_origin", ""), "rows": rows}
+
+
 def _dk_rate_origin() -> str:
     try:
         from bots.services.dk_prices import rate_source_text
@@ -235,7 +275,7 @@ def _dk_rate_origin() -> str:
 
 # ── Історія: що в що перевели ────────────────────────────────────────────────
 
-_NOTE_FX_RE = re.compile(r"Переведено з ([A-Z]{3}) в ([A-Z]{3}) за курсом (?:1 [A-Z]{3} = )?(\d+(?:\.\d+)?)")
+_NOTE_FX_RE = re.compile(r"Переведено (?:заново )?з ([A-Z]{3}) в ([A-Z]{3}) за курсом (?:1 [A-Z]{3} = )?(\d+(?:\.\d+)?)")
 _NOTE_DK_FX_RE = re.compile(r"\b([A-Z]{3}) → ([A-Z]{3}) за курсом (\d+(?:\.\d+)?)")   # старий імпорт з DigiKey
 _MIGRATED = "Перенесено з цін DigiKey при оновленні"
 
@@ -269,6 +309,7 @@ def describe(h, older_currency: str = "") -> dict:
     new_cur = (h.currency or "").upper()
     rate, r_from, r_to = d.get("rate"), d.get("rate_from"), d.get("rate_to")
     read = d.get("read") or {}
+    redo = d.get("redo") or {}
     from_dk = h.source == "digikey" or bool(read) or note.startswith(_MIGRATED)
     used = [_NOTE_FX_RE, _NOTE_DK_FX_RE]
     if not rate:
@@ -290,7 +331,7 @@ def describe(h, older_currency: str = "") -> dict:
         elif read_cur and read_cur != new_cur:
             title += f", лишилось у {new_cur}"
     elif rate:
-        icon, title = "💱", f"Переведено з {r_from} в {r_to}"
+        icon, title = "💱", f"Переведено {'заново ' if redo else ''}з {r_from} в {r_to}"
     else:
         icon = {"api": "🔌", "migration": "📦"}.get(h.source, "✏️")
         title = h.get_source_display() if h.source != "manual" else "Змінено вручну"
@@ -309,9 +350,12 @@ def describe(h, older_currency: str = "") -> dict:
     by_old = {r["min_qty"]: r["unit_price"] for r in old}
     by_new = {r["min_qty"]: r["unit_price"] for r in new}
     by_read = {r["min_qty"]: r["unit_price"] for r in read_rows}
-    qtys = sorted(set(by_old) | set(by_new) | set(by_read))
+    by_redo = {r["min_qty"]: r["unit_price"] for r in (normalize(redo.get("prices")) if rate else [])}
+    qtys = sorted(set(by_old) | set(by_new) | set(by_read) | set(by_redo))
     same_cur = old_cur == new_cur
     lines = []
+    if by_redo:   # переведено заново: з тих самих цін, що й попереднє переведення
+        lines.append({"label": f"До переведення, {r_from}", "cells": [{"v": by_redo.get(q, "—")} for q in qtys]})
     if old:
         lines.append({"label": f"Було, {old_cur}", "cells": [{"v": by_old.get(q, "—")} for q in qtys]})
     if read_rows:
@@ -319,8 +363,11 @@ def describe(h, older_currency: str = "") -> dict:
     lines.append({"label": f"Стало, {new_cur}", "strong": True, "cells": [
         {"v": by_new.get(q, "—"),
          "changed": bool(old) and same_cur and by_old.get(q) != by_new.get(q)} for q in qtys]})
+    note = _note_rest(h, used)
+    if by_redo and redo.get("rate"):
+        note = " · ".join(filter(None, [f"раніше переведено за курсом {rate_label(r_from, r_to, redo['rate'])}", note]))
     return {"icon": icon, "title": title, "rate": rate_line, "qtys": qtys, "lines": lines,
-            "note": _note_rest(h, used), "source": h.get_source_display()}
+            "note": note, "source": h.get_source_display()}
 
 
 def history(product, limit: int = 10) -> list[dict]:

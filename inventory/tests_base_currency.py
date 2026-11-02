@@ -143,6 +143,21 @@ class PageTests(Base):
         self.assertEqual((self.usd.base_price_currency, self.usd.base_prices[0]["unit_price"]), ("EUR", "251.1"))
         self.assertContains(self.client.get(self.url, {"all": 1}), "вже в EUR")
 
+    def test_same_rate_checkbox(self):
+        """«Однаковий курс з DigiKey» (за замовчуванням): курс — лише той, що для DigiKey, хоч би що вписали."""
+        page = self.client.get(self.url, {"all": 1})
+        self.assertContains(page, 'data-rate="0.86" checked')
+        self.assertContains(page, "однаковий курс з DigiKey")
+        preview = self.client.post(self.url, {"ids": "", "rate_USD": "0.95", "action": "preview"})
+        self.assertContains(preview, "зміняться на +10,5 %")          # без галочки — на скільки зрушать ціни DigiKey
+        self.assertContains(preview, "265.05 EUR")
+        self.client.post(self.url, {"ids": "", "rate_USD": "0.95", "same_USD": "1", "origin_USD": "вписано вручну",
+                                    "action": "convert", "confirm": "1"})
+        self.usd.refresh_from_db()
+        self.assertEqual(self.usd.base_prices[0]["unit_price"], "239.94")   # 279 × 0.86, а не × 0.95
+        h = ProductPriceHistory.objects.filter(product=self.usd).first()
+        self.assertTrue(h.details["rate_origin"].startswith("як для DigiKey"))
+
     def test_needs_change_permission(self):
         viewer = User.objects.create_user("vera", "v@x.y", "p", is_staff=True)
         self.client.force_login(viewer)
@@ -224,6 +239,8 @@ class HistoryTests(Base):
         self.assertEqual([c["v"] for c in self.line(item, "Стало, EUR")["cells"]], ["8.6", "8.17"])
         self.assertFalse(any(ln["label"].startswith("Було") for ln in item["lines"]))   # раніше цін не було
         self.assertIn("офер o9", item["note"])
+        p.refresh_from_db()
+        self.assertEqual([r["unit_price"] for r in bp.last_conversion(p)["rows"]], ["10", "9.5"])   # ціни DigiKey
 
     def test_old_records_from_notes(self):
         """Записи до 11.2026 (без подробиць): валюту й курс видно з примітки та з попереднього запису."""
@@ -265,6 +282,44 @@ class HistoryTests(Base):
         h = ProductPriceHistory.objects.get(product=q)
         self.assertNotIn("rate", h.details)
         self.assertEqual(bp.history(q)[0]["title"], "Змінено вручну · валюта USD → GBP без перерахунку цін")
+
+    def test_redo_at_digikey_rate(self):
+        """Переведено не за курсом DigiKey → картка бачить розбіжність; «однаковий курс» — ті самі ціни заново."""
+        from inventory.admin_currency import card_config
+        p = self.product("H-8", [(1, 279), (10, "268.39")])
+        bp.convert(p, "EUR", D("0.89"), origin="вписано вручну")
+        p.refresh_from_db()
+        last = bp.last_conversion(p)
+        self.assertEqual((last["from"], last["rate"], last["origin"]), ("USD", "0.89", "вписано вручну"))
+        cfg = card_config(p.pk)
+        self.assertEqual(cfg["last_fx"], {"pk": last["pk"], "from": "USD", "rate": 0.89, "origin": "вписано вручну",
+                                          "prices": [[1, "279"], [10, "268.39"]]})
+        self.assertEqual(cfg["to_minerva"], {"USD": 0.86})
+        fx = bp.parse_fx(f"USD>EUR:0.86@{last['pk']}:як для DigiKey")
+        self.assertEqual(fx["redo_of"], last["pk"])
+        bp.set_base_prices(p, [{"min_qty": 1, "unit_price": "239.94"}, {"min_qty": 10, "unit_price": "230.8154"}],
+                           currency="EUR", details=fx)
+        p.refresh_from_db()
+        self.assertTrue(p.base_prices_source.startswith("Переведено заново з USD в EUR за курсом 1 USD = 0.86 EUR"))
+        item = bp.history(p)[0]
+        self.assertEqual(item["title"], "Переведено заново з USD в EUR")
+        self.assertEqual([ln["label"] for ln in item["lines"]], ["До переведення, USD", "Було, EUR", "Стало, EUR"])
+        self.assertEqual([c["v"] for c in self.line(item, "До переведення, USD")["cells"]], ["279", "268.39"])
+        self.assertEqual(item["note"], "раніше переведено за курсом 1 USD = 0.89 EUR")
+        again = bp.last_conversion(p)                        # тепер — за курсом DigiKey, з тих самих цін у USD
+        self.assertEqual((again["rate"], [r["unit_price"] for r in again["rows"]]), ("0.86", ["279", "268.39"]))
+
+        q = self.product("H-9", [(1, 10)])                    # позначка «заново» чужого запису — не діє
+        bp.convert(q, "EUR", D("0.9"))
+        q.refresh_from_db()
+        bp.set_base_prices(q, [{"min_qty": 1, "unit_price": "8.6"}], currency="EUR",
+                           details=bp.parse_fx(f"USD>EUR:0.86@{last['pk']}:x"))
+        hq = ProductPriceHistory.objects.filter(product=q).first()
+        self.assertFalse({"redo", "redo_of"} & set(hq.details))
+        bp.set_base_prices(q, [{"min_qty": 1, "unit_price": "9"}], currency="EUR")   # змінили вручну — розбіжності немає
+        q.refresh_from_db()
+        self.assertIsNone(bp.last_conversion(q))
+        self.assertNotIn("last_fx", card_config(q.pk))
 
     def test_card_shows_history_table(self):
         self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))

@@ -96,6 +96,16 @@ def _origin(raw: str, rate, default_rate, home: str) -> str:
     return "вписано вручну"
 
 
+def _shift(rate, default) -> str:
+    """На скільки зміняться ціни на DigiKey, якщо перевести не за курсом DigiKey («+3,5 %»); той самий — ''."""
+    if not rate or not default:
+        return ""
+    pct = (Decimal(str(rate)) / Decimal(str(default)) - 1) * 100
+    if abs(pct) < Decimal("0.1"):
+        return ""
+    return ("+" if pct > 0 else "−") + format(abs(pct).quantize(Decimal("0.1")), "f").replace(".", ",") + " %"
+
+
 def currency_view(model_admin, request):
     """GET ?ids= / ?all=1 — що й за яким курсом стане у валюті Minerva; POST — перевести з історією."""
     if not model_admin.has_change_permission(request):
@@ -106,11 +116,17 @@ def currency_view(model_admin, request):
     for p in products:
         groups.setdefault((p.base_price_currency or "").upper(), []).append(p)
     cents = request.method == "POST" and bool(request.POST.get("cents"))
-    rates, defaults = {}, {}
+    rates, defaults, same = {}, {}, {}
     for cur in groups:
         defaults[cur] = bp.rate_to_home(cur, home)
-        posted = _rate(request.POST.get(f"rate_{cur}")) if request.method == "POST" else None
-        rates[cur] = posted or _rate(request.GET.get(f"rate_{cur}")) or defaults[cur]
+        # галочка «однаковий курс з DigiKey» (за замовчуванням): курс — лише той, що для DigiKey
+        if request.method == "POST":
+            same[cur] = bool(defaults[cur]) and bool(request.POST.get(f"same_{cur}"))
+            posted = None if same[cur] else _rate(request.POST.get(f"rate_{cur}"))
+        else:
+            posted = _rate(request.GET.get(f"rate_{cur}"))
+            same[cur] = bool(defaults[cur]) and not posted
+        rates[cur] = posted or defaults[cur]
     if request.method == "POST" and request.POST.get("action") != "preview":
         if not request.POST.get("confirm"):
             messages.warning(request, "Поставте галочку «Так, перевести» — нічого не змінено.")
@@ -121,7 +137,8 @@ def currency_view(model_admin, request):
                 if not rates.get(cur):
                     skipped += [p.sku for p in items]
                     continue
-                origin = _origin(request.POST.get(f"origin_{cur}"), rates[cur], defaults[cur], home)
+                origin = (f"як для DigiKey: {_dk_rate_source()}"[:60] if same[cur]
+                          else _origin(request.POST.get(f"origin_{cur}"), rates[cur], defaults[cur], home))
                 for p in items:
                     if bp.convert(p, home, rates[cur], user=request.user, note=note, cents=cents, origin=origin):
                         done += 1
@@ -147,7 +164,9 @@ def currency_view(model_admin, request):
         "title": f"💱 Базові ціни → {home}", "opts": Product._meta, "home": home,
         "groups": [{"cur": cur, "count": len(items), "rate": bp.rate_text(rates[cur]) if rates.get(cur) else "",
                     "inverse": bp.rate_text(1 / rates[cur]) if rates.get(cur) else "",
-                    "origin": request.POST.get(f"origin_{cur}", "")[:60],
+                    "origin": "" if same[cur] else request.POST.get(f"origin_{cur}", "")[:60],
+                    "same": same[cur], "default": bp.rate_text(defaults[cur]) if defaults[cur] else "",
+                    "shift": "" if same[cur] else _shift(rates[cur], defaults[cur]),
                     "hints": _hints(cur, home)} for cur, items in sorted(groups.items())],
         "rows": rows, "total": len(products), "more": max(0, len(products) - PREVIEW_ROWS),
         "ids": ids, "dk_rate_source": _dk_rate_source(), "cents": cents,
@@ -157,13 +176,17 @@ def currency_view(model_admin, request):
 
 def card_config(product_id=None) -> dict:
     """Для редактора базових цін у картці товару: валюта Minerva, курс для DigiKey (EUR → USD), курси «до валюти
-    Minerva» тим самим правилом, що для DigiKey (кнопка «Конвертувати» й «≈»), адреса переведення товару."""
+    Minerva» тим самим правилом, що для DigiKey (кнопка «Конвертувати» й «≈»), адреса переведення товару,
+    останнє переведення (`last_fx`: картка показує, якщо переведено не за курсом DigiKey)."""
     home = bp.home_currency()
     out = {"minerva": home, "to_minerva": {}, "dk": None, "convert_url": page_url([product_id]) if product_id else "",
            "fx_online_url": reverse("core_fx_online")}
-    current = None
-    if product_id:
-        current = Product.objects.filter(pk=product_id).values_list("base_price_currency", flat=True).first()
+    product = Product.objects.filter(pk=product_id).first() if product_id else None
+    current = product.base_price_currency if product else None
+    last = bp.last_conversion(product) if product else None
+    if last:
+        out["last_fx"] = {"pk": last["pk"], "from": last["from"], "rate": float(last["rate"]), "origin": last["origin"],
+                          "prices": [[r["min_qty"], r["unit_price"]] for r in last["rows"]]}
     try:
         from bots.services import dk_prices
         s = dk_prices.settings()
@@ -174,7 +197,7 @@ def card_config(product_id=None) -> dict:
                          "online": s.fx_source == s.FX_ONLINE,
                          "settings_url": reverse("admin:bots_digikeypricesettings_change", args=[s.pk])
                          + "#fieldset-0-2"}
-        for cur in {dk, (current or home).upper()} - {home}:
+        for cur in {dk, (current or home).upper(), last["from"] if last else home} - {home}:
             r = bp.rate_to_home(cur, home)
             if r:
                 out["to_minerva"][cur] = float(r)
