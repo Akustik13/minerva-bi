@@ -19,10 +19,19 @@
 .ss-btn:hover { border-color: var(--accent, #58a6ff); }
 .ss-del { background: none; border: none; color: var(--text-dim, #607d8b); cursor: pointer; font-size: 18px; padding: 0 6px; }
 .ss-del:hover { color: var(--err, #e53935); }
+.ss-ecb { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 2px 0 4px; }
+.ss-ecb .ss-hint { white-space: normal; }
+.ss-hot { color: var(--warn, #e3b341); }
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var HOME = '{{ home_currency|default:"EUR"|escapejs }}';
+  var ECB_URL = '{% url "core_fx_online" %}', ECB = null;   // довідкові курси ЄЦБ (core/fx_online.py)
+  function ecbRate(cur) {                                   // 1 cur = ? HOME за ЄЦБ (крос через EUR)
+    if (!ECB) return null;
+    var a = num(ECB.rates[cur]), b = num(ECB.rates[HOME]);
+    return a > 0 && b > 0 ? b / a : null;
+  }
   function num(v) { v = String(v == null ? '' : v).trim().replace(',', '.'); return v === '' ? NaN : Number(v); }
   function fmt(n) { return (Math.round(n * 10000) / 10000).toString().replace('.', ','); }
   function parse(ta, empty) { try { var v = JSON.parse(ta.value || ''); return v == null ? empty : v; } catch (e) { return empty; } }
@@ -61,17 +70,61 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!body.children.length) add([]);
     wrap.querySelector('.ss-btn').addEventListener('click', function () { add([]).querySelector('input').focus(); sync(); });
     sync();
+    return { wrap: wrap, body: body, add: add, sync: sync };
   }
 
-  // ── Курси валют: валюта | 1 валюта = ? HOME ──
-  tableEditor(document.querySelector('textarea[name="fx_rates"]'),
+  // ── Курси валют: валюта | 1 валюта = ? HOME | порівняння з ЄЦБ ──
+  var fx = tableEditor(document.querySelector('textarea[name="fx_rates"]'),
     [{ label: 'Валюта', cls: 'ss-cur', placeholder: 'USD' }, { label: '1 одиниця = ? ' + HOME, placeholder: '0,86' }],
     function (j) { return Object.keys(j || {}).map(function (k) { return [k, String(j[k]).replace('.', ',')]; }); },
     function (rows) { var o = {}; rows.forEach(function (r) { var c = r[0].toUpperCase(), v = num(r[1]); if (c && v > 0) o[c] = v; }); return o; },
     function (r) { var c = (r[0] || '').toUpperCase(), v = num(r[1]);
-      return c && v > 0 ? '1 ' + c + ' = ' + fmt(v) + ' ' + HOME + ' · 1 ' + HOME + ' = ' + fmt(1 / v) + ' ' + c : ''; },
+      if (!(c && v > 0)) return '';
+      var t = '1 ' + c + ' = ' + fmt(v) + ' ' + HOME + ' · 1 ' + HOME + ' = ' + fmt(1 / v) + ' ' + c, e = ecbRate(c);
+      if (e) {
+        var p = Math.round((v / e - 1) * 1000) / 10;
+        t += ' · 🌐 ЄЦБ: ' + fmt(e) + (Math.abs(p) >= 0.1 ? ' (' + (p > 0 ? '+' : '') + String(p).replace('.', ',').replace('-', '−') + ' %)' : ' ✓');
+      }
+      return t; },
     '+ Додати валюту',
     function (k, v) { return v === '' || (k === 0 ? /^[A-Za-z]{3}$/.test(v) : num(v) > 0); });
+  if (fx) {
+    var box = document.createElement('div');
+    box.className = 'ss-ecb';
+    box.innerHTML = '<button type="button" class="ss-btn ss-ecb-btn" title="Довідкові курси Європейського центрального банку — ' +
+      'підставляються в таблицю, зберігаються кнопкою «Зберегти»">🌐 Підставити курси ЄЦБ</button><span class="ss-hint ss-ecb-st">Завантаження курсів ЄЦБ…</span>';
+    fx.wrap.appendChild(box);
+    var st = box.querySelector('.ss-ecb-st'), btn = box.querySelector('.ss-ecb-btn');
+    fetch(ECB_URL, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok) { st.textContent = '🌐 ' + ((j && j.error) || 'Курси ЄЦБ недоступні.'); btn.disabled = true; return; }
+        ECB = j;
+        st.textContent = 'ЄЦБ на ' + j.date_text + ' — порівняння в кожному рядку.';
+        fx.sync();
+      })
+      .catch(function () { st.textContent = '🌐 Курси ЄЦБ недоступні (мережа).'; btn.disabled = true; });
+    btn.addEventListener('click', function () {
+      if (!ECB) return;
+      var done = [], missing = [], rows = fx.body.querySelectorAll('tr');
+      if (!Array.prototype.some.call(rows, function (tr) { return tr.querySelector('input').value.trim(); })) {
+        var first = rows[0] || fx.add([]);
+        first.querySelector('input').value = 'USD';
+        rows = fx.body.querySelectorAll('tr');
+      }
+      Array.prototype.forEach.call(rows, function (tr) {
+        var inp = tr.querySelectorAll('input'), c = inp[0].value.trim().toUpperCase();
+        if (!c) return;
+        var e = ecbRate(c);
+        if (e) { inp[1].value = fmt(Math.round(e * 1e6) / 1e6); done.push(c); } else missing.push(c);
+      });
+      fx.sync();
+      st.innerHTML = '';
+      st.textContent = (done.length ? '✓ Курси ЄЦБ на ' + ECB.date_text + ' підставлено (' + done.join(', ') + ') — натисніть «Зберегти». ' : '') +
+        (missing.length ? 'У ЄЦБ немає: ' + missing.join(', ') + '.' : '');
+      st.classList.toggle('ss-hot', !!done.length);
+    });
+  }
 
   // ── Шаблон ступенів: від кількості | знижка % ──
   tableEditor(document.querySelector('textarea[name="price_breaks"]'),

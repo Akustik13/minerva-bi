@@ -42,7 +42,9 @@ class ConvertTests(Base):
         self.assertEqual([r["unit_price"] for r in p.base_prices], ["239.94", "230.8154", "0.0389"])
         h = ProductPriceHistory.objects.get(product=p)
         self.assertEqual((h.currency, h.old_prices[0]["unit_price"]), ("EUR", "279"))
-        self.assertIn("Переведено з USD в EUR за курсом 0.86", h.note)
+        self.assertIn("Переведено з USD в EUR за курсом 1 USD = 0.86 EUR", h.note)
+        self.assertEqual((h.details["old_currency"], h.details["rate"], h.details["rate_from"], h.details["rate_to"]),
+                         ("USD", "0.86", "USD", "EUR"))
         self.assertIn("Переведено з USD в EUR", p.base_prices_source)
         self.assertFalse(bp.convert(p, "EUR", D("0.86")))           # уже в EUR
         q = self.product("AN-4", [(10, "268.39")])
@@ -82,7 +84,10 @@ class ImportTests(Base):
         p.refresh_from_db()
         self.assertEqual(p.base_price_currency, "EUR")
         self.assertEqual([r["unit_price"] for r in p.base_prices], ["8.6", "8.17"])
-        self.assertIn("USD → EUR за курсом 0.86", p.base_prices_source)
+        self.assertIn("Зчитано з DigiKey у USD · переведено в EUR за курсом 1 USD = 0.86 EUR", p.base_prices_source)
+        h = ProductPriceHistory.objects.get(product=p)
+        self.assertEqual(h.details["read"], {"from": "DigiKey", "currency": "USD", "prices": [
+            {"min_qty": 1, "unit_price": "10"}, {"min_qty": 10, "unit_price": "9.5"}]})
 
     def test_without_rate_keeps_digikey_currency(self):
         s = DigiKeyPriceSettings.get()
@@ -176,3 +181,155 @@ class CardTests(Base):
         s.save()
         cfg = self.config(self.eur)
         self.assertEqual((cfg["dk"]["rate"], cfg["dk"]["source"]), (1.25, "свій курс для DigiKey"))
+
+
+ECB_XML = """<gesmes:Envelope><Cube><Cube time='2026-10-30'>
+<Cube currency='USD' rate='1.1172'/><Cube currency='GBP' rate='0.8650'/></Cube></Cube></gesmes:Envelope>"""
+
+
+def _clear_fx_cache():
+    from core import fx_online
+    from core.shared_cache import cache
+    cache.delete(fx_online.CACHE_KEY)
+    cache.delete(fx_online.FAIL_KEY)
+
+
+class HistoryTests(Base):
+    """Історія базових цін: що в що перевели, за яким курсом, що зчитано з DigiKey і в якій валюті."""
+
+    def line(self, item, label):
+        return next(ln for ln in item["lines"] if ln["label"] == label)
+
+    def test_convert_shows_from_to_and_rate(self):
+        p = self.product("H-1", [(1, "2.69"), (10, "2.587")])
+        bp.convert(p, "EUR", D("0.86"), origin="ЄЦБ на 30.10.2026")
+        item = bp.history(p)[0]
+        self.assertEqual((item["icon"], item["title"]), ("💱", "Переведено з USD в EUR"))
+        self.assertEqual(item["rate"], "1 USD = 0.86 EUR · 1 EUR = 1.1628 USD · курс: ЄЦБ на 30.10.2026")
+        self.assertEqual(item["qtys"], [1, 10])
+        self.assertEqual([c["v"] for c in self.line(item, "Було, USD")["cells"]], ["2.69", "2.587"])
+        self.assertEqual([c["v"] for c in self.line(item, "Стало, EUR")["cells"]], ["2.3134", "2.2248"])
+        self.assertEqual(item["note"], "")                       # усе вже в заголовку й курсі
+        p.refresh_from_db()
+        self.assertIn("(ЄЦБ на 30.10.2026)", p.base_prices_source)
+
+    def test_digikey_read_in_usd_then_converted(self):
+        p = self.product("H-2", currency="EUR")
+        DigiKeyListing.objects.create(product=p, dk_offer_id="o9", sync_status="published",
+                                      dk_prices=[{"qty": 1, "price": 10}, {"qty": 10, "price": "9.5"}])
+        bp.import_from_digikey(p)
+        item = bp.history(p)[0]
+        self.assertEqual(item["title"], "Зчитано з DigiKey у USD → переведено в EUR")
+        self.assertEqual([c["v"] for c in self.line(item, "DigiKey, USD")["cells"]], ["10", "9.5"])
+        self.assertEqual([c["v"] for c in self.line(item, "Стало, EUR")["cells"]], ["8.6", "8.17"])
+        self.assertFalse(any(ln["label"].startswith("Було") for ln in item["lines"]))   # раніше цін не було
+        self.assertIn("офер o9", item["note"])
+
+    def test_old_records_from_notes(self):
+        """Записи до 11.2026 (без подробиць): валюту й курс видно з примітки та з попереднього запису."""
+        p = self.product("H-3", [(1, "2.3134")], "EUR")
+        rows_usd, rows_eur = [{"min_qty": 1, "unit_price": "2.69"}], [{"min_qty": 1, "unit_price": "2.3134"}]
+        ProductPriceHistory.objects.create(
+            product=p, source="migration", currency="USD", old_prices=[], new_prices=rows_usd, user_label="система",
+            note="Перенесено з цін DigiKey при оновленні (DigiKey · офер 26e9 · синхр. 30.06.2026 17:57)")
+        ProductPriceHistory.objects.create(
+            product=p, source="manual", currency="EUR", old_prices=rows_usd, new_prices=rows_eur, user_label="admin",
+            note="Переведено з USD в EUR за курсом 0.86")
+        new, old = bp.history(p)
+        self.assertEqual((new["title"], new["rate"]), ("Переведено з USD в EUR", "1 USD = 0.86 EUR · 1 EUR = 1.1628 USD"))
+        self.assertEqual([ln["label"] for ln in new["lines"]], ["Було, USD", "Стало, EUR"])
+        self.assertEqual((old["icon"], old["title"]), ("📥", "Зчитано з DigiKey у USD"))
+        self.assertEqual([ln["label"] for ln in old["lines"]], ["Стало, USD"])
+        self.assertEqual(old["note"], "перенесено під час оновлення Minerva · офер 26e9 · синхр. 30.06.2026 17:57")
+
+    def test_manual_change_marks_changed_tiers(self):
+        p = self.product("H-4", [(1, 10), (10, 9)], "EUR")
+        bp.set_base_prices(p, [{"min_qty": 1, "unit_price": "10"}, {"min_qty": 10, "unit_price": "8.5"}],
+                           note="знижка")
+        item = bp.history(p)[0]
+        self.assertEqual((item["icon"], item["title"], item["note"]), ("✏️", "Змінено вручну", "знижка"))
+        self.assertEqual([c["changed"] for c in self.line(item, "Стало, EUR")["cells"]], [False, True])
+
+    def test_card_converter_mark_goes_to_history(self):
+        p = self.product("H-5", [(1, "2.69")])
+        fx = bp.parse_fx("USD>EUR:0.895095:ЄЦБ на 30.10.2026")
+        self.assertEqual(fx, {"rate": "0.895095", "rate_from": "USD", "rate_to": "EUR", "rate_origin": "ЄЦБ на 30.10.2026"})
+        self.assertIsNone(bp.parse_fx("USD>EUR:abc"))
+        self.assertIsNone(bp.parse_fx("<script>"))
+        bp.set_base_prices(p, [{"min_qty": 1, "unit_price": "2.4078"}], currency="EUR", details=fx)
+        p.refresh_from_db()
+        self.assertEqual(p.base_prices_source, "Переведено з USD в EUR за курсом 1 USD = 0.895095 EUR (ЄЦБ на 30.10.2026)")
+        self.assertEqual(bp.history(p)[0]["title"], "Переведено з USD в EUR")
+        q = self.product("H-6", [(1, "2.69")])                  # позначка в іншу валюту — курс не пишемо
+        bp.set_base_prices(q, [{"min_qty": 1, "unit_price": "2.5"}], currency="GBP", details=fx)
+        h = ProductPriceHistory.objects.get(product=q)
+        self.assertNotIn("rate", h.details)
+        self.assertEqual(bp.history(q)[0]["title"], "Змінено вручну · валюта USD → GBP без перерахунку цін")
+
+    def test_card_shows_history_table(self):
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+        p = self.product("H-7", [(1, "2.69")])
+        bp.convert(p, "EUR", D("0.86"))
+        html = self.client.get(f"/admin/inventory/product/{p.pk}/change/").content.decode()
+        self.assertIn("💱 Переведено з USD в EUR", html)
+        self.assertIn("Було, USD", html)
+        self.assertIn("Стало, EUR", html)
+        self.assertIn('name="base_fx"', html)
+
+
+class OnlineRatesTests(Base):
+    """🌐 Курси ЄЦБ для сторінок: картка товару, «Курси валют», переведення."""
+
+    def setUp(self):
+        super().setUp()
+        _clear_fx_cache()
+        self.addCleanup(_clear_fx_cache)
+        self.root = User.objects.create_superuser("root", "r@x.y", "p")
+
+    def test_json_for_staff_only(self):
+        from unittest import mock
+        from core import fx_online
+        self.assertEqual(self.client.get("/core/fx-online/").status_code, 302)       # без входу
+        self.client.force_login(self.root)
+        with mock.patch.object(fx_online, "_download", return_value=ECB_XML):
+            j = self.client.get("/core/fx-online/").json()
+        self.assertEqual((j["ok"], j["date_text"], j["rates"]["USD"]), (True, "30.10.2026", "1.1172"))
+        _clear_fx_cache()
+        with mock.patch.object(fx_online, "_download", side_effect=OSError("offline")):
+            j = self.client.get("/core/fx-online/").json()
+        self.assertFalse(j["ok"])
+        self.assertIn("недоступні", j["error"])
+
+    def test_card_config_has_online_url_and_digikey_settings(self):
+        p = self.product("O-1", [(1, 10)], "EUR")
+        from inventory.admin_currency import card_config
+        cfg = card_config(p.pk)
+        self.assertEqual(cfg["fx_online_url"], "/core/fx-online/")
+        self.assertTrue(cfg["dk"]["settings_url"].startswith("/admin/bots/digikeypricesettings/"))
+        self.assertFalse(cfg["dk"]["online"])
+
+    def test_conversion_page_offers_ecb_and_records_origin(self):
+        from unittest import mock
+        from core import fx_online
+        self.client.force_login(self.root)
+        p = self.product("O-2", [(1, 279)])
+        url = "/admin/inventory/product/base-currency/"
+        with mock.patch.object(fx_online, "_download", return_value=ECB_XML):
+            page = self.client.get(url, {"ids": p.pk})
+        self.assertContains(page, 'data-origin="ЄЦБ на 30.10.2026"')
+        self.assertContains(page, "1 EUR = 1.162791 USD")
+        self.client.post(url, {"ids": str(p.pk), "rate_USD": "0.895095", "origin_USD": "ЄЦБ на 30.10.2026",
+                               "action": "convert", "confirm": "1"})
+        h = ProductPriceHistory.objects.get(product=p)
+        self.assertEqual((h.details["rate"], h.details["rate_origin"]), ("0.895095", "ЄЦБ на 30.10.2026"))
+        q = self.product("O-3", [(1, 279)])
+        self.client.post(url, {"ids": str(q.pk), "rate_USD": "0.86", "action": "convert", "confirm": "1"})
+        h = ProductPriceHistory.objects.get(product=q)
+        self.assertEqual(h.details["rate_origin"], "як для DigiKey: «Курси валют» Minerva")
+
+    def test_shop_rates_page_has_ecb_button(self):
+        self.client.force_login(self.root)
+        from shop.models import ShopSettings
+        html = self.client.get(f"/admin/shop/shopsettings/{ShopSettings.get().pk}/change/").content.decode()
+        self.assertIn("🌐 Підставити курси ЄЦБ", html)
+        self.assertIn("/core/fx-online/", html)

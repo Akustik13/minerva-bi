@@ -1,0 +1,43 @@
+{# Джерело та історія базових цін (ProductAdmin.base_prices_info ← inventory/services/base_prices.history) #}
+<style>
+.ph-head { opacity: .85; margin-bottom: 8px; }
+.ph-list { display: flex; flex-direction: column; gap: 10px; max-width: 1100px; }
+.ph-item { border: 1px solid var(--border-strong, #243347); border-radius: 6px; padding: 8px 12px; }
+.ph-top { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; font-size: 13px; }
+.ph-when { color: var(--text-muted, #9aafbe); white-space: nowrap; font-size: 12px; }
+.ph-title { font-weight: 700; }
+.ph-rate { font-family: monospace; font-size: 12px; background: var(--bg-hover, #1e2d40); border-radius: 4px; padding: 1px 6px; }
+.ph-note { color: var(--text-muted, #9aafbe); font-size: 12px; margin-top: 3px; }
+.ph-scroll { overflow-x: auto; margin-top: 6px; }
+.ph-tbl { border-collapse: collapse; font-size: 12px; }
+.ph-tbl th, .ph-tbl td { padding: 3px 9px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border, #1e2d40); }
+.ph-tbl th:first-child, .ph-tbl td:first-child { text-align: left; color: var(--text-muted, #9aafbe); font-weight: 600; font-family: inherit; }
+.ph-tbl thead th { color: var(--text-muted, #9aafbe); font-weight: 600; }
+.ph-tbl td { font-family: monospace; }
+.ph-tbl tr.ph-strong td { font-weight: 700; }
+.ph-tbl td.ph-ch { color: var(--accent, #58a6ff); }
+</style>
+<div class="ph-head">{{ head }}</div>
+{% if items %}
+<div class="ph-list">
+{% for h in items %}
+  <div class="ph-item">
+    <div class="ph-top">
+      <span class="ph-when">{{ h.when|date:"d.m.Y H:i" }} · {{ h.who }}</span>
+      <span class="ph-title">{{ h.icon }} {{ h.title }}</span>
+      {% if h.rate %}<span class="ph-rate" title="Курс, за яким перевели ціни">{{ h.rate }}</span>{% endif %}
+    </div>
+    <div class="ph-scroll"><table class="ph-tbl">
+      <thead><tr><th>Від, шт.</th>{% for q in h.qtys %}<th>{{ q }}</th>{% endfor %}</tr></thead>
+      <tbody>
+      {% for line in h.lines %}
+        <tr{% if line.strong %} class="ph-strong"{% endif %}><td>{{ line.label }}</td>
+          {% for c in line.cells %}<td{% if c.changed %} class="ph-ch" title="Змінилось"{% endif %}>{{ c.v }}</td>{% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    {% if h.note %}<div class="ph-note">{{ h.note }}</div>{% endif %}
+  </div>
+{% endfor %}
+</div>
+{% endif %}

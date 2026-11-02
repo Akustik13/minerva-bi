@@ -254,6 +254,15 @@ document.addEventListener('DOMContentLoaded', function() {
   background: rgba(227,179,65,.08); font-size: 13px; line-height: 1.5; }
 .inv-bp-warn a { font-weight: 700; margin: 0 6px; }
 .inv-bp-warn .inv-bp-muted { color: var(--text-muted, #9aafbe); font-size: 12px; }
+.inv-bp-tool b.c-from, .inv-bp-tool b.c-to, .inv-bp-tool b.bp-c { color: var(--text, #c9d8e4); }
+.inv-bp-tool.t-conv { flex-wrap: wrap; white-space: nowrap; }
+.inv-bp-tool input.t-rate { width: 96px; }
+.inv-bp-conv-note, .inv-bp-rate { font-size: 12px; color: var(--text-muted, #9aafbe); line-height: 1.6; margin: -4px 0 10px; }
+.inv-bp-rate { margin: 8px 0 0; }
+.inv-bp-conv-note b, .inv-bp-rate b { color: var(--text, #c9d8e4); }
+.inv-bp-conv-note a, .inv-bp-rate a { font-weight: 600; margin-left: 6px; white-space: nowrap; }
+.inv-bp-hot { color: var(--warn, #e3b341); }
+.inv-bp-muted { color: var(--text-muted, #9aafbe); }
 </style>
 {{ bp_config|json_script:"bp-config" }}
 <script>
@@ -301,17 +310,23 @@ document.addEventListener('DOMContentLoaded', function () {
   }).join('');
   wrap.innerHTML =
     '<div class="inv-bp-tools">' +
-      '<span class="inv-bp-tool">Ціна за 1 шт. <input type="text" class="t-base"><button type="button" class="b-base" title="Нова ціна за 1 шт.; інші ступені перераховуються зі збереженням знижок">Застосувати</button></span>' +
+      '<span class="inv-bp-tool">Ціна за 1 шт., <b class="bp-c"></b> <input type="text" class="t-base"><button type="button" class="b-base" title="Нова ціна за 1 шт.; інші ступені перераховуються зі збереженням знижок">Застосувати</button></span>' +
       '<span class="inv-bp-tool">Усі ціни <input type="text" class="t-pct" placeholder="+5"> % <button type="button" class="b-pct">Змінити</button></span>' +
       '<span class="inv-bp-tool">Закупівля + <input type="text" class="t-mk" value="' + (cfg.markup != null ? cfg.markup : 100) + '"> % <button type="button" class="b-mk" title="Ціна за 1 шт. = закупівельна × (1 + націнка); знижки ступенів зберігаються">→ ціна 1 шт.</button></span>' +
       '<span class="inv-bp-sep"></span>' +
       '<span class="inv-bp-tool"><button type="button" class="b-tpl" title="Ступені від ціни за 1 шт. за шаблоном «Налаштування цін»">Знижки за шаблоном</button></span>' +
       '<span class="inv-bp-tool">Округлення <select class="t-rnd">' + rOpts + '</select><button type="button" class="b-rnd">Округлити</button></span>' +
       '<span class="inv-bp-sep"></span>' +
-      '<span class="inv-bp-tool">Конвертувати в <input type="text" class="cur t-to" maxlength="3" value="' + minerva + '"> курс <input type="text" class="t-rate"> <button type="button" class="b-conv" title="Ціни × курс, до 4 знаків (округлити — «Округлити»). До ' + minerva + ' — курс як для DigiKey">Конвертувати</button></span>' +
+      '<span class="inv-bp-tool t-conv-open"><button type="button" class="b-conv-open" title="Якщо числа насправді в іншій валюті (напр. USD з DigiKey) — перевести їх у ' + minerva + ' за курсом">💱 Перевести з іншої валюти…</button></span>' +
+      '<span class="inv-bp-tool t-conv">💱 Перевести з <input type="text" class="cur t-from" maxlength="3" aria-label="З валюти"> в <input type="text" class="cur t-to" maxlength="3" aria-label="У валюту">: ' +
+        '1 <b class="c-from"></b> = <input type="text" class="t-rate" inputmode="decimal" aria-label="Курс"> <b class="c-to"></b> ' +
+        '<button type="button" class="b-ecb" title="Довідковий курс Європейського центрального банку на сьогодні">🌐 Курс ЄЦБ</button>' +
+        '<button type="button" class="b-conv" title="Ціни × курс, до 4 знаків (округлити — «Округлити»); курс запишеться в історію">Перевести</button></span>' +
     '</div>' +
-    '<table class="inv-bp-table"><thead><tr><th>Від кількості, шт.</th><th>Ціна за шт.</th><th>Знижка від 1 шт., %</th>' +
+    '<div class="inv-bp-conv-note"></div>' +
+    '<table class="inv-bp-table"><thead><tr><th>Від кількості, шт.</th><th>Ціна за шт., <span class="bp-c"></span></th><th>Знижка від 1 шт., %</th>' +
       '<th class="h-cv" style="text-align:right">≈ у ' + home + '</th><th style="width:36px"></th></tr></thead><tbody></tbody></table>' +
+    '<div class="inv-bp-rate"></div>' +
     '<div class="inv-bp-foot"><button type="button" class="inv-bp-btn b-add">+ Додати ступінь</button>' +
       '<button type="button" class="inv-bp-btn b-undo" title="Повернути ціни, як були при відкритті сторінки">↶ Скасувати зміни</button>' +
       '<span class="bp-state">Порядок за кількістю — автоматично при збереженні</span></div>';
@@ -373,12 +388,14 @@ document.addEventListener('DOMContentLoaded', function () {
     var r = rate(cur, home), cvCur = home;
     if (r === 1 && dk && dk.currency !== cur && cur === minerva) {   // ціни вже в EUR — що отримає DigiKey
       r = dk.rate || null; cvCur = dk.currency;
-      $('.h-cv').textContent = '≈ на DigiKey, ' + cvCur + (r ? ' (курс ' + fmt(r) + ')' : ' (немає курсу)');
-      $('.h-cv').title = 'До надбавки й округлення правил DigiKey · ' + (dk.source || '');
+      $('.h-cv').textContent = '≈ на DigiKey, ' + cvCur + (r ? '' : ' (немає курсу)');
+      $('.h-cv').title = 'До надбавки й округлення правил DigiKey · курс — під таблицею';
     } else {
-      $('.h-cv').textContent = r === 1 ? '' : '≈ у ' + home + (r ? ' (курс ' + fmt(r) + ')' : ' (немає курсу)');
+      $('.h-cv').textContent = r === 1 ? '' : '≈ у ' + home + (r ? '' : ' (немає курсу)');
       $('.h-cv').title = '';
     }
+    Array.prototype.forEach.call(wrap.querySelectorAll('.bp-c'), function (el) { el.textContent = cur || '?'; });
+    rateLine(cur, cvCur, r);
     rows().forEach(function (x) {
       var qn = num(x.q.value), pn = num(x.p.value);
       x.q.classList.toggle('is-bad', x.q.value.trim() !== '' && !(qn >= 1 && Math.floor(qn) === qn));
@@ -399,10 +416,102 @@ document.addEventListener('DOMContentLoaded', function () {
     st.textContent = dirty ? 'Є незбережені зміни — натисніть «Зберегти» внизу сторінки' : 'Порядок за кількістю — автоматично при збереженні';
     st.classList.toggle('inv-bp-dirty', dirty);
     if (document.activeElement !== $('.t-base')) $('.t-base').value = b > 0 ? fmt(b) : '';
-    if (document.activeElement !== $('.t-rate')) {
-      var cr = rate(curInp ? curInp.value : home, $('.t-to').value);
-      $('.t-rate').value = cr ? fmt(cr) : '';
+    convSync();
+  }
+
+  // ── 💱 Курси: ЄЦБ онлайн (core/fx-online/), курс для DigiKey під таблицею, конвертер «з → в» ──
+  var fxInp = document.querySelector('input[name="base_fx"]');
+  var ecb = null, ecbErr = '', ecbBusy = false, ecbWait = [], convOpen = false, origin = 'rule', lastConv = '';
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function r6(n) { return String(Math.round(n * 1e6) / 1e6); }
+  function pctDiff(a, b) { return Math.round((a / b - 1) * 1000) / 10; }
+  function pctText(p) { return (p > 0 ? '+' : '') + String(p).replace('.', ',').replace('-', '−') + ' %'; }
+  function loadEcb(cb) {
+    if (cb) ecbWait.push(cb);
+    if (ecb || ecbErr || !cfg.fx_online_url) { var w0 = ecbWait; ecbWait = []; w0.forEach(function (f) { f(); }); return; }
+    if (ecbBusy) return;
+    ecbBusy = true;
+    fetch(cfg.fx_online_url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (j && j.ok) ecb = j; else ecbErr = (j && j.error) || 'курси ЄЦБ недоступні'; })
+      .catch(function () { ecbErr = 'курси ЄЦБ недоступні (мережа)'; })
+      .then(function () { ecbBusy = false; sync(true); var w = ecbWait; ecbWait = []; w.forEach(function (f) { f(); }); });
+  }
+  function ecbRate(from, to) {                    // 1 from = ? to за ЄЦБ (крос через EUR)
+    if (!ecb) return null;
+    var a = num(ecb.rates[(from || '').toUpperCase()]), b = num(ecb.rates[(to || '').toUpperCase()]);
+    return a > 0 && b > 0 ? b / a : null;
+  }
+  function ruleText(from, to) {
+    if ((to === minerva && toMinerva[from]) || (from === minerva && dk && dk.currency === to)) {
+      return 'як для DigiKey: ' + ((dk && dk.source) || '«Курси валют» Minerva');
     }
+    return '«Курси валют» Minerva';
+  }
+  function dkLink() { return dk && dk.settings_url ? ' <a href="' + esc(dk.settings_url) + '">⚙ Курс для DigiKey →</a>' : ''; }
+  function rateLine(cur, cvCur, r) {      // під таблицею: яким курсом рахується «≈» і що каже ЄЦБ
+    var el = $('.inv-bp-rate'), html = '';
+    cur = (cur || '').toUpperCase();
+    if (r && r !== 1) {
+      var forDk = dk && cvCur === dk.currency && cur === minerva;
+      html = '💱 ' + (forDk ? 'Ціни на DigiKey' : '≈') + ': 1 ' + cur + ' = <b>' + fmt(r) + ' ' + cvCur + '</b> · 1 ' + cvCur +
+        ' = ' + fmt(1 / r) + ' ' + cur + ' — курс ' + esc(ruleText(cur, cvCur)) + '.';
+      var e = ecbRate(cur, cvCur);
+      if (e && !(dk && dk.online && (forDk || cur === dk.currency))) {
+        var p = pctDiff(r, e);
+        html += ' <span class="' + (Math.abs(p) >= 1 ? 'inv-bp-hot' : 'inv-bp-muted') + '">🌐 ЄЦБ на ' + esc(ecb.date_text) +
+          ': 1 ' + cur + ' = ' + fmt(e) + ' ' + cvCur + (Math.abs(p) >= 0.1 ? ' — цей курс ' + pctText(p) + ' від ЄЦБ' : ' — той самий') + '</span>';
+      } else if (ecbErr) {
+        html += ' <span class="inv-bp-muted">🌐 ' + esc(ecbErr) + '</span>';
+      }
+      if (dk && (forDk || cur === dk.currency)) html += dkLink();
+    }
+    el.innerHTML = html;
+    el.style.display = html ? '' : 'none';
+  }
+  function convValues() {
+    return { from: $('.t-from').value.trim().toUpperCase(), to: $('.t-to').value.trim().toUpperCase() };
+  }
+  function convSync(resetRate) {
+    var cur = (curInp ? curInp.value : minerva).trim().toUpperCase();
+    var show = convOpen || (cur !== minerva && !!ta.value.trim());
+    $('.t-conv').style.display = show ? '' : 'none';
+    $('.t-conv-open').style.display = show ? 'none' : '';
+    var note = $('.inv-bp-conv-note');
+    if (!show) { note.innerHTML = lastConv; note.style.display = lastConv ? '' : 'none'; return; }
+    if (!$('.t-from').value) $('.t-from').value = cur !== minerva ? cur : ((dk && dk.currency) || 'USD');
+    if (!$('.t-to').value) $('.t-to').value = minerva;
+    var v = convValues();
+    $('.c-from').textContent = v.from || '?';
+    $('.c-to').textContent = v.to || '?';
+    if (resetRate === true || (origin === 'rule' && document.activeElement !== $('.t-rate'))) {
+      var rr = rate(v.from, v.to);
+      $('.t-rate').value = rr ? r6(rr) : '';
+      origin = 'rule';
+    }
+    var r = num($('.t-rate').value), html;
+    if (v.from === v.to) {
+      html = 'Валюти однакові — переводити нічого.';
+    } else {
+      html = origin === 'ecb' ? 'Курс ЄЦБ на ' + esc(ecb.date_text) : origin === 'typed' ? 'Курс вписано вручну'
+        : rate(v.from, v.to) ? 'Курс ' + esc(ruleText(v.from, v.to)) : 'Курсу ' + v.from + ' → ' + v.to + ' немає — впишіть або візьміть 🌐 ЄЦБ';
+      if (r > 0) html += ' · 1 ' + v.to + ' = ' + fmt(1 / r) + ' ' + v.from;
+      var e = ecbRate(v.from, v.to);
+      if (e && origin !== 'ecb') html += ' · 🌐 ЄЦБ на ' + esc(ecb.date_text) + ': 1 ' + v.from + ' = ' + fmt(e) + ' ' + v.to;
+      else if (ecbErr) html += ' · 🌐 ' + esc(ecbErr);
+      // DigiKey рахує свої ціни з EUR за своїм курсом: інший курс тут — ціни на DigiKey зрушать
+      var rule = v.to === minerva && dk && v.from === dk.currency ? toMinerva[v.from] : null;
+      if (rule && r > 0 && origin !== 'rule') {
+        var p = pctDiff(r, rule);
+        if (Math.abs(p) >= 0.1) {
+          html += '<br><span class="inv-bp-hot">⚠ DigiKey рахує ціни за курсом 1 ' + v.from + ' = ' + fmt(rule) + ' ' + v.to +
+            ' (' + esc(dk.source || '') + '): з цим курсом ціни на DigiKey після «💲 Ціни на DigiKey» зміняться на ' + pctText(p) +
+            '. Щоб лишились — візьміть той самий курс для DigiKey.</span>' + dkLink();
+        }
+      }
+    }
+    note.innerHTML = html;
+    note.style.display = '';
   }
 
   // ── Інструменти ──
@@ -437,21 +546,56 @@ document.addEventListener('DOMContentLoaded', function () {
     sync();
   });
   $('.b-rnd').addEventListener('click', function () { var m = $('.t-rnd').value; eachPrice(function (p) { return roundMode(p, m); }); sync(); });
-  $('.t-to').addEventListener('input', function () { $('.t-rate').value = ''; sync(); });
+  $('.b-conv-open').addEventListener('click', function () {
+    convOpen = true; lastConv = '';
+    var cur = (curInp ? curInp.value : minerva).trim().toUpperCase();
+    $('.t-from').value = cur !== minerva ? cur : ((dk && dk.currency) || 'USD');
+    $('.t-to').value = minerva;
+    convSync(true);
+    $('.t-rate').focus();
+  });
+  [['.t-from'], ['.t-to']].forEach(function (c) { $(c[0]).addEventListener('input', function () { convSync(true); }); });
+  $('.t-rate').addEventListener('input', function () { origin = 'typed'; convSync(); });
+  $('.b-ecb').addEventListener('click', function () {
+    var btn = this; btn.disabled = true;
+    loadEcb(function () {
+      btn.disabled = false;
+      var v = convValues(), e = ecbRate(v.from, v.to);
+      if (!e) { alert(ecbErr || ('У курсах ЄЦБ немає ' + v.from + ' або ' + v.to + '.')); return; }
+      $('.t-rate').value = r6(e); origin = 'ecb'; convSync();
+    });
+  });
   $('.b-conv').addEventListener('click', function () {
-    var to = $('.t-to').value.trim().toUpperCase(), r = num($('.t-rate').value);
-    if (!/^[A-Z]{3}$/.test(to)) return $('.t-to').focus();
-    if (!(r > 0)) { alert('Вкажіть курс: 1 ' + (curInp ? curInp.value : '') + ' = ? ' + to); return $('.t-rate').focus(); }
+    var v = convValues(), r = num($('.t-rate').value);
+    if (!/^[A-Z]{3}$/.test(v.from)) return $('.t-from').focus();
+    if (!/^[A-Z]{3}$/.test(v.to) || v.from === v.to) return $('.t-to').focus();
+    if (!(r > 0)) { alert('Вкажіть курс: 1 ' + v.from + ' = ? ' + v.to); return $('.t-rate').focus(); }
+    var cur = (curInp ? curInp.value : v.from).trim().toUpperCase();
+    if (cur !== v.from && !confirm('Зараз валюта цін — ' + cur + '. Вважати, що числа насправді в ' + v.from +
+        ', і перевести їх у ' + v.to + ' (1 ' + v.from + ' = ' + fmt(r) + ' ' + v.to + ')?')) return;
     eachPrice(function (p) { return p * r; }, true);   // 4 знаки: зворотний перерахунок для DigiKey дає ту саму ціну
-    if (curInp) curInp.value = to;
+    var why = origin === 'ecb' ? 'ЄЦБ на ' + ecb.date_text : origin === 'typed' ? 'вписано вручну' : ruleText(v.from, v.to);
+    var src = v.from, total = r, prev = fxInp && fxInp.value.match(/^([A-Z]{3})>([A-Z]{3}):([\d.]+)/);
+    if (prev && prev[2] === v.from) { src = prev[1]; total = num(prev[3]) * r; why = 'у кілька кроків'; }   // USD → GBP → EUR
+    if (fxInp) fxInp.value = src === v.to ? '' : src + '>' + v.to + ':' + r6(total) + ':' + why.slice(0, 60);
+    if (curInp) curInp.value = v.to;
+    lastConv = '✓ Переведено з ' + v.from + ' в ' + v.to + ' за курсом 1 ' + v.from + ' = ' + fmt(r) + ' ' + v.to + ' (' + esc(why) +
+      ') — натисніть «Зберегти»: курс запишеться в історію.';
+    convOpen = false; origin = 'rule'; $('.t-from').value = ''; $('.t-to').value = '';
     sync();
   });
-  if (curInp) curInp.addEventListener('input', function () { sync(); });
+  if (curInp) curInp.addEventListener('input', function () { $('.t-from').value = ''; sync(); convSync(true); });
   $('.b-add').addEventListener('click', function () { var tr = addRow('', ''); tr.querySelector('.bp-q').focus(); sync(); });
-  $('.b-undo').addEventListener('click', function () { if (curInp) curInp.value = initialCur; load(initial); sync(); });
+  $('.b-undo').addEventListener('click', function () {
+    if (curInp) curInp.value = initialCur;
+    if (fxInp) fxInp.value = '';
+    convOpen = false; origin = 'rule'; lastConv = ''; $('.t-from').value = ''; $('.t-to').value = '';
+    load(initial); sync(); convSync(true);
+  });
 
   load(ta.value);
   sync();
+  loadEcb();
 });
 </script>
 {% endblock %}

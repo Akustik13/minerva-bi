@@ -742,6 +742,9 @@ class ProductPriceHistory(models.Model):
     old_prices = models.JSONField("Було", default=list, blank=True)
     new_prices = models.JSONField("Стало", default=list, blank=True)
     note = models.CharField("Примітка", max_length=255, blank=True, default="")
+    # {"old_currency": "USD", "rate": "0.86", "rate_from": "USD", "rate_to": "EUR",
+    #  "read": {"from": "DigiKey", "currency": "USD", "prices": [...]}} — для історії «що в що перевели»
+    details = models.JSONField("Подробиці", default=dict, blank=True)
 
     class Meta:
         verbose_name = "Зміна базових цін"

@@ -19,13 +19,18 @@
   #bcc td.num { text-align: right; font-family: monospace; white-space: nowrap; }
   #bcc input.bcc-rate { width: 110px; text-align: right; padding: 5px 8px; font-size: 14px; }
   #bcc .bcc-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 12px; }
+  #bcc .bcc-pick { background: none; border: 1px dashed var(--border-strong); border-radius: 4px; color: var(--text);
+    padding: 2px 8px; margin: 2px 0; cursor: pointer; font-size: 12px; text-align: left; }
+  #bcc .bcc-pick:hover { border-color: var(--accent); }
 </style>
 <div id="bcc">
   <div class="bcc-card">
     <p style="margin:0 0 6px">Валюта Minerva — <b>{{ home }}</b>: базові ціни на складі тримаються в ній, а DigiKey,
       магазини й Angebote перераховують їх у свою валюту за курсом.</p>
     <p class="bcc-muted" style="margin:0">Курс підставлено той самий, яким Minerva рахує ціни для DigiKey
-      ({{ dk_rate_source }}), — тоді після переведення ціни на DigiKey лишаться такими самими. Можна вписати свій.
+      ({{ dk_rate_source }}), — тоді після переведення ціни на DigiKey лишаться такими самими. Можна вписати свій
+      або клікнути курс «Для порівняння» (🌐 ЄЦБ — сьогоднішній довідковий курс): у кожного товару в історії буде
+      записано, з якої валюти в яку, за яким курсом і звідки курс.
       Ціни переводяться точно, до 4 знаків (230,8154 €): саме тоді зворотний перерахунок для DigiKey дає ту саму ціну.
       Округлити до центів можна галочкою нижче або згодом у редакторі базових цін («Округлення») — тоді ціни на
       DigiKey можуть зрушити на цент. Кожна зміна записується в історію товару
@@ -38,16 +43,20 @@
   <form method="post" class="bcc-card">{% csrf_token %}
     <input type="hidden" name="ids" value="{{ ids }}">
     <table>
-      <thead><tr><th>Валюта</th><th>Товарів</th><th>Курс: 1 одиниця = … {{ home }}</th><th>Для порівняння</th></tr></thead>
+      <thead><tr><th>З валюти</th><th>Товарів</th><th>Курс → {{ home }}</th><th>Для порівняння (клік — підставити)</th></tr></thead>
       <tbody>
       {% for g in groups %}
         <tr>
           <td><b>{{ g.cur }}</b></td>
           <td>{{ g.count }}</td>
-          <td><input class="bcc-rate" type="text" name="rate_{{ g.cur }}" value="{{ g.rate }}" inputmode="decimal"
-                     aria-label="Курс {{ g.cur }} → {{ home }}" {% if not g.rate %}placeholder="немає курсу"{% endif %}>
-              <span class="bcc-muted">1 {{ g.cur }} = ? {{ home }}</span></td>
-          <td class="bcc-muted">{% for h in g.hints %}{{ h }}{% if not forloop.last %}<br>{% endif %}{% empty %}—{% endfor %}</td>
+          <td><span class="bcc-muted">1 {{ g.cur }} =</span>
+              <input class="bcc-rate" type="text" name="rate_{{ g.cur }}" value="{{ g.rate }}" inputmode="decimal"
+                     data-cur="{{ g.cur }}" aria-label="Курс {{ g.cur }} → {{ home }}" {% if not g.rate %}placeholder="немає курсу"{% endif %}>
+              <span class="bcc-muted">{{ home }}</span>
+              <input type="hidden" name="origin_{{ g.cur }}" value="{{ g.origin }}">
+              {% if g.inverse %}<div class="bcc-muted">1 {{ home }} = {{ g.inverse }} {{ g.cur }}{% if g.origin %} · {{ g.origin }}{% endif %}</div>{% endif %}</td>
+          <td class="bcc-muted">{% for h in g.hints %}<button type="button" class="bcc-pick" data-cur="{{ g.cur }}" data-rate="{{ h.rate }}"
+                data-origin="{{ h.origin }}">{{ h.origin }}: 1 {{ g.cur }} = {{ h.rate }} {{ home }}</button>{% if not forloop.last %}<br>{% endif %}{% empty %}—{% endfor %}</td>
         </tr>
       {% endfor %}
       </tbody>
@@ -84,4 +93,22 @@
   </form>
   {% endif %}
 </div>
+<script>
+/* Клік на курс «Для порівняння» — підставити його й запам'ятати, звідки він (піде в історію); вписали свій — «вписано вручну». */
+document.addEventListener('DOMContentLoaded', function () {
+  var root = document.getElementById('bcc');
+  if (!root) return;
+  function origin(cur) { return root.querySelector('input[name="origin_' + cur + '"]'); }
+  root.addEventListener('click', function (e) {
+    var b = e.target.closest('.bcc-pick');
+    if (!b) return;
+    var inp = root.querySelector('input.bcc-rate[data-cur="' + b.dataset.cur + '"]');
+    if (inp) { inp.value = b.dataset.rate; }
+    if (origin(b.dataset.cur)) origin(b.dataset.cur).value = b.dataset.origin;
+  });
+  root.addEventListener('input', function (e) {
+    if (e.target.classList.contains('bcc-rate') && origin(e.target.dataset.cur)) origin(e.target.dataset.cur).value = 'вписано вручну';
+  });
+});
+</script>
 {% endblock %}

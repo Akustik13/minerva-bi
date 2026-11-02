@@ -200,6 +200,21 @@ def main_menu_view(request):
                          if refused else ''})
 
 
+@staff_member_required
+@require_http_methods(['GET'])
+def fx_online_view(request):
+    """Онлайн-курси ЄЦБ для сторінок (картка товару, «Курси валют»): {ok, date, rates {код: за 1 EUR}, source}.
+    Лише читання публічних курсів (`core.fx_online`, кеш 3 год); не вдалося — ok: false, сторінка лишає свої курси."""
+    from core import fx_online
+    data = fx_online.latest()
+    if not data:
+        return JsonResponse({'ok': False, 'error': 'Курси ЄЦБ зараз недоступні (мережа або сайт ЄЦБ) — '
+                                                   'спробуйте пізніше.'})
+    y, m, d = str(data['date'])[:10].split('-')
+    return JsonResponse({'ok': True, 'date': data['date'], 'date_text': f'{d}.{m}.{y}', 'rates': data['rates'],
+                         'source': data.get('source') or fx_online.SOURCE})
+
+
 def custom_403_view(request, exception=None):
     return render(request, 'core/access_denied.html', {
         'title': 'Доступ обмежено',

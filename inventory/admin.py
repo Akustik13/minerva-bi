@@ -2123,6 +2123,8 @@ class ProductAdminForm(forms.ModelForm):
                                      error_messages={"invalid": "Код валюти з 3 літер, напр. EUR або USD"})
     base_note = forms.CharField(label="Примітка до зміни", required=False, max_length=200,
                                 help_text="Необов'язково — потрапить в історію змін базових цін.")
+    # «💱 Перевести» в редакторі цін пише сюди «USD>EUR:0.86:ЄЦБ на 30.10.2026» — курс іде в історію
+    base_fx = forms.CharField(required=False, max_length=120, widget=forms.HiddenInput)
 
     class Meta:
         model = Product
@@ -2217,8 +2219,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         if form is not None and "base_prices_text" in getattr(form, "cleaned_data", {}):
             from .services.base_prices import set_base_prices
             d = form.cleaned_data
+            from .services.base_prices import parse_fx
             if set_base_prices(obj, d["base_prices_text"], source="manual", user=request.user,
-                               currency=d.get("base_currency"), note=d.get("base_note", "")):
+                               currency=d.get("base_currency"), note=d.get("base_note", ""),
+                               details=parse_fx(d.get("base_fx", ""))):
                 self.message_user(request, f"{obj.sku}: базові ціни змінено (записано в історію).")
         from .admin_prices import apply_shop_choices   # галочки «Базові ціни → магазин» (🏪 Інтернет-магазини)
         apply_shop_choices(request, obj)
@@ -2363,23 +2367,17 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
     @admin.display(description="Джерело та історія")
     def base_prices_info(self, obj):
-        """Звідки базові ціни + останні зміни (хто, коли, було → стало)."""
+        """Звідки базові ціни + останні зміни: що сталося (зчитано з DigiKey у USD / переведено з USD в EUR за
+        курсом …) і таблиця «від, шт. | було, USD | стало, EUR» — `base_prices.history`."""
         if not obj or not obj.pk:
             return "—"
-        fmt = lambda rows: ", ".join(f'{r["min_qty"]}+: {r["unit_price"]}' for r in rows or []) or "—"  # noqa: E731
+        from django.template.loader import render_to_string
+        from .services.base_prices import history
         label = obj.base_prices_source or "Базових цін ще немає"
         if obj.base_prices_updated_at and label.startswith("Змінено"):
             label += " · " + timezone.localtime(obj.base_prices_updated_at).strftime("%d.%m.%Y %H:%M")
-        head = format_html('<div style="opacity:.8">{}</div>', label)
-        rows = list(obj.price_history.all()[:10])
-        if not rows:
-            return head
-        body = format_html_join("", '<tr><td style="white-space:nowrap">{}</td><td>{}</td><td>{}</td>'
-                                    '<td style="font-family:monospace;font-size:11px">{} → {}</td><td>{}</td></tr>', (
-            (timezone.localtime(h.created_at).strftime("%d.%m.%Y %H:%M"), h.user_label or "—", h.get_source_display(),
-             fmt(h.old_prices), fmt(h.new_prices) + (f" {h.currency}" if h.currency else ""), h.note) for h in rows))
-        return format_html('{}<table style="margin-top:8px;font-size:12px"><tr><th>Коли</th><th>Хто</th><th>Джерело</th>'
-                           '<th>Було → стало</th><th>Примітка</th></tr>{}</table>', head, body)
+        return mark_safe(render_to_string("admin/inventory/product/_price_history.html",
+                                          {"head": label, "items": history(obj)}))
 
     @admin.display(description="Магазини")
     def shops_col(self, obj):
@@ -2427,7 +2425,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             )
         }),
         ("💰 Базові ціни (ступені)", {
-            "fields": (("base_prices_text", "base_currency"), "base_note", "base_prices_info"),
+            "fields": (("base_prices_text", "base_currency"), ("base_note", "base_fx"), "base_prices_info"),
             "description": "Власні ціни за кількістю. Можна один раз взяти з DigiKey (дія «⬇️ Базові ціни ← DigiKey» "
                            "у списку товарів), далі змінювати тут — кожна зміна записується в історію. "
                            "Магазини з джерелом ціни «базові» оновлюються автоматично.",
