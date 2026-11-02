@@ -47,10 +47,27 @@ class Base(TestCase):
 
 class TargetTests(Base):
     def test_stock_mode_uses_product_link_then_stock_rule(self):
-        self.assertEqual(dk_media.candidates(self.p, "image"), (["https://img.example.com/AN-1.png"], "товар (склад)"))
+        self.assertEqual(dk_media.candidates(self.p, "image"), (["https://img.example.com/AN-1.png"], "посилання товару"))
         found, how = dk_media.candidates(self.p, "datasheet")
         self.assertEqual((found[0], how), ("https://docs.example.com/datasheets/download.php?file=AN-1.pdf",
                                            "правило складу"))
+        self.p.image_url = "https://docs.example.com/pictures/download.php?file=AN-1.jpg"     # те саме, що правило
+        self.assertEqual(dk_media.candidates(self.p, "image")[1], "правило складу")
+
+    def test_server_copy_is_not_used_before_the_rule(self):
+        """Копія файлу на сервері Minerva («…/media/products/images/AN-1.php») — не для DigiKey, поки є правило."""
+        self.p.image_url = ""
+        self.p.image.name = "products/images/AN-1.php"
+        found, how = dk_media.candidates(self.p, "image")
+        self.assertEqual((found[0], how), ("https://docs.example.com/pictures/download.php?file=AN-1.jpg", "правило складу"))
+        s = InventorySettings.get()
+        s.image_url_template = ""
+        s.save()
+        self.assertEqual(dk_media.candidates(self.p, "image"), ([], ""))                  # «.php» — ні
+        self.p.image.name = "products/images/AN-1.jpg"
+        found, how = dk_media.candidates(self.p, "image")
+        self.assertTrue(found[0].endswith("/media/products/images/AN-1.jpg"))
+        self.assertEqual(how, "файл товару в Minerva")
 
     def test_own_rule_for_digikey(self):
         self.cfg.media_source = DigiKeyConfig.MEDIA_RULE
@@ -127,7 +144,14 @@ class PageTests(Base):
     def test_page_check_apply_and_push(self):
         page = self.client.get(self.url)
         self.assertContains(page, "https://img.example.com/AN-1.png")
+        self.assertContains(page, '<img class="dm-img" src="https://img.example.com/AN-1.png"')   # фото мініатюрою
+        self.assertContains(page, "📄 відкрити")
         self.assertContains(page, "не читали")
+        self.l.dk_image_on_dk = "https://mm.digikey.com/images/AN-1.jpg"          # уже бачили на DigiKey — без читання
+        self.l.save(update_fields=["dk_image_on_dk"])
+        page = self.client.get(self.url)
+        self.assertContains(page, 'src="https://mm.digikey.com/images/AN-1.jpg"')
+        self.assertContains(page, "востаннє бачили на DigiKey")
         live = {self.l.pk: {"imageUrl": "https://old.example.com/AN-1.jpg", "additionalFields": []}}
         with mock.patch.object(dk_media, "live_products", return_value=live), \
                 mock.patch.object(dk_media, "probe", return_value=""):

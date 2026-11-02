@@ -1,5 +1,11 @@
 <tr class="{% if r.state == 'diff' %}dv-diff{% elif r.state == 'missing' %}dv-missing{% elif r.state == 'unknown' %}dv-unknown{% endif %}">
   {% if pick and can_change %}<td>{% if r.pushable %}<input type="checkbox" name="fields" value="{{ r.key }}" checked title="Оновити на DigiKey з Minerva">{% endif %}</td>{% endif %}
-  <td>{{ r.label }}</td><td class="v">{{ r.minerva }}</td><td class="v">{{ r.dk }}</td>
+  <td>{{ r.label }}</td>
+  {% if r.tiers %}<td class="v" colspan="2"><table class="dv-tiers">
+      <thead><tr><th>Від, шт.</th><th>Minerva надсилає, {{ r.currency }}</th><th>На DigiKey зараз, {{ r.currency }}</th></tr></thead>
+      <tbody>{% for t in r.tiers %}<tr{% if not t.same %} class="dv-tdiff" title="Ціни різні"{% endif %}><td>{{ t.qty }}</td><td>{{ t.minerva }}</td><td>{{ t.dk }}</td></tr>{% endfor %}</tbody>
+    </table>{% if r.state == "missing" %}<div class="dv-muted">— немає на DigiKey —</div>{% endif %}</td>
+  {% else %}<td class="v">{% if r.img_m %}<a href="{{ r.img_m }}" target="_blank" rel="noopener noreferrer"><img class="dv-thumb" src="{{ r.img_m }}" alt="фото" loading="lazy" referrerpolicy="no-referrer"></a>{% endif %}{{ r.minerva }}</td>
+  <td class="v">{% if r.img_d %}<a href="{{ r.img_d }}" target="_blank" rel="noopener noreferrer"><img class="dv-thumb" src="{{ r.img_d }}" alt="фото" loading="lazy" referrerpolicy="no-referrer"></a>{% endif %}{{ r.dk }}</td>{% endif %}
   <td>{% if r.state == 'same' %}✓{% elif r.state == 'diff' %}<span title="На DigiKey інакше, ніж у Minerva">≠</span>{% elif r.state == 'unknown' %}<span title="DigiKey через API цього не повертає">?</span>{% else %}—{% endif %}</td>
 </tr>

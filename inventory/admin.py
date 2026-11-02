@@ -3887,6 +3887,16 @@ class InventorySettingsAdmin(admin.ModelAdmin):
 
         return format_html('''
 <div id="inv-mc-panel" style="font-size:13px">
+  <div style="max-width:760px;margin:0 0 10px;color:var(--text-muted);line-height:1.55">
+    <b style="color:var(--text)">Що це:</b> Minerva тримає <b style="color:var(--text)">копію</b> даташитів і фото
+    товарів на своєму сервері (media/products/…), щоб картки товарів, огляд складу, Angebote й листи відкривали їх
+    швидко — і тоді, коли сайт з оригіналами (напр. docs.sevskiy.com) недоступний.<br>
+    <b style="color:var(--text)">URL вказано</b> — у скількох товарів заповнене посилання («Посилання на Datasheet» /
+    «Зображення (URL)»); <b style="color:var(--text)">Локально</b> — у скількох уже є копія файлу на сервері;
+    <b style="color:var(--text)">Потрібно завантажити</b> — посилання є, а копії ще немає.<br>
+    Кнопка нижче завантажує ці файли (перевіряє, що це справді PDF / фото, а не сторінка з помилкою) і виправляє
+    старі копії з розширенням «.php». Посилання в товарах вона не змінює; DigiKey отримує посилання, а не копію.
+  </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;max-width:480px">
     <div style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong);border-radius:6px;padding:10px 14px">
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">📄 Datasheet PDF</div>

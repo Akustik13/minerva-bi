@@ -75,6 +75,42 @@ class DkViewTests(ToolsBase):
         self.assertFalse(v["web"])
         self.assertEqual(v["source"], "Manual")
 
+    def test_buyer_card_and_hidden_fields(self):
+        """«🛒 Як бачить покупець»: номер DigiKey, фото DigiKey, ціни × кількість, параметри (числові — з Minerva)."""
+        product = {"_id": "p-1", "partNumber": "FT220407", "title": "3228-FT220407-ND", "description": "Band-pass 2.4 GHz",
+                   "manufacturer": "Sevskiy", "imageUrl": "https://mm.digikey.com/img/FT220407.jpg", "webDisplay": True,
+                   "additionalFields": [{"code": "packaging", "value": "Bulk"},
+                                        {"code": "datasheetUrl", "value": "https://docs.example.com/FT220407.pdf"}]}
+        with mock.patch("bots.services.dk_prices._fetch_one", return_value=offer()), \
+                mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=product):
+            v = dk_view.live(self.listing)
+        b = v["buyer"]
+        self.assertEqual((b["dk_pn"], b["mpn"], b["image"], b["image_dk"]),
+                         ("3228-FT220407-ND", "FT220407", "https://mm.digikey.com/img/FT220407.jpg", True))
+        self.assertEqual(b["url"], "https://www.digikey.com/en/products/detail/-/-/3228-FT220407-ND")
+        self.assertEqual(b["datasheet"], "https://docs.example.com/FT220407.pdf")
+        self.assertEqual((b["stock"], b["moq"], b["lead"]), (40, 1, 11))
+        self.assertEqual([(t["qty"], t["unit"]) for t in b["prices"]], [(1, "19.50"), (10, "17.00")])
+        self.assertEqual(b["prices"][1]["ext"], dk_view.money(170, b["currency"]))            # ціна × кількість
+        attrs = {a["name"]: a for a in b["attrs"]}
+        self.assertEqual(attrs["Packaging"]["value"], "Bulk")
+        self.assertFalse(attrs["Packaging"]["from_minerva"])
+        self.assertEqual((attrs["Frequency"]["value"], attrs["Frequency"]["from_minerva"]), ("2.4 GHz", True))
+        self.assertNotIn("datasheetUrl", attrs)                                 # даташит — посиланням, не параметром
+        hidden = dict(v["hidden"])
+        self.assertEqual((hidden["Offer ID (DigiKey)"], hidden["Product ID (DigiKey)"]), ("o-1", "p-1"))
+        self.assertEqual(hidden["Товар показується на сайті"], "так")
+        p = {r["key"]: r for r in v["product_rows"]}
+        self.assertEqual(p["imageUrl"]["img_d"], "https://mm.digikey.com/img/FT220407.jpg")
+        self.assertIn("Frequency (139)", [r["label"] for r in v["attr_rows"]])
+
+    def test_price_table_by_quantity(self):
+        rows = {r["key"]: r for r in dk_view.offer_rows(self.listing, offer(
+            prices=[{"quantityBreak": 1, "price": 19.5}, {"quantityBreak": 50, "price": 16.0}]))}
+        self.assertEqual([(t["qty"], t["minerva"], t["dk"], t["same"]) for t in rows["prices"]["tiers"]],
+                         [(1, "19.50", "19.50", True), (10, "17.00", "—", False), (50, "—", "16.00", False)])
+        self.assertEqual(dk_view.money(1234.5, "USD"), "$1,234.50")
+
     def test_live_survives_network_errors(self):
         with mock.patch("bots.services.dk_prices._fetch_one", side_effect=RuntimeError("timeout")), \
                 mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=None):
@@ -89,6 +125,10 @@ class DkViewTests(ToolsBase):
                 mock.patch("bots.services.dk_marketplace.fetch_product_by_sku", return_value=None):
             r = self.client.get(url, {"pk": self.listing.pk})
         self.assertContains(r, "Строк відвантаження, дн")
+        self.assertContains(r, "🛒 Як бачить покупець")                           # два види, перемикач
+        self.assertContains(r, "🔧 Усі поля й службові")
+        self.assertContains(r, "🔒 Службові поля — покупець їх не бачить")
+        self.assertContains(r, "<th>Від, шт.</th><th>Minerva надсилає, ")          # ціни — таблицею
         self.assertContains(r, "📤 Оновити вибране на DigiKey")
         self.assertContains(r, "📤 Надіслати весь офер з Minerva")
         self.assertContains(r, "вручну на supplier.digikey.com")

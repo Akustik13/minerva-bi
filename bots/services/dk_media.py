@@ -1,7 +1,9 @@
 """🖼 Фото й даташити на DigiKey: звідки посилання, що зараз на DigiKey, звірка й надсилання.
 
 Посилання для DigiKey (`target`) — за «🛒 DigiKey → 🖼 Фото й даташити для DigiKey» (`DigiKeyConfig.media_source`):
-`stock` — як на складі й у магазинах (посилання товару, без нього — правило «Налаштувань складу»),
+`stock` — як на складі: посилання товару («Зображення (URL)» / «Посилання на Datasheet»), без нього — правило
+«Налаштувань складу», і лише без обох — копія файлу на сервері Minerva (файли зі старим розширенням «.php» — ні:
+DigiKey такої адреси не прийме),
 `rule` — свої правила для DigiKey (`media_image_template` / `media_datasheet_template`, {key} — як на складі).
 Ним користуються «Зі складу на DigiKey» (нова картка), картка лістингу («за правилом»), сторінка звірки.
 
@@ -76,13 +78,31 @@ def candidates(product, kind, sku: str = "", cfg=None) -> tuple[list[str], str]:
         found = media_links.candidates(template.strip(), key, kind)
         return found, ("правило DigiKey" if found else "")
     if product is not None:
-        url = _public(product.image_display_url if kind == IMAGE else product.datasheet_display_url)
-        if url:
-            return [url], "товар (склад)"
-        found = media_links.candidates(media_links.templates()[kind], media_links.key_for(product, kind), kind)
-        if found:
-            return found, "правило складу"
+        rule = media_links.candidates(media_links.templates()[kind], media_links.key_for(product, kind), kind)
+        link = ((product.image_url if kind == IMAGE else product.datasheet_url) or "").strip()
+        if link.startswith("http"):
+            return [link], ("правило складу" if link in rule else "посилання товару")
+        if rule:
+            return rule, "правило складу"
+        own = _own_file(product, kind)
+        if own:
+            return [own], "файл товару в Minerva"
     return [], ""
+
+
+FILE_EXT = {IMAGE: (".jpg", ".jpeg", ".png", ".gif", ".webp"), DATASHEET: (".pdf",)}
+
+
+def _own_file(product, kind) -> str:
+    """Публічна адреса копії файлу товару на сервері Minerva — лише з розширенням фото / PDF."""
+    f = product.image if kind == IMAGE else product.datasheet_file
+    name = (getattr(f, "name", "") or "").lower()
+    if not name.endswith(FILE_EXT[kind]):
+        return ""
+    try:
+        return _public(f.url)
+    except Exception:  # noqa: BLE001 — файл без сховища
+        return ""
 
 
 def target(product, kind, sku: str = "", cfg=None) -> str:
@@ -259,6 +279,8 @@ def row(listing, kind, dk: str | None = None, checked=None, cfg=None) -> dict:
             action, pick = PUSH, True
     return {"pk": listing.pk, "kind": kind, "label": LABEL[kind], "card": card, "card_error": card_error,
             "new": new, "new_error": new_error, "how": how, "dk": dk, "action": action,
+            # фото, яке DigiKey показував, коли Minerva востаннє читала товар (без нового читання)
+            "seen": (listing.dk_image_on_dk or "").strip() if kind == IMAGE and dk is None else "",
             "action_text": ACTION_TEXT.get(action, action), "pick": pick,
             "dk_same": dk is not None and dk == (new or card), "dk_copy": kind == IMAGE and dk_hosted(dk)}
 
