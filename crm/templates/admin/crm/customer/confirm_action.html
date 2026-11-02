@@ -1,0 +1,63 @@
+{% extends "admin/base_site.html" %}
+{% comment %}
+Підтвердження дії CRM, яку раніше запускало посилання (GET): «🎯 Призначити стратегію», «🔄 Синхронізація CRM».
+Дію виконує лише кнопка — POST з CSRF (CustomerAdmin._confirm_page). rows — (підпис, значення запису): значення
+записів екрановані й у translate="no".
+{% endcomment %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:crm_customer_changelist' %}">Клієнти</a>
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.ca-wrap { max-width: 560px; margin: 32px auto; }
+.ca-card {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-top: 4px solid #1976d2; border-radius: 8px; padding: 24px 28px;
+}
+.ca-title { font-size: 18px; font-weight: 700; color: var(--text); margin: 0 0 10px; }
+.ca-question { font-size: 14px; color: var(--text); margin: 0 0 14px; }
+.ca-rows { width: 100%; border-collapse: collapse; margin: 0 0 14px; }
+.ca-rows td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.ca-rows td:first-child { color: var(--text-muted); width: 30%; }
+.ca-note { font-size: 12px; color: var(--text-dim); margin: 0 0 18px; }
+.ca-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 0; }
+.ca-go {
+  padding: 9px 20px; background: #1976d2; color: #fff; border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.ca-go:hover { opacity: .88; }
+.ca-back {
+  padding: 9px 20px; background: var(--bg-card-2); color: var(--text-muted);
+  border: 1px solid var(--border-strong); border-radius: 6px; text-decoration: none;
+  font-size: 13px; font-weight: 600;
+}
+</style>
+
+<div class="ca-wrap">
+  <div class="ca-card">
+    <div class="ca-title">{{ title }}</div>
+    <p class="ca-question">{{ question }}</p>
+    {% if rows %}
+    <table class="ca-rows">
+      {% for label, value in rows %}
+      <tr><td>{{ label }}</td><td translate="no">{{ value }}</td></tr>
+      {% endfor %}
+    </table>
+    {% endif %}
+    {% if note %}<p class="ca-note">{{ note }}</p>{% endif %}
+    <form method="post" action="{{ action_url }}" class="ca-actions">
+      {% csrf_token %}
+      <button type="submit" class="ca-go">{{ button }}</button>
+      <a href="{{ back_url }}" class="ca-back">← Назад</a>
+    </form>
+  </div>
+</div>
+{% endblock %}

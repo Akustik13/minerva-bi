@@ -160,6 +160,33 @@ def _matching(customers):
     return rows, keyed, loose
 
 
+def orders_of(customer, base=None):
+    """Замовлення одного клієнта (QuerySet SalesOrder) — те саме правило, що _matching (RFM, «Тип», виручка):
+    за ключем (SalesOrder.customer_key = Customer.external_key), а замовлення без ключа клієнта CRM (порожній ключ
+    або клієнта з таким ключем уже немає) — за email (без регістру й пробілів по краях).
+
+    Без відбору продажів: base — свій queryset замовлень (за замовчуванням усі; sales.revenue.sale_orders() —
+    лише продажі). Панель клієнта (crm/side_panel.py) — замовлення, відправлення, неоплачені."""
+    from django.db.models.functions import Lower, Trim
+    from crm.models import Customer
+    from sales.models import SalesOrder
+
+    qs = SalesOrder.objects.all() if base is None else base
+    key = (getattr(customer, "external_key", "") or "") if customer is not None else ""
+    email = _norm_email(getattr(customer, "email", "")) if customer is not None else ""
+    cond = Q()
+    if key:
+        cond |= Q(customer_key=key)
+    if email:
+        loose = (SalesOrder.objects.exclude(email="")
+                 .exclude(customer_key__in=Customer.objects.exclude(external_key="").values("external_key"))
+                 .annotate(email_norm=Lower(Trim("email")))
+                 .filter(email_norm=email)
+                 .values("pk"))
+        cond |= Q(pk__in=loose)
+    return qs.filter(cond) if cond else qs.none()
+
+
 def order_counts(customers=None) -> dict:
     """{pk клієнта: кількість його продажів} (див. _matching).
 

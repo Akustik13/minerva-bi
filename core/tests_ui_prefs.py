@@ -73,8 +73,56 @@ class SettingsPageTests(TestCase):
         self.assertEqual(ui["theme"], "hc-light")
         self.assertEqual(ui["attrs"], {
             "data-mv-design": "new",                                 # вигляд ПК — за замовчуванням новий
+            "data-mv-sidebar": "auto",                               # бокове меню — само звужується до значків
             "data-mv-fix-contrast": "0", "data-mv-font": "readable", "data-mv-size": "125",
             "data-mv-focus": "always", "data-mv-links": "underline", "data-mv-motion": "reduce"})
+
+    def test_sidebar_rail_saved_and_rendered(self):
+        page = self.client.get("/core/my-settings/")
+        self.assertContains(page, 'id="ui-sidebar"')                  # «📐 Бокове меню на ПК» у «♿ Доступність»
+        self.assertContains(page, 'data-attr="data-mv-sidebar"')
+        self.assertEqual(self.post({"ui": {"sidebar": "rail"}}).status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.ui_prefs, {"sidebar": "rail"})
+        self.assertEqual(_page_ui(self.client.get("/admin/").content.decode())["attrs"]["data-mv-sidebar"], "rail")
+        self.post({"ui": {"sidebar": "wide"}})                         # ⇤ / ⇥ унизу меню
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.ui_prefs["sidebar"], "wide")
+
+    def test_sidebar_evil_ignored(self):
+        self.assertEqual(ui_prefs.clean({"sidebar": "evil"}), {})
+        self.assertEqual(ui_prefs.clean({"sidebar": "rail"}), {"sidebar": "rail"})
+        self.post({"ui": {"sidebar": "evil"}})
+        self.profile.refresh_from_db()
+        self.assertNotIn("sidebar", self.profile.ui_prefs or {})
+        self.assertEqual(_page_ui(self.client.get("/admin/").content.decode())["attrs"]["data-mv-sidebar"], "auto")
+
+    def test_page_loads_menu_component_and_rail_antiflash(self):
+        html = self.client.get("/admin/").content.decode()
+        self.assertIn('/static/admin/js/mv_menu.js?v=1', html)
+        self.assertIn('/static/admin/css/mv_menu.css?v=1', html)
+        self.assertIn("root.classList.add('mvd-rail')", html)          # значки ще до першого малювання
+        self.assertIn("attrs['data-mv-sidebar']", html)
+        self.assertIn('/static/admin/js/mv_desktop.js?v=3', html)
+        self.assertIn('/static/admin/css/mv_desktop.css?v=3', html)
+        self.assertIn('/static/admin/js/mv_show.js?v=2', html)
+        # спільне меню — раніше за панель праворуч і за бокове меню (обидва ним користуються)
+        self.assertLess(html.index('/static/admin/js/mv_menu.js'), html.index('/static/admin/js/mv_desktop.js'))
+        head = html.split("</head>")[0]
+        self.assertLess(head.index("root.classList.add('mvd-rail')"), head.index('/static/admin/css/mv_desktop.css'))
+
+    def test_save_rereads_profile_row(self):
+        """Застарілий профіль у пам'яті не затирає те, що тим часом записали панель і меню (select_for_update)."""
+        stale = UserProfile.objects.get(pk=self.profile.pk)
+        UserProfile.objects.filter(pk=self.profile.pk).update(
+            ui_prefs={"panels": {"*": {"nav": "top"}}, "menu": {"mode": "full"}})
+        self.assertEqual(ui_prefs.save(stale, {"sidebar": "rail", "theme": "light"}), ["ui_prefs", "theme"])
+        fresh = UserProfile.objects.get(pk=self.profile.pk)
+        self.assertEqual(fresh.ui_prefs, {"panels": {"*": {"nav": "top"}}, "menu": {"mode": "full"},
+                                          "sidebar": "rail", "theme": "light"})
+        self.assertEqual(fresh.theme, "light")
+        self.assertEqual((stale.ui_prefs, stale.theme), (fresh.ui_prefs, "light"))   # об'єкт — як у базі
+        self.assertEqual(ui_prefs.save(stale, {"sidebar": "rail"}), [])              # нічого нового — без запису
 
     def test_sidebar_switcher_saves_theme_only(self):
         self.post({"ui": {"font": "readable"}})
@@ -83,7 +131,7 @@ class SettingsPageTests(TestCase):
         self.assertEqual(self.profile.ui_prefs, {"font": "readable", "theme": "dark"})
 
     def test_bad_values_ignored(self):
-        self.post({"ui": {"theme": "pink", "text_size": "999", "font": "<script>"}})
+        self.post({"ui": {"theme": "pink", "text_size": "999", "font": "<script>", "sidebar": "evil"}})
         self.profile.refresh_from_db()
         self.assertEqual((self.profile.ui_prefs, self.profile.theme), ({}, "dark"))
 

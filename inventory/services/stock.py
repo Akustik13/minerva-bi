@@ -131,6 +131,26 @@ def shipped_before_tracking(order, product_id) -> bool:
     return first is not None and when < timezone.localdate(first)
 
 
+def _first_moves(order, product_ids) -> dict:
+    """{товар: перший рух} без резервів і без рухів самого замовлення — одним запитом для всіх позицій
+    (order_stock_issues; правило — як у shipped_before_tracking)."""
+    if order.status not in SHIPPED_STATUSES or not product_ids:
+        return {}
+    rows = (InventoryTransaction.objects.filter(product_id__in=product_ids).exclude(tx_type=TX.RESERVED)
+            .exclude(external_key__startswith=order_prefix(order)).order_by()
+            .values("product_id").annotate(t=Min("tx_date")))
+    return {r["product_id"]: r["t"] for r in rows}
+
+
+def _shipped_before(order, product_id, first_moves) -> bool:
+    """shipped_before_tracking з уже порахованих `_first_moves` — без запиту на кожну позицію."""
+    if order.status not in SHIPPED_STATUSES or not product_id:
+        return False
+    when = order.shipped_at or order.order_date
+    first = first_moves.get(product_id)
+    return bool(when) and first is not None and when < timezone.localdate(first)
+
+
 def _default_location_code():
     return (InventorySettings.get().default_location or "MAIN").strip()
 
@@ -1105,6 +1125,7 @@ def order_stock_issues(order, settings=None):
     lines = list(order.lines.select_related("product").order_by("pk"))
     by_line = _order_txs(order, line_pks)
     comps = _cancel_comps([tx.pk for txs in by_line.values() for tx in txs])
+    first_moves = _first_moves(order, {line.product_id for line in lines if line.product_id})
     issues = []
     for line in lines:
         txs = [tx for tx in by_line.get(line.pk, [])
@@ -1114,7 +1135,7 @@ def order_stock_issues(order, settings=None):
         base = {"line_pk": line.pk, "line_sku": sku, "line_qty": float(want)}
         if not txs:
             if (target is not None and line.product_id and want > 0
-                    and not shipped_before_tracking(order, line.product_id)):
+                    and not _shipped_before(order, line.product_id, first_moves)):
                 issues.append({**base, "tx_sku": "—", "tx_qty": 0, "tx_type": "", "product_diff": False,
                                "qty_diff": True, "text": f"{sku}: не записано на складі ({_label(target)} {_num(want)})"})
             continue

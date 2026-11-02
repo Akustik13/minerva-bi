@@ -3,7 +3,8 @@ import json
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_http_methods, require_safe
 
 
 @staff_member_required
@@ -24,6 +25,7 @@ def my_settings_view(request):
             return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
 
         fields_updated = []
+        ui_saved = []
 
         # «Email / Telegram сповіщення» і «Записів на сторінку» прибрано: їх ніщо не читало
         # (особисті повідомлення йдуть на Telegram ID, а що надсилати — у налаштуваннях кожної функції).
@@ -32,13 +34,14 @@ def my_settings_view(request):
             if data['interface_language'] in valid_langs:
                 profile.interface_language = data['interface_language']
                 fields_updated.append('interface_language')
-        # тема й доступність — core/ui_prefs.py (лише відомі значення; тема пишеться й у старе поле theme)
+        # тема й доступність — core/ui_prefs.py (лише відомі значення; тема пишеться й у старе поле theme).
+        # ui_prefs.save пише сам, під блокуванням рядка, — тут ці поля вдруге не зберігаються
         ui = dict(data.get('ui') or {}) if isinstance(data.get('ui'), dict) else {}
         if 'theme' in data:
             ui['theme'] = data['theme']
         if ui:
             from core import ui_prefs
-            fields_updated += ui_prefs.save(profile, ui)
+            ui_saved = ui_prefs.save(profile, ui)
         if 'telegram_id' in data:
             val = data['telegram_id']
             if val == '' or val is None:
@@ -53,7 +56,7 @@ def my_settings_view(request):
         if fields_updated:
             profile.save(update_fields=fields_updated)
 
-        return JsonResponse({'ok': True, 'updated': fields_updated})
+        return JsonResponse({'ok': True, 'updated': fields_updated + ui_saved})
 
     # GET
     modules = profile.get_allowed_modules()
@@ -140,27 +143,82 @@ def _panel_admin(request, model):
     return panel, ma
 
 
+def _panel_object(request, ma, pk):
+    """Запис для панелі — з queryset адмінки моделі: ті самі обмеження, що в списку; інакше 404."""
+    from django.http import Http404
+    obj = ma.get_queryset(request).filter(pk=pk).first()
+    if obj is None:
+        raise Http404
+    return obj
+
+
 @staff_member_required
+@never_cache
+@require_safe
 def panel_view(request, model, pk):
-    """📌 Панель праворуч (core/side_panel.py): HTML вибраних людиною блоків запису."""
+    """📌 Панель праворуч (core/side_panel.py): оболонка запису — шапка, дії, розділи у вибраному людиною порядку.
+    ?open=<розділ> — вміст цього розділу одразу (навіть якщо він вантажиться окремо)."""
+    from django.http import HttpResponse
+    from core import side_panel
+    panel, ma = _panel_admin(request, model)
+    obj = _panel_object(request, ma, pk)
+    p = side_panel.bind(request, panel, ma)
+    open_key = request.GET.get('open') or None
+    return HttpResponse(side_panel.render(panel, obj, request, p, open_key=open_key),
+                        content_type="text/html; charset=utf-8")
+
+
+@staff_member_required
+@never_cache
+@require_safe
+def panel_block_view(request, model, pk, key):
+    """Один розділ панелі з вмістом: розділи, що вантажаться окремо, згорнуті, «＋ Додати розділ»."""
     from django.http import Http404, HttpResponse
     from core import side_panel
     panel, ma = _panel_admin(request, model)
-    obj = ma.get_queryset(request).filter(pk=pk).first()         # ті самі обмеження, що в списку
-    if obj is None:
+    if key not in {b.key for b in side_panel.visible_blocks(panel, request)}:
         raise Http404
-    return HttpResponse(side_panel.render(panel, obj, request), content_type="text/html; charset=utf-8")
+    obj = _panel_object(request, ma, pk)
+    side_panel.bind(request, panel, ma)
+    return HttpResponse(side_panel.render_block(panel, key, obj, request), content_type="text/html; charset=utf-8")
+
+
+@staff_member_required
+@require_http_methods(['POST'])
+def panel_edit_view(request, model, pk):
+    """Швидка зміна поля з панелі (core/panel_edit.py): {key, value, expect} → JSON з оновленою шапкою,
+    розділами й клітинками рядка списку; 409 — запис щойно змінив хтось інший."""
+    from django.core.exceptions import PermissionDenied
+    from django.http import Http404
+    from core import panel_edit, side_panel
+    try:
+        panel, ma = _panel_admin(request, model)
+    except PermissionDenied:
+        return JsonResponse({'ok': False, 'error': 'forbidden', 'message': 'Немає права змінювати цей запис.'},
+                            status=403)
+    except Http404:
+        return JsonResponse({'ok': False, 'error': 'not_found', 'message': 'Панелі для цього списку немає.'},
+                            status=404)
+    try:
+        data = json.loads(request.body or b"{}")
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'bad_json', 'message': 'Не вдалося прочитати запит.'}, status=400)
+    side_panel.bind(request, panel, ma)
+    status, payload = panel_edit.apply_edit(request, panel, ma, pk, data)
+    return JsonResponse(payload, status=status)
 
 
 @staff_member_required
 @require_http_methods(['POST'])
 def panel_prefs_view(request, model):
-    """Вибір людини для панелі: блоки, порядок, швидкі дії, ширина, увімкнено (правий клік / ⚙ на панелі)."""
+    """Вибір людини для панелі (правий клік / ⚙): {set}, {shared}, {reset} або старий запис усього одразу (v1)."""
     from core import side_panel
     panel, _ma = _panel_admin(request, model)
     try:
         data = json.loads(request.body or b"{}")
     except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+    if not isinstance(data, dict):
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
     return JsonResponse({'ok': True, 'prefs': side_panel.save_prefs(request.user, panel, data)})
 

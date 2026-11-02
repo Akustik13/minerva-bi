@@ -21,7 +21,7 @@ MODULES = (                          # тека → розділ Minerva (пер
     ("orders/", "sales"), ("offers/", "offers"), ("accounting/", "accounting"),
     ("invoices/", "shipping"), ("packing_lists/", "shipping"), ("commercial_invoices/", "shipping"),
     ("shipments/", "shipping"), ("shipping/", "shipping"), ("generated_documents/", "documents"), ("document_templates/", "documents"),
-    ("scraper/", "scraper_hub"), ("rfq_diagrams/", "inventory"),
+    ("scraper/", "scraper_hub"), ("rfq_diagrams/", "inventory"), ("customers/", "crm"),
 )
 ADMIN_ONLY = ("knowledge/", "knowledge_sources/")
 UNSAFE_TYPES = ("text/html", "image/svg+xml", "application/xhtml+xml", "text/xml", "application/xml",

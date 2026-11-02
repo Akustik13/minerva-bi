@@ -2,6 +2,7 @@
 import json
 import logging
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
 from django.urls import path, reverse
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
@@ -127,7 +128,22 @@ class JLCConfigAdmin(admin.ModelAdmin):
         ]
         return custom + urls
 
+    def _action_refused(self, request):
+        """«🔌 Тест з'єднання», «🔄 Синхронізувати замовлення», «📊 Звіт статусів» пишуть журнал підключення,
+        створюють і оновлюють замовлення, надсилають звіт у Telegram / на пошту — лише POST з CSRF (кнопки сторінки
+        налаштувань — форми) і з правом змінювати налаштування JLCPCB. Без права — 403 для будь-якого методу;
+        GET (старе посилання, закладка) — назад на сторінку налаштувань, нічого не запускається."""
+        if not self.has_change_permission(request):
+            raise PermissionDenied
+        if request.method != 'POST':
+            messages.info(request, 'ℹ️ Цю дію запускає кнопка на сторінці налаштувань JLCPCB.')
+            return redirect('admin:jlcpcb_jlcconfig_changelist')
+        return None
+
     def test_connection_view(self, request):
+        refused = self._action_refused(request)
+        if refused:
+            return refused
         from .services.api import JLCAPIClient
         cfg = JLCConfig.get()
         client = JLCAPIClient.from_config()
@@ -149,6 +165,9 @@ class JLCConfigAdmin(admin.ModelAdmin):
         return redirect('admin:jlcpcb_jlcconfig_change', cfg.pk)
 
     def sync_orders_view(self, request):
+        refused = self._action_refused(request)
+        if refused:
+            return refused
         from django.core.management import call_command
         from io import StringIO
         buf = StringIO()
@@ -166,6 +185,9 @@ class JLCConfigAdmin(admin.ModelAdmin):
         return redirect('admin:jlcpcb_jlcconfig_change', JLCConfig.get().pk)
 
     def status_report_view(self, request):
+        refused = self._action_refused(request)
+        if refused:
+            return refused
         from .notifications import notify_jlc_active_orders_summary
         result = notify_jlc_active_orders_summary()
         if result['count'] == 0:

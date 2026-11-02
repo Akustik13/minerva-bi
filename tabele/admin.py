@@ -264,7 +264,7 @@ from django import forms as _forms
 from django.contrib.admin import helpers as _helpers
 
 SECRET_NAME_RE = _re.compile(r"(password|secret|api_key|apikey|token|license_key|access_key|private_key|"
-                             r"assistant_key)$", _re.I)
+                             r"assistant_key|secret_key)$", _re.I)
 
 
 def _secret_fields(form, legacy_only=False):

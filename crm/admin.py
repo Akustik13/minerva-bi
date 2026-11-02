@@ -3,10 +3,12 @@ import re as _re
 from collections import defaultdict
 from decimal import Decimal
 from django.contrib import admin, messages
+from django.core.exceptions import PermissionDenied
 from django.db.models import Sum, Count, Max
+from django.http import JsonResponse
 from django.shortcuts import redirect, get_object_or_404, render
-from django.urls import path
-from django.utils.html import escape, format_html
+from django.urls import path, reverse
+from django.utils.html import escape, format_html, format_html_join
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
 from .models import Customer, CustomerNote, CustomerTimeline
@@ -85,6 +87,123 @@ def _do_merge(winner_id: int, all_ids: list[int]) -> dict:
     if not winner:
         raise ValueError(f"Winner pk={winner_id} not found")
     return crm_merge.merge_customers(winner, [c for c in customers if c.pk != winner_id])
+
+
+# ── Дії, що змінюють дані, — лише POST з CSRF і з правом ─────────────────────────
+# Посилання (GET) нічого не змінює: «🎯 Стратегія» й «🔄 Синхронізація CRM» за посиланням показують сторінку
+# підтвердження з кнопкою, документи клієнта й ⭐ — лише POST, злиття — права змінювати й видаляти клієнтів.
+
+NO_CHANGE_RIGHT = "Немає права змінювати клієнтів"
+
+_STRATEGY_LABELS = {
+    "onboarding":   ("🚀", "Онбординг",       "#1976d2"),
+    "reactivation": ("🔄", "Реактивація",      "#e53935"),
+    "nurturing":    ("📈", "Нарощування",      "#f57c00"),
+    "retention":    ("👑", "Утримання VIP",    "#7b1fa2"),
+}
+
+# Посилання-кнопка, що шле POST: форма з токеном CSRF сторінки створюється поза формою картки / списку (вкладених
+# форм не буває). Ctrl / Shift / середня кнопка або сторінка без токена — звичайний перехід (GET → підтвердження).
+_POST_ONCLICK = (
+    "if(event.ctrlKey||event.metaKey||event.shiftKey||event.button)return true;"
+    "var t=document.querySelector('[name=csrfmiddlewaretoken]');if(!t)return true;"
+    "var f=document.createElement('form');f.method='post';f.action=this.href;"
+    "f.appendChild(t.cloneNode());document.body.appendChild(f);f.submit();return false"
+)
+
+
+def _post_only_json():
+    response = JsonResponse({"error": "Потрібен POST"}, status=405)
+    response["Allow"] = "POST"
+    return response
+
+
+def _doc_files(pk) -> list[tuple[str, int]]:
+    """Файли «📎 Документи» клієнта (media/customers/<pk>/): (назва, розмір у байтах), новіші першими."""
+    from pathlib import Path
+    from django.conf import settings
+    folder = Path(settings.MEDIA_ROOT) / "customers" / str(pk)
+    if not folder.is_dir():
+        return []
+    found = []
+    for entry in folder.iterdir():
+        try:
+            if entry.is_file():
+                stat = entry.stat()
+                found.append((stat.st_mtime, entry.name, stat.st_size))
+        except OSError:
+            continue
+    found.sort(key=lambda item: item[0], reverse=True)
+    return [(name, size) for _, name, size in found]
+
+
+_DOC_BTN = (
+    "padding:3px 9px;border-radius:4px;font-size:11px;font-weight:600;"
+    "cursor:pointer;border:none;white-space:nowrap"
+)
+
+# Кнопка вибору файлів і смужка завантаження — без даних клієнта (назви файлів — лише в рядках, екрановані).
+_DOC_UPLOAD_HTML = mark_safe(
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    '<label style="display:inline-flex;align-items:center;gap:8px;padding:7px 16px;'
+    'background:#1565c0;color:#fff;border-radius:6px;cursor:pointer;'
+    'font-size:13px;font-weight:600;white-space:nowrap">'
+    '📎 Вибрати файли'
+    '<input type="file" multiple style="display:none" id="custDocInput">'
+    '</label>'
+    '<span id="custDocStatus" style="font-size:12px;color:var(--text-muted)">Оберіть файли для завантаження</span>'
+    '</div>'
+    '<div id="custDocProgress" style="display:none;margin-top:8px">'
+    '<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">'
+    '<div id="custDocBar" style="height:100%;background:#1565c0;width:0;transition:width .3s"></div>'
+    '</div>'
+    '</div>'
+)
+
+# Адреси — з data-атрибутів (#custDocWidget data-upload-url, кнопка 🗑️ data-url / data-name), не з тексту скрипту.
+_DOC_JS = mark_safe(r"""<script>
+function custDocCsrf(){var t=document.querySelector("[name=csrfmiddlewaretoken]");return t?t.value:((document.cookie.match(/csrftoken=([^;]+)/)||[])[1]||"");}
+(function(){
+var inp=document.getElementById("custDocInput");
+if(!inp)return;
+inp.addEventListener("change",function(){
+var files=Array.from(this.files);
+if(!files.length)return;
+var url=document.getElementById("custDocWidget").dataset.uploadUrl;
+var st=document.getElementById("custDocStatus"),bar=document.getElementById("custDocBar");
+var fd=new FormData();
+files.forEach(function(f){fd.append("documents",f);});
+fd.append("csrfmiddlewaretoken",custDocCsrf());
+document.getElementById("custDocProgress").style.display="block";
+bar.style.width="30%";
+st.textContent="Завантаження...";
+fetch(url,{method:"POST",body:fd})
+.then(function(r){return r.json().catch(function(){return {};}).then(function(d){return {ok:r.ok,d:d};});})
+.then(function(res){
+if(!res.ok){bar.style.width="0";st.textContent="❌ "+(res.d.error||"Помилка завантаження");return;}
+bar.style.width="100%";
+st.textContent=(res.d.saved||0)+" файл(ів) збережено";
+setTimeout(function(){location.reload();},800);
+})
+.catch(function(){st.textContent="Помилка завантаження";});
+});
+})();
+function custDocDelete(btn,url,fname){
+url=url||btn.dataset.url;fname=fname||btn.dataset.name;
+if(!confirm("Видалити файл \""+fname+"\"?"))return;
+var fd=new FormData();
+fd.append("filename",fname);
+fd.append("csrfmiddlewaretoken",custDocCsrf());
+btn.disabled=true;btn.textContent="...";
+fetch(url,{method:"POST",body:fd})
+.then(function(r){return r.json().catch(function(){return {};});})
+.then(function(d){
+if(d.ok){btn.closest(".cust-doc-row").remove();}
+else{btn.disabled=false;btn.textContent="❌ Помилка";if(d.error)btn.title=d.error;}
+})
+.catch(function(){btn.disabled=false;btn.textContent="❌";});
+}
+</script>""")
 
 
 class CustomerNoteInline(admin.TabularInline):
@@ -268,28 +387,38 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             f"merge/?ids={','.join(str(i) for i in ids)}"
         )
     action_merge_customers.short_description = "🔀 Злити дублікатів в одного клієнта"
+    action_merge_customers.allowed_permissions = ("merge",)        # → has_merge_permission
+
+    def has_merge_permission(self, request, obj=None):
+        """Злиття змінює основного клієнта й назавжди видаляє дублікатів (crm/merge.py) — потрібні обидва права."""
+        return self.has_change_permission(request, obj) and self.has_delete_permission(request)
 
     # ── Actions: Статус ───────────────────────────────────────────────────────
+    # Дії списку без allowed_permissions Django показує й тим, хто клієнтів лише переглядає.
 
     def action_set_status_active(self, request, queryset):
         n = queryset.update(status=Customer.Status.ACTIVE)
         self.message_user(request, f"✅ Статус «Активний» встановлено для {n} клієнтів.", messages.SUCCESS)
     action_set_status_active.short_description = "🟢 Статус → Активний"
+    action_set_status_active.allowed_permissions = ("change",)
 
     def action_set_status_inactive(self, request, queryset):
         n = queryset.update(status=Customer.Status.INACTIVE)
         self.message_user(request, f"⚪ Статус «Неактивний» встановлено для {n} клієнтів.", messages.SUCCESS)
     action_set_status_inactive.short_description = "⚪ Статус → Неактивний"
+    action_set_status_inactive.allowed_permissions = ("change",)
 
     def action_set_status_vip(self, request, queryset):
         n = queryset.update(status=Customer.Status.VIP)
         self.message_user(request, f"⭐ Статус «VIP» встановлено для {n} клієнтів.", messages.SUCCESS)
     action_set_status_vip.short_description = "⭐ Статус → VIP"
+    action_set_status_vip.allowed_permissions = ("change",)
 
     def action_set_status_blocked(self, request, queryset):
         n = queryset.update(status=Customer.Status.BLOCKED)
         self.message_user(request, f"🚫 Статус «Заблокований» встановлено для {n} клієнтів.", messages.WARNING)
     action_set_status_blocked.short_description = "🚫 Статус → Заблокований"
+    action_set_status_blocked.allowed_permissions = ("change",)
 
     # ── Actions: Сегмент ──────────────────────────────────────────────────────
 
@@ -297,26 +426,31 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         n = queryset.update(segment=Customer.Segment.B2B)
         self.message_user(request, f"🏢 Сегмент «B2B» встановлено для {n} клієнтів.", messages.SUCCESS)
     action_set_segment_b2b.short_description = "🏢 Сегмент → B2B"
+    action_set_segment_b2b.allowed_permissions = ("change",)
 
     def action_set_segment_b2c(self, request, queryset):
         n = queryset.update(segment=Customer.Segment.B2C)
         self.message_user(request, f"👤 Сегмент «B2C» встановлено для {n} клієнтів.", messages.SUCCESS)
     action_set_segment_b2c.short_description = "👤 Сегмент → B2C"
+    action_set_segment_b2c.allowed_permissions = ("change",)
 
     def action_set_segment_distributor(self, request, queryset):
         n = queryset.update(segment=Customer.Segment.DISTRIBUTOR)
         self.message_user(request, f"🔗 Сегмент «Дистриб'ютор» встановлено для {n} клієнтів.", messages.SUCCESS)
     action_set_segment_distributor.short_description = "🔗 Сегмент → Дистриб'ютор"
+    action_set_segment_distributor.allowed_permissions = ("change",)
 
     def action_set_segment_reseller(self, request, queryset):
         n = queryset.update(segment=Customer.Segment.RESELLER)
         self.message_user(request, f"🛒 Сегмент «Реселер» встановлено для {n} клієнтів.", messages.SUCCESS)
     action_set_segment_reseller.short_description = "🛒 Сегмент → Реселер"
+    action_set_segment_reseller.allowed_permissions = ("change",)
 
     def action_set_segment_other(self, request, queryset):
         n = queryset.update(segment=Customer.Segment.OTHER)
         self.message_user(request, f"📎 Сегмент «Інше» встановлено для {n} клієнтів.", messages.SUCCESS)
     action_set_segment_other.short_description = "📎 Сегмент → Інше"
+    action_set_segment_other.allowed_permissions = ("change",)
 
     # EMAIL прибраний зі списку
     list_display = (
@@ -378,9 +512,21 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         "orders_count", "revenue_display", "avg_order_display",
         "last_order_display", "repeat_badge",
         "top_products_display", "order_history_display",
-        "strategy_btn", "upload_widget_customer", "dante_hours",
+        "strategy_btn", "upload_widget_customer", "docs_view_customer", "dante_hours",
     )
     inlines = [CustomerNoteInline, CustomerTimelineInline]
+
+    def get_fieldsets(self, request, obj=None):
+        """«📎 Документи» без «Вибрати файли» й «🗑️ Видалити» тим, хто клієнта лише переглядає."""
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is None or self.has_change_permission(request, obj):
+            return fieldsets
+        swap = {"upload_widget_customer": "docs_view_customer"}
+        return [
+            (name, {**options, "fields": tuple(swap.get(f, f) if isinstance(f, str) else f
+                                               for f in options.get("fields", ()))})
+            for name, options in fieldsets
+        ]
 
     def get_urls(self):
         urls = super().get_urls()
@@ -441,7 +587,10 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Merge view ────────────────────────────────────────────────────────────
 
     def merge_view(self, request):
-        """GET: preview злиття. POST: виконати злиття (crm/merge.py)."""
+        """GET: preview злиття. POST: виконати злиття (crm/merge.py). Обидва — з правами змінювати й видаляти
+        клієнтів (дублікати видаляються назавжди); інакше 403."""
+        if not self.has_merge_permission(request):
+            raise PermissionDenied
         # --- Parse IDs ---
         raw = request.GET.get("ids", "") or request.POST.get("ids", "")
         try:
@@ -502,6 +651,9 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 return redirect("admin:crm_customer_changelist")
 
             losers = [c for c in customers if c.pk != winner_id]
+            if not (self.has_change_permission(request, winner)
+                    and all(self.has_delete_permission(request, c) for c in losers)):
+                raise PermissionDenied
 
             # Усе, що посилається на дублікатів (замовлення, нотатки, проєкти, пошта, Angebote, задачі, рахунки…),
             # переходить до основного в одній транзакції — crm/merge.py
@@ -558,13 +710,16 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             "total_groups": len(duplicate_groups),
             "total_dupes": sum(len(g["members"]) - 1 for g in duplicate_groups),
             "merge_all_url": "merge-all/",
+            "can_merge": self.has_merge_permission(request),     # кнопок злиття без прав не показуємо
         }
         return render(request, "admin/crm/customer/find_duplicates.html", context)
 
     # ── Merge All view ────────────────────────────────────────────────────────
 
     def merge_all_view(self, request):
-        """POST: авто-злити всі знайдені групи дублікатів."""
+        """POST: авто-злити всі знайдені групи дублікатів — з правами змінювати й видаляти клієнтів."""
+        if not self.has_merge_permission(request):
+            raise PermissionDenied
         if request.method != "POST":
             return redirect("admin:crm_customer_find_duplicates")
 
@@ -614,12 +769,32 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             )
         return redirect("admin:crm_customer_find_duplicates")
 
+    def _can_assign_strategy(self, request, customer=None):
+        """Призначити стратегію = нова CustomerStrategy клієнта: право змінювати клієнта й додавати стратегії."""
+        return (self.has_change_permission(request, customer)
+                and request.user.has_perm("strategy.add_customerstrategy"))
+
+    def _confirm_page(self, request, *, title, question, button, action_url, back_url, rows=(), note=""):
+        """Сторінка підтвердження дії, яку раніше запускало посилання: кнопка шле POST з CSRF.
+        rows — (підпис, значення запису); значення показуються екранованими, у translate="no"."""
+        context = {
+            **self.admin_site.each_context(request),
+            "title": title, "opts": Customer._meta,
+            "question": question, "rows": rows, "note": note,
+            "button": button, "action_url": action_url, "back_url": back_url,
+        }
+        return render(request, "admin/crm/customer/confirm_action.html", context)
+
     def assign_strategy_view(self, request, pk):
-        """One-click: рекомендує шаблон → створює CustomerStrategy → відкриває canvas."""
+        """One-click: рекомендує шаблон → створює CustomerStrategy → відкриває canvas.
+        Призначає лише POST з CSRF («🎯 Стратегія» в списку й картці шле його одразу); GET (посилання, нова
+        вкладка, закладка) — сторінка підтвердження без змін. Без права — 403."""
         from strategy.models import StrategyTemplate, CustomerStrategy
         from strategy.services.engine import recommend_template_behavior, start_strategy
 
         customer = get_object_or_404(Customer, pk=pk)
+        if not self._can_assign_strategy(request, customer):
+            raise PermissionDenied
 
         # Якщо вже є активна стратегія — редиректимо на неї
         existing = CustomerStrategy.objects.filter(
@@ -649,6 +824,18 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             )
             return redirect("admin:crm_customer_change", pk)
 
+        if request.method != "POST":
+            return self._confirm_page(
+                request,
+                title="🎯 Призначити стратегію",
+                question="Призначити клієнту рекомендовану стратегію?",
+                rows=[("Клієнт", customer.company or customer.name), ("Стратегія", template.name)],
+                note="Стратегія почнеться з першого кроку шаблону, потім відкриється її канвас.",
+                button="✓ Призначити",
+                action_url=reverse("admin:crm_customer_assign_strategy", args=[pk]),
+                back_url=reverse("admin:crm_customer_change", args=[pk]),
+            )
+
         strategy = start_strategy(customer, template)
         messages.success(
             request,
@@ -657,11 +844,15 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         return redirect(f"/strategy/{strategy.pk}/canvas/")
 
     def assign_strategy_manual_view(self, request, pk):
-        """Ручний вибір шаблону стратегії зі списку."""
+        """Ручний вибір шаблону стратегії зі списку (GET — сторінка вибору, POST — призначити). Без права — 403."""
+        from django.http import HttpResponse
+        from django.middleware.csrf import get_token
         from strategy.models import StrategyTemplate, CustomerStrategy
         from strategy.services.engine import start_strategy
 
         customer = get_object_or_404(Customer, pk=pk)
+        if not self._can_assign_strategy(request, customer):
+            raise PermissionDenied
 
         existing = CustomerStrategy.objects.filter(customer=customer, status="active").first()
         if existing:
@@ -679,36 +870,38 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
 
         templates = StrategyTemplate.objects.filter(is_active=True).order_by("behavior_type", "name")
         ICONS = {"onboarding": "🚀", "reactivation": "🔄", "nurturing": "📈", "retention": "👑"}
-        tmpl_html = "".join(
-            f'<button type="submit" name="template_id" value="{t.pk}" '
-            f'style="display:block;width:100%;text-align:left;background:var(--bg-card);'
-            f'border:1px solid var(--border-strong);color:var(--text);padding:12px 16px;'
-            f'border-radius:6px;cursor:pointer;font-size:14px;margin-bottom:8px">'
-            f'{ICONS.get(t.behavior_type,"🎯")} <b>{t.name}</b> '
-            f'<span style="opacity:.6;font-size:12px">({t.behavior_type})</span></button>'
-            for t in templates
-        ) or "<p>Немає активних шаблонів. Запустіть: manage.py create_strategy_templates</p>"
+        # Назви клієнта й шаблонів — екрановані (format_html), у translate="no"
+        tmpl_html = format_html_join(
+            "",
+            '<button type="submit" name="template_id" value="{}" '
+            'style="display:block;width:100%;text-align:left;background:var(--bg-card);'
+            'border:1px solid var(--border-strong);color:var(--text);padding:12px 16px;'
+            'border-radius:6px;cursor:pointer;font-size:14px;margin-bottom:8px">'
+            '{} <b translate="no">{}</b> '
+            '<span style="opacity:.6;font-size:12px">({})</span></button>',
+            ((t.pk, ICONS.get(t.behavior_type, "🎯"), t.name, t.behavior_type) for t in templates),
+        ) or format_html("<p>{}</p>", "Немає активних шаблонів. Запустіть: manage.py create_strategy_templates")
 
-        html = (
-            f'<div style="max-width:600px;padding:24px">'
-            f'<h2 style="margin-bottom:4px">Вибір стратегії вручну</h2>'
-            f'<p style="opacity:.7;margin-bottom:20px">Клієнт: <b>{customer.company or customer.name}</b></p>'
-            f'<form method="post">'
-            f'<input type="hidden" name="csrfmiddlewaretoken" value="{request.META.get("CSRF_COOKIE","")}">'
-            f'{tmpl_html}'
-            f'</form>'
-            f'<a href="/admin/crm/customer/{pk}/change/" style="opacity:.6;font-size:12px">← Назад</a>'
-            f'</div>'
+        label = customer.company or customer.name
+        html = format_html(
+            '<div style="max-width:600px;padding:24px">'
+            '<h2 style="margin-bottom:4px">Вибір стратегії вручну</h2>'
+            '<p style="opacity:.7;margin-bottom:20px">Клієнт: <b translate="no">{}</b></p>'
+            '<form method="post">'
+            '<input type="hidden" name="csrfmiddlewaretoken" value="{}">'
+            '{}'
+            '</form>'
+            '<a href="{}" style="opacity:.6;font-size:12px">← Назад</a>'
+            '</div>',
+            label, get_token(request), tmpl_html, reverse("admin:crm_customer_change", args=[pk]),
         )
-        from django.http import HttpResponse
-        from django.middleware.csrf import get_token
-        get_token(request)  # ensure CSRF cookie is set
-        return HttpResponse(
-            f'<!doctype html><html><head><meta charset="utf-8">'
-            f'<link rel="stylesheet" href="/static/admin/css/base.css">'
-            f'<title>Стратегія — {customer.company or customer.name}</title></head>'
-            f'<body class="default">{html}</body></html>'
-        )
+        return HttpResponse(format_html(
+            '<!doctype html><html><head><meta charset="utf-8">'
+            '<link rel="stylesheet" href="/static/admin/css/base.css">'
+            '<title>Стратегія — {}</title></head>'
+            '<body class="default">{}</body></html>',
+            label, html,
+        ))
 
     def new_order_view(self, request, pk):
         """Редирект на форму нового замовлення з pre-filled даними клієнта."""
@@ -739,7 +932,22 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         return redirect(add_url)
 
     def sync_view(self, request):
-        """Запускає повну синхронізацію CRM з усіх замовлень."""
+        """Запускає повну синхронізацію CRM з усіх замовлень: створює й оновлює клієнтів — потрібні права додавати
+        й змінювати клієнтів (інакше 403). Синхронізує лише POST з CSRF; GET («🔄 Синхронізація CRM» над списком,
+        закладка) — сторінка підтвердження з кнопкою, нічого не змінює."""
+        if not (self.has_add_permission(request) and self.has_change_permission(request)):
+            raise PermissionDenied
+        if request.method != "POST":
+            return self._confirm_page(
+                request,
+                title="🔄 Синхронізація CRM",
+                question="Синхронізувати всіх клієнтів із замовлень?",
+                note="Minerva пройде всі замовлення: створить клієнтів, яких ще немає, доповнить адреси й телефони "
+                     "наявних і прив'яже замовлення до клієнтів. Це може зайняти кілька секунд.",
+                button="🔄 Синхронізувати",
+                action_url=reverse("admin:crm_customer_sync"),
+                back_url=reverse("admin:crm_customer_changelist"),
+            )
         stats = {
             "orders": 0,
             "customers_created": 0,
@@ -851,11 +1059,22 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             for s in ['active', 'vip', 'inactive', 'blocked']
         }
         extra_context['crm_count_favorites'] = Customer.objects.filter(is_favorite=True).count()
+        # Що людині можна в списку (кнопки шаблону без права — не показувати; сервер усе одно відмовить 403)
+        extra_context['crm_can_change'] = self.has_change_permission(request)       # ⭐, «Статус / Сегмент → …»
+        extra_context['crm_can_assign'] = self._can_assign_strategy(request)        # «🎯 Стратегія»
+        extra_context['crm_can_sync'] = (self.has_add_permission(request)           # «🔄 Синхронізація CRM»
+                                         and self.has_change_permission(request))
         return super().changelist_view(request, extra_context)
 
     def favorite_view(self, request, pk):
         from django.http import JsonResponse
+        if request.method != 'POST':                    # перемикає — лише POST з CSRF, не перехід за посиланням
+            response = JsonResponse({'error': 'Потрібен POST'}, status=405)
+            response['Allow'] = 'POST'
+            return response
         customer = get_object_or_404(Customer, pk=pk)
+        if not self.has_change_permission(request, customer):
+            return JsonResponse({'error': 'Немає права змінювати клієнтів'}, status=403)
         customer.is_favorite = not customer.is_favorite
         customer.save(update_fields=['is_favorite'])
         return JsonResponse({'is_favorite': customer.is_favorite, 'pk': pk})
@@ -1123,16 +1342,10 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         return customer_panel(obj)
 
     def strategy_btn(self, obj):
-        """Рекомендація стратегії + кнопка одного кліку."""
+        """Рекомендація стратегії + кнопка одного кліку (POST з CSRF — _POST_ONCLICK; без JS — сторінка
+        підтвердження)."""
         from strategy.models import CustomerStrategy
         from strategy.services.engine import recommend_template_behavior
-
-        LABELS = {
-            "onboarding":   ("🚀", "Онбординг",       "#1976d2"),
-            "reactivation": ("🔄", "Реактивація",      "#e53935"),
-            "nurturing":    ("📈", "Нарощування",      "#f57c00"),
-            "retention":    ("👑", "Утримання VIP",    "#7b1fa2"),
-        }
 
         # Якщо вже є активна стратегія — показуємо посилання на canvas
         active = CustomerStrategy.objects.filter(
@@ -1160,142 +1373,97 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 manual_url,
             )
 
-        icon, label, color = LABELS.get(behavior, ("🎯", behavior, "#607d8b"))
-        assign_url = f"/admin/crm/customer/{obj.pk}/assign-strategy/"
+        icon, label, color = _STRATEGY_LABELS.get(behavior, ("🎯", behavior, "#607d8b"))
+        assign_url = reverse("admin:crm_customer_assign_strategy", args=[obj.pk])
         return format_html(
-            '<a href="{}" '
+            '<a href="{}" onclick="{}" '
             'style="background:{};color:#fff;padding:3px 10px;'
             'border-radius:5px;font-size:11px;text-decoration:none;white-space:nowrap">'
             '{} {}</a>',
-            assign_url, color, icon, label,
+            assign_url, _POST_ONCLICK, color, icon, label,
         )
     strategy_btn.short_description = "🎯 Стратегія"
 
     def upload_widget_customer(self, obj):
-        """HTML-віджет для завантаження документів клієнта."""
-        if not obj.pk:
-            return format_html('<em style="color:#7d8590">Збережіть клієнта спочатку</em>')
-
-        from django.urls import reverse
-        upload_url = reverse('admin:crm_customer_upload_docs', args=[obj.pk])
-
-        # List existing files
-        from django.conf import settings
-        from django.urls import reverse as _rev
-        from pathlib import Path
-        delete_url = _rev('admin:crm_customer_delete_doc', args=[obj.pk])
-        customer_dir = Path(settings.MEDIA_ROOT) / 'customers' / str(obj.pk)
-        files_html = ''
-        if customer_dir.exists():
-            files = sorted(customer_dir.iterdir(), key=lambda f: f.stat().st_mtime, reverse=True)
-            if files:
-                _btn = (
-                    'padding:3px 9px;border-radius:4px;font-size:11px;font-weight:600;'
-                    'cursor:pointer;border:none;white-space:nowrap'
-                )
-                rows = ''.join(
-                    f'<div class="cust-doc-row" style="display:flex;align-items:center;gap:8px;'
-                    f'padding:6px 0;border-bottom:1px solid rgba(128,128,128,.1)">'
-                    f'<span style="font-size:14px;flex-shrink:0">📄</span>'
-                    f'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
-                    f'color:var(--text);font-size:13px" title="{f.name}">{f.name}</span>'
-                    f'<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;flex-shrink:0">'
-                    f'{f.stat().st_size // 1024 or "<1"} KB</span>'
-                    f'<a href="{settings.MEDIA_URL}customers/{obj.pk}/{f.name}" download '
-                    f'style="{_btn};background:rgba(21,101,192,.15);color:#42a5f5;text-decoration:none">'
-                    f'💾 Зберегти</a>'
-                    f'<button type="button" style="{_btn};background:rgba(229,57,53,.12);color:#ef5350" '
-                    f'onclick="custDocDelete(this,\'{delete_url}\',\'{f.name}\')">'
-                    f'🗑️ Видалити</button>'
-                    f'</div>'
-                    for f in files
-                )
-                files_html = (
-                    f'<div id="custDocList" style="margin-top:10px;padding:8px 12px;'
-                    f'background:var(--bg-input,#141f2b);border-radius:6px;'
-                    f'border:1px solid var(--border-strong)">'
-                    f'<div style="font-size:11px;font-weight:700;color:var(--text-muted);'
-                    f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">'
-                    f'📂 Файли клієнта ({len(files)} шт.)</div>'
-                    f'{rows}</div>'
-                )
-
-        widget_html = (
-            f'<div id="custDocWidget" data-upload-url="{upload_url}">'
-            f'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
-            f'<label style="display:inline-flex;align-items:center;gap:8px;padding:7px 16px;'
-            f'background:#1565c0;color:#fff;border-radius:6px;cursor:pointer;'
-            f'font-size:13px;font-weight:600;white-space:nowrap">'
-            f'📎 Вибрати файли'
-            f'<input type="file" multiple style="display:none" id="custDocInput">'
-            f'</label>'
-            f'<span id="custDocStatus" style="font-size:12px;color:var(--text-muted)">Оберіть файли для завантаження</span>'
-            f'</div>'
-            f'<div id="custDocProgress" style="display:none;margin-top:8px">'
-            f'<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">'
-            f'<div id="custDocBar" style="height:100%;background:#1565c0;width:0;transition:width .3s"></div>'
-            f'</div>'
-            f'</div>'
-            f'{files_html}'
-            f'</div>'
-            f'<script>'
-            f'(function(){{'
-            f'var inp=document.getElementById("custDocInput");'
-            f'if(!inp)return;'
-            f'inp.addEventListener("change",function(){{'
-            f'var files=Array.from(this.files);'
-            f'if(!files.length)return;'
-            f'var url=document.getElementById("custDocWidget").dataset.uploadUrl;'
-            f'var fd=new FormData();'
-            f'files.forEach(function(f){{fd.append("documents",f);}});'
-            f'fd.append("csrfmiddlewaretoken",document.cookie.match(/csrftoken=([^;]+)/)?.[1]||"");'
-            f'document.getElementById("custDocProgress").style.display="block";'
-            f'document.getElementById("custDocBar").style.width="30%";'
-            f'document.getElementById("custDocStatus").textContent="Завантаження...";'
-            f'fetch(url,{{method:"POST",body:fd}})'
-            f'.then(function(r){{return r.json();}})'
-            f'.then(function(d){{'
-            f'document.getElementById("custDocBar").style.width="100%";'
-            f'document.getElementById("custDocStatus").textContent='
-            f'(d.saved||0)+" файл(ів) збережено";'
-            f'setTimeout(function(){{location.reload();}},800);'
-            f'}})'
-            f'.catch(function(){{'
-            f'document.getElementById("custDocStatus").textContent="Помилка завантаження";'
-            f'}});'
-            f'}});'
-            f'}})()'
-            f'</script>'
-            f'<script>'
-            f'function custDocDelete(btn,url,fname){{'
-            f'if(!confirm("Видалити файл \\""+fname+"\\"?"))return;'
-            f'var fd=new FormData();'
-            f'fd.append("filename",fname);'
-            f'fd.append("csrfmiddlewaretoken",document.cookie.match(/csrftoken=([^;]+)/)?.[1]||"");'
-            f'btn.disabled=true;btn.textContent="...";'
-            f'fetch(url,{{method:"POST",body:fd}})'
-            f'.then(function(r){{return r.json();}})'
-            f'.then(function(d){{'
-            f'if(d.ok){{btn.closest(".cust-doc-row").remove();}}'
-            f'else{{btn.disabled=false;btn.textContent="❌ Помилка";}}'
-            f'}})'
-            f'.catch(function(){{btn.disabled=false;btn.textContent="❌";}});'
-            f'}}'
-            f'</script>'
-        )
-        return mark_safe(widget_html)
+        """HTML-віджет документів клієнта: завантажити, зберегти, видалити (картка з правом змінювати клієнта)."""
+        return self._docs_widget(obj, editable=True)
     upload_widget_customer.short_description = "📎 Документи клієнта"
 
+    @admin.display(description="📎 Документи клієнта")
+    def docs_view_customer(self, obj):
+        """Документи клієнта лише для перегляду (get_fieldsets — без права змінювати): «💾 Зберегти»."""
+        return self._docs_widget(obj, editable=False)
+
+    def _docs_widget(self, obj, editable):
+        """Рядки файлів media/customers/<pk>/ — назви екрановані (format_html) і в translate="no", посилання —
+        назва в URL-кодуванні; 🗑️ бере адресу й назву з data-атрибутів, не з тексту скрипту."""
+        if not obj.pk:
+            return format_html('<em style="color:#7d8590">{}</em>', "Збережіть клієнта спочатку")
+        from urllib.parse import quote
+        from django.conf import settings
+
+        delete_url = reverse('admin:crm_customer_delete_doc', args=[obj.pk])
+
+        def row(name, size):
+            delete_btn = format_html(
+                '<button type="button" style="{};background:rgba(229,57,53,.12);color:#ef5350" '
+                'data-url="{}" data-name="{}" onclick="custDocDelete(this)">🗑️ Видалити</button>',
+                _DOC_BTN, delete_url, name,
+            ) if editable else ""
+            return (
+                name, name, size // 1024 or "<1",
+                f"{settings.MEDIA_URL}customers/{obj.pk}/{quote(name)}", _DOC_BTN, delete_btn,
+            )
+
+        files = _doc_files(obj.pk)
+        files_html = ""
+        if files:
+            rows = format_html_join(
+                "",
+                '<div class="cust-doc-row" style="display:flex;align-items:center;gap:8px;'
+                'padding:6px 0;border-bottom:1px solid rgba(128,128,128,.1)">'
+                '<span style="font-size:14px;flex-shrink:0">📄</span>'
+                '<span translate="no" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+                'color:var(--text);font-size:13px" title="{}">{}</span>'
+                '<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;flex-shrink:0">'
+                '{} KB</span>'
+                '<a href="{}" download '
+                'style="{};background:rgba(21,101,192,.15);color:#42a5f5;text-decoration:none">'
+                '💾 Зберегти</a>'
+                '{}'
+                '</div>',
+                (row(name, size) for name, size in files),
+            )
+            files_html = format_html(
+                '<div id="custDocList" style="margin-top:10px;padding:8px 12px;'
+                'background:var(--bg-input,#141f2b);border-radius:6px;'
+                'border:1px solid var(--border-strong)">'
+                '<div style="font-size:11px;font-weight:700;color:var(--text-muted);'
+                'text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">'
+                '📂 Файли клієнта ({} шт.)</div>'
+                '{}</div>',
+                len(files), rows,
+            )
+        if not editable:
+            return files_html or format_html('<em style="color:var(--text-muted)">{}</em>', "Файлів немає")
+
+        upload_url = reverse('admin:crm_customer_upload_docs', args=[obj.pk])
+        return format_html(
+            '<div id="custDocWidget" data-upload-url="{}">{}{}</div>{}',
+            upload_url, _DOC_UPLOAD_HTML, files_html, _DOC_JS,
+        )
+
     def upload_docs_view_customer(self, request, pk):
-        """AJAX: зберігає документи у media/customers/{pk}/"""
-        from django.http import JsonResponse
+        """AJAX: зберігає документи у media/customers/{pk}/ — лише POST і з правом змінювати клієнта (403 JSON)."""
         from django.conf import settings
         from pathlib import Path
 
         if request.method != 'POST':
-            return JsonResponse({'error': 'Method not allowed'}, status=405)
+            return _post_only_json()
 
         customer = get_object_or_404(Customer, pk=pk)
+        if not self.has_change_permission(request, customer):
+            return JsonResponse({'error': NO_CHANGE_RIGHT}, status=403)
         files = request.FILES.getlist('documents')
         if not files:
             return JsonResponse({'error': 'Файли не вибрані'}, status=400)
@@ -1307,6 +1475,8 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         for f in files:
             try:
                 dest = dest_dir / f.name
+                if dest.resolve().parent != dest_dir.resolve():    # лише всередині теки клієнта
+                    raise ValueError('Неправильна назва файлу')
                 with dest.open('wb+') as fh:
                     for chunk in f.chunks():
                         fh.write(chunk)
@@ -1318,22 +1488,25 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         return JsonResponse({'saved': saved, 'results': results})
 
     def delete_doc_view_customer(self, request, pk):
-        """AJAX: видаляє один документ клієнта."""
-        from django.http import JsonResponse
+        """AJAX: видаляє один документ клієнта — лише POST і з правом змінювати клієнта (403 JSON)."""
         from django.conf import settings
         from pathlib import Path
         import os
 
         if request.method != 'POST':
-            return JsonResponse({'error': 'Method not allowed'}, status=405)
+            return _post_only_json()
+
+        customer = get_object_or_404(Customer, pk=pk)
+        if not self.has_change_permission(request, customer):
+            return JsonResponse({'error': NO_CHANGE_RIGHT}, status=403)
 
         filename = request.POST.get('filename', '').strip()
         # Security: no path traversal
         if not filename or os.sep in filename or '/' in filename or '..' in filename:
-            return JsonResponse({'error': 'Invalid filename'}, status=400)
+            return JsonResponse({'error': 'Неправильна назва файлу'}, status=400)
 
         dest = Path(settings.MEDIA_ROOT) / 'customers' / str(pk) / filename
-        if not dest.exists():
+        if not dest.is_file():
             return JsonResponse({'error': 'Файл не знайдено'}, status=404)
 
         try:

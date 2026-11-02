@@ -474,6 +474,7 @@ def export_sales_excel(modeladmin, request, queryset):
         from django.contrib import messages
         messages.error(request, f"Помилка: {e}")
 export_sales_excel.short_description = "📥 Експортувати в Excel"
+export_sales_excel.allowed_permissions = ("export",)     # SalesOrderAdmin.has_export_permission
 
 
 class SalesOrderDocumentsForm(forms.ModelForm):
@@ -491,7 +492,7 @@ class SalesOrderDocumentsForm(forms.ModelForm):
         model = SalesOrder
         fields = '__all__'
 
-@admin.action(description="📝 Створити Angebot із запиту пропозиції")
+@admin.action(description="📝 Створити Angebot із запиту пропозиції", permissions=["offer"])
 def create_offer_from_quote(modeladmin, request, queryset):
     """Запит пропозиції з магазину (QUOTE) → Angebot з поточними цінами Minerva (offers/services.py)."""
     from django.contrib import messages
@@ -693,6 +694,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     preserve_filters = True
     inlines        = [i for i in [SalesOrderLineInline, OrderPackagingInline] if i is not None]
 
+    # ── Права дій списку: Django не показує й не виконує дію, якщо has_<право>_permission → False ──
+    # (дії статусу, валюти, типу, складу й джерела — allowed_permissions = ("change",) біля кожної)
+
+    def has_export_permission(self, request):
+        """«📥 Експортувати в Excel» — «Може експортувати» і операція «Експорт» продажів (ролі Minerva)."""
+        from core.utils import user_can, user_has_operation
+        return user_can(request.user, "export") and user_has_operation(request.user, "sales", "export")
+
+    def has_offer_permission(self, request):
+        """«📝 Створити Angebot із запиту пропозиції» — право створювати Angebote."""
+        return request.user.has_perm("offers.add_offer")
+
     # ── Actions: Статус ───────────────────────────────────────────────────────
 
     def _set_status(self, request, queryset, status):
@@ -713,22 +726,26 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         n = self._set_status(request, queryset, "received")
         self.message_user(request, f"📥 Статус «Отримано» встановлено для {n} замовлень.")
     action_set_status_received.short_description = "📥 Статус → Отримано"
+    action_set_status_received.allowed_permissions = ("change",)
 
     def action_set_status_processing(self, request, queryset):
         n = self._set_status(request, queryset, "processing")
         self.message_user(request, f"⚙️ Статус «В обробці» встановлено для {n} замовлень.")
     action_set_status_processing.short_description = "⚙️ Статус → В обробці"
+    action_set_status_processing.allowed_permissions = ("change",)
 
     def action_set_status_shipped(self, request, queryset):
         n = self._set_status(request, queryset, "shipped")
         self.message_user(request, f"🚀 Статус «Відправлено» встановлено для {n} замовлень.")
     action_set_status_shipped.short_description = "🚀 Статус → Відправлено"
+    action_set_status_shipped.allowed_permissions = ("change",)
 
     def action_set_status_cancelled(self, request, queryset):
         n = self._set_status(request, queryset, "cancelled")
         self.message_user(request, f"❌ Статус «Скасовано» встановлено для {n} замовлень — "
                                    f"їхній товар повернуто на склад.")
     action_set_status_cancelled.short_description = "❌ Статус → Скасовано"
+    action_set_status_cancelled.allowed_permissions = ("change",)
 
     # ── Actions: Валюта продажу ───────────────────────────────────────────────
 
@@ -743,14 +760,17 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def action_set_currency_usd(self, request, queryset):
         self._apply_currency(request, queryset, "USD")
     action_set_currency_usd.short_description = "💵 Валюта → USD"
+    action_set_currency_usd.allowed_permissions = ("change",)
 
     def action_set_currency_eur(self, request, queryset):
         self._apply_currency(request, queryset, "EUR")
     action_set_currency_eur.short_description = "💶 Валюта → EUR"
+    action_set_currency_eur.allowed_permissions = ("change",)
 
     def action_set_currency_gbp(self, request, queryset):
         self._apply_currency(request, queryset, "GBP")
     action_set_currency_gbp.short_description = "💷 Валюта → GBP"
+    action_set_currency_gbp.allowed_permissions = ("change",)
 
     def action_set_currency_custom(self, request, queryset):
         """Встановлює довільну валюту (NZD, AUD, CAD тощо) через проміжну форму."""
@@ -772,6 +792,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             },
         )
     action_set_currency_custom.short_description = "💱 Валюта → інша (NZD, AUD, CAD…)"
+    action_set_currency_custom.allowed_permissions = ("change",)
 
     # ── Actions: Валюта доставки ──────────────────────────────────────────────
 
@@ -779,16 +800,19 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         n = queryset.update(shipping_currency="USD")
         self.message_user(request, f"💵 Валюта доставки → USD для {n} замовлень.")
     action_set_shipping_currency_usd.short_description = "💵 Валюта доставки → USD"
+    action_set_shipping_currency_usd.allowed_permissions = ("change",)
 
     def action_set_shipping_currency_eur(self, request, queryset):
         n = queryset.update(shipping_currency="EUR")
         self.message_user(request, f"💶 Валюта доставки → EUR для {n} замовлень.")
     action_set_shipping_currency_eur.short_description = "💶 Валюта доставки → EUR"
+    action_set_shipping_currency_eur.allowed_permissions = ("change",)
 
     def action_set_shipping_currency_gbp(self, request, queryset):
         n = queryset.update(shipping_currency="GBP")
         self.message_user(request, f"💷 Валюта доставки → GBP для {n} замовлень.")
     action_set_shipping_currency_gbp.short_description = "💷 Валюта доставки → GBP"
+    action_set_shipping_currency_gbp.allowed_permissions = ("change",)
 
     # ── Actions: Тип документа ────────────────────────────────────────────────
 
@@ -796,26 +820,31 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         n = queryset.update(document_type="SALE")
         self.message_user(request, f"📄 Тип → Sale для {n} замовлень.")
     action_set_doctype_sale.short_description = "📄 Тип документа → Sale"
+    action_set_doctype_sale.allowed_permissions = ("change",)
 
     def action_set_doctype_sample(self, request, queryset):
         n = queryset.update(document_type="SAMPLE")
         self.message_user(request, f"🧪 Тип → Sample для {n} замовлень.")
     action_set_doctype_sample.short_description = "🧪 Тип документа → Sample"
+    action_set_doctype_sample.allowed_permissions = ("change",)
 
     def action_set_doctype_transfer(self, request, queryset):
         n = queryset.update(document_type="TRANSFER")
         self.message_user(request, f"↔️ Тип → Transfer для {n} замовлень.")
     action_set_doctype_transfer.short_description = "↔️ Тип документа → Transfer"
+    action_set_doctype_transfer.allowed_permissions = ("change",)
 
     def action_set_doctype_warranty(self, request, queryset):
         n = queryset.update(document_type="WARRANTY")
         self.message_user(request, f"🛡️ Тип → Warranty для {n} замовлень.")
     action_set_doctype_warranty.short_description = "🛡️ Тип документа → Warranty"
+    action_set_doctype_warranty.allowed_permissions = ("change",)
 
     def action_set_doctype_other(self, request, queryset):
         n = queryset.update(document_type="OTHER")
         self.message_user(request, f"📎 Тип → Other для {n} замовлень.")
     action_set_doctype_other.short_description = "📎 Тип документа → Other"
+    action_set_doctype_other.allowed_permissions = ("change",)
 
     # ── Actions: Впливає на склад ─────────────────────────────────────────────
 
@@ -834,11 +863,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         n = self._set_affects_stock(queryset, True)
         self.message_user(request, f"✅ «Впливає на склад» увімкнено для {n} замовлень.")
     action_set_affects_stock_yes.short_description = "✅ Склад → Впливає"
+    action_set_affects_stock_yes.allowed_permissions = ("change",)
 
     def action_set_affects_stock_no(self, request, queryset):
         n = self._set_affects_stock(queryset, False)
         self.message_user(request, f"⬜ «Впливає на склад» вимкнено для {n} замовлень.")
     action_set_affects_stock_no.short_description = "⬜ Склад → Не впливає"
+    action_set_affects_stock_no.allowed_permissions = ("change",)
 
     # ── Action: Змінити джерело (проміжна форма) ──────────────────────────────
 
@@ -881,6 +912,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             },
         )
     action_change_source.short_description = "📦 Змінити джерело..."
+    action_change_source.allowed_permissions = ("change",)
 
     fieldsets = (
         ("📦 Замовлення", {
@@ -2793,9 +2825,25 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return JsonResponse({'ok': True, 'lines': result,
                              'ok_count': ok_count, 'bad_count': bad_count})
 
+    def _list_edit_refused(self, request, order=None):
+        """⭐ і 📝 у списку змінюють замовлення: лише POST (з CSRF) і з правом змінювати — інакше JSON 405 / 403."""
+        from django.http import JsonResponse
+        if request.method != 'POST':
+            response = JsonResponse({'ok': False, 'error': 'Потрібен POST'}, status=405)
+            response['Allow'] = 'POST'
+            return response
+        if order is not None and not self.has_change_permission(request, order):
+            return JsonResponse({'ok': False, 'error': 'Немає права змінювати замовлення'}, status=403)
+        return None
+
     def flag_order_view(self, request, pk):
         from django.http import JsonResponse
-        order = get_object_or_404(SalesOrder, pk=pk)
+        refused = self._list_edit_refused(request)
+        if refused is None:
+            order = get_object_or_404(SalesOrder, pk=pk)
+            refused = self._list_edit_refused(request, order)
+        if refused is not None:
+            return refused
         order.is_flagged = not order.is_flagged
         order.save(update_fields=['is_flagged'])
         return JsonResponse({'flagged': order.is_flagged, 'pk': pk})
@@ -2803,7 +2851,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def set_note_view(self, request, pk):
         from django.http import JsonResponse
         import json as _json
-        order = get_object_or_404(SalesOrder, pk=pk)
+        refused = self._list_edit_refused(request)
+        if refused is None:
+            order = get_object_or_404(SalesOrder, pk=pk)
+            refused = self._list_edit_refused(request, order)
+        if refused is not None:
+            return refused
         try:
             data = _json.loads(request.body or b'{}')
         except Exception:

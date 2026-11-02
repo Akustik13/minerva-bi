@@ -804,13 +804,20 @@ function crmQFFavorite() {
 
 /* ══ Favorite AJAX toggle ══════════════════════════════════ */
 
+{% trans "Не вдалося змінити обраність" as crm_fav_failed %}
+var _msgFavFailed = '{{ crm_fav_failed|escapejs }}';
 function crmFavorite(pk) {
   var csrf = document.cookie.match(/csrftoken=([^;]+)/);
   if (!csrf) return;
   fetch('/admin/crm/customer/' + pk + '/favorite/', {
     method: 'POST',
     headers: {'X-CSRFToken': csrf[1], 'X-Requested-With': 'XMLHttpRequest'},
-  }).then(function(r){ return r.json(); }).then(function(d){
+  }).then(function(r){
+    /* 403 (немає права змінювати клієнтів), 405, вхід закінчився — нічого не збережено: зірку не перемикати */
+    return r.json().catch(function(){ return {}; }).then(function(d){ return {ok: r.ok, d: d || {}}; });
+  }).then(function(res){
+    var d = res.d;
+    if (!res.ok || typeof d.is_favorite !== 'boolean') { alert(d.error || _msgFavFailed); return; }
     var _msgRemoveFav = '{% trans "Зняти обраність" %}';
     var _msgAddFav    = '{% trans "Позначити як обраний" %}';
     document.querySelectorAll('.crm-fav-btn[data-pk="' + pk + '"]').forEach(function(btn){
@@ -820,7 +827,7 @@ function crmFavorite(pk) {
     });
     var card = document.getElementById('crm-card-' + pk);
     if (card) card.classList.toggle('crm-card-fav', d.is_favorite);
-  });
+  }).catch(function(){ alert(_msgFavFailed); });   /* мережа впала — теж нічого не збережено */
 }
 
 /* ══ Init ══════════════════════════════════════════════════ */

@@ -3,7 +3,9 @@
 Що можна вибрати — лише тут: `THEMES` і `OPTIONS` (значення → атрибут на <html>, CSS — у
 `templates/admin/base_site.html`, блок «♿ Доступність»). `clean` пропускає лише відомі значення, тож у сторінку
 (скрипт у <head>) потрапляють тільки вони. Збереження — «Мої налаштування» і перемикач тем у меню
-(`core.views.my_settings_view`).
+(`core.views.my_settings_view`); `save` — під `select_for_update` рядка профілю.
+`sidebar` (`data-mv-sidebar`: auto / wide / rail) — бокове меню нового вигляду на ПК лише значками
+(static/admin/js/mv_desktop.js, html.mvd-rail ще до першого малювання — скрипт у <head>).
 """
 import json
 
@@ -22,6 +24,12 @@ OPTIONS = {
     "design": ("data-mv-design", "new", {
         "new": "Новий — меню «Просте / Повне», пошук усюди (Ctrl K), списки й фільтри по-новому",
         "classic": "Класичний — як було до 11.2026",
+    }),
+    # бокове меню в новому вигляді на ПК (static/admin/js/mv_desktop.js → html.mvd-rail; ⇤ / ⇥ унизу меню)
+    "sidebar": ("data-mv-sidebar", "auto", {
+        "auto": "Само звужується до значків, коли відкрита панель праворуч і списку тісно або вікно вужче за 1200 px",
+        "wide": "Завжди повне — з назвами",
+        "rail": "Завжди лише значки — підменю при наведенні або кліку",
     }),
     "fix_contrast": ("data-mv-fix-contrast", "1", {
         "1": "Так — підправляти колір тексту, що зливається з фоном",
@@ -50,8 +58,9 @@ OPTIONS = {
 
 
 TITLES = {
-    "design": ("🎨 Вигляд Minerva на ПК", "Повернутись до старого вигляду можна будь-коли — тут або в меню «🎨» угорі "
+    "design": ("🎨 Вигляд Minerva на ПК", "Повернутись до старого вигляду можна будь-коли — тут або в меню «🎨» унизу "
                                          "бокового меню. На телефоні вигляд свій, від цього не залежить."),
+    "sidebar": ("📐 Бокове меню на ПК", "Діє в новому вигляді. ⇤ / ⇥ унизу меню — швидко перемкнути."),
     "fix_contrast": ("🩹 Підправляти нечитабельний текст",
                      "Світлий текст на світлому фоні (і навпаки) стає темнішим чи світлішим — відтінок той самий."),
     "font": ("🔤 Шрифт", "Atkinson Hyperlegible — безкоштовний шрифт для людей зі слабким зором; встановіть його на ПК, "
@@ -103,17 +112,31 @@ def page_config(profile) -> str:
 
 
 def save(profile, data) -> list:
-    """Записати вибране; повертає змінені поля профілю. Інше в `ui_prefs` (панелі, нижня панель телефона) лишається."""
-    new = dict(getattr(profile, "ui_prefs", None) or {})
-    new.update(clean(data))
+    """Записати вибране; повертає змінені поля профілю. Інше в `ui_prefs` (панелі, меню, нижня панель телефона)
+    лишається: рядок профілю перечитується під `select_for_update` і зливається з ним, тож паралельний запис
+    (панель праворуч, меню на ПК) не губиться. Об'єкт `profile` після запису — такий, як у базі."""
+    from django.db import transaction
+
+    cleaned = clean(data)
     fields = []
-    if new != (profile.ui_prefs or {}):
-        profile.ui_prefs = new
-        fields.append("ui_prefs")
-    theme = new.get("theme")
-    if theme and theme != profile.theme and theme in dict(profile._meta.get_field("theme").choices):
-        profile.theme = theme
-        fields.append("theme")
-    if fields:
-        profile.save(update_fields=fields)
+    with transaction.atomic():
+        row = None
+        if getattr(profile, "pk", None) is not None:
+            row = type(profile)._default_manager.select_for_update().filter(pk=profile.pk).first()
+        target = row if row is not None else profile
+        cur = target.ui_prefs if isinstance(target.ui_prefs, dict) else {}
+        new = dict(cur)
+        new.update(cleaned)
+        if new != cur:
+            target.ui_prefs = new
+            fields.append("ui_prefs")
+        theme = new.get("theme")
+        if theme and theme != target.theme and theme in dict(profile._meta.get_field("theme").choices):
+            target.theme = theme
+            fields.append("theme")
+        if fields:
+            target.save(update_fields=fields)
+    if target is not profile:
+        profile.ui_prefs = target.ui_prefs
+        profile.theme = target.theme
     return fields

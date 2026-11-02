@@ -3462,7 +3462,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             raise Http404('File not found')
 
     def set_stock_view(self, request, object_id):
+        from django.core.exceptions import PermissionDenied
         product = get_object_or_404(Product, pk=object_id)
+        if not self.has_change_permission(request, product):   # «лише перегляд» — ні форми, ні коригування
+            raise PermissionDenied
         current = Decimal(str(self.stock_qty(product)))
         if request.method == "POST":
             form = SetStockForm(request.POST)

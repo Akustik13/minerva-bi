@@ -71,6 +71,9 @@
   box-shadow: 0 1px 3px rgba(0,0,0,.25);
 }
 .jlc-btn:hover { opacity: .88; box-shadow: 0 2px 6px rgba(0,0,0,.3); }
+/* Тест / синхронізація / звіт — кнопки POST-форм (CSRF), а не посилання */
+.jlc-btn-row form { margin: 0; display: inline-flex; }
+button.jlc-btn { font-family: inherit; line-height: inherit; }
 .jlc-btn-test   { background: #1565c0; }
 .jlc-btn-sync   { background: #2e7d32; }
 .jlc-btn-list   { background: #546e7a; }
@@ -106,12 +109,18 @@
     </div>
 
     <div class="jlc-btn-row">
-      <a href="{{ test_url }}" class="jlc-btn jlc-btn-test">🔌 Тест з'єднання</a>
-      <a href="{{ sync_url }}" class="jlc-btn jlc-btn-sync">🔄 Синхронізувати замовлення</a>
-      <a href="{{ status_report_url }}" class="jlc-btn jlc-btn-report">📊 Звіт статусів</a>
+      {% if has_change_permission %}
+      <form method="post" action="{{ test_url }}">{% csrf_token %}<button type="submit" class="jlc-btn jlc-btn-test">🔌 Тест з'єднання</button></form>
+      <form method="post" action="{{ sync_url }}">{% csrf_token %}<button type="submit" class="jlc-btn jlc-btn-sync">🔄 Синхронізувати замовлення</button></form>
+      <form method="post" action="{{ status_report_url }}">{% csrf_token %}<button type="submit" class="jlc-btn jlc-btn-report">📊 Звіт статусів</button></form>
+      {% endif %}
       <a href="{{ orders_url }}" class="jlc-btn jlc-btn-list">📋 Переглянути замовлення</a>
       <a href="{{ add_order_url }}" class="jlc-btn jlc-btn-add">➕ Додати замовлення</a>
     </div>
+
+    {% if not has_change_permission %}
+    <div class="jlc-meta">🔒 Тест з'єднання, синхронізація й звіт статусів — лише з правом змінювати налаштування JLCPCB.</div>
+    {% endif %}
 
     <div class="jlc-meta">
       {% if jlc_last_synced %}

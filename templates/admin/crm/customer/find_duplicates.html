@@ -171,6 +171,7 @@
   </div>
 
   {# ── Merge All button ─────────────────────────────── #}
+  {% if can_merge %}
   <div class="fd-merge-all-form">
     <form method="post" action="{{ merge_all_url }}"
           onsubmit="return confirm('Злити всі {{ total_groups }} груп дублікатів автоматично?\n\nПереможець обирається за кількістю замовлень.\nЦю дію неможливо скасувати!')">
@@ -180,7 +181,12 @@
       </button>
     </form>
   </div>
+  {% endif %}
 </div>
+
+{% if not can_merge %}
+<p class="fd-hint">🔒 Зливати дублікатів можна лише з правами змінювати й видаляти клієнтів — дублікат видаляється назавжди.</p>
+{% endif %}
 
 <p class="fd-hint">
   Групування по нормалізованій назві компанії (GmbH, KG, LLC тощо ігноруються).<br>
@@ -197,6 +203,7 @@
       {{ grp.members.0.company|default:grp.members.0.name }}
     </span>
     <span class="fd-group-cnt">{{ grp.members|length }} записи</span>
+    {% if can_merge %}
     <div class="fd-hd-btns">
       {# Auto-merge this group #}
       <form method="post" action="{% url 'admin:crm_customer_merge' %}"
@@ -211,6 +218,7 @@
       <a href="{% url 'admin:crm_customer_merge' %}?ids={{ grp.ids_str }}"
          class="fd-manual-btn">✋ Вручну</a>
     </div>
+    {% endif %}
   </div>
 
   {# ── Member cards ───────────────────────────────────── #}

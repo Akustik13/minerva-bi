@@ -62,6 +62,7 @@
     return best;
   }
   function reveal(el) {
+    if (window.MVDesktop && MVDesktop.reveal) try { MVDesktop.reveal(el); } catch (e) {}   // «Просте», значки — mv_desktop
     for (var n = el; n; n = n.parentElement) {
       if (n.tagName === 'DETAILS' && !n.open) n.open = true;
       if (n.classList && n.classList.contains('mg-group') && n.classList.contains('collapsed')) n.classList.remove('collapsed');

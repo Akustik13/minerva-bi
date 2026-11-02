@@ -1011,6 +1011,7 @@ function svFlagOrder(pk) {
     method: 'POST',
     headers: {'X-CSRFToken': csrf[1], 'X-Requested-With': 'XMLHttpRequest'},
   }).then(function(r) { return r.json(); }).then(function(d) {
+    if (typeof d.flagged !== 'boolean') { if (d.error) alert(d.error); return; }   // 403 / 405 — нічого не змінено
     document.querySelectorAll('.sv-flag-btn[data-pk="' + pk + '"]').forEach(function(btn) {
       btn.classList.toggle('sv-flagged', d.flagged);
       btn.style.color = d.flagged ? '#FFB300' : 'var(--text-dim)';
@@ -1036,7 +1037,7 @@ function svNoteSave(pk) {
     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf[1], 'X-Requested-With': 'XMLHttpRequest'},
     body: JSON.stringify({note: note}),
   }).then(function(r) { return r.json(); }).then(function(d) {
-    if (!d.ok) return;
+    if (!d.ok) { if (d.error) alert(d.error); return; }                            // 403 / 405 — не збережено
     svNoteToggle(pk);
     var btn = document.getElementById('sv-note-btn-' + pk);
     if (btn) {
