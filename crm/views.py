@@ -91,7 +91,6 @@ def _own_messages(user):
 
 
 NO_VIEW_RIGHT = "Немає доступу до клієнтів CRM"
-NO_CHANGE_RIGHT = "Немає права змінювати клієнтів"
 MAIL_EVENTS = ('email_in', 'email_out')
 MANUAL_EVENTS = ('note', 'reminder', 'call', 'meeting')     # що додають з картки («+ Додати» в хронології)
 PRIVATE_MAIL_TITLE = 'Лист з іншої скриньки'
@@ -102,6 +101,7 @@ def _customer_for(request, customer_pk, action='view'):
     """Клієнт для /crm/customer/<pk>/…: (клієнт, None) або (None, відмова JSON 403 / 404).
     Ці адреси поза /admin/ — ModuleAccessMiddleware їх не перевіряє, тож право тут, ролями Minerva (user.has_perm):
     view — розділ CRM доступний людині, change — ще й операція «змінювати» в CRM."""
+    from crm.admin import NO_CHANGE_RIGHT      # той самий текст, що в картці й списку клієнтів
     from crm.models import Customer
     if not request.user.has_perm(f'crm.{action}_customer'):
         text = NO_CHANGE_RIGHT if action == 'change' else NO_VIEW_RIGHT
