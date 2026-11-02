@@ -382,6 +382,9 @@ class QuoteScanSettingsTests(QuoteMailBase):
     def test_scan_old_mail_by_depth_and_switch_off(self):
         from offers.models import OfferSettings, QuoteRequest
         recent = self.mail("Anfrage", "Bitte Angebot für 500 Stück ANT-100")
+        from datetime import timedelta
+        from email_assistant.models import EmailMessage
+        EmailMessage.objects.filter(pk=recent.pk).update(sent_at=timezone.now() - timedelta(days=2))
         old = save_message(self.account, {
             "uid": 777, "message_id": "<old@x.example>", "in_reply_to": "", "references": [], "subject": "RFQ CAB-7",
             "from_email": "ops@old.example", "from_name": "", "to_emails": [ME], "cc_emails": [],

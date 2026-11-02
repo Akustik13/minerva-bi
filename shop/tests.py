@@ -182,7 +182,8 @@ class BasePriceTests(TestCase):
         self.assertTrue(import_from_digikey(self.p))
         self.p.refresh_from_db()
         self.assertEqual(self.p.base_prices[0], {"min_qty": 1, "unit_price": "10"})
-        self.assertIn("DigiKey · офер f11e", self.p.base_prices_source)
+        self.assertIn("Зчитано з DigiKey у ", self.p.base_prices_source)
+        self.assertIn("офер f11e", self.p.base_prices_source)
         h = self.p.price_history.get()
         self.assertEqual((h.source, h.old_prices, len(h.new_prices)), ("digikey", [], 3))
         self.assertFalse(import_from_digikey(self.p))  # без змін — без запису в історію
@@ -608,7 +609,8 @@ class ProductApiDigiKeyAttrsTests(TestCase):
                                                             {"min_qty": 10, "unit_price": 4.52},
                                                             {"min_qty": 50, "unit_price": 4.18}])
         self.assertEqual(d["base_prices"]["currency"], "USD")
-        self.assertIn("DigiKey · офер f11e", d["base_prices"]["source"])
+        self.assertIn("Зчитано з DigiKey у USD", d["base_prices"]["source"])
+        self.assertIn("офер f11e", d["base_prices"]["source"])
         x = self.c.get("/api/v1/products/?sku=X-1").json()["results"][0]
         self.assertIsNone(x["base_prices"])
         self.assertEqual((x["tech_attributes"], x["compliance"]), ({}, {}))
