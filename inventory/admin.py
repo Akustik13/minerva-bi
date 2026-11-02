@@ -1806,6 +1806,8 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
     list_filter   = ("tx_type", "location__code", "product__category")
     date_hierarchy = "created_at"
     autocomplete_fields = ("product", "location")
+    # усі змінюють рухи складу (queryset.update) — лише з правом змінювати (permissions=["change"] біля кожної):
+    # хто склад лише переглядає (бухгалтер), їх не бачить і не запустить
     actions = [
         "mark_as_reserved",
         "release_reservations",
@@ -1841,7 +1843,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
                     pass
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    @admin.action(description=_("🔒 Змінити тип → Резерв"))
+    @admin.action(description=_("🔒 Змінити тип → Резерв"), permissions=["change"])
     def mark_as_reserved(self, request, queryset):
         from django.db.models import F
         from django.db.models.functions import Abs
@@ -1850,7 +1852,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
                           _("Змінено %(n)d транзакцій → Резерв.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
-    @admin.action(description=_("🔓 Змінити тип → Списання (Outgoing)"))
+    @admin.action(description=_("🔓 Змінити тип → Списання (Outgoing)"), permissions=["change"])
     def release_reservations(self, request, queryset):
         from django.db.models import F
         from django.db.models.functions import Abs
@@ -1859,7 +1861,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
                           _("Змінено %(n)d транзакцій → Списання.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
-    @admin.action(description=_("▲ Змінити тип → Прихід (Incoming)"))
+    @admin.action(description=_("▲ Змінити тип → Прихід (Incoming)"), permissions=["change"])
     def mark_as_incoming(self, request, queryset):
         from django.db.models import F
         from django.db.models.functions import Abs
@@ -1868,14 +1870,15 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
                           _("Змінено %(n)d транзакцій → Прихід.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
-    @admin.action(description=_("⇄ Змінити тип → Коригування (Adjustment)"))
+    @admin.action(description=_("⇄ Змінити тип → Коригування (Adjustment)"), permissions=["change"])
     def mark_as_adjustment(self, request, queryset):
         updated = queryset.update(tx_type=InventoryTransaction.TxType.ADJUSTMENT)
         self.message_user(request,
                           _("Змінено %(n)d транзакцій → Коригування.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
-    @admin.action(description=_("🔧 Виправити знак qty для Outgoing з позитивним qty (пошкоджені дані)"))
+    @admin.action(description=_("🔧 Виправити знак qty для Outgoing з позитивним qty (пошкоджені дані)"),
+                  permissions=["change"])
     def fix_outgoing_sign(self, request, queryset):
         from django.db.models import F
         corrupted = queryset.filter(
@@ -2240,7 +2243,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return redirect(f"{url}?ids=" + ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)[:30]))
 
     # ── Масові дії: категорія, ціни DigiKey ──────────────────────────────────
-    @admin.action(description="🏷️ Змінити категорію…")
+    # Дії, що змінюють товари, — permissions=["change"] (хто товари лише переглядає, їх не бачить і не запустить);
+    # дії-переходи на сторінки (редактор цін, переведення в EUR, посилання, DigiKey) — без нього: сторінки
+    # перевіряють право самі
+    @admin.action(description="🏷️ Змінити категорію…", permissions=["change"])
     def action_set_category(self, request, queryset):
         from shop.admin import FormActionMixin
 
@@ -2255,7 +2261,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return FormActionMixin._form_action(self, request, queryset, ProductCategoryForm,
                                             "Змінити категорію товарів", apply)
 
-    @admin.action(description="♻️ Життєвий цикл (NRND / EOL / активний)…")
+    @admin.action(description="♻️ Життєвий цикл (NRND / EOL / активний)…", permissions=["change"])
     def action_set_lifecycle(self, request, queryset):
         from shop.admin import FormActionMixin
 
@@ -2291,7 +2297,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         from .admin_media_links import page_url
         return redirect(page_url(list(queryset.values_list("pk", flat=True)[:2000])))
 
-    @admin.action(description="🔗 Спільне фото / даташит (посилання або файл) для вибраних…")
+    @admin.action(description="🔗 Спільне фото / даташит (посилання або файл) для вибраних…", permissions=["change"])
     def action_shared_media(self, request, queryset):
         from shop.admin import FormActionMixin
         from .admin_media_links import link_result_text, shared_form_class, shared_result_text
@@ -2310,7 +2316,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return FormActionMixin._form_action(self, request, queryset, shared_form_class(products),
                                             "Спільне фото / даташит для вибраних товарів", apply)
 
-    @admin.action(description="⬇️ Базові ціни ← DigiKey (перезаписати)…")
+    @admin.action(description="⬇️ Базові ціни ← DigiKey (перезаписати)…", permissions=["change"])
     def action_base_from_dk(self, request, queryset):
         from shop.admin import FormActionMixin
         from .services.base_prices import import_from_digikey
@@ -2337,7 +2343,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return FormActionMixin._form_action(self, request, queryset, BaseFromDigiKeyForm,
                                             "Базові ціни ← DigiKey", apply)
 
-    @admin.action(description="💲 Ціна продажу = базова ціна за 1 шт.")
+    @admin.action(description="💲 Ціна продажу = базова ціна за 1 шт.", permissions=["change"])
     def action_sale_price_from_base(self, request, queryset):
         from shop.models import Shop
         from shop.services import fx_rate
@@ -2572,6 +2578,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         )
 
     bulk_sync_digikey_attrs.short_description = "🔄 Синх технічних атрибутів з DigiKey"
+    bulk_sync_digikey_attrs.allowed_permissions = ("change",)    # перезаписує tech_attributes товарів
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         extra_context = extra_context or {}

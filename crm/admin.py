@@ -516,9 +516,18 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     )
     inlines = [CustomerNoteInline, CustomerTimelineInline]
 
+    def get_object(self, request, object_id, from_field=None):
+        from worktime.panels import remember_viewer   # «⏱ Час askDANTE»: свій опис, вартість — від того, хто дивиться
+        return remember_viewer(super().get_object(request, object_id, from_field), request.user)
+
     def get_fieldsets(self, request, obj=None):
-        """«📎 Документи» без «Вибрати файли» й «🗑️ Видалити» тим, хто клієнта лише переглядає."""
+        """«📎 Документи» без «Вибрати файли» й «🗑️ Видалити» тим, хто клієнта лише переглядає; «⏱ Час askDANTE» —
+        лише з розділом «Робочий час» (worktime.panels.can_see)."""
+        from worktime.panels import can_see
         fieldsets = super().get_fieldsets(request, obj)
+        if not can_see(request.user):
+            fieldsets = [(name, options) for name, options in fieldsets
+                         if "dante_hours" not in options.get("fields", ())]
         if obj is None or self.has_change_permission(request, obj):
             return fieldsets
         swap = {"upload_widget_customer": "docs_view_customer"}
@@ -1338,8 +1347,8 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     def dante_hours(self, obj):
         if not obj or not obj.pk:
             return "—"
-        from worktime.panels import customer_panel   # робочий час askDANTE: лише читає копію записів
-        return customer_panel(obj)
+        from worktime.panels import customer_panel, viewer_of   # askDANTE: лише читає копію записів
+        return customer_panel(obj, viewer_of(obj)) or "—"
 
     def strategy_btn(self, obj):
         """Рекомендація стратегії + кнопка одного кліку (POST з CSRF — _POST_ONCLICK; без JS — сторінка

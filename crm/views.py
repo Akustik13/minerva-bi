@@ -90,6 +90,51 @@ def _own_messages(user):
                                  EmailMessage.FOLDER_SPAM)))
 
 
+NO_VIEW_RIGHT = "Немає доступу до клієнтів CRM"
+NO_CHANGE_RIGHT = "Немає права змінювати клієнтів"
+MAIL_EVENTS = ('email_in', 'email_out')
+MANUAL_EVENTS = ('note', 'reminder', 'call', 'meeting')     # що додають з картки («+ Додати» в хронології)
+PRIVATE_MAIL_TITLE = 'Лист з іншої скриньки'
+PRIVATE_MAIL_BODY = 'Тему й текст бачить лише власник скриньки.'
+
+
+def _customer_for(request, customer_pk, action='view'):
+    """Клієнт для /crm/customer/<pk>/…: (клієнт, None) або (None, відмова JSON 403 / 404).
+    Ці адреси поза /admin/ — ModuleAccessMiddleware їх не перевіряє, тож право тут, ролями Minerva (user.has_perm):
+    view — розділ CRM доступний людині, change — ще й операція «змінювати» в CRM."""
+    from crm.models import Customer
+    if not request.user.has_perm(f'crm.{action}_customer'):
+        text = NO_CHANGE_RIGHT if action == 'change' else NO_VIEW_RIGHT
+        return None, JsonResponse({'ok': False, 'error': text}, status=403)
+    customer = Customer.objects.filter(pk=customer_pk).first()
+    if customer is None:
+        return None, JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
+    return customer, None
+
+
+def _foreign_recipients(request, customer, addresses) -> list:
+    """Лист з картки клієнта: хто має пошту Minerva (розділ email_assistant) — будь-кому, як і з пошти; інакше —
+    лише на адреси цього клієнта (картка й його замовлення, crm.utils.orders_of) і собі. Повертає чужі адреси."""
+    if request.user.has_module_perms('email_assistant'):
+        return []
+    from crm.utils import orders_of
+    allowed = {customer.email, request.user.email}
+    for email, ship_email in orders_of(customer).values_list('email', 'ship_email'):
+        allowed.update((email, ship_email))
+    allowed = {a.strip().lower() for a in allowed if a and a.strip()}
+    return [a for a in addresses if a.strip().lower() not in allowed]
+
+
+def _mail_visible(event, user, own_mail_ids) -> bool:
+    """Тему й текст листа в хронології клієнта бачить лише власник скриньки (те саме правило, що _own_messages):
+    подія з листом — лист у власних скриньках людини; лист з картки CRM без листа в пошті — той, хто надіслав."""
+    if event.event_type not in MAIL_EVENTS:
+        return True
+    if event.email_message_id:
+        return event.email_message_id in own_mail_ids
+    return event.user_id is not None and event.user_id == user.pk
+
+
 def _gather_email_context(customer, user) -> list:
     """Pull recent EmailMessage records for this customer from the user's own mailboxes."""
     try:
@@ -179,12 +224,11 @@ def ai_customer_analysis(request, customer_pk):
     GET: AI-аналіз клієнта. Scope задається через ?include=customer,orders,emails,shipments
     За замовчуванням аналізуються всі 4 блоки. Результат зберігається в CustomerTimeline.
     """
-    from crm.models import Customer, CustomerTimeline
+    from crm.models import CustomerTimeline
 
-    try:
-        customer = Customer.objects.get(pk=customer_pk)
-    except Customer.DoesNotExist:
-        return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
+    customer, refused = _customer_for(request, customer_pk)
+    if refused is not None:
+        return refused
 
     # Scope: які блоки включати в аналіз
     include_raw = request.GET.get('include', 'customer,orders,emails,shipments')
@@ -326,12 +370,9 @@ def ai_compose_email_for_customer(request, customer_pk):
     POST: Скласти email для клієнта.
     Body JSON: {"purpose": "follow_up|...", "language": "uk|de|en"}
     """
-    from crm.models import Customer
-
-    try:
-        customer = Customer.objects.get(pk=customer_pk)
-    except Customer.DoesNotExist:
-        return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
+    customer, refused = _customer_for(request, customer_pk)
+    if refused is not None:
+        return refused
 
     data             = json.loads(request.body or '{}')
     purpose          = data.get('purpose', 'follow_up')
@@ -402,14 +443,16 @@ def _imap_save_sent(raw_bytes, imap_host, imap_port, imap_use_ssl,
 @staff_member_required
 @require_POST
 def send_customer_email(request, customer_pk):
-    """POST: Надіслати email клієнту безпосередньо з CRM-картки."""
+    """POST: Надіслати email клієнту безпосередньо з CRM-картки — з правом змінювати клієнтів; без пошти Minerva —
+    лише на адреси цього клієнта (_foreign_recipients)."""
     import html as _html
     from django.core.mail import EmailMultiAlternatives, get_connection
-    from django.shortcuts import get_object_or_404
     from config.models import NotificationSettings
-    from crm.models import Customer, CustomerTimeline
+    from crm.models import CustomerTimeline
 
-    customer = get_object_or_404(Customer, pk=customer_pk)
+    customer, refused = _customer_for(request, customer_pk, 'change')
+    if refused is not None:
+        return refused
     try:
         data = json.loads(request.body)
     except (json.JSONDecodeError, AttributeError):
@@ -428,6 +471,11 @@ def send_customer_email(request, customer_pk):
 
     to_list = [e.strip() for e in to_raw.split(',') if e.strip()]
     cc_list = [e.strip() for e in cc_raw.split(',') if e.strip()]
+    foreign = _foreign_recipients(request, customer, to_list + cc_list)
+    if foreign:
+        return JsonResponse({'ok': False, 'error': 'Без доступу до пошти Minerva лист з картки клієнта можна надіслати '
+                                                   'лише на адреси цього клієнта, а не на: ' + ', '.join(foreign)},
+                            status=403)
 
     ns = NotificationSettings.get()
 
@@ -550,22 +598,27 @@ def send_customer_email(request, customer_pk):
 
 @staff_member_required
 def customer_timeline_json(request, customer_pk):
-    """GET: хронологія клієнта | POST: додати нотатку/нагадування."""
-    from crm.models import CustomerTimeline, Customer
+    """GET: хронологія клієнта (розділ CRM) | POST: додати нотатку / дзвінок / зустріч / нагадування (право змінювати
+    клієнтів). Листи в хронології — тема й текст лише з власних скриньок (_mail_visible), решта — «Лист з іншої
+    скриньки» без теми, тексту, AI-резюме й посилання."""
+    from crm.models import CustomerTimeline
 
     if request.method == 'POST':
+        customer, refused = _customer_for(request, customer_pk, 'change')
+        if refused is not None:
+            return refused
         data = json.loads(request.body or '{}')
         try:
-            customer = Customer.objects.get(pk=customer_pk)
             remind_at = None
             if data.get('remind_at'):
                 from django.utils.dateparse import parse_datetime
                 remind_at = parse_datetime(data['remind_at'])
 
+            event_type = data.get('event_type', 'note')
             CustomerTimeline.objects.create(
                 customer=customer,
                 user=request.user,
-                event_type=data.get('event_type', 'note'),
+                event_type=event_type if event_type in MANUAL_EVENTS else 'note',   # лист чи замовлення — не вручну
                 title=data.get('title', '')[:300],
                 body=data.get('body', ''),
                 remind_at=remind_at,
@@ -579,14 +632,20 @@ def customer_timeline_json(request, customer_pk):
     from email_assistant.crm_link import customer_orders, find_order
     from sales.models import SalesOrder
 
+    customer, refused = _customer_for(request, customer_pk)
+    if refused is not None:
+        return refused
     events = list(CustomerTimeline.objects
                   .filter(customer_id=customer_pk)
                   .select_related('user')
                   .order_by('-is_pinned', '-created_at')[:200])
+    mail_ids = {e.email_message_id for e in events if e.event_type in MAIL_EVENTS and e.email_message_id}
+    own_mail_ids = set(_own_messages(request.user).filter(pk__in=mail_ids).values_list('pk', flat=True)) \
+        if mail_ids else set()
+    visible = {e.pk: _mail_visible(e, request.user, own_mail_ids) for e in events}
 
-    # Замовлення для гілок листування: збережене related_order_id або номер у темі/тексті
-    customer = Customer.objects.filter(pk=customer_pk).first()
-    orders = customer_orders(customer) if customer else []
+    # Замовлення для гілок листування: збережене related_order_id або номер у темі/тексті (лише свого листа)
+    orders = customer_orders(customer)
     orders_by_pk = {o.pk: o for o in orders}
     missing = {e.related_order_id for e in events if e.related_order_id} - orders_by_pk.keys()
     if missing:
@@ -595,7 +654,7 @@ def customer_timeline_json(request, customer_pk):
 
     def _order_json(e):
         order = orders_by_pk.get(e.related_order_id) if e.related_order_id else None
-        if order is None and e.event_type in ('email_in', 'email_out'):
+        if order is None and e.event_type in MAIL_EVENTS and visible[e.pk]:
             order = find_order(e.title, e.body, orders=orders, global_search=False)
         if order is None:
             return None
@@ -605,14 +664,16 @@ def customer_timeline_json(request, customer_pk):
             'url':    reverse('admin:sales_salesorder_change', args=[order.pk]),
         }
 
-    return JsonResponse({'events': [
-        {
+    def _event_json(e):
+        shown = visible[e.pk]
+        return {
             'id':         e.pk,
             'type':       e.event_type,
             'type_label': e.get_event_type_display(),
-            'title':      e.title,
-            'body':       e.body,
-            'ai_summary': e.ai_summary or '',
+            'title':      e.title if shown else PRIVATE_MAIL_TITLE,
+            'body':       e.body if shown else PRIVATE_MAIL_BODY,
+            'ai_summary': (e.ai_summary or '') if shown else '',
+            'private':    not shown,
             'user':       (e.user.get_full_name() or e.user.username
                            if e.user else 'Система'),
             'date':       e.created_at.strftime('%d.%m.%Y %H:%M'),
@@ -621,12 +682,12 @@ def customer_timeline_json(request, customer_pk):
                            if e.remind_at else None),
             'order':      _order_json(e),
             'thread':     (_thread_subject(e.title)
-                           if e.event_type in ('email_in', 'email_out') else ''),
+                           if e.event_type in MAIL_EVENTS and shown else ''),
             'email_url':  (reverse('email_assistant:message', args=[e.email_message_id])
-                           if e.email_message_id else ''),
+                           if e.email_message_id and shown else ''),
         }
-        for e in events
-    ]})
+
+    return JsonResponse({'events': [_event_json(e) for e in events]})
 
 
 _REPLY_PREFIX_RE = re.compile(r'^\s*(re|aw|antw|fwd?|wg|fw|sv|vs)\s*(\[\d+\])?\s*:\s*', re.IGNORECASE)
@@ -649,12 +710,11 @@ def ai_suggest_strategy(request, customer_pk):
     GET: AI генерує персоналізовану стратегію для клієнта.
     Повертає JSON зі структурою стратегії (без збереження в БД).
     """
-    from crm.models import Customer, CustomerTimeline
+    from crm.models import CustomerTimeline
 
-    try:
-        customer = Customer.objects.get(pk=customer_pk)
-    except Customer.DoesNotExist:
-        return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
+    customer, refused = _customer_for(request, customer_pk)
+    if refused is not None:
+        return refused
 
     profile = getattr(request.user, 'profile', None)
     extra_prompt = request.GET.get('extra_prompt', '').strip()
@@ -750,15 +810,16 @@ def ai_apply_strategy(request, customer_pk):
     """
     POST: Зберегти AI-згенеровану стратегію і запустити її для клієнта.
     Body JSON: {strategy_name, behavior_type, steps: [...]}
+    Право — як «🎯 Стратегія» в списку клієнтів: змінювати клієнтів і додавати стратегії клієнтів.
     """
     from django.utils import timezone
-    from crm.models import Customer
     from strategy.models import StrategyTemplate, TemplateStep, CustomerStrategy, CustomerStep
 
-    try:
-        customer = Customer.objects.get(pk=customer_pk)
-    except Customer.DoesNotExist:
-        return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
+    customer, refused = _customer_for(request, customer_pk, 'change')
+    if refused is not None:
+        return refused
+    if not request.user.has_perm('strategy.add_customerstrategy'):
+        return JsonResponse({'ok': False, 'error': 'Немає права призначати стратегії клієнтам'}, status=403)
 
     data = json.loads(request.body or '{}')
 
@@ -859,11 +920,9 @@ def ai_apply_strategy(request, customer_pk):
 @staff_member_required
 def customer_mailbox_emails(request, customer_pk):
     """GET: Повертає листи з власних скриньок користувача (email_assistant) для цього клієнта."""
-    from crm.models import Customer
-    try:
-        customer = Customer.objects.get(pk=customer_pk)
-    except Customer.DoesNotExist:
-        return JsonResponse({'error': 'Not found'}, status=404)
+    customer, refused = _customer_for(request, customer_pk)
+    if refused is not None:
+        return refused
 
     if not customer.email:
         return JsonResponse({'emails': [], 'message': 'Клієнт не має email адреси.'})
@@ -895,12 +954,9 @@ def ai_strategy_advisor(request, customer_pk):
     GET: AI аналізує виконані кроки стратегії, листування та дає рекомендацію.
     Повертає JSON { ok, advice, strategy_name }.
     """
-    from crm.models import Customer
-
-    try:
-        customer = Customer.objects.get(pk=customer_pk)
-    except Customer.DoesNotExist:
-        return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
+    customer, refused = _customer_for(request, customer_pk)
+    if refused is not None:
+        return refused
 
     profile = getattr(request.user, 'profile', None)
 
@@ -974,7 +1030,11 @@ def ai_strategy_advisor(request, customer_pk):
 @staff_member_required
 @require_POST
 def reset_customer_ai_context(request, customer_pk):
-    """POST: Clear per-customer AI conversation history for this customer."""
+    """POST: Clear per-customer AI conversation history for this customer.
+    Лише власну розмову людини (reset_conversation фільтрує за її профілем) — досить права бачити клієнтів CRM."""
+    _, refused = _customer_for(request, customer_pk)
+    if refused is not None:
+        return refused
     from ai_assistant.service import reset_conversation
     profile = getattr(request.user, 'profile', None)
     chat_id = f'crm_customer_{customer_pk}'

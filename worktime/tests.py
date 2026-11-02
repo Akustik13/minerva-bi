@@ -678,7 +678,7 @@ class RecordsTests(Base):
         self.assertEqual(services.customer_hours(customer)["total"], 120)   # без подвійного рахунку
         self.fake.records = [self.rec("1", MON, 90)]   # 2 і 3 видалили в askDANTE
         self.assertEqual(services.sync_records(self.st, MON, D(6))["removed"], 2)
-        self.assertIn("1:30", panels.project_panel(pr))
+        self.assertIn("1:30", panels.project_panel(pr, self.user))
 
     def test_balance_cached_for_all_users(self):
         from worktime.models import PeriodBalance

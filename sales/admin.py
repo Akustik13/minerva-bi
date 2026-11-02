@@ -277,6 +277,30 @@ def _base_qs():
     return SalesOrder.objects.all()
 
 
+def _notify_blocked(ns, order, kind) -> str:
+    """Чому «Налаштування сповіщень» не дозволяють лист клієнту цього виду ('' — дозволяють): «📧 Надіслати
+    клієнту» (customer) — customer_notify_enabled; «📥 Підтвердження замовлення» (order_confirm) —
+    order_confirm_notify_enabled і джерело замовлення в order_confirm_notify_sources (порожньо — усі); обидва — лише
+    з увімкненим Email. Те саме правило — для кнопок у картці й для самих листів (GET-шаблон і POST-відправлення)."""
+    if not ns.email_enabled:
+        return "SMTP не налаштовано. Увімкніть Email у Налаштуваннях сповіщень."
+    if kind == "customer":
+        return "" if ns.customer_notify_enabled else "Лист клієнту про відправку вимкнено в Налаштуваннях сповіщень."
+    if not ns.order_confirm_notify_enabled:
+        return "Підтвердження замовлення вимкнено в Налаштуваннях сповіщень."
+    sources = [s.strip() for s in (ns.order_confirm_notify_sources or "").split(",") if s.strip()]
+    if sources and order.source not in sources:
+        return f"Підтвердження замовлення для джерела «{order.source}» вимкнено в Налаштуваннях сповіщень."
+    return ""
+
+
+def _mail_html(text) -> str:
+    """HTML-версія листа клієнту з тексту форми: усе екранується, рядки — <br> (текст не стає розміткою листа)."""
+    from django.template.defaultfilters import linebreaksbr
+    return ('<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">'
+            + linebreaksbr(escape(text)) + '</body></html>')
+
+
 class StatusFilter(admin.SimpleListFilter):
     title = "Статус"
     parameter_name = "status"
@@ -978,10 +1002,27 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     readonly_fields = ['stock_summary', 'label_buttons_detail',
                        'documents_list', 'upload_widget', 'doc_buttons', 'doc_templates_panel',
-                       'packaging_panel', 'status_source', 'crm_link', 'bom_assembly_status']
-    
-    def _docs_panel_html(self, obj):
-        """Inner HTML for the documents panel (used by documents_list and doc_list_view)."""
+                       'packaging_panel', 'status_source', 'crm_link', 'bom_assembly_status',
+                       'documents_view', 'doc_buttons_view']
+
+    # Хто замовлення лише переглядає — документи без «🗑️», «📤 Завантажити» й «💾» (ті самі дії сервер і так
+    # відхиляє: _list_edit_refused)
+    _VIEW_ONLY_FIELDS = {'documents_list': 'documents_view', 'doc_buttons': 'doc_buttons_view', 'upload_widget': None}
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is None or self.has_change_permission(request, obj):
+            return fieldsets
+        swap = self._VIEW_ONLY_FIELDS
+        return [
+            (name, {**options, "fields": tuple(swap.get(f, f) for f in options.get("fields", ())
+                                               if not (isinstance(f, str) and f in swap and swap[f] is None))})
+            for name, options in fieldsets
+        ]
+
+    def _docs_panel_html(self, obj, editable=True):
+        """Inner HTML for the documents panel (used by documents_list and doc_list_view).
+        editable=False — без «🗑️» (хто замовлення лише переглядає)."""
         from django.conf import settings
         from urllib.parse import quote
         source = obj.source or 'manual'
@@ -1001,32 +1042,35 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             # URL-encode filename to handle special chars like # which break URLs
             safe_name = quote(file.name, safe='')
             url = f'{settings.MEDIA_URL}orders/{source}/{obj.order_number}/{safe_name}'
+            name, href = escape(file.name), escape(url)          # назву файлу дав той, хто його завантажив
             is_pdf = file.suffix.lower() == '.pdf'
             pdf_attrs = (
-                f' data-doc-pdf="{url}" data-doc-name="{file.name}"'
+                f' data-doc-pdf="{href}" data-doc-name="{name}"'
                 f' style="color:var(--text,#c9d8e4);text-decoration:none;cursor:pointer"'
             ) if is_pdf else ' style="color:var(--text,#c9d8e4);text-decoration:none"'
             rows += (
                 f'<tr style="border-bottom:1px solid var(--border-strong,#2a3f52)">'
                 f'<td style="padding:8px 4px 8px 0">'
-                f'<a href="{url}" target="_blank" title="Переглянути у браузері"'
+                f'<a href="{href}" target="_blank" title="Переглянути у браузері"'
                 f'{pdf_attrs}>'
-                f'📄 {file.name}</a></td>'
+                f'📄 {name}</a></td>'
                 f'<td style="padding:8px 4px;text-align:right;color:var(--text-muted,#9aafbe);font-size:11px;white-space:nowrap">'
                 f'{size_kb:.1f} KB</td>'
                 f'<td style="padding:8px 0;text-align:right;white-space:nowrap">'
                 f'<button type="button"'
-                f' data-dl-url="{escape(url)}" data-dl-name="{escape(file.name)}"'
+                f' data-dl-url="{href}" data-dl-name="{name}"'
                 f' onclick="dlDocFile(this.dataset.dlUrl,this.dataset.dlName)"'
                 f' style="background:#417690;color:#fff;border:none;padding:5px 10px;'
                 f'border-radius:3px;font-size:11px;margin-right:4px;cursor:pointer" title="Завантажити файл на ПК">⬇️</button>'
+                + (
                 f'<button type="button"'
                 f' data-del-url="{delete_url}"'
-                f' data-filename="{file.name}"'
+                f' data-filename="{name}"'
                 f' onclick="deleteOrderDoc(this)"'
                 f' style="background:#c62828;color:#fff;border:none;padding:5px 10px;'
                 f'border-radius:3px;font-size:11px;cursor:pointer"'
                 f' title="Видалити файл з сервера">🗑️</button>'
+                if editable else '') +
                 f'</td></tr>'
             )
 
@@ -1081,8 +1125,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             f'{inv_section}'
         )
 
-    def documents_list(self, obj):
-        """Показує список завантажених документів з кнопками видалення."""
+    def _documents_html(self, obj, editable=True):
+        """Показує список завантажених документів з кнопками видалення (editable=False — без них)."""
         if not obj.pk:
             return format_html('<em style="color:var(--text-dim,#607d8b)">Збережіть замовлення для завантаження документів</em>')
 
@@ -1141,7 +1185,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '</script>'
         )
 
-        inner = self._docs_panel_html(obj)
+        inner = self._docs_panel_html(obj, editable)
         return format_html(
             '{}<div id="order-docs-panel" data-pk="{}"'
             ' style="background:var(--bg-card,#161b22);border:1px solid var(--border-strong,#2a3f52);'
@@ -1150,10 +1194,26 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             mark_safe(js), obj.pk, mark_safe(inner)
         )
 
+    def documents_list(self, obj):
+        return self._documents_html(obj, editable=True)
+
     documents_list.short_description = '📋 Завантажені документи'
 
+    @admin.display(description='📋 Завантажені документи')
+    def documents_view(self, obj):
+        """Ті самі документи без «🗑️» — тим, хто замовлення лише переглядає (get_fieldsets)."""
+        return self._documents_html(obj, editable=False)
+
     def doc_buttons(self, obj):
-        """PDF generation buttons with inline quick-edit override panels."""
+        return self._doc_buttons_html(obj, editable=True)
+
+    @admin.display(description="📄 Генерація документів")
+    def doc_buttons_view(self, obj):
+        """Ті самі PDF без «💾» (зберегти в папку замовлення) — тим, хто замовлення лише переглядає."""
+        return self._doc_buttons_html(obj, editable=False)
+
+    def _doc_buttons_html(self, obj, editable=True):
+        """PDF generation buttons with inline quick-edit override panels (editable=False — без «💾»)."""
         if not obj.pk:
             return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
 
@@ -1233,6 +1293,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         base = f"/admin/sales/salesorder/{obj.pk}/doc"
 
         # ── Marketplace / invoice quick-links ───────────────────────────────
+        def save_btn(url, doc_id, title, color, attrs=''):
+            """«💾» — зберегти PDF у папку замовлення (POST, право змінювати замовлення); переглядачам — нічого."""
+            if not editable:
+                return ''
+            return (f'<button type="button"{attrs}'
+                    f' data-save-url="{url}" data-doc-id="{doc_id}"'
+                    f' onclick="_docSave(this)"'
+                    f' title="{title}"'
+                    f' style="background:{color};color:#fff;border:none;'
+                    f'border-left:1px solid rgba(255,255,255,.3);'
+                    f'padding:7px 11px;cursor:pointer;font-size:13px">💾</button>')
+
         extra_links_html = ''
         acct_url = f"/admin/accounting/invoice/add/?order={obj.pk}"
         extra_links_html += (
@@ -1266,14 +1338,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 f' style="background:#7b1fa2;color:#fff;padding:7px 14px;'
                 f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap">'
                 f'{inv_label}</a>'
-                f'<button type="button"'
-                f' data-save-url="{inv_save_url}" data-doc-id="inv"'
-                f' onclick="_docSave(this)"'
-                f' title="Зберегти PDF інвойсу в документи (генерує якщо нема)"'
-                f' style="background:#7b1fa2;color:#fff;border:none;'
-                f'border-left:1px solid rgba(255,255,255,.3);'
-                f'padding:7px 11px;cursor:pointer;font-size:13px">💾</button>'
-                f'</span>'
+                + save_btn(inv_save_url, "inv", "Зберегти PDF інвойсу в документи (генерує якщо нема)", "#7b1fa2")
+                + f'</span>'
             )
         if obj.source == 'digikey':
             pk_url      = f"/bots/digikey/packlist/{obj.pk}/"
@@ -1285,14 +1351,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 f' style="background:#1565c0;color:#fff;padding:7px 14px;'
                 f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap">'
                 f'📦 Pack List (DigiKey)</a>'
-                f'<button type="button"'
-                f' data-save-url="{pk_save_url}" data-doc-id="dkpl"'
-                f' onclick="_docSave(this)"'
-                f' title="Зберегти Pack List в документи замовлення"'
-                f' style="background:#1565c0;color:#fff;border:none;'
-                f'border-left:1px solid rgba(255,255,255,.3);'
-                f'padding:7px 11px;cursor:pointer;font-size:13px">💾</button>'
-                f'</span>'
+                + save_btn(pk_save_url, "dkpl", "Зберегти Pack List в документи замовлення", "#1565c0")
+                + f'</span>'
             )
         if extra_links_html:
             extra_links_html = (
@@ -1324,14 +1384,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 f' style="background:{color};color:#fff;padding:7px 14px;'
                 f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap">'
                 f'{label}</a>'
-                f'<button type="button" id="savebtn-{doc_id}"'
-                f' data-save-url="{save_url}" data-doc-id="{doc_id}"'
-                f' onclick="_docSave(this)"'
-                f' title="Зберегти PDF на сервер в папку замовлення"'
-                f' style="background:{color};color:#fff;border:none;'
-                f'border-left:1px solid rgba(255,255,255,.3);'
-                f'padding:7px 11px;cursor:pointer;font-size:13px">💾</button>'
-                f'</span>'
+                + save_btn(save_url, doc_id, "Зберегти PDF на сервер в папку замовлення", color,
+                           f' id="savebtn-{doc_id}"')
+                + f'</span>'
                 # ── quick-edit toggle ────────────────────────────────────────
                 f'<button type="button" id="ovr-toggle-{doc_id}"'
                 f' onclick="_toggleDocOvr(\'{doc_id}\')"'
@@ -1377,7 +1432,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             'var base=btn.dataset.saveUrl.split("?")[0];'
             'var url=base+"?action=save"+(extra?"&"+extra:"");'
             'btn.disabled=true;btn.textContent="⏳";'
-            'fetch(url,{headers:{"X-Requested-With":"XMLHttpRequest"}})'
+            # «💾» зберігає файл у папці замовлення — POST з CSRF (сервер приймає лише так і з правом змінювати)
+            'var tk=document.querySelector("[name=csrfmiddlewaretoken]");'
+            'fetch(url,{method:"POST",headers:{"X-Requested-With":"XMLHttpRequest","X-CSRFToken":tk?tk.value:""}})'
             '.then(r=>r.json())'
             '.then(d=>{'
             'if(d.already_exists){'
@@ -1837,27 +1894,28 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 extra_context["digikey_messages_url"]       = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/"
                 extra_context["digikey_messages_reply_base"] = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/"
                 extra_context["digikey_messages_new_topic_url"] = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/new-topic/"
+            # Листи клієнту, рахунок EU — лише тим, хто може змінювати замовлення (ті самі перевірки в самих view)
+            can_change = bool(obj and obj.pk and self.has_change_permission(request, obj))
             # EU Invoice button — repurposed to open /invoices/ with order pre-filled
             if obj and obj.pk:
                 extra_context["eu_invoice_suggest_url"]  = f"/admin/sales/salesorder/{obj.pk}/eu-invoice/suggest/"
-                extra_context["eu_invoice_generate_url"] = f"/admin/sales/salesorder/{obj.pk}/eu-invoice/generate/"
+                if can_change:
+                    extra_context["eu_invoice_generate_url"] = f"/admin/sales/salesorder/{obj.pk}/eu-invoice/generate/"
                 extra_context["eu_invoice_number"]       = obj.eu_invoice_number
                 extra_context["order_source"]            = obj.source
                 extra_context["order_number_for_invoice"] = obj.order_number or ""
             # Customer shipment notification button
-            if obj and obj.pk:
+            if can_change:
                 try:
                     from config.models import NotificationSettings as _NS
                     _ns = _NS.get()
-                    if _ns.customer_notify_enabled and _ns.email_enabled:
+                    if not _notify_blocked(_ns, obj, "customer"):
                         extra_context["notify_customer_url"] = f"/admin/sales/salesorder/{obj.pk}/notify-customer/"
                         extra_context["notify_customer_auto"] = _ns.customer_notify_auto
                         extra_context["ship_notify_sent_at"] = obj.ship_notify_sent_at
-                    if _ns.order_confirm_notify_enabled and _ns.email_enabled:
-                        allowed_srcs = [s.strip() for s in (_ns.order_confirm_notify_sources or '').split(',') if s.strip()]
-                        if not allowed_srcs or (obj.source in allowed_srcs):
-                            extra_context["notify_order_confirm_url"] = f"/admin/sales/salesorder/{obj.pk}/notify-order-confirm/"
-                            extra_context["order_confirm_sent_at"] = obj.order_confirm_sent_at
+                    if not _notify_blocked(_ns, obj, "order_confirm"):
+                        extra_context["notify_order_confirm_url"] = f"/admin/sales/salesorder/{obj.pk}/notify-order-confirm/"
+                        extra_context["order_confirm_sent_at"] = obj.order_confirm_sent_at
                 except Exception:
                     pass
             # Auto-sync shipping fields from active shipment (GET only)
@@ -2826,7 +2884,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                              'ok_count': ok_count, 'bad_count': bad_count})
 
     def _list_edit_refused(self, request, order=None):
-        """⭐ і 📝 у списку змінюють замовлення: лише POST (з CSRF) і з правом змінювати — інакше JSON 405 / 403."""
+        """Дії, що змінюють замовлення (⭐ і 📝 у списку, документи, синхронізація складу, трекінг, рахунок EU,
+        повідомлення DigiKey): лише POST (з CSRF) і з правом змінювати — інакше JSON 405 / 403."""
         from django.http import JsonResponse
         if request.method != 'POST':
             response = JsonResponse({'ok': False, 'error': 'Потрібен POST'}, status=405)
@@ -2835,6 +2894,16 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         if order is not None and not self.has_change_permission(request, order):
             return JsonResponse({'ok': False, 'error': 'Немає права змінювати замовлення'}, status=403)
         return None
+
+    def _order_to_change(self, request, pk, **lookup):
+        """(замовлення, None) для дії, що його змінює, або (None, відмова _list_edit_refused); немає замовлення — 404.
+        Метод перевіряється до пошуку замовлення, право — на знайдене замовлення."""
+        refused = self._list_edit_refused(request)
+        if refused is not None:
+            return None, refused
+        order = get_object_or_404(SalesOrder, pk=pk, **lookup)
+        refused = self._list_edit_refused(request, order)
+        return (None, refused) if refused is not None else (order, None)
 
     def flag_order_view(self, request, pk):
         from django.http import JsonResponse
@@ -2867,14 +2936,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     def digikey_fetch_tracking_view(self, request, pk):
         """POST /sales/salesorder/<pk>/digikey-fetch-tracking/
-        Підтягує tracking_number і shipping_courier з DigiKey Marketplace API."""
+        Підтягує tracking_number і shipping_courier з DigiKey Marketplace API (лише з правом змінювати замовлення)."""
         from django.http import JsonResponse
-        from django.shortcuts import get_object_or_404
 
-        if request.method != "POST":
-            return JsonResponse({"ok": False, "error": "POST only"}, status=405)
-
-        order = get_object_or_404(SalesOrder, pk=pk, source="digikey")
+        order, refused = self._order_to_change(request, pk, source="digikey")
+        if refused is not None:
+            return refused
 
         try:
             from bots.models import DigiKeyConfig
@@ -2909,14 +2976,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         })
 
     def push_to_shipping_view(self, request, pk):
-        """POST — створює або оновлює Shipment запис для відстеження посилки."""
+        """POST — створює або оновлює Shipment запис для відстеження посилки (лише з правом змінювати замовлення)."""
         from django.http import JsonResponse
-        from django.shortcuts import get_object_or_404
 
-        if request.method != "POST":
-            return JsonResponse({"ok": False, "error": "POST only"}, status=405)
-
-        order = get_object_or_404(SalesOrder, pk=pk)
+        order, refused = self._order_to_change(request, pk)
+        if refused is not None:
+            return refused
         if not order.tracking_number:
             return JsonResponse({"ok": False, "error": "Немає трекінг-номера"})
 
@@ -2938,13 +3003,16 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         })
 
     def doc_invoice_save_view(self, request, pk):
-        """AJAX GET — якщо інвойс є: повідомляє 'вже існує'. Якщо нема: генерує і зберігає PDF."""
+        """AJAX POST (з CSRF, з правом змінювати замовлення) — якщо інвойс є: повідомляє 'вже існує'. Якщо нема:
+        генерує і зберігає PDF. GET нічого не створює (405)."""
         from django.http import JsonResponse
         from django.conf import settings
         from pathlib import Path
         from datetime import date as _date
 
-        order = get_object_or_404(SalesOrder, pk=pk)
+        order, refused = self._order_to_change(request, pk)
+        if refused is not None:
+            return refused
 
         # ── Перевіряємо чи є вже інвойс ────────────────────────────────────
         try:
@@ -3036,18 +3104,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         })
 
     def eu_invoice_generate_view(self, request, pk):
-        """POST — генерує EU Invoice PDF; зберігає поля та повертає PDF."""
+        """POST — генерує EU Invoice PDF; зберігає поля та повертає PDF (видає номер і змінює замовлення — лише з
+        правом змінювати його)."""
+        order, refused = self._order_to_change(request, pk)
+        if refused is not None:
+            return refused
+
         from django.http import JsonResponse
         import json as _json
         from datetime import date as _date
         from decimal import Decimal as _Dec, InvalidOperation
         from .eu_invoice_numbers import InvoiceNumberTaken, assign_invoice_number
         from .eu_invoice_pdf import generate_eu_invoice
-
-        if request.method != "POST":
-            return JsonResponse({"error": "POST required"}, status=405)
-
-        order = get_object_or_404(SalesOrder, pk=pk)
 
         try:
             body = _json.loads(request.body)
@@ -3143,9 +3211,25 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         response["X-Invoice-Number"] = str(invoice_number)    # виданий номер (форма могла пропонувати інший)
         return response
 
+    def _notify_refused(self, request, order, ns, kind):
+        """Листи клієнту з картки (шаблон — GET, відправлення — POST з CSRF): лише з правом змінювати замовлення й
+        коли цей лист дозволено в «Налаштуваннях сповіщень» (_notify_blocked) — інакше JSON 405 / 403."""
+        from django.http import JsonResponse
+        if request.method not in ('GET', 'POST'):
+            response = JsonResponse({'ok': False, 'error': 'Method not allowed'}, status=405)
+            response['Allow'] = 'GET, POST'
+            return response
+        if not self.has_change_permission(request, order):
+            return JsonResponse({'ok': False, 'error': 'Немає права змінювати замовлення'}, status=403)
+        blocked = _notify_blocked(ns, order, kind)
+        if blocked:
+            return JsonResponse({'ok': False, 'error': blocked}, status=403)
+        return None
+
     def notify_customer_view(self, request, pk):
         """GET — повертає JSON з попередньо заповненим листом з шаблону.
-           POST — надсилає лист клієнту через SMTP."""
+           POST — надсилає лист клієнту через SMTP.
+           Обидва — лише з правом змінювати замовлення й з увімкненим листом (_notify_refused)."""
         from django.http import JsonResponse
         import json as _json
 
@@ -3156,6 +3240,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             ns = _NS.get()
         except Exception:
             return JsonResponse({'ok': False, 'error': 'NotificationSettings недоступні'})
+
+        refused = self._notify_refused(request, order, ns, 'customer')
+        if refused is not None:
+            return refused
 
         if request.method == 'GET':
             _EU = {
@@ -3235,16 +3323,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 return JsonResponse({'ok': False, 'error': 'Не вказано отримувача (Кому)'})
             if not subject:
                 return JsonResponse({'ok': False, 'error': 'Не вказано тему листа'})
-            if not ns.email_enabled:
-                return JsonResponse({'ok': False, 'error': 'SMTP не налаштовано. Увімкніть Email у Налаштуваннях сповіщень.'})
 
             try:
                 from django.core.mail import EmailMultiAlternatives
                 from dashboard.notifications import _smtp_connection
 
                 from_email = (ns.email_from or ns.email_host_user or '').strip()
-                html_body  = '<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">' \
-                             + body_text.replace('\n', '<br>') + '</body></html>'
+                html_body  = _mail_html(body_text)
                 msg = EmailMultiAlternatives(
                     subject=subject,
                     body=body_text,
@@ -3265,7 +3350,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     def notify_order_confirm_view(self, request, pk):
         """GET — JSON з попередньо заповненим листом підтвердження замовлення.
-           POST — надсилає лист клієнту через SMTP."""
+           POST — надсилає лист клієнту через SMTP.
+           Обидва — лише з правом змінювати замовлення, з увімкненим листом і для дозволених джерел (_notify_refused)."""
         from django.http import JsonResponse
         import json as _json
         order = get_object_or_404(SalesOrder, pk=pk)
@@ -3274,6 +3360,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             ns = NotificationSettings.get()
         except Exception:
             return JsonResponse({'ok': False, 'error': 'NotificationSettings недоступні'})
+
+        refused = self._notify_refused(request, order, ns, 'order_confirm')
+        if refused is not None:
+            return refused
 
         if request.method == 'GET':
             to_email = (order.ship_email or order.email or '').strip()
@@ -3325,15 +3415,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 return JsonResponse({'ok': False, 'error': 'Не вказано адресу отримувача'})
             if not subject:
                 return JsonResponse({'ok': False, 'error': 'Не вказано тему листа'})
-            if not ns.email_enabled:
-                return JsonResponse({'ok': False, 'error': 'SMTP не налаштовано. Увімкніть Email у Налаштуваннях сповіщень.'})
 
             try:
                 from django.core.mail import EmailMultiAlternatives
                 from dashboard.notifications import _smtp_connection
                 from_email = (ns.email_from or ns.email_host_user or '').strip()
-                html_body  = ('<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">'
-                              + body_text.replace('\n', '<br>') + '</body></html>')
+                html_body  = _mail_html(body_text)
                 msg = EmailMultiAlternatives(
                     subject=subject,
                     body=body_text,
@@ -3400,11 +3487,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({"error": str(e)}, status=500)
 
     def digikey_messages_reply_view(self, request, pk, topic_id):
-        """POST — відповісти на тему."""
+        """POST — відповісти на тему (покупцю на DigiKey — лише з правом змінювати замовлення)."""
         from django.http import JsonResponse
         from bots.services.digikey_messages import reply, get_topic
-        if request.method != "POST":
-            return JsonResponse({"error": "POST only"}, status=405)
+        _, refused = self._order_to_change(request, pk)
+        if refused is not None:
+            return refused
         import json as _json
         body = {}
         try:
@@ -3425,13 +3513,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({"error": str(e)}, status=500)
 
     def digikey_messages_new_topic_view(self, request, pk):
-        """POST — створити нову тему."""
+        """POST — створити нову тему (покупцю на DigiKey — лише з правом змінювати замовлення)."""
         from django.http import JsonResponse
         from bots.services.digikey_messages import create_topic
-        if request.method != "POST":
-            return JsonResponse({"error": "POST only"}, status=405)
+        order, refused = self._order_to_change(request, pk)
+        if refused is not None:
+            return refused
         import json as _json
-        order = get_object_or_404(SalesOrder, pk=pk)
         body = {}
         try:
             body = _json.loads(request.body)
@@ -3453,12 +3541,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def sync_inventory_view(self, request, pk):
         """
         GET  → розбіжності між позиціями замовлення і рухами складу (inventory/services/stock.py).
-        POST → виправляє їх тим самим сервісом, що й збереження замовлення (без подвійного повернення).
+        POST → виправляє їх тим самим сервісом, що й збереження замовлення (без подвійного повернення) — лише з
+               правом змінювати замовлення (_list_edit_refused); інші методи — 405.
         """
         from django.http import JsonResponse
         from inventory.services import stock as stock_service
 
-        order = get_object_or_404(SalesOrder, pk=pk)
+        if request.method == 'GET':
+            order = get_object_or_404(SalesOrder, pk=pk)
+        else:
+            order, refused = self._order_to_change(request, pk)
+            if refused is not None:
+                return refused
 
         cancelled = order.status == "cancelled"
         if not cancelled and not order.lines.exists():
@@ -3490,8 +3584,17 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     # ── PDF document views ─────────────────────────────────────────────────────
 
+    def _doc_order(self, request, pk):
+        """PDF замовлення: переглянути / завантажити (GET) — кожен, хто бачить замовлення; «💾» (?action=save —
+        файл у папці замовлення) — лише POST з CSRF і з правом змінювати замовлення (_order_to_change)."""
+        if request.GET.get('action') == 'save':
+            return self._order_to_change(request, pk)
+        return get_object_or_404(SalesOrder, pk=pk), None
+
     def _doc_packing_list(self, request, pk):
-        order = get_object_or_404(SalesOrder, pk=pk)
+        order, refused = self._doc_order(request, pk)
+        if refused is not None:
+            return refused
         from sales.doc_generators import generate_packing_list
         overrides = {k: v for k, v in request.GET.items() if k != 'action'}
         buf = generate_packing_list(order, overrides=overrides or None)
@@ -3504,7 +3607,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return response
 
     def _doc_proforma(self, request, pk):
-        order = get_object_or_404(SalesOrder, pk=pk)
+        order, refused = self._doc_order(request, pk)
+        if refused is not None:
+            return refused
         from sales.doc_generators import generate_proforma
         overrides = {k: v for k, v in request.GET.items() if k != 'action'}
         buf = generate_proforma(order, overrides=overrides or None)
@@ -3517,7 +3622,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return response
 
     def _doc_order_confirmation(self, request, pk):
-        order = get_object_or_404(SalesOrder, pk=pk)
+        order, refused = self._doc_order(request, pk)
+        if refused is not None:
+            return refused
         from sales.doc_generators import generate_order_confirmation
         overrides = {k: v for k, v in request.GET.items() if k != 'action'}
         buf = generate_order_confirmation(order, overrides=overrides or None)
@@ -3530,7 +3637,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return response
 
     def _doc_customs(self, request, pk):
-        order = get_object_or_404(SalesOrder, pk=pk)
+        order, refused = self._doc_order(request, pk)
+        if refused is not None:
+            return refused
         from sales.doc_generators import generate_customs
         overrides = {k: v for k, v in request.GET.items() if k != 'action'}
         buf = generate_customs(order, overrides=overrides or None)
@@ -3606,12 +3715,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         })
 
     def delete_doc_view(self, request, pk):
-        """AJAX POST — видаляє один файл із media/orders/{source}/{order_number}/."""
+        """AJAX POST — видаляє один файл із media/orders/{source}/{order_number}/ (з правом змінювати замовлення)."""
         from django.http import JsonResponse
         from django.conf import settings
-        if request.method != 'POST':
-            return JsonResponse({'error': 'Method not allowed'}, status=405)
-        order = get_object_or_404(SalesOrder, pk=pk)
+        order, refused = self._order_to_change(request, pk)
+        if refused is not None:
+            return refused
         filename = request.POST.get('filename', '').strip()
         # Захист від path traversal
         if not filename or '/' in filename or '\\' in filename or '..' in filename:
@@ -3625,14 +3734,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def doc_list_view(self, request, pk):
         """AJAX GET — повертає HTML-фрагмент панелі документів для оновлення без перезавантаження."""
         order = get_object_or_404(SalesOrder, pk=pk)
-        return HttpResponse(self._docs_panel_html(order))
+        return HttpResponse(self._docs_panel_html(order, self.has_change_permission(request, order)))
 
     def card_expand_view(self, request, pk):
-        """AJAX GET — документи замовлення для розгорнутої секції картки."""
+        """AJAX GET — документи замовлення для розгорнутої секції картки («📎 Вибрати файли» і «🗑️» — лише тим,
+        хто може змінювати замовлення)."""
         order = get_object_or_404(SalesOrder, pk=pk)
         doc_list_url = reverse('admin:sales_salesorder_doc_list', args=[pk])
 
-        docs_html = self._docs_panel_html(order)
+        editable = self.has_change_permission(request, order)
+        docs_html = self._docs_panel_html(order, editable)
+        if not editable:
+            return HttpResponse(f'<div id="cex-docs-{pk}">{docs_html}</div>')
         sep = '<div style="border-top:1px solid var(--border-strong,#2a3f52);margin:12px 0"></div>'
 
         html = (
@@ -3651,18 +3764,23 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return HttpResponse(html)
 
     def upload_docs_view(self, request, pk):
-        """AJAX-ендпоінт: зберігає документи замовлення на сервер (і локально)."""
+        """AJAX-ендпоінт: зберігає документи замовлення на сервер (і локально) — лише POST і з правом змінювати
+        замовлення (_list_edit_refused)."""
         from django.http import JsonResponse
         from django.conf import settings
         from datetime import date as _date
 
-        if request.method != 'POST':
-            return JsonResponse({'error': 'Method not allowed'}, status=405)
+        refused = self._list_edit_refused(request)
+        if refused is not None:
+            return refused
 
         try:
             order = SalesOrder.objects.get(pk=pk)
         except SalesOrder.DoesNotExist:
             return JsonResponse({'error': 'Замовлення не знайдено'}, status=404)
+        refused = self._list_edit_refused(request, order)
+        if refused is not None:
+            return refused
 
         files = request.FILES.getlist('documents')
         if not files:

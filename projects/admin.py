@@ -101,6 +101,18 @@ class ProjectAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("customer", "owner").annotate(
             _threads=Count("links", filter=Q(links__status=ProjectLink.CONFIRMED, links__thread__isnull=False)))
 
+    def get_object(self, request, object_id, from_field=None):
+        from worktime.panels import remember_viewer   # «⏱ Час askDANTE»: свій опис, вартість — від того, хто дивиться
+        return remember_viewer(super().get_object(request, object_id, from_field), request.user)
+
+    def get_fieldsets(self, request, obj=None):
+        """«⏱ Час askDANTE» — лише з розділом «Робочий час» (worktime.panels.can_see)."""
+        from worktime.panels import can_see
+        fieldsets = super().get_fieldsets(request, obj)
+        if can_see(request.user):
+            return fieldsets
+        return [(name, options) for name, options in fieldsets if "dante_hours" not in options.get("fields", ())]
+
     def save_model(self, request, obj, form, change):
         if not change and not obj.created_by_id:
             obj.created_by = request.user
@@ -186,8 +198,8 @@ class ProjectAdmin(admin.ModelAdmin):
     def dante_hours(self, obj):
         if not obj or not obj.pk:
             return "—"
-        from worktime.panels import project_panel   # робочий час askDANTE: лише читає копію записів
-        return project_panel(obj)
+        from worktime.panels import project_panel, viewer_of   # askDANTE: лише читає копію записів
+        return project_panel(obj, viewer_of(obj)) or "—"
 
     @admin.display(description="Створено з листування")
     def source_thread_link(self, obj):
