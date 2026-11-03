@@ -15,6 +15,10 @@ from agent import mail as agent_mail
 from agent import products as product_fields
 from agent.models import AgentProposal, AgentRule, AgentRun, AgentTask
 
+# ✓ на сторінці завдання — кому є що застосувати (кожна пропозиція ще перевіряє своє право, agent/decide.py)
+APPLY_PERMS = ('inventory.change_product', 'inventory.add_product', 'inventory.add_inventorytransaction',
+               'calendar_app.add_calendarevent', 'shop.change_shoplisting', 'bots.change_digikeylisting',
+               'shipping.add_shipment', 'sales.change_salesorder')
 STATUS_ICONS = {AgentRun.QUEUED: '⏳', AgentRun.RUNNING: '⚙️', AgentRun.DRAFTED: '📝', AgentRun.SCHEDULED: '✉️',
                 AgentRun.SKIPPED: '↷', AgentRun.FAILED: '⚠️'}
 
@@ -270,7 +274,18 @@ class AgentTaskAdmin(admin.ModelAdmin):
         data['message'] = mail.pk if mail else None
         if data.get('instruction'):              # ?instruction= — з «🧩 Підготувати завдання агенту» (agent/suggest.py)
             data['instruction'] = str(data['instruction'])[:3000]
+        numbers = self._orders_from_get(request)
+        if numbers:
+            data['instruction'] = 'Замовлення: ' + ', '.join(numbers) + '\n' + str(data.get('instruction') or '')
         return data
+
+    def _orders_from_get(self, request) -> list:
+        """«🤖 Завдання агенту для вибраних…» у списку замовлень → номери в тексті завдання (якщо людина їх бачить)."""
+        ids = [int(x) for x in (request.GET.get('orders') or '').split(',') if x.strip().isdigit()][:200]
+        if not ids or not request.user.has_perm('sales.view_salesorder'):
+            return []
+        from sales.models import SalesOrder
+        return list(SalesOrder.objects.filter(pk__in=ids).order_by('pk').values_list('order_number', flat=True))
 
     def has_change_permission(self, request, obj=None):
         if obj is not None and obj.owner_id != request.user.pk:
@@ -334,7 +349,9 @@ class AgentTaskAdmin(admin.ModelAdmin):
         rows = []
         for p in task.proposals.exclude(kind=AgentProposal.MAIL).select_related('product'):
             p.label, p.old_display, p.new_display = describe(p)
-            p.sku_text = p.product.sku if p.product_id else (p.data or {}).get('sku', '')
+            d = p.data or {}
+            p.sku_text = p.product.sku if p.product_id else (d.get('number') or d.get('sku', ''))
+            p.sku_url = '' if p.product_id else d.get('order_url', '')
             p.source_url = p.source if p.source.startswith(('http://', 'https://')) else ''
             rows.append(p)
         context = {
@@ -345,7 +362,7 @@ class AgentTaskAdmin(admin.ModelAdmin):
             'running': task.status in (AgentTask.QUEUED, AgentTask.RUNNING),
             'stopped': task.status in (AgentTask.FAILED, AgentTask.CANCELLED),
             'total': task.products.count(), 'done': len(task.done_products or []),
-            'can_apply': request.user.has_perm('inventory.change_product'),
+            'can_apply': any(request.user.has_perm(x) for x in APPLY_PERMS),
             'log': list(reversed((task.log or [])[-80:])),
             'back_url': reverse('admin:agent_agenttask_changelist'),
         }
@@ -357,7 +374,7 @@ class AgentTaskAdmin(admin.ModelAdmin):
         action = request.POST.get('action', '')
         ids = [int(x) for x in request.POST.getlist('ids') if x.isdigit()]
         if action == 'apply':
-            out = decide.apply_selected(task, ids, request.user)
+            out = decide.apply_selected(task, ids, request.user, request=request)
             if out['applied']:
                 messages.success(request, f'✓ Застосовано: {out["applied"]}')
             for line in out['failed'][:10]:

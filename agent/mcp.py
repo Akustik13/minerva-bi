@@ -26,17 +26,19 @@ logger = logging.getLogger(__name__)
 PROTOCOLS = ('2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05')
 SERVER = {'name': 'minerva', 'title': 'Minerva', 'version': '1.0'}
 INSTRUCTIONS = (
-    'Minerva — облік складу й продажів. Інструменти читають товари, даташити, локації, магазини й DigiKey; '
-    'propose_* лише ПРОПОНУЮТЬ зміни — людина перевіряє їх і застосовує ✓ у Minerva («🧩 Завдання агенту»). '
+    'Minerva — облік складу й продажів. Інструменти читають товари, даташити, локації, магазини, DigiKey, '
+    'замовлення до відправки й перевізників; '
+    'propose_* лише ПРОПОНУЮТЬ зміни (і чернетку відправлення — оформлює в перевізника людина) — людина '
+    'перевіряє їх і застосовує ✓ у Minerva («🧩 Завдання агенту»). '
     'Кожна пропозиція — з підставою (точна цитата) і джерелом. Ціни на DigiKey — лише за правилами Minerva.')
 SESSION_RE = re.compile(r'^[A-Za-z0-9-]{8,80}$')
 CLIENT_TTL = 24 * 3600
 
 
 def tool_defs() -> list:
-    from agent import channels, tools
+    from agent import channels, shipments, tools
     base = [tools.FIND, tools.GET, tools.READ, tools.CHANGE, tools.ATTR, tools.LOCATIONS, tools.STOCK_IN,
-            tools.NEW_PRODUCT, tools.EVENT] + channels.TOOLS
+            tools.NEW_PRODUCT, tools.EVENT] + channels.TOOLS + shipments.TOOLS
     return [{'name': t['name'], 'description': t['description'], 'inputSchema': t['input_schema'],
              'annotations': {'readOnlyHint': not is_write(t['name']), 'destructiveHint': False}} for t in base]
 

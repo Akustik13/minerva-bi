@@ -93,10 +93,12 @@ EVENT = {'name': 'propose_event', 'description': 'Запропонувати п�
 
 
 def definitions(task, single=False) -> list:
-    from agent import channels
+    from agent import channels, shipments
     tools = [FIND, GET, READ, CHANGE, ATTR, LOCATIONS, STOCK_IN] + channels.TOOLS
     if not (single or task.each_product):
         tools += [MAIL, NEW_PRODUCT, EVENT] + ([READ_MAIL, READ_ATT] if mail_of(task) is not None else [])
+        if shipments.can_read(task.owner if task.owner_id else None):    # замовлення й відправлення
+            tools += shipments.TOOLS
     return tools + ([dict(WEB_SEARCH)] if task.web else [])
 
 
@@ -182,9 +184,9 @@ def _pdf_pages(data) -> list:
 
 def run(ctx, name, args) -> tuple:
     """(текст результату, is_error) для tool_result."""
-    from agent import channels
+    from agent import channels, shipments
     try:
-        fn = HANDLERS.get(name) or channels.HANDLERS.get(name)
+        fn = HANDLERS.get(name) or channels.HANDLERS.get(name) or shipments.HANDLERS.get(name)
         if fn is None:
             raise ToolError(f'невідомий інструмент {name}')
         return fn(ctx, args or {}), False

@@ -17,13 +17,13 @@ from agent.models import AgentProposal, AgentTask
 from agent.tools import EMAIL_RE, ToolError, _datasheet_bytes, allowed_addresses
 
 
-def apply_selected(task, ids, user) -> dict:
+def apply_selected(task, ids, user, request=None) -> dict:
     """✓ вибраних: нові товари — першими (прихід нового артикула з того самого завдання знайде його)."""
     out = {'applied': 0, 'failed': []}
     chosen = task.proposals.filter(pk__in=ids, status=AgentProposal.PENDING).exclude(kind=AgentProposal.MAIL) \
         .select_related('product', 'task')
     for p in sorted(chosen, key=lambda x: (x.kind != AgentProposal.PRODUCT, x.pk)):
-        error = apply_one(p, user)
+        error = apply_one(p, user, request)
         product_fields.decided(p, user, AgentProposal.FAILED if error else AgentProposal.APPLIED, error)
         if error:
             what, _old, new = describe(p)
@@ -34,8 +34,8 @@ def apply_selected(task, ids, user) -> dict:
     return out
 
 
-def apply_one(p, user) -> str:
-    from agent import channels
+def apply_one(p, user, request=None) -> str:
+    from agent import channels, shipments
     if p.kind == AgentProposal.PRODUCT:
         return _create_product(p, user)
     if p.kind == AgentProposal.STOCK_IN:
@@ -48,14 +48,20 @@ def apply_one(p, user) -> str:
         return channels.apply_dk_prices(p, user)
     if p.kind == AgentProposal.DK_LEAD:
         return channels.apply_dk_lead(p, user)
+    if p.kind == AgentProposal.SHIPMENT:
+        return shipments.apply_shipment(p, user)
+    if p.kind == AgentProposal.ORDER:
+        return shipments.apply_order(p, user, request)
     return product_fields.apply(p, user)
 
 
 def describe(p) -> tuple:
     """(що, було, стане) — рядок таблиці на сторінці завдання."""
-    from agent import channels
+    from agent import channels, shipments
     if p.kind in (AgentProposal.SHOP, AgentProposal.DK_PRICES, AgentProposal.DK_LEAD):
         return channels.describe(p)
+    if p.kind in (AgentProposal.SHIPMENT, AgentProposal.ORDER):
+        return shipments.describe(p)
     d = p.data or {}
     if p.kind == AgentProposal.STOCK_IN:
         where = d.get('location') or 'локація за замовчуванням'

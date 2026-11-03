@@ -89,13 +89,13 @@
       <table>
         <thead><tr>
           <th><input type="checkbox" checked onclick="document.querySelectorAll('#agt input[name=ids]').forEach(function(c){ if(!c.disabled) c.checked = this.checked; }, this)"></th>
-          <th>Товар</th><th>Що</th><th>Було</th><th>Стане</th><th>Підстава</th><th>Стан</th>
+          <th>Товар · замовлення</th><th>Що</th><th>Було</th><th>Стане</th><th>Підстава</th><th>Стан</th>
         </tr></thead>
         <tbody>
         {% for p in rows %}
           <tr class="{% if p.status != 'pending' %}done{% endif %}">
             <td><input type="checkbox" name="ids" value="{{ p.pk }}" {% if p.status == 'pending' %}checked{% else %}disabled{% endif %}></td>
-            <td translate="no">{% if p.product %}<a href="{% url 'admin:inventory_product_change' p.product.pk %}" target="_blank">{{ p.product.sku }}</a>{% else %}{{ p.sku_text }}{% endif %}</td>
+            <td translate="no">{% if p.product %}<a href="{% url 'admin:inventory_product_change' p.product.pk %}" target="_blank">{{ p.product.sku }}</a>{% elif p.sku_url %}<a href="{{ p.sku_url }}" target="_blank">{{ p.sku_text }}</a>{% else %}{{ p.sku_text }}{% endif %}</td>
             <td>{{ p.label }}</td>
             <td translate="no">{{ p.old_display|default:"" }}</td>
             <td class="new" translate="no">{{ p.new_display }}{% if p.result_url %} <a href="{{ p.result_url }}" target="_blank">↗</a>{% endif %}</td>
@@ -110,7 +110,7 @@
       {% if pending %}
       <div class="agt-actions">
         {% if can_apply %}<button type="submit" name="action" value="apply" class="button default">✓ Застосувати вибрані</button>
-        {% else %}<span class="agt-muted">Застосувати може той, хто має право змінювати товари.</span>{% endif %}
+        {% else %}<span class="agt-muted">Застосувати може той, хто має право на ці зміни (товари, склад, замовлення, відправлення…).</span>{% endif %}
         <button type="submit" name="action" value="reject" class="button">✕ Відхилити вибрані</button>
       </div>
       {% endif %}

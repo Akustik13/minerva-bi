@@ -535,6 +535,14 @@ def create_offer_from_quote(modeladmin, request, queryset):
     return None
 
 
+@admin.action(description="🤖 Завдання агенту для вибраних…", permissions=["agent"])
+def agent_task_for_orders(modeladmin, request, queryset):
+    """Сторінка нового завдання агенту (agent/admin.py) з номерами цих замовлень у тексті."""
+    from django.urls import reverse
+    url = reverse("admin:agent_agenttask_add")
+    return redirect(f"{url}?orders=" + ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)[:200]))
+
+
 @admin.register(SalesOrder)
 class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     form = SalesOrderDocumentsForm
@@ -692,6 +700,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     actions        = [
         export_sales_excel,
         create_offer_from_quote,
+        agent_task_for_orders,
         # Статус
         "action_set_status_received",
         "action_set_status_processing",
@@ -732,6 +741,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def has_offer_permission(self, request):
         """«📝 Створити Angebot із запиту пропозиції» — право створювати Angebote."""
         return request.user.has_perm("offers.add_offer")
+
+    def has_agent_permission(self, request):
+        """«🤖 Завдання агенту для вибраних…» — право давати завдання агенту."""
+        return request.user.has_perm("agent.add_agenttask")
 
     # ── Actions: Статус ───────────────────────────────────────────────────────
 

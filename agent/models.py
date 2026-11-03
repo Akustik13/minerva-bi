@@ -187,9 +187,11 @@ class AgentProposal(models.Model):
     FIELD, ATTRIBUTE, MAIL = 'field', 'attribute', 'mail'
     STOCK_IN, PRODUCT, EVENT = 'stock_in', 'product', 'event'
     SHOP, DK_PRICES, DK_LEAD = 'shop', 'dk_prices', 'dk_lead'
+    SHIPMENT, ORDER = 'shipment', 'order'
     KINDS = [(FIELD, 'Поле товару'), (ATTRIBUTE, 'Технічний параметр'), (MAIL, 'Лист'),
              (STOCK_IN, '📦 Прихід на склад'), (PRODUCT, '🆕 Новий товар'), (EVENT, '📅 Подія в календарі'),
-             (SHOP, '🏪 Інтернет-магазин'), (DK_PRICES, '💲 Ціни на DigiKey'), (DK_LEAD, '⏱ Строк на DigiKey')]
+             (SHOP, '🏪 Інтернет-магазин'), (DK_PRICES, '💲 Ціни на DigiKey'), (DK_LEAD, '⏱ Строк на DigiKey'),
+             (SHIPMENT, '🚚 Чернетка відправлення'), (ORDER, '🧾 Зміна замовлення')]
     PENDING, APPLIED, REJECTED, FAILED = 'pending', 'applied', 'rejected', 'failed'
     STATUSES = [(PENDING, '👀 Чекає'), (APPLIED, '✓ Застосовано'), (REJECTED, '✕ Відхилено'),
                 (FAILED, '⚠️ Не вдалося')]
