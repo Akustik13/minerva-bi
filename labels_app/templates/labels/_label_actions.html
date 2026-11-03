@@ -62,7 +62,8 @@
 .svl-off{color:var(--text-muted,#9aafbe);font-size:11px}
 .svl-set{font-size:12px;color:var(--link,#58a6ff)}
 .svl-shot{position:relative;display:flex;align-items:center;justify-content:center;min-height:130px;background:var(--bg-hover,#1e2d40);border-radius:10px;padding:14px;margin-bottom:12px}
-.svl-shot img{width:100%;max-width:560px;height:auto;filter:drop-shadow(0 2px 8px rgba(0,0,0,.35));transition:opacity .15s}
+.svl-shot img{width:100%;max-width:560px;height:auto;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.35);transition:opacity .15s}
+.svl-shot img.sharp{padding:2.4% 2.6% 2.4% 3%;box-sizing:border-box}   /* збільшений рендер — без полів етикетки */
 .svl-shot img:not([src]){display:none}
 .svl-shot span{position:absolute;font-size:12px;color:var(--text-muted,#9aafbe);text-align:center;padding:0 12px}
 .svl-pv-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px;margin-bottom:6px}
@@ -293,6 +294,33 @@
     });
     return rows;
   }
+  // Чітка картинка: служба DYMO малює 72 точки на дюйм (етикетка — 247×100 px, у вікні розмито), тож для
+  // перегляду етикетка збільшується в SHARP разів від свого краю: координати, розміри, шрифти; штрихкод —
+  // на весь свій блок, як у звичайному перегляді DYMO (смужки Small / Medium / Large не збільшуються).
+  // На принтер і у файл іде початковий XML. Не DYMO Connect (DesktopLabel) — як є.
+  var SHARP = 4;
+  function sharpXml(xml) {
+    var rect = /<DYMORect>[\s\S]*?<\/DYMORect>/.exec(xml);
+    if (!rect || xml.indexOf('<DesktopLabel') < 0) return '';
+    var x0 = /<X>(-?[\d.]+)<\/X>/.exec(rect[0]), y0 = /<Y>(-?[\d.]+)<\/Y>/.exec(rect[0]);
+    if (!x0 || !y0) return '';
+    x0 = parseFloat(x0[1]); y0 = parseFloat(y0[1]);
+    var times = function (m, tag, n) { return '<' + tag + '>' + (parseFloat(n) * SHARP).toFixed(6) + '</' + tag + '>'; };
+    var from = function (start) {
+      return function (m, n) { return (start + (parseFloat(n) - start) * SHARP).toFixed(6); };
+    };
+    var tail = xml.slice(rect.index + rect[0].length)
+      .replace(/<X>(-?[\d.]+)<\/X>/g, function (m, n) { return '<X>' + from(x0)(m, n) + '</X>'; })
+      .replace(/<Y>(-?[\d.]+)<\/Y>/g, function (m, n) { return '<Y>' + from(y0)(m, n) + '</Y>'; })
+      .replace(/<(Width|Height)>([\d.]+)<\/\1>/g, times)
+      .replace(/<FontSize>([\d.]+)<\/FontSize>/g, function (m, n) {
+        return '<FontSize>' + (parseFloat(n) * SHARP).toFixed(2) + '</FontSize>';
+      })
+      .replace(/<BarcodeObject>[\s\S]*?<\/BarcodeObject>/g, function (b) {
+        return b.replace(/<Size>(Small|Medium|Large)<\/Size>/, '<Size>AutoFit</Size>');
+      });
+    return xml.slice(0, rect.index) + rect[0].replace(/<(Width|Height)>([\d.]+)<\/\1>/g, times) + tail;
+  }
   function preview(url, name, ctx, printer, xml) {
     var old = document.getElementById('svl-pv'); if (old) old.remove();
     var doc = parseXml(xml), rows = doc ? editables(doc) : [];
@@ -342,13 +370,15 @@
     });
 
     function render() {
-      var my = ++seq;
+      var my = ++seq, big = sharpXml(current), used = !!big;
       msg.textContent = 'Малюю етикетку…'; msg.hidden = false; img.style.opacity = '.45';
-      dymo('RenderLabel', {labelXml: current, renderParamsXml: '', printerName: printer})
+      var draw = function (xml) { return dymo('RenderLabel', {labelXml: xml, renderParamsXml: '', printerName: printer}); };
+      (big ? draw(big).catch(function () { used = false; return draw(current); }) : draw(current))
         .then(function (res) {
           if (my !== seq) return;
           res = res.trim();
           img.src = 'data:image/png;base64,' + (res.charAt(0) === '"' ? JSON.parse(res) : res);
+          img.classList.toggle('sharp', used);
           img.style.opacity = '1'; msg.hidden = true;
         })
         .catch(function (e) {

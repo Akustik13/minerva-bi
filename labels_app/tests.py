@@ -373,6 +373,7 @@ class LabelViewsTests(TestCase):
                 r = self.client.get(url)
                 self.assertContains(r, "DYMO_MODE = 'print'", msg_prefix=name)
                 self.assertContains(r, "https://127.0.0.1:41951/DYMO/DLS/Printing/", msg_prefix=name)
+                self.assertContains(r, "function sharpXml(xml)", msg_prefix=name)   # чіткий перегляд
                 self.assertNotContains(r, "labelwriter.com", msg_prefix=name)   # старий скрипт DYMO Label Software
             r = self.client.get(pages["product card"])
         self.assertContains(r, 'data-svl="filter" data-sku="FT220407-01A"')   # фільтр: файл з бази або шаблон
