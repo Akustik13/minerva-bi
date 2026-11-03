@@ -762,8 +762,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         </select>
       </label>
       <button class="em-sync-btn" id="em-docs-recent" onclick="emDocsRecent(this)"{% if email_settings.attachments_to_docs == "off" %} style="display:none"{% endif %}
-              title="{% trans "Листи за 30 днів, уже прив’язані до замовлень і проєктів: їхні документи — туди ж (те, що вже є, не дублюється)" %}">
-        📥 {% trans "Зберегти вкладення за 30 днів" %}
+              title="{% trans "Листи з документами, що прийшли за 30 днів: номер замовлення в темі, тексті чи вкладенні — документи туди ж (лист і в хронологію клієнта), гілка в проєкті — у проєкт. Те, що вже є, не дублюється" %}">
+        📥 <span id="em-docs-recent-l">{% trans "Зберегти вкладення за 30 днів" %}</span>
       </button>
       </div>
     </div>
@@ -2988,17 +2988,25 @@ function emDocsBtn() {
   if (sel && btn) btn.style.display = sel.value === 'off' ? 'none' : '';
 }
 async function emDocsRecent(btn) {
+  var url = '{% url "email_assistant:attachments_to_docs" %}', label = document.getElementById('em-docs-recent-l');
+  var idle = label.textContent;
   btn.disabled = true;
   try {
     var fd = new FormData(); fd.append('days', '30');
-    var r = await fetch('{% url "email_assistant:attachments_to_docs" %}', {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd});
-    var d = await r.json();
+    var d = await (await fetch(url, {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd})).json();
     if (!d.ok) { alert('❌ ' + (d.error || '')); return; }
-    _showToast('📎 {% trans "Листів" %}: ' + d.messages + ' · {% trans "у замовлення" %}: ' + d.orders
-               + (d.mode === 'all' ? ' · {% trans "у проєкти" %}: ' + d.projects : '')
-               + ' · {% trans "уже були" %}: ' + d.already);
+    while (d.running) {                      // у фоні: PDF читаються, лист прив'язується до замовлення
+      label.textContent = '⏳ ' + (d.messages || 0) + ' / ' + (d.total || '…');
+      await new Promise(function (r) { setTimeout(r, 1500); });
+      d = await (await fetch(url)).json();
+    }
+    if (d.error) { alert('❌ ' + d.error); return; }
+    _showToast('📎 {% trans "Листів з документами" %}: ' + (d.total || 0) + ' · {% trans "у замовлення" %}: ' + (d.orders || 0)
+               + (d.mode === 'all' ? ' · {% trans "у проєкти" %}: ' + (d.projects || 0) : '')
+               + ' · {% trans "уже були" %}: ' + (d.already || 0)
+               + (d.linked ? ' · {% trans "прив’язано до замовлень" %}: ' + d.linked : ''));
   } catch (e) { alert('❌ ' + e); }
-  finally { btn.disabled = false; }
+  finally { btn.disabled = false; label.textContent = idle; }
 }
 async function setEmailSetting(field, value, el) {
   var prev = el.dataset.prev !== undefined ? el.dataset.prev : null;

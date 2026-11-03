@@ -1,9 +1,9 @@
 """📎 Вкладення листів → документи замовлення й проєкту.
 
 Вмикає власник скриньки — `EmailSettings.attachments_to_docs` («⋯ Ще» у пошті; пошта — лише його):
-• orders — лист прив'язано до замовлення (подія хронології CRM з `related_order_id`: номер у темі, тексті чи
-  вкладенні, `crm_link.find_order`) → документи з нього копіюються в media/orders/{джерело}/{номер}/
-  («📄 Документи замовлення» в картці замовлення);
+• orders — замовлення листа (`_orders_of`: подія хронології CRM з `related_order_id`, а без неї — номер у темі,
+  тексті чи вкладенні, `crm_link.find_order`, як рядок 🔗 над листом) → документи з нього копіюються в
+  media/orders/{джерело}/{номер}/ («📄 Документи замовлення» в картці замовлення);
 • all — ще й проєкти, до яких підтверджено гілку чи лист (`projects.ProjectLink`) → «📎 Документи й посилання»
   проєкту (`rag_assistant.knowledge_items.add_file`: власник — власник скриньки, видно тим, хто бачить проєкт).
 Документи — `DOC_TYPES` (PDF, Word, Excel, CSV, TXT, XML, ZIP…), без картинок (логотипи в підписах) і вкладень,
@@ -12,7 +12,9 @@
 сигналу): файл, який людина видалила з документів, наступна прив'язка листа не повертає.
 
 Хто викликає — сигнали email_assistant/signals.py: новий лист, подія CRM із замовленням (і `relink_email_crm`),
-підтверджена гілка / лист проєкту; `save_recent` — «📥 Зберегти з листів за 30 днів» у «⋯ Ще».
+підтверджена гілка / лист проєкту; `start_recent` — «📥 Зберегти вкладення за 30 днів» у «⋯ Ще» (у фоні, хід —
+`state`): листи з документами, що прийшли раніше; ще не прив'язані до замовлення — спершу `link_message_to_crm`
+(лист з'являється й у хронології клієнта).
 """
 import copy
 import datetime
@@ -20,6 +22,8 @@ import hashlib
 import logging
 import os
 import re
+import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -33,9 +37,18 @@ DOC_TYPES = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'xlsm', 'odt', 'ods', 'rtf', '
 FILE_MAX_MB = 25
 NAME_MAX = 150
 RECENT_DAYS = 30
-RECENT_MAX = 500           # листів за одне «📥 Зберегти з листів за N днів»
+RECENT_MAX = 500           # листів з документами за одне «📥 Зберегти вкладення за N днів»
 THREAD_MAX = 200           # листів гілки, щойно підтвердженої в проєкті
+PROGRESS_EVERY = 10        # листів між оновленнями стану
+STALE_SECONDS = 180        # стільки без оновлення — збереження перервалось (перезапуск сервера)
+BACKGROUND = True          # тести — False: усе в тому самому потоці
 _BAD_CHARS = re.compile(r'[\x00-\x1f<>:"/\\|?*]')   # і для локальної копії на Windows
+_local = threading.local()
+
+
+def busy() -> bool:
+    """Іде `save_recent` у цьому потоці — сигнали не дублюють його роботу (і його лічильники)."""
+    return getattr(_local, 'busy', False)
 
 
 def mode_of(user_id) -> str:
@@ -117,12 +130,26 @@ def _write(folder: Path, name: str, data: bytes):
     os.replace(tmp, folder / name)
 
 
-def _orders_of(msg) -> list:
+def _linked_order_ids(msg) -> set:
     from crm.models import CustomerTimeline
+    return set(CustomerTimeline.objects.filter(email_message=msg, related_order_id__isnull=False)
+               .values_list('related_order_id', flat=True))
+
+
+def _orders_of(msg) -> list:
+    """Замовлення листа: з хронології CRM; лист туди не потрапив (клієнта не знайдено, внутрішнє пересилання) —
+    номер у темі, тексті чи вкладенні, як рядок 🔗 над листом."""
     from sales.models import SalesOrder
-    ids = set(CustomerTimeline.objects.filter(email_message=msg, related_order_id__isnull=False)
-              .values_list('related_order_id', flat=True))
-    return list(SalesOrder.objects.filter(pk__in=ids).order_by('pk')) if ids else []
+    ids = _linked_order_ids(msg)
+    if ids:
+        return list(SalesOrder.objects.filter(pk__in=ids).order_by('pk'))
+    from email_assistant.crm_link import find_order
+    try:
+        order = find_order(msg.subject or '', msg.body_text or '', message=msg)
+    except Exception as e:  # noqa: BLE001 — нечитабельний лист: без замовлення
+        logger.info('attachment docs: order of message %s: %s', msg.pk, e)
+        return []
+    return [order] if order is not None else []
 
 
 def _projects_of(msg) -> list:
@@ -152,12 +179,17 @@ def _project_has(project, sha) -> bool:
     return KnowledgeItem.objects.filter(project=project, file_sha256='sha256:' + sha).exists()
 
 
+def _skipped(msg) -> bool:
+    from email_assistant.models import EmailMessage
+    return (msg is None or msg.is_spam or msg.is_deleted
+            or msg.folder in (EmailMessage.FOLDER_SPAM, EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_TRASH))
+
+
 def save_for_message(msg, mode=None) -> dict:
     """Документи листа → документи його замовлень (і проєктів для «all»). → {'orders', 'projects', 'already'}"""
     from email_assistant.models import EmailMessage
     out = {'orders': 0, 'projects': 0, 'already': 0}
-    if (msg is None or msg.is_spam or msg.is_deleted
-            or msg.folder in (EmailMessage.FOLDER_SPAM, EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_TRASH)):
+    if _skipped(msg):
         return out
     raw = copy.deepcopy(list(msg.attachments or []))
     docs = [att for att in raw if is_document(att)]
@@ -246,28 +278,81 @@ def project_linked(link_pk) -> dict:
     return total
 
 
-def save_recent(user, days=RECENT_DAYS) -> dict:
-    """«📥 Зберегти з листів за N днів»: листи скриньок людини з вкладеннями, прив'язані до замовлення / проєкту."""
-    from django.db.models import Q
-
-    from crm.models import CustomerTimeline
+def save_recent(user, days=RECENT_DAYS, progress=None) -> dict:
+    """«📥 Зберегти вкладення за N днів»: листи скриньок людини з документами. Ще не прив'язаний до замовлення —
+    спершу в хронологію CRM (`link_message_to_crm` бачить номер і у вкладенні), далі `save_for_message`."""
+    from email_assistant.crm_link import link_message_to_crm
     from email_assistant.models import EmailMessage, EmailSettings
-    from projects.models import ProjectLink
     mode = EmailSettings.get_for_user(user).attachments_to_docs
-    total = {'orders': 0, 'projects': 0, 'already': 0, 'messages': 0, 'mode': mode}
+    total = {'orders': 0, 'projects': 0, 'already': 0, 'messages': 0, 'linked': 0, 'total': 0, 'mode': mode}
     if mode not in (ORDERS, ALL):
         return total
     since = timezone.now() - datetime.timedelta(days=int(days))
-    linked = Q(pk__in=CustomerTimeline.objects.filter(email_message__isnull=False, related_order_id__isnull=False)
-               .values('email_message_id'))
-    if mode == ALL:
-        confirmed = ProjectLink.objects.filter(status=ProjectLink.CONFIRMED)
-        linked |= (Q(thread_id__in=confirmed.exclude(thread=None).values('thread_id'))
-                   | Q(pk__in=confirmed.exclude(message=None).values('message_id')))
-    qs = (EmailMessage.objects.filter(linked, account__user=user, sent_at__gte=since)
-          .exclude(attachments=[]).select_related('account').order_by('-sent_at')[:RECENT_MAX])
-    for msg in qs:
-        total['messages'] += 1
-        for k, v in save_for_message(msg, mode).items():
-            total[k] += v
+    qs = (EmailMessage.objects.filter(account__user=user, sent_at__gte=since, is_spam=False, is_deleted=False)
+          .exclude(folder__in=(EmailMessage.FOLDER_SPAM, EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_TRASH))
+          .exclude(attachments=[]).select_related('account').order_by('-sent_at'))
+    msgs = [m for m in qs.iterator(chunk_size=200) if any(is_document(a) for a in m.attachments or [])]
+    msgs = msgs[:RECENT_MAX]
+    total['total'] = len(msgs)
+    _local.busy = True
+    try:
+        for i, msg in enumerate(msgs, 1):
+            if not _linked_order_ids(msg):
+                link_message_to_crm(msg)
+                if _linked_order_ids(msg):
+                    total['linked'] += 1
+            for k, v in save_for_message(msg, mode).items():
+                total[k] += v
+            total['messages'] = i
+            if progress and i % PROGRESS_EVERY == 0:
+                progress(dict(total))
+    finally:
+        _local.busy = False
     return total
+
+
+# ── «📥 Зберегти вкладення за 30 днів» у фоні ─────────────────────────────────
+
+def _key(user_id) -> str:
+    return f'attachment-docs-recent:{user_id}'
+
+
+def _set_state(user_id, **st):
+    from core.shared_cache import cache
+    cache.set(_key(user_id), {**st, 'at': time.time()}, 24 * 3600)
+
+
+def state(user) -> dict:
+    """Хід збереження людини: running, messages / total, orders, projects, already, linked, error, done."""
+    from core.shared_cache import cache
+    st = dict(cache.get(_key(user.pk)) or {})
+    if st.get('running') and time.time() - st.get('at', 0) > STALE_SECONDS:
+        st.update(running=False, error='Збереження зупинилось — мабуть, сервер перезапускався. Запустіть ще раз.')
+    st.pop('at', None)
+    return st
+
+
+def start_recent(user, days=RECENT_DAYS) -> bool:
+    """Запустити `save_recent` у фоні. False — уже йде."""
+    from django.db import connection
+    if state(user).get('running'):
+        return False
+    uid = user.pk
+    _set_state(uid, running=True, messages=0, total=0)
+
+    def run():
+        try:
+            result = save_recent(user, days, progress=lambda st: _set_state(uid, running=True, **st))
+            _set_state(uid, running=False, done=True, **result)
+        except Exception as e:  # noqa: BLE001
+            logger.exception('attachment docs for user %s: %s', uid, e)
+            _set_state(uid, running=False, error=f'Збереження перервано ({type(e).__name__})')
+        finally:
+            if BACKGROUND:
+                connection.close()
+
+    if BACKGROUND:
+        threading.Thread(target=run, daemon=True).start()
+    else:
+        run()
+    return True

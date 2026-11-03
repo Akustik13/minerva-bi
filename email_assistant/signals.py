@@ -91,8 +91,9 @@ def _attachments_to_docs(message_pk):
 
     def run():
         try:
-            from email_assistant.attachment_docs import save_message_pk
-            save_message_pk(message_pk)
+            from email_assistant.attachment_docs import busy, save_message_pk
+            if not busy():          # «📥 Зберегти вкладення за 30 днів» зробить це сам
+                save_message_pk(message_pk)
         except Exception as exc:  # noqa: BLE001 — збій копії не ламає листа
             logger.warning('attachment docs for message %s: %s', message_pk, exc)
     transaction.on_commit(run)

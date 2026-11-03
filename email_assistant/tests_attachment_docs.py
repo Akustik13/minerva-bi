@@ -166,25 +166,60 @@ class AttachmentDocsTests(TestCase):
         self._mail(self._att('Drawing.pdf', pdf_bytes('drawing')), subject='Filter', thread=thread)
         self.assertFalse(KnowledgeItem.objects.filter(project=project).exists())
 
-    def test_save_recent_and_views(self):
+    def _recent(self):
+        """«📥 Зберегти вкладення за 30 днів» (у тестах — без фонового потоку) → стан після завершення."""
         from config.models import SystemSettings
+        from core.shared_cache import cache
         SystemSettings.objects.update_or_create(pk=1, defaults={'is_onboarding_complete': True})
-        self._mail(self._att(ABD_NAME, self.abd))                    # прийшов, коли було вимкнено
+        cache.delete(attachment_docs._key(self.user.pk))
         self.client.force_login(self.user)
-        r = self.client.post('/email/attachments-to-docs/', {'days': '30'})
-        self.assertFalse(r.json()['ok'])
+        old, attachment_docs.BACKGROUND = attachment_docs.BACKGROUND, False
+        try:
+            with self.captureOnCommitCallbacks(execute=True):
+                started = self.client.post('/email/attachments-to-docs/', {'days': '30'}).json()
+        finally:
+            attachment_docs.BACKGROUND = old
+        if not started['ok']:
+            return started
+        return self.client.get('/email/attachments-to-docs/').json()
+
+    def test_save_recent_and_views(self):
+        msg = self._mail(self._att(ABD_NAME, self.abd))              # прийшов, коли було вимкнено
+        EmailMessage.objects.filter(pk=msg.pk).update(sent_at=datetime.now(dt_tz.utc))
+        self.assertFalse(self._recent()['ok'])
         r = self.client.post('/email/settings/toggle/', json.dumps({'field': 'attachments_to_docs',
                                                                     'value': 'orders'}),
                              content_type='application/json')
         self.assertTrue(r.json()['ok'])
-        msg =EmailMessage.objects.get(subject=SUBJECT)
-        EmailMessage.objects.filter(pk=msg.pk).update(sent_at=datetime.now(dt_tz.utc))
-        r = self.client.post('/email/attachments-to-docs/', {'days': '30'})
-        d = r.json()
-        self.assertEqual((d['ok'], d['messages'], d['orders'], d['already']), (True, 1, 1, 0))
+        d = self._recent()
+        self.assertEqual((d['ok'], d['running'], d['total'], d['orders'], d['already'], d['linked']),
+                         (True, False, 1, 1, 0, 0))
         self.assertEqual(self._files(), [ABD_NAME])
-        r = self.client.post('/email/attachments-to-docs/', {'days': '30'})
-        self.assertEqual((r.json()['orders'], r.json()['already']), (0, 0))   # уже позначено «saved»
+        d = self._recent()
+        self.assertEqual((d['orders'], d['already']), (0, 0))       # уже позначено «saved»
+
+    def test_mail_from_before_the_update_is_linked_and_saved(self):
+        """Як на сервері: ABD прийшов до оновлення — у хронології CRM його немає, кнопка прив'язує й зберігає."""
+        from crm.models import CustomerTimeline
+        msg = self._mail(self._att(ABD_NAME, self.abd))
+        EmailMessage.objects.filter(pk=msg.pk).update(sent_at=datetime.now(dt_tz.utc))
+        CustomerTimeline.objects.filter(email_message=msg).delete()
+        self._mode(attachment_docs.ORDERS)
+        d = self._recent()
+        self.assertEqual((d['total'], d['linked'], d['orders']), (1, 1, 1))
+        self.assertEqual(self._files(), [ABD_NAME])
+        self.assertEqual(CustomerTimeline.objects.get(email_message=msg).related_order_id, self.order.pk)
+
+    def test_order_without_crm_customer(self):
+        """Замовлення без клієнта CRM — у хронологію лист не йде, а документ у замовлення — так (номер у PDF)."""
+        from crm.models import CustomerTimeline
+        self.order.customer_key, self.order.email = '', ''
+        self.order.save()
+        self.diwakar.delete()
+        self._mode(attachment_docs.ORDERS)
+        msg = self._mail(self._att(ABD_NAME, self.abd))
+        self.assertFalse(CustomerTimeline.objects.filter(email_message=msg).exists())
+        self.assertEqual(self._files(), [ABD_NAME])
 
     def test_safe_name(self):
         self.assertEqual(attachment_docs.safe_name('..\\..\\C:\\x\\Rechnung..pdf'), 'Rechnung.pdf')

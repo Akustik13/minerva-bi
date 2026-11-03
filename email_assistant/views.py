@@ -2477,19 +2477,21 @@ def settings_toggle_view(request):
 
 
 @staff_member_required
-@require_POST
 def attachments_to_docs_view(request):
-    """«📥 Зберегти з листів за 30 днів»: вкладення вже прив'язаних листів своїх скриньок → документи замовлень
-    / проєктів (email_assistant/attachment_docs.py; що саме — як вибрано в «📎 Вкладення → документи»)."""
+    """«📥 Зберегти вкладення за 30 днів»: POST — запустити у фоні (листи своїх скриньок з документами → документи
+    замовлень / проєктів, email_assistant/attachment_docs.py), GET — хід."""
     from email_assistant import attachment_docs
+    from email_assistant.models import EmailSettings
+    if request.method != 'POST':
+        return JsonResponse({'ok': True, **attachment_docs.state(request.user)})
+    if EmailSettings.get_for_user(request.user).attachments_to_docs == attachment_docs.OFF:
+        return JsonResponse({'ok': False, 'error': 'Спершу виберіть, куди зберігати вкладення'})
     try:
         days = max(1, min(int(request.POST.get('days') or attachment_docs.RECENT_DAYS), 365))
     except ValueError:
         days = attachment_docs.RECENT_DAYS
-    result = attachment_docs.save_recent(request.user, days)
-    if result['mode'] == attachment_docs.OFF:
-        return JsonResponse({'ok': False, 'error': 'Спершу виберіть, куди зберігати вкладення'})
-    return JsonResponse({'ok': True, 'days': days, **result})
+    started = attachment_docs.start_recent(request.user, days)
+    return JsonResponse({'ok': True, 'started': started, **attachment_docs.state(request.user)})
 
 
 @staff_member_required
