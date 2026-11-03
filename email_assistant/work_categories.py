@@ -2,15 +2,18 @@
 email_assistant/work_categories.py — свої категорії листів (DigiKey, Інтернет-магазин…).
 
 Друга ознака листа поруч із типом співрозмовника (categorize.py: клієнт / постачальник / сервіс):
-тип відповідає «хто пише», своя категорія — «з якої роботи лист». Лист потрапляє в першу за порядком
-категорію, правила якої підходять:
-  ✋ гілку віднесено вручну (EmailThread.work_category) — має пріоритет;
+тип відповідає «хто пише», своя категорія — «з якої роботи лист». Лист потрапляє в КОЖНУ категорію,
+правила якої підходять (EmailMessage.work_categories): ABD митного брокера про замовлення DigiKey —
+і «DigiKey» (номер замовлення), і «Митниця» (відправник):
+  ✋ додано до гілки вручну (EmailThread.work_categories, основна — EmailThread.work_category);
   ✉️ відправник / наш адресат: адреса, @домен або частина домену (MailCategory.senders);
   🔤 слово в темі;
   📮 скринька (усі листи shop@…);
   🧾 у листі номер / трек-номер замовлення з джерел категорії (і, за галочкою, покупець цих джерел);
-  ⎘ інакше — категорія інших листів тієї ж гілки (відповідь на лист DigiKey теж DigiKey).
-Час на категорію в askDANTE — worktime/mail_time.py.
+  ⎘ жодна не підходить — категорії інших листів тієї ж гілки (відповідь на лист DigiKey теж DigiKey).
+«Лише ці» (EmailThread.work_categories_only) — гілка лише в категоріях, вибраних вручну, правила не додають.
+Основна категорія (EmailMessage.work_category) — вибрана вручну для гілки, інакше перша за порядком; за нею
+рахується час askDANTE (worktime/mail_time.py), лист без жодної — «Без своєї категорії».
 """
 import logging
 import threading
@@ -42,9 +45,14 @@ class Rules:
                 'by_customer': c.by_customer_orders,
             })
         self.by_pk = {it['cat'].pk: it['cat'] for it in self.items}
+        self.rank = {pk: i for i, pk in enumerate(self.by_pk)}   # порядок категорій (order, назва)
 
     def __bool__(self):
         return bool(self.items)
+
+    def ordered(self, ids) -> list:
+        """Активні категорії з `ids` за порядком."""
+        return [self.by_pk[i] for i in sorted({i for i in ids if i in self.by_pk}, key=self.rank.get)]
 
 
 def sender_matches(address: str, rule: str) -> bool:
@@ -116,72 +124,176 @@ def match(em, rules=None):
     return hit[0] if hit else None
 
 
-def explain(em) -> dict:
-    """Чому лист у своїй категорії (або чому ні) — для «🔍 Чому тут» у скриньці.
-    → {category, how (thread / sender / word / account / order / customer / inherit / ''), rule, contact, text,
-       also (інші категорії, що теж підходять), expected (що дасть перерахунок), stale}"""
-    rules = Rules()
-    hits = list(_hits(em, rules)) if rules else []
+def matches(em, rules=None) -> list:
+    """Усі свої категорії, правила яких підходять до листа (без гілки), за порядком."""
+    rules = rules if rules is not None else Rules()
+    return [h[0] for h in _hits(em, rules)] if rules else []
+
+
+def in_category(ids):
+    """Умова «лист у цій категорії (цих категоріях)» — основна або будь-яка з усіх категорій листа."""
+    from django.db.models import Q
+    from email_assistant.models import EmailMessage
+    ids = [ids] if isinstance(ids, int) else [getattr(i, 'pk', i) for i in ids]
+    through = EmailMessage.work_categories.through
+    return Q(work_category_id__in=ids) | Q(pk__in=through.objects.filter(mailcategory_id__in=ids)
+                                           .values('emailmessage_id'))
+
+
+def thread_manual(thread, rules) -> dict:
+    """Вибране людиною для гілки: {primary — основна вручну, cats — категорії вручну (з основною), only}."""
+    if thread is None:
+        return {'primary': None, 'cats': [], 'only': False}
+    ids = {c.pk for c in thread.work_categories.all()}
+    if thread.work_category_id:
+        ids.add(thread.work_category_id)
+    return {'primary': rules.by_pk.get(thread.work_category_id), 'cats': rules.ordered(ids),
+            'only': thread.work_categories_only}
+
+
+def _inherited(em, rules):
+    """(основна, усі) найновішого іншого листа гілки, що має категорію — відповідь на лист DigiKey теж DigiKey."""
+    from email_assistant.models import EmailMessage
+    other = (EmailMessage.objects.filter(thread_id=em.thread_id, work_category__in=list(rules.by_pk))
+             .exclude(pk=em.pk).order_by('-sent_at').first())
+    if other is None:
+        return None, []
+    ids = set(other.work_categories.values_list('pk', flat=True)) | {other.work_category_id}
+    return rules.by_pk.get(other.work_category_id), rules.ordered(ids)
+
+
+def resolve_all(em, rules=None):
+    """(основна, [усі категорії за порядком]) з урахуванням гілки: вручну для гілки + усі правила, що підходять
+    («лише ці» — лише вручну); нічого — як інші листи гілки. Основна — вибрана вручну, інакше перша за порядком."""
+    rules = rules if rules is not None else Rules()
+    if not rules:
+        return None, []
     thread = em.thread if em.thread_id else None
-    out = {'category': em.work_category if em.work_category_id else None, 'how': '', 'rule': '', 'contact': '',
-           'text': '', 'also': []}
-    if thread is not None and thread.work_category_id in rules.by_pk:
-        out.update(how='thread', text=f'✋ Гілку віднесено до «{rules.by_pk[thread.work_category_id].label}» '
-                                      'вручну — для неї це важливіше за правила')
-        out['also'] = [h[0] for h in hits if h[0].pk != thread.work_category_id]
-    elif hits:
-        cat, how, rule, contact = hits[0]
-        text = {
-            'sender': f'✉️ співрозмовник {contact} підходить під правило «{rule}» (Відправники)',
-            'word': f'🔤 у темі є «{rule}» (Слова в темі)',
-            'account': f'📮 лист у скриньці {em.account.email_address} (Усі листи скриньки)' if em.account_id else '',
-            'order': f'🧾 у листі номер або трек-номер замовлення з джерела {rule}',
-            'customer': f'🧾 співрозмовник замовляв через {rule} (і листи покупців цих джерел)',
-        }[how]
-        out.update(how=how, rule=rule, contact=contact, text=text)
-        out['also'] = [h[0] for h in hits[1:]]
-    elif out['category'] is not None:
-        out.update(how='inherit', text='↪ як інші листи цієї гілки (сам лист під правила не підходить)')
-    else:
-        out['text'] = 'Жодне правило своїх категорій не підходить'
-    expected = resolve(em, rules) if rules else None
-    out['expected'] = expected
-    out['stale'] = (expected.pk if expected else None) != em.work_category_id
-    return out
+    manual = thread_manual(thread, rules)
+    ids = {c.pk for c in manual['cats']}
+    if not manual['only']:
+        ids |= {c.pk for c in matches(em, rules)}
+        if not ids and thread is not None:
+            return _inherited(em, rules)
+    cats = rules.ordered(ids)
+    return (manual['primary'] or (cats[0] if cats else None)), cats
 
 
 def resolve(em, rules=None):
-    """Категорія з урахуванням гілки: вручну для гілки → правила → інші листи гілки."""
-    rules = rules if rules is not None else Rules()
+    """Основна категорія з урахуванням гілки (див. resolve_all)."""
+    return resolve_all(em, rules)[0]
+
+
+def _reason_text(em, how, rule, contact) -> str:
+    return {
+        'sender': f'✉️ співрозмовник {contact} підходить під правило «{rule}» (Відправники)',
+        'word': f'🔤 у темі є «{rule}» (Слова в темі)',
+        'account': f'📮 лист у скриньці {em.account.email_address} (Усі листи скриньки)' if em.account_id else '',
+        'order': f'🧾 у листі номер або трек-номер замовлення з джерела {rule}',
+        'customer': f'🧾 співрозмовник замовляв через {rule} (і листи покупців цих джерел)',
+    }[how]
+
+
+def explain(em) -> dict:
+    """Чому лист у своїх категоріях (або чому ні) — для «🔍 Чому тут» у скриньці.
+    → {category (основна зараз), categories [{cat, primary, has, will, manual, how, rule, contact, text, reasons}]
+       — категорії листа зараз і після перерахунку з причинами, expected / expected_all (що дасть перерахунок),
+       stale, manual {primary, cats, only}; для основної за чинними правилами — how / rule / contact / text,
+       also (інші категорії листа)}"""
+    rules = Rules()
+    hits = list(_hits(em, rules)) if rules else []
     thread = em.thread if em.thread_id else None
-    if thread is not None and thread.work_category_id:
-        cat = rules.by_pk.get(thread.work_category_id)
-        if cat is not None:
-            return cat
-    cat = match(em, rules)
-    if cat is not None or thread is None:
-        return cat
+    manual = thread_manual(thread, rules)
+    expected, expected_all = resolve_all(em, rules)
+    current = set(em.work_categories.values_list('pk', flat=True)) if em.pk else set()
+    if em.work_category_id:
+        current.add(em.work_category_id)
+    first_hit = {}
+    for h in hits:
+        first_hit.setdefault(h[0].pk, h)
+    manual_ids = {c.pk for c in manual['cats']}
+    inherited = bool(expected_all) and not manual_ids and not hits
+    items = []
+    for cat in rules.ordered(current | {c.pk for c in expected_all}):
+        will = cat in expected_all
+        reasons, how, rule, contact = [], '', '', ''
+        if cat.pk in manual_ids:
+            how = 'thread'
+            reasons.append('⭐ основна для гілки — вибрано вручну' if manual['primary'] == cat
+                           else '✋ додано до гілки вручну')
+        h = first_hit.get(cat.pk)
+        if h is not None:
+            if not how:
+                how, rule, contact = h[1], h[2], h[3]
+            reasons.append(_reason_text(em, h[1], h[2], h[3]) + (' — але гілка лише в категоріях, вибраних вручну'
+                                                                 if manual['only'] and cat.pk not in manual_ids else ''))
+        if inherited and will:
+            how = how or 'inherit'
+            reasons.append('↪ як інші листи цієї гілки (сам лист під правила не підходить)')
+        if not will:
+            reasons.append('після перерахунку вийде з цієї категорії')
+        items.append({'cat': cat, 'primary': cat.pk == em.work_category_id, 'has': cat.pk in current, 'will': will,
+                      'expected_primary': cat == expected, 'manual': cat.pk in manual_ids, 'how': how, 'rule': rule,
+                      'contact': contact, 'text': reasons[0] if reasons else '', 'reasons': reasons})
+    items.sort(key=lambda it: (not it['primary'], not it['has'], rules.rank.get(it['cat'].pk, 0)))
+    out = {'category': em.work_category if em.work_category_id else None, 'categories': items,
+           'expected': expected, 'expected_all': expected_all, 'manual': manual,
+           'stale': ((expected.pk if expected else None) != em.work_category_id
+                     or {c.pk for c in expected_all} != current),
+           'how': '', 'rule': '', 'contact': '', 'text': '',
+           'also': [c for c in expected_all if c != expected]}
+    main = next((it for it in items if it['cat'] == expected), None)
+    if main is not None:
+        out.update(how=main['how'], rule=main['rule'], contact=main['contact'], text=main['text'])
+    elif manual['only'] and not manual['cats']:
+        out['text'] = '✋ гілку вручну залишено без своєї категорії («↺ За правилами» — повернути)'
+    else:
+        out['text'] = 'Жодне правило своїх категорій не підходить'
+    return out
+
+
+def _stored(em, fresh=False):
+    """(основна, {усі}) листа, як зараз у базі (у перерахунку — з prefetch)."""
     from email_assistant.models import EmailMessage
-    other = (EmailMessage.objects.filter(thread_id=em.thread_id, work_category__in=list(rules.by_pk))
-             .exclude(pk=em.pk).order_by('-sent_at').values_list('work_category_id', flat=True).first())
-    return rules.by_pk.get(other)
+    if fresh:
+        primary = EmailMessage.objects.filter(pk=em.pk).values_list('work_category_id', flat=True).first()
+        ids = set(EmailMessage.work_categories.through.objects.filter(emailmessage_id=em.pk)
+                  .values_list('mailcategory_id', flat=True))
+        return primary, ids
+    return em.work_category_id, {c.pk for c in em.work_categories.all()}
+
+
+def _store(pks, primary_id, ids):
+    """Записати основну й усі категорії листам `pks` (рівно ці — зайві прибираються)."""
+    from email_assistant.models import EmailMessage
+    through = EmailMessage.work_categories.through
+    EmailMessage.objects.filter(pk__in=pks).update(work_category_id=primary_id)
+    through.objects.filter(emailmessage_id__in=pks).exclude(mailcategory_id__in=list(ids)).delete()
+    if ids:
+        through.objects.bulk_create([through(emailmessage_id=pk, mailcategory_id=i) for pk in pks for i in ids],
+                                    ignore_conflicts=True)
 
 
 def assign(em, rules=None) -> bool:
-    """Поставити своя категорію листу (сигнал нового листа); True — змінилась."""
+    """Поставити свої категорії листу (сигнал нового листа, перерахунок); True — змінились."""
     from email_assistant.models import EmailMessage
     try:
-        cat = resolve(em, rules)
+        primary, cats = resolve_all(em, rules)
     except Exception as e:  # noqa: BLE001 — правила не повинні зламати збереження листа
         logger.error('work category %s: %s', em.pk, e)
         return False
-    new = cat.pk if cat else None
-    if new == em.work_category_id:
+    new, ids = (primary.pk if primary else None), {c.pk for c in cats}
+    if (new, ids) == _stored(em):
         return False
-    EmailMessage.objects.filter(pk=em.pk).update(work_category_id=new)
+    if (new, ids) == _stored(em, fresh=True):   # prefetch застарів: лист уже оновлено разом з гілкою
+        return False
+    _store([em.pk], new, ids)
     em.work_category_id = new
-    if new and em.thread_id:   # решта гілки без категорії — туди ж
-        EmailMessage.objects.filter(thread_id=em.thread_id, work_category=None).update(work_category_id=new)
+    if new and em.thread_id:   # решта гілки без жодної категорії — туди ж
+        rest = list(EmailMessage.objects.filter(thread_id=em.thread_id, work_category=None).exclude(pk=em.pk)
+                    .values_list('pk', flat=True))
+        if rest:
+            _store(rest, new, ids)
     return True
 
 
@@ -190,7 +302,8 @@ def recompute(qs, rules=None, progress=None) -> int:
     rules = rules if rules is not None else Rules()
     changed = 0
     done = 0
-    for em in qs.select_related('thread').order_by('sent_at').iterator(chunk_size=500):
+    for em in (qs.select_related('thread').prefetch_related('work_categories', 'thread__work_categories')
+               .order_by('sent_at').iterator(chunk_size=500)):
         if assign(em, rules):
             changed += 1
         done += 1
@@ -295,42 +408,146 @@ def _remove_line(cat, key: str) -> bool:
     return True
 
 
-def set_for_message(em, category, scope: str = 'sender') -> dict:
-    """Віднести лист до своєї категорії (або category=None — забрати).
-    scope: sender — адреса співрозмовника стає правилом категорії; domain — весь @домен;
-    thread — лише ця гілка (вручну). Перераховує листи, яких це стосується."""
+def _add_line(cat, key: str):
+    if key not in cat.lines('senders'):
+        cat.senders = '\n'.join([ln for ln in (cat.senders or '').splitlines() if ln.strip()] + [key])
+        cat.save(update_fields=['senders'])
+
+
+def _set_thread(thread_id, primary=..., cats=None, add=(), drop=(), only=None):
+    """Змінити вибране вручну для гілки: основну, увесь набір (cats), додати / прибрати категорії, «лише ці»."""
+    from email_assistant.models import EmailThread
+    if not thread_id:
+        return
+    thread = EmailThread.objects.get(pk=thread_id)
+    fields = []
+    if primary is not ...:
+        thread.work_category = primary
+        fields.append('work_category')
+    if only is not None:
+        thread.work_categories_only = only
+        fields.append('work_categories_only')
+    if fields:
+        thread.save(update_fields=fields)
+    if cats is not None:
+        thread.work_categories.set(cats)
+    if add:
+        thread.work_categories.add(*add)
+    if drop:
+        thread.work_categories.remove(*drop)
+        if thread.work_category in drop:
+            EmailThread.objects.filter(pk=thread_id).update(work_category=None)
+
+
+def _messages_of(em, key: str = ''):
+    """Кого перерахувати: гілка листа + листи співрозмовника (адреса / домен правила)."""
     from django.db.models import Q
-    from email_assistant.models import EmailMessage, EmailThread, MailCategory
-    from email_assistant.crm_link import own_addresses
-    contacts = _contacts(em, own_addresses())
-    address = contacts[0] if contacts else ''
-    key = ''
-    if scope == 'thread' or not address:
-        if em.thread_id:
-            EmailThread.objects.filter(pk=em.thread_id).update(work_category=category)
-        scope = 'thread'
-    else:
-        key = '@' + address.split('@', 1)[1] if scope == 'domain' else address
-        for other in MailCategory.objects.all():   # одна адреса — одна категорія
-            if category is None or other.pk != category.pk:
-                _remove_line(other, key)
-        if category is not None and key not in category.lines('senders'):
-            category.senders = '\n'.join([ln for ln in (category.senders or '').splitlines() if ln.strip()] + [key])
-            category.save(update_fields=['senders'])
-        if em.thread_id and category is None:
-            EmailThread.objects.filter(pk=em.thread_id).update(work_category=None)
-    # кого перерахувати: гілка + листи цього співрозмовника
+    from email_assistant.models import EmailMessage
     cond = Q(thread_id=em.thread_id) if em.thread_id else Q(pk=em.pk)
     if key:
         needle = key.lstrip('@')
         cond |= Q(from_email__icontains=needle) | Q(to_emails__icontains=needle) | Q(cc_emails__icontains=needle)
-    qs = EmailMessage.objects.filter(cond, is_deleted=False)
-    if category is None:   # забрали — спершу скинути, правила інших категорій поставлять своє
-        qs.filter(work_category__isnull=False).update(work_category=None)
-    changed = recompute(qs)
+    return EmailMessage.objects.filter(cond, is_deleted=False)
+
+
+def current(em) -> list:
+    """Категорії листа зараз (з бази): основна першою, далі за порядком."""
+    from email_assistant.models import MailCategory
     em.refresh_from_db(fields=['work_category'])
-    return {'key': key or 'гілка', 'scope': scope, 'changed': changed,
-            'category': em.work_category.label if em.work_category_id else ''}
+    cats = list(MailCategory.objects.filter(all_messages=em).order_by('order', 'name'))
+    if em.work_category_id and em.work_category not in cats:
+        cats.insert(0, em.work_category)
+    cats.sort(key=lambda c: c.pk != em.work_category_id)
+    return cats
+
+
+def _result(em, key, scope, mode, changed, pinned=False) -> dict:
+    cats = current(em)
+    return {'key': key or 'гілка', 'scope': scope, 'mode': mode, 'changed': changed, 'pinned': pinned,
+            'category': em.work_category.label if em.work_category_id else '',
+            'categories': [{'pk': c.pk, 'label': c.label, 'color': c.color, 'primary': c.pk == em.work_category_id}
+                           for c in cats]}
+
+
+def set_for_message(em, category, scope: str = 'sender', mode: str = 'add') -> dict:
+    """Віднести лист до своєї категорії. Лист може бути в кількох — нова додається до наявних.
+    scope: sender — адреса співрозмовника стає правилом категорії; domain — весь @домен; thread — лише ця гілка
+    (вручну). mode:
+      add    — додати (зі «лише ці» гілки — ще й до гілки, інакше правило її не покаже);
+      only   — «Лише ця»: адреса / домен — лише в цій категорії (з інших прибирається), гілка — лише в ній;
+      remove — прибрати: з гілки (вручну) і правило цієї адреси / домену з категорії; якщо лист і далі в ній за
+               іншим правилом (замовлення, слово в темі…) — гілка лишається лише в інших своїх категоріях
+               («лише ці», «↺ За правилами» — повернути);
+    category=None — «Без своєї категорії»: адреса / домен — з усіх категорій, гілка — без жодної.
+    Перераховує листи, яких це стосується."""
+    from email_assistant.models import MailCategory
+    from email_assistant.crm_link import own_addresses
+    if category is None:
+        mode = 'clear'
+    contacts = _contacts(em, own_addresses())
+    address = contacts[0] if contacts else ''
+    if scope == 'thread' or not address:
+        scope, key = 'thread', ''
+    else:
+        key = '@' + address.split('@', 1)[1] if scope == 'domain' else address
+    thread = em.thread if em.thread_id else None
+    if mode == 'add':
+        if key:
+            _add_line(category, key)
+        if not key or (thread is not None and thread.work_categories_only):
+            _set_thread(em.thread_id, add=[category])
+    elif mode == 'only':
+        if key:
+            for other in MailCategory.objects.exclude(pk=category.pk):   # адреса — лише в цій категорії
+                _remove_line(other, key)
+            _add_line(category, key)
+        _set_thread(em.thread_id, primary=category, cats=[category], only=True)
+    elif mode == 'remove':
+        if key:
+            _remove_line(category, key)
+        _set_thread(em.thread_id, drop=[category])
+    else:   # clear
+        if key:
+            for other in MailCategory.objects.all():
+                _remove_line(other, key)
+        _set_thread(em.thread_id, primary=None, cats=[])
+    if thread is None and not key and mode in ('add', 'only'):   # лист без гілки й без правила — прямо листу
+        from email_assistant.models import EmailMessage
+        if mode == 'only' or not em.work_category_id:
+            _store([em.pk], category.pk, {category.pk})
+        else:
+            EmailMessage.work_categories.through.objects.get_or_create(emailmessage_id=em.pk,
+                                                                       mailcategory_id=category.pk)
+        return _result(em, key, scope, mode, 1)
+    changed = recompute(_messages_of(em, key))
+    pinned = False
+    if mode in ('remove', 'clear') and em.thread_id:
+        left = current(em)
+        held = (category in left) if mode == 'remove' else bool(left)
+        if held:   # тримає інше правило — гілка лишається лише в інших своїх категоріях (тепер вибраних вручну)
+            keep = [c for c in left if c != category] if mode == 'remove' else []
+            primary = em.work_category if em.work_category_id and em.work_category != category else None
+            _set_thread(em.thread_id, primary=primary if keep else None, cats=keep, only=True)
+            changed += recompute(_messages_of(em))
+            pinned = True
+    return _result(em, key, scope, mode, changed, pinned)
+
+
+def set_primary(em, category) -> dict:
+    """«⭐ Зробити основною»: основна категорія гілки вручну (за нею час askDANTE); лишається серед категорій листа."""
+    if not em.thread_id:
+        from email_assistant.models import EmailMessage
+        EmailMessage.objects.filter(pk=em.pk).update(work_category=category)
+        EmailMessage.work_categories.through.objects.get_or_create(emailmessage_id=em.pk, mailcategory_id=category.pk)
+        return _result(em, '', 'thread', 'primary', 1)
+    _set_thread(em.thread_id, primary=category, add=[category])
+    return _result(em, '', 'thread', 'primary', recompute(_messages_of(em)))
+
+
+def reset_thread(em) -> dict:
+    """«↺ За правилами»: забути вибране вручну для гілки — категорії лише за правилами."""
+    _set_thread(em.thread_id, primary=None, cats=[], only=False)
+    return _result(em, '', 'thread', 'rules', recompute(_messages_of(em)))
 
 
 def rules_summary(cat) -> list:
@@ -347,18 +564,22 @@ def rules_summary(cat) -> list:
     boxes = [a.email_address for a in cat.accounts.all()]
     if boxes:
         out.append('📮 Усі листи скриньок: ' + ', '.join(boxes))
-    manual = cat.threads.count()
+    from django.db.models import Q
+    from email_assistant.models import EmailThread
+    manual = EmailThread.objects.filter(Q(work_category=cat) | Q(work_categories=cat)).distinct().count()
     if manual:
         out.append(f'✋ Гілок віднесено вручну: {manual}')
     return out or ['Правил немає — лише листи, віднесені вручну']
 
 
 def counts(qs) -> list:
-    """[(категорія, листів, непрочитаних)] для фільтра скриньки."""
+    """[(категорія, листів, непрочитаних)] для фільтра скриньки — лист рахується в кожній своїй категорії."""
     from django.db.models import Count, Q
-    from email_assistant.models import MailCategory
-    rows = {r['work_category']: r for r in qs.order_by().exclude(work_category=None).values('work_category')
-            .annotate(n=Count('id'), unread=Count('id', filter=Q(is_read=False)))}
+    from email_assistant.models import EmailMessage, MailCategory
+    through = EmailMessage.work_categories.through
+    rows = {r['mailcategory']: r for r in through.objects.filter(emailmessage__in=qs.order_by().values('pk'))
+            .values('mailcategory').annotate(n=Count('emailmessage'),
+                                             unread=Count('emailmessage', filter=Q(emailmessage__is_read=False)))}
     return [(c, rows.get(c.pk, {}).get('n', 0), rows.get(c.pk, {}).get('unread', 0))
             for c in MailCategory.objects.filter(is_active=True)]
 

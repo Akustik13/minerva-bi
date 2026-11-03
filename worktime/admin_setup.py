@@ -105,8 +105,8 @@ def categories_page(model_admin, request):
     for cat in MailCategory.objects.filter(is_active=True).select_related("dante__dante_project", "dante__activity"):
         ct = getattr(cat, "dante", None)
         rows.append({"cat": cat, "ct": ct,
-                     "mails": EmailMessage.objects.filter(work_category=cat, sent_at__gte=since, sent_at__lt=until,
-                                                          is_deleted=False).count()})
+                     "mails": EmailMessage.objects.filter(work_categories.in_category([cat.pk]), sent_at__gte=since,
+                                                          sent_at__lt=until, is_deleted=False).count()})
     projects = list(DanteProject.objects.filter(archived=False, gone=False).select_related("parent").order_by("name"))
     context = {
         **model_admin.admin_site.each_context(request), "title": "🗂 Категорії листів → askDANTE", "st": st,

@@ -5,7 +5,7 @@ askDANTE через API записи лише створює (`/timetracking`) �
 старий запис там, а Minerva пише замість нього новий (`replace`, лише коли старого в askDANTE вже немає — без дублів).
 
 Матеріал для опису (`material`): листи скриньок працівника за день і 2 дні перед ним, що стосуються проєкту askDANTE:
-гілки проєктів Minerva з `ProjectMap` на нього, листи своїх категорій з `MailCategoryTime` на нього; якщо таких
+гілки проєктів Minerva з `ProjectMap` на нього, листи своїх категорій з `MailCategoryTime` на нього (будь-якої з категорій листа); якщо таких
 немає — листи, у темі яких є назва проєкту; і зустрічі календаря цього дня. Тексти листів — без цитат.
 """
 from __future__ import annotations
@@ -65,8 +65,9 @@ def material(du: DanteUser, day: datetime.date, dp, days_before: int = DAYS_BEFO
         cond |= Q(thread_id__in=links.exclude(thread=None).values("thread_id"))
         cond |= Q(pk__in=links.exclude(message=None).values("message_id"))
     cats = list(MailCategoryTime.objects.filter(dante_project_id__in=tree).values_list("category_id", flat=True))
-    if cats:
-        cond |= Q(work_category_id__in=cats)
+    if cats:   # лист у будь-якій із цих своїх категорій (не лише основній)
+        from email_assistant.work_categories import in_category
+        cond |= in_category(cats)
     msgs = list(base.filter(cond).order_by("sent_at")[:MAX_MAILS])
     if not msgs:   # без зв'язків — за назвою проєкту в темі
         words = [w for w in re.split(r"[\s/›,()\-]+", dp.name) if len(w) >= 4][:3]

@@ -308,6 +308,23 @@ def _attach_project_tags(emails):
         m.project_tags = tags.get(m.thread_id, [])
 
 
+def _attach_work_cats(emails):
+    """🏷 мітки в рядку: усі свої категорії листа, основна першою (data-wcats — для меню «Віднести до категорії»)."""
+    from email_assistant.models import EmailMessage
+    through = EmailMessage.work_categories.through
+    by_msg = {}
+    for row in (through.objects.filter(emailmessage_id__in=[m.pk for m in emails])
+                .select_related('mailcategory').order_by('mailcategory__order', 'mailcategory__name')):
+        by_msg.setdefault(row.emailmessage_id, []).append(row.mailcategory)
+    for m in emails:
+        cats = by_msg.get(m.pk, [])
+        if m.work_category_id and all(c.pk != m.work_category_id for c in cats):
+            cats = [m.work_category] + cats
+        cats.sort(key=lambda c: c.pk != m.work_category_id)
+        m.wcats = cats
+        m.wcat_ids = ','.join(str(c.pk) for c in cats)
+
+
 def _attach_quote_tags(emails):
     """📝 мітка в рядку: лист схожий на запит пропозиції (offers/detection.py), рішення ще немає."""
     from offers.detection import tags_for_messages
@@ -552,8 +569,9 @@ def inbox_view(request):
         qs = qs.filter(category=cat_filter)
     if work_filter == NO_CATEGORY:
         qs = qs.filter(work_category=None)
-    elif work_filter:
-        qs = qs.filter(work_category=work_filter)
+    elif work_filter:   # лист у кількох категоріях — у кожній
+        from email_assistant.work_categories import in_category
+        qs = qs.filter(in_category([work_filter.pk]))
     if customer_filter:
         from django.db.models import Q as _CQ
         qs = qs.filter(pk__in=EmailMessage.objects.filter(
@@ -590,6 +608,7 @@ def inbox_view(request):
     _attach_crm_customers(emails)
     _attach_contacts(emails)
     _attach_project_tags(emails)
+    _attach_work_cats(emails)
     _attach_quote_tags(emails)
     _attach_kb_tags(emails)
     _attach_logos(emails)
@@ -2346,8 +2365,10 @@ def set_category_view(request, message_pk):
 @staff_member_required
 @require_POST
 def set_work_category_view(request, message_pk):
-    """POST {category: pk | '' | 'new', name, scope: sender|domain|thread}: своя категорія (DigiKey, магазин…).
-    sender / domain — правило категорії для співрозмовника, thread — лише ця гілка (work_categories.py)."""
+    """POST {category: pk | '' | 'new', name, scope: sender|domain|thread, mode: add|only|remove|primary|rules}:
+    свої категорії (DigiKey, магазин…) — лист може бути в кількох. sender / domain — правило категорії для
+    співрозмовника, thread — лише ця гілка; add — додати, only — «лише ця», remove — прибрати, primary —
+    основна для гілки, rules — «↺ За правилами» (work_categories.py)."""
     import json as _json
     from email_assistant import work_categories
     from email_assistant.models import EmailMessage, MailCategory
@@ -2371,7 +2392,15 @@ def set_work_category_view(request, message_pk):
     else:
         category = None
     scope = data.get('scope') if data.get('scope') in ('sender', 'domain', 'thread') else 'sender'
-    result = work_categories.set_for_message(msg, category, scope)
+    mode = data.get('mode') if data.get('mode') in ('add', 'only', 'remove', 'primary', 'rules') else 'add'
+    if mode == 'rules':
+        result = work_categories.reset_thread(msg)
+    elif category is None and mode in ('remove', 'primary'):
+        return JsonResponse({'ok': False, 'error': 'Виберіть категорію'})
+    elif mode == 'primary':
+        result = work_categories.set_primary(msg, category)
+    else:
+        result = work_categories.set_for_message(msg, category, scope, mode)
     return JsonResponse({'ok': True, **result, 'id': msg.work_category_id,
                          'color': msg.work_category.color if msg.work_category_id else ''})
 

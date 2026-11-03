@@ -109,8 +109,15 @@ class EmailThread(models.Model):
         verbose_name='CRM клієнт')
     work_category = models.ForeignKey(
         'MailCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='threads',
-        verbose_name='Своя категорія гілки',
-        help_text='Вибрано вручну для всієї гілки — має пріоритет над правилами категорій')
+        verbose_name='Основна своя категорія гілки',
+        help_text='Вибрано вручну основною для всієї гілки — має пріоритет над порядком категорій; за нею '
+                  'рахується час askDANTE (work_categories.py)')
+    work_categories = models.ManyToManyField(
+        'MailCategory', blank=True, related_name='manual_threads', verbose_name='Свої категорії гілки (вручну)',
+        help_text='Додано вручну для всієї гілки — разом із категоріями за правилами (work_categories.py)')
+    work_categories_only = models.BooleanField(
+        default=False, verbose_name='Лише вибрані вручну',
+        help_text='«Лише ця» або категорію прибрали з гілки: правила не додають гілці інших категорій')
 
     class Meta:
         verbose_name = 'Гілка листування'
@@ -163,8 +170,13 @@ class EmailMessage(models.Model):
         help_text='Визначається автоматично (email_assistant/categorize.py); порожньо — ще не визначено')
     work_category = models.ForeignKey(
         'MailCategory', null=True, blank=True, on_delete=models.SET_NULL, related_name='messages',
-        verbose_name='Своя категорія',
-        help_text='DigiKey, Інтернет-магазин… — за правилами категорії (email_assistant/work_categories.py)')
+        verbose_name='Основна своя категорія',
+        help_text='Основна з категорій листа: вибрана вручну для гілки або перша за порядком; за нею рахується '
+                  'час askDANTE (email_assistant/work_categories.py)')
+    work_categories = models.ManyToManyField(
+        'MailCategory', blank=True, related_name='all_messages', verbose_name='Усі свої категорії',
+        help_text='DigiKey, митний брокер, Інтернет-магазин… — усі категорії листа разом з основною: за правилами '
+                  'й вручну (email_assistant/work_categories.py)')
     imap_folder_name = models.CharField(max_length=200, blank=True, default='', db_index=True,
         verbose_name='Папка IMAP',
         help_text='Оригінальна назва папки на IMAP-сервері (напр. "Meine Order")')
@@ -609,8 +621,8 @@ class EmailCategoryRule(models.Model):
 class MailCategory(models.Model):
     """
     Своя категорія листів (DigiKey, Інтернет-магазин…) — друга ознака поруч із типом співрозмовника
-    (клієнт / постачальник / сервіс). Спільна для всіх скриньок; лист потрапляє в першу за порядком,
-    правила якої підходять. Логіка — email_assistant/work_categories.py; час на неї в askDANTE —
+    (клієнт / постачальник / сервіс). Спільна для всіх скриньок; лист потрапляє в кожну, правила якої
+    підходять (EmailMessage.work_categories), основна — перша за порядком. Логіка — email_assistant/work_categories.py; час на неї в askDANTE —
     worktime (MailCategoryTime).
     """
     name   = models.CharField('Назва', max_length=80)
@@ -618,7 +630,7 @@ class MailCategory(models.Model):
     color  = models.CharField('Колір', max_length=9, default='#1a73e8',
                               help_text='HEX, напр. #e53935')
     order  = models.PositiveSmallIntegerField('Порядок', default=0,
-                                              help_text='Лист, що підходить до кількох, іде в першу.')
+                                              help_text='Лист, що підходить до кількох, — у кожній; основна (за нею час askDANTE) — перша за порядком.')
     is_active = models.BooleanField('Увімкнено', default=True)
     senders = models.TextField(
         'Відправники', blank=True, default='',

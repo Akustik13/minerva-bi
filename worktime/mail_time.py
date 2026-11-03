@@ -115,14 +115,24 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
     from email_assistant.models import EmailAccount, EmailMessage
     start, end = _bounds(date_from, date_to)
     accounts = list(EmailAccount.objects.filter(user_id=du.user_id).values_list("pk", flat=True))
-    msgs = list(EmailMessage.objects.filter(account_id__in=accounts, sent_at__gte=start, sent_at__lt=end,
-                                            is_spam=False, is_deleted=False)
-                .exclude(folder__in=[EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_TRASH])
-                .values("pk", "thread_id", "work_category_id", "folder", "is_read", "sent_at", "subject", "from_email",
-                        "from_name", "to_emails", "cc_emails", "message_id", "body_text").order_by("sent_at", "pk"))
+    base = (EmailMessage.objects.filter(account_id__in=accounts, sent_at__gte=start, sent_at__lt=end,
+                                        is_spam=False, is_deleted=False)
+            .exclude(folder__in=[EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_TRASH]))
+    msgs = list(base.values("pk", "thread_id", "work_category_id", "folder", "is_read", "sent_at", "subject",
+                            "from_email", "from_name", "to_emails", "cc_emails", "message_id", "body_text")
+                .order_by("sent_at", "pk"))
     cats = {c.category_id: c for c in MailCategoryTime.objects.filter(dante_project__isnull=False,
                                                                        category__is_active=True)
             .select_related("dante_project", "activity", "category").prefetch_related("category__sources")}
+    # лист у кількох своїх категоріях рахується один раз: основна з проєктом askDANTE, інакше наступна за порядком
+    other_cat = {}
+    if cats:
+        through = EmailMessage.work_categories.through
+        for mid, cid in (through.objects.filter(emailmessage__in=base.exclude(work_category__in=list(cats))
+                                                .values("pk"), mailcategory_id__in=list(cats))
+                         .order_by("mailcategory__order", "mailcategory__name")
+                         .values_list("emailmessage_id", "mailcategory_id")):
+            other_cat.setdefault(mid, cid)
     projects = _project_targets({m["thread_id"] for m in msgs if m["thread_id"]}, {m["pk"] for m in msgs}) \
         if st.mail_projects else {}
     rows, unmapped, loose, skipped = {}, {}, {}, {}
@@ -169,8 +179,8 @@ def estimate(du: DanteUser, date_from, date_to, st: DanteSettings | None = None)
             project, dp = target
             r = row(day, dp, f"📁 {project.code}", "project", st.mail_projects_auto, st.default_activity)
             r["raw"] += st.mail_reply_minutes if outgoing else st.mail_read_minutes
-        elif m["work_category_id"] in cats:
-            c = cats[m["work_category_id"]]
+        elif m["work_category_id"] in cats or m["pk"] in other_cat:
+            c = cats[m["work_category_id"] if m["work_category_id"] in cats else other_cat[m["pk"]]]
             r = row(day, c.dante_project, c.category.label, "category", c.auto, c.activity or st.default_activity)
             r["raw"] += c.reply_minutes if outgoing else c.read_minutes
         else:
@@ -600,7 +610,8 @@ def binding_hints(cat, limit: int = 5) -> dict:
     from collections import Counter
     from email_assistant.models import EmailMessage
     found = {}
-    threads = list(EmailMessage.objects.filter(work_category=cat).exclude(thread=None)
+    from email_assistant.work_categories import in_category
+    threads = list(EmailMessage.objects.filter(in_category([cat.pk])).exclude(thread=None)
                    .values_list("thread_id", flat=True).distinct()[:500])
     if threads:
         try:

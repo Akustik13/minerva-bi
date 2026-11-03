@@ -384,3 +384,23 @@ class OtherWorkTests(ProjectBase):
         self.assertEqual(r["Location"], back)
         self.assertEqual(book.call_args[1]["attendance"], "fixed")
         self.assertEqual(book.call_args[0][2], self.dp3)
+
+
+class MultiCategoryTimeTests(MailTimeBase):
+    """Лист у двох своїх категоріях рахується один раз: основна з проєктом askDANTE, інакше наступна."""
+
+    def test_counted_once_by_primary_then_next_with_project(self):
+        from email_assistant import work_categories
+        customs = MailCategory.objects.create(name="Митниця", senders="digikey", order=1)
+        dp_c = DanteProject.objects.create(dante_id="99", name="Zoll")
+        ct_c = MailCategoryTime.objects.create(category=customs, dante_project=dp_c, read_minutes=3)
+        m = self.msg()
+        self.assertEqual([c.name for c in work_categories.current(m)], ["DigiKey", "Митниця"])
+        [r] = mail_time.estimate(self.du, MON, MON)[MON]["rows"]
+        self.assertEqual((r["dp"], r["received"]), (self.dp, 1))
+        work_categories.set_primary(m, customs)
+        [r] = mail_time.estimate(self.du, MON, MON)[MON]["rows"]
+        self.assertEqual((r["dp"], r["received"]), (dp_c, 1))
+        ct_c.delete()   # в основної немає проєкту askDANTE — час іде в наступну категорію листа з проєктом
+        [r] = mail_time.estimate(self.du, MON, MON)[MON]["rows"]
+        self.assertEqual((r["dp"], r["received"]), (self.dp, 1))

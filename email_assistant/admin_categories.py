@@ -64,7 +64,8 @@ class MailCategoryAdmin(admin.ModelAdmin):
     @admin.display(description='Листів за 30 днів')
     def mails_col(self, obj):
         since = timezone.now() - datetime.timedelta(days=30)
-        n = EmailMessage.objects.filter(work_category=obj, sent_at__gte=since, is_deleted=False).count()
+        n = EmailMessage.objects.filter(work_categories.in_category([obj.pk]), sent_at__gte=since,
+                                        is_deleted=False).count()
         return format_html('<a href="/email/?wcat={}">{}</a>', obj.pk, n)
 
     @admin.display(description='askDANTE')

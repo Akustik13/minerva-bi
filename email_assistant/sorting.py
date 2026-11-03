@@ -220,7 +220,7 @@ def _drop_card(run, key):
 
 def accept(user, run, key, name, senders=(), words=(), ids=(), existing=None):
     """✓ Прийняти групу: своя категорія (нова або `existing`) з правилами (відправники, слова в темі, джерела
-    замовлень з картки) + вибрані листи в неї (їхні гілки — вручну). → (категорія, змінилось листів)"""
+    замовлень з картки) + вибрані листи в неї (їхні гілки — вручну, до наявних категорій). → (категорія, змінилось листів)"""
     from email_assistant import work_categories
     from email_assistant.models import EmailMessage, EmailThread, MailCategory, MailSortDecision
     card = next((g for g in run.groups if g['key'] == key), None)
@@ -245,7 +245,9 @@ def accept(user, run, key, name, senders=(), words=(), ids=(), existing=None):
         cat.sources.add(*SalesSource.objects.filter(slug__in=card['sources']))
     msgs = EmailMessage.objects.filter(pk__in=ids, account__user=user)
     threads = {m.thread_id for m in msgs if m.thread_id}
-    EmailThread.objects.filter(pk__in=threads, work_category=None).update(work_category=cat)   # ці гілки — сюди
+    through = EmailThread.work_categories.through   # ці гілки — і сюди (вручну; інші категорії лишаються)
+    through.objects.bulk_create([through(emailthread_id=t, mailcategory_id=cat.pk) for t in threads],
+                                ignore_conflicts=True)
     changed = work_categories.recompute(EmailMessage.objects.filter(pk__in=ids) |
                                         EmailMessage.objects.filter(thread_id__in=threads))
     MailSortDecision.objects.create(user=user, key=key, decision=MailSortDecision.ACCEPTED, name=cat.name, category=cat,

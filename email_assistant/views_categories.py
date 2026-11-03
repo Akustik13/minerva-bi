@@ -72,7 +72,7 @@ def layout_view(request):
 
 def _mails(account, cat):
     from email_assistant.views import ALL_FOLDERS, _build_qs
-    return _build_qs(account, ALL_FOLDERS).filter(work_category=cat)
+    return _build_qs(account, ALL_FOLDERS).filter(work_categories.in_category([cat.pk]))
 
 
 def _nav_ordered(user, cats) -> list:
@@ -202,7 +202,7 @@ def message_customer_create_view(request, message_pk):
 
 @staff_member_required
 def message_why_view(request, message_pk):
-    """«🔍 Чому лист тут»: своя категорія й правило, що спрацювало, інші категорії, що теж підходять,
+    """«🔍 Чому лист тут»: усі свої категорії листа (основна — ⭐) і правило кожної, вибране вручну для гілки,
     хто пише (тип співрозмовника — авто чи вручну), клієнт гілки й відкриті проєкти для вибору
     (проєкти гілки браузер бере з /projects/api/thread/<pk>/)."""
     from email_assistant.categorize import counterparts
@@ -238,8 +238,15 @@ def message_why_view(request, message_pk):
         'quote': quote,
         'subject': msg.subject or '', 'category': cat_json(why['category']), 'how': why['how'], 'rule': why['rule'],
         'text': why['text'], 'also': [cat_json(c) for c in why['also']], 'stale': why['stale'],
-        'expected': cat_json(why['expected']),
+        'expected': cat_json(why['expected']), 'expected_all': [cat_json(c) for c in why['expected_all']],
         'field': {'sender': 'senders', 'word': 'subject_words'}.get(why['how'], ''),
+        'mail_categories': [{**cat_json(it['cat']), 'primary': it['primary'], 'has': it['has'], 'will': it['will'],
+                             'expected_primary': it['expected_primary'], 'manual': it['manual'],
+                             'how': it['how'], 'rule': it['rule'], 'reasons': it['reasons'],
+                             'field': {'sender': 'senders', 'word': 'subject_words'}.get(it['how'], '')}
+                            for it in why['categories']],
+        'manual': {'primary': cat_json(why['manual']['primary']), 'only': why['manual']['only'],
+                   'categories': [cat_json(c) for c in why['manual']['cats']]},
         'contact': contact, 'domain': domain,
         'kind': dict(EmailMessage.CATEGORY_CHOICES).get(msg.category, '') if msg.category else '',
         'kind_manual': manual.key if manual else '',

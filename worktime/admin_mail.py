@@ -138,9 +138,13 @@ def from_mail_page(model_admin, request, message_pk):
         link = None
     if link is not None:
         return redirect(base + f"&proj={link.project_id}")
-    if msg.work_category_id and MailCategoryTime.objects.filter(category_id=msg.work_category_id) \
-            .exclude(dante_project=None).exists():
-        return redirect(base + f"&cat={msg.work_category_id}")
+    from email_assistant.work_categories import current
+    cat_ids = [c.pk for c in current(msg)]   # основна першою, далі інші свої категорії листа
+    with_dante = set(MailCategoryTime.objects.filter(category_id__in=cat_ids).exclude(dante_project=None)
+                     .values_list("category_id", flat=True))
+    cat_id = next((i for i in cat_ids if i in with_dante), None)
+    if cat_id:
+        return redirect(base + f"&cat={cat_id}")
     messages.warning(request, "Лист не в проєкті Minerva й не у своїй категорії з проєктом askDANTE — спершу "
                               "«📁 До проєкту…» в меню листа (або прив'яжіть категорію до askDANTE).")
     return redirect(request.META.get("HTTP_REFERER") or "/email/")

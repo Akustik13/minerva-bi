@@ -113,8 +113,11 @@ class WhyTests(MenuBase):
         d = self.why(self.a)
         self.assertEqual((d["category"]["pk"], d["how"], d["rule"], d["field"]), (self.dk.pk, "sender", "digikey", "senders"))
         self.assertIn("orders@digikey.com", d["text"])
-        self.assertEqual([c["pk"] for c in d["also"]], [self.shop.pk])   # теж підходить, але нижче за порядком
-        self.assertFalse(d["stale"])
+        self.assertEqual([c["pk"] for c in d["also"]], [self.shop.pk])   # теж підходить — лист і в ній
+        self.assertTrue(d["stale"])   # лист збережено до нового правила — «Магазин» з'явиться після перерахунку
+        self.assertEqual([c["pk"] for c in d["expected_all"]], [self.dk.pk, self.shop.pk])
+        self.assertEqual([(c["pk"], c["primary"], c["has"]) for c in d["mail_categories"]],
+                         [(self.dk.pk, True, True), (self.shop.pk, False, False)])
         self.assertEqual(d["contact"], "orders@digikey.com")
 
     def test_subject_word_manual_thread_and_none(self):

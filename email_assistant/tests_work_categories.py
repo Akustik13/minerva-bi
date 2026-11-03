@@ -103,7 +103,7 @@ class RulesTests(Base):
         work_categories.set_for_message(a, self.shop, "thread")
         a.refresh_from_db()
         self.assertEqual(a.work_category, self.shop)
-        self.assertEqual(a.thread.work_category, self.shop)
+        self.assertEqual(list(a.thread.work_categories.all()), [self.shop])   # гілці — вручну, основна — за порядком
         self.shop.refresh_from_db()
         self.assertEqual(self.shop.lines("senders"), [])
 
@@ -133,7 +133,8 @@ class InboxTests(Base):
         self.assertTrue(r["ok"])
         self.assertTrue(MailCategory.objects.filter(name="Митниця").exists())
         dk.refresh_from_db()
-        self.assertEqual(dk.work_category.name, "Митниця")
+        self.assertEqual(dk.work_category.name, "DigiKey")   # нова категорія додається, основна — за порядком
+        self.assertEqual([c["label"] for c in r["categories"]], ["🟥 DigiKey", "🏷 Митниця"])
 
     def test_admin_pages(self):
         self.client.force_login(self.user)
