@@ -49,6 +49,7 @@ related: api/key-insight, api/log-analysis, api/overview, api/console, api/endpo
 | Акаунти покупців магазину — читання / запис | `accounts:read` / `accounts:write` | кабінет покупця на сайті ([Кабінет покупця](guide:shop/customer-accounts)) |
 | Вебхуки — перегляд / створення, зміна, видалення | `webhooks:read` / `webhooks:write` | вебхуки цього ключа ([Вебхуки](guide:api/webhooks)) |
 | База знань — стрічка / статуси | `knowledge:read` / `knowledge:write` | лише службовий ключ RAG-ПК, не магазин |
+| Агент (MCP) — читання / пропозиції | `agent:read` / `agent:write` | Claude Code, Claude Desktop: товари, даташити, магазини, DigiKey; зміни лише пропонує, застосовує людина ✓ ([MCP](guide:api/mcp)) |
 
 Типові набори:
 
@@ -57,6 +58,7 @@ related: api/key-insight, api/log-analysis, api/overview, api/console, api/endpo
 | Сайт магазину | `stock:read`, `orders:read`, `orders:write`, `shipments:read`, `webhooks:read`, `webhooks:write` (+ `products:read`, `accounts:*` для магазину Minerva) |
 | Зовнішня CRM, закупівлі | `purchases:read`, `purchases:write` (+ `webhooks:*` для вебхука, `stock:read` для залишків) |
 | RAG читає каталог | лише `products:read` і `stock:read` |
+| Claude Code / Claude Desktop (MCP) | `agent:read`, `agent:write` + «🤖 Агент (MCP) — від імені кого» |
 | Партнер бачить лише наявність | `stock:read` + обмеження (приклад нижче) |
 
 ### Ключ сайту магазину

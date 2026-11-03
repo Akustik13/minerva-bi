@@ -116,7 +116,7 @@ class Context:
     def __init__(self, task, only=None):
         self.task = task
         self.only = only                      # поточний товар у режимі «окремо для кожного»
-        self.allowed = None if only else (set(task.products.values_list('pk', flat=True)) or None)
+        self.allowed = None if only or not task.pk else (set(task.products.values_list('pk', flat=True)) or None)
         self.pages = {}                       # pk → (сторінки, звідки)
         self.proposed = 0
 

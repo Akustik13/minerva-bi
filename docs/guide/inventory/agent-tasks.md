@@ -6,7 +6,7 @@ where: 📦 Склад → 🤖 Завдання агенту; 📦 Склад �
 urls: /admin/agent/agenttask/, /admin/agent/agenttask/add/, /admin/inventory/product/
 roles: менеджер, адміністратор
 keywords: агент, завдання, даташит, вага, HS-код, країна виробника, параметри, знайти й внести, надіслати даташит, прихід, Lieferschein, новий товар, календар, з листа, datasheet, Gewicht, Datenblatt, Wareneingang, agent, task
-related: mail/agent, inventory/products, inventory/stock, inventory/settings, calendar/overview, shop/overview, digikey/prices
+related: api/mcp, mail/agent, inventory/products, inventory/stock, inventory/settings, calendar/overview, shop/overview, digikey/prices
 ---
 
 ## Що це
@@ -65,6 +65,11 @@ related: mail/agent, inventory/products, inventory/stock, inventory/settings, ca
 | **⏱ Строк на DigiKey** | новий строк відвантаження, днів — записується й надсилається на DigiKey |
 
 Щось змінилось між пропозицією й ✓ (ціна в магазині, ціни на DigiKey чи в Minerva, строк) — Minerva не надсилає, а пише, що треба запустити завдання ще раз.
+
+## З Claude Code чи Claude Desktop (MCP)
+
+Ті самі інструменти (без пошти й інтернету) доступні зовнішнім агентам через [MCP](guide:api/mcp): ви пишете в
+Claude Code «знайди й запропонуй…», а пропозиції з'являються тут, у завданні «MCP · …», і чекають вашого ✓.
 
 ## Перевірити й застосувати
 

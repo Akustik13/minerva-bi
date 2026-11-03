@@ -68,6 +68,12 @@ class APIKeyAdmin(admin.ModelAdmin):
             'fields': ['scopes_input'],
             'description': 'Оберіть які операції дозволені для цього ключа.',
         }),
+        ('🤖 Агент (MCP)', {
+            'fields': ['agent_user'],
+            'description': 'Для зовнішніх агентів (Claude Code, Claude Desktop): адреса <code>/api/v1/mcp/</code>, '
+                           'права «Агент (MCP) — читання / пропонувати зміни». Пропозиції стають завданням цієї людини '
+                           'в «🧩 Завдання агенту» — застосовує вона ✓. Як підключити — гід «Агент через MCP».',
+        }),
         ('🔍 Що бачить і що може змінити цей ключ', {
             'fields': ['insight_panel'],
         }),

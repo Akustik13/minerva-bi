@@ -20,6 +20,8 @@ SCOPE_CHOICES = [
     ('accounts:write',  'Акаунти покупців магазину — реєстрація, вхід, пароль, профіль, кошик'),
     ('webhooks:read',   'Вебхуки — перегляд'),
     ('webhooks:write',  'Вебхуки — створення / зміна / видалення'),
+    ('agent:read',      'Агент (MCP) — товари, даташити, магазини, DigiKey (читання)'),
+    ('agent:write',     'Агент (MCP) — пропонувати зміни: застосовує людина ✓ у «🧩 Завдання агенту»'),
     ('knowledge:read',  'База знань — стрічка листів для RAG (лише службовий ключ RAG, не магазин)'),
     ('knowledge:write', 'База знань — статуси індексації від RAG'),
 ]
@@ -86,6 +88,12 @@ class APIKey(models.Model):
         help_text='Напр. «sku, available» — у списках і картках записів лишаться тільки ці поля. '
                   'Порожньо — усі поля.')
     log_mode = models.CharField('Журнал запитів', max_length=8, choices=LOG_CHOICES, default=LOG_ALL)
+    agent_user = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+        verbose_name='🤖 Агент (MCP) — від імені кого',
+        help_text='Пропозиції зовнішнього агента (Claude Code, Claude Desktop…) стають завданням цієї людини в '
+                  '«🧩 Завдання агенту» — вона перевіряє й застосовує ✓; її права діють і для читання. '
+                  'Порожньо — MCP для ключа вимкнено.')
 
     class Meta:
         verbose_name = 'API Ключ'

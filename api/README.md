@@ -30,6 +30,7 @@
 | `customers:read` / `customers:write` | клієнти CRM |
 | `webhooks:read` / `webhooks:write` | вебхуки, зареєстровані цим ключем |
 | `accounts:read` / `accounts:write` | особистий кабінет покупців магазину ключа (розділ 11a) |
+| `agent:read` / `agent:write` | MCP-сервер `POST /api/v1/mcp/` для Claude Code / Claude Desktop (JSON-RPC 2.0, `Authorization: Bearer <ключ>`): читання товарів, даташитів, магазинів, DigiKey / пропозиції змін — застосовує людина з поля ключа «🤖 Агент (MCP) — від імені кого» у «🧩 Завдання агенту» (гід `docs/guide/api/mcp.md`) |
 
 **Ліміт:** 120 запитів/хв на ключ (змінна оточення `API_RATE_LIMIT`, напр. `300/min`), або свій у ключа (нижче). При перевищенні — `429` + заголовок `Retry-After`.
 **Пагінація:** `?page=2&page_size=200` (макс. 500). Відповідь: `{count, next, previous, results}`.

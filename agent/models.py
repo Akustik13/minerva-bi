@@ -145,6 +145,11 @@ class AgentTask(models.Model):
     message = models.ForeignKey('email_assistant.EmailMessage', null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name='agent_tasks', verbose_name='Лист',
                                 help_text='Завдання з листа: агент читає цей лист і його вкладення (лише своя скринька)')
+    api_key = models.ForeignKey('api.APIKey', null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                                verbose_name='Ключ API (MCP)',
+                                help_text='Пропозиції зовнішнього агента через MCP (agent/mcp.py)')
+    mcp_session = models.CharField(max_length=80, blank=True, default='', db_index=True,
+                                   help_text='Сесія MCP (Mcp-Session-Id) або «day:<дата>» без сесії')
     each_product = models.BooleanField(
         'Окремо для кожного товару', default=False,
         help_text='Агент проходить вибрані товари по одному (для сотень товарів). Лист у цьому режимі не готує.')

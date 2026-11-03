@@ -245,8 +245,9 @@ def start(task) -> bool:
 
 
 def resume(task) -> bool:
-    """«▶ Продовжити» — завдання, що зупинилось (помилка, ліміт, перерва): далі з того самого місця."""
-    if task.status not in (AgentTask.FAILED, AgentTask.CANCELLED, AgentTask.REVIEW, AgentTask.DONE):
+    """«▶ Продовжити» — завдання, що зупинилось (помилка, ліміт, перерва): далі з того самого місця.
+    Завдання MCP (пропозиції зовнішнього агента) — ні: Minerva сама його не виконує."""
+    if task.mcp_session or task.status not in (AgentTask.FAILED, AgentTask.CANCELLED, AgentTask.REVIEW, AgentTask.DONE):
         return False
     AgentTask.objects.filter(pk=task.pk).update(status=AgentTask.QUEUED, error='')
     task.refresh_from_db()

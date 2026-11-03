@@ -1,7 +1,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 
-from . import accounts, media, payments, purchases, search, site_admin
+from . import accounts, mcp, media, payments, purchases, search, site_admin
 from .views import (
     SalesOrderViewSet, ProductViewSet, CustomerViewSet, StockViewSet, MovementViewSet,
     LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ShopShippingView,
@@ -68,5 +68,6 @@ urlpatterns = [
          name="knowledge-snapshot"),
     path("knowledge/status/", kv.StatusView.as_view(), name="knowledge-status"),
     path("knowledge/summary/", kv.SummaryView.as_view(), name="knowledge-summary"),
+    path("mcp/", mcp.MCPView.as_view(), name="mcp"),   # 🤖 MCP-сервер для зовнішніх агентів (agent/mcp.py)
     path("", include(router.urls)),
 ]

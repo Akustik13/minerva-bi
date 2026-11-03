@@ -38,6 +38,8 @@
       {% if running %}
         <form method="post">{% csrf_token %}<input type="hidden" name="action" value="cancel">
           <button type="submit" class="button">⏹ Зупинити</button></form>
+      {% elif task.mcp_session %}
+        <span class="agt-muted">🔌 Пропозиції зовнішнього агента через MCP — Minerva їх лише показує, застосовуєте ви ✓</span>
       {% elif stopped or task.status == 'review' or task.status == 'done' %}
         <form method="post" style="display:flex;gap:6px;align-items:center">{% csrf_token %}
           <input type="hidden" name="action" value="resume">
@@ -47,12 +49,19 @@
         </form>
       {% endif %}
     </div>
+    {% if task.mcp_session %}
+    <div class="agt-stats">
+      <span>🔌 Ключ API: <b translate="no">{{ task.api_key.name|default:"видалено" }}</b></span>
+      <span>Сесія: {% if task.mcp_session|slice:":4" == "day:" %}без сесії, за {{ task.mcp_session|slice:"4:" }}{% else %}<span translate="no">{{ task.mcp_session|truncatechars:14 }}</span>{% endif %}</span>
+    </div>
+    {% else %}
     <div class="agt-stats">
       <span>Товарів: {% if task.each_product %}<span id="agt-done">{{ done }}</span> з {{ total }} (окремо для кожного){% else %}{{ total|default:"шукає сам" }}{% endif %}</span>
       <span>Витрачено: <span id="agt-cost">{{ task.cost_usd|floatformat:2 }}</span> $ з {{ task.budget_usd }} $</span>
       <span>{{ task.get_model_display|truncatechars:22 }}</span>
       {% if task.web %}<span>🌐 пошуків: {{ task.web_searches }}</span>{% endif %}
     </div>
+    {% endif %}
     {% if task.error %}<div style="margin-top:8px;color:var(--error,#dc2626)">⚠️ {{ task.error }}</div>{% endif %}
     <div class="agt-muted" style="margin-top:10px">Завдання</div>
     <div class="agt-pre" translate="no">{{ task.instruction }}</div>
