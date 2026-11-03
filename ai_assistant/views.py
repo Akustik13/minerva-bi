@@ -77,6 +77,35 @@ def reset_chat(request):
 
 
 @login_required
+def capabilities_api(request):
+    """«Що я вмію» для вікна 🏛️: увімкнено AI чи ні, роль, кожна можливість — так / ні й чому, приклади запитань,
+    чи є в людини своя скринька (кнопка «✉️ Відкрити в пошті» під складеним листом)."""
+    from .permissions import capabilities, effective_role, role_label
+    profile = _get_profile(request.user)
+    enabled = bool(profile and profile.ai_enabled)
+    items = capabilities(profile) if profile else []
+    on = {c['tool'] for c in items if c['on']}
+    examples = ['Які товари закінчуються на складі?']
+    if 'get_recent_orders' in on:
+        examples.insert(0, 'Які замовлення ще не відправлені й у яких минув строк?')
+    if 'get_sales_analytics' in on:
+        examples.append('Порівняй продажі цього й минулого місяця')
+    if 'compose_email' in on:
+        examples.append('Склади лист клієнту з нагадуванням про наш Angebot')
+    try:
+        from email_assistant.models import EmailAccount
+        mailbox = EmailAccount.objects.filter(user=request.user).exists()
+    except Exception:  # noqa: BLE001 — без пошти просто без кнопки
+        mailbox = False
+    role = effective_role(profile)
+    return JsonResponse({
+        'enabled': enabled, 'role': role, 'role_label': role_label(role),
+        'admin': bool(profile) and role == 'admin' and profile.ai_assistant_role != 'admin',
+        'items': items, 'examples': examples[:4], 'mailbox': mailbox,
+    })
+
+
+@login_required
 def history_api(request):
     """Return active webchat conversation messages (user + assistant only)."""
     profile = _get_profile(request.user)

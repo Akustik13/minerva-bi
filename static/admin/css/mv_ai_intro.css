@@ -1,0 +1,54 @@
+/* 🤖 Помічники внизу праворуч — картка при наведенні й перше знайомство (static/admin/js/mv_ai_intro.js) */
+.mvai-card, .mvai-intro {
+  position: fixed; z-index: 10002; box-sizing: border-box;
+  background: var(--bg-card, #1b2330); color: var(--text, #e6edf3);
+  border: 1px solid var(--border-strong, #2f425a); border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+  font-size: 13px; line-height: 1.45;
+  opacity: 0; transform: translateY(6px); transition: opacity .15s ease, transform .15s ease;
+}
+.mvai-card.on, .mvai-intro.on { opacity: 1; transform: none; }
+.mvai-card { width: 300px; max-width: calc(100vw - 24px); padding: 10px 12px; }
+.mvai-intro { width: 380px; max-width: calc(100vw - 24px); padding: 14px 16px 12px; }
+.mvai-card-head, .mvai-row { display: flex; gap: 10px; align-items: flex-start; }
+.mvai-row { margin-top: 10px; }
+.mvai-ava { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; flex: none; }
+.mvai-ico {
+  width: 30px; height: 30px; border-radius: 50%; flex: none; display: inline-flex; align-items: center;
+  justify-content: center; background: var(--gold, #d4a017); color: #000; font-size: 16px;
+}
+.mvai-title { font-weight: 700; font-size: 14px; padding-right: 22px; }
+.mvai-what { color: var(--text-muted, #a9b8c6); }
+.mvai-text { margin-top: 3px; }
+.mvai-ex { margin-top: 3px; color: var(--text-muted, #a9b8c6); font-style: italic; }
+.mvai-more {
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border, #26364a);
+  color: var(--text-muted, #a9b8c6);
+}
+.mvai-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.mvai-card .mvai-foot { margin-top: 8px; }
+.mvai-hint { color: var(--text-muted, #a9b8c6); font-size: 12px; }
+.mvai-link {
+  background: none; border: none; padding: 0; font: inherit; font-size: 12px; cursor: pointer;
+  color: var(--accent, #3b82f6); text-decoration: underline;
+}
+.mvai-ok {
+  border: none; border-radius: 8px; padding: 6px 14px; font: inherit; font-weight: 600; cursor: pointer;
+  background: var(--accent, #3b82f6); color: var(--on-accent, #fff);
+}
+.mvai-x {
+  position: absolute; top: 8px; right: 8px; background: none; border: none; cursor: pointer;
+  color: var(--text-muted, #a9b8c6); font-size: 14px; padding: 2px 6px;
+}
+/* кнопки помічників, поки відкрите знайомство */
+.mvai-ring { animation: mvaiRing 1.6s ease-out infinite; }
+@keyframes mvaiRing {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold, #d4a017) 70%, transparent); }
+  70%  { box-shadow: 0 0 0 14px color-mix(in srgb, var(--gold, #d4a017) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mvai-ring { animation: none; outline: 3px solid var(--gold, #d4a017); outline-offset: 3px; }
+  .mvai-card, .mvai-intro { transition: none; }
+}
+html[data-mv-motion="reduce"] .mvai-ring { animation: none; outline: 3px solid var(--gold, #d4a017); outline-offset: 3px; }

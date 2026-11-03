@@ -2213,11 +2213,12 @@ window.addEventListener('appinstalled', function() {
 #mv-cpanel-head .mv-cp-title {
   flex: 1; font-weight: 600; font-size: 14px; color: var(--gold);
 }
-#mv-cp-reset, #mv-cp-close {
+#mv-cp-info, #mv-cp-reset, #mv-cp-close {
   background: none; border: none; cursor: pointer;
   color: var(--text-muted); font-size: 15px; padding: 2px 6px;
   border-radius: 4px;
 }
+#mv-cp-info:hover { color: var(--accent); }
 #mv-cp-reset:hover { color: var(--warn); }
 #mv-cp-close:hover { color: var(--err); }
 
@@ -2304,17 +2305,34 @@ window.addEventListener('appinstalled', function() {
 #mv-cp-ws-label:hover { border-color: var(--accent); color: var(--text); }
 #mv-cp-ws-label.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 #mv-cp-ws-toggle { display: none; }
+/* «Що я вмію» (GET /ai/capabilities/) і «✉️ Відкрити в пошті» під складеним листом */
+.mv-cp-caps { font-size: 12.5px; line-height: 1.45; }
+.mv-cp-caps b { display: block; margin-bottom: 4px; }
+.mv-cp-caps ul { margin: 4px 0; padding-left: 0; list-style: none; }
+.mv-cp-caps li { margin: 2px 0; }
+.mv-cp-caps li.off { color: var(--text-muted); }
+.mv-cp-caps li.off small { display: block; margin-left: 18px; font-size: 11.5px; }
+.mv-cp-caps .mv-cp-other { margin-top: 6px; color: var(--text-muted); }
+.mv-cp-caps .mv-cp-other a { color: var(--accent); }
+.mv-cp-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.mv-cp-chip, .mv-cp-mailbtn {
+  border: 1px solid var(--accent); background: transparent; color: var(--accent); border-radius: 12px;
+  padding: 2px 9px; font: inherit; font-size: 12px; cursor: pointer; text-align: left;
+}
+.mv-cp-chip:hover, .mv-cp-mailbtn:hover { background: var(--accent); color: #fff; }
+.mv-cp-mailbtn { display: inline-block; margin-top: 6px; text-decoration: none; font-weight: 600; }
 
 @media (max-width: 480px) {
   #mv-chat-panel { width: calc(100vw - 16px); right: 8px; bottom: 80px; }
 }
 </style>
 
-<div id="mv-fab" title="Minerva AI">🏛️<span class="mv-fab-badge"></span></div>
+<div id="mv-fab" title="Minerva AI — питання про ваш бізнес" role="button" tabindex="0">🏛️<span class="mv-fab-badge"></span></div>
 
 <div id="mv-chat-panel">
   <div id="mv-cpanel-head">
     <span class="mv-cp-title">🏛️ Minerva AI</span>
+    <button id="mv-cp-info" title="Що я вмію">ⓘ</button>
     <button id="mv-cp-reset" title="Нова розмова">🔄</button>
     <button id="mv-cp-close" title="Згорнути">✕</button>
   </div>
@@ -2387,12 +2405,100 @@ window.addEventListener('appinstalled', function() {
 
     col.appendChild(sender);
     col.appendChild(bubble);
+    var mail = role === 'bot' ? cpMailLink(text) : null;
+    if (mail) col.appendChild(mail);
 
     if (role === 'user') { wrap.appendChild(col); wrap.appendChild(avatar); }
     else                  { wrap.appendChild(avatar); wrap.appendChild(col); }
 
     cpMsgs.insertBefore(wrap, cpTyping);
     cpMsgs.scrollTop = cpMsgs.scrollHeight;
+    return bubble;
+  }
+
+  // Складений лист (формат compose_email: «📧 SUBJECT:» / «📧 TEXT:» / «📧 Sending to:») → новий лист у пошті
+  function cpMailLink(text) {
+    var subj = /📧\s*SUBJECT:\**\s*(.+)/.exec(text);
+    var body = /📧\s*TEXT:\**\s*([\s\S]*?)(?:\n\s*---|\n\s*\**📧\s*Sending to|$)/.exec(text);
+    if (!subj || !body || !body[1].trim()) return null;
+    var to = /📧\s*Sending to:\**\s*([^\s*]+@[^\s*]+)/.exec(text);
+    var q = new URLSearchParams();
+    if (to) q.set('to', to[1]);
+    q.set('subject', subj[1].replace(/\*+/g, '').trim());
+    q.set('body', body[1].replace(/\*\*/g, '').trim().slice(0, 5000));
+    var a = document.createElement('a');
+    a.className = 'mv-cp-mailbtn';
+    a.href = '/email/compose/?' + q.toString();
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.textContent = '✉️ Відкрити в пошті';
+    a.title = 'Новий лист у вашій скриньці з цим текстом — перевірте й надішліть самі';
+    return a;
+  }
+
+  // «Що я вмію» — для цієї людини: що увімкнено, що ні й чому, приклади запитань
+  var capsCache = null;
+  function cpShowCaps(greeting) {
+    var p = capsCache ? Promise.resolve(capsCache)
+      : fetch('/ai/capabilities/', {credentials: 'same-origin'}).then(function(r){ return r.json(); });
+    p.then(function(d){
+      capsCache = d;
+      var bubble = cpAddMsg('bot', '');
+      bubble.textContent = '';
+      var box = document.createElement('div');
+      box.className = 'mv-cp-caps';
+      var title = document.createElement('b');
+      title.textContent = greeting ? 'Вітаю! Я Minerva AI — відповідаю про ваш бізнес з живих даних Minerva. Що я вмію для вас:'
+                                   : 'Що я вмію для вас:';
+      box.appendChild(title);
+      if (!d.enabled) {
+        var off = document.createElement('div');
+        off.textContent = '🔒 Для вас AI вимкнено — адміністратор вмикає «AI увімкнено» у вашому профілі.';
+        box.appendChild(off);
+      }
+      var ul = document.createElement('ul');
+      (d.items || []).forEach(function(c){
+        var li = document.createElement('li');
+        li.className = c.on ? 'on' : 'off';
+        li.textContent = (c.on ? '✓ ' : '— ') + c.label;
+        if (!c.on && c.why) {
+          var why = document.createElement('small');
+          why.textContent = c.why;
+          li.appendChild(why);
+        }
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+      var role = document.createElement('div');
+      role.className = 'mv-cp-other';
+      role.textContent = 'Роль в AI: ' + (d.role_label || '') + (d.admin ? ' (ви адміністратор Minerva)' : '') + '.';
+      box.appendChild(role);
+      var other = document.createElement('div');
+      other.className = 'mv-cp-other';
+      other.appendChild(document.createTextNode('Як працювати в Minerva і про товари — «Minerva» з аватаром поруч. '));
+      var more = document.createElement('a');
+      more.href = '/guide/start/assistants/';
+      more.textContent = 'Хто з помічників для чого →';
+      other.appendChild(more);
+      box.appendChild(other);
+      if (d.enabled && (d.examples || []).length) {
+        var chips = document.createElement('div');
+        chips.className = 'mv-cp-chips';
+        d.examples.forEach(function(q){
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'mv-cp-chip';
+          b.textContent = q;
+          b.onclick = function(){ cpInput.value = q; cpSendMsg(); };
+          chips.appendChild(b);
+        });
+        box.appendChild(chips);
+      }
+      bubble.appendChild(box);
+      cpMsgs.scrollTop = cpMsgs.scrollHeight;
+    }).catch(function(){
+      if (greeting) cpAddMsg('bot', 'Вітаю! Я Minerva — ваш AI-помічник. Чим можу допомогти?');
+    });
   }
 
   function cpLoadHistory() {
@@ -2404,7 +2510,7 @@ window.addEventListener('appinstalled', function() {
           cpAddMsg(m.role === 'assistant' ? 'bot' : 'user', m.content);
         });
       } else {
-        cpAddMsg('bot', 'Вітаю! Я Minerva — ваш AI-помічник. Чим можу допомогти?');
+        cpShowCaps(true);
       }
     }).catch(function(){ histLoaded = false; });
   }
@@ -2426,6 +2532,10 @@ window.addEventListener('appinstalled', function() {
     panel.classList.contains('open') ? closePanel() : openPanel();
   };
   document.getElementById('mv-cp-close').onclick = closePanel;
+  document.getElementById('mv-cp-info').onclick = function(){ cpShowCaps(false); };
+  fab.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fab.click(); }
+  });
 
   document.getElementById('mv-cp-reset').onclick = function(){
     fetch('/ai/reset/', { method: 'POST', headers: {'X-CSRFToken': getCsrf()} })
@@ -2482,6 +2592,9 @@ window.addEventListener('appinstalled', function() {
 
 {% if user.is_authenticated and user.is_staff %}
 {% include "rag_assistant/widget.html" %}
+{% endif %}
+{% if user.is_authenticated %}{# 🤖 що це за кружечки внизу праворуч: картка при наведенні, перше знайомство #}
+<link rel="stylesheet" href="/static/admin/css/mv_ai_intro.css?v=1"><script src="/static/admin/js/mv_ai_intro.js?v=1" defer></script>
 {% endif %}
 
 {% if user.is_authenticated %}

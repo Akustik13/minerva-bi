@@ -143,7 +143,7 @@ a.rg-link { color: var(--rg-link); text-decoration: underline; }
 @media (max-width: 600px) { #rg-pill { right: 84px; padding-right: 12px; font-size: 14px; } #rg-panel { width: 100vw; } }
 </style>
 
-<button type="button" id="rg-pill" title="Помічник по продукції і складу"
+<button type="button" id="rg-pill" title="Minerva — як працювати в Minerva і товари"
         data-state="{% url 'rag_assistant:state' %}" data-base="/rag/api/" data-csrf="{{ csrf_token }}"
         data-avatar="{% url 'rag_assistant:avatar' %}" data-settings="{% url 'admin:rag_assistant_ragsettings_changelist' %}"
         data-admin="{% if user.is_superuser %}1{% endif %}">
