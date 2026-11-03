@@ -30,7 +30,11 @@ ACTIONS = {
     'web.search':      Action('Пошук в інтернеті (якщо дозволено в завданні)', READ),
     'product.propose': Action('Запропонувати поле чи параметр товару — застосовує людина (✓)', INTERNAL),
     'mail.propose':    Action('Підготувати лист на адресу з тексту завдання — надсилає людина', INTERNAL),
-    'product.price':   Action('Ціни, залишки, видимість у магазині й на DigiKey', NEVER),
+    'stock.receipt':   Action('Прихід на склад, новий товар — застосовує людина (✓)', INTERNAL),
+    'calendar.event':  Action('Подія в календарі людини — застосовує людина (✓)', INTERNAL),
+    'shop.listing':    Action('Показати / сховати в інтернет-магазині, ціна в магазині — лише з ✓ людини', EXTERNAL),
+    'digikey.prices':  Action('Ціни на DigiKey за правилами Minerva, строк відвантаження — лише з ✓ людини', EXTERNAL),
+    'product.price':   Action('Базові ціни й ціна продажу товару, списання й коригування залишків', NEVER),
 }
 
 

@@ -181,8 +181,10 @@ class AgentProposal(models.Model):
     """Що агент пропонує змінити: поле товару, технічний параметр або лист. Застосовує лише людина (✓)."""
     FIELD, ATTRIBUTE, MAIL = 'field', 'attribute', 'mail'
     STOCK_IN, PRODUCT, EVENT = 'stock_in', 'product', 'event'
+    SHOP, DK_PRICES, DK_LEAD = 'shop', 'dk_prices', 'dk_lead'
     KINDS = [(FIELD, 'Поле товару'), (ATTRIBUTE, 'Технічний параметр'), (MAIL, 'Лист'),
-             (STOCK_IN, '📦 Прихід на склад'), (PRODUCT, '🆕 Новий товар'), (EVENT, '📅 Подія в календарі')]
+             (STOCK_IN, '📦 Прихід на склад'), (PRODUCT, '🆕 Новий товар'), (EVENT, '📅 Подія в календарі'),
+             (SHOP, '🏪 Інтернет-магазин'), (DK_PRICES, '💲 Ціни на DigiKey'), (DK_LEAD, '⏱ Строк на DigiKey')]
     PENDING, APPLIED, REJECTED, FAILED = 'pending', 'applied', 'rejected', 'failed'
     STATUSES = [(PENDING, '👀 Чекає'), (APPLIED, '✓ Застосовано'), (REJECTED, '✕ Відхилено'),
                 (FAILED, '⚠️ Не вдалося')]

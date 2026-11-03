@@ -93,7 +93,8 @@ EVENT = {'name': 'propose_event', 'description': 'Запропонувати п�
 
 
 def definitions(task, single=False) -> list:
-    tools = [FIND, GET, READ, CHANGE, ATTR, LOCATIONS, STOCK_IN]
+    from agent import channels
+    tools = [FIND, GET, READ, CHANGE, ATTR, LOCATIONS, STOCK_IN] + channels.TOOLS
     if not (single or task.each_product):
         tools += [MAIL, NEW_PRODUCT, EVENT] + ([READ_MAIL, READ_ATT] if mail_of(task) is not None else [])
     return tools + ([dict(WEB_SEARCH)] if task.web else [])
@@ -181,8 +182,9 @@ def _pdf_pages(data) -> list:
 
 def run(ctx, name, args) -> tuple:
     """(текст результату, is_error) для tool_result."""
+    from agent import channels
     try:
-        fn = HANDLERS.get(name)
+        fn = HANDLERS.get(name) or channels.HANDLERS.get(name)
         if fn is None:
             raise ToolError(f'невідомий інструмент {name}')
         return fn(ctx, args or {}), False

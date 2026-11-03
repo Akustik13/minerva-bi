@@ -35,17 +35,27 @@ def apply_selected(task, ids, user) -> dict:
 
 
 def apply_one(p, user) -> str:
+    from agent import channels
     if p.kind == AgentProposal.PRODUCT:
         return _create_product(p, user)
     if p.kind == AgentProposal.STOCK_IN:
         return _stock_in(p, user)
     if p.kind == AgentProposal.EVENT:
         return _event(p, user)
+    if p.kind == AgentProposal.SHOP:
+        return channels.apply_shop(p, user)
+    if p.kind == AgentProposal.DK_PRICES:
+        return channels.apply_dk_prices(p, user)
+    if p.kind == AgentProposal.DK_LEAD:
+        return channels.apply_dk_lead(p, user)
     return product_fields.apply(p, user)
 
 
 def describe(p) -> tuple:
     """(що, було, стане) — рядок таблиці на сторінці завдання."""
+    from agent import channels
+    if p.kind in (AgentProposal.SHOP, AgentProposal.DK_PRICES, AgentProposal.DK_LEAD):
+        return channels.describe(p)
     d = p.data or {}
     if p.kind == AgentProposal.STOCK_IN:
         where = d.get('location') or 'локація за замовчуванням'
