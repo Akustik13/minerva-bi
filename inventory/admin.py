@@ -3431,6 +3431,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                  name="inventory_product_base_prices_template"),
             path("base-currency/", self.admin_site.admin_view(self._base_currency_view),
                  name="inventory_product_base_currency"),
+            path("base-currency/status/", self.admin_site.admin_view(self._base_currency_status_view),
+                 name="inventory_product_base_currency_status"),
             path('dk-sync-status/', self.admin_site.admin_view(self._dk_sync_status_view),
                  name='inventory_product_dk_sync_status'),
             path('dk-sync-cancel/', self.admin_site.admin_view(self._dk_sync_cancel_view),
@@ -3470,6 +3472,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     def _base_currency_view(self, request):
         from .admin_currency import currency_view
         return currency_view(self, request)
+
+    def _base_currency_status_view(self, request):
+        from .admin_currency import currency_status_view
+        return currency_status_view(self, request)
 
     def serve_datasheet_view(self, request, pk):
         """Serve product datasheet file via Django (bypasses Synology/nginx media routing)."""

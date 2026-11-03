@@ -2,10 +2,12 @@
 
     python manage.py test inventory.tests_base_currency --settings=tabele.settings_test
 """
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.test import TestCase
+from django.utils import timezone
 
 from bots.models import DigiKeyListing, DigiKeyPriceSettings
 from bots.services import dk_prices
@@ -26,6 +28,11 @@ class Base(TestCase):
         s = DigiKeyPriceSettings.get()
         s.currency = "USD"
         s.save()
+        bp.BACKGROUND = False                       # переведення багатьох — у тому самому потоці
+        self.addCleanup(setattr, bp, "BACKGROUND", True)
+        from core.shared_cache import cache
+        cache.delete(bp.CONVERT_KEY)
+        cache.delete(bp.CONVERT_LOCK)
 
     def product(self, sku, prices=(), currency="USD", **kw):
         return Product.objects.create(sku=sku, name=f"Name {sku}", base_price_currency=currency, base_prices=[
@@ -165,6 +172,58 @@ class PageTests(Base):
         self.assertIn(r.status_code, (302, 403))
         self.usd.refresh_from_db()
         self.assertEqual(self.usd.base_price_currency, "USD")
+
+
+class ConvertJobTests(Base):
+    """Багато товарів — у фоні пачками, хід для смуги на сторінці, одне переведення одночасно."""
+
+    def test_chunks_progress_skipped_and_errors(self):
+        ps = [self.product(f"J-{i}", [(1, 279), (10, "268.39")]) for i in range(5)]
+        eur = self.product("J-EUR", [(1, 10)], "EUR")
+        old_chunk = bp.CONVERT_CHUNK
+        bp.CONVERT_CHUNK = 2
+        self.addCleanup(setattr, bp, "CONVERT_CHUNK", old_chunk)
+        plan = [(p.pk, D("0.86"), "як для DigiKey") for p in ps] + [(eur.pk, D("0.86"), ""), (999999, D("0.86"), "")]
+        self.assertTrue(bp.start_convert(plan, "EUR", note="тест"))
+        st = bp.convert_state()
+        self.assertEqual((st["running"], st["total"], st["done"], st["converted"]), (False, 7, 7, 5))
+        self.assertEqual(st["skipped"], ["J-EUR", "999999"])                 # уже в EUR / товару немає
+        for p in ps:
+            p.refresh_from_db()
+            self.assertEqual((p.base_price_currency, p.base_prices[0]["unit_price"]), ("EUR", "239.94"))
+        h = ProductPriceHistory.objects.filter(product=ps[0]).first()
+        self.assertEqual(h.details["rate_origin"], "як для DigiKey")
+        self.assertIn("тест", h.note)
+
+    def test_one_at_a_time_and_stalled_run_can_restart(self):
+        from core.shared_cache import cache
+        p = self.product("J-1", [(1, 279)])
+        cache.add(bp.CONVERT_LOCK, 1, 60)                                    # уже йде інше
+        bp._save_state({"running": True, "total": 3, "done": 1, "started": timezone.now().isoformat(),
+                        "beat": timezone.now().isoformat()})
+        self.assertFalse(bp.start_convert([(p.pk, D("0.86"), "")], "EUR"))
+        old = (timezone.now() - timedelta(seconds=bp.CONVERT_STALE + 5)).isoformat()
+        bp._save_state({"running": True, "total": 3, "done": 1, "started": old, "beat": old})
+        self.assertTrue(bp.convert_state()["stalled"])                        # процес перезапустили
+        self.assertTrue(bp.start_convert([(p.pk, D("0.86"), "")], "EUR"))
+        self.assertEqual(bp.convert_state()["converted"], 1)
+        self.assertIsNone(cache.get(bp.CONVERT_LOCK))                        # замок знято
+
+    def test_page_starts_job_and_shows_progress(self):
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+        ps = [self.product(f"P-{i}", [(1, 279)]) for i in range(3)]
+        url = "/admin/inventory/product/base-currency/"
+        r = self.client.post(url + "?all=1", {"ids": "", "same_USD": "1", "action": "convert", "confirm": "1"})
+        self.assertRedirects(r, url + "?all=1", fetch_redirect_response=False)
+        page = self.client.get(url, {"all": 1})
+        self.assertContains(page, "💱 Переведення базових цін у EUR")
+        self.assertContains(page, "Переведено: 3")
+        self.assertContains(page, "Товари з цінами в EUR →")
+        st = self.client.get(url + "status/").json()
+        self.assertEqual((st["running"], st["total"], st["done"], st["converted"]), (False, 3, 3, 3))
+        for p in ps:
+            p.refresh_from_db()
+            self.assertEqual(p.base_price_currency, "EUR")
 
 
 class CardTests(Base):

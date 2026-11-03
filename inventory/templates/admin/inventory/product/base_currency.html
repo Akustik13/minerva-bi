@@ -26,6 +26,9 @@
   #bcc .bcc-same span { font-weight: 400; }
   #bcc input.bcc-rate[readonly] { background: var(--bg-hover); color: var(--text-muted); }
   #bcc .bcc-shift { color: var(--warn); font-size: 12px; }
+  #bcc .bcc-bar { height: 10px; border-radius: 5px; background: var(--bg-hover); overflow: hidden; margin: 8px 0 6px; }
+  #bcc .bcc-bar > div { height: 100%; background: var(--accent); transition: width .4s ease; }
+  #bcc .bcc-job.done .bcc-bar > div { background: var(--ok, #3fb950); }
 </style>
 <div id="bcc">
   <div class="bcc-card">
@@ -41,6 +44,19 @@
       DigiKey можуть зрушити на цент. Кожна зміна записується в історію товару
       («Переведено з … в {{ home }} за курсом …»).</p>
   </div>
+
+  {% if job.started %}
+  <div class="bcc-card bcc-job{% if not job.running %} done{% endif %}" id="bcc-job"{% if job.running %} data-status="{{ job_status_url }}"{% endif %}>
+    <b>💱 Переведення базових цін у {{ job.home }}</b> —
+    <span id="bcc-job-text">{% if job.running %}йде: {{ job.done }} з {{ job.total }} товарів{% elif job.stalled %}зупинилось на {{ job.done }} з {{ job.total }} — можна запустити знову{% else %}готово{% endif %}</span>
+    <div class="bcc-bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{ job.total }}" aria-valuenow="{{ job.done }}"><div id="bcc-job-fill" style="width:{{ job.pct }}%"></div></div>
+    <div class="bcc-muted"><span id="bcc-job-count">Переведено: {{ job.converted }}</span>{% if job.skipped %} · без змін (уже в {{ job.home }} або без цін): {{ job.skipped|length }}{% endif %}{% if job.errors %} · <span style="color:var(--err)">помилок: {{ job.errors|length }}</span>{% endif %}
+      {% if job.by %} · запустив {{ job.by }}{% endif %}{% if job.when %} · {{ job.when }}{% endif %}{% if job.running %} · сторінку можна закрити — переведення не зупиниться{% endif %}</div>
+    {% if job.error %}<div style="color:var(--err)">✗ {{ job.error }}</div>{% endif %}
+    {% if job.errors %}<details style="margin-top:6px"><summary style="cursor:pointer">Помилки</summary><ul class="bcc-muted">{% for sku, e in job.errors %}<li>{{ sku }}: {{ e }}</li>{% endfor %}</ul></details>{% endif %}
+    {% if not job.running %}<div style="margin-top:6px"><a href="{{ home_list_url }}">Товари з цінами в {{ job.home }} →</a></div>{% endif %}
+  </div>
+  {% endif %}
 
   {% if not total %}
     <div class="bcc-card">✓ Усі {% if ids %}вибрані {% endif %}товари з базовими цінами вже в {{ home }} — переводити нічого.</div>
@@ -96,7 +112,7 @@
     <div class="bcc-actions">
       <label><input type="checkbox" name="confirm" value="1"> Так, перевести базові ціни {{ total }} товарів у {{ home }}</label>
       <input type="text" name="note" maxlength="120" placeholder="Примітка в історію (необов'язково)" style="min-width:260px">
-      <button type="submit" name="action" value="convert" class="button default">💱 Перевести в {{ home }}</button>
+      <button type="submit" name="action" value="convert" class="button default"{% if job.running %} disabled title="Уже йде переведення — дочекайтеся кінця"{% endif %}>💱 Перевести в {{ home }}</button>
       <a href="{{ back_url }}">Скасувати</a>
     </div>
   </form>
@@ -108,6 +124,21 @@
 document.addEventListener('DOMContentLoaded', function () {
   var root = document.getElementById('bcc');
   if (!root) return;
+  /* Хід переведення у фоні: смуга оновлюється сама, наприкінці — сторінка з підсумком */
+  var job = document.getElementById('bcc-job');
+  if (job && job.dataset.status) {
+    var timer = setInterval(function () {
+      fetch(job.dataset.status, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.json(); }).then(function (s) {
+          var pct = s.total ? Math.round(100 * s.done / s.total) : 100;
+          document.getElementById('bcc-job-fill').style.width = pct + '%';
+          job.querySelector('.bcc-bar').setAttribute('aria-valuenow', s.done);
+          document.getElementById('bcc-job-text').textContent = 'йде: ' + s.done + ' з ' + s.total + ' товарів';
+          document.getElementById('bcc-job-count').textContent = 'Переведено: ' + s.converted;
+          if (!s.running) { clearInterval(timer); location.replace(location.pathname + location.search); }
+        }).catch(function () {});
+    }, 1000);
+  }
   function q(sel, cur) { return root.querySelector(sel + '[data-cur="' + cur + '"]'); }
   function origin(cur) { return root.querySelector('input[name="origin_' + cur + '"]'); }
   function num(v) { return Number(String(v || '').trim().replace(',', '.')); }

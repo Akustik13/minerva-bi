@@ -131,7 +131,7 @@ def currency_view(model_admin, request):
         if not request.POST.get("confirm"):
             messages.warning(request, "Поставте галочку «Так, перевести» — нічого не змінено.")
         else:
-            done, skipped = 0, []
+            plan, skipped = [], []
             note = (request.POST.get("note") or "").strip()[:120]
             for cur, items in groups.items():
                 if not rates.get(cur):
@@ -139,14 +139,17 @@ def currency_view(model_admin, request):
                     continue
                 origin = (f"як для DigiKey: {_dk_rate_source()}"[:60] if same[cur]
                           else _origin(request.POST.get(f"origin_{cur}"), rates[cur], defaults[cur], home))
-                for p in items:
-                    if bp.convert(p, home, rates[cur], user=request.user, note=note, cents=cents, origin=origin):
-                        done += 1
-            messages.success(request, f"Базові ціни переведено в {home}: {done} товарів (записано в історію)."
-                             if done else "Нічого не переведено.")
+                plan += [(p.pk, rates[cur], origin) for p in items]
             if skipped:
                 messages.warning(request, f"Без курсу — не переведено ({len(skipped)}): " + ", ".join(skipped[:20]))
-            return redirect(reverse("admin:inventory_product_changelist") + f"?base_cur={home}")
+            if not plan:
+                messages.warning(request, "Нічого не переведено.")
+            elif bp.start_convert(plan, home, user=request.user, note=note, cents=cents):
+                messages.info(request, f"Переводжу базові ціни {len(plan)} товарів у {home} — хід видно вгорі. "
+                                       "Сторінку можна закрити: переведення не зупиниться.")
+            else:
+                messages.warning(request, "Уже йде інше переведення — дочекайтеся, поки воно закінчиться.")
+            return redirect(request.get_full_path())
     rows = []
     for p in products[:PREVIEW_ROWS]:
         cur = (p.base_price_currency or "").upper()
@@ -159,6 +162,16 @@ def currency_view(model_admin, request):
             "will": format(bp.converted(tiers[0]["unit_price"], rate, cents), "f") if rate else None,
         })
     ids = request.GET.get("ids") or request.POST.get("ids") or ""
+    job = bp.convert_state()
+    if job:
+        job["pct"] = int(100 * job.get("done", 0) / job["total"]) if job.get("total") else 100
+        try:
+            from datetime import datetime
+
+            from django.utils import timezone
+            job["when"] = timezone.localtime(datetime.fromisoformat(job["started"])).strftime("%d.%m.%Y %H:%M")
+        except (KeyError, TypeError, ValueError):
+            job["when"] = ""
     return render(request, "admin/inventory/product/base_currency.html", {
         **model_admin.admin_site.each_context(request),
         "title": f"💱 Базові ціни → {home}", "opts": Product._meta, "home": home,
@@ -171,7 +184,20 @@ def currency_view(model_admin, request):
         "rows": rows, "total": len(products), "more": max(0, len(products) - PREVIEW_ROWS),
         "ids": ids, "dk_rate_source": _dk_rate_source(), "cents": cents,
         "back_url": reverse("admin:inventory_product_changelist"),
+        "job": job, "job_status_url": reverse("admin:inventory_product_base_currency_status"),
+        "home_list_url": reverse("admin:inventory_product_changelist") + f"?base_cur={home}",
     })
+
+
+def currency_status_view(model_admin, request):
+    """Хід переведення для смуги на сторінці (JSON)."""
+    if not model_admin.has_change_permission(request):
+        raise PermissionDenied
+    from django.http import JsonResponse
+    st = bp.convert_state()
+    return JsonResponse({k: st.get(k) for k in ("running", "total", "done", "converted", "stalled", "finished",
+                                                "error")} | {"skipped": len(st.get("skipped") or []),
+                                                             "errors": len(st.get("errors") or [])})
 
 
 def card_config(product_id=None) -> dict:

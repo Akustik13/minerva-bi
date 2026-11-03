@@ -3,7 +3,10 @@
 Angebote перераховують їх у свою валюту за курсом."""
 from __future__ import annotations
 
+import logging
 import re
+import threading
+from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.utils import timezone
@@ -378,3 +381,104 @@ def history(product, limit: int = 10) -> list[dict]:
         older = items[i + 1].currency if i + 1 < len(items) else ""
         out.append({**describe(h, older), "when": timezone.localtime(h.created_at), "who": h.user_label or "—"})
     return out
+
+
+# ── 💱 Переведення багатьох товарів у фоні (сторінка «💱 Базові ціни → EUR») ────────────────────
+# Кожне збереження перераховує позиції магазинів і шле вебхук «stock.changed» сайту, тож 150 товарів по одному
+# тримали сторінку хвилину. Тепер — у фоні, пачками по CONVERT_CHUNK в одній транзакції (одна подія вебхука на
+# пачку), хід — у core.shared_cache (convert_state), сторінка показує смугу.
+
+logger = logging.getLogger(__name__)
+CONVERT_KEY, CONVERT_LOCK = "base-currency-convert", "base-currency-convert-lock"
+CONVERT_CHUNK = 20
+CONVERT_STALE = 180                   # стільки секунд без ходу — переведення вважається зупиненим
+CONVERT_LIST_MAX = 50                 # пропущені й помилки в стані — перші N
+BACKGROUND = True
+
+
+def _cache():
+    from core.shared_cache import cache
+    return cache
+
+
+def _save_state(st):
+    _cache().set(CONVERT_KEY, st, 7 * 24 * 3600)
+
+
+def convert_state() -> dict:
+    """Хід переведення: {running, total, done, converted, skipped, errors, home, by, started, beat, finished,
+    stalled}; {} — ще не запускали."""
+    st = dict(_cache().get(CONVERT_KEY) or {})
+    if st.get("running"):
+        try:
+            age = (timezone.now() - datetime.fromisoformat(st.get("beat") or st["started"])).total_seconds()
+        except (KeyError, TypeError, ValueError):
+            age = CONVERT_STALE + 1
+        if age > CONVERT_STALE:                 # процес перезапустили посеред роботи — можна почати знову
+            st.update(running=False, stalled=True)
+    return st
+
+
+def start_convert(plan, home: str, *, user=None, note: str = "", cents: bool = False) -> bool:
+    """plan — [(pk товару, курс, звідки курс)]. Переведення у фоні; False — уже йде інше."""
+    if not _cache().add(CONVERT_LOCK, 1, 3600):
+        if not convert_state().get("stalled"):
+            return False
+        _cache().set(CONVERT_LOCK, 1, 3600)
+    plan = [(int(pk), str(rate), (origin or "")[:60]) for pk, rate, origin in plan]
+    now = timezone.now().isoformat()
+    who = (user.get_username() if user is not None and getattr(user, "is_authenticated", False) else "") or ""
+    _save_state({"running": True, "total": len(plan), "done": 0, "converted": 0, "skipped": [], "errors": [],
+                 "home": home.upper(), "by": who, "started": now, "beat": now, "finished": ""})
+    args = (plan, home.upper(), getattr(user, "pk", None), note, cents)
+    if not BACKGROUND:
+        _convert_thread(*args, close=False)
+        return True
+    threading.Thread(target=_convert_thread, args=args, daemon=True, name="MinervaBaseCurrency").start()
+    return True
+
+
+def _convert_thread(plan, home, user_id, note, cents, close=True):
+    from django.db import connection
+    try:
+        _convert_run(plan, home, user_id, note, cents)
+    except Exception as exc:  # noqa: BLE001 — стан має закритись, інакше сторінка чекатиме вічно
+        logger.exception("Base prices → %s", home)
+        st = convert_state()
+        st.update(running=False, finished=timezone.now().isoformat(), error=str(exc)[:300])
+        _save_state(st)
+    finally:
+        _cache().delete(CONVERT_LOCK)
+        if close:
+            connection.close()
+
+
+def _convert_run(plan, home, user_id, note, cents):
+    from django.contrib.auth import get_user_model
+    from django.db import transaction
+
+    from inventory.models import Product
+    user = get_user_model().objects.filter(pk=user_id).first() if user_id else None
+    st = convert_state()
+    for i in range(0, len(plan), CONVERT_CHUNK):
+        chunk = plan[i:i + CONVERT_CHUNK]
+        products = {p.pk: p for p in Product.objects.filter(pk__in=[pk for pk, _, _ in chunk])}
+        with transaction.atomic():              # вебхук «stock.changed» — одна подія на всю пачку
+            for pk, rate, origin in chunk:
+                p = products.get(pk)
+                try:
+                    with transaction.atomic():  # один товар з помилкою не відкочує пачку
+                        done = bool(p) and convert(p, home, Decimal(rate), user=user, note=note, cents=cents,
+                                                   origin=origin)
+                except Exception as exc:  # noqa: BLE001
+                    if len(st["errors"]) < CONVERT_LIST_MAX:
+                        st["errors"].append([p.sku if p else str(pk), str(exc)[:200]])
+                    continue
+                if done:
+                    st["converted"] += 1
+                elif len(st["skipped"]) < CONVERT_LIST_MAX:
+                    st["skipped"].append(p.sku if p else str(pk))
+        st.update(done=min(i + len(chunk), len(plan)), beat=timezone.now().isoformat())
+        _save_state(st)
+    st.update(running=False, finished=timezone.now().isoformat())
+    _save_state(st)
