@@ -215,6 +215,15 @@ def _finish(task, note='', error='', cancelled=False):
     summary = (task.summary or '') + (f'\n\n⚠️ {note}' if note else '')
     AgentTask.objects.filter(pk=task.pk).update(status=status, summary=summary.strip(), error=error[:500],
                                                 finished_at=timezone.now(), heartbeat_at=timezone.now())
+    if not cancelled:                                   # 🔔 лист і Telegram власнику (agent/notify.py)
+        from agent import notify
+        try:
+            done = notify.task_finished(task.pk, note)
+        except Exception as e:  # noqa: BLE001 — повідомлення не має ламати завдання
+            logger.warning('agent notify task %s: %s', task.pk, e)
+            done = ''
+        if done:
+            _log(task, done)
 
 
 def _claim(task) -> bool:
