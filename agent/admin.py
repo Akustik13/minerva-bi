@@ -1,11 +1,19 @@
-"""🤖 Доручення агента й 📜 журнал — лише власні скриньки (пошта — лише її власника, і для адміністратора)."""
+"""🤖 Доручення агента й 📜 журнал — лише власні скриньки (пошта — лише її власника, і для адміністратора);
+🤖 Завдання агенту — лише свої (сторінка перевірки: ✓ / ✕ пропозицій, лист, зупинити / продовжити)."""
+from decimal import Decimal, InvalidOperation
+
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
+from django.http import Http404, JsonResponse
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
 from agent import mail as agent_mail
-from agent.models import AgentRule, AgentRun
+from agent import products as product_fields
+from agent.models import AgentProposal, AgentRule, AgentRun, AgentTask
 
 STATUS_ICONS = {AgentRun.QUEUED: '⏳', AgentRun.RUNNING: '⚙️', AgentRun.DRAFTED: '📝', AgentRun.SCHEDULED: '✉️',
                 AgentRun.SKIPPED: '↷', AgentRun.FAILED: '⚠️'}
@@ -197,3 +205,183 @@ class AgentRunAdmin(admin.ModelAdmin):
     @admin.display(description='Результат')
     def result(self, obj):
         return _result_link(obj) or '—'
+
+
+# ── 🤖 Завдання агенту ───────────────────────────────────────────────────────
+
+class AgentTaskForm(forms.ModelForm):
+    class Meta:
+        model = AgentTask
+        fields = ['instruction', 'products', 'each_product', 'web', 'model', 'budget_usd']
+        widgets = {'instruction': forms.Textarea(attrs={
+            'rows': 6, 'placeholder': 'Напр.: Знайди в даташитах вагу однієї штуки й країну виробника і внеси. '
+                                      'Або: Знайди даташити цих антен і надішли їх на anna@kunde.de з коротким листом.'})}
+
+    def clean(self):
+        data = super().clean()
+        if data.get('each_product') and not data.get('products'):
+            raise forms.ValidationError('«Окремо для кожного товару» — виберіть товари.')
+        return data
+
+
+@admin.register(AgentTask)
+class AgentTaskAdmin(admin.ModelAdmin):
+    form = AgentTaskForm
+    list_display = ('created_at', 'title', 'status_col', 'products_col', 'proposals_col', 'cost_col')
+    list_filter = ('status',)
+    search_fields = ('title', 'instruction')
+    autocomplete_fields = ('products',)
+    fieldsets = ((None, {
+        'fields': ('instruction', 'products', 'each_product', 'web', 'model', 'budget_usd'),
+        'description': 'Напишіть завдання своїми словами. Агент читає картки товарів і їхні даташити (і за '
+                       'бажанням — сайти виробників), а потім ПРОПОНУЄ зміни: ви бачите «було → стане» з цитатою '
+                       'з джерела й підтверджуєте ✓. Лист агент лише готує — і лише на адреси, які ви написали тут.',
+    }),)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(owner=request.user)
+
+    def get_changeform_initial_data(self, request):
+        data = super().get_changeform_initial_data(request)
+        ids = [int(x) for x in (request.GET.get('ids') or '').split(',') if x.strip().isdigit()][:1000]
+        if ids:
+            data['products'] = ids
+            data['each_product'] = len(ids) > 5
+        return data
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and obj.owner_id != request.user.pk:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.owner_id != request.user.pk:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.owner = request.user
+        first = next((ln.strip() for ln in obj.instruction.splitlines() if ln.strip()), 'Завдання')
+        obj.title = first[:200]
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if not change:                                  # товари вже збережено (M2M) — можна починати
+            from agent import tasks
+            tasks.start(form.instance)
+
+    def response_add(self, request, obj, post_url_continue=None):
+        return redirect(reverse('admin:agent_agenttask_review', args=[obj.pk]))
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        return redirect(reverse('admin:agent_agenttask_review', args=[object_id]))
+
+    def get_urls(self):
+        from django.urls import path
+        own = [
+            path('<int:pk>/review/', self.admin_site.admin_view(self.review_view), name='agent_agenttask_review'),
+            path('<int:pk>/status/', self.admin_site.admin_view(self.status_view), name='agent_agenttask_status'),
+        ]
+        return own + super().get_urls()
+
+    def _task(self, request, pk):
+        task = AgentTask.objects.filter(pk=pk, owner=request.user).first()
+        if task is None:
+            raise Http404
+        return task
+
+    def status_view(self, request, pk):
+        task = self._task(request, pk)
+        return JsonResponse({
+            'status': task.status, 'label': task.get_status_display(),
+            'running': task.status in (AgentTask.QUEUED, AgentTask.RUNNING),
+            'done': len(task.done_products or []), 'total': task.products.count(),
+            'cost': f'{task.cost_usd:.2f}', 'pending': task.proposals.filter(status=AgentProposal.PENDING).count(),
+            'log': [e.get('text', '') for e in (task.log or [])[-6:]],
+        })
+
+    def review_view(self, request, pk):
+        task = self._task(request, pk)
+        if request.method == 'POST':
+            self._decide(request, task)
+            return redirect(reverse('admin:agent_agenttask_review', args=[task.pk]))
+        rows = []
+        for p in task.proposals.exclude(kind=AgentProposal.MAIL).select_related('product'):
+            p.label = product_fields.label(p)
+            p.source_url = p.source if p.source.startswith(('http://', 'https://')) else ''
+            rows.append(p)
+        context = {
+            **self.admin_site.each_context(request),
+            'title': task.title, 'task': task, 'rows': rows,
+            'mails': list(task.proposals.filter(kind=AgentProposal.MAIL)),
+            'pending': sum(1 for p in rows if p.status == AgentProposal.PENDING),
+            'running': task.status in (AgentTask.QUEUED, AgentTask.RUNNING),
+            'stopped': task.status in (AgentTask.FAILED, AgentTask.CANCELLED),
+            'total': task.products.count(), 'done': len(task.done_products or []),
+            'can_apply': request.user.has_perm('inventory.change_product'),
+            'log': list(reversed((task.log or [])[-80:])),
+            'back_url': reverse('admin:agent_agenttask_changelist'),
+        }
+        return TemplateResponse(request, 'admin/agent/agenttask/review.html', context)
+
+    def _decide(self, request, task):
+        """POST сторінки перевірки: apply / reject (ids), mail_draft / mail_send (pid + правки), cancel, resume."""
+        from agent import decide, tasks
+        action = request.POST.get('action', '')
+        ids = [int(x) for x in request.POST.getlist('ids') if x.isdigit()]
+        if action == 'apply':
+            out = decide.apply_selected(task, ids, request.user)
+            if out['applied']:
+                messages.success(request, f'✓ Застосовано: {out["applied"]}')
+            for line in out['failed'][:10]:
+                messages.error(request, f'⚠️ {line}')
+        elif action == 'reject':
+            messages.info(request, f'✕ Відхилено: {decide.reject_selected(task, ids, request.user)}')
+        elif action in ('mail_draft', 'mail_send'):
+            p = task.proposals.filter(pk=request.POST.get('pid') or 0, kind=AgentProposal.MAIL,
+                                      status=AgentProposal.PENDING).first()
+            error = 'лист уже оброблено' if p is None else decide.mail(
+                p, request.user, send=action == 'mail_send', to=request.POST.get('to', ''),
+                subject=request.POST.get('subject', ''), body=request.POST.get('body', ''))
+            if error:
+                messages.error(request, f'⚠️ {error}')
+            elif action == 'mail_draft':
+                messages.success(request, '📝 Чернетка листа готова — відкрийте її нижче')
+            else:
+                messages.success(request, '✉️ Лист у «⏳ Запланованих» — піде протягом 2 хв (ще можна скасувати)')
+        elif action == 'cancel':
+            AgentTask.objects.filter(pk=task.pk, status__in=(AgentTask.QUEUED, AgentTask.RUNNING)).update(
+                status=AgentTask.CANCELLED)
+            messages.info(request, '⏹ Агента зупинено — знайдене лишається')
+        elif action == 'resume':
+            try:
+                budget = Decimal((request.POST.get('budget') or '').replace(',', '.'))
+                if budget > 0:
+                    AgentTask.objects.filter(pk=task.pk).update(budget_usd=min(budget, Decimal('500')))
+            except (InvalidOperation, ValueError):
+                pass
+            task.refresh_from_db()
+            if tasks.resume(task):
+                messages.info(request, '▶ Агент продовжує')
+
+    @admin.display(description='Стан', ordering='status')
+    def status_col(self, obj):
+        return obj.get_status_display()
+
+    @admin.display(description='Товарів')
+    def products_col(self, obj):
+        total = obj.products.count()
+        return f'{len(obj.done_products or [])} / {total}' if obj.each_product else (total or 'сам шукає')
+
+    @admin.display(description='Пропозицій')
+    def proposals_col(self, obj):
+        props = obj.proposals.all()
+        pending = props.filter(status=AgentProposal.PENDING).count()
+        applied = props.filter(status=AgentProposal.APPLIED).count()
+        return f'👀 {pending} · ✓ {applied}' if pending or applied else '—'
+
+    @admin.display(description='Витрачено')
+    def cost_col(self, obj):
+        return f'{obj.cost_usd:.2f} $'

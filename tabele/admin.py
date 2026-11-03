@@ -71,7 +71,7 @@ def _get_app_list(self, request, app_label=None):
         'offers':          ['offer', 'offersettings', 'offerrevision'],
         'worktime':        ['workday', 'danteproject', 'workreport', 'danteuser', 'booking', 'dantesettings'],
         'email_assistant': ['emailaccount', 'emailsettings', 'mailcategory', 'emailmessage', 'emailthread'],
-        'agent':           ['agentrule', 'agentrun'],
+        'agent':           ['agenttask', 'agentrule', 'agentrun'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',
                       'inventorytransaction', 'reorderproxy', 'supplier',

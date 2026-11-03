@@ -1,0 +1,165 @@
+{% extends "admin/base_site.html" %}
+{# 🤖 Завдання агенту — перевірка: «було → стане» з цитатою, ✓ / ✕, листи, зупинити / продовжити (agent/admin.py) #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{{ back_url }}">🤖 Завдання агенту</a> &rsaquo; <span translate="no">{{ task.title }}</span>
+</div>
+{% endblock %}
+{% block content %}
+<style>
+  #agt { max-width: 1200px; }
+  #agt .agt-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; padding: 14px 16px; margin: 0 0 14px; }
+  #agt .agt-muted { color: var(--text-muted); font-size: 12px; }
+  #agt .agt-pre { white-space: pre-wrap; font-size: 13px; line-height: 1.5; }
+  #agt .agt-head { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  #agt .agt-badge { font-weight: 600; font-size: 14px; }
+  #agt .agt-stats { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+  #agt table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  #agt th { text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px;
+    padding: 6px 8px; border-bottom: 2px solid var(--border-strong); }
+  #agt td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  #agt td.new { font-weight: 600; }
+  #agt .agt-quote { font-size: 12px; color: var(--text-muted); max-width: 380px; }
+  #agt .agt-quote q { font-style: italic; }
+  #agt .agt-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+  #agt tr.done td { opacity: .6; }
+  #agt .agt-mail label { display: block; font-size: 11px; color: var(--text-muted); margin: 8px 0 2px; }
+  #agt .agt-mail input[type=text], #agt .agt-mail textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; }
+  #agt .agt-log { font-size: 12px; font-family: monospace; max-height: 320px; overflow-y: auto; }
+  #agt .agt-log div { padding: 1px 0; border-bottom: 1px dotted var(--border); }
+  #agt .conf-low { color: var(--warn, #d97706); }
+</style>
+<div id="agt">
+  <div class="agt-card">
+    <div class="agt-head">
+      <span class="agt-badge" id="agt-status">{{ task.get_status_display }}</span>
+      {% if running %}
+        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="cancel">
+          <button type="submit" class="button">⏹ Зупинити</button></form>
+      {% elif stopped or task.status == 'review' or task.status == 'done' %}
+        <form method="post" style="display:flex;gap:6px;align-items:center">{% csrf_token %}
+          <input type="hidden" name="action" value="resume">
+          <span class="agt-muted">Ліміт, $</span>
+          <input type="text" name="budget" value="{{ task.budget_usd }}" style="width:70px">
+          <button type="submit" class="button" title="Агент продовжить з того самого місця; знайдене лишається">▶ Продовжити</button>
+        </form>
+      {% endif %}
+    </div>
+    <div class="agt-stats">
+      <span>Товарів: {% if task.each_product %}<span id="agt-done">{{ done }}</span> з {{ total }} (окремо для кожного){% else %}{{ total|default:"шукає сам" }}{% endif %}</span>
+      <span>Витрачено: <span id="agt-cost">{{ task.cost_usd|floatformat:2 }}</span> $ з {{ task.budget_usd }} $</span>
+      <span>{{ task.get_model_display|truncatechars:22 }}</span>
+      {% if task.web %}<span>🌐 пошуків: {{ task.web_searches }}</span>{% endif %}
+    </div>
+    {% if task.error %}<div style="margin-top:8px;color:var(--error,#dc2626)">⚠️ {{ task.error }}</div>{% endif %}
+    <div class="agt-muted" style="margin-top:10px">Завдання</div>
+    <div class="agt-pre" translate="no">{{ task.instruction }}</div>
+    {% if running %}<div class="agt-muted" id="agt-live" style="margin-top:10px">⏳ Агент працює… сторінка оновиться сама.</div>{% endif %}
+  </div>
+
+  {% if task.summary %}
+  <div class="agt-card">
+    <div class="agt-muted">Що зробив агент</div>
+    <div class="agt-pre" translate="no">{{ task.summary }}</div>
+  </div>
+  {% endif %}
+
+  {% if rows %}
+  <div class="agt-card">
+    <form method="post">{% csrf_token %}
+      <div class="agt-head">
+        <b>Зміни в товарах</b>
+        <span class="agt-muted">{{ pending }} чекають вашої перевірки · нічого не змінено, поки ви не натиснете ✓</span>
+      </div>
+      <table>
+        <thead><tr>
+          <th><input type="checkbox" checked onclick="document.querySelectorAll('#agt input[name=ids]').forEach(function(c){ if(!c.disabled) c.checked = this.checked; }, this)"></th>
+          <th>Товар</th><th>Що</th><th>Було</th><th>Стане</th><th>Підстава</th><th>Стан</th>
+        </tr></thead>
+        <tbody>
+        {% for p in rows %}
+          <tr class="{% if p.status != 'pending' %}done{% endif %}">
+            <td><input type="checkbox" name="ids" value="{{ p.pk }}" {% if p.status == 'pending' %}checked{% else %}disabled{% endif %}></td>
+            <td translate="no">{% if p.product %}<a href="{% url 'admin:inventory_product_change' p.product.pk %}" target="_blank">{{ p.product.sku }}</a>{% endif %}</td>
+            <td>{{ p.label }}</td>
+            <td translate="no">{{ p.old_value|default:"—" }}</td>
+            <td class="new" translate="no">{{ p.new_value }}</td>
+            <td class="agt-quote"><q translate="no">{{ p.evidence|truncatechars:300 }}</q><br>
+              {% if p.source_url %}<a href="{{ p.source_url }}" target="_blank" rel="noopener noreferrer" translate="no">{{ p.source|truncatechars:60 }}</a>{% else %}<span translate="no">{{ p.source }}</span>{% endif %}
+              {% if p.confidence %}<span class="{% if p.confidence == 'low' %}conf-low{% endif %}"> · впевненість: {% if p.confidence == 'high' %}висока{% elif p.confidence == 'medium' %}середня{% else %}низька{% endif %}</span>{% endif %}</td>
+            <td>{{ p.get_status_display }}{% if p.error %}<br><span class="agt-muted">{{ p.error }}</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% if pending %}
+      <div class="agt-actions">
+        {% if can_apply %}<button type="submit" name="action" value="apply" class="button default">✓ Застосувати вибрані</button>
+        {% else %}<span class="agt-muted">Застосувати може той, хто має право змінювати товари.</span>{% endif %}
+        <button type="submit" name="action" value="reject" class="button">✕ Відхилити вибрані</button>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+  {% endif %}
+
+  {% for m in mails %}
+  <div class="agt-card agt-mail">
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="pid" value="{{ m.pk }}">
+      <div class="agt-head"><b>✉️ Лист</b> <span class="agt-muted">{{ m.get_status_display }}</span>
+        {% if m.result_url %}<a href="{{ m.result_url }}" target="_blank">{% if 'compose' in m.result_url %}📝 відкрити чернетку{% else %}⏳ запланований лист{% endif %}</a>{% endif %}
+        {% if m.error %}<span class="agt-muted">⚠️ {{ m.error }}</span>{% endif %}</div>
+      <label>Кому <span class="agt-muted">— лише адреси з тексту завдання</span></label>
+      <input type="text" name="to" value="{{ m.mail_to }}" {% if m.status != 'pending' %}readonly{% endif %} translate="no">
+      <label>Тема</label>
+      <input type="text" name="subject" value="{{ m.mail_subject }}" {% if m.status != 'pending' %}readonly{% endif %} translate="no">
+      <label>Текст</label>
+      <textarea name="body" rows="8" {% if m.status != 'pending' %}readonly{% endif %} translate="no">{{ m.mail_body }}</textarea>
+      {% if m.mail_attach %}<div class="agt-muted" style="margin-top:6px">📎 Даташити: <span translate="no">{{ m.mail_attach|join:", " }}</span></div>{% endif %}
+      {% if m.status == 'pending' %}
+      <div class="agt-actions">
+        <button type="submit" name="action" value="mail_draft" class="button">📝 Відкрити як чернетку</button>
+        <button type="submit" name="action" value="mail_send" class="button default" onclick="return confirm('Надіслати цей лист зараз? Він стане в «Заплановані» й піде протягом 2 хвилин.')">✉️ Надіслати</button>
+        <button type="submit" name="action" value="reject" class="button">✕ Не надсилати</button>
+        <input type="hidden" name="ids" value="{{ m.pk }}">
+      </div>
+      {% endif %}
+    </form>
+  </div>
+  {% endfor %}
+
+  {% if not rows and not mails and not running %}
+  <div class="agt-card agt-muted">Агент нічого не запропонував. Що він знайшов і чого ні — у підсумку вище й у кроках нижче.</div>
+  {% endif %}
+
+  <details class="agt-card" {% if running %}open{% endif %}>
+    <summary><b>Кроки агента</b> <span class="agt-muted">({{ task.log|length }})</span></summary>
+    <div class="agt-log" id="agt-log" translate="no">
+      {% for e in log %}<div>{{ e.at|slice:"11:19" }} {{ e.text }}</div>{% empty %}<div class="agt-muted">ще немає</div>{% endfor %}
+    </div>
+  </details>
+</div>
+{% if running %}
+<script>
+(function () {
+  var url = '{% url "admin:agent_agenttask_status" task.pk %}';
+  function tick() {
+    fetch(url, {credentials: 'same-origin'}).then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.running) { location.reload(); return; }
+      document.getElementById('agt-status').textContent = d.label;
+      document.getElementById('agt-cost').textContent = d.cost;
+      var done = document.getElementById('agt-done');
+      if (done) done.textContent = d.done;
+      var live = document.getElementById('agt-live');
+      if (live) live.textContent = '⏳ ' + (d.log[d.log.length - 1] || 'Агент працює…') + (d.pending ? ' · пропозицій: ' + d.pending : '');
+      setTimeout(tick, 3000);
+    }).catch(function () { setTimeout(tick, 6000); });
+  }
+  setTimeout(tick, 2000);
+})();
+</script>
+{% endif %}
+{% endblock %}

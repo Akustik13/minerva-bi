@@ -1,7 +1,7 @@
-"""🤖 Агент Minerva — доручення («на такі листи відповідай так») і журнал його роботи.
+"""🤖 Агент Minerva — доручення («на такі листи відповідай так»), завдання («знайди й внеси …») і журнал.
 
-Логіка — agent/mail.py (листи), рівні ризику дій — agent/risk.py. Доручення належить скриньці: пошта — лише
-власника, тож і доручення бачить і змінює лише він (адмінка, сторінки агента).
+Логіка — agent/mail.py (листи), agent/tasks.py + agent/tools.py (завдання), рівні ризику дій — agent/risk.py.
+Доручення належить скриньці (пошта — лише власника), завдання — людині, що його дала: бачить і змінює лише вона.
 """
 from django.conf import settings
 from django.db import models
@@ -117,3 +117,97 @@ class AgentRun(models.Model):
 
     def __str__(self):
         return f'{self.rule} · {self.message_id}'
+
+
+class AgentTask(models.Model):
+    """Завдання агенту словами людини: «знайди вагу в даташитах і внеси», «знайди даташити й надішли на …».
+    Агент читає товари й даташити (agent/tools.py) і лише ПРОПОНУЄ зміни (AgentProposal) — застосовує людина."""
+    QUEUED, RUNNING, REVIEW, DONE, FAILED, CANCELLED = 'queued', 'running', 'review', 'done', 'failed', 'cancelled'
+    STATUSES = [
+        (QUEUED, '⏳ У черзі'),
+        (RUNNING, '⚙️ Агент працює'),
+        (REVIEW, '👀 Чекає вашої перевірки'),
+        (DONE, '✅ Готово'),
+        (FAILED, '⚠️ Помилка'),
+        (CANCELLED, '✕ Зупинено'),
+    ]
+    MODELS = [
+        ('claude-opus-5-5', 'Claude Opus 5.5 — найточніше · $4 / $20 за 1 млн токенів'),
+        ('claude-sonnet-5-5', 'Claude Sonnet 5.5 — швидко й якісно · $2 / $10'),
+        ('claude-haiku-5-5', 'Claude Haiku 5.5 — найдешевше · $0.10 / $0.50'),
+    ]
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='agent_tasks',
+                              verbose_name='Хто дав завдання')
+    title = models.CharField('Завдання', max_length=200)
+    instruction = models.TextField('Що зробити')
+    products = models.ManyToManyField('inventory.Product', blank=True, related_name='+', verbose_name='Товари')
+    each_product = models.BooleanField(
+        'Окремо для кожного товару', default=False,
+        help_text='Агент проходить вибрані товари по одному (для сотень товарів). Лист у цьому режимі не готує.')
+    web = models.BooleanField('Можна шукати в інтернеті', default=False,
+                              help_text='Пошук на сайтах виробників, коли в Minerva даних немає (дорожче).')
+    model = models.CharField('Модель AI', max_length=40, choices=MODELS, default='claude-opus-5-5')
+    budget_usd = models.DecimalField('Найбільше витратити, $', max_digits=8, decimal_places=2, default=2,
+                                     help_text='Досягнуто — агент зупиняється, знайдене лишається.')
+    status = models.CharField('Стан', max_length=12, choices=STATUSES, default=QUEUED, db_index=True)
+    done_products = models.JSONField(default=list, blank=True, help_text='pk товарів, які агент уже пройшов')
+    summary = models.TextField('Що зробив агент', blank=True, default='')
+    error = models.CharField('Помилка', max_length=500, blank=True, default='')
+    log = models.JSONField(default=list, blank=True, help_text='Кроки агента: [{at, text}]')
+    input_tokens = models.PositiveIntegerField(default=0)
+    output_tokens = models.PositiveIntegerField(default=0)
+    web_searches = models.PositiveIntegerField(default=0)
+    cost_usd = models.DecimalField('Витрачено, $', max_digits=8, decimal_places=4, default=0)
+    attempts = models.PositiveSmallIntegerField(default=0, help_text='Скільки разів роботу продовжено після перерви')
+    created_at = models.DateTimeField('Створено', auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Завдання агенту'
+        verbose_name_plural = '🤖 Завдання агенту'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+
+
+class AgentProposal(models.Model):
+    """Що агент пропонує змінити: поле товару, технічний параметр або лист. Застосовує лише людина (✓)."""
+    FIELD, ATTRIBUTE, MAIL = 'field', 'attribute', 'mail'
+    KINDS = [(FIELD, 'Поле товару'), (ATTRIBUTE, 'Технічний параметр'), (MAIL, 'Лист')]
+    PENDING, APPLIED, REJECTED, FAILED = 'pending', 'applied', 'rejected', 'failed'
+    STATUSES = [(PENDING, '👀 Чекає'), (APPLIED, '✓ Застосовано'), (REJECTED, '✕ Відхилено'),
+                (FAILED, '⚠️ Не вдалося')]
+
+    task = models.ForeignKey(AgentTask, on_delete=models.CASCADE, related_name='proposals', verbose_name='Завдання')
+    kind = models.CharField('Що', max_length=10, choices=KINDS)
+    product = models.ForeignKey('inventory.Product', null=True, blank=True, on_delete=models.CASCADE,
+                                related_name='+', verbose_name='Товар')
+    field = models.CharField('Поле / параметр', max_length=200, blank=True, default='')
+    old_value = models.TextField('Було', blank=True, default='')
+    new_value = models.TextField('Стане', blank=True, default='')
+    evidence = models.TextField('Підстава (цитата)', blank=True, default='')
+    source = models.CharField('Звідки', max_length=500, blank=True, default='')
+    confidence = models.CharField('Впевненість', max_length=10, blank=True, default='')
+    mail_to = models.CharField('Кому', max_length=500, blank=True, default='')
+    mail_subject = models.CharField('Тема', max_length=500, blank=True, default='')
+    mail_body = models.TextField('Текст листа', blank=True, default='')
+    mail_attach = models.JSONField(default=list, blank=True, help_text='Артикули, чиї даташити додати до листа')
+    status = models.CharField('Стан', max_length=10, choices=STATUSES, default=PENDING, db_index=True)
+    error = models.CharField('Помилка', max_length=500, blank=True, default='')
+    result_url = models.CharField(max_length=300, blank=True, default='', help_text='Чернетка / запланований лист')
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='+')
+    decided_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Пропозиція агента'
+        verbose_name_plural = 'Пропозиції агента'
+        ordering = ['product__sku', 'pk']
+
+    def __str__(self):
+        return f'{self.get_kind_display()}: {self.field or self.mail_subject}'

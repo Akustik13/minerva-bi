@@ -24,6 +24,13 @@ ACTIONS = {
     'mail.facts': Action('Факти з Minerva про лист: замовлення, відправлення, склад, клієнт', READ),
     'mail.draft': Action('Зберегти чернетку відповіді в «📝 Чернетках»', INTERNAL),
     'mail.send':  Action('Надіслати відповідь співрозмовнику гілки (через кілька хвилин, можна скасувати)', EXTERNAL),
+    # завдання (agent/tasks.py, agent/tools.py): агент лише читає й пропонує, застосовує людина (agent/decide.py)
+    'product.read':    Action('Картка товару, пошук товарів', READ),
+    'datasheet.read':  Action('Текст даташита товару', READ),
+    'web.search':      Action('Пошук в інтернеті (якщо дозволено в завданні)', READ),
+    'product.propose': Action('Запропонувати поле чи параметр товару — застосовує людина (✓)', INTERNAL),
+    'mail.propose':    Action('Підготувати лист на адресу з тексту завдання — надсилає людина', INTERNAL),
+    'product.price':   Action('Ціни, залишки, видимість у магазині й на DigiKey', NEVER),
 }
 
 
