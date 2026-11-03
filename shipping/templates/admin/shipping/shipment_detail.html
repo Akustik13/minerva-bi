@@ -1247,13 +1247,13 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     📦 {% trans "Зберегти упаковку для товарів" %}
   </div>
   <p style="color:var(--text);font-size:13px;margin:0 0 10px">
-    {% trans "Наступні товари не мають налаштованої упаковки. Перейняти параметри посилки" %} ({% with pkg=shipment.packages.first %}{% if pkg %}{{pkg.length_cm}}×{{pkg.width_cm}}×{{pkg.height_cm}} {% trans "см" %}, {{pkg.weight_kg}} {% trans "кг" %}{% else %}{{shipment.length_cm}}×{{shipment.width_cm}}×{{shipment.height_cm}} {% trans "см" %}, {{shipment.weight_kg}} {% trans "кг" %}{% endif %}{% endwith %}) {% trans "і зберегти як упаковку?" %}
+    {% trans "Minerva ще не знає, що ці товари поміщаються в таку коробку стільки штук. Запам'ятати — і наступного разу рекомендувати так само?" %}
   </p>
   <ul style="margin:0 0 12px;padding-left:20px;color:var(--text);font-size:13px">
     {% for item in suggest_packaging %}
     <li style="margin-bottom:3px">
-      <code style="color:var(--text);font-weight:700">{{ item.sku }}</code>
-      <span style="color:var(--text)"> — {{ item.product_name }}</span>
+      <code style="color:var(--text);font-weight:700" translate="no">{{ item.sku }}</code>
+      <span style="color:var(--text)"> — <span translate="no">{{ item.product_name }}</span> · <span translate="no">{{ item.dims }}</span> · {% trans "до" %} {{ item.qty }} {% trans "шт у коробці" %}</span>
     </li>
     {% endfor %}
   </ul>

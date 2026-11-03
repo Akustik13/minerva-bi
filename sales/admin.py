@@ -1572,117 +1572,61 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     doc_templates_panel.short_description = "📄 Word шаблони"
 
     def packaging_panel(self, obj):
-        """Рекомендована упаковка на основі товарів замовлення."""
+        """Рекомендована упаковка замовлення — `shipping.services.packaging.recommend`:
+        📜 так само вже відправляли, інакше упаковки товарів (позиції ділять коробку)."""
         if not obj.pk:
             return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
-
-        lines = list(obj.lines.select_related('product').all())
-        if not lines:
-            return mark_safe('<span style="color:#607d8b">— рядків замовлення немає</span>')
-
         try:
-            from shipping.models import ProductPackaging
+            from shipping.services.packaging import recommend
         except ImportError:
             return mark_safe('<span style="color:#607d8b">— модуль shipping недоступний</span>')
 
-        def _pick_rec(product, qty):
-            """Return (rec, auto_selected). Prefers is_default; falls back to best fit."""
-            rec = ProductPackaging.objects.filter(
-                product=product, is_default=True
-            ).select_related('packaging').first()
-            if rec:
-                return rec, False
-            all_recs = list(
-                ProductPackaging.objects.filter(product=product)
-                .select_related('packaging').all()
-            )
-            if not all_recs:
-                return None, False
-            qty_f = float(qty)
-            best = min(
-                all_recs,
-                key=lambda r: (
-                    int(-(-qty_f // r.qty_per_box)) if r.qty_per_box > 0 else 9999,
-                    -r.qty_per_box,
-                )
-            )
-            return best, True
+        rec = recommend(obj)
+        if not rec:
+            return mark_safe('<span style="color:#607d8b">— рядків замовлення немає</span>')
 
-        import json as _json, html as _html
-        from collections import defaultdict
+        def _grams(v):
+            return f'{int(round(v))} г'
 
         rows_html = []
-        total_weight_g = 0
-        has_missing_weight = False
-        best_box = None
-        # agg[packaging_id] = {"pk": id, "qty_boxes": N, "weight_g": M}
-        agg = defaultdict(lambda: {"pk": 0, "qty_boxes": 0, "weight_g": 0})
-
-        for line in lines:
-            product = line.product
+        for info in rec.lines:
+            line, product = info.line, info.line.product
+            sku = escape(product.sku if product else (line.sku_raw or "?"))
+            qty = escape(f'{line.qty.normalize():f}' if line.qty is not None else '')
             if not product:
-                rows_html.append(
-                    f'<tr><td style="color:#9aafbe">{line.sku_raw or "?"}</td>'
-                    f'<td style="color:#9aafbe">{line.qty}</td>'
-                    f'<td style="color:#607d8b">— товар не в базі</td>'
-                    f'<td style="color:#607d8b">—</td></tr>'
-                )
-                continue
-
-            rec, auto_selected = _pick_rec(product, line.qty)
-
-            if rec:
-                box_str = str(rec.packaging)
-                boxes_needed = max(1, int(-(-float(line.qty) // rec.qty_per_box)))  # ceil
-                auto_badge = (
+                pack = '<span style="color:#607d8b">— товар не в базі</span>'
+            elif rec.source == 'history':
+                pack = '<span style="color:#80cbc4">📜 як минулого разу</span>'
+            elif info.rec:
+                badge = (
                     ' <span title="Підібрано автоматично зі списку упаковок товару" '
                     'style="font-size:10px;background:#1e3a24;color:#81c784;padding:1px 6px;'
                     'border-radius:4px;border:1px solid #2e7d32">🤖 Авто</span>'
-                    if auto_selected else ''
+                    if info.auto else ''
                 )
-                notes_hint = ''
-                if auto_selected and rec.notes:
-                    notes_hint = (
-                        f' <span style="font-size:10px;color:#607d8b" '
-                        f'title="{rec.notes}">({rec.notes[:40]}{"…" if len(rec.notes)>40 else ""})</span>'
-                    )
-                if rec.estimated_weight_g:
-                    line_weight = rec.estimated_weight_g * boxes_needed
-                    total_weight_g += line_weight
-                    weight_str = f'{line_weight} г'
-                    if best_box is None:
-                        best_box = rec.packaging
-                    # Accumulate for auto-fill
-                    pkg_id = rec.packaging_id
-                    agg[pkg_id]["pk"] = pkg_id
-                    agg[pkg_id]["qty_boxes"] += boxes_needed
-                    agg[pkg_id]["weight_g"] += float(line_weight)
-                else:
-                    weight_str = '<span style="color:#ff9800">⚠️ не вказана</span>'
-                    has_missing_weight = True
-                    # Still track packaging even without weight
-                    pkg_id = rec.packaging_id
-                    agg[pkg_id]["pk"] = pkg_id
-                    agg[pkg_id]["qty_boxes"] += boxes_needed
-                rows_html.append(
-                    f'<tr>'
-                    f'<td style="color:#9aafbe;font-family:monospace">{product.sku}</td>'
-                    f'<td style="color:#c9d8e4;text-align:center">{line.qty}</td>'
-                    f'<td style="color:#80cbc4">{box_str} × {boxes_needed}{auto_badge}{notes_hint}</td>'
-                    f'<td style="color:#aed581">{weight_str}</td>'
-                    f'</tr>'
-                )
+                notes = ''
+                if info.auto and info.rec.notes:
+                    n = info.rec.notes
+                    notes = (f' <span style="font-size:10px;color:#607d8b" title="{escape(n)}">'
+                             f'({escape(n[:40])}{"…" if len(n) > 40 else ""})</span>')
+                pack = (f'<span style="color:#80cbc4" translate="no">{escape(info.rec.packaging)}</span>'
+                        f' <span style="color:#9aafbe">· до {info.capacity} шт у коробці</span>'
+                        f'{badge}{notes}')
             else:
-                rows_html.append(
-                    f'<tr>'
-                    f'<td style="color:#9aafbe;font-family:monospace">{product.sku}</td>'
-                    f'<td style="color:#c9d8e4;text-align:center">{line.qty}</td>'
-                    f'<td style="color:#607d8b">— упаковку не налаштовано '
-                    f'<a href="/admin/inventory/product/{product.pk}/change/#packaging" '
-                    f'target="_blank" style="color:#2196f3">налаштувати</a></td>'
-                    f'<td style="color:#607d8b">—</td>'
-                    f'</tr>'
-                )
+                pack = (f'<span style="color:#607d8b">— упаковку не налаштовано '
+                        f'<a href="/admin/inventory/product/{product.pk}/change/#packaging" '
+                        f'target="_blank" style="color:#2196f3">налаштувати</a></span>')
+            if not product:
+                weight = '—'
+            elif info.weight_g is None:
+                weight = '<span style="color:#ff9800">⚠️ не вказана</span>'
+            else:
+                weight = ('≈ ' if info.approx else '') + _grams(info.weight_g)
+            rows_html.append(
+                f'<tr><td style="color:#9aafbe;font-family:monospace" translate="no">{sku}</td>'
+                f'<td style="color:#c9d8e4;text-align:center">{qty}</td>'
+                f'<td>{pack}</td><td style="color:#aed581">{weight}</td></tr>'
+            )
 
         table = (
             '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px">'
@@ -1690,28 +1634,47 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '<th style="text-align:left;padding:4px 8px;color:#607d8b">SKU</th>'
             '<th style="text-align:center;padding:4px 8px;color:#607d8b">К-сть</th>'
             '<th style="text-align:left;padding:4px 8px;color:#607d8b">Упаковка</th>'
-            '<th style="text-align:left;padding:4px 8px;color:#607d8b">Вага</th>'
+            '<th style="text-align:left;padding:4px 8px;color:#607d8b">Вага товару</th>'
             '</tr></thead><tbody>'
             + ''.join(rows_html)
             + '</tbody></table>'
         )
 
-        # Підсумок
-        if total_weight_g > 0:
-            weight_kg = total_weight_g / 1000
-            summary = (
-                f'<div style="padding:8px 12px;background:#0d2137;border-radius:6px;'
-                f'border-left:3px solid #2196f3;font-size:12px;color:#9aafbe">'
-                f'<b style="color:#c9d8e4">Орієнтовна вага посилки:</b> '
-                f'<span style="color:#aed581;font-weight:700">{weight_kg:.3f} кг ({total_weight_g} г)</span>'
+        # Підсумок: коробки й вага посилки
+        parts = []
+        if rec.source == 'history' and rec.shipment:
+            url = reverse('admin:shipping_shipment_detail', args=[rec.shipment.pk])
+            parts.append(
+                '<b style="color:#c9d8e4">📜 Так само вже відправляли:</b> '
+                f'<a href="{url}" target="_blank" style="color:#2196f3" translate="no">'
+                f'{escape(rec.shipment.order.order_number)}</a> — ті самі товари й кількості'
             )
-            if best_box:
-                summary += (
-                    f' &nbsp;|&nbsp; <b style="color:#c9d8e4">Рекомендована коробка:</b> '
-                    f'<span style="color:#80cbc4">{best_box}</span>'
-                )
-            if has_missing_weight:
+        if rec.boxes:
+            boxes = []
+            for b in rec.boxes:
+                s = f'<span style="color:#80cbc4" translate="no">{escape(b.label)}</span> × {b.qty}'
+                if b.lines > 1:
+                    s += f' <span style="color:#9aafbe">({b.lines} позиції разом)</span>'
+                boxes.append(s)
+            parts.append('<b style="color:#c9d8e4">Коробки:</b> ' + ', '.join(boxes))
+        if rec.weight_g > 0:
+            kg = rec.weight_g / 1000
+            parts.append(
+                '<b style="color:#c9d8e4">Орієнтовна вага посилки:</b> '
+                f'<span style="color:#aed581;font-weight:700">{"≈ " if rec.approx_weight else ""}'
+                f'{kg:.3f} кг ({_grams(rec.weight_g)})</span>'
+            )
+        if parts:
+            summary = (
+                '<div style="padding:8px 12px;background:#0d2137;border-radius:6px;'
+                'border-left:3px solid #2196f3;font-size:12px;color:#9aafbe;line-height:1.7">'
+                + '<br>'.join(parts)
+            )
+            if rec.missing_weight:
                 summary += '<br><span style="color:#ff9800">⚠️ Деякі товари без вказаної ваги — результат неточний</span>'
+            if rec.approx_weight:
+                summary += ('<br><span style="color:#607d8b">≈ — у частини товарів немає «Вага нетто», '
+                            'вагу взято з «Орієнт. ваги посилки»</span>')
             summary += '</div>'
         else:
             summary = '<div style="color:#607d8b;font-size:12px">Заповни поле «Вага нетто (г/шт)» у картці товару для розрахунку</div>'
@@ -1725,26 +1688,35 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             if used.exists():
                 has_existing = True
                 fixed_items = ', '.join(
-                    f'{u.packaging} ×{u.qty_boxes}'
-                    + (f' ({u.actual_weight_g} г)' if u.actual_weight_g else '')
+                    escape(f'{u.packaging} ×{u.qty_boxes}'
+                           + (f' ({u.actual_weight_g} г)' if u.actual_weight_g else ''))
                     for u in used
                 )
                 fixed = (
                     f'<div style="margin-top:8px;padding:6px 12px;background:#0d2b1a;'
                     f'border-radius:6px;border-left:3px solid #4caf50;font-size:12px">'
                     f'<span style="color:#4caf50;font-weight:700">✅ Зафіксовано:</span> '
-                    f'<span style="color:#9aafbe">{fixed_items}</span></div>'
+                    f'<span style="color:#9aafbe" translate="no">{fixed_items}</span></div>'
                 )
         except Exception:
             pass
 
         # Кнопка авто-заповнення (тільки якщо є рекомендації і немає зафіксованих)
         apply_btn_html = ''
-        if agg and not has_existing:
-            recs_list = [{"pk": v["pk"], "qty_boxes": v["qty_boxes"], "weight_g": round(v["weight_g"])}
-                         for v in agg.values() if v["pk"]]
-            if recs_list:
-                recs_attr = _html.escape(_json.dumps(recs_list), quote=True)
+        if rec.boxes and not has_existing:
+            unknown = [b.label for b in rec.boxes if not b.packaging]
+            if unknown:
+                apply_btn_html = (
+                    '<div style="margin-top:8px;font-size:12px;color:#ff9800">'
+                    f'⚠️ Коробки <span translate="no">{escape(", ".join(unknown))}</span> немає в '
+                    '<a href="/admin/shipping/packagingmaterial/" target="_blank" style="color:#2196f3">'
+                    'пакувальних матеріалах</a> — додайте її, щоб застосувати рекомендацію</div>'
+                )
+            else:
+                recs_list = [{"pk": b.packaging.pk, "qty_boxes": b.qty,
+                              "weight_g": int(round((b.weight_g or 0) * b.qty))}
+                             for b in rec.boxes]
+                recs_attr = escape(json.dumps(recs_list))
                 apply_btn_html = (
                     '<div style="margin-top:10px;padding:8px 12px;background:#0d1f35;'
                     'border-radius:6px;border-left:3px solid #1565c0;font-size:12px;'

@@ -1780,103 +1780,51 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     "quantity":  qty,
                 })
 
+            total_g = sum(o.actual_weight_g or 0 for o in ops if o.packaging)
             return {
                 "box":            op.packaging,
-                "total_boxes":    op.qty_boxes,
-                "weight_g":       raw_g,
+                "total_boxes":    sum(r["quantity"] for r in pkg_rows) or 1,
+                "weight_g":       total_g,
                 "weight_kg":      weight_kg,
-                "missing_weight": raw_g == 0,
+                "missing_weight": total_g == 0,
                 "no_packaging":   False,
                 "clamped":        clamped,
                 "source":         "order_packaging",
                 "pkg_rows":       pkg_rows,
             }
 
-        # ── Пріоритет 2: ProductPackaging + net_weight_g (з інвентарю) ──────────
-        lines = list(order.lines.select_related('product').all())
-        if not lines:
+        # ── Пріоритет 2: 📜 так само вже відправляли / упаковки товарів ─────────
+        from .services.packaging import recommend
+        rec = recommend(order)
+        if not rec or not (rec.boxes or rec.weight_g > 0):
             return None
-
-        total_weight_g = 0
-        total_boxes    = 0
-        best_box       = None
-        missing_weight = False
-        no_packaging   = False
-
-        def _pick_rec(product, qty):
-            r = (
-                ProductPackaging.objects
-                .filter(product=product, is_default=True)
-                .select_related('packaging').first()
-            )
-            if r:
-                return r
-            all_r = list(
-                ProductPackaging.objects.filter(product=product)
-                .select_related('packaging').all()
-            )
-            if not all_r:
-                return None
-            qty_f = float(qty)
-            return min(
-                all_r,
-                key=lambda x: (
-                    int(-(-qty_f // x.qty_per_box)) if x.qty_per_box > 0 else 9999,
-                    -x.qty_per_box,
-                )
-            )
-
-        for line in lines:
-            product = line.product
-            if not product:
-                continue
-
-            rec = _pick_rec(product, line.qty)
-
-            if rec:
-                boxes_needed = max(1, -(-line.qty // rec.qty_per_box))
-                total_boxes += boxes_needed
-                if rec.estimated_weight_g:
-                    total_weight_g += rec.estimated_weight_g * boxes_needed
-                elif getattr(product, 'net_weight_g', None):
-                    total_weight_g += (
-                        product.net_weight_g * line.qty
-                        + int(rec.packaging.tare_weight_kg * 1000) * boxes_needed
-                    )
-                else:
-                    missing_weight = True
-                if best_box is None:
-                    best_box = rec.packaging
-            else:
-                no_packaging = True
-                nw = getattr(product, 'net_weight_g', None)
-                if nw:
-                    total_weight_g += nw * line.qty
-                else:
-                    missing_weight = True
-
-        if total_weight_g > 0 or best_box:
-            raw_kg    = Decimal(total_weight_g) / 1000 if total_weight_g > 0 else Decimal(0)
-            clamped   = raw_kg > 0 and raw_kg < MIN_WEIGHT_KG
-            weight_kg = max(MIN_WEIGHT_KG, round(raw_kg, 3)) if raw_kg > 0 else None
-            if weight_kg:
-                shipment.weight_kg = weight_kg
-            if best_box:
-                shipment.length_cm = best_box.length_cm
-                shipment.width_cm  = best_box.width_cm
-                shipment.height_cm = best_box.height_cm
-
-            return {
-                "box":            best_box,
-                "total_boxes":    max(1, total_boxes) if total_boxes else 1,
-                "weight_g":       total_weight_g,
-                "weight_kg":      weight_kg,
-                "missing_weight": missing_weight,
-                "no_packaging":   no_packaging,
-                "clamped":        clamped,
-                "source":         "product_packaging",
-            }
-        return None
+        total_g   = int(rec.weight_g.to_integral_value()) if rec.weight_g else 0
+        raw_kg    = Decimal(total_g) / 1000
+        clamped   = 0 < raw_kg < MIN_WEIGHT_KG
+        weight_kg = max(MIN_WEIGHT_KG, round(raw_kg, 3)) if raw_kg > 0 else None
+        if weight_kg:
+            shipment.weight_kg = weight_kg
+        if rec.boxes:
+            first = rec.boxes[0]
+            shipment.length_cm = first.length_cm
+            shipment.width_cm  = first.width_cm
+            shipment.height_cm = first.height_cm
+        history = rec.shipment
+        return {
+            "box":            rec.boxes[0].label if rec.boxes else None,
+            "total_boxes":    rec.total_boxes or 1,
+            "boxes":          [f"{b.label} ×{b.qty}" for b in rec.boxes],
+            "weight_g":       total_g,
+            "weight_kg":      weight_kg,
+            "missing_weight": rec.missing_weight,
+            "approx_weight":  rec.approx_weight,
+            "no_packaging":   rec.no_packaging,
+            "clamped":        clamped,
+            "source":         rec.source,
+            "history_order":  history.order.order_number if history else "",
+            "history_url":    reverse("admin:shipping_shipment_detail", args=[history.pk]) if history else "",
+            "pkg_rows":       rec.rows(),
+        }
 
     def _build_description_from_order(self, order):
         from inventory.models import ProductCategory
@@ -2963,30 +2911,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if v != Shipment.Status.DRAFT
         ]
 
-        # ── Запропонувати зберегти упаковку для товарів без ProductPackaging ─
+        # ── Запропонувати запам'ятати упаковку: товари без неї або більша місткість ─
         suggest_packaging = []
-        has_pkg_data = (
-            shipment.packages.exists()
-            or (shipment.length_cm and shipment.width_cm and shipment.height_cm)
-        )
-        if has_pkg_data and order:
+        if order and request.user.has_perm("shipping.add_productpackaging"):
+            from .services.packaging import learn_plan
             try:
-                lines = list(order.lines.select_related('product').all())
-                for line in lines:
-                    if not line.product:
-                        continue
-                    has_pp = ProductPackaging.objects.filter(
-                        product=line.product
-                    ).exists()
-                    if not has_pp:
-                        suggest_packaging.append({
-                            'product_pk':  line.product.pk,
-                            'sku':         line.product.sku,
-                            'product_name': str(line.product),
-                            'qty':         float(line.qty),
-                        })
+                suggest_packaging = [
+                    {"sku": c["sku"], "product_name": c["name"], "qty": c["qty_per_box"],
+                     "dims": c["dims"]}
+                    for c in learn_plan(shipment)
+                ]
             except Exception:
-                pass
+                logger.warning("learn_plan failed for shipment %s", shipment.pk, exc_info=True)
 
         from sales.models import SalesSettings as _SS
         _sales_cfg = _SS.get()
@@ -3274,90 +3210,25 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Зберегти упаковку з параметрів відправлення ──────────────────────────
 
     def save_packaging_view(self, request, shipment_id):
-        """POST: знаходить або створює PackagingMaterial і ProductPackaging
-        для товарів замовлення що не мають налаштованої упаковки."""
+        """POST: запам'ятовує упаковку цієї посилки для товарів замовлення
+        (`services.packaging.learn`): коробку й скільки одиниць у неї вмістилось."""
+        from django.db import transaction
         from django.http import JsonResponse
-        from decimal import Decimal
+        from .services.packaging import learn
         if request.method != "POST":
             return JsonResponse({"error": "POST required"}, status=405)
+        if not request.user.has_perm("shipping.add_productpackaging"):
+            return JsonResponse({"error": "Немає права додавати упаковку товарів"}, status=403)
 
         shipment = get_object_or_404(Shipment, pk=shipment_id)
-        order = shipment.order
-        if not order:
+        if not shipment.order:
             return JsonResponse({"error": "Немає замовлення"}, status=400)
 
-        # Визначаємо розміри і вагу з відправлення
-        pkg = shipment.packages.first()
-        if pkg:
-            length_cm = pkg.length_cm
-            width_cm  = pkg.width_cm
-            height_cm = pkg.height_cm
-            weight_kg = pkg.weight_kg
-        else:
-            length_cm = shipment.length_cm
-            width_cm  = shipment.width_cm
-            height_cm = shipment.height_cm
-            weight_kg = shipment.weight_kg
-
-        if not (length_cm and width_cm and height_cm):
-            return JsonResponse({"error": "Розміри посилки не вказані"}, status=400)
-
-        # Знаходимо або створюємо PackagingMaterial з ±1 см точністю
-        tol = Decimal("1.0")
-        material = PackagingMaterial.objects.filter(
-            length_cm__gte=length_cm - tol, length_cm__lte=length_cm + tol,
-            width_cm__gte=width_cm - tol,   width_cm__lte=width_cm + tol,
-            height_cm__gte=height_cm - tol, height_cm__lte=height_cm + tol,
-            is_active=True,
-        ).first()
-
-        if not material:
-            material = PackagingMaterial.objects.create(
-                box_type=PackagingMaterial.BoxType.BOX,
-                length_cm=length_cm,
-                width_cm=width_cm,
-                height_cm=height_cm,
-                tare_weight_kg=Decimal("0"),
-                notes="Авто-створено із параметрів відправлення",
-            )
-
-        # Для кожного товару без ProductPackaging — створюємо
-        # Вага ділиться між SKU пропорційно (груба оцінка)
-        lines_with_product = [l for l in order.lines.select_related("product").all()
-                               if l.product]
-        num_skus = max(1, len(lines_with_product))
-        total_g = int(float(weight_kg) * 1000) if weight_kg else None
-
-        created = []
-        for line in lines_with_product:
-            qty_int = max(1, int(round(float(line.qty))))
-            if ProductPackaging.objects.filter(
-                product=line.product, qty_per_box=qty_int
-            ).exists():
-                continue
-            weight_g = (total_g // num_skus) if total_g else None
-            note = f"Авто зі відправлення #{shipment.pk}"
-            if num_skus > 1:
-                note += " (вага ≈ — мультипродуктове замовлення)"
-            # Mark as default only if no other ProductPackaging exists for this product
-            is_first = not ProductPackaging.objects.filter(product=line.product).exists()
-            ProductPackaging.objects.create(
-                product=line.product,
-                packaging=material,
-                qty_per_box=qty_int,
-                estimated_weight_g=weight_g,
-                is_default=is_first,
-                notes=note,
-            )
-            created.append({
-                "sku": line.product.sku,
-                "qty": qty_int,
-                "box": str(material),
-                "weight_g": weight_g,
-            })
-
+        with transaction.atomic():
+            created = learn(shipment)
         if not created:
-            return JsonResponse({"ok": True, "created": [], "msg": "Всі товари вже мають упаковку"})
+            return JsonResponse({"ok": True, "created": [],
+                                 "msg": "Minerva вже знає цю упаковку для всіх товарів"})
         return JsonResponse({"ok": True, "created": created,
                              "msg": f"Створено {len(created)} запис(ів) упаковки"})
 
@@ -7715,8 +7586,9 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
         return format_html(
             '<div id="pkg-sync-wrap">'
             '<p style="color:var(--text-muted);font-size:13px;margin:0 0 10px">'
-            'Аналізує всі минулі відправлення і для товарів без налаштованої упаковки '
-            'автоматично визначає розміри та вагу на основі параметрів посилки. '
+            'Аналізує всі минулі відправлення: для товарів без упаковки, а також коли в коробку '
+            'вмістилось більше, ніж Minerva знає, запам\'ятовує коробку, скільки одиниць у неї '
+            'вмістилось (усі товари коробки разом) і вагу посилки. '
             'Знаходить або створює відповідний пакувальний матеріал.'
             '</p>'
             '<button type="button" id="pkgSyncPreviewBtn"'
@@ -7739,7 +7611,7 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             '    btn.disabled=false;btn.textContent="🔍 Аналізувати відправлення";'
             '    var res=document.getElementById("pkgSyncResult");'
             '    if(!d.total){{'
-            '      res.innerHTML=\'<span style="color:var(--ok)">✅ Всі товари вже мають упаковку</span>\';'
+            '      res.innerHTML=\'<span style="color:var(--ok)">✅ Minerva вже знає упаковку всіх товарів</span>\';'
             '      return;'
             '    }}'
             '    var rows=d.candidates.map(function(c,i){{'
@@ -7754,8 +7626,8 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             '        +"</tr>";'
             '    }}).join("");'
             '    res.innerHTML='
-            '      \'<div style="color:var(--text);margin-bottom:8px">Знайдено <b>\'+d.total+\'</b> комбінацій товар+кількість без упаковки:</div>\''
-            '      +\'<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">≈ — вага приблизна (кілька SKU у замовленні)</div>\''
+            '      \'<div style="color:var(--text);margin-bottom:8px">Знайдено <b>\'+d.total+\'</b> нових упаковок товарів (к-сть — скільки одиниць вмістила коробка):</div>\''
+            '      +\'<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">≈ — у коробці було кілька товарів, вага — на всю коробку</div>\''
             '      +\'<div style="border:1px solid var(--border-strong);border-radius:6px;overflow:hidden;margin-bottom:12px">\''
             '      +\'<table style="font-size:12px;border-collapse:collapse;width:100%">\''
             '      +\'<thead><tr style="background:var(--bg-card-2)">\''
@@ -7797,135 +7669,50 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
     packaging_sync_panel.short_description = _("Синхронізація")
 
     def _sync_packaging(self, request, pk):
-        """Аналізує відправлення, для товарів без ProductPackaging створює записи.
-
-        Ключ унікальності: (product, qty_per_box) — для одного товару може бути
-        кілька записів з різними кількостями (1 шт → маленька коробка, 5 шт → більша).
-        Вага ділиться пропорційно між товарами замовлення (якщо їх кілька).
-        """
+        """Аналізує минулі відправлення (`services.packaging.learn_plan`, від найновіших):
+        товар без упаковки або коробка, у яку вмістилось більше, ніж Minerva знає.
+        GET — перегляд, POST — записати (право додавати упаковку товарів)."""
+        from django.db import transaction
         from django.http import JsonResponse
-        from decimal import Decimal
+        from django.utils.html import escape
+        from .services.packaging import learn, learn_plan, materials
 
         if request.method not in ("GET", "POST"):
             return JsonResponse({"error": "Method not allowed"}, status=405)
-
         apply = request.method == "POST"
+        if apply and not request.user.has_perm("shipping.add_productpackaging"):
+            return JsonResponse({"error": "Немає права додавати упаковку товарів"}, status=403)
 
-        candidates = []
-        # Ключ: (product_pk, qty_per_box) — дозволяємо різні qty для одного товару
-        seen_keys = set()
-
+        pool = materials()
         shipments = (Shipment.objects
                      .filter(order__isnull=False)
                      .select_related("order")
-                     .prefetch_related("packages", "order__lines__product")
+                     .prefetch_related("packages")
                      .order_by("-pk"))
-
-        for shipment in shipments:
-            order = shipment.order
-            if not order:
-                continue
-
-            pkg = shipment.packages.first()
-            if pkg:
-                L, W, H = pkg.length_cm, pkg.width_cm, pkg.height_cm
-                wkg = pkg.weight_kg
-            elif shipment.length_cm and shipment.width_cm and shipment.height_cm:
-                L, W, H = shipment.length_cm, shipment.width_cm, shipment.height_cm
-                wkg = shipment.weight_kg
-            else:
-                continue
-
-            lines_with_product = [l for l in order.lines.all() if l.product]
-            if not lines_with_product:
-                continue
-
-            # Загальна вага ÷ кількість рядків = приблизна вага на один SKU
-            total_w_g = int(float(wkg) * 1000) if wkg else None
-            num_skus = len(lines_with_product)
-
-            for line in lines_with_product:
-                qty_int = max(1, int(round(float(line.qty))))
-                key = (line.product.pk, qty_int)
-                if key in seen_keys:
+        preview, created = [], 0
+        with transaction.atomic():
+            for shipment in shipments:
+                plan = learn_plan(shipment, pool)
+                if not plan:
                     continue
-
-                # Перевіряємо чи вже є запис з такою кількістю
-                if ProductPackaging.objects.filter(
-                    product=line.product, qty_per_box=qty_int
-                ).exists():
-                    seen_keys.add(key)
-                    continue
-
-                seen_keys.add(key)
-
-                # Вага цього SKU: загальна / кількість різних SKU в замовленні
-                # (груба оцінка для мультипродуктових замовлень)
-                weight_g = (total_w_g // num_skus) if total_w_g else None
-
-                candidates.append({
-                    "product":      line.product,
-                    "sku":          line.product.sku,
-                    "shipment_pk":  shipment.pk,
-                    "order_number": order.order_number or str(order.pk),
-                    "length_cm":    L,
-                    "width_cm":     W,
-                    "height_cm":    H,
-                    "weight_g":     weight_g,
-                    "qty_per_box":  qty_int,
-                    "multi_sku":    num_skus > 1,
-                })
+                preview += [{
+                    "sku":          escape(c["sku"]),
+                    "order_number": escape(shipment.order.order_number or str(shipment.order.pk)),
+                    "qty":          c["qty_per_box"],
+                    "dims":         escape(c["dims"]),
+                    "weight_g":     c["weight_g"],
+                    "approx":       c["approx"],
+                } for c in plan]
+                # Записане враховує наступне (старіше) відправлення; перегляд — відкочується
+                created += len(learn(shipment, plan, pool))
+            if not apply:
+                transaction.set_rollback(True)
 
         if not apply:
-            preview = [
-                {
-                    "sku":          c["sku"],
-                    "order_number": c["order_number"],
-                    "qty":          c["qty_per_box"],
-                    "dims":         f'{c["length_cm"]}×{c["width_cm"]}×{c["height_cm"]} см',
-                    "weight_g":     c["weight_g"],
-                    "approx":       c["multi_sku"],
-                }
-                for c in candidates
-            ]
             return JsonResponse({"candidates": preview, "total": len(preview)})
-
-        # POST — застосовуємо
-        created_count = 0
-        tol = Decimal("1.0")
-        for c in candidates:
-            L, W, H = c["length_cm"], c["width_cm"], c["height_cm"]
-            material = PackagingMaterial.objects.filter(
-                length_cm__gte=L - tol, length_cm__lte=L + tol,
-                width_cm__gte=W - tol,  width_cm__lte=W + tol,
-                height_cm__gte=H - tol, height_cm__lte=H + tol,
-                is_active=True,
-            ).first()
-            if not material:
-                material = PackagingMaterial.objects.create(
-                    box_type=PackagingMaterial.BoxType.BOX,
-                    length_cm=L, width_cm=W, height_cm=H,
-                    tare_weight_kg=Decimal("0"),
-                    notes=f"Авто зі відправлення #{c['shipment_pk']}",
-                )
-            note = f"Синхр. зі відправлення #{c['shipment_pk']}"
-            if c["multi_sku"]:
-                note += " (вага ≈ — мультипродуктове замовлення)"
-            ProductPackaging.objects.get_or_create(
-                product=c["product"],
-                qty_per_box=c["qty_per_box"],
-                defaults={
-                    "packaging":          material,
-                    "estimated_weight_g": c["weight_g"],
-                    "is_default":         c["qty_per_box"] == 1,
-                    "notes":              note,
-                },
-            )
-            created_count += 1
-
-        msg = (f"Створено {created_count} запис(ів) упаковки" if created_count
-               else "Всі товари вже мають налаштовану упаковку")
-        return JsonResponse({"ok": True, "created": created_count, "msg": msg})
+        msg = (f"Створено {created} запис(ів) упаковки" if created
+               else "Minerva вже знає упаковку всіх товарів")
+        return JsonResponse({"ok": True, "created": created, "msg": msg})
 
     def has_add_permission(self, request):
         return False

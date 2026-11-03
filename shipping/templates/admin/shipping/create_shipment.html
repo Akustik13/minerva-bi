@@ -1511,13 +1511,20 @@ document.addEventListener('DOMContentLoaded', function() {
           {% if packaging_hint.box %}
             {% if packaging_hint.source == "order_packaging" %}
               ✅ Дані з <b>Фактичної упаковки</b> замовлення.
+            {% elif packaging_hint.source == "history" %}
+              📜 Так само вже відправляли: <a href="{{ packaging_hint.history_url }}" target="_blank" style="color:var(--accent)" translate="no">{{ packaging_hint.history_order }}</a> — ті самі товари й кількості.
             {% else %}
               Дані з <b>рекомендованої упаковки</b> інвентарю.
             {% endif %}
-            <b>Коробка:</b> {{ packaging_hint.box }}
-            {% if packaging_hint.weight_g %} · <b>Вага:</b> {{ packaging_hint.weight_g }} г{% endif %}
+            {% if packaging_hint.boxes|length > 1 %}
+              <b>Коробки:</b> <span translate="no">{{ packaging_hint.boxes|join:", " }}</span>
+            {% else %}
+              <b>Коробка:</b> <span translate="no">{{ packaging_hint.box }}</span>
+            {% endif %}
+            {% if packaging_hint.weight_g %} · <b>Вага:</b> {% if packaging_hint.approx_weight %}≈ {% endif %}{{ packaging_hint.weight_g }} г{% endif %}
             {% if packaging_hint.total_boxes > 1 %} · <b>{{ packaging_hint.total_boxes }} коробки</b>{% endif %}
             {% if packaging_hint.no_packaging %} · <span style="color:var(--warn)">деякі товари без налаштованої упаковки</span>{% endif %}
+            {% if packaging_hint.approx_weight %}<br><span style="color:var(--text-muted)">≈ — у частини товарів немає «Вага нетто», вагу взято з «Орієнт. ваги посилки»</span>{% endif %}
           {% else %}
             Вагу заповнено з <b>net_weight_g</b> товарів ({{ packaging_hint.weight_g }} г).
             Розміри не визначено — <a href="{% url 'admin:shipping_packagingmaterial_changelist' %}" target="_blank" style="color:var(--accent)">налаштуй упаковку →</a>
