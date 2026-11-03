@@ -3875,16 +3875,42 @@ class InventorySettingsAdmin(admin.ModelAdmin):
         )
     rfq_email_templates_panel.short_description = "Шаблони листів (по категоріях)"
 
+    def _media_sources(self, st):
+        """«Звідки качається»: сайти посилань і товари, що ще чекають копії (з посиланням, яке відкрити)."""
+        from inventory.services.media_files import DATASHEET, IMAGE
+        blocks = []
+        for kind, icon, field in ((DATASHEET, "📄", "Посилання на Datasheet"), (IMAGE, "🖼️", "Зображення (URL)")):
+            s = st[kind]
+            hosts = format_html_join(" · ", "<b>{}</b> — {}", s["hosts"]) if s["hosts"] else "посилань немає"
+            rows = format_html_join("", '<tr><td style="padding:2px 10px 2px 0;white-space:nowrap"><a href="{}">{}</a></td>'
+                                        '<td style="padding:2px 0;word-break:break-all"><a href="{}" target="_blank" '
+                                        'rel="noopener noreferrer">{}</a></td></tr>',
+                                    ((reverse("admin:inventory_product_change", args=[pk]), sku, url, url)
+                                     for pk, sku, url in s["missing"]))
+            missing = format_html(
+                '<details style="margin-top:3px"><summary style="cursor:pointer">Ще не завантажено ({}) — '
+                'артикул і посилання, з якого качатиметься</summary><table style="font-size:12px;margin-top:4px">{}</table>'
+                '{}</details>', s["need"], rows,
+                format_html('<div style="color:var(--text-muted)">… показано перші {}</div>', len(s["missing"]))
+                if s["need"] > len(s["missing"]) else "") if s["need"] else ""
+            inactive = format_html(' <span style="color:var(--text-muted)">· неактивних товарів з посиланням без копії: '
+                                   '{} — лише з галочкою нижче</span>', s["inactive_need"]) if s["inactive_need"] else ""
+            blocks.append(format_html(
+                '<div style="margin-top:6px">{} Звідки: поле товару «{}» — {}{}{}</div>', icon, field, hosts, inactive,
+                missing))
+        return format_html(
+            '<div style="max-width:760px;margin:0 0 12px;line-height:1.55"><b>🔗 Звідки качається.</b> '
+            '<span style="color:var(--text-muted)">Кожен файл — з посилання в картці свого товару. Посилання за '
+            'правилом вище записує «🔗 Сформувати й перевірити посилання →»; у картці товару його можна змінити.</span>{}</div>',
+            format_html_join("", "{}", ((b,) for b in blocks)))
+
     def media_cache_panel(self, obj):
-        total  = Product.objects.count()
-        ds_url  = Product.objects.filter(datasheet_url__gt='').count()
-        ds_file = Product.objects.exclude(datasheet_file='').exclude(datasheet_file__isnull=True).count()
-        ds_need = Product.objects.filter(datasheet_url__gt='').filter(datasheet_file='').count() + \
-                  Product.objects.filter(datasheet_url__gt='').filter(datasheet_file__isnull=True).count()
-        img_url  = Product.objects.filter(image_url__gt='').count()
-        img_file = Product.objects.exclude(image='').exclude(image__isnull=True).count()
-        img_need = Product.objects.filter(image_url__gt='').filter(image='').count() + \
-                   Product.objects.filter(image_url__gt='').filter(image__isnull=True).count()
+        from inventory.services.media_files import DATASHEET, IMAGE, cache_status
+        st = cache_status()
+        ds, img = st[DATASHEET], st[IMAGE]
+        ds_url, ds_file, ds_need = ds["url"], ds["local"], ds["need"]
+        img_url, img_file, img_need = img["url"], img["local"], img["need"]
+        inactive = ds["inactive_need"] + img["inactive_need"]
 
         cache_url = reverse('admin:inventory_inventorysettings_media_cache')
 
@@ -3894,9 +3920,9 @@ class InventorySettingsAdmin(admin.ModelAdmin):
     <b style="color:var(--text)">Що це:</b> Minerva тримає <b style="color:var(--text)">копію</b> даташитів і фото
     товарів на своєму сервері (media/products/…), щоб картки товарів, огляд складу, Angebote й листи відкривали їх
     швидко — і тоді, коли сайт з оригіналами (напр. docs.sevskiy.com) недоступний.<br>
-    <b style="color:var(--text)">URL вказано</b> — у скількох товарів заповнене посилання («Посилання на Datasheet» /
-    «Зображення (URL)»); <b style="color:var(--text)">Локально</b> — у скількох уже є копія файлу на сервері;
-    <b style="color:var(--text)">Потрібно завантажити</b> — посилання є, а копії ще немає.<br>
+    <b style="color:var(--text)">URL вказано</b> — у скількох активних товарів заповнене посилання («Посилання на
+    Datasheet» / «Зображення (URL)»); <b style="color:var(--text)">Локально</b> — у скількох уже є копія файлу на
+    сервері; <b style="color:var(--text)">Потрібно завантажити</b> — посилання є, а копії ще немає.<br>
     Кнопка нижче завантажує ці файли (перевіряє, що це справді PDF / фото, а не сторінка з помилкою) і виправляє
     старі копії з розширенням «.php». Посилання в товарах вона не змінює; DigiKey отримує посилання, а не копію.
   </div>
@@ -3914,6 +3940,8 @@ class InventorySettingsAdmin(admin.ModelAdmin):
       <div style="color:{};font-weight:700">Потрібно завантажити: {}</div>
     </div>
   </div>
+  {}
+  {}
   <button type="button" id="inv-mc-btn"
           onclick="invMediaCache()"
           style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:9px 20px;
@@ -3930,8 +3958,10 @@ function invMediaCache() {{
   btn.innerHTML = '⏳ Завантажується… (може зайняти кілька хвилин)';
   res.style.display = 'none';
   var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+  var body = new FormData(), inact = document.getElementById('inv-mc-inactive');
+  if (inact && inact.checked) body.append('inactive', '1');
   fetch('{}', {{
-    method: 'POST',
+    method: 'POST', body: body,
     headers: {{'X-CSRFToken': csrf ? csrf[1] : '', 'X-Requested-With': 'XMLHttpRequest'}},
   }}).then(function(r){{ return r.json(); }}).then(function(d) {{
     btn.disabled = false;
@@ -3966,6 +3996,10 @@ function invMediaCache() {{
             '#ff9800' if ds_need else '#4caf50', ds_need,
             img_url, img_file,
             '#ff9800' if img_need else '#4caf50', img_need,
+            self._media_sources(st),
+            format_html('<label style="display:block;margin:0 0 8px;float:none;width:auto;padding:0">'
+                        '<input type="checkbox" id="inv-mc-inactive"> разом з неактивними товарами ({})</label>',
+                        inactive) if inactive else "",
             cache_url,
         )
     media_cache_panel.short_description = _("Статус медіафайлів")
@@ -4016,7 +4050,7 @@ function invMediaCache() {{
             field.storage.delete(old)
             return True
 
-        products = Product.objects.filter(is_active=True)
+        products = Product.objects.all() if request.POST.get('inactive') == '1' else Product.objects.filter(is_active=True)
         base = lambda p: p.sku.replace('/', '_').replace(' ', '_')  # noqa: E731
 
         for p in products:
