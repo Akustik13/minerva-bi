@@ -2213,7 +2213,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     list_per_page = 50
     autocomplete_fields = ("successor",)
     form          = ProductAdminForm
-    actions       = ["action_set_category", "action_set_lifecycle", "action_base_editor", "action_base_from_dk",
+    actions       = ["action_set_category", "action_set_lifecycle", "action_archive", "action_unarchive", "action_base_editor", "action_base_from_dk",
                      "action_base_to_home", "action_sale_price_from_base", "action_media_links", "action_shared_media",
                      "bulk_sync_digikey_attrs", "action_dk_prices", "action_dk_from_stock"]
 
@@ -2279,6 +2279,22 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     n += 1
             return f"Життєвий цикл «{Product.Lifecycle(d['status']).label}»: {n} товарів"
         return FormActionMixin._form_action(self, request, queryset, LifecycleForm, "Життєвий цикл товарів", apply)
+
+    @admin.action(description="🗄 Архівувати вибрані (вимкнути «Активний»)")
+    def action_archive(self, request, queryset):
+        return self._set_active(request, queryset, False, "Архівовано товарів")
+
+    @admin.action(description="♻️ Відновити вибрані (увімкнути «Активний»)")
+    def action_unarchive(self, request, queryset):
+        return self._set_active(request, queryset, True, "Відновлено товарів")
+
+    def _set_active(self, request, queryset, value, label):
+        n = 0
+        for p in queryset.exclude(is_active=value):
+            p.is_active = value
+            p.save(update_fields=["is_active"])
+            n += 1
+        self.message_user(request, f"{label}: {n}")
 
     @admin.action(description="💰 Редактор базових цін для вибраних…")
     def action_base_editor(self, request, queryset):
