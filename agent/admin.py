@@ -212,7 +212,7 @@ class AgentRunAdmin(admin.ModelAdmin):
 class AgentTaskForm(forms.ModelForm):
     class Meta:
         model = AgentTask
-        fields = ['instruction', 'products', 'each_product', 'web', 'model', 'budget_usd']
+        fields = ['instruction', 'message', 'products', 'each_product', 'web', 'model', 'budget_usd']
         widgets = {'instruction': forms.Textarea(attrs={
             'rows': 6, 'placeholder': 'Напр.: Знайди в даташитах вагу однієї штуки й країну виробника і внеси. '
                                       'Або: Знайди даташити цих антен і надішли їх на anna@kunde.de з коротким листом.'})}
@@ -231,12 +231,31 @@ class AgentTaskAdmin(admin.ModelAdmin):
     list_filter = ('status',)
     search_fields = ('title', 'instruction')
     autocomplete_fields = ('products',)
-    fieldsets = ((None, {
-        'fields': ('instruction', 'products', 'each_product', 'web', 'model', 'budget_usd'),
-        'description': 'Напишіть завдання своїми словами. Агент читає картки товарів і їхні даташити (і за '
-                       'бажанням — сайти виробників), а потім ПРОПОНУЄ зміни: ви бачите «було → стане» з цитатою '
-                       'з джерела й підтверджуєте ✓. Лист агент лише готує — і лише на адреси, які ви написали тут.',
-    }),)
+    DESCRIPTION = ('Напишіть завдання своїми словами. Агент читає картки товарів, їхні даташити, лист завдання з '
+                   'вкладеннями (і за бажанням — сайти виробників), а потім ПРОПОНУЄ: зміни в картках, прихід на '
+                   'склад, нові товари, події в календарі, лист. Ви бачите «було → стане» з цитатою з джерела й '
+                   'підтверджуєте ✓. Лист агент лише готує — і лише на адреси, які ви написали тут.')
+
+    def get_fieldsets(self, request, obj=None):
+        mail = self._mail_from_get(request)
+        note = format_html('<br><br>✉️ <b>Завдання з листа</b> «<span translate="no">{}</span>» від '
+                           '<span translate="no">{}</span> — агент прочитає його й вкладення.',
+                           mail.subject or '(без теми)', mail.from_email) if mail else ''
+        return ((None, {'fields': ('instruction', 'message', 'products', 'each_product', 'web', 'model', 'budget_usd'),
+                        'description': format_html('{}{}', self.DESCRIPTION, note)}),)
+
+    def _mail_from_get(self, request):
+        from email_assistant.models import EmailMessage
+        pk = request.GET.get('msg', '')
+        return (EmailMessage.objects.filter(pk=pk, account__user=request.user).first()
+                if pk.isdigit() else None)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'message':                     # лише свої листи; поле приховане (з «?msg=»)
+            from email_assistant.models import EmailMessage
+            kwargs['queryset'] = EmailMessage.objects.filter(account__user=request.user)
+            kwargs['widget'] = forms.HiddenInput
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(owner=request.user)
@@ -247,6 +266,8 @@ class AgentTaskAdmin(admin.ModelAdmin):
         if ids:
             data['products'] = ids
             data['each_product'] = len(ids) > 5
+        mail = self._mail_from_get(request)
+        data['message'] = mail.pk if mail else None
         return data
 
     def has_change_permission(self, request, obj=None):
@@ -307,9 +328,11 @@ class AgentTaskAdmin(admin.ModelAdmin):
         if request.method == 'POST':
             self._decide(request, task)
             return redirect(reverse('admin:agent_agenttask_review', args=[task.pk]))
+        from agent.decide import describe
         rows = []
         for p in task.proposals.exclude(kind=AgentProposal.MAIL).select_related('product'):
-            p.label = product_fields.label(p)
+            p.label, p.old_display, p.new_display = describe(p)
+            p.sku_text = p.product.sku if p.product_id else (p.data or {}).get('sku', '')
             p.source_url = p.source if p.source.startswith(('http://', 'https://')) else ''
             rows.append(p)
         context = {

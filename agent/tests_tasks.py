@@ -20,8 +20,8 @@ from inventory.models import Product
 DATASHEET = pdf_bytes('AN220213 Antenna 2.4 GHz', 'Mechanical data', 'Weight: 45 g', 'Country of origin: Germany')
 
 
-def tool(id_, name, **inp):
-    return NS(type='tool_use', id=id_, name=name, input=inp)
+def tool(id_, tool_name, **inp):
+    return NS(type='tool_use', id=id_, name=tool_name, input=inp)
 
 
 def text(t):
@@ -256,3 +256,112 @@ class PageTests(Base):
         self.client.force_login(other)
         self.assertEqual(self.client.get(f'/admin/agent/agenttask/{task.pk}/review/').status_code, 404)
         self.assertNotContains(self.client.get('/admin/agent/agenttask/'), 'Знайди вагу')
+
+
+class MailStockCalendarTests(Base):
+    """Завдання з листа: Lieferschein у PDF → новий товар + прихід + подія в календарі."""
+
+    def setUp(self):
+        super().setUp()
+        import os
+
+        from email_assistant.models import EmailAccount, EmailMessage
+        from inventory.models import Location
+        Location.objects.get_or_create(code='MAIN', defaults={'name': 'Головний склад'})
+        Location.objects.get_or_create(code='B2', defaults={'name': 'Полиця B2'})
+        self.account = EmailAccount.objects.create(
+            user=self.user, email_address='slava@sevskiy.de', imap_username='x', imap_password='x',
+            smtp_username='x', smtp_password='x')
+        rel = os.path.join('email_attachments', str(self.account.pk), '1_Lieferschein.pdf')
+        os.makedirs(os.path.join(self.media, os.path.dirname(rel)), exist_ok=True)
+        with open(os.path.join(self.media, rel), 'wb') as fh:
+            fh.write(pdf_bytes('Lieferschein 4711', 'AN220213-01C  10 Stk', 'FT999001  5 Stk',
+                               'Abholung am 12.11.2026'))
+        self.msg = EmailMessage.objects.create(
+            account=self.account, folder='inbox', imap_folder_name='INBOX', imap_uid=1, subject='Lieferung 4711',
+            from_email='versand@lieferant.de', to_emails=['slava@sevskiy.de'], cc_emails=[],
+            body_text='Guten Tag, anbei der Lieferschein.', sent_at=timezone_now(),
+            attachments=[{'name': 'Lieferschein.pdf', 'file_path': rel, 'size': 10, 'content_type': 'application/pdf'}])
+
+    def mail_task(self, **kw):
+        task = self.task('Внеси на склад продукцію з цього листа (новий фільтр теж додай) і постав у календар забір.',
+                         products=[], message=self.msg, **kw)
+        return task
+
+    def test_whole_flow(self):
+        from calendar_app.models import CalendarEvent
+        from inventory.models import InventoryTransaction
+        task = self.mail_task()
+        fake = self.go(task, [
+            resp('tool_use', tool('t1', 'read_mail'), tool('t2', 'read_attachment', index=0)),
+            resp('tool_use',
+                 tool('t3', 'propose_product', sku='FT999001', name='Filter 999 MHz', manufacturer='Sevskiy',
+                      evidence='FT999001  5 Stk', source='Lieferschein.pdf, стор. 1'),
+                 tool('t4', 'propose_stock_in', sku='FT999001', qty=5, reference='Lieferschein 4711',
+                      evidence='FT999001  5 Stk', source='Lieferschein.pdf'),
+                 tool('t5', 'propose_stock_in', sku='AN220213-01C', qty=10, location='B2',
+                      reference='Lieferschein 4711', evidence='AN220213-01C  10 Stk', source='Lieferschein.pdf'),
+                 tool('t6', 'propose_event', title='Забір 4711', type='reminder', start='2026-11-12',
+                      evidence='Abholung am 12.11.2026', source='Lieferschein.pdf')),
+            resp('end_turn', text('Запропоновано 2 приходи, новий фільтр і нагадування.')),
+        ])
+        names = [t['name'] for t in fake.calls[0]['tools']]
+        self.assertIn('read_mail', names)
+        self.assertIn('Lieferung 4711', fake.calls[0]['messages'][0]['content'])
+        results = fake.calls[1]['messages'][-1]['content']
+        self.assertIn('Guten Tag', results[0]['content'])
+        self.assertIn('FT999001 5 Stk', results[1]['content'])
+        self.assertFalse(any(r.get('is_error') for r in fake.calls[2]['messages'][-1]['content']))
+        props = list(task.proposals.all())
+        self.assertEqual(len(props), 4)
+        out = decide.apply_selected(task, [p.pk for p in props], self.user)
+        self.assertEqual((out['applied'], out['failed']), (4, []))
+        new = Product.objects.get(sku='FT999001')
+        self.assertEqual((new.name, new.manufacturer), ('Filter 999 MHz', 'Sevskiy'))
+        txs = {t.product.sku: t for t in InventoryTransaction.objects.select_related('product', 'location')}
+        self.assertEqual((txs['FT999001'].qty, txs['FT999001'].location.code), (Decimal('5'), 'MAIN'))
+        self.assertEqual((txs['AN220213-01C'].qty, txs['AN220213-01C'].location.code), (Decimal('10'), 'B2'))
+        self.assertIn('Lieferschein 4711', txs['AN220213-01C'].ref_doc)
+        event = CalendarEvent.objects.get()
+        self.assertEqual((event.user, event.email_message, event.all_day, event.event_type),
+                         (self.user, self.msg, True, CalendarEvent.TYPE_REMINDER))
+
+    def test_checks(self):
+        task = self.mail_task()
+        fake = self.go(task, [
+            resp('tool_use',
+                 tool('t1', 'propose_stock_in', sku='AN220213-01C', qty=2.5, evidence='x', source='y'),
+                 tool('t2', 'propose_stock_in', sku='AN220213-01C', qty=1, location='NOPE', evidence='x', source='y'),
+                 tool('t3', 'propose_stock_in', sku='XX-UNKNOWN', qty=1, evidence='x', source='y'),
+                 tool('t4', 'propose_event', title='x', type='other', start='2031-01-01', evidence='x', source='y'),
+                 tool('t5', 'propose_product', sku='AN220213-01C', name='dup', evidence='x', source='y')),
+            resp('end_turn', text('…')),
+        ])
+        results = fake.calls[1]['messages'][-1]['content']
+        self.assertTrue(all(r.get('is_error') for r in results))
+        self.assertIn('ціла', results[0]['content'])
+        self.assertIn('NOPE', results[1]['content'])
+        self.assertIn('XX-UNKNOWN', results[2]['content'])
+        self.assertIn('поза межами', results[3]['content'])
+        self.assertIn('уже є', results[4]['content'])
+
+    def test_foreign_mail_is_not_readable(self):
+        other = User.objects.create_superuser('anna', 'a@x.y', 'p')
+        task = AgentTask.objects.create(owner=other, title='x', instruction='x', message=self.msg)
+        from agent.tools import definitions, mail_of
+        self.assertIsNone(mail_of(task))
+        self.assertNotIn('read_mail', [t['name'] for t in definitions(task)])
+
+    def test_add_page_from_mail(self):
+        self.client.force_login(self.user)
+        page = self.client.get(f'/admin/agent/agenttask/add/?msg={self.msg.pk}')
+        self.assertContains(page, 'Завдання з листа')
+        self.assertContains(page, 'Lieferung 4711')
+        other = User.objects.create_superuser('anna', 'a@x.y', 'p')
+        self.client.force_login(other)
+        self.assertNotContains(self.client.get(f'/admin/agent/agenttask/add/?msg={self.msg.pk}'), 'Lieferung 4711')
+
+
+def timezone_now():
+    from django.utils import timezone
+    return timezone.now()

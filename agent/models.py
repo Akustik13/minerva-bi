@@ -142,6 +142,9 @@ class AgentTask(models.Model):
     title = models.CharField('Завдання', max_length=200)
     instruction = models.TextField('Що зробити')
     products = models.ManyToManyField('inventory.Product', blank=True, related_name='+', verbose_name='Товари')
+    message = models.ForeignKey('email_assistant.EmailMessage', null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name='agent_tasks', verbose_name='Лист',
+                                help_text='Завдання з листа: агент читає цей лист і його вкладення (лише своя скринька)')
     each_product = models.BooleanField(
         'Окремо для кожного товару', default=False,
         help_text='Агент проходить вибрані товари по одному (для сотень товарів). Лист у цьому режимі не готує.')
@@ -177,7 +180,9 @@ class AgentTask(models.Model):
 class AgentProposal(models.Model):
     """Що агент пропонує змінити: поле товару, технічний параметр або лист. Застосовує лише людина (✓)."""
     FIELD, ATTRIBUTE, MAIL = 'field', 'attribute', 'mail'
-    KINDS = [(FIELD, 'Поле товару'), (ATTRIBUTE, 'Технічний параметр'), (MAIL, 'Лист')]
+    STOCK_IN, PRODUCT, EVENT = 'stock_in', 'product', 'event'
+    KINDS = [(FIELD, 'Поле товару'), (ATTRIBUTE, 'Технічний параметр'), (MAIL, 'Лист'),
+             (STOCK_IN, '📦 Прихід на склад'), (PRODUCT, '🆕 Новий товар'), (EVENT, '📅 Подія в календарі')]
     PENDING, APPLIED, REJECTED, FAILED = 'pending', 'applied', 'rejected', 'failed'
     STATUSES = [(PENDING, '👀 Чекає'), (APPLIED, '✓ Застосовано'), (REJECTED, '✕ Відхилено'),
                 (FAILED, '⚠️ Не вдалося')]
@@ -196,6 +201,9 @@ class AgentProposal(models.Model):
     mail_subject = models.CharField('Тема', max_length=500, blank=True, default='')
     mail_body = models.TextField('Текст листа', blank=True, default='')
     mail_attach = models.JSONField(default=list, blank=True, help_text='Артикули, чиї даташити додати до листа')
+    data = models.JSONField(default=dict, blank=True,
+                            help_text='Прихід: {sku, qty, location, reference}; новий товар: {sku, name, manufacturer, '
+                                      'category}; подія: {title, type, start, end, all_day, description}')
     status = models.CharField('Стан', max_length=10, choices=STATUSES, default=PENDING, db_index=True)
     error = models.CharField('Помилка', max_length=500, blank=True, default='')
     result_url = models.CharField(max_length=300, blank=True, default='', help_text='Чернетка / запланований лист')

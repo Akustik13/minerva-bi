@@ -56,6 +56,10 @@
     {% if task.error %}<div style="margin-top:8px;color:var(--error,#dc2626)">⚠️ {{ task.error }}</div>{% endif %}
     <div class="agt-muted" style="margin-top:10px">Завдання</div>
     <div class="agt-pre" translate="no">{{ task.instruction }}</div>
+    {% if task.message and task.message.account.user_id == task.owner_id %}
+    <div style="margin-top:6px;font-size:13px">✉️ З листа <a href="/email/message/{{ task.message_id }}/" target="_blank" translate="no">«{{ task.message.subject|default:"(без теми)" }}»</a>
+      <span class="agt-muted" translate="no">{{ task.message.from_email }}</span></div>
+    {% endif %}
     {% if running %}<div class="agt-muted" id="agt-live" style="margin-top:10px">⏳ Агент працює… сторінка оновиться сама.</div>{% endif %}
   </div>
 
@@ -70,7 +74,7 @@
   <div class="agt-card">
     <form method="post">{% csrf_token %}
       <div class="agt-head">
-        <b>Зміни в товарах</b>
+        <b>Що агент пропонує</b>
         <span class="agt-muted">{{ pending }} чекають вашої перевірки · нічого не змінено, поки ви не натиснете ✓</span>
       </div>
       <table>
@@ -82,10 +86,10 @@
         {% for p in rows %}
           <tr class="{% if p.status != 'pending' %}done{% endif %}">
             <td><input type="checkbox" name="ids" value="{{ p.pk }}" {% if p.status == 'pending' %}checked{% else %}disabled{% endif %}></td>
-            <td translate="no">{% if p.product %}<a href="{% url 'admin:inventory_product_change' p.product.pk %}" target="_blank">{{ p.product.sku }}</a>{% endif %}</td>
+            <td translate="no">{% if p.product %}<a href="{% url 'admin:inventory_product_change' p.product.pk %}" target="_blank">{{ p.product.sku }}</a>{% else %}{{ p.sku_text }}{% endif %}</td>
             <td>{{ p.label }}</td>
-            <td translate="no">{{ p.old_value|default:"—" }}</td>
-            <td class="new" translate="no">{{ p.new_value }}</td>
+            <td translate="no">{{ p.old_display|default:"" }}</td>
+            <td class="new" translate="no">{{ p.new_display }}{% if p.result_url %} <a href="{{ p.result_url }}" target="_blank">↗</a>{% endif %}</td>
             <td class="agt-quote"><q translate="no">{{ p.evidence|truncatechars:300 }}</q><br>
               {% if p.source_url %}<a href="{{ p.source_url }}" target="_blank" rel="noopener noreferrer" translate="no">{{ p.source|truncatechars:60 }}</a>{% else %}<span translate="no">{{ p.source }}</span>{% endif %}
               {% if p.confidence %}<span class="{% if p.confidence == 'low' %}conf-low{% endif %}"> · впевненість: {% if p.confidence == 'high' %}висока{% elif p.confidence == 'medium' %}середня{% else %}низька{% endif %}</span>{% endif %}</td>

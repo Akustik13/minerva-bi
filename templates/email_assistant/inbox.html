@@ -1103,6 +1103,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" data-k="customer" data-g="org" onclick="ctxAction('customer')" title="{% trans "Новий клієнт CRM з даних листа (ім'я, компанія, email, телефон, адреса з підпису) — і гілка, Angebote та проєкти до нього; або вибрати наявного" %}">👤 {% trans "Клієнт CRM з листа…" %}</div>
   <div class="em-ctx-item" data-k="why" data-g="org" onclick="ctxAction('why')" title="{% trans "До якої своєї категорії й чому, хто пише, проєкти — і швидко змінити правило" %}">🔍 {% trans "Чому лист тут — ознаки й правила…" %}</div>
   {% if agent_can %}<div class="em-ctx-item" data-k="agent" data-g="org" onclick="ctxAction('agent')" title="{% trans "Агент Minerva відповідатиме на такі листи за вашою інструкцією — спершу чернетками, які ви перевіряєте" %}">🤖 {% trans "Доручити агенту: відповідати на такі листи…" %}</div>{% endif %}
+  {% if agent_task_can %}<div class="em-ctx-item" data-k="agent_task" data-g="org" onclick="ctxAction('agent_task')" title="{% trans "Завдання своїми словами за цим листом: внести прихід на склад, нові товари, подію в календар, відповісти — агент прочитає лист і вкладення й запропонує, ви підтверджуєте" %}">🧩 {% trans "Завдання агенту з цього листа…" %}</div>{% endif %}
   <div class="em-ctx-item" data-k="project" data-g="org" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
   {% if knowledge_available %}
   <div class="em-ctx-item" data-k="kbsend" data-g="kb" onclick="ctxAction('kbsend')"
@@ -4132,6 +4133,7 @@ async function ctxAction(action) {
   if (action === 'logo') { emLogoDialog(_ctxMsg.from || '', _ctxMsg.rowEl); return; }
   if (action === 'why') { emWhy(pk); return; }
   if (action === 'agent') { emAgent(pk); return; }
+  if (action === 'agent_task') { window.open('/admin/agent/agenttask/add/?msg=' + pk, '_blank'); return; }
   if (action === 'dante') { window.open('/admin/worktime/workday/from-mail/' + pk + '/', '_blank'); return; }
   if (action === 'customer') {   // «👤 Клієнт CRM з листа»: те саме вікно, одразу з формою нового клієнта
     await emWhy(pk);

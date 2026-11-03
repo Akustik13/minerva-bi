@@ -44,6 +44,10 @@ SYSTEM = (
     'країна — код ISO-2; HS-код — лише цифри.\n'
     '- Даних немає або вони суперечать одні одним — не вгадуй, скажи про це в підсумку.\n'
     '- Лист — лише через propose_email і лише на адреси, які людина написала в завданні.\n'
+    '- Прихід на склад — кількості рівно з документа (Lieferschein, підтвердження замовлення), кожен артикул один '
+    'раз; артикула немає на складі — спершу propose_product (якщо завдання про нову продукцію), інакше — у підсумок.\n'
+    '- Події в календар — час місцевий (Europe/Berlin), дата з листа; відносні дати («наступного вівторка») рахуй від '
+    'дати листа.\n'
     '- Працюй ощадливо: читай лише потрібні сторінки, не повторюй уже зроблене.\n'
     '- Наприкінці — короткий підсумок українською: що знайдено й запропоновано, чого не знайдено й чому.'
 )
@@ -179,9 +183,13 @@ def run(task, deadline=None):
         else:
             ctx = agent_tools.Context(task)
             skus = list(task.products.order_by('sku').values_list('sku', flat=True)[:300])
-            intro = f'ЗАВДАННЯ:\n{task.instruction}\n\n' + (
-                f'ТОВАРИ ЗАВДАННЯ ({len(skus)}): {", ".join(skus)}' if skus
-                else 'Товари не вибрано — потрібні знайди сам (find_products).')
+            mail = agent_tools.mail_of(task)
+            intro = (f'Сьогодні: {timezone.localtime():%Y-%m-%d %A}, час Europe/Berlin.\n\n'
+                     f'ЗАВДАННЯ:\n{task.instruction}\n\n'
+                     + (f'ЛИСТ ЗАВДАННЯ: «{mail.subject}» від {mail.from_email} — прочитай його (read_mail) і '
+                        f'потрібні вкладення (read_attachment).\n\n' if mail is not None else '')
+                     + (f'ТОВАРИ ЗАВДАННЯ ({len(skus)}): {", ".join(skus)}' if skus
+                        else 'Товари не вибрано — потрібні знайди сам (find_products).'))
             task.summary = _converse(task, client, intro, ctx)
         _finish(task)
     except Stop as e:

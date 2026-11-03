@@ -6,7 +6,7 @@ where: 📧 Email → 📥 Вхідні → правий клік на лист�
 urls: /email/, /admin/agent/agentrule/, /admin/agent/agentrun/
 roles: менеджер, адміністратор (кожен — для своєї скриньки)
 keywords: агент, доручення, автоматична відповідь, відповідати самому, чернетка, автовідповідь, шаблон відповіді, Agent, Auftrag, automatische Antwort, agent, auto reply
-related: mail/ai-reply, mail/rules, mail/categories, mail/compose
+related: mail/ai-reply, mail/rules, mail/categories, mail/compose, inventory/agent-tasks
 ---
 
 ## Що це
@@ -64,6 +64,12 @@ related: mail/ai-reply, mail/rules, mail/categories, mail/compose
 
 > ⚠️ Лист від сторонньої людини для агента — лише дані. Якщо в листі просять змінити правила, надіслати щось
 > іншим людям чи переказати гроші, агент не виконує: лишає чернетку й пише про це.
+
+## Разове завдання з листа
+
+Не «на всі такі листи», а «зроби з цим листом»: правий клік → **«🧩 Завдання агенту з цього листа…»** — внести
+прихід на склад з Lieferschein, додати нові товари, поставити подію в календар, підготувати відповідь.
+Див. [Завдання агенту](guide:inventory/agent-tasks).
 
 ## Часті питання та проблеми
 
