@@ -465,6 +465,12 @@ def data(v) -> SafeString:
     return format_html('<span translate="no">{}</span>', v)
 
 
+def join(parts, sep=" · ") -> SafeString:
+    """Частини через « · »: рядки екрануються (слова інтерфейсу — їх перекладе 🌐), `data(...)` і готовий HTML —
+    як є; порожні пропускаються. Для назви, підзаголовка й підсумків розділів."""
+    return mark_safe(conditional_escape(sep).join(conditional_escape(p) for p in parts if not _is_empty(p)))
+
+
 def _value_html(v) -> SafeString:
     """Готовий HTML (SafeString) — як є, решта — як дані запису."""
     return v if hasattr(v, "__html__") else data(v)
@@ -1305,7 +1311,7 @@ def render_head(panel: Panel, obj, request, p: dict | None = None) -> str:
     _ensure_bound(request, panel, ma, p)
     title = _call(panel.title, obj, what="title")
     if title is None or title == "":
-        title = str(obj)
+        title = data(str(obj))
     subtitle = _call(panel.subtitle, obj, request, default="", what="subtitle") if panel.subtitle else ""
     hedit = mark_safe("".join(str(edit_html(request, obj, e.key)) for e in panel.edits if e.place == "head"))
     urls = _urls(panel, obj, request, ma)
@@ -1315,16 +1321,16 @@ def render_head(panel: Panel, obj, request, p: dict | None = None) -> str:
         'title="Попередній запис (↑)">‹</button>'
         '<button type="button" class="mvp-icon" data-mvp-nav="1" aria-label="Наступний запис (↓)" '
         'title="Наступний запис (↓)">›</button>'
-        '<h2 class="mvp-title" id="mvp-title" tabindex="-1"><span translate="no">{}</span></h2>'
+        '<h2 class="mvp-title" id="mvp-title" tabindex="-1"><span>{}</span></h2>'
         '<a class="mvp-icon" data-mvp-open href="{}" aria-label="Відкрити картку (Enter)" '
         'title="Відкрити картку (Enter) · Ctrl — нова вкладка">⤢</a>'
         '<button type="button" class="mvp-icon" data-mvp-menu aria-haspopup="menu" aria-label="Налаштувати панель" '
         'title="Налаштувати панель під себе (або правий клік)">⚙</button>'
         '<button type="button" class="mvp-icon" data-mvp-close aria-label="Закрити (Esc)" title="Закрити (Esc)">✕</button>'
         # статус — у другому рядку: у першому номер / назва не обрізаються (панель буває 360 px)
-        '</div><div class="mvp-sub"><div class="mvp-hedit">{}</div><span class="mvp-subt" translate="no">{}</span>'
+        '</div><div class="mvp-sub"><div class="mvp-hedit">{}</div><span class="mvp-subt">{}</span>'
         '<button type="button" class="mvp-pos" data-mvp-pos hidden></button></div>{}{}</header>',
-        _html(title), urls["change"] or "#", hedit, subtitle or "",
+        _html(title), urls["change"] or "#", hedit, _html(subtitle or ""),
         _actbar(panel, obj, request, ma, p, label_of(panel, obj)), _memo(panel, obj, request, ma))
 
 
@@ -1339,10 +1345,18 @@ def _badge_of(block: Block, obj, request):
     return b if isinstance(b, Badge) else None
 
 
-def _summary_of(block: Block, obj, request) -> str:
+BRIEF_MAX = 80
+
+
+def _summary_of(block: Block, obj, request) -> tuple:
+    """(текст, HTML) підсумку розділу. Дані запису провайдер позначає data(...) — їх 🌐 не перекладає; задовгий
+    підсумок обрізається текстом і тоді не перекладається весь (межі даних у ньому вже не видно)."""
     s = _call(block.summary, obj, request, default="", what=f"summary {block.key}") if block.summary else ""
-    s = " ".join(strip_tags(str(s or "")).split())
-    return s if len(s) <= 80 else s[:79] + "…"
+    text = " ".join(strip_tags(str(s or "")).split())
+    if len(text) > BRIEF_MAX:
+        text = text[:BRIEF_MAX - 1] + "…"
+        return text, data(text)
+    return text, conditional_escape(s or "")
 
 
 def _section(panel: Panel, block: Block, obj, request, p: dict, *, now: bool, change_url: str = "") -> SafeString:
@@ -1355,13 +1369,14 @@ def _section(panel: Panel, block: Block, obj, request, p: dict, *, now: bool, ch
         except Exception as exc:  # noqa: BLE001
             logger.warning("side panel %s.%s applies failed: %s", panel.model, key, exc)
     count = tone = btext = brief = ""
+    brief_html = mark_safe("")
     if not na:
         bdg = _badge_of(block, obj, request)
         if bdg is not None:
             count = "" if bdg.count is None else str(bdg.count)
             tone = bdg.tone if bdg.tone in TONES else ""
             btext = str(bdg.text or "")
-        brief = _summary_of(block, obj, request)
+        brief, brief_html = _summary_of(block, obj, request)
     state = ""
     if na:
         state, body = "na", empty(NA_TEXT)
@@ -1393,10 +1408,10 @@ def _section(panel: Panel, block: Block, obj, request, p: dict, *, now: bool, ch
     return format_html(
         '<section class="mvp-sec"{}><h3 class="mvp-sh" id="mvp-sh-{}"><button type="button" class="mvp-sh-btn" '
         'aria-expanded="{}" aria-controls="mvp-sb-{}"><span class="mvp-si" aria-hidden="true">{}</span>'
-        '<span class="mvp-st">{}</span><span class="mvp-sc">{}</span><span class="mvp-sbrief" translate="no">{}</span>'
+        '<span class="mvp-st">{}</span><span class="mvp-sc">{}</span><span class="mvp-sbrief">{}</span>'
         '<span class="mvp-chev" aria-hidden="true"></span></button>{}</h3>'
         '<div class="mvp-sb" id="mvp-sb-{}" role="region" aria-labelledby="mvp-sh-{}">{}</div></section>',
-        attrs, key, "false" if collapsed else "true", key, block.icon, block.title, count, brief, card_link,
+        attrs, key, "false" if collapsed else "true", key, block.icon, block.title, count, brief_html, card_link,
         key, key, body)
 
 

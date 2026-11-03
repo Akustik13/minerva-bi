@@ -708,6 +708,7 @@
     var m = on ? 'addEventListener' : 'removeEventListener';
     document[m]('pointerdown', onDown, true);
     document[m]('scroll', onScroll, true);
+    window[m]('keydown', onEscOutside, true);
     window[m]('blur', onBlur);
     window[m]('resize', onResize);
   }
@@ -727,8 +728,15 @@
       if (t === lv.el) { if (Date.now() > lv.quiet) closeAfter(st, i); return; }   // прокрутили меню — підменю геть
       if (t && t.nodeType === 1 && lv.el.contains(t)) return;
     }
-    if (Date.now() - st.born < 100) return;            // прокрутка, що почалась до меню
+    if (Date.now() - st.born < 250) return;            // прокрутка, що почалась до меню (і плавна до кнопки)
     closeAll('scroll');
+  }
+  // меню відкрили мишею, фокус лишився на сторінці — Esc закриває саме меню (і далі не йде: не панель, не вікно)
+  function onEscOutside(e) {
+    if (!state || (e.key !== 'Escape' && e.key !== 'Esc') || inside(document.activeElement)) return;
+    closeAll('escape');
+    e.preventDefault();
+    e.stopImmediatePropagation();
   }
   function onBlur() { if (state) closeAll('blur'); }
   function onResize() { if (state) closeAll('resize'); }
@@ -817,7 +825,9 @@
     document[on ? 'addEventListener' : 'removeEventListener']('keydown', onKeyZ, true);
   }
   function onKeyZ(e) {                                  // Ctrl Z, поки видно «↶ Скасувати» (не в полі вводу)
-    if (!tUndo || e.code !== 'KeyZ' || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+    // за символом (німецька розкладка: Z — на клавіші KeyY); кирилиця дає «я» — тоді за клавішею
+    var ch = e.key || '', isZ = /^[a-z]$/i.test(ch) ? ch.toLowerCase() === 'z' : e.code === 'KeyZ';
+    if (!tUndo || !isZ || !(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
     var t = e.target;
     if (t && t.nodeType === 1 && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
     e.preventDefault();

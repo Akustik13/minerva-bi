@@ -449,8 +449,8 @@ class GenericPanelTests(GenericTestBase):
         self.assertTrue(r.json()["prefs"]["on"])
         self.assertTrue(sp.prefs(User.objects.get(pk=self.root.pk), panel)["on"])
         shell = self.client.get(f"/core/panel/inventory.supplier/{s.pk}/").content.decode()
-        self.assertIn('<span translate="no"><b>Muster GmbH</b></span>', shell)
-        self.assertIn('<span class="mvp-subt" translate="no">Supplier</span>', shell)
+        self.assertIn('<b><span translate="no">Muster GmbH</span></b>', shell)
+        self.assertIn('<span class="mvp-subt">Supplier</span>', shell)      # назва моделі — слова інтерфейсу
         body = self.section(shell, "fields")
         self.assertNotIn("data-deferred", body)
         self.assertIn('<span translate="no">anna@muster.example</span>', body)

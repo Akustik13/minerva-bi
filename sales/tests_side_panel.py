@@ -274,8 +274,9 @@ class ShellTests(OrderPanelBase):
         self.order.status = "received"
         self.assertEqual(_status_confirm(self.order, "processing"), "")   # між «робочими» — без питання
         html = self.shell()
-        for part in (f'data-label="№ {NUMBER}"', f'<span translate="no"><b>№ {NUMBER}</b></span>',
-                     '<span class="mvp-subt" translate="no">Kunde A GmbH · Вручну · 486,00 EUR</span>',
+        for part in (f'data-label="№ {NUMBER}"', f'<b>№ <span translate="no">{NUMBER}</span></b>',
+                     '<span class="mvp-subt"><span translate="no">Kunde A GmbH</span> · <span translate="no">Вручну'
+                     '</span> · <span translate="no">486,00 EUR</span></span>',   # дані — без перекладу, решта — 🌐
                      'class="mvp-pill mvp-t-new" data-edit="status" data-kind="choice" data-value="received"',
                      "📥 Отримано ▾", "🚫 Скасовано", 'title="Змінити: Статус · S"',
                      f"Скасувати замовлення № {NUMBER}? Товар, який воно тримає, повернеться на склад.",
@@ -305,7 +306,7 @@ class ShellTests(OrderPanelBase):
     def test_title_marks_document_type_and_no_stock(self):
         o = self.make_order("S-2", self.product, "1", document_type="SAMPLE", affects_stock=False)
         html = self.shell(o.pk)
-        self.assertIn('<b>№ S-2</b> <span class="mvp-badge mvp-t-info">Sample</span> '
+        self.assertIn('<b>№ <span translate="no">S-2</span></b> <span class="mvp-badge mvp-t-info">Sample</span> '
                       '<span class="mvp-badge mvp-t-off">не впливає на склад</span>', html)
         self.assertIn("Не впливає на склад і статистику", self.section(html, "summary"))
 

@@ -143,10 +143,13 @@ def _panel_admin(request, model):
     return panel, ma
 
 
-def _panel_object(request, ma, pk):
+def _panel_object(request, ma, pk, prefetch=True):
     """Запис для панелі — з queryset адмінки моделі: ті самі обмеження, що в списку; інакше 404."""
     from django.http import Http404
-    obj = ma.get_queryset(request).filter(pk=pk).first()
+    qs = ma.get_queryset(request)
+    if not prefetch:                                  # один розділ: підвантаження списку адмінки йому не потрібні
+        qs = qs.prefetch_related(None)
+    obj = qs.filter(pk=pk).first()
     if obj is None:
         raise Http404
     return obj
@@ -178,7 +181,7 @@ def panel_block_view(request, model, pk, key):
     panel, ma = _panel_admin(request, model)
     if key not in {b.key for b in side_panel.visible_blocks(panel, request)}:
         raise Http404
-    obj = _panel_object(request, ma, pk)
+    obj = _panel_object(request, ma, pk, prefetch=False)
     side_panel.bind(request, panel, ma)
     return HttpResponse(side_panel.render_block(panel, key, obj, request), content_type="text/html; charset=utf-8")
 

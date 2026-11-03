@@ -69,8 +69,8 @@ class OrderListPageTests(PageTestBase):
         self.assertEqual(r.status_code, 200)
         html = r.content.decode()
         self.assertIn('id="mv-panel-config"', html)
-        self.assertIn('<script src="/static/admin/js/mv_panel.js?v=5" defer></script>', html)
-        self.assertIn('<link rel="stylesheet" href="/static/admin/css/mv_panel.css?v=5">', html)
+        self.assertIn('<script src="/static/admin/js/mv_panel.js?v=6" defer></script>', html)
+        self.assertIn('<link rel="stylesheet" href="/static/admin/css/mv_panel.css?v=6">', html)
         self.assertEqual(html.count("mv_panel.js?v="), 1)
         # mv_menu.js (window.MVMenu) виконується раніше: обидва defer — у порядку на сторінці
         self.assertIn("/static/admin/js/mv_menu.js", html)

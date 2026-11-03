@@ -332,6 +332,7 @@ class CustomerTimeline(models.Model):
         indexes             = [
             models.Index(fields=['customer', '-created_at']),
             models.Index(fields=['remind_at', 'remind_sent']),
+            models.Index(fields=['related_order_id'], name='crm_tl_related_order'),   # листи замовлення в панелі
         ]
 
     def save(self, *args, **kwargs):
