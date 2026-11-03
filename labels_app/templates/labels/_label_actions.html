@@ -68,6 +68,7 @@
 .svl-shot span{position:absolute;font-size:12px;color:var(--text-muted,#9aafbe);text-align:center;padding:0 12px}
 .svl-pv-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px;margin-bottom:6px}
 .svl-pv-row > label{font-weight:600;color:var(--text-muted,#9aafbe)}
+.svl-pv-row > label.svl-photos{font-weight:600;color:var(--text,#c9d8e4);display:inline-flex;gap:6px;align-items:center;cursor:pointer}
 .svl-copies{display:inline-flex;align-items:stretch;border:1px solid var(--border-strong,#243347);border-radius:6px;overflow:hidden}
 .svl-copies button{background:var(--bg-hover,#1e2d40);border:none;color:var(--text,#c9d8e4);width:34px;font-size:16px;cursor:pointer}
 .svl-copies input{width:54px;height:32px;text-align:center;border:none;border-left:1px solid var(--border-strong,#243347);border-right:1px solid var(--border-strong,#243347);background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:14px;font-weight:600;-moz-appearance:textfield;appearance:textfield}
@@ -197,9 +198,15 @@
       {t: '🔄 Повторити', main: true, f: retry},
     ].concat(url ? [{t: '⬇️ Завантажити файл', f: function () { download(url, name); }}] : []));
   }
-  function fetchText(url) {
+  // .dymo з адреси + що сервер каже про фото артикулів (етикетка замовлення, заголовок X-Minerva-Photos)
+  function fetchLabel(url) {
     return fetch(url, {credentials: 'same-origin'}).then(function (r) {
-      return r.text().then(function (t) { if (!r.ok) throw new Error(t || ('HTTP ' + r.status)); return t; });
+      return r.text().then(function (t) {
+        if (!r.ok) throw new Error(t || ('HTTP ' + r.status));
+        var photos = null;
+        try { photos = JSON.parse(r.headers.get('X-Minerva-Photos') || 'null'); } catch (e) {}
+        return {xml: t, photos: photos};
+      });
     });
   }
   function copiesText(n) {
@@ -230,16 +237,16 @@
   function directPrint(url, name, ctx) {
     ctx = ctx || {};
     var look = ctx.how ? ctx.how === 'preview' : PREVIEW;
-    var printer, label = fetchText(url);
+    var printer, label = fetchLabel(url);
     label.catch(function () {});
     toast(look ? '👁 ' + name + ' — готую перегляд…' : '🖨️ ' + name + ' — надсилаю на DYMO…');
     return printers()
       .then(function (list) { return pickPrinter(list); })
       .then(function (p) { printer = p; return label; })
-      .then(function (xml) {
-        if (!look) return send(printer, xml, name, 1);
+      .then(function (lab) {
+        if (!look) return send(printer, lab.xml, name, 1);
         var t = document.getElementById('svl-toast'); if (t) t.remove();
-        preview(url, name, ctx, printer, xml);
+        preview(url, name, ctx, printer, lab.xml, lab.photos);
       })
       .catch(function (e) { failed(e, function () { directPrint(url, name, ctx); }, url, name); });
   }
@@ -271,7 +278,7 @@
     var objs = [];
     ['TextObject', 'BarcodeObject', 'QRCodeObject'].forEach(function (tag) {
       all(doc, tag).forEach(function (o) {
-        if (first(o, 'Name') === MARK) return;
+        if (/^Minerva/.test(first(o, 'Name'))) return;   // позначка в куті, фото й їх номери
         var lay = o.getElementsByTagName('ObjectLayout')[0] || o;
         objs.push({el: o, tag: tag, x: parseFloat(first(lay, 'X')) || 0, y: parseFloat(first(lay, 'Y')) || 0});
       });
@@ -321,7 +328,15 @@
       });
     return xml.slice(0, rect.index) + rect[0].replace(/<(Width|Height)>([\d.]+)<\/\1>/g, times) + tail;
   }
-  function preview(url, name, ctx, printer, xml) {
+  // Фото артикулів на етикетці замовлення: {on, shown, available, positions, max} із заголовка відповіді
+  function photoBlocked(p) { return p.positions > p.max || !p.available; }
+  function photoNote(p) {
+    if (p.positions > p.max) return 'фото — коли позицій не більше ' + p.max;
+    if (!p.available) return 'у товарів цього замовлення немає фото';
+    var have = p.on ? p.shown : p.available;
+    return (have < p.positions ? 'фото є в ' + have + ' з ' + p.positions + ' · ' : '') + 'галочка — лише для цього друку';
+  }
+  function preview(url, name, ctx, printer, xml, photos) {
     var old = document.getElementById('svl-pv'); if (old) old.remove();
     var doc = parseXml(xml), rows = doc ? editables(doc) : [];
     var mark = doc ? markNode(doc) : null, markOrig = mark ? mark.textContent : '';
@@ -343,9 +358,12 @@
       + '<div class="svl-shot"><img alt="Етикетка ' + esc(name) + '" id="svl-png"><span id="svl-shot-msg">Малюю етикетку…</span></div>'
       + '<div class="svl-pv-row"><label for="svl-copies">Копій</label>'
       + '<span class="svl-copies"><button type="button" data-d="-1" title="Менше">−</button>'
-      + '<input type="number" id="svl-copies" min="1" max="' + MAX_COPIES + '" value="1">'
+      + '<input type="number" id="svl-copies" min="1" max="' + MAX_COPIES + '" value="' + (parseInt(ctx.copies, 10) || 1) + '">'
       + '<button type="button" data-d="1" title="Більше">＋</button></span>'
       + '<span class="svl-src">Принтер: <b id="svl-pr-name"></b> · <a href="#" id="svl-pr-change">змінити</a></span></div>'
+      + (photos ? '<div class="svl-pv-row"><label class="svl-photos"><input type="checkbox" id="svl-photos"'
+        + (photos.on ? ' checked' : '') + (photoBlocked(photos) && !photos.on ? ' disabled' : '') + '> 🖼 Фото артикулів</label>'
+        + '<span class="svl-src">' + esc(photoNote(photos)) + '</span></div>' : '')
       + '<div class="svl-src" id="svl-mark-note"></div>'
       + (rows.length || product ? '<button type="button" class="svl-btn svl-ed-toggle" id="svl-ed-toggle" aria-expanded="false">✏️ Правки ▸</button>'
         + '<div class="svl-edits" id="svl-edits" hidden>' + edits
@@ -361,6 +379,13 @@
     var box = m.querySelector('.svl-box'), img = box.querySelector('#svl-png'), msg = box.querySelector('#svl-shot-msg');
     var copiesEl = box.querySelector('#svl-copies'), go = box.querySelector('#svl-go');
     function close() { clearTimeout(timer); m.remove(); }
+    var photoBox = box.querySelector('#svl-photos');
+    if (photoBox) photoBox.onchange = function () {   // та сама етикетка з фото / без — лише для цього друку
+      var u = new URL(url, location.href);
+      u.searchParams.set('photos', photoBox.checked ? '1' : '0');
+      close();
+      directPrint(u.pathname + u.search, name, Object.assign({}, ctx, {how: 'preview', copies: copiesEl.value}));
+    };
     m.addEventListener('click', function (e) { if (e.target === m) close(); });
     box.querySelector('.svl-x').onclick = close;
     box.querySelector('#svl-cancel').onclick = close;

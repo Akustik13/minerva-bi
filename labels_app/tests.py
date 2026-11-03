@@ -1,3 +1,4 @@
+import io
 import json
 import shutil
 import tempfile
@@ -803,3 +804,132 @@ class ProductKindTests(TestCase):
         self.assertContains(r, "if (_tmpl) a.classList.add('sv-lbl-tmpl');")
         status = self.client.get("/labels/status/?skus=AD-FME-M1").json()["AD-FME-M1"]
         self.assertEqual((status["found"], status["file"]), (True, False))
+
+
+def _png(color=(30, 60, 140)):
+    from PIL import Image
+    out = io.BytesIO()
+    Image.new("RGB", (40, 30), color).save(out, "PNG")
+    return out.getvalue()
+
+
+class OrderLabelPhotoTests(TestCase):
+    """Фото артикулів на етикетці замовлення: праворуч від списку, до 4 позицій, налаштування й «для цього друку»."""
+
+    def setUp(self):
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.get_or_create(pk=1)[0]
+        ss.is_onboarding_complete = True
+        ss.save()
+        self.client.force_login(User.objects.create_user("staff", password="x", is_staff=True, is_superuser=True))
+        self.order = SalesOrder.objects.create(source="digikey", order_number="102635355", addr_country="SE")
+        photo = mock.patch.object(order_label, "label_photo",
+                                  side_effect=lambda p: _png() if p is not None and p.image_url else None)
+        photo.start()
+        self.addCleanup(photo.stop)
+
+    def add(self, sku, qty=1, image=True):
+        from sales.models import SalesOrderLine
+        product = Product.objects.create(sku=sku, name=sku,
+                                         image_url=f"https://example.com/{sku}.jpg" if image else "")
+        SalesOrderLine.objects.create(order=self.order, product=product, sku_raw=sku, qty=qty)
+
+    def objects(self, data):
+        root = ET.fromstring(order_label.render(data).encode("utf-8"))
+        images = [o for o in root.iter("ImageObject")]
+        numbers = [o for o in root.iter("TextObject") if o.findtext("Name").startswith("MinervaPhotoNo")]
+        width = float(root.find(".//TextObject[Name='ITextObject1']/ObjectLayout/Size/Width").text)
+        return images, numbers, width
+
+    def test_one_photo_beside_the_list(self):
+        self.add("AN220201-04A")
+        data = order_label.build(self.order, photos=True)
+        self.assertEqual(data["photo_info"], {"on": True, "shown": 1, "available": 1, "positions": 1, "max": 4})
+        images, numbers, width = self.objects(data)
+        self.assertEqual([o.findtext("Name") for o in images], ["MinervaPhoto1"])
+        self.assertEqual(numbers, [])                                   # одне фото — без номера
+        self.assertAlmostEqual(width, order_label.TEXT_W - order_label.TEXT_H - order_label.PHOTO_GAP, places=3)
+        x = float(images[0].find("ObjectLayout/DYMOPoint/X").text)
+        w = float(images[0].find("ObjectLayout/Size/Width").text)
+        self.assertAlmostEqual(x + w + order_label.PHOTO_PAD, order_label.LIST_X + order_label.TEXT_W, places=3)
+        self.assertEqual(data["lines"], ["1. AN220201-04A × 1"])
+        self.assertEqual(data["font_size"], 12)                         # список у вужчому блоці не дрібнішає
+
+    def test_four_photos_in_a_grid_with_numbers_and_skip_missing(self):
+        for n in range(4):
+            self.add(f"AN2202{n:02d}-01A", image=n != 2)
+        data = order_label.build(self.order, photos=True)
+        images, numbers, _w = self.objects(data)
+        self.assertEqual([o.findtext("Name") for o in images], ["MinervaPhoto1", "MinervaPhoto2", "MinervaPhoto4"])
+        self.assertEqual([next(o.iter("Text")).text for o in numbers], ["1", "2", "4"])
+        self.assertEqual((data["photo_info"]["shown"], data["photo_info"]["available"]), (3, 3))
+
+    def test_no_photos_over_four_positions_or_when_off(self):
+        for n in range(5):
+            self.add(f"AN2202{n:02d}-01A")
+        data = order_label.build(self.order, photos=True)
+        self.assertEqual((data["photos"], data["text_w"]), ([], order_label.TEXT_W))
+        self.assertEqual(data["photo_info"]["positions"], 5)
+        self.order.lines.all().delete()
+        self.add("AN220201-04A")
+        self.assertEqual(order_label.build(self.order, photos=False)["photos"], [])
+        ss = SalesSettings.get()
+        self.assertTrue(ss.order_label_photos)                         # за замовчуванням — так
+        self.assertEqual(len(order_label.build(self.order)["photos"]), 1)
+        ss.order_label_photos = False
+        ss.save()
+        self.assertEqual(order_label.build(self.order)["photos"], [])
+
+    def test_view_param_and_header_for_preview(self):
+        self.add("AN220201-04A")
+        ss = SalesSettings.get()
+        ss.order_label_photos = False
+        ss.save()
+        r = self.client.get(f"/labels/order/{self.order.pk}/")
+        self.assertNotIn(b"<ImageObject>", r.content)
+        self.assertEqual(json.loads(r["X-Minerva-Photos"]),
+                         {"on": False, "shown": 0, "available": 1, "positions": 1, "max": 4})
+        r = self.client.get(f"/labels/order/{self.order.pk}/?photos=1")    # лише для цього друку
+        self.assertIn(b"<Name>MinervaPhoto1</Name>", r.content)
+        self.assertTrue(json.loads(r["X-Minerva-Photos"])["on"])
+        self.assertNotIn(b"<!--", r.content)                           # коментарів DYMO не приймає
+        page = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
+        self.assertContains(page, "X-Minerva-Photos")                  # вікно перегляду читає заголовок
+        self.assertContains(page, "🖼 Фото артикулів")
+
+
+class OrderLabelPhotoFileTests(TestCase):
+    """label_photo: фото з картки → сіре PNG з білим фоном, кеш, недоступне — None."""
+
+    def setUp(self):
+        self.media = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.media, ignore_errors=True)
+        override = self.settings(MEDIA_ROOT=str(self.media))
+        override.enable()
+        self.addCleanup(override.disable)
+
+    def test_prepares_and_caches(self):
+        from PIL import Image, ImageDraw
+        from django.core.files.base import ContentFile
+        im = Image.new("RGB", (900, 600), (244, 244, 244))
+        ImageDraw.Draw(im).rectangle((300, 200, 600, 400), fill=(20, 110, 60))
+        out = io.BytesIO()
+        im.save(out, "JPEG")
+        product = Product.objects.create(sku="AN220201-04A", name="x")
+        product.image.save("a.jpg", ContentFile(out.getvalue()), save=True)
+        png = order_label.label_photo(product)
+        with Image.open(io.BytesIO(png)) as got:
+            self.assertEqual(got.format, "PNG")
+            self.assertEqual(got.mode, "L")
+            self.assertLessEqual(max(got.size), order_label.PHOTO_PX)
+            self.assertEqual(got.getpixel((2, 2)), 255)                 # світлий фон — чисто білий
+            self.assertLess(got.getpixel((got.size[0] // 2, got.size[1] // 2)), 128)
+        from inventory import thumbs
+        with mock.patch.object(thumbs, "_source_bytes", side_effect=AssertionError("кеш не спрацював")):
+            self.assertEqual(order_label.label_photo(product), png)
+        self.assertIsNone(order_label.label_photo(Product.objects.create(sku="NOPHOTO", name="y")))
+        broken = Product.objects.create(sku="BROKEN", name="z", image_url="https://example.com/x.jpg")
+        with mock.patch.object(thumbs, "_source_bytes", side_effect=OSError("network")) as fetch:
+            self.assertIsNone(order_label.label_photo(broken))
+            self.assertIsNone(order_label.label_photo(broken))          # невдача запам'ятована
+            self.assertEqual(fetch.call_count, 1)

@@ -1,15 +1,25 @@
 """
-Етикетка замовлення DYMO: номер замовлення з кодом країни і всі артикули з кількістю.
+Етикетка замовлення DYMO: номер замовлення з кодом країни, усі артикули з кількістю й, за бажанням, їх фото.
 
 Шаблон shipping/templates_dymo/order_label_template.dymo — макет антен без QR, логотипа, штрихкода й Copyright:
   {{ORDER}} {{COUNTRY}} — один рядок на всю ширину: «Order: 102497269   NZ» (країна жирним, `country`);
   {{LINE}} / {{FS}} — нумеровані позиції «1. AN220214-01A × 5» жирним моноширинним шрифтом (Courier New Bold) у стовпчиках; розмір
                       шрифту — найбільший, з яким усе вміщується (`layout`), інакше останній рядок «+N more».
+Фото артикулів (`SalesSettings.order_label_photos`, для одного друку — `photos=`): праворуч від списку, коли
+позицій не більше `PHOTO_MAX` — одне на всю висоту, два — одне над одним, три-чотири — сіткою 2 × 2 з номером
+позиції; список тоді вужчий. Фото — як у мініатюр списку товарів (inventory/thumbs.py: файл у картці → копія
+магазину → посилання), для етикетки — сіре з підтягнутим контрастом, кеш MEDIA_ROOT/thumbs/label_*.png.
+Що з фото (`photo_info`) віддає заголовок відповіді X-Minerva-Photos (вікно перегляду): XML-коментарів
+DYMO не приймає ніде в етикетці («Could not find ILabelObject of type»).
 Артикул — як у картці замовлення: з рядка замовлення, інакше товару; однакові артикули складаються.
 """
+import base64
+import hashlib
 import math
 import re
+import time
 from decimal import Decimal
+from io import BytesIO
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -18,11 +28,19 @@ from django.conf import settings
 TEMPLATE_PATH = Path(settings.BASE_DIR) / "shipping" / "templates_dymo" / "order_label_template.dymo"
 
 TEXT_W, TEXT_H = 3.13, 1.04      # блок позицій, дюйми (як у шаблоні)
+LIST_X, LIST_Y = 0.2233334, 0.3  # його лівий верхній кут
 FONT_SIZES = (12, 11, 10, 9, 8, 7, 6)
 CHAR_EM = 0.6                    # ширина символу Courier New
 LINE_EM = 1.2                    # висота рядка з запасом
 GAP = 3                          # пробіли між стовпчиками
 NBSP = " "                  # DYMO не стискає нерозривні пробіли
+
+PHOTO_MAX = 4                    # фото — лише коли позицій не більше (інакше списку бракує місця)
+PHOTO_GAP = 0.06                 # між списком і фото, дюйми
+PHOTO_PAD = 0.02                 # поле всередині клітинки фото
+PHOTO_PX = 240                   # сторона фото (≈ 230 точок на дюйм на 1″)
+PHOTO_RETRY = 3600               # недоступне фото не пробуємо знову годину
+WHITE_FROM = 232                 # світліше — чисто білий (термодрук розсипав би світло-сіре цятками)
 
 
 def _qty(value) -> str:
@@ -30,19 +48,33 @@ def _qty(value) -> str:
     return str(value.quantize(Decimal(1))) if value == value.to_integral_value() else f"{value.normalize():f}"
 
 
+def _sku(line) -> str:
+    return (line.sku_raw or "").strip() or (line.product.sku if line.product_id else "")
+
+
 def items(order) -> list[tuple[str, Decimal]]:
     """[(артикул, кількість)] у порядку рядків замовлення."""
     merged = {}
     for line in order.lines.select_related("product").order_by("pk"):
-        sku = (line.sku_raw or "").strip() or (line.product.sku if line.product_id else "")
+        sku = _sku(line)
         if sku:
             merged[sku] = merged.get(sku, Decimal(0)) + Decimal(line.qty or 0)
     return list(merged.items())
 
 
-def layout(rows) -> tuple[int, list[str]]:
-    """(розмір шрифту, рядки етикетки) — найбільший шрифт і найменше стовпчиків, з якими все вміщується.
-    Рядок позиції: «1. AN220214-01A × 5» (номер позиції, артикул, кількість — вирівняні)."""
+def _products(order) -> dict:
+    """{артикул: товар першого рядка з ним}."""
+    out = {}
+    for line in order.lines.select_related("product").order_by("pk"):
+        sku = _sku(line)
+        if sku and line.product_id and sku not in out:
+            out[sku] = line.product
+    return out
+
+
+def layout(rows, width=TEXT_W) -> tuple[int, list[str]]:
+    """(розмір шрифту, рядки етикетки) — найбільший шрифт і найменше стовпчиків, з якими все вміщується в блок
+    шириною width. Рядок позиції: «1. AN220214-01A × 5» (номер позиції, артикул, кількість — вирівняні)."""
     if not rows:
         return FONT_SIZES[0], []
     num_w = len(str(len(rows)))
@@ -52,7 +84,7 @@ def layout(rows) -> tuple[int, list[str]]:
              for n, (sku, q) in enumerate(rows, 1)]
     cell_w = len(cells[0])
     for size in FONT_SIZES:
-        per_line = int(TEXT_W / (CHAR_EM * size / 72))
+        per_line = int(width / (CHAR_EM * size / 72))
         cols_max = max(1, (per_line + GAP) // (cell_w + GAP))
         lines_max = max(1, int(TEXT_H / (LINE_EM * size / 72)))
         if len(cells) <= cols_max * lines_max:
@@ -81,16 +113,185 @@ def country(order) -> str:
     return ""
 
 
-def build(order) -> dict:
+# ── Фото артикулів ────────────────────────────────────────────────────────────
+
+def photos_default() -> bool:
+    """«Фото артикулів на етикетці замовлення» (SalesSettings.order_label_photos), за замовчуванням — так."""
+    try:
+        from sales.models import SalesSettings
+        return SalesSettings.get().order_label_photos
+    except Exception:
+        return True
+
+
+def _prepare(data: bytes) -> bytes:
+    """Фото → PNG для термодруку: прозоре — на білому, сіре, контраст підтягнуто, сторона ≤ PHOTO_PX."""
+    from PIL import Image, ImageOps
+    with Image.open(BytesIO(data)) as im:
+        im.draft("RGB", (PHOTO_PX * 2, PHOTO_PX * 2))
+        im = ImageOps.exif_transpose(im)
+        im.thumbnail((PHOTO_PX, PHOTO_PX))
+        if im.mode in ("RGBA", "LA", "P"):
+            im = im.convert("RGBA")
+            bg = Image.new("RGB", im.size, (255, 255, 255))
+            bg.paste(im, mask=im.split()[-1])
+            im = bg
+        im = ImageOps.autocontrast(im.convert("L"), cutoff=1)
+        im = im.point(lambda v: 255 if v >= WHITE_FROM else v)   # світлий фон — білий, без сірих цяток
+        out = BytesIO()
+        im.save(out, "PNG", optimize=True)
+        return out.getvalue()
+
+
+def label_photo(product) -> bytes | None:
+    """PNG фото товару для етикетки або None (фото немає / недоступне); джерело — як у мініатюр."""
+    from django.core.files.base import ContentFile
+    from django.core.files.storage import default_storage
+    from inventory import thumbs
+    if product is None or not thumbs.has_image(product):
+        return None
+    key = hashlib.sha1(f"label{PHOTO_PX}:{thumbs._key(product)}".encode()).hexdigest()[:24]
+    name = f"{thumbs.THUMB_DIR}/label_{key}.png"
+    if default_storage.exists(name):
+        with default_storage.open(name, "rb") as f:
+            return f.read()
+    fail = name + ".fail"
+    if default_storage.exists(fail):
+        try:
+            with default_storage.open(fail, "rb") as f:
+                if time.time() - float(f.read() or 0) < PHOTO_RETRY:
+                    return None
+        except (OSError, ValueError):
+            pass
+        default_storage.delete(fail)
+    try:
+        data = _prepare(thumbs._source_bytes(product))
+    except Exception:  # noqa: BLE001 — недоступне посилання або зіпсоване фото
+        default_storage.save(fail, ContentFile(str(time.time()).encode()))
+        return None
+    default_storage.save(name, ContentFile(data))
+    return data
+
+
+def photo_grid(count) -> tuple[int, int, float]:
+    """(стовпчиків, рядків, сторона клітинки) для count фото праворуч від списку (висота — як у списку)."""
+    if count <= 0:
+        return 0, 0, 0.0
+    if count == 1:
+        return 1, 1, TEXT_H
+    if count == 2:
+        return 1, 2, TEXT_H / 2
+    return 2, 2, TEXT_H / 2
+
+
+def build(order, photos=None) -> dict:
+    """photos — None: як у налаштуваннях; True / False — для цього друку."""
+    from inventory import thumbs
     rows = items(order)
-    size, lines = layout(rows)
+    want = photos_default() if photos is None else bool(photos)
+    products = _products(order)
+    available = sum(1 for sku, _q in rows if products.get(sku) is not None and thumbs.has_image(products[sku]))
+    pics = []
+    if want and 0 < len(rows) <= PHOTO_MAX:
+        for n, (sku, _q) in enumerate(rows, 1):
+            png = label_photo(products.get(sku))
+            if png:
+                pics.append((n, png))
+    cols, _rows, cell = photo_grid(len(pics))
+    width = TEXT_W - (cols * cell + PHOTO_GAP if pics else 0)
+    size, lines = layout(rows, width)
     return {
         "order": order.order_number,
         "country": country(order),
         "font_size": size,
         "lines": lines,
         "items": [(sku, _qty(q)) for sku, q in rows],
+        "photos": pics,
+        "text_w": width,
+        "photo_info": {"on": want, "shown": len(pics), "available": available, "positions": len(rows),
+                       "max": PHOTO_MAX},
     }
+
+
+_IMAGE = """        <ImageObject>
+          <Name>MinervaPhoto{n}</Name>
+          <Brushes>
+            <BackgroundBrush><SolidColorBrush><Color A="0" R="0" G="0" B="0"></Color></SolidColorBrush></BackgroundBrush>
+            <BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"></Color></SolidColorBrush></BorderBrush>
+            <StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"></Color></SolidColorBrush></StrokeBrush>
+            <FillBrush><SolidColorBrush><Color A="0" R="0" G="0" B="0"></Color></SolidColorBrush></FillBrush>
+          </Brushes>
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          <Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0" /></Margin>
+          <Data>{data}</Data>
+          <ScaleMode>Uniform</ScaleMode>
+          <HorizontalAlignment>Center</HorizontalAlignment>
+          <VerticalAlignment>Middle</VerticalAlignment>
+          <ObjectLayout>
+            <DYMOPoint><X>{x:.4f}</X><Y>{y:.4f}</Y></DYMOPoint>
+            <Size><Width>{w:.4f}</Width><Height>{h:.4f}</Height></Size>
+          </ObjectLayout>
+        </ImageObject>
+"""
+
+_NUMBER = """        <TextObject>
+          <Name>MinervaPhotoNo{n}</Name>
+          <Brushes>
+            <BackgroundBrush><SolidColorBrush><Color A="1" R="1" G="1" B="1"></Color></SolidColorBrush></BackgroundBrush>
+            <BorderBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"></Color></SolidColorBrush></BorderBrush>
+            <StrokeBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"></Color></SolidColorBrush></StrokeBrush>
+            <FillBrush><SolidColorBrush><Color A="0" R="0" G="0" B="0"></Color></SolidColorBrush></FillBrush>
+          </Brushes>
+          <Rotation>Rotation0</Rotation>
+          <OutlineThickness>1</OutlineThickness>
+          <IsOutlined>False</IsOutlined>
+          <BorderStyle>SolidLine</BorderStyle>
+          <Margin><DYMOThickness Left="0" Top="0" Right="0" Bottom="0" /></Margin>
+          <HorizontalAlignment>Left</HorizontalAlignment>
+          <VerticalAlignment>Top</VerticalAlignment>
+          <FitMode>None</FitMode>
+          <IsVertical>False</IsVertical>
+          <FormattedText>
+            <FitMode>None</FitMode>
+            <HorizontalAlignment>Left</HorizontalAlignment>
+            <VerticalAlignment>Top</VerticalAlignment>
+            <IsVertical>False</IsVertical>
+            <LineTextSpan>
+              <TextSpan>
+                <Text>{n}</Text>
+                <FontInfo>
+                  <FontName>Arial</FontName>
+                  <FontSize>7</FontSize>
+                  <IsBold>True</IsBold>
+                  <IsItalic>False</IsItalic>
+                  <IsUnderline>False</IsUnderline>
+                  <FontBrush><SolidColorBrush><Color A="1" R="0" G="0" B="0"></Color></SolidColorBrush></FontBrush>
+                </FontInfo>
+              </TextSpan>
+            </LineTextSpan>
+          </FormattedText>
+          <ObjectLayout>
+            <DYMOPoint><X>{x:.4f}</X><Y>{y:.4f}</Y></DYMOPoint>
+            <Size><Width>0.1300</Width><Height>0.1300</Height></Size>
+          </ObjectLayout>
+        </TextObject>
+"""
+
+
+def _photo_objects(pics) -> str:
+    cols, _rows, cell = photo_grid(len(pics))
+    x0 = LIST_X + TEXT_W - cols * cell
+    out = []
+    for i, (n, png) in enumerate(pics):
+        x, y = x0 + (i % cols) * cell, LIST_Y + (i // cols) * cell
+        out.append(_IMAGE.format(n=n, data=base64.b64encode(png).decode("ascii"), x=x + PHOTO_PAD, y=y + PHOTO_PAD,
+                                 w=cell - 2 * PHOTO_PAD, h=cell - 2 * PHOTO_PAD))
+        if len(pics) > 1:      # номер позиції в куті фото
+            out.append(_NUMBER.format(n=n, x=x + PHOTO_PAD, y=y + PHOTO_PAD))
+    return "".join(out)
 
 
 def render(data) -> str:
@@ -103,4 +304,12 @@ def render(data) -> str:
     country = NBSP * 3 + data["country"] if data["country"] else ""      # той самий рядок, що й номер
     for marker, value in (("{{ORDER}}", data["order"]), ("{{COUNTRY}}", country)):
         xml = xml.replace(marker, escape(value))
+    width = data.get("text_w", TEXT_W)
+    if width != TEXT_W:      # місце для фото: список вужчий
+        xml = re.sub(r"(<Name>ITextObject1</Name>.*?<Width>)[\d.]+(</Width>)",
+                     lambda m: f"{m.group(1)}{width:.4f}{m.group(2)}", xml, count=1, flags=re.S)
+    extra = _photo_objects(data.get("photos") or [])
+    if extra:
+        head, sep, tail = xml.rpartition("</LabelObjects>")
+        xml = head + extra + "      " + sep + tail
     return xml

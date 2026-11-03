@@ -4,6 +4,7 @@ views.py для системи етикеток DYMO
 Додати в urls.py проекту:
     path('labels/', include('labels.urls')),
 """
+import json
 import re
 from pathlib import Path
 from datetime import datetime
@@ -327,12 +328,14 @@ def product_label_file(request, sku):
 
 @staff_member_required
 def order_label(request, pk):
-    """Етикетка замовлення: номер, країна й усі артикули з кількістю (labels_app/order_label.py)."""
+    """Етикетка замовлення: номер, країна, усі артикули з кількістю й фото (labels_app/order_label.py);
+    ?photos=1|0 — фото для цього друку, без нього — як у налаштуваннях."""
     from django.shortcuts import get_object_or_404
     from labels_app import mark, order_label as builder
     from sales.models import SalesOrder
     order = get_object_or_404(SalesOrder, pk=pk)
-    data = builder.build(order)
+    photos = request.GET.get('photos')
+    data = builder.build(order, photos=None if photos in (None, '') else photos == '1')
     if not data['items']:
         return HttpResponse(f'У замовленні {order.order_number} немає позицій з артикулом.', status=400,
                             content_type='text/plain; charset=utf-8')
@@ -340,6 +343,8 @@ def order_label(request, pk):
     xml = mark.stamp(builder.render(data), 'auto')
     response = HttpResponse(xml.encode('utf-8'), content_type='application/octet-stream')
     response['Content-Disposition'] = f'attachment; filename="Order-{name}.dymo"'
+    # що з фото — для галочки «🖼 Фото артикулів» у вікні перегляду (у самому .dymo DYMO коментарів не приймає)
+    response['X-Minerva-Photos'] = json.dumps(data['photo_info'], separators=(',', ':'))
     return response
 
 
