@@ -261,6 +261,23 @@ a.em-att-chip:hover{border-color:#1a73e8;color:#1a73e8}
 #em-wc-dlg .wc-rules{font-size:12px;color:var(--text-muted);margin:4px 0 0;padding-left:16px}
 #em-wc-dlg .wc-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
 #em-wc-dlg .wc-muted{font-size:11px;color:var(--text-dim)}
+#em-agent-dlg{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-card);color:var(--text);
+  padding:14px 16px;width:min(560px,94vw);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+#em-agent-dlg::backdrop{background:rgba(0,0,0,.45)}
+#em-agent-dlg label{display:block;font-size:11px;color:var(--text-dim);margin:8px 0 2px}
+#em-agent-dlg input[type=text],#em-agent-dlg textarea,#em-agent-dlg select{width:100%;box-sizing:border-box;
+  background:var(--bg-input,var(--bg));color:var(--text);border:1px solid var(--border-strong);border-radius:6px;
+  padding:5px 7px;font:inherit;font-size:12px}
+#em-agent-dlg textarea{resize:vertical}
+#em-agent-dlg .wc-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap}
+#em-agent-dlg .ag-muted{font-size:11px;color:var(--text-dim)}
+#em-agent-dlg .ag-link{border:0;background:none;color:#1a73e8;cursor:pointer;font-size:11px;padding:0 4px}
+#em-agent-dlg .ag-note,#em-agent-dlg .ag-warn{font-size:12px;margin-top:8px;padding:6px 9px;border-radius:6px}
+#em-agent-dlg .ag-note{background:rgba(26,115,232,.1);border:1px solid rgba(26,115,232,.3)}
+#em-agent-dlg .ag-warn{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4)}
+#em-agent-dlg .ag-reply{white-space:pre-wrap;font-size:12.5px;max-height:240px;overflow-y:auto;padding:8px 10px;
+  border:1px solid var(--border-strong);border-radius:6px;background:var(--bg-input,var(--bg))}
+#em-agent-dlg .ag-check{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text);font-weight:400}
 #em-icon-dlg{border:1px solid var(--border-strong);border-radius:10px;background:var(--bg-card);color:var(--text);
   padding:14px 16px;width:min(420px,94vw);box-shadow:0 10px 30px rgba(0,0,0,.4)}
 #em-icon-dlg::backdrop{background:rgba(0,0,0,.45)}
@@ -1085,6 +1102,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   {% if mail_time_url %}<div class="em-ctx-item" data-k="dante" data-g="org" onclick="ctxAction('dante')" title="{% trans "Час на проєкт листа в askDANTE: дата й час з листа, AI коротко опише, що зроблено, і що надіслали" %}">⏱ {% trans "Записати в askDANTE з листа…" %}</div>{% endif %}
   <div class="em-ctx-item" data-k="customer" data-g="org" onclick="ctxAction('customer')" title="{% trans "Новий клієнт CRM з даних листа (ім'я, компанія, email, телефон, адреса з підпису) — і гілка, Angebote та проєкти до нього; або вибрати наявного" %}">👤 {% trans "Клієнт CRM з листа…" %}</div>
   <div class="em-ctx-item" data-k="why" data-g="org" onclick="ctxAction('why')" title="{% trans "До якої своєї категорії й чому, хто пише, проєкти — і швидко змінити правило" %}">🔍 {% trans "Чому лист тут — ознаки й правила…" %}</div>
+  {% if agent_can %}<div class="em-ctx-item" data-k="agent" data-g="org" onclick="ctxAction('agent')" title="{% trans "Агент Minerva відповідатиме на такі листи за вашою інструкцією — спершу чернетками, які ви перевіряєте" %}">🤖 {% trans "Доручити агенту: відповідати на такі листи…" %}</div>{% endif %}
   <div class="em-ctx-item" data-k="project" data-g="org" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
   {% if knowledge_available %}
   <div class="em-ctx-item" data-k="kbsend" data-g="kb" onclick="ctxAction('kbsend')"
@@ -1282,6 +1300,42 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     <div id="em-logo-err" style="color:var(--err,#e57373);font-size:12px;margin-top:4px"></div>
   </form>
 </dialog>
+{% if agent_can %}
+<dialog id="em-agent-dlg">
+  <form method="dialog" onsubmit="return false">
+    <div style="display:flex;gap:8px;align-items:center"><b style="font-size:14px">🤖 {% trans "Доручити агенту" %}</b>
+      <span class="ag-muted" id="ag-subj" translate="no" style="margin-left:auto;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+    <div class="ag-muted" style="margin-top:4px">{% trans "Нові листи, що підходять під усі умови нижче, агент оброблятиме сам за вашою інструкцією. Спершу — чернетки в «📝 Чернетках»: ви перевіряєте й надсилаєте." %}</div>
+    <div id="ag-rules" class="ag-note" hidden></div>
+    <div id="ag-warn" class="ag-warn" hidden></div>
+    <label>{% trans "Назва" %}</label>
+    <input type="text" id="ag-name" maxlength="200">
+    <label>{% trans "Від кого" %} <span class="ag-muted">— {% trans "по одному в рядку: адреса, @домен" %}</span>
+      <button type="button" class="ag-link" onclick="agDomain()">{% trans "весь домен" %}</button></label>
+    <textarea id="ag-senders" rows="2"></textarea>
+    <label>{% trans "Тема містить" %} <span class="ag-muted">— {% trans "по одному в рядку; порожньо — будь-яка" %}</span></label>
+    <textarea id="ag-subject" rows="2"></textarea>
+    <label>{% trans "Текст листа містить" %} <span class="ag-muted">— {% trans "необов’язково" %}</span></label>
+    <textarea id="ag-body" rows="1"></textarea>
+    <label>{% trans "Своя категорія листа" %}</label>
+    <select id="ag-cat"><option value="">— {% trans "будь-яка" %} —</option></select>
+    <label>{% trans "Що робити — інструкція агенту" %}</label>
+    <textarea id="ag-instr" rows="6" placeholder="{% trans "Напр.: Подякуй за документ і підтверди, що отримали. Якщо питають про строк відправки — візьми його із замовлення. Пиши коротко, мовою листа. Якщо просять знижку — не відповідай." %}"></textarea>
+    <label>{% trans "Режим" %}</label>
+    <select id="ag-mode"></select>
+    <div id="ag-result" hidden>
+      <label>{% trans "Відповідь агента на цей лист" %} <span class="ag-muted" id="ag-meta"></span></label>
+      <div id="ag-reply" class="ag-reply"></div>
+      <label class="ag-check" id="ag-draft-row"><input type="checkbox" id="ag-draft-now" checked> {% trans "І зберегти цю відповідь чернеткою для цього листа" %}</label>
+    </div>
+    <div class="wc-btns">
+      <button type="button" class="button" onclick="document.getElementById('em-agent-dlg').close()">{% trans "Закрити" %}</button>
+      <button type="button" class="button" id="ag-try" onclick="agTry()" title="{% trans "Агент напише відповідь на цей лист за інструкцією — нічого не зберігається й не надсилається" %}">🧪 {% trans "Спробувати на цьому листі" %}</button>
+      <button type="button" class="button default" id="ag-save" onclick="agSave()">💾 {% trans "Зберегти доручення" %}</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
 <dialog id="em-icon-dlg">
   <form method="dialog" onsubmit="return false">
     <b style="font-size:14px">🎨 {% trans "Значок" %}</b>
@@ -3952,6 +4006,99 @@ async function ctxSetWorkCategory(cat) {
   setTimeout(function(){ location.reload(); }, 900);
 }
 
+/* ── 🤖 Доручити агенту (agent/mail.py) ── */
+var _ag = null;   // {pk, domain}
+async function emAgent(pk) {
+  var dlg = document.getElementById('em-agent-dlg');
+  if (!dlg) return;
+  var r = await fetch('/agent/mail/' + pk + '/'), d = await r.json();
+  if (!d.ok) { alert('❌ ' + (d.error || '')); return; }
+  _ag = {pk: pk, domain: d.domain || ''};
+  document.getElementById('ag-subj').textContent = d.title || '';
+  document.getElementById('ag-name').value = d.name || '';
+  document.getElementById('ag-senders').value = d.sender || '';
+  document.getElementById('ag-subject').value = d.subject || '';
+  document.getElementById('ag-body').value = '';
+  document.getElementById('ag-instr').value = '';
+  var cat = document.getElementById('ag-cat');
+  cat.length = 1;
+  (d.categories || []).forEach(function (c) { cat.add(new Option(c.name, c.id)); });
+  cat.value = '';
+  var mode = document.getElementById('ag-mode');
+  mode.length = 0;
+  (d.modes || []).forEach(function (m) { mode.add(new Option(m.label, m.value)); });
+  var rules = document.getElementById('ag-rules');
+  rules.hidden = !(d.rules || []).length;
+  rules.textContent = '';
+  (d.rules || []).forEach(function (x) {
+    var a = document.createElement('a');
+    a.href = x.url; a.target = '_blank';
+    a.textContent = '🤖 ' + x.name + ' (' + x.mode + (x.enabled ? '' : ', {% trans "вимкнено" %}') + ')';
+    rules.append('{% trans "Цей лист уже підходить під доручення" %}: ', a, document.createElement('br'));
+  });
+  var warn = document.getElementById('ag-warn');
+  warn.hidden = !d.blocked;
+  warn.textContent = d.blocked ? '⚠️ {% trans "На цей лист агент не відповідав би" %}: ' + d.blocked : '';
+  document.getElementById('ag-result').hidden = true;
+  dlg.showModal();
+}
+function agDomain() {
+  if (_ag && _ag.domain) document.getElementById('ag-senders').value = _ag.domain;
+}
+function agData() {
+  return {
+    name: document.getElementById('ag-name').value, senders: document.getElementById('ag-senders').value,
+    subject_words: document.getElementById('ag-subject').value, body_words: document.getElementById('ag-body').value,
+    category: document.getElementById('ag-cat').value, instruction: document.getElementById('ag-instr').value,
+    mode: document.getElementById('ag-mode').value
+  };
+}
+async function agPost(url, data) {
+  var r = await fetch(url, {method: 'POST', headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+                            body: JSON.stringify(data)});
+  return r.json();
+}
+async function agTry() {
+  if (!_ag) return;
+  var btn = document.getElementById('ag-try'), box = document.getElementById('ag-result');
+  var reply = document.getElementById('ag-reply'), meta = document.getElementById('ag-meta');
+  btn.disabled = true;
+  box.hidden = false; meta.textContent = ''; reply.textContent = '⏳ {% trans "Агент пише відповідь…" %}';
+  document.getElementById('ag-draft-row').hidden = true;
+  try {
+    var d = await agPost('/agent/mail/' + _ag.pk + '/try/', agData());
+    if (!d.ok || d.error) { reply.textContent = '❌ ' + (d.error || ''); return; }
+    var notes = [];
+    if (!d.matches) notes.push('⚠️ {% trans "лист не підходить під умови" %}: ' + d.why);
+    if (d.blocked) notes.push('⚠️ ' + d.blocked);
+    if (d.skip) { reply.textContent = '↷ {% trans "Агент пропустив би цей лист" %}: ' + (d.skip_reason || ''); }
+    else {
+      reply.textContent = d.reply || '';
+      _ag.reply = d.reply || '';
+      document.getElementById('ag-draft-row').hidden = !!d.blocked;
+      if (!d.confident) notes.push('⚠️ {% trans "не впевнений — лишив би чернеткою" %}' + (d.doubts ? ': ' + d.doubts : ''));
+    }
+    if (d.model) notes.push(d.model);
+    meta.textContent = notes.join(' · ');
+  } catch (e) { reply.textContent = '❌ ' + e; }
+  finally { btn.disabled = false; }
+}
+async function agSave() {
+  if (!_ag) return;
+  var data = agData(), now = document.getElementById('ag-draft-now');
+  data.draft_now = !document.getElementById('ag-result').hidden && now.checked && !document.getElementById('ag-draft-row').hidden;
+  data.reply = data.draft_now ? (_ag.reply || '') : '';
+  var btn = document.getElementById('ag-save');
+  btn.disabled = true;
+  try {
+    var d = await agPost('/agent/mail/' + _ag.pk + '/save/', data);
+    if (!d.ok) { alert('❌ ' + (d.error || '')); return; }
+    document.getElementById('em-agent-dlg').close();
+    _showToast('🤖 {% trans "Доручення збережено — нові такі листи агент оброблятиме сам" %}'
+               + (d.draft ? ' · 📝 {% trans "чернетка для цього листа в Чернетках" %}' : ''));
+  } catch (e) { alert('❌ ' + e); }
+  finally { btn.disabled = false; }
+}
 async function ctxAction(action) {
   _ctx.classList.remove('open');
   if (!_ctxMsg) return;
@@ -3984,6 +4131,7 @@ async function ctxAction(action) {
   if (action === 'angebot') { pvOfferFromThread(tpk); return; }
   if (action === 'logo') { emLogoDialog(_ctxMsg.from || '', _ctxMsg.rowEl); return; }
   if (action === 'why') { emWhy(pk); return; }
+  if (action === 'agent') { emAgent(pk); return; }
   if (action === 'dante') { window.open('/admin/worktime/workday/from-mail/' + pk + '/', '_blank'); return; }
   if (action === 'customer') {   // «👤 Клієнт CRM з листа»: те саме вікно, одразу з формою нового клієнта
     await emWhy(pk);

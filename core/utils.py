@@ -103,7 +103,8 @@ ROLE_DEFAULTS = {
     },
     'manager': {
         'modules': ['crm', 'strategy', 'sales', 'shipping', 'dashboard', 'tasks',
-                    'email_assistant', 'projects', 'offers', 'calendar_app', 'worktime', 'faq', 'labels_app',
+                    'email_assistant', 'projects', 'offers', 'calendar_app', 'worktime', 'agent', 'faq',
+                    'labels_app',
                     'documents'],
         'can_delete': False,
         'can_export': True,
@@ -180,6 +181,7 @@ ROLE_OPERATIONS = {
         'offers':          ['view', 'add', 'change', 'export'],
         'calendar_app':    ['view', 'add', 'change'],
         'worktime':        ['view', 'add', 'change'],
+        'agent':           ['view', 'add', 'change'],
         'documents':       ['view', 'add', 'change'],
     },
     'warehouse': {

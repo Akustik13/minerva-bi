@@ -12,11 +12,14 @@ email_assistant/drafts.py — чернетки листів (EmailDraft).
 - discard: чернетку надіслано / заплановано / видалено — запис і її файли прибираються (сигнал post_delete).
 """
 import html as _html
+import logging
 
 from django.db.models import Q
 
 from email_assistant import attachments
 from email_assistant.models import EmailDraft
+
+logger = logging.getLogger(__name__)
 
 
 def addresses(raw) -> list:
@@ -96,10 +99,16 @@ def preview(draft, limit=220) -> str:
     return ' '.join(text.split())[:limit]
 
 
-def discard(account, pk) -> bool:
-    """Чернетку надіслано / заплановано / видалено → прибрати (файли — сигнал post_delete)."""
+def discard(account, pk, how='deleted', text='') -> bool:
+    """Чернетку надіслано / заплановано / видалено (how: sent / scheduled / deleted) → прибрати (файли — сигнал
+    post_delete). Чернетка агента — спершу його журнал (agent.mail.draft_closed: надіслано без змін чи з правками)."""
     draft = get(account, pk)
     if draft is None:
         return False
+    try:
+        from agent.mail import draft_closed
+        draft_closed(draft, how, text)
+    except Exception:  # noqa: BLE001 — журнал агента не заважає надіслати лист
+        logger.warning('agent draft outcome for draft %s', draft.pk, exc_info=True)
     draft.delete()
     return True

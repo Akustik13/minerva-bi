@@ -113,6 +113,7 @@ urlpatterns = [
     path("ai/", include("ai_assistant.urls")),
     path("rag/", include("rag_assistant.urls")),
     path("email/", include("email_assistant.urls")),
+    path("agent/", include("agent.urls")),
     path("projects/", include("projects.urls")),
     path("guide/", include("guide.urls")),
     path("offers/", include("offers.urls")),

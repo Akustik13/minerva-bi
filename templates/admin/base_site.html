@@ -1310,7 +1310,9 @@ window.MV_GROUPS = [
       { href:'/admin/email_assistant/mailcategory/',            icon:'🏷', label:'Свої категорії', app:'email_assistant', model:'MailCategory' },
       { href:'/email/sort/',                                    icon:'🧠', label:'Розбір пошти',  app:'email_assistant' },
       { href:'/admin/email_assistant/scheduledemail/',          icon:'⏳', label:'Заплановані',   app:'email_assistant', model:'ScheduledEmail' },
-    ], apps:['email_assistant'] },
+      { href:'/admin/agent/agentrule/',                          icon:'🤖', label:'Доручення агента', app:'agent', model:'AgentRule' },
+      { href:'/admin/agent/agentrun/',                           icon:'📜', label:'Журнал агента', app:'agent', model:'AgentRun' },
+    ], apps:['email_assistant', 'agent'] },
   { id:'calendar', icon:'📅', label:'📅 Календар', href:'/calendar/',
     links:[
       { href:'/calendar/',                                      icon:'📅', label:'Мій календар',  app:'calendar_app' },

@@ -30,6 +30,7 @@ MODULES = [
     {'app_label': 'email_assistant', 'name': 'Email Асистент',              'tier': 'premium',  'order': 56},
     {'app_label': 'calendar_app',    'name': 'Календар',                    'tier': 'standard', 'order': 57},
     {'app_label': 'worktime',        'name': 'Робочий час (askDANTE)',      'tier': 'standard', 'order': 58},
+    {'app_label': 'agent',           'name': 'Агент Minerva',               'tier': 'premium',  'order': 59},
     {'app_label': 'bots',            'name': 'AI та Боти',                  'tier': 'premium',  'order': 60},
     {'app_label': 'api',             'name': 'REST API',                    'tier': 'premium',  'order': 61},
     {'app_label': 'autoimport',      'name': 'Авто-імпорт',                 'tier': 'premium',  'order': 62},

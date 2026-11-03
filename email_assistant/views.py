@@ -678,6 +678,7 @@ def inbox_view(request):
         'can_change_project':    request.user.has_perm('projects.change_project'),
         'category_icons':        CATEGORY_ICONS,
         'mail_time_url':         _mail_time_url(),
+        'agent_can':             request.user.has_perm('agent.add_agentrule'),
         'can_delete_work_category': request.user.has_perm('email_assistant.delete_mailcategory'),
         'grouped':               grouped,
         'category_choices':      EmailMessage.CATEGORY_CHOICES,
@@ -795,6 +796,7 @@ def thread_preview_view(request, thread_pk):
         'sender_logos':    EmailSettings.get_for_user(request.user).sender_logos,
         'projects_state':  _projects_state(thread),
         'quote_request':   _quote_request(thread),
+        'agent_runs':      _agent_runs(emails),
         'links':           links,
         'attach_options':  _attach_options(emails, links),
         'reply_to_addr':   reply_to_addr,
@@ -806,6 +808,17 @@ def thread_preview_view(request, thread_pk):
         'last_msg':        emails[-1] if emails else None,
         'reply_signature': _get_signature(account),
     }))
+
+
+def _agent_runs(emails) -> list:
+    """Рядок «🤖 Агент …» у прев'ю: остання робота агента для кожного листа (agent/mail.py)."""
+    try:
+        from agent.mail import runs_for
+        runs = runs_for(emails)
+    except Exception as e:  # noqa: BLE001 — прев'ю відкривається й без агента
+        logger.warning('agent runs for preview: %s', e)
+        return []
+    return [runs[m.pk][0] for m in emails if runs.get(m.pk)]
 
 
 @staff_member_required
@@ -825,6 +838,7 @@ def message_preview_view(request, message_pk):
         'account':         account,
         'sender_logos':    EmailSettings.get_for_user(request.user).sender_logos,
         'projects_state':  _projects_state(msg.thread),
+        'agent_runs':      _agent_runs([msg]),
         'links':           links,
         'attach_options':  _attach_options([msg], links),
         'reply_to_addr':   reply_to_addr,
@@ -1325,7 +1339,7 @@ def _handle_send(request, account, reply_to=None):
             mark_sent_refs(offer_refs, result.get('message_id', ''), user=request.user)
         if request.POST.get('draft_pk'):   # лист із чернетки пішов — чернетка (і її файли) більше не потрібна
             from email_assistant import drafts as _drafts
-            _drafts.discard(account, request.POST['draft_pk'])
+            _drafts.discard(account, request.POST['draft_pk'], how='sent', text=body)
 
     return JsonResponse(result)
 
@@ -2132,7 +2146,7 @@ def schedule_email_api(request):
     _save_contacts(request.user, to_list + cc_list)
     if not is_json and request.POST.get('draft_pk'):   # чернетку заплановано — у листа свої копії файлів
         from email_assistant import drafts as _drafts
-        _drafts.discard(account, request.POST['draft_pk'])
+        _drafts.discard(account, request.POST['draft_pk'], how='scheduled', text=body)
 
     return JsonResponse({
         'ok':          True,

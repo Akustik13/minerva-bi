@@ -45,6 +45,7 @@ echo "   worktime_mail_time      daily — time spent on mail categories/project
 echo "   calendar_sync           iCal subscriptions + Google / Outlook / Minerva sync rules"
 echo "   send_reminders          every ${REMINDER_INTERVAL}s"
 echo "   sync_email              every ${EMAIL_SYNC_INTERVAL}s"
+echo "   agent_runs              every loop — 🤖 agent instructions: new mail → replies (nothing without instructions)"
 echo "   send_calendar_reminders every ${CALENDAR_REMINDER_INTERVAL}s"
 
 # Код змонтовано (./:/app) і підхоплюється сам, а цей цикл shell читає лише при старті контейнера.
@@ -125,6 +126,7 @@ while true; do
     python manage.py knowledge_sources --if-due 2>&1 || true   # «📂 Джерела знань»: папки й сайти за їх розкладом
     LAST_EMAIL_SYNC=$(date +%s)
   fi
+  python manage.py agent_runs 2>&1 || true                 # 🤖 доручення агента: нові листи → відповіді
 
   # ── Заплановані листи — кожні SCHEDULED_INTERVAL секунд ──
   if [ $((NOW - LAST_SCHEDULED)) -ge "$SCHEDULED_INTERVAL" ]; then

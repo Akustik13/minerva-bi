@@ -46,6 +46,7 @@ def _get_app_list(self, request, app_label=None):
         'ai_assistant',     # 🏛️ Minerva AI
         'rag_assistant',    # 📚 Помічник по продукції (RAG)
         'email_assistant',  # 📧 Email Асистент
+        'agent',            # 🤖 Агент Minerva
         'projects',         # 📁 Проєкти з пошти
         'offers',           # 📝 Angebote
         'worktime',         # ⏱ Робочий час (askDANTE)
@@ -70,6 +71,7 @@ def _get_app_list(self, request, app_label=None):
         'offers':          ['offer', 'offersettings', 'offerrevision'],
         'worktime':        ['workday', 'danteproject', 'workreport', 'danteuser', 'booking', 'dantesettings'],
         'email_assistant': ['emailaccount', 'emailsettings', 'mailcategory', 'emailmessage', 'emailthread'],
+        'agent':           ['agentrule', 'agentrun'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',
                       'inventorytransaction', 'reorderproxy', 'supplier',
