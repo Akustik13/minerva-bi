@@ -28,6 +28,9 @@ ACTIONS = {
     'product.read':    Action('Картка товару, пошук товарів', READ),
     'datasheet.read':  Action('Текст даташита товару', READ),
     'web.search':      Action('Пошук в інтернеті (якщо дозволено в завданні)', READ),
+    'rag.datasheets':  Action('Пошук по всіх даташитах у RAG (помічник по продукції, право «📦»)', READ),
+    'rag.history':     Action('Пошук в історії RAG: листи своїх скриньок і документи бази знань, лише перевірені '
+                              'Minerva (право «🔎»)', READ),
     'product.propose': Action('Запропонувати поле чи параметр товару — застосовує людина (✓)', INTERNAL),
     'mail.propose':    Action('Підготувати лист на адресу з тексту завдання — надсилає людина', INTERNAL),
     'stock.receipt':   Action('Прихід на склад, новий товар — застосовує людина (✓)', INTERNAL),

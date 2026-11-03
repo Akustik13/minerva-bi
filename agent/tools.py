@@ -5,6 +5,7 @@
 Межі: лише товари завдання (якщо їх вибрано); у режимі «окремо для кожного товару» — лише поточний і лише поля,
 параметри й прихід; лист завдання — лише зі скриньки того, хто дав завдання (`mail_of`); лист — лише на адреси, що є в
 тексті завдання (не з даташита, сайту чи листа — так стороння інструкція нікого не «додасть»).
+Пошук у RAG (усі даташити, історія пошти й документів) — agent/rag.py, лише читання.
 """
 import io
 import json
@@ -93,8 +94,8 @@ EVENT = {'name': 'propose_event', 'description': 'Запропонувати п�
 
 
 def definitions(task, single=False) -> list:
-    from agent import channels, shipments
-    tools = [FIND, GET, READ, CHANGE, ATTR, LOCATIONS, STOCK_IN] + channels.TOOLS
+    from agent import channels, rag, shipments
+    tools = [FIND, GET, READ, CHANGE, ATTR, LOCATIONS, STOCK_IN] + channels.TOOLS + rag.tools_for(task.owner)
     if not (single or task.each_product):
         tools += [MAIL, NEW_PRODUCT, EVENT] + ([READ_MAIL, READ_ATT] if mail_of(task) is not None else [])
         if shipments.can_read(task.owner if task.owner_id else None):    # замовлення й відправлення
@@ -184,9 +185,10 @@ def _pdf_pages(data) -> list:
 
 def run(ctx, name, args) -> tuple:
     """(текст результату, is_error) для tool_result."""
-    from agent import channels, shipments
+    from agent import channels, rag, shipments
     try:
-        fn = HANDLERS.get(name) or channels.HANDLERS.get(name) or shipments.HANDLERS.get(name)
+        fn = (HANDLERS.get(name) or channels.HANDLERS.get(name) or shipments.HANDLERS.get(name)
+              or rag.HANDLERS.get(name))
         if fn is None:
             raise ToolError(f'невідомий інструмент {name}')
         return fn(ctx, args or {}), False

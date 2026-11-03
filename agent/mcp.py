@@ -6,8 +6,9 @@ notifications/* (→ 202), ping, tools/list, tools/call.
 
 • Інструменти — `TOOL_DEFS`: читати товари, даташити, локації, магазини й DigiKey і пропонувати (propose_*) зміни
   товару, прихід, новий товар, подію, магазин, ціни / строк DigiKey. Листів (read_mail, propose_email) і пошуку в
-  інтернеті немає: пошта — лише її власника, а адресатів людина тут не називала. Викликати можна лише ці
-  (`call` перевіряє назву, хоч що надішле клієнт).
+  інтернеті немає: пошта — лише її власника, а адресатів людина тут не називала; з RAG — лише пошук по даташитах
+  (`search_datasheets`, якщо людині ключа доступний помічник по продукції), без історії листів. Викликати можна
+  лише ці (`call` перевіряє назву, хоч що надішле клієнт).
 • Пропозиції стають завданням людини ключа (`AgentTask`: `api_key`, `mcp_session` — одне на сесію, без сесії — одне
   на добу) у стані «👀 Чекає вашої перевірки»: застосовує вона ✓ на сторінці завдання (agent/decide.py). Відповідь
   інструмента містить адресу цієї сторінки.
@@ -27,7 +28,7 @@ PROTOCOLS = ('2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05')
 SERVER = {'name': 'minerva', 'title': 'Minerva', 'version': '1.0'}
 INSTRUCTIONS = (
     'Minerva — облік складу й продажів. Інструменти читають товари, даташити, локації, магазини, DigiKey, '
-    'замовлення до відправки й перевізників; '
+    'замовлення до відправки й перевізників (search_datasheets — пошук по всіх даташитах RAG, коли він є); '
     'propose_* лише ПРОПОНУЮТЬ зміни (і чернетку відправлення — оформлює в перевізника людина) — людина '
     'перевіряє їх і застосовує ✓ у Minerva («🧩 Завдання агенту»). '
     'Кожна пропозиція — з підставою (точна цитата) і джерелом. Ціни на DigiKey — лише за правилами Minerva.')
@@ -35,16 +36,18 @@ SESSION_RE = re.compile(r'^[A-Za-z0-9-]{8,80}$')
 CLIENT_TTL = 24 * 3600
 
 
-def tool_defs() -> list:
-    from agent import channels, shipments, tools
+def tool_defs(user=None) -> list:
+    """Інструменти для людини ключа; пошук по даташитах RAG — лише коли помічник налаштований і є право
+    «📦 Помічник по продукції» (історії пошти RAG тут немає — agent/rag.py)."""
+    from agent import channels, rag, shipments, tools
     base = [tools.FIND, tools.GET, tools.READ, tools.CHANGE, tools.ATTR, tools.LOCATIONS, tools.STOCK_IN,
-            tools.NEW_PRODUCT, tools.EVENT] + channels.TOOLS + shipments.TOOLS
+            tools.NEW_PRODUCT, tools.EVENT] + channels.TOOLS + shipments.TOOLS + rag.tools_for(user, mcp=True)
     return [{'name': t['name'], 'description': t['description'], 'inputSchema': t['input_schema'],
              'annotations': {'readOnlyHint': not is_write(t['name']), 'destructiveHint': False}} for t in base]
 
 
-def names() -> set:
-    return {t['name'] for t in tool_defs()}
+def names(user=None) -> set:
+    return {t['name'] for t in tool_defs(user)}
 
 
 def is_write(name) -> bool:
@@ -131,7 +134,7 @@ def _one(msg, key, user, session, review_base):
     if method == 'ping':
         return _result(mid, {}), ''
     if method == 'tools/list':
-        return _result(mid, {'tools': tool_defs()}), ''
+        return _result(mid, {'tools': tool_defs(user)}), ''
     if method == 'tools/call':
         return call(mid, params, key, user, session, review_base), ''
     return _error(mid, -32601, f'невідомий метод {method}'), ''
@@ -141,7 +144,7 @@ def call(mid, params, key, user, session, review_base):
     from agent import tools
     name = str(params.get('name') or '')
     args = params.get('arguments') or {}
-    if name not in names():
+    if name not in names(user):
         return _error(mid, -32602, f'невідомий інструмент {name}')
     if not isinstance(args, dict):
         return _error(mid, -32602, 'arguments — об\'єкт')
