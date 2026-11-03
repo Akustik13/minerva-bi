@@ -68,6 +68,8 @@ def calendar_view(request):
     qs = CalendarEvent.objects.filter(user=request.user, start_at__year=year, start_at__month=month)
     if not show_done:
         qs = qs.filter(is_done=False)
+    from calendar_app.order_deadlines import hidden_count, visible
+    qs = visible(qs, request.user)            # «Лише критичні» — далекі дедлайни замовлень з'являться пізніше
     events = list(qs.select_related('crm_customer', 'custom_category').order_by('start_at'))
 
     custom_cats     = list(CalendarCategory.objects.filter(user=request.user).values('id', 'name', 'color', 'emoji'))
@@ -123,6 +125,7 @@ def calendar_view(request):
         'wt_days':            wt['days'] if wt else {},
         'invites':            _invites(request.user),
         'deadlines_pending':  _deadlines_pending(request.user),
+        'order_hidden':       hidden_count(request.user),
         'is_nav_sidebar_enabled': True,
     })
 
@@ -177,7 +180,8 @@ def _invites(user):
 def events_json(request):
     from calendar_app.models import CalendarEvent
 
-    events = (CalendarEvent.objects
+    from calendar_app.order_deadlines import visible
+    events = (visible(CalendarEvent.objects, request.user)
               .filter(user=request.user, is_done=False)
               .select_related('crm_customer')
               .order_by('start_at')[:200])
@@ -453,6 +457,7 @@ def settings_view(request):
 
     cfg = CalendarSettings.for_user(request.user)
     saved = False
+    order_sweep = None
 
     if request.method == 'POST':
         cfg.notify_telegram = request.POST.get('notify_telegram') == '1'
@@ -468,8 +473,20 @@ def settings_view(request):
         cfg.invites_auto     = request.POST.get('invites_auto') == '1'
         from django.utils.dateparse import parse_date
         cfg.invites_since    = parse_date(request.POST.get('invites_since') or '') or cfg.invites_since
+        old_mode = cfg.order_deadlines
+        mode = request.POST.get('order_deadlines')
+        if mode in dict(CalendarSettings.ORDER_DEADLINE_CHOICES):
+            cfg.order_deadlines = mode
+        try:
+            cfg.order_deadline_days = max(0, min(60, int(request.POST.get('order_deadline_days',
+                                                                          cfg.order_deadline_days))))
+        except (ValueError, TypeError):
+            pass
         cfg.save()
         saved = True
+        if request.POST.get('order_sweep') == '1' or cfg.order_deadlines != old_mode:
+            from calendar_app.order_deadlines import sweep
+            order_sweep = sweep(user=request.user)   # правило — одразу й до вже внесених дедлайнів
         if request.POST.get('invites_scan') == '1' and cfg.invites_since:
             from calendar_app import invites
             cfg.invites_scan_status = f'⏳ Листи від {cfg.invites_since:%d.%m.%Y}: запуск…'
@@ -483,6 +500,8 @@ def settings_view(request):
         'saved': saved,
         'invites_pending': MeetingInvite.objects.filter(user=request.user,
                                                         status__in=MeetingInvite.PENDING).count(),
+        'order_choices': CalendarSettings.ORDER_DEADLINE_CHOICES,
+        'order_sweep': order_sweep,
         'is_nav_sidebar_enabled': True,
     })
 

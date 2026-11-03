@@ -372,8 +372,9 @@ def export(user, host: str) -> str:
     stamp = _dt(now)
     lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Minerva//Calendar//UK", "CALSCALE:GREGORIAN",
              "METHOD:PUBLISH", "X-WR-CALNAME:Minerva", "X-PUBLISHED-TTL:PT30M"]
-    events = CalendarEvent.objects.filter(user=user, start_at__gte=now - datetime.timedelta(days=30),
-                                          start_at__lte=now + datetime.timedelta(days=365))
+    from .order_deadlines import feed_q, visible
+    events = visible(CalendarEvent.objects.filter(feed_q(), user=user, start_at__gte=now - datetime.timedelta(days=30),
+                                                  start_at__lte=now + datetime.timedelta(days=365)), user)
     for ev in events:
         lines += ["BEGIN:VEVENT", f"UID:minerva-{ev.pk}@{host}", f"DTSTAMP:{stamp}"]
         if ev.all_day:

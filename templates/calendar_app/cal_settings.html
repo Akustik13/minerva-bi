@@ -191,6 +191,28 @@
         <div class="cal-hint">Шукає у ваших скриньках від цієї дати; листи Outlook без вкладення .ics Minerva бере з пошти ще раз (лише читання).</div>
       </div>
 
+      <p class="cal-section-title" id="orders">📦 Дедлайни замовлень</p>
+      <div class="cal-hint" style="margin-bottom:8px">Дедлайни з листів про замовлення («Minerva: Нове замовлення …», «🔎 Терміни
+        з пошти») Minerva пов'язує із самим замовленням: за номером у назві, у листі чи його вкладенні.</div>
+      {% for value, label in order_choices %}
+      <div class="cal-field">
+        <label>
+          <input type="radio" name="order_deadlines" value="{{ value }}" {% if cfg.order_deadlines == value %}checked{% endif %}>
+          {{ label }}
+        </label>
+      </div>
+      {% endfor %}
+      <div class="cal-field-row">
+        <label>«Критичні» — строк відправки через стільки днів або раніше</label>
+        <input type="number" name="order_deadline_days" min="0" max="60" value="{{ cfg.order_deadline_days }}">
+        <div class="cal-hint">Відправили чи скасували замовлення — його дедлайн стає «✓ Виконано» і зникає з календаря й
+          підписки (видно з «показати виконані»); повернули в роботу — дедлайн повертається. Прострочені завжди видно.</div>
+      </div>
+      <div style="margin-top:6px"><button type="submit" name="order_sweep" value="1" class="cal-save-btn">🧹 Зберегти й перевірити вже внесені</button></div>
+      {% if order_sweep %}<div class="cal-hint" style="margin-top:6px">✓ Перевірено: пов'язано з замовленнями {{ order_sweep.linked }},
+        закрито відправлених / скасованих {{ order_sweep.closed }}, відкрито знову {{ order_sweep.reopened }}{% if order_sweep.left %};
+        ще не перевірено {{ order_sweep.left }} — дочистить сама за кілька хвилин{% endif %}.</div>{% endif %}
+
       <p class="cal-section-title" id="blocks">🧹 Календар без сміття</p>
       <div class="cal-hint" style="margin-bottom:8px">Від спаму в календар нічого не потрапляє. Події з листів відправника, від якого терміни
         не потрібні, — у календарі: подія → «🚫 Більше не заносити від нього» (адреса або весь домен).

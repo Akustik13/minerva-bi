@@ -709,11 +709,13 @@ def view_events(user, src: str, start, end) -> tuple[list[dict], str]:
     from django.core.cache import cache
     from .models import CalendarFeed, ExternalEvent
     if src == "minerva":
+        from .order_deadlines import visible        # «Лише критичні» — далекі дедлайни замовлень не показуються
         return [{"id": f"m{e.pk}", "title": e.title, "start": e.start_at.isoformat(),
                  "end": e.end_at.isoformat() if e.end_at else None, "allDay": e.all_day,
                  "extendedProps": {"description": e.description or "", "type": e.get_event_type_display(),
                                    "link": f"/admin/calendar_app/calendarevent/{e.pk}/change/", "done": e.is_done}}
-                for e in CalendarEvent.objects.filter(user=user, start_at__gte=start, start_at__lt=end)], ""
+                for e in visible(CalendarEvent.objects.filter(user=user, start_at__gte=start, start_at__lt=end),
+                                 user)], ""
     kind, _, pk = src.partition(":")
     if kind == "f":
         feed = CalendarFeed.objects.filter(pk=pk or 0, user=user).first()

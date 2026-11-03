@@ -61,6 +61,14 @@ class CalendarEvent(models.Model):
         'sales.SalesOrder', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='calendar_events',
         verbose_name='Замовлення')
+    # Дедлайн замовлення (calendar_app/order_deadlines.py): '' — ще не перевірено, none — замовлення не знайдено,
+    # open — замовлення чекає відправки, closed — відправлено / скасовано, подію Minerva закрила сама
+    ORDER_UNCHECKED, ORDER_NONE, ORDER_OPEN, ORDER_CLOSED = '', 'none', 'open', 'closed'
+    ORDER_STATES = [(ORDER_UNCHECKED, 'Ще не перевірено'), (ORDER_NONE, 'Без замовлення'),
+                    (ORDER_OPEN, 'Замовлення чекає відправки'),
+                    (ORDER_CLOSED, 'Замовлення відправлено / скасовано — закрито автоматично')]
+    order_state = models.CharField(max_length=10, blank=True, default='', choices=ORDER_STATES,
+                                   verbose_name='Стан замовлення')
 
     remind_minutes_before = models.PositiveIntegerField(
         default=60, verbose_name='Нагадати за N хвилин')
@@ -117,6 +125,16 @@ class CalendarSettings(models.Model):
                                   help_text='Секрет адреси ICS календаря Minerva; порожньо — адресу вимкнено.')
     feed_worktime = models.BooleanField(default=True, verbose_name='У підписці — відпустки й лікарняні askDANTE')
     feed_busy_only = models.BooleanField(default=False, verbose_name='У підписці лише «Зайнято» (без назв і описів)')
+    ORDER_DEADLINES_OPEN, ORDER_DEADLINES_CRITICAL, ORDER_DEADLINES_ALL = 'open', 'critical', 'all'
+    ORDER_DEADLINE_CHOICES = [
+        (ORDER_DEADLINES_OPEN, 'Лише не відправлені — відправлене / скасоване прибирається само'),
+        (ORDER_DEADLINES_CRITICAL, 'Лише критичні — не відправлені, строк близько або прострочено'),
+        (ORDER_DEADLINES_ALL, 'Усі, як раніше'),
+    ]
+    order_deadlines = models.CharField(max_length=10, default=ORDER_DEADLINES_OPEN, choices=ORDER_DEADLINE_CHOICES,
+                                       verbose_name='Дедлайни замовлень у календарі')
+    order_deadline_days = models.PositiveSmallIntegerField(
+        default=3, verbose_name='«Критичні» — строк відправки через стільки днів або раніше')
 
     class Meta:
         verbose_name        = 'Налаштування сповіщень календаря'

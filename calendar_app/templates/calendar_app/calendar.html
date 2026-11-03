@@ -263,6 +263,7 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
     </div>
   </div>
 
+  {% if order_hidden %}<div class="cal-inv">📦 Сховано дедлайнів замовлень, до яких ще далеко: {{ order_hidden }} — з'являться, коли строк наблизиться. <a href="/calendar/settings/#orders">Що показувати →</a></div>{% endif %}
   {% if deadlines_pending %}<div class="cal-inv"><b>🔎 Терміни з пошти на перевірку: {{ deadlines_pending }}</b> <a href="/calendar/deadlines/">переглянути й занести →</a></div>{% endif %}
   {% if invites %}
   <div class="cal-inv" id="cal-inv">

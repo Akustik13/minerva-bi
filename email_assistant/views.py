@@ -855,7 +855,7 @@ def _mail_links(emails):
     for m in emails:
         texts += [m.subject or '', (m.body_text or '')[:50000]]
     try:
-        return find_links(texts)
+        return find_links(texts, messages=emails)
     except Exception as e:
         logger.warning('mail links: %s', e)
         return []

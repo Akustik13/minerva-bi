@@ -105,10 +105,11 @@ def _first_mentioned(orders, text):
     return best
 
 
-def find_order(subject, body, customer=None, orders=None, global_search=True):
+def find_order(subject, body, customer=None, orders=None, global_search=True, message=None):
     """
     Номер замовлення в темі (пріоритет) або тексті листа.
-    Спершу серед замовлень клієнта, потім (global_search) — серед усіх замовлень.
+    Спершу серед замовлень клієнта, потім (global_search) — серед усіх замовлень, трек-номери, а з message —
+    ще й номери з вкладень листа (ABD митниці, інвойс перевізника: links.order_in_attachments).
     """
     from sales.models import SalesOrder
     texts = [t for t in (subject or '', (body or '')[:20000]) if t]
@@ -130,12 +131,19 @@ def find_order(subject, body, customer=None, orders=None, global_search=True):
         if hit:
             return hit
     # Трек-номер замовлення чи відправлення (листи перевізника: UPS 1Z…, DHL…)
-    from email_assistant.links import find_order_by_tracking, tokens_in
-    return find_order_by_tracking(tokens_in(texts))
+    from email_assistant.links import find_order_by_tracking, order_in_attachments, tokens_in
+    hit = find_order_by_tracking(tokens_in(texts))
+    if hit is not None or message is None:
+        return hit
+    try:
+        return order_in_attachments(message, customer)
+    except Exception as e:  # noqa: BLE001 — нечитабельне вкладення не ламає прив'язку листа
+        logger.info('order in attachments of message %s: %s', getattr(message, 'pk', None), e)
+        return None
 
 
 def resolve(*, from_email, to_emails, cc_emails=(), subject='', body='',
-            is_sent_folder=False, own=None):
+            is_sent_folder=False, own=None, message=None):
     """
     Повертає (customer, direction, order) або (None, direction, None).
     direction: 'out' — лист від нас клієнту, 'in' — від клієнта.
@@ -153,7 +161,7 @@ def resolve(*, from_email, to_emails, cc_emails=(), subject='', body='',
         return None, direction, None
 
     customer = find_customer(counterparts)
-    order = find_order(subject, body, customer)
+    order = find_order(subject, body, customer, message=message)
     if customer is None and order is not None:
         customer = order.crm_customer
     return customer, direction, order
@@ -167,7 +175,7 @@ def link_to_crm(*, user, subject, body, from_email, to_emails, cc_emails=(),
 
     customer, direction, order = resolve(
         from_email=from_email, to_emails=to_emails, cc_emails=cc_emails,
-        subject=subject, body=body, is_sent_folder=is_sent_folder, own=own)
+        subject=subject, body=body, is_sent_folder=is_sent_folder, own=own, message=email_message)
     if customer is None:
         return None
 
