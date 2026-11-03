@@ -137,9 +137,9 @@ html.mvp-resizing #mv-panel, html.mvp-resizing #content { transition: none !impo
 .mvp-ed.is-editing > .mvp-ed-v, .mvp-ed.is-editing > .mvp-ed-btn { display: none; }
 .mvp-ed-form { display: inline-flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
 .mvp-ed-form.is-area { display: flex; width: 100%; }
-.mvp-ed-in { flex: 1 1 160px; min-width: 0; height: 32px; margin: 0; padding: 0 8px; border: 1px solid var(--border-strong);
+#mv-panel .mvp-ed-in { flex: 1 1 160px; min-width: 0; height: 32px; margin: 0; padding: 0 8px; border: 1px solid var(--border-strong);
   border-radius: 7px; background: var(--bg-card); color: var(--text); font: inherit; font-size: 13px; }
-textarea.mvp-ed-in { flex: 1 1 100%; width: 100%; min-height: 72px; height: auto; padding: 6px 8px; resize: vertical;
+#mv-panel textarea.mvp-ed-in { flex: 1 1 100%; width: 100%; min-height: 72px; height: auto; padding: 6px 8px; resize: vertical;
   line-height: 1.4; }
 .mvp-ed-ok, .mvp-ed-no { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; min-width: 32px;
   height: 32px; margin: 0; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: 7px; background: none;
@@ -166,7 +166,9 @@ textarea.mvp-ed-in { flex: 1 1 100%; width: 100%; min-height: 72px; height: auto
 .mvp-ch:hover { background: var(--bg-hover); color: var(--text); }
 .mvp-ch.is-active { color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
 .mvp-ch.is-na { opacity: .4; }
-#mv-panel.mvp-empty-compact .mvp-ch.is-empty { opacity: .6; }
+#mv-panel.mvp-empty-compact .mvp-ch.is-empty { color: var(--text-muted); }
+#mv-panel.mvp-empty-compact .mvp-ch.is-empty .mvp-ci { opacity: .55; }
+#mv-panel.mvp-empty-compact .mvp-ch.is-empty:hover { color: var(--text); }
 .mvp-ch.is-empty .mvp-cl { font-weight: 400; }
 .mvp-ch.is-dragging { opacity: .45; }
 .mvp-ci { flex: 0 0 auto; font-size: 13.5px; line-height: 1; }
@@ -285,7 +287,9 @@ body.mvp-open.mvp-dock .mvp-foot { padding-right: var(--mvp-dock, 8px); }
 .mvp-chip { display: inline-block; max-width: 100%; padding: 4px 9px; overflow: hidden; border: 1px solid var(--border-strong);
   border-radius: 8px; color: inherit; font-size: 12.5px; text-decoration: none; text-overflow: ellipsis;
   white-space: nowrap; }
-a.mvp-chip:hover { border-color: var(--accent); }
+#mv-panel button.mvp-chip { margin: 0; background: transparent; color: inherit; font: inherit; font-size: 12.5px;
+  line-height: inherit; cursor: pointer; }
+a.mvp-chip:hover, #mv-panel button.mvp-chip:hover { border-color: var(--accent); }
 .mvp-quote { margin-bottom: 6px; padding: 8px 10px; border-radius: 8px; background: var(--bg-card-2); }
 .mvp-empty { padding: 2px 0; color: var(--text-muted); font-size: 12.5px; }
 .mvp-empty.mvp-err { color: var(--err); font-weight: 400; }
@@ -295,16 +299,12 @@ a.mvp-chip:hover { border-color: var(--accent); }
   color: var(--accent); font-size: 11.5px; font-weight: 700; line-height: 1.35; vertical-align: 1px; white-space: nowrap; }
 .mvp-hedit .mvp-badge { padding: 5px 10px; font-size: 12px; }
 .mvp-t-new, .mvp-t-info { background: var(--accent-subtle); color: var(--accent); }
-.mvp-t-work, .mvp-t-warn { background: rgba(227, 179, 65, .16); background: color-mix(in srgb, var(--warn) 16%, transparent);
-  color: var(--warn); }
-.mvp-t-ship { background: rgba(88, 166, 255, .14); background: color-mix(in srgb, var(--link-fg) 14%, transparent);
-  color: var(--link-fg); }
-.mvp-t-done, .mvp-t-ok { background: rgba(63, 185, 80, .16); background: color-mix(in srgb, var(--ok) 16%, transparent);
-  color: var(--ok); }
-.mvp-t-err { background: rgba(248, 81, 73, .16); background: color-mix(in srgb, var(--err) 16%, transparent);
-  color: var(--err); }
-.mvp-t-off { background: rgba(127, 127, 127, .18); background: color-mix(in srgb, var(--text-muted) 18%, transparent);
-  color: var(--text-muted); }
+/* тони — лише rgba: color-mix() mv_contrast.js не читає (міряв би проти картки й не виправив би текст) */
+.mvp-t-work, .mvp-t-warn { background: rgba(227, 179, 65, .16); color: var(--warn); }
+.mvp-t-ship { background: rgba(88, 166, 255, .14); color: var(--link-fg); }
+.mvp-t-done, .mvp-t-ok { background: rgba(63, 185, 80, .16); color: var(--ok); }
+.mvp-t-err { background: rgba(248, 81, 73, .16); color: var(--err); }
+.mvp-t-off { background: rgba(127, 127, 127, .18); color: var(--text-muted); }
 .mvp-pill.mvp-t-new, .mvp-pill.mvp-t-info { border-color: var(--accent); }
 .mvp-pill.mvp-t-work, .mvp-pill.mvp-t-warn { border-color: var(--warn); }
 .mvp-pill.mvp-t-ship { border-color: var(--link-fg); }
@@ -316,6 +316,7 @@ a.mvp-chip:hover { border-color: var(--accent); }
 #mv-panel .mvp-table thead th { color: var(--text-muted); font-size: 11.5px; font-weight: 600; letter-spacing: normal;
   text-transform: none; }
 #mv-panel .mvp-table tr:last-child td { border-bottom: 0; }
+#mv-panel tr { background: none; }
 .mvp-table td { font-variant-numeric: tabular-nums; }
 .mvp-thumb { border-radius: 6px; object-fit: cover; vertical-align: middle; }
 .mvp-title .mvp-thumb { margin-right: 6px; }
@@ -403,11 +404,11 @@ a.mvp-more-link { display: inline-block; margin-top: 6px; color: var(--link-fg);
 
 /* ── список, поки панель відкрита ── */
 body.mvp-open.mvp-push #content { margin-right: var(--mvp-w); padding-left: 24px; padding-right: 24px; }
-body.mvp-open.mvp-push .messagelist { margin-right: var(--mvp-w); }
+body.mvp-open.mvp-push .messagelist, body.mvp-open.mvp-push #footer { margin-right: var(--mvp-w); }
 body.mvp-on #result_list tbody tr, body.mvp-on .sv-card[data-pk], body.mvp-on .crm-card[data-pk],
 body.mvp-on [data-mvp-row-pk] { cursor: pointer; }
 html body.mvp-on #result_list tbody tr.mvp-sel > td, html body.mvp-on #result_list tbody tr.mvp-sel > th {
-  background: var(--accent-subtle) !important; background: color-mix(in srgb, var(--accent) 18%, transparent) !important; }
+  background: var(--accent-subtle) !important; }
 html body.mvp-on #result_list tbody tr.mvp-sel > :first-child { box-shadow: inset 3px 0 0 var(--accent) !important; }
 html body.mvp-on .sv-card.mvp-sel, html body.mvp-on .crm-card.mvp-sel, html body.mvp-on [data-mvp-row-pk].mvp-sel {
   box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px var(--accent) !important;
@@ -523,5 +524,5 @@ html[data-mv-motion="reduce"] #mv-panel *::before, html[data-mv-motion="reduce"]
 
 @media print {
   #mv-panel, #mvp-toggle, .mvp-colnote, #mvp-live { display: none !important; }
-  body.mvp-open #content { margin-right: 0 !important; }
+  body.mvp-open #content, body.mvp-open #footer, body.mvp-open .messagelist { margin-right: 0 !important; }
 }

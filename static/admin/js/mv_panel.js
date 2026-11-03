@@ -166,6 +166,9 @@
   };
   var panel = null, wrap = null, grip = null, live = null, colStyle = null, pill = null, colNote = null;
   var cache = {}, cacheOrder = [];
+  var gens = {};                                     // покоління запису: +1 після кожної зміни (панель, список, 409)
+  function genOf(pk) { return gens[pk] || 0; }
+  function bump(pk) { gens[pk] = genOf(pk) + 1; cacheDrop(pk); }
 
   /* ── рядки списку ── */
   function rows() {
@@ -241,6 +244,7 @@
     var url = cardHref(S.pk);
     if (!url) return;
     hashUpdate();
+    flushNow();
     if (newTab) window.open(url, '_blank', 'noopener'); else location.href = url;
   }
 
@@ -248,11 +252,12 @@
   function cacheGet(pk) {
     var c = cache[pk];
     if (!c) return null;
+    if (c.gen != null && c.gen !== genOf(pk)) { cacheDrop(pk); return null; }   // запит почався до зміни
     if (now() - c.t > CACHE_TTL) { cacheDrop(pk); return null; }
     return c;
   }
-  function cachePut(pk, entry) {
-    if (typeof entry === 'string') entry = { t: now(), html: entry };
+  function cachePut(pk, entry, gen) {
+    if (typeof entry === 'string') entry = { t: now(), html: entry, gen: gen };
     cache[pk] = entry;
     var i = cacheOrder.indexOf(pk);
     if (i >= 0) cacheOrder.splice(i, 1);
@@ -377,7 +382,8 @@
     if (on) panel.setAttribute('aria-busy', 'true'); else panel.removeAttribute('aria-busy');
   }
   function load(pk, sec, fresh) {
-    var my = ++S.req;
+    if (pending) { flush().then(function () { if (S.open && S.pk === pk) load(pk, sec, true); }); return; }
+    var my = ++S.req, g = genOf(pk);
     abortMain();
     if (fresh) cacheDrop(pk);
     var hit = fresh ? null : cacheGet(pk);
@@ -393,7 +399,11 @@
     p.then(function (html) {
       if (my !== S.req) return;
       S.ctrl = null;
-      cachePut(pk, html);
+      if (genOf(pk) !== g || (hit && hit.gen != null && hit.gen !== genOf(pk))) {   // поки йшов запит, запис змінили
+        load(pk, sec, true);
+        return;
+      }
+      cachePut(pk, html, g);
       inject(my, pk, html);
     }, function (err) {
       if (my !== S.req || (err && err.name === 'AbortError')) return;
@@ -410,7 +420,7 @@
     if (!pk || pk === S.pk || cacheGet(pk)) return;
     if (S.pre && !S.pre.adopted && S.pre.html == null && S.pre.ctrl) { try { S.pre.ctrl.abort(); } catch (e) { /* уже */ } }
     var ctrl = window.AbortController ? new AbortController() : null;
-    var entry = { t: now(), ctrl: ctrl, adopted: false, html: null, promise: null };
+    var entry = { t: now(), ctrl: ctrl, adopted: false, html: null, promise: null, gen: genOf(pk) };
     entry.promise = fetchShell(pk, S.sec, ctrl && ctrl.signal).then(function (html) {
       entry.html = html; entry.promise = null; entry.t = now();
       return html;
@@ -428,6 +438,7 @@
     var keep = S.want || { sec: S.sec, offset: S.offset };
     S.want = null;
     var act = document.activeElement, fk = act && panel.contains(act) && act !== panel ? focusKey(act) : '';
+    dropLayers();
     wrap.innerHTML = html;                                    // оболонка з сервера (Django екранує дані)
     var shell = wrap.querySelector('.mvp-shell');
     if (!shell) { showError(pk, httpError(0, 'bad')); return; }
@@ -477,6 +488,7 @@
   }
   function showError(pk, err) {
     var st = err && err.status;
+    S.afterLoad = null;
     wrap.textContent = '';
     var shell = el('div', 'mvp-shell mvp-shell-err'), head = el('header', 'mvp-head'), row = el('div', 'mvp-hrow');
     shell.setAttribute('data-pk', pk);
@@ -495,6 +507,13 @@
     wrap.appendChild(shell);
     S.shell = shell;
     announce('Не вдалося завантажити');
+  }
+  /* аркуш налаштувань і редактор живуть усередині оболонки: її замінили — забути їх, інакше клавіші й
+     підсвітка розділу «чекають» на аркуш, якого вже немає */
+  function dropLayers() {
+    if (S.editor) { S.editor = null; }
+    if (S.sheet) { S.sheet = null; }
+    if (wrap) { var sh = wrap.querySelector('.mvp-shell'); if (sh) sh.classList.remove('mvp-sheet-on'); }
   }
   function refresh() {
     if (!S.open || !S.pk) return;
@@ -528,6 +547,7 @@
     if (S.sec) sSet('localStorage', 'mvp-sec:' + cfg.model, S.sec);
     S.open = false;
     S.req++;
+    S.afterLoad = null;
     abortMain();
     clearTimeout(S.navT);
     clearTimeout(S.hashT);
@@ -1398,7 +1418,7 @@
       var d = res.data || {};
       if (res.status === 200 && d.ok) applyEdit(pk, key, d, o);
       else if (res.status === 409 && d.html) {
-        cacheDrop(pk);
+        bump(pk);
         if (pk === S.pk) { closeEditor(true); swapShell(d.html); }
         toast(d.message || 'Запис щойно змінив інший користувач — показано свіже.');
       } else editFailed(o, res.status, d);
@@ -1418,7 +1438,7 @@
     toast(msg);                                      // повідомлення MVMenu — саме для читача екрана (role=status)
   }
   function applyEdit(pk, key, d, o) {
-    cacheDrop(pk);
+    bump(pk);
     if (o.editor && S.editor === o.editor) closeEditor(true);
     var fk = '';
     if (pk === S.pk && S.shell) {
@@ -1463,6 +1483,7 @@
   }
   function swapShell(html) {                        // 409: свіжа панель, той самий розділ і місце
     rememberSection();
+    dropLayers();
     var keep = { sec: S.sec, offset: S.offset };
     wrap.innerHTML = html;                          // оболонка з сервера (Django екранує дані)
     var shell = wrap.querySelector('.mvp-shell');
@@ -1502,6 +1523,7 @@
     var left = false;
     addEventListener('pagehide', function () { left = true; }, { once: true });
     setTimeout(function () { if (!left) sDel('sessionStorage', 'mvp-reopen'); }, 30000);   // файл — сторінка лишилась
+    flushNow();
     f.submit();
   }
   function adminItems(pk, label) {
@@ -1563,6 +1585,7 @@
                                                             offset: S.offset, t: t }));
       var q = new URLSearchParams(location.search);
       q.set(pg.param || 'p', String(pg.num + d));
+      flushNow();
       location.href = location.pathname + '?' + q.toString();
       return;
     }
@@ -1588,6 +1611,21 @@
     applyPrefs(Object.keys(delta), o);
     clearTimeout(saveT);
     saveT = setTimeout(flush, SAVE_DELAY);
+  }
+  /* перед переходом зі сторінки: вибір, що ще чекає 400 мс, — одразу, з keepalive (запит переживе перехід) */
+  function flushNow() {
+    if (!pending) return;
+    clearTimeout(saveT);
+    saveT = 0;
+    var p = pending, body = {};
+    pending = null;
+    if (Object.keys(p.set).length) body.set = p.set;
+    if (Object.keys(p.shared).length) body.shared = p.shared;
+    try {
+      fetch(cfg.prefsUrl, { method: 'POST', credentials: 'same-origin', keepalive: true, body: JSON.stringify(body),
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf(),
+                                       'X-Requested-With': 'XMLHttpRequest' } });
+    } catch (e) { /* сторінка вже йде */ }
   }
   function flush() {
     clearTimeout(saveT);
@@ -2495,7 +2533,7 @@
         try { item.releasePointerCapture(pid); } catch (x) { /* ні */ }
         if (!cancel && idx >= 0) {
           var all = items(), from = all.indexOf(item);
-          if (idx !== from && idx !== from + 1) onDrop(item, idx);
+          if (idx !== from && idx !== from + 1) onDrop(item, idx, all[idx] || null);
         }
       }
       function up(ev) { if (ev.pointerId === pid) end(false); }
@@ -2506,12 +2544,20 @@
       document.addEventListener('pointercancel', cancelIt, true);
     });
   }
-  function chipDrop(item, idx) {                    // фішку перенесли — розділи в тому самому порядку
-    var keys = chips().filter(function (c) { return !c.classList.contains('mvp-ch-more'); }).map(function (c) { return attr(c, 'data-go'); });
+  /* фішку перенесли — розділи в тому самому порядку. Місце — за фішкою, перед якою кинули: номер серед
+     видимих не збігається з порядком усіх, коли частина фішок у «⋯» */
+  function chipDrop(item, before) {
+    var real = chips().filter(function (c) { return !c.classList.contains('mvp-ch-more'); });
+    var keys = real.map(function (c) { return attr(c, 'data-go'); });
     var key = attr(item, 'data-go'), from = keys.indexOf(key);
     if (from < 0) return;
     keys.splice(from, 1);
-    keys.splice(idx > from ? idx - 1 : idx, 0, key);
+    var at = before ? keys.indexOf(attr(before, 'data-go')) : -1;
+    if (at < 0) {                                   // у кінець видимих — одразу за останньою видимою
+      var vis = real.filter(function (c) { return !c.hidden && c !== item; }), last = vis[vis.length - 1];
+      at = last ? keys.indexOf(attr(last, 'data-go')) + 1 : keys.length;
+    }
+    keys.splice(at, 0, key);
     var shown = shownBlocks();
     var hiddenTail = shown.filter(function (k) { return keys.indexOf(k) < 0; });   // фішки в «⋯»
     setBlocks(keys.concat(hiddenTail));
@@ -2596,6 +2642,7 @@
     var u = changeLinkOf(row) || (S.pk === pkOf(row) ? cardHref(S.pk) : '');
     if (!u) return;
     hashUpdate();
+    flushNow();
     location.href = u;
   }
   function onPanelClick(e) {
@@ -2667,16 +2714,22 @@
     var snap = S.snap && S.snap.t === e.timeStamp && S.snap.key === e.key ? S.snap : { layer: layerOpen() };
     if (e.key === 'Escape' || e.key === 'Esc') { if (!e.defaultPrevented) onEsc(e, snap); return; }
     if (!S.open || snap.layer || e.defaultPrevented || S.dragging) return;
-    var t = e.target, code = e.code || '';
-    if (typing(t) || e.altKey || e.metaKey) return;
+    var t = e.target, code = e.code || '', ch = e.key || '';
+    var altGr = !!(e.getModifierState && e.getModifierState('AltGraph'));
+    if (typing(t) || (e.altKey && !altGr) || e.metaKey) return;
     if (t && t.closest && t.closest(KEY_SKIP)) return;
-    if (e.ctrlKey) {
+    // «?» — будь-якою розкладкою; клавіша «/» з Shift — лише коли вона дає не латинський знак (кирилиця)
+    if (ch === '?' || (code === 'Slash' && e.shiftKey && !altGr && ch.length === 1 && ch.charCodeAt(0) > 127)) {
+      e.preventDefault(); if (S.sheet && S.sheet.kind === 'keys') closeSheet(); else keysSheet(); return;
+    }
+    if (e.ctrlKey && !altGr) {
       if ((code === 'Enter' || code === 'NumpadEnter') && enterTarget(t) && !S.sheet) { e.preventDefault(); openCard(true); }
       return;
     }
-    if (code === 'Slash' && e.shiftKey) { e.preventDefault(); if (S.sheet && S.sheet.kind === 'keys') closeSheet(); else keysSheet(); return; }
     if (S.sheet) return;                             // у налаштуваннях клавіші — звичайні
     if (t && t.closest && t.closest('.mvp-grip')) return;
+    if (ch === '[' || ch === ']') { e.preventDefault(); stepSec(ch === '[' ? -1 : 1); return; }
+    if (altGr) return;
     switch (code) {
       case 'ArrowDown': case 'KeyJ': e.preventDefault(); step(1, 'key'); return;
       case 'ArrowUp': case 'KeyK': e.preventDefault(); step(-1, 'key'); return;
@@ -2740,7 +2793,11 @@
     S.rzT = setTimeout(function () {
       syncOn();
       if (!wide()) { if (S.open) close(); return; }
-      if (S.open) { relayout(); colNoteUpdate(); }
+      if (S.open) {
+        if (prefs.width == null) emit('mv:panel', { open: true, width: wantWidth(), model: cfg.model, pk: S.pk });
+        relayout();
+        colNoteUpdate();
+      }
     }, 150);
   }
   function onRailChange() {                          // бокове меню звузилось / розширилось
@@ -2840,7 +2897,7 @@
       if (f) filterRows(f);
     });
     dragList(panel, '.mvp-nav .mvp-ch', function () { return navMode() === 'side' ? 'y' : 'x'; },
-             function (item, idx) { chipDrop(item, idx); });
+             function (item, idx, before) { chipDrop(item, before); });
     wireGrip();
     if (window.ResizeObserver) new ResizeObserver(function () { if (S.open) fitSoon(); }).observe(panel);
     addEventListener('resize', onResize);
@@ -2853,7 +2910,20 @@
       S.railSig = (root.classList.contains('mvd-rail') ? 'r' : 'w') + '|' + (root.getAttribute('data-mv-sidebar') || '');
       new MutationObserver(onRailChange).observe(root, { attributes: true, attributeFilter: ['class', 'data-mv-sidebar'] });
     }
-    addEventListener('pagehide', function () { if (S.open) hashUpdate(); });
+    addEventListener('pagehide', function () { if (S.open) hashUpdate(); flushNow(); });
+    // змінили запис прямо в списку (⭐, 📝 …) — у панелі й кеші не лишати старе
+    document.addEventListener('mv:list-edit', function (e) {
+      var pk = String((e.detail && e.detail.pk) || '');
+      if (!PK.test(pk)) return;
+      bump(pk);
+      if (S.open && S.pk === pk && !S.editor && !S.sheet) refresh();
+    });
+    // форма дій списку (і сторінки підтвердження) йде на адресу з #mvp= — після неї панель не відкривала б
+    // запис, якого вже може не бути (видалили)
+    document.addEventListener('submit', function (e) {
+      var f = e.target;
+      if (f && f.id === 'changelist-form' || (f && f.querySelector && f.querySelector('input[name="post"][value="yes"]'))) hashClear();
+    }, true);
     // «Назад» з картки, сторінку взято з кешу браузера: панель ще відкрита — показати свіже (запис могли змінити)
     addEventListener('pageshow', function (e) { if (e.persisted && S.open) { cacheClear(); refresh(); } });
     reopen();

@@ -281,7 +281,8 @@ document.addEventListener('DOMContentLoaded', function () {
                        white-space:nowrap;cursor:default">⚠️ DK</span>
           {% endif %}
         {% endif %}
-        {# Flag toggle #}
+        {# Flag toggle — лише з правом змінювати замовлення #}
+        {% if sv_can_change %}
         <button type="button" class="sv-flag-btn {% if order.is_flagged %}sv-flagged{% endif %}"
                 data-pk="{{ order.pk }}"
                 onclick="svFlagOrder({{ order.pk }})"
@@ -289,6 +290,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 title="{% if order.is_flagged %}{% trans "Зняти позначку" %}{% else %}{% trans "Позначити як важливе" %}{% endif %}">
           {% if order.is_flagged %}⭐{% else %}☆{% endif %}
         </button>
+        {% elif order.is_flagged %}
+        <span style="color:#FFB300" title="{% trans "Позначено як важливе" %}">⭐</span>
+        {% endif %}
       </div>
       {# Dates column #}
       <div style="text-align:right;font-size:12px;display:flex;flex-direction:column;gap:3px;align-items:flex-end">
@@ -543,13 +547,17 @@ document.addEventListener('DOMContentLoaded', function () {
       {% endif %}
       {% endwith %}{# end with tn #}
 
-      {# Note button #}
+      {# Note button — змінити лише з правом; без нього нотатку видно, але не редагується #}
+      {% if sv_can_change %}
       <button type="button" class="sv-note-btn {% if order.internal_note %}sv-note-has{% endif %}"
               id="sv-note-btn-{{ order.pk }}"
               onclick="svNoteToggle({{ order.pk }})"
               title="{{ order.internal_note|default:'' }}">
         📝{% if order.internal_note %} {{ order.internal_note|truncatechars:22 }}{% endif %}
       </button>
+      {% elif order.internal_note %}
+      <span class="sv-note-btn sv-note-has" title="{{ order.internal_note }}">📝 {{ order.internal_note|truncatechars:22 }}</span>
+      {% endif %}
 
       {# Етикетка замовлення DYMO: номер + усі артикули з кількістю (labels/_label_actions.html, правий клік — меню) #}
       {% if order.lines.all %}
@@ -569,6 +577,7 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
 
     {# Note edit panel #}
+    {% if sv_can_change %}
     <div class="sv-note-panel" id="sv-note-panel-{{ order.pk }}">
       <span style="font-size:13px;flex-shrink:0">📝</span>
       <input class="sv-note-input" id="sv-note-input-{{ order.pk }}" type="text" maxlength="500"
@@ -578,6 +587,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <button type="button" onclick="svNoteSave({{ order.pk }})" style="background:#1565c0;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">💾 {% trans "Зберегти" %}</button>
       <button type="button" onclick="svNoteToggle({{ order.pk }})" style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong);border-radius:4px;padding:4px 8px;cursor:pointer;color:var(--text-muted);font-size:11px;flex-shrink:0">✕</button>
     </div>
+    {% endif %}
 
     {# Expandable panel — docs, upload, auto-doc, packaging #}
     <div class="sv-cex-panel" id="sv-cex-{{ order.pk }}">
@@ -1020,7 +1030,12 @@ function svFlagOrder(pk) {
     });
     var card = document.querySelector('.sv-card[data-pk="' + pk + '"]');
     if (card) card.classList.toggle('sv-card-flagged', d.flagged);
+    svListEdited(pk);
   });
+}
+/* змінили запис прямо в списку — панель праворуч перечитає його, а не покаже старе (подія mv:list-edit) */
+function svListEdited(pk) {
+  try { document.dispatchEvent(new CustomEvent('mv:list-edit', {detail: {pk: String(pk)}})); } catch (e) {}
 }
 function svNoteToggle(pk) {
   var panel = document.getElementById('sv-note-panel-' + pk); if (!panel) return;
@@ -1043,10 +1058,16 @@ function svNoteSave(pk) {
     if (btn) {
       btn.classList.toggle('sv-note-has', !!note);
       btn.title = note || '{% trans "Додати нотатку" %}';
-      btn.innerHTML = note
-        ? '📝 <span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle">' + note.substring(0, 22) + (note.length > 22 ? '…' : '') + '</span>'
-        : '📝';
+      btn.textContent = '📝';                                  // текст нотатки — лише як текст, не HTML
+      if (note) {
+        var sp = document.createElement('span');
+        sp.style.cssText = 'max-width:120px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle';
+        sp.textContent = note.substring(0, 22) + (note.length > 22 ? '…' : '');
+        btn.appendChild(document.createTextNode(' '));
+        btn.appendChild(sp);
+      }
     }
+    svListEdited(pk);
   });
 }
 

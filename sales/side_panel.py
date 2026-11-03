@@ -337,7 +337,7 @@ def _label_button(o, line, request):
 # ── назва, підзаголовок ────────────────────────────────────────────────────────
 
 def title(o):
-    parts = [format_html("<b>№ {}</b>", o.order_number)]
+    parts = [format_html("<b>№ {}</b>", sp.data(o.order_number))]
     if o.document_type and o.document_type != "SALE":
         parts.append(sp.badge(o.get_document_type_display(), "info"))
     if not o.affects_stock:
@@ -351,7 +351,7 @@ def label(o):
 
 def subtitle(o, request):
     total = sp.money(o.total_price, o.currency) if o.total_price is not None else ""
-    return " · ".join(x for x in (o.client or o.contact_name, _source_name(o), total) if x)
+    return sp.join([sp.data(o.client or o.contact_name), sp.data(_source_name(o)), sp.data(total)])
 
 
 # ── 👤 Клієнт ──────────────────────────────────────────────────────────────────
@@ -390,8 +390,7 @@ def summary(o, request):
 
 def _summary_brief(o, request):
     from shop.countries import name as country_name
-    return " · ".join(x for x in (o.client or o.contact_name,
-                                   country_name(o.addr_country) if o.addr_country else "") if x)
+    return sp.join([sp.data(o.client or o.contact_name), country_name(o.addr_country) if o.addr_country else ""])
 
 
 # ── 📦 Позиції й склад ─────────────────────────────────────────────────────────
@@ -606,13 +605,13 @@ def _shipping_summary(o, request):
     if ships:
         s = ships[0]
         eta = s.eta_to or s.carrier_eta or s.eta_from
-        parts = [s.carrier.name if s.carrier_id else "", _first_lower(s.get_status_display()),
+        parts = [sp.data(s.carrier.name) if s.carrier_id else "", _first_lower(s.get_status_display()),
                  f"до {_short_date(eta)}" if eta else ""]
     else:
-        parts = [o.shipping_courier, o.tracking_number]
+        parts = [sp.data(o.shipping_courier), sp.data(o.tracking_number)]
         if o.status in OPEN_STATUSES and o.shipping_deadline:
             parts.append(f"відправити до {_short_date(o.shipping_deadline)}")
-    return " · ".join(p for p in parts if p)
+    return sp.join(parts)
 
 
 # ── 💶 Гроші й оплата ─────────────────────────────────────────────────────────
@@ -722,7 +721,7 @@ def _knowledge(o, request):
         if not access.has(request.user, "documents"):
             return []
         from rag_assistant.knowledge_items import items_for
-        items = list(items_for(request.user, "order", o))[:KNOWLEDGE_MAX]
+        items = items_for(request.user, "order", o, limit=KNOWLEDGE_MAX)
     except Exception as exc:  # noqa: BLE001 — база знань не ламає розділ
         logger.warning("order panel: knowledge items of %s failed: %s", o.pk, exc)
         return []

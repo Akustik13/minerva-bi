@@ -294,6 +294,31 @@ class MediaAdminTests(MediaTestBase):
         self.assertIn("HTML", d["errors"][0])
         self.assertFalse(self.p.datasheet_file)   # сторінку помилки не зберегли як «даташит»
 
+    def test_panel_shows_where_files_come_from(self):
+        """«Статус медіафайлів»: з яких сайтів качається, які товари чекають (з посиланням), неактивні — окремо
+        й лише з галочкою «разом з неактивними»."""
+        from inventory.models import InventorySettings
+        s, _ = InventorySettings.objects.get_or_create(pk=1)
+        old = Product.objects.create(sku="OLD-1", name="Old", is_active=False,
+                                     image_url="https://img.example.com/download.php?file=OLD-1.jpg")
+        st = media_files.cache_status()
+        self.assertEqual((st[IMAGE]["url"], st[IMAGE]["need"], st[IMAGE]["inactive_need"]), (1, 1, 1))
+        self.assertEqual(st[IMAGE]["hosts"], [("img.example.com", 1)])
+        self.assertEqual(st[IMAGE]["missing"], [(self.p.pk, "AN-1", self.p.image_url)])
+        page = self.client.get(f"/admin/inventory/inventorysettings/{s.pk}/change/")
+        self.assertContains(page, "🔗 Звідки качається.")
+        self.assertContains(page, "<b>img.example.com</b> — 1")
+        self.assertContains(page, f'href="{self.p.image_url}"')
+        self.assertContains(page, "разом з неактивними товарами (1)")
+        with web({self.p.image_url: JPG, self.p.datasheet_url: PDF, old.image_url: JPG}):
+            self.client.post("/admin/inventory/inventorysettings/media-cache/")
+            old.refresh_from_db()
+            self.assertFalse(old.image)                            # без галочки неактивні не качаються
+            self.client.post("/admin/inventory/inventorysettings/media-cache/", {"inactive": "1"})
+        old.refresh_from_db()
+        self.assertTrue(old.image.name.endswith(".jpg"))
+        self.assertEqual(media_files.cache_status()[IMAGE]["need"], 0)
+
 
 class PerShopMediaTests(MediaTestBase):
     """Фото для кожного магазину окремо: перемикач сайту й індексація лише товарів вибраного магазину."""

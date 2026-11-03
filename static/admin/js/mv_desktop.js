@@ -272,6 +272,8 @@
       var shut = lsGet('mvd-sg-' + id) === '1' && !items.some(function (it) { return it.key === active; });
       box.dataset.sg = id;
       if (shut) box.classList.add('mvd-shut');
+      // група з поточною сторінкою — підсвічена (значками видно лише групу; mvd-here — для «Повного»)
+      if (items.some(function (it) { return it.key === active; })) box.classList.add('mvd-cur');
       var b = el('button', 'mvd-gtitle mvd-gbtn'); b.type = 'button';
       b.setAttribute('aria-controls', gid);
       b.setAttribute('aria-expanded', shut ? 'false' : 'true');
@@ -1430,6 +1432,7 @@
       if (e.code !== 'KeyK' && e.key !== 'k' && e.key !== 'K') return;         // e.code — і на українській розкладці
       if (!wide()) return;
       e.preventDefault();
+      if (menuOpen()) window.MVMenu.close();        // інакше Esc у пошуку чекав би на меню, якого не видно
       if (root.classList.contains('mvd-pal-open')) closePalette(); else openPalette();
     });
     window.addEventListener('keydown', onEscape, true);

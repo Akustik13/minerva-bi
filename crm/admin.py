@@ -1070,7 +1070,9 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         extra_context['crm_count_favorites'] = Customer.objects.filter(is_favorite=True).count()
         # Що людині можна в списку (кнопки шаблону без права — не показувати; сервер усе одно відмовить 403)
         extra_context['crm_can_change'] = self.has_change_permission(request)       # ⭐, «Статус / Сегмент → …»
+        self._list_can_change = extra_context['crm_can_change']                      # favorite_col
         extra_context['crm_can_assign'] = self._can_assign_strategy(request)        # «🎯 Стратегія»
+        self._list_can_assign = extra_context['crm_can_assign']                      # strategy_btn
         extra_context['crm_can_sync'] = (self.has_add_permission(request)           # «🔄 Синхронізація CRM»
                                          and self.has_change_permission(request))
         return super().changelist_view(request, extra_context)
@@ -1163,6 +1165,9 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     @admin.display(description="⭐")
     def favorite_col(self, obj):
         icon = '⭐' if obj.is_favorite else '☆'
+        if not getattr(self, '_list_can_change', True):          # лише перегляд — позначка без кнопки
+            return format_html('<span style="color:#FFB300;font-size:16px" title="{}">⭐</span>',
+                               'Обраний клієнт') if obj.is_favorite else ''
         return format_html(
             '<button class="crm-fav-btn {}" data-pk="{}" '
             'onclick="crmFavorite({});return false" '
@@ -1373,6 +1378,9 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
 
         behavior = recommend_template_behavior(obj)
         manual_url = f"/admin/crm/customer/{obj.pk}/assign-strategy/manual/"
+        can_assign = getattr(self, "_list_can_assign", True)      # лише перегляд — рекомендація без кнопки
+        if not behavior and not can_assign:
+            return "—"
         if not behavior:
             return format_html(
                 '<a href="{}" '
@@ -1383,6 +1391,9 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             )
 
         icon, label, color = _STRATEGY_LABELS.get(behavior, ("🎯", behavior, "#607d8b"))
+        if not can_assign:
+            return format_html('<span style="color:var(--text-muted);font-size:11px;white-space:nowrap" '
+                               'title="{}">{} {}</span>', "Рекомендована стратегія", icon, label)
         assign_url = reverse("admin:crm_customer_assign_strategy", args=[obj.pk])
         return format_html(
             '<a href="{}" onclick="{}" '

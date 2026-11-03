@@ -348,8 +348,8 @@ def title(p):
                                  LIFECYCLE_TONES.get(p.lifecycle_status, "warn"), full, _abbr(full)))
     if not p.is_active:
         marks.append(format_html(" {}", sp.badge("неактивний", "off")))
-    name = format_html(' <span class="mvp-note">{}</span>', p.name) if p.name else ""
-    return format_html("{}<b>{}</b>{}{}", img, p.sku, _join(marks), name)
+    name = format_html(' <span class="mvp-note">{}</span>', sp.data(p.name)) if p.name else ""
+    return format_html("{}<b>{}</b>{}{}", img, sp.data(p.sku), _join(marks), name)
 
 
 def label(p) -> str:
@@ -357,13 +357,10 @@ def label(p) -> str:
 
 
 def subtitle(p, request) -> str:
-    parts = [f"Доступно {_q(p, _available(p))}"]
-    category = _category_name(p)
-    if category:
-        parts.append(category)
+    parts = [f"Доступно {_q(p, _available(p))}", sp.data(_category_name(p))]
     if p.sale_price is not None:
-        parts.append(sp.money(p.sale_price, _home(p)))
-    return " · ".join(parts)
+        parts.append(sp.data(sp.money(p.sale_price, _home(p))))
+    return sp.join(parts)
 
 
 # ── 1. Склад зараз ─────────────────────────────────────────────────────────────
@@ -406,12 +403,10 @@ def stock_block(p, request):
 def stock_badge(p, request):
     available, reserved = _available(p), _reserved(p)
     point = p.reorder_point or 0
-    if available <= 0 and reserved > 0:
-        return Badge(None, "err", f"вільного немає, резерв {_q(p, reserved)}")
+    if available <= 0:                               # нічого продати — червоним, як у списку («Склад зараз»)
+        return Badge(None, "err", f"вільного немає, резерв {_q(p, reserved)}" if reserved > 0 else "немає на складі")
     if available <= point:
-        if point:
-            return Badge(None, "warn", f"доступно {_q(p, available)} — не більше точки дозамовлення ({point})")
-        return Badge(None, "warn", "вільного немає")
+        return Badge(None, "warn", f"доступно {_q(p, available)} — не більше точки дозамовлення ({point})")
     return Badge(None, "ok", f"доступно {_q(p, available)}")
 
 
@@ -811,10 +806,10 @@ def params_block(p, request):
 
 def params_summary(p, request) -> str:
     n = len(_tech_params(p))
-    parts = [x for x in (_category_name(p), p.manufacturer) if x]
+    parts = [sp.data(_category_name(p)), sp.data(p.manufacturer)]
     if n:
         parts.append(f"параметрів: {n}")
-    return " · ".join(parts)
+    return sp.join(parts)
 
 
 # ── 8. Комплектація (BOM) ──────────────────────────────────────────────────────

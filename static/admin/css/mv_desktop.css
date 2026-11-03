@@ -333,6 +333,8 @@ html.mvd-pal-open #mvd-pal { display: block; }
   html[data-mv-design="new"].mvd-rail #mvd-snav .mvd-mine > .mvd-gtitle,
   html[data-mv-design="new"].mvd-rail #mvd-snav .mvd-mine > .mvd-hint { display: none; }
   html[data-mv-design="new"].mvd-rail #mvd-snav .mvd-mine { padding-bottom: 6px; border-bottom: 1px solid var(--sb-border); }
+  html[data-mv-design="new"].mvd-rail #mvd-snav > .mvd-group.mvd-cur > .mvd-gbtn { background: var(--accent-subtle) !important;
+    box-shadow: inset 3px 0 0 var(--accent); }
   html[data-mv-design="new"].mvd-rail #mvd-snav > .mvd-group:not(.mvd-mine) > .mvd-gitems { display: none; }
   html[data-mv-design="new"].mvd-rail #mvd-snav > .mvd-group > .mvd-item > .mvd-cnt { position: absolute; top: 2px; right: 0;
     min-width: 16px; padding: 0 4px; box-sizing: border-box; font-size: 10px; line-height: 16px; text-align: center; }
@@ -419,6 +421,24 @@ html.mvd-pal-open #mvd-pal { display: block; }
   .mvd-fside, .mvd-fx { height: 32px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 8px;
     background: transparent; color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
   html:not(.mvd-fdrawer) .mvd-fx { display: none; }
+}
+
+/* висока контрастність Windows (ПК; шухляда телефона — mv_mobile): фон і тіні зникають — поточне й лічильники рамкою */
+@media (min-width: 769px) and (forced-colors: active) {
+  html[data-mv-design="new"] #nav-sidebar .mvd-item.on,
+  html[data-mv-design="new"] #nav-sidebar .mvd-on,
+  html[data-mv-design="new"].mvd-rail #nav-sidebar .mg-group.mvd-here > .mg-header,
+  html[data-mv-design="new"].mvd-rail #mvd-snav > .mvd-group.mvd-cur > .mvd-gbtn,
+  html[data-mv-design="new"] .mvd-pal-row.on, .mvd-igrid button.on { outline: 2px solid Highlight; outline-offset: -2px; }
+  html[data-mv-design="new"].mvd-rail #nav-sidebar .mg-group > .mg-header[data-mvd-count]::after,
+  html[data-mv-design="new"].mvd-rail #mvd-snav > .mvd-group > .mvd-gbtn[data-mvd-count]::after,
+  html[data-mv-design="new"].mvd-rail #mvd-snav > .mvd-group > .mvd-item > .mvd-cnt { border: 1px solid CanvasText; }
+  html[data-mv-design="new"].mvd-rail #nav-sidebar .mg-group.mvd-fly > .mg-content,
+  html[data-mv-design="new"].mvd-rail #mvd-snav .mvd-group.mvd-fly > .mvd-gitems,
+  html[data-mv-design="new"].mvd-fdrawer.mvd-fopen #changelist-filter { border: 1px solid CanvasText !important; }
+  #mvd-toast, #mvd-tip { border: 1px solid CanvasText; }
+  .mvd-seg button[aria-pressed="true"] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+  html[data-mv-design="new"] #nav-sidebar .mvd-tool[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: -2px; }
 }
 
 /* без миші (планшет із клавіатурою) ＋ видно трохи завжди */

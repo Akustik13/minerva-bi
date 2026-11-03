@@ -175,10 +175,10 @@ class ShellTests(Base):
         html = self.shell()
         self.assertNotIn("<script>alert(1)", html)
         self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
-        self.assertIn("<b>FT220407</b>", html)
+        self.assertIn('<b><span translate="no">FT220407</span></b>', html)
         self.assertIn('title="Не рекомендовано для нових розробок (NRND)">NRND</span>', html)
         self.assertIn('<span class="mvp-badge mvp-t-off">неактивний</span>', html)
-        self.assertIn("Доступно 20 шт. · filter · 12,50 EUR", html)
+        self.assertIn('Доступно 20 шт. · <span translate="no">filter</span> · <span translate="no">12,50 EUR</span>', html)
         self.assertNotIn("data-history-url", html)                 # history_view товару — рух складу
         self.assertNotIn("set-stock", html)
         with tempfile.TemporaryDirectory() as labels, override_settings(LABELS_DIR=Path(labels)):

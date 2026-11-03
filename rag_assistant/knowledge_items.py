@@ -141,7 +141,9 @@ def visible_q(user):
     return own | (Q(visibility=KnowledgeItem.TEAM) & (no_links | linked))
 
 
-def items_for(user, kind, obj):
+def items_for(user, kind, obj, limit=None):
+    """Документи картки, які людина бачить, — новіші першими. limit — лише перші N: умова visible_q у SQL (панель
+    праворуч показує кілька, а не всі документи клієнта), can_view перевіряє їх ще раз."""
     from .models import KnowledgeItem
     if kind not in LINK_FIELDS:
         return []
@@ -151,6 +153,8 @@ def items_for(user, kind, obj):
     qs = (KnowledgeItem.objects.filter(cond).distinct()
           .select_related("owner", "customer", "project", "order", "product", "knowledge_source")
           .prefetch_related("knowledge_source__projects").order_by("-created_at"))
+    if limit is not None:
+        qs = qs.filter(visible_q(user))[:limit]
     return visible(user, qs)
 
 

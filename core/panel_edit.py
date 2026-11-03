@@ -130,6 +130,10 @@ def _cells(edit, ma, request, obj) -> dict:
         names = [n for n in ma.get_list_display(request) if isinstance(n, str)]
     except Exception:  # noqa: BLE001
         return out
+    # ⭐ / 📝 рядка (SalesOrderAdmin.flag_col, CustomerAdmin.favorite_col) — кнопкою: зміну людині щойно дозволили
+    # (прапорець ставить changelist_view для останнього списку — він міг бути чужим, лише для перегляду)
+    if hasattr(ma, "_list_can_change"):
+        ma._list_can_change = True
     for name in edit.cells:
         if name not in names:
             continue

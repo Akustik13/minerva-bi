@@ -582,6 +582,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             _base_qs().filter(shipping_deadline__lt=today, status__in=['received', 'processing']).count()
         )
         extra_context['sv_count_flagged']     = _base_qs().filter(is_flagged=True).count()
+        # ⭐ і 📝 у рядку / картці — лише з правом змінювати (сервер усе одно відмовить 403); flag_col читає з self
+        self._list_can_change = extra_context['sv_can_change'] = self.has_change_permission(request)
         extra_context['sv_count_in_transit']  = _base_qs().filter(
             status='shipped', shipments__status='in_transit').distinct().count()
         _ss = SalesSettings.get()
@@ -2258,6 +2260,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     @admin.display(description="⭐")
     def flag_col(self, obj):
         icon = '⭐' if obj.is_flagged else '☆'
+        if not getattr(self, '_list_can_change', True):          # лише перегляд — позначка без кнопки
+            return format_html('<span style="color:#FFB300;font-size:16px" title="{}">⭐</span>',
+                               'Позначено як важливе') if obj.is_flagged else ''
         return format_html(
             '<button class="sv-flag-btn {}" data-pk="{}" onclick="svFlagOrder({});return false" '
             'style="background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;'

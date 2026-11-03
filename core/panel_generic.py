@@ -750,7 +750,7 @@ def make(key, **overrides) -> sp.Block:
 
 
 def _title(obj) -> SafeString:
-    return format_html("<b>{}</b>", obj)
+    return format_html("<b>{}</b>", sp.data(str(obj)))
 
 
 def _subtitle(obj, request) -> str:

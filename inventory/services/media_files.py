@@ -105,6 +105,36 @@ def probe(url: str, kind: str, timeout: tuple[float, float] = (5, 15)) -> str:
     return ""
 
 
+CACHE_FIELDS = ((DATASHEET, "datasheet_url", "datasheet_file"), (IMAGE, "image_url", "image"))
+
+
+def cache_status(limit: int = 300) -> dict:
+    """«Статус медіафайлів» у налаштуваннях складу. Копія файлу качається з посилання в картці товару
+    («Посилання на Datasheet» / «Зображення (URL)»), кнопка бере лише активні товари — тож і числа про них:
+    {вид: {url, local, need, inactive_need, hosts: [(сайт, товарів)], missing: [(pk, артикул, посилання)]}}."""
+    from collections import Counter
+
+    from django.db.models import Q
+
+    from inventory.models import Product
+    out = {}
+    for kind, url_field, file_field in CACHE_FIELDS:
+        no_file = Q(**{file_field: ""}) | Q(**{f"{file_field}__isnull": True})
+        with_url = Product.objects.filter(**{f"{url_field}__gt": ""})
+        active = with_url.filter(is_active=True)
+        need = active.filter(no_file).order_by("sku")
+        out[kind] = {
+            "url": active.count(),
+            "local": Product.objects.filter(is_active=True).exclude(no_file).count(),
+            "need": need.count(),
+            "inactive_need": with_url.filter(is_active=False).filter(no_file).count(),
+            "hosts": Counter((urlsplit(u.strip()).hostname or "—")
+                             for u in active.values_list(url_field, flat=True)).most_common(),
+            "missing": list(need.values_list("pk", "sku", url_field)[:limit]),
+        }
+    return out
+
+
 def read_field(field, kind: str) -> bytes:
     """Вміст файлу з поля товару (FileField / ImageField) з перевіркою; MediaError, якщо його немає чи він не той."""
     if not field or not field.name:

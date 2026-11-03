@@ -19,7 +19,7 @@
 </script>
 <script src="/static/admin/js/mv_contrast.js?v=2" defer></script>
 {% if user.is_authenticated and user.is_staff %}<script src="/static/admin/js/mv_show.js?v=2" defer></script>{% endif %}
-{% if user.is_authenticated and user.is_staff %}{# 🧭 спільне меню (правий клік, ⚙ / ⋯): панель праворуч і бокове меню #}<link rel="stylesheet" href="/static/admin/css/mv_menu.css?v=1"><script src="/static/admin/js/mv_menu.js?v=1" defer></script>{% endif %}
+{% if user.is_authenticated and user.is_staff %}{# 🧭 спільне меню (правий клік, ⚙ / ⋯): панель праворуч і бокове меню #}<link rel="stylesheet" href="/static/admin/css/mv_menu.css?v=2"><script src="/static/admin/js/mv_menu.js?v=2" defer></script>{% endif %}
 {% load side_panel_tags %}{% if cl %}{% side_panel_config cl %}{% endif %}{# 📌 панель праворуч у списку (core/side_panel.py) #}
 {% if MV_UI_DICT %}{# інтерфейс іншою мовою (core/ui_text): сторінку видно, щойно переклад готовий (не довше 1,5 с) #}
 <style>html.mv-tr-pending body{visibility:hidden}</style>
@@ -46,8 +46,8 @@
 {% endif %}
 {% if MV_MENU_JSON %}{# 🧭 ПК, новий вигляд: меню «Просте / Повне», пошук усюди, фільтри (core/main_menu.py) #}
 <script id="mv-menu-config" type="application/json">{{ MV_MENU_JSON|safe }}</script>
-<link rel="stylesheet" href="/static/admin/css/mv_desktop.css?v=3">
-<script src="/static/admin/js/mv_desktop.js?v=3" defer></script>
+<link rel="stylesheet" href="/static/admin/css/mv_desktop.css?v=4">
+<script src="/static/admin/js/mv_desktop.js?v=4" defer></script>
 {% endif %}
 <style>
 /* Emoji fallback font stack for country flags (shown via onerror on flagcdn.com img) */

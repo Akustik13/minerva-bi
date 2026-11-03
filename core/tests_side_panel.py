@@ -253,8 +253,8 @@ class ConfigTests(PanelTestBase):
     def test_list_page_has_config_and_v2_assets(self):
         html = self.client.get("/admin/inventory/supplier/").content.decode()
         self.assertIn('id="mv-panel-config"', html)
-        self.assertIn("/static/admin/js/mv_panel.js?v=5", html)
-        self.assertIn("/static/admin/css/mv_panel.css?v=5", html)
+        self.assertIn("/static/admin/js/mv_panel.js?v=6", html)
+        self.assertIn("/static/admin/css/mv_panel.css?v=6", html)
         cfg = cfg_of(html)
         self.assertEqual((cfg["v"], cfg["model"], cfg["url"], cfg["prefsUrl"]),
                          (2, MODEL, URL, URL + "prefs/"))
@@ -264,7 +264,7 @@ class ConfigTests(PanelTestBase):
 
     def test_config_contents_follow_permissions(self):
         cfg, out = self.tag_config(self.root)
-        self.assertIn("mv_panel.js?v=5", out)
+        self.assertIn("mv_panel.js?v=6", out)
         self.assertEqual([b["key"] for b in cfg["blocks"]],
                          ["info", "secret", "lazy", "folded", "na", "boom", "blank", "extra"])
         info = cfg["blocks"][0]
@@ -314,7 +314,7 @@ class ShellTests(PanelTestBase):
                      f'data-change-url="/admin/inventory/supplier/{pk}/change/"',
                      f'data-history-url="/admin/inventory/supplier/{pk}/history/"',
                      f'data-delete-url="/admin/inventory/supplier/{pk}/delete/"', 'data-can-change="1"',
-                     'data-mvp-nav="-1"', 'data-mvp-nav="1"', '<span translate="no"><b>Muster GmbH</b></span>',
+                     'data-mvp-nav="-1"', 'data-mvp-nav="1"', 'tabindex="-1"><span><b>Muster GmbH</b></span></h2>',
                      'data-mvp-open href="/admin/inventory/supplier/', 'data-mvp-menu', 'data-mvp-close',
                      '<span translate="no">anna@muster.example</span>', 'data-mvp-pos hidden',
                      '<nav class="mvp-nav" aria-label="Розділи запису"></nav>', 'class="mvp-body" tabindex="0"',

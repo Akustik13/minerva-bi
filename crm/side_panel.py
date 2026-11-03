@@ -167,7 +167,7 @@ def _stats(c) -> dict:
 
 def title(c):
     star = format_html(' <span title="{}">⭐</span>', "Обраний клієнт") if c.is_favorite else ""
-    return format_html("<b>{}</b>{}", _name(c), star)
+    return format_html("<b>{}</b>{}", sp.data(_name(c)), star)
 
 
 def label(c) -> str:
@@ -250,7 +250,7 @@ def contact_html(c, request):
 
 
 def contact_summary(c, request) -> str:
-    return " · ".join(p for p in (c.email, c.phone) if p)
+    return sp.join([sp.data(c.email), sp.data(c.phone)])
 
 
 # ── 📊 Продажі й RFM ───────────────────────────────────────────────────────────
@@ -265,7 +265,7 @@ def sales_html(c, request):
     card, rfm = st["card"], st["rfm"]
     if not card["count"]:
         return ""
-    first = orders_of(c, base=sale_orders()).aggregate(first=Min("order_date"))["first"]
+    first = _orders(c, base=sale_orders()).aggregate(first=Min("order_date"))["first"]
     last = sp.date(card["last"])
     if last and card["days"] is not None:
         ago = "· сьогодні" if card["days"] == 0 else f"· {card['days']} дн. тому"
@@ -303,11 +303,19 @@ def sales_summary(c, request) -> str:
 
 # ── 🧾 Замовлення ──────────────────────────────────────────────────────────────
 
+def _orders(c, base=None):
+    """orders_of(c) з номерами, знайденими один раз на запит (sp.memo): розділи, лічильник і підсумок питають
+    замовлення клієнта п'ять разів, а кожен orders_of — підзапит за ключем і email по всіх замовленнях."""
+    from sales.models import SalesOrder
+    ids = sp.memo(c, "crm:order-ids", lambda: list(orders_of(c).values_list("pk", flat=True)))
+    return (SalesOrder.objects.all() if base is None else base).filter(pk__in=ids)
+
+
 def _order_counts(c) -> dict:
     """Усього замовлень клієнта (orders_of), чекають відправки й прострочені (sales.revenue.to_ship)."""
     def load():
         from sales.revenue import to_ship
-        qs = orders_of(c)
+        qs = _orders(c)
         n = qs.count()
         if not n:
             return {"n": 0, "waiting": 0, "late": 0}
@@ -332,7 +340,7 @@ def orders_html(c, request):
     k = _order_counts(c)
     if not k["n"]:
         return ""
-    qs = orders_of(c)
+    qs = _orders(c)
     rows = list(qs.annotate(_mvp_lines=Count("lines"))
                 .order_by(F("order_date").desc(nulls_last=True), "-pk")[:ORDERS_SHOWN])
     waiting = set(to_ship(qs.filter(pk__in=[o.pk for o in rows])).values_list("pk", flat=True))
@@ -668,7 +676,7 @@ def projects_summary(c, request) -> str:
 def shipments_html(c, request):
     from api.serializers import carrier_tracking_url
     from shipping.models import Shipment
-    ships = list(Shipment.objects.filter(order__in=orders_of(c)).select_related("carrier", "order")
+    ships = list(Shipment.objects.filter(order__in=_orders(c)).select_related("carrier", "order")
                  .order_by("-pk")[:SHIPMENTS_SHOWN])
     out = []
     for s in ships:
@@ -719,7 +727,7 @@ def money_html(c, request):
         parts.append(_group("🧾 Рахунки", _concat(lines)))
     if request.user.has_perm("sales.view_salesorder"):
         lines = []
-        for o in (orders_of(c).filter(payment_status__in=UNPAID)
+        for o in (_orders(c).filter(payment_status__in=UNPAID)
                   .order_by(F("order_date").desc(nulls_last=True), "-pk")[:ORDERS_SHOWN]):
             lines.append(_line(_join([sp.admin_link(request, o, f"№ {o.order_number}"),
                                       sp.badge(o.get_payment_status_display(), "warn")], " "),
@@ -825,7 +833,7 @@ def documents_html(c, request):
         from rag_assistant import access
         if access.has(request.user, "documents"):
             from rag_assistant import knowledge_items
-            for item in list(knowledge_items.items_for(request.user, "customer", c)[:KNOWLEDGE_SHOWN]):
+            for item in knowledge_items.items_for(request.user, "customer", c, limit=KNOWLEDGE_SHOWN):
                 knowledge.append(_line(sp.link(_url("rag_assistant:knowledge_item", item.pk), sp.data(item.title)),
                                        _ui(item.get_kind_display()), sp.date(item.created_at)))
     except Exception as exc:  # noqa: BLE001 — без бази знань — лише файли

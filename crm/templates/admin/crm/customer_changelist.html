@@ -526,11 +526,15 @@ function crmDoAction() {
     {# Right: ⭐ + badges #}
     <div class="crm-hd-right">
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
-        {# Favorite toggle #}
+        {# Favorite toggle — лише з правом змінювати клієнтів; без нього обраний — просто ⭐ #}
+        {% if crm_can_change %}
         <button class="crm-fav-btn {% if customer.is_favorite %}crm-fav-on{% endif %}"
                 data-pk="{{ customer.pk }}"
                 onclick="crmFavorite({{ customer.pk }});return false"
                 title="{% if customer.is_favorite %}{% trans "Зняти обраність" %}{% else %}{% trans "Позначити як обраний" %}{% endif %}">{% if customer.is_favorite %}⭐{% else %}☆{% endif %}</button>
+        {% elif customer.is_favorite %}
+        <span class="crm-fav-btn crm-fav-on" title="{% trans "Обраний клієнт" %}">⭐</span>
+        {% endif %}
         {# Status #}
         {% if customer.status == 'active' %}    <span class="crm-badge" style="background:#43a047">{% trans "Активний" %}</span>
         {% elif customer.status == 'vip' %}     <span class="crm-badge" style="background:#f9a825;color:#000">⭐ VIP</span>
@@ -685,18 +689,20 @@ function crmDoAction() {
     <a href="{% url 'admin:crm_customer_change' customer.pk %}" class="crm-btn crm-btn-open">⚙️ {% trans "Відкрити" %}</a>
     <a href="{% url 'admin:sales_salesorder_changelist' %}?q={{ customer.email|default:customer.name }}" class="crm-btn crm-btn-orders">📋 {% trans "Замовлення" %}</a>
     <a href="{% url 'admin:crm_customer_new_order' customer.pk %}" class="crm-btn crm-btn-order">➕ {% trans "Нове" %}</a>
+    {# призначити стратегію — лише з правом (crm_can_assign), POST одразу (crmPostLink), як «🎯 Стратегія» в таблиці #}
     {% if sdata %}
       <a href="/strategy/{{ sdata.pk }}/canvas/" class="crm-btn crm-btn-strat">🎯 Canvas</a>
+    {% elif not crm_can_assign %}
     {% elif rfm.R > 3 and rfm.F == 1 %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#1976d2;color:#fff !important">🚀 {% trans "Онбординг" %}</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" onclick="return crmPostLink(event,this)" class="crm-btn" style="background:#1976d2;color:#fff !important">🚀 {% trans "Онбординг" %}</a>
     {% elif "At Risk" in rfm.segment or "Hibernating" in rfm.segment %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#e53935;color:#fff !important">🔄 {% trans "Реактивація" %}</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" onclick="return crmPostLink(event,this)" class="crm-btn" style="background:#e53935;color:#fff !important">🔄 {% trans "Реактивація" %}</a>
     {% elif "Potential" in rfm.segment or "Regular" in rfm.segment or "New" in rfm.segment %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#f57c00;color:#fff !important">📈 {% trans "Нарощування" %}</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" onclick="return crmPostLink(event,this)" class="crm-btn" style="background:#f57c00;color:#fff !important">📈 {% trans "Нарощування" %}</a>
     {% elif "Champion" in rfm.segment or "Loyal" in rfm.segment %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#7b1fa2;color:#fff !important">👑 {% trans "Утримання" %}</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" onclick="return crmPostLink(event,this)" class="crm-btn" style="background:#7b1fa2;color:#fff !important">👑 {% trans "Утримання" %}</a>
     {% else %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn crm-btn-strat">✏️ {% trans "Вибрати" %}</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" onclick="return crmPostLink(event,this)" class="crm-btn crm-btn-strat">✏️ {% trans "Вибрати" %}</a>
     {% endif %}
   </div>
 
@@ -827,7 +833,24 @@ function crmFavorite(pk) {
     });
     var card = document.getElementById('crm-card-' + pk);
     if (card) card.classList.toggle('crm-card-fav', d.is_favorite);
+    /* змінили в списку — панель праворуч перечитає запис (подія mv:list-edit) */
+    try { document.dispatchEvent(new CustomEvent('mv:list-edit', {detail: {pk: String(pk)}})); } catch (e) {}
   }).catch(function(){ alert(_msgFavFailed); });   /* мережа впала — теж нічого не збережено */
+}
+
+/* ══ Посилання, що шле POST (🎯 стратегія, 🔄 синхронізація) — як _POST_ONCLICK у crm/admin.py ══ */
+function crmPostLink(e, a) {
+  if (e && (e.ctrlKey || e.metaKey || e.shiftKey || e.button)) return true;     /* нова вкладка — підтвердження */
+  var t = document.querySelector('[name=csrfmiddlewaretoken]'), c = document.cookie.match(/csrftoken=([^;]+)/);
+  if (!t && !c) return true;
+  var f = document.createElement('form');
+  f.method = 'post';
+  f.action = a.href;
+  if (t) f.appendChild(t.cloneNode());
+  else { var i = document.createElement('input'); i.type = 'hidden'; i.name = 'csrfmiddlewaretoken'; i.value = c[1]; f.appendChild(i); }
+  document.body.appendChild(f);
+  f.submit();
+  return false;
 }
 
 /* ══ Init ══════════════════════════════════════════════════ */
@@ -857,12 +880,16 @@ function crmFavorite(pk) {
             🔍 {% trans "Знайти дублікати" %}
         </a>
     </li>
+    {% if crm_can_sync %}
+    {% trans "Синхронізувати всіх клієнтів з замовлень? Це може зайняти кілька секунд." as crm_sync_q %}
     <li>
+        {# одне питання й POST одразу; без JS (або Ctrl / середня кнопка) — сторінка підтвердження #}
         <a href="{% url 'admin:crm_customer_sync' %}"
            style="background:#1976d2;color:white;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block"
-           onclick="return confirm('{% trans "Синхронізувати всіх клієнтів з замовлень? Це може зайняти кілька секунд." %}')">
+           onclick="if(event.ctrlKey||event.metaKey||event.shiftKey||event.button)return true;if(!confirm('{{ crm_sync_q|escapejs }}'))return false;return crmPostLink(event,this)">
             🔄 {% trans "Синхронізація CRM" %}
         </a>
     </li>
+    {% endif %}
 {% endblock %}
