@@ -1846,6 +1846,34 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 '</div>'
             )
 
+        # 📎 Вкладення з пошти того, хто дивиться (email_assistant/attachment_docs.py) — пошта лише його
+        try:
+            from email_assistant.attachment_docs import OFF, mode_of
+            from email_assistant.models import EmailAccount
+            _req = getattr(self, 'request', None)
+            _mail_mode = (mode_of(_req.user.pk) if _req is not None
+                          and EmailAccount.objects.filter(user_id=_req.user.pk).exists() else None)
+        except Exception:  # noqa: BLE001
+            _mail_mode = None
+        if _mail_mode is None:
+            mail_docs_info = ''
+        elif _mail_mode != OFF:
+            mail_docs_info = (
+                '<div style="margin:6px 0;padding:7px 12px;background:rgba(46,125,50,.12);'
+                'border:1px solid rgba(46,125,50,.3);border-radius:5px;font-size:12px;color:var(--text,#e6edf3)">'
+                '📎 Вкладення з вашої пошти: PDF, Word, Excel… з листів до цього замовлення '
+                'Minerva кладе сюди сама (той самий файл не дублюється). '
+                '<span style="color:var(--text-muted,#9aafbe);font-size:11px">Пошта → ⋯ Ще → 📎</span>'
+                '</div>'
+            )
+        else:
+            mail_docs_info = (
+                '<div style="margin:6px 0;font-size:11px;color:var(--text-dim,#607d8b)">'
+                '📎 Вкладення з вашої пошти сюди не зберігаються — увімкнути: Пошта → ⋯ Ще → '
+                '«📎 Вкладення → документи замовлення».'
+                '</div>'
+            )
+
         html = (
             '<div id="docWidgetRoot"'
             ' data-upload-url="' + upload_url + '"'
@@ -1861,6 +1889,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '<p style="margin:0 0 6px;font-size:12px;color:var(--text-dim,#607d8b)">'
             'Можна кілька файлів одночасно. Завантаження на сервер починається автоматично після вибору.</p>'
             + server_save_info
+            + mail_docs_info
             + local_info +
             '<div id="docResult" style="margin-top:10px;font-size:13px;color:var(--text,#e6edf3)"></div>'
             '</div>'

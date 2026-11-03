@@ -321,6 +321,17 @@ class EmailSettings(models.Model):
     nav_icons = models.BooleanField(
         default=True, verbose_name='Значки категорій і проєктів',
         help_text='Емодзі перед назвою своїх категорій і проєктів у лівій колонці й мітках листів')
+    DOCS_OFF, DOCS_ORDERS, DOCS_ALL = 'off', 'orders', 'all'
+    DOCS_CHOICES = [(DOCS_OFF, 'Не зберігати'),
+                    (DOCS_ORDERS, 'У документи замовлення'),
+                    (DOCS_ALL, 'У документи замовлення й проєкту')]
+    attachments_to_docs = models.CharField(
+        max_length=8, default=DOCS_OFF, choices=DOCS_CHOICES,
+        verbose_name='📎 Вкладення листів → документи',
+        help_text='Лист прив’язано до замовлення (номер у темі, тексті чи вкладенні) — PDF, Word, Excel, CSV… '
+                  'з нього Minerva сама кладе в «Документи замовлення»; «… й проєкту» — ще й у «📎 Документи» '
+                  'проєкту, до якого підтверджено гілку. Той самий файл уже є — не зберігається '
+                  '(email_assistant/attachment_docs.py)')
     nav_project_codes = models.BooleanField(
         default=True, verbose_name='Номер проєкту перед назвою',
         help_text='Ліва колонка скриньки «📁 Проєкти»: «P-2026-002 · Назва» або лише назва')

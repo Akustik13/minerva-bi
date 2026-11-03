@@ -751,6 +751,20 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
         </select>
       </label>
       {% endif %}
+      <label class="em-sync-btn" style="cursor:pointer;gap:6px"
+             title="{% trans "Лист прив’язано до замовлення (номер у темі, тексті чи вкладенні) або гілку — до проєкту: PDF, Word, Excel, CSV… з нього Minerva сама кладе в документи замовлення / проєкту. Той самий файл уже є — не зберігає. Діє лише для вашої пошти" %}">
+        📎
+        <select id="em-docs-mode" data-label="📎 " onchange="setEmailSetting('attachments_to_docs', this.value, this); emDocsBtn()"
+                style="flex:1;min-width:0;border:none;background:transparent;color:inherit;font-size:12px;font-family:inherit;cursor:pointer;outline:none">
+          {% for key, label in docs_choices %}
+          <option value="{{ key }}"{% if email_settings.attachments_to_docs == key %} selected{% endif %}>{% if key == "off" %}{% trans "Вкладення: не зберігати в документи" %}{% elif key == "orders" %}{% trans "Вкладення → документи замовлення" %}{% else %}{% trans "Вкладення → документи замовлення й проєкту" %}{% endif %}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="em-sync-btn" id="em-docs-recent" onclick="emDocsRecent(this)"{% if email_settings.attachments_to_docs == "off" %} style="display:none"{% endif %}
+              title="{% trans "Листи за 30 днів, уже прив’язані до замовлень і проєктів: їхні документи — туди ж (те, що вже є, не дублюється)" %}">
+        📥 {% trans "Зберегти вкладення за 30 днів" %}
+      </button>
       </div>
     </div>
 
@@ -2969,6 +2983,23 @@ async function toggleEmailSetting(field, el) {
   } catch(e) { el.checked = !el.checked; }
 }
 
+function emDocsBtn() {
+  var sel = document.getElementById('em-docs-mode'), btn = document.getElementById('em-docs-recent');
+  if (sel && btn) btn.style.display = sel.value === 'off' ? 'none' : '';
+}
+async function emDocsRecent(btn) {
+  btn.disabled = true;
+  try {
+    var fd = new FormData(); fd.append('days', '30');
+    var r = await fetch('{% url "email_assistant:attachments_to_docs" %}', {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd});
+    var d = await r.json();
+    if (!d.ok) { alert('❌ ' + (d.error || '')); return; }
+    _showToast('📎 {% trans "Листів" %}: ' + d.messages + ' · {% trans "у замовлення" %}: ' + d.orders
+               + (d.mode === 'all' ? ' · {% trans "у проєкти" %}: ' + d.projects : '')
+               + ' · {% trans "уже були" %}: ' + d.already);
+  } catch (e) { alert('❌ ' + e); }
+  finally { btn.disabled = false; }
+}
 async function setEmailSetting(field, value, el) {
   var prev = el.dataset.prev !== undefined ? el.dataset.prev : null;
   try {
@@ -2979,7 +3010,8 @@ async function setEmailSetting(field, value, el) {
     var d = await r.json();
     if (!d.ok) { if (prev !== null) el.value = prev; return; }
     el.dataset.prev = value;
-    _showToast('🤖 {% trans "AI модель" %}: ' + el.options[el.selectedIndex].text.split(' — ')[0]);
+    _showToast((el.dataset.label !== undefined ? el.dataset.label : '🤖 {% trans "AI модель" %}: ')
+               + el.options[el.selectedIndex].text.split(' — ')[0]);
   } catch(e) { if (prev !== null) el.value = prev; }
 }
 

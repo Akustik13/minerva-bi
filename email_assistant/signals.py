@@ -85,6 +85,47 @@ def link_email_to_crm(sender, instance, created, **kwargs):
         assign(instance)   # своя категорія (DigiKey, магазин…) — після CRM: замовлення з листа вже знайдено
 
 
+def _attachments_to_docs(message_pk):
+    """📎 Документи листа → документи замовлення / проєкту (email_assistant/attachment_docs.py) — після commit."""
+    from django.db import transaction
+
+    def run():
+        try:
+            from email_assistant.attachment_docs import save_message_pk
+            save_message_pk(message_pk)
+        except Exception as exc:  # noqa: BLE001 — збій копії не ламає листа
+            logger.warning('attachment docs for message %s: %s', message_pk, exc)
+    transaction.on_commit(run)
+
+
+@receiver(post_save, sender='email_assistant.EmailMessage')
+def attachments_to_docs_new_mail(sender, instance, created, **kwargs):
+    if created and not kwargs.get('raw') and instance.attachments:
+        _attachments_to_docs(instance.pk)
+
+
+@receiver(post_save, sender='crm.CustomerTimeline')
+def attachments_to_docs_order_link(sender, instance, **kwargs):
+    """Лист прив'язано до замовлення (і пізніше — «relink_email_crm», ручна прив'язка гілки до клієнта)."""
+    if instance.email_message_id and instance.related_order_id and not kwargs.get('raw'):
+        _attachments_to_docs(instance.email_message_id)
+
+
+@receiver(post_save, sender='projects.ProjectLink')
+def attachments_to_docs_project(sender, instance, **kwargs):
+    if instance.status != 'confirmed' or kwargs.get('raw') or not (instance.thread_id or instance.message_id):
+        return
+    from django.db import transaction
+
+    def run():
+        try:
+            from email_assistant.attachment_docs import project_linked
+            project_linked(instance.pk)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning('attachment docs for project link %s: %s', instance.pk, exc)
+    transaction.on_commit(run)
+
+
 def _set_category(em):
     """Категорія для фільтра скриньки (клієнти, постачальники, сервіси…); після прив'язки до CRM."""
     try:

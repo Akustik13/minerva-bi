@@ -86,6 +86,7 @@ urlpatterns = [
     path('logo-set/',                                   views.sender_logo_set_view,    name='sender_logo_set'),
     path('logo/<str:domain>/',                          views.sender_logo_view,        name='sender_logo'),
     path('settings/toggle/',                             views.settings_toggle_view,    name='settings_toggle'),
+    path('attachments-to-docs/',                         views.attachments_to_docs_view, name='attachments_to_docs'),
     # Email rules
     path('rules/',                                       views.rules_list,              name='rules_list'),
     path('rules/create/',                                views.create_rule_api,         name='create_rule'),

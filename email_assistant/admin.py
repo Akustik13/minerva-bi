@@ -477,6 +477,11 @@ class EmailSettingsAdmin(admin.ModelAdmin):
         ("📬 Читання та синхронізація", {
             'fields': ('mark_read_on_server', 'spam_folder'),
         }),
+        ("📎 Вкладення листів → документи", {
+            'fields': ('attachments_to_docs',),
+            'description': 'Те саме — у пошті «⋯ Ще» (там же «📥 Зберегти вкладення за 30 днів» для листів, '
+                           'уже прив’язаних до замовлень і проєктів).',
+        }),
         ("🔗 CRM синхронізація", {
             'fields': ('sync_to_crm_timeline',),
         }),

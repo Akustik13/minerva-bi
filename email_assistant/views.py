@@ -631,6 +631,7 @@ def inbox_view(request):
         'sender_colors':         logos.STANDARD_COLORS,
         'ai_model_choices':      EmailSettings.AI_MODEL_CHOICES,
         'rag_mode_choices':      EmailSettings.RAG_MODE_CHOICES,
+        'docs_choices':          EmailSettings.DOCS_CHOICES,
         'folder_label':          decode_mutf7(folder),
         'cat_filter':            cat_filter,
         'customer_filter':       customer_filter,
@@ -2376,7 +2377,7 @@ def set_work_category_view(request, message_pk):
 
 
 _SETTINGS_TOGGLES = {'mark_read_on_server', 'nav_project_codes', 'sender_logos', 'nav_icons'}
-_SETTINGS_CHOICES = {'ai_model', 'rag_mode', 'nav_sort'}
+_SETTINGS_CHOICES = {'ai_model', 'rag_mode', 'nav_sort', 'attachments_to_docs'}
 
 
 def _model_label(model_id: str) -> str:
@@ -2473,6 +2474,22 @@ def settings_toggle_view(request):
     setattr(es, field, bool(data.get('value')))
     es.save(update_fields=[field])
     return JsonResponse({'ok': True, field: getattr(es, field)})
+
+
+@staff_member_required
+@require_POST
+def attachments_to_docs_view(request):
+    """«📥 Зберегти з листів за 30 днів»: вкладення вже прив'язаних листів своїх скриньок → документи замовлень
+    / проєктів (email_assistant/attachment_docs.py; що саме — як вибрано в «📎 Вкладення → документи»)."""
+    from email_assistant import attachment_docs
+    try:
+        days = max(1, min(int(request.POST.get('days') or attachment_docs.RECENT_DAYS), 365))
+    except ValueError:
+        days = attachment_docs.RECENT_DAYS
+    result = attachment_docs.save_recent(request.user, days)
+    if result['mode'] == attachment_docs.OFF:
+        return JsonResponse({'ok': False, 'error': 'Спершу виберіть, куди зберігати вкладення'})
+    return JsonResponse({'ok': True, 'days': days, **result})
 
 
 @staff_member_required
