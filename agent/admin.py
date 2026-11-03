@@ -268,6 +268,8 @@ class AgentTaskAdmin(admin.ModelAdmin):
             data['each_product'] = len(ids) > 5
         mail = self._mail_from_get(request)
         data['message'] = mail.pk if mail else None
+        if data.get('instruction'):              # ?instruction= — з «🧩 Підготувати завдання агенту» (agent/suggest.py)
+            data['instruction'] = str(data['instruction'])[:3000]
         return data
 
     def has_change_permission(self, request, obj=None):

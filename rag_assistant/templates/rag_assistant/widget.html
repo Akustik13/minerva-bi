@@ -82,6 +82,14 @@
   background: var(--rg-bubble); border: 1px solid var(--rg-border); }
 .rg-m.user .rg-b { background: var(--rg-user); color: var(--rg-user-text); border-color: transparent; white-space: pre-wrap; }
 .rg-m.failed .rg-b { border-color: var(--rg-err); }
+/* 🧩 «Це може зробити агент» під повідомленням людини (agent/suggest.py) */
+.rg-m.user.has-agent { flex-wrap: wrap; }
+.rg-agent { flex-basis: 100%; box-sizing: border-box; margin-top: 6px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--rg-accent); background: var(--rg-soft); color: var(--rg-text); font-size: 13px; line-height: 1.45; }
+.rg-agent b { display: block; margin-bottom: 3px; color: var(--rg-strong); }
+.rg-agent a { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 8px; font-weight: 600;
+  background: var(--rg-accent); color: #fff; text-decoration: none; }
+.rg-agent a:hover { filter: brightness(1.1); }
 .rg-b p { margin: 0 0 8px; } .rg-b p:last-child { margin-bottom: 0; }
 .rg-b h4 { margin: 8px 0 6px; font-size: 14px; color: var(--rg-strong); }
 .rg-b ul, .rg-b ol { margin: 4px 0 8px 18px; padding: 0; }
@@ -358,7 +366,19 @@ a.rg-link { color: var(--rg-link); text-decoration: underline; }
     row.dataset.id = m.id;
     if (m.role === 'assistant') { var av = el('img'); av.src = AVATAR; av.alt = ''; row.appendChild(av); }
     row.appendChild(bubble);
-    if (m.role === 'user') { bubble.textContent = m.content; return row; }
+    if (m.role === 'user') {
+      bubble.textContent = m.content;
+      if (m.agent && m.agent.url && m.agent.url.charAt(0) === '/') {   // 🧩 агент — форма вже заповнена
+        row.classList.add('has-agent');
+        var card = el('div', 'rg-agent');
+        card.appendChild(el('b', null, m.agent.title));
+        card.appendChild(el('div', null, m.agent.text));
+        var go = el('a', null, m.agent.label); go.href = m.agent.url; go.target = '_blank'; go.rel = 'noopener';
+        card.appendChild(go);
+        row.appendChild(card);
+      }
+      return row;
+    }
     if (m.mode) setTimeout(function () { if (row.isConnected && !bubble.querySelector('.rg-mode')) bubble.insertBefore(modeBar(m, row), bubble.firstChild); }, 0);
     if (m.status === 'pending') {
       var st = el('div', 'rg-stage'); st.appendChild(el('span', 'rg-spin')); st.appendChild(el('span', null, m.stage || 'Обробляю запит…'));
@@ -426,10 +446,12 @@ a.rg-link { color: var(--rg-link); text-decoration: underline; }
     var can = [];
     if (state.guide) can.push('як працює Minerva — де що знайти й як налаштувати');
     if (state.products) can.push('характеристики товарів, даташити й наявність на складі');
+    if (state.agent) can.push('а роботу («знайди й внеси», «підготуй відправлення») — підготую завдання агентові Minerva');
     box.appendChild(el('div', null, 'Привіт! Я ' + state.name + ' — допоможу: ' + can.join('; ') + '. Просто запитайте — я сама зрозумію, про що.'));
     var hints = el('div', 'rg-hints'), examples = [];
     if (state.guide) examples.push('❓ Що на цій сторінці й що тут можна зробити?', 'Як створити Angebot з листа?');
     if (state.products) examples.push('Які антени підтримують Bluetooth і є на складі?', 'Яка потужність AN050201-01C-175-MHF1?');
+    if (state.agent) examples.splice(1, 0, 'Перебери даташити антен і внеси параметри на склад');
     examples.slice(0, 4)
       .forEach(function (q) { var b = el('button', null, q); b.type = 'button'; b.onclick = function () { input.value = q; send(); }; hints.appendChild(b); });
     box.appendChild(hints);
@@ -556,7 +578,7 @@ a.rg-link { color: var(--rg-link); text-decoration: underline; }
     .then(function (d) {
       if (!d || !d.enabled) { pill.remove(); panel.remove(); return; }
       state.configured = d.configured; state.name = d.name || 'Minerva'; state.convs = d.conversations || [];
-      state.guide = d.guide !== false && !!d.guide; state.products = d.products !== false;
+      state.guide = d.guide !== false && !!d.guide; state.products = d.products !== false; state.agent = !!d.agent;
       var sub = [state.guide ? 'гід по Minerva' : '', state.products ? 'продукція й даташити' : ''].filter(Boolean).join(' · ');
       panel.querySelector('.rg-title small').textContent = sub;
       if (state.guide) {

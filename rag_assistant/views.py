@@ -70,10 +70,17 @@ def _client(request) -> RagClient:
 
 # ── Серіалізація ─────────────────────────────────────────────────────────────
 
-def _msg(m: RagMessage) -> dict:
-    return {"id": m.id, "role": m.role, "content": m.content, "status": m.status, "stage": m.stage,
-            "sources": m.sources, "products": m.products, "trace": m.trace, "error": m.error, "mode": m.mode,
-            "created_at": m.created_at.isoformat()}
+def _msg(m: RagMessage, user=None) -> dict:
+    out = {"id": m.id, "role": m.role, "content": m.content, "status": m.status, "stage": m.stage,
+           "sources": m.sources, "products": m.products, "trace": m.trace, "error": m.error, "mode": m.mode,
+           "created_at": m.created_at.isoformat()}
+    if user is not None and m.role == RagMessage.ROLE_USER:     # 🧩 «це може зробити агент» — під повідомленням
+        try:
+            from agent.suggest import suggest
+            out["agent"] = suggest(m.content, user)
+        except Exception:  # noqa: BLE001 — без підказки відповідь однаково показується
+            out["agent"] = None
+    return out
 
 
 def _conv(c: RagConversation) -> dict:
@@ -259,7 +266,8 @@ def state(request):
     from .access import has
     shown = products or guide or (st.enabled and has(request.user, "products"))   # увімкнено, але не налаштовано
     return JsonResponse({"enabled": shown, "configured": products or guide, "products": products,
-                         "guide": guide, "name": st.name, "conversations": [_conv(c) for c in convs]})
+                         "guide": guide, "agent": guide and request.user.has_perm("agent.add_agenttask"),
+                         "name": st.name, "conversations": [_conv(c) for c in convs]})
 
 
 @require_POST
@@ -273,7 +281,7 @@ def conversation_new(request):
 @_guard
 def conversation_detail(request, pk):
     c = get_object_or_404(RagConversation, pk=pk, user=request.user)
-    return JsonResponse({"conversation": _conv(c), "messages": [_msg(m) for m in c.messages.all()]})
+    return JsonResponse({"conversation": _conv(c), "messages": [_msg(m, request.user) for m in c.messages.all()]})
 
 
 @require_POST
@@ -327,7 +335,7 @@ def ask(request, pk):
         c.save(update_fields=["title", "updated_at"])
         guide_assistant.start(bot_msg.pk, question, page, history, request.user.pk,
                               guide_assistant.clean_ui(body.get("ui")))
-        return JsonResponse({"user": _msg(user_msg), "assistant": _msg(bot_msg), "conversation": _conv(c)},
+        return JsonResponse({"user": _msg(user_msg, request.user), "assistant": _msg(bot_msg), "conversation": _conv(c)},
                             status=202)
     if not has(request.user, "products"):
         return JsonResponse({"error": "Немає права на 📦 помічника по продукції — його надає адміністратор."},
@@ -344,7 +352,7 @@ def ask(request, pk):
     if not c.title:
         c.title = question[:120]
     c.save(update_fields=["title", "updated_at"])
-    return JsonResponse({"user": _msg(user_msg), "assistant": _msg(bot_msg), "conversation": _conv(c)}, status=202)
+    return JsonResponse({"user": _msg(user_msg, request.user), "assistant": _msg(bot_msg), "conversation": _conv(c)}, status=202)
 
 
 @require_GET
