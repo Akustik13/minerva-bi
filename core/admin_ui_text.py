@@ -149,8 +149,9 @@ class UITextAdmin(admin.ModelAdmin):
             return redirect('admin:core_uitext_changelist')
         res = catalog.sync()
         back = f" · повернулось: {res['back']}" if res['back'] else ''
+        bundled = f" · перекладів з комплекту: {res['bundled']}" if res.get('bundled') else ''
         messages.success(request, f"Написів у коді: {res['total']} · нових: {res['new']} · "
-                                  f"зникло з коду: {res['gone']}{back}.")
+                                  f"зникло з коду: {res['gone']}{back}{bundled}.")
         return redirect('admin:core_uitext_changelist')
 
     def translate_view(self, request):

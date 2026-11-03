@@ -29,9 +29,11 @@ def key_of(source: str) -> str:
     return hashlib.sha1(source.encode("utf-8")).hexdigest()
 
 
-def sync(base_dir=None) -> dict:
-    """Каталог ← код. {"total", "new", "gone", "back"}."""
+def sync(base_dir=None, bundled_path=None) -> dict:
+    """Каталог ← код, далі переклади з комплекту (bundled.apply — лише там, де перекладу немає).
+    {"total", "new", "gone", "back", "bundled"}."""
     from core.models import UIText
+    from core.ui_text import bundled
     from core.ui_text.extract import collect
     found = collect(base_dir or settings.BASE_DIR)
     by_key = {key_of(src): (src, meta) for src, meta in found.items()}
@@ -51,7 +53,8 @@ def sync(base_dir=None) -> dict:
     UIText.objects.bulk_update(changed, ["where", "uses", "active"], batch_size=500)
     gone = UIText.objects.filter(active=True).exclude(key__in=list(by_key)).update(active=False)
     bump()
-    return {"total": len(by_key), "new": len(new), "gone": gone, "back": back}
+    return {"total": len(by_key), "new": len(new), "gone": gone, "back": back,
+            "bundled": bundled.apply(bundled_path)}
 
 
 def counts() -> dict:

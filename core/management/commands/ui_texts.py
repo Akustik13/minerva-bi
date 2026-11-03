@@ -1,6 +1,7 @@
 """Переклади інтерфейсу (core/ui_text) з консолі.
 
-    python manage.py ui_texts collect                      — каталог ← код
+    python manage.py ui_texts collect                      — каталог ← код (+ переклади з комплекту bundled.jsonl)
+    python manage.py ui_texts bundled [--todo FILE]        — чого бракує в комплекті (FILE — JSONL {"s": …} для перекладу)
     python manage.py ui_texts estimate [--model …]         — скільки фраз без перекладу й скільки коштуватиме
     python manage.py ui_texts translate --yes [--model …] [--limit N]   — перекласти (рахунок API Anthropic)
 """
@@ -13,15 +14,30 @@ class Command(BaseCommand):
     help = "Каталог написів інтерфейсу й AI-переклад (en, de)"
 
     def add_arguments(self, parser):
-        parser.add_argument("what", choices=["collect", "estimate", "translate"])
+        parser.add_argument("what", choices=["collect", "bundled", "estimate", "translate"])
         parser.add_argument("--model", default=translate.DEFAULT_MODEL, choices=list(translate.MODELS))
         parser.add_argument("--limit", type=int, default=None)
         parser.add_argument("--yes", action="store_true", help="так, перекладати (це коштує грошей)")
+        parser.add_argument("--todo", default="", help="bundled: записати написи без перекладу в комплекті сюди")
 
-    def handle(self, what, model, limit, yes, **opts):
+    def handle(self, what, model, limit, yes, todo="", **opts):
         if what == "collect":
             res = catalog.sync()
-            self.stdout.write(f"Написів: {res['total']} · нових: {res['new']} · зникло: {res['gone']}")
+            self.stdout.write(f"Написів: {res['total']} · нових: {res['new']} · зникло: {res['gone']} · "
+                              f"перекладів з комплекту: {res['bundled']}")
+            return
+        if what == "bundled":
+            import json
+
+            from core.ui_text import bundled
+            gaps = bundled.missing()
+            self.stdout.write(f"У комплекті: {len(bundled.load())} написів · "
+                              f"у коді без перекладу в комплекті: {len(gaps)}")
+            if todo:
+                with open(todo, "w", encoding="utf-8", newline="\n") as fh:
+                    for src in gaps:
+                        fh.write(json.dumps({"s": src}, ensure_ascii=False) + "\n")
+                self.stdout.write(f"Записано: {todo}")
             return
         rows, langs = translate.todo()
         if limit:

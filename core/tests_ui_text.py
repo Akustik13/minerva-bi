@@ -12,7 +12,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from core.models import UIText, UserProfile
-from core.ui_text import catalog, extract, translate
+from core.ui_text import bundled, catalog, extract, translate
 from core.ui_text.text import edges
 
 
@@ -190,3 +190,59 @@ class PagesTests(CacheReset):
         self.assertIn(self.client.get("/admin/core/uitext/").status_code, (302, 403))
         self.assertEqual(self.client.post("/admin/core/uitext/translate/").status_code in (302, 403), True)
         self.assertEqual(translate.state(), {})                         # нічого не запущено
+
+
+class BundledTests(CacheReset):
+    """Переклади в комплекті (core/ui_text/bundled.jsonl): заповнюють лише порожнє, без AI."""
+
+    def setUp(self):
+        super().setUp()
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = Path(tmp.name)
+        self.path = self.dir / "bundled.jsonl"
+        bundled.write({"Зберегти": {"en": "Save", "de": "Speichern"},
+                       "Видно {0} з {1}": {"en": "Visible {0} of {1}", "de": "Sichtbar {0}"},     # бракує {1}
+                       "Скасувати": {"en": "Cancel", "de": "Abbrechen"}}, self.path)
+
+    def test_write_is_sorted_and_merges(self):
+        bundled.write({"Архів": {"en": "Archive"}, "Зберегти": {"de": "Sichern"}}, self.path)
+        lines = [json.loads(l) for l in self.path.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([l["uk"] for l in lines], ["Архів", "Видно {0} з {1}", "Зберегти", "Скасувати"])
+        self.assertEqual(lines[2], {"uk": "Зберегти", "en": "Save", "de": "Sichern"})
+
+    def test_apply_fills_only_missing_and_valid(self):
+        save = UIText.objects.create(key=catalog.key_of("Зберегти"), source="Зберегти",
+                                     translations={"en": {"text": "Store", "by": "human"}})
+        seen = UIText.objects.create(key=catalog.key_of("Видно {0} з {1}"), source="Видно {0} з {1}")
+        gone = UIText.objects.create(key=catalog.key_of("Скасувати"), source="Скасувати", active=False)
+        v1 = catalog.version()
+        self.assertEqual(bundled.apply(self.path), 2)                  # de «Зберегти» + en «Видно…»
+        save.refresh_from_db()
+        self.assertEqual((save.text("en"), save.translations["en"]["by"]), ("Store", "human"))   # людське — як було
+        self.assertEqual((save.text("de"), save.translations["de"]["model"]), ("Speichern", bundled.MODEL))
+        seen.refresh_from_db()
+        self.assertEqual((seen.text("en"), seen.text("de")), ("Visible {0} of {1}", ""))   # без {1} — ні
+        gone.refresh_from_db()
+        self.assertEqual(gone.translations, {})                        # неактивні — ні
+        self.assertNotEqual(catalog.version(), v1)
+        self.assertEqual(bundled.apply(self.path), 0)                  # удруге — нічого
+
+    def test_sync_applies_bundle_and_reports_missing(self):
+        tree = self.dir / "code" / "app" / "templates"
+        tree.mkdir(parents=True)
+        (tree / "page.html").write_text("<b>Зберегти</b><i>Новий напис</i>", encoding="utf-8")
+        res = catalog.sync(self.dir / "code", bundled_path=self.path)
+        self.assertEqual((res["new"], res["bundled"]), (2, 2))
+        self.assertEqual(UIText.objects.get(source="Зберегти").text("de"), "Speichern")
+        self.assertEqual(catalog.dictionary("en")["exact"], {"Зберегти": "Save"})
+        found = extract.collect(self.dir / "code")
+        self.assertEqual(bundled.missing(found, self.path), ["Новий напис"])
+
+    def test_real_bundle_is_valid(self):
+        data = bundled.load()
+        if not data:
+            self.skipTest("bundled.jsonl ще немає")
+        bad = [src for src, langs in data.items()
+               if set(langs) != set(catalog.TARGETS) or not all(translate.valid(src, t) for t in langs.values())]
+        self.assertEqual(bad[:10], [])

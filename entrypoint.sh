@@ -16,6 +16,8 @@ python manage.py collectstatic --noinput --clear
 # Переклади Django (locale/*/LC_MESSAGES/django.po → .mo): без .mo {% trans %} і gettext не перекладають
 echo "🌐 Compiling translations..."
 python manage.py compilemessages --ignore=venv --ignore=staticfiles --ignore=node_modules >/dev/null   || echo "⚠️  compilemessages failed — interface stays in Ukrainian"
+# Каталог написів інтерфейсу ← код + переклади з комплекту (core/ui_text/bundled.jsonl) — без AI, лише де перекладу немає
+python manage.py ui_texts collect || echo "⚠️  ui_texts collect failed — run «🔄 Зібрати» in «🌐 Переклади інтерфейсу»"
 
 echo "👤 Creating superuser if needed..."
 python manage.py shell -c "
