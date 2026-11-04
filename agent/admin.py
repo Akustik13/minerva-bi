@@ -1,5 +1,6 @@
 """🤖 Доручення агента й 📜 журнал — лише власні скриньки (пошта — лише її власника, і для адміністратора);
 🤖 Завдання агенту — лише свої (сторінка перевірки: ✓ / ✕ пропозицій, лист, зупинити / продовжити)."""
+import json
 from decimal import Decimal, InvalidOperation
 
 from django import forms
@@ -10,6 +11,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
 
 from agent import mail as agent_mail
 from agent import products as product_fields
@@ -80,15 +82,54 @@ class AgentRuleForm(forms.ModelForm):
         return data
 
 
+# Написи результату «🧪 Що зробив би агент» — тут, а не в JS (переклади інтерфейсу беруть їх з Python)
+_TEST_LABELS = {'not_match': '⚠️ Лист не підходить під умови:', 'to': 'Кому:', 'cc': 'Копія:', 'order': 'Замовлення:',
+                'tracking': 'трек-номер', 'subject': 'Тема:', 'att': 'Вкладення:', 'none': 'немає',
+                'opts': 'Лист піде', 'model': 'Модель AI:'}
+_TEST_JS = """(function () {
+  var URL = '/admin/agent/agentrule/%(pk)s/test/';
+  var L = JSON.parse(document.getElementById('art-labels').dataset.l);
+  document.querySelectorAll('[data-art]').forEach(function (b) {
+    b.addEventListener('click', async function () {
+      var row = document.getElementById('art-res-' + b.dataset.art), pre = row.querySelector('pre');
+      row.hidden = false; pre.textContent = '⏳ …'; b.disabled = true;
+      var csrf = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+      try {
+        var r = await fetch(URL + b.dataset.art + '/', {method: 'POST', credentials: 'same-origin',
+                                                        headers: {'X-CSRFToken': csrf}});
+        var d = await r.json();
+        if (!d.ok) { pre.textContent = '❌ ' + (d.error || ''); return; }
+        var lines = [d.outcome || ''];
+        if (!d.matches) lines.push(L.not_match + ' ' + d.why);
+        if (d.to) lines.push(L.to + ' ' + (d.to_name ? d.to_name + ' <' + d.to + '>' : d.to));
+        if (d.cc && d.cc.length) lines.push(L.cc + ' ' + d.cc.join(', '));
+        if (d.order) lines.push(L.order + ' ' + d.order + (d.tracking ? ' · ' + L.tracking + ' ' + d.tracking : ''));
+        if (d.subject) lines.push(L.subject + ' ' + d.subject);
+        if (d.attachments) lines.push(L.att + ' ' + (d.attachments.join(', ') || L.none));
+        if (d.options) lines.push(L.opts + ' ' + d.options);
+        if (d.model) lines.push(L.model + ' ' + d.model);
+        if (d.reply && d.kind !== 'mail_mark') lines.push('', d.reply);
+        pre.textContent = lines.join('\\n');
+      } catch (e) { pre.textContent = '❌ ' + e; }
+      finally { b.disabled = false; }
+    });
+  });
+})();"""
+
+
 @admin.register(AgentRule)
 class AgentRuleAdmin(admin.ModelAdmin):
     form = AgentRuleForm
     list_display = ('name', 'account', 'mode_col', 'enabled', 'conditions', 'stats', 'last_run')
     list_filter = ('enabled', 'kind', 'mode')
     search_fields = ('name', 'senders', 'subject_words', 'instruction')
-    readonly_fields = ('promote_panel', 'recent_runs', 'example_link', 'streak', 'created_by', 'created_at')
+    readonly_fields = ('promote_panel', 'recent_runs', 'example_link', 'streak', 'created_by', 'created_at',
+                       'test_panel')
     fieldsets = (
         (None, {'fields': ('promote_panel', 'name', 'enabled', 'account', 'kind')}),
+        ('🧪 Перевірити, як працює', {'fields': ('test_panel',),
+                                     'description': 'Що буде після цих налаштувань: опис, листи скриньки, що '
+                                                    'підходять, і «🧪 Що зробив би агент» на будь-якому з них.'}),
         ('Які листи — усі задані умови разом', {
             'fields': ('senders', 'subject_words', 'body_words', 'category', 'example_link'),
             'description': 'У кожному полі — по одному в рядку, підходить будь-який рядок; «Текст листа містить» — '
@@ -212,6 +253,78 @@ class AgentRuleAdmin(admin.ModelAdmin):
                 'Заплановані» на {} хв — до відправки можна скасувати.</div>', obj.streak, obj.send_delay_minutes)
         return format_html('<div style="opacity:.8">{} · без змін поспіль: {} (після {} — пропозиція надсилати '
                            'самому)</div>', obj.get_mode_display(), obj.streak, agent_mail.PROMOTE_AFTER)
+
+    @admin.display(description='Перевірка')
+    def test_panel(self, obj):
+        """🧪 Що робитиме доручення, які листи під нього підходять і що агент зробив би з листом (agent/rule_check.py)."""
+        if obj is None or not obj.pk:
+            return 'Спершу збережіть доручення — тоді тут можна перевірити його на листах скриньки.'
+        from agent import rule_check
+        plan = format_html_join('', '<li>{}</li>', ((ln,) for ln in rule_check.plan(obj)))
+        data = rule_check.candidates(obj)
+        ai = obj.kind in rule_check.AI_KINDS
+        label = '🧪 Що зробив би агент' + (' (AI)' if ai else '')
+        tip = ('Агент напише відповідь на цей лист, як «🧪 Спробувати» у пошті (виклик AI); нічого не зберігається й не '
+               'надсилається' if ai else 'Нічого не зберігається й не надсилається')
+        rows = format_html_join('', (
+            '<tr><td style="white-space:nowrap">{}</td><td>{}</td><td style="opacity:.8">{}</td><td>{}</td>'
+            '<td><button type="button" class="button" data-art="{}" title="{}">{}</button></td></tr>'
+            '<tr id="art-res-{}" hidden><td colspan="5"><pre class="art-pre"></pre></td></tr>'), (
+            (timezone.localtime(f['msg'].sent_at).strftime('%d.%m %H:%M') if f['msg'].sent_at else '',
+             _mail_link(f['msg']), f['why'],
+             (f'{STATUS_ICONS.get(f["run"].status, "")} {f["run"].get_status_display()}' if f['run']
+              else ('⚠️ ' + f['blocked'] if f['blocked'] else '')),
+             f['msg'].pk, tip, label, f['msg'].pk) for f in data['found']))
+        if data['found']:
+            table = format_html('<table style="width:100%;margin-top:4px"><tbody>{}</tbody></table>', rows)
+        else:
+            table = format_html('<div style="margin-top:4px">Жоден лист за {} днів не підходить під умови — '
+                                'перевірте «Від кого», «Тема містить», «Текст листа містить» і категорію.</div>',
+                                data['days'])
+        near = ''
+        if data['near']:
+            near = format_html(
+                '<div style="margin-top:8px;opacity:.85">Від того самого відправника, але не підійшли:<ul>{}</ul></div>',
+                format_html_join('', '<li>{} — {}</li>', ((_mail_link(n['msg']), n['why']) for n in data['near'])))
+        return format_html(
+            '<div class="art"><b>Що робитиме доручення з кожним таким листом</b><ul style="margin:4px 0 8px">{}</ul>'
+            '<div style="opacity:.8">Перевіряється збережене доручення — після змін спершу «Зберегти і продовжити '
+            'редагування». Кнопка нижче нічого не зберігає й не надсилає.</div>'
+            '<div style="margin-top:10px"><b>Листи за {} днів, що підходять: {}</b> '
+            '<span style="opacity:.7">(переглянуто {} листів Вхідних)</span></div>{}{}</div>'
+            '<style>.art-pre{{white-space:pre-wrap;margin:4px 0;padding:8px 10px;border-radius:6px;'
+            'background:var(--darkened-bg,rgba(127,127,127,.12));font:inherit;max-height:420px;overflow:auto}}</style>'
+            '<div id="art-labels" data-l="{}" hidden></div><script>{}</script>',
+            plan, data['days'], len(data['found']) if len(data['found']) < rule_check.SHOW
+            else f'{rule_check.SHOW}+', data['scanned'], table, near, json.dumps(_TEST_LABELS, ensure_ascii=False),
+            mark_safe(_TEST_JS % {'pk': obj.pk}))
+
+    def get_urls(self):
+        from django.urls import path
+        own = [path('<int:pk>/test/<int:msg_pk>/', self.admin_site.admin_view(self.test_view),
+                    name='agent_agentrule_test')]
+        return own + super().get_urls()
+
+    def test_view(self, request, pk, msg_pk):
+        """POST: що агент зробив би з цим листом (agent/rule_check.one) — JSON; нічого не зберігає й не надсилає."""
+        from django.http import JsonResponse
+        from email_assistant.models import EmailMessage
+        from agent import rule_check
+        if request.method != 'POST':
+            return JsonResponse({'ok': False, 'error': 'Лише POST'}, status=405)
+        rule = self.get_queryset(request).filter(pk=pk).first()
+        if rule is None:
+            return JsonResponse({'ok': False, 'error': 'Доручення не знайдено'}, status=404)
+        if not self.has_change_permission(request, rule):
+            return JsonResponse({'ok': False, 'error': 'Немає права змінювати доручення'}, status=403)
+        msg = EmailMessage.objects.filter(pk=msg_pk, account_id=rule.account_id).select_related('account').first()
+        if msg is None:
+            return JsonResponse({'ok': False, 'error': 'Лист не знайдено в скриньці доручення'}, status=404)
+        try:
+            out = rule_check.one(rule, msg)
+        except Exception as e:  # noqa: BLE001 — показати, а не 500
+            return JsonResponse({'ok': False, 'error': f'{type(e).__name__}: {e}'[:300]})
+        return JsonResponse({'ok': True, 'kind': rule.kind, **out})
 
     @admin.display(description='Створено з листа')
     def example_link(self, obj):
