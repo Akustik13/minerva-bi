@@ -124,6 +124,7 @@ TEMPLATES = [
             "core.context_processors.user_modules",
             "core.context_processors.language_context",
             "core.context_processors.ui_context",
+            "core.context_processors.public_registration",
         ]},
     }
 ]
@@ -194,6 +195,11 @@ AUTHENTICATION_BACKENDS = [
 # або встанови EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 # та EMAIL_HOST / EMAIL_PORT / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD через env.
 EMAIL_BACKEND = 'config.email_backend.NotificationSettingsEmailBackend'
+
+# Самореєстрація нових фірм (/register/, tabele/views.py) — лише для сайту продажу Minerva. На робочій установці
+# всі акаунти в одній базі: зареєстрований сторонній бачив би дані цієї фірми. Тому за замовчуванням вимкнено;
+# увімкнено — реєстрація лише підтверджує email, доступ відкриває адміністратор вручну.
+PUBLIC_REGISTRATION = os.getenv("MINERVA_PUBLIC_REGISTRATION", "0") == "1"
 DEFAULT_FROM_EMAIL = 'Minerva BI <noreply@minerva-bi.local>'
 PASSWORD_RESET_TIMEOUT = 259200  # 3 дні
 

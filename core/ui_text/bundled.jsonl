@@ -1127,7 +1127,9 @@
 {"uk": "Email помилка: {0}", "en": "Email error: {0}", "de": "E-Mail-Fehler: {0}"}
 {"uk": "Email підтверджено", "en": "Email confirmed", "de": "E-Mail bestätigt"}
 {"uk": "Email підтверджено — {0}", "en": "Email confirmed — {0}", "de": "E-Mail bestätigt – {0}"}
+{"uk": "Email підтверджено — доступ закрито, доки ви його не відкриєте", "en": "Email confirmed — access stays closed until you open it", "de": "E-Mail bestätigt — der Zugang bleibt gesperrt, bis Sie ihn freigeben"}
 {"uk": "Email підтверджено: {0}", "en": "Email confirmed: {0}", "de": "E-Mail bestätigt: {0}"}
+{"uk": "Email підтвердив", "en": "Email confirmed", "de": "E-Mail bestätigt"}
 {"uk": "Email сповіщення", "en": "Email notifications", "de": "E-Mail-Benachrichtigungen"}
 {"uk": "Email сповіщення (SMTP, алерти критичного складу)", "en": "Email notifications (SMTP, critical stock alerts)", "de": "E-Mail-Benachrichtigungen (SMTP, Warnungen bei kritischem Bestand)"}
 {"uk": "Email увімкнено", "en": "Email enabled", "de": "E-Mail aktiviert"}
@@ -2610,6 +2612,7 @@
 {"uk": "{0}: {1} шт. × {2} = {3}", "en": "{0}: {1} pcs × {2} = {3}", "de": "{0}: {1} Stk. × {2} = {3}"}
 {"uk": "{0}: {1} — таких адрес API немає", "en": "{0}: {1} — no such API endpoints", "de": "{0}: {1} — solche API-Adressen gibt es nicht"}
 {"uk": "{0}: «від» більше за «до».", "en": "{0}: “from” is greater than “to”.", "de": "{0}: „von“ ist größer als „bis“."}
+{"uk": "{0}: Компанія: {1} Власник: {2}", "en": "{0}: Company: {1} Owner: {2}", "de": "{0}: Firma: {1} Inhaber: {2}"}
 {"uk": "{0}: ПОМИЛКА — {1}", "en": "{0}: ERROR — {1}", "de": "{0}: FEHLER — {1}"}
 {"uk": "{0}: автоматичне відслідковування недоступне для {1}. Перевір вручну: {2}", "en": "{0}: automatic tracking is not available for {1}. Check manually: {2}", "de": "{0}: Automatische Sendungsverfolgung ist für {1} nicht verfügbar. Prüfen Sie manuell: {2}"}
 {"uk": "{0}: адреси Minerva немає «{1}»", "en": "{0}: no such Minerva address “{1}”", "de": "{0}: Minerva-Adresse „{1}“ existiert nicht"}
@@ -3250,6 +3253,7 @@
 {"uk": "Адмінка сайту", "en": "Site admin", "de": "Website-Admin"}
 {"uk": "Адміністративний доступ до всіх модулів.", "en": "Administrative access to all modules.", "de": "Administrativer Zugriff auf alle Module."}
 {"uk": "Адміністратор", "en": "Administrator", "de": "Administrator"}
+{"uk": "Адміністратор відкриє вам доступ — тоді увійдіть", "en": "The administrator opens your access — then log in", "de": "Der Administrator gibt Ihren Zugang frei — dann melden Sie sich an"}
 {"uk": "Адміністратор сайту — усі налаштування, ключі й паролі", "en": "Site administrator — all settings, keys and passwords", "de": "Website-Administrator – alle Einstellungen, Schlüssel und Passwörter"}
 {"uk": "Адміністратор — усі права", "en": "Administrator — all rights", "de": "Administrator – alle Rechte"}
 {"uk": "Адміністратор, який створив цього користувача", "en": "The administrator who created this user", "de": "Der Administrator, der diesen Benutzer angelegt hat"}
@@ -3324,6 +3328,7 @@
 {"uk": "Акаунт тестового магазину: замість справжньої Kundennummer.", "en": "Test shop account: instead of a real Kundennummer.", "de": "Konto des Testshops: anstelle einer echten Kundennummer."}
 {"uk": "Акаунт: {0}", "en": "Account: {0}", "de": "Konto: {0}"}
 {"uk": "Акаунти", "en": "Accounts", "de": "Konten"}
+{"uk": "Акаунти в цій Minerva створює адміністратор фірми.", "en": "Accounts in this Minerva are created by the company administrator.", "de": "Konten in dieser Minerva legt der Administrator der Firma an."}
 {"uk": "Акаунти кабінету", "en": "Customer accounts", "de": "Kundenkonten"}
 {"uk": "Акаунти клієнтів", "en": "Customer accounts", "de": "Kundenkonten"}
 {"uk": "Акаунти магазину", "en": "Shop accounts", "de": "Webshop-Konten"}
@@ -4806,6 +4811,7 @@
 {"uk": "Вітаємо, {0}!", "en": "Welcome, {0}!", "de": "Willkommen, {0}!"}
 {"uk": "Вітаємо, {0}! Ваш акаунт активовано. Пробний період: до {1}. Пакет: {2} Увійти в систему: {3}/admin/ Email: {4} Пароль: той що ви вказали при реєстрації", "en": "Welcome, {0}! Your account has been activated. Trial period: until {1}. Package: {2} Log in: {3}/admin/ Email: {4} Password: the one you specified at registration", "de": "Willkommen, {0}! Ihr Konto wurde aktiviert. Testzeitraum: bis {1}. Paket: {2} Anmelden: {3}/admin/ E-Mail: {4} Passwort: das bei der Registrierung angegebene"}
 {"uk": "Вітаємо, {0}! Ви зареєструвались в {1}. Підтвердіть email перейшовши за посиланням: {2} Посилання дійсне 48 годин. Якщо ви не реєструвались — проігноруйте цей лист.", "en": "Welcome, {0}! You have registered with {1}. Confirm your email by following the link: {2} The link is valid for 48 hours. If you did not register, please ignore this email.", "de": "Willkommen, {0}! Sie haben sich bei {1} registriert. Bestätigen Sie Ihre E-Mail über diesen Link: {2} Der Link ist 48 Stunden gültig. Wenn Sie sich nicht registriert haben, ignorieren Sie diese E-Mail."}
+{"uk": "Вітаємо, {0}! Ви зареєструвались в {1}. Підтвердіть email перейшовши за посиланням: {2} Посилання дійсне {3} годин. Доступ до системи відкриє адміністратор. Якщо ви не реєструвались — проігноруйте цей лист.", "en": "Hello, {0}! You have registered with {1}. Confirm your email by following the link: {2} The link is valid for {3} hours. The administrator will open your access to the system. If you did not register, ignore this email.", "de": "Hallo {0}! Sie haben sich bei {1} registriert. Bestätigen Sie Ihre E-Mail über den Link: {2} Der Link ist {3} Stunden gültig. Den Zugang zum System gibt der Administrator frei. Wenn Sie sich nicht registriert haben, ignorieren Sie diese E-Mail."}
 {"uk": "ГБ", "en": "GB", "de": "GB"}
 {"uk": "ГРЕЦІЯ", "en": "GREECE", "de": "GRIECHENLAND"}
 {"uk": "Габаритні розміри корпусу (Д×Ш×В)", "en": "Overall dimensions of the housing (L×W×H)", "de": "Außenmaße des Gehäuses (L×B×H)"}
@@ -5528,6 +5534,7 @@
 {"uk": "Дуже великий (24px)", "en": "Very large (24px)", "de": "Sehr groß (24px)"}
 {"uk": "Дуже широка 720", "en": "Very wide 720", "de": "Sehr breit 720"}
 {"uk": "Дякуємо за запит. Пропонуємо", "en": "Thank you for your request. We offer", "de": "Vielen Dank für Ihre Anfrage. Wir bieten Ihnen an"}
+{"uk": "Дякуємо! Доступ до системи відкриє адміністратор.", "en": "Thank you! The administrator will open your access to the system.", "de": "Danke! Den Zugang zum System gibt der Administrator frei."}
 {"uk": "Дякуємо! Повідомлення надіслано на", "en": "Thank you! The message has been sent to", "de": "Vielen Dank! Die Nachricht wurde gesendet an"}
 {"uk": "Діагностика", "en": "Diagnostics", "de": "Diagnose"}
 {"uk": "Діагностика AI Tools", "en": "AI Tools diagnostics", "de": "Diagnose der AI Tools"}
@@ -5727,6 +5734,7 @@
 {"uk": "Забагато невдалих спроб — зачекайте {0} хвилин.", "en": "Too many failed attempts — wait {0} minutes.", "de": "Zu viele fehlgeschlagene Versuche – warten Sie {0} Minuten."}
 {"uk": "Забагато невдалих спроб. Спробуйте пізніше.", "en": "Too many failed attempts. Try again later.", "de": "Zu viele fehlgeschlagene Versuche. Versuchen Sie es später erneut."}
 {"uk": "Забагато переадресацій", "en": "Too many redirects", "de": "Zu viele Weiterleitungen"}
+{"uk": "Забагато реєстрацій з вашої адреси. Спробуйте пізніше.", "en": "Too many registrations from your address. Please try again later.", "de": "Zu viele Registrierungen von Ihrer Adresse. Bitte versuchen Sie es später erneut."}
 {"uk": "Заблок.", "en": "Blocked", "de": "Gesperrt"}
 {"uk": "Заблокований", "en": "Blocked", "de": "Gesperrt"}
 {"uk": "Заблоковано", "en": "Blocked", "de": "Gesperrt"}
@@ -7212,6 +7220,7 @@
 {"uk": "Коли списувати залишки", "en": "When to write off stock", "de": "Wann der Bestand ausgebucht wird"}
 {"uk": "Коли треба перевірити: перший раз, змінились дані, є зауваження", "en": "When a check is needed: first time, data changed, there are warnings", "de": "Wann geprüft werden soll: beim ersten Mal, bei geänderten Daten, bei Hinweisen"}
 {"uk": "Коли у відправлення є етикетка або трек-номер, а замовлення ще не «Відправлено», на сторінці відправлення з'являється банер з кнопками", "en": "When a shipment has a label or tracking number and the order is not yet “Shipped”, a banner with buttons appears on the shipment page", "de": "Wenn eine Sendung ein Etikett oder eine Sendungsnummer hat und der Auftrag noch nicht „Versendet“ ist, erscheint auf der Sendungsseite ein Banner mit Schaltflächen"}
+{"uk": "Коли це станеться, ви зможете увійти зі своїм email і паролем.", "en": "Once that happens, you can log in with your email and password.", "de": "Danach können Sie sich mit Ihrer E-Mail und Ihrem Passwort anmelden."}
 {"uk": "Колонка", "en": "Column", "de": "Spalte"}
 {"uk": "Колонка \"Відправлено\"", "en": "The \"Shipped\" column", "de": "Die Spalte \"Versendet\""}
 {"uk": "Колонка «{0}»", "en": "Column “{0}”", "de": "Spalte „{0}“"}
@@ -8628,6 +8637,7 @@
 {"uk": "Не знайдено рядків замовлення (orderDetailId відсутні)", "en": "No order lines found (orderDetailId missing)", "de": "Keine Auftragszeilen gefunden (orderDetailId fehlen)"}
 {"uk": "Не знайдено.", "en": "Not found.", "de": "Nicht gefunden."}
 {"uk": "Не знайшов «", "en": "Could not find “", "de": "Nicht gefunden: „"}
+{"uk": "Не знаєте цю фірму — видаліть акаунт", "en": "Don't know this company — delete the account", "de": "Firma unbekannt — Konto löschen"}
 {"uk": "Не знижувати статус при синхронізації (наприклад «В дорозі» → «Етикетка готова» буде ігноровано). Рекомендовано: увімкнено.", "en": "Do not lower the status on synchronization (for example “In transit” → “Label ready” will be ignored). Recommended: enabled.", "de": "Status bei der Synchronisierung nicht senken (z. B. „Unterwegs“ → „Etikett bereit“ wird ignoriert). Empfohlen: aktiviert."}
 {"uk": "Не копіюється", "en": "Not copied", "de": "Wird nicht kopiert"}
 {"uk": "Не може увійти в Minerva (неактивний або не співробітник).", "en": "Cannot sign in to Minerva (inactive or not an employee).", "de": "Kann sich nicht bei Minerva anmelden (inaktiv oder kein Mitarbeiter)."}
@@ -8976,6 +8986,7 @@
 {"uk": "Новий Packing List", "en": "New Packing List", "de": "Neue Packing List"}
 {"uk": "Новий order → автоматично в Minerva", "en": "New order → automatically in Minerva", "de": "Neuer Order → automatisch in Minerva"}
 {"uk": "Новий акаунт покупця — команді", "en": "New customer account — to the team", "de": "Neues Kundenkonto – an das Team"}
+{"uk": "Новий акаунт через реєстрацію", "en": "New account via registration", "de": "Neues Konto über die Registrierung"}
 {"uk": "Новий вигляд Minerva", "en": "New Minerva look", "de": "Neue Minerva-Ansicht"}
 {"uk": "Новий залишок (абсолютне значення)", "en": "New stock level (absolute value)", "de": "Neuer Bestand (absoluter Wert)"}
 {"uk": "Новий залишок (шт.) — для всіх {0} лістингів", "en": "New stock (pcs) — for all {0} listings", "de": "Neuer Bestand (Stk.) — für alle {0} Listings"}
@@ -9664,6 +9675,7 @@
 {"uk": "Очікує оплати", "en": "Awaiting payment", "de": "Zahlung ausstehend"}
 {"uk": "Очікує передачі", "en": "Awaiting handover", "de": "Wartet auf Übergabe"}
 {"uk": "Очікує підтвердження email", "en": "Awaiting email confirmation", "de": "Wartet auf E-Mail-Bestätigung"}
+{"uk": "Очікує підтвердження email · доступу немає", "en": "Waiting for email confirmation · no access", "de": "Wartet auf E-Mail-Bestätigung · kein Zugang"}
 {"uk": "Очікується", "en": "Expected", "de": "Erwartet"}
 {"uk": "Очікується (відкриті закупівлі)", "en": "Expected (open purchase orders)", "de": "Erwartet (offene Bestellungen)"}
 {"uk": "Очікується JSON-об'єкт.", "en": "A JSON object is expected.", "de": "Ein JSON-Objekt wird erwartet."}
@@ -9725,6 +9737,7 @@
 {"uk": "Пакет модулів", "en": "Module bundle", "de": "Modulpaket"}
 {"uk": "Пакет і статус", "en": "Bundle and status", "de": "Paket und Status"}
 {"uk": "Пакет: {0}", "en": "Package: {0}", "de": "Paket: {0}"}
+{"uk": "Пакет: {0} Країна: {1} IP: {2} Статус: {3} Не знаєте цю фірму — видаліть акаунт: {4}/admin/core/tenantaccount/ {5}/admin/auth/user/?is_active__exact=0", "en": "Package: {0} Country: {1} IP: {2} Status: {3} Don't know this company — delete the account: {4}/admin/core/tenantaccount/ {5}/admin/auth/user/?is_active__exact=0", "de": "Paket: {0} Land: {1} IP: {2} Status: {3} Firma unbekannt — Konto löschen: {4}/admin/core/tenantaccount/ {5}/admin/auth/user/?is_active__exact=0"}
 {"uk": "Пакет: {0} Країна: {1} IP: {2} Статус: Очікує підтвердження email Керувати: {3}/admin/core/tenantaccount/", "en": "Package: {0} Country: {1} IP: {2} Status: Waiting for email confirmation Manage: {3}/admin/core/tenantaccount/", "de": "Paket: {0} Land: {1} IP: {2} Status: Wartet auf E-Mail-Bestätigung Verwalten: {3}/admin/core/tenantaccount/"}
 {"uk": "Пакети модулів", "en": "Module bundles", "de": "Modulpakete"}
 {"uk": "Пакистан", "en": "Pakistan", "de": "Pakistan"}
@@ -10697,6 +10710,7 @@
 {"uk": "Посилання (пріоритет) → потім локальний файл", "en": "Link (priority) → then local file", "de": "Link (Priorität) → danach lokale Datei"}
 {"uk": "Посилання вже використано або термін дії минув.", "en": "The link has already been used or has expired.", "de": "Der Link wurde bereits verwendet oder ist abgelaufen."}
 {"uk": "Посилання дійсне 48 годин.", "en": "The link is valid for 48 hours.", "de": "Der Link ist 48 Stunden gültig."}
+{"uk": "Посилання дійсне {0} годин. Доступ до системи відкриє адміністратор.", "en": "The link is valid for {0} hours. The administrator will open your access to the system.", "de": "Der Link ist {0} Stunden gültig. Den Zugang zum System gibt der Administrator frei."}
 {"uk": "Посилання діє 3 дні.", "en": "The link is valid for 3 days.", "de": "Der Link ist 3 Tage gültig."}
 {"uk": "Посилання діє 3 дні. Якщо ви не запитували скидання пароля — проігноруйте цей лист. --- Minerva Business Intelligence System", "en": "The link is valid for 3 days. If you did not request a password reset, ignore this e-mail. --- Minerva Business Intelligence System", "de": "Der Link ist 3 Tage gültig. Falls Sie das Zurücksetzen des Passworts nicht angefordert haben, ignorieren Sie diese E-Mail. --- Minerva Business Intelligence System"}
 {"uk": "Посилання з листа", "en": "Link from e-mail", "de": "Link aus E-Mail"}
@@ -10704,6 +10718,7 @@
 {"uk": "Посилання з листів", "en": "Links from e-mails", "de": "Links aus E-Mails"}
 {"uk": "Посилання за правилом", "en": "Link by rule", "de": "Link nach Regel"}
 {"uk": "Посилання записано: {0} товарів. «🖼 Фото й даташити» магазину перевірить їх як змінені (автоматично, якщо ввімкнено).", "en": "Links saved: {0} products. The shop’s “🖼 Photos and datasheets” will check them as changed (automatically, if enabled).", "de": "Links gespeichert: {0} Artikel. „🖼 Fotos und Datenblätter“ des Shops prüft sie als geändert (automatisch, wenn aktiviert)."}
+{"uk": "Посилання застаріло. Зверніться до адміністратора.", "en": "The link has expired. Please contact the administrator.", "de": "Der Link ist abgelaufen. Bitte wenden Sie sich an den Administrator."}
 {"uk": "Посилання збере правило з Налаштувань складу. Вид, для якого вписано готове посилання, тут не діє.", "en": "The link will be built by the rule from the Stock settings. A type for which a ready-made link is entered does not apply here.", "de": "Den Link erzeugt die Regel aus den Lagereinstellungen. Eine Art, für die ein fertiger Link eingetragen ist, gilt hier nicht."}
 {"uk": "Посилання й ім'я файлу на момент перевірки; зміна в картці → перевірити знову.", "en": "The link and file name at the time of the check; a change on the card → check again.", "de": "Link und Dateiname zum Zeitpunkt der Prüfung; Änderung in der Karte → erneut prüfen."}
 {"uk": "Посилання має починатися з http:// або https://, напр. https://example.com/download.php?file={0}.pdf", "en": "The link must start with http:// or https://, e.g. https://example.com/download.php?file={0}.pdf", "de": "Der Link muss mit http:// oder https:// beginnen, z. B. https://example.com/download.php?file={0}.pdf"}
@@ -11558,6 +11573,8 @@
 {"uk": "Решта — на підтвердження (захист від масової помилки, напр. неправильного курсу).", "en": "The rest require confirmation (protection against a mass error, e.g. a wrong exchange rate).", "de": "Der Rest erfordert eine Bestätigung (Schutz vor einem Massenfehler, z. B. bei falschem Wechselkurs)."}
 {"uk": "Реєстр модулів", "en": "Module registry", "de": "Modulregister"}
 {"uk": "Реєстраційний суд (напр. Munich, HRB 208657)", "en": "Registry court (e.g. Munich, HRB 208657)", "de": "Registergericht (z. B. Munich, HRB 208657)"}
+{"uk": "Реєстрацію закрито", "en": "Registration is closed", "de": "Registrierung geschlossen"}
+{"uk": "Реєстрацію закрито — {0}", "en": "Registration is closed — {0}", "de": "Registrierung geschlossen — {0}"}
 {"uk": "Реєстрація", "en": "Registration", "de": "Registrierung"}
 {"uk": "Реєстрація з підтвердженням email, вхід, «забули пароль», статус замовлень і трекінг, адреси, кошик на всіх пристроях. Акаунти — лише в Minerva, листи надсилає Minerva.", "en": "Registration with email confirmation, login, “forgot password”, order status and tracking, addresses, a cart on all devices. Accounts exist only in Minerva, and Minerva sends the emails.", "de": "Registrierung mit E-Mail-Bestätigung, Anmeldung, „Passwort vergessen“, Auftragsstatus und Sendungsverfolgung, Adressen, Warenkorb auf allen Geräten. Konten gibt es nur in Minerva, die E-Mails versendet Minerva."}
 {"uk": "Реєстрація з підтвердженням email, вхід, скидання пароля, статус замовлень і кошик на сайті. Акаунти зберігаються лише в Minerva; сайт тримає тільки ключ сесії в cookie. Ключу сайту додайте права «Акаунти покупців — читання» і «— запис». Листи покупцям надсилає Minerva — з «✉️ Пошта магазину» вище.", "en": "Registration with email confirmation, login, password reset, order status and cart on the site. Accounts are stored only in Minerva; the site keeps only the session key in a cookie. Give the site’s key the permissions “Customer accounts — read” and “— write”. Emails to customers are sent by Minerva — from “✉️ Shop mail” above.", "de": "Registrierung mit E-Mail-Bestätigung, Anmeldung, Zurücksetzen des Passworts, Auftragsstatus und Warenkorb auf der Website. Konten werden nur in Minerva gespeichert; die Website hält nur den Sitzungsschlüssel in einem Cookie. Geben Sie dem Schlüssel der Website die Berechtigungen „Kundenkonten — Lesen“ und „— Schreiben“. E-Mails an Kunden sendet Minerva — aus „✉️ Shop-E-Mail“ oben."}
@@ -11831,6 +11848,7 @@
 {"uk": "Само звужується до значків", "en": "Narrows to icons automatically", "de": "Wird automatisch auf Symbole verkleinert"}
 {"uk": "Само звужується до значків, коли відкрита панель праворуч і списку тісно або вікно вужче за 1200 px", "en": "Collapses to icons by itself when the right-hand panel is open and the list is cramped, or the window is narrower than 1200 px", "de": "Wird automatisch auf Symbole verkleinert, wenn das rechte Panel geöffnet ist und die Liste zu wenig Platz hat oder das Fenster schmaler als 1200 px ist"}
 {"uk": "Самоа", "en": "Samoa", "de": "Samoa"}
+{"uk": "Самореєстрацію закрито. Доступ до Minerva видає адміністратор вашої фірми.", "en": "Self-registration is closed. Access to Minerva is given by your company administrator.", "de": "Die Selbstregistrierung ist geschlossen. Zugang zu Minerva erteilt der Administrator Ihrer Firma."}
 {"uk": "Самостійно — лише зміни до, %", "en": "Automatically — only changes up to, %", "de": "Automatisch — nur Änderungen bis, %"}
 {"uk": "Самостійно — не більше товарів за раз", "en": "Automatically — max. products at a time", "de": "Automatisch — höchstens so viele Artikel pro Durchlauf"}
 {"uk": "Самохостинг або Enterprise", "en": "Self-hosting or Enterprise", "de": "Selbst-Hosting oder Enterprise"}
@@ -14373,6 +14391,7 @@
 {"uk": "Якщо вже існує — трекінг і кур'єра буде оновлено.", "en": "If one already exists, the tracking and courier will be updated.", "de": "Falls bereits eine vorhanden ist, werden Tracking und Kurier aktualisiert."}
 {"uk": "Якщо ви не запитували скидання пароля — проігноруйте цей лист.", "en": "If you did not request a password reset, ignore this e-mail.", "de": "Falls Sie das Zurücksetzen des Passworts nicht angefordert haben, ignorieren Sie diese E-Mail."}
 {"uk": "Якщо ви не реєструвались — проігноруйте цей лист.", "en": "If you did not register, please ignore this email.", "de": "Wenn Sie sich nicht registriert haben, ignorieren Sie diese E-Mail."}
+{"uk": "Якщо ви тут працюєте — попросіть його надіслати запрошення.", "en": "If you work here, ask them to send you an invitation.", "de": "Wenn Sie hier arbeiten, bitten Sie ihn um eine Einladung."}
 {"uk": "Якщо вказано — використовується замість дефолтів ролі", "en": "If specified, used instead of the role defaults", "de": "Wenn angegeben, wird dies anstelle der Standardwerte der Rolle verwendet"}
 {"uk": "Якщо вказано — правило застосовується ТІЛЬКИ для трекінг-номерів з цим префіксом. Приклади: 1Z (UPS), JD (DHL Paket), 7489 (DHL Express). Порожньо = матчить за типом перевізника.", "en": "If specified, the rule applies ONLY to tracking numbers with this prefix. Examples: 1Z (UPS), JD (DHL Paket), 7489 (DHL Express). Empty = matches by carrier type.", "de": "Wenn angegeben, gilt die Regel NUR für Sendungsnummern mit diesem Präfix. Beispiele: 1Z (UPS), JD (DHL Paket), 7489 (DHL Express). Leer = Zuordnung nach Typ des Versanddienstleisters."}
 {"uk": "Якщо вкл — завантажити свій PDF інвойс замість UPS автогенерації", "en": "If enabled — upload your own PDF invoice instead of UPS auto-generation", "de": "Wenn aktiviert — eigene PDF-Rechnung anstelle der UPS-Autogenerierung hochladen"}

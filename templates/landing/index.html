@@ -441,9 +441,11 @@ h1 .l2 {
       <button class="lang-btn" onclick="setLang('en')">EN</button>
     </div>
     <div class="header-actions">
+      {% if PUBLIC_REGISTRATION %}
       <a href="/register/" class="btn-ghost" data-li="uk">Реєстрація</a>
       <a href="/register/" class="btn-ghost" data-li="de" style="display:none">Registrieren</a>
       <a href="/register/" class="btn-ghost" data-li="en" style="display:none">Sign up</a>
+      {% endif %}
       <a href="/admin/login/" class="btn-ghost accent" data-li="uk">Увійти</a>
       <a href="/admin/login/" class="btn-ghost accent" data-li="de" style="display:none">Anmelden</a>
       <a href="/admin/login/" class="btn-ghost accent" data-li="en" style="display:none">Login</a>
@@ -10058,7 +10060,7 @@ font-family="Microsoft YaHei" font-size="8.13913" font-weight="400" font-style="
   <p class="latin">NOCTUA MINERVAE · СОВА МІНЕРВИ ЗЛІТАЄ В СУТІНКИ</p>
 
   <div class="cta-wrap">
-    <a href="/register/" class="cta-primary" onclick="toggleOwl()">
+    <a href="{% if PUBLIC_REGISTRATION %}/register/{% else %}mailto:info@minerva-bi.com{% endif %}" class="cta-primary" onclick="toggleOwl()">
       <span data-li="uk">🏛️ &nbsp;Спробувати безкоштовно</span>
       <span data-li="de" style="display:none">🏛️ &nbsp;Kostenlos testen</span>
       <span data-li="en" style="display:none">🏛️ &nbsp;Start free trial</span>
@@ -10337,7 +10339,7 @@ font-family="Microsoft YaHei" font-size="8.13913" font-weight="400" font-style="
       <li><span data-li="uk">Email-сповіщення</span><span data-li="de" style="display:none">E-Mail-Benachrichtigungen</span><span data-li="en" style="display:none">Email notifications</span></li>
       <li><span data-li="uk">Хостинг включено</span><span data-li="de" style="display:none">Hosting inklusive</span><span data-li="en" style="display:none">Hosting included</span></li>
     </ul>
-    <a href="/register/?pkg=starter" class="plan-cta outline"><span data-li="uk">Спробувати</span><span data-li="de" style="display:none">Testen</span><span data-li="en" style="display:none">Try free</span></a>
+    <a href="{% if PUBLIC_REGISTRATION %}/register/?pkg=starter{% else %}mailto:info@minerva-bi.com{% endif %}" class="plan-cta outline"><span data-li="uk">Спробувати</span><span data-li="de" style="display:none">Testen</span><span data-li="en" style="display:none">Try free</span></a>
   </div>
 
   <div class="plan featured">
@@ -10354,7 +10356,7 @@ font-family="Microsoft YaHei" font-size="8.13913" font-weight="400" font-style="
       <li><span data-li="uk">UPS інтеграція</span><span data-li="de" style="display:none">UPS-Integration</span><span data-li="en" style="display:none">UPS integration</span></li>
       <li><span data-li="uk">Пріоритетна підтримка</span><span data-li="de" style="display:none">Prioritätssupport</span><span data-li="en" style="display:none">Priority support</span></li>
     </ul>
-    <a href="/register/?pkg=business" class="plan-cta"><span data-li="uk">Спробувати</span><span data-li="de" style="display:none">Testen</span><span data-li="en" style="display:none">Try free</span></a>
+    <a href="{% if PUBLIC_REGISTRATION %}/register/?pkg=business{% else %}mailto:info@minerva-bi.com{% endif %}" class="plan-cta"><span data-li="uk">Спробувати</span><span data-li="de" style="display:none">Testen</span><span data-li="en" style="display:none">Try free</span></a>
   </div>
 
   <div class="plan">
@@ -10387,8 +10389,10 @@ font-family="Microsoft YaHei" font-size="8.13913" font-weight="400" font-style="
     <span>MINERVA BUSINESS INTELLIGENCE SYSTEM · SAPIENTIA ET VERITAS</span>
     <span>
       <a href="/admin/login/"><span data-li="uk">Увійти</span><span data-li="de" style="display:none">Anmelden</span><span data-li="en" style="display:none">Login</span></a>
+      {% if PUBLIC_REGISTRATION %}
       &nbsp;·&nbsp;
       <a href="/register/"><span data-li="uk">Реєстрація</span><span data-li="de" style="display:none">Registrieren</span><span data-li="en" style="display:none">Register</span></a>
+      {% endif %}
       &nbsp;·&nbsp;
       <a href="mailto:info@minerva-bi.com"><span data-li="uk">Контакт</span><span data-li="de" style="display:none">Kontakt</span><span data-li="en" style="display:none">Contact</span></a>
     </span>

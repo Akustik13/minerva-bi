@@ -1,0 +1,16 @@
+{% extends "registration/base_public.html" %}
+{% block title %}Реєстрацію закрито — {{ company_name }}{% endblock %}
+{% block body %}
+<div class="card" style="text-align:center">
+  <div style="font-size:56px;margin-bottom:20px">🔒</div>
+  <h2>Реєстрацію закрито</h2>
+  <p class="sub" style="margin-bottom:24px">
+    Акаунти в цій Minerva створює адміністратор фірми.<br>
+    Якщо ви тут працюєте — попросіть його надіслати запрошення.
+  </p>
+  <a href="/admin/login/" class="btn" style="display:inline-block;
+     text-decoration:none;padding:12px 28px;width:auto;margin-top:0">
+    Увійти →
+  </a>
+</div>
+{% endblock %}

@@ -119,8 +119,10 @@ html,body{height:100%;font-family:'Crimson Pro',Georgia,serif;background:var(--b
     </form>
     <div class="link-row">
       <a href="{% url 'password_reset' %}">Забули пароль?</a>
+      {% if PUBLIC_REGISTRATION %}
       &nbsp;·&nbsp;
       <a href="/register/">Реєстрація</a>
+      {% endif %}
     </div>
   </div>
 </div>

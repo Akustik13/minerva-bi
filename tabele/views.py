@@ -1,11 +1,15 @@
+import logging
 import secrets
+from datetime import timedelta
 
-from django.contrib.auth import login
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
+
+logger = logging.getLogger(__name__)
 
 
 def landing_view(request):
@@ -69,18 +73,58 @@ def contact_view(request):
 
 
 # ── Registration ─────────────────────────────────────────────────────────────
+#
+# Самореєстрація нових фірм — лише коли settings.PUBLIC_REGISTRATION (env MINERVA_PUBLIC_REGISTRATION=1).
+# Minerva не розділяє фірми: усі акаунти в одній базі. Тому реєстрація ніколи сама не відкриває доступ —
+# акаунт неактивний, без доступу до адмінки й з роллю «Лише перегляд»; посилання з листа лише підтверджує email,
+# а доступ (активний, співробітник, роль) відкриває адміністратор вручну в «Користувачах».
+
+CLOSED_REASON = 'Самореєстрацію закрито. Доступ до Minerva видає адміністратор вашої фірми.'
+VERIFY_HOURS = 48                  # посилання з листа «Підтвердіть email» діє стільки годин
+REGISTER_PER_HOUR = 3              # реєстрацій з однієї адреси за годину
+REGISTER_ROLE = 'readonly'         # роль нового акаунта (до рішення адміністратора)
+
+
+def registration_open() -> bool:
+    return bool(getattr(settings, 'PUBLIC_REGISTRATION', False))
+
+
+def _closed(request):
+    from config.models import SystemSettings
+    return render(request, 'registration/register_closed.html', {
+        'company_name': SystemSettings.get().company_name,
+    }, status=404)
+
+
+def _register_throttled(ip: str) -> bool:
+    """Не більше REGISTER_PER_HOUR реєстрацій з однієї адреси за годину (спільний кеш процесів gunicorn)."""
+    from core.shared_cache import cache
+    key = f'register-ip:{ip or "unknown"}'
+    try:
+        if cache.add(key, 1, 3600):
+            return False
+        return cache.incr(key) > REGISTER_PER_HOUR
+    except Exception:
+        return False
+
 
 def register_view(request):
-    """Registration page for new clients."""
+    """Registration page for new clients (лише коли самореєстрацію увімкнено)."""
+    if not registration_open():
+        return _closed(request)
     if request.user.is_authenticated and request.user.is_staff:
         return redirect('/admin/')
 
     from core.forms import ClientRegistrationForm
     from core.models import TenantAccount, AuditLog
+    from core.utils import client_ip
     from config.models import SystemSettings
 
     if request.method == 'POST':
         form = ClientRegistrationForm(request.POST)
+        ip = client_ip(request) or ''
+        if form.is_valid() and _register_throttled(ip):
+            form.add_error(None, 'Забагато реєстрацій з вашої адреси. Спробуйте пізніше.')
         if form.is_valid():
             data = form.cleaned_data
             s    = SystemSettings.get()
@@ -100,9 +144,9 @@ def register_view(request):
                 password=data['password1'],
                 first_name=name_parts[0] if name_parts else '',
                 last_name=' '.join(name_parts[1:]),
-                is_staff=False,   # activated only after email verification
-                is_active=False,  # cannot login until email confirmed
-            )
+                is_staff=False,
+                is_active=False,  # головний замок: неактивний не увійде (is_staff core/signals.py ставить усім);
+            )                     # активним його робить лише адміністратор у «Користувачах»
 
             trial_end = timezone.now().date() + timezone.timedelta(days=30)
             tenant = TenantAccount.objects.create(
@@ -120,20 +164,16 @@ def register_view(request):
             )
             tenant.activate_modules()
 
-            # Assign admin role
+            # Найменша роль: адміністратор вирішить, що відкрити (раніше — «Адміністратор» з усім доступом)
             from core.models import UserProfile
             from core.utils import apply_role_defaults
             profile, _ = UserProfile.objects.get_or_create(user=user)
-            profile.role = 'admin'
-            profile.save()
+            profile.role = REGISTER_ROLE
             apply_role_defaults(profile)
+            profile.save()
 
-            # Send verification email
             _send_verification_email(user, tenant, token, s)
 
-            # Log registration — IP extracted via X-Forwarded-For in AuditLog.log()
-            from core.utils import client_ip
-            ip = client_ip(request) or ''
             AuditLog.log(
                 action='create',
                 module='registration',
@@ -150,15 +190,13 @@ def register_view(request):
                 },
             )
 
-            # Notify vendor (email + Telegram)
-            _notify_vendor_new_client(tenant, s, ip)
+            _notify_vendor(tenant, s, ip=ip)
 
             return redirect('/register/pending/')
     else:
         initial_package = request.GET.get('package', 'starter')
         form = ClientRegistrationForm(initial={'package': initial_package})
 
-    from config.models import SystemSettings
     s = SystemSettings.get()
     return render(request, 'registration/register.html', {
         'form': form,
@@ -167,6 +205,8 @@ def register_view(request):
 
 
 def register_pending_view(request):
+    if not registration_open():
+        return _closed(request)
     from config.models import SystemSettings
     s = SystemSettings.get()
     return render(request, 'registration/register_pending.html', {
@@ -174,31 +214,28 @@ def register_pending_view(request):
     })
 
 
+def _verify_error(request, reason, status=400):
+    return render(request, 'registration/verify_error.html', {'reason': reason}, status=status)
+
+
 def verify_email_view(request, token):
+    """Посилання з листа: лише підтверджує email. Доступу не відкриває й не входить — це робить адміністратор."""
+    if not registration_open():
+        return _verify_error(request, CLOSED_REASON, status=404)
+
     from core.models import TenantAccount, AuditLog
     from config.models import SystemSettings
 
-    try:
-        tenant = TenantAccount.objects.get(
-            verification_token=token,
-            email_verified=False,
-        )
-    except TenantAccount.DoesNotExist:
-        return render(request, 'registration/verify_error.html', {
-            'reason': 'Посилання недійсне або вже використане.',
-        })
+    tenant = TenantAccount.objects.filter(verification_token=token, email_verified=False).first() if token else None
+    if tenant is None:
+        return _verify_error(request, 'Посилання недійсне або вже використане.')
+    sent = tenant.verification_sent_at
+    if sent is None or sent < timezone.now() - timedelta(hours=VERIFY_HOURS):
+        return _verify_error(request, 'Посилання застаріло. Зверніться до адміністратора.')
 
     tenant.email_verified     = True
-    tenant.status             = 'trial'
-    tenant.activated_at       = timezone.now()
     tenant.verification_token = ''
-    tenant.save()
-
-    # Activate the user account only after email confirmation
-    if tenant.owner_user:
-        tenant.owner_user.is_active = True
-        tenant.owner_user.is_staff  = True
-        tenant.owner_user.save(update_fields=['is_active', 'is_staff'])
+    tenant.save(update_fields=['email_verified', 'verification_token'])
 
     AuditLog.log(
         action='settings',
@@ -206,21 +243,16 @@ def verify_email_view(request, token):
         model_name='TenantAccount',
         object_id=tenant.pk,
         object_repr=str(tenant),
+        request=request,
         extra={
             'event': 'email_verified',
             'company': tenant.company_name,
             'package': tenant.package,
-            'trial_ends': str(tenant.trial_ends_at),
         },
     )
 
-    if tenant.owner_user:
-        login(request, tenant.owner_user,
-              backend='core.auth_backend.EmailOrUsernameBackend')
-
-    s = SystemSettings.get()
-    _send_welcome_email(tenant, s)
-
+    from core.utils import client_ip
+    _notify_vendor(tenant, SystemSettings.get(), ip=client_ip(request) or '', verified=True)
     return redirect('/verify/success/')
 
 
@@ -234,51 +266,31 @@ def verify_success_view(request):
 
 # ── Email helpers ─────────────────────────────────────────────────────────────
 
+def _one_line(text) -> str:
+    """Тема листа з даних форми: без переносів рядка (інакше Django відкидає лист — BadHeaderError)."""
+    return ' '.join(str(text or '').split())[:150]
+
+
 def _send_verification_email(user, tenant, token, settings_obj):
     from django.core.mail import send_mail
     verify_url = f'{settings_obj.site_url}/verify/{token}/'
     try:
         send_mail(
-            subject=f'{settings_obj.company_name} — Підтвердіть email',
+            subject=_one_line(f'{settings_obj.company_name} — Підтвердіть email'),
             message=(
                 f'Вітаємо, {tenant.owner_name}!\n\n'
                 f'Ви зареєструвались в {settings_obj.company_name}.\n\n'
                 f'Підтвердіть email перейшовши за посиланням:\n'
                 f'{verify_url}\n\n'
-                f'Посилання дійсне 48 годин.\n\n'
+                f'Посилання дійсне {VERIFY_HOURS} годин. Доступ до системи відкриє адміністратор.\n\n'
                 f'Якщо ви не реєструвались — проігноруйте цей лист.'
             ),
             from_email=settings_obj.from_email,
             recipient_list=[user.email],
-            fail_silently=True,
+            fail_silently=False,
         )
-    except Exception:
-        pass
-
-
-def _send_welcome_email(tenant, settings_obj):
-    from django.core.mail import send_mail
-    try:
-        trial_str = tenant.trial_ends_at.strftime('%d.%m.%Y') if tenant.trial_ends_at else '—'
-        send_mail(
-            subject=f'Ласкаво просимо до {settings_obj.company_name}!',
-            message=(
-                f'Вітаємо, {tenant.owner_name}!\n\n'
-                f'Ваш акаунт активовано. Пробний період: до {trial_str}.\n\n'
-                f'Пакет: {tenant.get_package_display()}\n\n'
-                f'Увійти в систему:\n{settings_obj.site_url}/admin/\n\n'
-                f'Email: {tenant.owner_email}\n'
-                f'Пароль: той що ви вказали при реєстрації\n\n'
-                + (f'Telegram: {settings_obj.company_telegram}'
-                   if settings_obj.company_telegram else
-                   f'Email: {settings_obj.company_email}')
-            ),
-            from_email=settings_obj.from_email,
-            recipient_list=[tenant.owner_email],
-            fail_silently=True,
-        )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning('Registration: verification mail to %s failed: %s', user.email, e)
 
 
 def manifest_view(request):
@@ -312,57 +324,72 @@ def manifest_view(request):
     }, content_type='application/manifest+json')
 
 
-def _notify_vendor_new_client(tenant, settings_obj, ip=''):
+def vendor_recipients(settings_obj, ns) -> list:
+    """Хто дізнається про реєстрацію: «Контактний email» системних налаштувань + отримувачі системних сповіщень."""
+    from dashboard.notifications import configured_recipients
+    out = []
+    for email in [settings_obj.company_email] + configured_recipients(ns):
+        email = (email or '').strip()
+        if email and email.lower() not in {e.lower() for e in out}:
+            out.append(email)
+    return out
+
+
+def _notify_vendor(tenant, settings_obj, ip='', verified=False):
+    """Лист і Telegram адміністратору про нову реєстрацію / підтверджений email. Дані з форми — екрановані
+    (Telegram відкидає повідомлення з «<», «&»), тема — одним рядком; збій — у журнал, а не мовчки."""
     from django.core.mail import send_mail
     from config.models import NotificationSettings
-    import json, urllib.request
+    from dashboard.notifications import esc, _send_telegram
 
+    try:
+        ns = NotificationSettings.get()
+    except Exception as e:
+        logger.warning('Registration: notification settings unavailable: %s', e)
+        return
+
+    state = ('Email підтверджено — доступ закрито, доки ви його не відкриєте' if verified
+             else 'Очікує підтвердження email · доступу немає')
+    title = 'Email підтвердив' if verified else 'Новий акаунт через реєстрацію'
     body = (
-        f'Зареєструвався новий клієнт:\n\n'
+        f'{title}:\n\n'
         f'Компанія: {tenant.company_name}\n'
         f'Власник:  {tenant.owner_name} <{tenant.owner_email}>\n'
         f'Пакет:    {tenant.get_package_display()}\n'
         f'Країна:   {tenant.company_country}\n'
         f'IP:       {ip or "невідомий"}\n\n'
-        f'Статус:   Очікує підтвердження email\n\n'
-        f'Керувати: {settings_obj.site_url}/admin/core/tenantaccount/'
+        f'Статус:   {state}\n\n'
+        f'Не знаєте цю фірму — видаліть акаунт:\n'
+        f'{settings_obj.site_url}/admin/core/tenantaccount/\n'
+        f'{settings_obj.site_url}/admin/auth/user/?is_active__exact=0'
     )
 
-    # Email to vendor
-    vendor_email = settings_obj.company_email
-    if vendor_email:
+    recipients = vendor_recipients(settings_obj, ns)
+    if recipients:
         try:
             send_mail(
-                subject=f'🆕 Новий клієнт: {tenant.company_name}',
+                subject=_one_line(f'⚠️ Minerva — {title}: {tenant.company_name} ({tenant.owner_email})'),
                 message=body,
                 from_email=settings_obj.from_email,
-                recipient_list=[vendor_email],
-                fail_silently=True,
+                recipient_list=recipients,
+                fail_silently=False,
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning('Registration: vendor mail failed: %s', e)
+    else:
+        logger.warning('Registration: no recipient — set «Контактний email» or notification recipients')
 
-    # Telegram to vendor
-    try:
-        ns = NotificationSettings.get()
-        if ns.telegram_enabled and ns.telegram_bot_token and ns.telegram_chat_id:
-            tg_text = (
-                f'🆕 <b>Новий клієнт</b>\n'
-                f'🏢 {tenant.company_name}\n'
-                f'👤 {tenant.owner_name} — {tenant.owner_email}\n'
-                f'📦 {tenant.get_package_display()}\n'
-                f'🌍 {tenant.company_country}\n'
-                f'🌐 IP: <code>{ip or "невідомий"}</code>\n'
-                f'⏳ Очікує підтвердження email'
-            )
-            tg_url = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendMessage'
-            tg_data = json.dumps({
-                'chat_id': ns.telegram_chat_id,
-                'text': tg_text,
-                'parse_mode': 'HTML',
-            }).encode('utf-8')
-            req = urllib.request.Request(tg_url, data=tg_data,
-                                         headers={'Content-Type': 'application/json'})
-            urllib.request.urlopen(req, timeout=5)
-    except Exception:
-        pass
+    if ns.telegram_enabled and ns.telegram_bot_token and ns.telegram_chat_id:
+        tg_text = (
+            f'⚠️ <b>{esc(title)}</b>\n'
+            f'🏢 {esc(tenant.company_name)}\n'
+            f'👤 {esc(tenant.owner_name)} — {esc(tenant.owner_email)}\n'
+            f'📦 {esc(tenant.get_package_display())}\n'
+            f'🌍 {esc(tenant.company_country)}\n'
+            f'🌐 IP: <code>{esc(ip or "невідомий")}</code>\n'
+            f'🔒 {esc(state)}'
+        )
+        try:
+            _send_telegram(ns, tg_text)
+        except Exception as e:
+            logger.warning('Registration: vendor Telegram failed: %s', e)

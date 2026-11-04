@@ -62,6 +62,11 @@ def ui_context(request):
     return out
 
 
+def public_registration(request):
+    """Посилання «Реєстрація» (вхід, лендінг) — лише коли самореєстрацію увімкнено (settings.PUBLIC_REGISTRATION)."""
+    return {'PUBLIC_REGISTRATION': bool(getattr(_settings, 'PUBLIC_REGISTRATION', False))}
+
+
 def language_context(request):
     """Inject LANGUAGES list and CURRENT_LANGUAGE into all templates."""
     lang = getattr(request, 'LANGUAGE_CODE', 'uk')[:2]
