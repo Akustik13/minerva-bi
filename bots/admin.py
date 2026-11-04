@@ -187,6 +187,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "messages_panel",
                 ("msg_check_enabled", "msg_check_interval"),
                 ("msg_notify_telegram", "msg_notify_email"),
+                "msg_notify_own",
                 "msg_notify_email_to",
             ),
             "description": (
@@ -382,6 +383,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "messages/new-topic/",
                 self.admin_site.admin_view(self.messages_new_topic_view),
                 name="bots_digikeyconfig_messages_new_topic",
+            ),
+            path(
+                "messages/<str:topic_id>/forward/",
+                self.admin_site.admin_view(self.messages_forward_view),
+                name="bots_digikeyconfig_messages_forward",
             ),
             path(
                 "messages/check-now/",
@@ -1212,6 +1218,8 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
     def messages_hub_view(self, request):
         """GET /admin/bots/digikeyconfig/messages/ — повний чат-хаб."""
         from django.shortcuts import render
+
+        from bots.services import dk_message_watch
         config, token = self._get_messages_token()
         ctx = self.admin_site.each_context(request)
         ctx.update({
@@ -1223,6 +1231,8 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             "mark_read_base": "/admin/bots/digikeyconfig/messages/",
             "new_topic_url":  reverse("admin:bots_digikeyconfig_messages_new_topic"),
             "ai_url":         reverse("admin:bots_digikeyconfig_messages_ai"),
+            "forward_to":     ", ".join(dk_message_watch.recipients(config)),
+            "can_change":     self.has_change_permission(request),
             "opts":           DigiKeyConfig._meta,
         })
         return render(request, "admin/bots/digikeyconfig/messages.html", ctx)
@@ -1674,9 +1684,9 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             '<button type="button" class="button" id="dkm-check"{}>🔄 Перевірити зараз</button> '
             '<span id="dkm-state" style="color:var(--text-dim);font-size:12px">{}</span>'
             '<div style="margin-top:8px;font-size:13px">{}{}{}{}{}</div>'
-            '<div style="color:var(--text-dim);font-size:12px;margin-top:4px">Надсилаються нові повідомлення '
-            'покупця й оператора DigiKey (ваші відповіді — ні): у Telegram — коротко, листом — повний текст, '
-            'попередні повідомлення й посилання на відповідь у Minerva. Відповідати — у «💬 Messages Hub».</div>'
+            '<div style="color:var(--text-dim);font-size:12px;margin-top:4px">{} У Telegram — коротко, листом — '
+            'повний текст, попередні повідомлення й посилання на відповідь у Minerva. Відповідати — у «💬 Messages '
+            'Hub»; там і в картці замовлення «✉️ Чат на пошту» — переслати весь чат листом.</div>'
             '</div>'
             '<script>(function () {{'
             'var p = document.getElementById("dkm-panel"), b = document.getElementById("dkm-check"),'
@@ -1695,9 +1705,40 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             check_url, hub_url, " disabled" if st["running"] else "",
             "⏳ Іде перевірка…" if st["running"] else "",
             auto, last, late, telegram, mail,
+            "Надсилаються нові повідомлення покупця, оператора DigiKey і відповіді з нашого боку (колеги чи ваші)."
+            if st["own"] else "Надсилаються нові повідомлення покупця й оператора DigiKey (відповіді з нашого боку — ні).",
             "setTimeout(poll, 3000);" if st["running"] else "",
         )
     messages_panel.short_description = "Повідомлення"
+
+    def messages_forward_view(self, request, topic_id):
+        """POST {to} — «✉️ Чат на пошту»: уся розмова DigiKey наживо → лист (dk_message_watch.forward), право change."""
+        import json
+
+        from django.http import JsonResponse
+
+        from bots.services import dk_message_watch
+        from dashboard.notifications import MAX_RECIPIENTS, parse_recipients
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        if not self.has_change_permission(request):
+            return JsonResponse({"error": "Немає права надсилати повідомлення DigiKey."}, status=403)
+        try:
+            body = json.loads(request.body or b"{}")
+        except ValueError:
+            body = {}
+        to, bad = parse_recipients(body.get("to") or "")
+        if bad:
+            return JsonResponse({"error": "Неправильна адреса: " + ", ".join(bad[:5])}, status=400)
+        if len(to) > MAX_RECIPIENTS:
+            return JsonResponse({"error": f"Не більше {MAX_RECIPIENTS} адрес."}, status=400)
+        try:
+            done = dk_message_watch.forward(topic_id, to, user=request.user.get_username())
+        except dk_message_watch.ForwardError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        except Exception as exc:  # noqa: BLE001 — DigiKey / SMTP
+            return JsonResponse({"error": f"Не надіслано: {exc}"[:300]}, status=502)
+        return JsonResponse({"ok": True, "to": done["to"], "messages": done["messages"]})
 
     def messages_check_now_view(self, request):
         """POST — «🔄 Перевірити зараз» (фоном, право change); GET — чи йде перевірка (JSON для панелі)."""

@@ -211,6 +211,7 @@ class OrderActionTests(_Base):
             ("doc/proforma/?action=save", {}),
             ("digikey-messages/T-1/reply/", {}),
             ("digikey-messages/new-topic/", {}),
+            ("digikey-messages/forward/", {}),
         ]
         with mock.patch("bots.services.digikey.get_marketplace_token", side_effect=AssertionError("DigiKey")), \
                 pdf_generators(mock.Mock(side_effect=AssertionError("PDF"))):
@@ -231,7 +232,7 @@ class OrderActionTests(_Base):
             self.client.force_login(user)
             for path in ("doc/invoice-save/", "doc/proforma/?action=save", "doc/customs/?action=save",
                          "doc/delete/", "upload-docs/", "push-to-shipping/", "eu-invoice/generate/",
-                         "digikey-fetch-tracking/", "digikey-messages/new-topic/"):
+                         "digikey-fetch-tracking/", "digikey-messages/new-topic/", "digikey-messages/forward/"):
                 r = self.client.get(f"{self.base}/{path}")
                 self.assertEqual(r.status_code, 405, path)
                 self.assertEqual(r["Allow"], "POST", path)

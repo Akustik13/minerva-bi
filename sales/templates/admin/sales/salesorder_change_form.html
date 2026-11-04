@@ -217,6 +217,10 @@
       <span style="font-size:11px;color:var(--text-dim)" id="dkm-toggle-icon">▾ показати</span>
     </div>
     <div id="dkm-panel" style="display:none;padding:0 16px 14px">
+      {% if has_change_permission %}<div style="text-align:right;margin-bottom:6px">
+        <button type="button" id="dkm-fwd-btn" onclick="dkmForwardChat()" title="Прочитати чат замовлення з DigiKey зараз і переслати листом усі теми"
+                style="background:#1565c0;color:#fff;border:none;border-radius:4px;padding:4px 12px;font-size:12px;cursor:pointer">✉️ Чат на пошту</button>
+        <span id="dkm-fwd-state" style="font-size:12px;color:var(--text-dim);margin-left:6px"></span></div>{% endif %}
       <div id="dkm-topics-wrap"></div>
       <div id="dkm-convo-wrap" style="margin-top:10px"></div>
       <div id="dkm-reply-wrap" style="display:none;margin-top:8px;display:none">
@@ -1201,8 +1205,24 @@ document.addEventListener('DOMContentLoaded',function(){
   const MSG_URL   = "{{ digikey_messages_url }}";
   const REPLY_BASE = "{{ digikey_messages_reply_base }}";
   const NEW_TOPIC_URL = "{{ digikey_messages_new_topic_url }}";
+  const FORWARD_URL = "{{ digikey_messages_forward_url }}";
+  const FORWARD_TO = "{{ digikey_messages_forward_to|escapejs }}";
   const CSRF = "{{ csrf_token }}";
   let _topics = [], _curTopicId = null, _loaded = false;
+
+  // ✉️ Чат на пошту — усі теми замовлення з DigiKey наживо → один лист (bots/services/dk_message_watch.forward_order)
+  window.dkmForwardChat = function() {
+    const to = prompt('Кому переслати чат замовлення (усі теми)? Адреси через кому:', FORWARD_TO);
+    if (to === null) return;
+    const btn = document.getElementById('dkm-fwd-btn'), st = document.getElementById('dkm-fwd-state');
+    btn.disabled = true; st.textContent = '⏳ Читаю чат з DigiKey і надсилаю…';
+    fetch(FORWARD_URL, {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF}, body: JSON.stringify({to: to})})
+      .then(r => r.json()).then(j => {
+        btn.disabled = false;
+        st.textContent = j.ok ? '✓ Надіслано (' + j.messages + ' повід.): ' + j.to.join(', ') : '✗ ' + (j.error || 'Не надіслано');
+      }).catch(() => { btn.disabled = false; st.textContent = '✗ Не надіслано (мережа)'; });
+  };
 
   window.dkmToggle = function() {
     const panel = document.getElementById('dkm-panel');

@@ -126,6 +126,8 @@
     <div id="dkm-topic-header" style="display:none">
       <span id="dkm-topic-title-label">—</span>
       <span id="dkm-topic-order-label" style="font-size:11px;font-family:monospace;color:var(--text-dim)"></span>
+      {% if can_change %}<button class="dkm-btn dkm-btn-sm" id="dkm-fwd-btn" onclick="dkmForward()" style="margin-left:auto"
+              title="Прочитати розмову з DigiKey зараз і переслати весь чат листом">✉️ Чат на пошту</button>{% endif %}
     </div>
     <div class="dkm-convo" id="dkm-convo">
       <div class="dkm-empty">Оберіть тему зліва</div>
@@ -161,6 +163,7 @@ const MARK_READ_BASE = "{{ mark_read_base }}";
 const NEW_TOPIC_URL  = "{{ new_topic_url }}";
 const AI_URL         = "{{ ai_url }}";
 const CSRF           = "{{ csrf_token }}";
+const FORWARD_TO     = "{{ forward_to|escapejs }}";
 
 let _currentTopicId = null;
 let _allTopics      = [];
@@ -343,6 +346,24 @@ function dkmOpenTopic(topicId) {
       }).catch(() => {});
     }
   }
+}
+
+// ── ✉️ Чат на пошту: уся розмова з DigiKey наживо → лист (bots/services/dk_message_watch.forward) ──
+
+function dkmForward() {
+  if (!_currentTopicId) return;
+  const to = prompt('Кому переслати весь чат цієї теми? Адреси через кому:', FORWARD_TO);
+  if (to === null) return;
+  const btn = document.getElementById('dkm-fwd-btn'), st = document.getElementById('dkm-status');
+  btn.disabled = true; st.textContent = '⏳ Читаю розмову з DigiKey і надсилаю лист…';
+  fetch(REPLY_BASE + _currentTopicId + '/forward/', {
+    method: 'POST', credentials: 'same-origin',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify({to: to}),
+  }).then(r => r.json()).then(j => {
+    btn.disabled = false;
+    st.textContent = j.ok ? '✓ Чат надіслано (' + j.messages + ' повід.): ' + j.to.join(', ') : '✗ ' + (j.error || 'Не надіслано');
+  }).catch(() => { btn.disabled = false; st.textContent = '✗ Не надіслано (мережа)'; });
 }
 
 // ── Reply enable/disable ──────────────────────────────────────────────────────

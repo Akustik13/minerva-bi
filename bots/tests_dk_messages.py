@@ -56,6 +56,7 @@ class WatchTests(TestCase):
         self.cfg.marketplace_access_token = "a"
         self.cfg.public_base_url = "https://minerva.example.com"
         self.cfg.msg_check_enabled = self.cfg.msg_notify_telegram = self.cfg.msg_notify_email = True
+        self.cfg.msg_notify_own = False                       # наші відповіді — окремий тест
         self.cfg.save()
         ns, _ = NotificationSettings.objects.get_or_create(pk=1)
         ns.telegram_enabled, ns.telegram_bot_token, ns.telegram_chat_id = True, "bot", "chat"
@@ -118,6 +119,92 @@ class WatchTests(TestCase):
         self.assertIn("покупець і оператор DigiKey", self.tg[1])
         self.assertIn("Danke!", mail.outbox[-1].alternatives[0][0])
         self.assertIn("Morgen.", mail.outbox[-1].alternatives[0][0])                  # «Раніше в розмові»
+
+    def test_own_replies_option(self):
+        """«І відповіді з нашого боку»: відповідь колеги (Supplier) — теж сповіщення; вимкнено — ні."""
+        self.dk.add("t1")
+        self.dk.say("t1", "m1", "Customer", "Frage", minutes_ago=5)
+        self.run_check()
+        self.cfg.msg_notify_own = True
+        self.cfg.save()
+        self.dk.say("t1", "m2", "Supplier", "Antwort vom Kollegen", minutes_ago=2)
+        self.run_check()
+        self.assertEqual(len(self.tg), 2)
+        self.assertIn("наша відповідь", self.tg[1])
+        self.assertIn("Antwort vom Kollegen", self.tg[1])
+        self.cfg.msg_notify_own = False
+        self.cfg.save()
+        self.dk.say("t1", "m3", "Supplier", "Noch eine Antwort", minutes_ago=1)
+        self.run_check()
+        self.assertEqual(len(self.tg), 2)
+
+    def login(self):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+
+    def test_forward_whole_chat_from_hub(self):
+        self.login()
+        self.dk.add("t1")
+        self.dk.say("t1", "m1", "Customer", "Erste Frage", days_ago=30)          # і старі — увесь чат
+        self.dk.say("t1", "m2", "Supplier", "Unsere Antwort", days_ago=29)
+        self.dk.say("t1", "m3", "Customer", "Letzte Frage", minutes_ago=3)
+        url = "/admin/bots/digikeyconfig/messages/t1/forward/"
+        r = self.client.post(url, '{"to": "chef@example.com"}', content_type="application/json")
+        self.assertEqual(r.json(), {"ok": True, "to": ["chef@example.com"], "messages": 3})
+        m = mail.outbox[-1]
+        self.assertEqual(m.to, ["chef@example.com"])
+        self.assertIn("↪ DigiKey #1001: Lieferzeit", m.subject)              # номер замовлення — зі списку тем
+        html = m.alternatives[0][0]
+        for text in ("Erste Frage", "Unsere Antwort", "Letzte Frage", "переслав root", "найновіше"):
+            self.assertIn(text, html)
+        self.assertEqual(self.tg, [])                                          # лише лист
+        bad = self.client.post(url, '{"to": "not-an-address"}', content_type="application/json")
+        self.assertEqual(bad.status_code, 400)
+        page = self.client.get("/admin/bots/digikeyconfig/messages/")
+        self.assertContains(page, "✉️ Чат на пошту")
+        self.assertContains(page, 'const FORWARD_TO     = "team@example.com"')
+        ns = NotificationSettings.objects.get(pk=1)
+        ns.email_host = ""
+        ns.save()
+        r = self.client.post(url, "{}", content_type="application/json")
+        self.assertEqual((r.status_code, r.json()["error"]), (400, "у «Налаштування → Сповіщення» немає SMTP"))
+        viewer = User.objects.create_user("vera", "v@x.y", "p", is_staff=True)
+        self.client.force_login(viewer)
+        self.assertIn(self.client.post(url, "{}", content_type="application/json").status_code, (302, 403))
+
+    def test_forward_order_chat_from_order_card(self):
+        self.login()
+        self.dk.add("t1", title="Lieferzeit")
+        self.dk.say("t1", "m1", "Customer", "Wann?", days_ago=2)
+        self.dk.add("t2", title="Rechnung")
+        self.dk.say("t2", "m2", "Operator", "Bitte Rechnung hochladen", minutes_ago=10)
+        self.dk.add("t3", order="5555", title="Fremd")
+        self.dk.say("t3", "m3", "Customer", "Anderes Auftrag", minutes_ago=1)
+        base = f"/admin/sales/salesorder/{self.order.pk}/digikey-messages/"
+        listed = self.client.get(base).json()
+        self.assertEqual(sorted(t["id"] for t in listed["topics"]), ["t1", "t2"])  # лише теми замовлення
+        r = self.client.post(base + "forward/", '{"to": ""}', content_type="application/json")
+        self.assertEqual(r.json(), {"ok": True, "to": ["team@example.com"], "messages": 2})
+        m = mail.outbox[-1]
+        self.assertIn("чат (2 теми)", m.subject)
+        html = m.alternatives[0][0]
+        for text in ("Lieferzeit", "Rechnung", "Wann?", "Bitte Rechnung hochladen", "R&amp;D GmbH"):
+            self.assertIn(text, html)
+        self.assertNotIn("Anderes Auftrag", html)
+        page = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
+        self.assertContains(page, "✉️ Чат на пошту")
+        empty = SalesOrder.objects.create(order_number="7777", source="digikey")
+        r = self.client.post(f"/admin/sales/salesorder/{empty.pk}/digikey-messages/forward/", "{}",
+                             content_type="application/json")
+        self.assertEqual((r.status_code, r.json()["error"]), (400, "у DigiKey немає розмов цього замовлення"))
+        self.assertEqual(self.client.get(base + "forward/").status_code, 405)
+        from core.models import UserProfile
+        viewer = User.objects.create_user("vera", "v@x.y", "p", is_staff=True)
+        UserProfile.objects.filter(user=viewer).update(role="readonly", allowed_modules=["sales"])
+        self.client.force_login(User.objects.get(pk=viewer.pk))      # лише перегляд замовлень — не надсилає
+        self.assertIn(self.client.post(base + "forward/", "{}", content_type="application/json").status_code,
+                      (302, 403))
 
     def test_old_messages_of_an_unknown_topic_are_not_sent(self):
         self.dk.add("old")

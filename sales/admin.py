@@ -1911,6 +1911,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 extra_context["digikey_messages_url"]       = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/"
                 extra_context["digikey_messages_reply_base"] = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/"
                 extra_context["digikey_messages_new_topic_url"] = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/new-topic/"
+                extra_context["digikey_messages_forward_url"] = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/forward/"
+                try:
+                    from bots.models import DigiKeyConfig
+                    from bots.services.dk_message_watch import recipients
+                    extra_context["digikey_messages_forward_to"] = ", ".join(recipients(DigiKeyConfig.get()))
+                except Exception:  # noqa: BLE001 — без підказки адрес
+                    extra_context["digikey_messages_forward_to"] = ""
             # Листи клієнту, рахунок EU — лише тим, хто може змінювати замовлення (ті самі перевірки в самих view)
             can_change = bool(obj and obj.pk and self.has_change_permission(request, obj))
             # EU Invoice button — repurposed to open /invoices/ with order pre-filled
@@ -2789,6 +2796,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/digikey-messages/new-topic/',
                  self.admin_site.admin_view(self.digikey_messages_new_topic_view),
                  name='sales_salesorder_digikey_messages_new_topic'),
+            path('<int:pk>/digikey-messages/forward/',
+                 self.admin_site.admin_view(self.digikey_messages_forward_view),
+                 name='sales_salesorder_digikey_messages_forward'),
             # AJAX: stock availability check (returns JSON per line)
             path('<int:pk>/stock-avail/',
                  self.admin_site.admin_view(self.stock_avail_view),
@@ -3479,7 +3489,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         Завантажуємо всі теми і фільтруємо на стороні сервера по order_number.
         """
         from django.http import JsonResponse
-        from bots.services.digikey_messages import get_topics, get_topic
+        from bots.services.dk_message_watch import order_topics
         order = get_object_or_404(SalesOrder, pk=pk)
         if order.source != "digikey" or not order.order_number:
             return JsonResponse({"topics": []})
@@ -3487,24 +3497,39 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         if not token:
             return JsonResponse({"error": "Marketplace не авторизовано"}, status=401)
         try:
-            # API OrderId приймає UUID, а не order_number — завантажуємо всі і фільтруємо за orderNumber
-            data = get_topics(config, token, order_id=None, max_results=100)
-            items = data.get("messageTopicItems", []) if isinstance(data, dict) else data
-            # Filter to this order by numeric orderNumber
-            order_items = [t for t in items if str(t.get("orderNumber", "")) == str(order.order_number)]
-            result = []
-            for t in order_items:
-                tid = str(t.get("id", ""))
-                if not tid:
-                    continue
-                try:
-                    full = get_topic(config, token, tid)
-                    result.append(full)
-                except Exception:
-                    result.append(t)
+            # API OrderId приймає UUID, а не order_number — увесь список тем (не лише перші 100) і відбір за номером
+            result = order_topics(config, token, order.order_number)
             return JsonResponse({"topics": result, "order_number": order.order_number})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
+    def digikey_messages_forward_view(self, request, pk):
+        """POST {to} — «✉️ Чат на пошту»: усі теми замовлення з DigiKey наживо → один лист (право змінювати замовлення)."""
+        import json as _json
+
+        from django.http import JsonResponse
+
+        from bots.services import dk_message_watch
+        from dashboard.notifications import MAX_RECIPIENTS, parse_recipients
+        order, refused = self._order_to_change(request, pk)
+        if refused is not None:
+            return refused
+        try:
+            body = _json.loads(request.body or b"{}")
+        except ValueError:
+            body = {}
+        to, bad = parse_recipients(body.get("to") or "")
+        if bad:
+            return JsonResponse({"error": "Неправильна адреса: " + ", ".join(bad[:5])}, status=400)
+        if len(to) > MAX_RECIPIENTS:
+            return JsonResponse({"error": f"Не більше {MAX_RECIPIENTS} адрес."}, status=400)
+        try:
+            done = dk_message_watch.forward_order(order, to, user=request.user.get_username())
+        except dk_message_watch.ForwardError as exc:
+            return JsonResponse({"error": str(exc)}, status=400)
+        except Exception as exc:  # noqa: BLE001 — DigiKey / SMTP
+            return JsonResponse({"error": f"Не надіслано: {exc}"[:300]}, status=502)
+        return JsonResponse({"ok": True, "to": done["to"], "messages": done["messages"]})
 
     def digikey_messages_reply_view(self, request, pk, topic_id):
         """POST — відповісти на тему (покупцю на DigiKey — лише з правом змінювати замовлення)."""

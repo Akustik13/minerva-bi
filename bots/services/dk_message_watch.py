@@ -12,9 +12,12 @@ bots/services/dk_message_watch.py — 💬 нові повідомлення Dig
 Тепер `check`: список тем (до LIST_MAX, сторінками) → свіжі розмови найновіших тем (до FETCH_MAX, WORKERS
 потоків) → нові повідомлення покупця й оператора DigiKey після `DigiKeyMessageSeen.notified_upto` (тема, яку
 Minerva бачить уперше або давно не перевіряла, — не старші за FIRST_DAYS, щоб не розіслати весь архів) → одне
-сповіщення на тему: Telegram і лист з повним текстом, попередніми повідомленнями й посиланнями. «Прочитано» в хабі
-(`last_message_id`) перевірка не змінює. `run` — розклад, токен, повтори (cron `check_digikey_messages`, кнопка
-«🔄 Перевірити зараз»); `status` — що зараз діє (панель у налаштуваннях DigiKey).
+сповіщення на тему: Telegram і лист з повним текстом, попередніми повідомленнями й посиланнями. Відповіді з нашого
+боку (Supplier: колега чи ви — з Minerva або supplier.digikey.com) — теж, якщо `DigiKeyConfig.msg_notify_own`
+(`senders`). «Прочитано» в хабі (`last_message_id`) перевірка не змінює. `run` — розклад, токен, повтори (cron
+`check_digikey_messages`, кнопка «🔄 Перевірити зараз»); `status` — що зараз діє (панель у налаштуваннях DigiKey);
+`forward` / `forward_order` — «✉️ Чат на пошту» в хабі й у картці замовлення: увесь чат теми / усіх тем замовлення
+з DigiKey наживо → лист будь-кому (`chat_email`); `order_topics` — теми замовлення (API фільтрує лише за UUID).
 """
 from __future__ import annotations
 
@@ -36,7 +39,7 @@ WORKERS = 4
 FIRST_DAYS = 7                  # повідомлення, старші за стільки днів, не розсилаються (архів, довга перерва)
 CONTEXT_MESSAGES = 6            # попередніх повідомлень розмови в листі
 NOTIFY_SENDERS = ("customer", "operator")
-WHO = {"customer": "покупець", "operator": "оператор DigiKey", "supplier": "ми"}
+WHO = {"customer": "покупець", "operator": "оператор DigiKey", "supplier": "наша відповідь"}
 AUTH_WORDS = ("401", "unauthorized", "token refresh error", "не авторизовано", "invalid_grant")
 LOCK_KEY = "dk-messages-check"
 LOCK_SECONDS = 15 * 60
@@ -62,6 +65,15 @@ def _local(dt) -> str:
 
 def _sender(m) -> str:
     return (m.get("sender") or "").strip().lower()
+
+
+def senders(config) -> tuple:
+    """Про чиї повідомлення сповіщати: покупець і оператор DigiKey, з `msg_notify_own` — і наш бік (Supplier)."""
+    return NOTIFY_SENDERS + (("supplier",) if config.msg_notify_own else ())
+
+
+class ForwardError(Exception):
+    """Зрозуміла причина, чому «✉️ На пошту» не надіслав."""
 
 
 # ── Перевірка ─────────────────────────────────────────────────────────────────
@@ -105,6 +117,7 @@ def check(config, token, *, notify=True) -> dict:
     floor = timezone.now() - timedelta(days=FIRST_DAYS)
     found, sent = [], {"telegram": 0, "email": 0}
     channels = _channels(config) if notify else {}
+    whose = senders(config)
     for topic in topics:
         tid = str(topic["id"])
         conv = [m for m in (topic.get("conversation") or []) if _when(m.get("createDateUtc"))]
@@ -112,7 +125,7 @@ def check(config, token, *, notify=True) -> dict:
         row = rows.get(tid)
         since = row.notified_upto if row and row.notified_upto else None
         start = max(since, floor) if since else floor
-        new = [m for m in conv if _sender(m) in NOTIFY_SENDERS and _when(m.get("createDateUtc")) > start]
+        new = [m for m in conv if _sender(m) in whose and _when(m.get("createDateUtc")) > start]
         if new:
             found.append({"topic": topic, "messages": new})
             if notify:
@@ -332,7 +345,7 @@ def _send(config, topic, new, conv, channels) -> dict:
 
 def _who_line(new) -> str:
     kinds = {_sender(m) for m in new}
-    return " і ".join(WHO.get(k, k) for k in ("customer", "operator") if k in kinds) or "покупець"
+    return " і ".join(WHO.get(k, k) for k in ("customer", "operator", "supplier") if k in kinds) or "покупець"
 
 
 def telegram_text(topic, new, ctx) -> str:
@@ -355,11 +368,12 @@ def telegram_text(topic, new, ctx) -> str:
 
 
 def email_message(topic, new, conv, ctx) -> tuple[str, str]:
-    """(тема, HTML) — повний текст нових повідомлень, кілька попередніх, посилання."""
+    """(тема, HTML) сповіщення — повний текст нових повідомлень, кілька попередніх, посилання."""
     from django.template.defaultfilters import linebreaksbr
     from django.utils.html import escape
     first = (new[-1].get("content") or "").strip().replace("\n", " ")
     subject = f"💬 DigiKey #{ctx['number']}: {topic.get('topic') or ''} — {first[:60]}".strip()
+    intro = f'<p><b>Нове повідомлення в DigiKey Marketplace</b> — {escape(_who_line(new))}.</p>'
 
     def block(m, strong):
         who = WHO.get(_sender(m), _sender(m)).capitalize()
@@ -383,7 +397,7 @@ def email_message(topic, new, conv, ctx) -> tuple[str, str]:
     html = (
         '<html><head></head><body style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222">'
         '<div style="max-width:640px">'
-        f'<p><b>Нове повідомлення в DigiKey Marketplace</b> — {escape(_who_line(new))}.</p>'
+        + intro +
         f'<table style="border-collapse:collapse;font-size:13px;margin-bottom:8px">{table}</table>'
         + "".join(block(m, True) for m in new)
         + (('<p style="color:#666;margin:14px 0 4px">Раніше в розмові:</p>' + "".join(block(m, False) for m in earlier))
@@ -394,6 +408,127 @@ def email_message(topic, new, conv, ctx) -> tuple[str, str]:
     return subject[:200], html
 
 
+# ── «✉️ Чат на пошту»: хаб і картка замовлення ───────────────────────────────
+
+def _conv(topic) -> list:
+    return sorted((m for m in (topic.get("conversation") or []) if _when(m.get("createDateUtc"))),
+                  key=lambda m: _when(m.get("createDateUtc")))
+
+
+def order_topics(config, token, order_number) -> list:
+    """Усі теми замовлення з повними розмовами. API DigiKey фільтрує теми лише за UUID замовлення, тож — увесь
+    список (до LIST_MAX) і відбір за номером; розмову не прочитано — тема без неї."""
+    from bots.services.digikey_messages import get_all_topics_paginated, get_topic
+    number = str(order_number or "").strip()
+    out = []
+    for item in get_all_topics_paginated(config, token, max_total=LIST_MAX):
+        if not item.get("id") or str(item.get("orderNumber", "")) != number:
+            continue
+        try:
+            full = get_topic(config, token, str(item["id"]))
+        except Exception:  # noqa: BLE001
+            full = dict(item)
+        full["orderNumber"] = item.get("orderNumber", "")
+        out.append(full)
+    return out
+
+
+def chat_email(topics, ctx, forwarded_by="") -> tuple[str, str]:
+    """(тема, HTML) — увесь чат: кожна тема з усіма повідомленнями по порядку, найновіше виділено; посилання."""
+    from django.template.defaultfilters import linebreaksbr
+    from django.utils.html import escape
+    convs = [(t, _conv(t)) for t in topics]
+    total = sum(len(c) for _, c in convs)
+    last = max((m for _, c in convs for m in c), key=lambda m: _when(m.get("createDateUtc")), default=None)
+    title = topics[0].get("topic") or "" if len(topics) == 1 else f"чат ({len(topics)} теми)"
+    subject = f"↪ DigiKey #{ctx['number']}: {title} — повідомлень {total}".strip()
+
+    def block(m):
+        strong = m is last
+        who = WHO.get(_sender(m), _sender(m)).capitalize()
+        files = (f'<div style="color:#666;font-size:12px">📎 файлів: {len(m["files"])} — дивіться в DigiKey</div>'
+                 if m.get("files") else "")
+        mine = _sender(m) == "supplier"
+        style = ("border-left:4px solid #1565c0;background:#f3f7ff;padding:10px 14px;margin:8px 0" if strong else
+                 "border-left:3px solid " + ("#2e7d32" if mine else "#ccc") + ";padding:6px 12px;margin:6px 0")
+        return (f'<div style="{style}"><div style="font-size:12px;color:#666">{escape(who)} · '
+                f'{escape(_local(_when(m.get("createDateUtc"))))}{" · найновіше" if strong else ""}</div>'
+                f'<div>{linebreaksbr(escape((m.get("content") or "").strip()))}</div>{files}</div>')
+
+    parts = []
+    for t, conv in convs:
+        parts.append(f'<h3 style="font-size:15px;margin:16px 0 4px">📋 {escape(t.get("topic") or "—")}</h3>')
+        parts.append("".join(block(m) for m in conv) or '<p style="color:#888">Повідомлень немає.</p>')
+    rows = [("Замовлення", f"#{ctx['number']}"), ("Клієнт", ctx["customer"])]
+    table = "".join(f'<tr><td style="color:#666;padding:2px 12px 2px 0">{escape(k)}</td><td><b>{escape(v)}</b></td></tr>'
+                    for k, v in rows if v)
+    links = []
+    if ctx["hub"].startswith("http"):
+        links.append(f'<a href="{escape(ctx["hub"])}">💬 Відповісти в Minerva</a>')
+    if ctx["order_url"].startswith("http"):
+        links.append(f'<a href="{escape(ctx["order_url"])}">📦 Замовлення в Minerva</a>')
+    who = f" — переслав {escape(forwarded_by)}" if forwarded_by else ""
+    html = (
+        '<html><head></head><body style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#222">'
+        '<div style="max-width:640px">'
+        f'<p><b>↪ Чат DigiKey Marketplace</b>{who} · повідомлень: {total}.</p>'
+        f'<table style="border-collapse:collapse;font-size:13px;margin-bottom:8px">{table}</table>'
+        + "".join(parts)
+        + (f'<p style="margin-top:14px">{" · ".join(links)}</p>' if links else "")
+        + '<p style="color:#888;font-size:12px">Відповісти листом не можна — DigiKey приймає відповідь лише в '
+          'Marketplace: у Minerva («💬 Messages Hub») або на supplier.digikey.com.</p></div></body></html>')
+    return subject[:200], html
+
+
+def _deliver(config, ns, to, topics, user) -> dict:
+    from dashboard.notifications import _send_event_email, send_only_to
+    if not topics:
+        raise ForwardError("у DigiKey немає розмов цього замовлення")
+    if not any(_conv(t) for t in topics):
+        raise ForwardError("у розмові ще немає повідомлень")
+    subject, html = chat_email(topics, _context(config, topics[0]), forwarded_by=user)
+    with send_only_to(to, telegram=False):
+        _send_event_email(ns, subject, html)
+    return {"to": to, "subject": subject, "messages": sum(len(_conv(t)) for t in topics)}
+
+
+def _prepare(to):
+    """(config, ns, адреси) — SMTP «Налаштування → Сповіщення» (перемикач «Email» там не потрібен: ручне
+    надсилання); без адрес — «Email одержувачів» повідомлень DigiKey або «Кому (email)» сповіщень."""
+    from bots.models import DigiKeyConfig
+    config = DigiKeyConfig.get()
+    ns = _ns()
+    if not ns or not ns.email_host:
+        raise ForwardError("у «Налаштування → Сповіщення» немає SMTP")
+    to = list(to or []) or recipients(config, ns)
+    if not to:
+        raise ForwardError("не вказано, кому")
+    return config, ns, to
+
+
+def forward(topic_id, to=None, user="") -> dict:
+    """Хаб «✉️ Чат на пошту»: уся розмова теми з DigiKey наживо → лист. → {to, subject, messages}."""
+    from bots.services.digikey import get_marketplace_token
+    from bots.services.digikey_messages import get_all_topics_paginated, get_topic
+    config, ns, to = _prepare(to)
+    token = get_marketplace_token(config)
+    topic = get_topic(config, token, str(topic_id))
+    if not topic.get("orderNumber"):                     # GET теми номера замовлення не віддає — кеш хабу, список тем
+        known = next((t for t in (config.msg_topics_cache or []) if str(t.get("id")) == str(topic_id)), None)
+        if not known:
+            known = next((t for t in get_all_topics_paginated(config, token, max_total=LIST_MAX)
+                          if str(t.get("id")) == str(topic_id)), None)
+        topic["orderNumber"] = (known or {}).get("orderNumber", "")
+    return _deliver(config, ns, to, [topic], user)
+
+
+def forward_order(order, to=None, user="") -> dict:
+    """Картка замовлення «✉️ Чат на пошту»: усі теми замовлення з DigiKey наживо → один лист."""
+    from bots.services.digikey import get_marketplace_token
+    config, ns, to = _prepare(to)
+    return _deliver(config, ns, to, order_topics(config, get_marketplace_token(config), order.order_number), user)
+
+
 # ── Стан для панелі ───────────────────────────────────────────────────────────
 
 def status(config) -> dict:
@@ -402,7 +537,7 @@ def status(config) -> dict:
     late = None
     if config.msg_check_enabled and config.msg_last_checked_at and config.msg_check_interval:
         late = timezone.now() - config.msg_last_checked_at > timedelta(minutes=3 * config.msg_check_interval + 10)
-    return {"enabled": config.msg_check_enabled, "interval": config.msg_check_interval,
+    return {"enabled": config.msg_check_enabled, "interval": config.msg_check_interval, "own": config.msg_notify_own,
             "last": _local(config.msg_last_checked_at), "result": config.msg_last_result, "late": late,
             "telegram": ch["telegram"], "email": {k: v for k, v in ch["email"].items()},
             "running": bool(_cache().get(LOCK_KEY))}

@@ -258,6 +258,11 @@ class DigiKeyConfig(models.Model):
         "Email одержувачів (через кому)", max_length=500, blank=True, default="",
         help_text="Порожньо = використати адресу з загальних налаштувань сповіщень"
     )
+    msg_notify_own = models.BooleanField(
+        "І відповіді з нашого боку", default=True,
+        help_text="Сповіщати й про відповіді колеги чи ваші (з Minerva або supplier.digikey.com); вимкніть — "
+                  "надходитимуть лише повідомлення покупця й оператора DigiKey"
+    )
     msg_last_result = models.CharField(
         "Підсумок останньої перевірки", max_length=300, blank=True, default="",
         help_text="Що знайшла остання перевірка повідомлень і куди надіслала (або чому ні)"
