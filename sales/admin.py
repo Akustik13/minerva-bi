@@ -248,12 +248,32 @@ class SalesOrderLineInline(admin.TabularInline):
             if obj.sku_raw:
                 return format_html('<span style="color:#ff9800">⚠️ {} не в базі</span>', obj.sku_raw)
             return "—"
-        stock = float(_line_cover(obj)["free"])
-        needed = float(obj.qty or 0)
+        cover = _line_cover(obj)
+        stock = float(cover["free"])
+        needed = float(cover.get("need", obj.qty) or 0)
+        sent = float(cover.get("sent") or 0)
+        wait = ""
+        if stock < needed:
+            # бракує, але вже замовлено в постачальника — «📥 +300 PO-10 · 15.11.2026»
+            from inventory.services import stock as _stock
+            inc = _stock.incoming_info([obj.product_id]).get(obj.product_id)
+            if inc:
+                wait = format_html(' <span style="font-size:11px;color:var(--link-fg,#58a6ff)" title="{}">📥 +{} {}{}</span>',
+                                   "Чекаємо поставку від постачальника", int(inc["qty"]), ", ".join(inc["codes"]),
+                                   f" · {inc['date']:%d.%m.%Y}" if inc["date"] else "")
+        if sent and needed <= 0:
+            return format_html('<span style="background:#2e7d32;color:#fff;padding:2px 8px;border-radius:8px;'
+                               'font-size:11px">📦 ✓ {} відправлено</span>', int(sent))
+        if sent:
+            # частину відправлено посилками: «вільно / ще потрібно» — лише для залишку
+            tone = "#4caf50" if stock >= needed else ("#ff9800" if stock > 0 else "#f44336")
+            return format_html('<span style="background:{};color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">'
+                               '{} / {}</span> <span style="font-size:11px;color:var(--text-muted)">📦 ✓ {} '
+                               'відправлено</span>{}', tone, int(stock), int(needed), int(sent), wait)
         if stock <= 0:
-            return format_html('<span style="background:#f44336;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">🚫 Немає (0)</span>')
+            return format_html('<span style="background:#f44336;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">🚫 Немає (0)</span>{}', wait)
         elif stock < needed:
-            return format_html('<span style="background:#ff9800;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">⚠️ {} / {}</span>', int(stock), int(needed))
+            return format_html('<span style="background:#ff9800;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">⚠️ {} / {}</span>{}', int(stock), int(needed), wait)
         return format_html('<span style="background:#4caf50;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">✅ {} шт.</span>', int(stock))
     stock_status.short_description = "На складі"
 
@@ -619,7 +639,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     order_pks = [o.pk for o in cl.result_list]
                     line_objs = list(stock_service.annotate_line_held(
                         SalesOrderLine.objects.filter(order_id__in=order_pks, product_id__isnull=False)
-                        .select_related('order')).order_by('pk'))
+                        .select_related('order', 'product')).order_by('pk'))
                     line_data = [{'order_id': l.order_id, 'product_id': l.product_id, 'qty': l.qty}
                                  for l in line_objs]
                     product_ids = list({lp['product_id'] for lp in line_data})
@@ -628,68 +648,55 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     # так само, як картка замовлення)
                     avail = {pid: p._available for pid, p in stock_service.stock_map(product_ids).items()}
                     order_stock = {}
+                    line_rows = []
                     for l in line_objs:
                         free = avail.get(l.product_id, 0) + stock_service.line_cover_held(l)
-                        order_stock.setdefault(str(l.order_id), []).append({
+                        sent = stock_service.line_sent(l)       # відправлено посилками — уже пішло
+                        row = {
                             'pid':   l.product_id,
-                            'need':  int(l.qty or 0),
+                            'need':  max(0, int((l.qty or 0) - sent)),
+                            'sent':  int(sent),
                             'stock': max(0, int(free)),
-                        })
+                        }
+                        line_rows.append(row)
+                        order_stock.setdefault(str(l.order_id), []).append(row)
                     response.context_data['sv_order_stock_json'] = _json.dumps(order_stock)
                     self._stock_cache = order_stock  # per-request cache for stock_warning()
 
-                    # Batch-fetch active PO info for deadline warning
-                    from inventory.models import PurchaseOrderLine as _POLine
+                    # 📥 Чекаємо поставку: позиції, яким бракує товару (ще потрібно > вільно), а він уже замовлений у
+                    # постачальника (закупівлі ordered / partial — stock.incoming_info): біля позиції «+300 PO-10»,
+                    # угорі картки — що саме чекаємо і коли; поставка пізніше за дедлайн — червоним
                     from datetime import date as _date
-                    po_lines_raw = []
-                    if product_ids:
-                        po_lines_raw = list(
-                            _POLine.objects.filter(
-                                product_id__in=product_ids,
-                                purchase_order__status='ordered',
-                            ).values('product_id', 'purchase_order__expected_date')
-                        )
-                    # product → earliest expected_date (None = on order, no date)
-                    po_by_pid: dict = {}
-                    for pl in po_lines_raw:
-                        pid = pl['product_id']
-                        ed  = pl['purchase_order__expected_date']
-                        if pid not in po_by_pid:
-                            po_by_pid[pid] = ed
-                        elif ed is not None:
-                            if po_by_pid[pid] is None or ed < po_by_pid[pid]:
-                                po_by_pid[pid] = ed
-
-                    # deadline per active order
+                    incoming = stock_service.incoming_info(product_ids)
                     deadline_map = {
                         o.pk: o.shipping_deadline
                         for o in cl.result_list
                         if o.shipping_deadline and o.status in ('received', 'processing')
                     }
-
+                    sku_by_line = {l.pk: (l.sku_raw or (l.product.sku if l.product_id else '') or '?')
+                                   for l in line_objs}
                     order_po: dict = {}
-                    for lp in line_data:
-                        pid = lp['product_id']
-                        if pid not in po_by_pid:
+                    for l, row in zip(line_objs, line_rows):
+                        inc = incoming.get(l.product_id)
+                        if not inc or row['need'] <= row['stock']:
                             continue
-                        oid = str(lp['order_id'])
-                        if oid not in order_po:
-                            order_po[oid] = {'has_po': True, 'expected_date': None, 'is_late': False}
-                        ed = po_by_pid[pid]
-                        if ed is not None:
-                            cur = order_po[oid]['expected_date']
-                            if cur is None or ed > cur:
-                                order_po[oid]['expected_date'] = ed
-
-                    today = _date.today()
+                        row['inc'] = int(inc['qty'])
+                        row['inc_po'] = ', '.join(inc['codes'])
+                        row['inc_date'] = inc['date'].strftime('%d.%m.%Y') if inc['date'] else ''
+                        d = order_po.setdefault(str(l.order_id), {'has_po': True, 'items': [], 'expected_date': None,
+                                                                   'no_date': False, 'is_late': False})
+                        d['items'].append(f"{sku_by_line[l.pk]} +{int(inc['qty'])} ({', '.join(inc['codes'])})")
+                        if inc['date'] is None:
+                            d['no_date'] = True
+                        elif d['expected_date'] is None or inc['date'] > d['expected_date']:
+                            d['expected_date'] = inc['date']
                     for oid_str, d in order_po.items():
-                        oid_int = int(oid_str)
-                        deadline = deadline_map.get(oid_int)
+                        deadline = deadline_map.get(int(oid_str))
                         ed = d['expected_date']
-                        if ed and deadline and ed > deadline:
-                            d['is_late'] = True
+                        d['is_late'] = bool(ed and deadline and ed > deadline)
                         d['expected_date'] = ed.strftime('%d.%m.%Y') if ed else ''
-
+                        d['items'] = '; '.join(d['items'])
+                    response.context_data['sv_order_stock_json'] = _json.dumps(order_stock)
                     response.context_data['sv_order_po_json'] = _json.dumps(order_po)
                 except Exception:
                     response.context_data['sv_order_stock_json'] = '{}'

@@ -2458,6 +2458,7 @@
 {"uk": "{0} без повернення на склад {1}", "en": "{0} without returning to stock {1}", "de": "{0} ohne Rückbuchung ins Lager {1}"}
 {"uk": "{0} витрат", "en": "{0} expenses", "de": "{0} Kosten"}
 {"uk": "{0} відповідає не як API магазину — перевірте адресу сайту.", "en": "{0} does not respond like the shop API — check the site address.", "de": "{0} antwortet nicht wie die Shop-API – prüfen Sie die Website-Adresse."}
+{"uk": "{0} відправлено", "en": "{0} shipped", "de": "{0} versendet"}
 {"uk": "{0} відправлень", "en": "{0} shipments", "de": "{0} Sendungen"}
 {"uk": "{0} г", "en": "{0} g", "de": "{0} g"}
 {"uk": "{0} год", "en": "{0} h", "de": "{0} Std."}
@@ -11016,6 +11017,7 @@
 {"uk": "Послуги та підтримка", "en": "Services and support", "de": "Leistungen und Support"}
 {"uk": "Поспіль без змін", "en": "In a row unchanged", "de": "In Folge unverändert"}
 {"uk": "Поставив галочку, а на сайті товару немає", "en": "I ticked the box, but the product is not on the website", "de": "Häkchen gesetzt, aber der Artikel erscheint nicht auf der Website"}
+{"uk": "Поставка після дедлайну! Очікується", "en": "Delivery after the deadline! Expected", "de": "Lieferung nach der Frist! Erwartet"}
 {"uk": "Поставте галочку «Так, перевести» — нічого не змінено.", "en": "Tick “Yes, convert” — nothing was changed.", "de": "Setzen Sie das Häkchen „Ja, umrechnen“ — es wurde nichts geändert."}
 {"uk": "Поставте ✅ біля \"Надсилати email-сповіщення\" та збережіть", "en": "Tick ✅ next to \"Send email notifications\" and save", "de": "Setzen Sie ✅ bei \"E-Mail-Benachrichtigungen senden\" und speichern Sie"}
 {"uk": "Постачальник", "en": "Supplier", "de": "Lieferant"}
@@ -14296,6 +14298,8 @@
 {"uk": "Чекає перевірки", "en": "Awaiting check", "de": "Wartet auf Prüfung"}
 {"uk": "Чекає підтвердження", "en": "Awaiting confirmation", "de": "Wartet auf Bestätigung"}
 {"uk": "Чекає рішення", "en": "Awaiting decision", "de": "Wartet auf Entscheidung"}
+{"uk": "Чекаємо поставку від постачальника", "en": "Waiting for the supplier delivery", "de": "Warten auf die Lieferung des Lieferanten"}
+{"uk": "Чекаємо поставку, очікується", "en": "Waiting for delivery, expected", "de": "Warten auf Lieferung, erwartet"}
 {"uk": "Чекаємо, поки DigiKey покаже офер.", "en": "Waiting for DigiKey to show the offer.", "de": "Wir warten, bis DigiKey das Offer anzeigt."}
 {"uk": "Чер", "en": "Jun", "de": "Jun"}
 {"uk": "Черв", "en": "Jun", "de": "Jun"}
@@ -17790,6 +17794,7 @@
 {"uk": "умовами окремої угоди.", "en": "by the terms of a separate agreement.", "de": "durch die Bedingungen einer gesonderten Vereinbarung begrenzt sein."}
 {"uk": "уп", "en": "pack", "de": "Pck."}
 {"uk": "упаковку не налаштовано", "en": "packaging is not configured", "de": "Verpackung nicht konfiguriert"}
+{"uk": "усе відправлено", "en": "everything shipped", "de": "alles versendet"}
 {"uk": "усе замовлення", "en": "whole order", "de": "ganzer Auftrag"}
 {"uk": "усе замовлення в посилках", "en": "whole order is in parcels", "de": "ganzer Auftrag in Paketen"}
 {"uk": "усе замовлення одним підтвердженням — кожна посилка своїм трек-номером (так приймає DigiKey)", "en": "the whole order in one confirmation — each parcel with its own tracking number (that is how DigiKey accepts it)", "de": "der ganze Auftrag in einer Bestätigung — jedes Paket mit eigener Sendungsnummer (so akzeptiert es DigiKey)"}

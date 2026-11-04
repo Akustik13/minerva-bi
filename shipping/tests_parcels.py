@@ -559,3 +559,67 @@ class DigiKeyParcelsCallTests(ParcelBase):
         from bots.services.digikey import _ship_hint
         self.assertIn("лише всього замовлення", _ship_hint("Invalid Shipped Quantity"))
         self.assertEqual(_ship_hint("Unauthorized"), "")
+
+
+class StockCoverTests(ParcelBase):
+    """Колонка «Склад» картки: відправлене посилками окремо, «потрібно» — лише залишок."""
+
+    def test_cover_after_first_parcel(self):
+        self.mode("shipped")
+        o = self.make_order()
+        self.move(self.ship(o, (10, 4)), "label_ready")
+        cover = stock.order_lines_cover(SalesOrder.objects.get(pk=o.pk))
+        p, q = cover[self.lp.pk], cover[self.lq.pk]
+        self.assertEqual((p["sent"], p["need"], p["free"]), (10, 0, 10))     # на полиці 10, для замовлення — нічого
+        self.assertEqual((q["sent"], q["need"], q["free"]), (4, 2, 16))      # на полиці 16, ще потрібно 2
+
+    def test_cover_without_parcels_unchanged(self):
+        self.mode("shipped")
+        o = self.make_order()
+        c = stock.order_lines_cover(SalesOrder.objects.get(pk=o.pk))[self.lq.pk]
+        self.assertEqual((c["sent"], c["need"], c["free"]), (0, 6, 20))
+
+    def test_list_card_json(self):
+        import json
+        self.mode("shipped")
+        self.admin_client()
+        o = self.make_order()
+        self.move(self.ship(o, (10, 4)), "label_ready")
+        r = self.client.get("/admin/sales/salesorder/")
+        data = {l["pid"]: l for l in json.loads(r.context_data["sv_order_stock_json"])[str(o.pk)]}
+        self.assertEqual((data[self.p.pk]["need"], data[self.p.pk]["sent"]), (0, 10))
+        self.assertEqual((data[self.q.pk]["need"], data[self.q.pk]["sent"], data[self.q.pk]["stock"]), (2, 4, 16))
+
+
+class IncomingOnCardTests(ParcelBase):
+    """📥 Чекаємо поставку: позиції бракує товару, а його вже замовлено в постачальника."""
+
+    def test_short_line_shows_incoming(self):
+        import json
+        from datetime import date
+        from inventory.models import PurchaseOrder, PurchaseOrderLine
+        self.mode("shipped")
+        self.admin_client()
+        o = self.order((self.q, 30))                          # на складі 20 — бракує 10
+        po = PurchaseOrder.objects.create(status="ordered", code="PO-10", expected_date=date(2026, 11, 20))
+        PurchaseOrderLine.objects.create(purchase_order=po, product=self.q, qty_ordered=300)
+        PurchaseOrderLine.objects.create(purchase_order=po, product=self.p, qty_ordered=50)   # FT не бракує
+        self.assertEqual(stock.incoming_info([self.q.pk])[self.q.pk]["codes"], ["PO-10"])
+        r = self.client.get("/admin/sales/salesorder/")
+        row = json.loads(r.context_data["sv_order_stock_json"])[str(o.pk)][0]
+        self.assertEqual((row["inc"], row["inc_po"], row["inc_date"]), (300, "PO-10", "20.11.2026"))
+        po_info = json.loads(r.context_data["sv_order_po_json"])[str(o.pk)]
+        self.assertEqual((po_info["items"], po_info["expected_date"]), ("AN220213 +300 (PO-10)", "20.11.2026"))
+        r = self.client.get(f"/admin/sales/salesorder/{o.pk}/change/")
+        self.assertContains(r, "📥 +300 PO-10 · 20.11.2026")
+
+    def test_enough_stock_no_incoming_note(self):
+        import json
+        from inventory.models import PurchaseOrder, PurchaseOrderLine
+        self.admin_client()
+        o = self.order((self.q, 5))
+        po = PurchaseOrder.objects.create(status="ordered", code="PO-11")
+        PurchaseOrderLine.objects.create(purchase_order=po, product=self.q, qty_ordered=300)
+        r = self.client.get("/admin/sales/salesorder/")
+        self.assertNotIn("inc", json.loads(r.context_data["sv_order_stock_json"])[str(o.pk)][0])
+        self.assertNotIn(str(o.pk), json.loads(r.context_data["sv_order_po_json"]))

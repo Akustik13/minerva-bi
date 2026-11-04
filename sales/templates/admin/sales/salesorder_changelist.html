@@ -1213,6 +1213,9 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
 {% endif %}
 
 // ── Stock chip + column: fill from batch data ─────────────────────────────
+function _svEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 (function() {
   var stockData = {{ sv_order_stock_json|default:"{}"|safe }};
 
@@ -1224,6 +1227,16 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
     var allOk = lines.every(function(l) { return l.stock >= l.need; });
     var txt   = chip.querySelector('.sv-stock-txt');
     if (!txt) return;
+    // відправлено посилками повністю — «✓», решта рядків — як завжди (лише залишок)
+    var open = lines.filter(function(l) { return !(l.sent && !l.need); });
+    var doneN = lines.length - open.length;
+    if (doneN && !open.length) {
+      txt.innerHTML = '<span style="color:var(--ok)">📦 ✓</span> <b style="color:var(--ok)">{% trans "усе відправлено" %}</b>';
+      chip.style.borderColor = 'var(--ok)';
+      chip.style.background  = 'rgba(76,175,80,.1)';
+      return;
+    }
+    if (doneN) { lines = open; }
 
     if (lines.length === 1) {
       var l     = lines[0];
@@ -1264,6 +1277,9 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
         : '<span style="color:var(--warn,#ff9800)">⚠️</span> ';
       txt.innerHTML = icon + parts.join('<span style="color:var(--text-dim);margin:0 3px">·</span>');
     }
+    if (doneN) {
+      txt.innerHTML += '<span style="color:var(--ok);font-size:10px;margin-left:6px">· ✓ ' + doneN + ' {% trans "відправлено" %}</span>';
+    }
 
     // Chip border/background
     if (allOk) {
@@ -1283,28 +1299,44 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
       );
       if (!cell) return;
       var after = l.stock - l.need;
+      var sentLine = l.sent
+        ? '<div style="font-size:10px;color:var(--ok)">📦 ✓ ' + l.sent + ' {% trans "відправлено" %}</div>' : '';
+      if (l.inc) {
+        // бракує, але вже замовлено в постачальника
+        sentLine += '<div style="font-size:10px;color:var(--link-fg,#58a6ff)" title="{% trans "Чекаємо поставку від постачальника" %}">📥 +'
+          + l.inc + ' ' + _svEsc(l.inc_po) + (l.inc_date ? ' · ' + _svEsc(l.inc_date) : '') + '</div>';
+      }
 
+      if (l.sent && !l.need) {
+        // усе з позиції вже відправлено посилками: на складі зараз — l.stock
+        cell.innerHTML =
+          '<div style="line-height:1.4;text-align:center">'
+          + '<div style="font-weight:700;color:var(--ok);font-size:12px">✓ ' + l.sent + ' {% trans "відправлено" %}</div>'
+          + '<div style="font-size:10px;color:var(--text-dim)">{% trans "на складі" %} ' + l.stock + '</div>'
+          + '</div>';
+        return;
+      }
       if (l.stock >= l.need) {
         // Sufficient: green current, dimmed remaining
         cell.innerHTML =
           '<div style="line-height:1.4;text-align:center">'
           + '<div style="font-weight:700;color:var(--ok);font-size:13px">' + l.stock + '</div>'
           + '<div style="font-size:10px;color:var(--text-dim)">↓ ' + after + '</div>'
-          + '</div>';
+          + sentLine + '</div>';
       } else if (l.stock > 0) {
         // Partial: orange current, red deficit
         cell.innerHTML =
           '<div style="line-height:1.4;text-align:center">'
           + '<div style="font-weight:700;color:var(--warn,#ff9800);font-size:13px">⚠ ' + l.stock + '</div>'
           + '<div style="font-size:10px;color:var(--err)">↓ ' + after + '</div>'
-          + '</div>';
+          + sentLine + '</div>';
       } else {
         // Zero stock: all red
         cell.innerHTML =
           '<div style="line-height:1.4;text-align:center">'
           + '<div style="font-weight:700;color:var(--err);font-size:13px">🚫 0</div>'
           + '<div style="font-size:10px;color:var(--err)">−' + l.need + '</div>'
-          + '</div>';
+          + sentLine + '</div>';
       }
     });
   });
@@ -1318,14 +1350,16 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
     var el = document.getElementById('sv-po-warn-' + oid);
     if (!el || !d.has_po) return;
     var html;
+    // лише позиції, яким бракує товару: «📥 Чекаємо поставку: CA-… +300 (PO-10)»
     if (d.is_late) {
-      html = '<span style="color:#ef5350;font-weight:600">⚠️ {% trans "Замовлено, затримка! Очікується" %} ' + d.expected_date + '</span>';
-    } else if (d.expected_date) {
-      html = '<span style="color:var(--text-dim)">📦 {% trans "Товар замовлено, очікується" %} ' + d.expected_date + '</span>';
+      html = '<span style="color:#ef5350;font-weight:600">⚠️ {% trans "Поставка після дедлайну! Очікується" %} ' + _svEsc(d.expected_date) + '</span>';
+    } else if (d.expected_date && !d.no_date) {
+      html = '<span style="color:var(--link-fg,#58a6ff)">📥 {% trans "Чекаємо поставку, очікується" %} ' + _svEsc(d.expected_date) + '</span>';
     } else {
-      html = '<span style="color:var(--text-dim)">📦 {% trans "Товар замовлено" %}</span>';
+      html = '<span style="color:var(--link-fg,#58a6ff)">📥 {% trans "Чекаємо поставку від постачальника" %}</span>';
     }
     el.innerHTML = html;
+    el.title = d.items || '';
   });
 })();
 

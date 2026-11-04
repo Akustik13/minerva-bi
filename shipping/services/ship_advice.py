@@ -113,8 +113,8 @@ def checks(order, stock=None, shipments=None) -> list:
         c = stock.get(line.pk)
         if line.product_id is None:
             add('warn', f'позиція {line.sku_raw or "?"} без товару складу')
-        elif c is not None and c['free'] < (line.qty or 0):
-            add('warn', f'бракує {line.product.sku}: потрібно {num(line.qty)}, вільно {num(c["free"])}')
+        elif c is not None and c['free'] < c.get('need', line.qty or 0):
+            add('warn', f'бракує {line.product.sku}: потрібно {num(c.get("need", line.qty))}, вільно {num(c["free"])}')
     if code and code not in eu():
         no_hs = [l.product.sku for l in lines if l.product_id and not hs(l.product)]
         if no_hs:

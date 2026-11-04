@@ -97,6 +97,14 @@ def _line_held_txs():
     )
 
 
+def _line_sent_txs():
+    """Списання позиції, відправлені посилками (OuterRef — SalesOrderLine): ключ …:line:<pk>:sent:… (посилки)."""
+    key = _FlatConcat(Value("so:"), OuterRef("order__source"), Value(":"), OuterRef("order__order_number"),
+                      Value(":line:"), Cast(OuterRef("pk"), output_field=CharField()), Value(":sent:"))
+    return InventoryTransaction.objects.filter(
+        product_id=OuterRef("product_id"), tx_type=TX.OUTGOING, external_key__startswith=key)
+
+
 def _ships_late(settings=None):
     """Режим «списувати при Доставлено»: відправлене замовлення ще в on_hand, доки його не доставлено."""
     s = settings or InventorySettings.get()
@@ -176,6 +184,32 @@ def incoming_subquery(statuses=OPEN_PO_STATUSES):
     return (PurchaseOrderLine.objects
             .filter(product=OuterRef("pk"), purchase_order__status__in=statuses)
             .values("product").annotate(t=Sum(po_open_qty())).values("t"))
+
+
+def incoming_info(product_ids, statuses=CONFIRMED_PO_STATUSES) -> dict:
+    """{pk товару: {qty, codes, date}} — що ще прийде за закупівлями, уже замовленими в постачальника (ordered /
+    partial, без чернеток-кошика): скільки, які закупівлі (код PO), найраніша очікувана дата (None — не вказана).
+    Картка замовлення: «📥 чекаємо поставку» біля позиції, якій бракує товару."""
+    ids = [pk for pk in product_ids if pk]
+    out = {}
+    if not ids:
+        return out
+    rows = (PurchaseOrderLine.objects
+            .filter(product_id__in=ids, purchase_order__status__in=statuses)
+            .annotate(open_qty=po_open_qty()).filter(open_qty__gt=0)
+            .values("product_id", "open_qty", "purchase_order_id", "purchase_order__code",
+                    "purchase_order__expected_date")
+            .order_by("purchase_order__expected_date", "purchase_order_id"))
+    for r in rows:
+        d = out.setdefault(r["product_id"], {"qty": Decimal("0"), "codes": [], "date": None})
+        d["qty"] += r["open_qty"]
+        code = r["purchase_order__code"] or f"PO-{r['purchase_order_id']}"
+        if code not in d["codes"]:
+            d["codes"].append(code)
+        ed = r["purchase_order__expected_date"]
+        if ed and (d["date"] is None or ed < d["date"]):
+            d["date"] = ed
+    return out
 
 
 def incoming_qty(product, statuses=OPEN_PO_STATUSES):
@@ -311,8 +345,18 @@ def annotate_line_held(lines_qs):
     """Позиції замовлень + _held_tx: скільки під позицію вже списано / заброньовано рухом складу;
     _held_out — чи під позицію вже є списання (Outgoing)."""
     held = (_line_held_txs().values("product").annotate(t=Sum("qty")).values("t"))
+    sent = (_line_sent_txs().values("product").annotate(t=Sum("qty")).values("t"))
     return lines_qs.annotate(_held_tx=-Coalesce(Subquery(held, output_field=_DEC), _ZERO),
-                             _held_out=Exists(_line_held_txs().filter(tx_type=TX.OUTGOING)))
+                             _held_out=Exists(_line_held_txs().filter(tx_type=TX.OUTGOING)),
+                             _held_sent=-Coalesce(Subquery(sent, output_field=_DEC), _ZERO))
+
+
+def line_sent(line):
+    """Скільки з позиції вже відправлено посилками (замовлення ще не «Відправлено»): цього товару вже немає на
+    складі й для цього замовлення його більше не треба. Потрібен annotate_line_held."""
+    if line.order.status in SHIPPED_STATUSES:
+        return Decimal("0")
+    return max(getattr(line, "_held_sent", None) or Decimal("0"), Decimal("0"))
 
 
 def line_held(line):
@@ -335,19 +379,23 @@ def line_cover_held(line):
     Потрібен annotate_line_held."""
     if line.order.status in SHIPPED_STATUSES and getattr(line, "_held_out", False):
         return Decimal("0")
-    return line_held(line)
+    # частину відправлено посилками: вона вже пішла зі складу — додається лише те, що тримається під залишок
+    return max(line_held(line) - line_sent(line), Decimal("0"))
 
 
 def order_lines_cover(order):
-    """{pk позиції: {available, held, free}} для картки замовлення: free = доступно + те, що вже взяло це
-    замовлення (його списання / резерв / бронь не рахуються як нестача). Відправлене й списане — free = available."""
+    """{pk позиції: {available, held, free, sent, need}} для картки замовлення: free = доступно + те, що вже взяло
+    це замовлення (його списання / резерв / бронь не рахуються як нестача). Відправлене й списане — free = available.
+    Відправлене посилками (sent) уже пішло: need = кількість − sent — скільки ще потрібно для залишку."""
     lines = list(annotate_line_held(order.lines.filter(product__isnull=False)).select_related("order"))
     avail = {pid: p._available for pid, p in stock_map({l.product_id for l in lines}).items()}
     out = {}
     for line in lines:
         a = avail.get(line.product_id, Decimal("0"))
         h = line_cover_held(line)
-        out[line.pk] = {"available": a, "held": h, "free": a + h}
+        sent = line_sent(line)
+        out[line.pk] = {"available": a, "held": h, "free": a + h, "sent": sent,
+                        "need": max((line.qty or Decimal("0")) - sent, Decimal("0"))}
     return out
 
 
