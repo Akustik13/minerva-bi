@@ -44,7 +44,7 @@ def suggest_view(request, pk):
     for rule in AgentRule.objects.filter(account=msg.account).select_related('category'):
         ok, why = agent_mail.matches(rule, msg)
         if ok:
-            mode = rule.get_kind_display() if rule.kind == AgentRule.MAIL_TASK else rule.get_mode_display()
+            mode = rule.get_mode_display() if rule.kind == AgentRule.MAIL_REPLY else rule.get_kind_display()
             rules.append({'id': rule.pk, 'name': rule.name, 'mode': mode, 'enabled': rule.enabled,
                           'why': why, 'url': f'/admin/agent/agentrule/{rule.pk}/change/'})
     return JsonResponse({
@@ -94,7 +94,7 @@ def save_view(request, pk):
     if rule.kind == AgentRule.MAIL_TASK and not request.user.has_perm('agent.add_agenttask'):
         return JsonResponse({'ok': False, 'error': 'Немає права давати завдання агенту'}, status=403)
     out = agent_mail.save(rule, msg, reply=str(data.get('reply') or '') if data.get('draft_now') else '',
-                          task_now=bool(data.get('task_now')))
+                          task_now=bool(data.get('task_now')), subject=str(data.get('subject') or '')[:300])
     task = out.get('task')
     return JsonResponse({'ok': True, 'id': out['rule'].pk, 'url': f'/admin/agent/agentrule/{out["rule"].pk}/change/',
                          'draft': out['draft'].pk if out['draft'] else None,

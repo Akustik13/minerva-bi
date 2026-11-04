@@ -44,13 +44,14 @@ class AgentRuleForm(forms.ModelForm):
     class Meta:
         model = AgentRule
         fields = ['name', 'enabled', 'account', 'kind', 'senders', 'subject_words', 'body_words', 'category',
-                  'instruction', 'mode', 'send_delay_minutes', 'daily_limit', 'auto_apply', 'task_model',
+                  'instruction', 'mode', 'send_delay_minutes', 'daily_limit', 'cc', 'auto_apply', 'task_model',
                   'task_budget_usd']
         widgets = {
             'senders': forms.Textarea(attrs={'rows': 3}),
             'subject_words': forms.Textarea(attrs={'rows': 3}),
             'body_words': forms.Textarea(attrs={'rows': 3}),
             'instruction': forms.Textarea(attrs={'rows': 8}),
+            'cc': forms.Textarea(attrs={'rows': 2}),
         }
 
     def clean(self):
@@ -60,6 +61,10 @@ class AgentRuleForm(forms.ModelForm):
         if not rule.has_conditions:
             raise forms.ValidationError('Потрібна хоча б одна умова: від кого, тема, текст або своя категорія — '
                                         'інакше агент відповідав би на всі листи.')
+        import re as _re
+        bad = [x for x in _re.split(r'[\s,;]+', data.get('cc') or '') if x and not agent_mail.EMAIL_RE.fullmatch(x)]
+        if bad:
+            self.add_error('cc', 'Не схоже на адресу: ' + ', '.join(bad[:3]))
         long_lines = [ln for ln in (data.get('body_words') or '').splitlines() if len(ln.split()) > 6]
         if long_lines:
             self.add_error('body_words', 'Це слова чи фраза, яка має буквально бути в тексті листа (по одній у рядку). '
@@ -84,8 +89,11 @@ class AgentRuleAdmin(admin.ModelAdmin):
                            'автовідповіді й листи, на які вже відповіли; 🧩 завдання — і з листів колег.',
         }),
         ('Що робити', {'fields': ('instruction', 'daily_limit')}),
-        ('✉️ Відповідь', {'fields': ('mode', 'send_delay_minutes', 'streak'),
-                          'description': 'Лише для «Відповідати на такі листи».'}),
+        ('✉️ Лист: відповідь або клієнту замовлення', {
+            'fields': ('mode', 'send_delay_minutes', 'cc', 'streak'),
+            'description': 'Для «Відповідати на такі листи» і «📨 Писати клієнту замовлення». Клієнту — замовлення, '
+                           'чий трек-номер (у замовленні чи його відправленні) є в листі; на адресу клієнта із '
+                           'замовлення, тому самому клієнту про те саме замовлення — не частіше ніж раз на 14 днів.'}),
         ('🧩 Завдання агенту', {
             'fields': ('auto_apply', 'task_model', 'task_budget_usd'),
             'description': 'Лише для «Завдання агенту з кожного такого листа»: з кожного нового такого листа — '
@@ -128,7 +136,8 @@ class AgentRuleAdmin(admin.ModelAdmin):
     def mode_col(self, obj):
         if obj.kind == AgentRule.MAIL_TASK:
             return '🧩 завдання' + (' · ✓ трек-номер сам' if obj.auto_apply else '')
-        return '✉️ сам' if obj.mode == AgentRule.SEND else '📝 чернетка'
+        mode = '✉️ сам' if obj.mode == AgentRule.SEND else '📝 чернетка'
+        return f'📨 клієнту · {mode}' if obj.kind == AgentRule.MAIL_CUSTOMER else mode
 
     @admin.display(description='Умови')
     def conditions(self, obj):

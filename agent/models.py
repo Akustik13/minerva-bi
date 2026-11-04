@@ -20,8 +20,9 @@ class AgentRule(models.Model):
     (чернетка або, якщо дозволено, надіслати самому); mail_task — 🧩 завдання агенту з кожного такого листа
     (трек-номер у замовлення, закупівля з листа постачальника …): пропозиції застосовуєте ви ✓, а з auto_apply
     трек-номер і кур’єра в порожнє поле замовлення та трек-номер посилки закупівлі агент вносить сам."""
-    MAIL_REPLY, MAIL_TASK = 'mail_reply', 'mail_task'
+    MAIL_REPLY, MAIL_TASK, MAIL_CUSTOMER = 'mail_reply', 'mail_task', 'mail_customer'
     KINDS = [(MAIL_REPLY, '✉️ Відповідати на такі листи'),
+             (MAIL_CUSTOMER, '📨 Писати клієнту замовлення (трек-номер з листа)'),
              (MAIL_TASK, '🧩 Завдання агенту з кожного такого листа')]
     DRAFT, SEND = 'draft', 'send'
     MODES = [(DRAFT, '📝 Лише чернетка — ви перевіряєте й надсилаєте'),
@@ -57,6 +58,9 @@ class AgentRule(models.Model):
     task_budget_usd = models.DecimalField('Найбільше на одне завдання, $', max_digits=6, decimal_places=2,
                                           default=0.5)
     mode = models.CharField('Режим', max_length=10, choices=MODES, default=DRAFT)
+    cc = models.TextField(
+        'Копія (CC)', blank=True, default='',
+        help_text='Адреси по одній у рядку (або через кому) — у копію кожного листа агента: відповіді й листа клієнту.')
     send_delay_minutes = models.PositiveSmallIntegerField(
         'Надсилати через, хв', default=15,
         help_text='Режим «Надсилати самому»: лист стає в «⏳ Заплановані», до відправки можна скасувати.')
@@ -128,6 +132,9 @@ class AgentRun(models.Model):
                                   on_delete=models.SET_NULL, related_name='+', verbose_name='Запланований лист')
     task = models.ForeignKey('AgentTask', null=True, blank=True, on_delete=models.SET_NULL,
                              related_name='mail_runs', verbose_name='Завдання агенту')
+    order = models.ForeignKey('sales.SalesOrder', null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name='+', verbose_name='Замовлення',
+                              help_text='«📨 Писати клієнту замовлення»: замовлення, знайдене за трек-номером листа')
     outcome = models.CharField('Що зробили ви', max_length=12, choices=OUTCOMES, blank=True, default='')
     created_at = models.DateTimeField('Коли', auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
