@@ -12,6 +12,7 @@ TASK_MODELS = [
     ('claude-sonnet-5-5', 'Claude Sonnet 5.5 — швидко й якісно · $2 / $10'),
     ('claude-haiku-5-5', 'Claude Haiku 5.5 — найдешевше · $0.10 / $0.50'),
 ]
+DEFAULT_MODEL = 'claude-haiku-5-5'      # за замовчуванням — найдешевша; для складних даташитів людина вибирає Opus
 
 
 class AgentRule(models.Model):
@@ -52,8 +53,7 @@ class AgentRule(models.Model):
         '✓ Трек-номер вносити самому', default=False,
         help_text='Лише «🧩 Завдання агенту»: трек-номер і кур’єра — у замовлення, де поле ще порожнє, і трек-номер '
                   'посилки до наявної закупівлі. Решту пропозицій (статус, нова закупівля, прихід…) застосовуєте ви ✓.')
-    task_model = models.CharField('Модель AI завдання', max_length=40, choices=TASK_MODELS,
-                                  default='claude-sonnet-5-5')
+    task_model = models.CharField('Модель AI завдання', max_length=40, choices=TASK_MODELS, default=DEFAULT_MODEL)
     task_budget_usd = models.DecimalField('Найбільше на одне завдання, $', max_digits=6, decimal_places=2,
                                           default=0.5)
     mode = models.CharField('Режим', max_length=10, choices=MODES, default=DRAFT)
@@ -175,7 +175,7 @@ class AgentTask(models.Model):
         help_text='Агент проходить вибрані товари по одному (для сотень товарів). Лист у цьому режимі не готує.')
     web = models.BooleanField('Можна шукати в інтернеті', default=False,
                               help_text='Пошук на сайтах виробників, коли в Minerva даних немає (дорожче).')
-    model = models.CharField('Модель AI', max_length=40, choices=MODELS, default='claude-opus-5-5')
+    model = models.CharField('Модель AI', max_length=40, choices=MODELS, default=DEFAULT_MODEL)
     budget_usd = models.DecimalField('Найбільше витратити, $', max_digits=8, decimal_places=2, default=2,
                                      help_text='Досягнуто — агент зупиняється, знайдене лишається.')
     status = models.CharField('Стан', max_length=12, choices=STATUSES, default=QUEUED, db_index=True)

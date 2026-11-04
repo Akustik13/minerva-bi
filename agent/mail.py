@@ -24,7 +24,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from agent import risk
-from agent.models import AgentProposal, AgentRule, AgentRun, AgentTask
+from agent.models import DEFAULT_MODEL, AgentProposal, AgentRule, AgentRun, AgentTask
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +312,7 @@ def make_task(rule, msg):
     return AgentTask.objects.create(
         owner=rule.account.user, title=f'🤖 {rule.name}: {msg.subject or "(без теми)"}'[:200],
         instruction=(rule.instruction or '').strip() + TASK_NOTE.format(name=rule.name), message=msg,
-        model=rule.task_model or 'claude-sonnet-5-5', budget_usd=rule.task_budget_usd)
+        model=rule.task_model or DEFAULT_MODEL, budget_usd=rule.task_budget_usd)
 
 
 def process_task(run):

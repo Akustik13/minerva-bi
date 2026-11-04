@@ -62,6 +62,12 @@ MAIL = {'name': 'propose_email', 'description': 'Підготувати лист
             'body': {'type': 'string'}, 'attach_datasheets': {'type': 'array', 'items': {'type': 'string'}}},
             'required': ['to', 'subject', 'body']}}
 WEB_SEARCH = {'type': 'web_search_20260209', 'name': 'web_search', 'max_uses': 8}
+# Haiku 5.5 — без динамічної фільтрації (web_search_20260209 лише в Opus / Sonnet): попередня версія пошуку
+WEB_SEARCH_BASIC = {'type': 'web_search_20250305', 'name': 'web_search', 'max_uses': 8}
+
+
+def web_search_for(model) -> dict:
+    return dict(WEB_SEARCH_BASIC if str(model or '').startswith('claude-haiku') else WEB_SEARCH)
 READ_MAIL = {'name': 'read_mail', 'description': 'Лист завдання: від кого, кому, дата, тема, текст (новий, без цитати), '
              'вкладення (номери для read_attachment) і короткі попередні листи гілки.',
              'input_schema': {'type': 'object', 'properties': {}}}
@@ -103,7 +109,7 @@ def definitions(task, single=False) -> list:
             tools += shipments.TOOLS
         if purchases.can_read(owner):    # закупівлі й вхідні посилки
             tools += purchases.TOOLS
-    return tools + ([dict(WEB_SEARCH)] if task.web else [])
+    return tools + ([web_search_for(task.model)] if task.web else [])
 
 
 def mail_of(task):

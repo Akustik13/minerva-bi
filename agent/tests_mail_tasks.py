@@ -52,7 +52,7 @@ class MailTaskTests(Base):
         self.assertEqual(run.status, AgentRun.TASKED)
         task = run.task
         self.assertEqual((task.owner, task.message, task.status, task.model, task.budget_usd),
-                         (self.user, msg, AgentTask.QUEUED, 'claude-sonnet-5-5', Decimal('0.50')))
+                         (self.user, msg, AgentTask.QUEUED, 'claude-haiku-5-5', Decimal('0.50')))
         self.assertIn('внеси трек-номер у замовлення', task.instruction)
         self.assertIn('Доручення «Трек-номер DigiKey»', task.instruction)
         self.assertEqual(agent_mail.run_due()['queued'], 0)              # той самий лист — один раз
@@ -147,3 +147,17 @@ class MailTaskTests(Base):
             'task_model': 'claude-sonnet-5-5', 'task_budget_usd': '0.50'})
         self.assertFalse(form.is_valid())
         self.assertIn('body_words', form.errors)
+
+
+class DefaultModelTests(Base):
+    """Claude Haiku 5.5 — за замовчуванням; пошук в інтернеті для Haiku — без динамічної фільтрації."""
+
+    def test_haiku_default_and_web_search_version(self):
+        from agent import tools
+        task = self.task('x', products=[], web=True)
+        self.assertEqual((task.model, AgentRule().task_model), ('claude-haiku-5-5', 'claude-haiku-5-5'))
+        web = [t for t in tools.definitions(task) if t.get('name') == 'web_search']
+        self.assertEqual(web[0]['type'], 'web_search_20250305')
+        task.model = 'claude-opus-5-5'
+        web = [t for t in tools.definitions(task) if t.get('name') == 'web_search']
+        self.assertEqual(web[0]['type'], 'web_search_20260209')
