@@ -7,11 +7,21 @@ from django.conf import settings
 from django.db import models
 
 
+TASK_MODELS = [
+    ('claude-opus-5-5', 'Claude Opus 5.5 — найточніше · $4 / $20 за 1 млн токенів'),
+    ('claude-sonnet-5-5', 'Claude Sonnet 5.5 — швидко й якісно · $2 / $10'),
+    ('claude-haiku-5-5', 'Claude Haiku 5.5 — найдешевше · $0.10 / $0.50'),
+]
+
+
 class AgentRule(models.Model):
-    """Доручення агенту. Вид mail_reply: нові листи скриньки, що підходять під умови, → відповідь за інструкцією
-    (чернетка або, якщо дозволено, надіслати самому)."""
-    MAIL_REPLY = 'mail_reply'
-    KINDS = [(MAIL_REPLY, '✉️ Відповідати на такі листи')]
+    """Доручення агенту на нові листи скриньки, що підходять під умови. Вид mail_reply — відповідь за інструкцією
+    (чернетка або, якщо дозволено, надіслати самому); mail_task — 🧩 завдання агенту з кожного такого листа
+    (трек-номер у замовлення, закупівля з листа постачальника …): пропозиції застосовуєте ви ✓, а з auto_apply
+    трек-номер і кур’єра в порожнє поле замовлення та трек-номер посилки закупівлі агент вносить сам."""
+    MAIL_REPLY, MAIL_TASK = 'mail_reply', 'mail_task'
+    KINDS = [(MAIL_REPLY, '✉️ Відповідати на такі листи'),
+             (MAIL_TASK, '🧩 Завдання агенту з кожного такого листа')]
     DRAFT, SEND = 'draft', 'send'
     MODES = [(DRAFT, '📝 Лише чернетка — ви перевіряєте й надсилаєте'),
              (SEND, '✉️ Надсилати самому — через кілька хвилин, можна скасувати')]
@@ -35,15 +45,25 @@ class AgentRule(models.Model):
                                  related_name='+', verbose_name='Своя категорія листа')
     instruction = models.TextField(
         'Що робити — інструкція агенту',
-        help_text='Як відповідати: що написати, чим підтвердити, коли не відповідати. Агент бере факти лише з '
-                  'Minerva й листа, а чого немає — пише [уточнити] і лишає чернетку.')
+        help_text='Відповідь: що написати, чим підтвердити, коли не відповідати (факти — лише з Minerva й листа, '
+                  'чого немає — [уточнити] і чернетка). Завдання: що зробити з листом — напр. «знайди номер '
+                  'замовлення й трек-номер і внеси трек-номер у замовлення».')
+    auto_apply = models.BooleanField(
+        '✓ Трек-номер вносити самому', default=False,
+        help_text='Лише «🧩 Завдання агенту»: трек-номер і кур’єра — у замовлення, де поле ще порожнє, і трек-номер '
+                  'посилки до наявної закупівлі. Решту пропозицій (статус, нова закупівля, прихід…) застосовуєте ви ✓.')
+    task_model = models.CharField('Модель AI завдання', max_length=40, choices=TASK_MODELS,
+                                  default='claude-sonnet-5-5')
+    task_budget_usd = models.DecimalField('Найбільше на одне завдання, $', max_digits=6, decimal_places=2,
+                                          default=0.5)
     mode = models.CharField('Режим', max_length=10, choices=MODES, default=DRAFT)
     send_delay_minutes = models.PositiveSmallIntegerField(
         'Надсилати через, хв', default=15,
         help_text='Режим «Надсилати самому»: лист стає в «⏳ Заплановані», до відправки можна скасувати.')
     daily_limit = models.PositiveSmallIntegerField(
         'Найбільше листів на день', default=20,
-        help_text='Понад це — лише чернетки (режим «Надсилати самому»).')
+        help_text='Відповідь: понад це — лише чернетки (режим «Надсилати самому»). Завдання: понад це за день — '
+                  'листи пропускаються.')
     example_message = models.ForeignKey('email_assistant.EmailMessage', null=True, blank=True,
                                         on_delete=models.SET_NULL, related_name='+',
                                         verbose_name='Створено з листа')
@@ -77,11 +97,13 @@ class AgentRule(models.Model):
 class AgentRun(models.Model):
     """Один лист за одним дорученням: що агент вирішив і зробив, а потім — що зробили ви з його чернеткою."""
     QUEUED, RUNNING, DRAFTED, SCHEDULED, SKIPPED, FAILED = 'queued', 'running', 'drafted', 'scheduled', 'skipped', 'failed'
+    TASKED = 'tasked'
     STATUSES = [
         (QUEUED, '⏳ У черзі'),
         (RUNNING, '⚙️ Готує'),
         (DRAFTED, '📝 Чернетка готова'),
         (SCHEDULED, '✉️ Заплановано надіслати'),
+        (TASKED, '🧩 Завдання агенту'),
         (SKIPPED, '↷ Пропущено'),
         (FAILED, '⚠️ Помилка'),
     ]
@@ -104,6 +126,8 @@ class AgentRun(models.Model):
                               related_name='+', verbose_name='Чернетка')
     scheduled = models.ForeignKey('email_assistant.ScheduledEmail', null=True, blank=True,
                                   on_delete=models.SET_NULL, related_name='+', verbose_name='Запланований лист')
+    task = models.ForeignKey('AgentTask', null=True, blank=True, on_delete=models.SET_NULL,
+                             related_name='mail_runs', verbose_name='Завдання агенту')
     outcome = models.CharField('Що зробили ви', max_length=12, choices=OUTCOMES, blank=True, default='')
     created_at = models.DateTimeField('Коли', auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -131,11 +155,7 @@ class AgentTask(models.Model):
         (FAILED, '⚠️ Помилка'),
         (CANCELLED, '✕ Зупинено'),
     ]
-    MODELS = [
-        ('claude-opus-5-5', 'Claude Opus 5.5 — найточніше · $4 / $20 за 1 млн токенів'),
-        ('claude-sonnet-5-5', 'Claude Sonnet 5.5 — швидко й якісно · $2 / $10'),
-        ('claude-haiku-5-5', 'Claude Haiku 5.5 — найдешевше · $0.10 / $0.50'),
-    ]
+    MODELS = TASK_MODELS
 
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='agent_tasks',
                               verbose_name='Хто дав завдання')

@@ -224,6 +224,15 @@ def run(task, deadline=None):
 
 
 def _finish(task, note='', error='', cancelled=False):
+    auto = ''
+    if not error and not cancelled:                     # доручення «🧩 … ✓ Трек-номер вносити самому» (agent/mail.py)
+        try:
+            from agent.mail import auto_apply
+            auto = auto_apply(task)
+        except Exception as e:  # noqa: BLE001 — пропозиції лишаються на ✓ людини
+            logger.warning('agent auto-apply task %s: %s', task.pk, e)
+        if auto:
+            _log(task, '✓ ' + auto)
     pending = AgentProposal.objects.filter(task=task, status=AgentProposal.PENDING).exists()
     if error:
         status = AgentTask.FAILED
@@ -231,7 +240,7 @@ def _finish(task, note='', error='', cancelled=False):
         status = AgentTask.CANCELLED
     else:
         status = AgentTask.REVIEW if pending else AgentTask.DONE
-    summary = (task.summary or '') + (f'\n\n⚠️ {note}' if note else '')
+    summary = (task.summary or '') + (f'\n\n⚠️ {note}' if note else '') + (f'\n\n✓ {auto}' if auto else '')
     AgentTask.objects.filter(pk=task.pk).update(status=status, summary=summary.strip(), error=error[:500],
                                                 finished_at=timezone.now(), heartbeat_at=timezone.now())
     if not cancelled:                                   # 🔔 лист і Telegram власнику (agent/notify.py)

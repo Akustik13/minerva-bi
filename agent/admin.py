@@ -18,9 +18,9 @@ from agent.models import AgentProposal, AgentRule, AgentRun, AgentTask
 # ✓ на сторінці завдання — кому є що застосувати (кожна пропозиція ще перевіряє своє право, agent/decide.py)
 APPLY_PERMS = ('inventory.change_product', 'inventory.add_product', 'inventory.add_inventorytransaction',
                'calendar_app.add_calendarevent', 'shop.change_shoplisting', 'bots.change_digikeylisting',
-               'shipping.add_shipment', 'sales.change_salesorder')
+               'shipping.add_shipment', 'sales.change_salesorder', 'inventory.add_purchaseorder')
 STATUS_ICONS = {AgentRun.QUEUED: '⏳', AgentRun.RUNNING: '⚙️', AgentRun.DRAFTED: '📝', AgentRun.SCHEDULED: '✉️',
-                AgentRun.SKIPPED: '↷', AgentRun.FAILED: '⚠️'}
+                AgentRun.TASKED: '🧩', AgentRun.SKIPPED: '↷', AgentRun.FAILED: '⚠️'}
 
 
 def _mail_link(msg):
@@ -35,14 +35,17 @@ def _result_link(run):
     if run.scheduled_id:
         return format_html('<a href="/admin/email_assistant/scheduledemail/{}/change/">⏳ запланований лист</a>',
                            run.scheduled_id)
+    if run.task_id:
+        return format_html('<a href="/admin/agent/agenttask/{}/review/">🧩 завдання #{}</a>', run.task_id, run.task_id)
     return ''
 
 
 class AgentRuleForm(forms.ModelForm):
     class Meta:
         model = AgentRule
-        fields = ['name', 'enabled', 'account', 'senders', 'subject_words', 'body_words', 'category',
-                  'instruction', 'mode', 'send_delay_minutes', 'daily_limit']
+        fields = ['name', 'enabled', 'account', 'kind', 'senders', 'subject_words', 'body_words', 'category',
+                  'instruction', 'mode', 'send_delay_minutes', 'daily_limit', 'auto_apply', 'task_model',
+                  'task_budget_usd']
         widgets = {
             'senders': forms.Textarea(attrs={'rows': 3}),
             'subject_words': forms.Textarea(attrs={'rows': 3}),
@@ -57,6 +60,10 @@ class AgentRuleForm(forms.ModelForm):
         if not rule.has_conditions:
             raise forms.ValidationError('Потрібна хоча б одна умова: від кого, тема, текст або своя категорія — '
                                         'інакше агент відповідав би на всі листи.')
+        long_lines = [ln for ln in (data.get('body_words') or '').splitlines() if len(ln.split()) > 6]
+        if long_lines:
+            self.add_error('body_words', 'Це слова чи фраза, яка має буквально бути в тексті листа (по одній у рядку). '
+                                         'Пояснення, що робити, — у «Що робити — інструкція агенту».')
         return data
 
 
@@ -64,18 +71,26 @@ class AgentRuleForm(forms.ModelForm):
 class AgentRuleAdmin(admin.ModelAdmin):
     form = AgentRuleForm
     list_display = ('name', 'account', 'mode_col', 'enabled', 'conditions', 'stats', 'last_run')
-    list_filter = ('enabled', 'mode')
+    list_filter = ('enabled', 'kind', 'mode')
     search_fields = ('name', 'senders', 'subject_words', 'instruction')
     readonly_fields = ('promote_panel', 'recent_runs', 'example_link', 'streak', 'created_by', 'created_at')
     fieldsets = (
-        (None, {'fields': ('promote_panel', 'name', 'enabled', 'account')}),
+        (None, {'fields': ('promote_panel', 'name', 'enabled', 'account', 'kind')}),
         ('Які листи — усі задані умови разом', {
             'fields': ('senders', 'subject_words', 'body_words', 'category', 'example_link'),
-            'description': 'У кожному полі — по одному в рядку, підходить будь-який рядок. Порожнє поле не '
-                           'перевіряється. Агент бере лише нові листи у Вхідних (не старші за три дні), не відповідає '
-                           'на свої листи, noreply-адреси, автовідповіді й листи, на які вже відповіли.',
+            'description': 'У кожному полі — по одному в рядку, підходить будь-який рядок; «Текст листа містить» — '
+                           'слова чи фраза, що буквально є в листі. Порожнє поле не перевіряється. Агент бере лише '
+                           'нові листи у Вхідних (не старші за три дні). Відповідь — не на свої листи, noreply-адреси, '
+                           'автовідповіді й листи, на які вже відповіли; 🧩 завдання — і з листів колег.',
         }),
-        ('Що робити', {'fields': ('instruction', 'mode', 'send_delay_minutes', 'daily_limit', 'streak')}),
+        ('Що робити', {'fields': ('instruction', 'daily_limit')}),
+        ('✉️ Відповідь', {'fields': ('mode', 'send_delay_minutes', 'streak'),
+                          'description': 'Лише для «Відповідати на такі листи».'}),
+        ('🧩 Завдання агенту', {
+            'fields': ('auto_apply', 'task_model', 'task_budget_usd'),
+            'description': 'Лише для «Завдання агенту з кожного такого листа»: з кожного нового такого листа — '
+                           'завдання агенту (як «🧩 Завдання агенту з цього листа»). Пропозиції — на сторінці '
+                           'завдання, коли закінчить — лист і Telegram.'}),
         ('📜 Останні листи за цим дорученням', {'fields': ('recent_runs',)}),
         ('Службове', {'fields': ('created_by', 'created_at'), 'classes': ('collapse',)}),
     )
@@ -111,6 +126,8 @@ class AgentRuleAdmin(admin.ModelAdmin):
 
     @admin.display(description='Режим')
     def mode_col(self, obj):
+        if obj.kind == AgentRule.MAIL_TASK:
+            return '🧩 завдання' + (' · ✓ трек-номер сам' if obj.auto_apply else '')
         return '✉️ сам' if obj.mode == AgentRule.SEND else '📝 чернетка'
 
     @admin.display(description='Умови')
@@ -130,6 +147,7 @@ class AgentRuleAdmin(admin.ModelAdmin):
         counts = {
             '📝': runs.filter(status=AgentRun.DRAFTED).count(),
             '✉️': runs.filter(status=AgentRun.SCHEDULED).count(),
+            '🧩': runs.filter(status=AgentRun.TASKED).count(),
             '✓': runs.filter(outcome=AgentRun.SENT_SAME).count(),
             '✏️': runs.filter(outcome=AgentRun.SENT_EDITED).count(),
             '↷': runs.filter(status=AgentRun.SKIPPED).count(),
@@ -146,6 +164,9 @@ class AgentRuleAdmin(admin.ModelAdmin):
         if obj is None or not obj.pk:
             return format_html('<div style="opacity:.8">Простіше створити доручення з листа: у пошті правий клік на '
                                'листі → «🤖 Доручити агенту…» — там можна й спробувати відповідь на цьому листі.</div>')
+        if obj.kind == AgentRule.MAIL_TASK:
+            return format_html('<div style="opacity:.8">🧩 З кожного нового такого листа — завдання агенту{}.</div>',
+                               ' · трек-номер у порожнє поле замовлення вносить сам' if obj.auto_apply else '')
         if agent_mail.promote_ready(obj):
             return format_html(
                 '<div style="padding:8px 12px;border-radius:6px;background:rgba(46,125,50,.14);'
@@ -163,7 +184,7 @@ class AgentRuleAdmin(admin.ModelAdmin):
     def recent_runs(self, obj):
         if obj is None or not obj.pk:
             return '—'
-        runs = obj.runs.select_related('message').order_by('-created_at')[:15]
+        runs = obj.runs.select_related('message', 'task').order_by('-created_at')[:15]
         if not runs:
             return 'Ще жодного листа — агент перевіряє нові листи щохвилини.'
         return format_html(

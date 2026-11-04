@@ -222,6 +222,7 @@
 {"uk": "(«Зображення (URL)», «Посилання на Datasheet»); якщо воно не відповідає або віддає не фото / не PDF", "en": "(“Image (URL)”, “Datasheet link”); if it does not respond or returns something that is not a photo / not a PDF", "de": "(„Bild (URL)“, „Link zum Datenblatt“); wenn er nicht antwortet oder kein Foto / kein PDF liefert"}
 {"uk": "(«Переведено з … в {0} за курсом …»).", "en": "(“Converted from … to {0} at rate …”).", "de": "(„Umgerechnet von … in {0} zum Kurs …“)."}
 {"uk": "(«🔄 Синх технічних атрибутів з DigiKey») або додайте їх у картці товару («📡 Технічні атрибути»).", "en": "(“🔄 Sync technical attributes from DigiKey”) or add them in the product card (“📡 Technical attributes”).", "de": "(„🔄 Technische Attribute von DigiKey synchronisieren“) oder fügen Sie sie in der Artikelkarte hinzu („📡 Technische Attribute“)."}
+{"uk": "(Доручення «{0}»: цей лист підійшов під умови. Якщо він не про це — нічого не пропонуй і коротко напиши чому.)", "en": "(Доручення «{0}»: цей лист підійшов під умови. Якщо він не про це — нічого не пропонуй і коротко напиши чому.)", "de": "(Доручення «{0}»: цей лист підійшов під умови. Якщо він не про це — нічого не пропонуй і коротко напиши чому.)"}
 {"uk": "(Лист порожній)", "en": "(Email is empty)", "de": "(E-Mail ist leer)"}
 {"uk": "(НАШ ЛИСТ)", "en": "(НАШ ЛИСТ)", "de": "(НАШ ЛИСТ)"}
 {"uk": "(Німеччина / ЄС / світ).", "en": "(Germany / EU / world).", "de": "(Deutschland / EU / Welt)."}
@@ -2948,6 +2949,7 @@
 {"uk": "Ємен", "en": "Yemen", "de": "Jemen"}
 {"uk": "І відповіді з нашого боку", "en": "Also replies from our side", "de": "Auch Antworten von unserer Seite"}
 {"uk": "І листи покупців, які замовляли через ці джерела", "en": "And emails of customers who ordered through these sources", "de": "Und E-Mails von Kunden, die über diese Quellen bestellt haben"}
+{"uk": "І одразу завдання з цього листа", "en": "And a task from this email right away", "de": "Und gleich eine Aufgabe aus dieser E-Mail"}
 {"uk": "ІНДІЯ", "en": "INDIA", "de": "INDIEN"}
 {"uk": "ІНФОРМАЦІЙНІ — корисно знати", "en": "INFORMATIONAL — good to know", "de": "INFORMATIV — gut zu wissen"}
 {"uk": "ІНШІ ЛИСТУВАННЯ З ЦИМ КЛІЄНТОМ / ВІДПРАВНИКОМ", "en": "OTHER CORRESPONDENCE WITH THIS CUSTOMER / SENDER", "de": "WEITERER SCHRIFTVERKEHR MIT DIESEM KUNDEN / ABSENDER"}
@@ -3283,6 +3285,7 @@
 {"uk": "Агент продовжить з того самого місця; знайдене лишається", "en": "The agent will continue from the same point; what was found is kept", "de": "Der Agent macht an derselben Stelle weiter; das Gefundene bleibt erhalten"}
 {"uk": "Агент продовжує", "en": "The agent continues", "de": "Der Agent macht weiter"}
 {"uk": "Агент проходить вибрані товари по одному (для сотень товарів). Лист у цьому режимі не готує.", "en": "The agent goes through the selected products one by one (for hundreds of products). It does not prepare an e-mail in this mode.", "de": "Der Agent geht die ausgewählten Artikel einzeln durch (für Hunderte von Artikeln). In diesem Modus bereitet er keine E-Mail vor."}
+{"uk": "Агент читає й листи колег (переслані), знаходить замовлення чи закупівлю й пропонує зміни на сторінці завдання; коли закінчить — повідомить.", "en": "The agent also reads colleagues' (forwarded) emails, finds the order or purchase order and proposes changes on the task page; it notifies you when done.", "de": "Der Agent liest auch E-Mails von Kollegen (weitergeleitet), findet den Auftrag oder die Bestellung und schlägt Änderungen auf der Aufgabenseite vor; wenn fertig, meldet er sich."}
 {"uk": "Агент, завдання #{0}: «{1}»", "en": "Agent, task #{0}: “{1}”", "de": "Agent, Aufgabe #{0}: „{1}“"}
 {"uk": "Агента зупинено — знайдене лишається", "en": "Agent stopped — what was found is kept", "de": "Agent gestoppt – das Gefundene bleibt erhalten"}
 {"uk": "Агрегатор", "en": "Aggregator", "de": "Aggregator"}
@@ -4379,6 +4382,7 @@
 {"uk": "Вміст змінився", "en": "Content changed", "de": "Inhalt geändert"}
 {"uk": "Вміст сповіщень (Нові замовлення + DigiKey)", "en": "Notification content (New orders + DigiKey)", "de": "Inhalt der Benachrichtigungen (Neue Aufträge + DigiKey)"}
 {"uk": "Вміст файлу не схожий на .{0}", "en": "The file content does not look like .{0}", "de": "Der Dateiinhalt sieht nicht nach .{0} aus"}
+{"uk": "Внесено самому (доручення «", "en": "Entered by itself (instruction «", "de": "Selbst eingetragen (Auftrag «"}
 {"uk": "Внизу кожного листа: компанія, адреса, контакти.", "en": "At the bottom of every e-mail: company, address, contacts.", "de": "Am Ende jeder E-Mail: Firma, Adresse, Kontaktdaten."}
 {"uk": "Вносимі втрати", "en": "Insertion loss", "de": "Einfügedämpfung"}
 {"uk": "Внутрішня нотатка", "en": "Internal note", "de": "Interne Notiz"}
@@ -4718,6 +4722,8 @@
 {"uk": "Відповідь — ЛИШЕ JSON без пояснень", "en": "Відповідь — ЛИШЕ JSON без пояснень", "de": "Відповідь — ЛИШЕ JSON без пояснень"}
 {"uk": "Відповідь — статус {0}", "en": "Response — status {0}", "de": "Antwort — Status {0}"}
 {"uk": "Відповідь: {0}", "en": "Reply: {0}", "de": "Antwort: {0}"}
+{"uk": "Відповідь: понад це — лише чернетки (режим «Надсилати самому»). Завдання: понад це за день — листи пропускаються.", "en": "Reply: above this — drafts only («Send by itself» mode). Task: above this per day — emails are skipped.", "de": "Antwort: darüber — nur Entwürfe (Modus «Selbst senden»). Aufgabe: darüber pro Tag — E-Mails werden übersprungen."}
+{"uk": "Відповідь: що написати, чим підтвердити, коли не відповідати (факти — лише з Minerva й листа, чого немає — [уточнити] і чернетка). Завдання: що зробити з листом — напр. «знайди номер замовлення й трек-номер і внеси трек-номер у замовлення».", "en": "Reply: what to write, what to confirm, when not to reply (facts only from Minerva and the email, missing — [clarify] and a draft). Task: what to do with the email — e.g. «find the order number and tracking number and enter the tracking number into the order».", "de": "Antwort: was schreiben, was bestätigen, wann nicht antworten (Fakten nur aus Minerva und der E-Mail, fehlt etwas — [klären] und Entwurf). Aufgabe: was mit der E-Mail tun — z. B. «finde Auftragsnummer und Sendungsnummer und trage die Sendungsnummer in den Auftrag ein»."}
 {"uk": "Відповіді", "en": "Answers", "de": "Antworten"}
 {"uk": "Відповіді віконця «Minerva» про роботу в системі за гідом (AI — рахується в бюджет AI).", "en": "Answers of the “Minerva” window about working in the system, based on the guide (AI — counted against the AI budget).", "de": "Antworten des „Minerva“-Fensters zur Arbeit im System anhand des Leitfadens (KI — wird auf das KI-Budget angerechnet)."}
 {"uk": "Відповіді віконця «Minerva» про товари за даташитами й каталогом (RAG по продукції); пошук агента по всіх даташитах («🧩 Завдання агенту», MCP).", "en": "Answers of the “Minerva” window about products based on datasheets and the catalog (RAG on products); agent search across all datasheets (“🧩 Agent tasks”, MCP).", "de": "Antworten des „Minerva“-Fensters zu Artikeln anhand von Datenblättern und Katalog (RAG zu Produkten); Agentensuche in allen Datenblättern („🧩 Agentenaufgaben“, MCP)."}
@@ -5228,6 +5234,7 @@
 {"uk": "Для деяких валют немає курсу — різницю не пораховано.", "en": "For some currencies there is no rate — the difference was not calculated.", "de": "Für einige Währungen gibt es keinen Kurs — die Differenz wurde nicht berechnet."}
 {"uk": "Для доставки з переліком позицій потрібен delivery_id (або tracking_number) — так Minerva відрізняє повтор від нової доставки.", "en": "A delivery with a list of lines requires delivery_id (or tracking_number) — this is how Minerva tells a repeat from a new delivery.", "de": "Für eine Lieferung mit Positionsliste ist delivery_id (oder tracking_number) erforderlich — so unterscheidet Minerva eine Wiederholung von einer neuen Lieferung."}
 {"uk": "Для дії «Ціна = закупівля + націнка». 100 % = закупівельна ціна × 2.", "en": "For the action “Price = purchase + markup”. 100 % = purchase price × 2.", "de": "Für die Aktion „Preis = Einkauf + Aufschlag“. 100 % = Einkaufspreis × 2."}
+{"uk": "Для завдання — «І одразу завдання з цього листа» під час збереження", "en": "For a task — «And a task from this email right away» when saving", "de": "Für eine Aufgabe — beim Speichern «Und gleich eine Aufgabe aus dieser E-Mail»"}
 {"uk": "Для замовлення {0} уже є чернетка відправлення #{1}.", "en": "Order {0} already has shipment draft #{1}.", "de": "Für Auftrag {0} gibt es schon den Sendungsentwurf #{1}."}
 {"uk": "Для замовлення невідома ставка ПДВ — онлайн-оплату не створено.", "en": "The VAT rate is unknown for the order — the online payment was not created.", "de": "Der Mehrwertsteuersatz für den Auftrag ist unbekannt – die Online-Zahlung wurde nicht erstellt."}
 {"uk": "Для замовлень зроблених на сайті", "en": "For orders placed on the website", "de": "Für Bestellungen, die auf der Website aufgegeben wurden"}
@@ -5734,6 +5741,7 @@
 {"uk": "З даташитом", "en": "With datasheet", "de": "Mit Datenblatt"}
 {"uk": "З каталогу Minerva", "en": "From the Minerva catalog", "de": "Aus dem Minerva-Katalog"}
 {"uk": "З каталогу продуктів", "en": "From the product catalog", "de": "Aus dem Artikelkatalog"}
+{"uk": "З кожного нового такого листа — завдання агенту{0}.", "en": "A task for the agent from every new such email{0}.", "de": "Aus jeder neuen solchen E-Mail — eine Aufgabe für den Agenten{0}."}
 {"uk": "З листа", "en": "From e-mail", "de": "Aus E-Mail"}
 {"uk": "З листа {0} від {1}: {2}", "en": "From email {0} dated {1}: {2}", "de": "Aus E-Mail {0} vom {1}: {2}"}
 {"uk": "З листа «{0}»", "en": "From e-mail “{0}”", "de": "Aus E-Mail „{0}“"}
@@ -5746,6 +5754,7 @@
 {"uk": "З рекомендацій", "en": "From recommendations", "de": "Aus Empfehlungen"}
 {"uk": "З таблиці", "en": "From a table", "de": "Aus Tabelle"}
 {"uk": "З фото", "en": "With photo", "de": "Mit Foto"}
+{"uk": "З цього листа завдання не буде", "en": "No task will be made from this email", "de": "Aus dieser E-Mail wird keine Aufgabe"}
 {"uk": "З цін Minerva стане", "en": "From Minerva prices it will become", "de": "Aus den Minerva-Preisen wird"}
 {"uk": "З цінами, реквізитами компанії та банківськими даними.", "en": "With prices, company details and bank details.", "de": "Mit Preisen, Firmendaten und Bankdaten."}
 {"uk": "З якої скриньки Minerva", "en": "From which Minerva mailbox", "de": "Aus welchem Minerva-Postfach"}
@@ -5887,6 +5896,7 @@
 {"uk": "Завдання RAG не знайдено (минув строк)", "en": "RAG job not found (expired)", "de": "RAG-Auftrag nicht gefunden (abgelaufen)"}
 {"uk": "Завдання агенту", "en": "Agent task", "de": "Agentenaufgabe"}
 {"uk": "Завдання агенту для вибраних…", "en": "Agent task for selected…", "de": "Agentenaufgabe für Ausgewählte…"}
+{"uk": "Завдання агенту з кожного такого листа", "en": "A task for the agent from every such email", "de": "Aufgabe für den Agenten aus jeder solchen E-Mail"}
 {"uk": "Завдання в календар", "en": "Task to calendar", "de": "Aufgabe in den Kalender"}
 {"uk": "Завдання з листа", "en": "Task from e-mail", "de": "Aufgabe aus E-Mail"}
 {"uk": "Завдання з листа: агент читає цей лист і його вкладення (лише своя скринька)", "en": "Task from an e-mail: the agent reads this e-mail and its attachments (own mailbox only)", "de": "Aufgabe aus einer E-Mail: Der Agent liest diese E-Mail und ihre Anhänge (nur eigenes Postfach)"}
@@ -7743,6 +7753,7 @@
 {"uk": "Лише http(s) URL.", "en": "http(s) URLs only.", "de": "Nur http(s)-URLs."}
 {"uk": "Лише http(s)-адреси API цієї Minerva", "en": "Only http(s) addresses of this Minerva's API", "de": "Nur http(s)-Adressen der API dieser Minerva"}
 {"uk": "Лише «Зайнято» (без деталей)", "en": "Only “Busy” (no details)", "de": "Nur „Besetzt“ (ohne Details)"}
+{"uk": "Лише «🧩 Завдання агенту»: трек-номер і кур’єра — у замовлення, де поле ще порожнє, і трек-номер посилки до наявної закупівлі. Решту пропозицій (статус, нова закупівля, прихід…) застосовуєте ви ✓.", "en": "Only «🧩 Task for the agent»: tracking number and courier into the order where the field is still empty, and the parcel tracking number to an existing purchase order. Other proposals (status, new purchase order, stock-in…) you apply ✓.", "de": "Nur «🧩 Aufgabe für den Agenten»: Sendungsnummer und Kurier in den Auftrag, wo das Feld noch leer ist, und die Paketsendungsnummer zu einer bestehenden Bestellung. Andere Vorschläge (Status, neue Bestellung, Wareneingang…) wenden Sie an ✓."}
 {"uk": "Лише адреса або ім'я хоста, напр. 192.168.2.68 — без http://, порту й шляху.", "en": "Address or host name only, e.g. 192.168.2.68 — without http://, port and path.", "de": "Nur Adresse oder Hostname, z. B. 192.168.2.68 — ohne http://, Port und Pfad."}
 {"uk": "Лише адреси API Minerva: {0}…", "en": "Only Minerva API addresses: {0}…", "de": "Nur Adressen der Minerva-API: {0}…"}
 {"uk": "Лише базові ціни (ступені) товару", "en": "Only the product's base prices (price breaks)", "de": "Nur die Basispreise (Staffelpreise) des Artikels"}
@@ -7753,6 +7764,8 @@
 {"uk": "Лише вручну", "en": "Manual only", "de": "Nur manuell"}
 {"uk": "Лише групу поточної сторінки", "en": "Only the group of the current page", "de": "Nur die Gruppe der aktuellen Seite"}
 {"uk": "Лише дані", "en": "Data only", "de": "Nur Daten"}
+{"uk": "Лише для «Відповідати на такі листи».", "en": "Only for «Reply to such emails».", "de": "Nur für «Auf solche E-Mails antworten»."}
+{"uk": "Лише для «Завдання агенту з кожного такого листа»: з кожного нового такого листа — завдання агенту (як «🧩 Завдання агенту з цього листа»). Пропозиції — на сторінці завдання, коли закінчить — лист і Telegram.", "en": "Only for «A task for the agent from every such email»: every new such email becomes a task for the agent (like «🧩 Task for the agent from this email»). Proposals are on the task page; when done — email and Telegram.", "de": "Nur für «Aufgabe für den Agenten aus jeder solchen E-Mail»: jede neue solche E-Mail wird eine Aufgabe (wie «🧩 Aufgabe für den Agenten aus dieser E-Mail»). Vorschläge auf der Aufgabenseite; wenn fertig — E-Mail und Telegram."}
 {"uk": "Лише для кабелів. Без галочки етикетка складається з шаблону й лише завантажується. Файл цього артикула", "en": "Cables only. Without the checkbox the label is built from the template and only downloaded. The file of this SKU", "de": "Nur für Kabel. Ohne Häkchen wird das Etikett aus der Vorlage erstellt und nur heruntergeladen. Die Datei dieser Artikelnummer"}
 {"uk": "Лише для кабелів. Без галочки етикетка складається з шаблону й лише завантажується. Файл цього артикула, що вже є в базі (можливо, виправлений вручну), замінюється тільки після підтвердження.", "en": "Cables only. Without the checkbox the label is built from the template and only downloaded. The file of this SKU that is already in the database (possibly corrected manually) is replaced only after confirmation.", "de": "Nur für Kabel. Ohne Häkchen wird das Etikett aus der Vorlage erstellt und nur heruntergeladen. Die Datei dieser Artikelnummer, die bereits in der Datenbank vorhanden ist (möglicherweise manuell korrigiert), wird erst nach Bestätigung ersetzt."}
 {"uk": "Лише для ключа API сайту.", "en": "Only for a website API key.", "de": "Nur für den API-Schlüssel einer Website."}
@@ -8077,6 +8090,7 @@
 {"uk": "Мова: визнач по імені клієнта, якщо незрозуміло — українська.", "en": "Language: determine it from the customer’s name; if unclear — Ukrainian.", "de": "Sprache: anhand des Kundennamens bestimmen; falls unklar — Ukrainisch."}
 {"uk": "Модель", "en": "Model", "de": "Modell"}
 {"uk": "Модель AI", "en": "AI model", "de": "KI-Modell"}
+{"uk": "Модель AI завдання", "en": "Task AI model", "de": "KI-Modell der Aufgabe"}
 {"uk": "Модель Minerva AI вибирає сама: швидка (Haiku) для простих запитань, потужніша (Sonnet) — для аналітики й пошуку в інтернеті. Бюджет — у «⚙️ Налаштуваннях AI».", "en": "Minerva AI chooses the model itself: a fast one (Haiku) for simple questions, a more powerful one (Sonnet) for analytics and web search. The budget is in “⚙️ AI settings”.", "de": "Minerva AI wählt das Modell selbst: ein schnelles (Haiku) für einfache Fragen, ein leistungsfähigeres (Sonnet) für Analysen und die Internetsuche. Das Budget finden Sie unter „⚙️ KI-Einstellungen“."}
 {"uk": "Модель позицій дозволяє додати B2B-прайси для окремих клієнтів або груп — так само, як для окремих магазинів.", "en": "The item model makes it possible to add B2B price lists for individual customers or groups — the same way as for individual shops.", "de": "Das Positionsmodell erlaubt es, B2B-Preislisten für einzelne Kunden oder Gruppen hinzuzufügen — genauso wie für einzelne Shops."}
 {"uk": "Моделі вивантажено.", "en": "Models unloaded.", "de": "Modelle entladen."}
@@ -8448,6 +8462,7 @@
 {"uk": "Найбільше витратити", "en": "Maximum spend", "de": "Maximale Ausgaben"}
 {"uk": "Найбільше листів на день", "en": "Maximum e-mails per day", "de": "Maximale E-Mails pro Tag"}
 {"uk": "Найбільше листів на маленькому екрані: значки збоку, щільно, без міток", "en": "Most emails on a small screen: icons on the side, dense, no labels", "de": "Die meisten E-Mails auf kleinem Bildschirm: Symbole an der Seite, dicht, ohne Markierungen"}
+{"uk": "Найбільше на одне завдання", "en": "At most per task", "de": "Höchstens pro Aufgabe"}
 {"uk": "Найбільші відповіді", "en": "Largest responses", "de": "Größte Antworten"}
 {"uk": "Найбільші клієнти", "en": "Largest customers", "de": "Größte Kunden"}
 {"uk": "Найбільші клієнти за {0} міс", "en": "Largest customers over {0} months", "de": "Größte Kunden der letzten {0} Monate"}
@@ -8554,6 +8569,8 @@
 {"uk": "Напр.: \"Electronic components\"", "en": "E.g.: \"Electronic components\"", "de": "Z. B.: \"Electronic components\""}
 {"uk": "Напр.: \"Payment in advance, 30 days net\"", "en": "E.g.: \"Payment in advance, 30 days net\"", "de": "Z. B.: \"Payment in advance, 30 days net\""}
 {"uk": "Напр.: Знайди в даташитах вагу однієї штуки й країну виробника і внеси. Або: Знайди даташити цих антен і надішли їх на anna@kunde.de з коротким листом.", "en": "E.g.: Find the weight of one piece and the manufacturer's country in the datasheets and enter them. Or: Find the datasheets of these antennas and send them to anna@kunde.de with a short e-mail.", "de": "Z. B.: Suche in den Datenblättern das Gewicht eines Stücks und das Herstellerland und trage sie ein. Oder: Suche die Datenblätter dieser Antennen und sende sie mit einer kurzen E-Mail an anna@kunde.de."}
+{"uk": "Напр.: Знайди в листі номер замовлення DigiKey і трек-номер UPS і внеси трек-номер у це замовлення.", "en": "E.g.: Find the DigiKey order number and the UPS tracking number in the email and enter the tracking number into that order.", "de": "Z. B.: Finde in der E-Mail die DigiKey-Auftragsnummer und die UPS-Sendungsnummer und trage die Sendungsnummer in diesen Auftrag ein."}
+{"uk": "Напр.: Подякуй за документ і підтверди, що отримали. Якщо питають про строк відправки — візьми його із замовлення. Пиши коротко, мовою листа. Якщо просять знижку — не відповідай.", "en": "E.g.: Thank them for the document and confirm we received it. If they ask about the shipping date — take it from the order. Write briefly, in the email's language. If they ask for a discount — do not reply.", "de": "Z. B.: Bedanke dich für das Dokument und bestätige den Erhalt. Fragen sie nach dem Versanddatum — nimm es aus dem Auftrag. Schreib kurz, in der Sprache der E-Mail. Bitten sie um Rabatt — nicht antworten."}
 {"uk": "Напр.: чого не вистачає на складі? що обіцяли клієнту щодо строку? де посилка?", "en": "E.g.: what is missing in stock? what did we promise the customer about the deadline? where is the parcel?", "de": "Z. B.: Was fehlt im Lager? Was wurde dem Kunden zur Frist zugesagt? Wo ist das Paket?"}
 {"uk": "Напр.: що клієнт замовляв і на яких умовах? які були скарги? що ми обіцяли?", "en": "E.g.: what did the customer order and on what terms? what complaints were there? what did we promise?", "de": "Z. B.: Was hat der Kunde bestellt und zu welchen Bedingungen? Welche Beschwerden gab es? Was haben wir zugesagt?"}
 {"uk": "Напр.: що ще не надіслали клієнту? які домовленості щодо ціни й строків?", "en": "E.g.: what has not been sent to the customer yet? what was agreed on price and lead times?", "de": "Z. B.: Was wurde dem Kunden noch nicht gesendet? Was wurde zu Preis und Fristen vereinbart?"}
@@ -8977,6 +8994,7 @@
 {"uk": "Немає полів для відправки (або категорія не «filter»).", "en": "No fields to send (or the category is not “filter”).", "de": "Keine Felder zum Senden (oder die Kategorie ist nicht „filter“)."}
 {"uk": "Немає права (403)", "en": "No permission (403)", "de": "Keine Berechtigung (403)"}
 {"uk": "Немає права видаляти свої категорії", "en": "No permission to delete your own categories", "de": "Keine Berechtigung zum Löschen eigener Kategorien"}
+{"uk": "Немає права давати завдання агенту", "en": "No permission to give tasks to the agent", "de": "Keine Berechtigung, dem Agenten Aufgaben zu geben"}
 {"uk": "Немає права додавати документи в базу знань — його надає адміністратор.", "en": "No permission to add documents to the knowledge base — it is granted by an administrator.", "de": "Keine Berechtigung, Dokumente zur Wissensdatenbank hinzuzufügen – sie wird von einem Administrator erteilt."}
 {"uk": "Немає права додавати упаковку товарів", "en": "No permission to add product packaging", "de": "Keine Berechtigung, Artikelverpackungen hinzuzufügen"}
 {"uk": "Немає права змінювати «Налаштування цін».", "en": "You do not have permission to change “Price settings”.", "de": "Sie haben keine Berechtigung, die „Preiseinstellungen“ zu ändern."}
@@ -13343,6 +13361,8 @@
 {"uk": "Транзит", "en": "Transit", "de": "Transit"}
 {"uk": "Трек закупівлі", "en": "Purchase tracking", "de": "Sendungsverfolgung der Bestellung"}
 {"uk": "Трек-номер", "en": "Tracking number", "de": "Sendungsnummer"}
+{"uk": "Трек-номер вносити самому", "en": "Enter the tracking number by itself", "de": "Sendungsnummer selbst eintragen"}
+{"uk": "Трек-номер вносити самому — у замовлення, де поле ще порожнє, і в посилку закупівлі (решту пропозицій застосовуєте ви ✓)", "en": "Enter the tracking number by itself — into the order where the field is still empty, and into the purchase order parcel (other proposals you apply ✓)", "de": "Sendungsnummer selbst eintragen — in den Auftrag, wo das Feld noch leer ist, und ins Paket der Bestellung (andere Vorschläge wenden Sie an ✓)"}
 {"uk": "Трек-номер закупівлі", "en": "Purchase order tracking number", "de": "Sendungsnummer der Bestellung"}
 {"uk": "Трек-номер закупівлі (номер у тілі)", "en": "Purchase order tracking number (number in the body)", "de": "Sendungsnummer der Bestellung (Nummer im Body)"}
 {"uk": "Трек-номер є, але відправлення НЕ підтверджено на DigiKey Marketplace", "en": "Tracking number exists, but the shipment is NOT confirmed on DigiKey Marketplace", "de": "Sendungsnummer vorhanden, aber die Sendung ist auf DigiKey Marketplace NICHT bestätigt"}
@@ -13478,6 +13498,7 @@
 {"uk": "У ключа не вказано «🤖 Агент (MCP) — від імені кого».", "en": "The key has no “🤖 Agent (MCP) — on behalf of” set.", "de": "Beim Schlüssel ist „🤖 Agent (MCP) — im Namen von“ nicht angegeben."}
 {"uk": "У кнопку", "en": "Into a button", "de": "In eine Schaltfläche"}
 {"uk": "У кожному полі — по одному в рядку, підходить будь-який рядок. Порожнє поле не перевіряється. Агент бере лише нові листи у Вхідних (не старші за три дні), не відповідає на свої листи, noreply-адреси, автовідповіді й листи, на які вже відповіли.", "en": "In each field — one per line, any line matches. An empty field is not checked. The agent only takes new e-mails in the Inbox (not older than three days) and does not reply to its own e-mails, noreply addresses, auto-replies, or e-mails that have already been answered.", "de": "In jedem Feld – eine pro Zeile, jede Zeile passt. Ein leeres Feld wird nicht geprüft. Der Agent nimmt nur neue E-Mails im Posteingang (nicht älter als drei Tage) und antwortet nicht auf eigene E-Mails, noreply-Adressen, Automatik-Antworten und bereits beantwortete E-Mails."}
+{"uk": "У кожному полі — по одному в рядку, підходить будь-який рядок; «Текст листа містить» — слова чи фраза, що буквально є в листі. Порожнє поле не перевіряється. Агент бере лише нові листи у Вхідних (не старші за три дні). Відповідь — не на свої листи, noreply-адреси, автовідповіді й листи, на які вже відповіли; 🧩 завдання — і з листів колег.", "en": "One per line in each field, any line matches; «Email text contains» — words or a phrase literally in the email. An empty field is not checked. The agent takes only new emails in the Inbox (not older than three days). Reply — not to our own emails, noreply addresses, auto-replies and emails already answered; 🧩 task — also from colleagues' emails.", "de": "In jedem Feld eins pro Zeile, jede Zeile passt; «E-Mail-Text enthält» — Wörter oder eine Wendung, die wörtlich in der E-Mail stehen. Ein leeres Feld wird nicht geprüft. Der Agent nimmt nur neue E-Mails im Posteingang (nicht älter als drei Tage). Antwort — nicht auf eigene E-Mails, noreply-Adressen, Autoantworten und schon beantwortete E-Mails; 🧩 Aufgabe — auch aus E-Mails von Kollegen."}
 {"uk": "У комплекті: {0} написів · у коді без перекладу в комплекті: {1}", "en": "Bundled: {0} strings · in code without a bundled translation: {1}", "de": "Mitgeliefert: {0} Texte · im Code ohne mitgelieferte Übersetzung: {1}"}
 {"uk": "У користувача немає email-адреси", "en": "The user has no email address", "de": "Der Benutzer hat keine E-Mail-Adresse"}
 {"uk": "У кошику", "en": "In the cart", "de": "Im Warenkorb"}
@@ -13893,6 +13914,7 @@
 {"uk": "Це поле тут змінити не можна — відкрийте картку.", "en": "This field cannot be changed here — open the card.", "de": "Dieses Feld kann hier nicht geändert werden — öffnen Sie die Karte."}
 {"uk": "Це посилання HTML (для браузера). В Outlook після «Опублікувати» скопіюйте посилання ICS (закінчується на .ics).", "en": "This is an HTML link (for the browser). In Outlook, after “Publish”, copy the ICS link (ends with .ics).", "de": "Das ist ein HTML-Link (für den Browser). Kopieren Sie in Outlook nach „Veröffentlichen“ den ICS-Link (endet auf .ics)."}
 {"uk": "Це публічна адреса — Minerva побачить події, лише якщо календар відкрито для всіх. Для свого календаря краще «Секретна адреса у форматі iCal».", "en": "This is a public address — Minerva will see events only if the calendar is open to everyone. For your own calendar, “Secret address in iCal format” is better.", "de": "Das ist eine öffentliche Adresse — Minerva sieht Termine nur, wenn der Kalender für alle geöffnet ist. Für den eigenen Kalender ist die „Geheime Adresse im iCal-Format“ besser."}
+{"uk": "Це слова чи фраза, яка має буквально бути в тексті листа (по одній у рядку). Пояснення, що робити, — у «Що робити — інструкція агенту».", "en": "These are words or a phrase that must literally be in the email text (one per line). The explanation of what to do goes into «What to do — instruction for the agent».", "de": "Das sind Wörter oder eine Wendung, die wörtlich im E-Mail-Text stehen müssen (eins pro Zeile). Was zu tun ist, gehört in «Was tun — Anweisung für den Agenten»."}
 {"uk": "Це спам", "en": "This is spam", "de": "Das ist Spam"}
 {"uk": "Це спам — прибрати все від відправника", "en": "This is spam — remove everything from the sender", "de": "Das ist Spam — alles vom Absender entfernen"}
 {"uk": "Це те, що бачать користувачі в списках та бейджах.", "en": "This is what users see in lists and badges.", "de": "Das sehen die Benutzer in Listen und Badges."}
@@ -14434,6 +14456,7 @@
 {"uk": "Що робити", "en": "What to do", "de": "Was zu tun ist"}
 {"uk": "Що робити з відсутніми в Minerva позиціями", "en": "What to do with items missing in Minerva", "de": "Was mit den in Minerva fehlenden Positionen geschehen soll"}
 {"uk": "Що робити з відсутніми товарами", "en": "What to do with missing products", "de": "Was mit fehlenden Artikeln geschehen soll"}
+{"uk": "Що робити з такими листами", "en": "What to do with such emails", "de": "Was mit solchen E-Mails tun"}
 {"uk": "Що робити коли нове Marketplace замовлення надходить: підтвердити одразу на DigiKey, перевірити залишки на складі, або залишити для ручного підтвердження.", "en": "What to do when a new Marketplace order arrives: confirm it on DigiKey right away, check stock levels in the warehouse, or leave it for manual confirmation.", "de": "Was zu tun ist, wenn ein neuer Marketplace-Auftrag eingeht: sofort auf DigiKey bestätigen, Lagerbestände prüfen oder für die manuelle Bestätigung belassen."}
 {"uk": "Що робити при натисканні PDF-лінку мітки UPS/DHL у списку замовлень. Якщо браузер не може відкрити PDF — автоматично завантажується.", "en": "What to do when clicking the UPS/DHL label PDF link in the order list. If the browser cannot open the PDF, it is downloaded automatically.", "de": "Was beim Klick auf den PDF-Link des UPS/DHL-Etiketts in der Auftragsliste geschehen soll. Kann der Browser das PDF nicht öffnen, wird es automatisch heruntergeladen."}
 {"uk": "Що робити якщо запис вже існує (тільки для Замовлень)", "en": "What to do if the record already exists (orders only)", "de": "Was zu tun ist, wenn der Datensatz bereits existiert (nur für Aufträge)"}
@@ -15001,6 +15024,7 @@
 {"uk": "включно з кошиком (запрошення часто видаляють, коли Outlook уже заніс їх у календар)", "en": "including trash (invitations are often deleted once Outlook has already added them to the calendar)", "de": "einschließlich Papierkorb (Einladungen werden oft gelöscht, wenn Outlook sie bereits in den Kalender eingetragen hat)"}
 {"uk": "власний (завантажений)", "en": "custom (uploaded)", "de": "eigene (hochgeladen)"}
 {"uk": "власник {0} → {1}", "en": "owner {0} → {1}", "de": "Eigentümer {0} → {1}"}
+{"uk": "власник скриньки не може давати завдання агенту", "en": "the mailbox owner cannot give tasks to the agent", "de": "der Postfachinhaber darf dem Agenten keine Aufgaben geben"}
 {"uk": "вміст змінився", "en": "content changed", "de": "Inhalt geändert"}
 {"uk": "вміст не схожий на {0}", "en": "content does not look like {0}", "de": "Inhalt sieht nicht nach {0} aus"}
 {"uk": "внесено", "en": "entered", "de": "eingetragen"}
@@ -15446,6 +15470,10 @@
 {"uk": "завантажую з сервера…", "en": "downloading from the server…", "de": "vom Server wird heruntergeladen…"}
 {"uk": "завантажує", "en": "loading", "de": "lädt"}
 {"uk": "завантажує PDF-датащити та фото з вказаних URL на сервер — файли відкриваються швидше і доступні, навіть якщо зовнішній сервер недоступний.", "en": "downloads PDF datasheets and photos from the specified URLs to the server — files open faster and remain available even if the external server is unavailable.", "de": "lädt PDF-Datenblätter und Fotos von den angegebenen URLs auf den Server herunter — Dateien öffnen sich schneller und sind auch dann verfügbar, wenn der externe Server nicht erreichbar ist."}
+{"uk": "завдання", "en": "task", "de": "Aufgabe"}
+{"uk": "завдання #{0}", "en": "task #{0}", "de": "Aufgabe #{0}"}
+{"uk": "завдання агенту", "en": "task for the agent", "de": "Aufgabe für den Agenten"}
+{"uk": "завдання з цього листа в черзі", "en": "the task from this email is queued", "de": "Aufgabe aus dieser E-Mail ist in der Warteschlange"}
 {"uk": "завдань {0} · з кешу {1} · RAG зайнятий {2} · зупинено покинутих {3} · запасний пошук по даташитах {4} · помилок {5}", "en": "jobs {0} · from cache {1} · RAG busy {2} · abandoned stopped {3} · fallback datasheet search {4} · errors {5}", "de": "Aufgaben {0} · aus dem Cache {1} · RAG belegt {2} · verwaiste gestoppt {3} · Ersatzsuche in Datenblättern {4} · Fehler {5}"}
 {"uk": "завеликий для індексації", "en": "too large to index", "de": "zu groß für die Indexierung"}
 {"uk": "завершених {0}", "en": "{0} completed", "de": "{0} abgeschlossen"}
@@ -15962,6 +15990,7 @@
 {"uk": "лютого", "en": "February", "de": "Februar"}
 {"uk": "ліворуч — ваш календар («Налаштування моїх календарів») → «Інтеграція календаря» → «Секретна адреса у форматі iCal» → копіювати", "en": "on the left — your calendar (“Settings for my calendars”) → “Integrate calendar” → “Secret address in iCal format” → copy", "de": "links — Ihr Kalender („Einstellungen für meine Kalender“) → „Kalender integrieren“ → „Geheime Adresse im iCal-Format“ → kopieren"}
 {"uk": "лікарняний", "en": "sick leave", "de": "Krankheit"}
+{"uk": "ліміт {0} завдань на день", "en": "limit of {0} tasks per day", "de": "Limit {0} Aufgaben pro Tag"}
 {"uk": "ліміт {0} листів на день — лише чернетка", "en": "limit of {0} e-mails per day — draft only", "de": "Limit von {0} E-Mails pro Tag – nur Entwurf"}
 {"uk": "ліміт запитів", "en": "request limit", "de": "Anfragelimit"}
 {"uk": "лінії — ціна, що діяла (кожен крок — зміна ціни) · точки — фактична середня ціна продажу за місяць", "en": "lines — the price in effect (each step is a price change) · dots — the actual average sale price per month", "de": "Linien — gültiger Preis (jede Stufe ist eine Preisänderung) · Punkte — tatsächlicher durchschnittlicher Verkaufspreis pro Monat"}
@@ -17460,6 +17489,8 @@
 {"uk": "трек-номер {0} уже є в «Трекінгу приходу»", "en": "tracking number {0} is already in «Incoming tracking»", "de": "Sendungsnummer {0} ist schon in «Wareneingang-Tracking»"}
 {"uk": "трек-номер {0} уже є — посилка #{1}", "en": "tracking number {0} already exists — parcel #{1}", "de": "Sendungsnummer {0} gibt es schon — Paket #{1}"}
 {"uk": "трек-номер закупівлі", "en": "purchase order tracking number", "de": "Sendungsnummer einer Bestellung"}
+{"uk": "трек-номер сам", "en": "tracking number by itself", "de": "Sendungsnummer selbst"}
+{"uk": "трек-номер у порожнє поле замовлення вносить сам", "en": "enters the tracking number into an empty order field by itself", "de": "trägt die Sendungsnummer selbst in ein leeres Auftragsfeld ein"}
 {"uk": "трек-номер і дата відправки — у листі, перед надсиланням можна виправити", "en": "tracking number and shipping date are in the email, you can edit it before sending", "de": "Sendungsnummer und Versanddatum stehen in der E-Mail, vor dem Senden änderbar"}
 {"uk": "трек-номер — без пробілів і з цифрами", "en": "tracking number — no spaces and with digits", "de": "Sendungsnummer – ohne Leerzeichen und mit Ziffern"}
 {"uk": "трекінг", "en": "tracking", "de": "Sendungsverfolgung"}

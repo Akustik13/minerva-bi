@@ -24,7 +24,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from agent import risk
-from agent.models import AgentRule, AgentRun
+from agent.models import AgentProposal, AgentRule, AgentRun, AgentTask
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +121,21 @@ def blocked(rule, msg, *, check_age=True) -> str:
 
 # ── Черга ────────────────────────────────────────────────────────────────────
 
+def task_blocked(msg, *, check_age=True) -> str:
+    """Чому з листа не робити 🧩 завдання ('' — можна). Листи колег — можна (на відміну від відповіді)."""
+    from email_assistant.models import EmailMessage
+    if msg.is_spam or msg.is_deleted or msg.folder != EmailMessage.FOLDER_INBOX:
+        return 'лист не у Вхідних (спам, кошик чи надісланий)'
+    if check_age and msg.sent_at and msg.sent_at < timezone.now() - datetime.timedelta(hours=RECENT_HOURS):
+        return 'лист давніший за три дні'
+    return ''
+
+
+def why_not(rule, msg, *, check_age=True) -> str:
+    return task_blocked(msg, check_age=check_age) if rule.kind == AgentRule.MAIL_TASK \
+        else blocked(rule, msg, check_age=check_age)
+
+
 def start_pk(account) -> int:
     """Нове доручення не чіпає листів, що вже лежать у скриньці."""
     from email_assistant.models import EmailMessage
@@ -162,7 +177,7 @@ def run_due(limit=PER_LOOP) -> dict:
     out['stale'] = AgentRun.objects.filter(status=AgentRun.RUNNING, started_at__lt=stale).update(
         status=AgentRun.FAILED, reason='Обробку перервано (сервер перезапускався) — лист лишився без відповіді',
         finished_at=timezone.now())
-    for rule in AgentRule.objects.filter(enabled=True, kind=AgentRule.MAIL_REPLY).select_related('account'):
+    for rule in AgentRule.objects.filter(enabled=True).select_related('account'):
         if rule.account.is_active:
             out['queued'] += scan(rule)
     runs = (AgentRun.objects.filter(status=AgentRun.QUEUED, rule__enabled=True)
@@ -282,10 +297,78 @@ def _finish(run, status, reason='', **fields):
     run.save()
 
 
+def _tasks_today(rule) -> int:
+    start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+    return AgentRun.objects.filter(rule=rule, status=AgentRun.TASKED, finished_at__gte=start).count()
+
+
+TASK_NOTE = ('\n\n(Доручення «{name}»: цей лист підійшов під умови. Якщо він не про це — нічого не пропонуй і коротко '
+             'напиши чому.)')
+
+
+def make_task(rule, msg):
+    """🧩 Завдання агенту з листа за дорученням: власник скриньки, інструкція доручення, у черзі (cron
+    `agent_runs` → `tasks.run_due`)."""
+    return AgentTask.objects.create(
+        owner=rule.account.user, title=f'🤖 {rule.name}: {msg.subject or "(без теми)"}'[:200],
+        instruction=(rule.instruction or '').strip() + TASK_NOTE.format(name=rule.name), message=msg,
+        model=rule.task_model or 'claude-sonnet-5-5', budget_usd=rule.task_budget_usd)
+
+
+def process_task(run):
+    rule, msg = run.rule, run.message
+    why = task_blocked(msg)
+    if why:
+        return _finish(run, AgentRun.SKIPPED, why)
+    owner = rule.account.user
+    if owner is None or not owner.is_active or not owner.has_perm('agent.add_agenttask'):
+        return _finish(run, AgentRun.FAILED, 'власник скриньки не може давати завдання агенту')
+    if _tasks_today(rule) >= rule.daily_limit:
+        return _finish(run, AgentRun.SKIPPED, f'ліміт {rule.daily_limit} завдань на день')
+    task = make_task(rule, msg)
+    _finish(run, AgentRun.TASKED, f'завдання #{task.pk}', task=task)
+
+
+AUTO_FIELDS = ('tracking', 'courier')
+
+
+def _auto_ok(p) -> bool:
+    if p.kind == AgentProposal.PARCEL:
+        return True
+    return (p.kind == AgentProposal.ORDER and (p.data or {}).get('field') in AUTO_FIELDS
+            and not str(p.old_value or '').strip())
+
+
+def auto_apply(task) -> str:
+    """Завдання з доручення з «✓ Трек-номер вносити самому» закінчилось → застосувати трек-номер / кур’єра в
+    порожнє поле замовлення й трек-номер посилки закупівлі; решта чекає ✓ людини. → що зроблено ('' — нічого)."""
+    from agent import decide
+    run = AgentRun.objects.filter(task=task).select_related('rule').first()
+    if run is None or not run.rule.enabled or not run.rule.auto_apply:
+        return ''
+    chosen = [p for p in task.proposals.filter(status=AgentProposal.PENDING) if _auto_ok(p)]
+    if not chosen:
+        return ''
+    out = decide.apply_selected(task, [p.pk for p in chosen], task.owner)
+    done = [f'{decide.describe(p)[0]} {p.new_value}' for p in AgentProposal.objects.filter(
+        pk__in=[p.pk for p in chosen], status=AgentProposal.APPLIED)]
+    text = ('Внесено самому (доручення «' + run.rule.name + '»): ' + '; '.join(done)) if done else ''
+    if out['failed']:
+        text = (text + '. ' if text else '') + 'Не вдалося: ' + '; '.join(out['failed'])
+    return text[:1000]
+
+
 def process(run):
-    """Лист з черги → відповідь за дорученням: чернетка або запланований лист (див. модуль)."""
+    """Лист з черги → відповідь за дорученням: чернетка або запланований лист (див. модуль);
+    доручення «🧩 Завдання агенту» — завдання з листа (`process_task`)."""
     from email_assistant.models import ScheduledEmail
     rule, msg = run.rule, run.message
+    if rule.kind == AgentRule.MAIL_TASK:
+        try:
+            return process_task(run)
+        except Exception as e:  # noqa: BLE001 — одна помилка не зупиняє чергу
+            logger.exception('agent task run %s: %s', run.pk, e)
+            return _finish(run, AgentRun.FAILED, f'Помилка: {type(e).__name__}')
     try:
         why = blocked(rule, msg)
         if why:
@@ -376,6 +459,7 @@ def suggest(msg) -> dict:
         'subject': phrase,
         'category': msg.work_category_id,
         'blocked': blocked(AgentRule(account=msg.account), msg, check_age=False),
+        'blocked_task': task_blocked(msg, check_age=False),
     }
 
 
@@ -387,6 +471,8 @@ def rule_from(data, msg, user=None) -> AgentRule:
                      subject_words=text('subject_words'), body_words=text('body_words'),
                      instruction=text('instruction', 8000), example_message=msg, created_by=user)
     rule.mode = AgentRule.SEND if data.get('mode') == AgentRule.SEND else AgentRule.DRAFT
+    rule.kind = AgentRule.MAIL_TASK if data.get('kind') == AgentRule.MAIL_TASK else AgentRule.MAIL_REPLY
+    rule.auto_apply = rule.kind == AgentRule.MAIL_TASK and bool(data.get('auto_apply'))
     cat = str(data.get('category') or '')
     if cat.isdigit():
         from email_assistant.models import MailCategory
@@ -406,28 +492,36 @@ def rule_from(data, msg, user=None) -> AgentRule:
 def try_on(rule, msg) -> dict:
     """«🧪 Спробувати на цьому листі»: нічого не зберігає й не надсилає."""
     ok, why = matches(rule, msg)
-    out = {'matches': ok, 'why': why, 'blocked': blocked(rule, msg, check_age=False)}
+    out = {'matches': ok, 'why': why, 'blocked': why_not(rule, msg, check_age=False)}
     out.update(generate(rule, msg))
     return out
 
 
-def save(rule, msg, *, reply='') -> dict:
-    """Зберегти доручення; reply (з «🧪 Спробувати») — одразу чернетка й для цього листа."""
+def save(rule, msg, *, reply='', task_now=False) -> dict:
+    """Зберегти доручення; reply (з «🧪 Спробувати») — одразу чернетка й для цього листа; task_now (🧩) — одразу
+    завдання агенту з цього листа."""
     with transaction.atomic():
         rule.seen_pk = start_pk(msg.account)
         rule.save()
-        draft = None
+        draft = task = None
+        if rule.kind == AgentRule.MAIL_TASK:
+            if task_now and not task_blocked(msg, check_age=False):
+                task = make_task(rule, msg)
+                AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.TASKED, task=task,
+                                        reason='з вікна «🤖 Доручити агенту»', finished_at=timezone.now())
+            return {'rule': rule, 'draft': None, 'task': task}
         if reply.strip() and not blocked(rule, msg, check_age=False):
             draft = make_draft(msg, reply.strip()[:REPLY_MAX])
             AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.DRAFTED, reply=reply.strip(),
                                     draft=draft, reason='з вікна «🤖 Доручити агенту»', finished_at=timezone.now())
-    return {'rule': rule, 'draft': draft}
+    return {'rule': rule, 'draft': draft, 'task': task}
 
 
 def runs_for(messages) -> dict:
     """{pk листа: [AgentRun]} — рядок «🤖 Агент …» у прев'ю листа."""
     out = {}
     pks = [m.pk for m in messages]
-    for run in AgentRun.objects.filter(message_id__in=pks).select_related('rule', 'scheduled').order_by('-created_at'):
+    for run in (AgentRun.objects.filter(message_id__in=pks).select_related('rule', 'scheduled', 'task')
+                .order_by('-created_at')):
         out.setdefault(run.message_id, []).append(run)
     return out

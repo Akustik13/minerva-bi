@@ -318,10 +318,11 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
     {% for run in agent_runs %}
     <div class="em-pv-link em-pv-agent">
       <span>🤖 <b>{% trans "Агент" %}</b> · <span translate="no">{{ run.rule.name }}</span>:
-        {% if run.status == 'drafted' %}📝 {% trans "чернетка відповіді готова" %}{% elif run.status == 'scheduled' %}{% if run.scheduled.status == 'sent' %}✉️ {% trans "надіслав відповідь" %}{% elif run.scheduled.status == 'cancelled' %}✕ {% trans "відправку скасовано" %}{% else %}✉️ {% trans "надішле" %} {{ run.scheduled.scheduled_at|date:"d.m H:i" }}{% endif %}{% elif run.status == 'skipped' %}↷ {% trans "пропустив" %}{% elif run.status == 'failed' %}⚠️ {% trans "не вдалося" %}{% else %}⏳ {% trans "готує відповідь" %}{% endif %}
+        {% if run.status == 'drafted' %}📝 {% trans "чернетка відповіді готова" %}{% elif run.status == 'scheduled' %}{% if run.scheduled.status == 'sent' %}✉️ {% trans "надіслав відповідь" %}{% elif run.scheduled.status == 'cancelled' %}✕ {% trans "відправку скасовано" %}{% else %}✉️ {% trans "надішле" %} {{ run.scheduled.scheduled_at|date:"d.m H:i" }}{% endif %}{% elif run.status == 'tasked' %}🧩 завдання агенту{% if run.task %} — {{ run.task.get_status_display }}{% endif %}{% elif run.status == 'skipped' %}↷ {% trans "пропустив" %}{% elif run.status == 'failed' %}⚠️ {% trans "не вдалося" %}{% else %}⏳ {% trans "готує відповідь" %}{% endif %}
         {% if run.outcome %}· {{ run.get_outcome_display }}{% endif %}
         {% if run.reason %}<span class="why">{{ run.reason }}</span>{% endif %}</span>
       {% if run.draft_id %}<a class="em-pv-btn" style="padding:2px 10px" href="/email/compose/?draft={{ run.draft_id }}">✏️ {% trans "Відкрити чернетку" %}</a>{% endif %}
+      {% if run.task_id %}<a class="em-pv-btn" style="padding:2px 10px" href="/admin/agent/agenttask/{{ run.task_id }}/review/" target="_blank">🧩 Відкрити завдання</a>{% endif %}
       {% if run.scheduled_id and run.scheduled.status == 'pending' %}<a class="em-pv-btn" style="padding:2px 10px" href="/admin/email_assistant/scheduledemail/{{ run.scheduled_id }}/change/" target="_blank">{% trans "Скасувати / змінити" %}</a>{% endif %}
       <a href="/admin/agent/agentrule/{{ run.rule_id }}/change/" target="_blank" title="{% trans "Доручення агента" %}">⚙️</a>
     </div>

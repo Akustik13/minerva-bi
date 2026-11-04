@@ -44,7 +44,8 @@ def suggest_view(request, pk):
     for rule in AgentRule.objects.filter(account=msg.account).select_related('category'):
         ok, why = agent_mail.matches(rule, msg)
         if ok:
-            rules.append({'id': rule.pk, 'name': rule.name, 'mode': rule.get_mode_display(), 'enabled': rule.enabled,
+            mode = rule.get_kind_display() if rule.kind == AgentRule.MAIL_TASK else rule.get_mode_display()
+            rules.append({'id': rule.pk, 'name': rule.name, 'mode': mode, 'enabled': rule.enabled,
                           'why': why, 'url': f'/admin/agent/agentrule/{rule.pk}/change/'})
     return JsonResponse({
         'ok': True,
@@ -53,6 +54,8 @@ def suggest_view(request, pk):
                        for c in MailCategory.objects.order_by('order', 'name')],
         'rules': rules,
         'modes': [{'value': v, 'label': lbl} for v, lbl in AgentRule.MODES],
+        'kinds': [{'value': v, 'label': lbl} for v, lbl in AgentRule.KINDS],
+        'can_task': request.user.has_perm('agent.add_agenttask'),
     })
 
 
@@ -68,6 +71,8 @@ def try_view(request, pk):
         rule = agent_mail.rule_from(_data(request), msg, request.user)
     except ValueError as e:
         return JsonResponse({'ok': False, 'error': str(e)})
+    if rule.kind == AgentRule.MAIL_TASK:
+        return JsonResponse({'ok': False, 'error': 'Для завдання — «І одразу завдання з цього листа» під час збереження'})
     return JsonResponse({'ok': True, **agent_mail.try_on(rule, msg)})
 
 
@@ -86,6 +91,12 @@ def save_view(request, pk):
         return JsonResponse({'ok': False, 'error': str(e)})
     if rule.mode == AgentRule.SEND and not request.user.has_perm('agent.change_agentrule'):
         rule.mode = AgentRule.DRAFT
-    out = agent_mail.save(rule, msg, reply=str(data.get('reply') or '') if data.get('draft_now') else '')
+    if rule.kind == AgentRule.MAIL_TASK and not request.user.has_perm('agent.add_agenttask'):
+        return JsonResponse({'ok': False, 'error': 'Немає права давати завдання агенту'}, status=403)
+    out = agent_mail.save(rule, msg, reply=str(data.get('reply') or '') if data.get('draft_now') else '',
+                          task_now=bool(data.get('task_now')))
+    task = out.get('task')
     return JsonResponse({'ok': True, 'id': out['rule'].pk, 'url': f'/admin/agent/agentrule/{out["rule"].pk}/change/',
-                         'draft': out['draft'].pk if out['draft'] else None})
+                         'draft': out['draft'].pk if out['draft'] else None,
+                         'task': task.pk if task else None,
+                         'task_url': f'/admin/agent/agenttask/{task.pk}/review/' if task else ''})

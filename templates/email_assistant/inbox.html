@@ -1309,6 +1309,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     <div class="ag-muted" style="margin-top:4px">{% trans "Нові листи, що підходять під усі умови нижче, агент оброблятиме сам за вашою інструкцією. Спершу — чернетки в «📝 Чернетках»: ви перевіряєте й надсилаєте." %}</div>
     <div id="ag-rules" class="ag-note" hidden></div>
     <div id="ag-warn" class="ag-warn" hidden></div>
+    <label>Що робити з такими листами</label>
+    <select id="ag-kind" onchange="agKind()"></select>
     <label>{% trans "Назва" %}</label>
     <input type="text" id="ag-name" maxlength="200">
     <label>{% trans "Від кого" %} <span class="ag-muted">— {% trans "по одному в рядку: адреса, @домен" %}</span>
@@ -1322,8 +1324,15 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     <select id="ag-cat"><option value="">— {% trans "будь-яка" %} —</option></select>
     <label>{% trans "Що робити — інструкція агенту" %}</label>
     <textarea id="ag-instr" rows="6" placeholder="{% trans "Напр.: Подякуй за документ і підтверди, що отримали. Якщо питають про строк відправки — візьми його із замовлення. Пиши коротко, мовою листа. Якщо просять знижку — не відповідай." %}"></textarea>
+    <div id="ag-reply-opts">
     <label>{% trans "Режим" %}</label>
     <select id="ag-mode"></select>
+    </div>
+    <div id="ag-task-opts" hidden>
+      <label class="ag-check"><input type="checkbox" id="ag-auto"> ✓ Трек-номер вносити самому — у замовлення, де поле ще порожнє, і в посилку закупівлі (решту пропозицій застосовуєте ви ✓)</label>
+      <label class="ag-check"><input type="checkbox" id="ag-task-now" checked> І одразу завдання з цього листа</label>
+      <div class="ag-muted">Агент читає й листи колег (переслані), знаходить замовлення чи закупівлю й пропонує зміни на сторінці завдання; коли закінчить — повідомить.</div>
+    </div>
     <div id="ag-result" hidden>
       <label>{% trans "Відповідь агента на цей лист" %} <span class="ag-muted" id="ag-meta"></span></label>
       <div id="ag-reply" class="ag-reply"></div>
@@ -4021,6 +4030,12 @@ async function emAgent(pk) {
   document.getElementById('ag-subject').value = d.subject || '';
   document.getElementById('ag-body').value = '';
   document.getElementById('ag-instr').value = '';
+  var kind = document.getElementById('ag-kind');
+  kind.length = 0;
+  (d.kinds || []).forEach(function (k) { if (k.value !== 'mail_task' || d.can_task) kind.add(new Option(k.label, k.value)); });
+  kind.value = 'mail_reply';
+  document.getElementById('ag-auto').checked = false;
+  document.getElementById('ag-task-now').checked = true;
   var cat = document.getElementById('ag-cat');
   cat.length = 1;
   (d.categories || []).forEach(function (c) { cat.add(new Option(c.name, c.id)); });
@@ -4037,11 +4052,31 @@ async function emAgent(pk) {
     a.textContent = '🤖 ' + x.name + ' (' + x.mode + (x.enabled ? '' : ', {% trans "вимкнено" %}') + ')';
     rules.append('{% trans "Цей лист уже підходить під доручення" %}: ', a, document.createElement('br'));
   });
-  var warn = document.getElementById('ag-warn');
-  warn.hidden = !d.blocked;
-  warn.textContent = d.blocked ? '⚠️ {% trans "На цей лист агент не відповідав би" %}: ' + d.blocked : '';
+  _ag.blocked = d.blocked || ''; _ag.blockedTask = d.blocked_task || '';
+  _ag.namePhrase = d.subject || d.sender || '';
   document.getElementById('ag-result').hidden = true;
+  agKind();
   dlg.showModal();
+}
+// ✉️ відповідь / 🧩 завдання агенту з кожного такого листа (agent/mail.py process_task)
+function agKind() {
+  var task = document.getElementById('ag-kind').value === 'mail_task';
+  document.getElementById('ag-reply-opts').hidden = task;
+  document.getElementById('ag-task-opts').hidden = !task;
+  document.getElementById('ag-try').hidden = task;
+  if (task) document.getElementById('ag-result').hidden = true;
+  var instr = document.getElementById('ag-instr');
+  instr.placeholder = task
+    ? 'Напр.: Знайди в листі номер замовлення DigiKey і трек-номер UPS і внеси трек-номер у це замовлення.'
+    : 'Напр.: Подякуй за документ і підтверди, що отримали. Якщо питають про строк відправки — візьми його із замовлення. Пиши коротко, мовою листа. Якщо просять знижку — не відповідай.';
+  var name = document.getElementById('ag-name');
+  if (_ag && _ag.namePhrase && /^(Відповідь|Завдання): /.test(name.value)) {
+    name.value = (task ? 'Завдання: ' : 'Відповідь: ') + _ag.namePhrase;
+  }
+  var why = task ? (_ag && _ag.blockedTask) : (_ag && _ag.blocked);
+  var warn = document.getElementById('ag-warn');
+  warn.hidden = !why;
+  warn.textContent = why ? (task ? '⚠️ З цього листа завдання не буде: ' : '⚠️ {% trans "На цей лист агент не відповідав би" %}: ') + why : '';
 }
 function agDomain() {
   if (_ag && _ag.domain) document.getElementById('ag-senders').value = _ag.domain;
@@ -4051,7 +4086,8 @@ function agData() {
     name: document.getElementById('ag-name').value, senders: document.getElementById('ag-senders').value,
     subject_words: document.getElementById('ag-subject').value, body_words: document.getElementById('ag-body').value,
     category: document.getElementById('ag-cat').value, instruction: document.getElementById('ag-instr').value,
-    mode: document.getElementById('ag-mode').value
+    mode: document.getElementById('ag-mode').value, kind: document.getElementById('ag-kind').value,
+    auto_apply: document.getElementById('ag-auto').checked
   };
 }
 async function agPost(url, data) {
@@ -4089,6 +4125,7 @@ async function agSave() {
   var data = agData(), now = document.getElementById('ag-draft-now');
   data.draft_now = !document.getElementById('ag-result').hidden && now.checked && !document.getElementById('ag-draft-row').hidden;
   data.reply = data.draft_now ? (_ag.reply || '') : '';
+  data.task_now = data.kind === 'mail_task' && document.getElementById('ag-task-now').checked;
   var btn = document.getElementById('ag-save');
   btn.disabled = true;
   try {
@@ -4096,7 +4133,9 @@ async function agSave() {
     if (!d.ok) { alert('❌ ' + (d.error || '')); return; }
     document.getElementById('em-agent-dlg').close();
     _showToast('🤖 {% trans "Доручення збережено — нові такі листи агент оброблятиме сам" %}'
-               + (d.draft ? ' · 📝 {% trans "чернетка для цього листа в Чернетках" %}' : ''));
+               + (d.draft ? ' · 📝 {% trans "чернетка для цього листа в Чернетках" %}' : '')
+               + (d.task ? ' · 🧩 завдання з цього листа в черзі' : ''));
+    if (d.task_url) window.open(d.task_url, '_blank');
   } catch (e) { alert('❌ ' + e); }
   finally { btn.disabled = false; }
 }
