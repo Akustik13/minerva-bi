@@ -265,11 +265,13 @@ class SalesOrderLineInline(admin.TabularInline):
             return format_html('<span style="background:#2e7d32;color:#fff;padding:2px 8px;border-radius:8px;'
                                'font-size:11px">📦 ✓ {} відправлено</span>', int(sent))
         if sent:
-            # частину відправлено посилками: «вільно / ще потрібно» — лише для залишку
+            # частину відправлено посилками: явно «ще відправити N», вільно на складі — для залишку
             tone = "#4caf50" if stock >= needed else ("#ff9800" if stock > 0 else "#f44336")
-            return format_html('<span style="background:{};color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">'
-                               '{} / {}</span> <span style="font-size:11px;color:var(--text-muted)">📦 ✓ {} '
-                               'відправлено</span>{}', tone, int(stock), int(needed), int(sent), wait)
+            return format_html('<span style="background:#e65100;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px;'
+                               'font-weight:700">⏳ ще відправити {}</span> <span style="background:{};color:#fff;'
+                               'padding:2px 8px;border-radius:8px;font-size:11px">вільно {}</span> <span style="font-size:11px;'
+                               'color:var(--text-muted)">📦 ✓ {} відправлено</span>{}',
+                               int(needed), tone, max(0, int(stock)), int(sent), wait)
         if stock <= 0:
             return format_html('<span style="background:#f44336;color:#fff;padding:2px 8px;border-radius:8px;font-size:11px">🚫 Немає (0)</span>{}', wait)
         elif stock < needed:

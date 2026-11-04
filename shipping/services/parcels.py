@@ -390,7 +390,9 @@ def annotate_orders(orders) -> None:
         o.parcel_info = None
         if o.pk in ids:
             p = progress(o)
+            left = sum((q for _sku, q in p.left()), ZERO)
             o.parcel_info = {"sent": qty_text(p.out), "ordered": qty_text(p.ordered),
+                             "left": qty_text(left) if left > 0 else "",
                              "remainder": p.left_text(), "unpacked": p.unpacked_text(),
                              "to_pack": p.to_pack > 0, "started": p.started}
 

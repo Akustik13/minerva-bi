@@ -623,3 +623,17 @@ class IncomingOnCardTests(ParcelBase):
         r = self.client.get("/admin/sales/salesorder/")
         self.assertNotIn("inc", json.loads(r.context_data["sv_order_stock_json"])[str(o.pk)][0])
         self.assertNotIn(str(o.pk), json.loads(r.context_data["sv_order_po_json"]))
+
+
+class StillToShipTests(ParcelBase):
+    """«⏳ ще відправити N» — явно для частково відправленої позиції й замовлення."""
+
+    def test_badge_and_inline(self):
+        self.mode("shipped")
+        self.admin_client()
+        o = self.make_order()
+        self.move(self.ship(o, (10, 4)), "label_ready")
+        r = self.client.get("/admin/sales/salesorder/")
+        self.assertContains(r, "📦 14 / 16 · ⏳ ще 2")
+        r = self.client.get(f"/admin/sales/salesorder/{o.pk}/change/")
+        self.assertContains(r, "⏳ ще відправити 2")

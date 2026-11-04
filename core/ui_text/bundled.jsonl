@@ -18028,6 +18028,8 @@
 {"uk": "ще {0}", "en": "{0} more", "de": "{0} weitere"}
 {"uk": "ще {0} записів не збережено (ліміт {1})", "en": "{0} more records not saved (limit {1})", "de": "weitere {0} Datensätze nicht gespeichert (Limit {1})"}
 {"uk": "ще {0} старіших не показано", "en": "{0} more older ones not shown", "de": "weitere {0} ältere nicht angezeigt"}
+{"uk": "ще відправити", "en": "still to ship", "de": "noch zu versenden"}
+{"uk": "ще відправити {0}", "en": "still to ship {0}", "de": "noch zu versenden {0}"}
 {"uk": "ще не було", "en": "none yet", "de": "noch keiner"}
 {"uk": "ще не в жодній посилці: {0}", "en": "not in any parcel yet: {0}", "de": "noch in keinem Paket: {0}"}
 {"uk": "ще не видно {0}", "en": "{0} not visible yet", "de": "{0} noch nicht sichtbar"}
