@@ -4,14 +4,14 @@ EmailSettings.nav_pinned — ключі обраного в порядку за�
 (за вживанням / кількістю листів / назвою / як у налаштуваннях категорій); nav_usage — {ключ: [бал, дата]}:
 кожен клік у колонці +1, бал «старіє» вдвічі за HALF_LIFE_DAYS — рідко потрібне само опускається вниз.
 Ключі: wc:<pk> — своя категорія, kind:<тип> — «Хто пише», nocat — без своєї категорії, quote — запити
-пропозицій, sort — «Розібрати пошту».
+пропозицій, fu — «⏰ Чекаю реакції», sort — «Розібрати пошту».
 """
 import re
 from datetime import date
 
 from django.utils import timezone
 
-KEY_RE = re.compile(r"^(?:wc:\d{1,9}|kind:[a-z_]{1,30}|nocat|quote|sort)$")
+KEY_RE = re.compile(r"^(?:wc:\d{1,9}|kind:[a-z_]{1,30}|nocat|quote|fu|sort)$")
 PIN_MAX = 30
 USAGE_MAX = 200          # ключів у nav_usage (найменш уживані відкидаються)
 HALF_LIFE_DAYS = 30      # клік місяць тому важить половину
@@ -93,7 +93,7 @@ def ordered(items, es, key_of, n_of=None, name_of=None) -> list:
 CTX_KEYS = (
     "sel_copy", "sel_rag", "sel_ask", "sel_mail",                                  # виділений текст
     "reply", "forward", "ai_reply", "translate", "history", "angebot",             # лише у відкритому листі
-    "open", "read", "star", "cat", "logo", "dante", "customer", "why", "agent", "agent_task", "project",
+    "open", "read", "star", "importance", "followup", "cat", "logo", "dante", "customer", "why", "agent", "agent_task", "project",
     "kbsend", "kb", "rule", "task", "spam", "archive", "restore", "delete",        # restore — лише в Кошику
 )
 CTX_LETTER_ONLY = frozenset(CTX_KEYS[:10])

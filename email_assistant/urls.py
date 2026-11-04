@@ -39,6 +39,9 @@ urlpatterns = [
     path('message/<int:message_pk>/history/',            views.history_view,         name='history'),
     # Actions
     path('message/<int:message_pk>/star/',               views.toggle_star_view,     name='toggle_star'),
+    path('message/<int:message_pk>/importance/',         views.importance_view,      name='message_importance'),
+    path('message/<int:message_pk>/followup/',           views.message_followup_view, name='message_followup'),
+    path('followup/<int:pk>/',                           views.followup_action_view, name='followup_action'),
     path('message/<int:message_pk>/spam/',               views.toggle_spam_view,     name='toggle_spam'),
     path('message/<int:message_pk>/delete/',             views.delete_message_view,  name='delete_message'),
     path('message/<int:message_pk>/restore/',            views.restore_message_view, name='restore_message'),

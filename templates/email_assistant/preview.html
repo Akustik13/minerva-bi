@@ -13,6 +13,12 @@
 .em-pv-link a:hover{text-decoration:underline}
 .em-pv-link .why{font-size:10px;color:var(--text-dim);margin-left:auto}
 .em-pv-quote{background:rgba(192,38,211,.08);border-color:rgba(192,38,211,.3);margin-top:6px}
+.em-pv-fu.bad{background:rgba(229,57,53,.10);border-color:rgba(229,57,53,.45);color:var(--text)}
+.em-pv-fu.ok{background:rgba(46,125,50,.08);border-color:rgba(46,125,50,.35)}
+.em-imp-btn{border:none;background:none;cursor:pointer;font-size:12px;font-weight:700;color:var(--text-dim);padding:0 4px;
+  opacity:.45;line-height:1}
+.em-imp-btn:hover{opacity:1}
+.em-imp-btn.on{opacity:1;color:#e53935}
 /* Проєкти гілки: підтверджені (зелені), пропозиції системи (✓/✗), панель «До проєкту» */
 .em-pv-proj{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .em-pv-kb{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:var(--text-muted)}
@@ -349,10 +355,44 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
     };
     </script>
     {% endif %}
+    {% for fu in followups %}
+    <div class="em-pv-link em-pv-agent em-pv-fu {{ fu.state.tone }}" id="pv-fu-{{ fu.f.pk }}">
+      <span><span class="fu-icon">{{ fu.state.icon }}</span> <b>{% trans "Чекаю реакції" %}</b>{% if followups|length > 1 %} · <span translate="no">{{ fu.msg.sent_at|date:"d.m H:i" }}</span>{% endif %}:
+        <span class="fu-text">{{ fu.state.text }}</span>
+        {% if fu.f.notify_result %}<span class="why">{{ fu.f.notify_result }}</span>{% endif %}</span>
+      {% if fu.f.status != 'done' %}
+      {% if fu.f.status != 'replied' %}<button type="button" class="em-pv-btn" style="padding:2px 10px" onclick="pvFollowup({{ fu.f.pk }}, 'snooze')" title="{% trans "Нагадати ще раз через 2 дні" %}">⏰ +2 {% trans "дні" %}</button>{% endif %}
+      {% if fu.f.remind_at %}<button type="button" class="em-pv-btn" style="padding:2px 10px" onclick="pvFollowup({{ fu.f.pk }}, 'stop')" title="{% trans "Не нагадувати (стан прочитання й відповіді видно далі)" %}">🔕 {% trans "Без нагадування" %}</button>{% endif %}
+      <button type="button" class="em-pv-btn" style="padding:2px 10px" onclick="pvFollowup({{ fu.f.pk }}, 'done')" title="{% trans "Усе гаразд — більше не стежити за цим листом" %}">✓ {% trans "Закрити" %}</button>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% if followups %}
+    <script>
+    window.pvFollowup = async function (pk, action) {
+      var row = document.getElementById('pv-fu-' + pk);
+      row.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+      var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+      try {
+        var r = await fetch('/email/followup/' + pk + '/', {method: 'POST', credentials: 'same-origin',
+          headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'},
+          body: JSON.stringify({action: action, days: 2})});
+        var d = await r.json();
+        if (!d.ok) { alert('❌ ' + (d.error || '{% trans "Помилка" %}')); return; }
+        row.querySelector('.fu-text').textContent = d.state.text;
+        row.querySelector('.fu-icon').textContent = d.state.icon;
+        var why = row.querySelector('.why'); if (why) why.remove();   // «Повідомлено» — про попереднє нагадування
+        row.className = 'em-pv-link em-pv-agent em-pv-fu ' + d.state.tone;
+        if (action !== 'snooze') row.querySelectorAll('button').forEach(function (b) { b.remove(); });
+      } catch (e) { alert('❌ ' + e); }
+      finally { row.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); }
+    };
+    </script>
+    {% endif %}
     {% for run in agent_runs %}
     <div class="em-pv-link em-pv-agent">
       <span>🤖 <b>{% trans "Агент" %}</b> · <span translate="no">{{ run.rule.name }}</span>:
-        {% if run.status == 'drafted' and run.rule.kind == 'mail_forward' %}📝 пересилання готове{% elif run.status == 'drafted' and run.rule.kind == 'mail_customer' %}📝 лист клієнту готовий{% elif run.status == 'drafted' %}📝 {% trans "чернетка відповіді готова" %}{% elif run.status == 'scheduled' %}{% if run.scheduled.status == 'sent' %}✉️ {% trans "надіслав відповідь" %}{% elif run.scheduled.status == 'cancelled' %}✕ {% trans "відправку скасовано" %}{% else %}✉️ {% trans "надішле" %} {{ run.scheduled.scheduled_at|date:"d.m H:i" }}{% endif %}{% elif run.status == 'tasked' %}🧩 завдання агенту{% if run.task %} — {{ run.task.get_status_display }}{% endif %}{% elif run.status == 'skipped' %}↷ {% trans "пропустив" %}{% elif run.status == 'failed' %}⚠️ {% trans "не вдалося" %}{% else %}⏳ {% trans "готує відповідь" %}{% endif %}
+        {% if run.status == 'marked' %}{{ run.rule.get_importance_display }}{% elif run.status == 'drafted' and run.rule.kind == 'mail_forward' %}📝 пересилання готове{% elif run.status == 'drafted' and run.rule.kind == 'mail_customer' %}📝 лист клієнту готовий{% elif run.status == 'drafted' %}📝 {% trans "чернетка відповіді готова" %}{% elif run.status == 'scheduled' %}{% if run.scheduled.status == 'sent' %}✉️ {% trans "надіслав відповідь" %}{% elif run.scheduled.status == 'cancelled' %}✕ {% trans "відправку скасовано" %}{% else %}✉️ {% trans "надішле" %} {{ run.scheduled.scheduled_at|date:"d.m H:i" }}{% endif %}{% elif run.status == 'tasked' %}🧩 завдання агенту{% if run.task %} — {{ run.task.get_status_display }}{% endif %}{% elif run.status == 'skipped' %}↷ {% trans "пропустив" %}{% elif run.status == 'failed' %}⚠️ {% trans "не вдалося" %}{% else %}⏳ {% trans "готує відповідь" %}{% endif %}
         {% if run.outcome %}· {{ run.get_outcome_display }}{% endif %}
         {% if run.reason %}<span class="why">{{ run.reason }}</span>{% endif %}</span>
       {% if run.draft_id %}<a class="em-pv-btn" style="padding:2px 10px" href="/email/compose/?draft={{ run.draft_id }}">✏️ {% trans "Відкрити чернетку" %}</a>{% endif %}
@@ -506,6 +546,10 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
         </div>
         <div class="em-card-right">
           {% if msg.has_attachments %}<span style="font-size:12px;color:var(--text-dim)">📎</span>{% endif %}
+          <button type="button" class="em-imp-btn{% if msg.importance %} on {{ msg.importance }}{% endif %}" id="pv-imp-{{ msg.pk }}"
+                  data-level="{{ msg.importance }}" data-hint="{% trans "Клік — ❗ Важливо → ‼️ Дуже важливо → звичайний" %}"
+                  onclick="event.stopPropagation();pvImportance({{ msg.pk }}, this)"
+                  title="{% if msg.importance %}{{ msg.imp_text }} · {% endif %}{% trans "Клік — ❗ Важливо → ‼️ Дуже важливо → звичайний" %}">{% if msg.importance == 'urgent' %}‼️{% elif msg.importance == 'important' %}❗{% else %}!{% endif %}</button>
           <span class="em-card-date">{{ msg.sent_at|date:"d.m.Y H:i" }}</span>
           <!-- Action buttons always in header -->
           <div class="em-card-actions" onclick="event.stopPropagation()">
@@ -787,6 +831,25 @@ window.pvToggleOrder = function() {
   document.cookie = 'em_thread_order=' + next + ';path=/;max-age=31536000;SameSite=Lax';
   var exp = msgs.querySelector('.em-card.expanded');
   if (exp) setTimeout(function(){ exp.scrollIntoView({block: 'nearest'}); }, 30);
+};
+
+// ❗ / ‼️ у шапці листа: клік — наступний рівень (email_assistant/importance.py); мітка в рядку списку — теж
+window.pvImportance = async function(pk, btn, level) {
+  var cur = btn ? btn.dataset.level || '' : '';
+  if (level === undefined) level = {'': 'important', important: 'urgent', urgent: ''}[cur];
+  var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  try {
+    var r = await fetch('/email/message/' + pk + '/importance/', {method: 'POST', credentials: 'same-origin',
+      headers: {'X-CSRFToken': csrf, 'Content-Type': 'application/json'}, body: JSON.stringify({level: level})});
+    var d = await r.json();
+    if (!d.ok) { alert('❌ ' + (d.error || '{% trans "Помилка" %}')); return; }
+    document.querySelectorAll('#pv-imp-' + pk).forEach(function(b) {
+      b.dataset.level = d.level; b.textContent = d.icon || '!';
+      b.className = 'em-imp-btn' + (d.level ? ' on ' + d.level : '');
+      b.title = (d.level ? d.label + ' · ' : '') + (b.dataset.hint || '');
+    });
+    if (window.emRowImportance) window.emRowImportance(pk, d.level, d.icon, d.label);
+  } catch (e) { alert('❌ ' + e); }
 };
 
 window.pvToggleCard = function(pk, e) {

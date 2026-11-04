@@ -45,7 +45,7 @@ class AgentRuleForm(forms.ModelForm):
         model = AgentRule
         fields = ['name', 'enabled', 'account', 'kind', 'senders', 'subject_words', 'body_words', 'category',
                   'instruction', 'mode', 'send_delay_minutes', 'daily_limit', 'forward_to', 'cc', 'auto_apply',
-                  'task_model', 'task_budget_usd']
+                  'task_model', 'task_budget_usd', 'importance', 'notify']
         widgets = {
             'senders': forms.Textarea(attrs={'rows': 3}),
             'subject_words': forms.Textarea(attrs={'rows': 3}),
@@ -68,6 +68,8 @@ class AgentRuleForm(forms.ModelForm):
                    if x and not agent_mail.EMAIL_RE.fullmatch(x)]
             if bad:
                 self.add_error(field, 'Не схоже на адресу: ' + ', '.join(bad[:3]))
+        if data.get('kind') not in AgentRule.NO_INSTRUCTION and not (data.get('instruction') or '').strip():
+            self.add_error('instruction', 'Напишіть, що робити — інструкцію агенту.')
         if data.get('kind') == AgentRule.MAIL_FORWARD and not (data.get('forward_to') or '').strip():
             self.add_error('forward_to', 'Вкажіть, кому пересилати.')
         long_lines = [ln for ln in (data.get('body_words') or '').splitlines() if len(ln.split()) > 6]
@@ -99,6 +101,11 @@ class AgentRuleAdmin(admin.ModelAdmin):
             'description': 'Для «Відповідати на такі листи» і «📨 Писати клієнту замовлення». Клієнту — замовлення, '
                            'чий трек-номер (у замовленні чи його відправленні) є в листі; на адресу клієнта із '
                            'замовлення, тому самому клієнту про те саме замовлення — не частіше ніж раз на 14 днів.'}),
+        ('❗ Позначати такі листи', {
+            'fields': ('importance', 'notify'),
+            'description': 'Лише для «❗ Позначати такі листи важливими»: позначка в списку листів і в папці '
+                           '«⭐ Важливі», з «🔔» — ще й лист і Telegram вам, щойно такий лист прийде. Без AI. '
+                           '«Що робити» — необов’язкова примітка в повідомленні.'}),
         ('🧩 Завдання агенту', {
             'fields': ('auto_apply', 'task_model', 'task_budget_usd'),
             'description': 'Лише для «Завдання агенту з кожного такого листа»: з кожного нового такого листа — '
@@ -144,6 +151,8 @@ class AgentRuleAdmin(admin.ModelAdmin):
         mode = '✉️ сам' if obj.mode == AgentRule.SEND else '📝 чернетка'
         if obj.kind == AgentRule.MAIL_FORWARD:
             return f'📤 переслати · {mode}'
+        if obj.kind == AgentRule.MAIL_MARK:
+            return obj.get_importance_display() + (' · 🔔' if obj.notify else '')
         return f'📨 клієнту · {mode}' if obj.kind == AgentRule.MAIL_CUSTOMER else mode
 
     @admin.display(description='Умови')
@@ -164,6 +173,7 @@ class AgentRuleAdmin(admin.ModelAdmin):
             '📝': runs.filter(status=AgentRun.DRAFTED).count(),
             '✉️': runs.filter(status=AgentRun.SCHEDULED).count(),
             '🧩': runs.filter(status=AgentRun.TASKED).count(),
+            '❗': runs.filter(status=AgentRun.MARKED).count(),
             '✓': runs.filter(outcome=AgentRun.SENT_SAME).count(),
             '✏️': runs.filter(outcome=AgentRun.SENT_EDITED).count(),
             '↷': runs.filter(status=AgentRun.SKIPPED).count(),
@@ -180,6 +190,9 @@ class AgentRuleAdmin(admin.ModelAdmin):
         if obj is None or not obj.pk:
             return format_html('<div style="opacity:.8">Простіше створити доручення з листа: у пошті правий клік на '
                                'листі → «🤖 Доручити агенту…» — там можна й спробувати відповідь на цьому листі.</div>')
+        if obj.kind == AgentRule.MAIL_MARK:
+            return format_html('<div style="opacity:.8">{} — кожен новий такий лист{}.</div>',
+                               obj.get_importance_display(), ' · 🔔 одразу лист і Telegram вам' if obj.notify else '')
         if obj.kind == AgentRule.MAIL_TASK:
             return format_html('<div style="opacity:.8">🧩 З кожного нового такого листа — завдання агенту{}.</div>',
                                ' · трек-номер у порожнє поле замовлення вносить сам' if obj.auto_apply else '')

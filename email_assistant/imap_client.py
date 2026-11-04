@@ -125,6 +125,22 @@ def _get_body(msg) -> tuple:
     return text_body, html_body
 
 
+def _importance(msg) -> str:
+    try:
+        from email_assistant.importance import from_headers
+        return from_headers(msg)
+    except Exception:  # noqa: BLE001 — позначка не має зупиняти синхронізацію
+        return ''
+
+
+def _mdn(msg):
+    try:
+        from email_assistant.followups import parse_mdn
+        return parse_mdn(msg)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def parse_addresses(*headers) -> list:
     """Адреси з заголовків To/Cc (коми в іменах "Прізвище, Ім'я" не ламають розбір)."""
     return [addr.lower() for _, addr in getaddresses([str(h) for h in headers if h]) if '@' in addr]
@@ -439,6 +455,8 @@ class IMAPClient:
                 'is_read':     '\\Seen' in flags_str,
                 'sent_at':     sent_at,
                 'list_unsubscribe': bool(msg.get('List-Unsubscribe')),
+                'importance':  _importance(msg),     # ❗ відправник позначив важливим (email_assistant/importance.py)
+                'mdn':         _mdn(msg),            # 📬 підтвердження прочитання нашого листа (followups.parse_mdn)
             }
         except Exception as e:
             logger.error('Error parsing message: %s', e)

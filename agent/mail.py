@@ -131,8 +131,11 @@ def task_blocked(msg, *, check_age=True) -> str:
     return ''
 
 
+NO_REPLY_KINDS = (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER, AgentRule.MAIL_FORWARD, AgentRule.MAIL_MARK)
+
+
 def why_not(rule, msg, *, check_age=True) -> str:
-    return task_blocked(msg, check_age=check_age) if rule.kind in (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER, AgentRule.MAIL_FORWARD) \
+    return task_blocked(msg, check_age=check_age) if rule.kind in NO_REPLY_KINDS \
         else blocked(rule, msg, check_age=check_age)
 
 
@@ -634,6 +637,56 @@ def process_forward(run):
                 draft=draft, scheduled=scheduled)
 
 
+# ── ❗ Позначати такі листи ───────────────────────────────────────────────────
+
+MARK_TEXT_MAX = 400
+
+
+def mark_notice(rule, msg) -> dict:
+    """Повідомлення власнику скриньки «‼️ Дуже важливий лист …» (agent/notify.deliver)."""
+    from email_assistant import importance, quotes
+    from email_assistant.followups import message_link
+    label = importance.LABELS[rule.importance]
+    sender = f'{msg.from_name} <{msg.from_email}>' if msg.from_name else msg.from_email
+    text = ' '.join((quotes.new_text(msg.body_text or '') or '').split())
+    if len(text) > MARK_TEXT_MAX:
+        text = text[:MARK_TEXT_MAX].rstrip() + '…'
+    lines = [f'Від: {sender}', f'Тема: {msg.subject or "(без теми)"}', f'Доручення: {rule.name}']
+    if rule.instruction.strip():
+        lines.append(f'Примітка: {rule.instruction.strip()[:300]}')
+    return {'subject': f'{label}: {msg.subject or "(без теми)"}'[:200],
+            'head': f'{label} — новий лист від {sender}', 'lines': lines, 'summary': text,
+            'link': message_link(msg.pk)}
+
+
+def mark(rule, msg, *, notify=True) -> str:
+    """❗ / ‼️ листу (вибір людини сильніший) і, якщо в дорученні «🔔», — повідомлення. → що зроблено."""
+    from email_assistant import importance
+    label = importance.LABELS[rule.importance]
+    if importance.raise_level(msg, rule.importance):
+        done = label
+    elif msg.importance_by == importance.BY_ME:
+        done = f'{label}: не змінено — ви позначили лист інакше'
+    else:
+        done = f'{label}: уже позначено'
+    if notify and rule.notify:
+        from agent.notify import deliver
+        user = rule.account.user
+        done += ' · ' + (deliver(user, mark_notice(rule, msg), link_text='Відкрити лист') if user
+                         else 'у скриньки немає власника')
+    return done
+
+
+def process_mark(run):
+    """Лист, що підійшов під умови, → ❗ Важливо / ‼️ Дуже важливо і (за дорученням) лист і Telegram власнику.
+    Без AI."""
+    rule, msg = run.rule, run.message
+    why = task_blocked(msg)
+    if why:
+        return _finish(run, AgentRun.SKIPPED, why)
+    return _finish(run, AgentRun.MARKED, mark(rule, msg)[:500])
+
+
 AUTO_FIELDS = ('tracking', 'courier')
 
 
@@ -668,9 +721,9 @@ def process(run):
     доручення «🧩 Завдання агенту» — завдання з листа (`process_task`)."""
     from email_assistant.models import ScheduledEmail
     rule, msg = run.rule, run.message
-    if rule.kind in (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER, AgentRule.MAIL_FORWARD):
+    if rule.kind in NO_REPLY_KINDS:
         handler = {AgentRule.MAIL_TASK: process_task, AgentRule.MAIL_CUSTOMER: process_customer,
-                   AgentRule.MAIL_FORWARD: process_forward}[rule.kind]
+                   AgentRule.MAIL_FORWARD: process_forward, AgentRule.MAIL_MARK: process_mark}[rule.kind]
         try:
             return handler(run)
         except Exception as e:  # noqa: BLE001 — одна помилка не зупиняє чергу
@@ -779,8 +832,9 @@ def rule_from(data, msg, user=None) -> AgentRule:
                      instruction=text('instruction', 8000), example_message=msg, created_by=user)
     rule.mode = AgentRule.SEND if data.get('mode') == AgentRule.SEND else AgentRule.DRAFT
     kind = str(data.get('kind') or '')
-    rule.kind = kind if kind in (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER, AgentRule.MAIL_FORWARD) \
-        else AgentRule.MAIL_REPLY
+    rule.kind = kind if kind in NO_REPLY_KINDS else AgentRule.MAIL_REPLY
+    rule.importance = 'urgent' if data.get('importance') == 'urgent' else 'important'
+    rule.notify = rule.kind == AgentRule.MAIL_MARK and bool(data.get('notify'))
     rule.cc = text('cc', 1000)
     rule.forward_to = text('forward_to', 1000)
     if rule.kind == AgentRule.MAIL_FORWARD and not forward_list(rule):
@@ -795,7 +849,7 @@ def rule_from(data, msg, user=None) -> AgentRule:
             setattr(rule, key, max(0 if key == 'send_delay_minutes' else 1, min(int(data.get(key, default)), top)))
         except (TypeError, ValueError):
             setattr(rule, key, default)
-    if not rule.instruction:
+    if not rule.instruction and rule.kind not in AgentRule.NO_INSTRUCTION:
         raise ValueError('Напишіть, що робити — інструкцію агенту')
     if not rule.has_conditions:
         raise ValueError('Потрібна хоча б одна умова: від кого, тема, текст або своя категорія')
@@ -808,6 +862,11 @@ def try_on(rule, msg) -> dict:
     out = {'matches': ok, 'why': why, 'blocked': why_not(rule, msg, check_age=False)}
     if rule.kind == AgentRule.MAIL_FORWARD:
         return {**out, **forward_preview(rule, msg)}
+    if rule.kind == AgentRule.MAIL_MARK:
+        from email_assistant import importance
+        return {**out, 'skip': False, 'confident': True, 'doubts': '',
+                'reply': importance.LABELS[rule.importance] + (
+                    ' · 🔔 одразу лист і Telegram вам' if rule.notify else '')}
     if rule.kind == AgentRule.MAIL_CUSTOMER:
         order, tracking, reason = order_for(msg)
         if order is None:
@@ -836,6 +895,11 @@ def save(rule, msg, *, reply='', task_now=False, subject='') -> dict:
                 AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.TASKED, task=task,
                                         reason='з вікна «🤖 Доручити агенту»', finished_at=timezone.now())
             return {'rule': rule, 'draft': None, 'task': task}
+        if rule.kind == AgentRule.MAIL_MARK:   # той самий лист, з якого доручення, — позначити одразу
+            if not task_blocked(msg, check_age=False):
+                AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.MARKED, finished_at=timezone.now(),
+                                        reason=(mark(rule, msg, notify=False) + ' · з вікна «🤖 Доручити агенту»')[:500])
+            return {'rule': rule, 'draft': None, 'task': None}
         if rule.kind == AgentRule.MAIL_FORWARD:
             if reply.strip() and forward_list(rule) and not task_blocked(msg, check_age=False):
                 draft, _ = make_forward(rule, msg)

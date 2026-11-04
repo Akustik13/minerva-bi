@@ -9,6 +9,7 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 
+from email_assistant.importance import folder_q as _imp_folder_q
 from email_assistant.sync import set_read
 
 logger = logging.getLogger('email_assistant')
@@ -200,8 +201,9 @@ def _build_qs(account, folder, q=''):
 
     if folder == 'spam':
         qs = EmailMessage.objects.filter(account=account, is_spam=True, is_deleted=False)
-    elif folder == 'starred':
-        qs = EmailMessage.objects.filter(account=account, is_starred=True, is_deleted=False)
+    elif folder == 'starred':   # ⭐ зірочка й ❗ / ‼️ (email_assistant/importance.py)
+        from email_assistant.importance import folder_q
+        qs = EmailMessage.objects.filter(folder_q(), account=account, is_deleted=False)
     elif folder == 'archived':
         archived_ids = EmailThread.objects.filter(
             account=account, is_archived=True
@@ -492,7 +494,7 @@ def _attach_thread_stats(emails):
             m.thread_pks = ','.join(map(str, pks[m.thread_id]))
 
 
-def _filter_qs(cat, customer, project=None, quote=False, wcat=None) -> str:
+def _filter_qs(cat, customer, project=None, quote=False, wcat=None, fu=False) -> str:
     from urllib.parse import urlencode
     params = {}
     if cat:
@@ -505,6 +507,8 @@ def _filter_qs(cat, customer, project=None, quote=False, wcat=None) -> str:
         params['project'] = project.pk
     if quote:
         params['quote'] = 1
+    if fu:
+        params['fu'] = 1
     return ('&' + urlencode(params)) if params else ''
 
 
@@ -542,11 +546,13 @@ def inbox_view(request):
     project_filter = _parse_project_filter(request)
     quote_filter = request.GET.get('quote') in ('1', 'all')   # all — ще й оброблені (з Angebot)
     quote_all = request.GET.get('quote') == 'all'
+    fu_filter = request.GET.get('fu') == '1'   # ⏰ надіслані листи, що чекають реакції (email_assistant/followups.py)
     # «📝 Чернетки»: список чернеток замість листів (пошук — по чернетках); фільтр лівої колонки — знову листи
     drafts_view = folder == DRAFTS_FOLDER and not (cat_filter or work_filter or customer_filter or project_filter
-                                                   or quote_filter)
+                                                   or quote_filter or fu_filter)
     # Пошук і фільтри «Категорія / Клієнт / Проєкт / Запити» діють по всіх папках (у Спамі й Кошику — лише в них)
-    search_all = bool(q or cat_filter or work_filter or customer_filter or project_filter or quote_filter) \
+    search_all = bool(q or cat_filter or work_filter or customer_filter or project_filter or quote_filter
+                      or fu_filter) \
         and folder not in ('spam', 'trash') and not drafts_view
     qs = _build_qs(account, ALL_FOLDERS if search_all else folder, q)
     counts_qs = qs if folder in ('spam', 'trash') else _build_qs(account, ALL_FOLDERS, '' if drafts_view else q)
@@ -583,6 +589,9 @@ def inbox_view(request):
     if quote_filter:
         qs = qs.filter(pk__in=_quote_messages(account, with_done=quote_all))
     quote_count = counts_qs.filter(pk__in=_quote_messages(account)).count()
+    from email_assistant import followups as _followups
+    if fu_filter:
+        qs = qs.filter(pk__in=_followups.message_pks(account))
     # «Групувати по гілці» (⎘, cookie): один рядок на гілку — її найновіший лист у цьому списку
     grouped = request.COOKIES.get('em_group') == '1'
     if grouped:
@@ -610,6 +619,8 @@ def inbox_view(request):
     _attach_project_tags(emails)
     _attach_work_cats(emails)
     _attach_quote_tags(emails)
+    _followups.attach(emails)   # ⏰ / 📬 / ⚠️ на надісланих листах
+    _attach_importance(emails)
     _attach_kb_tags(emails)
     _attach_logos(emails)
     _attach_chips(emails)
@@ -626,7 +637,7 @@ def inbox_view(request):
     ).filter(_inbox_q(account)).exclude(thread_id__in=_archived_ids).count()
     unread_counts = {
         'inbox':    unread_inbox,
-        'starred':  EmailMessage.objects.filter(account=account, is_starred=True, is_read=False, is_deleted=False).count(),
+        'starred':  EmailMessage.objects.filter(_imp_folder_q(), account=account, is_read=False, is_deleted=False).count(),
         'spam':     EmailMessage.objects.filter(account=account, is_spam=True, is_read=False, is_deleted=False).count(),
         'sent':     0,
         'archived': 0,
@@ -665,7 +676,10 @@ def inbox_view(request):
         'categories':            categories,
         'mail_customers':        mail_customers,
         'cust_sources':          _customer_sources(mail_customers),
-        'filter_qs':             _filter_qs(cat_filter, customer_filter, project_filter, quote_filter, work_filter),
+        'filter_qs':             _filter_qs(cat_filter, customer_filter, project_filter, quote_filter, work_filter,
+                                            fu_filter),
+        'fu_filter':             fu_filter,
+        'fu_counts':             _followups.counts(account),
         'work_filter':           work_filter,
         'no_category':           work_filter == NO_CATEGORY,
         'no_category_count':     counts_qs.filter(work_category=None).count() if work_categories else 0,
@@ -791,6 +805,7 @@ def thread_preview_view(request, thread_pk):
 
     links = _mail_links(emails)
     _attach_logos(emails)
+    _attach_importance(emails)
     reply_to_addr, reply_cc = _reply_addresses(account, emails[-1]) if emails else ('', [])
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
@@ -798,6 +813,8 @@ def thread_preview_view(request, thread_pk):
         'projects_state':  _projects_state(thread),
         'quote_request':   _quote_request(thread),
         'agent_runs':      _agent_runs(emails),
+        'followups':       _followups_for(emails),
+        'meeting_invites': _meeting_invites(request.user, emails),
         'links':           links,
         'attach_options':  _attach_options(emails, links),
         'reply_to_addr':   reply_to_addr,
@@ -820,6 +837,24 @@ def _agent_runs(emails) -> list:
         logger.warning('agent runs for preview: %s', e)
         return []
     return [runs[m.pk][0] for m in emails if runs.get(m.pk)]
+
+
+def _attach_importance(emails):
+    """msg.imp_text — підказка позначки ❗ / ‼️ («‼️ Дуже важливо — позначили ви»)."""
+    from email_assistant.importance import describe
+    for m in emails:
+        m.imp_text = describe(m)
+
+
+def _followups_for(emails) -> list:
+    """Рядок «⏰ Чекаю реакції» у прев'ю: надіслані листи гілки з 📬 / ⏰ (email_assistant/followups.py)."""
+    try:
+        from email_assistant import followups
+        found = followups.for_messages(emails)
+    except Exception as e:  # noqa: BLE001 — прев'ю відкривається й без цього
+        logger.warning('followups for preview: %s', e)
+        return []
+    return [{'msg': m, 'f': found[m.pk], 'state': followups.state(found[m.pk])} for m in emails if m.pk in found]
 
 
 def _meeting_invites(user, emails) -> list:
@@ -845,6 +880,7 @@ def message_preview_view(request, message_pk):
 
     links = _mail_links([msg])
     _attach_logos([msg])
+    _attach_importance([msg])
     reply_to_addr, reply_cc = _reply_addresses(account, msg)
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
@@ -852,6 +888,7 @@ def message_preview_view(request, message_pk):
         'projects_state':  _projects_state(msg.thread),
         'agent_runs':      _agent_runs([msg]),
         'meeting_invites': _meeting_invites(request.user, [msg]),
+        'followups':       _followups_for([msg]),
         'links':           links,
         'attach_options':  _attach_options([msg], links),
         'reply_to_addr':   reply_to_addr,
@@ -1308,13 +1345,17 @@ def _handle_send(request, account, reply_to=None):
             return JsonResponse({'ok': False, 'error': f'Вкладення недоступне: {name}'})
         attachments.append(att)
 
+    from email_assistant import followups
+    opts = followups.options(request.POST)   # ❗ Важливо / 📬 запит на прочитання / ⏰ нагадати, якщо без реакції
     result = SMTPClient(account).send(
         to_emails=to_list, subject=subject, body_text=body,
         body_html=body_html or '',
         cc_emails=cc_list, reply_to_message=reply_to, attachments=attachments,
+        importance=opts['importance'], read_receipt=opts['read_receipt'],
     )
 
     if result['ok']:
+        sent_copy = None
         try:
             from email_assistant.sync import get_or_create_thread
             now = timezone.now()
@@ -1328,7 +1369,7 @@ def _handle_send(request, account, reply_to=None):
             if reply_to and not reply_to.thread_id:
                 reply_to.thread = thread           # лист без гілки — тепер вони разом
                 reply_to.save(update_fields=['thread'])
-            EmailMessage.objects.create(
+            sent_copy = EmailMessage.objects.create(
                 account=account, thread=thread, folder='sent',
                 # без UID поки копія з «Надісланих» не синхронізується (sync.save_message допише UID)
                 imap_folder_name=('minerva:' + result.get('message_id', ''))[:200],
@@ -1337,6 +1378,7 @@ def _handle_send(request, account, reply_to=None):
                 subject=subject, from_email=account.email_address,
                 from_name=account.display_name, to_emails=to_list, cc_emails=cc_list,
                 body_text=body, body_html=body_html or '', is_read=True, sent_at=now,
+                importance=opts['importance'], importance_by='me' if opts['importance'] else '',
                 attachments=[{'name': a['name'], 'content_type': a['content_type'],
                               'size': len(a['content'])} for a in attachments],
             )
@@ -1345,6 +1387,15 @@ def _handle_send(request, account, reply_to=None):
             thread.save(update_fields=['message_count', 'last_message_at'])
         except Exception as e:
             logger.warning('store sent message: %s', e)
+        try:
+            fu = followups.track(account, msg_id=result.get('message_id', ''), subject=subject,
+                                 recipients=to_list + cc_list, message=sent_copy, user=request.user,
+                                 read_receipt=opts['read_receipt'], remind_days=opts['remind_days'],
+                                 until=opts['until'])
+            if fu is not None:
+                result['followup'] = followups.state(fu)['text']
+        except Exception as e:  # noqa: BLE001 — лист уже пішов
+            logger.warning('followup for sent message: %s', e)
         _save_contacts(request.user, to_list + cc_list)
         offer_refs = [r for r in request.POST.getlist('att_ref') if r.startswith('offer:')]
         if offer_refs:   # надіслано документ Angebot → версія «надіслана» (незмінна)
@@ -1908,7 +1959,8 @@ def unread_count_view(request):
     base = EmailMessage.objects.filter(account=account, is_deleted=False, is_read=False)
     archived_ids = EmailThread.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
     inbox = base.filter(folder='inbox').filter(_inbox_q(account)).exclude(thread_id__in=archived_ids).count()
-    starred = base.filter(is_starred=True).count()
+    from email_assistant.importance import folder_q
+    starred = base.filter(folder_q()).count()
     spam    = base.filter(is_spam=True).count()
     from email_assistant import drafts as _drafts
     return JsonResponse({'count': inbox, 'inbox': inbox, 'starred': starred, 'spam': spam,
@@ -1924,6 +1976,63 @@ def toggle_star_view(request, message_pk):
     msg.is_starred = not msg.is_starred
     msg.save(update_fields=['is_starred'])
     return JsonResponse({'ok': True, 'starred': msg.is_starred})
+
+
+def _json_body(request) -> dict:
+    try:
+        data = json.loads(request.body or b'{}')
+    except ValueError:
+        data = {}
+    return data if isinstance(data, dict) else {}
+
+
+@staff_member_required
+@require_POST
+def importance_view(request, message_pk):
+    """❗ Важливо / ‼️ Дуже важливо / звичайний — POST {level: important | urgent | ''} (email_assistant/importance.py)."""
+    from email_assistant import importance
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    level = str(_json_body(request).get('level') or '')
+    if level not in importance.LEVELS:
+        return JsonResponse({'ok': False, 'error': 'Невідомий рівень важливості'}, status=400)
+    importance.set_level([msg], level)
+    return JsonResponse({'ok': True, 'level': level, 'icon': importance.ICONS.get(level, ''),
+                         'label': importance.LABELS[level]})
+
+
+@staff_member_required
+@require_POST
+def message_followup_view(request, message_pk):
+    """«⏰ Нагадати, якщо немає реакції…» для свого надісланого листа — POST {days, until: reaction | reply}."""
+    from email_assistant import followups
+    from email_assistant.models import EmailMessage, MailFollowup
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    data = _json_body(request)
+    until = MailFollowup.UNTIL_REPLY if data.get('until') == MailFollowup.UNTIL_REPLY else MailFollowup.UNTIL_REACTION
+    try:
+        f = followups.track_message(msg, int(data.get('days') or followups.DEFAULT_DAYS), until, user=request.user)
+    except (TypeError, ValueError) as e:
+        return JsonResponse({'ok': False, 'error': str(e) or 'Невірна кількість днів'}, status=400)
+    return JsonResponse({'ok': True, 'id': f.pk, 'state': followups.state(f)})
+
+
+@staff_member_required
+@require_POST
+def followup_action_view(request, pk):
+    """Дії з очікуванням реакції: {action: done | snooze | stop, days}."""
+    from email_assistant import followups
+    from email_assistant.models import MailFollowup
+    account = _get_account(request)
+    f = get_object_or_404(MailFollowup, pk=pk, account=account)
+    data = _json_body(request)
+    try:
+        followups.act(f, str(data.get('action') or ''), data.get('days'))
+    except (TypeError, ValueError) as e:
+        return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+    return JsonResponse({'ok': True, 'state': followups.state(f), 'status': f.status})
 
 
 @staff_member_required
@@ -2150,11 +2259,13 @@ def schedule_email_api(request):
         if error:
             return JsonResponse({'ok': False, 'error': error})
 
+    from email_assistant.followups import stored as _followup_stored
     scheduled = ScheduledEmail.objects.create(
         account=account, subject=subject,
         to_emails=to_list, cc_emails=cc_list,
         body=body, body_html=body_html, attachments=items, reply_to=reply_to,
         scheduled_at=dt, trigger='manual',
+        send_options=_followup_stored(data),   # ❗ / 📬 / ⏰ — застосує send_scheduled
     )
     _save_contacts(request.user, to_list + cc_list)
     if not is_json and request.POST.get('draft_pk'):   # чернетку заплановано — у листа свої копії файлів

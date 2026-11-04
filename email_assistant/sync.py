@@ -212,6 +212,9 @@ def save_message(account, msg_data, imap_folder, folder_type=None, persist_files
         is_read=msg_data['is_read'],
         sent_at=msg_data['sent_at'],
     )
+    if msg_data.get('importance'):   # ❗ відправник позначив важливим (Importance / X-Priority)
+        from email_assistant.importance import BY_SENDER
+        em.importance, em.importance_by = msg_data['importance'], BY_SENDER
     em._list_unsubscribe = msg_data.get('list_unsubscribe', False)  # підказка для категорії (сигнал)
     from email_assistant import spam
     spam.before_save(em)   # відомий спамер → у Спам ще до сигналів (запрошення, терміни, CRM)
@@ -226,6 +229,11 @@ def save_message(account, msg_data, imap_folder, folder_type=None, persist_files
     participants = sorted({p.lower() for p in (thread.participants or [])} | _addresses(msg_data))[:50]
     thread.participants = participants
     thread.save(update_fields=['message_count', 'last_message_at', 'has_unread', 'participants'])
+    try:   # ⏰ наш лист чекав реакції: це підтвердження прочитання чи відповідь? (email_assistant/followups.py)
+        from email_assistant import followups
+        followups.on_incoming(em, msg_data)
+    except Exception as e:  # noqa: BLE001 — синхронізація важливіша
+        logger.warning('followups for message %s: %s', em.pk, e)
     return em
 
 

@@ -72,16 +72,16 @@ def _email_to(user) -> str:
     return acc.email_address if acc else ''
 
 
-def _send_mail(user, m) -> str:
+def _send_mail(user, m, link_text='Відкрити завдання') -> str:
     from worktime import reports
     to = _email_to(user)
     if not to:
         return 'немає email'
     text = '\n'.join([m['head'], ''] + m['lines'] + (['', m['summary']] if m['summary'] else []) +
-                     ['', f'Відкрити завдання: {m["link"]}'])
+                     ['', f'{link_text}: {m["link"]}'])
     html = (f'<p><b>{escape(m["head"])}</b></p><p>' + '<br>'.join(escape(x) for x in m['lines']) + '</p>'
             + (f'<p style="white-space:pre-wrap;color:#444">{escape(m["summary"])}</p>' if m['summary'] else '')
-            + f'<p><a href="{escape(m["link"])}">Відкрити завдання →</a></p>')
+            + f'<p><a href="{escape(m["link"])}">{escape(link_text)} →</a></p>')
     err = reports.deliver(None, [to], m['subject'], text, html)
     if err and 'SMTP' in err:                        # сповіщення не налаштовані — зі своєї скриньки
         from email_assistant.models import EmailAccount
@@ -91,7 +91,7 @@ def _send_mail(user, m) -> str:
     return err
 
 
-def _send_telegram(user, m) -> str:
+def _send_telegram(user, m, link_text='Відкрити завдання') -> str:
     chat = getattr(getattr(user, 'profile', None), 'telegram_id', None)
     if not chat:
         return ''
@@ -102,7 +102,7 @@ def _send_telegram(user, m) -> str:
         return 'немає бота в «Налаштування → Сповіщення»'
     text = (f'<b>{escape(m["subject"])}</b>\n{escape(m["head"])}\n' + '\n'.join(escape(x) for x in m['lines'])
             + (f'\n\n{escape(m["summary"][:500])}' if m['summary'] else '')
-            + f'\n\n<a href="{escape(m["link"])}">Відкрити завдання</a>')
+            + f'\n\n<a href="{escape(m["link"])}">{escape(link_text)}</a>')
     try:
         send(ns, text, chat_id_override=chat)
     except Exception as e:  # noqa: BLE001
@@ -115,16 +115,22 @@ def task_finished(task_id, note='') -> str:
     task = AgentTask.objects.select_related('owner', 'owner__profile').filter(pk=task_id).first()
     if task is None or not due(task):
         return ''
-    m = compose(task, note)
-    telegram = bool(getattr(getattr(task.owner, 'profile', None), 'telegram_id', None))
+    return deliver(task.owner, compose(task, note))
+
+
+def deliver(user, m, link_text='Відкрити завдання') -> str:
+    """Лист і (якщо в профілі є Telegram ID) Telegram людині. m — {subject, head, lines, summary, link}.
+    Ним же — «⚠️ Немає реакції на лист» (email_assistant/followups.py), «‼️ Дуже важливий лист» (agent/mail.py).
+    → «🔔 Повідомлено: пошта, Telegram» / «🔕 Не вдалося повідомити — …»."""
+    telegram = bool(getattr(getattr(user, 'profile', None), 'telegram_id', None))
     sent, failed = [], []
     for name, fn, wanted in (('пошта', _send_mail, True), ('Telegram', _send_telegram, telegram)):
         if not wanted:
             continue
         try:
-            err = fn(task.owner, m)
-        except Exception as e:  # noqa: BLE001 — повідомлення не має ламати завдання
-            logger.warning('agent notify %s task %s: %s', name, task.pk, e)
+            err = fn(user, m, link_text)
+        except Exception as e:  # noqa: BLE001 — повідомлення не має ламати роботу
+            logger.warning('notify %s user %s: %s', name, getattr(user, 'pk', None), e)
             err = type(e).__name__
         if err:
             failed.append(f'{name}: {err}')

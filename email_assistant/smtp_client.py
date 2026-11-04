@@ -63,9 +63,12 @@ class SMTPClient:
     def send(self, to_emails: list, subject: str, body_text: str,
              body_html: str = '', cc_emails: list = None,
              bcc_emails: list = None, reply_to_message=None,
-             attachments: list = None, calendar: tuple = None) -> dict:
+             attachments: list = None, calendar: tuple = None, importance: str = '',
+             read_receipt: bool = False) -> dict:
         """calendar — (метод iTIP, текст iCalendar), напр. ('REPLY', ics): частина text/calendar; method=… поруч з
-        текстом (так відповідь на запрошення розуміють Outlook / Google / Teams) і той самий файл invite.ics."""
+        текстом (так відповідь на запрошення розуміють Outlook / Google / Teams) і той самий файл invite.ics.
+        importance «important» — ❗ Importance: high / X-Priority: 1; read_receipt — 📬 запит на прочитання
+        (Disposition-Notification-To на адресу скриньки; відповідь розпізнає email_assistant/followups.py)."""
         cc_emails   = cc_emails   or []
         bcc_emails  = bcc_emails  or []
         attachments = attachments or []
@@ -85,6 +88,12 @@ class SMTPClient:
             msg['Message-ID'] = message_id
             if cc_emails:
                 msg['Cc'] = ', '.join(cc_emails)
+            from email_assistant.importance import outgoing_headers
+            for name, value in outgoing_headers(importance).items():
+                msg[name] = value
+            if read_receipt:
+                msg['Disposition-Notification-To'] = self.account.email_address
+                msg['Return-Receipt-To'] = self.account.email_address
 
             if reply_to_message and reply_to_message.message_id:
                 # Відповідь, а не новий лист: поштові програми клієнта ставлять її в ту саму гілку

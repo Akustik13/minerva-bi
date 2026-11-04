@@ -445,6 +445,9 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 .em-tag.cust{--c:#3b82f6;max-width:150px}
 .em-tag.proj{--c:#16a34a}
 .em-tag.quote{--c:#c026d3}
+.em-tag.fu{--c:#d97706;cursor:default;max-width:none}.em-tag.fu.ok{--c:#16a34a}.em-tag.fu.bad{--c:#dc2626}
+.em-tag.fu.done{--c:#9aa0a6}
+.em-imp{color:#e53935;font-weight:700;margin-right:3px}
 .em-tag.kb{--c:#0891b2;max-width:none;cursor:default}
 .em-tag.kb.kb-wait{--c:#d97706}.em-tag.kb.kb-fail{--c:#dc2626}
 .em-p2-quote{flex:0 0 auto;white-space:nowrap}
@@ -649,6 +652,12 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
             <span class="em-folder-icon">📝</span><span class="em-folder-label">{% trans "Запити пропозицій" %}</span>{% if quote_count %}<span class="em-badge">{{ quote_count }}</span>{% endif %}
           </a>
           {% endif %}
+          {% if fu_counts.open or fu_filter or "fu" in email_settings.nav_pinned %}
+          <a href="#" class="em-folder-link em-nav-item{% if fu_filter %} active{% endif %}" onclick="return emNav(event, 'fu', '1')"
+             data-nav="fu" oncontextmenu="return showNavCtx(event, this)" title="{% trans "Надіслані листи з 📬 запитом на прочитання або ⏰ нагадуванням: чи прочитали, чи відповіли" %}">
+            <span class="em-folder-icon">⏰</span><span class="em-folder-label">{% trans "Чекаю реакції" %}</span>{% if fu_counts.bad %}<span class="em-badge" title="{% trans "Без реакції — потрібне ручне втручання" %}">⚠️ {{ fu_counts.bad }}</span>{% elif fu_counts.open %}<span class="em-nav-n">{{ fu_counts.open }}</span>{% endif %}
+          </a>
+          {% endif %}
           <div class="em-nav-sub">{% trans "Хто пише" %}</div>
           {% for key, label, n, unread in categories %}{% if n %}
           <a href="#" class="em-folder-link em-nav-item{% if cat_filter == key %} active{% endif %}" onclick="return emNav(event, 'cat', '{{ key }}')"
@@ -802,7 +811,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     </div>
     <nav class="em-p1-tabs" id="em-p1-tabs">
       <button type="button" class="em-p1-tab" data-pane="mail" title="{% trans "Папки: вхідні, надіслані, важливі, спам, архів, папки сервера" %}">✉️<small>{% trans "Папки" %}</small><span class="n" id="em-tab-mail-n"></span></button>
-      <button type="button" class="em-p1-tab" data-pane="cats" title="{% trans "Категорії: свої категорії, запити пропозицій, хто пише; перетягніть лист і затримайте тут — відкриється" %}">🏷<small>{% trans "Категорії" %}</small>{% if quote_count %}<span class="n warn" title="{% trans "Запити пропозицій" %}">{{ quote_count }}</span>{% endif %}{% if work_filter or cat_filter or quote_filter or no_category %}<span class="dot"></span>{% endif %}</button>
+      <button type="button" class="em-p1-tab" data-pane="cats" title="{% trans "Категорії: свої категорії, запити пропозицій, хто пише; перетягніть лист і затримайте тут — відкриється" %}">🏷<small>{% trans "Категорії" %}</small>{% if quote_count %}<span class="n warn" title="{% trans "Запити пропозицій" %}">{{ quote_count }}</span>{% endif %}{% if fu_counts.bad %}<span class="n warn" title="{% trans "Без реакції — потрібне ручне втручання" %}">⚠️{{ fu_counts.bad }}</span>{% endif %}{% if work_filter or cat_filter or quote_filter or no_category or fu_filter %}<span class="dot"></span>{% endif %}</button>
       <button type="button" class="em-p1-tab" data-pane="proj" title="{% trans "Проєкти з листами цієї скриньки" %}">📁<small>{% trans "Проєкти" %}</small>{% if project_filter %}<span class="dot"></span>{% endif %}</button>
       <button type="button" class="em-p1-tab" data-pane="cust" title="{% trans "Клієнти CRM з листів" %}">👤<small>{% trans "Клієнти" %}</small>{% if customer_filter %}<span class="dot"></span>{% endif %}</button>
       <button type="button" class="em-p1-tab" data-pane="more" title="{% trans "Ще: усі папки, налаштування скриньки, фільтри спаму, AI, логотипи" %}">⋯<small>{% trans "Ще" %}</small></button>
@@ -917,6 +926,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
            data-sender="{{ msg.sender_display|lower }}"
            data-subject="{{ msg.subject|lower }}"
            data-from="{{ msg.from_email }}"
+           data-sent="{% if msg.folder == 'sent' %}1{% else %}0{% endif %}"
+           data-imp="{{ msg.importance }}"
            data-read="{% if msg.thread_unread %}0{% else %}{{ msg.is_read|yesno:'1,0' }}{% endif %}"
            data-pks="{{ msg.thread_pks|default:msg.pk }}"
            data-cat="{{ msg.category }}"
@@ -956,9 +967,10 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
                       title="{% if folder == 'trash' %}{% trans "Видалити назавжди" %}{% else %}{% trans "Видалити" %}{% endif %}">🗑️</button>
             </div>
           </div>
-          <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:120 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
-          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag or msg.wcats or msg.kb_tag %}
+          <div class="em-row-subj">{% if msg.importance %}<span class="em-imp" title="{{ msg.imp_text }}">{% if msg.importance == 'urgent' %}‼️{% else %}❗{% endif %}</span>{% endif %}{% if msg.subject %}{{ msg.subject|truncatechars:120 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
+          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag or msg.wcats or msg.kb_tag or msg.fu_state %}
           <div class="em-row-meta">
+            {% if msg.fu_state %}<span class="em-tag fu {{ msg.fu_state.tone }}" title="{{ msg.fu_state.text }}">{{ msg.fu_state.short }}</span>{% endif %}
             {% for wc in msg.wcats %}
             <button class="em-tag wcat" style="--c:{{ wc.color }}" onclick="filterMailBy(event, 'wcat', {{ wc.pk }})"
                     title="{% if forloop.first and msg.wcats|length > 1 %}⭐ {% trans "Основна своя категорія (за нею час askDANTE)" %}{% else %}{% trans "Своя категорія" %}{% endif %}: {{ wc.name }} — {% trans "показати всі її листи" %}">{% if email_settings.nav_icons %}{{ wc.label }}{% else %}{{ wc.name }}{% endif %}</button>
@@ -1063,6 +1075,17 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <div class="em-ctx-item" data-k="open" data-g="mark" onclick="ctxAction('open')">↗ {% trans "Відкрити окремо" %}</div>
   <div class="em-ctx-item" data-k="read" data-g="mark" data-label="✉️ {% trans "Позначити прочитаним / непрочитаним" %}" onclick="ctxAction(this.dataset.act || 'read')">✉️ {% trans "Позначити прочитаним" %}</div>
   <div class="em-ctx-item" data-k="star" data-g="mark" onclick="ctxAction('star')">⭐ {% trans "Важливе" %}</div>
+  <div class="em-ctx-item has-sub" data-k="importance" data-g="mark" onclick="event.stopPropagation()"
+       title="{% trans "Позначка листа: видно в списку й у папці «⭐ Важливі»" %}">
+    ❗ {% trans "Важливість" %} <span class="em-ctx-arrow">▸</span>
+    <div class="em-ctx-sub" onclick="event.stopPropagation()">
+      <div class="em-ctx-item" data-imp="important" onclick="ctxImportance('important')">❗ {% trans "Важливо" %}</div>
+      <div class="em-ctx-item" data-imp="urgent" onclick="ctxImportance('urgent')">‼️ {% trans "Дуже важливо" %}</div>
+      <div class="em-ctx-item" data-imp="" onclick="ctxImportance('')">— {% trans "Звичайний" %}</div>
+    </div>
+  </div>
+  <div class="em-ctx-item" data-k="followup" data-g="mark" data-own="1" onclick="ctxAction('followup')"
+       title="{% trans "Якщо через N днів не буде ні підтвердження прочитання, ні відповіді — Minerva повідомить листом і в Telegram" %}">⏰ {% trans "Нагадати, якщо немає реакції…" %}</div>
   <div class="em-ctx-item has-sub" data-k="cat" data-g="org" onclick="event.stopPropagation()">
     🗂 {% trans "Віднести до категорії" %} <span class="em-ctx-arrow">▸</span>
     <div class="em-ctx-sub" onclick="event.stopPropagation()">
@@ -1340,6 +1363,12 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
       <label class="ag-check"><input type="checkbox" id="ag-auto"> ✓ Трек-номер вносити самому — у замовлення, де поле ще порожнє, і в посилку закупівлі (решту пропозицій застосовуєте ви ✓)</label>
       <label class="ag-check"><input type="checkbox" id="ag-task-now" checked> І одразу завдання з цього листа</label>
       <div class="ag-muted">Агент читає й листи колег (переслані), знаходить замовлення чи закупівлю й пропонує зміни на сторінці завдання; коли закінчить — повідомить.</div>
+    </div>
+    <div id="ag-mark-opts" hidden>
+      <label>{% trans "Позначка" %}</label>
+      <select id="ag-imp"><option value="important">❗ {% trans "Важливо" %}</option><option value="urgent">‼️ {% trans "Дуже важливо" %}</option></select>
+      <label class="ag-check"><input type="checkbox" id="ag-notify"> 🔔 {% trans "Одразу повідомити мене — лист і Telegram, щойно такий лист прийде" %}</label>
+      <div class="ag-muted">{% trans "Без AI: позначка в списку листів і в папці «⭐ Важливі». «Що робити» — необов’язкова примітка в повідомленні. Цей лист теж позначиться." %}</div>
     </div>
     <div id="ag-result" hidden>
       <label>{% trans "Відповідь агента на цей лист" %} <span class="ag-muted" id="ag-meta"></span></label>
@@ -1821,7 +1850,7 @@ function emNav(ev, key, value) {
   if (params.get(key) === String(value)) params.delete(key);
   else {
     params.set(key, value);
-    var nk = key === 'wcat' ? (String(value) === '0' ? 'nocat' : 'wc:' + value) : key === 'quote' ? 'quote'
+    var nk = key === 'wcat' ? (String(value) === '0' ? 'nocat' : 'wc:' + value) : key === 'quote' ? 'quote' : key === 'fu' ? 'fu'
       : key === 'cat' ? 'kind:' + value : '';
     if (nk) navUse(nk);   // вживання — часті пункти піднімаються вгору
   }
@@ -2622,6 +2651,58 @@ function _whyCatsShow() {
                      + ' — {% trans "правила інших не додають" %}'
                    : '✋ {% trans "Гілку вручну залишено без своєї категорії" %}')
     : '✋ {% trans "Вручну для гілки" %}: ' + cats.join(', ') + ' — {% trans "разом із правилами" %}';
+}
+// ❗ / ‼️ (email_assistant/importance.py): меню правого кліку → мітка в рядку й кнопка в шапці листа
+async function ctxImportance(level) {
+  _ctx.classList.remove('open');
+  if (!_ctxMsg) return;
+  var pk = _ctxMsg.pk;
+  try {
+    var r = await fetch('/email/message/' + pk + '/importance/', {method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify({level: level})});
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || _i18n.помилка);
+    emRowImportance(pk, d.level, d.icon, d.label);
+    document.querySelectorAll('#pv-imp-' + pk).forEach(function(b) {
+      b.dataset.level = d.level; b.textContent = d.icon || '!';
+      b.className = 'em-imp-btn' + (d.level ? ' on ' + d.level : '');
+      b.title = (d.level ? d.label + ' · ' : '') + (b.dataset.hint || '');
+    });
+    _showToast(d.label);
+  } catch (e) { alert('❌ ' + e.message); }
+}
+window.emRowImportance = function(pk, level, icon, label) {
+  var row = document.getElementById('row-' + pk);
+  if (!row) return;
+  row.dataset.imp = level || '';
+  var subj = row.querySelector('.em-row-subj'), span = subj && subj.querySelector('.em-imp');
+  if (!subj) return;
+  if (!level) { if (span) span.remove(); return; }
+  if (!span) { span = document.createElement('span'); span.className = 'em-imp'; subj.insertBefore(span, subj.firstChild); }
+  span.textContent = icon; span.title = label;
+};
+// ⏰ Нагадати, якщо немає реакції (email_assistant/followups.py track_message)
+async function emFollowup(pk) {
+  var days = prompt('{% trans "Нагадати, якщо через стільки днів не буде ні підтвердження прочитання, ні відповіді" %}', '3');
+  if (days === null) return;
+  days = parseInt(days, 10);
+  if (!(days > 0)) return;
+  try {
+    var r = await fetch('/email/message/' + pk + '/followup/', {method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'}, body: JSON.stringify({days: days})});
+    var d = await r.json();
+    if (!d.ok) throw new Error(d.error || _i18n.помилка);
+    _showToast('⏰ ' + d.state.text);
+    var row = document.getElementById('row-' + pk), meta = row && row.querySelector('.em-row-meta');
+    if (row && !meta) {
+      meta = document.createElement('div'); meta.className = 'em-row-meta';
+      row.querySelector('.em-row-subj').after(meta);
+    }
+    if (meta) {
+      var tag = meta.querySelector('.em-tag.fu') || meta.insertBefore(document.createElement('span'), meta.firstChild);
+      tag.className = 'em-tag fu ' + d.state.tone; tag.textContent = d.state.short; tag.title = d.state.text;
+    }
+  } catch (e) { alert('❌ ' + e.message); }
 }
 function _wcToast(d) {
   var cats = d.categories || [];
@@ -3519,6 +3600,7 @@ function _ctxFits(el, ctx) {
   if (el.dataset.sel && !ctx.sel) return false;
   if (el.dataset.need && typeof window[el.dataset.need] !== 'function') return false;
   if (el.dataset.thread && !+ctx.tpk) return false;
+  if (el.dataset.own && !(ctx.rowEl && ctx.rowEl.dataset.sent === '1')) return false;   // ⏰ — лише надіслані
   return true;
 }
 // Пункти — у меню або в «⋯ Ще» (CTX_HIDDEN[режим]), у початковому порядку, роздільник між групами
@@ -3556,6 +3638,12 @@ function _ctxOpen(ctx) {   // ctx: {mode: list | letter, pk, tpk, rowEl, from, s
     rd.dataset.act = unread ? 'read' : 'unread';
     rd.textContent = unread ? '✉️ {% trans "Позначити прочитаним" %}' : '📩 {% trans "Позначити непрочитаним" %}';
   }
+  var imp = rowEl.dataset.imp || '';   // ❗ поточна важливість — ✓
+  _ctx.querySelectorAll('[data-imp]').forEach(function(it) {
+    it.classList.toggle('on', it.dataset.imp === imp);
+    if (!it.dataset.label) it.dataset.label = it.textContent;
+    it.textContent = (it.dataset.imp === imp ? '✓ ' : '') + it.dataset.label;
+  });
   // Підменю категорій: поточна категорія, для кого запам'ятовується, домен
   var contact = rowEl.dataset.contact || '';
   var domain  = contact.indexOf('@') > 0 ? '@' + contact.split('@')[1] : '';
@@ -4046,6 +4134,8 @@ async function emAgent(pk) {
   document.getElementById('ag-task-now').checked = true;
   document.getElementById('ag-cc').value = '';
   document.getElementById('ag-forward').value = '';
+  document.getElementById('ag-imp').value = 'important';
+  document.getElementById('ag-notify').checked = false;
   var cat = document.getElementById('ag-cat');
   cat.length = 1;
   (d.categories || []).forEach(function (c) { cat.add(new Option(c.name, c.id)); });
@@ -4071,8 +4161,9 @@ async function emAgent(pk) {
 // ✉️ відповідь / 🧩 завдання агенту з кожного такого листа (agent/mail.py process_task)
 function agKind() {
   var kind = document.getElementById('ag-kind').value, task = kind === 'mail_task', cust = kind === 'mail_customer';
-  var fwd = kind === 'mail_forward';
-  document.getElementById('ag-reply-opts').hidden = task;
+  var fwd = kind === 'mail_forward', mark = kind === 'mail_mark';
+  document.getElementById('ag-reply-opts').hidden = task || mark;
+  document.getElementById('ag-mark-opts').hidden = !mark;
   document.getElementById('ag-customer-note').hidden = !cust;
   document.getElementById('ag-forward-row').hidden = !fwd;
   document.getElementById('ag-task-opts').hidden = !task;
@@ -4083,15 +4174,16 @@ function agKind() {
     ? 'Напр.: Знайди в листі номер замовлення DigiKey і трек-номер UPS і внеси трек-номер у це замовлення.'
     : cust ? 'Напр.: UPS пише, що клієнт не оплатив мито / брокерський збір. Ввічливо попроси клієнта оплатити їх у місцевому офісі UPS до вказаної в листі дати; назви суму й трек-номер з листа.'
     : fwd ? 'Текст над пересланим листом, напр.: Сергію, прошу оплатити рахунок. Дякую!'
+    : mark ? 'Необов’язково — примітка в повідомленні, напр.: Рахунок до сплати — перевірити сьогодні.'
     : 'Напр.: Подякуй за документ і підтверди, що отримали. Якщо питають про строк відправки — візьми його із замовлення. Пиши коротко, мовою листа. Якщо просять знижку — не відповідай.';
   var name = document.getElementById('ag-name');
-  if (_ag && _ag.namePhrase && /^(Відповідь|Завдання|Клієнту|Переслати): /.test(name.value)) {
-    name.value = (task ? 'Завдання: ' : cust ? 'Клієнту: ' : fwd ? 'Переслати: ' : 'Відповідь: ') + _ag.namePhrase;
+  if (_ag && _ag.namePhrase && /^(Відповідь|Завдання|Клієнту|Переслати|Позначити): /.test(name.value)) {
+    name.value = (task ? 'Завдання: ' : cust ? 'Клієнту: ' : fwd ? 'Переслати: ' : mark ? 'Позначити: ' : 'Відповідь: ') + _ag.namePhrase;
   }
-  var why = (task || cust || fwd) ? (_ag && _ag.blockedTask) : (_ag && _ag.blocked);
+  var why = (task || cust || fwd || mark) ? (_ag && _ag.blockedTask) : (_ag && _ag.blocked);
   var warn = document.getElementById('ag-warn');
   warn.hidden = !why;
-  warn.textContent = why ? (task ? '⚠️ З цього листа завдання не буде: ' : cust ? '⚠️ З цього листа агент не писав би клієнту: ' : fwd ? '⚠️ Цей лист агент не пересилав би: ' : '⚠️ {% trans "На цей лист агент не відповідав би" %}: ') + why : '';
+  warn.textContent = why ? (task ? '⚠️ З цього листа завдання не буде: ' : cust ? '⚠️ З цього листа агент не писав би клієнту: ' : fwd ? '⚠️ Цей лист агент не пересилав би: ' : mark ? '⚠️ Цей лист агент не позначив би: ' : '⚠️ {% trans "На цей лист агент не відповідав би" %}: ') + why : '';
 }
 function agDomain() {
   if (_ag && _ag.domain) document.getElementById('ag-senders').value = _ag.domain;
@@ -4103,7 +4195,8 @@ function agData() {
     category: document.getElementById('ag-cat').value, instruction: document.getElementById('ag-instr').value,
     mode: document.getElementById('ag-mode').value, kind: document.getElementById('ag-kind').value,
     auto_apply: document.getElementById('ag-auto').checked, cc: document.getElementById('ag-cc').value,
-    forward_to: document.getElementById('ag-forward').value
+    forward_to: document.getElementById('ag-forward').value,
+    importance: document.getElementById('ag-imp').value, notify: document.getElementById('ag-notify').checked
   };
 }
 async function agPost(url, data) {
@@ -4156,7 +4249,12 @@ async function agSave() {
     document.getElementById('em-agent-dlg').close();
     _showToast('🤖 {% trans "Доручення збережено — нові такі листи агент оброблятиме сам" %}'
                + (d.draft ? ' · 📝 {% trans "чернетка для цього листа в Чернетках" %}' : '')
-               + (d.task ? ' · 🧩 завдання з цього листа в черзі' : ''));
+               + (d.task ? ' · 🧩 завдання з цього листа в черзі' : '')
+               + (data.kind === 'mail_mark' ? ' · ❗ {% trans "цей лист позначено" %}' : ''));
+    if (data.kind === 'mail_mark' && !_ag.blockedTask) {
+      var lvl = data.importance === 'urgent' ? 'urgent' : 'important';
+      emRowImportance(_ag.pk, lvl, lvl === 'urgent' ? '‼️' : '❗', lvl === 'urgent' ? '‼️ Дуже важливо' : '❗ Важливо');
+    }
     if (d.task_url) window.open(d.task_url, '_blank');
   } catch (e) { alert('❌ ' + e); }
   finally { btn.disabled = false; }
@@ -4193,6 +4291,7 @@ async function ctxAction(action) {
   if (action === 'angebot') { pvOfferFromThread(tpk); return; }
   if (action === 'logo') { emLogoDialog(_ctxMsg.from || '', _ctxMsg.rowEl); return; }
   if (action === 'why') { emWhy(pk); return; }
+  if (action === 'followup') { emFollowup(pk); return; }
   if (action === 'agent') { emAgent(pk); return; }
   if (action === 'agent_task') { window.open('/admin/agent/agenttask/add/?msg=' + pk, '_blank'); return; }
   if (action === 'dante') { window.open('/admin/worktime/workday/from-mail/' + pk + '/', '_blank'); return; }

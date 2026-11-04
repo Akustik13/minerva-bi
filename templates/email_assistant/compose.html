@@ -21,6 +21,13 @@
 .em-body-editor { min-height:340px; overflow-y:auto; padding:10px 0; outline:none; font-size:14px; line-height:1.7; color:var(--text); word-break:break-word; }
 .em-body-editor[placeholder]:empty::before { content:attr(placeholder); color:var(--text-dim); pointer-events:none; }
 .em-sig-div { margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-strong); font-size:13px; }
+/* ❗ / 📬 / ⏰ (email_assistant/followups.py) */
+.em-opts { padding:8px 18px; border-top:1px solid var(--border); display:flex; align-items:center; gap:6px 16px;
+  flex-wrap:wrap; font-size:12px; color:var(--text-muted); }
+.em-opts label { display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
+.em-opts select { font-size:12px; padding:2px 4px; background:var(--bg-input); color:var(--text);
+  border:1px solid var(--border); border-radius:5px; }
+.em-opts .on { color:var(--text); }
 .em-footer { padding:12px 18px; border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--bg-input); }
 .em-send-btn { padding:9px 24px; border-radius:7px; font-size:13px; font-weight:700; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; border:none; cursor:pointer; transition:opacity .15s; }
 .em-send-btn:hover { opacity:.88; }
@@ -201,6 +208,28 @@
           <span class="em-att-chip" title="{% trans "Документ Minerva або файл чернетки — додається на сервері" %}"><input type="hidden" name="att_ref" value="{{ a.ref }}"><input type="hidden" name="att_ref_name" value="{{ a.name }}">📎 {{ a.name }} <button type="button" class="em-att-x" onclick="this.parentNode.remove()" title="{% trans "Прибрати" %}">✕</button></span>
           {% endfor %}
         </div>
+      </div>
+
+      <!-- ❗ Важливо / 📬 запит на прочитання / ⏰ нагадати, якщо немає реакції (email_assistant/followups.py) -->
+      <div class="em-opts" id="send-opts">
+        <label title="{% trans "Отримувач побачить позначку «важливо» (Outlook, Thunderbird, Gmail)" %}">
+          <input type="checkbox" name="opt_important" value="1"> ❗ {% trans "Важливо" %}</label>
+        <label title="{% trans "Попросити підтвердження прочитання — поштова програма отримувача запитає його; підтвердження Minerva покаже біля листа" %}">
+          <input type="checkbox" name="opt_receipt" value="1"> 📬 {% trans "Запит на прочитання" %}</label>
+        <label title="{% trans "Якщо до цього часу не буде реакції — Minerva повідомить листом і в Telegram: потрібне ручне втручання" %}">
+          <input type="checkbox" name="opt_remind" value="1" id="opt-remind"
+                 onchange="document.getElementById('opt-remind-more').hidden = !this.checked"> ⏰ {% trans "Нагадати, якщо немає реакції" %}</label>
+        <span id="opt-remind-more" hidden>
+          {% trans "через" %}
+          <select name="remind_days">
+            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
+            <option value="5">5</option><option value="7">7</option><option value="14">14</option>
+          </select> {% trans "дн., якщо" %}
+          <select name="remind_until">
+            <option value="reaction">{% trans "немає ні підтвердження прочитання, ні відповіді" %}</option>
+            <option value="reply">{% trans "немає відповіді" %}</option>
+          </select>
+        </span>
       </div>
 
       <!-- Footer -->
@@ -440,7 +469,7 @@ async function sendNow() {
   try {
     var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:data});
     var d = await r.json();
-    status.textContent = d.ok ? '✓ Відправлено!' + (d.via ? ' · через ' + d.via : '') : '✗ ' + d.error;
+    status.textContent = d.ok ? '✓ Відправлено!' + (d.via ? ' · через ' + d.via : '') + (d.followup ? ' · ' + d.followup : '') : '✗ ' + d.error;
     status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
     if (d.ok) setTimeout(function(){ window.location = '/email/'; }, d.mode_fixed ? 6000 : 2500);
     else { btn.disabled = false; btn.style.opacity = '1'; }

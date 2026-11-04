@@ -46,6 +46,7 @@ echo "   calendar_sync           iCal subscriptions + Google / Outlook / Minerva
 echo "   send_reminders          every ${REMINDER_INTERVAL}s"
 echo "   sync_email              every ${EMAIL_SYNC_INTERVAL}s"
 echo "   agent_runs              every loop — 🤖 agent instructions: new mail → replies (nothing without instructions)"
+echo "   mail_followups          every loop — ⏰ sent mail without reaction → notify the owner"
 echo "   send_calendar_reminders every ${CALENDAR_REMINDER_INTERVAL}s"
 
 # Код змонтовано (./:/app) і підхоплюється сам, а цей цикл shell читає лише при старті контейнера.
@@ -127,6 +128,7 @@ while true; do
     LAST_EMAIL_SYNC=$(date +%s)
   fi
   python manage.py agent_runs 2>&1 || true                 # 🤖 доручення агента: нові листи → відповіді
+  python manage.py mail_followups 2>&1 || true             # ⏰ листи без реакції → повідомити (нічого без нагадувань)
 
   # ── Заплановані листи — кожні SCHEDULED_INTERVAL секунд ──
   if [ $((NOW - LAST_SCHEDULED)) -ge "$SCHEDULED_INTERVAL" ]; then

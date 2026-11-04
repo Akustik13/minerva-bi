@@ -21,10 +21,14 @@ class AgentRule(models.Model):
     (трек-номер у замовлення, закупівля з листа постачальника …): пропозиції застосовуєте ви ✓, а з auto_apply
     трек-номер і кур’єра в порожнє поле замовлення та трек-номер посилки закупівлі агент вносить сам."""
     MAIL_REPLY, MAIL_TASK, MAIL_CUSTOMER, MAIL_FORWARD = 'mail_reply', 'mail_task', 'mail_customer', 'mail_forward'
+    MAIL_MARK = 'mail_mark'
     KINDS = [(MAIL_REPLY, '✉️ Відповідати на такі листи'),
              (MAIL_CUSTOMER, '📨 Писати клієнту замовлення (трек-номер з листа)'),
              (MAIL_FORWARD, '📤 Пересилати такі листи (з вкладеннями, без AI)'),
+             (MAIL_MARK, '❗ Позначати такі листи важливими (без AI)'),
              (MAIL_TASK, '🧩 Завдання агенту з кожного такого листа')]
+    IMPORTANCE = [('important', '❗ Важливо'), ('urgent', '‼️ Дуже важливо')]
+    NO_INSTRUCTION = (MAIL_MARK,)          # інструкція необов’язкова: лише примітка в повідомленні
     DRAFT, SEND = 'draft', 'send'
     MODES = [(DRAFT, '📝 Лише чернетка — ви перевіряєте й надсилаєте'),
              (SEND, '✉️ Надсилати самому — через кілька хвилин, можна скасувати')]
@@ -47,7 +51,7 @@ class AgentRule(models.Model):
     category = models.ForeignKey('email_assistant.MailCategory', null=True, blank=True, on_delete=models.SET_NULL,
                                  related_name='+', verbose_name='Своя категорія листа')
     instruction = models.TextField(
-        'Що робити — інструкція агенту',
+        'Що робити — інструкція агенту', blank=True, default='',
         help_text='Відповідь: що написати, чим підтвердити, коли не відповідати (факти — лише з Minerva й листа, '
                   'чого немає — [уточнити] і чернетка). Завдання: що зробити з листом — напр. «знайди номер '
                   'замовлення й трек-номер і внеси трек-номер у замовлення».')
@@ -66,6 +70,14 @@ class AgentRule(models.Model):
     cc = models.TextField(
         'Копія (CC)', blank=True, default='',
         help_text='Адреси по одній у рядку (або через кому) — у копію кожного листа агента: відповіді й листа клієнту.')
+    importance = models.CharField(
+        'Позначка', max_length=10, choices=IMPORTANCE, default='important',
+        help_text='«❗ Позначати такі листи»: ❗ Важливо або ‼️ Дуже важливо — у списку листів і в папці «⭐ Важливі». '
+                  'Позначку, яку ви змінили вручну, доручення не перебиває.')
+    notify = models.BooleanField(
+        '🔔 Одразу повідомити мене', default=False,
+        help_text='«❗ Позначати такі листи»: щойно такий лист прийде — лист і Telegram власнику скриньки (тема, від '
+                  'кого, початок тексту, примітка з «Що робити»).')
     send_delay_minutes = models.PositiveSmallIntegerField(
         'Надсилати через, хв', default=15,
         help_text='Режим «Надсилати самому»: лист стає в «⏳ Заплановані», до відправки можна скасувати.')
@@ -106,13 +118,14 @@ class AgentRule(models.Model):
 class AgentRun(models.Model):
     """Один лист за одним дорученням: що агент вирішив і зробив, а потім — що зробили ви з його чернеткою."""
     QUEUED, RUNNING, DRAFTED, SCHEDULED, SKIPPED, FAILED = 'queued', 'running', 'drafted', 'scheduled', 'skipped', 'failed'
-    TASKED = 'tasked'
+    TASKED, MARKED = 'tasked', 'marked'
     STATUSES = [
         (QUEUED, '⏳ У черзі'),
         (RUNNING, '⚙️ Готує'),
         (DRAFTED, '📝 Чернетка готова'),
         (SCHEDULED, '✉️ Заплановано надіслати'),
         (TASKED, '🧩 Завдання агенту'),
+        (MARKED, '❗ Позначено'),
         (SKIPPED, '↷ Пропущено'),
         (FAILED, '⚠️ Помилка'),
     ]

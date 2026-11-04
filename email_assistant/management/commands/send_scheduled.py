@@ -63,6 +63,8 @@ class Command(BaseCommand):
                         cc_emails=scheduled.cc_emails or [],
                         reply_to_message=scheduled.reply_to,
                         attachments=files,
+                        importance=(scheduled.send_options or {}).get('importance', ''),
+                        read_receipt=bool((scheduled.send_options or {}).get('read_receipt')),
                     )
             except Exception as e:
                 result = {'ok': False, 'error': str(e)}
@@ -97,3 +99,14 @@ class Command(BaseCommand):
         except Exception as e:
             logger.warning('send_scheduled pk=%s: Angebot не позначено надісланим: %s', scheduled.pk, e)
         attachments.remove_stored(items)
+        opts = scheduled.send_options or {}
+        if opts.get('read_receipt') or opts.get('remind_days'):   # 📬 / ⏰ — копію з «Надісланих» прив'яже sync
+            try:
+                from email_assistant import followups
+                followups.track(scheduled.account, msg_id=result.get('message_id', ''), subject=scheduled.subject,
+                                recipients=list(scheduled.to_emails or []) + list(scheduled.cc_emails or []),
+                                read_receipt=bool(opts.get('read_receipt')),
+                                remind_days=int(opts.get('remind_days') or 0),
+                                until=opts.get('until') or 'reaction', user=scheduled.account.user)
+            except Exception as e:  # noqa: BLE001 — лист уже пішов
+                logger.warning('send_scheduled pk=%s: нагадування не створено: %s', scheduled.pk, e)

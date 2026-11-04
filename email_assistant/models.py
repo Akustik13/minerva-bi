@@ -182,6 +182,14 @@ class EmailMessage(models.Model):
         help_text='Оригінальна назва папки на IMAP-сервері (напр. "Meine Order")')
     is_read     = models.BooleanField(default=False)
     is_starred  = models.BooleanField(default=False)
+    # ❗ Важливо / ‼️ Дуже важливо (email_assistant/importance.py): вручну, з заголовків відправника
+    # (Importance / X-Priority), або дорученням агента «❗ Позначати такі листи»
+    IMPORTANT, URGENT = 'important', 'urgent'
+    IMPORTANCE_CHOICES = [('', '—'), (IMPORTANT, '❗ Важливо'), (URGENT, '‼️ Дуже важливо')]
+    importance = models.CharField('Важливість', max_length=10, blank=True, default='', db_index=True,
+                                  choices=IMPORTANCE_CHOICES)
+    importance_by = models.CharField('Хто позначив', max_length=10, blank=True, default='',
+                                     help_text='sender — відправник (заголовок листа), me — людина, agent — доручення')
     is_deleted  = models.BooleanField(default=False)
     # Папка, з якої лист пішов у Кошик (inbox / sent / spam) — «↩ Відновити» повертає його саме туди
     trashed_from = models.CharField(max_length=20, blank=True, default='', verbose_name='Папка до Кошика')
@@ -433,6 +441,8 @@ class ScheduledEmail(models.Model):
     sent_at      = models.DateTimeField(null=True, blank=True, verbose_name='Надіслано о')
     error_msg    = models.TextField(blank=True, verbose_name='Помилка')
     trigger      = models.CharField(max_length=50, default='manual', verbose_name='Тригер')
+    # ❗ Важливо / 📬 запит на прочитання / ⏰ нагадати, якщо немає реакції (email_assistant/followups.py options)
+    send_options = models.JSONField('Параметри листа', default=dict, blank=True)
     created_at   = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -760,3 +770,47 @@ class MailSortDecision(models.Model):
         verbose_name = 'Рішення розбору пошти'
         verbose_name_plural = 'Рішення розбору пошти'
         ordering = ['-created_at']
+
+
+class MailFollowup(models.Model):
+    """⏰ Надісланий лист чекає реакції: 📬 запит на прочитання й / або нагадування «немає реакції через N днів»
+    (email_assistant/followups.py). Реакція — підтвердження прочитання (MDN) або відповідь у гілці; немає до
+    `remind_at` — лист і Telegram власнику скриньки: потрібне ручне втручання."""
+    WAITING, READ, REPLIED, NO_REACTION, DONE = 'waiting', 'read', 'replied', 'no_reaction', 'done'
+    STATUSES = [(WAITING, '⏰ Чекаю реакції'), (READ, '📬 Прочитано'), (REPLIED, '↩ Відповіли'),
+                (NO_REACTION, '⚠️ Немає реакції'), (DONE, '✓ Закрито')]
+    UNTIL_REACTION, UNTIL_REPLY = 'reaction', 'reply'
+    UNTIL = [(UNTIL_REACTION, 'немає ні підтвердження прочитання, ні відповіді'), (UNTIL_REPLY, 'немає відповіді')]
+
+    account = models.ForeignKey(EmailAccount, on_delete=models.CASCADE, related_name='followups',
+                                verbose_name='Скринька')
+    message = models.ForeignKey(EmailMessage, null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name='followups', verbose_name='Надісланий лист')
+    msg_id = models.CharField('Message-ID', max_length=500, db_index=True)
+    subject = models.CharField('Тема', max_length=500, blank=True, default='')
+    recipients = models.JSONField('Кому', default=list, blank=True)
+    sent_at = models.DateTimeField('Надіслано')
+    read_receipt = models.BooleanField('📬 Запит на прочитання', default=False)
+    remind_at = models.DateTimeField('⏰ Нагадати', null=True, blank=True, db_index=True,
+                                     help_text='Порожньо — без нагадування (лише запит на прочитання)')
+    until = models.CharField('Нагадати, якщо', max_length=10, choices=UNTIL, default=UNTIL_REACTION)
+    status = models.CharField('Стан', max_length=12, choices=STATUSES, default=WAITING, db_index=True)
+    read_at = models.DateTimeField('Прочитано', null=True, blank=True)
+    read_by = models.CharField('Хто підтвердив', max_length=300, blank=True, default='')
+    receipt = models.CharField('Підтвердження', max_length=20, blank=True, default='',
+                               help_text='displayed — прочитано, deleted — видалено без прочитання')
+    replied_at = models.DateTimeField('Відповіли', null=True, blank=True)
+    reply = models.ForeignKey(EmailMessage, null=True, blank=True, on_delete=models.SET_NULL, related_name='+',
+                              verbose_name='Відповідь')
+    notified_at = models.DateTimeField('Повідомлено', null=True, blank=True)
+    notify_result = models.CharField('Як повідомлено', max_length=300, blank=True, default='')
+    created_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Очікування реакції на лист'
+        verbose_name_plural = '⏰ Очікування реакції на листи'
+        ordering = ['-sent_at']
+
+    def __str__(self):
+        return f'{self.subject[:60]} → {", ".join(self.recipients[:2])}'
