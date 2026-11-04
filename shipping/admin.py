@@ -1732,8 +1732,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "pkg_rows_json":       _json.dumps(pkg_rows),
             "pkg_auto":            pkg_auto,
             "recent_recipients_json": _json.dumps(unique_recipients),
+            "agent_checks":        self._ship_checks(order),
             "addr_book_json":      self._build_addr_book_json(request),
         })
+
+    def _ship_checks(self, order):
+        """🤖 Агент відправки — що завадить відправити це замовлення (`ship_advice.checks`)."""
+        try:
+            from .services import ship_advice
+            return ship_advice.checks(order)
+        except Exception as e:  # noqa: BLE001 — без перевірки сторінка однаково працює
+            logger.warning("ship checks for order %s: %s", order.pk, e)
+            return []
 
     def _fill_packaging_from_order(self, shipment):
         from decimal import Decimal
@@ -5480,7 +5490,24 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "dims":             f"{length}×{width}×{height}",
             "packages":         display_packages,
             "from_address":     from_address,
+            "advice":           self._ship_advice(request, body.get("order_id"), results),
         })
+
+    def _ship_advice(self, request, order_id, results):
+        """🤖 Агент відправки: рекомендований тариф з причиною (shipping/services/ship_advice.py) — лише людині, яка
+        бачить замовлення; збій — без рекомендації, тарифи показуються як були."""
+        from sales.models import SalesOrder
+        if not str(order_id or "").isdigit() or not request.user.has_perm("sales.view_salesorder"):
+            return None
+        order = SalesOrder.objects.filter(pk=int(order_id)).first()
+        if order is None:
+            return None
+        try:
+            from .services import ship_advice
+            return ship_advice.recommend(order, results)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("ship advice for order %s: %s", order_id, e)
+            return None
 
     # ── Submit → Jumingo API ──────────────────────────────────────────────────
 

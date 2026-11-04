@@ -25,7 +25,7 @@ _ORDER_SOURCE = {'type': 'string', 'description': 'Джерело замовле
                  'однозначний'}
 _EVIDENCE = {'type': 'string', 'description': 'Чому: цитата з завдання, листа чи даних'}
 LIST_LIMIT = 60
-BLOCKING = ('draft', 'submitted', 'label_ready', 'in_transit', 'delivered')   # такі відправлення — нове не потрібне
+from shipping.services.ship_advice import BLOCKING  # noqa: E402 — такі відправлення — нове не потрібне
 # поле пропозиції → швидка зміна панелі праворуч (sales/side_panel.py)
 ORDER_FIELDS = {'tracking': ('tracking', 'tracking_number', 'Трек-номер'),
                 'courier': ('courier', 'shipping_courier', 'Кур’єр'),
@@ -115,18 +115,36 @@ def _carrier(value):
     return carrier
 
 
+# перевірка замовлення й допоміжне — спільне з «🤖 Агентом відправки» (shipping/services/ship_advice.py)
 def _blocking(order) -> list:
-    return list(order.shipments.filter(status__in=BLOCKING).select_related('carrier').order_by('-pk'))
+    from shipping.services import ship_advice
+    return ship_advice.blocking(order)
 
 
 def _eu() -> set:
-    from shipping.services.jumingo import JumingoService
-    return set(JumingoService._EU_COUNTRIES)
+    from shipping.services import ship_advice
+    return ship_advice.eu()
 
 
 def _country(order) -> str:
-    from labels_app.order_label import country
-    return country(order)
+    from shipping.services import ship_advice
+    return ship_advice.country(order)
+
+
+def _cover(order) -> dict:
+    from shipping.services import ship_advice
+    return ship_advice.cover(order)
+
+
+def _n(value) -> str:
+    from shipping.services import ship_advice
+    return ship_advice.num(value)
+
+
+def problems(order, cover=None, shipments=None) -> list:
+    """Що завадить відправити: склад, адреса, телефон, митниця, наявне відправлення, статус."""
+    from shipping.services import ship_advice
+    return ship_advice.problems(order, cover, shipments)
 
 
 def _ship_to(order):
@@ -149,64 +167,6 @@ def _packaging(shipment) -> dict:
 
 def _days(d):
     return (d - timezone.localdate()).days if isinstance(d, date) else None
-
-
-def problems(order, cover=None, shipments=None) -> list:
-    """Що завадить відправити: склад, адреса, телефон, митниця, наявне відправлення, статус."""
-    out = []
-    if order.status == 'cancelled':
-        out.append('замовлення скасовано')
-    if order.status in ('shipped', 'delivered') or order.shipped_at:
-        out.append('вже відправлено')
-    for s in shipments if shipments is not None else _blocking(order):
-        out.append(f'вже є відправлення #{s.pk} ({s.get_status_display()})')
-    if not (order.addr_street or order.addr_city or (order.shipping_address or '').strip()):
-        out.append('немає адреси доставки')
-    code = _country(order)
-    if not code:
-        out.append('не визначено країну доставки')
-    if not (order.ship_phone or order.phone):
-        out.append('немає телефону отримувача (UPS / DHL для міжнародних відправлень вимагають)')
-    lines = list(order.lines.select_related('product'))
-    cover = cover if cover is not None else _cover(order)
-    for line in lines:
-        c = cover.get(line.pk)
-        if line.product_id is None:
-            out.append(f'позиція {line.sku_raw or "?"} без товару складу')
-        elif c is not None and c['free'] < (line.qty or 0):
-            out.append(f'бракує {line.product.sku}: потрібно {_n(line.qty)}, вільно {_n(c["free"])}')
-    if code and code not in _eu():
-        no_hs = [l.product.sku for l in lines if l.product_id and not _hs(l.product)]
-        if no_hs:
-            out.append('поза ЄС — немає HS-коду для митниці: ' + ', '.join(no_hs[:10]))
-    no_weight = [l.product.sku for l in lines if l.product_id and not l.product.net_weight_g]
-    if no_weight:
-        out.append('немає ваги 1 шт (вага відправлення буде приблизна): ' + ', '.join(no_weight[:10]))
-    return out
-
-
-def _hs(product) -> str:
-    if product.hs_code:
-        return product.hs_code
-    from inventory.models import ProductCategory
-    cat = ProductCategory.objects.filter(slug=product.category).only('customs_hs_code').first() \
-        if product.category else None
-    return getattr(cat, 'customs_hs_code', '') or ''
-
-
-def _cover(order) -> dict:
-    from inventory.services.stock import order_lines_cover
-    try:
-        return order_lines_cover(order)
-    except Exception:  # noqa: BLE001
-        return {}
-
-
-def _n(value) -> str:
-    try:
-        return format(Decimal(value).normalize(), 'f')
-    except (InvalidOperation, TypeError, ValueError):
-        return str(value)
 
 
 def _shipment_row(s) -> dict:

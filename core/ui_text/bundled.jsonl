@@ -2474,6 +2474,7 @@
 {"uk": "{0} кг · {1}, {2}", "en": "{0} kg · {1}, {2}", "de": "{0} kg · {1}, {2}"}
 {"uk": "{0} кг/шт", "en": "{0} kg/pc", "de": "{0} kg/Stk."}
 {"uk": "{0} клієнтів", "en": "{0} customers", "de": "{0} Kunden"}
+{"uk": "{0} кор.", "en": "{0} box(es)", "de": "{0} Karton(s)"}
 {"uk": "{0} коробки", "en": "{0} boxes", "de": "{0} Kartons"}
 {"uk": "{0} коробок · {1} кг заг.", "en": "{0} boxes · {1} kg total", "de": "{0} Kartons · {1} kg gesamt"}
 {"uk": "{0} коробок, {1} кг заг.", "en": "{0} boxes, {1} kg total", "de": "{0} Kartons, {1} kg gesamt"}
@@ -2713,6 +2714,8 @@
 {"uk": "{0}HTML виправлено: {1}, нових подій у CRM: {2}, оновлено/привʼязано: {3}, видалено дублів: {4}, без клієнта: {5}", "en": "{0}HTML fixed: {1}, new events in CRM: {2}, updated/linked: {3}, duplicates removed: {4}, without customer: {5}", "de": "{0}HTML korrigiert: {1}, neue Ereignisse im CRM: {2}, aktualisiert/verknüpft: {3}, Duplikate entfernt: {4}, ohne Kunde: {5}"}
 {"uk": "{0}{1} кг ({2})", "en": "{0}{1} kg ({2})", "de": "{0}{1} kg ({2})"}
 {"uk": "{0}{1}; після першого успішного запиту попередження зникне", "en": "{0}{1}; the warning disappears after the first successful request", "de": "{0}{1}; die Warnung verschwindet nach der ersten erfolgreichen Anfrage"}
+{"uk": "{0}», найдешевша послуга — яку саме оплатив клієнт, у замовленні не сказано", "en": "{0}», cheapest service — the order does not say which service the customer paid for", "de": "{0}», günstigster Service — welchen Service der Kunde bezahlt hat, steht nicht im Auftrag"}
+{"uk": "{0}», послуга — як минулого разу", "en": "{0}», service as last time", "de": "{0}», Service wie beim letzten Mal"}
 {"uk": "{0}×{1} мм", "en": "{0}×{1} mm", "de": "{0}×{1} mm"}
 {"uk": "{0}×{1}×{2} см", "en": "{0}×{1}×{2} cm", "de": "{0}×{1}×{2} cm"}
 {"uk": "{0}×{1}×{2} см, {3} кг", "en": "{0}×{1}×{2} cm, {3} kg", "de": "{0}×{1}×{2} cm, {3} kg"}
@@ -3245,6 +3248,7 @@
 {"uk": "Агент (MCP) — товари, даташити, магазини, DigiKey (читання)", "en": "Agent (MCP) — products, datasheets, shops, DigiKey (read)", "de": "Agent (MCP) — Artikel, Datenblätter, Shops, DigiKey (Lesen)"}
 {"uk": "Агент Minerva", "en": "Minerva Agent", "de": "Minerva-Agent"}
 {"uk": "Агент Minerva: нові листи за дорученнями й завдання з черги", "en": "Minerva agent: new e-mails per rules and tasks from the queue", "de": "Minerva-Agent: neue E-Mails gemäß Regeln und Aufgaben aus der Warteschlange"}
+{"uk": "Агент відправки", "en": "Shipping agent", "de": "Versand-Agent"}
 {"uk": "Агент закінчив — {0} пропозицій чекають вашої перевірки (✓ / ✕).", "en": "The agent has finished — {0} proposals are awaiting your review (✓ / ✕).", "de": "Der Agent ist fertig – {0} Vorschläge warten auf Ihre Prüfung (✓ / ✕)."}
 {"uk": "Агент закінчив — нових пропозицій немає.", "en": "The agent has finished — there are no new proposals.", "de": "Der Agent ist fertig – es gibt keine neuen Vorschläge."}
 {"uk": "Агент зупинився з помилкою: {0}", "en": "The agent stopped with an error: {0}", "de": "Der Agent wurde mit einem Fehler angehalten: {0}"}
@@ -6024,6 +6028,7 @@
 {"uk": "Замовлення вже має статус «{0}» — скасування неможливе.", "en": "The order already has the status “{0}” — cancellation is not possible.", "de": "Der Auftrag hat bereits den Status „{0}“ — eine Stornierung ist nicht möglich."}
 {"uk": "Замовлення вже оплачено.", "en": "The order is already paid.", "de": "Der Auftrag ist bereits bezahlt."}
 {"uk": "Замовлення відправлено / скасовано — закрито автоматично", "en": "Order shipped / cancelled — closed automatically", "de": "Auftrag versendet / storniert — automatisch geschlossen"}
+{"uk": "Замовлення готове до відправки", "en": "Order is ready to ship", "de": "Auftrag ist versandbereit"}
 {"uk": "Замовлення де дедлайн уже минув.", "en": "Orders whose deadline has already passed.", "de": "Aufträge, deren Frist bereits abgelaufen ist."}
 {"uk": "Замовлення до перенесення", "en": "Orders before the transfer", "de": "Aufträge vor der Übertragung"}
 {"uk": "Замовлення доставлено — можна прийняти на склад.", "en": "The order has been delivered — it can be received into stock.", "de": "Die Bestellung wurde geliefert — sie kann ins Lager übernommen werden."}
@@ -9666,7 +9671,9 @@
 {"uk": "Оформити відправлення в перевізника (етикетка, оплата)", "en": "Book a shipment with the carrier (label, payment)", "de": "Sendung beim Versanddienstleister anlegen (Etikett, Bezahlung)"}
 {"uk": "Оформити замовлення через API автоматично", "en": "Place the order automatically via API", "de": "Bestellung automatisch über die API aufgeben"}
 {"uk": "Оформити замовлення через Jumingo API (оплата bill/invoice)", "en": "Place the order via the Jumingo API (payment by bill/invoice)", "de": "Bestellung über die Jumingo API aufgeben (Zahlung per bill/invoice)"}
+{"uk": "Оформити рекомендований", "en": "Book the recommended one", "de": "Empfohlenen buchen"}
 {"uk": "Оформлення в 3 кроки", "en": "Checkout in 3 steps", "de": "Bestellung in 3 Schritten"}
+{"uk": "Оформлення в перевізника (етикетка, оплата) — лише після вашого підтвердження.", "en": "Booking with the carrier (label, payment) happens only after your confirmation.", "de": "Buchung beim Versanddienst (Etikett, Zahlung) erst nach Ihrer Bestätigung."}
 {"uk": "Оформлення відправлень через Jumingo (агрегатор). Кнопка «Створити відправлення» зі сторінки замовлення. Пакувальні матеріали — заплановано.", "en": "Booking shipments via Jumingo (aggregator). “Create shipment” button on the order page. Packaging materials — planned.", "de": "Erstellung von Sendungen über Jumingo (Aggregator). Schaltfläche „Sendung erstellen“ auf der Auftragsseite. Verpackungsmaterial — geplant."}
 {"uk": "Оформлення — лише кнопкою «Підтвердити і відправити» на сторінці перевірки. Перевірте дані й натисніть її.", "en": "Booking is only via the “Confirm and ship” button on the check page. Check the data and click it.", "de": "Die Buchung erfolgt nur über die Schaltfläche „Bestätigen und versenden“ auf der Prüfseite. Prüfen Sie die Daten und klicken Sie darauf."}
 {"uk": "Оформіть на сайті замовлення з передоплатою: воно з'явиться в «Продажах» з джерелом «{0}», прийдуть листи покупцю й команді. Потім скасуйте його — товар повернеться на склад.", "en": "Place an order with prepayment on the site: it will appear in “Sales” with the source “{0}”, and e-mails will go to the customer and the team. Then cancel it — the products will return to stock.", "de": "Geben Sie auf der Website einen Auftrag mit Vorauszahlung auf: Er erscheint unter „Verkäufe“ mit der Quelle „{0}“, E-Mails gehen an den Kunden und das Team. Stornieren Sie ihn danach – die Artikel kommen zurück ins Lager."}
@@ -9885,6 +9892,8 @@
 {"uk": "Перевізник підтвердив затримку посилки", "en": "The carrier confirmed a parcel delay", "de": "Der Versanddienstleister hat eine Paketverzögerung bestätigt"}
 {"uk": "Перевізник: {0}", "en": "Carrier: {0}", "de": "Versanddienstleister: {0}"}
 {"uk": "Перевізник: доставлено ({0})", "en": "Carrier: delivered ({0})", "de": "Versanddienstleister: zugestellt ({0})"}
+{"uk": "Перевізник: натисніть «📊 Порівняти тарифи» — агент вибере й пояснить.", "en": "Carrier: click «📊 Порівняти тарифи» — the agent will pick one and explain why.", "de": "Versanddienst: klicken Sie «📊 Порівняти тарифи» — der Agent wählt und erklärt warum."}
+{"uk": "Перевізник: тарифів немає — перевірте адресу, вагу й налаштування перевізників.", "en": "Carrier: no rates — check the address, weight and carrier settings.", "de": "Versanddienst: keine Tarife — prüfen Sie Adresse, Gewicht und Einstellungen der Versanddienste."}
 {"uk": "Перевізника не знайдено у списку DigiKey — якщо DigiKey відхилить, підтвердіть вручну.", "en": "The carrier was not found in the DigiKey list — if DigiKey rejects it, confirm manually.", "de": "Der Versanddienstleister wurde in der DigiKey-Liste nicht gefunden — falls DigiKey ihn ablehnt, bestätigen Sie manuell."}
 {"uk": "Перевізники", "en": "Carriers", "de": "Versanddienstleister"}
 {"uk": "Перевізники (Jumingo / DHL)", "en": "Carriers (Jumingo / DHL)", "de": "Versanddienstleister (Jumingo / DHL)"}
@@ -11602,6 +11611,7 @@
 {"uk": "Рекомендовано: 5–60 хв. Використовується cron_runner (MSG_CHECK_INTERVAL).", "en": "Recommended: 5–60 min. Used by cron_runner (MSG_CHECK_INTERVAL).", "de": "Empfohlen: 5–60 Min. Wird vom cron_runner verwendet (MSG_CHECK_INTERVAL)."}
 {"uk": "Рекомендовані упаковки", "en": "Recommended packagings", "de": "Empfohlene Verpackungen"}
 {"uk": "Рекомендовані ціни", "en": "Recommended prices", "de": "Empfohlene Preise"}
+{"uk": "Рекомендую", "en": "Recommended", "de": "Empfohlen"}
 {"uk": "Рекомендую позначити як виконані (mark_events_done) події що вже не актуальні.", "en": "I recommend marking events that are no longer relevant as done (mark_events_done).", "de": "Ich empfehle, nicht mehr aktuelle Termine als erledigt zu markieren (mark_events_done)."}
 {"uk": "Рекомендуємо змінити пароль після першого входу в систему", "en": "We recommend changing your password after your first login", "de": "Wir empfehlen, das Passwort nach der ersten Anmeldung am System zu ändern"}
 {"uk": "Рекомендуємо зробити резервну копію перед очищенням.", "en": "We recommend making a backup before clearing.", "de": "Wir empfehlen, vor der Bereinigung eine Sicherung zu erstellen."}
@@ -12843,6 +12853,7 @@
 {"uk": "Твій особистий Telegram ID (дізнатись через /myid в боті)", "en": "Your personal Telegram ID (find it with /myid in the bot)", "de": "Ihre persönliche Telegram-ID (über /myid im Bot ermitteln)"}
 {"uk": "Те саме запитання", "en": "The same question", "de": "Dieselbe Frage"}
 {"uk": "Те саме — у пошті «⋯ Ще» (там же «📥 Зберегти вкладення за 30 днів» для листів, уже прив’язаних до замовлень і проєктів).", "en": "The same is available in the mail under “⋯ More” (that is also where “📥 Save attachments for 30 days” is, for emails already linked to orders and projects).", "de": "Dasselbe finden Sie in der E-Mail unter „⋯ Mehr“ (dort auch „📥 Anhänge der letzten 30 Tage speichern“ für E-Mails, die bereits mit Aufträgen und Projekten verknüpft sind)."}
+{"uk": "Те саме, що кнопка цього тарифу в таблиці: збереже відправлення й відкриє оформлення в перевізника", "en": "Same as this rate's button in the table: saves the shipment and opens the carrier booking", "de": "Wie die Schaltfläche dieses Tarifs in der Tabelle: speichert die Sendung und öffnet die Buchung"}
 {"uk": "Текст", "en": "Text", "de": "Text"}
 {"uk": "Текст вкладення листа завдання (PDF по сторінках, DOCX, TXT, CSV) за номером з read_mail.", "en": "Text of a task e-mail attachment (PDF by pages, DOCX, TXT, CSV) by the number from read_mail.", "de": "Text eines Anhangs der Aufgaben-E-Mail (PDF seitenweise, DOCX, TXT, CSV) anhand der Nummer aus read_mail."}
 {"uk": "Текст вступу", "en": "Introduction text", "de": "Einleitungstext"}
@@ -14333,6 +14344,7 @@
 {"uk": "Щодня заповнювати порожні робочі дні (режим — у налаштуваннях).", "en": "Fill empty working days daily (mode is in the settings).", "de": "Leere Arbeitstage täglich ausfüllen (Modus – in den Einstellungen)."}
 {"uk": "Щодня заповнює порожні робочі дні працівників, яким увімкнено автозаповнення. День, де вже є записи, не чіпається.", "en": "Fills empty working days daily for employees with auto-fill enabled. A day that already has entries is left untouched.", "de": "Füllt täglich leere Arbeitstage von Mitarbeitern, für die das automatische Ausfüllen aktiviert ist. Ein Tag, an dem bereits Einträge vorhanden sind, wird nicht angetastet."}
 {"uk": "Щодня о {0}", "en": "Daily at {0}", "de": "Täglich um {0}"}
+{"uk": "Щойно відкрито — одразу запитати тарифи всіх перевізників і вибрати", "en": "As soon as the page opens — ask all carriers for rates and pick one", "de": "Sobald die Seite offen ist — Tarife aller Versanddienste abfragen und wählen"}
 {"uk": "Щойно змінену базову ціну не відправляти одразу — раптом її ще редагують.", "en": "Do not send a just-changed base price immediately — it may still be being edited.", "de": "Einen soeben geänderten Basispreis nicht sofort senden — möglicherweise wird er noch bearbeitet."}
 {"uk": "Щойно прочитано з DigiKey (GET /offers): кожен офер продавця поруч із лістингом Minerva", "en": "Just read from DigiKey (GET /offers): each seller offer next to the Minerva listing", "de": "Soeben von DigiKey gelesen (GET /offers): jedes Offer des Verkäufers neben dem Minerva-Listing"}
 {"uk": "Щойно прочитано з DigiKey (GET /offers): кожен офер продавця поруч із лістингом Minerva — за ID офера, інакше за артикулом. Нічого не змінюється, поки не натиснете кнопку.", "en": "Just read from DigiKey (GET /offers): each seller offer next to the Minerva listing — by offer ID, otherwise by SKU. Nothing changes until you click the button.", "de": "Soeben von DigiKey gelesen (GET /offers): jedes Offer des Verkäufers neben dem Minerva-Listing — nach Offer-ID, andernfalls nach Artikelnummer. Es ändert sich nichts, bis Sie auf die Schaltfläche klicken."}
@@ -14548,6 +14560,7 @@
 {"uk": "автоматично.", "en": "automatically.", "de": "automatisch."}
 {"uk": "автооновлення вимкнено", "en": "auto-update disabled", "de": "Auto-Aktualisierung deaktiviert"}
 {"uk": "автоперевірку вимкнено — лише кнопка «🔄 Перевірити оплати»", "en": "automatic check is off — only the “🔄 Check payments” button", "de": "automatische Prüfung ist aus – nur die Schaltfläche „🔄 Zahlungen prüfen“"}
+{"uk": "агент", "en": "agent", "de": "Agent"}
 {"uk": "агент не впевнений — лише чернетка", "en": "the agent is not sure — draft only", "de": "der Agent ist nicht sicher – nur Entwurf"}
 {"uk": "агент не написав відповіді", "en": "the agent did not write a reply", "de": "der Agent hat keine Antwort geschrieben"}
 {"uk": "агент прочитає його й вкладення.", "en": "the agent will read it and its attachments.", "de": "der Agent liest sie samt Anhängen."}
@@ -14705,6 +14718,7 @@
 {"uk": "в askDANTE", "en": "in askDANTE", "de": "in askDANTE"}
 {"uk": "в askDANTE за цей день немає приходу / відходу — спершу внесіть їх (📅 клік на дату в календарі робочого часу)", "en": "no clock-in / clock-out in askDANTE for this day — enter them first (📅 click the date in the working time calendar)", "de": "in askDANTE gibt es für diesen Tag kein Kommen / Gehen – tragen Sie es zuerst ein (📅 Klick auf das Datum im Arbeitszeitkalender)"}
 {"uk": "в askDANTE того дня вже є запис з такою назвою", "en": "there is already an entry with this name in askDANTE for that day", "de": "in askDANTE gibt es für diesen Tag bereits einen Eintrag mit diesem Namen"}
+{"uk": "в {0} відправляли {1} ({2} раз.)", "en": "shipped to {0} with {1} ({2} times)", "de": "nach {0} mit {1} versandt ({2}-mal)"}
 {"uk": "в адмін-панелі.", "en": "in the admin panel.", "de": "im Admin-Panel."}
 {"uk": "в дорозі {0}", "en": "in transit {0}", "de": "unterwegs {0}"}
 {"uk": "в картки лістингів, а з галочкою — підуть і на DigiKey (фото — полем товару «imageUrl»; DigiKey перевіряє зміни", "en": "to the listing cards, and with the checkbox they will also go to DigiKey (the photo as the product field “imageUrl”; DigiKey reviews changes", "de": "in die Listing-Karten, und mit dem Häkchen gehen sie auch an DigiKey (das Foto als Artikelfeld „imageUrl“; DigiKey prüft Änderungen"}
@@ -14725,6 +14739,7 @@
 {"uk": "вага (г)", "en": "weight (g)", "de": "Gewicht (g)"}
 {"uk": "вага має бути більша за 0 і менша за 1 000 000 г", "en": "weight must be greater than 0 and less than 1,000,000 g", "de": "Gewicht muss größer als 0 und kleiner als 1.000.000 g sein"}
 {"uk": "вага не вказана", "en": "weight not specified", "de": "Gewicht nicht angegeben"}
+{"uk": "вага неповна", "en": "weight incomplete", "de": "Gewicht unvollständig"}
 {"uk": "вага — лише число в грамах (напр. 45 або 0.5)", "en": "weight — a number in grams only (e.g. 45 or 0.5)", "de": "Gewicht – nur eine Zahl in Gramm (z. B. 45 oder 0.5)"}
 {"uk": "вагу нетто (г/шт)", "en": "net weight (g/pc)", "de": "Nettogewicht (g/Stk.)"}
 {"uk": "валюта", "en": "currency", "de": "Währung"}
@@ -15244,6 +15259,7 @@
 {"uk": "за адресою не календар iCal — перевірте, що це секретна адреса .ics", "en": "the address is not an iCal calendar — check that it is the secret .ics address", "de": "unter der Adresse befindet sich kein iCal-Kalender — prüfen Sie, ob es die geheime .ics-Adresse ist"}
 {"uk": "за бажанням", "en": "optional", "de": "optional"}
 {"uk": "за бажанням — після звірки", "en": "optional — after the comparison", "de": "optional — nach dem Abgleich"}
+{"uk": "за вагою товарів", "en": "by product weight", "de": "nach Produktgewicht"}
 {"uk": "за весь період", "en": "over the entire period", "de": "im gesamten Zeitraum"}
 {"uk": "за вибраний період", "en": "for the selected period", "de": "für den ausgewählten Zeitraum"}
 {"uk": "за видом товару — каталог DigiKey: {0}", "en": "by product type — DigiKey catalog: {0}", "de": "nach Artikelart — DigiKey-Katalog: {0}"}
@@ -15273,6 +15289,7 @@
 {"uk": "за ставками askDANTE", "en": "at askDANTE rates", "de": "nach askDANTE-Sätzen"}
 {"uk": "за сьогодні", "en": "for today", "de": "für heute"}
 {"uk": "за типом", "en": "by type", "de": "nach Typ"}
+{"uk": "за упаковкою товарів", "en": "by product packaging", "de": "nach Produktverpackung"}
 {"uk": "за хвилину: {0}", "en": "per minute: {0}", "de": "pro Minute: {0}"}
 {"uk": "за хвилину: загальний ліміт сервера ({0})", "en": "per minute: the server’s general limit ({0})", "de": "pro Minute: allgemeines Limit des Servers ({0})"}
 {"uk": "за цим темпом залишилось", "en": "at this rate remaining", "de": "bei diesem Tempo verbleiben"}
@@ -15609,6 +15626,7 @@
 {"uk": "клієнт CRM зустрічі", "en": "CRM customer of the meeting", "de": "CRM-Kunde der Besprechung"}
 {"uk": "клієнт {0}", "en": "customer {0}", "de": "Kunde {0}"}
 {"uk": "клієнт «{0}»", "en": "customer “{0}”", "de": "Kunde „{0}“"}
+{"uk": "клієнт вибрав «{0}", "en": "the customer chose «{0}", "de": "der Kunde hat «{0}"}
 {"uk": "клієнт не відреагував", "en": "the customer did not respond", "de": "der Kunde hat nicht reagiert"}
 {"uk": "клієнт проєкту {0}", "en": "customer of project {0}", "de": "Kunde des Projekts {0}"}
 {"uk": "клієнта", "en": "customer", "de": "Kunden"}
@@ -15889,6 +15907,7 @@
 {"uk": "на DigiKey — їхня копія фото; надіслати, лише якщо фото змінилось", "en": "on DigiKey it is their copy of the photo; send only if the photo has changed", "de": "auf DigiKey liegt deren Kopie des Fotos; nur senden, wenn sich das Foto geändert hat"}
 {"uk": "на digikey.com", "en": "on digikey.com", "de": "auf digikey.com"}
 {"uk": "на {0}", "en": "for {0}", "de": "für {0}"}
+{"uk": "на {0} {1} дорожче за найдешевший ({2} · {3})", "en": "{0} {1} more than the cheapest ({2} · {3})", "de": "{0} {1} teurer als der günstigste ({2} · {3})"}
 {"uk": "на «{0}»: {1} → {2}", "en": "at “{0}”: {1} → {2}", "de": "an „{0}“: {1} → {2}"}
 {"uk": "на адресу відправника", "en": "to the sender’s address", "de": "an die Absenderadresse"}
 {"uk": "на акаунті UPS.", "en": "on the UPS account.", "de": "im UPS-Konto."}
@@ -15955,6 +15974,8 @@
 {"uk": "найближчих: {0}", "en": "upcoming: {0}", "de": "anstehend: {0}"}
 {"uk": "найбільша зміна ціни для однієї кількості (і на новому чи прибраному ступені) — її перевіряє запобіжник автооновлення", "en": "the largest price change for a single quantity (including on a new or removed price break) — it is checked by the auto-update safeguard", "de": "die größte Preisänderung für eine einzelne Menge (auch bei einer neuen oder entfernten Staffel) — sie wird von der Sicherung der automatischen Aktualisierung geprüft"}
 {"uk": "найбільше", "en": "most", "de": "am meisten"}
+{"uk": "найдешевший", "en": "cheapest", "de": "günstigster"}
+{"uk": "найдешевший з доставкою до {0} днів", "en": "cheapest with delivery within {0} days", "de": "günstigster mit Zustellung in bis zu {0} Tagen"}
 {"uk": "найкраща", "en": "best", "de": "beste"}
 {"uk": "найменування", "en": "item name", "de": "Benennung"}
 {"uk": "найновіше", "en": "newest", "de": "neueste"}
@@ -16297,6 +16318,7 @@
 {"uk": "одразу надіслати на DigiKey (лише строк)", "en": "send to DigiKey right away (lead time only)", "de": "sofort an DigiKey senden (nur die Lieferzeit)"}
 {"uk": "одразу показує, як буде. Нічого не збережено, доки не натиснете «💾 Зберегти».", "en": "immediately shows the result. Nothing is saved until you click “💾 Save”.", "de": "zeigt sofort das Ergebnis. Es wird nichts gespeichert, bis Sie auf „💾 Speichern“ klicken."}
 {"uk": "одразу при додаванні замовлення.", "en": "immediately when the order is added.", "de": "sofort beim Hinzufügen des Auftrags."}
+{"uk": "одразу шукати тарифи", "en": "look up rates right away", "de": "Tarife sofort abfragen"}
 {"uk": "окремо для DigiKey. Фото DigiKey приймає полем товару, даташит — лише додатковим полем DigiKey, якщо воно є.", "en": "separately for DigiKey. DigiKey accepts the photo as a product field, the datasheet only as an additional DigiKey field, if one exists.", "de": "separat für DigiKey. DigiKey nimmt das Foto als Artikelfeld an, das Datenblatt nur als zusätzliches DigiKey-Feld, sofern vorhanden."}
 {"uk": "окремі абзаци; все між ними (заголовок, таблиця, розмір/вага) повторюється для кожної коробки.", "en": "separate paragraphs; everything between them (heading, table, size/weight) is repeated for each box.", "de": "eigene Absätze; alles dazwischen (Überschrift, Tabelle, Größe/Gewicht) wird für jeden Karton wiederholt."}
 {"uk": "окремі абзаци; все між ними (заголовок, таблиця, розмір/вага) повторюється для кожної коробки. У таблиці рядки з", "en": "separate paragraphs; everything between them (heading, table, size/weight) is repeated for each box. In the table, rows with", "de": "eigene Absätze; alles dazwischen (Überschrift, Tabelle, Größe/Gewicht) wird für jeden Karton wiederholt. In der Tabelle stehen Zeilen mit"}
@@ -17164,6 +17186,8 @@
 {"uk": "таблиці розділу «Інтернет-магазин»", "en": "tables of the “Web shop” section", "de": "Tabellen des Bereichs „Webshop“"}
 {"uk": "так", "en": "yes", "de": "ja"}
 {"uk": "так вирішив агент", "en": "the agent decided so", "de": "so hat der Agent entschieden"}
+{"uk": "так відправляли в {0} ({1} раз.)", "en": "shipped like this to {0} ({1} times)", "de": "so nach {0} versandt ({1}-mal)"}
+{"uk": "так відправляли цьому клієнту ({0} раз.)", "en": "shipped like this to this customer ({0} times)", "de": "so an diesen Kunden versandt ({0}-mal)"}
 {"uk": "так — готово; ні — «🔄 Повне підключення» (запис і правила)", "en": "yes — done; no — “🔄 Full connection” (writing and rules)", "de": "ja — fertig; nein — „🔄 Vollständige Verbindung“ (Schreiben und Regeln)"}
 {"uk": "так, перекладати (це коштує грошей)", "en": "yes, translate (this costs money)", "de": "ja, übersetzen (das kostet Geld)"}
 {"uk": "такий тип файлу не індексується", "en": "this file type is not indexed", "de": "dieser Dateityp wird nicht indexiert"}
@@ -17486,6 +17510,7 @@
 {"uk": "цитати прибрано в {0}", "en": "quotes removed in {0}", "de": "Zitate entfernt in {0}"}
 {"uk": "цього конкретного", "en": "this specific", "de": "diesen bestimmten"}
 {"uk": "цього ступеня не буде", "en": "this price break will not exist", "de": "diese Staffel entfällt"}
+{"uk": "цьому клієнту відправляли {0} ({1} раз.)", "en": "shipped to this customer with {0} ({1} times)", "de": "an diesen Kunden mit {0} versandt ({1}-mal)"}
 {"uk": "ця зустріч уже записувалась сюди", "en": "this meeting has already been recorded here", "de": "diese Besprechung wurde hier bereits eingetragen"}
 {"uk": "ця скринька не вибрана на «🧠 База знань»", "en": "this mailbox is not selected on “🧠 Knowledge base”", "de": "dieses Postfach ist auf „🧠 Wissensdatenbank“ nicht ausgewählt"}
 {"uk": "цікаво", "en": "interesting", "de": "interessant"}
@@ -17671,6 +17696,7 @@
 {"uk": "як джерело.", "en": "as the source.", "de": "als Quelle."}
 {"uk": "як для DigiKey", "en": "as for DigiKey", "de": "wie bei DigiKey"}
 {"uk": "як для DigiKey: {0}", "en": "as for DigiKey: {0}", "de": "wie für DigiKey: {0}"}
+{"uk": "як записано в замовленні", "en": "as recorded in the order", "de": "wie im Auftrag erfasst"}
 {"uk": "як минулого разу", "en": "as last time", "de": "wie beim letzten Mal"}
 {"uk": "як на DigiKey", "en": "as on DigiKey", "de": "wie auf DigiKey"}
 {"uk": "як працювати в Minerva і товари", "en": "how to work in Minerva, and products", "de": "Arbeiten mit Minerva und Artikel"}

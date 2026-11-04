@@ -543,6 +543,7 @@ function compareRates(){
     sender_state:      get('sender_state'),
     recipient_state:   get('recipient_state'),
     packages,
+    order_id: '{% if order %}{{ order.pk }}{% endif %}',
   };
   const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
 
@@ -614,6 +615,7 @@ function compareRates(){
     // Reset filter to 'all' on new request
     setRatesFilter('all');
     _applyRatesFilter();
+    if (window.agentAdvice) agentAdvice(data.advice);
   })
   .catch(err=>{
     loading.style.display='none';
@@ -2233,6 +2235,94 @@ document.addEventListener('DOMContentLoaded', function() {
 
   <!-- ── Права колонка: дані замовлення ── -->
   <div>
+    {% if order %}
+    <div class="sh-card" id="agent-card" style="margin-bottom:14px">
+      <div class="sh-card-title" style="justify-content:space-between">
+        <span>🤖 Агент відправки</span>
+        <label style="font-weight:400;font-size:11px;text-transform:none;letter-spacing:0;cursor:pointer"
+               title="Щойно відкрито — одразу запитати тарифи всіх перевізників і вибрати">
+          <input type="checkbox" id="agent-auto"> одразу шукати тарифи</label>
+      </div>
+      <div class="agent-checks">
+        {% for c in agent_checks %}
+        <div class="agent-check {{ c.level }}">{% if c.level == 'block' %}⛔{% else %}⚠️{% endif %} {{ c.text }}</div>
+        {% empty %}
+        <div class="agent-check ok">✓ Замовлення готове до відправки</div>
+        {% endfor %}
+      </div>
+      {% if packaging_hint %}
+      <div class="agent-line">📦 Упаковка: <b>{{ packaging_hint.total_boxes }} кор.</b>{% if packaging_hint.weight_kg %} · {{ packaging_hint.weight_kg }} кг{% endif %}
+        <span class="agent-dim">· {% if packaging_hint.source == 'order_packaging' %}як записано в замовленні{% elif packaging_hint.source == 'history' %}як минулого разу{% if packaging_hint.history_order %} ({{ packaging_hint.history_order }}){% endif %}{% elif packaging_hint.source == 'product_packaging' %}за упаковкою товарів{% else %}за вагою товарів{% endif %}{% if packaging_hint.missing_weight %} · ⚠️ вага неповна{% endif %}</span>
+      </div>
+      {% endif %}
+      <div class="agent-line" id="agent-advice">🚚 Перевізник: натисніть «📊 Порівняти тарифи» — агент вибере й пояснить.</div>
+      <div id="agent-advice-act" style="display:none;margin-top:8px"></div>
+    </div>
+    <style>
+      #agent-card .agent-check { font-size:12px; line-height:1.45; padding:2px 0; }
+      #agent-card .agent-check.block { color:var(--err); font-weight:600; }
+      #agent-card .agent-check.warn { color:var(--warn); }
+      #agent-card .agent-check.ok { color:var(--ok, #2e7d32); }
+      #agent-card .agent-line { font-size:12px; line-height:1.5; margin-top:8px; }
+      #agent-card .agent-dim { color:var(--text-muted); }
+      #agent-card .agent-go { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:7px 14px;
+        font-weight:700; cursor:pointer; font-size:12px; }
+      .agent-pick { outline:2px solid var(--gold, #d4a017); outline-offset:2px; border-radius:6px; }
+      .agent-badge { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; font-size:10px;
+        font-weight:700; background:var(--gold, #d4a017); color:#000; white-space:nowrap; }
+    </style>
+    <script>
+    (function(){
+      var KEY = 'ship-agent-auto';
+      var auto = document.getElementById('agent-auto');
+      var blocked = !!document.querySelector('#agent-card .agent-check.block');
+      try { auto.checked = localStorage.getItem(KEY) !== '0'; } catch (e) { auto.checked = true; }
+      auto.addEventListener('change', function(){ try { localStorage.setItem(KEY, auto.checked ? '1' : '0'); } catch (e) {} });
+      function el(tag, cls, text){ var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+      function money(v){ var n = parseFloat(v); return isNaN(n) ? v : n.toFixed(2); }
+      function findBtns(p){
+        return Array.prototype.filter.call(document.querySelectorAll('#rates-results .cmp-book-btn'), function(b){
+          return b.dataset.carrierId === String(p.carrier_id) && b.dataset.code === String(p.code);
+        });
+      }
+      window.agentAdvice = function(a){
+        var box = document.getElementById('agent-advice'), act = document.getElementById('agent-advice-act');
+        document.querySelectorAll('.agent-pick').forEach(function(n){ n.classList.remove('agent-pick'); });
+        document.querySelectorAll('.agent-badge').forEach(function(n){ n.remove(); });
+        act.innerHTML = ''; act.style.display = 'none';
+        if (!a || !a.pick) { box.textContent = '🚚 Перевізник: тарифів немає — перевірте адресу, вагу й налаштування перевізників.'; return; }
+        var p = a.pick;
+        box.textContent = '';
+        box.appendChild(document.createTextNode('⭐ Рекомендую: '));
+        box.appendChild(el('b', null, p.carrier_name + ' · ' + p.name));
+        box.appendChild(document.createTextNode(' — ' + money(p.price) + ' ' + p.currency
+          + (p.transit_days != null ? ' · ' + p.transit_days + ' дн.' : '')));
+        box.appendChild(el('div', 'agent-dim', 'Чому: ' + a.reason + (a.extra ? '; ' + a.extra : '')));
+        var btns = findBtns(p);
+        btns.forEach(function(b){
+          var row = b.closest('tr') || b.parentElement;
+          if (row) row.classList.add('agent-pick');
+          b.insertAdjacentElement('afterend', el('span', 'agent-badge', '⭐ агент'));
+        });
+        if (btns.length) {
+          var go = el('button', 'agent-go', '🚀 Оформити рекомендований');
+          go.type = 'button';
+          go.title = 'Те саме, що кнопка цього тарифу в таблиці: збереже відправлення й відкриє оформлення в перевізника';
+          go.onclick = function(){ btns[0].click(); };
+          act.appendChild(go);
+          act.appendChild(el('div', 'agent-dim', 'Оформлення в перевізника (етикетка, оплата) — лише після вашого підтвердження.'));
+          act.style.display = '';
+        }
+      };
+      document.addEventListener('DOMContentLoaded', function(){
+        var country = document.querySelector('[name="recipient_country"]');
+        if (auto.checked && !blocked && country && country.value.trim() && window.compareRates) {
+          setTimeout(compareRates, 300);
+        }
+      });
+    })();
+    </script>
+    {% endif %}
     <div class="sh-card" style="position:sticky;top:80px">
       {% if order %}
       <div class="sh-card-title">📋 Замовлення {{ order.order_number }}</div>
