@@ -1357,6 +1357,13 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     </div>
     <label>Копія (CC) <span class="ag-muted">— адреси через кому; у копію кожного листа агента</span></label>
     <input type="text" id="ag-cc" placeholder="sergey@sevskiy.de">
+    <div class="ag-opts" title="Як галочки в «Написати»: у чернетку й запланований лист агента">
+      <label class="ag-check"><input type="checkbox" id="ag-opt-imp"> ❗ Важливо</label>
+      <label class="ag-check"><input type="checkbox" id="ag-opt-receipt"> 📬 Запит на прочитання</label>
+      <label class="ag-check"><input type="checkbox" id="ag-opt-remind"> ⏰ Нагадати, якщо немає реакції через
+        <select id="ag-remind-days"><option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option><option value="7">7</option><option value="14">14</option></select> дн.</label>
+      <div class="ag-muted">Немає ні підтвердження прочитання, ні відповіді — лист і Telegram вам: потрібне ручне втручання.</div>
+    </div>
     <div class="ag-muted" id="ag-customer-note" hidden>Агент знайде в листі трек-номер замовлення Minerva і напише клієнту цього замовлення (адреса — із замовлення). Тому самому клієнту про те саме замовлення — не частіше ніж раз на 14 днів.</div>
     </div>
     <div id="ag-task-opts" hidden>
@@ -4135,6 +4142,8 @@ async function emAgent(pk) {
   document.getElementById('ag-cc').value = '';
   document.getElementById('ag-forward').value = '';
   document.getElementById('ag-imp').value = 'important';
+  ['ag-opt-imp', 'ag-opt-receipt', 'ag-opt-remind'].forEach(function (id) { document.getElementById(id).checked = false; });
+  document.getElementById('ag-remind-days').value = '3';
   document.getElementById('ag-notify').checked = false;
   var cat = document.getElementById('ag-cat');
   cat.length = 1;
@@ -4196,7 +4205,10 @@ function agData() {
     mode: document.getElementById('ag-mode').value, kind: document.getElementById('ag-kind').value,
     auto_apply: document.getElementById('ag-auto').checked, cc: document.getElementById('ag-cc').value,
     forward_to: document.getElementById('ag-forward').value,
-    importance: document.getElementById('ag-imp').value, notify: document.getElementById('ag-notify').checked
+    importance: document.getElementById('ag-imp').value, notify: document.getElementById('ag-notify').checked,
+    opt_important: document.getElementById('ag-opt-imp').checked,
+    opt_receipt: document.getElementById('ag-opt-receipt').checked,
+    remind_days: document.getElementById('ag-opt-remind').checked ? +document.getElementById('ag-remind-days').value : 0
   };
 }
 async function agPost(url, data) {

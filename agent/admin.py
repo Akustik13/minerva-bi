@@ -45,7 +45,8 @@ class AgentRuleForm(forms.ModelForm):
         model = AgentRule
         fields = ['name', 'enabled', 'account', 'kind', 'senders', 'subject_words', 'body_words', 'category',
                   'instruction', 'mode', 'send_delay_minutes', 'daily_limit', 'forward_to', 'cc', 'auto_apply',
-                  'task_model', 'task_budget_usd', 'importance', 'notify']
+                  'task_model', 'task_budget_usd', 'importance', 'notify', 'opt_important', 'opt_receipt',
+                  'remind_days', 'remind_until']
         widgets = {
             'senders': forms.Textarea(attrs={'rows': 3}),
             'subject_words': forms.Textarea(attrs={'rows': 3}),
@@ -101,6 +102,11 @@ class AgentRuleAdmin(admin.ModelAdmin):
             'description': 'Для «Відповідати на такі листи» і «📨 Писати клієнту замовлення». Клієнту — замовлення, '
                            'чий трек-номер (у замовленні чи його відправленні) є в листі; на адресу клієнта із '
                            'замовлення, тому самому клієнту про те саме замовлення — не частіше ніж раз на 14 днів.'}),
+        ('📬 Листи агента: важливо, запит на прочитання, нагадування', {
+            'fields': ('opt_important', 'opt_receipt', 'remind_days', 'remind_until'),
+            'description': 'Для відповідей, листів клієнту замовлення й пересилань — як галочки в «Написати». '
+                           'Чернетка відкривається з ними вже вибраними; «Надсилати самому» — запланований лист з ними. '
+                           'Немає реакції — лист і Telegram вам: потрібне ручне втручання.'}),
         ('❗ Позначати такі листи', {
             'fields': ('importance', 'notify'),
             'description': 'Лише для «❗ Позначати такі листи важливими»: позначка в списку листів і в папці '
@@ -149,6 +155,8 @@ class AgentRuleAdmin(admin.ModelAdmin):
         if obj.kind == AgentRule.MAIL_TASK:
             return '🧩 завдання' + (' · ✓ трек-номер сам' if obj.auto_apply else '')
         mode = '✉️ сам' if obj.mode == AgentRule.SEND else '📝 чернетка'
+        mode += (' · ❗' if obj.opt_important else '') + (' · 📬' if obj.opt_receipt else '') + (
+            f' · ⏰ {obj.remind_days} дн.' if obj.remind_days else '')
         if obj.kind == AgentRule.MAIL_FORWARD:
             return f'📤 переслати · {mode}'
         if obj.kind == AgentRule.MAIL_MARK:

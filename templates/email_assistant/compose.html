@@ -213,21 +213,20 @@
       <!-- ❗ Важливо / 📬 запит на прочитання / ⏰ нагадати, якщо немає реакції (email_assistant/followups.py) -->
       <div class="em-opts" id="send-opts">
         <label title="{% trans "Отримувач побачить позначку «важливо» (Outlook, Thunderbird, Gmail)" %}">
-          <input type="checkbox" name="opt_important" value="1"> ❗ {% trans "Важливо" %}</label>
+          <input type="checkbox" name="opt_important" value="1"{% if initial.opts.importance %} checked{% endif %}> ❗ {% trans "Важливо" %}</label>
         <label title="{% trans "Попросити підтвердження прочитання — поштова програма отримувача запитає його; підтвердження Minerva покаже біля листа" %}">
-          <input type="checkbox" name="opt_receipt" value="1"> 📬 {% trans "Запит на прочитання" %}</label>
+          <input type="checkbox" name="opt_receipt" value="1"{% if initial.opts.read_receipt %} checked{% endif %}> 📬 {% trans "Запит на прочитання" %}</label>
         <label title="{% trans "Якщо до цього часу не буде реакції — Minerva повідомить листом і в Telegram: потрібне ручне втручання" %}">
-          <input type="checkbox" name="opt_remind" value="1" id="opt-remind"
+          <input type="checkbox" name="opt_remind" value="1" id="opt-remind"{% if initial.opts.remind_days %} checked{% endif %}
                  onchange="document.getElementById('opt-remind-more').hidden = !this.checked"> ⏰ {% trans "Нагадати, якщо немає реакції" %}</label>
-        <span id="opt-remind-more" hidden>
+        <span id="opt-remind-more"{% if not initial.opts.remind_days %} hidden{% endif %}>
           {% trans "через" %}
           <select name="remind_days">
-            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option>
-            <option value="5">5</option><option value="7">7</option><option value="14">14</option>
+            {% for d in remind_choices %}<option value="{{ d }}"{% if d == remind_sel %} selected{% endif %}>{{ d }}</option>{% endfor %}
           </select> {% trans "дн., якщо" %}
           <select name="remind_until">
             <option value="reaction">{% trans "немає ні підтвердження прочитання, ні відповіді" %}</option>
-            <option value="reply">{% trans "немає відповіді" %}</option>
+            <option value="reply"{% if initial.opts.until == 'reply' %} selected{% endif %}>{% trans "немає відповіді" %}</option>
           </select>
         </span>
       </div>

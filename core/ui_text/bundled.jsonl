@@ -538,6 +538,7 @@
 {"uk": "1 : N — один до багатьох", "en": "1 : N — one to many", "de": "1 : N — eins zu viele"}
 {"uk": "1 = ті самі ціни, 1.15 = на 15 % дорожче, 0.9 = на 10 % дешевше", "en": "1 = same prices, 1.15 = 15 % more expensive, 0.9 = 10 % cheaper", "de": "1 = gleiche Preise, 1.15 = 15 % teurer, 0.9 = 10 % günstiger"}
 {"uk": "1 год", "en": "1 h", "de": "1 Std."}
+{"uk": "1 день", "en": "1 day", "de": "1 Tag"}
 {"uk": "1 замовлення", "en": "1 order", "de": "1 Auftrag"}
 {"uk": "1 міс", "en": "1 mo", "de": "1 Mon."}
 {"uk": "1 одиниця = ?", "en": "1 unit = ?", "de": "1 Einheit = ?"}
@@ -573,6 +574,7 @@
 {"uk": "10–20 сек · {0} базових перевірок вже виконано локально", "en": "10–20 sec · {0} basic checks already done locally", "de": "10–20 Sek. · {0} Basisprüfungen bereits lokal durchgeführt"}
 {"uk": "12 товарів, 3 категорії, 4 джерела продажів", "en": "12 products, 3 categories, 4 sales sources", "de": "12 Artikel, 3 Kategorien, 4 Verkaufsquellen"}
 {"uk": "12.50 або 12,50 (кома замінюється)", "en": "12.50 or 12,50 (the comma is replaced)", "de": "12.50 oder 12,50 (das Komma wird ersetzt)"}
+{"uk": "14 днів", "en": "14 days", "de": "14 Tage"}
 {"uk": "14. Minerva без RAG (мертва адреса, потім повертається)", "en": "14. Minerva without RAG (dead address, then it returns)", "de": "14. Minerva ohne RAG (tote Adresse, danach kehrt sie zurück)"}
 {"uk": "15. Minerva недоступна → зміна → запуск", "en": "15. Minerva unavailable → change → start", "de": "15. Minerva nicht verfügbar → Änderung → Start"}
 {"uk": "180 днів / 6 міс", "en": "180 days / 6 mo.", "de": "180 Tage / 6 Mon."}
@@ -585,6 +587,7 @@
 {"uk": "1️⃣ Ручне перевизначення", "en": "1️⃣ Manual override", "de": "1️⃣ Manuelle Überschreibung"}
 {"uk": "2 аркуші", "en": "2 sheets", "de": "2 Blätter"}
 {"uk": "2 год", "en": "2 h", "de": "2 Std."}
+{"uk": "2 дні", "en": "2 days", "de": "2 Tage"}
 {"uk": "2 знаки (за замовч.)", "en": "2 decimals (default)", "de": "2 Nachkommastellen (Standard)"}
 {"uk": "2 колонки на телефоні, 1 колонка на дуже маленьких екранах", "en": "2 columns on a phone, 1 column on very small screens", "de": "2 Spalten auf dem Smartphone, 1 Spalte auf sehr kleinen Bildschirmen"}
 {"uk": "2 роки", "en": "2 years", "de": "2 Jahre"}
@@ -616,6 +619,7 @@
 {"uk": "2nd Connector — 2-й роз'єм", "en": "2nd Connector — 2nd connector", "de": "2nd Connector — 2. Steckverbinder"}
 {"uk": "2nd Contact Gender — 2-й гендер", "en": "2nd Contact Gender — 2nd gender", "de": "2nd Contact Gender — 2. Geschlecht"}
 {"uk": "2️⃣ Пакет: {0}", "en": "2️⃣ Bundle: {0}", "de": "2️⃣ Paket: {0}"}
+{"uk": "3 дні", "en": "3 days", "de": "3 Tage"}
 {"uk": "3 знаки", "en": "3 decimals", "de": "3 Nachkommastellen"}
 {"uk": "3 міс", "en": "3 mo", "de": "3 Mon."}
 {"uk": "3 місяці", "en": "3 months", "de": "3 Monate"}
@@ -659,6 +663,7 @@
 {"uk": "405 — цей метод тут не підтримується.", "en": "405 — this method is not supported here.", "de": "405 — diese Methode wird hier nicht unterstützt."}
 {"uk": "409 — конфлікт", "en": "409 — conflict", "de": "409 — Konflikt"}
 {"uk": "429 — забагато запитів, зачекайте хвилину.", "en": "429 — too many requests, wait a minute.", "de": "429 — zu viele Anfragen, bitte warten Sie eine Minute."}
+{"uk": "5 днів", "en": "5 days", "de": "5 Tage"}
 {"uk": "5 задач: алерти складу, дедлайни, CRM", "en": "5 tasks: stock alerts, deadlines, CRM", "de": "5 Aufgaben: Lagerwarnungen, Fristen, CRM"}
 {"uk": "5 кроків від товару на складі до продажу", "en": "5 steps from a product in stock to a sale", "de": "5 Schritte vom Artikel im Lager bis zum Verkauf"}
 {"uk": "5 невдалих входів → блокування на 15 хв", "en": "5 failed logins → locked for 15 min", "de": "5 fehlgeschlagene Anmeldungen → Sperre für 15 Min."}
@@ -672,6 +677,7 @@
 {"uk": "6. Стан доставок — чи є незавершені відправлення, затримки, проблеми", "en": "6. Delivery status — whether there are unfinished shipments, delays, problems", "de": "6. Lieferstatus — ob es offene Sendungen, Verzögerungen oder Probleme gibt"}
 {"uk": "60 д", "en": "60 d", "de": "60 T"}
 {"uk": "60 днів (2 міс)", "en": "60 days (2 mo.)", "de": "60 Tage (2 Mon.)"}
+{"uk": "7 днів", "en": "7 days", "de": "7 Tage"}
 {"uk": "7 днів 9:00", "en": "7 days 9:00", "de": "7 Tage 9:00"}
 {"uk": "8.50 або $8.50", "en": "8.50 or $8.50", "de": "8.50 oder $8.50"}
 {"uk": "90 д", "en": "90 d", "de": "90 T"}
@@ -5309,6 +5315,7 @@
 {"uk": "Для автоматичних: offer", "en": "For automatic ones: offer", "de": "Für automatische: offer"}
 {"uk": "Для базових цін в іншій валюті: скільки одиниць валюти магазину за 1 одиницю, напр. {\"USD\": 0.86} — 1 USD = 0,86 EUR.", "en": "For base prices in another currency: how many units of the shop currency per 1 unit, e.g. {\"USD\": 0.86} — 1 USD = 0.86 EUR.", "de": "Für Basispreise in einer anderen Währung: wie viele Einheiten der Shop-Währung pro 1 Einheit, z. B. {\"USD\": 0.86} – 1 USD = 0,86 EUR."}
 {"uk": "Для вас AI вимкнено — адміністратор вмикає «AI увімкнено» у вашому профілі.", "en": "AI is turned off for you — an administrator enables “AI enabled” in your profile.", "de": "KI ist für Sie deaktiviert — ein Administrator aktiviert „KI aktiviert“ in Ihrem Profil."}
+{"uk": "Для відповідей, листів клієнту замовлення й пересилань — як галочки в «Написати». Чернетка відкривається з ними вже вибраними; «Надсилати самому» — запланований лист з ними. Немає реакції — лист і Telegram вам: потрібне ручне втручання.", "en": "For replies, emails to the order's customer and forwards — like the checkboxes in «Compose». The draft opens with them already ticked; «Send by itself» — the scheduled email goes with them. No reaction — an email and Telegram to you: manual action needed.", "de": "Für Antworten, E-Mails an den Kunden des Auftrags und Weiterleitungen — wie die Häkchen in «Verfassen». Der Entwurf öffnet sich mit ihnen bereits angehakt; «Selbst senden» — die geplante E-Mail geht mit ihnen. Keine Reaktion — E-Mail und Telegram an Sie: manuelles Eingreifen nötig."}
 {"uk": "Для відповідей, перекладу, історії, граматики й нових листів. Фонове визначення дедлайнів у кожному листі завжди «Автоматично» (дешево).", "en": "For replies, translation, history, grammar and new emails. Background deadline detection in every email is always “Automatic” (cheap).", "de": "Für Antworten, Übersetzung, Verlauf, Grammatik und neue E-Mails. Die Hintergrunderkennung von Fristen in jeder E-Mail ist immer „Automatisch“ (günstig)."}
 {"uk": "Для групи", "en": "For a group", "de": "Für eine Gruppe"}
 {"uk": "Для деяких валют немає курсу — різницю не пораховано.", "en": "For some currencies there is no rate — the difference was not calculated.", "de": "Für einige Währungen gibt es keinen Kurs — die Differenz wurde nicht berechnet."}
@@ -7820,6 +7827,9 @@
 {"uk": "Лист: склади його інструментом compose_email; юзер відкриє його в пошті кнопкою «✉️ Відкрити в пошті» під", "en": "E-mail: compose it with the compose_email tool; the user will open it in the mail with the “✉️ Open in mail” button under", "de": "E-Mail: Verfasse sie mit dem Werkzeug compose_email; der Benutzer öffnet sie im Postfach über die Schaltfläche „✉️ Im Postfach öffnen“ unter"}
 {"uk": "Листи", "en": "E-mails", "de": "E-Mails"}
 {"uk": "Листи {0}–{1} розкладаються у фоні — далі виберіть їм проєкт askDANTE.", "en": "E-mails {0}–{1} are being sorted in the background — then choose an askDANTE project for them.", "de": "Die E-Mails {0}–{1} werden im Hintergrund einsortiert – wählen Sie anschließend ein askDANTE-Projekt dafür."}
+{"uk": "Листи агента (відповідь, клієнту замовлення, пересилання) — з позначкою «важливо» для отримувача.", "en": "Agent emails (reply, to the order's customer, forward) — marked «important» for the recipient.", "de": "E-Mails des Agenten (Antwort, an den Kunden des Auftrags, Weiterleitung) — für den Empfänger als «wichtig» markiert."}
+{"uk": "Листи агента просять підтвердження прочитання; коли воно прийде — «📬 прочитано» біля листа.", "en": "Agent emails request a read receipt; when it arrives — «📬 read» next to the email.", "de": "E-Mails des Agenten fordern eine Lesebestätigung an; wenn sie eintrifft — «📬 gelesen» neben der E-Mail."}
+{"uk": "Листи агента: важливо, запит на прочитання, нагадування", "en": "Agent emails: important, read receipt, reminder", "de": "E-Mails des Agenten: wichtig, Lesebestätigung, Erinnerung"}
 {"uk": "Листи в пошті", "en": "E-mails in the mailbox", "de": "E-Mails im Postfach"}
 {"uk": "Листи від {0}: запуск…", "en": "E-mails from {0}: starting…", "de": "E-Mails von {0}: Start…"}
 {"uk": "Листи від {0}: перевірено {1} з {2}, запрошень {3}", "en": "E-mails from {0}: checked {1} of {2}, invitations {3}", "de": "E-Mails ab {0}: {1} von {2} geprüft, Einladungen {3}"}
@@ -8383,6 +8393,7 @@
 {"uk": "Нагадати о...", "en": "Remind at...", "de": "Erinnern um..."}
 {"uk": "Нагадати про листи без реакції (⏰ «Нагадати, якщо немає реакції»)", "en": "Remind about emails without a reaction (⏰ «Remind if there is no reaction»)", "de": "An E-Mails ohne Reaktion erinnern (⏰ «Erinnern, wenn keine Reaktion»)"}
 {"uk": "Нагадати, якщо", "en": "Remind if", "de": "Erinnern, wenn"}
+{"uk": "Нагадати, якщо немає реакції через", "en": "Remind if there is no reaction within", "de": "Erinnern, wenn keine Reaktion innerhalb von"}
 {"uk": "Нагадування", "en": "Reminder", "de": "Erinnerung"}
 {"uk": "Нагадування Клієнт: {0} {1}", "en": "Reminder Customer: {0} {1}", "de": "Erinnerung Kunde: {0} {1}"}
 {"uk": "Нагадування на сьогодні", "en": "Reminders for today", "de": "Erinnerungen für heute"}
@@ -9110,6 +9121,7 @@
 {"uk": "Немає недавніх дій", "en": "No recent activity", "de": "Keine letzten Aktivitäten"}
 {"uk": "Немає номера відправлення UPS (1Z…) — в UPS нічого не створено, скасовувати нічого. Статус у Minerva — «🔧 Статус вручну».", "en": "There is no UPS shipment number (1Z…) — nothing was created in UPS, nothing to cancel. Status in Minerva — “🔧 Set status manually”.", "de": "Es gibt keine UPS-Sendungsnummer (1Z…) — bei UPS wurde nichts erstellt, es gibt nichts zu stornieren. Status in Minerva — „🔧 Status manuell“."}
 {"uk": "Немає номера замовлення", "en": "No order number", "de": "Keine Bestellnummer"}
+{"uk": "Немає ні підтвердження прочитання, ні відповіді — лист і Telegram вам: потрібне ручне втручання.", "en": "Neither a read receipt nor a reply — an email and Telegram to you: manual action needed.", "de": "Weder Lesebestätigung noch Antwort — E-Mail und Telegram an Sie: manuelles Eingreifen nötig."}
 {"uk": "Немає опису: ні на складі, ні на DigiKey, ні в старому файлі — впишіть.", "en": "No description: not in stock, not on DigiKey, not in the old file — please enter one.", "de": "Keine Beschreibung: weder im Lager noch auf DigiKey noch in der alten Datei — bitte eintragen."}
 {"uk": "Немає отримувачів", "en": "No recipients", "de": "Keine Empfänger"}
 {"uk": "Немає отримувачів (поле email_to порожнє)", "en": "No recipients (the email_to field is empty)", "de": "Keine Empfänger (das Feld email_to ist leer)"}
@@ -9151,6 +9163,7 @@
 {"uk": "Немає проєктів askDANTE цього клієнта.", "en": "No askDANTE projects for this customer.", "de": "Keine askDANTE-Projekte für diesen Kunden."}
 {"uk": "Немає підпапок", "en": "No subfolders", "de": "Keine Unterordner"}
 {"uk": "Немає реакції", "en": "No reaction", "de": "Keine Reaktion"}
+{"uk": "Немає реакції за стільки днів після відправки — лист і Telegram вам: потрібне ручне втручання. Як «⏰ Нагадати, якщо немає реакції» у «Написати».", "en": "No reaction within this many days after sending — an email and Telegram to you: manual action needed. Like «⏰ Remind if there is no reaction» in «Compose».", "de": "Keine Reaktion so viele Tage nach dem Senden — E-Mail und Telegram an Sie: manuelles Eingreifen nötig. Wie «⏰ Erinnern, wenn keine Reaktion» in «Verfassen»."}
 {"uk": "Немає реакції на лист «{0}» — {1}. Потрібне ручне втручання: зателефонуйте або напишіть ще раз.", "en": "No reaction to the email «{0}» — {1}. Manual action needed: call or write again.", "de": "Keine Reaktion auf die E-Mail «{0}» — {1}. Manuelles Eingreifen nötig: anrufen oder erneut schreiben."}
 {"uk": "Немає реакції: {0}", "en": "No reaction: {0}", "de": "Keine Reaktion: {0}"}
 {"uk": "Немає роз'єму — рядок «Connector type» не друкується.", "en": "No connector — the “Connector type” line is not printed.", "de": "Kein Steckverbinder — die Zeile „Connector type“ wird nicht gedruckt."}
@@ -14738,6 +14751,7 @@
 {"uk": "Як виставити рахунок", "en": "How to issue an invoice", "de": "So stellen Sie eine Rechnung aus"}
 {"uk": "Як вони мають збігатися (кур'єрські посилки)", "en": "How they must match (courier parcels)", "de": "Wie sie übereinstimmen müssen (Kurierpakete)"}
 {"uk": "Як відповідати: що написати, чим підтвердити, коли не відповідати. Агент бере факти лише з Minerva й листа, а чого немає — пише [уточнити] і лишає чернетку.", "en": "How to reply: what to write, what to confirm with, when not to reply. The agent takes facts only from Minerva and the e-mail, and where something is missing it writes [clarify] and leaves a draft.", "de": "Wie zu antworten ist: was zu schreiben ist, womit zu bestätigen ist, wann nicht zu antworten ist. Der Agent nimmt Fakten nur aus Minerva und der E-Mail, und wo etwas fehlt, schreibt er [klären] und lässt einen Entwurf."}
+{"uk": "Як галочки в «Написати»: у чернетку й запланований лист агента", "en": "Like the checkboxes in «Compose»: into the agent's draft and scheduled email", "de": "Wie die Häkchen in «Verfassen»: in den Entwurf und die geplante E-Mail des Agenten"}
 {"uk": "Як додати новий товар на склад?", "en": "How do I add a new product to stock?", "de": "Wie füge ich einen neuen Artikel zum Lager hinzu?"}
 {"uk": "Як друкувати", "en": "How to print", "de": "So drucken Sie"}
 {"uk": "Як друкувати фото", "en": "How to print photos", "de": "Wie Fotos gedruckt werden"}
@@ -16501,6 +16515,7 @@
 {"uk": "не зроблено", "en": "not done", "de": "nicht erledigt"}
 {"uk": "не йде. Натисніть «🔍 Прочитати з DigiKey і перевірити» — Minerva візьме код поля з ваших товарів на DigiKey", "en": "is not sent. Click “🔍 Read from DigiKey and check” — Minerva will take the field code from your products on DigiKey", "de": "wird nicht gesendet. Klicken Sie auf „🔍 Von DigiKey lesen und prüfen“ — Minerva übernimmt den Feldcode aus Ihren Artikeln bei DigiKey"}
 {"uk": "не може увійти (неактивний або не співробітник)", "en": "cannot sign in (inactive or not an employee)", "de": "kann sich nicht anmelden (inaktiv oder kein Mitarbeiter)"}
+{"uk": "не нагадувати", "en": "do not remind", "de": "nicht erinnern"}
 {"uk": "не надсилалась", "en": "not sent", "de": "nicht gesendet"}
 {"uk": "не надіслано", "en": "not sent", "de": "nicht gesendet"}
 {"uk": "не налаштовано", "en": "not configured", "de": "nicht eingerichtet"}

@@ -46,7 +46,7 @@ def get(account, pk):
 
 
 def save(account, *, to='', cc='', subject='', body='', body_html='', reply_to=None,
-         refs=(), names=(), files=(), draft=None) -> EmailDraft:
+         refs=(), names=(), files=(), draft=None, options=None) -> EmailDraft:
     """«💾 Зберегти»: нова чернетка або оновлення тієї самої (draft). Лист не надсилається.
     Порожня чернетка (ні адреси, ні теми, ні тексту, ні вкладень) — ValueError."""
     if not (addresses(to) or addresses(cc) or (subject or '').strip() or (body or '').strip()
@@ -66,6 +66,8 @@ def save(account, *, to='', cc='', subject='', body='', body_html='', reply_to=N
     draft.body_html = body_html or ''
     draft.reply_to = reply_to
     draft.attachments = items
+    if options is not None:   # ❗ / 📬 / ⏰ з форми (followups.stored)
+        draft.send_options = options
     draft.save()
     attachments.remove_stored(old, keep=items)   # прибрані з чернетки файли — з диска
     return draft

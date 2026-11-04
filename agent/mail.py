@@ -287,11 +287,20 @@ def _subject(msg) -> str:
     return subject if re.match(r'\s*(re|aw|antw|sv)\s*:', subject, re.IGNORECASE) else f'Re: {subject}'
 
 
-def make_draft(msg, reply, cc=()):
+def send_options(rule) -> dict:
+    """❗ Важливо / 📬 запит на прочитання / ⏰ нагадування доручення → `send_options` чернетки й запланованого листа
+    (той самий формат, що галочки «Написати», email_assistant/followups.py). {} — нічого не вибрано."""
+    from email_assistant import followups
+    return followups.stored({'opt_important': rule.opt_important, 'opt_receipt': rule.opt_receipt,
+                             'opt_remind': bool(rule.remind_days), 'remind_days': rule.remind_days or '',
+                             'remind_until': rule.remind_until})
+
+
+def make_draft(msg, reply, cc=(), options=None):
     from email_assistant.models import EmailDraft
     return EmailDraft.objects.create(account=msg.account, reply_to=msg, subject=_subject(msg)[:500],
                                      to_emails=[msg.from_email], cc_emails=list(cc), body=reply,
-                                     source=EmailDraft.SOURCE_AUTO_REPLY)
+                                     source=EmailDraft.SOURCE_AUTO_REPLY, send_options=options or {})
 
 
 EMAIL_RE = re.compile(r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+')
@@ -504,14 +513,15 @@ def carrier_contacts(text, msg, order) -> list:
                   & {e for e in source if e not in allowed and not is_own(e, mine)})
 
 
-def _customer_mail(msg, to, cc, subject, body, *, send=False, delay=15):
+def _customer_mail(msg, to, cc, subject, body, *, send=False, delay=15, options=None):
     from email_assistant.models import EmailDraft, ScheduledEmail
     if send:
         return None, ScheduledEmail.objects.create(
             account=msg.account, subject=subject[:500], to_emails=[to], cc_emails=list(cc), body=body,
-            scheduled_at=timezone.now() + datetime.timedelta(minutes=delay), trigger='agent')
+            scheduled_at=timezone.now() + datetime.timedelta(minutes=delay), trigger='agent',
+            send_options=options or {})
     return EmailDraft.objects.create(account=msg.account, subject=subject[:500], to_emails=[to], cc_emails=list(cc),
-                                     body=body, source=EmailDraft.SOURCE_AUTO_REPLY), None
+                                     body=body, source=EmailDraft.SOURCE_AUTO_REPLY, send_options=options or {}), None
 
 
 def process_customer(run):
@@ -551,7 +561,7 @@ def process_customer(run):
     head = f'клієнту {to} · замовлення {order.order_number}'
     with transaction.atomic():
         draft, scheduled = _customer_mail(msg, to, cc_list(rule), result['subject'], body, send=send,
-                                          delay=rule.send_delay_minutes)
+                                          delay=rule.send_delay_minutes, options=send_options(rule))
         _finish(run, AgentRun.SCHEDULED if send else AgentRun.DRAFTED, head + (f' · {note}' if note else ''),
                 reply=body, model=result.get('model', ''), draft=draft, scheduled=scheduled, order=order)
 
@@ -607,7 +617,8 @@ def forward_preview(rule, msg) -> dict:
 def make_forward(rule, msg, *, send=False):
     from email_assistant.models import EmailDraft, ScheduledEmail
     fields = dict(account=msg.account, subject=forward_subject(msg)[:500], to_emails=forward_list(rule),
-                  cc_emails=cc_list(rule), body=forward_body(rule, msg), attachments=forward_attachments(msg))
+                  cc_emails=cc_list(rule), body=forward_body(rule, msg), attachments=forward_attachments(msg),
+                  send_options=send_options(rule))
     if send:
         return None, ScheduledEmail.objects.create(
             **fields, trigger='agent',
@@ -753,12 +764,13 @@ def process(run):
                 when = timezone.now() + datetime.timedelta(minutes=rule.send_delay_minutes)
                 scheduled = ScheduledEmail.objects.create(
                     account=msg.account, subject=_subject(msg)[:500], to_emails=[msg.from_email],
-                    cc_emails=cc_list(rule), body=reply, reply_to=msg, scheduled_at=when, trigger='agent')
+                    cc_emails=cc_list(rule), body=reply, reply_to=msg, scheduled_at=when, trigger='agent',
+                    send_options=send_options(rule))
                 _finish(run, AgentRun.SCHEDULED, note, reply=reply, model=result.get('model', ''),
                         scheduled=scheduled)
             else:
                 _finish(run, AgentRun.DRAFTED, note, reply=reply, model=result.get('model', ''),
-                        draft=make_draft(msg, reply, cc_list(rule)))
+                        draft=make_draft(msg, reply, cc_list(rule), send_options(rule)))
     except Exception as e:  # noqa: BLE001 — одна помилка не зупиняє чергу
         logger.exception('agent run %s: %s', run.pk, e)
         _finish(run, AgentRun.FAILED, f'Помилка: {type(e).__name__}')
@@ -837,6 +849,13 @@ def rule_from(data, msg, user=None) -> AgentRule:
     rule.notify = rule.kind == AgentRule.MAIL_MARK and bool(data.get('notify'))
     rule.cc = text('cc', 1000)
     rule.forward_to = text('forward_to', 1000)
+    rule.opt_important, rule.opt_receipt = bool(data.get('opt_important')), bool(data.get('opt_receipt'))
+    try:
+        days = int(data.get('remind_days') or 0)
+    except (TypeError, ValueError):
+        days = 0
+    rule.remind_days = days if days in dict(AgentRule.REMIND_DAYS) else 0
+    rule.remind_until = 'reply' if data.get('remind_until') == 'reply' else 'reaction'
     if rule.kind == AgentRule.MAIL_FORWARD and not forward_list(rule):
         raise ValueError('Вкажіть, кому пересилати — адресу в «Кому переслати»')
     rule.auto_apply = rule.kind == AgentRule.MAIL_TASK and bool(data.get('auto_apply'))
@@ -912,13 +931,13 @@ def save(rule, msg, *, reply='', task_now=False, subject='') -> dict:
             to = customer_email(order) if order is not None else ''
             if reply.strip() and to and not task_blocked(msg, check_age=False):
                 draft, _ = _customer_mail(msg, to, cc_list(rule), subject or f'Order {order.order_number}',
-                                          reply.strip()[:REPLY_MAX])
+                                          reply.strip()[:REPLY_MAX], options=send_options(rule))
                 AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.DRAFTED, reply=reply.strip(),
                                         draft=draft, order=order, finished_at=timezone.now(),
                                         reason=f'клієнту {to} · з вікна «🤖 Доручити агенту»')
             return {'rule': rule, 'draft': draft, 'task': None}
         if reply.strip() and not blocked(rule, msg, check_age=False):
-            draft = make_draft(msg, reply.strip()[:REPLY_MAX], cc_list(rule))
+            draft = make_draft(msg, reply.strip()[:REPLY_MAX], cc_list(rule), send_options(rule))
             AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.DRAFTED, reply=reply.strip(),
                                     draft=draft, reason='з вікна «🤖 Доручити агенту»', finished_at=timezone.now())
     return {'rule': rule, 'draft': draft, 'task': task}

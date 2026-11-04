@@ -268,6 +268,8 @@ class EmailDraft(models.Model):
                                   help_text='Текст із форми листа разом із підписом і цитатою; порожньо — лише текст (AI)')
     # [{file, name, content_type, size}] — файл з комп'ютера в MEDIA; [{ref, name}] — документ Minerva (attachments.py)
     attachments = models.JSONField(default=list)
+    # ❗ / 📬 / ⏰ — галочки форми листа (email_assistant/followups.py stored): збережені з форми або з доручення агента
+    send_options = models.JSONField('Параметри листа', default=dict, blank=True)
     source     = models.CharField(max_length=20, choices=SOURCE_CHOICES, default=SOURCE_MANUAL,
                                   verbose_name='Звідки')
     updated_at = models.DateTimeField(auto_now=True)

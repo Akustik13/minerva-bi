@@ -78,6 +78,21 @@ class AgentRule(models.Model):
         '🔔 Одразу повідомити мене', default=False,
         help_text='«❗ Позначати такі листи»: щойно такий лист прийде — лист і Telegram власнику скриньки (тема, від '
                   'кого, початок тексту, примітка з «Що робити»).')
+    # ❗ / 📬 / ⏰ — як галочки форми «Написати» (email_assistant/followups.py): у чернетку й запланований лист агента
+    REMIND_DAYS = [(0, '— не нагадувати'), (1, '1 день'), (2, '2 дні'), (3, '3 дні'), (5, '5 днів'), (7, '7 днів'),
+                   (14, '14 днів')]
+    REMIND_UNTIL = [('reaction', 'немає ні підтвердження прочитання, ні відповіді'), ('reply', 'немає відповіді')]
+    opt_important = models.BooleanField(
+        '❗ Важливо', default=False,
+        help_text='Листи агента (відповідь, клієнту замовлення, пересилання) — з позначкою «важливо» для отримувача.')
+    opt_receipt = models.BooleanField(
+        '📬 Запит на прочитання', default=False,
+        help_text='Листи агента просять підтвердження прочитання; коли воно прийде — «📬 прочитано» біля листа.')
+    remind_days = models.PositiveSmallIntegerField(
+        '⏰ Нагадати, якщо немає реакції через', default=0, choices=REMIND_DAYS,
+        help_text='Немає реакції за стільки днів після відправки — лист і Telegram вам: потрібне ручне втручання. '
+                  'Як «⏰ Нагадати, якщо немає реакції» у «Написати».')
+    remind_until = models.CharField('Нагадати, якщо', max_length=10, choices=REMIND_UNTIL, default='reaction')
     send_delay_minutes = models.PositiveSmallIntegerField(
         'Надсилати через, хв', default=15,
         help_text='Режим «Надсилати самому»: лист стає в «⏳ Заплановані», до відправки можна скасувати.')

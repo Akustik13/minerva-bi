@@ -9,6 +9,7 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 
+from email_assistant.followups import DAYS as _FU_DAYS, DEFAULT_DAYS as _FU_DEFAULT_DAYS, stored as _fu_stored
 from email_assistant.importance import folder_q as _imp_folder_q
 from email_assistant.sync import set_read
 
@@ -1226,7 +1227,8 @@ def compose_view(request):
             raise Http404('Чернетку не знайдено')
         reply_to = draft.reply_to if draft.reply_to and draft.reply_to.account_id == account.pk else None
         initial = {'to': ', '.join(draft.to_emails or []), 'cc': ', '.join(draft.cc_emails or []),
-                   'subject': draft.subject, 'att_refs': _drafts.chips(draft)}
+                   'subject': draft.subject, 'att_refs': _drafts.chips(draft),
+                   'opts': dict(draft.send_options or {})}   # ❗ / 📬 / ⏰ з чернетки (і з доручення агента)
         if draft.body_html:   # збережено з форми листа — разом із підписом і цитатою
             initial['draft_html'] = _sanitize_quote_html(draft.body_html)
         else:                 # AI-чернетка (автовідповідь, нове замовлення) — лише текст; підпис і цитата — як завжди
@@ -1301,6 +1303,8 @@ def compose_view(request):
         'draft':        draft,
         'reply_to':     reply_to,
         'initial':      initial,
+        'remind_choices': _FU_DAYS,
+        'remind_sel':   (initial.get('opts') or {}).get('remind_days') or _FU_DEFAULT_DAYS,
         'signature':    sig,
         'crm_contacts': _crm_contacts(request.user),   # json_script у шаблоні — ім'я з CRM не «вийде» зі <script>
     }))
@@ -1504,7 +1508,7 @@ def draft_save_view(request):
             subject=request.POST.get('subject', ''), body=request.POST.get('body', ''),
             body_html=request.POST.get('body_html', '').strip(), reply_to=_form_reply_to(request, account),
             refs=request.POST.getlist('att_ref'), names=request.POST.getlist('att_ref_name'),
-            files=request.FILES.getlist('attachments'))
+            files=request.FILES.getlist('attachments'), options=_fu_stored(request.POST))
     except ValueError as e:
         return JsonResponse({'ok': False, 'error': str(e)})
     return JsonResponse({'ok': True, 'draft_pk': draft.pk, 'attachments': _drafts.chips(draft),
