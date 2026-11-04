@@ -2911,6 +2911,7 @@
 {"uk": "«📈 Ціни й продажі» вгорі картки товару (inventory/admin_report.card_context → product_report.build(tables=False)).", "en": "“📈 Prices and sales” at the top of the product card (inventory/admin_report.card_context → product_report.build(tables=False)).", "de": "„📈 Preise und Verkäufe“ oben in der Artikelkarte (inventory/admin_report.card_context → product_report.build(tables=False))."}
 {"uk": "«📈 Ціни й продажі» вгорі картки товару (inventory/admin_report.card_context → product_report.build(tables=False)). Згорнуто / розгорнуто — localStorage prw-open; графіки малюються при першому розгортанні.", "en": "“📈 Prices and sales” at the top of the product card (inventory/admin_report.card_context → product_report.build(tables=False)). Collapsed / expanded — localStorage prw-open; charts are drawn on first expansion.", "de": "„📈 Preise und Verkäufe“ oben in der Artikelkarte (inventory/admin_report.card_context → product_report.build(tables=False)). Eingeklappt / ausgeklappt — localStorage prw-open; Diagramme werden beim ersten Aufklappen gezeichnet."}
 {"uk": "«📜 Історія» листа (лише Minerva)", "en": "“📜 History” of the e-mail (Minerva only)", "de": "„📜 Historie“ der E-Mail (nur Minerva)"}
+{"uk": "«📤 Пересилати такі листи»: адреси по одній у рядку (або через кому). Над пересланим листом — текст з «Що робити», вкладення — усі (без логотипів підпису).", "en": "«📤 Forward such emails»: addresses one per line (or comma-separated). Above the forwarded email — the text from «What to do», attachments — all (without signature logos).", "de": "«📤 Solche E-Mails weiterleiten»: Adressen eine pro Zeile (oder mit Komma). Über der weitergeleiteten E-Mail — der Text aus «Was tun», Anhänge — alle (ohne Signatur-Logos)."}
 {"uk": "«📤 Файли з ПК» у картці джерела-папки: вибір файлів / папки на ПК (телефоні) або перетягування; JS — change_form.html.", "en": "“📤 Files from PC” on the folder-source card: choosing files / a folder on the PC (phone) or drag and drop; JS — change_form.html.", "de": "„📤 Dateien vom PC“ in der Karte der Ordnerquelle: Auswahl von Dateien / Ordner am PC (Telefon) oder Drag-and-drop; JS – change_form.html."}
 {"uk": "«📤 Файли з ПК» у картці джерела-папки: вибір файлів / папки на ПК (телефоні) або перетягування; JS — change_form.html. new — сторінка «Додати»: вибране чекає «Зберегти» (джерело створюється, потім файли завантажуються в нього)", "en": "“📤 Files from PC” on the folder-source card: choosing files / a folder on the PC (phone) or drag and drop; JS — change_form.html. new — the “Add” page: the selection waits for “Save” (the source is created, then the files are uploaded to it)", "de": "„📤 Dateien vom PC“ in der Karte der Ordnerquelle: Auswahl von Dateien / Ordner am PC (Telefon) oder Drag-and-drop; JS – change_form.html. new – Seite „Hinzufügen“: Die Auswahl wartet auf „Speichern“ (die Quelle wird erstellt, danach werden die Dateien hineingeladen)"}
 {"uk": "«📦 Створити Offer» — товар затверджено, можна виставляти", "en": "“📦 Create Offer” — the product is approved, you can list it", "de": "„📦 Offer erstellen“ — Artikel freigegeben, kann eingestellt werden"}
@@ -4376,6 +4377,8 @@
 {"uk": "Вкажіть шлях до файлу бекапу.", "en": "Specify the path to the backup file.", "de": "Geben Sie den Pfad zur Sicherungsdatei an."}
 {"uk": "Вкажіть і «з», і «по» — або лише тривалість.", "en": "Specify both “from” and “to” — or just a duration.", "de": "Geben Sie sowohl „von“ als auch „bis“ an — oder nur eine Dauer."}
 {"uk": "Вкажіть, кому надсилати, або увімкніть «Кожному працівнику».", "en": "Specify the recipients or enable “To each employee”.", "de": "Geben Sie die Empfänger an oder aktivieren Sie „An jeden Mitarbeiter“."}
+{"uk": "Вкажіть, кому пересилати — адресу в «Кому переслати»", "en": "Say who to forward to — an address in «Forward to»", "de": "Geben Sie an, an wen weitergeleitet wird — Adresse in «Weiterleiten an»"}
+{"uk": "Вкажіть, кому пересилати.", "en": "Say who to forward to.", "de": "Geben Sie an, an wen weitergeleitet wird."}
 {"uk": "Вказати у кожну коробку яка кількість кожного товару.", "en": "Specify what quantity of each product goes into each box.", "de": "Geben Sie an, welche Menge jedes Artikels in jeden Karton kommt."}
 {"uk": "Вказати шлях вручну…", "en": "Enter path manually…", "de": "Pfad manuell angeben…"}
 {"uk": "Вкладення", "en": "Attachments", "de": "Anhänge"}
@@ -7442,6 +7445,7 @@
 {"uk": "Кому в Telegram", "en": "Telegram recipient", "de": "Telegram-Empfänger"}
 {"uk": "Кому й звідки", "en": "To whom and from where", "de": "An wen und von wo"}
 {"uk": "Кому надсилати? Впишіть адресу або виберіть Telegram.", "en": "Who should it be sent to? Enter an address or choose Telegram.", "de": "An wen soll gesendet werden? Geben Sie eine Adresse ein oder wählen Sie Telegram."}
+{"uk": "Кому переслати", "en": "Forward to", "de": "Weiterleiten an"}
 {"uk": "Кому переслати весь чат цієї теми? Адреси через кому", "en": "Forward the whole chat of this topic to whom? Addresses separated by commas", "de": "An wen den ganzen Chat dieses Themas weiterleiten? Adressen durch Komma getrennt"}
 {"uk": "Кому переслати чат замовлення (усі теми)? Адреси через кому", "en": "Forward the order chat (all topics) to whom? Addresses separated by commas", "de": "An wen den Auftragschat (alle Themen) weiterleiten? Adressen durch Komma getrennt"}
 {"uk": "Кому пишемо (для AI)", "en": "Who we are writing to (for AI)", "de": "An wen wir schreiben (für die KI)"}
@@ -7788,6 +7792,7 @@
 {"uk": "Лист, що підходить до кількох, — у кожній; основна (за нею час askDANTE) — перша за порядком.", "en": "An email that fits several is in each of them; the primary one (askDANTE time is counted for it) is the first in order.", "de": "Eine E-Mail, die zu mehreren passt, ist in jeder davon; die Hauptkategorie (danach wird die askDANTE-Zeit gerechnet) ist die erste in der Reihenfolge."}
 {"uk": "Лист-нагадування", "en": "Reminder email", "de": "Erinnerungs-E-Mail"}
 {"uk": "Лист: відповідь або клієнту замовлення", "en": "Email: reply or to the order's customer", "de": "E-Mail: Antwort oder an den Kunden des Auftrags"}
+{"uk": "Лист: відповідь, клієнту замовлення або пересилання", "en": "Email: reply, to the order's customer or forward", "de": "E-Mail: Antwort, an den Kunden des Auftrags oder Weiterleitung"}
 {"uk": "Лист: склади його інструментом compose_email; юзер відкриє його в пошті кнопкою «✉️ Відкрити в пошті» під", "en": "E-mail: compose it with the compose_email tool; the user will open it in the mail with the “✉️ Open in mail” button under", "de": "E-Mail: Verfasse sie mit dem Werkzeug compose_email; der Benutzer öffnet sie im Postfach über die Schaltfläche „✉️ Im Postfach öffnen“ unter"}
 {"uk": "Листи", "en": "E-mails", "de": "E-Mails"}
 {"uk": "Листи {0}–{1} розкладаються у фоні — далі виберіть їм проєкт askDANTE.", "en": "E-mails {0}–{1} are being sorted in the background — then choose an askDANTE project for them.", "de": "Die E-Mails {0}–{1} werden im Hintergrund einsortiert – wählen Sie anschließend ein askDANTE-Projekt dafür."}
@@ -10322,11 +10327,14 @@
 {"uk": "Перерахунок перервано ({0})", "en": "Recalculation interrupted ({0})", "de": "Neuberechnung abgebrochen ({0})"}
 {"uk": "Перерахунок уже йде — дочекайтеся кінця (хід над списком).", "en": "A recalculation is already running — wait for it to finish (progress above the list).", "de": "Eine Neuberechnung läuft bereits — warten Sie auf das Ende (Fortschritt über der Liste)."}
 {"uk": "Переробки за місяць", "en": "Overtime for the month", "de": "Überstunden im Monat"}
+{"uk": "Пересилати такі листи (з вкладеннями, без AI)", "en": "Forward such emails (with attachments, no AI)", "de": "Solche E-Mails weiterleiten (mit Anhängen, ohne KI)"}
 {"uk": "Переслано", "en": "Forwarded", "de": "Weitergeleitet"}
 {"uk": "Переслано --- Від: {0} Кому: {1} {2}", "en": "Forwarded --- From: {0} To: {1} {2}", "de": "Weitergeleitet --- Von: {0} An: {1} {2}"}
 {"uk": "Переслано від {0} / Кому: {1}", "en": "Forwarded from {0} / To: {1}", "de": "Weitergeleitet von {0} / An: {1}"}
 {"uk": "Переслано колегою: лист від {0}", "en": "Forwarded by a colleague: email from {0}", "de": "Von einem Kollegen weitergeleitet: E-Mail von {0}"}
 {"uk": "Переслано — оригінал від: {0}", "en": "Forwarded — original from: {0}", "de": "Weitergeleitet — Original von: {0}"}
+{"uk": "Переслати", "en": "Forward", "de": "Weiterleiten"}
+{"uk": "Переслати з усіма вкладеннями (без логотипів підпису); текст з «Що робити» — над пересланим листом. Без AI.", "en": "Forward with all attachments (without signature logos); the text from «What to do» goes above the forwarded email. No AI.", "de": "Mit allen Anhängen weiterleiten (ohne Signatur-Logos); der Text aus «Was tun» steht über der weitergeleiteten E-Mail. Ohne KI."}
 {"uk": "Перестворити відправлення", "en": "Recreate shipment", "de": "Sendung neu anlegen"}
 {"uk": "Перехід «{0}» → «{1}» неможливий.", "en": "Transition “{0}” → “{1}” is not possible.", "de": "Der Übergang „{0}“ → „{1}“ ist nicht möglich."}
 {"uk": "Перехід до next_step_yes/no", "en": "Moves to next_step_yes/no", "de": "Wechselt zu next_step_yes/no"}
@@ -13111,6 +13119,7 @@
 {"uk": "Текст листа містить", "en": "E-mail text contains", "de": "E-Mail-Text enthält"}
 {"uk": "Текст листа порожній", "en": "The email text is empty", "de": "Der E-Mail-Text ist leer"}
 {"uk": "Текст листа...", "en": "E-mail text...", "de": "E-Mail-Text..."}
+{"uk": "Текст над пересланим листом, напр.: Сергію, прошу оплатити рахунок. Дякую!", "en": "Text above the forwarded email, e.g.: Sergey, please pay the invoice. Thanks!", "de": "Text über der weitergeleiteten E-Mail, z. B.: Sergey, bitte die Rechnung bezahlen. Danke!"}
 {"uk": "Текст нотатки...", "en": "Note text...", "de": "Notiztext..."}
 {"uk": "Текст повідомлення…", "en": "Message text…", "de": "Nachrichtentext…"}
 {"uk": "Текст порожній", "en": "The text is empty", "de": "Der Text ist leer"}
@@ -14057,6 +14066,7 @@
 {"uk": "Цей календар уже підключено — оновлено.", "en": "This calendar is already connected — updated.", "de": "Dieser Kalender ist bereits verbunden — aktualisiert."}
 {"uk": "Цей ключ не дозволено використовувати з адреси {0}.", "en": "This key may not be used from address {0}.", "de": "Dieser Schlüssel darf nicht von der Adresse {0} aus verwendet werden."}
 {"uk": "Цей контейнер не має доступу до Docker.", "en": "This container has no access to Docker.", "de": "Dieser Container hat keinen Zugriff auf Docker."}
+{"uk": "Цей лист агент не пересилав би", "en": "The agent would not forward this email", "de": "Diese E-Mail würde der Agent nicht weiterleiten"}
 {"uk": "Цей лист є кроком CRM стратегії: \"{0}\".", "en": "This email is a step of the CRM strategy: \"{0}\".", "de": "Diese E-Mail ist ein Schritt der CRM-Strategie: \"{0}\"."}
 {"uk": "Цей модуль вимкнено в налаштуваннях системи або у вас немає доступу до нього.", "en": "This module is disabled in the system settings, or you do not have access to it.", "de": "Dieses Modul ist in den Systemeinstellungen deaktiviert, oder Sie haben keinen Zugriff darauf."}
 {"uk": "Цей пароль буде встановлено для користувача і вказано в листі.", "en": "This password will be set for the user and stated in the email.", "de": "Dieses Passwort wird für den Benutzer festgelegt und in der E-Mail angegeben."}
@@ -14884,6 +14894,7 @@
 {"uk": "адреси {0} немає в тексті завдання", "en": "the address {0} is not in the task text", "de": "die Adresse {0} steht nicht im Aufgabentext"}
 {"uk": "адреси {0} немає в тексті завдання — лист можна лише на адреси, які написала людина", "en": "the address {0} is not in the task text — an e-mail can only go to addresses the person wrote", "de": "die Adresse {0} steht nicht im Aufgabentext – eine E-Mail geht nur an Adressen, die die Person angegeben hat"}
 {"uk": "адреси немає", "en": "no address", "de": "keine Adresse"}
+{"uk": "адреси через кому", "en": "addresses separated by commas", "de": "Adressen mit Komma"}
 {"uk": "адреси через кому; у копію кожного листа агента", "en": "addresses separated by commas; CC of every agent email", "de": "Adressen mit Komma; in CC jeder Agent-E-Mail"}
 {"uk": "адреси. Нічого не відкривається й не виконується від імені людини. «✏️ Змінити доступ» (core/access_editor.py)", "en": "address check. Nothing is opened or executed on behalf of the person. “✏️ Change access” (core/access_editor.py)", "de": "Adressprüfung. Im Namen der Person wird nichts geöffnet oder ausgeführt. „✏️ Zugriff ändern“ (core/access_editor.py)"}
 {"uk": "адресна книга", "en": "address book", "de": "Adressbuch"}
@@ -15170,6 +15181,7 @@
 {"uk": "вкладення не індексуються (налаштування «🧠 База знань»)", "en": "attachments are not indexed (“🧠 Knowledge base” settings)", "de": "Anhänge werden nicht indexiert (Einstellung „🧠 Wissensdatenbank“)"}
 {"uk": "вкладення нового листа знайдено", "en": "attachment of the new e-mail found", "de": "Anhang der neuen E-Mail gefunden"}
 {"uk": "вкладення: {0}", "en": "attachments: {0}", "de": "Anhänge: {0}"}
+{"uk": "вкладень: {0}", "en": "attachments: {0}", "de": "Anhänge: {0}"}
 {"uk": "включно з кошиком (запрошення часто видаляють, коли Outlook уже заніс їх у календар)", "en": "including trash (invitations are often deleted once Outlook has already added them to the calendar)", "de": "einschließlich Papierkorb (Einladungen werden oft gelöscht, wenn Outlook sie bereits in den Kalender eingetragen hat)"}
 {"uk": "власний (завантажений)", "en": "custom (uploaded)", "de": "eigene (hochgeladen)"}
 {"uk": "власник {0} → {1}", "en": "owner {0} → {1}", "de": "Eigentümer {0} → {1}"}
@@ -16829,11 +16841,15 @@
 {"uk": "перенести в askDANTE", "en": "transfer to askDANTE", "de": "in askDANTE übertragen"}
 {"uk": "перенести сюди", "en": "move here", "de": "hierher verschieben"}
 {"uk": "перервано ({0})", "en": "interrupted ({0})", "de": "abgebrochen ({0})"}
+{"uk": "пересилання готове", "en": "forward is ready", "de": "Weiterleitung ist bereit"}
 {"uk": "переслав {0}", "en": "forwarded by {0}", "de": "weitergeleitet von {0}"}
 {"uk": "переслано від {0}", "en": "forwarded from {0}", "de": "weitergeleitet von {0}"}
 {"uk": "переслано від {0} — це {1}, а не клієнт чи новий контакт", "en": "forwarded from {0} — this is {1}, not a customer or new contact", "de": "weitergeleitet von {0} — das ist {1}, kein Kunde oder neuer Kontakt"}
 {"uk": "переслано лише зі своїх адрес ({0}) — листа ззовні всередині не знайдено", "en": "forwarded only from your own addresses ({0}) — no external e-mail found inside", "de": "nur von eigenen Adressen weitergeleitet ({0}) — keine externe E-Mail darin gefunden"}
 {"uk": "переслано: лист від {0}", "en": "forwarded: email from {0}", "de": "weitergeleitet: E-Mail von {0}"}
+{"uk": "переслати {0}", "en": "forward to {0}", "de": "weiterleiten an {0}"}
+{"uk": "переслати {0} · з вікна «🤖 Доручити агенту»", "en": "forward to {0} · from the «🤖 Instruct the agent» window", "de": "weiterleiten an {0} · aus dem Fenster «🤖 Agent beauftragen»"}
+{"uk": "переслати · {0}", "en": "forward · {0}", "de": "weiterleiten · {0}"}
 {"uk": "перестануть відображатися в цій категорії.", "en": "will no longer be shown in this category.", "de": "werden nicht mehr in dieser Kategorie angezeigt."}
 {"uk": "перестануть відображатися під цим джерелом.", "en": "will stop being shown under this source.", "de": "nicht mehr unter dieser Quelle angezeigt."}
 {"uk": "переходимо на Дзвінок.", "en": "we move on to the Call.", "de": "wir gehen zum Anruf über."}
@@ -17709,6 +17725,7 @@
 {"uk": "у верхньому правому куті форми → готовий A4-документ.", "en": "in the top right corner of the form → a ready A4 document.", "de": "oben rechts im Formular → fertiges A4-Dokument."}
 {"uk": "у всій вашій пошті", "en": "in all your email", "de": "in Ihrer gesamten E-Mail"}
 {"uk": "у документі будуть вони, а не Minerva", "en": "the document will contain these, not Minerva's", "de": "im Dokument stehen diese, nicht die von Minerva"}
+{"uk": "у дорученні не вказано, кому пересилати", "en": "the instruction does not say who to forward to", "de": "im Auftrag steht nicht, an wen weitergeleitet wird"}
 {"uk": "у дорученні немає жодної умови", "en": "the rule has no conditions", "de": "die Regel enthält keine Bedingung"}
 {"uk": "у завдання немає листа", "en": "the task has no e-mail", "de": "die Aufgabe hat keine E-Mail"}
 {"uk": "у замовлення {0} вже є відправлення #{1} ({2}) — нове не потрібне", "en": "order {0} already has shipment #{1} ({2}) — a new one is not needed", "de": "Auftrag {0} hat bereits Sendung #{1} ({2}) – eine neue ist nicht nötig"}

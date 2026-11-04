@@ -1327,6 +1327,11 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     <div id="ag-reply-opts">
     <label>{% trans "Режим" %}</label>
     <select id="ag-mode"></select>
+    <div id="ag-forward-row" hidden>
+      <label>Кому переслати <span class="ag-muted">— адреси через кому</span></label>
+      <input type="text" id="ag-forward" placeholder="sergey@sevskiy.de">
+      <div class="ag-muted">Переслати з усіма вкладеннями (без логотипів підпису); текст з «Що робити» — над пересланим листом. Без AI.</div>
+    </div>
     <label>Копія (CC) <span class="ag-muted">— адреси через кому; у копію кожного листа агента</span></label>
     <input type="text" id="ag-cc" placeholder="sergey@sevskiy.de">
     <div class="ag-muted" id="ag-customer-note" hidden>Агент знайде в листі трек-номер замовлення Minerva і напише клієнту цього замовлення (адреса — із замовлення). Тому самому клієнту про те саме замовлення — не частіше ніж раз на 14 днів.</div>
@@ -4040,6 +4045,7 @@ async function emAgent(pk) {
   document.getElementById('ag-auto').checked = false;
   document.getElementById('ag-task-now').checked = true;
   document.getElementById('ag-cc').value = '';
+  document.getElementById('ag-forward').value = '';
   var cat = document.getElementById('ag-cat');
   cat.length = 1;
   (d.categories || []).forEach(function (c) { cat.add(new Option(c.name, c.id)); });
@@ -4065,8 +4071,10 @@ async function emAgent(pk) {
 // ✉️ відповідь / 🧩 завдання агенту з кожного такого листа (agent/mail.py process_task)
 function agKind() {
   var kind = document.getElementById('ag-kind').value, task = kind === 'mail_task', cust = kind === 'mail_customer';
+  var fwd = kind === 'mail_forward';
   document.getElementById('ag-reply-opts').hidden = task;
   document.getElementById('ag-customer-note').hidden = !cust;
+  document.getElementById('ag-forward-row').hidden = !fwd;
   document.getElementById('ag-task-opts').hidden = !task;
   document.getElementById('ag-try').hidden = task;
   if (task) document.getElementById('ag-result').hidden = true;
@@ -4074,15 +4082,16 @@ function agKind() {
   instr.placeholder = task
     ? 'Напр.: Знайди в листі номер замовлення DigiKey і трек-номер UPS і внеси трек-номер у це замовлення.'
     : cust ? 'Напр.: UPS пише, що клієнт не оплатив мито / брокерський збір. Ввічливо попроси клієнта оплатити їх у місцевому офісі UPS до вказаної в листі дати; назви суму й трек-номер з листа.'
+    : fwd ? 'Текст над пересланим листом, напр.: Сергію, прошу оплатити рахунок. Дякую!'
     : 'Напр.: Подякуй за документ і підтверди, що отримали. Якщо питають про строк відправки — візьми його із замовлення. Пиши коротко, мовою листа. Якщо просять знижку — не відповідай.';
   var name = document.getElementById('ag-name');
-  if (_ag && _ag.namePhrase && /^(Відповідь|Завдання|Клієнту): /.test(name.value)) {
-    name.value = (task ? 'Завдання: ' : cust ? 'Клієнту: ' : 'Відповідь: ') + _ag.namePhrase;
+  if (_ag && _ag.namePhrase && /^(Відповідь|Завдання|Клієнту|Переслати): /.test(name.value)) {
+    name.value = (task ? 'Завдання: ' : cust ? 'Клієнту: ' : fwd ? 'Переслати: ' : 'Відповідь: ') + _ag.namePhrase;
   }
-  var why = (task || cust) ? (_ag && _ag.blockedTask) : (_ag && _ag.blocked);
+  var why = (task || cust || fwd) ? (_ag && _ag.blockedTask) : (_ag && _ag.blocked);
   var warn = document.getElementById('ag-warn');
   warn.hidden = !why;
-  warn.textContent = why ? (task ? '⚠️ З цього листа завдання не буде: ' : cust ? '⚠️ З цього листа агент не писав би клієнту: ' : '⚠️ {% trans "На цей лист агент не відповідав би" %}: ') + why : '';
+  warn.textContent = why ? (task ? '⚠️ З цього листа завдання не буде: ' : cust ? '⚠️ З цього листа агент не писав би клієнту: ' : fwd ? '⚠️ Цей лист агент не пересилав би: ' : '⚠️ {% trans "На цей лист агент не відповідав би" %}: ') + why : '';
 }
 function agDomain() {
   if (_ag && _ag.domain) document.getElementById('ag-senders').value = _ag.domain;
@@ -4093,7 +4102,8 @@ function agData() {
     subject_words: document.getElementById('ag-subject').value, body_words: document.getElementById('ag-body').value,
     category: document.getElementById('ag-cat').value, instruction: document.getElementById('ag-instr').value,
     mode: document.getElementById('ag-mode').value, kind: document.getElementById('ag-kind').value,
-    auto_apply: document.getElementById('ag-auto').checked, cc: document.getElementById('ag-cc').value
+    auto_apply: document.getElementById('ag-auto').checked, cc: document.getElementById('ag-cc').value,
+    forward_to: document.getElementById('ag-forward').value
   };
 }
 async function agPost(url, data) {
@@ -4118,7 +4128,8 @@ async function agTry() {
     else {
       reply.textContent = (d.to ? 'Кому: ' + (d.to_name ? d.to_name + ' <' + d.to + '>' : d.to)
                                   + (d.cc && d.cc.length ? ' · Копія: ' + d.cc.join(', ') : '')
-                           + (d.order ? ' · замовлення ' + d.order : '') + '\nТема: ' + (d.subject || '') + '\n\n' : '')
+                           + (d.order ? ' · замовлення ' + d.order : '') + '\nТема: ' + (d.subject || '')
+                           + (d.attachments ? '\nВкладення: ' + (d.attachments.join(', ') || 'немає') : '') + '\n\n' : '')
                           + (d.reply || '');
       _ag.reply = d.reply || '';
       _ag.subject = d.subject || '';

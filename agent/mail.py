@@ -132,7 +132,7 @@ def task_blocked(msg, *, check_age=True) -> str:
 
 
 def why_not(rule, msg, *, check_age=True) -> str:
-    return task_blocked(msg, check_age=check_age) if rule.kind in (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER) \
+    return task_blocked(msg, check_age=check_age) if rule.kind in (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER, AgentRule.MAIL_FORWARD) \
         else blocked(rule, msg, check_age=check_age)
 
 
@@ -553,6 +553,87 @@ def process_customer(run):
                 reply=body, model=result.get('model', ''), draft=draft, scheduled=scheduled, order=order)
 
 
+# ── 📤 Пересилати такі листи (без AI) ────────────────────────────────────────────
+
+LOGO_MAX = 20 * 1024        # картинки, менші за це, — логотипи підпису, не пересилаються
+
+
+def forward_list(rule) -> list:
+    return list(dict.fromkeys(e.lower() for e in EMAIL_RE.findall(rule.forward_to or '')))[:10]
+
+
+def forward_attachments(msg) -> list:
+    """Вкладення листа для пересилання ({ref, name}): без вбудованих у текст і дрібних картинок (логотипи)."""
+    out = []
+    for i, att in enumerate(msg.attachments or []):
+        if not isinstance(att, dict) or att.get('is_inline'):
+            continue
+        ctype = str(att.get('content_type') or '').lower()
+        if ctype.startswith('image/') and (att.get('size') or 0) < LOGO_MAX:
+            continue
+        out.append({'ref': f'msg:{msg.pk}:{i}', 'name': att.get('name') or 'attachment'})
+    return out
+
+
+def forward_subject(msg) -> str:
+    subject = (msg.subject or '').strip()
+    return subject if re.match(r'\s*(wg|fw|fwd)\s*:', subject, re.IGNORECASE) else f'WG: {subject}'
+
+
+def forward_body(rule, msg) -> str:
+    """Текст з «Що робити» + пересланий лист (заголовки й текст; з HTML — якщо в text/plain лише підпис)."""
+    when = timezone.localtime(msg.sent_at).strftime('%d.%m.%Y %H:%M') if msg.sent_at else ''
+    original = _mail_text(msg).split('\n\n', 1)[-1].strip()
+    head = '\n'.join(x for x in (
+        '---------- Weitergeleitete Nachricht / Forwarded message ----------',
+        f'Von: {msg.from_name} <{msg.from_email}>' if msg.from_name else f'Von: {msg.from_email}',
+        f'Datum: {when}' if when else '',
+        f'Betreff: {msg.subject or ""}',
+        f'An: {", ".join(msg.to_emails or [])}' if msg.to_emails else '',
+    ) if x)
+    return f'{(rule.instruction or "").strip()}\n\n{head}\n\n{original}'.strip()
+
+
+def forward_preview(rule, msg) -> dict:
+    """Що буде переслано (для «🧪 Спробувати»): без AI, нічого не зберігає."""
+    return {'to': ', '.join(forward_list(rule)), 'cc': cc_list(rule), 'subject': forward_subject(msg),
+            'attachments': [a['name'] for a in forward_attachments(msg)], 'reply': forward_body(rule, msg),
+            'skip': False, 'confident': True, 'doubts': ''}
+
+
+def make_forward(rule, msg, *, send=False):
+    from email_assistant.models import EmailDraft, ScheduledEmail
+    fields = dict(account=msg.account, subject=forward_subject(msg)[:500], to_emails=forward_list(rule),
+                  cc_emails=cc_list(rule), body=forward_body(rule, msg), attachments=forward_attachments(msg))
+    if send:
+        return None, ScheduledEmail.objects.create(
+            **fields, trigger='agent',
+            scheduled_at=timezone.now() + datetime.timedelta(minutes=rule.send_delay_minutes))
+    return EmailDraft.objects.create(**fields, source=EmailDraft.SOURCE_AUTO_REPLY), None
+
+
+def process_forward(run):
+    """Лист, що підійшов під умови, → переслати з вкладеннями на «Кому переслати» з текстом «Що робити»: чернетка
+    або, якщо дозволено, запланований лист. Без AI."""
+    rule, msg = run.rule, run.message
+    why = task_blocked(msg)
+    if why:
+        return _finish(run, AgentRun.SKIPPED, why)
+    to = forward_list(rule)
+    if not to:
+        return _finish(run, AgentRun.FAILED, 'у дорученні не вказано, кому пересилати')
+    send = risk.allowed(rule, 'mail.send')
+    note = ''
+    if send and _sent_today(rule) >= rule.daily_limit:
+        send, note = False, f' · ліміт {rule.daily_limit} листів на день — лише чернетка'
+    files = forward_attachments(msg)
+    with transaction.atomic():
+        draft, scheduled = make_forward(rule, msg, send=send)
+        _finish(run, AgentRun.SCHEDULED if send else AgentRun.DRAFTED,
+                f'переслати {", ".join(to)}' + (f' · вкладень: {len(files)}' if files else '') + note,
+                draft=draft, scheduled=scheduled)
+
+
 AUTO_FIELDS = ('tracking', 'courier')
 
 
@@ -587,9 +668,11 @@ def process(run):
     доручення «🧩 Завдання агенту» — завдання з листа (`process_task`)."""
     from email_assistant.models import ScheduledEmail
     rule, msg = run.rule, run.message
-    if rule.kind in (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER):
+    if rule.kind in (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER, AgentRule.MAIL_FORWARD):
+        handler = {AgentRule.MAIL_TASK: process_task, AgentRule.MAIL_CUSTOMER: process_customer,
+                   AgentRule.MAIL_FORWARD: process_forward}[rule.kind]
         try:
-            return process_task(run) if rule.kind == AgentRule.MAIL_TASK else process_customer(run)
+            return handler(run)
         except Exception as e:  # noqa: BLE001 — одна помилка не зупиняє чергу
             logger.exception('agent run %s: %s', run.pk, e)
             return _finish(run, AgentRun.FAILED, f'Помилка: {type(e).__name__}')
@@ -696,8 +779,12 @@ def rule_from(data, msg, user=None) -> AgentRule:
                      instruction=text('instruction', 8000), example_message=msg, created_by=user)
     rule.mode = AgentRule.SEND if data.get('mode') == AgentRule.SEND else AgentRule.DRAFT
     kind = str(data.get('kind') or '')
-    rule.kind = kind if kind in (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER) else AgentRule.MAIL_REPLY
+    rule.kind = kind if kind in (AgentRule.MAIL_TASK, AgentRule.MAIL_CUSTOMER, AgentRule.MAIL_FORWARD) \
+        else AgentRule.MAIL_REPLY
     rule.cc = text('cc', 1000)
+    rule.forward_to = text('forward_to', 1000)
+    if rule.kind == AgentRule.MAIL_FORWARD and not forward_list(rule):
+        raise ValueError('Вкажіть, кому пересилати — адресу в «Кому переслати»')
     rule.auto_apply = rule.kind == AgentRule.MAIL_TASK and bool(data.get('auto_apply'))
     cat = str(data.get('category') or '')
     if cat.isdigit():
@@ -719,6 +806,8 @@ def try_on(rule, msg) -> dict:
     """«🧪 Спробувати на цьому листі»: нічого не зберігає й не надсилає."""
     ok, why = matches(rule, msg)
     out = {'matches': ok, 'why': why, 'blocked': why_not(rule, msg, check_age=False)}
+    if rule.kind == AgentRule.MAIL_FORWARD:
+        return {**out, **forward_preview(rule, msg)}
     if rule.kind == AgentRule.MAIL_CUSTOMER:
         order, tracking, reason = order_for(msg)
         if order is None:
@@ -747,6 +836,13 @@ def save(rule, msg, *, reply='', task_now=False, subject='') -> dict:
                 AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.TASKED, task=task,
                                         reason='з вікна «🤖 Доручити агенту»', finished_at=timezone.now())
             return {'rule': rule, 'draft': None, 'task': task}
+        if rule.kind == AgentRule.MAIL_FORWARD:
+            if reply.strip() and forward_list(rule) and not task_blocked(msg, check_age=False):
+                draft, _ = make_forward(rule, msg)
+                AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.DRAFTED, draft=draft,
+                                        finished_at=timezone.now(), reason=f'переслати {", ".join(forward_list(rule))} '
+                                                                           f'· з вікна «🤖 Доручити агенту»')
+            return {'rule': rule, 'draft': draft, 'task': None}
         if rule.kind == AgentRule.MAIL_CUSTOMER:
             order, _tracking, _why = order_for(msg)
             to = customer_email(order) if order is not None else ''

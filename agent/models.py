@@ -20,9 +20,10 @@ class AgentRule(models.Model):
     (чернетка або, якщо дозволено, надіслати самому); mail_task — 🧩 завдання агенту з кожного такого листа
     (трек-номер у замовлення, закупівля з листа постачальника …): пропозиції застосовуєте ви ✓, а з auto_apply
     трек-номер і кур’єра в порожнє поле замовлення та трек-номер посилки закупівлі агент вносить сам."""
-    MAIL_REPLY, MAIL_TASK, MAIL_CUSTOMER = 'mail_reply', 'mail_task', 'mail_customer'
+    MAIL_REPLY, MAIL_TASK, MAIL_CUSTOMER, MAIL_FORWARD = 'mail_reply', 'mail_task', 'mail_customer', 'mail_forward'
     KINDS = [(MAIL_REPLY, '✉️ Відповідати на такі листи'),
              (MAIL_CUSTOMER, '📨 Писати клієнту замовлення (трек-номер з листа)'),
+             (MAIL_FORWARD, '📤 Пересилати такі листи (з вкладеннями, без AI)'),
              (MAIL_TASK, '🧩 Завдання агенту з кожного такого листа')]
     DRAFT, SEND = 'draft', 'send'
     MODES = [(DRAFT, '📝 Лише чернетка — ви перевіряєте й надсилаєте'),
@@ -58,6 +59,10 @@ class AgentRule(models.Model):
     task_budget_usd = models.DecimalField('Найбільше на одне завдання, $', max_digits=6, decimal_places=2,
                                           default=0.5)
     mode = models.CharField('Режим', max_length=10, choices=MODES, default=DRAFT)
+    forward_to = models.TextField(
+        'Кому переслати', blank=True, default='',
+        help_text='«📤 Пересилати такі листи»: адреси по одній у рядку (або через кому). Над пересланим листом — '
+                  'текст з «Що робити», вкладення — усі (без логотипів підпису).')
     cc = models.TextField(
         'Копія (CC)', blank=True, default='',
         help_text='Адреси по одній у рядку (або через кому) — у копію кожного листа агента: відповіді й листа клієнту.')
