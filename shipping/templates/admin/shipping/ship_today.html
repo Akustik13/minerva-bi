@@ -1,0 +1,120 @@
+{% extends "admin/base_site.html" %}
+{# 📦 Відправка сьогодні — черга агента відправки (shipping/services/ship_advice.queue, ShipmentAdmin.ship_today_view) #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  &rsaquo; Відправка сьогодні
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="st-wrap">
+  <div class="st-head">
+    <div>
+      <h1>📦 Відправка сьогодні</h1>
+      <div class="st-muted">Агент відправки: що чекає на відправку, від найтерміновішого. Відкрийте замовлення —
+        агент перевірить його, запитає тарифи й порадить перевізника; після оформлення — друк, «Відправлено»,
+        лист клієнту й наступне.</div>
+    </div>
+    {% if q.first %}
+    <a class="st-btn main" href="{{ q.first.url }}">▶ Почати з <span translate="no">{{ q.first.order.order_number }}</span></a>
+    {% endif %}
+  </div>
+
+  {% if q.finish %}
+  <section class="st-sec">
+    <h2>🚚 Оформлено — завершіть <span class="st-count">{{ q.finish|length }}</span></h2>
+    <div class="st-muted">Відправлення вже є в перевізника, а замовлення ще не позначене «Відправлено»: друк,
+      «✅ Відправлено», лист клієнту — на сторінці відправлення.</div>
+    <table class="st-table">
+      <thead><tr><th>Замовлення</th><th>Клієнт</th><th>Перевізник</th><th>Стан</th><th></th></tr></thead>
+      <tbody>
+      {% for f in q.finish %}
+        <tr>
+          <td translate="no"><a href="{% url 'admin:sales_salesorder_change' f.order.pk %}">{{ f.order.order_number }}</a></td>
+          <td translate="no">{{ f.order.client|default:f.order.email }}</td>
+          <td><span translate="no">{{ f.shipment.carrier.name|default:"—" }}</span>{% if f.shipment.tracking_number %} · <code translate="no">{{ f.shipment.tracking_number }}</code>{% endif %}</td>
+          <td>{{ f.shipment.get_status_display }}</td>
+          <td class="st-act"><a class="st-btn" href="{{ f.url }}">➡️ Що далі</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  <section class="st-sec">
+    <h2>📦 Чекають відправки <span class="st-count">{{ q.total }}</span></h2>
+    {% if q.total > q.shown %}<div class="st-muted">Показано перші {{ q.shown }} — найтерміновіші.</div>{% endif %}
+    {% for gid, gtitle, rows in q.groups %}
+      <h3 class="st-group st-{{ gid }}">{{ gtitle }} <span class="st-count">{{ rows|length }}</span></h3>
+      <table class="st-table">
+        <thead><tr><th>Замовлення</th><th>Клієнт</th><th>Позиції</th><th>Строк</th><th>Агент</th><th></th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr{% if r.blocks %} class="st-blocked"{% endif %}>
+            <td><a href="{{ r.order_url }}" translate="no">{{ r.order.order_number }}</a>
+              <div class="st-muted" translate="no">{{ r.order.source }}</div></td>
+            <td><span translate="no">{{ r.order.client|default:r.order.email }}</span>
+              {% if r.country %}<div class="st-muted" translate="no">{{ r.country }}{% if r.order.shipping_courier %} · {{ r.order.shipping_courier }}{% endif %}</div>{% endif %}</td>
+            <td class="st-items" translate="no">{{ r.items }}</td>
+            <td>{% if r.order.shipping_deadline %}{{ r.order.shipping_deadline|date:"d.m.Y" }}
+              {% if r.late %}<div class="st-bad">прострочено на {{ r.late }} дн.</div>{% endif %}
+              {% else %}—{% endif %}</td>
+            <td class="st-agent">
+              {% for t in r.blocks %}<div class="st-bad">⛔ {{ t }}</div>{% endfor %}
+              {% for t in r.warns %}<div class="st-warn">⚠️ {{ t }}</div>{% endfor %}
+              {% if not r.blocks and not r.warns %}<div class="st-ok">✓ готове</div>{% endif %}
+              {% for w in r.wishes %}<div class="st-wish">📬 {{ w.label }}: {{ w.text }}</div>{% endfor %}
+              {% if r.mails and not r.wishes %}<div class="st-muted">📬 листів: {{ r.mails }}</div>{% endif %}
+            </td>
+            <td class="st-act">
+              {% if r.draft %}<a class="st-btn" href="{{ r.draft.url }}">✏️ Чернетка #{{ r.draft.pk }}</a>{% endif %}
+              {% if r.url and not r.blocks %}<a class="st-btn{% if not r.draft %} main{% endif %}" href="{{ r.url }}">🚚 Відправити</a>{% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% empty %}
+      <div class="st-ok st-empty">✓ Усе відправлено — замовлень, що чекають відправки, немає.</div>
+    {% endfor %}
+  </section>
+</div>
+<style>
+  .st-wrap { padding:20px 28px 60px; color:var(--text); }
+  .st-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; margin-bottom:18px; }
+  .st-head h1 { margin:0 0 6px; font-size:22px; }
+  .st-muted { color:var(--text-muted); font-size:12px; line-height:1.5; }
+  .st-sec { margin-bottom:26px; }
+  .st-sec h2 { font-size:16px; margin:0 0 6px; }
+  .st-group { font-size:14px; margin:16px 0 6px; }
+  .st-group.st-overdue { color:var(--err); }
+  .st-count { display:inline-block; min-width:20px; padding:0 7px; border-radius:10px; background:var(--bg-hover);
+              border:1px solid var(--border-strong); font-size:11px; text-align:center; color:var(--text); }
+  .st-table { width:100%; border-collapse:collapse; font-size:13px; background:var(--bg-card);
+              border:1px solid var(--border-strong); border-radius:8px; }
+  .st-table th { text-align:left; font-size:11px; color:var(--text-muted); font-weight:600; padding:7px 10px;
+                 border-bottom:1px solid var(--border-strong); }
+  .st-table td { padding:8px 10px; border-bottom:1px solid var(--border-strong); vertical-align:top; }
+  .st-table tr:last-child td { border-bottom:none; }
+  .st-blocked td { opacity:.7; }
+  .st-items { font-size:12px; max-width:260px; }
+  .st-agent { font-size:12px; line-height:1.45; max-width:360px; }
+  .st-bad { color:var(--err); font-weight:600; }
+  .st-warn { color:var(--warn); }
+  .st-ok { color:var(--ok, #2e7d32); font-weight:600; }
+  .st-wish { color:var(--text); }
+  .st-empty { padding:14px 0; }
+  .st-act { white-space:nowrap; text-align:right; }
+  .st-btn { display:inline-block; background:var(--bg-hover); border:1px solid var(--border-strong); color:var(--text);
+            border-radius:6px; padding:6px 12px; font-size:12px; text-decoration:none; margin-left:4px; }
+  .st-btn:hover { border-color:var(--link-fg); }
+  .st-btn.main { background:var(--link-fg); border-color:var(--link-fg); color:var(--bg-card); font-weight:700; }
+  @media (max-width:768px) { .st-wrap { padding:12px 16px 40px; } .st-table { display:block; overflow-x:auto; } }
+</style>
+{% endblock %}

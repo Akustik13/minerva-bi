@@ -803,33 +803,37 @@ def _word(term):
     return re.compile(r"(?<!\w)" + re.escape(term) + r"(?!\w)", re.IGNORECASE)
 
 
-def _mail_messages(o, request) -> list:
+def order_messages(o, user, limit=MAIL_MAX) -> list:
     """Власні листи замовлення: прив'язані в хронології CRM + з номером замовлення (від 5 символів) або
-    трек-номером (від 8) у темі — цілим словом, не раніше ніж за 30 днів до дати замовлення. Нові зверху."""
-    def load():
-        own = _own(request)
-        found = {m.pk: m for m in own.filter(crm_events__related_order_id=o.pk).distinct()
-                 .order_by("-sent_at", "-pk")[:MAIL_MAX]}
-        terms = []
-        number = (o.order_number or "").strip()
-        if len(number) >= SUBJECT_MIN:
-            terms.append(number)
-        tracking = {(o.tracking_number or "").strip()}
-        tracking |= {(t or "").strip() for t in o.shipments.exclude(tracking_number="")
-                     .values_list("tracking_number", flat=True)[:SHIPMENTS_MAX]}
-        terms += sorted(t for t in tracking if len(t) >= TRACKING_MIN and t not in terms)
-        since = o.order_date - timedelta(days=MAIL_DAYS_BEFORE) if o.order_date else None
-        for term in terms:
-            qs = own.filter(subject__icontains=term)
-            if since is not None:
-                qs = qs.filter(sent_at__date__gte=since)
-            rx = _word(term)
-            for m in qs.order_by("-sent_at", "-pk")[:20]:
-                if m.pk not in found and rx.search(m.subject or ""):
-                    found[m.pk] = m
-        return sorted(found.values(), key=lambda m: (m.sent_at.timestamp() if m.sent_at else float("-inf"), m.pk),
-                      reverse=True)[:MAIL_MAX]
-    return sp.memo(o, "sales:mail", load)
+    трек-номером (від 8) у темі — цілим словом, не раніше ніж за 30 днів до дати замовлення. Нові зверху.
+    Ним же — «📬 Побажання з пошти» агента відправки (shipping/services/ship_wishes.py)."""
+    from crm.views import _own_messages
+    own = _own_messages(user)
+    found = {m.pk: m for m in own.filter(crm_events__related_order_id=o.pk).distinct()
+             .order_by("-sent_at", "-pk")[:limit]}
+    terms = []
+    number = (o.order_number or "").strip()
+    if len(number) >= SUBJECT_MIN:
+        terms.append(number)
+    tracking = {(o.tracking_number or "").strip()}
+    tracking |= {(t or "").strip() for t in o.shipments.exclude(tracking_number="")
+                 .values_list("tracking_number", flat=True)[:SHIPMENTS_MAX]}
+    terms += sorted(t for t in tracking if len(t) >= TRACKING_MIN and t not in terms)
+    since = o.order_date - timedelta(days=MAIL_DAYS_BEFORE) if o.order_date else None
+    for term in terms:
+        qs = own.filter(subject__icontains=term)
+        if since is not None:
+            qs = qs.filter(sent_at__date__gte=since)
+        rx = _word(term)
+        for m in qs.order_by("-sent_at", "-pk")[:20]:
+            if m.pk not in found and rx.search(m.subject or ""):
+                found[m.pk] = m
+    return sorted(found.values(), key=lambda m: (m.sent_at.timestamp() if m.sent_at else float("-inf"), m.pk),
+                  reverse=True)[:limit]
+
+
+def _mail_messages(o, request) -> list:
+    return sp.memo(o, "sales:mail", lambda: order_messages(o, request.user))
 
 
 def _mail_html(m, request, number, inbox):

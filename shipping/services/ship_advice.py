@@ -297,6 +297,75 @@ def next_order(exclude=None):
     return qs.first(), qs.count()
 
 
+QUEUE_MAX = 100
+FINISH_DAYS = 60
+GROUPS = (('overdue', '⏰ Прострочено'), ('today', '📅 Сьогодні'), ('tomorrow', '🌅 Завтра'),
+          ('week', '🗓 Цього тижня'), ('later', '⏳ Пізніше'), ('none', '📭 Без строку відправки'))
+
+
+def _group(deadline, today) -> str:
+    if deadline is None:
+        return 'none'
+    days = (deadline - today).days
+    return ('overdue' if days < 0 else 'today' if days == 0 else 'tomorrow' if days == 1
+            else 'week' if days <= 7 else 'later')
+
+
+def queue(user) -> dict:
+    """📦 Відправка сьогодні: {finish — оформлені, але замовлення ще не «Відправлено» (крок «що далі»),
+    groups — [(id, назва, [рядок])] черги `next_order`, total, first}. Лише читання, без AI;
+    побажання з пошти — лише збережені раніше (`ship_wishes.cached`)."""
+    from datetime import timedelta as _td
+
+    from django.db.models import Count, Exists, F, OuterRef, Prefetch
+    from django.urls import reverse
+
+    from sales.revenue import to_ship
+    from shipping.models import Shipment
+    from shipping.services import ship_wishes
+    today = timezone.localdate()
+    finish = []
+    for s in (Shipment.objects.filter(status__in=NEXT_STATUSES, order__isnull=False, order__shipped_at__isnull=True,
+                                      created_at__gte=timezone.now() - _td(days=FINISH_DAYS))
+              .exclude(order__status__in=('shipped', 'delivered', 'cancelled'))
+              .select_related('order', 'carrier').order_by('-pk')[:QUEUE_MAX]):
+        finish.append({'shipment': s, 'order': s.order, 'url': reverse('admin:shipping_shipment_detail', args=[s.pk])})
+    busy = Shipment.objects.filter(order=OuterRef('pk'), status__in=SHIPPED)
+    qs = (to_ship().filter(~Exists(busy))
+          .order_by(F('shipping_deadline').asc(nulls_last=True), 'order_date', 'pk')
+          .prefetch_related(Prefetch('shipments', queryset=Shipment.objects.filter(status='draft').order_by('-pk'),
+                                     to_attr='drafts'), 'lines__product'))
+    total = qs.count()
+    orders = list(qs[:QUEUE_MAX])
+    mails = {}
+    try:
+        from crm.views import _own_messages
+        mails = dict(_own_messages(user).filter(crm_events__related_order_id__in=[o.pk for o in orders])
+                     .values_list('crm_events__related_order_id').annotate(n=Count('pk', distinct=True)))
+    except Exception:  # noqa: BLE001 — без лічильника листів
+        pass
+    can_add = user.has_perm('shipping.add_shipment')
+    groups = {g: [] for g, _ in GROUPS}
+    for o in orders:
+        found = checks(o, shipments=[])
+        draft = o.drafts[0] if o.drafts else None
+        wishes = ship_wishes.cached(o, user)
+        groups[_group(o.shipping_deadline, today)].append({
+            'order': o, 'country': country(o),
+            'items': ', '.join(f'{(l.sku_raw or (l.product.sku if l.product else "")).strip()} × {num(l.qty)}'
+                               for l in list(o.lines.all())[:4]) + (' …' if len(o.lines.all()) > 4 else ''),
+            'blocks': [c['text'] for c in found if c['level'] == 'block'],
+            'warns': [c['text'] for c in found if c['level'] == 'warn'],
+            'late': max(0, (today - o.shipping_deadline).days) if o.shipping_deadline else 0,
+            'draft': draft and {'pk': draft.pk, 'url': reverse('admin:shipping_shipment_change', args=[draft.pk])},
+            'url': reverse('admin:shipping_shipment_create', args=[o.pk]) if can_add else '',
+            'order_url': reverse('admin:sales_salesorder_change', args=[o.pk]),
+            'mails': mails.get(o.pk, 0), 'wishes': (wishes or {}).get('wishes') or []})
+    first = next((r for g, _ in GROUPS for r in groups[g] if r['url'] and not r['blocks']), None)
+    return {'finish': finish, 'groups': [(g, title, groups[g]) for g, title in GROUPS if groups[g]],
+            'total': total, 'shown': len(orders), 'first': first, 'can_add': can_add}
+
+
 def mail_state(order, user) -> dict:
     """Лист клієнту про відправку («📧 Надіслати клієнту» картки замовлення): {sent, url, to} або {sent, blocked}."""
     from django.urls import reverse

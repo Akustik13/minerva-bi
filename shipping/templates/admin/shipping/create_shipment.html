@@ -2255,9 +2255,12 @@ document.addEventListener('DOMContentLoaded', function() {
         <span class="agent-dim">· {% if packaging_hint.source == 'order_packaging' %}як записано в замовленні{% elif packaging_hint.source == 'history' %}як минулого разу{% if packaging_hint.history_order %} ({{ packaging_hint.history_order }}){% endif %}{% elif packaging_hint.source == 'product_packaging' %}за упаковкою товарів{% else %}за вагою товарів{% endif %}{% if packaging_hint.missing_weight %} · ⚠️ вага неповна{% endif %}</span>
       </div>
       {% endif %}
+      <div class="agent-line" id="agent-wishes"></div>
       <div class="agent-line" id="agent-advice">🚚 Перевізник: натисніть «📊 Порівняти тарифи» — агент вибере й пояснить.</div>
       <div id="agent-advice-act" style="display:none;margin-top:8px"></div>
+      <div class="agent-line"><a href="{% url 'admin:shipping_shipment_ship_today' %}" style="color:var(--accent)">📦 Уся черга відправки →</a></div>
     </div>
+    {{ agent_wishes|json_script:"agent-wishes-data" }}
     <style>
       #agent-card .agent-check { font-size:12px; line-height:1.45; padding:2px 0; }
       #agent-card .agent-check.block { color:var(--err); font-weight:600; }
@@ -2265,6 +2268,12 @@ document.addEventListener('DOMContentLoaded', function() {
       #agent-card .agent-check.ok { color:var(--ok, #2e7d32); }
       #agent-card .agent-line { font-size:12px; line-height:1.5; margin-top:8px; }
       #agent-card .agent-dim { color:var(--text-muted); }
+      #agent-card .agent-wish { margin-top:4px; padding-left:8px; border-left:2px solid var(--border-strong); }
+      #agent-card .agent-quote { color:var(--text-muted); font-style:italic; }
+      #agent-card .agent-small { background:none; border:1px solid var(--border-strong); color:var(--accent);
+        border-radius:5px; padding:3px 9px; font-size:11px; cursor:pointer; margin-left:4px; }
+      #agent-card .agent-small:disabled { opacity:.5; cursor:wait; }
+      #agent-card .agent-warn { color:var(--warn); font-weight:600; margin-top:4px; }
       #agent-card .agent-go { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:7px 14px;
         font-weight:700; cursor:pointer; font-size:12px; }
       .agent-pick { outline:2px solid var(--gold, #d4a017); outline-offset:2px; border-radius:6px; }
@@ -2285,7 +2294,66 @@ document.addEventListener('DOMContentLoaded', function() {
           return b.dataset.carrierId === String(p.carrier_id) && b.dataset.code === String(p.code);
         });
       }
+      // 📬 Побажання з пошти (shipping/services/ship_wishes.py): що клієнт просив про відправку
+      var WURL = '{% url "admin:shipping_shipment_ship_wishes" order.pk %}';
+      var wishCarrier = '', lastAdvice = null;
+      function csrf(){ var m = document.cookie.match(/csrftoken=([^;]+)/); return m ? m[1] : ((document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || ''); }
+      function readBtn(text){
+        var b = el('button', 'agent-small', text); b.type = 'button';
+        b.title = 'AI прочитає листи цього замовлення з ваших скриньок і випише прохання про відправку — з цитатами';
+        b.onclick = function(){
+          b.disabled = true; b.textContent = '⏳ Читаю листи…';
+          fetch(WURL, {method: 'POST', headers: {'X-CSRFToken': csrf()}, credentials: 'same-origin'})
+            .then(function(r){ return r.json(); })
+            .then(function(d){ renderWishes(d.ok ? d : {mails: 0, result: {state: 'error', error: d.error}}); })
+            .catch(function(e){ renderWishes({mails: 0, result: {state: 'error', error: String(e)}}); });
+        };
+        return b;
+      }
+      function renderWishes(d){
+        var box = document.getElementById('agent-wishes');
+        box.textContent = ''; wishCarrier = '';
+        if (!d) return;
+        var r = d.result;
+        if (!r && !d.mails) { box.appendChild(el('span', 'agent-dim', '📬 Листів про це замовлення у вашій пошті немає.')); return; }
+        if (!r) {
+          box.appendChild(document.createTextNode('📬 Листів про це замовлення: ' + d.mails + ' '));
+          box.appendChild(readBtn('📬 Прочитати листи (AI)'));
+          return;
+        }
+        if (r.state === 'no_mail') { box.appendChild(el('span', 'agent-dim', '📬 Листів про це замовлення у вашій пошті немає.')); return; }
+        if (r.state === 'ok') {
+          box.appendChild(el('b', null, '📬 Клієнт просив у листах:'));
+          (r.wishes || []).forEach(function(w){
+            var row = el('div', 'agent-wish');
+            row.appendChild(el('b', null, w.label + ': '));
+            row.appendChild(document.createTextNode(w.text));
+            var q = el('div', 'agent-quote', '«' + w.quote + '» — ' + (w.mail.ours ? 'наш лист' : w.mail.from) + ', ' + w.mail.date);
+            q.setAttribute('translate', 'no');
+            row.appendChild(q);
+            box.appendChild(row);
+            if (w.carrier && !wishCarrier) wishCarrier = w.carrier;
+          });
+        } else if (r.state === 'none') {
+          box.appendChild(el('span', 'agent-dim', '📬 У листах (' + r.mails + ') прохань щодо відправки немає.'));
+        } else {
+          box.appendChild(el('span', 'agent-warn', '📬 Листи не прочитано: ' + (r.error || (r.state === 'no_ai' ? 'AI недоступний — перевірте ключ і ліміти в «Налаштуваннях AI»' : r.state))));
+        }
+        var tail = el('div', 'agent-dim');
+        if (d.stale) tail.appendChild(el('span', 'agent-warn', '⚠️ відтоді прийшли нові листи '));
+        else if (r.at && (r.state === 'ok' || r.state === 'none')) tail.appendChild(document.createTextNode('прочитано ' + r.at + ' '));
+        tail.appendChild(readBtn('↻ Прочитати ще раз'));
+        box.appendChild(tail);
+        if (lastAdvice) window.agentAdvice(lastAdvice);
+      }
+      function wishCheck(p){
+        if (!wishCarrier) return null;
+        var hay = (p.carrier_type + ' ' + p.carrier_name + ' ' + p.name).toLowerCase();
+        if (hay.indexOf(wishCarrier) >= 0) return el('div', 'agent-dim', '✓ Як клієнт просив у листі: ' + wishCarrier.toUpperCase());
+        return el('div', 'agent-warn', '⚠️ Клієнт у листі просив ' + wishCarrier.toUpperCase() + ' — рекомендація інша, перевірте вибір.');
+      }
       window.agentAdvice = function(a){
+        lastAdvice = a;
         var box = document.getElementById('agent-advice'), act = document.getElementById('agent-advice-act');
         document.querySelectorAll('.agent-pick').forEach(function(n){ n.classList.remove('agent-pick'); });
         document.querySelectorAll('.agent-badge').forEach(function(n){ n.remove(); });
@@ -2298,6 +2366,8 @@ document.addEventListener('DOMContentLoaded', function() {
         box.appendChild(document.createTextNode(' — ' + money(p.price) + ' ' + p.currency
           + (p.transit_days != null ? ' · ' + p.transit_days + ' дн.' : '')));
         box.appendChild(el('div', 'agent-dim', 'Чому: ' + a.reason + (a.extra ? '; ' + a.extra : '')));
+        var wc = wishCheck(p);
+        if (wc) box.appendChild(wc);
         var btns = findBtns(p);
         btns.forEach(function(b){
           var row = b.closest('tr') || b.parentElement;
@@ -2314,6 +2384,7 @@ document.addEventListener('DOMContentLoaded', function() {
           act.style.display = '';
         }
       };
+      try { renderWishes(JSON.parse(document.getElementById('agent-wishes-data').textContent || 'null')); } catch (e) {}
       document.addEventListener('DOMContentLoaded', function(){
         var country = document.querySelector('[name="recipient_country"]');
         if (auto.checked && !blocked && country && country.value.trim() && window.compareRates) {

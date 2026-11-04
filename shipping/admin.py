@@ -1288,6 +1288,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_create",
             ),
             path(
+                "today/",
+                self.admin_site.admin_view(self.ship_today_view),
+                name="shipping_shipment_ship_today",
+            ),
+            path(
+                "ship-wishes/<int:order_id>/",
+                self.admin_site.admin_view(self.ship_wishes_view),
+                name="shipping_shipment_ship_wishes",
+            ),
+            path(
                 "<int:shipment_id>/submit/",
                 self.admin_site.admin_view(self.submit_view),
                 name="shipping_shipment_submit",
@@ -1733,8 +1743,43 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "pkg_auto":            pkg_auto,
             "recent_recipients_json": _json.dumps(unique_recipients),
             "agent_checks":        self._ship_checks(order),
+            "agent_wishes":        self._ship_wishes(order, request.user),
             "addr_book_json":      self._build_addr_book_json(request),
         })
+
+    def ship_today_view(self, request):
+        """📦 Відправка сьогодні — черга агента відправки (`ship_advice.queue`): що оформити й що завершити."""
+        from django.core.exceptions import PermissionDenied
+        if not (self.has_view_permission(request) and request.user.has_perm("sales.view_salesorder")):
+            raise PermissionDenied
+        from .services.ship_advice import queue
+        return render(request, "admin/shipping/ship_today.html", {
+            **self.admin_site.each_context(request),
+            "title": "📦 Відправка сьогодні",
+            "opts": self.model._meta,
+            "q": queue(request.user),
+        })
+
+    def ship_wishes_view(self, request, order_id):
+        """📬 Побажання з пошти (`ship_wishes`): GET — що вже відомо, POST — прочитати листи з AI. Лише свої скриньки."""
+        from django.http import JsonResponse
+        from sales.models import SalesOrder
+        if not request.user.has_perm("sales.view_salesorder"):
+            return JsonResponse({"ok": False, "error": "Немає доступу до замовлень"}, status=403)
+        order = get_object_or_404(SalesOrder, pk=order_id)
+        from .services import ship_wishes
+        if request.method == "POST":
+            result = ship_wishes.read(order, request.user)
+            return JsonResponse({"ok": True, "mails": result.get("mails", 0), "stale": False, "result": result})
+        return JsonResponse({"ok": True, **ship_wishes.state(order, request.user)})
+
+    def _ship_wishes(self, order, user):
+        try:
+            from .services import ship_wishes
+            return ship_wishes.state(order, user)
+        except Exception as e:  # noqa: BLE001 — без пошти сторінка однаково працює
+            logger.warning("ship wishes for order %s: %s", order.pk, e)
+            return None
 
     def _ship_checks(self, order):
         """🤖 Агент відправки — що завадить відправити це замовлення (`ship_advice.checks`)."""
