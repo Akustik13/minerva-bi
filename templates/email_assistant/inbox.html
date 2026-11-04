@@ -4116,7 +4116,8 @@ async function agTry() {
     if (d.blocked) notes.push('⚠️ ' + d.blocked);
     if (d.skip) { reply.textContent = '↷ {% trans "Агент пропустив би цей лист" %}: ' + (d.skip_reason || ''); }
     else {
-      reply.textContent = (d.to ? 'Кому: ' + d.to + (d.cc && d.cc.length ? ' · Копія: ' + d.cc.join(', ') : '')
+      reply.textContent = (d.to ? 'Кому: ' + (d.to_name ? d.to_name + ' <' + d.to + '>' : d.to)
+                                  + (d.cc && d.cc.length ? ' · Копія: ' + d.cc.join(', ') : '')
                            + (d.order ? ' · замовлення ' + d.order : '') + '\nТема: ' + (d.subject || '') + '\n\n' : '')
                           + (d.reply || '');
       _ag.reply = d.reply || '';

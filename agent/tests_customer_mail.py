@@ -144,3 +144,43 @@ class CustomerMailTests(Base):
             'send_delay_minutes': 15, 'daily_limit': 20, 'task_model': 'claude-haiku-5-5', 'task_budget_usd': '0.50'})
         self.assertFalse(form.is_valid())
         self.assertIn('cc', form.errors)
+
+
+class GreetingTests(CustomerMailTests):
+    """Звертання — до власника email (покупець), а не до отримувача посилки; контакти UPS клієнту не даються."""
+
+    def setUp(self):
+        super().setUp()
+        SalesOrder.objects.filter(pk=self.order.pk).update(ship_name='Hanna Battles', contact_name='')
+        self.order.refresh_from_db()
+
+    def test_recipient_is_email_owner(self):
+        from crm.models import Customer
+        Customer.objects.update_or_create(email='matthew@customer.example',
+                                          defaults={'name': 'Matthew Obinwa', 'company': 'RTX'})
+        order = SalesOrder.objects.get(pk=self.order.pk)
+        if order.crm_customer is None or order.crm_customer.email != 'matthew@customer.example':
+            SalesOrder.objects.filter(pk=order.pk).update(customer_key='')
+            order = SalesOrder.objects.get(pk=order.pk)
+        self.assertEqual(agent_mail.recipient(order)[:2], ('matthew@customer.example', 'Matthew Obinwa'))
+        SalesOrder.objects.filter(pk=order.pk).update(ship_email='hanna@receiving.example')
+        order = SalesOrder.objects.get(pk=order.pk)
+        self.assertEqual(agent_mail.recipient(order)[:2], ('hanna@receiving.example', 'Hanna Battles'))
+
+    def test_prompt_names_and_carrier_contacts(self):
+        from email_assistant.models import EmailDraft, ScheduledEmail
+        SalesOrder.objects.filter(pk=self.order.pk).update(contact_name='Matthew Obinwa')
+        self.rule(mode=AgentRule.SEND)
+        self.mail()
+        leak = dict(LETTER, reply='Dear Matthew Obinwa,\nplease contact UPS at ERNDE@UPS.COM to pay 46.80 USD.')
+        with self.ai(leak) as call:
+            agent_mail.run_due()
+        prompt = call.call_args[0][0]
+        self.assertIn('ПИШЕМО (звертайся саме до цієї людини): Matthew Obinwa <matthew@customer.example>', prompt)
+        self.assertIn('Отримувач посилки (адреса доставки, лише довідка): Hanna Battles', prompt)
+        self.assertIn('клієнту їх не давай', prompt)
+        run = AgentRun.objects.get()
+        self.assertEqual(run.status, AgentRun.DRAFTED)                     # з адресою UPS — не надсилається само
+        self.assertIn('ernde@ups.com', run.reason)
+        self.assertEqual(ScheduledEmail.objects.count(), 0)
+        self.assertEqual(EmailDraft.objects.get().to_emails, ['matthew@customer.example'])
