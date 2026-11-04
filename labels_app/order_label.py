@@ -43,6 +43,11 @@ PHOTO_PAD = 0.02                 # поле всередині клітинки 
 PHOTO_PX = 240                   # сторона фото (≈ 230 точок на дюйм на 1″)
 PHOTO_RETRY = 3600               # недоступне фото не пробуємо знову годину
 WHITE_FROM = 232                 # світліше — чисто білий (термодрук розсипав би світло-сіре цятками)
+STYLES = ("outline", "gray")     # фото: контур (без заливки) / сіре
+PHOTO_RING = 2                   # контур: товщина обвідки темних площ, px (тонше — деталь лишається суцільною)
+EDGE_SHARE = 0.06                # контур: частка найсильніших перепадів яскравості, що стають лініями
+EDGE_MIN = 60                    # … і не слабші за цей перепад (рівний фон — без ліній)
+PREP_VERSION = 2                 # змінилась обробка — новий кеш фото
 
 
 def _qty(value) -> str:
@@ -146,33 +151,90 @@ def photos_default() -> bool:
         return True
 
 
-def _prepare(data: bytes) -> bytes:
-    """Фото → PNG для термодруку: прозоре — на білому, сіре, контраст підтягнуто, сторона ≤ PHOTO_PX."""
+def photo_style_default() -> str:
+    """«Фото на етикетці замовлення» (SalesSettings.order_label_photo_style): контур, за замовчуванням, або сіре."""
+    try:
+        from sales.models import SalesSettings
+        style = SalesSettings.get().order_label_photo_style
+    except Exception:
+        style = ""
+    return style if style in STYLES else STYLES[0]
+
+
+def _otsu(gray) -> int:
+    """Поріг, що найкраще ділить сіре зображення на темне й світле (метод Оцу)."""
+    hist = gray.histogram()[:256]
+    total, s_all = sum(hist), sum(i * h for i, h in enumerate(hist))
+    w_b = s_b = 0
+    best, threshold = -1.0, 128
+    for t in range(256):
+        w_b += hist[t]
+        if not w_b or w_b == total:
+            continue
+        s_b += t * hist[t]
+        m_b, m_f = s_b / w_b, (s_all - s_b) / (total - w_b)
+        spread = w_b * (total - w_b) * (m_b - m_f) ** 2
+        if spread > best:
+            best, threshold = spread, t
+    return threshold
+
+
+def _outline(gray):
+    """Сіре фото → лінії без заливки: великі темні площі — лише обвідка зсередини (PHOTO_RING), тонкі темні
+    деталі (кабель, дріт) — суцільні, плюс найсильніші перепади яскравості (обриси світлих деталей, написи).
+    Суцільне чорне термопринтер друкує плямою, а контур лишає видно, що це за річ."""
+    from PIL import ImageChops, ImageFilter, ImageOps
+    g = gray.filter(ImageFilter.GaussianBlur(0.7))
+    dark = g.point(lambda v, t=min(_otsu(g), 150): 255 if v < t else 0)
+    rim = ImageChops.subtract(dark, dark.filter(ImageFilter.MinFilter(2 * PHOTO_RING + 1)))
+    sobel = [ImageFilter.Kernel((3, 3), k, scale=1, offset=128) for k in
+             ([-1, 0, 1, -2, 0, 2, -1, 0, 1], [-1, -2, -1, 0, 0, 0, 1, 2, 1])]
+    edge = ImageChops.add(*(g.filter(k).point(lambda v: abs(v - 128) * 2) for k in sobel))
+    hist, need, cut = edge.histogram(), edge.size[0] * edge.size[1] * EDGE_SHARE, 255
+    while cut > 0 and sum(hist[cut:]) < need:
+        cut -= 1
+    lines = ImageChops.lighter(rim, edge.point(lambda v: 255 if v >= max(cut, EDGE_MIN) else 0))
+    w, h = lines.size                     # край фото — не обрис речі
+    for box in ((0, 0, w, 2), (0, h - 2, w, h), (0, 0, 2, h), (w - 2, 0, w, h)):
+        lines.paste(0, box)
+    return ImageOps.invert(lines)
+
+
+def _prepare(data: bytes, style: str = "outline") -> bytes:
+    """Фото → PNG для термодруку, сторона ≤ PHOTO_PX, прозоре — на білому: контур (`_outline`) або сіре з
+    підтягнутим контрастом і білим світлим фоном."""
     from PIL import Image, ImageOps
     with Image.open(BytesIO(data)) as im:
         im.draft("RGB", (PHOTO_PX * 2, PHOTO_PX * 2))
         im = ImageOps.exif_transpose(im)
         im.thumbnail((PHOTO_PX, PHOTO_PX))
+        if style == "outline" and max(im.size) < PHOTO_PX:     # дрібне фото — до клітинки, щоб обвідка не з'їла його
+            k = PHOTO_PX / max(im.size)
+            im = im.resize((max(1, round(im.size[0] * k)), max(1, round(im.size[1] * k))), Image.LANCZOS)
         if im.mode in ("RGBA", "LA", "P"):
             im = im.convert("RGBA")
             bg = Image.new("RGB", im.size, (255, 255, 255))
             bg.paste(im, mask=im.split()[-1])
             im = bg
         im = ImageOps.autocontrast(im.convert("L"), cutoff=1)
-        im = im.point(lambda v: 255 if v >= WHITE_FROM else v)   # світлий фон — білий, без сірих цяток
+        if style == "outline":
+            im = _outline(im)
+        else:
+            im = im.point(lambda v: 255 if v >= WHITE_FROM else v)   # світлий фон — білий, без сірих цяток
         out = BytesIO()
         im.save(out, "PNG", optimize=True)
         return out.getvalue()
 
 
-def label_photo(product) -> bytes | None:
+def label_photo(product, style: str = "outline") -> bytes | None:
     """PNG фото товару для етикетки або None (фото немає / недоступне); джерело — як у мініатюр."""
     from django.core.files.base import ContentFile
     from django.core.files.storage import default_storage
     from inventory import thumbs
     if product is None or not thumbs.has_image(product):
         return None
-    key = hashlib.sha1(f"label{PHOTO_PX}:{thumbs._key(product)}".encode()).hexdigest()[:24]
+    style = style if style in STYLES else STYLES[0]
+    key = hashlib.sha1(f"label{PHOTO_PX}:{style}:v{PREP_VERSION}:{thumbs._key(product)}".encode()).hexdigest()[:24]
     name = f"{thumbs.THUMB_DIR}/label_{key}.png"
     if default_storage.exists(name):
         with default_storage.open(name, "rb") as f:
@@ -187,7 +249,7 @@ def label_photo(product) -> bytes | None:
             pass
         default_storage.delete(fail)
     try:
-        data = _prepare(thumbs._source_bytes(product))
+        data = _prepare(thumbs._source_bytes(product), style)
     except Exception:  # noqa: BLE001 — недоступне посилання або зіпсоване фото
         default_storage.save(fail, ContentFile(str(time.time()).encode()))
         return None
@@ -206,17 +268,19 @@ def photo_grid(count) -> tuple[int, int, float]:
     return 2, 2, TEXT_H / 2
 
 
-def build(order, photos=None) -> dict:
-    """photos — None: як у налаштуваннях; True / False — для цього друку."""
+def build(order, photos=None, style=None) -> dict:
+    """photos — None: як у налаштуваннях; True / False — для цього друку. style — «outline» / «gray» для цього
+    друку, None — як у налаштуваннях."""
     from inventory import thumbs
     rows = items(order)
     want = photos_default() if photos is None else bool(photos)
+    style = style if style in STYLES else photo_style_default()
     products = _products(order)
     available = sum(1 for sku, _q in rows if products.get(sku) is not None and thumbs.has_image(products[sku]))
     pics, too_long = [], False
     if want and 0 < len(rows) <= PHOTO_MAX:
         for n, (sku, _q) in enumerate(rows, 1):
-            png = label_photo(products.get(sku))
+            png = label_photo(products.get(sku), style)
             if png:
                 pics.append((n, png))
     if pics:      # фото забирають ширину — довгі артикули тоді не обрізаються, а етикетка без фото
@@ -235,7 +299,7 @@ def build(order, photos=None) -> dict:
         "photos": pics,
         "text_w": width,
         "photo_info": {"on": want, "shown": len(pics), "available": available, "positions": len(rows),
-                       "max": PHOTO_MAX, "too_long": too_long},
+                       "max": PHOTO_MAX, "too_long": too_long, "style": style},
     }
 
 
@@ -336,10 +400,15 @@ def render(data) -> str:
     country = NBSP * 3 + data["country"] if data["country"] else ""      # той самий рядок, що й номер
     for marker, value in (("{{ORDER}}", data["order"]), ("{{COUNTRY}}", country)):
         xml = xml.replace(marker, escape(value))
+    # Список: ширина — без місця для фото, висота — рівно під рядки нашим шрифтом, AlwaysFit (шаблон) — DYMO сам
+    # зменшує текст, якщо він не вміщується (власні метрики шрифту, «✏️ Правки»), і не роздуває його понад цей розмір
     width = data.get("text_w", TEXT_W)
-    if width != TEXT_W:      # місце для фото: список вужчий
-        xml = re.sub(r"(<Name>ITextObject1</Name>.*?<Width>)[\d.]+(</Width>)",
-                     lambda m: f"{m.group(1)}{width:.4f}{m.group(2)}", xml, count=1, flags=re.S)
+    height = min(TEXT_H, max(1, len(data["lines"])) * LINE_EM * data["font_size"] / 72)
+    head, body = xml.split("<Name>ITextObject1</Name>", 1)
+    obj, rest = body.split("</TextObject>", 1)
+    obj = re.sub(r"<Width>[\d.]+</Width>", f"<Width>{width:.4f}</Width>", obj, count=1)
+    obj = re.sub(r"<Height>[\d.]+</Height>", f"<Height>{height:.4f}</Height>", obj, count=1)
+    xml = head + "<Name>ITextObject1</Name>" + obj + "</TextObject>" + rest
     extra = _photo_objects(data.get("photos") or [])
     if extra:
         head, sep, tail = xml.rpartition("</LabelObjects>")

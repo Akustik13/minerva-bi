@@ -830,8 +830,11 @@ class OrderLabelPhotoTests(TestCase):
         ss.save()
         self.client.force_login(User.objects.create_user("staff", password="x", is_staff=True, is_superuser=True))
         self.order = SalesOrder.objects.create(source="digikey", order_number="102635355", addr_country="SE")
-        photo = mock.patch.object(order_label, "label_photo",
-                                  side_effect=lambda p: _png() if p is not None and p.image_url else None)
+        self.styles = []
+        def fake(p, style="outline"):
+            self.styles.append(style)
+            return _png() if p is not None and p.image_url else None
+        photo = mock.patch.object(order_label, "label_photo", side_effect=fake)
         photo.start()
         self.addCleanup(photo.stop)
 
@@ -852,7 +855,7 @@ class OrderLabelPhotoTests(TestCase):
         self.add("AN220201-04A")
         data = order_label.build(self.order, photos=True)
         self.assertEqual(data["photo_info"], {"on": True, "shown": 1, "available": 1, "positions": 1, "max": 4,
-                                              "too_long": False})
+                                              "too_long": False, "style": "outline"})
         images, numbers, width = self.objects(data)
         self.assertEqual([o.findtext("Name") for o in images], ["MinervaPhoto1"])
         self.assertEqual(numbers, [])                                   # одне фото — без номера
@@ -919,7 +922,8 @@ class OrderLabelPhotoTests(TestCase):
         r = self.client.get(f"/labels/order/{self.order.pk}/")
         self.assertNotIn(b"<ImageObject>", r.content)
         self.assertEqual(json.loads(r["X-Minerva-Photos"]),
-                         {"on": False, "shown": 0, "available": 1, "positions": 1, "max": 4, "too_long": False})
+                         {"on": False, "shown": 0, "available": 1, "positions": 1, "max": 4, "too_long": False,
+                          "style": "outline"})
         r = self.client.get(f"/labels/order/{self.order.pk}/?photos=1")    # лише для цього друку
         self.assertIn(b"<Name>MinervaPhoto1</Name>", r.content)
         self.assertTrue(json.loads(r["X-Minerva-Photos"])["on"])
@@ -927,10 +931,37 @@ class OrderLabelPhotoTests(TestCase):
         page = self.client.get(f"/admin/sales/salesorder/{self.order.pk}/change/")
         self.assertContains(page, "X-Minerva-Photos")                  # вікно перегляду читає заголовок
         self.assertContains(page, "🖼 Фото артикулів")
+        self.assertContains(page, "name=\"svl-style\"")                 # «✏️ Контур / ◐ Сіре» для цього друку
+
+    def test_photo_style_setting_and_param(self):
+        self.add("AN220201-04A")
+        self.assertEqual(order_label.build(self.order, photos=True)["photo_info"]["style"], "outline")
+        self.assertEqual(self.styles[-1], "outline")                    # за замовчуванням — контур
+        ss = SalesSettings.get()
+        ss.order_label_photo_style = "gray"
+        ss.save()
+        self.assertEqual(order_label.build(self.order, photos=True)["photo_info"]["style"], "gray")
+        r = self.client.get(f"/labels/order/{self.order.pk}/?photos=1&style=outline")
+        self.assertEqual((json.loads(r["X-Minerva-Photos"])["style"], self.styles[-1]), ("outline", "outline"))
+        r = self.client.get(f"/labels/order/{self.order.pk}/?photos=1&style=bogus")    # невідоме — як у налаштуваннях
+        self.assertEqual(json.loads(r["X-Minerva-Photos"])["style"], "gray")
+
+    def test_list_text_is_fitted_by_dymo(self):
+        """Список — AlwaysFit: якщо текст не вміщується (метрики шрифту DYMO, «✏️ Правки»), DYMO сам зменшує його;
+        висота рівно під рядки — більшим за підібраний розмір він не стане."""
+        for sku in ("CA-MHF4-MC1.13-150", "CA-MHF4-MC1.13-075"):
+            self.add(sku)
+        data = order_label.build(self.order, photos=True)
+        root = ET.fromstring(order_label.render(data).encode("utf-8"))
+        obj = root.find(".//TextObject[Name='ITextObject1']")
+        self.assertEqual([e.text for e in obj.iter("FitMode")], ["AlwaysFit", "AlwaysFit"])
+        height = float(obj.find("ObjectLayout/Size/Height").text)
+        self.assertAlmostEqual(height, 2 * order_label.LINE_EM * data["font_size"] / 72, places=3)
+        self.assertAlmostEqual(float(obj.find("ObjectLayout/Size/Width").text), data["text_w"], places=3)
 
 
 class OrderLabelPhotoFileTests(TestCase):
-    """label_photo: фото з картки → сіре PNG з білим фоном, кеш, недоступне — None."""
+    """label_photo: фото з картки → PNG (контур або сіре) з білим фоном, кеш, недоступне — None."""
 
     def setUp(self):
         self.media = Path(tempfile.mkdtemp())
@@ -938,6 +969,24 @@ class OrderLabelPhotoFileTests(TestCase):
         override = self.settings(MEDIA_ROOT=str(self.media))
         override.enable()
         self.addCleanup(override.disable)
+
+    def test_outline_draws_rims_not_fill(self):
+        """Контур: велика темна площа — лише обвідка (середина біла), тонкий темний дріт — суцільний, фон білий."""
+        from PIL import Image, ImageDraw
+        im = Image.new("RGB", (480, 480), (246, 246, 246))
+        draw = ImageDraw.Draw(im)
+        draw.rectangle((60, 60, 300, 300), fill=(15, 15, 15))           # корпус — велика темна площа
+        draw.line((360, 40, 360, 440), fill=(15, 15, 15), width=4)      # дріт — 2 px на 240
+        out = io.BytesIO()
+        im.save(out, "PNG")
+        with Image.open(io.BytesIO(order_label._prepare(out.getvalue(), "outline"))) as got:
+            self.assertEqual(got.size, (240, 240))
+            self.assertEqual(got.getpixel((90, 90)), 255)               # середина корпусу — не залита
+            self.assertEqual(got.getpixel((31, 90)), 0)                 # обвідка
+            self.assertEqual(got.getpixel((180, 120)), 0)               # дріт — суцільна лінія
+            self.assertEqual(got.getpixel((10, 10)), 255)               # фон
+            black = sum(1 for v in got.getdata() if v < 128) / (240 * 240)
+            self.assertLess(black, 0.15)                                # не пляма: корпус — ~25 % площі
 
     def test_prepares_and_caches(self):
         from PIL import Image, ImageDraw
@@ -948,7 +997,7 @@ class OrderLabelPhotoFileTests(TestCase):
         im.save(out, "JPEG")
         product = Product.objects.create(sku="AN220201-04A", name="x")
         product.image.save("a.jpg", ContentFile(out.getvalue()), save=True)
-        png = order_label.label_photo(product)
+        png = order_label.label_photo(product, "gray")
         with Image.open(io.BytesIO(png)) as got:
             self.assertEqual(got.format, "PNG")
             self.assertEqual(got.mode, "L")
@@ -957,7 +1006,8 @@ class OrderLabelPhotoFileTests(TestCase):
             self.assertLess(got.getpixel((got.size[0] // 2, got.size[1] // 2)), 128)
         from inventory import thumbs
         with mock.patch.object(thumbs, "_source_bytes", side_effect=AssertionError("кеш не спрацював")):
-            self.assertEqual(order_label.label_photo(product), png)
+            self.assertEqual(order_label.label_photo(product, "gray"), png)
+        self.assertNotEqual(order_label.label_photo(product), png)      # контур — свій кеш
         self.assertIsNone(order_label.label_photo(Product.objects.create(sku="NOPHOTO", name="y")))
         broken = Product.objects.create(sku="BROKEN", name="z", image_url="https://example.com/x.jpg")
         with mock.patch.object(thumbs, "_source_bytes", side_effect=OSError("network")) as fetch:

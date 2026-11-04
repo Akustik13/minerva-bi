@@ -61,10 +61,10 @@
           </Margin>
           <HorizontalAlignment>Left</HorizontalAlignment>
           <VerticalAlignment>Top</VerticalAlignment>
-          <FitMode>None</FitMode>
+          <FitMode>AlwaysFit</FitMode>
           <IsVertical>False</IsVertical>
           <FormattedText>
-            <FitMode>None</FitMode>
+            <FitMode>AlwaysFit</FitMode>
             <HorizontalAlignment>Left</HorizontalAlignment>
             <VerticalAlignment>Top</VerticalAlignment>
             <IsVertical>False</IsVertical>

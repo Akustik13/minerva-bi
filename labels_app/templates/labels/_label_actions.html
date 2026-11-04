@@ -69,6 +69,8 @@
 .svl-pv-row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-size:13px;margin-bottom:6px}
 .svl-pv-row > label{font-weight:600;color:var(--text-muted,#9aafbe)}
 .svl-pv-row > label.svl-photos{font-weight:600;color:var(--text,#c9d8e4);display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.svl-styles{display:inline-flex;gap:10px;align-items:center}
+.svl-styles label.svl-photos{font-weight:500;color:var(--text,#c9d8e4);display:inline-flex;gap:4px;align-items:center;cursor:pointer}
 .svl-copies{display:inline-flex;align-items:stretch;border:1px solid var(--border-strong,#243347);border-radius:6px;overflow:hidden}
 .svl-copies button{background:var(--bg-hover,#1e2d40);border:none;color:var(--text,#c9d8e4);width:34px;font-size:16px;cursor:pointer}
 .svl-copies input{width:54px;height:32px;text-align:center;border:none;border-left:1px solid var(--border-strong,#243347);border-right:1px solid var(--border-strong,#243347);background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:14px;font-weight:600;-moz-appearance:textfield;appearance:textfield}
@@ -328,7 +330,11 @@
       });
     return xml.slice(0, rect.index) + rect[0].replace(/<(Width|Height)>([\d.]+)<\/\1>/g, times) + tail;
   }
-  // Фото артикулів на етикетці замовлення: {on, shown, available, positions, max, too_long} із заголовка відповіді
+  // Фото артикулів на етикетці замовлення: {on, shown, available, positions, max, too_long, style} із заголовка відповіді
+  var PHOTO_STYLES = [
+    {v: 'outline', t: '✏️ Контур', title: 'Лише обриси й деталі, без заливки — термопринтер не друкує чорної плями'},
+    {v: 'gray', t: '◐ Сіре', title: 'Сіре фото, як у картці товару'},
+  ];
   function photoBlocked(p) { return p.positions > p.max || !p.available; }
   function photoNote(p) {
     if (p.positions > p.max) return 'фото — коли позицій не більше ' + p.max;
@@ -364,6 +370,11 @@
       + '<span class="svl-src">Принтер: <b id="svl-pr-name"></b> · <a href="#" id="svl-pr-change">змінити</a></span></div>'
       + (photos ? '<div class="svl-pv-row"><label class="svl-photos"><input type="checkbox" id="svl-photos"'
         + (photos.on ? ' checked' : '') + (photoBlocked(photos) && !photos.on ? ' disabled' : '') + '> 🖼 Фото артикулів</label>'
+        + (photos.shown ? '<span class="svl-styles" role="radiogroup" aria-label="Як друкувати фото">'
+          + PHOTO_STYLES.map(function (s) {
+            return '<label class="svl-photos" title="' + esc(s.title) + '"><input type="radio" name="svl-style" value="' + s.v + '"'
+              + (photos.style === s.v ? ' checked' : '') + '> ' + esc(s.t) + '</label>';
+          }).join('') + '</span>' : '')
         + '<span class="svl-src">' + esc(photoNote(photos)) + '</span></div>' : '')
       + '<div class="svl-src" id="svl-mark-note"></div>'
       + (rows.length || product ? '<button type="button" class="svl-btn svl-ed-toggle" id="svl-ed-toggle" aria-expanded="false">✏️ Правки ▸</button>'
@@ -381,12 +392,16 @@
     var copiesEl = box.querySelector('#svl-copies'), go = box.querySelector('#svl-go');
     function close() { clearTimeout(timer); m.remove(); }
     var photoBox = box.querySelector('#svl-photos');
-    if (photoBox) photoBox.onchange = function () {   // та сама етикетка з фото / без — лише для цього друку
+    function again(key, value) {   // та сама етикетка з іншим вибором фото — лише для цього друку
       var u = new URL(url, location.href);
-      u.searchParams.set('photos', photoBox.checked ? '1' : '0');
+      u.searchParams.set(key, value);
       close();
       directPrint(u.pathname + u.search, name, Object.assign({}, ctx, {how: 'preview', copies: copiesEl.value}));
-    };
+    }
+    if (photoBox) photoBox.onchange = function () { again('photos', photoBox.checked ? '1' : '0'); };
+    box.querySelectorAll('input[name="svl-style"]').forEach(function (r) {
+      r.onchange = function () { if (r.checked) again('style', r.value); };
+    });
     m.addEventListener('click', function (e) { if (e.target === m) close(); });
     box.querySelector('.svl-x').onclick = close;
     box.querySelector('#svl-cancel').onclick = close;

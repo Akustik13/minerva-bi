@@ -181,7 +181,7 @@ class SalesSettingsAdmin(admin.ModelAdmin):
         }),
         ('🏷️ Етикетки DYMO', {
             'fields': ('dymo_open_mode', 'dymo_print_preview', 'dymo_origin_mark', 'order_label_photos',
-                       'dymo_label_source',
+                       'order_label_photo_style', 'dymo_label_source',
                        'antenna_label_sources', 'antenna_label_digikey', 'antenna_label_window'),
             'description': (
                 'Кнопка 🖨️ Друкувати в замовленнях, картці товару й на сторінці «Наклейки DYMO»; '

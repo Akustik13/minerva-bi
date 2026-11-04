@@ -329,13 +329,14 @@ def product_label_file(request, sku):
 @staff_member_required
 def order_label(request, pk):
     """Етикетка замовлення: номер, країна, усі артикули з кількістю й фото (labels_app/order_label.py);
-    ?photos=1|0 — фото для цього друку, без нього — як у налаштуваннях."""
+    ?photos=1|0 і ?style=outline|gray — фото й як їх друкувати для цього друку, без них — як у налаштуваннях."""
     from django.shortcuts import get_object_or_404
     from labels_app import mark, order_label as builder
     from sales.models import SalesOrder
     order = get_object_or_404(SalesOrder, pk=pk)
     photos = request.GET.get('photos')
-    data = builder.build(order, photos=None if photos in (None, '') else photos == '1')
+    data = builder.build(order, photos=None if photos in (None, '') else photos == '1',
+                         style=request.GET.get('style') or None)
     if not data['items']:
         return HttpResponse(f'У замовленні {order.order_number} немає позицій з артикулом.', status=400,
                             content_type='text/plain; charset=utf-8')

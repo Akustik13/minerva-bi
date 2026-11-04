@@ -7485,6 +7485,9 @@
 {"uk": "Контраст — темна", "en": "Contrast — dark", "de": "Kontrast — dunkel"}
 {"uk": "Контраст — темна (≥ 7 : 1)", "en": "Contrast — dark (≥ 7 : 1)", "de": "Kontrast — dunkel (≥ 7 : 1)"}
 {"uk": "Контролює чи автоматично зараховувати товар при зміні qty_received у PO. Закупівлі, які зробила зовнішня CRM, приходять через REST API (/api/v1/purchase-orders/, права purchases:read / purchases:write): повідомлення «доставлено» оприбутковується один раз — повтор не дублює прихід.", "en": "Controls whether stock is automatically received when qty_received changes in a PO. Purchases made by an external CRM come in via the REST API (/api/v1/purchase-orders/, permissions purchases:read / purchases:write): a “delivered” message is booked into stock only once — a repeat does not duplicate the receipt.", "de": "Steuert, ob Ware bei Änderung von qty_received in einer PO automatisch eingebucht wird. Bestellungen, die ein externes CRM angelegt hat, kommen über die REST API (/api/v1/purchase-orders/, Berechtigungen purchases:read / purchases:write): Die Meldung „geliefert“ wird nur einmal eingebucht — eine Wiederholung dupliziert den Wareneingang nicht."}
+{"uk": "Контур", "en": "Outline", "de": "Umriss"}
+{"uk": "Контур — лише обриси й деталі, без заливки", "en": "Outline — only contours and details, no fill", "de": "Umriss — nur Konturen und Details, ohne Füllung"}
+{"uk": "Контур: великі темні площі — лише обвідка, тонкі деталі (кабель) і написи — лініями; термопринтер не друкує чорної плями. Сіре — як фото. У вікні перегляду можна змінити для одного друку.", "en": "Outline: large dark areas are only outlined, thin details (cable) and lettering are drawn as lines; the thermal printer does not print a black blot. Gray — like the photo. In the preview window you can change it for one print.", "de": "Umriss: große dunkle Flächen werden nur umrandet, dünne Details (Kabel) und Beschriftungen als Linien; der Thermodrucker druckt keinen schwarzen Fleck. Grau — wie das Foto. Im Vorschaufenster lässt es sich für einen Druck ändern."}
 {"uk": "Конфлікти", "en": "Conflicts", "de": "Konflikte"}
 {"uk": "Конфлікти (SKU/замовлення вже є)", "en": "Conflicts (SKU/order already exists)", "de": "Konflikte (SKU/Auftrag bereits vorhanden)"}
 {"uk": "Конфіг власного скрапера", "en": "Custom scraper config", "de": "Konfiguration des eigenen Scrapers"}
@@ -7864,6 +7867,7 @@
 {"uk": "Лише мені ({0})", "en": "Only me ({0})", "de": "Nur an mich ({0})"}
 {"uk": "Лише на замовленнях DigiKey", "en": "Only on DigiKey orders", "de": "Nur bei DigiKey-Aufträgen"}
 {"uk": "Лише не відправлені — відправлене / скасоване прибирається само", "en": "Not shipped only — shipped / cancelled ones are removed automatically", "de": "Nur nicht versendete — versendete / stornierte werden automatisch entfernt"}
+{"uk": "Лише обриси й деталі, без заливки — термопринтер не друкує чорної плями", "en": "Only contours and details, no fill — the thermal printer does not print a black blot", "de": "Nur Konturen und Details, ohne Füllung — der Thermodrucker druckt keinen schwarzen Fleck"}
 {"uk": "Лише останні ревізії даташитів", "en": "Only the latest datasheet revisions", "de": "Nur die neuesten Datenblatt-Revisionen"}
 {"uk": "Лише перевіряє наявність — нічого не змінює (тому досить права читання).", "en": "Only checks availability — changes nothing (so the read permission is enough).", "de": "Prüft nur die Verfügbarkeit — ändert nichts (daher genügt das Leserecht)."}
 {"uk": "Лише перегляд", "en": "View only", "de": "Nur Ansicht"}
@@ -13008,6 +13012,9 @@
 {"uk": "Сьєрра-Леоне", "en": "Sierra Leone", "de": "Sierra Leone"}
 {"uk": "Сінгапур", "en": "Singapore", "de": "Singapur"}
 {"uk": "Сіра рамка", "en": "Gray border", "de": "Grauer Rahmen"}
+{"uk": "Сіре", "en": "Gray", "de": "Grau"}
+{"uk": "Сіре фото", "en": "Gray photo", "de": "Graues Foto"}
+{"uk": "Сіре фото, як у картці товару", "en": "Gray photo, as in the product card", "de": "Graues Foto, wie in der Produktkarte"}
 {"uk": "Січ", "en": "Jan", "de": "Jan"}
 {"uk": "Січень", "en": "January", "de": "Januar"}
 {"uk": "ТІЛЬКИ JSON, без пояснень.", "en": "ONLY JSON, no explanations.", "de": "NUR JSON, ohne Erklärungen."}
@@ -14661,6 +14668,8 @@
 {"uk": "Як відповідати: що написати, чим підтвердити, коли не відповідати. Агент бере факти лише з Minerva й листа, а чого немає — пише [уточнити] і лишає чернетку.", "en": "How to reply: what to write, what to confirm with, when not to reply. The agent takes facts only from Minerva and the e-mail, and where something is missing it writes [clarify] and leaves a draft.", "de": "Wie zu antworten ist: was zu schreiben ist, womit zu bestätigen ist, wann nicht zu antworten ist. Der Agent nimmt Fakten nur aus Minerva und der E-Mail, und wo etwas fehlt, schreibt er [klären] und lässt einen Entwurf."}
 {"uk": "Як додати новий товар на склад?", "en": "How do I add a new product to stock?", "de": "Wie füge ich einen neuen Artikel zum Lager hinzu?"}
 {"uk": "Як друкувати", "en": "How to print", "de": "So drucken Sie"}
+{"uk": "Як друкувати фото", "en": "How to print photos", "de": "Wie Fotos gedruckt werden"}
+{"uk": "Як друкувати фото на етикетці замовлення", "en": "How to print photos on the order label", "de": "Wie Fotos auf dem Auftragsetikett gedruckt werden"}
 {"uk": "Як з'явився", "en": "How it appeared", "de": "Wie es entstanden ist"}
 {"uk": "Як запустити імпорт (3 кроки)", "en": "How to run the import (3 steps)", "de": "So starten Sie den Import (3 Schritte)"}
 {"uk": "Як зараз на DigiKey (ті самі кількості, ціни з Minerva)", "en": "As currently on DigiKey (same quantities, prices from Minerva)", "de": "Wie aktuell auf DigiKey (gleiche Mengen, Preise aus Minerva)"}
