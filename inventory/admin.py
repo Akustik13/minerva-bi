@@ -4226,8 +4226,22 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     search_fields = ("code", "tracking_number", "supplier__name", "notes", "external_id", "supplier_order_no")
     date_hierarchy = "order_date"
     inlines       = (PurchaseOrderLineInline, PurchaseReceiptInline)
-    readonly_fields = ("code", "created_at", "updated_at", "external_source", "external_id", "delivered_reported_at")
+    readonly_fields = ("code", "created_at", "updated_at", "external_source", "external_id", "delivered_reported_at",
+                       "parcels_view")
     preserve_filters = True
+
+    def parcels_view(self, obj):
+        """📥 Посилки цієї закупівлі на сторінці «Відправлення» (напрямок «До нас»): трек-номер і стан."""
+        if not obj or not obj.pk:
+            return "—"
+        add = reverse("admin:shipping_shipment_add_tracking") + f"?direction=in&po={obj.pk}"
+        rows = format_html_join(
+            "", '<div><a href="{}">📥 #{} · {} · {}</a> — {}</div>',
+            ((reverse("admin:shipping_shipment_detail", args=[s.pk]), s.pk, s.carrier.name, s.tracking_number,
+              s.get_status_display()) for s in obj.parcels.select_related("carrier").order_by("-pk")[:20]))
+        return format_html('{}<div style="margin-top:4px"><a href="{}">＋ Додати трек-номер посилки</a></div>',
+                           rows or "—", add)
+    parcels_view.short_description = _("📦 Посилки (трекінг)")
 
     class Media:
         js = ('admin/js/po_qty_received.js',)

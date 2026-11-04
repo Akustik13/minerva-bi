@@ -7,7 +7,7 @@
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
   &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a>
-  &rsaquo; #{{ shipment.pk }} — {{ shipment.recipient_name }}
+  &rsaquo; {% if shipment.direction == 'in' %}📥 #{{ shipment.pk }} — {{ shipment.sender_company }}{% else %}#{{ shipment.pk }} — {{ shipment.recipient_name }}{% endif %}
 </div>
 {% endblock %}
 
@@ -326,6 +326,39 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   </script>
   {% endif %}
 
+  {% if shipment.direction == 'in' %}
+  <!-- ── 📥 Вхідна посилка (shipping/services/incoming.py) ── -->
+  <div class="agn agn-in">
+    <div class="agn-head">
+      <b>📥 Вхідна посилка{% if shipment.sender_company %} від <span translate="no">{{ shipment.sender_company }}</span>{% endif %}</b>
+      <span class="agn-muted">Лише трекінг: статус оновлюється сам, як і для наших відправлень.
+        {% if incoming_info %}Що в посилці — позиції закупівлі; прибула — оприбуткуйте закупівлю.{% elif shipment.jlc_order_id %}Замовлення JLCPCB.{% else %}Не прив’язана до закупівлі.{% endif %}</span>
+    </div>
+    {% if incoming_info %}
+    <div class="agn-act">
+      <a class="agn-btn{% if incoming_info.to_receive %} main{% endif %}" href="{{ incoming_info.url }}">🛒 <span translate="no">{{ incoming_info.po.code }}</span>{% if incoming_info.po.supplier %} · <span translate="no">{{ incoming_info.po.supplier.name }}</span>{% endif %}</a>
+      <span class="agn-muted">{{ incoming_info.po.get_status_display }}{% if incoming_info.po.supplier_order_no %} · <span translate="no">{{ incoming_info.po.supplier_order_no }}</span>{% endif %}</span>
+    </div>
+    {% if incoming_info.to_receive %}<div class="agn-ok">✅ Посилку доставлено — відкрийте закупівлю й оприбуткуйте товар.</div>{% endif %}
+    <div class="agn-items" translate="no">
+      {% for l in incoming_info.lines %}<div>{{ l.sku }} × {{ l.ordered|floatformat:"-3" }}{% if l.received %} <span class="agn-muted">(отримано {{ l.received|floatformat:"-3" }})</span>{% endif %}</div>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <style>
+    .agn { background:var(--bg-card); border:1px solid var(--border-strong); border-left:4px solid var(--link-fg);
+           border-radius:8px; padding:12px 16px; margin-bottom:16px; color:var(--text); font-size:13px; }
+    .agn-head { display:flex; flex-direction:column; gap:2px; margin-bottom:10px; }
+    .agn-muted { color:var(--text-muted); font-size:12px; }
+    .agn-ok { color:var(--ok, #2e7d32); font-weight:600; font-size:12px; margin-top:8px; }
+    .agn-items { display:flex; flex-direction:column; gap:2px; margin-top:8px; font-size:12px; }
+    .agn-act { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0; }
+    .agn-btn { background:var(--bg-hover); border:1px solid var(--border-strong); color:var(--text); border-radius:6px;
+               padding:7px 14px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; }
+    .agn-btn.main { background:var(--link-fg); border-color:var(--link-fg); color:var(--bg-card); font-weight:700; }
+  </style>
+  {% endif %}
+
   {% if agent_next %}
   <!-- ── 🤖 Агент відправки: що далі (shipping/services/ship_advice.after_booking) ── -->
   <div class="agn" id="agn">
@@ -530,16 +563,20 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   <div class="sd-header">
     <div>
       <div class="sd-title">
-        <span class="sd-id">#{{ shipment.pk }}</span>
+        <span class="sd-id">{% if shipment.direction == 'in' %}📥 {% endif %}#{{ shipment.pk }}</span>
+        {% if shipment.direction == 'in' %}
+        <span class="sd-name">{{ shipment.sender_company|default:"Вхідна посилка" }}</span>
+        {% else %}
         <span class="sd-name">{{ shipment.recipient_name }}</span>
         {% if shipment.recipient_company %}
         <span class="sd-company">{{ shipment.recipient_company }}</span>
+        {% endif %}
         {% endif %}
       </div>
       <div class="sd-meta">
         {{ shipment.carrier.name|default:"{% trans 'Без перевізника' %}" }}
         <span class="sd-dot">·</span>
-        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% else %}<form method="post" action="{% url 'admin:shipping_shipment_create_order' shipment.pk %}" style="display:inline">{% csrf_token %}<button type="submit" style="background:none;border:none;cursor:pointer;color:var(--link-fg);font-size:12px;padding:0;text-decoration:underline" onclick="return confirm('{% trans "Створити нове замовлення на основі цього відправлення?" %}')">➕ {% trans "Без замовлення — натисни щоб створити" %}</button></form>{% endif %}
+        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% elif shipment.direction == 'in' %}{% if shipment.purchase_order %}<a href="{% url 'admin:inventory_purchaseorder_change' shipment.purchase_order_id %}">🛒 {{ shipment.purchase_order.code }}</a>{% else %}📥 До нас{% endif %}{% else %}<form method="post" action="{% url 'admin:shipping_shipment_create_order' shipment.pk %}" style="display:inline">{% csrf_token %}<button type="submit" style="background:none;border:none;cursor:pointer;color:var(--link-fg);font-size:12px;padding:0;text-decoration:underline" onclick="return confirm('{% trans "Створити нове замовлення на основі цього відправлення?" %}')">➕ {% trans "Без замовлення — натисни щоб створити" %}</button></form>{% endif %}
         <span class="sd-dot">·</span>
         {% trans "Створено" %} {{ shipment.created_at|date:"d.m.Y H:i" }}
         {% if shipment.submitted_at %}

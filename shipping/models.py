@@ -238,6 +238,15 @@ class Shipment(models.Model):
         null=True, blank=True,
         related_name="shipments", verbose_name="JLCPCB замовлення",
     )
+    # 📤 від нас (замовлення клієнта, оформлення в перевізника) / 📥 до нас (постачальник, JLCPCB) — лише трекінг
+    OUT, IN = "out", "in"
+    DIRECTIONS = [(OUT, "📤 Від нас"), (IN, "📥 До нас")]
+    direction = models.CharField("Напрямок", max_length=3, choices=DIRECTIONS, default=OUT, db_index=True)
+    purchase_order = models.ForeignKey(
+        "inventory.PurchaseOrder", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="parcels", verbose_name="Закупівля (PO)",
+        help_text="Вхідна посилка від постачальника: що в ній — позиції закупівлі; прибула — оприбуткуйте PO.",
+    )
     carrier = models.ForeignKey(
         Carrier, on_delete=models.PROTECT,
         verbose_name="Перевізник"

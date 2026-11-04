@@ -977,9 +977,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         "recipient_col", "recipient_country_flag", "weight_kg",
         "price_col", "tracking_badge", "label_badge", "created_at_fmt",
     )
-    list_filter   = ("status", "carrier", "carrier__carrier_type", "recipient_country")
+    list_filter   = ("direction", "status", "carrier", "carrier__carrier_type", "recipient_country")
     search_fields = ("order__order_number", "recipient_name", "tracking_number",
-                     "carrier_shipment_id")
+                     "carrier_shipment_id", "sender_company", "purchase_order__code")
     readonly_fields = (
         "carrier_shipment_id", "tracking_number", "label_url", "customs_url",
         "carrier_price", "carrier_currency", "carrier_service",
@@ -1071,10 +1071,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         self._crm_cache = {}   # reset per-request CRM customer cache
         extra_context = extra_context or {}
         from django.db.models import Count
+        # 📤 Від нас / 📥 До нас — перемикач над списком; лічильники статусів — у вибраному напрямку
+        direction = request.GET.get('direction__exact', '')
+        if direction not in (Shipment.OUT, Shipment.IN):
+            direction = ''
+        by_dir = dict(Shipment.objects.values_list('direction').annotate(n=Count('id')).values_list('direction', 'n'))
+        extra_context['sv_dir'] = direction
+        extra_context['sv_dir_items'] = [{'val': v, 'label': l, 'count': by_dir.get(v, 0)} for v, l in Shipment.DIRECTIONS]
+        base = Shipment.objects.filter(direction=direction) if direction else Shipment.objects.all()
         counts = dict(
-            Shipment.objects.values_list('status')
-                            .annotate(n=Count('id'))
-                            .values_list('status', 'n')
+            base.values_list('status')
+                .annotate(n=Count('id'))
+                .values_list('status', 'n')
         )
         total = sum(counts.values())
         _status_meta = [
@@ -1218,12 +1226,37 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if not tracking:
                 messages.error(request, "Номер трекінгу обов'язковий.")
                 return redirect(reverse("admin:shipping_shipment_add_tracking"))
+            from .services import incoming
+            if request.POST.get("direction") == Shipment.IN:
+                # 📥 До нас: посилка постачальника — лише трекінг, прив'язка до закупівлі
+                from inventory.models import PurchaseOrder
+                po = PurchaseOrder.objects.filter(pk=request.POST.get("purchase_order") or 0).first()
+                try:
+                    carrier = incoming.carrier_for(tracking, carrier_id or "")
+                    s = incoming.create(tracking, carrier=carrier, purchase_order=po,
+                                        sender_company=request.POST.get("sender_company", ""),
+                                        sender_country=sender_country, notes=notes, reference=reference)
+                except incoming.Duplicate as e:
+                    messages.warning(request, f"Посилка з трек-номером {tracking} вже є — #{e.shipment.pk}.")
+                    return redirect(reverse("admin:shipping_shipment_detail", args=[e.shipment.pk]))
+                except incoming.NoCarrier as e:
+                    messages.error(request, str(e))
+                    return redirect(reverse("admin:shipping_shipment_add_tracking"))
+                messages.success(request, f"📥 Вхідну посилку #{s.pk} ({tracking}) додано — статус оновлюватиметься "
+                                          f"сам.")
+                return redirect(reverse("admin:shipping_shipment_detail", args=[s.pk]))
             carrier = None
             if carrier_id:
                 try:
                     carrier = Carrier.objects.get(pk=carrier_id)
                 except Carrier.DoesNotExist:
                     pass
+            if carrier is None:        # перевізник обов'язковий — за номером (1Z… → UPS), інакше за замовчуванням
+                try:
+                    carrier = incoming.carrier_for(tracking)
+                except incoming.NoCarrier as e:
+                    messages.error(request, str(e))
+                    return redirect(reverse("admin:shipping_shipment_add_tracking"))
             order = None
             if order_id:
                 try:
@@ -1256,11 +1289,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         from sales.models import SalesOrder
         carriers = Carrier.objects.filter(is_active=True).order_by("-is_default", "name")
         orders   = SalesOrder.objects.order_by("-order_date").values("pk", "order_number", "client")[:300]
+        from .services.incoming import open_orders
         return render(request, "admin/shipping/add_tracking.html", {
             **self.admin_site.each_context(request),
             "title": "Додати трекінг",
             "carriers": carriers,
             "orders": orders,
+            "purchase_orders": open_orders(),
+            "po_selected": request.GET.get("po", ""),
+            "direction": Shipment.IN if request.GET.get("direction") == Shipment.IN else Shipment.OUT,
             "cancel_url": reverse("admin:shipping_shipment_changelist"),
         })
 
@@ -3083,6 +3120,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 args=[shipment.pk, "label", _lbl_filename],
             )
 
+        # 📥 Вхідна посилка: закупівля, що в ній, і чи пора оприбуткувати
+        incoming_info = None
+        if shipment.direction == Shipment.IN and shipment.purchase_order_id:
+            po = shipment.purchase_order
+            incoming_info = {
+                "po": po, "url": reverse("admin:inventory_purchaseorder_change", args=[po.pk]),
+                "lines": [{"sku": (l.product.sku if l.product else l.external_sku) or l.description,
+                           "ordered": l.qty_ordered, "received": l.qty_received}
+                          for l in po.lines.select_related("product").order_by("pk")[:30]],
+                "to_receive": shipment.status == Shipment.Status.DELIVERED
+                              and po.status not in ("received", "cancelled"),
+            }
+
         # 🤖 Агент відправки: що далі після оформлення (друк, «Відправлено», лист клієнту, наступне замовлення)
         from labels_app.views import label_context
         try:
@@ -3109,7 +3159,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "raw_request":               _to_str(shipment.raw_request),
             "raw_response":              _to_str(shipment.raw_response),
             "suggest_packaging":         suggest_packaging,
-            "title":                     f"Відправлення #{shipment.pk} — {shipment.recipient_name}",
+            "title":                     (f"📥 Посилка #{shipment.pk} — {shipment.sender_company}"
+                                          if shipment.direction == Shipment.IN else
+                                          f"Відправлення #{shipment.pk} — {shipment.recipient_name}"),
             "auto_save_labels_to_server": _sales_cfg.auto_save_labels_to_server,
             "save_labels_url":           _save_labels_url,
             "tracking_url":              _tracking_url,
@@ -3118,6 +3170,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "label_a4_url":              _label_a4_url,
             "shop_confirm":              self._shop_confirm_context(shipment),
             "agent_next":                agent_next,
+            "incoming_info":             incoming_info,
             **(label_context() if agent_next else {}),
         })
 
@@ -6432,12 +6485,21 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # ── List columns ──────────────────────────────────────────────────────────
 
     def id_badge(self, obj):
+        if obj.direction == Shipment.IN:
+            return format_html('<b style="color:#9aafbe" title="📥 До нас — вхідна посилка">📥 #{}</b>', obj.pk)
         return format_html('<b style="color:#9aafbe">#{}</b>', obj.pk)
     id_badge.short_description = "#"
 
     def order_link(self, obj):
-        url = reverse("admin:sales_salesorder_change", args=[obj.order_id])
-        return format_html('<a href="{}">{}</a>', url, obj.order)
+        if obj.order_id:
+            url = reverse("admin:sales_salesorder_change", args=[obj.order_id])
+            return format_html('<a href="{}">{}</a>', url, obj.order)
+        if obj.purchase_order_id:          # 📥 вхідна посилка закупівлі
+            url = reverse("admin:inventory_purchaseorder_change", args=[obj.purchase_order_id])
+            return format_html('<a href="{}" title="Закупівля">🛒 {}</a>', url, obj.purchase_order)
+        if obj.direction == Shipment.IN and obj.sender_company:
+            return format_html('<span title="Від кого">📥 {}</span>', obj.sender_company)
+        return "—"
     order_link.short_description = _("Замовлення")
 
     def carrier_badge(self, obj):

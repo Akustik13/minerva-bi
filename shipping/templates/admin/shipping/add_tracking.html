@@ -42,8 +42,41 @@
     <div><h2>{% trans "Додати трекінг вручну" %}</h2></div>
   </div>
 
-  <form method="post">
+  <style>
+    .at-dir { display:flex; gap:18px; flex-wrap:wrap; }
+    .at-dir label { cursor:pointer; font-weight:600; }
+    form:not(.at-in) .at-in-only, form.at-in .at-out-only { display:none; }
+  </style>
+  <form method="post" id="at-form"{% if direction == 'in' %} class="at-in"{% endif %}>
     {% csrf_token %}
+
+    <!-- ── Напрямок: 📤 наше відправлення / 📥 посилка до нас (закупівля) ── -->
+    <p class="at-section">↕️ Напрямок</p>
+    <div class="at-card at-dir">
+      <label><input type="radio" name="direction" value="out"{% if direction != 'in' %} checked{% endif %}> 📤 Від нас — наше відправлення</label>
+      <label><input type="radio" name="direction" value="in"{% if direction == 'in' %} checked{% endif %}> 📥 До нас — посилка від постачальника</label>
+    </div>
+
+    <!-- ── Закупівля (лише 📥) ── -->
+    <div class="at-in-only">
+    <p class="at-section">🛒 Закупівля (PO)</p>
+    <div class="at-card">
+      <div class="at-row">
+        <label class="at-label">Що в посилці</label>
+        <select class="at-input" name="purchase_order" id="at-po">
+          <option value="">— без закупівлі —</option>
+          {% for po in purchase_orders %}
+          <option value="{{ po.pk }}" data-supplier="{{ po.supplier.name|default:'' }}"{% if po_selected == po.pk|stringformat:"d" %} selected{% endif %}>{{ po.code }}{% if po.supplier %} — {{ po.supplier.name }}{% endif %}{% if po.supplier_order_no %} · {{ po.supplier_order_no }}{% endif %}</option>
+          {% endfor %}
+        </select>
+        <p class="at-hint">Відкриті закупівлі (ще не отримані). Посилка прибула — оприбуткуйте закупівлю.</p>
+      </div>
+      <div class="at-row">
+        <label class="at-label">Від кого (постачальник)</label>
+        <input class="at-input" type="text" name="sender_company" id="at-sender" placeholder="Raynool…">
+      </div>
+    </div>
+    </div>
 
     <!-- ── Трекінг + перевізник ── -->
     <p class="at-section">📡 {% trans "Трекінг" %}</p>
@@ -71,6 +104,7 @@
     </div>
 
     <!-- ── Замовлення ── -->
+    <div class="at-out-only">
     <p class="at-section">🛒 {% trans "Замовлення (необов'язково)" %}</p>
     <div class="at-card">
       <div class="at-row">
@@ -90,6 +124,21 @@
         <p class="at-hint">{% trans "Тільки замовлення що вже є в системі (останні 300). Можна залишити порожнім." %}</p>
       </div>
     </div>
+    </div>
+
+    <script>
+    (function () {
+      var form = document.getElementById('at-form'), po = document.getElementById('at-po'),
+          sender = document.getElementById('at-sender');
+      form.querySelectorAll('input[name=direction]').forEach(function (r) {
+        r.addEventListener('change', function () { form.classList.toggle('at-in', r.value === 'in' && r.checked); });
+      });
+      if (po) po.addEventListener('change', function () {
+        var opt = po.options[po.selectedIndex];
+        if (sender && !sender.value && opt && opt.dataset.supplier) sender.value = opt.dataset.supplier;
+      });
+    })();
+    </script>
 
     <!-- ── Отримувач ── -->
     <p class="at-section">📬 {% trans "Отримувач" %}</p>

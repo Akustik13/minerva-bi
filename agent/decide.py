@@ -35,7 +35,7 @@ def apply_selected(task, ids, user, request=None) -> dict:
 
 
 def apply_one(p, user, request=None) -> str:
-    from agent import channels, shipments
+    from agent import channels, purchases, shipments
     if p.kind == AgentProposal.PRODUCT:
         return _create_product(p, user)
     if p.kind == AgentProposal.STOCK_IN:
@@ -52,12 +52,18 @@ def apply_one(p, user, request=None) -> str:
         return shipments.apply_shipment(p, user)
     if p.kind == AgentProposal.ORDER:
         return shipments.apply_order(p, user, request)
+    if p.kind == AgentProposal.PURCHASE:
+        return purchases.apply_purchase(p, user)
+    if p.kind == AgentProposal.PARCEL:
+        return purchases.apply_parcel(p, user)
     return product_fields.apply(p, user)
 
 
 def describe(p) -> tuple:
     """(що, було, стане) — рядок таблиці на сторінці завдання."""
-    from agent import channels, shipments
+    from agent import channels, purchases, shipments
+    if p.kind in (AgentProposal.PURCHASE, AgentProposal.PARCEL):
+        return purchases.describe(p)
     if p.kind in (AgentProposal.SHOP, AgentProposal.DK_PRICES, AgentProposal.DK_LEAD):
         return channels.describe(p)
     if p.kind in (AgentProposal.SHIPMENT, AgentProposal.ORDER):

@@ -164,8 +164,8 @@ def history(order) -> dict:
     """{customer: Counter, country: Counter} — (тип перевізника, послуга) успішних відправлень за HISTORY_DAYS."""
     from shipping.models import Shipment
     since = timezone.now() - timedelta(days=HISTORY_DAYS)
-    base = Shipment.objects.filter(status__in=SHIPPED, created_at__gte=since, carrier__isnull=False) \
-        .exclude(order=order).select_related('carrier')
+    base = Shipment.objects.filter(status__in=SHIPPED, created_at__gte=since, carrier__isnull=False,
+                                   direction=Shipment.OUT).exclude(order=order).select_related('carrier')
     who = None
     if order.customer_key:
         who = base.filter(order__customer_key=order.customer_key)

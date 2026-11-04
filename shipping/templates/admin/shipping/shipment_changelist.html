@@ -3,11 +3,25 @@
 
 {% block search %}
 {{ block.super }}
+{% url 'admin:shipping_shipment_changelist' as cl_url %}
+{% if sv_dir_items %}
+<div class="sv-dir" style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 0 0">
+  {% for d in sv_dir_items %}
+  <a href="{{ cl_url }}{% if sv_dir != d.val %}?direction__exact={{ d.val }}{% endif %}"
+     title="{% if d.val == 'in' %}Посилки до нас: від постачальників (закупівлі PO), JLCPCB — лише трекінг{% else %}Наші відправлення клієнтам{% endif %}"
+     style="display:inline-flex;align-items:center;gap:5px;padding:6px 15px;border-radius:8px;
+            font-size:13px;font-weight:700;text-decoration:none;border:1px solid;
+            {% if sv_dir == d.val %}background:rgba(88,166,255,.18);color:#58a6ff;border-color:rgba(88,166,255,.5)
+            {% else %}background:var(--bg-card,#1a2535);color:var(--text-muted);border-color:var(--border){% endif %}">
+    {{ d.label }}&nbsp;<span style="background:rgba(128,128,128,.18);border-radius:10px;padding:1px 6px;font-size:10px">{{ d.count }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
 {% if sv_status_items %}
 <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 0 6px">
-  {% url 'admin:shipping_shipment_changelist' as cl_url %}
 
-  <a href="{{ cl_url }}"
+  <a href="{{ cl_url }}{% if sv_dir %}?direction__exact={{ sv_dir }}{% endif %}"
      style="display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:20px;
             font-size:12px;font-weight:700;text-decoration:none;border:1px solid;
             {% if not sv_status_filter %}background:rgba(88,166,255,.18);color:#58a6ff;border-color:rgba(88,166,255,.5)
@@ -16,7 +30,7 @@
   </a>
 
   {% for item in sv_status_items %}{% if item.count or sv_status_filter == item.val %}
-  <a href="{{ cl_url }}?status__exact={{ item.val }}"
+  <a href="{{ cl_url }}?status__exact={{ item.val }}{% if sv_dir %}&amp;direction__exact={{ sv_dir }}{% endif %}"
      style="display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:20px;
             font-size:12px;font-weight:700;text-decoration:none;border:1px solid;
             {% if sv_status_filter == item.val %}background:{{ item.color }}22;color:{{ item.color }};border-color:{{ item.color }}77

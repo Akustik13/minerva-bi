@@ -39,9 +39,10 @@ CLIENT_TTL = 24 * 3600
 def tool_defs(user=None) -> list:
     """Інструменти для людини ключа; пошук по даташитах RAG — лише коли помічник налаштований і є право
     «📦 Помічник по продукції» (історії пошти RAG тут немає — agent/rag.py)."""
-    from agent import channels, rag, shipments, tools
+    from agent import channels, purchases, rag, shipments, tools
     base = [tools.FIND, tools.GET, tools.READ, tools.CHANGE, tools.ATTR, tools.LOCATIONS, tools.STOCK_IN,
-            tools.NEW_PRODUCT, tools.EVENT] + channels.TOOLS + shipments.TOOLS + rag.tools_for(user, mcp=True)
+            tools.NEW_PRODUCT, tools.EVENT] + channels.TOOLS + shipments.TOOLS + purchases.TOOLS \
+        + rag.tools_for(user, mcp=True)
     return [{'name': t['name'], 'description': t['description'], 'inputSchema': t['input_schema'],
              'annotations': {'readOnlyHint': not is_write(t['name']), 'destructiveHint': False}} for t in base]
 
