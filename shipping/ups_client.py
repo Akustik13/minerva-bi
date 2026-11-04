@@ -1218,43 +1218,47 @@ class UPSClient:
 
     # ── Cancel Pickup ─────────────────────────────────────────────────────────
 
+    # Pickup API: DELETE /api/shipments/{version}/pickup/{CancelBy}, CancelBy 02 = за PRN (заголовок Prn).
+    # Версія — як у замовленні забору (v1); шлюз не знайшов маршрут (404) — наступна.
+    PICKUP_CANCEL_VERSIONS = ('v1', _API_VERSION)
+
     def cancel_pickup(self, prn: str) -> dict:
-        """DELETE /api/pickupcancel/v1/cancel/{PRN}"""
+        """DELETE /api/shipments/{version}/pickup/02 з заголовком Prn."""
         from .ups_logger import log_call
-        url = f'{self.base_url}/api/pickupcancel/v1/cancel/{prn}'
-        headers = self._headers()
-        headers['PRN']          = prn
-        headers['CancelBy']     = '02'   # 02 = Customer
-        headers['ReasonCode']   = '010'  # 010 = Customer Request
-        t0 = time.time()
-        r  = None
-        resp_body  = None
-        error_str  = None
-
-        try:
-            r = requests.delete(url, headers=headers, timeout=30)
+        r = None
+        for version in self.PICKUP_CANCEL_VERSIONS:
+            url = f'{self.base_url}/api/shipments/{version}/pickup/02'
+            headers = self._headers()
+            headers['Prn'] = prn
+            t0 = time.time()
+            r = None
+            resp_body = None
+            error_str = None
             try:
-                resp_body = r.json()
-            except Exception:
-                resp_body = {'_raw': r.text[:500]}
-        except requests.Timeout:
-            error_str = 'Timeout (30s)'
-        except requests.ConnectionError as e:
-            error_str = str(e)
-        finally:
-            log_call(
-                action='cancel_pickup',
-                method='DELETE', url=url,
-                req_headers=headers,
-                resp_status=r.status_code if r is not None else None,
-                resp_body=resp_body,
-                duration_ms=int((time.time() - t0) * 1000),
-                error=error_str,
-                carrier_id=self.carrier.pk,
-            )
-
-        if error_str:
-            raise UPSError(f"Помилка з'єднання: {error_str}")
+                r = requests.delete(url, headers=headers, timeout=30)
+                try:
+                    resp_body = r.json()
+                except Exception:
+                    resp_body = {'_raw': r.text[:500]}
+            except requests.Timeout:
+                error_str = 'Timeout (30s)'
+            except requests.ConnectionError as e:
+                error_str = str(e)
+            finally:
+                log_call(
+                    action='cancel_pickup',
+                    method='DELETE', url=url,
+                    req_headers=headers,
+                    resp_status=r.status_code if r is not None else None,
+                    resp_body=resp_body,
+                    duration_ms=int((time.time() - t0) * 1000),
+                    error=error_str,
+                    carrier_id=self.carrier.pk,
+                )
+            if error_str:
+                raise UPSError(f"Помилка з'єднання: {error_str}")
+            if r.status_code != 404:
+                break
         if not r.ok:
             self._handle_error(r)
         return resp_body or {}

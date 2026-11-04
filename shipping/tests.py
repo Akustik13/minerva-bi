@@ -183,6 +183,44 @@ class UPSVoidTests(TestCase):
             with self.assertRaisesRegex(UPSError, "190117"):
                 UPSClient(carrier=self.ups).void_shipment("1ZA1B2C30412345678")
 
+    def _cancel_pickup(self, *responses):
+        with mock.patch.object(UPSClient, "get_token", return_value="tok"), \
+                mock.patch("shipping.ups_client.requests.delete", side_effect=list(responses)) as delete, \
+                mock.patch("shipping.ups_logger.log_call") as log:
+            body = UPSClient(carrier=self.ups).cancel_pickup("2929AH4L7V6")
+        return body, delete, log
+
+    def test_cancel_pickup_uses_pickup_api_by_prn(self):
+        """Скасування забору — DELETE /api/shipments/<версія>/pickup/02 з заголовком Prn
+        (адреси /api/pickupcancel/… в UPS немає — шлюз відповідав 404)."""
+        ok = mock.Mock(ok=True, status_code=200)
+        ok.json.return_value = {"PickupCancelResponse": {"Response": {"ResponseStatus": {"Code": "1"}}}}
+        body, delete, log = self._cancel_pickup(ok)
+        self.assertEqual(body["PickupCancelResponse"]["Response"]["ResponseStatus"]["Code"], "1")
+        self.assertEqual(delete.call_count, 1)
+        self.assertEqual(delete.call_args[0][0], "https://wwwcie.ups.com/api/shipments/v1/pickup/02")
+        headers = delete.call_args[1]["headers"]
+        self.assertEqual(headers["Prn"], "2929AH4L7V6")
+        self.assertEqual(headers["Authorization"], "Bearer tok")
+        self.assertEqual(log.call_args[1]["action"], "cancel_pickup")
+
+    def test_cancel_pickup_tries_next_version_on_404(self):
+        missing = mock.Mock(ok=False, status_code=404, text="")
+        missing.json.side_effect = ValueError
+        ok = mock.Mock(ok=True, status_code=200)
+        ok.json.return_value = {"PickupCancelResponse": {}}
+        _, delete, _ = self._cancel_pickup(missing, ok)
+        self.assertEqual([c[0][0] for c in delete.call_args_list], [
+            "https://wwwcie.ups.com/api/shipments/v1/pickup/02",
+            "https://wwwcie.ups.com/api/shipments/v2409/pickup/02",
+        ])
+
+    def test_cancel_pickup_refusal_is_ups_error(self):
+        refused = mock.Mock(ok=False, status_code=400, text="{}")
+        refused.json.return_value = {"response": {"errors": [{"code": "9510118", "message": "Pickup already completed"}]}}
+        with self.assertRaisesRegex(UPSError, "9510118"):
+            self._cancel_pickup(refused)
+
 
 class ShipmentTextsTests(TestCase):
     """Тексти, що посилаються на кнопки: лише ті, що справді є на сторінках."""
