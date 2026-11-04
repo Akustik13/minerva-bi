@@ -325,6 +325,180 @@ def dismiss(inv, user=None):
     return inv
 
 
+# ── відповідь організатору: ✅ Буду / ❔ Можливо / ✕ Відхилити (iCalendar REPLY, RFC 5546) ──────────────
+
+PARTSTAT = {"accepted": "ACCEPTED", "tentative": "TENTATIVE", "declined": "DECLINED"}
+SUBJECT_PREFIX = {"accepted": "Accepted / Angenommen", "tentative": "Tentative / Mit Vorbehalt",
+                  "declined": "Declined / Abgelehnt"}
+VERB = {"accepted": "accepted / hat die Einladung angenommen",
+        "tentative": "tentatively accepted / hat mit Vorbehalt angenommen",
+        "declined": "declined / hat die Einladung abgelehnt"}
+
+
+class RespondError(Exception):
+    pass
+
+
+def _raw_event(text: str, uid: str):
+    """Сирі рядки VEVENT з цим UID: {ім'я: [(параметри, значення)]} — щоб ORGANIZER / ATTENDEE / SEQUENCE взяти як є."""
+    cur, depth = None, 0
+    for name, params, value in _lines(text or ""):
+        if name == "BEGIN" and value.strip().upper() == "VEVENT" and cur is None:
+            cur, depth = {}, 0
+        elif cur is not None and name == "BEGIN":
+            depth += 1
+        elif cur is not None and name == "END" and value.strip().upper() == "VEVENT":
+            if (cur.get("UID") or [({}, "")])[0][1].strip() == uid:
+                return cur
+            cur = None
+        elif cur is not None and name == "END":
+            depth -= 1
+        elif cur is not None and depth == 0:
+            cur.setdefault(name, []).append((params, value))
+    return None
+
+
+def _source_event(inv):
+    msg = inv.email_message
+    if msg is None:
+        raise RespondError("немає листа із запрошенням")
+    for texts in (calendars_of(msg), None):
+        if texts is None:
+            try:
+                texts = fetch_calendar_from_imap(msg)
+            except Exception as e:  # noqa: BLE001
+                logger.info("invite %s imap: %s", inv.pk, e)
+                texts = []
+        for text in texts:
+            ev = _raw_event(text, inv.uid)
+            if ev is not None:
+                return ev
+    raise RespondError("у листі не знайшлося файлу запрошення (.ics) — відповісти можна лише в поштовій програмі")
+
+
+def _mailto(value: str) -> str:
+    return re.sub(r"^mailto:", "", (value or "").strip(), flags=re.I).strip().lower()
+
+
+def _param(value: str) -> str:
+    value = str(value or "").replace('"', "'")
+    return f'"{value}"' if re.search(r"[;:,]", value) else value
+
+
+def _fold(line: str) -> str:
+    """Рядок iCalendar ≤ 75 байт: продовження з пробілом (RFC 5545 3.1)."""
+    out, cur = [], ""
+    for ch in line:
+        if len((cur + ch).encode("utf-8")) > (75 if not out else 74):
+            out.append(cur)
+            cur = ""
+        cur += ch
+    out.append(cur)
+    return "\r\n ".join(out)
+
+
+def build_reply(ev: dict, attendee: str, name: str, answer: str) -> str:
+    """iCalendar METHOD:REPLY для однієї події: UID, SEQUENCE, RECURRENCE-ID, ORGANIZER — з оригіналу."""
+    def first(key):
+        return (ev.get(key) or [({}, "")])[0]
+    org_params, org_value = first("ORGANIZER")
+    org = "ORGANIZER" + "".join(f";{k}={_param(v)}" for k, v in org_params.items() if k == "CN") + f":mailto:{_mailto(org_value)}"
+    att = (f"ATTENDEE;PARTSTAT={PARTSTAT[answer]}" + (f";CN={_param(name)}" if name else "")
+           + f":mailto:{attendee}")
+    lines = ["BEGIN:VCALENDAR", "PRODID:-//Minerva//Meeting reply//EN", "VERSION:2.0", "METHOD:REPLY",
+             "BEGIN:VEVENT", f"UID:{first('UID')[1].strip()}",
+             f"DTSTAMP:{timezone.now().astimezone(datetime.timezone.utc):%Y%m%dT%H%M%SZ}"]
+    seq = first("SEQUENCE")[1].strip()
+    if seq:
+        lines.append(f"SEQUENCE:{seq}")
+    for key in ("RECURRENCE-ID", "DTSTART", "DTEND"):
+        if ev.get(key):
+            params, value = ev[key][0]
+            if "TZID" in params and key != "RECURRENCE-ID":
+                continue                        # без VTIMEZONE пояс не передаємо — DTSTART у відповіді необов'язковий
+            lines.append(key + "".join(f";{k}={_param(v)}" for k, v in params.items()) + f":{value.strip()}")
+    summary = first("SUMMARY")[1].strip()
+    if summary:
+        lines.append(f"SUMMARY:{summary}")
+    lines += [org, att, "END:VEVENT", "END:VCALENDAR"]
+    return "\r\n".join(_fold(x) for x in lines) + "\r\n"
+
+
+def _attendee(ev, account) -> str:
+    """Ми серед учасників запрошення: адреса скриньки, інакше будь-яка наша адреса з ATTENDEE, інакше скринька."""
+    from email_assistant.crm_link import is_own, own_addresses
+    mine = (account.email_address or "").strip().lower()
+    listed = [_mailto(v) for _p, v in ev.get("ATTENDEE", [])]
+    if mine in listed:
+        return mine
+    own = own_addresses()
+    return next((a for a in listed if a and is_own(a, own)), mine)
+
+
+def respond(inv, user, answer: str) -> dict:
+    """✅ Буду / ❔ Можливо / ✕ Відхилити: лист організатору з iCalendar REPLY зі скриньки, куди прийшло запрошення,
+    і календар Minerva: буду / можливо — подія в календарі (❔ — з позначкою), відхилено — подія знімається.
+    → {ok, to} або RespondError (нічого не надіслано)."""
+    from email_assistant.smtp_client import SMTPClient
+
+    from .models import MeetingInvite
+    if answer not in PARTSTAT:
+        raise RespondError("невідома відповідь")
+    if inv.user_id != user.pk:
+        raise RespondError("це не ваше запрошення")
+    if inv.status in (MeetingInvite.CANCEL, MeetingInvite.CANCELLED):
+        raise RespondError("організатор скасував зустріч — відповідати нема на що")
+    msg = inv.email_message
+    if msg is None or msg.account.user_id != user.pk:
+        raise RespondError("запрошення прийшло не у вашу скриньку")
+    ev = _source_event(inv)
+    organizer = _mailto((ev.get("ORGANIZER") or [({}, "")])[0][1])
+    if not organizer or "@" not in organizer:
+        raise RespondError("у запрошенні немає адреси організатора")
+    account = msg.account
+    attendee = _attendee(ev, account)
+    name = account.display_name or user.get_full_name() or ""
+    ics = build_reply(ev, attendee, name, answer)
+    when = timezone.localtime(inv.start_at)
+    date = when.strftime("%d.%m.%Y") if inv.all_day else when.strftime("%d.%m.%Y %H:%M")
+    subject = f"{SUBJECT_PREFIX[answer]}: {inv.title}"[:300]
+    body = f"{name or attendee} {VERB[answer]}: {inv.title} — {date}"
+    result = SMTPClient(account).send([organizer], subject, body, reply_to_message=msg, calendar=("REPLY", ics))
+    if not result.get("ok"):
+        raise RespondError("лист не надіслано" + (f": {result['error']}" if result.get("error") else ""))
+    if answer == "declined":
+        if inv.event_id:
+            event = inv.event
+            if not event.title.startswith("✕ "):
+                event.title = ("✕ Відхилено: " + event.title)[:300]
+            event.is_done = True
+            event.save(update_fields=["title", "is_done"])
+        inv.status = MeetingInvite.DISMISSED
+        inv.decided_at = timezone.now()
+    else:
+        if inv.status in MeetingInvite.PENDING or not inv.event_id:
+            accept(inv, user)
+        event = inv.event
+        if event is not None:
+            title = re.sub(r"^(❔ |✕ Відхилено: )", "", event.title)
+            event.title = (("❔ " + title) if answer == "tentative" else title)[:300]
+            event.is_done = False
+            event.save(update_fields=["title", "is_done"])
+    inv.response, inv.responded_at = answer, timezone.now()
+    inv.save(update_fields=["status", "decided_at", "response", "responded_at"])
+    return {"ok": True, "to": organizer}
+
+
+def for_messages(user, messages) -> dict:
+    """{pk листа: MeetingInvite} — блок «📅 Запрошення» у прев'ю листа (лише свої)."""
+    from .models import MeetingInvite
+    pks = [m.pk for m in messages]
+    out = {}
+    for inv in (MeetingInvite.objects.filter(user=user, email_message_id__in=pks).order_by("-pk")):
+        out.setdefault(inv.email_message_id, inv)
+    return out
+
+
 def pending(user) -> list:
     from .models import MeetingInvite
     if not getattr(user, "pk", None):

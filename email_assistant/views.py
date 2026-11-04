@@ -822,6 +822,17 @@ def _agent_runs(emails) -> list:
     return [runs[m.pk][0] for m in emails if runs.get(m.pk)]
 
 
+def _meeting_invites(user, emails) -> list:
+    """Блок «📅 Запрошення» у прев'ю: ✅ Буду / ❔ Можливо / ✕ Відхилити (calendar_app/invites.py respond)."""
+    try:
+        from calendar_app.invites import for_messages
+        found = for_messages(user, emails)
+    except Exception as e:  # noqa: BLE001 — прев'ю відкривається й без календаря
+        logger.warning('meeting invites for preview: %s', e)
+        return []
+    return [found[m.pk] for m in emails if m.pk in found]
+
+
 @staff_member_required
 def message_preview_view(request, message_pk):
     """AJAX: HTML fragment for a single message in panel-3."""
@@ -840,6 +851,7 @@ def message_preview_view(request, message_pk):
         'sender_logos':    EmailSettings.get_for_user(request.user).sender_logos,
         'projects_state':  _projects_state(msg.thread),
         'agent_runs':      _agent_runs([msg]),
+        'meeting_invites': _meeting_invites(request.user, [msg]),
         'links':           links,
         'attach_options':  _attach_options([msg], links),
         'reply_to_addr':   reply_to_addr,

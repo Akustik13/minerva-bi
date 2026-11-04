@@ -509,10 +509,19 @@ def settings_view(request):
 @staff_member_required
 @require_POST
 def invite_decide(request, pk, action):
-    """✓ / ✕ запрошення з пошти (лише своє)."""
+    """✓ / ✕ запрошення з пошти (лише своє); yes / maybe / no — ще й відповідь організатору (iCalendar REPLY)."""
     from calendar_app import invites
     from calendar_app.models import MeetingInvite
     inv = get_object_or_404(MeetingInvite, pk=pk, user=request.user)
+    answers = {'yes': 'accepted', 'maybe': 'tentative', 'no': 'declined'}
+    if action in answers:
+        try:
+            out = invites.respond(inv, request.user, answers[action])
+        except invites.RespondError as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+        inv.refresh_from_db()
+        return JsonResponse({'ok': True, 'status': inv.status, 'event_id': inv.event_id, 'to': out['to'],
+                             'response': inv.response})
     if action == 'accept':
         invites.accept(inv, request.user)
     elif action == 'dismiss':

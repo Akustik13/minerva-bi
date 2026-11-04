@@ -283,9 +283,14 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
         {% elif inv.status == "update" %}
         <button class="cal-inv-ok" onclick="invDecide({{ inv.pk }}, 'accept')">✓ Оновити в календарі</button>
         {% else %}
-        <button class="cal-inv-ok" onclick="invDecide({{ inv.pk }}, 'accept')">✓ В календар</button>
+        <button class="cal-inv-ok" onclick="invDecide({{ inv.pk }}, 'accept')" title="Лише в календар Minerva, організатору нічого не надсилається">✓ В календар</button>
         {% endif %}
-        <button class="cal-inv-no" onclick="invDecide({{ inv.pk }}, 'dismiss')" title="Не заносити">✕</button>
+        {% if inv.status != "cancel" and inv.email_message_id %}
+        <button class="cal-inv-ok" onclick="invDecide({{ inv.pk }}, 'yes')" title="Організатору — «Буду» (відповідь на запрошення з вашої скриньки), зустріч — у календар">✅ Буду</button>
+        <button class="cal-inv-no" onclick="invDecide({{ inv.pk }}, 'maybe')" title="Організатору — «Можливо», зустріч — у календар з ❔">❔ Можливо</button>
+        <button class="cal-inv-no" onclick="invDecide({{ inv.pk }}, 'no')" title="Організатору — «Відхилено», у календар не заноситься">✕ Відхилити</button>
+        {% endif %}
+        <button class="cal-inv-no" onclick="invDecide({{ inv.pk }}, 'dismiss')" title="Не заносити, організатору нічого не надсилати">✕</button>
         {% if inv.email_message_id %}<button class="cal-inv-no" onclick="calBlock({invite: {{ inv.pk }}})" title="Від цього відправника більше нічого не заносити (або це спам)">🚫</button>{% endif %}
       </div>
     </div>
@@ -1299,15 +1304,19 @@ buildFilterBar();
 </script>
 <script>
 /* ─── 📨 Запрошення з пошти ─────────────────────────────── */
+var INV_ASK = {yes: 'Надіслати організатору відповідь «Буду»?', maybe: 'Надіслати організатору відповідь «Можливо»?',
+               no: 'Надіслати організатору відповідь «Відхилено»?'};
 async function invDecide(pk, action) {
   var row = document.getElementById('inv-' + pk);
+  if (INV_ASK[action] && !confirm(INV_ASK[action])) return;
   row.querySelectorAll('button').forEach(function(b){ b.disabled = true; });
   try {
     var r = await fetch('/calendar/invites/' + pk + '/' + action + '/', {
       method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': CSRF}});
     var d = await r.json();
-    if (!d.ok) { alert(d.error || 'Помилка'); row.querySelectorAll('button').forEach(function(b){ b.disabled = false; }); return; }
-    if (action === 'accept') { location.reload(); return; }
+    if (!d.ok) { alert('❌ ' + (d.error || 'Помилка')); row.querySelectorAll('button').forEach(function(b){ b.disabled = false; }); return; }
+    if (d.to) alert('✉️ Відповідь надіслано: ' + d.to);
+    if (action === 'accept' || action === 'yes' || action === 'maybe') { location.reload(); return; }
     row.remove();
     if (!document.querySelector('.cal-inv-row')) { var box = document.getElementById('cal-inv'); if (box) box.remove(); }
   } catch (e) { alert('Немає зв\'язку з Minerva'); row.querySelectorAll('button').forEach(function(b){ b.disabled = false; }); }

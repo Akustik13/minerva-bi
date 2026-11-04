@@ -63,7 +63,9 @@ class SMTPClient:
     def send(self, to_emails: list, subject: str, body_text: str,
              body_html: str = '', cc_emails: list = None,
              bcc_emails: list = None, reply_to_message=None,
-             attachments: list = None) -> dict:
+             attachments: list = None, calendar: tuple = None) -> dict:
+        """calendar — (метод iTIP, текст iCalendar), напр. ('REPLY', ics): частина text/calendar; method=… поруч з
+        текстом (так відповідь на запрошення розуміють Outlook / Google / Teams) і той самий файл invite.ics."""
         cc_emails   = cc_emails   or []
         bcc_emails  = bcc_emails  or []
         attachments = attachments or []
@@ -133,6 +135,11 @@ class SMTPClient:
             msg.set_content(body_text, charset='utf-8')
             if body_html:
                 msg.add_alternative(body_html, subtype='html', charset='utf-8')
+            if calendar:
+                method, ics = calendar
+                msg.add_alternative(ics, subtype='calendar', charset='utf-8', params={'method': method})
+                attachments = list(attachments) + [{'name': 'invite.ics', 'content': ics.encode('utf-8'),
+                                                     'content_type': 'application/ics'}]
 
             for att in attachments:
                 ct = att.get('content_type', 'application/octet-stream')

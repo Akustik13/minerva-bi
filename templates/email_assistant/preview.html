@@ -315,6 +315,40 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
               title="{% trans "Це не запит пропозиції — прибрати підказку" %}">✕ {% trans "Не запит" %}</button>
     </div>
     {% endif %}
+    {% for inv in meeting_invites %}
+    <div class="em-pv-link em-pv-agent" id="pv-inv-{{ inv.pk }}">
+      <span>📅 <b>Запрошення</b> · <span translate="no">{{ inv.title }}</span> · {{ inv.start_at|date:"D d.m.Y" }}{% if not inv.all_day %} {{ inv.start_at|time:"H:i" }}{% endif %}{% if inv.organizer %} · <span translate="no">{{ inv.organizer }}</span>{% endif %}
+        {% if inv.response %}<span class="why">ваша відповідь: {{ inv.get_response_display }} {{ inv.responded_at|date:"d.m H:i" }}</span>{% elif inv.status == 'cancel' or inv.status == 'cancelled' %}<span class="why">✖ скасовано організатором</span>{% endif %}</span>
+      {% if inv.status != 'cancel' and inv.status != 'cancelled' %}
+      <button type="button" class="em-pv-btn" style="padding:2px 10px" onclick="pvInvite({{ inv.pk }}, 'yes')" title="Організатору — «Буду» з вашої скриньки, зустріч — у календар">✅ Буду</button>
+      <button type="button" class="em-pv-btn" style="padding:2px 10px" onclick="pvInvite({{ inv.pk }}, 'maybe')" title="Організатору — «Можливо», зустріч — у календар з ❔">❔ Можливо</button>
+      <button type="button" class="em-pv-btn" style="padding:2px 10px" onclick="pvInvite({{ inv.pk }}, 'no')" title="Організатору — «Відхилено»">✕ Відхилити</button>
+      {% endif %}
+      <a href="/calendar/" target="_blank" title="Календар">📅</a>
+    </div>
+    {% endfor %}
+    {% if meeting_invites %}
+    <script>
+    window.pvInvite = async function (pk, action) {
+      var ask = {yes: 'Надіслати організатору відповідь «Буду»?', maybe: 'Надіслати організатору відповідь «Можливо»?',
+                 no: 'Надіслати організатору відповідь «Відхилено»?'}[action];
+      if (!confirm(ask)) return;
+      var row = document.getElementById('pv-inv-' + pk);
+      row.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+      var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+      try {
+        var r = await fetch('/calendar/invites/' + pk + '/' + action + '/', {method: 'POST', credentials: 'same-origin',
+                                                                            headers: {'X-CSRFToken': csrf}});
+        var d = await r.json();
+        if (!d.ok) { alert('❌ ' + (d.error || 'Помилка')); return; }
+        var why = row.querySelector('.why') || row.firstElementChild.appendChild(document.createElement('span'));
+        why.className = 'why';
+        why.textContent = '✉️ відповідь надіслано: ' + d.to;
+      } catch (e) { alert('❌ ' + e); }
+      finally { row.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); }
+    };
+    </script>
+    {% endif %}
     {% for run in agent_runs %}
     <div class="em-pv-link em-pv-agent">
       <span>🤖 <b>{% trans "Агент" %}</b> · <span translate="no">{{ run.rule.name }}</span>:

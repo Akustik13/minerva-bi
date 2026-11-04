@@ -160,6 +160,9 @@ class MeetingInvite(models.Model):
         (ADDED, '✅ У календарі'), (DISMISSED, '— Не заносити'), (CANCELLED, '✖ Знято з календаря'),
     ]
     PENDING = (NEW, UPDATE, CANCEL)
+    # відповідь організатору (iCalendar REPLY, calendar_app/invites.py respond)
+    ACCEPTED, TENTATIVE, DECLINED = 'accepted', 'tentative', 'declined'
+    RESPONSES = [(ACCEPTED, '✅ Буду'), (TENTATIVE, '❔ Можливо'), (DECLINED, '✕ Відхилено')]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='meeting_invites')
     uid = models.CharField(max_length=500, verbose_name='UID зустрічі')
@@ -183,6 +186,8 @@ class MeetingInvite(models.Model):
                               related_name='invites', verbose_name='Подія календаря')
     created_at = models.DateTimeField(auto_now_add=True)
     decided_at = models.DateTimeField(null=True, blank=True)
+    response = models.CharField('Відповідь організатору', max_length=10, choices=RESPONSES, blank=True, default='')
+    responded_at = models.DateTimeField('Коли відповіли', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Запрошення з пошти'
