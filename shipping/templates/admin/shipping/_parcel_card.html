@@ -88,6 +88,9 @@
 </details>
 <script>
 (function () {
+  // посилання «✂️ Відправили лише частину?» з картки замовлення веде сюди (#parcel) — блок одразу розгорнутий
+  var card = document.getElementById('parcel');
+  if (card && location.hash === '#parcel') { card.open = true; card.scrollIntoView({block: 'start'}); }
   var form = document.getElementById('pc-form');
   if (!form) return;
   function num(v) { v = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(v) ? 0 : v; }

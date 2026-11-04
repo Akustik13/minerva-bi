@@ -1390,6 +1390,13 @@ document.addEventListener('DOMContentLoaded',function(){
   </span>
   {% endif %}
   {% endwith %}
+  {% if parcel_split %}
+  <a href="{{ parcel_split.url }}" title="{{ parcel_split.title }}"
+     style="background:var(--bg-hover,#1f2a37);border:1px solid var(--border-strong,#30363d);color:var(--text,#e6edf3);
+            padding:8px 14px;border-radius:7px;text-decoration:none;font-size:13px;display:inline-block">
+    {{ parcel_split.label }}
+  </a>
+  {% endif %}
 </div>
 {% endif %}
 

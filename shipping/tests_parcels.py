@@ -380,3 +380,17 @@ class PagesTests(ParcelBase):
         o.save()
         self.assertEqual(getattr(o, "_parcels_held", None), "shipped")
         self.assertEqual(self.status(self.o), "processing")
+
+    def test_order_card_split_link(self):
+        card = f"/admin/sales/salesorder/{self.o.pk}/change/"
+        r = self.client.get(card)
+        self.assertContains(r, f"/admin/shipping/shipment/create/{self.o.pk}/#parcel-card")
+        self.assertContains(r, "✂️ Відправити лише частину")
+        s = self.ship(self.o, status="in_transit")
+        r = self.client.get(card)
+        self.assertContains(r, f"/admin/shipping/shipment/{s.pk}/detail/#parcel")
+        self.assertContains(r, "✂️ Відправили лише частину?")
+        parcels.set_contents(Shipment.objects.get(pk=s.pk), {self.lp.pk: 10, self.lq.pk: 4})
+        r = self.client.get(card)
+        self.assertNotContains(r, "✂️ Відправили лише частину?")
+        self.assertContains(r, "📦 Відправлено частинами")

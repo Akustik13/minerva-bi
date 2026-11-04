@@ -4770,6 +4770,7 @@
 {"uk": "Відправити замовлення EBDE-0010 {0}", "en": "Ship order EBDE-0010 {0}", "de": "Auftrag EBDE-0010 versenden {0}"}
 {"uk": "Відправити заплановані листи (status=pending, scheduled_at <= now)", "en": "Send scheduled emails (status=pending, scheduled_at <= now)", "de": "Geplante E-Mails senden (status=pending, scheduled_at <= now)"}
 {"uk": "Відправити зараз", "en": "Ship now", "de": "Jetzt versenden"}
+{"uk": "Відправити лише частину", "en": "Ship only part", "de": "Nur einen Teil versenden"}
 {"uk": "Відправити сьогодні", "en": "Ship today", "de": "Heute versenden"}
 {"uk": "Відправка сьогодні", "en": "Shipping today", "de": "Versand heute"}
 {"uk": "Відправка…", "en": "Sending…", "de": "Wird gesendet…"}
@@ -4781,6 +4782,7 @@
 {"uk": "Відправлення #{0} &bull", "en": "Shipment #{0} &bull", "de": "Sendung #{0} &bull"}
 {"uk": "Відправлення #{0} &bull; {1}", "en": "Shipment #{0} &bull; {1}", "de": "Sendung #{0} &bull; {1}"}
 {"uk": "Відправлення #{0} з трекінгом {1} додано.", "en": "Shipment #{0} with tracking {1} added.", "de": "Sendung #{0} mit Tracking {1} hinzugefügt."}
+{"uk": "Відправлення #{0} записане як усе замовлення. Якщо в коробці була лише частина — вкажіть, що в ній: замовлення лишиться відкритим для решти.", "en": "Shipment #{0} is recorded as the whole order. If the box held only part, enter what was in it: the order stays open for the rest.", "de": "Sendung #{0} ist als ganzer Auftrag erfasst. War im Karton nur ein Teil, geben Sie den Inhalt an: der Auftrag bleibt für den Rest offen."}
 {"uk": "Відправлення #{0} збережено (Jumingo ID: {1}…)", "en": "Shipment #{0} saved (Jumingo ID: {1}…)", "de": "Sendung #{0} gespeichert (Jumingo-ID: {1}…)"}
 {"uk": "Відправлення #{0} збережено як чернетку.", "en": "Shipment #{0} saved as a draft.", "de": "Sendung #{0} als Entwurf gespeichert."}
 {"uk": "Відправлення #{0} збережено.", "en": "Shipment #{0} saved.", "de": "Sendung #{0} gespeichert."}
@@ -9153,6 +9155,7 @@
 {"uk": "Нове відправлення | Minerva", "en": "New shipment | Minerva", "de": "Neue Sendung | Minerva"}
 {"uk": "Нове відправлення — {0}", "en": "New shipment — {0}", "de": "Neue Sendung — {0}"}
 {"uk": "Нове відправлення — вибір замовлення", "en": "New shipment — select an order", "de": "Neue Sendung — Auftrag auswählen"}
+{"uk": "Нове відправлення, у якому ви вкажете, скільки чого лежить у коробці; решта замовлення лишиться відкритою.", "en": "A new shipment where you enter how much of each item is in the box; the rest of the order stays open.", "de": "Neue Sendung, in der Sie angeben, wie viel von jeder Position im Karton ist; der Rest des Auftrags bleibt offen."}
 {"uk": "Нове замовлення", "en": "New order", "de": "Neuer Auftrag"}
 {"uk": "Нове замовлення з Gerber", "en": "New order from Gerber", "de": "Neue Bestellung aus Gerber"}
 {"uk": "Нове замовлення прийшло", "en": "A new order has arrived", "de": "Ein neuer Auftrag ist eingegangen"}

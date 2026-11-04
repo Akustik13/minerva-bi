@@ -56,6 +56,12 @@
   function init() {
   var card = document.getElementById('parcel-card');
   if (!card) return;
+  if (location.hash === '#parcel-card') {
+    // «✂️ Відправити лише частину» з картки замовлення: одразу до блоку, курсор — у першу кількість
+    card.scrollIntoView({block: 'center'});
+    var first = card.querySelector('.pc-row input');
+    if (first) first.focus();
+  }
   var rows = Array.prototype.slice.call(card.querySelectorAll('.pc-row'));
   function num(v) { v = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(v) ? 0 : v; }
   function fmt(v) { return String(Math.round(v * 1000) / 1000); }

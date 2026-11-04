@@ -1953,6 +1953,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             # 📦 Відправлення частинами — що вже поїхало й що лишилось (shipping/services/parcels.py)
             if obj and obj.pk:
                 extra_context["parcels_info"] = _parcels_info(obj)
+                extra_context["parcel_split"] = _parcel_split_link(obj)
             # Linked invoices panel
             if obj and obj.pk:
                 try:
@@ -4292,6 +4293,33 @@ def _get_sales_stats():
         }
     except Exception:
         return {"received": "—", "processing": "—", "overdue": "—", "shipped_month": "—"}
+
+
+def _parcel_split_link(order):
+    """«✂️» біля «🚚 Створити відправлення» в картці замовлення, поки посилок у замовлення ще немає (з посилками —
+    смуга «📦 Відправлено частинами» вгорі): є відправлення на все замовлення — «Відправили лише частину?» →
+    блок «📦 Що в цій посилці» останнього з них; відправлень немає — «Відправити лише частину» → той самий блок
+    у формі нового відправлення. Скасоване замовлення — нічого."""
+    try:
+        from django.urls import reverse
+        from shipping.services import parcels
+        if order.status == "cancelled" or not order.lines.exists() or parcels.has_parcels(order):
+            return None
+        whole = parcels.whole_parcels(order)
+        if whole:
+            s = whole[-1]
+            return {"url": reverse("admin:shipping_shipment_detail", args=[s.pk]) + "#parcel",
+                    "label": "✂️ Відправили лише частину?",
+                    "title": f"Відправлення #{s.pk} записане як усе замовлення. Якщо в коробці була лише частина — "
+                             f"вкажіть, що в ній: замовлення лишиться відкритим для решти."}
+        if order.status not in ("received", "processing"):
+            return None
+        return {"url": reverse("admin:shipping_shipment_create", args=[order.pk]) + "#parcel-card",
+                "label": "✂️ Відправити лише частину",
+                "title": "Нове відправлення, у якому ви вкажете, скільки чого лежить у коробці; решта замовлення "
+                         "лишиться відкритою."}
+    except Exception:
+        return None
 
 
 def _parcels_info(order):
