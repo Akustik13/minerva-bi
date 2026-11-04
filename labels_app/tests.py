@@ -455,6 +455,13 @@ class OrderLabelTests(TestCase):
         self.assertEqual(size, 6)
         self.assertRegex(lines[-1], r"\+\d+ more")
 
+    def test_long_line_gets_smaller_font_to_fit_width(self):
+        """Рядок, ширший за блок, раніше лишався 12 pt і обрізався: тепер шрифт менший."""
+        rows = [("CA-SMA-MALE-RG316-DOUBLE-SHIELD-1500MM", 10)]
+        size, lines = order_label.layout(rows)
+        self.assertLess(size, 12)
+        self.assertLessEqual(len(lines[0]), order_label._per_line(order_label.TEXT_W, size))
+
     def test_download_and_buttons(self):
         self.add("AN220214-01A", 5)
         r = self.client.get(f"/labels/order/{self.order.pk}/")
@@ -844,7 +851,8 @@ class OrderLabelPhotoTests(TestCase):
     def test_one_photo_beside_the_list(self):
         self.add("AN220201-04A")
         data = order_label.build(self.order, photos=True)
-        self.assertEqual(data["photo_info"], {"on": True, "shown": 1, "available": 1, "positions": 1, "max": 4})
+        self.assertEqual(data["photo_info"], {"on": True, "shown": 1, "available": 1, "positions": 1, "max": 4,
+                                              "too_long": False})
         images, numbers, width = self.objects(data)
         self.assertEqual([o.findtext("Name") for o in images], ["MinervaPhoto1"])
         self.assertEqual(numbers, [])                                   # одне фото — без номера
@@ -863,6 +871,29 @@ class OrderLabelPhotoTests(TestCase):
         self.assertEqual([o.findtext("Name") for o in images], ["MinervaPhoto1", "MinervaPhoto2", "MinervaPhoto4"])
         self.assertEqual([next(o.iter("Text")).text for o in numbers], ["1", "2", "4"])
         self.assertEqual((data["photo_info"]["shown"], data["photo_info"]["available"]), (3, 3))
+
+    def fits(self, data):
+        """Кожен рядок вміщується в ширину списку тим шрифтом, яким його друкуємо."""
+        per_line = order_label._per_line(data["text_w"], data["font_size"])
+        return all(len(line) <= per_line for line in data["lines"])
+
+    def test_long_skus_beside_photos_get_smaller_font_not_cut(self):
+        """Три кабелі з фото (2 × 2): список удвічі вужчий — шрифт менший, а не обрізаний артикул."""
+        for sku in ("CA-MHF4-MC1.13-150", "CA-MHF4-MC1.13-075", "CA-MHF4-MC1.13-100"):
+            self.add(sku)
+        data = order_label.build(self.order, photos=True)
+        self.assertEqual(len(data["photos"]), 3)
+        self.assertLess(data["font_size"], 12)                          # було 12 і «…-15» обрізано
+        self.assertTrue(self.fits(data), data)
+        self.assertFalse(data["photo_info"]["too_long"])
+
+    def test_too_long_skus_go_without_photos(self):
+        for n in range(3):
+            self.add(f"CA-SMA-MALE-RG316-DOUBLE-SHIELD-{n:02d}-1500MM")
+        data = order_label.build(self.order, photos=True)
+        self.assertEqual((data["photos"], data["text_w"]), ([], order_label.TEXT_W))
+        self.assertTrue(data["photo_info"]["too_long"])
+        self.assertTrue(self.fits(data), data)
 
     def test_no_photos_over_four_positions_or_when_off(self):
         for n in range(5):
@@ -888,7 +919,7 @@ class OrderLabelPhotoTests(TestCase):
         r = self.client.get(f"/labels/order/{self.order.pk}/")
         self.assertNotIn(b"<ImageObject>", r.content)
         self.assertEqual(json.loads(r["X-Minerva-Photos"]),
-                         {"on": False, "shown": 0, "available": 1, "positions": 1, "max": 4})
+                         {"on": False, "shown": 0, "available": 1, "positions": 1, "max": 4, "too_long": False})
         r = self.client.get(f"/labels/order/{self.order.pk}/?photos=1")    # лише для цього друку
         self.assertIn(b"<Name>MinervaPhoto1</Name>", r.content)
         self.assertTrue(json.loads(r["X-Minerva-Photos"])["on"])

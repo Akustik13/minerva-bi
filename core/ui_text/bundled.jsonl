@@ -14917,6 +14917,7 @@
 {"uk": "артикула «{0}» немає на складі — якщо це нова продукція, спершу propose_product", "en": "SKU «{0}» is not in stock — if it is a new product, propose_product first", "de": "Artikel «{0}» ist nicht im Lager — bei neuem Produkt zuerst propose_product"}
 {"uk": "артикули з каталогу Minerva, знайдені в листі", "en": "SKUs from the Minerva catalog found in the e-mail", "de": "Artikelnummern aus dem Minerva-Katalog, die in der E-Mail gefunden wurden"}
 {"uk": "артикули з кількістю й питання про ціну", "en": "SKUs with a quantity and a price question", "de": "Artikelnummern mit Menge und eine Preisfrage"}
+{"uk": "артикули задовгі — з фото текст став би задрібним, тому без фото", "en": "part numbers too long — with photos the text would be too small, so no photos", "de": "Artikelnummern zu lang — mit Fotos wäre der Text zu klein, daher ohne Fotos"}
 {"uk": "артикулом", "en": "SKU", "de": "Artikelnummer"}
 {"uk": "артикулів у листі не знайдено — введіть", "en": "no SKUs found in the e-mail — enter them", "de": "keine Artikelnummern in der E-Mail gefunden — bitte eingeben"}
 {"uk": "атрибутів → склад", "en": "attributes → stock", "de": "Attribute → Lager"}

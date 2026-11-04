@@ -31,11 +31,13 @@ TEXT_W, TEXT_H = 3.13, 1.04      # блок позицій, дюйми (як у 
 LIST_X, LIST_Y = 0.2233334, 0.3  # його лівий верхній кут
 FONT_SIZES = (12, 11, 10, 9, 8, 7, 6)
 CHAR_EM = 0.6                    # ширина символу Courier New
+FIT = 0.97                       # запас ширини: останній символ не впритул до краю / фото
 LINE_EM = 1.2                    # висота рядка з запасом
 GAP = 3                          # пробіли між стовпчиками
 NBSP = " "                  # DYMO не стискає нерозривні пробіли
 
 PHOTO_MAX = 4                    # фото — лише коли позицій не більше (інакше списку бракує місця)
+PHOTO_MIN_FONT = 8               # дрібніше заради фото текст не стає — тоді етикетка без фото
 PHOTO_GAP = 0.06                 # між списком і фото, дюйми
 PHOTO_PAD = 0.02                 # поле всередині клітинки фото
 PHOTO_PX = 240                   # сторона фото (≈ 230 точок на дюйм на 1″)
@@ -72,24 +74,44 @@ def _products(order) -> dict:
     return out
 
 
+def _cells(rows) -> list[str]:
+    num_w = len(str(len(rows)))
+    sku_w = max(len(sku) for sku, _q in rows)
+    qty_w = max(len(_qty(q)) for _s, q in rows)
+    return [f"{str(n).rjust(num_w)}. {sku.ljust(sku_w)} × {_qty(q).rjust(qty_w)}"
+            for n, (sku, q) in enumerate(rows, 1)]
+
+
+def _per_line(width, size) -> int:
+    """Скільки символів Courier New розміру size вміщується в ширину width (дюйми)."""
+    return int(width * FIT / (CHAR_EM * size / 72))
+
+
+def fit_size(rows, width=TEXT_W):
+    """Найбільший шрифт, з яким усі позиції вміщуються в блок шириною width (і по ширині рядка, і за кількістю
+    рядків), або None — навіть найменшим не вміщується."""
+    if not rows:
+        return FONT_SIZES[0]
+    cell_w = len(_cells(rows)[0])
+    for size in FONT_SIZES:
+        cols_max = (_per_line(width, size) + GAP) // (cell_w + GAP)   # 0 — рядок ширший за блок
+        lines_max = max(1, int(TEXT_H / (LINE_EM * size / 72)))
+        if cols_max and len(rows) <= cols_max * lines_max:
+            return size
+    return None
+
+
 def layout(rows, width=TEXT_W) -> tuple[int, list[str]]:
     """(розмір шрифту, рядки етикетки) — найбільший шрифт і найменше стовпчиків, з якими все вміщується в блок
     шириною width. Рядок позиції: «1. AN220214-01A × 5» (номер позиції, артикул, кількість — вирівняні)."""
     if not rows:
         return FONT_SIZES[0], []
-    num_w = len(str(len(rows)))
-    sku_w = max(len(sku) for sku, _q in rows)
-    qty_w = max(len(_qty(q)) for _s, q in rows)
-    cells = [f"{str(n).rjust(num_w)}. {sku.ljust(sku_w)} × {_qty(q).rjust(qty_w)}"
-             for n, (sku, q) in enumerate(rows, 1)]
+    cells = _cells(rows)
     cell_w = len(cells[0])
-    for size in FONT_SIZES:
-        per_line = int(width / (CHAR_EM * size / 72))
-        cols_max = max(1, (per_line + GAP) // (cell_w + GAP))
-        lines_max = max(1, int(TEXT_H / (LINE_EM * size / 72)))
-        if len(cells) <= cols_max * lines_max:
-            break
-    else:                                     # навіть найменшим шрифтом не вміщується
+    size = fit_size(rows, width) or FONT_SIZES[-1]
+    cols_max = max(1, (_per_line(width, size) + GAP) // (cell_w + GAP))
+    lines_max = max(1, int(TEXT_H / (LINE_EM * size / 72)))
+    if len(cells) > cols_max * lines_max:     # навіть найменшим шрифтом не вміщується
         keep = cols_max * lines_max - 1
         cells = cells[:keep] + [f"+{len(cells) - keep} more"]
     cols = min(cols_max, math.ceil(len(cells) / lines_max))
@@ -191,14 +213,18 @@ def build(order, photos=None) -> dict:
     want = photos_default() if photos is None else bool(photos)
     products = _products(order)
     available = sum(1 for sku, _q in rows if products.get(sku) is not None and thumbs.has_image(products[sku]))
-    pics = []
+    pics, too_long = [], False
     if want and 0 < len(rows) <= PHOTO_MAX:
         for n, (sku, _q) in enumerate(rows, 1):
             png = label_photo(products.get(sku))
             if png:
                 pics.append((n, png))
-    cols, _rows, cell = photo_grid(len(pics))
-    width = TEXT_W - (cols * cell + PHOTO_GAP if pics else 0)
+    if pics:      # фото забирають ширину — довгі артикули тоді не обрізаються, а етикетка без фото
+        size = fit_size(rows, _text_width(len(pics)))
+        too_long = size is None or size < PHOTO_MIN_FONT
+        if too_long:
+            pics = []
+    width = _text_width(len(pics))
     size, lines = layout(rows, width)
     return {
         "order": order.order_number,
@@ -209,8 +235,14 @@ def build(order, photos=None) -> dict:
         "photos": pics,
         "text_w": width,
         "photo_info": {"on": want, "shown": len(pics), "available": available, "positions": len(rows),
-                       "max": PHOTO_MAX},
+                       "max": PHOTO_MAX, "too_long": too_long},
     }
+
+
+def _text_width(photos) -> float:
+    """Ширина списку позицій, коли праворуч photos фото."""
+    cols, _rows, cell = photo_grid(photos)
+    return TEXT_W - (cols * cell + PHOTO_GAP if photos else 0)
 
 
 _IMAGE = """        <ImageObject>

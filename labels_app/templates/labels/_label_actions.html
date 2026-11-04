@@ -328,11 +328,12 @@
       });
     return xml.slice(0, rect.index) + rect[0].replace(/<(Width|Height)>([\d.]+)<\/\1>/g, times) + tail;
   }
-  // Фото артикулів на етикетці замовлення: {on, shown, available, positions, max} із заголовка відповіді
+  // Фото артикулів на етикетці замовлення: {on, shown, available, positions, max, too_long} із заголовка відповіді
   function photoBlocked(p) { return p.positions > p.max || !p.available; }
   function photoNote(p) {
     if (p.positions > p.max) return 'фото — коли позицій не більше ' + p.max;
     if (!p.available) return 'у товарів цього замовлення немає фото';
+    if (p.on && p.too_long) return 'артикули задовгі — з фото текст став би задрібним, тому без фото';
     var have = p.on ? p.shown : p.available;
     return (have < p.positions ? 'фото є в ' + have + ' з ' + p.positions + ' · ' : '') + 'галочка — лише для цього друку';
   }
