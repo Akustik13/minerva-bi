@@ -12,6 +12,10 @@
 3. найдешевший з доставкою ≤ `FAST_DAYS` днів; 4. найдешевший.
 Ціни порівнюються у валюті Minerva (`offers.pricing.fx`); варіант без курсу в «найдешевший» не потрапляє. Оформлює
 людина — та сама кнопка «🚀 …» на сторінці нового відправлення, нічого не надсилається звідси.
+
+`after_booking(shipment, user)` — що далі після оформлення (панель на сторінці відправлення): друк (PDF перевізника з
+документами, етикетки DYMO — `order_labels`), «✅ Відправлено», лист клієнту (`mail_state`), наступне замовлення
+(`next_order`).
 """
 from collections import Counter
 from datetime import timedelta
@@ -247,3 +251,94 @@ def recommend(order, results) -> dict | None:
     clean = lambda o: o and {k: (str(v) if isinstance(v, Decimal) else v) for k, v in o.items()}  # noqa: E731
     return {'pick': clean(pick), 'reason': reason, 'rule': rule, 'extra': extra,
             'cheapest': clean(cheapest), 'fastest': clean(fastest)}
+
+
+# ── Після оформлення: друк, «Відправлено», лист клієнту, наступне замовлення ───────────────
+
+NEXT_STATUSES = ('submitted', 'label_ready', 'in_transit')   # відправлення оформлено, посилка ще не доїхала
+DASHES = str.maketrans({'–': '-', '—': '-', '‐': '-', '‑': '-'})
+
+
+def order_labels(order) -> list:
+    """Етикетки DYMO замовлення — як кнопки 🖨️ у картці замовлення (`label_buttons_detail`): етикетка замовлення
+    і по одній на позицію (артикул з рядка замовлення, кількість — на етикетці). [{kind, sku, qty, order, file, title}]"""
+    from labels_app.views import get_label_path, label_kinds
+    out = [{'kind': 'order', 'sku': order.order_number or str(order.pk), 'qty': 1, 'order': order.pk, 'file': False,
+            'title': f'🏷️ Етикетка замовлення {order.order_number or order.pk}'}]
+    lines = []
+    for line in order.lines.select_related('product').order_by('pk'):
+        sku = ((line.sku_raw or '').strip() or (line.product.sku if line.product else '')).translate(DASHES).strip()
+        if sku:
+            lines.append((sku, int(line.qty or 1)))
+    kinds = label_kinds([sku for sku, _ in lines]) if lines else {}
+    for sku, qty in lines:
+        if not kinds.get(sku):
+            continue
+        try:
+            has_file = bool(get_label_path(sku))
+        except OSError:
+            has_file = False
+        out.append({'kind': kinds[sku], 'sku': sku, 'qty': qty, 'order': order.pk, 'file': has_file,
+                    'title': f'🏷️ {sku} × {qty}'})
+    return out
+
+
+def next_order(exclude=None):
+    """(замовлення, скільки ще) — наступне до відправки: `sales.revenue.to_ship()` без оформлених відправлень
+    (`SHIPPED`), спершу найближчий дедлайн відправки, потім найстаріше."""
+    from django.db.models import Exists, F, OuterRef
+    from sales.revenue import to_ship
+    from shipping.models import Shipment
+    busy = Shipment.objects.filter(order=OuterRef('pk'), status__in=SHIPPED)
+    qs = to_ship().filter(~Exists(busy))
+    if exclude:
+        qs = qs.exclude(pk=exclude)
+    qs = qs.order_by(F('shipping_deadline').asc(nulls_last=True), 'order_date', 'pk')
+    return qs.first(), qs.count()
+
+
+def mail_state(order, user) -> dict:
+    """Лист клієнту про відправку («📧 Надіслати клієнту» картки замовлення): {sent, url, to} або {sent, blocked}."""
+    from django.urls import reverse
+    sent = order.ship_notify_sent_at
+    if not user.has_perm('sales.change_salesorder'):
+        return {'sent': sent, 'blocked': 'немає права змінювати замовлення'}
+    try:
+        from config.models import NotificationSettings
+        from sales.admin import _notify_blocked
+        why = _notify_blocked(NotificationSettings.get(), order, 'customer')
+    except Exception:  # noqa: BLE001 — без налаштувань сповіщень листа немає
+        why = 'Налаштування сповіщень недоступні'
+    if why:
+        return {'sent': sent, 'blocked': why}
+    to = (order.ship_email or order.email or '').strip()
+    if not to:
+        return {'sent': sent, 'blocked': 'у замовленні немає email клієнта'}
+    return {'sent': sent, 'to': to, 'url': reverse('admin:sales_salesorder_notify_customer', args=[order.pk])}
+
+
+def after_booking(shipment, user) -> dict | None:
+    """Що зробити після оформлення в перевізника — панель «🤖 Агент відправки: що далі» на сторінці відправлення.
+    Нічого не робить сам: друк — у браузері (PDF і служба DYMO), «Відправлено» — та сама дія, що «✅ Підтвердити»
+    (`ShipmentAdmin.shop_confirm_view`), лист — той самий, що в картці замовлення."""
+    from django.urls import reverse
+    order = shipment.order
+    if not order or shipment.status not in NEXT_STATUSES:
+        return None
+    shipped = order.status in ('shipped', 'delivered') or bool(order.shipped_at)
+    nxt, left = next_order(exclude=order.pk)
+    return {
+        'pdf_url': reverse('admin:shipping_shipment_print_all', args=[shipment.pk]) if shipment.label_url else '',
+        'is_eu': country(order) in eu(),
+        'labels': order_labels(order),
+        'shipped': shipped,
+        'shipped_at': order.shipped_at,
+        'order_status': order.get_status_display(),
+        'can_ship': user.has_perm('sales.change_salesorder'),
+        'ship_url': reverse('admin:shipping_shipment_shop_confirm', args=[shipment.pk]),
+        'is_digikey': order.source == 'digikey',
+        'tracking': shipment.tracking_number or order.tracking_number or '',
+        'mail': mail_state(order, user),
+        'next': nxt and {'order': nxt, 'url': reverse('admin:shipping_shipment_create', args=[nxt.pk])},
+        'left': left,
+    }

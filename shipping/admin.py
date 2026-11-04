@@ -2635,6 +2635,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if not order:
             messages.error(request, "Відправлення не пов'язане із замовленням.")
             return back
+        if not request.user.has_perm("sales.change_salesorder"):
+            messages.error(request, "Немає права змінювати замовлення.")
+            return back
         tracking = shipment.tracking_number or order.tracking_number or ""
 
         if order.source == "digikey":
@@ -2662,7 +2665,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         return back
 
     def shop_confirm_dismiss_view(self, request, shipment_id):
-        if request.method == "POST":
+        if request.method == "POST" and self.has_change_permission(request):
             Shipment.objects.filter(pk=shipment_id).update(shop_confirm_dismissed=True)
             messages.info(request, "Пропозицію підтвердження приховано для цього відправлення.")
         return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
@@ -3035,6 +3038,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 args=[shipment.pk, "label", _lbl_filename],
             )
 
+        # 🤖 Агент відправки: що далі після оформлення (друк, «Відправлено», лист клієнту, наступне замовлення)
+        from labels_app.views import label_context
+        try:
+            from .services.ship_advice import after_booking
+            agent_next = after_booking(shipment, request.user)
+        except Exception:  # noqa: BLE001 — сторінка відправлення працює й без панелі
+            logger.warning("after_booking failed for shipment %s", shipment.pk, exc_info=True)
+            agent_next = None
+
         return render(request, "admin/shipping/shipment_detail.html", {
             **self.admin_site.each_context(request),
             "shipment":                  shipment,
@@ -3060,6 +3072,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "label_display_url":         _label_display_url,
             "label_a4_url":              _label_a4_url,
             "shop_confirm":              self._shop_confirm_context(shipment),
+            "agent_next":                agent_next,
+            **(label_context() if agent_next else {}),
         })
 
     # ── Створення SalesOrder з відправлення ──────────────────────────────────

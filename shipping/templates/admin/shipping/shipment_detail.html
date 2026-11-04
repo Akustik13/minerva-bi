@@ -326,6 +326,205 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   </script>
   {% endif %}
 
+  {% if agent_next %}
+  <!-- ── 🤖 Агент відправки: що далі (shipping/services/ship_advice.after_booking) ── -->
+  <div class="agn" id="agn">
+    <div class="agn-head">
+      <b>🤖 Агент відправки: що далі</b>
+      <span class="agn-muted">Посилку оформлено — ще кілька кроків, і можна братися за наступне замовлення.</span>
+    </div>
+    <ol class="agn-steps">
+      <li class="agn-step" id="agn-s-print">
+        <div class="agn-step-h"><span class="agn-num">1</span> 🖨️ Друк <span class="agn-ok" id="agn-print-done"></span></div>
+        <div class="agn-items">
+          {% if agent_next.pdf_url %}
+          <label><input type="checkbox" id="agn-p-pdf" checked> 📄 Етикетка перевізника й документи
+            <span class="agn-muted">{% if agent_next.is_eu %}одним PDF у новій вкладці{% else %}з митними документами, одним PDF у новій вкладці{% endif %}</span></label>
+          {% else %}
+          <div class="agn-muted">📄 Етикетки перевізника ще немає — PDF з’явиться, коли перевізник її видасть.</div>
+          {% endif %}
+          {% for l in agent_next.labels %}
+          <label><input type="checkbox" class="agn-p-lbl" data-i="{{ forloop.counter0 }}" checked> {{ l.title }} <span class="agn-muted">DYMO</span></label>
+          {% endfor %}
+        </div>
+        <div class="agn-act">
+          <button type="button" class="agn-btn main" id="agn-print">🖨️ Друкувати вибране</button>
+          <span class="agn-report" id="agn-print-report"></span>
+        </div>
+      </li>
+
+      <li class="agn-step" id="agn-s-ship"{% if agent_next.shipped %} data-done="1"{% endif %}>
+        <div class="agn-step-h"><span class="agn-num">2</span> ✅ Позначити відправленим</div>
+        {% if agent_next.shipped %}
+          <div class="agn-ok">✓ Замовлення «{{ agent_next.order_status }}»{% if agent_next.shipped_at %} · {{ agent_next.shipped_at|date:"d.m.Y" }}{% endif %}</div>
+        {% elif not agent_next.can_ship %}
+          <div class="agn-muted">Немає права змінювати замовлення.</div>
+        {% elif shop_confirm %}
+          <div class="agn-act">
+            <button type="button" class="agn-btn main" id="agn-ship-open">✅ Підтвердити відправлення…</button>
+            <span class="agn-muted">{% if shop_confirm.is_digikey %}DigiKey отримає трек-номер і повідомить покупця{% else %}статус «Відправлено», дата — сьогодні{% endif %}</span>
+          </div>
+        {% else %}
+          <form method="post" action="{{ agent_next.ship_url }}" class="agn-act" id="agn-ship-form"
+                data-digikey="{% if agent_next.is_digikey %}1{% endif %}">
+            {% csrf_token %}
+            <button type="submit" class="agn-btn main"
+                    {% if agent_next.is_digikey and not agent_next.tracking %}disabled title="Немає трек-номера"{% endif %}>
+              ✅ {% if agent_next.is_digikey %}Підтвердити на DigiKey{% else %}Позначити «Відправлено»{% endif %}</button>
+            <span class="agn-muted">{% if agent_next.is_digikey %}DigiKey отримає трек-номер і повідомить покупця{% else %}статус «Відправлено», дата — сьогодні, трек-номер — у замовлення{% endif %}</span>
+          </form>
+        {% endif %}
+      </li>
+
+      <li class="agn-step" id="agn-s-mail"{% if agent_next.mail.sent %} data-done="1"{% endif %}>
+        <div class="agn-step-h"><span class="agn-num">3</span> ✉️ Лист клієнту <span class="agn-ok" id="agn-mail-done">{% if agent_next.mail.sent %}✓ Надіслано {{ agent_next.mail.sent|date:"d.m.Y H:i" }}{% endif %}</span></div>
+        {% if agent_next.mail.url %}
+          <div class="agn-act">
+            <button type="button" class="agn-btn{% if not agent_next.mail.sent %} main{% endif %}" id="agn-mail"
+                    data-url="{{ agent_next.mail.url }}">✉️ {% if agent_next.mail.sent %}Надіслати ще раз…{% else %}Лист клієнту…{% endif %}</button>
+            <span class="agn-muted"><span translate="no">{{ agent_next.mail.to }}</span> · трек-номер і дата відправки — у листі, перед надсиланням можна виправити</span>
+          </div>
+          {% if not agent_next.shipped %}<div class="agn-muted">⚠️ Спершу крок 2 — інакше в листі не буде дати відправки.</div>{% endif %}
+        {% elif not agent_next.mail.sent %}
+          <div class="agn-muted">{{ agent_next.mail.blocked }}</div>
+        {% endif %}
+      </li>
+
+      <li class="agn-step" id="agn-s-next">
+        <div class="agn-step-h"><span class="agn-num">4</span> ➡️ Наступне замовлення</div>
+        {% if agent_next.next %}{% with n=agent_next.next.order %}
+          <div class="agn-act">
+            <a class="agn-btn" href="{{ agent_next.next.url }}" translate="no">➡️ {{ n.order_number }}</a>
+            <span class="agn-muted"><span translate="no">{{ n.client|default:n.email }}{% if n.addr_country %} · {{ n.addr_country }}{% endif %}</span>{% if n.shipping_deadline %} · відправити до {{ n.shipping_deadline|date:"d.m.Y" }}{% endif %} · у черзі до відправки: {{ agent_next.left }}</span>
+          </div>
+        {% endwith %}{% else %}
+          <div class="agn-ok">✓ Більше замовлень до відправки немає.</div>
+        {% endif %}
+      </li>
+    </ol>
+  </div>
+  {{ agent_next.labels|json_script:"agn-labels" }}
+  {% include "labels/_label_actions.html" %}
+  {% if agent_next.mail.url %}{% include "admin/sales/_notify_customer_modal.html" with notify_customer_url=agent_next.mail.url ship_notify_sent_at=agent_next.mail.sent %}{% endif %}
+  <style>
+    .agn { background:var(--bg-card); border:1px solid var(--border-strong); border-left:4px solid var(--link-fg);
+           border-radius:8px; padding:12px 16px; margin-bottom:16px; color:var(--text); font-size:13px; }
+    .agn-head { display:flex; flex-direction:column; gap:2px; margin-bottom:10px; }
+    .agn-head b { font-size:14px; }
+    .agn-muted { color:var(--text-muted); font-size:12px; }
+    .agn-ok { color:var(--ok, #2e7d32); font-weight:600; font-size:12px; }
+    .agn-steps { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px; }
+    .agn-step { border:1px solid var(--border-strong); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+    .agn-step.now { border-color:var(--link-fg); box-shadow:0 0 0 1px var(--link-fg); }
+    .agn-step[data-done="1"] { opacity:.75; }
+    .agn-step-h { font-weight:700; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .agn-num { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%;
+               background:var(--bg-hover); border:1px solid var(--border-strong); font-size:11px; }
+    .agn-step.now .agn-num { background:var(--link-fg); border-color:var(--link-fg); color:var(--bg-card); }
+    .agn-step[data-done="1"] .agn-num { background:var(--ok, #2e7d32); border-color:var(--ok, #2e7d32); color:#fff; }
+    .agn-items { display:flex; flex-direction:column; gap:4px; }
+    .agn-items label { display:flex; gap:6px; align-items:baseline; cursor:pointer; flex-wrap:wrap; }
+    .agn-act { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:0; }
+    .agn-btn { background:var(--bg-hover); border:1px solid var(--border-strong); color:var(--text); border-radius:6px;
+               padding:7px 14px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; }
+    .agn-btn:hover { border-color:var(--link-fg); }
+    .agn-btn.main { background:var(--link-fg); border-color:var(--link-fg); color:var(--bg-card); font-weight:700; }
+    .agn-btn:disabled { opacity:.5; cursor:not-allowed; }
+    .agn-report { font-size:12px; color:var(--text-muted); }
+    .agn-report .bad { color:var(--err); }
+    .agn-report button { background:none; border:1px solid var(--border-strong); color:var(--link-fg); border-radius:4px;
+                         padding:2px 8px; font-size:12px; cursor:pointer; margin:2px 4px 0 0; }
+  </style>
+  <script>
+  (function () {
+    var KEY = 'ship-agent-printed-{{ shipment.pk }}', PDF = '{{ agent_next.pdf_url|escapejs }}';
+    var labels = JSON.parse(document.getElementById('agn-labels').textContent || '[]');
+    var btn = document.getElementById('agn-print'), rep = document.getElementById('agn-print-report');
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+      });
+    }
+    function now() { var d = new Date(); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+    function current() {     // підсвітити перший незроблений крок
+      var found = false;
+      document.querySelectorAll('#agn .agn-step').forEach(function (s) {
+        s.classList.remove('now');
+        if (!found && s.dataset.done !== '1') { s.classList.add('now'); found = true; }
+      });
+    }
+    function printedAt(t) {
+      document.getElementById('agn-s-print').dataset.done = '1';
+      document.getElementById('agn-print-done').innerHTML = '✓ <span>' + 'надруковано' + '</span> <span translate="no">' + esc(t) + '</span>';
+      btn.textContent = '🖨️ ' + 'Друкувати ще раз';
+      btn.classList.remove('main');
+      current();
+    }
+    var was = null;
+    try { was = localStorage.getItem(KEY); } catch (e) {}
+    if (was) printedAt(was);
+    current();
+
+    btn.addEventListener('click', function () {
+      var pdf = document.getElementById('agn-p-pdf'), withPdf = !!(pdf && pdf.checked && PDF);
+      var items = [];
+      document.querySelectorAll('.agn-p-lbl').forEach(function (c) { if (c.checked) items.push(labels[+c.dataset.i]); });
+      if (!withPdf && !items.length) { rep.textContent = 'Нічого не вибрано.'; return; }
+      if (withPdf) window.open(PDF, '_blank');          // одразу в обробнику кліку — інакше браузер заблокує вкладку
+      function finish(r) {
+        var html = [];
+        if (withPdf) html.push('📄 ' + esc('PDF відкрито в новій вкладці'));
+        if (r && r.printed.length) {
+          html.push((r.saved ? '⬇️ <span>' + 'завантажено файли .dymo' + '</span>' : '✓ DYMO') + ': <span translate="no">'
+                    + esc(r.printed.join(', ')) + '</span>');
+        }
+        if (r && r.check.length) {
+          html.push(esc('Перевірте перед друком:') + ' ' + r.check.map(function (o, i) {
+            return '<button type="button" data-check="' + i + '">🔍 <span translate="no">' + esc(o.sku) + '</span></button>';
+          }).join(''));
+        }
+        if (r && r.failed.length) {
+          html.push('<span class="bad">✗ ' + r.failed.map(function (f) {
+            return '<span translate="no">' + esc(f.o.sku) + '</span> — ' + esc(f.error);
+          }).join('; ') + '</span>');
+        }
+        rep.innerHTML = html.join(' · ');
+        rep.querySelectorAll('[data-check]').forEach(function (b) {
+          b.onclick = function () { window.svLabel.run(r.check[+b.dataset.check], 'check'); };
+        });
+        var t = now();
+        try { localStorage.setItem(KEY, t); } catch (e) {}
+        printedAt(t);
+      }
+      if (!items.length) { finish(null); return; }
+      if (!window.svLabel || !window.svLabel.batch) { rep.textContent = 'Друк DYMO на цій сторінці недоступний.'; return; }
+      btn.disabled = true;
+      rep.textContent = '⏳ DYMO…';
+      window.svLabel.batch(items, finish).then(function () { btn.disabled = false; });
+    });
+
+    var shipForm = document.getElementById('agn-ship-form');
+    if (shipForm) shipForm.addEventListener('submit', function (e) {
+      var ask = shipForm.dataset.digikey ? 'Підтвердити відправлення на DigiKey через API? DigiKey повідомить покупця.'
+                                         : 'Позначити замовлення як «Відправлено»?';
+      if (!confirm(ask)) e.preventDefault();
+    });
+    var ship = document.getElementById('agn-ship-open');
+    if (ship) ship.addEventListener('click', function () {
+      var m = document.getElementById('sd-sc-modal'); if (m) m.classList.add('open');
+    });
+    var mail = document.getElementById('agn-mail');
+    if (mail) mail.addEventListener('click', function () { if (window.ncOpen) window.ncOpen(mail.dataset.url); });
+    document.addEventListener('nc:sent', function () {
+      var li = document.getElementById('agn-s-mail');
+      li.dataset.done = '1';
+      document.getElementById('agn-mail-done').innerHTML = '✓ <span>' + 'Надіслано' + '</span> <span translate="no">' + esc(now()) + '</span>';
+      current();
+    });
+  })();
+  </script>
+  {% endif %}
+
   <!-- ── Header ── -->
   <div class="sd-header">
     <div>

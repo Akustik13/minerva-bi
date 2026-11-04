@@ -150,3 +150,108 @@ class PageTests(Base):
         self.assertContains(page, '🤖 Агент відправки')
         self.assertContains(page, 'бракує AN220213-01C')
         self.assertContains(page, f"order_id: '{o.pk}'")
+
+
+def staff(username, role):
+    user = User.objects.create_user(username, f'{username}@x.y', 'p', is_staff=True)
+    user.profile.role = role
+    user.profile.save()
+    return User.objects.get(pk=user.pk)
+
+
+class AfterBookingTests(Base):
+    """Що далі після оформлення: друк, «Відправлено», лист клієнту, наступне замовлення."""
+
+    def setUp(self):
+        super().setUp()
+        self.user = User.objects.create_superuser('boss', 'b@x.y', 'p')
+
+    def booked(self, order, status=Shipment.Status.LABEL_READY, **kw):
+        return Shipment.objects.create(order=order, carrier=self.ups, status=status, tracking_number='1Z999',
+                                       label_url='/media/shipping/labels/ups_1.pdf', recipient_country='DE', **kw)
+
+    def test_only_after_booking(self):
+        o = self.order()
+        self.assertIsNone(ship_advice.after_booking(self.booked(o, Shipment.Status.DRAFT), self.user))
+        self.assertIsNone(ship_advice.after_booking(Shipment.objects.create(carrier=self.ups,
+                                                                            status=Shipment.Status.LABEL_READY),
+                                                    self.user))
+        a = ship_advice.after_booking(self.booked(o), self.user)
+        self.assertTrue(a['pdf_url'].endswith('/print-all/'))
+        self.assertFalse(a['shipped'])
+        self.assertTrue(a['can_ship'])
+
+    def test_labels_like_order_card(self):
+        o = self.order()
+        cable = Product.objects.create(sku='CA-SMA-1M', name='Cable')
+        SalesOrderLine.objects.create(order=o, product=cable, sku_raw='CA–SMA-1M', qty=Decimal('3'))
+        labels = ship_advice.order_labels(o)
+        self.assertEqual(labels[0], {'kind': 'order', 'sku': o.order_number, 'qty': 1, 'order': o.pk, 'file': False,
+                                     'title': f'🏷️ Етикетка замовлення {o.order_number}'})
+        self.assertEqual([(l['sku'], l['qty']) for l in labels[1:]], [('AN220213-01C', 2), ('CA-SMA-1M', 3)])
+        self.assertEqual(labels[1]['kind'], 'antenna')
+
+    def test_next_order_by_deadline(self):
+        today = timezone.localdate()
+        current = self.order()
+        late = self.order(shipping_deadline=today + timedelta(days=9))
+        soon = self.order(shipping_deadline=today + timedelta(days=1))
+        busy = self.order(shipping_deadline=today)
+        self.booked(busy)                                   # уже оформлено — не наступне
+        self.order(status='cancelled')
+        Shipment.objects.create(order=self.order(shipping_deadline=today), carrier=self.ups,
+                                status=Shipment.Status.DRAFT)   # чернетка — ще не оформлено, тож у черзі
+        nxt, left = ship_advice.next_order(exclude=current.pk)
+        self.assertEqual(nxt.shipping_deadline, today)
+        self.assertNotEqual(nxt.pk, busy.pk)
+        self.assertEqual(left, 3)
+        self.assertEqual(ship_advice.next_order(exclude=nxt.pk)[0].pk, soon.pk)
+        self.assertEqual(ship_advice.next_order(exclude=soon.pk)[1], 3)   # current, late, чернетка
+
+    def test_mail_state(self):
+        from config.models import NotificationSettings
+        o = self.order()
+        self.assertIn('SMTP', ship_advice.mail_state(o, self.user)['blocked'])
+        NotificationSettings.objects.update_or_create(pk=1, defaults={'email_enabled': True,
+                                                                      'customer_notify_enabled': True})
+        state = ship_advice.mail_state(o, self.user)
+        self.assertEqual((state['to'], state['url']), ('a@acme.example', f'/admin/sales/salesorder/{o.pk}/notify-customer/'))
+        self.assertEqual(ship_advice.mail_state(o, staff('bea', 'accountant'))['blocked'],
+                         'немає права змінювати замовлення')
+        SalesOrder.objects.filter(pk=o.pk).update(email='')
+        o.refresh_from_db()
+        self.assertEqual(ship_advice.mail_state(o, self.user)['blocked'], 'у замовленні немає email клієнта')
+
+    def test_page_shows_next_steps(self):
+        o = self.order()
+        nxt = self.order(shipping_deadline=timezone.localdate())
+        s = self.booked(o)
+        self.client.force_login(self.user)
+        page = self.client.get(f'/admin/shipping/shipment/{s.pk}/detail/')
+        self.assertContains(page, '🤖 Агент відправки: що далі')
+        self.assertContains(page, 'id="agn-labels"')
+        self.assertContains(page, 'window.svLabel')
+        self.assertContains(page, f'/admin/shipping/shipment/create/{nxt.pk}/')
+        self.assertContains(page, '/print-all/')
+        self.assertContains(page, 'Позначити «Відправлено»')
+
+    def test_mark_shipped_needs_order_right(self):
+        from django.contrib import admin
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        ma = admin.site._registry[Shipment]
+        o = self.order()
+        s = self.booked(o)
+
+        def post(user):
+            req = RequestFactory().post('/')
+            req.user, req.session = user, {}
+            req._messages = FallbackStorage(req)
+            return ma.shop_confirm_view(req, s.pk)
+
+        post(staff('bea', 'accountant'))
+        o.refresh_from_db()
+        self.assertEqual((o.status, o.shipped_at), ('received', None))
+        post(self.user)
+        o.refresh_from_db()
+        self.assertEqual((o.status, o.shipped_at, o.tracking_number), ('shipped', timezone.localdate(), '1Z999'))
+        self.assertTrue(ship_advice.after_booking(s, self.user)['shipped'])

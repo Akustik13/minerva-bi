@@ -560,6 +560,63 @@
     alert('Для ' + o.sku + ' немає етикетки в базі.');
   }
 
+  // ── Кілька етикеток одним натисканням («🖨️ Друкувати все» агента відправки) ─────────────────────
+  // items — як у кнопок {kind, sku, qty, order, file}; по черзі на той самий принтер, без перегляду
+  // («Дія при натисканні» = завантажити — файли завантажуються). Етикетка товару, яку ще не перевіряли
+  // (вікно перевірки), не друкується — у звіті check. done({printed: [назва], check: [o], failed: [{o, error}],
+  // saved: файли завантажено, а не надруковано}).
+  function labelUrl(o) {
+    if (o.kind === 'order') {
+      return Promise.resolve({url: '/labels/order/' + encodeURIComponent(o.order) + '/', name: 'Order-' + o.sku});
+    }
+    if (!templ(o)) {
+      if (o.file) return Promise.resolve({url: '/labels/serve/' + encodeURIComponent(o.sku) + '/?qty=' + o.qty, name: o.sku});
+      return Promise.reject(new Error('немає етикетки в базі'));
+    }
+    if (o.kind === 'cable') {
+      return fetch('/labels/generate/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+                                         body: JSON.stringify({part_no: o.sku, qty: o.qty})})
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d.ok) throw new Error(d.error || 'не сформовано');
+          return {url: d.download_url, name: o.sku};
+        });
+    }
+    var q = new URLSearchParams({sku: o.sku, qty: o.qty});
+    if (o.order) q.set('order', o.order);
+    return fetch('/labels/product/check/?' + q.toString())
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok) throw new Error(d.error || 'Помилка');
+        return d.ready ? {url: d.url, name: d.pn} : {check: true};
+      });
+  }
+  function batch(items, done) {
+    var save = DYMO_MODE === 'download', printer = null;
+    var report = {printed: [], check: [], failed: [], saved: save};
+    var start = save ? Promise.resolve(null) : printers().then(function (list) { return pickPrinter(list); });
+    return start.then(function (p) {
+      printer = p;
+      return items.reduce(function (chain, o) {
+        return chain.then(function () {
+          return labelUrl(o).then(function (r) {
+            if (r.check) { report.check.push(o); return; }
+            if (save) { download(r.url, r.name); report.printed.push(r.name); return; }
+            return fetchLabel(r.url)
+              .then(function (lab) { return send(printer, lab.xml, r.name, 1); })
+              .then(function () { report.printed.push(r.name); });
+          }).catch(function (e) {
+            if (e && e.offline) throw e;           // служба DYMO не відповідає — далі немає сенсу
+            report.failed.push({o: o, error: (e && e.message) || String(e)});
+          });
+        });
+      }, Promise.resolve());
+    }).then(function () {
+      if (done) done(report);
+      return report;
+    }).catch(function (e) { failed(e, function () { batch(items, done); }); });
+  }
+
   // ── Меню правого кліку ──────────────────────────────────────────────────────
   function closeMenu() { var m = document.getElementById('svl-menu'); if (m) m.remove(); }
   function menu(el, ev) {
@@ -794,7 +851,7 @@
     (act === 'download' ? dl : pr).focus();
   }
 
-  window.svLabel = {run: run, menu: menu, print: directPrint, open: open, choosePrinter: choosePrinter,
+  window.svLabel = {run: run, menu: menu, print: directPrint, open: open, choosePrinter: choosePrinter, batch: batch,
                     preview: function (url, name) { return directPrint(url, name, {how: 'preview'}); },
                     check: function (o) { generate(Object.assign({kind: 'generic', qty: 1, order: ''}, o), 'check'); }};
 })();
