@@ -3,6 +3,8 @@
 Логіка — agent/mail.py (листи), agent/tasks.py + agent/tools.py (завдання), рівні ризику дій — agent/risk.py.
 Доручення належить скриньці (пошта — лише власника), завдання — людині, що його дала: бачить і змінює лише вона.
 """
+import datetime
+
 from django.conf import settings
 from django.db import models
 
@@ -183,6 +185,40 @@ class AgentRun(models.Model):
         return f'{self.rule} · {self.message_id}'
 
 
+class AgentSchedule(models.Model):
+    """⏰ Регулярне завдання агенту: «щодня о 8:00 перевір, що не відправлено й чому», «зранку — що прийшло в пошту,
+    що важливе, що на сьогодні» … За розкладом — нове AgentTask з цією інструкцією, підсумок — звіт листом і в
+    Telegram власнику (agent/schedules.py, agent/notify.py)."""
+    WEEKDAYS = [(0, 'Пн'), (1, 'Вт'), (2, 'Ср'), (3, 'Чт'), (4, 'Пт'), (5, 'Сб'), (6, 'Нд')]
+
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='agent_schedules',
+                              verbose_name='Чиє')
+    name = models.CharField('Назва', max_length=200)
+    enabled = models.BooleanField('Увімкнено', default=True)
+    instruction = models.TextField(
+        'Що зробити й про що звітувати',
+        help_text='Своїми словами, як завдання агенту. Агент виконує його за розкладом і надсилає вам підсумок — звіт.')
+    time = models.TimeField('О котрій', default=datetime.time(8, 0), help_text='За часом Берліна.')
+    days = models.JSONField('Дні тижня', default=list, blank=True,
+                            help_text='0 — понеділок … 6 — неділя; порожньо — щодня.')
+    model = models.CharField('Модель AI', max_length=40, choices=TASK_MODELS, default=DEFAULT_MODEL)
+    budget_usd = models.DecimalField('Найбільше на один запуск, $', max_digits=6, decimal_places=2, default=0.3)
+    notify_email = models.BooleanField('✉️ Звіт на пошту', default=True)
+    notify_telegram = models.BooleanField(
+        '💬 Звіт у Telegram', default=True,
+        help_text='На Telegram ID з «Мої налаштування» (бот — «Налаштування → Сповіщення»).')
+    last_run_at = models.DateTimeField('Останній запуск', null=True, blank=True)
+    created_at = models.DateTimeField('Створено', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Регулярне завдання агенту'
+        verbose_name_plural = '⏰ Регулярні завдання агенту'
+        ordering = ['time', 'name']
+
+    def __str__(self):
+        return self.name
+
+
 class AgentTask(models.Model):
     """Завдання агенту словами людини: «знайди вагу в даташитах і внеси», «знайди даташити й надішли на …».
     Агент читає товари й даташити (agent/tools.py) і лише ПРОПОНУЄ зміни (AgentProposal) — застосовує людина."""
@@ -208,6 +244,9 @@ class AgentTask(models.Model):
     mail_cc = models.TextField(
         'Копія (CC)', blank=True, default='',
         help_text='Необов’язково: адреси в копію кожного листа завдання (на сторінці перевірки можна змінити).')
+    schedule = models.ForeignKey('AgentSchedule', null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name='tasks', verbose_name='Регулярне завдання',
+                                 help_text='Запуск регулярного завдання за розкладом — звіт іде вам листом і в Telegram')
     products = models.ManyToManyField('inventory.Product', blank=True, related_name='+', verbose_name='Товари')
     message = models.ForeignKey('email_assistant.EmailMessage', null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name='agent_tasks', verbose_name='Лист',

@@ -6,7 +6,7 @@ where: 📧 Email → 📥 Вхідні → правий клік на лист�
 urls: /email/, /admin/agent/agentrule/, /admin/agent/agentrun/
 roles: менеджер, адміністратор (кожен — для своєї скриньки)
 keywords: агент, доручення, перевірити доручення, протестувати, що буде, спробувати, запит на прочитання, нагадати, немає реакції, позначати важливими, важливо, дуже важливо, повідомити одразу, Telegram, переслати, пересилати, автоматично переслати, рахунок, Rechnung, weiterleiten, forward, лист клієнту, писати клієнту, мито, брокерський збір, UPS exception, Zölle, Brokerage Fee, копія, CC, завдання з кожного листа, трек-номер у замовлення, трек-номер сам, листи колег, переслані листи, автоматична відповідь, відповідати самому, чернетка, автовідповідь, шаблон відповіді, Agent, Auftrag, automatische Antwort, agent, auto reply
-related: mail/importance, mail/ai-reply, mail/rules, mail/categories, mail/compose, inventory/agent-tasks
+related: inventory/agent-schedules, mail/importance, mail/ai-reply, mail/rules, mail/categories, mail/compose, inventory/agent-tasks
 ---
 
 ## Що це
@@ -40,6 +40,9 @@ related: mail/importance, mail/ai-reply, mail/rules, mail/categories, mail/compo
 
 Агент перевіряє нові листи щохвилини; ті, що вже лежать у скриньці, не чіпає. Готова чернетка — у «📝 Чернетках»,
 а в листі зверху рядок **«🤖 Агент · … 📝 чернетка відповіді готова → ✏️ Відкрити чернетку»**.
+
+> 💡 Доручення спрацьовують на нові листи. Щоб агент **щодня в певний час** робив щось і звітував (що не
+> відправлено й чому, огляд пошти й дня в Telegram) — [⏰ Регулярні завдання агенту](guide:inventory/agent-schedules).
 
 ## 🧪 Перевірити, як працює
 

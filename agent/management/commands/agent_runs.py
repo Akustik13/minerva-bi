@@ -9,7 +9,12 @@ class Command(BaseCommand):
         parser.add_argument('--limit', type=int, default=None, help='Листів за прохід (за замовч. PER_LOOP)')
 
     def handle(self, *args, **opts):
-        from agent.models import AgentRule, AgentTask
+        from agent.models import AgentRule, AgentSchedule, AgentTask
+        if AgentSchedule.objects.filter(enabled=True).exists():   # ⏰ регулярні завдання → у чергу
+            from agent import schedules
+            n = schedules.run_due()
+            if n:
+                self.stdout.write(f'agent schedules: запущено {n}')
         if AgentRule.objects.filter(enabled=True).exists():
             from agent.mail import PER_LOOP, run_due
             out = run_due(opts['limit'] or PER_LOOP)

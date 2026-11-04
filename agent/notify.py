@@ -92,6 +92,7 @@ def _send_mail(user, m, link_text='Відкрити завдання') -> str:
 
 
 def _send_telegram(user, m, link_text='Відкрити завдання') -> str:
+    tg_max = m.get('tg_max', 500)
     chat = getattr(getattr(user, 'profile', None), 'telegram_id', None)
     if not chat:
         return ''
@@ -101,7 +102,7 @@ def _send_telegram(user, m, link_text='Відкрити завдання') -> st
     if not ns.telegram_bot_token:
         return 'немає бота в «Налаштування → Сповіщення»'
     text = (f'<b>{escape(m["subject"])}</b>\n{escape(m["head"])}\n' + '\n'.join(escape(x) for x in m['lines'])
-            + (f'\n\n{escape(m["summary"][:500])}' if m['summary'] else '')
+            + (f'\n\n{escape(m["summary"][:tg_max])}' if m['summary'] else '')
             + f'\n\n<a href="{escape(m["link"])}">{escape(link_text)}</a>')
     try:
         send(ns, text, chat_id_override=chat)
@@ -112,19 +113,47 @@ def _send_telegram(user, m, link_text='Відкрити завдання') -> st
 
 def task_finished(task_id, note='') -> str:
     """Після `_finish`: повідомити власника, якщо прохід був довгим. → що записано в кроки ('' — нічого)."""
-    task = AgentTask.objects.select_related('owner', 'owner__profile').filter(pk=task_id).first()
-    if task is None or not due(task):
+    task = AgentTask.objects.select_related('owner', 'owner__profile', 'schedule').filter(pk=task_id).first()
+    if task is None:
+        return ''
+    if task.schedule_id:                    # ⏰ регулярне завдання — звіт завжди, у вибрані канали
+        s = task.schedule
+        return deliver(task.owner, report(task, note), mail=s.notify_email, telegram=s.notify_telegram)
+    if not due(task):
         return ''
     return deliver(task.owner, compose(task, note))
 
 
-def deliver(user, m, link_text='Відкрити завдання') -> str:
+REPORT_MAX = 3500       # звіт регулярного завдання — пошта
+REPORT_TG_MAX = 3000    # і Telegram (ліміт повідомлення 4096 разом з розміткою)
+
+
+def report(task, note='') -> dict:
+    """Звіт регулярного завдання (agent/schedules.py): підсумок агента повністю (до REPORT_MAX)."""
+    from django.utils import timezone
+    m = compose(task, note)
+    s = task.schedule
+    summary = (task.summary or '').strip()
+    if len(summary) > REPORT_MAX:
+        summary = summary[:REPORT_MAX].rstrip() + '…'
+    pending = task.proposals.filter(status=AgentProposal.PENDING).count()
+    ok = task.status != AgentTask.FAILED and not note
+    lines = [f'Витрачено: {task.cost_usd:.2f} $ з {task.budget_usd} $']
+    if pending:
+        lines.insert(0, f'Пропозицій чекають вашої перевірки: {pending}')
+    return {'subject': f'🤖 {s.name} — {timezone.localtime():%d.%m.%Y}'[:200],
+            'head': f'🤖 Звіт агента — «{s.name}»' if ok else m['head'],
+            'lines': lines, 'summary': summary or 'Агент нічого не написав.', 'link': m['link'],
+            'tg_max': REPORT_TG_MAX}
+
+
+def deliver(user, m, link_text='Відкрити завдання', *, mail=True, telegram=True) -> str:
     """Лист і (якщо в профілі є Telegram ID) Telegram людині. m — {subject, head, lines, summary, link}.
     Ним же — «⚠️ Немає реакції на лист» (email_assistant/followups.py), «‼️ Дуже важливий лист» (agent/mail.py).
     → «🔔 Повідомлено: пошта, Telegram» / «🔕 Не вдалося повідомити — …»."""
-    telegram = bool(getattr(getattr(user, 'profile', None), 'telegram_id', None))
+    telegram = telegram and bool(getattr(getattr(user, 'profile', None), 'telegram_id', None))
     sent, failed = [], []
-    for name, fn, wanted in (('пошта', _send_mail, True), ('Telegram', _send_telegram, telegram)):
+    for name, fn, wanted in (('пошта', _send_mail, mail), ('Telegram', _send_telegram, telegram)):
         if not wanted:
             continue
         try:

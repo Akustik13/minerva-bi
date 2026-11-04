@@ -15,7 +15,7 @@ from django.utils.safestring import mark_safe
 
 from agent import mail as agent_mail
 from agent import products as product_fields
-from agent.models import AgentProposal, AgentRule, AgentRun, AgentTask
+from agent.models import AgentProposal, AgentRule, AgentRun, AgentSchedule, AgentTask
 
 # ✓ на сторінці завдання — кому є що застосувати (кожна пропозиція ще перевіряє своє право, agent/decide.py)
 APPLY_PERMS = ('inventory.change_product', 'inventory.add_product', 'inventory.add_inventorytransaction',
@@ -345,6 +345,146 @@ class AgentRuleAdmin(admin.ModelAdmin):
                                STATUS_ICONS.get(r.status, ''), r.get_status_display(),
                                r.get_outcome_display() if r.outcome else '', r.reason, _result_link(r))
                               for r in runs)))
+
+
+# ── ⏰ Регулярні завдання агенту ──────────────────────────────────────────────
+
+class AgentScheduleForm(forms.ModelForm):
+    days = forms.TypedMultipleChoiceField(
+        label='Дні тижня', choices=AgentSchedule.WEEKDAYS, coerce=int, required=False,
+        widget=forms.CheckboxSelectMultiple, help_text='Нічого не вибрано — щодня.')
+
+    class Meta:
+        model = AgentSchedule
+        fields = ['name', 'enabled', 'instruction', 'time', 'days', 'model', 'budget_usd', 'notify_email',
+                  'notify_telegram']
+        widgets = {'instruction': forms.Textarea(attrs={'rows': 7})}
+
+    def clean_days(self):
+        return sorted(set(self.cleaned_data.get('days') or []))
+
+
+@admin.register(AgentSchedule)
+class AgentScheduleAdmin(admin.ModelAdmin):
+    form = AgentScheduleForm
+    list_display = ('name', 'when_col', 'enabled', 'last_col', 'next_col')
+    list_filter = ('enabled',)
+    readonly_fields = ('state_panel',)
+    DESCRIPTION = ('Агент виконує завдання за розкладом і надсилає вам звіт — у Telegram і на пошту. Пишіть своїми '
+                   'словами, як завдання агенту. Агент лише читає й звітує (зміни — лише якщо попросите, і тоді — '
+                   'пропозиції, які ви підтверджуєте ✓).')
+
+    def get_fieldsets(self, request, obj=None):
+        presets = format_html_join(' · ', '<a href="?preset={}">{}</a>',
+                                   ((key, p['name']) for key, p in schedules_presets().items()))
+        top = [(None, {'fields': ('name', 'enabled', 'instruction'),
+                       'description': format_html('{}<br><br>Готові приклади: {}', self.DESCRIPTION, presets)})]
+        if obj is not None and obj.pk:
+            top.insert(0, ('Стан', {'fields': ('state_panel',)}))
+        return top + [
+            ('⏰ Коли', {'fields': ('time', 'days')}),
+            ('Звіт і витрати', {'fields': ('notify_telegram', 'notify_email', 'model', 'budget_usd')}),
+        ]
+
+    def get_changeform_initial_data(self, request):
+        data = super().get_changeform_initial_data(request)
+        preset = schedules_presets().get(request.GET.get('preset', ''))
+        if preset:
+            data.update(name=preset['name'], instruction=preset['instruction'])
+        data.setdefault('days', [0, 1, 2, 3, 4])
+        return data
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).filter(owner=request.user)
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and obj.owner_id != request.user.pk:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.owner_id != request.user.pk:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.owner = request.user
+        super().save_model(request, obj, form, change)
+
+    def get_urls(self):
+        from django.urls import path
+        return [path('<int:pk>/run/', self.admin_site.admin_view(self.run_view),
+                     name='agent_agentschedule_run')] + super().get_urls()
+
+    def run_view(self, request, pk):
+        """«▶ Запустити зараз» (POST): нове завдання у фоні, звіт — як за розкладом."""
+        from agent import schedules
+        obj = self.get_queryset(request).filter(pk=pk).first()
+        if obj is None:
+            raise Http404
+        if request.method != 'POST' or not request.user.has_perm('agent.add_agenttask'):
+            messages.error(request, 'Немає права давати завдання агенту')
+            return redirect(reverse('admin:agent_agentschedule_change', args=[obj.pk]))
+        task = schedules.start(obj, manual=True)
+        if task is None:
+            messages.error(request, 'Не вдалося запустити: ' + (schedules.allowed(obj) or 'спробуйте ще раз'))
+            return redirect(reverse('admin:agent_agentschedule_change', args=[obj.pk]))
+        messages.info(request, '▶ Агент працює — звіт прийде, коли закінчить; хід — на цій сторінці')
+        return redirect(reverse('admin:agent_agenttask_review', args=[task.pk]))
+
+    @admin.display(description='Коли')
+    def when_col(self, obj):
+        from agent import schedules
+        return f'{schedules.days_text(obj)} о {obj.time:%H:%M}'
+
+    @admin.display(description='Останній запуск')
+    def last_col(self, obj):
+        task = obj.tasks.order_by('-created_at').first()
+        if task is None:
+            return '—'
+        return format_html('<a href="{}">{} · {}</a>', reverse('admin:agent_agenttask_review', args=[task.pk]),
+                           timezone.localtime(task.created_at).strftime('%d.%m %H:%M'), task.get_status_display())
+
+    @admin.display(description='Наступний')
+    def next_col(self, obj):
+        from agent import schedules
+        at = schedules.next_run(obj)
+        return timezone.localtime(at).strftime('%d.%m %H:%M') if at else '—'
+
+    @admin.display(description='Стан')
+    def state_panel(self, obj):
+        from agent import schedules
+        at = schedules.next_run(obj)
+        profile = getattr(obj.owner, 'profile', None)
+        tg = bool(getattr(profile, 'telegram_id', None))
+        notes = []
+        if obj.notify_telegram and not tg:
+            notes.append(format_html('⚠️ У «<a href="/core/my-settings/">Мої налаштування</a>» не вказано Telegram ID — '
+                                     'звіт у Telegram не прийде'))
+        why = schedules.allowed(obj)
+        if why:
+            notes.append(f'⚠️ Не запускається: {why}')
+        runs = format_html_join('', '<li><a href="{}">{}</a> — {}</li>', (
+            (reverse('admin:agent_agenttask_review', args=[t.pk]),
+             timezone.localtime(t.created_at).strftime('%d.%m %H:%M'), t.get_status_display())
+            for t in obj.tasks.order_by('-created_at')[:7]))
+        return format_html(
+            '<div>{} о {} · наступний запуск: <b>{}</b></div>{}'
+            '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formmethod="post" '
+            'formnovalidate onclick="return confirm(\'Запустити зараз? Агент виконає завдання й надішле звіт.\')">'
+            '▶ Запустити зараз</button> <span style="opacity:.7">— одразу, звіт прийде як за розкладом; '
+            'збережені налаштування</span></div>'
+            '<div style="margin-top:8px">Останні запуски:<ul style="margin:4px 0">{}</ul></div>',
+            schedules.days_text(obj), obj.time.strftime('%H:%M'),
+            timezone.localtime(at).strftime('%d.%m %H:%M') if at else 'вимкнено',
+            format_html_join('', '<div style="margin-top:6px">{}</div>', ((n,) for n in notes)),
+            reverse('admin:agent_agentschedule_run', args=[obj.pk]), runs or format_html('<li>ще не було</li>'))
+
+
+def schedules_presets():
+    from agent.schedules import PRESETS
+    return PRESETS
 
 
 @admin.register(AgentRun)

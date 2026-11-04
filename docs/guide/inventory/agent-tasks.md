@@ -6,7 +6,7 @@ where: 📦 Склад → 🤖 Завдання агенту; 📦 Склад �
 urls: /admin/agent/agenttask/, /admin/agent/agenttask/add/, /admin/inventory/product/, /admin/sales/salesorder/
 roles: менеджер, адміністратор
 keywords: агент, завдання, перегенерувати лист, переписати лист, звернення, мова листа, копія, CC, кому надсилати, закупівля з листа, посилка від постачальника, інвойс, Invoice, Raynool, вхідна посилка, повідомлення, сповіщення, коли закінчить, Telegram, даташит, вага, HS-код, країна виробника, параметри, знайти й внести, надіслати даташит, прихід, Lieferschein, новий товар, календар, з листа, відправлення, чернетка відправлення, трек-номер, що відправити, прострочені замовлення, Versand, Sendungsnummer, shipment, tracking, RAG, аналог, пошук по даташитах, історія листування, datasheet, Gewicht, Datenblatt, Wareneingang, agent, task
-related: api/mcp, ai/product-assistant, ai/knowledge-access, shipping/shipments, sales/orders, mail/agent, inventory/products, inventory/stock, inventory/settings, calendar/overview, shop/overview, digikey/prices
+related: inventory/agent-schedules, api/mcp, ai/product-assistant, ai/knowledge-access, shipping/shipments, sales/orders, mail/agent, inventory/products, inventory/stock, inventory/settings, calendar/overview, shop/overview, digikey/prices
 ---
 
 ## Що це
@@ -49,6 +49,11 @@ related: api/mcp, ai/product-assistant, ai/knowledge-access, shipping/shipments,
 натисніть **«Зберегти»** — сам віконце нічого не запускає. На прохання «на такі листи відповідай …» — підказка
 про **🤖 Доручення агента** й кнопка **«📥 Відкрити пошту»**. Питання «як / де …» віконце, як і раніше, пояснює за
 гідом.
+
+## ⏰ Щодня за розкладом
+
+Те саме завдання можна запускати щодня (напр. о 8:00 у будні) зі звітом у Telegram і на пошту — «що не відправлено
+й чому», «що прийшло в пошту й що на сьогодні»: [Регулярні завдання агенту](guide:inventory/agent-schedules).
 
 ## Кому надсилати лист
 
