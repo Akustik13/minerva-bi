@@ -120,7 +120,7 @@ class LoopTests(Base):
                                   body='Hallo Anna, anbei das Datenblatt.', attach_datasheets=['AN220213-01C'])),
             resp('end_turn', text('Лист підготовлено.')),
         ])
-        self.assertIn('немає в тексті завдання', fake.calls[1]['messages'][-1]['content'][0]['content'])
+        self.assertIn('немає в завданні', fake.calls[1]['messages'][-1]['content'][0]['content'])
         mail = task.proposals.get(kind=AgentProposal.MAIL)
         self.assertEqual((mail.mail_to, mail.mail_attach), ('anna@kunde.de', ['AN220213-01C']))
 
@@ -219,7 +219,7 @@ class DecideTests(Base):
         self.assertEqual((draft.to_emails, draft.attachments[0]['name']), (['anna@kunde.de'], 'AN220213-01C-datasheet.pdf'))
         self.assertEqual(decide.mail(p2, self.user, send=True), '')
         self.assertEqual(ScheduledEmail.objects.get().to_emails, ['anna@kunde.de'])
-        self.assertIn('немає в тексті завдання', decide.mail(p3, self.user, to='boss@other.com'))
+        self.assertIn('немає в завданні', decide.mail(p3, self.user, to='boss@other.com'))
 
 
 class PageTests(Base):

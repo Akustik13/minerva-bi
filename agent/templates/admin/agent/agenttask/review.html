@@ -27,6 +27,9 @@
   #agt tr.done td { opacity: .6; }
   #agt .agt-mail label { display: block; font-size: 11px; color: var(--text-muted); margin: 8px 0 2px; }
   #agt .agt-mail input[type=text], #agt .agt-mail textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; }
+  #agt .agt-redo { margin-top: 12px; padding: 10px 12px; border-radius: 6px; border: 1px dashed var(--border-strong); }
+  #agt .agt-redo-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; }
+  #agt .agt-redo-row > div:first-child { flex: 1 1 360px; }
   #agt .agt-log { font-size: 12px; font-family: monospace; max-height: 320px; overflow-y: auto; }
   #agt .agt-log div { padding: 1px 0; border-bottom: 1px dotted var(--border); }
   #agt .conf-low { color: var(--warn, #d97706); }
@@ -125,14 +128,30 @@
       <div class="agt-head"><b>✉️ Лист</b> <span class="agt-muted">{{ m.get_status_display }}</span>
         {% if m.result_url %}<a href="{{ m.result_url }}" target="_blank">{% if 'compose' in m.result_url %}📝 відкрити чернетку{% else %}⏳ запланований лист{% endif %}</a>{% endif %}
         {% if m.error %}<span class="agt-muted">⚠️ {{ m.error }}</span>{% endif %}</div>
-      <label>Кому <span class="agt-muted">— лише адреси з тексту завдання</span></label>
+      <label>Кому <span class="agt-muted">— лише адреси із завдання (текст або «Кому надсилати листи»)</span></label>
       <input type="text" name="to" value="{{ m.mail_to }}" {% if m.status != 'pending' %}readonly{% endif %} translate="no">
+      <label>Копія (CC) <span class="agt-muted">— адреси через кому, необов’язково</span></label>
+      <input type="text" name="cc" value="{{ m.data.cc|join:', ' }}" placeholder="sergey@sevskiy.de" {% if m.status != 'pending' %}readonly{% endif %} translate="no">
       <label>Тема</label>
       <input type="text" name="subject" value="{{ m.mail_subject }}" {% if m.status != 'pending' %}readonly{% endif %} translate="no">
       <label>Текст</label>
       <textarea name="body" rows="8" {% if m.status != 'pending' %}readonly{% endif %} translate="no">{{ m.mail_body }}</textarea>
       {% if m.mail_attach %}<div class="agt-muted" style="margin-top:6px">📎 Даташити: <span translate="no">{{ m.mail_attach|join:", " }}</span></div>{% endif %}
       {% if m.status == 'pending' %}
+      <div class="agt-redo">
+        <div class="agt-redo-row">
+          <div>
+            <label>✍️ Що змінити <span class="agt-muted">— напр.: «Звернення: Привіт, Сергію!», «коротше», «на ти»</span></label>
+            <textarea name="change" rows="2" placeholder="Звернення — «Привіт, Сергію!», решту лиши як є"></textarea>
+          </div>
+          <div>
+            <label>Мова листа</label>
+            <select name="lang">{% for v, l in mail_langs %}<option value="{{ v }}"{% if v == m.data.lang %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+          </div>
+          <button type="submit" name="action" value="mail_rewrite" class="button"
+                  title="AI перепише тему й текст за вашим побажанням і мовою; номери, артикули, дати й кількості лишаються ті самі. Нічого не надсилається.">🔄 Перегенерувати лист</button>
+        </div>
+      </div>
       <div class="agt-actions">
         <button type="submit" name="action" value="mail_draft" class="button">📝 Відкрити як чернетку</button>
         <button type="submit" name="action" value="mail_send" class="button default" onclick="return confirm('Надіслати цей лист зараз? Він стане в «Заплановані» й піде протягом 2 хвилин.')">✉️ Надіслати</button>

@@ -56,7 +56,8 @@ ATTR = {'name': 'propose_attribute', 'description': 'Запропонувати 
             'evidence': _EVIDENCE, 'source': _SOURCE, 'confidence': _CONF},
             'required': ['sku', 'name', 'value', 'evidence', 'source']}}
 MAIL = {'name': 'propose_email', 'description': 'Підготувати лист (людина перевірить і надішле). Адреси — лише ті, '
-        'що є в тексті завдання. attach_datasheets — артикули, чиї даташити додати до листа.',
+        'що є в тексті завдання або в «Кому надсилати листи» (порожній to — саме їм); копію додає Minerva сама. '
+        'attach_datasheets — артикули, чиї даташити додати до листа.',
         'input_schema': {'type': 'object', 'properties': {
             'to': {'type': 'array', 'items': {'type': 'string'}}, 'subject': {'type': 'string'},
             'body': {'type': 'string'}, 'attach_datasheets': {'type': 'array', 'items': {'type': 'string'}}},
@@ -295,20 +296,30 @@ def _attr(ctx, args):
 
 
 def allowed_addresses(task) -> set:
-    return {a.lower() for a in EMAIL_RE.findall(task.instruction or '')}
+    """Кому агент може писати: адреси з тексту завдання й поля «Кому надсилати листи» (лише те, що написала людина)."""
+    return {a.lower() for a in EMAIL_RE.findall(f'{task.instruction or ""}\n{task.mail_to or ""}')}
+
+
+def task_recipients(task) -> tuple:
+    """(кому, копія) з полів завдання «Кому надсилати листи» / «Копія (CC)»."""
+    from agent.mail_edit import cc_list
+    return cc_list(task.mail_to), cc_list(task.mail_cc)
 
 
 def _mail(ctx, args):
     if ctx.task.each_product or ctx.only is not None:
         raise ToolError('у режимі «окремо для кожного товару» листів не готуємо')
     to = [str(a).strip().lower() for a in (args.get('to') or []) if str(a).strip()]
+    task_to, task_cc = task_recipients(ctx.task)
+    if not to:
+        to = task_to                            # «Кому надсилати листи» завдання
     if not to:
         raise ToolError('кому?')
     allowed = allowed_addresses(ctx.task)
     foreign = [a for a in to if a not in allowed]
     if foreign:
-        raise ToolError(f'адреси {", ".join(foreign)} немає в тексті завдання — лист можна лише на адреси, '
-                        f'які написала людина')
+        raise ToolError(f'адреси {", ".join(foreign)} немає в завданні — лист можна лише на адреси, які написала '
+                        f'людина (текст завдання або «Кому надсилати листи»)')
     attach = []
     for sku in args.get('attach_datasheets') or []:
         product = ctx.product(sku)
@@ -319,7 +330,7 @@ def _mail(ctx, args):
     if not subject or not body:
         raise ToolError('потрібні тема й текст листа')
     AgentProposal.objects.create(task=ctx.task, kind=AgentProposal.MAIL, mail_to=', '.join(to), mail_subject=subject,
-                                 mail_body=body[:20000], mail_attach=attach)
+                                 mail_body=body[:20000], mail_attach=attach, data={'cc': task_cc} if task_cc else {})
     ctx.proposed += 1
     return f'Лист на {", ".join(to)} підготовлено — людина перевірить і надішле' + (
         f' (вкладення: даташити {", ".join(attach)})' if attach else '')

@@ -387,16 +387,29 @@ class AgentRunAdmin(admin.ModelAdmin):
 class AgentTaskForm(forms.ModelForm):
     class Meta:
         model = AgentTask
-        fields = ['instruction', 'message', 'products', 'each_product', 'web', 'model', 'budget_usd']
+        fields = ['instruction', 'mail_to', 'mail_cc', 'message', 'products', 'each_product', 'web', 'model',
+                  'budget_usd']
         widgets = {'instruction': forms.Textarea(attrs={
             'rows': 6, 'placeholder': 'Напр.: Знайди в даташитах вагу однієї штуки й країну виробника і внеси. '
-                                      'Або: Знайди даташити цих антен і надішли їх на anna@kunde.de з коротким листом.'})}
+                                      'Або: Знайди даташити цих антен і надішли їх на anna@kunde.de з коротким листом.'}),
+            'mail_to': forms.Textarea(attrs={'rows': 1, 'placeholder': 'anna@kunde.de'}),
+            'mail_cc': forms.Textarea(attrs={'rows': 1, 'placeholder': 'sergey@sevskiy.de'})}
 
     def clean(self):
         data = super().clean()
         if data.get('each_product') and not data.get('products'):
             raise forms.ValidationError('«Окремо для кожного товару» — виберіть товари.')
+        from agent.mail_edit import bad_cc
+        for field in ('mail_to', 'mail_cc'):
+            bad = bad_cc(data.get(field) or '')
+            if bad:
+                self.add_error(field, 'Не схоже на адресу: ' + ', '.join(bad[:3]))
         return data
+
+
+def mail_langs():
+    from agent.mail_edit import LANG_CHOICES
+    return LANG_CHOICES
 
 
 @admin.register(AgentTask)
@@ -416,7 +429,8 @@ class AgentTaskAdmin(admin.ModelAdmin):
         note = format_html('<br><br>✉️ <b>Завдання з листа</b> «<span translate="no">{}</span>» від '
                            '<span translate="no">{}</span> — агент прочитає його й вкладення.',
                            mail.subject or '(без теми)', mail.from_email) if mail else ''
-        return ((None, {'fields': ('instruction', 'message', 'products', 'each_product', 'web', 'model', 'budget_usd'),
+        return ((None, {'fields': ('instruction', 'mail_to', 'mail_cc', 'message', 'products', 'each_product', 'web',
+                                   'model', 'budget_usd'),
                         'description': format_html('{}{}', self.DESCRIPTION, note)}),)
 
     def _mail_from_get(self, request):
@@ -529,6 +543,7 @@ class AgentTaskAdmin(admin.ModelAdmin):
             **self.admin_site.each_context(request),
             'title': task.title, 'task': task, 'rows': rows,
             'mails': list(task.proposals.filter(kind=AgentProposal.MAIL)),
+            'mail_langs': mail_langs(),
             'pending': sum(1 for p in rows if p.status == AgentProposal.PENDING),
             'running': task.status in (AgentTask.QUEUED, AgentTask.RUNNING),
             'stopped': task.status in (AgentTask.FAILED, AgentTask.CANCELLED),
@@ -552,12 +567,25 @@ class AgentTaskAdmin(admin.ModelAdmin):
                 messages.error(request, f'⚠️ {line}')
         elif action == 'reject':
             messages.info(request, f'✕ Відхилено: {decide.reject_selected(task, ids, request.user)}')
+        elif action == 'mail_rewrite':   # ✍️ «🔄 Перегенерувати лист» (agent/mail_edit.py)
+            from agent import mail_edit
+            p = task.proposals.filter(pk=request.POST.get('pid') or 0, kind=AgentProposal.MAIL,
+                                      status=AgentProposal.PENDING).first()
+            error = 'лист уже оброблено' if p is None else mail_edit.rewrite(
+                p, request.user, change=request.POST.get('change', ''), lang=request.POST.get('lang', ''),
+                subject=request.POST.get('subject', ''), body=request.POST.get('body', ''),
+                cc=request.POST.get('cc', ''))
+            if error:
+                messages.error(request, f'⚠️ {error}')
+            else:
+                messages.success(request, '🔄 Лист переписано — перевірте й надішліть')
         elif action in ('mail_draft', 'mail_send'):
             p = task.proposals.filter(pk=request.POST.get('pid') or 0, kind=AgentProposal.MAIL,
                                       status=AgentProposal.PENDING).first()
             error = 'лист уже оброблено' if p is None else decide.mail(
                 p, request.user, send=action == 'mail_send', to=request.POST.get('to', ''),
-                subject=request.POST.get('subject', ''), body=request.POST.get('body', ''))
+                subject=request.POST.get('subject', ''), body=request.POST.get('body', ''),
+                cc=request.POST.get('cc', ''))
             if error:
                 messages.error(request, f'⚠️ {error}')
             elif action == 'mail_draft':

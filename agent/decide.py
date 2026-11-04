@@ -171,8 +171,10 @@ def _settle(task):
         AgentTask.objects.filter(pk=task.pk).update(status=AgentTask.DONE)
 
 
-def mail(proposal, user, *, send=False, to='', subject='', body='') -> str:
-    """Лист з пропозиції (можна з правками людини) → чернетка або відправка. '' — готово, інакше — чому ні."""
+def mail(proposal, user, *, send=False, to='', subject='', body='', cc=None) -> str:
+    """Лист з пропозиції (можна з правками людини) → чернетка або відправка. '' — готово, інакше — чому ні.
+    «Кому» — лише адреси з тексту завдання; «Копія (CC)» — адреси, які ввела людина на сторінці перевірки
+    (None — збережені в proposal.data, agent/mail_edit.py)."""
     from email_assistant import attachments
     from email_assistant.models import EmailAccount, EmailDraft, ScheduledEmail
     from inventory.models import Product
@@ -183,7 +185,16 @@ def mail(proposal, user, *, send=False, to='', subject='', body='') -> str:
     allowed = allowed_addresses(proposal.task)
     foreign = [a for a in addresses if a not in allowed]
     if not addresses or foreign:
-        return (f'адреси {", ".join(foreign)} немає в тексті завдання' if foreign else 'кому?')
+        return (f'адреси {", ".join(foreign)} немає в завданні (текст або «Кому надсилати листи»)'
+                if foreign else 'кому?')
+    from agent.mail_edit import bad_cc, cc_list
+    if cc is None:
+        cc_emails = list((proposal.data or {}).get('cc') or [])
+    else:
+        bad = bad_cc(cc)
+        if bad:
+            return 'не схоже на адресу в «Копія (CC)»: ' + ', '.join(bad[:3])
+        cc_emails = cc_list(cc)
     subject = (subject or proposal.mail_subject).strip()[:500]
     body = (body or proposal.mail_body).strip()
     if not subject or not body:
@@ -200,14 +211,16 @@ def mail(proposal, user, *, send=False, to='', subject='', body='') -> str:
         items.append(attachments.store_file(f'{sku}-datasheet.pdf', data, 'application/pdf'))
     if send:
         sched = ScheduledEmail.objects.create(account=account, subject=subject, to_emails=addresses, body=body,
-                                              attachments=items, scheduled_at=timezone.now(), trigger='agent')
+                                              cc_emails=cc_emails, attachments=items, scheduled_at=timezone.now(),
+                                              trigger='agent')
         proposal.result_url = f'/admin/email_assistant/scheduledemail/{sched.pk}/change/'
     else:
         draft = EmailDraft.objects.create(account=account, subject=subject, to_emails=addresses, body=body,
-                                          attachments=items, source=EmailDraft.SOURCE_MANUAL)
+                                          cc_emails=cc_emails, attachments=items, source=EmailDraft.SOURCE_MANUAL)
         proposal.result_url = f'/email/compose/?draft={draft.pk}'
     proposal.mail_to, proposal.mail_subject, proposal.mail_body = ', '.join(addresses), subject, body
-    proposal.save(update_fields=['mail_to', 'mail_subject', 'mail_body', 'result_url'])
+    proposal.data = {**(proposal.data or {}), 'cc': cc_emails}
+    proposal.save(update_fields=['mail_to', 'mail_subject', 'mail_body', 'result_url', 'data'])
     product_fields.decided(proposal, user, AgentProposal.APPLIED)
     _settle(proposal.task)
     return ''

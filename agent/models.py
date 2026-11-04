@@ -201,6 +201,13 @@ class AgentTask(models.Model):
                               verbose_name='Хто дав завдання')
     title = models.CharField('Завдання', max_length=200)
     instruction = models.TextField('Що зробити')
+    mail_to = models.TextField(
+        'Кому надсилати листи', blank=True, default='',
+        help_text='Необов’язково. Якщо завдання — написати лист: адреси по одній у рядку або через кому. Агент пише саме '
+                  'їм (лист — лише на адреси звідси або з тексту завдання); ви перевіряєте й надсилаєте.')
+    mail_cc = models.TextField(
+        'Копія (CC)', blank=True, default='',
+        help_text='Необов’язково: адреси в копію кожного листа завдання (на сторінці перевірки можна змінити).')
     products = models.ManyToManyField('inventory.Product', blank=True, related_name='+', verbose_name='Товари')
     message = models.ForeignKey('email_assistant.EmailMessage', null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name='agent_tasks', verbose_name='Лист',

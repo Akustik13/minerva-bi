@@ -205,8 +205,11 @@ def run(task, deadline=None):
             ctx = agent_tools.Context(task)
             skus = list(task.products.order_by('sku').values_list('sku', flat=True)[:300])
             mail = agent_tools.mail_of(task)
+            to, cc = agent_tools.task_recipients(task)
             intro = (f'Сьогодні: {timezone.localtime():%Y-%m-%d %A}, час Europe/Berlin.\n\n'
                      f'ЗАВДАННЯ:\n{task.instruction}\n\n'
+                     + (f'ЛИСТ НАДСИЛАТИ НА: {", ".join(to)}' + (f' (копія {", ".join(cc)} — додається сама)'
+                                                                 if cc else '') + '\n\n' if to else '')
                      + (f'ЛИСТ ЗАВДАННЯ: «{mail.subject}» від {mail.from_email} — прочитай його (read_mail) і '
                         f'потрібні вкладення (read_attachment).\n\n' if mail is not None else '')
                      + (f'ТОВАРИ ЗАВДАННЯ ({len(skus)}): {", ".join(skus)}' if skus
