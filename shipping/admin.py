@@ -1390,6 +1390,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_detail",
             ),
             path(
+                "<int:shipment_id>/parcel/",
+                self.admin_site.admin_view(self.parcel_view),
+                name="shipping_shipment_parcel",
+            ),
+            path(
                 "<int:shipment_id>/label-a4/",
                 self.admin_site.admin_view(self.label_a4_view),
                 name="shipping_shipment_label_a4",
@@ -1719,6 +1724,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if request.method == "POST":
             return self._handle_create_post(request, order, carriers)
 
+        parcel_ctx = self._parcel_form_context(order)
+        if parcel_ctx and parcel_ctx["partial"] and parcel_ctx["value"] > 0:
+            shipment.declared_value = parcel_ctx["value"]
+
         n_articles = len(customs_articles) or 1
         default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 5)
 
@@ -1782,6 +1791,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "agent_checks":        self._ship_checks(order),
             "agent_wishes":        self._ship_wishes(order, request.user),
             "addr_book_json":      self._build_addr_book_json(request),
+            "parcel":              parcel_ctx,
         })
 
     def ship_today_view(self, request):
@@ -2025,6 +2035,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         self._apply_ups_payers_from_post(shipment, request)
         shipment.save()
         self._save_customs_weights_to_products(request, shipment)
+        self._save_parcel_from_post(request, shipment)
 
         # ── Multi-package: зберігаємо ShipmentPackage рядки якщо є ──────────
         pkg_weights = request.POST.getlist("pkg_weight[]")
@@ -2326,6 +2337,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "pkg_auto":             len(pkg_rows_edit) > 1 or (len(pkg_rows_edit) == 1 and pkg_rows_edit[0]["quantity"] > 1),
             "pkg_items_dist_json":  _json2.dumps(pkg_items_dist_edit),
             "addr_book_json":       self._build_addr_book_json(request),
+            "parcel":               self._parcel_form_context(order, shipment) if order else None,
         })
 
     def _handle_edit_post(self, request, shipment, carriers):
@@ -2423,6 +2435,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         self._apply_ups_payers_from_post(shipment, request)
         shipment.save()
         self._save_customs_weights_to_products(request, shipment)
+        self._save_parcel_from_post(request, shipment)
 
         # ── Multi-package: оновлюємо ShipmentPackage рядки ─────────────────────
         pkg_weights = request.POST.getlist("pkg_weight[]")
@@ -2630,7 +2643,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     def _shop_confirm_context(shipment):
         """Банер «Підтвердити відправлення в магазині» або None."""
         order = shipment.order
-        if not order or shipment.shop_confirm_dismissed:
+        if not order or shipment.shop_confirm_dismissed or shipment.shop_confirmed_at:
             return None
         if not (shipment.tracking_number or shipment.label_url):
             return None
@@ -2642,8 +2655,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if not cfg.shop_confirm_prompt or order.source not in (cfg.shop_confirm_sources or []):
             return None
         from sales.models import SalesSource
+        from .services import parcels
         src = SalesSource.objects.filter(slug=order.source).first()
         is_dk = order.source == "digikey"
+        here = parcels.contents(shipment)
+        part = shipment.lines.exists()
+        prog = parcels.progress(order) if part else None
         ctx = {
             "is_digikey":  is_dk,
             "source_name": src.name if src else order.source,
@@ -2651,11 +2668,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "ship_date":   timezone.localdate(),
             "lines":       [{"sku": (l.product.sku if l.product else l.sku_raw) or "",
                              "name": ((l.product.name_export or l.product.name) if l.product else "") or "",
-                             "qty": l.qty}
-                            for l in order.lines.select_related("product").order_by("pk")],
+                             "qty": here.get(l.pk, 0)}
+                            for l in order.lines.select_related("product").order_by("pk")
+                            if here.get(l.pk, 0) > 0],
+            "part":        part,
+            "parcel_n":    prog.number(shipment) if prog else None,
+            "parcel_of":   len(prog.parcels) if prog else None,
             "confirm_url": reverse("admin:shipping_shipment_shop_confirm", args=[shipment.pk]),
             "dismiss_url": reverse("admin:shipping_shipment_shop_confirm_dismiss", args=[shipment.pk]),
-            "manual_url":  f"/bots/digikey/ship/{order.pk}/" if is_dk else "",
+            "manual_url":  f"/bots/digikey/ship/{order.pk}/?shipment={shipment.pk}" if is_dk else "",
         }
         if is_dk:
             carrier = ShipmentAdmin._dk_carrier_for(shipment)
@@ -2731,7 +2752,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if not carrier_id:
                 messages.warning(request, "Перевізника не знайдено у списку DigiKey — "
                                           "якщо DigiKey відхилить, підтвердіть вручну.")
-            confirm_digikey_shipment(request, order, config, tracking, carrier=carrier_id)
+            from .services import parcels
+            confirm_digikey_shipment(request, order, config, tracking, carrier=carrier_id, shipment=shipment,
+                                     parts_by_sku=parcels.parts_by_sku(shipment))
             return back
 
         fields = ["status"]
@@ -2743,7 +2766,123 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             order.shipped_at = timezone.localdate()
             fields.append("shipped_at")
         order.save(update_fields=fields)
-        messages.success(request, f"✅ Замовлення {order.order_number} позначено як «Відправлено».")
+        Shipment.objects.filter(pk=shipment.pk).update(shop_confirmed_at=timezone.now())
+        order.refresh_from_db(fields=["status"])
+        if order.status in ("shipped", "delivered"):
+            messages.success(request, f"✅ Замовлення {order.order_number} позначено як «Відправлено».")
+        else:
+            from .services import parcels
+            messages.success(request, f"✅ Посилку #{shipment.pk} підтверджено. Замовлення {order.order_number} "
+                                      f"лишається «В обробці» — ще не відправлено: "
+                                      f"{parcels.progress(order).remainder_text()}.")
+        return back
+
+    # ── 📦 Відправлення частинами (посилки) — shipping/services/parcels.py ────
+
+    @staticmethod
+    def _parcel_rows(order, shipment=None):
+        from .services import parcels
+        rows = parcels.view_rows(order, shipment)
+        for r in rows:
+            for k in ("ordered", "other", "here", "left"):
+                r[k + "_txt"] = parcels.qty_text(r[k])
+            r["unit_txt"] = f"{r['unit_price']:f}" if r["unit_price"] is not None else ""
+        return rows
+
+    def _parcel_form_context(self, order, shipment=None):
+        """Блок «📦 Що в цій посилці» форми створення / редагування відправлення."""
+        from .services import parcels
+        if not order or not order.lines.exists():
+            return None
+        rows = self._parcel_rows(order, shipment)
+        here = {r["pk"]: r["here"] for r in rows}
+        partial = any(r["here"] != r["ordered"] for r in rows)
+        others = parcels.whole_parcels(order, exclude=shipment.pk if shipment is not None else None)
+        return {
+            "rows": rows, "partial": partial, "value": parcels.parcel_value(order, here),
+            "whole_others": [{"pk": s.pk, "url": reverse("admin:shipping_shipment_detail", args=[s.pk])}
+                             for s in others] if all(r["here"] == 0 for r in rows) else [],
+        }
+
+    def _save_parcel_from_post(self, request, shipment):
+        """Форма відправлення: поля parcel_qty_<pk позиції> → вміст посилки (parcels.set_contents)."""
+        from .services import parcels
+        qty = parcels.parse_post(request.POST)
+        if qty is None or not shipment.order_id:
+            return
+        try:
+            res = parcels.set_contents(shipment, qty)
+        except parcels.ParcelError as e:
+            messages.warning(request, f"📦 Вміст посилки не збережено: {e}")
+            return
+        if not res["whole"]:
+            left = res["progress"].unpacked_text()
+            messages.info(request, f"📦 Посилка #{shipment.pk} — частина замовлення."
+                                   + (f" Ще не в жодній посилці: {left}." if left
+                                      else " Тепер усе замовлення розкладено по посилках."))
+
+    def _parcel_context(self, shipment, request):
+        """Блок «📦 Що в цій посилці» на сторінці відправлення."""
+        from .services import parcels
+        order = shipment.order
+        if not order or not order.lines.exists():
+            return None
+        prog = parcels.progress(order)
+        others = []
+        for p in prog.parcels:
+            s = p["shipment"]
+            if s.pk == shipment.pk:
+                continue
+            others.append({"pk": s.pk, "n": p["n"], "status": s.get_status_display(), "whole": p["whole"],
+                           "qty": parcels.qty_text(p["qty"]),
+                           "url": reverse("admin:shipping_shipment_detail", args=[s.pk])})
+        return {
+            "rows": self._parcel_rows(order, shipment),
+            "whole": not shipment.lines.exists(),
+            "active": prog.active,
+            "n": prog.number(shipment),
+            "of": len(prog.parcels),
+            "others": others,
+            "sent": parcels.qty_text(prog.sent),
+            "ordered": parcels.qty_text(prog.ordered),
+            "remainder": prog.remainder_text(),
+            "to_pack": prog.to_pack > 0,
+            "new_url": reverse("admin:shipping_shipment_create", args=[order.pk]),
+            "url": reverse("admin:shipping_shipment_parcel", args=[shipment.pk]),
+            "can_edit": self.has_change_permission(request) and shipment.status != Shipment.Status.CANCELLED,
+            "confirmed": shipment.shop_confirmed_at,
+            "order_status": order.get_status_display(),
+            "ci_url": f"{reverse('commercial_invoice_new')}?order={order.pk}&shipment={shipment.pk}",
+            "pl_url": f"{reverse('packing_list_new')}?order={order.pk}&shipment={shipment.pk}",
+        }
+
+    def parcel_view(self, request, shipment_id):
+        """POST — записати, що лежить у посилці (parcel_qty_<pk позиції>). Замовлення й склад — за посилками."""
+        from .services import parcels
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        back = redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+        if request.method != "POST":
+            return back
+        if not self.has_change_permission(request, shipment):
+            messages.error(request, "Немає права змінювати відправлення.")
+            return back
+        try:
+            res = parcels.set_contents(shipment, parcels.parse_post(request.POST) or {})
+        except parcels.ParcelError as e:
+            messages.error(request, f"📦 {e}")
+            return back
+        order = shipment.order
+        order.refresh_from_db(fields=["status"])
+        left = res["progress"].remainder_text()
+        if res["whole"]:
+            messages.success(request, f"📦 У посилці #{shipment.pk} — усе замовлення.")
+        else:
+            messages.success(request, f"📦 Вміст посилки #{shipment.pk} збережено."
+                                      + (f" Ще відправити: {left} — замовлення «{order.get_status_display()}»."
+                                         if left else ""))
+        if shipment.shop_confirmed_at:
+            messages.warning(request, "Посилку вже підтверджено в магазині з попередніми кількостями — магазин "
+                                      "їх не змінить; за потреби виправте там вручну.")
         return back
 
     def shop_confirm_dismiss_view(self, request, shipment_id):
@@ -3169,6 +3308,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "label_display_url":         _label_display_url,
             "label_a4_url":              _label_a4_url,
             "shop_confirm":              self._shop_confirm_context(shipment),
+            "parcel":                    self._parcel_context(shipment, request),
             "agent_next":                agent_next,
             "incoming_info":             incoming_info,
             **(label_context() if agent_next else {}),

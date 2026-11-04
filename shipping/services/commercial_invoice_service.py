@@ -131,18 +131,23 @@ def _lines(order, shipment) -> list:
     cats = {c.slug: c for c in ProductCategory.objects.filter(slug__in=cat_slugs)} if cat_slugs else {}
     customs = _customs_by_sku(shipment, order)
     sender_country = (shipment.carrier.sender_country if shipment and shipment.carrier else "") or "DE"
+    from .packing_list_service import parcel_quantities
+    here = parcel_quantities(shipment)
 
     lines = []
     for ln in order_lines:
+        if here is not None and not here.get(ln.pk):
+            continue                      # позиції немає в цій посилці
         p = ln.product
         cat = cats.get(p.category) if p and p.category else None
         sku = (p.sku if p else ln.sku_raw) or ""
         c = customs.get(sku, {})
         c_desc = "" if is_placeholder_description(c.get("description"), sku) else c.get("description", "")
-        qty = _dec(ln.qty)
+        full = _dec(ln.qty)
+        qty = _dec(here[ln.pk]) if here is not None else full
         unit = _dec(ln.unit_price)
-        if not unit and qty:
-            unit = _dec(ln.total_price) / qty
+        if not unit and full:
+            unit = _dec(ln.total_price) / full
         origin = (c.get("origin_country") or (p.country_of_origin if p else "")
                   or (cat.customs_country_of_origin if cat else "") or sender_country)
         lines.append({
@@ -158,15 +163,20 @@ def _lines(order, shipment) -> list:
     return lines
 
 
-def initial_data(order) -> dict:
+def initial_data(order, shipment_pk=None) -> dict:
     from shipping.models import CommercialInvoice
 
-    shipment = latest_shipment(order)
+    shipment = latest_shipment(order, shipment_pk)
     ship_to = build_ship_to(order, shipment)
     lines = _lines(order, shipment)
     currency = ((order.currency or "") or next((l.currency for l in order.lines.all() if l.currency), "") or "USD").upper()[:3]
 
     notes = []
+    if shipment is not None and shipment.lines.exists():
+        from .parcels import progress
+        prog = progress(order)
+        notes.append(f"📦 Посилка {prog.number(shipment) or '?'} з {len(prog.parcels)} (відправлення #{shipment.pk}) — "
+                     f"в інвойсі лише її вміст. За потреби допишіть «Partial shipment».")
     shipping_cost = _dec(order.shipping_cost)
     ship_cur = (order.shipping_currency or currency).upper()
     if shipping_cost and ship_cur != currency:

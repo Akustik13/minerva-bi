@@ -33,7 +33,21 @@ COURIER_TYPES = {'ups': 'ups', 'dhl': 'dhl', 'fedex': 'fedex'}
 # ── Замовлення ───────────────────────────────────────────────────────────────
 
 def blocking(order) -> list:
-    return list(order.shipments.filter(status__in=BLOCKING).select_related('carrier').order_by('-pk'))
+    """Відправлення, через які друге робити не треба. Посилки частини замовлення (рядки ShipmentLine) — ні: поки є
+    залишок, наступну посилку створюють свідомо (shipping/services/parcels.py)."""
+    qs = order.shipments.filter(status__in=BLOCKING)
+    from shipping.services import parcels
+    if parcels.has_parcels(order) and parcels.progress(order).to_pack > 0:
+        qs = qs.filter(lines__isnull=True)
+    return list(qs.select_related('carrier').distinct().order_by('-pk'))
+
+
+def parcel_remainder(order) -> str:
+    """«AN… × 50» — що з замовлення, відправленого частинами, ще не відправлено ('' — посилок немає / усе)."""
+    from shipping.services import parcels
+    if not parcels.has_parcels(order):
+        return ''
+    return parcels.progress(order).remainder_text()
 
 
 def eu() -> set:
@@ -79,7 +93,10 @@ def checks(order, stock=None, shipments=None) -> list:
 
     if order.status == 'cancelled':
         add('block', 'замовлення скасовано')
-    if order.status in ('shipped', 'delivered') or order.shipped_at:
+    rest = parcel_remainder(order)
+    if rest and order.status not in ('shipped', 'delivered', 'cancelled'):
+        add('warn', f'відправляється частинами — ще не відправлено: {rest}')
+    elif order.status in ('shipped', 'delivered') or order.shipped_at:
         add('block', 'вже відправлено')
     for s in shipments if shipments is not None else blocking(order):
         add('warn', f'вже є відправлення #{s.pk} ({s.get_status_display()})')
@@ -259,17 +276,23 @@ NEXT_STATUSES = ('submitted', 'label_ready', 'in_transit')   # відправл�
 DASHES = str.maketrans({'–': '-', '—': '-', '‐': '-', '‑': '-'})
 
 
-def order_labels(order) -> list:
+def order_labels(order, shipment=None) -> list:
     """Етикетки DYMO замовлення — як кнопки 🖨️ у картці замовлення (`label_buttons_detail`): етикетка замовлення
-    і по одній на позицію (артикул з рядка замовлення, кількість — на етикетці). [{kind, sku, qty, order, file, title}]"""
+    і по одній на позицію (артикул з рядка замовлення, кількість — на етикетці). Посилка частини замовлення
+    (shipment з рядками) — лише її позиції й кількості. [{kind, sku, qty, order, file, title}]"""
     from labels_app.views import get_label_path, label_kinds
     out = [{'kind': 'order', 'sku': order.order_number or str(order.pk), 'qty': 1, 'order': order.pk, 'file': False,
             'title': f'🏷️ Етикетка замовлення {order.order_number or order.pk}'}]
+    here = None
+    if shipment is not None and shipment.lines.exists():
+        from shipping.services.parcels import contents
+        here = contents(shipment)
     lines = []
     for line in order.lines.select_related('product').order_by('pk'):
         sku = ((line.sku_raw or '').strip() or (line.product.sku if line.product else '')).translate(DASHES).strip()
-        if sku:
-            lines.append((sku, int(line.qty or 1)))
+        qty = here.get(line.pk, 0) if here is not None else (line.qty or 1)
+        if sku and qty:
+            lines.append((sku, int(qty)))
     kinds = label_kinds([sku for sku, _ in lines]) if lines else {}
     for sku, qty in lines:
         if not kinds.get(sku):
@@ -289,7 +312,8 @@ def next_order(exclude=None):
     from django.db.models import Exists, F, OuterRef
     from sales.revenue import to_ship
     from shipping.models import Shipment
-    busy = Shipment.objects.filter(order=OuterRef('pk'), status__in=SHIPPED)
+    # посилки частини замовлення (з рядками) не роблять його «вже відправленим» — залишок ще в черзі
+    busy = Shipment.objects.filter(order=OuterRef('pk'), status__in=SHIPPED, lines__isnull=True)
     qs = to_ship().filter(~Exists(busy))
     if exclude:
         qs = qs.exclude(pk=exclude)
@@ -330,7 +354,8 @@ def queue(user) -> dict:
               .exclude(order__status__in=('shipped', 'delivered', 'cancelled'))
               .select_related('order', 'carrier').order_by('-pk')[:QUEUE_MAX]):
         finish.append({'shipment': s, 'order': s.order, 'url': reverse('admin:shipping_shipment_detail', args=[s.pk])})
-    busy = Shipment.objects.filter(order=OuterRef('pk'), status__in=SHIPPED)
+    # посилки частини замовлення (з рядками) не роблять його «вже відправленим» — залишок ще в черзі
+    busy = Shipment.objects.filter(order=OuterRef('pk'), status__in=SHIPPED, lines__isnull=True)
     qs = (to_ship().filter(~Exists(busy))
           .order_by(F('shipping_deadline').asc(nulls_last=True), 'order_date', 'pk')
           .prefetch_related(Prefetch('shipments', queryset=Shipment.objects.filter(status='draft').order_by('-pk'),
@@ -395,11 +420,14 @@ def after_booking(shipment, user) -> dict | None:
     if not order or shipment.status not in NEXT_STATUSES:
         return None
     shipped = order.status in ('shipped', 'delivered') or bool(order.shipped_at)
+    if shipment.lines.exists():
+        # посилка частини замовлення: «Відправлено» — коли саме її підтвердили в магазині
+        shipped = order.status in ('shipped', 'delivered') or bool(shipment.shop_confirmed_at)
     nxt, left = next_order(exclude=order.pk)
     return {
         'pdf_url': reverse('admin:shipping_shipment_print_all', args=[shipment.pk]) if shipment.label_url else '',
         'is_eu': country(order) in eu(),
-        'labels': order_labels(order),
+        'labels': order_labels(order, shipment),
         'shipped': shipped,
         'shipped_at': order.shipped_at,
         'order_status': order.get_status_display(),

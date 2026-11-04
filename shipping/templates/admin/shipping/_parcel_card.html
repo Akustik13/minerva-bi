@@ -1,0 +1,107 @@
+{# 📦 Що в цій посилці — сторінка відправлення (shipment_detail.html). Контекст: parcel = ShipmentAdmin._parcel_context #}
+{% if parcel %}
+<style>
+  .pc-card { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:8px; padding:12px 16px;
+             margin-bottom:16px; color:var(--text); font-size:13px; }
+  .pc-card.pc-active { border-left:4px solid var(--warn); }
+  .pc-card > summary { list-style:none; cursor:pointer; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .pc-card > summary::-webkit-details-marker { display:none; }
+  .pc-title { font-weight:700; font-size:14px; }
+  .pc-muted { color:var(--text-muted); }
+  .pc-rem { margin:10px 0 4px; padding:8px 10px; border-radius:6px; background:var(--bg-hover); }
+  .pc-table { width:100%; max-width:820px; border-collapse:collapse; margin:10px 0; font-size:12px; }
+  .pc-table th { text-align:right; color:var(--text-dim); font-weight:600; padding:5px 8px;
+                 border-bottom:1px solid var(--border-strong); white-space:nowrap; }
+  .pc-table td { text-align:right; padding:5px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
+  .pc-table th:first-child, .pc-table td:first-child { text-align:left; }
+  .pc-table input { width:84px; padding:4px 6px; text-align:center; font-size:13px; background:var(--bg-input);
+                    color:var(--text); border:1px solid var(--border-strong); border-radius:4px; }
+  .pc-left.pc-has { color:var(--warn); font-weight:700; }
+  .pc-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:4px; }
+  .pc-btn { background:var(--bg-hover); border:1px solid var(--border-strong); color:var(--text); border-radius:6px;
+            padding:6px 12px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; }
+  .pc-btn:hover { border-color:var(--link-fg); }
+  .pc-btn.primary { background:var(--link-fg); border-color:var(--link-fg); color:var(--bg-card); font-weight:700; }
+  .pc-others { margin-top:10px; }
+</style>
+<details class="pc-card{% if parcel.active %} pc-active{% endif %}" id="parcel"{% if parcel.active %} open{% endif %}>
+  <summary>
+    <span class="pc-title">📦 {% if parcel.active %}Посилка {{ parcel.n }} з {{ parcel.of }}{% else %}Що в цій посилці{% endif %}</span>
+    <span class="pc-muted">{% if parcel.whole %}усе замовлення{% else %}частина замовлення{% endif %}{% if parcel.active %} · відправлено {{ parcel.sent }} з {{ parcel.ordered }} шт.{% endif %}</span>
+    {% if not parcel.active and parcel.can_edit %}<span class="pc-btn">✂️ Відправили лише частину?</span>{% endif %}
+  </summary>
+
+  {% if parcel.active and parcel.remainder %}
+  <div class="pc-rem">⏳ Ще не відправлено: <b translate="no">{{ parcel.remainder }}</b>.
+    Замовлення «{{ parcel.order_status }}» — не закривається, доки не поїде все.</div>
+  {% elif not parcel.active %}
+  <div class="pc-muted" style="margin-top:8px">Якщо в коробці лише частина замовлення — впишіть, скільки чого в ній,
+    і збережіть. Замовлення лишиться відкритим для решти, склад спише лише відправлене, а підтвердження в магазині
+    (DigiKey) піде лише з цими кількостями.</div>
+  {% endif %}
+
+  <form method="post" action="{{ parcel.url }}" id="pc-form">
+    {% csrf_token %}
+    <table class="pc-table">
+      <thead>
+        <tr><th>Позиція</th><th>Замовлено</th><th>В інших посилках</th><th>У цій посилці</th><th>Ще не в посилках</th></tr>
+      </thead>
+      <tbody>
+        {% for r in parcel.rows %}
+        <tr class="pc-row" data-ordered="{{ r.ordered_txt }}" data-other="{{ r.other_txt }}">
+          <td translate="no"><code>{{ r.sku }}</code>{% if r.name %}<div class="pc-muted">{{ r.name }}</div>{% endif %}</td>
+          <td>{{ r.ordered_txt }}</td>
+          <td>{{ r.other_txt }}</td>
+          <td>{% if parcel.can_edit %}<input type="number" name="parcel_qty_{{ r.pk }}" value="{{ r.here_txt }}"
+                 min="0" max="{{ r.ordered_txt }}" step="any">{% else %}{{ r.here_txt }}{% endif %}</td>
+          <td class="pc-left{% if r.left %} pc-has{% endif %}">{{ r.left_txt }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if parcel.can_edit %}
+    <div class="pc-actions">
+      <button type="submit" class="pc-btn primary"
+              onclick="return confirm('Зберегти, що лежить у цій посилці? Статус замовлення й склад перерахуються.')">💾 Зберегти вміст посилки</button>
+      <span class="pc-muted">Склад спише лише відправлене, решта — у резерві.</span>
+    </div>
+    {% endif %}
+  </form>
+
+  {% if parcel.others %}
+  <div class="pc-others pc-muted">Інші посилки замовлення:
+    {% for o in parcel.others %}<a href="{{ o.url }}#parcel">#{{ o.pk }}</a> ({{ o.status }}, {% if o.whole %}усе замовлення{% else %}{{ o.qty }} шт.{% endif %}){% if not forloop.last %} · {% endif %}{% endfor %}
+  </div>
+  {% endif %}
+  {% if parcel.active %}
+  <div class="pc-actions" style="margin-top:10px">
+    {% if parcel.to_pack %}<a class="pc-btn" href="{{ parcel.new_url }}">🚚 Створити посилку на залишок</a>{% endif %}
+    {% if not parcel.whole %}
+    <a class="pc-btn" href="{{ parcel.ci_url }}">🧾 Commercial Invoice цієї посилки</a>
+    <a class="pc-btn" href="{{ parcel.pl_url }}">📋 Packing List цієї посилки</a>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% if parcel.confirmed %}
+  <div class="pc-muted" style="margin-top:8px">🛒 Посилку підтверджено в магазині {{ parcel.confirmed|date:"d.m.Y H:i" }}.</div>
+  {% endif %}
+</details>
+<script>
+(function () {
+  var form = document.getElementById('pc-form');
+  if (!form) return;
+  function num(v) { v = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(v) ? 0 : v; }
+  function fmt(v) { return String(Math.round(v * 1000) / 1000); }
+  form.querySelectorAll('.pc-row').forEach(function (row) {
+    var inp = row.querySelector('input');
+    if (!inp) return;
+    inp.addEventListener('input', function () {
+      var left = Math.max(num(row.dataset.ordered) - num(row.dataset.other) - num(inp.value), 0);
+      var cell = row.querySelector('.pc-left');
+      cell.textContent = fmt(left);
+      cell.classList.toggle('pc-has', left > 0);
+    });
+  });
+})();
+</script>
+{% endif %}

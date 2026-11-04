@@ -27,6 +27,13 @@
   Скасування через API з restock=false лишає списане списаним — позначка so-writeoff:<pk руху> (0 шт.).
   Зміни замовлення йдуть під блокуванням рядка замовлення (select_for_update) — два одночасні збереження
   не спишуть товар двічі.
+
+Відправлення частинами (посилки, shipping/services/parcels.py): поки замовлення не «Відправлено», позиція, частину
+якої вже відправили посилками, тримає два рухи — відправлене (Outgoing, ключ …:line:<pk>:sent:<uuid>, дата —
+коли поїхало) і залишок (Резерв, у будь-якому режимі складу: товар обіцяно, він ще на полиці). Режим «при
+Доставлено» — лише доставлені посилки. Замовлення стало «Відправлено» — залишок стає списанням (разом = кількість
+позиції); посилку скасували — її списання повертається. Компоненти BOM таких позицій — за відправленим.
+Режим «списувати при створенні» посилок не розрізняє: усе списано одразу.
 """
 from __future__ import annotations
 
@@ -351,16 +358,24 @@ def open_order_lines(product_ids):
     (pending_order_lines: історія до обліку складу)."""
     from sales.models import SalesOrderLine
     product_ids = list(product_ids)
+    reserved_qty = (_line_held_txs().filter(tx_type=TX.RESERVED)
+                    .values("product").annotate(t=Sum("qty")).values("t"))
     qs = (SalesOrderLine.objects
           .filter(product_id__in=product_ids, order__affects_stock=True, qty__gt=0)
           .exclude(order__status__in=NOT_PENDING_STATUSES)
-          .annotate(_held_type=Subquery(_line_held_txs().values("tx_type")[:1]))
+          .annotate(_held_type=Subquery(_line_held_txs().values("tx_type")[:1]),
+                    _reserved_qty=-Coalesce(Subquery(reserved_qty, output_field=_DEC), _ZERO))
           .select_related("order")
           .order_by("product_id", "order__order_date", "pk"))
     pending = set(pending_order_lines().filter(product_id__in=product_ids).values_list("pk", flat=True))
     out = []
     for line in qs:
         state = {TX.RESERVED: "reserved", TX.OUTGOING: "deducted"}.get(line._held_type, "pending")
+        line._open_qty = line.qty
+        if line._reserved_qty > 0 and line._reserved_qty < line.qty:
+            # відправлено частинами (посилки): частину списано, залишок — резерв
+            state = "reserved"
+            line._open_qty = line._reserved_qty
         if state == "deducted" and line.order.status in SHIPPED_STATUSES:
             continue
         if state == "pending" and line.pk not in pending:
@@ -692,20 +707,25 @@ def _component_location():
             or Location.objects.filter(is_active=True).first())
 
 
-def _bom_plan(order, lines, target):
+def _bom_plan(order, lines, target, sent=None):
     """Що має статися з компонентами BOM позицій (спільне для sync_order і order_stock_issues).
 
     Компоненти списуються разом із позицією — коли вона списується (target Outgoing): кількість на 1 виріб ×
     кількість позиції, по одному руху на компонент. Кількість позиції змінилась — рух виправляється на різницю;
     позицію змінили на інший товар чи поставили 0 — компоненти повертаються; компонент прибрали з BOM після
-    списання — списане лишається (як і зміна налаштувань). Повертає (кроки, компенсації скасування), крок —
-    {"do": drop | fix | create, line, kit, comp, sku, txs, need}."""
+    списання — списане лишається (як і зміна налаштувань). sent — {pk позиції: відправлено посилками} для позицій,
+    відправлених частинами (замовлення ще не «Відправлено»): компоненти — лише за відправленим.
+    Повертає (кроки, компенсації скасування), крок — {"do": drop | fix | create, line, kit, comp, sku, txs, need}."""
     bom_txs = _order_bom_txs(order, lines)
     comps = _cancel_comps([tx.pk for tx in _bom_flat(bom_txs)])
     kits = _kit_boms({l.product_id for l in lines})
     steps = []
     for line in lines:
+        line_target = target
         want = max(line.qty or Decimal("0"), Decimal("0"))
+        if sent is not None and line.pk in sent:
+            want = sent[line.pk]
+            line_target = TX.OUTGOING if want > 0 else None
         bom = kits.get(line.product_id, {}) if line.product_id and want > 0 else {}
         held = {}
         for key, txs in bom_txs.get(line.pk, {}).items():
@@ -721,7 +741,7 @@ def _bom_plan(order, lines, target):
             need = per[0] * want if per else -txs[0].qty
             if len(txs) > 1 or txs[0].qty != -need:
                 steps.append({**step, "do": "fix", "need": need})
-        if target == TX.OUTGOING:
+        if line_target == TX.OUTGOING:
             for comp, (per, sku) in bom.items():
                 if (line.product_id, comp) not in held:
                     steps.append({"do": "create", "line": line, "kit": line.product_id, "comp": comp, "sku": sku,
@@ -827,6 +847,157 @@ def _release_reservations(order):
     return changes
 
 
+# ── Відправлення частинами (посилки) ──────────────────────────────────────────
+
+_SENT_KEY = "sent:"
+
+
+def _parcels_sent(order, settings):
+    """{pk позиції: відправлено посилками} (shipping.services.parcels; режим «при Доставлено» — лише доставлені
+    посилки). Без посилок у замовленні — {}."""
+    try:
+        from shipping.services.parcels import sent_by_line
+    except ImportError:
+        return {}
+    return sent_by_line(order, delivered_only=_ships_late(settings))
+
+
+def _split_sent(order, line, txs):
+    """(рухи «відправлено посилками», решта рухів) позиції."""
+    mark = order_prefix(order, line.pk) + _SENT_KEY
+    sent = [tx for tx in txs if tx.external_key.startswith(mark)]
+    return sent, [tx for tx in txs if not tx.external_key.startswith(mark)]
+
+
+def _parcel_split(want, sent_txs, target, sent_now):
+    """Що має тримати позиція, відправлена частинами: {"sent": списано посилками, "rest": залишок,
+    "rest_type": тип руху залишку (None — залишок не тримається рухом: посилок не відправлено, а режим списує
+    лише при відправці)}. Замовлення вже «Відправлено» (target Outgoing) — залишок теж списано, відправлене
+    посилками лишається окремим рухом (з датою, коли поїхало)."""
+    if target == TX.OUTGOING:
+        sent = min(sum((-tx.qty for tx in sent_txs), Decimal("0")), want)
+        return {"sent": max(sent, Decimal("0")), "rest": want - max(sent, Decimal("0")), "rest_type": TX.OUTGOING}
+    if sent_now <= 0:
+        return {"sent": Decimal("0"), "rest": want, "rest_type": target}
+    return {"sent": sent_now, "rest": want - sent_now, "rest_type": TX.RESERVED}
+
+
+def _uses_parcels(sent_txs, target, sent_now):
+    """Позиція йде правилом посилок: уже має рух «відправлено посилками» або частину відправили зараз."""
+    return bool(sent_txs) or (target != TX.OUTGOING and sent_now > 0)
+
+
+def _apply_parcel_split(order, line, sku, plan, sent_txs, main_txs, comps, performer, settings):
+    """Привести рухи позиції до _parcel_split. Повертає список змін."""
+    changes = []
+    location = None
+    sent, rest, rest_type = plan["sent"], plan["rest"], plan["rest_type"]
+    if sent > 0:
+        tx = sent_txs[0] if sent_txs else None
+        for extra in sent_txs[1:]:
+            _drop(extra, comps)
+            changes.append(f"{sku}: зайвий рух посилок прибрано")
+        if tx is None:
+            location = order_location(settings)
+            InventoryTransaction.objects.create(
+                external_key=f"{order_prefix(order, line.pk)}{_SENT_KEY}{uuid.uuid4()}",
+                tx_type=TX.OUTGOING, qty=-sent, product_id=line.product_id, location=location,
+                ref_doc=f"{_order_ref(order)} · посилки", tx_date=timezone.now(), performed_by=performer)
+            changes.append(f"{sku}: відправлено посилками — списано {_num(sent)}")
+        else:
+            fields = []
+            if tx.product_id != line.product_id:
+                tx.product_id = line.product_id
+                fields.append("product")
+            if tx.qty != -sent:
+                changes.append(f"{sku}: відправлено посилками {_num(abs(tx.qty))} → {_num(sent)}")
+                tx.qty = -sent
+                fields.append("qty")
+            if tx.tx_type != TX.OUTGOING:
+                tx.tx_type = TX.OUTGOING
+                fields.append("tx_type")
+            if fields:
+                tx.save(update_fields=fields)
+    else:
+        for tx in sent_txs:
+            changes.append(f"{sku}: посилку не відправлено — списання {_num(abs(tx.qty))} повернуто")
+            _drop(tx, comps)
+
+    if rest <= 0:
+        for tx in main_txs:
+            _drop(tx, comps)
+            changes.append(f"{sku}: залишку немає — {_label(tx.tx_type)} {_num(abs(tx.qty))} прибрано")
+        return changes
+    if rest_type is None:
+        # посилок не відправлено, режим «списувати при відправці»: резерв залишку знімається (товар знову —
+        # звичайна бронь незаписаного замовлення); уже списане лишається, як завжди
+        for tx in main_txs:
+            if tx.tx_type == TX.RESERVED:
+                _drop(tx, comps)
+                changes.append(f"{sku}: резерв {_num(abs(tx.qty))} знято")
+        main_txs = [tx for tx in main_txs if tx.tx_type != TX.RESERVED]
+        if not main_txs:
+            return changes
+        rest_type = TX.OUTGOING
+    tx = main_txs[0] if main_txs else None
+    for extra in main_txs[1:]:
+        _drop(extra, comps)
+        changes.append(f"{sku}: зайвий рух прибрано")
+    if tx is None:
+        location = location or order_location(settings)
+        InventoryTransaction.objects.create(
+            external_key=f"{order_prefix(order, line.pk)}{uuid.uuid4()}",
+            tx_type=rest_type, qty=-rest, product_id=line.product_id, location=location,
+            ref_doc=_order_ref(order), tx_date=_order_tx_date(order), performed_by=performer)
+        changes.append(f"{sku}: залишок {_num(rest)} — {_label(rest_type)}")
+        return changes
+    fields = []
+    if tx.product_id != line.product_id:
+        tx.product_id = line.product_id
+        fields.append("product")
+    if tx.qty != -rest:
+        changes.append(f"{sku}: залишок {_num(abs(tx.qty))} → {_num(rest)}")
+        tx.qty = -rest
+        fields.append("qty")
+    if tx.tx_type != rest_type:
+        changes.append(f"{sku}: залишок {_num(rest)} — {_label(tx.tx_type)} → {_label(rest_type)}")
+        tx.tx_type = rest_type
+        fields.append("tx_type")
+    if fields:
+        tx.save(update_fields=fields)
+    return changes
+
+
+def _parcel_issue(line, plan, sent_txs, main_txs):
+    """Чим рухи позиції, відправленої частинами, відрізняються від _parcel_split ([] — усе гаразд)."""
+    parts = []
+    sent, rest, rest_type = plan["sent"], plan["rest"], plan["rest_type"]
+    have_sent = sum((-tx.qty for tx in sent_txs), Decimal("0"))
+    if len(sent_txs) > 1:
+        parts.append(f"зайвих рухів посилок: {len(sent_txs) - 1}")
+    if have_sent != sent or any(tx.product_id != line.product_id or tx.tx_type != TX.OUTGOING for tx in sent_txs):
+        parts.append(f"відправлено посилками {_num(have_sent)} → {_num(sent)}")
+    if rest_type is None:
+        if any(tx.tx_type == TX.RESERVED for tx in main_txs):
+            parts.append("резерв залишку зняти")
+        return parts
+    if rest <= 0:
+        if main_txs:
+            parts.append("залишку немає — рух прибрати")
+        return parts
+    if not main_txs:
+        parts.append(f"залишок {_num(rest)} не записано ({_label(rest_type)})")
+        return parts
+    tx = main_txs[0]
+    if len(main_txs) > 1:
+        parts.append(f"зайвих рухів: {len(main_txs) - 1}")
+    if tx.qty != -rest or tx.product_id != line.product_id:
+        parts.append(f"залишок {_num(abs(tx.qty))} → {_num(rest)}")
+    if tx.tx_type != rest_type:
+        parts.append(f"залишок — {_label(tx.tx_type)} → {_label(rest_type)}")
+    return parts
+
+
 def sync_order(order, *, settings=None, performed_by=None, shipping_now=False):
     """Позиції замовлення → рухи складу (подія: позицію додано / змінено, статус змінився, «Синхронізувати»).
     Відправлене без руху, яке відправили раніше, ніж почали вести склад товару (shipped_before_tracking), —
@@ -853,6 +1024,8 @@ def sync_order(order, *, settings=None, performed_by=None, shipping_now=False):
         lines = list(order.lines.select_related("product").order_by("pk"))
         by_line = _order_txs(order, {l.pk for l in lines})
         comps = _cancel_comps([tx.pk for txs in by_line.values() for tx in txs])
+        sent_map = _parcels_sent(order, s) if target != TX.OUTGOING else {}
+        bom_sent = {}
         location = None
         for line in lines:
             txs = [tx for tx in by_line.get(line.pk, [])
@@ -863,6 +1036,14 @@ def sync_order(order, *, settings=None, performed_by=None, shipping_now=False):
                 for tx in txs:
                     _drop(tx, comps)
                     changes.append(f"{sku}: рух прибрано (кількість 0)")
+                continue
+            sent_txs, main_txs = _split_sent(order, line, txs)
+            sent_now = min(sent_map.get(line.pk, Decimal("0")), want)
+            if _uses_parcels(sent_txs, target, sent_now):
+                plan = _parcel_split(want, sent_txs, target, sent_now)
+                changes += _apply_parcel_split(order, line, sku, plan, sent_txs, main_txs, comps, performer, s)
+                if target != TX.OUTGOING:
+                    bom_sent[line.pk] = plan["sent"]
                 continue
             if not txs:
                 if target is None or (not shipping_now and shipped_before_tracking(order, line.product_id)):
@@ -894,7 +1075,7 @@ def sync_order(order, *, settings=None, performed_by=None, shipping_now=False):
                 changes.append(f"{sku}: резерв → списано")
             if fields:
                 tx.save(update_fields=fields)
-        steps, bom_comps = _bom_plan(order, lines, target)
+        steps, bom_comps = _bom_plan(order, lines, target, sent=bom_sent)
         changes += _apply_bom_plan(order, steps, bom_comps, performer)
     return changes
 
@@ -1126,6 +1307,8 @@ def order_stock_issues(order, settings=None):
     by_line = _order_txs(order, line_pks)
     comps = _cancel_comps([tx.pk for txs in by_line.values() for tx in txs])
     first_moves = _first_moves(order, {line.product_id for line in lines if line.product_id})
+    sent_map = _parcels_sent(order, s) if target != TX.OUTGOING else {}
+    bom_sent = {}
     issues = []
     for line in lines:
         txs = [tx for tx in by_line.get(line.pk, [])
@@ -1133,6 +1316,21 @@ def order_stock_issues(order, settings=None):
         want = max(line.qty or Decimal("0"), Decimal("0"))
         sku = line.product.sku if line.product_id else (line.sku_raw or "?")
         base = {"line_pk": line.pk, "line_sku": sku, "line_qty": float(want)}
+        if line.product_id and want > 0:
+            sent_txs, main_txs = _split_sent(order, line, txs)
+            sent_now = min(sent_map.get(line.pk, Decimal("0")), want)
+            if _uses_parcels(sent_txs, target, sent_now):
+                plan = _parcel_split(want, sent_txs, target, sent_now)
+                if target != TX.OUTGOING:
+                    bom_sent[line.pk] = plan["sent"]
+                parts = _parcel_issue(line, plan, sent_txs, main_txs)
+                if parts:
+                    tx = (sent_txs + main_txs)[0] if txs else None
+                    issues.append({**base, "tx_sku": tx.product.sku if tx else "—",
+                                   "tx_qty": float(abs(tx.qty)) if tx else 0, "tx_type": tx.tx_type if tx else "",
+                                   "tx_pk": tx.pk if tx else None, "product_diff": False, "qty_diff": True,
+                                   "text": f"{sku}: " + ", ".join(parts)})
+                continue
         if not txs:
             if (target is not None and line.product_id and want > 0
                     and not _shipped_before(order, line.product_id, first_moves)):
@@ -1155,7 +1353,7 @@ def order_stock_issues(order, settings=None):
             issues.append({**base, "tx_sku": tx.product.sku, "tx_qty": float(abs(tx.qty)), "tx_type": tx.tx_type,
                            "tx_pk": tx.pk, "product_diff": product_diff, "qty_diff": qty_diff,
                            "text": f"{sku}: " + ", ".join(parts)})
-    steps, _ = _bom_plan(order, lines, target)
+    steps, _ = _bom_plan(order, lines, target, sent=bom_sent)
     for st in steps:
         line = st["line"]
         sku = line.product.sku if line.product_id else (line.sku_raw or "?")

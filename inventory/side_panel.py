@@ -426,7 +426,7 @@ def demand_block(p, request):
     out, total = [], ZERO
     for line, state in lines:
         o = line.order
-        total += _num(line.qty)
+        total += _num(getattr(line, "_open_qty", line.qty))
         who = o.client or o.contact_name or o.email or ""
         head = format_html("{}{}", sp.admin_link(request, o, f"№ {o.order_number}"),
                            format_html(" · {}", sp.data(who)) if who else "")
@@ -437,7 +437,7 @@ def demand_block(p, request):
             when = f"відправити до {sp.date(deadline)}"
         else:
             when = ""
-        out.append(_line(head, sp.data(_q(p, line.qty)), _dot([LINE_STATES.get(state, state),
+        out.append(_line(head, sp.data(_q(p, getattr(line, "_open_qty", line.qty))), _dot([LINE_STATES.get(state, state),
                                                               o.get_status_display(), when])))
     foot = format_html('<div class="mvp-note">{}</div>', f"Разом чекають: {_q(p, total)}")
     return format_html("{}{}", _join(out), foot)
@@ -453,7 +453,7 @@ def demand_summary(p, request) -> str:
     if not lines:
         return ""
     orders = len({line.order_id for line, _state in lines})
-    total = sum((_num(line.qty) for line, _state in lines), ZERO)
+    total = sum((_num(getattr(line, "_open_qty", line.qty)) for line, _state in lines), ZERO)
     return f"замовлень: {orders} · {_q(p, total)}"
 
 

@@ -163,9 +163,12 @@ def _order_lines(order, shipment=None) -> list:
     cat_slugs = {ln.product.category for ln in order_lines if ln.product and ln.product.category}
     cats = {c.slug: c for c in ProductCategory.objects.filter(slug__in=cat_slugs)} if cat_slugs else {}
     customs = _customs_by_sku(shipment, order)
+    here = parcel_quantities(shipment)
 
     lines = []
     for ln in order_lines:
+        if here is not None and not here.get(ln.pk):
+            continue                      # позиції немає в цій посилці
         p = ln.product
         cat = cats.get(p.category) if p and p.category else None
         sku = (p.sku if p else ln.sku_raw) or ""
@@ -187,7 +190,7 @@ def _order_lines(order, shipment=None) -> list:
         lines.append({
             "description": desc,
             "part_no":     sku,
-            "qty":         float(ln.qty or 0),
+            "qty":         float(here[ln.pk] if here is not None else (ln.qty or 0)),
             "unit_net_kg": unit_kg,
             "product_id":  p.pk if p else None,
             "weight_src":  src,
@@ -256,8 +259,23 @@ def order_packaging_rows(order) -> list:
     return rows
 
 
-def latest_shipment(order):
-    return order.shipments.exclude(status="cancelled").order_by("-created_at").first()
+def latest_shipment(order, pk=None):
+    """Відправлення для документа: вибране (pk, лише цього замовлення) або останнє нескасоване."""
+    qs = order.shipments.exclude(status="cancelled")
+    if pk and str(pk).isdigit():
+        chosen = qs.filter(pk=pk).first()
+        if chosen:
+            return chosen
+    return qs.order_by("-created_at").first()
+
+
+def parcel_quantities(shipment) -> dict | None:
+    """{pk позиції: кількість} посилки — частини замовлення (shipping/services/parcels.py); None — у відправленні
+    усе замовлення. Документи (Packing List, Commercial Invoice) тоді — лише вміст посилки."""
+    if shipment is None or not shipment.pk or not shipment.lines.exists():
+        return None
+    from shipping.services.parcels import contents
+    return contents(shipment)
 
 
 def build_ship_to(order, shipment=None) -> dict:
@@ -298,9 +316,10 @@ def last_signer() -> tuple:
     return d.signer_name, d.signer_position
 
 
-def initial_data(order) -> dict:
-    """Чернетка форми з даних замовлення та останнього відправлення."""
-    shipment = latest_shipment(order)
+def initial_data(order, shipment_pk=None) -> dict:
+    """Чернетка форми з даних замовлення та останнього (або вибраного — shipment_pk) відправлення. Посилка
+    частини замовлення — лише її вміст."""
+    shipment = latest_shipment(order, shipment_pk)
     order_lines = _order_lines(order, shipment)
     if shipment:
         parcels = _parcels_from_shipment(shipment, order_lines)

@@ -293,7 +293,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           {% for l in shop_confirm.lines %}
             <div><code>{{ l.sku }}</code>{% if l.name %} · {{ l.name }}{% endif %} — <b>{{ l.qty|floatformat:"-3" }} шт</b></div>
           {% empty %}—{% endfor %}
-          {% if shop_confirm.is_digikey %}<div class="sd-sc-hint">усі позиції повністю; часткове відправлення — через «Вручну»</div>{% endif %}
+          {% if shop_confirm.part %}<div class="sd-sc-hint">📦 посилка {{ shop_confirm.parcel_n }} з {{ shop_confirm.parcel_of }} — лише те, що лежить у ній; решта замовлення лишається відкритою</div>{% elif shop_confirm.is_digikey %}<div class="sd-sc-hint">усе, що на DigiKey ще не відправлено; у коробці лише частина — спершу вкажіть її вміст у блоці «📦 Що в цій посилці»</div>{% endif %}
         </td></tr>
       </table>
       <div class="sd-shopconf-actions">
@@ -653,6 +653,8 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     </div>
   </div>
   {% endif %}
+
+  {% include "admin/shipping/_parcel_card.html" %}
 
   <!-- ── Body ── -->
   <div class="sd-body">

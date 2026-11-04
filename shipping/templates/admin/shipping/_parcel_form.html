@@ -1,0 +1,134 @@
+{# Parcel contents block of the shipment create / edit form (create_shipment.html): ShipmentAdmin._parcel_form_context #}
+{# Fields parcel_qty_<order line pk> -> parcels.set_contents; JS copies quantities into customs rows and declared value #}
+{% if parcel %}
+<style>
+  #parcel-card .pc-hint { color:var(--text-muted); font-size:12px; margin-bottom:10px; line-height:1.5; }
+  #parcel-card .pc-warn { color:var(--warn); font-size:12px; margin-bottom:10px; }
+  #parcel-card table { width:100%; border-collapse:collapse; font-size:12px; }
+  #parcel-card th { text-align:right; color:var(--text-muted); font-weight:600; padding:6px 8px;
+                    border-bottom:1px solid var(--border-strong); white-space:nowrap; }
+  #parcel-card td { text-align:right; padding:5px 8px; border-bottom:1px solid var(--border); vertical-align:top; }
+  #parcel-card th:first-child, #parcel-card td:first-child { text-align:left; }
+  #parcel-card input[type=number] { width:84px; text-align:center; }
+  #parcel-card .pc-left.pc-has { color:var(--warn); font-weight:700; }
+  #parcel-card .pc-foot { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:10px; font-size:12px; }
+  #parcel-card .pc-state { font-weight:600; }
+</style>
+<div class="sh-card" id="parcel-card">
+  <div class="sh-card-title">📦 Що в цій посилці</div>
+  <div class="pc-hint">Відправляєте не все замовлення одразу? Впишіть, скільки чого лежить у цій посилці. Решта
+    лишиться залишком: замовлення не закриється, склад спише лише відправлене, митна декларація й оголошена
+    вартість — за посилкою.</div>
+  {% if parcel.whole_others %}
+  <div class="pc-warn">⚠️ {% for o in parcel.whole_others %}<a href="{{ o.url }}#parcel" target="_blank">Відправлення #{{ o.pk }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}
+    записане як «усе замовлення», тож для цієї посилки нічого не лишилось. Якщо там була лише частина — спершу
+    вкажіть його вміст (блок «📦 Що в цій посилці» на сторінці відправлення).</div>
+  {% endif %}
+  <table>
+    <thead>
+      <tr><th>Позиція</th><th>Замовлено</th><th>В інших посилках</th><th>У цій посилці</th><th>Ще не в посилках</th></tr>
+    </thead>
+    <tbody>
+      {% for r in parcel.rows %}
+      <tr class="pc-row" data-sku="{{ r.sku }}" data-ordered="{{ r.ordered_txt }}" data-other="{{ r.other_txt }}"
+          data-unit="{{ r.unit_txt }}">
+        <td translate="no"><code>{{ r.sku }}</code>{% if r.name %}<div style="color:var(--text-muted)">{{ r.name }}</div>{% endif %}</td>
+        <td>{{ r.ordered_txt }}</td>
+        <td>{{ r.other_txt }}</td>
+        <td><input class="sh-input" type="number" name="parcel_qty_{{ r.pk }}" value="{{ r.here_txt }}"
+                   min="0" max="{{ r.ordered_txt }}" step="any"></td>
+        <td class="pc-left{% if r.left %} pc-has{% endif %}">{{ r.left_txt }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="pc-foot">
+    <button type="button" id="pc-rest"
+            style="background:var(--bg-card-2);border:1px solid var(--border-strong);color:var(--text-muted);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px">↺ Усе, що ще не в посилках</button>
+    <span class="pc-state" id="pc-state"></span>
+  </div>
+  <div class="pc-hint" id="pc-weight-note" style="margin-top:8px;display:none">⚖️ Вагу й коробки перевірте: підказка
+    пакування рахує все замовлення, а в посилці лише частина.</div>
+</div>
+<script>
+(function () {
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+  function init() {
+  var card = document.getElementById('parcel-card');
+  if (!card) return;
+  var rows = Array.prototype.slice.call(card.querySelectorAll('.pc-row'));
+  function num(v) { v = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(v) ? 0 : v; }
+  function fmt(v) { return String(Math.round(v * 1000) / 1000); }
+  function caRow(row) {
+    if (row._ca) return row._ca;
+    document.querySelectorAll('#customs-rows input[name="ca_sku"]').forEach(function (i) {
+      if (!row._ca && i.value === row.dataset.sku) row._ca = i.closest('tr');
+    });
+    return row._ca;
+  }
+  function apply(row, initial) {
+    var inp = row.querySelector('input'), q = num(inp.value);
+    var ordered = num(row.dataset.ordered), other = num(row.dataset.other);
+    var left = Math.max(ordered - other - q, 0), cell = row.querySelector('.pc-left');
+    cell.textContent = fmt(left);
+    cell.classList.toggle('pc-has', left > 0);
+    if (initial && q === ordered) return;
+    var tr = caRow(row);
+    if (!tr) return;
+    // позиції немає в посилці — рядок митної декларації прибирається з таблиці (не надсилається; нумерація
+    // рядків для розподілу по коробках лишається такою ж, як на сервері), повертається, коли кількість > 0
+    if (q <= 0) {
+      if (tr.isConnected) { row._caMark = document.createComment('parcel'); tr.replaceWith(row._caMark); }
+      return;
+    }
+    if (!tr.isConnected && row._caMark) { row._caMark.replaceWith(tr); }
+    var qi = tr.querySelector('[name="ca_qty"]');
+    qi.value = Math.max(1, Math.round(q));
+    var unit = num(row.dataset.unit), vi = tr.querySelector('[name="ca_value"]');
+    if (unit > 0 && vi) vi.value = (unit * q).toFixed(2);
+    if (window.updateUnitVal) window.updateUnitVal(qi);
+  }
+  function totals(fromUser) {
+    var value = 0, whole = true, any = false;
+    rows.forEach(function (r) {
+      var q = num(r.querySelector('input').value);
+      value += num(r.dataset.unit) * q;
+      if (q !== num(r.dataset.ordered)) whole = false;
+      if (q > 0) any = true;
+    });
+    var st = document.getElementById('pc-state');
+    st.textContent = !any ? '⚠️ У посилці нічого немає' : (whole ? 'Усе замовлення' : 'Частина замовлення');
+    st.style.color = !any ? 'var(--err)' : (whole ? 'var(--text-muted)' : 'var(--warn)');
+    document.getElementById('pc-weight-note').style.display = whole ? 'none' : '';
+    if (fromUser && !whole && value > 0) {
+      var dv = document.querySelector('[name="declared_value"]');
+      if (dv) dv.value = value.toFixed(2);
+    }
+    if (window.updateCaTotal) window.updateCaTotal();
+    return any;
+  }
+  rows.forEach(function (r) {
+    apply(r, true);
+    r.querySelector('input').addEventListener('input', function () { apply(r, false); totals(true); });
+  });
+  totals(false);
+  document.getElementById('pc-rest').addEventListener('click', function () {
+    rows.forEach(function (r) {
+      r.querySelector('input').value = fmt(Math.max(num(r.dataset.ordered) - num(r.dataset.other), 0));
+      apply(r, false);
+    });
+    totals(true);
+  });
+  var form = card.closest('form');
+  if (form) form.addEventListener('submit', function (e) {
+    if (!totals(false)) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      alert('У посилці нічого немає — впишіть, скільки чого в ній лежить.');
+      card.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+  }, true);
+  }
+})();
+</script>
+{% endif %}

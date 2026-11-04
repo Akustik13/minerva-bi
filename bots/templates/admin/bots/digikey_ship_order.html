@@ -134,39 +134,47 @@
     </div>
 
     <!-- Per-line shipped quantities -->
-    {% if order_details %}
+    {% if shipment %}<input type="hidden" name="shipment" value="{{ shipment.pk }}">{% endif %}
+    {% if ship_rows %}
     <div style="margin-bottom:16px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:8px">
         Кількість відправлених одиниць (за кожною позицією)
       </label>
-      <table style="border-collapse:collapse;font-size:12px;width:100%;max-width:600px">
+      {% if shipment %}
+      <div style="font-size:12px;color:var(--text);margin-bottom:8px">
+        📦 Посилка — відправлення <a href="{% url 'admin:shipping_shipment_detail' shipment.pk %}">#{{ shipment.pk }}</a>:
+        кількості взято з того, що в ній лежить.
+      </div>
+      {% endif %}
+      <table style="border-collapse:collapse;font-size:12px;width:100%;max-width:700px">
         <thead>
           <tr style="color:var(--text-dim);border-bottom:1px solid var(--border-strong)">
             <th style="padding:4px 8px;text-align:left">Part#</th>
             <th style="padding:4px 8px;text-align:center">Замовлено</th>
-            <th style="padding:4px 8px;text-align:center">Відправити</th>
+            <th style="padding:4px 8px;text-align:center">Уже відправлено на DigiKey</th>
+            <th style="padding:4px 8px;text-align:center">Відправити зараз</th>
           </tr>
         </thead>
         <tbody>
-          {% for line in order_details %}
-          {% with detail_id=line.orderDetailId qty=line.adjustedQuantity|default:line.quantity %}
+          {% for r in ship_rows %}
           <tr style="border-bottom:1px solid var(--border);color:var(--text)">
-            <td style="padding:4px 8px;font-family:monospace">{{ line.productPartNumber|default:line.supplierSku }}</td>
-            <td style="padding:4px 8px;text-align:center">{{ qty }}</td>
+            <td style="padding:4px 8px;font-family:monospace" translate="no">{{ r.part }}{% if r.sku and r.sku != r.part %}<div style="color:var(--text-muted)">{{ r.sku }}</div>{% endif %}</td>
+            <td style="padding:4px 8px;text-align:center">{{ r.ordered }}</td>
+            <td style="padding:4px 8px;text-align:center">{% if r.already %}{{ r.already }}{% else %}—{% endif %}</td>
             <td style="padding:4px 8px;text-align:center">
-              <input type="number" name="qty_{{ detail_id }}"
-                     value="{{ qty }}" min="1"
+              <input type="number" name="qty_{{ r.detail_id }}"
+                     value="{{ r.value }}" min="0" max="{{ r.left }}"
                      style="width:70px;padding:4px 6px;background:var(--bg-input);
                             border:1px solid var(--border-strong);border-radius:4px;
                             color:var(--text);font-size:13px;text-align:center">
             </td>
           </tr>
-          {% endwith %}
           {% endfor %}
         </tbody>
       </table>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-        Змінюй тільки якщо відправляєш неповну кількість (часткове відправлення).
+        Відправляєте частину — впишіть, скільки поїхало в цій посилці; 0 — позиція не в цій посилці.
+        Поки на DigiKey щось лишається невідправленим, замовлення в Minerva лишається «В обробці».
       </div>
     </div>
     {% endif %}

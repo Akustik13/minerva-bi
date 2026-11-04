@@ -183,7 +183,7 @@ def pl_new(request):
             return redirect("/packing-lists/")
         return redirect(f"/packing-lists/{pl.pk}/edit/")
 
-    data = svc.initial_data(order)
+    data = svc.initial_data(order, request.GET.get("shipment"))
     existing = order.packing_lists.order_by("-created_at").first()
     if existing:
         messages.info(request, f"ℹ️ Для цього замовлення вже є Packing List #{existing.number} — "

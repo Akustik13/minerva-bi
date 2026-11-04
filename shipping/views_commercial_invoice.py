@@ -169,7 +169,7 @@ def ci_new(request):
             return redirect(BASE)
         return redirect(f"{BASE}{ci.pk}/edit/")
 
-    data = svc.initial_data(order)
+    data = svc.initial_data(order, request.GET.get("shipment"))
     existing = order.commercial_invoices.order_by("-created_at").first()
     if existing:
         messages.info(request, f"ℹ️ Для цього замовлення вже є Invoice #{existing.number} — "

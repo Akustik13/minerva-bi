@@ -1,0 +1,17 @@
+{# 📦 Відправлено частинами — картка замовлення (form_top). Контекст: parcels_info = sales.admin._parcels_info #}
+{% if parcels_info %}
+<div class="pcb" style="margin:0 0 14px;padding:10px 14px;border:1px solid var(--border-strong);border-left:4px solid {% if parcels_info.remainder %}var(--warn){% else %}var(--ok){% endif %};border-radius:8px;background:var(--bg-card);color:var(--text);font-size:13px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center">
+  <b>📦 Відправлено частинами: {{ parcels_info.sent }} з {{ parcels_info.ordered }} шт.</b>
+  {% if parcels_info.remainder %}
+  <span>⏳ Ще відправити: <b translate="no">{{ parcels_info.remainder }}</b> — замовлення не закривається, доки не поїде все.</span>
+  {% else %}
+  <span style="color:var(--text-muted)">усе замовлення в посилках</span>
+  {% endif %}
+  <span style="color:var(--text-muted)">Посилки:
+    {% for x in parcels_info.parcels %}<a href="{{ x.url }}#parcel">#{{ x.pk }}</a> ({{ x.status }}, {% if x.whole %}усе замовлення{% else %}{{ x.qty }} шт.{% endif %}){% if not forloop.last %} · {% endif %}{% endfor %}
+  </span>
+  {% if parcels_info.to_pack %}
+  <a href="{{ parcels_info.new_url }}" style="margin-left:auto;background:var(--link-fg);color:var(--bg-card);padding:6px 12px;border-radius:6px;text-decoration:none;font-weight:700">🚚 Відправити залишок</a>
+  {% endif %}
+</div>
+{% endif %}

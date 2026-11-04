@@ -46,6 +46,19 @@ def _status_can_advance(current: str, new: str) -> bool:
     return _STATUS_PRIORITY.get(new, 0) > _STATUS_PRIORITY.get(current, 0)
 
 
+def _parcels_hold(sale, status: str) -> str:
+    """Статус з DigiKey для замовлення Minerva: відправлене частинами (посилки) не стає «Відправлено» /
+    «Доставлено», поки є залишок (shipping.services.parcels.hold_status)."""
+    if not getattr(sale, "pk", None):
+        return status
+    try:
+        from shipping.services.parcels import hold_status
+        return hold_status(sale, status)
+    except Exception:
+        logger.exception("DigiKey: parcel status check failed for order %s", sale.pk)
+        return status
+
+
 def _config_sync_status() -> bool:
     """Return True if DigiKeyConfig.sync_order_status is enabled."""
     try:
@@ -909,8 +922,10 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
             except Exception:
                 pass
         else:
-            # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати)
+            # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати); замовлення, відправлене
+            # частинами (посилки Minerva), не закривається, поки є невідправлений залишок
             update_fields = []
+            minerva_status = _parcels_hold(sale, minerva_status)
             if _status_can_advance(sale.status, minerva_status):
                 old_status = sale.status
                 sale.status = minerva_status
@@ -1197,7 +1212,8 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
     _check("shipped_at",       shipped_at)
     _check("delivered_at",     delivered_at)
 
-    # Статус — тільки якщо просунувся вперед
+    # Статус — тільки якщо просунувся вперед (посилки: поки є залишок — не закривається)
+    new_status = _parcels_hold(sale, new_status)
     status_order = ["received", "processing", "shipped", "delivered", "cancelled"]
     old_idx = status_order.index(sale.status) if sale.status in status_order else 0
     new_idx = status_order.index(new_status)  if new_status in status_order else 0
@@ -1561,20 +1577,69 @@ def fetch_marketplace_order_data(config, order_id: str) -> dict:
     return _fetch_marketplace_order(config, order_id, token)
 
 
+def marketplace_already_shipped(order_data: dict) -> dict:
+    """{orderDetailId: уже відправлено} — з shippingTrackingInfoList[].shippedParts замовлення DigiKey
+    (кожне попереднє підтвердження відправлення — свій трек-номер зі своїми кількостями)."""
+    out = {}
+    for t in (order_data.get("shippingTrackingInfoList") or order_data.get("shippingTracking") or []):
+        for part in (t.get("shippedParts") or []):
+            did = part.get("orderDetailId")
+            if did:
+                out[did] = out.get(did, 0) + int(part.get("quantity") or 0)
+    return out
+
+
+def _detail_qty(line: dict) -> int:
+    return int(line.get("adjustedQuantity") or line.get("quantity") or 0)
+
+
+def parcel_ship_quantities(order_details: list, parts_by_sku: dict, already: dict = None):
+    """Посилка {артикул: кількість} → ({orderDetailId: кількість}, [що не знайшлося]). Артикул шукається серед
+    supplierSku / manufacturerPartNumber / productPartNumber позиції (без регістру); більше, ніж на DigiKey ще не
+    відправлено, — у «не знайшлося» (не надсилається, щоб не підтвердити зайве)."""
+    already = already or {}
+    want = {}
+    for sku, qty in (parts_by_sku or {}).items():
+        q = int(qty or 0)
+        if q > 0:
+            key = str(sku).strip().lower()
+            want[key] = want.get(key, 0) + q
+    out = {}
+    for line in order_details:
+        did = line.get("orderDetailId")
+        if not did:
+            continue
+        keys = {str(line.get(f) or "").strip().lower()
+                for f in ("supplierSku", "manufacturerPartNumber", "productPartNumber")} - {""}
+        for key in keys:
+            if want.get(key, 0) <= 0:
+                continue
+            take = min(want[key], max(_detail_qty(line) - already.get(did, 0), 0))
+            if take > 0:
+                out[did] = out.get(did, 0) + take
+                want[key] -= take
+            break
+    missing = [f"{sku} × {q}" for sku, q in want.items() if q > 0]
+    return out, missing
+
+
 def ship_marketplace_order(config, order_id: str, tracking_number: str,
                             carrier_id: str = None,
                             invoice_number: str = None,
                             net_vat_invoice_amount: float = None,
                             shipped_quantities: dict = None,
-                            vat_file_id: str = None) -> dict:
+                            vat_file_id: str = None,
+                            parts_by_sku: dict = None) -> dict:
     """
     PUT /Sales/Marketplace2/Orders/v1/orders/{orderId}/ship
     Підтверджує відправлення Marketplace замовлення та передає трек-номер на DigiKey.
 
-    shipped_quantities: {orderDetailId: quantity} — перевизначає кількості по рядках.
+    shipped_quantities: {orderDetailId: quantity} — лише ці позиції й лише кількість > 0 (форма підтвердження).
+    parts_by_sku: {артикул: quantity} — посилка Minerva (частина замовлення), позиції DigiKey — за артикулом.
+    Без обох — усе, що на DigiKey ще не відправлено (попередні підтвердження частин враховуються).
     net_vat_invoice_amount: float — сума рахунку без ПДВ.
     vat_file_id: str — зарезервовано (не підтримується у ShipOrderModel, ігнорується).
-    Повертає {'ok': bool, 'message': str, 'raw': dict}.
+    Повертає {'ok', 'message', 'raw', 'parts' — що підтверджено, 'remaining' — скільки ще не відправлено}.
     """
     import requests as req
 
@@ -1582,20 +1647,39 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
 
     order_data    = _fetch_marketplace_order(config, order_id, token)
     order_details = order_data.get("orderDetails") or []
+    already       = marketplace_already_shipped(order_data)
+
+    if parts_by_sku is not None:
+        shipped_quantities, missing = parcel_ship_quantities(order_details, parts_by_sku, already)
+        if missing:
+            return {"ok": False, "raw": {}, "parts": [], "remaining": None,
+                    "message": "❌ Не підтверджено: у замовленні DigiKey цього немає або вже відправлено — "
+                               + ", ".join(missing)}
 
     shipped_parts = []
     for line in order_details:
         detail_id = line.get("orderDetailId")
-        if detail_id:
-            if shipped_quantities and detail_id in shipped_quantities:
-                qty = int(shipped_quantities[detail_id])
-            else:
-                qty = line.get("adjustedQuantity") or line.get("quantity") or 1
-            shipped_parts.append({
-                "orderDetailId": detail_id,
-                "dkPartNumber":  line.get("productPartNumber") or line.get("supplierSku") or "",
-                "quantity":      qty,
-            })
+        if not detail_id:
+            continue
+        if shipped_quantities is not None:
+            if detail_id not in shipped_quantities:
+                continue
+            qty = int(shipped_quantities[detail_id] or 0)
+        else:
+            qty = _detail_qty(line) - already.get(detail_id, 0)
+        if qty <= 0:
+            continue
+        shipped_parts.append({
+            "orderDetailId": detail_id,
+            "dkPartNumber":  line.get("productPartNumber") or line.get("supplierSku") or "",
+            "quantity":      qty,
+        })
+    if not shipped_parts:
+        return {"ok": False, "raw": {}, "parts": [], "remaining": None,
+                "message": "❌ Немає жодної позиції з кількістю — на DigiKey нічого не надіслано."}
+    now = {p["orderDetailId"]: p["quantity"] for p in shipped_parts}
+    remaining = sum(max(_detail_qty(l) - already.get(l.get("orderDetailId"), 0) - now.get(l.get("orderDetailId"), 0), 0)
+                    for l in order_details if l.get("orderDetailId"))
 
     tracking_entry = {"shippingTrackingNumber": tracking_number, "shippedParts": shipped_parts}
     if carrier_id:
@@ -1617,11 +1701,12 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
         raw = {"text": resp.text[:500]}
 
     if resp.ok:
-        return {"ok": True, "message": "✅ Відправлення підтверджено на DigiKey", "raw": raw}
+        return {"ok": True, "message": "✅ Відправлення підтверджено на DigiKey", "raw": raw,
+                "parts": shipped_parts, "remaining": remaining}
 
     detail = raw.get("detail") or raw.get("title") or raw.get("error") or resp.text[:300]
     logger.error("DigiKey ship order %s: %s %s", order_id, resp.status_code, detail)
-    return {"ok": False, "message": f"❌ {resp.status_code}: {detail}", "raw": raw}
+    return {"ok": False, "message": f"❌ {resp.status_code}: {detail}", "raw": raw, "parts": [], "remaining": None}
 
 
 def update_supplier_invoice_number(config, order_id: str, invoice_number: str) -> dict:

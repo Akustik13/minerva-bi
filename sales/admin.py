@@ -1901,6 +1901,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 extra_context["digikey_packlist_url"] = f"/bots/digikey/packlist/{obj.pk}/"
             if obj and obj.source == "digikey" and obj.status in ("processing", "shipped"):
                 extra_context["digikey_ship_url"] = f"/bots/digikey/ship/{obj.pk}/"
+                # посилка частини замовлення, ще не підтверджена на DigiKey — форма бере кількості з неї
+                _parcel = (obj.shipments.exclude(status__in=("cancelled", "error", "draft"))
+                           .filter(shop_confirmed_at__isnull=True, lines__isnull=False).order_by("pk").first())
+                if _parcel:
+                    extra_context["digikey_ship_url"] += f"?shipment={_parcel.pk}"
                 dk_confirmed = (obj.status == "shipped" and obj.status_source == "DigiKey Marketplace")
                 extra_context["digikey_already_shipped"] = dk_confirmed
                 extra_context["digikey_not_confirmed"] = (
@@ -1945,6 +1950,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             # Auto-sync shipping fields from active shipment (GET only)
             if obj and request.method == "GET":
                 _sync_order_from_active_shipment(obj)
+            # 📦 Відправлення частинами — що вже поїхало й що лишилось (shipping/services/parcels.py)
+            if obj and obj.pk:
+                extra_context["parcels_info"] = _parcels_info(obj)
             # Linked invoices panel
             if obj and obj.pk:
                 try:
@@ -1966,6 +1974,17 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
+        held = getattr(obj, "_parcels_held", None)
+        if held:
+            from django.contrib import messages
+            try:
+                from shipping.services import parcels
+                left = parcels.progress(obj).remainder_text()
+            except Exception:
+                left = ""
+            messages.warning(request, f"📦 Замовлення лишилось «{obj.get_status_display()}»: ще не відправлено "
+                                      f"{left or 'частину позицій'}. Воно закриється, коли поїде остання посилка; "
+                                      f"залишок скасовано — зменште кількість у позиції.")
 
     def save_formset(self, request, form, formset, change):
         super().save_formset(request, form, formset, change)
@@ -4273,6 +4292,27 @@ def _get_sales_stats():
         }
     except Exception:
         return {"received": "—", "processing": "—", "overdue": "—", "shipped_month": "—"}
+
+
+def _parcels_info(order):
+    """Блок «📦 Відправлено частинами» в картці замовлення: лише коли в замовленні є посилки (частини)."""
+    try:
+        from django.urls import reverse
+        from shipping.services import parcels
+        if not parcels.has_parcels(order):
+            return None
+        p = parcels.progress(order)
+        return {
+            "sent": parcels.qty_text(p.sent), "ordered": parcels.qty_text(p.ordered),
+            "remainder": p.remainder_text(), "to_pack": p.to_pack > 0,
+            "parcels": [{"pk": x["shipment"].pk, "n": x["n"], "status": x["shipment"].get_status_display(),
+                         "whole": x["whole"], "qty": parcels.qty_text(x["qty"]),
+                         "url": reverse("admin:shipping_shipment_detail", args=[x["shipment"].pk])}
+                        for x in p.parcels],
+            "new_url": reverse("admin:shipping_shipment_create", args=[order.pk]),
+        }
+    except Exception:
+        return None
 
 
 def _sync_order_from_active_shipment(order) -> None:

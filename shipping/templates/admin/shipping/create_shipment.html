@@ -1908,6 +1908,8 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
 
+    {% include "admin/shipping/_parcel_form.html" %}
+
     <!-- 🛃 Митна декларація -->
     <div class="sh-card" id="customs-card"{% if not needs_customs %} style="display:none"{% endif %}>
       <div class="sh-card-title">🛃 Митна декларація</div>

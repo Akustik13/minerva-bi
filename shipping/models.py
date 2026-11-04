@@ -405,6 +405,11 @@ class Shipment(models.Model):
         "Не пропонувати підтвердження в магазині", default=False,
         help_text="Банер «Підтвердити відправлення» відхилено для цього відправлення.",
     )
+    shop_confirmed_at = models.DateTimeField(
+        "Підтверджено в магазині", null=True, blank=True,
+        help_text="Коли відправлення цієї посилки підтверджено в магазині (DigiKey тощо). "
+                  "Посилка частини замовлення: банер більше не пропонує підтвердити її вдруге.",
+    )
     ups_document_id     = models.CharField(
         "UPS Document ID", max_length=100, blank=True, default="",
         help_text="ID документу з Paperless Document API (заповнюється автоматично)"
@@ -551,6 +556,33 @@ class ShipmentPackage(models.Model):
             f"{self.weight_kg} кг"
             + (f" ×{self.quantity}" if self.quantity and self.quantity > 1 else "")
         )
+
+
+class ShipmentLine(models.Model):
+    """Що з замовлення лежить у цій посилці (відправлення частинами).
+
+    Відправлення без жодного рядка — уся кількість замовлення (як завжди було). Рядки є лише тоді, коли в
+    посилці не все замовлення: 150 / 150 / 250 з 150 / 150 / 300. Логіка — shipping/services/parcels.py."""
+
+    shipment = models.ForeignKey(
+        Shipment, on_delete=models.CASCADE, related_name="lines", verbose_name="Відправлення",
+    )
+    order_line = models.ForeignKey(
+        "sales.SalesOrderLine", on_delete=models.CASCADE,
+        related_name="shipment_lines", verbose_name="Позиція замовлення",
+    )
+    qty = models.DecimalField("Кількість у посилці", max_digits=12, decimal_places=3)
+
+    class Meta:
+        verbose_name        = "Позиція посилки"
+        verbose_name_plural = "Позиції посилки"
+        ordering            = ["order_line_id"]
+        constraints = [
+            models.UniqueConstraint(fields=["shipment", "order_line"], name="shipmentline_unique_line"),
+        ]
+
+    def __str__(self):
+        return f"#{self.shipment_id}: {self.order_line_id} × {self.qty}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

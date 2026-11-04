@@ -285,10 +285,37 @@ def digikey_packlist(request, order_pk):
     return response
 
 
+def _ship_rows(order_details, dk_order, shipment=None) -> list:
+    """Рядки «Кількість відправлених одиниць» форми підтвердження: що вже відправлено на DigiKey (попередні
+    підтвердження частин) і скільки відправити зараз — посилка Minerva (shipment) або все, що ще не відправлено."""
+    from bots.services.digikey import marketplace_already_shipped, parcel_ship_quantities, _detail_qty
+    already = marketplace_already_shipped(dk_order or {})
+    preset = None
+    if shipment is not None:
+        from shipping.services.parcels import parts_by_sku
+        parts = parts_by_sku(shipment)
+        if parts is not None:
+            preset, _missing = parcel_ship_quantities(order_details, parts, already)
+    rows = []
+    for line in order_details:
+        did = line.get("orderDetailId")
+        if not did:
+            continue
+        ordered = _detail_qty(line)
+        left = max(ordered - already.get(did, 0), 0)
+        rows.append({"detail_id": did, "part": line.get("productPartNumber") or line.get("supplierSku") or "",
+                     "sku": line.get("supplierSku") or "", "ordered": ordered, "already": already.get(did, 0),
+                     "left": left, "value": preset.get(did, 0) if preset is not None else left})
+    return rows
+
+
 def confirm_digikey_shipment(request, order, config, tracking, carrier=None, invoice=None,
-                              net_vat=None, shipped_quantities=None) -> bool:
+                              net_vat=None, shipped_quantities=None, shipment=None, parts_by_sku=None) -> bool:
     """Підтверджує відправлення на DigiKey Marketplace (ShipOrder API) і ставить замовлення в shipped.
     Використовується формою /bots/digikey/ship/<pk>/ і автопідтвердженням зі сторінки відправлення.
+    Частина замовлення (посилка — parts_by_sku, або менші кількості у формі): на DigiKey ще лишається
+    невідправлене — замовлення не закривається («В обробці»); посилка позначається підтвердженою
+    (Shipment.shop_confirmed_at), щоб банер не запропонував її вдруге.
     Повідомлення — через django.contrib.messages. Повертає True при успіху."""
     from django.contrib import messages as msg
     from bots.services.digikey import ship_marketplace_order, upload_vat_invoice, DigiKeyAPIError
@@ -366,17 +393,41 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
                 net_vat_invoice_amount=net_vat,
                 shipped_quantities=shipped_quantities or None,
                 vat_file_id=vat_file_id,
+                parts_by_sku=parts_by_sku,
             )
             if result["ok"]:
                 ok = True
+                remaining = result.get("remaining") or 0
+                if shipment is not None:
+                    from django.utils import timezone as _tz
+                    from shipping.models import Shipment as _Shipment
+                    _Shipment.objects.filter(pk=shipment.pk).update(shop_confirmed_at=_tz.now())
                 update_fields = ["status", "status_source"]
-                order.status        = "shipped"
+                # Частина: на DigiKey ще не все відправлено — замовлення лишається відкритим
+                order.status        = "processing" if remaining > 0 else "shipped"
                 order.status_source = "DigiKey Marketplace"
                 if tracking and not order.tracking_number:
                     order.tracking_number = tracking
                     update_fields.append("tracking_number")
                 order.save(update_fields=update_fields)
-                msg.success(request, result["message"])
+                parts_text = ", ".join(
+                    "{} × {}".format(p.get("dkPartNumber") or p.get("orderDetailId"), p.get("quantity"))
+                    for p in result.get("parts") or [])
+                if remaining > 0:
+                    msg.success(request, "✅ DigiKey: підтверджено частину замовлення ({}). Ще не відправлено на "
+                                         "DigiKey: {} шт. — замовлення лишається «В обробці».".format(parts_text, remaining))
+                else:
+                    msg.success(request, result["message"])
+                    order.refresh_from_db(fields=["status"])
+                    if order.status not in ("shipped", "delivered"):
+                        try:
+                            from shipping.services import parcels as _parcels
+                            left = _parcels.progress(order).remainder_text()
+                        except Exception:
+                            left = ""
+                        if left:
+                            msg.warning(request, "Замовлення лишається «В обробці»: у Minerva ще не відправлено "
+                                                 "{}.".format(left))
 
                 if vat_file_id:
                     msg.info(request, f"\ud83d\udcce VAT \u0444\u0430\u0439\u043b \u0437\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043e \u043d\u0430 DigiKey (ID: {vat_file_id}). \u041f\u0440\u0438\u0432'\u044f\u0436\u0456\u0442\u044c \u0439\u043e\u0433\u043e \u0432\u0440\u0443\u0447\u043d\u0443 \u0443 DigiKey Marketplace portal.")
@@ -407,8 +458,14 @@ def digikey_ship_order(request, order_pk):
 
     order  = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
     config = DigiKeyConfig.get()
+    from shipping.models import Shipment as _Shipment
+    shipment_pk = str((request.POST if request.method == "POST" else request.GET).get("shipment") or "")
+    shipment = _Shipment.objects.filter(pk=shipment_pk, order=order).first() if shipment_pk.isdigit() else None
 
     if request.method == "POST":
+        if not request.user.has_perm("sales.change_salesorder"):
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied("Немає права змінювати замовлення.")
         tracking        = request.POST.get("tracking_number", "").strip()
         carrier         = request.POST.get("carrier_id", "").strip() or None
         invoice         = request.POST.get("invoice_number", "").strip() or None
@@ -425,13 +482,15 @@ def digikey_ship_order(request, order_pk):
                 except ValueError:
                     pass
 
-        confirm_digikey_shipment(request, order, config, tracking, carrier, invoice, net_vat, shipped_quantities)
+        confirm_digikey_shipment(request, order, config, tracking, carrier, invoice, net_vat, shipped_quantities,
+                                 shipment=shipment)
 
         return redirect(f"/admin/sales/salesorder/{order_pk}/change/")
 
     # GET — показати форму; підтягуємо список carriers і деталі замовлення з DigiKey API
     carriers      = []
     order_details = []
+    dk_order      = {}
     has_token = bool(config.marketplace_access_token)
     if has_token:
         try:
@@ -513,6 +572,8 @@ def digikey_ship_order(request, order_pk):
         "has_token":          has_token,
         "carriers":           carriers,
         "order_details":      order_details,
+        "ship_rows":          _ship_rows(order_details, dk_order, shipment),
+        "shipment":           shipment,
         "supplier_id":        supplier_id,
         "is_eu":              is_eu,
         "preset_carrier_id":  preset_carrier_id,

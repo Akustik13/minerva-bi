@@ -332,7 +332,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             reservations_detail[l.product_id].append({
                 'order_number':     o.order_number,
                 'order_pk':         o.pk,
-                'qty':              float(l.qty),
+                'qty':              float(getattr(l, '_open_qty', l.qty)),
                 'client':           o.client or o.ship_name or o.email or f'#{o.order_number}',
                 'status':           o.get_status_display(),
                 'shipping_deadline': o.shipping_deadline,
