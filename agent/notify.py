@@ -114,7 +114,7 @@ def _send_telegram(user, m, link_text='Відкрити завдання') -> st
 def task_finished(task_id, note='') -> str:
     """Після `_finish`: повідомити власника, якщо прохід був довгим. → що записано в кроки ('' — нічого)."""
     task = AgentTask.objects.select_related('owner', 'owner__profile', 'schedule').filter(pk=task_id).first()
-    if task is None:
+    if task is None or task.quiet:          # 🧪 пробний запуск — лише на сторінці завдання
         return ''
     if task.schedule_id:                    # ⏰ регулярне завдання — звіт завжди, у вибрані канали
         s = task.schedule

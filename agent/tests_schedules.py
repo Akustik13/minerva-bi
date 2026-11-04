@@ -164,3 +164,45 @@ class ScheduleAdminTests(Base):
         self.client.force_login(other)
         self.assertEqual(self.client.get(f'/admin/agent/agentschedule/{s.pk}/change/').status_code, 302)
         self.assertEqual(self.client.post(f'/admin/agent/agentschedule/{s.pk}/run/').status_code, 404)
+
+
+class PreviewTests(Base):
+    def setUp(self):
+        super().setUp()
+        from email_assistant.models import EmailAccount
+        EmailAccount.objects.create(user=self.user, email_address='slava@sevskiy.de')
+        self.s = AgentSchedule.objects.create(owner=self.user, name='☀️ Ранок', instruction='Що в пошті?',
+                                              time=datetime.time(8, 0), days=[])
+        self.client.force_login(self.user)
+
+    def test_preview_lists_access_and_report(self):
+        info = schedules.preview(self.s)
+        see = ' '.join(text for _ok, text in info['see'])
+        self.assertIn('📦 Замовлення й відправлення', see)
+        self.assertIn('📬 Ваша пошта — за останню добу 0 листів', see)
+        report = dict((text.split(' — ')[0], ok) for ok, text in info['report'])
+        self.assertFalse(report['💬 Telegram'])                       # немає Telegram ID
+        self.assertTrue(report['✉️ Пошта'])
+        self.assertEqual(info['when'][0], 'щодня о 08:00')
+        page = self.client.get(f'/admin/agent/agentschedule/{self.s.pk}/change/').content.decode()
+        self.assertIn('👀 Що агент бачитиме', page)
+        self.assertIn('🧪 Спробувати без звіту', page)
+        self.assertIn('не вказано Telegram ID', page)
+
+    def test_quiet_run_sends_nothing(self):
+        fake = FakeClient([resp('end_turn', text('Пошта: 2 важливі листи.'))])
+        with mock.patch('agent.tasks._client', return_value=fake), \
+                mock.patch('agent.notify.deliver') as deliver:
+            r = self.client.post(f'/admin/agent/agentschedule/{self.s.pk}/run/?quiet=1')
+        deliver.assert_not_called()
+        task = AgentTask.objects.get(schedule=self.s)
+        self.assertTrue(task.quiet)
+        self.assertTrue(task.title.startswith('🧪 '))
+        self.assertEqual((task.status, task.summary), (AgentTask.DONE, 'Пошта: 2 важливі листи.'))
+        self.assertEqual(r['Location'], f'/admin/agent/agenttask/{task.pk}/review/')
+        page = self.client.get(r['Location']).content.decode()
+        self.assertIn('пробний запуск — звіт нікуди не надсилається', page)
+        self.s.refresh_from_db()
+        self.assertIsNone(self.s.last_run_at)
+        self.assertIn('пробний, без звіту',
+                      self.client.get(f'/admin/agent/agentschedule/{self.s.pk}/change/').content.decode())

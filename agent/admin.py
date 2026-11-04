@@ -380,7 +380,7 @@ class AgentScheduleAdmin(admin.ModelAdmin):
         top = [(None, {'fields': ('name', 'enabled', 'instruction'),
                        'description': format_html('{}<br><br>Готові приклади: {}', self.DESCRIPTION, presets)})]
         if obj is not None and obj.pk:
-            top.insert(0, ('Стан', {'fields': ('state_panel',)}))
+            top.insert(0, ('🧪 Перевірити, як працює', {'fields': ('state_panel',)}))
         return top + [
             ('⏰ Коли', {'fields': ('time', 'days')}),
             ('Звіт і витрати', {'fields': ('notify_telegram', 'notify_email', 'model', 'budget_usd')}),
@@ -426,11 +426,13 @@ class AgentScheduleAdmin(admin.ModelAdmin):
         if request.method != 'POST' or not request.user.has_perm('agent.add_agenttask'):
             messages.error(request, 'Немає права давати завдання агенту')
             return redirect(reverse('admin:agent_agentschedule_change', args=[obj.pk]))
-        task = schedules.start(obj, manual=True)
+        quiet = request.GET.get('quiet') == '1'      # 🧪 «Спробувати без звіту»
+        task = schedules.start(obj, manual=True, quiet=quiet)
         if task is None:
             messages.error(request, 'Не вдалося запустити: ' + (schedules.allowed(obj) or 'спробуйте ще раз'))
             return redirect(reverse('admin:agent_agentschedule_change', args=[obj.pk]))
-        messages.info(request, '▶ Агент працює — звіт прийде, коли закінчить; хід — на цій сторінці')
+        messages.info(request, '🧪 Пробний запуск — результат з’явиться на цій сторінці, звіт нікуди не надсилається'
+                      if quiet else '▶ Агент працює — звіт прийде, коли закінчить; хід — на цій сторінці')
         return redirect(reverse('admin:agent_agenttask_review', args=[task.pk]))
 
     @admin.display(description='Коли')
@@ -452,35 +454,38 @@ class AgentScheduleAdmin(admin.ModelAdmin):
         at = schedules.next_run(obj)
         return timezone.localtime(at).strftime('%d.%m %H:%M') if at else '—'
 
-    @admin.display(description='Стан')
+    @admin.display(description='Перевірка')
     def state_panel(self, obj):
+        """🧪 Як виконуватиметься (agent/schedules.preview) + «Спробувати без звіту» / «Запустити зараз» + запуски."""
         from agent import schedules
-        at = schedules.next_run(obj)
-        profile = getattr(obj.owner, 'profile', None)
-        tg = bool(getattr(profile, 'telegram_id', None))
-        notes = []
-        if obj.notify_telegram and not tg:
-            notes.append(format_html('⚠️ У «<a href="/core/my-settings/">Мої налаштування</a>» не вказано Telegram ID — '
-                                     'звіт у Telegram не прийде'))
-        why = schedules.allowed(obj)
-        if why:
-            notes.append(f'⚠️ Не запускається: {why}')
-        runs = format_html_join('', '<li><a href="{}">{}</a> — {}</li>', (
-            (reverse('admin:agent_agenttask_review', args=[t.pk]),
-             timezone.localtime(t.created_at).strftime('%d.%m %H:%M'), t.get_status_display())
-            for t in obj.tasks.order_by('-created_at')[:7]))
-        return format_html(
-            '<div>{} о {} · наступний запуск: <b>{}</b></div>{}'
-            '<div style="margin-top:8px"><button type="submit" class="button" formaction="{}" formmethod="post" '
-            'formnovalidate onclick="return confirm(\'Запустити зараз? Агент виконає завдання й надішле звіт.\')">'
-            '▶ Запустити зараз</button> <span style="opacity:.7">— одразу, звіт прийде як за розкладом; '
-            'збережені налаштування</span></div>'
-            '<div style="margin-top:8px">Останні запуски:<ul style="margin:4px 0">{}</ul></div>',
-            schedules.days_text(obj), obj.time.strftime('%H:%M'),
-            timezone.localtime(at).strftime('%d.%m %H:%M') if at else 'вимкнено',
-            format_html_join('', '<div style="margin-top:6px">{}</div>', ((n,) for n in notes)),
-            reverse('admin:agent_agentschedule_run', args=[obj.pk]), runs or format_html('<li>ще не було</li>'))
+        info = schedules.preview(obj)
 
+        def checks(rows):
+            return format_html_join('', '<li>{} {}</li>', (('✓' if ok else '⚠️', text) for ok, text in rows))
+        runs = format_html_join('', '<li><a href="{}">{}</a> — {}{}</li>', (
+            (reverse('admin:agent_agenttask_review', args=[t.pk]),
+             timezone.localtime(t.created_at).strftime('%d.%m %H:%M'), t.get_status_display(),
+             ' · 🧪 пробний, без звіту' if t.quiet else '')
+            for t in obj.tasks.order_by('-created_at')[:7]))
+        blocked = format_html('<div style="margin-top:6px">⚠️ Не запускається: {}</div>', info['blocked']) \
+            if info['blocked'] else ''
+        run_url = reverse('admin:agent_agentschedule_run', args=[obj.pk])
+        return format_html(
+            '<div><b>⏰ Коли:</b> {}</div>{}'
+            '<div style="margin-top:8px"><b>👀 Що агент бачитиме</b><ul style="margin:4px 0">{}</ul></div>'
+            '<div><b>📨 Куди піде звіт</b><ul style="margin:4px 0">{}</ul></div>'
+            '<div style="opacity:.8">🤖 {}. Перевіряються збережені налаштування — після змін спершу «Зберегти і '
+            'продовжити редагування».</div>'
+            '<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
+            '<button type="submit" class="button" formaction="{}?quiet=1" formmethod="post" formnovalidate '
+            'title="Агент виконає завдання зараз; результат — на сторінці запуску, звіт нікуди не надсилається">'
+            '🧪 Спробувати без звіту</button>'
+            '<button type="submit" class="button" formaction="{}" formmethod="post" formnovalidate '
+            'onclick="return confirm(\'Запустити зараз? Агент виконає завдання й надішле звіт.\')">'
+            '▶ Запустити зараз (зі звітом)</button></div>'
+            '<div style="margin-top:8px">Останні запуски:<ul style="margin:4px 0">{}</ul></div>',
+            ' · '.join(info['when']), blocked, checks(info['see']), checks(info['report']), info['cost'],
+            run_url, run_url, runs or format_html('<li>ще не було</li>'))
 
 def schedules_presets():
     from agent.schedules import PRESETS

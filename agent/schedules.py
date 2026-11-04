@@ -104,28 +104,85 @@ def allowed(schedule) -> str:
     return ''
 
 
-def make_task(schedule) -> AgentTask:
+def make_task(schedule, *, quiet=False) -> AgentTask:
     today = timezone.localdate()
     return AgentTask.objects.create(
-        owner=schedule.owner, schedule=schedule, title=f'{schedule.name} · {today:%d.%m.%Y}'[:200],
+        owner=schedule.owner, schedule=schedule, quiet=quiet,
+        title=(f'🧪 {schedule.name} · пробний · {today:%d.%m.%Y}' if quiet
+               else f'{schedule.name} · {today:%d.%m.%Y}')[:200],
         instruction=schedule.instruction.strip() + NOTE.format(name=schedule.name),
         model=schedule.model, budget_usd=schedule.budget_usd)
 
 
-def start(schedule, *, manual=False, at=None):
-    """manual — «▶ Запустити зараз» (у фоні, розклад не змінює); інакше — запуск cron (черга завдань), at — «зараз»
-    для запису запуску. → AgentTask або None (не можна / уже запущено сьогодні)."""
+def start(schedule, *, manual=False, at=None, quiet=False):
+    """manual — «▶ Запустити зараз» (у фоні, розклад не змінює); quiet — «🧪 Спробувати без звіту» (те саме, звіт
+    нікуди не йде); інакше — запуск cron (черга завдань), at — «зараз» для запису запуску. → AgentTask або None
+    (не можна / уже запущено сьогодні)."""
     why = allowed(schedule)
     if why:
         logger.info('agent schedule %s skipped: %s', schedule.pk, why)
         return None
+    manual = manual or quiet
     if not manual and not _claim(schedule, at or timezone.now()):
         return None
-    task = make_task(schedule)
+    task = make_task(schedule, quiet=quiet)
     if manual:
         from agent import tasks
         tasks.start(task)
     return task
+
+
+def preview(schedule) -> dict:
+    """🧪 Як виконуватиметься: коли, що агент бачитиме (✓ / ✗ з причиною), куди піде звіт. Лише читання бази."""
+    from agent import inbox_tools, purchases, rag, shipments
+    from agent.notify import _email_to
+    owner = schedule.owner
+    at = next_run(schedule)
+    when = [f'{days_text(schedule)} о {schedule.time:%H:%M}',
+            'наступний запуск: ' + (timezone.localtime(at).strftime('%d.%m.%Y %H:%M') if at else 'вимкнено')]
+    see = [(True, '📋 Склад, товари, даташити, ціни, магазини')]
+    see.append((shipments.can_read(owner), '📦 Замовлення й відправлення — що не відправлено, склад позицій, адреса'
+                if shipments.can_read(owner) else '📦 Замовлення — немає права бачити замовлення (Продажі)'))
+    see.append((purchases.can_read(owner), '🛒 Закупівлі й вхідні посилки' if purchases.can_read(owner)
+                else '🛒 Закупівлі — немає права бачити закупівлі'))
+    if inbox_tools.can_read(owner):
+        from email_assistant.models import EmailMessage
+        day = timezone.now() - datetime.timedelta(hours=24)
+        mails = EmailMessage.objects.filter(account__user=owner, folder=EmailMessage.FOLDER_INBOX, is_deleted=False,
+                                            is_spam=False, sent_at__gte=day)
+        see.append((True, f'📬 Ваша пошта — за останню добу {mails.count()} листів, непрочитаних '
+                          f'{mails.filter(is_read=False).count()}'))
+        from calendar_app.models import CalendarEvent
+        start = _at(timezone.localdate(), datetime.time.min)
+        events = CalendarEvent.objects.filter(user=owner, start_at__gte=start,
+                                              start_at__lt=start + datetime.timedelta(days=1)).count()
+        see.append((True, f'📅 Ваш календар — сьогодні подій: {events}'))
+    else:
+        see.append((False, '📬 Пошта й 📅 календар — у вас немає скриньки в Minerva'))
+    if rag.tools_for(owner):
+        see.append((True, '🔎 Пошук у RAG (даташити, історія листування)'))
+    report = []
+    if schedule.notify_telegram:
+        tg = getattr(getattr(owner, 'profile', None), 'telegram_id', None)
+        try:
+            from config.models import NotificationSettings
+            bot = bool(NotificationSettings.get().telegram_bot_token)
+        except Exception:  # noqa: BLE001
+            bot = False
+        if not tg:
+            report.append((False, '💬 Telegram — у «Мої налаштування» не вказано Telegram ID'))
+        elif not bot:
+            report.append((False, '💬 Telegram — бот не налаштований («Налаштування → Сповіщення»)'))
+        else:
+            report.append((True, f'💬 Telegram — на ваш ID {tg}'))
+    if schedule.notify_email:
+        to = _email_to(owner)
+        report.append((bool(to), f'✉️ Пошта — на {to}' if to else '✉️ Пошта — немає вашої адреси'))
+    if not report:
+        report.append((False, 'Звіт нікуди не надсилається — увімкніть Telegram чи пошту'))
+    model = dict(AgentSchedule._meta.get_field('model').choices).get(schedule.model, schedule.model)
+    return {'when': when, 'see': see, 'report': report, 'blocked': allowed(schedule),
+            'cost': f'{model}, до {schedule.budget_usd} $ за запуск'}
 
 
 def run_due(now=None) -> int:

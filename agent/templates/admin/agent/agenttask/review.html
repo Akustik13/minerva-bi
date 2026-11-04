@@ -38,6 +38,8 @@
   <div class="agt-card">
     <div class="agt-head">
       <span class="agt-badge" id="agt-status">{{ task.get_status_display }}</span>
+      {% if task.schedule_id %}<span class="agt-muted">⏰ <a href="{% url 'admin:agent_agentschedule_change' task.schedule_id %}">{{ task.schedule.name }}</a> ·
+        {% if task.quiet %}🧪 пробний запуск — звіт нікуди не надсилається, підсумок нижче — те, що прийшло б{% else %}підсумок нижче — це звіт у Telegram і на пошту{% endif %}</span>{% endif %}
       {% if running %}
         <form method="post">{% csrf_token %}<input type="hidden" name="action" value="cancel">
           <button type="submit" class="button">⏹ Зупинити</button></form>

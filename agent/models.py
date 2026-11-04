@@ -247,6 +247,9 @@ class AgentTask(models.Model):
     schedule = models.ForeignKey('AgentSchedule', null=True, blank=True, on_delete=models.SET_NULL,
                                  related_name='tasks', verbose_name='Регулярне завдання',
                                  help_text='Запуск регулярного завдання за розкладом — звіт іде вам листом і в Telegram')
+    quiet = models.BooleanField('🔕 Без повідомлень', default=False,
+                                help_text='Пробний запуск («🧪 Спробувати без звіту»): результат — лише на сторінці '
+                                          'завдання, звіт нікуди не надсилається')
     products = models.ManyToManyField('inventory.Product', blank=True, related_name='+', verbose_name='Товари')
     message = models.ForeignKey('email_assistant.EmailMessage', null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name='agent_tasks', verbose_name='Лист',
