@@ -17566,6 +17566,7 @@
 {"uk": "той самий клієнт CRM", "en": "same CRM customer", "de": "derselbe CRM-Kunde"}
 {"uk": "токен", "en": "token", "de": "Token"}
 {"uk": "токен протермінований. Зайди в Налаштування DigiKey → Marketplace OAuth → авторизуй.", "en": "the token has expired. Go to DigiKey settings → Marketplace OAuth → authorize.", "de": "das Token ist abgelaufen. Zu den DigiKey-Einstellungen → Marketplace OAuth wechseln und autorisieren."}
+{"uk": "токенів", "en": "tokens", "de": "Tokens"}
 {"uk": "токенів (запит / відповідь)", "en": "tokens (request / response)", "de": "Tokens (Anfrage / Antwort)"}
 {"uk": "тому", "en": "ago", "de": "her"}
 {"uk": "тому на DigiKey вийде", "en": "so on DigiKey it will come to", "de": "daher ergibt sich auf DigiKey"}

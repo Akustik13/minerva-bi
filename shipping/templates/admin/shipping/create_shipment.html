@@ -2344,6 +2344,13 @@ document.addEventListener('DOMContentLoaded', function() {
         var tail = el('div', 'agent-dim');
         if (d.stale) tail.appendChild(el('span', 'agent-warn', '⚠️ відтоді прийшли нові листи '));
         else if (r.at && (r.state === 'ok' || r.state === 'none')) tail.appendChild(document.createTextNode('прочитано ' + r.at + ' '));
+        if (r.tokens) {        // скільки коштувало (записано в «AI Бюджет по місяцях»)
+          var spent = el('span', null, '· ' + Number(r.tokens).toLocaleString('uk-UA') + ' ');
+          spent.appendChild(el('span', null, 'токенів'));
+          spent.appendChild(document.createTextNode(' · $' + r.cost_usd + ' '));
+          spent.title = r.model || '';
+          tail.appendChild(spent);
+        }
         tail.appendChild(readBtn('↻ Прочитати ще раз'));
         box.appendChild(tail);
         if (lastAdvice) window.agentAdvice(lastAdvice);

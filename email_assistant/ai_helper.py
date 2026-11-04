@@ -46,10 +46,17 @@ def last_model() -> str:
     return getattr(_last, 'model', '')
 
 
+def last_usage():
+    """usage останньої відповіді `_call_ai_direct` у цьому потоці (None — виклику не було або він не вдався) —
+    для обліку витрат (ai_assistant.budget_guard.record_monthly)."""
+    return getattr(_last, 'usage', None)
+
+
 def _call_ai_direct(prompt: str, max_tokens: int = 1024, user=None, model: str = '') -> str:
     """Direct Anthropic API call — isolated per-request, no conversation history, no tools.
     model — явна модель (напр. для брифу); інакше — з «Налаштувань пошти» / роутер."""
     _last.model = ''
+    _last.usage = None
     try:
         import anthropic
         from strategy.models import AISettings
@@ -73,10 +80,11 @@ def _call_ai_direct(prompt: str, max_tokens: int = 1024, user=None, model: str =
                 response = client.messages.create(**params)
         else:
             response = client.messages.create(**params)
+        _last.usage = getattr(response, 'usage', None)
+        _last.model = getattr(response, 'model', '') or model
         if response.stop_reason == 'refusal':
             logger.warning('AI refusal (%s): %s', model, getattr(response, 'stop_details', None))
             return ''
-        _last.model = getattr(response, 'model', '') or model
         return ''.join(b.text for b in response.content if getattr(b, 'type', '') == 'text')
     except Exception as e:
         logger.error('_call_ai_direct error: %s', e)

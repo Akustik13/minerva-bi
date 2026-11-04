@@ -294,8 +294,8 @@ class QueueTests(AfterBookingTests):
         self.assertIsNone(q['first'])
 
 
-class WishesTests(Base):
-    """📬 Побажання з пошти: лише свої скриньки, цитата має бути в листі, кеш до нового листа."""
+class WishesSetup(Base):
+    """Скриньки, замовлення WB-24680 і листи для «📬 Побажань з пошти»."""
 
     def setUp(self):
         super().setUp()
@@ -309,6 +309,10 @@ class WishesTests(Base):
         SalesOrder.objects.filter(pk=self.o.pk).update(order_number='WB-24680')
         self.o.refresh_from_db()
         self.uid = 0
+        from core.shared_cache import cache                       # спільний кеш переживає тести — чистимо
+        from shipping.services import ship_wishes
+        for u in (self.user, self.olga):
+            cache.delete(ship_wishes._key(self.o, u))
 
     def mail(self, account, body, subject='Re: Bestellung WB-24680'):
         from email_assistant.models import EmailMessage
@@ -320,6 +324,9 @@ class WishesTests(Base):
         import json
         from unittest import mock
         return mock.patch('email_assistant.ai_helper._call_ai_direct', return_value=json.dumps({'wishes': wishes}))
+
+class WishesTests(WishesSetup):
+    """📬 Побажання з пошти: лише свої скриньки, цитата має бути в листі, кеш до нового листа."""
 
     def test_reads_only_own_mail_and_checks_quotes(self):
         from shipping.services import ship_wishes
@@ -390,3 +397,35 @@ class CircleTests(AfterBookingTests):
         self.assertIn('Чекають відправки: 1', card['text'])
         self.assertEqual(suggest('Відправ замовлення 777777', self.user)['kind'], 'task')   # такого немає — агенту
         self.assertIsNone(suggest('Що відправити сьогодні?', staff('vera', 'readonly')))
+
+
+class WishesBudgetTests(WishesSetup):
+    """Витрати «📬 Прочитати листи» — у «AI Бюджет по місяцях» і в картці; ціни моделей 5.x."""
+
+    def test_usage_recorded_and_shown(self):
+        from types import SimpleNamespace
+        from unittest import mock
+
+        from ai_assistant.models import AIBudgetLog
+        from shipping.services import ship_wishes
+        self.mail(self.mine, 'Bitte per UPS Express schicken.')
+        usage = SimpleNamespace(input_tokens=6000, output_tokens=2000, cache_read_input_tokens=0,
+                                cache_creation_input_tokens=0)
+        with self.ai([{'kind': 'carrier', 'text': 'UPS Express', 'quote': 'per UPS Express', 'mail': 1}]), \
+                mock.patch('email_assistant.ai_helper.last_usage', return_value=usage), \
+                mock.patch('email_assistant.ai_helper.last_model', return_value='claude-haiku-5-5-20261001'):
+            r = ship_wishes.read(self.o, self.user)
+        self.assertEqual((r['tokens'], r['cost_usd']), (8000, '0.0016'))   # 6000 × $0.10/M + 2000 × $0.50/M
+        log = AIBudgetLog.current()
+        self.assertEqual((log.total_requests, log.total_input_tokens, log.total_output_tokens), (1, 6000, 2000))
+        self.assertEqual(str(log.total_cost_usd), '0.0016')
+        self.assertEqual(ship_wishes.state(self.o, self.user)['result']['tokens'], 8000)
+
+    def test_prices_of_5x_models(self):
+        from decimal import Decimal
+
+        from ai_assistant.budget_guard import calc_cost
+        self.assertEqual(calc_cost('claude-haiku-5-5', 1_000_000, 1_000_000), Decimal('0.6'))
+        self.assertEqual(calc_cost('claude-sonnet-5-5', 1_000_000, 0), Decimal('2'))
+        self.assertEqual(calc_cost('claude-opus-5-5-20261101', 0, 1_000_000), Decimal('20'))
+        self.assertEqual(calc_cost('unknown-model', 1_000_000, 0), Decimal('3'))      # як раніше

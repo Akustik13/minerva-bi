@@ -2,20 +2,53 @@ from decimal import Decimal
 from django.utils import timezone
 
 
+# $ за 1 токен; ціни 5.x — ті самі, що в agent/tasks.PRICES і shop/search_assist.PRICES
 PRICE_PER_INPUT_TOKEN = {
     'claude-haiku-4-5-20251001': Decimal('0.00000025'),
     'claude-sonnet-4-6':         Decimal('0.000003'),
+    'claude-opus-5-5':           Decimal('0.000004'),
+    'claude-sonnet-5-5':         Decimal('0.000002'),
+    'claude-haiku-5-5':          Decimal('0.0000001'),
 }
 PRICE_PER_OUTPUT_TOKEN = {
     'claude-haiku-4-5-20251001': Decimal('0.00000125'),
     'claude-sonnet-4-6':         Decimal('0.000015'),
+    'claude-opus-5-5':           Decimal('0.00002'),
+    'claude-sonnet-5-5':         Decimal('0.00001'),
+    'claude-haiku-5-5':          Decimal('0.0000005'),
 }
 
 
+def _price(table: dict, model: str, default: Decimal) -> Decimal:
+    """Ціна за назвою моделі; з датою в кінці («claude-haiku-5-5-20261001») — за найдовшим збігом початку."""
+    model = str(model or '')
+    if model in table:
+        return table[model]
+    hits = [k for k in table if model.startswith(k)]
+    return table[max(hits, key=len)] if hits else default
+
+
 def calc_cost(model: str, input_tokens: int, output_tokens: int) -> Decimal:
-    pi = PRICE_PER_INPUT_TOKEN.get(model, Decimal('0.000003'))
-    po = PRICE_PER_OUTPUT_TOKEN.get(model, Decimal('0.000015'))
+    pi = _price(PRICE_PER_INPUT_TOKEN, model, Decimal('0.000003'))
+    po = _price(PRICE_PER_OUTPUT_TOKEN, model, Decimal('0.000015'))
     return pi * input_tokens + po * output_tokens
+
+
+def record_monthly(model: str, usage) -> dict:
+    """Один виклик AI поза розмовою Minerva AI (гід, «📬 Прочитати листи» …) → місячний бюджет «AI Бюджет по
+    місяцях». usage — відповідь Anthropic (input / cache / output tokens). → {input, output, cost} для показу."""
+    from django.db.models import F
+
+    from .models import AIBudgetLog
+    inp = sum(getattr(usage, key, 0) or 0
+              for key in ('input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens'))
+    out = getattr(usage, 'output_tokens', 0) or 0
+    cost = calc_cost(model, inp, out)
+    log = AIBudgetLog.current()
+    AIBudgetLog.objects.filter(pk=log.pk).update(
+        total_requests=F('total_requests') + 1, total_input_tokens=F('total_input_tokens') + inp,
+        total_output_tokens=F('total_output_tokens') + out, total_cost_usd=F('total_cost_usd') + cost)
+    return {'input': inp, 'output': out, 'cost': cost}
 
 
 def check_budget(profile) -> tuple[bool, str]:

@@ -6,6 +6,7 @@
 частинами, інше. Кожне — з дослівною цитатою; цитати, якої немає в листі, Minerva не показує (`_valid`). Тексти листів
 у запиті — ДАНІ, не вказівки. Результат — у core.shared_cache на `TTL` для людини й замовлення разом з відбитком листів
 (`fingerprint`): з'явився новий лист — «застаріло», прочитати ще раз. Нічого не змінює в замовленні.
+Кожен виклик AI — у місячний бюджет «AI Бюджет по місяцях» (`_record`), токени й вартість — у результаті й у картці.
 """
 import hashlib
 import json
@@ -112,6 +113,19 @@ def _parse(raw: str):
     return data.get('wishes') if isinstance(data, dict) and isinstance(data.get('wishes'), list) else None
 
 
+def _record(model, usage) -> dict:
+    """Витрати виклику → місячний бюджет AI (`budget_guard.record_monthly`); → {tokens, cost_usd} для показу."""
+    if usage is None:
+        return {}
+    try:
+        from ai_assistant.budget_guard import record_monthly
+        r = record_monthly(model, usage)
+    except Exception as e:  # noqa: BLE001 — облік не ламає читання листів
+        logger.warning('ship wishes usage not recorded: %s', e)
+        return {}
+    return {'tokens': r['input'] + r['output'], 'cost_usd': f'{r["cost"]:.4f}', 'model': model}
+
+
 def state(order, user, msgs=None) -> dict:
     """Що вже відомо без AI: {mails, stale, result | None} — для картки агента й черги відправки."""
     from core.shared_cache import cache
@@ -154,18 +168,21 @@ def read(order, user) -> dict:
                      f'тема: {row["subject"]}\n{_text(m)}')
     prompt = PROMPT.format(number=order.order_number or order.pk, client=order.client or order.email or '—',
                            country=country(order) or '—', mails='\n\n'.join(parts))
+    spent = {}
     try:
         from email_assistant import ai_helper
         raw = ai_helper._call_ai_direct(prompt, max_tokens=1500, user=user, model=AI_MODEL)
+        spent = _record(ai_helper.last_model() or AI_MODEL, ai_helper.last_usage())
     except Exception as e:  # noqa: BLE001
         logger.warning('ship wishes: %s', e)
         raw = ''
     if not raw:
-        return {'state': 'no_ai', 'wishes': [], 'mails': len(msgs), 'at': at}
+        return {'state': 'no_ai', 'wishes': [], 'mails': len(msgs), 'at': at, **spent}
     found = _parse(raw)
     if found is None:
-        return {'state': 'error', 'wishes': [], 'mails': len(msgs), 'at': at, 'error': 'AI відповів не JSON'}
+        return {'state': 'error', 'wishes': [], 'mails': len(msgs), 'at': at, 'error': 'AI відповів не JSON',
+                **spent}
     wishes = _valid(found, msgs)
-    result = {'state': 'ok' if wishes else 'none', 'wishes': wishes, 'mails': len(msgs), 'at': at}
+    result = {'state': 'ok' if wishes else 'none', 'wishes': wishes, 'mails': len(msgs), 'at': at, **spent}
     cache.set(_key(order, user), {'fp': fingerprint(msgs), 'result': result}, TTL)
     return result

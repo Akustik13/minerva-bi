@@ -179,17 +179,8 @@ def _call(system_contents: str, payload: str):
 def _record(model: str, usage) -> None:
     """Витрати — у місячний бюджет AI (як 🏛 Minerva AI)."""
     try:
-        from ai_assistant.budget_guard import calc_cost
-        from ai_assistant.models import AIBudgetLog
-        inp = (getattr(usage, "input_tokens", 0) or 0) + (getattr(usage, "cache_creation_input_tokens", 0) or 0) \
-            + (getattr(usage, "cache_read_input_tokens", 0) or 0)
-        out = getattr(usage, "output_tokens", 0) or 0
-        log = AIBudgetLog.current()
-        log.total_requests += 1
-        log.total_input_tokens += inp
-        log.total_output_tokens += out
-        log.total_cost_usd += calc_cost(model, inp, out)
-        log.save(update_fields=["total_requests", "total_input_tokens", "total_output_tokens", "total_cost_usd"])
+        from ai_assistant.budget_guard import record_monthly
+        record_monthly(model, usage)
     except Exception as e:  # noqa: BLE001 — облік не ламає відповідь
         logger.warning("guide answer usage not recorded: %s", e)
 
