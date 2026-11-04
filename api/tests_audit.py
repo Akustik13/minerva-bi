@@ -101,7 +101,9 @@ class ShopKeyTests(TestCase):
 
 class WebhookAuditTests(TestCase):
     def setUp(self):
+        from django.core.cache import cache
         from shop.models import Shop, ShopListing
+        cache.clear()   # ліміт запитів ключа (pk ключа повторюється між тестами; agent.tests_mcp іде перед цими)
         InventorySettings.get()
         Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
         self.p = Product.objects.create(sku="AN-1", name="Antenne", sale_price=Decimal("20"))

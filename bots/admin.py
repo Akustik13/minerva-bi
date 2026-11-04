@@ -186,14 +186,13 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             "fields": (
                 "messages_panel",
                 ("msg_check_enabled", "msg_check_interval"),
-                "msg_last_checked_at",
                 ("msg_notify_telegram", "msg_notify_email"),
                 "msg_notify_email_to",
             ),
             "description": (
-                "Читайте та відповідайте на повідомлення покупців DigiKey Marketplace. "
-                "Авто-перевірка: <code>python manage.py check_digikey_messages</code>. "
-                "Telegram-бот та SMTP налаштовуються в "
+                "Читайте та відповідайте на повідомлення покупців DigiKey Marketplace. Нові повідомлення покупця й "
+                "оператора DigiKey Minerva перевіряє сама (за «Інтервалом перевірки») і надсилає в Telegram і листом — "
+                "з повним текстом і посиланням на відповідь. Telegram-бот та SMTP налаштовуються в "
                 "<a href='/admin/config/notificationsettings/1/change/'>Загальних налаштуваннях сповіщень</a>."
             ),
         }),
@@ -383,6 +382,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "messages/new-topic/",
                 self.admin_site.admin_view(self.messages_new_topic_view),
                 name="bots_digikeyconfig_messages_new_topic",
+            ),
+            path(
+                "messages/check-now/",
+                self.admin_site.admin_view(self.messages_check_now_view),
+                name="bots_digikeyconfig_messages_check_now",
             ),
             path(
                 "messages/ai/",
@@ -1269,7 +1273,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     last = max(convo, key=lambda m: m.get("createDateUtc") or "")
                     last_id = str(last.get("id", ""))
                     t["is_new"] = (
-                        last.get("sender") == "Customer"
+                        last.get("sender") in ("Customer", "Operator")   # покупець або оператор DigiKey
                         and last_id != seen_map.get(tid, "")
                     )
                 else:
@@ -1638,22 +1642,76 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
     poll_now_button.short_description = "Ручна перевірка"
 
     def messages_panel(self, obj):
+        """Хаб, «🔄 Перевірити зараз» і що діє: авто-перевірка, остання перевірка, Telegram, пошта (dk_message_watch)."""
         hub_url = reverse("admin:bots_digikeyconfig_messages")
         authorized = bool(obj and obj.marketplace_refresh_token)
         if not authorized:
             return format_html(
                 '<span style="color:var(--text-dim)">⚠️ Потрібна Marketplace OAuth авторизація</span>'
             )
-        last = obj.msg_last_checked_at
-        last_str = last.strftime("%d.%m.%Y %H:%M") if last else "ніколи"
+        from bots.services import dk_message_watch
+        st = dk_message_watch.status(obj)
+
+        def line(icon, label, text, bad=False):
+            return format_html('<div style="margin:2px 0">{} <b>{}</b>: <span style="color:{}">{}</span></div>',
+                               icon, label, "var(--err,#e5484d)" if bad else "var(--text)", text)
+
+        auto = (line("✅", "Авто-перевірка", f"кожні {st['interval']} хв") if st["enabled"]
+                else line("⏸", "Авто-перевірка", "вимкнена — нові повідомлення самі не перевіряються", True))
+        last = line("🕒", "Остання перевірка", st["result"] or st["last"] or "ще не було")
+        late = (line("⚠️", "Увага", "перевірка давно не запускалась — чи працює контейнер cron "
+                                    "(docker-compose restart cron)?", True) if st["late"] else "")
+        tg = st["telegram"]
+        em = st["email"]
+        telegram = line("✈️", "Telegram", "так" if tg["on"] else tg["why"], not tg["on"])
+        mail = line("✉️", "Пошта", ("так — " + ", ".join(em["to"])) if em["on"] else em["why"], not em["on"])
+        check_url = reverse("admin:bots_digikeyconfig_messages_check_now")
         return format_html(
+            '<div id="dkm-panel" data-url="{}">'
             '<a href="{}" style="background:#1565c0;color:#fff;padding:6px 16px;'
             'border-radius:4px;text-decoration:none;font-weight:600;font-size:13px">'
-            '💬 Відкрити Messages Hub</a>'
-            '&nbsp;<span style="color:var(--text-dim);font-size:11px">Остання перевірка: {}</span>',
-            hub_url, last_str,
+            '💬 Відкрити Messages Hub</a> '
+            '<button type="button" class="button" id="dkm-check"{}>🔄 Перевірити зараз</button> '
+            '<span id="dkm-state" style="color:var(--text-dim);font-size:12px">{}</span>'
+            '<div style="margin-top:8px;font-size:13px">{}{}{}{}{}</div>'
+            '<div style="color:var(--text-dim);font-size:12px;margin-top:4px">Надсилаються нові повідомлення '
+            'покупця й оператора DigiKey (ваші відповіді — ні): у Telegram — коротко, листом — повний текст, '
+            'попередні повідомлення й посилання на відповідь у Minerva. Відповідати — у «💬 Messages Hub».</div>'
+            '</div>'
+            '<script>(function () {{'
+            'var p = document.getElementById("dkm-panel"), b = document.getElementById("dkm-check"),'
+            ' s = document.getElementById("dkm-state"); if (!p || !b) return;'
+            'var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || "";'
+            'function poll() {{ fetch(p.dataset.url, {{credentials: "same-origin"}}).then(function (r) {{ return r.json(); }})'
+            '.then(function (j) {{ if (j.running) {{ setTimeout(poll, 3000); return; }} location.reload(); }})'
+            '.catch(function () {{ s.textContent = "Не вдалося дізнатися стан — оновіть сторінку."; }}); }}'
+            'b.addEventListener("click", function () {{ b.disabled = true; s.textContent = "⏳ Перевіряю повідомлення DigiKey…";'
+            'fetch(p.dataset.url, {{method: "POST", credentials: "same-origin", headers: {{"X-CSRFToken": csrf}}}})'
+            '.then(function (r) {{ return r.json().then(function (j) {{ return [r.ok, j]; }}); }})'
+            '.then(function (x) {{ if (!x[0]) {{ s.textContent = x[1].error || "Не вдалося."; b.disabled = false; return; }}'
+            ' setTimeout(poll, 2000); }}).catch(function () {{ s.textContent = "Не вдалося."; b.disabled = false; }}); }});'
+            '{}'
+            '}})();</script>',
+            check_url, hub_url, " disabled" if st["running"] else "",
+            "⏳ Іде перевірка…" if st["running"] else "",
+            auto, last, late, telegram, mail,
+            "setTimeout(poll, 3000);" if st["running"] else "",
         )
     messages_panel.short_description = "Повідомлення"
+
+    def messages_check_now_view(self, request):
+        """POST — «🔄 Перевірити зараз» (фоном, право change); GET — чи йде перевірка (JSON для панелі)."""
+        from django.http import JsonResponse
+        from bots.services import dk_message_watch
+        if request.method == "POST":
+            if not self.has_change_permission(request):
+                return JsonResponse({"error": "Немає права змінювати налаштування DigiKey."}, status=403)
+            started = dk_message_watch.start_now(request.user.get_username())
+            return JsonResponse({"started": started, "running": True})
+        if not self.has_view_permission(request):
+            return JsonResponse({"error": "Немає доступу."}, status=403)
+        st = dk_message_watch.status(DigiKeyConfig.get())
+        return JsonResponse({"running": st["running"], "last": st["last"], "result": st["result"]})
 
     def task_status_panel(self, obj):
         status_url = reverse('admin:bots_digikeyconfig_task_status')

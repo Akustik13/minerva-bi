@@ -228,7 +228,7 @@ class DigiKeyConfig(models.Model):
 
     # ── Messages check settings ───────────────────────────────────────────────
     msg_check_enabled = models.BooleanField(
-        "Авто-перевірка повідомлень", default=False,
+        "Авто-перевірка повідомлень", default=True,
         help_text="Автоматично перевіряти нові повідомлення від покупців DigiKey"
     )
     msg_check_interval = models.PositiveSmallIntegerField(
@@ -246,16 +246,21 @@ class DigiKeyConfig(models.Model):
         "Кеш оновлено", null=True, blank=True
     )
     msg_notify_telegram = models.BooleanField(
-        "Telegram — при новому повідомленні", default=False,
-        help_text="Надіслати Telegram-сповіщення коли покупець надсилає нове повідомлення"
+        "Telegram — при новому повідомленні", default=True,
+        help_text="Нове повідомлення покупця чи оператора DigiKey — у Telegram (бот і чат — «Налаштування → Сповіщення»)"
     )
     msg_notify_email = models.BooleanField(
-        "Email — при новому повідомленні", default=False,
-        help_text="Надіслати email-сповіщення коли покупець надсилає нове повідомлення"
+        "Email — при новому повідомленні", default=True,
+        help_text="Нове повідомлення покупця чи оператора DigiKey пересилається листом: повний текст, попередні "
+                  "повідомлення розмови й посилання на відповідь у Minerva"
     )
     msg_notify_email_to = models.CharField(
         "Email одержувачів (через кому)", max_length=500, blank=True, default="",
         help_text="Порожньо = використати адресу з загальних налаштувань сповіщень"
+    )
+    msg_last_result = models.CharField(
+        "Підсумок останньої перевірки", max_length=300, blank=True, default="",
+        help_text="Що знайшла остання перевірка повідомлень і куди надіслала (або чому ні)"
     )
 
     # ── API Error Handling & Retry Strategy ───────────────────────────────────
@@ -300,10 +305,14 @@ class DigiKeyConfig(models.Model):
 # ── DigiKey message seen tracker ──────────────────────────────────────────────
 
 class DigiKeyMessageSeen(models.Model):
-    """Зберігає id останнього побаченого повідомлення по кожній темі — для нотифікацій."""
+    """Тема DigiKey: що людина прочитала в хабі (`last_message_id` — «нове» в «💬 Messages Hub») і до якого
+    повідомлення вже надіслано сповіщення (`notified_upto` — bots/services/dk_message_watch.py). Окремо: сповіщення
+    не робить розмову прочитаною."""
     topic_id        = models.CharField("Topic ID", max_length=64, unique=True)
     last_message_id = models.CharField("Last Message ID", max_length=64, blank=True, default="")
     last_seen_at    = models.DateTimeField(auto_now=True)
+    notified_upto   = models.DateTimeField("Сповіщено до", null=True, blank=True)
+    notified_message_id = models.CharField("Останнє перевірене повідомлення", max_length=64, blank=True, default="")
 
     class Meta:
         verbose_name        = "DigiKey Message Seen"
