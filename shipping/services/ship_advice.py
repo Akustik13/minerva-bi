@@ -47,7 +47,7 @@ def parcel_remainder(order) -> str:
     from shipping.services import parcels
     if not parcels.has_parcels(order):
         return ''
-    return parcels.progress(order).remainder_text()
+    return parcels.progress(order).left_text()
 
 
 def eu() -> set:
@@ -391,10 +391,14 @@ def queue(user) -> dict:
             'total': total, 'shown': len(orders), 'first': first, 'can_add': can_add}
 
 
-def mail_state(order, user) -> dict:
-    """Лист клієнту про відправку («📧 Надіслати клієнту» картки замовлення): {sent, url, to} або {sent, blocked}."""
+def mail_state(order, user, shipment=None) -> dict:
+    """Лист клієнту про відправку («📧 Надіслати клієнту» картки замовлення): {sent, url, to} або {sent, blocked}.
+    Посилка частини замовлення — лист саме про неї (`?shipment=`), «надіслано» — її customer_notified_at."""
     from django.urls import reverse
     sent = order.ship_notify_sent_at
+    query = ''
+    if shipment is not None and shipment.lines.exists():
+        sent, query = shipment.customer_notified_at, f'?shipment={shipment.pk}'
     if not user.has_perm('sales.change_salesorder'):
         return {'sent': sent, 'blocked': 'немає права змінювати замовлення'}
     try:
@@ -408,7 +412,7 @@ def mail_state(order, user) -> dict:
     to = (order.ship_email or order.email or '').strip()
     if not to:
         return {'sent': sent, 'blocked': 'у замовленні немає email клієнта'}
-    return {'sent': sent, 'to': to, 'url': reverse('admin:sales_salesorder_notify_customer', args=[order.pk])}
+    return {'sent': sent, 'to': to, 'url': reverse('admin:sales_salesorder_notify_customer', args=[order.pk]) + query}
 
 
 def after_booking(shipment, user) -> dict | None:
@@ -435,7 +439,7 @@ def after_booking(shipment, user) -> dict | None:
         'ship_url': reverse('admin:shipping_shipment_shop_confirm', args=[shipment.pk]),
         'is_digikey': order.source == 'digikey',
         'tracking': shipment.tracking_number or order.tracking_number or '',
-        'mail': mail_state(order, user),
+        'mail': mail_state(order, user, shipment),
         'next': nxt and {'order': nxt, 'url': reverse('admin:shipping_shipment_create', args=[nxt.pk])},
         'left': left,
     }

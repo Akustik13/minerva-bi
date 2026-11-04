@@ -59,6 +59,22 @@ def _parcels_hold(sale, status: str) -> str:
         return status
 
 
+DK_SHIPPED_STATES = {"Shipped", "Received", "Closed", "Delivered", "Completed"}
+
+
+def _parcels_dk_shipped(sale, dk_state: str) -> None:
+    """DigiKey показує замовлення відправленим (підтвердили на supplier.digikey.com вручну чи з Minerva) — посилки
+    Minerva з трек-номером позначаються підтвердженими, банер «Підтвердити відправлення» їх більше не пропонує."""
+    if dk_state not in DK_SHIPPED_STATES or not getattr(sale, "pk", None):
+        return
+    try:
+        from shipping.services.parcels import has_parcels, mark_shop_confirmed
+        if has_parcels(sale):
+            mark_shop_confirmed(sale)
+    except Exception:
+        logger.exception("DigiKey: parcels confirm mark failed for order %s", sale.pk)
+
+
 def _config_sync_status() -> bool:
     """Return True if DigiKeyConfig.sync_order_status is enabled."""
     try:
@@ -926,6 +942,7 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
             # частинами (посилки Minerva), не закривається, поки є невідправлений залишок
             update_fields = []
             minerva_status = _parcels_hold(sale, minerva_status)
+            _parcels_dk_shipped(sale, dk_state)
             if _status_can_advance(sale.status, minerva_status):
                 old_status = sale.status
                 sale.status = minerva_status
@@ -1214,6 +1231,8 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
 
     # Статус — тільки якщо просунувся вперед (посилки: поки є залишок — не закривається)
     new_status = _parcels_hold(sale, new_status)
+    if not dry_run:
+        _parcels_dk_shipped(sale, dk_state)
     status_order = ["received", "processing", "shipped", "delivered", "cancelled"]
     old_idx = status_order.index(sale.status) if sale.status in status_order else 0
     new_idx = status_order.index(new_status)  if new_status in status_order else 0
@@ -1629,7 +1648,8 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
                             net_vat_invoice_amount: float = None,
                             shipped_quantities: dict = None,
                             vat_file_id: str = None,
-                            parts_by_sku: dict = None) -> dict:
+                            parts_by_sku: dict = None,
+                            shipments: list = None) -> dict:
     """
     PUT /Sales/Marketplace2/Orders/v1/orders/{orderId}/ship
     Підтверджує відправлення Marketplace замовлення та передає трек-номер на DigiKey.
@@ -1637,6 +1657,9 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
     shipped_quantities: {orderDetailId: quantity} — лише ці позиції й лише кількість > 0 (форма підтвердження).
     parts_by_sku: {артикул: quantity} — посилка Minerva (частина замовлення), позиції DigiKey — за артикулом.
     Без обох — усе, що на DigiKey ще не відправлено (попередні підтвердження частин враховуються).
+    shipments: [{tracking, carrier_id, parts_by_sku}] — кілька посилок ОДНИМ підтвердженням (так DigiKey приймає
+    відправлення частинами: сума кількостей усіх посилок по кожній позиції = замовлене, інакше 400 «Invalid Shipped
+    Quantity»); сума не збігається — нічого не надсилається.
     net_vat_invoice_amount: float — сума рахунку без ПДВ.
     vat_file_id: str — зарезервовано (не підтримується у ShipOrderModel, ігнорується).
     Повертає {'ok', 'message', 'raw', 'parts' — що підтверджено, 'remaining' — скільки ще не відправлено}.
@@ -1648,6 +1671,15 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
     order_data    = _fetch_marketplace_order(config, order_id, token)
     order_details = order_data.get("orderDetails") or []
     already       = marketplace_already_shipped(order_data)
+
+    if order_details and all(already.get(l.get("orderDetailId"), 0) >= _detail_qty(l)
+                             for l in order_details if l.get("orderDetailId")):
+        return {"ok": False, "already": True, "raw": {}, "parts": [], "remaining": 0,
+                "message": "ℹ️ На DigiKey це замовлення вже підтверджено відправленим — нічого не надіслано."}
+
+    if shipments is not None:
+        return _ship_parcels(config, order_id, token, order_details, already, shipments,
+                             invoice_number, net_vat_invoice_amount)
 
     if parts_by_sku is not None:
         shipped_quantities, missing = parcel_ship_quantities(order_details, parts_by_sku, already)
@@ -1706,7 +1738,73 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
 
     detail = raw.get("detail") or raw.get("title") or raw.get("error") or resp.text[:300]
     logger.error("DigiKey ship order %s: %s %s", order_id, resp.status_code, detail)
-    return {"ok": False, "message": f"❌ {resp.status_code}: {detail}", "raw": raw, "parts": [], "remaining": None}
+    return {"ok": False, "message": f"❌ {resp.status_code}: {detail}{_ship_hint(detail)}", "raw": raw, "parts": [],
+            "remaining": None}
+
+
+def _ship_hint(detail) -> str:
+    """Пояснення до відмови DigiKey «Invalid Shipped Quantity»: частину позиції окремо не приймає."""
+    if "shipped quantit" in str(detail or "").lower():
+        return (" — DigiKey приймає підтвердження лише всього замовлення разом: сума кількостей усіх посилок по "
+                "кожній позиції має дорівнювати замовленому (кілька посилок — кілька трек-номерів одним підтвердженням)")
+    return ""
+
+
+def _ship_parcels(config, order_id, token, order_details, already, shipments, invoice_number, net_vat_invoice_amount):
+    """PUT /ship з кількома трек-номерами (посилки Minerva). Перевіряє, що разом — усе замовлення DigiKey."""
+    import requests as req
+    by_id = {l.get("orderDetailId"): l for l in order_details if l.get("orderDetailId")}
+    running = dict(already)
+    entries, all_parts = [], []
+    for sh in shipments:
+        tracking = (sh.get("tracking") or "").strip()
+        if not tracking:
+            return {"ok": False, "raw": {}, "parts": [], "remaining": None,
+                    "message": "❌ Не в усіх посилок є трек-номер — на DigiKey нічого не надіслано."}
+        q, missing = parcel_ship_quantities(order_details, sh.get("parts_by_sku") or {}, running)
+        if missing:
+            return {"ok": False, "raw": {}, "parts": [], "remaining": None,
+                    "message": f"❌ Посилка {tracking}: у замовленні DigiKey цього немає або більше, ніж замовлено — "
+                               + ", ".join(missing)}
+        parts = []
+        for did, qty in q.items():
+            running[did] = running.get(did, 0) + qty
+            line = by_id.get(did, {})
+            parts.append({"orderDetailId": did,
+                          "dkPartNumber": line.get("productPartNumber") or line.get("supplierSku") or "",
+                          "quantity": qty})
+        entry = {"shippingTrackingNumber": tracking, "shippedParts": parts}
+        if sh.get("carrier_id"):
+            entry["shippingCarrierId"] = sh["carrier_id"]
+        entries.append(entry)
+        all_parts += parts
+    short = [f"{(l.get('supplierSku') or l.get('productPartNumber') or did)} × {_detail_qty(l) - running.get(did, 0)}"
+             for did, l in by_id.items() if running.get(did, 0) < _detail_qty(l)]
+    if short:
+        return {"ok": False, "raw": {}, "parts": [], "remaining": None,
+                "message": "❌ DigiKey приймає лише все замовлення разом, а в посилках ще бракує: " + ", ".join(short)
+                           + " — на DigiKey нічого не надіслано."}
+    payload = {"shippingTracking": entries}
+    if invoice_number:
+        payload["supplierInvoiceNumber"] = invoice_number
+    if net_vat_invoice_amount is not None:
+        payload["netVatInvoiceAmount"] = float(net_vat_invoice_amount)
+    url = f"{_base_url(config)}{MARKETPLACE_SHIP_PATH.format(order_id=order_id)}"
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'ship_marketplace_order', 'PUT', url, req.put,
+                          headers=_headers(config, token), json=payload, timeout=20)
+    raw = {}
+    try:
+        raw = resp.json()
+    except Exception:
+        raw = {"text": resp.text[:500]}
+    if resp.ok:
+        return {"ok": True, "message": f"✅ Відправлення підтверджено на DigiKey — посилок: {len(entries)}",
+                "raw": raw, "parts": all_parts, "remaining": 0}
+    detail = raw.get("detail") or raw.get("title") or raw.get("error") or resp.text[:300]
+    logger.error("DigiKey ship order %s (parcels): %s %s", order_id, resp.status_code, detail)
+    return {"ok": False, "message": f"❌ {resp.status_code}: {detail}{_ship_hint(detail)}", "raw": raw, "parts": [],
+            "remaining": None}
 
 
 def update_supplier_invoice_number(config, order_id: str, invoice_number: str) -> dict:

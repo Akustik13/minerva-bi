@@ -142,8 +142,9 @@
       </label>
       {% if shipment %}
       <div style="font-size:12px;color:var(--text);margin-bottom:8px">
-        📦 Посилка — відправлення <a href="{% url 'admin:shipping_shipment_detail' shipment.pk %}">#{{ shipment.pk }}</a>:
-        кількості взято з того, що в ній лежить.
+        📦 Відправлення <a href="{% url 'admin:shipping_shipment_detail' shipment.pk %}">#{{ shipment.pk }}</a> — частина
+        замовлення. DigiKey приймає лише все замовлення разом: тут — усе на один трек-номер. Кілька посилок, кожну своїм
+        трек-номером, підтверджує кнопка на сторінці посилки, коли відправлено все.
       </div>
       {% endif %}
       <table style="border-collapse:collapse;font-size:12px;width:100%;max-width:700px">
@@ -173,8 +174,8 @@
         </tbody>
       </table>
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-        Відправляєте частину — впишіть, скільки поїхало в цій посилці; 0 — позиція не в цій посилці.
-        Поки на DigiKey щось лишається невідправленим, замовлення в Minerva лишається «В обробці».
+        DigiKey приймає лише всю кількість замовлення одним підтвердженням (частину — «Invalid Shipped Quantity»).
+        Відправляєте частинами — підтвердіть, коли поїде остання посилка, на сторінці посилки (усі трек-номери разом).
       </div>
     </div>
     {% endif %}

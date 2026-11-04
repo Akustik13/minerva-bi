@@ -337,32 +337,70 @@ class PagesTests(ParcelBase):
         self.client.post(f"/admin/shipping/shipment/{s.pk}/parcel/", {f"parcel_qty_{self.lp.pk}": "1"})
         self.assertFalse(ShipmentLine.objects.exists())
 
-    def test_digikey_confirm_sends_parcel_and_keeps_order_open(self):
+    def dk_setup(self):
         from shipping.models import ShippingSettings
         self.o.source = "digikey"
         self.o.save()
         cfg = ShippingSettings.get()
         cfg.shop_confirm_prompt, cfg.shop_confirm_sources = True, ["digikey"]
         cfg.save()
-        s = self.ship(self.o, (10, 4))
-        Shipment.objects.filter(pk=s.pk).update(tracking_number="1Z1", status="in_transit")
-        r = self.client.get(f"/admin/shipping/shipment/{s.pk}/detail/")
-        self.assertContains(r, "посилка 1 з 1")
-        calls = {}
+
+    def test_digikey_waits_for_all_parcels_then_confirms_them_together(self):
+        """DigiKey приймає лише все замовлення разом: посилка 1 — «чекаємо», коли є трек-номер посилки 2 — одне
+        підтвердження з обома трек-номерами."""
+        self.dk_setup()
+        s1 = self.ship(self.o, (10, 4))
+        Shipment.objects.filter(pk=s1.pk).update(tracking_number="1Z1", status="label_ready")
+        r = self.client.get(f"/admin/shipping/shipment/{s1.pk}/detail/")
+        self.assertContains(r, "DigiKey: підтвердимо разом")
+        self.assertContains(r, "🚚 Відправити залишок")
+        calls = []
 
         def fake_ship(config, order_id, **kw):
-            calls.update(kw)
-            return {"ok": True, "message": "ok", "raw": {}, "remaining": 2,
-                    "parts": [{"dkPartNumber": "FT220407", "quantity": 10}, {"dkPartNumber": "AN220213", "quantity": 4}]}
+            calls.append(kw)
+            return {"ok": True, "message": "ok", "raw": {}, "remaining": 0, "parts": []}
 
         with mock.patch("bots.services.digikey.ship_marketplace_order", side_effect=fake_ship), \
                 mock.patch("shipping.admin.ShipmentAdmin._dk_carrier_for", return_value=None):
-            self.client.post(f"/admin/shipping/shipment/{s.pk}/shop-confirm/")
-        self.assertEqual(calls["parts_by_sku"], {"FT220407": D(10), "AN220213": D(4)})
+            self.client.post(f"/admin/shipping/shipment/{s1.pk}/shop-confirm/", {"mode": "parcels"})
+            self.assertEqual(calls, [])                          # ще не все в посилках — DigiKey не викликається
+            s2 = Shipment.objects.create(order=self.o, carrier=self.carrier)
+            Shipment.objects.filter(pk=s2.pk).update(tracking_number="1Z2", status="label_ready")
+            r = self.client.get(f"/admin/shipping/shipment/{s2.pk}/detail/")
+            self.assertContains(r, "усе замовлення одним підтвердженням")
+            self.client.post(f"/admin/shipping/shipment/{s2.pk}/shop-confirm/", {"mode": "parcels"})
+        self.assertEqual([(x["tracking"], x["parts_by_sku"]) for x in calls[0]["shipments"]],
+                         [("1Z1", {"FT220407": D(10), "AN220213": D(4)}), ("1Z2", {"AN220213": D(2)})])
+        self.assertTrue(all(s.shop_confirmed_at for s in Shipment.objects.filter(order=self.o)))
+
+    def test_digikey_all_on_this_tracking_fallback(self):
+        self.dk_setup()
+        s1 = self.ship(self.o, (10, 4))
+        Shipment.objects.filter(pk=s1.pk).update(tracking_number="1Z1", status="label_ready")
+        calls = []
+
+        def fake_ship(config, order_id, **kw):
+            calls.append(kw)
+            return {"ok": True, "message": "ok", "raw": {}, "remaining": 0, "parts": []}
+
+        with mock.patch("bots.services.digikey.ship_marketplace_order", side_effect=fake_ship), \
+                mock.patch("shipping.admin.ShipmentAdmin._dk_carrier_for", return_value=None):
+            self.client.post(f"/admin/shipping/shipment/{s1.pk}/shop-confirm/", {"mode": "all_here"})
+        self.assertEqual((calls[0]["tracking_number"], calls[0].get("parts_by_sku"), calls[0].get("shipments")),
+                         ("1Z1", None, None))
+        self.assertEqual(self.status(self.o), "processing")      # у Minerva ще 2 шт. не відправлено
+        self.assertIsNotNone(Shipment.objects.get(pk=s1.pk).shop_confirmed_at)
+
+    def test_manual_confirm_on_digikey_is_respected(self):
+        """Підтвердили на supplier.digikey.com — синхронізація з DigiKey позначає посилки підтвердженими."""
+        from bots.services.digikey import _parcels_dk_shipped
+        s1 = self.ship(self.o, (10, 4))
+        Shipment.objects.filter(pk=s1.pk).update(tracking_number="1Z1", status="in_transit")
+        _parcels_dk_shipped(SalesOrder.objects.get(pk=self.o.pk), "ShippingInProgress")
+        self.assertIsNone(Shipment.objects.get(pk=s1.pk).shop_confirmed_at)
+        _parcels_dk_shipped(SalesOrder.objects.get(pk=self.o.pk), "Shipped")
+        self.assertIsNotNone(Shipment.objects.get(pk=s1.pk).shop_confirmed_at)
         self.assertEqual(self.status(self.o), "processing")
-        self.assertIsNotNone(Shipment.objects.get(pk=s.pk).shop_confirmed_at)
-        r = self.client.get(f"/admin/shipping/shipment/{s.pk}/detail/")
-        self.assertNotContains(r, "🛒 Підтвердити відправлення в")
 
     def test_documents_take_parcel_quantities(self):
         from shipping.services import commercial_invoice_service as ci, packing_list_service as pl
@@ -381,6 +419,14 @@ class PagesTests(ParcelBase):
         self.assertEqual(getattr(o, "_parcels_held", None), "shipped")
         self.assertEqual(self.status(self.o), "processing")
 
+    def test_order_card_remainder_button_and_list_badge(self):
+        s = self.ship(self.o, (10, 4))
+        self.move(s, "label_ready")
+        r = self.client.get(f"/admin/sales/salesorder/{self.o.pk}/change/")
+        self.assertContains(r, "🚚 Відправити залишок")
+        r = self.client.get("/admin/sales/salesorder/")
+        self.assertContains(r, "📦 14 / 16")
+
     def test_order_card_split_link(self):
         card = f"/admin/sales/salesorder/{self.o.pk}/change/"
         r = self.client.get(card)
@@ -394,3 +440,122 @@ class PagesTests(ParcelBase):
         r = self.client.get(card)
         self.assertNotContains(r, "✂️ Відправили лише частину?")
         self.assertContains(r, "📦 Відправлено частинами")
+
+
+class PartialMoreTests(ParcelBase):
+    """Склад після етикетки, картки, лист клієнту, DigiKey кількома посилками."""
+
+    def test_label_ready_parcel_leaves_the_shelf_order_stays_open(self):
+        self.mode("shipped")
+        o = self.make_order()
+        s1 = self.ship(o, (10, 4))
+        self.move(s1, "label_ready")
+        self.assertEqual((self.nums(self.p), self.nums(self.q)), ((10, 0, 10), (16, 2, 14)))
+        self.assertEqual(self.status(o), "processing")
+        self.assertClean(o)
+
+    def test_list_annotation(self):
+        o = self.make_order()
+        other = self.order((self.p, 1))
+        self.move(self.ship(o, (10, 4)), "label_ready")
+        orders = [SalesOrder.objects.get(pk=o.pk), SalesOrder.objects.get(pk=other.pk)]
+        parcels.annotate_orders(orders)
+        self.assertEqual((orders[0].parcel_info["sent"], orders[0].parcel_info["ordered"],
+                          orders[0].parcel_info["unpacked"]), ("14", "16", "AN220213 × 2"))
+        self.assertIsNone(orders[1].parcel_info)
+
+    def test_mail_about_parcel(self):
+        from dashboard.notifications import mark_ship_mail_sent, ship_mail_context
+        o = self.make_order()
+        s1 = self.ship(o, (10, 4))
+        Shipment.objects.filter(pk=s1.pk).update(tracking_number="1Z1", status="label_ready")
+        ctx, parcel, suffix = ship_mail_context(SalesOrder.objects.get(pk=o.pk))
+        self.assertEqual((parcel.pk, ctx["tracking_number"]), (s1.pk, "1Z1"))
+        self.assertIn("FT220407 — 10 pcs.", ctx["items"])
+        self.assertIn("partial shipment (parcel 1 of 2)", ctx["items"])
+        self.assertIn("AN220213 — 2 pcs.", ctx["items"].split("Still to follow")[1])
+        self.assertEqual(suffix, " — partial shipment 1/2")
+        mark_ship_mail_sent(o, parcel)
+        s2 = Shipment.objects.create(order=o, carrier=self.carrier)
+        Shipment.objects.filter(pk=s2.pk).update(tracking_number="1Z2", status="label_ready")
+        ctx, parcel, suffix = ship_mail_context(SalesOrder.objects.get(pk=o.pk))
+        self.assertEqual((parcel.pk, ctx["tracking_number"], suffix), (s2.pk, "1Z2", " — parcel 2/2"))
+        self.assertIn("final parcel", ctx["items"])
+        self.assertNotIn("FT220407", ctx["items"])
+
+    def test_mail_without_parcels_unchanged(self):
+        from dashboard.notifications import ship_mail_context
+        o = self.make_order()
+        o.tracking_number = "1Z9"
+        o.save()
+        ctx, parcel, suffix = ship_mail_context(o)
+        self.assertEqual((parcel, suffix, ctx["tracking_number"]), (None, "", "1Z9"))
+        self.assertIn("AN220213 — 6 pcs.", ctx["items"])
+
+    def test_shop_plan(self):
+        o = self.make_order()
+        s1 = self.ship(o, (10, 4))
+        Shipment.objects.filter(pk=s1.pk).update(tracking_number="1Z1", status="label_ready")
+        plan = parcels.shop_plan(o)
+        self.assertFalse(plan["ready"])
+        self.assertIn("AN220213 × 2", plan["reason"])
+        s2 = Shipment.objects.create(order=o, carrier=self.carrier)
+        self.assertIn("чернетка", parcels.shop_plan(o)["reason"])
+        Shipment.objects.filter(pk=s2.pk).update(status="label_ready")
+        self.assertIn("трек-номер", parcels.shop_plan(o)["reason"])
+        Shipment.objects.filter(pk=s2.pk).update(tracking_number="1Z2")
+        self.assertTrue(parcels.shop_plan(o)["ready"])
+
+
+class DigiKeyParcelsCallTests(ParcelBase):
+    """ship_marketplace_order(shipments=…): одне підтвердження, кожна посилка — свій трек-номер."""
+
+    ORDER = DigiKeyShipTests.ORDER
+
+    def call_payload(self, order=None, **kw):
+        from bots.services import digikey
+        sent = {}
+
+        class Resp:
+            ok, status_code, text = True, 200, "{}"
+
+            def json(self):
+                return {}
+
+        def put(url, headers=None, json=None, timeout=None):
+            sent["payload"] = json
+            return Resp()
+
+        with mock.patch.object(digikey, "get_marketplace_token", return_value="t"), \
+                mock.patch.object(digikey, "_fetch_marketplace_order", return_value=order or self.ORDER), \
+                mock.patch("requests.put", side_effect=put):
+            res = digikey.ship_marketplace_order(mock.Mock(use_sandbox=True), "102", tracking_number="1Z1", **kw)
+        return res, sent.get("payload")
+
+    def test_two_parcels_one_call(self):
+        res, payload = self.call_payload(shipments=[
+            {"tracking": "1Z1", "carrier_id": "c", "parts_by_sku": {"FT220407": D(10), "AN220213": D(4)}},
+            {"tracking": "1Z2", "carrier_id": None, "parts_by_sku": {"AN220213": D(2)}}])
+        self.assertTrue(res["ok"])
+        self.assertEqual([(t["shippingTrackingNumber"], [(p["orderDetailId"], p["quantity"]) for p in t["shippedParts"]])
+                          for t in payload["shippingTracking"]],
+                         [("1Z1", [("d1", 10), ("d2", 4)]), ("1Z2", [("d2", 2)])])
+
+    def test_short_parcels_not_sent(self):
+        res, payload = self.call_payload(shipments=[
+            {"tracking": "1Z1", "parts_by_sku": {"FT220407": D(10), "AN220213": D(4)}}])
+        self.assertFalse(res["ok"])
+        self.assertIn("AN220213 × 2", res["message"])
+        self.assertIsNone(payload)
+
+    def test_already_shipped_on_digikey(self):
+        order = dict(self.ORDER, shippingTrackingInfoList=[
+            {"shippedParts": [{"orderDetailId": "d1", "quantity": 10}, {"orderDetailId": "d2", "quantity": 6}]}])
+        res, payload = self.call_payload(order=order)
+        self.assertTrue(res.get("already"))
+        self.assertIsNone(payload)
+
+    def test_invalid_quantity_hint(self):
+        from bots.services.digikey import _ship_hint
+        self.assertIn("лише всього замовлення", _ship_hint("Invalid Shipped Quantity"))
+        self.assertEqual(_ship_hint("Unauthorized"), "")

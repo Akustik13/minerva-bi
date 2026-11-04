@@ -1886,11 +1886,77 @@ _EU_COUNTRIES = {
 }
 
 
-def send_ship_notification(order) -> bool:
+def ship_mail_context(order, shipment=None) -> tuple:
+    """Змінні шаблону листа клієнту про відправку → (ctx, посилка або None, доповнення до теми).
+
+    Замовлення, відправлене частинами (shipping/services/parcels.py), — лист про посилку: її трек-номер і
+    перевізник, у {items} — лише її вміст і примітка «partial shipment n of m, still to follow …» (або «final
+    parcel»), до теми — « — partial shipment 1/2». Без посилок — як завжди, про все замовлення."""
+    tracking = (order.tracking_number or '').strip()
+    carrier  = (order.shipping_courier or '').strip()
+    lines = order.lines.select_related('product').all() if hasattr(order, 'lines') else []
+    items_text = '\n'.join(
+        '• {} — {} pcs.'.format(
+            l.sku_raw or (l.product.sku if l.product else ''), int(l.qty)
+        )
+        for l in lines
+    ) or '—'
+    parcel, suffix = None, ''
+    try:
+        from shipping.services import parcels as _parcels
+        parcel = _parcels.current_parcel(order, shipment)
+        part = _parcels.mail_parts(order, parcel) if parcel is not None else None
+    except Exception as e:  # noqa: BLE001 — без посилок лист як завжди
+        logger.warning('Посилки для листа клієнту %s: %s', order.pk, e)
+        part = None
+    if part:
+        items_text = part['items']
+        tracking = part['tracking'] or tracking
+        carrier = part['carrier'] or carrier
+        suffix = part['subject_suffix']
+    elif parcel is not None and (parcel.tracking_number or '').strip():
+        tracking = parcel.tracking_number.strip()
+    country = (order.addr_country or '').strip().upper()
+    addr_parts = filter(None, [
+        getattr(order, 'ship_name', '') or order.client,
+        getattr(order, 'addr_street', '') or getattr(order, 'shipping_address', ''),
+        ('{} {}'.format(
+            getattr(order, 'addr_zip', '') or '',
+            getattr(order, 'addr_city', '') or ''
+        )).strip(),
+        country,
+    ])
+    ctx = {
+        'order_number':    order.order_number or str(order.pk),
+        'customer_name':   (getattr(order, 'ship_name', '') or order.client or
+                            getattr(order, 'contact_name', '') or '').strip(),
+        'tracking_number': tracking,
+        'carrier':         carrier,
+        'shipped_date':    order.shipped_at.strftime('%d.%m.%Y') if order.shipped_at else '',
+        'items':           items_text,
+        'ship_address':    '\n'.join(addr_parts),
+    }
+    return ctx, parcel, suffix
+
+
+def mark_ship_mail_sent(order, parcel=None) -> None:
+    """Лист клієнту про відправку надіслано: замовлення (ship_notify_sent_at) і посилка (customer_notified_at)."""
+    from django.utils import timezone as _tz
+    from sales.models import SalesOrder
+    now = _tz.now()
+    SalesOrder.objects.filter(pk=order.pk).update(ship_notify_sent_at=now)
+    if parcel is not None:
+        from shipping.models import Shipment
+        Shipment.objects.filter(pk=parcel.pk).update(customer_notified_at=now)
+
+
+def send_ship_notification(order, shipment=None) -> bool:
     """Send shipment notification email to customer.
 
     Uses EU or non-EU template based on order.addr_country.
-    Sets order.ship_notify_sent_at on success.
+    Order shipped in parts: the mail is about the parcel (shipment, or the newest one not yet mailed) — its
+    tracking number, its contents and what still follows (ship_mail_context).
+    Sets order.ship_notify_sent_at (and the parcel's customer_notified_at) on success.
     Returns True on success, False on failure.
     """
     try:
@@ -1906,42 +1972,9 @@ def send_ship_notification(order) -> bool:
     if not to_email:
         return False
 
-    cust_name   = (getattr(order, 'ship_name', '') or order.client or
-                   getattr(order, 'contact_name', '') or '').strip()
-    tracking    = (order.tracking_number or '').strip()
-    carrier     = (order.shipping_courier or '').strip()
-    shipped     = order.shipped_at.strftime('%d.%m.%Y') if order.shipped_at else ''
     country     = (order.addr_country or '').strip().upper()
     is_eu       = country in _EU_COUNTRIES
-
-    lines = order.lines.select_related('product').all() if hasattr(order, 'lines') else []
-    items_text = '\n'.join(
-        '• {} — {} pcs.'.format(
-            l.sku_raw or (l.product.sku if l.product else ''), int(l.qty)
-        )
-        for l in lines
-    ) or '—'
-
-    addr_parts = filter(None, [
-        getattr(order, 'ship_name', '') or order.client,
-        getattr(order, 'addr_street', '') or getattr(order, 'shipping_address', ''),
-        ('{} {}'.format(
-            getattr(order, 'addr_zip', '') or '',
-            getattr(order, 'addr_city', '') or ''
-        )).strip(),
-        country,
-    ])
-    ship_address = '\n'.join(addr_parts)
-
-    ctx = {
-        'order_number':    order.order_number or str(order.pk),
-        'customer_name':   cust_name,
-        'tracking_number': tracking,
-        'carrier':         carrier,
-        'shipped_date':    shipped,
-        'items':           items_text,
-        'ship_address':    ship_address,
-    }
+    ctx, parcel, subject_suffix = ship_mail_context(order, shipment)
 
     def _render(tpl, values=ctx):
         try:
@@ -1952,7 +1985,7 @@ def send_ship_notification(order) -> bool:
     body_tpl = ns.customer_notify_body if is_eu else (
         getattr(ns, 'customer_notify_body_noneu', '') or ns.customer_notify_body
     )
-    subject   = _render(ns.customer_notify_subject)
+    subject   = _render(ns.customer_notify_subject) + subject_suffix
     body_text = _render(body_tpl)
     body_html = _render(body_tpl, {k: esc(v) for k, v in ctx.items()})
     cc_str    = (getattr(ns, 'customer_notify_cc', '') or '').strip()
@@ -1977,8 +2010,7 @@ def send_ship_notification(order) -> bool:
         msg.attach_alternative(outlook_safe(html_body), 'text/html')
         msg.send()
 
-        from sales.models import SalesOrder
-        SalesOrder.objects.filter(pk=order.pk).update(ship_notify_sent_at=_tz.now())
+        mark_ship_mail_sent(order, parcel)
         return True
     except Exception as e:
         logger.warning('Лист клієнту про відправку %s не надіслано: %s', order.order_number, e)

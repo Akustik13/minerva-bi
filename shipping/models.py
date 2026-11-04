@@ -410,6 +410,11 @@ class Shipment(models.Model):
         help_text="Коли відправлення цієї посилки підтверджено в магазині (DigiKey тощо). "
                   "Посилка частини замовлення: банер більше не пропонує підтвердити її вдруге.",
     )
+    customer_notified_at = models.DateTimeField(
+        "Клієнту написано про посилку", null=True, blank=True,
+        help_text="Лист клієнту про відправку саме цієї посилки (замовлення частинами: кожна посилка — свій лист "
+                  "зі своїм трек-номером і вмістом).",
+    )
     ups_document_id     = models.CharField(
         "UPS Document ID", max_length=100, blank=True, default="",
         help_text="ID документу з Paperless Document API (заповнюється автоматично)"

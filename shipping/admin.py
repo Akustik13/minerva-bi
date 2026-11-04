@@ -2649,7 +2649,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return None
         if shipment.status in (Shipment.Status.CANCELLED, Shipment.Status.ERROR, Shipment.Status.DRAFT):
             return None
-        if order.status in ("shipped", "delivered", "cancelled"):
+        from .services import parcels as _parcels
+        if order.status == "cancelled":
+            return None
+        # посилки DigiKey підтверджуються разом — і тоді, коли остання вже в дорозі й замовлення «Відправлено»
+        if order.status in ("shipped", "delivered") and not (order.source == "digikey" and _parcels.has_parcels(order)):
             return None
         cfg = ShippingSettings.get()
         if not cfg.shop_confirm_prompt or order.source not in (cfg.shop_confirm_sources or []):
@@ -2683,6 +2687,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             ctx["carrier_label"] = (carrier.get("label") or carrier.get("name") or "") if carrier else ""
             ctx["courier"] = order.shipping_courier or (shipment.carrier.get_carrier_type_display() if shipment.carrier else "")
             ctx["invoice_text"] = ShipmentAdmin._dk_invoice_text(order)
+            if parcels.has_parcels(order):
+                # DigiKey приймає лише все замовлення разом: кожна посилка — своїм трек-номером, одним підтвердженням
+                plan = parcels.shop_plan(order)
+                ctx["dk_plan"] = plan
+                ctx["dk_wait"] = not plan["ready"]
+                ctx["remainder_url"] = (reverse("admin:shipping_shipment_create", args=[order.pk])
+                                        if plan["unpacked"] else "")
         return ctx
 
     @staticmethod
@@ -2753,8 +2764,26 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 messages.warning(request, "Перевізника не знайдено у списку DigiKey — "
                                           "якщо DigiKey відхилить, підтвердіть вручну.")
             from .services import parcels
-            confirm_digikey_shipment(request, order, config, tracking, carrier=carrier_id, shipment=shipment,
-                                     parts_by_sku=parcels.parts_by_sku(shipment))
+            if not parcels.has_parcels(order):
+                confirm_digikey_shipment(request, order, config, tracking, carrier=carrier_id, shipment=shipment)
+                return back
+            if request.POST.get("mode") == "all_here":
+                # дедлайн: усе замовлення на трек-номер цієї посилки (решту — покупцю в чаті)
+                if confirm_digikey_shipment(request, order, config, tracking, carrier=carrier_id, shipment=shipment):
+                    parcels.mark_shop_confirmed(order)
+                return back
+            plan = parcels.shop_plan(order)
+            if not plan["ready"]:
+                messages.warning(request, f"DigiKey приймає підтвердження лише всього замовлення разом, а зараз "
+                                          f"{plan['reason']}. Підтвердимо, коли все буде в посилках із трек-номерами.")
+                return back
+            items = []
+            for p in plan["parcels"]:
+                c = self._dk_carrier_for(p["shipment"])
+                items.append({"shipment": p["shipment"], "tracking": p["tracking"], "parts_by_sku": p["parts"],
+                              "carrier_id": (c.get("id") or c.get("carrierId")) if c else carrier_id})
+            confirm_digikey_shipment(request, order, config, tracking or plan["parcels"][0]["tracking"],
+                                     carrier=carrier_id, shipment=shipment, parcels=items)
             return back
 
         fields = ["status"]
@@ -2774,7 +2803,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             from .services import parcels
             messages.success(request, f"✅ Посилку #{shipment.pk} підтверджено. Замовлення {order.order_number} "
                                       f"лишається «В обробці» — ще не відправлено: "
-                                      f"{parcels.progress(order).remainder_text()}.")
+                                      f"{parcels.progress(order).left_text()}.")
         return back
 
     # ── 📦 Відправлення частинами (посилки) — shipping/services/parcels.py ────
@@ -2843,9 +2872,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "n": prog.number(shipment),
             "of": len(prog.parcels),
             "others": others,
-            "sent": parcels.qty_text(prog.sent),
+            "sent": parcels.qty_text(prog.out),
             "ordered": parcels.qty_text(prog.ordered),
-            "remainder": prog.remainder_text(),
+            "remainder": prog.left_text(),
             "to_pack": prog.to_pack > 0,
             "new_url": reverse("admin:shipping_shipment_create", args=[order.pk]),
             "url": reverse("admin:shipping_shipment_parcel", args=[shipment.pk]),
@@ -2873,7 +2902,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return back
         order = shipment.order
         order.refresh_from_db(fields=["status"])
-        left = res["progress"].remainder_text()
+        left = res["progress"].left_text()
         if res["whole"]:
             messages.success(request, f"📦 У посилці #{shipment.pk} — усе замовлення.")
         else:
@@ -4743,7 +4772,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 _ns = _NS.get()
                 if _ns.customer_notify_enabled and _ns.customer_notify_auto and _ns.email_enabled:
                     _order = shipment.order
-                    if not _order.ship_notify_sent_at and _order.tracking_number:
+                    from shipping.services import parcels as _parcels
+                    if _parcels.has_parcels(_order):
+                        # частинами: кожна посилка — свій лист (її трек-номер, вміст і що ще буде)
+                        _fresh = Shipment.objects.get(pk=shipment.pk)
+                        if not _fresh.customer_notified_at and _fresh.tracking_number:
+                            from dashboard.notifications import send_ship_notification
+                            send_ship_notification(_order, _fresh)
+                    elif not _order.ship_notify_sent_at and _order.tracking_number:
                         from dashboard.notifications import send_ship_notification
                         send_ship_notification(_order)
             except Exception as _e:

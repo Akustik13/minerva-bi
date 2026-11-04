@@ -260,6 +260,14 @@ document.addEventListener('DOMContentLoaded', function () {
               class="sv-status-{{ order.status|default:'default' }}">
           {{ order.get_status_display }}
         </span>
+        {# 📦 Відправлено частинами (shipping/services/parcels.annotate_orders) #}
+        {% if order.parcel_info %}
+        <span title="{% trans "Відправлено частинами" %}{% if order.parcel_info.remainder %} — {% trans "ще відправити:" %} {{ order.parcel_info.remainder }}{% endif %}"
+              translate="no"
+              style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;cursor:default;
+                     {% if order.parcel_info.remainder %}color:#ff9800;border:1px solid rgba(255,152,0,.5);background:rgba(255,152,0,.10)
+                     {% else %}color:#4caf50;border:1px solid rgba(76,175,80,.5);background:rgba(76,175,80,.10){% endif %}">📦 {{ order.parcel_info.sent }} / {{ order.parcel_info.ordered }}</span>
+        {% endif %}
         {# Status source badge — which API last changed the status #}
         {% if order.status_source %}
         <span title="{% trans "Останній статус встановлено:" %} {{ order.status_source }}"
@@ -470,11 +478,20 @@ document.addEventListener('DOMContentLoaded', function () {
       </a>
 
       {% if order.status != 'delivered' and order.status != 'shipped' %}
+      {% if order.parcel_info and order.parcel_info.to_pack %}
+      <a href="{% url 'admin:shipping_shipment_create' order.pk %}#parcel-card"
+         title="{% trans "Ще не в жодній посилці:" %} {{ order.parcel_info.unpacked }}"
+         style="padding:5px 14px;background:#2e7d32;color:#fff;
+                border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
+        🚚 {% trans "Відправити залишок" %}
+      </a>
+      {% elif not order.parcel_info %}
       <a href="{% url 'admin:shipping_shipment_create' order.pk %}"
          style="padding:5px 14px;background:#2e7d32;color:#fff;
                 border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
         🚚 {% trans "Відправлення" %}
       </a>
+      {% endif %}
       {# Склад chip — clickable, opens stock detail popup #}
       {% if order.affects_stock %}
         <button type="button"

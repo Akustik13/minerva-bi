@@ -1884,6 +1884,16 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     upload_widget.short_description = '📤 Завантажити документи'
     
+    def get_changelist_instance(self, request):
+        """Картки списку: «📦 Частково» й «🚚 Залишок» для замовлень, відправлених частинами (parcel_info)."""
+        cl = super().get_changelist_instance(request)
+        try:
+            from shipping.services import parcels
+            parcels.annotate_orders(cl.result_list)
+        except Exception:
+            pass
+        return cl
+
     def change_view(self, request, object_id, form_url='', extra_context=None):
         """Зберігаємо request для доступу в методах"""
         self.request = request
@@ -1901,11 +1911,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 extra_context["digikey_packlist_url"] = f"/bots/digikey/packlist/{obj.pk}/"
             if obj and obj.source == "digikey" and obj.status in ("processing", "shipped"):
                 extra_context["digikey_ship_url"] = f"/bots/digikey/ship/{obj.pk}/"
-                # посилка частини замовлення, ще не підтверджена на DigiKey — форма бере кількості з неї
-                _parcel = (obj.shipments.exclude(status__in=("cancelled", "error", "draft"))
-                           .filter(shop_confirmed_at__isnull=True, lines__isnull=False).order_by("pk").first())
-                if _parcel:
-                    extra_context["digikey_ship_url"] += f"?shipment={_parcel.pk}"
+                # частинами: DigiKey приймає лише все замовлення разом — підтвердження на сторінці останньої
+                # посилки (усі трек-номери одним разом)
+                from shipping.services import parcels as _parcels
+                if _parcels.has_parcels(obj):
+                    _last = (_parcels.live_parcels(obj) or [None])[-1]
+                    if _last is not None:
+                        extra_context["digikey_ship_url"] = reverse(
+                            "admin:shipping_shipment_detail", args=[_last.pk])
                 dk_confirmed = (obj.status == "shipped" and obj.status_source == "DigiKey Marketplace")
                 extra_context["digikey_already_shipped"] = dk_confirmed
                 extra_context["digikey_not_confirmed"] = (
@@ -3276,6 +3289,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({'ok': False, 'error': blocked}, status=403)
         return None
 
+    @staticmethod
+    def _notify_parcel(request, order):
+        """?shipment=<pk> — лист про цю посилку (лише відправлення цього замовлення), інакше None."""
+        pk = str(request.GET.get('shipment') or '')
+        if not pk.isdigit():
+            return None
+        return order.shipments.filter(pk=pk).first()
+
     def notify_customer_view(self, request, pk):
         """GET — повертає JSON з попередньо заповненим листом з шаблону.
            POST — надсилає лист клієнту через SMTP.
@@ -3302,38 +3323,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 'NL','PL','PT','RO','SE','SI','SK',
             }
             to_email    = (order.ship_email or order.email or '').strip()
-            cust_name   = (order.ship_name or order.client or order.contact_name or '').strip()
-            tracking    = (order.tracking_number or '').strip()
-            carrier     = (order.shipping_courier or '').strip()
-            shipped     = order.shipped_at.strftime('%d.%m.%Y') if order.shipped_at else ''
             country     = (order.addr_country or '').strip().upper()
             is_eu       = country in _EU
 
-            lines = order.lines.select_related('product').all()
-            items_text = '\n'.join(
-                '• {} — {} pcs.'.format(
-                    l.sku_raw or (l.product.sku if l.product else ''), int(l.qty)
-                )
-                for l in lines
-            ) or '—'
-
-            addr_parts = filter(None, [
-                order.ship_name or order.client,
-                order.addr_street or order.shipping_address,
-                ('{} {}'.format(order.addr_zip or '', order.addr_city or '')).strip(),
-                order.addr_country,
-            ])
-            ship_address = '\n'.join(addr_parts)
-
-            ctx = {
-                'order_number':    order.order_number or str(order.pk),
-                'customer_name':   cust_name,
-                'tracking_number': tracking,
-                'carrier':         carrier,
-                'shipped_date':    shipped,
-                'items':           items_text,
-                'ship_address':    ship_address,
-            }
+            # замовлення частинами — лист про посилку (її трек-номер, вміст і що ще буде) — ship_mail_context
+            from dashboard.notifications import ship_mail_context
+            ctx, parcel, subject_suffix = ship_mail_context(order, self._notify_parcel(request, order))
 
             def _render(tpl):
                 try:
@@ -3343,7 +3338,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
             body_eu    = _render(ns.customer_notify_body)
             body_noneu = _render(getattr(ns, 'customer_notify_body_noneu', '') or ns.customer_notify_body)
-            subject    = _render(ns.customer_notify_subject)
+            subject    = _render(ns.customer_notify_subject) + subject_suffix
 
             return JsonResponse({
                 'ok':        True,
@@ -3390,8 +3385,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 )
                 msg.attach_alternative(html_body, 'text/html')
                 msg.send()
-                from django.utils import timezone as _tz
-                SalesOrder.objects.filter(pk=pk).update(ship_notify_sent_at=_tz.now())
+                from dashboard.notifications import mark_ship_mail_sent
+                from shipping.services.parcels import current_parcel
+                mark_ship_mail_sent(order, current_parcel(order, self._notify_parcel(request, order)))
                 return JsonResponse({'ok': True})
             except Exception as e:
                 return JsonResponse({'ok': False, 'error': str(e)})
@@ -4303,8 +4299,16 @@ def _parcel_split_link(order):
     try:
         from django.urls import reverse
         from shipping.services import parcels
-        if order.status == "cancelled" or not order.lines.exists() or parcels.has_parcels(order):
+        if order.status == "cancelled" or not order.lines.exists():
             return None
+        if parcels.has_parcels(order):
+            # уже частинами: кнопка на залишок, поки щось не лежить у жодній посилці
+            p = parcels.progress(order)
+            if p.to_pack <= 0:
+                return None
+            return {"url": reverse("admin:shipping_shipment_create", args=[order.pk]) + "#parcel-card",
+                    "label": "🚚 Відправити залишок", "primary": True,
+                    "title": f"Ще не в жодній посилці: {p.unpacked_text()}"}
         whole = parcels.whole_parcels(order)
         if whole:
             s = whole[-1]
@@ -4331,8 +4335,8 @@ def _parcels_info(order):
             return None
         p = parcels.progress(order)
         return {
-            "sent": parcels.qty_text(p.sent), "ordered": parcels.qty_text(p.ordered),
-            "remainder": p.remainder_text(), "to_pack": p.to_pack > 0,
+            "sent": parcels.qty_text(p.out), "ordered": parcels.qty_text(p.ordered),
+            "remainder": p.left_text(), "to_pack": p.to_pack > 0,
             "parcels": [{"pk": x["shipment"].pk, "n": x["n"], "status": x["shipment"].get_status_display(),
                          "whole": x["whole"], "qty": parcels.qty_text(x["qty"]),
                          "url": reverse("admin:shipping_shipment_detail", args=[x["shipment"].pk])}

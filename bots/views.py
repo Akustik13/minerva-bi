@@ -310,12 +310,16 @@ def _ship_rows(order_details, dk_order, shipment=None) -> list:
 
 
 def confirm_digikey_shipment(request, order, config, tracking, carrier=None, invoice=None,
-                              net_vat=None, shipped_quantities=None, shipment=None, parts_by_sku=None) -> bool:
+                              net_vat=None, shipped_quantities=None, shipment=None, parts_by_sku=None,
+                              parcels=None) -> bool:
     """Підтверджує відправлення на DigiKey Marketplace (ShipOrder API) і ставить замовлення в shipped.
     Використовується формою /bots/digikey/ship/<pk>/ і автопідтвердженням зі сторінки відправлення.
     Частина замовлення (посилка — parts_by_sku, або менші кількості у формі): на DigiKey ще лишається
     невідправлене — замовлення не закривається («В обробці»); посилка позначається підтвердженою
     (Shipment.shop_confirmed_at), щоб банер не запропонував її вдруге.
+    parcels — [{shipment, tracking, carrier_id, parts_by_sku}]: усі посилки замовлення ОДНИМ підтвердженням (DigiKey
+    приймає лише все замовлення разом); успіх — усі вони підтверджені.
+    DigiKey уже показує замовлення відправленим (підтвердили на сайті вручну) — посилки позначаються підтвердженими.
     Повідомлення — через django.contrib.messages. Повертає True при успіху."""
     from django.contrib import messages as msg
     from bots.services.digikey import ship_marketplace_order, upload_vat_invoice, DigiKeyAPIError
@@ -394,14 +398,30 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
                 shipped_quantities=shipped_quantities or None,
                 vat_file_id=vat_file_id,
                 parts_by_sku=parts_by_sku,
+                shipments=[{k: p.get(k) for k in ("tracking", "carrier_id", "parts_by_sku")} for p in parcels]
+                if parcels else None,
             )
+            confirmed = [p["shipment"].pk for p in parcels or [] if p.get("shipment") is not None]
+            if shipment is not None:
+                confirmed.append(shipment.pk)
+            if result.get("already"):
+                # уже підтверджено на сайті DigiKey (вручну) — Minerva лише запам'ятовує це
+                from shipping.services import parcels as _parcels
+                _parcels.mark_shop_confirmed(order)
+                if confirmed:
+                    from django.utils import timezone as _tz
+                    from shipping.models import Shipment as _Shipment
+                    _Shipment.objects.filter(pk__in=confirmed, shop_confirmed_at__isnull=True).update(
+                        shop_confirmed_at=_tz.now())
+                msg.info(request, result["message"] + " Minerva позначила посилки підтвердженими.")
+                return True
             if result["ok"]:
                 ok = True
                 remaining = result.get("remaining") or 0
-                if shipment is not None:
+                if confirmed:
                     from django.utils import timezone as _tz
                     from shipping.models import Shipment as _Shipment
-                    _Shipment.objects.filter(pk=shipment.pk).update(shop_confirmed_at=_tz.now())
+                    _Shipment.objects.filter(pk__in=confirmed).update(shop_confirmed_at=_tz.now())
                 update_fields = ["status", "status_source"]
                 # Частина: на DigiKey ще не все відправлено — замовлення лишається відкритим
                 order.status        = "processing" if remaining > 0 else "shipped"
@@ -422,7 +442,7 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
                     if order.status not in ("shipped", "delivered"):
                         try:
                             from shipping.services import parcels as _parcels
-                            left = _parcels.progress(order).remainder_text()
+                            left = _parcels.progress(order).left_text()
                         except Exception:
                             left = ""
                         if left:
@@ -572,7 +592,8 @@ def digikey_ship_order(request, order_pk):
         "has_token":          has_token,
         "carriers":           carriers,
         "order_details":      order_details,
-        "ship_rows":          _ship_rows(order_details, dk_order, shipment),
+        # DigiKey приймає лише все замовлення разом — форма пропонує все, що там ще не відправлено
+        "ship_rows":          _ship_rows(order_details, dk_order, None),
         "shipment":           shipment,
         "supplier_id":        supplier_id,
         "is_eu":              is_eu,
