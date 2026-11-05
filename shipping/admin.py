@@ -965,6 +965,15 @@ class ShipmentForm(forms.ModelForm):
                 'ups_billing_account',
                 'UPS API вимагає номер акаунту для BillReceiver / BillThirdParty.',
             )
+        if 'export_mrn' in cd:
+            from .services import mrn as _mrn
+            value = _mrn.normalize(cd.get('export_mrn'))
+            carrier = cd.get('carrier')
+            country = cd.get('sender_country') or (carrier.sender_country if carrier else '')
+            error = _mrn.problem(value, country)
+            if error:
+                self.add_error('export_mrn', error)
+            cd['export_mrn'] = value
         return cd
 
 
@@ -1055,9 +1064,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             )
         }),
         ("🛃 Митна декларація", {
-            "fields": ("customs_articles_panel",),
+            "fields": ("export_mrn", "customs_articles_panel"),
             "classes": ("collapse",),
-            "description": "Артикули що передаються до Jumingo для позаєвропейських відправлень.",
+            "description": "Артикули що передаються до Jumingo для позаєвропейських відправлень. "
+                           "MRN з Ausfuhrbegleitdokument UPS приймає лише під час оформлення.",
         }),
         ("📋 Технічні деталі", {
             "fields": ("raw_request", "raw_response", "submitted_at", "created_at"),
@@ -4334,6 +4344,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             back = (reverse('admin:shipping_shipment_ups_confirm', args=[shipment.pk]) + '?' + urlencode({
                 'service_code': service_code, 'rate_price': rate_price, 'rate_currency': rate_currency,
                 'rate_source': rate_source, 'rate_ref': rate_ref, 'delivery_date': delivery_date}))
+            from .services import mrn as _mrn
+            export_mrn = _mrn.normalize(request.POST.get('export_mrn', ''))
+            mrn_problem = _mrn.problem(export_mrn, self._ups_extract_shipper(shipment).get('country'))
+            if mrn_problem:
+                messages.error(request, f'❌ MRN: {mrn_problem}')
+                return redirect(back)
             use_custom = request.POST.get('use_custom_invoice') == '1'
             pdf = request.FILES.get('custom_invoice_pdf')
             if use_custom:
@@ -4350,7 +4366,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 shipment.custom_invoice_pdf = pdf
             shipment.use_custom_invoice = use_custom
             shipment.ups_document_id = ''
-            shipment.save(update_fields=['use_custom_invoice', 'custom_invoice_pdf', 'ups_document_id'])
+            if 'export_mrn' in request.POST:
+                shipment.export_mrn = export_mrn
+            shipment.save(update_fields=['use_custom_invoice', 'custom_invoice_pdf', 'ups_document_id',
+                                         'export_mrn'])
             return self._ups_book(request, shipment, {
                 'service_code':       service_code,
                 'pickup_type':        request.POST.get('pickup_type', 'dropoff'),
@@ -4406,6 +4425,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             else reverse('admin:shipping_shipment_change', args=[shipment.pk])
         )
 
+        from .services import mrn as _mrn
+        mrn_found = None if shipment.export_mrn else _mrn.find_in_mail(
+            shipment.order, request.user, shipper.get('country'))
+
         from datetime import date as _date, timedelta as _td
         from django.utils import timezone as _tz
         _now       = _tz.localtime()
@@ -4442,12 +4465,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'rate_source':          rate_source,
             'rate_ref':             rate_ref,
             'delivery_date':        delivery_date,
+            'mrn_value':            shipment.export_mrn or (mrn_found or {}).get('mrn', ''),
+            'mrn_found':            mrn_found,
+            'mrn_country':          (shipper.get('country') or '').upper()[:2],
         })
 
     def ups_dry_run_view(self, request, shipment_id):
         """GET — build UPS shipment payload without sending. Returns JSON for debug."""
         import json as _json
         from django.http import JsonResponse
+        from .services.mrn import normalize as _mrn_normalize
         from .ups_client import UPSClient, UPSError
 
         shipment     = get_object_or_404(Shipment, pk=shipment_id)
@@ -4478,6 +4505,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     'DRY-RUN-DOC-ID'
                     if shipment.use_custom_invoice and shipment.custom_invoice_pdf else ''
                 ),
+                mrn          = (_mrn_normalize(request.GET['mrn']) if 'mrn' in request.GET
+                                else shipment.export_mrn),
                 dry_run      = True,
             )
             return JsonResponse({'ok': True, 'payload': payload}, json_dumps_params={'indent': 2, 'ensure_ascii': False})
@@ -4603,6 +4632,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 billing=billing,
                 duties_billing=duties_billing,
                 custom_document_id=custom_doc_id,
+                mrn=shipment.export_mrn,
             )
         except Exception as e:
             # UPS відмовив або не відповів — знову «❌ Помилка»: виправити й оформити ще раз

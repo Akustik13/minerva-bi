@@ -361,6 +361,62 @@
         <span class="uc-val">{{ shipment.get_ups_duties_billing_display }}{% if shipment.ups_duties_billing == 'third_party' %} — {{ shipment.ups_duties_account|default:"⚠️ акаунт не вказано" }} · {{ shipment.ups_payer_addresses.duties.company|default:shipment.ups_payer_addresses.duties.name }}, {{ shipment.ups_duties_country }}{% endif %}</span>
       </div>
 
+      {# ── MRN з Ausfuhrbegleitdokument (ABD) → Shipment.MovementReferenceNumber ── #}
+      <div style="margin-top:16px;padding:12px 14px;border:1px dashed var(--border-strong);
+                  border-radius:6px;background:var(--bg-input)">
+        <label for="uc-mrn" style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">
+          📑 {% trans "MRN (Ausfuhrbegleitdokument)" %}
+        </label>
+        <input type="text" id="uc-mrn" name="export_mrn" form="ups-confirm-form" maxlength="18"
+               value="{{ mrn_value }}" placeholder="26DE760298696748B4" autocomplete="off" spellcheck="false"
+               translate="no" data-country="{{ mrn_country }}"
+               style="width:100%;max-width:260px;box-sizing:border-box;background:var(--bg-card);
+                      border:1px solid var(--border-strong);color:var(--text);border-radius:4px;
+                      padding:7px 10px;font-size:14px;font-family:monospace;text-transform:uppercase">
+        <div id="uc-mrn-msg" style="font-size:12px;margin-top:6px;color:var(--err)"></div>
+        {% if mrn_found %}
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px">
+          ✉️ {% trans "Підставлено з листа ABD" %}: «<span translate="no">{{ mrn_found.subject|truncatechars:90 }}</span>»
+          ({{ mrn_found.date|date:"d.m.Y H:i" }}) — {% trans "перевірте" %}
+        </div>
+        {% elif not mrn_value %}
+        <div style="font-size:12px;color:var(--text-dim);margin-top:6px">
+          {% trans "Листа ABD із MRN до цього замовлення у вашій пошті не знайдено — впишіть MRN вручну або залиште порожнім." %}
+        </div>
+        {% endif %}
+        <div style="font-size:12px;color:var(--text-dim);margin-top:6px">
+          ℹ️ {% trans "UPS приймає MRN лише під час оформлення: 18 латинських літер і цифр, символи 3–4 — країна відправника. Після створення етикетки змінити його можна лише через скасування (Void) і нове оформлення." %}
+        </div>
+      </div>
+      <script>
+      (function(){
+        var inp = document.getElementById('uc-mrn'), out = document.getElementById('uc-mrn-msg');
+        var T = {
+          len:  '{% trans "MRN має бути рівно 18 знаків (зараз {0})." as t %}{{ t|escapejs }}',
+          chars:'{% trans "MRN — лише латинські літери й цифри." as t %}{{ t|escapejs }}',
+          cc:   '{% trans "Символи 3–4 MRN ({0}) мають бути країною відправника ({1})." as t %}{{ t|escapejs }}'
+        };
+        function check(){
+          var v = inp.value.replace(/[\s\-.]/g, '').toUpperCase(), cc = inp.dataset.country || '';
+          var msg = '';
+          if (v && v.length !== 18) msg = T.len.replace('{0}', v.length);
+          else if (v && !/^[A-Z0-9]+$/.test(v)) msg = T.chars;
+          else if (v && cc && v.slice(2, 4) !== cc) msg = T.cc.replace('{0}', v.slice(2, 4)).replace('{1}', cc);
+          out.textContent = msg;
+          inp.style.borderColor = msg ? 'var(--err)' : '';
+          return !msg;
+        }
+        inp.addEventListener('input', check);
+        check();
+        document.addEventListener('DOMContentLoaded', function(){
+          var form = document.getElementById('ups-confirm-form');
+          if (form) form.addEventListener('submit', function(e){
+            if (!check()) { e.preventDefault(); e.stopImmediatePropagation(); inp.focus(); }
+          }, true);
+        });
+      })();
+      </script>
+
       {# ── Власний інвойс (UPS Paperless) ─────────────────────────────────── #}
       <div style="margin-top:16px;padding:12px 14px;border:1px dashed var(--border-strong);
                   border-radius:6px;background:var(--bg-input)">
@@ -546,6 +602,8 @@ function ucDryRun() {
   panel.style.display = '';
   pre.textContent = _msgLoading;
   var url = '{% url "admin:shipping_shipment_ups_dry_run" shipment.pk %}?service_code={{ service_code }}&terms_of_shipment={{ customs.terms_of_shipment|default:"DAP" }}';
+  var mrnInp = document.getElementById('uc-mrn');
+  if (mrnInp) url += '&mrn=' + encodeURIComponent(mrnInp.value);
   fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
     .then(function(r){ return r.json(); })
     .then(function(d){

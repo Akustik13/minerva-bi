@@ -1386,6 +1386,8 @@
 {"uk": "MOQ (мін. кількість)", "en": "MOQ (min. quantity)", "de": "MOQ (Mindestmenge)"}
 {"uk": "MOQ = {0} шт. — може відлякувати", "en": "MOQ = {0} pcs — may put buyers off", "de": "MOQ = {0} Stk. — kann abschreckend wirken"}
 {"uk": "MOQ має бути щонайменше 1", "en": "MOQ must be at least 1", "de": "MOQ muss mindestens 1 betragen"}
+{"uk": "MRN має бути рівно {0} знаків (зараз {1}).", "en": "The MRN must be exactly {0} characters (currently {1}).", "de": "Die MRN muss genau {0} Zeichen lang sein (derzeit {1})."}
+{"uk": "MRN — лише латинські літери й цифри.", "en": "MRN — Latin letters and digits only.", "de": "MRN — nur lateinische Buchstaben und Ziffern."}
 {"uk": "Manager — + аналітика, звіти", "en": "Manager — + analytics, reports", "de": "Manager — + Analysen, Berichte"}
 {"uk": "Marketplace API (3-legged OAuth), спроб: {0}", "en": "Marketplace API (3-legged OAuth), attempts: {0}", "de": "Marketplace-API (3-legged OAuth), Versuche: {0}"}
 {"uk": "Marketplace API не авторизовано.", "en": "The Marketplace API is not authorized.", "de": "Die Marketplace API ist nicht autorisiert."}
@@ -1510,6 +1512,7 @@
 {"uk": "ModuleBundle }o--o{ ModuleRegistry : \"містить модулі (M2M)\"", "en": "ModuleBundle }o--o{ ModuleRegistry : \"contains modules (M2M)\"", "de": "ModuleBundle }o--o{ ModuleRegistry : \"enthält Module (M2M)\""}
 {"uk": "ModuleRegistry: не вдалося зареєструвати модулі", "en": "ModuleRegistry: failed to register modules", "de": "ModuleRegistry: Module konnten nicht registriert werden"}
 {"uk": "Mounting Type — тип монтажу", "en": "Mounting Type — mounting type", "de": "Mounting Type — Montageart"}
+{"uk": "Movement Reference Number з ABD митного брокера (18 знаків, напр. 26DE760298696748B4). UPS: передається при оформленні (Shipment.MovementReferenceNumber).", "en": "Movement Reference Number from the customs broker's ABD (18 characters, e.g. 26DE760298696748B4). UPS: sent when the shipment is booked (Shipment.MovementReferenceNumber).", "de": "Movement Reference Number aus dem ABD des Zollagenten (18 Zeichen, z. B. 26DE760298696748B4). UPS: wird bei der Buchung übermittelt (Shipment.MovementReferenceNumber)."}
 {"uk": "My Apps → Create App (тип: Marketplace Seller).", "en": "My Apps → Create App (type: Marketplace Seller).", "de": "My Apps → Create App (Typ: Marketplace Seller)."}
 {"uk": "MyDHL API трекає лише", "en": "MyDHL API only tracks", "de": "Die MyDHL-API verfolgt nur"}
 {"uk": "N днів", "en": "N days", "de": "N Tage"}
@@ -3581,6 +3584,7 @@
 {"uk": "Артикул, кількість і рік перевірено — зауважень немає.", "en": "SKU, quantity and year checked — no remarks.", "de": "Artikelnummer, Menge und Jahr geprüft — keine Anmerkungen."}
 {"uk": "Артикули / номери", "en": "SKUs / numbers", "de": "Artikelnummern / Nummern"}
 {"uk": "Артикули що передаються до Jumingo для позаєвропейських відправлень.", "en": "SKUs passed to Jumingo for non-European shipments.", "de": "Artikelnummern, die bei außereuropäischen Sendungen an Jumingo übergeben werden."}
+{"uk": "Артикули що передаються до Jumingo для позаєвропейських відправлень. MRN з Ausfuhrbegleitdokument UPS приймає лише під час оформлення.", "en": "Items sent to Jumingo for shipments outside the EU. UPS accepts the MRN from the Ausfuhrbegleitdokument only when the shipment is booked.", "de": "Artikel, die bei Sendungen außerhalb der EU an Jumingo übermittelt werden. UPS akzeptiert die MRN aus dem Ausfuhrbegleitdokument nur bei der Buchung."}
 {"uk": "Артикули, чиї даташити додати до листа", "en": "SKUs whose datasheets to attach to the e-mail", "de": "Artikelnummern, deren Datenblätter der E-Mail beigefügt werden sollen"}
 {"uk": "Архів", "en": "Archive", "de": "Archiv"}
 {"uk": "Архів askDANTE", "en": "askDANTE archive", "de": "askDANTE-Archiv"}
@@ -12497,6 +12501,7 @@
 {"uk": "Сигнали", "en": "Signals", "de": "Signale"}
 {"uk": "Сигнали дій — Minerva", "en": "Action signals — Minerva", "de": "Handlungssignale — Minerva"}
 {"uk": "Сигнали — попередження системи", "en": "Signals — system warnings", "de": "Signale — Warnungen des Systems"}
+{"uk": "Символи 3–4 MRN ({0}) мають бути країною відправника ({1}).", "en": "Characters 3–4 of the MRN ({0}) must be the sender's country ({1}).", "de": "Die Zeichen 3–4 der MRN ({0}) müssen das Absenderland sein ({1})."}
 {"uk": "Симуляція запиту ключа (без запису)", "en": "Key request simulation (no writing)", "de": "Simulation einer Schlüsselanfrage (ohne Schreiben)"}
 {"uk": "Симуляція — лише для POST / PUT / PATCH / DELETE; читання — «👁 Приклад даних».", "en": "Simulation is only for POST / PUT / PATCH / DELETE; for reads use “👁 Sample data”.", "de": "Die Simulation gilt nur für POST / PUT / PATCH / DELETE; für Lesezugriffe nutzen Sie „👁 Beispieldaten“."}
 {"uk": "Синк", "en": "Sync", "de": "Sync"}

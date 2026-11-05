@@ -1,11 +1,11 @@
 ---
 title: UPS: відправлення й свій інвойс
 order: 30
-summary: Як оформити посилку UPS — сторінка перевірки, хто платить доставку й мито, свій PDF-інвойс замість інвойсу UPS (Paperless), скасування в UPS (Void), виклик кур'єра, рахунки UPS.
+summary: Як оформити посилку UPS — сторінка перевірки, хто платить доставку й мито, свій PDF-інвойс замість інвойсу UPS (Paperless), MRN з Ausfuhrbegleitdokument, скасування в UPS (Void), виклик кур'єра, рахунки UPS.
 where: 🚚 Доставка → 📦 Відправлення → «📊 Порівняти тарифи» → «🟤 UPS»
 urls: /admin/shipping/shipment/, /admin/shipping/carrier/, /admin/shipping/shipment/ups-track-lookup/
 roles: менеджер, склад, адміністратор (налаштування)
-keywords: UPS, Paperless, свій інвойс, commercial invoice, Rechnung, PDF інвойс, митна декларація, BillShipper, BillReceiver, BillThirdParty, DDP, DAP, мито, Zoll, Abholung, забір, кур'єр, PRN, UPS Billing, рахунки UPS, 1Z, Void, скасувати, анулювати, Stornieren
+keywords: UPS, Paperless, свій інвойс, commercial invoice, Rechnung, PDF інвойс, митна декларація, BillShipper, BillReceiver, BillThirdParty, DDP, DAP, мито, Zoll, Abholung, забір, кур'єр, PRN, UPS Billing, рахунки UPS, 1Z, Void, скасувати, анулювати, Stornieren, MRN, ABD, Ausfuhrbegleitdokument, Movement Reference Number, експорт, Ausfuhr
 related: shipping/shipments, shipping/carriers, shipping/tracking, sales/commercial-invoices
 ---
 
@@ -86,6 +86,26 @@ Incoterm **DDP** сам ставить «Мито: Відправник».
 > позиції, кількості, вартість, HS-коди, країна походження, Incoterm.
 
 Галочка є лише для міжнародних відправлень (де показується митна декларація).
+
+## MRN з Ausfuhrbegleitdokument (ABD)
+
+Для експорту за межі ЄС митний брокер присилає **Ausfuhrbegleitdokument (ABD)** з номером **MRN** (Movement
+Reference Number), напр. `26DE760298696748B4`. Minerva передає його в UPS разом з відправленням.
+
+1. На сторінці перевірки UPS у картці **«🛃 Митна декларація»** є поле **«📑 MRN (Ausfuhrbegleitdokument)»**.
+2. Якщо лист ABD уже у вашій пошті й прив'язаний до цього замовлення, MRN підставиться сам — під полем видно
+   **«✉️ Підставлено з листа ABD: «…»»**. Перевірте номер. Інакше впишіть MRN вручну або залиште поле порожнім.
+3. **«🟤 Підтвердити і відправити через UPS»** — MRN піде в UPS і збережеться у відправленні (видно в картці
+   відправлення як **«📑 MRN (ABD)»**).
+
+Формат: рівно **18** латинських літер і цифр, символи **3–4** — країна відправника (`DE`). Неправильний MRN
+Minerva покаже червоним і не відправить. **«🔍 Переглянути тіло запиту»** показує MRN у полі
+`MovementReferenceNumber`.
+
+> ⚠️ UPS приймає MRN **лише під час оформлення**. Якщо етикетка вже створена без MRN або з неправильним —
+> [скасуйте відправлення в UPS (Void)](#скасувати-відправлення-ups-void) і оформіть заново.
+
+> ℹ️ Лист ABD шукається лише у **ваших** скриньках. Колега, у чиїй скриньці лист, побачить підказку сам.
 
 ## Скасувати відправлення UPS (Void)
 

@@ -401,6 +401,11 @@ class Shipment(models.Model):
         null=True, blank=True,
         help_text="PDF інвойс/CN23/CN22 вашої компанії"
     )
+    export_mrn = models.CharField(
+        "MRN (Ausfuhrbegleitdokument)", max_length=18, blank=True, default="",
+        help_text="Movement Reference Number з ABD митного брокера (18 знаків, напр. 26DE760298696748B4). "
+                  "UPS: передається при оформленні (Shipment.MovementReferenceNumber).",
+    )
     shop_confirm_dismissed = models.BooleanField(
         "Не пропонувати підтвердження в магазині", default=False,
         help_text="Банер «Підтвердити відправлення» відхилено для цього відправлення.",

@@ -687,11 +687,13 @@ class UPSClient:
                         billing: dict = None,
                         duties_billing: dict = None,
                         custom_document_id: str = '',
+                        mrn: str = '',
                         dry_run: bool = False) -> dict:
         """
         POST /api/shipments/v2409/ship
         dry_run=True — build and return the payload dict without sending to UPS.
         custom_document_id — ID з upload_paperless_document(): UPS бере наш PDF замість генерації інвойсу.
+        mrn — MRN з ABD (shipping/services/mrn.py перевіряє формат) → Shipment.MovementReferenceNumber.
         Повертає: {tracking_number, shipment_id, label_base64, label_format, total_charge, currency}
         """
         pickup  = from_address or self._default_shipper()  # physical pickup (can be US)
@@ -741,6 +743,9 @@ class UPSClient:
             (to_address.get('country') or 'DE').upper() !=
             (pickup.get('country') or 'DE').upper()
         )
+        if is_intl and mrn:
+            # MRN з Ausfuhrbegleitdokument (ABD) — UPS лише при створенні відправлення
+            shipment['MovementReferenceNumber'] = mrn
         if is_intl and customs_info:
             # InvoiceLineTotal at Shipment level (required for international)
             items_list = customs_info.get('items') or []
