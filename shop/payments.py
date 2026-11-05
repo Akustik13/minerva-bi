@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import json
 import logging
+import re
 import time
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -79,6 +80,13 @@ def site_methods(shop: Shop | None) -> list[str] | None:
 
 
 HOSTED, EMBEDDED = "hosted_page", "embedded_page"
+# Вигляд сторінки / форми Stripe у стилі сайту (Checkout Session branding_settings) — кольори просить сайт
+BORDER_STYLES = ("pill", "rectangular", "rounded")
+FONT_FAMILIES = ("be_vietnam_pro", "bitter", "chakra_petch", "default", "hahmlet", "inconsolata", "inter", "lato",
+                 "lora", "m_plus_1_code", "montserrat", "noto_sans", "noto_sans_jp", "noto_serif", "nunito",
+                 "open_sans", "pridi", "pt_sans", "pt_serif", "raleway", "roboto", "roboto_slab", "source_sans_pro",
+                 "titillium_web", "ubuntu_mono", "zen_maru_gothic")
+_HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
 EMBEDDED_MODES = ("embedded_page", "embedded")   # що може попросити сайт; Stripe API: embedded_page (до 2026 — embedded)
 REDIRECTS = ("always", "if_required", "never")
 
@@ -95,6 +103,27 @@ def embedded_problem(shop: Shop | None) -> str:
     if key_mode(pk) != key_mode(shop.stripe_secret_key):
         return "публічний і секретний ключі з різних режимів (тестовий / бойовий)"
     return ""
+
+
+def clean_branding(raw) -> dict:
+    """Вигляд форми Stripe, який просить сайт (branding_settings): кольори фону й кнопки #rrggbb, кути й шрифт зі
+    списку Stripe, назва над формою ≤ 60 символів. Решта (логотип, іконка — посилання) не береться: логотип —
+    у налаштуваннях Stripe. Неправильне поле просто не передається."""
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for field in ("background_color", "button_color"):
+        value = str(raw.get(field) or "").strip()
+        if _HEX_COLOR.match(value):
+            out[field] = value.lower()
+    if raw.get("border_style") in BORDER_STYLES:
+        out["border_style"] = raw["border_style"]
+    if raw.get("font_family") in FONT_FAMILIES:
+        out["font_family"] = raw["font_family"]
+    name = " ".join(str(raw.get("display_name") or "").split())[:60]
+    if name:
+        out["display_name"] = name
+    return out
 
 
 def public_status(shop: Shop | None) -> dict:
@@ -210,11 +239,29 @@ def find_order(shop: Shop, number):
     return order
 
 
+def _create_session(shop: Shop, data: dict, key: str, embedded: bool) -> dict:
+    """POST /v1/checkout/sessions. Обліковий запис Stripe на старшій версії API: невідомий branding_settings —
+    без нього (форма в кольорах зі Stripe), embedded_page ще звався embedded. Інший запит — інший Idempotency-Key."""
+    while True:
+        try:
+            return _request(shop, "POST", "/v1/checkout/sessions", data, idempotency_key=key)
+        except PaymentError as e:
+            if "branding_settings" in data and "branding_settings" in e.message:
+                data = {k: v for k, v in data.items() if k != "branding_settings"}
+                key += "-nb"
+            elif embedded and data.get("ui_mode") == EMBEDDED and "ui_mode" in e.message:
+                data = {**data, "ui_mode": "embedded"}
+                key += "-legacy"
+            else:
+                raise
+
+
 def start_checkout(shop: Shop, order, success_url, cancel_url, lang: str = "de", ui_mode: str = "",
-                   return_url=None, redirect_on_completion: str = "") -> ShopPayment:
+                   return_url=None, redirect_on_completion: str = "", branding=None) -> ShopPayment:
     """Оплата Stripe для замовлення: відкрита сесія того самого вигляду використовується повторно, інші відкриті —
     закриваються (без подвійної оплати). ui_mode embedded_page (сайт просить форму на своїй сторінці) — сесія
-    embedded_page з return_url і client_secret; інакше — сторінка Stripe (success_url / cancel_url)."""
+    embedded_page з return_url і client_secret; інакше — сторінка Stripe (success_url / cancel_url).
+    branding — кольори сайту для форми / сторінки Stripe (clean_branding → branding_settings)."""
     from sales.models import SalesOrder
     if not connected(shop):  # Stripe прибрали з каси — давніші замовлення все одно можна оплатити
         raise PaymentError(403, "stripe_disabled", "Stripe у магазині не підключено (немає ключа).")
@@ -274,16 +321,12 @@ def start_checkout(shop: Shop, order, success_url, cancel_url, lang: str = "de",
             data.update({"ui_mode": EMBEDDED, "return_url": return_url, "redirect_on_completion": redirect_on_completion})
         else:
             data.update({"success_url": success_url, "cancel_url": cancel_url})
+        brand = clean_branding(branding)
+        if brand:
+            data["branding_settings"] = brand
         attempt = order.shop_payments.count() + 1
         key = f"minerva-{shop.slug}-{order.pk}-{attempt}" + ("-e" if embedded else "")
-        try:
-            session = _request(shop, "POST", "/v1/checkout/sessions", data, idempotency_key=key)
-        except PaymentError as e:
-            if not (embedded and "ui_mode" in e.message):
-                raise
-            # обліковий запис Stripe на старій версії API: там embedded_page ще звався embedded
-            data["ui_mode"] = "embedded"
-            session = _request(shop, "POST", "/v1/checkout/sessions", data, idempotency_key=key + "-legacy")
+        session = _create_session(shop, data, key, embedded)
         if embedded and not session.get("client_secret"):
             raise PaymentError(502, "stripe_error", "Stripe не повернув client_secret для форми на сайті.")
         payment = ShopPayment.objects.create(

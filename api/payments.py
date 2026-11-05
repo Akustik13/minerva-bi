@@ -2,7 +2,8 @@
 Онлайн-оплата Stripe — API для сайту і вебхук Stripe (логіка: shop/payments.py).
 
   GET  shop/payments/                       {stripe: {enabled, mode}}                       (orders:read)
-  POST shop/payments/stripe/checkout/       {order_number, success_url, cancel_url, lang}
+  POST shop/payments/stripe/checkout/       {order_number, success_url, cancel_url, lang} (+ ui_mode embedded_page,
+                                            return_url, redirect_on_completion; branding — кольори форми Stripe)
                                             → {url, session_id, amount, currency, expires_at} (orders:write)
   POST shop/payments/stripe/sync/           {order_number} → {payment_status, paid}           (orders:write)
   POST payments/stripe/webhook/<код магазину>/   — для Stripe (без ключа API, підпис Stripe-Signature)
@@ -44,9 +45,10 @@ def checkout_payload(payment, number: str = "") -> dict:
 
 
 def checkout_args(d) -> dict:
-    """Поля запиту сайту для start_checkout (і сторінка Stripe, і форма на сайті)."""
+    """Поля запиту сайту для start_checkout (і сторінка Stripe, і форма на сайті); branding — кольори сайту
+    для форми Stripe ({background_color, button_color, border_style, font_family, display_name})."""
     return {"ui_mode": str(d.get("ui_mode") or ""), "return_url": d.get("return_url"),
-            "redirect_on_completion": str(d.get("redirect_on_completion") or "")}
+            "redirect_on_completion": str(d.get("redirect_on_completion") or ""), "branding": d.get("branding")}
 
 
 class PaymentsStatusView(APIView):

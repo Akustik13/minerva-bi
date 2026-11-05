@@ -28,12 +28,18 @@ class FakeStripe:
     def __init__(self):
         self.sessions, self.calls = {}, []
         self.old_api = False   # обліковий запис на старій версії API: ui_mode embedded_page ще невідомий
+        self.no_branding = False   # …і branding_settings теж
 
     def __call__(self, method, url, data=None, headers=None, timeout=None):
         path = url.split("://", 1)[1].split("/", 1)[1]
         form = dict(data or [])
         self.calls.append((method, "/" + path, form, headers or {}))
         resp = mock.Mock()
+        if (method == "POST" and path == "v1/checkout/sessions" and self.no_branding
+                and any(k.startswith("branding_settings") for k in form)):
+            resp.status_code = 400
+            resp.json.return_value = {"error": {"message": "Received unknown parameter: branding_settings"}}
+            return resp
         if method == "POST" and path == "v1/checkout/sessions" and self.old_api and form.get("ui_mode") == "embedded_page":
             resp.status_code = 400
             resp.json.return_value = {"error": {"message": "Invalid ui_mode: must be one of hosted, embedded or custom"}}
@@ -553,3 +559,58 @@ class EmbeddedCheckoutTests(StripeTestCase):
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(self.fake.calls[-1][2]["ui_mode"], "embedded")
         self.assertTrue(r.json()["client_secret"])
+
+
+class BrandingTests(EmbeddedCheckoutTests):
+    """Форма / сторінка Stripe у кольорах сайту: сайт надсилає branding → branding_settings сесії Checkout."""
+
+    SITE_STYLE = {"background_color": "#F3F8FA", "button_color": "#103448", "border_style": "rounded",
+                  "font_family": "open_sans", "display_name": "  Sevskiy   GmbH "}
+
+    def test_status_flag(self):   # базові тести — у EmbeddedCheckoutTests
+        pass
+
+    test_embedded_session_for_the_site = test_reuse_and_switch_without_double_payment = \
+        test_unavailable_and_bad_return_url = test_older_stripe_api_version = test_status_flag
+
+    def brand_form(self):
+        form = self.fake.calls[-1][2]
+        return {k[len("branding_settings["):-1]: v for k, v in form.items() if k.startswith("branding_settings[")}
+
+    def test_site_colours_go_to_stripe(self):
+        self.order()
+        r = self.embedded(branding=self.SITE_STYLE)
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.brand_form(), {"background_color": "#f3f8fa", "button_color": "#103448",
+                                             "border_style": "rounded", "font_family": "open_sans",
+                                             "display_name": "Sevskiy GmbH"})
+
+    def test_hosted_page_too(self):
+        self.order()
+        r = self.c.post("/api/v1/shop/payments/stripe/checkout/", {
+            "order_number": "WS-1", "lang": "de", "success_url": SITE + "?zahlung=ok",
+            "cancel_url": SITE + "?zahlung=abgebrochen", "branding": {"background_color": "#103448"}}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.brand_form(), {"background_color": "#103448"})
+
+    def test_wrong_values_are_dropped(self):
+        from shop.payments import clean_branding
+        self.assertEqual(clean_branding({"background_color": "red", "button_color": "#12345",
+                                         "border_style": "round", "font_family": "Arial",
+                                         "logo": {"type": "url", "url": "https://evil.example/x.png"}}), {})
+        self.assertEqual(clean_branding("#103448"), {})
+        self.order()
+        self.assertEqual(self.embedded(branding={"background_color": "javascript:1"}).status_code, 201)
+        self.assertEqual(self.brand_form(), {})
+
+    def test_older_api_without_branding(self):
+        self.order()
+        self.fake.no_branding = self.fake.old_api = True
+        r = self.embedded(branding=self.SITE_STYLE)
+        self.assertEqual(r.status_code, 201, r.content)
+        last = self.fake.calls[-1]
+        self.assertEqual(self.brand_form(), {})
+        self.assertEqual(last[2]["ui_mode"], "embedded")
+        keys = [c[3].get("Idempotency-Key") for c in self.fake.calls if c[1] == "/v1/checkout/sessions"]
+        self.assertEqual(len(set(keys)), len(keys))     # інший запит — інший ключ ідемпотентності
+        self.assertEqual(ShopPayment.objects.get().client_secret, r.json()["client_secret"])
