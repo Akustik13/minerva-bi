@@ -1928,7 +1928,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     if _last is not None:
                         extra_context["digikey_ship_url"] = reverse(
                             "admin:shipping_shipment_detail", args=[_last.pk])
-                dk_confirmed = (obj.status == "shipped" and obj.status_source == "DigiKey Marketplace")
+                # DigiKey уже показує відправленим: статус від DigiKey, позначка з синхронізації / «Трекінг з DigiKey»
+                # (підтвердили вручну на порталі), або всі посилки з трек-номером підтверджені в магазині
+                dk_confirmed = ((obj.status == "shipped" and obj.status_source == "DigiKey Marketplace")
+                                or bool(obj.marketplace_shipped_at))
+                if not dk_confirmed and _parcels.has_parcels(obj):
+                    _tracked = [p for p in _parcels.live_parcels(obj) if p.tracking_number]
+                    dk_confirmed = bool(_tracked) and all(p.shop_confirmed_at for p in _tracked)
                 extra_context["digikey_already_shipped"] = dk_confirmed
                 extra_context["digikey_not_confirmed"] = (
                     not dk_confirmed and bool(obj.tracking_number)
@@ -3028,6 +3034,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
         tracking = _extract_tracking(data)
         carrier  = _extract_carrier(data)
+        # підтвердили відправлення вручну на supplier.digikey.com — Minerva запам'ятовує (банер зникає, посилки — ✓)
+        from bots.services.digikey import DK_SHIPPED_STATES, _parcels_dk_shipped
+        dk_state = str((data or {}).get("orderState") or "")
+        shipped_on_digikey = dk_state in DK_SHIPPED_STATES
+        if shipped_on_digikey:
+            _parcels_dk_shipped(order, dk_state)
 
         updated = []
         if tracking and tracking != order.tracking_number:
@@ -3045,6 +3057,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             "updated": updated,
             "tracking_number":  order.tracking_number,
             "shipping_courier": order.shipping_courier,
+            "dk_state": dk_state,
+            "shipped_on_digikey": shipped_on_digikey,
         })
 
     def push_to_shipping_view(self, request, pk):

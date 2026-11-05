@@ -407,6 +407,11 @@ def mark_shop_confirmed(order) -> int:
     """Магазин уже показує замовлення відправленим (підтвердили на сайті DigiKey вручну чи раніше) — посилки з
     трек-номером позначаються підтвердженими: банер «Підтвердити відправлення» їх більше не пропонує."""
     from shipping.models import Shipment
+    try:   # замовлення — «магазин показує відправленим» (банер у картці замовлення)
+        from bots.services.digikey import note_marketplace_shipped
+        note_marketplace_shipped(order)
+    except Exception:  # noqa: BLE001
+        pass
     ids = [s.pk for s in live_parcels(order) if s.tracking_number and not s.shop_confirmed_at]
     if not ids:
         return 0

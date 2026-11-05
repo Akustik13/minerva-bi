@@ -637,3 +637,52 @@ class StillToShipTests(ParcelBase):
         self.assertContains(r, "📦 14 / 16 · ⏳ ще 2")
         r = self.client.get(f"/admin/sales/salesorder/{o.pk}/change/")
         self.assertContains(r, "⏳ ще відправити 2")
+
+
+class DigiKeyBannerTests(ParcelBase):
+    """Банер «Відправку не підтверджено на DigiKey» у картці замовлення: зникає, коли DigiKey уже показує
+    відправленим (вручну на supplier.digikey.com) — замовлення частинами, у Minerva ще «В обробці»."""
+
+    BANNER = "Відправку не підтверджено на DigiKey Marketplace"
+
+    def setUp(self):
+        super().setUp()
+        self.admin_client()
+        self.o = self.make_order()
+        SalesOrder.objects.filter(pk=self.o.pk).update(source="digikey", tracking_number="1Z0R6B300439360978")
+        s1 = self.ship(self.o, (10, 4))
+        s2 = self.ship(self.o, (0, 2))
+        Shipment.objects.filter(pk=s1.pk).update(tracking_number="1Z0R6B300439360978", status="in_transit")
+        Shipment.objects.filter(pk=s2.pk).update(tracking_number="1Z0R6B300439360979", status="label_ready")
+        self.url = f"/admin/sales/salesorder/{self.o.pk}/change/"
+
+    def test_manual_confirm_hides_banner_via_tracking_button(self):
+        self.assertContains(self.client.get(self.url), self.BANNER)
+        with mock.patch("bots.services.digikey.get_marketplace_token", return_value="t"), \
+                mock.patch("bots.services.digikey._fetch_marketplace_order",
+                           return_value={"orderState": "Shipped"}):
+            d = self.client.post(f"/admin/sales/salesorder/{self.o.pk}/digikey-fetch-tracking/").json()
+        self.assertEqual((d["ok"], d["shipped_on_digikey"]), (True, True))
+        o = SalesOrder.objects.get(pk=self.o.pk)
+        self.assertIsNotNone(o.marketplace_shipped_at)
+        self.assertEqual(o.status, "processing")                     # посилка 2 ще не поїхала — статус той самий
+        self.assertNotContains(self.client.get(self.url), self.BANNER)
+
+    def test_sync_marks_order_and_parcels(self):
+        from bots.services.digikey import _parcels_dk_shipped
+        _parcels_dk_shipped(SalesOrder.objects.get(pk=self.o.pk), "Shipped")
+        self.assertIsNotNone(SalesOrder.objects.get(pk=self.o.pk).marketplace_shipped_at)
+        self.assertNotContains(self.client.get(self.url), self.BANNER)
+
+    def test_parcels_confirmed_hide_banner_even_without_mark(self):
+        from django.utils import timezone
+        Shipment.objects.filter(order=self.o).update(shop_confirmed_at=timezone.now())
+        self.assertNotContains(self.client.get(self.url), self.BANNER)
+
+    def test_not_shipped_on_digikey_keeps_banner(self):
+        with mock.patch("bots.services.digikey.get_marketplace_token", return_value="t"), \
+                mock.patch("bots.services.digikey._fetch_marketplace_order",
+                           return_value={"orderState": "ShippingInProgress"}):
+            d = self.client.post(f"/admin/sales/salesorder/{self.o.pk}/digikey-fetch-tracking/").json()
+        self.assertFalse(d["shipped_on_digikey"])
+        self.assertContains(self.client.get(self.url), self.BANNER)

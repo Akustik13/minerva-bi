@@ -62,11 +62,28 @@ def _parcels_hold(sale, status: str) -> str:
 DK_SHIPPED_STATES = {"Shipped", "Received", "Closed", "Delivered", "Completed"}
 
 
+def note_marketplace_shipped(sale) -> None:
+    """Замовлення відправлене на DigiKey Marketplace (уперше) — `SalesOrder.marketplace_shipped_at`: банер
+    «Відправку не підтверджено на DigiKey» зникає, навіть коли Minerva ще тримає статус (посилки, свій трекінг)."""
+    if not getattr(sale, "pk", None):
+        return
+    from django.utils import timezone
+    from sales.models import SalesOrder
+    now = timezone.now()
+    if SalesOrder.objects.filter(pk=sale.pk, marketplace_shipped_at__isnull=True).update(marketplace_shipped_at=now):
+        sale.marketplace_shipped_at = now
+
+
 def _parcels_dk_shipped(sale, dk_state: str) -> None:
-    """DigiKey показує замовлення відправленим (підтвердили на supplier.digikey.com вручну чи з Minerva) — посилки
-    Minerva з трек-номером позначаються підтвердженими, банер «Підтвердити відправлення» їх більше не пропонує."""
+    """DigiKey показує замовлення відправленим (підтвердили на supplier.digikey.com вручну чи з Minerva) — замовлення
+    отримує позначку (note_marketplace_shipped), посилки Minerva з трек-номером — підтверджені, банер «Підтвердити
+    відправлення» їх більше не пропонує."""
     if dk_state not in DK_SHIPPED_STATES or not getattr(sale, "pk", None):
         return
+    try:
+        note_marketplace_shipped(sale)
+    except Exception:
+        logger.exception("DigiKey: marketplace shipped mark failed for order %s", sale.pk)
     try:
         from shipping.services.parcels import has_parcels, mark_shop_confirmed
         if has_parcels(sale):

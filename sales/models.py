@@ -48,6 +48,12 @@ class SalesOrder(models.Model):
     )
     shipping_courier   = models.CharField("Кур'єр", max_length=64,  blank=True, default="")
     tracking_number    = models.CharField("Трек-номер", max_length=128, blank=True, default="")
+    # DigiKey Marketplace показує замовлення відправленим (підтвердили з Minerva чи вручну на supplier.digikey.com) —
+    # банер «Відправку не підтверджено на DigiKey» більше не показується (bots/services/digikey.note_marketplace_shipped)
+    marketplace_shipped_at = models.DateTimeField(
+        "Магазин показує відправленим", null=True, blank=True,
+        help_text="Коли DigiKey Marketplace уперше показав замовлення відправленим (синхронізація, «Трекінг з DigiKey» "
+                  "або підтвердження з Minerva).")
     lieferschein_nr    = models.CharField("Lieferschein Nr", max_length=64,  blank=True, default="")
     shipping_region    = models.CharField("Регіон доставки", max_length=32,  blank=True, default="")
     shipping_address   = models.TextField("Адреса доставки (текстом)", blank=True, default="")

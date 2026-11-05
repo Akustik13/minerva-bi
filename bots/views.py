@@ -423,6 +423,9 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
                     from shipping.models import Shipment as _Shipment
                     _Shipment.objects.filter(pk__in=confirmed).update(shop_confirmed_at=_tz.now())
                 update_fields = ["status", "status_source"]
+                if remaining <= 0:   # DigiKey показує все замовлення відправленим
+                    from bots.services.digikey import note_marketplace_shipped
+                    note_marketplace_shipped(order)
                 # Частина: на DigiKey ще не все відправлено — замовлення лишається відкритим
                 order.status        = "processing" if remaining > 0 else "shipped"
                 order.status_source = "DigiKey Marketplace"
