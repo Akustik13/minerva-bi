@@ -167,7 +167,7 @@ class MailMapTests(TestCase):
         verify = r["Підтвердження email, новий пароль, запрошення від менеджера"]
         self.assertEqual(verify["sender"], "Sevskiy Shop <info@sevskiy.de>")
         self.assertIn(f"/admin/email_assistant/emailaccount/{self.acc.pk}/change/", [c.get("url") for c in verify["change"]])
-        customer = r["«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено"]
+        customer = r["«Willkommen», пароль змінено, акаунт видалено"]
         self.assertIn("відповіді — на vertrieb@sevskiy.de", customer["sender"])
         self.assertIn("прихована копія: archiv@sevskiy.de", customer["to"])
         self.assertEqual(r["Команді: оплата отримана, новий акаунт покупця"]["to"], "sergey@sevskiy.de, slava@sevskiy.de")
@@ -186,3 +186,73 @@ class MailMapTests(TestCase):
         for text in ("Що звідки йде", "Хто надсилає", 'data-go="mail_sender"', "Контактна форма сайту",
                      'href="https://www.sevskiy.de/admin/" target="_blank" rel="noopener"'):
             self.assertContains(page, text)
+
+
+class PurposeSenderTests(TestCase):
+    """Скринька для кожного призначення (shop/mail.py PURPOSES): кабінет, оплати, команді, сайт; порожньо — основна."""
+
+    def setUp(self):
+        from email_assistant.models import EmailAccount
+        self.user = User.objects.create_superuser("adm", "adm@example.com", "p")
+
+        def box(addr):
+            return EmailAccount.objects.create(
+                user=self.user, display_name=addr, email_address=addr, imap_username=addr, imap_password="i",
+                smtp_host="smtp.ionos.de", smtp_port=587, smtp_use_tls=True, smtp_use_ssl=False,
+                smtp_username=addr, smtp_password="s")
+        self.main, self.kasse, self.team, self.site = (box(a) for a in (
+            "shop@sevskiy.de", "kasse@sevskiy.de", "team@sevskiy.de", "web@sevskiy.de"))
+        self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True, url="https://www.sevskiy.de",
+                                        mail_sender=self.main, mail_from_name="Sevskiy Shop",
+                                        team_emails="sergey@sevskiy.de")
+
+    def set(self, **kw):
+        Shop.objects.filter(pk=self.shop.pk).update(**kw)
+        self.shop.refresh_from_db()
+
+    def test_each_purpose_falls_back_to_the_main_box(self):
+        for purpose in mail.PURPOSES:
+            self.assertEqual(mail.account_for(self.shop, purpose), self.main, purpose)
+        self.set(mail_sender_payments=self.kasse, mail_sender_team=self.team, mail_sender_site=self.site)
+        self.assertEqual([mail.account_for(self.shop, p) for p in ("customer", "payment", "team", "site")],
+                         [self.main, self.kasse, self.team, self.site])
+        type(self.kasse).objects.filter(pk=self.kasse.pk).update(is_active=False)   # вимкнена — знову основна
+        self.shop.refresh_from_db()
+        self.assertEqual(mail.account_for(self.shop, "payment"), self.main)
+
+    def test_mails_go_from_their_box(self):
+        self.set(mail_sender_payments=self.kasse, mail_sender_team=self.team)
+        mail.send(self.shop, "kunde@firma.de", "paid", "de", name="Anna", number="WS-1", amount="10 EUR")
+        self.assertIn("kasse@sevskiy.de", outbox.outbox[-1].from_email)
+        mail.send(self.shop, "kunde@firma.de", "verify", "de", name="Anna", link=LINK + "#x")
+        self.assertIn("shop@sevskiy.de", outbox.outbox[-1].from_email)
+        mail.send_team(self.shop, "team_registered", email="a@b.de", company="X", name="Y")
+        self.assertIn("team@sevskiy.de", outbox.outbox[-1].from_email)
+        self.assertEqual(outbox.outbox[-1].to, ["sergey@sevskiy.de"])
+
+    def test_site_takes_its_box(self):
+        from api.models import APIKey
+        from . import site_mail
+        key = APIKey.objects.create(name="Сайт", scopes=["products:read"], shop=self.shop)
+        self.set(site_mail_managed=True)
+        self.assertEqual(site_mail.public_config(self.shop, key)["from"], "shop@sevskiy.de")
+        self.set(mail_sender_site=self.site)
+        cfg = site_mail.public_config(self.shop, key)
+        self.assertEqual((cfg["from"], cfg["smtp"]["user"]), ("web@sevskiy.de", "web@sevskiy.de"))
+
+    def test_test_mail_once_per_box_and_card_buttons(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+        self.set(mail_sender_payments=self.kasse)
+        outbox.outbox.clear()
+        self.client.post(f"/admin/shop/shop/{self.shop.pk}/test-mail/")
+        senders = sorted(m.from_email for m in outbox.outbox)
+        self.assertEqual(len(senders), 2)   # основна (кабінет + команді) і окрема для оплат
+        self.assertTrue(any("kasse@" in x for x in senders) and any("shop@" in x for x in senders))
+        page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
+        for field in ("mail_sender", "mail_sender_payments", "mail_sender_team", "mail_sender_site"):
+            self.assertContains(page, f'id="add_id_{field}"')   # «＋» — нова скринька прямо з картки
+        self.assertContains(page, "«Zahlung erhalten» — оплату отримано")

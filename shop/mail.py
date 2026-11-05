@@ -26,10 +26,33 @@ def _backend() -> str:
     return getattr(settings, "SHOP_MAIL_BACKEND", "") or "django.core.mail.backends.smtp.EmailBackend"
 
 
-def smtp_settings(shop) -> dict:
-    """SMTP для листів магазину: акаунт пошти магазину або SMTP сповіщень Minerva."""
-    acc = shop.mail_sender
-    if acc is not None and acc.is_active and acc.smtp_host and acc.email_address:
+# Призначення листів → поле скриньки магазину; без своєї скриньки — «Відправник листів покупцям» (mail_sender)
+PURPOSES = {"customer": "mail_sender", "payment": "mail_sender_payments", "team": "mail_sender_team",
+            "site": "mail_sender_site"}
+PURPOSE_LABELS = {"customer": "кабінет", "payment": "оплати", "team": "команді", "site": "сайт"}
+
+
+def usable(acc) -> bool:
+    return acc is not None and acc.is_active and bool(acc.smtp_host) and bool(acc.email_address)
+
+
+def account_for(shop, purpose: str = "customer"):
+    """Скринька для призначення: своя (якщо придатна), інакше «Відправник листів покупцям»; None — немає."""
+    for field in dict.fromkeys((PURPOSES.get(purpose, "mail_sender"), "mail_sender")):
+        acc = getattr(shop, field, None)
+        if usable(acc):
+            return acc
+    return None
+
+
+def purpose_of(kind: str) -> str:
+    return "team" if kind in TEAM_KINDS else ("payment" if kind == "paid" else "customer")
+
+
+def smtp_settings(shop, purpose: str = "customer") -> dict:
+    """SMTP для листів магазину: скринька призначення (або «Відправник листів покупцям») або SMTP сповіщень Minerva."""
+    acc = account_for(shop, purpose)
+    if acc is not None:
         return {"host": acc.smtp_host, "port": int(acc.smtp_port or 587), "username": acc.smtp_username,
                 "password": acc.smtp_password, "ssl": bool(acc.smtp_use_ssl),
                 "tls": bool(acc.smtp_use_tls) and not acc.smtp_use_ssl, "source": "акаунт пошти",
@@ -67,10 +90,10 @@ def _mode_mismatch(cfg: dict) -> bool:
     return (cfg["ssl"] and cfg["port"] in (25, 587)) or (not cfg["ssl"] and cfg["port"] == 465)
 
 
-def describe_sender(shop) -> str:
-    """Для адмінки: через що підуть листи."""
+def describe_sender(shop, purpose: str = "customer") -> str:
+    """Для адмінки: через що підуть листи цього призначення."""
     try:
-        cfg = smtp_settings(shop)
+        cfg = smtp_settings(shop, purpose)
     except MailNotConfigured as e:
         return f"❌ {e}"
     mode = "SSL" if cfg["ssl"] else "TLS (STARTTLS)" if cfg["tls"] else "без шифрування"
@@ -298,11 +321,11 @@ def team_message(shop, kind: str = "team_paid", **vars) -> tuple[str, str]:
     return _fill(t["subject"], fmt).strip(), _fill(t["intro"], fmt).strip()
 
 
-def send(shop, to: str, kind: str, lang: str, **kwargs) -> None:
-    """Надсилає лист; помилки SMTP — винятком (обробляє виклик).
+def send(shop, to: str, kind: str, lang: str, purpose: str = "", **kwargs) -> None:
+    """Надсилає лист зі скриньки його призначення (purpose_of; purpose — для тестового листа); помилки SMTP — винятком.
     SSL/TLS не відповідає порту (WRONG_VERSION_NUMBER) → ще одна спроба іншим режимом, як у email_assistant."""
     subject, text, body = compose(shop, kind, lang, **kwargs)
-    cfg = smtp_settings(shop)
+    cfg = smtp_settings(shop, purpose or purpose_of(kind))
     customer_mail = kind not in TEAM_KINDS and kind != "test"
     msg = EmailMultiAlternatives(
         subject=subject, body=text, from_email=cfg["from"], to=[to], connection=_connection(cfg),
@@ -320,7 +343,7 @@ def send_team(shop, kind: str, **vars) -> str:
     subject, details = team_message(shop, kind, **vars)
     to = addresses(shop.team_emails)
     if to:
-        cfg = smtp_settings(shop)
+        cfg = smtp_settings(shop, "team")
         msg = EmailMultiAlternatives(subject=subject, body=details, from_email=cfg["from"], to=to,
                                      connection=_connection(cfg))
         msg.attach_alternative(f'<p style="white-space:pre-line">{_html.escape(details)}</p>', "text/html")
