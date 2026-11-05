@@ -515,6 +515,23 @@ class InventorySettings(models.Model):
                  (API_DELIVERY_ARRIVED, "Лише позначити «прибуло» — оприбуткує склад у Minerva")],
         help_text="REST API /purchase-orders/…/deliveries/ (закупівлі, які зробила CRM). "
                   "Оприбуткування — як «Додавати при надходженні закупівлі».")
+    # 📥 Вхідна посилка (Відправлення «📥 До нас») стала «Доставлено» — shipping/services/incoming.py on_delivered
+    INCOMING_OFF, INCOMING_NOTIFY, INCOMING_ARRIVED, INCOMING_RECEIVE = "off", "notify", "arrived", "receive"
+    incoming_delivered = models.CharField(
+        "📥 Вхідну посилку доставлено", max_length=10, default=INCOMING_NOTIFY,
+        choices=[(INCOMING_OFF, "— Нічого (лише загальне сповіщення про відправлення)"),
+                 (INCOMING_NOTIFY, "🔔 Повідомити — лист і Telegram з закупівлею й позиціями"),
+                 (INCOMING_ARRIVED, "📦 Повідомити й позначити закупівлю «прибуло» — оприбутковує людина"),
+                 (INCOMING_RECEIVE, "✅ Повідомити й одразу оприбуткувати на склад")],
+        help_text="Коли трекінг показав «Доставлено» для вхідної посилки (📥 До нас) з закупівлею. Оприбуткування — "
+                  "усе, що ще не отримано за закупівлею, один раз; кілька посилок на одну закупівлю — коли доставлені "
+                  "всі. Недовкладення чи пересорт тоді треба виправляти вручну.")
+    incoming_notify_email = models.BooleanField(
+        "✉️ Повідомлення на пошту", default=True,
+        help_text="Адреси й SMTP — «Налаштування → Сповіщення».")
+    incoming_notify_telegram = models.BooleanField(
+        "💬 Повідомлення в Telegram", default=True,
+        help_text="Бот і чат — «Налаштування → Сповіщення».")
     allow_negative_stock = models.BooleanField(
         "Дозволити від'ємний залишок",
         default=True,

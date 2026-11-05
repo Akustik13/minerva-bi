@@ -344,9 +344,10 @@ def upsert_shipment(po: PurchaseOrder, data: dict, source: str = "") -> Incoming
 
 # ── Доставка ──────────────────────────────────────────────────────────────────
 
-def deliver(po: PurchaseOrder, data: dict, source: str = "") -> dict:
+def deliver(po: PurchaseOrder, data: dict, source: str = "", booked=None) -> dict:
     """Зовнішня система повідомила «доставлено». Повертає {duplicate, delivery_id, booked, received[], status,
-    warnings[]}. Один ключ доставки — одне оприбуткування; повтор → duplicate без змін складу."""
+    warnings[]}. Один ключ доставки — одне оприбуткування; повтор → duplicate без змін складу.
+    booked — оприбуткувати (True) / лише «прибуло» (False); None — як `api_delivery_mode` (REST API)."""
     tracking = str(data.get("tracking_number") or "").strip()[:255]
     items = data.get("lines")
     delivery_id = str(data.get("delivery_id") or "").strip()[:100]
@@ -357,7 +358,8 @@ def deliver(po: PurchaseOrder, data: dict, source: str = "") -> dict:
                             "так Minerva відрізняє повтор від нової доставки.", code="delivery_id_required")
     key = delivery_id or (f"tracking:{tracking.lower()}" if tracking else "all")
     delivered_at = _dt(data.get("delivered_at"))
-    booked = InventorySettings.get().api_delivery_mode == InventorySettings.API_DELIVERY_RECEIVE
+    if booked is None:
+        booked = InventorySettings.get().api_delivery_mode == InventorySettings.API_DELIVERY_RECEIVE
     warnings = []
     with transaction.atomic():
         po = PurchaseOrder.objects.select_for_update().get(pk=po.pk)

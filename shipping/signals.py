@@ -23,6 +23,11 @@ def _notify_shipment_events(sender, instance, created, **kwargs):
         if old_status and old_status != new_status:
             from dashboard.notifications import notify_shipment_status
             notify_shipment_status(instance, old_status, new_status)
+            if new_status == 'delivered' and getattr(instance, 'direction', 'out') == 'in':
+                from django.db import transaction
+                from shipping.services.incoming import on_delivered
+                pk = instance.pk   # 📥 посилку доставлено → закупівля (після commit: трекінг уже записав статус)
+                transaction.on_commit(lambda: on_delivered(Shipment.objects.get(pk=pk)))
     except Exception:
         pass
 

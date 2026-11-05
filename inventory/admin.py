@@ -3814,7 +3814,8 @@ class InventorySettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ("📥 Надходження на склад (закупівлі)", {
-            "fields": ("add_on_po_receive", "api_delivery_mode"),
+            "fields": ("add_on_po_receive", "api_delivery_mode", "incoming_delivered", "incoming_notify_email",
+                       "incoming_notify_telegram"),
             "description": "Контролює чи автоматично зараховувати товар при зміні qty_received у PO. "
                            "Закупівлі, які зробила зовнішня CRM, приходять через REST API "
                            "(/api/v1/purchase-orders/, права purchases:read / purchases:write): "
@@ -4187,7 +4188,7 @@ class PurchaseReceiptInline(admin.TabularInline):
     can_delete = False
     fields = ("delivered_at", "delivery_key", "tracking_number", "booked", "lines_text", "source", "created_at")
     readonly_fields = fields
-    verbose_name_plural = _("📦 Доставки, про які повідомила зовнішня система (API)")
+    verbose_name_plural = _("📦 Доставки: зовнішня система (API) і вхідні посилки 📥")
 
     def has_add_permission(self, request, obj=None):
         return False

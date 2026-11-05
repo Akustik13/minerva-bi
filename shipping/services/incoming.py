@@ -7,6 +7,8 @@
 `carrier_for(number, wanted)` — перевізник для трекінгу: вибраний → за номером (1Z… → UPS) → за замовчуванням.
 `create(...)` — нова вхідна посилка; той самий трек-номер уже є — `Duplicate` з наявною.
 `open_orders()` — закупівлі, до яких можна прив'язати посилку (ще не отримані й не скасовані).
+`on_delivered(shipment)` — трекінг показав «Доставлено» (сигнал shipping/signals.py): за
+`InventorySettings.incoming_delivered` — повідомити, позначити закупівлю «прибуло» або оприбуткувати.
 """
 from django.utils import timezone
 
@@ -96,3 +98,47 @@ def create(number: str, *, carrier=None, purchase_order=None, sender_company='',
             purchase_order.expected_date = expected
         purchase_order.save(update_fields=['tracking_number', 'shipping_service', 'expected_date', 'updated_at'])
     return s
+
+
+# ── 📥 Посилку доставлено ─────────────────────────────────────────────────────
+
+LIVE_EXCLUDE = ("cancelled", "error")
+
+
+def on_delivered(shipment) -> dict:
+    """Вхідна посилка стала «Доставлено» → за налаштуванням складу:
+    notify — лише повідомлення; arrived — ще й доставка закупівлі «прибуло» (оприбутковує людина); receive — ще й
+    оприбуткування всього, що не отримано за закупівлею (`purchases.deliver`, ключ `parcel:<pk>` — один раз). Кілька
+    живих посилок на одну закупівлю — закупівля чекає, доки доставлять усі (що в якій — невідомо).
+    → {mode, po, result, waiting, error} (mode off / не вхідна — {}). Повідомлення — dashboard.notifications."""
+    from inventory.models import InventorySettings, PurchaseOrder
+    from shipping.models import Shipment
+    if shipment.direction != Shipment.IN:
+        return {}
+    s = InventorySettings.get()
+    mode = s.incoming_delivered
+    if mode == InventorySettings.INCOMING_OFF:
+        return {}
+    po = shipment.purchase_order if shipment.purchase_order_id else None
+    out = {"mode": mode, "po": po, "result": None, "waiting": [], "error": ""}
+    open_po = po is not None and po.status not in (PurchaseOrder.Status.RECEIVED, PurchaseOrder.Status.CANCELLED)
+    if open_po and mode in (InventorySettings.INCOMING_ARRIVED, InventorySettings.INCOMING_RECEIVE):
+        out["waiting"] = list(po.parcels.filter(direction=Shipment.IN).exclude(status__in=LIVE_EXCLUDE)
+                              .exclude(status="delivered").exclude(pk=shipment.pk))
+        if not out["waiting"]:
+            from inventory.services import purchases
+            try:
+                out["result"] = purchases.deliver(
+                    po, {"delivery_id": f"parcel:{shipment.pk}", "tracking_number": shipment.tracking_number or "",
+                         "delivered_at": shipment.delivered_at or timezone.now()},
+                    source="parcel", booked=mode == InventorySettings.INCOMING_RECEIVE)
+                po.refresh_from_db()
+            except purchases.PurchaseError as e:
+                out["error"] = str(e)
+    try:
+        from dashboard.notifications import notify_incoming_delivered
+        notify_incoming_delivered(shipment, out, email=s.incoming_notify_email, telegram=s.incoming_notify_telegram)
+    except Exception as e:  # noqa: BLE001 — повідомлення не має ламати трекінг
+        import logging
+        logging.getLogger(__name__).warning("incoming delivered #%s: %s", shipment.pk, e)
+    return out

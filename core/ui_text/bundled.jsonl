@@ -3442,6 +3442,7 @@
 {"uk": "Адреси внутрішньої мережі (імена контейнерів, .local) — лише для вебхуків адміністратора.", "en": "Internal network addresses (container names, .local) are only for administrator webhooks.", "de": "Adressen des internen Netzwerks (Containernamen, .local) sind nur für Webhooks des Administrators zulässig."}
 {"uk": "Адреси для сповіщень (необов'язково)", "en": "Notification addresses (optional)", "de": "Adressen für Benachrichtigungen (optional)"}
 {"uk": "Адреси за 7 днів: {0}", "en": "Addresses in the last 7 days: {0}", "de": "Adressen der letzten 7 Tage: {0}"}
+{"uk": "Адреси й SMTP — «Налаштування → Сповіщення».", "en": "Addresses and SMTP — «Settings → Notifications».", "de": "Adressen und SMTP — «Einstellungen → Benachrichtigungen»."}
 {"uk": "Адреси по одній у рядку (або через кому) — у копію кожного листа агента: відповіді й листа клієнту.", "en": "Addresses one per line (or comma-separated) — CC of every agent email: replies and customer emails.", "de": "Adressen eine pro Zeile (oder mit Komma) — in CC jeder Agent-E-Mail: Antworten und Kunden-E-Mails."}
 {"uk": "Адреси через кому або з нового рядка.", "en": "Addresses separated by commas or on new lines.", "de": "Adressen durch Komma getrennt oder jeweils in einer neuen Zeile."}
 {"uk": "Адреси через кому. Порожньо — використовувати alert_email із загальних налаштувань.", "en": "Comma-separated addresses. If empty — alert_email from the general settings is used.", "de": "Adressen durch Komma getrennt. Wenn leer — wird alert_email aus den allgemeinen Einstellungen verwendet."}
@@ -3775,6 +3776,7 @@
 {"uk": "Бот / Сервіс", "en": "Bot / Service", "de": "Bot / Dienst"}
 {"uk": "Бот {0} ще не реалізований", "en": "Bot {0} is not implemented yet", "de": "Bot {0} ist noch nicht implementiert"}
 {"uk": "Бот не адміністратор каналу", "en": "The bot is not a channel administrator", "de": "Der Bot ist kein Administrator des Kanals"}
+{"uk": "Бот і чат — «Налаштування → Сповіщення».", "en": "Bot and chat — «Settings → Notifications».", "de": "Bot und Chat — «Einstellungen → Benachrichtigungen»."}
 {"uk": "Боти", "en": "Bots", "de": "Bots"}
 {"uk": "Боти та AI", "en": "Bots and AI", "de": "Bots und KI"}
 {"uk": "Боти та API", "en": "Bots and API", "de": "Bots und API"}
@@ -4630,6 +4632,7 @@
 {"uk": "Вхідна посилка від постачальника: що в ній — позиції закупівлі; прибула — оприбуткуйте PO.", "en": "Incoming parcel from a supplier: its contents are the purchase order lines; once it arrives, receive the PO.", "de": "Eingehendes Paket vom Lieferanten: Inhalt sind die Bestellpositionen; angekommen — Bestellung einbuchen."}
 {"uk": "Вхідне відправлення", "en": "Incoming shipment", "de": "Eingehende Sendung"}
 {"uk": "Вхідну посилку #{0} ({1}) додано — статус оновлюватиметься сам.", "en": "Incoming parcel #{0} ({1}) added — its status will update automatically.", "de": "Eingehendes Paket #{0} ({1}) hinzugefügt — der Status aktualisiert sich automatisch."}
+{"uk": "Вхідну посилку доставлено", "en": "Incoming parcel delivered", "de": "Eingehendes Paket zugestellt"}
 {"uk": "Вхідні", "en": "Inbox", "de": "Posteingang"}
 {"uk": "Вхідні відправлення", "en": "Incoming shipments", "de": "Eingehende Sendungen"}
 {"uk": "Вхідні замовлення від клієнтів — потребує", "en": "Incoming orders from customers — requires", "de": "Eingehende Aufträge von Kunden — erfordert"}
@@ -4714,6 +4717,7 @@
 {"uk": "Відкрити документацію", "en": "Open documentation", "de": "Dokumentation öffnen"}
 {"uk": "Відкрити завдання", "en": "Open task", "de": "Aufgabe öffnen"}
 {"uk": "Відкрити завдання: {0}", "en": "Open task: {0}", "de": "Aufgabe öffnen: {0}"}
+{"uk": "Відкрити закупівлю", "en": "Open purchase order", "de": "Bestellung öffnen"}
 {"uk": "Відкрити замовлення", "en": "Open order", "de": "Auftrag öffnen"}
 {"uk": "Відкрити звіт", "en": "Open report", "de": "Bericht öffnen"}
 {"uk": "Відкрити звіт у Minerva", "en": "Open the report in Minerva", "de": "Bericht in Minerva öffnen"}
@@ -4727,6 +4731,7 @@
 {"uk": "Відкрити магазин", "en": "Open shop", "de": "Shop öffnen"}
 {"uk": "Відкрити налаштування", "en": "Open settings", "de": "Einstellungen öffnen"}
 {"uk": "Відкрити налаштування Google Calendar", "en": "Open Google Calendar settings", "de": "Google-Kalender-Einstellungen öffnen"}
+{"uk": "Відкрити посилку", "en": "Open parcel", "de": "Paket öffnen"}
 {"uk": "Відкрити пошту", "en": "Open mail", "de": "Postfach öffnen"}
 {"uk": "Відкрити службу DYMO", "en": "Open the DYMO service", "de": "DYMO-Dienst öffnen"}
 {"uk": "Відкрити список відправлень на Jumingo — знайдіть за скопійованим ID", "en": "Open the shipment list on Jumingo — find it by the copied ID", "de": "Sendungsliste bei Jumingo öffnen — mit der kopierten ID suchen"}
@@ -5422,6 +5427,7 @@
 {"uk": "До 1,00", "en": "Up to 1.00", "de": "Bis 1,00"}
 {"uk": "До 20 символів", "en": "Up to 20 characters", "de": "Bis zu 20 Zeichen"}
 {"uk": "До адресної книги", "en": "To address book", "de": "Ins Adressbuch"}
+{"uk": "До закупівлі ще {0} посилок у дорозі", "en": "{0} more parcels of the purchase order are on the way", "de": "Noch {0} Pakete der Bestellung unterwegs"}
 {"uk": "До замовлення", "en": "To order", "de": "Zu bestellen"}
 {"uk": "До надбавки й округлення правил DigiKey · курс — під таблицею", "en": "Before the markup and rounding of the DigiKey rules · rate — below the table", "de": "Vor Aufschlag und Rundung der DigiKey-Regeln · Kurs — unter der Tabelle"}
 {"uk": "До налаштувань DigiKey", "en": "To the DigiKey settings", "de": "Zu den DigiKey-Einstellungen"}
@@ -5671,6 +5677,7 @@
 {"uk": "Доставки закупівель (API)", "en": "Purchase deliveries (API)", "de": "Bestelllieferungen (API)"}
 {"uk": "Доставки ще немає.", "en": "No delivery yet.", "de": "Noch keine Lieferung."}
 {"uk": "Доставки, про які повідомила зовнішня система (API)", "en": "Deliveries reported by an external system (API)", "de": "Lieferungen, die ein externes System gemeldet hat (API)"}
+{"uk": "Доставки: зовнішня система (API) і вхідні посилки", "en": "Deliveries: external system (API) and incoming parcels", "de": "Lieferungen: externes System (API) und eingehende Pakete"}
 {"uk": "Доставку оплачує", "en": "Shipping paid by", "de": "Versandkosten trägt"}
 {"uk": "Доставку повідомила зовнішня система", "en": "The delivery was reported by an external system", "de": "Die Lieferung wurde von einem externen System gemeldet"}
 {"uk": "Доставлено", "en": "Delivered", "de": "Geliefert"}
@@ -5678,6 +5685,7 @@
 {"uk": "Доставлено ({0})", "en": "Delivered ({0})", "de": "Zugestellt ({0})"}
 {"uk": "Доставлено {0} з {1}", "en": "Delivered {0} of {1}", "de": "{0} von {1} zugestellt"}
 {"uk": "Доставлено частково — SKU і кількість з блоку «Склад» (інакше — уся решта)", "en": "Partially delivered — SKU and quantity from the “Stock” block (otherwise the whole remainder)", "de": "Teilweise geliefert — SKU und Menge aus dem Block „Lager“ (sonst der gesamte Rest)"}
+{"uk": "Доставлено: {0}", "en": "Delivered: {0}", "de": "Zugestellt: {0}"}
 {"uk": "Доставлені", "en": "Delivered", "de": "Zugestellte"}
 {"uk": "Доставляється", "en": "In delivery", "de": "In Zustellung"}
 {"uk": "Доступ", "en": "Access", "de": "Zugriff"}
@@ -6135,6 +6143,7 @@
 {"uk": "Закріплене", "en": "Pinned", "de": "Angeheftet"}
 {"uk": "Закріплено вгорі", "en": "Pinned at top", "de": "Oben angeheftet"}
 {"uk": "Закупівлю «{0}» не знайдено.", "en": "Purchase order “{0}” not found.", "de": "Bestellung „{0}“ nicht gefunden."}
+{"uk": "Закупівлю позначено «прибуло» — звірте кількість і оприбуткуйте на сторінці закупівлі.", "en": "The purchase order is marked «arrived» — check the quantity and receive it on the purchase order page.", "de": "Die Bestellung ist als «angekommen» markiert — Menge prüfen und auf der Bestellseite einbuchen."}
 {"uk": "Закупівлю скасовано — доставку не прийнято.", "en": "The purchase order is cancelled — the delivery was not accepted.", "de": "Die Bestellung ist storniert — die Lieferung wurde nicht angenommen."}
 {"uk": "Закупівлю створено в Minerva — через API змінюються лише замовлення, які передала зовнішня система.", "en": "The purchase order was created in Minerva — via the API only orders submitted by an external system can be changed.", "de": "Die Bestellung wurde in Minerva angelegt — über die API können nur Bestellungen geändert werden, die ein externes System übergeben hat."}
 {"uk": "Закупівля", "en": "Purchase", "de": "Bestellung"}
@@ -6142,6 +6151,7 @@
 {"uk": "Закупівля + <input type=\"text\" class=\"t-mk\" value=\"", "en": "Purchase + <input type=\"text\" class=\"t-mk\" value=\"", "de": "Einkauf + <input type=\"text\" class=\"t-mk\" value=\""}
 {"uk": "Закупівля + націнка з налаштувань", "en": "Purchase + markup from settings", "de": "Einkauf + Aufschlag aus den Einstellungen"}
 {"uk": "Закупівля CRM", "en": "CRM purchase", "de": "CRM-Bestellung"}
+{"uk": "Закупівля вже {0} — нічого не змінено.", "en": "The purchase order is already {0} — nothing changed.", "de": "Die Bestellung ist bereits {0} — nichts geändert."}
 {"uk": "Закупівля — стан, трекінг, очікувана дата, доставка (лише якщо вибрано)", "en": "Purchase order — status, tracking, expected date, delivery (only if selected)", "de": "Bestellung — Status, Tracking, erwartetes Datum, Lieferung (nur wenn ausgewählt)"}
 {"uk": "Закупівлі", "en": "Purchase orders", "de": "Bestellungen"}
 {"uk": "Закупівлі (PO)", "en": "Purchase orders (PO)", "de": "Bestellungen (PO)"}
@@ -6844,6 +6854,7 @@
 {"uk": "Звірка оферів: що зараз на DigiKey (назва, ціни, залишок, MOQ, строк, активний) проти даних Minerva. Читає", "en": "Offer reconciliation: what is on DigiKey now (name, prices, stock, MOQ, lead time, active) against Minerva data. Reads", "de": "Offer-Abgleich: was aktuell bei DigiKey steht (Name, Preise, Bestand, MOQ, Lieferzeit, aktiv) im Vergleich zu den Minerva-Daten. Liest"}
 {"uk": "Звірка оферів: що зараз на DigiKey (назва, ціни, залишок, MOQ, строк, активний) проти даних Minerva. Читає ваші офери з DigiKey (один запит на всіх), нічого не змінює. Товар (опис, параметри) — у звірці одного лістингу.", "en": "Offer reconciliation: what is on DigiKey now (name, prices, stock, MOQ, lead time, active) against Minerva data. Reads your offers from DigiKey (one request for all), changes nothing. The product (description, parameters) is in the single-listing reconciliation.", "de": "Offer-Abgleich: was aktuell bei DigiKey steht (Name, Preise, Bestand, MOQ, Lieferzeit, aktiv) im Vergleich zu den Minerva-Daten. Liest Ihre Offers von DigiKey (eine Anfrage für alle), ändert nichts. Der Artikel (Beschreibung, Parameter) steht im Abgleich eines einzelnen Listings."}
 {"uk": "Звірку стрічки запущено у фоні — оновіть сторінку за хвилину.", "en": "Feed reconciliation started in the background — refresh the page in a minute.", "de": "Der Feed-Abgleich wurde im Hintergrund gestartet — aktualisieren Sie die Seite in einer Minute."}
+{"uk": "Звірте кількість і оприбуткуйте на сторінці закупівлі.", "en": "Check the quantity and receive it on the purchase order page.", "de": "Menge prüfen und auf der Bestellseite einbuchen."}
 {"uk": "Звіт", "en": "Report", "de": "Bericht"}
 {"uk": "Звіт RAG по вкладеннях для status_revision: [{index, state, reason}]. None — RAG про вкладення цієї ревізії не звітував (наприклад, проіндексовано до 28.10.2026).", "en": "RAG report on attachments for status_revision: [{index, state, reason}]. None — RAG did not report on the attachments of this revision (e.g. indexed before 28.10.2026).", "de": "RAG-Bericht zu Anhängen für status_revision: [{index, state, reason}]. None – RAG hat zu den Anhängen dieser Revision nichts gemeldet (z. B. vor dem 28.10.2026 indexiert)."}
 {"uk": "Звіт автозаповнення", "en": "Auto-fill report", "de": "Bericht zum automatischen Ausfüllen"}
@@ -7496,6 +7507,7 @@
 {"uk": "Коли списувати", "en": "When to write off", "de": "Wann ausbuchen"}
 {"uk": "Коли списувати залишки", "en": "When to write off stock", "de": "Wann der Bestand ausgebucht wird"}
 {"uk": "Коли треба перевірити: перший раз, змінились дані, є зауваження", "en": "When a check is needed: first time, data changed, there are warnings", "de": "Wann geprüft werden soll: beim ersten Mal, bei geänderten Daten, bei Hinweisen"}
+{"uk": "Коли трекінг показав «Доставлено» для вхідної посилки (📥 До нас) з закупівлею. Оприбуткування — усе, що ще не отримано за закупівлею, один раз; кілька посилок на одну закупівлю — коли доставлені всі. Недовкладення чи пересорт тоді треба виправляти вручну.", "en": "When tracking shows «Delivered» for an incoming parcel (📥 To us) with a purchase order. Receiving — everything not yet received for the purchase order, once; several parcels for one purchase order — when all are delivered. Short or wrong deliveries then have to be corrected by hand.", "de": "Wenn die Sendungsverfolgung «Zugestellt» für ein eingehendes Paket (📥 An uns) mit Bestellung zeigt. Einbuchen — alles noch nicht Erhaltene der Bestellung, einmal; mehrere Pakete pro Bestellung — wenn alle zugestellt sind. Fehl- oder Falschlieferungen sind dann von Hand zu korrigieren."}
 {"uk": "Коли у відправлення є етикетка або трек-номер, а замовлення ще не «Відправлено», на сторінці відправлення з'являється банер з кнопками", "en": "When a shipment has a label or tracking number and the order is not yet “Shipped”, a banner with buttons appears on the shipment page", "de": "Wenn eine Sendung ein Etikett oder eine Sendungsnummer hat und der Auftrag noch nicht „Versendet“ ist, erscheint auf der Sendungsseite ein Banner mit Schaltflächen"}
 {"uk": "Коли це станеться, ви зможете увійти зі своїм email і паролем.", "en": "Once that happens, you can log in with your email and password.", "de": "Danach können Sie sich mit Ihrer E-Mail und Ihrem Passwort anmelden."}
 {"uk": "Колонка", "en": "Column", "de": "Spalte"}
@@ -9026,6 +9038,7 @@
 {"uk": "Не оновити", "en": "Do not update", "de": "Nicht aktualisieren"}
 {"uk": "Не оновлювати зміни, менші за, %", "en": "Do not update changes smaller than, %", "de": "Änderungen kleiner als nicht aktualisieren, %"}
 {"uk": "Не оплачено", "en": "Unpaid", "de": "Nicht bezahlt"}
+{"uk": "Не оприбутковано: {0}", "en": "Not received: {0}", "de": "Nicht eingebucht: {0}"}
 {"uk": "Не отримали? Перевірте папку «Спам» або зачекайте 5 хвилин.", "en": "Didn't receive it? Check the “Spam” folder or wait 5 minutes.", "de": "Nichts erhalten? Prüfen Sie den Ordner „Spam“ oder warten Sie 5 Minuten."}
 {"uk": "Не перевіряється: {0}.", "en": "Not checked: {0}.", "de": "Nicht geprüft: {0}."}
 {"uk": "Не передано product_code.", "en": "product_code not provided.", "de": "product_code nicht übergeben."}
@@ -9528,6 +9541,7 @@
 {"uk": "Нідерланди", "en": "Netherlands", "de": "Niederlande"}
 {"uk": "Нікарагуа", "en": "Nicaragua", "de": "Nicaragua"}
 {"uk": "Німеччина", "en": "Germany", "de": "Deutschland"}
+{"uk": "Нічого (лише загальне сповіщення про відправлення)", "en": "Nothing (only the general shipment notification)", "de": "Nichts (nur die allgemeine Sendungsbenachrichtigung)"}
 {"uk": "Нічого не вибрано — щодня.", "en": "Nothing selected — every day.", "de": "Nichts ausgewählt — täglich."}
 {"uk": "Нічого не вибрано.", "en": "Nothing selected.", "de": "Nichts ausgewählt."}
 {"uk": "Нічого не записано.", "en": "Nothing recorded.", "de": "Nichts erfasst."}
@@ -9854,6 +9868,7 @@
 {"uk": "Оплачені, прострочені й повернені не перевіряються.", "en": "Paid, expired and refunded ones are not checked.", "de": "Bezahlte, abgelaufene und erstattete werden nicht geprüft."}
 {"uk": "Оповіщати через N днів після дедлайну", "en": "Notify N days after the deadline", "de": "N Tage nach der Frist benachrichtigen"}
 {"uk": "Оприбутковано на склад", "en": "Received into stock", "de": "Ins Lager eingebucht"}
+{"uk": "Оприбутковано на склад: {0}. Перевірте кількість — недовкладення виправте на сторінці закупівлі.", "en": "Received into stock: {0}. Check the quantity — fix short deliveries on the purchase order page.", "de": "Ins Lager eingebucht: {0}. Menge prüfen — Fehlmengen auf der Bestellseite korrigieren."}
 {"uk": "Оптовий обʼєм", "en": "Wholesale volume", "de": "Großmengen"}
 {"uk": "Опубл.", "en": "Publ.", "de": "Veröff."}
 {"uk": "Опубліковано", "en": "Published", "de": "Veröffentlicht"}
@@ -10672,12 +10687,17 @@
 {"uk": "Повторно перевіряти посилання, днів", "en": "Re-check links, days", "de": "Links erneut prüfen, Tage"}
 {"uk": "Повторно синхронізуйте через DigiKey API для оновлення цін.", "en": "Re-sync via the DigiKey API to update prices.", "de": "Synchronisieren Sie erneut über die DigiKey-API, um die Preise zu aktualisieren."}
 {"uk": "Повторні клієнти", "en": "Repeat customers", "de": "Wiederkehrende Kunden"}
+{"uk": "Повідомити й одразу оприбуткувати на склад", "en": "Notify and receive into stock right away", "de": "Benachrichtigen und sofort ins Lager einbuchen"}
+{"uk": "Повідомити й позначити закупівлю «прибуло» — оприбутковує людина", "en": "Notify and mark the purchase order «arrived» — a person receives it", "de": "Benachrichtigen und Bestellung als «angekommen» markieren — ein Mensch bucht ein"}
+{"uk": "Повідомити — лист і Telegram з закупівлею й позиціями", "en": "Notify — email and Telegram with the purchase order and its lines", "de": "Benachrichtigen — E-Mail und Telegram mit Bestellung und Positionen"}
 {"uk": "Повідомлення", "en": "Message", "de": "Nachricht"}
 {"uk": "Повідомлення DigiKey", "en": "DigiKey messages", "de": "DigiKey-Nachrichten"}
 {"uk": "Повідомлення DigiKey — у картці", "en": "DigiKey messages — in the card", "de": "DigiKey-Nachrichten — in der Karte"}
 {"uk": "Повідомлення · AI чат · алерти", "en": "Notifications · AI chat · alerts", "de": "Benachrichtigungen · KI-Chat · Alarme"}
+{"uk": "Повідомлення в Telegram", "en": "Notification to Telegram", "de": "Benachrichtigung per Telegram"}
 {"uk": "Повідомлення клієнту надіслано", "en": "Customer notification sent", "de": "Benachrichtigung an den Kunden gesendet"}
 {"uk": "Повідомлення клієнту про відправку", "en": "Shipping notice to the customer", "de": "Versandbenachrichtigung an den Kunden"}
+{"uk": "Повідомлення на пошту", "en": "Notification by email", "de": "Benachrichtigung per E-Mail"}
 {"uk": "Повідомлення про відправку", "en": "Shipping notification", "de": "Versandbenachrichtigung"}
 {"uk": "Повідомлення про помилку", "en": "Error message", "de": "Fehlermeldung"}
 {"uk": "Повідомлено", "en": "Notified", "de": "Benachrichtigt"}
@@ -10737,6 +10757,7 @@
 {"uk": "Позиції без ціни (на запит): {0}", "en": "Lines without a price (on request): {0}", "de": "Positionen ohne Preis (auf Anfrage): {0}"}
 {"uk": "Позиції з листа", "en": "Lines from the e-mail", "de": "Positionen aus der E-Mail"}
 {"uk": "Позиції закупівель", "en": "Purchase order lines", "de": "Bestellpositionen"}
+{"uk": "Позиції закупівлі", "en": "Purchase order lines", "de": "Bestellpositionen"}
 {"uk": "Позиції замовлення", "en": "Order items", "de": "Auftragspositionen"}
 {"uk": "Позиції замовлення ({0})", "en": "Order lines ({0})", "de": "Bestellpositionen ({0})"}
 {"uk": "Позиції замовлень JLCPCB", "en": "JLCPCB order lines", "de": "JLCPCB-Bestellpositionen"}
@@ -11199,6 +11220,7 @@
 {"uk": "Посилка {0} з {1} (відправлення #{2}) — в інвойсі лише її вміст. За потреби допишіть «Partial shipment».", "en": "Parcel {0} of {1} (shipment #{2}) — the invoice lists only its contents. Add “Partial shipment” if needed.", "de": "Paket {0} von {1} (Sendung #{2}) — die Rechnung enthält nur seinen Inhalt. Bei Bedarf „Partial shipment“ ergänzen."}
 {"uk": "Посилка {0} не знайдена в DHL (можливо вже скасована або неправильний трекінг).", "en": "Parcel {0} not found at DHL (possibly already cancelled or the tracking is wrong).", "de": "Paket {0} bei DHL nicht gefunden (möglicherweise bereits storniert oder falsche Sendungsnummer)."}
 {"uk": "Посилка {0}: у замовленні DigiKey цього немає або більше, ніж замовлено", "en": "Parcel {0}: not in the DigiKey order or more than ordered", "de": "Paket {0}: nicht im DigiKey-Auftrag oder mehr als bestellt"}
+{"uk": "Посилка без закупівлі — перевірте, що прийшло.", "en": "Parcel without a purchase order — check what arrived.", "de": "Paket ohne Bestellung — prüfen Sie, was angekommen ist."}
 {"uk": "Посилка до нас", "en": "Incoming parcel", "de": "Eingehendes Paket"}
 {"uk": "Посилка з трек-номером {0} вже є — #{1}.", "en": "A parcel with tracking number {0} already exists — #{1}.", "de": "Ein Paket mit der Sendungsnummer {0} gibt es schon — #{1}."}
 {"uk": "Посилка затримується", "en": "The parcel is delayed", "de": "Das Paket verzögert sich"}
@@ -11501,6 +11523,7 @@
 {"uk": "Прийняту пропозицію не змінюють.", "en": "An accepted quotation is not changed.", "de": "Ein angenommenes Angebot wird nicht geändert."}
 {"uk": "Прийом вже виконано або кількість = 0.", "en": "Receipt has already been done or quantity = 0.", "de": "Der Wareneingang wurde bereits durchgeführt oder die Menge = 0."}
 {"uk": "Прийом тільки для доставлених замовлень.", "en": "Receipt is only possible for delivered orders.", "de": "Wareneingang ist nur für gelieferte Bestellungen möglich."}
+{"uk": "Прийшла посилка {0} від {1}", "en": "Parcel {0} from {1} has arrived", "de": "Paket {0} von {1} ist angekommen"}
 {"uk": "Прийшов / Пішов", "en": "Clock in / Clock out", "de": "Kommen / Gehen"}
 {"uk": "Прийшов / пішов", "en": "Clock in / clock out", "de": "Kommen / Gehen"}
 {"uk": "Прийшов о", "en": "Clocked in at", "de": "Kommen um"}
@@ -13745,6 +13768,7 @@
 {"uk": "Трекінг-номер: {0}", "en": "Tracking number: {0}", "de": "Sendungsnummer: {0}"}
 {"uk": "Трекінг: Sidebar → Доставка", "en": "Tracking: Sidebar → Shipping", "de": "Sendungsverfolgung: Seitenleiste → Versand"}
 {"uk": "Трекінг: {0}", "en": "Tracking: {0}", "de": "Tracking: {0}"}
+{"uk": "Трекінг: {0} · {1}", "en": "Tracking: {0} · {1}", "de": "Sendungsverfolgung: {0} · {1}"}
 {"uk": "Трекінг: {0}{1}", "en": "Tracking: {0}{1}", "de": "Tracking: {0}{1}"}
 {"uk": "Трекінг{0}", "en": "Tracking{0}", "de": "Tracking{0}"}
 {"uk": "Третя сторона", "en": "Third party", "de": "Dritter"}
@@ -16933,6 +16957,7 @@
 {"uk": "нічого не робити", "en": "do nothing", "de": "nichts tun"}
 {"uk": "нічого пов'язаного в базі", "en": "nothing related in the database", "de": "nichts Zugehöriges in der Datenbank"}
 {"uk": "нічого — бачить усе, що є в її модулях", "en": "nothing — sees everything in their modules", "de": "nichts — sieht alles, was in den Modulen der Person enthalten ist"}
+{"uk": "нічого — уже отримано", "en": "nothing — already received", "de": "nichts — bereits erhalten"}
 {"uk": "нічого, лише мова", "en": "нічого, лише мова", "de": "нічого, лише мова"}
 {"uk": "о {0} Minerva запише день в askDANTE сама", "en": "at {0} Minerva will record the day in askDANTE by itself", "de": "um {0} erfasst Minerva den Tag selbst in askDANTE"}
 {"uk": "об'єднуються в одне замовлення.", "en": "are combined into one order.", "de": "werden zu einem Auftrag zusammengefasst."}
@@ -17022,6 +17047,7 @@
 {"uk": "оплатити до", "en": "pay by", "de": "zahlbar bis"}
 {"uk": "оплатити до {0}", "en": "pay by {0}", "de": "zahlbar bis {0}"}
 {"uk": "оплачено {0}", "en": "paid {0}", "de": "bezahlt {0}"}
+{"uk": "оприбуткую, коли доставлять усі.", "en": "I will receive it when all are delivered.", "de": "Ich buche ein, wenn alle zugestellt sind."}
 {"uk": "опубліковано", "en": "published", "de": "veröffentlicht"}
 {"uk": "організатор скасував зустріч — відповідати нема на що", "en": "the organizer cancelled the meeting — nothing to reply to", "de": "der Organisator hat den Termin abgesagt — nichts zu beantworten"}
 {"uk": "основна для гілки — вибрано вручну", "en": "primary for the thread — chosen manually", "de": "Hauptkategorie des Verlaufs — manuell gewählt"}
@@ -17248,6 +17274,7 @@
 {"uk": "позначили ви", "en": "marked by you", "de": "von Ihnen markiert"}
 {"uk": "позначило доручення агента", "en": "marked by an agent instruction", "de": "von einem Agenten-Auftrag markiert"}
 {"uk": "позначка в куті стане «E»", "en": "the corner mark will become “E”", "de": "die Markierung in der Ecke wird zu „E“"}
+{"uk": "позначу «прибуло», коли доставлять усі.", "en": "I will mark it «arrived» when all are delivered.", "de": "Ich markiere «angekommen», wenn alle zugestellt sind."}
 {"uk": "показано", "en": "shown", "de": "angezeigt"}
 {"uk": "показано {0} з {1}", "en": "showing {0} of {1}", "de": "{0} von {1} angezeigt"}
 {"uk": "показано {0} найновіших", "en": "показано {0} найновіших", "de": "показано {0} найновіших"}

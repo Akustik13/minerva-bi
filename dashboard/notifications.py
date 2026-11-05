@@ -1651,6 +1651,87 @@ _SHIPMENT_STATUS_COLORS = {
 }
 
 
+def incoming_message(shipment, out) -> dict:
+    """«📥 Прийшла посилка PO-10 від Raynool …» — тема, рядки, позиції, підсумок дії й посилання (shipping/services/
+    incoming.on_delivered)."""
+    from inventory.models import InventorySettings
+    po, mode, result, waiting = out.get("po"), out.get("mode"), out.get("result"), out.get("waiting") or []
+    sender = (getattr(shipment, 'sender_company', '') or getattr(shipment, 'sender_name', '') or
+              (str(po.supplier) if po is not None and po.supplier_id else '') or '—')
+    when = shipment.delivered_at or timezone.now()
+    head = f'📥 Прийшла посилка {po.code if po is not None else "#" + str(shipment.pk)} від {sender}'
+    lines = [f'Доставлено: {timezone.localtime(when):%d.%m.%Y %H:%M}',
+             f'Трекінг: {shipment.tracking_number or "—"} · {shipment.carrier or "—"}']
+    items = []
+    if po is not None:
+        for line in po.lines.select_related('product'):
+            sku = line.product.sku if line.product_id else (line.external_sku or line.description or '?')
+            items.append(f'{sku} × {format(line.qty_ordered.normalize(), "f")}'
+                         + (f' (отримано {format(line.qty_received.normalize(), "f")})' if line.qty_received else ''))
+    if po is None:
+        action = 'Посилка без закупівлі — перевірте, що прийшло.'
+    elif out.get("error"):
+        action = f'⚠️ Не оприбутковано: {out["error"]}'
+    elif waiting:
+        action = (f'⏳ До закупівлі ще {len(waiting)} посилок у дорозі — '
+                  + ('оприбуткую, коли доставлять усі.' if mode == InventorySettings.INCOMING_RECEIVE
+                     else 'позначу «прибуло», коли доставлять усі.'))
+    elif result is not None and result.get("booked"):
+        booked = ', '.join(f'{l.get("sku")} × {l.get("qty")}' for l in result.get("lines") or []) or 'нічого — уже отримано'
+        action = f'✅ Оприбутковано на склад: {booked}. Перевірте кількість — недовкладення виправте на сторінці закупівлі.'
+    elif result is not None:
+        action = '📦 Закупівлю позначено «прибуло» — звірте кількість і оприбуткуйте на сторінці закупівлі.'
+    elif po.status in ('received', 'cancelled'):
+        action = f'Закупівля вже {po.get_status_display().lower()} — нічого не змінено.'
+    else:
+        action = '👉 Звірте кількість і оприбуткуйте на сторінці закупівлі.'
+    path = (f'/admin/inventory/purchaseorder/{po.pk}/change/' if po is not None
+            else f'/admin/shipping/shipment/{shipment.pk}/change/')
+    try:
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.filter(pk=1).first()
+        link = (ss.site_url.rstrip('/') + path) if ss is not None and ss.site_domain else path
+    except Exception:  # noqa: BLE001
+        link = path
+    return {'subject': head, 'head': head, 'lines': lines, 'items': items, 'action': action, 'link': link,
+            'link_text': 'Відкрити закупівлю' if po is not None else 'Відкрити посилку'}
+
+
+def notify_incoming_delivered(shipment, out, *, email=True, telegram=True):
+    """📥 Вхідну посилку доставлено — лист і Telegram (адреси, SMTP і бот — «Налаштування → Сповіщення»)."""
+    ns = _get_ns()
+    if not ns:
+        return
+    send_email, send_tg = channels(ns, email and ns.email_enabled, telegram and ns.telegram_enabled)
+    if not (send_email or send_tg):
+        return
+    m = incoming_message(shipment, out)
+    if send_email:
+        try:
+            items = ''.join(f'<li>{esc(i)}</li>' for i in m['items'])
+            html = (
+                '<div style="font-family:sans-serif;max-width:560px;margin:0 auto;border:1px solid #e0e0e0;'
+                'border-radius:8px;overflow:hidden"><div style="background:#2e7d32;padding:16px 20px">'
+                f'<span style="color:#fff;font-size:18px;font-weight:700">{esc(m["head"])}</span></div>'
+                '<div style="padding:20px;background:#fafafa;font-size:14px;line-height:1.7">'
+                + '<br>'.join(esc(x) for x in m['lines'])
+                + (f'<p style="margin:10px 0 4px"><b>Позиції закупівлі:</b></p><ul style="margin:0">{items}</ul>'
+                   if items else '')
+                + f'<p style="margin:12px 0"><b>{esc(m["action"])}</b></p>'
+                f'<p><a href="{esc(m["link"])}">{esc(m["link_text"])} →</a></p></div></div>')
+            _send_event_email(ns, m['subject'], html)
+        except Exception as e:  # noqa: BLE001
+            logger.warning('Вхідна посилка #%s: email не надіслано: %s', shipment.pk, e)
+    if send_tg:
+        try:
+            text = (f'<b>{esc(m["head"])}</b>\n' + '\n'.join(esc(x) for x in m['lines'])
+                    + ('\n\n' + '\n'.join(f'• {esc(i)}' for i in m['items'][:30]) if m['items'] else '')
+                    + f'\n\n{esc(m["action"])}\n<a href="{esc(m["link"])}">{esc(m["link_text"])}</a>')
+            _send_telegram(ns, tg_cut(text))
+        except Exception as e:  # noqa: BLE001
+            logger.warning('Вхідна посилка #%s: Telegram не надіслано: %s', shipment.pk, e)
+
+
 def notify_shipment_status(shipment, old_status, new_status):
     """Send notification when Shipment status changes."""
     ns = _get_ns()
@@ -1680,6 +1761,13 @@ def notify_shipment_status(shipment, old_status, new_status):
             send_tg    = ns.telegram_enabled
             jlc_tg_chat = None
     else:
+        if new_status == 'delivered' and getattr(shipment, 'direction', 'out') == 'in':
+            try:   # 📥 вхідна посилка — своє повідомлення з закупівлею (notify_incoming_delivered)
+                from inventory.models import InventorySettings
+                if InventorySettings.get().incoming_delivered != InventorySettings.INCOMING_OFF:
+                    return
+            except Exception:  # noqa: BLE001
+                pass
         flag_map = {
             'submitted':   getattr(ns, 'shipment_on_submitted',   False),
             'label_ready': getattr(ns, 'shipment_on_label_ready', False),
