@@ -29,9 +29,9 @@ def _site_admin(shop: Shop) -> str:
     return f"{parts.scheme}://{parts.netloc}/admin/" if parts.scheme in ("http", "https") and parts.netloc else ""
 
 
-def _minerva_sender(shop: Shop, purpose: str = "customer") -> str:
+def _minerva_sender(shop: Shop) -> str:
     try:
-        return mail.smtp_settings(shop, purpose)["from"]
+        return mail.smtp_settings(shop)["from"]
     except mail.MailNotConfigured:
         return ""
 
@@ -59,9 +59,7 @@ def _site_report(shop: Shop) -> tuple[str, dict]:
 
 def rows(shop: Shop) -> list[dict]:
     """[{mail, who, sender, to, change: [{go, label} | {url, label, external}]}] — у порядку важливості."""
-    missing = "❌ не задано: оберіть «Відправник листів покупцям» або SMTP у «Налаштування → Сповіщення»"
-    sender = _minerva_sender(shop) or missing
-    paid_sender = _minerva_sender(shop, "payment") or missing
+    sender = _minerva_sender(shop) or "❌ не задано: оберіть «Відправник листів покупцям» або SMTP у «Налаштування → Сповіщення»"
     acc = shop.mail_sender
     smtp = ([_url(reverse("admin:email_assistant_emailaccount_change", args=[acc.pk]), f"SMTP скриньки {acc.email_address}")]
             if acc is not None else [])
@@ -77,24 +75,20 @@ def rows(shop: Shop) -> list[dict]:
          "to": "покупцю (без прихованої копії — в листі одноразове посилання)",
          "change": [_go("mail_sender", "Відправник листів покупцям"), _go("mail_from_name", "Ім'я відправника"),
                     *smtp, templates]},
-        {"mail": "«Willkommen», пароль змінено, акаунт видалено", "who": "Minerva",
+        {"mail": "«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено", "who": "Minerva",
          "sender": sender + reply,
          "to": "покупцю" + (f" · прихована копія: {', '.join(bcc)}" if bcc else ""),
          "change": [_go("mail_reply_to", "Відповіді покупців"), _go("mail_bcc", "Прихована копія"),
                     _go("mail_welcome", "Лист «Ласкаво просимо»"), templates]},
-        {"mail": "«Zahlung erhalten» — оплату отримано", "who": "Minerva", "sender": paid_sender + reply,
-         "to": "покупцю" + (f" · прихована копія: {', '.join(bcc)}" if bcc else ""),
-         "change": [_go("mail_sender_payments", "«Zahlung erhalten» — з якої скриньки"), templates]},
     ]
     if team:
-        team_sender, team_to = _minerva_sender(shop, "team") or missing, ", ".join(team)
+        team_sender, team_to = sender, ", ".join(team)
     else:
         team_sender = ns["sender"] or "SMTP сповіщень Minerva"
         team_to = ", ".join(ns["to"]) or "нікому — email у «Налаштування → Сповіщення» вимкнено або без адрес"
     out.append({"mail": "Команді: оплата отримана, новий акаунт покупця", "who": "Minerva", "sender": team_sender,
                 "to": team_to + (" · Telegram" if ns["telegram"] else ""),
                 "change": [_go("team_emails", "Сповіщення команді — на адреси"),
-                           _go("mail_sender_team", "Сповіщення команді — з якої скриньки"),
                            _go("team_notify_registration", "Команді: новий акаунт покупця"), notifications]})
 
     host, report = _site_report(shop)
@@ -103,11 +97,10 @@ def rows(shop: Shop) -> list[dict]:
     who = f"сайт {host}" if host else "сайт"
     managed = shop.site_mail_managed and site_mail.sender_account(shop) is not None
     if managed:
-        site_sender = (_minerva_sender(shop, "site") or missing) + " (з Minerva)"
+        site_sender = sender + " (з Minerva)"
         confirm = shop.site_order_confirmation
         notify = ", ".join(team) or ((report.get("notify") or "—") + " (як на сайті)")
-        change = [_go("mail_sender_site", "Листи сайту — з якої скриньки"),
-                  _go("site_mail_managed", "Сайт надсилає листи з цієї ж скриньки")]
+        change = [_go("site_mail_managed", "Сайт надсилає листи з цієї ж скриньки")]
     elif report:
         site_sender = f"{report.get('from') or '—'} ({report.get('host') or 'SMTP не задано'}) — файли сайту"
         confirm = report.get("confirmation")

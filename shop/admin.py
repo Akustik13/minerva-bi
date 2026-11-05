@@ -237,9 +237,6 @@ class CopyShopForm(forms.Form):
         return slug
 
 
-SENDER_FIELDS = ("mail_sender", "mail_sender_payments", "mail_sender_team", "mail_sender_site")
-
-
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
     list_display = ["name", "roadmap_list_col", "slug", "is_default", "is_active", "currency", "listings_col",
@@ -290,10 +287,10 @@ class ShopAdmin(admin.ModelAdmin):
                            "Швидкий старт: «🌍 Створити базові зони» або «⬇️ Імпортувати з DigiKey».",
         }),
         ("✉️ Пошта магазину", {
-            "fields": ["mail_map_col", "mail_sender", "mail_sender_payments", "mail_sender_team", "mail_from_name",
-                       "mail_reply_to", "mail_bcc", "team_emails", "mail_welcome",
+            "fields": ["mail_map_col", "mail_sender", "mail_from_name", "mail_reply_to", "mail_bcc", "team_emails",
+                       "mail_welcome",
                        "team_notify_registration", "mail_footer", "team_lang", "mail_tools",
-                       "site_mail_managed", "mail_sender_site", "site_order_confirmation", "site_mail_col"],
+                       "site_mail_managed", "site_order_confirmation", "site_mail_col"],
             "description": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату "
                            "отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину "
                            "додайте в Minerva як акаунт пошти (Email → Акаунти): тоді відповіді покупців потрапляють у "
@@ -345,17 +342,17 @@ class ShopAdmin(admin.ModelAdmin):
     ]
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name in SENDER_FIELDS:
+        if db_field.name == "mail_sender":
             from email_assistant.models import EmailAccount
             kwargs["queryset"] = EmailAccount.objects.filter(is_active=True).select_related("user")
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        for name in SENDER_FIELDS:   # «＋» — нова скринька, «✎» — її SMTP у спливному вікні (за правами розділу Email)
-            widget = form.base_fields.get(name) and form.base_fields[name].widget
-            if widget is not None:
-                widget.can_delete_related = widget.can_view_related = False
+        widget = form.base_fields.get("mail_sender") and form.base_fields["mail_sender"].widget
+        if widget is not None:  # акаунти пошти створюються в розділі «Email», не звідси
+            widget.can_add_related = widget.can_change_related = widget.can_delete_related = False
+            widget.can_view_related = False
         return form
 
     @admin.display(description="Стан Stripe")
@@ -705,22 +702,12 @@ class ShopAdmin(admin.ModelAdmin):
         to = (request.user.email or "").strip()
         if not to:
             self.message_user(request, "У вашого користувача Minerva не задано email.", messages.ERROR)
-            return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
-        senders = {}   # From → призначення: одна скринька — один тестовий лист
-        for purpose in ("customer", "payment", "team") + (("site",) if shop.site_mail_managed else ()):
+        else:
             try:
-                senders.setdefault(mail.smtp_settings(shop, purpose)["from"], []).append(purpose)
-            except mail.MailNotConfigured as e:
-                self.message_user(request, f"Лист не надіслано: {e}", messages.ERROR)
-                return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
-        for sender, purposes in senders.items():
-            what = ", ".join(mail.PURPOSE_LABELS[p] for p in purposes)
-            try:
-                mail.send(shop, to, "test", "de", purpose=purposes[0])
-                self.message_user(request, f"Тестовий лист надіслано на {to} від {sender} ({what}; "
-                                           f"{mail.describe_sender(shop, purposes[0])}).")
+                mail.send(shop, to, "test", "de")
+                self.message_user(request, f"Тестовий лист надіслано на {to} ({mail.describe_sender(shop)}).")
             except Exception as e:
-                self.message_user(request, f"Лист від {sender} ({what}) не надіслано: {e}", messages.ERROR)
+                self.message_user(request, f"Лист не надіслано: {e}", messages.ERROR)
         return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
 
     def render_change_form(self, request, context, *args, **kwargs):

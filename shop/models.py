@@ -159,25 +159,8 @@ class Shop(models.Model):
     mail_sender = models.ForeignKey(
         "email_assistant.EmailAccount", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="+", verbose_name="Відправник листів покупцям",
-        help_text="Кабінет: підтвердження реєстрації, новий пароль, запрошення, «Ласкаво просимо». Також для решти листів, "
-                  "якщо для них нижче не вибрано окрему скриньку. Порожньо — SMTP сповіщень Minerva (Налаштування → "
-                  "Сповіщення). Копія в «Надісланих» не зберігається: у листах одноразові посилання. «＋» — додати "
-                  "скриньку, «✎» — змінити її SMTP.",
-    )
-    mail_sender_payments = models.ForeignKey(
-        "email_assistant.EmailAccount", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="+", verbose_name="«Zahlung erhalten» — з якої скриньки",
-        help_text="Лист покупцю про отриману оплату. Порожньо — «Відправник листів покупцям».",
-    )
-    mail_sender_team = models.ForeignKey(
-        "email_assistant.EmailAccount", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="+", verbose_name="Сповіщення команді — з якої скриньки",
-        help_text="Оплата отримана, новий акаунт покупця — на «Сповіщення команді — на адреси». Порожньо — «Відправник листів покупцям».",
-    )
-    mail_sender_site = models.ForeignKey(
-        "email_assistant.EmailAccount", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="+", verbose_name="Листи сайту — з якої скриньки",
-        help_text="З «Сайт надсилає листи з цієї ж скриньки»: підтвердження замовлення, нове замовлення команді, контактна форма. Порожньо — «Відправник листів покупцям».",
+        help_text="Підтвердження реєстрації, скидання пароля. Порожньо — SMTP сповіщень Minerva "
+                  "(Налаштування → Сповіщення). Копія в «Надісланих» не зберігається: у листах одноразові посилання.",
     )
     mail_from_name = models.CharField("Ім'я відправника", max_length=80, blank=True, default="",
                                       help_text="Напр. «Sevskiy Shop». Порожньо — назва магазину.")
@@ -209,9 +192,8 @@ class Shop(models.Model):
     # ── Пошта сайту з Minerva (shop/site_mail.py; сайт читає GET /api/v1/shop/site-mail/) ──
     site_mail_managed = models.BooleanField(
         "Сайт надсилає листи з цієї ж скриньки", default=False,
-        help_text="Сайт бере SMTP, відправника й «Відповіді покупців» звідси (скринька «Листи сайту», порожньо — "
-                  "«Відправник листів покупцям») замість private/contact-config.php і /admin/ → «Пошта». "
-                  "Перевіряє раз на хвилину.",
+        help_text="Сайт бере SMTP, відправника й «Відповіді покупців» звідси (акаунт пошти вище) замість "
+                  "private/contact-config.php і /admin/ → «Пошта». Перевіряє раз на хвилину.",
     )
     site_order_confirmation = models.BooleanField(
         "Сайт надсилає покупцю підтвердження замовлення", default=True,

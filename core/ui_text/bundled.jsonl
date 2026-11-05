@@ -2847,9 +2847,6 @@
 {"uk": "«Void» — лише для відправлень UPS.", "en": "“Void” is only for UPS shipments.", "de": "„Void“ gilt nur für UPS-Sendungen."}
 {"uk": "«Von:» пересланого листа", "en": "“Von:” of the forwarded e-mail", "de": "„Von:“ der weitergeleiteten E-Mail"}
 {"uk": "«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено", "en": "«Willkommen», «Zahlung erhalten», password changed, account deleted", "de": "«Willkommen», «Zahlung erhalten», Passwort geändert, Konto gelöscht"}
-{"uk": "«Willkommen», пароль змінено, акаунт видалено", "en": "«Willkommen», password changed, account deleted", "de": "«Willkommen», Passwort geändert, Konto gelöscht"}
-{"uk": "«Zahlung erhalten» — з якої скриньки", "en": "«Zahlung erhalten» — from which mailbox", "de": "«Zahlung erhalten» — aus welchem Postfach"}
-{"uk": "«Zahlung erhalten» — оплату отримано", "en": "«Zahlung erhalten» — payment received", "de": "«Zahlung erhalten» — Zahlung eingegangen"}
 {"uk": "«sku:AMP-100», «order_number:WS-1001», «code:PO-12», «id:5» — кожен запис, який ключ отримав (до 2000; більше — лише кількість у «Записів»)", "en": "“sku:AMP-100”, “order_number:WS-1001”, “code:PO-12”, “id:5” — every record the key received (up to 2000; beyond that only the count in “Records”)", "de": "„sku:AMP-100“, „order_number:WS-1001“, „code:PO-12“, „id:5“ — jeder Datensatz, den der Schlüssel erhalten hat (bis zu 2000; darüber hinaus nur die Anzahl unter „Datensätze“)"}
 {"uk": "«{0}» ({1}) вже є в основного клієнта, а без клієнта цей запис існувати не може. Злиття не виконано.", "en": "“{0}” ({1}) already exists for the primary customer, and this record cannot exist without a customer. Merge not performed.", "de": "„{0}“ ({1}) ist beim Hauptkunden bereits vorhanden, und dieser Datensatz kann ohne Kunden nicht existieren. Zusammenführung nicht durchgeführt."}
 {"uk": "«{0}» · код {1} · покупці бачать «{2}»", "en": "“{0}” · code {1} · customers see “{2}”", "de": "„{0}“ · Code {1} · Kunden sehen „{2}“"}
@@ -5880,7 +5877,6 @@
 {"uk": "Журнал — там само, вкладка «Журнал» контейнера.", "en": "Log — in the same place, the container’s “Log” tab.", "de": "Protokoll — ebenda, Registerkarte „Protokoll“ des Containers."}
 {"uk": "Журналі аудиту", "en": "Audit log", "de": "Audit-Protokoll"}
 {"uk": "З AI", "en": "With AI", "de": "Mit KI"}
-{"uk": "З «Сайт надсилає листи з цієї ж скриньки»: підтвердження замовлення, нове замовлення команді, контактна форма. Порожньо — «Відправник листів покупцям».", "en": "With «Сайт надсилає листи з цієї ж скриньки»: order confirmation, new order to the team, contact form. Empty — «Відправник листів покупцям».", "de": "Mit «Сайт надсилає листи з цієї ж скриньки»: Bestellbestätigung, neue Bestellung an das Team, Kontaktformular. Leer — «Відправник листів покупцям»."}
 {"uk": "З БД", "en": "From DB", "de": "Aus DB"}
 {"uk": "З будь-якої адреси.", "en": "From any address.", "de": "Von jeder Adresse."}
 {"uk": "З валюти", "en": "From currency", "de": "Von Währung"}
@@ -7177,7 +7173,6 @@
 {"uk": "Кабінет", "en": "Account area", "de": "Kundenbereich"}
 {"uk": "Кабінет покупця", "en": "Buyer account area", "de": "Käuferbereich"}
 {"uk": "Кабінет покупців", "en": "Buyers’ account area", "de": "Käuferbereich"}
-{"uk": "Кабінет: підтвердження реєстрації, новий пароль, запрошення, «Ласкаво просимо». Також для решти листів, якщо для них нижче не вибрано окрему скриньку. Порожньо — SMTP сповіщень Minerva (Налаштування → Сповіщення). Копія в «Надісланих» не зберігається: у листах одноразові посилання. «＋» — додати скриньку, «✎» — змінити її SMTP.", "en": "Customer account: registration confirmation, new password, invitation, «Welcome». Also for the other e-mails if no separate mailbox is chosen below. Empty — Minerva notification SMTP (Settings → Notifications). No copy in «Sent»: the e-mails contain one-time links. «＋» — add a mailbox, «✎» — change its SMTP.", "de": "Kundenkonto: Registrierungsbestätigung, neues Passwort, Einladung, «Willkommen». Auch für die übrigen E-Mails, wenn unten kein eigenes Postfach gewählt ist. Leer — SMTP der Minerva-Benachrichtigungen (Einstellungen → Benachrichtigungen). Keine Kopie unter «Gesendet»: die E-Mails enthalten Einmal-Links. «＋» — Postfach hinzufügen, «✎» — dessen SMTP ändern."}
 {"uk": "Казати що ти Claude або AI від Anthropic", "en": "Saying that you are Claude or an AI from Anthropic", "de": "Sagen, dass du Claude oder eine KI von Anthropic bist"}
 {"uk": "Казахстан", "en": "Kazakhstan", "de": "Kasachstan"}
 {"uk": "Календар", "en": "Calendar", "de": "Kalender"}
@@ -7887,7 +7882,6 @@
 {"uk": "Лист «Ласкаво просимо» після підтвердження реєстрації", "en": "“Welcome” e-mail after registration is confirmed", "de": "E-Mail „Willkommen“ nach Bestätigung der Registrierung"}
 {"uk": "Лист «оплату отримано»", "en": "“Payment received” e-mail", "de": "E-Mail „Zahlung eingegangen“"}
 {"uk": "Лист без гілки листування", "en": "Email without a thread", "de": "E-Mail ohne Verlauf"}
-{"uk": "Лист від {0} ({1}) не надіслано: {2}", "en": "E-mail from {0} ({1}) not sent: {2}", "de": "E-Mail von {0} ({1}) nicht gesendet: {2}"}
 {"uk": "Лист відправлено на", "en": "Email sent to", "de": "E-Mail gesendet an"}
 {"uk": "Лист з одноразовим посиланням (60 хв). Новий пароль завершує всі інші входи; покупець отримує лист «пароль змінено».", "en": "An email with a one-time link (60 min). The new password ends all other sessions; the buyer receives a “password changed” email.", "de": "E-Mail mit einem Einmal-Link (60 Min.). Das neue Passwort beendet alle anderen Anmeldungen; der Käufer erhält eine E-Mail „Passwort geändert“."}
 {"uk": "Лист з якого витягнуто дедлайн", "en": "E-mail the deadline was extracted from", "de": "E-Mail, aus der die Frist entnommen wurde"}
@@ -7909,7 +7903,6 @@
 {"uk": "Лист переписано — перевірте й надішліть", "en": "Email rewritten — check it and send", "de": "E-Mail umgeschrieben — prüfen und senden"}
 {"uk": "Лист переписано: «{0}»", "en": "Email rewritten: «{0}»", "de": "E-Mail umgeschrieben: «{0}»"}
 {"uk": "Лист покупцю з посиланням «Passwort festlegen» (діє 7 днів). Пароль задає сам покупець; після цього email вважається підтвердженим і попередні замовлення з цією адресою з'являться в кабінеті.", "en": "An email to the customer with a “Passwort festlegen” link (valid for 7 days). The customer sets the password themselves; after that the email is considered confirmed and earlier orders with this address will appear in the account area.", "de": "E-Mail an den Kunden mit dem Link „Passwort festlegen“ (7 Tage gültig). Das Passwort legt der Kunde selbst fest; danach gilt die E-Mail als bestätigt und frühere Aufträge mit dieser Adresse erscheinen im Kundenkonto."}
-{"uk": "Лист покупцю про отриману оплату. Порожньо — «Відправник листів покупцям».", "en": "E-mail to the customer about the received payment. Empty — «Відправник листів покупцям».", "de": "E-Mail an den Kunden über die eingegangene Zahlung. Leer — «Відправник листів покупцям»."}
 {"uk": "Лист прив’язано до замовлення (номер у темі, тексті чи вкладенні) — PDF, Word, Excel, CSV… з нього Minerva сама кладе в «Документи замовлення»; «… й проєкту» — ще й у «📎 Документи» проєкту, до якого підтверджено гілку. Той самий файл уже є — не зберігається (email_assistant/attachment_docs.py)", "en": "The email is linked to an order (number in the subject, text or attachment) — Minerva itself puts PDF, Word, Excel, CSV… from it into the order’s “Documents”; “… and project” — also into the “📎 Documents” of the project the thread is confirmed for. The same file is already there — it is not saved (email_assistant/attachment_docs.py)", "de": "Die E-Mail ist mit einem Auftrag verknüpft (Nummer im Betreff, Text oder Anhang) — Minerva legt PDF, Word, Excel, CSV… daraus selbst unter „Auftragsdokumente“ ab; „… und Projekt“ — zusätzlich unter „📎 Dokumente“ des Projekts, dem der Verlauf zugeordnet ist. Ist dieselbe Datei bereits vorhanden, wird sie nicht gespeichert (email_assistant/attachment_docs.py)"}
 {"uk": "Лист піде", "en": "The email will go", "de": "Die E-Mail geht"}
 {"uk": "Лист у «⏳ Запланованих» — піде протягом 2 хв (ще можна скасувати)", "en": "The e-mail is in “⏳ Scheduled” — it will go out within 2 min (can still be cancelled)", "de": "Die E-Mail steht in „⏳ Geplant“ – sie wird innerhalb von 2 Min. gesendet (noch abbrechbar)"}
@@ -7945,7 +7938,6 @@
 {"uk": "Листи працівника (теми, співрозмовники, текст і опис AI з них) бачить і змінює лише він сам — вам видно лише кількість листів і хвилини.", "en": "An employee's e-mails (subjects, correspondents, text and AI descriptions from them) are visible and editable only to the employee — you can only see the number of e-mails and minutes.", "de": "E-Mails eines Mitarbeiters (Betreffs, Gesprächspartner, Text und daraus erzeugte KI-Beschreibungen) sieht und ändert nur er selbst – Sie sehen nur die Anzahl der E-Mails und die Minuten."}
 {"uk": "Листи проєкту в пошті ({0})", "en": "Project e-mails in mail ({0})", "de": "Projekt-E-Mails im Postfach ({0})"}
 {"uk": "Листи проєктів Minerva — на їхній проєкт askDANTE", "en": "E-mails of Minerva projects — to their askDANTE project", "de": "E-Mails von Minerva-Projekten – auf ihr askDANTE-Projekt"}
-{"uk": "Листи сайту — з якої скриньки", "en": "Site e-mails — from which mailbox", "de": "E-Mails der Website — aus welchem Postfach"}
 {"uk": "Листи своїх категорій (DigiKey, магазин…) і проєктів Minerva → оцінка часу по днях → запис у їхній проєкт askDANTE (після ✓ або автоматично, як задано в категорії).", "en": "E-mails of own categories (DigiKey, shop…) and Minerva projects → time estimate by day → entry in their askDANTE project (after ✓ or automatically, as set in the category).", "de": "E-Mails eigener Kategorien (DigiKey, Shop…) und Minerva-Projekte → Zeitschätzung pro Tag → Eintrag in ihr askDANTE-Projekt (nach ✓ oder automatisch, wie in der Kategorie festgelegt)."}
 {"uk": "Листи скриньки з більшим номером агент ще не перевіряв (раніші — не чіпає)", "en": "The agent has not yet checked mailbox e-mails with a higher number (earlier ones — it does not touch)", "de": "E-Mails des Postfachs mit höherer Nummer hat der Agent noch nicht geprüft (frühere fasst er nicht an)"}
 {"uk": "Листи старіші цього терміну ігноруються.", "en": "E-mails older than this period are ignored.", "de": "E-Mails, die älter als dieser Zeitraum sind, werden ignoriert."}
@@ -9851,7 +9843,6 @@
 {"uk": "Оплата", "en": "Payment", "de": "Zahlung"}
 {"uk": "Оплата Stripe", "en": "Stripe payment", "de": "Stripe-Zahlung"}
 {"uk": "Оплата на сайті", "en": "Payment on the site", "de": "Zahlung auf der Website"}
-{"uk": "Оплата отримана, новий акаунт покупця — на «Сповіщення команді — на адреси». Порожньо — «Відправник листів покупцям».", "en": "Payment received, new customer account — to «Сповіщення команді — на адреси». Empty — «Відправник листів покупцям».", "de": "Zahlung eingegangen, neues Kundenkonto — an «Сповіщення команді — на адреси». Leer — «Відправник листів покупцям»."}
 {"uk": "Оплата протягом 14 днів після рахунку.", "en": "Payment within 14 days of the invoice.", "de": "Zahlung innerhalb von 14 Tagen nach Rechnung."}
 {"uk": "Оплата цього замовлення вже обробляється (напр. SEPA) — дочекайтесь результату.", "en": "The payment for this order is already being processed (e.g. SEPA) — wait for the result.", "de": "Die Zahlung für diesen Auftrag wird bereits verarbeitet (z. B. SEPA) – warten Sie das Ergebnis ab."}
 {"uk": "Оплати", "en": "Payments", "de": "Zahlungen"}
@@ -12315,7 +12306,6 @@
 {"uk": "Сайт бачить, що кабінет увімкнено.", "en": "The site sees that the customer account is enabled.", "de": "Die Website erkennt, dass das Kundenkonto aktiviert ist."}
 {"uk": "Сайт без HTTPS: кабінет покупця й оплата потребують https://.", "en": "The site has no HTTPS: the customer account and payment require https://.", "de": "Die Website hat kein HTTPS: Kundenkonto und Zahlung erfordern https://."}
 {"uk": "Сайт бере SMTP, відправника й «Відповіді покупців» звідси (акаунт пошти вище) замість private/contact-config.php і /admin/ → «Пошта». Перевіряє раз на хвилину.", "en": "The site takes SMTP, sender and “Customer replies” from here (the mail account above) instead of private/contact-config.php and /admin/ → “Mail”. Checked once a minute.", "de": "Die Website übernimmt SMTP, Absender und „Antworten der Kunden“ von hier (das E-Mail-Konto oben) statt aus private/contact-config.php und /admin/ → „E-Mail“. Prüfung einmal pro Minute."}
-{"uk": "Сайт бере SMTP, відправника й «Відповіді покупців» звідси (скринька «Листи сайту», порожньо — «Відправник листів покупцям») замість private/contact-config.php і /admin/ → «Пошта». Перевіряє раз на хвилину.", "en": "The site takes SMTP, sender and «Відповіді покупців» from here (mailbox «Листи сайту», empty — «Відправник листів покупцям») instead of private/contact-config.php and /admin/ → «Пошта». Checks once a minute.", "de": "Die Website übernimmt SMTP, Absender und «Відповіді покупців» von hier (Postfach «Листи сайту», leer — «Відправник листів покупцям») statt private/contact-config.php und /admin/ → «Пошта». Prüft einmal pro Minute."}
 {"uk": "Сайт бере налаштування з private/minerva-config.php.", "en": "The site takes its settings from private/minerva-config.php.", "de": "Die Website übernimmt ihre Einstellungen aus private/minerva-config.php."}
 {"uk": "Сайт видаляє файл при наступному запиті налаштувань; знімається, коли сайти повідомили, що файлу немає.", "en": "The site deletes the file on its next settings request; it is removed once the sites report that the file is gone.", "de": "Die Website löscht die Datei bei der nächsten Einstellungsanfrage; der Eintrag entfällt, sobald die Websites melden, dass die Datei nicht mehr vorhanden ist."}
 {"uk": "Сайт відповів HTTP {0} на {1} — переадресовує. {2}", "en": "The site answered HTTP {0} to {1} — it redirects. {2}", "de": "Die Website antwortete mit HTTP {0} auf {1} — sie leitet weiter. {2}"}
@@ -12804,7 +12794,6 @@
 {"uk": "Сповіщення", "en": "Notifications", "de": "Benachrichtigungen"}
 {"uk": "Сповіщення (NotificationSettings)", "en": "Notifications (NotificationSettings)", "de": "Benachrichtigungen (NotificationSettings)"}
 {"uk": "Сповіщення вимкнено в налаштуваннях JLCConfig.", "en": "Notifications are disabled in the JLCConfig settings.", "de": "Benachrichtigungen sind in den JLCConfig-Einstellungen deaktiviert."}
-{"uk": "Сповіщення команді — з якої скриньки", "en": "Team notifications — from which mailbox", "de": "Team-Benachrichtigungen — aus welchem Postfach"}
 {"uk": "Сповіщення команді — на адреси", "en": "Team notifications — to addresses", "de": "Teambenachrichtigungen – an Adressen"}
 {"uk": "Сповіщення команді: {0}", "en": "Team notifications: {0}", "de": "Teambenachrichtigungen: {0}"}
 {"uk": "Сповіщення на Email", "en": "Notifications by e-mail", "de": "Benachrichtigungen per E-Mail"}
@@ -13455,7 +13444,6 @@
 {"uk": "Тестовий лист", "en": "Test e-mail", "de": "Test-E-Mail"}
 {"uk": "Тестовий лист «{0}» надіслано на {1}.", "en": "Test email “{0}” sent to {1}.", "de": "Test-E-Mail „{0}“ an {1} gesendet."}
 {"uk": "Тестовий лист надіслано на {0} ({1}).", "en": "Test email sent to {0} ({1}).", "de": "Test-E-Mail an {0} ({1}) gesendet."}
-{"uk": "Тестовий лист надіслано на {0} від {1} ({2}; {3}).", "en": "Test e-mail sent to {0} from {1} ({2}; {3}).", "de": "Testnachricht an {0} von {1} gesendet ({2}; {3})."}
 {"uk": "Тестовий магазин", "en": "Test shop", "de": "Testshop"}
 {"uk": "Тестовий номер (TEST-N)", "en": "Test number (TEST-N)", "de": "Testnummer (TEST-N)"}
 {"uk": "Тестовий режим (не зберігати в БД)", "en": "Test mode (do not save to the DB)", "de": "Testmodus (nicht in der DB speichern)"}
@@ -16177,7 +16165,6 @@
 {"uk": "к-сть не знайдено в листі — перевірте", "en": "quantity not found in the e-mail — please check", "de": "Menge in der E-Mail nicht gefunden — bitte prüfen"}
 {"uk": "кабель", "en": "cable", "de": "Kabel"}
 {"uk": "кабелю", "en": "cable", "de": "Kabel"}
-{"uk": "кабінет", "en": "customer account", "de": "Kundenkonto"}
 {"uk": "кабінет вимкнено", "en": "customer account disabled", "de": "Kundenkonto deaktiviert"}
 {"uk": "кабінет покупця", "en": "customer account", "de": "Kundenkonto"}
 {"uk": "кабінет покупців", "en": "buyer account area", "de": "Kundenbereich"}
@@ -16288,7 +16275,6 @@
 {"uk": "колонку видно; без галочки — сховано, поки панель відкрита (дані є в панелі).", "en": "the column is visible; unchecked — hidden while the panel is open (the data is in the panel).", "de": "die Spalte ist sichtbar; ohne Häkchen — ausgeblendet, solange das Panel geöffnet ist (die Daten stehen im Panel)."}
 {"uk": "колонок SKU, назви, категорії, залишків та ін.", "en": "of the SKU, name, category, stock columns etc.", "de": "der Spalten SKU, Name, Kategorie, Bestand usw."}
 {"uk": "команда", "en": "command", "de": "Befehl"}
-{"uk": "команді", "en": "to the team", "de": "an das Team"}
 {"uk": "компанія", "en": "company", "de": "Firma"}
 {"uk": "компанія / email покупця", "en": "customer’s company / email", "de": "Firma / E-Mail des Kunden"}
 {"uk": "компанія {0}", "en": "company {0}", "de": "Firma {0}"}
@@ -17033,7 +17019,6 @@
 {"uk": "оплата вже обробляється", "en": "the payment is already being processed", "de": "die Zahlung wird bereits verarbeitet"}
 {"uk": "оплата замовлення покупця", "en": "payment for a buyer order", "de": "Zahlung für einen Käuferauftrag"}
 {"uk": "оплата: спосіб, статус, реф.", "en": "payment: method, status, ref.", "de": "Zahlung: Methode, Status, Ref."}
-{"uk": "оплати", "en": "payments", "de": "Zahlungen"}
 {"uk": "оплатити до", "en": "pay by", "de": "zahlbar bis"}
 {"uk": "оплатити до {0}", "en": "pay by {0}", "de": "zahlbar bis {0}"}
 {"uk": "оплачено {0}", "en": "paid {0}", "de": "bezahlt {0}"}
