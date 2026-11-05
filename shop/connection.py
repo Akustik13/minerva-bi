@@ -12,7 +12,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import requests
 from django.utils import timezone
@@ -36,6 +36,24 @@ ACCOUNT_SCOPES = {"accounts:read": "кабінет покупця", "accounts:wr
 
 def _item(level, title, detail=""):
     return {"level": level, "title": title, "detail": detail}
+
+
+def site_key(host) -> str:
+    """Той самий сайт з «www.» і без: www.sevskiy.de = sevskiy.de (сайт звітує одне, в картці — інше)."""
+    host = (host or "").lower().rstrip(".")
+    return host[4:] if host.startswith("www.") else host
+
+
+REDIRECT_WHO = "Переадресацію робить сам сайт (правило в .htaccess) або хостинг; Minerva за нею не йде."
+
+
+def _redirect_target(url, location, tail):
+    """(повна адреса переадресації, корінь сайту з «/» або '') — корінь, якщо адреса закінчується на tail."""
+    to = urljoin(url, location or "")
+    parts = urlsplit(to)
+    if parts.scheme in ("http", "https") and parts.hostname and parts.path.endswith(tail):
+        return to, f"{parts.scheme}://{parts.netloc}{parts.path[:-len(tail)]}"
+    return to, ""
 
 
 def _when(dt) -> str:
@@ -151,7 +169,12 @@ def _catalog_at(shop: Shop, base: str) -> list:
     except requests.exceptions.RequestException as e:
         return [_item(ERROR, title, f"{url}: сайт недоступний ({type(e).__name__}) — перевірте адресу й домен.")]
     if r.is_redirect:
-        return [_item(ERROR, title, f"Сайт переадресовує на {r.headers.get('Location', '?')} — вкажіть у «Адреса сайту» "
+        to, base_to = _redirect_target(url, r.headers.get("Location"), "api/shop/catalog.php")
+        if base_to:
+            return [_item(ERROR, title, f"{url} переадресовує на {to}. {REDIRECT_WHO} Вкажіть у «Адреса сайту» "
+                                        f"{base_to}, а URL вебхука сайту — {base_to}api/shop/webhook.php "
+                                        "(REST API → Вебхуки).")]
+        return [_item(ERROR, title, f"Сайт переадресовує на {to or '?'} — вкажіть у «Адреса сайту» "
                                     "кінцеву адресу (з https:// і www, якщо сайт їх вимагає).")]
     if r.status_code == 404:
         return [dict(_item(ERROR, title, f"{url}: немає (HTTP 404). Домен має вказувати на папку public (dist) "
@@ -245,8 +268,8 @@ def _webhook(shop: Shop, base: str) -> list:
     """Підписаний ping на вебхук цього сайту: сайт приймає лише з правильним секретом."""
     from api.models import Webhook, WebhookDelivery
     from api.webhooks import emit
-    host = urlsplit(base).hostname
-    hooks = [h for h in Webhook.objects.filter(is_active=True) if urlsplit(h.url).hostname == host]
+    host = site_key(urlsplit(base).hostname)
+    hooks = [h for h in Webhook.objects.filter(is_active=True) if site_key(urlsplit(h.url).hostname) == host]
     if not hooks:
         return [_item(WARN, "Вебхук", "На цей сайт вебхук не налаштовано: зміни складу й цін з'являться на сайті "
                                       "лише після його кешу (зазвичай хвилина-дві). Налаштування: REST API → "
@@ -265,6 +288,8 @@ def _webhook(shop: Shop, base: str) -> list:
         if d.response_code == 401:
             detail = ("Сайт відхилив підпис (HTTP 401): секрет вебхука в Minerva не збігається з 'webhook_secret' "
                       "у private/shop-config.php сайту.")
+        elif 300 <= (d.response_code or 0) < 400:
+            detail = _webhook_redirect(hook, d.response_code)
         elif d.response_code:
             detail = f"Сайт відповів HTTP {d.response_code} на {hook.url}."
             right = base + "api/shop/webhook.php"
@@ -274,6 +299,20 @@ def _webhook(shop: Shop, base: str) -> list:
             detail = f"Немає відповіді від {hook.url}: {d.response_body[:160]}"
         out.append(_item(ERROR, title, detail))
     return out
+
+
+def _webhook_redirect(hook, code) -> str:
+    """Вебхук отримав 3xx: куди сайт переадресовує (HEAD без переходу) — цю адресу й вписати у вебхук."""
+    head = f"Сайт відповів HTTP {code} на {hook.url} — переадресовує. {REDIRECT_WHO}"
+    try:
+        r = requests.head(hook.url, timeout=(5, 15), allow_redirects=False, headers={"User-Agent": USER_AGENT})
+        location = r.headers.get("Location") if 300 <= r.status_code < 400 else ""
+    except requests.exceptions.RequestException:
+        location = ""
+    to, _base = _redirect_target(hook.url, location, "api/shop/webhook.php") if location else ("", "")
+    if to and to != hook.url:
+        return f"{head} Змініть URL у картці вебхука (REST API → Вебхуки) на {to}."
+    return f"{head} Вкажіть у вебхуку кінцеву адресу сайту (з https:// і www, якщо сайт їх вимагає)."
 
 
 RAG_API_REASONS = {   # режим «RAG API, як помічник Minerva»: адреса й ключ — з налаштувань помічника

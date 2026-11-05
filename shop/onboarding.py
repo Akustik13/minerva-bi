@@ -37,9 +37,8 @@ def _host(url) -> str:
 
 
 def _site(host) -> str:
-    """Той самий сайт з «www.» і без: www.sevskiy.de = sevskiy.de (сайт звітує одне, в картці — інше)."""
-    host = (host or "").lower().rstrip(".")
-    return host[4:] if host.startswith("www.") else host
+    from .connection import site_key
+    return site_key(host)
 
 
 def _when(dt) -> str:

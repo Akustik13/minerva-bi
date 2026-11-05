@@ -190,6 +190,30 @@ class ConnectionCheckTests(ConnectionBase):
             res = connection.check(self.shop)
         self.assertIn("— https://shop.example.com/api/shop/webhook.php: змініть URL", self.detail(res, "Вебхук «Сайт»"))
 
+    def test_www_redirect_names_exact_addresses(self):
+        """sevskiy.de → www.sevskiy.de (.htaccess сайту): точна «Адреса сайту», а вебхук — адреса з переадресації."""
+        Webhook.objects.create(name="Сайт", url="https://shop.example.com/api/shop/webhook.php")
+        moved = FakeResponse(301, headers={"Location": "https://www.shop.example.com/api/shop/catalog.php?lang=de"})
+        head = FakeResponse(301, headers={"Location": "https://www.shop.example.com/api/shop/webhook.php"})
+        with self.site(moved), mock.patch("requests.post", return_value=FakeResponse(301)), \
+                mock.patch.object(connection.requests, "head", return_value=head) as h:
+            res = connection.check(self.shop)
+        cat = self.detail(res, "Minerva → сайт")
+        self.assertIn("Вкажіть у «Адреса сайту» https://www.shop.example.com/,", cat)
+        self.assertIn(".htaccess", cat)
+        hook = self.detail(res, "Вебхук «Сайт»")
+        self.assertIn("на https://www.shop.example.com/api/shop/webhook.php.", hook)
+        self.assertEqual(h.call_args.kwargs["allow_redirects"], False)
+
+    def test_webhook_found_with_or_without_www(self):
+        Shop.objects.filter(pk=self.shop.pk).update(url="https://www.shop.example.com")
+        self.shop.refresh_from_db()
+        Webhook.objects.create(name="Сайт", url="https://shop.example.com/api/shop/webhook.php")
+        with self.site(FakeResponse(data=self.catalog())), \
+                mock.patch("requests.post", return_value=FakeResponse(200, text='{"ok":true}')):
+            res = connection.check(self.shop)
+        self.assertEqual(self.levels(res)["Вебхук «Сайт»"], "ok")
+
     def test_no_webhook_is_warning(self):
         with self.site(FakeResponse(data=self.catalog())):
             res = connection.check(self.shop)

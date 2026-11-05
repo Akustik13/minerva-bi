@@ -2468,11 +2468,13 @@
 {"uk": "{0} Агент: {1}", "en": "{0} Agent: {1}", "de": "{0} Agent: {1}"}
 {"uk": "{0} Б", "en": "{0} B", "de": "{0} B"}
 {"uk": "{0} Валюта магазину: {1}.", "en": "{0} Shop currency: {1}.", "de": "{0} Shopwährung: {1}."}
+{"uk": "{0} Вкажіть у вебхуку кінцеву адресу сайту (з https:// і www, якщо сайт їх вимагає).", "en": "{0} Enter the site's final address in the webhook (with https:// and www if the site requires them).", "de": "{0} Im Webhook die endgültige Adresse der Website eintragen (mit https:// und www, falls die Website sie verlangt)."}
 {"uk": "{0} Відкрийте askDANTE і відмітьте відхід або виправте день: {1}", "en": "{0} Open askDANTE and mark the clock-out or correct the day: {1}", "de": "{0} Öffnen Sie askDANTE und markieren Sie das Gehen oder korrigieren Sie den Tag: {1}"}
 {"uk": "{0} Відкрийте askDANTE і відмітьте відхід або виправте день: {1} Minerva закриває робочий день сама лише тоді, коли в askDANTE за день нічого не внесено вручну.", "en": "{0} Open askDANTE and mark the clock-out or correct the day: {1} Minerva closes the working day by itself only when nothing was entered manually in askDANTE for the day.", "de": "{0} Öffnen Sie askDANTE und markieren Sie das Gehen oder korrigieren Sie den Tag: {1} Minerva schließt den Arbeitstag nur dann selbst, wenn in askDANTE für den Tag nichts manuell eingetragen wurde."}
 {"uk": "{0} Відправлення #{1} → Скасовано.", "en": "{0} Shipment #{1} → Cancelled.", "de": "{0} Sendung #{1} → Storniert."}
 {"uk": "{0} Відправлення #{1}: {2}", "en": "{0} Shipment #{1}: {2}", "de": "{0} Sendung #{1}: {2}"}
 {"uk": "{0} Звідки: поле товару «{1}» — {2}{3}{4}", "en": "{0} Source: product field “{1}” — {2}{3}{4}", "de": "{0} Herkunft: Artikelfeld „{1}“ — {2}{3}{4}"}
+{"uk": "{0} Змініть URL у картці вебхука (REST API → Вебхуки) на {1}.", "en": "{0} Change the URL in the webhook card (REST API → Вебхуки) to {1}.", "de": "{0} In der Webhook-Karte (REST API → Вебхуки) die URL auf {1} ändern."}
 {"uk": "{0} КБ", "en": "{0} KB", "de": "{0} KB"}
 {"uk": "{0} ЛИСТИ", "en": "{0} ЛИСТИ", "de": "{0} ЛИСТИ"}
 {"uk": "{0} МБ", "en": "{0} MB", "de": "{0} MB"}
@@ -2570,6 +2572,7 @@
 {"uk": "{0} опубліковано на DigiKey", "en": "{0} published on DigiKey", "de": "{0} auf DigiKey veröffentlicht"}
 {"uk": "{0} отримав відмову {1} ({2})", "en": "{0} received a rejection {1} ({2})", "de": "{0} erhielt eine Ablehnung {1} ({2})"}
 {"uk": "{0} пар.", "en": "{0} params", "de": "{0} Param."}
+{"uk": "{0} переадресовує на {1}. {2} Вкажіть у «Адреса сайту» {3}, а URL вебхука сайту — {4}api/shop/webhook.php (REST API → Вебхуки).", "en": "{0} redirects to {1}. {2} Enter {3} in «Адреса сайту», and as the site's webhook URL — {4}api/shop/webhook.php (REST API → Вебхуки).", "de": "{0} leitet weiter auf {1}. {2} In «Адреса сайту» {3} eintragen, als Webhook-URL der Website — {4}api/shop/webhook.php (REST API → Вебхуки)."}
 {"uk": "{0} повторно надіслав замовлення {1} — воно вже було, нового не створено", "en": "{0} resent order {1} — it already existed, no new one was created", "de": "{0} hat den Auftrag {1} erneut gesendet — er existierte bereits, es wurde kein neuer angelegt"}
 {"uk": "{0} повід. · {1}", "en": "{0} msg. · {1}", "de": "{0} Nachr. · {1}"}
 {"uk": "{0} позицій", "en": "{0} lines", "de": "{0} Positionen"}
@@ -10227,6 +10230,7 @@
 {"uk": "Пауза 90 днів", "en": "Pause 90 days", "de": "Pause 90 Tage"}
 {"uk": "Пауза перед наступним циклом нарощування.", "en": "Pause before the next build-up cycle.", "de": "Pause vor dem nächsten Ausbauzyklus."}
 {"uk": "Пд. Корея", "en": "S. Korea", "de": "Südkorea"}
+{"uk": "Переадресацію робить сам сайт (правило в .htaccess) або хостинг; Minerva за нею не йде.", "en": "The redirect is made by the site itself (a rule in .htaccess) or by the hosting; Minerva does not follow it.", "de": "Die Weiterleitung macht die Website selbst (Regel in .htaccess) oder das Hosting; Minerva folgt ihr nicht."}
 {"uk": "Перебери даташити антен і внеси параметри на склад", "en": "Go through the antenna datasheets and enter the parameters into stock", "de": "Gehen Sie die Antennen-Datenblätter durch und tragen Sie die Parameter im Lager ein"}
 {"uk": "Переведення базових цін у {0}", "en": "Converting base prices to {0}", "de": "Umrechnung der Basispreise in {0}"}
 {"uk": "Переведено", "en": "Converted", "de": "Umgerechnet"}
@@ -12287,6 +12291,7 @@
 {"uk": "Сайт бере SMTP, відправника й «Відповіді покупців» звідси (акаунт пошти вище) замість private/contact-config.php і /admin/ → «Пошта». Перевіряє раз на хвилину.", "en": "The site takes SMTP, sender and “Customer replies” from here (the mail account above) instead of private/contact-config.php and /admin/ → “Mail”. Checked once a minute.", "de": "Die Website übernimmt SMTP, Absender und „Antworten der Kunden“ von hier (das E-Mail-Konto oben) statt aus private/contact-config.php und /admin/ → „E-Mail“. Prüfung einmal pro Minute."}
 {"uk": "Сайт бере налаштування з private/minerva-config.php.", "en": "The site takes its settings from private/minerva-config.php.", "de": "Die Website übernimmt ihre Einstellungen aus private/minerva-config.php."}
 {"uk": "Сайт видаляє файл при наступному запиті налаштувань; знімається, коли сайти повідомили, що файлу немає.", "en": "The site deletes the file on its next settings request; it is removed once the sites report that the file is gone.", "de": "Die Website löscht die Datei bei der nächsten Einstellungsanfrage; der Eintrag entfällt, sobald die Websites melden, dass die Datei nicht mehr vorhanden ist."}
+{"uk": "Сайт відповів HTTP {0} на {1} — переадресовує. {2}", "en": "The site answered HTTP {0} to {1} — it redirects. {2}", "de": "Die Website antwortete mit HTTP {0} auf {1} — sie leitet weiter. {2}"}
 {"uk": "Сайт відповів HTTP {0} на {1}.", "en": "The site responded with HTTP {0} at {1}.", "de": "Die Website hat unter {1} mit HTTP {0} geantwortet."}
 {"uk": "Сайт відповідає помилкою — перевірте «🔌 Перевірити зв'язок із сайтом».", "en": "The site responds with an error — check “🔌 Check connection with the site”.", "de": "Die Website antwortet mit einem Fehler – prüfen Sie „🔌 Verbindung zur Website prüfen“."}
 {"uk": "Сайт відповідає, але магазин на ньому вимкнено ('enabled' => false у private/shop-config.php).", "en": "The site responds, but the shop on it is disabled ('enabled' => false in private/shop-config.php).", "de": "Die Website antwortet, aber der Shop ist dort deaktiviert ('enabled' => false in private/shop-config.php)."}
