@@ -3815,7 +3815,7 @@ class InventorySettingsAdmin(admin.ModelAdmin):
         }),
         ("📥 Надходження на склад (закупівлі)", {
             "fields": ("add_on_po_receive", "api_delivery_mode", "incoming_delivered", "incoming_notify_email",
-                       "incoming_notify_telegram"),
+                       "incoming_notify_telegram", "incoming_pending_panel"),
             "description": "Контролює чи автоматично зараховувати товар при зміні qty_received у PO. "
                            "Закупівлі, які зробила зовнішня CRM, приходять через REST API "
                            "(/api/v1/purchase-orders/, права purchases:read / purchases:write): "
@@ -3851,7 +3851,50 @@ class InventorySettingsAdmin(admin.ModelAdmin):
         }),
     )
 
-    readonly_fields = ("media_cache_panel", "rfq_email_templates_panel", "media_links_panel")
+    readonly_fields = ("media_cache_panel", "rfq_email_templates_panel", "media_links_panel", "incoming_pending_panel")
+
+    def incoming_pending_panel(self, obj):
+        """Доставлені посилки з неоприбуткованою закупівлею (доставили до того, як увімкнули налаштування) + кнопка."""
+        from shipping.services.incoming import pending_delivered
+        pending = pending_delivered()
+        if not pending:
+            return format_html('<span style="opacity:.75">{}</span>', _("Доставлених посилок з неоприбуткованою "
+                                                                         "закупівлею немає. Трекінг — кожні 5 хв."))
+        rows = format_html_join("", '<li><a href="{}">{}</a> · {} · 📥 #{} {} — доставлено {}</li>', (
+            (reverse("admin:inventory_purchaseorder_change", args=[s.purchase_order_id]), s.purchase_order.code,
+             s.purchase_order.supplier or "—", s.pk, s.tracking_number,
+             timezone.localtime(s.delivered_at).strftime("%d.%m %H:%M") if s.delivered_at else "—") for s in pending))
+        mode = (obj.incoming_delivered if obj else InventorySettings.INCOMING_NOTIFY)
+        can = mode in (InventorySettings.INCOMING_ARRIVED, InventorySettings.INCOMING_RECEIVE)
+        button = format_html(
+            '<button type="submit" class="button" formaction="{}" formmethod="post" formnovalidate '
+            'onclick="return confirm(\'{}\')">📥 Застосувати до цих посилок зараз</button>',
+            reverse("admin:inventory_inventorysettings_incoming_catch_up"),
+            _("Застосувати збережене налаштування до доставлених посилок? Оприбуткування — один раз на закупівлю.")) \
+            if can else format_html('<div style="opacity:.8">{}</div>', _(
+                "Щоб оприбуткувати їх автоматично, виберіть «📦 … «прибуло»» або «✅ … одразу оприбуткувати», "
+                "«Зберегти» — і тут з'явиться кнопка."))
+        return format_html('<div>{}</div><ul style="margin:4px 0">{}</ul>{}',
+                           _("Уже доставлені, а закупівлю не оприбутковано (налаштування діє, коли статус стає "
+                             "«Доставлено», — ці доставили раніше):"), rows, button)
+    incoming_pending_panel.short_description = _("Доставлені, не оприбутковані")
+
+    def _incoming_catch_up_view(self, request):
+        """«📥 Застосувати до цих посилок зараз» (POST, право change налаштувань)."""
+        from django.contrib import messages as _msg
+        from django.shortcuts import redirect
+        from shipping.services import incoming
+        back = reverse("admin:inventory_inventorysettings_changelist")
+        if request.method != "POST" or not self.has_change_permission(request):
+            self.message_user(request, _("Немає права змінювати налаштування складу"), _msg.ERROR)
+            return redirect(back)
+        result = incoming.catch_up()
+        for _parcel, out in result["done"]:
+            self.message_user(request, incoming.outcome_text(out), _msg.SUCCESS)
+        if not result["done"]:
+            self.message_user(request, _("Нічого не застосовано — збережіть «📦 … «прибуло»» або «✅ … одразу "
+                                         "оприбуткувати» і спробуйте знову."), _msg.INFO)
+        return redirect(back)
 
     def media_links_panel(self, obj):
         from .admin_media_links import settings_panel
@@ -4050,6 +4093,8 @@ function invMediaCache() {{
                  name="inventory_inventorysettings_media_links"),
             path("media-links/status/", self.admin_site.admin_view(self._media_links_status_view),
                  name="inventory_inventorysettings_media_links_status"),
+            path("incoming/catch-up/", self.admin_site.admin_view(self._incoming_catch_up_view),
+                 name="inventory_inventorysettings_incoming_catch_up"),
         ]
         return custom + urls
 
@@ -4236,12 +4281,24 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
         if not obj or not obj.pk:
             return "—"
         add = reverse("admin:shipping_shipment_add_tracking") + f"?direction=in&po={obj.pk}"
+        parcels = list(obj.parcels.select_related("carrier").order_by("-pk")[:20])
         rows = format_html_join(
             "", '<div><a href="{}">📥 #{} · {} · {}</a> — {}</div>',
             ((reverse("admin:shipping_shipment_detail", args=[s.pk]), s.pk, s.carrier.name, s.tracking_number,
-              s.get_status_display()) for s in obj.parcels.select_related("carrier").order_by("-pk")[:20]))
-        return format_html('{}<div style="margin-top:4px"><a href="{}">＋ Додати трек-номер посилки</a></div>',
-                           rows or "—", add)
+              s.get_status_display()) for s in parcels))
+        check = ""
+        if parcels:
+            from shipping.services.incoming import pending_delivered
+            pending = pending_delivered(obj)
+            hint = format_html('<div style="margin-top:4px">✅ Посилку доставлено — закупівлю ще не оприбутковано.</div>') \
+                if pending else ""
+            check = format_html(
+                '{}<div style="margin-top:6px"><button type="submit" class="button" formaction="{}" formmethod="post" '
+                'formnovalidate title="Оновити трекінг посилок зараз і застосувати налаштування складу «📥 Вхідну посилку '
+                'доставлено» (повідомити / «прибуло» / оприбуткувати)">🔄 Перевірити посилки зараз</button></div>',
+                hint, reverse("admin:inventory_purchaseorder_parcels_check", args=[obj.pk]))
+        return format_html('{}{}<div style="margin-top:4px"><a href="{}">＋ Додати трек-номер посилки</a></div>',
+                           rows or "—", check, add)
     parcels_view.short_description = _("📦 Посилки (трекінг)")
 
     class Media:
@@ -4252,6 +4309,42 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
         initial.setdefault('order_date', timezone.now().date())
         initial.setdefault('status', 'draft')
         return initial
+
+    def get_urls(self):
+        return [path('<int:pk>/parcels/check/', self.admin_site.admin_view(self.parcels_check_view),
+                     name='inventory_purchaseorder_parcels_check')] + super().get_urls()
+
+    def parcels_check_view(self, request, pk):
+        """«🔄 Перевірити посилки зараз» (POST): трекінг вхідних посилок закупівлі зараз, потім — налаштування
+        «📥 Вхідну посилку доставлено» і для вже доставлених (shipping/services/incoming.py)."""
+        from django.contrib import messages as _msg
+        from django.shortcuts import redirect
+        from shipping.services import incoming
+        po = self.get_queryset(request).filter(pk=pk).first()
+        back = reverse('admin:inventory_purchaseorder_change', args=[pk])
+        if po is None or request.method != 'POST' or not self.has_change_permission(request, po):
+            self.message_user(request, _("Немає права змінювати закупівлю"), _msg.ERROR)
+            return redirect(back)
+        for parcel, before, after, error in incoming.refresh(po):
+            if error:
+                self.message_user(request, f'⚠️ #{parcel.pk} {parcel.tracking_number}: {error}', _msg.WARNING)
+            else:
+                self.message_user(request, f'🔄 #{parcel.pk} {parcel.tracking_number}: {parcel.get_status_display()}'
+                                           + ('' if before == after else ' (оновлено)'), _msg.INFO)
+        po.refresh_from_db()
+        result = incoming.catch_up(po)
+        for _parcel, out in result['done']:
+            self.message_user(request, incoming.outcome_text(out), _msg.SUCCESS)
+        if result['pending'] and not result['done']:
+            self.message_user(request, _("✅ Посилку доставлено. Налаштування складу — «Лише повідомити», тож оприбуткуйте "
+                                         "вручну: «Status» → Received → «Зберегти» (або виберіть «✅ … одразу "
+                                         "оприбуткувати» в налаштуваннях складу)."), _msg.INFO)
+        elif not result['pending'] and not result['done']:
+            po.refresh_from_db()
+            if po.status not in ('received', 'cancelled') and not po.parcels.filter(status='delivered').exists():
+                self.message_user(request, _("ℹ️ Посилка ще не доставлена — перевірю знову за розкладом (кожні 5 хв)."),
+                                  _msg.INFO)
+        return redirect(back)
 
     def save_model(self, request, obj, form, change):
         if change and obj.pk:

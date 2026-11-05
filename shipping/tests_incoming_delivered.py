@@ -16,7 +16,7 @@ from shipping.services import incoming
 TN, TN2 = '1Z2R5D130407163813', '1Z2R5D130407163999'
 
 
-class IncomingDeliveredTests(TestCase):
+class Base(TestCase):
     def setUp(self):
         from config.models import NotificationSettings, SystemSettings
         SystemSettings.objects.update_or_create(pk=1, defaults={'is_onboarding_complete': True})
@@ -46,6 +46,8 @@ class IncomingDeliveredTests(TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             s.save()
 
+
+class IncomingDeliveredTests(Base):
     def test_notify_only(self):
         self.deliver()
         self.mail.assert_called_once()
@@ -112,3 +114,62 @@ class IncomingDeliveredTests(TestCase):
         out = Shipment.objects.create(carrier=self.ups, tracking_number='1ZOUT0000001', status='in_transit',
                                       recipient_name='ACME')
         self.assertEqual(incoming.on_delivered(out), {})
+
+
+class CatchUpTests(Base):
+    """Посилку доставили до того, як увімкнули налаштування (статус змінився без сигналу) — «Перевірити зараз»."""
+
+    def old_delivered(self):
+        from django.utils import timezone
+        Shipment.objects.filter(pk=self.parcel.pk).update(status='delivered', delivered_at=timezone.now())
+
+    def test_pending_and_catch_up(self):
+        self.old_delivered()
+        self.assertEqual([s.pk for s in incoming.pending_delivered()], [self.parcel.pk])
+        out = incoming.catch_up()                                   # «лише повідомити» — нічого не робить
+        self.assertEqual((out['mode'], out['done']), ('notify', []))
+        self.mail.assert_not_called()
+        self.mode(InventorySettings.INCOMING_RECEIVE)
+        out = incoming.catch_up()
+        self.assertEqual(len(out['done']), 1)
+        self.assertIn('✅', incoming.outcome_text(out['done'][0][1]))
+        self.line.refresh_from_db()
+        self.assertEqual(self.line.qty_received, Decimal('1000'))
+        self.assertEqual(incoming.pending_delivered(), [])
+        self.assertEqual(incoming.catch_up()['done'], [])           # удруге — нічого
+
+    def test_po_check_button_refreshes_tracking(self):
+        from django.contrib.auth.models import User
+        self.client.force_login(User.objects.create_superuser('boss', 'b@x.y', 'p'))
+        self.mode(InventorySettings.INCOMING_RECEIVE)
+
+        def track(parcel, dry_run=False):
+            parcel.status = 'delivered'
+            parcel.save()
+            return True, [{'tracker': 'ups'}]
+        page = self.client.get(f'/admin/inventory/purchaseorder/{self.po.pk}/change/').content.decode()
+        self.assertIn('🔄 Перевірити посилки зараз', page)
+        with mock.patch('shipping.services.tracking_engine.track_with_fallback', side_effect=track), \
+                self.captureOnCommitCallbacks(execute=True):
+            r = self.client.post(f'/admin/inventory/purchaseorder/{self.po.pk}/parcels/check/', follow=True)
+        self.line.refresh_from_db()
+        self.assertEqual(self.line.qty_received, Decimal('1000'))   # оприбутковано один раз
+        self.assertEqual(self.po.receipts.count(), 1)
+        self.assertContains(r, 'Доставлено (оновлено)')
+        self.assertEqual(self.client.get(f'/admin/inventory/purchaseorder/{self.po.pk}/parcels/check/')
+                         .status_code, 302)                         # GET нічого не робить
+
+    def test_settings_panel_and_button(self):
+        from django.contrib.auth.models import User
+        self.client.force_login(User.objects.create_superuser('boss', 'b@x.y', 'p'))
+        self.old_delivered()
+        page = self.client.get('/admin/inventory/inventorysettings/', follow=True).content.decode()
+        self.assertIn(self.po.code, page)
+        self.assertNotIn('📥 Застосувати до цих посилок зараз', page)   # «лише повідомити» — без кнопки
+        self.mode(InventorySettings.INCOMING_RECEIVE)
+        page = self.client.get('/admin/inventory/inventorysettings/', follow=True).content.decode()
+        self.assertIn('📥 Застосувати до цих посилок зараз', page)
+        r = self.client.post('/admin/inventory/inventorysettings/incoming/catch-up/', follow=True)
+        self.assertContains(r, f'✅ {self.po.code}: оприбутковано на склад')
+        self.line.refresh_from_db()
+        self.assertEqual(self.line.qty_received, Decimal('1000'))

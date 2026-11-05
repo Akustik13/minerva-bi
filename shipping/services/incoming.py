@@ -142,3 +142,79 @@ def on_delivered(shipment) -> dict:
         import logging
         logging.getLogger(__name__).warning("incoming delivered #%s: %s", shipment.pk, e)
     return out
+
+
+# ── «🔄 Перевірити зараз» і вже доставлені посилки ────────────────────────────
+
+CATCH_UP_DAYS = 90
+
+
+def pending_delivered(po=None, days=CATCH_UP_DAYS) -> list:
+    """Доставлені вхідні посилки, з якими ще нічого не зроблено: закупівля не отримана й не скасована, доставки
+    з посилки (`parcel:…`) у закупівлі ще немає — доставили до того, як увімкнули налаштування, тощо."""
+    import datetime
+    from django.db.models import Q
+    from inventory.models import PurchaseOrder
+    from shipping.models import Shipment
+    since = timezone.now() - datetime.timedelta(days=days)
+    qs = (Shipment.objects.filter(direction=Shipment.IN, status="delivered", purchase_order__isnull=False)
+          .exclude(purchase_order__status__in=(PurchaseOrder.Status.RECEIVED, PurchaseOrder.Status.CANCELLED))
+          .filter(Q(delivered_at__gte=since) | Q(delivered_at__isnull=True, created_at__gte=since))
+          .exclude(purchase_order__receipts__delivery_key__startswith="parcel:")
+          .select_related("purchase_order", "purchase_order__supplier", "carrier").order_by("-pk"))
+    if po is not None:
+        qs = qs.filter(purchase_order=po)
+    return list(qs.distinct())
+
+
+def catch_up(po=None) -> dict:
+    """Застосувати налаштування «📥 Вхідну посилку доставлено» до вже доставлених посилок. Лише «прибуло» /
+    «оприбуткувати» (повідомлення про старі посилки не шлемо повторно). → {mode, pending, done: [(посилка, out)]}"""
+    from inventory.models import InventorySettings
+    mode = InventorySettings.get().incoming_delivered
+    pending = pending_delivered(po)
+    done = []
+    if mode in (InventorySettings.INCOMING_ARRIVED, InventorySettings.INCOMING_RECEIVE):
+        seen = set()
+        for parcel in pending:
+            if parcel.purchase_order_id in seen:      # одна закупівля — один раз
+                continue
+            seen.add(parcel.purchase_order_id)
+            done.append((parcel, on_delivered(parcel)))
+    return {"mode": mode, "pending": pending, "done": done}
+
+
+def refresh(po) -> list:
+    """Оновити трекінг живих вхідних посилок закупівлі зараз (як cron `track_shipments`). Стала «Доставлено» —
+    сигнал сам застосує налаштування. → [(посилка, статус до, статус після, помилка)]."""
+    from shipping.models import Shipment
+    from shipping.services.tracking_engine import track_with_fallback
+    out = []
+    for parcel in po.parcels.filter(direction=Shipment.IN).exclude(status__in=("delivered",) + LIVE_EXCLUDE) \
+            .exclude(tracking_number="").select_related("carrier"):
+        before, error = parcel.status, ""
+        try:
+            _changed, log = track_with_fallback(parcel)
+            if log and not any(not e.get("error") for e in log):
+                error = "; ".join(str(e.get("error")) for e in log)[:200]
+        except Exception as e:  # noqa: BLE001 — одна посилка не зупиняє решту
+            error = f"{type(e).__name__}: {e}"[:200]
+        parcel.refresh_from_db()
+        out.append((parcel, before, parcel.status, error))
+    return out
+
+
+def outcome_text(out) -> str:
+    """Що зроблено з посилкою (результат on_delivered) — людською мовою для повідомлення на сторінці."""
+    po, result, waiting = out.get("po"), out.get("result"), out.get("waiting") or []
+    code = po.code if po is not None else "—"
+    if out.get("error"):
+        return f"⚠️ {code}: не оприбутковано — {out['error']}"
+    if waiting:
+        return f"⏳ {code}: ще {len(waiting)} посилок у дорозі — дочекаюсь усіх"
+    if result is not None and result.get("booked"):
+        lines = ", ".join(f'{l.get("sku")} × {l.get("qty")}' for l in result.get("lines") or []) or "нічого нового"
+        return f"✅ {code}: оприбутковано на склад — {lines}"
+    if result is not None:
+        return f"📦 {code}: позначено «прибуло» — оприбуткуйте на сторінці закупівлі"
+    return f"ℹ️ {code}: нічого не змінено"
