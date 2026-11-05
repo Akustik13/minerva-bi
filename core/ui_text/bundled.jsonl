@@ -1818,6 +1818,7 @@
 {"uk": "StrategyTemplate ||--o{ TemplateStep : \"кроки\"", "en": "StrategyTemplate ||--o{ TemplateStep : \"steps\"", "de": "StrategyTemplate ||--o{ TemplateStep : \"Schritte\""}
 {"uk": "Stripe вибрано, але ключ не задано — покупці Stripe не побачать. Вставте ключ у «💳 Оплата Stripe» (спершу тестовий sk_test_…).", "en": "Stripe is selected but no key is set — Stripe customers will not see it. Paste the key into “💳 Stripe payment” (first the test sk_test_…).", "de": "Stripe ist ausgewählt, aber kein Schlüssel festgelegt – Stripe-Kunden sehen es nicht. Fügen Sie den Schlüssel unter „💳 Stripe-Zahlung“ ein (zuerst den Test-Schlüssel sk_test_…)."}
 {"uk": "Stripe вибрано, але не підключено", "en": "Stripe selected but not connected", "de": "Stripe ausgewählt, aber nicht verbunden"}
+{"uk": "Stripe не повернув client_secret для форми на сайті.", "en": "Stripe did not return a client_secret for the form on the site.", "de": "Stripe hat kein client_secret für das Formular auf der Website zurückgegeben."}
 {"uk": "Stripe недоступний: {0}", "en": "Stripe unavailable: {0}", "de": "Stripe nicht verfügbar: {0}"}
 {"uk": "Stripe працює без вебхука: Minerva сама питає Stripe про оплати кожні {0} хв. Щоб оплата позначалась одразу — додайте в Stripe вебхук з адресою з блоку «💳 Оплата Stripe» і вставте його секрет.", "en": "Stripe works without a webhook: Minerva itself asks Stripe about payments every {0} min. For payments to be marked immediately, add a webhook in Stripe with the address from the “💳 Stripe payment” block and paste its secret.", "de": "Stripe funktioniert ohne Webhook: Minerva fragt alle {0} Min. selbst bei Stripe nach Zahlungen. Damit Zahlungen sofort markiert werden, fügen Sie in Stripe einen Webhook mit der Adresse aus dem Block „💳 Stripe-Zahlung“ hinzu und tragen Sie dessen Secret ein."}
 {"uk": "Stripe працює без вебхука: Minerva сама питає Stripe про оплати кожні {0} хв. Щоб оплата позначалась одразу — у Stripe → Developers → Webhooks додайте вебхук з адресою нижче й вставте його секрет (whsec_…) у «💳 Оплата Stripe».", "en": "Stripe works without a webhook: Minerva asks Stripe about payments itself every {0} min. To mark payments at once — in Stripe → Developers → Webhooks add a webhook with the address below and paste its secret (whsec_…) into «💳 Оплата Stripe».", "de": "Stripe funktioniert ohne Webhook: Minerva fragt Stripe selbst alle {0} Min. nach Zahlungen. Damit Zahlungen sofort erfasst werden — in Stripe → Developers → Webhooks einen Webhook mit der Adresse unten anlegen und sein Secret (whsec_…) in «💳 Оплата Stripe» einfügen."}
@@ -1825,6 +1826,7 @@
 {"uk": "Stripe у касі", "en": "Stripe at checkout", "de": "Stripe an der Kasse"}
 {"uk": "Stripe у магазині не підключено (немає ключа).", "en": "Stripe is not connected in the shop (no key).", "de": "Stripe ist im Shop nicht verbunden (kein Schlüssel)."}
 {"uk": "Stripe ще не надсилав вебхуків", "en": "Stripe has not sent any webhooks yet", "de": "Stripe hat noch keine Webhooks gesendet"}
+{"uk": "Stripe: публічний ключ", "en": "Stripe: publishable key", "de": "Stripe: öffentlicher Schlüssel"}
 {"uk": "Stripe: секрет вебхука", "en": "Stripe: webhook secret", "de": "Stripe: Webhook-Secret"}
 {"uk": "Stripe: секретний ключ", "en": "Stripe: secret key", "de": "Stripe: Secret Key"}
 {"uk": "Style — стиль кабелю", "en": "Style — cable style", "de": "Style — Kabelstil"}
@@ -2129,6 +2131,7 @@
 {"uk": "carrier_shipment_id відсутній", "en": "carrier_shipment_id is missing", "de": "carrier_shipment_id fehlt"}
 {"uk": "changed_since: очікується дата або дата й час ISO 8601.", "en": "changed_since: a date or a date and time in ISO 8601 is expected.", "de": "changed_since: Erwartet wird ein Datum oder Datum mit Uhrzeit nach ISO 8601."}
 {"uk": "check_tasks: готово", "en": "check_tasks: done", "de": "check_tasks: fertig"}
+{"uk": "client_secret сесії embedded_page — сайт відкриває нею форму Stripe.", "en": "client_secret of the embedded_page session — the site opens the Stripe form with it.", "de": "client_secret der embedded_page-Sitzung — damit öffnet die Website das Stripe-Formular."}
 {"uk": "cnt + ' невідом' + (cnt === 1 ? 'е поле' : 'их полів') + '", "en": "cnt + ' unknown ' + (cnt === 1 ? 'field' : 'fields') + '", "de": "cnt + ' unbekannte' + (cnt === 1 ? 's Feld' : ' Felder') + '"}
 {"uk": "collectstatic timeout (>120с)", "en": "collectstatic timeout (>120s)", "de": "collectstatic-Timeout (>120 s)"}
 {"uk": "collectstatic готово!", "en": "collectstatic done!", "de": "collectstatic abgeschlossen!"}
@@ -2204,6 +2207,7 @@
 {"uk": "git pull помилка", "en": "git pull error", "de": "git pull-Fehler"}
 {"uk": "git не знайдено в контейнері. Потрібен --rebuild образу.", "en": "git not found in the container. An image --rebuild is required.", "de": "git wurde im Container nicht gefunden. Ein --rebuild des Images ist erforderlich."}
 {"uk": "git не знайдено.", "en": "git not found.", "de": "git wurde nicht gefunden."}
+{"uk": "hosted_page — сторінка Stripe; embedded_page — форма на сторінці сайту.", "en": "hosted_page — Stripe page; embedded_page — form on the site page.", "de": "hosted_page — Stripe-Seite; embedded_page — Formular auf der Website."}
 {"uk": "http(s)://адреса:порт без /v2 — складається з полів «Адреса RAG-ПК», «Порт», «HTTPS». Порожньо — пошук RAG вимкнено.", "en": "http(s)://address:port without /v2 — built from the fields “RAG PC address”, “Port”, “HTTPS”. Empty — RAG search is disabled.", "de": "http(s)://Adresse:Port ohne /v2 – wird aus den Feldern „Adresse des RAG-PCs“, „Port“, „HTTPS“ gebildet. Leer – die RAG-Suche ist deaktiviert."}
 {"uk": "http:// дозволено лише до IP локальної мережі (напр. 192.168.…); інакше потрібен https://.", "en": "http:// is allowed only for local network IPs (e.g. 192.168.…); otherwise https:// is required.", "de": "http:// ist nur für IP-Adressen des lokalen Netzwerks erlaubt (z. B. 192.168.…); andernfalls ist https:// erforderlich."}
 {"uk": "https://… посилання на сторінку або PDF", "en": "https://… link to a page or PDF", "de": "https://… Link auf eine Seite oder ein PDF"}
@@ -2272,6 +2276,7 @@
 {"uk": "pg_dump не знайдено. Перебудуйте Docker образ: docker-compose build web && docker-compose up -d", "en": "pg_dump not found. Rebuild the Docker image: docker-compose build web && docker-compose up -d", "de": "pg_dump wurde nicht gefunden. Erstellen Sie das Docker-Image neu: docker-compose build web && docker-compose up -d"}
 {"uk": "pk своїх категорій, яких не показувати в лівій колонці скриньки (правий клік → «Сховати»)", "en": "pk of your own categories not to show in the mailbox’s left column (right-click → “Hide”)", "de": "pk eigener Kategorien, die in der linken Spalte des Postfachs nicht angezeigt werden (Rechtsklick → „Ausblenden“)"}
 {"uk": "pk товарів, які агент уже пройшов", "en": "pk of products the agent has already gone through", "de": "pk der Artikel, die der Agent bereits durchlaufen hat"}
+{"uk": "pk_test_… / pk_live_… — Stripe → Developers → API keys → Publishable key (того самого режиму, що й секретний). Потрібен для оплати на сторінці сайту; не секрет — його бачить браузер покупця.", "en": "pk_test_… / pk_live_… — Stripe → Developers → API keys → Publishable key (same mode as the secret key). Needed for payment on the site page; not a secret — the customer's browser sees it.", "de": "pk_test_… / pk_live_… — Stripe → Developers → API keys → Publishable key (im selben Modus wie der geheime Schlüssel). Nötig für die Zahlung auf der Website; nicht geheim — der Browser des Kunden sieht ihn."}
 {"uk": "placeholder=\"🔍 Введіть партнамбер або назву...\"", "en": "placeholder=\"🔍 Enter a part number or name...\"", "de": "placeholder=\"🔍 Teilenummer oder Namen eingeben...\""}
 {"uk": "playwright не встановлений.", "en": "playwright is not installed.", "de": "playwright ist nicht installiert."}
 {"uk": "playwright не встановлений. Виконайте: pip install playwright playwright install chromium", "en": "playwright is not installed. Run: pip install playwright playwright install chromium", "de": "playwright ist nicht installiert. Führen Sie aus: pip install playwright playwright install chromium"}
@@ -7362,6 +7367,7 @@
 {"uk": "Ключ сайту не прив'язаний до магазину.", "en": "The website key is not bound to a shop.", "de": "Der Website-Schlüssel ist nicht an einen Shop gebunden."}
 {"uk": "Ключ сайту: Minerva відкине поля", "en": "Website key: Minerva will discard the fields", "de": "Website-Schlüssel: Minerva verwirft die Felder"}
 {"uk": "Ключ сесії покупця (або заголовок X-Customer-Session): замовлення з'явиться в його кабінеті", "en": "Buyer session key (or the X-Customer-Session header): the order will appear in their account", "de": "Sitzungsschlüssel des Käufers (oder Header X-Customer-Session): Der Auftrag erscheint in seinem Kundenkonto"}
+{"uk": "Ключ форми на сайті", "en": "Site form key", "de": "Schlüssel des Formulars auf der Website"}
 {"uk": "Ключ ідемпотентності (повтор не дублює рух)", "en": "Idempotency key (a repeat does not duplicate the movement)", "de": "Idempotenzschlüssel (eine Wiederholung dupliziert die Bewegung nicht)"}
 {"uk": "Ключ із правами", "en": "Key with permissions", "de": "Schlüssel mit Berechtigungen"}
 {"uk": "Ключам без прав «Акаунти покупців»: {0}", "en": "Keys without “Customer accounts” permissions: {0}", "de": "Schlüssel ohne Berechtigung „Kundenkonten“: {0}"}
@@ -9893,6 +9899,9 @@
 {"uk": "Оплата", "en": "Payment", "de": "Zahlung"}
 {"uk": "Оплата Stripe", "en": "Stripe payment", "de": "Stripe-Zahlung"}
 {"uk": "Оплата на сайті", "en": "Payment on the site", "de": "Zahlung auf der Website"}
+{"uk": "Оплата на сторінці сайту", "en": "Payment on the site page", "de": "Zahlung auf der Website"}
+{"uk": "Оплата на сторінці сайту не діє: {0}.", "en": "Payment on the site page is not active: {0}.", "de": "Zahlung auf der Website nicht aktiv: {0}."}
+{"uk": "Оплата на сторінці сайту: {0}", "en": "Payment on the site page: {0}", "de": "Zahlung auf der Website: {0}"}
 {"uk": "Оплата протягом 14 днів після рахунку.", "en": "Payment within 14 days of the invoice.", "de": "Zahlung innerhalb von 14 Tagen nach Rechnung."}
 {"uk": "Оплата цього замовлення вже обробляється (напр. SEPA) — дочекайтесь результату.", "en": "The payment for this order is already being processed (e.g. SEPA) — wait for the result.", "de": "Die Zahlung für diesen Auftrag wird bereits verarbeitet (z. B. SEPA) – warten Sie das Ergebnis ab."}
 {"uk": "Оплати", "en": "Payments", "de": "Zahlungen"}
@@ -14214,6 +14223,7 @@
 {"uk": "Фон інпуту (--bg-input)", "en": "Input background (--bg-input)", "de": "Eingabefeld-Hintergrund (--bg-input)"}
 {"uk": "Фони", "en": "Backgrounds", "de": "Hintergründe"}
 {"uk": "Фонові завдання", "en": "Background tasks", "de": "Hintergrundaufgaben"}
+{"uk": "Форма Stripe відкривається прямо на сторінці сайту (Kasse), без переходу на сторінку Stripe; після оплати покупець лишається на сайті. Потрібен публічний ключ і сайт v022+. Вимкнено — перехід на сторінку Stripe і назад.", "en": "The Stripe form opens right on the site page (Kasse), without going to the Stripe page; after paying the customer stays on the site. Needs the publishable key and site v022+. Off — go to the Stripe page and back.", "de": "Das Stripe-Formular öffnet sich direkt auf der Website (Kasse), ohne Wechsel zur Stripe-Seite; nach der Zahlung bleibt der Kunde auf der Website. Nötig: öffentlicher Schlüssel und Website v022+. Aus — Wechsel zur Stripe-Seite und zurück."}
 {"uk": "Форма відправлення", "en": "Shipment form", "de": "Sendungsformular"}
 {"uk": "Форма містить незбережені зміни.", "en": "The form contains unsaved changes.", "de": "Das Formular enthält nicht gespeicherte Änderungen."}
 {"uk": "Формат", "en": "Format", "de": "Format"}
@@ -15652,6 +15662,7 @@
 {"uk": "він покаже ваш ID", "en": "it will show your ID", "de": "er zeigt Ihnen Ihre ID an"}
 {"uk": "г (грам)", "en": "g (gram)", "de": "g (Gramm)"}
 {"uk": "галочка «{0}» на «🧠 База знань» вимкнена", "en": "the “{0}” checkbox on “🧠 Knowledge base” is off", "de": "das Kontrollkästchen „{0}“ auf „🧠 Wissensdatenbank“ ist deaktiviert"}
+{"uk": "галочка «Оплата на сторінці сайту»", "en": "checkbox «Оплата на сторінці сайту»", "de": "Häkchen «Оплата на сторінці сайту»"}
 {"uk": "галочка — лише для цього друку", "en": "checkbox — for this print only", "de": "Häkchen — nur für diesen Druck"}
 {"uk": "год", "en": "h", "de": "Std."}
 {"uk": "год за останні {0} днів", "en": "h in the last {0} days", "de": "Std. in den letzten {0} Tagen"}
@@ -15847,6 +15858,7 @@
 {"uk": "діє до", "en": "valid until", "de": "gültig bis"}
 {"uk": "діє до {0}", "en": "valid until {0}", "de": "gültig bis {0}"}
 {"uk": "діє з {0}", "en": "active since {0}", "de": "gilt seit {0}"}
+{"uk": "діє — форма Stripe на сторінці сайту (Kasse)", "en": "on — Stripe form on the site page (Kasse)", "de": "aktiv — Stripe-Formular auf der Website (Kasse)"}
 {"uk": "дії", "en": "actions", "de": "Aktionen"}
 {"uk": "експорт", "en": "export", "de": "Export"}
 {"uk": "елемент", "en": "item", "de": "Element"}
@@ -16935,7 +16947,9 @@
 {"uk": "немає працівників з галочкою «Автозаповнення» (👥 Працівники askDANTE)", "en": "no employees with the “Auto-fill” checkbox (👥 askDANTE employees)", "de": "keine Mitarbeiter mit dem Häkchen „Automatisches Ausfüllen“ (👥 askDANTE-Mitarbeiter)"}
 {"uk": "немає профілю Minerva", "en": "no Minerva profile", "de": "kein Minerva-Profil"}
 {"uk": "немає прохання про Angebot / ціну", "en": "no request for an Angebot / price", "de": "keine Bitte um Angebot / Preis"}
+{"uk": "немає публічного ключа (pk_test_… / pk_live_…)", "en": "no publishable key (pk_test_… / pk_live_…)", "de": "kein öffentlicher Schlüssel (pk_test_… / pk_live_…)"}
 {"uk": "немає реакції — {0}. Потрібне ручне втручання", "en": "no reaction — {0}. Manual action needed", "de": "keine Reaktion — {0}. Manuelles Eingreifen nötig"}
+{"uk": "немає секретного ключа Stripe", "en": "no Stripe secret key", "de": "kein geheimer Stripe-Schlüssel"}
 {"uk": "немає такого календаря", "en": "no such calendar", "de": "kein solcher Kalender"}
 {"uk": "немає такої підписки", "en": "no such subscription", "de": "kein solches Abonnement"}
 {"uk": "немає текстових вкладень", "en": "no text attachments", "de": "keine Textanhänge"}
@@ -17002,6 +17016,7 @@
 {"uk": "ні в тексті, ні в HTML-версії листа", "en": "neither in the text nor in the HTML version of the e-mail", "de": "weder im Text noch in der HTML-Version der E-Mail"}
 {"uk": "ні файлу, ні посилання", "en": "neither a file nor a link", "de": "weder Datei noch Link"}
 {"uk": "ні, лише нові й змінені", "en": "no, only new and changed", "de": "nein, nur neue und geänderte"}
+{"uk": "ні, перехід на сторінку Stripe", "en": "no, redirect to the Stripe page", "de": "nein, Wechsel zur Stripe-Seite"}
 {"uk": "нікого", "en": "nobody", "de": "niemand"}
 {"uk": "нікого — додайте внизу «👥 Доступ до адмінки сайту»", "en": "no one — add at the bottom “👥 Access to the site admin”", "de": "niemand — fügen Sie unten „👥 Zugriff auf die Website-Administration“ hinzu"}
 {"uk": "ніколи", "en": "never", "de": "nie"}
@@ -17640,6 +17655,7 @@
 {"uk": "публічний", "en": "public", "de": "öffentlich"}
 {"uk": "публічний Qdrant (даташити) не має колекції пошти", "en": "the public Qdrant (datasheets) has no mail collection", "de": "das öffentliche Qdrant (Datenblätter) hat keine Mail-Collection"}
 {"uk": "публічний ключ доступу.", "en": "public access key.", "de": "öffentlicher Zugriffsschlüssel."}
+{"uk": "публічний і секретний ключі з різних режимів (тестовий / бойовий)", "en": "publishable and secret keys are from different modes (test / live)", "de": "öffentlicher und geheimer Schlüssel aus verschiedenen Modi (Test / Live)"}
 {"uk": "пунктир — зв'язок за значенням або через API (не зовнішній ключ)", "en": "dashed — a relation by value or via API (not a foreign key)", "de": "gestrichelt — Beziehung über den Wert oder per API (kein Fremdschlüssel)"}
 {"uk": "пунктів — спершу приберіть один.", "en": "items — remove one first.", "de": "Einträge — entfernen Sie zuerst einen."}
 {"uk": "під це замовлення вже враховано {0}", "en": "{0} already accounted for this order", "de": "für diesen Auftrag sind bereits {0} berücksichtigt"}

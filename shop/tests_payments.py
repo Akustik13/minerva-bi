@@ -27,18 +27,25 @@ class FakeStripe:
 
     def __init__(self):
         self.sessions, self.calls = {}, []
+        self.old_api = False   # обліковий запис на старій версії API: ui_mode embedded_page ще невідомий
 
     def __call__(self, method, url, data=None, headers=None, timeout=None):
         path = url.split("://", 1)[1].split("/", 1)[1]
         form = dict(data or [])
         self.calls.append((method, "/" + path, form, headers or {}))
         resp = mock.Mock()
+        if method == "POST" and path == "v1/checkout/sessions" and self.old_api and form.get("ui_mode") == "embedded_page":
+            resp.status_code = 400
+            resp.json.return_value = {"error": {"message": "Invalid ui_mode: must be one of hosted, embedded or custom"}}
+            return resp
         if method == "POST" and path == "v1/checkout/sessions":
             sid = f"cs_test_{len(self.sessions) + 1}"
             s = {"id": sid, "object": "checkout.session", "url": f"https://checkout.stripe.test/{sid}",
                  "status": "open", "payment_status": "unpaid", "livemode": False,
                  "expires_at": int(time.time()) + 86400, "payment_intent": None,
                  "amount_total": int(form["line_items[0][price_data][unit_amount]"])}
+            if form.get("ui_mode") in ("embedded_page", "embedded"):   # форма на сайті: client_secret, без url
+                s.update({"url": None, "client_secret": f"{sid}_secret_abc", "ui_mode": form["ui_mode"]})
             self.sessions[sid] = s
             resp.status_code, resp.json.return_value = 200, s
         elif method == "POST" and path.endswith("/expire"):
@@ -100,7 +107,7 @@ class CheckoutTests(StripeTestCase):
     def test_status(self):
         self.assertEqual(self.c.get("/api/v1/shop/payments/").json(), {
             "methods": ["prepayment", "invoice", "stripe"],
-            "stripe": {"enabled": True, "connected": True, "mode": "test"}})
+            "stripe": {"enabled": True, "connected": True, "mode": "test", "embedded_checkout": False}})
         self.shop.payment_methods = ["invoice", "prepayment"]  # Stripe прибрали з каси
         self.shop.save()
         d = self.c.get("/api/v1/shop/payments/").json()
@@ -476,3 +483,73 @@ class MailTemplateTests(StripeTestCase):
         self.assertEqual(dj_mail.outbox[-1].to, ["adm@example.com"])
         r = self.client.get("/admin/shop/shopmailtemplate/add/?kind=paid&lang=en")
         self.assertContains(r, "Payment received")
+
+
+class EmbeddedCheckoutTests(StripeTestCase):
+    """Оплата на сторінці сайту (Stripe Embedded Checkout, ui_mode embedded_page) — сайт v022+ (_embedded.php)."""
+
+    def setUp(self):
+        super().setUp()
+        self.shop.stripe_publishable_key, self.shop.stripe_embedded = "pk_test_abc123", True
+        self.shop.save()
+
+    def embedded(self, number="WS-1", **over):
+        body = {"order_number": number, "lang": "de", "ui_mode": "embedded_page",
+                "return_url": SITE + "?zahlung=ok", "redirect_on_completion": "if_required"}
+        body.update(over)
+        return self.c.post("/api/v1/shop/payments/stripe/checkout/", body, format="json")
+
+    def test_status_flag(self):
+        self.assertTrue(self.c.get("/api/v1/shop/payments/").json()["stripe"]["embedded_checkout"])
+        for field, value in (("stripe_publishable_key", "pk_live_abc"), ("stripe_publishable_key", ""),
+                             ("stripe_embedded", False)):
+            Shop.objects.filter(pk=self.shop.pk).update(**{field: value})
+            self.assertFalse(self.c.get("/api/v1/shop/payments/").json()["stripe"]["embedded_checkout"], field)
+            Shop.objects.filter(pk=self.shop.pk).update(stripe_publishable_key="pk_test_abc123", stripe_embedded=True)
+
+    def test_embedded_session_for_the_site(self):
+        import re
+        self.order()
+        r = self.embedded()
+        self.assertEqual(r.status_code, 201, r.content)
+        d = r.json()
+        self.assertRegex(d["client_secret"], r"^cs_(test|live)_[A-Za-z0-9]+_secret_[A-Za-z0-9]+$")   # як перевіряє сайт
+        self.assertEqual((d["publishable_key"], d["ui_mode"], d["order_number"]), ("pk_test_abc123", "embedded_page", "WS-1"))
+        self.assertEqual(d["client_secret"].split("_secret_")[0], d["session_id"])
+        form = self.fake.calls[-1][2]
+        self.assertEqual((form["ui_mode"], form["return_url"], form["redirect_on_completion"]),
+                         ("embedded_page", SITE + "?zahlung=ok", "if_required"))
+        self.assertNotIn("success_url", form)
+        self.assertNotIn("cancel_url", form)
+        p = ShopPayment.objects.get()
+        self.assertEqual((p.ui_mode, p.client_secret), ("embedded_page", d["client_secret"]))
+
+    def test_reuse_and_switch_without_double_payment(self):
+        self.order()
+        first = self.embedded().json()
+        posts = len([c for c in self.fake.calls if c[0] == "POST" and c[1] == "/v1/checkout/sessions"])
+        self.assertEqual(self.embedded().json()["client_secret"], first["client_secret"])   # та сама сесія
+        self.assertEqual(posts, len([c for c in self.fake.calls if c[0] == "POST" and c[1] == "/v1/checkout/sessions"]))
+        hosted = self.checkout().json()                                                      # сторінка Stripe
+        self.assertTrue(hosted["url"].startswith("https://checkout.stripe.test/"))
+        self.assertNotIn("client_secret", hosted)
+        self.assertEqual(ShopPayment.objects.get(session_id=first["session_id"]).status, ShopPayment.EXPIRED)
+        self.assertIn(("POST", f"/v1/checkout/sessions/{first['session_id']}/expire"),
+                      [(c[0], c[1]) for c in self.fake.calls])
+
+    def test_unavailable_and_bad_return_url(self):
+        self.order()
+        Shop.objects.filter(pk=self.shop.pk).update(stripe_embedded=False)
+        r = self.embedded()
+        self.assertEqual((r.status_code, r.json()["code"]), (409, "embedded_unavailable"))
+        Shop.objects.filter(pk=self.shop.pk).update(stripe_embedded=True)
+        r = self.embedded(return_url="https://evil.example.org/x")
+        self.assertEqual(r.status_code, 400)
+
+    def test_older_stripe_api_version(self):
+        self.order()
+        self.fake.old_api = True
+        r = self.embedded()
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(self.fake.calls[-1][2]["ui_mode"], "embedded")
+        self.assertTrue(r.json()["client_secret"])

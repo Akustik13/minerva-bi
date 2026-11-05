@@ -144,8 +144,13 @@ def stripe_tools(shop: Shop) -> str:
                  else format_html('<span style="color:#81c784">бойовий режим</span>') if mode == "live" else "—")
     path = payments.webhook_path(shop)
     last = ShopPayment.objects.filter(shop=shop).order_by("-created_at").first()
+    problem = payments.embedded_problem(shop)
+    embedded = (format_html('<span style="color:#81c784">{}</span>', "діє — форма Stripe на сторінці сайту (Kasse)")
+                if not problem else format_html("{} — {}", "ні, перехід на сторінку Stripe",
+                                                problem if problem != "вимкнено" else "галочка «Оплата на сторінці сайту»"))
     return format_html(
         '<div>Секретний ключ: {} · секрет вебхука: {} · {}</div>'
+        '<div style="margin-top:6px">Оплата на сторінці сайту: {}</div>'
         '<div style="margin-top:6px">Адреса вебхука для Stripe (Developers → Webhooks → Add endpoint): '
         '<code id="stripe-hook-{}">{}</code>'
         '<script>(function(){{var c=document.getElementById("stripe-hook-{}");if(c)c.textContent=location.origin+c.textContent;}})();</script>'
@@ -156,7 +161,7 @@ def stripe_tools(shop: Shop) -> str:
         '🔌 Перевірити ключ Stripe</button> '
         '<button type="submit" class="button" formaction="{}" formnovalidate>🔄 Перевірити незавершені оплати зараз</button> '
         '<span class="help">незбережені зміни на сторінці не зберігаються</span></div>',
-        tail(shop.stripe_secret_key), tail(shop.stripe_webhook_secret), mode_html,
+        tail(shop.stripe_secret_key), tail(shop.stripe_webhook_secret), mode_html, embedded,
         shop.pk, path, shop.pk, ", ".join(STRIPE_EVENTS),
         format_html('<a href="{}">{} · {} {} · {}</a>', reverse("admin:shop_shoppayment_change", args=[last.pk]),
                     timezone.localtime(last.created_at).strftime("%d.%m.%Y %H:%M"), last.amount, last.currency,

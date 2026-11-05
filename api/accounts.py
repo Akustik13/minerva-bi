@@ -226,14 +226,14 @@ class OrderPayView(AccountView):
     def post(self, request, number):
         def run(req, d):
             from shop import payments
-            from .payments import checkout_payload
+            from .payments import checkout_args, checkout_payload
             info = accounts.find_order(self.customer, number)
             try:
                 payment = payments.start_checkout(self.shop, info.order, d.get("success_url"), d.get("cancel_url"),
-                                                  d.get("lang") or self.customer.lang)
+                                                  d.get("lang") or self.customer.lang, **checkout_args(d))
             except payments.PaymentError as e:
                 raise AccountError(e.status, e.code, e.message)
-            return Response(checkout_payload(payment), status=status.HTTP_201_CREATED)
+            return Response(checkout_payload(payment, number), status=status.HTTP_201_CREATED)
         return self.dispatch_account(request, run)
 
 

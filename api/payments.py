@@ -31,9 +31,22 @@ def _error(e: PaymentError):
     return Response({"detail": e.message, "code": e.code}, status=e.status)
 
 
-def checkout_payload(payment) -> dict:
-    return {"url": payment.url, "session_id": payment.session_id, "amount": payment.amount,
-            "currency": payment.currency, "expires_at": payment.expires_at, "mode": "live" if payment.livemode else "test"}
+def checkout_payload(payment, number: str = "") -> dict:
+    """Відповідь сайту; для форми на сторінці сайту (embedded_page) — ще client_secret і публічний ключ.
+    number — номер, яким сайт питав (сайт звіряє order_number з ним)."""
+    out = {"url": payment.url, "session_id": payment.session_id, "amount": payment.amount,
+           "currency": payment.currency, "expires_at": payment.expires_at, "mode": "live" if payment.livemode else "test",
+           "order_number": str(number or payment.order.order_number), "ui_mode": payment.ui_mode}
+    if payment.ui_mode == payments.EMBEDDED and payment.client_secret:
+        out.update({"client_secret": payment.client_secret,
+                    "publishable_key": (payment.shop.stripe_publishable_key or "").strip()})
+    return out
+
+
+def checkout_args(d) -> dict:
+    """Поля запиту сайту для start_checkout (і сторінка Stripe, і форма на сайті)."""
+    return {"ui_mode": str(d.get("ui_mode") or ""), "return_url": d.get("return_url"),
+            "redirect_on_completion": str(d.get("redirect_on_completion") or "")}
 
 
 class PaymentsStatusView(APIView):
@@ -54,10 +67,10 @@ class StripeCheckoutView(APIView):
         try:
             order = payments.find_order(shop, d.get("order_number"))
             payment = payments.start_checkout(shop, order, d.get("success_url"), d.get("cancel_url"),
-                                              d.get("lang", "de"))
+                                              d.get("lang", "de"), **checkout_args(d))
         except PaymentError as e:
             return _error(e)
-        return Response(checkout_payload(payment), status=status.HTTP_201_CREATED)
+        return Response(checkout_payload(payment, d.get("order_number")), status=status.HTTP_201_CREATED)
 
 
 class StripeSyncView(APIView):

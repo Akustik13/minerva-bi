@@ -237,6 +237,17 @@ class Shop(models.Model):
         "Stripe: секрет вебхука", max_length=255, blank=True, default="",
         help_text="whsec_… — Stripe → Developers → Webhooks → ваш endpoint → Signing secret.",
     )
+    stripe_publishable_key = models.CharField(
+        "Stripe: публічний ключ", max_length=255, blank=True, default="",
+        help_text="pk_test_… / pk_live_… — Stripe → Developers → API keys → Publishable key (того самого режиму, що й "
+                  "секретний). Потрібен для оплати на сторінці сайту; не секрет — його бачить браузер покупця.",
+    )
+    stripe_embedded = models.BooleanField(
+        "Оплата на сторінці сайту", default=False,
+        help_text="Форма Stripe відкривається прямо на сторінці сайту (Kasse), без переходу на сторінку Stripe; після "
+                  "оплати покупець лишається на сайті. Потрібен публічний ключ і сайт v022+. Вимкнено — перехід на "
+                  "сторінку Stripe і назад.",
+    )
     stripe_poll_minutes = models.PositiveSmallIntegerField(
         "Автоперевірка оплат, хв", default=15,
         help_text="Поки вебхук Stripe не працює, Minerva раз на стільки хвилин сама питає Stripe про незавершені "
@@ -636,6 +647,10 @@ class ShopPayment(models.Model):
     last_event = models.CharField("Остання подія Stripe", max_length=80, blank=True, default="")
     expires_at = models.DateTimeField("Сесія дійсна до", null=True, blank=True)
     paid_at = models.DateTimeField("Оплачено", null=True, blank=True)
+    ui_mode = models.CharField("Вигляд", max_length=20, default="hosted_page",
+                               help_text="hosted_page — сторінка Stripe; embedded_page — форма на сторінці сайту.")
+    client_secret = models.CharField("Ключ форми на сайті", max_length=300, blank=True, default="",
+                                     help_text="client_secret сесії embedded_page — сайт відкриває нею форму Stripe.")
     notified_at = models.DateTimeField("Лист «оплату отримано»", null=True, blank=True,
                                        help_text="Покупцю надіслано підтвердження оплати (один раз).")
     created_at = models.DateTimeField("Створено", auto_now_add=True)

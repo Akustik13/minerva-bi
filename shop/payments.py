@@ -78,11 +78,31 @@ def site_methods(shop: Shop | None) -> list[str] | None:
     return [m for m in shop.payment_methods if m != "stripe" or connected(shop)]
 
 
+HOSTED, EMBEDDED = "hosted_page", "embedded_page"
+EMBEDDED_MODES = ("embedded_page", "embedded")   # що може попросити сайт; Stripe API: embedded_page (до 2026 — embedded)
+REDIRECTS = ("always", "if_required", "never")
+
+
+def embedded_problem(shop: Shop | None) -> str:
+    """Чому оплата на сторінці сайту не діє ('' — діє)."""
+    if shop is None or not shop.stripe_embedded:
+        return "вимкнено"
+    if not connected(shop):
+        return "немає секретного ключа Stripe"
+    pk = (shop.stripe_publishable_key or "").strip()
+    if not pk.startswith(("pk_test_", "pk_live_")):
+        return "немає публічного ключа (pk_test_… / pk_live_…)"
+    if key_mode(pk) != key_mode(shop.stripe_secret_key):
+        return "публічний і секретний ключі з різних режимів (тестовий / бойовий)"
+    return ""
+
+
 def public_status(shop: Shop | None) -> dict:
-    """Що бачить сайт: способи оплати магазину і стан Stripe."""
+    """Що бачить сайт: способи оплати магазину і стан Stripe (embedded_checkout — форма на сторінці сайту)."""
     return {"methods": site_methods(shop),
             "stripe": {"enabled": enabled(shop), "connected": connected(shop),
-                       "mode": key_mode(shop.stripe_secret_key) if shop else ""}}
+                       "mode": key_mode(shop.stripe_secret_key) if shop else "",
+                       "embedded_checkout": bool(shop) and enabled(shop) and not embedded_problem(shop)}}
 
 
 # ── Stripe API ───────────────────────────────────────────────────────────────
@@ -190,12 +210,24 @@ def find_order(shop: Shop, number):
     return order
 
 
-def start_checkout(shop: Shop, order, success_url, cancel_url, lang: str = "de") -> ShopPayment:
-    """Сторінка оплати Stripe для замовлення: відкрита сесія використовується повторно (без подвійної оплати)."""
+def start_checkout(shop: Shop, order, success_url, cancel_url, lang: str = "de", ui_mode: str = "",
+                   return_url=None, redirect_on_completion: str = "") -> ShopPayment:
+    """Оплата Stripe для замовлення: відкрита сесія того самого вигляду використовується повторно, інші відкриті —
+    закриваються (без подвійної оплати). ui_mode embedded_page (сайт просить форму на своїй сторінці) — сесія
+    embedded_page з return_url і client_secret; інакше — сторінка Stripe (success_url / cancel_url)."""
     from sales.models import SalesOrder
     if not connected(shop):  # Stripe прибрали з каси — давніші замовлення все одно можна оплатити
         raise PaymentError(403, "stripe_disabled", "Stripe у магазині не підключено (немає ключа).")
-    success_url, cancel_url = check_return_url(shop, success_url), check_return_url(shop, cancel_url)
+    embedded = str(ui_mode or "") in EMBEDDED_MODES
+    if embedded:
+        problem = embedded_problem(shop)
+        if problem:
+            raise PaymentError(409, "embedded_unavailable", f"Оплата на сторінці сайту не діє: {problem}.")
+        return_url = check_return_url(shop, return_url)
+        redirect_on_completion = redirect_on_completion if redirect_on_completion in REDIRECTS else "if_required"
+    else:
+        success_url, cancel_url = check_return_url(shop, success_url), check_return_url(shop, cancel_url)
+    wanted = EMBEDDED if embedded else HOSTED
     if order.document_type == "QUOTE" or order.status == "cancelled":
         raise PaymentError(409, "not_payable", "Це замовлення не оплачується онлайн.")
     if order.payment_status == "paid":
@@ -214,11 +246,11 @@ def start_checkout(shop: Shop, order, success_url, cancel_url, lang: str = "de")
             raise PaymentError(409, "payment_processing",
                                "Оплата цього замовлення вже обробляється (напр. SEPA) — дочекайтесь результату.")
         now = timezone.now()
-        reuse = (order.shop_payments.filter(status=ShopPayment.OPEN, amount=gross, currency=currency,
+        reuse = (order.shop_payments.filter(status=ShopPayment.OPEN, amount=gross, currency=currency, ui_mode=wanted,
                                             expires_at__gt=now + REUSE_MARGIN).order_by("-created_at").first())
-        if reuse:
+        if reuse and (reuse.client_secret if embedded else reuse.url):
             return reuse
-        for old in order.shop_payments.filter(status=ShopPayment.OPEN):  # інша сума / майже прострочена
+        for old in order.shop_payments.filter(status=ShopPayment.OPEN):  # інша сума / вигляд / майже прострочена
             try:
                 _request(shop, "POST", f"/v1/checkout/sessions/{old.session_id}/expire")
             except PaymentError as e:
@@ -233,17 +265,30 @@ def start_checkout(shop: Shop, order, success_url, cancel_url, lang: str = "de")
             "line_items": [{"quantity": 1, "price_data": {
                 "currency": currency.lower(), "unit_amount": int(gross * 100),
                 "product_data": {"name": title[:250], "description": items or None}}}],
-            "success_url": success_url, "cancel_url": cancel_url,
             "client_reference_id": order.order_number, "locale": lang,
             "customer_email": order.email or None,
             "metadata": meta,
             "payment_intent_data": {"metadata": meta, "description": title[:250]},
         }
+        if embedded:
+            data.update({"ui_mode": EMBEDDED, "return_url": return_url, "redirect_on_completion": redirect_on_completion})
+        else:
+            data.update({"success_url": success_url, "cancel_url": cancel_url})
         attempt = order.shop_payments.count() + 1
-        session = _request(shop, "POST", "/v1/checkout/sessions", data,
-                           idempotency_key=f"minerva-{shop.slug}-{order.pk}-{attempt}")
+        key = f"minerva-{shop.slug}-{order.pk}-{attempt}" + ("-e" if embedded else "")
+        try:
+            session = _request(shop, "POST", "/v1/checkout/sessions", data, idempotency_key=key)
+        except PaymentError as e:
+            if not (embedded and "ui_mode" in e.message):
+                raise
+            # обліковий запис Stripe на старій версії API: там embedded_page ще звався embedded
+            data["ui_mode"] = "embedded"
+            session = _request(shop, "POST", "/v1/checkout/sessions", data, idempotency_key=key + "-legacy")
+        if embedded and not session.get("client_secret"):
+            raise PaymentError(502, "stripe_error", "Stripe не повернув client_secret для форми на сайті.")
         payment = ShopPayment.objects.create(
             order=order, shop=shop, session_id=session["id"], url=session.get("url") or "",
+            ui_mode=wanted, client_secret=session.get("client_secret") or "" if embedded else "",
             amount=gross, currency=currency, livemode=bool(session.get("livemode")),
             expires_at=_ts(session.get("expires_at")) or now + timedelta(hours=24))
         if order.payment_method != "stripe" or order.payment_status not in ("pending",):

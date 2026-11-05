@@ -311,8 +311,8 @@ class ShopAdmin(admin.ModelAdmin):
                            "замовленні: вимкнений спосіб не приймається.",
         }),
         ("💳 Оплата Stripe", {
-            "fields": ["stripe_secret_key", "stripe_webhook_secret", "stripe_clear",
-                       "stripe_poll_minutes", "stripe_col"],
+            "fields": ["stripe_secret_key", "stripe_webhook_secret", "stripe_clear", "stripe_publishable_key",
+                       "stripe_embedded", "stripe_poll_minutes", "stripe_col"],
             "description": "Щоб покупці бачили Stripe, відмітьте «Онлайн через Stripe» у способах оплати вище. "
                            "Покупець обирає на сайті «Kreditkarte / Online (Stripe)» і платить на сторінці Stripe Checkout; "
                            "суму рахує Minerva (нетто + доставка + ПДВ). Після оплати Stripe повідомляє Minerva "
