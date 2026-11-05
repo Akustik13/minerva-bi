@@ -23,6 +23,12 @@
             {% if s.kind == "recommended" %}<span class="rm-kind">рекомендовано</span>{% elif s.kind == "optional" %}<span class="rm-kind">за бажанням</span>{% endif %}
           </div>
           {% if s.detail %}<div class="rm-detail">{{ s.detail }}</div>{% endif %}
+          {% if s.items %}<ul class="rm-items">{% for it in s.items %}
+            <li><b>{{ it.title }}</b>{% if it.code %} <code class="rm-code" translate="no">{{ it.code }}</code>{% endif %}
+              {% for line in it.lines %}<div class="rm-line">{{ line }}</div>{% endfor %}
+              {% if it.links %}<div class="rm-line">{% for l in it.links %}<a href="{{ l.url }}">{{ l.label }} →</a>{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+            </li>{% endfor %}
+          </ul>{% endif %}
           {% if s.hint %}<div class="rm-hint">💡 {{ s.hint }}</div>{% endif %}
           {% if s.go or s.link %}<div class="rm-act">
             {% if s.go %}<a href="#" class="button" data-go="{{ s.go }}">{% if s.state == "done" or s.state == "skip" %}Перейти{% else %}Зробити{% endif %} ↓</a>{% endif %}

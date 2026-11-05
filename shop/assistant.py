@@ -90,14 +90,17 @@ def describe(shop: Shop) -> str:
 
 # ── Що фактично використовує кожен сайт (звіт сайту) і видалення файлу на сайтах ──────────────────────────────
 
-def record_report(shop: Shop, params) -> None:
-    """GET /shop/assistant/?site=…&file=…: сайт повідомляє, що в його private/minerva-config.php (без ключа)."""
+def record_report(shop: Shop, params, key=None) -> None:
+    """GET /shop/assistant/?site=…&file=…: сайт повідомляє, що в його private/minerva-config.php (без ключа).
+    key — ключ API, яким сайт звернувся (дорожня карта: який сайт яким ключем працює)."""
     host = str(params.get("site") or "").strip().lower()[:120]
     if not host or not all(c.isalnum() or c in ".-:" for c in host):
         return
     report = {"at": timezone.now().isoformat(timespec="seconds"), "file": params.get("file") == "1",
               "file_enabled": params.get("file_enabled") == "1", "file_key": params.get("file_key") == "1",
               "file_url": str(params.get("file_url") or "")[:200]}
+    if key is not None:
+        report["key"] = key.pk
     sites = dict(shop.assistant_sites or {})
     sites[host] = report
     sites = dict(sorted(sites.items(), key=lambda kv: kv[1].get("at", ""), reverse=True)[:10])

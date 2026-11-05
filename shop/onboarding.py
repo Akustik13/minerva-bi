@@ -4,7 +4,8 @@
 із сайтом» (shop/connection.py). Крок: {key, title, kind, state, detail, hint, go, link}:
 - kind: required — без цього магазин не працює; recommended — працює, але краще зробити; optional — за бажанням;
 - state: done — готово; warn — працює, але є що виправити; todo — не зроблено; skip — вимкнено (за бажанням);
-- go — поле картки (назва поля або #id елемента), до якого веде кнопка; link — {url, label} іншої сторінки.
+- go — поле картки (назва поля або #id елемента), до якого веде кнопка; link — {url, label} іншої сторінки;
+- items — як упізнати ключі кроку: [{title, code (початок…кінець ключа), lines, links [{url, label}]}].
 """
 from __future__ import annotations
 
@@ -22,11 +23,13 @@ DONE, WARN, TODO, SKIP = "done", "warn", "todo", "skip"
 REQUIRED, RECOMMENDED, OPTIONAL = "required", "recommended", "optional"
 QUIET_DAYS = 7    # сайт довше не звертався до Minerva — попередження
 REPORT_DAYS = 3   # звіти сайтів за цей час — які сайти зараз працюють з ключем магазину
+LOG_DAYS = 7      # «📜 Журнал API»: з яких адрес і якою програмою ключ звертався
+WHERE_ON_SITE = "на сайті — /admin/ → «🔌 Minerva»"
 
 
-def _step(key, title, kind, state, detail="", hint="", go="", link=None) -> dict:
+def _step(key, title, kind, state, detail="", hint="", go="", link=None, items=None) -> dict:
     return {"key": key, "title": title, "kind": kind, "state": state, "detail": detail, "hint": hint,
-            "go": go, "link": link}
+            "go": go, "link": link, "items": items or []}
 
 
 def _host(url) -> str:
@@ -44,6 +47,91 @@ def site_keys(shop: Shop) -> list:
     keys = APIKey.objects.filter(is_active=True).filter(
         Q(shop=shop) | Q(shop__isnull=True, default_source=shop.slug)).order_by("-last_used", "name")
     return [k for k in keys if not k.expires_at or k.expires_at >= today]
+
+
+def hosts_by_key(shop: Shop) -> dict:
+    """{pk ключа | None: {сайт}} — зі звітів сайтів за REPORT_DAYS днів. None — звіт без ключа (сайт звітував
+    до того, як Minerva почала його записувати; з наступним звітом з'явиться)."""
+    from django.utils.dateparse import parse_datetime
+    since = timezone.now() - timedelta(days=REPORT_DAYS)
+    out = {}
+    for reports in (shop.site_mail_reports or {}, shop.assistant_sites or {}):
+        for host, r in reports.items():
+            at = parse_datetime(str((r or {}).get("at") or ""))
+            if at is not None and at >= since:
+                out.setdefault((r or {}).get("key"), set()).add(host.lower())
+    known = set().union(*(v for k, v in out.items() if k is not None)) if out else set()
+    if None in out:
+        out[None] -= known                    # той самий сайт уже звітував з ключем — не «невідомий»
+        if not out[None]:
+            del out[None]
+    return out
+
+
+def _agent(text: str) -> str:
+    """Перший «продукт/версія» з User-Agent: «SevskiyShop/1.4», «curl/8.4.0», «Mozilla/5.0»."""
+    text = (text or "").strip()
+    return (text.split(" ")[0] if text else "")[:60]
+
+
+def key_items(shop: Shop, keys=None, usage: bool = True) -> list[dict]:
+    """Як упізнати кожен ключ магазину й де він працює (лише читання бази):
+    назва + початок і кінець ключа; сайти зі звітів; адреси й програма з «📜 Журналу API» за LOG_DAYS днів;
+    хто й коли підключив сайт кодом. usage=False — лише назва, ключ і права (крок «Ключ API для сайту»)."""
+    from django.db.models import Count, Max
+    from api.models import APIKey, APIRequestLog
+    from core.secrets import mask
+    from .connection import ACCOUNT_SCOPES, REQUIRED_SCOPES
+    from .models import ShopPairing
+    keys = site_keys(shop) if keys is None else keys
+    need = set(REQUIRED_SCOPES) | (set(ACCOUNT_SCOPES) if shop.accounts_enabled else set())
+    by_key = hosts_by_key(shop) if usage else {}
+    since = timezone.now() - timedelta(days=LOG_DAYS)
+    items = []
+    for k in keys:
+        lines, links = [], [{"url": reverse("admin:api_apikey_change", args=[k.pk]), "label": "Картка ключа"}]
+        if not usage:
+            missing = sorted(need - set(k.scopes or []))
+            lines.append("права: усі потрібні" if not missing else "бракує прав: " + ", ".join(missing))
+            lines.append(("останнє звернення " + _when(k.last_used)) if k.last_used else "ще не звертався")
+            items.append({"title": f"«{k.name}»", "code": mask(k.key), "lines": lines, "links": links})
+            continue
+        lines.append(("останнє звернення " + _when(k.last_used)) if k.last_used else "ще не звертався")
+        hosts = sorted(by_key.get(k.pk, ()))
+        if hosts:
+            lines.append("сайт: " + ", ".join(hosts) + f" — ключ {WHERE_ON_SITE}, закінчується на …{k.key[-4:]}")
+        logs = APIRequestLog.objects.filter(key=k, created_at__gte=since)
+        ips = list(logs.exclude(ip=None).values("ip").annotate(n=Count("id"), last=Max("created_at"))
+                   .order_by("-last", "-n")[:3])
+        if ips:
+            lines.append(f"звідки за {LOG_DAYS} днів: " + "; ".join(
+                f"{r['ip']} ({r['n']} запит., остання {timezone.localtime(r['last']):%d.%m %H:%M})" for r in ips))
+            agents = [_agent(r["user_agent"]) for r in logs.exclude(user_agent="").values("user_agent")
+                      .annotate(n=Count("id")).order_by("-n")[:3]]
+            agents = list(dict.fromkeys(a for a in agents if a))
+            if agents:
+                lines.append("програма: " + ", ".join(agents))
+            links.append({"url": reverse("admin:api_apirequestlog_changelist") + f"?key__id__exact={k.pk}",
+                          "label": "📜 Журнал ключа"})
+        elif k.log_mode == APIKey.LOG_OFF:
+            lines.append("журнал запитів цього ключа вимкнено — адрес не видно (картка ключа → «📜 Журнал запитів»)")
+        elif k.last_used:
+            lines.append(f"за {LOG_DAYS} днів запитів у журналі немає")
+        paired = (ShopPairing.objects.filter(api_key=k, used_at__isnull=False).select_related("created_by")
+                  .order_by("-used_at").first())
+        if paired:
+            who = (paired.created_by.get_full_name() or paired.created_by.username) if paired.created_by else "—"
+            lines.append(f"підключено кодом {timezone.localtime(paired.used_at):%d.%m.%Y %H:%M} · код створив {who}"
+                         + (f" · сайт {paired.site_url}" if paired.site_url else ""))
+        else:
+            lines.append(f"створено {timezone.localtime(k.created_at):%d.%m.%Y} вручну (REST API → API Токени)")
+        items.append({"title": f"«{k.name}»", "code": mask(k.key), "lines": lines, "links": links, "hosts": hosts})
+    unknown = sorted(by_key.get(None, ()))
+    if unknown:
+        items.append({"title": ", ".join(unknown), "code": "", "links": [],
+                      "lines": ["яким ключем — ще невідомо: сайт звітував до оновлення Minerva; з'явиться після його "
+                                f"наступного звіту (до {REPORT_DAYS} днів, зазвичай за кілька хвилин)"]})
+    return items
 
 
 def site_hosts(shop: Shop) -> list[str]:
@@ -145,17 +233,57 @@ def _payment(shop) -> dict:
                      "Виберіть, що покупець бачить у касі: передоплата, рахунок, Stripe.", go="payment_methods")
     detail = ", ".join(labels[m].split(" (")[0] for m in methods)
     bank = "Банківські реквізити для передоплати — на сайті /admin/ → «💳 Оплата»." if "prepayment" in methods else ""
+    items = stripe_items(shop) if "stripe" in methods or shop.stripe_secret_key else []
     if "stripe" in methods and not shop.stripe_secret_key:
         state = TODO if methods == ["stripe"] else WARN
         return _step("payment", "Оплата", REQUIRED, state, detail,
                      "Stripe вибрано, але ключ не задано — покупці Stripe не побачать. Вставте ключ у «💳 Оплата "
-                     "Stripe» (спершу тестовий sk_test_…).", go="stripe_secret_key")
+                     "Stripe» (спершу тестовий sk_test_…).", go="stripe_secret_key", items=items)
     if "stripe" in methods and not shop.stripe_webhook_secret:
         return _step("payment", "Оплата", REQUIRED, WARN, detail,
                      "Stripe працює без вебхука: Minerva сама питає Stripe про оплати кожні "
-                     f"{shop.stripe_poll_minutes or '—'} хв. Щоб оплата позначалась одразу — додайте в Stripe вебхук "
-                     "з адресою з блоку «💳 Оплата Stripe» і вставте його секрет. " + bank, go="stripe_webhook_secret")
-    return _step("payment", "Оплата", REQUIRED, DONE, detail, bank, go="payment_methods")
+                     f"{shop.stripe_poll_minutes or '—'} хв. Щоб оплата позначалась одразу — у Stripe → Developers → "
+                     "Webhooks додайте вебхук з адресою нижче й вставте його секрет (whsec_…) у «💳 Оплата Stripe». "
+                     + bank, go="stripe_webhook_secret", items=items)
+    return _step("payment", "Оплата", REQUIRED, DONE, detail, bank, go="payment_methods", items=items)
+
+
+STRIPE_MODES = (("sk_live_", "робочий (sk_live_)"), ("sk_test_", "тестовий (sk_test_)"),
+                ("rk_live_", "обмежений робочий (rk_live_)"), ("rk_test_", "обмежений тестовий (rk_test_)"))
+
+
+def stripe_items(shop: Shop) -> list[dict]:
+    """Ключ Stripe і секрет вебхука — початок і кінець, щоб знайти їх у кабінеті Stripe; адреса вебхука."""
+    from core.secrets import mask
+    from .payments import webhook_path
+    key = (shop.stripe_secret_key or "").strip()
+    mode = next((label for prefix, label in STRIPE_MODES if key.startswith(prefix)), "невідомого виду")
+    items = []
+    if key:
+        lines = [f"режим: {mode}",
+                 f"у Stripe: Developers → API keys — ключ, що закінчується на …{key[-4:]}"]
+        if shop.stripe_poll_last_at:
+            lines.append("остання автоперевірка оплат " + _when(shop.stripe_poll_last_at))
+        items.append({"title": "Ключ Stripe", "code": mask(key), "lines": lines, "links": []})
+    else:
+        items.append({"title": "Ключ Stripe", "code": "", "lines": ["не задано"], "links": []})
+    hook = (shop.stripe_webhook_secret or "").strip()
+    url = webhook_path(shop)
+    try:
+        from config.models import SystemSettings
+        s = SystemSettings.objects.first()
+        if s and s.site_domain:
+            url = s.site_url.rstrip("/") + url
+    except Exception:
+        pass
+    lines = [f"адреса вебхука для Stripe: {url}"]
+    if hook:
+        lines.append(f"у Stripe: Developers → Webhooks → вебхук з цією адресою → Signing secret …{hook[-4:]}")
+    lines.append(("останній вебхук від Stripe " + _when(shop.stripe_webhook_last_at))
+                 if shop.stripe_webhook_last_at else "Stripe ще не надсилав вебхуків")
+    items.append({"title": "Секрет вебхука Stripe", "code": mask(hook) if hook else "не задано", "lines": lines,
+                  "links": []})
+    return items
 
 
 def _key(shop) -> dict:
@@ -170,15 +298,18 @@ def _key(shop) -> dict:
                      go="site_admin_col")
     need = set(REQUIRED_SCOPES) | (set(ACCOUNT_SCOPES) if shop.accounts_enabled else set())
     names = ", ".join(f"«{k.name}» {mask(k.key)}" for k in keys)
+    items = key_items(shop, keys, usage=False)
     good = [k for k in keys if need <= set(k.scopes or [])]
     if not good:
         missing = sorted(need - set(keys[0].scopes or []))
         return _step("key", "Ключ API для сайту", REQUIRED, WARN, f"{names}: бракує прав {', '.join(missing)}",
                      "Додайте права в картці ключа або підключіть сайт кодом — новий ключ отримає їх сам.",
-                     link={"url": reverse("admin:api_apikey_change", args=[keys[0].pk]), "label": "Картка ключа"})
-    hint = ("Ключів кілька: кожен сайт — свій ключ; той, що більше не потрібен, вимкніть."
-            if len(keys) > 1 else "Ключ видає лише Minerva; на сайті він лежить у /admin/ → «🔌 Minerva».")
-    return _step("key", "Ключ API для сайту", REQUIRED, DONE, names, hint, go="keys_col")
+                     link={"url": reverse("admin:api_apikey_change", args=[keys[0].pk]), "label": "Картка ключа"},
+                     items=items)
+    hint = ("Ключів кілька: кожен сайт — свій ключ; який сайт яким користується — у кроці «Сайт підключено». "
+            "Той, що більше не потрібен, вимкніть." if len(keys) > 1
+            else f"Ключ видає лише Minerva; {WHERE_ON_SITE}.")
+    return _step("key", "Ключ API для сайту", REQUIRED, DONE, f"ключів: {len(keys)}", hint, go="keys_col", items=items)
 
 
 def _staff(shop) -> dict:
@@ -209,19 +340,29 @@ def _connected(shop) -> dict:
                      "сайт (код)» у блоці «🌐 Адмінка сайту» (діє 30 хв). Сайт отримає власний ключ і вебхук. Потім — "
                      "«🔌 Перевірити зв'язок із сайтом».", go="site_admin_col")
     detail = f"останнє звернення {_when(used)}" + (f" · сайти: {', '.join(hosts)}" if hosts else "")
+    items = key_items(shop, keys)
     others = [h for h in hosts if h != own]
     if own and others:
+        from core.secrets import mask
+        by_key = hosts_by_key(shop)
+        which = []
+        for h in others:
+            ks = [k for k in keys if h in by_key.get(k.pk, ())]
+            which.append(f"{h} — " + (", ".join(f"ключ «{k.name}» {mask(k.key)}" for k in ks) if ks
+                                      else "ключ стане видно після наступного звіту сайту"))
         return _step("connected", "Сайт підключено", REQUIRED, WARN, detail,
-                     f"Ключем цього магазину користується ще {', '.join(others)}. Сайти одного магазину мають спільні "
-                     "акаунти покупців, кошики й замовлення. Для тестового чи іншого сайту — окремий магазин "
-                     "(«📋 Копіювати магазин») і підключення кодом.", go="site_admin_col")
+                     f"Ключем цього магазину користується ще {'; '.join(which)}. Сайти одного магазину мають спільні "
+                     "акаунти покупців, кошики й замовлення. Якщо це інший сайт — на ньому "
+                     f"(/admin/ → «🔌 Minerva») замініть ключ на ключ його власного магазину, а для тестового сайту — "
+                     "окремий магазин («📋 Копіювати магазин») і підключення кодом. Якщо ключ на тому сайті більше не "
+                     "потрібен — вимкніть його в картці ключа.", go="site_admin_col", items=items)
     if timezone.now() - used > timedelta(days=QUIET_DAYS):
         return _step("connected", "Сайт підключено", REQUIRED, WARN, detail,
                      f"Сайт не звертався понад {QUIET_DAYS} днів. Перевірте, чи працює сайт і чи не змінився ключ, — "
-                     "«🔌 Перевірити зв'язок із сайтом».", go="connection_col")
+                     "«🔌 Перевірити зв'язок із сайтом».", go="connection_col", items=items)
     return _step("connected", "Сайт підключено", REQUIRED, DONE, detail,
                  "Повна перевірка (каталог, ключ, вебхук, фото) — «🔌 Перевірити зв'язок із сайтом».",
-                 go="connection_col")
+                 go="connection_col", items=items)
 
 
 def _webhook(shop) -> dict:

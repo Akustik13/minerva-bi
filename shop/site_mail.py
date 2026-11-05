@@ -55,8 +55,9 @@ def problem(shop: Shop) -> str:
     return ""
 
 
-def record_report(shop: Shop, params) -> None:
-    """Що в пошті сайту (його файли / /admin/): ?mail_site=…&mail_host=…&mail_user=…&mail_from=…&mail_password=1…"""
+def record_report(shop: Shop, params, key=None) -> None:
+    """Що в пошті сайту (його файли / /admin/): ?mail_site=…&mail_host=…&mail_user=…&mail_from=…&mail_password=1…
+    key — ключ API, яким сайт звернувся (дорожня карта показує, який сайт яким ключем працює)."""
     host = str(params.get("mail_site") or "").strip().lower()[:120]
     if not host or not all(c.isalnum() or c in ".-:" for c in host):
         return
@@ -65,6 +66,8 @@ def record_report(shop: Shop, params) -> None:
               "host": text("mail_host"), "user": text("mail_user"), "from": text("mail_from"),
               "password": params.get("mail_password") == "1", "notify": text("mail_notify", 300),
               "confirmation": params.get("mail_confirmation") == "1", "recipient": text("mail_recipient")}
+    if key is not None:
+        report["key"] = key.pk
     reports = dict(shop.site_mail_reports or {})
     reports[host] = report
     reports = dict(sorted(reports.items(), key=lambda kv: kv[1].get("at", ""), reverse=True)[:10])

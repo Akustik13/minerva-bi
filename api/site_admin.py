@@ -80,7 +80,7 @@ class SiteMailView(APIView):
                             status=status.HTTP_404_NOT_FOUND)
         bound = _bound_shop(request) is not None
         if bound and request.query_params.get("mail_site"):
-            site_mail.record_report(shop, request.query_params)
+            site_mail.record_report(shop, request.query_params, key)
         return Response(site_mail.public_config(shop, key))
 
 

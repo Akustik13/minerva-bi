@@ -1814,9 +1814,11 @@
 {"uk": "Stripe вибрано, але не підключено", "en": "Stripe selected but not connected", "de": "Stripe ausgewählt, aber nicht verbunden"}
 {"uk": "Stripe недоступний: {0}", "en": "Stripe unavailable: {0}", "de": "Stripe nicht verfügbar: {0}"}
 {"uk": "Stripe працює без вебхука: Minerva сама питає Stripe про оплати кожні {0} хв. Щоб оплата позначалась одразу — додайте в Stripe вебхук з адресою з блоку «💳 Оплата Stripe» і вставте його секрет.", "en": "Stripe works without a webhook: Minerva itself asks Stripe about payments every {0} min. For payments to be marked immediately, add a webhook in Stripe with the address from the “💳 Stripe payment” block and paste its secret.", "de": "Stripe funktioniert ohne Webhook: Minerva fragt alle {0} Min. selbst bei Stripe nach Zahlungen. Damit Zahlungen sofort markiert werden, fügen Sie in Stripe einen Webhook mit der Adresse aus dem Block „💳 Stripe-Zahlung“ hinzu und tragen Sie dessen Secret ein."}
+{"uk": "Stripe працює без вебхука: Minerva сама питає Stripe про оплати кожні {0} хв. Щоб оплата позначалась одразу — у Stripe → Developers → Webhooks додайте вебхук з адресою нижче й вставте його секрет (whsec_…) у «💳 Оплата Stripe».", "en": "Stripe works without a webhook: Minerva asks Stripe about payments itself every {0} min. To mark payments at once — in Stripe → Developers → Webhooks add a webhook with the address below and paste its secret (whsec_…) into «💳 Оплата Stripe».", "de": "Stripe funktioniert ohne Webhook: Minerva fragt Stripe selbst alle {0} Min. nach Zahlungen. Damit Zahlungen sofort erfasst werden — in Stripe → Developers → Webhooks einen Webhook mit der Adresse unten anlegen und sein Secret (whsec_…) in «💳 Оплата Stripe» einfügen."}
 {"uk": "Stripe підключено ({0})", "en": "Stripe connected ({0})", "de": "Stripe verbunden ({0})"}
 {"uk": "Stripe у касі", "en": "Stripe at checkout", "de": "Stripe an der Kasse"}
 {"uk": "Stripe у магазині не підключено (немає ключа).", "en": "Stripe is not connected in the shop (no key).", "de": "Stripe ist im Shop nicht verbunden (kein Schlüssel)."}
+{"uk": "Stripe ще не надсилав вебхуків", "en": "Stripe has not sent any webhooks yet", "de": "Stripe hat noch keine Webhooks gesendet"}
 {"uk": "Stripe: секрет вебхука", "en": "Stripe: webhook secret", "de": "Stripe: Webhook-Secret"}
 {"uk": "Stripe: секретний ключ", "en": "Stripe: secret key", "de": "Stripe: Secret Key"}
 {"uk": "Style — стиль кабелю", "en": "Style — cable style", "de": "Style — Kabelstil"}
@@ -2374,6 +2376,7 @@
 {"uk": "{\"числовий_код\": \"значення\"}", "en": "{\"numeric_code\": \"value\"}", "de": "{\"numerischer_Code\": \"Wert\"}"}
 {"uk": "{0} % ({1} шт)", "en": "{0} % ({1} pcs)", "de": "{0} % ({1} Stk.)"}
 {"uk": "{0} % від {1}", "en": "{0} % of {1}", "de": "{0} % von {1}"}
+{"uk": "{0} ({1} запит., остання {2})", "en": "{0} ({1} req., last {2})", "de": "{0} ({1} Anfr., zuletzt {2})"}
 {"uk": "{0} ({1} листів)", "en": "{0} ({1} emails)", "de": "{0} ({1} E-Mails)"}
 {"uk": "{0} ({1} позицій)", "en": "{0} ({1} lines)", "de": "{0} ({1} Positionen)"}
 {"uk": "{0} ({1} тому)", "en": "{0} ({1} ago)", "de": "{0} (vor {1})"}
@@ -7277,7 +7280,9 @@
 {"uk": "Ключ Minerva (сервер підставить)", "en": "Minerva key (the server will insert it)", "de": "Minerva-Schlüssel (der Server setzt ihn ein)"}
 {"uk": "Ключ Minerva для RAG (RAG → Minerva)", "en": "Minerva key for RAG (RAG → Minerva)", "de": "Minerva-Schlüssel für RAG (RAG → Minerva)"}
 {"uk": "Ключ RAG API", "en": "RAG API key", "de": "RAG-API-Schlüssel"}
+{"uk": "Ключ Stripe", "en": "Stripe key", "de": "Stripe-Schlüssel"}
 {"uk": "Ключ «{0}»", "en": "Key “{0}”", "de": "Schlüssel „{0}“"}
+{"uk": "Ключ видає лише Minerva; {0}.", "en": "Only Minerva issues the key; {0}.", "de": "Den Schlüssel vergibt nur Minerva; {0}."}
 {"uk": "Ключ видає лише Minerva; на сайті він лежить у /admin/ → «🔌 Minerva».", "en": "Only Minerva issues the key; on the site it is stored in /admin/ → “🔌 Minerva”.", "de": "Den Schlüssel stellt nur Minerva aus; auf der Website liegt er unter /admin/ → „🔌 Minerva“."}
 {"uk": "Ключ вимкнений", "en": "Key disabled", "de": "Schlüssel deaktiviert"}
 {"uk": "Ключ вимкнений — будь-який запит отримає 401.", "en": "The key is disabled — any request will get 401.", "de": "Der Schlüssel ist deaktiviert — jede Anfrage erhält 401."}
@@ -7309,6 +7314,7 @@
 {"uk": "Ключ із правами", "en": "Key with permissions", "de": "Schlüssel mit Berechtigungen"}
 {"uk": "Ключам без прав «Акаунти покупців»: {0}", "en": "Keys without “Customer accounts” permissions: {0}", "de": "Schlüssel ohne Berechtigung „Kundenkonten“: {0}"}
 {"uk": "Ключем цього магазину користується ще {0}. Сайти одного магазину мають спільні акаунти покупців, кошики й замовлення. Для тестового чи іншого сайту — окремий магазин («📋 Копіювати магазин») і підключення кодом.", "en": "The key of this shop is also used by {0}. Sites of one shop share customer accounts, carts and orders. For a test or another site, use a separate shop (“📋 Copy shop”) and connect by code.", "de": "Den Schlüssel dieses Shops verwendet auch {0}. Websites eines Shops teilen Kundenkonten, Warenkörbe und Aufträge. Für eine Test- oder andere Website verwenden Sie einen eigenen Shop („📋 Shop kopieren“) und verbinden Sie per Code."}
+{"uk": "Ключем цього магазину користується ще {0}. Сайти одного магазину мають спільні акаунти покупців, кошики й замовлення. Якщо це інший сайт — на ньому (/admin/ → «🔌 Minerva») замініть ключ на ключ його власного магазину, а для тестового сайту — окремий магазин («📋 Копіювати магазин») і підключення кодом. Якщо ключ на тому сайті більше не потрібен — вимкніть його в картці ключа.", "en": "This shop's key is also used by {0}. Sites of one shop share customer accounts, carts and orders. If it is a different site — replace the key there (/admin/ → «🔌 Minerva») with the key of its own shop; for a test site — a separate shop («📋 Копіювати магазин») and connection by code. If the key is no longer needed on that site — deactivate it in the key card.", "de": "Den Schlüssel dieses Shops nutzt auch {0}. Websites eines Shops teilen Kundenkonten, Warenkörbe und Bestellungen. Ist es eine andere Website — dort (/admin/ → «🔌 Minerva») den Schlüssel durch den ihres eigenen Shops ersetzen; für eine Test-Website — ein eigener Shop («📋 Копіювати магазин») und Verbindung per Code. Wird der Schlüssel dort nicht mehr gebraucht — in der Schlüsselkarte deaktivieren."}
 {"uk": "Ключове слово для звуження (наприклад 'DigiKey', 'замовлення', 'відвантаження').", "en": "Keyword to narrow down the search (for example 'DigiKey', 'order', 'shipment').", "de": "Stichwort zur Eingrenzung (zum Beispiel 'DigiKey', 'Auftrag', 'Versand')."}
 {"uk": "Ключові компоненти (простий BOM)", "en": "Key components (simple BOM)", "de": "Schlüsselkomponenten (einfache BOM)"}
 {"uk": "Ключові компоненти — товар має список компонентів (BOM); без BOM — простий товар", "en": "Key components — the product has a list of components (BOM); without BOM — a simple product", "de": "Schlüsselkomponenten — der Artikel hat eine Komponentenliste (BOM); ohne BOM — einfacher Artikel"}
@@ -7328,6 +7334,7 @@
 {"uk": "Ключі правильні. Як тільки JLCPCB схвалить — все запрацює.", "en": "The keys are correct. As soon as JLCPCB approves, everything will work.", "de": "Die Schlüssel sind korrekt. Sobald JLCPCB genehmigt, funktioniert alles."}
 {"uk": "Ключів", "en": "Keys", "de": "Schlüssel"}
 {"uk": "Ключів кілька: кожен сайт — свій ключ; той, що більше не потрібен, вимкніть.", "en": "There are several keys: each site has its own key; disable the one that is no longer needed.", "de": "Es gibt mehrere Schlüssel: Jede Website hat ihren eigenen Schlüssel; deaktivieren Sie den, der nicht mehr benötigt wird."}
+{"uk": "Ключів кілька: кожен сайт — свій ключ; який сайт яким користується — у кроці «Сайт підключено». Той, що більше не потрібен, вимкніть.", "en": "There are several keys: one key per site; which site uses which — see the step «Сайт підключено». Deactivate the one you no longer need.", "de": "Es gibt mehrere Schlüssel: je Website ein eigener; welche Website welchen nutzt — im Schritt «Сайт підключено». Den nicht mehr benötigten deaktivieren."}
 {"uk": "Ключів немає — API недоступний", "en": "No keys — API unavailable", "de": "Keine Schlüssel — API nicht verfügbar"}
 {"uk": "Клік", "en": "Click", "de": "Klick"}
 {"uk": "Клік на 🖨️ — як у «Продажі → Налаштування → 🏷️ Етикетки DYMO»: завантажити .dymo або одразу надрукувати через службу DYMO Connect; правий клік — інші варіанти", "en": "Click on 🖨️ — as in “Sales → Settings → 🏷️ DYMO labels”: download .dymo or print right away via the DYMO Connect service; right-click — other options", "de": "Klick auf 🖨️ – wie unter „Verkauf → Einstellungen → 🏷️ DYMO-Etiketten“: .dymo herunterladen oder sofort über den Dienst DYMO Connect drucken; Rechtsklick – weitere Optionen"}
@@ -12385,6 +12392,7 @@
 {"uk": "Сегменти клієнтів", "en": "Customer segments", "de": "Kundensegmente"}
 {"uk": "Сейшельські Острови", "en": "Seychelles", "de": "Seychellen"}
 {"uk": "Секрет адреси ICS календаря Minerva; порожньо — адресу вимкнено.", "en": "Secret of the Minerva calendar ICS address; empty — the address is disabled.", "de": "Geheimnis der ICS-Adresse des Minerva-Kalenders; leer — die Adresse ist deaktiviert."}
+{"uk": "Секрет вебхука Stripe", "en": "Stripe webhook secret", "de": "Stripe-Webhook-Secret"}
 {"uk": "Секрет вебхука починається з whsec_….", "en": "The webhook secret starts with whsec_….", "de": "Das Webhook-Secret beginnt mit whsec_…."}
 {"uk": "Секрет підпису", "en": "Signing secret", "de": "Signatur-Secret"}
 {"uk": "Секретна адреса — як пароль: видно лише початок.", "en": "The secret address is like a password: only the beginning is visible.", "de": "Die geheime Adresse ist wie ein Passwort: Nur der Anfang ist sichtbar."}
@@ -15088,6 +15096,7 @@
 {"uk": "адреса RAG не підходить: потрібен https:// або http:// до IP локальної мережі", "en": "the RAG address is not suitable: https:// or http:// to a local network IP is required", "de": "die RAG-Adresse ist nicht geeignet: erforderlich ist https:// oder http:// zu einer IP im lokalen Netz"}
 {"uk": "адреса {0}", "en": "address {0}", "de": "Adresse {0}"}
 {"uk": "адреса {0} не приймає відповідей (noreply)", "en": "the address {0} does not accept replies (noreply)", "de": "die Adresse {0} nimmt keine Antworten an (noreply)"}
+{"uk": "адреса вебхука для Stripe: {0}", "en": "webhook address for Stripe: {0}", "de": "Webhook-Adresse für Stripe: {0}"}
 {"uk": "адреса доставки", "en": "delivery address", "de": "Lieferadresse"}
 {"uk": "адреса з файлу сайту", "en": "address from the site file", "de": "Adresse aus der Datei der Website"}
 {"uk": "адреса й ключ чату лишаться тільки в Minerva · незбережені зміни на сторінці не зберігаються", "en": "the chat address and key will remain only in Minerva · unsaved changes on the page are not saved", "de": "Adresse und Schlüssel des Chats bleiben nur in Minerva erhalten · nicht gespeicherte Änderungen auf der Seite werden nicht gespeichert"}
@@ -15213,6 +15222,7 @@
 {"uk": "бракує", "en": "missing", "de": "fehlt"}
 {"uk": "бракує {0}", "en": "{0} short", "de": "es fehlen {0}"}
 {"uk": "бракує {0}: потрібно {1}, вільно {2}", "en": "{0} is short: need {1}, available {2}", "de": "{0} fehlt: benötigt {1}, verfügbar {2}"}
+{"uk": "бракує прав", "en": "missing rights", "de": "fehlende Rechte"}
 {"uk": "бренд", "en": "brand", "de": "Marke"}
 {"uk": "бриф", "en": "brief", "de": "Briefing"}
 {"uk": "бриф — {0}", "en": "brief — {0}", "de": "Briefing — {0}"}
@@ -15746,6 +15756,7 @@
 {"uk": "жодного", "en": "none", "de": "keine"}
 {"uk": "жодної", "en": "none", "de": "keine"}
 {"uk": "жодної моделі", "en": "no model", "de": "kein Modell"}
+{"uk": "журнал запитів цього ключа вимкнено — адрес не видно (картка ключа → «📜 Журнал запитів»)", "en": "the request log of this key is off — addresses are not visible (key card → «📜 Журнал запитів»)", "de": "das Anfrageprotokoll dieses Schlüssels ist aus — Adressen nicht sichtbar (Schlüsselkarte → «📜 Журнал запитів»)"}
 {"uk": "журнал застосовано повністю", "en": "journal fully applied", "de": "Journal vollständig angewendet"}
 {"uk": "журнал сайту", "en": "website log", "de": "Website-Protokoll"}
 {"uk": "з Ship to", "en": "from Ship to", "de": "aus Ship to"}
@@ -15795,6 +15806,7 @@
 {"uk": "за 90 днів", "en": "over 90 days", "de": "in 90 Tagen"}
 {"uk": "за ID офера, інакше за артикулом. Нічого не змінюється, поки не натиснете кнопку.", "en": "by offer ID, otherwise by SKU. Nothing changes until you click the button.", "de": "nach Offer-ID, andernfalls nach Artikelnummer. Es ändert sich nichts, bis Sie auf die Schaltfläche klicken."}
 {"uk": "за {0} дн.", "en": "for {0} days", "de": "für {0} Tage"}
+{"uk": "за {0} днів запитів у журналі немає", "en": "no requests in the log for {0} days", "de": "seit {0} Tagen keine Anfragen im Protokoll"}
 {"uk": "за {0} с після надсилання, далі кожні 10 хв (до {1} год); результат — у Telegram / email.", "en": "is {0} s after sending, then every 10 min (up to {1} h); the result goes to Telegram / email.", "de": "erfolgt {0} s nach dem Senden, danach alle 10 Min. (bis zu {1} Std.); das Ergebnis geht an Telegram / E-Mail."}
 {"uk": "за адресою не календар iCal — перевірте, що це секретна адреса .ics", "en": "the address is not an iCal calendar — check that it is the secret .ics address", "de": "unter der Adresse befindet sich kein iCal-Kalender — prüfen Sie, ob es die geheime .ics-Adresse ist"}
 {"uk": "за бажанням", "en": "optional", "de": "optional"}
@@ -16028,6 +16040,7 @@
 {"uk": "зв'язки проєктів", "en": "project links", "de": "Projektverknüpfungen"}
 {"uk": "звертався {0}", "en": "contacted {0}", "de": "Zugriff {0}"}
 {"uk": "звертається до Stripe", "en": "contacts Stripe", "de": "greift auf Stripe zu"}
+{"uk": "звідки за {0} днів", "en": "from where in {0} days", "de": "von wo in {0} Tagen"}
 {"uk": "звіт", "en": "report", "de": "Bericht"}
 {"uk": "звіт RAG: записів {0}, прийнято {1}", "en": "RAG report: {0} records, {1} accepted", "de": "RAG-Bericht: {0} Datensätze, {1} angenommen"}
 {"uk": "звіт на {0} · останні {1} міс. · суми в {2}", "en": "report as of {0} · last {1} mo. · amounts in {2}", "de": "Bericht vom {0} · letzte {1} Mon. · Beträge in {2}"}
@@ -16165,6 +16178,8 @@
 {"uk": "клацніть на картку клієнта, якого хочете залишити (він стане основним). Усе, що прив'язано до інших клієнтів (", "en": "click the card of the customer you want to keep (it becomes the primary one). Everything linked to the other customers (", "de": "klicken Sie auf die Karte des Kunden, den Sie behalten möchten (er wird zum Hauptkunden). Alles, was mit den anderen Kunden verknüpft ist ("}
 {"uk": "ключ", "en": "key", "de": "Schlüssel"}
 {"uk": "ключ API не має доступу до цієї моделі — виберіть іншу модель або перевірте ключ", "en": "the API key has no access to this model — select another model or check the key", "de": "der API-Schlüssel hat keinen Zugriff auf dieses Modell – wählen Sie ein anderes Modell oder prüfen Sie den Schlüssel"}
+{"uk": "ключ {0}, закінчується на …{1}", "en": "key {0}, ends with …{1}", "de": "Schlüssel {0}, endet auf …{1}"}
+{"uk": "ключ «{0}» {1}", "en": "key «{0}» {1}", "de": "Schlüssel «{0}» {1}"}
 {"uk": "ключ з файлу сайту", "en": "key from the site file", "de": "Schlüssel aus der Datei der Website"}
 {"uk": "ключ збережено", "en": "key saved", "de": "Schlüssel gespeichert"}
 {"uk": "ключ магазину не має доступу", "en": "a shop key has no access", "de": "ein Shop-Schlüssel hat keinen Zugriff"}
@@ -16176,6 +16191,7 @@
 {"uk": "ключ сайту змінює лише поля оплати; решту Minerva відкидає (ignored_fields)", "en": "the website key changes only payment fields; Minerva discards the rest (ignored_fields)", "de": "der Website-Schlüssel ändert nur Zahlungsfelder; den Rest verwirft Minerva (ignored_fields)"}
 {"uk": "ключ сайту не отримує", "en": "the website key does not receive", "de": "der Website-Schlüssel erhält nicht"}
 {"uk": "ключ сайту: права", "en": "website key: permissions", "de": "Website-Schlüssel: Berechtigungen"}
+{"uk": "ключ стане видно після наступного звіту сайту", "en": "the key will show after the site's next report", "de": "der Schlüssel erscheint nach dem nächsten Bericht der Website"}
 {"uk": "ключам без прав «Акаунти покупців»: {0}", "en": "keys without the “Customer accounts” permissions: {0}", "de": "Schlüssel ohne die Berechtigungen „Kundenkonten“: {0}"}
 {"uk": "ключем востаннє користувались", "en": "the key was last used", "de": "der Schlüssel wurde zuletzt verwendet"}
 {"uk": "ключі", "en": "keys", "de": "Schlüssel"}
@@ -16509,6 +16525,7 @@
 {"uk": "на рахунку API Anthropic закінчились кредити — поповніть у Claude Console → «Abrechnung» → «Credits kaufen» (це окремий рахунок, не підписка Claude)", "en": "the Anthropic API account has run out of credits — top up in Claude Console → “Abrechnung” → “Credits kaufen” (this is a separate account, not a Claude subscription)", "de": "auf dem Anthropic-API-Konto sind die Credits aufgebraucht – laden Sie sie in der Claude Console unter „Abrechnung“ → „Credits kaufen“ auf (das ist ein separates Konto, kein Claude-Abonnement)"}
 {"uk": "на сайті", "en": "on the site", "de": "auf der Website"}
 {"uk": "на сайті {0} файлів · звіт {1}", "en": "{0} files on the site · report {1}", "de": "{0} Dateien auf der Website · Bericht {1}"}
+{"uk": "на сайті — /admin/ → «🔌 Minerva»", "en": "on the site — /admin/ → «🔌 Minerva»", "de": "auf der Website — /admin/ → «🔌 Minerva»"}
 {"uk": "на склад нічого не додається. «Доставлено» справді оприбутковує товар (якщо так налаштовано склад).", "en": "nothing is added to stock. “Delivered” actually receives the goods into stock (if the stock is set up that way).", "de": "dem Lager wird nichts hinzugefügt. „Geliefert“ bucht die Ware tatsächlich ein (sofern das Lager so konfiguriert ist)."}
 {"uk": "на складі", "en": "in stock", "de": "auf Lager"}
 {"uk": "на складі {0} з {1} шт", "en": "{0} of {1} pcs in stock", "de": "{0} von {1} Stk. auf Lager"}
@@ -16719,6 +16736,7 @@
 {"uk": "невідомий інструмент {0}", "en": "unknown tool {0}", "de": "unbekanntes Werkzeug {0}"}
 {"uk": "невідомо", "en": "unknown", "de": "unbekannt"}
 {"uk": "невідомо коли", "en": "unknown when", "de": "unbekannt, wann"}
+{"uk": "невідомого виду", "en": "of unknown type", "de": "unbekannter Art"}
 {"uk": "недостатньо товару на складі", "en": "not enough stock", "de": "nicht genügend Bestand"}
 {"uk": "недоступно", "en": "unavailable", "de": "nicht verfügbar"}
 {"uk": "недоступно → сайт показує свій файл", "en": "unavailable → the site shows its own file", "de": "nicht verfügbar → die Website zeigt ihre eigene Datei"}
@@ -16900,6 +16918,8 @@
 {"uk": "обидва блоки, щоб порівняти; блок Claude платний завжди.", "en": "both blocks, to compare; the Claude block is always paid.", "de": "beide Blöcke zum Vergleichen; der Claude-Block ist immer kostenpflichtig."}
 {"uk": "обирає товари, кошик, вводить дані, перевіряє і підтверджує", "en": "chooses products, cart, enters details, reviews and confirms", "de": "wählt Artikel, Warenkorb, gibt Daten ein, prüft und bestätigt"}
 {"uk": "обмежений ключ", "en": "restricted key", "de": "eingeschränkter Schlüssel"}
+{"uk": "обмежений робочий (rk_live_)", "en": "restricted live (rk_live_)", "de": "eingeschränkt, live (rk_live_)"}
+{"uk": "обмежений тестовий (rk_test_)", "en": "restricted test (rk_test_)", "de": "eingeschränkt, Test (rk_test_)"}
 {"uk": "обов'язкове поле DigiKey", "en": "required DigiKey field", "de": "DigiKey-Pflichtfeld"}
 {"uk": "обов'язковий UPS-акаунт отримувача (адреса береться з блоку «📬 Отримувач»)", "en": "the recipient's UPS account is required (the address is taken from the “📬 Recipient” block)", "de": "UPS-Konto des Empfängers erforderlich (Adresse wird aus dem Block „📬 Empfänger“ übernommen)"}
 {"uk": "обов'язковий UPS-акаунт отримувача (адреса береться з блоку «📬 Отримувач»); без акаунту UPS відхилить запит. Для", "en": "the recipient's UPS account is required (the address is taken from the “📬 Recipient” block); without an account UPS will reject the request. For", "de": "UPS-Konto des Empfängers erforderlich (Adresse wird aus dem Block „📬 Empfänger“ übernommen); ohne Konto lehnt UPS die Anfrage ab. Für"}
@@ -16978,15 +16998,18 @@
 {"uk": "особа", "en": "person", "de": "Person"}
 {"uk": "особливі права — див. опис", "en": "special permissions — see description", "de": "besondere Berechtigungen — siehe Beschreibung"}
 {"uk": "остання {0}", "en": "last {0}", "de": "zuletzt {0}"}
+{"uk": "остання автоперевірка оплат", "en": "last automatic payment check", "de": "letzte automatische Zahlungsprüfung"}
 {"uk": "остання доставка {0}", "en": "last delivery {0}", "de": "letzte Zustellung {0}"}
 {"uk": "остання перевірена копія", "en": "last checked copy", "de": "zuletzt geprüfte Kopie"}
 {"uk": "остання перевірка {0}", "en": "last check {0}", "de": "letzte Prüfung {0}"}
 {"uk": "остання подія перевізника: «{0}»", "en": "last carrier event: “{0}”", "de": "letztes Ereignis des Versanddienstleisters: „{0}“"}
 {"uk": "останнє завдання", "en": "last job", "de": "letzte Aufgabe"}
+{"uk": "останнє звернення", "en": "last request", "de": "letzte Anfrage"}
 {"uk": "останнє звернення {0}", "en": "last request {0}", "de": "letzte Anfrage {0}"}
 {"uk": "останнє: пошук", "en": "last: search", "de": "zuletzt: Suche"}
 {"uk": "останні 3 міс", "en": "last 3 mo.", "de": "letzte 3 Mon."}
 {"uk": "останній", "en": "last", "de": "letzte"}
+{"uk": "останній вебхук від Stripe", "en": "last webhook from Stripe", "de": "letzter Webhook von Stripe"}
 {"uk": "от", "en": "от", "de": "от"}
 {"uk": "отримано {0} · 📤 надіслано {1} · гілок {2}", "en": "received {0} · 📤 sent {1} · threads {2}", "de": "empfangen {0} · 📤 gesendet {1} · Verläufe {2}"}
 {"uk": "отримано {0} · 📤 надіслано {1} · гілок {2} · Angebote {3} · замовлень {4}", "en": "received {0} · 📤 sent {1} · threads {2} · Angebote {3} · orders {4}", "de": "empfangen {0} · 📤 gesendet {1} · Verläufe {2} · Angebote {3} · Aufträge {4}"}
@@ -17347,6 +17370,7 @@
 {"uk": "пошуків: {0}", "en": "searches: {0}", "de": "Suchen: {0}"}
 {"uk": "права «Агент (MCP) — читання / пропонувати зміни». Пропозиції стають завданням цієї людини в «🧩 Завдання агенту» — застосовує вона ✓. Як підключити — гід «Агент через MCP».", "en": "permissions “Agent (MCP) — read / propose changes”. The proposals become a task for this person in “🧩 Agent tasks” — they apply them with ✓. How to connect — see the guide “Agent via MCP”.", "de": "Rechte „Agent (MCP) — Lesen / Änderungen vorschlagen“. Die Vorschläge werden zu einer Aufgabe dieser Person unter „🧩 Agentenaufgaben“ — sie übernimmt sie mit ✓. Zur Anbindung siehe den Leitfaden „Agent über MCP“."}
 {"uk": "права повернулись anna", "en": "permissions returned to anna", "de": "Berechtigungen an anna zurückgegeben"}
+{"uk": "права: усі потрібні", "en": "rights: all required", "de": "Rechte: alle erforderlichen"}
 {"uk": "правий клік — «за роллю»", "en": "right-click — “by role”", "de": "Rechtsklick — „nach Rolle“"}
 {"uk": "правий клік — меню", "en": "right-click — menu", "de": "Rechtsklick — Menü"}
 {"uk": "правил: {0}", "en": "rules: {0}", "de": "Regeln: {0}"}
@@ -17407,6 +17431,7 @@
 {"uk": "провів інвентаризацію", "en": "performed stocktaking", "de": "hat eine Inventur durchgeführt"}
 {"uk": "провінція", "en": "province", "de": "Provinz"}
 {"uk": "прогноз", "en": "forecast", "de": "Prognose"}
+{"uk": "програма", "en": "program", "de": "Programm"}
 {"uk": "прогрес на панелі.", "en": "progress on the panel.", "de": "Fortschritt im Panel."}
 {"uk": "прогін {0}", "en": "run {0}", "de": "Durchlauf {0}"}
 {"uk": "продаж", "en": "sale", "de": "Verkauf"}
@@ -17501,6 +17526,7 @@
 {"uk": "підключення сайту кодом", "en": "connecting a website with a code", "de": "Verbinden einer Website per Code"}
 {"uk": "підключено", "en": "connected", "de": "verbunden"}
 {"uk": "підключено кодом", "en": "connected by code", "de": "per Code verbunden"}
+{"uk": "підключено кодом {0} · код створив {1}", "en": "connected by code {0} · code created by {1}", "de": "per Code verbunden {0} · Code erstellt von {1}"}
 {"uk": "підключив сайт кодом", "en": "connected a website with a code", "de": "hat eine Website per Code verbunden"}
 {"uk": "піднято до закупівельної + {0} %", "en": "raised to purchase price + {0} %", "de": "auf Einkaufspreis + {0} % angehoben"}
 {"uk": "підпапок немає", "en": "no subfolders", "de": "keine Unterordner"}
@@ -17541,6 +17567,7 @@
 {"uk": "режим «Лише Minerva»", "en": "“Minerva only” mode", "de": "Modus „Nur Minerva“"}
 {"uk": "режим «питати»", "en": "“ask” mode", "de": "Modus „Nachfragen“"}
 {"uk": "режим невідомий", "en": "mode unknown", "de": "Modus unbekannt"}
+{"uk": "режим: {0}", "en": "mode: {0}", "de": "Modus: {0}"}
 {"uk": "резерв", "en": "reserved", "de": "reserviert"}
 {"uk": "резерв залишку зняти", "en": "release the reservation of the remainder", "de": "Reservierung des Rests aufheben"}
 {"uk": "резерв → списано", "en": "reserved → written off", "de": "reserviert → ausgebucht"}
@@ -17557,6 +17584,7 @@
 {"uk": "реєстрація, вхід, статус замовлень, кошик", "en": "registration, login, order status, cart", "de": "Registrierung, Anmeldung, Auftragsstatus, Warenkorb"}
 {"uk": "роб. день", "en": "business day", "de": "Werktag"}
 {"uk": "роб. днів", "en": "business days", "de": "Werktage"}
+{"uk": "робочий (sk_live_)", "en": "live (sk_live_)", "de": "live (sk_live_)"}
 {"uk": "роз'єм", "en": "connector", "de": "Steckverbinder"}
 {"uk": "розбіжност", "en": "discrepanc", "de": "Abweichung"}
 {"uk": "розбіжностей", "en": "discrepancies", "de": "Abweichungen"}
@@ -17599,6 +17627,7 @@
 {"uk": "с)", "en": "s)", "de": "s)"}
 {"uk": "с.", "en": "s.", "de": "s."}
 {"uk": "сайт", "en": "website", "de": "Website"}
+{"uk": "сайт {0}", "en": "site {0}", "de": "Website {0}"}
 {"uk": "сайт востаннє звертався", "en": "the site last connected", "de": "die Website hat sich zuletzt verbunden"}
 {"uk": "сайт відповів HTTP {0} ({1})", "en": "the site responded with HTTP {0} ({1})", "de": "die Website hat mit HTTP {0} geantwortet ({1})"}
 {"uk": "сайт забрав", "en": "site fetched", "de": "Website hat abgeholt"}
@@ -17743,6 +17772,7 @@
 {"uk": "створення клієнта CRM", "en": "CRM customer creation", "de": "Anlegen eines CRM-Kunden"}
 {"uk": "створення товару", "en": "product creation", "de": "Anlegen eines Artikels"}
 {"uk": "створено {0}", "en": "created {0}", "de": "erstellt {0}"}
+{"uk": "створено {0} вручну (REST API → API Токени)", "en": "created {0} manually (REST API → API Токени)", "de": "manuell erstellt {0} (REST API → API Токени)"}
 {"uk": "створено нових: {0}", "en": "new created: {0}", "de": "neu erstellt: {0}"}
 {"uk": "створив вебхук #{0}", "en": "created webhook #{0}", "de": "hat Webhook #{0} angelegt"}
 {"uk": "створив замовлення {0}", "en": "created order {0}", "de": "hat Auftrag {0} angelegt"}
@@ -17879,6 +17909,7 @@
 {"uk": "термін постачання", "en": "delivery time", "de": "Lieferzeit"}
 {"uk": "терміновістю", "en": "urgency", "de": "Dringlichkeit"}
 {"uk": "тестова подія вебхука", "en": "webhook test event", "de": "Webhook-Testereignis"}
+{"uk": "тестовий (sk_test_)", "en": "test (sk_test_)", "de": "Test (sk_test_)"}
 {"uk": "тестовий режим", "en": "test mode", "de": "Testmodus"}
 {"uk": "технологія що перетворює веб-сайт на нативний додаток: власна іконка, повноекранний режим без адресного рядка, кешування статики, офлайн-заглушка.", "en": "a technology that turns a website into a native app: its own icon, full-screen mode without an address bar, static file caching, an offline placeholder.", "de": "eine Technologie, die eine Website in eine native App verwandelt: eigenes Symbol, Vollbildmodus ohne Adressleiste, Caching statischer Dateien, Offline-Platzhalter."}
 {"uk": "тиждень у Minerva поруч із оригіналом", "en": "a week in Minerva next to the original", "de": "eine Woche in Minerva neben dem Original"}
@@ -17985,6 +18016,8 @@
 {"uk": "у RAG — {0}%", "en": "in RAG — {0}%", "de": "in RAG – {0}%"}
 {"uk": "у RAG — знаходиться пошуком", "en": "in RAG — can be found by search", "de": "in RAG – über die Suche auffindbar"}
 {"uk": "у RAG: {0}", "en": "in RAG: {0}", "de": "in RAG: {0}"}
+{"uk": "у Stripe: Developers → API keys — ключ, що закінчується на …{0}", "en": "in Stripe: Developers → API keys — the key ending with …{0}", "de": "in Stripe: Developers → API keys — der Schlüssel, der auf …{0} endet"}
+{"uk": "у Stripe: Developers → Webhooks → вебхук з цією адресою → Signing secret …{0}", "en": "in Stripe: Developers → Webhooks → the webhook with this address → Signing secret …{0}", "de": "in Stripe: Developers → Webhooks → Webhook mit dieser Adresse → Signing secret …{0}"}
 {"uk": "у Telegram і надішліть йому будь-яке повідомлення — він поверне ваш Chat ID. Якщо поле порожнє — сповіщення йдуть в канал із загальних налаштувань.", "en": "in Telegram and send it any message — it will return your Chat ID. If the field is empty, notifications go to the channel from the general settings.", "de": "in Telegram und senden Sie ihm eine beliebige Nachricht — er gibt Ihre Chat-ID zurück. Ist das Feld leer, gehen die Benachrichtigungen an den Kanal aus den allgemeinen Einstellungen."}
 {"uk": "у environment.", "en": "in environment.", "de": "in environment."}
 {"uk": "у {0}", "en": "in {0}", "de": "in {0}"}
@@ -18422,6 +18455,7 @@
 {"uk": "як інші листи цієї гілки (сам лист під правила не підходить)", "en": "like other emails of this thread (the email itself matches no rules)", "de": "wie andere E-Mails dieses Verlaufs (die E-Mail selbst passt zu keiner Regel)"}
 {"uk": "яке посилання", "en": "which link", "de": "welcher Link"}
 {"uk": "яке посилання за правилом", "en": "which link by the rule", "de": "welcher Link nach Regel"}
+{"uk": "яким ключем — ще невідомо: сайт звітував до оновлення Minerva; з'явиться після його наступного звіту (до {0} днів, зазвичай за кілька хвилин)", "en": "which key — not known yet: the site reported before the Minerva update; it will show after its next report (up to {0} days, usually within minutes)", "de": "welcher Schlüssel — noch unbekannt: die Website hat vor dem Minerva-Update berichtet; erscheint nach ihrem nächsten Bericht (bis {0} Tage, meist in wenigen Minuten)"}
 {"uk": "якщо API недоступний, система використає останній збережений статус.", "en": "if the API is unavailable, the system uses the last saved status.", "de": "ist die API nicht verfügbar, verwendet das System den zuletzt gespeicherten Status."}
 {"uk": "якщо в джерелах відповіді немає або її частини — так і скажи і напиши, де ще пошукати; нічого не вигадуй", "en": "if the sources do not contain the answer or part of it — say so and write where else to look; invent nothing", "de": "wenn die Quellen die Antwort oder einen Teil davon nicht enthalten — sagen Sie das und schreiben Sie, wo man sonst suchen kann; erfinden Sie nichts"}
 {"uk": "якщо вибрано пакет", "en": "if a bundle is selected", "de": "wenn ein Paket gewählt ist"}
