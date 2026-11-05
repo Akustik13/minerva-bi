@@ -152,6 +152,18 @@ class KeyHintsTests(TestCase):
         self.assertIn("код створив Anna K · сайт https://test.sevskiy.de", own)
         self.assertNotIn(self.own.key, str(step))                            # повного ключа немає ніде
 
+    def test_www_is_the_same_site(self):
+        """У картці https://www.sevskiy.de, сайт звітує «sevskiy.de» — це той самий сайт, не «ще один»."""
+        Shop.objects.filter(pk=self.shop.pk).update(url="https://www.sevskiy.de")
+        self.shop.refresh_from_db()
+        self.other.delete()
+        self.report("sevskiy.de", self.own)
+        step = by_key(self.shop)["connected"]
+        self.assertEqual(step["state"], onboarding.DONE)
+        self.assertNotIn("користується ще", step["hint"])
+        self.report("test.sevskiy.de", self.own)                              # а піддомен — справді інший сайт
+        self.assertEqual(by_key(self.shop)["connected"]["state"], onboarding.WARN)
+
     def test_report_without_key_is_explained(self):
         Shop.objects.filter(pk=self.shop.pk).update(assistant_sites={
             "sevskiy.de": {"at": timezone.now().isoformat(timespec="seconds")}})

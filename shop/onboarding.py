@@ -36,6 +36,12 @@ def _host(url) -> str:
     return (urlsplit(str(url or "")).hostname or "").lower()
 
 
+def _site(host) -> str:
+    """Той самий сайт з «www.» і без: www.sevskiy.de = sevskiy.de (сайт звітує одне, в картці — інше)."""
+    host = (host or "").lower().rstrip(".")
+    return host[4:] if host.startswith("www.") else host
+
+
 def _when(dt) -> str:
     return f"{timezone.localtime(dt):%d.%m.%Y %H:%M} ({timesince(dt)} тому)"
 
@@ -177,7 +183,7 @@ def _url(shop, pending) -> dict:
         return _step("url", "Адреса сайту", REQUIRED, TODO, "не задано", hint, go="url")
     if "url" in pending:
         return _step("url", "Адреса сайту", REQUIRED, TODO, f"{shop.url} — як в оригіналі", hint, go="url")
-    same = [s.name for s in Shop.objects.exclude(pk=shop.pk).only("name", "url") if _host(s.url) == host]
+    same = [s.name for s in Shop.objects.exclude(pk=shop.pk).only("name", "url") if _site(_host(s.url)) == _site(host)]
     if same:
         return _step("url", "Адреса сайту", REQUIRED, WARN, shop.url,
                      f"Та сама адреса — у магазині «{', '.join(same)}». Один сайт — один магазин: інакше каталог, "
@@ -341,7 +347,7 @@ def _connected(shop) -> dict:
                      "«🔌 Перевірити зв'язок із сайтом».", go="site_admin_col")
     detail = f"останнє звернення {_when(used)}" + (f" · сайти: {', '.join(hosts)}" if hosts else "")
     items = key_items(shop, keys)
-    others = [h for h in hosts if h != own]
+    others = [h for h in hosts if _site(h) != _site(own)]
     if own and others:
         from core.secrets import mask
         by_key = hosts_by_key(shop)
@@ -369,7 +375,7 @@ def _webhook(shop) -> dict:
     from api.models import Webhook
     from .connection import site_bases
     own = _host(shop.url)
-    hooks = [h for h in Webhook.objects.filter(is_active=True) if own and _host(h.url) == own]
+    hooks = [h for h in Webhook.objects.filter(is_active=True) if own and _site(_host(h.url)) == _site(own)]
     expected = (site_bases(shop) or [""])[0] + "api/shop/webhook.php"
     listing = {"url": reverse("admin:api_webhook_changelist"), "label": "REST API → Вебхуки"}
     if not hooks:
