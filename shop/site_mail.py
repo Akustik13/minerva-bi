@@ -18,10 +18,9 @@ from .models import Shop
 
 
 def sender_account(shop: Shop):
-    acc = shop.mail_sender
-    if acc is not None and acc.is_active and acc.smtp_host and acc.email_address:
-        return acc
-    return None
+    """Скринька листів сайту (таблиця «Що звідки йде»), інакше «Відправник листів покупцям»."""
+    from .mail import account_for
+    return account_for(shop, "site")
 
 
 def public_config(shop: Shop, key=None) -> dict:

@@ -287,10 +287,10 @@ class ShopAdmin(admin.ModelAdmin):
                            "Швидкий старт: «🌍 Створити базові зони» або «⬇️ Імпортувати з DigiKey».",
         }),
         ("✉️ Пошта магазину", {
-            "fields": ["mail_map_col", "mail_sender", "mail_from_name", "mail_reply_to", "mail_bcc", "team_emails",
+            "fields": ["mail_map_col", "mail_from_name", "mail_reply_to", "mail_bcc", "team_emails",
                        "mail_welcome",
                        "team_notify_registration", "mail_footer", "team_lang", "mail_tools",
-                       "site_mail_managed", "site_order_confirmation", "site_mail_col"],
+                       "site_order_confirmation", "site_mail_col"],
             "description": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату "
                            "отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину "
                            "додайте в Minerva як акаунт пошти (Email → Акаунти): тоді відповіді покупців потрапляють у "
@@ -478,6 +478,17 @@ class ShopAdmin(admin.ModelAdmin):
             return "Спершу збережіть магазин."
         from . import mail_map
 
+        def route(r):
+            if not r.get("route"):
+                return format_html('{}<div class="help">{}</div>', format_html('<span translate="no">{}</span>', r["sender"]),
+                                   f"як у рядку «{r.get('same_as', '')}»" if r.get("same_as") else "")
+            c = r["route"]
+            options = format_html_join("", '<option value="{}"{}>{}</option>', (
+                (v, format_html(" selected") if v == c["value"] else "", label) for v, label in c["options"]))
+            return format_html('<select name="{}" class="mm-route" style="max-width:100%">{}</select>'
+                               '<div class="help">{} <span translate="no">{}</span>{}</div>', c["name"], options,
+                               "зараз:", r["sender"], format_html(" · {}", c["note"]) if c["note"] else "")
+
         def links(items):
             return format_html_join(" · ", "{}", ((
                 format_html('<a href="#" data-go="{}">{} ↓</a>', i["go"], i["label"]) if i.get("go") else
@@ -485,13 +496,12 @@ class ShopAdmin(admin.ModelAdmin):
                             format_html(' target="_blank" rel="noopener"') if i.get("external") else "", i["label"]),)
                 for i in items or []))
         rows = format_html_join("", "<tr><td><b>{}</b></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>", (
-            (r["mail"], r["who"], format_html('<span translate="no">{}</span>', r["sender"]),
-             r["to"], links(r["change"])) for r in mail_map.rows(obj)))
+            (r["mail"], r["who"], route(r), r["to"], links(r["change"])) for r in mail_map.rows(obj)))
         return format_html(
             '<table class="mm-table" style="font-size:12px;width:100%"><tr><th>Лист</th><th>Хто надсилає</th>'
             '<th>З якої адреси</th><th>Кому</th><th>Де змінити</th></tr>{}</table>'
-            '<div class="help">«↓» — до поля на цій сторінці (незбережені зміни тут ще не враховано), «→» — інша сторінка; '
-            'дані сайту — з його останнього звіту.</div>', rows)
+            '<div class="help">«З якої адреси» — виберіть скриньку для кожного листа й натисніть «Зберегти» внизу сторінки. '
+            '«↓» — до поля на цій сторінці, «→» — інша сторінка; дані сайту — з його останнього звіту.</div>', rows)
 
     @admin.display(description="Пошта сайтів")
     def site_mail_col(self, obj):
@@ -702,12 +712,23 @@ class ShopAdmin(admin.ModelAdmin):
         to = (request.user.email or "").strip()
         if not to:
             self.message_user(request, "У вашого користувача Minerva не задано email.", messages.ERROR)
-        else:
+            return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
+        senders = {}   # From → що з неї йде: одна скринька — один тестовий лист
+        labels = {"account": "кабінет", "notices": "Willkommen / оплати", "team": "команді"}
+        for purpose in labels:
             try:
-                mail.send(shop, to, "test", "de")
-                self.message_user(request, f"Тестовий лист надіслано на {to} ({mail.describe_sender(shop)}).")
-            except Exception as e:
+                senders.setdefault(mail.smtp_settings(shop, purpose)["from"], []).append(purpose)
+            except mail.MailNotConfigured as e:
                 self.message_user(request, f"Лист не надіслано: {e}", messages.ERROR)
+                return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
+        for sender, purposes in senders.items():
+            what = ", ".join(labels[p] for p in purposes)
+            try:
+                mail.send(shop, to, "test", "de", purpose=purposes[0])
+                self.message_user(request, f"Тестовий лист надіслано на {to} від {sender} ({what}; "
+                                           f"{mail.describe_sender(shop, purposes[0])}).")
+            except Exception as e:
+                self.message_user(request, f"Лист від {sender} ({what}) не надіслано: {e}", messages.ERROR)
         return redirect(reverse("admin:shop_shop_change", args=[shop.pk]))
 
     def render_change_form(self, request, context, *args, **kwargs):
@@ -724,6 +745,9 @@ class ShopAdmin(admin.ModelAdmin):
         return super().render_change_form(request, context, *args, **kwargs)
 
     def save_model(self, request, obj, form, change):
+        if change and any(k.startswith("route_") for k in request.POST):   # меню «З якої адреси» в «Що звідки йде»
+            from . import mail_map
+            mail_map.save_routes(obj, request.POST)
         super().save_model(request, obj, form, change)
         if obj.review_fields:   # копія: змінені поля більше не підсвічуються
             from . import copying

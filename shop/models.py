@@ -162,6 +162,11 @@ class Shop(models.Model):
         help_text="Підтвердження реєстрації, скидання пароля. Порожньо — SMTP сповіщень Minerva "
                   "(Налаштування → Сповіщення). Копія в «Надісланих» не зберігається: у листах одноразові посилання.",
     )
+    mail_routes = models.JSONField(
+        "З якої скриньки — для інших листів", default=dict, blank=True,
+        help_text="Вибирається в таблиці «Що звідки йде»: для «Willkommen» / оплат, команди й сайту — скринька або SMTP "
+                  "сповіщень; не вибрано — як «Відправник листів покупцям».",
+    )
     mail_from_name = models.CharField("Ім'я відправника", max_length=80, blank=True, default="",
                                       help_text="Напр. «Sevskiy Shop». Порожньо — назва магазину.")
     mail_footer = models.TextField("Підпис листів", blank=True, default="",

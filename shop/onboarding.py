@@ -409,15 +409,15 @@ def _mail(shop) -> dict:
         return _step("mail", "Пошта магазину", RECOMMENDED, WARN, detail,
                      "«Відправник листів покупцям» не вибрано — листи кабінету й оплат ідуть зі скриньки сповіщень "
                      "Minerva. Виберіть скриньку магазину («➕ Додати скриньку в Minerva»): відповіді покупців тоді "
-                     "приходять у пошту Minerva й прив'язуються до клієнта в CRM.", go="mail_sender")
+                     "приходять у пошту Minerva й прив'язуються до клієнта в CRM.", go="mail_map_col")
     problem = site_mail.problem(shop)
     if problem or "⚠" in text:
         return _step("mail", "Пошта магазину", RECOMMENDED, WARN, detail,
-                     problem or "Виправте порт або режим шифрування скриньки в Email → Акаунти.", go="mail_sender")
+                     problem or "Виправте порт або режим шифрування скриньки в Email → Акаунти.", go="mail_map_col")
     hint = "" if shop.site_mail_managed else ("Щоб і підтвердження замовлень із сайту йшли з цієї скриньки — "
                                               "«Сайт надсилає листи з цієї ж скриньки».")
     return _step("mail", "Пошта магазину", RECOMMENDED, DONE, detail, hint,
-                 go="mail_sender" if shop.site_mail_managed else "site_mail_managed")
+                 go="mail_map_col")
 
 
 def _order(shop) -> dict:

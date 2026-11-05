@@ -172,7 +172,7 @@ class MailMapTests(TestCase):
         self.assertIn("прихована копія: archiv@sevskiy.de", customer["to"])
         self.assertEqual(r["Команді: оплата отримана, новий акаунт покупця"]["to"], "sergey@sevskiy.de, slava@sevskiy.de")
         order = r["Підтвердження замовлення покупцю"]
-        self.assertEqual((order["sender"], order["to"]), ("Sevskiy Shop <info@sevskiy.de> (з Minerva)", "не надсилається"))
+        self.assertEqual((order["sender"], order["to"]), ("info@sevskiy.de (з Minerva)", "не надсилається"))
         self.assertIn("site_order_confirmation", [c.get("go") for c in order["change"]])
         self.assertEqual(r["Команді: нове замовлення з сайту"]["to"], "sergey@sevskiy.de, slava@sevskiy.de")
 
@@ -183,6 +183,109 @@ class MailMapTests(TestCase):
         s.save()
         self.client.force_login(self.user)
         page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
-        for text in ("Що звідки йде", "Хто надсилає", 'data-go="mail_sender"', "Контактна форма сайту",
+        for text in ("Що звідки йде", "Хто надсилає", 'name="route_account"', "Контактна форма сайту",
                      'href="https://www.sevskiy.de/admin/" target="_blank" rel="noopener"'):
             self.assertContains(page, text)
+
+
+class MailRouteTests(TestCase):
+    """Меню «З якої адреси» в «Що звідки йде»: скринька для кожного листа (Shop.mail_routes, shop/mail.py account_for)."""
+
+    def setUp(self):
+        from email_assistant.models import EmailAccount
+        from config.models import NotificationSettings, SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        ns = NotificationSettings.get()
+        ns.email_enabled, ns.email_host, ns.email_host_user, ns.email_from = True, "smtp.ionos.de", "shop@sevskiy.de", "shop@sevskiy.de"
+        ns.save()
+        self.user = User.objects.create_superuser("adm", "adm@example.com", "p")
+
+        def box(addr):
+            return EmailAccount.objects.create(
+                user=self.user, display_name=addr, email_address=addr, imap_username=addr, imap_password="i",
+                smtp_host="smtp.ionos.de", smtp_port=587, smtp_use_tls=True, smtp_use_ssl=False,
+                smtp_username=addr, smtp_password="s")
+        self.sales, self.kasse = box("sales01@sevskiy.de"), box("kasse@sevskiy.de")
+        self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True, url="https://www.sevskiy.de",
+                                        mail_sender=self.sales, mail_from_name="Sevskiy Shop",
+                                        team_emails="sergey@sevskiy.de")
+        self.client.force_login(self.user)
+
+    def post(self, **routes):
+        """Зберегти картку магазину з меню «З якої адреси» (решта полів — як у формі)."""
+        page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
+        form = page.context["adminform"].form
+        data = {}
+        for name, field in form.fields.items():
+            value = form.initial.get(name, field.initial)
+            if value is None:
+                continue
+            if isinstance(value, (list, tuple)):
+                data[name] = list(value)
+            elif isinstance(value, bool):
+                if value:
+                    data[name] = "on"
+            elif isinstance(value, (dict,)):
+                import json
+                data[name] = json.dumps(value)
+            else:
+                data[name] = value
+        for fs in page.context["inline_admin_formsets"]:
+            mgmt = fs.formset.management_form
+            for k, v in mgmt.initial.items():
+                data[f"{mgmt.prefix}-{k}"] = v
+        data.update(routes)
+        r = self.client.post(f"/admin/shop/shop/{self.shop.pk}/change/", data)
+        self.shop.refresh_from_db()
+        return r
+
+    def test_each_mail_from_its_box(self):
+        from . import mail_map
+        mail_map.save_routes(self.shop, {"route_notices": f"acc:{self.kasse.pk}", "route_team": "ns"})
+        self.shop.save()
+        self.assertEqual(mail.account_for(self.shop, "account"), self.sales)
+        self.assertEqual(mail.account_for(self.shop, "notices"), self.kasse)
+        self.assertIsNone(mail.account_for(self.shop, "team"))        # SMTP сповіщень
+        mail.send(self.shop, "kunde@firma.de", "paid", "de", name="Anna", number="WS-1", amount="10 EUR")
+        self.assertIn("kasse@sevskiy.de", outbox.outbox[-1].from_email)
+        mail.send(self.shop, "kunde@firma.de", "verify", "de", name="Anna", link=LINK + "#x")
+        self.assertIn("sales01@sevskiy.de", outbox.outbox[-1].from_email)
+        mail.send_team(self.shop, "team_registered", email="a@b.de", company="X", name="Y")
+        self.assertIn("shop@sevskiy.de", outbox.outbox[-1].from_email)
+        type(self.kasse).objects.filter(pk=self.kasse.pk).update(is_active=False)   # вимкнена — як основна
+        self.shop.refresh_from_db()
+        self.assertEqual(mail.account_for(self.shop, "notices"), self.sales)
+
+    def test_site_route_turns_site_mail_on_and_off(self):
+        from . import mail_map, site_mail
+        mail_map.save_routes(self.shop, {"route_site": f"acc:{self.kasse.pk}"})
+        self.assertTrue(self.shop.site_mail_managed)
+        self.assertEqual(site_mail.sender_account(self.shop), self.kasse)
+        mail_map.save_routes(self.shop, {"route_site": "files"})
+        self.assertFalse(self.shop.site_mail_managed)
+        self.assertNotIn("site", self.shop.mail_routes)
+        mail_map.save_routes(self.shop, {"route_account": "", "route_site": "acc:99999"})   # невідома — без змін
+        self.assertIsNone(self.shop.mail_sender)
+        self.assertFalse(self.shop.site_mail_managed)
+
+    def test_card_menus_save_with_the_form(self):
+        page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
+        for name in ("route_account", "route_notices", "route_team", "route_site"):
+            self.assertContains(page, f'name="{name}"')
+        self.assertContains(page, "shop@sevskiy.de — SMTP сповіщень Minerva")
+        self.assertContains(page, f'<option value="acc:{self.sales.pk}" selected>')
+        r = self.post(route_account="", route_notices=f"acc:{self.kasse.pk}", route_team="", route_site="files")
+        self.assertEqual(r.status_code, 302, getattr(r, "context", None) and r.context["adminform"].form.errors)
+        self.assertIsNone(self.shop.mail_sender)                            # основні — SMTP сповіщень
+        self.assertEqual(self.shop.mail_routes, {"notices": f"acc:{self.kasse.pk}"})
+
+    def test_test_mail_once_per_box(self):
+        from . import mail_map
+        mail_map.save_routes(self.shop, {"route_notices": f"acc:{self.kasse.pk}"})
+        self.shop.save()
+        outbox.outbox.clear()
+        self.client.post(f"/admin/shop/shop/{self.shop.pk}/test-mail/")
+        senders = sorted(m.from_email for m in outbox.outbox)
+        self.assertEqual(len(senders), 2, senders)   # sales01 (кабінет, команді) і kasse (Willkommen / оплати)
