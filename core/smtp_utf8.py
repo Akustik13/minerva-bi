@@ -87,6 +87,68 @@ def imap_login(conn, user, password):
 
 # ── 🔌 Перевірити з'єднання (без надсилання листа) ────────────────────────────
 
+def check_imap(host, port, *, use_ssl=True, user='', password='', timeout=15) -> dict:
+    """IMAP: підключитись (SSL або STARTTLS), увійти, порахувати папки й листи у Вхідних — нічого не змінює.
+    → {ok, steps: [(ok, text)], hint}."""
+    import imaplib
+    import socket
+    import ssl
+    steps, hint = [], ''
+    host, port = (host or '').strip(), int(port or (993 if use_ssl else 143))
+    if not host:
+        return {'ok': False, 'steps': [(False, 'Не вказано IMAP хост')], 'hint': ''}
+    conn = None
+    try:
+        try:
+            if use_ssl:
+                conn = imaplib.IMAP4_SSL(host, port, timeout=timeout)
+            else:
+                conn = imaplib.IMAP4(host, port, timeout=timeout)
+                conn.starttls()
+            steps.append((True, f"З'єднання з {host}:{port} ({'SSL' if use_ssl else 'STARTTLS'})"))
+        except ssl.SSLError as e:
+            steps.append((False, f'SSL/TLS: {e}'))
+            hint = ('Режим не відповідає порту: 993 — SSL ✓, 143 — без SSL (STARTTLS).'
+                    if 'WRONG_VERSION_NUMBER' in str(e).upper() else '')
+            return {'ok': False, 'steps': steps, 'hint': hint}
+        except socket.gaierror:
+            steps.append((False, f'Адресу сервера «{host}» не знайдено'))
+            return {'ok': False, 'steps': steps, 'hint': 'Перевірте IMAP хост (напр. imap.ionos.de).'}
+        except (socket.timeout, TimeoutError):
+            steps.append((False, f'{host}:{port} не відповідає за {timeout} с'))
+            return {'ok': False, 'steps': steps, 'hint': 'Перевірте порт (993 — SSL, 143 — STARTTLS).'}
+        except ConnectionRefusedError:
+            steps.append((False, f"{host} відхилив з'єднання на порту {port}"))
+            return {'ok': False, 'steps': steps, 'hint': 'Перевірте порт: 993 — SSL, 143 — STARTTLS.'}
+        if not user:
+            steps.append((False, 'Не вказано IMAP логін'))
+            return {'ok': False, 'steps': steps, 'hint': ''}
+        try:
+            imap_login(conn, user, password)
+            steps.append((True, f'Вхід як {user} — успішно'))
+        except imaplib.IMAP4.error as e:
+            msg = e.args[0].decode('utf-8', 'replace') if e.args and isinstance(e.args[0], bytes) else str(e)
+            steps.append((False, f'Вхід як {user}: сервер відмовив ({msg[:150]})'))
+            return {'ok': False, 'steps': steps, 'hint': 'Логін або пароль не підходить (логін — зазвичай повна адреса).'}
+        status, folders = conn.list()
+        if status == 'OK':
+            steps.append((True, f'Папок на сервері: {len(folders or [])}'))
+        status, data = conn.select('INBOX', readonly=True)
+        if status == 'OK':
+            count = data[0].decode() if data and isinstance(data[0], bytes) else str(data[0] if data else '?')
+            steps.append((True, f'Вхідні: листів {count}'))
+        return {'ok': True, 'steps': steps, 'hint': ''}
+    except Exception as e:  # noqa: BLE001 — показати, а не впасти
+        steps.append((False, f'{type(e).__name__}: {e}'[:300]))
+        return {'ok': False, 'steps': steps, 'hint': hint}
+    finally:
+        if conn is not None:
+            try:
+                conn.logout()
+            except Exception:  # noqa: BLE001
+                pass
+
+
 def check_smtp(host, port, *, use_ssl=False, use_tls=False, user='', password='', timeout=15) -> dict:
     """Підключитись, увімкнути шифрування й увійти — без листа. → {ok, steps: [(ok, text)], hint}."""
     import socket

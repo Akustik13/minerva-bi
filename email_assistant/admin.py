@@ -4,7 +4,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponseRedirect, JsonResponse
-from django.urls import path
+from django.urls import path, reverse
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from .models import (EmailAccount, EmailCategoryRule, EmailMessage, EmailThread, EmailDraft, EmailSettings,
@@ -147,7 +147,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
     list_display  = ('email_address', 'user', 'display_name', 'is_primary', 'is_active', 'last_sync_col')
     list_filter   = ('is_active', 'is_primary')
     search_fields = ('email_address', 'user__username', 'display_name')
-    readonly_fields = ('last_sync_at', 'last_seen_uid', 'sync_all_widget', 'export_import_widget')
+    readonly_fields = ('last_sync_at', 'last_seen_uid', 'sync_all_widget', 'export_import_widget', 'test_panel')
 
     fieldsets = (
         ("👤 Акаунт", {
@@ -170,6 +170,10 @@ class EmailAccountAdmin(admin.ModelAdmin):
             'fields': ('smtp_host', 'smtp_port', 'smtp_use_tls', 'smtp_use_ssl',
                        'smtp_username', 'smtp_password'),
             'description': 'IONOS: host=smtp.ionos.de, port=587, TLS=✓',
+        }),
+        ("🔌 Перевірка скриньки", {
+            'fields': ('test_panel',),
+            'description': 'Чи підключається скринька до IMAP і SMTP і чи доходить лист.',
         }),
         ("📊 Статус", {
             'fields': ('last_sync_at', 'last_seen_uid'),
@@ -224,9 +228,121 @@ class EmailAccountAdmin(admin.ModelAdmin):
         )
     export_import_widget.short_description = _('Листи')
 
+    def test_panel(self, obj):
+        """🔌 Перевірити підключення (IMAP + SMTP значеннями з форми, ще не збереженими теж; пароль порожній —
+        збережений) і ✉️ тестовий лист (зі збережених налаштувань, копія — у «Надіслані»)."""
+        check = reverse('admin:emailaccount_check', args=[obj.pk if obj and obj.pk else 0])
+        mail = reverse('admin:emailaccount_test_mail', args=[obj.pk]) if obj and obj.pk else ''
+        return format_html(
+            '<div id="ea-test" data-check="{}" data-mail="{}">'
+            '<button type="button" class="button" id="ea-check-btn">🔌 Перевірити підключення</button> '
+            '<span class="help">IMAP і SMTP значеннями з форми (ще не збереженими теж), лист не надсилається</span>'
+            '<div id="ea-check-out" style="margin-top:6px"></div>'
+            '{}</div>'
+            '<script>(function () {{'
+            '  var box = document.getElementById("ea-test"); if (!box) return;'
+            '  var csrf = function () {{ return (document.querySelector("[name=csrfmiddlewaretoken]") || {{}}).value || ""; }};'
+            '  function v(id) {{ var el = document.getElementById(id); return el ? (el.type === "checkbox" ? el.checked : el.value) : ""; }}'
+            '  function show(out, d) {{ out.textContent = "";'
+            '    (d.sections || [[null, d]]).forEach(function (sec) {{'
+            '      if (sec[0]) {{ var h = document.createElement("div"); h.style.fontWeight = "600"; h.style.marginTop = "4px"; h.textContent = sec[0]; out.appendChild(h); }}'
+            '      var r = sec[1] || {{}};'
+            '      (r.steps || []).forEach(function (s) {{ var div = document.createElement("div");'
+            '        div.textContent = (s[0] ? "✓ " : "✗ ") + s[1]; if (!s[0]) div.style.color = "var(--err, #e53935)"; out.appendChild(div); }});'
+            '      if (r.error) {{ var e = document.createElement("div"); e.style.color = "var(--err, #e53935)"; e.textContent = "❌ " + r.error; out.appendChild(e); }}'
+            '      if (r.message) {{ var m = document.createElement("div"); m.textContent = "✓ " + r.message; out.appendChild(m); }}'
+            '      if (r.hint) {{ var h2 = document.createElement("div"); h2.style.opacity = ".8"; h2.textContent = "💡 " + r.hint; out.appendChild(h2); }}'
+            '    }}); }}'
+            '  async function post(url, body, btn, out) {{ btn.disabled = true; out.textContent = "⏳ …";'
+            '    try {{ var r = await fetch(url, {{method: "POST", credentials: "same-origin",'
+            '        headers: {{"X-CSRFToken": csrf(), "Content-Type": "application/json"}}, body: JSON.stringify(body)}});'
+            '      show(out, await r.json()); }} catch (e) {{ out.textContent = "❌ " + e; }} finally {{ btn.disabled = false; }} }}'
+            '  document.getElementById("ea-check-btn").addEventListener("click", function () {{'
+            '    post(box.dataset.check, {{imap_host: v("id_imap_host"), imap_port: v("id_imap_port"), imap_use_ssl: v("id_imap_use_ssl"),'
+            '      imap_username: v("id_imap_username"), imap_password: v("id_imap_password"),'
+            '      smtp_host: v("id_smtp_host"), smtp_port: v("id_smtp_port"), smtp_use_tls: v("id_smtp_use_tls"),'
+            '      smtp_use_ssl: v("id_smtp_use_ssl"), smtp_username: v("id_smtp_username"), smtp_password: v("id_smtp_password")}},'
+            '      this, document.getElementById("ea-check-out")); }});'
+            '  var mb = document.getElementById("ea-mail-btn");'
+            '  if (mb) mb.addEventListener("click", function () {{'
+            '    post(box.dataset.mail, {{to: v("ea-mail-to")}}, this, document.getElementById("ea-mail-out")); }});'
+            '}})();</script>',
+            check, mail,
+            format_html(
+                '<div style="margin-top:10px"><input type="email" id="ea-mail-to" style="width:260px" '
+                'placeholder="{}"> <button type="button" class="button" id="ea-mail-btn">✉️ Надіслати тестовий лист</button> '
+                '<span class="help">зі збережених налаштувань (спершу «Зберегти»); копія — у «Надіслані» скриньки</span>'
+                '<div id="ea-mail-out" style="margin-top:6px"></div></div>', 'кому (порожньо — ваш email)')
+            if mail else format_html('<div class="help" style="margin-top:6px">{}</div>',
+                                     'Тестовий лист — після збереження скриньки.'))
+    test_panel.short_description = _('Перевірка')
+
+    def _account_or_none(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        obj = EmailAccount.objects.filter(pk=pk).first() if pk else None
+        allowed = (self.has_change_permission(request, obj) if obj is not None else self.has_add_permission(request))
+        if request.method != 'POST' or not allowed or (pk and obj is None):
+            raise PermissionDenied
+        return obj
+
+    def _check_view(self, request, pk):
+        """POST {imap_*, smtp_*} → {sections: [[IMAP, {ok, steps, hint}], [SMTP, …]]}; пароль порожній — збережений."""
+        import json as _json
+        from django.http import JsonResponse
+        from core.smtp_utf8 import check_imap, check_smtp
+        obj = self._account_or_none(request, pk)
+        try:
+            d = _json.loads(request.body or b'{}')
+        except ValueError:
+            d = {}
+
+        def num(key, default):
+            try:
+                return int(d.get(key) or default)
+            except (TypeError, ValueError):
+                return default
+        saved = obj if obj is not None else EmailAccount()
+        imap = check_imap(str(d.get('imap_host') or ''), num('imap_port', 993), use_ssl=bool(d.get('imap_use_ssl')),
+                          user=str(d.get('imap_username') or '').strip(),
+                          password=str(d.get('imap_password') or '') or (saved.imap_password or ''))
+        smtp = check_smtp(str(d.get('smtp_host') or ''), num('smtp_port', 587), use_ssl=bool(d.get('smtp_use_ssl')),
+                          use_tls=bool(d.get('smtp_use_tls')), user=str(d.get('smtp_username') or '').strip(),
+                          password=str(d.get('smtp_password') or '') or (saved.smtp_password or ''))
+        return JsonResponse({'ok': imap['ok'] and smtp['ok'],
+                             'sections': [['📥 IMAP (читання)', imap], ['📤 SMTP (відправка)', smtp]]})
+
+    def _test_mail_view(self, request, pk):
+        """POST {to} → тестовий лист зі збережених налаштувань скриньки (SMTPClient — як звичайні листи)."""
+        import json as _json
+        from django.core.validators import validate_email
+        from django.core.exceptions import ValidationError
+        from django.http import JsonResponse
+        from django.utils import timezone
+        from email_assistant.smtp_client import SMTPClient
+        obj = self._account_or_none(request, pk)
+        try:
+            to = str((_json.loads(request.body or b'{}') or {}).get('to') or '').strip()
+        except ValueError:
+            to = ''
+        to = to or (request.user.email or '').strip()
+        try:
+            validate_email(to)
+        except ValidationError:
+            return JsonResponse({'ok': False, 'error': 'Вкажіть, на яку адресу надіслати.'})
+        when = timezone.localtime().strftime('%d.%m.%Y %H:%M')
+        result = SMTPClient(obj).send(
+            [to], f'Testnachricht / Тестовий лист — {obj.email_address}',
+            f'Dies ist eine Testnachricht aus Minerva, gesendet {when} über das Postfach {obj.email_address}.\n'
+            f'Це тестовий лист з Minerva, надіслано {when} через скриньку {obj.email_address}.')
+        if result.get('ok'):
+            return JsonResponse({'ok': True, 'message': f'Лист надіслано на {to} · {result.get("via", "")}'})
+        return JsonResponse({'ok': False, 'error': result.get('error') or 'Лист не надіслано.'})
+
     def get_urls(self):
         urls = super().get_urls()
         custom = [
+            path('<int:pk>/check/', self.admin_site.admin_view(self._check_view), name='emailaccount_check'),
+            path('<int:pk>/test-mail/', self.admin_site.admin_view(self._test_mail_view), name='emailaccount_test_mail'),
             path('<int:pk>/sync-all/',
                  self.admin_site.admin_view(self._sync_all_view),
                  name='emailaccount_sync_all'),
