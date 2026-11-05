@@ -23,7 +23,7 @@ class MailNotConfigured(Exception):
 
 def _backend() -> str:
     # У тестах — locmem (tabele/settings_test.py)
-    return getattr(settings, "SHOP_MAIL_BACKEND", "") or "django.core.mail.backends.smtp.EmailBackend"
+    return getattr(settings, "SHOP_MAIL_BACKEND", "") or "core.smtp_utf8.EmailBackend"
 
 
 def smtp_settings(shop) -> dict:

@@ -464,7 +464,7 @@ def _send_email(ns, critical_items, overdue_orders, is_test=False):
     from_email = (ns.email_from or ns.email_host_user or 'noreply@minerva.local').strip()
 
     connection = get_connection(
-        backend='django.core.mail.backends.smtp.EmailBackend',
+        backend='core.smtp_utf8.EmailBackend',
         host=ns.email_host,
         port=ns.email_port,
         username=ns.email_host_user,
@@ -1007,7 +1007,7 @@ def _get_ns():
 def _smtp_connection(ns):
     from django.core.mail import get_connection
     return get_connection(
-        backend='django.core.mail.backends.smtp.EmailBackend',
+        backend='core.smtp_utf8.EmailBackend',
         host=ns.email_host,
         port=ns.email_port,
         username=ns.email_host_user,

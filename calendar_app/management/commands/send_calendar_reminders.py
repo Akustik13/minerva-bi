@@ -118,7 +118,7 @@ class Command(BaseCommand):
 
         try:
             conn = get_connection(
-                backend='django.core.mail.backends.smtp.EmailBackend',
+                backend='core.smtp_utf8.EmailBackend',
                 host=ns.email_host,
                 port=ns.email_port,
                 username=ns.email_host_user,

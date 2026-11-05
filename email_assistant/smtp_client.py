@@ -165,7 +165,8 @@ class SMTPClient:
 
             conn = self._open()
 
-            conn.login(self.account.smtp_username, self.account.smtp_password)
+            from core.smtp_utf8 import smtp_login   # пароль з «§», «ä», кирилицею
+            smtp_login(conn, self.account.smtp_username, self.account.smtp_password)
             conn.sendmail(self.account.email_address, all_recipients, msg_bytes)
             conn.quit()
 

@@ -242,6 +242,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         "imap_actions", "imap_last_fetched",
         "weekly_digest_actions", "weekly_digest_last_sent",
         "monthly_digest_actions", "monthly_digest_last_sent",
+        "smtp_check_panel",
     )
 
     def get_form(self, request, obj=None, **kwargs):
@@ -260,7 +261,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "email_enabled",
                 ("email_host", "email_port"),
                 ("email_use_tls", "email_use_ssl"),
-                "email_host_user", "email_host_password",
+                "email_host_user", "email_host_password", "smtp_check_panel",
                 "email_from", "email_to",
                 "email_signature_template",
             ),
@@ -528,6 +529,11 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "<int:pk>/send-now/",
                 self.admin_site.admin_view(self._send_now),
                 name="config_notificationsettings_send_now",
+            ),
+            path(
+                "<int:pk>/smtp-check/",
+                self.admin_site.admin_view(self._smtp_check),
+                name="config_notificationsettings_smtp_check",
             ),
             path(
                 "<int:pk>/test-telegram/",
@@ -963,6 +969,59 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
     def _send_monthly_digest(self, request, pk):
         from config.admin_send import send_now_view
         return send_now_view(self, request, "monthly")
+
+    def smtp_check_panel(self, obj):
+        """🔌 Перевірити з'єднання з SMTP-сервером — значеннями з форми (пароль порожній — збережений), без листа."""
+        if not obj or not obj.pk:
+            return "—"
+        url = reverse("admin:config_notificationsettings_smtp_check", args=[obj.pk])
+        return format_html(
+            '<button type="button" class="button" id="smtp-check-btn">🔌 Перевірити з\'єднання</button> '
+            '<span style="opacity:.75">— підключення, шифрування й вхід значеннями з форми (ще не збереженими теж), '
+            'лист не надсилається</span><div id="smtp-check-out" style="margin-top:6px"></div>'
+            '<script>(function () {{'
+            '  var btn = document.getElementById("smtp-check-btn"), out = document.getElementById("smtp-check-out");'
+            '  function v(id) {{ var el = document.getElementById(id); return el ? (el.type === "checkbox" ? el.checked : el.value) : ""; }}'
+            '  btn.addEventListener("click", async function () {{'
+            '    btn.disabled = true; out.textContent = "⏳ …";'
+            '    var csrf = (document.querySelector("[name=csrfmiddlewaretoken]") || {{}}).value || "";'
+            '    try {{'
+            '      var r = await fetch("{}", {{method: "POST", credentials: "same-origin",'
+            '        headers: {{"X-CSRFToken": csrf, "Content-Type": "application/json"}},'
+            '        body: JSON.stringify({{host: v("id_email_host"), port: v("id_email_port"), tls: v("id_email_use_tls"),'
+            '          ssl: v("id_email_use_ssl"), user: v("id_email_host_user"), password: v("id_email_host_password")}})}});'
+            '      var d = await r.json(); out.textContent = "";'
+            '      (d.steps || []).forEach(function (s) {{ var div = document.createElement("div");'
+            '        div.textContent = (s[0] ? "✓ " : "✗ ") + s[1]; div.style.color = s[0] ? "" : "var(--err, #e53935)"; out.appendChild(div); }});'
+            '      if (d.error) {{ var e = document.createElement("div"); e.textContent = "❌ " + d.error; out.appendChild(e); }}'
+            '      if (d.hint) {{ var h = document.createElement("div"); h.style.opacity = ".8"; h.textContent = "💡 " + d.hint; out.appendChild(h); }}'
+            '    }} catch (e) {{ out.textContent = "❌ " + e; }}'
+            '    finally {{ btn.disabled = false; }}'
+            '  }});'
+            '}})();</script>', url)
+    smtp_check_panel.short_description = "Перевірка"
+
+    def _smtp_check(self, request, pk):
+        """POST {host, port, tls, ssl, user, password} → core.smtp_utf8.check_smtp (без листа). Пароль порожній —
+        збережений. Лише з правом змінювати налаштування сповіщень."""
+        import json as _json
+        from django.http import JsonResponse
+        from core.smtp_utf8 import check_smtp
+        obj = NotificationSettings.get()
+        if request.method != "POST" or not self.has_change_permission(request, obj):
+            return JsonResponse({"ok": False, "error": "Немає права змінювати налаштування сповіщень"}, status=403)
+        try:
+            data = _json.loads(request.body or b"{}")
+        except ValueError:
+            data = {}
+        try:
+            port = int(data.get("port") or 0)
+        except (TypeError, ValueError):
+            return JsonResponse({"ok": False, "error": "Порт — число (465 або 587)"})
+        result = check_smtp(str(data.get("host") or ""), port, use_ssl=bool(data.get("ssl")),
+                            use_tls=bool(data.get("tls")), user=str(data.get("user") or "").strip(),
+                            password=str(data.get("password") or "") or (obj.email_host_password or ""))
+        return JsonResponse(result)
 
     def imap_actions(self, obj):
         if not obj or not obj.pk:

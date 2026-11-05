@@ -128,7 +128,8 @@ class Command(BaseCommand):
         else:
             conn = imaplib.IMAP4(profile.imap_host, profile.imap_port)
             conn.starttls()
-        conn.login(profile.imap_user, profile.imap_password)
+        from core.smtp_utf8 import imap_login   # пароль не лише з латиниці
+        imap_login(conn, profile.imap_user, profile.imap_password)
         return conn
 
     def _select_folder(self, conn, folder_name: str) -> bool:

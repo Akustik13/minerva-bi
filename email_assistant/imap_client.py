@@ -297,7 +297,8 @@ class IMAPClient:
             self.conn.sock.settimeout(90)
         except Exception:
             pass
-        self.conn.login(self.account.imap_username, self.account.imap_password)
+        from core.smtp_utf8 import imap_login   # пароль не лише з латиниці
+        imap_login(self.conn, self.account.imap_username, self.account.imap_password)
         return self
 
     def disconnect(self):

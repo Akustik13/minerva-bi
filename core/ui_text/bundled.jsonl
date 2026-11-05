@@ -326,6 +326,7 @@
 {"uk": "(останній збій {0})", "en": "(last failure {0})", "de": "(letzte Störung {0})"}
 {"uk": "(отримано {0})", "en": "(received {0})", "de": "(erhalten {0})"}
 {"uk": "(офер не знайдено)", "en": "(offer not found)", "de": "(Offer nicht gefunden)"}
+{"uk": "(пароль не лише з латиниці — вхід у UTF-8)", "en": "(password not only Latin — UTF-8 login)", "de": "(Passwort nicht nur lateinisch — Anmeldung in UTF-8)"}
 {"uk": "(перевірка тіла без запису).", "en": "(body check without writing).", "de": "(Prüfung des Bodys ohne Schreiben)."}
 {"uk": "(переглянуто {0} листів Вхідних)", "en": "({0} Inbox emails checked)", "de": "({0} E-Mails im Posteingang geprüft)"}
 {"uk": "(перемикач, localStorage dv-mode): «🛒 Як бачить покупець» (v.buyer — картка, як на digikey.com) і «🔧 Усі поля»", "en": "(switch, localStorage dv-mode): “🛒 As the buyer sees it” (v.buyer — a card, like on digikey.com) and “🔧 All fields”", "de": "(Umschalter, localStorage dv-mode): „🛒 So sieht es der Käufer“ (v.buyer — eine Karte wie auf digikey.com) und „🔧 Alle Felder“"}
@@ -2499,6 +2500,7 @@
 {"uk": "{0} відповідає не як API магазину — перевірте адресу сайту.", "en": "{0} does not respond like the shop API — check the site address.", "de": "{0} antwortet nicht wie die Shop-API – prüfen Sie die Website-Adresse."}
 {"uk": "{0} відправлено", "en": "{0} shipped", "de": "{0} versendet"}
 {"uk": "{0} відправлень", "en": "{0} shipments", "de": "{0} Sendungen"}
+{"uk": "{0} відхилив з'єднання на порту {1}", "en": "{0} refused the connection on port {1}", "de": "{0} hat die Verbindung auf Port {1} abgelehnt"}
 {"uk": "{0} г", "en": "{0} g", "de": "{0} g"}
 {"uk": "{0} год", "en": "{0} h", "de": "{0} Std."}
 {"uk": "{0} год {1} хв", "en": "{0} h {1} min", "de": "{0} Std. {1} Min."}
@@ -2813,6 +2815,7 @@
 {"uk": "{0}: індекси вкладень повторюються", "en": "{0}: attachment indexes are repeated", "de": "{0}: Anhangsindizes wiederholen sich"}
 {"uk": "{0}: ✓ як за правилом", "en": "{0}: ✓ same as by rule", "de": "{0}: ✓ wie nach Regel"}
 {"uk": "{0}:{1} від {2} — {3}", "en": "{0}:{1} from {2} — {3}", "de": "{0}:{1} vom {2} — {3}"}
+{"uk": "{0}:{1} не відповідає за {2} с", "en": "{0}:{1} did not answer within {2} s", "de": "{0}:{1} antwortet nicht innerhalb {2} s"}
 {"uk": "{0}; бракує прав: {1}. Додайте їх у картці ключа. {2}.", "en": "{0}; missing permissions: {1}. Add them on the key card. {2}.", "de": "{0}; fehlende Berechtigungen: {1}. Fügen Sie sie in der Schlüsselkarte hinzu. {2}."}
 {"uk": "{0}HTML виправлено: {1}, нових подій у CRM: {2}, оновлено/привʼязано: {3}, видалено дублів: {4}, без клієнта: {5}", "en": "{0}HTML fixed: {1}, new events in CRM: {2}, updated/linked: {3}, duplicates removed: {4}, without customer: {5}", "de": "{0}HTML korrigiert: {1}, neue Ereignisse im CRM: {2}, aktualisiert/verknüpft: {3}, Duplikate entfernt: {4}, ohne Kunde: {5}"}
 {"uk": "{0}{1} кг ({2})", "en": "{0}{1} kg ({2})", "de": "{0}{1} kg ({2})"}
@@ -3457,6 +3460,7 @@
 {"uk": "Адресна етикетка з доставки", "en": "Address label from shipping", "de": "Adressetikett aus dem Versand"}
 {"uk": "Адресна книга", "en": "Address book", "de": "Adressbuch"}
 {"uk": "Адресна книга порожня", "en": "Address book is empty", "de": "Das Adressbuch ist leer"}
+{"uk": "Адресу сервера «{0}» не знайдено", "en": "Server address «{0}» not found", "de": "Serveradresse «{0}» nicht gefunden"}
 {"uk": "Азербайджан", "en": "Azerbaijan", "de": "Aserbaidschan"}
 {"uk": "Азія", "en": "Asia", "de": "Asien"}
 {"uk": "Акаунт", "en": "Account", "de": "Konto"}
@@ -4637,6 +4641,10 @@
 {"uk": "Вхід в акаунт", "en": "Account sign-in", "de": "Kontoanmeldung"}
 {"uk": "Вхід заблоковано", "en": "Login blocked", "de": "Anmeldung gesperrt"}
 {"uk": "Вхід заблоковано до", "en": "Sign-in blocked until", "de": "Anmeldung gesperrt bis"}
+{"uk": "Вхід не налаштовано (SMTP Login порожній)", "en": "Login not set up (SMTP Login empty)", "de": "Anmeldung nicht eingerichtet (SMTP-Login leer)"}
+{"uk": "Вхід як {0} — успішно", "en": "Login as {0} — successful", "de": "Anmeldung als {0} — erfolgreich"}
+{"uk": "Вхід як {0}: {1}", "en": "Login as {0}: {1}", "de": "Anmeldung als {0}: {1}"}
+{"uk": "Вхід як {0}: сервер відмовив ({1} {2})", "en": "Login as {0}: the server refused ({1} {2})", "de": "Anmeldung als {0}: der Server hat abgelehnt ({1} {2})"}
 {"uk": "Вхідна посилка", "en": "Incoming parcel", "de": "Eingehendes Paket"}
 {"uk": "Вхідна посилка від постачальника: що в ній — позиції закупівлі; прибула — оприбуткуйте PO.", "en": "Incoming parcel from a supplier: its contents are the purchase order lines; once it arrives, receive the PO.", "de": "Eingehendes Paket vom Lieferanten: Inhalt sind die Bestellpositionen; angekommen — Bestellung einbuchen."}
 {"uk": "Вхідне відправлення", "en": "Incoming shipment", "de": "Eingehende Sendung"}
@@ -5926,6 +5934,7 @@
 {"uk": "З якої скриньки Minerva", "en": "From which Minerva mailbox", "de": "Aus welchem Minerva-Postfach"}
 {"uk": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину додайте в Minerva як акаунт пошти (Email → Акаунти): тоді відповіді покупців потрапляють у пошту Minerva й прив'язуються до клієнта в CRM. Тексти — «Шаблони листів». Підтвердження замовлення й контактну форму надсилає сайт: з «Сайт надсилає листи з цієї ж скриньки» — з цієї самої скриньки, інакше — з власних налаштувань сайту (/admin/ → «Пошта»).", "en": "The mailbox from which Minerva writes to this shop’s customers (account, “Welcome”, “Payment received”), where replies arrive, and which team members receive notifications. Add the shop’s mailbox to Minerva as a mail account (Email → Accounts): then customer replies land in Minerva mail and are linked to the customer in CRM. Texts — “Email templates”. The order confirmation and the contact form are sent by the site: with “The site sends emails from this same mailbox” — from this same mailbox, otherwise — from the site’s own settings (/admin/ → “Mail”).", "de": "Das Postfach, von dem Minerva an die Kunden dieses Shops schreibt (Kundenkonto, „Willkommen“, „Zahlung erhalten“), wohin die Antworten gelangen und welche Teammitglieder Benachrichtigungen erhalten. Fügen Sie das Postfach des Shops in Minerva als E-Mail-Konto hinzu (E-Mail → Konten): Dann landen die Antworten der Kunden in der Minerva-E-Mail und werden dem Kunden im CRM zugeordnet. Texte — „E-Mail-Vorlagen“. Die Auftragsbestätigung und das Kontaktformular sendet die Website: mit „Die Website sendet E-Mails aus diesem Postfach“ — aus diesem Postfach, andernfalls — aus den eigenen Einstellungen der Website (/admin/ → „E-Mail“)."}
 {"uk": "З'явиться після завершення попереднього.", "en": "Will appear after the previous one is completed.", "de": "Erscheint nach Abschluss des vorherigen."}
+{"uk": "З'єднання з {0}:{1} ({2})", "en": "Connection to {0}:{1} ({2})", "de": "Verbindung zu {0}:{1} ({2})"}
 {"uk": "ЗАБОРОНЕНО", "en": "FORBIDDEN", "de": "VERBOTEN"}
 {"uk": "ЗАВДАННЯ", "en": "TASK", "de": "AUFGABE"}
 {"uk": "ЗАВДАННЯ: {0}", "en": "TASK: {0}", "de": "AUFGABE: {0}"}
@@ -8092,6 +8101,7 @@
 {"uk": "Логін", "en": "Username", "de": "Benutzername"}
 {"uk": "Логін (email)", "en": "Login (email)", "de": "Login (E-Mail)"}
 {"uk": "Логін / Email", "en": "Login / Email", "de": "Login / E-Mail"}
+{"uk": "Логін або пароль не підходить. Gmail — потрібен App Password.", "en": "Login or password does not match. Gmail needs an App Password.", "de": "Login oder Passwort passt nicht. Gmail — App-Passwort nötig."}
 {"uk": "Логін не вдався. URL: {0}", "en": "Login failed. URL: {0}", "de": "Login fehlgeschlagen. URL: {0}"}
 {"uk": "Логін успішний. URL: {0}", "en": "Login successful. URL: {0}", "de": "Login erfolgreich. URL: {0}"}
 {"uk": "Локал. перевірки", "en": "Local checks", "de": "Lokale Prüfungen"}
@@ -8982,6 +8992,7 @@
 {"uk": "Не вибрано жодної позиції.", "en": "No items selected.", "de": "Es wurde keine Position ausgewählt."}
 {"uk": "Не вибрано, що оновлювати.", "en": "Nothing selected to update.", "de": "Es wurde nichts zum Aktualisieren ausgewählt."}
 {"uk": "Не видно, від кого лист", "en": "Cannot see who the e-mail is from", "de": "Absender der E-Mail nicht erkennbar"}
+{"uk": "Не вказано SMTP Host", "en": "SMTP Host not set", "de": "SMTP-Host nicht angegeben"}
 {"uk": "Не вказано Supplier UUID у налаштуваннях DigiKey («🪪 Отримати Supplier UUID»)", "en": "Supplier UUID is not specified in the DigiKey settings (“🪪 Get Supplier UUID”)", "de": "Supplier UUID ist in den DigiKey-Einstellungen nicht angegeben („🪪 Supplier UUID abrufen“)"}
 {"uk": "Не вказано адресу отримувача", "en": "Recipient address not specified", "de": "Empfängeradresse nicht angegeben"}
 {"uk": "Не вказано отримувача (Кому)", "en": "No recipient specified (To)", "de": "Kein Empfänger angegeben (An)"}
@@ -9278,6 +9289,7 @@
 {"uk": "Немає права змінювати клієнтів", "en": "You do not have permission to change customers", "de": "Sie haben nicht das Recht, Kunden zu ändern"}
 {"uk": "Немає права змінювати налаштування DigiKey.", "en": "You may not change the DigiKey settings.", "de": "Sie dürfen die DigiKey-Einstellungen nicht ändern."}
 {"uk": "Немає права змінювати налаштування складу", "en": "No permission to change stock settings", "de": "Keine Berechtigung, die Lagereinstellungen zu ändern"}
+{"uk": "Немає права змінювати налаштування сповіщень", "en": "No permission to change notification settings", "de": "Keine Berechtigung, die Benachrichtigungseinstellungen zu ändern"}
 {"uk": "Немає права змінювати проєкти askDANTE категорій.", "en": "You do not have permission to change the askDANTE projects of categories.", "de": "Sie haben keine Berechtigung, die askDANTE-Projekte der Kategorien zu ändern."}
 {"uk": "Немає права змінювати проєкти askDANTE.", "en": "You do not have permission to change askDANTE projects.", "de": "Sie haben keine Berechtigung, askDANTE-Projekte zu ändern."}
 {"uk": "Немає права змінювати свої категорії", "en": "No permission to edit your own categories", "de": "Keine Berechtigung zum Bearbeiten eigener Kategorien"}
@@ -10336,6 +10348,7 @@
 {"uk": "Перевірити всі незавершені оплати зараз", "en": "Check all unfinished payments now", "de": "Alle unvollständigen Zahlungen jetzt prüfen"}
 {"uk": "Перевірити дані етикетки…", "en": "Check the label data…", "de": "Etikettendaten prüfen…"}
 {"uk": "Перевірити джерела знань (папки й сайти) і передати зміни в базу знань", "en": "Check knowledge sources (folders and websites) and pass changes to the knowledge base", "de": "Wissensquellen (Ordner und Websites) prüfen und Änderungen an die Wissensdatenbank übergeben"}
+{"uk": "Перевірити з'єднання", "en": "Check connection", "de": "Verbindung prüfen"}
 {"uk": "Перевірити залишок AK-6060-GR {0}", "en": "Check the stock of AK-6060-GR {0}", "de": "Bestand von AK-6060-GR prüfen {0}"}
 {"uk": "Перевірити зараз", "en": "Check now", "de": "Jetzt prüfen"}
 {"uk": "Перевірити зараз, навіть якщо авто-перевірку вимкнено чи інтервал не минув", "en": "Check now, even if auto-check is off or the interval has not passed", "de": "Jetzt prüfen, auch wenn die automatische Prüfung aus ist oder das Intervall nicht abgelaufen ist"}
@@ -10402,6 +10415,7 @@
 {"uk": "Перевірку ще не запускали", "en": "The check has not been run yet", "de": "Die Prüfung wurde noch nicht gestartet"}
 {"uk": "Перевірок", "en": "Checks", "de": "Prüfungen"}
 {"uk": "Перевірок {0}, OK {1}, FAIL {2}; пошук p50 {3} с, max {4} с; звіт: {5}", "en": "Checks {0}, OK {1}, FAIL {2}; search p50 {3} s, max {4} s; report: {5}", "de": "Prüfungen {0}, OK {1}, FAIL {2}; Suche p50 {3} s, max {4} s; Bericht: {5}"}
+{"uk": "Перевірте SMTP Host (напр. smtp.ionos.de).", "en": "Check the SMTP Host (e.g. smtp.ionos.de).", "de": "SMTP-Host prüfen (z. B. smtp.ionos.de)."}
 {"uk": "Перевірте URL або поверніться до головної.", "en": "Check the URL or go back to the home page.", "de": "Prüfen Sie die URL oder kehren Sie zur Startseite zurück."}
 {"uk": "Перевірте email", "en": "Check your e-mail", "de": "Prüfen Sie Ihre E-Mail"}
 {"uk": "Перевірте дані перед відправкою на Jumingo", "en": "Check the data before sending to Jumingo", "de": "Prüfen Sie die Daten vor dem Senden an Jumingo"}
@@ -10409,6 +10423,8 @@
 {"uk": "Перевірте наявність на складі", "en": "Check availability in stock", "de": "Prüfen Sie die Verfügbarkeit im Lager"}
 {"uk": "Перевірте перед друком", "en": "Check before printing", "de": "Vor dem Druck prüfen"}
 {"uk": "Перевірте поля.", "en": "Check the fields.", "de": "Prüfen Sie die Felder."}
+{"uk": "Перевірте порт (465 — SSL, 587 — STARTTLS) і чи не блокує його мережа сервера.", "en": "Check the port (465 — SSL, 587 — STARTTLS) and whether the server's network blocks it.", "de": "Port prüfen (465 — SSL, 587 — STARTTLS) und ob das Netzwerk des Servers ihn blockiert."}
+{"uk": "Перевірте порт: 465 — SSL, 587 — STARTTLS.", "en": "Check the port: 465 — SSL, 587 — STARTTLS.", "de": "Port prüfen: 465 — SSL, 587 — STARTTLS."}
 {"uk": "Перевірте пошту", "en": "Check your mail", "de": "Prüfen Sie Ihren Posteingang"}
 {"uk": "Перевірте правильність вказаної ваги перед відправкою.", "en": "Check that the specified weight is correct before shipping.", "de": "Prüfen Sie vor dem Versand, ob das angegebene Gewicht korrekt ist."}
 {"uk": "Перевірте підключення до інтернету та", "en": "Check your internet connection and", "de": "Prüfen Sie die Internetverbindung und"}
@@ -11174,6 +11190,7 @@
 {"uk": "Порожній файл", "en": "Empty file", "de": "Leere Datei"}
 {"uk": "Порт", "en": "Port", "de": "Port"}
 {"uk": "Порт SMTP і режим шифрування не збігаються: 587 — TLS (STARTTLS) без SSL, 465 — SSL без TLS. Виправте в налаштуваннях email-акаунта.", "en": "The SMTP port and encryption mode do not match: 587 — TLS (STARTTLS) without SSL, 465 — SSL without TLS. Fix this in the email account settings.", "de": "SMTP-Port und Verschlüsselungsmodus passen nicht zusammen: 587 — TLS (STARTTLS) ohne SSL, 465 — SSL ohne TLS. Korrigieren Sie dies in den Einstellungen des E-Mail-Kontos."}
+{"uk": "Порт — число (465 або 587)", "en": "Port must be a number (465 or 587)", "de": "Port ist eine Zahl (465 oder 587)"}
 {"uk": "Португалія", "en": "Portugal", "de": "Portugal"}
 {"uk": "Поруч зі списком", "en": "Next to the list", "de": "Neben der Liste"}
 {"uk": "Порядок", "en": "Order", "de": "Reihenfolge"}
@@ -12056,9 +12073,11 @@
 {"uk": "Режим «Надсилати самому»: лист стає в «⏳ Заплановані», до відправки можна скасувати.", "en": "“Send automatically” mode: the e-mail goes to “⏳ Scheduled” and can be cancelled before it is sent.", "de": "Modus „Selbst senden“: Die E-Mail landet in „⏳ Geplant“ und kann vor dem Versand abgebrochen werden."}
 {"uk": "Режим автовідповіді", "en": "Auto-reply mode", "de": "Modus der Automatikantwort"}
 {"uk": "Режим вибору", "en": "Selection mode", "de": "Auswahlmodus"}
+{"uk": "Режим не відповідає порту: для 465 — «SSL», для 587 — «TLS (STARTTLS)», не обидва.", "en": "The mode does not match the port: 465 — «SSL», 587 — «TLS (STARTTLS)», not both.", "de": "Modus passt nicht zum Port: 465 — «SSL», 587 — «TLS (STARTTLS)», nicht beide."}
 {"uk": "Режим перегляду — натисни «Редагувати» щоб змінити поля", "en": "View mode — click “Edit” to change the fields", "de": "Ansichtsmodus — auf „Bearbeiten“ klicken, um die Felder zu ändern"}
 {"uk": "Режим імпорту", "en": "Import mode", "de": "Importmodus"}
 {"uk": "Режим: {0}", "en": "Mode: {0}", "de": "Modus: {0}"}
+{"uk": "Режим: {0}. Листи надсилатимуться так само.", "en": "Mode: {0}. Emails will be sent the same way.", "de": "Modus: {0}. E-Mails werden genauso gesendet."}
 {"uk": "Резерв", "en": "Reserved", "de": "Reserviert"}
 {"uk": "Резервна опція (ручний запуск через термінал)", "en": "Fallback option (manual run via terminal)", "de": "Alternative Option (manueller Start über das Terminal)"}
 {"uk": "Резервне копіювання", "en": "Backup", "de": "Datensicherung"}
@@ -12485,6 +12504,8 @@
 {"uk": "Сервер", "en": "Server", "de": "Server"}
 {"uk": "Сервер відхилив запит", "en": "The server rejected the request", "de": "Der Server hat die Anfrage abgelehnt"}
 {"uk": "Сервер не відповів. Перевірте адресу; якщо адреса правильна — на сервері ще не встановлено оновлення з підтримкою CORS (Оновлення системи → 🚀 Повне оновлення).", "en": "The server did not respond. Check the address; if the address is correct, the update with CORS support has not yet been installed on the server (System update → 🚀 Full update).", "de": "Der Server hat nicht geantwortet. Prüfen Sie die Adresse; ist sie korrekt, wurde das Update mit CORS-Unterstützung auf dem Server noch nicht installiert (Systemaktualisierung → 🚀 Vollständiges Update)."}
+{"uk": "Сервер не приймає AUTH PLAIN / LOGIN — пароль не лише з латинських літер так не передати. Змініть пароль скриньки на латиницю й цифри.", "en": "The server does not accept AUTH PLAIN / LOGIN — a password with non-Latin characters cannot be sent this way. Change the mailbox password to Latin letters and digits.", "de": "Der Server akzeptiert kein AUTH PLAIN / LOGIN — ein Passwort mit nicht lateinischen Zeichen lässt sich so nicht übertragen. Ändern Sie das Postfach-Passwort auf lateinische Buchstaben und Ziffern."}
+{"uk": "Сервер не пропонує вхід (AUTH) у цьому режимі — спробуйте SSL / STARTTLS.", "en": "The server offers no login (AUTH) in this mode — try SSL / STARTTLS.", "de": "Der Server bietet in diesem Modus keine Anmeldung (AUTH) an — SSL / STARTTLS versuchen."}
 {"uk": "Сервер пошти та Telegram-бот налаштовуються в", "en": "The mail server and the Telegram bot are configured in", "de": "Mailserver und Telegram-Bot werden eingerichtet in"}
 {"uk": "Сервіс", "en": "Service", "de": "Service"}
 {"uk": "Сервіс помічника тимчасово недоступний.", "en": "The assistant service is temporarily unavailable.", "de": "Der Assistentendienst ist vorübergehend nicht verfügbar."}
@@ -14727,6 +14748,7 @@
 {"uk": "Широка 560", "en": "Wide 560", "de": "Breit 560"}
 {"uk": "Широке меню", "en": "Wide menu", "de": "Breites Menü"}
 {"uk": "Широкий список на весь екран, лист відкривається замість нього (← назад), файли в рядку", "en": "Wide full-screen list, the email opens in its place (← back), files in the row", "de": "Breite Liste über den ganzen Bildschirm, die E-Mail öffnet sich anstelle der Liste (← zurück), Dateien in der Zeile"}
+{"uk": "Шифрування STARTTLS увімкнено", "en": "STARTTLS encryption on", "de": "STARTTLS-Verschlüsselung aktiv"}
 {"uk": "Шлях / URL", "en": "Path / URL", "de": "Pfad / URL"}
 {"uk": "Шлях вихідного .docx", "en": "Path of the output .docx", "de": "Pfad der Ausgabedatei .docx"}
 {"uk": "Шлях відносний", "en": "The path is relative", "de": "Der Pfad ist relativ"}
@@ -15249,6 +15271,7 @@
 {"uk": "бежевий", "en": "beige", "de": "beige"}
 {"uk": "без AI, безкоштовно: частота, роз'єм і стандарт у запиті, схожі товари, кабелі, наступник, «часто купують разом».", "en": "without AI, free of charge: frequency, connector and standard in the query, similar products, cables, successor, “frequently bought together”.", "de": "ohne KI, kostenlos: Frequenz, Steckverbinder und Standard in der Anfrage, ähnliche Artikel, Kabel, Nachfolger, „wird oft zusammen gekauft“."}
 {"uk": "без SKU", "en": "no SKU", "de": "ohne Artikelnummer"}
+{"uk": "без SSL", "en": "without SSL", "de": "ohne SSL"}
 {"uk": "без автооновлення", "en": "no auto-update", "de": "keine automatische Aktualisierung"}
 {"uk": "без акаунту UPS відхилить запит. Для", "en": "without an account UPS will reject the request. For", "de": "ohne Konto lehnt UPS die Anfrage ab. Für"}
 {"uk": "без активності в Minerva — стандартний день", "en": "no activity in Minerva — standard day", "de": "keine Aktivität in Minerva — Standardtag"}
@@ -17608,6 +17631,7 @@
 {"uk": "підказки пошуку", "en": "search suggestions", "de": "Suchvorschläge"}
 {"uk": "підказки, повідомлення). Переклад робиться", "en": "hints, messages). Translation is done", "de": "Hinweise, Meldungen). Die Übersetzung erfolgt"}
 {"uk": "підключення сайту кодом", "en": "connecting a website with a code", "de": "Verbinden einer Website per Code"}
+{"uk": "підключення, шифрування й вхід значеннями з форми (ще не збереженими теж), лист не надсилається", "en": "connection, encryption and login with the values in the form (unsaved too), no email is sent", "de": "Verbindung, Verschlüsselung und Anmeldung mit den Werten im Formular (auch ungespeicherten), keine E-Mail wird gesendet"}
 {"uk": "підключено", "en": "connected", "de": "verbunden"}
 {"uk": "підключено кодом", "en": "connected by code", "de": "per Code verbunden"}
 {"uk": "підключено кодом {0} · код створив {1}", "en": "connected by code {0} · code created by {1}", "de": "per Code verbunden {0} · Code erstellt von {1}"}

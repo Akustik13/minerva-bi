@@ -432,7 +432,8 @@ def _imap_save_sent(raw_bytes, imap_host, imap_port, imap_use_ssl,
     try:
         cls = imaplib.IMAP4_SSL if imap_use_ssl else imaplib.IMAP4
         M = cls(imap_host, int(imap_port))
-        M.login(imap_user, imap_password)
+        from core.smtp_utf8 import imap_login   # пароль не лише з латиниці
+        imap_login(M, imap_user, imap_password)
         M.append(quoted_folder, r'\Seen', None, raw_bytes)
         M.logout()
         logger.info("IMAP: saved sent copy to %s@%s/%s", imap_user, imap_host, folder)
@@ -544,7 +545,7 @@ def send_customer_email(request, customer_pk):
 
     try:
         connection = get_connection(
-            backend='django.core.mail.backends.smtp.EmailBackend',
+            backend='core.smtp_utf8.EmailBackend',
             **smtp_params,
             fail_silently=False,
         )

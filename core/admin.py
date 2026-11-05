@@ -545,7 +545,7 @@ class MinervaUserAdmin(_DjangoUserAdmin):
                 return {'ok': False, 'error': 'SMTP не налаштований (Config → Notifications → Email)'}
             from django.core.mail import EmailMultiAlternatives, get_connection
             conn = get_connection(
-                backend='django.core.mail.backends.smtp.EmailBackend',
+                backend='core.smtp_utf8.EmailBackend',
                 host=ns.email_host,
                 port=ns.email_port,
                 username=ns.email_host_user,

@@ -171,7 +171,7 @@ def deliver(sender, to: list[str], subject: str, text: str, html: str) -> str:
     if not (ns.email_host and (ns.email_from or ns.email_host_user)):
         return "не задано SMTP: виберіть скриньку Minerva у звіті або заповніть Налаштування → Сповіщення"
     conn = get_connection(backend=getattr(settings, "WORKTIME_MAIL_BACKEND", "")
-                          or "django.core.mail.backends.smtp.EmailBackend",
+                          or "core.smtp_utf8.EmailBackend",
                           host=ns.email_host, port=ns.email_port, username=ns.email_host_user,
                           password=ns.email_host_password, use_ssl=bool(ns.email_use_ssl),
                           use_tls=bool(ns.email_use_tls) and not ns.email_use_ssl, timeout=20)
