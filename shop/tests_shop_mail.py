@@ -123,3 +123,66 @@ class MailAdminTests(TestCase):
         self.assertEqual(f.clean_team_emails(), "a@b.de, c@d.de")
         with self.assertRaises(Exception):
             f.clean_mail_bcc()
+
+
+class MailMapTests(TestCase):
+    """«Що звідки йде» (shop/mail_map.py): хто надсилає який лист, з якої адреси, кому і де змінити."""
+
+    def setUp(self):
+        from email_assistant.models import EmailAccount
+        self.user = User.objects.create_superuser("adm", "adm@example.com", "p")
+        self.acc = EmailAccount.objects.create(
+            user=self.user, display_name="Sevskiy Shop", email_address="info@sevskiy.de", imap_username="info@sevskiy.de",
+            imap_password="imap-secret", smtp_host="smtp.ionos.de", smtp_port=587, smtp_use_ssl=False, smtp_use_tls=True,
+            smtp_username="info@sevskiy.de", smtp_password="smtp-secret")
+        self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True, url="https://www.sevskiy.de/shop/",
+                                        site_mail_reports={"www.sevskiy.de": {
+                                            "at": "2026-11-05T10:45:00+00:00", "from": "info@sevskiy.de",
+                                            "host": "smtp.ionos.de", "notify": "sergey@sevskiy.de", "confirmation": True,
+                                            "recipient": "kontakt@sevskiy.de"}})
+
+    def rows(self):
+        from . import mail_map
+        self.shop.refresh_from_db()
+        return {r["mail"]: r for r in mail_map.rows(self.shop)}
+
+    def test_without_sender_and_from_site_files(self):
+        r = self.rows()
+        self.assertIn("❌ не задано", r["Підтвердження email, новий пароль, запрошення від менеджера"]["sender"])
+        self.assertIn("нікому", r["Команді: оплата отримана, новий акаунт покупця"]["to"])
+        order = r["Підтвердження замовлення покупцю"]
+        self.assertEqual((order["who"], order["to"]), ("сайт www.sevskiy.de", "покупцю"))
+        self.assertIn("info@sevskiy.de (smtp.ionos.de) — файли сайту", order["sender"])
+        self.assertEqual(r["Команді: нове замовлення з сайту"]["to"], "sergey@sevskiy.de")
+        contact = r["Контактна форма сайту"]
+        self.assertEqual(contact["to"], "kontakt@sevskiy.de")
+        self.assertEqual(contact["change"][0]["url"], "https://www.sevskiy.de/admin/")   # адмінка — корінь домену
+
+    def test_shop_mailbox_team_and_site_from_minerva(self):
+        Shop.objects.filter(pk=self.shop.pk).update(
+            mail_sender=self.acc, mail_from_name="Sevskiy Shop", mail_reply_to="vertrieb@sevskiy.de",
+            mail_bcc="archiv@sevskiy.de", team_emails="sergey@sevskiy.de, slava@sevskiy.de",
+            site_mail_managed=True, site_order_confirmation=False)
+        r = self.rows()
+        verify = r["Підтвердження email, новий пароль, запрошення від менеджера"]
+        self.assertEqual(verify["sender"], "Sevskiy Shop <info@sevskiy.de>")
+        self.assertIn(f"/admin/email_assistant/emailaccount/{self.acc.pk}/change/", [c.get("url") for c in verify["change"]])
+        customer = r["«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено"]
+        self.assertIn("відповіді — на vertrieb@sevskiy.de", customer["sender"])
+        self.assertIn("прихована копія: archiv@sevskiy.de", customer["to"])
+        self.assertEqual(r["Команді: оплата отримана, новий акаунт покупця"]["to"], "sergey@sevskiy.de, slava@sevskiy.de")
+        order = r["Підтвердження замовлення покупцю"]
+        self.assertEqual((order["sender"], order["to"]), ("Sevskiy Shop <info@sevskiy.de> (з Minerva)", "не надсилається"))
+        self.assertIn("site_order_confirmation", [c.get("go") for c in order["change"]])
+        self.assertEqual(r["Команді: нове замовлення з сайту"]["to"], "sergey@sevskiy.de, slava@sevskiy.de")
+
+    def test_card_shows_the_map(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+        page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
+        for text in ("Що звідки йде", "Хто надсилає", 'data-go="mail_sender"', "Контактна форма сайту",
+                     'href="https://www.sevskiy.de/admin/" target="_blank" rel="noopener"'):
+            self.assertContains(page, text)

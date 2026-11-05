@@ -373,6 +373,7 @@
 {"uk": "(через RAG API помічника Minerva)", "en": "(via the RAG API of the Minerva assistant)", "de": "(über die RAG-API des Minerva-Assistenten)"}
 {"uk": "(числа з запасом зручніші — легше вставити між ними).", "en": "(numbers with gaps are more convenient — easier to insert between them).", "de": "(Zahlen mit Abstand sind praktischer — so lässt sich leichter etwas dazwischen einfügen)."}
 {"uk": "(як буде після «💾 Зберегти»)", "en": "(as it will be after “💾 Save”)", "de": "(so, wie es nach „💾 Speichern“ sein wird)"}
+{"uk": "(як на сайті)", "en": "(as on the site)", "de": "(wie auf der Website)"}
 {"uk": "(якщо її змонтовано «лише для читання», файли туди", "en": "(if it is mounted “read-only”, add files there", "de": "(wenn er „schreibgeschützt“ eingebunden ist, Dateien dort"}
 {"uk": "(якщо її змонтовано «лише для читання», файли туди додавайте на NAS)", "en": "(if it is mounted “read-only”, add files there on the NAS)", "de": "(wenn er „schreibgeschützt“ eingebunden ist, Dateien dort auf dem NAS hinzufügen)"}
 {"uk": "(і артикулів каталогу з кількістю разом із питанням про ціну)", "en": "(and catalog SKUs with a quantity together with a price question)", "de": "(und Katalog-Artikelnummern mit Menge zusammen mit einer Preisfrage)"}
@@ -1751,6 +1752,7 @@
 {"uk": "SMTP не налаштовано. Увімкніть Email у Налаштуваннях сповіщень.", "en": "SMTP is not configured. Enable e-mail in the notification settings.", "de": "SMTP ist nicht konfiguriert. Aktivieren Sie E-Mail in den Benachrichtigungseinstellungen."}
 {"uk": "SMTP пароль", "en": "SMTP password", "de": "SMTP-Passwort"}
 {"uk": "SMTP порт", "en": "SMTP port", "de": "SMTP-Port"}
+{"uk": "SMTP скриньки {0}", "en": "SMTP of mailbox {0}", "de": "SMTP des Postfachs {0}"}
 {"uk": "SMTP сповіщень Minerva", "en": "Minerva notification SMTP", "de": "SMTP für Minerva-Benachrichtigungen"}
 {"uk": "SMTP хост", "en": "SMTP host", "de": "SMTP-Host"}
 {"uk": "SMTP, Bot Token, Chat ID, алерти", "en": "SMTP, Bot Token, Chat ID, alerts", "de": "SMTP, Bot Token, Chat ID, Warnungen"}
@@ -2381,6 +2383,7 @@
 {"uk": "{0} ({1} позицій)", "en": "{0} ({1} lines)", "de": "{0} ({1} Positionen)"}
 {"uk": "{0} ({1} тому)", "en": "{0} ({1} ago)", "de": "{0} (vor {1})"}
 {"uk": "{0} ({1}) — {2}, отримано {3} з {4} · {5} · очікується {6}", "en": "{0} ({1}) — {2}, received {3} of {4} · {5} · expected {6}", "de": "{0} ({1}) — {2}, {3} von {4} erhalten · {5} · erwartet {6}"}
+{"uk": "{0} ({1}) — файли сайту", "en": "{0} ({1}) — site files", "de": "{0} ({1}) — Dateien der Website"}
 {"uk": "{0} ({1}с)", "en": "{0} ({1}s)", "de": "{0} ({1} s)"}
 {"uk": "{0} ({1}с) ── {2}", "en": "{0} ({1}s) ── {2}", "de": "{0} ({1} s) ── {2}"}
 {"uk": "{0} (до {1})", "en": "{0} (until {1})", "de": "{0} (bis {1})"}
@@ -2843,6 +2846,7 @@
 {"uk": "«OAuth consent screen»: External, додати свою пошту; потім «Publish app» → «In production» (у режимі Testing Google відкликає доступ кожні 7 днів; попередження «неперевірений застосунок» — нормально для власного).", "en": "“OAuth consent screen”: External, add your own e-mail; then “Publish app” → “In production” (in Testing mode Google revokes access every 7 days; the “unverified app” warning is normal for your own app).", "de": "„OAuth consent screen“: External, eigene E-Mail-Adresse hinzufügen; dann „Publish app“ → „In production“ (im Modus Testing widerruft Google den Zugriff alle 7 Tage; die Warnung „nicht verifizierte App“ ist bei einer eigenen App normal)."}
 {"uk": "«Void» — лише для відправлень UPS.", "en": "“Void” is only for UPS shipments.", "de": "„Void“ gilt nur für UPS-Sendungen."}
 {"uk": "«Von:» пересланого листа", "en": "“Von:” of the forwarded e-mail", "de": "„Von:“ der weitergeleiteten E-Mail"}
+{"uk": "«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено", "en": "«Willkommen», «Zahlung erhalten», password changed, account deleted", "de": "«Willkommen», «Zahlung erhalten», Passwort geändert, Konto gelöscht"}
 {"uk": "«sku:AMP-100», «order_number:WS-1001», «code:PO-12», «id:5» — кожен запис, який ключ отримав (до 2000; більше — лише кількість у «Записів»)", "en": "“sku:AMP-100”, “order_number:WS-1001”, “code:PO-12”, “id:5” — every record the key received (up to 2000; beyond that only the count in “Records”)", "de": "„sku:AMP-100“, „order_number:WS-1001“, „code:PO-12“, „id:5“ — jeder Datensatz, den der Schlüssel erhalten hat (bis zu 2000; darüber hinaus nur die Anzahl unter „Datensätze“)"}
 {"uk": "«{0}» ({1}) вже є в основного клієнта, а без клієнта цей запис існувати не може. Злиття не виконано.", "en": "“{0}” ({1}) already exists for the primary customer, and this record cannot exist without a customer. Merge not performed.", "de": "„{0}“ ({1}) ist beim Hauptkunden bereits vorhanden, und dieser Datensatz kann ohne Kunden nicht existieren. Zusammenführung nicht durchgeführt."}
 {"uk": "«{0}» · код {1} · покупці бачать «{2}»", "en": "“{0}” · code {1} · customers see “{2}”", "de": "„{0}“ · Code {1} · Kunden sehen „{2}“"}
@@ -2915,6 +2919,7 @@
 {"uk": "«Окремо для кожного товару» — виберіть товари.", "en": "“Separately for each product” — select products.", "de": "„Einzeln für jeden Artikel“ – wählen Sie Artikel aus."}
 {"uk": "«Оплату отримано» тощо — email і Telegram з «Налаштування → Сповіщення».", "en": "“Payment received” etc. — e-mail and Telegram from “Settings → Notifications”.", "de": "„Zahlung eingegangen“ usw. – E-Mail und Telegram aus „Einstellungen → Benachrichtigungen“."}
 {"uk": "«Опублікувати календар» → виберіть календар і «Може переглядати всі відомості» → «Опублікувати» → скопіюйте посилання ICS (не HTML)", "en": "“Publish calendar” → choose the calendar and “Can view all details” → “Publish” → copy the ICS link (not HTML)", "de": "„Kalender veröffentlichen“ → Kalender wählen und „Kann alle Details anzeigen“ → „Veröffentlichen“ → den ICS-Link kopieren (nicht HTML)"}
+{"uk": "«Отримувач запитів з форми»", "en": "«Отримувач запитів з форми» (form recipient)", "de": "«Отримувач запитів з форми» (Formular-Empfänger)"}
 {"uk": "«Перевірити» = import + create нових в фоні", "en": "“Check” = import + create new ones in the background", "de": "„Prüfen“ = Import + Neuanlage im Hintergrund"}
 {"uk": "«Передати перевізнику»", "en": "“Hand over to carrier”", "de": "„An Versanddienstleister übergeben“"}
 {"uk": "«По» має бути пізніше за «з» (00:00 — кінець доби).", "en": "“To” must be later than “from” (00:00 — end of day).", "de": "„Bis“ muss später sein als „von“ (00:00 – Ende des Tages)."}
@@ -2940,6 +2945,7 @@
 {"uk": "«одразу на DigiKey» — лише leadTimeToShip (bots/services/dk_lead.py), хід — status/.", "en": "“straight to DigiKey” — only leadTimeToShip (bots/services/dk_lead.py), progress — status/.", "de": "„direkt an DigiKey“ — nur leadTimeToShip (bots/services/dk_lead.py), Fortschritt — status/."}
 {"uk": "«чого не вистачає» — порівнюй потрібні кількості з вільним залишком і тим, що очікується", "en": "“what is missing” — compare the required quantities with the available stock and with what is expected", "de": "„was fehlt“ — vergleichen Sie die benötigten Mengen mit dem verfügbaren Bestand und mit dem, was erwartet wird"}
 {"uk": "«шестерня»", "en": "“gear”", "de": "„Zahnrad“"}
+{"uk": "«↓» — до поля на цій сторінці (незбережені зміни тут ще не враховано), «→» — інша сторінка; дані сайту — з його останнього звіту.", "en": "«↓» — to the field on this page (unsaved changes are not reflected here yet), «→» — another page; site data — from its latest report.", "de": "«↓» — zum Feld auf dieser Seite (ungespeicherte Änderungen sind hier noch nicht berücksichtigt), «→» — andere Seite; Website-Daten — aus ihrem letzten Bericht."}
 {"uk": "«⏱ Строки відвантаження DigiKey» (bots/admin_dk_tools.lead_view): вибрати лістинги → новий строк", "en": "“⏱ DigiKey lead times” (bots/admin_dk_tools.lead_view): select listings → new lead time", "de": "„⏱ DigiKey-Lieferzeiten“ (bots/admin_dk_tools.lead_view): Listings auswählen → neue Lieferzeit"}
 {"uk": "«⏱ Строки відвантаження DigiKey» (bots/admin_dk_tools.lead_view): вибрати лістинги → новий строк; «одразу на DigiKey» — лише leadTimeToShip (bots/services/dk_lead.py), хід — status/.", "en": "“⏱ DigiKey lead times” (bots/admin_dk_tools.lead_view): select listings → new lead time; “straight to DigiKey” — only leadTimeToShip (bots/services/dk_lead.py), progress — status/.", "de": "„⏱ DigiKey-Lieferzeiten“ (bots/admin_dk_tools.lead_view): Listings auswählen → neue Lieferzeit; „direkt an DigiKey“ — nur leadTimeToShip (bots/services/dk_lead.py), Fortschritt — status/."}
 {"uk": "«✅ Відправлено», лист клієнту — на сторінці відправлення.", "en": "«✅ Shipped», email to the customer — on the shipment page.", "de": "«✅ Versendet», E-Mail an den Kunden — auf der Sendungsseite."}
@@ -4841,6 +4847,7 @@
 {"uk": "Відповіді віконця «Minerva» про товари за даташитами й каталогом (RAG по продукції); пошук агента по всіх даташитах («🧩 Завдання агенту», MCP).", "en": "Answers of the “Minerva” window about products based on datasheets and the catalog (RAG on products); agent search across all datasheets (“🧩 Agent tasks”, MCP).", "de": "Antworten des „Minerva“-Fensters zu Artikeln anhand von Datenblättern und Katalog (RAG zu Produkten); Agentensuche in allen Datenblättern („🧩 Agentenaufgaben“, MCP)."}
 {"uk": "Відповіді немає за {0} с — RAG зайнятий або працює повільно.", "en": "No answer within {0} s — RAG is busy or slow.", "de": "Keine Antwort innerhalb von {0} s — RAG ist ausgelastet oder arbeitet langsam."}
 {"uk": "Відповіді перевіряє «🧪 Перевірити RAG».", "en": "The answers are checked by “🧪 Check RAG”.", "de": "Die Antworten prüft „🧪 RAG prüfen“."}
+{"uk": "Відповіді покупців", "en": "Customer replies", "de": "Antworten der Kunden"}
 {"uk": "Відповіді покупців — на адресу", "en": "Customer replies — to the address", "de": "Antworten der Kunden – an die Adresse"}
 {"uk": "Відповіді покупців: {0}", "en": "Customer replies: {0}", "de": "Antworten der Kunden: {0}"}
 {"uk": "Відповіді — за даташитами і каталогом. Перевіряйте важливі дані в джерелах.", "en": "Answers are based on datasheets and the catalog. Verify important data in the sources.", "de": "Die Antworten beruhen auf Datenblättern und dem Katalog. Prüfen Sie wichtige Angaben in den Quellen."}
@@ -5246,6 +5253,7 @@
 {"uk": "Де", "en": "Where", "de": "Wo"}
 {"uk": "Де в коді", "en": "Where in the code", "de": "Wo im Code"}
 {"uk": "Де використовується", "en": "Where it is used", "de": "Wo es verwendet wird"}
+{"uk": "Де змінити", "en": "Where to change", "de": "Wo ändern"}
 {"uk": "Де знаходиться", "en": "Where to find it", "de": "Wo zu finden"}
 {"uk": "Де кнопки", "en": "Where the buttons are", "de": "Wo die Schaltflächen sind"}
 {"uk": "Де можна брати папки", "en": "Where folders may be taken from", "de": "Woher Ordner genommen werden dürfen"}
@@ -5895,6 +5903,7 @@
 {"uk": "З цього листа завдання не буде", "en": "No task will be made from this email", "de": "Aus dieser E-Mail wird keine Aufgabe"}
 {"uk": "З цін Minerva стане", "en": "From Minerva prices it will become", "de": "Aus den Minerva-Preisen wird"}
 {"uk": "З цінами, реквізитами компанії та банківськими даними.", "en": "With prices, company details and bank details.", "de": "Mit Preisen, Firmendaten und Bankdaten."}
+{"uk": "З якої адреси", "en": "From which address", "de": "Von welcher Adresse"}
 {"uk": "З якої скриньки Minerva", "en": "From which Minerva mailbox", "de": "Aus welchem Minerva-Postfach"}
 {"uk": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину додайте в Minerva як акаунт пошти (Email → Акаунти): тоді відповіді покупців потрапляють у пошту Minerva й прив'язуються до клієнта в CRM. Тексти — «Шаблони листів». Підтвердження замовлення й контактну форму надсилає сайт: з «Сайт надсилає листи з цієї ж скриньки» — з цієї самої скриньки, інакше — з власних налаштувань сайту (/admin/ → «Пошта»).", "en": "The mailbox from which Minerva writes to this shop’s customers (account, “Welcome”, “Payment received”), where replies arrive, and which team members receive notifications. Add the shop’s mailbox to Minerva as a mail account (Email → Accounts): then customer replies land in Minerva mail and are linked to the customer in CRM. Texts — “Email templates”. The order confirmation and the contact form are sent by the site: with “The site sends emails from this same mailbox” — from this same mailbox, otherwise — from the site’s own settings (/admin/ → “Mail”).", "de": "Das Postfach, von dem Minerva an die Kunden dieses Shops schreibt (Kundenkonto, „Willkommen“, „Zahlung erhalten“), wohin die Antworten gelangen und welche Teammitglieder Benachrichtigungen erhalten. Fügen Sie das Postfach des Shops in Minerva als E-Mail-Konto hinzu (E-Mail → Konten): Dann landen die Antworten der Kunden in der Minerva-E-Mail und werden dem Kunden im CRM zugeordnet. Texte — „E-Mail-Vorlagen“. Die Auftragsbestätigung und das Kontaktformular sendet die Website: mit „Die Website sendet E-Mails aus diesem Postfach“ — aus diesem Postfach, andernfalls — aus den eigenen Einstellungen der Website (/admin/ → „E-Mail“)."}
 {"uk": "З'явиться після завершення попереднього.", "en": "Will appear after the previous one is completed.", "de": "Erscheint nach Abschluss des vorherigen."}
@@ -7513,7 +7522,9 @@
 {"uk": "Команда не вказана", "en": "No command specified", "de": "Kein Befehl angegeben"}
 {"uk": "Команди", "en": "Commands", "de": "Befehle"}
 {"uk": "Команди: /reset — нова розмова, /myid — твій Telegram ID, /help — довідка", "en": "Commands: /reset — new conversation, /myid — your Telegram ID, /help — help", "de": "Befehle: /reset – neue Unterhaltung, /myid – deine Telegram-ID, /help – Hilfe"}
+{"uk": "Команді: нове замовлення з сайту", "en": "To the team: new order from the site", "de": "An das Team: neue Bestellung von der Website"}
 {"uk": "Команді: новий акаунт покупця", "en": "To the team: new customer account", "de": "An das Team: neues Kundenkonto"}
+{"uk": "Команді: оплата отримана, новий акаунт покупця", "en": "To the team: payment received, new customer account", "de": "An das Team: Zahlung eingegangen, neues Kundenkonto"}
 {"uk": "Коментар", "en": "Comment", "de": "Kommentar"}
 {"uk": "Комерційна пропозиція", "en": "Commercial quotation", "de": "Angebot"}
 {"uk": "Комерційний інвойс", "en": "Commercial invoice", "de": "Commercial Invoice"}
@@ -7574,6 +7585,7 @@
 {"uk": "Контактна особа (білінг)", "en": "Contact person (billing)", "de": "Ansprechpartner (Rechnung)"}
 {"uk": "Контактна особа.", "en": "Contact person.", "de": "Ansprechpartner."}
 {"uk": "Контактна форма", "en": "Contact form", "de": "Kontaktformular"}
+{"uk": "Контактна форма сайту", "en": "Site contact form", "de": "Kontaktformular der Website"}
 {"uk": "Контактна інформація", "en": "Contact information", "de": "Kontaktinformationen"}
 {"uk": "Контактний email", "en": "Contact email", "de": "Kontakt-E-Mail"}
 {"uk": "Контейнер cron викликає автозаповнення щохвилини; давно не було — щоденні запуски не працюють.", "en": "The cron container calls auto-fill every minute; if there has been no call for a long time, the daily runs are not working.", "de": "Der Cron-Container ruft das automatische Ausfüllen jede Minute auf; war lange kein Aufruf zu sehen, funktionieren die täglichen Läufe nicht."}
@@ -7866,6 +7878,7 @@
 {"uk": "Лист Excel", "en": "Excel sheet", "de": "Excel-Blatt"}
 {"uk": "Лист {0}{1} · {2} · від: {3} · тема: {4}", "en": "Лист {0}{1} · {2} · від: {3} · тема: {4}", "de": "Лист {0}{1} · {2} · від: {3} · тема: {4}"}
 {"uk": "Лист {0}{1} · {2} · від: {3} · тема: {4} {5}", "en": "Лист {0}{1} · {2} · від: {3} · тема: {4} {5}", "de": "Лист {0}{1} · {2} · від: {3} · тема: {4} {5}"}
+{"uk": "Лист «Ласкаво просимо»", "en": "«Welcome» e-mail", "de": "E-Mail «Willkommen»"}
 {"uk": "Лист «Ласкаво просимо» після підтвердження реєстрації", "en": "“Welcome” e-mail after registration is confirmed", "de": "E-Mail „Willkommen“ nach Bestätigung der Registrierung"}
 {"uk": "Лист «оплату отримано»", "en": "“Payment received” e-mail", "de": "E-Mail „Zahlung eingegangen“"}
 {"uk": "Лист без гілки листування", "en": "Email without a thread", "de": "E-Mail ohne Verlauf"}
@@ -8749,6 +8762,7 @@
 {"uk": "Налаштування цін магазину", "en": "Shop price settings", "de": "Preiseinstellungen des Shops"}
 {"uk": "Налаштування шаблонів листів для замовлення товарів постачальнику. Використовується в", "en": "Settings for e-mail templates for ordering products from a supplier. Used in", "de": "Einstellungen der E-Mail-Vorlagen für die Bestellung von Artikeln beim Lieferanten. Wird verwendet in"}
 {"uk": "Налаштування — {0}", "en": "Settings — {0}", "de": "Einstellungen — {0}"}
+{"uk": "Налаштування → Сповіщення", "en": "Settings → Notifications", "de": "Einstellungen → Benachrichtigungen"}
 {"uk": "Налаштуваннях документів", "en": "Document settings", "de": "Dokumenteinstellungen"}
 {"uk": "Налаштувань сповіщень", "en": "Notification settings", "de": "Benachrichtigungseinstellungen"}
 {"uk": "Налаштувати", "en": "Configure", "de": "Konfigurieren"}
@@ -11527,6 +11541,7 @@
 {"uk": "Примітки до результату", "en": "Result notes", "de": "Notizen zum Ergebnis"}
 {"uk": "Принтер", "en": "Printer", "de": "Drucker"}
 {"uk": "Принтер DYMO", "en": "DYMO printer", "de": "DYMO-Drucker"}
+{"uk": "Прихована копія", "en": "Blind copy", "de": "Blindkopie"}
 {"uk": "Прихована копія листів покупцям", "en": "Blind copy of e-mails to customers", "de": "Blindkopie der E-Mails an Kunden"}
 {"uk": "Прихована копія: {0}", "en": "Bcc: {0}", "de": "Bcc: {0}"}
 {"uk": "Прихований або службовий файл — пропущено", "en": "Hidden or system file — skipped", "de": "Versteckte oder Systemdatei – übersprungen"}
@@ -11835,6 +11850,7 @@
 {"uk": "Підтвер­дження", "en": "Confirmation", "de": "Bestätigung"}
 {"uk": "Підтвердження", "en": "Confirmation", "de": "Bestätigung"}
 {"uk": "Підтвердження email", "en": "Email confirmation", "de": "E-Mail-Bestätigung"}
+{"uk": "Підтвердження email, новий пароль, запрошення від менеджера", "en": "E-mail confirmation, new password, invitation from a manager", "de": "E-Mail-Bestätigung, neues Passwort, Einladung durch einen Mitarbeiter"}
 {"uk": "Підтвердження відправки", "en": "Confirmation of sending", "de": "Bestätigung des Versands"}
 {"uk": "Підтвердження відправлення в магазині", "en": "Shipment confirmation in the shop", "de": "Versandbestätigung im Shop"}
 {"uk": "Підтвердження дії CRM, яку раніше запускало посилання (GET): «🎯 Призначити стратегію», «🔄 Синхронізація CRM».", "en": "Confirmation of a CRM action that used to be triggered by a link (GET): “🎯 Assign strategy”, “🔄 CRM sync”.", "de": "Bestätigung einer CRM-Aktion, die früher über einen Link (GET) ausgelöst wurde: „🎯 Strategie zuweisen“, „🔄 CRM-Synchronisierung“."}
@@ -11842,6 +11858,7 @@
 {"uk": "Підтвердження замовлення вимкнено в Налаштуваннях сповіщень.", "en": "Order confirmation is turned off in the notification settings.", "de": "Die Auftragsbestätigung ist in den Benachrichtigungseinstellungen deaktiviert."}
 {"uk": "Підтвердження замовлення для джерела «{0}» вимкнено в Налаштуваннях сповіщень.", "en": "Order confirmation for source “{0}” is turned off in the notification settings.", "de": "Die Auftragsbestätigung für die Quelle „{0}“ ist in den Benachrichtigungseinstellungen deaktiviert."}
 {"uk": "Підтвердження замовлення надіслано", "en": "Order confirmation sent", "de": "Auftragsbestätigung gesendet"}
+{"uk": "Підтвердження замовлення покупцю", "en": "Order confirmation to the customer", "de": "Bestellbestätigung an den Kunden"}
 {"uk": "Підтвердження надіслано", "en": "Confirmation sent", "de": "Bestätigung gesendet"}
 {"uk": "Підтвердження отримання замовлення", "en": "Order receipt confirmation", "de": "Bestätigung des Auftragseingangs"}
 {"uk": "Підтвердження покупцю", "en": "Confirmation to the customer", "de": "Bestätigung an den Kunden"}
@@ -12307,6 +12324,7 @@
 {"uk": "Сайт має працювати через https://.", "en": "The site must work over https://.", "de": "Die Website muss über https:// laufen."}
 {"uk": "Сайт надсилає адресу кабінету {0} ({1} {2}), а «Адреса сайту» магазину — {3}. Реєстрація й листи не працюють: впишіть у «Адреса сайту» {4}.", "en": "The site sends the account page address {0} ({1} {2}), while the shop’s “Site address” is {3}. Registration and emails do not work: enter {4} in “Site address”.", "de": "Die Website sendet die Kundenkonto-Adresse {0} ({1} {2}), die „Website-Adresse“ des Shops lautet jedoch {3}. Registrierung und E-Mails funktionieren nicht: Tragen Sie in „Website-Adresse“ {4} ein."}
 {"uk": "Сайт надсилає листи з цієї ж скриньки", "en": "The site sends e-mails from this same mailbox", "de": "Die Website sendet E-Mails aus demselben Postfach"}
+{"uk": "Сайт надсилає покупцю підтвердження", "en": "The site sends the customer a confirmation", "de": "Die Website sendet dem Kunden eine Bestätigung"}
 {"uk": "Сайт надсилає покупцю підтвердження замовлення", "en": "The site sends the customer an order confirmation", "de": "Die Website sendet dem Kunden eine Auftragsbestätigung"}
 {"uk": "Сайт не звертався понад {0} днів. Перевірте, чи працює сайт і чи не змінився ключ, — «🔌 Перевірити зв'язок із сайтом».", "en": "The site has not connected for more than {0} days. Check whether the site works and whether the key has changed — “🔌 Check connection with the site”.", "de": "Die Website hat sich seit mehr als {0} Tagen nicht verbunden. Prüfen Sie, ob die Website läuft und ob sich der Schlüssel geändert hat – „🔌 Verbindung zur Website prüfen“."}
 {"uk": "Сайт не зміг оновити каталог з Minerva і показує стару копію ({0}). Перевірте на сайті в private/shop-config.php адресу Minerva ('minerva_url') і ключ ('minerva_token'), а на хостингу — вихідні HTTPS-з'єднання.", "en": "The site could not update the catalog from Minerva and shows an old copy ({0}). On the site, check the Minerva address ('minerva_url') and key ('minerva_token') in private/shop-config.php, and on the hosting, outgoing HTTPS connections.", "de": "Die Website konnte den Katalog nicht von Minerva aktualisieren und zeigt eine alte Kopie ({0}). Prüfen Sie auf der Website in private/shop-config.php die Minerva-Adresse ('minerva_url') und den Schlüssel ('minerva_token'), beim Hosting die ausgehenden HTTPS-Verbindungen."}
@@ -14232,6 +14250,7 @@
 {"uk": "Хто може замовити", "en": "Who can order", "de": "Wer bestellen kann"}
 {"uk": "Хто може користуватись помічником «Minerva», пошуком у базі знань, додавати документи й керувати", "en": "Who can use the “Minerva” assistant and knowledge base search, add documents and manage", "de": "Wer den Assistenten „Minerva“ und die Suche in der Wissensdatenbank nutzen, Dokumente hinzufügen und"}
 {"uk": "Хто може користуватись помічником «Minerva», пошуком у базі знань, додавати документи й керувати базою знань. За замовчуванням", "en": "Who can use the “Minerva” assistant and knowledge base search, add documents and manage the knowledge base. By default", "de": "Wer den Assistenten „Minerva“ und die Suche in der Wissensdatenbank nutzen, Dokumente hinzufügen und die Wissensdatenbank verwalten darf. Standardmäßig"}
+{"uk": "Хто надсилає", "en": "Who sends", "de": "Wer sendet"}
 {"uk": "Хто оплачує вартість доставки. Застосовується тільки для UPS.", "en": "Who pays the shipping cost. Applies to UPS only.", "de": "Wer die Versandkosten bezahlt. Gilt nur für UPS."}
 {"uk": "Хто перевірив", "en": "Checked by", "de": "Geprüft von"}
 {"uk": "Хто платить", "en": "Who pays", "de": "Wer zahlt"}
@@ -14782,6 +14801,7 @@
 {"uk": "Що замовити", "en": "What to order", "de": "Was zu bestellen ist"}
 {"uk": "Що записалось би зараз (без запису)", "en": "What would be recorded now (without recording)", "de": "Was jetzt eingetragen würde (ohne Eintrag)"}
 {"uk": "Що зараз робить RAG", "en": "What RAG is doing now", "de": "Was RAG gerade tut"}
+{"uk": "Що звідки йде", "en": "What goes where", "de": "Was woher kommt"}
 {"uk": "Що змінено, що чекає підтвердження, коли ціни на DigiKey діють.", "en": "What was changed, what awaits confirmation, and when the prices on DigiKey take effect.", "de": "Was geändert wurde, was auf Bestätigung wartet und wann die Preise auf DigiKey gelten."}
 {"uk": "Що змінилось", "en": "What changed", "de": "Was sich geändert hat"}
 {"uk": "Що змінити", "en": "What to change", "de": "Was ändern"}
@@ -15051,6 +15071,7 @@
 {"uk": "або DD.MM.YYYY", "en": "or DD.MM.YYYY", "de": "oder DD.MM.YYYY"}
 {"uk": "або all", "en": "or all", "de": "oder all"}
 {"uk": "або document", "en": "or document", "de": "oder document"}
+{"uk": "або брати пошту з Minerva", "en": "or take mail settings from Minerva", "de": "oder E-Mail-Einstellungen aus Minerva übernehmen"}
 {"uk": "або будь-яке повідомлення", "en": "or any message", "de": "oder eine beliebige Nachricht"}
 {"uk": "або біле на чорному, кожен текст щонайменше 7 : 1 (найвищий рівень WCAG — AAA).", "en": "or white on black, every text at least 7 : 1 (the highest WCAG level — AAA).", "de": "oder Weiß auf Schwarz, jeder Text mit mindestens 7 : 1 (höchste WCAG-Stufe – AAA)."}
 {"uk": "або впишіть свою; кілька — через кому. Надсилається лише цим адресам — решта команди нічого не отримає, і", "en": "or enter your own; several — separated by commas. It is sent only to these addresses — the rest of the team will receive nothing, and", "de": "oder tragen Sie eine eigene ein; mehrere — durch Komma getrennt. Es wird nur an diese Adressen gesendet — der Rest des Teams erhält nichts, und"}
@@ -15512,6 +15533,7 @@
 {"uk": "відповідь надіслано", "en": "reply sent", "de": "Antwort gesendet"}
 {"uk": "відповідь — {0}", "en": "reply — {0}", "de": "Antwort — {0}"}
 {"uk": "відповідь — файл, не дані", "en": "the response is a file, not data", "de": "die Antwort ist eine Datei, keine Daten"}
+{"uk": "відповіді — на {0}", "en": "replies — to {0}", "de": "Antworten — an {0}"}
 {"uk": "відповіли", "en": "replied", "de": "beantwortet"}
 {"uk": "відповіли {0}", "en": "replied {0}", "de": "beantwortet {0}"}
 {"uk": "відповісти як", "en": "answer as", "de": "antworten als"}
@@ -16683,6 +16705,7 @@
 {"uk": "не задано ключ — вкажіть «Ключ помічника» тут (ключ сайту має бути прив'язаний до магазину) або bridge_key у private/minerva-config.php", "en": "no key set — enter “Assistant key” here (the site key must be bound to the shop) or bridge_key in private/minerva-config.php", "de": "kein Schlüssel festgelegt – tragen Sie hier „Schlüssel des Assistenten“ ein (der Website-Schlüssel muss dem Shop zugeordnet sein) oder bridge_key in private/minerva-config.php"}
 {"uk": "не задано назву цього сервера для RAG (MINERVA_INSTANCE_ID)", "en": "name of this server for RAG not set (MINERVA_INSTANCE_ID)", "de": "Name dieses Servers für RAG nicht festgelegt (MINERVA_INSTANCE_ID)"}
 {"uk": "не задано — маршрути для RAG вимкнені (503)", "en": "not set — RAG routes are disabled (503)", "de": "nicht festgelegt — RAG-Routen sind deaktiviert (503)"}
+{"uk": "не задано: оберіть «Відправник листів покупцям» або SMTP у «Налаштування → Сповіщення»", "en": "not set: choose «Відправник листів покупцям» or SMTP in «Settings → Notifications»", "de": "nicht festgelegt: «Відправник листів покупцям» wählen oder SMTP in «Einstellungen → Benachrichtigungen»"}
 {"uk": "не записано", "en": "not saved", "de": "nicht gespeichert"}
 {"uk": "не збігається з сумою замовлення {0}", "en": "does not match the order total {0}", "de": "stimmt nicht mit der Auftragssumme {0} überein"}
 {"uk": "не знайдено", "en": "not found", "de": "nicht gefunden"}
@@ -16694,6 +16717,7 @@
 {"uk": "не може увійти (неактивний або не співробітник)", "en": "cannot sign in (inactive or not an employee)", "de": "kann sich nicht anmelden (inaktiv oder kein Mitarbeiter)"}
 {"uk": "не нагадувати", "en": "do not remind", "de": "nicht erinnern"}
 {"uk": "не надсилалась", "en": "not sent", "de": "nicht gesendet"}
+{"uk": "не надсилається", "en": "not sent", "de": "wird nicht gesendet"}
 {"uk": "не надіслано", "en": "not sent", "de": "nicht gesendet"}
 {"uk": "не налаштовано", "en": "not configured", "de": "nicht eingerichtet"}
 {"uk": "не налаштовано: {0}", "en": "not configured: {0}", "de": "nicht konfiguriert: {0}"}
@@ -16741,6 +16765,7 @@
 {"uk": "невідомий інструмент {0}", "en": "unknown tool {0}", "de": "unbekanntes Werkzeug {0}"}
 {"uk": "невідомо", "en": "unknown", "de": "unbekannt"}
 {"uk": "невідомо коли", "en": "unknown when", "de": "unbekannt, wann"}
+{"uk": "невідомо — сайт ще не звітував про пошту", "en": "unknown — the site has not reported its mail yet", "de": "unbekannt — die Website hat ihre E-Mail-Einstellungen noch nicht gemeldet"}
 {"uk": "невідомого виду", "en": "of unknown type", "de": "unbekannter Art"}
 {"uk": "недостатньо товару на складі", "en": "not enough stock", "de": "nicht genügend Bestand"}
 {"uk": "недоступно", "en": "unavailable", "de": "nicht verfügbar"}
@@ -16896,6 +16921,7 @@
 {"uk": "нікого", "en": "nobody", "de": "niemand"}
 {"uk": "нікого — додайте внизу «👥 Доступ до адмінки сайту»", "en": "no one — add at the bottom “👥 Access to the site admin”", "de": "niemand — fügen Sie unten „👥 Zugriff auf die Website-Administration“ hinzu"}
 {"uk": "ніколи", "en": "never", "de": "nie"}
+{"uk": "нікому — email у «Налаштування → Сповіщення» вимкнено або без адрес", "en": "nobody — e-mail in «Settings → Notifications» is off or has no addresses", "de": "niemand — E-Mail in «Einstellungen → Benachrichtigungen» ist aus oder ohne Adressen"}
 {"uk": "німецькою (Deutsch)", "en": "німецькою (Deutsch)", "de": "німецькою (Deutsch)"}
 {"uk": "німецьку", "en": "German", "de": "Deutsche"}
 {"uk": "ніхто з активних співробітників не має доступу", "en": "none of the active employees has access", "de": "keiner der aktiven Mitarbeiter hat Zugriff"}
@@ -17238,6 +17264,8 @@
 {"uk": "поки Minerva недоступна — курсор стоїть, last_error unavailable", "en": "while Minerva is unavailable — the cursor stays put, last_error unavailable", "de": "solange Minerva nicht verfügbar ist — der Cursor bleibt stehen, last_error unavailable"}
 {"uk": "поки відправлення активне (UPS/DHL не delivered), маркетплейс не може встановити «Доставлено».", "en": "while the shipment is active (UPS/DHL not delivered), the marketplace cannot set “Delivered”.", "de": "solange die Sendung aktiv ist (UPS/DHL nicht zugestellt), kann der Marktplatz nicht „Zugestellt“ setzen."}
 {"uk": "покупець", "en": "buyer", "de": "Käufer"}
+{"uk": "покупцю", "en": "to the customer", "de": "an den Kunden"}
+{"uk": "покупцю (без прихованої копії — в листі одноразове посилання)", "en": "to the customer (no blind copy — the e-mail contains a one-time link)", "de": "an den Kunden (ohne Blindkopie — die E-Mail enthält einen Einmal-Link)"}
 {"uk": "покупці на сайті", "en": "customers on the site", "de": "Kunden auf der Website"}
 {"uk": "поле source має відповідати slug в розділі Продажі → Джерела.", "en": "the source field must match the slug in the Sales → Sources section.", "de": "das Feld source muss dem Slug im Bereich Verkauf → Quellen entsprechen."}
 {"uk": "поле «{0}» змінювати не можна; можна: {1}", "en": "the field “{0}” cannot be changed; allowed: {1}", "de": "das Feld „{0}“ darf nicht geändert werden; erlaubt: {1}"}
@@ -17419,6 +17447,7 @@
 {"uk": "приклад", "en": "sample", "de": "Beispiel"}
 {"uk": "примітка", "en": "note", "de": "Anmerkung"}
 {"uk": "примітки: {0}", "en": "remarks: {0}", "de": "Anmerkungen: {0}"}
+{"uk": "прихована копія: {0}", "en": "blind copy: {0}", "de": "Blindkopie: {0}"}
 {"uk": "приховано {0}: ліміт {1} різних записів за добу", "en": "{0} hidden: limit of {1} distinct records per day", "de": "{0} ausgeblendet: Limit von {1} verschiedenen Datensätzen pro Tag"}
 {"uk": "приховано або в календарі немає подій", "en": "hidden or the calendar has no events", "de": "ausgeblendet oder der Kalender enthält keine Termine"}
 {"uk": "прихід", "en": "receipt", "de": "Wareneingang"}
@@ -17632,6 +17661,7 @@
 {"uk": "с)", "en": "s)", "de": "s)"}
 {"uk": "с.", "en": "s.", "de": "s."}
 {"uk": "сайт", "en": "website", "de": "Website"}
+{"uk": "сайт /admin/ → «✉️ Пошта»", "en": "site /admin/ → «✉️ Пошта»", "de": "Website /admin/ → «✉️ Пошта»"}
 {"uk": "сайт {0}", "en": "site {0}", "de": "Website {0}"}
 {"uk": "сайт востаннє звертався", "en": "the site last connected", "de": "die Website hat sich zuletzt verbunden"}
 {"uk": "сайт відповів HTTP {0} ({1})", "en": "the site responded with HTTP {0} ({1})", "de": "die Website hat mit HTTP {0} geantwortet ({1})"}

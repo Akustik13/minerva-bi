@@ -246,7 +246,7 @@ class ShopAdmin(admin.ModelAdmin):
     form = ShopForm
     readonly_fields = ["created_at", "roadmap_col", "search_col", "keys_col", "connection_col", "zones_tools",
                        "accounts_tools",
-                       "mail_tools",
+                       "mail_tools", "mail_map_col",
                        "site_mail_col",
                        "stripe_col",
                        "assistant_col", "assistant_test_col", "site_admin_col"]
@@ -287,7 +287,8 @@ class ShopAdmin(admin.ModelAdmin):
                            "Швидкий старт: «🌍 Створити базові зони» або «⬇️ Імпортувати з DigiKey».",
         }),
         ("✉️ Пошта магазину", {
-            "fields": ["mail_sender", "mail_from_name", "mail_reply_to", "mail_bcc", "team_emails", "mail_welcome",
+            "fields": ["mail_map_col", "mail_sender", "mail_from_name", "mail_reply_to", "mail_bcc", "team_emails",
+                       "mail_welcome",
                        "team_notify_registration", "mail_footer", "team_lang", "mail_tools",
                        "site_mail_managed", "site_order_confirmation", "site_mail_col"],
             "description": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату "
@@ -469,6 +470,28 @@ class ShopAdmin(admin.ModelAdmin):
                 reverse("admin:shop_shop_rag_model", args=[obj.pk]),
                 reverse("admin:rag_assistant_ragsettings_change", args=[1])),
             format_html_join(", ", "«{}» ×{}", zero) if zero else "—", report)
+
+    @admin.display(description="Що звідки йде")
+    def mail_map_col(self, obj):
+        """Карта листів магазину (shop/mail_map.py): хто надсилає, з якої адреси, кому, де змінити."""
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        from . import mail_map
+
+        def links(items):
+            return format_html_join(" · ", "{}", ((
+                format_html('<a href="#" data-go="{}">{} ↓</a>', i["go"], i["label"]) if i.get("go") else
+                format_html('<a href="{}"{}>{} →</a>', i["url"],
+                            format_html(' target="_blank" rel="noopener"') if i.get("external") else "", i["label"]),)
+                for i in items or []))
+        rows = format_html_join("", "<tr><td><b>{}</b></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>", (
+            (r["mail"], r["who"], format_html('<span translate="no">{}</span>', r["sender"]),
+             r["to"], links(r["change"])) for r in mail_map.rows(obj)))
+        return format_html(
+            '<table class="mm-table" style="font-size:12px;width:100%"><tr><th>Лист</th><th>Хто надсилає</th>'
+            '<th>З якої адреси</th><th>Кому</th><th>Де змінити</th></tr>{}</table>'
+            '<div class="help">«↓» — до поля на цій сторінці (незбережені зміни тут ще не враховано), «→» — інша сторінка; '
+            'дані сайту — з його останнього звіту.</div>', rows)
 
     @admin.display(description="Пошта сайтів")
     def site_mail_col(self, obj):
