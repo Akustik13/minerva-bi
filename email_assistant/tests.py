@@ -296,7 +296,7 @@ class FakeIMAP:
             uid = int(u)
             yield _msg(uid, seen=self.folders[self._selected][uid])
 
-    def fetch_messages(self, folder, days_back=30, since_uid=0, limit=None):
+    def fetch_messages(self, folder, days_back=30, since_uid=0, limit=None, keep_documents=False):
         return [_msg(u, seen=seen) for u, seen in sorted(self.folders.get(folder, {}).items()) if u > since_uid]
 
     def search_unseen(self, folder):

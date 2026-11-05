@@ -294,18 +294,20 @@ def save_recent(user, days=RECENT_DAYS, progress=None) -> dict:
     msgs = [m for m in qs.iterator(chunk_size=200) if any(is_document(a) for a in m.attachments or [])]
     msgs = msgs[:RECENT_MAX]
     total['total'] = len(msgs)
+    from email_assistant.links import allow_fetch
     _local.busy = True
     try:
-        for i, msg in enumerate(msgs, 1):
-            if not _linked_order_ids(msg):
-                link_message_to_crm(msg)
-                if _linked_order_ids(msg):
-                    total['linked'] += 1
-            for k, v in save_for_message(msg, mode).items():
-                total[k] += v
-            total['messages'] = i
-            if progress and i % PROGRESS_EVERY == 0:
-                progress(dict(total))
+        with allow_fetch():    # PDF, якого синхронізація не зберегла, — з IMAP: номер замовлення у вкладенні
+            for i, msg in enumerate(msgs, 1):
+                if not _linked_order_ids(msg):
+                    link_message_to_crm(msg)
+                    if _linked_order_ids(msg):
+                        total['linked'] += 1
+                for k, v in save_for_message(msg, mode).items():
+                    total[k] += v
+                total['messages'] = i
+                if progress and i % PROGRESS_EVERY == 0:
+                    progress(dict(total))
     finally:
         _local.busy = False
     return total

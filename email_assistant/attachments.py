@@ -93,6 +93,35 @@ def attachment_bytes(account, msg, index):
     return data
 
 
+def fetch_documents(msg, indexes) -> dict:
+    """Файли вкладень листа, яких немає на диску, — з IMAP одним запитом (лист цілком), на диск.
+    → {індекс: file_path}; вкладення, чия назва не збігається (лист на сервері змінився), — пропускається.
+    Нічого не зберігає в листі — це робить той, хто питає (links.attachment_tokens пише UPDATE без сигналу)."""
+    if not indexes or not msg.imap_uid:
+        return {}
+    import email as email_lib
+    from email_assistant.imap_client import IMAPClient, _attachment_dir, _get_attachments_raw, _write_attachment
+    account = msg.account
+    imap_folder = msg.imap_folder_name or account.imap_folder_inbox
+    with IMAPClient(account) as imap:
+        imap.select_folder(imap_folder)
+        _, raw_data = imap.conn.uid('fetch', str(msg.imap_uid).encode(), '(BODY.PEEK[])')
+    if not (raw_data and isinstance(raw_data[0], tuple)):
+        return {}
+    parts = _get_attachments_raw(email_lib.message_from_bytes(raw_data[0][1]))
+    atts = msg.attachments or []
+    rel_dir = _attachment_dir(account.pk, msg.imap_uid, imap_folder)
+    out = {}
+    for i in indexes:
+        if not (0 <= i < len(parts) and i < len(atts)) or parts[i].get('name') != atts[i].get('name'):
+            continue
+        data = parts[i].get('_data') or b''
+        path = _write_attachment(rel_dir, i, parts[i]['name'], data) if data else ''
+        if path:
+            out[i] = path
+    return out
+
+
 def can_attach(account, kind: str) -> bool:
     """Документ Minerva у листі — лише якщо власник скриньки (той, хто надсилає) сам може бачити Angebote /
     замовлення (has_perm іде за ролями Minerva, core/permissions.py). Інакше будь-хто з поштою міг би вкласти

@@ -935,12 +935,13 @@ def _attach_options(emails, links):
 
 def _mail_links(emails):
     """Замовлення / клієнти / відправлення, згадані в листах гілки (номер замовлення, трек-номер)."""
-    from email_assistant.links import find_links
+    from email_assistant.links import PREVIEW_FETCH, allow_fetch, find_links
     texts = []
     for m in emails:
         texts += [m.subject or '', (m.body_text or '')[:50000]]
     try:
-        return find_links(texts, messages=emails)
+        with allow_fetch(PREVIEW_FETCH):    # PDF, якого синхронізація не зберегла, — з IMAP (раз)
+            return find_links(texts, messages=emails)
     except Exception as e:
         logger.warning('mail links: %s', e)
         return []

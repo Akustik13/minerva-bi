@@ -50,7 +50,7 @@ class Command(BaseCommand):
     def _sync_account(self, account, dry_run: bool, sync_all: bool = False, with_folders: bool = False):
         from email_assistant.imap_client import IMAPClient
         from email_assistant.models import EmailMessage, EmailSettings
-        from email_assistant.sync import folders_to_sync, pull_read_flags, save_message, sync_folder
+        from email_assistant.sync import DOCUMENTS, folders_to_sync, pull_read_flags, save_message, sync_folder
 
         created = errors = 0
         days_back = 3650 if sync_all else account.sync_days_back
@@ -74,6 +74,7 @@ class Command(BaseCommand):
                     days_back=days_back,
                     since_uid=since_uid,
                     limit=limit,
+                    keep_documents=not dry_run,   # PDF / DOCX — одразу на диск: номер замовлення у вкладенні
                 )
 
                 for msg_data in messages:
@@ -88,7 +89,7 @@ class Command(BaseCommand):
                             continue
 
                         # CRM-хронологія і клієнт гілки — сигнал email_assistant.signals.link_email_to_crm
-                        em = save_message(account, msg_data, folder, folder_type)
+                        em = save_message(account, msg_data, folder, folder_type, persist_files=DOCUMENTS)
                         if em is None:
                             continue
 

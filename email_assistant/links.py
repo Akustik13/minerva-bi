@@ -9,6 +9,8 @@ email_assistant/links.py — зв'язки листа з даними Minerva.
 Номер буває лише у вкладенні (ABD митниці «Referenznummer/UCR 102497269», інвойс перевізника): тоді —
 текст PDF / DOCX / TXT / CSV листа (`attachment_tokens`, `order_in_attachments`).
 """
+import contextlib
+import contextvars
 import copy
 import logging
 
@@ -24,6 +26,40 @@ ATTACHMENT_CHARS = 30000      # тексту з одного вкладення
 ATTACHMENT_TOKENS = 300       # номерів з одного вкладення (кеш у attachments[i]['tokens'])
 ATTACHMENT_MIN_DIGITS = 6     # у вкладеннях — лише довші номери: індекси, телефони, коди товарів (5 цифр) не плутати
 PREVIEW_FILES = 6             # прев'ю гілки читає за раз не більше стількох ще не прочитаних вкладень
+PREVIEW_FETCH = 2             # …і бере з IMAP файли не більше ніж стількох листів (синхронізація зберегла не все)
+
+# Файлу документа немає на диску (лист збережено без вкладень) — брати з IMAP лише там, де можна чекати:
+# прев'ю листа, relink_email_crm, «📥 Зберегти вкладення за 30 днів». Сигнал нового листа (синхронізація) — ні.
+_FETCH = contextvars.ContextVar('links_fetch', default=None)
+
+
+@contextlib.contextmanager
+def allow_fetch(limit=None):
+    """Дозволити attachment_tokens брати файли з IMAP: limit — скільки листів (None — без обмеження)."""
+    token = _FETCH.set([limit])
+    try:
+        yield
+    finally:
+        _FETCH.reset(token)
+
+
+def _take_fetch() -> bool:
+    box = _FETCH.get()
+    if box is None:
+        return False
+    if box[0] is None:
+        return True
+    if box[0] <= 0:
+        return False
+    box[0] -= 1
+    return True
+
+
+def _unread(att) -> bool:
+    """Номери вкладення ще не прочитано. Порожній кеш без позначки tokens_read — теж: так раніше запам'ятовувався
+    PDF, якого синхронізація ще не зберегла (тоді номер з нього не знаходився ніколи, навіть коли файл з'являвся)."""
+    tokens = att.get('tokens')
+    return tokens is None or (not tokens and not att.get('tokens_read'))
 
 
 def tokens_in(texts) -> set:
@@ -58,26 +94,40 @@ def orders_for_tokens(tokens):
 def attachment_tokens(msg, budget=None) -> dict:
     """{номер: назва вкладення} — кандидати з тексту PDF / DOCX / TXT / CSV листа (≥ ATTACHMENT_MIN_DIGITS цифр).
     Кожне вкладення читається раз: знайдене пишеться в attachments[i]['tokens'] (UPDATE без сигналу).
+    Файлу на диску немає — кеш не пишеться (прочитається, коли файл з'явиться); у allow_fetch — файли з IMAP.
     budget — [скільки ще вкладень можна прочитати] на весь запит (прев'ю гілки не читає десятки PDF)."""
     from email_assistant.models import EmailMessage
-    from email_assistant.reply_brief import ATTACHMENT_TYPES, attachment_text
+    from email_assistant.reply_brief import ATTACHMENT_TYPES, _attachment_path, attachment_text
 
     raw = list(getattr(msg, 'attachments', None) or [])
     if not raw:
         return {}
     raw = copy.deepcopy(raw)
-    out, changed, seen = {}, False, 0
-    for att in raw:
+    docs = []
+    for i, att in enumerate(raw):
         if not isinstance(att, dict) or att.get('is_inline'):
             continue
         name = att.get('name') or ''
         if name.rsplit('.', 1)[-1].lower() not in ATTACHMENT_TYPES:
             continue
-        seen += 1
-        if seen > ATTACHMENT_FILES:
+        docs.append((i, att))
+        if len(docs) >= ATTACHMENT_FILES:
             break
+    out, changed = {}, False
+    missing = [i for i, att in docs if _unread(att) and not _attachment_path(att)]
+    if missing and getattr(msg, 'imap_uid', None) and (budget is None or budget[0] > 0) and _take_fetch():
+        from email_assistant.attachments import fetch_documents
+        try:
+            for i, path in fetch_documents(msg, missing).items():
+                raw[i]['file_path'] = path
+                changed = True
+        except Exception as e:  # noqa: BLE001 — IMAP недоступний: спробуємо наступного разу
+            logger.info('attachment files of message %s from IMAP: %s', getattr(msg, 'pk', None), e)
+    for _i, att in docs:
         tokens = att.get('tokens')
-        if tokens is None:
+        if _unread(att):
+            if not _attachment_path(att):
+                continue      # файлу ще немає — не запам'ятовувати «нічого не знайдено»
             if budget is not None:
                 if budget[0] <= 0:
                     continue
@@ -85,10 +135,10 @@ def attachment_tokens(msg, budget=None) -> dict:
             text = attachment_text(att, limit=ATTACHMENT_CHARS)
             tokens = sorted(t for t in tokens_in([text])
                             if sum(ch.isdigit() for ch in t) >= ATTACHMENT_MIN_DIGITS)[:ATTACHMENT_TOKENS]
-            att['tokens'] = tokens
+            att['tokens'], att['tokens_read'] = tokens, True      # прочитано з файлу (і коли нічого не знайдено)
             changed = True
-        for tok in tokens:
-            out.setdefault(tok, name)
+        for tok in tokens or []:
+            out.setdefault(tok, att.get('name') or '')
     if changed and getattr(msg, 'pk', None):
         try:
             EmailMessage.objects.filter(pk=msg.pk).update(attachments=raw)
@@ -123,14 +173,21 @@ def find_links(texts, messages=()) -> list:
 
     found = orders_for_tokens(tokens_in(texts))
     if messages and len(found) < MAX_ORDERS:
-        budget, extra = [PREVIEW_FILES], {}
+        budget, extra, per_message = [PREVIEW_FILES], {}, []
         for m in messages:
             try:
-                extra.update(attachment_tokens(m, budget))
+                tokens = attachment_tokens(m, budget)
             except Exception as e:  # noqa: BLE001 — пошкоджене вкладення не ламає прев'ю
                 logger.info('attachment tokens of message %s: %s', getattr(m, 'pk', None), e)
-        for pk, (order, reason) in orders_for_tokens(set(extra)).items():
+                continue
+            extra.update(tokens)
+            if tokens:
+                per_message.append((m, tokens))
+        in_files = orders_for_tokens(set(extra))
+        for pk, (order, reason) in in_files.items():
             found.setdefault(pk, (order, f'{reason} у вкладенні'))
+        if in_files:
+            link_from_attachments(per_message)
     if not found:
         return []
     shipments = {}
@@ -156,6 +213,27 @@ def find_links(texts, messages=()) -> list:
             } for s in shipments.get(order.pk, [])[:3]],
         })
     return links
+
+
+def link_from_attachments(per_message) -> int:
+    """Лист, у вкладенні якого номер замовлення, ще не в хронології цього замовлення (номер прочитано вже після
+    збереження листа — синхронізація тоді не зберегла PDF) → crm_link.link_message_to_crm, як для нового листа.
+    per_message — [(лист, {номер: файл})]. → скільки листів прив'язано."""
+    from crm.models import CustomerTimeline
+    from email_assistant.crm_link import link_message_to_crm
+    n = 0
+    for m, tokens in per_message:
+        if not getattr(m, 'pk', None) or not orders_for_tokens(set(tokens)):
+            continue
+        if CustomerTimeline.objects.filter(email_message=m, related_order_id__isnull=False).exists():
+            continue
+        try:
+            event = link_message_to_crm(m)
+        except Exception as e:  # noqa: BLE001 — прев'ю важливіше
+            logger.info('link message %s to order from attachment: %s', m.pk, e)
+            continue
+        n += bool(event is not None and event.related_order_id)
+    return n
 
 
 def find_order_by_tracking(tokens):

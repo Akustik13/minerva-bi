@@ -216,28 +216,68 @@ def _get_attachments_raw(msg) -> list:
     return attachments
 
 
+# Документи листа (PDF / DOCX / TXT / CSV) — у них шукають номер замовлення (links.attachment_tokens), тож щохвилинна
+# синхронізація (sync_email) зберігає їх одразу, решту вкладень — лише на вимогу (attachments.attachment_bytes).
+DOCUMENT_EXTS = ('pdf', 'docx', 'txt', 'csv')
+KEEP_DOCUMENT_MB = 15         # більший документ — лише на вимогу (як reply_brief.ATTACHMENT_MAX_MB)
+KEEP_DOCUMENTS_TOTAL_MB = 60  # на одну синхронізацію папки: решта — на вимогу
+
+
+def is_document(att) -> bool:
+    """Вкладення-документ, у тексті якого можна шукати номери (не картинка в тексті листа)."""
+    name = (att.get('name') or '').lower()
+    return not att.get('is_inline') and '.' in name and name.rsplit('.', 1)[-1] in DOCUMENT_EXTS
+
+
+def _attachment_dir(account_pk, imap_uid, folder_name) -> str:
+    import hashlib
+    return f'email_attachments/{account_pk}/{imap_uid}_{hashlib.md5(folder_name.encode()).hexdigest()[:8]}'
+
+
+def _write_attachment(rel_dir, index, name, data) -> str:
+    """Файл вкладення в MEDIA → відносний шлях ('' — не вдалося)."""
+    import os
+    from django.conf import settings
+    try:
+        abs_dir = os.path.join(settings.MEDIA_ROOT, rel_dir)
+        os.makedirs(abs_dir, exist_ok=True)
+        safe = ''.join(c for c in name if c.isalnum() or c in '.-_ ')[:80].strip() or 'file'
+        with open(os.path.join(abs_dir, f'{index}_{safe}'), 'wb') as fh:
+            fh.write(data)
+        return f'{rel_dir}/{index}_{safe}'
+    except Exception as ex:  # noqa: BLE001 — лист зберігається й без файлу
+        logger.warning('save attachment %s: %s', name, ex)
+        return ''
+
+
 def persist_attachments(account_pk, imap_uid, folder_name, attachments: list) -> list:
     """Save attachment binaries to media/email_attachments/. Returns cleaned list (no _data)."""
-    import os, hashlib
-    from django.conf import settings
-    folder_hash = hashlib.md5(folder_name.encode()).hexdigest()[:8]
-    rel_dir = f'email_attachments/{account_pk}/{imap_uid}_{folder_hash}'
+    rel_dir = _attachment_dir(account_pk, imap_uid, folder_name)
     saved = []
     for i, att in enumerate(attachments):
         data = att.pop('_data', None)
         clean = {'name': att['name'], 'content_type': safe_content_type(att['content_type']), 'size': att['size']}
         if data:
-            try:
-                abs_dir = os.path.join(settings.MEDIA_ROOT, rel_dir)
-                os.makedirs(abs_dir, exist_ok=True)
-                safe = ''.join(c for c in att['name'] if c.isalnum() or c in '.-_ ')[:80].strip() or 'file'
-                abs_path = os.path.join(abs_dir, f'{i}_{safe}')
-                with open(abs_path, 'wb') as fh:
-                    fh.write(data)
-                clean['file_path'] = f'{rel_dir}/{i}_{safe}'
-            except Exception as ex:
-                logger.warning('save attachment %s: %s', att['name'], ex)
+            path = _write_attachment(rel_dir, i, att['name'], data)
+            if path:
+                clean['file_path'] = path
         saved.append(clean)
+    return saved
+
+
+def persist_documents(account_pk, imap_uid, folder_name, attachments: list) -> list:
+    """Лише документи (is_document), що прийшли з даними, — на диск (file_path); решта полів вкладень лишається
+    як була (is_inline, content_id), _data прибирається з усіх."""
+    rel_dir = _attachment_dir(account_pk, imap_uid, folder_name)
+    saved = []
+    for i, att in enumerate(attachments):
+        att = dict(att)
+        data = att.pop('_data', None)
+        if data and is_document(att) and not att.get('file_path'):
+            path = _write_attachment(rel_dir, i, att.get('name') or 'file', data)
+            if path:
+                att['file_path'] = path
+        saved.append(att)
     return saved
 
 
@@ -486,14 +526,21 @@ class IMAPClient:
                     yield parsed
 
     def fetch_messages(self, folder: str = 'INBOX', days_back: int = 30,
-                       since_uid: int = 0, limit=200) -> list:
-        """Fetch messages as a list. Attachment _data is stripped (use fetch_by_uids_iter for raw)."""
+                       since_uid: int = 0, limit=200, keep_documents=False) -> list:
+        """Fetch messages as a list. Attachment _data is stripped (use fetch_by_uids_iter for raw).
+        keep_documents — дані документів (is_document, ≤ KEEP_DOCUMENT_MB, разом ≤ KEEP_DOCUMENTS_TOTAL_MB)
+        лишаються: sync_email зберігає їх одразу (sync.save_message persist_files='documents')."""
         uids = self.search_uids(folder, days_back, since_uid, limit)
         if not uids:
             return []
-        result = []
+        result, kept = [], 0
         for m in self.fetch_by_uids_iter(uids):
             for att in m.get('attachments', []):
+                size = len(att.get('_data') or b'')
+                if (keep_documents and size and is_document(att) and size <= KEEP_DOCUMENT_MB * 1024 * 1024
+                        and kept + size <= KEEP_DOCUMENTS_TOTAL_MB * 1024 * 1024):
+                    kept += size
+                    continue
                 att.pop('_data', None)
             result.append(m)
         return result

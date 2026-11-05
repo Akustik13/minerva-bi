@@ -162,9 +162,14 @@ def timezone_now():
     return timezone.now()
 
 
+DOCUMENTS = 'documents'   # save_message(persist_files=DOCUMENTS) — на диск лише документи (imap_client.persist_documents)
+
+
 def save_message(account, msg_data, imap_folder, folder_type=None, persist_files=False):
-    """Зберегти лист з IMAP (якщо його ще немає). Повертає EmailMessage або None."""
-    from email_assistant.imap_client import persist_attachments
+    """Зберегти лист з IMAP (якщо його ще немає). Повертає EmailMessage або None.
+    persist_files: True — усі вкладення на диск, DOCUMENTS — лише документи (номер замовлення у PDF прочитається
+    вже сигналом нового листа), False — жодного (файл — на вимогу)."""
+    from email_assistant.imap_client import persist_attachments, persist_documents
     from email_assistant.models import EmailMessage
 
     if EmailMessage.objects.filter(account=account, imap_uid=msg_data['uid'],
@@ -186,7 +191,9 @@ def save_message(account, msg_data, imap_folder, folder_type=None, persist_files
             return None
 
     attachments = msg_data.get('attachments', [])
-    if persist_files:
+    if persist_files == DOCUMENTS:
+        attachments = persist_documents(account.pk, msg_data['uid'], imap_folder, attachments)
+    elif persist_files:
         attachments = persist_attachments(account.pk, msg_data['uid'], imap_folder, attachments)
     else:
         for att in attachments:

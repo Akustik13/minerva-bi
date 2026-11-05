@@ -53,7 +53,8 @@ class Command(BaseCommand):
         stats = dict(html=0, created=0, linked=0, removed=0, unmatched=0)
         last_pk_before = CustomerTimeline.objects.aggregate(m=Max('pk'))['m'] or 0
 
-        with transaction.atomic():
+        from email_assistant.links import allow_fetch
+        with transaction.atomic(), allow_fetch():   # PDF без файлу на диску — з IMAP (номер замовлення у вкладенні)
             for em in qs.iterator(chunk_size=200):
                 if em.fix_html_body():
                     stats['html'] += 1
