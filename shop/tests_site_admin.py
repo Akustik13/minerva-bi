@@ -77,6 +77,17 @@ class StaffLoginTests(Base):
         e = ShopSiteEvent.objects.filter(action="settings").get()
         self.assertEqual(e.details, {"fields": ["minerva.minerva_token", "mail.smtp_host"]})
 
+    def test_limits_reset_event_has_a_label(self):
+        """Сайт /admin/ → «🚦 Блокування» → «Скинути»: у картці магазину — зрозуміла назва, а не код дії."""
+        from .admin import ShopAdmin
+        from django.contrib import admin as django_admin
+        self.c.post("/api/v1/shop/site-events/", {"user": "anna", "action": "limits_reset", "site": "shop.example.com",
+                                                  "fields": ["Реєстрація в кабінеті"]}, format="json")
+        html = str(ShopAdmin(Shop, django_admin.site).site_admin_col(self.shop))
+        self.assertIn("скинуто блокування спроб", html)
+        self.assertIn("Реєстрація в кабінеті", html)
+        self.assertNotIn("limits_reset", html)
+
 
 class PairingTests(Base):
     def pair(self, code, site="https://neu.example.com"):

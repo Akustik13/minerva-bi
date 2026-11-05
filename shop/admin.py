@@ -574,7 +574,8 @@ class ShopAdmin(admin.ModelAdmin):
         staff = [s for s in obj.staff.select_related("user") if s.is_active]
         events = list(obj.site_events.all()[:12])
         labels = {"login": "вхід", "login_failed": "невдалий вхід", "settings": "змінено налаштування",
-                  "pair": "підключено кодом", "logout": "вихід", "test": "перевірка"}
+                  "pair": "підключено кодом", "logout": "вихід", "test": "перевірка",
+                  "limits_reset": "скинуто блокування спроб"}   # сайт /admin/ → «🚦 Блокування»
         rows = format_html_join("", "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>", (
             (f"{timezone.localtime(e.at):%d.%m %H:%M}", e.site or "—", e.user or "—", labels.get(e.action, e.action),
              ", ".join((e.details or {}).get("fields") or []) or "") for e in events))

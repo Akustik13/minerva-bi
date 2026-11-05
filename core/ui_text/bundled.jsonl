@@ -17703,6 +17703,7 @@
 {"uk": "скидання пароля покупця", "en": "buyer password reset", "de": "Zurücksetzen des Käuferpassworts"}
 {"uk": "скинути", "en": "reset", "de": "zurücksetzen"}
 {"uk": "скинути всі", "en": "reset all", "de": "alle zurücksetzen"}
+{"uk": "скинуто блокування спроб", "en": "attempt limits reset", "de": "Versuchssperren zurückgesetzt"}
 {"uk": "склад", "en": "stock", "de": "Lager"}
 {"uk": "склад не зміниться (замовлення не впливає на склад)", "en": "stock will not change (the order does not affect stock)", "de": "das Lager ändert sich nicht (der Auftrag wirkt sich nicht auf das Lager aus)"}
 {"uk": "склад, замовлення й статуси беруться з даних Minerva (група «Історія» / картка): вони новіші за старі листи", "en": "stock, orders and statuses are taken from Minerva data (the “History” group / card): they are newer than old emails", "de": "Lager, Aufträge und Status stammen aus den Minerva-Daten (Gruppe „Verlauf“ / Karte): Sie sind aktueller als alte E-Mails"}
