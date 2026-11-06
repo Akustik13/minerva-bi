@@ -156,6 +156,36 @@ def safe_content_type(value) -> str:
     return ct if _CONTENT_TYPE_RE.match(ct) else 'application/octet-stream'
 
 
+# Загальні типи, з якими поштовики шлють будь-які файли (dakosy — PDF ABD як application/octet-stream)
+GENERIC_TYPES = frozenset({'application/octet-stream', 'binary/octet-stream', 'application/x-download',
+                           'application/download', 'application/force-download', 'application/unknown'})
+
+
+def sniff_content_type(data) -> str:
+    """Тип файлу за першими байтами — лише ті, що браузер показує сам: PDF, PNG, JPEG, GIF, WEBP; '' — інше."""
+    head = bytes((data or b'')[:1024])
+    if head.find(b'%PDF-') != -1:      # PDF-читачі терплять службові байти перед заголовком
+        return 'application/pdf'
+    if head.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    if head.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    if head[:6] in (b'GIF87a', b'GIF89a'):
+        return 'image/gif'
+    if head[:4] == b'RIFF' and head[8:12] == b'WEBP':
+        return 'image/webp'
+    return ''
+
+
+def attachment_type(declared, data) -> str:
+    """Тип вкладення: безпечний «тип/підтип» відправника; загальний (octet-stream…) — за вмістом, якщо це PDF чи
+    картинка (тоді «👁 Переглянути» відкриває їх, а не завантажує)."""
+    ct = safe_content_type(declared)
+    if ct in GENERIC_TYPES:
+        return sniff_content_type(data) or ct
+    return ct
+
+
 def _get_attachments(msg) -> list:
     attachments = []
     for part in msg.walk():
@@ -184,7 +214,7 @@ def _get_attachments_raw(msg) -> list:
                 data = part.get_payload(decode=True) or b''
                 attachments.append({
                     'name':         filename,
-                    'content_type': safe_content_type(part.get_content_type()),
+                    'content_type': attachment_type(part.get_content_type(), data),
                     'size':         len(data),
                     '_data':        data,
                     'content_id':   cid,

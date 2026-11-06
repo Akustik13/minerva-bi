@@ -107,6 +107,27 @@ class AttachmentServeTests(Base):
         r = self.serve('image/png', download=True)
         self.assertTrue(r['Content-Disposition'].startswith('attachment'))
 
+    def test_pdf_sent_as_octet_stream_opens_for_viewing(self):
+        """dakosy (ABD): PDF як application/octet-stream — «👁 Переглянути» відкриває, а не завантажує."""
+        pdf = b'%PDF-1.7\n%\xe2\xe3\xcf\xd3\n1 0 obj'
+        for ct in ('application/octet-stream', 'application/x-download', 'application/x-pdf'):
+            r = self.serve(ct, name='EXP-1-DE2211955.pdf', data=pdf)
+            self.assertTrue(r['Content-Disposition'].startswith('inline'), ct)
+            self.assertEqual(r['Content-Type'], 'application/pdf', ct)
+            self.assertEqual(r['X-Content-Type-Options'], 'nosniff')
+        r = self.serve('application/octet-stream', data=pdf, download=True)       # ⬇ — як і раніше файлом
+        self.assertTrue(r['Content-Disposition'].startswith('attachment'))
+        r = self.serve('application/octet-stream', data=b'\x89PNG\r\n\x1a\nxx')
+        self.assertEqual((r['Content-Type'], r['Content-Disposition'][:6]), ('image/png', 'inline'))
+        self.assertIn('sandbox', r['Content-Security-Policy'])
+
+    def test_unknown_bytes_stay_a_download(self):
+        for data in (b'<html><script>alert(1)</script>', b'PK\x03\x04zip', b'MZ\x90\x00exe'):
+            r = self.serve('application/octet-stream', name='x.pdf', data=data)
+            self.assertTrue(r['Content-Disposition'].startswith('attachment'), data)
+            self.assertEqual(r['Content-Type'], 'application/octet-stream')
+            self.assertIn('sandbox', r['Content-Security-Policy'])
+
 
 # ── 3. Чужа скринька в адмінці ───────────────────────────────────────────────
 class OwnMailboxAdminTests(Base):
@@ -242,6 +263,11 @@ class ContentTypeTests(Base):
         self.assertEqual(_get_attachments(msg)[0]['content_type'], 'application/octet-stream')
         parts = _get_attachments_raw(msg)
         self.assertEqual(parts[0]['content_type'], 'application/octet-stream')
+        raw_pdf = (b'Content-Type: multipart/mixed; boundary="b"\r\n\r\n--b\r\nContent-Type: text/plain\r\n\r\nhi\r\n'
+                   b'--b\r\nContent-Type: application/octet-stream\r\n'
+                   b'Content-Disposition: attachment; filename="ABD.pdf"\r\n\r\n%PDF-1.4 x\r\n--b--\r\n')
+        self.assertEqual(_get_attachments_raw(email_lib.message_from_bytes(raw_pdf))[0]['content_type'],
+                         'application/pdf')       # dakosy: PDF як octet-stream — тип за вмістом
         self.assertEqual(persist_attachments(1, 1, 'INBOX', [{'name': 'a', 'content_type': 'text/<b>', 'size': 0}])
                          [0]['content_type'], 'application/octet-stream')
 

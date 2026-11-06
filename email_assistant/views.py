@@ -2301,10 +2301,13 @@ def _is_previewable(content_type: str) -> bool:
 
 def _attachment_response(data, name, content_type, force_download=False):
     """Відповідь з вкладенням листа: тип — лише з безпечного переліку для перегляду, решта — завантаженням;
-    nosniff і CSP sandbox — браузер не вгадує HTML і нічого не виконує від імені Minerva."""
+    nosniff і CSP sandbox — браузер не вгадує HTML і нічого не виконує від імені Minerva. Тип відправника не з
+    переліку (PDF надіслали як application/octet-stream) — за першими байтами файлу: лише PDF і картинки."""
     from django.utils.http import content_disposition_header
-    from email_assistant.imap_client import safe_content_type
+    from email_assistant.imap_client import safe_content_type, sniff_content_type
     ctype = safe_content_type(content_type)
+    if not _is_previewable(ctype):
+        ctype = sniff_content_type(data) or ctype
     inline = not force_download and _is_previewable(ctype)
     if ctype == 'text/plain':
         ctype = 'text/plain; charset=utf-8'
