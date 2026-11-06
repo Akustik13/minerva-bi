@@ -19,21 +19,9 @@
   .pov-next { border: 1px solid var(--hairline-color, #ddd); border-radius: 4px; padding: 8px 10px; margin-top: 10px; }
 </style>
 
-{% if attention %}
-  <div class="pov-att">
-    <b>⚠️ Потребує уваги</b>
-    <ul>
-      {% for a in attention %}
-        <li class="pov-{{ a.level }}">{{ a.icon }}
-          {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}</li>
-      {% endfor %}
-    </ul>
-  </div>
-{% else %}
-  <div class="pov-ok">✅ Нічого термінового</div>
-{% endif %}
 <div class="pov-counts">📥 отримано {{ counts.in }} · 📤 надіслано {{ counts.out }} · гілок {{ counts.threads }}
   · Angebote {{ counts.offers }} · замовлень {{ counts.orders }}</div>
+<div class="pov-sub" style="margin-bottom:8px"><a href="#pj-cockpit">⚠️ «Потребує уваги» — у пульті вгорі картки</a></div>
 
 <div class="pov-head">
   <b>🧭 Огляд (AI)</b>

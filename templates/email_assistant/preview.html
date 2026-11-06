@@ -403,7 +403,8 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
     {% endfor %}
     {% if thread %}
     <div class="em-pv-proj" id="pv-proj" data-tpk="{{ thread.pk }}" data-state="{{ projects_state }}"
-         data-ov="{% if perms.projects.view_project %}1{% endif %}" style="display:none"></div>
+         data-ov="{% if perms.projects.view_project %}1{% endif %}"
+         data-ch="{% if perms.projects.change_project %}1{% endif %}" style="display:none"></div>
     <div class="em-proj-panel" id="pv-proj-panel">
       <input class="em-reply-inp" id="pv-proj-q" type="search" autocomplete="off"
              placeholder="{% trans "Пошук проєкту: код, назва, клієнт…" %}" oninput="pvProjRenderCands()">
@@ -1793,7 +1794,7 @@ window.pvAiTranslate = async function(pk, force) {
     clearTimeout(t._hide); t._hide = setTimeout(function(){ t.style.display = 'none'; }, 2200);
   }
   function render(state) {
-    var h = '', ov = box.dataset.ov === '1', ovBtn = document.getElementById('pv-ov-btn');
+    var h = '', ov = box.dataset.ov === '1', ch = box.dataset.ch === '1', ovBtn = document.getElementById('pv-ov-btn');
     var confirmed = state.confirmed || [];
     if (ovBtn) {   // «🧭 Огляд проєкту» у діях — для першого підтвердженого проєкту гілки
       ovBtn.style.display = ov && confirmed.length ? '' : 'none';
@@ -1803,6 +1804,7 @@ window.pvAiTranslate = async function(pk, force) {
       h += '<span class="em-proj-chip" title="' + esc(c.reason) + '">'
          + '<a href="' + esc(c.project.url) + '" target="_blank">📁 ' + esc(c.project.code) + ' · ' + esc(c.project.name) + '</a>'
          + (ov ? '<button onclick="pvProjOverview(' + c.project.id + ')" title="{% trans "Огляд проєкту" %}">🧭</button>' : '')
+         + (ch ? '<button onclick="pvProjMoment(' + c.project.id + ')" title="{% trans "Позначити цей лист як важливий момент проєкту (виділений текст — цитата)" %}">📌</button>' : '')
          + '<a href="' + esc(c.project.mail_url) + '" title="{% trans "Усі листи проєкту" %}">✉</a>'
          + '<button onclick="pvProjRemove(' + c.link + ')" title="{% trans "Прибрати цю переписку з проєкту" %}">✕</button></span>';
     });
@@ -1856,6 +1858,19 @@ window.pvAiTranslate = async function(pk, force) {
     try {
       var d = await post('/projects/api/thread/' + tpk + '/link/', {project_id: projectId});
       if (d.ok) { render(d); document.getElementById('pv-proj-panel').classList.remove('open'); toast('📁 {% trans "Додано до проєкту" %}'); }
+    } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  };
+  // 📌 Важливий момент проєкту з поточного листа (projects/views.highlight_view): назва — тема, цитата — виділене
+  window.pvProjMoment = async function(projectId) {
+    var pk = typeof _pvReplyPk !== 'undefined' ? _pvReplyPk : 0;
+    var subj = typeof _pvReplySubj !== 'undefined' ? _pvReplySubj : '';
+    var quote = (window.getSelection ? String(window.getSelection()) : '').trim().slice(0, 1500);
+    var title = prompt('📌 {% trans "Важливий момент проєкту — що сталося?" %}', subj.replace(/^(\s*(re|aw|wg|fw|fwd)\s*:\s*)+/i, ''));
+    if (title === null || !title.trim()) return;
+    try {
+      var d = await post('/projects/api/project/' + projectId + '/highlights/',
+                         {title: title.trim(), message: pk || '', quote: quote, kind: 'other'});
+      toast(d.ok ? '📌 {% trans "Додано до проєкту" %} ' + d.project.code : '⚠️ ' + (d.error || '{% trans "Помилка" %}'));
     } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
   };
   window.pvProjCreate = async function() {

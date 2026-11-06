@@ -1,4 +1,8 @@
+import logging
+
+from django import forms
 from django.contrib import admin, messages
+from django.db import models as dj_models
 from django.db.models import Count, Q
 from django.shortcuts import redirect, render
 from django.template.loader import render_to_string
@@ -7,7 +11,9 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
 from . import services
-from .models import DismissedThread, Project, ProjectLink, ProjectParticipant
+from .models import DismissedThread, Project, ProjectHighlight, ProjectLink, ProjectParticipant
+
+logger = logging.getLogger(__name__)
 
 
 class ParticipantInline(admin.TabularInline):
@@ -19,7 +25,8 @@ class ParticipantInline(admin.TabularInline):
 
 
 class MailLinkInline(admin.TabularInline):
-    """Гілки й листи: статус можна підтвердити / відхилити; додаються з пошти або «Розбору пошти»."""
+    """Гілки й листи: статус можна підтвердити / відхилити; додаються з пошти або «Розбору пошти».
+    Тема й посилання — лише власнику скриньки (як «📬 Листи зі скриньки»)."""
     model = ProjectLink
     fk_name = "project"
     extra = 0
@@ -28,37 +35,84 @@ class MailLinkInline(admin.TabularInline):
     verbose_name_plural = "✉️ Листування (додати — у пошті: «📁 До проєкту» або «Розбір пошти»)"
 
     def get_queryset(self, request):
-        return super().get_queryset(request).filter(order__isnull=True).select_related("thread", "message")
+        self._uid = request.user.pk
+        return (super().get_queryset(request).filter(Q(thread__isnull=False) | Q(message__isnull=False))
+                .select_related("thread__account", "message__account"))
 
     def has_add_permission(self, request, obj=None):
         return False
 
     @admin.display(description="Гілка / лист")
     def target(self, obj):
-        if obj.thread_id:
-            return format_html('<a href="/email/thread/{}/" target="_blank">✉️ {}</a>',
-                               obj.thread_id, obj.thread.subject or "(без теми)")
-        if obj.message_id:
-            return format_html('<a href="/email/message/{}/" target="_blank">📨 {}</a>',
-                               obj.message_id, obj.message.subject or "(без теми)")
-        return "—"
+        from .cockpit import link_label
+        label, url = link_label(obj, getattr(self, "_uid", None))
+        return format_html('<a href="{}" target="_blank">{}</a>', url, label) if url else label
 
 
-class OrderLinkInline(admin.TabularInline):
+class _ObjectLinkInline(admin.TabularInline):
+    """Прив'язка замовлення, закупівлі, JLC-замовлення чи відправлення: ціль обов'язкова; пропозиції Minerva
+    приходять зі статусом «Запропоновано» — підтвердьте або відхиліть (відхилене не пропонується знову)."""
     model = ProjectLink
     fk_name = "project"
     extra = 0
+    target_field = ""
+    readonly_fields = ("source",)
+
+    def get_queryset(self, request):
+        return (super().get_queryset(request).filter(**{f"{self.target_field}__isnull": False})
+                .select_related(self.target_field))
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == self.target_field:
+            kwargs["required"] = True
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
+class OrderLinkInline(_ObjectLinkInline):
+    target_field = "order"
     fields = ("order", "status", "reason")
+    readonly_fields = ()
     raw_id_fields = ("order",)
     verbose_name = "Замовлення"
     verbose_name_plural = "🛒 Замовлення проєкту"
 
-    def get_queryset(self, request):
-        return super().get_queryset(request).filter(order__isnull=False).select_related("order")
+
+class PurchaseLinkInline(_ObjectLinkInline):
+    target_field = "purchase_order"
+    fields = ("purchase_order", "status", "reason", "source")
+    raw_id_fields = ("purchase_order",)
+    verbose_name = "Закупівля"
+    verbose_name_plural = "🏭 Закупівлі проєкту (PO) — JLC-замовлення й посилки закупівлі видно на шкалі самі"
+
+
+class JLCLinkInline(_ObjectLinkInline):
+    target_field = "jlc_order"
+    fields = ("jlc_order", "status", "reason", "source")
+    raw_id_fields = ("jlc_order",)
+    verbose_name = "JLC-замовлення"
+    verbose_name_plural = "🔧 JLC-замовлення проєкту (без закупівлі в Minerva)"
+
+
+class ShipmentLinkInline(_ObjectLinkInline):
+    target_field = "shipment"
+    fields = ("shipment", "status", "reason", "source")
+    raw_id_fields = ("shipment",)
+    verbose_name = "Відправлення"
+    verbose_name_plural = "🚚 Відправлення й посилки без замовлення (зразки) — відправлення замовлень видно самі"
+
+
+class HighlightInline(admin.TabularInline):
+    model = ProjectHighlight
+    extra = 0
+    fields = ("date", "kind", "title", "quote", "source", "created_by")
+    readonly_fields = ("source", "created_by")
+    formfield_overrides = {dj_models.TextField: {"widget": forms.Textarea(attrs={"rows": 2, "cols": 40})}}
+    verbose_name_plural = "📌 Важливі моменти (додати — у «🧭 Пульті», у прев'ю листа або тут)"
 
 
 class AttentionFilter(admin.SimpleListFilter):
-    """«Потребує уваги» — відкриті проєкти з терміновим (🔴) або будь-яким важливим (🔴/🟡) пунктом огляду."""
+    """«Потребує уваги» — відкриті проєкти з терміновим (🔴) або будь-яким важливим (🔴/🟡) пунктом огляду.
+    Береться кеш стану (projects/state.py), застаріле рахується наново."""
     title = "терміновістю"          # адмінка показує «За терміновістю»
     parameter_name = "attention"
 
@@ -68,10 +122,9 @@ class AttentionFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value() not in ("high", "any"):
             return queryset
-        from . import overview
-        levels = ("high",) if self.value() == "high" else ("high", "medium")
-        ids = [p.pk for p in queryset.filter(status__in=Project.OPEN_STATUSES)
-               if any(a["level"] in levels for a in overview.collect(p)["attention"])]
+        from . import state
+        states = state.states(queryset.filter(status__in=Project.OPEN_STATUSES))
+        ids = [pk for pk, st in states.items() if st.high or (self.value() == "any" and st.medium)]
         return queryset.filter(pk__in=ids)
 
 
@@ -82,12 +135,13 @@ class ProjectAdmin(admin.ModelAdmin):
     list_display_links = ("code", "name")
     list_filter = (AttentionFilter, "status", "owner")
     search_fields = ("code", "name", "customer__name", "participants__email")
-    autocomplete_fields = ("customer",)
+    autocomplete_fields = ("customer", "products")
     readonly_fields = ("code", "overview_panel", "mail_link", "timeline_html", "offers_panel", "dante_hours",
                        "source_thread_link", "created_by", "created_at", "updated_at")
     fieldsets = [
-        (None, {"fields": ["code", "name", "icon", "status", "customer", "owner", "due_date", "next_action"]}),
-        ("🧭 Огляд проєкту", {"fields": ["overview_panel"]}),
+        (None, {"fields": ["code", "name", "icon", "status", "customer", "owner", "start_date", "due_date",
+                           "next_action", "products"]}),
+        ("🧠 AI-огляд проєкту", {"fields": ["overview_panel"]}),
         ("Опис і вимоги", {"fields": ["description"]}),
         ("Листування й хронологія", {"fields": ["mail_link", "timeline_html"]}),
         ("📝 Angebote", {"fields": ["offers_panel"]}),
@@ -95,11 +149,58 @@ class ProjectAdmin(admin.ModelAdmin):
         ("Службове", {"fields": ["source_thread_link", "created_by", "created_at", "updated_at"],
                       "classes": ["collapse"]}),
     ]
-    inlines = [ParticipantInline, MailLinkInline, OrderLinkInline]
+    inlines = [ParticipantInline, MailLinkInline, OrderLinkInline, PurchaseLinkInline, JLCLinkInline,
+               ShipmentLinkInline, HighlightInline]
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("customer", "owner").annotate(
             _threads=Count("links", filter=Q(links__status=ProjectLink.CONFIRMED, links__thread__isnull=False)))
+
+    def get_changelist_instance(self, request):
+        """Стан рядків сторінки — з кешу (projects/state.py), застаріле рахується лише для цих рядків."""
+        cl = super().get_changelist_instance(request)
+        from . import state
+        self._viewer = request.user
+        try:
+            self._states = state.states(cl.result_list)
+        except Exception:  # noqa: BLE001 — список без колонки «Увага» краще, ніж помилка сторінки
+            logger.exception("project states for list")
+            self._states = {}
+        return cl
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        """«🧭 Пульт проєкту» над формою (projects/cockpit.py) — для наявного проєкту, на GET."""
+        extra_context = extra_context or {}
+        if object_id and request.method == "GET":
+            obj = self.get_object(request, object_id)
+            if obj is not None and self.has_view_permission(request, obj):
+                from . import cockpit
+                try:
+                    extra_context["pj_cockpit"] = cockpit.render(obj, request.user)
+                except Exception:  # noqa: BLE001 — картка без пульта краще, ніж помилка сторінки
+                    logger.exception("project cockpit %s", object_id)
+                    extra_context["pj_cockpit_error"] = True
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for obj in formset.deleted_objects:
+            obj.delete()
+        for obj in instances:
+            if isinstance(obj, ProjectHighlight) and not obj.created_by_id:
+                obj.created_by = request.user
+            if isinstance(obj, ProjectLink) and not obj.pk:
+                obj.created_by = request.user
+            obj.save()
+        formset.save_m2m()
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if "products" in form.changed_data:          # нові товари проєкту → закупівлі й JLC з ними — пропозиції
+            n = services.scan(form.instance)
+            if n:
+                messages.info(request, f"🔎 Minerva знайшла закупівлі чи JLC-замовлення з товарами проєкту: {n}. "
+                                       f"Перевірте пропозиції у «🧭 Пульті» (✓ / ✗).")
 
     def get_object(self, request, object_id, from_field=None):
         from worktime.panels import remember_viewer   # «⏱ Час askDANTE»: свій опис, вартість — від того, хто дивиться
@@ -125,29 +226,33 @@ class ProjectAdmin(admin.ModelAdmin):
 
     @admin.display(description="Увага")
     def attention_col(self, obj):
-        """🔴 термінове / 🟡 важливе з «Потребує уваги» (без AI); підказка — самі пункти."""
+        """🔴 термінове / 🟡 важливе з «Потребує уваги» (без AI, кеш стану); підказка — самі пункти,
+        тема чужого листа — без тексту."""
         if not obj.is_open:
             return "—"
-        from . import overview
-        items = overview.urgent(overview.collect(obj)["attention"])
+        from . import state
+        st = getattr(self, "_states", {}).get(obj.pk)
+        if st is None:
+            st = state.states([obj])[obj.pk]
+        items = state.items_for(st, getattr(self, "_viewer", None))
         if not items:
             return "✅"
         high = sum(1 for a in items if a["level"] == "high")
         label = " ".join(x for x in [f"🔴 {high}" if high else "", f"🟡 {len(items) - high}" if len(items) > high else ""] if x)
-        return format_html('<a href="{}#overview" title="{}">{}</a>',
+        return format_html('<a href="{}#pj-cockpit" title="{}">{}</a>',
                            reverse("admin:projects_project_change", args=[obj.pk]),
                            "\n".join(f"{a['icon']} {a['text']}" for a in items), label)
 
     @admin.display(description="Стан")
     def overview_panel(self, obj):
-        """Потребує уваги (з бази, без AI) + останній AI-огляд: обіцянки, виконано, питання, наступна дія."""
+        """Останній AI-огляд: обіцянки, виконано, питання, наступна дія («Потребує уваги» — у «🧭 Пульті» вгорі)."""
         if not obj or not obj.pk:
             return "Огляд з'явиться після збереження проєкту."
         from . import overview
         facts = overview.collect(obj)
         saved, stale = overview.saved(obj, facts)
         return render_to_string("admin/projects/overview_panel.html", {
-            "attention": facts["attention"], "counts": facts["counts"], "ov": saved, "stale": stale,
+            "counts": facts["counts"], "ov": saved, "stale": stale,
             "d": overview.for_display(saved.data) if saved else {},
             "generate_url": reverse("projects:overview", args=[obj.pk]),
             "next_action_url": reverse("projects:overview_next_action", args=[obj.pk]),
@@ -167,14 +272,16 @@ class ProjectAdmin(admin.ModelAdmin):
     def timeline_html(self, obj):
         if not obj or not obj.pk:
             return "—"
-        events = services.timeline(obj, limit=150)
+        from worktime.panels import viewer_of   # хто дивиться (get_object → remember_viewer)
+        events = services.timeline(obj, limit=150, viewer=viewer_of(obj))
         if not events:
             return "Поки порожньо — додайте листування з пошти («📁 До проєкту») або на сторінці «Розбір пошти»."
         rows = format_html_join(
             "", '<tr><td style="white-space:nowrap;color:var(--body-quiet-color)">{}</td><td>{}</td>'
-                '<td><a href="{}" target="_blank">{}</a></td><td style="color:var(--body-quiet-color)">{}</td></tr>',
-            ((timezone.localtime(e["date"]).strftime("%d.%m.%Y %H:%M") if e["date"] else "—",
-              e["icon"], e["url"], e["title"], e["who"]) for e in events))
+                '<td>{}</td><td style="color:var(--body-quiet-color)">{}</td></tr>',
+            ((timezone.localtime(e["date"]).strftime("%d.%m.%Y %H:%M") if e["date"] else "—", e["icon"],
+              format_html('<a href="{}" target="_blank">{}</a>', e["url"], e["title"]) if e["url"] else e["title"],
+              e["who"]) for e in events))
         return format_html('<table style="width:100%">{}</table>', rows)
 
     @admin.display(description="Пропозиції")

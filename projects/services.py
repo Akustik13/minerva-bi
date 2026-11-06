@@ -6,7 +6,7 @@
 import logging
 import re
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.db.models import Q
@@ -236,13 +236,19 @@ def candidate_projects(thread=None, limit=50) -> list:
     return projects
 
 
-def timeline(project, limit=300) -> list:
-    """Хронологія проєкту: листи (📥/📤) і замовлення — нові зверху."""
+def timeline(project, limit=300, viewer=None) -> list:
+    """Хронологія проєкту: листи (📥/📤) і замовлення — нові зверху.
+    Тема й адреси листа — лише власнику скриньки (viewer); решті — «лист з іншої скриньки» без посилання."""
     from email_assistant.crm_link import is_own, own_addresses
     own = own_addresses()
+    uid = getattr(viewer, "pk", None)
     events = []
-    for m in project_messages(project).select_related("thread").order_by("-sent_at")[:limit]:
+    for m in project_messages(project).select_related("thread", "account").order_by("-sent_at")[:limit]:
         out = is_own(m.from_email, own)
+        if m.account_id is None or m.account.user_id != uid:
+            events.append({"date": m.sent_at, "icon": "📤" if out else "📥", "title": "лист з іншої скриньки",
+                           "who": "", "url": ""})
+            continue
         events.append({
             "date": m.sent_at, "icon": "📤" if out else "📥",
             "title": m.subject or "(без теми)",
@@ -260,6 +266,133 @@ def timeline(project, limit=300) -> list:
         })
     events.sort(key=lambda e: e["date"] or timezone.now(), reverse=True)
     return events
+
+
+# ── Закупівлі, JLC-замовлення, відправлення ──────────────────────────────────
+
+SUGGEST_MAX = 5        # товар у багатьох проєктах — не більше стількох пропозицій на один об'єкт
+SCAN_DAYS = 365        # «🔎 Знайти пов'язане» — закупівлі й JLC за останній рік
+SCAN_MAX = 100
+
+
+def _suggest(project, reason, **target):
+    """Пропозиція прив'язки. Наявний зв'язок (підтверджений, відхилений чи вже запропонований) не змінюється."""
+    link, created = ProjectLink.objects.get_or_create(
+        project=project, **target,
+        defaults={"source": ProjectLink.AUTO, "status": ProjectLink.SUGGESTED, "reason": reason[:255]})
+    return link if created else None
+
+
+def link_object(project, *, user=None, reason="", **target) -> ProjectLink:
+    """Прив'язати вручну закупівлю, JLC-замовлення чи відправлення; відхилену пропозицію — підтвердити."""
+    link, created = ProjectLink.objects.get_or_create(project=project, **target, defaults={
+        "source": ProjectLink.MANUAL, "status": ProjectLink.CONFIRMED, "reason": reason[:255], "created_by": user})
+    if not created and link.status != ProjectLink.CONFIRMED:
+        link.status, link.source = ProjectLink.CONFIRMED, ProjectLink.MANUAL
+        link.decided_by, link.decided_at = user, timezone.now()
+        link.save(update_fields=["status", "source", "decided_by", "decided_at"])
+    return link
+
+
+def _sku_reason(project_product_ids, product_skus) -> str:
+    skus = [sku for pid, sku in product_skus.items() if pid in project_product_ids]
+    return f"товар {', '.join(sorted(skus)[:3])} проєкту" if skus else "товар проєкту"
+
+
+def suggest_for_purchase(po) -> list:
+    """Закупівля → проєкти, де є її товар (кожен відкритий такий проєкт, до SUGGEST_MAX); товарів проєктів немає —
+    проєкт, де постачальник закупівлі є учасником (лише якщо такий проєкт один)."""
+    if po is None or not po.pk:
+        return []
+    skus = {l.product_id: l.product.sku for l in po.lines.exclude(product=None).select_related("product")}
+    made, matched = [], False
+    if skus:
+        for p in (Project.objects.filter(status__in=Project.OPEN_STATUSES, products__in=list(skus))
+                  .distinct().order_by("-updated_at")[:SUGGEST_MAX]):
+            matched = True
+            reason = _sku_reason(set(p.products.values_list("pk", flat=True)), skus)
+            made.append(_suggest(p, reason, purchase_order=po))
+    if not matched and po.supplier_id and (po.supplier.email or "").strip():
+        ids = set(ProjectParticipant.objects.filter(
+            email=po.supplier.email.strip().lower(), role=ProjectParticipant.SUPPLIER,
+            project__status__in=Project.OPEN_STATUSES).values_list("project_id", flat=True))
+        if len(ids) == 1:
+            made.append(_suggest(Project.objects.get(pk=ids.pop()), "постачальник закупівлі — учасник проєкту",
+                                 purchase_order=po))
+    return [l for l in made if l]
+
+
+def suggest_for_jlc(jlc) -> list:
+    """JLC-замовлення → проєкти з його товаром. Якщо його закупівля вже в проєкті — нічого (видно через неї)."""
+    if jlc is None or not jlc.pk:
+        return []
+    if jlc.purchase_order_id and ProjectLink.objects.filter(purchase_order_id=jlc.purchase_order_id,
+                                                           status=ProjectLink.CONFIRMED).exists():
+        return []
+    skus = {}
+    if jlc.product_id:
+        skus[jlc.product_id] = jlc.product.sku
+    for line in jlc.lines.exclude(product=None).select_related("product"):
+        skus[line.product_id] = line.product.sku
+    if not skus:
+        return []
+    made = []
+    for p in (Project.objects.filter(status__in=Project.OPEN_STATUSES, products__in=list(skus))
+              .distinct().order_by("-updated_at")[:SUGGEST_MAX]):
+        made.append(_suggest(p, _sku_reason(set(p.products.values_list("pk", flat=True)), skus), jlc_order=jlc))
+    return [l for l in made if l]
+
+
+def scan(project) -> int:
+    """«🔎 Знайти пов'язане»: закупівлі й JLC-замовлення з товарами проєкту за останній рік → пропозиції ✓/✗.
+    Повертає кількість нових пропозицій."""
+    from inventory.models import PurchaseOrder
+    from jlcpcb.models import JLCOrder
+    product_ids = set(project.products.values_list("pk", flat=True))
+    if not product_ids:
+        return 0
+    since = timezone.localdate() - timedelta(days=SCAN_DAYS)
+    n = 0
+    pos = (PurchaseOrder.objects.filter(lines__product_id__in=product_ids, order_date__gte=since)
+           .exclude(status=PurchaseOrder.Status.CANCELLED).distinct().prefetch_related("lines__product")[:SCAN_MAX])
+    for po in pos:
+        skus = {l.product_id: l.product.sku for l in po.lines.all() if l.product_id}
+        n += bool(_suggest(project, _sku_reason(product_ids, skus), purchase_order=po))
+    linked_pos = set(ProjectLink.objects.filter(project=project, status=ProjectLink.CONFIRMED)
+                     .exclude(purchase_order=None).values_list("purchase_order_id", flat=True))
+    jlcs = (JLCOrder.objects.filter(Q(product_id__in=product_ids) | Q(lines__product_id__in=product_ids),
+                                    order_date__gte=since)
+            .exclude(local_status=JLCOrder.LocalStatus.CANCELLED).distinct()
+            .select_related("product").prefetch_related("lines__product")[:SCAN_MAX])
+    for j in jlcs:
+        if j.purchase_order_id in linked_pos:
+            continue
+        skus = {l.product_id: l.product.sku for l in j.lines.all() if l.product_id}
+        if j.product_id:
+            skus[j.product_id] = j.product.sku
+        n += bool(_suggest(project, _sku_reason(product_ids, skus), jlc_order=j))
+    return n
+
+
+# ── 📌 Важливі моменти ───────────────────────────────────────────────────────
+
+class HighlightError(ValueError):
+    pass
+
+
+def add_highlight(project, *, title, date=None, kind="", quote="", message=None, user=None):
+    """📌 Важливий момент (вручну). Дата — з листа, інакше сьогодні. Повертає ProjectHighlight."""
+    from .models import ProjectHighlight
+    title = " ".join(str(title or "").split())[:255]
+    if not title:
+        raise HighlightError("Напишіть, що сталося")
+    kinds = dict(ProjectHighlight.KIND_CHOICES)
+    if not date and message is not None and message.sent_at:
+        date = timezone.localtime(message.sent_at).date() if timezone.is_aware(message.sent_at) else message.sent_at.date()
+    return ProjectHighlight.objects.create(
+        project=project, title=title, date=date or timezone.localdate(),
+        kind=kind if kind in kinds else ProjectHighlight.OTHER, quote=str(quote or "").strip()[:2000],
+        message=message, created_by=user)
 
 
 def tags_for_threads(thread_ids) -> dict:

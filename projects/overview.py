@@ -2,8 +2,9 @@
 Огляд проєкту: що обіцяли, що виконано, відкриті питання, наступна дія.
 
 Два шари:
-- collect() — факти з бази без AI: листування (хто кому винен відповідь), Angebote, замовлення, терміни з листів,
-  і список «потребує уваги». Безкоштовно, показується завжди.
+- collect() — факти з бази без AI: листування (хто кому винен відповідь), Angebote, замовлення, закупівлі,
+  JLC-замовлення, відправлення, терміни з листів, важливі моменти, і список «потребує уваги».
+  Безкоштовно, показується завжди (пульт проєкту — projects/cockpit.py, кеш для списку — projects/state.py).
 - generate() — AI-огляд на вимогу: модель отримує ці факти, листи проєкту й знайдене в базі знань RAG
   (листування клієнта поза гілками проєкту — _rag_block), відповідає JSON; кожен пункт посилається на лист [#N]
   або документ. Відповідь перевіряється (посилання, дати, статуси) і зберігається
@@ -16,10 +17,11 @@ import logging
 import re
 from datetime import date, datetime, timedelta
 
+from django.db.models import Q
 from django.utils import timezone
 
 from . import services
-from .models import Project, ProjectLink, ProjectOverview
+from .models import Project, ProjectHighlight, ProjectLink, ProjectOverview
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +70,7 @@ def _messages(project):
     own = own_addresses()
     out = []
     for m in (services.project_messages(project).exclude(is_spam=True).exclude(folder__in=("spam", "trash"))
-              .exclude(category="newsletter").select_related("thread").order_by("sent_at", "pk")):
+              .exclude(category="newsletter").select_related("thread", "account").order_by("sent_at", "pk")):
         recipients = list(m.to_emails or []) + list(m.cc_emails or [])
         if not is_own(m.from_email, own):
             direction = "in"
@@ -96,18 +98,89 @@ def _deadlines(message_ids):
     return list(CalendarEvent.objects.filter(email_message_id__in=message_ids).order_by("start_at"))
 
 
+def _linked_ids(project, field) -> set:
+    return set(ProjectLink.objects.filter(project=project, status=ProjectLink.CONFIRMED)
+               .exclude(**{field: None}).values_list(f"{field}_id", flat=True))
+
+
+def _purchases(project):
+    """Прив'язані закупівлі (PO) з постачальником, позиціями, посилками й JLC-замовленнями."""
+    from inventory.models import PurchaseOrder
+    ids = _linked_ids(project, "purchase_order")
+    if not ids:
+        return []
+    return list(PurchaseOrder.objects.filter(pk__in=ids).select_related("supplier")
+                .prefetch_related("lines__product", "parcels", "jlc_orders").order_by("order_date", "pk"))
+
+
+def _jlc(project, purchases):
+    """JLC-замовлення: прив'язані напряму й ті, що належать прив'язаним закупівлям."""
+    from jlcpcb.models import JLCOrder
+    ids = _linked_ids(project, "jlc_order") | {j.pk for po in purchases for j in po.jlc_orders.all()}
+    if not ids:
+        return []
+    return list(JLCOrder.objects.filter(pk__in=ids).order_by("order_date", "pk"))
+
+
+def _shipments(project, orders, purchases, jlc):
+    """Відправлення й посилки: прив'язані напряму, замовлень, закупівель і JLC-замовлень проєкту (без скасованих)."""
+    from shipping.models import Shipment
+    cond = Q(pk__in=_linked_ids(project, "shipment"))
+    if orders:
+        cond |= Q(order_id__in=[o.pk for o in orders])
+    if purchases:
+        cond |= Q(purchase_order_id__in=[p.pk for p in purchases])
+    if jlc:
+        cond |= Q(jlc_order_id__in=[j.pk for j in jlc])
+    return list(Shipment.objects.filter(cond).exclude(status=Shipment.Status.CANCELLED)
+                .select_related("carrier", "order", "purchase_order").order_by("created_at", "pk"))
+
+
+def _highlights(project):
+    return list(ProjectHighlight.objects.filter(project=project, status=ProjectLink.CONFIRMED)
+                .select_related("message__account").order_by("date", "pk"))
+
+
+def _owner(message):
+    """Власник скриньки листа: тему й текст бачить лише він (як «📬 Листи зі скриньки»)."""
+    return message.account.user_id if message is not None and message.account_id else None
+
+
+def visible(items, viewer) -> list:
+    """Пункти «Потребує уваги» для конкретної людини: тема чужого листа чи назва події з чужого календаря —
+    без тексту й посилання (private_text)."""
+    uid = getattr(viewer, "pk", None)
+    out = []
+    for a in items:
+        if a.get("owner") is not None and a["owner"] != uid:
+            out.append({**a, "text": a.get("private_text") or a["text"], "url": ""})
+        else:
+            out.append(a)
+    return out
+
+
 def collect(project, today=None) -> dict:
-    """Факти проєкту з бази і «потребує уваги» — без AI."""
+    """Факти проєкту з бази і «потребує уваги» — без AI.
+
+    Кожен пункт «потребує уваги»: level (high / medium / info), kind (todo — що зробити нам, risk — що може зірвати
+    строк), owner + private_text — для листів і подій календаря (visible() ховає їх від інших людей)."""
     today = today or timezone.localdate()
     messages = _messages(project)
     offers = list(project.offers.order_by("created_at", "pk")) if hasattr(project, "offers") else []
     orders = _orders(project, offers)
     deadlines = _deadlines([x["msg"].pk for x in messages])
+    purchases = _purchases(project)
+    jlc = _jlc(project, purchases)
+    shipments = _shipments(project, orders, purchases, jlc)
+    highlights = _highlights(project)
     is_open = project.is_open
     attention = []
 
-    def add(level, icon, text, url=""):
-        attention.append({"level": level, "icon": icon, "text": text, "url": url})
+    def add(level, icon, text, url="", kind="risk", owner=None, private_text=""):
+        item = {"level": level, "icon": icon, "text": text, "url": url, "kind": kind}
+        if owner is not None:
+            item.update(owner=owner, private_text=private_text)
+        attention.append(item)
 
     if is_open and project.due_date:
         left = (project.due_date - today).days
@@ -131,12 +204,14 @@ def collect(project, today=None) -> dict:
             if is_open:
                 add("high" if age >= REPLY_WAIT_DAYS else "medium", "📨",
                     f"Чекає нашої відповіді {_days(age)}: «{m.subject or '(без теми)'}» від {m.from_name or m.from_email}",
-                    url)
+                    url, kind="todo", owner=_owner(m),
+                    private_text=f"Чекає нашої відповіді {_days(age)}: лист з іншої скриньки")
         elif age >= FOLLOW_UP_DAYS:
             waiting_them.append(m)
             if is_open:
                 add("medium", "🔁", f"Наш лист без відповіді {_days(age)}: «{m.subject or '(без теми)'}» — нагадати?",
-                    url)
+                    url, kind="todo", owner=_owner(m),
+                    private_text=f"Наш лист без відповіді {_days(age)}: лист з іншої скриньки")
 
     for o in offers:
         url = f"/admin/offers/offer/{o.pk}/change/"
@@ -150,7 +225,7 @@ def collect(project, today=None) -> dict:
                 add("medium", "📝", f"Angebot {o.display_number} надіслано {_days((today - _day(o.sent_at)).days)} "
                                     f"тому — рішення клієнта немає", url)
         elif o.status in (o.DRAFT, o.REVIEW, o.APPROVED) and is_open:
-            add("info", "📝", f"Angebot {o.display_number} ще не надіслано ({o.get_status_display()})", url)
+            add("info", "📝", f"Angebot {o.display_number} ще не надіслано ({o.get_status_display()})", url, kind="todo")
 
     for order in orders:
         url = f"/admin/sales/salesorder/{order.pk}/change/"
@@ -160,7 +235,10 @@ def collect(project, today=None) -> dict:
             if left < 0:
                 add("high", "🛒", f"Замовлення {label}: строк відправки минув {_fmt(order.shipping_deadline)}", url)
             elif left <= 2:
-                add("medium", "🛒", f"Замовлення {label}: відправити до {_fmt(order.shipping_deadline)}", url)
+                add("medium", "🛒", f"Замовлення {label}: відправити до {_fmt(order.shipping_deadline)}", url,
+                    kind="todo")
+
+    _supply_attention(add, purchases, jlc, shipments, today, is_open)
 
     now = timezone.now()
     for ev in deadlines:
@@ -168,35 +246,90 @@ def collect(project, today=None) -> dict:
             continue
         url = f"/email/message/{ev.email_message_id}/"
         if ev.start_at < now:
-            add("high", "📅", f"Прострочено: {ev.title} ({_fmt(ev.start_at)})", url)
+            add("high", "📅", f"Прострочено: {ev.title} ({_fmt(ev.start_at)})", url, owner=ev.user_id,
+                private_text=f"Прострочено: термін з іншого календаря ({_fmt(ev.start_at)})")
         elif (_day(ev.start_at) - today).days <= 3:
-            add("medium", "📅", f"Скоро: {ev.title} ({_fmt(ev.start_at)})", url)
+            add("medium", "📅", f"Скоро: {ev.title} ({_fmt(ev.start_at)})", url, kind="todo", owner=ev.user_id,
+                private_text=f"Скоро: термін з іншого календаря ({_fmt(ev.start_at)})")
 
     last = messages[-1]["msg"] if messages else None
     if is_open and last and last.sent_at and (today - _day(last.sent_at)).days >= IDLE_DAYS:
         add("info", "💤", f"Тиша {_days((today - _day(last.sent_at)).days)} — останній лист {_fmt(last.sent_at)}")
     if is_open and not project.next_action:
-        add("info", "➡️", "Не задано наступну дію")
+        add("info", "➡️", "Не задано наступну дію", kind="todo")
 
     attention.sort(key=lambda a: LEVELS[a["level"]])
     return {
         "project": project, "today": today, "messages": messages, "offers": offers, "orders": orders,
         "deadlines": deadlines, "attention": attention, "waiting_us": waiting_us, "waiting_them": waiting_them,
+        "purchases": purchases, "jlc": jlc, "shipments": shipments, "highlights": highlights,
         "counts": {"in": sum(1 for x in messages if x["dir"] == "in"),
                    "out": sum(1 for x in messages if x["dir"] == "out"),
                    "threads": len({x["msg"].thread_id for x in messages}),
                    "offers": len(offers), "orders": len(orders)},
-        "fingerprint": fingerprint(project, messages, offers, orders, deadlines),
+        "more": {"purchases": len(purchases), "jlc": len(jlc), "shipments": len(shipments),
+                 "highlights": len(highlights)},
+        "fingerprint": fingerprint(project, messages, offers, orders, deadlines, purchases, jlc, shipments),
     }
 
 
-def fingerprint(project, messages, offers, orders, deadlines) -> str:
-    """Стан, на якому зроблено огляд: нові листи, зміна документів чи термінів → інший відбиток."""
+def _supply_attention(add, purchases, jlc, shipments, today, is_open):
+    """Закупівлі, JLC-замовлення й відправлення проєкту: прострочене — ризик, що зробити — задача."""
+    if not is_open:
+        return
+    from shipping.models import Shipment
+    for po in purchases:
+        url = f"/admin/inventory/purchaseorder/{po.pk}/change/"
+        who = f" ({po.supplier.name})" if po.supplier_id else ""
+        if po.status == po.Status.DRAFT:
+            add("info", "🏭", f"Закупівля {po}{who} ще чернетка — надіслати постачальнику?", url, kind="todo")
+        elif po.status in (po.Status.ORDERED, po.Status.PARTIAL) and po.expected_date:
+            left = (po.expected_date - today).days
+            if left < 0:
+                add("high", "🏭", f"Закупівля {po}{who}: чекали {_fmt(po.expected_date)}, ще не отримано", url)
+            elif left <= 3:
+                add("info", "🏭", f"Закупівля {po}{who}: очікується {_fmt(po.expected_date)}", url, kind="todo")
+    for j in jlc:
+        if j.local_status in (j.LocalStatus.DELIVERED, j.LocalStatus.CANCELLED) or not j.expected_date:
+            continue
+        if j.expected_date < today:
+            add("medium", "🔧", f"JLC {j.jlc_order_number or j.jlc_order_id}: чекали {_fmt(j.expected_date)}, "
+                               f"зараз «{j.get_local_status_display()}»", f"/admin/jlcpcb/jlcorder/{j.pk}/change/")
+    for s in shipments:
+        url = f"/admin/shipping/shipment/{s.pk}/change/"
+        name = s.tracking_number or f"#{s.pk}"
+        if s.status == Shipment.Status.DELIVERED:
+            po = s.purchase_order
+            if s.direction == Shipment.IN and po is not None and po.status in (po.Status.ORDERED, po.Status.PARTIAL):
+                add("medium", "📥", f"Посилка {name} до {po} доставлена — оприбуткуйте закупівлю",
+                    f"/admin/inventory/purchaseorder/{po.pk}/change/", kind="todo")
+            continue
+        if s.status == Shipment.Status.ERROR:
+            add("high", "🚚", f"Відправлення {name}: помилка оформлення", url)
+        elif s.carrier_delayed:
+            add("medium", "🚚", f"{'Посилка' if s.direction == Shipment.IN else 'Відправлення'} {name}: "
+                                f"перевізник повідомив про затримку", url)
+        else:
+            eta = s.eta_to or s.carrier_eta
+            if s.status == Shipment.Status.IN_TRANSIT and eta and eta < today:
+                add("medium", "🚚", f"{'Посилка' if s.direction == Shipment.IN else 'Відправлення'} {name}: "
+                                    f"мало бути доставлено {_fmt(eta)}", url)
+
+
+def fingerprint(project, messages, offers, orders, deadlines, purchases=(), jlc=(), shipments=()) -> str:
+    """Стан, на якому зроблено огляд: нові листи, зміна документів чи термінів → інший відбиток.
+    Закупівлі, JLC і відправлення додаються лише коли вони є (давні огляди проєктів без них не «застарівають»)."""
     parts = [project.status, str(project.due_date), project.description,
              ",".join(str(x["msg"].pk) for x in messages),
              ",".join(f"{o.pk}:{o.status}:{o.revision}" for o in offers),
              ",".join(f"{o.pk}:{o.status}:{o.shipped_at}:{o.delivered_at}" for o in orders),
              ",".join(f"{e.pk}:{e.is_done}:{e.start_at}" for e in deadlines)]
+    if purchases:
+        parts.append("po:" + ",".join(f"{p.pk}:{p.status}:{p.expected_date}:{p.received_date}" for p in purchases))
+    if jlc:
+        parts.append("jlc:" + ",".join(f"{j.pk}:{j.local_status}:{j.shipped_date}:{j.delivered_date}" for j in jlc))
+    if shipments:
+        parts.append("sh:" + ",".join(f"{s.pk}:{s.status}" for s in shipments))
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
@@ -224,6 +357,26 @@ def _order_line(order) -> str:
     return ", ".join(p for p in parts if p)
 
 
+def _purchase_line(po) -> str:
+    parts = [f"Закупівля {po} — {po.get_status_display()}", po.supplier.name if po.supplier_id else "",
+             f"від {_fmt(po.order_date)}" if po.order_date else "",
+             f"очікується {_fmt(po.expected_date)}" if po.expected_date else "",
+             f"отримано {_fmt(po.received_date)}" if po.received_date else ""]
+    lines = [f"  · {l.product.sku if l.product_id else (l.external_sku or l.description[:60])} × {_qty(l.qty_ordered)}"
+             + (f", отримано {_qty(l.qty_received)}" if l.qty_received else "")
+             for l in list(po.lines.all())[:10]]
+    return ", ".join(p for p in parts if p) + ("\n" + "\n".join(lines) if lines else "")
+
+
+def _jlc_line(j) -> str:
+    parts = [f"JLC {j.jlc_order_number or j.jlc_order_id} ({j.get_order_type_display()}) — {j.get_local_status_display()}",
+             (j.description or "")[:80], f"{j.quantity} шт", f"замовлено {_fmt(j.order_date)}" if j.order_date else "",
+             f"очікується {_fmt(j.expected_date)}" if j.expected_date else "",
+             f"відправлено {_fmt(j.shipped_date)}" if j.shipped_date else "",
+             f"доставлено {_fmt(j.delivered_date)}" if j.delivered_date else ""]
+    return ", ".join(p for p in parts if p)
+
+
 def prompt_text(facts) -> tuple:
     """(текст фактів і листів, [pk листів за номерами #1…#N])."""
     p = facts["project"]
@@ -237,6 +390,12 @@ def prompt_text(facts) -> tuple:
         parts.append("ANGEBOTE:\n" + "\n".join(_offer_line(o) for o in facts["offers"]))
     if facts["orders"]:
         parts.append("ЗАМОВЛЕННЯ:\n" + "\n".join(_order_line(o) for o in facts["orders"]))
+    if facts.get("purchases") or facts.get("jlc"):
+        parts.append("ЗАКУПІВЛІ Й ВИРОБНИЦТВО:\n" + "\n".join(
+            [_purchase_line(po) for po in facts.get("purchases", [])] + [_jlc_line(j) for j in facts.get("jlc", [])]))
+    if facts.get("highlights"):
+        parts.append("ВАЖЛИВІ МОМЕНТИ (позначила людина):\n" + "\n".join(
+            f"{_fmt(h.date)} — {h.get_kind_display()}: {h.title}" for h in facts["highlights"]))
     if facts["deadlines"]:
         parts.append("ТЕРМІНИ, ЗНАЙДЕНІ В ЛИСТАХ:\n" + "\n".join(
             f"{_fmt(e.start_at)} — {e.title}{' (виконано)' if e.is_done else ''}" for e in facts["deadlines"]))
@@ -482,7 +641,7 @@ def state(project, user) -> dict:
         "project": {"id": project.pk, "code": project.code, "name": project.name,
                     "url": f"/admin/projects/project/{project.pk}/change/#overview",
                     "next_action": project.next_action},
-        "attention": facts["attention"], "counts": facts["counts"],
+        "attention": visible(facts["attention"], user), "counts": facts["counts"],
         "overview": for_display(overview.data) if overview else None,
         "meta": {"created_at": timezone.localtime(overview.created_at).strftime("%d.%m.%Y %H:%M"),
                  "model": overview.model, "messages_count": overview.messages_count} if overview else None,
@@ -536,7 +695,7 @@ def owner_digest(user, limit=8) -> list:
     out = []
     for project in (Project.objects.filter(owner=user, status__in=Project.OPEN_STATUSES)
                     .select_related("customer").order_by("-updated_at")[:200]):
-        items = urgent(collect(project)["attention"])
+        items = visible(urgent(collect(project)["attention"]), user)
         if items:
             out.append((project, items))
     out.sort(key=lambda pi: (-sum(1 for a in pi[1] if a["level"] == "high"), -len(pi[1])))

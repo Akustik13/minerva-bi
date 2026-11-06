@@ -31,8 +31,15 @@ class Project(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                               related_name="owned_projects", verbose_name="Відповідальний")
     status = models.CharField("Статус", max_length=10, choices=STATUS_CHOICES, default=ACTIVE, db_index=True)
-    due_date = models.DateField("Строк", null=True, blank=True)
+    start_date = models.DateField("Старт", null=True, blank=True,
+                                  help_text="Коли почали роботу; порожньо — шкала починається з першої події проєкту")
+    due_date = models.DateField("Строк клієнту", null=True, blank=True,
+                                help_text="Що обіцяли клієнту: на шкалі — червона лінія; минув — «Потребує уваги»")
     next_action = models.CharField("Наступна дія", max_length=255, blank=True, default="")
+    products = models.ManyToManyField("inventory.Product", blank=True, related_name="projects",
+                                      verbose_name="Товари проєкту",
+                                      help_text="Що розробляємо чи постачаємо: за ними Minerva пропонує закупівлі "
+                                                "й JLC-замовлення проєкту")
     source_thread = models.ForeignKey("email_assistant.EmailThread", null=True, blank=True,
                                       on_delete=models.SET_NULL, related_name="+",
                                       verbose_name="Створено з листування")
@@ -100,8 +107,23 @@ class ProjectParticipant(models.Model):
         super().save(*args, **kwargs)
 
 
+LINK_TARGETS = ("thread", "message", "order", "purchase_order", "jlc_order", "shipment")
+
+
+def _one_target():
+    """Рівно одна ціль прив'язки (CheckConstraint)."""
+    condition = None
+    for target in LINK_TARGETS:
+        part = Q(**{f"{t}__isnull": t != target for t in LINK_TARGETS})
+        condition = part if condition is None else condition | part
+    return condition
+
+
 class ProjectLink(models.Model):
-    """Прив'язка до проєкту гілки, окремого листа або замовлення — з підставою й статусом."""
+    """Прив'язка до проєкту гілки, окремого листа, замовлення, закупівлі, JLC-замовлення чи відправлення —
+    з підставою й статусом. Що досяжне через уже прив'язане (відправлення замовлення, JLC і посилки закупівлі),
+    окремого рядка не потребує (projects/facts.py)."""
+    TARGETS = LINK_TARGETS
     MANUAL, RULE, AUTO = "manual", "rule", "auto"
     SOURCE_CHOICES = [(MANUAL, "вручну"), (RULE, "правило"), (AUTO, "пропозиція системи")]
     SUGGESTED, CONFIRMED, REJECTED = "suggested", "confirmed", "rejected"
@@ -114,6 +136,12 @@ class ProjectLink(models.Model):
                                 related_name="project_links", verbose_name="Окремий лист")
     order = models.ForeignKey("sales.SalesOrder", null=True, blank=True, on_delete=models.CASCADE,
                               related_name="project_links", verbose_name="Замовлення")
+    purchase_order = models.ForeignKey("inventory.PurchaseOrder", null=True, blank=True, on_delete=models.CASCADE,
+                                       related_name="project_links", verbose_name="Закупівля (PO)")
+    jlc_order = models.ForeignKey("jlcpcb.JLCOrder", null=True, blank=True, on_delete=models.CASCADE,
+                                  related_name="project_links", verbose_name="JLC-замовлення")
+    shipment = models.ForeignKey("shipping.Shipment", null=True, blank=True, on_delete=models.CASCADE,
+                                 related_name="project_links", verbose_name="Відправлення / посилка")
     source = models.CharField("Джерело", max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
     status = models.CharField("Статус", max_length=10, choices=STATUS_CHOICES, default=CONFIRMED, db_index=True)
     reason = models.CharField("Підстава", max_length=255, blank=True, default="")
@@ -135,15 +163,24 @@ class ProjectLink(models.Model):
                                     name="unique_project_message"),
             models.UniqueConstraint(fields=["project", "order"], condition=Q(order__isnull=False),
                                     name="unique_project_order"),
-            models.CheckConstraint(
-                condition=(Q(thread__isnull=False, message__isnull=True, order__isnull=True)
-                           | Q(thread__isnull=True, message__isnull=False, order__isnull=True)
-                           | Q(thread__isnull=True, message__isnull=True, order__isnull=False)),
-                name="project_link_one_target"),
+            models.UniqueConstraint(fields=["project", "purchase_order"], condition=Q(purchase_order__isnull=False),
+                                    name="unique_project_purchase_order"),
+            models.UniqueConstraint(fields=["project", "jlc_order"], condition=Q(jlc_order__isnull=False),
+                                    name="unique_project_jlc_order"),
+            models.UniqueConstraint(fields=["project", "shipment"], condition=Q(shipment__isnull=False),
+                                    name="unique_project_shipment"),
+            models.CheckConstraint(condition=_one_target(), name="project_link_one_target"),
         ]
 
     def __str__(self):
         return f"{self.project.code} ← {self.target_label}"
+
+    @property
+    def target(self):
+        for name in self.TARGETS:
+            if getattr(self, f"{name}_id"):
+                return getattr(self, name)
+        return None
 
     @property
     def target_label(self) -> str:
@@ -151,7 +188,17 @@ class ProjectLink(models.Model):
             return f"✉️ {self.thread.subject or '(без теми)'}"
         if self.message_id:
             return f"📨 {self.message.subject or '(без теми)'}"
-        return f"🛒 {self.order.source}:{self.order.order_number}"
+        if self.order_id:
+            return f"🛒 {self.order.source}:{self.order.order_number}"
+        if self.purchase_order_id:
+            po = self.purchase_order
+            return f"🏭 {po}" + (f" · {po.supplier.name}" if po.supplier_id else "")
+        if self.jlc_order_id:
+            return f"🔧 JLC {self.jlc_order.jlc_order_number or self.jlc_order.jlc_order_id}"
+        if self.shipment_id:
+            s = self.shipment
+            return f"{'📥' if s.direction == s.IN else '🚚'} {s.tracking_number or f'відправлення #{s.pk}'}"
+        return "—"
 
 
 class ProjectOverview(models.Model):
@@ -185,3 +232,58 @@ class DismissedThread(models.Model):
     class Meta:
         verbose_name = "Гілка поза проєктами"
         verbose_name_plural = "Гілки поза проєктами"
+
+
+class ProjectHighlight(models.Model):
+    """📌 Важливий момент проєкту на шкалі: рішення, погодження, зміна вимог, проблема… — з листом і цитатою.
+    Ставить людина (з пульта, шкали чи прев'ю листа); source / status — для майбутніх пропозицій AI ✓/✗."""
+    DECISION, APPROVAL, CHANGE, PROBLEM = "decision", "approval", "change", "problem"
+    DEADLINE, DELIVERY, PAYMENT, OTHER = "deadline", "delivery", "payment", "other"
+    KIND_CHOICES = [
+        (DECISION, "🧭 Рішення"), (APPROVAL, "✅ Погодження"), (CHANGE, "✏️ Зміна вимог"), (PROBLEM, "⚠️ Проблема"),
+        (DEADLINE, "⏰ Строк"), (DELIVERY, "📦 Поставка"), (PAYMENT, "💶 Оплата"), (OTHER, "📌 Інше"),
+    ]
+    MANUAL, AI, RULE = "manual", "ai", "rule"
+    SOURCE_CHOICES = [(MANUAL, "вручну"), (AI, "AI"), (RULE, "правило")]
+    STATUS_CHOICES = ProjectLink.STATUS_CHOICES
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="highlights")
+    date = models.DateField("Дата", db_index=True)
+    kind = models.CharField("Вид", max_length=10, choices=KIND_CHOICES, default=OTHER)
+    title = models.CharField("Що сталося", max_length=255)
+    quote = models.TextField("Цитата / примітка", blank=True, default="")
+    message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="project_highlights", verbose_name="Лист")
+    source = models.CharField("Джерело", max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
+    status = models.CharField("Статус", max_length=10, choices=STATUS_CHOICES, default=ProjectLink.CONFIRMED,
+                              db_index=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+", verbose_name="Додав")
+    created_at = models.DateTimeField("Додано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Важливий момент"
+        verbose_name_plural = "📌 Важливі моменти"
+        ordering = ["-date", "-pk"]
+
+    def __str__(self):
+        return f"{self.project.code} · {self.date:%d.%m.%Y} · {self.title}"
+
+
+class ProjectState(models.Model):
+    """Кеш стану проєкту для списку й фільтра «За терміновістю» (projects/state.py): колір, найважливіше
+    з «Потребує уваги», коли пораховано. Картка проєкту рахує стан наживо й оновлює цей запис."""
+    project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name="state")
+    health = models.CharField("Стан", max_length=8, blank=True, default="", db_index=True)
+    high = models.PositiveSmallIntegerField(default=0)
+    medium = models.PositiveSmallIntegerField(default=0)
+    items = models.JSONField(default=list, blank=True)
+    computed_at = models.DateTimeField(null=True, blank=True)
+    dirty = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Стан проєкту (кеш)"
+        verbose_name_plural = "Стани проєктів (кеш)"
+
+    def __str__(self):
+        return f"{self.project.code}: {self.health or '—'}"

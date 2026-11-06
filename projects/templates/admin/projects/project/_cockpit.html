@@ -1,0 +1,108 @@
+{# «🧭 Пульт проєкту» (projects/cockpit.py → context); JS і стилі — change_form.html. #}
+{# Без <script> і без <form>: пульт усередині форми картки, поля «📌» без name. #}
+<div class="pjc" data-range="{{ range }}" data-cockpit="{{ urls.cockpit }}" data-highlight="{{ urls.highlight }}"
+     data-scan="{{ urls.scan }}">
+  <div class="pjc-head">
+    <b class="pjc-title">🧭 Пульт проєкту</b>
+    <span class="pjc-health pjc-h-{{ health.key }}"
+          title="Колір — з «Потребує уваги»: є термінове — червоний, важливе — жовтий, нічого — зелений">{{ health.icon }} {{ health.label }}</span>
+    {% if due %}
+      <span class="pjc-due{% if due.late %} late{% endif %}">⏰ Строк клієнту <b>{{ due.date|date:"d.m.Y" }}</b>{% if due.text %} · {{ due.text }}{% endif %}</span>
+    {% else %}<span class="pjc-sub">строк клієнту не задано</span>{% endif %}
+    {% if start %}<span class="pjc-sub">старт {{ start|date:"d.m.Y" }}</span>{% endif %}
+    <span class="pjc-sub" title="Листи від клієнта / наші · Angebote · замовлення · закупівлі · JLC-замовлення · відправлення">📥 {{ counts.in }} · 📤 {{ counts.out }} · 📝 {{ counts.offers }} · 🛒 {{ counts.orders }} · 🏭 {{ more.purchases }} · 🔧 {{ more.jlc }} · 🚚 {{ more.shipments }}</span>
+    <a class="pjc-link" href="{{ urls.mail }}" target="_blank">✉️ Листи проєкту</a>
+  </div>
+  {% if notice %}<div class="pjc-notice" role="status">{{ notice }}</div>{% endif %}
+
+  <div class="pjc-cols">
+    <section class="pjc-card" aria-label="Що зараз">
+      <h4>🎯 Що зараз</h4>
+      {% if next_action %}<div class="pjc-next">➡️ <b>{{ next_action }}</b></div>{% endif %}
+      {% if todo %}
+        <ul class="pjc-list">
+          {% for a in todo %}<li class="pjc-{{ a.level }}">{{ a.icon }} {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}</li>{% endfor %}
+        </ul>
+      {% elif not next_action %}<div class="pjc-sub">Нічого не чекає на нас. Запишіть «Наступну дію» в полях проєкту.</div>{% endif %}
+      {% if suggestions %}
+        <div class="pjc-sg">
+          <div class="pjc-sgt">🔗 Пропозиції прив'язок · {{ suggestions|length }}</div>
+          <ul class="pjc-list">
+            {% for s in suggestions %}
+              <li>{% if s.url %}<a href="{{ s.url }}" target="_blank">{{ s.label }}</a>{% else %}{{ s.label }}{% endif %}
+                <span class="pjc-sub">· {{ s.reason }}</span>
+                {% if can_change and s.can_decide %}<span class="pjc-yn">
+                  <button type="button" class="pjc-b" data-pjc-decide="{% url 'projects:link_decide' project.pk s.id %}" data-accept="1" title="Так, це цей проєкт">✓</button>
+                  <button type="button" class="pjc-b" data-pjc-decide="{% url 'projects:link_decide' project.pk s.id %}" data-accept="0" title="Ні — більше не пропонувати">✗</button>
+                </span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+      {% if can_change %}
+        <div class="pjc-actions">
+          <button type="button" class="pjc-b" data-pjc-scan title="Закупівлі й JLC-замовлення з товарами проєкту за останній рік">🔎 Знайти пов'язане</button>
+          {% if not has_products %}<span class="pjc-sub">шукає за «Товарами проєкту» — додайте їх у полях нижче</span>{% endif %}
+        </div>
+      {% endif %}
+    </section>
+
+    <section class="pjc-card" aria-label="Ризики">
+      <h4>⚠️ Ризики</h4>
+      {% if risks %}
+        <ul class="pjc-list">
+          {% for a in risks %}<li class="pjc-{{ a.level }}">{{ a.icon }} {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}</li>{% endfor %}
+        </ul>
+      {% else %}<div class="pjc-sub">✅ Ризиків не видно: строки, Angebote, замовлення й закупівлі в порядку.</div>{% endif %}
+    </section>
+
+    <section class="pjc-card" aria-label="Важливі моменти">
+      <h4>📌 Важливі моменти {% if moments_total %}<span class="pjc-sub">{{ moments_total }}</span>{% endif %}
+        {% if can_change %}<button type="button" class="pjc-b pjc-right" data-pjc-mtoggle aria-expanded="false">＋ Додати</button>{% endif %}</h4>
+      {% if can_change %}
+        <div class="pjc-mform" hidden data-pjc-mform>
+          <div class="pjc-mrow">
+            <input type="date" data-f="date" value="{{ today|date:'Y-m-d' }}" aria-label="Дата">
+            <select data-f="kind" aria-label="Вид">{% for k, l in kinds %}<option value="{{ k }}"{% if k == "other" %} selected{% endif %}>{{ l }}</option>{% endfor %}</select>
+          </div>
+          <input type="text" data-f="title" maxlength="255" placeholder="Що сталося: «Клієнт погодив зразок»" aria-label="Що сталося">
+          {% if mails %}<select data-f="message" aria-label="Лист"><option value="">✉️ Лист (за бажанням)…</option>{% for m in mails %}<option value="{{ m.pk }}">{{ m.label }}</option>{% endfor %}</select>{% endif %}
+          <textarea data-f="quote" rows="2" placeholder="Цитата з листа або примітка (за бажанням)" aria-label="Цитата або примітка"></textarea>
+          <div class="pjc-mrow"><button type="button" class="pjc-b pri" data-pjc-madd>📌 Зберегти</button><span class="pjc-merr" role="alert"></span></div>
+        </div>
+      {% endif %}
+      {% if moments %}
+        <ul class="pjc-list pjc-moments">
+          {% for m in moments %}
+            <li class="pjc-m-{{ m.kind_key }}"><time>{{ m.date|date:"d.m.Y" }}</time> {{ m.icon }}
+              {% if m.url %}<a href="{{ m.url }}" target="_blank">{{ m.title }}</a>{% else %}{{ m.title }}{% endif %}
+              <span class="pjc-sub">· {{ m.kind }}</span>
+              {% if can_change %}<button type="button" class="pjc-x" data-pjc-mdel="{% url 'projects:highlight_delete' m.id %}" title="Прибрати момент" aria-label="Прибрати момент">✕</button>{% endif %}
+              {% if m.quote %}<div class="pjc-q">«{{ m.quote|truncatechars:180 }}»</div>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% if moments_total > moments|length %}<div class="pjc-sub">Усі моменти — у розділі «📌 Важливі моменти» нижче.</div>{% endif %}
+      {% else %}
+        <div class="pjc-sub">Позначайте рішення, погодження, зміни вимог і проблеми — вони стануть прапорцями на шкалі.
+          З пошти — 📌 біля проєкту в прев'ю листа, зі шкали — клік на точку листа.</div>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="pjc-card pjc-tl" aria-label="Шкала проєкту">
+    <h4>🗓 Шкала проєкту
+      <span class="pjc-ranges" role="group" aria-label="Період шкали">{% for key, label in ranges %}<button type="button" class="pjc-b{% if key == range %} on{% endif %}" data-pjc-range="{{ key }}" aria-pressed="{% if key == range %}true{% else %}false{% endif %}">{{ label }}</button>{% endfor %}</span>
+    </h4>
+    <div class="pjc-svg">{{ timeline|safe }}</div>
+    <div class="pjc-legend">
+      <span><i class="lg-dot in"></i>лист клієнта</span><span><i class="lg-dot out"></i>наш лист</span>
+      <span><i class="lg-ring"></i>чекає нашої відповіді</span>
+      <span><i class="lg-bar ok"></i>завершено</span><span><i class="lg-bar open"></i>в роботі</span>
+      <span><i class="lg-bar bad"></i>прострочено</span><span><i class="lg-bar warn"></i>затримка</span>
+      <span><i class="lg-bar plan"></i>чернетка</span>
+      <span class="pjc-hint">Наведіть на позначку — подробиці, клік — відкрити; клік на точку листа — меню з 📌.</span>
+    </div>
+  </section>
+</div>
