@@ -75,9 +75,10 @@ def attachment_bytes(account, msg, index):
     with IMAPClient(account) as imap:
         imap.select_folder(imap_folder)
         _, raw_data = imap.conn.uid('fetch', str(msg.imap_uid).encode(), '(RFC822)')
-    if not (raw_data and isinstance(raw_data[0], tuple)):
+    body = message_bytes(raw_data)
+    if body is None:
         return None
-    parts = _get_attachments_raw(email_lib.message_from_bytes(raw_data[0][1]))
+    parts = _get_attachments_raw(email_lib.message_from_bytes(body))
     if index >= len(parts):
         return None
     data = parts[index].get('_data', b'')
@@ -93,6 +94,15 @@ def attachment_bytes(account, msg, index):
     return data
 
 
+def message_bytes(raw_data):
+    """Сирий лист з відповіді IMAP FETCH: перша пара (заголовок, байти). Сервер може спершу надіслати чужу
+    відповідь (* 5 FETCH (FLAGS …) — позначку «прочитано» щойно змінили з іншого з'єднання)."""
+    for item in raw_data or []:
+        if isinstance(item, tuple) and len(item) >= 2 and isinstance(item[1], (bytes, bytearray)):
+            return bytes(item[1])
+    return None
+
+
 def fetch_documents(msg, indexes) -> dict:
     """Файли вкладень листа, яких немає на диску, — з IMAP одним запитом (лист цілком), на диск.
     → {індекс: file_path}; вкладення, чия назва не збігається (лист на сервері змінився), — пропускається.
@@ -106,9 +116,10 @@ def fetch_documents(msg, indexes) -> dict:
     with IMAPClient(account) as imap:
         imap.select_folder(imap_folder)
         _, raw_data = imap.conn.uid('fetch', str(msg.imap_uid).encode(), '(BODY.PEEK[])')
-    if not (raw_data and isinstance(raw_data[0], tuple)):
+    body = message_bytes(raw_data)
+    if body is None:
         return {}
-    parts = _get_attachments_raw(email_lib.message_from_bytes(raw_data[0][1]))
+    parts = _get_attachments_raw(email_lib.message_from_bytes(body))
     atts = msg.attachments or []
     rel_dir = _attachment_dir(account.pk, msg.imap_uid, imap_folder)
     out = {}

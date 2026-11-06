@@ -22,8 +22,13 @@ echo ""
 
 if [ $REBUILD -eq 1 ]; then
   echo "🔨 Rebuild Docker образу (requirements.txt змінився)..."
-  docker-compose build --no-cache web
+  # cron і telegram-bot — окремі образи з того самого Dockerfile: без них там лишаються старі бібліотеки
+  # (напр. немає pypdf — синхронізація пошти не читає PDF у листах)
+  docker-compose build --no-cache web cron telegram-bot
   docker-compose up -d web cron
+  if docker-compose ps --services --filter "status=running" 2>/dev/null | grep -qx telegram-bot; then
+    docker-compose up -d telegram-bot
+  fi
 else
   echo "🔄 Перезапуск web + cron (без rebuild)..."
   docker-compose restart web cron

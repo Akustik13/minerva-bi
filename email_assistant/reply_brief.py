@@ -136,10 +136,21 @@ def _attachment_path(att) -> str:
 def attachment_text(att, limit=ATTACHMENT_CHARS, path=None) -> str:
     """Текст PDF / DOCX / TXT / CSV із збереженого вкладення; '' — якщо недоступне чи інший тип.
     path — уже перевірений шлях (файл із папки «📂 Джерела знань»), інакше — file_path у MEDIA."""
+    return read_attachment_text(att, limit, path) or ''
+
+
+def read_attachment_text(att, limit=ATTACHMENT_CHARS, path=None):
+    """Як attachment_text, але розрізняє: None — файл не вдалося прочитати зараз (немає файлу, немає бібліотеки
+    в цьому контейнері, помилка читання), '' — прочитано, тексту немає (скан) або тип / розмір не читаються.
+    Кеш номерів вкладень (links.attachment_tokens) не запам'ятовує None як «номерів немає»."""
     name = (att.get('name') or '').lower()
     ext = name.rsplit('.', 1)[-1] if '.' in name else ''
+    if ext not in ATTACHMENT_TYPES:
+        return ''
     path = path if path is not None else _attachment_path(att)
-    if ext not in ATTACHMENT_TYPES or not path or os.path.getsize(path) > ATTACHMENT_MAX_MB * 1024 * 1024:
+    if not path:
+        return None
+    if os.path.getsize(path) > ATTACHMENT_MAX_MB * 1024 * 1024:
         return ''
     try:
         if ext == 'pdf':
@@ -160,7 +171,7 @@ def attachment_text(att, limit=ATTACHMENT_CHARS, path=None) -> str:
                 text = fh.read(limit * 4).decode('utf-8', errors='replace')
     except Exception as e:  # noqa: BLE001 — пошкоджений файл не зупиняє підготовку
         logger.info('reply brief: attachment %s not readable: %s', name, e)
-        return ''
+        return None
     return re.sub(r'[ \t]+', ' ', re.sub(r'\n{3,}', '\n\n', text)).strip()[:limit]
 
 

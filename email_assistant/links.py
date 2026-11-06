@@ -55,11 +55,19 @@ def _take_fetch() -> bool:
     return True
 
 
+TOKENS_VERSION = 2   # tokens_v: кеш, де невдале читання не записується як «номерів немає»
+READ_TRIES = 3       # стільки разів пробувати прочитати файл, що не читається (пошкоджений PDF), потім — ні
+
+
 def _unread(att) -> bool:
-    """Номери вкладення ще не прочитано. Порожній кеш без позначки tokens_read — теж: так раніше запам'ятовувався
-    PDF, якого синхронізація ще не зберегла (тоді номер з нього не знаходився ніколи, навіть коли файл з'являвся)."""
+    """Номери вкладення ще не прочитано. Порожній кеш без tokens_v — теж: раніше так запам'ятовувалось і невдале
+    читання (PDF ще не збережено; у контейнері синхронізації немає бібліотеки PDF) — номер не знаходився ніколи."""
     tokens = att.get('tokens')
-    return tokens is None or (not tokens and not att.get('tokens_read'))
+    if tokens:
+        return False
+    if tokens is None:
+        return int(att.get('tokens_fail') or 0) < READ_TRIES
+    return att.get('tokens_v') != TOKENS_VERSION
 
 
 def tokens_in(texts) -> set:
@@ -97,7 +105,7 @@ def attachment_tokens(msg, budget=None) -> dict:
     Файлу на диску немає — кеш не пишеться (прочитається, коли файл з'явиться); у allow_fetch — файли з IMAP.
     budget — [скільки ще вкладень можна прочитати] на весь запит (прев'ю гілки не читає десятки PDF)."""
     from email_assistant.models import EmailMessage
-    from email_assistant.reply_brief import ATTACHMENT_TYPES, _attachment_path, attachment_text
+    from email_assistant.reply_brief import ATTACHMENT_TYPES, _attachment_path, read_attachment_text
 
     raw = list(getattr(msg, 'attachments', None) or [])
     if not raw:
@@ -132,11 +140,18 @@ def attachment_tokens(msg, budget=None) -> dict:
                 if budget[0] <= 0:
                     continue
                 budget[0] -= 1
-            text = attachment_text(att, limit=ATTACHMENT_CHARS)
+            text = read_attachment_text(att, limit=ATTACHMENT_CHARS)
+            changed = True
+            if text is None:   # не прочиталось тут (пошкоджений файл, немає бібліотеки PDF) — спробувати пізніше
+                att.pop('tokens', None)
+                att.pop('tokens_read', None)
+                att['tokens_fail'] = int(att.get('tokens_fail') or 0) + 1
+                continue
             tokens = sorted(t for t in tokens_in([text])
                             if sum(ch.isdigit() for ch in t) >= ATTACHMENT_MIN_DIGITS)[:ATTACHMENT_TOKENS]
-            att['tokens'], att['tokens_read'] = tokens, True      # прочитано з файлу (і коли нічого не знайдено)
-            changed = True
+            att.pop('tokens_fail', None)
+            # прочитано з файлу (і коли нічого не знайдено)
+            att['tokens'], att['tokens_read'], att['tokens_v'] = tokens, True, TOKENS_VERSION
         for tok in tokens or []:
             out.setdefault(tok, att.get('name') or '')
     if changed and getattr(msg, 'pk', None):

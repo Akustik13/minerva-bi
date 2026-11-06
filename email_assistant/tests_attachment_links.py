@@ -6,6 +6,7 @@
 python manage.py test email_assistant.tests_attachment_links --settings=tabele.settings_test
 """
 import io
+import sys
 import os
 import shutil
 import tempfile
@@ -15,6 +16,7 @@ from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import StringIO
+from unittest import mock
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -140,7 +142,8 @@ class AttachmentLinkTests(TestCase):
         msg = self._abd(bad)
         self.assertFalse(CustomerTimeline.objects.filter(email_message=msg).exists())
         msg.refresh_from_db()
-        self.assertEqual(msg.attachments[0]['tokens'], [])
+        self.assertNotIn('tokens', msg.attachments[0])                 # невдача — не «номерів немає»
+        self.assertEqual(msg.attachments[0]['tokens_fail'], 1)
 
 
 # ── Синхронізація зберегла лист без PDF (cron sync_email): номер з вкладення не знаходився ніколи ─────────────
@@ -312,3 +315,68 @@ class SyncSavesDocumentsTests(AttachmentLinkTests.__bases__[0]):
         self.assertFalse(any(a.get('_data') for a in plain))
         with patch.object(imap_client, 'KEEP_DOCUMENT_MB', 0):
             self.assertFalse(client.fetch_messages('INBOX', keep_documents=True)[0]['attachments'][0].get('_data'))
+
+
+class ReadFailureTests(AttachmentLinkTests.__bases__[0]):
+    """Сервер 06.11: PDF лежить на диску й читається, але в листі «прочитано, номерів немає» (tokens [] +
+    tokens_read) — лист зберігав контейнер синхронізації без бібліотеки PDF, і невдача записувалась як порожньо."""
+
+    setUp = AttachmentLinkTests.setUp
+    _order = AttachmentLinkTests._order
+    _file = AttachmentLinkTests._file
+    _abd = AttachmentLinkTests._abd
+    _abd_pdf = AttachmentLinkTests._abd_pdf
+
+    def test_sync_without_pdf_library_is_read_later(self):
+        from email_assistant.links import find_links
+        with mock.patch.dict(sys.modules, {'pypdf': None}):            # як у старому образі cron
+            msg = self._abd(self._abd_pdf('102497269'))
+        self.assertFalse(CustomerTimeline.objects.filter(email_message=msg).exists())
+        msg.refresh_from_db()
+        self.assertNotIn('tokens', msg.attachments[0])
+        self.assertEqual(msg.attachments[0]['tokens_fail'], 1)
+        links = find_links([msg.subject], messages=[msg])               # прев'ю у web — бібліотека є
+        self.assertEqual([lk['order'] for lk in links], [self.order])
+        ev = CustomerTimeline.objects.get(email_message=msg)
+        self.assertEqual((ev.customer, ev.related_order_id), (self.diwakar, self.order.pk))
+        msg.refresh_from_db()
+        att = msg.attachments[0]
+        self.assertIn('102497269', att['tokens'])
+        self.assertNotIn('tokens_fail', att)
+        self.assertEqual(att['tokens_v'], 2)
+
+    def test_server_state_of_06_11_is_reread(self):
+        """Файл є, а в листі старий порожній кеш tokens [] + tokens_read без tokens_v."""
+        from email_assistant.links import find_links
+        att = self._abd_pdf('102497269')
+        msg = self._abd({'name': att['name'], 'size': att['size'], 'content_type': 'application/octet-stream'})
+        EmailMessage.objects.filter(pk=msg.pk).update(attachments=[{**att, 'tokens': [], 'tokens_read': True,
+                                                                    'content_type': 'application/octet-stream'}])
+        msg.refresh_from_db()
+        links = find_links([msg.subject], messages=[msg])
+        self.assertEqual([lk['order'] for lk in links], [self.order])
+        self.assertEqual(CustomerTimeline.objects.get(email_message=msg).related_order_id, self.order.pk)
+
+    def test_broken_file_is_tried_a_few_times_only(self):
+        from email_assistant import links
+        msg = self._abd(self._file('broken.pdf', b'%PDF-1.4 not really'))   # сигнал — 1-ша спроба
+        for _ in range(5):
+            msg.refresh_from_db()
+            links.attachment_tokens(msg)
+        msg.refresh_from_db()
+        self.assertEqual(msg.attachments[0]['tokens_fail'], links.READ_TRIES)
+
+    def test_imap_answer_with_a_flags_update_first(self):
+        """Сервер спершу шле «* 7 FETCH (FLAGS (\\Seen))» (лист щойно позначили прочитаним в іншому з'єднанні)."""
+        from email_assistant.links import PREVIEW_FETCH, allow_fetch, attachment_tokens
+
+        class FlagsFirst(FakeConn):
+            def uid(self, cmd, *args):
+                typ, data = super().uid(cmd, *args)
+                return (typ, [b'7 (FLAGS (\\Seen))'] + data) if cmd == 'fetch' else (typ, data)
+
+        msg = self._abd({'name': PDF_NAME, 'size': 1000, 'content_type': 'application/pdf'})
+        conn = FlagsFirst({7: avm_raw(pdf_bytes('Referenznummer/UCR [12 08] 102497269'))})
+        with mock.patch('email_assistant.imap_client.IMAPClient', FakeIMAPClient(conn)), allow_fetch(PREVIEW_FETCH):
+            tokens = attachment_tokens(msg)
+        self.assertIn('102497269', tokens)
