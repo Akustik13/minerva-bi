@@ -67,7 +67,7 @@ def _get_app_list(self, request, app_label=None):
         'strategy': ['aisettings', 'strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
         'ai_assistant':    ['aiconversation', 'aibudgetlog'],
         'rag_assistant':   ['ragsettings', 'ragconversation', 'knowledgesettings', 'knowledgesource', 'knowledgeitem', 'knowledgedoc'],
-        'projects':        ['project', 'projecttemplate', 'dismissedthread'],
+        'projects':        ['project', 'projectrisk', 'projecttemplate', 'projectsettings', 'dismissedthread'],
         'offers':          ['offer', 'offersettings', 'offerrevision'],
         'worktime':        ['workday', 'danteproject', 'workreport', 'danteuser', 'booking', 'dantesettings'],
         'email_assistant': ['emailaccount', 'emailsettings', 'mailcategory', 'emailmessage', 'emailthread'],

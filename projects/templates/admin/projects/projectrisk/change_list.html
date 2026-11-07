@@ -1,0 +1,51 @@
+{% extends "admin/change_list.html" %}
+{# ⚠️ Ризики всіх проєктів (ProjectRiskAdmin): матриця 3 × 3 за поточними фільтрами над списком #}
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .pjrm { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: flex-start; margin: 4px 0 14px; }
+  .pjrm-grid { display: grid; gap: 3px; min-width: 300px; }
+  .pjrm-row { display: grid; grid-template-columns: 20px repeat(3, 1fr); gap: 3px; }
+  .pjrm-axis { font-size: 11px; color: var(--text-muted, #9aafbe); text-align: center; align-self: center; }
+  .pjrm-cap { font-size: 11px; color: var(--text-muted, #9aafbe); }
+  .pjrm-cell { min-height: 48px; border-radius: 6px; padding: 4px; display: flex; flex-wrap: wrap; gap: 3px; align-content: flex-start; }
+  .pjrm-green { background: color-mix(in srgb, var(--ok, #3fb950) 18%, transparent); }
+  .pjrm-yellow { background: color-mix(in srgb, var(--warn, #e3b341) 24%, transparent); }
+  .pjrm-red { background: color-mix(in srgb, var(--err, #f85149) 24%, transparent); }
+  .pjrm-n { font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px; text-decoration: none;
+            border: 1px solid var(--border-strong, #2a3f52); background: var(--bg-card, var(--body-bg, #fff)); }
+  .pjrm-help { max-width: 460px; font-size: 12.5px; color: var(--text-muted, #9aafbe); line-height: 1.5; }
+  .pjr-score { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 6px; font-weight: 700; text-align: center; }
+  .pjr-red { background: color-mix(in srgb, var(--err, #f85149) 28%, transparent); }
+  .pjr-yellow { background: color-mix(in srgb, var(--warn, #e3b341) 30%, transparent); }
+  .pjr-green { background: color-mix(in srgb, var(--ok, #3fb950) 22%, transparent); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if risk_matrix %}
+<div class="pjrm">
+  <div class="pjrm-grid" aria-label="Матриця ризиків: ймовірність × вплив">
+    <div class="pjrm-cap">ймовірність ↑</div>
+    {% for row in risk_matrix %}
+      <div class="pjrm-row"><span class="pjrm-axis">{{ row.p }}</span>
+        {% for cell in row.cells %}
+          <div class="pjrm-cell pjrm-{{ cell.level }}" title="ймовірність {{ row.p }} × вплив {{ cell.i }} = {{ cell.score }}">
+            {% for it in cell.items %}<a class="pjrm-n" href="{% url 'admin:projects_projectrisk_change' it.risk.pk %}" title="{{ it.risk.project.code }} · {{ it.risk.title }}">#{{ it.risk.pk }}</a>{% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    <div class="pjrm-row"><span></span><span class="pjrm-axis">1</span><span class="pjrm-axis">2</span><span class="pjrm-axis">3</span></div>
+    <div class="pjrm-cap" style="text-align:center;padding-left:22px">вплив на строк і гроші →</div>
+  </div>
+  <div class="pjrm-help">
+    <p>Бал = ймовірність × вплив (1–3): до 2 — 🟢, 3–4 — 🟡, від 6 — 🔴. Матриця — за фільтрами праворуч.</p>
+    <p>⚙️ Правила відкривають і закривають ризики самі: прогноз пізніше строку клієнту, віха критичного шляху зсунулась,
+      залежність від іншого проєкту, спільного товару бракує, чекаємо клієнта чи постачальника понад план, закупівля
+      прострочена. Закритий людиною ризик правило вже не відкриває.</p>
+  </div>
+</div>
+{% endif %}
+{{ block.super }}
+{% endblock %}

@@ -248,14 +248,64 @@ def scan_view(request, pk):
 # ── 📅 План (projects/plan.py, schedule.py) ──────────────────────────────────
 
 def _plan_action(request, pk, fn):
-    """Дія плану: право змінювати проєкт; помилка плану → 400 з поясненням; успіх → свіжий пульт."""
-    from . import plan
+    """Дія плану, ризику чи статусу: право змінювати проєкт; помилка даних (PlanError, RiskError, ValueError) →
+    400 з поясненням; успіх → свіжий пульт."""
     project = _project_for_change(request, pk)
     try:
         notice = fn(project, _body(request))
-    except plan.PlanError as e:
+    except ValueError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=400)
     return _cockpit(request, project, notice)
+
+
+# ── ⚠️ Ризики й 📝 тижневий статус (projects/risks.py, risk_rules.py, health.py) ─────────────
+
+@staff_member_required
+@require_POST
+def risk_view(request, pk):
+    """Створити / змінити ризик: {id, title, description, category, probability, impact, owner, mitigation, status,
+    review_on, steps, message, quote} — message лише з власної скриньки (ризик з листа)."""
+    from . import risks
+
+    def run(project, body):
+        message = None
+        if str(body.get("message") or "").isdigit() and not body.get("id"):
+            message = _own_message(request, int(body["message"]))
+            if message is None:
+                raise risks.RiskError("Лист не знайдено у ваших скриньках")
+        r = risks.save(project, body, user=request.user, message=message)
+        return f"⚠️ Ризик збережено: {r.title}"
+    return _plan_action(request, pk, run)
+
+
+@staff_member_required
+@require_POST
+def risk_delete_view(request, pk, rid):
+    from . import risks
+    return _plan_action(request, pk, lambda project, body: "⚠️ Ризик видалено" if risks.delete(project, rid)
+                        else "Ризик уже видалено")
+
+
+@staff_member_required
+@require_POST
+def status_view(request, pk):
+    """📝 Тижневий статус: {health on_track | at_risk | off_track, text, ai} — зі знімком плану й ризиків."""
+    from . import health
+
+    def run(project, body):
+        u = health.save(project, request.user, body.get("health"), body.get("text"), ai=bool(body.get("ai")))
+        return f"📝 Статус збережено: {u.get_health_display()}"
+    return _plan_action(request, pk, run)
+
+
+@staff_member_required
+@require_POST
+def status_draft_view(request, pk):
+    """🧠 AI-чернетка тижневого статусу (Claude Haiku 5.5, бюджет AI) → {ok, text, error} — нічого не зберігає."""
+    from . import health
+    project = _project_for_change(request, pk)
+    text, error = health.ai_draft(project, request.user)
+    return JsonResponse({"ok": bool(text), "text": text, "error": error})
 
 
 @staff_member_required

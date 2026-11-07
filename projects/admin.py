@@ -11,7 +11,8 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
 from . import services
-from .models import DismissedThread, Project, ProjectHighlight, ProjectLink, ProjectParticipant, ProjectTemplate
+from .models import (DismissedThread, Project, ProjectHighlight, ProjectLink, ProjectParticipant, ProjectRisk,
+                     ProjectSettings, ProjectTemplate)
 
 logger = logging.getLogger(__name__)
 
@@ -523,6 +524,233 @@ class ProjectTemplateAdmin(admin.ModelAdmin):
         if not change and not obj.created_by_id:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+
+
+# ── ⚠️ Реєстр ризиків усіх проєктів, ⚙️ налаштування проєктів ─────────────────────────────
+
+class RiskStateFilter(admin.SimpleListFilter):
+    """Стан ризику; без вибору — відкриті й ті, за якими стежимо (закриті — окремо)."""
+    title = "станом"
+    parameter_name = "state"
+    LIVE = "live"
+
+    def lookups(self, request, model_admin):
+        return [(self.LIVE, "⚠️ Відкриті й «стежимо»"), ("open", "⚠️ Відкриті"), ("watch", "👀 Стежимо"),
+                ("closed", "✓ Закриті"), ("all", "Усі")]
+
+    def value(self):
+        return super().value() or self.LIVE
+
+    def choices(self, changelist):
+        for key, label in self.lookup_choices:
+            yield {"selected": self.value() == key, "display": label,
+                   "query_string": changelist.get_query_string({self.parameter_name: key})}
+
+    def queryset(self, request, queryset):
+        from .models import ProjectRisk
+        v = self.value()
+        if v == self.LIVE:
+            return queryset.exclude(status=ProjectRisk.CLOSED)
+        if v in dict(ProjectRisk.STATUS_CHOICES):
+            return queryset.filter(status=v)
+        return queryset
+
+
+class RiskLevelFilter(admin.SimpleListFilter):
+    title = "балом"
+    parameter_name = "level"
+
+    def lookups(self, request, model_admin):
+        return [("red", "🔴 від 6"), ("yellow", "🟡 3–4"), ("green", "🟢 до 2")]
+
+    def queryset(self, request, queryset):
+        from django.db.models import F
+        qs = queryset.annotate(_score=F("probability") * F("impact"))
+        return {"red": qs.filter(_score__gte=6), "yellow": qs.filter(_score__gte=3, _score__lt=6),
+                "green": qs.filter(_score__lt=3)}.get(self.value(), queryset)
+
+
+@admin.register(ProjectRisk)
+class ProjectRiskAdmin(admin.ModelAdmin):
+    """⚠️ Ризики всіх проєктів: матриця 3 × 3 над списком (за поточними фільтрами), реєстр — власник, заходи, дата
+    перегляду. Ризики правил (projects/risk_rules.py) видаляти не можна — лише закрити; назву й підставу пише правило."""
+    change_list_template = "admin/projects/projectrisk/change_list.html"
+    list_display = ("number", "score_col", "title_col", "project_col", "source_col", "owner", "review_col", "status")
+    list_display_links = ("number", "title_col")
+    list_filter = (RiskStateFilter, RiskLevelFilter, "source", "category", "owner")
+    search_fields = ("title", "mitigation", "description", "project__code", "project__name")
+    list_select_related = ("project", "owner")
+    autocomplete_fields = ("project",)
+    actions = ["close_selected", "watch_selected", "reopen_selected"]
+    fieldsets = (
+        (None, {"fields": ("project", "title", "description", ("category", "status"), ("probability", "impact"),
+                           "owner", "mitigation", "review_on", "steps")}),
+        ("Звідки", {"fields": ("source", "rule_key", "evidence", "message", "opened_at", "closed_at", "closed_auto",
+                               "edited", "created_by", "updated_at")}),
+    )
+    readonly_fields = ("source", "rule_key", "evidence", "message", "opened_at", "closed_at", "closed_auto", "edited",
+                       "created_by", "updated_at")
+
+    def get_queryset(self, request):
+        from django.db.models import F
+        return super().get_queryset(request).annotate(_score=F("probability") * F("impact"))
+
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.source == ProjectRisk.RULE:
+            ro += ["project", "title", "description"]
+        return ro
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        steps = form.base_fields.get("steps")
+        if steps is not None:
+            from .models import ProjectStep
+            steps.queryset = (ProjectStep.objects.filter(project=obj.project) if obj is not None
+                              else ProjectStep.objects.none())
+            steps.help_text = "Кроки цього проєкту (з’являться після збереження)" if obj is None else ""
+        return form
+
+    def save_model(self, request, obj, form, change):
+        from . import risks
+        if change:
+            old = ProjectRisk.objects.get(pk=obj.pk)
+            if obj.source == ProjectRisk.RULE and (old.probability, old.impact) != (obj.probability, obj.impact):
+                obj.edited = True
+            new_status, obj.status = obj.status, old.status
+            risks.set_status(obj, new_status)
+        else:
+            obj.created_by = request.user
+            obj.source = ProjectRisk.MANUAL
+            obj.owner = obj.owner or obj.project.owner
+        super().save_model(request, obj, form, change)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.source == ProjectRisk.RULE:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
+
+    def changelist_view(self, request, extra_context=None):
+        response = super().changelist_view(request, extra_context)
+        try:
+            cl = response.context_data["cl"]
+        except (AttributeError, KeyError, TypeError):
+            return response
+        from . import risk_rules
+        risks = sorted(cl.queryset.select_related("project")[:500], key=lambda r: (-r.score, r.pk))
+        response.context_data["risk_matrix"] = risk_rules.matrix(risks)
+        response.context_data["risk_numbers"] = {r.pk: n for n, r in enumerate(risks, 1)}
+        return response
+
+    def _set_status(self, request, queryset, status, text):
+        from . import risks
+        n = 0
+        for r in queryset:
+            risks.set_status(r, status)
+            r.save()
+            n += 1
+        self.message_user(request, f"{text}: {n}")
+
+    @admin.action(description="✓ Закрити вибрані", permissions=["change"])
+    def close_selected(self, request, queryset):
+        self._set_status(request, queryset, ProjectRisk.CLOSED, "Закрито")
+
+    @admin.action(description="👀 Стежимо", permissions=["change"])
+    def watch_selected(self, request, queryset):
+        self._set_status(request, queryset, ProjectRisk.WATCH, "Стежимо")
+
+    @admin.action(description="⚠️ Відкрити знову", permissions=["change"])
+    def reopen_selected(self, request, queryset):
+        self._set_status(request, queryset, ProjectRisk.OPEN, "Відкрито знову")
+
+    @admin.display(description="№", ordering="pk")
+    def number(self, obj):
+        return f"#{obj.pk}"
+
+    @admin.display(description="Бал", ordering="_score")
+    def score_col(self, obj):
+        return format_html('<span class="pjr-score pjr-{}" title="ймовірність {} × вплив {}">{}</span>', obj.level,
+                           obj.probability, obj.impact, obj.score)
+
+    @admin.display(description="Ризик", ordering="title")
+    def title_col(self, obj):
+        mitig = format_html('<div style="opacity:.75;font-size:12px">➡️ {}</div>', obj.mitigation[:140]) \
+            if obj.mitigation else ""
+        return format_html('<span translate="no">{}</span>{}', obj.title, mitig)
+
+    @admin.display(description="Проєкт", ordering="project__code")
+    def project_col(self, obj):
+        return format_html('<a href="{}#pj-risks" translate="no">{}</a>',
+                           reverse("admin:projects_project_change", args=[obj.project_id]), obj.project.code)
+
+    @admin.display(description="Звідки", ordering="source")
+    def source_col(self, obj):
+        from .risk_rules import rule_name
+        rule = rule_name(obj.rule_key)
+        return f"{obj.get_source_display()}" + (f" «{rule}»" if rule else "")
+
+    @admin.display(description="Переглянути", ordering="review_on")
+    def review_col(self, obj):
+        if not obj.review_on:
+            return "—"
+        late = obj.is_open and obj.review_on < timezone.localdate()
+        return format_html('<span style="{}">{}</span>', "color:var(--err,#f85149);font-weight:600" if late else "",
+                           obj.review_on.strftime("%d.%m.%Y"))
+
+
+@admin.register(ProjectSettings)
+class ProjectSettingsAdmin(admin.ModelAdmin):
+    """⚙️ Налаштування проєктів (один запис): тижневий звіт відповідальним (projects/weekly.py), історія кольорів,
+    нагадування про статус. «▶ Надіслати зараз» / «📨 Лише мені» — POST, право змінювати налаштування."""
+    change_form_template = "admin/projects/projectsettings/change_form.html"
+    fieldsets = (
+        ("📨 Щотижневий звіт відповідальним", {
+            "fields": ("weekly_enabled", ("weekday", "hour"), ("send_email", "send_telegram")),
+            "description": "Кожному відповідальному — його відкриті проєкти: колір і причина, фаза, прогноз проти "
+                           "строку клієнту, нові й закриті ризики, коли оновлювали статус, кроки наступного тижня. "
+                           "Лист — через SMTP «Налаштування → Сповіщення» (не задано — скринька людини), Telegram — "
+                           "якщо в профілі є Telegram ID."}),
+        ("📝 Тижневий статус і історія", {"fields": ("auto_snapshot", "stale_days")}),
+        ("Стан", {"fields": ("last_run_at", "last_result")}),
+    )
+    readonly_fields = ("last_run_at", "last_result")
+
+    def has_add_permission(self, request):
+        return not ProjectSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        obj = ProjectSettings.get()
+        return redirect(reverse("admin:projects_projectsettings_change", args=[obj.pk]))
+
+    def get_urls(self):
+        return [path("send-now/", self.admin_site.admin_view(self.send_now_view), name="projects_projectsettings_send")] \
+            + super().get_urls()
+
+    def send_now_view(self, request):
+        """▶ Надіслати звіт зараз усім (who=all) або лише собі (who=me) — незалежно від розкладу."""
+        from . import weekly
+        back = reverse("admin:projects_projectsettings_change", args=[ProjectSettings.get().pk])
+        if request.method != "POST" or not self.has_change_permission(request):
+            messages.error(request, "Немає права надсилати звіт")
+            return redirect(back)
+        if request.POST.get("who") == "me":
+            out = weekly.run(only=request.user)
+            if not out["people"]:
+                messages.info(request, "У вас немає відкритих проєктів, де ви відповідальний — звіту немає.")
+            else:
+                messages.success(request, f"📨 Звіт надіслано собі: {out['result']}")
+        else:
+            out = weekly.run()
+            messages.success(request, f"📨 {out['result']}")
+        return redirect(back)
 
 
 @admin.register(DismissedThread)

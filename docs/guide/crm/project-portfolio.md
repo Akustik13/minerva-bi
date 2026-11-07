@@ -6,7 +6,7 @@ where: 📁 Проєкти → 📊 Портфель
 urls: /admin/projects/project/portfolio/, /admin/projects/project/
 roles: адміністратор, менеджер
 keywords: портфель, портфель проєктів, усі проєкти, дошка фаз, канбан проєктів, карта зв'язків, впливи, перехресні впливи, залежність між проєктами, спільний товар, спільний постачальник, навантаження, перевантаження, кого зачепить затримка, проєкти клієнта, проєкти постачальника, Portfolio, Projektübersicht, Abhängigkeiten
-related: crm/projects, crm/project-cockpit, crm/project-plan, crm/project-overview, start/side-panel, inventory/purchases
+related: crm/projects, crm/project-cockpit, crm/project-plan, crm/project-risks, crm/project-overview, start/side-panel, inventory/purchases
 ---
 
 ## Що це

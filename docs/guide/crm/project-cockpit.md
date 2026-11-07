@@ -6,7 +6,7 @@ where: 📁 Проєкти → Усі проєкти → проєкт → «🧭
 urls: /admin/projects/project/
 roles: адміністратор, менеджер
 keywords: пульт проєкту, шкала проєкту, timeline, таймлайн, хронологія, важливий момент, моменти, 📌, ризики, що зараз, закупівля проєкту, JLC проєкту, відправлення проєкту, товари проєкту, строк клієнту, старт проєкту, стан проєкту, Projektübersicht, project cockpit
-related: crm/project-plan, crm/projects, crm/project-overview, crm/project-triage, inventory/purchases, shipping/shipments, worktime/projects
+related: crm/project-plan, crm/project-risks, crm/projects, crm/project-overview, crm/project-triage, inventory/purchases, shipping/shipments, worktime/projects
 ---
 
 ## Що це
@@ -20,7 +20,9 @@ related: crm/project-plan, crm/projects, crm/project-overview, crm/project-triag
 - **«📌 Важливі моменти»** — рішення, погодження, зміни вимог, проблеми, які ви позначили;
 - **«🗓 Шкала проєкту»** — усе, що відбувалось і що заплановано, на одній осі часу;
 - **«📅 План»** (друга вкладка поруч зі шкалою) — фази, кроки, віхи й діаграма Ганта з прогнозом і
-  критичним шляхом, див. [План проєкту](guide:crm/project-plan).
+  критичним шляхом, див. [План проєкту](guide:crm/project-plan);
+- **«⚠️ Ризики»** і **«📝 Статус»** — матриця й реєстр ризиків, тижневий статус з історією, див.
+  [Ризики й тижневий статус](guide:crm/project-risks).
 
 Пульт оновлюється без перезавантаження сторінки: незбережені зміни в полях проєкту нижче не пропадають.
 

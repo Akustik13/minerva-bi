@@ -215,6 +215,57 @@
   .pjp-auto[hidden], .pjp-dlg [data-only][hidden] { display: none; }
   .pjp-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
   @media (max-width: 640px) { .pjp-grid { grid-template-columns: 1fr; } .pjp-wide2 { grid-column: auto; } }
+
+  /* ⚠️ Ризики: матриця 3 × 3 і реєстр; 📝 статус */
+  .pjc-st { font: inherit; font-size: 12px; padding: 1px 9px; border-radius: 999px; cursor: pointer; background: none;
+            border: 1px solid currentColor; color: var(--text, var(--body-fg)); }
+  .pjc-st-on_track { color: var(--ok, #3fb950); }
+  .pjc-st-at_risk { color: var(--warn, #e3b341); }
+  .pjc-st-off_track { color: var(--err, #f85149); }
+  .pjr { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .pjr { grid-template-columns: 1fr; } }
+  .pjr-matrix { display: grid; gap: 3px; }
+  .pjr-cap { font-size: 11px; color: var(--text-muted, #9aafbe); }
+  .pjr-xcap { text-align: center; padding-left: 22px; }
+  .pjr-row { display: grid; grid-template-columns: 18px repeat(3, 1fr); gap: 3px; align-items: stretch; }
+  .pjr-axis, .pjr-xaxis span { font-size: 11px; color: var(--text-muted, #9aafbe); text-align: center; align-self: center; }
+  .pjr-cell { min-height: 54px; border-radius: 6px; padding: 4px; display: flex; flex-wrap: wrap; gap: 3px;
+              align-content: flex-start; }
+  .pjr-green { background: color-mix(in srgb, var(--ok, #3fb950) 18%, transparent); }
+  .pjr-yellow { background: color-mix(in srgb, var(--warn, #e3b341) 24%, transparent); }
+  .pjr-red { background: color-mix(in srgb, var(--err, #f85149) 24%, transparent); }
+  .pjr-n { font: inherit; font-size: 11px; font-weight: 700; min-width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+           border: 1px solid var(--border-strong, #2a3f52); background: var(--bg-card, var(--body-bg, #fff));
+           color: var(--text, var(--body-fg)); }
+  .pjr-t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .pjr-t th { text-align: left; font-size: 11px; color: var(--text-muted, #9aafbe); padding: 3px 8px 5px 0; background: none;
+              border-bottom: 1px solid var(--border-strong, #2a3f52); text-transform: none; }
+  .pjr-t td { padding: 5px 8px 5px 0; border-bottom: 1px solid var(--hairline-color, rgba(127,127,127,.18)); vertical-align: top; }
+  .pjr-t tr[data-pjc-risk] { cursor: pointer; }
+  .pjr-t tr[data-pjc-risk]:hover td, .pjr-t tr[data-pjc-risk]:focus td { background: var(--accent2-hover, rgba(127,127,127,.08)); }
+  .pjr-score { display: inline-block; min-width: 22px; padding: 0 6px; border-radius: 6px; font-weight: 700; text-align: center;
+               color: var(--text, var(--body-fg)); }
+  .pjr-closed { margin-top: 8px; font-size: 12.5px; }
+  .pjr-closed summary { cursor: pointer; color: var(--text-muted, #9aafbe); }
+  .pjr-link { cursor: pointer; }
+  .pjs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .pjs { grid-template-columns: 1fr; } }
+  .pjs-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; margin-bottom: 6px; }
+  .pjs-h.pjs-on_track { color: var(--ok, #3fb950); }
+  .pjs-h.pjs-at_risk { color: var(--warn, #e3b341); }
+  .pjs-h.pjs-off_track { color: var(--err, #f85149); }
+  .pjs-text { line-height: 1.5; padding: 7px 10px; border-left: 3px solid var(--border-strong, #2a3f52); white-space: normal; }
+  .pjs-hist { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 10px; }
+  .pjs-dot { display: inline-block; width: 18px; height: 18px; border-radius: 4px; }
+  .pjs-dot.pjs-on_track { background: var(--ok, #3fb950); }
+  .pjs-dot.pjs-at_risk { background: var(--warn, #e3b341); }
+  .pjs-dot.pjs-off_track { background: var(--err, #f85149); }
+  .pjs-dot.pjs-auto { opacity: .45; }
+  .pjs-form { display: grid; gap: 7px; }
+  .pjs-form textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; }
+  .pjs-c.on.pjs-on_track { background: var(--ok, #3fb950); border-color: var(--ok, #3fb950); }
+  .pjs-c.on.pjs-at_risk { background: var(--warn, #e3b341); border-color: var(--warn, #e3b341); }
+  .pjs-c.on.pjs-off_track { background: var(--err, #f85149); border-color: var(--err, #f85149); }
 </style>
 {% endblock %}
 
@@ -246,12 +297,15 @@
     return false;
   }
 
-  // ── Вкладки «🗓 Шкала» / «📅 План»: #pj-plan в адресі → план, інакше — як востаннє ──
+  // ── Вкладки «🗓 Шкала» / «📅 План» / «⚠️ Ризики» / «📝 Статус»: #pj-plan, #pj-risks, #pj-status в адресі → ця
+  // вкладка, інакше — як востаннє ──
+  var TABS = ['timeline', 'plan', 'risks', 'status'];
+  var HASH = {'#pj-plan': 'plan', '#pj-risks': 'risks', '#pj-status': 'status'};
   function firstTab() {
-    if (location.hash === '#pj-plan') return 'plan';
+    if (HASH[location.hash]) return HASH[location.hash];
     var saved = '';
     try { saved = localStorage.getItem(TAB) || ''; } catch (e) { saved = ''; }
-    if (saved === 'plan' || saved === 'timeline') return saved;
+    if (TABS.indexOf(saved) >= 0) return saved;
     var b = box();
     return b && b.dataset.hasPlan ? 'plan' : 'timeline';
   }
@@ -259,7 +313,7 @@
     var b = box();
     if (!b) return;
     curTab = key || firstTab();
-    b.querySelectorAll('[data-pjc-tab]').forEach(function (t) {
+    b.querySelectorAll('.pjc-tab[data-pjc-tab]').forEach(function (t) {
       var on = t.dataset.pjcTab === curTab;
       t.classList.toggle('on', on);
       t.setAttribute('aria-selected', on ? 'true' : 'false');
@@ -267,7 +321,7 @@
     b.querySelectorAll('[data-pjc-pane]').forEach(function (p) { p.hidden = p.dataset.pjcPane !== curTab; });
   }
   applyTab();
-  window.addEventListener('hashchange', function () { if (location.hash === '#pj-plan') applyTab('plan'); });
+  window.addEventListener('hashchange', function () { if (HASH[location.hash]) applyTab(HASH[location.hash]); });
 
   // ── 📅 Вікна кроку й фази: у <body>, поза формою картки (Enter не надсилає форму проєкту) ──
   function planData() {
@@ -338,9 +392,13 @@
     var tpl = document.getElementById('pjp-dialogs');
     if (!tpl) return null;
     document.body.appendChild(tpl.content.cloneNode(true));
-    dlg = {step: document.getElementById('pjp-step'), phase: document.getElementById('pjp-phase')};
+    dlg = {step: document.getElementById('pjp-step'), phase: document.getElementById('pjp-phase'),
+           risk: document.getElementById('pjr-risk')};
     wire(dlg.step, saveStep, deleteStep);
     wire(dlg.phase, savePhase, deletePhase);
+    wire(dlg.risk, saveRisk, deleteRisk);
+    q(dlg.risk, 'data-r', 'probability').addEventListener('change', riskScore);
+    q(dlg.risk, 'data-r', 'impact').addEventListener('change', riskScore);
     q(dlg.step, 'data-s', 'kind').addEventListener('change', syncStep);
     q(dlg.step, 'data-s', 'side').addEventListener('change', syncStep);
     // ⛓ кроки інших проєктів: пошук за кодом проєкту чи назвою кроку
@@ -572,17 +630,143 @@
     else openPhase(t.dataset.phase || t.dataset.pjcPhase);
   }
 
+  // ── ⚠️ Вікно ризику (те саме перенесення в <body>, що й вікна кроку) ──
+  function riskData() {
+    var n = root.querySelector('#pjr-data'), d = null;
+    if (n) { try { d = JSON.parse(n.textContent); } catch (e) { d = null; } }
+    d = d || {};
+    ['risks', 'users', 'steps', 'categories', 'statuses', 'probabilities', 'impacts'].forEach(function (k) {
+      d[k] = d[k] || [];
+    });
+    return d;
+  }
+  function riskScore() {
+    var d = dlg.risk, p = +q(d, 'data-r', 'probability').value || 0, i = +q(d, 'data-r', 'impact').value || 0;
+    var s = p * i, b = d.querySelector('[data-r-score]');
+    b.textContent = 'бал ' + s;
+    b.className = 'pjr-score pjr-' + (s >= 6 ? 'red' : (s >= 3 ? 'yellow' : 'green'));
+  }
+  function openRisk(id) {
+    var ds = dialogs();
+    if (!ds) return;
+    var d = ds.risk, data = riskData(), r = null;
+    data.risks.forEach(function (x) { if (String(x.id) === String(id)) r = x; });
+    var isNew = !r, f = function (k) { return q(d, 'data-r', k); };
+    r = r || {id: '', title: '', description: '', category: 'schedule', probability: 2, impact: 2, owner: data.owner,
+              mitigation: '', status: 'open', review_on: data.review || '', source: 'manual', evidence: '', rule: '',
+              steps: []};
+    var rule = r.source === 'rule';
+    d.dataset.id = r.id;
+    f('title').value = r.title;
+    f('title').readOnly = rule;
+    f('description').value = r.description || '';
+    fillSelect(f('category'), data.categories, r.category);
+    fillSelect(f('probability'), data.probabilities, r.probability);
+    fillSelect(f('impact'), data.impacts, r.impact);
+    fillSelect(f('owner'), data.users.map(function (u) { return [u.id, u.label]; }), r.owner, '— без власника');
+    fillSelect(f('status'), data.statuses, r.status);
+    f('review_on').value = r.review_on || '';
+    f('mitigation').value = r.mitigation || '';
+    fillChecks(q(d, 'data-r-list', 'steps'), data.steps, r.steps);
+    var ev = d.querySelector('[data-r-evidence]');
+    ev.textContent = rule ? '⚙️ ' + (r.evidence || ('Правило «' + r.rule + '»')) + ' · '
+      + 'Ризик відкрило правило — закриється сам, коли умова зникне.' : (r.evidence || '');
+    ev.hidden = !ev.textContent;
+    d.querySelector('[data-r-desc]').hidden = rule;
+    d.querySelector('[data-pjp-del]').hidden = isNew || rule;
+    d.querySelector('[data-pjp-err]').textContent = '';
+    d.querySelector('h3').textContent = isNew ? '⚠️ Новий ризик' : '⚠️ Ризик';
+    riskScore();
+    d.showModal();
+    (rule ? f('mitigation') : f('title')).focus();
+  }
+  function saveRisk() {
+    var d = dlg.risk, f = function (k) { return q(d, 'data-r', k); };
+    var body = {id: d.dataset.id || '', title: f('title').value, description: f('description').value,
+                category: f('category').value, probability: f('probability').value, impact: f('impact').value,
+                owner: f('owner').value, status: f('status').value, review_on: f('review_on').value,
+                mitigation: f('mitigation').value, steps: picked(q(d, 'data-r-list', 'steps'))};
+    if (!body.title.trim()) { d.querySelector('[data-pjp-err]').textContent = 'Напишіть, що може статися'; f('title').focus(); return; }
+    post(d, box().dataset.risk, body);
+  }
+  function deleteRisk() {
+    var d = dlg.risk;
+    if (!d.dataset.id) return;
+    if (!confirm('Видалити ризик «' + q(d, 'data-r', 'title').value + '»?')) return;
+    post(d, box().dataset.risk + d.dataset.id + '/delete/', {});
+  }
+
+  // ── 📝 Тижневий статус ──
+  function statusBox() { return root.querySelector('.pjs-form'); }
+  function statusErr(text) {
+    var n = root.querySelector('[data-pjs-err]');
+    if (n) n.textContent = text || '';
+  }
+  function saveStatus(btn) {
+    var f = statusBox();
+    if (!f) return;
+    var on = f.querySelector('[data-pjs-health].on'), text = f.querySelector('[data-pjs-text]');
+    if (!on) { statusErr('Виберіть колір'); return; }
+    if (!text.value.trim()) { statusErr('Напишіть, як справи на проєкті'); text.focus(); return; }
+    btn.disabled = true;
+    send(box().dataset.statusSave, {health: on.dataset.pjsHealth, text: text.value, ai: text.dataset.ai === '1'})
+      .then(function (j) { if (!done(j)) { btn.disabled = false; statusErr((j && j.error) || ''); } });
+  }
+  function aiStatus(btn) {
+    var f = statusBox();
+    if (!f) return;
+    var label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '🧠 Пишу…';
+    statusErr('');
+    send(box().dataset.statusDraft, {}).then(function (j) {
+      btn.disabled = false;
+      btn.textContent = label;
+      if (j && j.ok && j.text) {
+        var t = f.querySelector('[data-pjs-text]');
+        t.value = j.text;
+        t.dataset.ai = '1';
+        t.focus();
+      } else {
+        statusErr('⚠️ ' + ((j && j.error) || 'AI не відповів'));
+      }
+    });
+  }
+
   root.addEventListener('click', function (e) {
     var t = e.target.closest('[data-pjc-range],[data-pjc-decide],[data-pjc-scan],[data-pjc-mtoggle],[data-pjc-madd],' +
       '[data-pjc-mdel],g[data-mails],[data-pjc-tab],[data-pjc-step-new],[data-pjc-phase-new],[data-pjc-post],' +
-      '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase]');
+      '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase],[data-pjc-risk],' +
+      '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai]');
     if (!t || !root.contains(t)) return;
     e.preventDefault();
     if (t.matches('g[data-mails]')) { mailMenu(t, e); return; }
     if (t.matches('g[data-step],g[data-phase],[data-pjc-phase]')) { openRow(t); return; }
+    if (t.dataset.pjcRisk || t.hasAttribute('data-pjc-risk-new')) {
+      if (box().dataset.canChange) openRisk(t.dataset.pjcRisk || '');
+      return;
+    }
+    if (t.dataset.pjsHealth) {
+      statusBox().querySelectorAll('[data-pjs-health]').forEach(function (b) {
+        b.classList.toggle('on', b === t);
+        b.setAttribute('aria-pressed', b === t ? 'true' : 'false');
+      });
+      return;
+    }
+    if (t.hasAttribute('data-pjs-save')) { saveStatus(t); return; }
+    if (t.hasAttribute('data-pjs-ai')) { aiStatus(t); return; }
     if (t.dataset.pjcTab) {
       try { localStorage.setItem(TAB, t.dataset.pjcTab); } catch (x) { /* лише на цю сторінку */ }
       applyTab(t.dataset.pjcTab);
+      if (HASH[location.hash] && HASH[location.hash] !== curTab) {   // #pj-risks в адресі, а вибрали іншу вкладку
+        var want = '';
+        Object.keys(HASH).forEach(function (h) { if (HASH[h] === curTab) want = h; });
+        try { history.replaceState(null, '', location.pathname + location.search + want); } catch (x) { /* як є */ }
+      }
+      if (!t.classList.contains('pjc-tab')) {        // кнопка в шапці чи в картці — показати вкладку
+        var sec = box().querySelector('.pjc-tl');
+        if (sec) sec.scrollIntoView({behavior: 'smooth', block: 'start'});
+      }
     } else if (t.hasAttribute('data-pjc-step-new')) {
       openStep('');
     } else if (t.hasAttribute('data-pjc-phase-new')) {
@@ -625,6 +809,8 @@
   root.addEventListener('keydown', function (e) {
     var row = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('g[data-step],g[data-phase]');
     if (row) { e.preventDefault(); openRow(row); return; }
+    var risk = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('tr[data-pjc-risk]');
+    if (risk) { e.preventDefault(); openRisk(risk.dataset.pjcRisk); return; }
     if (e.key !== 'Enter' || e.isComposing || e.target.tagName === 'TEXTAREA' || !e.target.closest('input,select')) return;
     e.preventDefault();
     if (e.target.closest('[data-pjc-mform]')) addMoment();
@@ -693,6 +879,34 @@
       <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
       <span class="pjc-merr" role="alert" data-pjp-err></span>
       <button type="button" class="pjc-b pjc-right pjc-danger" data-pjp-del>🗑 Видалити фазу</button>
+    </div>
+  </dialog>
+  <dialog id="pjr-risk" class="pjp-dlg" aria-labelledby="pjr-risk-h">
+    <h3 id="pjr-risk-h">⚠️ Ризик</h3>
+    <div class="pjp-auto" data-r-evidence hidden></div>
+    <div class="pjp-grid">
+      <label class="pjp-wide">Що може статися <input type="text" data-r="title" maxlength="200" autocomplete="off"
+             placeholder="Клієнт погодить зразок пізніше"></label>
+      <label>Ймовірність <select data-r="probability"></select></label>
+      <label>Вплив на строк і гроші <select data-r="impact"></select></label>
+      <label>Бал <span class="pjr-score" data-r-score></span></label>
+      <label>Категорія <select data-r="category"></select></label>
+      <label>Власник <select data-r="owner"></select></label>
+      <label>Стан <select data-r="status"></select></label>
+      <label>Переглянути <input type="date" data-r="review_on"></label>
+    </div>
+    <label>Заходи — що робимо, щоб не сталося або зашкодило менше <textarea data-r="mitigation" rows="3"></textarea></label>
+    <label data-r-desc>Опис <textarea data-r="description" rows="2"></textarea></label>
+    <fieldset>
+      <legend>Кроки під впливом</legend>
+      <div class="pjp-checks" data-r-list="steps"></div>
+    </fieldset>
+    <p class="pjp-hint">Бал = ймовірність × вплив: до 2 — 🟢, 3–4 — 🟡, від 6 — 🔴. Закритий вами ризик правило вже не відкриє знову.</p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>💾 Зберегти</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+      <button type="button" class="pjc-b pjc-right pjc-danger" data-pjp-del>🗑 Видалити ризик</button>
     </div>
   </dialog>
 </template>

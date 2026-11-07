@@ -170,13 +170,15 @@
               <td><a class="pf-code" href="{% url 'admin:projects_project_change' r.project.pk %}#pj-cockpit">{{ r.project.code }}</a>
                 <span class="pf-name" translate="no" title="{{ r.project.name }}">{{ r.project.icon }} {{ r.project.name }}</span></td>
               <td>{% if r.phase_total %}{{ r.phase_text }}{% if r.stuck %} <span class="pf-flag pf-bad">затягується</span>{% endif %}{% else %}<span class="pf-sub">без плану</span>{% endif %}</td>
-              <td class="{% if r.health == 'bad' %}pf-bad{% elif r.health == 'warn' %}pf-warn{% elif r.health == 'ok' %}pf-ok{% endif %}">{{ r.dot }} {{ r.reason }}</td>
+              <td class="{% if r.health == 'bad' %}pf-bad{% elif r.health == 'warn' %}pf-warn{% elif r.health == 'ok' %}pf-ok{% endif %}">{{ r.dot }} {{ r.reason }}
+                {% if r.status %}<div class="pf-sub" title="Тижневий статус: {{ r.status.text|truncatechars:300 }}"><a href="{% url 'admin:projects_project_change' r.project.pk %}#pj-status">📝 {{ r.status.get_health_display }} · {{ r.status.created_at|date:"d.m" }}</a></div>{% endif %}</td>
               <td>{% if r.next %}{{ r.next.title }}{% if r.next.end %} <span class="pf-sub">до {{ r.next.end|date:"d.m" }}</span>{% endif %}
                     {% if r.next.late %}<span class="pf-flag pf-bad">прострочено</span>{% elif r.next.critical %}<span class="pf-flag pf-warn">критичний шлях</span>{% endif %}
                   {% elif r.project.next_action %}➡️ {{ r.project.next_action }}{% else %}<span class="pf-sub">—</span>{% endif %}</td>
               <td>{{ r.waiting|default:"—" }}</td>
               <td>{% if r.risks %}<a href="{% url 'admin:projects_project_change' r.project.pk %}#pj-cockpit" title="{% for a in r.items %}{{ a.icon }} {{ a.text }}
-{% endfor %}">⚠️ {{ r.risks }}</a>{% else %}—{% endif %}</td>
+{% endfor %}">⚠️ {{ r.risks }}</a>{% else %}—{% endif %}
+                {% if r.risk_counts.red or r.risk_counts.yellow %}<div class="pf-sub"><a href="{% url 'admin:projects_project_change' r.project.pk %}#pj-risks" title="Відкриті ризики проєкту">ризики{% if r.risk_counts.red %} 🔴{{ r.risk_counts.red }}{% endif %}{% if r.risk_counts.yellow %} 🟡{{ r.risk_counts.yellow }}{% endif %}</a></div>{% endif %}</td>
               <td class="pf-cell-tl">{{ mini|safe }}</td>
             </tr>
           {% endfor %}

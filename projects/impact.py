@@ -291,11 +291,11 @@ def compute(today, focus=None) -> list:
     return out
 
 
-def attention(project, add, today):
-    """Впливи проєкту → «потребує уваги» (add(level, icon, text, url, kind))."""
+def attention(project, add, today, items=None):
+    """Впливи проєкту → «потребує уваги» (add(level, icon, text, url, kind)); items — уже пораховані compute(focus)."""
     if not project.is_open:
         return
-    for i in compute(today, focus=project):
+    for i in (items if items is not None else compute(today, focus=project)):
         if i.kind == "dep":
             d = i.data
             if d["succ"].project_id == project.pk:

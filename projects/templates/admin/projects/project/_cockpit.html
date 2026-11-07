@@ -3,12 +3,15 @@
 <div class="pjc" data-range="{{ range }}" data-cockpit="{{ urls.cockpit }}" data-highlight="{{ urls.highlight }}"
      data-scan="{{ urls.scan }}" data-plan-base="{{ urls.plan_base }}" data-plan-step="{{ urls.plan_step }}"
      data-plan-phase="{{ urls.plan_phase }}" data-plan-save-template="{{ urls.plan_save_template }}"
-     data-has-plan="{% if plan.has_plan %}1{% endif %}" data-can-change="{% if can_change %}1{% endif %}"{% if can_change %}
+     data-has-plan="{% if plan.has_plan %}1{% endif %}" data-can-change="{% if can_change %}1{% endif %}"
+     data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
   <div class="pjc-head">
     <b class="pjc-title">🧭 Пульт проєкту</b>
     <span class="pjc-health pjc-h-{{ health.key }}"
           title="Колір — з «Потребує уваги»: є термінове — червоний, важливе — жовтий, нічого — зелений">{{ health.icon }} {{ health.label }}</span>
+    {% if status.last %}<button type="button" class="pjc-st pjc-st-{{ status.last.health }}" data-pjc-tab="status"
+          title="Тижневий статус: {{ status.last.text|truncatechars:300 }}">📝 {{ status.last.get_health_display }} · {{ status.last.created_at|date:"d.m" }}</button>{% endif %}
     {% if due %}
       <span class="pjc-due{% if due.late %} late{% endif %}">⏰ Строк клієнту <b>{{ due.date|date:"d.m.Y" }}</b>{% if due.text %} · {{ due.text }}{% endif %}</span>
     {% else %}<span class="pjc-sub">строк клієнту не задано</span>{% endif %}
@@ -64,7 +67,9 @@
     </section>
 
     <section class="pjc-card" aria-label="Ризики">
-      <h4>⚠️ Ризики</h4>
+      <h4>⚠️ Ризики
+        <button type="button" class="pjc-b pjc-right" data-pjc-tab="risks" title="Матриця й реєстр ризиків проєкту">
+          реєстр{% if riskreg.counts.red %} 🔴 {{ riskreg.counts.red }}{% endif %}{% if riskreg.counts.yellow %} 🟡 {{ riskreg.counts.yellow }}{% endif %}{% if riskreg.counts.green %} 🟢 {{ riskreg.counts.green }}{% endif %}{% if not riskreg.total %} · 0{% endif %} →</button></h4>
       {% if risks %}
         <ul class="pjc-list">
           {% for a in risks %}<li class="pjc-{{ a.level }}">{{ a.icon }} {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}</li>{% endfor %}
@@ -110,6 +115,94 @@
     <div class="pjc-tabs" role="tablist">
       <button type="button" class="pjc-tab" role="tab" data-pjc-tab="timeline">🗓 Шкала проєкту</button>
       <button type="button" class="pjc-tab" role="tab" data-pjc-tab="plan">📅 План{% if plan.has_plan %} · {{ plan.steps }} кроків{% endif %}</button>
+      <button type="button" class="pjc-tab" role="tab" data-pjc-tab="risks">⚠️ Ризики{% if riskreg.total %} · {{ riskreg.total }}{% endif %}</button>
+      <button type="button" class="pjc-tab" role="tab" data-pjc-tab="status">📝 Статус{% if status.last %} {{ status.last_dot }}{% endif %}</button>
+    </div>
+
+    <div class="pjc-pane" data-pjc-pane="risks" id="pj-risks">
+      <div class="pjc-ptools">
+        {% if can_change %}<button type="button" class="pjc-b pri" data-pjc-risk-new>＋ Ризик</button>{% endif %}
+        <span class="pjc-sub">бал = ймовірність × вплив: до 2 — 🟢, 3–4 — 🟡, від 6 — 🔴 · ⚙️ правила відкривають і закривають ризики самі</span>
+        <a class="pjc-b pjc-right" href="/admin/projects/projectrisk/?project__id__exact={{ project.pk }}">⚠️ Реєстр усіх ризиків →</a>
+      </div>
+      <div class="pjr">
+        <div class="pjr-matrix" aria-label="Матриця ризиків: ймовірність × вплив">
+          <div class="pjr-cap">ймовірність ↑</div>
+          {% for row in riskreg.matrix %}
+            <div class="pjr-row"><span class="pjr-axis">{{ row.p }}</span>
+              {% for cell in row.cells %}
+                <div class="pjr-cell pjr-{{ cell.level }}" title="ймовірність {{ row.p }} × вплив {{ cell.i }} = {{ cell.score }}">
+                  {% for it in cell.items %}<button type="button" class="pjr-n" data-pjc-risk="{{ it.risk.pk }}" title="{{ it.risk.title }}">{{ it.n }}</button>{% endfor %}
+                </div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+          <div class="pjr-row pjr-xaxis"><span class="pjr-axis"></span><span>1</span><span>2</span><span>3</span></div>
+          <div class="pjr-cap pjr-xcap">вплив на строк і гроші →</div>
+        </div>
+        <div class="pjr-list">
+          <table class="pjr-t">
+            <thead><tr><th>№</th><th>Ризик</th><th>Звідки</th><th>Бал</th><th>Заходи</th><th>Власник</th><th>Переглянути</th><th>Стан</th></tr></thead>
+            <tbody>
+            {% for row in riskreg.rows %}
+              {% with r=row.risk %}
+              <tr{% if can_change %} data-pjc-risk="{{ r.pk }}" tabindex="0"{% endif %} title="{{ r.evidence|default:r.description }}">
+                <td>{{ row.n }}</td>
+                <td><b translate="no">{{ r.title }}</b>{% if row.steps %}<div class="pjc-sub">кроки: <span translate="no">{{ row.steps|join:", " }}</span></div>{% endif %}</td>
+                <td class="pjc-sub">{{ r.get_source_display }}{% if row.rule %} «{{ row.rule }}»{% endif %}</td>
+                <td><span class="pjr-score pjr-{{ r.level }}">{{ r.score }}</span></td>
+                <td>{% if r.mitigation %}<span translate="no">{{ r.mitigation|truncatechars:90 }}</span>{% else %}<span class="pjc-sub">—</span>{% endif %}</td>
+                <td>{% if r.owner %}<span translate="no">{{ r.owner.get_full_name|default:r.owner.username }}</span>{% else %}<span class="pjc-sub">—</span>{% endif %}</td>
+                <td>{% if r.review_on %}<span class="{% if r.review_on < today %}pjc-high{% endif %}">{{ r.review_on|date:"d.m" }}</span>{% else %}<span class="pjc-sub">—</span>{% endif %}</td>
+                <td>{{ r.get_status_display }}</td>
+              </tr>
+              {% endwith %}
+            {% empty %}
+              <tr><td colspan="8" class="pjc-sub">✅ Відкритих ризиків немає. Правила відкриють їх самі, коли щось почне загрожувати строку{% if can_change %}, або додайте свій — «＋ Ризик»{% endif %}.</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% if riskreg.closed %}
+            <details class="pjr-closed"><summary>Закриті · {{ riskreg.closed_total }}</summary>
+              <ul class="pjc-list">{% for r in riskreg.closed %}<li{% if can_change %} data-pjc-risk="{{ r.pk }}" class="pjr-link"{% endif %}>✓ <span translate="no">{{ r.title }}</span> <span class="pjc-sub">· {{ r.get_source_display }}{% if r.closed_at %} · {{ r.closed_at|date:"d.m.Y" }}{% endif %}{% if r.closed_auto %} · умова зникла{% endif %}</span></li>{% endfor %}</ul>
+            </details>
+          {% endif %}
+        </div>
+      </div>
+      {% if riskreg.data %}{{ riskreg.data|json_script:"pjr-data" }}{% endif %}
+    </div>
+
+    <div class="pjc-pane" data-pjc-pane="status" id="pj-status">
+      <div class="pjs">
+        <section class="pjs-last">
+          {% if status.last %}
+            <div class="pjs-head"><b class="pjs-h pjs-{{ status.last.health }}">{{ status.last.get_health_display }}</b>
+              <span class="pjc-sub">{{ status.last.created_at|date:"d.m.Y" }}{% if status.last.author %} · <span translate="no">{{ status.last.author.get_full_name|default:status.last.author.username }}</span>{% endif %} · {% if status.age %}{{ status.age }} дн. тому{% else %}сьогодні{% endif %}{% if status.last.ai_draft %} · з AI-чернетки{% endif %}</span></div>
+            <div class="pjs-text" translate="no">{{ status.last.text|linebreaksbr }}</div>
+          {% else %}
+            <p class="pjc-sub">Тижневого статусу ще немає. Раз на тиждень коротко запишіть, як справи: колір і кілька речень — так видно, як змінювався проєкт.</p>
+          {% endif %}
+          {% if status.history %}
+            <div class="pjs-hist"><span class="pjc-sub">Історія:</span>
+              {% for u in status.history %}<span class="pjs-dot pjs-{{ u.health }}{% if u.source == 'auto' %} pjs-auto{% endif %}" title="{{ u.created_at|date:'d.m.Y' }} · {{ u.get_health_display }}{% if u.source == 'auto' %} · знімок тижневого звіту{% endif %} · {{ u.text|truncatechars:200 }}"></span>{% endfor %}
+            </div>
+          {% endif %}
+        </section>
+        {% if can_change and project.is_open %}
+          <section class="pjs-form" aria-label="Новий тижневий статус">
+            <div class="pjc-mrow" role="group" aria-label="Колір статусу">
+              {% for key, label in status.choices %}<button type="button" class="pjc-b pjs-c pjs-{{ key }}{% if key == status.suggest %} on{% endif %}" data-pjs-health="{{ key }}" aria-pressed="{% if key == status.suggest %}true{% else %}false{% endif %}">{{ label }}</button>{% endfor %}
+            </div>
+            <textarea data-pjs-text rows="5" aria-label="Тижневий статус">{{ status.draft }}</textarea>
+            <div class="pjc-mrow">
+              <button type="button" class="pjc-b pri" data-pjs-save>💾 Зберегти статус</button>
+              <button type="button" class="pjc-b" data-pjs-ai title="Claude Haiku: чернетка з фактів тижня; нічого не зберігає">🧠 AI-чернетка</button>
+              <span class="pjc-merr" data-pjs-err role="alert"></span>
+            </div>
+            <p class="pjc-sub">Колір запропоновано з «потребує уваги», текст — з даних тижня (кроки, моменти, ризики). Змініть, як вважаєте правильним.</p>
+          </section>
+        {% endif %}
+      </div>
     </div>
 
     <div class="pjc-pane" data-pjc-pane="plan">

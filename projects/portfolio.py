@@ -63,6 +63,8 @@ class Row:
     milestones: list = field(default_factory=list)  # [{date, title, status, slip}]
     in_phase_days: int | None = None
     stuck: bool = False
+    risk_counts: dict = field(default_factory=dict)  # {"red": n, "yellow": n, "green": n} — відкриті й «стежимо»
+    status: object = None                 # останній тижневий статус людини (ProjectUpdate)
 
     @property
     def dot(self):
@@ -111,8 +113,19 @@ def load(projects, viewer=None, today=None, refresh=True) -> list:
               .exclude(predecessor__project_id=F("successor__project_id")).select_related("predecessor__project")):
         if _status(d.predecessor) not in CLOSED:
             external[d.successor_id].append(d.predecessor)
-    return [_row(p, phases[p.pk], steps[p.pk], states.get(p.pk), viewer, today, suppliers, external)
+    from . import risk_rules
+    from .models import ProjectUpdate
+    counts = risk_rules.counts(ids)
+    statuses = {}
+    for u in (ProjectUpdate.objects.filter(project_id__in=ids, source=ProjectUpdate.MANUAL)
+              .order_by("project_id", "-created_at", "-pk")):
+        statuses.setdefault(u.project_id, u)
+    rows = [_row(p, phases[p.pk], steps[p.pk], states.get(p.pk), viewer, today, suppliers, external)
             for p in projects]
+    for r in rows:
+        r.risk_counts = counts.get(r.project.pk, {})
+        r.status = statuses.get(r.project.pk)
+    return rows
 
 
 def _row(p, phases, steps, st, viewer, today, suppliers, external) -> Row:

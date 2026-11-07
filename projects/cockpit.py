@@ -125,6 +125,55 @@ def _plan_context(project, facts, today, can_change=False) -> dict:
                                                    ("done", "skipped"))}
 
 
+def _risks_context(project, can_change) -> dict:
+    """Вкладка «⚠️ Ризики»: матриця 3 × 3 і реєстр (відкриті й ті, за якими стежимо — за балом; закриті окремо);
+    дані вікна ризику — лише тому, хто може змінювати проєкт."""
+    from django.contrib.auth import get_user_model
+    from . import risk_rules
+    from .models import ProjectRisk, ProjectStep
+    risks = list(ProjectRisk.objects.filter(project=project).select_related("owner").prefetch_related("steps"))
+    live = sorted([r for r in risks if r.is_open], key=lambda r: (-r.score, r.status != ProjectRisk.OPEN, r.pk))
+    closed = sorted([r for r in risks if not r.is_open], key=lambda r: r.closed_at or r.updated_at, reverse=True)
+    rows = [{"n": n, "risk": r, "rule": risk_rules.rule_name(r.rule_key), "steps": [s.title for s in r.steps.all()]}
+            for n, r in enumerate(live, 1)]
+    data = None
+    if can_change:
+        users = get_user_model().objects.filter(is_active=True, is_staff=True).order_by("first_name", "username")
+        data = {
+            "risks": [{"id": r.pk, "title": r.title, "description": r.description, "category": r.category,
+                       "probability": r.probability, "impact": r.impact, "owner": r.owner_id or "",
+                       "mitigation": r.mitigation, "status": r.status,
+                       "review_on": r.review_on.isoformat() if r.review_on else "", "source": r.source,
+                       "evidence": r.evidence, "rule": risk_rules.rule_name(r.rule_key),
+                       "steps": [s.pk for s in r.steps.all()]} for r in risks],
+            "users": [{"id": u.pk, "label": u.get_full_name() or u.username} for u in users[:200]],
+            "steps": [{"id": s.pk, "label": s.title} for s in ProjectStep.objects.filter(project=project)
+                      .order_by("phase__order", "order", "pk")],
+            "categories": ProjectRisk.CATEGORY_CHOICES, "statuses": ProjectRisk.STATUS_CHOICES,
+            "probabilities": ProjectRisk.PROBABILITY_CHOICES, "impacts": ProjectRisk.IMPACT_CHOICES,
+            "owner": project.owner_id or "", "review": risk_rules.review_default().isoformat(),
+        }
+    return {"rows": rows, "closed": closed[:20], "closed_total": len(closed), "matrix": risk_rules.matrix(live),
+            "counts": {k: sum(1 for r in live if r.level == k) for k in ("red", "yellow", "green")},
+            "total": len(live), "data": data}
+
+
+def _status_context(project, user, facts, st, today, can_change) -> dict:
+    """Вкладка «📝 Статус»: останній статус людини, історія кольорів, форма з чернеткою без AI."""
+    from . import health
+    from .models import ProjectUpdate
+    last = health.latest(project)
+    draft = ""
+    if can_change and project.is_open:
+        try:
+            draft = health.draft_text(health.facts_for(project, user, today, facts))
+        except Exception:  # noqa: BLE001 — форма без чернетки краще, ніж пульт без вкладки
+            draft = ""
+    return {"last": last, "age": health.age(last, today), "history": health.history(project),
+            "suggest": health.suggest(st.health), "draft": draft, "choices": ProjectUpdate.HEALTH_CHOICES,
+            "dots": health.DOTS, "last_dot": health.DOTS.get(last.health, "") if last else ""}
+
+
 def context(project, user, range_key="all", notice="") -> dict:
     today = timezone.localdate()
     if range_key not in timeline.RANGES:
@@ -152,7 +201,11 @@ def context(project, user, range_key="all", notice="") -> dict:
         "has_products": project.products.exists(),
         "notice": notice,
         "plan": _plan_context(project, facts, today, can_change),
+        "riskreg": _risks_context(project, can_change),
+        "status": _status_context(project, user, facts, st, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
+                 "risk": reverse("projects:risk", args=[pk]), "status_save": reverse("projects:status", args=[pk]),
+                 "status_draft": reverse("projects:status_draft", args=[pk]),
                  "scan": reverse("projects:scan", args=[pk]), "mail": f"/email/?project={pk}",
                  "plan_template": reverse("projects:plan_template", args=[pk]),
                  "plan_step": reverse("projects:plan_step", args=[pk]),

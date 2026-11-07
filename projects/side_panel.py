@@ -83,8 +83,11 @@ def state_html(p, request):
     if r.next:
         nxt = sp.join([sp.data(r.next["title"]), f"до {r.next['end']:%d.%m}" if r.next.get("end") else "",
                        "прострочено" if r.next.get("late") else ("критичний шлях" if r.next.get("critical") else "")])
+    st = r.status
+    status = sp.join([st.get_health_display(), sp.date(st.created_at), sp.data(st.text[:160])]) if st else ""
     return sp.kv([
         ("Стан", sp.join([f"{icon} {name}", r.reason]), HEALTH_TONES.get(r.health, "")),
+        ("Тижневий статус", status),
         ("Строк клієнту", due),
         ("Прогноз", sp.date(r.forecast) if r.forecast and not p.due_date else ""),
         ("Фаза", r.phase_text),
@@ -93,6 +96,31 @@ def state_html(p, request):
         ("Наступна дія", sp.data(p.next_action) if p.next_action else ""),
         ("Старт", sp.date(p.start_date)),
     ])
+
+
+# ── ⚠️ Ризики ──────────────────────────────────────────────────────────────────
+
+def risks_html(p, request):
+    from .models import ProjectRisk
+    from .risk_rules import rule_name
+    items = sorted(ProjectRisk.objects.filter(project=p).exclude(status=ProjectRisk.CLOSED).select_related("owner"),
+                   key=lambda r: (-r.score, r.pk))
+    lines = []
+    for r in items[:8]:
+        owner = (r.owner.get_full_name() or r.owner.get_username()) if r.owner_id else ""
+        rule = rule_name(r.rule_key)
+        lines.append(_line(r.title, sp.badge(f"бал {r.score}", {"red": "err", "yellow": "warn", "green": "ok"}[r.level]),
+                           sp.join([f"{r.get_source_display()}" + (f" «{rule}»" if rule else ""), owner,
+                                    sp.data(r.mitigation[:120]) if r.mitigation else ""])))
+    lines.append(sp.more(_url("admin:projects_project_change", p.pk, query="#pj-risks"), "⚠️ Матриця й реєстр →"))
+    return mark_safe("".join(str(x) for x in lines)) if items else ""
+
+
+def risks_badge(p, request):
+    from .risk_rules import counts
+    c = counts([p.pk]).get(p.pk, {})
+    n = sum(c.values())
+    return sp.Badge(n, "err" if c.get("red") else "warn", f"ризиків: {n}") if n else None
 
 
 def state_summary(p, request) -> str:
@@ -228,6 +256,8 @@ BLOCKS = [
     sp.Block("state", "Стан", state_html, icon="🧭", summary=state_summary, empty="Стан ще не пораховано."),
     sp.Block("attention", "Потребує уваги", attention_html, icon="⚠️", short="Увага", badge=attention_badge,
              empty="✅ Нічого не чекає: строки, листи, Angebote й закупівлі в порядку."),
+    sp.Block("risks", "Ризики", risks_html, icon="🎯", badge=risks_badge,
+             empty="Відкритих ризиків немає — правила відкриють їх самі."),
     sp.Block("plan", "План і фази", plan_html, icon="📅", short="План", summary=plan_summary,
              empty="Плану ще немає — «📅 План» у пульті картки проєкту."),
     sp.Block("links", "Пов’язане", links_html, icon="🔗", badge=links_badge,

@@ -6,7 +6,7 @@ where: 📁 Проєкти → Усі проєкти → проєкт → «🧭
 urls: /admin/projects/project/, /admin/projects/projecttemplate/, /calendar/
 roles: адміністратор, менеджер
 keywords: план проєкту, фази, фаза, етап, етапи, віха, віхи, milestone, крок плану, задачі проєкту, діаграма Ганта, гант, gantt, критичний шлях, базовий план, baseline, зсув, прогноз, залежності, шаблон плану, шаблони планів, stage-gate, умова переходу, Projektplan, Meilenstein, Phasen, Zeitplan
-related: crm/project-cockpit, crm/project-portfolio, crm/projects, crm/project-overview, calendar/overview, offers/overview, inventory/purchases
+related: crm/project-cockpit, crm/project-portfolio, crm/project-risks, crm/projects, crm/project-overview, calendar/overview, offers/overview, inventory/purchases
 ---
 
 ## Що це

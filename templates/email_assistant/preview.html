@@ -1800,11 +1800,14 @@ window.pvAiTranslate = async function(pk, force) {
       ovBtn.style.display = ov && confirmed.length ? '' : 'none';
       ovBtn.dataset.pid = confirmed.length ? confirmed[0].project.id : '';
     }
+    var tipMoment = 'Позначити цей лист як важливий момент проєкту (виділений текст — цитата)';
+    var tipRisk = 'Додати ризик проєкту з цього листа (виділений текст — підстава)';
     confirmed.forEach(function(c) {
       h += '<span class="em-proj-chip" title="' + esc(c.reason) + '">'
          + '<a href="' + esc(c.project.url) + '" target="_blank">📁 ' + esc(c.project.code) + ' · ' + esc(c.project.name) + '</a>'
          + (ov ? '<button onclick="pvProjOverview(' + c.project.id + ')" title="{% trans "Огляд проєкту" %}">🧭</button>' : '')
-         + (ch ? '<button onclick="pvProjMoment(' + c.project.id + ')" title="{% trans "Позначити цей лист як важливий момент проєкту (виділений текст — цитата)" %}">📌</button>' : '')
+         + (ch ? '<button onclick="pvProjMoment(' + c.project.id + ')" title="' + tipMoment + '">📌</button>' : '')
+         + (ch ? '<button onclick="pvProjRisk(' + c.project.id + ')" title="' + tipRisk + '">⚠️</button>' : '')
          + '<a href="' + esc(c.project.mail_url) + '" title="{% trans "Усі листи проєкту" %}">✉</a>'
          + '<button onclick="pvProjRemove(' + c.link + ')" title="{% trans "Прибрати цю переписку з проєкту" %}">✕</button></span>';
     });
@@ -1865,12 +1868,24 @@ window.pvAiTranslate = async function(pk, force) {
     var pk = typeof _pvReplyPk !== 'undefined' ? _pvReplyPk : 0;
     var subj = typeof _pvReplySubj !== 'undefined' ? _pvReplySubj : '';
     var quote = (window.getSelection ? String(window.getSelection()) : '').trim().slice(0, 1500);
-    var title = prompt('📌 {% trans "Важливий момент проєкту — що сталося?" %}', subj.replace(/^(\s*(re|aw|wg|fw|fwd)\s*:\s*)+/i, ''));
+    var title = prompt('📌 Важливий момент проєкту — що сталося?', subj.replace(/^(\s*(re|aw|wg|fw|fwd)\s*:\s*)+/i, ''));
     if (title === null || !title.trim()) return;
     try {
       var d = await post('/projects/api/project/' + projectId + '/highlights/',
                          {title: title.trim(), message: pk || '', quote: quote, kind: 'other'});
-      toast(d.ok ? '📌 {% trans "Додано до проєкту" %} ' + d.project.code : '⚠️ ' + (d.error || '{% trans "Помилка" %}'));
+      toast(d.ok ? '📌 Момент додано до проєкту ' + d.project.code : '⚠️ ' + (d.error || '{% trans "Помилка" %}'));
+    } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  };
+  // ⚠️ Ризик проєкту з поточного листа (projects/views.risk_view): назва — що може статися, підстава — виділене
+  window.pvProjRisk = async function(projectId) {
+    var pk = typeof _pvReplyPk !== 'undefined' ? _pvReplyPk : 0;
+    var quote = (window.getSelection ? String(window.getSelection()) : '').trim().slice(0, 1000);
+    var title = prompt('⚠️ Ризик проєкту — що може статися?', '');
+    if (title === null || !title.trim()) return;
+    try {
+      var d = await post('/projects/api/project/' + projectId + '/risk/',
+                         {title: title.trim(), message: pk || '', quote: quote, probability: 2, impact: 2});
+      toast(d.ok ? '⚠️ Ризик додано до проєкту' : '⚠️ ' + (d.error || '{% trans "Помилка" %}'));
     } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
   };
   window.pvProjCreate = async function() {

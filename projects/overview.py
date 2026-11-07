@@ -267,11 +267,24 @@ def collect(project, today=None) -> dict:
         schedule.attention(plan, project, lambda level, icon, text, url, kind: add(level, icon, text, url, kind),
                            today)
     # ⚡ Впливи інших проєктів: затримка кроку, від якого залежимо, спільний товар, постачальник, навантаження
-    from . import impact
-    try:
-        impact.attention(project, lambda level, icon, text, url, kind: add(level, icon, text, url, kind), today)
-    except Exception:  # noqa: BLE001 — огляд без впливів краще, ніж без огляду
-        logger.exception("project impacts %s", project.pk)
+    from . import health, impact, risk_rules
+
+    def to_add(level, icon, text, url, kind):
+        add(level, icon, text, url, kind)
+    impacts = []
+    if is_open:
+        try:
+            impacts = impact.compute(today, focus=project)
+            impact.attention(project, to_add, today, impacts)
+        except Exception:  # noqa: BLE001 — огляд без впливів краще, ніж без огляду
+            logger.exception("project impacts %s", project.pk)
+        # ⚠️ Ризики: правила відкривають і закривають самі; ризики людей і дата перегляду — у «потребує уваги»
+        try:
+            risk_rules.sync(project, risk_rules.hits(project, {"plan": plan, "purchases": purchases}, impacts, today))
+            risk_rules.attention(project, to_add, today)
+        except Exception:  # noqa: BLE001
+            logger.exception("project risks %s", project.pk)
+        health.attention(project, to_add, today, plan.has_plan)     # 📝 тижневий статус давно не оновлювали
 
     attention.sort(key=lambda a: LEVELS[a["level"]])
     return {

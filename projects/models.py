@@ -426,3 +426,132 @@ class ProjectTemplate(models.Model):
 
     def __str__(self):
         return self.name
+
+
+# ── Ризики й тижневий статус (projects/risk_rules.py, health.py, weekly.py) ──────────────────────────────────────
+
+class ProjectRisk(models.Model):
+    """Ризик проєкту: ймовірність × вплив (1–3) → бал 1–9 (до 2 — 🟢, 3–4 — 🟡, від 6 — 🔴), власник, заходи, дата
+    перегляду. source rule — відкриває й закриває risk_rules.py сам (rule_key — що саме перевіряло правило; умова
+    зникла — closed_auto, повернулась — відкривається знову); закрила людина — правило його вже не відкриває.
+    edited — людина змінила ймовірність / вплив: правило їх не перезаписує."""
+    OPEN, WATCH, CLOSED = "open", "watch", "closed"
+    STATUS_CHOICES = [(OPEN, "⚠️ Відкритий"), (WATCH, "👀 Стежимо"), (CLOSED, "✓ Закрито")]
+    RULE, MANUAL, AI = "rule", "manual", "ai"
+    SOURCE_CHOICES = [(RULE, "⚙️ Правило"), (MANUAL, "✍️ Вручну"), (AI, "🧠 AI")]
+    SCHEDULE, SUPPLY, CUSTOMER, QUALITY, COST, OTHER = "schedule", "supply", "customer", "quality", "cost", "other"
+    CATEGORY_CHOICES = [(SCHEDULE, "⏰ Строки"), (SUPPLY, "🏭 Постачання й склад"), (CUSTOMER, "👤 Клієнт"),
+                        (QUALITY, "🔧 Технічне й якість"), (COST, "💶 Гроші"), (OTHER, "❓ Інше")]
+    PROBABILITY_CHOICES = [(1, "1 — малоймовірно"), (2, "2 — можливо"), (3, "3 — ймовірно")]
+    IMPACT_CHOICES = [(1, "1 — незначний"), (2, "2 — помітний"), (3, "3 — серйозний")]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="risks")
+    title = models.CharField("Ризик", max_length=200)
+    description = models.TextField("Опис", blank=True, default="")
+    category = models.CharField("Категорія", max_length=10, choices=CATEGORY_CHOICES, default=SCHEDULE)
+    probability = models.PositiveSmallIntegerField("Ймовірність", choices=PROBABILITY_CHOICES, default=2)
+    impact = models.PositiveSmallIntegerField("Вплив на строк і гроші", choices=IMPACT_CHOICES, default=2)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name="project_risks", verbose_name="Власник")
+    mitigation = models.TextField("Заходи", blank=True, default="",
+                                  help_text="Що робимо, щоб ризик не стався або зашкодив менше")
+    status = models.CharField("Стан", max_length=8, choices=STATUS_CHOICES, default=OPEN, db_index=True)
+    review_on = models.DateField("Переглянути", null=True, blank=True)
+    source = models.CharField("Звідки", max_length=8, choices=SOURCE_CHOICES, default=MANUAL)
+    rule_key = models.CharField("Ключ правила", max_length=80, blank=True, default="")
+    evidence = models.TextField("Підстава", blank=True, default="")
+    message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="+", verbose_name="Лист")
+    steps = models.ManyToManyField(ProjectStep, blank=True, related_name="risks", verbose_name="Кроки під впливом")
+    edited = models.BooleanField(default=False)
+    closed_auto = models.BooleanField(default=False)
+    opened_at = models.DateTimeField("Відкрито", default=timezone.now)
+    closed_at = models.DateTimeField("Закрито", null=True, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ризик проєкту"
+        verbose_name_plural = "⚠️ Ризики проєктів"
+        ordering = ["project", "-probability", "-impact", "pk"]
+        constraints = [models.UniqueConstraint(fields=["project", "rule_key"], condition=~Q(rule_key=""),
+                                               name="unique_project_risk_rule")]
+
+    def __str__(self):
+        return f"{self.project.code} · {self.title}"
+
+    @property
+    def score(self) -> int:
+        return (self.probability or 0) * (self.impact or 0)
+
+    @property
+    def level(self) -> str:
+        return "red" if self.score >= 6 else ("yellow" if self.score >= 3 else "green")
+
+    @property
+    def is_open(self) -> bool:
+        return self.status != self.CLOSED
+
+
+class ProjectUpdate(models.Model):
+    """Тижневий статус: колір, короткий текст, хто й коли, знімок (фаза, прогноз, строк, ризики, кроки). auto — знімок,
+    який записав тижневий запуск сам (людина за тиждень статусу не написала): історія здоров'я без пропусків."""
+    ON_TRACK, AT_RISK, OFF_TRACK = "on_track", "at_risk", "off_track"
+    HEALTH_CHOICES = [(ON_TRACK, "🟢 За планом"), (AT_RISK, "🟡 Під загрозою"), (OFF_TRACK, "🔴 Не встигаємо")]
+    MANUAL, AUTO = "manual", "auto"
+    SOURCE_CHOICES = [(MANUAL, "людина"), (AUTO, "автоматично")]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="updates")
+    health = models.CharField("Колір", max_length=10, choices=HEALTH_CHOICES, default=ON_TRACK)
+    text = models.TextField("Статус", blank=True, default="")
+    ai_draft = models.BooleanField("З AI-чернетки", default=False)
+    source = models.CharField(max_length=8, choices=SOURCE_CHOICES, default=MANUAL)
+    snapshot = models.JSONField(default=dict, blank=True)
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name="+", verbose_name="Хто")
+    created_at = models.DateTimeField("Коли", default=timezone.now, db_index=True)
+
+    class Meta:
+        verbose_name = "Тижневий статус"
+        verbose_name_plural = "Тижневі статуси"
+        ordering = ["-created_at", "-pk"]
+
+    def __str__(self):
+        return f"{self.project.code} · {self.get_health_display()} · {self.created_at:%d.%m.%Y}"
+
+
+class ProjectSettings(models.Model):
+    """Налаштування проєктів (один запис): тижневий звіт відповідальним — день, година, лист / Telegram;
+    знімок кольору в історію, якщо статус не написали; через скільки днів нагадувати про статус."""
+    WEEKDAYS = [(0, "Понеділок"), (1, "Вівторок"), (2, "Середа"), (3, "Четвер"), (4, "П’ятниця"), (5, "Субота"),
+                (6, "Неділя")]
+    weekly_enabled = models.BooleanField("Щотижневий звіт відповідальним", default=False,
+                                         help_text="Раз на тиждень кожному відповідальному — його відкриті проєкти: "
+                                                   "колір, прогноз, нові й закриті ризики, кроки тижня")
+    weekday = models.PositiveSmallIntegerField("День", choices=WEEKDAYS, default=0)
+    hour = models.PositiveSmallIntegerField("Година", default=8, help_text="0–23, час Minerva")
+    send_email = models.BooleanField("Листом", default=True)
+    send_telegram = models.BooleanField("У Telegram", default=True,
+                                        help_text="Якщо в профілі людини є Telegram ID і бот у «Налаштування → "
+                                                  "Сповіщення»")
+    auto_snapshot = models.BooleanField("Записувати колір в історію, якщо статус не написали", default=True)
+    stale_days = models.PositiveSmallIntegerField("Нагадувати оновити статус через, днів", default=7)
+    last_run_at = models.DateTimeField("Останній звіт", null=True, blank=True)
+    last_result = models.CharField("Результат", max_length=255, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Налаштування проєктів"
+        verbose_name_plural = "⚙️ Налаштування проєктів"
+
+    def __str__(self):
+        return "Налаштування проєктів"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

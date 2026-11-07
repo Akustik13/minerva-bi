@@ -101,6 +101,9 @@ while true; do
   # ── Ранковий брифінг — у «Час відправки» з BriefingSettings, раз на день (стан — last_sent_at у БД) ──
   python manage.py morning_briefing --if-due 2>&1 || true
 
+  # ── 📨 Тижневий звіт за проєктами — день і година в «⚙️ Налаштування проєктів» (вимкнено за замовчуванням) ──
+  python manage.py project_weekly --if-due --verbosity 0 2>&1 || true
+
   # ── Авто-імпорт: профілі, яким настав «Наступний запуск» (інтервал — у профілі) ──
   python manage.py auto_import --all --verbosity 0 2>&1 || true
 
