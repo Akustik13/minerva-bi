@@ -1,7 +1,10 @@
 {# «🧭 Пульт проєкту» (projects/cockpit.py → context); JS і стилі — change_form.html. #}
 {# Без <script> і без <form>: пульт усередині форми картки, поля «📌» без name. #}
 <div class="pjc" data-range="{{ range }}" data-cockpit="{{ urls.cockpit }}" data-highlight="{{ urls.highlight }}"
-     data-scan="{{ urls.scan }}">
+     data-scan="{{ urls.scan }}" data-plan-base="{{ urls.plan_base }}" data-plan-step="{{ urls.plan_step }}"
+     data-plan-phase="{{ urls.plan_phase }}" data-plan-save-template="{{ urls.plan_save_template }}"
+     data-has-plan="{% if plan.has_plan %}1{% endif %}" data-can-change="{% if can_change %}1{% endif %}"{% if can_change %}
+     data-name="{{ project.name }}"{% endif %}>
   <div class="pjc-head">
     <b class="pjc-title">🧭 Пульт проєкту</b>
     <span class="pjc-health pjc-h-{{ health.key }}"
@@ -9,11 +12,23 @@
     {% if due %}
       <span class="pjc-due{% if due.late %} late{% endif %}">⏰ Строк клієнту <b>{{ due.date|date:"d.m.Y" }}</b>{% if due.text %} · {{ due.text }}{% endif %}</span>
     {% else %}<span class="pjc-sub">строк клієнту не задано</span>{% endif %}
+    {% if plan.has_plan and plan.end %}<span class="pjc-fc{% if plan.late %} late{% endif %}" title="Прогноз завершення за планом">📅 прогноз <b>{{ plan.end|date:"d.m.Y" }}</b></span>{% endif %}
     {% if start %}<span class="pjc-sub">старт {{ start|date:"d.m.Y" }}</span>{% endif %}
     <span class="pjc-sub" title="Листи від клієнта / наші · Angebote · замовлення · закупівлі · JLC-замовлення · відправлення">📥 {{ counts.in }} · 📤 {{ counts.out }} · 📝 {{ counts.offers }} · 🛒 {{ counts.orders }} · 🏭 {{ more.purchases }} · 🔧 {{ more.jlc }} · 🚚 {{ more.shipments }}</span>
     <a class="pjc-link" href="{{ urls.mail }}" target="_blank">✉️ Листи проєкту</a>
   </div>
   {% if notice %}<div class="pjc-notice" role="status">{{ notice }}</div>{% endif %}
+  {% if plan.has_plan %}
+    <ol class="pjc-strip" aria-label="Фази проєкту">
+      {% for f in plan.strip %}
+        <li class="pjc-ph pjc-ph-{{ f.status }}{% if f.gate %} pjc-ph-gate{% endif %}"{% if f.id and can_change %} data-pjc-phase="{{ f.id }}"{% endif %}
+            title="{{ f.name }}{% if f.gate %} · умова переходу: {{ f.gate }}{% if f.gate_done %} ✓{% endif %}{% endif %}{% if f.dates %} · {{ f.dates }}{% endif %}">
+          <b>{% if f.status == "done" %}✓ {% elif f.status == "active" %}● {% endif %}{{ f.name }}</b>
+          <small>{% if f.progress %}{{ f.progress }}{% endif %}{% if f.dates %} · {{ f.dates }}{% endif %}{% if f.slip %} · <span class="pjc-slip">+{{ f.slip }} дн.</span>{% endif %}</small>
+        </li>
+      {% endfor %}
+    </ol>
+  {% endif %}
 
   <div class="pjc-cols">
     <section class="pjc-card" aria-label="Що зараз">
@@ -91,8 +106,54 @@
     </section>
   </div>
 
-  <section class="pjc-card pjc-tl" aria-label="Шкала проєкту">
-    <h4>🗓 Шкала проєкту
+  <section class="pjc-card pjc-tl" id="pj-plan" aria-label="Шкала й план проєкту">
+    <div class="pjc-tabs" role="tablist">
+      <button type="button" class="pjc-tab" role="tab" data-pjc-tab="timeline">🗓 Шкала проєкту</button>
+      <button type="button" class="pjc-tab" role="tab" data-pjc-tab="plan">📅 План{% if plan.has_plan %} · {{ plan.steps }} кроків{% endif %}</button>
+    </div>
+
+    <div class="pjc-pane" data-pjc-pane="plan">
+      {% if plan.has_plan %}
+        <div class="pjc-ptools">
+          {% if can_change %}
+            <button type="button" class="pjc-b pri" data-pjc-step-new>＋ Крок</button>
+            <button type="button" class="pjc-b" data-pjc-phase-new>＋ Фаза</button>
+            <button type="button" class="pjc-b" data-pjc-post="{{ urls.plan_baseline }}"
+                    data-confirm="{% if plan.baseline_at %}Перезаписати базовий план поточним прогнозом?{% else %}Зафіксувати поточний план як базовий — з ним порівнюватиметься зсув?{% endif %}">📌 {% if plan.baseline_at %}Перезаписати{% else %}Зафіксувати{% endif %} базовий план</button>
+            <button type="button" class="pjc-b" data-pjc-save-tpl>💾 Зберегти як шаблон</button>
+          {% endif %}
+          <span class="pjc-sub">{% if plan.baseline_at %}базовий план від {{ plan.baseline_at|date:"d.m.Y" }}{% else %}базовий план не зафіксовано{% endif %}{% if plan.critical %} · на критичному шляху {{ plan.critical }}{% endif %}</span>
+          {% if can_change %}<button type="button" class="pjc-b pjc-right pjc-danger" data-pjc-post="{{ urls.plan_clear }}"
+                  data-confirm="Видалити весь план (фази й кроки)? Листи, замовлення й закупівлі проєкту лишаться.">🗑 Очистити план</button>{% endif %}
+        </div>
+        <div class="pjc-svg">{{ plan.gantt|safe }}</div>
+        <div class="pjc-legend">
+          <span><i class="lg-bar ok"></i>виконано</span><span><i class="lg-bar open"></i>в роботі</span>
+          <span><i class="lg-bar warn"></i>чекаємо</span><span><i class="lg-bar plan"></i>заплановано</span>
+          <span><i class="lg-bar crit"></i>критичний шлях</span><span><i class="lg-base"></i>базовий план</span>
+          <span>◆ віха · +N — зсув від базового · 🔗 стан з прив'язаних об'єктів</span>
+          <span class="pjc-hint">{% if can_change %}Клік на крок чи фазу — змінити.{% endif %}</span>
+        </div>
+        {% if plan.data %}{{ plan.data|json_script:"pjp-data" }}{% endif %}
+      {% else %}
+        <div class="pjc-empty">
+          <p>Плану ще немає.{% if can_change %} Складіть його з шаблону — фази, кроки й дати з'являться самі, далі їх можна змінити.{% endif %}</p>
+          {% if can_change %}
+            <div class="pjc-mrow">
+              <select data-pjc-tpl aria-label="Шаблон плану">
+                {% for t in plan.templates %}<option value="{{ t.id }}" title="{{ t.description }}">{{ t.name }} · фаз {{ t.counts.0 }}, кроків {{ t.counts.1 }}</option>{% endfor %}
+              </select>
+              <label class="pjc-sub">старт <input type="date" data-pjc-tpl-start value="{% if start %}{{ start|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"></label>
+              <button type="button" class="pjc-b pri" data-pjc-tpl-apply data-url="{{ urls.plan_template }}">🧩 Скласти план з шаблону</button>
+              <button type="button" class="pjc-b" data-pjc-phase-new>＋ Фаза вручну</button>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="pjc-pane" data-pjc-pane="timeline">
+    <h4>
       <span class="pjc-ranges" role="group" aria-label="Період шкали">{% for key, label in ranges %}<button type="button" class="pjc-b{% if key == range %} on{% endif %}" data-pjc-range="{{ key }}" aria-pressed="{% if key == range %}true{% else %}false{% endif %}">{{ label }}</button>{% endfor %}</span>
     </h4>
     <div class="pjc-svg">{{ timeline|safe }}</div>
@@ -103,6 +164,7 @@
       <span><i class="lg-bar bad"></i>прострочено</span><span><i class="lg-bar warn"></i>затримка</span>
       <span><i class="lg-bar plan"></i>чернетка</span>
       <span class="pjc-hint">Наведіть на позначку — подробиці, клік — відкрити; клік на точку листа — меню з 📌.</span>
+    </div>
     </div>
   </section>
 </div>

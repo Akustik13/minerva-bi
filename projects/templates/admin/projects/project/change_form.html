@@ -110,6 +110,105 @@
   .pjt a, .pjt g[data-mails] { cursor: pointer; }
   .pjt a:hover .pjt-t, .pjt a:focus .pjt-t { text-decoration: underline; }
   .pjt-empty { padding: 10px; color: var(--text-muted, #9aafbe); }
+
+  /* 📅 Прогноз, смуга фаз, вкладки */
+  .pjc-fc.late, .pjc-fc.late b { color: var(--err, #f85149); }
+  .pjc-slip { color: var(--err, #f85149); font-weight: 600; }
+  .pjc-strip { display: flex; list-style: none; margin: 0 0 10px; padding: 0; gap: 3px; overflow-x: auto; }
+  .pjc-strip li.pjc-ph { list-style: none; flex: 1 1 0; min-width: 118px; padding: 5px 16px 5px 20px; line-height: 1.35;
+    background: var(--accent2-subtle, rgba(127,127,127,.1));
+    clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 50%, calc(100% - 11px) 100%, 0 100%, 11px 50%); }
+  .pjc-strip li.pjc-ph:first-child { padding-left: 11px;
+    clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 50%, calc(100% - 11px) 100%, 0 100%); }
+  .pjc-ph b, .pjc-ph small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pjc-ph b { font-size: 12px; }
+  .pjc-ph small { font-size: 11px; color: var(--text-muted, #9aafbe); }
+  .pjc-strip li.pjc-ph-done { background: color-mix(in srgb, var(--ok, #3fb950) 22%, transparent); }
+  .pjc-strip li.pjc-ph-active { background: color-mix(in srgb, var(--accent, #58a6ff) 28%, transparent); }
+  .pjc-strip li[data-pjc-phase] { cursor: pointer; }
+  .pjc-strip li[data-pjc-phase]:hover b { text-decoration: underline; }
+  .pjc-tabs { display: flex; flex-wrap: wrap; gap: 2px; margin: -3px 0 9px; border-bottom: 1px solid var(--border-strong, #2a3f52); }
+  .pjc-tab { font: inherit; font-size: 13px; font-weight: 600; padding: 4px 12px 6px; margin-bottom: -1px; cursor: pointer;
+             background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted, #9aafbe); }
+  .pjc-tab:hover { color: var(--text, var(--body-fg)); }
+  .pjc-tab.on { color: var(--text, var(--body-fg)); border-bottom-color: var(--accent, #58a6ff); }
+  .pjc-pane[hidden] { display: none; }
+  .pjc-pane > h4 { justify-content: flex-end; }
+  .pjc-ptools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-bottom: 8px; }
+  .pjc-danger:hover { border-color: var(--err, #f85149); color: var(--err, #f85149); }
+  .pjc-empty p { margin: 0 0 8px; color: var(--text-muted, #9aafbe); }
+  .pjc-empty select { max-width: 420px; }
+  .lg-bar.crit { border: 2px solid var(--err, #f85149); box-sizing: border-box; }
+  .lg-base { display: inline-block; width: 16px; height: 3px; margin-right: 5px; vertical-align: middle;
+             background: var(--text-muted, #9aafbe); }
+
+  /* Гант плану (projects/gantt.py) */
+  .pjg { display: block; width: 100%; min-width: 880px; height: auto; font-family: inherit; }
+  .pjg text { fill: var(--text, var(--body-fg)); font-size: 11px; }
+  .pjg .pjg-we { fill: var(--accent2-hover, rgba(127,127,127,.06)); }
+  .pjg .pjg-wk { stroke: var(--hairline-color, rgba(127,127,127,.18)); stroke-width: 1; }
+  .pjg .pjg-wkt { fill: var(--text-dim, #8296a5); font-size: 9.5px; }
+  .pjg .pjg-mon { stroke: var(--border-strong, #2a3f52); stroke-width: 1; }
+  .pjg .pjg-mont { fill: var(--text-muted, #9aafbe); font-weight: 600; }
+  .pjg .pjg-th { fill: var(--text-muted, #9aafbe); font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+  .pjg .pjg-rowbg { fill: transparent; }
+  .pjg .pjg-phbg { fill: var(--accent2-subtle, rgba(127,127,127,.08)); }
+  .pjg .pjg-pname { font-weight: 700; font-size: 11.5px; }
+  .pjg .pjg-dates, .pjg .pjg-who { fill: var(--text-muted, #9aafbe); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .pjg .pjg-side-customer { fill: var(--accent, #58a6ff); }
+  .pjg .pjg-side-supplier { fill: var(--warn, #e3b341); }
+  .pjg .pjg-sum { fill: var(--text-muted, #9aafbe); opacity: .8; }
+  .pjg .pjg-phase.pjg-active .pjg-sum { fill: var(--accent, #58a6ff); }
+  .pjg .pjg-phase.pjg-done .pjg-sum { fill: var(--ok, #3fb950); }
+  .pjg .pjg-base, .pjg .pjg-base-d { fill: var(--text-muted, #9aafbe); opacity: .75; }
+  .pjg .pjg-bar, .pjg .pjg-dia { fill: transparent; stroke: var(--text-muted, #9aafbe); stroke-width: 1.2; stroke-dasharray: 3 2; }
+  .pjg .pjg-doing .pjg-bar, .pjg .pjg-doing .pjg-dia { fill: var(--accent, #58a6ff); stroke: none; }
+  .pjg .pjg-waiting .pjg-bar, .pjg .pjg-waiting .pjg-dia { fill: var(--warn, #e3b341); stroke: none; }
+  .pjg .pjg-done .pjg-bar, .pjg .pjg-done .pjg-dia { fill: var(--ok, #3fb950); stroke: none; }
+  .pjg .pjg-skipped .pjg-bar, .pjg .pjg-skipped .pjg-dia { stroke-dasharray: 1 3; opacity: .7; }
+  .pjg .pjg-skipped .pjg-t { fill: var(--text-muted, #9aafbe); text-decoration: line-through; }
+  .pjg .pjg-crit .pjg-bar, .pjg .pjg-crit .pjg-dia { stroke: var(--err, #f85149); stroke-width: 2; stroke-dasharray: none; }
+  .pjg .pjg-slip { fill: var(--err, #f85149); font-weight: 700; font-size: 10.5px; }
+  .pjg .pjg-auto { font-size: 10px; }
+  .pjg .pjg-dep { fill: none; stroke: var(--text-muted, #9aafbe); stroke-width: 1.1; opacity: .85; }
+  .pjg .pjg-dep-c { fill: none; stroke: var(--err, #f85149); stroke-width: 1.4; }
+  .pjg .pjg-ah { fill: var(--text-muted, #9aafbe); }
+  .pjg .pjg-ah-c { fill: var(--err, #f85149); }
+  .pjg .pjg-today { stroke: var(--text, var(--body-fg)); stroke-width: 1.5; }
+  .pjg .pjg-due { stroke: var(--err, #f85149); stroke-width: 1.5; stroke-dasharray: 5 3; }
+  .pjg g[tabindex] { cursor: pointer; outline: none; }
+  .pjg g[tabindex]:hover .pjg-rowbg, .pjg g[tabindex]:focus .pjg-rowbg { fill: var(--accent2-hover, rgba(127,127,127,.14)); }
+  .pjg g[tabindex]:focus-visible .pjg-rowbg { stroke: var(--accent, #58a6ff); stroke-width: 1.5; }
+
+  /* Вікна кроку й фази (у <body>, поза формою картки) */
+  .pjp-dlg { width: min(740px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 14px 16px;
+             border: 1px solid var(--border-strong, #2a3f52); border-radius: 10px; box-sizing: border-box;
+             background: var(--bg-card, var(--body-bg, #fff)); color: var(--text, var(--body-fg)); font-size: 13px;
+             box-shadow: 0 14px 44px rgba(0,0,0,.35); }
+  .pjp-dlg::backdrop { background: rgba(0,0,0,.45); }
+  .pjp-dlg h3 { margin: 0 0 10px; font-size: 15px; color: inherit; background: none; padding: 0; }
+  .pjp-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 10px; }
+  .pjp-grid > label, .pjp-dlg > label { display: grid; gap: 3px; font-size: 12px; color: var(--text-muted, #9aafbe); }
+  .pjp-dlg > label { margin-top: 10px; }
+  .pjp-wide { grid-column: 1 / -1; }
+  .pjp-wide2 { grid-column: span 2; }
+  .pjp-dlg input[type=text], .pjp-dlg input[type=date], .pjp-dlg input[type=number], .pjp-dlg select, .pjp-dlg textarea {
+    width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; }
+  .pjp-dlg fieldset { border: 1px solid var(--border-strong, #2a3f52); border-radius: 8px; margin: 10px 0 0; padding: 6px 10px 8px; }
+  .pjp-dlg legend { font-size: 12px; font-weight: 700; padding: 0 4px; color: var(--text, var(--body-fg)); }
+  .pjp-checks { display: grid; gap: 2px; max-height: 150px; overflow: auto; margin: 4px 0; font-size: 12.5px; }
+  .pjp-checks[hidden] { display: none; }
+  .pjp-checks label { display: flex; gap: 6px; align-items: baseline; color: var(--text, var(--body-fg)); }
+  .pjp-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .pjp-row select { width: auto; flex: 1 1 240px; }
+  .pjp-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted, #9aafbe); }
+  .pjp-inline input[type=number] { width: 84px; }
+  .pjp-hint { margin: 6px 0 0; font-size: 11.5px; color: var(--text-muted, #9aafbe); }
+  .pjp-auto { margin-top: 8px; padding: 5px 8px; border-left: 3px solid var(--accent, #58a6ff); border-radius: 0 6px 6px 0;
+              background: var(--accent2-subtle, rgba(127,127,127,.08)); font-size: 12px; }
+  .pjp-auto[hidden], .pjp-dlg [data-only][hidden] { display: none; }
+  .pjp-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+  @media (max-width: 640px) { .pjp-grid { grid-template-columns: 1fr; } .pjp-wide2 { grid-column: auto; } }
 </style>
 {% endblock %}
 
@@ -122,7 +221,7 @@
   var root = document.getElementById('pj-cockpit');
   if (!root || root.dataset.ready) return;
   root.dataset.ready = '1';
-  var KEY = 'pj-tl-range';
+  var KEY = 'pj-tl-range', TAB = 'pj-tab', curTab = '', dlg = null;
   function csrf() {
     var i = document.querySelector('[name=csrfmiddlewaretoken]');
     return i ? i.value : '';
@@ -134,10 +233,261 @@
     var n = root.querySelector('.pjc-merr');
     if (n) n.textContent = text;
   }
+  function put(html) { root.innerHTML = html; applyTab(curTab); }
   function done(j) {
-    if (j && j.ok && j.html) { root.innerHTML = j.html; return true; }
+    if (j && j.ok && j.html) { put(j.html); return true; }
     toast('⚠️ ' + ((j && j.error) || 'не вдалося'));
     return false;
+  }
+
+  // ── Вкладки «🗓 Шкала» / «📅 План»: #pj-plan в адресі → план, інакше — як востаннє ──
+  function firstTab() {
+    if (location.hash === '#pj-plan') return 'plan';
+    var saved = '';
+    try { saved = localStorage.getItem(TAB) || ''; } catch (e) { saved = ''; }
+    if (saved === 'plan' || saved === 'timeline') return saved;
+    var b = box();
+    return b && b.dataset.hasPlan ? 'plan' : 'timeline';
+  }
+  function applyTab(key) {
+    var b = box();
+    if (!b) return;
+    curTab = key || firstTab();
+    b.querySelectorAll('[data-pjc-tab]').forEach(function (t) {
+      var on = t.dataset.pjcTab === curTab;
+      t.classList.toggle('on', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    b.querySelectorAll('[data-pjc-pane]').forEach(function (p) { p.hidden = p.dataset.pjcPane !== curTab; });
+  }
+  applyTab();
+  window.addEventListener('hashchange', function () { if (location.hash === '#pj-plan') applyTab('plan'); });
+
+  // ── 📅 Вікна кроку й фази: у <body>, поза формою картки (Enter не надсилає форму проєкту) ──
+  function planData() {
+    var n = root.querySelector('#pjp-data'), d = null;
+    if (n) { try { d = JSON.parse(n.textContent); } catch (e) { d = null; } }
+    d = d || {};
+    ['steps', 'phases', 'users', 'links', 'offers', 'kinds', 'sides', 'statuses', 'triggers'].forEach(function (k) {
+      d[k] = d[k] || [];
+    });
+    return d;
+  }
+  function q(d, attr, key) { return d.querySelector('[' + attr + '="' + key + '"]'); }
+  function fillSelect(sel, items, value, empty) {
+    sel.textContent = '';
+    if (empty !== undefined) items = [['', empty]].concat(items);
+    items.forEach(function (it) {
+      var o = document.createElement('option');
+      o.value = it[0];
+      o.textContent = it[1];
+      sel.appendChild(o);
+    });
+    sel.value = value === null || value === undefined ? '' : String(value);
+    if (sel.selectedIndex < 0 && sel.options.length) sel.selectedIndex = 0;
+  }
+  function fillChecks(holder, items, chosen) {
+    var want = (chosen || []).map(String);
+    holder.textContent = '';
+    items.forEach(function (it) {
+      var l = document.createElement('label'), c = document.createElement('input');
+      c.type = 'checkbox';
+      c.value = it.id;
+      c.checked = want.indexOf(String(it.id)) >= 0;
+      l.appendChild(c);
+      l.appendChild(document.createTextNode(it.label));
+      holder.appendChild(l);
+    });
+    holder.hidden = !items.length;
+  }
+  function picked(holder) {
+    return Array.prototype.map.call(holder.querySelectorAll('input:checked'), function (c) { return c.value; });
+  }
+  function phaseName(data, id) {
+    var out = '';
+    data.phases.forEach(function (p) { if (String(p.id) === String(id)) out = ((p.icon || '') + ' ' + p.name).trim(); });
+    return out || 'без фази';
+  }
+  function defaultPhase() {
+    var b = box(), li = b && (b.querySelector('.pjc-ph-active[data-pjc-phase]') || b.querySelector('.pjc-ph-planned[data-pjc-phase]'));
+    if (!li && b) {
+      var all = b.querySelectorAll('[data-pjc-phase]');
+      li = all.length ? all[all.length - 1] : null;
+    }
+    return li ? li.dataset.pjcPhase : '';
+  }
+  function lastBefore(data, phase) {
+    // Новий крок — після останнього кроку цієї фази (або попередніх фаз)
+    var pos = {}, last = null, end = data.phases.length;
+    data.phases.forEach(function (p, i) { pos[String(p.id)] = i; });
+    var want = phase === '' || pos[String(phase)] === undefined ? end : pos[String(phase)];
+    data.steps.forEach(function (x) {
+      var p = x.phase === '' || pos[String(x.phase)] === undefined ? end : pos[String(x.phase)];
+      if (p <= want) last = x;
+    });
+    return last;
+  }
+  function dialogs() {
+    if (dlg) return dlg;
+    var tpl = document.getElementById('pjp-dialogs');
+    if (!tpl) return null;
+    document.body.appendChild(tpl.content.cloneNode(true));
+    dlg = {step: document.getElementById('pjp-step'), phase: document.getElementById('pjp-phase')};
+    wire(dlg.step, saveStep, deleteStep);
+    wire(dlg.phase, savePhase, deletePhase);
+    q(dlg.step, 'data-s', 'kind').addEventListener('change', syncStep);
+    q(dlg.step, 'data-s', 'side').addEventListener('change', syncStep);
+    // Початок + тривалість → кінець; початок і кінець → тривалість (дати ISO, рахуємо в UTC)
+    var st = q(dlg.step, 'data-s', 'start'), en = q(dlg.step, 'data-s', 'end'), du = q(dlg.step, 'data-s', 'duration');
+    du.addEventListener('input', function () {
+      var n = parseInt(du.value, 10);
+      if (st.value && n > 0) en.value = new Date(Date.parse(st.value) + (n - 1) * 864e5).toISOString().slice(0, 10);
+    });
+    [st, en].forEach(function (i) {
+      i.addEventListener('change', function () {
+        if (st.value && en.value && en.value >= st.value) du.value = Math.round((Date.parse(en.value) - Date.parse(st.value)) / 864e5) + 1;
+      });
+    });
+    return dlg;
+  }
+  function wire(d, save, del) {
+    d.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-pjp-save],[data-pjp-close],[data-pjp-del]');
+      if (!t || t.disabled) return;
+      if (t.hasAttribute('data-pjp-save')) save();
+      else if (t.hasAttribute('data-pjp-close')) d.close();
+      else del();
+    });
+    d.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.isComposing && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') {
+        e.preventDefault();
+        save();
+      }
+    });
+  }
+  function post(d, url, body) {
+    var btns = d.querySelectorAll('.pjp-foot button'), err = d.querySelector('[data-pjp-err]');
+    btns.forEach(function (b) { b.disabled = true; });
+    err.textContent = '';
+    send(url, body).then(function (j) {
+      btns.forEach(function (b) { b.disabled = false; });
+      if (j && j.ok && j.html) { put(j.html); d.close(); return; }
+      err.textContent = '⚠️ ' + ((j && j.error) || 'не вдалося');
+    });
+  }
+  function syncStep() {
+    var d = dlg.step, kind = q(d, 'data-s', 'kind').value, side = q(d, 'data-s', 'side').value;
+    d.querySelectorAll('[data-only]').forEach(function (n) {
+      var w = n.dataset.only;
+      n.hidden = (w === 'task' && kind === 'milestone') || (w === 'milestone' && kind !== 'milestone') ||
+        (w === 'person' && side !== 'we' && side !== 'colleague');
+    });
+  }
+  function openStep(id) {
+    var ds = dialogs();
+    if (!ds) return;
+    var d = ds.step, data = planData(), s = null;
+    data.steps.forEach(function (x) { if (String(x.id) === String(id)) s = x; });
+    var isNew = !s;
+    if (isNew) {
+      var ph = defaultPhase(), last = lastBefore(data, ph);
+      s = {id: '', title: '', kind: 'task', phase: ph, side: 'we', assignee: '', start: '', end: '', duration: 1,
+           status: 'todo', trigger: '', auto: true, after: last ? [last.id] : [], lag: 0, links: [], offers: [],
+           notes: '', note: '', eff: ''};
+    }
+    var f = function (k) { return q(d, 'data-s', k); };
+    d.dataset.id = s.id;
+    f('title').value = s.title;
+    fillSelect(f('kind'), data.kinds, s.kind);
+    fillSelect(f('phase'), data.phases.map(function (p) { return [p.id, ((p.icon || '') + ' ' + p.name).trim()]; }),
+               s.phase, '— без фази');
+    fillSelect(f('side'), data.sides, s.side);
+    fillSelect(f('assignee'), data.users.map(function (u) { return [u.id, u.label]; }), s.assignee, '— не вказано');
+    f('start').value = s.start || '';
+    f('end').value = s.end || '';
+    f('duration').value = s.duration || 1;
+    fillSelect(f('status'), data.statuses, s.status);
+    fillSelect(f('trigger'), data.triggers, s.trigger);
+    f('auto').checked = s.auto !== false;
+    f('lag').value = s.lag || 0;
+    f('notes').value = s.notes || '';
+    fillChecks(q(d, 'data-s-list', 'after'), data.steps.filter(function (x) { return String(x.id) !== String(s.id); })
+      .map(function (x) { return {id: x.id, label: phaseName(data, x.phase) + ' · ' + x.title}; }), s.after);
+    fillChecks(q(d, 'data-s-list', 'links'), data.links, s.links);
+    fillChecks(q(d, 'data-s-list', 'offers'), data.offers, s.offers);
+    var note = d.querySelector('[data-s-note]'), eff = '';
+    data.statuses.forEach(function (x) { if (x[0] === s.eff) eff = x[1]; });
+    note.textContent = s.note ? '🔗 Зараз: ' + s.note + (s.eff && s.eff !== s.status ? ' · стан за ними: ' + eff : '') : '';
+    note.hidden = !s.note;
+    d.querySelector('[data-pjp-del]').hidden = isNew;
+    d.querySelector('[data-pjp-err]').textContent = '';
+    d.querySelector('h3').textContent = isNew ? '📋 Новий крок плану' : '📋 Крок плану';
+    syncStep();
+    d.showModal();
+    f('title').focus();
+  }
+  function saveStep() {
+    var d = dlg.step, err = d.querySelector('[data-pjp-err]'), f = function (k) { return q(d, 'data-s', k); };
+    var kind = f('kind').value, side = f('side').value;
+    var body = {
+      id: d.dataset.id || '', title: f('title').value, kind: kind, phase: f('phase').value, side: side,
+      assignee: side === 'we' || side === 'colleague' ? f('assignee').value : '',
+      start: kind === 'milestone' ? '' : f('start').value, end: f('end').value, duration: f('duration').value,
+      status: f('status').value, trigger: f('trigger').value, auto: f('auto').checked, lag: f('lag').value,
+      notes: f('notes').value, after: picked(q(d, 'data-s-list', 'after')),
+      links: picked(q(d, 'data-s-list', 'links')), offers: picked(q(d, 'data-s-list', 'offers'))
+    };
+    if (!body.title.trim()) { err.textContent = 'Напишіть назву кроку'; f('title').focus(); return; }
+    if (body.start && body.end && body.end < body.start) { err.textContent = 'Кінець раніше за початок'; return; }
+    post(d, box().dataset.planStep, body);
+  }
+  function deleteStep() {
+    var d = dlg.step;
+    if (!d.dataset.id) return;
+    if (!confirm('Видалити крок «' + q(d, 'data-s', 'title').value + '»? Наступні за ним кроки підуть після його попередників.')) return;
+    post(d, box().dataset.planBase + 'step/' + d.dataset.id + '/delete/', {});
+  }
+  function openPhase(id) {
+    var ds = dialogs();
+    if (!ds) return;
+    var d = ds.phase, data = planData(), p = null;
+    data.phases.forEach(function (x) { if (String(x.id) === String(id)) p = x; });
+    var isNew = !p, f = function (k) { return q(d, 'data-p', k); };
+    p = p || {id: '', name: '', icon: '', gate: '', order: ''};
+    d.dataset.id = p.id;
+    f('icon').value = p.icon || '';
+    f('name').value = p.name || '';
+    f('gate').value = p.gate || '';
+    f('order').value = p.order === '' || p.order === undefined ? '' : p.order;
+    d.querySelector('[data-pjp-del]').hidden = isNew;
+    d.querySelector('[data-pjp-err]').textContent = '';
+    d.querySelector('h3').textContent = isNew ? '🗂 Нова фаза плану' : '🗂 Фаза плану';
+    d.showModal();
+    f('name').focus();
+  }
+  function savePhase() {
+    var d = dlg.phase, f = function (k) { return q(d, 'data-p', k); };
+    var body = {id: d.dataset.id || '', name: f('name').value, icon: f('icon').value, gate: f('gate').value,
+                order: f('order').value};
+    if (!body.name.trim()) { d.querySelector('[data-pjp-err]').textContent = 'Напишіть назву фази'; f('name').focus(); return; }
+    post(d, box().dataset.planPhase, body);
+  }
+  function deletePhase() {
+    var d = dlg.phase;
+    if (!d.dataset.id) return;
+    if (!confirm('Видалити фазу «' + q(d, 'data-p', 'name').value + '»? Її кроки лишаться — без фази.')) return;
+    post(d, box().dataset.planBase + 'phase/' + d.dataset.id + '/delete/', {});
+  }
+  function applyTemplate(btn) {
+    var b = box(), sel = b.querySelector('[data-pjc-tpl]'), st = b.querySelector('[data-pjc-tpl-start]');
+    if (!sel || !sel.value) return;
+    btn = btn || b.querySelector('[data-pjc-tpl-apply]');
+    var label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '🧩 Складаю план…';
+    send(btn.dataset.url, {template: sel.value, start: st ? st.value : ''}).then(function (j) {
+      if (!done(j)) { btn.disabled = false; btn.textContent = label; }
+    });
   }
   function send(url, body) {
     return fetch(url, {
@@ -153,7 +503,7 @@
     if (!b) return;
     fetch(b.dataset.cockpit + '?range=' + encodeURIComponent(key), {credentials: 'same-origin'})
       .then(function (r) { return r.json(); })
-      .then(function (j) { if (j && j.ok) root.innerHTML = j.html; })
+      .then(function (j) { if (j && j.ok) put(j.html); })
       .catch(function () {});
   }
   try {
@@ -194,12 +544,39 @@
     window.MVMenu.open(e, items, {title: 'Листи дня'});
   }
 
+  function openRow(t) {
+    if (!box().dataset.canChange) return;          // перегляд: подробиці — у підказці рядка
+    if (t.dataset.step) openStep(t.dataset.step);
+    else openPhase(t.dataset.phase || t.dataset.pjcPhase);
+  }
+
   root.addEventListener('click', function (e) {
-    var t = e.target.closest('[data-pjc-range],[data-pjc-decide],[data-pjc-scan],[data-pjc-mtoggle],[data-pjc-madd],[data-pjc-mdel],g[data-mails]');
+    var t = e.target.closest('[data-pjc-range],[data-pjc-decide],[data-pjc-scan],[data-pjc-mtoggle],[data-pjc-madd],' +
+      '[data-pjc-mdel],g[data-mails],[data-pjc-tab],[data-pjc-step-new],[data-pjc-phase-new],[data-pjc-post],' +
+      '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase]');
     if (!t || !root.contains(t)) return;
     e.preventDefault();
     if (t.matches('g[data-mails]')) { mailMenu(t, e); return; }
-    if (t.dataset.pjcRange) {
+    if (t.matches('g[data-step],g[data-phase],[data-pjc-phase]')) { openRow(t); return; }
+    if (t.dataset.pjcTab) {
+      try { localStorage.setItem(TAB, t.dataset.pjcTab); } catch (x) { /* лише на цю сторінку */ }
+      applyTab(t.dataset.pjcTab);
+    } else if (t.hasAttribute('data-pjc-step-new')) {
+      openStep('');
+    } else if (t.hasAttribute('data-pjc-phase-new')) {
+      openPhase('');
+    } else if (t.hasAttribute('data-pjc-tpl-apply')) {
+      applyTemplate(t);
+    } else if (t.dataset.pjcPost) {
+      if (t.dataset.confirm && !confirm(t.dataset.confirm)) return;
+      t.disabled = true;
+      send(t.dataset.pjcPost).then(function (j) { if (!done(j)) t.disabled = false; });
+    } else if (t.hasAttribute('data-pjc-save-tpl')) {
+      var name = prompt('Назва нового шаблону плану — він з’явиться у виборі шаблонів для інших проєктів:',
+                        box().dataset.name || '');
+      if (name === null || !name.trim()) return;
+      send(box().dataset.planSaveTemplate, {name: name}).then(done);
+    } else if (t.dataset.pjcRange) {
       try { localStorage.setItem(KEY, t.dataset.pjcRange); } catch (x) { /* лише на цю сторінку */ }
       load(t.dataset.pjcRange);
     } else if (t.dataset.pjcDecide) {
@@ -221,15 +598,76 @@
       send(t.dataset.pjcMdel).then(done);
     }
   });
-  // Enter у полях «📌» зберігає момент, а не форму проєкту
+  // Enter у полях пульта не надсилає форму проєкту: «📌» — зберегти момент, шаблон — скласти план;
+  // Enter / пробіл на рядку діаграми — вікно кроку чи фази
   root.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && e.target.closest('[data-pjc-mform]') && e.target.tagName !== 'TEXTAREA') {
-      e.preventDefault();
-      addMoment();
-    }
+    var row = (e.key === 'Enter' || e.key === ' ') && e.target.closest && e.target.closest('g[data-step],g[data-phase]');
+    if (row) { e.preventDefault(); openRow(row); return; }
+    if (e.key !== 'Enter' || e.isComposing || e.target.tagName === 'TEXTAREA' || !e.target.closest('input,select')) return;
+    e.preventDefault();
+    if (e.target.closest('[data-pjc-mform]')) addMoment();
+    else if (e.target.closest('.pjc-empty')) applyTemplate();
   });
 })();
 </script>
+{# Вікна кроку й фази: JS переносить їх у <body> (поза формою картки) при першому відкритті #}
+<template id="pjp-dialogs">
+  <dialog id="pjp-step" class="pjp-dlg" aria-labelledby="pjp-step-h">
+    <h3 id="pjp-step-h">📋 Крок плану</h3>
+    <div class="pjp-grid">
+      <label class="pjp-wide">Назва <input type="text" data-s="title" maxlength="200" autocomplete="off"></label>
+      <label>Вид <select data-s="kind"></select></label>
+      <label>Фаза <select data-s="phase"></select></label>
+      <label>Хто робить <select data-s="side"></select></label>
+      <label data-only="person">Відповідальний <select data-s="assignee"></select></label>
+      <label data-only="task">Початок <input type="date" data-s="start"></label>
+      <label><span data-only="task">Кінець</span><span data-only="milestone">Дата віхи</span> <input type="date" data-s="end"></label>
+      <label data-only="task">Тривалість, днів <input type="number" min="1" max="999" data-s="duration"></label>
+      <label>Стан <select data-s="status"></select></label>
+    </div>
+    <p class="pjp-hint">Порожні дати Minerva рахує сама: після попередніх кроків, тривалістю з поля «Тривалість». Дні — календарні.</p>
+    <div class="pjp-auto" data-s-note hidden></div>
+    <fieldset>
+      <legend>⛓ Після кроків</legend>
+      <div class="pjp-checks" data-s-list="after"></div>
+      <label class="pjp-inline">Відступ після них, днів <input type="number" min="-365" max="365" data-s="lag"></label>
+    </fieldset>
+    <fieldset>
+      <legend>🔗 Виконано, коли</legend>
+      <div class="pjp-row">
+        <select data-s="trigger" aria-label="Виконано, коли"></select>
+        <label class="pjp-inline"><input type="checkbox" data-s="auto"> стан з прив'язаних об'єктів</label>
+      </div>
+      <div class="pjp-checks" data-s-list="links"></div>
+      <div class="pjp-checks" data-s-list="offers"></div>
+      <p class="pjp-hint">Нічого не вибрано — Minerva сама прив'яже найраніший підхожий об'єкт проєкту.
+        «Виконано» й «Пропущено», поставлені вручну, автоматика не змінює.</p>
+    </fieldset>
+    <label>Нотатки <textarea data-s="notes" rows="2"></textarea></label>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>💾 Зберегти</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+      <button type="button" class="pjc-b pjc-right pjc-danger" data-pjp-del>🗑 Видалити крок</button>
+    </div>
+  </dialog>
+  <dialog id="pjp-phase" class="pjp-dlg" aria-labelledby="pjp-phase-h">
+    <h3 id="pjp-phase-h">🗂 Фаза плану</h3>
+    <div class="pjp-grid">
+      <label>Значок <input type="text" data-p="icon" maxlength="8" placeholder="🔧" autocomplete="off"></label>
+      <label class="pjp-wide2">Назва <input type="text" data-p="name" maxlength="120" autocomplete="off"></label>
+      <label class="pjp-wide2">Умова переходу далі <input type="text" data-p="gate" maxlength="200" placeholder="Клієнт погодив зразок" autocomplete="off"></label>
+      <label>Порядок <input type="number" min="0" data-p="order"></label>
+    </div>
+    <p class="pjp-hint">Фаза завершена, коли виконано всі її кроки. Умова переходу — для людей; остання віха фази показує, чи її досягнуто.</p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>💾 Зберегти</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+      <button type="button" class="pjc-b pjc-right pjc-danger" data-pjp-del>🗑 Видалити фазу</button>
+    </div>
+  </dialog>
+</template>
 {% elif pj_cockpit_error %}
 <div class="pjc-err">🧭 Пульт проєкту зараз не вдалося показати — поля нижче працюють як звичайно.</div>
 {% endif %}

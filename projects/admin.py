@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
 from . import services
-from .models import DismissedThread, Project, ProjectHighlight, ProjectLink, ProjectParticipant
+from .models import DismissedThread, Project, ProjectHighlight, ProjectLink, ProjectParticipant, ProjectTemplate
 
 logger = logging.getLogger(__name__)
 
@@ -367,6 +367,116 @@ class ProjectAdmin(admin.ModelAdmin):
             "opts": self.model._meta,
         }
         return render(request, "admin/projects/triage.html", ctx)
+
+
+class ProjectTemplateForm(forms.ModelForm):
+    class Meta:
+        model = ProjectTemplate
+        fields = ("name", "description", "is_active", "order", "plan")
+
+    def clean_plan(self):
+        """Те саме, що читає plan.apply_template: [{name, icon, gate, steps: [{title, days, side, kind, trigger, after}]}]."""
+        from . import schedule
+        from .models import ProjectStep
+        data = self.cleaned_data.get("plan")
+        if not isinstance(data, list) or not data:
+            raise forms.ValidationError('Потрібен список фаз: [{"name": "…", "steps": [{"title": "…", "days": 3}]}]')
+        sides, total = dict(ProjectStep.SIDE_CHOICES), 0
+        for i, ph in enumerate(data, 1):
+            if not isinstance(ph, dict) or not str(ph.get("name") or "").strip():
+                raise forms.ValidationError(f"Фаза {i}: потрібна назва (name)")
+            steps = ph.get("steps") or []
+            if not isinstance(steps, list):
+                raise forms.ValidationError(f"Фаза {i}: steps — список кроків")
+            for j, st in enumerate(steps, 1):
+                where = f"Фаза {i}, крок {j}"
+                if not isinstance(st, dict) or not str(st.get("title") or "").strip():
+                    raise forms.ValidationError(f"{where}: потрібна назва (title)")
+                if st.get("side") and st["side"] not in sides:
+                    raise forms.ValidationError(f"{where}: side — одне з {', '.join(sides)}")
+                if st.get("trigger") and st["trigger"] not in schedule.TRIGGER_TYPES:
+                    raise forms.ValidationError(f"{where}: невідома умова trigger «{st['trigger']}»")
+                try:
+                    int(st.get("days") or 0)
+                except (TypeError, ValueError):
+                    raise forms.ValidationError(f"{where}: days — ціле число днів")
+                total += 1
+        if not total:
+            raise forms.ValidationError("У шаблоні немає жодного кроку")
+        return data
+
+
+@admin.register(ProjectTemplate)
+class ProjectTemplateAdmin(admin.ModelAdmin):
+    """🧩 Шаблони планів: вбудовані (plan.ensure_builtin) можна сховати, не видалити; свої — «💾 Зберегти як шаблон»."""
+    form = ProjectTemplateForm
+    list_display = ("name", "counts_col", "is_active", "order", "builtin_col", "created_by", "created_at")
+    list_editable = ("is_active", "order")
+    list_filter = ("is_active", "builtin")
+    search_fields = ("name", "description")
+    readonly_fields = ("preview", "builtin", "created_by", "created_at")
+    fieldsets = (
+        (None, {"fields": ("name", "description", "is_active", "order", "preview")}),
+        ("Для досвідчених: фази й кроки в JSON", {
+            "classes": ("collapse",),
+            "description": "Фаза: name, icon, gate, steps. Крок: title, days, side (we / customer / supplier / "
+                           "colleague), kind (task / milestone), trigger, after (null — після попереднього, "
+                           "\"parallel\" — разом з попереднім, [0, 2] — після цих кроків шаблону за номером від 0).",
+            "fields": ("plan",)}),
+        ("Службове", {"classes": ("collapse",), "fields": ("builtin", "created_by", "created_at")}),
+    )
+
+    def changelist_view(self, request, extra_context=None):
+        from . import plan
+        plan.ensure_builtin()
+        return super().changelist_view(request, extra_context)
+
+    @admin.display(description="Фаз / кроків")
+    def counts_col(self, obj):
+        from . import plan
+        phases, steps = plan.template_counts(obj)
+        return f"{phases} / {steps}"
+
+    @admin.display(description="Вбудований", boolean=True, ordering="builtin")
+    def builtin_col(self, obj):
+        return obj.builtin
+
+    @admin.display(description="Що в шаблоні")
+    def preview(self, obj):
+        from .models import TRIGGERS, ProjectStep
+        if not obj or not obj.plan:
+            return "—"
+        sides, triggers = dict(ProjectStep.SIDE_CHOICES), dict(TRIGGERS)
+        blocks = []
+        for ph in obj.plan:
+            if not isinstance(ph, dict):
+                continue
+            rows = format_html_join("", "<li>{}{} · {} · {}{}</li>", (
+                ("◆ " if st.get("kind") == ProjectStep.MILESTONE else "", st.get("title", ""),
+                 sides.get(st.get("side") or ProjectStep.WE, ""),
+                 "віха" if st.get("kind") == ProjectStep.MILESTONE else f"{st.get('days') or 1} дн.",
+                 f" · 🔗 {triggers[st['trigger']]}" if st.get("trigger") in triggers and st.get("trigger") else "")
+                for st in ph.get("steps") or [] if isinstance(st, dict)))
+            gate = format_html(' <span style="opacity:.75">· умова переходу: {}</span>', ph["gate"]) \
+                if ph.get("gate") else ""
+            blocks.append(format_html('<div style="margin-bottom:8px"><b>{} {}</b>{}<ol style="margin:4px 0 0 18px">'
+                                      '{}</ol></div>', ph.get("icon", ""), ph.get("name", ""), gate, rows))
+        return format_html_join("", "{}", ((b,) for b in blocks))
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and obj.builtin:
+            return False            # вбудований повернувся б сам — його можна лише сховати
+        return super().has_delete_permission(request, obj)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)      # серед вибраних можуть бути вбудовані — видаляти по одному з картки
+        return actions
+
+    def save_model(self, request, obj, form, change):
+        if not change and not obj.created_by_id:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(DismissedThread)

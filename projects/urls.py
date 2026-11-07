@@ -19,4 +19,13 @@ urlpatterns = [
     path("api/highlight/<int:hid>/delete/", views.highlight_delete_view, name="highlight_delete"),
     path("api/project/<int:pk>/links/<int:link_pk>/decide/", views.link_decide_view, name="link_decide"),
     path("api/project/<int:pk>/scan/", views.scan_view, name="scan"),
+    # 📅 План (projects/plan.py)
+    path("api/project/<int:pk>/plan/template/", views.plan_template_view, name="plan_template"),
+    path("api/project/<int:pk>/plan/step/", views.plan_step_view, name="plan_step"),
+    path("api/project/<int:pk>/plan/step/<int:sid>/delete/", views.plan_step_delete_view, name="plan_step_delete"),
+    path("api/project/<int:pk>/plan/phase/", views.plan_phase_view, name="plan_phase"),
+    path("api/project/<int:pk>/plan/phase/<int:fid>/delete/", views.plan_phase_delete_view, name="plan_phase_delete"),
+    path("api/project/<int:pk>/plan/baseline/", views.plan_baseline_view, name="plan_baseline"),
+    path("api/project/<int:pk>/plan/save-template/", views.plan_save_template_view, name="plan_save_template"),
+    path("api/project/<int:pk>/plan/clear/", views.plan_clear_view, name="plan_clear"),
 ]

@@ -120,6 +120,8 @@ body.wt-hide .cal-wt,body.wt-hide #cal-wt-panel{display:none}
 .cal-inv-btns{display:flex;gap:6px}
 .cal-inv-ok{border:none;border-radius:6px;padding:4px 10px;background:#1a73e8;color:#fff;cursor:pointer;font-size:12px}
 .cal-ext{opacity:.85;font-style:italic}
+.cal-pj{background:rgba(124,58,237,.14);color:#7c3aed;text-decoration:none;border-left:2px solid #7c3aed}
+.cal-pj-late{background:rgba(239,68,68,.14);color:#ef4444;border-left-color:#ef4444}
 .cal-inv-no{border:1px solid rgba(128,128,128,.4);border-radius:6px;padding:4px 9px;background:none;color:inherit;cursor:pointer}
 .cal-chip{display:flex;align-items:center;gap:3px;padding:2px 5px;border-radius:4px;
   margin-bottom:2px;font-size:10px;cursor:pointer;transition:opacity .1s;
@@ -352,6 +354,8 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
           </div>{% endif %}
           {% for x in cell.ext %}<div class="cal-chip cal-ext" style="background:{{ x.color }}22;color:{{ x.color }}" title="{{ x.feed }} · {{ x.time }} {{ x.title }}{% if x.location %} · {{ x.location }}{% endif %}">
             <span class="cal-chip-dot" style="background:{{ x.color }}"></span><span class="cal-chip-txt">{% if x.time %}{{ x.time }} {% endif %}{{ x.title|truncatechars:18 }}</span></div>{% endfor %}
+          {% for x in cell.pj %}<a class="cal-chip cal-pj{% if x.late %} cal-pj-late{% endif %}" href="{{ x.url }}" onclick="event.stopPropagation()" title="{{ x.tip }}">
+            <span class="cal-chip-txt">{{ x.icon }} {{ x.title|truncatechars:18 }}</span></a>{% endfor %}
           {% for ev in cell.events %}
           <div class="cal-chip{% if ev.is_done %} done-ev{% endif %}"
                style="background:{{ ev.display_color }}33;color:{{ ev.display_color }}"

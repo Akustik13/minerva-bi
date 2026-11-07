@@ -243,3 +243,101 @@ def scan_view(request, pk):
         notice = (f"🔎 Нових пропозицій: {n}" if n else
                   "🔎 Нового не знайдено: закупівлі й JLC-замовлення з товарами проєкту вже запропоновані або їх немає")
     return _cockpit(request, project, notice)
+
+
+# ── 📅 План (projects/plan.py, schedule.py) ──────────────────────────────────
+
+def _plan_action(request, pk, fn):
+    """Дія плану: право змінювати проєкт; помилка плану → 400 з поясненням; успіх → свіжий пульт."""
+    from . import plan
+    project = _project_for_change(request, pk)
+    try:
+        notice = fn(project, _body(request))
+    except plan.PlanError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    return _cockpit(request, project, notice)
+
+
+@staff_member_required
+@require_POST
+def plan_template_view(request, pk):
+    """«🧩 Скласти план з шаблону»: {template, start YYYY-MM-DD}."""
+    from . import plan
+    from .models import ProjectTemplate
+
+    def run(project, body):
+        tpl = ProjectTemplate.objects.filter(pk=body.get("template") or 0, is_active=True).first() \
+            if str(body.get("template") or "").isdigit() else None
+        if tpl is None:
+            raise plan.PlanError("Виберіть шаблон")
+        n = plan.apply_template(project, tpl, plan._date(body.get("start")), user=request.user)
+        return f"🧩 План з шаблону «{tpl.name}»: кроків {n}. Перевірте дати й зафіксуйте базовий план"
+    return _plan_action(request, pk, run)
+
+
+@staff_member_required
+@require_POST
+def plan_step_view(request, pk):
+    from . import plan
+
+    def run(project, body):
+        step = plan.save_step(project, body, user=request.user)
+        return f"📋 Збережено: {step.title}"
+    return _plan_action(request, pk, run)
+
+
+@staff_member_required
+@require_POST
+def plan_step_delete_view(request, pk, sid):
+    from . import plan
+    return _plan_action(request, pk, lambda project, body: "📋 Крок прибрано" if plan.delete_step(project, sid)
+                        else "Крок уже прибрано")
+
+
+@staff_member_required
+@require_POST
+def plan_phase_view(request, pk):
+    from . import plan
+
+    def run(project, body):
+        phase = plan.save_phase(project, body)
+        return f"📋 Фаза збережена: {phase.name}"
+    return _plan_action(request, pk, run)
+
+
+@staff_member_required
+@require_POST
+def plan_phase_delete_view(request, pk, fid):
+    from . import plan
+    return _plan_action(request, pk, lambda project, body: "📋 Фазу прибрано, її кроки лишились без фази"
+                        if plan.delete_phase(project, fid) else "Фазу вже прибрано")
+
+
+@staff_member_required
+@require_POST
+def plan_baseline_view(request, pk):
+    from . import plan
+    return _plan_action(request, pk, lambda project, body:
+                        f"📌 Базовий план зафіксовано: кроків {plan.baseline(project, request.user)}")
+
+
+@staff_member_required
+@require_POST
+def plan_save_template_view(request, pk):
+    from . import plan
+
+    def run(project, body):
+        tpl = plan.save_as_template(project, body.get("name"), user=request.user)
+        return f"💾 Шаблон «{tpl.name}» збережено — він з'явиться у виборі шаблонів"
+    return _plan_action(request, pk, run)
+
+
+@staff_member_required
+@require_POST
+def plan_clear_view(request, pk):
+    from . import plan
+
+    def run(project, body):
+        plan.clear(project)
+        return "🗑 План очищено"
+    return _plan_action(request, pk, run)

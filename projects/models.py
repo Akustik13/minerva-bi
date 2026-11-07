@@ -43,6 +43,7 @@ class Project(models.Model):
     source_thread = models.ForeignKey("email_assistant.EmailThread", null=True, blank=True,
                                       on_delete=models.SET_NULL, related_name="+",
                                       verbose_name="Створено з листування")
+    baseline_at = models.DateTimeField("Базовий план зафіксовано", null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name="+", verbose_name="Створив")
     created_at = models.DateTimeField("Створено", auto_now_add=True)
@@ -287,3 +288,141 @@ class ProjectState(models.Model):
 
     def __str__(self):
         return f"{self.project.code}: {self.health or '—'}"
+
+
+# ── План: фази, кроки, залежності, шаблони (projects/plan.py, розрахунок — projects/schedule.py) ─────────────────
+
+class ProjectPhase(models.Model):
+    """Фаза плану (stage-gate): кроки фази + умова переходу (gate). Дати фази — з її кроків; без кроків — свої."""
+    PLANNED, ACTIVE, DONE = "planned", "active", "done"
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="phases")
+    order = models.PositiveIntegerField("Порядок", default=0)
+    name = models.CharField("Фаза", max_length=120)
+    icon = models.CharField("Значок", max_length=8, blank=True, default="")
+    gate = models.CharField("Умова переходу", max_length=200, blank=True, default="",
+                            help_text="Що має статися, щоб іти далі: «Клієнт погодив зразок»")
+    start = models.DateField("Початок", null=True, blank=True)
+    end = models.DateField("Кінець", null=True, blank=True)
+    # кеш розрахунку (schedule.persist)
+    f_start = models.DateField(null=True, blank=True)
+    f_end = models.DateField(null=True, blank=True)
+    eff_status = models.CharField(max_length=10, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Фаза"
+        verbose_name_plural = "Фази"
+        ordering = ["project", "order", "pk"]
+
+    def __str__(self):
+        return f"{self.project.code} · {self.name}"
+
+
+TRIGGERS = [
+    ("", "— вручну"),
+    ("offer_sent", "📝 Angebot надіслано"),
+    ("offer_accepted", "🤝 Angebot прийнято"),
+    ("order_received", "🛒 Отримано замовлення клієнта"),
+    ("order_shipped", "🚚 Замовлення відправлено"),
+    ("order_delivered", "✅ Замовлення доставлено"),
+    ("po_ordered", "🏭 Закупівлю замовлено"),
+    ("po_received", "📥 Закупівлю отримано"),
+    ("jlc_ordered", "🔧 JLC-замовлення зроблено"),
+    ("jlc_delivered", "📦 JLC-замовлення доставлено"),
+    ("shipment_sent", "🚚 Відправлення передано перевізнику"),
+    ("shipment_delivered", "✅ Відправлення доставлено"),
+]
+
+
+class ProjectStep(models.Model):
+    """Крок плану: задача, віха (◆) — дати, хто, залежності, стан. trigger + прив'язані об'єкти → стан сам
+    (Angebot надіслано, закупівлю отримано…). Поля f_* / eff_status / critical / slip_days — кеш розрахунку."""
+    TASK, MILESTONE = "task", "milestone"
+    KIND_CHOICES = [(TASK, "Крок"), (MILESTONE, "◆ Віха")]
+    WE, CUSTOMER, SUPPLIER, COLLEAGUE = "we", "customer", "supplier", "colleague"
+    SIDE_CHOICES = [(WE, "Ми"), (CUSTOMER, "Клієнт"), (SUPPLIER, "Постачальник"), (COLLEAGUE, "Колега")]
+    TODO, DOING, WAITING, DONE, SKIPPED = "todo", "doing", "waiting", "done", "skipped"
+    STATUS_CHOICES = [(TODO, "○ Заплановано"), (DOING, "● В роботі"), (WAITING, "⏳ Чекаємо"),
+                      (DONE, "✓ Виконано"), (SKIPPED, "⤼ Пропущено")]
+    MANUAL, TEMPLATE, AI = "manual", "template", "ai"
+    SOURCE_CHOICES = [(MANUAL, "вручну"), (TEMPLATE, "шаблон"), (AI, "AI")]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="steps")
+    phase = models.ForeignKey(ProjectPhase, null=True, blank=True, on_delete=models.SET_NULL, related_name="steps",
+                              verbose_name="Фаза")
+    order = models.PositiveIntegerField("Порядок", default=0)
+    title = models.CharField("Крок", max_length=200)
+    kind = models.CharField("Вид", max_length=10, choices=KIND_CHOICES, default=TASK)
+    side = models.CharField("Хто", max_length=10, choices=SIDE_CHOICES, default=WE)
+    assignee = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name="project_steps", verbose_name="Виконавець")
+    start = models.DateField("Початок (план)", null=True, blank=True)
+    end = models.DateField("Кінець (план)", null=True, blank=True)
+    duration_days = models.PositiveSmallIntegerField("Тривалість, дн.", default=1)
+    baseline_start = models.DateField("Базовий початок", null=True, blank=True)
+    baseline_end = models.DateField("Базовий кінець", null=True, blank=True)
+    status = models.CharField("Стан", max_length=10, choices=STATUS_CHOICES, default=TODO, db_index=True)
+    started_on = models.DateField("Почали", null=True, blank=True)
+    done_on = models.DateField("Виконано", null=True, blank=True)
+    trigger = models.CharField("Виконано, коли", max_length=20, choices=TRIGGERS, blank=True, default="")
+    auto = models.BooleanField("Стан з прив'язаних об'єктів", default=True)
+    links = models.ManyToManyField(ProjectLink, blank=True, related_name="steps", verbose_name="Прив'язані об'єкти")
+    offers = models.ManyToManyField("offers.Offer", blank=True, related_name="project_steps", verbose_name="Angebote")
+    notes = models.TextField("Примітки", blank=True, default="")
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
+    # кеш розрахунку (schedule.persist)
+    f_start = models.DateField(null=True, blank=True)
+    f_end = models.DateField(null=True, blank=True)
+    eff_status = models.CharField(max_length=10, blank=True, default="")
+    critical = models.BooleanField(default=False)
+    slip_days = models.SmallIntegerField(null=True, blank=True)
+    auto_note = models.CharField(max_length=255, blank=True, default="")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Крок плану"
+        verbose_name_plural = "Кроки плану"
+        ordering = ["project", "order", "pk"]
+
+    def __str__(self):
+        return f"{self.project.code} · {self.title}"
+
+
+class StepDependency(models.Model):
+    """Наступний крок починається після попереднього (фініш → старт) + lag_days. Попередній може бути
+    в іншому проєкті (тоді беруться його збережені дати прогнозу)."""
+    predecessor = models.ForeignKey(ProjectStep, on_delete=models.CASCADE, related_name="successor_links")
+    successor = models.ForeignKey(ProjectStep, on_delete=models.CASCADE, related_name="predecessor_links")
+    lag_days = models.SmallIntegerField("Відступ, дн.", default=0)
+
+    class Meta:
+        verbose_name = "Залежність кроків"
+        verbose_name_plural = "Залежності кроків"
+        constraints = [
+            models.UniqueConstraint(fields=["predecessor", "successor"], name="unique_step_dependency"),
+            models.CheckConstraint(condition=~Q(predecessor=models.F("successor")), name="step_dependency_not_self"),
+        ]
+
+
+class ProjectTemplate(models.Model):
+    """Шаблон плану: фази й кроки з тривалостями (plan — JSON, див. projects/plan.py). Вбудовані з'являються
+    самі (plan.ensure_builtin), їх можна сховати, не видалити; свій — «💾 Зберегти як шаблон» з плану проєкту."""
+    name = models.CharField("Назва", max_length=120, unique=True)
+    description = models.TextField("Опис", blank=True, default="")
+    plan = models.JSONField("Фази й кроки", default=list)
+    is_active = models.BooleanField("Показувати", default=True)
+    builtin = models.BooleanField("Вбудований", default=False)
+    order = models.PositiveIntegerField("Порядок", default=0)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Шаблон плану"
+        verbose_name_plural = "🧩 Шаблони планів"
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name

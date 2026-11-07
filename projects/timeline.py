@@ -1,6 +1,6 @@
 """Шкала проєкту для пульта (projects/cockpit.py): події з усіх джерел на одній осі часу → SVG без бібліотек.
 
-Доріжки (порожні не показуються): 📌 важливі моменти, ✉️ листування (точки по днях: від клієнта / наші, кружечок —
+Доріжки (порожні не показуються): 📌 важливі моменти, 📋 фази й віхи плану (schedule.py), ✉️ листування (точки по днях: від клієнта / наші, кружечок —
 лист без нашої відповіді), 📝 Angebote й документи бази знань, 🛒 замовлення й відправлення, 🏭 закупівлі, JLC і посилки
 до нас, 📅 терміни й зустрічі з листів проєкту, ⏱ години askDANTE по тижнях. Лінії: сьогодні, старт, строк клієнту.
 
@@ -18,6 +18,7 @@ from .models import ProjectHighlight
 
 LANES = [
     ("moments", "📌 Важливі моменти"),
+    ("plan", "📋 Фази й віхи"),
     ("mail", "✉️ Листування"),
     ("docs", "📝 Angebote й документи"),
     ("orders", "🛒 Замовлення й доставка"),
@@ -88,6 +89,7 @@ def events(project, facts, viewer, today=None) -> list:
         cls = {ProjectHighlight.PROBLEM: "bad", ProjectHighlight.APPROVAL: "ok"}.get(h.kind, "")
         ev("moments", "flag", h.date, h.title, tip, f"/email/message/{h.message_id}/" if own else "", cls, hid=h.pk)
 
+    _plan_events(ev, facts, today)
     _mail_events(ev, facts, uid)
     _doc_events(ev, project, facts, viewer)
     _order_events(ev, facts, today)
@@ -105,6 +107,42 @@ def events(project, facts, viewer, today=None) -> list:
 
     out.extend(_hours(project, viewer))
     return out
+
+
+def _plan_events(ev, facts, today):
+    """📋 Фази плану — смуги (прогноз), віхи — ромби; зсув від базового плану — жовтим, прострочена віха — червоним."""
+    from .models import ProjectPhase, ProjectStep
+    plan = facts.get("plan")
+    if plan is None or not plan.has_plan:
+        return
+    for pc in plan.phases:
+        if pc.phase is None or not pc.start or not pc.end:
+            continue
+        late = pc.status != ProjectPhase.DONE and bool(pc.slip and pc.slip > 0)
+        cls = "warn" if late else {ProjectPhase.DONE: "ok", ProjectPhase.ACTIVE: "open"}.get(pc.status, "plan")
+        name = f"{pc.phase.icon} {pc.phase.name}".strip()
+        ev("plan", "bar", pc.start, name,
+           f"📋 {name} · кроків {pc.done} з {len(pc.steps)} · {_fmt(pc.start)} → {_fmt(pc.end)}"
+           + (f" · зсув +{pc.slip} дн." if late else "") + (f"\nУмова переходу: {pc.phase.gate}" if pc.phase.gate else ""),
+           "", cls, end=pc.end)
+    for c in plan.steps:
+        s = c.step
+        if s.kind != ProjectStep.MILESTONE or not c.end:
+            continue
+        if c.status == ProjectStep.DONE:
+            cls = "ok"
+        elif c.status == ProjectStep.SKIPPED:
+            cls = "plan"
+        elif s.end and s.end < today:
+            cls = "bad"
+        elif c.slip and c.slip > 0:
+            cls = "warn"
+        else:
+            cls = "open"
+        ev("plan", "diamond", c.end, f"◆ {s.title}",
+           f"◆ {s.title} · {dict(ProjectStep.STATUS_CHOICES).get(c.status, c.status)} · {_fmt(c.end)}"
+           + (f" · план {_fmt(s.baseline_end)}" if s.baseline_end and s.baseline_end != c.end else "")
+           + (f"\n{c.note}" if c.note else ""), "", cls)
 
 
 def _mail_events(ev, facts, uid):

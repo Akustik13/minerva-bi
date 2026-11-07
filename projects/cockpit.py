@@ -92,6 +92,39 @@ def _mails(facts, uid) -> list:
     return out
 
 
+def _strip(plan) -> list:
+    """Смуга фаз (stage-gate): назва, стан, дати, кроки, зсув, умова переходу."""
+    out = []
+    for pc in plan.phases:
+        ph = pc.phase
+        gate = pc.gate_step
+        out.append({
+            "name": (f"{ph.icon} {ph.name}".strip() if ph else "Без фази"), "status": pc.status,
+            "dates": f"{pc.start:%d.%m}–{pc.end:%d.%m}" if pc.start and pc.end else "",
+            "progress": f"{pc.done} з {len(pc.steps)}" if pc.steps else "",
+            "slip": pc.slip if pc.slip and pc.slip > 0 and pc.status != "done" else 0,
+            "gate": ph.gate if ph else "", "gate_done": bool(gate and gate.status == "done"),
+            "id": ph.pk if ph else "",
+        })
+    return out
+
+
+def _plan_context(project, facts, today, can_change=False) -> dict:
+    """Вкладка «📅 План»: смуга фаз, Гант, дані вікна кроку (лише тому, хто може змінювати проєкт)."""
+    from . import gantt, plan as plan_mod
+    p = facts.get("plan")
+    if p is None or not p.has_plan:
+        return {"has_plan": False, "templates": [
+            {"id": t.pk, "name": t.name, "counts": plan_mod.template_counts(t), "description": t.description}
+            for t in plan_mod.templates()] if can_change else []}
+    return {"has_plan": True, "strip": _strip(p), "gantt": gantt.render(project, p, today, editable=can_change),
+            "end": p.end, "base_end": p.base_end,
+            "late": bool(project.due_date and p.end and p.end > project.due_date),
+            "baseline_at": project.baseline_at, "data": plan_mod.editor_data(project, p) if can_change else None,
+            "steps": len(p.steps), "critical": sum(1 for c in p.steps if c.critical and c.status not in
+                                                   ("done", "skipped"))}
+
+
 def context(project, user, range_key="all", notice="") -> dict:
     today = timezone.localdate()
     if range_key not in timeline.RANGES:
@@ -102,6 +135,7 @@ def context(project, user, range_key="all", notice="") -> dict:
     attention = overview.visible(facts["attention"], user)
     icon, label = state.HEALTH[st.health]
     pk = project.pk
+    can_change = bool(user and user.has_perm("projects.change_project"))
     return {
         "project": project, "health": {"key": st.health, "icon": icon, "label": label},
         "due": _due(project, today), "start": project.start_date, "today": today,
@@ -114,11 +148,19 @@ def context(project, user, range_key="all", notice="") -> dict:
         "counts": facts["counts"], "more": facts["more"],
         "timeline": timeline.render(project, facts, user, months=timeline.RANGES[range_key], today=today),
         "range": range_key, "ranges": RANGE_LABELS,
-        "can_change": bool(user and user.has_perm("projects.change_project")),
+        "can_change": can_change,
         "has_products": project.products.exists(),
         "notice": notice,
+        "plan": _plan_context(project, facts, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
-                 "scan": reverse("projects:scan", args=[pk]), "mail": f"/email/?project={pk}"},
+                 "scan": reverse("projects:scan", args=[pk]), "mail": f"/email/?project={pk}",
+                 "plan_template": reverse("projects:plan_template", args=[pk]),
+                 "plan_step": reverse("projects:plan_step", args=[pk]),
+                 "plan_phase": reverse("projects:plan_phase", args=[pk]),
+                 "plan_baseline": reverse("projects:plan_baseline", args=[pk]),
+                 "plan_save_template": reverse("projects:plan_save_template", args=[pk]),
+                 "plan_clear": reverse("projects:plan_clear", args=[pk]),
+                 "plan_base": f"/projects/api/project/{pk}/plan/"},
     }
 
 

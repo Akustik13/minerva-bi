@@ -89,6 +89,7 @@ def calendar_view(request):
 
     wt = _worktime_layer(request, year, month)
     ext_by_day = _external_events(request.user, year, month)
+    pj_by_day = _project_steps(request.user, year, month)
     weeks_data = []
     for week in raw_weeks:
         week_cells = []
@@ -100,6 +101,7 @@ def calendar_view(request):
                 'other':    day == 0,
                 'wt':       wt['days'].get(day) if wt and day else None,
                 'ext':      ext_by_day.get(day, []) if day else [],
+                'pj':       pj_by_day.get(day, []) if day else [],
             })
         weeks_data.append(week_cells)
 
@@ -139,6 +141,17 @@ def _worktime_layer(request, year, month):
         import logging
         logging.getLogger(__name__).exception('worktime layer')
         return None
+
+
+def _project_steps(user, year, month) -> dict:
+    """📋 Кроки й віхи планів проєктів людини (projects/calendar_layer.py); без проєктів — порожньо."""
+    try:
+        from projects.calendar_layer import month_steps
+        return month_steps(user, year, month)
+    except Exception:   # календар працює й без проєктів
+        import logging
+        logging.getLogger(__name__).exception('projects layer')
+        return {}
 
 
 def _external_events(user, year, month) -> dict:

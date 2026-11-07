@@ -258,11 +258,20 @@ def collect(project, today=None) -> dict:
     if is_open and not project.next_action:
         add("info", "➡️", "Не задано наступну дію", kind="todo")
 
+    # План: прогноз, критичний шлях, стан кроків з об'єктів (schedule.py) → кеш у кроках і пункти уваги
+    from . import schedule
+    plan = schedule.compute(project, {"offers": offers, "orders": orders, "purchases": purchases, "jlc": jlc,
+                                      "shipments": shipments}, today)
+    if plan.has_plan:
+        schedule.persist(plan)
+        schedule.attention(plan, project, lambda level, icon, text, url, kind: add(level, icon, text, url, kind),
+                           today)
+
     attention.sort(key=lambda a: LEVELS[a["level"]])
     return {
         "project": project, "today": today, "messages": messages, "offers": offers, "orders": orders,
         "deadlines": deadlines, "attention": attention, "waiting_us": waiting_us, "waiting_them": waiting_them,
-        "purchases": purchases, "jlc": jlc, "shipments": shipments, "highlights": highlights,
+        "purchases": purchases, "jlc": jlc, "shipments": shipments, "highlights": highlights, "plan": plan,
         "counts": {"in": sum(1 for x in messages if x["dir"] == "in"),
                    "out": sum(1 for x in messages if x["dir"] == "out"),
                    "threads": len({x["msg"].thread_id for x in messages}),
@@ -396,6 +405,17 @@ def prompt_text(facts) -> tuple:
     if facts.get("highlights"):
         parts.append("ВАЖЛИВІ МОМЕНТИ (позначила людина):\n" + "\n".join(
             f"{_fmt(h.date)} — {h.get_kind_display()}: {h.title}" for h in facts["highlights"]))
+    plan = facts.get("plan")
+    if plan is not None and plan.has_plan:
+        lines = []
+        for pc in plan.phases:
+            lines.append(f"Фаза «{pc.phase.name if pc.phase else 'без фази'}» — {pc.status}, "
+                         f"{_fmt(pc.start)}–{_fmt(pc.end)}" + (f"; умова переходу: {pc.phase.gate}"
+                                                              if pc.phase and pc.phase.gate else ""))
+            for c in pc.steps[:12]:
+                lines.append(f"  · {c.step.title} ({c.step.get_side_display()}) — {c.status}, "
+                             f"{_fmt(c.start)}–{_fmt(c.end)}")
+        parts.append("ПЛАН ПРОЄКТУ (фази й кроки, прогноз):\n" + "\n".join(lines[:80]))
     if facts["deadlines"]:
         parts.append("ТЕРМІНИ, ЗНАЙДЕНІ В ЛИСТАХ:\n" + "\n".join(
             f"{_fmt(e.start_at)} — {e.title}{' (виконано)' if e.is_done else ''}" for e in facts["deadlines"]))
