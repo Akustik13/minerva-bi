@@ -174,6 +174,26 @@ def _status_context(project, user, facts, st, today, can_change) -> dict:
             "dots": health.DOTS, "last_dot": health.DOTS.get(last.health, "") if last else ""}
 
 
+def _ai_context(project, user, can_change) -> dict:
+    """«🧠 AI-помічник»: пропозиції з листів цієї людини (лише її), скільки її листів ще не прочитано, чи є база
+    знань і право доручати агенту. Без права змінювати проєкт — блоку немає."""
+    from . import ai_scan, delegate, forgotten
+    from .models import ProjectSuggestion
+    if not can_change or user is None:
+        return {"on": False}
+    scan = ai_scan.context(project, user, can_change)
+    items = []
+    for s in scan["items"]:
+        risk = s.kind == ProjectSuggestion.RISK
+        icon, _, label = (s.get_category_display() if risk else s.get_moment_kind_display()).partition(" ")
+        items.append({"id": s.pk, "kind": s.kind, "icon": icon, "label": label, "title": s.title, "quote": s.quote,
+                      "date": s.date, "risk": risk, "score": s.score, "level": s.level, "mitigation": s.mitigation,
+                      "url": f"/email/message/{s.message_id}/" if s.message_id else ""})
+    return {"on": True, "items": items, "moments": sum(1 for i in items if not i["risk"]),
+            "risks": sum(1 for i in items if i["risk"]), "unread": scan["unread"], "own": scan["own"],
+            "rag": forgotten.rag_ready(user), "agent": delegate.can(user)}
+
+
 def context(project, user, range_key="all", notice="") -> dict:
     today = timezone.localdate()
     if range_key not in timeline.RANGES:
@@ -185,6 +205,10 @@ def context(project, user, range_key="all", notice="") -> dict:
     icon, label = state.HEALTH[st.health]
     pk = project.pk
     can_change = bool(user and user.has_perm("projects.change_project"))
+    plan = _plan_context(project, facts, today, can_change)
+    ai = _ai_context(project, user, can_change)
+    if plan.get("data") is not None:
+        plan["data"]["agent"] = bool(ai.get("agent"))
     return {
         "project": project, "health": {"key": st.health, "icon": icon, "label": label},
         "due": _due(project, today), "start": project.start_date, "today": today,
@@ -200,7 +224,8 @@ def context(project, user, range_key="all", notice="") -> dict:
         "can_change": can_change,
         "has_products": project.products.exists(),
         "notice": notice,
-        "plan": _plan_context(project, facts, today, can_change),
+        "plan": plan,
+        "ai": ai,
         "riskreg": _risks_context(project, can_change),
         "status": _status_context(project, user, facts, st, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
@@ -213,7 +238,12 @@ def context(project, user, range_key="all", notice="") -> dict:
                  "plan_baseline": reverse("projects:plan_baseline", args=[pk]),
                  "plan_save_template": reverse("projects:plan_save_template", args=[pk]),
                  "plan_clear": reverse("projects:plan_clear", args=[pk]),
-                 "plan_base": f"/projects/api/project/{pk}/plan/"},
+                 "plan_base": f"/projects/api/project/{pk}/plan/",
+                 "ai_scan": reverse("projects:ai_scan", args=[pk]), "ai_plan": reverse("projects:ai_plan", args=[pk]),
+                 "ai_plan_apply": reverse("projects:ai_plan_apply", args=[pk]),
+                 "ai_base": f"/projects/api/project/{pk}/ai/suggestion/",
+                 "forgotten": reverse("projects:forgotten", args=[pk]),
+                 "forgotten_decide": reverse("projects:forgotten_decide", args=[pk])},
     }
 
 

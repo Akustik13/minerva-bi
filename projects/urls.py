@@ -33,4 +33,13 @@ urlpatterns = [
     path("api/project/<int:pk>/risk/<int:rid>/delete/", views.risk_delete_view, name="risk_delete"),
     path("api/project/<int:pk>/status/", views.status_view, name="status"),
     path("api/project/<int:pk>/status/draft/", views.status_draft_view, name="status_draft"),
+    # 🧠 AI-помічник проєкту (projects/ai_scan.py, ai_plan.py, forgotten.py, delegate.py)
+    path("api/project/<int:pk>/ai/scan/", views.ai_scan_view, name="ai_scan"),
+    path("api/project/<int:pk>/ai/suggestion/<int:sid>/", views.ai_suggestion_view, name="ai_suggestion"),
+    path("api/project/<int:pk>/ai/plan/", views.ai_plan_view, name="ai_plan"),
+    path("api/project/<int:pk>/ai/plan/apply/", views.ai_plan_apply_view, name="ai_plan_apply"),
+    path("api/project/<int:pk>/forgotten/", views.forgotten_view, name="forgotten"),
+    path("api/project/<int:pk>/forgotten/decide/", views.forgotten_decide_view, name="forgotten_decide"),
+    path("api/project/<int:pk>/forgotten/<uuid:job_id>/", views.forgotten_poll_view, name="forgotten_poll"),
+    path("api/project/<int:pk>/plan/step/<int:sid>/agent/", views.step_agent_view, name="step_agent"),
 ]

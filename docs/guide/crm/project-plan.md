@@ -6,7 +6,7 @@ where: 📁 Проєкти → Усі проєкти → проєкт → «🧭
 urls: /admin/projects/project/, /admin/projects/projecttemplate/, /calendar/
 roles: адміністратор, менеджер
 keywords: план проєкту, фази, фаза, етап, етапи, віха, віхи, milestone, крок плану, задачі проєкту, діаграма Ганта, гант, gantt, критичний шлях, базовий план, baseline, зсув, прогноз, залежності, шаблон плану, шаблони планів, stage-gate, умова переходу, Projektplan, Meilenstein, Phasen, Zeitplan
-related: crm/project-cockpit, crm/project-portfolio, crm/project-risks, crm/projects, crm/project-overview, calendar/overview, offers/overview, inventory/purchases
+related: crm/project-cockpit, crm/project-portfolio, crm/project-risks, crm/project-ai, crm/projects, crm/project-overview, calendar/overview, offers/overview, inventory/purchases
 ---
 
 ## Що це
@@ -38,7 +38,10 @@ related: crm/project-cockpit, crm/project-portfolio, crm/project-risks, crm/proj
 | **Кабельна збірка** | Креслення → Зразок → Серія |
 | **Перепродаж зі складу** | Продаж: Angebot → замовлення → відправка → доставлено |
 
-Без шаблону — **«＋ Фаза вручну»**, далі **«＋ Крок»**.
+Без шаблону — **«＋ Фаза вручну»**, далі **«＋ Крок»**. Або **«🧠 Скласти план з листування»** — AI складе
+чернетку з ваших листів і тривалостей минулих проєктів, ви її переглянете перед застосуванням
+([AI-помічник проєкту](guide:crm/project-ai)). Крок плану можна доручити агенту — **«🤖 Доручити агенту»** у вікні
+кроку.
 
 > 💡 Добрий план одного проєкту можна зберегти: **«💾 Зберегти як шаблон»** — він з'явиться у виборі
 > шаблонів для інших проєктів.

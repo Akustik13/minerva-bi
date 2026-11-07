@@ -51,6 +51,25 @@
   .pjc-m-problem { border-left: 3px solid var(--err, #f85149); padding-left: 6px !important; }
   .pjc-m-approval { border-left: 3px solid var(--ok, #3fb950); padding-left: 6px !important; }
   .pjc-q { color: var(--text-muted, #9aafbe); font-size: 12px; font-style: italic; }
+  .pja { margin-top: 10px; }
+  .pja-list > li { padding: 5px 0; border-top: 1px dashed var(--border-strong, #2a3f52); }
+  .pja-list > li:first-child { border-top: 0; }
+  .pja-k { font-size: 11.5px; color: var(--text-muted, #9aafbe); margin-right: 4px; }
+  .pja-ptr { display: inline-block; margin-top: 6px; font-size: 12px; }
+  .pja-found { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border-strong, #2a3f52); }
+  .pja-found[hidden] { display: none; }
+  .pja-fh { font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .pja-f { padding: 3px 0; }
+  .pjp-agent { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+  .pjp-agent[hidden] { display: none; }
+  .pjp-agent-tasks { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; }
+  .pjd-start { margin-top: 8px; }
+  .pjd-list { margin-top: 8px; max-height: 52vh; overflow: auto; border: 1px solid var(--border-strong, #2a3f52);
+              border-radius: 8px; padding: 6px 10px; }
+  .pjd-ph { font-weight: 700; margin: 8px 0 3px; }
+  .pjd-ph:first-child { margin-top: 0; }
+  .pjd-st { display: flex; gap: 8px; align-items: baseline; padding: 2px 0 2px 6px; font-size: 12.5px; }
+  .pjd-body { min-width: 0; }
   .pjc-mform { display: grid; gap: 6px; margin-bottom: 8px; padding: 8px; border: 1px dashed var(--border-strong, #2a3f52);
                border-radius: 6px; }
   .pjc-mform[hidden] { display: none; }
@@ -290,7 +309,7 @@
     var n = root.querySelector('.pjc-merr');
     if (n) n.textContent = text;
   }
-  function put(html) { root.innerHTML = html; applyTab(curTab); }
+  function put(html) { root.innerHTML = html; applyTab(curTab); renderFound(); }
   function done(j) {
     if (j && j.ok && j.html) { put(j.html); return true; }
     toast('⚠️ ' + ((j && j.error) || 'не вдалося'));
@@ -393,10 +412,18 @@
     if (!tpl) return null;
     document.body.appendChild(tpl.content.cloneNode(true));
     dlg = {step: document.getElementById('pjp-step'), phase: document.getElementById('pjp-phase'),
-           risk: document.getElementById('pjr-risk')};
+           risk: document.getElementById('pjr-risk'), plan: document.getElementById('pja-plan'),
+           agent: document.getElementById('pja-agent')};
     wire(dlg.step, saveStep, deleteStep);
     wire(dlg.phase, savePhase, deletePhase);
     wire(dlg.risk, saveRisk, deleteRisk);
+    wire(dlg.plan, applyPlanDraft, function () {}, false);
+    wire(dlg.agent, startAgent, function () {}, false);
+    dlg.step.querySelector('[data-pja-agent]').addEventListener('click', function () {
+      var id = dlg.step.dataset.id;
+      dlg.step.close();
+      if (id) openAgent(id);
+    });
     q(dlg.risk, 'data-r', 'probability').addEventListener('change', riskScore);
     q(dlg.risk, 'data-r', 'impact').addEventListener('change', riskScore);
     q(dlg.step, 'data-s', 'kind').addEventListener('change', syncStep);
@@ -422,7 +449,7 @@
     });
     return dlg;
   }
-  function wire(d, save, del) {
+  function wire(d, save, del, enter) {
     d.addEventListener('click', function (e) {
       var t = e.target.closest('[data-pjp-save],[data-pjp-close],[data-pjp-del]');
       if (!t || t.disabled) return;
@@ -430,6 +457,7 @@
       else if (t.hasAttribute('data-pjp-close')) d.close();
       else del();
     });
+    if (enter === false) return;                    // вікна AI: Enter не запускає дію
     d.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && !e.isComposing && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') {
         e.preventDefault();
@@ -498,6 +526,17 @@
     data.statuses.forEach(function (x) { if (x[0] === s.eff) eff = x[1]; });
     note.textContent = s.note ? '🔗 Зараз: ' + s.note + (s.eff && s.eff !== s.status ? ' · стан за ними: ' + eff : '') : '';
     note.hidden = !s.note;
+    var ag = d.querySelector('[data-s-agent]'), agl = d.querySelector('[data-s-agent-tasks]');
+    ag.hidden = isNew || !data.agent;
+    agl.textContent = '';
+    (s.agent || []).forEach(function (t) {
+      var a = document.createElement('a');
+      a.href = t.url;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = '🤖 ' + t.label;
+      agl.appendChild(a);
+    });
     d.querySelector('[data-pjp-del]').hidden = isNew;
     d.querySelector('[data-pjp-err]').textContent = '';
     d.querySelector('h3').textContent = isNew ? '📋 Новий крок плану' : '📋 Крок плану';
@@ -733,6 +772,311 @@
     });
   }
 
+  // ── 🧠 AI-помічник: моменти й ризики з листів, забуті листи, чернетка плану, доручення агенту ──
+  function aiErr(text) {
+    var n = root.querySelector('[data-pja-err]');
+    if (n) n.textContent = text || '';
+    if (text) toast(text);
+  }
+  function busy(btn, text) {
+    var label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = text;
+    return function () { btn.disabled = false; btn.textContent = label; };
+  }
+  function aiScan(btn) {
+    var undo = busy(btn, '🧠 AI читає листи…');
+    aiErr('');
+    send(box().dataset.aiScan, {}).then(function (j) {
+      if (j && j.ok && j.html) { put(j.html); return; }
+      undo();
+      aiErr('⚠️ ' + ((j && j.error) || 'не вдалося'));
+    });
+  }
+  function aiDecide(btn) {
+    btn.disabled = true;
+    send(box().dataset.aiBase + btn.dataset.pjaDecide + '/', {accept: btn.dataset.accept === '1'}).then(function (j) {
+      if (j && j.ok && j.html) { put(j.html); return; }
+      btn.disabled = false;
+      aiErr('⚠️ ' + ((j && j.error) || 'не вдалося'));
+    });
+  }
+
+  // 🔎 Забуті листи: список живе в пам'яті сторінки й малюється знову після кожного оновлення пульта
+  var found = null;
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function foundRow(r, ul) {
+    var li = el('li', 'pja-f'), a = el('a', '', r.subject);
+    a.href = r.url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.setAttribute('translate', 'no');
+    li.appendChild(document.createTextNode('✉️ '));
+    li.appendChild(a);
+    var meta = [r.date, r.from].filter(Boolean).join(' · ');
+    if (meta) {
+      var m = el('span', 'pjc-sub', ' · ' + meta);
+      m.setAttribute('translate', 'no');
+      li.appendChild(m);
+    }
+    var yn = el('span', 'pjc-yn'), state = found.decided[r.thread];
+    if (state) {
+      yn.textContent = state;
+    } else {
+      [['1', '✓', 'Так — додати гілку до проєкту'], ['0', '✗', 'Ні — не стосується цього проєкту']].forEach(function (x) {
+        var b = el('button', 'pjc-b', x[1]);
+        b.type = 'button';
+        b.title = x[2];
+        b.dataset.pjaFdecide = r.thread;
+        b.dataset.accept = x[0];
+        yn.appendChild(b);
+      });
+    }
+    li.appendChild(yn);
+    if (r.reasons && r.reasons.length) li.appendChild(el('div', 'pjc-sub', r.reasons.join(' · ')));
+    ul.appendChild(li);
+  }
+  function renderFound() {
+    var holder = root.querySelector('[data-pja-found]');
+    if (!holder) return;
+    if (!found) { holder.hidden = true; holder.textContent = ''; return; }
+    var seen = {}, rows = [];
+    found.rows.concat(found.ragRows).forEach(function (r) {
+      if (!seen[r.thread]) { seen[r.thread] = 1; rows.push(r); }
+    });
+    holder.hidden = false;
+    holder.textContent = '';
+    var h = el('div', 'pja-fh', '🔎 Забуті листи · ' + rows.length + ' '), x = el('button', 'pjc-x', '✕');
+    x.type = 'button';
+    x.title = 'Сховати';
+    x.setAttribute('aria-label', 'Сховати');
+    x.dataset.pjaFclose = '1';
+    h.appendChild(x);
+    holder.appendChild(h);
+    if (rows.length) {
+      var ul = el('ul', 'pjc-list');
+      rows.forEach(function (r) { foundRow(r, ul); });
+      holder.appendChild(ul);
+    }
+    var note = '';
+    if (found.rag && !found.ragDone) note = '🔎 База знань шукає…';
+    else if (found.rag && found.message) note = 'База знань: ' + found.message;
+    if (!rows.length && (!found.rag || found.ragDone)) {
+      note = (note ? note + ' · ' : '') + (found.rag
+        ? 'Нічого не знайшлося: шукали за учасниками й клієнтом проєкту, номерами замовлень і закупівель, артикулами й у базі знань.'
+        : 'Нічого не знайшлося: шукали за учасниками й клієнтом проєкту, номерами замовлень і закупівель та артикулами.');
+    }
+    if (note) holder.appendChild(el('div', 'pjc-sub', note));
+  }
+  function pollFound() {
+    if (!found || !found.job) return;
+    var job = found.job;
+    fetch(box().dataset.forgotten + job + '/', {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!found || found.job !== job) return;
+        if (!j || !j.ok) {
+          found.ragDone = true;
+          found.job = '';
+          found.message = (j && j.error) || 'не відповіла';
+        } else {
+          found.ragRows = j.rag_rows || [];
+          found.ragDone = !!j.done;
+          found.message = j.message || '';
+          found.job = j.job || '';
+        }
+        renderFound();
+        if (found.job) setTimeout(pollFound, (j && j.poll_ms) || 1500);
+      })
+      .catch(function () {
+        if (!found || found.job !== job) return;
+        found.ragDone = true;
+        found.job = '';
+        found.message = 'сервер не відповідає';
+        renderFound();
+      });
+  }
+  function findForgotten(btn) {
+    var undo = busy(btn, '🔎 Шукаю…');
+    aiErr('');
+    send(box().dataset.forgotten, {}).then(function (j) {
+      undo();
+      if (!j || !j.ok) { aiErr('⚠️ ' + ((j && j.error) || 'не вдалося')); return; }
+      found = {rows: j.rows || [], rag: !!j.rag, ragRows: j.rag_rows || [], ragDone: !!j.done, message: j.message || '',
+               job: j.job || '', decided: {}};
+      renderFound();
+      var holder = root.querySelector('[data-pja-found]');
+      if (holder) holder.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+      if (found.job) setTimeout(pollFound, j.poll_ms || 1500);
+    });
+  }
+  function forgottenDecide(btn) {
+    var accept = btn.dataset.accept === '1', thread = btn.dataset.pjaFdecide;
+    btn.disabled = true;
+    send(box().dataset.forgottenDecide, {thread: thread, accept: accept}).then(function (j) {
+      if (!j || !j.ok) { btn.disabled = false; aiErr('⚠️ ' + ((j && j.error) || 'не вдалося')); return; }
+      if (found) found.decided[thread] = accept ? '✓ додано' : '✕ не стосується';
+      if (j.notice) toast(j.notice);
+      if (accept) load(range());
+      else renderFound();
+    });
+  }
+
+  // 🧠 Чернетка плану з листування: перегляд у вікні, галочки кроків, «✓ Застосувати план»
+  var SIDE_LABELS = {we: 'ми', customer: 'клієнт', supplier: 'постачальник', colleague: 'колега'};
+  function aiPlan(btn) {
+    var undo = busy(btn, '🧠 AI складає план… до хвилини');
+    aiErr('');
+    send(box().dataset.aiPlan, {}).then(function (j) {
+      undo();
+      if (!j || !j.ok) { aiErr('⚠️ ' + ((j && j.error) || 'не вдалося')); return; }
+      openPlanDraft(j.draft);
+    });
+  }
+  function openPlanDraft(d) {
+    var ds = dialogs();
+    if (!ds || !d) return;
+    var dl = ds.plan, list = dl.querySelector('[data-pd-list]'), i = 0;
+    q(dl, 'data-pd', 'start').value = d.start || '';
+    dl.querySelector('[data-pd-info]').textContent = [d.template ? 'на основі шаблону «' + d.template + '»' : '',
+      'кроків ' + d.steps, 'ваших листів прочитано ' + d.mails, d.model].filter(Boolean).join(' · ');
+    var notes = dl.querySelector('[data-pd-notes]');
+    notes.textContent = d.notes || '';
+    notes.hidden = !d.notes;
+    list.textContent = '';
+    (d.phases || []).forEach(function (ph) {
+      var head = el('div', 'pjd-ph', ((ph.icon || '') + ' ' + ph.name).trim());
+      head.setAttribute('translate', 'no');
+      if (ph.gate) head.appendChild(el('span', 'pjc-sub', ' · умова переходу: ' + ph.gate));
+      list.appendChild(head);
+      (ph.steps || []).forEach(function (st) {
+        var row = el('label', 'pjd-st'), c = document.createElement('input');
+        c.type = 'checkbox';
+        c.checked = true;
+        c.value = i++;
+        row.appendChild(c);
+        var body = el('span', 'pjd-body'), t = el('b', '', (st.kind === 'milestone' ? '◆ ' : '') + st.title);
+        t.setAttribute('translate', 'no');
+        body.appendChild(t);
+        var meta = [st.kind === 'milestone' ? 'віха' : st.days + ' дн.', SIDE_LABELS[st.side] || st.side];
+        if (st.history) meta.push('⏱ як у минулих проєктах: ' + st.history.days + ' дн. · кроків ' + st.history.n);
+        if (st.done) meta.push('✓ уже зроблено ' + st.done.split('-').reverse().join('.'));
+        body.appendChild(el('small', 'pjc-sub', ' · ' + meta.join(' · ')));
+        if (st.ref && st.ref.message) {
+          var a = el('a', '', ' ✉️ #' + st.ref.n);
+          a.href = '/email/message/' + st.ref.message + '/';
+          a.target = '_blank';
+          a.rel = 'noopener';
+          body.appendChild(a);
+        }
+        if (st.why) {
+          var w = el('div', 'pjc-sub', st.why);
+          w.setAttribute('translate', 'no');
+          body.appendChild(w);
+        }
+        row.appendChild(body);
+        list.appendChild(row);
+      });
+    });
+    dl.querySelector('[data-pjp-err]').textContent = '';
+    dl.showModal();
+  }
+  function applyPlanDraft() {
+    var dl = dlg.plan, skip = [];
+    dl.querySelectorAll('[data-pd-list] input[type=checkbox]').forEach(function (c) { if (!c.checked) skip.push(+c.value); });
+    post(dl, box().dataset.aiPlanApply, {skip: skip, start: q(dl, 'data-pd', 'start').value});
+  }
+
+  // 🤖 Доручити крок агенту: варіанти доручення з кроку, текст і адреси можна змінити, запуск — завдання агенту
+  var agentStep = '';
+  function fillAgent(d, p) {
+    q(d, 'data-ag', 'instruction').value = p.instruction || '';
+    q(d, 'data-ag', 'mail_to').value = p.mail_to || '';
+  }
+  function openAgent(stepId) {
+    var ds = dialogs();
+    if (!ds) return;
+    var d = ds.agent, list = d.querySelector('[data-ag-presets]');
+    agentStep = stepId;
+    d.querySelector('[data-pjp-err]').textContent = '';
+    d.querySelector('[data-ag-done]').hidden = true;
+    d.querySelector('[data-ag-start]').disabled = true;
+    list.textContent = '…';
+    fillAgent(d, {});
+    d.showModal();
+    fetch(box().dataset.planBase + 'step/' + stepId + '/agent/', {credentials: 'same-origin'})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok) { list.textContent = '⚠️ ' + ((j && j.error) || 'не вдалося'); return; }
+        d.querySelector('[data-ag-step]').textContent = j.step.title;
+        list.textContent = '';
+        (j.presets || []).forEach(function (p, i) {
+          var l = el('label'), r = document.createElement('input');
+          r.type = 'radio';
+          r.name = 'pja-preset';
+          r.checked = i === 0;
+          r.addEventListener('change', function () { fillAgent(d, p); });
+          l.appendChild(r);
+          l.appendChild(document.createTextNode(' ' + p.label));
+          list.appendChild(l);
+        });
+        if ((j.presets || []).length) fillAgent(d, j.presets[0]);
+        fillSelect(q(d, 'data-ag', 'model'), j.models || [], j.model);
+        q(d, 'data-ag', 'budget').value = j.budget || '';
+        var tl = d.querySelector('[data-ag-tasks]');
+        tl.textContent = '';
+        (j.tasks || []).forEach(function (t) {
+          var a = el('a', '', '🤖 #' + t.id + ' ' + t.label + ' ');
+          a.href = t.url;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          tl.appendChild(a);
+        });
+        tl.hidden = !(j.tasks || []).length;
+        d.querySelector('[data-ag-start]').disabled = !j.can;
+        if (!j.can) d.querySelector('[data-pjp-err]').textContent = 'Немає права давати завдання агенту';
+        q(d, 'data-ag', 'instruction').focus();
+      })
+      .catch(function () { list.textContent = '⚠️ сервер не відповідає'; });
+  }
+  function startAgent() {
+    var d = dlg.agent, f = function (k) { return q(d, 'data-ag', k); };
+    var err = d.querySelector('[data-pjp-err]'), start = d.querySelector('[data-ag-start]');
+    var body = {instruction: f('instruction').value, mail_to: f('mail_to').value, model: f('model').value,
+                budget: f('budget').value};
+    start.disabled = true;
+    err.textContent = '';
+    send(box().dataset.planBase + 'step/' + agentStep + '/agent/', body).then(function (j) {
+      if (j && j.ok) {
+        if (j.html) put(j.html);
+        var ok = d.querySelector('[data-ag-done]');
+        ok.querySelector('a').href = j.url;
+        ok.hidden = false;
+        return;
+      }
+      start.disabled = false;
+      err.textContent = '⚠️ ' + ((j && j.error) || 'не вдалося');
+    });
+  }
+
+  root.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-pja-scan],[data-pja-decide],[data-pja-forgotten],[data-pja-fdecide],' +
+      '[data-pja-fclose],[data-pja-plan]');
+    if (!t || !root.contains(t) || t.disabled) return;
+    e.preventDefault();
+    if (t.hasAttribute('data-pja-scan')) aiScan(t);
+    else if (t.dataset.pjaDecide) aiDecide(t);
+    else if (t.hasAttribute('data-pja-forgotten')) findForgotten(t);
+    else if (t.dataset.pjaFdecide) forgottenDecide(t);
+    else if (t.dataset.pjaFclose) { found = null; renderFound(); }
+    else if (t.hasAttribute('data-pja-plan')) aiPlan(t);
+  });
+
   root.addEventListener('click', function (e) {
     var t = e.target.closest('[data-pjc-range],[data-pjc-decide],[data-pjc-scan],[data-pjc-mtoggle],[data-pjc-madd],' +
       '[data-pjc-mdel],g[data-mails],[data-pjc-tab],[data-pjc-step-new],[data-pjc-phase-new],[data-pjc-post],' +
@@ -858,6 +1202,11 @@
         «Виконано» й «Пропущено», поставлені вручну, автоматика не змінює.</p>
     </fieldset>
     <label>Нотатки <textarea data-s="notes" rows="2"></textarea></label>
+    <div class="pjp-agent" data-s-agent hidden>
+      <button type="button" class="pjc-b" data-pja-agent>🤖 Доручити агенту</button>
+      <span class="pjp-hint">нагадати постачальнику чи клієнту, підготувати закупівлю — агент лише пропонує, вирішуєте ви</span>
+      <span class="pjp-agent-tasks" data-s-agent-tasks></span>
+    </div>
     <div class="pjp-foot">
       <button type="button" class="pjc-b pri" data-pjp-save>💾 Зберегти</button>
       <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
@@ -907,6 +1256,44 @@
       <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
       <span class="pjc-merr" role="alert" data-pjp-err></span>
       <button type="button" class="pjc-b pjc-right pjc-danger" data-pjp-del>🗑 Видалити ризик</button>
+    </div>
+  </dialog>
+  <dialog id="pja-plan" class="pjp-dlg" aria-labelledby="pja-plan-h">
+    <h3 id="pja-plan-h">🧠 Чернетка плану з листування</h3>
+    <p class="pjp-hint" data-pd-info></p>
+    <div class="pjp-auto" data-pd-notes hidden></div>
+    <label class="pjp-inline pjd-start">Старт проєкту <input type="date" data-pd="start"></label>
+    <div class="pjd-list" data-pd-list></div>
+    <p class="pjp-hint">Зніміть галочку з кроків, які не потрібні. Після застосування план змінюється як звичайно:
+      тривалості, дати, хто робить, залежності. «Уже зроблено» — з листа, на який посилається крок.</p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>✓ Застосувати план</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+    </div>
+  </dialog>
+  <dialog id="pja-agent" class="pjp-dlg" aria-labelledby="pja-agent-h">
+    <h3 id="pja-agent-h">🤖 Доручити агенту</h3>
+    <p class="pjp-hint">Крок: <b data-ag-step translate="no"></b></p>
+    <fieldset>
+      <legend>Що доручити</legend>
+      <div class="pjp-checks" data-ag-presets></div>
+    </fieldset>
+    <label>Доручення агенту <textarea data-ag="instruction" rows="7"></textarea></label>
+    <div class="pjp-grid">
+      <label class="pjp-wide">Кому писати листи (адреси) <input type="text" data-ag="mail_to" autocomplete="off"></label>
+      <label class="pjp-wide2">Модель AI <select data-ag="model"></select></label>
+      <label>Найбільше витратити, $ <input type="number" min="0.05" max="10" step="0.05" data-ag="budget"></label>
+    </div>
+    <p class="pjp-hint">Агент лише пропонує: лист, закупівлю чи зміни ви перевіряєте й застосовуєте на сторінці
+      завдання. Лист — лише на адреси з доручення.</p>
+    <div class="pjp-auto" data-ag-tasks hidden></div>
+    <div class="pjp-auto" data-ag-done hidden>✅ Завдання створено — агент працює.
+      <a target="_blank" rel="noopener">Відкрити завдання агенту →</a></div>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save data-ag-start>🤖 Запустити агента</button>
+      <button type="button" class="pjc-b" data-pjp-close>Закрити</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
     </div>
   </dialog>
 </template>

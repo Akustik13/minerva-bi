@@ -6,7 +6,7 @@ where: 📁 Проєкти → Усі проєкти → проєкт → «🧭
 urls: /admin/projects/project/
 roles: адміністратор, менеджер
 keywords: пульт проєкту, шкала проєкту, timeline, таймлайн, хронологія, важливий момент, моменти, 📌, ризики, що зараз, закупівля проєкту, JLC проєкту, відправлення проєкту, товари проєкту, строк клієнту, старт проєкту, стан проєкту, Projektübersicht, project cockpit
-related: crm/project-plan, crm/project-risks, crm/projects, crm/project-overview, crm/project-triage, inventory/purchases, shipping/shipments, worktime/projects
+related: crm/project-plan, crm/project-risks, crm/project-ai, crm/projects, crm/project-overview, crm/project-triage, inventory/purchases, shipping/shipments, worktime/projects
 ---
 
 ## Що це
@@ -22,7 +22,9 @@ related: crm/project-plan, crm/project-risks, crm/projects, crm/project-overview
 - **«📅 План»** (друга вкладка поруч зі шкалою) — фази, кроки, віхи й діаграма Ганта з прогнозом і
   критичним шляхом, див. [План проєкту](guide:crm/project-plan);
 - **«⚠️ Ризики»** і **«📝 Статус»** — матриця й реєстр ризиків, тижневий статус з історією, див.
-  [Ризики й тижневий статус](guide:crm/project-risks).
+  [Ризики й тижневий статус](guide:crm/project-risks);
+- **«🧠 AI-помічник»** — моменти й ризики з ваших листів з цитатою, чернетка плану з листування, забуті листи,
+  доручення кроку агенту, див. [AI-помічник проєкту](guide:crm/project-ai).
 
 Пульт оновлюється без перезавантаження сторінки: незбережені зміни в полях проєкту нижче не пропадають.
 

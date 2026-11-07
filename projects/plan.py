@@ -129,12 +129,19 @@ def template_counts(template) -> tuple:
 @transaction.atomic
 def apply_template(project, template, start=None, user=None) -> int:
     """Фази й кроки шаблону → проєкт; дати — від start за тривалостями й залежностями. → кроків."""
+    return len(apply_plan(project, template.plan or [], start, user))
+
+
+@transaction.atomic
+def apply_plan(project, phases, start=None, user=None, source=ProjectStep.TEMPLATE) -> list:
+    """Фази й кроки у форматі шаблону (шаблон або AI-чернетка, projects/ai_plan.py) → порожній план проєкту.
+    → [(крок, опис кроку з phases)]."""
     from . import schedule
     if ProjectStep.objects.filter(project=project).exists() or ProjectPhase.objects.filter(project=project).exists():
         raise PlanError("У проєкті вже є план — додайте кроки вручну або спершу очистіть план")
     start = start or project.start_date or timezone.localdate()
     created, order = [], 0
-    for pi, ph in enumerate(template.plan or []):
+    for pi, ph in enumerate(phases or []):
         phase = ProjectPhase.objects.create(project=project, order=(pi + 1) * 10, name=str(ph.get("name"))[:120],
                                             icon=str(ph.get("icon") or "")[:8], gate=str(ph.get("gate") or "")[:200])
         for st in ph.get("steps") or []:
@@ -145,11 +152,12 @@ def apply_template(project, template, start=None, user=None) -> int:
                 side=st.get("side") if st.get("side") in dict(ProjectStep.SIDE_CHOICES) else W,
                 duration_days=max(int(st.get("days") or 0), 0 if kind == M else 1),
                 trigger=st.get("trigger") if st.get("trigger") in schedule.TRIGGER_TYPES else "",
-                source=ProjectStep.TEMPLATE, created_by=user)
-            created.append((step, st.get("after")))
-    for i, (step, after) in enumerate(created):
+                source=source, created_by=user)
+            created.append((step, st))
+    for i, (step, st) in enumerate(created):
         if i == 0:
             continue
+        after = st.get("after")
         if after == "parallel":
             preds = [p for p, _ in StepDependency.objects.filter(successor=created[i - 1][0])
                      .values_list("predecessor_id", "lag_days")]
@@ -164,7 +172,7 @@ def apply_template(project, template, start=None, user=None) -> int:
     if not project.start_date:
         project.start_date = start
         project.save(update_fields=["start_date", "updated_at"])
-    return len(created)
+    return created
 
 
 def _fix_dates(project, start):
@@ -396,6 +404,12 @@ def editor_data(project, plan) -> dict:
     offer_ids = {}
     for row in ProjectStep.offers.through.objects.filter(projectstep__project=project):
         offer_ids.setdefault(row.projectstep_id, []).append(row.offer_id)
+    agent = {}                          # 🤖 завдання агенту, доручені з кроку (projects/delegate.py)
+    for row in (ProjectStep.agent_tasks.through.objects.filter(projectstep__project=project)
+                .select_related("agenttask").order_by("-agenttask__created_at")):
+        agent.setdefault(row.projectstep_id, []).append(
+            {"id": row.agenttask_id, "label": f"#{row.agenttask_id} {row.agenttask.get_status_display()}",
+             "url": f"/admin/agent/agenttask/{row.agenttask_id}/review/"})
     for c in plan.steps:
         s = c.step
         d = deps.get(s.pk, [])
@@ -404,7 +418,7 @@ def editor_data(project, plan) -> dict:
                       "end": s.end.isoformat() if s.end else "", "duration": s.duration_days, "status": s.status,
                       "trigger": s.trigger, "auto": s.auto, "after": [p for p, _ in d],
                       "lag": d[0][1] if d else 0, "links": link_ids.get(s.pk, []), "offers": offer_ids.get(s.pk, []),
-                      "notes": s.notes, "eff": c.status, "note": c.note,
+                      "notes": s.notes, "eff": c.status, "note": c.note, "agent": agent.get(s.pk, [])[:3],
                       "f_start": c.start.isoformat() if c.start else "", "f_end": c.end.isoformat() if c.end else ""})
     from .cockpit import link_label
     links = []

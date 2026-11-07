@@ -4,7 +4,9 @@
      data-scan="{{ urls.scan }}" data-plan-base="{{ urls.plan_base }}" data-plan-step="{{ urls.plan_step }}"
      data-plan-phase="{{ urls.plan_phase }}" data-plan-save-template="{{ urls.plan_save_template }}"
      data-has-plan="{% if plan.has_plan %}1{% endif %}" data-can-change="{% if can_change %}1{% endif %}"
-     data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"{% if can_change %}
+     data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"
+     data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
+     data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
   <div class="pjc-head">
     <b class="pjc-title">🧭 Пульт проєкту</b>
@@ -75,6 +77,7 @@
           {% for a in risks %}<li class="pjc-{{ a.level }}">{{ a.icon }} {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}</li>{% endfor %}
         </ul>
       {% else %}<div class="pjc-sub">✅ Ризиків не видно: строки, Angebote, замовлення й закупівлі в порядку.</div>{% endif %}
+      {% if ai.risks %}<a class="pja-ptr" href="#pj-ai">🧠 Ризиків з листів чекають ✓/✗: {{ ai.risks }}</a>{% endif %}
     </section>
 
     <section class="pjc-card" aria-label="Важливі моменти">
@@ -108,8 +111,43 @@
         <div class="pjc-sub">Позначайте рішення, погодження, зміни вимог і проблеми — вони стануть прапорцями на шкалі.
           З пошти — 📌 біля проєкту в прев'ю листа, зі шкали — клік на точку листа.</div>
       {% endif %}
+      {% if ai.moments %}<a class="pja-ptr" href="#pj-ai">🧠 Моментів з листів чекають ✓/✗: {{ ai.moments }}</a>{% endif %}
     </section>
   </div>
+
+  {% if ai.on %}
+  <section class="pjc-card pja" id="pj-ai" aria-label="AI-помічник проєкту">
+    <h4>🧠 AI-помічник <span class="pjc-sub">читає лише ваші листи · лише пропонує, вирішуєте ви</span></h4>
+    <div class="pjc-actions">
+      <button type="button" class="pjc-b" data-pja-scan{% if not ai.unread %} disabled{% endif %}
+              title="Claude Haiku читає ваші листи проєкту, яких ще не читав (до 12 за раз), і пропонує важливі моменти й ризики — з цитатою з листа">🧠 Знайти моменти й ризики{% if ai.unread %} · непрочитаних листів {{ ai.unread }}{% elif ai.own %} · усі листи прочитано{% endif %}</button>
+      <button type="button" class="pjc-b" data-pja-forgotten
+              title="Гілки з ваших скриньок, які стосуються проєкту, але не прив'язані: учасники, клієнт, номери замовлень і закупівель, артикули{% if ai.rag %} і база знань{% endif %}">🔎 Знайти забуті листи</button>
+      {% if not plan.has_plan %}<button type="button" class="pjc-b" data-pja-plan
+              title="Claude Sonnet складає чернетку плану з ваших листів, шаблонів і тривалостей минулих проєктів; перед застосуванням ви її переглядаєте">🧠 Скласти план з листування</button>{% endif %}
+      <span class="pjc-merr" data-pja-err role="alert"></span>
+    </div>
+    {% if not ai.own %}<p class="pjc-sub">У проєкті ще немає листів з ваших скриньок — моменти й ризики AI шукає лише у вашій пошті.</p>{% endif %}
+    {% if ai.items %}
+      <ul class="pjc-list pja-list">
+        {% for s in ai.items %}
+          <li class="pja-it pja-{{ s.kind }}">
+            <span class="pja-k">{% if s.risk %}<span class="pjr-score pjr-{{ s.level }}" title="ймовірність × вплив">{{ s.score }}</span> ⚠️ ризик · {% else %}📌 момент · {% endif %}{{ s.icon }} {{ s.label }}</span>
+            <b translate="no">{{ s.title }}</b>
+            <span class="pjc-sub">{{ s.date|date:"d.m.Y" }}{% if s.url %} · <a href="{{ s.url }}" target="_blank">✉️ лист</a>{% endif %}</span>
+            <span class="pjc-yn">
+              <button type="button" class="pjc-b" data-pja-decide="{{ s.id }}" data-accept="1" title="{% if s.risk %}Так — додати ризик до проєкту{% else %}Так — додати важливий момент{% endif %}">✓</button>
+              <button type="button" class="pjc-b" data-pja-decide="{{ s.id }}" data-accept="0" title="Ні — більше не пропонувати">✗</button>
+            </span>
+            <div class="pjc-q" translate="no">«{{ s.quote|truncatechars:260 }}»</div>
+            {% if s.mitigation %}<div class="pjc-sub">заходи: <span translate="no">{{ s.mitigation }}</span></div>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    <div class="pja-found" data-pja-found hidden></div>
+  </section>
+  {% endif %}
 
   <section class="pjc-card pjc-tl" id="pj-plan" aria-label="Шкала й план проєкту">
     <div class="pjc-tabs" role="tablist">
@@ -239,6 +277,8 @@
               <label class="pjc-sub">старт <input type="date" data-pjc-tpl-start value="{% if start %}{{ start|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"></label>
               <button type="button" class="pjc-b pri" data-pjc-tpl-apply data-url="{{ urls.plan_template }}">🧩 Скласти план з шаблону</button>
               <button type="button" class="pjc-b" data-pjc-phase-new>＋ Фаза вручну</button>
+              {% if ai.on %}<button type="button" class="pjc-b" data-pja-plan
+                      title="Claude Sonnet складає чернетку плану з ваших листів, шаблонів і тривалостей минулих проєктів; перед застосуванням ви її переглядаєте">🧠 Скласти план з листування</button>{% endif %}
             </div>
           {% endif %}
         </div>

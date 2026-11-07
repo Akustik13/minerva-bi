@@ -380,8 +380,9 @@ class HighlightError(ValueError):
     pass
 
 
-def add_highlight(project, *, title, date=None, kind="", quote="", message=None, user=None):
-    """📌 Важливий момент (вручну). Дата — з листа, інакше сьогодні. Повертає ProjectHighlight."""
+def add_highlight(project, *, title, date=None, kind="", quote="", message=None, user=None, source=""):
+    """📌 Важливий момент (вручну; source ai — прийнята пропозиція AI-помічника). Дата — з листа, інакше сьогодні.
+    Повертає ProjectHighlight."""
     from .models import ProjectHighlight
     title = " ".join(str(title or "").split())[:255]
     if not title:
@@ -392,7 +393,8 @@ def add_highlight(project, *, title, date=None, kind="", quote="", message=None,
     return ProjectHighlight.objects.create(
         project=project, title=title, date=date or timezone.localdate(),
         kind=kind if kind in kinds else ProjectHighlight.OTHER, quote=str(quote or "").strip()[:2000],
-        message=message, created_by=user)
+        message=message, created_by=user,
+        source=ProjectHighlight.AI if source == ProjectHighlight.AI else ProjectHighlight.MANUAL)
 
 
 def tags_for_threads(thread_ids) -> dict:

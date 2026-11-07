@@ -6,7 +6,7 @@ where: 📁 Проєкти → проєкт → «🧭 Пульт проєкту
 urls: /admin/projects/projectrisk/, /admin/projects/projectsettings/, /admin/projects/project/
 roles: адміністратор, менеджер
 keywords: ризик, ризики, реєстр ризиків, матриця ризиків, ймовірність, вплив, бал ризику, власник ризику, заходи, дата перегляду, тижневий статус, статус проєкту, on track, at risk, off track, історія здоров'я, тижневий звіт, звіт відповідальним, Risiko, Risikomatrix, Statusbericht
-related: crm/project-cockpit, crm/project-plan, crm/project-portfolio, crm/projects, mail/inbox
+related: crm/project-cockpit, crm/project-plan, crm/project-ai, crm/project-portfolio, crm/projects, mail/inbox
 ---
 
 ## Що це
@@ -58,6 +58,10 @@ related: crm/project-cockpit, crm/project-plan, crm/project-portfolio, crm/proje
 У прев'ю листа, у блоці **«📁»** біля підтвердженого проєкту — **⚠️**. Виділіть у листі речення — воно стане
 підставою ризику; напишіть, що може статися. Ризик з'явиться в реєстрі проєкту з посиланням на лист (лист
 відкриється лише власнику скриньки).
+
+Ризики з листів пропонує й AI: **«🧠 Знайти моменти й ризики»** у пульті читає ваші листи проєкту й пропонує
+ризики з цитатою, балом і заходами; ✓ — ризик у реєстрі з позначкою «🧠 AI»
+([AI-помічник проєкту](guide:crm/project-ai)).
 
 ## ⚠️ Реєстр усіх ризиків
 

@@ -237,7 +237,8 @@ class DismissedThread(models.Model):
 
 class ProjectHighlight(models.Model):
     """📌 Важливий момент проєкту на шкалі: рішення, погодження, зміна вимог, проблема… — з листом і цитатою.
-    Ставить людина (з пульта, шкали чи прев'ю листа); source / status — для майбутніх пропозицій AI ✓/✗."""
+    Ставить людина (з пульта, шкали чи прев'ю листа); source ai — прийнята пропозиція AI-помічника
+    (ProjectSuggestion, projects/ai_scan.py)."""
     DECISION, APPROVAL, CHANGE, PROBLEM = "decision", "approval", "change", "problem"
     DEADLINE, DELIVERY, PAYMENT, OTHER = "deadline", "delivery", "payment", "other"
     KIND_CHOICES = [
@@ -367,6 +368,8 @@ class ProjectStep(models.Model):
     auto = models.BooleanField("Стан з прив'язаних об'єктів", default=True)
     links = models.ManyToManyField(ProjectLink, blank=True, related_name="steps", verbose_name="Прив'язані об'єкти")
     offers = models.ManyToManyField("offers.Offer", blank=True, related_name="project_steps", verbose_name="Angebote")
+    agent_tasks = models.ManyToManyField("agent.AgentTask", blank=True, related_name="project_steps",
+                                         verbose_name="Завдання агенту")
     notes = models.TextField("Примітки", blank=True, default="")
     source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
     # кеш розрахунку (schedule.persist)
@@ -555,3 +558,72 @@ class ProjectSettings(models.Model):
     def get(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+# ── 🧠 AI-помічник проєкту (projects/ai_scan.py, ai_plan.py, forgotten.py, delegate.py) ─────────────────────────
+
+class ProjectSuggestion(models.Model):
+    """🧠 Пропозиція AI з листа: важливий момент або ризик з дослівною цитатою, яку Minerva знайшла в тексті листа.
+    Бачить і вирішує лише той, хто запустив пошук (листи — з його скриньок): ✓ — момент / ризик проєкту
+    (source AI), ✗ — та сама цитата більше не пропонується."""
+    MOMENT, RISK = "moment", "risk"
+    KIND_CHOICES = [(MOMENT, "📌 Важливий момент"), (RISK, "⚠️ Ризик")]
+    SUGGESTED, ACCEPTED, REJECTED = "suggested", "accepted", "rejected"
+    STATUS_CHOICES = [(SUGGESTED, "❔ Чекає рішення"), (ACCEPTED, "✅ Прийнято"), (REJECTED, "✖ Відхилено")]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="suggestions")
+    kind = models.CharField("Що", max_length=8, choices=KIND_CHOICES)
+    title = models.CharField("Назва", max_length=255)
+    quote = models.TextField("Цитата з листа")
+    message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="+", verbose_name="Лист")
+    date = models.DateField("Дата", null=True, blank=True)
+    moment_kind = models.CharField("Вид моменту", max_length=10, blank=True, default="",
+                                   choices=ProjectHighlight.KIND_CHOICES)
+    category = models.CharField("Категорія ризику", max_length=10, blank=True, default="",
+                                choices=ProjectRisk.CATEGORY_CHOICES)
+    probability = models.PositiveSmallIntegerField("Ймовірність", default=2)
+    impact = models.PositiveSmallIntegerField("Вплив", default=2)
+    mitigation = models.TextField("Заходи", blank=True, default="")
+    key = models.CharField(max_length=40, help_text="Відбиток: вид + лист + цитата — відхилене не пропонується знову")
+    status = models.CharField("Стан", max_length=10, choices=STATUS_CHOICES, default=SUGGESTED, db_index=True)
+    model = models.CharField("Модель AI", max_length=60, blank=True, default="")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name="+", verbose_name="Чиї листи")
+    created_at = models.DateTimeField("Знайдено", auto_now_add=True)
+    decided_at = models.DateTimeField("Вирішено", null=True, blank=True)
+    highlight = models.ForeignKey(ProjectHighlight, null=True, blank=True, on_delete=models.SET_NULL,
+                                  related_name="+")
+    risk = models.ForeignKey(ProjectRisk, null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+
+    class Meta:
+        verbose_name = "Пропозиція AI"
+        verbose_name_plural = "Пропозиції AI"
+        ordering = ["-created_at", "-pk"]
+        constraints = [models.UniqueConstraint(fields=["project", "key"], name="unique_project_suggestion")]
+
+    def __str__(self):
+        return f"{self.project.code} · {self.get_kind_display()} · {self.title}"
+
+    @property
+    def score(self) -> int:
+        return (self.probability or 0) * (self.impact or 0)
+
+    @property
+    def level(self) -> str:
+        return "red" if self.score >= 6 else ("yellow" if self.score >= 3 else "green")
+
+
+class ProjectMailScan(models.Model):
+    """Лист проєкту, який AI-помічник уже прочитав (пошук моментів і ризиків): удруге не читається."""
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="+")
+    message = models.ForeignKey("email_assistant.EmailMessage", on_delete=models.CASCADE, related_name="+")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                             related_name="+")
+    found = models.PositiveSmallIntegerField(default=0)
+    scanned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Прочитаний AI лист"
+        verbose_name_plural = "Прочитані AI листи"
+        constraints = [models.UniqueConstraint(fields=["project", "message"], name="unique_project_mail_scan")]

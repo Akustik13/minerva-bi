@@ -391,3 +391,130 @@ def plan_clear_view(request, pk):
         plan.clear(project)
         return "🗑 План очищено"
     return _plan_action(request, pk, run)
+
+
+# ── 🧠 AI-помічник проєкту (projects/ai_scan.py, ai_plan.py, forgotten.py, delegate.py) ───────────────────────────
+# Усе — з правом змінювати проєкт; пошта — лише власні скриньки людини (перевіряють самі модулі).
+
+@staff_member_required
+@require_POST
+def ai_scan_view(request, pk):
+    """🧠 Знайти моменти й ризики в листах: наступна порція власних непрочитаних листів проєкту → свіжий пульт."""
+    from . import ai_scan
+    project = _project_for_change(request, pk)
+    res = ai_scan.scan(project, request.user)
+    if res["error"]:
+        return JsonResponse({"ok": False, "error": res["error"]}, status=400)
+    if not res["read"]:
+        notice = "🧠 Нових листів немає — усі ваші листи проєкту вже прочитано"
+    else:
+        notice = f"🧠 Прочитано листів: {res['read']} · нових пропозицій: {res['found']}"
+        if res["left"]:
+            notice += f" · ще не прочитано: {res['left']}"
+    return _cockpit(request, project, notice)
+
+
+@staff_member_required
+@require_POST
+def ai_suggestion_view(request, pk, sid):
+    """✓ / ✗ пропозиції AI: {accept: true|false} — лише та людина, з чиїх листів пропозиція."""
+    from . import ai_scan
+
+    def run(project, body):
+        if body.get("accept"):
+            return ai_scan.accept(project, request.user, sid)
+        return ai_scan.reject(project, request.user, sid)
+    return _plan_action(request, pk, run)
+
+
+@staff_member_required
+@require_POST
+def ai_plan_view(request, pk):
+    """🧠 Чернетка плану з листування → JSON для вікна перегляду (нічого не пише в план)."""
+    from . import ai_plan
+    project = _project_for_change(request, pk)
+    try:
+        draft = ai_plan.draft(project, request.user)
+    except ValueError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    return JsonResponse({"ok": True, "draft": draft})
+
+
+@staff_member_required
+@require_POST
+def ai_plan_apply_view(request, pk):
+    """✓ Застосувати чернетку: {skip: [номери кроків], start} → план → свіжий пульт."""
+    from . import ai_plan
+
+    def run(project, body):
+        skip = body.get("skip") if isinstance(body.get("skip"), list) else []
+        return f"🧠 План з листування складено: кроків {ai_plan.apply(project, request.user, skip, body.get('start'))}"
+    return _plan_action(request, pk, run)
+
+
+def _rag_state(project, user, job) -> dict:
+    from . import forgotten
+    from rag_assistant.models import RetrievalJob
+    if job is None:
+        return {"rag": False, "job": "", "done": True, "rag_rows": [], "message": ""}
+    done = job.is_terminal
+    rows = forgotten.rag_rows(project, user, job) if job.status == RetrievalJob.COMPLETED else []
+    return {"rag": True, "job": "" if done else str(job.pk), "done": done, "rag_rows": rows,
+            "message": "" if job.status == RetrievalJob.COMPLETED else (job.message or job.get_status_display()),
+            "poll_ms": max(800, min(5000, int(job.poll_after_ms or 1500)))}
+
+
+@staff_member_required
+@require_POST
+def forgotten_view(request, pk):
+    """🔎 Забуті листи: одразу — знайдене без AI; база знань — завдання RAG, браузер опитує forgotten_poll."""
+    from . import forgotten
+    project = _project_for_change(request, pk)
+    rows = forgotten.local(project, request.user)
+    return JsonResponse({"ok": True, "rows": rows, **_rag_state(project, request.user,
+                                                                 forgotten.rag_start(project, request.user))})
+
+
+@staff_member_required
+def forgotten_poll_view(request, pk, job_id):
+    from rag_assistant import retrieval
+    from rag_assistant.models import RetrievalJob
+    project = _project_for_change(request, pk)
+    job = get_object_or_404(RetrievalJob, pk=job_id, user=request.user, purpose="project_forgotten")
+    retrieval.poll(job)
+    return JsonResponse({"ok": True, **_rag_state(project, request.user, job)})
+
+
+@staff_member_required
+@require_POST
+def forgotten_decide_view(request, pk):
+    """✓ / ✗ забутої гілки: {thread, accept} — лише гілки власних скриньок."""
+    from . import forgotten
+    project = _project_for_change(request, pk)
+    body = _body(request)
+    try:
+        notice = forgotten.decide(project, request.user, int(body.get("thread") or 0), bool(body.get("accept")))
+    except (TypeError, ValueError) as e:
+        return JsonResponse({"ok": False, "error": str(e) or "Гілку не знайдено"}, status=400)
+    return JsonResponse({"ok": True, "notice": notice})
+
+
+@staff_member_required
+def step_agent_view(request, pk, sid):
+    """🤖 Доручити крок агенту: GET — варіанти доручення й завдання кроку; POST {instruction, mail_to, model, budget}
+    — завдання агенту від імені людини, прив'язане до кроку, запуск у фоні → свіжий пульт і адреса перевірки."""
+    from . import cockpit, delegate
+    from .models import ProjectStep
+    project = _project_for_change(request, pk)
+    step = get_object_or_404(ProjectStep.objects.select_related("project__customer", "phase"), pk=sid, project=project)
+    if request.method == "GET":
+        return JsonResponse(delegate.editor(step, request.user))
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "POST"}, status=405)
+    try:
+        task = delegate.create(step, request.user, _body(request))
+    except ValueError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    return JsonResponse({"ok": True, "url": f"/admin/agent/agenttask/{task.pk}/review/",
+                         "html": cockpit.render(project, request.user, str(_body(request).get("range") or "all"),
+                                                f"🤖 Завдання агенту #{task.pk}: «{step.title}» — агент працює")})

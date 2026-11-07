@@ -44,15 +44,17 @@ def set_status(risk, status, now=None):
     risk.status = status
 
 
-def save(project, data, user=None, message=None) -> ProjectRisk:
-    """{id, title, description, category, probability, impact, owner, mitigation, status, review_on, steps: [id]}."""
+def save(project, data, user=None, message=None, source=ProjectRisk.MANUAL) -> ProjectRisk:
+    """{id, title, description, category, probability, impact, owner, mitigation, status, review_on, steps: [id]}.
+    source — для нового ризику: вручну або прийнята пропозиція AI-помічника (ai); правило — лише risk_rules."""
     rid = data.get("id")
     risk = ProjectRisk.objects.filter(project=project, pk=rid).first() if str(rid or "").isdigit() else None
     if rid and risk is None:
         raise RiskError("Ризик не знайдено")
     new = risk is None
     if new:
-        risk = ProjectRisk(project=project, source=ProjectRisk.MANUAL, created_by=user, owner=project.owner)
+        risk = ProjectRisk(project=project, source=ProjectRisk.AI if source == ProjectRisk.AI else ProjectRisk.MANUAL,
+                           created_by=user, owner=project.owner)
     if risk.source != ProjectRisk.RULE:
         title = " ".join(str(data.get("title") or "").split())[:200]
         if not title:
