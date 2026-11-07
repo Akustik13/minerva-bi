@@ -1071,7 +1071,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         from shipping.services import parcels as _parcels
 
         items = self._parcel_shipments(obj)
-        if len(items) < 2:
+        if not self._parcels_to_show(obj):
             return "—"
         lines = _parcels.order_lines(obj)
         by_pk = {line.pk: line for line in lines}
@@ -1083,9 +1083,16 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             if tn:
                 seen.setdefault(tn.upper(), n)
             warn = format_html(
-                '<div style="color:var(--warn,#ef6c00)" title="{}">⚠️ той самий номер, що посилка {}</div>',
-                "Номер іншої посилки. Справжній — на етикетці цієї посилки: виправте в картці відправлення "
-                "або python manage.py repair_parcel_tracking", same) if same else ""
+                '<div style="color:var(--warn,#ef6c00)" title="{}">⚠️ той самий номер, що посилка {} · '
+                '<a href="{}">✏️ виправити</a></div>',
+                "Номер іншої посилки. Справжній — на етикетці цієї посилки: впишіть його на сторінці посилки "
+                "або python manage.py repair_parcel_tracking", same,
+                reverse("admin:shipping_shipment_detail", args=[s.pk]) + "?fix=1#fix-tracking") if same else ""
+            boxes_tn = [t for t in (s.package_tracking or []) if t]
+            if len(boxes_tn) > 1:
+                warn = format_html('{}<div style="font-size:11.5px">{}</div>', warn, mark_safe("".join(
+                    str(format_html('<div>📦 {}/{} · <span translate="no">{}</span></div>', i, len(boxes_tn), t))
+                    for i, t in enumerate(boxes_tn, 1))))
             inside = "; ".join(
                 f"{_parcels.line_sku(by_pk[pk])} × {_parcels.qty_text(q)}"
                 for pk, q in _parcels.contents(s, lines).items() if q and pk in by_pk)
@@ -1132,9 +1139,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '<thead><tr>{}</tr></thead><tbody>{}</tbody></table></div>{}',
             mark_safe(head), mark_safe("".join(str(r) for r in rows)), total)
 
+    def _parcels_to_show(self, obj) -> bool:
+        """«📦 Посилки» потрібні: дві й більше посилки або одна з кількома коробками (свої трек-номери)."""
+        items = self._parcel_shipments(obj)
+        return len(items) > 1 or any(len([t for t in (s.package_tracking or []) if t]) > 1 for s in items)
+
     def get_fieldsets(self, request, obj=None):
         fieldsets = super().get_fieldsets(request, obj)
-        if len(self._parcel_shipments(obj)) < 2:
+        if not self._parcels_to_show(obj):
             fieldsets = [(name, {**options, "fields": tuple(f for f in options.get("fields", ())
                                                             if f != "parcel_tracking")})
                          for name, options in fieldsets]

@@ -841,6 +841,10 @@ class UPSClient:
         # Для multi-package: збираємо ВСІ label-и і об'єднуємо їх
         tracking = results_data.get('ShipmentIdentificationNumber', '')
         label_b64 = ''
+        # Трек-номер кожної коробки (надрукований на її етикетці)
+        package_tracking = [p.get('TrackingNumber', '') for p in
+                            (pkg_results if isinstance(pkg_results, list) else [pkg_results or {}])
+                            if isinstance(p, dict) and p.get('TrackingNumber')]
 
         if isinstance(pkg_results, list):
             # Кілька пакетів — витягнути label з кожного
@@ -916,6 +920,7 @@ class UPSClient:
 
         return {
             'tracking_number':  tracking,
+            'package_tracking': package_tracking,
             'shipment_id':      results_data.get('ShipmentIdentificationNumber', ''),
             'label_base64':     label_b64,     # A4 PDF
             'label_gif_base64': gif_b64,       # original GIF from UPS

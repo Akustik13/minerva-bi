@@ -8147,6 +8147,7 @@
 {"uk": "Кутовий поглинач", "en": "Corner absorber", "de": "Eckabsorber"}
 {"uk": "Кіл-ть", "en": "Qty", "de": "Menge"}
 {"uk": "Кілограми (дробні числа)", "en": "Kilograms (decimal numbers)", "de": "Kilogramm (Dezimalzahlen)"}
+{"uk": "Кілька коробок в одному відправленні UPS: у кожної свій номер (на її етикетці); перший зазвичай збігається з трек-номером відправлення.", "en": "Several boxes in one UPS shipment: each has its own number (on its label); the first usually matches the shipment tracking number.", "de": "Mehrere Kartons in einer UPS-Sendung: jeder hat eine eigene Nummer (auf seinem Etikett); die erste entspricht meist der Sendungsnummer."}
 {"uk": "Кілька коробок — розрахунок", "en": "Multiple boxes — calculation", "de": "Mehrere Kartons — Berechnung"}
 {"uk": "Кілька кількостей через «;», ціна — після «:» (без ціни — з Minerva). Перша — основна.", "en": "Several quantities separated by “;”, price after “:” (no price — taken from Minerva). The first is the main one.", "de": "Mehrere Mengen durch „;“ getrennt, Preis nach „:“ (ohne Preis — aus Minerva). Die erste ist die Hauptmenge."}
 {"uk": "Кілька магазинів", "en": "Several shops", "de": "Mehrere Shops"}
@@ -8389,6 +8390,7 @@
 {"uk": "Лише останні ревізії даташитів", "en": "Only the latest datasheet revisions", "de": "Nur die neuesten Datenblatt-Revisionen"}
 {"uk": "Лише перевіряє наявність — нічого не змінює (тому досить права читання).", "en": "Only checks availability — changes nothing (so the read permission is enough).", "de": "Prüft nur die Verfügbarkeit — ändert nichts (daher genügt das Leserecht)."}
 {"uk": "Лише перегляд", "en": "View only", "de": "Nur Ansicht"}
+{"uk": "Лише перегляд. Щоб виправити — додайте --apply", "en": "Preview only. To fix, add --apply", "de": "Nur Vorschau. Zum Korrigieren --apply hinzufügen"}
 {"uk": "Лише позначені поля беруться з Minerva; решта офера лишається такою, як на DigiKey зараз.", "en": "Only the selected fields are taken from Minerva; the rest of the offer stays as it is on DigiKey now.", "de": "Nur die ausgewählten Felder werden aus Minerva übernommen; der Rest des Offers bleibt so, wie er aktuell bei DigiKey ist."}
 {"uk": "Лише позначити «прибуло» — оприбуткує склад у Minerva", "en": "Only mark “arrived” — receives the stock in Minerva", "de": "Nur „eingetroffen“ markieren — bucht den Bestand in Minerva ein"}
 {"uk": "Лише покупці з країн активних зон, бо на сайті в списку країн тільки вони. Замовлення з інших країн Minerva відхилить і через API.", "en": "Only buyers from the countries of active zones, because only those are in the website’s country list. Minerva will also reject orders from other countries via the API.", "de": "Nur Käufer aus Ländern aktiver Zonen, da nur diese in der Länderliste der Website stehen. Aufträge aus anderen Ländern lehnt Minerva auch über die API ab."}
@@ -14368,6 +14370,7 @@
 {"uk": "Трек-номер і кур’єра в порожнє поле замовлення вносить сам.", "en": "Enters the tracking number and courier into an empty order field by itself.", "de": "Trägt Sendungsnummer und Kurier selbst in ein leeres Auftragsfeld ein."}
 {"uk": "Трек-номер, кур’єр, статус, строк відправки замовлення — застосовує людина (✓)", "en": "Tracking number, courier, status, shipping deadline of an order — applied by a person (✓)", "de": "Sendungsnummer, Kurier, Status, Versandfrist des Auftrags – wird von einer Person übernommen (✓)"}
 {"uk": "Трек-номер: {0}", "en": "Tracking number: {0}", "de": "Sendungsnummer: {0}"}
+{"uk": "Трек-номери коробок", "en": "Box tracking numbers", "de": "Sendungsnummern der Kartons"}
 {"uk": "Трек-номерів", "en": "Tracking numbers", "de": "Sendungsnummern"}
 {"uk": "Трекер", "en": "Tracker", "de": "Tracker"}
 {"uk": "Трекінг", "en": "Tracking", "de": "Tracking"}
@@ -16163,6 +16166,7 @@
 {"uk": "вимкнено: {0}", "en": "disabled: {0}", "de": "deaktiviert: {0}"}
 {"uk": "вимкніть якщо статус керується трекінгом перевізника (UPS/DHL) або виставляється вручну. Зазвичай вмикають поки трекінг-номер ще не отримано.", "en": "turn off if the status is controlled by carrier tracking (UPS/DHL) or set manually. It is usually turned on while the tracking number has not yet been received.", "de": "deaktivieren Sie dies, wenn der Status über die Sendungsverfolgung des Versanddienstleisters (UPS/DHL) gesteuert oder manuell gesetzt wird. Üblicherweise ist es aktiviert, solange die Sendungsnummer noch nicht vorliegt."}
 {"uk": "виняток", "en": "exception", "de": "Ausnahme"}
+{"uk": "виправити", "en": "fix", "de": "korrigieren"}
 {"uk": "виправити — {0}", "en": "fix — {0}", "de": "beheben — {0}"}
 {"uk": "виправлено {0}", "en": "fixed {0}", "de": "korrigiert {0}"}
 {"uk": "виробник", "en": "manufacturer", "de": "Hersteller"}

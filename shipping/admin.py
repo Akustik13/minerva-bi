@@ -1536,6 +1536,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_ups_abd",
             ),
             path(
+                "<int:shipment_id>/ups-abd/preview/",
+                self.admin_site.admin_view(self.ups_abd_preview_view),
+                name="shipping_shipment_ups_abd_preview",
+            ),
+            path(
                 "<int:shipment_id>/ups-pickup/",
                 self.admin_site.admin_view(self.ups_pickup_standalone_view),
                 name="shipping_shipment_ups_pickup",
@@ -4022,15 +4027,27 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if request.method != "POST":
             return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
 
+        import re as _re
+        from django.core.exceptions import PermissionDenied
         shipment = get_object_or_404(Shipment, pk=shipment_id)
+        if not self.has_change_permission(request, shipment):
+            raise PermissionDenied
         tn = (request.POST.get("tracking_number") or "").strip()
 
         if not tn:
             messages.error(request, "❌ Трекінг-номер не може бути порожнім.")
             return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
+        old_tn = (shipment.tracking_number or "").strip()
         update_fields = ["tracking_number"]
         shipment.tracking_number = tn
+        if "package_tracking" in request.POST:       # номери коробок: по одному в рядку / через кому
+            boxes = []
+            for t in _re.split(r"[\s,;]+", request.POST.get("package_tracking") or ""):
+                if t and t.upper() not in {b.upper() for b in boxes}:
+                    boxes.append(t)
+            shipment.package_tracking = boxes if len(boxes) > 1 else []
+            update_fields.append("package_tracking")
 
         # Якщо статус draft/submitted — переводимо в label_ready
         if shipment.status in (Shipment.Status.DRAFT, Shipment.Status.SUBMITTED):
@@ -4039,10 +4056,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         shipment.save(update_fields=update_fields)
 
-        # Копіюємо TN на SalesOrder (замінюємо якщо попередній від скасованого відправлення)
-        if shipment.order and _should_set_order_tn(shipment.order, tn):
-            shipment.order.tracking_number = tn
-            shipment.order.save(update_fields=["tracking_number"])
+        # Копіюємо TN на SalesOrder (замінюємо якщо попередній від скасованого відправлення або це був номер
+        # цього ж відправлення, якого більше не має жодна інша посилка)
+        order = shipment.order
+        if order:
+            own_old = (old_tn and old_tn != tn and (order.tracking_number or "").strip() == old_tn
+                       and not order.shipments.exclude(pk=shipment.pk).exclude(status=Shipment.Status.CANCELLED)
+                       .filter(tracking_number=old_tn).exists())
+            if own_old or _should_set_order_tn(order, tn):
+                order.tracking_number = tn
+                order.save(update_fields=["tracking_number"])
 
         messages.success(request, f"✅ Трекінг-номер збережено: {tn}")
         return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
@@ -4667,6 +4690,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if result['tracking_number']:
             shipment.tracking_number = result['tracking_number']
             update_fields.append('tracking_number')
+        if len(result.get('package_tracking') or []) > 1:
+            shipment.package_tracking = list(result['package_tracking'])
+            update_fields.append('package_tracking')
         if result['service_name']:
             shipment.carrier_service = result['service_name']
             update_fields.append('carrier_service')
@@ -4959,7 +4985,38 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         return {'abd_ok': True, 'abd_files': files, 'abd_sent': self._ups_abd_sent(shipment),
                 'abd_can': self.has_change_permission(request, shipment),
                 'abd_url': reverse('admin:shipping_shipment_ups_abd', args=[shipment.pk]),
+                'abd_preview_url': reverse('admin:shipping_shipment_ups_abd_preview', args=[shipment.pk]),
                 'abd_formats': ', '.join(_mrn.UPS_FORMATS)}
+
+    def ups_abd_preview_view(self, request, shipment_id):
+        """GET ?ref=msg:<pk>:<i> — швидкий перегляд файлу з листа ABD перед надсиланням в UPS (лише файли зі
+        списку `abd_files` цієї людини; відповідь — як вкладення пошти: безпечний тип, nosniff, sandbox)."""
+        from django.core.exceptions import PermissionDenied
+        from django.http import Http404
+        from email_assistant.attachments import attachment_bytes
+        from email_assistant.views import _attachment_response
+        from .services import mrn as _mrn
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        if not self.has_view_permission(request, shipment):
+            raise PermissionDenied
+        ref = (request.GET.get('ref') or '').strip()
+        found = next((f for f in _mrn.abd_files(shipment.order, request.user) if f['ref'] == ref), None)
+        if found is None:
+            raise Http404
+        msg = found['message']
+        idx = int(ref.rsplit(':', 1)[-1])
+        try:
+            data = attachment_bytes(msg.account, msg, idx)
+        except Exception as e:  # noqa: BLE001 — IMAP
+            logger.warning('ABD preview %s: %s', ref, e)
+            data = None
+        if not data:
+            raise Http404
+        att = (msg.attachments or [])[idx]
+        resp = _attachment_response(data, found['name'], att.get('content_type', 'application/octet-stream'))
+        resp['X-Frame-Options'] = 'SAMEORIGIN'          # перегляд у вікні на сторінці відправлення
+        return resp
 
     def ups_abd_view(self, request, shipment_id):
         """POST — надіслати ABD (Export-Begleitdokument) в UPS до вже оформленої посилки: Paperless upload

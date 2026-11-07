@@ -192,6 +192,20 @@ class AbdToUpsTests(MrnFromMailTests):
         self.assertTrue(any("UPS не прийняв ABD" in m for m in self.messages(r)))
         self.assertNotIn("UPS_ABD", self.reload().notes or "")
 
+    def test_preview_own_file_only(self):
+        msg = self._abd_mail()
+        preview = f"/admin/shipping/shipment/{self.shipment.pk}/ups-abd/preview/"
+        page = self.client.get(self.detail)
+        self.assertContains(page, "data-abd-view")
+        r = self.client.get(preview, {"ref": f"msg:{msg.pk}:0"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(b"".join(r), b"%PDF-1.4 ABD")
+        self.assertEqual(r["X-Frame-Options"], "SAMEORIGIN")
+        other = User.objects.create_user("colleague", password="x", is_staff=True)
+        foreign = self._abd_mail(other, "colleague@sevskiy.de")
+        self.assertEqual(self.client.get(preview, {"ref": f"msg:{foreign.pk}:0"}).status_code, 404)
+        self.assertEqual(self.client.get(preview, {"ref": "msg:999:0"}).status_code, 404)
+
     def test_draft_and_get_do_nothing(self):
         self.assertEqual(self.client.get(self.url).status_code, 302)
         Shipment.objects.filter(pk=self.shipment.pk).update(status=Shipment.Status.DRAFT)

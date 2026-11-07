@@ -117,3 +117,48 @@ class OrderCardTests(ParcelTrackingBase):
                      "Разом за посилки", "58,68 EUR", "Вписати у «Вартість доставки»"):
             self.assertContains(r, text)
         self.assertNotContains(r, "той самий номер")
+
+    def test_one_shipment_with_two_boxes_shows_box_numbers(self):
+        self.ship(TN1, package_tracking=[TN1, TN2])
+        r = self.client.get(self.url)
+        self.assertContains(r, "📦 Посилки")
+        self.assertContains(r, TN2)
+
+    def test_fix_tracking_on_shipment_page(self):
+        first = self.ship(TN1)
+        second = self.ship(TN1)
+        fix = reverse("admin:shipping_shipment_set_tracking", args=[second.pk])
+        detail = reverse("admin:shipping_shipment_detail", args=[second.pk])
+        self.assertContains(self.client.get(detail + "?fix=1"), "Виправити трек-номер")
+        self.client.post(fix, {"tracking_number": TN2, "package_tracking": ""})
+        second.refresh_from_db()
+        self.order.refresh_from_db()
+        self.assertEqual((second.tracking_number, second.package_tracking), (TN2, []))
+        self.assertEqual(self.order.tracking_number, TN1)        # номер першої посилки лишається в замовленні
+        self.client.post(reverse("admin:shipping_shipment_set_tracking", args=[first.pk]),
+                         {"tracking_number": TN1, "package_tracking": f"{TN1}\n{TN2}\n{TN2}"})
+        first.refresh_from_db()
+        self.assertEqual(first.package_tracking, [TN1, TN2])
+
+    def test_fix_own_number_updates_order(self):
+        only = self.ship(TN1)
+        self.client.post(reverse("admin:shipping_shipment_set_tracking", args=[only.pk]), {"tracking_number": TN2})
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.tracking_number, TN2)
+
+
+class UpsPackageNumbersTests(TestCase):
+    def test_package_numbers_from_response(self):
+        from unittest import mock
+        from shipping.ups_client import UPSClient
+        carrier = Carrier(name="UPS", carrier_type="ups", api_key="a", api_secret="b", connection_uuid="A1B2C3",
+                          sender_country="DE", sender_city="München", sender_zip="81829", sender_street="X 1")
+        resp = {"ShipmentResponse": {"ShipmentResults": {
+            "ShipmentIdentificationNumber": TN1,
+            "PackageResults": [{"TrackingNumber": TN1, "ShippingLabel": {}},
+                               {"TrackingNumber": TN2, "ShippingLabel": {}}]}}}
+        pkgs = [{"weight_kg": 1, "length_cm": 20, "width_cm": 10, "height_cm": 5}] * 2
+        with mock.patch.object(UPSClient, "_post", return_value=resp):
+            result = UPSClient(carrier=carrier).create_shipment(
+                {"name": "Y", "country": "DE", "city": "Berlin", "street": "Z", "zip": "10115"}, pkgs)
+        self.assertEqual((result["tracking_number"], result["package_tracking"]), (TN1, [TN1, TN2]))

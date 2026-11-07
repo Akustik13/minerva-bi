@@ -944,6 +944,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             </span>
           </div>
           {% endif %}
+          {% if shipment.package_tracking %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">📦 {% trans "Коробки" %}</span>
+            <span class="sd-info-val sd-mono sd-small" translate="no">
+              {% for t in shipment.package_tracking %}<div>{{ forloop.counter }}/{{ shipment.package_tracking|length }} · {% if shipment.carrier.carrier_type == "ups" %}<a href="https://www.ups.com/track?tracknum={{ t|urlencode }}" target="_blank" rel="noopener">{{ t }}</a>{% else %}{{ t }}{% endif %}</div>{% endfor %}
+            </span>
+          </div>
+          {% endif %}
           {% if shipment.carrier_service %}
           <div class="sd-info-row">
             <span class="sd-info-key">{% trans "Сервіс" %}</span>
@@ -1384,6 +1392,20 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
               </div>
             </form>
           </div>
+          {% elif shipment.tracking_number and shipment.status != "cancelled" %}
+          <details class="sd-divider" id="fix-tracking" {% if request.GET.fix %}open{% endif %}>
+            <summary class="sd-section-label" style="cursor:pointer">✏️ {% trans "Виправити трек-номер / номери коробок" %}</summary>
+            <form method="post" action="{% url 'admin:shipping_shipment_set_tracking' shipment.pk %}"
+                  onsubmit="return confirm('{% trans "Зберегти нові трек-номери цієї посилки?" %}')">
+              {% csrf_token %}
+              <label style="display:block;font-size:12px;margin:6px 0 2px">{% trans "Трек-номер відправлення (як на етикетці)" %}</label>
+              <input type="text" name="tracking_number" value="{{ shipment.tracking_number }}" class="sd-field-input" translate="no">
+              <label style="display:block;font-size:12px;margin:8px 0 2px">{% trans "Номери коробок — кожен з нової строки (якщо коробок кілька)" %}</label>
+              <textarea name="package_tracking" rows="3" class="sd-field-input" translate="no" style="width:100%;font-family:monospace">{% for t in shipment.package_tracking %}{{ t }}
+{% endfor %}</textarea>
+              <button type="submit" class="sd-btn-save-sm" style="margin-top:6px">💾 {% trans "Зберегти" %}</button>
+            </form>
+          </details>
           {% endif %}
 
           <!-- Manual Jumingo ID -->
@@ -1423,14 +1445,19 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
                 <input type="radio" name="abd_ref" value="{{ f.ref }}" {% if forloop.first %}checked{% endif %}>
                 📎 <span translate="no">{{ f.name }}</span>
                 <span style="color:var(--text-dim)">· {{ f.date|date:"d.m.Y H:i" }}{% if f.mrn %} · MRN <span translate="no">{{ f.mrn }}</span>{% endif %}</span>
+                <button type="button" class="button" style="padding:1px 8px;margin-left:4px"
+                  title="{% trans 'Швидкий перегляд документа' %}"
+                  data-abd-view="{{ abd.abd_preview_url }}?ref={{ f.ref|urlencode }}" data-abd-name="{{ f.name }}">👁</button>
               </label>
               {% empty %}
               <div class="sd-section-note">{% trans "Листа ABD з файлом у ваших скриньках не знайдено — виберіть файл з ПК." %}</div>
               {% endfor %}
               <div style="margin:6px 0;font-size:12.5px">
                 {% if abd.abd_files %}{% trans "або файл з ПК:" %}{% endif %}
-                <input type="file" name="abd_file" accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.doc,.docx,.rtf,.txt,.xls,.xlsx"
+                <input type="file" name="abd_file" id="abd-file" accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.doc,.docx,.rtf,.txt,.xls,.xlsx"
                   onchange="if(this.files.length){this.form.querySelectorAll('input[name=abd_ref]').forEach(function(r){r.checked=false})}">
+                <button type="button" class="button" style="padding:1px 8px" data-abd-local
+                  title="{% trans 'Швидкий перегляд вибраного файлу' %}">👁</button>
               </div>
               <button type="submit" class="button default"
                 onclick="return confirm('{% trans "Надіслати ABD в UPS до цієї посилки?" %}')">
@@ -1440,6 +1467,62 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             <div class="sd-section-note">
               {% trans "UPS Paperless: тип «Export-Begleitdokument», прив’язується до вже оформленої посилки. Файл до 10 МБ, до 13 документів на посилку. Копія — у документах замовлення." %}
             </div>
+            <div id="abd-pv" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);align-items:center;justify-content:center"
+                 role="dialog" aria-modal="true">
+              <div style="background:var(--bg-card,#1b2530);border:1px solid var(--border-2,#33475b);border-radius:10px;width:min(920px,94vw);height:88vh;display:flex;flex-direction:column;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border,#2c3a47)">
+                  <b>👁 {% trans "Перегляд" %}:</b> <span id="abd-pv-name" translate="no" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                  <a id="abd-pv-open" href="#" target="_blank" rel="noopener" class="button" style="padding:2px 8px">↗ {% trans "Нова вкладка" %}</a>
+                  <button type="button" class="button" style="padding:2px 10px" data-abd-close>✕</button>
+                </div>
+                <div id="abd-pv-body" style="flex:1;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto"></div>
+              </div>
+            </div>
+            <script>
+            (function () {
+              var box = document.getElementById('abd-pv'), body = document.getElementById('abd-pv-body'),
+                  nameEl = document.getElementById('abd-pv-name'), openEl = document.getElementById('abd-pv-open'),
+                  local = null;
+              if (!box) return;
+              function show(url, name, isImg) {
+                body.textContent = '';
+                var el = document.createElement(isImg ? 'img' : 'iframe');
+                el.src = url;
+                if (isImg) { el.style.maxWidth = '100%'; el.style.maxHeight = '100%'; }
+                else { el.style.width = '100%'; el.style.height = '100%'; el.style.border = '0'; }
+                body.appendChild(el);
+                nameEl.textContent = name || '';
+                openEl.href = url;
+                box.style.display = 'flex';
+              }
+              function close() {
+                box.style.display = 'none'; body.textContent = '';
+                if (local) { URL.revokeObjectURL(local); local = null; }
+              }
+              var IMG = /\.(png|jpe?g|gif|bmp)$/i, VIEW = /\.(pdf|png|jpe?g|gif|bmp|txt)$/i;
+              document.addEventListener('click', function (e) {
+                var b = e.target.closest('[data-abd-view]');
+                if (b) {
+                  e.preventDefault();
+                  var n = b.getAttribute('data-abd-name');
+                  if (!VIEW.test(n)) { window.open(b.getAttribute('data-abd-view'), '_blank'); return; }
+                  show(b.getAttribute('data-abd-view'), n, IMG.test(n)); return;
+                }
+                if (e.target.closest('[data-abd-local]')) {
+                  e.preventDefault();
+                  var f = document.getElementById('abd-file');
+                  if (!f || !f.files.length) { alert('{% trans "Спершу виберіть файл з ПК." %}'); return; }
+                  var file = f.files[0];
+                  if (!VIEW.test(file.name)) { alert('{% trans "Цей тип файлу браузер не показує — перегляд лише для PDF, картинок і TXT." %}'); return; }
+                  if (local) URL.revokeObjectURL(local);
+                  local = URL.createObjectURL(file);
+                  show(local, file.name, IMG.test(file.name)); return;
+                }
+                if (e.target.closest('[data-abd-close]') || e.target === box) close();
+              });
+              document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && box.style.display === 'flex') close(); });
+            })();
+            </script>
             {% endif %}
           </div>
           {% endif %}
