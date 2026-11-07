@@ -161,7 +161,7 @@ class AbdToUpsTests(MrnFromMailTests):
         self.assertEqual(upload.call_args.kwargs, {"document_type": "004", "file_format": "pdf"})
         ids, ups_id, tracking, _when = push.call_args.args
         self.assertEqual((ids, ups_id, tracking), (["D" * 26], "1Z0R6B300439360978", ["1Z0R6B300439360978"]))
-        self.assertIn("UPS_ABD |", self.reload().notes)
+        self.assertIn("UPS_DOC | ", self.reload().notes)
         self.assertContains(self.client.get(self.detail), "Надіслано")
 
     @mock.patch.object(UPSClient, "push_paperless_documents", return_value="")
@@ -189,7 +189,7 @@ class AbdToUpsTests(MrnFromMailTests):
         upload.side_effect = UPSError("Upload Forms Created Offline not enabled")
         msg = self._abd_mail()
         r = self.client.post(self.url, {"abd_ref": f"msg:{msg.pk}:0"})
-        self.assertTrue(any("UPS не прийняв ABD" in m for m in self.messages(r)))
+        self.assertTrue(any("UPS не прийняв документи" in m for m in self.messages(r)))
         self.assertNotIn("UPS_ABD", self.reload().notes or "")
 
     def test_preview_own_file_only(self):
@@ -209,7 +209,7 @@ class AbdToUpsTests(MrnFromMailTests):
     def test_draft_and_get_do_nothing(self):
         self.assertEqual(self.client.get(self.url).status_code, 302)
         Shipment.objects.filter(pk=self.shipment.pk).update(status=Shipment.Status.DRAFT)
-        self.assertNotContains(self.client.get(self.detail), "Надіслати ABD в UPS")
+        self.assertNotContains(self.client.get(self.detail), "Документи для митниці в UPS")
 
     def test_push_payload(self):
         from datetime import datetime as _dt

@@ -1531,6 +1531,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_ups_void",
             ),
             path(
+                "repair-tracking/",
+                self.admin_site.admin_view(self.repair_tracking_view),
+                name="shipping_shipment_repair_tracking",
+            ),
+            path(
                 "<int:shipment_id>/ups-abd/",
                 self.admin_site.admin_view(self.ups_abd_view),
                 name="shipping_shipment_ups_abd",
@@ -4955,6 +4960,44 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                       'якщо він уже не потрібен, натисніть «❌ Скасувати забір UPS».')
         return redirect(detail)
 
+    # ── 🔧 Автоперевірка трек-номерів посилок (дублі в одному замовленні) ─────────
+    def repair_tracking_view(self, request):
+        """GET — що знайдено (`?order=<pk>` — лише це замовлення); POST — записати вибрані після підтвердження.
+        Логіка — shipping/services/parcel_repair.py (та сама, що manage.py repair_parcel_tracking)."""
+        from django.core.exceptions import PermissionDenied
+        from django.template.response import TemplateResponse
+        from sales.models import SalesOrder
+        from .services import parcel_repair
+
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        order = None
+        if (request.GET.get("order") or request.POST.get("order") or "").isdigit():
+            order = get_object_or_404(SalesOrder, pk=int(request.GET.get("order") or request.POST.get("order")))
+        back = (reverse("admin:sales_salesorder_change", args=[order.pk]) if order
+                else reverse("admin:shipping_shipment_changelist"))
+        if request.method == "POST":
+            if not self.has_change_permission(request):
+                raise PermissionDenied
+            only = [int(v) for v in request.POST.getlist("pk") if v.isdigit()]
+            done = parcel_repair.apply_for(order, only) if only else 0
+            if done:
+                messages.success(request, f"✅ Виправлено трек-номерів: {done}.")
+            else:
+                messages.info(request, "ℹ️ Нічого не змінено.")
+            return redirect(back)
+        rows = parcel_repair.plan(order)
+        for row in rows:
+            row["url"] = reverse("admin:shipping_shipment_detail", args=[row["pk"]])
+            row["order_url"] = reverse("admin:sales_salesorder_change", args=[row["order_pk"]])
+        return TemplateResponse(request, "admin/shipping/shipment/repair_tracking.html", {
+            **self.admin_site.each_context(request),
+            "title": "🔧 Автоперевірка трек-номерів посилок",
+            "rows": rows, "order": order, "back": back,
+            "can_change": self.has_change_permission(request),
+            "fixable": any(r["new"] for r in rows),
+        })
+
     # ── 📑 ABD (Ausfuhrbegleitdokument) в UPS для вже оформленого відправлення ──
     UPS_ABD_STATUSES = (Shipment.Status.SUBMITTED, Shipment.Status.LABEL_READY,
                         Shipment.Status.IN_TRANSIT, Shipment.Status.DELIVERED)
@@ -4967,68 +5010,65 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     @staticmethod
     def _ups_abd_sent(shipment) -> list:
-        """Що вже надіслано: рядки «UPS_ABD | дата | DocID:… | файл» у нотатках → [{when, doc, name}]."""
-        import re as _re
-        return [{'when': m.group(1), 'doc': m.group(2), 'name': m.group(3)}
-                for m in _re.finditer(r'UPS_ABD \| ([^|]+?) \| DocID:(\S+) \| ([^\n]*)', shipment.notes or '')]
+        """Що вже надіслано в UPS до цієї посилки (ups_docs.sent)."""
+        from .services import ups_docs
+        return ups_docs.sent(shipment)
 
     def _ups_abd_context(self, request, shipment) -> dict:
-        """Блок «📑 ABD в UPS» сторінки відправлення: файли з листів ABD замовлення (лише свої скриньки)."""
+        """Блок «📑 Документи для митниці в UPS» сторінки відправлення: файли з листів замовлення (свої скриньки)
+        і папки документів замовлення, тип і посилка — автоматично (shipping/services/ups_docs.py)."""
         if not self._ups_abd_ok(shipment):
             return {}
-        from .services import mrn as _mrn
+        from .services import ups_docs
         files = []
         try:
-            files = _mrn.abd_files(shipment.order, request.user, shipment.carrier.sender_country or 'DE')
-        except Exception as e:  # noqa: BLE001 — пошта не обов'язкова
-            logger.info('ABD files for shipment %s: %s', shipment.pk, e)
-        return {'abd_ok': True, 'abd_files': files, 'abd_sent': self._ups_abd_sent(shipment),
+            files = ups_docs.candidates(shipment, request.user)
+        except Exception as e:  # noqa: BLE001 — пошта / файли не обов'язкові
+            logger.info('UPS docs for shipment %s: %s', shipment.pk, e)
+        parcels = ups_docs.live_parcels(shipment.order)
+        number = next((n for n, p in enumerate(parcels, 1) if p.pk == shipment.pk), None)
+        return {'abd_ok': True, 'abd_files': files, 'abd_sent': ups_docs.sent(shipment),
                 'abd_can': self.has_change_permission(request, shipment),
                 'abd_url': reverse('admin:shipping_shipment_ups_abd', args=[shipment.pk]),
                 'abd_preview_url': reverse('admin:shipping_shipment_ups_abd_preview', args=[shipment.pk]),
-                'abd_formats': ', '.join(_mrn.UPS_FORMATS)}
+                'abd_types': ups_docs.DOC_TYPES, 'abd_formats': ', '.join(ups_docs.UPS_FORMATS),
+                'abd_parcel_no': number, 'abd_parcels': len(parcels),
+                'abd_left': max(ups_docs.PER_PARCEL - len(ups_docs.sent(shipment)), 0)}
 
     def ups_abd_preview_view(self, request, shipment_id):
-        """GET ?ref=msg:<pk>:<i> — швидкий перегляд файлу з листа ABD перед надсиланням в UPS (лише файли зі
-        списку `abd_files` цієї людини; відповідь — як вкладення пошти: безпечний тип, nosniff, sandbox)."""
+        """GET ?ref=msg:<pk>:<i> | order:<файл> — швидкий перегляд документа перед надсиланням в UPS (лише файли
+        зі списку цієї людини; відповідь — як вкладення пошти: безпечний тип, nosniff, sandbox)."""
         from django.core.exceptions import PermissionDenied
         from django.http import Http404
-        from email_assistant.attachments import attachment_bytes
         from email_assistant.views import _attachment_response
-        from .services import mrn as _mrn
+        from .services import ups_docs
 
         shipment = get_object_or_404(Shipment, pk=shipment_id)
         if not self.has_view_permission(request, shipment):
             raise PermissionDenied
-        ref = (request.GET.get('ref') or '').strip()
-        found = next((f for f in _mrn.abd_files(shipment.order, request.user) if f['ref'] == ref), None)
-        if found is None:
-            raise Http404
-        msg = found['message']
-        idx = int(ref.rsplit(':', 1)[-1])
         try:
-            data = attachment_bytes(msg.account, msg, idx)
+            found = ups_docs.read(shipment, request.user, (request.GET.get('ref') or '').strip())
         except Exception as e:  # noqa: BLE001 — IMAP
-            logger.warning('ABD preview %s: %s', ref, e)
-            data = None
-        if not data:
+            logger.warning('UPS doc preview %s: %s', request.GET.get('ref'), e)
+            found = None
+        if not found:
             raise Http404
-        att = (msg.attachments or [])[idx]
-        resp = _attachment_response(data, found['name'], att.get('content_type', 'application/octet-stream'))
+        name, data, ctype = found
+        resp = _attachment_response(data, name, ctype or 'application/octet-stream')
         resp['X-Frame-Options'] = 'SAMEORIGIN'          # перегляд у вікні на сторінці відправлення
         return resp
 
     def ups_abd_view(self, request, shipment_id):
-        """POST — надіслати ABD (Export-Begleitdokument) в UPS до вже оформленої посилки: Paperless upload
-        (тип 004) → PushToImageRepository (номер відправлення, трек-номер, дата оформлення). Файл — з листа ABD
-        замовлення (`abd_ref`, лише свої скриньки) або з ПК (`abd_file`). Копія — у документи замовлення,
-        запис «UPS_ABD | …» — у нотатки."""
+        """POST — надіслати документи для митниці в UPS до вже оформленої посилки: кожен файл — Paperless upload
+        зі своїм типом (`type_<ref>`, з ПК — `pc_type`), потім один PushToImageRepository (номер відправлення,
+        трек-номери, дата оформлення). Файли — вибрані `doc` (листи замовлення — лише свої скриньки, папка
+        документів замовлення) і `pc_file` з ПК. Копія — у документи замовлення, «UPS_DOC | …» — у нотатки.
+        Старі поля `abd_ref` / `abd_file` — тип 004."""
         import os
         import re as _re
         from django.conf import settings as django_settings
         from django.core.exceptions import PermissionDenied
-        from email_assistant.attachments import attachment_bytes
-        from .services import mrn as _mrn
+        from .services import ups_docs
         from .ups_client import UPSClient, UPSError
 
         detail = reverse('admin:shipping_shipment_detail', args=[shipment_id])
@@ -5038,74 +5078,87 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if not self.has_change_permission(request, shipment):
             raise PermissionDenied
         if not self._ups_abd_ok(shipment):
-            messages.error(request, '❌ ABD в UPS — лише для оформленого відправлення UPS з номером 1Z….')
+            messages.error(request, '❌ Документи в UPS — лише для оформленого відправлення UPS з номером 1Z….')
             return redirect(detail)
 
-        upload, ref = request.FILES.get('abd_file'), (request.POST.get('abd_ref') or '').strip()
-        name, data = '', None
-        if upload:
-            name = os.path.basename(upload.name or 'ABD.pdf')
-            if upload.size > _mrn.UPS_FILE_MAX:
-                messages.error(request, '❌ Файл більший за 10 МБ — UPS його не прийме.')
-                return redirect(detail)
-            data = upload.read()
-        elif ref:
-            found = next((f for f in _mrn.abd_files(shipment.order, request.user) if f['ref'] == ref), None)
-            if found is None:
-                messages.error(request, '❌ Лист з цим файлом не знайдено у ваших скриньках.')
-                return redirect(detail)
-            name = found['name']
-            msg = found['message']
+        codes = {c for c, *_ in ups_docs.DOC_TYPES}
+        files = []                                   # (назва, байти, тип, копіювати в документи замовлення)
+        refs = request.POST.getlist('doc') or ([request.POST['abd_ref']] if request.POST.get('abd_ref') else [])
+        for ref in refs:
             try:
-                data = attachment_bytes(msg.account, msg, int(ref.rsplit(':', 1)[-1]))
+                found = ups_docs.read(shipment, request.user, ref.strip())
             except Exception as e:  # noqa: BLE001 — IMAP
-                logger.warning('ABD attachment %s: %s', ref, e)
-            if not data:
-                messages.error(request, f'❌ Не вдалося прочитати «{name}» з пошти — завантажте файл з ПК.')
+                logger.warning('UPS doc %s: %s', ref, e)
+                found = None
+            if not found:
+                messages.error(request, '❌ Файл не знайдено (лист не у ваших скриньках або файл видалено) — '
+                                        'завантажте його з ПК.')
                 return redirect(detail)
-        else:
-            messages.error(request, '❌ Виберіть файл ABD з листа або з ПК.')
+            code = request.POST.get(f'type_{ref}') or ups_docs.detect(found[0])[0] or '004'
+            files.append((found[0], found[1], code, not ref.startswith('order:')))
+        pc_files = request.FILES.getlist('pc_file') or request.FILES.getlist('abd_file')
+        for upload in pc_files:
+            name = os.path.basename(upload.name or 'document.pdf')
+            if upload.size > ups_docs.FILE_MAX:
+                messages.error(request, f'❌ «{name}» більший за 10 МБ — UPS його не прийме.')
+                return redirect(detail)
+            code = request.POST.get('pc_type') or ups_docs.detect(name)[0] or '004'
+            files.append((name, upload.read(), code, True))
+        if not files:
+            messages.error(request, '❌ Виберіть документи з листа, документів замовлення або з ПК.')
             return redirect(detail)
 
-        ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
-        if ext not in _mrn.UPS_FORMATS:
-            messages.error(request, f'❌ UPS приймає лише {", ".join(_mrn.UPS_FORMATS)} — «{name}» не підходить.')
-            return redirect(detail)
-        if len(data) > _mrn.UPS_FILE_MAX:
-            messages.error(request, '❌ Файл більший за 10 МБ — UPS його не прийме.')
-            return redirect(detail)
-        if len(self._ups_abd_sent(shipment)) >= 13:
+        for name, data, code, _copy in files:
+            ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+            if ext not in ups_docs.UPS_FORMATS:
+                messages.error(request, f'❌ UPS приймає лише {", ".join(ups_docs.UPS_FORMATS)} — «{name}» не підходить.')
+                return redirect(detail)
+            if len(data) > ups_docs.FILE_MAX:
+                messages.error(request, f'❌ «{name}» більший за 10 МБ — UPS його не прийме.')
+                return redirect(detail)
+            if code not in codes:
+                messages.error(request, f'❌ Невідомий тип документа для «{name}».')
+                return redirect(detail)
+        if len(ups_docs.sent(shipment)) + len(files) > ups_docs.PER_PARCEL:
             messages.error(request, '❌ UPS приймає до 13 документів на посилку — більше додати не можна.')
             return redirect(detail)
 
         ups_id = (shipment.carrier_shipment_id or shipment.tracking_number).strip()
+        tracking = [shipment.tracking_number or ups_id] + [t for t in (shipment.package_tracking or [])
+                                                           if t and t != shipment.tracking_number]
+        uploaded = []
         try:
             client = UPSClient(carrier=shipment.carrier)
-            doc_id = client.upload_paperless_document(data, name, document_type='004',
-                                                      file_format='jpg' if ext == 'jpeg' else ext)
-            client.push_paperless_documents([doc_id], ups_id, [shipment.tracking_number or ups_id],
+            for name, data, code, _copy in files:
+                ext = name.rsplit('.', 1)[-1].lower()
+                uploaded.append((name, code, client.upload_paperless_document(
+                    data, name, document_type=code, file_format='jpg' if ext == 'jpeg' else ext)))
+            client.push_paperless_documents([d for _n, _c, d in uploaded], ups_id, tracking,
                                             timezone.localtime(shipment.submitted_at or shipment.created_at))
         except UPSError as e:
-            messages.error(request, f'❌ UPS не прийняв ABD: {e}. Можна завантажити вручну на ups.com → '
-                                    '«Meine Dokumente hochladen» (тип «Export-Begleitdokument»).')
+            messages.error(request, f'❌ UPS не прийняв документи: {e}. Можна завантажити вручну на ups.com → '
+                                    '«Meine Dokumente hochladen».')
             return redirect(detail)
 
-        try:      # копія в документи замовлення
-            folder = os.path.join(django_settings.MEDIA_ROOT, 'shipping', 'customs')
-            os.makedirs(folder, exist_ok=True)
-            safe = _re.sub(r'[^\w.\- ]+', '_', name).strip(' .') or 'ABD.pdf'
-            fpath = os.path.join(folder, f'abd_{shipment.pk}_{safe}')
-            with open(fpath, 'wb') as fh:
-                fh.write(data)
-            _copy_shipment_file_to_order_docs(fpath, shipment)
-        except Exception as e:  # noqa: BLE001 — копія не обов'язкова
-            logger.warning('ABD copy for shipment %s: %s', shipment.pk, e)
+        for name, data, _code, copy in files:      # копія в документи замовлення
+            if not copy:
+                continue
+            try:
+                folder = os.path.join(django_settings.MEDIA_ROOT, 'shipping', 'customs')
+                os.makedirs(folder, exist_ok=True)
+                safe = _re.sub(r'[^\w.\- ]+', '_', name).strip(' .') or 'document.pdf'
+                fpath = os.path.join(folder, f'ups_doc_{shipment.pk}_{safe}')
+                with open(fpath, 'wb') as fh:
+                    fh.write(data)
+                _copy_shipment_file_to_order_docs(fpath, shipment)
+            except Exception as e:  # noqa: BLE001 — копія не обов'язкова
+                logger.warning('UPS doc copy for shipment %s: %s', shipment.pk, e)
 
-        stamp = timezone.localtime().strftime('%d.%m.%Y %H:%M')
-        shipment.notes = ((shipment.notes.rstrip() + '\n') if shipment.notes else '') + \
-            f'UPS_ABD | {stamp} | DocID:{doc_id} | {name}'
+        lines = [ups_docs.note_line(code, doc_id, name) for name, code, doc_id in uploaded]
+        shipment.notes = ((shipment.notes.rstrip() + '\n') if shipment.notes else '') + '\n'.join(lines)
         shipment.save(update_fields=['notes'])
-        messages.success(request, f'✅ ABD «{name}» надіслано в UPS і прив\'язано до {ups_id}.')
+        names = ', '.join(f'«{n}» ({ups_docs.TYPE_NAMES.get(c, c)})' for n, c, _d in uploaded)
+        messages.success(request, f'✅ Надіслано в UPS і прив\'язано до {ups_id}: {names}.')
         return redirect(detail)
 
     # ── UPS Pickup standalone (Abholung для вже існуючого відправлення) ────────

@@ -1084,9 +1084,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 seen.setdefault(tn.upper(), n)
             warn = format_html(
                 '<div style="color:var(--warn,#ef6c00)" title="{}">⚠️ той самий номер, що посилка {} · '
-                '<a href="{}">✏️ виправити</a></div>',
-                "Номер іншої посилки. Справжній — на етикетці цієї посилки: впишіть його на сторінці посилки "
-                "або python manage.py repair_parcel_tracking", same,
+                '<a href="{}">🔧 автоперевірка</a> · <a href="{}">✏️ вручну</a></div>',
+                "Номер іншої посилки. Справжній — на етикетці цієї посилки: «🔧 автоперевірка» знайде його сама "
+                "(з підтвердженням), «✏️ вручну» — вписати на сторінці посилки", same,
+                reverse("admin:shipping_shipment_repair_tracking") + f"?order={obj.pk}",
                 reverse("admin:shipping_shipment_detail", args=[s.pk]) + "?fix=1#fix-tracking") if same else ""
             boxes_tn = [t for t in (s.package_tracking or []) if t]
             if len(boxes_tn) > 1:

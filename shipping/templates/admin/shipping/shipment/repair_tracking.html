@@ -1,0 +1,47 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{% block content %}
+<div style="max-width:900px">
+  <p style="font-size:13.5px">
+    {% if order %}{% trans "Замовлення" %} <b translate="no">{{ order.order_number }}</b>: {% endif %}
+    {% trans "Minerva шукає посилки одного замовлення з однаковим трек-номером і бере справжній номер з того, що перевізник видав саме цій посилці: назва файлу етикетки або ID відправлення UPS." %}
+  </p>
+  {% if not rows %}
+    <div style="padding:12px 14px;border-radius:8px;background:var(--bg-card-2,#1a2433)">
+      ✅ {% trans "Посилок з чужим трек-номером не знайдено." %}
+    </div>
+  {% else %}
+  <form method="post">{% csrf_token %}
+    {% if order %}<input type="hidden" name="order" value="{{ order.pk }}">{% endif %}
+    <table style="border-collapse:collapse;font-size:13px;width:100%">
+      <thead><tr>
+        <th></th><th style="text-align:left;padding:6px">{% trans "Замовлення" %}</th>
+        <th style="text-align:left;padding:6px">{% trans "Посилка" %}</th>
+        <th style="text-align:left;padding:6px">{% trans "Зараз" %}</th>
+        <th style="text-align:left;padding:6px">{% trans "Стане" %}</th>
+        <th style="text-align:left;padding:6px">{% trans "Звідки" %}</th>
+      </tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr style="border-top:1px solid var(--hairline-color,#2c3a47)">
+          <td style="padding:6px">{% if r.new %}<input type="checkbox" name="pk" value="{{ r.pk }}" checked>{% endif %}</td>
+          <td style="padding:6px"><a href="{{ r.order_url }}" translate="no">{{ r.order }}</a></td>
+          <td style="padding:6px"><a href="{{ r.url }}">#{{ r.pk }}</a></td>
+          <td style="padding:6px;font-family:monospace" translate="no">{{ r.old }}</td>
+          <td style="padding:6px;font-family:monospace">{% if r.new %}<b translate="no">{{ r.new }}</b>{% else %}<span style="color:var(--warn,#ef6c00)">{% trans "невідомо — впишіть вручну" %}</span>{% endif %}</td>
+          <td style="padding:6px">{% if r.new %}{{ r.why }}{% else %}<a href="{{ r.url }}?fix=1#fix-tracking">✏️ {% trans "виправити" %}</a>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p style="font-size:12.5px;color:var(--text-dim)">{% trans "Звірте номер з наклейкою посилки. Змінюється лише трек-номер відправлення; номер у полі замовлення лишається номером першої посилки." %}</p>
+    {% if can_change and fixable %}
+      <button type="submit" class="button default"
+        onclick="return confirm('{% trans "Записати вибрані трек-номери?" %}')">✅ {% trans "Виправити вибрані" %}</button>
+    {% endif %}
+    <a href="{{ back }}" class="button" style="margin-left:8px">← {% trans "Назад" %}</a>
+  </form>
+  {% endif %}
+  {% if not rows %}<p><a href="{{ back }}" class="button">← {% trans "Назад" %}</a></p>{% endif %}
+</div>
+{% endblock %}
