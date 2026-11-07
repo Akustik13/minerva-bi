@@ -40,6 +40,48 @@ def find_in_text(text: str, shipper_country: str = "") -> str:
     return ""
 
 
+UPS_FORMATS = ("pdf", "jpg", "jpeg", "png", "gif", "bmp", "doc", "docx", "rtf", "txt", "xls", "xlsx")
+UPS_FILE_MAX = 10 * 1024 * 1024        # UPS: файл ≤ 10 МБ
+
+
+def _order_messages(order, user):
+    """Листи замовлення (хронологія CRM) лише зі скриньок цієї людини, найновіші першими, без повторів."""
+    from crm.models import CustomerTimeline
+
+    events = (CustomerTimeline.objects
+              .filter(related_order_id=order.pk, email_message__isnull=False,
+                      email_message__account__user=user)
+              .select_related("email_message", "email_message__account")
+              .order_by("-created_at")[:MAIL_SCAN])
+    out, seen = [], set()
+    for ev in events:
+        if ev.email_message_id not in seen:
+            seen.add(ev.email_message_id)
+            out.append(ev.email_message)
+    return out
+
+
+def abd_files(order, user, shipper_country: str = "") -> list:
+    """Файли з листів ABD замовлення (лише свої скриньки), які UPS приймає:
+    [{ref 'msg:<pk>:<i>', name, subject, date, mrn, message}] — для «📑 ABD в UPS»."""
+    if not order or not user or not getattr(user, "is_authenticated", False):
+        return []
+    out = []
+    for msg in _order_messages(order, user):
+        if not ABD_HINT.search(f"{msg.subject or ''} {(msg.body_text or '')[:2000]}"):
+            continue
+        for i, att in enumerate(msg.attachments or []):
+            if not isinstance(att, dict) or att.get("is_inline"):
+                continue
+            name = att.get("name") or ""
+            if name.rsplit(".", 1)[-1].lower() not in UPS_FORMATS:
+                continue
+            out.append({"ref": f"msg:{msg.pk}:{i}", "name": name, "subject": msg.subject or "",
+                        "date": msg.sent_at or msg.created_at, "message": msg,
+                        "mrn": find_in_text(msg.subject, shipper_country)})
+    return out
+
+
 def find_in_mail(order, user, shipper_country: str = ""):
     """MRN з листа ABD, прив'язаного до замовлення (хронологія CRM), лише зі скриньок цієї людини.
     → {mrn, subject, date, message_pk} або None."""

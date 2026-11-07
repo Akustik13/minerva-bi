@@ -1531,6 +1531,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_ups_void",
             ),
             path(
+                "<int:shipment_id>/ups-abd/",
+                self.admin_site.admin_view(self.ups_abd_view),
+                name="shipping_shipment_ups_abd",
+            ),
+            path(
                 "<int:shipment_id>/ups-pickup/",
                 self.admin_site.admin_view(self.ups_pickup_standalone_view),
                 name="shipping_shipment_ups_pickup",
@@ -3347,6 +3352,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "label_display_url":         _label_display_url,
             "label_a4_url":              _label_a4_url,
             "shop_confirm":              self._shop_confirm_context(shipment),
+            "abd":                       self._ups_abd_context(request, shipment),
             "parcel":                    self._parcel_context(shipment, request),
             "agent_next":                agent_next,
             "incoming_info":             incoming_info,
@@ -4921,6 +4927,128 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if pickup and pickup.group(1) != '-':
             messages.warning(request, f'⚠️ Забір кур\'єром UPS (PRN {pickup.group(1)}) Void не скасовує — '
                                       'якщо він уже не потрібен, натисніть «❌ Скасувати забір UPS».')
+        return redirect(detail)
+
+    # ── 📑 ABD (Ausfuhrbegleitdokument) в UPS для вже оформленого відправлення ──
+    UPS_ABD_STATUSES = (Shipment.Status.SUBMITTED, Shipment.Status.LABEL_READY,
+                        Shipment.Status.IN_TRANSIT, Shipment.Status.DELIVERED)
+
+    @classmethod
+    def _ups_abd_ok(cls, shipment) -> bool:
+        return bool(shipment.carrier and shipment.carrier.carrier_type == 'ups'
+                    and shipment.status in cls.UPS_ABD_STATUSES
+                    and (shipment.carrier_shipment_id or shipment.tracking_number or '').strip())
+
+    @staticmethod
+    def _ups_abd_sent(shipment) -> list:
+        """Що вже надіслано: рядки «UPS_ABD | дата | DocID:… | файл» у нотатках → [{when, doc, name}]."""
+        import re as _re
+        return [{'when': m.group(1), 'doc': m.group(2), 'name': m.group(3)}
+                for m in _re.finditer(r'UPS_ABD \| ([^|]+?) \| DocID:(\S+) \| ([^\n]*)', shipment.notes or '')]
+
+    def _ups_abd_context(self, request, shipment) -> dict:
+        """Блок «📑 ABD в UPS» сторінки відправлення: файли з листів ABD замовлення (лише свої скриньки)."""
+        if not self._ups_abd_ok(shipment):
+            return {}
+        from .services import mrn as _mrn
+        files = []
+        try:
+            files = _mrn.abd_files(shipment.order, request.user, shipment.carrier.sender_country or 'DE')
+        except Exception as e:  # noqa: BLE001 — пошта не обов'язкова
+            logger.info('ABD files for shipment %s: %s', shipment.pk, e)
+        return {'abd_ok': True, 'abd_files': files, 'abd_sent': self._ups_abd_sent(shipment),
+                'abd_can': self.has_change_permission(request, shipment),
+                'abd_url': reverse('admin:shipping_shipment_ups_abd', args=[shipment.pk]),
+                'abd_formats': ', '.join(_mrn.UPS_FORMATS)}
+
+    def ups_abd_view(self, request, shipment_id):
+        """POST — надіслати ABD (Export-Begleitdokument) в UPS до вже оформленої посилки: Paperless upload
+        (тип 004) → PushToImageRepository (номер відправлення, трек-номер, дата оформлення). Файл — з листа ABD
+        замовлення (`abd_ref`, лише свої скриньки) або з ПК (`abd_file`). Копія — у документи замовлення,
+        запис «UPS_ABD | …» — у нотатки."""
+        import os
+        import re as _re
+        from django.conf import settings as django_settings
+        from django.core.exceptions import PermissionDenied
+        from email_assistant.attachments import attachment_bytes
+        from .services import mrn as _mrn
+        from .ups_client import UPSClient, UPSError
+
+        detail = reverse('admin:shipping_shipment_detail', args=[shipment_id])
+        if request.method != 'POST':
+            return redirect(detail)
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        if not self.has_change_permission(request, shipment):
+            raise PermissionDenied
+        if not self._ups_abd_ok(shipment):
+            messages.error(request, '❌ ABD в UPS — лише для оформленого відправлення UPS з номером 1Z….')
+            return redirect(detail)
+
+        upload, ref = request.FILES.get('abd_file'), (request.POST.get('abd_ref') or '').strip()
+        name, data = '', None
+        if upload:
+            name = os.path.basename(upload.name or 'ABD.pdf')
+            if upload.size > _mrn.UPS_FILE_MAX:
+                messages.error(request, '❌ Файл більший за 10 МБ — UPS його не прийме.')
+                return redirect(detail)
+            data = upload.read()
+        elif ref:
+            found = next((f for f in _mrn.abd_files(shipment.order, request.user) if f['ref'] == ref), None)
+            if found is None:
+                messages.error(request, '❌ Лист з цим файлом не знайдено у ваших скриньках.')
+                return redirect(detail)
+            name = found['name']
+            msg = found['message']
+            try:
+                data = attachment_bytes(msg.account, msg, int(ref.rsplit(':', 1)[-1]))
+            except Exception as e:  # noqa: BLE001 — IMAP
+                logger.warning('ABD attachment %s: %s', ref, e)
+            if not data:
+                messages.error(request, f'❌ Не вдалося прочитати «{name}» з пошти — завантажте файл з ПК.')
+                return redirect(detail)
+        else:
+            messages.error(request, '❌ Виберіть файл ABD з листа або з ПК.')
+            return redirect(detail)
+
+        ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
+        if ext not in _mrn.UPS_FORMATS:
+            messages.error(request, f'❌ UPS приймає лише {", ".join(_mrn.UPS_FORMATS)} — «{name}» не підходить.')
+            return redirect(detail)
+        if len(data) > _mrn.UPS_FILE_MAX:
+            messages.error(request, '❌ Файл більший за 10 МБ — UPS його не прийме.')
+            return redirect(detail)
+        if len(self._ups_abd_sent(shipment)) >= 13:
+            messages.error(request, '❌ UPS приймає до 13 документів на посилку — більше додати не можна.')
+            return redirect(detail)
+
+        ups_id = (shipment.carrier_shipment_id or shipment.tracking_number).strip()
+        try:
+            client = UPSClient(carrier=shipment.carrier)
+            doc_id = client.upload_paperless_document(data, name, document_type='004',
+                                                      file_format='jpg' if ext == 'jpeg' else ext)
+            client.push_paperless_documents([doc_id], ups_id, [shipment.tracking_number or ups_id],
+                                            timezone.localtime(shipment.submitted_at or shipment.created_at))
+        except UPSError as e:
+            messages.error(request, f'❌ UPS не прийняв ABD: {e}. Можна завантажити вручну на ups.com → '
+                                    '«Meine Dokumente hochladen» (тип «Export-Begleitdokument»).')
+            return redirect(detail)
+
+        try:      # копія в документи замовлення
+            folder = os.path.join(django_settings.MEDIA_ROOT, 'shipping', 'customs')
+            os.makedirs(folder, exist_ok=True)
+            safe = _re.sub(r'[^\w.\- ]+', '_', name).strip(' .') or 'ABD.pdf'
+            fpath = os.path.join(folder, f'abd_{shipment.pk}_{safe}')
+            with open(fpath, 'wb') as fh:
+                fh.write(data)
+            _copy_shipment_file_to_order_docs(fpath, shipment)
+        except Exception as e:  # noqa: BLE001 — копія не обов'язкова
+            logger.warning('ABD copy for shipment %s: %s', shipment.pk, e)
+
+        stamp = timezone.localtime().strftime('%d.%m.%Y %H:%M')
+        shipment.notes = ((shipment.notes.rstrip() + '\n') if shipment.notes else '') + \
+            f'UPS_ABD | {stamp} | DocID:{doc_id} | {name}'
+        shipment.save(update_fields=['notes'])
+        messages.success(request, f'✅ ABD «{name}» надіслано в UPS і прив\'язано до {ups_id}.')
         return redirect(detail)
 
     # ── UPS Pickup standalone (Abholung для вже існуючого відправлення) ────────

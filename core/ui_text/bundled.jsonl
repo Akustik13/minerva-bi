@@ -720,6 +720,8 @@
 {"uk": "?with_stock=1 додає", "en": "?with_stock=1 adds", "de": "?with_stock=1 fügt hinzu"}
 {"uk": "@username_каналу", "en": "@channel_username", "de": "@Kanal_username"}
 {"uk": "A — з шаблону, B — файл з бази, E — поправлено вручну", "en": "A — from the template, B — file from the database, E — corrected manually", "de": "A — aus der Vorlage, B — Datei aus der Datenbank, E — manuell korrigiert"}
+{"uk": "ABD «{0}» надіслано в UPS і прив'язано до {1}.", "en": "ABD «{0}» sent to UPS and attached to {1}.", "de": "ABD «{0}» an UPS gesendet und mit {1} verknüpft."}
+{"uk": "ABD в UPS — лише для оформленого відправлення UPS з номером 1Z….", "en": "ABD to UPS — only for a booked UPS shipment with a 1Z… number.", "de": "ABD an UPS — nur für eine gebuchte UPS-Sendung mit 1Z…-Nummer."}
 {"uk": "ACL: інша скринька — лист не повертається", "en": "ACL: another mailbox — the e-mail is not returned", "de": "ACL: anderes Postfach — E-Mail wird nicht zurückgegeben"}
 {"uk": "ACL: інший користувач не бачить лист", "en": "ACL: another user does not see the e-mail", "de": "ACL: anderer Benutzer sieht die E-Mail nicht"}
 {"uk": "AI ({0}, сьогодні {1} з {2}, ≈ {3})", "en": "AI ({0}, today {1} of {2}, ≈ {3})", "de": "KI ({0}, heute {1} von {2}, ≈ {3})"}
@@ -1968,10 +1970,13 @@
 {"uk": "UPS доставка Польща {0}", "en": "UPS shipping Poland {0}", "de": "UPS-Versand Polen {0}"}
 {"uk": "UPS лог — макс. записів", "en": "UPS log — max. records", "de": "UPS-Protokoll — max. Einträge"}
 {"uk": "UPS налаштування: {0}", "en": "UPS settings: {0}", "de": "UPS-Einstellungen: {0}"}
+{"uk": "UPS не прийняв ABD: {0}. Можна завантажити вручну на ups.com → «Meine Dokumente hochladen» (тип «Export-Begleitdokument»).", "en": "UPS did not accept the ABD: {0}. You can upload it manually on ups.com → «Meine Dokumente hochladen» (type «Export-Begleitdokument»).", "de": "UPS hat das ABD nicht angenommen: {0}. Manuell hochladen auf ups.com → «Meine Dokumente hochladen» (Typ «Export-Begleitdokument»)."}
 {"uk": "UPS не підтвердив скасування {0}: {1}. Статус відправлення не змінено — перевірте в «📋 UPS Лог» перевізника.", "en": "UPS did not confirm the cancellation of {0}: {1}. The shipment status was not changed — check the carrier in “📋 UPS Log”.", "de": "UPS hat die Stornierung von {0} nicht bestätigt: {1}. Der Sendungsstatus wurde nicht geändert — prüfen Sie den Versanddienstleister im „📋 UPS-Protokoll“."}
 {"uk": "UPS не скасував відправлення {0}: {1}. Якщо кур'єр уже забрав посилку, Void неможливий; статус у Minerva — «🔧 Статус вручну».", "en": "UPS did not cancel shipment {0}: {1}. If the courier has already picked up the parcel, Void is impossible; for the status in Minerva use “🔧 Set status manually”.", "de": "UPS hat Sendung {0} nicht storniert: {1}. Wurde das Paket bereits vom Kurier abgeholt, ist ein Void nicht möglich; den Status in Minerva ändern Sie über „🔧 Status manuell“."}
 {"uk": "UPS перевізник не налаштований", "en": "UPS carrier is not configured", "de": "UPS-Versanddienstleister ist nicht konfiguriert"}
 {"uk": "UPS помилка 120317: Обліковий запис {0} не налаштований для відправлень з {1}. Зверніться до UPS для активації схеми «Importer of Record» / «Bill to Third Party» для відправлень з третіх країн.", "en": "UPS error 120317: Account {0} is not configured for shipments from {1}. Contact UPS to activate the “Importer of Record” / “Bill to Third Party” scheme for shipments from third countries.", "de": "UPS-Fehler 120317: Das Konto {0} ist nicht für Sendungen aus {1} eingerichtet. Wenden Sie sich an UPS, um das Schema „Importer of Record“ / „Bill to Third Party“ für Sendungen aus Drittländern zu aktivieren."}
+{"uk": "UPS приймає до 13 документів на посилку — більше додати не можна.", "en": "UPS accepts up to 13 documents per parcel — no more can be added.", "de": "UPS akzeptiert bis zu 13 Dokumente pro Paket — mehr können nicht hinzugefügt werden."}
+{"uk": "UPS приймає лише {0} — «{1}» не підходить.", "en": "UPS accepts only {0} — «{1}» is not suitable.", "de": "UPS akzeptiert nur {0} — «{1}» ist nicht geeignet."}
 {"uk": "UPS інтеграція", "en": "UPS integration", "de": "UPS-Integration"}
 {"uk": "UPS, DHL, FedEx… (порожньо — за номером)", "en": "UPS, DHL, FedEx… (empty — by the number)", "de": "UPS, DHL, FedEx… (leer — nach Nummer)"}
 {"uk": "UPS: адреси третіх сторін", "en": "UPS: third-party addresses", "de": "UPS: Adressen Dritter"}
@@ -4263,6 +4268,7 @@
 {"uk": "Виберіть проєкт askDANTE.", "en": "Select an askDANTE project.", "de": "Wählen Sie ein askDANTE-Projekt."}
 {"uk": "Виберіть проєкт.", "en": "Choose a project.", "de": "Wählen Sie ein Projekt."}
 {"uk": "Виберіть файл", "en": "Choose a file", "de": "Wählen Sie eine Datei"}
+{"uk": "Виберіть файл ABD з листа або з ПК.", "en": "Choose the ABD file from the e-mail or from your PC.", "de": "Wählen Sie die ABD-Datei aus der E-Mail oder vom PC."}
 {"uk": "Виберіть файл або вставте посилання", "en": "Choose a file or paste a link", "de": "Wählen Sie eine Datei oder fügen Sie einen Link ein"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть порожнім: Minerva створить свою. Після «Зберегти» Minerva створить джерело й завантажить вибране. Типи: {0} · до {1} МБ на файл.", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field empty: Minerva will create its own. After “Save” Minerva will create the source and upload the selection. Types: {0} · up to {1} MB per file.", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“ leer: Minerva erstellt einen eigenen. Nach „Speichern“ erstellt Minerva die Quelle und lädt die Auswahl hoch. Typen: {0} · bis zu {1} MB pro Datei."}
@@ -8249,6 +8255,7 @@
 {"uk": "Лист від {0} ({1}) не надіслано: {2}", "en": "E-mail from {0} ({1}) not sent: {2}", "de": "E-Mail von {0} ({1}) nicht gesendet: {2}"}
 {"uk": "Лист відправлено на", "en": "Email sent to", "de": "E-Mail gesendet an"}
 {"uk": "Лист з одноразовим посиланням (60 хв). Новий пароль завершує всі інші входи; покупець отримує лист «пароль змінено».", "en": "An email with a one-time link (60 min). The new password ends all other sessions; the buyer receives a “password changed” email.", "de": "E-Mail mit einem Einmal-Link (60 Min.). Das neue Passwort beendet alle anderen Anmeldungen; der Käufer erhält eine E-Mail „Passwort geändert“."}
+{"uk": "Лист з цим файлом не знайдено у ваших скриньках.", "en": "The e-mail with this file was not found in your mailboxes.", "de": "Die E-Mail mit dieser Datei wurde in Ihren Postfächern nicht gefunden."}
 {"uk": "Лист з якого витягнуто дедлайн", "en": "E-mail the deadline was extracted from", "de": "E-Mail, aus der die Frist entnommen wurde"}
 {"uk": "Лист з іншої скриньки", "en": "Email from another mailbox", "de": "E-Mail aus einem anderen Postfach"}
 {"uk": "Лист завдання: від кого, кому, дата, тема, текст (новий, без цитати), вкладення (номери для read_attachment) і короткі попередні листи гілки.", "en": "The task e-mail: from, to, date, subject, text (new, without the quote), attachments (numbers for read_attachment) and short earlier e-mails of the thread.", "de": "Die Aufgaben-E-Mail: von, an, Datum, Betreff, Text (neu, ohne Zitat), Anhänge (Nummern für read_attachment) und kurze frühere E-Mails des Verlaufs."}
@@ -9353,6 +9360,7 @@
 {"uk": "Не вдалося перечитати день в askDANTE: {0}", "en": "Could not re-read the day in askDANTE: {0}", "de": "Der Tag konnte in askDANTE nicht neu gelesen werden: {0}"}
 {"uk": "Не вдалося повідомити", "en": "Could not notify", "de": "Benachrichtigung fehlgeschlagen"}
 {"uk": "Не вдалося показати цей блок.", "en": "Could not show this block.", "de": "Dieser Block konnte nicht angezeigt werden."}
+{"uk": "Не вдалося прочитати «{0}» з пошти — завантажте файл з ПК.", "en": "Could not read «{0}» from the mail — upload the file from your PC.", "de": "«{0}» konnte nicht aus der E-Mail gelesen werden — laden Sie die Datei vom PC hoch."}
 {"uk": "Не вдалося прочитати запит.", "en": "Could not read the request.", "de": "Die Anfrage konnte nicht gelesen werden."}
 {"uk": "Не вдалося прочитати зміни — оновіть сторінку й спробуйте ще раз.", "en": "Could not read the changes — refresh the page and try again.", "de": "Die Änderungen konnten nicht gelesen werden — aktualisieren Sie die Seite und versuchen Sie es erneut."}
 {"uk": "Не вдалося прочитати зображення", "en": "Could not read the image", "de": "Bild konnte nicht gelesen werden"}
@@ -14762,6 +14770,7 @@
 {"uk": "Файл {0}.dymo не знайдено", "en": "File {0}.dymo not found", "de": "Datei {0}.dymo nicht gefunden"}
 {"uk": "Файл «FT220407_Datenblatt.pdf» прив'яжеться до товару FT220407 (артикул каталогу в назві файлу чи сторінки)", "en": "The file “FT220407_Datenblatt.pdf” will be linked to product FT220407 (catalog SKU in the file or page name)", "de": "Die Datei „FT220407_Datenblatt.pdf“ wird dem Artikel FT220407 zugeordnet (Artikelnummer aus dem Katalog im Datei- oder Seitennamen)"}
 {"uk": "Файл бекапу (.sql / .zip / .mbackup)", "en": "Backup file (.sql / .zip / .mbackup)", "de": "Sicherungsdatei (.sql / .zip / .mbackup)"}
+{"uk": "Файл більший за 10 МБ — UPS його не прийме.", "en": "The file is larger than 10 MB — UPS will not accept it.", "de": "Die Datei ist größer als 10 MB — UPS nimmt sie nicht an."}
 {"uk": "Файл більший за {0} МБ", "en": "The file is larger than {0} MB", "de": "Die Datei ist größer als {0} MB"}
 {"uk": "Файл даташита в картці товару — прив'язаний до товару (посилання на сайт виробника не завантажуються).", "en": "The datasheet file on the product card — linked to the product (links to the manufacturer's website are not downloaded).", "de": "Datenblatt-Datei in der Artikelkarte – dem Artikel zugeordnet (Links zur Website des Herstellers werden nicht heruntergeladen)."}
 {"uk": "Файл з ПК", "en": "File from PC", "de": "Datei vom PC"}

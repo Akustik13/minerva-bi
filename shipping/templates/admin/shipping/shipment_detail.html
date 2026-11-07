@@ -1408,6 +1408,42 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           </div>
           {% endif %}
 
+          <!-- 📑 ABD (Ausfuhrbegleitdokument) в UPS -->
+          {% if abd.abd_ok %}
+          <div class="sd-divider" id="ups-abd">
+            <div class="sd-section-label">📑 {% trans "ABD (Export-Begleitdokument) в UPS" %}</div>
+            {% for s in abd.abd_sent %}
+            <div class="sd-section-note" style="color:var(--ok)">✅ {% trans "Надіслано" %} {{ s.when }} · <span translate="no">{{ s.name }}</span></div>
+            {% endfor %}
+            {% if abd.abd_can %}
+            <form method="post" action="{{ abd.abd_url }}" enctype="multipart/form-data" style="margin-top:6px">
+              {% csrf_token %}
+              {% for f in abd.abd_files %}
+              <label style="display:block;margin:3px 0;font-size:12.5px;cursor:pointer">
+                <input type="radio" name="abd_ref" value="{{ f.ref }}" {% if forloop.first %}checked{% endif %}>
+                📎 <span translate="no">{{ f.name }}</span>
+                <span style="color:var(--text-dim)">· {{ f.date|date:"d.m.Y H:i" }}{% if f.mrn %} · MRN <span translate="no">{{ f.mrn }}</span>{% endif %}</span>
+              </label>
+              {% empty %}
+              <div class="sd-section-note">{% trans "Листа ABD з файлом у ваших скриньках не знайдено — виберіть файл з ПК." %}</div>
+              {% endfor %}
+              <div style="margin:6px 0;font-size:12.5px">
+                {% if abd.abd_files %}{% trans "або файл з ПК:" %}{% endif %}
+                <input type="file" name="abd_file" accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.doc,.docx,.rtf,.txt,.xls,.xlsx"
+                  onchange="if(this.files.length){this.form.querySelectorAll('input[name=abd_ref]').forEach(function(r){r.checked=false})}">
+              </div>
+              <button type="submit" class="button default"
+                onclick="return confirm('{% trans "Надіслати ABD в UPS до цієї посилки?" %}')">
+                📑 {% trans "Надіслати ABD в UPS" %}
+              </button>
+            </form>
+            <div class="sd-section-note">
+              {% trans "UPS Paperless: тип «Export-Begleitdokument», прив’язується до вже оформленої посилки. Файл до 10 МБ, до 13 документів на посилку. Копія — у документах замовлення." %}
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+
           <!-- UPS Void -->
           {% if ups_void_id %}
           <div class="sd-divider" id="ups-void">
