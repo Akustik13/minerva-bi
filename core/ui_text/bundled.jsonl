@@ -9916,6 +9916,7 @@
 {"uk": "Номер і умови", "en": "Number and terms", "de": "Nummer und Konditionen"}
 {"uk": "Номер інвойсу", "en": "Invoice number", "de": "Rechnungsnummer"}
 {"uk": "Номер інвойсу обов'язковий", "en": "Invoice number is required", "de": "Die Invoice-Nummer ist erforderlich"}
+{"uk": "Номер іншої посилки. Справжній — на етикетці цієї посилки: виправте в картці відправлення або python manage.py repair_parcel_tracking", "en": "Number of another parcel. The real one is on this parcel's label: fix it on the shipment page or run python manage.py repair_parcel_tracking", "de": "Nummer eines anderen Pakets. Die richtige steht auf dem Etikett dieses Pakets: in der Sendung korrigieren oder python manage.py repair_parcel_tracking ausführen"}
 {"uk": "Номер, з яким сайт надіслав замовлення (повтор того самого — те саме замовлення); у Minerva замовлення отримує PO", "en": "The number with which the site sent the order (a repeat of the same one — the same order); in Minerva the order gets PO", "de": "Die Nummer, mit der die Website den Auftrag gesendet hat (eine Wiederholung derselben – derselbe Auftrag); in Minerva erhält der Auftrag PO"}
 {"uk": "Номери днів тижня: 1 — понеділок … 7 — неділя. Свята й відпустки askDANTE враховуються окремо.", "en": "Weekday numbers: 1 — Monday … 7 — Sunday. askDANTE holidays and vacations are taken into account separately.", "de": "Wochentagsnummern: 1 – Montag … 7 – Sonntag. Feiertage und Urlaub aus askDANTE werden separat berücksichtigt."}
 {"uk": "Номери документів", "en": "Document numbers", "de": "Dokumentnummern"}
@@ -18900,6 +18901,7 @@
 {"uk": "товарів, яких там немає", "en": "products that are not there", "de": "Artikel, die dort nicht vorhanden sind"}
 {"uk": "той самий", "en": "the same", "de": "derselbe"}
 {"uk": "той самий клієнт CRM", "en": "same CRM customer", "de": "derselbe CRM-Kunde"}
+{"uk": "той самий номер, що посилка {0}", "en": "same number as parcel {0}", "de": "dieselbe Nummer wie Paket {0}"}
 {"uk": "токен", "en": "token", "de": "Token"}
 {"uk": "токен протермінований. Зайди в Налаштування DigiKey → Marketplace OAuth → авторизуй.", "en": "the token has expired. Go to DigiKey settings → Marketplace OAuth → authorize.", "de": "das Token ist abgelaufen. Zu den DigiKey-Einstellungen → Marketplace OAuth wechseln und autorisieren."}
 {"uk": "токенів", "en": "tokens", "de": "Tokens"}

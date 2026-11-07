@@ -984,7 +984,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 ("ship_phone", "ship_email"),
                 # ── Логістика ─────────────────────────────────────────────────
                 "shipping_deadline", "shipped_at", "delivered_at",
-                "shipping_courier", "tracking_number", "lieferschein_nr",
+                "shipping_courier", "tracking_number", "parcel_tracking", "lieferschein_nr",
                 ("shipping_cost", "shipping_currency"),
             ),
             "description": (
@@ -1028,14 +1028,116 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     readonly_fields = ['stock_summary', 'label_buttons_detail',
                        'documents_list', 'upload_widget', 'doc_buttons', 'doc_templates_panel',
                        'packaging_panel', 'status_source', 'crm_link', 'bom_assembly_status',
-                       'documents_view', 'doc_buttons_view']
+                       'documents_view', 'doc_buttons_view', 'parcel_tracking']
 
     # Хто замовлення лише переглядає — документи без «🗑️», «📤 Завантажити» й «💾» (ті самі дії сервер і так
     # відхиляє: _list_edit_refused)
     _VIEW_ONLY_FIELDS = {'documents_list': 'documents_view', 'doc_buttons': 'doc_buttons_view', 'upload_widget': None}
 
+    @staticmethod
+    def _parcel_shipments(obj):
+        """Живі відправлення замовлення (без скасованих), від першого — для «📦 Посилки» біля трек-номера."""
+        if not obj or not obj.pk:
+            return []
+        from shipping.models import Shipment
+        if not hasattr(obj, "_parcel_cache"):
+            obj._parcel_cache = list(
+                obj.shipments.exclude(status=Shipment.Status.CANCELLED).exclude(direction="in")
+                .select_related("carrier").prefetch_related("packages", "lines").order_by("pk"))
+        return obj._parcel_cache
+
+    @staticmethod
+    def _parcel_boxes(s):
+        """Коробки посилки текстом: «30×20×15 см, 1.2 кг ×2» (без коробок — розміри й вага відправлення)."""
+        def num(v):
+            return f"{v:f}".rstrip("0").rstrip(".") if v is not None else "?"
+        boxes = list(s.packages.all())
+        if boxes:
+            return "; ".join(
+                f"{num(b.length_cm)}×{num(b.width_cm)}×{num(b.height_cm)} см, {num(b.weight_kg)} кг"
+                + (f" ×{b.quantity}" if (b.quantity or 1) > 1 else "") for b in boxes)
+        if s.weight_kg:
+            dims = (f"{num(s.length_cm)}×{num(s.width_cm)}×{num(s.height_cm)} см, "
+                    if s.length_cm and s.width_cm and s.height_cm else "")
+            return f"{dims}{num(s.weight_kg)} кг"
+        return ""
+
+    @admin.display(description="📦 Посилки")
+    def parcel_tracking(self, obj):
+        """Кожна посилка окремо, коли замовлення пішло кількома відправленнями (поля замовлення — лише одне):
+        трек-номер, перевізник і послуга, статус, коли оформлено, що в ній, коробки, вартість; разом — сума."""
+        from decimal import Decimal
+        from django.utils import timezone
+        from shipping.services import parcels as _parcels
+
+        items = self._parcel_shipments(obj)
+        if len(items) < 2:
+            return "—"
+        lines = _parcels.order_lines(obj)
+        by_pk = {line.pk: line for line in lines}
+        seen, rows, totals = {}, [], {}
+        cell = 'style="padding:4px 8px;border-bottom:1px solid var(--hairline-color,#2c3a47);vertical-align:top"'
+        for n, s in enumerate(items, 1):
+            tn = (s.tracking_number or "").strip()
+            same = seen.get(tn.upper()) if tn else None
+            if tn:
+                seen.setdefault(tn.upper(), n)
+            warn = format_html(
+                '<div style="color:var(--warn,#ef6c00)" title="{}">⚠️ той самий номер, що посилка {}</div>',
+                "Номер іншої посилки. Справжній — на етикетці цієї посилки: виправте в картці відправлення "
+                "або python manage.py repair_parcel_tracking", same) if same else ""
+            inside = "; ".join(
+                f"{_parcels.line_sku(by_pk[pk])} × {_parcels.qty_text(q)}"
+                for pk, q in _parcels.contents(s, lines).items() if q and pk in by_pk)
+            if s.carrier_price:
+                cur = (s.carrier_currency or "EUR").upper()
+                totals[cur] = totals.get(cur, Decimal("0")) + s.carrier_price
+                price = f"{s.carrier_price:.2f} {cur}".replace(".", ",")
+            else:
+                price = "—"
+            when = s.submitted_at or s.created_at
+            rows.append(format_html(
+                '<tr><td {c}><b>{}/{}</b></td>'
+                '<td {c}><a href="{}"><b translate="no">{}</b></a>{}</td>'
+                '<td {c}><span translate="no">{}</span></td>'
+                '<td {c}>{}</td><td {c}>{}</td>'
+                '<td {c}><span translate="no">{}</span></td>'
+                '<td {c}>{}</td><td {c}><span style="white-space:nowrap">{}</span></td></tr>',
+                n, len(items), reverse("admin:shipping_shipment_detail", args=[s.pk]),
+                tn or "без трек-номера", warn,
+                " · ".join(x for x in (str(s.carrier) if s.carrier_id else "", s.carrier_service or "") if x) or "—",
+                s.get_status_display(), timezone.localtime(when).strftime("%d.%m.%Y") if when else "—",
+                inside or "—", self._parcel_boxes(s) or "—", price, c=mark_safe(cell)))
+        head = "".join(f'<th {cell}>{h}</th>' for h in (
+            "№", "Трек-номер", "Перевізник", "Статус", "Оформлено", "Що в посилці", "Коробки", "Вартість"))
+        total = ""
+        if totals:
+            total_text = " + ".join(f"{v:.2f} {k}".replace(".", ",") for k, v in totals.items())
+            fill = ""
+            if len(totals) == 1:
+                (cur, value), = totals.items()
+                if (obj.shipping_cost or 0) != value:
+                    fill = format_html(
+                        ' <button type="button" class="button" style="padding:2px 8px" '
+                        'onclick="var c=document.getElementById(\'id_shipping_cost\'),'
+                        'k=document.getElementById(\'id_shipping_currency\');'
+                        'if(c){{c.value=\'{}\';c.dispatchEvent(new Event(\'change\'))}}'
+                        'if(k&&k.value!==undefined){{k.value=\'{}\'}}"'
+                        ' title="{}">↧ Вписати у «Вартість доставки»</button>',
+                        f"{value:.2f}", cur,
+                        "Підставити суму всіх посилок у поле замовлення (збережеться після «Зберегти»)")
+            total = format_html('<div style="margin-top:6px">Разом за посилки: <b>{}</b>{}</div>', total_text, fill)
+        return format_html(
+            '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:12.5px;min-width:640px">'
+            '<thead><tr>{}</tr></thead><tbody>{}</tbody></table></div>{}',
+            mark_safe(head), mark_safe("".join(str(r) for r in rows)), total)
+
     def get_fieldsets(self, request, obj=None):
         fieldsets = super().get_fieldsets(request, obj)
+        if len(self._parcel_shipments(obj)) < 2:
+            fieldsets = [(name, {**options, "fields": tuple(f for f in options.get("fields", ())
+                                                            if f != "parcel_tracking")})
+                         for name, options in fieldsets]
         if obj is None or self.has_change_permission(request, obj):
             return fieldsets
         swap = self._VIEW_ONLY_FIELDS
