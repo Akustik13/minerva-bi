@@ -1,0 +1,325 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{# 📊 Портфель проєктів (ProjectAdmin.portfolio_view): таблиця з міні-шкалами, шкала, дошка фаз, карта зв'язків, ⚡ Впливи #}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{% url 'admin:projects_project_changelist' %}">📁 Проєкти</a> ›
+  📊 Портфель
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .pf { color: var(--text, var(--body-fg)); font-size: 13px; }
+  .pf a { text-decoration: none; }
+  .pf a:hover { text-decoration: underline; }
+  .pf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 2px 0 12px; }
+  .pf-tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--border-strong, #2a3f52); margin-bottom: 10px; }
+  .pf-tabs a { padding: 5px 13px 7px; font-weight: 600; color: var(--text-muted, #9aafbe); border-bottom: 2px solid transparent;
+               margin-bottom: -1px; }
+  .pf-tabs a.on { color: var(--text, var(--body-fg)); border-bottom-color: var(--accent, #58a6ff); }
+  .pf-tabs a:hover { color: var(--text, var(--body-fg)); text-decoration: none; }
+  .pf-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pf-chip { padding: 2px 10px; border-radius: 999px; border: 1px solid var(--border-strong, #2a3f52); font-size: 12px;
+             color: var(--text, var(--body-fg)); }
+  .pf-chip.on { background: var(--accent, #58a6ff); border-color: var(--accent, #58a6ff); color: var(--body-bg, #fff); }
+  .pf-chip b { font-weight: 700; margin-left: 3px; }
+  .pf-sub { color: var(--text-muted, #9aafbe); font-size: 12px; }
+  .pf-search { display: flex; gap: 6px; }
+  .pf-search input[type=search] { min-width: 220px; }
+  .pf-card { border: 1px solid var(--border-strong, #2a3f52); border-radius: 10px; background: var(--bg-card, transparent);
+             overflow-x: auto; }
+  /* таблиця */
+  .pf-t { width: 100%; border-collapse: collapse; min-width: 1040px; }
+  .pf-t th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted, #9aafbe);
+             padding: 8px 10px; border-bottom: 1px solid var(--border-strong, #2a3f52); background: none; white-space: nowrap; }
+  .pf-t td { padding: 7px 10px; border-bottom: 1px solid var(--hairline-color, rgba(127,127,127,.18)); vertical-align: middle; }
+  .pf-t tr.pf-g td { background: var(--accent2-subtle, rgba(127,127,127,.08)); font-weight: 700; padding: 6px 10px; }
+  .pf-t tr:hover td { background: var(--accent2-hover, rgba(127,127,127,.06)); }
+  .pf-code { font-weight: 700; white-space: nowrap; }
+  .pf-name { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pf-bad { color: var(--err, #f85149); font-weight: 600; }
+  .pf-warn { color: var(--warn, #e3b341); }
+  .pf-ok { color: var(--ok, #3fb950); }
+  .pf-flag { font-size: 11px; padding: 0 6px; border-radius: 6px; border: 1px solid currentColor; margin-left: 4px; white-space: nowrap; }
+  .pf-cell-tl { width: 264px; }
+  svg.pf-mini { display: block; width: 260px; height: auto; }
+  /* спільні кольори SVG */
+  .pf-mini text, .pf-tl text, .pf-map text { fill: var(--text, var(--body-fg)); font-size: 11px; }
+  .pf-axis { stroke: var(--hairline-color, rgba(127,127,127,.25)); stroke-width: 1; }
+  .pf-grid { stroke: var(--hairline-color, rgba(127,127,127,.22)); stroke-width: 1; }
+  svg .pf-mon { fill: var(--text-muted, #9aafbe); font-size: 10px; font-weight: 600; }
+  svg .pf-wk { fill: var(--text-dim, #8296a5); font-size: 9.5px; }
+  .pf-done { fill: var(--ok, #3fb950); }
+  .pf-active { fill: var(--accent, #58a6ff); }
+  .pf-plan { fill: transparent; stroke: var(--text-muted, #9aafbe); stroke-width: 1; stroke-dasharray: 3 2; }
+  .pf-late.pf-active, .pf-late.pf-plan { fill: var(--warn, #e3b341); stroke: none; }
+  .pf-cur { stroke: var(--text, var(--body-fg)); stroke-width: 1.2; }
+  .pf-dia { fill: var(--accent, #58a6ff); stroke: var(--bg-card, #0d1117); stroke-width: 1; }
+  .pf-dia.pf-done { fill: var(--ok, #3fb950); }
+  .pf-dia.pf-late { fill: var(--err, #f85149); }
+  .pf-dia.pf-plan { fill: var(--text-muted, #9aafbe); }
+  .pf-today { stroke: var(--text, var(--body-fg)); stroke-width: 1.4; }
+  .pf-due { stroke: var(--err, #f85149); stroke-width: 2; }
+  /* шкала всіх проєктів */
+  svg.pf-tl { display: block; width: 100%; min-width: 980px; height: auto; }
+  .pf-tl .pf-grp { fill: var(--accent2-subtle, rgba(127,127,127,.08)); }
+  .pf-tl .pf-grp-t { font-weight: 700; font-size: 11.5px; }
+  .pf-tl .pf-rowbg { fill: transparent; }
+  .pf-tl .pf-row { cursor: pointer; }
+  .pf-tl .pf-row:hover .pf-rowbg { fill: var(--accent2-hover, rgba(127,127,127,.1)); }
+  .pf-tl .pf-name { font-size: 11.5px; }
+  .pf-tl .pf-none { fill: var(--text-muted, #9aafbe); font-style: italic; }
+  .pf-tl .pf-fc { fill: var(--text-muted, #9aafbe); font-size: 10px; }
+  .pf-tl .pf-fc.pf-late { fill: var(--err, #f85149); font-weight: 700; }
+  .pf-dep { fill: none; stroke: var(--text-muted, #9aafbe); stroke-width: 1.2; }
+  .pf-dep-l { fill: none; stroke: var(--err, #f85149); stroke-width: 1.6; }
+  .pf-ah { fill: var(--text-muted, #9aafbe); }
+  .pf-ah-l { fill: var(--err, #f85149); }
+  /* дошка */
+  .pf-board { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; align-items: flex-start; }
+  .pf-col { flex: 0 0 250px; border: 1px solid var(--border-strong, #2a3f52); border-radius: 10px; background: var(--bg-card, transparent); }
+  .pf-col h4 { margin: 0; padding: 8px 10px; font-size: 13px; border-bottom: 1px solid var(--border-strong, #2a3f52);
+               color: var(--text, var(--body-fg)); background: none; text-transform: none; display: flex; justify-content: space-between; }
+  .pf-cards { display: grid; gap: 7px; padding: 8px; }
+  .pf-bc { border: 1px solid var(--hairline-color, rgba(127,127,127,.3)); border-radius: 8px; padding: 7px 9px; display: grid; gap: 3px; }
+  .pf-bc.pf-stuck { border-left: 3px solid var(--err, #f85149); }
+  /* карта */
+  svg.pf-map { display: block; width: 100%; min-width: 980px; height: auto; }
+  .pf-map .pf-th { fill: var(--text-muted, #9aafbe); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; }
+  .pf-m-box { fill: var(--bg-card, transparent); stroke: var(--border-strong, #2a3f52); stroke-width: 1.2; }
+  .pf-m-p .pf-m-box { stroke: var(--accent, #58a6ff); }
+  .pf-m-bad .pf-m-box { stroke: var(--err, #f85149); stroke-width: 2; }
+  .pf-m-warn .pf-m-box { stroke: var(--warn, #e3b341); stroke-width: 1.8; }
+  .pf-m-t { font-weight: 700; }
+  .pf-map .pf-m-sub { fill: var(--text-muted, #9aafbe); font-size: 10.5px; }
+  .pf-map .pf-m-bad-t { fill: var(--err, #f85149); }
+  .pf-m-node { cursor: pointer; outline: none; }
+  .pf-m-node:focus-visible .pf-m-box { stroke-width: 2.5; }
+  .pf-m-edge { fill: none; stroke: var(--text-muted, #9aafbe); stroke-width: 1.2; opacity: .7; }
+  .pf-m-dash { stroke-dasharray: 5 4; }
+  .pf-m-short { fill: none; stroke: var(--warn, #e3b341); stroke-width: 2; }
+  .pf-m-dep { fill: none; stroke: var(--text-muted, #9aafbe); stroke-width: 1.6; }
+  .pf-m-dep.pf-m-late { stroke: var(--err, #f85149); }
+  .pf-map.pf-sel [data-e], .pf-map.pf-sel .pf-m-node { opacity: .15; }
+  .pf-map.pf-sel .pf-hl { opacity: 1 !important; }
+  .pf-map.pf-sel path.pf-hl { stroke-width: 2.4; }
+  .pf-map.pf-hide-dep .pf-m-dep, .pf-map.pf-hide-supply [data-k="supply"], .pf-map.pf-hide-supply [data-k="plan"],
+  .pf-map.pf-hide-short [data-k="short"], .pf-map.pf-hide-short .pf-m-node[data-n^="g"] { display: none; }
+  .pf-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11.5px; color: var(--text-muted, #9aafbe); margin: 8px 2px 0; }
+  .lg-sw { display: inline-block; width: 18px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .lg-sw.done { background: var(--ok, #3fb950); }
+  .lg-sw.active { background: var(--accent, #58a6ff); }
+  .lg-sw.plan { border: 1px dashed var(--text-muted, #9aafbe); }
+  .lg-sw.late { background: var(--warn, #e3b341); }
+  .lg-ln { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--err, #f85149); margin-right: 5px; vertical-align: middle; }
+  /* впливи */
+  .pf-imp { margin-top: 16px; }
+  .pf-imp h3 { font-size: 15px; margin: 0 0 8px; background: none; color: var(--text, var(--body-fg)); padding: 0; }
+  .pf-imp ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  .pf-imp li { list-style: none; padding: 8px 11px; border: 1px solid var(--border-strong, #2a3f52); border-radius: 8px;
+               border-left-width: 4px; background: var(--bg-card, transparent); line-height: 1.45; }
+  .pf-imp li.medium, .pf-imp li.high { border-left-color: var(--err, #f85149); }
+  .pf-imp li.info { border-left-color: var(--text-muted, #9aafbe); }
+  .pf-imp .pf-act { margin-left: 8px; font-size: 12px; padding: 1px 8px; border: 1px solid var(--border-strong, #2a3f52); border-radius: 6px; }
+  .pf-empty { padding: 26px; text-align: center; color: var(--text-muted, #9aafbe); }
+  @media (max-width: 768px) { .pf-search input[type=search] { min-width: 0; width: 100%; } }
+</style>
+
+<div class="pf">
+  <div class="pf-tabs" role="tablist">
+    {% for key, label, url, on in views %}<a href="{{ url }}" class="{% if on %}on{% endif %}" role="tab" aria-selected="{% if on %}true{% else %}false{% endif %}">{{ label }}</a>{% endfor %}
+  </div>
+
+  <div class="pf-bar">
+    <span class="pf-chips" role="group" aria-label="Які проєкти">
+      {% for label, n, url, on in filters %}<a class="pf-chip{% if on %} on{% endif %}" href="{{ url }}">{{ label }}<b>{{ n }}</b></a>{% endfor %}
+    </span>
+    {% if params.view != "board" and params.view != "map" %}
+      <span class="pf-sub">Групувати:
+        {% for label, url, on in groups_menu %}<a class="pf-chip{% if on %} on{% endif %}" href="{{ url }}">{{ label }}</a> {% endfor %}
+      </span>
+    {% endif %}
+    <a class="pf-chip{% if params.closed %} on{% endif %}" href="{{ closed_url }}">{% if params.closed %}✓ {% endif %}з закритими</a>
+    <form method="get" class="pf-search">
+      {% if params.view != "table" %}<input type="hidden" name="view" value="{{ params.view }}">{% endif %}
+      {% if params.group != "customer" %}<input type="hidden" name="group" value="{{ params.group }}">{% endif %}
+      {% if params.closed %}<input type="hidden" name="closed" value="1">{% endif %}
+      <input type="search" name="q" value="{{ params.q }}" placeholder="Код, назва, клієнт…" aria-label="Пошук проєкту">
+      <button class="button" type="submit">🔍</button>
+    </form>
+    {% if counts.all >= limit %}<span class="pf-sub">показано перші {{ limit }}</span>{% endif %}
+  </div>
+
+  {% if not rows %}
+    <div class="pf-card pf-empty">Немає проєктів за цими умовами. <a href="{% url 'admin:projects_project_add' %}">＋ Новий проєкт</a></div>
+  {% elif params.view == "table" %}
+    <div class="pf-card">
+      <table class="pf-t">
+        <thead><tr>
+          <th>Проєкт</th><th>Фаза</th><th>Стан</th><th>Наступне</th>
+          <th>Чекаємо на</th><th>Увага</th><th class="pf-cell-tl">{{ axis|safe }}</th>
+        </tr></thead>
+        <tbody>
+        {% for title, items in groups %}
+          {% if title %}<tr class="pf-g"><td colspan="7"><span translate="no">{{ title }}</span> <span class="pf-sub">· {{ items|length }}</span></td></tr>{% endif %}
+          {% for r, mini in items %}
+            <tr>
+              <td><a class="pf-code" href="{% url 'admin:projects_project_change' r.project.pk %}#pj-cockpit">{{ r.project.code }}</a>
+                <span class="pf-name" translate="no" title="{{ r.project.name }}">{{ r.project.icon }} {{ r.project.name }}</span></td>
+              <td>{% if r.phase_total %}{{ r.phase_text }}{% if r.stuck %} <span class="pf-flag pf-bad">затягується</span>{% endif %}{% else %}<span class="pf-sub">без плану</span>{% endif %}</td>
+              <td class="{% if r.health == 'bad' %}pf-bad{% elif r.health == 'warn' %}pf-warn{% elif r.health == 'ok' %}pf-ok{% endif %}">{{ r.dot }} {{ r.reason }}</td>
+              <td>{% if r.next %}{{ r.next.title }}{% if r.next.end %} <span class="pf-sub">до {{ r.next.end|date:"d.m" }}</span>{% endif %}
+                    {% if r.next.late %}<span class="pf-flag pf-bad">прострочено</span>{% elif r.next.critical %}<span class="pf-flag pf-warn">критичний шлях</span>{% endif %}
+                  {% elif r.project.next_action %}➡️ {{ r.project.next_action }}{% else %}<span class="pf-sub">—</span>{% endif %}</td>
+              <td>{{ r.waiting|default:"—" }}</td>
+              <td>{% if r.risks %}<a href="{% url 'admin:projects_project_change' r.project.pk %}#pj-cockpit" title="{% for a in r.items %}{{ a.icon }} {{ a.text }}
+{% endfor %}">⚠️ {{ r.risks }}</a>{% else %}—{% endif %}</td>
+              <td class="pf-cell-tl">{{ mini|safe }}</td>
+            </tr>
+          {% endfor %}
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="pf-legend">
+      <span><i class="lg-sw done"></i>фазу завершено</span><span><i class="lg-sw active"></i>поточна фаза</span>
+      <span><i class="lg-sw plan"></i>заплановано</span><span><i class="lg-sw late"></i>затягується</span>
+      <span>◆ віха</span><span><i class="lg-ln"></i>строк клієнту</span><span>│ сьогодні</span>
+    </div>
+  {% elif params.view == "timeline" %}
+    <div class="pf-card" id="pf-tl">{{ svg|safe }}</div>
+    <div class="pf-legend">
+      <span><i class="lg-sw done"></i>фазу завершено</span><span><i class="lg-sw active"></i>поточна фаза</span>
+      <span><i class="lg-sw plan"></i>заплановано</span><span><i class="lg-sw late"></i>затягується</span>
+      <span>◆ віха</span><span><i class="lg-ln"></i>строк клієнту</span>
+      <span>⛓ залежність між проєктами (червона — затримує)</span><span>Клік на рядок — план проєкту.</span>
+    </div>
+  {% elif params.view == "board" %}
+    <div class="pf-board">
+      {% for c in columns %}
+        <section class="pf-col" aria-label="{{ c.name }}">
+          <h4><span translate="no">{{ c.icon }} {{ c.name }}</span><span class="pf-sub">{{ c.rows|length }}</span></h4>
+          <div class="pf-cards">
+            {% for r in c.rows %}
+              <div class="pf-bc{% if r.stuck %} pf-stuck{% endif %}">
+                <span><a class="pf-code" href="{% url 'admin:projects_project_change' r.project.pk %}#pj-plan">{{ r.dot }} {{ r.project.code }}</a></span>
+                <span translate="no">{{ r.project.name }}</span>
+                <span class="pf-sub">{% if r.phase_total %}{{ r.phase_index }}/{{ r.phase_total }}{% endif %}{% if r.in_phase_days is not None %} · у фазі {{ r.in_phase_days }} дн.{% endif %}{% if r.stuck %} · <span class="pf-bad">затягується</span>{% endif %}</span>
+                <span class="{% if r.health == 'bad' %}pf-bad{% elif r.health == 'warn' %}pf-warn{% else %}pf-sub{% endif %}">{{ r.reason }}</span>
+                {% if r.next %}<span class="pf-sub">➡️ {{ r.next.title }}{% if r.next.end %} · {{ r.next.end|date:"d.m" }}{% endif %}</span>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+    <p class="pf-sub">Колонка — поточна фаза проєкту (однакові назви фаз — разом). Червона риска — фаза мала вже закінчитись.</p>
+  {% else %}
+    <div class="pf-bar">
+      <label class="pf-sub"><input type="checkbox" data-pf-show="dep" checked> ⛓ залежності</label>
+      <label class="pf-sub"><input type="checkbox" data-pf-show="supply" checked> 🏭 закупівлі й виробництво</label>
+      <label class="pf-sub"><input type="checkbox" data-pf-show="short" checked> 📦 товари, яких бракує</label>
+      <span class="pf-sub">Клік на вузол — показати його зв’язки, подвійний клік або Enter — відкрити.</span>
+    </div>
+    <div class="pf-card" id="pf-map">{{ svg|safe }}</div>
+    <div class="pf-legend">
+      <span>— клієнт → проєкт, закупівля, виробництво</span><span>- - заплановано (чернетка закупівлі, учасник-постачальник)</span>
+      <span><i class="lg-ln"></i>⛓ залежність, що затримує</span><span><i class="lg-sw late"></i>спільний товар, якого бракує</span>
+    </div>
+  {% endif %}
+
+  <section class="pf-imp" id="impacts" aria-label="Перехресні впливи">
+    <h3>⚡ Перехресні впливи · {{ impacts|length }}</h3>
+    {% if impacts %}
+      <ul>
+        {% for i in impacts %}
+          <li class="{{ i.level }}">{{ i.icon }} <b translate="no">{{ i.title }}</b> — {{ i.text }}
+            {% for p in i.projects %}<a class="pf-act" href="{% url 'admin:projects_project_change' p.pk %}#pj-plan">{{ p.code }}</a>{% endfor %}
+            {% if i.action %}<a class="pf-act" href="{{ i.action.1 }}">{{ i.action.0 }}</a>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="pf-sub">✅ Проєкти не заважають один одному: немає затримок через інші проєкти, спільних товарів, яких бракує, і перевантажених людей.</p>
+    {% endif %}
+  </section>
+</div>
+
+<script>
+(function () {
+  var tl = document.getElementById('pf-tl');
+  if (tl) tl.addEventListener('click', function (e) {
+    var row = e.target.closest('[data-href]');
+    if (row) location.href = row.getAttribute('data-href');
+  });
+  var box = document.getElementById('pf-map');
+  if (!box) return;
+  var svg = box.querySelector('svg');
+  if (!svg) return;
+  var adj = {};
+  svg.querySelectorAll('[data-e]').forEach(function (p) {
+    var ab = p.getAttribute('data-e').split(' '), kind = p.getAttribute('data-k') || '';
+    (adj[ab[0]] = adj[ab[0]] || []).push({other: ab[1], path: p, kind: kind, out: true});
+    (adj[ab[1]] = adj[ab[1]] || []).push({other: ab[0], path: p, kind: kind, out: false});
+  });
+  var picked = null;
+  function clear() {
+    svg.classList.remove('pf-sel');
+    svg.querySelectorAll('.pf-hl').forEach(function (n) { n.classList.remove('pf-hl'); });
+    picked = null;
+  }
+  function mark(id) {
+    var n = svg.querySelector('[data-n="' + id + '"]');
+    if (n) n.classList.add('pf-hl');
+  }
+  function pick(id) {
+    // Кого зачепить: сусіди вузла; далі від зачеплених проєктів — їхні клієнти й проєкти, що чекають на них (⛓).
+    // Від клієнта — ще й постачальники його проєктів.
+    clear();
+    picked = id;
+    svg.classList.add('pf-sel');
+    mark(id);
+    var queue = id.charAt(0) === 'p' ? [id] : [], seen = {};
+    (adj[id] || []).forEach(function (x) {
+      x.path.classList.add('pf-hl');
+      mark(x.other);
+      if (x.other.charAt(0) === 'p' && (x.kind !== 'dep' || x.out)) queue.push(x.other);
+    });
+    while (queue.length) {
+      var cur = queue.shift();
+      if (seen[cur]) continue;
+      seen[cur] = true;
+      (adj[cur] || []).forEach(function (x) {
+        var follow = x.kind === 'customer' || (x.kind === 'dep' && x.out) || id.charAt(0) === 'c';
+        if (!follow) return;
+        x.path.classList.add('pf-hl');
+        mark(x.other);
+        if (x.kind === 'dep' && x.out) queue.push(x.other);
+      });
+    }
+  }
+  svg.addEventListener('click', function (e) {
+    var n = e.target.closest('[data-n]');
+    if (!n) { clear(); return; }
+    var id = n.getAttribute('data-n');
+    if (picked === id) clear(); else pick(id);
+  });
+  svg.addEventListener('dblclick', function (e) {
+    var n = e.target.closest('[data-href]');
+    if (n) location.href = n.getAttribute('data-href');
+  });
+  svg.addEventListener('keydown', function (e) {
+    var n = e.target.closest('[data-n]');
+    if (!n) return;
+    if (e.key === 'Enter' && n.getAttribute('data-href')) { location.href = n.getAttribute('data-href'); }
+    else if (e.key === ' ') { e.preventDefault(); pick(n.getAttribute('data-n')); }
+  });
+  document.querySelectorAll('[data-pf-show]').forEach(function (cb) {
+    cb.addEventListener('change', function () { svg.classList.toggle('pf-hide-' + cb.dataset.pfShow, !cb.checked); });
+  });
+})();
+</script>
+{% endblock %}

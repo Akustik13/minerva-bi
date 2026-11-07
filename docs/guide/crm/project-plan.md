@@ -2,11 +2,11 @@
 title: План проєкту — фази, віхи й діаграма Ганта
 order: 47
 summary: Вкладка «📅 План» у пульті проєкту — фази з умовою переходу, кроки й віхи, залежності, прогноз дат, критичний шлях, базовий план і зсув; стан кроків оновлюється сам з Angebote, замовлень, закупівель, JLC і відправлень.
-where: 👥 CRM → Проєкти → проєкт → «🧭 Пульт проєкту» → «📅 План»
+where: 📁 Проєкти → Усі проєкти → проєкт → «🧭 Пульт проєкту» → «📅 План»
 urls: /admin/projects/project/, /admin/projects/projecttemplate/, /calendar/
 roles: адміністратор, менеджер
 keywords: план проєкту, фази, фаза, етап, етапи, віха, віхи, milestone, крок плану, задачі проєкту, діаграма Ганта, гант, gantt, критичний шлях, базовий план, baseline, зсув, прогноз, залежності, шаблон плану, шаблони планів, stage-gate, умова переходу, Projektplan, Meilenstein, Phasen, Zeitplan
-related: crm/project-cockpit, crm/projects, crm/project-overview, calendar/overview, offers/overview, inventory/purchases
+related: crm/project-cockpit, crm/project-portfolio, crm/projects, crm/project-overview, calendar/overview, offers/overview, inventory/purchases
 ---
 
 ## Що це
@@ -131,7 +131,7 @@ related: crm/project-cockpit, crm/projects, crm/project-overview, calendar/overv
 
 ## Шаблони планів
 
-**👥 CRM → «🧩 Шаблони планів»** — усі шаблони: скільки фаз і кроків, **«Показувати»** (зняти — шаблону не
+**📁 Проєкти → «🧩 Шаблони планів»** — усі шаблони: скільки фаз і кроків, **«Показувати»** (зняти — шаблону не
 буде у виборі), **«Порядок»**. У картці — що в шаблоні: фази, кроки, хто, тривалість, умови. Вбудовані
 шаблони можна сховати, але не видалити. Досвідчені можуть змінити фази й кроки в JSON (згорнутий блок).
 

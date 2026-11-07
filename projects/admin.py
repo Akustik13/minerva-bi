@@ -315,10 +315,56 @@ class ProjectAdmin(admin.ModelAdmin):
                                obj.source_thread_id, obj.source_thread.subject or "(без теми)")
         return "—"
 
-    # ── «Розбір пошти» ──────────────────────────────────────────────────────
+    # ── «Розбір пошти», «📊 Портфель» ───────────────────────────────────────
     def get_urls(self):
-        return [path("triage/", self.admin_site.admin_view(self.triage_view), name="projects_project_triage")] \
-            + super().get_urls()
+        return [path("triage/", self.admin_site.admin_view(self.triage_view), name="projects_project_triage"),
+                path("portfolio/", self.admin_site.admin_view(self.portfolio_view),
+                     name="projects_project_portfolio")] + super().get_urls()
+
+    def portfolio_view(self, request):
+        """📊 Портфель: таблиця з міні-шкалами, шкала всіх проєктів, дошка фаз, карта зв'язків і «⚡ Впливи»
+        (projects/portfolio.py, impact.py, portfolio_draw.py) — лише читає; право — перегляд проєктів."""
+        from django.core.exceptions import PermissionDenied
+        from . import impact, portfolio, portfolio_draw as draw
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        today = timezone.localdate()
+        params = portfolio.Params.parse(request.GET)
+        rows, counts, _all = portfolio.select(params, request.user, today)
+        groups = portfolio.grouped(rows, params.group)
+        shown = {r.project.pk for r in rows}
+        try:
+            impacts = [i for i in impact.compute(today) if i.project_ids & shown]
+        except Exception:  # noqa: BLE001 — портфель без «Впливів» краще, ніж помилка сторінки
+            logger.exception("project impacts")
+            impacts = []
+        rng = portfolio.span(rows, today)
+        ctx = {
+            **self.admin_site.each_context(request),
+            "title": "📊 Портфель проєктів", "opts": self.model._meta, "params": params, "counts": counts,
+            "rows": rows, "impacts": impacts, "today": today, "limit": portfolio.LIMIT,
+            "views": [(key, label, params.query(view=key), key == params.view)
+                      for key, label in (("table", "📋 Таблиця"), ("timeline", "🗓 Шкала"),
+                                         ("board", "🗂 Дошка фаз"), ("map", "🔗 Карта зв’язків"))],
+            "groups_menu": [(label, params.query(group=key), key == params.group)
+                            for key, label in portfolio.GROUPS.items()],
+            "filters": [(label, n, params.query(f=f, h=h), (params.mine, params.health) == (f == "mine", h))
+                        for label, n, f, h in (("Усі", counts["all"], "", ""), ("Мої", counts["mine"], "mine", ""),
+                                               ("🔴", counts["bad"], "", "bad"), ("🟡", counts["warn"], "", "warn"),
+                                               ("🟢", counts["ok"], "", "ok"),
+                                               ("⚪ без плану", counts["noplan"], "", "noplan"))],
+            "closed_url": params.query(closed="" if params.closed else "1"),
+        }
+        if params.view == "table":
+            ctx["groups"] = [(title, [(r, draw.mini(r, rng, today)) for r in items]) for title, items in groups]
+            ctx["axis"] = draw.axis_head(rng, 300, 2, 298)
+        elif params.view == "timeline":
+            ctx["svg"] = draw.timeline(groups, rng, today, portfolio.cross_deps(rows))
+        elif params.view == "board":
+            ctx["columns"] = portfolio.board(rows)
+        else:
+            ctx["svg"] = draw.relation_map(portfolio.relations(rows, impacts))
+        return render(request, "admin/projects/portfolio.html", ctx)
 
     def triage_view(self, request):
         from email_assistant.models import EmailThread

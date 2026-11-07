@@ -23,6 +23,7 @@ ITEMS = {
     "purchases": ("🧾", "Закупівлі", "/admin/inventory/purchaseorder/", "inventory.view_purchaseorder"),
     "labels":    ("🏷", "Етикетки", "/labels/", "module:labels_app"),
     "projects":  ("📁", "Проєкти", "/admin/projects/project/", "projects.view_project"),
+    "portfolio": ("📊", "Портфель проєктів", "/admin/projects/project/portfolio/", "projects.view_project"),
     "worktime":  ("⏱", "Робочий час", "/admin/worktime/workday/", "worktime.view_workday"),
     "signals":   ("🚨", "Сигнали", "/dashboard/signals/", "module:dashboard"),
     "dashboard": ("📊", "Дашборд", "/dashboard/", "module:dashboard"),

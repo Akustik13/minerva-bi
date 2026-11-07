@@ -199,6 +199,12 @@
   .pjp-checks { display: grid; gap: 2px; max-height: 150px; overflow: auto; margin: 4px 0; font-size: 12.5px; }
   .pjp-checks[hidden] { display: none; }
   .pjp-checks label { display: flex; gap: 6px; align-items: baseline; color: var(--text, var(--body-fg)); }
+  .pjp-checks label[hidden], .pjp-x[hidden] { display: none; }
+  .pjp-x { margin: 6px 0; }
+  .pjp-x summary { cursor: pointer; font-size: 12px; color: var(--text, var(--body-fg)); }
+  .pjp-x input[type=search] { width: 100%; box-sizing: border-box; margin: 5px 0 3px; font: inherit; font-size: 12.5px; }
+  .pjg .pjg-ext { fill: var(--warn, #e3b341); font-size: 11px; }
+  .pjg .pjg-ext.pjg-ext-late { fill: var(--err, #f85149); font-weight: 700; }
   .pjp-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
   .pjp-row select { width: auto; flex: 1 1 240px; }
   .pjp-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted, #9aafbe); }
@@ -337,6 +343,14 @@
     wire(dlg.phase, savePhase, deletePhase);
     q(dlg.step, 'data-s', 'kind').addEventListener('change', syncStep);
     q(dlg.step, 'data-s', 'side').addEventListener('change', syncStep);
+    // ⛓ кроки інших проєктів: пошук за кодом проєкту чи назвою кроку
+    var xq = dlg.step.querySelector('[data-s-xq]');
+    xq.addEventListener('input', function () {
+      var t = xq.value.trim().toLowerCase();
+      q(dlg.step, 'data-s-list', 'xafter').querySelectorAll('label').forEach(function (l) {
+        l.hidden = !!t && l.textContent.toLowerCase().indexOf(t) < 0 && !l.querySelector('input').checked;
+      });
+    });
     // Початок + тривалість → кінець; початок і кінець → тривалість (дати ISO, рахуємо в UTC)
     var st = q(dlg.step, 'data-s', 'start'), en = q(dlg.step, 'data-s', 'end'), du = q(dlg.step, 'data-s', 'duration');
     du.addEventListener('input', function () {
@@ -413,6 +427,13 @@
     f('notes').value = s.notes || '';
     fillChecks(q(d, 'data-s-list', 'after'), data.steps.filter(function (x) { return String(x.id) !== String(s.id); })
       .map(function (x) { return {id: x.id, label: phaseName(data, x.phase) + ' · ' + x.title}; }), s.after);
+    var xlist = q(d, 'data-s-list', 'xafter');
+    fillChecks(xlist, data.others || [], s.after);
+    d.querySelector('[data-s-xq]').value = '';
+    var xn = xlist.querySelectorAll('input:checked').length;
+    d.querySelector('[data-s-xcount]').textContent = xn ? '· ' + xn : '';
+    d.querySelector('[data-s-x]').open = xn > 0;
+    d.querySelector('[data-s-x]').hidden = !(data.others || []).length;
     fillChecks(q(d, 'data-s-list', 'links'), data.links, s.links);
     fillChecks(q(d, 'data-s-list', 'offers'), data.offers, s.offers);
     var note = d.querySelector('[data-s-note]'), eff = '';
@@ -434,7 +455,8 @@
       assignee: side === 'we' || side === 'colleague' ? f('assignee').value : '',
       start: kind === 'milestone' ? '' : f('start').value, end: f('end').value, duration: f('duration').value,
       status: f('status').value, trigger: f('trigger').value, auto: f('auto').checked, lag: f('lag').value,
-      notes: f('notes').value, after: picked(q(d, 'data-s-list', 'after')),
+      notes: f('notes').value,
+      after: picked(q(d, 'data-s-list', 'after')).concat(picked(q(d, 'data-s-list', 'xafter'))),
       links: picked(q(d, 'data-s-list', 'links')), offers: picked(q(d, 'data-s-list', 'offers'))
     };
     if (!body.title.trim()) { err.textContent = 'Напишіть назву кроку'; f('title').focus(); return; }
@@ -630,6 +652,12 @@
     <fieldset>
       <legend>⛓ Після кроків</legend>
       <div class="pjp-checks" data-s-list="after"></div>
+      <details class="pjp-x" data-s-x>
+        <summary>⛓ Кроки інших проєктів <span class="pjp-hint" data-s-xcount></span></summary>
+        <input type="search" data-s-xq placeholder="Код проєкту або назва кроку…" aria-label="Пошук кроку іншого проєкту" autocomplete="off">
+        <div class="pjp-checks" data-s-list="xafter"></div>
+        <p class="pjp-hint">Крок почнеться після кроку іншого проєкту — затримку там видно в «⚡ Впливах» і в обох проєктах.</p>
+      </details>
       <label class="pjp-inline">Відступ після них, днів <input type="number" min="-365" max="365" data-s="lag"></label>
     </fieldset>
     <fieldset>

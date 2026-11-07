@@ -10,12 +10,14 @@ after: null — після попереднього кроку шаблону, "
 from datetime import date, timedelta
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from .models import Project, ProjectLink, ProjectPhase, ProjectStep, ProjectTemplate, StepDependency
 
 W, C, S = ProjectStep.WE, ProjectStep.CUSTOMER, ProjectStep.SUPPLIER
 M = ProjectStep.MILESTONE
+OTHER_STEPS = 400               # кроків інших проєктів у вікні кроку (⛓ залежність між проєктами)
 
 
 def _st(title, days=1, side=W, kind=ProjectStep.TASK, trigger="", after=None):
@@ -316,12 +318,14 @@ def save_step(project, data, user=None) -> ProjectStep:
         except (TypeError, ValueError):
             lag = 0
         wanted = [int(i) for i in (data.get("after") or []) if str(i).isdigit()]
-        preds = list(ProjectStep.objects.filter(project=project, pk__in=wanted).exclude(pk=step.pk))
+        # попередні — кроки цього проєкту або відкритих інших (⛓ залежність між проєктами, impact.py)
+        preds = list(ProjectStep.objects.filter(Q(project=project) | Q(project__status__in=Project.OPEN_STATUSES),
+                                                pk__in=wanted).exclude(pk=step.pk).select_related("project"))
         for p in preds:
             if _would_cycle(step, p):
-                raise PlanError(f"«{p.title}» уже йде після цього кроку — вийшло б коло")
-        StepDependency.objects.filter(successor=step, predecessor__project=project).exclude(
-            predecessor__in=preds).delete()
+                where = "" if p.project_id == project.pk else f" ({p.project.code})"
+                raise PlanError(f"«{p.title}»{where} уже йде після цього кроку — вийшло б коло")
+        StepDependency.objects.filter(successor=step).exclude(predecessor__in=preds).delete()
         for p in preds:
             dep, _ = StepDependency.objects.get_or_create(predecessor=p, successor=step)
             if dep.lag_days != lag:
@@ -413,8 +417,13 @@ def editor_data(project, plan) -> dict:
     users = [{"id": u.pk, "label": u.get_full_name() or u.username}
              for u in get_user_model().objects.filter(is_active=True, is_staff=True).order_by("first_name",
                                                                                               "username")[:200]]
+    # ⛓ кроки інших відкритих проєктів — для «Після кроків» (залежність між проєктами)
+    others = [{"id": s.pk, "label": f"{s.project.code} · {s.title}"}
+              for s in (ProjectStep.objects.filter(project__status__in=Project.OPEN_STATUSES).exclude(project=project)
+                        .select_related("project").order_by("project__code", "phase__order", "order", "pk")
+                        [:OTHER_STEPS])]
     return {"steps": steps, "phases": [{"id": p.pk, "name": p.name, "icon": p.icon, "gate": p.gate, "order": p.order}
                                        for p in ProjectPhase.objects.filter(project=project).order_by("order", "pk")],
-            "users": users, "links": links, "offers": offers,
+            "users": users, "links": links, "offers": offers, "others": others,
             "kinds": ProjectStep.KIND_CHOICES, "sides": ProjectStep.SIDE_CHOICES,
             "statuses": ProjectStep.STATUS_CHOICES, "triggers": TRIGGERS}

@@ -1241,10 +1241,16 @@ window.MV_GROUPS = [
       { href:'/admin/crm/customer/',                 icon:'👤', label:'Клієнти',    app:'crm',      model:'Customer' },
       { href:'/admin/strategy/customerstrategy/',    icon:'🎯', label:'Стратегії',  app:'strategy', model:'CustomerStrategy' },
       { href:'/admin/strategy/strategytemplate/',    icon:'📋', label:'Шаблони',    app:'strategy', model:'StrategyTemplate' },
-      { href:'/admin/projects/project/',             icon:'📁', label:'Проєкти',    app:'projects', model:'Project' },
-      { href:'/admin/projects/project/triage/',      icon:'📥', label:'Розбір пошти', app:'projects', model:'Project' },
-      { href:'/admin/projects/projecttemplate/',     icon:'🧩', label:'Шаблони планів', app:'projects', model:'ProjectTemplate' },
-    ], apps:['crm','strategy','projects'] },
+    ], apps:['crm','strategy'] },
+  /* Проєкти — окремою групою: зачіпають продажі, закупівлі, виробництво й доставку (projects/portfolio.py) */
+  { id:'projects', icon:'📁', label:'📁 Проєкти', href:'/admin/projects/project/portfolio/', after:'crm',
+    links:[
+      { href:'/admin/projects/project/portfolio/',          icon:'📊', label:'Портфель',        app:'projects', model:'Project' },
+      { href:'/admin/projects/project/',                    icon:'📁', label:'Усі проєкти',     app:'projects', model:'Project' },
+      { href:'/admin/projects/project/portfolio/?view=map', icon:'🔗', label:'Карта зв’язків',  app:'projects', model:'Project' },
+      { href:'/admin/projects/projecttemplate/',            icon:'🧩', label:'Шаблони планів',  app:'projects', model:'ProjectTemplate' },
+      { href:'/admin/projects/project/triage/',             icon:'📥', label:'Розбір пошти',    app:'projects', model:'Project' },
+    ], apps:['projects'] },
   { id:'sales', icon:'🛒', label:'🛒 Продажі',
     links:[
       { href:'/offers/',                                        icon:'📝', label:'📝 Angebote — огляд', app:'offers' },
@@ -1597,7 +1603,7 @@ document.addEventListener('DOMContentLoaded', function(){
   var _URL_GROUP = {
     '/dashboard/':       'analytics',
     '/admin/crm/':            'crm',
-    '/admin/projects/':       'crm',
+    '/admin/projects/':       'projects',
     '/admin/offers/':         'sales',
     '/offers/':               'sales',
     '/admin/strategy/':       'crm',

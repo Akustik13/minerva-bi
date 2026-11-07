@@ -2,11 +2,11 @@
 title: Проєкти
 order: 40
 summary: Проєкт збирає навколо однієї справи клієнта кілька гілок листування, замовлення, Angebote, закупівлі, JLC-замовлення й учасників; Minerva сама підказує, до якого проєкту належить новий лист чи закупівля.
-where: 👥 CRM → Проєкти
+where: 📁 Проєкти → Усі проєкти
 urls: /admin/projects/project/, /admin/projects/project/add/
 roles: адміністратор, менеджер
 keywords: проєкт, проект, project, Projekt, P-2026-001, код проєкту, гілка, листування, учасники, справа клієнта, до проєкту, пропозиція проєкту, товари проєкту, закупівля проєкту, строк клієнту
-related: crm/project-cockpit, crm/project-plan, crm/project-triage, crm/project-overview, mail/inbox, mail/why, offers/overview, worktime/projects
+related: crm/project-cockpit, crm/project-plan, crm/project-portfolio, crm/project-triage, crm/project-overview, mail/inbox, mail/why, offers/overview, worktime/projects
 ---
 
 ## Що це

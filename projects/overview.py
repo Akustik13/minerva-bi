@@ -266,6 +266,12 @@ def collect(project, today=None) -> dict:
         schedule.persist(plan)
         schedule.attention(plan, project, lambda level, icon, text, url, kind: add(level, icon, text, url, kind),
                            today)
+    # ⚡ Впливи інших проєктів: затримка кроку, від якого залежимо, спільний товар, постачальник, навантаження
+    from . import impact
+    try:
+        impact.attention(project, lambda level, icon, text, url, kind: add(level, icon, text, url, kind), today)
+    except Exception:  # noqa: BLE001 — огляд без впливів краще, ніж без огляду
+        logger.exception("project impacts %s", project.pk)
 
     attention.sort(key=lambda a: LEVELS[a["level"]])
     return {

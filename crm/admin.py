@@ -3,6 +3,7 @@ import re as _re
 from collections import defaultdict
 from decimal import Decimal
 from django.contrib import admin, messages
+from projects.panels import ProjectsBlockMixin
 from django.core.exceptions import PermissionDenied
 from django.db.models import Sum, Count, Max
 from django.http import JsonResponse
@@ -346,7 +347,9 @@ class FavoriteFilter(admin.SimpleListFilter):
 
 
 @admin.register(Customer)
-class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
+class CustomerAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
+    projects_block_kind = "customer"           # «📁 Проєкти» (projects/panels.py)
+    projects_block_after = "🎯 Сегментація"
     change_list_template = "admin/crm/customer_changelist.html"
     change_form_template = "admin/crm/customer/change_form.html"
 

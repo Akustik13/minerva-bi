@@ -155,6 +155,18 @@ def render(project, plan, today=None, editable=False) -> str:
                 g.append(f'<text x="{_n(bar_end + 4)}" y="{_n(cy + 4)}" class="pjg-slip">+{c.slip}</text>')
             elif c.note and s.trigger:
                 g.append(f'<text x="{_n(bar_end + 4)}" y="{_n(cy + 4)}" class="pjg-auto">🔗</text>')
+            # ⛓ залежність від кроку іншого проєкту (його збережений прогноз)
+            ext = [(p, lag) for p, lag in c.preds if not hasattr(p, "step")]
+            if ext:
+                late, tips = False, []
+                for p, lag in ext:
+                    p_end = p.f_end or p.end
+                    open_ = (p.eff_status or p.status) not in ("done", "skipped")
+                    late = late or bool(open_ and p_end and s.start and p_end + timedelta(days=1 + lag) > s.start)
+                    tips.append(f"⛓ чекає {p.project.code}: «{p.title}»" + (f" — прогноз {_fmt(p_end)}" if p_end else ""))
+                sx = (x(c.end) + ppd / 2 - 9 if s.kind == ProjectStep.MILESTONE else x(c.start)) - 14
+                g.append(f'<text x="{_n(sx)}" y="{_n(cy + 4)}" class="pjg-ext{" pjg-ext-late" if late else ""}">'
+                         f'<title>{escape("; ".join(tips))}</title>⛓</text>')
         g.append("</g>")
         out.append("".join(g))
 

@@ -101,9 +101,9 @@ class MainMenuTests(TestCase):
 
     def test_groups_carry_id_and_icon(self):
         cfg = cfg_of(self.client.get("/admin/").content.decode(), "mv-menu-config")
-        self.assertEqual([g["id"] for g in cfg["groups"]], ["sales", "stock", "comms", "more"])
+        self.assertEqual([g["id"] for g in cfg["groups"]], ["sales", "stock", "projects", "comms", "more"])
         self.assertEqual({g["id"]: g["icon"] for g in cfg["groups"]},
-                         {"sales": "🛒", "stock": "📦", "comms": "💬", "more": "⋯"})
+                         {"sales": "🛒", "stock": "📦", "projects": "📁", "comms": "💬", "more": "⋯"})
         self.assertTrue(all(g["title"] and g["keys"] for g in cfg["groups"]))
         self.assertEqual(cfg["maxIcons"], main_menu.MAX_ICONS)
 

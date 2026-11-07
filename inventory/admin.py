@@ -10,6 +10,7 @@ import tempfile
 
 from django import forms
 from django.contrib import admin, messages
+from projects.panels import ProjectsBlockMixin
 from django.db import transaction
 from django.db.models import Sum, Window
 from django.db.models.functions import Coalesce
@@ -2199,7 +2200,9 @@ class ProductCategoryForm(forms.Form):
 
 
 @admin.register(Product)
-class ProductAdmin(AuditableMixin, admin.ModelAdmin):
+class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
+    projects_block_kind = "product"            # «📁 Проєкти» (projects/panels.py)
+    projects_block_after = "📦 Availability"
     change_list_template = "admin/inventory/product/change_list.html"
     list_display = (
         "sku", "media_col", "sku_short", "category", "shops_col", "kind", "bom_type", "is_active",
@@ -4244,7 +4247,9 @@ class PurchaseReceiptInline(admin.TabularInline):
 
 
 @admin.register(Supplier)
-class SupplierAdmin(admin.ModelAdmin):
+class SupplierAdmin(ProjectsBlockMixin, admin.ModelAdmin):
+    projects_block_kind = "supplier"           # «📁 Проєкти» (projects/panels.py)
+    projects_block_after = "🏢 Постачальник"
     list_display  = ("name", "contact_person", "email", "phone", "currency", "website")
     search_fields = ("name", "contact_person", "email")
     fieldsets = (
@@ -4264,7 +4269,8 @@ class SupplierAdmin(admin.ModelAdmin):
 
 
 @admin.register(PurchaseOrder)
-class PurchaseOrderAdmin(admin.ModelAdmin):
+class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
+    projects_block_kind = "purchase"           # «📁 Проєкти» (projects/panels.py)
     list_display  = ("code", "supplier", "status_badge", "order_date",
                      "expected_date", "received_date", "lines_count",
                      "total_price", "tracking_number", "external_col")

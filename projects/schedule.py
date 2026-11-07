@@ -14,6 +14,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
+from django.db.models import F
 from django.utils import timezone
 
 from .models import ProjectLink, ProjectPhase, ProjectStep, StepDependency
@@ -294,7 +295,7 @@ def compute(project, facts=None, today=None) -> Plan:
     plan.steps = calcs
     plan.by_id = {c.step.pk: c for c in calcs}
     succ = defaultdict(list)
-    for dep in StepDependency.objects.filter(successor_id__in=ids).select_related("predecessor"):
+    for dep in StepDependency.objects.filter(successor_id__in=ids).select_related("predecessor__project"):
         target = plan.by_id[dep.successor_id]
         pred = plan.by_id.get(dep.predecessor_id)
         if pred is not None:
@@ -397,19 +398,27 @@ def _phase(phase, calcs) -> PhaseCalc:
 
 
 def persist(plan):
-    """Кеш розрахунку → кроки й фази (лише змінене)."""
-    changed = []
+    """Кеш розрахунку → кроки й фази (лише змінене). Змінився прогноз чи стан кроку, від якого залежать кроки
+    інших проєктів, — їхній кеш стану позначається застарілим (state.mark_dirty): там перерахують прогноз."""
+    changed, moved = [], []
     for c in plan.steps:
         s = c.step
         new = {"f_start": c.start, "f_end": c.end, "eff_status": c.status, "critical": c.critical,
                "slip_days": c.slip, "auto_note": c.note[:255]}
         if any(getattr(s, k) != v for k, v in new.items()):
+            if (s.f_end, s.eff_status) != (c.end, c.status):
+                moved.append(s.pk)
             for k, v in new.items():
                 setattr(s, k, v)
             changed.append(s)
     if changed:
         ProjectStep.objects.bulk_update(changed, ["f_start", "f_end", "eff_status", "critical", "slip_days",
                                                   "auto_note"])
+    if moved:
+        from . import state
+        state.mark_dirty(StepDependency.objects.filter(predecessor_id__in=moved)
+                         .exclude(successor__project_id=F("predecessor__project_id"))
+                         .values_list("successor__project_id", flat=True))
     phases = []
     for pc in plan.phases:
         p = pc.phase

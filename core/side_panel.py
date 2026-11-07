@@ -40,10 +40,9 @@ logger = logging.getLogger(__name__)
 # ── константи ──────────────────────────────────────────────────────────────────
 
 PROVIDERS = {"sales.salesorder": "sales.side_panel", "inventory.product": "inventory.side_panel",
-             "crm.customer": "crm.side_panel"}
+             "crm.customer": "crm.side_panel", "projects.project": "projects.side_panel"}
 GENERIC = ("shipping.shipment", "inventory.purchaseorder", "inventory.supplier", "inventory.inventorytransaction",
-           "offers.offer", "projects.project", "shop.shoplisting", "bots.digikeylisting", "accounting.invoice",
-           "tasks.task")
+           "offers.offer", "shop.shoplisting", "bots.digikeylisting", "accounting.invoice", "tasks.task")
 NEVER_APPS = {"email_assistant", "calendar_app", "rag_assistant", "ai_assistant", "api", "auth", "admin",
               "contenttypes", "sessions", "config"}
 NEVER_MODELS = {"core.userprofile", "core.auditlog", "core.tenantaccount", "core.uitext", "core.moduleregistry",

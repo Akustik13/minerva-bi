@@ -205,8 +205,8 @@ class FieldsTests(GenericTestBase):
         from inventory.models import Supplier
         s = Supplier.objects.create(name="Muster GmbH")
         groups, html = self.fields(s)
-        self.assertEqual([g["title"] for g in groups], ["🏢 Постачальник", "📞 Контакти", "📍 Адреса",
-                                                        "💼 Комерційні умови"])
+        self.assertEqual([g["title"] for g in groups], ["🏢 Постачальник", "📁 Проєкти", "📞 Контакти", "📍 Адреса",
+                                                        "💼 Комерційні умови"])         # «📁 Проєкти» — projects/panels.py
         for n in (2, 3, 4, 1):
             self.assertIn(f"<summary>Порожні поля ({n})</summary>", html)
         self.assertLess(html.index("Muster GmbH"), html.index("Порожні поля (2)"))
