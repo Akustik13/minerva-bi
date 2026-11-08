@@ -54,7 +54,7 @@ TYPE_NAMES = {code: name for code, name, _de, _hint in DOC_TYPES}
 
 _RULES = [
     ("004", r"ausfuhrbegleit|export[\s_-]*accompanying|\bABD\b|\bMRN\b|ausfuhranmeldung"),
-    ("010", r"packing[\s_-]*list|packliste|lieferschein|\bPL[\s_-]?\d"),
+    ("010", r"pack(?:ing)?[\s_-]*list|packliste|lieferschein|\bPL[\s_-]?\d"),
     ("003", r"certificate[\s_-]*of[\s_-]*origin|ursprungszeugnis|origin[\s_-]*certificate|\bCOO\b"),
     ("005", r"export[\s_-]*licen[cs]e|ausfuhrgenehmigung|ausfuhrlizenz"),
     ("006", r"import[\s_-]*permit|einfuhrgenehmigung"),
@@ -66,7 +66,8 @@ _RULES = [
     ("002", r"commercial[\s_-]*invoice|handelsrechnung|pro[\s_-]?forma|rechnung|invoice|\bCI[\s_-]?\d"),
     ("013", r"declaration|erkl(?:ä|ae)rung"),
 ]
-_LABEL_FILE = re.compile(r"^(ups|dhl|fedex)_\d+_|label|etikett|\.dymo$", re.I)
+# етикетки, інвойс, який згенерував сам UPS при оформленні (ups_customs_…), і наші копії вже надісланого (ups_doc_…)
+_LABEL_FILE = re.compile(r"^(ups|dhl|fedex)_(customs_|doc_)?\d+_|label|etikett|\.dymo$", re.I)
 
 
 def detect(name: str, text: str = "") -> tuple:
@@ -206,7 +207,7 @@ def candidates(shipment, user) -> list:
             if not code:
                 code, why = detect("", text)
             if not code:
-                code, why = "008", "тип не визначено"
+                code, why = "008", "не визначено"
             date = datetime.fromtimestamp(os.path.getmtime(path), tz=dt_tz.utc)
             mrn_in = _mrn.find_in_text(text, country)
             out.append(_row(shipment, parcels, f"order:{name}", name, "order", date, code, why, text, mrn_in,
@@ -217,7 +218,7 @@ def candidates(shipment, user) -> list:
 
 
 def _row(shipment, parcels, ref, name, source, date, code, why, text, mrn_in, sent_to, subject):
-    m = match(shipment, parcels, text, date, mrn_in)
+    m = match(shipment, parcels, f"{name} {subject} {text}", date, mrn_in)
     here_n = next((n for n, p in enumerate(parcels, 1) if p.pk == shipment.pk), None)
     already = sent_to.get(name, [])
     checked = (code == "004" and m["here"] is not False and here_n not in already

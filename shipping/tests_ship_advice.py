@@ -229,6 +229,9 @@ class AfterBookingTests(Base):
         self.client.force_login(self.user)
         page = self.client.get(f'/admin/shipping/shipment/{s.pk}/detail/')
         self.assertContains(page, '🤖 Агент відправки: що далі')
+        html = page.content.decode()
+        self.assertLess(html.index('class="sd-header"'), html.index('id="agn"'))   # статус угорі, агент під ним
+        self.assertIn('id="agn-fold"', html)
         self.assertContains(page, 'id="agn-labels"')
         self.assertContains(page, 'window.svLabel')
         self.assertContains(page, f'/admin/shipping/shipment/create/{nxt.pk}/')

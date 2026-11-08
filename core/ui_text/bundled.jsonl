@@ -17564,6 +17564,7 @@
 {"uk": "не вдалося — {0}", "en": "failed — {0}", "de": "fehlgeschlagen — {0}"}
 {"uk": "не вдалося: {0}", "en": "failed: {0}", "de": "fehlgeschlagen: {0}"}
 {"uk": "не вибрано жодного способу", "en": "no method selected", "de": "keine Zahlungsart ausgewählt"}
+{"uk": "не визначено", "en": "not detected", "de": "nicht erkannt"}
 {"uk": "не визначено країну доставки", "en": "the delivery country is not determined", "de": "das Lieferland ist nicht bestimmt"}
 {"uk": "не використовувати", "en": "do not use", "de": "nicht verwenden"}
 {"uk": "не використовується (гібрид вимкнено)", "en": "not used (hybrid disabled)", "de": "wird nicht verwendet (Hybrid deaktiviert)"}

@@ -22,7 +22,7 @@ class DetectTests(BookingBase):
         cases = {
             "ABD_187472.pdf": "004", "Ausfuhrbegleitdokument.pdf": "004", "Invoice_17701.pdf": "002",
             "Rechnung 17701.docx": "002", "Packing List_17701.pdf": "010", "Lieferschein.pdf": "010",
-            "Ursprungszeugnis.pdf": "003", "Vollmacht UPS.pdf": "009",
+            "Ursprungszeugnis.pdf": "003", "Vollmacht UPS.pdf": "009", "DigiKey_PackList_102519268.pdf": "010",
         }
         for name, code in cases.items():
             self.assertEqual(ups_docs.detect(name)[0], code, name)
@@ -55,7 +55,9 @@ class UpsDocsViewTests(BookingBase):
         folder = ups_docs.order_folder(self.order)
         os.makedirs(folder, exist_ok=True)
         for name, body in (("Invoice_300002.pdf", b"%PDF inv"), ("Packing List_300002.pdf", b"%PDF pl"),
-                           (f"ups_{self.shipment.pk}_{TN1}.pdf", b"%PDF label"), ("notes.dymo", b"x")):
+                           (f"ups_{self.shipment.pk}_{TN1}.pdf", b"%PDF label"), ("notes.dymo", b"x"),
+                           (f"ups_customs_{self.shipment.pk}_{TN1}.pdf", b"%PDF ups inv"),
+                           (f"ups_doc_{self.shipment.pk}_ABD.pdf", b"%PDF copy")):
             with open(os.path.join(folder, name), "wb") as fh:
                 fh.write(body)
         self.url = f"/admin/shipping/shipment/{self.shipment.pk}/ups-abd/"
@@ -92,6 +94,8 @@ class UpsDocsViewTests(BookingBase):
                          [("002", "Invoice_300002.pdf"), ("010", "Packing List_300002.pdf")])
         rows = {r["name"]: r for r in ups_docs.candidates(self.shipment, self.user)}
         self.assertTrue(rows["Invoice_300002.pdf"]["sent_here"])
+        page = self.client.get(self.detail)
+        self.assertContains(page, '<details id="abd-box" >')      # надіслано — блок згорнутий
 
     @mock.patch.object(UPSClient, "upload_paperless_document")
     def test_bad_type_refused(self, upload):
