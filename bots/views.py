@@ -322,12 +322,12 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
     DigiKey уже показує замовлення відправленим (підтвердили на сайті вручну) — посилки позначаються підтвердженими.
     Повідомлення — через django.contrib.messages. Повертає True при успіху."""
     from django.contrib import messages as msg
-    from bots.services.digikey import ship_marketplace_order, upload_vat_invoice, DigiKeyAPIError
+    from bots.services.digikey import ship_marketplace_order, DigiKeyAPIError
+    from bots.services import dk_vat
 
     ok = False
-    _EU = {"AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR",
-           "HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"}
-    is_eu_post = (order.addr_country or "").upper() in _EU
+    is_eu_post = dk_vat.is_eu(order)
+    inv_obj = None
 
     if not tracking:
         msg.error(request, "Вкажіть трек-номер відправлення.")
@@ -351,6 +351,7 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
                             invoice_number=invoice or None,
                         )
                         # Feed invoice number and subtotal into ship API call
+                        inv_obj = _auto_inv
                         invoice = _auto_inv.invoice_number
                         if net_vat is None:
                             net_vat = float(_auto_inv.subtotal or 0) or None
@@ -359,14 +360,16 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
                         msg.warning(request, f"Авто-генерація інвойсу не вдалась: {_inv_err}")
                 else:
                     # Existing invoice — still fill fields for ship API
+                    inv_obj = _existing_inv
                     invoice = invoice or _existing_inv.invoice_number
                     if net_vat is None:
                         net_vat = float(_existing_inv.subtotal or 0) or None
 
-            # ── STEP 2: Optional VAT invoice file upload before shipping ──────
-            vat_file_id = None
+            # ── STEP 2: PDF рахунку до замовлення на DigiKey (bots/services/dk_vat.py) ──────
+            # файл із форми — завжди; інакше ЄС + «Прикріплювати PDF рахунку» — PDF з «Інвойси DigiKey».
+            # Завантажує й прикріплює ship_marketplace_order (vat_document), результат — result['vat'].
+            vat_document = None
             vat_file    = request.FILES.get("vat_invoice_file")
-            supplier_id = request.POST.get("supplier_id", "").strip() or None
             if vat_file:
                 vat_bytes = vat_file.read()
 
@@ -380,14 +383,9 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
                     msg.success(request, f"📄 {vat_file.name} збережено в документи замовлення.")
                 except Exception as _e:
                     msg.warning(request, f"Не вдалося зберегти файл в документи: {_e}")
-
-                # Upload to DigiKey FileDocuments (best-effort)
-                up = upload_vat_invoice(config, vat_bytes, vat_file.name,
-                                        supplier_id=supplier_id)
-                if up["ok"]:
-                    vat_file_id = up.get("file_id")
-                else:
-                    msg.warning(request, f"Файл VAT не завантажено на DigiKey: {up['message']}")
+                vat_document = (vat_bytes, vat_file.name)
+            elif is_eu_post and getattr(config, "vat_attach_eu", False):
+                vat_document = dk_vat.invoice_pdf(order, inv_obj)
 
             result = ship_marketplace_order(
                 config, order.order_number,
@@ -396,7 +394,7 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
                 invoice_number=invoice,
                 net_vat_invoice_amount=net_vat,
                 shipped_quantities=shipped_quantities or None,
-                vat_file_id=vat_file_id,
+                vat_document=vat_document,
                 parts_by_sku=parts_by_sku,
                 shipments=[{k: p.get(k) for k in ("tracking", "carrier_id", "parts_by_sku")} for p in parcels]
                 if parcels else None,
@@ -452,8 +450,13 @@ def confirm_digikey_shipment(request, order, config, tracking, carrier=None, inv
                             msg.warning(request, "Замовлення лишається «В обробці»: у Minerva ще не відправлено "
                                                  "{}.".format(left))
 
-                if vat_file_id:
-                    msg.info(request, f"\ud83d\udcce VAT \u0444\u0430\u0439\u043b \u0437\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043e \u043d\u0430 DigiKey (ID: {vat_file_id}). \u041f\u0440\u0438\u0432'\u044f\u0436\u0456\u0442\u044c \u0439\u043e\u0433\u043e \u0432\u0440\u0443\u0447\u043d\u0443 \u0443 DigiKey Marketplace portal.")
+                vat = result.get("vat")
+                if vat is None and is_eu_post and getattr(config, "vat_attach_eu", False) and not vat_document:
+                    vat = {"state": dk_vat.NO_PDF}
+                note = dk_vat.message(vat, order.order_number)
+                if note:
+                    getattr(msg, note[0])(request, note[1])
+                dk_vat.remember(config, vat, order.order_number)
             else:
                 msg.error(request, result["message"])
         except DigiKeyAPIError as e:
@@ -474,10 +477,7 @@ def digikey_ship_order(request, order_pk):
     from django.shortcuts import render, redirect
     from sales.models import SalesOrder
     from bots.models import DigiKeyConfig
-    from bots.services.digikey import (
-        ship_marketplace_order, upload_vat_invoice,
-        fetch_marketplace_order_data, DigiKeyAPIError,
-    )
+    from bots.services.digikey import fetch_marketplace_order_data
 
     order  = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
     config = DigiKeyConfig.get()
@@ -514,6 +514,7 @@ def digikey_ship_order(request, order_pk):
     carriers      = []
     order_details = []
     dk_order      = {}
+    supplier_id   = ""
     has_token = bool(config.marketplace_access_token)
     if has_token:
         try:
@@ -532,12 +533,8 @@ def digikey_ship_order(request, order_pk):
     # Auto-match order.shipping_courier against DigiKey carrier list
     preset_carrier_id = _match_carrier_id(order.shipping_courier, carriers)
 
-    EU_COUNTRIES = {
-        "AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI",
-        "FR","GR","HR","HU","IE","IT","LT","LU","LV","MT",
-        "NL","PL","PT","RO","SE","SI","SK",
-    }
-    is_eu = (order.addr_country or "").upper() in EU_COUNTRIES
+    from bots.services import dk_vat
+    is_eu = dk_vat.is_eu(order)
 
     # Auto-fill invoice fields from existing Invoice record
     existing_invoice = None
@@ -605,6 +602,11 @@ def digikey_ship_order(request, order_pk):
         "inv_net_amount":     inv_net_amount,
         "inv_info":           inv_info,
         "auto_generated_now": auto_generated_now,
+        # PDF рахунку, який Minerva прикріпить до замовлення на DigiKey (без файлу у формі)
+        "vat_attach":         bool(is_eu and config.vat_attach_eu),
+        "vat_pdf":            dk_vat.pdf_name(order, existing_invoice) if is_eu else "",
+        "vat_on_dk":          dk_vat.shown(dk_order),
+        "vat_last":           dk_vat.last_text(config),
     })
 
 

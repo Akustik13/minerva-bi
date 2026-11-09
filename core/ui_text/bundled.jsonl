@@ -349,6 +349,7 @@
 {"uk": "(потрібні 2 літери ISO, напр. DE)", "en": "(2 ISO letters required, e.g. DE)", "de": "(2 ISO-Buchstaben erforderlich, z. B. DE)"}
 {"uk": "(пропустити дублі) або", "en": "(skip duplicates) or", "de": "(Duplikate überspringen) oder"}
 {"uk": "(пусто)", "en": "(empty)", "de": "(leer)"}
+{"uk": "(рахунок #{0} — без PDF)", "en": "(invoice #{0} — no PDF)", "de": "(Rechnung #{0} — ohne PDF)"}
 {"uk": "(реальні продажі).", "en": "(real sales).", "de": "(echte Verkäufe)."}
 {"uk": "(реєстрація з підтвердженням email) — вони з'являються тут автоматично.", "en": "(registration with e-mail confirmation) — they appear here automatically.", "de": "(Registrierung mit E-Mail-Bestätigung) – sie erscheinen hier automatisch."}
 {"uk": "(реєстрація з підтвердженням email) — вони з'являються тут автоматично. Можна створити й за покупця", "en": "(registration with e-mail confirmation) — they appear here automatically. You can also create one on behalf of the customer", "de": "(Registrierung mit E-Mail-Bestätigung) – sie erscheinen hier automatisch. Sie können auch im Namen des Kunden eines erstellen"}
@@ -450,6 +451,7 @@
 {"uk": ". Вага — у грамах на 1 штуку, країна — код ISO-2.", "en": ". Weight — in grams per 1 piece, country — ISO-2 code.", "de": ". Gewicht – in Gramm pro Stück, Land – ISO-2-Code."}
 {"uk": ". Вважати, що числа насправді в", "en": ". Assume that the numbers are actually in", "de": ". Annehmen, dass die Zahlen tatsächlich in"}
 {"uk": ". Виберіть для кожного поля одну колонку.", "en": ". Choose one column for each field.", "de": ". Wählen Sie für jedes Feld eine Spalte."}
+{"uk": ". Виберіть файл тут — Minerva завантажить його на DigiKey, передасть разом із трек-номером і перевірить, чи рахунок прив'язався; інакше прикріпіть на", "en": ". Choose a file here — Minerva uploads it to DigiKey, sends it with the tracking number and checks whether the invoice got attached; otherwise attach it on", "de": ". Wählen Sie hier eine Datei — Minerva lädt sie zu DigiKey hoch, sendet sie mit der Sendungsnummer und prüft, ob die Rechnung zugeordnet wurde; sonst hängen Sie sie an auf"}
 {"uk": ". Вони незалежні. Щоб замовлення стало \"✅ Відправлено\" — заповніть", "en": ". They are independent. For the order to become \"✅ Shipped\", fill in", "de": ". Sie sind voneinander unabhängig. Damit der Auftrag zu \"✅ Versendet\" wird, befüllen Sie"}
 {"uk": ". Всі числові ключі передаються в DigiKey при публікації як additionalFields.", "en": ". All numeric keys are passed to DigiKey on publishing as additionalFields.", "de": ". Alle numerischen Schlüssel werden beim Veröffentlichen als additionalFields an DigiKey übergeben."}
 {"uk": ". Він буде вимкнений", "en": ". It will be disabled", "de": ". Er wird deaktiviert"}
@@ -832,6 +834,7 @@
 {"uk": "AI-функції", "en": "AI features", "de": "KI-Funktionen"}
 {"uk": "AI-чернетка", "en": "AI draft", "de": "KI-Entwurf"}
 {"uk": "AIConversation ||--o{ AIMessage : \"повідомлення\"", "en": "AIConversation ||--o{ AIMessage : \"messages\"", "de": "AIConversation ||--o{ AIMessage : \"Nachrichten\""}
+{"uk": "API DigiKey офіційно приймає з підтвердженням відправки лише номер і суму рахунку. Minerva ще завантажує PDF і передає його разом із трек-номером, а потім перечитує замовлення: «прикріплено» — на сайті нічого робити не треба, інакше прикріпіть рахунок на supplier.digikey.com.", "en": "With the shipping confirmation the DigiKey API officially accepts only the invoice number and amount. Minerva also uploads the PDF and sends it with the tracking number, then re-reads the order: \"attached\" — nothing to do on the website, otherwise attach the invoice on supplier.digikey.com.", "de": "Die DigiKey-API nimmt mit der Versandbestätigung offiziell nur Rechnungsnummer und Betrag an. Minerva lädt zusätzlich das PDF hoch, sendet es mit der Sendungsnummer und liest dann den Auftrag erneut: „angehängt“ — auf der Website ist nichts zu tun, sonst hängen Sie die Rechnung auf supplier.digikey.com an."}
 {"uk": "API Key не вказано", "en": "API Key not specified", "de": "API Key nicht angegeben"}
 {"uk": "API Secret / пароль", "en": "API Secret / password", "de": "API Secret / Passwort"}
 {"uk": "API URL / режим", "en": "API URL / mode", "de": "API-URL / Modus"}
@@ -1118,6 +1121,8 @@
 {"uk": "DigiKey не передав код авторизації. Натисніть «🔑 Авторизувати» ще раз.", "en": "DigiKey did not provide an authorization code. Click “🔑 Authorize” again.", "de": "DigiKey hat keinen Autorisierungscode übermittelt. Klicken Sie erneut auf „🔑 Autorisieren“."}
 {"uk": "DigiKey не повернув жодного дійсного коду — можливо, Custom Fields API не налаштовано для цього облікового запису.", "en": "DigiKey returned no valid code — perhaps the Custom Fields API is not set up for this account.", "de": "DigiKey hat keinen gültigen Code zurückgegeben — möglicherweise ist die Custom Fields API für dieses Konto nicht eingerichtet."}
 {"uk": "DigiKey не повернув регіонів доставки (в оферах немає shippingRates).", "en": "DigiKey returned no shipping regions (the offers have no shippingRates).", "de": "DigiKey hat keine Versandregionen zurückgegeben (die Angebote enthalten keine shippingRates)."}
+{"uk": "DigiKey не приймає рахунок разом із підтвердженням", "en": "DigiKey does not accept the invoice with the confirmation", "de": "DigiKey nimmt die Rechnung nicht mit der Bestätigung an"}
+{"uk": "DigiKey не приймає рахунок разом із підтвердженням{0} — відправлення підтверджено без нього. Будь ласка, {1}.", "en": "DigiKey does not accept the invoice with the confirmation{0} — the shipment was confirmed without it. Please {1}.", "de": "DigiKey nimmt die Rechnung nicht mit der Bestätigung an{0} — der Versand wurde ohne sie bestätigt. Bitte {1}."}
 {"uk": "DigiKey не пустив (авторизація): {0}", "en": "DigiKey refused access (authorization): {0}", "de": "DigiKey hat den Zugriff verweigert (Autorisierung): {0}"}
 {"uk": "DigiKey отримає трек-номер і повідомить покупця", "en": "DigiKey will receive the tracking number and notify the buyer", "de": "DigiKey erhält die Sendungsnummer und benachrichtigt den Käufer"}
 {"uk": "DigiKey перевірив і прийняв товар — він є серед товарів вашого постачальника (Products API). Зазвичай 1–3 робочі дні.", "en": "DigiKey has reviewed and accepted the product — it is among your supplier's products (Products API). Usually 1–3 business days.", "de": "DigiKey hat den Artikel geprüft und akzeptiert — er ist unter den Artikeln Ihres Lieferanten (Products API) zu finden. In der Regel 1–3 Werktage."}
@@ -1136,6 +1141,7 @@
 {"uk": "DigiKey приймає підтвердження лише всього замовлення — кожна посилка своїм трек-номером, одним разом. Зараз {0}.", "en": "DigiKey accepts confirmation only for the whole order — each parcel with its own tracking number, all at once. Right now: {0}.", "de": "DigiKey akzeptiert nur die Bestätigung des ganzen Auftrags — jedes Paket mit eigener Sendungsnummer, alles auf einmal. Aktuell: {0}."}
 {"uk": "DigiKey прийняв зміни {0}", "en": "DigiKey accepted the changes {0}", "de": "DigiKey hat die Änderungen {0} akzeptiert"}
 {"uk": "DigiKey прийняв нові ціни (відповідь на оновлення)", "en": "DigiKey accepted the new prices (update response)", "de": "DigiKey hat die neuen Preise akzeptiert (Antwort auf die Aktualisierung)"}
+{"uk": "DigiKey прийняв підтвердження, але рахунку в замовленні не показує", "en": "DigiKey accepted the confirmation but does not show the invoice in the order", "de": "DigiKey hat die Bestätigung angenommen, zeigt die Rechnung im Auftrag aber nicht an"}
 {"uk": "DigiKey підтверджується через DigiKey Marketplace API; інші джерела — замовлення позначається як «Відправлено» в Minerva.", "en": "DigiKey is confirmed via the DigiKey Marketplace API; for other sources the order is marked as “Shipped” in Minerva.", "de": "DigiKey wird über die DigiKey Marketplace API bestätigt; bei anderen Quellen wird der Auftrag in Minerva als „Versendet“ markiert."}
 {"uk": "DigiKey рахує ціни за курсом 1", "en": "DigiKey calculates prices at the rate 1", "de": "DigiKey berechnet die Preise zum Kurs 1"}
 {"uk": "DigiKey синхронізація", "en": "DigiKey sync", "de": "DigiKey-Synchronisierung"}
@@ -1628,6 +1634,8 @@
 {"uk": "PCB Trace, Whip, Patch, Helical, Monopole тощо", "en": "PCB Trace, Whip, Patch, Helical, Monopole, etc.", "de": "PCB Trace, Whip, Patch, Helical, Monopole usw."}
 {"uk": "PCB файл", "en": "PCB file", "de": "PCB-Datei"}
 {"uk": "PCBA (складання)", "en": "PCBA (assembly)", "de": "PCBA (Bestückung)"}
+{"uk": "PDF Minerva прикріпить до замовлення на DigiKey", "en": "Minerva will attach the PDF to the order on DigiKey", "de": "Minerva hängt das PDF an den Auftrag bei DigiKey an"}
+{"uk": "PDF «{0}» Minerva прикріпить до замовлення на DigiKey", "en": "Minerva will attach the PDF \"{0}\" to the order on DigiKey", "de": "Minerva hängt das PDF „{0}“ an den Auftrag bei DigiKey an"}
 {"uk": "PDF відкрито в новій вкладці", "en": "PDF opened in a new tab", "de": "PDF in neuem Tab geöffnet"}
 {"uk": "PDF генерується на льоту з даних замовлення", "en": "The PDF is generated on the fly from the order data", "de": "Das PDF wird bei Bedarf aus den Auftragsdaten erzeugt"}
 {"uk": "PDF документа замовлення (не JSON)", "en": "PDF of the order document (not JSON)", "de": "PDF des Auftragsdokuments (kein JSON)"}
@@ -1635,7 +1643,13 @@
 {"uk": "PDF звіти по замовленнях та рахунки-фактури", "en": "PDF reports on orders and invoices", "de": "PDF-Berichte zu Aufträgen und Rechnungen"}
 {"uk": "PDF конвертація: {0}", "en": "PDF conversion: {0}", "de": "PDF-Konvertierung: {0}"}
 {"uk": "PDF не вдалось отримати після генерації", "en": "The PDF could not be obtained after generation", "de": "Das PDF konnte nach der Erzeugung nicht abgerufen werden"}
+{"uk": "PDF не завантажився на DigiKey", "en": "The PDF was not uploaded to DigiKey", "de": "Das PDF wurde nicht zu DigiKey hochgeladen"}
 {"uk": "PDF не читається ({0})", "en": "PDF cannot be read ({0})", "de": "PDF kann nicht gelesen werden ({0})"}
+{"uk": "PDF рахунку «{0}» надіслано на DigiKey, але в замовленні {1} його не видно — DigiKey не прив'язав файл через API. Будь ласка, {2}.", "en": "The invoice PDF \"{0}\" was sent to DigiKey, but it is not visible in order {1} — DigiKey did not attach the file via the API. Please {2}.", "de": "Das Rechnungs-PDF „{0}“ wurde an DigiKey gesendet, ist im Auftrag {1} aber nicht sichtbar — DigiKey hat die Datei über die API nicht zugeordnet. Bitte {2}."}
+{"uk": "PDF рахунку «{0}» надіслано, але перечитати замовлення {1} з DigiKey не вдалося — перевірте на supplier.digikey.com.", "en": "The invoice PDF \"{0}\" was sent, but order {1} could not be re-read from DigiKey — check on supplier.digikey.com.", "de": "Das Rechnungs-PDF „{0}“ wurde gesendet, aber der Auftrag {1} konnte nicht erneut von DigiKey gelesen werden — prüfen Sie auf supplier.digikey.com."}
+{"uk": "PDF рахунку для цього замовлення ще немає", "en": "There is no invoice PDF for this order yet", "de": "Für diesen Auftrag gibt es noch kein Rechnungs-PDF"}
+{"uk": "PDF рахунку не завантажився на DigiKey{0} — {1}.", "en": "The invoice PDF was not uploaded to DigiKey{0} — {1}.", "de": "Das Rechnungs-PDF wurde nicht zu DigiKey hochgeladen{0} — {1}."}
+{"uk": "PDF рахунку немає — прикріпіть на supplier.digikey.com", "en": "no invoice PDF — attach it on supplier.digikey.com", "de": "kein Rechnungs-PDF — hängen Sie es auf supplier.digikey.com an"}
 {"uk": "PDF файл", "en": "PDF file", "de": "PDF-Datei"}
 {"uk": "PDF інвойс/CN23/CN22 вашої компанії", "en": "PDF invoice/CN23/CN22 of your company", "de": "PDF-Rechnung/CN23/CN22 Ihres Unternehmens"}
 {"uk": "PDF-генерація", "en": "PDF generation", "de": "PDF-Erzeugung"}
@@ -3492,6 +3506,8 @@
 {"uk": "Автоперевірка зараз (як «▶ Перевірити зараз»)", "en": "Auto-check now (like “▶ Check now”)", "de": "Automatische Prüfung jetzt (wie „▶ Jetzt prüfen“)"}
 {"uk": "Автоперевірка оплат, хв", "en": "Automatic payment check, min", "de": "Automatische Zahlungsprüfung, Min."}
 {"uk": "Автоперевірка трек-номерів посилок", "en": "Automatic check of parcel tracking numbers", "de": "Automatische Prüfung der Paket-Sendungsnummern"}
+{"uk": "Автоприкріплення PDF рахунку вимкнено в налаштуваннях DigiKey — Minerva надішле лише файл, вибраний тут", "en": "Automatic attaching of the invoice PDF is off in the DigiKey settings — Minerva sends only the file chosen here", "de": "Automatisches Anhängen des Rechnungs-PDFs ist in den DigiKey-Einstellungen aus — Minerva sendet nur die hier gewählte Datei"}
+{"uk": "Автоприкріплення PDF рахунку вимкнено в налаштуваннях DigiKey — Minerva надішле лише файл, вибраний тут, і після підтвердження перевірить, чи DigiKey прив'язав його до замовлення.", "en": "Automatic attaching of the invoice PDF is off in the DigiKey settings — Minerva sends only the file chosen here and, after the confirmation, checks whether DigiKey attached it to the order.", "de": "Automatisches Anhängen des Rechnungs-PDFs ist in den DigiKey-Einstellungen aus — Minerva sendet nur die hier gewählte Datei und prüft nach der Bestätigung, ob DigiKey sie dem Auftrag zugeordnet hat."}
 {"uk": "Автор", "en": "Author", "de": "Autor"}
 {"uk": "Автор системи", "en": "System author", "de": "Autor des Systems"}
 {"uk": "Авторизацію DigiKey не прийнято", "en": "DigiKey authorization was not accepted", "de": "Die DigiKey-Autorisierung wurde nicht akzeptiert"}
@@ -3913,6 +3929,7 @@
 {"uk": "Без ступенів", "en": "No price breaks", "de": "Keine Staffelpreise"}
 {"uk": "Без товару з каталогу не перенесено позиції: {0}.", "en": "Lines without a catalog product were not transferred: {0}.", "de": "Positionen ohne Katalogartikel wurden nicht übernommen: {0}."}
 {"uk": "Без фази", "en": "No phase", "de": "Ohne Phase"}
+{"uk": "Без файлу тут Minerva сама прикріпить", "en": "Without a file here Minerva will attach", "de": "Ohne Datei hier hängt Minerva selbst an:"}
 {"uk": "Без фото", "en": "Without photo", "de": "Ohne Foto"}
 {"uk": "Без фото й без даташита", "en": "Without photo and datasheet", "de": "Ohne Foto und Datenblatt"}
 {"uk": "Без цього документу відправлення може бути затримано або конфісковано митницею.", "en": "Without this document the shipment may be held or confiscated by customs.", "de": "Ohne dieses Dokument kann die Sendung vom Zoll aufgehalten oder beschlagnahmt werden."}
@@ -4303,6 +4320,7 @@
 {"uk": "Виберіть файл", "en": "Choose a file", "de": "Wählen Sie eine Datei"}
 {"uk": "Виберіть файл ABD з листа або з ПК.", "en": "Choose the ABD file from the e-mail or from your PC.", "de": "Wählen Sie die ABD-Datei aus der E-Mail oder vom PC."}
 {"uk": "Виберіть файл або вставте посилання", "en": "Choose a file or paste a link", "de": "Wählen Sie eine Datei oder fügen Sie einen Link ein"}
+{"uk": "Виберіть файл тут — Minerva завантажить його на DigiKey, передасть разом із трек-номером і перевірить, чи", "en": "Choose a file here — Minerva uploads it to DigiKey, sends it with the tracking number and checks whether", "de": "Wählen Sie hier eine Datei — Minerva lädt sie zu DigiKey hoch, sendet sie mit der Sendungsnummer und prüft, ob"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть порожнім: Minerva створить свою. Після «Зберегти» Minerva створить джерело й завантажить вибране. Типи: {0} · до {1} МБ на файл.", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field empty: Minerva will create its own. After “Save” Minerva will create the source and upload the selection. Types: {0} · up to {1} MB per file.", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“ leer: Minerva erstellt einen eigenen. Nach „Speichern“ erstellt Minerva die Quelle und lädt die Auswahl hoch. Typen: {0} · bis zu {1} MB pro Datei."}
 {"uk": "Виберіть шаблон", "en": "Choose a template", "de": "Wählen Sie eine Vorlage"}
@@ -5655,6 +5673,7 @@
 {"uk": "Для доставки з переліком позицій потрібен delivery_id (або tracking_number) — так Minerva відрізняє повтор від нової доставки.", "en": "A delivery with a list of lines requires delivery_id (or tracking_number) — this is how Minerva tells a repeat from a new delivery.", "de": "Für eine Lieferung mit Positionsliste ist delivery_id (oder tracking_number) erforderlich — so unterscheidet Minerva eine Wiederholung von einer neuen Lieferung."}
 {"uk": "Для дії «Ціна = закупівля + націнка». 100 % = закупівельна ціна × 2.", "en": "For the action “Price = purchase + markup”. 100 % = purchase price × 2.", "de": "Für die Aktion „Preis = Einkauf + Aufschlag“. 100 % = Einkaufspreis × 2."}
 {"uk": "Для завдання — «І одразу завдання з цього листа» під час збереження", "en": "For a task — «And a task from this email right away» when saving", "de": "Für eine Aufgabe — beim Speichern «Und gleich eine Aufgabe aus dieser E-Mail»"}
+{"uk": "Для замовлення {0} (ЄС) немає PDF рахунку — створіть його в «Інвойси DigiKey» або {1}.", "en": "There is no invoice PDF for order {0} (EU) — create it in \"DigiKey invoices\" or {1}.", "de": "Für den Auftrag {0} (EU) gibt es kein Rechnungs-PDF — erstellen Sie es unter „DigiKey-Rechnungen“ oder {1}."}
 {"uk": "Для замовлення {0} уже є чернетка відправлення #{1}.", "en": "Order {0} already has shipment draft #{1}.", "de": "Für Auftrag {0} gibt es schon den Sendungsentwurf #{1}."}
 {"uk": "Для замовлення невідома ставка ПДВ — онлайн-оплату не створено.", "en": "The VAT rate is unknown for the order — the online payment was not created.", "de": "Der Mehrwertsteuersatz für den Auftrag ist unbekannt – die Online-Zahlung wurde nicht erstellt."}
 {"uk": "Для замовлень зроблених на сайті", "en": "For orders placed on the website", "de": "Für Bestellungen, die auf der Website aufgegeben wurden"}
@@ -10479,6 +10498,9 @@
 {"uk": "Остання синхр.", "en": "Last sync", "de": "Letzte Sync."}
 {"uk": "Остання синхронізація", "en": "Last sync", "de": "Letzte Synchronisierung"}
 {"uk": "Остання синхронізація: {0}", "en": "Last synchronization: {0}", "de": "Letzte Synchronisierung: {0}"}
+{"uk": "Остання спроба", "en": "Last attempt", "de": "Letzter Versuch"}
+{"uk": "Остання спроба прикріпити рахунок", "en": "Last attempt to attach the invoice", "de": "Letzter Versuch, die Rechnung anzuhängen"}
+{"uk": "Остання спроба: {0}", "en": "Last attempt: {0}", "de": "Letzter Versuch: {0}"}
 {"uk": "Остання успішна синхронізація", "en": "Last successful sync", "de": "Letzte erfolgreiche Synchronisierung"}
 {"uk": "Останнє", "en": "Latest", "de": "Zuletzt"}
 {"uk": "Останнє авто-стягування", "en": "Last automatic pull", "de": "Letzter automatischer Abruf"}
@@ -12079,6 +12101,7 @@
 {"uk": "При наведенні на значок кошика з'являється вікно з вмістом і сумою. Після додавання товару збоку коротко виїжджає панель. Клік по значку відкриває сторінку кошика зі списком.", "en": "Hovering over the cart icon shows a window with the contents and total. After a product is added, a panel briefly slides out at the side. Clicking the icon opens the cart page with the list.", "de": "Beim Überfahren des Warenkorb-Symbols erscheint ein Fenster mit Inhalt und Summe. Nach dem Hinzufügen eines Artikels fährt seitlich kurz ein Panel ein. Ein Klick auf das Symbol öffnet die Warenkorbseite mit der Liste."}
 {"uk": "При надходженні замовлення — створювати резерв (🔒 Резерв) замість негайного списання. Товар залишається на складі, але позначається як зарезервований. При переведенні замовлення у «Відправлено» — резерв автоматично конвертується у фактичне списання.", "en": "When an order arrives — create a reservation (🔒 Reserved) instead of an immediate write-off. The product stays in stock but is marked as reserved. When the order is moved to “Shipped”, the reservation is automatically converted into an actual write-off.", "de": "Beim Eingang eines Auftrags — eine Reservierung (🔒 Reserviert) anlegen statt sofort auszubuchen. Der Artikel bleibt im Lager, wird aber als reserviert markiert. Wird der Auftrag auf „Versendet“ gesetzt, wird die Reservierung automatisch in eine tatsächliche Ausbuchung umgewandelt."}
 {"uk": "При натисканні 💾 на Пакувальному листі / Proforma / Митній декларації зберігати PDF на сервер (без зайвого підтвердження).", "en": "When clicking 💾 on Packing List / Proforma / Customs declaration, save the PDF to the server (without extra confirmation).", "de": "Beim Klick auf 💾 bei Packliste / Proforma / Zollerklärung das PDF auf dem Server speichern (ohne zusätzliche Bestätigung)."}
+{"uk": "При підтвердженні відправки в ЄС Minerva завантажує PDF рахунку з «Інвойси DigiKey» на DigiKey і передає його разом із трек-номером. API DigiKey цього офіційно не описує, тому після відправки Minerva перечитує замовлення й каже, чи рахунок прив'язався; ні — прикріпіть на supplier.digikey.com вручну.", "en": "When confirming an EU shipment, Minerva uploads the invoice PDF from \"DigiKey invoices\" to DigiKey and sends it with the tracking number. The DigiKey API does not officially describe this, so after shipping Minerva re-reads the order and tells you whether the invoice got attached; if not, attach it on supplier.digikey.com manually.", "de": "Bei der Versandbestätigung in die EU lädt Minerva das Rechnungs-PDF aus „DigiKey-Rechnungen“ zu DigiKey hoch und sendet es mit der Sendungsnummer. Die DigiKey-API beschreibt das offiziell nicht, daher liest Minerva den Auftrag nach dem Versand erneut und meldet, ob die Rechnung zugeordnet wurde; wenn nicht — auf supplier.digikey.com manuell anhängen."}
 {"uk": "При створенні", "en": "On creation", "de": "Beim Anlegen"}
 {"uk": "При створенні UPS/DHL мітки — автоматично копіювати PDF етикетки і митної декларації у папку документів замовлення (media/orders/{0}/{1}/).", "en": "When creating a UPS/DHL label, automatically copy the label PDF and the customs declaration to the order documents folder (media/orders/{0}/{1}/).", "de": "Beim Erstellen eines UPS/DHL-Etiketts das Etiketten-PDF und die Zollerklärung automatisch in den Dokumentenordner des Auftrags kopieren (media/orders/{0}/{1}/)."}
 {"uk": "При створенні замовлення", "en": "When the order is created", "de": "Beim Anlegen des Auftrags"}
@@ -12170,6 +12193,7 @@
 {"uk": "Приклади: antenna, cable, rf_filter", "en": "Examples: antenna, cable, rf_filter", "de": "Beispiele: antenna, cable, rf_filter"}
 {"uk": "Приклади: digikey, nova_post, webshop", "en": "Examples: digikey, nova_post, webshop", "de": "Beispiele: digikey, nova_post, webshop"}
 {"uk": "Прикріплені файли. Зберігаються в", "en": "Attached files. Stored in", "de": "Angehängte Dateien. Gespeichert in"}
+{"uk": "Прикріплювати PDF рахунку до замовлення (ЄС)", "en": "Attach the invoice PDF to the order (EU)", "de": "Rechnungs-PDF an den Auftrag anhängen (EU)"}
 {"uk": "Примусово в базу знань", "en": "Forced into the knowledge base", "de": "Erzwungen in die Wissensdatenbank"}
 {"uk": "Примітка", "en": "Note", "de": "Anmerkung"}
 {"uk": "Примітка в історію", "en": "Note for the history", "de": "Hinweis für die Historie"}
@@ -12663,6 +12687,8 @@
 {"uk": "Рахунок (Kauf auf Rechnung)", "en": "Invoice (Kauf auf Rechnung)", "de": "Rechnung (Kauf auf Rechnung)"}
 {"uk": "Рахунок (Rechnung)", "en": "Invoice (Rechnung)", "de": "Rechnung"}
 {"uk": "Рахунок / Proforma з вартістю, HS-кодами й країною походження. Митниця країни отримувача рахує за ним мито й податки.", "en": "Invoice / proforma with value, HS codes and country of origin. Destination customs calculate duties and taxes from it.", "de": "Rechnung / Proforma mit Wert, HS-Codes und Ursprungsland. Der Zoll des Empfängerlandes berechnet danach Zoll und Steuern."}
+{"uk": "Рахунок «{0}» прикріплено до замовлення {1} на DigiKey — на сайті нічого робити не треба.", "en": "Invoice \"{0}\" is attached to order {1} on DigiKey — nothing to do on the website.", "de": "Rechnung „{0}“ ist dem Auftrag {1} bei DigiKey angehängt — auf der Website ist nichts zu tun."}
+{"uk": "Рахунок до замовлення на DigiKey", "en": "Invoice for the order on DigiKey", "de": "Rechnung zum Auftrag bei DigiKey"}
 {"uk": "Рахунок клієнта", "en": "Customer account", "de": "Kundenkonto"}
 {"uk": "Рахунок надіслано клієнту", "en": "Invoice sent to the customer", "de": "Rechnung an den Kunden gesendet"}
 {"uk": "Рахунок скасовано", "en": "Invoice cancelled", "de": "Rechnung storniert"}
@@ -14626,7 +14652,9 @@
 {"uk": "У документи замовлення й проєкту", "en": "Into order and project documents", "de": "In die Auftrags- und Projektdokumente"}
 {"uk": "У замовлення {0} уже так", "en": "Order {0} already has this", "de": "Auftrag {0} ist bereits so"}
 {"uk": "У замовлення кілька відправлень, а позицій не передано — відправлення позначено доставленим, на склад нічого не додано. Передайте lines.", "en": "The order has several shipments and no lines were passed — the shipment was marked as delivered, nothing was added to stock. Pass lines.", "de": "Die Bestellung hat mehrere Sendungen und es wurden keine Positionen übergeben — die Sendung wurde als zugestellt markiert, ins Lager wurde nichts übernommen. Übergeben Sie lines."}
+{"uk": "У замовленні {0} на DigiKey рахунок уже є («{1}») — новий не надсилався.", "en": "Order {0} on DigiKey already has an invoice (\"{1}\") — no new one was sent.", "de": "Der Auftrag {0} bei DigiKey hat bereits eine Rechnung („{1}“) — keine neue gesendet."}
 {"uk": "У замовленні {0} немає позицій з артикулом.", "en": "Order {0} has no lines with a SKU.", "de": "Auftrag {0} hat keine Positionen mit Artikelnummer."}
+{"uk": "У замовленні на DigiKey рахунок уже є", "en": "The order on DigiKey already has an invoice", "de": "Der Auftrag bei DigiKey hat bereits eine Rechnung"}
 {"uk": "У замовленні немає позицій.", "en": "The order has no lines.", "de": "Der Auftrag hat keine Positionen."}
 {"uk": "У календарі", "en": "In the calendar", "de": "Im Kalender"}
 {"uk": "У картці лістингу", "en": "In the listing card", "de": "In der Listing-Karte"}
@@ -16722,6 +16750,8 @@
 {"uk": "з {0}", "en": "of {0}", "de": "von {0}"}
 {"uk": "з {0} (окремо для кожного)", "en": "of {0} (separately for each)", "de": "von {0} (einzeln für jeden)"}
 {"uk": "з {0} гілок.", "en": "from {0} threads.", "de": "aus {0} Verläufen."}
+{"uk": "з «Інвойси DigiKey»", "en": "from \"DigiKey invoices\"", "de": "aus „DigiKey-Rechnungen“"}
+{"uk": "з «Інвойси DigiKey»: завантажить на DigiKey, передасть разом із трек-номером і після підтвердження перевірить, чи DigiKey показує рахунок у замовленні. Не прив'язався — Minerva скаже, і тоді прикріпіть його на", "en": "from \"DigiKey invoices\": uploads it to DigiKey, sends it with the tracking number and after the confirmation checks whether DigiKey shows the invoice in the order. Not attached — Minerva tells you, and then attach it on", "de": "aus „DigiKey-Rechnungen“: lädt es zu DigiKey hoch, sendet es mit der Sendungsnummer und prüft nach der Bestätigung, ob DigiKey die Rechnung im Auftrag anzeigt. Nicht zugeordnet — Minerva meldet es, dann hängen Sie sie an auf"}
 {"uk": "з «Налаштувань Angebote»", "en": "from “Angebote settings”", "de": "aus den „Angebote-Einstellungen“"}
 {"uk": "з «Налаштувань Angebote» (мову листа не визначено)", "en": "from “Angebote settings” (e-mail language not determined)", "de": "aus den „Angebote-Einstellungen“ (Sprache der E-Mail nicht bestimmt)"}
 {"uk": "з «Налаштувань Angebote» — виберіть клієнта, і валюта стане за його країною", "en": "from “Angebote settings” — choose a customer and the currency will follow their country", "de": "aus den „Angebote-Einstellungen“ — wählen Sie einen Kunden, und die Währung richtet sich nach dessen Land"}
@@ -16827,6 +16857,7 @@
 {"uk": "завантажено файли .dymo", "en": ".dymo files downloaded", "de": ".dymo-Dateien heruntergeladen"}
 {"uk": "завантажив документ замовлення", "en": "downloaded an order document", "de": "hat ein Auftragsdokument abgerufen"}
 {"uk": "завантажити файл", "en": "download the file", "de": "Datei herunterladen"}
+{"uk": "завантажить на DigiKey, передасть разом із трек-номером і після підтвердження перевірить, чи DigiKey показує", "en": "uploads it to DigiKey, sends it with the tracking number and after the confirmation checks whether DigiKey shows", "de": "lädt es zu DigiKey hoch, sendet es mit der Sendungsnummer und prüft nach der Bestätigung, ob DigiKey"}
 {"uk": "завантажте файли з ПК вище", "en": "upload files from the PC above", "de": "laden Sie oben Dateien vom PC hoch"}
 {"uk": "завантажую з сервера…", "en": "downloading from the server…", "de": "vom Server wird heruntergeladen…"}
 {"uk": "завантажує", "en": "loading", "de": "lädt"}
@@ -17676,6 +17707,7 @@
 {"uk": "не вдалося завантажити", "en": "could not be downloaded", "de": "konnte nicht heruntergeladen werden"}
 {"uk": "не вдалося завантажити: {0}", "en": "could not load: {0}", "de": "Laden fehlgeschlagen: {0}"}
 {"uk": "не вдалося змінити подію в календарі", "en": "could not change the event in the calendar", "de": "der Termin im Kalender konnte nicht geändert werden"}
+{"uk": "не вдалося перечитати замовлення з DigiKey", "en": "could not re-read the order from DigiKey", "de": "Auftrag konnte nicht erneut von DigiKey gelesen werden"}
 {"uk": "не вдалося побудувати графіки — відкрийте звіт або спробуйте пізніше", "en": "could not build the charts — open the report or try later", "de": "Diagramme konnten nicht erstellt werden — öffnen Sie den Bericht oder versuchen Sie es später erneut"}
 {"uk": "не вдалося прочитати офери DigiKey: {0}", "en": "could not read DigiKey offers: {0}", "de": "DigiKey-Offers konnten nicht gelesen werden: {0}"}
 {"uk": "не вдалося слухати порт {0}: {1} — повтор через 15 с", "en": "could not listen on port {0}: {1} — retrying in 15 s", "de": "Port {0} konnte nicht abgehört werden: {1} — erneuter Versuch in 15 s"}
@@ -17906,6 +17938,7 @@
 {"uk": "новий", "en": "new", "de": "neu"}
 {"uk": "новий залишок", "en": "new stock level", "de": "neuer Bestand"}
 {"uk": "новий лист знайдено", "en": "new e-mail found", "de": "neue E-Mail gefunden"}
+{"uk": "новий не надсилається.", "en": "no new one is sent.", "de": "es wird keine neue gesendet."}
 {"uk": "новий пароль покупця", "en": "new buyer password", "de": "neues Käuferpasswort"}
 {"uk": "новий ступінь", "en": "new price break", "de": "neue Staffel"}
 {"uk": "новий ступінь; зараз на DigiKey {0} шт — по {1}", "en": "new price break; currently on DigiKey {0} pcs — {1} each", "de": "neue Staffel; aktuell auf DigiKey {0} Stk. — je {1}"}
@@ -18490,6 +18523,7 @@
 {"uk": "прийнято", "en": "accepted", "de": "angenommen"}
 {"uk": "прийом до {0}", "en": "accepted until {0}", "de": "Annahme bis {0}"}
 {"uk": "приклад", "en": "sample", "de": "Beispiel"}
+{"uk": "прикріпіть рахунок на supplier.digikey.com (замовлення {0})", "en": "attach the invoice on supplier.digikey.com (order {0})", "de": "hängen Sie die Rechnung auf supplier.digikey.com an (Auftrag {0})"}
 {"uk": "примітка", "en": "note", "de": "Anmerkung"}
 {"uk": "примітки: {0}", "en": "remarks: {0}", "de": "Anmerkungen: {0}"}
 {"uk": "прихована копія: {0}", "en": "blind copy: {0}", "de": "Blindkopie: {0}"}
@@ -18655,6 +18689,9 @@
 {"uk": "раніші замовлення відправника: {0}", "en": "sender’s earlier orders: {0}", "de": "frühere Aufträge des Absenders: {0}"}
 {"uk": "рахунків", "en": "invoices", "de": "Rechnungen"}
 {"uk": "рахунок API не приймає резервні моделі (fallbacks) — виберіть модель Haiku 5.5", "en": "the API account does not accept fallback models (fallbacks) — select the Haiku 5.5 model", "de": "das API-Konto akzeptiert keine Ausweichmodelle (Fallbacks) – wählen Sie das Modell Haiku 5.5"}
+{"uk": "рахунок прив'язався; інакше прикріпіть на", "en": "the invoice got attached; otherwise attach it on", "de": "die Rechnung zugeordnet wurde; sonst hängen Sie sie an auf"}
+{"uk": "рахунок прикріплено до замовлення", "en": "invoice attached to the order", "de": "Rechnung an den Auftrag angehängt"}
+{"uk": "рахунок у замовленні. Не прив'язався — Minerva скаже, і тоді прикріпіть його на", "en": "the invoice in the order. Not attached — Minerva tells you, and then attach it on", "de": "die Rechnung im Auftrag anzeigt. Nicht zugeordnet — Minerva meldet es, dann hängen Sie sie an auf"}
 {"uk": "регіон", "en": "region", "de": "Region"}
 {"uk": "редагування", "en": "editing", "de": "Bearbeiten"}
 {"uk": "режим «Лише Minerva»", "en": "“Minerva only” mode", "de": "Modus „Nur Minerva“"}
@@ -19534,6 +19571,7 @@
 {"uk": "ще відправити", "en": "still to ship", "de": "noch zu versenden"}
 {"uk": "ще відправити {0}", "en": "still to ship {0}", "de": "noch zu versenden {0}"}
 {"uk": "ще не було", "en": "none yet", "de": "noch keiner"}
+{"uk": "ще не було — спершу підтвердження відправки замовлення в ЄС з PDF рахунку", "en": "none yet — first a shipping confirmation of an EU order with an invoice PDF", "de": "noch keiner — zuerst eine Versandbestätigung eines EU-Auftrags mit Rechnungs-PDF"}
 {"uk": "ще не в жодній посилці: {0}", "en": "not in any parcel yet: {0}", "de": "noch in keinem Paket: {0}"}
 {"uk": "ще не видно {0}", "en": "{0} not visible yet", "de": "{0} noch nicht sichtbar"}
 {"uk": "ще не визначено", "en": "not determined yet", "de": "noch nicht bestimmt"}
@@ -19672,6 +19710,7 @@
 {"uk": "і перевести їх у", "en": "and convert them to", "de": "und sie umrechnen in"}
 {"uk": "і переводить їх у", "en": "and converts them to", "de": "und wandelt sie um in"}
 {"uk": "і полем «Магазин». Ключ вставляється в конфіг сайту.", "en": "and the “Shop” field. The key is pasted into the website config.", "de": "und das Feld „Shop“. Der Schlüssel wird in die Website-Konfiguration eingefügt."}
+{"uk": "і після підтвердження перевірить, чи DigiKey прив'язав його до замовлення.", "en": "and after the confirmation checks whether DigiKey attached it to the order.", "de": "und prüft nach der Bestätigung, ob DigiKey sie dem Auftrag zugeordnet hat."}
 {"uk": "і створює записи DigiKeyListing. Оберіть режим імпорту", "en": "and creates DigiKeyListing records. Choose the import mode", "de": "und legt DigiKeyListing-Datensätze an. Wählen Sie den Importmodus"}
 {"uk": "і хочете побачити їх у Minerva зі статусом ⏳ Очікує затвердження.", "en": "and want to see them in Minerva with the status ⏳ Awaiting approval.", "de": "und sie in Minerva mit dem Status ⏳ Wartet auf Freigabe sehen möchten."}
 {"uk": "ів", "en": "s", "de": "s"}
@@ -19762,3 +19801,4 @@
 {"uk": "ℹ️ Системне", "en": "ℹ️ System", "de": "ℹ️ System"}
 {"uk": "ℹ️ Хід виробництва недоступний для цього замовлення.", "en": "ℹ️ Production progress is not available for this order.", "de": "ℹ️ Der Fertigungsfortschritt ist für diese Bestellung nicht verfügbar."}
 {"uk": "ℹ️ Цю дію запускає кнопка на сторінці налаштувань JLCPCB.", "en": "ℹ️ This action is started by the button on the JLCPCB settings page.", "de": "ℹ️ Diese Aktion wird über die Schaltfläche auf der JLCPCB-Einstellungsseite gestartet."}
+{"uk": "ℹ️ у замовленні на DigiKey рахунок уже був", "en": "ℹ️ the order on DigiKey already had an invoice", "de": "ℹ️ der Auftrag bei DigiKey hatte bereits eine Rechnung"}

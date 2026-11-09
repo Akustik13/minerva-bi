@@ -116,6 +116,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         "action_buttons",
         "task_status_panel",
         "messages_panel",
+        "vat_link_panel",
         "oauth_url_display",
         "webhook_url_display",
         "media_panel",
@@ -231,7 +232,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             ),
         }),
         ("🛒 Marketplace API (3-legged OAuth)", {
-            "fields": ("marketplace_auth_status", "auto_invoice_eu"),
+            "fields": ("marketplace_auth_status", "auto_invoice_eu", "vat_attach_eu", "vat_link_panel"),
             "description": (
                 "Marketplace API потребує авторизації користувача (3-legged OAuth). "
                 "Натисніть <b>🔑 Авторизувати Marketplace</b> нижче."
@@ -1650,6 +1651,23 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         )
 
     poll_now_button.short_description = "Ручна перевірка"
+
+    @admin.display(description="📎 Рахунок до замовлення на DigiKey")
+    def vat_link_panel(self, obj):
+        """Чим закінчилась остання спроба прикріпити PDF рахунку при підтвердженні відправки (dk_vat)."""
+        from bots.services import dk_vat
+        state = ((obj and obj.vat_link_last) or {}).get("state")
+        color = ("var(--ok,#2e7d32)" if state == dk_vat.LINKED
+                 else "var(--err,#e5484d)" if state in (dk_vat.IGNORED, dk_vat.REJECTED, dk_vat.UPLOAD_FAILED,
+                                                         dk_vat.UNKNOWN)
+                 else "var(--text)")
+        return format_html(
+            '<div style="font-size:13px"><b>Остання спроба</b>: <span style="color:{}">{}</span></div>'
+            '<div style="color:var(--text-dim);font-size:12px;margin-top:4px">API DigiKey офіційно приймає з '
+            'підтвердженням відправки лише номер і суму рахунку. Minerva ще завантажує PDF і передає його разом із '
+            'трек-номером, а потім перечитує замовлення: «прикріплено» — на сайті нічого робити не треба, інакше '
+            'прикріпіть рахунок на supplier.digikey.com.</div>',
+            color, dk_vat.last_text(obj))
 
     def messages_panel(self, obj):
         """Хаб, «🔄 Перевірити зараз» і що діє: авто-перевірка, остання перевірка, Telegram, пошта (dk_message_watch)."""

@@ -1666,7 +1666,8 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
                             shipped_quantities: dict = None,
                             vat_file_id: str = None,
                             parts_by_sku: dict = None,
-                            shipments: list = None) -> dict:
+                            shipments: list = None,
+                            vat_document: tuple = None) -> dict:
     """
     PUT /Sales/Marketplace2/Orders/v1/orders/{orderId}/ship
     Підтверджує відправлення Marketplace замовлення та передає трек-номер на DigiKey.
@@ -1678,11 +1679,11 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
     відправлення частинами: сума кількостей усіх посилок по кожній позиції = замовлене, інакше 400 «Invalid Shipped
     Quantity»); сума не збігається — нічого не надсилається.
     net_vat_invoice_amount: float — сума рахунку без ПДВ.
-    vat_file_id: str — зарезервовано (не підтримується у ShipOrderModel, ігнорується).
-    Повертає {'ok', 'message', 'raw', 'parts' — що підтверджено, 'remaining' — скільки ще не відправлено}.
+    vat_document: (байти, назва) PDF рахунку / vat_file_id — уже завантажений файл: перед підтвердженням файл
+    завантажується на DigiKey і йде в трек-номери як supplierVATObjectId (недокументовано; відхилили — без нього),
+    після — замовлення перечитується (bots/services/dk_vat.py) → result['vat'].
+    Повертає {'ok', 'message', 'raw', 'parts' — що підтверджено, 'remaining' — скільки ще не відправлено, 'vat'}.
     """
-    import requests as req
-
     token = get_marketplace_token(config)
 
     order_data    = _fetch_marketplace_order(config, order_id, token)
@@ -1694,9 +1695,10 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
         return {"ok": False, "already": True, "raw": {}, "parts": [], "remaining": 0,
                 "message": "ℹ️ На DigiKey це замовлення вже підтверджено відправленим — нічого не надіслано."}
 
+    vat_args = {"order_data": order_data, "vat_document": vat_document, "vat_file_id": vat_file_id}
     if shipments is not None:
         return _ship_parcels(config, order_id, token, order_details, already, shipments,
-                             invoice_number, net_vat_invoice_amount)
+                             invoice_number, net_vat_invoice_amount, **vat_args)
 
     if parts_by_sku is not None:
         shipped_quantities, missing = parcel_ship_quantities(order_details, parts_by_sku, already)
@@ -1739,19 +1741,10 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
     if net_vat_invoice_amount is not None:
         payload["netVatInvoiceAmount"] = float(net_vat_invoice_amount)
 
-    url = f"{_base_url(config)}{MARKETPLACE_SHIP_PATH.format(order_id=order_id)}"
-    from tabele.api_logger import logged_request
-    resp = logged_request('digikey', 'ship_marketplace_order', 'PUT', url, req.put,
-                          headers=_headers(config, token), json=payload, timeout=20)
-    raw = {}
-    try:
-        raw = resp.json()
-    except Exception:
-        raw = {"text": resp.text[:500]}
-
+    resp, raw, vat = _put_ship(config, order_id, token, payload, **vat_args)
     if resp.ok:
         return {"ok": True, "message": "✅ Відправлення підтверджено на DigiKey", "raw": raw,
-                "parts": shipped_parts, "remaining": remaining}
+                "parts": shipped_parts, "remaining": remaining, "vat": vat}
 
     detail = raw.get("detail") or raw.get("title") or raw.get("error") or resp.text[:300]
     logger.error("DigiKey ship order %s: %s %s", order_id, resp.status_code, detail)
@@ -1767,9 +1760,45 @@ def _ship_hint(detail) -> str:
     return ""
 
 
-def _ship_parcels(config, order_id, token, order_details, already, shipments, invoice_number, net_vat_invoice_amount):
-    """PUT /ship з кількома трек-номерами (посилки Minerva). Перевіряє, що разом — усе замовлення DigiKey."""
+def _put_ship(config, order_id, token, payload, order_data=None, vat_document=None, vat_file_id=None):
+    """PUT /ship → (resp, raw, vat). З PDF рахунку (vat_document / vat_file_id): файл — на DigiKey (dk_vat.prepare),
+    його id — у кожен трек-номер як supplierVATObjectId; DigiKey відхилив запит (400 не через кількості) — той самий
+    запит без поля; підтверджено — dk_vat.verify перечитує замовлення. vat — None без рахунку."""
     import requests as req
+    from tabele.api_logger import logged_request
+    from bots.services import dk_vat
+    url = f"{_base_url(config)}{MARKETPLACE_SHIP_PATH.format(order_id=order_id)}"
+
+    def put(body):
+        resp = logged_request('digikey', 'ship_marketplace_order', 'PUT', url, req.put,
+                              headers=_headers(config, token), json=body, timeout=20)
+        try:
+            raw = resp.json()
+        except Exception:
+            raw = {"text": resp.text[:500]}
+        return resp, raw if isinstance(raw, dict) else {"value": raw}
+
+    vat = None
+    if vat_document or vat_file_id:
+        vat = dk_vat.prepare(config, order_data or {}, vat_document, vat_file_id)
+    if not vat or not vat.get("file_id"):
+        resp, raw = put(payload)
+        return resp, raw, vat
+    resp, raw = put(dk_vat.attach(payload, vat["file_id"]))
+    detail = raw.get("detail") or raw.get("title") or raw.get("error") or resp.text[:300]
+    if not resp.ok and dk_vat.retry_without(resp.status_code, detail):
+        logger.warning("DigiKey ship %s: %s з рахунком — %s; повтор без %s", order_id, resp.status_code, detail,
+                       dk_vat.FIELD)
+        vat.update(state=dk_vat.REJECTED, detail=str(detail)[:300])
+        resp, raw = put(payload)
+    if resp.ok:
+        vat = dk_vat.verify(config, order_id, token, vat)
+    return resp, raw, vat
+
+
+def _ship_parcels(config, order_id, token, order_details, already, shipments, invoice_number, net_vat_invoice_amount,
+                  order_data=None, vat_document=None, vat_file_id=None):
+    """PUT /ship з кількома трек-номерами (посилки Minerva). Перевіряє, що разом — усе замовлення DigiKey."""
     by_id = {l.get("orderDetailId"): l for l in order_details if l.get("orderDetailId")}
     running = dict(already)
     entries, all_parts = [], []
@@ -1806,18 +1835,11 @@ def _ship_parcels(config, order_id, token, order_details, already, shipments, in
         payload["supplierInvoiceNumber"] = invoice_number
     if net_vat_invoice_amount is not None:
         payload["netVatInvoiceAmount"] = float(net_vat_invoice_amount)
-    url = f"{_base_url(config)}{MARKETPLACE_SHIP_PATH.format(order_id=order_id)}"
-    from tabele.api_logger import logged_request
-    resp = logged_request('digikey', 'ship_marketplace_order', 'PUT', url, req.put,
-                          headers=_headers(config, token), json=payload, timeout=20)
-    raw = {}
-    try:
-        raw = resp.json()
-    except Exception:
-        raw = {"text": resp.text[:500]}
+    resp, raw, vat = _put_ship(config, order_id, token, payload, order_data=order_data,
+                               vat_document=vat_document, vat_file_id=vat_file_id)
     if resp.ok:
         return {"ok": True, "message": f"✅ Відправлення підтверджено на DigiKey — посилок: {len(entries)}",
-                "raw": raw, "parts": all_parts, "remaining": 0}
+                "raw": raw, "parts": all_parts, "remaining": 0, "vat": vat}
     detail = raw.get("detail") or raw.get("title") or raw.get("error") or resp.text[:300]
     logger.error("DigiKey ship order %s (parcels): %s %s", order_id, resp.status_code, detail)
     return {"ok": False, "message": f"❌ {resp.status_code}: {detail}{_ship_hint(detail)}", "raw": raw, "parts": [],

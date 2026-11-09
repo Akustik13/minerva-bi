@@ -169,6 +169,16 @@ class DigiKeyConfig(models.Model):
             "генерує інвойс (якщо ще не згенеровано). Якщо вимкнено — лише ручний режим."
         ),
     )
+    vat_attach_eu = models.BooleanField(
+        "Прикріплювати PDF рахунку до замовлення (ЄС)", default=True,
+        help_text=(
+            "При підтвердженні відправки в ЄС Minerva завантажує PDF рахунку з «Інвойси DigiKey» на DigiKey і передає його "
+            "разом із трек-номером. API DigiKey цього офіційно не описує, тому після відправки Minerva перечитує "
+            "замовлення й каже, чи рахунок прив'язався; ні — прикріпіть на supplier.digikey.com вручну."
+        ),
+    )
+    # {state, at, order, file_id, name, detail} — чим закінчилась остання спроба (bots/services/dk_vat.py)
+    vat_link_last = models.JSONField("Остання спроба прикріпити рахунок", default=dict, blank=True)
 
     # ── Webhook ───────────────────────────────────────────────────────────────
     webhook_enabled = models.BooleanField("Webhook увімкнений", default=False)

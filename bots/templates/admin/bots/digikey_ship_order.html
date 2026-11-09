@@ -326,14 +326,28 @@
       <input type="file" name="vat_invoice_file"
              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.png"
              style="color:var(--text);font-size:13px">
-      <div style="font-size:11px;color:var(--text-muted);margin-top:6px;
+      <div id="dk-vat-note" style="font-size:11px;color:var(--text-muted);margin-top:6px;
                   background:var(--bg-hover);border-radius:4px;padding:8px 10px;
                   border-left:3px solid #ff9800">
-        📎 Minerva завантажує файл на DigiKey і намагається прив'язати його автоматично
-        (варіант 3 — в розробці).
-        Якщо не вдасться — з'явиться попередження з ID файлу для ручного додавання на
-        <a href="https://marketplace.digikey.com" target="_blank"
-           style="color:var(--link-fg)">сайті DigiKey</a>.
+        {% if vat_on_dk.id or vat_on_dk.name or vat_on_dk.objects %}
+        ✅ У замовленні на DigiKey рахунок уже є{% if vat_on_dk.name %} («<span translate="no">{{ vat_on_dk.name }}</span>»){% endif %} — новий не надсилається.
+        {% elif vat_attach and vat_pdf %}
+        📎 Без файлу тут Minerva сама прикріпить <b translate="no">{{ vat_pdf }}</b> з «Інвойси DigiKey»:
+        завантажить на DigiKey, передасть разом із трек-номером і після підтвердження перевірить, чи DigiKey показує
+        рахунок у замовленні. Не прив'язався — Minerva скаже, і тоді прикріпіть його на
+        <a href="https://supplier.digikey.com" target="_blank" rel="noopener"
+           style="color:var(--link-fg)">supplier.digikey.com</a>.
+        {% elif vat_attach %}
+        📎 PDF рахунку для цього замовлення ще немає{% if existing_invoice %} (рахунок #{{ existing_invoice.invoice_number }} — без PDF){% endif %}.
+        Виберіть файл тут — Minerva завантажить його на DigiKey, передасть разом із трек-номером і перевірить, чи
+        рахунок прив'язався; інакше прикріпіть на
+        <a href="https://supplier.digikey.com" target="_blank" rel="noopener"
+           style="color:var(--link-fg)">supplier.digikey.com</a>.
+        {% else %}
+        📎 Автоприкріплення PDF рахунку вимкнено в налаштуваннях DigiKey — Minerva надішле лише файл, вибраний тут,
+        і після підтвердження перевірить, чи DigiKey прив'язав його до замовлення.
+        {% endif %}
+        <br>Остання спроба: {{ vat_last }}
         <br>Підтримувані формати: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG.
       </div>
     </div>

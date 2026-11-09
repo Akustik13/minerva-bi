@@ -2749,20 +2749,28 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     @staticmethod
     def _dk_invoice_text(order):
-        """Що піде в DigiKey як інвойс (лише ЄС і при auto_invoice_eu — як у confirm_digikey_shipment)."""
+        """Що піде в DigiKey як інвойс (лише ЄС; номер і сума — при auto_invoice_eu, PDF — при vat_attach_eu, як у
+        confirm_digikey_shipment / bots/services/dk_vat.py)."""
         from bots.models import DigiKeyConfig
-        from django.db.models import Q
-        from shipping.models import Invoice
-        eu = {"AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR",
-              "HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"}
-        if (order.addr_country or "").upper() not in eu:
+        from bots.services import dk_vat
+        if not dk_vat.is_eu(order):
             return "не передається (відправлення за межі ЄС)"
-        if not DigiKeyConfig.get().auto_invoice_eu:
-            return "не передається (автоінвойс для ЄС вимкнено в налаштуваннях DigiKey)"
-        inv = Invoice.objects.filter(Q(sales_order=order) | Q(digikey_order_no=order.order_number)).first()
+        cfg = DigiKeyConfig.get()
+        inv = dk_vat.invoice_for(order)
+        pdf = ""
+        if cfg.vat_attach_eu:
+            name = dk_vat.pdf_name(order, inv) if inv else ""
+            if name:
+                pdf = f"; PDF «{name}» Minerva прикріпить до замовлення на DigiKey"
+            elif inv or not cfg.auto_invoice_eu:
+                pdf = "; PDF рахунку немає — прикріпіть на supplier.digikey.com"
+            else:
+                pdf = "; PDF Minerva прикріпить до замовлення на DigiKey"
+        if not cfg.auto_invoice_eu:
+            return "не передається (автоінвойс для ЄС вимкнено в налаштуваннях DigiKey)" + pdf
         if inv:
-            return f"#{inv.invoice_number}, нетто {inv.subtotal:.2f}"
-        return "буде згенеровано автоматично (/invoices/)"
+            return f"#{inv.invoice_number}, нетто {inv.subtotal:.2f}" + pdf
+        return "буде згенеровано автоматично (/invoices/)" + pdf
 
     def shop_confirm_view(self, request, shipment_id):
         """POST — підтвердити відправлення в магазині: DigiKey через API, інші — статус «Відправлено»."""
