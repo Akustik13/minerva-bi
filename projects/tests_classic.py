@@ -53,6 +53,18 @@ class ClassicGanttTests(PortfolioBase):
         overview.collect(self.project)
 
 
+class EmptyPlanHintTests(PortfolioBase):
+    def test_empty_plan_says_where_the_gantt_will_be(self):
+        html = self.client.get(f"/projects/api/project/{self.project.pk}/cockpit/").json()["html"]
+        self.assertIn("Плану ще немає", html)
+        self.assertIn("data-pjc-gantt-hint", html)
+        self.assertNotIn('data-pjg-view="classic"', html)                       # перемикача ще немає
+        self.plan_two_phases()
+        html = self.client.get(f"/projects/api/project/{self.project.pk}/cockpit/").json()["html"]
+        self.assertNotIn("data-pjc-gantt-hint", html)
+        self.assertIn('data-pjg-view="classic"', html)
+
+
 class MailPlanActionsTests(PortfolioBase):
     def test_thread_state_has_phase_health_and_open_steps(self):
         from projects.views import thread_state

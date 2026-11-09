@@ -10,7 +10,7 @@ from django.contrib.auth.models import User
 
 from agent.models import AgentTask
 from email_assistant.models import EmailAccount
-from projects import ai_plan, ai_scan, delegate, forgotten, plan as pplan, services
+from projects import ai_plan, ai_scan, bg, delegate, forgotten, plan as pplan, services
 from projects.models import (ProjectHighlight, ProjectLink, ProjectMailScan, ProjectRisk, ProjectStep,
                              ProjectSuggestion)
 from projects.tests_portfolio import PortfolioBase
@@ -31,6 +31,9 @@ def answer(data):
 class AIBase(PortfolioBase):
     def setUp(self):
         super().setUp()
+        nobg = patch.object(bg, "BACKGROUND", False)                            # дії AI — без потоку
+        nobg.start()
+        self.addCleanup(nobg.stop)
         self.reply = self.mail("Re: Anfrage 5G Antenne", sent=self.ago(5), in_reply_to=self.ask.message_id,
                                references=(self.ask.message_id,),
                                body="Wir haben uns für den Stecker MHF4 entschieden.\nBitte Muster bis 25.11.\n\n"
@@ -52,6 +55,18 @@ class AIBase(PortfolioBase):
 
 
 class AIScanTests(AIBase):
+    def test_scan_runs_in_background_and_returns_the_cockpit(self):
+        url = self.url("ai_scan", self.project.pk)
+        with patch.object(bg, "BACKGROUND", True), patch("threading.Thread") as thread:
+            r = self.post(url)
+        self.assertTrue(r.json()["pending"])                                     # відповідь одразу, без 504
+        self.assertTrue(self.client.get(url).json()["pending"])
+        fake, _calls = answer({"items": []})
+        with patch("email_assistant.ai_helper._call_ai_direct", side_effect=fake), \
+                patch("email_assistant.ai_helper.last_usage", return_value=None):
+            thread.call_args.kwargs["target"]()
+        self.assertIn("🧠 Прочитано листів: 2 · нових пропозицій: 0", self.client.get(url).json()["html"])
+
     def test_only_quotes_from_the_letter_itself_survive(self):
         res, calls = self.scan([
             {"type": "moment", "mail": 2, "kind": "decision", "title": "Клієнт вибрав роз'єм MHF4",
@@ -231,6 +246,27 @@ class AIPlanTests(AIBase):
         ai_plan.apply(self.project, self.user)
         with self.assertRaises(ai_plan.DraftError):
             self.draft()
+
+    def test_draft_runs_in_background_and_browser_polls(self):
+        url = self.url("ai_plan", self.project.pk)
+        self.assertEqual(self.client.get(url).status_code, 400)                  # ще не запускали
+        with patch.object(bg, "BACKGROUND", True), patch("threading.Thread") as thread:
+            r = self.post(url)
+        self.assertEqual((r.json()["ok"], r.json()["pending"]), (True, True))      # відповідь одразу, без 504
+        thread.return_value.start.assert_called_once()
+        self.assertTrue(self.client.get(url).json()["pending"])                  # браузер опитує
+        with patch.object(bg, "BACKGROUND", True), patch("threading.Thread") as again:
+            self.assertTrue(self.post(url).json()["pending"])
+        again.assert_not_called()                                                 # уже складає — вдруге ні
+        with patch("projects.bg.time.time", return_value=bg.time.time() + ai_plan.STALE_SECONDS + 5):
+            self.assertIn("не відповів вчасно", self.client.get(url).json()["error"])
+        target = thread.call_args.kwargs["target"]
+        fake, _calls = answer(self.plan_json())
+        with patch("email_assistant.ai_helper._call_ai_direct", side_effect=fake), \
+                patch("email_assistant.ai_helper.last_usage", return_value=None):
+            target()                                                              # потік доробив
+        j = self.client.get(url).json()
+        self.assertEqual((j["ok"], j["draft"]["steps"]), (True, 5))
 
     def test_views(self):
         fake, _ = answer(self.plan_json())

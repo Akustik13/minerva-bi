@@ -1229,14 +1229,35 @@
     btn.textContent = text;
     return function () { btn.disabled = false; btn.textContent = label; };
   }
+  // Довга дія AI у фоні: POST запускає, далі GET кожні poll_ms, доки не готово (проксі NAS чекає лише ≈ 60 с)
+  var BG_POLLS = 100;
+  function bgRun(url, onDone, onFail) {
+    var polls = 0;
+    function poll() {
+      fetch(url + '?range=' + encodeURIComponent(range()), {credentials: 'same-origin'})
+        .then(function (r) { return r.json().catch(function () { return {ok: true, pending: true}; }); })
+        .catch(function () { return {ok: true, pending: true}; })
+        .then(step);
+    }
+    function step(j) {
+      if (j && j.ok && j.pending) {
+        if (++polls > BG_POLLS) { onFail('AI довго не відповідає — спробуйте пізніше'); return; }
+        setTimeout(poll, j.poll_ms || 3000);
+        return;
+      }
+      if (!j || !j.ok) { onFail((j && j.error) || 'не вдалося'); return; }
+      onDone(j);
+    }
+    send(url, {}).then(step);
+  }
   function aiScan(btn) {
-    var undo = busy(btn, '🧠 AI читає листи…');
+    var undo = busy(btn, '🧠 AI читає листи… до 2 хвилин');
     aiErr('');
-    send(box().dataset.aiScan, {}).then(function (j) {
-      if (j && j.ok && j.html) { put(j.html); return; }
+    bgRun(box().dataset.aiScan, function (j) {
+      if (j.html) { put(j.html); return; }
       undo();
-      aiErr('⚠️ ' + ((j && j.error) || 'не вдалося'));
-    });
+      aiErr('⚠️ не вдалося');
+    }, function (err) { undo(); aiErr('⚠️ ' + err); });
   }
   function aiDecide(btn) {
     btn.disabled = true;
@@ -1375,13 +1396,10 @@
   // 🧠 Чернетка плану з листування: перегляд у вікні, галочки кроків, «✓ Застосувати план»
   var SIDE_LABELS = {we: 'ми', customer: 'клієнт', supplier: 'постачальник', colleague: 'колега'};
   function aiPlan(btn) {
-    var undo = busy(btn, '🧠 AI складає план… до хвилини');
+    var undo = busy(btn, '🧠 AI складає план… 1–3 хвилини');
     aiErr('');
-    send(box().dataset.aiPlan, {}).then(function (j) {
-      undo();
-      if (!j || !j.ok) { aiErr('⚠️ ' + ((j && j.error) || 'не вдалося')); return; }
-      openPlanDraft(j.draft);
-    });
+    bgRun(box().dataset.aiPlan, function (j) { undo(); openPlanDraft(j.draft); },
+          function (err) { undo(); aiErr('⚠️ ' + err); });
   }
   function openPlanDraft(d) {
     var ds = dialogs();

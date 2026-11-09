@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 AI_MODEL = "claude-haiku-5-5"
 BATCH = 12                 # листів за один запуск
+STALE_SECONDS = 4 * 60     # «читає» довше — потік загинув, можна знову (projects/bg.py)
 TEXT_MAX = 1800            # символів нового тексту одного листа
 ITEMS_MAX = 10             # пропозицій за один запуск
 SHOWN = 30                 # пропозицій у пульті
@@ -255,6 +256,23 @@ def scan(project, user, today=None) -> dict:
         ProjectMailScan.objects.get_or_create(project=project, message=m,
                                               defaults={"user": user, "found": per.get(m.pk, 0)})
     return {"found": found, "read": len(msgs), "left": unread(project, user).count(), "error": ""}
+
+
+def _run_key(project, user) -> str:
+    return f"pj-ai-scan-run:{getattr(user, 'pk', 0)}:{project.pk}"
+
+
+def run_state(project, user) -> dict:
+    """Хід пошуку (projects/bg.py): {} — не запускали, {running}, {done, result: scan()}, {error}."""
+    from . import bg
+    return bg.state(_run_key(project, user), STALE_SECONDS)
+
+
+def start(project, user) -> dict:
+    """scan у фоні (Haiku з роздумами над 12 листами може думати довше, ніж проксі NAS чекає відповіді)."""
+    from . import bg
+    return bg.start(_run_key(project, user), STALE_SECONDS, lambda: scan(project, user),
+                    f"project ai scan {project.code}")
 
 
 def pending(project, user) -> list:

@@ -752,6 +752,7 @@
 {"uk": "AI відповів не у форматі плану — спробуйте ще раз", "en": "The AI did not answer in the plan format — try again", "de": "Die KI hat nicht im Planformat geantwortet — versuchen Sie es erneut"}
 {"uk": "AI відповів не у форматі — спробуйте ще раз", "en": "The AI did not answer in the expected format — try again", "de": "Die KI hat nicht im erwarteten Format geantwortet — versuchen Sie es erneut"}
 {"uk": "AI групує листи {0}–{1} з {2}…", "en": "AI is grouping emails {0}–{1} of {2}…", "de": "Die KI gruppiert E-Mails {0}–{1} von {2}…"}
+{"uk": "AI довго не відповідає — спробуйте пізніше", "en": "The AI is taking too long — try again later", "de": "Die KI antwortet zu lange nicht — versuchen Sie es später erneut"}
 {"uk": "AI загалом: {0}", "en": "AI total: {0}", "de": "KI gesamt: {0}"}
 {"uk": "AI запитів всього", "en": "AI requests total", "de": "KI-Anfragen gesamt"}
 {"uk": "AI класифікація: {0}", "en": "AI classification: {0}", "de": "KI-Klassifizierung: {0}"}
@@ -763,6 +764,7 @@
 {"uk": "AI не відповів", "en": "AI did not respond", "de": "Die KI hat nicht geantwortet"}
 {"uk": "AI не відповів (немає ключа Anthropic у налаштуваннях AI або збій) — напишіть опис вручну.", "en": "The AI did not respond (no Anthropic key in the AI settings or a failure) — write the description manually.", "de": "Die KI hat nicht geantwortet (kein Anthropic-Schlüssel in den KI-Einstellungen oder ein Fehler) – schreiben Sie die Beschreibung manuell."}
 {"uk": "AI не відповів (перевірте ключ і модель у налаштуваннях AI)", "en": "The AI did not respond (check the key and model in the AI settings)", "de": "Die KI hat nicht geantwortet (prüfen Sie Schlüssel und Modell in den KI-Einstellungen)"}
+{"uk": "AI не відповів вчасно — спробуйте ще раз", "en": "The AI did not answer in time — try again", "de": "Die KI hat nicht rechtzeitig geantwortet — versuchen Sie es erneut"}
 {"uk": "AI не відповів у форматі огляду — спробуйте ще раз", "en": "The AI did not reply in the overview format — try again", "de": "Die KI hat nicht im Übersichtsformat geantwortet — versuchen Sie es erneut"}
 {"uk": "AI не відповів — перевірте ключ AI або спробуйте ще раз", "en": "The AI did not reply — check the AI key or try again", "de": "Die KI hat nicht geantwortet — prüfen Sie den KI-Schlüssel oder versuchen Sie es erneut"}
 {"uk": "AI не відповів — перевірте ключ AI в «⚙️ Налаштування AI»", "en": "The AI did not respond — check the AI key in “⚙️ AI settings”", "de": "Die KI hat nicht geantwortet – prüfen Sie den KI-Schlüssel unter „⚙️ KI-Einstellungen“"}
@@ -790,6 +792,7 @@
 {"uk": "AI рішення: {0}", "en": "AI decision: {0}", "de": "KI-Entscheidung: {0}"}
 {"uk": "AI складає огляд лише з листів проєкту, даних Minerva і бази знань RAG", "en": "The AI compiles the overview only from the project e-mails, Minerva data and the RAG knowledge base", "de": "Die KI erstellt die Übersicht ausschließlich aus den Projekt-E-Mails, Minerva-Daten und der RAG-Wissensdatenbank"}
 {"uk": "AI складає огляд лише з листів проєкту, даних Minerva і бази знань RAG (листування клієнта поза проєктом); перевіряйте за посиланнями ↗.", "en": "The AI compiles the overview only from the project e-mails, Minerva data and the RAG knowledge base (the customer's correspondence outside the project); verify using the links ↗.", "de": "Die KI erstellt die Übersicht ausschließlich aus den Projekt-E-Mails, Minerva-Daten und der RAG-Wissensdatenbank (Korrespondenz des Kunden außerhalb des Projekts); prüfen Sie anhand der Links ↗."}
+{"uk": "AI складає план… 1–3 хвилини", "en": "The AI is drafting the plan… 1–3 minutes", "de": "Die KI erstellt den Plan… 1–3 Minuten"}
 {"uk": "AI складає план… до хвилини", "en": "AI is drafting the plan… up to a minute", "de": "Die KI erstellt den Plan… bis zu einer Minute"}
 {"uk": "AI стратегія для {0}", "en": "AI strategy for {0}", "de": "KI-Strategie für {0}"}
 {"uk": "AI стратегія: {0}", "en": "AI strategy: {0}", "de": "KI-Strategie: {0}"}
@@ -801,6 +804,7 @@
 {"uk": "AI читає листи й зустрічі проєкту за цей і 2 попередні дні та систематизує, що зроблено. Текст можна виправити.", "en": "AI reads the project’s e-mails and meetings for this day and the 2 previous days and summarizes what was done. You can edit the text.", "de": "Die KI liest die E-Mails und Besprechungen des Projekts für diesen und die 2 vorherigen Tage und fasst zusammen, was erledigt wurde. Der Text kann korrigiert werden."}
 {"uk": "AI читає листи й зустрічі…", "en": "AI is reading e-mails and meetings…", "de": "KI liest E-Mails und Besprechungen…"}
 {"uk": "AI читає листи…", "en": "AI is reading the emails…", "de": "Die KI liest die E-Mails…"}
+{"uk": "AI читає листи… до 2 хвилин", "en": "The AI is reading the e-mails… up to 2 minutes", "de": "Die KI liest die E-Mails… bis zu 2 Minuten"}
 {"uk": "AI є й на місці роботи: у 📥 Пошті — AI-відповідь і «📋 Підготувати відповідь», у картках клієнта", "en": "AI is also where you work: in 📥 Mail — an AI reply and “📋 Prepare reply”, in the cards of the customer", "de": "KI ist auch direkt am Arbeitsplatz: in 📥 E-Mail — KI-Antwort und „📋 Antwort vorbereiten“, in den Karten von Kunde"}
 {"uk": "AI — Штучний інтелект", "en": "AI — Artificial Intelligence", "de": "KI — Künstliche Intelligenz"}
 {"uk": "AI-автовідповідь", "en": "AI auto-reply", "de": "KI-Automatikantwort"}
@@ -7891,6 +7895,7 @@
 {"uk": "Коли етикетка йде на принтер DYMO. Перегляд малює сама служба DYMO — так, як надрукує; «✏️ Правки» — тексти й штрихкод лише для цього друку. Правий клік на 🖨️ — другий варіант.", "en": "When the label goes to the DYMO printer. The preview is rendered by the DYMO service itself — exactly as it will print; “✏️ Edits” — texts and barcode for this print only. Right-click on 🖨️ — the second option.", "de": "Wann das Etikett an den DYMO-Drucker geht. Die Vorschau wird vom DYMO-Dienst selbst erzeugt — genau so, wie gedruckt wird; „✏️ Änderungen“ — Texte und Barcode nur für diesen Druck. Rechtsklick auf 🖨️ — die zweite Variante."}
 {"uk": "Коли країну клієнта не визначено або валюта не за країною.", "en": "When the customer's country is not determined or the currency is not by country.", "de": "Wenn das Land des Kunden nicht bestimmt ist oder die Währung nicht nach Land gewählt wird."}
 {"uk": "Коли надсилає", "en": "When it is sent", "de": "Wann gesendet wird"}
+{"uk": "Коли план буде, тут з'явиться діаграма Ганта — перемикач над нею: «Діаграма Minerva» або «Класична діаграма Ганта».", "en": "Once there is a plan, a Gantt chart will appear here — the switch above it: «Minerva chart» or «Classic Gantt chart».", "de": "Sobald es einen Plan gibt, erscheint hier ein Gantt-Diagramm — der Umschalter darüber: «Minerva-Diagramm» oder «Klassisches Gantt-Diagramm»."}
 {"uk": "Коли почали роботу; порожньо — шкала починається з першої події проєкту", "en": "When work started; empty — the timeline starts with the first project event", "de": "Wann die Arbeit begann; leer — die Zeitleiste beginnt mit dem ersten Projektereignis"}
 {"uk": "Коли розклад сервера востаннє надіслав брифінг — щоб не надсилати двічі за день.", "en": "When the server schedule last sent the briefing — so that it is not sent twice a day.", "de": "Wann der Serverzeitplan das Briefing zuletzt gesendet hat — damit es nicht zweimal am Tag gesendet wird."}
 {"uk": "Коли списувати", "en": "When to write off", "de": "Wann ausbuchen"}
@@ -9401,6 +9406,7 @@
 {"uk": "Не вдалось підключитись до {0}", "en": "Could not connect to {0}", "de": "Verbindung zu {0} nicht möglich"}
 {"uk": "Не вдалось розібрати відповідь DHL API (не JSON)", "en": "Could not parse the DHL API response (not JSON)", "de": "Die Antwort der DHL API konnte nicht verarbeitet werden (kein JSON)"}
 {"uk": "Не вдалося", "en": "Failed", "de": "Fehlgeschlagen"}
+{"uk": "Не вдалося ({0}) — спробуйте ще раз", "en": "Failed ({0}) — try again", "de": "Fehlgeschlagen ({0}) — versuchen Sie es erneut"}
 {"uk": "Не вдалося видалити", "en": "Could not delete", "de": "Löschen fehlgeschlagen"}
 {"uk": "Не вдалося видалити файл: {0}", "en": "Could not delete the file: {0}", "de": "Datei konnte nicht gelöscht werden: {0}"}
 {"uk": "Не вдалося видати унікальний код проєкту", "en": "Could not issue a unique project code", "de": "Es konnte kein eindeutiger Projektcode vergeben werden"}
@@ -11976,6 +11982,7 @@
 {"uk": "Пошук у базі знань…", "en": "Searching the knowledge base…", "de": "Suche in der Wissensdatenbank…"}
 {"uk": "Пошук уже йде — зачекайте", "en": "A search is already running — please wait", "de": "Es läuft bereits eine Suche — bitte warten"}
 {"uk": "Пошук усюди", "en": "Search everywhere", "de": "Überall suchen"}
+{"uk": "Пошук ще не запускали", "en": "The search has not been started yet", "de": "Die Suche wurde noch nicht gestartet"}
 {"uk": "Пошук: назва або код — напр. Schweiz, Швейцарія, CH", "en": "Search: name or code — e.g. Schweiz, Switzerland, CH", "de": "Suche: Name oder Code – z. B. Schweiz, Switzerland, CH"}
 {"uk": "Пошуки в RAG", "en": "RAG searches", "de": "RAG-Suchen"}
 {"uk": "Пошуків", "en": "Searches", "de": "Suchanfragen"}
@@ -15404,6 +15411,7 @@
 {"uk": "Чернетка листа готова — відкрийте її нижче", "en": "The draft e-mail is ready — open it below", "de": "Der E-Mail-Entwurf ist fertig – öffnen Sie ihn unten"}
 {"uk": "Чернетка плану з листування", "en": "Plan draft from the correspondence", "de": "Planentwurf aus der Korrespondenz"}
 {"uk": "Чернетки", "en": "Drafts", "de": "Entwürfe"}
+{"uk": "Чернетки немає — натисніть «🧠 Скласти план з листування»", "en": "There is no draft — click «🧠 Draft a plan from the correspondence»", "de": "Kein Entwurf vorhanden — klicken Sie auf «🧠 Plan aus der Korrespondenz erstellen»"}
 {"uk": "Чернетку видалено", "en": "Draft deleted", "de": "Entwurf gelöscht"}
 {"uk": "Чернетку збережено о", "en": "Draft saved at", "de": "Entwurf gespeichert um"}
 {"uk": "Чернетку не знайдено", "en": "Draft not found", "de": "Entwurf nicht gefunden"}

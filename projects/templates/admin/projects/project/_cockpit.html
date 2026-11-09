@@ -286,6 +286,7 @@
       {% else %}
         <div class="pjc-empty">
           <p>Плану ще немає.{% if can_change %} Складіть його з шаблону — фази, кроки й дати з'являться самі, далі їх можна змінити.{% endif %}</p>
+          <p class="pjc-sub" data-pjc-gantt-hint>📊 Коли план буде, тут з'явиться діаграма Ганта — перемикач над нею: «Діаграма Minerva» або «Класична діаграма Ганта».</p>
           {% if can_change %}
             <div class="pjc-mrow">
               <select data-pjc-tpl aria-label="Шаблон плану">

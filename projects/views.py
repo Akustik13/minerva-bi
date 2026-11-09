@@ -408,13 +408,27 @@ def plan_clear_view(request, pk):
 # ── 🧠 AI-помічник проєкту (projects/ai_scan.py, ai_plan.py, forgotten.py, delegate.py) ───────────────────────────
 # Усе — з правом змінювати проєкт; пошта — лише власні скриньки людини (перевіряють самі модулі).
 
+PLAN_POLL_MS = 3000         # браузер питає про фонову дію AI (план, моменти й ризики) кожні 3 с
+
+
 @staff_member_required
-@require_POST
+@require_http_methods(["GET", "POST"])
 def ai_scan_view(request, pk):
-    """🧠 Знайти моменти й ризики в листах: наступна порція власних непрочитаних листів проєкту → свіжий пульт."""
+    """🧠 Знайти моменти й ризики в листах (у фоні): POST — наступна порція власних непрочитаних листів проєкту,
+    GET — хід; прочитано → свіжий пульт."""
     from . import ai_scan
     project = _project_for_change(request, pk)
-    res = ai_scan.scan(project, request.user)
+    if request.method == "POST":
+        st = ai_scan.start(project, request.user)
+    else:
+        st = ai_scan.run_state(project, request.user)
+    if st.get("running"):
+        return JsonResponse({"ok": True, "pending": True, "poll_ms": PLAN_POLL_MS})
+    if st.get("error"):
+        return JsonResponse({"ok": False, "error": st["error"]}, status=400)
+    res = st.get("result") if st.get("done") else None
+    if not res:
+        return JsonResponse({"ok": False, "error": "Пошук ще не запускали"}, status=400)
     if res["error"]:
         return JsonResponse({"ok": False, "error": res["error"]}, status=400)
     if not res["read"]:
@@ -440,15 +454,27 @@ def ai_suggestion_view(request, pk, sid):
 
 
 @staff_member_required
-@require_POST
+@require_http_methods(["GET", "POST"])
 def ai_plan_view(request, pk):
-    """🧠 Чернетка плану з листування → JSON для вікна перегляду (нічого не пише в план)."""
+    """🧠 Чернетка плану з листування (у фоні, нічого не пише в план): POST — почати, GET — хід; готова — JSON
+    для вікна перегляду."""
     from . import ai_plan
     project = _project_for_change(request, pk)
-    try:
-        draft = ai_plan.draft(project, request.user)
-    except ValueError as e:
-        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    if request.method == "POST":
+        try:
+            st = ai_plan.start(project, request.user)
+        except ValueError as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    else:
+        st = ai_plan.run_state(project, request.user)
+    if st.get("running"):
+        return JsonResponse({"ok": True, "pending": True, "poll_ms": PLAN_POLL_MS})
+    if st.get("error"):
+        return JsonResponse({"ok": False, "error": st["error"]}, status=400)
+    draft = ai_plan.saved(project, request.user) if st.get("done") else None
+    if draft is None:
+        return JsonResponse({"ok": False, "error": "Чернетки немає — натисніть «🧠 Скласти план з листування»"},
+                            status=400)
     return JsonResponse({"ok": True, "draft": draft})
 
 

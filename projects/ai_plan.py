@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 AI_MODEL = "claude-sonnet-5-5"
 DRAFT_TTL = 24 * 3600
+STALE_SECONDS = 6 * 60      # «складає» довше — потік загинув (перезапуск процесу), можна знову (projects/bg.py)
 HISTORY_TOP = 40           # тривалостей з минулих проєктів у промпті
 PHASES_MAX, STEPS_MAX, PHASE_STEPS_MAX = 10, 50, 25
 DAYS_MAX = 365
@@ -196,12 +197,9 @@ def _key(project, user) -> str:
     return f"pj-ai-plan:{getattr(user, 'pk', 0)}:{project.pk}"
 
 
-def draft(project, user, today=None) -> dict:
-    """AI-чернетка плану → {start, template, notes, phases, steps, model, mails}; лежить у кеші для apply."""
-    from ai_assistant.budget_guard import check_budget, record_monthly
-    from core.shared_cache import cache
-    from email_assistant import ai_helper
-    today = today or timezone.localdate()
+def _check(project, user):
+    """Чернетка можлива: план порожній, бюджет AI не вичерпано (інакше DraftError)."""
+    from ai_assistant.budget_guard import check_budget
     if ProjectStep.objects.filter(project=project).exists():
         raise DraftError("У проєкті вже є план — AI складає чернетку лише для порожнього плану")
     profile = getattr(user, "profile", None)
@@ -209,6 +207,15 @@ def draft(project, user, today=None) -> dict:
         ok, reason = check_budget(profile)
         if not ok:
             raise DraftError(reason or "Ліміт бюджету AI вичерпано")
+
+
+def draft(project, user, today=None) -> dict:
+    """AI-чернетка плану → {start, template, notes, phases, steps, model, mails}; лежить у кеші для apply."""
+    from ai_assistant.budget_guard import record_monthly
+    from core.shared_cache import cache
+    from email_assistant import ai_helper
+    today = today or timezone.localdate()
+    _check(project, user)
     hist = durations(exclude_project=project)
     facts, refs = _own_facts(project, user, today)
     prompt = PROMPT.format(triggers=", ".join(sorted(TRIGGER_KEYS)), steps_max=STEPS_MAX, today=today.isoformat(),
@@ -235,6 +242,32 @@ def draft(project, user, today=None) -> dict:
 def saved(project, user):
     from core.shared_cache import cache
     return cache.get(_key(project, user))
+
+
+def _run_key(project, user) -> str:
+    return f"pj-ai-plan-run:{getattr(user, 'pk', 0)}:{project.pk}"
+
+
+def run_state(project, user) -> dict:
+    """Хід чернетки (projects/bg.py): {} — не запускали, {running}, {done}, {error}."""
+    from . import bg
+    return bg.state(_run_key(project, user), STALE_SECONDS)
+
+
+def start(project, user) -> dict:
+    """Чернетка у фоні: Sonnet думає довше, ніж проксі NAS чекає відповіді (HTTP 504), — браузер опитує
+    run_state; план уже є / бюджет — одразу DraftError. Уже складає — нічого нового. → run_state."""
+    from . import bg
+    key = _run_key(project, user)
+    st = bg.state(key, STALE_SECONDS)
+    if st.get("running"):
+        return st
+    _check(project, user)
+
+    def work():
+        draft(project, user)
+        return {}
+    return bg.start(key, STALE_SECONDS, work, f"project ai plan {project.code}")
 
 
 @transaction.atomic
