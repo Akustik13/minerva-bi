@@ -277,3 +277,9 @@ class LetterMarkTests(RepeatBase):
         self.assertEqual((letter.run_id, letter.how), (run.pk, AgentLetter.DRAFT))
         migration.mark_earlier_letters(apps, None)                      # повтор — без дубля
         self.assertEqual(AgentLetter.objects.count(), 1)
+        # запис зроблено «зараз», але лист пішов 4 дні тому — повтор рахується від листа, не від оновлення
+        self.assertLess(agent_mail.sent_when(run), timezone.now() - datetime.timedelta(days=3))
+        msg = self.mail(subject=FINAL)
+        with self.ai():
+            agent_mail.run_due()
+        self.assertEqual(AgentRun.objects.get(rule=rule, message=msg).status, AgentRun.DRAFTED)

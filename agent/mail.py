@@ -466,10 +466,17 @@ def earlier_letters(rule, order, exclude_pk=None) -> tuple:
 
 
 def sent_when(run):
-    """Коли пішов (піде) лист за цією роботою агента."""
+    """Коли пішов (піде) лист за цією роботою агента: дата надісланого листа в пошті; запис «🤖 агент» міграції
+    створено під час оновлення, тож його час — не дата листа."""
+    from email_assistant.models import EmailMessage
     if run.scheduled_id and run.scheduled is not None:
         return run.scheduled.sent_at or run.scheduled.scheduled_at
     letter = run.letters.order_by('created_at').first()
+    if letter is not None and letter.message_id:
+        sent = (EmailMessage.objects.filter(account_id=letter.account_id, message_id=letter.message_id)
+                .exclude(sent_at=None).order_by('sent_at').values_list('sent_at', flat=True).first())
+        if sent:
+            return sent
     return (letter.created_at if letter else None) or run.finished_at or run.created_at
 
 
