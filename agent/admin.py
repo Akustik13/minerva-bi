@@ -15,14 +15,13 @@ from django.utils.safestring import mark_safe
 
 from agent import mail as agent_mail
 from agent import products as product_fields
+from agent import run_state
 from agent.models import AgentProposal, AgentRule, AgentRun, AgentSchedule, AgentTask
 
 # ✓ на сторінці завдання — кому є що застосувати (кожна пропозиція ще перевіряє своє право, agent/decide.py)
 APPLY_PERMS = ('inventory.change_product', 'inventory.add_product', 'inventory.add_inventorytransaction',
                'calendar_app.add_calendarevent', 'shop.change_shoplisting', 'bots.change_digikeylisting',
                'shipping.add_shipment', 'sales.change_salesorder', 'inventory.add_purchaseorder')
-STATUS_ICONS = {AgentRun.QUEUED: '⏳', AgentRun.RUNNING: '⚙️', AgentRun.DRAFTED: '📝', AgentRun.SCHEDULED: '✉️',
-                AgentRun.TASKED: '🧩', AgentRun.SKIPPED: '↷', AgentRun.FAILED: '⚠️'}
 
 
 def _mail_link(msg):
@@ -275,7 +274,7 @@ class AgentRuleAdmin(admin.ModelAdmin):
             '<tr id="art-res-{}" hidden><td colspan="5"><pre class="art-pre"></pre></td></tr>'), (
             (timezone.localtime(f['msg'].sent_at).strftime('%d.%m %H:%M') if f['msg'].sent_at else '',
              _mail_link(f['msg']), f['why'],
-             (f'{STATUS_ICONS.get(f["run"].status, "")} {f["run"].get_status_display()}' if f['run']
+             (run_state.text(f['run']) if f['run']
               else ('⚠️ ' + f['blocked'] if f['blocked'] else '')),
              f['msg'].pk, tip, label, f['msg'].pk) for f in data['found']))
         if data['found']:
@@ -376,17 +375,16 @@ class AgentRuleAdmin(admin.ModelAdmin):
     def recent_runs(self, obj):
         if obj is None or not obj.pk:
             return '—'
-        runs = obj.runs.select_related('message', 'task').order_by('-created_at')[:15]
+        runs = (obj.runs.select_related('message', 'task', 'scheduled').prefetch_related('letters__scheduled')
+                .order_by('-created_at')[:15])
         if not runs:
             return 'Ще жодного листа — агент перевіряє нові листи щохвилини.'
         return format_html(
             '<table style="width:100%"><tbody>{}</tbody></table>',
-            format_html_join('', '<tr><td style="white-space:nowrap">{}</td><td>{}</td><td>{} {}{}</td>'
-                                 '<td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>',
+            format_html_join('', '<tr><td style="white-space:nowrap">{}</td><td>{}</td><td>{}{}</td>'
+                                 '<td>{}</td><td>{}</td><td>{}</td></tr>',
                              ((timezone.localtime(r.created_at).strftime('%d.%m %H:%M'), _mail_link(r.message),
-                               STATUS_ICONS.get(r.status, ''), r.get_status_display(),
-                               ' ↻' if r.retried_at else '',
-                               r.get_outcome_display() if r.outcome else '', r.reason, _result_link(r),
+                               run_state.text(r), ' ↻' if r.retried_at else '', r.reason, _result_link(r),
                                self._retry_button(obj, r))
                               for r in runs)))
 
@@ -595,7 +593,7 @@ class AgentRunAdmin(admin.ModelAdmin):
 
     @admin.display(description='Стан', ordering='status')
     def status_col(self, obj):
-        return f'{STATUS_ICONS.get(obj.status, "")} {obj.get_status_display()}'
+        return run_state.text(obj)
 
     @admin.display(description='Результат')
     def result(self, obj):

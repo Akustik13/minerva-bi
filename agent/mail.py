@@ -1149,7 +1149,9 @@ def runs_for(messages) -> dict:
     """{pk листа: [AgentRun]} — рядок «🤖 Агент …» у прев'ю листа."""
     out = {}
     pks = [m.pk for m in messages]
+    from agent import run_state
     for run in (AgentRun.objects.filter(message_id__in=pks).select_related('rule', 'scheduled', 'task')
-                .order_by('-created_at')):
+                .prefetch_related('letters__scheduled').order_by('-created_at')):
+        run.done_text = run_state.done(run)       # уже надіслано / скасовано / чернетку видалено
         out.setdefault(run.message_id, []).append(run)
     return out

@@ -102,7 +102,8 @@ def candidates(rule, days=DAYS) -> dict:
         if ok:
             if len(found) < SHOW:
                 found.append({'msg': msg, 'why': why, 'blocked': agent_mail.why_not(rule, msg, check_age=False),
-                              'run': AgentRun.objects.filter(rule=rule, message=msg).first()})
+                              'run': AgentRun.objects.filter(rule=rule, message=msg).select_related('scheduled')
+                              .prefetch_related('letters__scheduled').first()})
         elif with_sender and why != 'інший відправник' and len(near) < NEAR:
             near.append({'msg': msg, 'why': why})
     return {'found': found, 'near': near, 'scanned': scanned, 'days': days}

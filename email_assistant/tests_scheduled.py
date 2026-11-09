@@ -79,3 +79,72 @@ class SendScheduledTests(TestCase):
         with patch("email_assistant.smtp_client.SMTPClient.send", return_value={"ok": True}) as send:
             self.run_command()
         send.assert_called_once()
+
+
+class SendNowActionTests(TestCase):
+    """«📤 Надіслати зараз» у «⏳ Запланованих»: вибрані листи, що чекають, — одразу, тим самим шляхом, що cron."""
+    URL = "/admin/email_assistant/scheduledemail/"
+
+    def setUp(self):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.user = User.objects.create_superuser("slava", "s@x.y", "p")
+        self.account = EmailAccount.objects.create(
+            user=self.user, email_address=ME, imap_username=ME, imap_password="x", smtp_username=ME,
+            smtp_password="x")
+        self.client.force_login(self.user)
+
+    def letter(self, subject="Final Reminder", minutes=30, account=None, **kw):
+        return ScheduledEmail.objects.create(
+            account=account or self.account, subject=subject, to_emails=["buyer@client.example"], body="Hallo",
+            scheduled_at=timezone.now() + timedelta(minutes=minutes), **kw)
+
+    def act(self, *letters):
+        return self.client.post(self.URL, {"action": "send_now", "_selected_action": [m.pk for m in letters]},
+                                follow=True)
+
+    def test_sends_selected_before_their_time(self):
+        a, b = self.letter("A"), self.letter("B", minutes=120)
+        with patch("email_assistant.smtp_client.SMTPClient.send", return_value={"ok": True}) as send:
+            r = self.act(a, b)
+        self.assertEqual(send.call_count, 2)
+        for m in (a, b):
+            m.refresh_from_db()
+            self.assertEqual(m.status, ScheduledEmail.STATUS_SENT)
+        self.assertContains(r, "Надіслано зараз: 2")
+        with patch("email_assistant.smtp_client.SMTPClient.send") as send:
+            call_command("send_scheduled", stdout=StringIO())   # cron удруге не надсилає
+            r = self.act(a)                                       # і кнопка теж
+        send.assert_not_called()
+        self.assertContains(r, "Пропущено: 1")
+
+    def test_skips_not_waiting_and_reports_smtp_error(self):
+        sent = self.letter("Sent", status=ScheduledEmail.STATUS_SENT, sent_at=timezone.now())
+        busy = self.letter("Busy", sent_at=timezone.now())                  # саме відправляє cron
+        cancelled = self.letter("Cancelled", status=ScheduledEmail.STATUS_CANCELLED)
+        bad = self.letter("Bad")
+        with patch("email_assistant.smtp_client.SMTPClient.send",
+                   return_value={"ok": False, "error": "535 auth"}) as send:
+            r = self.act(sent, busy, cancelled, bad)
+        send.assert_called_once()
+        self.assertContains(r, "Не надіслано «Bad»: 535 auth")
+        self.assertContains(r, "Пропущено: 3")
+        bad.refresh_from_db()
+        self.assertEqual((bad.status, bad.sent_at), (ScheduledEmail.STATUS_FAILED, None))
+
+    def test_only_own_mailbox(self):
+        other = User.objects.create_superuser("anna", "a@x.y", "p")
+        theirs = self.letter("Theirs", account=EmailAccount.objects.create(user=other, email_address="a@ex.example"))
+        with patch("email_assistant.smtp_client.SMTPClient.send") as send:
+            self.act(theirs)
+        send.assert_not_called()
+        theirs.refresh_from_db()
+        self.assertEqual(theirs.status, ScheduledEmail.STATUS_PENDING)
+
+    def test_agent_letter_gets_mark(self):
+        mail = self.letter("Order 1", trigger="agent")
+        with patch("email_assistant.smtp_client.SMTPClient.send", return_value={"ok": True, "message_id": "<m@x>"}), \
+                patch("agent.letters.scheduled_sent") as mark:
+            self.act(mail)
+        mark.assert_called_once()
+        self.assertEqual(mark.call_args[0][1], "<m@x>")

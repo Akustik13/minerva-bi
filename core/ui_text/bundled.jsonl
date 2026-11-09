@@ -4298,6 +4298,7 @@
 {"uk": "Ви (або хтось інший) запросили скидання пароля для вашого акаунту в Minerva BI.", "en": "You (or someone else) requested a password reset for your Minerva BI account.", "de": "Sie (oder jemand anderes) haben das Zurücksetzen des Passworts für Ihr Konto in Minerva BI angefordert."}
 {"uk": "Ви вийшли з системи", "en": "You have signed out", "de": "Sie wurden abgemeldet"}
 {"uk": "Ви заблокували бота в особистому чаті", "en": "You blocked the bot in a private chat", "de": "Sie haben den Bot im privaten Chat blockiert"}
+{"uk": "Ви запланували на {0}", "en": "You scheduled it for {0}", "de": "Von Ihnen geplant für {0}"}
 {"uk": "Ви зареєструвались в {0}.", "en": "You have registered with {0}.", "de": "Sie haben sich bei {0} registriert."}
 {"uk": "Ви можете зайти в систему прямо зараз.", "en": "You can sign in right now.", "de": "Sie können sich jetzt sofort anmelden."}
 {"uk": "Вибач, не вдалося отримати відповідь. Спробуй ще раз.", "en": "Sorry, I could not get a reply. Try again.", "de": "Entschuldige, ich konnte keine Antwort erhalten. Versuche es noch einmal."}
@@ -5158,6 +5159,7 @@
 {"uk": "Відправку не знайдено", "en": "Shipment not found", "de": "Sendung nicht gefunden"}
 {"uk": "Відправку не підтверджено на DigiKey Marketplace", "en": "Shipment not confirmed on DigiKey Marketplace", "de": "Sendung auf DigiKey Marketplace nicht bestätigt"}
 {"uk": "Відправку перервано — невідомо, чи лист пішов. Перевірте «Надіслані» і, якщо треба, поставте лист у чергу знову (статус «Очікує»).", "en": "Sending was interrupted — it is unknown whether the email went out. Check “Sent” and, if needed, put the email back in the queue (status “Pending”).", "de": "Der Versand wurde unterbrochen — es ist unklar, ob die E-Mail abgegangen ist. Prüfen Sie „Gesendet“ und stellen Sie die E-Mail bei Bedarf erneut in die Warteschlange (Status „Ausstehend“)."}
+{"uk": "Відправку скасовано", "en": "Sending cancelled", "de": "Versand storniert"}
 {"uk": "Відправлення", "en": "Shipments", "de": "Sendungen"}
 {"uk": "Відправлення #{0}", "en": "Shipment #{0}", "de": "Sendung #{0}"}
 {"uk": "Відправлення #{0} &bull", "en": "Shipment #{0} &bull", "de": "Sendung #{0} &bull"}
@@ -6283,6 +6285,7 @@
 {"uk": "За правилом з налаштувань (", "en": "By the rule from the settings (", "de": "Nach der Regel aus den Einstellungen ("}
 {"uk": "За пріоритетом", "en": "By priority", "de": "Nach Priorität"}
 {"uk": "За раз записується до {0}; ще {1} — натисніть «Записати» ще раз.", "en": "Up to {0} are recorded at a time; {1} more — click “Record” again.", "de": "Pro Durchgang werden bis zu {0} eingetragen; noch {1} – klicken Sie erneut auf „Eintragen“."}
+{"uk": "За раз — до {0} листів; ще {1} надішліть наступним натисканням або вони підуть у свій час.", "en": "Up to {0} emails at a time; send the other {1} with the next click, or they will go at their time.", "de": "Bis zu {0} E-Mails auf einmal; die übrigen {1} senden Sie mit dem nächsten Klick, sonst gehen sie zu ihrer Zeit raus."}
 {"uk": "За роллю", "en": "By role", "de": "Nach Rolle"}
 {"uk": "За скриньками", "en": "By mailbox", "de": "Nach Postfächern"}
 {"uk": "За скільки днів (макс 30)", "en": "For how many days (max 30)", "de": "Für wie viele Tage (max. 30)"}
@@ -6868,6 +6871,7 @@
 {"uk": "Запитів за добу", "en": "Requests per day", "de": "Anfragen pro Tag"}
 {"uk": "Запитів за хвилину", "en": "Requests per minute", "de": "Anfragen pro Minute"}
 {"uk": "Запланований лист", "en": "Scheduled e-mail", "de": "Geplante E-Mail"}
+{"uk": "Запланований лист видалено", "en": "Scheduled email deleted", "de": "Geplante E-Mail gelöscht"}
 {"uk": "Заплановано", "en": "Planned", "de": "Geplant"}
 {"uk": "Заплановано на", "en": "Scheduled for", "de": "Geplant für"}
 {"uk": "Заплановано надіслати", "en": "Scheduled to send", "de": "Zum Senden geplant"}
@@ -9067,6 +9071,7 @@
 {"uk": "Надсилається на DigiKey: {0}.", "en": "Being sent to DigiKey: {0}.", "de": "Wird an DigiKey gesendet: {0}."}
 {"uk": "Надсилається раз на місяць у обраний день і час — розклад сервера перевіряє це сам (", "en": "Sent once a month on the chosen day and time — the server schedule checks this itself (", "de": "Wird einmal im Monat am gewählten Tag und zur gewählten Zeit gesendet — der Serverzeitplan prüft dies selbst ("}
 {"uk": "Надсилається раз на тиждень у обраний день і час — розклад сервера перевіряє це сам (", "en": "Sent once a week on the chosen day and time — the server schedule checks this itself (", "de": "Wird einmal pro Woche am gewählten Tag und zur gewählten Zeit gesendet — der Serverzeitplan prüft dies selbst ("}
+{"uk": "Надсилається…", "en": "Sending…", "de": "Wird gesendet…"}
 {"uk": "Надходження на склад (закупівлі)", "en": "Stock receipts (purchases)", "de": "Wareneingänge (Bestellungen)"}
 {"uk": "Надіслав би сам о {0} (через {1} хв, у «⏳ Запланованих» — можна скасувати)", "en": "Would send by itself at {0} (in {1} min, in «⏳ Scheduled» — can be cancelled)", "de": "Würde selbst um {0} senden (in {1} Min., in «⏳ Geplant» — stornierbar)"}
 {"uk": "Надісланий лист", "en": "Sent email", "de": "Gesendete E-Mail"}
@@ -9077,6 +9082,7 @@
 {"uk": "Надіслано в UPS і прив'язано до {0}: {1}.", "en": "Sent to UPS and attached to {0}: {1}.", "de": "An UPS gesendet und mit {0} verknüpft: {1}."}
 {"uk": "Надіслано з правками", "en": "Sent with edits", "de": "Mit Änderungen gesendet"}
 {"uk": "Надіслано запрошень: {0}. Посилання діє 7 днів.", "en": "Invitations sent: {0}. The link is valid for 7 days.", "de": "Gesendete Einladungen: {0}. Der Link ist 7 Tage gültig."}
+{"uk": "Надіслано зараз: {0}.", "en": "Sent now: {0}.", "de": "Jetzt gesendet: {0}."}
 {"uk": "Надіслано листів для нового пароля: {0}. Посилання діє 1 годину.", "en": "Emails for a new password sent: {0}. The link is valid for 1 hour.", "de": "Gesendete E-Mails für ein neues Passwort: {0}. Der Link ist 1 Stunde gültig."}
 {"uk": "Надіслано листів підтвердження / запрошень: {0} (підтверджені акаунти пропущено).", "en": "Confirmation / invitation emails sent: {0} (confirmed accounts skipped).", "de": "Gesendete Bestätigungs-/Einladungs-E-Mails: {0} (bestätigte Konten übersprungen)."}
 {"uk": "Надіслано о", "en": "Sent at", "de": "Gesendet um"}
@@ -9107,6 +9113,7 @@
 {"uk": "Надіслати запрошення", "en": "Send invitation", "de": "Einladung senden"}
 {"uk": "Надіслати запрошення (встановити пароль, 7 днів)", "en": "Send invitation (set password, 7 days)", "de": "Einladung senden (Passwort festlegen, 7 Tage)"}
 {"uk": "Надіслати запрошення — {0}", "en": "Send invitation — {0}", "de": "Einladung senden — {0}"}
+{"uk": "Надіслати зараз", "en": "Send now", "de": "Jetzt senden"}
 {"uk": "Надіслати зараз усім", "en": "Send to everyone now", "de": "Jetzt an alle senden"}
 {"uk": "Надіслати зараз — {0}", "en": "Send now — {0}", "de": "Jetzt senden — {0}"}
 {"uk": "Надіслати звіт зараз", "en": "Send report now", "de": "Bericht jetzt senden"}
@@ -9136,6 +9143,7 @@
 {"uk": "Надіслати тижневий звіт зараз", "en": "Send weekly report now", "de": "Wochenbericht jetzt senden"}
 {"uk": "Надіслати товар на DigiKey на перевірку?", "en": "Send the product to DigiKey for review?", "de": "Artikel zur Prüfung an DigiKey senden?"}
 {"uk": "Надіслати ще раз…", "en": "Send again…", "de": "Erneut senden…"}
+{"uk": "Надішле о {0}", "en": "Will send at {0}", "de": "Sendet um {0}"}
 {"uk": "Надішле тестове повідомлення", "en": "Sends a test message", "de": "Sendet eine Testnachricht"}
 {"uk": "Надішліть", "en": "Send", "de": "Senden Sie"}
 {"uk": "Надішліть боту", "en": "Send the bot", "de": "Senden Sie dem Bot"}
@@ -9569,6 +9577,8 @@
 {"uk": "Не надсилати якщо змін не виявлено", "en": "Do not send if no changes were detected", "de": "Nicht senden, wenn keine Änderungen erkannt wurden"}
 {"uk": "Не надіслано", "en": "Not sent", "de": "Nicht gesendet"}
 {"uk": "Не надіслано (мережа)", "en": "Not sent (network)", "de": "Nicht gesendet (Netzwerk)"}
+{"uk": "Не надіслано «{0}»: {1}", "en": "Not sent “{0}”: {1}", "de": "Nicht gesendet „{0}“: {1}"}
+{"uk": "Не надіслано — помилка відправки", "en": "Not sent — sending error", "de": "Nicht gesendet — Versandfehler"}
 {"uk": "Не надіслано: {0}", "en": "Not sent: {0}", "de": "Nicht gesendet: {0}"}
 {"uk": "Не надіслані", "en": "Not sent", "de": "Nicht gesendet"}
 {"uk": "Не налаштовано", "en": "Not configured", "de": "Nicht konfiguriert"}
@@ -12373,6 +12383,7 @@
 {"uk": "Пропущено (нема даних): {0}", "en": "Skipped (no data): {0}", "de": "Übersprungen (keine Daten): {0}"}
 {"uk": "Пропущено фільтром: {0}.", "en": "Skipped by the filter: {0}.", "de": "Durch Filter übersprungen: {0}."}
 {"uk": "Пропущено: {0}", "en": "Skipped: {0}", "de": "Übersprungen: {0}"}
+{"uk": "Пропущено: {0} — уже не в черзі (надіслані, скасовані, з помилкою або саме відправляються). Лист з помилкою — спершу поставте статус «Очікує».", "en": "Skipped: {0} — no longer in the queue (sent, cancelled, failed or being sent right now). For a failed email, first set the status to “Waiting”.", "de": "Übersprungen: {0} — nicht mehr in der Warteschlange (gesendet, storniert, fehlgeschlagen oder wird gerade gesendet). Bei einer fehlgeschlagenen E-Mail setzen Sie zuerst den Status auf „Wartet“."}
 {"uk": "Пропущено: сервер не працював о {0} — наступний брифінг завтра.", "en": "Skipped: the server was not running at {0} — the next briefing is tomorrow.", "de": "Übersprungen: Der Server lief um {0} nicht – das nächste Briefing ist morgen."}
 {"uk": "Просте", "en": "Simple", "de": "Einfach"}
 {"uk": "Просте меню", "en": "Simple menu", "de": "Einfaches Menü"}
@@ -15470,6 +15481,7 @@
 {"uk": "Чернетка відправлення", "en": "Shipment draft", "de": "Sendungsentwurf"}
 {"uk": "Чернетка відправлення з замовлення — застосовує людина (✓)", "en": "A shipment draft from an order — applied by a person (✓)", "de": "Sendungsentwurf aus einem Auftrag – wird von einer Person übernommen (✓)"}
 {"uk": "Чернетка готова", "en": "Draft ready", "de": "Entwurf fertig"}
+{"uk": "Чернетка готова — чекає вас", "en": "Draft ready — waiting for you", "de": "Entwurf fertig — wartet auf Sie"}
 {"uk": "Чернетка застаріла — складіть її ще раз", "en": "The draft is outdated — create it again", "de": "Der Entwurf ist veraltet — erstellen Sie ihn erneut"}
 {"uk": "Чернетка листа", "en": "Email draft", "de": "E-Mail-Entwurf"}
 {"uk": "Чернетка листа готова — відкрийте її нижче", "en": "The draft e-mail is ready — open it below", "de": "Der E-Mail-Entwurf ist fertig – öffnen Sie ihn unten"}
@@ -15478,6 +15490,7 @@
 {"uk": "Чернетки немає — натисніть «🧠 Скласти план з листування»", "en": "There is no draft — click «🧠 Draft a plan from the correspondence»", "de": "Kein Entwurf vorhanden — klicken Sie auf «🧠 Plan aus der Korrespondenz erstellen»"}
 {"uk": "Чернетку агента відклали «⏰ Пізніше» — Message-ID з’явиться, коли піде", "en": "The agent's draft was postponed «⏰ Later» — the Message-ID appears once it is sent", "de": "Der Entwurf des Agenten wurde «⏰ Später» verschoben — die Message-ID erscheint nach dem Versand"}
 {"uk": "Чернетку видалено", "en": "Draft deleted", "de": "Entwurf gelöscht"}
+{"uk": "Чернетку закрито", "en": "Draft closed", "de": "Entwurf geschlossen"}
 {"uk": "Чернетку збережено о", "en": "Draft saved at", "de": "Entwurf gespeichert um"}
 {"uk": "Чернетку не знайдено", "en": "Draft not found", "de": "Entwurf nicht gefunden"}
 {"uk": "Чернетку підготував агент Minerva · доручення «{0}»", "en": "Draft prepared by the Minerva agent · rule «{0}»", "de": "Entwurf vom Minerva-Agenten vorbereitet · Regel «{0}»"}

@@ -748,6 +748,37 @@ class ScheduledEmailAdmin(OwnMailboxAdminMixin, admin.ModelAdmin):
     list_filter     = ('status', 'trigger', ('account', admin.RelatedOnlyFieldListFilter))
     search_fields   = ('subject',)
     readonly_fields = ('sent_at', 'error_msg', 'created_at')
+    actions         = ('send_now',)
+    SEND_NOW_MAX    = 20      # за одне натискання — SMTP відправляє по одному, сторінка чекає
+
+    @admin.action(description='📤 Надіслати зараз', permissions=['change'])
+    def send_now(self, request, queryset):
+        """Вибрані листи, що чекають у черзі, — зараз, не чекаючи свого часу й cron: той самий шлях, що cron
+        (`scheduled_send.send_one` — бронь, кожен лист один раз). Надіслані, скасовані, з помилкою і ті, що саме
+        відправляються, пропускаються."""
+        from email_assistant import scheduled_send
+        chosen = list(queryset.filter(account__user=request.user)
+                      .select_related('account', 'account__user', 'reply_to').order_by('scheduled_at', 'pk'))
+        waiting = [s for s in chosen if s.status == ScheduledEmail.STATUS_PENDING and s.sent_at is None]
+        later = waiting[self.SEND_NOW_MAX:]
+        sent = busy = 0
+        for scheduled in waiting[:self.SEND_NOW_MAX]:
+            result = scheduled_send.send_one(scheduled)
+            if result['ok'] is None:
+                busy += 1
+            elif result['ok']:
+                sent += 1
+            else:
+                messages.error(request, f'✗ Не надіслано «{scheduled.subject[:80]}»: {result["error"]}')
+        if sent:
+            messages.success(request, f'📤 Надіслано зараз: {sent}.')
+        skipped = len(chosen) - len(waiting) + busy
+        if skipped:
+            messages.warning(request, f'Пропущено: {skipped} — уже не в черзі (надіслані, скасовані, з помилкою '
+                                      f'або саме відправляються). Лист з помилкою — спершу поставте статус «Очікує».')
+        if later:
+            messages.info(request, f'За раз — до {self.SEND_NOW_MAX} листів; ще {len(later)} надішліть наступним '
+                                   f'натисканням або вони підуть у свій час.')
 
     def subject_col(self, obj):
         return obj.subject[:60]
