@@ -1680,7 +1680,8 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
     Quantity»); сума не збігається — нічого не надсилається.
     net_vat_invoice_amount: float — сума рахунку без ПДВ.
     vat_document: (байти, назва) PDF рахунку / vat_file_id — уже завантажений файл: перед підтвердженням файл
-    завантажується на DigiKey і йде в трек-номери як supplierVATObjectId (недокументовано; відхилили — без нього),
+    завантажується на DigiKey і йде в тіло як vatFileId і в трек-номери як supplierVATObjectId (недокументовано;
+    відхилили — без них),
     після — замовлення перечитується (bots/services/dk_vat.py) → result['vat'].
     Повертає {'ok', 'message', 'raw', 'parts' — що підтверджено, 'remaining' — скільки ще не відправлено, 'vat'}.
     """
@@ -1762,8 +1763,9 @@ def _ship_hint(detail) -> str:
 
 def _put_ship(config, order_id, token, payload, order_data=None, vat_document=None, vat_file_id=None):
     """PUT /ship → (resp, raw, vat). З PDF рахунку (vat_document / vat_file_id): файл — на DigiKey (dk_vat.prepare),
-    його id — у кожен трек-номер як supplierVATObjectId; DigiKey відхилив запит (400 не через кількості) — той самий
-    запит без поля; підтверджено — dk_vat.verify перечитує замовлення. vat — None без рахунку."""
+    його id — у тіло як vatFileId і в кожен трек-номер як supplierVATObjectId; DigiKey відхилив запит (400 не через
+    кількості) — той самий запит без полів; підтверджено — dk_vat.verify перечитує замовлення. vat — None без
+    рахунку."""
     import requests as req
     from tabele.api_logger import logged_request
     from bots.services import dk_vat
@@ -1787,8 +1789,8 @@ def _put_ship(config, order_id, token, payload, order_data=None, vat_document=No
     resp, raw = put(dk_vat.attach(payload, vat["file_id"]))
     detail = raw.get("detail") or raw.get("title") or raw.get("error") or resp.text[:300]
     if not resp.ok and dk_vat.retry_without(resp.status_code, detail):
-        logger.warning("DigiKey ship %s: %s з рахунком — %s; повтор без %s", order_id, resp.status_code, detail,
-                       dk_vat.FIELD)
+        logger.warning("DigiKey ship %s: %s з рахунком — %s; повтор без %s / %s", order_id, resp.status_code, detail,
+                       dk_vat.ORDER_FIELD, dk_vat.FIELD)
         vat.update(state=dk_vat.REJECTED, detail=str(detail)[:300])
         resp, raw = put(payload)
     if resp.ok:

@@ -7,8 +7,10 @@ PUT /orders/{id}/ship приймає лише трек-номери, supplierInv
 
 1. `prepare` — до підтвердження: у замовленні на DigiKey рахунку ще немає → PDF (з форми або «Інвойси DigiKey»)
    завантажується з supplierId замовлення (`digikey.upload_vat_invoice`);
-2. `attach` — id файлу йде в кожен трек-номер як supplierVATObjectId (недокументовано); DigiKey відхилив запит
-   (`retry_without`: 400 не через кількості) — той самий запит без поля (`digikey._put_ship`);
+2. `attach` — id файлу йде в тіло як vatFileId (як supplierInvoiceNumber / netVatInvoiceAmount — поля замовлення)
+   і в кожен трек-номер як supplierVATObjectId (обидва недокументовано; лише supplierVATObjectId DigiKey 09.11.2026
+   прийняв без помилки, але рахунку не прив'язав — замовлення 102620293); DigiKey відхилив запит
+   (`retry_without`: 400 не через кількості) — той самий запит без полів (`digikey._put_ship`);
 3. `verify` — після успішного підтвердження замовлення перечитується: чи DigiKey тепер показує рахунок.
 
 `message` — що сказати людині, `remember` → `DigiKeyConfig.vat_link_last` (панель у налаштуваннях DigiKey).
@@ -23,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 EU = frozenset({"AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU", "IE", "IT",
                 "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE", "SI", "SK"})
-FIELD = "supplierVATObjectId"
+FIELD = "supplierVATObjectId"          # у кожному трек-номері
+ORDER_FIELD = "vatFileId"              # у тілі PUT /ship
 PDF_MAX = 10 * 1024 * 1024
 
 LINKED, IGNORED, REJECTED, UPLOAD_FAILED, ALREADY, UNKNOWN, NO_PDF = (
@@ -108,8 +111,9 @@ def prepare(config, order_data, document=None, file_id=None) -> dict:
 
 
 def attach(payload: dict, file_id: str) -> dict:
-    """Копія тіла PUT /ship з supplierVATObjectId у кожному трек-номері."""
+    """Копія тіла PUT /ship з vatFileId і supplierVATObjectId у кожному трек-номері."""
     body = copy.deepcopy(payload)
+    body[ORDER_FIELD] = file_id
     for entry in body.get("shippingTracking") or []:
         entry[FIELD] = file_id
     return body
@@ -146,19 +150,20 @@ def message(vat: dict, order_number: str):
     """(рівень django.contrib.messages, текст) або None."""
     if not vat or not vat.get("state"):
         return None
+    # підставляються лише дані (назва, номер, відповідь DigiKey): фраза всередині фрази не перекладається (🌐)
     st, name, n = vat["state"], vat.get("name") or "", order_number
     detail = f" ({vat['detail']})" if vat.get("detail") else ""
-    portal = f"прикріпіть рахунок на supplier.digikey.com (замовлення {n})"
     if st == LINKED:
         return "success", f"📎 Рахунок «{name}» прикріплено до замовлення {n} на DigiKey — на сайті нічого робити не треба."
     if st == IGNORED:
         return "warning", (f"📎 PDF рахунку «{name}» надіслано на DigiKey, але в замовленні {n} його не видно — "
-                           f"DigiKey не прив'язав файл через API. Будь ласка, {portal}.")
+                           f"DigiKey не прив'язав файл через API. Прикріпіть рахунок на supplier.digikey.com вручну.")
     if st == REJECTED:
-        return "warning", (f"📎 DigiKey не приймає рахунок разом із підтвердженням{detail} — відправлення "
-                           f"підтверджено без нього. Будь ласка, {portal}.")
+        return "warning", (f"📎 DigiKey не приймає рахунок разом із підтвердженням{detail} — замовлення {n} "
+                           f"підтверджено відправленим без нього. Прикріпіть рахунок на supplier.digikey.com вручну.")
     if st == UPLOAD_FAILED:
-        return "warning", f"📎 PDF рахунку не завантажився на DigiKey{detail} — {portal}."
+        return "warning", (f"📎 PDF рахунку не завантажився на DigiKey{detail} — прикріпіть рахунок до замовлення {n} "
+                           f"на supplier.digikey.com вручну.")
     if st == ALREADY:
         return "info", f"📎 У замовленні {n} на DigiKey рахунок уже є («{name}») — новий не надсилався."
     if st == UNKNOWN:
@@ -166,7 +171,7 @@ def message(vat: dict, order_number: str):
                            f"перевірте на supplier.digikey.com.")
     if st == NO_PDF:
         return "info", (f"📎 Для замовлення {n} (ЄС) немає PDF рахунку — створіть його в «Інвойси DigiKey» "
-                        f"або {portal}.")
+                        f"або прикріпіть рахунок на supplier.digikey.com вручну.")
     return None
 
 

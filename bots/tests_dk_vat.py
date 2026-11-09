@@ -61,6 +61,7 @@ class ShipWithInvoiceTests(TestCase):
         self.assertTrue(res["ok"])
         self.assertEqual(uploads, [(PDF, "Invoice_10240.pdf", "sup-uuid")])
         self.assertEqual(sent[0]["shippingTracking"][0]["supplierVATObjectId"], "F1")
+        self.assertEqual(sent[0]["vatFileId"], "F1")
         self.assertEqual(res["vat"]["state"], dk_vat.LINKED)
         level, text = dk_vat.message(res["vat"], "1001")
         self.assertEqual(level, "success")
@@ -80,12 +81,37 @@ class ShipWithInvoiceTests(TestCase):
         self.assertEqual(level, "warning")
         self.assertIn("supplier.digikey.com", text)
 
+    def test_messages_translate_whole(self):
+        """🌐 перекладач підставляє значення {n} як є: у повідомленнях лише дані, і кожне є в комплекті перекладів."""
+        import re
+        from core.ui_text import bundled
+        from core.ui_text.text import edges
+        cyr = re.compile("[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ]")
+        pats = sorted(((src, tr["en"]) for src, tr in bundled.load().items() if "{0}" in src and tr.get("en")),
+                      key=lambda p: -len(p[0]))             # як mv_translate.js: довші шаблони першими
+        for st in (dk_vat.LINKED, dk_vat.IGNORED, dk_vat.REJECTED, dk_vat.UPLOAD_FAILED, dk_vat.ALREADY,
+                   dk_vat.UNKNOWN, dk_vat.NO_PDF):
+            _, text = dk_vat.message({"state": st, "name": "Invoice_1.pdf", "detail": "Bad Request"}, "1001")
+            core = edges(text)[1]
+            out = None
+            for src, dst in pats:
+                rx = "^" + "(.+?)".join(re.escape(part) for part in re.split(r"\{\d+\}", src)) + "$"
+                m = re.match(rx, core)
+                if m:
+                    out = dst
+                    for i, v in enumerate(m.groups()):
+                        out = out.replace("{%d}" % i, v)
+                    break
+            self.assertIsNotNone(out, text)
+            self.assertIsNone(cyr.search(out), out)
+
     def test_rejected_field_retries_without_it(self):
         res, sent, _ = self.run_ship([Resp(400, {"title": "Unknown field supplierVATObjectId"}), Resp()])
         self.assertTrue(res["ok"])
         self.assertEqual(len(sent), 2)
         self.assertIn("supplierVATObjectId", sent[0]["shippingTracking"][0])
         self.assertNotIn("supplierVATObjectId", sent[1]["shippingTracking"][0])
+        self.assertEqual((sent[0].get("vatFileId"), sent[1].get("vatFileId")), ("F1", None))
         self.assertEqual(res["vat"]["state"], dk_vat.REJECTED)
         self.assertIn("Unknown field", res["vat"]["detail"])
 
