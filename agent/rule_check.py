@@ -17,6 +17,12 @@ SCAN = 400          # листів скриньки, які переглядає
 SHOW = 10           # підходять — показати до стількох
 NEAR = 5            # від того самого відправника, але не підійшли — до стількох
 AI_KINDS = (AgentRule.MAIL_REPLY, AgentRule.MAIL_CUSTOMER)
+SIGN_TEXT = {
+    AgentRule.SIGN_FULL: '🤖 Наприкінці листа — підпис AI-помічника мовою листа (ім’я помічника, чий він, фірма); '
+                         'під ним — підпис скриньки.',
+    AgentRule.SIGN_LINE: '🤖 Наприкінці листа — рядок «Цей лист написав наш AI-помічник» мовою листа.',
+    AgentRule.SIGN_OFF: '✍️ Без позначки AI — лист виглядає як від вас.',
+}
 UNTIL_TEXT = {'reaction': 'немає ні підтвердження прочитання, ні відповіді', 'reply': 'немає відповіді'}
 
 
@@ -68,6 +74,8 @@ def plan(rule) -> list:
                      f'{rule.task_budget_usd} $): агент читає лист і вкладення й пропонує зміни на сторінці завдання.')
         if rule.auto_apply:
             lines.append('✓ Трек-номер і кур’єра в порожнє поле замовлення вносить сам.')
+    if rule.kind in (AgentRule.MAIL_REPLY, AgentRule.MAIL_CUSTOMER):
+        lines.append(SIGN_TEXT[rule.ai_sign])
     if rule.kind in (AgentRule.MAIL_REPLY, AgentRule.MAIL_CUSTOMER, AgentRule.MAIL_FORWARD):
         cc = agent_mail.cc_list(rule)
         if cc:

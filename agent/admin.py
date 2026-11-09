@@ -125,7 +125,7 @@ class AgentRuleAdmin(admin.ModelAdmin):
     list_filter = ('enabled', 'kind', 'mode')
     search_fields = ('name', 'senders', 'subject_words', 'instruction')
     readonly_fields = ('promote_panel', 'recent_runs', 'example_link', 'streak', 'created_by', 'created_at',
-                       'test_panel')
+                       'test_panel', 'sign_preview')
     fieldsets = (
         (None, {'fields': ('promote_panel', 'name', 'enabled', 'account', 'kind')}),
         ('🧪 Перевірити, як працює', {'fields': ('test_panel',),
@@ -140,7 +140,8 @@ class AgentRuleAdmin(admin.ModelAdmin):
         }),
         ('Що робити', {'fields': ('instruction', 'daily_limit')}),
         ('✉️ Лист: відповідь, клієнту замовлення або пересилання', {
-            'fields': ('mode', 'send_delay_minutes', 'forward_to', 'cc', 'repeat_days', 'streak'),
+            'fields': ('mode', 'send_delay_minutes', 'forward_to', 'cc', 'repeat_days', 'ai_sign', 'ai_sign_name',
+                       'ai_sign_text', 'sign_preview', 'streak'),
             'description': 'Для «Відповідати на такі листи» і «📨 Писати клієнту замовлення». Клієнту — замовлення, '
                            'чий трек-номер (у замовленні чи його відправленні) є в листі; на адресу клієнта із '
                            'замовлення. Повторний лист про те саме замовлення — за «🔁 Повторно про те саме '
@@ -347,6 +348,25 @@ class AgentRuleAdmin(admin.ModelAdmin):
         except Exception as e:  # noqa: BLE001 — показати, а не 500
             return JsonResponse({'ok': False, 'error': f'{type(e).__name__}: {e}'[:300]})
         return JsonResponse({'ok': True, 'kind': rule.kind, **out})
+
+    @admin.display(description='Як виглядатиме')
+    def sign_preview(self, obj):
+        """Підпис AI-помічника в листі англійською й німецькою — за збереженими налаштуваннями доручення."""
+        if obj is None or not obj.pk:
+            return 'Спершу збережіть доручення.'
+        if obj.ai_sign == AgentRule.SIGN_OFF:
+            return 'Без позначки — лист виглядає як від вас.'
+        samples = (('English', 'Dear Mr. Smith,\nplease pay the UPS fee by November 12, 2026. Thank you for your '
+                               'order and your help with this shipment.'),
+                   ('Deutsch', 'Sehr geehrte Damen und Herren,\nbitte zahlen Sie die Gebühr bei UPS. Vielen Dank für '
+                               'Ihre Bestellung und Ihre Unterstützung bei dieser Sendung.'))
+        return format_html(
+            '{}<div style="opacity:.75;margin-top:4px">Після «Зберегти» — за новими налаштуваннями. Під ним, як '
+            'завжди, — підпис скриньки.</div>',
+            format_html_join('', '<div style="margin-top:6px"><b>{}</b><pre style="white-space:pre-wrap;margin:2px 0;'
+                                 'padding:8px 10px;border-radius:6px;background:var(--darkened-bg,rgba(127,127,127,.12));'
+                                 'font:inherit" translate="no">…\n\n{}</pre></div>',
+                             ((lang, agent_mail.ai_signature(obj, text)) for lang, text in samples)))
 
     @admin.display(description='Створено з листа')
     def example_link(self, obj):

@@ -311,6 +311,79 @@ def cc_list(rule) -> list:
     return list(dict.fromkeys(e.lower() for e in EMAIL_RE.findall(rule.cc or '')))[:10]
 
 
+# 🤖 Підпис AI-помічника для отримувача (`AgentRule.ai_sign`): мовою листа; підпис скриньки — під ним при відправці
+AI_SIGNATURES = {
+    'de': '{assistant}\nKI-Assistent von {owner}{at}\n\nDiese E-Mail hat ein KI-Assistent im Auftrag von {owner} '
+          'verfasst. Bei Fragen antworten Sie einfach auf diese E-Mail – Ihre Nachricht erreicht {owner} direkt.',
+    'en': '{assistant}\nAI assistant to {owner}{at}\n\nThis email was written by an AI assistant on behalf of {owner}. '
+          'If you have any questions, simply reply to this email — your message will reach {owner} directly.',
+    'uk': '{assistant}\nAI-помічник · {owner}{at}\n\nЦей лист написав AI-помічник за дорученням: {owner}. Якщо є '
+          'запитання — просто дайте відповідь на цей лист, її отримає {owner}.',
+}
+AI_LINES = {
+    'de': 'Diese E-Mail hat unser KI-Assistent verfasst. Bei Fragen antworten Sie einfach auf diese E-Mail.',
+    'en': 'This email was written by our AI assistant. If you have any questions, simply reply to this email.',
+    'uk': 'Цей лист написав наш AI-помічник. Якщо є запитання — просто дайте відповідь на цей лист.',
+}
+_CYR_RE = re.compile(r'[а-яіїєґ]', re.IGNORECASE)
+_DE_WORDS = re.compile(r'\b(?:und|bitte|für|mit|wir|ihr|ihnen|sie|sehr|geehrte\w*|grüßen|vielen|dank|danke|der|die|'
+                       r'das|ist|nicht|haben|wird|zahlen|sendung|bestellung|zoll\w*)\b', re.IGNORECASE)
+_EN_WORDS = re.compile(r'\b(?:the|and|please|for|with|we|you|your|regards|thank|thanks|is|are|not|have|will|pay|'
+                       r'shipment|order|fee)\b', re.IGNORECASE)
+_PLACEHOLDER_RE = re.compile(r'\{(assistant|owner|company)\}')
+
+
+def letter_lang(body) -> str:
+    """Мова листа для підпису: кирилиця → uk, німецьких слів більше (умлаути теж) → de, інакше en."""
+    text = body or ''
+    if len(_CYR_RE.findall(text)) > len(text) * 0.3:
+        return 'uk'
+    de = len(_DE_WORDS.findall(text)) + (1 if re.search(r'[äöüß]', text, re.IGNORECASE) else 0)
+    return 'de' if de > len(_EN_WORDS.findall(text)) else 'en'
+
+
+def _who(rule) -> dict:
+    """{assistant, owner, company} для підпису: ім'я помічника, власник скриньки доручення, фірма Minerva."""
+    account = rule.account
+    user = getattr(account, 'user', None)
+    owner = ((user.get_full_name() if user else '') or account.display_name or account.email_address or '').strip()
+    company = ''
+    try:
+        from config.models import SystemSettings
+        company = (SystemSettings.get().company_name or '').strip()
+    except Exception:  # noqa: BLE001 — без назви фірми підпис коротший
+        pass
+    if company in ('Моя компанія', 'Minerva BI'):           # не заповнено в «Налаштуваннях системи»
+        company = ''
+    return {'assistant': (rule.ai_sign_name or '').strip() or 'Minerva', 'owner': owner, 'company': company}
+
+
+def ai_signature(rule, body) -> str:
+    """Підпис AI-помічника для цього листа ('' — доручення його не ставить)."""
+    mode = getattr(rule, 'ai_sign', AgentRule.SIGN_OFF)
+    if mode == AgentRule.SIGN_OFF:
+        return ''
+    lang = letter_lang(body)
+    if mode == AgentRule.SIGN_LINE:
+        return AI_LINES[lang]
+    who = _who(rule)
+    own = (rule.ai_sign_text or '').strip()
+    if own:
+        return _PLACEHOLDER_RE.sub(lambda m: who[m.group(1)], own).strip()
+    return AI_SIGNATURES[lang].format(assistant=who['assistant'], owner=who['owner'] or who['company'] or '—',
+                                      at=f' · {who["company"]}' if who['company'] else '')
+
+
+def with_ai_signature(rule, body) -> str:
+    """Текст листа + підпис AI-помічника останнім блоком (підпис скриньки додається після нього при відправці);
+    уже є — не дублюється."""
+    sign = ai_signature(rule, body)
+    body = (body or '').rstrip()
+    if not sign or sign in body:
+        return body
+    return f'{body}\n\n{sign}'
+
+
 def _finish(run, status, reason='', **fields):
     run.status, run.reason, run.finished_at = status, (reason or '')[:500], timezone.now()
     for k, v in fields.items():
@@ -659,8 +732,8 @@ def process_customer(run):
     head = f'клієнту {to} · замовлення {order.order_number}' + (
         f' · 🔁 повторне нагадування (раніше — {_when(previous[0]["when"])})' if previous else '')
     with transaction.atomic():
-        draft, scheduled = _customer_mail(msg, to, cc_list(rule), result['subject'], body, send=send,
-                                          delay=rule.send_delay_minutes, options=send_options(rule))
+        draft, scheduled = _customer_mail(msg, to, cc_list(rule), result['subject'], with_ai_signature(rule, body),
+                                          send=send, delay=rule.send_delay_minutes, options=send_options(rule))
         _finish(run, AgentRun.SCHEDULED if send else AgentRun.DRAFTED, head + (f' · {note}' if note else ''),
                 reply=body, model=result.get('model', ''), draft=draft, scheduled=scheduled, order=order)
 
@@ -858,18 +931,19 @@ def process(run):
             send, note = False, f'ліміт {rule.daily_limit} листів на день — лише чернетка'
         elif risk.allowed(rule, 'mail.send') and not result['confident']:
             note = 'агент не впевнений — лише чернетка' + (f': {note}' if note else '')
+        letter = with_ai_signature(rule, reply)
         with transaction.atomic():
             if send:
                 when = timezone.now() + datetime.timedelta(minutes=rule.send_delay_minutes)
                 scheduled = ScheduledEmail.objects.create(
                     account=msg.account, subject=_subject(msg)[:500], to_emails=[msg.from_email],
-                    cc_emails=cc_list(rule), body=reply, reply_to=msg, scheduled_at=when, trigger='agent',
+                    cc_emails=cc_list(rule), body=letter, reply_to=msg, scheduled_at=when, trigger='agent',
                     send_options=send_options(rule))
                 _finish(run, AgentRun.SCHEDULED, note, reply=reply, model=result.get('model', ''),
                         scheduled=scheduled)
             else:
                 _finish(run, AgentRun.DRAFTED, note, reply=reply, model=result.get('model', ''),
-                        draft=make_draft(msg, reply, cc_list(rule), send_options(rule)))
+                        draft=make_draft(msg, letter, cc_list(rule), send_options(rule)))
     except Exception as e:  # noqa: BLE001 — одна помилка не зупиняє чергу
         logger.exception('agent run %s: %s', run.pk, e)
         _finish(run, AgentRun.FAILED, f'Помилка: {type(e).__name__}')
@@ -1014,12 +1088,16 @@ def try_on(rule, msg) -> dict:
         if why:
             return {**out, 'skip': True, 'skip_reason': why}
         out.update(generate_customer(rule, msg, order, tracking, previous))
+        if out.get('reply'):                      # як піде: з підписом AI-помічника
+            out['reply'] = with_ai_signature(rule, out['reply'])
         if previous:
             out['repeat'] = f'🔁 повторне нагадування — раніше писали {_when(previous[0]["when"])}'
         out.update({'to': to, 'to_name': recipient(order)[1], 'cc': cc_list(rule),
                     'order': f'{order.source}:{order.order_number}', 'tracking': tracking})
         return out
     out.update(generate(rule, msg))
+    if out.get('reply') and not out.get('skip'):
+        out['reply'] = with_ai_signature(rule, out['reply'])
     return out
 
 
@@ -1053,13 +1131,15 @@ def save(rule, msg, *, reply='', task_now=False, subject='') -> dict:
             to = customer_email(order) if order is not None else ''
             if reply.strip() and to and not task_blocked(msg, check_age=False):
                 draft, _ = _customer_mail(msg, to, cc_list(rule), subject or f'Order {order.order_number}',
-                                          reply.strip()[:REPLY_MAX], options=send_options(rule))
+                                          with_ai_signature(rule, reply.strip()[:REPLY_MAX]),
+                                          options=send_options(rule))
                 AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.DRAFTED, reply=reply.strip(),
                                         draft=draft, order=order, finished_at=timezone.now(),
                                         reason=f'клієнту {to} · з вікна «🤖 Доручити агенту»')
             return {'rule': rule, 'draft': draft, 'task': None}
         if reply.strip() and not blocked(rule, msg, check_age=False):
-            draft = make_draft(msg, reply.strip()[:REPLY_MAX], cc_list(rule), send_options(rule))
+            draft = make_draft(msg, with_ai_signature(rule, reply.strip()[:REPLY_MAX]), cc_list(rule),
+                               send_options(rule))
             AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.DRAFTED, reply=reply.strip(),
                                     draft=draft, reason='з вікна «🤖 Доручити агенту»', finished_at=timezone.now())
     return {'rule': rule, 'draft': draft, 'task': task}

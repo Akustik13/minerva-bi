@@ -110,7 +110,9 @@ class RunTests(Base):
         self.assertEqual(run.status, AgentRun.DRAFTED)
         draft = EmailDraft.objects.get(pk=run.draft_id)
         self.assertEqual((draft.reply_to, draft.to_emails, draft.subject), (msg, [msg.from_email], 'Re: Lieferschein 4711'))
-        self.assertEqual(draft.body, 'Vielen Dank, wir haben das Dokument erhalten.')
+        self.assertTrue(draft.body.startswith('Vielen Dank, wir haben das Dokument erhalten.\n\nMinerva\n'
+                                              'KI-Assistent von '), draft.body)   # 🤖 підпис AI-помічника
+        self.assertEqual(run.reply, 'Vielen Dank, wir haben das Dokument erhalten.')
         prompt = ai.call_args[0][0]
         self.assertIn('Bedanke dich kurz für den Lieferschein.', prompt)
         self.assertIn('ДАНІ від сторонніх людей', prompt)
@@ -242,8 +244,8 @@ class ViewTests(Base):
         with mock.patch(AI, return_value=ai_json()):
             d = self.client.post(f'/agent/mail/{self.msg.pk}/try/', json.dumps(data),
                                  content_type='application/json').json()
-        self.assertEqual((d['ok'], d['matches'], d['reply']),
-                         (True, True, 'Vielen Dank, wir haben das Dokument erhalten.'))
+        self.assertEqual((d['ok'], d['matches']), (True, True))
+        self.assertTrue(d['reply'].startswith('Vielen Dank, wir haben das Dokument erhalten.\n\nMinerva'), d['reply'])
         self.assertFalse(AgentRule.objects.exists() or EmailDraft.objects.exists())
 
     def test_save_with_draft_now(self):
@@ -254,7 +256,8 @@ class ViewTests(Base):
         rule = AgentRule.objects.get(pk=d['id'])
         self.assertEqual((rule.account, rule.example_message, rule.created_by), (self.account, self.msg, self.user))
         self.assertGreaterEqual(rule.seen_pk, self.msg.pk)       # уже наявні листи — не чіпає
-        self.assertEqual(EmailDraft.objects.get(pk=d['draft']).body, 'Danke!')
+        body = EmailDraft.objects.get(pk=d['draft']).body
+        self.assertTrue(body.startswith('Danke!\n\nMinerva\nKI-Assistent von '), body)
         self.assertEqual(AgentRun.objects.get().status, AgentRun.DRAFTED)
 
     def test_save_needs_condition_and_instruction(self):

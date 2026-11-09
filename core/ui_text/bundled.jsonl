@@ -3275,6 +3275,7 @@
 {"uk": "Імпортувати продажі з Excel файлу", "en": "Import sales from an Excel file", "de": "Verkäufe aus einer Excel-Datei importieren"}
 {"uk": "Імпортуйте Excel через Wizard", "en": "Import Excel via the wizard", "de": "Importieren Sie Excel über den Assistenten"}
 {"uk": "Імпортую…", "en": "Importing…", "de": "Import läuft…"}
+{"uk": "Ім’я AI-помічника", "en": "AI assistant name", "de": "Name des KI-Assistenten"}
 {"uk": "Інвентаризація — встановити фактичний залишок", "en": "Stocktaking — set the actual stock level", "de": "Inventur — tatsächlichen Bestand festlegen"}
 {"uk": "Інвентаризація: {0} → {1}", "en": "Stocktaking: {0} → {1}", "de": "Inventur: {0} → {1}"}
 {"uk": "Інвентаризація: встановлює фактичний залишок товару на локації — Minerva записує рух «Коригування» на різницю.", "en": "Stocktaking: sets the actual stock level of a product at a location — Minerva records an “Adjustment” movement for the difference.", "de": "Inventur: legt den tatsächlichen Bestand eines Artikels an einem Lagerort fest — Minerva bucht die Differenz als Lagerbewegung „Korrektur“."}
@@ -3922,6 +3923,9 @@
 {"uk": "Без плану", "en": "No plan", "de": "Ohne Plan"}
 {"uk": "Без повідомлення — лише позначка.", "en": "No notification — just the mark.", "de": "Ohne Benachrichtigung — nur die Markierung."}
 {"uk": "Без повідомлень", "en": "No notifications", "de": "Ohne Benachrichtigungen"}
+{"uk": "Без позначки AI — лист виглядає як від вас.", "en": "No AI mark — the email looks like it comes from you.", "de": "Ohne KI-Hinweis — die E-Mail sieht aus, als käme sie von Ihnen."}
+{"uk": "Без позначки — лист виглядає як від вас.", "en": "No mark — the email looks like it comes from you.", "de": "Ohne Hinweis — die E-Mail sieht aus, als käme sie von Ihnen."}
+{"uk": "Без позначки — лист як від вас", "en": "No mark — the email as if from you", "de": "Ohne Hinweis — E-Mail wie von Ihnen"}
 {"uk": "Без порівняння", "en": "No comparison", "de": "Ohne Vergleich"}
 {"uk": "Без прив'язки (поле «Магазин» порожнє), тому працюють з магазином за замовчуванням: {0}", "en": "Not linked (the “Shop” field is empty), so they work with the default shop: {0}", "de": "Ohne Zuordnung (das Feld „Shop“ ist leer), daher arbeiten sie mit dem Standard-Shop: {0}"}
 {"uk": "Без проєкту Minerva", "en": "Without Minerva project", "de": "Ohne Minerva-Projekt"}
@@ -5120,6 +5124,7 @@
 {"uk": "Відповіді", "en": "Answers", "de": "Antworten"}
 {"uk": "Відповіді віконця «Minerva» про роботу в системі за гідом (AI — рахується в бюджет AI).", "en": "Answers of the “Minerva” window about working in the system, based on the guide (AI — counted against the AI budget).", "de": "Antworten des „Minerva“-Fensters zur Arbeit im System anhand des Leitfadens (KI — wird auf das KI-Budget angerechnet)."}
 {"uk": "Відповіді віконця «Minerva» про товари за даташитами й каталогом (RAG по продукції); пошук агента по всіх даташитах («🧩 Завдання агенту», MCP).", "en": "Answers of the “Minerva” window about products based on datasheets and the catalog (RAG on products); agent search across all datasheets (“🧩 Agent tasks”, MCP).", "de": "Antworten des „Minerva“-Fensters zu Artikeln anhand von Datenblättern und Katalog (RAG zu Produkten); Agentensuche in allen Datenblättern („🧩 Agentenaufgaben“, MCP)."}
+{"uk": "Відповіді й листи клієнту замовлення: отримувач бачить, що лист написав ваш AI-помічник. Підпис — мовою листа, після тексту; підпис скриньки (ваше ім’я, фірма, адреса) — під ним, як завжди.", "en": "Replies and emails to the order’s customer: the recipient sees that your AI assistant wrote the email. The signature is in the email’s language, after the text; the mailbox signature (your name, company, address) follows below it as always.", "de": "Antworten und E-Mails an den Kunden der Bestellung: Der Empfänger sieht, dass Ihr KI-Assistent die E-Mail verfasst hat. Die Signatur steht in der Sprache der E-Mail nach dem Text; die Signatur des Postfachs (Ihr Name, Firma, Adresse) folgt wie immer darunter."}
 {"uk": "Відповіді немає за {0} с — RAG зайнятий або працює повільно.", "en": "No answer within {0} s — RAG is busy or slow.", "de": "Keine Antwort innerhalb von {0} s — RAG ist ausgelastet oder arbeitet langsam."}
 {"uk": "Відповіді перевіряє «🧪 Перевірити RAG».", "en": "The answers are checked by “🧪 Check RAG”.", "de": "Die Antworten prüft „🧪 RAG prüfen“."}
 {"uk": "Відповіді покупців", "en": "Customer replies", "de": "Antworten der Kunden"}
@@ -8508,6 +8513,7 @@
 {"uk": "Лише при помилках — попередження друк не зупиняють", "en": "Only on errors — warnings do not stop printing", "de": "Nur bei Fehlern — Warnungen stoppen den Druck nicht"}
 {"uk": "Лише продажі — без запитів пропозицій, скасованих і тестових; суми — у валюті Minerva.", "en": "Sales only — excluding quote requests, cancelled and test orders; amounts in the Minerva currency.", "de": "Nur Verkäufe — ohne Angebotsanfragen, stornierte und Testaufträge; Beträge in der Minerva-Währung."}
 {"uk": "Лише продажі: тип «Sale», не скасовані, «Впливає на склад» (без запитів пропозицій, зразків і тестового магазину). Сер. ціна — виручка рядків з ціною ÷ їхні штуки.", "en": "Sales only: type “Sale”, not cancelled, “Affects stock” (excluding quote requests, samples and the test shop). Avg. price — revenue of lines with a price ÷ their pieces.", "de": "Nur Verkäufe: Typ „Sale“, nicht storniert, „Wirkt sich auf den Bestand aus“ (ohne Angebotsanfragen, Muster und Testshop). Ø Preis — Umsatz der Positionen mit Preis ÷ deren Stückzahl."}
+{"uk": "Лише рядок наприкінці «Цей лист написав наш AI-помічник»", "en": "Only a line at the end: “This email was written by our AI assistant”", "de": "Nur eine Zeile am Ende: „Diese E-Mail hat unser KI-Assistent verfasst“"}
 {"uk": "Лише склад Minerva", "en": "Minerva stock only", "de": "Nur Minerva-Lager"}
 {"uk": "Лише текст тіла листа: без теми, без прощання й підпису (додаються самі), без Markdown.", "en": "Only the body text of the e-mail: no subject, no sign-off and signature (they are added automatically), no Markdown.", "de": "Nur der Text des E-Mail-Körpers: ohne Betreff, ohne Grußformel und Signatur (werden automatisch hinzugefügt), ohne Markdown."}
 {"uk": "Лише терміни дій або подій. Не бери дати минулих подій, дати в підписах, номери документів. Немає — [].", "en": "Only deadlines of actions or events. Do not take dates of past events, dates in signatures, document numbers. None — [].", "de": "Nur Fristen von Aktionen oder Terminen. Keine Daten vergangener Ereignisse, keine Daten in Signaturen, keine Dokumentnummern übernehmen. Keine — []."}
@@ -9357,6 +9363,8 @@
 {"uk": "Наприклад: Заблокувати спам", "en": "For example: Block spam", "de": "Zum Beispiel: Spam blockieren"}
 {"uk": "Наприклад: ТОВ Акустик або John's Workshop", "en": "For example: Akustik LLC or John's Workshop", "de": "Zum Beispiel: Akustik GmbH oder John's Workshop"}
 {"uk": "Наприклад: продано 30 шт за 3 міс = 10 шт/міс.", "en": "For example: 30 pcs sold in 3 months = 10 pcs/month.", "de": "Zum Beispiel: 30 Stk. in 3 Monaten verkauft = 10 Stk./Monat."}
+{"uk": "Наприкінці листа — підпис AI-помічника мовою листа (ім’я помічника, чий він, фірма); під ним — підпис скриньки.", "en": "At the end of the email — the AI assistant’s signature in the email’s language (assistant’s name, whose assistant, company); below it — the mailbox signature.", "de": "Am Ende der E-Mail — die Signatur des KI-Assistenten in der Sprache der E-Mail (Name des Assistenten, wessen Assistent, Firma); darunter — die Signatur des Postfachs."}
+{"uk": "Наприкінці листа — рядок «Цей лист написав наш AI-помічник» мовою листа.", "en": "At the end of the email — the line “This email was written by our AI assistant” in the email’s language.", "de": "Am Ende der E-Mail — die Zeile „Diese E-Mail hat unser KI-Assistent verfasst“ in der Sprache der E-Mail."}
 {"uk": "Наприкінці — короткий підсумок українською: що знайдено й запропоновано, чого не знайдено й чому.", "en": "At the end — a short summary in Ukrainian: what was found and proposed, what was not found and why.", "de": "Am Ende – eine kurze Zusammenfassung auf Ukrainisch: was gefunden und vorgeschlagen wurde, was nicht gefunden wurde und warum."}
 {"uk": "Наприкінці — рядок «Детальніше: [назва сторінки гіда](/guide/…/)» для головної сторінки, з якої відповідь.", "en": "At the end — a line “More details: [guide page name](/guide/…/)” for the main page the answer comes from.", "de": "Am Ende — eine Zeile „Mehr dazu: [Name der Leitfaden-Seite](/guide/…/)“ für die Hauptseite, aus der die Antwort stammt."}
 {"uk": "Напруга живлення", "en": "Supply voltage", "de": "Versorgungsspannung"}
@@ -11756,6 +11764,7 @@
 {"uk": "Порожньо — натисніть 📥 Стягнути поля з DigiKey.", "en": "Empty — click 📥 Pull fields from DigiKey.", "de": "Leer — auf 📥 Felder von DigiKey abrufen klicken."}
 {"uk": "Порожньо — рекомендована заміна з картки товару.", "en": "Empty — the recommended replacement from the product card.", "de": "Leer – der empfohlene Ersatz aus der Artikelkarte."}
 {"uk": "Порожньо — стандартна інструкція генерації відповіді", "en": "Empty — the standard reply-generation instruction", "de": "Leer — Standardanweisung zur Antworterstellung"}
+{"uk": "Порожньо — стандартний мовою листа (німецька, англійська, українська). Свій — однаковий для всіх листів; можна вставити {0} (ім’я помічника), {1} (ваше ім’я), {2} (фірма).", "en": "Empty — the standard one in the email’s language (German, English, Ukrainian). Your own — the same for all emails; you can insert {0} (assistant’s name), {1} (your name), {2} (company).", "de": "Leer — die Standardsignatur in der Sprache der E-Mail (Deutsch, Englisch, Ukrainisch). Eigene — für alle E-Mails gleich; Sie können {0} (Name des Assistenten), {1} (Ihr Name), {2} (Firma) einfügen."}
 {"uk": "Порожньо — стандартний шаблон Minerva (offers/templates_docx/offer_template.docx).", "en": "Empty — the standard Minerva template (offers/templates_docx/offer_template.docx).", "de": "Leer — Standardvorlage von Minerva (offers/templates_docx/offer_template.docx)."}
 {"uk": "Порожньо — термін зони", "en": "Empty — zone lead time", "de": "Leer – Lieferzeit der Zone"}
 {"uk": "Порожньо — усі активні скриньки.", "en": "Empty — all active mailboxes.", "de": "Leer – alle aktiven Postfächer."}
@@ -12538,6 +12547,8 @@
 {"uk": "Підпис", "en": "Signature", "de": "Unterschrift"}
 {"uk": "Підпис (для рахунків-фактур)", "en": "Signature (for invoices)", "de": "Unterschrift (für Rechnungen)"}
 {"uk": "Підпис (застарілий — використовуй підпис акаунту)", "en": "Signature (obsolete — use the account signature)", "de": "Signatur (veraltet — verwenden Sie die Kontosignatur)"}
+{"uk": "Підпис AI-помічника в листі", "en": "AI assistant signature in the email", "de": "Signatur des KI-Assistenten in der E-Mail"}
+{"uk": "Підпис AI-помічника — ім’я, чий помічник, фірма, як зв’язатися з вами", "en": "AI assistant signature — name, whose assistant, company, how to reach you", "de": "Signatur des KI-Assistenten — Name, wessen Assistent, Firma, wie man Sie erreicht"}
 {"uk": "Підпис для цього акаунту. {0} = ваше ім'я. Якщо порожньо — береться з профілю.", "en": "Signature for this account. {0} = your name. If empty, it is taken from the profile.", "de": "Signatur für dieses Konto. {0} = Ihr Name. Wenn leer, wird sie aus dem Profil übernommen."}
 {"uk": "Підпис кнопки з посиланням (якщо лист його має).", "en": "Caption of the link button (if the e-mail has one).", "de": "Beschriftung der Link-Schaltfläche (falls die E-Mail eine hat)."}
 {"uk": "Підпис листа", "en": "E-mail signature", "de": "E-Mail-Signatur"}
@@ -12630,6 +12641,7 @@
 {"uk": "Підтримується формат .xlsx", "en": "The .xlsx format is supported", "de": "Das Format .xlsx wird unterstützt"}
 {"uk": "Пізніше", "en": "Later", "de": "Später"}
 {"uk": "Після", "en": "After", "de": "Nach"}
+{"uk": "Після «Зберегти» — за новими налаштуваннями. Під ним, як завжди, — підпис скриньки.", "en": "After “Save” — with the new settings. Below it, as always, — the mailbox signature.", "de": "Nach „Speichern“ — mit den neuen Einstellungen. Darunter wie immer — die Signatur des Postfachs."}
 {"uk": "Після «Зберегти» — одразу оновити ціну на DigiKey (з новими базовими цінами, правила — «💲 Налаштування цін DigiKey»)", "en": "After “Save” — update the price on DigiKey immediately (with the new base prices, rules from “💲 DigiKey price settings”)", "de": "Nach „Speichern“ — den Preis sofort auf DigiKey aktualisieren (mit den neuen Basispreisen, Regeln aus „💲 DigiKey-Preiseinstellungen“)"}
 {"uk": "Після впровадження", "en": "After implementation", "de": "Nach der Einführung"}
 {"uk": "Після завершення можна застосувати ціни прямо тут.", "en": "Once finished, you can apply the prices right here.", "de": "Nach Abschluss können Sie die Preise direkt hier übernehmen."}
@@ -13152,6 +13164,7 @@
 {"uk": "Свій курс: 1 валюта Minerva = … валюти DigiKey", "en": "Own rate: 1 Minerva currency = … DigiKey currency", "de": "Eigener Kurs: 1 Minerva-Währung = … DigiKey-Währung"}
 {"uk": "Свій прихід", "en": "Own clock-in", "de": "Eigenes Kommen"}
 {"uk": "Свій статус у магазині", "en": "Own status in the shop", "de": "Eigener Status im Shop"}
+{"uk": "Свій текст підпису", "en": "Custom signature text", "de": "Eigener Signaturtext"}
 {"uk": "Світла", "en": "Light", "de": "Hell"}
 {"uk": "Світлий текст на світлому фоні (і навпаки) стає темнішим чи світлішим — відтінок той самий.", "en": "Light text on a light background (and vice versa) becomes darker or lighter — the hue stays the same.", "de": "Heller Text auf hellem Hintergrund (und umgekehrt) wird dunkler bzw. heller — der Farbton bleibt gleich."}
 {"uk": "Сеанс завершено", "en": "Session ended", "de": "Sitzung beendet"}
@@ -13507,6 +13520,7 @@
 {"uk": "Спершу задайте тут адресу й ключ помічника — інакше без файлу чат на сайті зупиниться.", "en": "First set the assistant address and key here — otherwise, without the file, the chat on the site will stop.", "de": "Legen Sie zuerst hier Adresse und Schlüssel des Assistenten fest — andernfalls stoppt der Chat auf der Website ohne die Datei."}
 {"uk": "Спершу заповніть «Ціна закупки» (у валюті базових цін).", "en": "First fill in “Purchase price” (in the base price currency).", "de": "Füllen Sie zuerst „Einkaufspreis“ aus (in der Währung der Basispreise)."}
 {"uk": "Спершу збережіть доручення — тоді тут можна перевірити його на листах скриньки.", "en": "Save the instruction first — then you can check it on the mailbox's emails here.", "de": "Speichern Sie den Auftrag zuerst — dann können Sie ihn hier an den E-Mails des Postfachs prüfen."}
+{"uk": "Спершу збережіть доручення.", "en": "Save the rule first.", "de": "Speichern Sie zuerst die Regel."}
 {"uk": "Спершу збережіть магазин — тоді тут з'являться кроки підключення й підказки.", "en": "Save the shop first — then the connection steps and hints will appear here.", "de": "Speichern Sie zuerst den Shop — dann erscheinen hier die Anbindungsschritte und Hinweise."}
 {"uk": "Спершу збережіть магазин.", "en": "Save the shop first.", "de": "Speichern Sie zuerst den Shop."}
 {"uk": "Спершу збережіть правило. На сторінці видно для кожного товару, яке посилання буде, чи воно відповідає, і що зміниться; записуються лише вибрані рядки.", "en": "Save the rule first. The page shows for each product which link it will be, whether it matches, and what will change; only the selected rows are saved.", "de": "Speichern Sie zuerst die Regel. Die Seite zeigt für jeden Artikel, welcher Link entsteht, ob er passt und was sich ändert; es werden nur die ausgewählten Zeilen gespeichert."}
@@ -15840,6 +15854,7 @@
 {"uk": "Як бачить Minerva: {0}", "en": "Minerva as seen by: {0}", "de": "Minerva aus Sicht von: {0}"}
 {"uk": "Як бачить покупець", "en": "As the buyer sees it", "de": "So sieht es der Käufer"}
 {"uk": "Як було", "en": "As it was", "de": "Wie vorher"}
+{"uk": "Як виглядатиме", "en": "How it will look", "de": "So wird es aussehen"}
 {"uk": "Як визначається доступ (за пріоритетом)", "en": "How access is determined (by priority)", "de": "Wie der Zugriff ermittelt wird (nach Priorität)"}
 {"uk": "Як виставити рахунок", "en": "How to issue an invoice", "de": "So stellen Sie eine Rechnung aus"}
 {"uk": "Як вони мають збігатися (кур'єрські посилки)", "en": "How they must match (courier parcels)", "de": "Wie sie übereinstimmen müssen (Kurierpakete)"}
