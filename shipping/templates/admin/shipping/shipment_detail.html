@@ -219,6 +219,102 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 {% block content %}
 <div class="sd-wrap">
 
+  <!-- ── Header ── -->
+  <div class="sd-header">
+    <div>
+      <div class="sd-title">
+        <span class="sd-id">{% if shipment.direction == 'in' %}📥 {% endif %}#{{ shipment.pk }}</span>
+        {% if shipment.direction == 'in' %}
+        <span class="sd-name">{{ shipment.sender_company|default:"Вхідна посилка" }}</span>
+        {% else %}
+        <span class="sd-name">{{ shipment.recipient_name }}</span>
+        {% if shipment.recipient_company %}
+        <span class="sd-company">{{ shipment.recipient_company }}</span>
+        {% endif %}
+        {% endif %}
+      </div>
+      <div class="sd-meta">
+        {{ shipment.carrier.name|default:"{% trans 'Без перевізника' %}" }}
+        <span class="sd-dot">·</span>
+        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% elif shipment.direction == 'in' %}{% if shipment.purchase_order %}<a href="{% url 'admin:inventory_purchaseorder_change' shipment.purchase_order_id %}">🛒 {{ shipment.purchase_order.code }}</a>{% else %}📥 До нас{% endif %}{% else %}<form method="post" action="{% url 'admin:shipping_shipment_create_order' shipment.pk %}" style="display:inline">{% csrf_token %}<button type="submit" style="background:none;border:none;cursor:pointer;color:var(--link-fg);font-size:12px;padding:0;text-decoration:underline" onclick="return confirm('{% trans "Створити нове замовлення на основі цього відправлення?" %}')">➕ {% trans "Без замовлення — натисни щоб створити" %}</button></form>{% endif %}
+        <span class="sd-dot">·</span>
+        {% trans "Створено" %} {{ shipment.created_at|date:"d.m.Y H:i" }}
+        {% if shipment.submitted_at %}
+        <span class="sd-dot">·</span>
+        {% trans "Надіслано" %} {{ shipment.submitted_at|date:"d.m.Y H:i" }}
+        {% endif %}
+      </div>
+    </div>
+    <span class="sd-status-badge sd-status-{{ shipment.status }}">
+      {% if shipment.status == "draft" %}⬜
+      {% elif shipment.status == "submitted" %}📤
+      {% elif shipment.status == "label_ready" %}🏷️
+      {% elif shipment.status == "in_transit" %}🚚
+      {% elif shipment.status == "delivered" %}✅
+      {% elif shipment.status == "error" %}❌
+      {% elif shipment.status == "cancelled" %}🚫
+      {% endif %}
+      {{ shipment.get_status_display }}
+    </span>
+  </div>
+
+  <!-- ── Error banner ── -->
+  {% if shipment.status == "error" %}
+  <div class="sd-error-block">
+    <span style="font-size:20px;flex-shrink:0">❌</span>
+    <div>
+      <div class="sd-error-title">{% trans "Помилка при оформленні відправлення" %}</div>
+      <div class="sd-error-msg">{{ shipment.error_message|default:"{% trans 'Невідома помилка' %}" }}</div>
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+        <a href="{% url 'admin:shipping_shipment_edit_draft' shipment.pk %}" class="sd-btn sd-btn-green" style="display:inline-block;width:auto;padding:8px 18px">
+          ✏️ {% trans "Виправити і повторити" %}
+        </a>
+        {% if raw_request or raw_response %}
+        <a href="#debug" class="sd-btn sd-btn-ghost" style="display:inline-block;width:auto;padding:8px 18px">
+          🔍 Debug
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% elif shipment.status == "cancelled" %}
+  <div class="sd-info-block" style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+    <span>🚫 {% if ups_void_info %}{% trans "Відправлення скасовано в UPS (Void)" %} {{ ups_void_info.at }} · {{ ups_void_info.id }}.{% else %}{% trans "Відправлення скасовано." %}{% endif %}</span>
+    <form method="post" action="{% url 'admin:shipping_shipment_clone' shipment.pk %}" style="margin:0;flex-shrink:0">
+      {% csrf_token %}
+      <button type="submit"
+        onclick="return confirm('{% trans "Створити нове відправлення на основі" %} #{{ shipment.pk }}?\n\n{% trans "Всі дані отримувача, параметри посилки і митна декларація будуть скопійовані." %}')"
+        class="sd-btn sd-btn-green" style="border:none;cursor:pointer;padding:8px 18px;display:inline-block">
+        🔁 {% trans "Повторити відправлення" %}
+      </button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- ── Timeline ── -->
+  {% if show_timeline %}
+  <div class="sd-timeline-wrap">
+    <div class="sd-timeline">
+      {% for step in timeline %}
+      <div class="sd-tl-item sd-tl-{{ step.state }}{% if step.delay_reason %} sd-tl-delay{% endif %}">
+        <div class="sd-tl-dot"></div>
+        <div class="sd-tl-label">{{ step.label }}</div>
+        {% if step.carrier_note %}
+        <div class="sd-tl-carrier-note">{{ step.carrier_note|truncatechars:60 }}</div>
+        {% elif step.delay_reason %}
+        <div class="sd-tl-delay-reason">📦 {{ step.delay_reason }}</div>
+        {% endif %}
+      </div>
+      {% if not step.is_last %}
+      <div class="sd-tl-line {% if step.state == 'done' %}sd-tl-line-done{% endif %}"></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+
   {% if shop_confirm %}
   {% if shop_confirm.dk_wait %}
   {# DigiKey приймає лише все замовлення разом: посилка частини — чекаємо решту (shipping/services/parcels.shop_plan) #}
@@ -404,9 +500,13 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   {% if agent_next %}
   <!-- ── 🤖 Агент відправки: що далі (shipping/services/ship_advice.after_booking) ── -->
   <div class="agn" id="agn">
-    <div class="agn-head">
-      <b>🤖 Агент відправки: що далі</b>
-      <span class="agn-muted">Посилку оформлено — ще кілька кроків, і можна братися за наступне замовлення.</span>
+    <div class="agn-head agn-head-row">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <b>🤖 Агент відправки: що далі</b>
+        <span class="agn-muted">Посилку оформлено — ще кілька кроків, і можна братися за наступне замовлення.</span>
+        <div class="agn-sum" id="agn-sum"></div>
+      </div>
+      <button type="button" class="agn-btn agn-fold" id="agn-fold" aria-expanded="true" style="display:none">▴ Згорнути</button>
     </div>
     <ol class="agn-steps">
       <li class="agn-step" id="agn-s-print">
@@ -510,6 +610,15 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     .agn-report .bad { color:var(--err); }
     .agn-report button { background:none; border:1px solid var(--border-strong); color:var(--link-fg); border-radius:4px;
                          padding:2px 8px; font-size:12px; cursor:pointer; margin:2px 4px 0 0; }
+    .agn-head-row { flex-direction:row; justify-content:space-between; align-items:flex-start; gap:10px; }
+    .agn-fold { padding:4px 10px; font-size:12px; flex-shrink:0; }
+    .agn-sum { display:none; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .agn.agn-closed .agn-steps { display:none; }
+    .agn.agn-closed .agn-sum { display:flex; }
+    .agn.agn-closed .agn-head { margin-bottom:0; }
+    .agn-chip { border:1px solid var(--border-strong); border-radius:12px; padding:2px 10px; font-size:12px; color:var(--text-muted); }
+    .agn-chip.done { color:var(--ok, #2e7d32); border-color:var(--ok, #2e7d32); }
+    .agn-chip.now { color:var(--link-fg); border-color:var(--link-fg); font-weight:700; }
   </style>
   <script>
   (function () {
@@ -528,6 +637,38 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
         s.classList.remove('now');
         if (!found && s.dataset.done !== '1') { s.classList.add('now'); found = true; }
       });
+      summary();
+    }
+    // Згорнутий агент — рядок кроків «1 🖨️ Друк ✓ · 2 …»; високий блок згортається сам, вибір людини
+    // запам'ятовується (localStorage agn-fold: open / closed)
+    var box = document.getElementById('agn'), fold = document.getElementById('agn-fold'),
+        sum = document.getElementById('agn-sum'), FOLD_KEY = 'agn-fold', TALL = 260;
+    function summary() {
+      if (!sum) return;
+      sum.innerHTML = '';
+      document.querySelectorAll('#agn .agn-step').forEach(function (s) {
+        var h = s.querySelector('.agn-step-h'), chip = document.createElement('span');
+        var t = h ? h.cloneNode(true) : null;
+        if (t) t.querySelectorAll('.agn-ok').forEach(function (x) { x.remove(); });
+        chip.className = 'agn-chip' + (s.dataset.done === '1' ? ' done' : s.classList.contains('now') ? ' now' : '');
+        chip.textContent = (t ? t.textContent.replace(/\s+/g, ' ').trim() : '') + (s.dataset.done === '1' ? ' ✓' : '');
+        sum.appendChild(chip);
+      });
+    }
+    function setFold(closed, remember) {
+      box.classList.toggle('agn-closed', closed);
+      fold.textContent = closed ? '▾ Розгорнути' : '▴ Згорнути';
+      fold.setAttribute('aria-expanded', closed ? 'false' : 'true');
+      if (remember) { try { localStorage.setItem(FOLD_KEY, closed ? 'closed' : 'open'); } catch (e) {} }
+    }
+    if (box && fold) {
+      var saved = null;
+      try { saved = localStorage.getItem(FOLD_KEY); } catch (e) {}
+      var tall = box.offsetHeight > TALL;
+      if (tall || saved === 'closed') fold.style.display = '';
+      setFold(saved === 'closed' || (saved !== 'open' && tall), false);
+      fold.addEventListener('click', function () { setFold(!box.classList.contains('agn-closed'), true); });
+      sum.addEventListener('click', function () { setFold(false, true); });
     }
     function printedAt(t) {
       document.getElementById('agn-s-print').dataset.done = '1';
@@ -599,101 +740,6 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     });
   })();
   </script>
-  {% endif %}
-
-  <!-- ── Header ── -->
-  <div class="sd-header">
-    <div>
-      <div class="sd-title">
-        <span class="sd-id">{% if shipment.direction == 'in' %}📥 {% endif %}#{{ shipment.pk }}</span>
-        {% if shipment.direction == 'in' %}
-        <span class="sd-name">{{ shipment.sender_company|default:"Вхідна посилка" }}</span>
-        {% else %}
-        <span class="sd-name">{{ shipment.recipient_name }}</span>
-        {% if shipment.recipient_company %}
-        <span class="sd-company">{{ shipment.recipient_company }}</span>
-        {% endif %}
-        {% endif %}
-      </div>
-      <div class="sd-meta">
-        {{ shipment.carrier.name|default:"{% trans 'Без перевізника' %}" }}
-        <span class="sd-dot">·</span>
-        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% elif shipment.direction == 'in' %}{% if shipment.purchase_order %}<a href="{% url 'admin:inventory_purchaseorder_change' shipment.purchase_order_id %}">🛒 {{ shipment.purchase_order.code }}</a>{% else %}📥 До нас{% endif %}{% else %}<form method="post" action="{% url 'admin:shipping_shipment_create_order' shipment.pk %}" style="display:inline">{% csrf_token %}<button type="submit" style="background:none;border:none;cursor:pointer;color:var(--link-fg);font-size:12px;padding:0;text-decoration:underline" onclick="return confirm('{% trans "Створити нове замовлення на основі цього відправлення?" %}')">➕ {% trans "Без замовлення — натисни щоб створити" %}</button></form>{% endif %}
-        <span class="sd-dot">·</span>
-        {% trans "Створено" %} {{ shipment.created_at|date:"d.m.Y H:i" }}
-        {% if shipment.submitted_at %}
-        <span class="sd-dot">·</span>
-        {% trans "Надіслано" %} {{ shipment.submitted_at|date:"d.m.Y H:i" }}
-        {% endif %}
-      </div>
-    </div>
-    <span class="sd-status-badge sd-status-{{ shipment.status }}">
-      {% if shipment.status == "draft" %}⬜
-      {% elif shipment.status == "submitted" %}📤
-      {% elif shipment.status == "label_ready" %}🏷️
-      {% elif shipment.status == "in_transit" %}🚚
-      {% elif shipment.status == "delivered" %}✅
-      {% elif shipment.status == "error" %}❌
-      {% elif shipment.status == "cancelled" %}🚫
-      {% endif %}
-      {{ shipment.get_status_display }}
-    </span>
-  </div>
-
-  <!-- ── Error banner ── -->
-  {% if shipment.status == "error" %}
-  <div class="sd-error-block">
-    <span style="font-size:20px;flex-shrink:0">❌</span>
-    <div>
-      <div class="sd-error-title">{% trans "Помилка при оформленні відправлення" %}</div>
-      <div class="sd-error-msg">{{ shipment.error_message|default:"{% trans 'Невідома помилка' %}" }}</div>
-      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
-        <a href="{% url 'admin:shipping_shipment_edit_draft' shipment.pk %}" class="sd-btn sd-btn-green" style="display:inline-block;width:auto;padding:8px 18px">
-          ✏️ {% trans "Виправити і повторити" %}
-        </a>
-        {% if raw_request or raw_response %}
-        <a href="#debug" class="sd-btn sd-btn-ghost" style="display:inline-block;width:auto;padding:8px 18px">
-          🔍 Debug
-        </a>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-
-  {% elif shipment.status == "cancelled" %}
-  <div class="sd-info-block" style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-    <span>🚫 {% if ups_void_info %}{% trans "Відправлення скасовано в UPS (Void)" %} {{ ups_void_info.at }} · {{ ups_void_info.id }}.{% else %}{% trans "Відправлення скасовано." %}{% endif %}</span>
-    <form method="post" action="{% url 'admin:shipping_shipment_clone' shipment.pk %}" style="margin:0;flex-shrink:0">
-      {% csrf_token %}
-      <button type="submit"
-        onclick="return confirm('{% trans "Створити нове відправлення на основі" %} #{{ shipment.pk }}?\n\n{% trans "Всі дані отримувача, параметри посилки і митна декларація будуть скопійовані." %}')"
-        class="sd-btn sd-btn-green" style="border:none;cursor:pointer;padding:8px 18px;display:inline-block">
-        🔁 {% trans "Повторити відправлення" %}
-      </button>
-    </form>
-  </div>
-  {% endif %}
-
-  <!-- ── Timeline ── -->
-  {% if show_timeline %}
-  <div class="sd-timeline-wrap">
-    <div class="sd-timeline">
-      {% for step in timeline %}
-      <div class="sd-tl-item sd-tl-{{ step.state }}{% if step.delay_reason %} sd-tl-delay{% endif %}">
-        <div class="sd-tl-dot"></div>
-        <div class="sd-tl-label">{{ step.label }}</div>
-        {% if step.carrier_note %}
-        <div class="sd-tl-carrier-note">{{ step.carrier_note|truncatechars:60 }}</div>
-        {% elif step.delay_reason %}
-        <div class="sd-tl-delay-reason">📦 {{ step.delay_reason }}</div>
-        {% endif %}
-      </div>
-      {% if not step.is_last %}
-      <div class="sd-tl-line {% if step.state == 'done' %}sd-tl-line-done{% endif %}"></div>
-      {% endif %}
-      {% endfor %}
-    </div>
-  </div>
   {% endif %}
 
   {% include "admin/shipping/_parcel_card.html" %}
@@ -941,6 +987,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             <span class="sd-info-key">{% trans "Трекінг-номер" %}</span>
             <span class="sd-info-val sd-tracking">
               {% if tracking_url %}<a href="{{ tracking_url }}" target="_blank" rel="noopener" class="sd-tracking" style="text-decoration:underline dotted">{{ shipment.tracking_number }}</a>{% else %}{{ shipment.tracking_number }}{% endif %}
+            </span>
+          </div>
+          {% endif %}
+          {% if shipment.package_tracking %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">📦 {% trans "Коробки" %}</span>
+            <span class="sd-info-val sd-mono sd-small" translate="no">
+              {% for t in shipment.package_tracking %}<div>{{ forloop.counter }}/{{ shipment.package_tracking|length }} · {% if shipment.carrier.carrier_type == "ups" %}<a href="https://www.ups.com/track?tracknum={{ t|urlencode }}" target="_blank" rel="noopener">{{ t }}</a>{% else %}{{ t }}{% endif %}</div>{% endfor %}
             </span>
           </div>
           {% endif %}
@@ -1384,6 +1438,25 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
               </div>
             </form>
           </div>
+          {% elif shipment.tracking_number and shipment.status != "cancelled" %}
+          <details class="sd-divider" id="fix-tracking" {% if request.GET.fix %}open{% endif %}>
+            <summary class="sd-section-label" style="cursor:pointer">✏️ {% trans "Виправити трек-номер / номери коробок" %}</summary>
+            <form method="post" action="{% url 'admin:shipping_shipment_set_tracking' shipment.pk %}"
+                  onsubmit="return confirm('{% trans "Зберегти нові трек-номери цієї посилки?" %}')">
+              {% csrf_token %}
+              <label style="display:block;font-size:12px;margin:6px 0 2px">{% trans "Трек-номер відправлення (як на етикетці)" %}</label>
+              <input type="text" name="tracking_number" value="{{ shipment.tracking_number }}" class="sd-field-input" translate="no">
+              <label style="display:block;font-size:12px;margin:8px 0 2px">{% trans "Номери коробок — кожен з нової строки (якщо коробок кілька)" %}</label>
+              <textarea name="package_tracking" rows="3" class="sd-field-input" translate="no" style="width:100%;font-family:monospace">{% for t in shipment.package_tracking %}{{ t }}
+{% endfor %}</textarea>
+              <button type="submit" class="sd-btn-save-sm" style="margin-top:6px">💾 {% trans "Зберегти" %}</button>
+            </form>
+            {% if shipment.order_id %}
+            <div class="sd-section-note">
+              <a href="{% url 'admin:shipping_shipment_repair_tracking' %}?order={{ shipment.order_id }}">🔧 {% trans "Автоперевірка номерів посилок цього замовлення" %}</a>
+            </div>
+            {% endif %}
+          </details>
           {% endif %}
 
           <!-- Manual Jumingo ID -->
@@ -1405,6 +1478,158 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
                 <button type="submit" class="sd-btn-save-sm">💾 {% trans "Зберегти" %}</button>
               </div>
             </form>
+          </div>
+          {% endif %}
+
+          <!-- 📑 ABD (Ausfuhrbegleitdokument) в UPS -->
+          {% if abd.abd_ok %}
+          <div class="sd-divider" id="ups-abd">
+            <details id="abd-box" {% if not abd.abd_sent %}open{% endif %}>
+            <summary class="sd-section-label" style="cursor:pointer">📑 {% trans "Документи для митниці в UPS" %}{% if abd.abd_parcels > 1 %} · {% trans "посилка" %} {{ abd.abd_parcel_no }}/{{ abd.abd_parcels }}{% endif %}{% if abd.abd_sent %} · <span style="color:var(--ok)">✅ {% trans "надіслано" %}: {{ abd.abd_sent|length }}</span>{% endif %}</summary>
+            {% for s in abd.abd_sent %}
+            <div class="sd-section-note" style="color:var(--ok)">✅ {% trans "Надіслано" %} {{ s.when }} · {{ s.type_name }} · <span translate="no">{{ s.name }}</span></div>
+            {% endfor %}
+            {% if abd.abd_can %}
+            <form method="post" action="{{ abd.abd_url }}" enctype="multipart/form-data" style="margin-top:6px" id="abd-form">
+              {% csrf_token %}
+              {% for f in abd.abd_files %}
+              <div style="margin:6px 0;padding:6px 8px;border:1px solid var(--border,#2c3a47);border-radius:6px;font-size:12.5px{% if f.here is False or f.sent_here %};opacity:.75{% endif %}">
+                <label style="cursor:pointer;display:flex;gap:6px;align-items:flex-start">
+                  <input type="checkbox" name="doc" value="{{ f.ref }}" {% if f.checked %}checked{% endif %} style="margin-top:3px">
+                  <span style="flex:1;min-width:0">
+                    {% if f.source == "mail" %}✉️{% else %}📁{% endif %} <b translate="no" style="word-break:break-all">{{ f.name }}</b>
+                    <span style="color:var(--text-dim)">· {{ f.date|date:"d.m.Y H:i" }}{% if f.mrn %} · MRN <span translate="no">{{ f.mrn }}</span>{% endif %}</span>
+                  </span>
+                  <button type="button" class="button" style="padding:1px 8px"
+                    title="{% trans 'Швидкий перегляд документа' %}"
+                    data-abd-view="{{ abd.abd_preview_url }}?ref={{ f.ref|urlencode }}" data-abd-name="{{ f.name }}">👁</button>
+                </label>
+                <div style="margin:4px 0 0 22px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+                  <select name="type_{{ f.ref }}" style="font-size:12px;max-width:100%">
+                    {% for code, name, de, hint in abd.abd_types %}<option value="{{ code }}" title="{{ hint }}" {% if code == f.type %}selected{% endif %}>{{ name }} ({{ de }})</option>{% endfor %}
+                  </select>
+                  {% if f.type_why %}<span style="color:var(--text-dim);font-size:11.5px">🔎 {% trans "тип:" %} {{ f.type_why }}</span>{% endif %}
+                </div>
+                <div style="margin:3px 0 0 22px;font-size:11.5px">
+                  {% if f.sent_here %}<span style="color:var(--ok)">✅ {% trans "вже надіслано до цієї посилки" %}</span>
+                  {% elif f.sent_to %}<span style="color:var(--warn,#ef6c00)">↪ {% trans "вже надіслано до посилки" %} {{ f.sent_to|join:", " }}</span>{% endif %}
+                  {% if f.here is True %}<span style="color:var(--ok)">⭐ {% trans "для цієї посилки" %}: {{ f.match_why }}</span>
+                  {% elif f.here is False %}<span style="color:var(--warn,#ef6c00)">⚠️ {% trans "схоже, для іншої посилки" %}: {{ f.match_why }}</span>
+                  {% elif f.match_why and not f.sent_here %}<span style="color:var(--text-dim)">ℹ️ {{ f.match_why }}</span>{% endif %}
+                </div>
+              </div>
+              {% empty %}
+              <div class="sd-section-note">{% trans "У листах замовлення (ваші скриньки) і документах замовлення митних документів не знайдено — виберіть файли з ПК." %}</div>
+              {% endfor %}
+              <div style="margin:8px 0;font-size:12.5px">
+                {% if abd.abd_files %}{% trans "або файли з ПК:" %}{% endif %}
+                <input type="file" name="pc_file" id="abd-file" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.doc,.docx,.rtf,.txt,.xls,.xlsx">
+                <button type="button" class="button" style="padding:1px 8px" data-abd-local
+                  title="{% trans 'Швидкий перегляд вибраного файлу' %}">👁</button>
+                <div style="margin-top:4px">
+                  <select name="pc_type" id="abd-pc-type" style="font-size:12px;max-width:100%">
+                    {% for code, name, de, hint in abd.abd_types %}<option value="{{ code }}" title="{{ hint }}">{{ name }} ({{ de }})</option>{% endfor %}
+                  </select>
+                  <span id="abd-pc-why" style="color:var(--text-dim);font-size:11.5px"></span>
+                </div>
+              </div>
+              <button type="submit" class="button default"
+                onclick="return confirm('{% trans "Надіслати вибрані документи в UPS до цієї посилки?" %}')">
+                📑 {% trans "Надіслати в UPS" %}
+              </button>
+              <span style="font-size:11.5px;color:var(--text-dim)">· {% trans "ще можна" %}: {{ abd.abd_left }}</span>
+            </form>
+            <details class="sd-section-note" style="margin-top:6px">
+              <summary style="cursor:pointer">❓ {% trans "Які документи потрібні й що куди" %}</summary>
+              <div style="margin-top:4px">
+                {% trans "Документи прив’язуються до вже оформленої посилки (UPS Paperless). Файл до 10 МБ, до 13 документів на посилку. Копія — у документах замовлення. Тип Minerva визначає за назвою й текстом файлу; посилку — за трек-номером або MRN у документі, інакше підказує за датою." %}
+                <ul style="margin:6px 0 0 16px;padding:0">
+                  {% for code, name, de, hint in abd.abd_types %}<li style="margin:2px 0"><b>{{ name }}</b> <span style="color:var(--text-dim)">· ups.com: «{{ de }}»</span><br>{{ hint }}</li>{% endfor %}
+                </ul>
+              </div>
+            </details>
+            <script>
+            (function () {
+              var f = document.getElementById('abd-file'), sel = document.getElementById('abd-pc-type'),
+                  why = document.getElementById('abd-pc-why');
+              if (!f || !sel) return;
+              var RULES = [['004', /ausfuhrbegleit|export.?accompanying|\babd\b|\bmrn\b/i],
+                           ['010', /pack(ing)?.?list|packliste|lieferschein/i],
+                           ['003', /certificate.?of.?origin|ursprungszeugnis/i],
+                           ['005', /export.?licen|ausfuhrgenehmigung/i],
+                           ['009', /power.?of.?attorney|vollmacht/i],
+                           ['002', /commercial.?invoice|handelsrechnung|pro.?forma|rechnung|invoice/i],
+                           ['013', /declaration|erkl(ä|ae)rung/i]];
+              f.addEventListener('change', function () {
+                if (!f.files.length) { why.textContent = ''; return; }
+                var name = f.files[0].name.replace(/_/g, ' ');
+                for (var i = 0; i < RULES.length; i++) {
+                  if (RULES[i][1].test(name)) { sel.value = RULES[i][0]; why.textContent = '🔎 {% trans "тип за назвою файлу" %}'; return; }
+                }
+                why.textContent = '{% trans "тип не визначено — виберіть" %}';
+              });
+            })();
+            </script>
+            {% endif %}
+            </details>
+            {% if abd.abd_can %}
+            <div id="abd-pv" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.6);align-items:center;justify-content:center"
+                 role="dialog" aria-modal="true">
+              <div style="background:var(--bg-card,#1b2530);border:1px solid var(--border-2,#33475b);border-radius:10px;width:min(920px,94vw);height:88vh;display:flex;flex-direction:column;overflow:hidden">
+                <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border,#2c3a47)">
+                  <b>👁 {% trans "Перегляд" %}:</b> <span id="abd-pv-name" translate="no" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                  <a id="abd-pv-open" href="#" target="_blank" rel="noopener" class="button" style="padding:2px 8px">↗ {% trans "Нова вкладка" %}</a>
+                  <button type="button" class="button" style="padding:2px 10px" data-abd-close>✕</button>
+                </div>
+                <div id="abd-pv-body" style="flex:1;background:#fff;display:flex;align-items:center;justify-content:center;overflow:auto"></div>
+              </div>
+            </div>
+            <script>
+            (function () {
+              var box = document.getElementById('abd-pv'), body = document.getElementById('abd-pv-body'),
+                  nameEl = document.getElementById('abd-pv-name'), openEl = document.getElementById('abd-pv-open'),
+                  local = null;
+              if (!box) return;
+              function show(url, name, isImg) {
+                body.textContent = '';
+                var el = document.createElement(isImg ? 'img' : 'iframe');
+                el.src = url;
+                if (isImg) { el.style.maxWidth = '100%'; el.style.maxHeight = '100%'; }
+                else { el.style.width = '100%'; el.style.height = '100%'; el.style.border = '0'; }
+                body.appendChild(el);
+                nameEl.textContent = name || '';
+                openEl.href = url;
+                box.style.display = 'flex';
+              }
+              function close() {
+                box.style.display = 'none'; body.textContent = '';
+                if (local) { URL.revokeObjectURL(local); local = null; }
+              }
+              var IMG = /\.(png|jpe?g|gif|bmp)$/i, VIEW = /\.(pdf|png|jpe?g|gif|bmp|txt)$/i;
+              document.addEventListener('click', function (e) {
+                var b = e.target.closest('[data-abd-view]');
+                if (b) {
+                  e.preventDefault();
+                  var n = b.getAttribute('data-abd-name');
+                  if (!VIEW.test(n)) { window.open(b.getAttribute('data-abd-view'), '_blank'); return; }
+                  show(b.getAttribute('data-abd-view'), n, IMG.test(n)); return;
+                }
+                if (e.target.closest('[data-abd-local]')) {
+                  e.preventDefault();
+                  var f = document.getElementById('abd-file');
+                  if (!f || !f.files.length) { alert('{% trans "Спершу виберіть файл з ПК." %}'); return; }
+                  var file = f.files[0];
+                  if (!VIEW.test(file.name)) { alert('{% trans "Цей тип файлу браузер не показує — перегляд лише для PDF, картинок і TXT." %}'); return; }
+                  if (local) URL.revokeObjectURL(local);
+                  local = URL.createObjectURL(file);
+                  show(local, file.name, IMG.test(file.name)); return;
+                }
+                if (e.target.closest('[data-abd-close]') || e.target === box) close();
+              });
+              document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && box.style.display === 'flex') close(); });
+            })();
+            </script>
+            {% endif %}
           </div>
           {% endif %}
 

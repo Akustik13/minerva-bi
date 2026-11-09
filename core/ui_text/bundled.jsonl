@@ -721,6 +721,8 @@
 {"uk": "?with_stock=1 додає", "en": "?with_stock=1 adds", "de": "?with_stock=1 fügt hinzu"}
 {"uk": "@username_каналу", "en": "@channel_username", "de": "@Kanal_username"}
 {"uk": "A — з шаблону, B — файл з бази, E — поправлено вручну", "en": "A — from the template, B — file from the database, E — corrected manually", "de": "A — aus der Vorlage, B — Datei aus der Datenbank, E — manuell korrigiert"}
+{"uk": "ABD «{0}» надіслано в UPS і прив'язано до {1}.", "en": "ABD «{0}» sent to UPS and attached to {1}.", "de": "ABD «{0}» an UPS gesendet und mit {1} verknüpft."}
+{"uk": "ABD в UPS — лише для оформленого відправлення UPS з номером 1Z….", "en": "ABD to UPS — only for a booked UPS shipment with a 1Z… number.", "de": "ABD an UPS — nur für eine gebuchte UPS-Sendung mit 1Z…-Nummer."}
 {"uk": "ACL: інша скринька — лист не повертається", "en": "ACL: another mailbox — the e-mail is not returned", "de": "ACL: anderes Postfach — E-Mail wird nicht zurückgegeben"}
 {"uk": "ACL: інший користувач не бачить лист", "en": "ACL: another user does not see the e-mail", "de": "ACL: anderer Benutzer sieht die E-Mail nicht"}
 {"uk": "AI ({0}, сьогодні {1} з {2}, ≈ {3})", "en": "AI ({0}, today {1} of {2}, ≈ {3})", "de": "KI ({0}, heute {1} von {2}, ≈ {3})"}
@@ -908,6 +910,7 @@
 {"uk": "Applications — застосування", "en": "Applications — uses", "de": "Applications — Anwendungen"}
 {"uk": "At Risk клієнти", "en": "At Risk customers", "de": "At-Risk-Kunden"}
 {"uk": "Atkinson Hyperlegible — безкоштовний шрифт для людей зі слабким зором; встановіть його на ПК, інакше Minerva візьме Verdana. Курсив — звичайним напівжирним.", "en": "Atkinson Hyperlegible is a free font for people with low vision; install it on your PC, otherwise Minerva will use Verdana. Italics are shown as regular semi-bold.", "de": "Atkinson Hyperlegible ist eine kostenlose Schriftart für Menschen mit Sehschwäche; installieren Sie sie auf Ihrem PC, sonst verwendet Minerva Verdana. Kursivschrift wird als normales Halbfett dargestellt."}
+{"uk": "Authorization Form — форма доручення", "en": "Authorization Form", "de": "Authorization Form — Autorisierungsformular"}
 {"uk": "AutoImportProfile ||--o{ AutoImportLog : \"логи запусків\"", "en": "AutoImportProfile ||--o{ AutoImportLog : \"run logs\"", "de": "AutoImportProfile ||--o{ AutoImportLog : \"Laufprotokolle\""}
 {"uk": "B2B (компанія)", "en": "B2B (company)", "de": "B2B (Firma)"}
 {"uk": "B2B · 👤 B2C · 🔗 Дистриб'ютор · 🛒 Реселер · 📎 Інше", "en": "B2B · 👤 B2C · 🔗 Distributor · 🛒 Reseller · 📎 Other", "de": "B2B · 👤 B2C · 🔗 Distributor · 🛒 Wiederverkäufer · 📎 Sonstiges"}
@@ -965,6 +968,7 @@
 {"uk": "Carrier ||--o{ Shipment : \"перевозить\"", "en": "Carrier ||--o{ Shipment : \"carries\"", "de": "Carrier ||--o{ Shipment : \"befördert\""}
 {"uk": "Carrier відсутній", "en": "Carrier is missing", "de": "Carrier fehlt"}
 {"uk": "Carrier не налаштовано", "en": "Carrier not configured", "de": "Carrier nicht konfiguriert"}
+{"uk": "Certificate of Origin — сертифікат походження", "en": "Certificate of Origin", "de": "Certificate of Origin — Ursprungszeugnis"}
 {"uk": "Chart.js 4.4 (той самий, що на дашборді) підвантажується, лише коли графік уперше малюється.", "en": "Chart.js 4.4 (the same as on the dashboard) is loaded only when a chart is drawn for the first time.", "de": "Chart.js 4.4 (dasselbe wie im Dashboard) wird erst geladen, wenn ein Diagramm zum ersten Mal gezeichnet wird."}
 {"uk": "Chrome/Edge — нативний діалог Windows · Firefox — вкажіть шлях у налаштуваннях", "en": "Chrome/Edge — native Windows dialog · Firefox — specify the path in settings", "de": "Chrome/Edge — nativer Windows-Dialog · Firefox — geben Sie den Pfad in den Einstellungen an"}
 {"uk": "Claude Code (у комплекті)", "en": "Claude Code (bundled)", "de": "Claude Code (mitgeliefert)"}
@@ -989,6 +993,7 @@
 {"uk": "Commercial (продаж)", "en": "Commercial (sale)", "de": "Commercial (Verkauf)"}
 {"uk": "Commercial Invoice (свій шаблон)", "en": "Commercial Invoice (custom template)", "de": "Commercial Invoice (eigene Vorlage)"}
 {"uk": "Commercial Invoice цієї посилки", "en": "Commercial Invoice for this parcel", "de": "Commercial Invoice für dieses Paket"}
+{"uk": "Commercial Invoice — рахунок для митниці", "en": "Commercial Invoice — invoice for customs", "de": "Commercial Invoice — Handelsrechnung für den Zoll"}
 {"uk": "Commercial — продаж (Sale)", "en": "Commercial — sale (Sale)", "de": "Commercial — Verkauf (Sale)"}
 {"uk": "Company: \"{0}\" | {1} записів", "en": "Company: \"{0}\" | {1} records", "de": "Company: \"{0}\" | {1} Datensätze"}
 {"uk": "Config (Singleton моделі)", "en": "Config (Singleton models)", "de": "Config (Singleton-Modelle)"}
@@ -1053,6 +1058,7 @@
 {"uk": "Datasheet» / «Зображення (URL)»)", "en": "Datasheet” / “Image (URL)”)", "de": "Datenblatt“ / „Bild (URL)“)"}
 {"uk": "Debug запитів", "en": "Debugging requests", "de": "Debugging von Anfragen"}
 {"uk": "Debug — Rate API запит / відповідь", "en": "Debug — Rate API request / response", "de": "Debug — Rate-API-Anfrage / Antwort"}
+{"uk": "Declaration — декларація / заява", "en": "Declaration", "de": "Declaration — Erklärung"}
 {"uk": "Delay notify якщо carrier_delayed", "en": "Delay notify if carrier_delayed", "de": "Delay notify, wenn carrier_delayed"}
 {"uk": "Deutsch (тільки DE)", "en": "Deutsch (DE only)", "de": "Deutsch (nur DE)"}
 {"uk": "Deutsch / English (DE+EN двомовні)", "en": "Deutsch / English (bilingual DE+EN)", "de": "Deutsch / English (zweisprachig DE+EN)"}
@@ -1259,6 +1265,7 @@
 {"uk": "Enter — запитати, Shift+Enter — новий рядок", "en": "Enter — ask, Shift+Enter — new line", "de": "Enter – fragen, Umschalt+Enter – neue Zeile"}
 {"uk": "Excel файл", "en": "Excel file", "de": "Excel-Datei"}
 {"uk": "Excel → Замовлення, Товари", "en": "Excel → Orders, Products", "de": "Excel → Aufträge, Artikel"}
+{"uk": "Export License — експортна ліцензія", "en": "Export License", "de": "Export License — Ausfuhrgenehmigung"}
 {"uk": "FAQ та підтримка", "en": "FAQ and support", "de": "FAQ und Support"}
 {"uk": "FAQ та підтримка | Minerva", "en": "FAQ and support | Minerva", "de": "FAQ und Support | Minerva"}
 {"uk": "FAQ та підтримка · Послуги", "en": "FAQ and support · Services", "de": "FAQ und Support · Dienstleistungen"}
@@ -1335,6 +1342,7 @@
 {"uk": "ID / ключ", "en": "ID / key", "de": "ID / Schlüssel"}
 {"uk": "ID в askDANTE", "en": "ID in askDANTE", "de": "ID in askDANTE"}
 {"uk": "ID відправлення (перевізник)", "en": "Shipment ID (carrier)", "de": "Sendungs-ID (Versanddienstleister)"}
+{"uk": "ID відправлення UPS", "en": "UPS shipment ID", "de": "UPS-Sendungs-ID"}
 {"uk": "ID документу з Paperless Document API (заповнюється автоматично)", "en": "Document ID from the Paperless Document API (filled in automatically)", "de": "Dokument-ID aus der Paperless Document API (wird automatisch ausgefüllt)"}
 {"uk": "ID замовлення", "en": "Order ID", "de": "Auftrags-ID"}
 {"uk": "ID замовлення JLC", "en": "JLC order ID", "de": "JLC-Bestell-ID"}
@@ -1367,6 +1375,7 @@
 {"uk": "ISO-2 (2 літери)", "en": "ISO-2 (2 letters)", "de": "ISO-2 (2 Buchstaben)"}
 {"uk": "ISO-3 (3 букви: DEU, UKR, POL)", "en": "ISO-3 (3 letters: DEU, UKR, POL)", "de": "ISO-3 (3 Buchstaben: DEU, UKR, POL)"}
 {"uk": "Impedance — імпеданс", "en": "Impedance — impedance", "de": "Impedance — Impedanz"}
+{"uk": "Import Permit — дозвіл на ввезення", "en": "Import Permit", "de": "Import Permit — Einfuhrgenehmigung"}
 {"uk": "Inbox папка", "en": "Inbox folder", "de": "Inbox-Ordner"}
 {"uk": "Incoming/Outgoing — додатне; Adjustment — зі знаком", "en": "Incoming/Outgoing — positive; Adjustment — signed", "de": "Incoming/Outgoing — positiv; Adjustment — mit Vorzeichen"}
 {"uk": "IncomingShipment.purchase_order nullable — можна додати поза PO", "en": "IncomingShipment.purchase_order is nullable — can be added outside a PO", "de": "IncomingShipment.purchase_order ist nullable — kann außerhalb einer Bestellung hinzugefügt werden"}
@@ -1442,6 +1451,8 @@
 {"uk": "MOQ (мін. кількість)", "en": "MOQ (min. quantity)", "de": "MOQ (Mindestmenge)"}
 {"uk": "MOQ = {0} шт. — може відлякувати", "en": "MOQ = {0} pcs — may put buyers off", "de": "MOQ = {0} Stk. — kann abschreckend wirken"}
 {"uk": "MOQ має бути щонайменше 1", "en": "MOQ must be at least 1", "de": "MOQ muss mindestens 1 betragen"}
+{"uk": "MRN {0} — як у посилки {1}", "en": "MRN {0} — same as parcel {1}", "de": "MRN {0} — wie bei Paket {1}"}
+{"uk": "MRN {0} — як у цієї посилки", "en": "MRN {0} — same as this parcel", "de": "MRN {0} — wie bei diesem Paket"}
 {"uk": "MRN має бути рівно {0} знаків (зараз {1}).", "en": "The MRN must be exactly {0} characters (currently {1}).", "de": "Die MRN muss genau {0} Zeichen lang sein (derzeit {1})."}
 {"uk": "MRN — лише латинські літери й цифри.", "en": "MRN — Latin letters and digits only.", "de": "MRN — nur lateinische Buchstaben und Ziffern."}
 {"uk": "Manager — + аналітика, звіти", "en": "Manager — + analytics, reports", "de": "Manager — + Analysen, Berichte"}
@@ -1641,11 +1652,13 @@
 {"uk": "Packing List (Пакувальний лист)", "en": "Packing List", "de": "Packliste"}
 {"uk": "Packing List (свій шаблон)", "en": "Packing List (custom template)", "de": "Packing List (eigene Vorlage)"}
 {"uk": "Packing List цієї посилки", "en": "Packing List for this parcel", "de": "Packing List für dieses Paket"}
+{"uk": "Packing List — пакувальний лист", "en": "Packing List", "de": "Packing List — Packliste"}
 {"uk": "Parcel {0}: нетто {1} кг > брутто {2} кг", "en": "Parcel {0}: net {1} kg > gross {2} kg", "de": "Parcel {0}: netto {1} kg > brutto {2} kg"}
 {"uk": "Personal Effects — особисті речі", "en": "Personal Effects — personal belongings", "de": "Personal Effects — persönliche Gegenstände"}
 {"uk": "Polarization — поляризація", "en": "Polarization — polarization", "de": "Polarization — Polarisation"}
 {"uk": "Port 465 → вимкніть TLS, увімкніть SSL. Port 587 → навпаки", "en": "Port 465 → disable TLS, enable SSL. Port 587 → the other way round", "de": "Port 465 → TLS deaktivieren, SSL aktivieren. Port 587 → umgekehrt"}
 {"uk": "Post.xlsx: product namber або QTY не знайдено", "en": "Post.xlsx: product namber or QTY not found", "de": "Post.xlsx: product namber oder QTY nicht gefunden"}
+{"uk": "Power of Attorney — довіреність", "en": "Power of Attorney", "de": "Power of Attorney — Vollmacht"}
 {"uk": "Premium — підвищене страхування (повне покриття)", "en": "Premium — extended insurance (full coverage)", "de": "Premium — erweiterte Versicherung (Vollschutz)"}
 {"uk": "Private (особисте)", "en": "Private (personal)", "de": "Private (privat)"}
 {"uk": "Product ID відсутній — спочатку опублікуй продукт.", "en": "Product ID is missing — publish the product first.", "de": "Product ID fehlt — veröffentlichen Sie zuerst den Artikel."}
@@ -1961,6 +1974,7 @@
 {"uk": "UPS Carrier «{0}»: заповніть API ключ (Client ID), API Secret (Client Secret) і Connection UUID (Account Number).", "en": "UPS Carrier “{0}”: fill in the API key (Client ID), API Secret (Client Secret) and Connection UUID (Account Number).", "de": "UPS Carrier „{0}“: Tragen Sie den API-Schlüssel (Client ID), das API Secret (Client Secret) und die Connection UUID (Account Number) ein."}
 {"uk": "UPS OAuth помилка: {0}", "en": "UPS OAuth error: {0}", "de": "UPS-OAuth-Fehler: {0}"}
 {"uk": "UPS Paperless: відповідь без DocumentID: {0}", "en": "UPS Paperless: response without DocumentID: {0}", "de": "UPS Paperless: Antwort ohne DocumentID: {0}"}
+{"uk": "UPS Paperless: документ не прив'язано: {0}", "en": "UPS Paperless: document not attached: {0}", "de": "UPS Paperless: Dokument nicht verknüpft: {0}"}
 {"uk": "UPS scraper ще в розробці. Використайте CSV-імпорт на сторінці UPS Billing.", "en": "UPS scraper is still in development. Use the CSV import on the UPS Billing page.", "de": "Der UPS-Scraper befindet sich noch in Entwicklung. Verwenden Sie den CSV-Import auf der Seite UPS Billing."}
 {"uk": "UPS Тарифи — #{0} → {1}", "en": "UPS Rates — #{0} → {1}", "de": "UPS Tarife — #{0} → {1}"}
 {"uk": "UPS Трекінг", "en": "UPS Tracking", "de": "UPS Tracking"}
@@ -1971,10 +1985,14 @@
 {"uk": "UPS доставка Польща {0}", "en": "UPS shipping Poland {0}", "de": "UPS-Versand Polen {0}"}
 {"uk": "UPS лог — макс. записів", "en": "UPS log — max. records", "de": "UPS-Protokoll — max. Einträge"}
 {"uk": "UPS налаштування: {0}", "en": "UPS settings: {0}", "de": "UPS-Einstellungen: {0}"}
+{"uk": "UPS не прийняв ABD: {0}. Можна завантажити вручну на ups.com → «Meine Dokumente hochladen» (тип «Export-Begleitdokument»).", "en": "UPS did not accept the ABD: {0}. You can upload it manually on ups.com → «Meine Dokumente hochladen» (type «Export-Begleitdokument»).", "de": "UPS hat das ABD nicht angenommen: {0}. Manuell hochladen auf ups.com → «Meine Dokumente hochladen» (Typ «Export-Begleitdokument»)."}
+{"uk": "UPS не прийняв документи: {0}. Можна завантажити вручну на ups.com → «Meine Dokumente hochladen».", "en": "UPS did not accept the documents: {0}. You can upload them manually on ups.com → «Meine Dokumente hochladen».", "de": "UPS hat die Dokumente nicht angenommen: {0}. Manuell hochladen auf ups.com → «Meine Dokumente hochladen»."}
 {"uk": "UPS не підтвердив скасування {0}: {1}. Статус відправлення не змінено — перевірте в «📋 UPS Лог» перевізника.", "en": "UPS did not confirm the cancellation of {0}: {1}. The shipment status was not changed — check the carrier in “📋 UPS Log”.", "de": "UPS hat die Stornierung von {0} nicht bestätigt: {1}. Der Sendungsstatus wurde nicht geändert — prüfen Sie den Versanddienstleister im „📋 UPS-Protokoll“."}
 {"uk": "UPS не скасував відправлення {0}: {1}. Якщо кур'єр уже забрав посилку, Void неможливий; статус у Minerva — «🔧 Статус вручну».", "en": "UPS did not cancel shipment {0}: {1}. If the courier has already picked up the parcel, Void is impossible; for the status in Minerva use “🔧 Set status manually”.", "de": "UPS hat Sendung {0} nicht storniert: {1}. Wurde das Paket bereits vom Kurier abgeholt, ist ein Void nicht möglich; den Status in Minerva ändern Sie über „🔧 Status manuell“."}
 {"uk": "UPS перевізник не налаштований", "en": "UPS carrier is not configured", "de": "UPS-Versanddienstleister ist nicht konfiguriert"}
 {"uk": "UPS помилка 120317: Обліковий запис {0} не налаштований для відправлень з {1}. Зверніться до UPS для активації схеми «Importer of Record» / «Bill to Third Party» для відправлень з третіх країн.", "en": "UPS error 120317: Account {0} is not configured for shipments from {1}. Contact UPS to activate the “Importer of Record” / “Bill to Third Party” scheme for shipments from third countries.", "de": "UPS-Fehler 120317: Das Konto {0} ist nicht für Sendungen aus {1} eingerichtet. Wenden Sie sich an UPS, um das Schema „Importer of Record“ / „Bill to Third Party“ für Sendungen aus Drittländern zu aktivieren."}
+{"uk": "UPS приймає до 13 документів на посилку — більше додати не можна.", "en": "UPS accepts up to 13 documents per parcel — no more can be added.", "de": "UPS akzeptiert bis zu 13 Dokumente pro Paket — mehr können nicht hinzugefügt werden."}
+{"uk": "UPS приймає лише {0} — «{1}» не підходить.", "en": "UPS accepts only {0} — «{1}» is not suitable.", "de": "UPS akzeptiert nur {0} — «{1}» ist nicht geeignet."}
 {"uk": "UPS інтеграція", "en": "UPS integration", "de": "UPS-Integration"}
 {"uk": "UPS, DHL, FedEx… (порожньо — за номером)", "en": "UPS, DHL, FedEx… (empty — by the number)", "de": "UPS, DHL, FedEx… (leer — nach Nummer)"}
 {"uk": "UPS: адреси третіх сторін", "en": "UPS: third-party addresses", "de": "UPS: Adressen Dritter"}
@@ -2972,6 +2990,7 @@
 {"uk": "«{0}» +{1} дн.", "en": "“{0}” +{1} d.", "de": "„{0}“ +{1} Tg."}
 {"uk": "«{0}» · код {1} · покупці бачать «{2}»", "en": "“{0}” · code {1} · customers see “{2}”", "de": "„{0}“ · Code {1} · Kunden sehen „{2}“"}
 {"uk": "«{0}» × {1} — поза каталогом, піде в нотатку", "en": "“{0}” × {1} — not in the catalog, will go into the note", "de": "„{0}“ × {1} — nicht im Katalog, wird in die Notiz übernommen"}
+{"uk": "«{0}» більший за 10 МБ — UPS його не прийме.", "en": "«{0}» is larger than 10 MB — UPS will not accept it.", "de": "«{0}» ist größer als 10 MB — UPS nimmt sie nicht an."}
 {"uk": "«{0}» на {1} дн. пізніше базового плану", "en": "“{0}” {1} days later than the baseline", "de": "„{0}“ {1} Tage später als der Basisplan"}
 {"uk": "«{0}» на «{1}»: {2} → {3}", "en": "“{0}” at “{1}”: {2} → {3}", "de": "„{0}“ an „{1}“: {2} → {3}"}
 {"uk": "«{0}» не знайдено у списку DigiKey — буде передано без перевізника", "en": "“{0}” not found in the DigiKey list — will be sent without a carrier", "de": "„{0}“ wurde in der DigiKey-Liste nicht gefunden — wird ohne Versanddienstleister übermittelt"}
@@ -3273,6 +3292,7 @@
 {"uk": "Індія", "en": "India", "de": "Indien"}
 {"uk": "Інструкція", "en": "Instructions", "de": "Anleitung"}
 {"uk": "Інструкція UPS — кому виставити рахунок", "en": "UPS instruction — who to bill", "de": "UPS-Anleitung — wem die Rechnung gestellt wird"}
+{"uk": "Інструкція відправника для експедитора.", "en": "Shipper's instructions for the forwarder.", "de": "Anweisungen des Versenders an den Spediteur."}
 {"uk": "Інструкція для AI (автовідповідь)", "en": "AI instruction (auto-reply)", "de": "Anweisung für die KI (Automatikantwort)"}
 {"uk": "Інструкція для відповіді (необов'язково): напр. «вибачся і запропонуй повернення»…", "en": "Reply instruction (optional): e.g. “apologize and offer a return”…", "de": "Anweisung für die Antwort (optional): z. B. „entschuldige dich und biete eine Rücksendung an“…"}
 {"uk": "Інструкції для AI", "en": "Instructions for AI", "de": "Anweisungen für die KI"}
@@ -3311,6 +3331,7 @@
 {"uk": "Інше (загальний склад)", "en": "Other (general warehouse)", "de": "Sonstiges (allgemeines Lager)"}
 {"uk": "Інше листування «{0}» ({1} лист.) — останній лист {2} від {3}", "en": "Other correspondence “{0}” ({1} emails) — last email {2} from {3}", "de": "Weiterer Schriftverkehr „{0}“ ({1} E-Mails) — letzte E-Mail {2} von {3}"}
 {"uk": "Інше — загальна категорія без специфічних атрибутів.", "en": "Other — a general category without specific attributes.", "de": "Sonstige — allgemeine Kategorie ohne spezifische Attribute."}
+{"uk": "Інший документ", "en": "Other document", "de": "Sonstiges Dokument"}
 {"uk": "Інший перевізник", "en": "Other carrier", "de": "Anderer Versanddienstleister"}
 {"uk": "Інший перерахунок листів ще йде — після нього натисніть «🔄 Перерахувати листи за правилами» в «🏷 Свої категорії».", "en": "Another e-mail recalculation is still running — afterwards click “🔄 Recalculate e-mails by rules” in “🏷 Own categories”.", "de": "Eine andere Neuberechnung der E-Mails läuft noch – klicken Sie danach in „🏷 Eigene Kategorien“ auf „🔄 E-Mails nach Regeln neu berechnen“."}
 {"uk": "Інший розбір уже йде — зачекайте.", "en": "Another sorting run is already in progress — please wait.", "de": "Ein anderer Sortierlauf läuft bereits — bitte warten Sie."}
@@ -3466,6 +3487,7 @@
 {"uk": "Автооновлення ціни з Minerva", "en": "Auto-update of prices from Minerva", "de": "Automatische Aktualisierung der Preise aus Minerva"}
 {"uk": "Автоперевірка зараз (як «▶ Перевірити зараз»)", "en": "Auto-check now (like “▶ Check now”)", "de": "Automatische Prüfung jetzt (wie „▶ Jetzt prüfen“)"}
 {"uk": "Автоперевірка оплат, хв", "en": "Automatic payment check, min", "de": "Automatische Zahlungsprüfung, Min."}
+{"uk": "Автоперевірка трек-номерів посилок", "en": "Automatic check of parcel tracking numbers", "de": "Automatische Prüfung der Paket-Sendungsnummern"}
 {"uk": "Автор", "en": "Author", "de": "Autor"}
 {"uk": "Автор системи", "en": "System author", "de": "Autor des Systems"}
 {"uk": "Авторизацію DigiKey не прийнято", "en": "DigiKey authorization was not accepted", "de": "Die DigiKey-Autorisierung wurde nicht akzeptiert"}
@@ -4258,6 +4280,7 @@
 {"uk": "Виберіть адресу, вставте тіло JSON, яке надсилає програма, — Minerva перевірить його тим самим", "en": "Choose an address and paste the JSON body that the application sends — Minerva will check it with the same", "de": "Wählen Sie eine Adresse und fügen Sie den JSON-Body ein, den die Anwendung sendet — Minerva prüft ihn mit demselben"}
 {"uk": "Виберіть адресу, вставте тіло JSON, яке надсилає програма, — Minerva перевірить його тим самим серіалізатором, що й справжній запит, прочитає потрібне з бази (товар за артикулом, залишок, наявне замовлення) і скаже, що сталося б. Нічого не записується: перевірка йде в транзакції, яка завжди відкочується.", "en": "Choose an address and paste the JSON body that the application sends — Minerva will check it with the same serializer as a real request, read what it needs from the database (product by SKU, stock level, existing order) and tell what would happen. Nothing is written: the check runs in a transaction that is always rolled back.", "de": "Wählen Sie eine Adresse und fügen Sie den JSON-Body ein, den die Anwendung sendet — Minerva prüft ihn mit demselben Serializer wie eine echte Anfrage, liest das Nötige aus der Datenbank (Artikel nach Artikelnummer, Bestand, vorhandenen Auftrag) und sagt, was passieren würde. Es wird nichts geschrieben: Die Prüfung läuft in einer Transaktion, die immer zurückgerollt wird."}
 {"uk": "Виберіть дату й проєкт askDANTE.", "en": "Select a date and an askDANTE project.", "de": "Wählen Sie ein Datum und ein askDANTE-Projekt."}
+{"uk": "Виберіть документи з листа, документів замовлення або з ПК.", "en": "Choose documents from the e-mail, the order documents or your PC.", "de": "Wählen Sie Dokumente aus der E-Mail, den Auftragsdokumenten oder vom PC."}
 {"uk": "Виберіть запити пропозиції (тип документа «Запит пропозиції»).", "en": "Select quote requests (document type “Quote request”).", "de": "Wählen Sie Angebotsanfragen aus (Dokumenttyp „Angebotsanfrage“)."}
 {"uk": "Виберіть значок", "en": "Choose an icon", "de": "Wählen Sie ein Symbol"}
 {"uk": "Виберіть значок зі списку або один емодзі", "en": "Choose an icon from the list or a single emoji", "de": "Wählen Sie ein Symbol aus der Liste oder ein einzelnes Emoji"}
@@ -4274,6 +4297,7 @@
 {"uk": "Виберіть проєкт askDANTE.", "en": "Select an askDANTE project.", "de": "Wählen Sie ein askDANTE-Projekt."}
 {"uk": "Виберіть проєкт.", "en": "Choose a project.", "de": "Wählen Sie ein Projekt."}
 {"uk": "Виберіть файл", "en": "Choose a file", "de": "Wählen Sie eine Datei"}
+{"uk": "Виберіть файл ABD з листа або з ПК.", "en": "Choose the ABD file from the e-mail or from your PC.", "de": "Wählen Sie die ABD-Datei aus der E-Mail oder vom PC."}
 {"uk": "Виберіть файл або вставте посилання", "en": "Choose a file or paste a link", "de": "Wählen Sie eine Datei oder fügen Sie einen Link ein"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“"}
 {"uk": "Виберіть файли або папку — назва джерела підставиться сама (назва папки). Поле «Папка» лишіть порожнім: Minerva створить свою. Після «Зберегти» Minerva створить джерело й завантажить вибране. Типи: {0} · до {1} МБ на файл.", "en": "Choose files or a folder — the source name will be filled in automatically (the folder name). Leave the “Folder” field empty: Minerva will create its own. After “Save” Minerva will create the source and upload the selection. Types: {0} · up to {1} MB per file.", "de": "Wählen Sie Dateien oder einen Ordner – der Name der Quelle wird automatisch eingesetzt (Ordnername). Lassen Sie das Feld „Ordner“ leer: Minerva erstellt einen eigenen. Nach „Speichern“ erstellt Minerva die Quelle und lädt die Auswahl hoch. Typen: {0} · bis zu {1} MB pro Datei."}
@@ -4505,6 +4529,8 @@
 {"uk": "Виправлено", "en": "Fixed", "de": "Behoben"}
 {"uk": "Виправлено {0} транзакцій: qty змінено на від'ємне значення.", "en": "{0} transactions fixed: qty changed to a negative value.", "de": "{0} Transaktionen korrigiert: qty auf einen negativen Wert geändert."}
 {"uk": "Виправлено людиною", "en": "Corrected by a human", "de": "Von Menschen korrigiert"}
+{"uk": "Виправлено трек-номерів: {0}.", "en": "Tracking numbers fixed: {0}.", "de": "Sendungsnummern korrigiert: {0}."}
+{"uk": "Виправлено: {0}", "en": "Fixed: {0}", "de": "Korrigiert: {0}"}
 {"uk": "Виправте «Supplier SKU» та «Назву (DK)» перед публікацією.", "en": "Fix “Supplier SKU” and “Name (DK)” before publishing.", "de": "Korrigieren Sie „Supplier SKU“ und „Name (DK)“ vor der Veröffentlichung."}
 {"uk": "Виправте вагу брутто коробки або вагу нетто товарів.", "en": "Correct the gross weight of the box or the net weight of the products.", "de": "Korrigieren Sie das Bruttogewicht des Kartons oder das Nettogewicht der Artikel."}
 {"uk": "Виправте дані, натисніть «📊 Порівняти тарифи» і знову виберіть тариф перевізника (🟤 UPS, 🚀 DHL, 🟣 FedEx, ✅ Jumingo) — або «💾 Зберегти чернетку», щоб продовжити пізніше.", "en": "Correct the data, click “📊 Compare rates” and select the carrier rate again (🟤 UPS, 🚀 DHL, 🟣 FedEx, ✅ Jumingo) — or “💾 Save draft” to continue later.", "de": "Korrigieren Sie die Daten, klicken Sie auf „📊 Tarife vergleichen“ und wählen Sie erneut einen Tarif des Versanddienstleisters (🟤 UPS, 🚀 DHL, 🟣 FedEx, ✅ Jumingo) — oder auf „💾 Entwurf speichern“, um später fortzufahren."}
@@ -4853,6 +4879,7 @@
 {"uk": "Від спаму в календар нічого не потрапляє. Події з листів відправника, від якого терміни", "en": "No spam gets into the calendar. Events from e-mails of a sender from whom deadlines", "de": "Von Spam gelangt nichts in den Kalender. Termine aus E-Mails eines Absenders, von dem Fristen"}
 {"uk": "Від спаму в календар нічого не потрапляє. Події з листів відправника, від якого терміни не потрібні, — у календарі: подія → «🚫 Більше не заносити від нього» (адреса або весь домен). Список фільтрів і чистка того, що вже внесено, з переглядом перед видаленням", "en": "No spam gets into the calendar. Events from e-mails of a sender from whom deadlines are not needed — in the calendar: event → “🚫 Stop adding from this sender” (address or whole domain). A list of filters and cleanup of what has already been added, with a preview before deletion", "de": "Von Spam gelangt nichts in den Kalender. Termine aus E-Mails eines Absenders, von dem Fristen nicht benötigt werden – im Kalender: Termin → „🚫 Von diesem Absender nicht mehr übernehmen“ (Adresse oder ganze Domain). Liste der Filter und Bereinigung des bereits Eingetragenen mit Vorschau vor dem Löschen"}
 {"uk": "Від того самого відправника, але не підійшли", "en": "From the same sender, but did not match", "de": "Vom selben Absender, aber nicht passend"}
+{"uk": "Від торгової палати (IHK). Потрібен для пільгового мита або коли цього вимагає країна отримувача.", "en": "Issued by the chamber of commerce (IHK). Needed for preferential duty or when the destination country requires it.", "de": "Von der IHK. Nötig für Präferenzzoll oder wenn das Empfängerland es verlangt."}
 {"uk": "Від цього відправника більше нічого не заносити (або це спам)", "en": "Add nothing more from this sender (or it is spam)", "de": "Von diesem Absender nichts mehr eintragen (oder es ist Spam)"}
 {"uk": "Від цін Minerva (після перерахунку у валюту DigiKey): +10 — на 10 % дорожче, −5 — знижка 5 %.", "en": "Relative to the Minerva prices (after conversion to the DigiKey currency): +10 — 10 % more expensive, −5 — 5 % discount.", "de": "Bezogen auf die Minerva-Preise (nach Umrechnung in die DigiKey-Währung): +10 — 10 % teurer, −5 — 5 % Rabatt."}
 {"uk": "Від шт.", "en": "From pcs", "de": "Ab Stk."}
@@ -5004,6 +5031,7 @@
 {"uk": "Відновити налаштування", "en": "Restore settings", "de": "Einstellungen wiederherstellen"}
 {"uk": "Відновити налаштування з \"{0}\"?", "en": "Restore settings from “{0}”?", "de": "Einstellungen aus „{0}“ wiederherstellen?"}
 {"uk": "Відновити налаштування з \"{0}\"? Це перезапише існуючі налаштування.", "en": "Restore settings from “{0}”? This will overwrite the existing settings.", "de": "Einstellungen aus „{0}“ wiederherstellen? Dadurch werden die vorhandenen Einstellungen überschrieben."}
+{"uk": "Відновити трек-номери посилок з однаковим номером в одному замовленні", "en": "Restore tracking numbers of parcels sharing one number within an order", "de": "Sendungsnummern von Paketen mit gleicher Nummer im selben Auftrag wiederherstellen"}
 {"uk": "Відновить: юзерів, групи, токени API, конфігурацію ботів і систему.", "en": "Will restore: users, groups, API tokens, bot configuration and system.", "de": "Stellt wieder her: Benutzer, Gruppen, API-Token, Bot-Konfiguration und System."}
 {"uk": "Відновлення", "en": "Restore", "de": "Wiederherstellung"}
 {"uk": "Відновлення з бекапу", "en": "Restore from backup", "de": "Wiederherstellung aus Sicherung"}
@@ -5717,6 +5745,7 @@
 {"uk": "Довільний текст", "en": "Any text", "de": "Beliebiger Text"}
 {"uk": "Довільний текст (до 200 символів)", "en": "Any text (up to 200 characters)", "de": "Beliebiger Text (bis zu 200 Zeichen)"}
 {"uk": "Довільні нотатки.", "en": "Free-form notes.", "de": "Freie Notizen."}
+{"uk": "Довіреність UPS діяти як митний представник (для деяких країн).", "en": "Authorises UPS to act as customs representative (for some countries).", "de": "Vollmacht für UPS als Zollvertreter (für einige Länder)."}
 {"uk": "Довіряти кешу при збої API", "en": "Trust the cache when the API fails", "de": "Bei API-Ausfall dem Cache vertrauen"}
 {"uk": "Додав", "en": "Added by", "de": "Hinzugefügt von"}
 {"uk": "Додавати документи може той, кому адміністратор дав право «📎 Документи й посилання».", "en": "Documents can be added by anyone to whom an administrator has granted the “📎 Documents and links” right.", "de": "Dokumente kann hinzufügen, wem ein Administrator das Recht „📎 Dokumente und Links“ erteilt hat."}
@@ -5827,6 +5856,8 @@
 {"uk": "Дозволити від'ємний залишок", "en": "Allow negative stock", "de": "Negativen Bestand zulassen"}
 {"uk": "Дозволити відвантаження навіть якщо залишок менший за 0.", "en": "Allow shipping even if the stock level is below 0.", "de": "Versand auch zulassen, wenn der Bestand kleiner als 0 ist."}
 {"uk": "Дозволити/заборонити конкретні операції (перегляд, створення, редагування, видалення, експорт, імпорт) окремо для кожного модуля.", "en": "Allow/deny specific operations (view, create, edit, delete, export, import) separately for each module.", "de": "Bestimmte Operationen (Ansehen, Erstellen, Bearbeiten, Löschen, Export, Import) für jedes Modul einzeln erlauben/verbieten."}
+{"uk": "Дозвіл BAFA на товари подвійного призначення, якщо він потрібен.", "en": "BAFA licence for dual-use goods, if required.", "de": "BAFA-Genehmigung für Dual-Use-Güter, falls erforderlich."}
+{"uk": "Дозвіл країни отримувача; зазвичай його надає отримувач.", "en": "Permit of the destination country; usually provided by the recipient.", "de": "Genehmigung des Empfängerlandes; stellt meist der Empfänger bereit."}
 {"uk": "Докладніше в гіді", "en": "More in the guide", "de": "Mehr im Leitfaden"}
 {"uk": "Документ", "en": "Document", "de": "Dokument"}
 {"uk": "Документ '{0}' не знайдено у замовленні {1}.", "en": "Document '{0}' not found in order {1}.", "de": "Dokument '{0}' im Auftrag {1} nicht gefunden."}
@@ -5852,6 +5883,7 @@
 {"uk": "Документація інтеграції магазину", "en": "Web shop integration documentation", "de": "Dokumentation der Webshop-Integration"}
 {"uk": "Документи", "en": "Documents", "de": "Dokumente"}
 {"uk": "Документи бази знань", "en": "Knowledge base documents", "de": "Dokumente der Wissensdatenbank"}
+{"uk": "Документи в UPS — лише для оформленого відправлення UPS з номером 1Z….", "en": "Documents to UPS — only for a booked UPS shipment with a 1Z… number.", "de": "Dokumente an UPS — nur für eine gebuchte UPS-Sendung mit 1Z…-Nummer."}
 {"uk": "Документи в папці замовлення", "en": "Documents in the order folder", "de": "Dokumente im Auftragsordner"}
 {"uk": "Документи джерела", "en": "Source documents", "de": "Dokumente der Quelle"}
 {"uk": "Документи джерела видно в «📎 Документи й посилання» цих карток; у RAG вони прив'язані до всіх вибраних проєктів. Без прив'язок — загальні документи.", "en": "Source documents are visible in “📎 Documents and links” of these cards; in RAG they are linked to all selected projects. Without links — general documents.", "de": "Die Dokumente der Quelle sind in „📎 Dokumente und Links“ dieser Karten sichtbar; in RAG sind sie allen ausgewählten Projekten zugeordnet. Ohne Zuordnung — allgemeine Dokumente."}
@@ -6063,6 +6095,8 @@
 {"uk": "Екваторіальна Гвінея", "en": "Equatorial Guinea", "de": "Äquatorialguinea"}
 {"uk": "Експорт", "en": "Export", "de": "Export"}
 {"uk": "Експорт / Імпорт", "en": "Export / Import", "de": "Export / Import"}
+{"uk": "Експортна декларація США (для відправлень зі США).", "en": "US export declaration (for shipments from the USA).", "de": "US-Ausfuhranmeldung (für Sendungen aus den USA)."}
+{"uk": "Експортна декларація з MRN від митного брокера (ATLAS). Для експорту з ЄС понад 1000 € — UPS просить її, щоб випустити посилку.", "en": "Export declaration with MRN from the customs broker (ATLAS). For EU exports over €1000 — UPS asks for it to release the parcel.", "de": "Ausfuhranmeldung mit MRN vom Zollagenten (ATLAS). Für EU-Exporte über 1000 € — UPS verlangt sie zur Freigabe des Pakets."}
 {"uk": "Експортувати", "en": "Export", "de": "Exportieren"}
 {"uk": "Експортувати в Excel", "en": "Export to Excel", "de": "Nach Excel exportieren"}
 {"uk": "Елемент", "en": "Element", "de": "Element"}
@@ -6997,6 +7031,7 @@
 {"uk": "Зацікавлений після дзвінка?", "en": "Interested after the call?", "de": "Interessiert nach dem Anruf?"}
 {"uk": "Зацікавлені в послугах?", "en": "Interested in our services?", "de": "Interesse an unseren Leistungen?"}
 {"uk": "Зачекайте — панель ще завантажує інший запис.", "en": "Please wait — the panel is still loading another record.", "de": "Bitte warten — das Panel lädt noch einen anderen Datensatz."}
+{"uk": "Заява відправника або виробника (Lieferantenerklärung, заява про подвійне призначення тощо).", "en": "Statement of the shipper or manufacturer (supplier's declaration, dual-use statement, etc.).", "de": "Erklärung des Versenders oder Herstellers (Lieferantenerklärung, Dual-Use-Erklärung usw.)."}
 {"uk": "Збалансована", "en": "Balanced", "de": "Ausgewogen"}
 {"uk": "Зберегти", "en": "Save", "de": "Speichern"}
 {"uk": "Зберегти (Ctrl+Enter)", "en": "Save (Ctrl+Enter)", "de": "Speichern (Ctrl+Enter)"}
@@ -8182,6 +8217,7 @@
 {"uk": "Кутовий поглинач", "en": "Corner absorber", "de": "Eckabsorber"}
 {"uk": "Кіл-ть", "en": "Qty", "de": "Menge"}
 {"uk": "Кілограми (дробні числа)", "en": "Kilograms (decimal numbers)", "de": "Kilogramm (Dezimalzahlen)"}
+{"uk": "Кілька коробок в одному відправленні UPS: у кожної свій номер (на її етикетці); перший зазвичай збігається з трек-номером відправлення.", "en": "Several boxes in one UPS shipment: each has its own number (on its label); the first usually matches the shipment tracking number.", "de": "Mehrere Kartons in einer UPS-Sendung: jeder hat eine eigene Nummer (auf seinem Etikett); die erste entspricht meist der Sendungsnummer."}
 {"uk": "Кілька коробок — розрахунок", "en": "Multiple boxes — calculation", "de": "Mehrere Kartons — Berechnung"}
 {"uk": "Кілька кількостей через «;», ціна — після «:» (без ціни — з Minerva). Перша — основна.", "en": "Several quantities separated by “;”, price after “:” (no price — taken from Minerva). The first is the main one.", "de": "Mehrere Mengen durch „;“ getrennt, Preis nach „:“ (ohne Preis — aus Minerva). Die erste ist die Hauptmenge."}
 {"uk": "Кілька магазинів", "en": "Several shops", "de": "Mehrere Shops"}
@@ -8292,6 +8328,7 @@
 {"uk": "Лист відправлено на", "en": "Email sent to", "de": "E-Mail gesendet an"}
 {"uk": "Лист з одноразовим посиланням (60 хв). Новий пароль завершує всі інші входи; покупець отримує лист «пароль змінено».", "en": "An email with a one-time link (60 min). The new password ends all other sessions; the buyer receives a “password changed” email.", "de": "E-Mail mit einem Einmal-Link (60 Min.). Das neue Passwort beendet alle anderen Anmeldungen; der Käufer erhält eine E-Mail „Passwort geändert“."}
 {"uk": "Лист з першим файлом", "en": "E-mail with the first file", "de": "E-Mail mit der ersten Datei"}
+{"uk": "Лист з цим файлом не знайдено у ваших скриньках.", "en": "The e-mail with this file was not found in your mailboxes.", "de": "Die E-Mail mit dieser Datei wurde in Ihren Postfächern nicht gefunden."}
 {"uk": "Лист з якого витягнуто дедлайн", "en": "E-mail the deadline was extracted from", "de": "E-Mail, aus der die Frist entnommen wurde"}
 {"uk": "Лист з іншої скриньки", "en": "Email from another mailbox", "de": "E-Mail aus einem anderen Postfach"}
 {"uk": "Лист завдання: від кого, кому, дата, тема, текст (новий, без цитати), вкладення (номери для read_attachment) і короткі попередні листи гілки.", "en": "The task e-mail: from, to, date, subject, text (new, without the quote), attachments (numbers for read_attachment) and short earlier e-mails of the thread.", "de": "Die Aufgaben-E-Mail: von, an, Datum, Betreff, Text (neu, ohne Zitat), Anhänge (Nummern für read_attachment) und kurze frühere E-Mails des Verlaufs."}
@@ -8426,6 +8463,7 @@
 {"uk": "Лише останні ревізії даташитів", "en": "Only the latest datasheet revisions", "de": "Nur die neuesten Datenblatt-Revisionen"}
 {"uk": "Лише перевіряє наявність — нічого не змінює (тому досить права читання).", "en": "Only checks availability — changes nothing (so the read permission is enough).", "de": "Prüft nur die Verfügbarkeit — ändert nichts (daher genügt das Leserecht)."}
 {"uk": "Лише перегляд", "en": "View only", "de": "Nur Ansicht"}
+{"uk": "Лише перегляд. Щоб виправити — додайте --apply", "en": "Preview only. To fix, add --apply", "de": "Nur Vorschau. Zum Korrigieren --apply hinzufügen"}
 {"uk": "Лише позначені поля беруться з Minerva; решта офера лишається такою, як на DigiKey зараз.", "en": "Only the selected fields are taken from Minerva; the rest of the offer stays as it is on DigiKey now.", "de": "Nur die ausgewählten Felder werden aus Minerva übernommen; der Rest des Offers bleibt so, wie er aktuell bei DigiKey ist."}
 {"uk": "Лише позначити «прибуло» — оприбуткує склад у Minerva", "en": "Only mark “arrived” — receives the stock in Minerva", "de": "Nur „eingetroffen“ markieren — bucht den Bestand in Minerva ein"}
 {"uk": "Лише покупці з країн активних зон, бо на сайті в списку країн тільки вони. Замовлення з інших країн Minerva відхилить і через API.", "en": "Only buyers from the countries of active zones, because only those are in the website’s country list. Minerva will also reject orders from other countries via the API.", "de": "Nur Käufer aus Ländern aktiver Zonen, da nur diese in der Länderliste der Website stehen. Aufträge aus anderen Ländern lehnt Minerva auch über die API ab."}
@@ -8993,6 +9031,7 @@
 {"uk": "Надіслано (", "en": "Sent (", "de": "Gesendet ("}
 {"uk": "Надіслано {0}", "en": "Sent {0}", "de": "Gesendet {0}"}
 {"uk": "Надіслано без змін", "en": "Sent unchanged", "de": "Unverändert gesendet"}
+{"uk": "Надіслано в UPS і прив'язано до {0}: {1}.", "en": "Sent to UPS and attached to {0}: {1}.", "de": "An UPS gesendet und mit {0} verknüpft: {1}."}
 {"uk": "Надіслано з правками", "en": "Sent with edits", "de": "Mit Änderungen gesendet"}
 {"uk": "Надіслано запрошень: {0}. Посилання діє 7 днів.", "en": "Invitations sent: {0}. The link is valid for 7 days.", "de": "Gesendete Einladungen: {0}. Der Link ist 7 Tage gültig."}
 {"uk": "Надіслано листів для нового пароля: {0}. Посилання діє 1 годину.", "en": "Emails for a new password sent: {0}. The link is valid for 1 hour.", "de": "Gesendete E-Mails für ein neues Passwort: {0}. Der Link ist 1 Stunde gültig."}
@@ -9399,6 +9438,7 @@
 {"uk": "Не вдалося перечитати день в askDANTE: {0}", "en": "Could not re-read the day in askDANTE: {0}", "de": "Der Tag konnte in askDANTE nicht neu gelesen werden: {0}"}
 {"uk": "Не вдалося повідомити", "en": "Could not notify", "de": "Benachrichtigung fehlgeschlagen"}
 {"uk": "Не вдалося показати цей блок.", "en": "Could not show this block.", "de": "Dieser Block konnte nicht angezeigt werden."}
+{"uk": "Не вдалося прочитати «{0}» з пошти — завантажте файл з ПК.", "en": "Could not read «{0}» from the mail — upload the file from your PC.", "de": "«{0}» konnte nicht aus der E-Mail gelesen werden — laden Sie die Datei vom PC hoch."}
 {"uk": "Не вдалося прочитати запит.", "en": "Could not read the request.", "de": "Die Anfrage konnte nicht gelesen werden."}
 {"uk": "Не вдалося прочитати зміни — оновіть сторінку й спробуйте ще раз.", "en": "Could not read the changes — refresh the page and try again.", "de": "Die Änderungen konnten nicht gelesen werden — aktualisieren Sie die Seite und versuchen Sie es erneut."}
 {"uk": "Не вдалося прочитати зображення", "en": "Could not read the image", "de": "Bild konnte nicht gelesen werden"}
@@ -9550,6 +9590,7 @@
 {"uk": "Невідомий перемикач: {0}", "en": "Unknown switch: {0}", "de": "Unbekannter Schalter: {0}"}
 {"uk": "Невідомий рівень важливості", "en": "Unknown importance level", "de": "Unbekannte Wichtigkeitsstufe"}
 {"uk": "Невідомий сайт: {0}", "en": "Unknown site: {0}", "de": "Unbekannte Website: {0}"}
+{"uk": "Невідомий тип документа для «{0}».", "en": "Unknown document type for «{0}».", "de": "Unbekannter Dokumenttyp für «{0}»."}
 {"uk": "Невідомий тип імпорту: {0}", "en": "Unknown import type: {0}", "de": "Unbekannter Importtyp: {0}"}
 {"uk": "Невідомий тип: {0}", "en": "Unknown type: {0}", "de": "Unbekannter Typ: {0}"}
 {"uk": "Невідомий трекер: {0}", "en": "Unknown tracker: {0}", "de": "Unbekannter Tracker: {0}"}
@@ -9965,6 +10006,8 @@
 {"uk": "Номер і умови", "en": "Number and terms", "de": "Nummer und Konditionen"}
 {"uk": "Номер інвойсу", "en": "Invoice number", "de": "Rechnungsnummer"}
 {"uk": "Номер інвойсу обов'язковий", "en": "Invoice number is required", "de": "Die Invoice-Nummer ist erforderlich"}
+{"uk": "Номер іншої посилки. Справжній — на етикетці цієї посилки: «🔧 автоперевірка» знайде його сама (з підтвердженням), «✏️ вручну» — вписати на сторінці посилки", "en": "Number of another parcel. The real one is on this parcel's label: «🔧 автоперевірка» finds it itself (with confirmation), «✏️ вручну» — enter it on the parcel page", "de": "Nummer eines anderen Pakets. Die richtige steht auf dem Etikett dieses Pakets: «🔧 автоперевірка» findet sie selbst (mit Bestätigung), «✏️ вручну» — auf der Paketseite eintragen"}
+{"uk": "Номер іншої посилки. Справжній — на етикетці цієї посилки: виправте в картці відправлення або python manage.py repair_parcel_tracking", "en": "Number of another parcel. The real one is on this parcel's label: fix it on the shipment page or run python manage.py repair_parcel_tracking", "de": "Nummer eines anderen Pakets. Die richtige steht auf dem Etikett dieses Pakets: in der Sendung korrigieren oder python manage.py repair_parcel_tracking ausführen"}
 {"uk": "Номер, з яким сайт надіслав замовлення (повтор того самого — те саме замовлення); у Minerva замовлення отримує PO", "en": "The number with which the site sent the order (a repeat of the same one — the same order); in Minerva the order gets PO", "de": "Die Nummer, mit der die Website den Auftrag gesendet hat (eine Wiederholung derselben – derselbe Auftrag); in Minerva erhält der Auftrag PO"}
 {"uk": "Номери днів тижня: 1 — понеділок … 7 — неділя. Свята й відпустки askDANTE враховуються окремо.", "en": "Weekday numbers: 1 — Monday … 7 — Sunday. askDANTE holidays and vacations are taken into account separately.", "de": "Wochentagsnummern: 1 – Montag … 7 – Sonntag. Feiertage und Urlaub aus askDANTE werden separat berücksichtigt."}
 {"uk": "Номери документів", "en": "Document numbers", "de": "Dokumentnummern"}
@@ -11784,6 +11827,7 @@
 {"uk": "Посилку доставлено. Налаштування складу — «Лише повідомити», тож оприбуткуйте вручну: «Status» → Received → «Зберегти» (або виберіть «✅ … одразу оприбуткувати» в налаштуваннях складу).", "en": "Parcel delivered. The stock setting is «Notify only», so receive it by hand: «Status» → Received → «Save» (or choose «✅ … receive right away» in the stock settings).", "de": "Paket zugestellt. Die Lagereinstellung ist «Nur benachrichtigen», also von Hand einbuchen: «Status» → Received → «Sichern» (oder «✅ … sofort einbuchen» in den Lagereinstellungen wählen)."}
 {"uk": "Посилку оформлено — ще кілька кроків, і можна братися за наступне замовлення.", "en": "The parcel is booked — a few more steps and you can move on to the next order.", "de": "Das Paket ist gebucht — noch ein paar Schritte, dann geht es mit dem nächsten Auftrag weiter."}
 {"uk": "Посилку підтверджено в магазині {0}.", "en": "Parcel confirmed in the shop on {0}.", "de": "Paket im Shop bestätigt am {0}."}
+{"uk": "Посилок з чужим трек-номером не знайдено.", "en": "No parcels with another parcel's tracking number found.", "de": "Keine Pakete mit fremder Sendungsnummer gefunden."}
 {"uk": "Послуга", "en": "Service", "de": "Service"}
 {"uk": "Послуга перевізника", "en": "Carrier service", "de": "Service des Versanddienstleisters"}
 {"uk": "Послуги", "en": "Services", "de": "Dienstleistungen"}
@@ -12572,6 +12616,7 @@
 {"uk": "Разом до сплати", "en": "Total due", "de": "Gesamt zu zahlen"}
 {"uk": "Разом з email при спрацюванні алерту. Вручну — кнопка", "en": "Together with the email when an alert triggers. Manually — the button", "de": "Zusammen mit der E-Mail, wenn eine Warnung ausgelöst wird. Manuell — die Schaltfläche"}
 {"uk": "Разом з ПДВ", "en": "Including VAT", "de": "Inkl. USt."}
+{"uk": "Разом за посилки", "en": "Total for parcels", "de": "Summe der Pakete"}
 {"uk": "Разом чекають: {0}", "en": "Waiting in total: {0}", "de": "Insgesamt wartend: {0}"}
 {"uk": "Разом, USD", "en": "Total, USD", "de": "Gesamt, USD"}
 {"uk": "Разом: {0} USD", "en": "Total: {0} USD", "de": "Gesamt: {0} USD"}
@@ -12610,6 +12655,7 @@
 {"uk": "Рахунок", "en": "Invoice", "de": "Rechnung"}
 {"uk": "Рахунок (Kauf auf Rechnung)", "en": "Invoice (Kauf auf Rechnung)", "de": "Rechnung (Kauf auf Rechnung)"}
 {"uk": "Рахунок (Rechnung)", "en": "Invoice (Rechnung)", "de": "Rechnung"}
+{"uk": "Рахунок / Proforma з вартістю, HS-кодами й країною походження. Митниця країни отримувача рахує за ним мито й податки.", "en": "Invoice / proforma with value, HS codes and country of origin. Destination customs calculate duties and taxes from it.", "de": "Rechnung / Proforma mit Wert, HS-Codes und Ursprungsland. Der Zoll des Empfängerlandes berechnet danach Zoll und Steuern."}
 {"uk": "Рахунок клієнта", "en": "Customer account", "de": "Kundenkonto"}
 {"uk": "Рахунок надіслано клієнту", "en": "Invoice sent to the customer", "de": "Rechnung an den Kunden gesendet"}
 {"uk": "Рахунок скасовано", "en": "Invoice cancelled", "de": "Rechnung storniert"}
@@ -13120,6 +13166,7 @@
 {"uk": "Серйозних проблем не знайдено", "en": "No serious issues found", "de": "Keine ernsthaften Probleme gefunden"}
 {"uk": "Серп", "en": "Aug", "de": "Aug"}
 {"uk": "Серпень", "en": "August", "de": "August"}
+{"uk": "Сертифікат походження для США / Канади / Мексики.", "en": "Certificate of origin for USA / Canada / Mexico.", "de": "Ursprungszeugnis für USA / Kanada / Mexiko."}
 {"uk": "Серійне виготовлення через постачальника", "en": "Series production via a supplier", "de": "Serienfertigung über einen Lieferanten"}
 {"uk": "Серія", "en": "Series", "de": "Serie"}
 {"uk": "Серії контактів з клієнтами: коли писати, дзвонити, чекати — і що робити залежно від реакції", "en": "Contact sequences with customers: when to write, call or wait — and what to do depending on the reaction", "de": "Kontaktserien mit Kunden: wann schreiben, anrufen, warten — und was je nach Reaktion zu tun ist"}
@@ -14439,6 +14486,7 @@
 {"uk": "Трек-номер і кур’єра в порожнє поле замовлення вносить сам.", "en": "Enters the tracking number and courier into an empty order field by itself.", "de": "Trägt Sendungsnummer und Kurier selbst in ein leeres Auftragsfeld ein."}
 {"uk": "Трек-номер, кур’єр, статус, строк відправки замовлення — застосовує людина (✓)", "en": "Tracking number, courier, status, shipping deadline of an order — applied by a person (✓)", "de": "Sendungsnummer, Kurier, Status, Versandfrist des Auftrags – wird von einer Person übernommen (✓)"}
 {"uk": "Трек-номер: {0}", "en": "Tracking number: {0}", "de": "Sendungsnummer: {0}"}
+{"uk": "Трек-номери коробок", "en": "Box tracking numbers", "de": "Sendungsnummern der Kartons"}
 {"uk": "Трек-номерів", "en": "Tracking numbers", "de": "Sendungsnummern"}
 {"uk": "Трекер", "en": "Tracker", "de": "Tracker"}
 {"uk": "Трекінг", "en": "Tracking", "de": "Tracking"}
@@ -14735,6 +14783,7 @@
 {"uk": "Усе перекладено. Нові написи з'являються після оновлення Minerva — «🔄 Зібрати написи з коду».", "en": "Everything is translated. New labels appear after a Minerva update — “🔄 Collect labels from code”.", "de": "Alles ist übersetzt. Neue Beschriftungen erscheinen nach einem Minerva-Update — „🔄 Beschriftungen aus dem Code sammeln“."}
 {"uk": "Усе проіндексовано й підтверджено — пошук готовий.", "en": "Everything is indexed and confirmed — search is ready.", "de": "Alles ist indexiert und bestätigt – die Suche ist bereit."}
 {"uk": "Усе підряд", "en": "All in sequence", "de": "Alles nacheinander"}
+{"uk": "Усе інше, що просить UPS або митниця.", "en": "Anything else UPS or customs ask for.", "de": "Alles andere, was UPS oder der Zoll verlangt."}
 {"uk": "Усе, що прив'язано до інших клієнтів (", "en": "Everything linked to the other customers (", "de": "Alles, was mit den anderen Kunden verknüpft ist ("}
 {"uk": "Усе, що ще не в посилках", "en": "Everything not yet in parcels", "de": "Alles, was noch in keinem Paket ist"}
 {"uk": "Успіх", "en": "Success", "de": "Erfolg"}
@@ -14842,6 +14891,7 @@
 {"uk": "Файл {0}.dymo не знайдено", "en": "File {0}.dymo not found", "de": "Datei {0}.dymo nicht gefunden"}
 {"uk": "Файл «FT220407_Datenblatt.pdf» прив'яжеться до товару FT220407 (артикул каталогу в назві файлу чи сторінки)", "en": "The file “FT220407_Datenblatt.pdf” will be linked to product FT220407 (catalog SKU in the file or page name)", "de": "Die Datei „FT220407_Datenblatt.pdf“ wird dem Artikel FT220407 zugeordnet (Artikelnummer aus dem Katalog im Datei- oder Seitennamen)"}
 {"uk": "Файл бекапу (.sql / .zip / .mbackup)", "en": "Backup file (.sql / .zip / .mbackup)", "de": "Sicherungsdatei (.sql / .zip / .mbackup)"}
+{"uk": "Файл більший за 10 МБ — UPS його не прийме.", "en": "The file is larger than 10 MB — UPS will not accept it.", "de": "Die Datei ist größer als 10 MB — UPS nimmt sie nicht an."}
 {"uk": "Файл більший за {0} МБ", "en": "The file is larger than {0} MB", "de": "Die Datei ist größer als {0} MB"}
 {"uk": "Файл даташита в картці товару — прив'язаний до товару (посилання на сайт виробника не завантажуються).", "en": "The datasheet file on the product card — linked to the product (links to the manufacturer's website are not downloaded).", "de": "Datenblatt-Datei in der Artikelkarte – dem Artikel zugeordnet (Links zur Website des Herstellers werden nicht heruntergeladen)."}
 {"uk": "Файл з ПК", "en": "File from PC", "de": "Datei vom PC"}
@@ -14854,6 +14904,7 @@
 {"uk": "Файл не завантажено", "en": "No file uploaded", "de": "Keine Datei hochgeladen"}
 {"uk": "Файл не згенеровано", "en": "File not generated", "de": "Datei nicht erstellt"}
 {"uk": "Файл не знайдено", "en": "File not found", "de": "Datei nicht gefunden"}
+{"uk": "Файл не знайдено (лист не у ваших скриньках або файл видалено) — завантажте його з ПК.", "en": "File not found (the e-mail is not in your mailboxes or the file was deleted) — upload it from your PC.", "de": "Datei nicht gefunden (E-Mail nicht in Ihren Postfächern oder Datei gelöscht) — laden Sie sie vom PC hoch."}
 {"uk": "Файл не знайдено.", "en": "File not found.", "de": "Datei nicht gefunden."}
 {"uk": "Файл не знайдено. Пересинхронізуйте пошту.", "en": "File not found. Re-sync the mail.", "de": "Datei nicht gefunden. Synchronisieren Sie die E-Mails erneut."}
 {"uk": "Файл не знайдено: {0}", "en": "File not found: {0}", "de": "Datei nicht gefunden: {0}"}
@@ -14907,6 +14958,7 @@
 {"uk": "Фонові завдання", "en": "Background tasks", "de": "Hintergrundaufgaben"}
 {"uk": "Форма Stripe відкривається прямо на сторінці сайту (Kasse), без переходу на сторінку Stripe; після оплати покупець лишається на сайті. Потрібен публічний ключ і сайт v022+. Вимкнено — перехід на сторінку Stripe і назад.", "en": "The Stripe form opens right on the site page (Kasse), without going to the Stripe page; after paying the customer stays on the site. Needs the publishable key and site v022+. Off — go to the Stripe page and back.", "de": "Das Stripe-Formular öffnet sich direkt auf der Website (Kasse), ohne Wechsel zur Stripe-Seite; nach der Zahlung bleibt der Kunde auf der Website. Nötig: öffentlicher Schlüssel und Website v022+. Aus — Wechsel zur Stripe-Seite und zurück."}
 {"uk": "Форма відправлення", "en": "Shipment form", "de": "Sendungsformular"}
+{"uk": "Форма доручення UPS на митне оформлення.", "en": "UPS authorisation form for customs clearance.", "de": "UPS-Autorisierungsformular für die Verzollung."}
 {"uk": "Форма містить незбережені зміни.", "en": "The form contains unsaved changes.", "de": "Das Formular enthält nicht gespeicherte Änderungen."}
 {"uk": "Формат", "en": "Format", "de": "Format"}
 {"uk": "Формат / Допустимі значення", "en": "Format / Allowed values", "de": "Format / Zulässige Werte"}
@@ -15590,6 +15642,7 @@
 {"uk": "Що в посилці — позиції закупівлі; прибула — оприбуткуйте закупівлю.", "en": "The parcel holds the purchase order lines; once it arrives, receive the purchase order.", "de": "Im Paket sind die Bestellpositionen; angekommen — Bestellung einbuchen."}
 {"uk": "Що в цій посилці", "en": "What is in this parcel", "de": "Was in diesem Paket ist"}
 {"uk": "Що в шаблоні", "en": "What is in the template", "de": "Inhalt der Vorlage"}
+{"uk": "Що в якій коробці, вага й розміри. Просять, коли коробок кілька або митниця перевіряє вміст.", "en": "What is in which box, weight and dimensions. Asked for when there are several boxes or customs check the contents.", "de": "Was in welchem Karton ist, Gewicht und Maße. Wird verlangt, wenn es mehrere Kartons gibt oder der Zoll den Inhalt prüft."}
 {"uk": "Що включати у Telegram/Email сповіщення для нових замовлень і DigiKey авто-підтвердження. Вимкніть зайві поля щоб зменшити обсяг повідомлення. Фото товарів: надсилаються окремо після тексту — 1 фото або альбом (до 10 фото).", "en": "What to include in Telegram/Email notifications for new orders and DigiKey auto-confirmations. Turn off unneeded fields to reduce the message size. Product photos: sent separately after the text — 1 photo or an album (up to 10 photos).", "de": "Was in die Telegram-/E-Mail-Benachrichtigungen zu neuen Aufträgen und DigiKey-Autobestätigungen aufgenommen wird. Deaktivieren Sie überflüssige Felder, um die Nachricht zu verkürzen. Artikelfotos: werden nach dem Text separat gesendet — 1 Foto oder ein Album (bis zu 10 Fotos)."}
 {"uk": "Що включати у брифінг", "en": "What to include in the briefing", "de": "Was im Briefing enthalten sein soll"}
 {"uk": "Що включає (Telegram приклад)", "en": "What it includes (Telegram example)", "de": "Was enthalten ist (Telegram-Beispiel)"}
@@ -16247,6 +16300,7 @@
 {"uk": "вимкнено: {0}", "en": "disabled: {0}", "de": "deaktiviert: {0}"}
 {"uk": "вимкніть якщо статус керується трекінгом перевізника (UPS/DHL) або виставляється вручну. Зазвичай вмикають поки трекінг-номер ще не отримано.", "en": "turn off if the status is controlled by carrier tracking (UPS/DHL) or set manually. It is usually turned on while the tracking number has not yet been received.", "de": "deaktivieren Sie dies, wenn der Status über die Sendungsverfolgung des Versanddienstleisters (UPS/DHL) gesteuert oder manuell gesetzt wird. Üblicherweise ist es aktiviert, solange die Sendungsnummer noch nicht vorliegt."}
 {"uk": "виняток", "en": "exception", "de": "Ausnahme"}
+{"uk": "виправити", "en": "fix", "de": "korrigieren"}
 {"uk": "виправити — {0}", "en": "fix — {0}", "de": "beheben — {0}"}
 {"uk": "виправлено {0}", "en": "fixed {0}", "de": "korrigiert {0}"}
 {"uk": "виробник", "en": "manufacturer", "de": "Hersteller"}
@@ -16716,6 +16770,8 @@
 {"uk": "за видом товару — каталог DigiKey: {0}", "en": "by product type — DigiKey catalog: {0}", "de": "nach Artikelart — DigiKey-Katalog: {0}"}
 {"uk": "за виручкою", "en": "by revenue", "de": "nach Umsatz"}
 {"uk": "за годину", "en": "per hour", "de": "pro Stunde"}
+{"uk": "за датою ближче до посилки {0} (перевірте)", "en": "by date closer to parcel {0} (check)", "de": "nach Datum näher an Paket {0} (prüfen)"}
+{"uk": "за датою — найближча посилка (перевірте)", "en": "by date — the nearest parcel (check)", "de": "nach Datum — das nächste Paket (prüfen)"}
 {"uk": "за джерелом «{0}»", "en": "by source “{0}”", "de": "nach Quelle „{0}“"}
 {"uk": "за добу", "en": "per day", "de": "pro Tag"}
 {"uk": "за замовленнями", "en": "by orders", "de": "nach Aufträgen"}
@@ -16728,6 +16784,7 @@
 {"uk": "за курсом\">💱 Перевести з іншої валюти…", "en": "at the rate\">💱 Convert from another currency…", "de": "zum Kurs\">💱 Aus anderer Währung umrechnen…"}
 {"uk": "за кількістю замовлень · {0} днів", "en": "by number of orders · {0} days", "de": "nach Anzahl der Aufträge · {0} Tage"}
 {"uk": "за мовою листа", "en": "by e-mail language", "de": "nach Sprache der E-Mail"}
+{"uk": "за назвою файлу", "en": "by file name", "de": "nach Dateiname"}
 {"uk": "за планом", "en": "on plan", "de": "planmäßig"}
 {"uk": "за посиланням", "en": "via link", "de": "per Link"}
 {"uk": "за правилами «💲 Ціни DigiKey ← Minerva»; щоб інакше — впишіть «кількість: ціна; …»", "en": "by the rules of “💲 DigiKey prices ← Minerva”; to do it differently, enter “quantity: price; …”", "de": "nach den Regeln von „💲 DigiKey-Preise ← Minerva“; für eine andere Preisgestaltung „Menge: Preis; …“ eintragen"}
@@ -17280,6 +17337,7 @@
 {"uk": "лис", "en": "Nov", "de": "Nov"}
 {"uk": "лист", "en": "e-mail", "de": "E-Mail"}
 {"uk": "лист #{0}", "en": "e-mail #{0}", "de": "E-Mail #{0}"}
+{"uk": "лист ABD", "en": "ABD e-mail", "de": "ABD-E-Mail"}
 {"uk": "лист {0} (Expresszuschlag + вкладення) видалено з БД", "en": "e-mail {0} (Expresszuschlag + attachment) deleted from the DB", "de": "E-Mail {0} (Expresszuschlag + Anhang) aus der DB gelöscht"}
 {"uk": "лист {0} (Rabatt) у кошику: {1}", "en": "e-mail {0} (Rabatt) in trash: {1}", "de": "E-Mail {0} (Rabatt) im Papierkorb: {1}"}
 {"uk": "лист {0} відсутній", "en": "e-mail {0} is missing", "de": "E-Mail {0} fehlt"}
@@ -17616,6 +17674,7 @@
 {"uk": "не вдалося — {0}", "en": "failed — {0}", "de": "fehlgeschlagen — {0}"}
 {"uk": "не вдалося: {0}", "en": "failed: {0}", "de": "fehlgeschlagen: {0}"}
 {"uk": "не вибрано жодного способу", "en": "no method selected", "de": "keine Zahlungsart ausgewählt"}
+{"uk": "не визначено", "en": "not detected", "de": "nicht erkannt"}
 {"uk": "не визначено країну доставки", "en": "the delivery country is not determined", "de": "das Lieferland ist nicht bestimmt"}
 {"uk": "не використовувати", "en": "do not use", "de": "nicht verwenden"}
 {"uk": "не використовується (гібрид вимкнено)", "en": "not used (hybrid disabled)", "de": "wird nicht verwendet (Hybrid deaktiviert)"}
@@ -18969,6 +19028,7 @@
 {"uk": "тип", "en": "type", "de": "Typ"}
 {"uk": "тип {0}", "en": "type {0}", "de": "Typ {0}"}
 {"uk": "тип документу", "en": "document type", "de": "Dokumenttyp"}
+{"uk": "тип не визначено", "en": "type not detected", "de": "Typ nicht erkannt"}
 {"uk": "тип пакування. Допустимі значення", "en": "packaging type. Allowed values", "de": "Verpackungstyp. Zulässige Werte"}
 {"uk": "тип співрозмовника — {0}: запити шукаються лише від клієнтів і нових контактів", "en": "correspondent type is {0}: requests are searched only from customers and new contacts", "de": "Gesprächspartnertyp ist {0}: Anfragen werden nur von Kunden und neuen Kontakten gesucht"}
 {"uk": "тип: SALE / QUOTE", "en": "type: SALE / QUOTE", "de": "Typ: SALE / QUOTE"}
@@ -19021,6 +19081,7 @@
 {"uk": "товарів, яких там немає", "en": "products that are not there", "de": "Artikel, die dort nicht vorhanden sind"}
 {"uk": "той самий", "en": "the same", "de": "derselbe"}
 {"uk": "той самий клієнт CRM", "en": "same CRM customer", "de": "derselbe CRM-Kunde"}
+{"uk": "той самий номер, що посилка {0}", "en": "same number as parcel {0}", "de": "dieselbe Nummer wie Paket {0}"}
 {"uk": "токен", "en": "token", "de": "Token"}
 {"uk": "токен протермінований. Зайди в Налаштування DigiKey → Marketplace OAuth → авторизуй.", "en": "the token has expired. Go to DigiKey settings → Marketplace OAuth → authorize.", "de": "das Token ist abgelaufen. Zu den DigiKey-Einstellungen → Marketplace OAuth wechseln und autorisieren."}
 {"uk": "токенів", "en": "tokens", "de": "Tokens"}
@@ -19096,6 +19157,8 @@
 {"uk": "у власника немає права давати завдання агенту", "en": "the owner may not give tasks to the agent", "de": "der Inhaber darf dem Agenten keine Aufgaben geben"}
 {"uk": "у всій вашій пошті", "en": "in all your email", "de": "in Ihrer gesamten E-Mail"}
 {"uk": "у документі будуть вони, а не Minerva", "en": "the document will contain these, not Minerva's", "de": "im Dokument stehen diese, nicht die von Minerva"}
+{"uk": "у документі трек-номер посилки {0} ({1})", "en": "the document has the tracking number of parcel {0} ({1})", "de": "im Dokument steht die Sendungsnummer von Paket {0} ({1})"}
+{"uk": "у документі трек-номер цієї посилки {0}", "en": "the document has this parcel's tracking number {0}", "de": "im Dokument steht die Sendungsnummer dieses Pakets {0}"}
 {"uk": "у дорученні не вказано, кому пересилати", "en": "the instruction does not say who to forward to", "de": "im Auftrag steht nicht, an wen weitergeleitet wird"}
 {"uk": "у дорученні немає жодної умови", "en": "the rule has no conditions", "de": "die Regel enthält keine Bedingung"}
 {"uk": "у завдання немає листа", "en": "the task has no e-mail", "de": "die Aufgabe hat keine E-Mail"}
@@ -19153,6 +19216,7 @@
 {"uk": "у тексті адреса з листа перевізника ({0}) — вона для нас, не для клієнта; приберіть її.", "en": "the text contains an address from the carrier's email ({0}) — it is for us, not for the customer; remove it.", "de": "im Text steht eine Adresse aus der E-Mail des Versanddienstes ({0}) — sie ist für uns, nicht für den Kunden; bitte entfernen."}
 {"uk": "у тексті листа (HTML-версії немає)", "en": "in the e-mail text (no HTML version)", "de": "im E-Mail-Text (keine HTML-Version vorhanden)"}
 {"uk": "у тексті немає потрібних слів", "en": "the text does not contain the required words", "de": "im Text fehlen die erforderlichen Wörter"}
+{"uk": "у тексті: «{0}»", "en": "in the text: «{0}»", "de": "im Text: «{0}»"}
 {"uk": "у темі листа прив'язує лист до проєкту автоматично.", "en": "in the e-mail subject links the e-mail to the project automatically.", "de": "im Betreff der E-Mail ordnet die E-Mail automatisch dem Projekt zu."}
 {"uk": "у темі є «{0}» (Слова в темі)", "en": "the subject contains “{0}” (Words in the subject)", "de": "im Betreff steht „{0}“ (Wörter im Betreff)"}
 {"uk": "у теці Minerva на NAS (", "en": "in the Minerva folder on the NAS (", "de": "im Minerva-Ordner auf dem NAS ("}

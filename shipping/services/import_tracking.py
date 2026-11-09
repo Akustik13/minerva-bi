@@ -37,6 +37,13 @@ def _detect_carrier_type(tracking: str, carrier_name: str = "") -> Tuple[str, st
     return Carrier.CarrierType.OTHER, display
 
 
+def tracking_numbers_in(value: str) -> list:
+    """Окремі трек-номери з поля: «1Z…, 1Z…», рядками, «Part1: JD… Part2: JD…» (DigiKey)."""
+    import re
+    s = re.sub(r"\bPart\s*\d+\s*:", " ", value or "", flags=re.IGNORECASE)
+    return [p for p in re.split(r"[,;\s]+", s) if p]
+
+
 def ensure_shipment_for_order(
     order,
     tracking_number: str,
@@ -46,7 +53,8 @@ def ensure_shipment_for_order(
     Знаходить або створює Shipment для замовлення.
 
     Повертає (shipment, created: bool).
-    Якщо Shipment вже є — оновлює tracking_number і підвищує статус до IN_TRANSIT.
+    Відправлення з цим трек-номером (або без трек-номера) вже є — дописує номер, якщо його не було, і підвищує
+    статус до IN_TRANSIT; номер іншого відправлення не змінює — тоді створює нове.
     """
     from shipping.models import Carrier, Shipment
 
@@ -69,11 +77,17 @@ def ensure_shipment_for_order(
         )
         logger.info("import_tracking: created Carrier '%s' type=%s", display_name, carrier_type)
 
-    # Перевіряємо чи вже є Shipment для цього замовлення
-    existing = Shipment.objects.filter(order=order).first()
+    # Відправлення з цим трек-номером уже є — воно. Інакше — відправлення без трек-номера (чернетка).
+    # Трек-номер ІНШОГО відправлення не перезаписується ніколи: замовлення частинами має кілька посилок, і
+    # раніше «📦 Відстежувати» ставило номер першої посилки в найновішу (дві посилки з одним номером).
+    numbers = {t.upper() for t in tracking_numbers_in(tracking_number)} or {tracking_number.upper()}
+    live = list(Shipment.objects.filter(order=order).exclude(status=Shipment.Status.CANCELLED).order_by("-pk"))
+    existing = next((s for s in live if (s.tracking_number or "").strip().upper() in numbers), None)
+    if existing is None:
+        existing = next((s for s in live if not (s.tracking_number or "").strip()), None)
     if existing:
         changed = False
-        if tracking_number and existing.tracking_number != tracking_number:
+        if not (existing.tracking_number or "").strip():
             existing.tracking_number = tracking_number
             changed = True
         if existing.status in (

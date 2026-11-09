@@ -373,6 +373,11 @@ class Shipment(models.Model):
                                            max_length=200, blank=True, default="")
     tracking_number     = models.CharField("Трекінг номер", max_length=200,
                                            blank=True, default="")
+    package_tracking    = models.JSONField(
+        "Трек-номери коробок", default=list, blank=True,
+        help_text="Кілька коробок в одному відправленні UPS: у кожної свій номер (на її етикетці); "
+                  "перший зазвичай збігається з трек-номером відправлення.",
+    )
     label_url           = models.URLField("URL етикетки (PDF)", max_length=500,
                                           blank=True, default="")
     customs_url         = models.URLField("URL митної декларації (PDF)", max_length=500,

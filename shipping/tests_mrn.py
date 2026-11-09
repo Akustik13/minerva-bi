@@ -127,3 +127,101 @@ class MrnFromMailTests(BookingBase):
             r = self.client.get(self.urls["ups"][0] + "?service_code=65")
         self.assertContains(r, f'value="{MRN}"')
         self.assertContains(r, "Підставлено з листа ABD")
+
+
+class AbdToUpsTests(MrnFromMailTests):
+    """📑 ABD в UPS до вже оформленої посилки: Paperless upload (004) + PushToImageRepository."""
+    test_confirm_page_prefills_mrn_from_mail = None      # сторінка оформлення — лише для чернетки
+
+    def setUp(self):
+        super().setUp()
+        Shipment.objects.filter(pk=self.shipment.pk).update(
+            status=Shipment.Status.LABEL_READY, tracking_number="1Z0R6B300439360978",
+            carrier_shipment_id="1Z0R6B300439360978", recipient_country="QA")
+        self.url = f"/admin/shipping/shipment/{self.shipment.pk}/ups-abd/"
+        self.detail = f"/admin/shipping/shipment/{self.shipment.pk}/detail/"
+
+    def _abd_mail(self, user=None, address="me@sevskiy.de"):
+        msg = self._mail(user or self.user, address)
+        (self.media / "mail").mkdir(exist_ok=True)
+        (self.media / "mail" / "abd.pdf").write_bytes(b"%PDF-1.4 ABD")
+        msg.attachments = [{"name": "ABD_187472.pdf", "file_path": "mail/abd.pdf", "content_type": "application/pdf"}]
+        msg.save(update_fields=["attachments"])
+        return msg
+
+    @mock.patch.object(UPSClient, "push_paperless_documents", return_value="G1")
+    @mock.patch.object(UPSClient, "upload_paperless_document", return_value="D" * 26)
+    def test_from_mail(self, upload, push):
+        msg = self._abd_mail()
+        page = self.client.get(self.detail)
+        self.assertContains(page, "ABD_187472.pdf")
+        r = self.client.post(self.url, {"abd_ref": f"msg:{msg.pk}:0"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(upload.call_args.args[:2], (b"%PDF-1.4 ABD", "ABD_187472.pdf"))
+        self.assertEqual(upload.call_args.kwargs, {"document_type": "004", "file_format": "pdf"})
+        ids, ups_id, tracking, _when = push.call_args.args
+        self.assertEqual((ids, ups_id, tracking), (["D" * 26], "1Z0R6B300439360978", ["1Z0R6B300439360978"]))
+        self.assertIn("UPS_DOC | ", self.reload().notes)
+        self.assertContains(self.client.get(self.detail), "Надіслано")
+
+    @mock.patch.object(UPSClient, "push_paperless_documents", return_value="")
+    @mock.patch.object(UPSClient, "upload_paperless_document", return_value="D" * 26)
+    def test_from_pc(self, upload, push):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.post(self.url, {"abd_file": SimpleUploadedFile("ABD.png", b"\x89PNG..", "image/png")})
+        self.assertEqual(upload.call_args.kwargs["file_format"], "png")
+        push.assert_called_once()
+
+    @mock.patch.object(UPSClient, "upload_paperless_document")
+    def test_other_mailbox_and_bad_format_refused(self, upload):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        other = User.objects.create_user("colleague", password="x", is_staff=True)
+        msg = self._abd_mail(other, "colleague@sevskiy.de")
+        r = self.client.post(self.url, {"abd_ref": f"msg:{msg.pk}:0"})
+        self.assertTrue(any("не знайдено" in m for m in self.messages(r)))
+        r = self.client.post(self.url, {"abd_file": SimpleUploadedFile("x.exe", b"MZ", "application/octet-stream")})
+        self.assertTrue(any("UPS приймає лише" in m for m in self.messages(r)))
+        upload.assert_not_called()
+
+    @mock.patch.object(UPSClient, "upload_paperless_document")
+    def test_ups_error_keeps_notes(self, upload):
+        from shipping.ups_client import UPSError
+        upload.side_effect = UPSError("Upload Forms Created Offline not enabled")
+        msg = self._abd_mail()
+        r = self.client.post(self.url, {"abd_ref": f"msg:{msg.pk}:0"})
+        self.assertTrue(any("UPS не прийняв документи" in m for m in self.messages(r)))
+        self.assertNotIn("UPS_ABD", self.reload().notes or "")
+
+    def test_preview_own_file_only(self):
+        msg = self._abd_mail()
+        preview = f"/admin/shipping/shipment/{self.shipment.pk}/ups-abd/preview/"
+        page = self.client.get(self.detail)
+        self.assertContains(page, "data-abd-view")
+        r = self.client.get(preview, {"ref": f"msg:{msg.pk}:0"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(b"".join(r), b"%PDF-1.4 ABD")
+        self.assertEqual(r["X-Frame-Options"], "SAMEORIGIN")
+        other = User.objects.create_user("colleague", password="x", is_staff=True)
+        foreign = self._abd_mail(other, "colleague@sevskiy.de")
+        self.assertEqual(self.client.get(preview, {"ref": f"msg:{foreign.pk}:0"}).status_code, 404)
+        self.assertEqual(self.client.get(preview, {"ref": "msg:999:0"}).status_code, 404)
+
+    def test_draft_and_get_do_nothing(self):
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        Shipment.objects.filter(pk=self.shipment.pk).update(status=Shipment.Status.DRAFT)
+        self.assertNotContains(self.client.get(self.detail), "Документи для митниці в UPS")
+
+    def test_push_payload(self):
+        from datetime import datetime as _dt
+        from shipping.models import Carrier
+        client = UPSClient(carrier=Carrier(name="UPS", carrier_type="ups", api_key="a", api_secret="b",
+                                           connection_uuid="A1B2C3"))
+        with mock.patch.object(UPSClient, "_post", return_value={"PushToImageRepositoryResponse": {
+                "Response": {"ResponseStatus": {"Code": "1"}}, "FormsGroupID": "G1"}}) as post:
+            self.assertEqual(client.push_paperless_documents(["D" * 26], "1ZX", ["1ZX"], _dt(2026, 11, 5, 11, 27, 15)),
+                             "G1")
+        endpoint, body = post.call_args.args[:2]
+        req = body["PushToImageRepositoryRequest"]
+        self.assertEqual(endpoint, "/api/paperlessdocuments/v2/image")
+        self.assertEqual((req["ShipmentDateAndTime"], req["ShipmentType"], req["ShipperNumber"]),
+                         ("2026-11-05-11.27.15", "1", "A1B2C3"))

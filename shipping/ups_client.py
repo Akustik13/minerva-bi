@@ -841,6 +841,10 @@ class UPSClient:
         # Для multi-package: збираємо ВСІ label-и і об'єднуємо їх
         tracking = results_data.get('ShipmentIdentificationNumber', '')
         label_b64 = ''
+        # Трек-номер кожної коробки (надрукований на її етикетці)
+        package_tracking = [p.get('TrackingNumber', '') for p in
+                            (pkg_results if isinstance(pkg_results, list) else [pkg_results or {}])
+                            if isinstance(p, dict) and p.get('TrackingNumber')]
 
         if isinstance(pkg_results, list):
             # Кілька пакетів — витягнути label з кожного
@@ -916,6 +920,7 @@ class UPSClient:
 
         return {
             'tracking_number':  tracking,
+            'package_tracking': package_tracking,
             'shipment_id':      results_data.get('ShipmentIdentificationNumber', ''),
             'label_base64':     label_b64,     # A4 PDF
             'label_gif_base64': gif_b64,       # original GIF from UPS
@@ -930,10 +935,10 @@ class UPSClient:
     # ── Paperless Documents ───────────────────────────────────────────────────
 
     def upload_paperless_document(self, pdf_bytes: bytes, filename: str,
-                                  document_type: str = '002') -> str:
+                                  document_type: str = '002', file_format: str = 'pdf') -> str:
         """
         POST /api/paperlessdocuments/v2/upload → DocumentID для InternationalForms.
-        document_type '002' = Commercial Invoice.
+        document_type '002' = Commercial Invoice, '004' = Export Accompanying Document (ABD).
         """
         payload = {
             'UploadRequest': {
@@ -941,7 +946,7 @@ class UPSClient:
                 'ShipperNumber': self.carrier.connection_uuid,
                 'UserCreatedForm': {
                     'UserCreatedFormFileName':     filename[:100],
-                    'UserCreatedFormFileFormat':   'pdf',
+                    'UserCreatedFormFileFormat':   file_format,
                     'UserCreatedFormDocumentType': document_type,
                     'UserCreatedFormFile':         base64.b64encode(pdf_bytes).decode(),
                 },
@@ -961,6 +966,34 @@ class UPSClient:
         if not doc_ids:
             raise UPSError(f'UPS Paperless: відповідь без DocumentID: {str(data)[:300]}')
         return doc_ids
+
+    def push_paperless_documents(self, document_ids, shipment_id: str, tracking_numbers,
+                                 shipped_at) -> str:
+        """
+        POST /api/paperlessdocuments/v2/image (PushToImageRepository) — прив'язати завантажені документи до вже
+        оформленого відправлення (малі посилки: ShipmentType 1, дата й час оформлення, трек-номери).
+        → FormsGroupID ('' — UPS не повернув).
+        """
+        payload = {
+            'PushToImageRepositoryRequest': {
+                'Request': {'TransactionReference': {'CustomerContext': (shipment_id or '')[:35]}},
+                'ShipperNumber': self.carrier.connection_uuid,
+                'FormsHistoryDocumentID': {'DocumentID': list(document_ids)[:13]},
+                'ShipmentIdentifier': (shipment_id or '')[:19],
+                'ShipmentDateAndTime': shipped_at.strftime('%Y-%m-%d-%H.%M.%S'),
+                'ShipmentType': '1',
+                'TrackingNumber': [t for t in tracking_numbers if t][:20],
+            },
+        }
+        data = self._post(
+            '/api/paperlessdocuments/v2/image', payload,
+            extra_headers={'ShipperNumber': self.carrier.connection_uuid},
+        )
+        resp = (data or {}).get('PushToImageRepositoryResponse', {})
+        status = (resp.get('Response', {}).get('ResponseStatus', {}) or {}).get('Code', '')
+        if status and str(status) != '1':
+            raise UPSError(f'UPS Paperless: документ не прив\'язано: {str(data)[:300]}')
+        return resp.get('FormsGroupID', '') or ''
 
     # ── Tracking ──────────────────────────────────────────────────────────────
 
