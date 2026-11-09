@@ -104,6 +104,7 @@ _TEST_JS = """(function () {
         if (d.to) lines.push(L.to + ' ' + (d.to_name ? d.to_name + ' <' + d.to + '>' : d.to));
         if (d.cc && d.cc.length) lines.push(L.cc + ' ' + d.cc.join(', '));
         if (d.order) lines.push(L.order + ' ' + d.order + (d.tracking ? ' · ' + L.tracking + ' ' + d.tracking : ''));
+        if (d.repeat) lines.push(d.repeat);
         if (d.subject) lines.push(L.subject + ' ' + d.subject);
         if (d.attachments) lines.push(L.att + ' ' + (d.attachments.join(', ') || L.none));
         if (d.options) lines.push(L.opts + ' ' + d.options);
@@ -139,10 +140,11 @@ class AgentRuleAdmin(admin.ModelAdmin):
         }),
         ('Що робити', {'fields': ('instruction', 'daily_limit')}),
         ('✉️ Лист: відповідь, клієнту замовлення або пересилання', {
-            'fields': ('mode', 'send_delay_minutes', 'forward_to', 'cc', 'streak'),
+            'fields': ('mode', 'send_delay_minutes', 'forward_to', 'cc', 'repeat_days', 'streak'),
             'description': 'Для «Відповідати на такі листи» і «📨 Писати клієнту замовлення». Клієнту — замовлення, '
                            'чий трек-номер (у замовленні чи його відправленні) є в листі; на адресу клієнта із '
-                           'замовлення, тому самому клієнту про те саме замовлення — не частіше ніж раз на 14 днів.'}),
+                           'замовлення. Повторний лист про те саме замовлення — за «🔁 Повторно про те саме '
+                           'замовлення». Кожен лист агента в пошті позначено «🤖 агент» (бачите лише ви).'}),
         ('📬 Листи агента: важливо, запит на прочитання, нагадування', {
             'fields': ('opt_important', 'opt_receipt', 'remind_days', 'remind_until'),
             'description': 'Для відповідей, листів клієнту замовлення й пересилань — як галочки в «Написати». '
@@ -302,8 +304,28 @@ class AgentRuleAdmin(admin.ModelAdmin):
     def get_urls(self):
         from django.urls import path
         own = [path('<int:pk>/test/<int:msg_pk>/', self.admin_site.admin_view(self.test_view),
-                    name='agent_agentrule_test')]
+                    name='agent_agentrule_test'),
+               path('<int:pk>/retry/<int:run_pk>/', self.admin_site.admin_view(self.retry_view),
+                    name='agent_agentrule_retry')]
         return own + super().get_urls()
+
+    def retry_view(self, request, pk, run_pk):
+        """POST «↻ Обробити ще раз» з «📜 Останні листи»: пропущений лист / лист з помилкою — знову в чергу."""
+        if request.method != 'POST':
+            return redirect(reverse('admin:agent_agentrule_change', args=[pk]))
+        rule = self.get_queryset(request).filter(pk=pk).first()
+        if rule is None or not self.has_change_permission(request, rule):
+            raise Http404
+        run = rule.runs.filter(pk=run_pk).select_related('rule').first()
+        if run is None:
+            raise Http404
+        why = agent_mail.retry(run)
+        if why:
+            messages.error(request, f'↻ Не вдалося: {why}')
+        else:
+            messages.success(request, f'↻ Лист «{run.message.subject or "(без теми)"}» знову в черзі — агент '
+                                      f'обробить його протягом хвилини за теперішніми налаштуваннями.')
+        return redirect(reverse('admin:agent_agentrule_change', args=[pk]) + '#fieldset-0-8-heading')
 
     def test_view(self, request, pk, msg_pk):
         """POST: що агент зробив би з цим листом (agent/rule_check.one) — JSON; нічого не зберігає й не надсилає."""
@@ -339,12 +361,26 @@ class AgentRuleAdmin(admin.ModelAdmin):
             return 'Ще жодного листа — агент перевіряє нові листи щохвилини.'
         return format_html(
             '<table style="width:100%"><tbody>{}</tbody></table>',
-            format_html_join('', '<tr><td style="white-space:nowrap">{}</td><td>{}</td><td>{} {}</td>'
-                                 '<td>{}</td><td>{}</td><td>{}</td></tr>',
+            format_html_join('', '<tr><td style="white-space:nowrap">{}</td><td>{}</td><td>{} {}{}</td>'
+                                 '<td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>',
                              ((timezone.localtime(r.created_at).strftime('%d.%m %H:%M'), _mail_link(r.message),
                                STATUS_ICONS.get(r.status, ''), r.get_status_display(),
-                               r.get_outcome_display() if r.outcome else '', r.reason, _result_link(r))
+                               ' ↻' if r.retried_at else '',
+                               r.get_outcome_display() if r.outcome else '', r.reason, _result_link(r),
+                               self._retry_button(obj, r))
                               for r in runs)))
+
+    @staticmethod
+    def _retry_button(rule, run):
+        """«↻ Ще раз» — кнопка форми картки (formaction): POST з CSRF картки на retry_view, поля форми не зберігаються."""
+        if run.status not in agent_mail.RETRY_STATES:
+            return ''
+        return format_html(
+            '<button type="submit" class="button" formaction="{}" formmethod="post" formnovalidate '
+            'title="{}" style="white-space:nowrap">↻ Ще раз</button>',
+            reverse('admin:agent_agentrule_retry', args=[rule.pk, run.pk]),
+            'Обробити цей лист ще раз за теперішніми налаштуваннями доручення (навіть давній). Інші зміни '
+            'в картці при цьому не зберігаються.')
 
 
 # ── ⏰ Регулярні завдання агенту ──────────────────────────────────────────────
@@ -499,12 +535,31 @@ class AgentRunAdmin(admin.ModelAdmin):
     search_fields = ('message__subject', 'message__from_email', 'reason')
     list_select_related = ('rule', 'message')
     readonly_fields = ('rule', 'mail', 'status', 'reason', 'reply', 'model', 'result', 'outcome',
-                       'created_at', 'started_at', 'finished_at')
+                       'created_at', 'started_at', 'finished_at', 'retried_at')
     fields = readonly_fields
     date_hierarchy = 'created_at'
+    actions = ['retry_runs']
 
     def get_queryset(self, request):
         return super().get_queryset(request).filter(rule__account__user=request.user)
+
+    def has_retry_permission(self, request):
+        return request.user.has_perm('agent.change_agentrule')
+
+    @admin.action(description='↻ Обробити ще раз (пропущені й з помилкою)', permissions=['retry'])
+    def retry_runs(self, request, queryset):
+        done, refused = 0, []
+        for run in queryset.select_related('rule', 'message'):
+            why = agent_mail.retry(run)
+            if why:
+                refused.append(f'«{run.message.subject[:60] or "(без теми)"}» — {why}')
+            else:
+                done += 1
+        if done:
+            messages.success(request, f'↻ Знову в черзі: {done} — агент обробить протягом хвилини за теперішніми '
+                                      f'налаштуваннями доручень.')
+        for line in refused[:5]:
+            messages.warning(request, line)
 
     def has_add_permission(self, request):
         return False

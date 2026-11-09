@@ -608,6 +608,7 @@ def inbox_view(request):
         for d in drafts:
             d.preview = _drafts.preview(d)
             d.n_attachments = len(d.attachments or [])
+        _attach_agent_drafts(account, drafts)
     else:
         total = qs.count()
         start = (page - 1) * per_page
@@ -621,6 +622,7 @@ def inbox_view(request):
     _attach_work_cats(emails)
     _attach_quote_tags(emails)
     _followups.attach(emails)   # ⏰ / 📬 / ⚠️ на надісланих листах
+    _attach_agent_marks(account, emails)
     _attach_importance(emails)
     _attach_kb_tags(emails)
     _attach_logos(emails)
@@ -807,6 +809,7 @@ def thread_preview_view(request, thread_pk):
     links = _mail_links(emails)
     _attach_logos(emails)
     _attach_importance(emails)
+    _attach_agent_marks(account, emails)
     reply_to_addr, reply_cc = _reply_addresses(account, emails[-1]) if emails else ('', [])
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
@@ -838,6 +841,23 @@ def _agent_runs(emails) -> list:
         logger.warning('agent runs for preview: %s', e)
         return []
     return [runs[m.pk][0] for m in emails if runs.get(m.pk)]
+
+
+def _attach_agent_marks(account, emails):
+    """msg.agent_mark — «🤖 агент»: лист написав агент Minerva (agent/letters.py; лише в Minerva, клієнт не бачить)."""
+    try:
+        from agent import letters
+    except ImportError:
+        return
+    letters.attach(account, emails)
+
+
+def _attach_agent_drafts(account, drafts):
+    try:
+        from agent import letters
+    except ImportError:
+        return
+    letters.draft_marks(account, drafts)
 
 
 def _attach_importance(emails):
@@ -882,6 +902,7 @@ def message_preview_view(request, message_pk):
     links = _mail_links([msg])
     _attach_logos([msg])
     _attach_importance([msg])
+    _attach_agent_marks(account, [msg])
     reply_to_addr, reply_cc = _reply_addresses(account, msg)
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
@@ -1409,7 +1430,8 @@ def _handle_send(request, account, reply_to=None):
             mark_sent_refs(offer_refs, result.get('message_id', ''), user=request.user)
         if request.POST.get('draft_pk'):   # лист із чернетки пішов — чернетка (і її файли) більше не потрібна
             from email_assistant import drafts as _drafts
-            _drafts.discard(account, request.POST['draft_pk'], how='sent', text=body)
+            _drafts.discard(account, request.POST['draft_pk'], how='sent', text=body,
+                            message_id=result.get('message_id', ''))
 
     return JsonResponse(result)
 
@@ -2276,7 +2298,7 @@ def schedule_email_api(request):
     _save_contacts(request.user, to_list + cc_list)
     if not is_json and request.POST.get('draft_pk'):   # чернетку заплановано — у листа свої копії файлів
         from email_assistant import drafts as _drafts
-        _drafts.discard(account, request.POST['draft_pk'], how='scheduled', text=body)
+        _drafts.discard(account, request.POST['draft_pk'], how='scheduled', text=body, scheduled=scheduled)
 
     return JsonResponse({
         'ok':          True,

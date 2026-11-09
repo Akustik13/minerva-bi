@@ -447,6 +447,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 .em-tag.quote{--c:#c026d3}
 .em-tag.fu{--c:#d97706;cursor:default;max-width:none}.em-tag.fu.ok{--c:#16a34a}.em-tag.fu.bad{--c:#dc2626}
 .em-tag.fu.done{--c:#9aa0a6}
+.em-tag.ag{--c:#7c3aed;cursor:default;max-width:none}
 .em-imp{color:#e53935;font-weight:700;margin-right:3px}
 .em-tag.kb{--c:#0891b2;max-width:none;cursor:default}
 .em-tag.kb.kb-wait{--c:#d97706}.em-tag.kb.kb-fail{--c:#dc2626}
@@ -904,6 +905,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
           </div>
           <div class="em-row-subj">{% if d.subject %}{{ d.subject|truncatechars:120 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
           <div class="em-row-meta">
+            {% if d.agent_mark %}<span class="em-tag ag" title="{{ d.agent_mark.title }}">🤖 {% trans "агент" %}</span>{% endif %}
             <span class="em-tag" style="cursor:default" title="{% trans "Звідки чернетка" %}">{{ d.get_source_display }}</span>
             {% if d.reply_to_id %}<span class="em-tag" style="cursor:default;--c:#3b82f6" title="{% trans "Відповідь на лист" %}: {{ d.reply_to.subject }}">↩ {% trans "відповідь" %}</span>{% endif %}
             {% if d.n_attachments %}<span class="em-tag" style="cursor:default;--c:#64748b">📎 {{ d.n_attachments }}</span>{% endif %}
@@ -968,8 +970,9 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
             </div>
           </div>
           <div class="em-row-subj">{% if msg.importance %}<span class="em-imp" title="{{ msg.imp_text }}">{% if msg.importance == 'urgent' %}‼️{% else %}❗{% endif %}</span>{% endif %}{% if msg.subject %}{{ msg.subject|truncatechars:120 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
-          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag or msg.wcats or msg.kb_tag or msg.fu_state %}
+          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag or msg.project_tags or msg.quote_request_tag or msg.wcats or msg.kb_tag or msg.fu_state or msg.agent_mark %}
           <div class="em-row-meta">
+            {% if msg.agent_mark %}<span class="em-tag ag" title="{{ msg.agent_mark.title }}">🤖 {% trans "агент" %}</span>{% endif %}
             {% if msg.fu_state %}<span class="em-tag fu {{ msg.fu_state.tone }}" title="{{ msg.fu_state.text }}">{{ msg.fu_state.short }}</span>{% endif %}
             {% for wc in msg.wcats %}
             <button class="em-tag wcat" style="--c:{{ wc.color }}" onclick="filterMailBy(event, 'wcat', {{ wc.pk }})"

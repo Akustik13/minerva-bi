@@ -88,8 +88,14 @@ class Command(BaseCommand):
 
     @staticmethod
     def _after_sent(scheduled, result):
-        """Надіслано: Angebot у вкладенні → версія «надіслана»; збережені файли листа — з диска."""
+        """Надіслано: Angebot у вкладенні → версія «надіслана»; збережені файли листа — з диска; лист агента —
+        мітка «🤖 агент» у пошті (agent/letters.py)."""
         from email_assistant import attachments
+        try:
+            from agent import letters
+            letters.scheduled_sent(scheduled, result.get('message_id', ''))
+        except Exception as e:  # noqa: BLE001 — лист уже пішов
+            logger.warning('send_scheduled pk=%s: мітку листа агента не записано: %s', scheduled.pk, e)
         items = [i for i in scheduled.attachments or [] if isinstance(i, dict)]
         offer_refs = [i['ref'] for i in items if str(i.get('ref', '')).startswith('offer:')]
         try:

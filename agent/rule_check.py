@@ -51,6 +51,11 @@ def plan(rule) -> list:
         lines.append('📨 Агент знаходить у листі трек-номер замовлення Minerva і (AI) пише клієнту цього замовлення '
                      'за інструкцією; немає замовлення з таким трек-номером — пропускає.')
         lines.append(_mode_text(rule) + '.')
+        if rule.repeat_days == AgentRule.REPEAT_NEVER:
+            lines.append('🔁 Про те саме замовлення клієнту вдруге не пише.')
+        else:
+            lines.append(f'🔁 Про те саме замовлення ще раз — {rule.get_repeat_days_display()}: повторне нагадування '
+                         f'з датою попереднього листа; чернетка, яку ви ще не надіслали, — друга не створюється.')
     elif rule.kind == AgentRule.MAIL_FORWARD:
         to = ', '.join(agent_mail.forward_list(rule)) or '— не вказано, кому! —'
         lines.append(f'📤 Пересилає лист з усіма вкладеннями на {to}, без AI; над листом — текст «Що робити».')

@@ -101,15 +101,18 @@ def preview(draft, limit=220) -> str:
     return ' '.join(text.split())[:limit]
 
 
-def discard(account, pk, how='deleted', text='') -> bool:
+def discard(account, pk, how='deleted', text='', message_id='', scheduled=None) -> bool:
     """Чернетку надіслано / заплановано / видалено (how: sent / scheduled / deleted) → прибрати (файли — сигнал
-    post_delete). Чернетка агента — спершу його журнал (agent.mail.draft_closed: надіслано без змін чи з правками)."""
+    post_delete). Чернетка агента — спершу його журнал (agent.mail.draft_closed: надіслано без змін чи з правками)
+    і мітка «🤖 агент» надісланого листа (agent.letters.draft_closed: Message-ID, або запланований лист)."""
     draft = get(account, pk)
     if draft is None:
         return False
     try:
+        from agent import letters
         from agent.mail import draft_closed
         draft_closed(draft, how, text)
+        letters.draft_closed(draft, how, text, message_id=message_id, scheduled=scheduled)
     except Exception:  # noqa: BLE001 — журнал агента не заважає надіслати лист
         logger.warning('agent draft outcome for draft %s', draft.pk, exc_info=True)
     draft.delete()

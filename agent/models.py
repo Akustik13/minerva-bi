@@ -72,6 +72,15 @@ class AgentRule(models.Model):
     cc = models.TextField(
         'Копія (CC)', blank=True, default='',
         help_text='Адреси по одній у рядку (або через кому) — у копію кожного листа агента: відповіді й листа клієнту.')
+    REPEAT_NEVER = 999
+    REPEAT = [(0, 'на кожен новий такий лист'), (1, 'не частіше ніж раз на день'), (3, 'не частіше ніж раз на 3 дні'),
+              (7, 'не частіше ніж раз на тиждень'), (14, 'не частіше ніж раз на 14 днів'),
+              (REPEAT_NEVER, 'не писати вдруге')]
+    repeat_days = models.PositiveSmallIntegerField(
+        '🔁 Повторно про те саме замовлення', choices=REPEAT, default=1,
+        help_text='«📨 Писати клієнту замовлення»: прийшов новий такий лист (UPS «Reminder», «Final Reminder»), а '
+                  'клієнту про це замовлення вже писали — агент пише ще раз як повторне нагадування (знає дату й текст '
+                  'попереднього листа). Чернетка, яку ви ще не надіслали, — друга не створюється.')
     importance = models.CharField(
         'Позначка', max_length=10, choices=IMPORTANCE, default='important',
         help_text='«❗ Позначати такі листи»: ❗ Важливо або ‼️ Дуже важливо — у списку листів і в папці «⭐ Важливі». '
@@ -171,6 +180,9 @@ class AgentRun(models.Model):
                               related_name='+', verbose_name='Замовлення',
                               help_text='«📨 Писати клієнту замовлення»: замовлення, знайдене за трек-номером листа')
     outcome = models.CharField('Що зробили ви', max_length=12, choices=OUTCOMES, blank=True, default='')
+    retried_at = models.DateTimeField(
+        '↻ Обробити ще раз', null=True, blank=True,
+        help_text='Коли людина запустила лист повторно (пропущений чи з помилкою) — тоді й давній лист обробляється')
     created_at = models.DateTimeField('Коли', auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
@@ -183,6 +195,35 @@ class AgentRun(models.Model):
 
     def __str__(self):
         return f'{self.rule} · {self.message_id}'
+
+
+class AgentLetter(models.Model):
+    """🤖 Лист, який написав агент і який пішов (Message-ID) — за ним пошта показує «🤖 агент» біля листа:
+    у списку, у гілці, у відкритому листі. Записує agent/letters.py, коли лист справді надіслано."""
+    SENT, DRAFT, EDITED = 'sent', 'draft', 'edited'
+    HOW = [(SENT, 'агент надіслав сам'), (DRAFT, 'чернетку агента ви надіслали без змін'),
+           (EDITED, 'чернетку агента ви надіслали зі змінами')]
+
+    account = models.ForeignKey('email_assistant.EmailAccount', on_delete=models.CASCADE, related_name='+',
+                                verbose_name='Скринька')
+    message_id = models.CharField('Message-ID', max_length=500, blank=True, default='', db_index=True)
+    scheduled = models.ForeignKey('email_assistant.ScheduledEmail', null=True, blank=True, on_delete=models.SET_NULL,
+                                  related_name='+', verbose_name='Запланований лист',
+                                  help_text='Чернетку агента відклали «⏰ Пізніше» — Message-ID з’явиться, коли піде')
+    run = models.ForeignKey(AgentRun, null=True, blank=True, on_delete=models.SET_NULL, related_name='letters',
+                            verbose_name='Доручення — робота')
+    task = models.ForeignKey('AgentTask', null=True, blank=True, on_delete=models.SET_NULL, related_name='letters',
+                             verbose_name='Завдання агенту')
+    how = models.CharField('Як пішов', max_length=10, choices=HOW, default=SENT)
+    created_at = models.DateTimeField('Коли', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Лист агента'
+        verbose_name_plural = 'Листи агента'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.message_id or f'#{self.pk}'
 
 
 class AgentSchedule(models.Model):
