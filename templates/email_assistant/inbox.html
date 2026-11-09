@@ -1072,6 +1072,8 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
        title="{% trans "Що було з цим замовленням і перепискою: дати, доставка, листи, нотатки CRM" %}">📜 {% trans "Історія" %}</div>
   <div class="em-ctx-item" data-k="angebot" data-g="letter" data-where="letter" data-need="pvOfferFromThread" data-thread="1" onclick="ctxAction('angebot')"
        title="{% trans "Чернетка Angebot: клієнт і проєкт листування, артикули й кількості з листа, ціни з Minerva" %}">📝 Angebot</div>
+  <div class="em-ctx-item" data-k="projdo" data-g="letter" data-where="letter" data-need="pvProjMenu" onclick="ctxAction('projdo')"
+       title="Проєкт цього листа: важливий момент, крок плану, ризик, закрити крок">📁 Проєкт листа: момент, крок, ризик…</div>
   <div class="em-ctx-item" data-k="open" data-g="mark" onclick="ctxAction('open')">↗ {% trans "Відкрити окремо" %}</div>
   <div class="em-ctx-item" data-k="read" data-g="mark" data-label="✉️ {% trans "Позначити прочитаним / непрочитаним" %}" onclick="ctxAction(this.dataset.act || 'read')">✉️ {% trans "Позначити прочитаним" %}</div>
   <div class="em-ctx-item" data-k="star" data-g="mark" onclick="ctxAction('star')">⭐ {% trans "Важливе" %}</div>
@@ -4301,6 +4303,7 @@ async function ctxAction(action) {
   if (action === 'translate') { pvAiTranslate(pk); return; }
   if (action === 'history') { pvHistory(pk); return; }
   if (action === 'angebot') { pvOfferFromThread(tpk); return; }
+  if (action === 'projdo') { pvProjMenu(); return; }
   if (action === 'logo') { emLogoDialog(_ctxMsg.from || '', _ctxMsg.rowEl); return; }
   if (action === 'why') { emWhy(pk); return; }
   if (action === 'followup') { emFollowup(pk); return; }

@@ -365,6 +365,102 @@ def delete_step(project, step_id) -> bool:
     return True
 
 
+CLOSED_STATES = (ProjectStep.DONE, ProjectStep.SKIPPED)
+OPEN_SHOWN = 15
+
+
+def _mail_day(message):
+    if message is None or not message.sent_at:
+        return timezone.localdate()
+    return timezone.localtime(message.sent_at).date() if timezone.is_aware(message.sent_at) else message.sent_at.date()
+
+
+def brief(project) -> dict:
+    """Для прев'ю листа (📁 біля проєкту): колір стану (кеш state.py), фаза «3/7 · 🔧 Прототип», наступний крок і
+    відкриті кроки — для «✅ Закрити крок». Лише кеш плану (f_* / eff_status), без розрахунку."""
+    from . import state
+    st = state.states([project]).get(project.pk)
+    icon, label = state.HEALTH.get(st.health if st else "", ("", ""))
+    phases = list(ProjectPhase.objects.filter(project=project).order_by("order", "pk"))
+    steps = list(ProjectStep.objects.filter(project=project).order_by("phase__order", "order", "pk"))
+
+    def is_open(s):
+        return (s.eff_status or s.status) not in CLOSED_STATES
+
+    current = next((p for p in phases if any(s.phase_id == p.pk and is_open(s) for s in steps)), None)
+    if current is not None:
+        phase = f"{phases.index(current) + 1}/{len(phases)} · {current.icon} {current.name}".replace("  ", " ")
+    else:
+        phase = "усі фази завершено" if phases and steps else ""
+    open_steps = sorted((s for s in steps if is_open(s)), key=lambda s: (s.f_start or s.start or date.max, s.order))
+
+    def when(s):
+        d = s.f_end or s.end
+        return f"{d:%d.%m}" if d else ""
+    nxt = open_steps[0] if open_steps else None
+    return {"health": st.health if st else "", "icon": icon, "label": label, "phase": phase,
+            "next": {"title": nxt.title, "end": when(nxt)} if nxt else None,
+            "open": [{"id": s.pk, "title": s.title, "end": when(s)} for s in open_steps[:OPEN_SHOWN]]}
+
+
+def quick_step(project, title, message=None, user=None) -> ProjectStep:
+    """➕ Крок з листа: у поточну фазу (перша незавершена), після її кроків, «ми», від сьогодні на 1 день;
+    у примітці — дата листа (тема — ні: її бачить лише власник скриньки)."""
+    title = " ".join(str(title or "").split())[:200]
+    if not title:
+        raise PlanError("Напишіть назву кроку")
+    steps = list(ProjectStep.objects.filter(project=project).order_by("phase__order", "order", "pk"))
+    phases = list(ProjectPhase.objects.filter(project=project).order_by("order", "pk"))
+    phase = next((p for p in phases if any(s.phase_id == p.pk and (s.eff_status or s.status) not in CLOSED_STATES
+                                           for s in steps)), phases[-1] if phases else None)
+    same = [s.order for s in steps if s.phase_id == (phase.pk if phase else None)]
+    order = (max(same) + 1) if same else (max([s.order for s in steps] or [0]) + 10)
+    today = timezone.localdate()
+    return ProjectStep.objects.create(
+        project=project, phase=phase, order=order, title=title, kind=ProjectStep.TASK, side=ProjectStep.WE,
+        start=today, end=today, duration_days=1, notes=f"✉️ з листа від {_mail_day(message):%d.%m.%Y}",
+        source=ProjectStep.MANUAL, created_by=user)
+
+
+def close_step(project, step_id, message=None, user=None) -> ProjectStep:
+    """✅ Закрити крок з листа: «виконано» датою листа; у примітці — що за листом (без теми)."""
+    step = ProjectStep.objects.filter(project=project, pk=step_id).first()
+    if step is None:
+        raise PlanError("Крок не знайдено")
+    day = _mail_day(message)
+    step.status, step.done_on = ProjectStep.DONE, day
+    note = f"✓ виконано за листом від {day:%d.%m.%Y}"
+    step.notes = f"{step.notes}\n{note}".strip() if step.notes else note
+    step.save(update_fields=["status", "done_on", "notes", "updated_at"])
+    return step
+
+
+def move_step(project, step_id, start=None, end=None) -> ProjectStep:
+    """📋 Класична діаграма: смугу перетягнули — нові планові дати (крок: початок і кінець → тривалість; віха —
+    дата). Прогноз однаково рахує розрахунок (не раніше попередніх кроків)."""
+    step = ProjectStep.objects.filter(project=project, pk=step_id).first()
+    if step is None:
+        raise PlanError("Крок не знайдено")
+    start, end = _date(start), _date(end)
+    if step.kind == ProjectStep.MILESTONE:
+        day = end or start
+        if day is None:
+            raise PlanError("Немає дати віхи")
+        step.start, step.end = None, day
+    else:
+        start = start or step.start
+        end = end or step.end
+        if start is None or end is None:
+            raise PlanError("Немає дат кроку")
+        if end < start:
+            raise PlanError("Кінець раніше за початок")
+        if (end - start).days > 999:
+            raise PlanError("Крок довший за 999 днів")
+        step.start, step.end, step.duration_days = start, end, (end - start).days + 1
+    step.save(update_fields=["start", "end", "duration_days", "updated_at"])
+    return step
+
+
 def save_phase(project, data) -> ProjectPhase:
     name = " ".join(str(data.get("name") or "").split())[:120]
     if not name:

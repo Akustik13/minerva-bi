@@ -1,7 +1,9 @@
 """🤖 Доручити крок проєкту агенту (етап 5): готове доручення з контексту кроку → завдання агенту (agent.AgentTask).
 
-presets(step) — варіанти: 📨 нагадати постачальнику чи клієнту (адреса — з прив'язаної закупівлі, учасників проєкту
-або клієнта CRM), 🛒 підготувати закупівлю (товари проєкту), ✍️ своє завдання з контекстом кроку. Людина бачить і
+presets(step, user) — варіанти: 📨 нагадати постачальнику чи клієнту (адреса — з прив'язаної закупівлі, учасників
+проєкту або клієнта CRM), 📝 підготувати Angebot (крок «Angebot надіслано / прийнято» або «Angebot» у назві; лише з
+правом offers.add_offer — агент пропонує чернетку, ціни й строки рахує Minerva), 🛒 підготувати закупівлю (товари
+проєкту), ✍️ своє завдання з контекстом кроку. Людина бачить і
 змінює текст, адресу листа, модель і ліміт витрат; create створює AgentTask від її імені (право agent.add_agenttask),
 прив'язує до кроку (ProjectStep.agent_tasks) і запускає (agent.tasks.start). Агент лише пропонує — лист,
 закупівлю чи зміни застосовує людина на сторінці перевірки завдання.
@@ -15,6 +17,8 @@ BUDGET_MIN, BUDGET_MAX, BUDGET_DEFAULT = Decimal("0.05"), Decimal("10"), Decimal
 INSTRUCTION_MAX = 4000
 TASKS_SHOWN = 5
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+OFFER_RE = re.compile(r"angebot|quotation|\bquote|\boffer|пропозиц|\bкп\b", re.I)
+OFFER_TRIGGERS = ("offer_sent", "offer_accepted")
 
 
 class DelegateError(ValueError):
@@ -74,11 +78,29 @@ def context_line(step) -> str:
             f"{dict(ProjectStep.STATUS_CHOICES).get(step.eff_status or step.status, step.status)}.")
 
 
-def presets(step) -> list:
+def offer_preset(step, c, ctx):
+    """📝 Чернетка Angebot для кроку про Angebot: клієнт, проєкт, товари — агент пропонує (propose_offer)."""
+    project = step.project
+    name, email = c["customer"]
+    who = f" для клієнта {name}" + (f" ({email})" if email else "") if (name or email) else ""
+    crm = f" Клієнт CRM — #{project.customer_id}." if project.customer_id else ""
+    skus = ", ".join(project.products.values_list("sku", flat=True)[:15]) or "— (у проєкті не вказано)"
+    return {"key": "offer", "label": "📝 Підготувати Angebot", "mail_to": "",
+            "instruction": f"{ctx}\nПідготуй чернетку Angebot{who}.{crm} Артикули й кількості візьми з останнього "
+                           f"запиту клієнта в листуванні проєкту, інакше — товари проєкту: {skus}. Мова документа — "
+                           f"як у листуванні з клієнтом. Ціни й строки не вказуй — Minerva порахує сама. У "
+                           f"propose_offer вкажи проєкт {project.code}. Angebot лише запропонуй — перевірю й "
+                           f"надішлю я сам."}
+
+
+def presets(step, user=None) -> list:
     """Варіанти доручення [{key, label, instruction, mail_to}] — перший підходить кроку найкраще."""
     project, c = step.project, contacts(step)
     ctx = context_line(step)
     out = []
+    if ((step.trigger in OFFER_TRIGGERS or OFFER_RE.search(step.title or ""))
+            and (user is None or user.has_perm("offers.add_offer"))):
+        out.append(offer_preset(step, c, ctx))
     name, email = c["supplier"]
     if email and step.side in (ProjectStep.SUPPLIER, ProjectStep.WE):
         po = c["po"]
@@ -147,6 +169,6 @@ def create(step, user, data):
 def editor(step, user) -> dict:
     """Для вікна «🤖 Доручити агенту»: варіанти, моделі, ліміт, завдання кроку."""
     from agent.models import DEFAULT_MODEL, TASK_MODELS
-    return {"ok": True, "step": {"id": step.pk, "title": step.title}, "presets": presets(step),
+    return {"ok": True, "step": {"id": step.pk, "title": step.title}, "presets": presets(step, user),
             "models": TASK_MODELS, "model": DEFAULT_MODEL, "budget": str(BUDGET_DEFAULT), "tasks": tasks_for(step),
             "can": can(user)}

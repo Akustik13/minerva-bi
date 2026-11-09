@@ -455,7 +455,37 @@ a.rg-link { color: var(--rg-link); text-decoration: underline; }
     examples.slice(0, 4)
       .forEach(function (q) { var b = el('button', null, q); b.type = 'button'; b.onclick = function () { input.value = q; send(); }; hints.appendChild(b); });
     box.appendChild(hints);
+    projectActions(box);
     msgsEl.appendChild(box);
+  }
+  // На сторінці проєкту: «❓ Запитати про цей проєкт» (поле «❓ Запитати» картки) і «🧩 Доручити агенту»
+  function projectActions(box) {
+    var pj = document.querySelector('#pj-cockpit .pjc');
+    if (!pj || !pj.dataset.code) return;
+    var acts = el('div', 'rg-hints');
+    acts.appendChild(el('div', null, 'Проєкт ' + pj.dataset.code + ' на цій сторінці:'));
+    var ask = el('button', null, '❓ Запитати про цей проєкт');
+    ask.type = 'button';
+    ask.onclick = function () {
+      var eh = document.querySelector('details.ehw[data-kind="project"]');
+      closePanel();
+      if (!eh) { location.hash = '#overview'; return; }
+      eh.open = true;
+      eh.scrollIntoView({behavior: 'smooth', block: 'center'});
+      var q = eh.querySelector('.ehw-q');
+      if (q) setTimeout(function () { q.focus(); }, 350);
+    };
+    acts.appendChild(ask);
+    if (state.agent) {
+      var ag = el('button', null, '🧩 Доручити агенту роботу за цим проєктом');
+      ag.type = 'button';
+      ag.onclick = function () {
+        var text = 'Проєкт ' + pj.dataset.code + (pj.dataset.title ? ' «' + pj.dataset.title + '»' : '') + ': ';
+        window.open('/admin/agent/agenttask/add/?instruction=' + encodeURIComponent(text), '_blank', 'noopener');
+      };
+      acts.appendChild(ag);
+    }
+    box.appendChild(acts);
   }
   function renderMessages(list) {
     msgsEl.innerHTML = '';

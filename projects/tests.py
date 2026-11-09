@@ -387,8 +387,8 @@ class OverviewTests(ProjectsBase):
                 patch("ai_assistant.tools.execute_tool", return_value={}), \
                 patch("requests.post", side_effect=lambda url, json=None, timeout=None: sent.append(json) or Ok()):
             call_command("morning_briefing", stdout=StringIO())
-        self.assertIn("ПРОЄКТИ, ЩО ПОТРЕБУЮТЬ УВАГИ", chat.call_args[0][0])
-        self.assertIn("Доброго ранку!\n\n📁 <b>Потребує уваги</b>\n• " + self.project.code, sent[0]["text"])
+        self.assertIn("ПРОЄКТИ (відповідальний — цей користувач)", chat.call_args[0][0])
+        self.assertIn("Доброго ранку!\n\n📁 <b>Проєкти</b>\n• " + self.project.code, sent[0]["text"])
         self.assertIn("«Re: Anfrage Antennen»", sent[0]["text"])
 
     def test_ai_reply_draft_uses_project_overview(self):

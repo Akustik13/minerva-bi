@@ -8,6 +8,8 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 
+from projects.panels import ProjectsBlockMixin
+
 from . import services
 from .models import Offer, OfferLine, OfferRevision, OfferSettings, QuoteRequest
 
@@ -86,7 +88,9 @@ class OfferLineInline(admin.TabularInline):
 
 
 @admin.register(Offer)
-class OfferAdmin(admin.ModelAdmin):
+class OfferAdmin(ProjectsBlockMixin, admin.ModelAdmin):
+    projects_block_kind = "offer"              # «📁 Проєкти»: проєкт і крок плану (projects/panels.py)
+    projects_block_after = None
     list_display = ("number_col", "customer", "project", "status_col", "request_kind", "gross_col", "valid_until",
                     "owner", "updated_at")
     list_filter = ("status", "request_kind", "owner", "currency")

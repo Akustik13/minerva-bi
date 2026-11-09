@@ -110,6 +110,9 @@ def definitions(task, single=False) -> list:
             tools += shipments.TOOLS
         if purchases.can_read(owner):    # закупівлі й вхідні посилки
             tools += purchases.TOOLS
+        from agent import offers_tool
+        if offers_tool.can_read(owner):  # 📝 чернетка Angebot (ціни — з Minerva)
+            tools += offers_tool.TOOLS
         from agent import inbox_tools
         if inbox_tools.can_read(owner):  # пошта й календар власника (лише читання)
             tools += inbox_tools.TOOLS
@@ -196,6 +199,12 @@ def _pdf_pages(data) -> list:
 
 # ── Виконання інструментів ───────────────────────────────────────────────────
 
+def _offer_handler(name):
+    """📝 propose_offer (agent/offers_tool.py) — право перевіряє сам інструмент."""
+    from agent import offers_tool
+    return offers_tool.HANDLERS.get(name)
+
+
 def run(ctx, name, args) -> tuple:
     """(текст результату, is_error) для tool_result."""
     from agent import channels, inbox_tools, purchases, rag, shipments
@@ -203,7 +212,8 @@ def run(ctx, name, args) -> tuple:
         if name in inbox_tools.HANDLERS and not inbox_tools.can_read(ctx.task.owner):
             raise ToolError('пошта й календар — лише для того, хто дав завдання і має скриньку')
         fn = (HANDLERS.get(name) or channels.HANDLERS.get(name) or shipments.HANDLERS.get(name)
-              or purchases.HANDLERS.get(name) or rag.HANDLERS.get(name) or inbox_tools.HANDLERS.get(name))
+              or purchases.HANDLERS.get(name) or rag.HANDLERS.get(name) or inbox_tools.HANDLERS.get(name)
+              or _offer_handler(name))
         if fn is None:
             raise ToolError(f'невідомий інструмент {name}')
         return fn(ctx, args or {}), False

@@ -276,6 +276,8 @@ class CockpitViewTests(CockpitBase):
         self.assertEqual(self.client.get(self.url("highlight", self.project.pk)).status_code, 405)
 
     def test_viewer_without_change_right(self):
+        self.project.name = "Antenne n78"               # назва проєкту видна всім; тема листа — лише власнику
+        self.project.save(update_fields=["name"])
         viewer = User.objects.create_user("viewer", "v@x.y", "p", is_staff=True)
         viewer.user_permissions.add(Permission.objects.get(codename="view_project"))
         viewer.profile.module_operations = {"projects": ["view"]}

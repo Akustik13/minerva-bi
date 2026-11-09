@@ -156,7 +156,45 @@ def product_html(product, viewer) -> str:
                   "Товар не використовується в проєктах (ні в «Товарах проєкту», ні в замовленнях чи Angebote проєктів).")
 
 
-RENDER = {"customer": customer_html, "supplier": supplier_html, "purchase": purchase_html, "product": product_html}
+def _steps_why(titles) -> str:
+    return ("крок «" + "», «".join(titles[:3]) + "»") if titles else ""
+
+
+def order_html(order, viewer) -> str:
+    """Замовлення: проєкти, до яких воно прив'язане (і кроки плану, які воно закриває), та проєкт Angebot,
+    з якого воно створене."""
+    if not can_see(viewer):
+        return ""
+    rows, seen = [], set()
+    for link in (ProjectLink.objects.filter(order=order).exclude(status=ProjectLink.REJECTED)
+                 .select_related("project__customer", "project__owner")):
+        why = _steps_why(list(link.steps.values_list("title", flat=True)[:3]))
+        if link.status == ProjectLink.SUGGESTED:
+            why = (why + " · " if why else "") + "пропозиція — підтвердіть у пульті проєкту (✓ / ✗)"
+        rows.append((link.project, why))
+        seen.add(link.project_id)
+    for offer in order.offers.filter(project__isnull=False).select_related("project__customer", "project__owner"):
+        if offer.project_id not in seen:
+            steps = list(offer.project_steps.values_list("title", flat=True)[:3])
+            rows.append((offer.project, "; ".join(x for x in (f"з Angebot {offer.display_number}",
+                                                               _steps_why(steps)) if x)))
+            seen.add(offer.project_id)
+    return _table(_order(rows), "Крок плану", viewer,
+                  "Замовлення ще не прив'язане до проєкту — «📁 До проєкту…» в пошті чи прив'язки в картці проєкту.")
+
+
+def offer_html(offer, viewer) -> str:
+    """Angebot: його проєкт і кроки плану, які він закриває (Angebot надіслано / прийнято)."""
+    if not can_see(viewer):
+        return ""
+    if not offer.project_id:
+        return _table([], "", viewer, "Angebot без проєкту — виберіть проєкт у полі «Проєкт».")
+    steps = list(offer.project_steps.values_list("title", flat=True)[:3])
+    return _table([(offer.project, _steps_why(steps))], "Крок плану", viewer, "")
+
+
+RENDER = {"customer": customer_html, "supplier": supplier_html, "purchase": purchase_html, "product": product_html,
+          "order": order_html, "offer": offer_html}
 
 
 class ProjectsBlockMixin:

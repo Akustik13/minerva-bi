@@ -20,7 +20,7 @@ from datetime import date, datetime, timedelta
 from django.db.models import Q
 from django.utils import timezone
 
-from . import services
+from . import services, terms
 from .models import Project, ProjectHighlight, ProjectLink, ProjectOverview
 
 logger = logging.getLogger(__name__)
@@ -90,12 +90,16 @@ def _orders(project, offers):
     return list(SalesOrder.objects.filter(pk__in=ids).prefetch_related("shipments__carrier").order_by("order_date", "pk"))
 
 
-def _deadlines(message_ids):
+def _deadlines(message_ids, project=None):
+    """Події календаря проєкту: з його листів і прив'язані до проєкту вручну («📅 ＋ Подія»)."""
     try:
         from calendar_app.models import CalendarEvent
     except ImportError:
         return []
-    return list(CalendarEvent.objects.filter(email_message_id__in=message_ids).order_by("start_at"))
+    cond = Q(email_message_id__in=message_ids)
+    if project is not None:
+        cond |= Q(project_links__project=project, project_links__status=ProjectLink.CONFIRMED)
+    return list(CalendarEvent.objects.filter(cond).distinct().order_by("start_at"))
 
 
 def _linked_ids(project, field) -> set:
@@ -168,7 +172,7 @@ def collect(project, today=None) -> dict:
     messages = _messages(project)
     offers = list(project.offers.order_by("created_at", "pk")) if hasattr(project, "offers") else []
     orders = _orders(project, offers)
-    deadlines = _deadlines([x["msg"].pk for x in messages])
+    deadlines = _deadlines([x["msg"].pk for x in messages], project)
     purchases = _purchases(project)
     jlc = _jlc(project, purchases)
     shipments = _shipments(project, orders, purchases, jlc)
@@ -240,17 +244,22 @@ def collect(project, today=None) -> dict:
 
     _supply_attention(add, purchases, jlc, shipments, today, is_open)
 
-    now = timezone.now()
-    for ev in deadlines:
-        if ev.is_done:
-            continue
+    # 📅 Терміни й зустрічі (projects/terms.py): минула зустріч — відбулась; термін, після якого ми відповіли в
+    # гілці, — ймовірно виконано; прострочено — лише без жодного сліду виконання
+    terms_list = terms.classify(deadlines, messages)
+    for t in terms_list:
+        ev = t.event
         url = f"/email/message/{ev.email_message_id}/"
-        if ev.start_at < now:
+        what = "зустріч" if t.meeting else "термін"
+        if t.state == terms.OVERDUE:
             add("high", "📅", f"Прострочено: {ev.title} ({_fmt(ev.start_at)})", url, owner=ev.user_id,
                 private_text=f"Прострочено: термін з іншого календаря ({_fmt(ev.start_at)})")
-        elif (_day(ev.start_at) - today).days <= 3:
-            add("medium", "📅", f"Скоро: {ev.title} ({_fmt(ev.start_at)})", url, kind="todo", owner=ev.user_id,
-                private_text=f"Скоро: термін з іншого календаря ({_fmt(ev.start_at)})")
+        elif t.state == terms.MOVED:
+            add("info", "📅", f"Перевірте термін: {ev.title} ({_fmt(ev.start_at)}) — {t.note}", url, kind="todo",
+                owner=ev.user_id, private_text=f"Перевірте термін з іншого календаря ({_fmt(ev.start_at)})")
+        elif t.state == terms.SOON:
+            add("medium", "🤝" if t.meeting else "📅", f"Скоро {what}: {ev.title} ({_fmt(ev.start_at)})", url,
+                kind="todo", owner=ev.user_id, private_text=f"Скоро {what} з іншого календаря ({_fmt(ev.start_at)})")
 
     last = messages[-1]["msg"] if messages else None
     if is_open and last and last.sent_at and (today - _day(last.sent_at)).days >= IDLE_DAYS:
@@ -289,7 +298,8 @@ def collect(project, today=None) -> dict:
     attention.sort(key=lambda a: LEVELS[a["level"]])
     return {
         "project": project, "today": today, "messages": messages, "offers": offers, "orders": orders,
-        "deadlines": deadlines, "attention": attention, "waiting_us": waiting_us, "waiting_them": waiting_them,
+        "deadlines": deadlines, "terms": terms_list, "attention": attention, "waiting_us": waiting_us,
+        "waiting_them": waiting_them,
         "purchases": purchases, "jlc": jlc, "shipments": shipments, "highlights": highlights, "plan": plan,
         "counts": {"in": sum(1 for x in messages if x["dir"] == "in"),
                    "out": sum(1 for x in messages if x["dir"] == "out"),
@@ -435,7 +445,11 @@ def prompt_text(facts) -> tuple:
                 lines.append(f"  · {c.step.title} ({c.step.get_side_display()}) — {c.status}, "
                              f"{_fmt(c.start)}–{_fmt(c.end)}")
         parts.append("ПЛАН ПРОЄКТУ (фази й кроки, прогноз):\n" + "\n".join(lines[:80]))
-    if facts["deadlines"]:
+    if facts.get("terms"):
+        parts.append("ТЕРМІНИ Й ЗУСТРІЧІ, ЗНАЙДЕНІ В ЛИСТАХ:\n" + "\n".join(
+            f"{_fmt(t.event.start_at)} — {'зустріч' if t.meeting else 'термін'}: {t.event.title} ({t.label})"
+            for t in facts["terms"]))
+    elif facts["deadlines"]:
         parts.append("ТЕРМІНИ, ЗНАЙДЕНІ В ЛИСТАХ:\n" + "\n".join(
             f"{_fmt(e.start_at)} — {e.title}{' (виконано)' if e.is_done else ''}" for e in facts["deadlines"]))
 
@@ -741,13 +755,58 @@ def owner_digest(user, limit=8) -> list:
     return out[:limit]
 
 
-def digest_text(user, limit=8, per_project=3) -> str:
-    """Текст для брифінгу: «P-2026-001 · Назва: 📨 Чекає нашої відповіді 5 дн. …»."""
+WEEK_STEPS = 10
+NEW_RISKS = 8
+
+
+def week_steps(user, today=None, days=7) -> list:
+    """Кроки плану на тиждень: відкриті кроки відкритих проєктів, де людина — відповідальний за проєкт або
+    виконавець кроку, з кінцем (прогноз, інакше план) до today + days, прострочені — теж. → [(крок, кінець)]."""
+    from .models import ProjectStep
+    today = today or timezone.localdate()
+    out = []
+    for s in (ProjectStep.objects.filter(project__status__in=Project.OPEN_STATUSES)
+              .filter(Q(project__owner=user) | Q(assignee=user))
+              .exclude(status__in=(ProjectStep.DONE, ProjectStep.SKIPPED))
+              .exclude(eff_status__in=(ProjectStep.DONE, ProjectStep.SKIPPED))
+              .select_related("project").order_by("project__code", "order")):
+        end = s.f_end or s.end
+        if end and end <= today + timedelta(days=days):
+            out.append((s, end))
+    out.sort(key=lambda se: (se[1], se[0].project.code))
+    return out
+
+
+def new_risks(user, since) -> list:
+    """Ризики, відкриті з since у відкритих проєктах людини (відповідальний за проєкт або власник ризику)."""
+    from .models import ProjectRisk
+    return list(ProjectRisk.objects.filter(project__status__in=Project.OPEN_STATUSES, opened_at__gte=since)
+                .filter(Q(project__owner=user) | Q(owner=user)).exclude(status=ProjectRisk.CLOSED)
+                .select_related("project").order_by("-probability", "-impact", "-opened_at")[:NEW_RISKS])
+
+
+def digest_text(user, limit=8, per_project=3, today=None) -> str:
+    """Текст для брифінгу: «P-2026-001 · Назва: 📨 Чекає нашої відповіді 5 дн. …», далі кроки тижня й нові
+    ризики за добу."""
+    today = today or timezone.localdate()
     lines = []
     for project, items in owner_digest(user, limit):
         shown = "; ".join(f"{a['icon']} {a['text']}" for a in items[:per_project])
         more = f" (+ ще {len(items) - per_project})" if len(items) > per_project else ""
         lines.append(f"• {project.code} · {project.name}: {shown}{more}")
+    steps = week_steps(user, today)
+    if steps:
+        lines.append("📋 Кроки тижня:")
+        for s, end in steps[:WEEK_STEPS]:
+            late = " — прострочено" if end < today else ""
+            lines.append(f"• {s.project.code} · {s.title} — до {end:%d.%m}{late}")
+        if len(steps) > WEEK_STEPS:
+            lines.append(f"  … і ще {len(steps) - WEEK_STEPS}")
+    risks = new_risks(user, timezone.now() - timedelta(days=1))
+    if risks:
+        lines.append("⚠️ Нові ризики за добу:")
+        for r in risks:
+            lines.append(f"• {r.project.code} · {r.title} — бал {r.score}")
     return "\n".join(lines)
 
 

@@ -315,7 +315,8 @@ def event_set_type(request, pk):
         return JsonResponse({'ok': False, 'error': 'invalid type'}, status=400)
     ev.event_type = new_type
     ev.custom_category = None
-    ev.save(update_fields=['event_type', 'custom_category'])
+    ev.type_by_user = True          # шкала проєкту більше не вгадує тип за назвою (projects/terms.py)
+    ev.save(update_fields=['event_type', 'custom_category', 'type_by_user'])
     return JsonResponse({
         'ok':        True,
         'type_key':  new_type,

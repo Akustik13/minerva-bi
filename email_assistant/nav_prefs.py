@@ -92,11 +92,11 @@ def ordered(items, es, key_of, n_of=None, name_of=None) -> list:
 # немає списку — CTX_DEFAULT_HIDDEN. Пункти letter_only є лише в меню відкритого листа.
 CTX_KEYS = (
     "sel_copy", "sel_rag", "sel_ask", "sel_mail",                                  # виділений текст
-    "reply", "forward", "ai_reply", "translate", "history", "angebot",             # лише у відкритому листі
+    "reply", "forward", "ai_reply", "translate", "history", "angebot", "projdo",   # лише у відкритому листі
     "open", "read", "star", "importance", "followup", "cat", "logo", "dante", "customer", "why", "agent", "agent_task", "project",
     "kbsend", "kb", "rule", "task", "spam", "archive", "restore", "delete",        # restore — лише в Кошику
 )
-CTX_LETTER_ONLY = frozenset(CTX_KEYS[:10])
+CTX_LETTER_ONLY = frozenset(CTX_KEYS[:11])
 CTX_DEFAULT_HIDDEN = {
     "list": ["open", "logo", "kbsend", "kb", "rule", "task"],
     "letter": ["translate", "open", "star", "logo", "kbsend", "kb", "rule", "task", "spam", "archive"],

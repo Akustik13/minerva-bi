@@ -1,5 +1,6 @@
 from django.contrib import admin
 from core.mixins import AuditableMixin
+from projects.panels import ProjectsBlockMixin
 from crm.utils import sync_customer_from_order
 from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
@@ -566,7 +567,9 @@ def agent_task_for_orders(modeladmin, request, queryset):
 
 
 @admin.register(SalesOrder)
-class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
+class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
+    projects_block_kind = "order"              # «📁 Проєкти»: проєкт і крок плану (projects/panels.py)
+    projects_block_after = "📦 Замовлення"
     form = SalesOrderDocumentsForm
     # ── Прибрано: phone, tracking_number, customer_link (без лінку) ───────────
     list_display = (

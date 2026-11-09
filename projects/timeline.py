@@ -1,11 +1,14 @@
 """Шкала проєкту для пульта (projects/cockpit.py): події з усіх джерел на одній осі часу → SVG без бібліотек.
 
 Доріжки (порожні не показуються): 📌 важливі моменти, 📋 фази й віхи плану (schedule.py), ✉️ листування (точки по днях: від клієнта / наші, кружечок —
-лист без нашої відповіді), 📝 Angebote й документи бази знань, 🛒 замовлення й відправлення, 🏭 закупівлі, JLC і посилки
-до нас, 📅 терміни й зустрічі з листів проєкту, ⏱ години askDANTE по тижнях. Лінії: сьогодні, старт, строк клієнту.
+лист без нашої відповіді), 📝 Angebote й документи бази знань, 📎 файли з листів (будь-які вкладення, крім картинок у
+тексті й запрошень .ics; надіслані — зеленим, отримані — синім), 🛒 замовлення й відправлення, 🏭 закупівлі, JLC і
+посилки до нас, 📅 терміни й зустрічі з листів проєкту (стан — projects/terms.py: минула зустріч відбулась, термін з
+нашою відповіддю — ймовірно виконано; клік на ромб — ✓ виконано / тип події), ⏱ години askDANTE по тижнях.
+Лінії: сьогодні, старт, строк клієнту.
 
-Пошта й календар — особисті: тема листа чи назва події видна лише власнику скриньки / календаря, решті — кількість
-листів «з інших скриньок»; події чужих календарів не показуються. Кольори — змінні тем Minerva (CSS у change_form).
+Пошта й календар — особисті: тема листа, назва вкладення чи події видна лише власнику скриньки / календаря, решті —
+кількість листів і файлів «з інших скриньок»; події чужих календарів не показуються. Кольори — змінні тем Minerva (CSS у change_form).
 """
 import json
 from collections import defaultdict
@@ -21,6 +24,7 @@ LANES = [
     ("plan", "📋 Фази й віхи"),
     ("mail", "✉️ Листування"),
     ("docs", "📝 Angebote й документи"),
+    ("files", "📎 Файли з листів"),
     ("orders", "🛒 Замовлення й доставка"),
     ("supply", "🏭 Закупівлі й виробництво"),
     ("calendar", "📅 Терміни й зустрічі"),
@@ -36,6 +40,8 @@ FUTURE_DAYS = 21             # праворуч від «сьогодні», я�
 MAX_FUTURE_DAYS = 200        # далі в майбутнє шкала не тягнеться (крім строку клієнту)
 MIN_DAYS = 35
 MAIL_LIST = 12               # листів дня в меню точки
+FILES_LIST = 12              # файлів дня в меню позначки
+FILE_SKIP_TYPES = ("text/calendar",)
 
 
 def _d(value):
@@ -92,21 +98,34 @@ def events(project, facts, viewer, today=None) -> list:
     _plan_events(ev, facts, today)
     _mail_events(ev, facts, uid)
     _doc_events(ev, project, facts, viewer)
+    _file_events(ev, project, facts, uid)
     _order_events(ev, facts, today)
     _supply_events(ev, facts, today)
-
-    now = timezone.now()
-    for e in facts.get("deadlines", []):
-        if e.user_id != uid:            # календар особистий: чужі події не показуються
-            continue
-        meeting = e.event_type == "meeting"
-        cls = "ok" if e.is_done else ("bad" if e.start_at < now and not meeting else "warn")
-        ev("calendar", "diamond", e.start_at, f"{'🤝' if meeting else '⏰'} {e.title}",
-           f"{'🤝' if meeting else '⏰'} {_fmt(e.start_at)} · {e.title}{' · виконано' if e.is_done else ''}",
-           f"/email/message/{e.email_message_id}/" if e.email_message_id else "", cls)
-
+    _term_events(ev, project, facts, uid)
     out.extend(_hours(project, viewer))
     return out
+
+
+def _term_events(ev, project, facts, uid):
+    """📅 Терміни й зустрічі — лише з календаря того, хто дивиться (чужі події не показуються); стан — terms.py;
+    подія, прив'язана до проєкту вручну, — з «✕ Прибрати з проєкту» в меню."""
+    from . import terms
+    from .models import ProjectLink
+    linked = set(ProjectLink.objects.filter(project=project).exclude(event=None).values_list("event_id", flat=True))
+    items = facts.get("terms")
+    if items is None:
+        items = terms.classify(facts.get("deadlines", []), facts.get("messages", []))
+    for t in items:
+        e = t.event
+        if e.user_id != uid:            # календар особистий
+            continue
+        times = f" ×{t.count}" if t.count > 1 else ""
+        tip = (f"{t.icon} {_fmt(e.start_at)} · {e.title} · {t.label}" + (f" — {t.note}" if t.note else "")
+               + (f"\nЗнайдено в листах {t.count} рази — показано один раз" if t.count > 1 else "")
+               + "\nКлік — ✓ виконано, зустріч чи термін, лист")
+        ev("calendar", "diamond", e.start_at, f"{t.icon} {e.title}{times}", tip, "", t.cls,
+           cal={"ids": [e.pk] + [d.pk for d in t.duplicates], "done": bool(e.is_done), "meeting": t.meeting,
+                "mail": e.email_message_id or "", "linked": e.pk in linked})
 
 
 def _plan_events(ev, facts, today):
@@ -199,6 +218,67 @@ def _doc_events(ev, project, facts, viewer):
     for item in items:
         ev("docs", "point", item.created_at, f"📎 {item.title}",
            f"📎 {item.title} · додано {_fmt(item.created_at)}", f"/rag/knowledge/{item.pk}/", "doc")
+
+
+def _size(n) -> str:
+    try:
+        n = int(n or 0)
+    except (TypeError, ValueError):
+        return ""
+    if n >= 1024 * 1024:
+        return f"{n / 1024 / 1024:.1f} МБ".replace(".", ",")
+    return f"{max(n // 1024, 1)} КБ" if n else ""
+
+
+def files_of(message) -> list:
+    """[(номер вкладення, вкладення)] — файли листа: без картинок у тексті листа й запрошень .ics."""
+    out = []
+    for i, a in enumerate(message.attachments or []):
+        if not isinstance(a, dict) or a.get("is_inline") or not a.get("name"):
+            continue
+        if (a.get("content_type") or "").split(";")[0].strip().lower() in FILE_SKIP_TYPES:
+            continue
+        out.append((i, a))
+    return out
+
+
+def _file_events(ev, project, facts, uid):
+    """📎 Файли з листів проєкту по днях: надіслані (зелені) й отримані (сині). Назви й посилання — лише власнику
+    скриньки, решті — «N файлів з інших скриньок». Файл, який уже став документом проєкту (📎 Вкладення → документи),
+    тут не повторюється — він на доріжці документів."""
+    days = defaultdict(lambda: {"own": [], "other": 0})
+    saved = f"project:{project.pk}"
+    for x in facts.get("messages", []):
+        if x["dir"] == "internal":
+            continue
+        m = x["msg"]
+        files = [(i, a) for i, a in files_of(m) if saved not in (a.get("saved") or [])]
+        if not files:
+            continue
+        d = _d(m.sent_at)
+        if d is None:
+            continue
+        if _owner(m) == uid:
+            days[(d, x["dir"])]["own"].extend((m, i, a) for i, a in files)
+        else:
+            days[(d, x["dir"])]["other"] += len(files)
+    for (d, direction), v in days.items():
+        own, other = v["own"], v["other"]
+        n = len(own) + other
+        verb = "📤 надіслали" if direction == "out" else "📥 отримали"
+        lines = [f"📎 {verb} · {_fmt(d)} · файлів {n}"]
+        lines += [f"{a['name']}" + (f" ({_size(a.get('size'))})" if _size(a.get("size")) else "")
+                  + f" — «{_cut(m.subject or '(без теми)', 60)}»" for m, i, a in own[:FILES_LIST]]
+        if other:
+            lines.append(f"ще {other} з інших скриньок")
+        files = [{"u": f"/email/message/{m.pk}/attachment/{i}/", "n": _cut(a["name"], 70),
+                  "m": f"/email/message/{m.pk}/"} for m, i, a in own[:FILES_LIST]]
+        if own:
+            label = f"📎 {own[0][2]['name']}" + (f" +{n - 1}" if n > 1 else "")
+        else:
+            label = f"📎 {n}"
+        ev("files", "file", d, label, "\n".join(lines), files[0]["u"] if n == 1 and own else "", direction,
+           files=files if n > 1 and files else None)
 
 
 def _order_events(ev, facts, today):
@@ -331,12 +411,12 @@ class _Lane:
     def __init__(self):
         self.rows = []      # кінець зайнятого місця в кожному рядку
 
-    def place(self, lo, hi):
+    def place(self, lo, hi, limit=MAX_ROWS):
         for i, end in enumerate(self.rows):
             if lo >= end + 4:
                 self.rows[i] = hi
                 return i
-        if len(self.rows) < MAX_ROWS:
+        if len(self.rows) < limit:
             self.rows.append(hi)
             return len(self.rows) - 1
         return None
@@ -445,6 +525,10 @@ def _attrs(e) -> str:
 
 def _wrap(e, inner) -> str:
     data = f' data-hid="{e["hid"]}"' if e.get("hid") else ""
+    if e.get("cal"):
+        data += f' data-cal="{escape(json.dumps(e["cal"]))}" tabindex="0" role="button"'
+    if e.get("files"):
+        data += f' data-files="{escape(json.dumps(e["files"], ensure_ascii=False))}" tabindex="0" role="button"'
     g = f'<g class="pjt-ev pjt-{e["cls"] or "def"}"{data}>{_attrs(e)}{inner}</g>'
     if e["url"]:
         return f'<a href="{escape(e["url"])}" target="_blank" rel="noopener">{g}</a>'
@@ -470,8 +554,11 @@ def _draw_lane(items, top, x, xc, clip):
         if not label:
             lo, hi = x1 - 7, x2 + 7
         row = lane.place(lo, hi)
-        if row is None:                                # місця немає — позначка в першому рядку без підпису
-            row, label = 0, ""
+        if row is None and label:                      # підпис не влазить — лише позначка, хай і в ще одному рядку
+            label, lo, hi = "", x1 - 7, x2 + 7
+            row = lane.place(lo, hi, MAX_ROWS + 1)
+        if row is None:                                # місця немає й так — позначка в першому рядку
+            row = 0
         placed.append((e, row, x1, x2, label, anchor, lx))
     rows = max(len(lane.rows), 1)
     height = LANE_PAD * 2 + rows * ROW_H
@@ -484,6 +571,9 @@ def _draw_lane(items, top, x, xc, clip):
         elif shape == "diamond":
             inner = (f'<polygon points="{_n(x1)},{_n(cy - 6)} {_n(x1 + 6)},{_n(cy)} {_n(x1)},{_n(cy + 6)} '
                      f'{_n(x1 - 6)},{_n(cy)}" class="pjt-dia"/>')
+        elif shape == "file":
+            inner = (f'<path d="M{_n(x1 - 4.5)},{_n(cy - 6)} h6 l3,3 v9 h-9 z" class="pjt-file"/>'
+                     f'<path d="M{_n(x1 + 1.5)},{_n(cy - 6)} v3 h3" class="pjt-fold"/>')
         elif shape == "flag":
             inner = (f'<line x1="{_n(x1)}" y1="{_n(cy - 7)}" x2="{_n(x1)}" y2="{_n(cy + 7)}" class="pjt-pole"/>'
                      f'<polygon points="{_n(x1)},{_n(cy - 7)} {_n(x1 + 8)},{_n(cy - 4)} {_n(x1)},{_n(cy - 1)}" '
@@ -529,3 +619,23 @@ def _draw_hours(items, top, x):
     parts.append(f'<text x="{W - RIGHT}" y="{_n(top + 12)}" text-anchor="end" class="pjt-ht">'
                  f'Σ {_n(total / 60).replace(".", ",")} год</text>')
     return HOURS_H, parts
+
+
+LANE_ICONS = {"moments": "📌", "plan": "📋", "mail": "✉️", "docs": "📝", "files": "📎", "orders": "🛒",
+              "supply": "🏭", "calendar": "📅"}
+MOBILE_LIMIT = 40
+
+
+def mobile_items(project, facts, viewer, today=None, limit=MOBILE_LIMIT) -> list:
+    """На телефоні замість шкали — список подій, нові зверху: дата, значок доріжки, текст (перший рядок підказки —
+    там уже лише те, що людині можна бачити), посилання. Години askDANTE — ні."""
+    today = today or timezone.localdate()
+    out = []
+    for e in events(project, facts, viewer, today):
+        if e["lane"] == "hours":
+            continue
+        text = (e["tip"] or e["label"] or "").split("\n")[0]
+        out.append({"date": e["start"], "icon": LANE_ICONS.get(e["lane"], "•"), "text": _cut(text, 140),
+                    "url": e["url"], "cls": e["cls"] or ""})
+    out.sort(key=lambda x: x["date"], reverse=True)
+    return out[:limit]

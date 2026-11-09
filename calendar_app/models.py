@@ -76,6 +76,9 @@ class CalendarEvent(models.Model):
     push_sent   = models.BooleanField(default=False)
 
     is_done    = models.BooleanField(default=False, verbose_name='Виконано', db_index=True)
+    # Тип вибрала людина (меню події: «🤝 Це зустріч» / «⏰ Це термін») — шкала проєкту більше не вгадує його за
+    # назвою (Telko, Call, Besprechung… — projects/terms.py)
+    type_by_user = models.BooleanField(default=False, verbose_name='Тип вибрала людина')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

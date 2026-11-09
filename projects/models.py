@@ -108,7 +108,7 @@ class ProjectParticipant(models.Model):
         super().save(*args, **kwargs)
 
 
-LINK_TARGETS = ("thread", "message", "order", "purchase_order", "jlc_order", "shipment")
+LINK_TARGETS = ("thread", "message", "order", "purchase_order", "jlc_order", "shipment", "event")
 
 
 def _one_target():
@@ -143,6 +143,8 @@ class ProjectLink(models.Model):
                                   related_name="project_links", verbose_name="JLC-замовлення")
     shipment = models.ForeignKey("shipping.Shipment", null=True, blank=True, on_delete=models.CASCADE,
                                  related_name="project_links", verbose_name="Відправлення / посилка")
+    event = models.ForeignKey("calendar_app.CalendarEvent", null=True, blank=True, on_delete=models.CASCADE,
+                              related_name="project_links", verbose_name="Подія календаря")
     source = models.CharField("Джерело", max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
     status = models.CharField("Статус", max_length=10, choices=STATUS_CHOICES, default=CONFIRMED, db_index=True)
     reason = models.CharField("Підстава", max_length=255, blank=True, default="")
@@ -170,6 +172,8 @@ class ProjectLink(models.Model):
                                     name="unique_project_jlc_order"),
             models.UniqueConstraint(fields=["project", "shipment"], condition=Q(shipment__isnull=False),
                                     name="unique_project_shipment"),
+            models.UniqueConstraint(fields=["project", "event"], condition=Q(event__isnull=False),
+                                    name="unique_project_event"),
             models.CheckConstraint(condition=_one_target(), name="project_link_one_target"),
         ]
 
@@ -199,6 +203,8 @@ class ProjectLink(models.Model):
         if self.shipment_id:
             s = self.shipment
             return f"{'📥' if s.direction == s.IN else '🚚'} {s.tracking_number or f'відправлення #{s.pk}'}"
+        if self.event_id:
+            return f"📅 {self.event.title}"
         return "—"
 
 

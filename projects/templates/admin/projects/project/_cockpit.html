@@ -1,12 +1,14 @@
 {# «🧭 Пульт проєкту» (projects/cockpit.py → context); JS і стилі — change_form.html. #}
 {# Без <script> і без <form>: пульт усередині форми картки, поля «📌» без name. #}
 <div class="pjc" data-range="{{ range }}" data-cockpit="{{ urls.cockpit }}" data-highlight="{{ urls.highlight }}"
+     data-code="{{ project.code }}" data-title="{{ project.name }}"
      data-scan="{{ urls.scan }}" data-plan-base="{{ urls.plan_base }}" data-plan-step="{{ urls.plan_step }}"
      data-plan-phase="{{ urls.plan_phase }}" data-plan-save-template="{{ urls.plan_save_template }}"
      data-has-plan="{% if plan.has_plan %}1{% endif %}" data-can-change="{% if can_change %}1{% endif %}"
      data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"
      data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
-     data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"{% if can_change %}
+     data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
+     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
   <div class="pjc-head">
     <b class="pjc-title">🧭 Пульт проєкту</b>
@@ -21,6 +23,7 @@
     {% if start %}<span class="pjc-sub">старт {{ start|date:"d.m.Y" }}</span>{% endif %}
     <span class="pjc-sub" title="Листи від клієнта / наші · Angebote · замовлення · закупівлі · JLC-замовлення · відправлення">📥 {{ counts.in }} · 📤 {{ counts.out }} · 📝 {{ counts.offers }} · 🛒 {{ counts.orders }} · 🏭 {{ more.purchases }} · 🔧 {{ more.jlc }} · 🚚 {{ more.shipments }}</span>
     <a class="pjc-link" href="{{ urls.mail }}" target="_blank">✉️ Листи проєкту</a>
+    <button type="button" class="pjc-b" data-pjc-fields title="Поля проєкту: назва, клієнт, статус, строки, учасники, прив'язки">⚙️ Поля</button>
   </div>
   {% if notice %}<div class="pjc-notice" role="status">{{ notice }}</div>{% endif %}
   {% if plan.has_plan %}
@@ -257,7 +260,21 @@
           {% if can_change %}<button type="button" class="pjc-b pjc-right pjc-danger" data-pjc-post="{{ urls.plan_clear }}"
                   data-confirm="Видалити весь план (фази й кроки)? Листи, замовлення й закупівлі проєкту лишаться.">🗑 Очистити план</button>{% endif %}
         </div>
-        <div class="pjc-svg">{{ plan.gantt|safe }}</div>
+        <div class="pjc-ptools pjg-views">
+          <span class="pjc-ranges" role="group" aria-label="Вигляд діаграми Ганта">
+            <button type="button" class="pjc-b" data-pjg-view="ours" aria-pressed="true">📊 Діаграма Minerva</button>
+            <button type="button" class="pjc-b" data-pjg-view="classic" aria-pressed="false">📋 Класична діаграма Ганта</button>
+          </span>
+          <span class="pjc-ranges" role="group" aria-label="Масштаб" data-pjg-only="classic" hidden>
+            <button type="button" class="pjc-b" data-pjg-scale="day">Дні</button>
+            <button type="button" class="pjc-b" data-pjg-scale="week">Тижні</button>
+            <button type="button" class="pjc-b" data-pjg-scale="month">Місяці</button>
+          </span>
+          <span class="pjc-hint" data-pjg-only="classic" hidden>{% if can_change %}Перетягніть смугу — нові дати, її правий край — тривалість; клік — вікно кроку.{% else %}Наведіть на смугу — дати кроку.{% endif %}</span>
+        </div>
+        <div class="pjc-svg" data-pjg-pane="ours">{{ plan.gantt|safe }}</div>
+        <div class="pjg2" data-pjg-pane="classic" hidden></div>
+        {{ plan.classic|json_script:"pjg-data" }}
         <div class="pjc-legend">
           <span><i class="lg-bar ok"></i>виконано</span><span><i class="lg-bar open"></i>в роботі</span>
           <span><i class="lg-bar warn"></i>чекаємо</span><span><i class="lg-bar plan"></i>заплановано</span>
@@ -288,8 +305,14 @@
     <div class="pjc-pane" data-pjc-pane="timeline">
     <h4>
       <span class="pjc-ranges" role="group" aria-label="Період шкали">{% for key, label in ranges %}<button type="button" class="pjc-b{% if key == range %} on{% endif %}" data-pjc-range="{{ key }}" aria-pressed="{% if key == range %}true{% else %}false{% endif %}">{{ label }}</button>{% endfor %}</span>
+      {% if can_change %}<button type="button" class="pjc-b pjc-right" data-pjc-event-add title="Зустріч чи термін з вашого календаря, який не прийшов листом проєкту">📅 ＋ Подія з календаря</button>{% endif %}
     </h4>
     <div class="pjc-svg">{{ timeline|safe }}</div>
+    {% if timeline_list %}
+      <ul class="pjt-mlist" aria-label="Події проєкту">
+        {% for e in timeline_list %}<li class="pjt-ml-{{ e.cls|default:'def' }}"><time>{{ e.date|date:"d.m.y" }}</time> <span translate="no">{% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener">{{ e.icon }} {{ e.text }}</a>{% else %}{{ e.icon }} {{ e.text }}{% endif %}</span></li>{% endfor %}
+      </ul>
+    {% endif %}
     <div class="pjc-legend">
       <span><i class="lg-dot in"></i>лист клієнта</span><span><i class="lg-dot out"></i>наш лист</span>
       <span><i class="lg-ring"></i>чекає нашої відповіді</span>

@@ -811,7 +811,7 @@ def thread_preview_view(request, thread_pk):
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
         'sender_logos':    EmailSettings.get_for_user(request.user).sender_logos,
-        'projects_state':  _projects_state(thread),
+        'projects_state':  _projects_state(thread, request.user),
         'quote_request':   _quote_request(thread),
         'agent_runs':      _agent_runs(emails),
         'followups':       _followups_for(emails),
@@ -886,7 +886,7 @@ def message_preview_view(request, message_pk):
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
         'sender_logos':    EmailSettings.get_for_user(request.user).sender_logos,
-        'projects_state':  _projects_state(msg.thread),
+        'projects_state':  _projects_state(msg.thread, request.user),
         'agent_runs':      _agent_runs([msg]),
         'meeting_invites': _meeting_invites(request.user, [msg]),
         'followups':       _followups_for([msg]),
@@ -911,13 +911,14 @@ def _quote_request(thread):
         return None
 
 
-def _projects_state(thread) -> str:
-    """JSON проєктів гілки для блоку «📁» у прев'ю (підтверджені + пропозиції системи)."""
+def _projects_state(thread, user=None) -> str:
+    """JSON проєктів гілки для блоку «📁» у прев'ю (підтверджені + пропозиції системи; фаза й кроки — з правом
+    бачити проєкти)."""
     if thread is None:
         return ''
     try:
         from projects.views import thread_state
-        return json.dumps(thread_state(thread), ensure_ascii=False)
+        return json.dumps(thread_state(thread, user), ensure_ascii=False)
     except Exception as e:
         logger.warning('projects state: %s', e)
         return ''

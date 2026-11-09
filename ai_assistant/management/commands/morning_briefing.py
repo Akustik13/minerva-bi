@@ -195,7 +195,8 @@ class Command(BaseCommand):
         data_section = '\n'.join(data_lines) if data_lines else '— немає даних —'
 
         projects = self._projects_text(profile.user) if bs.include_projects else ''
-        projects_prompt = (f"\n\nПРОЄКТИ, ЩО ПОТРЕБУЮТЬ УВАГИ (відповідальний — цей користувач):\n{projects}"
+        projects_prompt = (f"\n\nПРОЄКТИ (відповідальний — цей користувач): що потребує уваги, кроки тижня, "
+                           f"нові ризики:\n{projects}"
                            if projects else '')
 
         prompt = (
@@ -218,7 +219,7 @@ class Command(BaseCommand):
         text = chat(prompt, profile=profile, channel='system_briefing')
         if projects:   # повний список — під текстом AI, щоб нічого не загубилось
             from html import escape
-            text = (text or '').rstrip() + '\n\n📁 <b>Потребує уваги</b>\n' + escape(projects)
+            text = (text or '').rstrip() + '\n\n📁 <b>Проєкти</b>\n' + escape(projects)
         return text
 
     def _projects_text(self, user) -> str:

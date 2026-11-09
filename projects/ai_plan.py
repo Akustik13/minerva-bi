@@ -120,7 +120,8 @@ def _own_facts(project, user, today):
     uid = getattr(user, "pk", None)
     own = [x for x in facts["messages"] if x["msg"].account_id and x["msg"].account.user_id == uid]
     deadlines = [e for e in facts.get("deadlines", []) if getattr(e, "user_id", None) == uid]
-    return overview.prompt_text(dict(facts, messages=own, deadlines=deadlines, plan=None))
+    own_terms = [t for t in facts.get("terms", []) if getattr(t.event, "user_id", None) == uid]
+    return overview.prompt_text(dict(facts, messages=own, deadlines=deadlines, terms=own_terms, plan=None))
 
 
 def _parse(raw):

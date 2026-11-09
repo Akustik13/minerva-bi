@@ -198,7 +198,7 @@ class FieldsTests(GenericTestBase):
         self.assertIn('<span translate="no">Muster GmbH</span>', block)
         self.assertNotIn("Не вдалося показати цей блок.", block)
         # групи без полів моделі — одним рядком з посиланнями на групу картки
-        self.assertIn(f'<a class="mvp-link" href="/admin/sales/salesorder/{order.pk}/change/#fieldset-0-5-heading">'
+        self.assertIn(f'<a class="mvp-link" href="/admin/sales/salesorder/{order.pk}/change/#fieldset-0-6-heading">'
                       "🏷️ Етикетки DYMO</a>", html)
 
     def test_empty_fields_are_folded_with_their_count(self):

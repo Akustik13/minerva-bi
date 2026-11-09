@@ -323,6 +323,16 @@ class DelegateTests(AIBase):
         c = self.step("Тест у клієнта", 5, side=C)
         self.assertEqual(delegate.presets(c)[0]["mail_to"], "buyer@client.example")
 
+    def test_offer_step_suggests_an_angebot_first(self):
+        s = self.step("Angebot Serie 2500 Stk", 3, trigger="offer_sent")
+        first = delegate.presets(s, self.user)[0]
+        self.assertEqual(first["key"], "offer")
+        self.assertIn(self.project.code, first["instruction"])
+        self.assertIn("Ціни й строки не вказуй", first["instruction"])
+        olga, _ = self.colleague(role="readonly", modules=("projects",))
+        self.assertNotIn("offer", [p["key"] for p in delegate.presets(s, olga)])     # без права на Angebote
+        self.assertNotIn("offer", [p["key"] for p in delegate.presets(self.step("Тест у клієнта", 5, side=C))])
+
     def test_create_links_the_task_and_starts_it(self):
         s, _ = self.supplier_step()
         with patch("agent.tasks.start", return_value=True) as start:

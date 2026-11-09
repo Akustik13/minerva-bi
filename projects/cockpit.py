@@ -47,6 +47,9 @@ def link_label(link, uid) -> tuple:
         own = _own(link.message, uid)
         return (f"📨 {link.message.subject or '(без теми)'}" if own else "📨 лист з іншої скриньки",
                 f"/email/message/{link.message_id}/" if own else "")
+    if link.event_id:
+        own = link.event.user_id == uid
+        return (f"📅 {link.event.title}" if own else "📅 подія з іншого календаря", "/calendar/" if own else "")
     urls = {"order_id": "/admin/sales/salesorder/{}/change/",
             "purchase_order_id": "/admin/inventory/purchaseorder/{}/change/",
             "jlc_order_id": "/admin/jlcpcb/jlcorder/{}/change/",
@@ -118,6 +121,7 @@ def _plan_context(project, facts, today, can_change=False) -> dict:
             {"id": t.pk, "name": t.name, "counts": plan_mod.template_counts(t), "description": t.description}
             for t in plan_mod.templates()] if can_change else []}
     return {"has_plan": True, "strip": _strip(p), "gantt": gantt.render(project, p, today, editable=can_change),
+            "classic": gantt.classic_data(project, p, today),
             "end": p.end, "base_end": p.base_end,
             "late": bool(project.due_date and p.end and p.end > project.due_date),
             "baseline_at": project.baseline_at, "data": plan_mod.editor_data(project, p) if can_change else None,
@@ -220,6 +224,7 @@ def context(project, user, range_key="all", notice="") -> dict:
         "kinds": ProjectHighlight.KIND_CHOICES, "mails": _mails(facts, uid),
         "counts": facts["counts"], "more": facts["more"],
         "timeline": timeline.render(project, facts, user, months=timeline.RANGES[range_key], today=today),
+        "timeline_list": timeline.mobile_items(project, facts, user, today),
         "range": range_key, "ranges": RANGE_LABELS,
         "can_change": can_change,
         "has_products": project.products.exists(),
@@ -243,7 +248,9 @@ def context(project, user, range_key="all", notice="") -> dict:
                  "ai_plan_apply": reverse("projects:ai_plan_apply", args=[pk]),
                  "ai_base": f"/projects/api/project/{pk}/ai/suggestion/",
                  "forgotten": reverse("projects:forgotten", args=[pk]),
-                 "forgotten_decide": reverse("projects:forgotten_decide", args=[pk])},
+                 "forgotten_decide": reverse("projects:forgotten_decide", args=[pk]),
+                 "events": reverse("projects:project_events", args=[pk]),
+                 "event_link": reverse("projects:project_event_link", args=[pk])},
     }
 
 

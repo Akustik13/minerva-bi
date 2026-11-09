@@ -56,6 +56,9 @@ def apply_one(p, user, request=None) -> str:
         return purchases.apply_purchase(p, user)
     if p.kind == AgentProposal.PARCEL:
         return purchases.apply_parcel(p, user)
+    if p.kind == AgentProposal.OFFER:
+        from agent import offers_tool
+        return offers_tool.apply_offer(p, user)
     return product_fields.apply(p, user)
 
 
@@ -64,6 +67,9 @@ def describe(p) -> tuple:
     from agent import channels, purchases, shipments
     if p.kind in (AgentProposal.PURCHASE, AgentProposal.PARCEL):
         return purchases.describe(p)
+    if p.kind == AgentProposal.OFFER:
+        from agent import offers_tool
+        return offers_tool.describe(p)
     if p.kind in (AgentProposal.SHOP, AgentProposal.DK_PRICES, AgentProposal.DK_LEAD):
         return channels.describe(p)
     if p.kind in (AgentProposal.SHIPMENT, AgentProposal.ORDER):

@@ -26,12 +26,24 @@ def _project_dict(p):
             "url": f"/admin/projects/project/{p.pk}/change/", "mail_url": f"/email/?project={p.pk}"}
 
 
-def thread_state(thread) -> dict:
+def _brief(project) -> dict:
+    """Фаза, колір стану й відкриті кроки для прев'ю листа; збій — без них (прев'ю однаково показує проєкт)."""
+    from . import plan
+    try:
+        return plan.brief(project)
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def thread_state(thread, viewer=None) -> dict:
+    """Проєкти гілки для блоку «📁» у прев'ю листа; фаза й кроки (brief) — лише з правом бачити проєкти
+    (viewer None — без перевірки: тести, внутрішні виклики)."""
     info = services.thread_projects(thread)
+    show = viewer is None or viewer.has_perm("projects.view_project")
     return {
         "thread": thread.pk,
-        "confirmed": [{"link": l.pk, "project": _project_dict(l.project), "reason": l.reason}
-                      for l in info["confirmed"]],
+        "confirmed": [{"link": l.pk, "project": _project_dict(l.project), "reason": l.reason,
+                       "brief": _brief(l.project) if show else {}} for l in info["confirmed"]],
         "suggested": [{"link": l.pk, "project": _project_dict(l.project), "reason": l.reason}
                       for l in info["suggested"]],
     }
@@ -47,7 +59,7 @@ def _body(request) -> dict:
 @staff_member_required
 def thread_view(request, thread_pk):
     thread = _thread_for(request, thread_pk)
-    state = thread_state(thread)
+    state = thread_state(thread, request.user)
     linked = {c["project"]["id"] for c in state["confirmed"]}
     state["candidates"] = [_project_dict(p) for p in services.candidate_projects(thread) if p.pk not in linked]
     state["name_suggestion"] = services.suggest_name([thread])
@@ -60,7 +72,7 @@ def link_view(request, thread_pk):
     thread = _thread_for(request, thread_pk)
     project = get_object_or_404(Project, pk=_body(request).get("project_id") or 0)
     services.link_thread(project, thread, user=request.user, reason="додано з пошти")
-    return JsonResponse({"ok": True, **thread_state(thread)})
+    return JsonResponse({"ok": True, **thread_state(thread, request.user)})
 
 
 @staff_member_required
@@ -68,7 +80,7 @@ def link_view(request, thread_pk):
 def create_view(request, thread_pk):
     thread = _thread_for(request, thread_pk)
     project = services.create_project(name=_body(request).get("name", ""), user=request.user, threads=[thread])
-    return JsonResponse({"ok": True, "project": _project_dict(project), **thread_state(thread)})
+    return JsonResponse({"ok": True, "project": _project_dict(project), **thread_state(thread, request.user)})
 
 
 def _link_for(request, link_pk):
@@ -86,7 +98,7 @@ def _link_for(request, link_pk):
 def decide_view(request, link_pk):
     link = _link_for(request, link_pk)
     services.decide(link, bool(_body(request).get("accept")), user=request.user)
-    return JsonResponse({"ok": True, **(thread_state(link.thread) if link.thread_id else {})})
+    return JsonResponse({"ok": True, **(thread_state(link.thread, request.user) if link.thread_id else {})})
 
 
 @staff_member_required
@@ -95,7 +107,7 @@ def remove_view(request, link_pk):
     link = _link_for(request, link_pk)
     thread = link.thread
     services.unlink(link)
-    return JsonResponse({"ok": True, **(thread_state(thread) if thread else {})})
+    return JsonResponse({"ok": True, **(thread_state(thread, request.user) if thread else {})})
 
 
 # ── Огляд проєкту ────────────────────────────────────────────────────────────
@@ -518,3 +530,94 @@ def step_agent_view(request, pk, sid):
     return JsonResponse({"ok": True, "url": f"/admin/agent/agenttask/{task.pk}/review/",
                          "html": cockpit.render(project, request.user, str(_body(request).get("range") or "all"),
                                                 f"🤖 Завдання агенту #{task.pk}: «{step.title}» — агент працює")})
+
+
+@staff_member_required
+@require_POST
+def plan_step_dates_view(request, pk, sid):
+    """📋 Класична діаграма Ганта: смугу перетягнули — {start, end} → нові планові дати кроку → свіжий пульт."""
+    from . import plan
+
+    def run(project, body):
+        step = plan.move_step(project, sid, body.get("start"), body.get("end"))
+        when = f"{step.end:%d.%m.%Y}" if step.kind == step.MILESTONE else f"{step.start:%d.%m} – {step.end:%d.%m.%Y}"
+        return f"📋 «{step.title}»: {when}"
+    return _plan_action(request, pk, run)
+
+
+def _mail_of(request, body):
+    """Лист з тіла запиту ({message}) — лише з власних скриньок; немає / чужий → None."""
+    pk = body.get("message")
+    return _own_message(request, int(pk)) if str(pk or "").isdigit() else None
+
+
+@staff_member_required
+@require_POST
+def plan_quick_step_view(request, pk):
+    """➕ Крок з листа (прев'ю листа): {title, message} → крок у поточній фазі."""
+    from . import plan
+
+    def run(project, body):
+        step = plan.quick_step(project, body.get("title"), _mail_of(request, body), request.user)
+        return f"➕ Крок додано: {step.title}"
+    return _plan_action(request, pk, run)
+
+
+@staff_member_required
+@require_POST
+def plan_step_close_view(request, pk, sid):
+    """✅ Закрити крок з листа: {message} → «виконано» датою листа."""
+    from . import plan
+
+    def run(project, body):
+        step = plan.close_step(project, sid, _mail_of(request, body), request.user)
+        return f"✅ Крок виконано: {step.title}"
+    return _plan_action(request, pk, run)
+
+
+# ── 📅 Подія календаря → проєкт (шкала: «📅 ＋ Подія з календаря», меню ромба — «✕ Прибрати з проєкту») ──────────
+
+EVENTS_BACK, EVENTS_AHEAD, EVENTS_SHOWN = 45, 90, 30
+
+
+@staff_member_required
+def project_events_view(request, pk):
+    """GET — власні події календаря навколо сьогодні, ще не пов'язані з проєктом (ні вручну, ні через лист)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from calendar_app.models import CalendarEvent
+    project = _project_for_change(request, pk)
+    now = timezone.now()
+    linked = set(ProjectLink.objects.filter(project=project).exclude(event=None).values_list("event_id", flat=True))
+    mails = services.project_messages(project).values("pk")
+    rows = []
+    for e in (CalendarEvent.objects.filter(user=request.user, start_at__gte=now - timedelta(days=EVENTS_BACK),
+                                           start_at__lte=now + timedelta(days=EVENTS_AHEAD))
+              .exclude(pk__in=linked).exclude(email_message__in=mails)):
+        rows.append({"id": e.pk, "title": e.title, "date": timezone.localtime(e.start_at).strftime("%d.%m.%Y"),
+                     "type": e.get_event_type_display(), "far": abs((e.start_at - now).total_seconds())})
+    rows.sort(key=lambda r: r["far"])
+    for r in rows:
+        r.pop("far")
+    return JsonResponse({"ok": True, "events": rows[:EVENTS_SHOWN]})
+
+
+@staff_member_required
+@require_POST
+def project_event_link_view(request, pk):
+    """{event, link: true|false} — власна подія календаря до проєкту / геть з проєкту."""
+    from calendar_app.models import CalendarEvent
+
+    def run(project, body):
+        ev = CalendarEvent.objects.filter(pk=body.get("event") if str(body.get("event") or "").isdigit() else 0,
+                                          user=request.user).first()
+        if ev is None:
+            raise ValueError("Подію не знайдено у вашому календарі")
+        if body.get("link", True):
+            services.link_object(project, user=request.user, reason="📅 вручну з календаря", event=ev)
+            return f"📅 Подію додано до проєкту: {ev.title}"
+        ProjectLink.objects.filter(project=project, event=ev).delete()
+        return f"✕ Подію прибрано з проєкту: {ev.title}"
+    return _plan_action(request, pk, run)

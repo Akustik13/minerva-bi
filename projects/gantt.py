@@ -204,3 +204,62 @@ def render(project, plan, today=None, editable=False) -> str:
                    f'<title>Строк клієнту {project.due_date:%d.%m.%Y}</title></line>')
     out.append("</svg>")
     return "".join(out)
+
+
+# ── 📋 Класична діаграма Ганта (малює браузер — admin/projects/project/change_form.html) ──────────────────────────
+
+def classic_data(project, plan, today=None) -> dict:
+    """Таблиця кроків з номерами (1, 1.1 …) + смуги: прогноз, базовий план, стан, критичний шлях, попередники.
+    Рядки — у порядку плану (фаза → кроки); крок іншого проєкту в «Попередниках» — його код."""
+    today = today or timezone.localdate()
+    rows, number = [], {}
+    phase_no = 0
+    for pc in plan.phases:
+        if pc.phase is not None:
+            phase_no += 1
+            prefix = f"{phase_no}."
+            rows.append({"type": "phase", "id": pc.phase.pk, "n": str(phase_no),
+                         "title": f"{pc.phase.icon} {pc.phase.name}".strip(), "start": _iso(pc.start),
+                         "end": _iso(pc.end), "status": pc.status, "done": pc.done, "total": len(pc.steps)})
+        else:
+            prefix = ""
+            if pc.steps:
+                rows.append({"type": "phase", "id": "", "n": "", "title": "без фази", "start": _iso(pc.start),
+                             "end": _iso(pc.end), "status": pc.status, "done": pc.done, "total": len(pc.steps)})
+        for j, c in enumerate(pc.steps, 1):
+            number[c.step.pk] = f"{prefix}{j}"
+    for pc in plan.phases:
+        for c in pc.steps:
+            s = c.step
+            preds = []
+            for pred, lag in c.preds:
+                if hasattr(pred, "step"):
+                    preds.append({"id": pred.step.pk, "n": number.get(pred.step.pk, ""), "lag": lag})
+                else:
+                    preds.append({"id": "", "n": f"{pred.project.code}", "lag": lag, "ext": True})
+            rows.append({
+                "type": "step", "id": s.pk, "phase": s.phase_id or "", "n": number.get(s.pk, ""), "title": s.title,
+                "kind": s.kind, "side": SIDE_SHORT.get(s.side, s.side),
+                "who": (s.assignee.get_full_name() or s.assignee.username) if s.assignee_id else "",
+                "start": _iso(c.start), "end": _iso(c.end), "bstart": _iso(s.baseline_start),
+                "bend": _iso(s.baseline_end), "status": c.status, "crit": bool(c.critical and c.status not in
+                                                                              ("done", "skipped")),
+                "slip": c.slip or 0, "preds": preds, "days": (c.end - c.start).days + 1 if c.start and c.end else 0,
+                "note": c.note or ""})
+    # кроки — одразу після своєї фази
+    out, by_phase = [], {}
+    for r in rows:
+        if r["type"] == "step":
+            by_phase.setdefault(r["phase"], []).append(r)
+    for r in rows:
+        if r["type"] == "phase":
+            out.append(r)
+            out.extend(by_phase.get(r["id"], []))
+    return {"rows": out, "today": today.isoformat(), "due": _iso(project.due_date),
+            "start": _iso(min([c.start for c in plan.steps if c.start] or [today])),
+            "end": _iso(max([c.end for c in plan.steps if c.end] + ([project.due_date] if project.due_date else [])
+                            + [today]))}
+
+
+def _iso(d) -> str:
+    return d.isoformat() if d else ""

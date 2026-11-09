@@ -35,6 +35,7 @@
 .em-proj-chip i{font-style:normal;font-size:10px;color:var(--text-dim)}
 .em-proj-chip button{border:none;background:none;cursor:pointer;color:var(--text-dim);padding:0 2px;font-size:12px}
 .em-proj-chip button:hover{color:var(--text)}
+.em-proj-st{font-size:11px;color:var(--text-dim);white-space:nowrap}
 .em-proj-panel{display:none;margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg-card)}
 .em-proj-panel.open{display:block}
 .em-proj-cands{max-height:200px;overflow-y:auto;margin:6px 0}
@@ -1793,7 +1794,14 @@ window.pvAiTranslate = async function(pk, force) {
     t.textContent = msg; t.style.display = 'block';
     clearTimeout(t._hide); t._hide = setTimeout(function(){ t.style.display = 'none'; }, 2200);
   }
+  function briefHtml(b) {
+    if (!b || (!b.phase && !b.icon)) return '';
+    var tip = [b.label, b.phase, b.next ? 'наступне: ' + b.next.title + (b.next.end ? ' · ' + b.next.end : '') : '']
+      .filter(Boolean).join(' · ');
+    return '<span class="em-proj-st" title="' + esc(tip) + '">' + esc((b.icon ? b.icon + ' ' : '') + (b.phase || '')) + '</span>';
+  }
   function render(state) {
+    box._state = state;
     var h = '', ov = box.dataset.ov === '1', ch = box.dataset.ch === '1', ovBtn = document.getElementById('pv-ov-btn');
     var confirmed = state.confirmed || [];
     if (ovBtn) {   // «🧭 Огляд проєкту» у діях — для першого підтвердженого проєкту гілки
@@ -1802,12 +1810,18 @@ window.pvAiTranslate = async function(pk, force) {
     }
     var tipMoment = 'Позначити цей лист як важливий момент проєкту (виділений текст — цитата)';
     var tipRisk = 'Додати ризик проєкту з цього листа (виділений текст — підстава)';
+    var tipStep = 'Крок плану проєкту з цього листа — що зробити';
+    var tipClose = 'Позначити крок плану виконаним за цим листом';
     confirmed.forEach(function(c) {
       h += '<span class="em-proj-chip" title="' + esc(c.reason) + '">'
          + '<a href="' + esc(c.project.url) + '" target="_blank">📁 ' + esc(c.project.code) + ' · ' + esc(c.project.name) + '</a>'
+         + briefHtml(c.brief)
          + (ov ? '<button onclick="pvProjOverview(' + c.project.id + ')" title="{% trans "Огляд проєкту" %}">🧭</button>' : '')
          + (ch ? '<button onclick="pvProjMoment(' + c.project.id + ')" title="' + tipMoment + '">📌</button>' : '')
          + (ch ? '<button onclick="pvProjRisk(' + c.project.id + ')" title="' + tipRisk + '">⚠️</button>' : '')
+         + (ch ? '<button onclick="pvProjStep(' + c.project.id + ')" title="' + tipStep + '">➕</button>' : '')
+         + (ch && c.brief && c.brief.open && c.brief.open.length
+            ? '<button onclick="pvProjClose(' + c.project.id + ', this)" title="' + tipClose + '">✅</button>' : '')
          + '<a href="' + esc(c.project.mail_url) + '" title="{% trans "Усі листи проєкту" %}">✉</a>'
          + '<button onclick="pvProjRemove(' + c.link + ')" title="{% trans "Прибрати цю переписку з проєкту" %}">✕</button></span>';
     });
@@ -1887,6 +1901,72 @@ window.pvAiTranslate = async function(pk, force) {
                          {title: title.trim(), message: pk || '', quote: quote, probability: 2, impact: 2});
       toast(d.ok ? '⚠️ Ризик додано до проєкту' : '⚠️ ' + (d.error || '{% trans "Помилка" %}'));
     } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  };
+  async function refresh() {
+    try {
+      var r = await fetch('/projects/api/thread/' + tpk + '/', {credentials: 'same-origin'});
+      var d = await r.json();
+      if (d && d.confirmed) render(d);
+    } catch (e) { /* стан лишається як був */ }
+  }
+  function confirmedOf(projectId) {
+    var st = box._state || {};
+    return (st.confirmed || []).filter(function (c) { return !projectId || c.project.id === projectId; });
+  }
+  // ➕ Крок плану з цього листа: у поточну фазу, «ми», від сьогодні
+  window.pvProjStep = async function(projectId) {
+    var pk = typeof _pvReplyPk !== 'undefined' ? _pvReplyPk : 0;
+    var subj = typeof _pvReplySubj !== 'undefined' ? _pvReplySubj : '';
+    var title = prompt('➕ Крок плану проєкту — що зробити?', subj.replace(/^(\s*(re|aw|wg|fw|fwd)\s*:\s*)+/i, ''));
+    if (title === null || !title.trim()) return;
+    try {
+      var d = await post('/projects/api/project/' + projectId + '/plan/quick-step/', {title: title.trim(), message: pk || ''});
+      toast(d.ok ? '➕ Крок додано до плану проєкту' : '⚠️ ' + (d.error || '{% trans "Помилка" %}'));
+      if (d.ok) refresh();
+    } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  };
+  // ✅ Закрити крок: вибір відкритого кроку → «виконано» датою листа
+  async function closeStep(projectId, stepId) {
+    var pk = typeof _pvReplyPk !== 'undefined' ? _pvReplyPk : 0;
+    try {
+      var d = await post('/projects/api/project/' + projectId + '/plan/step/' + stepId + '/close/', {message: pk || ''});
+      toast(d.ok ? '✅ Крок позначено виконаним' : '⚠️ ' + (d.error || '{% trans "Помилка" %}'));
+      if (d.ok) refresh();
+    } catch (e) { toast('⚠️ {% trans "Помилка" %}'); }
+  }
+  function stepItems(c) {
+    return ((c.brief && c.brief.open) || []).map(function (s) {
+      return {label: s.title, hint: s.end, icon: '✅', data: true, onSelect: function () { closeStep(c.project.id, s.id); }};
+    });
+  }
+  window.pvProjClose = function(projectId, btn) {
+    var c = confirmedOf(projectId)[0];
+    if (!c) return;
+    var items = stepItems(c);
+    if (!items.length) { toast('Відкритих кроків немає'); return; }
+    if (window.MVMenu) { window.MVMenu.open(btn || box, items, {title: 'Який крок виконано?'}); return; }
+    var list = c.brief.open.map(function (s, i) { return (i + 1) + '. ' + s.title; }).join('\n');
+    var n = parseInt(prompt('Який крок виконано? Номер:\n' + list, '1'), 10);
+    if (n >= 1 && n <= c.brief.open.length) closeStep(projectId, c.brief.open[n - 1].id);
+  };
+  // 📁 Меню правого кліку «Проєкт листа»: момент, крок, ризик, закрити крок — для кожного проєкту гілки
+  window.pvProjMenu = function() {
+    var list = confirmedOf();
+    if (!list.length) { toast('Лист ще не в проєкті — «📁 До проєкту…»'); return; }
+    var ch = box.dataset.ch === '1', items = [];
+    list.forEach(function (c) {
+      items.push({type: 'title', label: c.project.code + ' · ' + c.project.name, data: true});
+      if (!ch) {
+        items.push({label: 'Відкрити проєкт', icon: '📁', href: c.project.url, target: '_blank'});
+        return;
+      }
+      items.push({label: 'Важливий момент…', icon: '📌', onSelect: function () { pvProjMoment(c.project.id); }});
+      items.push({label: 'Крок плану з листа…', icon: '➕', onSelect: function () { pvProjStep(c.project.id); }});
+      items.push({label: 'Ризик з листа…', icon: '⚠️', onSelect: function () { pvProjRisk(c.project.id); }});
+      var steps = stepItems(c);
+      if (steps.length) items.push({type: 'submenu', label: 'Закрити крок', icon: '✅', items: steps});
+    });
+    if (window.MVMenu) window.MVMenu.open(box.style.display === 'none' ? null : box, items, {title: 'Проєкт листа'});
   };
   window.pvProjCreate = async function() {
     var name = (document.getElementById('pv-proj-name').value || '').trim();

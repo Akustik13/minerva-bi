@@ -122,6 +122,19 @@ class Base(TestCase):
         return Customer.objects.get(pk=self.c.pk)
 
 
+class CardAnchorTests(Base):
+    """«↗ Відкрити в картці» веде на ту саму групу, хоч картка людини має й «📁 Проєкти» (з правом бачити проєкти)."""
+    def test_anchor_follows_inserted_projects_group(self):
+        from crm.admin import CustomerAdmin
+        static = [name for name, _o in CustomerAdmin.fieldsets]
+        html = self.shell()
+        for key, title in (("sales", "📊 Аналітика"), ("orders", "📜 Історія замовлень")):
+            i = static.index(title)                       # після «🎯 Сегментація» картка має ще «📁 Проєкти»
+            self.assertIn(f'data-card="/admin/crm/customer/{self.c.pk}/change/#fieldset-0-{i + 1}-heading"',
+                          self.section(html, key))
+        self.assertIn(f"#fieldset-0-{static.index('📋 Контактна інформація')}-heading", self.section(html, "contact"))
+
+
 class OrdersOfTests(Base):
     """crm.utils.orders_of — те саме правило, що _matching (RFM, «Тип»), але без відбору продажів."""
 

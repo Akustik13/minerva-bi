@@ -138,7 +138,7 @@ class Block:
     applies: Callable | None = None        # (obj) -> bool без запитів; False — «не стосується»
     empty: str = ""                        # текст порожнього розділу («Немає даних.»)
     affects: tuple = ()                    # ключі Edit, після яких розділ перемальовується
-    fieldset: int | None = None            # номер групи полів картки → «↗» на #fieldset-0-<i>-heading
+    fieldset: int | None = None            # номер групи в fieldsets адмінки → «↗» на ту саму групу картки (card_group)
 
 
 @dataclass
@@ -389,6 +389,32 @@ def field_editable(panel: Panel, ma, request, obj, name: str) -> bool:
         cache[key] = (names, readonly)
     names, readonly = cache[key]
     return (name in names or name in (panel.extra_fields or ())) and name not in readonly
+
+
+def card_group(ma, request, obj, index):
+    """«↗ Відкрити в картці»: розділ панелі знає номер групи в `fieldsets` адмінки, а картка людини може мати й
+    інші групи (get_fieldsets додає «📁 Проєкти», без розділу прибирає «⏱ Час askDANTE») — та сама група за назвою
+    (і за порядком серед однойменних). → номер у картці, None — групи в картці немає; без адмінки — як є."""
+    if index is None or ma is None:
+        return index
+    static = list(getattr(ma, "fieldsets", None) or ())
+    if not 0 <= index < len(static):
+        return index
+    cache = _request_cache(request, "_mvp_groups")
+    key = (ma.opts.label_lower, getattr(obj, "pk", None))
+    if key not in cache:
+        try:
+            cache[key] = [name for name, _opts in ma.get_fieldsets(request, obj)]
+        except Exception as exc:  # noqa: BLE001 — без якоря розділ однаково працює
+            logger.warning("side panel fieldsets %s failed: %s", ma.opts.label_lower, exc)
+            cache[key] = None
+    names = cache[key]
+    if names is None:
+        return index
+    name = static[index][0]
+    nth = sum(1 for other, _opts in static[:index] if other == name)
+    hits = [i for i, other in enumerate(names) if other == name]
+    return hits[nth] if nth < len(hits) else None
 
 
 def visible_edits(panel: Panel, request, ma, obj=None) -> list:
@@ -1358,7 +1384,8 @@ def _summary_of(block: Block, obj, request) -> tuple:
     return text, conditional_escape(s or "")
 
 
-def _section(panel: Panel, block: Block, obj, request, p: dict, *, now: bool, change_url: str = "") -> SafeString:
+def _section(panel: Panel, block: Block, obj, request, p: dict, *, now: bool, change_url: str = "",
+             ma=None) -> SafeString:
     key = block.key
     collapsed = key in (p.get("collapsed") or ())
     na = False
@@ -1394,8 +1421,8 @@ def _section(panel: Panel, block: Block, obj, request, p: dict, *, now: bool, ch
                 state, body = "empty", empty(block.empty or EMPTY_TEXT)
             else:
                 body = _html(inner)
-    card = f"{change_url}#fieldset-0-{int(block.fieldset)}-heading" if change_url and block.fieldset is not None \
-        else ""
+    group = card_group(ma, request, obj, block.fieldset) if change_url else None
+    card = f"{change_url}#fieldset-0-{int(group)}-heading" if group is not None else ""
     attrs = _attrs([
         ("id", f"mvp-sec-{key}"), ("data-sec", key), ("data-title", block.title),
         ("data-short", block.short or block.title), ("data-icon", block.icon), ("data-count", count),
@@ -1428,7 +1455,7 @@ def render(panel: Panel, obj, request, p: dict | None = None, open_key: str | No
             continue
         collapsed = key in (p.get("collapsed") or ())
         now = not collapsed and (not block.lazy or key == open_key)
-        sections.append(str(_section(panel, block, obj, request, p, now=now, change_url=urls["change"])))
+        sections.append(str(_section(panel, block, obj, request, p, now=now, change_url=urls["change"], ma=ma)))
     body = mark_safe("".join(sections)) if sections else empty(NO_SECTIONS_TEXT)
     shell = _attrs([
         ("data-model", panel.model), ("data-pk", obj.pk), ("data-label", label_of(panel, obj)),
@@ -1453,4 +1480,5 @@ def render_block(panel: Panel, key: str, obj, request) -> str:
     p = _prefs_for(panel, request)
     ma = admin_for(request, obj)
     _ensure_bound(request, panel, ma, p)
-    return str(_section(panel, block, obj, request, p, now=True, change_url=_urls(panel, obj, request, ma)["change"]))
+    return str(_section(panel, block, obj, request, p, now=True, change_url=_urls(panel, obj, request, ma)["change"],
+                        ma=ma))
