@@ -66,13 +66,14 @@ class WatchTests(TestCase):
                                 external_key="k-1")
         self.order = SalesOrder.objects.create(order_number="1001", source="digikey", customer_key="k-1")
         self.dk = FakeDK()
-        self.tg = []
+        self.tg, self.tg_chats = [], []
         patches = [
             mock.patch("bots.services.digikey_messages.get_all_topics_paginated", side_effect=self.dk.listing),
             mock.patch("bots.services.digikey_messages.get_topic", side_effect=self.dk.topic),
             mock.patch("bots.services.digikey.get_marketplace_token", return_value="tok"),
             mock.patch("dashboard.notifications._send_telegram",
-                       side_effect=lambda ns, text, *a, **k: self.tg.append(text)),
+                       side_effect=lambda ns, text, *a, **k: (self.tg.append(text),
+                                                              self.tg_chats.append(k.get("chat_id_override")))),
             mock.patch("dashboard.notifications._smtp_connection", return_value=None),
         ]
         for p in patches:
@@ -248,6 +249,53 @@ class WatchTests(TestCase):
         self.assertIsNone(watch.run(force=True))                                       # уже йде інша
         cache.delete(watch.LOCK_KEY)
         self.assertIsNotNone(watch.run(force=True))
+
+    def test_own_telegram_chats(self):
+        """«Telegram-чати» повідомлень DigiKey: спільна група й особистий чат; порожньо — основний чат."""
+        self.dk.add("t1")
+        self.dk.say("t1", "m1", "Customer", "Hallo", minutes_ago=2)
+        self.run_check()
+        self.assertEqual(self.tg_chats, ["chat"])
+        self.cfg.msg_notify_tg_chats = "-1001234567890, 987654321"
+        self.cfg.save()
+        self.dk.say("t1", "m2", "Customer", "Noch da?", minutes_ago=1)
+        self.run_check()
+        self.assertEqual(self.tg_chats[1:], ["-1001234567890", "987654321"])
+        self.assertEqual(watch.status(self.cfg)["telegram"]["to"], ["-1001234567890", "987654321"])
+        ns = NotificationSettings.get()
+        ns.telegram_chat_id = ""
+        ns.save()
+        self.cfg.msg_notify_tg_chats = ""
+        self.cfg.save()
+        self.assertEqual(watch.status(self.cfg)["telegram"]["why"], "не вказано чат Telegram")
+
+    def test_settings_form_pickers_and_validation(self):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+        url = f"/admin/bots/digikeyconfig/{self.cfg.pk}/change/"
+        page = self.client.get(url)
+        for text in ('name="msg_notify_tg_chats"', 'class="nt-pick" data-kind="tg"', 'data-kind="email"',
+                     "mv_notify_pick.js", "основний чат сповіщень: chat"):
+            self.assertContains(page, text)
+        form = page.context["adminform"].form
+        data = {}
+        for name, f in form.fields.items():
+            v = form.initial.get(name, f.initial)
+            if isinstance(v, bool):
+                if v:
+                    data[name] = "on"
+            elif v is not None and not isinstance(v, (dict, list)):
+                data[name] = v.isoformat() if hasattr(v, "isoformat") else v
+        data.update({"msg_notify_tg_chats": "-100123, kein chat", "msg_notify_email_to": "a@b.de"})
+        r = self.client.post(url, data)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("msg_notify_tg_chats", r.context["adminform"].form.errors)
+        data["msg_notify_tg_chats"] = "-100123, @lager_chan"
+        r = self.client.post(url, data)
+        self.assertEqual(r.status_code, 302, r.status_code == 200 and r.context["adminform"].form.errors)
+        self.cfg.refresh_from_db()
+        self.assertEqual(self.cfg.msg_notify_tg_chats, "-100123, @lager_chan")
 
     def test_list_failure_is_reported(self):
         with mock.patch("bots.services.digikey_messages.get_all_topics_paginated",

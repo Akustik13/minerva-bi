@@ -6,11 +6,12 @@
 """
 from __future__ import annotations
 
+from django import forms
 from django.templatetags.static import static
 from django.utils.html import format_html, format_html_join, json_script
 from django.utils.safestring import mark_safe
 
-ASSETS_VERSION = "2"
+ASSETS_VERSION = "3"
 
 
 def assets(email_options, chat_options) -> str:
@@ -28,6 +29,65 @@ def picker(kind: str, value: str, *, name: str = "", sync: str = "", empty: str 
         'style="width:100%;box-sizing:border-box">{}</div>',
         kind, empty, value, attrs, "a@firma.de, b@firma.de" if kind == "email" else "Chat ID, напр. -1001234567890",
         format_html('<div class="help">{}</div>', hint) if hint else "")
+
+
+class PickWidget(forms.TextInput):
+    """Поле форми чипами (email | tg): «＋ з Minerva» і своя адреса / Chat ID. empty — що діє, коли порожньо."""
+
+    def __init__(self, kind="email", empty="", attrs=None):
+        super().__init__(attrs)
+        self.kind, self.empty = kind, empty
+
+    def render(self, name, value, attrs=None, renderer=None):
+        from . import notify_routes
+        try:
+            from config.models import NotificationSettings
+            ns = NotificationSettings.get()
+        except Exception:
+            ns = None
+        attrs = {**(attrs or {}), "class": "nt-in", "autocomplete": "off", "style": "width:100%;box-sizing:border-box"}
+        return format_html('<div class="nt-pick" data-kind="{}" data-empty="{}" style="max-width:640px">{}</div>{}',
+                           self.kind, self.empty, super().render(name, value, attrs, renderer),
+                           assets(notify_routes.email_options(ns), notify_routes.chat_options(ns)))
+
+
+def recipients_widgets(form, email="", tg=""):
+    """Поля «кому (email)» і «Telegram-чати» форми адмінки — чипами; порожньо — як у «Налаштування → Сповіщення»."""
+    from . import notify_routes
+    try:
+        from config.models import NotificationSettings
+        ns = NotificationSettings.get()
+    except Exception:
+        ns = None
+    if email and email in form.base_fields:
+        from dashboard.notifications import configured_recipients
+        to = ", ".join(configured_recipients(ns)) if ns else ""
+        field = form.base_fields[email]
+        field.widget = PickWidget("email", f"як «Кому (email)» сповіщень: {to or 'нікому'}")
+        field.validators = [*field.validators, _valid_emails]
+    if tg and tg in form.base_fields:
+        chat = notify_routes.default_chat(ns) if ns else ""
+        field = form.base_fields[tg]
+        field.widget = PickWidget("tg", f"основний чат сповіщень: {chat}" if chat else "основний чат — не задано")
+        field.validators = [*field.validators, _valid_chats]
+
+
+def _valid_emails(value):
+    from django.core.exceptions import ValidationError
+
+    from dashboard.notifications import parse_recipients
+    bad = parse_recipients(value)[1]
+    if bad:
+        raise ValidationError("Не схоже на email: " + ", ".join(bad))
+
+
+def _valid_chats(value):
+    from django.core.exceptions import ValidationError
+
+    from .notify_routes import parse_chats
+    bad = parse_chats(value)[1]
+    if bad:
+        raise ValidationError("Не схоже на Chat ID (число або @назва каналу): " + ", ".join(bad))
 
 
 def check(label: str, checked: bool, *, name: str = "", sync: str = "", title: str = "", role: str = "") -> str:

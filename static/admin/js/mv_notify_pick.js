@@ -3,6 +3,8 @@
    [data-nt-go] — перейти до поля на сторінці (розгорнути згорнутий блок, підсвітити). */
 (function () {
   'use strict';
+  if (window.__mvNotifyPick) return;   // скрипт на сторінці кілька разів (кілька полів) — один раз
+  window.__mvNotifyPick = true;
   var EMAIL = /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/;
   var CHAT = /^(-?\d{3,20}|@[A-Za-z][A-Za-z0-9_]{3,31})$/;
   var BLOCK = /^(@[^\s@,;<>]+\.[^\s@,;<>]+|[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+)$/;
@@ -36,6 +38,8 @@
 
   function setupPick(box) {
     var input = box.querySelector('.nt-in');
+    if (!input || box.getAttribute('data-nt-ready')) return;
+    box.setAttribute('data-nt-ready', '1');
     var kind = RULE[box.getAttribute('data-kind')] ? box.getAttribute('data-kind') : 'email';
     var real = target(input);
     if (input.hasAttribute('data-sync') && !real) return;   // поля картки немає — лишається вимкненим
