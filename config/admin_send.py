@@ -24,6 +24,9 @@ WHAT = {
 }
 
 
+EVENT_KEYS = {"alerts": "alerts", "daily": "digest", "weekly": "digest_weekly", "monthly": "digest_monthly"}
+
+
 def _back():
     return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
 
@@ -83,8 +86,11 @@ def send_now_view(model_admin, request, what):
         raise PermissionDenied
     ns = NotificationSettings.get()
     from dashboard.notifications import MAX_RECIPIENTS, configured_recipients, parse_recipients
-    tg_ready = bool(ns.telegram_bot_token and ns.telegram_chat_id)
-    text, telegram, error = ", ".join(configured_recipients(ns)), _telegram_default(ns, what) and tg_ready, ""
+    from dashboard.notify_routes import default_chat, route_chats, route_to
+    key = EVENT_KEYS.get(what, "")            # свої адреси й чати цього сповіщення («🗺 Хто що отримує»)
+    configured = route_to(ns, key) or configured_recipients(ns)
+    tg_ready = bool(ns.telegram_bot_token and (route_chats(ns, key) or default_chat(ns)))
+    text, telegram, error = ", ".join(configured), _telegram_default(ns, what) and tg_ready, ""
     if request.method == "POST":
         if not model_admin.has_change_permission(request, ns):
             raise PermissionDenied
@@ -106,7 +112,7 @@ def send_now_view(model_admin, request, what):
     return TemplateResponse(request, "admin/config/notificationsettings/send_now.html", {
         **model_admin.admin_site.each_context(request), "opts": NotificationSettings._meta,
         "title": f"Надіслати зараз — {title}", "what": what, "about": about, "preview": _preview(ns, what),
-        "to": text, "configured": ", ".join(configured_recipients(ns)), "my_email": request.user.email or "",
+        "to": text, "configured": ", ".join(configured), "my_email": request.user.email or "",
         "telegram": telegram, "tg_ready": tg_ready, "tg_allowed": what != "test", "error": error,
         "back_url": reverse("admin:config_notificationsettings_change", args=[1]),
         "can_send": model_admin.has_change_permission(request, ns),

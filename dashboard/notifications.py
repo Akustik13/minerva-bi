@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import contextvars
+import functools
 import html as _html
 import json
 import logging
@@ -159,21 +160,12 @@ def _build_telegram_text(critical_items, overdue_orders, company_name='Minerva')
     return tg_cut('\n'.join(lines))
 
 
-def _send_telegram(ns, text, chat_id_override=None):
-    """Send a message via Telegram Bot API using stdlib urllib.
-
-    Задовге повідомлення обрізається (tg_cut, ліміт Telegram 4096); відмову Telegram («can't parse entities»…)
-    піднімає RuntimeError з його поясненням (без токена) — викликач записує в журнал."""
-    url  = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendMessage'
-    data = json.dumps({
-        'chat_id':                  chat_id_override or ns.telegram_chat_id,
-        'text':                     tg_cut(text, 4000),
-        'parse_mode':               'HTML',
-        'disable_web_page_preview': True,
-    }).encode('utf-8')
-    req = urllib.request.Request(url, data, {'Content-Type': 'application/json'})
+def _tg_call(ns, method, payload, timeout=10):
+    """Один запит до Telegram Bot API; відмова Telegram → RuntimeError з його поясненням (без токена)."""
+    url = f'https://api.telegram.org/bot{ns.telegram_bot_token}/{method}'
+    req = urllib.request.Request(url, json.dumps(payload).encode('utf-8'), {'Content-Type': 'application/json'})
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
         try:
@@ -183,33 +175,49 @@ def _send_telegram(ns, text, chat_id_override=None):
         raise RuntimeError(f'Telegram {e.code}: {detail or e.reason}') from None
 
 
+def _to_chats(ns, method, payload, chat_id_override=None, timeout=10):
+    """Той самий запит у кожен чат сповіщення (tg_chats: свої чати виду з «🗺 Хто що отримує», інакше Chat ID).
+    Не вдалося нікому — помилка першого чату; частині — попередження в журнал."""
+    chats = [chat_id_override] if chat_id_override else tg_chats(ns)
+    if not chats:
+        raise RuntimeError('Telegram: не вказано чат (Chat ID у «Налаштування → Сповіщення»)')
+    result, errors = None, []
+    for chat in chats:
+        try:
+            result = _tg_call(ns, method, {**payload, 'chat_id': chat}, timeout)
+        except Exception as e:  # noqa: BLE001
+            errors.append((chat, e))
+    if errors and result is None:
+        raise errors[0][1]
+    for chat, e in errors:
+        logger.warning('Telegram %s → чат %s не надіслано: %s', method, chat, e)
+    return result
+
+
+def _send_telegram(ns, text, chat_id_override=None):
+    """Send a message via Telegram Bot API using stdlib urllib.
+
+    Задовге повідомлення обрізається (tg_cut, ліміт Telegram 4096); відмову Telegram («can't parse entities»…)
+    піднімає RuntimeError з його поясненням (без токена) — викликач записує в журнал. Чати — tg_chats
+    (свої для виду сповіщення, інакше Chat ID налаштувань) або chat_id_override."""
+    return _to_chats(ns, 'sendMessage', {
+        'text':                     tg_cut(text, 4000),
+        'parse_mode':               'HTML',
+        'disable_web_page_preview': True,
+    }, chat_id_override)
+
+
 def _send_telegram_photo(ns, photo_url, caption=''):
     """Send a photo via Telegram Bot API (caption max 1024 chars)."""
-    url  = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendPhoto'
     if len(caption) > 1024:
         caption = caption[:1020] + '\n...'
-    data = json.dumps({
-        'chat_id':    ns.telegram_chat_id,
-        'photo':      photo_url,
-        'caption':    caption,
-        'parse_mode': 'HTML',
-    }).encode('utf-8')
-    req = urllib.request.Request(url, data, {'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read())
+    return _to_chats(ns, 'sendPhoto', {'photo': photo_url, 'caption': caption, 'parse_mode': 'HTML'})
 
 
 def _send_telegram_media_group(ns, photo_urls: list):
     """Send up to 10 photos as a Telegram album (sendMediaGroup)."""
-    url   = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendMediaGroup'
     media = [{'type': 'photo', 'media': u} for u in photo_urls[:10]]
-    data  = json.dumps({
-        'chat_id': ns.telegram_chat_id,
-        'media':   media,
-    }).encode('utf-8')
-    req = urllib.request.Request(url, data, {'Content-Type': 'application/json'})
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        return json.loads(resp.read())
+    return _to_chats(ns, 'sendMediaGroup', {'media': media}, timeout=15)
 
 
 def _send_tg_images(ns, lines_data: list):
@@ -396,13 +404,56 @@ def targeted() -> bool:
     return _ONLY.get() is not None
 
 
+# Вид сповіщення, що зараз надсилається (dashboard/notify_routes.EVENTS): його адреси й Telegram-чати з «🗺 Що кому
+# йде» замінюють «Кому (email)» і Chat ID. Ставить for_event / event; поза ним — як завжди.
+_EVENT = contextvars.ContextVar('minerva_notify_event', default='')
+
+
+@contextmanager
+def event(key: str):
+    token = _EVENT.set(key or '')
+    try:
+        yield
+    finally:
+        _EVENT.reset(token)
+
+
+def for_event(key):
+    """Декоратор: функція надсилає сповіщення виду key (рядок або функція від тих самих аргументів → рядок)."""
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            with event(key(*args, **kwargs) if callable(key) else key):
+                return fn(*args, **kwargs)
+        return wrapper
+    return deco
+
+
+def current_event() -> str:
+    return _EVENT.get()
+
+
 def configured_recipients(ns) -> list:
     return [e.strip() for e in (ns.email_to or '').replace(';', ',').split(',') if e.strip()]
 
 
 def recipients(ns) -> list:
+    """Кому лист: вибране в «Надіслати зараз» → свої адреси виду сповіщення → «Кому (email)»."""
     only = _ONLY.get()
-    return list(only['emails']) if only is not None else configured_recipients(ns)
+    if only is not None:
+        return list(only['emails'])
+    from .notify_routes import route_to
+    return route_to(ns, _EVENT.get()) or configured_recipients(ns)
+
+
+def tg_chats(ns) -> list:
+    """Куди в Telegram: свої чати виду сповіщення → Chat ID налаштувань."""
+    from .notify_routes import default_chat, route_chats
+    own = route_chats(ns, _EVENT.get())
+    if own:
+        return own
+    chat = default_chat(ns)
+    return [chat] if chat else []
 
 
 def channels(ns, email_on: bool, tg_on: bool) -> tuple:
@@ -411,7 +462,7 @@ def channels(ns, email_on: bool, tg_on: bool) -> tuple:
     if only is None:
         return email_on, tg_on
     return (bool(only['emails']) and bool(ns.email_host),
-            only['telegram'] and bool(ns.telegram_bot_token) and bool(ns.telegram_chat_id))
+            only['telegram'] and bool(ns.telegram_bot_token) and bool(tg_chats(ns)))
 
 
 def parse_recipients(text) -> tuple:
@@ -492,6 +543,7 @@ def _send_email(ns, critical_items, overdue_orders, is_test=False):
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
+@for_event('alerts')
 def run_alerts(force: bool = False, is_test: bool = False, test_channel: str | None = None) -> dict:
     """
     Main entry point.
@@ -503,11 +555,13 @@ def run_alerts(force: bool = False, is_test: bool = False, test_channel: str | N
     except Exception as e:
         return {'sent': False, 'error': str(e)}
 
-    email_active = ns.email_enabled and bool(configured_recipients(ns))
+    from .notify_routes import flag
+    email_active = ns.email_enabled and bool(recipients(ns)) and (is_test or flag(ns, 'alerts', 'email'))
     tg_active = (
         ns.telegram_enabled
         and bool(ns.telegram_bot_token)
-        and bool(ns.telegram_chat_id)
+        and bool(tg_chats(ns))
+        and (is_test or flag(ns, 'alerts', 'telegram'))
     )
     email_active, tg_active = channels(ns, email_active, tg_active)
     if not email_active and not tg_active:
@@ -602,6 +656,7 @@ def run_alerts(force: bool = False, is_test: bool = False, test_channel: str | N
 
 # ── Event-based notifications (real-time, triggered by signals) ────────────────
 
+@for_event('sync_result')
 def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
     """
     Надсилає підсумок після синхронізації з деталями по кожному запису.
@@ -763,6 +818,7 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
             logger.warning('Сповіщення «%s» у Telegram не надіслано: %s', source, e)
 
 
+@for_event('dk_auto_confirm')
 def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
     """Надсилає сповіщення після успішного авто-підтвердження DigiKey замовлення."""
     ns = _get_ns()
@@ -1087,6 +1143,7 @@ def _order_email_html(order, title, color, body_extra='', show_total: bool = Tru
     )
 
 
+@for_event('new_order')
 def notify_new_order(order, is_test: bool = False):
     """Send new-order notification via email and/or Telegram."""
     ns = _get_ns()
@@ -1387,6 +1444,7 @@ def notify_new_order(order, is_test: bool = False):
             logger.warning('Нове замовлення %s: Telegram не надіслано: %s', order.order_number, e)
 
 
+@for_event('status_change')
 def notify_status_change(order, old_status, new_status):
     """Send status-change notification via email and/or Telegram."""
     ns = _get_ns()
@@ -1697,6 +1755,7 @@ def incoming_message(shipment, out) -> dict:
             'link_text': 'Відкрити закупівлю' if po is not None else 'Відкрити посилку'}
 
 
+@for_event('incoming')
 def notify_incoming_delivered(shipment, out, *, email=True, telegram=True):
     """📥 Вхідну посилку доставлено — лист і Telegram (адреси, SMTP і бот — «Налаштування → Сповіщення»)."""
     ns = _get_ns()
@@ -1732,6 +1791,7 @@ def notify_incoming_delivered(shipment, out, *, email=True, telegram=True):
             logger.warning('Вхідна посилка #%s: Telegram не надіслано: %s', shipment.pk, e)
 
 
+@for_event(lambda shipment, *a, **kw: '' if getattr(shipment, 'jlc_order_id', None) else 'shipment')
 def notify_shipment_status(shipment, old_status, new_status):
     """Send notification when Shipment status changes."""
     ns = _get_ns()
@@ -1899,13 +1959,12 @@ def send_order_confirm_notification(order):
     if allowed_srcs and (order.source not in allowed_srcs):
         return False
 
-    to_email = (getattr(order, 'ship_email', '') or getattr(order, 'email', '') or '').strip()
+    from .notify_routes import blocked, order_address
+    to_email = order_address(order)
     if not to_email:
-        try:
-            to_email = (order.customer.email or '').strip()
-        except Exception:
-            to_email = ''
-    if not to_email:
+        return False
+    if blocked(ns, to_email):
+        logger.info('Підтвердження замовлення %s: %s у списку «🚫 Не надсилати клієнтам»', order.order_number, to_email)
         return False
 
     customer_name = (getattr(order, 'ship_name', '') or getattr(order, 'client', '') or getattr(order, 'contact_name', '') or '').strip()
@@ -2058,6 +2117,10 @@ def send_ship_notification(order, shipment=None) -> bool:
 
     to_email = (getattr(order, 'ship_email', '') or order.email or '').strip()
     if not to_email:
+        return False
+    from .notify_routes import blocked
+    if blocked(ns, to_email):
+        logger.info('Лист про відправку %s: %s у списку «🚫 Не надсилати клієнтам»', order.order_number, to_email)
         return False
 
     country     = (order.addr_country or '').strip().upper()

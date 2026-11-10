@@ -376,6 +376,49 @@ def send_team(shop, kind: str, **vars) -> str:
     return "notifications"
 
 
+def team_chats(shop) -> list:
+    """Telegram-чати команди магазину (team_telegram); порожньо — основний чат «Налаштування → Сповіщення»."""
+    from dashboard.notify_routes import parse_chats
+    return parse_chats(shop.team_telegram)[0]
+
+
+def team_telegram(shop, kind: str, **vars) -> str:
+    """Telegram команді магазину ('' — не надсилалось): чати магазину, інакше основний чат; бот — зі сповіщень."""
+    if not shop.team_notify_telegram:
+        return ""
+    try:
+        from dashboard.notifications import _get_ns, _send_telegram, esc
+        ns = _get_ns()
+    except Exception:
+        return ""
+    if ns is None or not getattr(ns, "telegram_enabled", False) or not ns.telegram_bot_token:
+        return ""
+    chats = team_chats(shop) or ([str(ns.telegram_chat_id).strip()] if str(ns.telegram_chat_id or "").strip() else [])
+    text, sent = esc(team_message(shop, kind, **vars)[0]), 0
+    for chat in chats:
+        try:
+            _send_telegram(ns, text, chat_id_override=chat)
+            sent += 1
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Telegram %s → %s failed: %s", kind, chat, e)
+    return "telegram" if sent else ""
+
+
+def notify_team(shop, kind: str, **vars) -> list:
+    """Сповіщення команді магазину: лист (send_team) і Telegram (team_telegram). Помилки — у журнал.
+    → що надіслано: ['team' | 'notifications', 'telegram']."""
+    done = []
+    try:
+        how = send_team(shop, kind, **vars)
+        if how:
+            done.append(how)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("Team mail %s failed: %s", kind, e)
+    if team_telegram(shop, kind, **vars):
+        done.append("telegram")
+    return done
+
+
 def _deliver(msg, cfg) -> None:
     try:
         msg.send()

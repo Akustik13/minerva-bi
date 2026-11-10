@@ -580,6 +580,13 @@ def _table_section(title, count, hdr_color, hdr_bg, columns, rows_html) -> str:
 # ── Send digest ────────────────────────────────────────────────────────────────
 
 def send_digest(force: bool = False, period: str = "daily") -> dict:
+    from dashboard.notifications import event
+    key = {"weekly": "digest_weekly", "monthly": "digest_monthly"}.get(period, "digest")
+    with event(key):
+        return _send_digest(force, period)
+
+
+def _send_digest(force: bool = False, period: str = "daily") -> dict:
     """
     Send digest report for the given period ('daily', 'weekly', 'monthly').
     Call with force=True to bypass schedule check.

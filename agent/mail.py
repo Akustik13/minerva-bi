@@ -698,6 +698,16 @@ def _customer_mail(msg, to, cc, subject, body, *, send=False, delay=15, options=
                                      body=body, source=EmailDraft.SOURCE_AUTO_REPLY, send_options=options or {}), None
 
 
+def customer_blocked(email) -> str:
+    """Правило «🚫 Не надсилати листи цим клієнтам» (Налаштування → Сповіщення), під яке підпадає адреса."""
+    try:
+        from config.models import NotificationSettings
+        from dashboard.notify_routes import blocked
+        return blocked(NotificationSettings.get(), email)
+    except Exception:  # noqa: BLE001
+        return ''
+
+
 def process_customer(run):
     """Лист (UPS «Exception», митний брокер …) → клієнту замовлення з тим самим трек-номером: чернетка або,
     якщо дозволено, запланований лист; копія — «Копія (CC)» доручення."""
@@ -711,6 +721,10 @@ def process_customer(run):
     to = customer_email(order)
     if not to:
         return _finish(run, AgentRun.SKIPPED, f'у замовленні {order.order_number} немає email клієнта', order=order)
+    blocked = customer_blocked(to)
+    if blocked:
+        return _finish(run, AgentRun.SKIPPED, f'{to} у списку «🚫 Не надсилати листи цим клієнтам» ({blocked})',
+                       order=order)
     why, previous = repeat_check(rule, order, to, exclude_pk=run.pk)
     if why:
         return _finish(run, AgentRun.SKIPPED, why, order=order)

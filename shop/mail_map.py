@@ -45,7 +45,9 @@ def _notifications() -> dict:
         return {"to": [], "sender": "", "telegram": False}
     on = bool(getattr(ns, "email_enabled", False))
     return {"to": mail.addresses(ns.email_to) if on else [], "sender": (ns.email_from or ns.email_host_user or "") if on else "",
-            "telegram": bool(getattr(ns, "telegram_enabled", False) and getattr(ns, "telegram_chat_id", ""))}
+            "telegram": bool(getattr(ns, "telegram_enabled", False) and getattr(ns, "telegram_chat_id", "")),
+            "bot": bool(getattr(ns, "telegram_enabled", False) and getattr(ns, "telegram_bot_token", "")),
+            "chat": str(getattr(ns, "telegram_chat_id", "") or "").strip()}
 
 
 def _site_report(shop: Shop) -> tuple[str, dict]:
@@ -72,9 +74,18 @@ def _choice(name, value, options, note=""):
     return {"name": name, "value": value, "options": options, "note": note}
 
 
+def _check(label, field, on, title=""):
+    return {"type": "check", "label": label, "sync": field, "on": bool(on), "title": title}
+
+
+def _pick(kind, field, value, empty, label=""):
+    return {"type": "pick", "kind": kind, "sync": field, "value": value or "", "empty": empty, "label": label}
+
+
 def rows(shop: Shop) -> list[dict]:
-    """[{mail, who, sender, to, change, route}] — route {name, value, options [(значення, підпис)], note}: меню
-    «З якої адреси» (зберігає ShopAdmin.save_model → save_routes). У порядку важливості."""
+    """[{mail, who, sender, to, change, route, edit}] — route {name, value, options [(значення, підпис)], note}: меню
+    «З якої адреси» (зберігає ShopAdmin.save_model → save_routes); edit — поля «Кому» ([_check | _pick], поле
+    картки, яке JS змінює: mv_notify_pick.js). У порядку важливості."""
     missing = "❌ не задано: оберіть скриньку або SMTP у «Налаштування → Сповіщення»"
     sender = _minerva_sender(shop) or missing
     acc = shop.mail_sender
@@ -103,11 +114,14 @@ def rows(shop: Shop) -> list[dict]:
         {"mail": "Підтвердження email, новий пароль, запрошення від менеджера", "who": "Minerva", "sender": sender,
          "to": "покупцю (без прихованої копії — в листі одноразове посилання)",
          "route": _choice("route_account", main_value, [("", ns_label)] + boxes),
+         "edit": [],
          "change": [_go("mail_from_name", "Ім'я відправника"), *smtp, add_box, templates]},
         {"mail": "«Willkommen», «Zahlung erhalten», пароль змінено, акаунт видалено", "who": "Minerva",
          "sender": notices_sender + reply,
          "to": "покупцю" + (f" · прихована копія: {', '.join(bcc)}" if bcc else ""),
          "route": _choice("route_notices", routed("notices"), [("", same), ("ns", ns_label)] + boxes),
+         "edit": [_check("«Ласкаво просимо»", "mail_welcome", shop.mail_welcome),
+                  _pick("email", "mail_bcc", shop.mail_bcc, "без прихованої копії", "покупцю · прихована копія:")],
          "change": [_go("mail_reply_to", "Відповіді покупців"), _go("mail_bcc", "Прихована копія"),
                     _go("mail_welcome", "Лист «Ласкаво просимо»"), templates]},
     ]
@@ -117,9 +131,19 @@ def rows(shop: Shop) -> list[dict]:
         team_sender = ns["sender"] or "SMTP сповіщень Minerva"
         team_to = ", ".join(ns["to"]) or "нікому — email у «Налаштування → Сповіщення» вимкнено або без адрес"
         team_note = "вибір діє, коли задано «Сповіщення команді — на адреси»; зараз — SMTP сповіщень"
+    chats = mail.team_chats(shop)
+    tg = shop.team_notify_telegram and ns["bot"] and bool(chats or ns["chat"])
     out.append({"mail": "Команді: оплата отримана, новий акаунт покупця", "who": "Minerva", "sender": team_sender,
-                "to": team_to + (" · Telegram" if ns["telegram"] else ""),
+                "to": team_to + (" · Telegram" if tg else ""),
                 "route": _choice("route_team", routed("team"), [("", same), ("ns", ns_label)] + boxes, team_note),
+                "edit": [_check("💳 оплата", "", True, "оплату отримано — завжди"),
+                         _check("👤 новий акаунт", "team_notify_registration", shop.team_notify_registration),
+                         _pick("email", "team_emails", shop.team_emails,
+                               "як «Кому (email)» сповіщень: " + (", ".join(ns["to"]) or "нікому"), "✉️ на адреси:"),
+                         _check("💬 Telegram", "team_notify_telegram", shop.team_notify_telegram),
+                         _pick("tg", "team_telegram", shop.team_telegram,
+                               ("основний чат сповіщень: " + ns["chat"]) if ns["chat"] else "основний чат — не задано",
+                               "")],
                 "change": [_go("team_emails", "Сповіщення команді — на адреси"),
                            _go("team_notify_registration", "Команді: новий акаунт покупця"), notifications]})
 
@@ -152,9 +176,11 @@ def rows(shop: Shop) -> list[dict]:
     out += [
         {"mail": "Підтвердження замовлення покупцю", "who": who, "sender": site_sender,
          "to": "невідомо" if confirm is None else ("покупцю" if confirm else "не надсилається"), "route": site_route,
+         "edit": [_check("покупцю", "site_order_confirmation", shop.site_order_confirmation)] if managed else [],
          "change": change + ([_go("site_order_confirmation", "Сайт надсилає покупцю підтвердження")] if managed else [])},
         {"mail": "Команді: нове замовлення з сайту", "who": who, "sender": site_sender, "to": notify,
          "route": None, "same_as": "Підтвердження замовлення покупцю",
+         "edit_note": "ті самі адреси, що «Команді: оплата…» вище" if managed and team else "",
          "change": ([_go("team_emails", "Сповіщення команді — на адреси")] if managed else []) + change},
         {"mail": "Контактна форма сайту", "who": who, "sender": site_sender,
          "to": report.get("recipient") or "—", "route": None, "same_as": "Підтвердження замовлення покупцю",

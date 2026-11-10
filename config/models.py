@@ -760,6 +760,15 @@ class NotificationSettings(models.Model):
         "Останнє нагадування", null=True, blank=True,
     )
 
+    # «🗺 Хто що отримує» (dashboard/notify_routes.py): {вид: {"to": [email], "tg": [chat], "email": bool, "telegram": bool}}
+    routes = models.JSONField(
+        "Кому які сповіщення", default=dict, blank=True,
+        help_text="Свої адреси й Telegram-чати для окремих сповіщень; порожньо — «Кому (email)» і Chat ID вище.")
+    customer_block = models.TextField(
+        "🚫 Не надсилати листи цим клієнтам", blank=True, default="",
+        help_text="Адреси або @домени через кому чи з нового рядка: їм не йдуть ні автоматичні, ні ручні листи "
+                  "«📧 про відправку» і «📥 підтвердження замовлення».")
+
     class Meta:
         verbose_name = "Налаштування сповіщень"
         verbose_name_plural = "Налаштування сповіщень"

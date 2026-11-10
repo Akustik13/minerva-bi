@@ -185,7 +185,7 @@ class Shop(models.Model):
                   "одноразовими посиланнями (підтвердження, новий пароль, запрошення) не копіюються.",
     )
     team_emails = models.CharField(
-        "Сповіщення команді — на адреси", max_length=300, blank=True, default="",
+        "Сповіщення команді — на адреси", max_length=1000, blank=True, default="",
         help_text="Через кому. Оплати, нові акаунти покупців, а з «Сайт надсилає листи з цієї ж скриньки» — і нові "
                   "замовлення з сайту. Порожньо — email з «Налаштування → Сповіщення» (замовлення — як на сайті).",
     )
@@ -194,6 +194,14 @@ class Shop(models.Model):
         help_text="Також коли покупець уперше задає пароль за запрошенням менеджера.",
     )
     team_notify_registration = models.BooleanField("Команді: новий акаунт покупця", default=False)
+    team_notify_telegram = models.BooleanField(
+        "Команді — і в Telegram", default=True,
+        help_text="Оплата отримана, новий акаунт покупця — ще й повідомленням у Telegram (бот — «Налаштування → "
+                  "Сповіщення»).")
+    team_telegram = models.CharField(
+        "Telegram-чати команди", max_length=300, blank=True, default="",
+        help_text="Chat ID через кому (група, канал @назва або особистий чат з ботом). Порожньо — основний чат "
+                  "«Налаштування → Сповіщення».")
     # ── Пошта сайту з Minerva (shop/site_mail.py; сайт читає GET /api/v1/shop/site-mail/) ──
     site_mail_managed = models.BooleanField(
         "Сайт надсилає листи з цієї ж скриньки", default=False,
