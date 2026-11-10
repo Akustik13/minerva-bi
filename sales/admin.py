@@ -308,6 +308,11 @@ def _notify_blocked(ns, order, kind) -> str:
     з увімкненим Email. Те саме правило — для кнопок у картці й для самих листів (GET-шаблон і POST-відправлення)."""
     if not ns.email_enabled:
         return "SMTP не налаштовано. Увімкніть Email у Налаштуваннях сповіщень."
+    from dashboard.notify_routes import blocked, order_address
+    rule = blocked(ns, order_address(order))
+    if rule:
+        return (f"Клієнт у списку «🚫 Не надсилати листи цим клієнтам» ({rule}) — Налаштування → Сповіщення → "
+                "«🗺 Хто що отримує».")
     if kind == "customer":
         return "" if ns.customer_notify_enabled else "Лист клієнту про відправку вимкнено в Налаштуваннях сповіщень."
     if not ns.order_confirm_notify_enabled:

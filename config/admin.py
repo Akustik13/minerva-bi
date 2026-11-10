@@ -235,6 +235,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         return redirect(reverse("admin:config_notificationsettings_change", args=[obj.pk]))
 
     readonly_fields = (
+        "notify_map_col",
         "alert_actions", "last_alert_sent",
         "new_order_preview",
         "dk_confirm_preview",
@@ -256,6 +257,14 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         return form
 
     fieldsets = [
+        ("🗺 Хто що отримує", {
+            "fields": ("notify_map_col",),
+            "description": (
+                "Кожне сповіщення: увімкнено чи ні, кому на пошту, в які Telegram-чати — тут же можна змінити "
+                "і додати адреси з Minerva чи свої. Детальніше (які статуси, тексти листів, розклад) — "
+                "за посиланнями «↓» у кожному рядку."
+            ),
+        }),
         ("📧 Email (SMTP)", {
             "fields": (
                 "email_enabled",
@@ -387,6 +396,12 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "Змінні: {order_number} {customer_name} {order_date} {items}"
             ),
         }),
+        ("🚫 Не надсилати клієнтам", {
+            "fields": ("customer_block",),
+            "classes": ("collapse",),
+            "description": "Цим адресам і доменам не йдуть листи «📧 про відправку» і «📥 підтвердження "
+                           "замовлення» — ні самі, ні кнопкою в замовленні. Те саме поле — у таблиці вгорі.",
+        }),
         ("🔔 Планові сповіщення (cron)", {
             "fields": (
                 "stock_alerts_enabled",
@@ -489,6 +504,20 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
             ),
         }),
     ]
+
+    @admin.display(description="Хто що отримує")
+    def notify_map_col(self, obj):
+        """Таблиця «🗺 Хто що отримує» (config/admin_notify_map.py)."""
+        if not obj or not obj.pk:
+            return "—"
+        from config import admin_notify_map
+        return admin_notify_map.render(obj)
+
+    def save_model(self, request, obj, form, change):
+        if any(k.startswith("nr_") for k in request.POST):   # таблиця «🗺 Хто що отримує»
+            from config import admin_notify_map
+            admin_notify_map.save(request, obj)
+        super().save_model(request, obj, form, change)
 
     def alert_actions(self, obj):
         if not obj or not obj.pk:

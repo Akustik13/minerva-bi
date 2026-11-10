@@ -289,7 +289,8 @@ class ShopAdmin(admin.ModelAdmin):
         ("✉️ Пошта магазину", {
             "fields": ["mail_map_col", "mail_from_name", "mail_reply_to", "mail_bcc", "team_emails",
                        "mail_welcome",
-                       "team_notify_registration", "mail_footer", "team_lang", "mail_tools",
+                       "team_notify_registration", "team_notify_telegram", "team_telegram",
+                       "mail_footer", "team_lang", "mail_tools",
                        "site_order_confirmation", "site_mail_col"],
             "description": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату "
                            "отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину "
@@ -485,7 +486,7 @@ class ShopAdmin(admin.ModelAdmin):
             c = r["route"]
             options = format_html_join("", '<option value="{}"{}>{}</option>', (
                 (v, format_html(" selected") if v == c["value"] else "", label) for v, label in c["options"]))
-            return format_html('<select name="{}" class="mm-route" style="max-width:100%">{}</select>'
+            return format_html('<select name="{}" class="mm-route" style="max-width:100%;width:260px">{}</select>'
                                '<div class="help">{} <span translate="no">{}</span>{}</div>', c["name"], options,
                                "зараз:", r["sender"], format_html(" · {}", c["note"]) if c["note"] else "")
 
@@ -495,13 +496,48 @@ class ShopAdmin(admin.ModelAdmin):
                 format_html('<a href="{}"{}>{} →</a>', i["url"],
                             format_html(' target="_blank" rel="noopener"') if i.get("external") else "", i["label"]),)
                 for i in items or []))
+        from dashboard import notify_routes, notify_widgets as w
+        synced = []
+
+        def to_cell(r):
+            """«Кому»: поля, що змінюють адреси / чати / прапорці картки (dashboard/notify_widgets.py)."""
+            edit = r.get("edit") or []
+            if not edit:
+                return format_html('{}{}', r["to"], format_html('<div class="help">{}</div>', r["edit_note"])
+                                   if r.get("edit_note") else "")
+            parts = []
+            for e in edit:
+                if e["type"] == "check":
+                    if e["sync"]:
+                        synced.append(e["sync"])
+                        parts.append(w.check(e["label"], e["on"], sync="id_" + e["sync"], title=e["title"]))
+                    else:
+                        parts.append(format_html('<span class="nt-chk" title="{}">✅ {}</span>', e["title"], e["label"]))
+                    continue
+                synced.append(e["sync"])
+                if e["label"]:
+                    parts.append(format_html('<div class="nt-when">{}</div>', e["label"]))
+                parts.append(w.picker(e["kind"], e["value"], sync="id_" + e["sync"], empty=e["empty"]))
+            return format_html_join("", "{}", ((part,) for part in parts))
+
+        data = mail_map.rows(obj)
         rows = format_html_join("", "<tr><td><b>{}</b></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>", (
-            (r["mail"], r["who"], route(r), r["to"], links(r["change"])) for r in mail_map.rows(obj)))
+            (r["mail"], r["who"], route(r), to_cell(r), links(r["change"])) for r in data))
+        try:
+            from config.models import NotificationSettings
+            ns = NotificationSettings.get()
+        except Exception:
+            ns = None
         return format_html(
-            '<table class="mm-table" style="font-size:12px;width:100%"><tr><th>Лист</th><th>Хто надсилає</th>'
-            '<th>З якої адреси</th><th>Кому</th><th>Де змінити</th></tr>{}</table>'
-            '<div class="help">«З якої адреси» — виберіть скриньку для кожного листа й натисніть «Зберегти» внизу сторінки. '
-            '«↓» — до поля на цій сторінці, «→» — інша сторінка; дані сайту — з його останнього звіту.</div>', rows)
+            '{}<table class="mm-table" style="font-size:12px;width:100%"><tr><th>Лист</th><th>Хто надсилає</th>'
+            '<th>З якої адреси</th><th style="min-width:260px">Кому</th><th>Де змінити</th></tr>{}</table>'
+            '<span data-nt-hide="{}"></span>'
+            '<div class="help">«З якої адреси» і «Кому» — змініть тут (адреси й Telegram-чати — «＋ з Minerva» або '
+            'своя, Enter) і натисніть «Зберегти» внизу сторінки. «↓» — до поля на цій сторінці, «→» — інша сторінка; '
+            'дані сайту — з його останнього звіту. Решта сповіщень — {}.</div>',
+            w.assets(notify_routes.email_options(ns), notify_routes.chat_options(ns)), rows, " ".join(synced),
+            format_html('<a href="{}">Налаштування → Сповіщення → «🗺 Хто що отримує»</a>',
+                        reverse("admin:config_notificationsettings_changelist")))
 
     @admin.display(description="Пошта сайтів")
     def site_mail_col(self, obj):

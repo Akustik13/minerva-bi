@@ -464,12 +464,8 @@ def on_verified(customer: ShopCustomer):
 def _notify_team_registered(customer: ShopCustomer) -> None:
     """«Команді: новий акаунт покупця» (картка магазину). Помилка пошти не заважає реєстрації."""
     from . import mail
-    try:
-        mail.send_team(customer.shop, "team_registered", email=customer.email, company=customer.company or "—",
-                       name=customer.name or "—")
-    except Exception as e:
-        import logging
-        logging.getLogger("shop").warning("Team mail team_registered failed: %s", e)
+    mail.notify_team(customer.shop, "team_registered", email=customer.email, company=customer.company or "—",
+                     name=customer.name or "—")
 
 
 def link_crm(customer: ShopCustomer):

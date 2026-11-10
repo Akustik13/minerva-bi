@@ -289,3 +289,49 @@ class MailRouteTests(TestCase):
         self.client.post(f"/admin/shop/shop/{self.shop.pk}/test-mail/")
         senders = sorted(m.from_email for m in outbox.outbox)
         self.assertEqual(len(senders), 2, senders)   # sales01 (кабінет, команді) і kasse (Willkommen / оплати)
+
+
+class TeamTelegramTests(AccountTestCase):
+    """Сповіщення команді — і в Telegram: чати магазину або основний чат (shop/mail.py notify_team)."""
+
+    def setUp(self):
+        super().setUp()
+        from config.models import NotificationSettings
+        ns = NotificationSettings.get()
+        ns.telegram_enabled, ns.telegram_bot_token, ns.telegram_chat_id = True, "1:abc", "-100"
+        ns.save()
+        p = mock.patch("dashboard.notifications._send_telegram")
+        self.tg = p.start()
+        self.addCleanup(p.stop)
+
+    def chats(self):
+        return [c.kwargs.get("chat_id_override") for c in self.tg.call_args_list]
+
+    def test_shop_chats_or_default_chat(self):
+        mail.notify_team(self.shop, "team_registered", email="a@b.de", company="X & Y <GmbH>", name="Y")
+        self.assertEqual(self.chats(), ["-100"])                               # свого немає — основний чат
+        self.assertNotIn("<GmbH>", self.tg.call_args.args[1])                  # текст екранований для HTML Telegram
+        self.tg.reset_mock()
+        Shop.objects.filter(pk=self.shop.pk).update(team_telegram="555, @lager_chan, ???")
+        self.shop.refresh_from_db()
+        self.assertEqual(mail.notify_team(self.shop, "team_paid", number="WS-1", amount="1 EUR", customer="K",
+                                          reference="pi"), ["telegram"])
+        self.assertEqual(self.chats(), ["555", "@lager_chan"])
+        self.tg.reset_mock()
+        Shop.objects.filter(pk=self.shop.pk).update(team_notify_telegram=False)
+        self.shop.refresh_from_db()
+        mail.notify_team(self.shop, "team_paid", number="WS-1", amount="1 EUR", customer="K", reference="pi")
+        self.tg.assert_not_called()
+
+    def test_card_edits_who_gets_what(self):
+        from config.models import SystemSettings
+        from . import mail_map
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        team = next(r for r in mail_map.rows(self.shop) if r["mail"].startswith("Команді: оплата"))
+        self.assertEqual([e.get("sync") for e in team["edit"]],
+                         ["", "team_notify_registration", "team_emails", "team_notify_telegram", "team_telegram"])
+        self.client.force_login(User.objects.create_superuser("tgadm", "tgadm@example.com", "p"))
+        page = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
+        for text in ('data-sync="id_team_emails"', 'data-sync="id_team_telegram"', 'data-sync="id_mail_bcc"',
+                     'name="team_telegram"', "data-nt-hide=", "mv_notify_pick.js"):
+            self.assertContains(page, text)
