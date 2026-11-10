@@ -8,7 +8,9 @@
      data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"
      data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
      data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
-     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}"{% if can_change %}
+     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}"
+     data-ai-settings="{{ urls.ai_settings }}" data-ai-since="{{ ai.since|date:'Y-m-d' }}" data-start="{{ start|date:'Y-m-d' }}"
+     data-steps="{{ plan.steps|default:0 }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
   <div class="pjc-head">
     <b class="pjc-title">🧭 Пульт проєкту</b>
@@ -23,6 +25,7 @@
     {% if start %}<span class="pjc-sub">старт {{ start|date:"d.m.Y" }}</span>{% endif %}
     <span class="pjc-sub" title="Листи від клієнта / наші · Angebote · замовлення · закупівлі · JLC-замовлення · відправлення">📥 {{ counts.in }} · 📤 {{ counts.out }} · 📝 {{ counts.offers }} · 🛒 {{ counts.orders }} · 🏭 {{ more.purchases }} · 🔧 {{ more.jlc }} · 🚚 {{ more.shipments }}</span>
     <a class="pjc-link" href="{{ urls.mail }}" target="_blank">✉️ Листи проєкту</a>
+    <a class="pjc-b pjc-ws-link" href="{{ urls.workspace }}" title="План, діаграми Ганта й шкала на весь екран — без полів картки">⤢ Робочий стіл</a>
     <button type="button" class="pjc-b" data-pjc-fields title="Поля проєкту: назва, клієнт, статус, строки, учасники, прив'язки">⚙️ Поля</button>
   </div>
   {% if notice %}<div class="pjc-notice" role="status">{{ notice }}</div>{% endif %}
@@ -126,9 +129,15 @@
               title="Claude Haiku читає ваші листи проєкту, яких ще не читав (до 12 за раз), і пропонує важливі моменти й ризики — з цитатою з листа">🧠 Знайти моменти й ризики{% if ai.unread %} · непрочитаних листів {{ ai.unread }}{% elif ai.own %} · усі листи прочитано{% endif %}</button>
       <button type="button" class="pjc-b" data-pja-forgotten
               title="Гілки з ваших скриньок, які стосуються проєкту, але не прив'язані: учасники, клієнт, номери замовлень і закупівель, артикули{% if ai.rag %} і база знань{% endif %}">🔎 Знайти забуті листи</button>
-      {% if not plan.has_plan %}<button type="button" class="pjc-b" data-pja-plan
-              title="Claude Sonnet складає чернетку плану з ваших листів, шаблонів і тривалостей минулих проєктів; перед застосуванням ви її переглядаєте">🧠 Скласти план з листування</button>{% endif %}
+      <button type="button" class="pjc-b" data-pja-plan
+              title="Claude Sonnet складає чернетку плану з ваших листів, шаблонів, тривалостей минулих проєктів і вашої підказки (що врахувати, що вже відбулось); перед застосуванням ви її переглядаєте">🧠 {% if plan.has_plan %}Переробити план з листування{% else %}Скласти план з листування{% endif %}</button>
       <span class="pjc-merr" data-pja-err role="alert"></span>
+    </div>
+    <div class="pja-set">
+      <label>📅 Листи для AI — з <input type="date" data-pja-since value="{{ ai.since|date:'Y-m-d' }}"></label>
+      <label>старт проєкту <input type="date" data-pja-start value="{{ start|date:'Y-m-d' }}"></label>
+      <button type="button" class="pjc-b" data-pja-settings>💾 Зберегти</button>
+      <span class="pjc-sub">«Знайти моменти й ризики», «Забуті листи» й план з листування читають листи лише з цієї дати; порожньо — усі листи.</span>
     </div>
     {% if not ai.own %}<p class="pjc-sub">У проєкті ще немає листів з ваших скриньок — моменти й ризики AI шукає лише у вашій пошті.</p>{% endif %}
     {% if ai.items %}
@@ -265,14 +274,21 @@
             <button type="button" class="pjc-b" data-pjg-view="ours" aria-pressed="true">📊 Діаграма Minerva</button>
             <button type="button" class="pjc-b" data-pjg-view="classic" aria-pressed="false">📋 Класична діаграма Ганта</button>
           </span>
+          <span class="pjc-ranges" role="group" aria-label="Деталізація діаграми">
+            <button type="button" class="pjc-b" data-pjg-detail-btn="brief" title="Лише фази й віхи (◆) — ключові моменти проєкту">Коротко</button>
+            <button type="button" class="pjc-b" data-pjg-detail-btn="full" title="Усі кроки кожної фази">Детально</button>
+          </span>
           <span class="pjc-ranges" role="group" aria-label="Масштаб" data-pjg-only="classic" hidden>
+            <button type="button" class="pjc-b" data-pjg-zoom="out" title="Віддалити (Ctrl + коліщатко)">－</button>
             <button type="button" class="pjc-b" data-pjg-scale="day">Дні</button>
             <button type="button" class="pjc-b" data-pjg-scale="week">Тижні</button>
             <button type="button" class="pjc-b" data-pjg-scale="month">Місяці</button>
+            <button type="button" class="pjc-b" data-pjg-zoom="in" title="Наблизити (Ctrl + коліщатко)">＋</button>
           </span>
-          <span class="pjc-hint" data-pjg-only="classic" hidden>{% if can_change %}Перетягніть смугу — нові дати, її правий край — тривалість; клік — вікно кроку.{% else %}Наведіть на смугу — дати кроку.{% endif %}</span>
+          <span class="pjc-hint" data-pjg-only="classic" hidden>{% if can_change %}Ctrl + коліщатко — масштаб · тягніть фон — прокрутка · тягніть смугу — нові дати, край — тривалість · правий клік — меню · клік на фазу — згорнути{% else %}Ctrl + коліщатко — масштаб · тягніть фон — прокрутка · клік на фазу — згорнути{% endif %}</span>
+          {% if can_change %}<span class="pjc-hint" data-pjg-only="ours">Тягніть смугу чи ◆ — нові дати, край смуги — тривалість · клік — вікно кроку · правий клік — меню</span>{% endif %}
         </div>
-        <div class="pjc-svg" data-pjg-pane="ours">{{ plan.gantt|safe }}</div>
+        <div class="pjc-svg" data-pjg-pane="ours"><div data-pjg-detail="full">{{ plan.gantt|safe }}</div><div data-pjg-detail="brief" hidden>{{ plan.gantt_brief|safe }}</div></div>
         <div class="pjg2" data-pjg-pane="classic" hidden></div>
         {{ plan.classic|json_script:"pjg-data" }}
         <div class="pjc-legend">
@@ -304,11 +320,10 @@
     </div>
 
     <div class="pjc-pane" data-pjc-pane="timeline">
-    <h4>
-      <span class="pjc-ranges" role="group" aria-label="Період шкали">{% for key, label in ranges %}<button type="button" class="pjc-b{% if key == range %} on{% endif %}" data-pjc-range="{{ key }}" aria-pressed="{% if key == range %}true{% else %}false{% endif %}">{{ label }}</button>{% endfor %}</span>
-      {% if can_change %}<button type="button" class="pjc-b pjc-right" data-pjc-event-add title="Зустріч чи термін з вашого календаря, який не прийшов листом проєкту">📅 ＋ Подія з календаря</button>{% endif %}
-    </h4>
-    <div class="pjc-svg">{{ timeline|safe }}</div>
+    {% if can_change %}<h4 class="pjt-head"><button type="button" class="pjc-b pjc-right" data-pjc-event-add title="Зустріч чи термін з вашого календаря, який не прийшов листом проєкту">📅 ＋ Подія з календаря</button></h4>{% endif %}
+    {# SVG з сервера — поки браузер не намалював живу шкалу (pj_timeline.js: масштаб, прокрутка, доріжки) #}
+    <div class="pjc-svg" data-pjt-live>{{ timeline|safe }}</div>
+    {{ timeline_data|json_script:"pjt-data" }}
     {% if timeline_list %}
       <ul class="pjt-mlist" aria-label="Події проєкту">
         {% for e in timeline_list %}<li class="pjt-ml-{{ e.cls|default:'def' }}"><time>{{ e.date|date:"d.m.y" }}</time> <span translate="no">{% if e.url %}<a href="{{ e.url }}" target="_blank" rel="noopener">{{ e.icon }} {{ e.text }}</a>{% else %}{{ e.icon }} {{ e.text }}{% endif %}</span></li>{% endfor %}

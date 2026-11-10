@@ -422,10 +422,29 @@ class _Lane:
         return None
 
 
-def render(project, facts, viewer, months=None, today=None) -> str:
+def payload(project, facts, viewer, today=None, evs=None) -> dict:
+    """Дані шкали для браузера (projects/static/projects/pj_timeline.js — масштаб і прокрутка без запитів):
+    доріжки, події (лише те, що людині можна бачити, — events) і межі «усе / 3 / 6 / 12 міс»."""
+    today = today or timezone.localdate()
+    evs = events(project, facts, viewer, today) if evs is None else evs
+    out = []
+    for e in evs:
+        d = {k: v for k, v in e.items() if k not in ("start", "end") and v not in (None, "", [], {})}
+        d.update(lane=e["lane"], shape=e["shape"], start=e["start"].isoformat())
+        if e.get("end"):
+            d["end"] = e["end"].isoformat()
+        out.append(d)
+    return {"lanes": LANES, "events": out, "today": today.isoformat(),
+            "start": project.start_date.isoformat() if project.start_date else "",
+            "due": project.due_date.isoformat() if project.due_date else "",
+            "bounds": {key: [b.isoformat() for b in bounds(project, evs, today, months)]
+                       for key, months in RANGES.items()}}
+
+
+def render(project, facts, viewer, months=None, today=None, evs=None) -> str:
     """SVG шкали. months — останні N місяців (до строку / сьогодні + FUTURE_DAYS), None — усе."""
     today = today or timezone.localdate()
-    evs = events(project, facts, viewer, today)
+    evs = events(project, facts, viewer, today) if evs is None else evs
     start, end = bounds(project, evs, today, months)
     days = max((end - start).days, 1)
     ppd = (W - LEFT - RIGHT) / days
@@ -626,12 +645,12 @@ LANE_ICONS = {"moments": "📌", "plan": "📋", "mail": "✉️", "docs": "📝
 MOBILE_LIMIT = 40
 
 
-def mobile_items(project, facts, viewer, today=None, limit=MOBILE_LIMIT) -> list:
+def mobile_items(project, facts, viewer, today=None, limit=MOBILE_LIMIT, evs=None) -> list:
     """На телефоні замість шкали — список подій, нові зверху: дата, значок доріжки, текст (перший рядок підказки —
     там уже лише те, що людині можна бачити), посилання. Години askDANTE — ні."""
     today = today or timezone.localdate()
     out = []
-    for e in events(project, facts, viewer, today):
+    for e in (events(project, facts, viewer, today) if evs is None else evs):
         if e["lane"] == "hours":
             continue
         text = (e["tip"] or e["label"] or "").split("\n")[0]

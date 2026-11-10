@@ -95,9 +95,11 @@ def _skip(project, thread_ids) -> tuple:
     return skip, elsewhere, suggested
 
 
-def _own_base(user, days=DAYS):
+def _own_base(user, days=DAYS, day=None):
+    """Власні листи за DAYS днів; day («Листи для AI — з» проєкту) — з цієї дати."""
     from email_assistant.models import EmailMessage
-    since = timezone.now() - timedelta(days=days)
+    from .ai_scan import since_dt
+    since = since_dt(day) if day else timezone.now() - timedelta(days=days)
     return (EmailMessage.objects.filter(account__user=user, is_deleted=False, is_spam=False, sent_at__gte=since)
             .exclude(folder=EmailMessage.FOLDER_TRASH).exclude(thread=None))
 
@@ -126,7 +128,8 @@ def local(project, user, limit=LIMIT) -> list:
         cond |= Q(thread__crm_customer_id=project.customer_id)
     if not cond:
         return []
-    msgs = list(_own_base(user).filter(cond).select_related("thread").order_by("-sent_at", "-pk")[:SCAN_MAX])
+    msgs = list(_own_base(user, day=project.ai_mail_since).filter(cond).select_related("thread")
+                .order_by("-sent_at", "-pk")[:SCAN_MAX])
     skip, elsewhere, suggested = _skip(project, {m.thread_id for m in msgs})
     found = {}
     for m in msgs:

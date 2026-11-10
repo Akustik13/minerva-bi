@@ -77,11 +77,20 @@ def _mail_date(m):
 
 
 def own_messages(project, user):
-    """Листи проєкту з власних скриньок людини (без спаму)."""
+    """Листи проєкту з власних скриньок людини (без спаму); «Листи для AI — з» проєкту — лише з цієї дати."""
     from .services import project_messages
     if user is None or not getattr(user, "pk", None):
         return project_messages(project).none()
-    return project_messages(project).filter(account__user=user, is_spam=False)
+    qs = project_messages(project).filter(account__user=user, is_spam=False)
+    if project.ai_mail_since:
+        qs = qs.filter(sent_at__gte=since_dt(project.ai_mail_since))
+    return qs
+
+
+def since_dt(day):
+    """Дата «з» → початок цього дня в часовому поясі Minerva (для sent_at__gte)."""
+    from datetime import datetime, time
+    return timezone.make_aware(datetime.combine(day, time.min))
 
 
 def unread(project, user):

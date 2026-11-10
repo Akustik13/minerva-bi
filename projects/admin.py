@@ -141,7 +141,7 @@ class ProjectAdmin(admin.ModelAdmin):
                        "source_thread_link", "created_by", "created_at", "updated_at")
     fieldsets = [
         (None, {"fields": ["code", "name", "icon", "status", "customer", "owner", "start_date", "due_date",
-                           "next_action", "products"]}),
+                           "ai_mail_since", "next_action", "products"]}),
         ("🧠 AI-огляд проєкту", {"fields": ["overview_panel"]}),
         ("Опис і вимоги", {"fields": ["description"]}),
         ("Листування й хронологія", {"fields": ["mail_link", "timeline_html"]}),
@@ -320,7 +320,33 @@ class ProjectAdmin(admin.ModelAdmin):
     def get_urls(self):
         return [path("triage/", self.admin_site.admin_view(self.triage_view), name="projects_project_triage"),
                 path("portfolio/", self.admin_site.admin_view(self.portfolio_view),
-                     name="projects_project_portfolio")] + super().get_urls()
+                     name="projects_project_portfolio"),
+                path("<path:object_id>/workspace/", self.admin_site.admin_view(self.workspace_view),
+                     name="projects_project_workspace")] + super().get_urls()
+
+    def workspace_view(self, request, object_id):
+        """🧭 Робочий стіл проєкту: той самий пульт, що в картці (projects/cockpit.py), на всю ширину й без полів
+        картки — план і діаграми Ганта, шкала, ризики, статус, AI. Право — перегляд проєкту; змінює — хто може."""
+        from django.core.exceptions import PermissionDenied
+        from django.http import Http404
+        from django.template.response import TemplateResponse
+        from . import cockpit
+        obj = self.get_object(request, object_id)
+        if obj is None:
+            raise Http404
+        if not self.has_view_permission(request, obj):
+            raise PermissionDenied
+        html = ""
+        try:
+            html = cockpit.render(obj, request.user)
+        except Exception:  # noqa: BLE001 — сторінка з поясненням краще, ніж помилка
+            logger.exception("project workspace %s", object_id)
+        customer = obj.customer if obj.customer_id else None
+        ctx = {**self.admin_site.each_context(request), "title": f"🧭 {obj.code} · {obj.name}", "opts": self.model._meta,
+               "project": obj, "pj_cockpit": html,
+               "customer": (customer.company or customer.name or customer.email) if customer else "",
+               "owner": (obj.owner.get_full_name() or obj.owner.username) if obj.owner_id else ""}
+        return TemplateResponse(request, "admin/projects/project/workspace.html", ctx)
 
     def portfolio_view(self, request):
         """📊 Портфель: таблиця з міні-шкалами, шкала всіх проєктів, дошка фаз, карта зв'язків і «⚡ Впливи»

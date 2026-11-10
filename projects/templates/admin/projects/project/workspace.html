@@ -1,0 +1,61 @@
+{% extends "admin/base_site.html" %}
+{# «🧭 Робочий стіл проєкту» (ProjectAdmin.workspace_view): пульт на всю ширину без полів картки — план і діаграми Ганта, #}
+{# шкала, ризики, статус, AI. Той самий пульт (_cockpit.html), стилі й скрипт (pj.css, pj.js), що й у картці. #}
+
+{% block extrahead %}
+{{ block.super }}
+{% include "admin/projects/project/_assets_head.html" %}
+<style>
+  body.pj-workspace #content { max-width: none; }
+  .pjw { color: var(--text, var(--body-fg)); }
+  .pjw-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 8px; }
+  .pjw-head h1 { margin: 0; font-size: 20px; }
+  .pjw-meta { color: var(--text-muted, #9aafbe); font-size: 13px; }
+  .pjw-links { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+  .pjw-links a { text-decoration: none; }
+  /* на робочому столі план і шкала — одразу під шапкою, картки «Що зараз / Ризики / Моменти» — нижче */
+  .pjw .pjc { display: flex; flex-direction: column; }
+  .pjw .pjc > .pjc-head { order: 0; }
+  .pjw .pjc > .pjc-notice { order: 1; }
+  .pjw .pjc > .pjc-strip { order: 2; }
+  .pjw .pjc > .pjc-tl { order: 3; }
+  .pjw .pjc > .pjc-cols { order: 4; }
+  .pjw .pjc > #pj-ai { order: 5; }
+  .pjw [data-pjc-fields], .pjw .pjc-ws-link { display: none; }
+  .pjw .pjg2 { max-height: none; }
+</style>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} pj-workspace{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{% url 'admin:projects_project_changelist' %}">📁 Проєкти</a> ›
+  <a href="{% url 'admin:projects_project_change' project.pk %}" translate="no">{{ project.code }}</a> ›
+  🧭 Робочий стіл
+</div>
+{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<div class="pjw">
+  <div class="pjw-head">
+    <h1>🧭 <span translate="no">{{ project.code }} · {{ project.name }}</span></h1>
+    <span class="pjw-meta">{{ project.get_status_display }}{% if customer %} · 👤 <span translate="no">{{ customer }}</span>{% endif %}{% if owner %} · відповідальний <span translate="no">{{ owner }}</span>{% endif %}</span>
+    <span class="pjw-links">
+      <a class="pjc-b" href="{% url 'admin:projects_project_change' project.pk %}" title="Поля проєкту, учасники, прив'язки, важливі моменти">📝 Картка проєкту</a>
+      <a class="pjc-b" href="/email/?project={{ project.pk }}" target="_blank">✉️ Листи проєкту</a>
+      <a class="pjc-b" href="{% url 'admin:projects_project_portfolio' %}">📊 Портфель</a>
+    </span>
+  </div>
+  {% csrf_token %}
+  {% if pj_cockpit %}
+    <div id="pj-cockpit">{{ pj_cockpit }}</div>
+    {% include "admin/projects/project/_assets_body.html" %}
+  {% else %}
+    <div class="pjc-err">🧭 Робочий стіл проєкту зараз не вдалося показати — відкрийте картку проєкту.</div>
+  {% endif %}
+</div>
+{% endblock %}

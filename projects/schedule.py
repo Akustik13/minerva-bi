@@ -44,6 +44,9 @@ def _fmt(value) -> str:
     return d.strftime("%d.%m") if d else ""
 
 
+# Виконаний крок без дати початку, який «тягнувся» б від давнього планового старту, — смуга лише його тривалості
+STRETCH_FACTOR, STRETCH_DAYS = 3, 7
+
 @dataclass
 class StepCalc:
     step: ProjectStep
@@ -330,7 +333,10 @@ def compute(project, facts=None, today=None) -> Plan:
                 after = cand if after is None or cand > after else after
         if c.status == ProjectStep.DONE:
             c.end = c.finished or s.end or today
-            c.start = c.started or s.start or (c.end - timedelta(days=max(dur - 1, 0)))
+            fallback = c.end - timedelta(days=max(dur - 1, 0))
+            c.start = c.started or s.start or fallback
+            if not c.started and (c.end - c.start).days + 1 > STRETCH_FACTOR * max(dur, 1) + STRETCH_DAYS:
+                c.start = fallback      # коли почали — невідомо, плановий старт давно застарів: смуга — тривалість до кінця
             c.start = min(c.start, c.end)
             continue
         if c.status == ProjectStep.SKIPPED:

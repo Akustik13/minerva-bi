@@ -121,6 +121,7 @@ def _plan_context(project, facts, today, can_change=False) -> dict:
             {"id": t.pk, "name": t.name, "counts": plan_mod.template_counts(t), "description": t.description}
             for t in plan_mod.templates()] if can_change else []}
     return {"has_plan": True, "strip": _strip(p), "gantt": gantt.render(project, p, today, editable=can_change),
+            "gantt_brief": gantt.render(project, p, today, editable=can_change, brief=True),
             "classic": gantt.classic_data(project, p, today),
             "end": p.end, "base_end": p.base_end,
             "late": bool(project.due_date and p.end and p.end > project.due_date),
@@ -193,7 +194,8 @@ def _ai_context(project, user, can_change) -> dict:
         items.append({"id": s.pk, "kind": s.kind, "icon": icon, "label": label, "title": s.title, "quote": s.quote,
                       "date": s.date, "risk": risk, "score": s.score, "level": s.level, "mitigation": s.mitigation,
                       "url": f"/email/message/{s.message_id}/" if s.message_id else ""})
-    return {"on": True, "items": items, "moments": sum(1 for i in items if not i["risk"]),
+    return {"on": True, "items": items, "since": project.ai_mail_since,
+            "moments": sum(1 for i in items if not i["risk"]),
             "risks": sum(1 for i in items if i["risk"]), "unread": scan["unread"], "own": scan["own"],
             "rag": forgotten.rag_ready(user), "agent": delegate.can(user)}
 
@@ -213,6 +215,7 @@ def context(project, user, range_key="all", notice="") -> dict:
     ai = _ai_context(project, user, can_change)
     if plan.get("data") is not None:
         plan["data"]["agent"] = bool(ai.get("agent"))
+    evs = timeline.events(project, facts, user, today)          # одні події — для SVG, браузера й телефона
     return {
         "project": project, "health": {"key": st.health, "icon": icon, "label": label},
         "due": _due(project, today), "start": project.start_date, "today": today,
@@ -223,8 +226,9 @@ def context(project, user, range_key="all", notice="") -> dict:
         "moments": _moments(facts, uid)[:MOMENTS], "moments_total": len(facts["highlights"]),
         "kinds": ProjectHighlight.KIND_CHOICES, "mails": _mails(facts, uid),
         "counts": facts["counts"], "more": facts["more"],
-        "timeline": timeline.render(project, facts, user, months=timeline.RANGES[range_key], today=today),
-        "timeline_list": timeline.mobile_items(project, facts, user, today),
+        "timeline": timeline.render(project, facts, user, months=timeline.RANGES[range_key], today=today, evs=evs),
+        "timeline_data": timeline.payload(project, facts, user, today, evs=evs),
+        "timeline_list": timeline.mobile_items(project, facts, user, today, evs=evs),
         "range": range_key, "ranges": RANGE_LABELS,
         "can_change": can_change,
         "has_products": project.products.exists(),
@@ -246,10 +250,12 @@ def context(project, user, range_key="all", notice="") -> dict:
                  "plan_base": f"/projects/api/project/{pk}/plan/",
                  "ai_scan": reverse("projects:ai_scan", args=[pk]), "ai_plan": reverse("projects:ai_plan", args=[pk]),
                  "ai_plan_apply": reverse("projects:ai_plan_apply", args=[pk]),
+                 "ai_settings": reverse("projects:ai_settings", args=[pk]),
                  "ai_base": f"/projects/api/project/{pk}/ai/suggestion/",
                  "forgotten": reverse("projects:forgotten", args=[pk]),
                  "forgotten_decide": reverse("projects:forgotten_decide", args=[pk]),
                  "events": reverse("projects:project_events", args=[pk]),
+                 "workspace": reverse("admin:projects_project_workspace", args=[pk]),
                  "event_link": reverse("projects:project_event_link", args=[pk])},
     }
 

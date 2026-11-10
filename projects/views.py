@@ -461,8 +461,12 @@ def ai_plan_view(request, pk):
     from . import ai_plan
     project = _project_for_change(request, pk)
     if request.method == "POST":
+        from .plan import _date
+        body = _body(request)
         try:
-            st = ai_plan.start(project, request.user)
+            st = ai_plan.start(project, request.user, wish=str(body.get("wish") or ""),
+                               since=_date(body.get("since")) if "since" in body else ai_plan.KEEP,
+                               replace=bool(body.get("replace")), start_date=_date(body.get("start")))
         except ValueError as e:
             return JsonResponse({"ok": False, "error": str(e)}, status=400)
     else:
@@ -476,6 +480,25 @@ def ai_plan_view(request, pk):
         return JsonResponse({"ok": False, "error": "Чернетки немає — натисніть «🧠 Скласти план з листування»"},
                             status=400)
     return JsonResponse({"ok": True, "draft": draft})
+
+
+@staff_member_required
+@require_POST
+def ai_settings_view(request, pk):
+    """📅 «Листи для AI — з» і старт проєкту (блок «🧠 AI-помічник»): {since, start}; порожньо — усі листи."""
+    from .plan import _date
+
+    def run(project, body):
+        since, start = _date(body.get("since")), _date(body.get("start"))
+        project.ai_mail_since = since
+        fields = ["ai_mail_since", "updated_at"]
+        if start:
+            project.start_date = start
+            fields.append("start_date")
+        project.save(update_fields=fields)
+        return (f"🧠 AI читає листи проєкту з {since:%d.%m.%Y}" if since else "🧠 AI читає всі листи проєкту") + \
+            (f" · старт проєкту {start:%d.%m.%Y}" if start else "")
+    return _plan_action(request, pk, run)
 
 
 @staff_member_required

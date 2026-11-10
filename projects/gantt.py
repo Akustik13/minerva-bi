@@ -3,7 +3,8 @@
 Рядки: фаза (підсумкова смуга, базовий план тонкою лінією) і її кроки: смуга кроку чи ◆ віха, тонка смуга
 базового плану під нею, червоний контур — критичний шлях, «+N» — зсув від базового плану, стрілки — залежності
 «фініш → старт». Лінії: сьогодні, строк клієнту. editable: рядки фокусуються (tabindex) — клік / Enter відкриває
-вікно кроку чи фази (data-step / data-phase, JS — change_form.html); підказка рядка — <title>.
+вікно кроку чи фази (data-step / data-phase, JS — projects/static/projects/pj.js: ще й перетягування смуг за
+data-ppd / data-day0 і правий клік); підказка рядка — <title>. brief — «Коротко»: лише фази й віхи (◆).
 """
 from datetime import timedelta
 
@@ -36,7 +37,7 @@ def _fmt(d) -> str:
     return d.strftime("%d.%m") if d else ""
 
 
-def render(project, plan, today=None, editable=False) -> str:
+def render(project, plan, today=None, editable=False, brief=False) -> str:
     today = today or timezone.localdate()
     if not plan.has_plan:
         return ""
@@ -59,11 +60,12 @@ def render(project, plan, today=None, editable=False) -> str:
     rows = []                      # ("phase", PhaseCalc) | ("step", StepCalc)
     for pc in plan.phases:
         rows.append(("phase", pc))
-        rows += [("step", c) for c in pc.steps]
+        rows += [("step", c) for c in pc.steps if not brief or c.step.kind == ProjectStep.MILESTONE]
     height = HEAD + len(rows) * RH + 8
     top_of = {}
     focus = ' tabindex="0" role="button"' if editable else ""
-    out = [f'<svg class="pjg" viewBox="0 0 {W} {height}" role="group" aria-label="'
+    out = [f'<svg class="pjg" viewBox="0 0 {W} {height}" data-ppd="{ppd:.4f}" data-day0="{start.isoformat()}" '
+           f'role="group" aria-label="'
            f'{escape(f"План проєкту {project.code}: {len(plan.steps)} кроків, прогноз до {_fmt(plan.end)}")}">',
            '<defs><marker id="pjgA" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" '
            'orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="pjg-ah"/></marker>'

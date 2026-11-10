@@ -44,6 +44,9 @@ class Project(models.Model):
                                       on_delete=models.SET_NULL, related_name="+",
                                       verbose_name="Створено з листування")
     baseline_at = models.DateTimeField("Базовий план зафіксовано", null=True, blank=True)
+    ai_mail_since = models.DateField("Листи для AI — з", null=True, blank=True,
+                                     help_text="«🧠 AI-помічник» (моменти й ризики, план з листування, забуті листи) "
+                                               "читає листи проєкту лише з цієї дати; порожньо — усі")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name="+", verbose_name="Створив")
     created_at = models.DateTimeField("Створено", auto_now_add=True)

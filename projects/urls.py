@@ -26,6 +26,7 @@ urlpatterns = [
     path("api/project/<int:pk>/plan/step/<int:sid>/dates/", views.plan_step_dates_view, name="plan_step_dates"),
     path("api/project/<int:pk>/plan/step/<int:sid>/close/", views.plan_step_close_view, name="plan_step_close"),
     path("api/project/<int:pk>/plan/quick-step/", views.plan_quick_step_view, name="plan_quick_step"),
+    path("api/project/<int:pk>/ai/settings/", views.ai_settings_view, name="ai_settings"),
     path("api/project/<int:pk>/events/", views.project_events_view, name="project_events"),
     path("api/project/<int:pk>/events/link/", views.project_event_link_view, name="project_event_link"),
     path("api/project/<int:pk>/plan/phase/", views.plan_phase_view, name="plan_phase"),

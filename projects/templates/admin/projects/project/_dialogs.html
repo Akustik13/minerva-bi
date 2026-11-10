@@ -1,0 +1,155 @@
+{# Вікна кроку й фази: JS переносить їх у <body> (поза формою картки) при першому відкритті #}
+<template id="pjp-dialogs">
+  <dialog id="pjp-step" class="pjp-dlg" aria-labelledby="pjp-step-h">
+    <h3 id="pjp-step-h">📋 Крок плану</h3>
+    <div class="pjp-grid">
+      <label class="pjp-wide">Назва <input type="text" data-s="title" maxlength="200" autocomplete="off"></label>
+      <label>Вид <select data-s="kind"></select></label>
+      <label>Фаза <select data-s="phase"></select></label>
+      <label>Хто робить <select data-s="side"></select></label>
+      <label data-only="person">Відповідальний <select data-s="assignee"></select></label>
+      <label data-only="task">Початок <input type="date" data-s="start"></label>
+      <label><span data-only="task">Кінець</span><span data-only="milestone">Дата віхи</span> <input type="date" data-s="end"></label>
+      <label data-only="task">Тривалість, днів <input type="number" min="1" max="999" data-s="duration"></label>
+      <label>Стан <select data-s="status"></select></label>
+    </div>
+    <p class="pjp-hint">Порожні дати Minerva рахує сама: після попередніх кроків, тривалістю з поля «Тривалість». Дні — календарні.</p>
+    <div class="pjp-auto" data-s-note hidden></div>
+    <fieldset>
+      <legend>⛓ Після кроків</legend>
+      <div class="pjp-checks" data-s-list="after"></div>
+      <details class="pjp-x" data-s-x>
+        <summary>⛓ Кроки інших проєктів <span class="pjp-hint" data-s-xcount></span></summary>
+        <input type="search" data-s-xq placeholder="Код проєкту або назва кроку…" aria-label="Пошук кроку іншого проєкту" autocomplete="off">
+        <div class="pjp-checks" data-s-list="xafter"></div>
+        <p class="pjp-hint">Крок почнеться після кроку іншого проєкту — затримку там видно в «⚡ Впливах» і в обох проєктах.</p>
+      </details>
+      <label class="pjp-inline">Відступ після них, днів <input type="number" min="-365" max="365" data-s="lag"></label>
+    </fieldset>
+    <fieldset>
+      <legend>🔗 Виконано, коли</legend>
+      <div class="pjp-row">
+        <select data-s="trigger" aria-label="Виконано, коли"></select>
+        <label class="pjp-inline"><input type="checkbox" data-s="auto"> стан з прив'язаних об'єктів</label>
+      </div>
+      <div class="pjp-checks" data-s-list="links"></div>
+      <div class="pjp-checks" data-s-list="offers"></div>
+      <p class="pjp-hint">Нічого не вибрано — Minerva сама прив'яже найраніший підхожий об'єкт проєкту.
+        «Виконано» й «Пропущено», поставлені вручну, автоматика не змінює.</p>
+    </fieldset>
+    <label>Нотатки <textarea data-s="notes" rows="2"></textarea></label>
+    <div class="pjp-agent" data-s-agent hidden>
+      <button type="button" class="pjc-b" data-pja-agent>🤖 Доручити агенту</button>
+      <span class="pjp-hint">нагадати постачальнику чи клієнту, підготувати закупівлю — агент лише пропонує, вирішуєте ви</span>
+      <span class="pjp-agent-tasks" data-s-agent-tasks></span>
+    </div>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>💾 Зберегти</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+      <button type="button" class="pjc-b pjc-right pjc-danger" data-pjp-del>🗑 Видалити крок</button>
+    </div>
+  </dialog>
+  <dialog id="pjp-phase" class="pjp-dlg" aria-labelledby="pjp-phase-h">
+    <h3 id="pjp-phase-h">🗂 Фаза плану</h3>
+    <div class="pjp-grid">
+      <label>Значок <input type="text" data-p="icon" maxlength="8" placeholder="🔧" autocomplete="off"></label>
+      <label class="pjp-wide2">Назва <input type="text" data-p="name" maxlength="120" autocomplete="off"></label>
+      <label class="pjp-wide2">Умова переходу далі <input type="text" data-p="gate" maxlength="200" placeholder="Клієнт погодив зразок" autocomplete="off"></label>
+      <label>Порядок <input type="number" min="0" data-p="order"></label>
+    </div>
+    <p class="pjp-hint">Фаза завершена, коли виконано всі її кроки. Умова переходу — для людей; остання віха фази показує, чи її досягнуто.</p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>💾 Зберегти</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+      <button type="button" class="pjc-b pjc-right pjc-danger" data-pjp-del>🗑 Видалити фазу</button>
+    </div>
+  </dialog>
+  <dialog id="pjr-risk" class="pjp-dlg" aria-labelledby="pjr-risk-h">
+    <h3 id="pjr-risk-h">⚠️ Ризик</h3>
+    <div class="pjp-auto" data-r-evidence hidden></div>
+    <div class="pjp-grid">
+      <label class="pjp-wide">Що може статися <input type="text" data-r="title" maxlength="200" autocomplete="off"
+             placeholder="Клієнт погодить зразок пізніше"></label>
+      <label>Ймовірність <select data-r="probability"></select></label>
+      <label>Вплив на строк і гроші <select data-r="impact"></select></label>
+      <label>Бал <span class="pjr-score" data-r-score></span></label>
+      <label>Категорія <select data-r="category"></select></label>
+      <label>Власник <select data-r="owner"></select></label>
+      <label>Стан <select data-r="status"></select></label>
+      <label>Переглянути <input type="date" data-r="review_on"></label>
+    </div>
+    <label>Заходи — що робимо, щоб не сталося або зашкодило менше <textarea data-r="mitigation" rows="3"></textarea></label>
+    <label data-r-desc>Опис <textarea data-r="description" rows="2"></textarea></label>
+    <fieldset>
+      <legend>Кроки під впливом</legend>
+      <div class="pjp-checks" data-r-list="steps"></div>
+    </fieldset>
+    <p class="pjp-hint">Бал = ймовірність × вплив: до 2 — 🟢, 3–4 — 🟡, від 6 — 🔴. Закритий вами ризик правило вже не відкриє знову.</p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>💾 Зберегти</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+      <button type="button" class="pjc-b pjc-right pjc-danger" data-pjp-del>🗑 Видалити ризик</button>
+    </div>
+  </dialog>
+  <dialog id="pja-ask" class="pjp-dlg" aria-labelledby="pja-ask-h">
+    <h3 id="pja-ask-h">🧠 План з листування</h3>
+    <p class="pjp-hint">AI читає ваші листи проєкту, шаблони планів і тривалості минулих проєктів — і складає чернетку.
+      Перед застосуванням ви її переглянете.</p>
+    <label class="pjp-wide">Що врахувати, що додати, що вже відбулось
+      <textarea data-pa="wish" rows="5" maxlength="2000"
+        placeholder="Наприклад: зустріч 05.11 відбулась — клієнт погодив схему. Додай фазу сертифікації CE після зразків. Серія — 3 партії по 500 шт."></textarea></label>
+    <div class="pjp-row">
+      <label>Листи — з <input type="date" data-pa="since"></label>
+      <label>Старт проєкту <input type="date" data-pa="start"></label>
+    </div>
+    <label class="pja-replace" data-pa-replace-row><input type="checkbox" data-pa="replace"><span>Замінити поточний план
+      (кроків: <b data-pa-steps></b>) — старі кроки, їхні дати й прив'язки зникнуть після «✓ Застосувати план»</span></label>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>🧠 Скласти чернетку</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+    </div>
+  </dialog>
+  <dialog id="pja-plan" class="pjp-dlg" aria-labelledby="pja-plan-h">
+    <h3 id="pja-plan-h">🧠 Чернетка плану з листування</h3>
+    <p class="pjp-hint" data-pd-info></p>
+    <div class="pjc-merr" data-pd-replace hidden></div>
+    <div class="pjp-auto" data-pd-notes hidden></div>
+    <label class="pjp-inline pjd-start">Старт проєкту <input type="date" data-pd="start"></label>
+    <div class="pjd-list" data-pd-list></div>
+    <p class="pjp-hint">Зніміть галочку з кроків, які не потрібні. Після застосування план змінюється як звичайно:
+      тривалості, дати, хто робить, залежності. «Уже зроблено» — з листа, на який посилається крок.</p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>✓ Застосувати план</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+    </div>
+  </dialog>
+  <dialog id="pja-agent" class="pjp-dlg" aria-labelledby="pja-agent-h">
+    <h3 id="pja-agent-h">🤖 Доручити агенту</h3>
+    <p class="pjp-hint">Крок: <b data-ag-step translate="no"></b></p>
+    <fieldset>
+      <legend>Що доручити</legend>
+      <div class="pjp-checks" data-ag-presets></div>
+    </fieldset>
+    <label>Доручення агенту <textarea data-ag="instruction" rows="7"></textarea></label>
+    <div class="pjp-grid">
+      <label class="pjp-wide">Кому писати листи (адреси) <input type="text" data-ag="mail_to" autocomplete="off"></label>
+      <label class="pjp-wide2">Модель AI <select data-ag="model"></select></label>
+      <label>Найбільше витратити, $ <input type="number" min="0.05" max="10" step="0.05" data-ag="budget"></label>
+    </div>
+    <p class="pjp-hint">Агент лише пропонує: лист, закупівлю чи зміни ви перевіряєте й застосовуєте на сторінці
+      завдання. Лист — лише на адреси з доручення.</p>
+    <div class="pjp-auto" data-ag-tasks hidden></div>
+    <div class="pjp-auto" data-ag-done hidden>✅ Завдання створено — агент працює.
+      <a target="_blank" rel="noopener">Відкрити завдання агенту →</a></div>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save data-ag-start>🤖 Запустити агента</button>
+      <button type="button" class="pjc-b" data-pjp-close>Закрити</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+    </div>
+  </dialog>
+</template>
