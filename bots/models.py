@@ -257,7 +257,8 @@ class DigiKeyConfig(models.Model):
     )
     msg_notify_telegram = models.BooleanField(
         "Telegram — при новому повідомленні", default=True,
-        help_text="Нове повідомлення покупця чи оператора DigiKey — у Telegram (бот і чат — «Налаштування → Сповіщення»)"
+        help_text="Нове повідомлення покупця чи оператора DigiKey — у Telegram (бот — «Налаштування → Сповіщення», "
+                  "куди — «Telegram-чати» нижче)"
     )
     msg_notify_email = models.BooleanField(
         "Email — при новому повідомленні", default=True,
@@ -266,7 +267,12 @@ class DigiKeyConfig(models.Model):
     )
     msg_notify_email_to = models.CharField(
         "Email одержувачів (через кому)", max_length=500, blank=True, default="",
-        help_text="Порожньо = використати адресу з загальних налаштувань сповіщень"
+        help_text="Порожньо = «Кому (email)» загальних налаштувань сповіщень"
+    )
+    msg_notify_tg_chats = models.CharField(
+        "Telegram-чати", max_length=500, blank=True, default="",
+        help_text="Chat ID через кому: спільна група / канал (@назва) або особистий чат співробітника з ботом. "
+                  "Порожньо = основний чат «Налаштування → Сповіщення»."
     )
     msg_notify_own = models.BooleanField(
         "І відповіді з нашого боку", default=True,

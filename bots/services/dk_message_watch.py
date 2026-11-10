@@ -264,16 +264,27 @@ def recipients(config, ns=None) -> list:
     return [e.strip() for e in raw.replace(";", ",").replace("\n", ",").split(",") if e.strip()]
 
 
+def chats(config, ns=None) -> list:
+    """Куди в Telegram: «Telegram-чати» повідомлень DigiKey, порожньо — основний чат «Налаштування → Сповіщення»."""
+    from dashboard.notify_routes import default_chat, parse_chats
+    own = parse_chats(config.msg_notify_tg_chats)[0]
+    ns = ns if ns is not None else _ns()
+    main = default_chat(ns) if ns else ""
+    return own or ([main] if main else [])
+
+
 def _channels(config) -> dict:
     """{telegram|email: {on, why, to}} — чи піде сповіщення і чому ні."""
     ns = _ns()
-    tg = {"on": False, "why": ""}
+    tg = {"on": False, "why": "", "to": chats(config, ns) if ns else []}
     if not config.msg_notify_telegram:
         tg["why"] = "вимкнено для повідомлень DigiKey"
     elif not ns or not ns.telegram_enabled:
         tg["why"] = "Telegram вимкнено в «Налаштування → Сповіщення»"
-    elif not (ns.telegram_bot_token and ns.telegram_chat_id):
-        tg["why"] = "у «Налаштування → Сповіщення» немає бота або чату Telegram"
+    elif not ns.telegram_bot_token:
+        tg["why"] = "у «Налаштування → Сповіщення» немає бота Telegram"
+    elif not tg["to"]:
+        tg["why"] = "не вказано чат Telegram"
     else:
         tg["on"] = True
     em = {"on": False, "why": "", "to": recipients(config, ns) if ns else []}
@@ -323,12 +334,14 @@ def _send(config, topic, new, conv, channels) -> dict:
     sent = {"telegram": 0, "email": 0}
     ctx = _context(config, topic)
     if channels["telegram"]["on"]:
-        try:
-            from dashboard.notifications import _send_telegram
-            _send_telegram(channels["ns"], telegram_text(topic, new, ctx))
-            sent["telegram"] = 1
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("DigiKey message → Telegram: %s", exc)
+        from dashboard.notifications import _send_telegram
+        text = telegram_text(topic, new, ctx)
+        for chat in channels["telegram"]["to"]:        # кожен чат окремо: один не прийняв — інші отримають
+            try:
+                _send_telegram(channels["ns"], text, chat_id_override=chat)
+                sent["telegram"] = 1
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("DigiKey message → Telegram %s: %s", chat, exc)
     if channels["email"]["on"]:
         try:
             from dashboard.notifications import _send_event_email, send_only_to

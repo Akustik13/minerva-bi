@@ -189,6 +189,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 ("msg_check_enabled", "msg_check_interval"),
                 ("msg_notify_telegram", "msg_notify_email"),
                 "msg_notify_own",
+                "msg_notify_tg_chats",
                 "msg_notify_email_to",
             ),
             "description": (
@@ -255,6 +256,9 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         for field_name in ('client_secret', 'webhook_secret'):
             if field_name in form.base_fields:
                 form.base_fields[field_name].widget = PasswordInput(render_value=True)
+        if 'msg_notify_tg_chats' in form.base_fields:     # чипи: «＋ з Minerva» (спільний чат, особисті) або свій
+            from dashboard.notify_widgets import recipients_widgets
+            recipients_widgets(form, email='msg_notify_email_to', tg='msg_notify_tg_chats')
         return form
 
     def get_urls(self):
@@ -1691,7 +1695,10 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                                     "(docker-compose restart cron)?", True) if st["late"] else "")
         tg = st["telegram"]
         em = st["email"]
-        telegram = line("✈️", "Telegram", "так" if tg["on"] else tg["why"], not tg["on"])
+        from dashboard.notify_routes import chat_options, labels
+        names = [f"{label} ({chat})" if label else chat
+                 for chat, label in labels(tg.get("to") or [], chat_options(dk_message_watch._ns()))]
+        telegram = line("✈️", "Telegram", ("так — " + ", ".join(names)) if tg["on"] else tg["why"], not tg["on"])
         mail = line("✉️", "Пошта", ("так — " + ", ".join(em["to"])) if em["on"] else em["why"], not em["on"])
         check_url = reverse("admin:bots_digikeyconfig_messages_check_now")
         return format_html(

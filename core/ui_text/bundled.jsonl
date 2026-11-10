@@ -988,6 +988,7 @@
 {"uk": "Certificate of Origin — сертифікат походження", "en": "Certificate of Origin", "de": "Certificate of Origin — Ursprungszeugnis"}
 {"uk": "Chart.js 4.4 (той самий, що на дашборді) підвантажується, лише коли графік уперше малюється.", "en": "Chart.js 4.4 (the same as on the dashboard) is loaded only when a chart is drawn for the first time.", "de": "Chart.js 4.4 (dasselbe wie im Dashboard) wird erst geladen, wenn ein Diagramm zum ersten Mal gezeichnet wird."}
 {"uk": "Chat ID через кому (група, канал @назва або особистий чат з ботом). Порожньо — основний чат «Налаштування → Сповіщення».", "en": "Chat IDs separated by commas (group, channel @name or a personal chat with the bot). Empty — the main chat in «Settings → Notifications».", "de": "Chat-IDs durch Komma getrennt (Gruppe, Kanal @Name oder persönlicher Chat mit dem Bot). Leer — der Hauptchat aus «Einstellungen → Benachrichtigungen»."}
+{"uk": "Chat ID через кому: спільна група / канал (@назва) або особистий чат співробітника з ботом. Порожньо = основний чат «Налаштування → Сповіщення».", "en": "Chat IDs separated by commas: a shared group / channel (@name) or a staff member's personal chat with the bot. Empty = the main chat in «Settings → Notifications».", "de": "Chat-IDs durch Komma getrennt: gemeinsame Gruppe / Kanal (@Name) oder persönlicher Chat eines Mitarbeiters mit dem Bot. Leer = der Hauptchat aus «Einstellungen → Benachrichtigungen»."}
 {"uk": "Chat ID, напр. -1001234567890", "en": "Chat ID, e.g. -1001234567890", "de": "Chat-ID, z. B. -1001234567890"}
 {"uk": "Chrome/Edge — нативний діалог Windows · Firefox — вкажіть шлях у налаштуваннях", "en": "Chrome/Edge — native Windows dialog · Firefox — specify the path in settings", "de": "Chrome/Edge — nativer Windows-Dialog · Firefox — geben Sie den Pfad in den Einstellungen an"}
 {"uk": "Claude Code (у комплекті)", "en": "Claude Code (bundled)", "de": "Claude Code (mitgeliefert)"}
@@ -1986,6 +1987,7 @@
 {"uk": "Telegram-боти, автоімпорт замовлень, синхронізація з маркетплейсами (Amazon, eBay, DigiKey, Nova Poshta).", "en": "Telegram bots, automatic order import, synchronization with marketplaces (Amazon, eBay, DigiKey, Nova Poshta).", "de": "Telegram-Bots, automatischer Auftragsimport, Synchronisierung mit Marktplätzen (Amazon, eBay, DigiKey, Nova Poshta)."}
 {"uk": "Telegram-сповіщення (успіх)", "en": "Telegram notifications (success)", "de": "Telegram-Benachrichtigungen (Erfolg)"}
 {"uk": "Telegram-сповіщення надсилаються коли ETA посилки прострочена або перевізник підтвердив затримку.", "en": "Telegram notifications are sent when the parcel ETA is overdue or the carrier has confirmed a delay.", "de": "Telegram-Benachrichtigungen werden gesendet, wenn die voraussichtliche Lieferzeit des Pakets überschritten ist oder der Versanddienstleister eine Verzögerung bestätigt hat."}
+{"uk": "Telegram-чати", "en": "Telegram chats", "de": "Telegram-Chats"}
 {"uk": "Telegram-чати команди", "en": "Team Telegram chats", "de": "Telegram-Chats des Teams"}
 {"uk": "Telegram/Email якщо синк падає після всіх спроб (timeout, network error)", "en": "Telegram/Email if the sync fails after all attempts (timeout, network error)", "de": "Telegram/E-Mail, wenn die Synchronisierung nach allen Versuchen fehlschlägt (timeout, network error)"}
 {"uk": "Telegram: DigiKey авто-підтвердження", "en": "Telegram: DigiKey auto-confirmation", "de": "Telegram: DigiKey-Autobestätigung"}
@@ -9708,6 +9710,7 @@
 {"uk": "Не створювати, але зафіксувати SKU у повідомленні після завершення", "en": "Do not create, but record the SKUs in the message after completion", "de": "Nichts erstellen, aber die Artikelnummern nach Abschluss in der Meldung festhalten"}
 {"uk": "Не стосується цього запису.", "en": "Does not apply to this record.", "de": "Betrifft diesen Datensatz nicht."}
 {"uk": "Не схоже на Chat ID", "en": "Does not look like a Chat ID", "de": "Sieht nicht wie eine Chat-ID aus"}
+{"uk": "Не схоже на Chat ID (число або @назва каналу)", "en": "Does not look like a Chat ID (a number or @channel name)", "de": "Sieht nicht wie eine Chat-ID aus (Zahl oder @Kanalname)"}
 {"uk": "Не схоже на email", "en": "Does not look like an email", "de": "Sieht nicht wie eine E-Mail-Adresse aus"}
 {"uk": "Не схоже на адресу", "en": "Doesn't look like an address", "de": "Sieht nicht nach einer Adresse aus"}
 {"uk": "Не схоже на адресу http(s)://…", "en": "Does not look like an http(s)://… address", "de": "Sieht nicht wie eine http(s)://…-Adresse aus"}
@@ -10042,6 +10045,7 @@
 {"uk": "Нове повідомлення від покупця в DigiKey Marketplace.", "en": "A new message from a buyer in DigiKey Marketplace.", "de": "Neue Nachricht eines Käufers im DigiKey Marketplace."}
 {"uk": "Нове повідомлення покупця чи оператора DigiKey пересилається листом: повний текст, попередні повідомлення розмови й посилання на відповідь у Minerva", "en": "A new message from the buyer or the DigiKey operator is forwarded by e-mail: full text, earlier messages of the conversation and a link to reply in Minerva", "de": "Eine neue Nachricht des Käufers oder des DigiKey-Operators wird per E-Mail weitergeleitet: voller Text, frühere Nachrichten des Gesprächs und Link zum Antworten in Minerva"}
 {"uk": "Нове повідомлення покупця чи оператора DigiKey — у Telegram (бот і чат — «Налаштування → Сповіщення»)", "en": "A new message from the buyer or the DigiKey operator goes to Telegram (bot and chat — \"Settings → Notifications\")", "de": "Eine neue Nachricht des Käufers oder des DigiKey-Operators geht an Telegram (Bot und Chat — „Einstellungen → Benachrichtigungen“)"}
+{"uk": "Нове повідомлення покупця чи оператора DigiKey — у Telegram (бот — «Налаштування → Сповіщення», куди — «Telegram-чати» нижче)", "en": "A new message from a DigiKey buyer or operator — to Telegram (bot — «Settings → Notifications», where to — «Telegram chats» below)", "de": "Neue Nachricht eines DigiKey-Käufers oder -Operators — an Telegram (Bot — «Einstellungen → Benachrichtigungen», wohin — «Telegram-Chats» unten)"}
 {"uk": "Нове покоління журналу: {0}. RAG зробить повну звірку.", "en": "New journal generation: {0}. RAG will do a full reconciliation.", "de": "Neue Journal-Generation: {0}. RAG führt einen vollständigen Abgleich durch."}
 {"uk": "Нове правило пошти", "en": "New mail rule", "de": "Neue E-Mail-Regel"}
 {"uk": "Новий", "en": "New", "de": "Neu"}
@@ -11853,6 +11857,7 @@
 {"uk": "Порада після зміни", "en": "Tip after the change", "de": "Hinweis nach der Änderung"}
 {"uk": "Пораховано за останніми {0} запитами періоду.", "en": "Counted from the last {0} requests of the period.", "de": "Berechnet aus den letzten {0} Anfragen des Zeitraums."}
 {"uk": "Порожньо", "en": "Empty", "de": "Leer"}
+{"uk": "Порожньо = «Кому (email)» загальних налаштувань сповіщень", "en": "Empty = «To (email)» of the general notification settings", "de": "Leer = «An (E-Mail)» der allgemeinen Benachrichtigungseinstellungen"}
 {"uk": "Порожньо = адреса з загальних налаштувань сповіщень", "en": "Empty = address from the general notification settings", "de": "Leer = Adresse aus den allgemeinen Benachrichtigungseinstellungen"}
 {"uk": "Порожньо = взяти адресу з загальних налаштувань сповіщень", "en": "Empty = take the address from the general notification settings", "de": "Leer = Adresse aus den allgemeinen Benachrichtigungseinstellungen übernehmen"}
 {"uk": "Порожньо = використати адресу з загальних налаштувань сповіщень", "en": "Empty = use the address from the general notification settings", "de": "Leer = Adresse aus den allgemeinen Benachrichtigungseinstellungen verwenden"}
@@ -17959,6 +17964,7 @@
 {"uk": "не використовується (гібрид вимкнено)", "en": "not used (hybrid disabled)", "de": "wird nicht verwendet (Hybrid deaktiviert)"}
 {"uk": "не вказана", "en": "not specified", "de": "nicht angegeben"}
 {"uk": "не вказано", "en": "not specified", "de": "nicht angegeben"}
+{"uk": "не вказано чат Telegram", "en": "no Telegram chat set", "de": "kein Telegram-Chat angegeben"}
 {"uk": "не вказано, кому", "en": "no recipient set", "de": "kein Empfänger angegeben"}
 {"uk": "не вказано, кому!", "en": "recipient not set!", "de": "kein Empfänger angegeben!"}
 {"uk": "не вказувати", "en": "do not specify", "de": "nicht angeben"}
@@ -18336,6 +18342,7 @@
 {"uk": "основний чат", "en": "main chat", "de": "Hauptchat"}
 {"uk": "основний чат сповіщень", "en": "main notification chat", "de": "Haupt-Benachrichtigungschat"}
 {"uk": "основний чат сповіщень (Chat ID)", "en": "main notification chat (Chat ID)", "de": "Haupt-Benachrichtigungschat (Chat-ID)"}
+{"uk": "основний чат сповіщень: {0}", "en": "main notification chat: {0}", "de": "Haupt-Benachrichtigungschat: {0}"}
 {"uk": "основний чат — не задано", "en": "main chat — not set", "de": "Hauptchat — nicht eingerichtet"}
 {"uk": "основний чат: {0}", "en": "main chat: {0}", "de": "Hauptchat: {0}"}
 {"uk": "особа", "en": "person", "de": "Person"}
@@ -19463,6 +19470,7 @@
 {"uk": "у «Δ%» = немає даних попереднього року для порівняння", "en": "in “Δ%” = no data from the previous year to compare", "de": "in „Δ%“ = keine Daten des Vorjahres zum Vergleich"}
 {"uk": "у «Виручка» = немає замовлень або відсутні ціни", "en": "in “Revenue” = no orders or prices are missing", "de": "in „Umsatz“ = keine Aufträge oder Preise fehlen"}
 {"uk": "у «Налаштування → Сповіщення» немає SMTP", "en": "no SMTP in \"Settings → Notifications\"", "de": "kein SMTP in „Einstellungen → Benachrichtigungen“"}
+{"uk": "у «Налаштування → Сповіщення» немає бота Telegram", "en": "no Telegram bot in «Settings → Notifications»", "de": "kein Telegram-Bot in «Einstellungen → Benachrichtigungen»"}
 {"uk": "у «Налаштування → Сповіщення» немає бота або чату Telegram", "en": "no Telegram bot or chat in \"Settings → Notifications\"", "de": "kein Telegram-Bot oder -Chat in „Einstellungen → Benachrichtigungen“"}
 {"uk": "у «⚙️ Налаштування помічника» (Minerva AI) не задано адресу RAG API", "en": "the RAG API address is not set in “⚙️ Assistant settings” (Minerva AI)", "de": "die RAG-API-Adresse ist in „⚙️ Assistenten-Einstellungen“ (Minerva AI) nicht festgelegt"}
 {"uk": "у базі: {0}", "en": "in the database: {0}", "de": "in der Datenbank: {0}"}
@@ -19909,6 +19917,7 @@
 {"uk": "юридична назва або торгова марка.", "en": "legal name or trademark.", "de": "juristischer Name oder Marke."}
 {"uk": "як additionalFields.", "en": "as additionalFields.", "de": "als additionalFields."}
 {"uk": "як «Кому (email)» сповіщень", "en": "like the notification «To (email)»", "de": "wie «An (E-Mail)» der Benachrichtigungen"}
+{"uk": "як «Кому (email)» сповіщень: {0}", "en": "like the notification «To (email)»: {0}", "de": "wie «An (E-Mail)» der Benachrichtigungen: {0}"}
 {"uk": "як «Кому (email)»: {0}", "en": "like «To (email)»: {0}", "de": "wie «An (E-Mail)»: {0}"}
 {"uk": "як «Кому» за замовчуванням: {0}", "en": "like the default «To»: {0}", "de": "wie das Standard-«An»: {0}"}
 {"uk": "як «Підтвердження email…» ({0})", "en": "as «Підтвердження email…» ({0})", "de": "wie «Підтвердження email…» ({0})"}

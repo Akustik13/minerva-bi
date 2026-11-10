@@ -340,7 +340,9 @@ def others(ns) -> list:
         url = _url("admin:bots_digikeyconfig_change", dk.pk)
         add("💬 DigiKey: нові повідомлення покупців",
             f"{_on(getattr(dk, 'msg_notify_email', False))} {getattr(dk, 'msg_notify_email_to', '') or default_to}",
-            _on(getattr(dk, "msg_notify_telegram", False)) + " основний чат", url, "Налаштування DigiKey")
+            _on(getattr(dk, "msg_notify_telegram", False)) + " "
+            + (", ".join(parse_chats(getattr(dk, "msg_notify_tg_chats", ""))[0]) or "основний чат"),
+            url, "Налаштування DigiKey → 💬 Повідомлення")
         add("🛒 DigiKey: лістинги опубліковано",
             f"{_on(getattr(dk, 'poll_notify_email', False))} {getattr(dk, 'poll_notify_email_to', '') or default_to}",
             _on(getattr(dk, "poll_notify_telegram", False)) + " основний чат", url, "Налаштування DigiKey")
