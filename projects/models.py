@@ -636,3 +636,32 @@ class ProjectMailScan(models.Model):
         verbose_name = "Прочитаний AI лист"
         verbose_name_plural = "Прочитані AI листи"
         constraints = [models.UniqueConstraint(fields=["project", "message"], name="unique_project_mail_scan")]
+
+
+class MailHandled(models.Model):
+    """Лист, на який відповіли (або від якого отримали відповідь) поза поштою — телефоном, на зустрічі, іншим шляхом,
+    або відповідь не потрібна. Позначає людина — власник скриньки — з «Що зараз» пульта проєкту.
+
+    «Чекає нашої відповіді» / «Наш лист без відповіді» про цей лист більше не показується (overview.collect);
+    новий лист у гілці — знову за звичайними правилами. Одна позначка на лист — для всіх проєктів з цією гілкою."""
+    PHONE, MEETING, OTHER, NOT_NEEDED = "phone", "meeting", "other", "not_needed"
+    HOW_CHOICES = [
+        (PHONE, "📞 Телефоном"),
+        (MEETING, "🤝 На зустрічі"),
+        (OTHER, "✉️ Іншим шляхом"),
+        (NOT_NEEDED, "🙅 Відповідь не потрібна"),
+    ]
+    message = models.OneToOneField("email_assistant.EmailMessage", on_delete=models.CASCADE, related_name="+",
+                                   verbose_name="Лист")
+    how = models.CharField("Як", max_length=12, choices=HOW_CHOICES)
+    note = models.CharField("Примітка", max_length=255, blank=True)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
+                             related_name="+", verbose_name="Хто позначив")
+    created_at = models.DateTimeField("Позначено", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Відповідь поза поштою"
+        verbose_name_plural = "Відповіді поза поштою"
+
+    def __str__(self):
+        return f"{self.get_how_display()} · {self.message_id}"

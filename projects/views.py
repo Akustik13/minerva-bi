@@ -220,6 +220,49 @@ def highlight_view(request, pk):
     return JsonResponse({"ok": True, **info})
 
 
+HANDLED_MAX = 200
+
+
+@staff_member_required
+@require_POST
+def mail_handled_view(request, pk):
+    """✓ «Відповіли поза поштою» з «Що зараз» пульта: {messages: [pk…], how, note, undo, range} — право змінювати
+    проєкт; лише листи цього проєкту з власних скриньок людини. how — MailHandled.HOW_CHOICES; undo: true — зняти
+    позначку (лист знову в «Що зараз»). У відповіді — свіжий пульт і marked (позначені листи — для «↶ Скасувати»)."""
+    from django.db.models import Q
+
+    from . import state
+    from .models import MailHandled
+    project = _project_for_change(request, pk)
+    body = _body(request)
+    raw = body.get("messages") if isinstance(body.get("messages"), list) else []
+    ids = [int(i) for i in raw if str(i).isdigit()][:HANDLED_MAX]
+    undo = bool(body.get("undo"))
+    how = str(body.get("how") or "")
+    hows = dict(MailHandled.HOW_CHOICES)
+    if not undo and how not in hows:
+        return JsonResponse({"ok": False, "error": "Виберіть, як відповіли"}, status=400)
+    own = sorted(services.project_messages(project).filter(pk__in=ids, account__user=request.user, is_deleted=False)
+                 .values_list("pk", flat=True).distinct())
+    if not own:
+        return JsonResponse({"ok": False, "error": "Листи не знайдено серед ваших листів цього проєкту"}, status=400)
+    if undo:
+        MailHandled.objects.filter(message_id__in=own).delete()
+        notice = ("↶ Позначку знято — лист знову в «Що зараз»" if len(own) == 1 else
+                  f"↶ Позначки знято: {len(own)} — листи знову в «Що зараз»")
+    else:
+        note = " ".join(str(body.get("note") or "").split())[:255]
+        for mid in own:
+            MailHandled.objects.update_or_create(message_id=mid,
+                                                 defaults={"how": how, "note": note, "user": request.user})
+        notice = f"✓ {hows[how]}" + (f": листів {len(own)}" if len(own) > 1 else "")
+    from email_assistant.models import EmailMessage
+    threads = EmailMessage.objects.filter(pk__in=own).exclude(thread=None).values_list("thread_id", flat=True)
+    state.mark_dirty(set(ProjectLink.objects.filter(Q(thread_id__in=threads) | Q(message_id__in=own))
+                         .values_list("project_id", flat=True)) | {project.pk})
+    return _cockpit(request, project, notice, extra={"marked": own, "undo": undo, "notice": notice})
+
+
 @staff_member_required
 @require_POST
 def highlight_delete_view(request, hid):

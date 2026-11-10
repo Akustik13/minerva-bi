@@ -5,6 +5,8 @@ timeline.render. Пошта й календар особисті: тема ли�
 Маршрути — projects/views.py: cockpit (GET, перегляд), highlight / highlight_delete / link_decide / scan (POST, зміна);
 JS пульта — admin/projects/project/change_form.html (замінює #pj-cockpit без перезавантаження форми).
 """
+import json
+
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
@@ -79,6 +81,30 @@ def _moments(facts, uid) -> list:
         icon, _, name = h.get_kind_display().partition(" ")
         out.append({"id": h.pk, "date": h.date, "icon": icon, "kind": name, "kind_key": h.kind, "title": h.title,
                     "quote": h.quote, "url": f"/email/message/{h.message_id}/" if _own(h.message, uid) else ""})
+    return out
+
+
+def _handled(facts, uid) -> list:
+    """«✓ Позначено вручну»: власні листи, на які відповіли поза поштою (телефоном, на зустрічі…) — з «↶»."""
+    out = []
+    for h in facts.get("handled") or []:
+        m = h["msg"]
+        if _own(m, uid):
+            mark = h["mark"]
+            out.append({"pk": m.pk, "subject": m.subject or "(без теми)", "dir": h["dir"],
+                        "label": overview.HANDLED_LABELS.get(mark.how, mark.how), "date": mark.created_at,
+                        "note": mark.note, "url": f"/email/message/{m.pk}/",
+                        "who": (m.from_name or m.from_email) if h["dir"] == "in" else ", ".join((m.to_emails or [])[:1])})
+    return out
+
+
+def _acts(attention, can_change) -> list:
+    """✓ біля пункту «Що зараз» / «Ризики» (overview.collect → act): JSON для меню — лише з правом змінювати."""
+    out = []
+    for a in attention:
+        if a.get("act") and can_change:
+            a = {**a, "act_json": json.dumps(a["act"], ensure_ascii=False)}
+        out.append(a)
     return out
 
 
@@ -211,6 +237,7 @@ def context(project, user, range_key="all", notice="") -> dict:
     icon, label = state.HEALTH[st.health]
     pk = project.pk
     can_change = bool(user and user.has_perm("projects.change_project"))
+    attention = _acts(attention, can_change)
     plan = _plan_context(project, facts, today, can_change)
     ai = _ai_context(project, user, can_change)
     if plan.get("data") is not None:
@@ -223,6 +250,7 @@ def context(project, user, range_key="all", notice="") -> dict:
         "todo": [a for a in attention if a.get("kind") == "todo"],
         "risks": [a for a in attention if a.get("kind") != "todo"],
         "suggestions": _suggestions(project, uid),
+        "handled": _handled(facts, uid),
         "moments": _moments(facts, uid)[:MOMENTS], "moments_total": len(facts["highlights"]),
         "kinds": ProjectHighlight.KIND_CHOICES, "mails": _mails(facts, uid),
         "counts": facts["counts"], "more": facts["more"],
@@ -238,6 +266,7 @@ def context(project, user, range_key="all", notice="") -> dict:
         "riskreg": _risks_context(project, can_change),
         "status": _status_context(project, user, facts, st, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
+                 "mail_handled": reverse("projects:mail_handled", args=[pk]),
                  "risk": reverse("projects:risk", args=[pk]), "status_save": reverse("projects:status", args=[pk]),
                  "status_draft": reverse("projects:status_draft", args=[pk]),
                  "scan": reverse("projects:scan", args=[pk]), "mail": f"/email/?project={pk}",

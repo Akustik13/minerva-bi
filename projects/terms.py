@@ -6,6 +6,7 @@ classify(events, messages) → [Term]:
 - термін: ✓ позначила людина — виконано; після листа, з якого термін, ми відповіли в тій самій гілці не раніше ніж
   за MET_WINDOW_DAYS до терміну — «ймовірно виконано» (раніша відповідь — лише «дякуємо, зробимо»); після терміну інша сторона написала в гілці — «листування продовжилось, перевірте»; інакше —
   прострочено;
+- відпустка, свято, відсутність у назві («Початок відпустки», «Urlaub», «Betriebsferien») — минула лише «минуло»;
 - однакові події (та сама людина, назва й день — AI знайшов ту саму зустріч у кількох листах) — одна, ×N.
 Ним користуються шкала (timeline) і «потребує уваги» (overview.collect). Рішення людини — у календарі
 (✓ виконано, тип події); шкала дає це зробити кліком на ромб.
@@ -18,17 +19,25 @@ from datetime import timedelta
 from django.utils import timezone
 
 MEETING_RE = re.compile(
-    r"(?<!\w)(telko|telefon\w*|video(?:call|konferenz|chat|anruf|meeting)\w*|call|calls|meeting|meet|besprechung|"
-    r"gespr[äa]ch\w*|konferenz\w*|teams|zoom|"
+    r"(?<!\w)(telko|telefon\w*|video(?:call|konferenz|chat|anruf|meeting)\w*|call|calls|meeting|meet|"
+    r"\w*besprechung\w*|\w*gespr[äa]ch\w*|\w*konferenz\w*|teams|zoom|"
     r"webex|anruf\w*|termin vor ort|розмов\w*|дзвін\w*|зустріч\w*|нарад\w*|конференц\w*|відеодзвін\w*|созвон\w*|"
+    r"відео(?:нарад|зустріч|дзвін|конференц|зв.язок)\w*|"
     r"звонок\w*|встреч\w*|совещан\w*)(?!\w)", re.I)
+# Лише в назві події (в описі «visit our website», «Besuch der Messe» — не зустріч)
+VISIT_RE = re.compile(r"(?<!\w)(візит\w*|besuch\w*|visit|vor[ -]ort\w*|приїзд\w*|приїде\w*)(?!\w)", re.I)
+# Відпустка, свято, відсутність — минула така подія не «прострочено»
+ABSENCE_RE = re.compile(
+    r"(?<!\w)(відпустк\w*|відпочин\w*|свят[оа]|відсутн\w*|urlaub\w*|\w*ferien|feiertag\w*|"
+    r"abwesen\w*|vacation|holiday\w*|day off|out of office|ooo)(?!\w)", re.I)
 SOON_DAYS = 3
 MET_WINDOW_DAYS = 7      # наша відповідь раніше за термін − 7 днів — лише «дякуємо, зробимо», не виконання
 
-HELD, DONE, MET, MOVED, OVERDUE, SOON, PLANNED = "held", "done", "met", "moved", "overdue", "soon", "planned"
+HELD, DONE, MET, MOVED, OVERDUE, SOON, PLANNED, PASSED = (
+    "held", "done", "met", "moved", "overdue", "soon", "planned", "passed")
 LABELS = {HELD: "відбулась", DONE: "виконано", MET: "ймовірно виконано", MOVED: "листування продовжилось — перевірте",
-          OVERDUE: "прострочено", SOON: "скоро", PLANNED: "заплановано"}
-CLS = {HELD: "ok", DONE: "ok", MET: "ok", MOVED: "warn", OVERDUE: "bad", SOON: "warn", PLANNED: "open"}
+          OVERDUE: "прострочено", SOON: "скоро", PLANNED: "заплановано", PASSED: "минуло"}
+CLS = {HELD: "ok", DONE: "ok", MET: "ok", MOVED: "warn", OVERDUE: "bad", SOON: "warn", PLANNED: "open", PASSED: "ok"}
 
 
 @dataclass
@@ -59,9 +68,18 @@ def is_meeting(event) -> bool:
         return getattr(event, "event_type", "") == "meeting"
     if getattr(event, "event_type", "") == "meeting":
         return True
+    if VISIT_RE.search(event.title or ""):
+        return True
     if getattr(event, "event_type", "") == "deadline" and not MEETING_RE.search(event.title or ""):
         return False
     return bool(MEETING_RE.search(f"{event.title or ''} {event.description or ''}"[:600]))
+
+
+def is_absence(event) -> bool:
+    """Відпустка, свято, відсутність — подія для відома, а не справа (людина вибрала тип — не вгадуємо)."""
+    if getattr(event, "type_by_user", False):
+        return False
+    return bool(ABSENCE_RE.search(event.title or ""))
 
 
 def _day(value):
@@ -103,6 +121,9 @@ def classify(events, messages, now=None) -> list:
             continue
         if meeting:
             t.state = HELD
+            continue
+        if is_absence(e):
+            t.state = PASSED
             continue
         src = by_pk.get(e.email_message_id)
         later = []

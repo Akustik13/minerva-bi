@@ -8,7 +8,7 @@
      data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"
      data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
      data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
-     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}"
+     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}"
      data-ai-settings="{{ urls.ai_settings }}" data-ai-since="{{ ai.since|date:'Y-m-d' }}" data-start="{{ start|date:'Y-m-d' }}"
      data-steps="{{ plan.steps|default:0 }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
@@ -47,9 +47,19 @@
       {% if next_action %}<div class="pjc-next">➡️ <b>{{ next_action }}</b></div>{% endif %}
       {% if todo %}
         <ul class="pjc-list">
-          {% for a in todo %}<li class="pjc-{{ a.level }}">{{ a.icon }} {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}</li>{% endfor %}
+          {% for a in todo %}<li class="pjc-{{ a.level }}">{{ a.icon }} {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}{% if a.act_json %} <button type="button" class="pjc-mk" data-pjc-act="{{ a.act_json }}" title="Позначити: відповіли телефоном, обговорили на зустрічі, зустріч відбулась, виконано…" aria-label="Позначити як зроблене">✓</button>{% endif %}</li>{% endfor %}
         </ul>
       {% elif not next_action %}<div class="pjc-sub">Нічого не чекає на нас. Запишіть «Наступну дію» в полях проєкту.</div>{% endif %}
+      {% if handled %}
+        <details class="pjc-hd">
+          <summary>✓ Відповіли поза поштою · {{ handled|length }}</summary>
+          <ul class="pjc-list">
+            {% for h in handled %}<li>{% if h.dir == "in" %}📥{% else %}📤{% endif %} <a href="{{ h.url }}" target="_blank" translate="no">«{{ h.subject }}»</a>
+              <span class="pjc-sub">· <span translate="no">{{ h.who }}</span> · {{ h.label }} {{ h.date|date:"d.m.Y" }}{% if h.note %} — <span translate="no">{{ h.note }}</span>{% endif %}</span>{% if can_change %}
+              <button type="button" class="pjc-mk" data-pjc-unmark="{{ h.pk }}" title="Зняти позначку — лист знову в «Що зараз»" aria-label="Зняти позначку">↶</button>{% endif %}</li>{% endfor %}
+          </ul>
+        </details>
+      {% endif %}
       {% if suggestions %}
         <div class="pjc-sg">
           <div class="pjc-sgt">🔗 Пропозиції прив'язок · {{ suggestions|length }}</div>
@@ -80,7 +90,7 @@
           реєстр{% if riskreg.counts.red %} 🔴 {{ riskreg.counts.red }}{% endif %}{% if riskreg.counts.yellow %} 🟡 {{ riskreg.counts.yellow }}{% endif %}{% if riskreg.counts.green %} 🟢 {{ riskreg.counts.green }}{% endif %}{% if not riskreg.total %} · 0{% endif %} →</button></h4>
       {% if risks %}
         <ul class="pjc-list">
-          {% for a in risks %}<li class="pjc-{{ a.level }}">{{ a.icon }} {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}</li>{% endfor %}
+          {% for a in risks %}<li class="pjc-{{ a.level }}">{{ a.icon }} {% if a.url %}<a href="{{ a.url }}" target="_blank">{{ a.text }}</a>{% else %}{{ a.text }}{% endif %}{% if a.act_json %} <button type="button" class="pjc-mk" data-pjc-act="{{ a.act_json }}" title="Позначити: відповіли телефоном, обговорили на зустрічі, зустріч відбулась, виконано…" aria-label="Позначити як зроблене">✓</button>{% endif %}</li>{% endfor %}
         </ul>
       {% else %}<div class="pjc-sub">✅ Ризиків не видно: строки, Angebote, замовлення й закупівлі в порядку.</div>{% endif %}
       {% if ai.risks %}<a class="pja-ptr" href="#pj-ai">🧠 Ризиків з листів чекають ✓/✗: {{ ai.risks }}</a>{% endif %}

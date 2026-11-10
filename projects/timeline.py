@@ -173,6 +173,8 @@ def _mail_events(ev, facts, uid):
         if d is not None:
             days[d][x["dir"]].append(x["msg"])
     waiting = {m.pk for m in facts.get("waiting_us", [])}
+    from .overview import handled_text
+    marks = {h["msg"].pk: h["mark"] for h in facts.get("handled") or []}
     for d, by in days.items():
         for direction, msgs in by.items():
             if not msgs:
@@ -182,6 +184,7 @@ def _mail_events(ev, facts, uid):
             head = f"{'📥 від клієнта' if direction == 'in' else '📤 наші'} · {_fmt(d)} · {len(msgs)}"
             lines = [head] + [f"«{_cut(m.subject or '(без теми)', 70)}» — "
                               f"{(m.from_name or m.from_email) if direction == 'in' else ', '.join((m.to_emails or [])[:2])}"
+                              + (f" · {handled_text(marks[m.pk])}" if m.pk in marks else "")
                               for m in own[:8]]
             if other:
                 lines.append(f"ще {other} з інших скриньок")

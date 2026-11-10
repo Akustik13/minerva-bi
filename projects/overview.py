@@ -157,10 +157,30 @@ def visible(items, viewer) -> list:
     out = []
     for a in items:
         if a.get("owner") is not None and a["owner"] != uid:
-            out.append({**a, "text": a.get("private_text") or a["text"], "url": ""})
+            out.append({k: v for k, v in {**a, "text": a.get("private_text") or a["text"], "url": ""}.items()
+                        if k != "act"})
         else:
             out.append(a)
     return out
+
+
+HANDLED_LABELS = {"phone": "📞 відповіли телефоном", "meeting": "🤝 обговорили на зустрічі",
+                  "other": "✉️ відповіли іншим шляхом", "not_needed": "🙅 відповідь не потрібна"}
+
+
+def handled_marks(message_ids) -> dict:
+    """{pk листа: MailHandled} — листи, на які людина відповіла поза поштою (телефоном, на зустрічі…)."""
+    from .models import MailHandled
+    ids = [i for i in message_ids if i]
+    if not ids:
+        return {}
+    return {h.message_id: h for h in MailHandled.objects.filter(message_id__in=ids).select_related("user")}
+
+
+def handled_text(mark) -> str:
+    """«📞 відповіли телефоном 10.11.2026 — домовились про зразок» (для AI, шкали й списку позначок)."""
+    text = f"{HANDLED_LABELS.get(mark.how, mark.how)} {_fmt(mark.created_at)}"
+    return f"{text} — {mark.note}" if mark.note else text
 
 
 def collect(project, today=None) -> dict:
@@ -180,10 +200,12 @@ def collect(project, today=None) -> dict:
     is_open = project.is_open
     attention = []
 
-    def add(level, icon, text, url="", kind="risk", owner=None, private_text=""):
+    def add(level, icon, text, url="", kind="risk", owner=None, private_text="", act=None):
         item = {"level": level, "icon": icon, "text": text, "url": url, "kind": kind}
         if owner is not None:
             item.update(owner=owner, private_text=private_text)
+            if act:                         # ✓ на пульті — лише власнику (visible() прибирає для інших)
+                item["act"] = act
         attention.append(item)
 
     if is_open and project.due_date:
@@ -199,23 +221,31 @@ def collect(project, today=None) -> dict:
         if x["dir"] != "internal":
             threads[x["msg"].thread_id or f"m{x['msg'].pk}"] = x
     waiting_us, waiting_them = [], []
+    marks = handled_marks([x["msg"].pk for x in threads.values()])
+    handled = []
     for x in threads.values():
         m = x["msg"]
         age = (today - _day(m.sent_at)).days if m.sent_at else 0
         url = f"/email/message/{m.pk}/"
+        act = {"m": m.pk, "dir": x["dir"], "who": (m.from_email if x["dir"] == "in" else
+                                                     ",".join((m.to_emails or [])[:1])).lower(),
+               "name": (m.from_name or m.from_email) if x["dir"] == "in" else ", ".join((m.to_emails or [])[:1])}
+        if m.pk in marks:                    # людина позначила: відповіли телефоном, на зустрічі… — не нагадуємо
+            handled.append({"msg": m, "dir": x["dir"], "mark": marks[m.pk]})
+            continue
         if x["dir"] == "in":
             waiting_us.append(m)
             if is_open:
                 add("high" if age >= REPLY_WAIT_DAYS else "medium", "📨",
                     f"Чекає нашої відповіді {_days(age)}: «{m.subject or '(без теми)'}» від {m.from_name or m.from_email}",
                     url, kind="todo", owner=_owner(m),
-                    private_text=f"Чекає нашої відповіді {_days(age)}: лист з іншої скриньки")
+                    private_text=f"Чекає нашої відповіді {_days(age)}: лист з іншої скриньки", act=act)
         elif age >= FOLLOW_UP_DAYS:
             waiting_them.append(m)
             if is_open:
                 add("medium", "🔁", f"Наш лист без відповіді {_days(age)}: «{m.subject or '(без теми)'}» — нагадати?",
                     url, kind="todo", owner=_owner(m),
-                    private_text=f"Наш лист без відповіді {_days(age)}: лист з іншої скриньки")
+                    private_text=f"Наш лист без відповіді {_days(age)}: лист з іншої скриньки", act=act)
 
     for o in offers:
         url = f"/admin/offers/offer/{o.pk}/change/"
@@ -249,14 +279,15 @@ def collect(project, today=None) -> dict:
     terms_list = terms.classify(deadlines, messages)
     for t in terms_list:
         ev = t.event
-        url = f"/email/message/{ev.email_message_id}/"
+        url = f"/email/message/{ev.email_message_id}/" if ev.email_message_id else ""
         what = "зустріч" if t.meeting else "термін"
+        cal = {"ev": [ev.pk] + [d.pk for d in t.duplicates], "meeting": t.meeting, "mail": ev.email_message_id}
         if t.state == terms.OVERDUE:
             add("high", "📅", f"Прострочено: {ev.title} ({_fmt(ev.start_at)})", url, owner=ev.user_id,
-                private_text=f"Прострочено: термін з іншого календаря ({_fmt(ev.start_at)})")
+                private_text=f"Прострочено: термін з іншого календаря ({_fmt(ev.start_at)})", act=cal)
         elif t.state == terms.MOVED:
             add("info", "📅", f"Перевірте термін: {ev.title} ({_fmt(ev.start_at)}) — {t.note}", url, kind="todo",
-                owner=ev.user_id, private_text=f"Перевірте термін з іншого календаря ({_fmt(ev.start_at)})")
+                owner=ev.user_id, private_text=f"Перевірте термін з іншого календаря ({_fmt(ev.start_at)})", act=cal)
         elif t.state == terms.SOON:
             add("medium", "🤝" if t.meeting else "📅", f"Скоро {what}: {ev.title} ({_fmt(ev.start_at)})", url,
                 kind="todo", owner=ev.user_id, private_text=f"Скоро {what} з іншого календаря ({_fmt(ev.start_at)})")
@@ -299,7 +330,7 @@ def collect(project, today=None) -> dict:
     return {
         "project": project, "today": today, "messages": messages, "offers": offers, "orders": orders,
         "deadlines": deadlines, "terms": terms_list, "attention": attention, "waiting_us": waiting_us,
-        "waiting_them": waiting_them,
+        "waiting_them": waiting_them, "handled": handled,
         "purchases": purchases, "jlc": jlc, "shipments": shipments, "highlights": highlights, "plan": plan,
         "counts": {"in": sum(1 for x in messages if x["dir"] == "in"),
                    "out": sum(1 for x in messages if x["dir"] == "out"),
@@ -457,14 +488,17 @@ def prompt_text(facts) -> tuple:
     skipped = len(facts["messages"]) - len(msgs)
     refs, blocks, budget = [], [], AI_TOTAL_CHARS
     labels = {"in": "← ОТРИМАЛИ від", "out": "→ НАДІСЛАЛИ МИ, від", "internal": "↔ ВНУТРІШНІЙ, від"}
+    marks = {h["msg"].pk: h["mark"] for h in facts.get("handled") or []}
     for i, x in enumerate(msgs, 1):
         m = x["msg"]
         limit = AI_NEWEST_CHARS if i > len(msgs) - AI_NEWEST else AI_CHARS
         body = " ".join((m.body_text or "").split())[:min(limit, max(budget, 0))]
         budget -= len(body)
         to = ", ".join((m.to_emails or [])[:3])
+        note = (f"\n(ПОЗНАЧКА ЛЮДИНИ: {'на цей лист ' if x['dir'] == 'in' else 'на цей наш лист '}"
+                f"{handled_text(marks[m.pk])} — поза поштою)") if m.pk in marks else ""
         blocks.append(f"[#{i}] {_fmt(m.sent_at)} {labels[x['dir']]} {m.from_name or m.from_email} → {to} · "
-                      f"тема: {m.subject or '—'}\n{body}")
+                      f"тема: {m.subject or '—'}{note}\n{body}")
         refs.append(m.pk)
     head = f"ЛИСТИ ПРОЄКТУ (від старих до нових{f'; ще {skipped} старіших не показано' if skipped else ''}):"
     parts.append(head + "\n\n" + "\n\n".join(blocks) if blocks else "ЛИСТІВ У ПРОЄКТІ НЕМАЄ.")

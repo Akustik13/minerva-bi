@@ -370,3 +370,10 @@
   #pja-ask .pja-replace { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0 4px; font-size: 13px; }
   #pja-ask .pja-replace input { margin-top: 3px; }
   #pja-ask .pjp-row label { display: grid; gap: 3px; }
+
+/* ✓ біля пункту «Що зараз» / «Ризики» і «Відповіли поза поштою» */
+.pjc-mk { margin-left: 4px; padding: 0 6px; border: 1px solid var(--border-color, #ccc); border-radius: 10px;
+  background: transparent; color: inherit; font-size: 12px; line-height: 18px; cursor: pointer; opacity: .75; }
+.pjc-mk:hover, .pjc-mk:focus-visible { opacity: 1; border-color: var(--primary, #79aec8); }
+.pjc-hd { margin-top: 6px; }
+.pjc-hd summary { cursor: pointer; font-size: 12px; opacity: .8; }

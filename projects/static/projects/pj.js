@@ -993,6 +993,47 @@
     }
     window.MVMenu.open(e, items, {title: 'Подія в календарі'});
   }
+  // ✓ «Що зараз» / «Ризики»: відповіли поза поштою (лист) або виконано / зустріч відбулась (подія календаря)
+  var HOWS = [['phone', '📞', 'Відповіли телефоном'], ['meeting', '🤝', 'Обговорили на зустрічі'],
+              ['other', '✉️', 'Відповіли іншим шляхом'], ['not_needed', '🙅', 'Відповідь не потрібна']];
+  function handled(ids, how, undo) {
+    send(box().dataset.mailHandled, {messages: ids, how: how || '', undo: !!undo}).then(function (j) {
+      if (!j || !j.ok) { toast('⚠️ ' + ((j && j.error) || 'не вдалося')); return; }
+      put(j.html);
+      if (!undo && window.MVMenu && window.MVMenu.toast) {
+        window.MVMenu.toast(j.notice || '✓', {undo: function () { handled(j.marked, '', true); }});
+      }
+    });
+  }
+  function actMenu(btn, e) {
+    var a = {};
+    try { a = JSON.parse(btn.getAttribute('data-pjc-act') || '{}'); } catch (x) { a = {}; }
+    if (a.ev) {
+      var g = document.createElement('i');
+      g.setAttribute('data-cal', JSON.stringify({ids: a.ev, meeting: a.meeting, mail: a.mail}));
+      calMenu(g, e);
+      return;
+    }
+    if (!a.m || !window.MVMenu) return;
+    var same = [];
+    root.querySelectorAll('[data-pjc-act]').forEach(function (b) {
+      var o = {};
+      try { o = JSON.parse(b.getAttribute('data-pjc-act') || '{}'); } catch (x) { o = {}; }
+      if (o.m && o.dir === a.dir && o.who && o.who === a.who) same.push(o.m);
+    });
+    var items = HOWS.map(function (h) {
+      return {label: h[2], icon: h[1], onSelect: function () { handled([a.m], h[0]); }};
+    });
+    if (same.length > 1) {
+      items.push({type: 'submenu', label: 'Усі листи цієї людини ({0})'.replace('{0}', same.length), icon: '✓',
+                  items: HOWS.map(function (h) {
+                    return {label: h[2], icon: h[1], onSelect: function () { handled(same, h[0]); }};
+                  })});
+    }
+    items.push({type: 'separator'});
+    items.push({label: 'Відкрити лист', icon: '✉️', href: '/email/message/' + a.m + '/', target: '_blank'});
+    window.MVMenu.open(e, items, {title: a.dir === 'in' ? 'Як ми відповіли?' : 'Як отримали відповідь?'});
+  }
   // 📎 Кілька файлів дня — меню зі списком (один файл відкривається одразу посиланням)
   function filesMenu(g, e) {
     var files = [];
@@ -1518,9 +1559,11 @@
     var t = e.target.closest('[data-pjc-range],[data-pjc-decide],[data-pjc-scan],[data-pjc-mtoggle],[data-pjc-madd],' +
       '[data-pjc-mdel],g[data-mails],g[data-cal],g[data-files],[data-pjc-event-add],[data-pjc-tab],[data-pjc-step-new],[data-pjc-phase-new],[data-pjc-post],' +
       '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase],[data-pjc-risk],' +
-      '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai]');
+      '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai],[data-pjc-act],[data-pjc-unmark]');
     if (!t || !root.contains(t)) return;
     e.preventDefault();
+    if (t.hasAttribute('data-pjc-act')) { actMenu(t, e); return; }
+    if (t.hasAttribute('data-pjc-unmark')) { handled([+t.getAttribute('data-pjc-unmark')], '', true); return; }
     if (t.matches('g[data-mails]')) { mailMenu(t, e); return; }
     if (t.matches('g[data-cal]')) { calMenu(t, e); return; }
     if (t.matches('g[data-files]')) { filesMenu(t, e); return; }
