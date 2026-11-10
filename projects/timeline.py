@@ -125,6 +125,7 @@ def _term_events(ev, project, facts, uid):
                + "\nКлік — ✓ виконано, зустріч чи термін, лист")
         ev("calendar", "diamond", e.start_at, f"{t.icon} {e.title}{times}", tip, "", t.cls,
            cal={"ids": [e.pk] + [d.pk for d in t.duplicates], "done": bool(e.is_done), "meeting": t.meeting,
+                "day": _d(e.start_at).isoformat() if e.start_at else "", "what": (e.title or "")[:120],
                 "mail": e.email_message_id or "", "linked": e.pk in linked})
 
 

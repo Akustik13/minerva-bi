@@ -275,7 +275,7 @@ def compute(project, facts=None, today=None) -> Plan:
     today = today or timezone.localdate()
     plan = Plan(today=today)
     phases = list(ProjectPhase.objects.filter(project=project).order_by("order", "pk"))
-    steps = list(ProjectStep.objects.filter(project=project).select_related("assignee", "phase")
+    steps = list(ProjectStep.objects.filter(project=project).select_related("assignee", "phase", "party")
                  .order_by("phase__order", "order", "pk"))
     phase_pos = {p.pk: i for i, p in enumerate(phases)}
     steps.sort(key=lambda s: (phase_pos.get(s.phase_id, len(phases)), s.order, s.pk))

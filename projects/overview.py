@@ -281,7 +281,8 @@ def collect(project, today=None) -> dict:
         ev = t.event
         url = f"/email/message/{ev.email_message_id}/" if ev.email_message_id else ""
         what = "зустріч" if t.meeting else "термін"
-        cal = {"ev": [ev.pk] + [d.pk for d in t.duplicates], "meeting": t.meeting, "mail": ev.email_message_id}
+        cal = {"ev": [ev.pk] + [d.pk for d in t.duplicates], "meeting": t.meeting, "mail": ev.email_message_id,
+               "day": _day(ev.start_at).isoformat() if ev.start_at else ""}
         if t.state == terms.OVERDUE:
             add("high", "📅", f"Прострочено: {ev.title} ({_fmt(ev.start_at)})", url, owner=ev.user_id,
                 private_text=f"Прострочено: термін з іншого календаря ({_fmt(ev.start_at)})", act=cal)

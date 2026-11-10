@@ -122,7 +122,10 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
         top_of[s.pk] = (top, c)
         who = (s.assignee.get_full_name() or s.assignee.username) \
             if s.assignee_id and s.side in (ProjectStep.WE, ProjectStep.COLLEAGUE) else SIDE_SHORT.get(s.side, "")
-        tip = (f"{STATUS_ICON.get(c.status, '')} {s.title} · {s.get_side_display()}"
+        if s.party_id and not s.assignee_id:
+            who = s.party.name
+        tip = (f"{STATUS_ICON.get(c.status, '')} {s.title} · "
+               f"{s.party.name if s.party_id else s.get_side_display()}"
                + (f" · {who}" if s.assignee_id else "") + f" · прогноз {_fmt(c.start)}–{_fmt(c.end)}"
                + (f" · план {_fmt(s.baseline_start)}–{_fmt(s.baseline_end)}" if s.baseline_end else "")
                + (f" · зсув {c.slip:+d} дн." if c.slip else "") + (" · критичний шлях" if c.critical else "")
@@ -242,7 +245,8 @@ def classic_data(project, plan, today=None) -> dict:
             rows.append({
                 "type": "step", "id": s.pk, "phase": s.phase_id or "", "n": number.get(s.pk, ""), "title": s.title,
                 "kind": s.kind, "side": SIDE_SHORT.get(s.side, s.side),
-                "who": (s.assignee.get_full_name() or s.assignee.username) if s.assignee_id else "",
+                "who": ((s.assignee.get_full_name() or s.assignee.username) if s.assignee_id else
+                        (s.party.name if s.party_id else "")),
                 "start": _iso(c.start), "end": _iso(c.end), "bstart": _iso(s.baseline_start),
                 "bend": _iso(s.baseline_end), "status": c.status, "crit": bool(c.critical and c.status not in
                                                                               ("done", "skipped")),

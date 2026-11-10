@@ -30,7 +30,7 @@ class MailHandledTests(TermsBase):
         self.assertEqual(r.status_code, 200)
         j = r.json()
         self.assertEqual(j["marked"], [self.reply.pk])
-        self.assertEqual(j["notice"], "✓ 📞 Телефоном")                         # текст для сповіщення з «↶»
+        self.assertEqual(j["notice"], "✓ 📞 Телефоном · 📌 записано в моменти")   # текст для сповіщення з «↶»
         self.assertIn("✓ Відповіли поза поштою · 1", j["html"])
         self.assertIn("Домовились про зразки", j["html"])
         self.assertFalse(self.waiting())
@@ -95,3 +95,49 @@ class MeetingWordsTests(TermsBase):
         t = self.terms()
         self.assertEqual(t["Datenblatt senden"].state, terms.OVERDUE)            # «visit» в описі — не зустріч
         self.assertEqual(t["Urlaub-Vertretung organisieren"].state, terms.OVERDUE)   # людина вибрала «термін»
+
+
+class TalkNoteTests(TermsBase):
+    """📝 «Про що йшла мова»: дзвінок / зустріч → 📌 момент (лист або подія календаря — для майбутньої транскрипції)."""
+    def post(self, name, body, user=None):
+        from django.urls import reverse
+        if user is not None:
+            self.client.force_login(user)
+        return self.client.post(reverse(f"projects:{name}", args=[self.project.pk]), json.dumps(body),
+                                content_type="application/json")
+
+    def test_phone_reply_with_summary_becomes_a_call_moment(self):
+        from projects.models import ProjectHighlight
+        r = self.post("mail_handled", {"messages": [self.reply.pk], "how": "phone",
+                                        "summary": "Погодили MHF4\nЗразки до 25.11, ціна після тесту"})
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("📌 записано в моменти", r.json()["notice"])
+        h = ProjectHighlight.objects.get(project=self.project)
+        self.assertEqual((h.kind, h.title, h.message_id), (ProjectHighlight.CALL, "Погодили MHF4", self.reply.pk))
+        self.assertIn("Зразки до 25.11", h.quote)
+        mark = MailHandled.objects.get(message=self.reply)
+        self.assertEqual(mark.highlight_id, h.pk)
+        self.post("mail_handled", {"messages": [self.reply.pk], "undo": True})
+        self.assertFalse(ProjectHighlight.objects.exists())                     # ↶ прибирає й момент
+
+    def test_meeting_held_with_summary_links_the_event(self):
+        from projects.models import ProjectHighlight
+        ev = self.event("Videobesprechung Muster", -2, kind="meeting")
+        r = self.post("event_note", {"events": [ev.pk], "done": True, "summary": "Клієнт хоче 3 партії по 500"})
+        self.assertEqual(r.status_code, 200)
+        ev.refresh_from_db()
+        self.assertTrue(ev.is_done)
+        h = ProjectHighlight.objects.get(pk=r.json()["highlight"])
+        self.assertEqual((h.kind, h.event_id, h.date), (ProjectHighlight.MEETING, ev.pk, ev.start_at.date()))
+        self.post("event_note", {"events": [ev.pk], "undo": True, "highlight": h.pk})
+        ev.refresh_from_db()
+        self.assertFalse(ev.is_done)
+        self.assertFalse(ProjectHighlight.objects.exists())
+
+    def test_only_own_calendar(self):
+        olga, _acc = self.colleague()
+        ev = self.event("Telko", -1, kind="meeting")
+        r = self.post("event_note", {"events": [ev.pk], "done": True, "summary": "x"}, user=olga)
+        self.assertEqual(r.status_code, 400)
+        ev.refresh_from_db()
+        self.assertFalse(ev.is_done)

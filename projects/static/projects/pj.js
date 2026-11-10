@@ -34,8 +34,8 @@
 
   // ── Вкладки «🗓 Шкала» / «📅 План» / «⚠️ Ризики» / «📝 Статус»: #pj-plan, #pj-risks, #pj-status в адресі → ця
   // вкладка, інакше — як востаннє ──
-  var TABS = ['timeline', 'plan', 'risks', 'status'];
-  var HASH = {'#pj-plan': 'plan', '#pj-risks': 'risks', '#pj-status': 'status'};
+  var TABS = ['timeline', 'plan', 'risks', 'status', 'parties'];
+  var HASH = {'#pj-plan': 'plan', '#pj-risks': 'risks', '#pj-status': 'status', '#pj-parties': 'parties'};
   function firstTab() {
     if (HASH[location.hash]) return HASH[location.hash];
     var saved = '';
@@ -485,7 +485,7 @@
     return s;
   }
   function stepBody(s, patch) {
-    var b = {id: s.id, title: s.title, kind: s.kind, phase: s.phase, side: s.side, assignee: s.assignee,
+    var b = {id: s.id, title: s.title, kind: s.kind, phase: s.phase, side: s.side, party: s.party, assignee: s.assignee,
              start: s.kind === 'milestone' ? '' : s.start, end: s.end, duration: s.duration, status: s.status,
              trigger: s.trigger, auto: s.auto, lag: s.lag, notes: s.notes, after: s.after, links: s.links,
              offers: s.offers};
@@ -570,6 +570,12 @@
       {label: 'Віддалити', icon: '🔭', onSelect: function () { setPref(GP, String(Math.max(ganttPpd() / 1.6, PPD_MIN))); applyGantt(); }}];
     window.MVMenu.open(ev, items, {title: dshort(iso)});
   }
+  root.addEventListener('contextmenu', function (ev) {         // 🔗 сторона: правий клік — меню
+    var g = ev.target.closest('g[data-party]');
+    if (!g || ev.shiftKey || !window.MVMenu) return;
+    ev.preventDefault();
+    partyMenu(g, ev);
+  });
   root.addEventListener('contextmenu', function (ev) {         // «📊 Діаграма Minerva»
     var g = ev.target.closest('[data-pjg-pane="ours"] g[data-step], [data-pjg-pane="ours"] g[data-phase]');
     if (!g || !canEdit() || ev.shiftKey || !window.MVMenu) return;
@@ -708,7 +714,18 @@
     document.body.appendChild(tpl.content.cloneNode(true));
     dlg = {step: document.getElementById('pjp-step'), phase: document.getElementById('pjp-phase'),
            risk: document.getElementById('pjr-risk'), plan: document.getElementById('pja-plan'),
-           agent: document.getElementById('pja-agent'), ask: document.getElementById('pja-ask')};
+           agent: document.getElementById('pja-agent'), ask: document.getElementById('pja-ask'),
+           talk: document.getElementById('pjh-talk'), party: document.getElementById('pjy-party'),
+           exp: document.getElementById('pjx-export')};
+    if (dlg.party) wire(dlg.party, saveParty, deleteParty);
+    if (dlg.exp) {
+      wire(dlg.exp, function () { runExport(false); }, function () {}, false);
+      dlg.exp.querySelector('[data-x-send]').addEventListener('click', function () { runExport(true); });
+    }
+    if (dlg.talk) {
+      wire(dlg.talk, function () { saveTalk(false); }, function () {}, false);
+      dlg.talk.querySelector('[data-pt-skip]').addEventListener('click', function () { saveTalk(true); });
+    }
     wire(dlg.step, saveStep, deleteStep);
     wire(dlg.phase, savePhase, deletePhase);
     wire(dlg.risk, saveRisk, deleteRisk);
@@ -724,6 +741,11 @@
     q(dlg.risk, 'data-r', 'impact').addEventListener('change', riskScore);
     q(dlg.step, 'data-s', 'kind').addEventListener('change', syncStep);
     q(dlg.step, 'data-s', 'side').addEventListener('change', syncStep);
+    q(dlg.step, 'data-s', 'party').addEventListener('change', function () {      // сторона → «Хто робить» за роллю
+      var pid = this.value, side = '';
+      (planData().parties || []).forEach(function (p) { if (String(p.id) === pid) side = ROLE_SIDE[p.role] || ''; });
+      if (side) { q(dlg.step, 'data-s', 'side').value = side; syncStep(); }
+    });
     // ⛓ кроки інших проєктів: пошук за кодом проєкту чи назвою кроку
     var xq = dlg.step.querySelector('[data-s-xq]');
     xq.addEventListener('input', function () {
@@ -799,6 +821,8 @@
     fillSelect(f('phase'), data.phases.map(function (p) { return [p.id, ((p.icon || '') + ' ' + p.name).trim()]; }),
                s.phase, '— без фази');
     fillSelect(f('side'), data.sides, s.side);
+    fillSelect(f('party'), (data.parties || []).map(function (p) { return [p.id, p.label]; }), s.party || '',
+               '— не вказано');
     fillSelect(f('assignee'), data.users.map(function (u) { return [u.id, u.label]; }), s.assignee, '— не вказано');
     f('start').value = s.start || '';
     f('end').value = s.end || '';
@@ -846,6 +870,7 @@
     var kind = f('kind').value, side = f('side').value;
     var body = {
       id: d.dataset.id || '', title: f('title').value, kind: kind, phase: f('phase').value, side: side,
+      party: f('party').value,
       assignee: side === 'we' || side === 'colleague' ? f('assignee').value : '',
       start: kind === 'milestone' ? '' : f('start').value, end: f('end').value, duration: f('duration').value,
       status: f('status').value, trigger: f('trigger').value, auto: f('auto').checked, lag: f('lag').value,
@@ -961,15 +986,30 @@
       if (c.mail) window.open('/email/message/' + c.mail + '/', '_blank', 'noopener');
       return;
     }
-    var items = [];
+    var items = [], note = box() && box().dataset.eventNote;
     if (!c.done) {
       items.push({label: c.meeting ? 'Відбулась' : 'Виконано', icon: '✓', onSelect: function () {
-        calAll(c, function (id) { return calPost('/calendar/event/' + id + '/done/'); }, '✓ Позначено в календарі');
+        if (!note) {
+          calAll(c, function (id) { return calPost('/calendar/event/' + id + '/done/'); }, '✓ Позначено в календарі');
+        } else if (c.meeting) {
+          talk('🤝 ' + (c.what || ''), c.day, function (text, day) {
+            eventNote(c.ids, {done: true, summary: text, date: day});
+          });
+        } else {
+          eventNote(c.ids, {done: true});
+        }
       }});
     } else {
       items.push({label: 'Ще не виконано', icon: '↺', onSelect: function () {
         calAll({ids: [c.ids[0]]}, function (id) { return calPost('/calendar/event/' + id + '/toggle/'); },
                '↺ Позначку знято');
+      }});
+    }
+    if (note && c.meeting) {
+      items.push({label: 'Про що йшла мова…', icon: '📝', onSelect: function () {
+        talk('🤝 ' + (c.what || ''), c.day, function (text, day) {
+          if (text) eventNote(c.ids, {summary: text, date: day});
+        });
       }});
     }
     items.push(c.meeting
@@ -993,11 +1033,199 @@
     }
     window.MVMenu.open(e, items, {title: 'Подія в календарі'});
   }
+  // 🔗 Сторони проєкту: вікно, меню, «Підставити з даних проєкту»
+  var ROLE_SIDE = {customer: 'customer', we: 'we', contractor: 'supplier', manufacturer: 'supplier',
+                   supplier: 'supplier', logistics: 'supplier', other: 'colleague'};
+  function partyData() {
+    var n = document.getElementById('pjy-data');
+    try { return n ? JSON.parse(n.textContent) : {roles: [], parties: []}; } catch (x) { return {roles: [], parties: []}; }
+  }
+  function openParty(id, preset) {
+    var ds = dialogs();
+    if (!ds || !ds.party) return;
+    var d = ds.party, data = partyData(), p = null, f = function (k) { return q(d, 'data-y', k); };
+    data.parties.forEach(function (x) { if (String(x.id) === String(id)) p = x; });
+    p = p || Object.assign({id: '', role: 'supplier', name: '', what: '', delivers_to: '', email: '', note: '', steps: 0},
+                           preset || {});
+    d.dataset.id = p.id || '';
+    fillSelect(f('role'), data.roles, p.role);
+    f('name').value = p.name;
+    f('what').value = p.what;
+    f('email').value = p.email;
+    f('note').value = p.note;
+    fillSelect(f('delivers_to'), data.parties.filter(function (x) { return String(x.id) !== String(p.id); })
+      .map(function (x) { return [x.id, x.name]; }), p.delivers_to || '', '— нікому (кінець ланцюжка)');
+    d.querySelector('[data-y-steps]').textContent = p.steps ? 'Кроків плану цієї сторони: {n}'.replace('{n}', p.steps) : '';
+    d.querySelector('[data-pjp-del]').hidden = !p.id;
+    d.querySelector('[data-pjp-err]').textContent = '';
+    d.showModal();
+    f('name').focus();
+  }
+  function saveParty() {
+    var d = dlg.party, f = function (k) { return q(d, 'data-y', k); };
+    var body = {id: d.dataset.id || '', role: f('role').value, name: f('name').value, what: f('what').value,
+                delivers_to: f('delivers_to').value, email: f('email').value, note: f('note').value};
+    if (!body.name.trim()) { d.querySelector('[data-pjp-err]').textContent = 'Напишіть назву сторони'; f('name').focus(); return; }
+    post(d, box().dataset.party, body);
+  }
+  function deleteParty() {
+    var d = dlg.party;
+    if (!d.dataset.id) return;
+    if (!confirm('Прибрати сторону «' + q(d, 'data-y', 'name').value + '»? Ті, хто їй постачав, віддаватимуть далі по ланцюжку; кроки плану лишаться без сторони.')) return;
+    post(d, box().dataset.partyBase + d.dataset.id + '/delete/', {});
+  }
+  function partyMenu(g, e) {
+    var id = g.getAttribute('data-party'), p = null;
+    partyData().parties.forEach(function (x) { if (String(x.id) === String(id)) p = x; });
+    if (!p || !window.MVMenu) { openParty(id); return; }
+    window.MVMenu.open(e, [
+      {label: 'Змінити…', icon: '✏️', onSelect: function () { openParty(id); }},
+      {label: 'Хто їй постачає — ＋ сторона…', icon: '📦', onSelect: function () {
+        openParty('', {role: p.role === 'customer' ? 'we' : 'supplier', delivers_to: p.id});
+      }},
+      {label: 'Кому віддає — ＋ сторона…', icon: '➡️', onSelect: function () {
+        openParty('', {role: 'customer'});
+      }},
+      {type: 'separator'},
+      {label: 'Прибрати', icon: '🗑', onSelect: function () {
+        if (confirm('Прибрати сторону «' + p.name + '»?')) send(box().dataset.partyBase + p.id + '/delete/', {}).then(done);
+      }}
+    ], {title: p.name});
+  }
+
+  // 📤 Експорт і лист: діаграма як на екрані → PNG (pj_export.js) → PDF / Excel / лист на сервері
+  var expKind = '';
+  var EXP_TITLES = {plan: '📅 План проєкту', timeline: '🗓 Шкала проєкту', chain: '🔗 Сторони проєкту'};
+  function openExport(kind) {
+    var ds = dialogs();
+    if (!ds || !ds.exp) return;
+    var d = ds.exp, lang = 'de';
+    expKind = kind;
+    try { lang = localStorage.getItem('pj-export-lang') || 'de'; } catch (x) { lang = 'de'; }
+    q(d, 'data-x', 'lang').value = lang;
+    d.querySelector('[data-x-what]').textContent = EXP_TITLES[kind] || '';
+    d.querySelectorAll('[data-x-only]').forEach(function (el) { el.hidden = el.dataset.xOnly !== kind; });
+    d.querySelector('[data-pjp-err]').textContent = '';
+    d.showModal();
+  }
+  function exportSvgs(kind) {
+    if (kind === 'chain') return Array.prototype.slice.call(root.querySelectorAll('[data-pjy-svg] svg'));
+    if (kind === 'timeline') {
+      var t = root.querySelector('[data-pjt-live] svg');
+      return t ? [t] : [];
+    }
+    var classic = root.querySelector('[data-pjg-pane="classic"]');
+    if (classic && !classic.hidden) {
+      return Array.prototype.slice.call(classic.querySelectorAll('svg.pjg2-grid, svg.pjg2-svg'));
+    }
+    var ours = Array.prototype.slice.call(root.querySelectorAll('[data-pjg-pane="ours"] [data-pjg-detail]'))
+      .filter(function (el) { return !el.hidden; });
+    return ours.length ? Array.prototype.slice.call(ours[0].querySelectorAll('svg')).slice(0, 1) : [];
+  }
+  function runExport(sendMail) {
+    var d = dlg.exp, err = d.querySelector('[data-pjp-err]'), f = function (k) { return q(d, 'data-x', k); };
+    var want = {pdf: f('pdf').checked, png: f('png').checked, xlsx: expKind === 'plan' && f('xlsx').checked,
+                table: expKind === 'plan' && f('table').checked, lang: f('lang').value};
+    try { localStorage.setItem('pj-export-lang', want.lang); } catch (x) { /* немає сховища */ }
+    if (!want.pdf && !want.png && !want.xlsx) { err.textContent = 'Виберіть хоча б один файл'; return; }
+    var svgs = exportSvgs(expKind);
+    if ((want.pdf || want.png) && !svgs.length) { err.textContent = 'Діаграми зараз не видно — відкрийте її вкладку'; return; }
+    if (!window.PJExport) { err.textContent = 'Експорт не завантажився — оновіть сторінку'; return; }
+    var btns = d.querySelectorAll('.pjp-foot button');
+    btns.forEach(function (b) { b.disabled = true; });
+    err.textContent = '⏳ Готую файли…';
+    var title = (box().dataset.code || '') + ' · ' + (box().dataset.title || '');
+    var pic = svgs.length && (want.pdf || want.png) ? window.PJExport.png(svgs) : Promise.resolve(null);
+    function ask(blob, formats, mail) {
+      var fd = new FormData();
+      if (blob) fd.append('image', blob, 'diagram.png');
+      fd.append('what', expKind);
+      fd.append('lang', want.lang);
+      fd.append('formats', formats.join(','));
+      fd.append('table', want.table ? '1' : '');
+      fd.append('send', mail ? '1' : '');
+      return fetch(box().dataset.export, {method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': csrf()},
+                                          body: fd})
+        .then(function (r) {
+          var type = r.headers.get('Content-Type') || '';
+          if (r.ok && type.indexOf('application/json') < 0) {
+            var name = (r.headers.get('Content-Disposition') || '').replace(/^.*filename="?([^";]+)"?.*$/, '$1');
+            return r.blob().then(function (b) { window.PJExport.save(b, decodeURIComponent(name || 'export')); return {ok: true}; });
+          }
+          return r.json().catch(function () { return {ok: false, error: 'HTTP ' + r.status}; });
+        });
+    }
+    pic.then(function (blob) {
+      var formats = [want.pdf ? 'pdf' : '', want.png ? 'png' : '', want.xlsx ? 'xlsx' : ''].filter(Boolean);
+      if (sendMail) return ask(blob, formats, true);
+      if (want.png && blob) window.PJExport.save(blob, window.PJExport.fileName(title, expKind, 'png'));
+      var server = formats.filter(function (x) { return x !== 'png'; }), chain = Promise.resolve({ok: true});
+      server.forEach(function (fmt) {
+        chain = chain.then(function (j) { return j && j.ok ? ask(fmt === 'pdf' ? blob : null, [fmt], false) : j; });
+      });
+      return chain;
+    }).then(function (j) {
+      btns.forEach(function (b) { b.disabled = false; });
+      if (!j || !j.ok) { err.textContent = '⚠️ ' + ((j && j.error) || 'не вдалося'); return; }
+      err.textContent = '';
+      d.close();
+      if (j.compose) { window.open(j.compose, '_blank', 'noopener'); toast('✉️ Лист з файлами відкрито в новій вкладці'); }
+    }).catch(function (x) {
+      btns.forEach(function (b) { b.disabled = false; });
+      err.textContent = '⚠️ ' + (x && x.message ? x.message : 'не вдалося');
+    });
+  }
+
   // ✓ «Що зараз» / «Ризики»: відповіли поза поштою (лист) або виконано / зустріч відбулась (подія календаря)
   var HOWS = [['phone', '📞', 'Відповіли телефоном'], ['meeting', '🤝', 'Обговорили на зустрічі'],
               ['other', '✉️', 'Відповіли іншим шляхом'], ['not_needed', '🙅', 'Відповідь не потрібна']];
-  function handled(ids, how, undo) {
-    send(box().dataset.mailHandled, {messages: ids, how: how || '', undo: !!undo}).then(function (j) {
+  var TALK = {phone: 1, meeting: 1};             // спершу «📝 Про що йшла мова» (можна «Без опису»)
+  var talkCb = null;
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  }
+  function talk(what, day, cb) {
+    var ds = dialogs();
+    if (!ds || !ds.talk) { cb('', day); return; }
+    var d = ds.talk, t = q(d, 'data-pt', 'summary');
+    d.querySelector('[data-pt-what]').textContent = what || '';
+    d.querySelector('[data-pjp-err]').textContent = '';
+    t.value = '';
+    q(d, 'data-pt', 'date').value = day || today();
+    talkCb = cb;
+    d.showModal();
+    t.focus();
+  }
+  function saveTalk(skip) {
+    var d = dlg.talk, text = skip ? '' : q(d, 'data-pt', 'summary').value.trim();
+    if (!skip && !text) {
+      d.querySelector('[data-pjp-err]').textContent = 'Напишіть коротко, про що йшла мова, або «Без опису»';
+      return;
+    }
+    d.close();
+    var cb = talkCb;
+    talkCb = null;
+    if (cb) cb(text, q(d, 'data-pt', 'date').value);
+  }
+  function itemText(el) {
+    var li = el && el.closest && el.closest('li'), a = li && li.querySelector('a');
+    return a ? a.textContent.trim() : '';
+  }
+  function eventNote(ids, body) {
+    send(box().dataset.eventNote, Object.assign({events: ids}, body)).then(function (j) {
+      if (!j || !j.ok) { toast('⚠️ ' + ((j && j.error) || 'не вдалося')); return; }
+      put(j.html);
+      if (!body.undo && window.MVMenu && window.MVMenu.toast) {
+        window.MVMenu.toast(j.notice || '✓', {undo: function () {
+          eventNote(ids, {undo: true, highlight: j.highlight});
+        }});
+      }
+    });
+  }
+  function handled(ids, how, undo, summary, day) {
+    send(box().dataset.mailHandled, {messages: ids, how: how || '', undo: !!undo, summary: summary || '',
+                                     date: day || ''}).then(function (j) {
       if (!j || !j.ok) { toast('⚠️ ' + ((j && j.error) || 'не вдалося')); return; }
       put(j.html);
       if (!undo && window.MVMenu && window.MVMenu.toast) {
@@ -1010,7 +1238,8 @@
     try { a = JSON.parse(btn.getAttribute('data-pjc-act') || '{}'); } catch (x) { a = {}; }
     if (a.ev) {
       var g = document.createElement('i');
-      g.setAttribute('data-cal', JSON.stringify({ids: a.ev, meeting: a.meeting, mail: a.mail}));
+      g.setAttribute('data-cal', JSON.stringify({ids: a.ev, meeting: a.meeting, mail: a.mail, day: a.day,
+                                                 what: itemText(btn)}));
       calMenu(g, e);
       return;
     }
@@ -1021,13 +1250,18 @@
       try { o = JSON.parse(b.getAttribute('data-pjc-act') || '{}'); } catch (x) { o = {}; }
       if (o.m && o.dir === a.dir && o.who && o.who === a.who) same.push(o.m);
     });
+    var what = itemText(btn);
+    function pick(ids, h) {
+      if (!TALK[h[0]]) { handled(ids, h[0]); return; }
+      talk(h[1] + ' ' + what, today(), function (text, day) { handled(ids, h[0], false, text, day); });
+    }
     var items = HOWS.map(function (h) {
-      return {label: h[2], icon: h[1], onSelect: function () { handled([a.m], h[0]); }};
+      return {label: h[2], icon: h[1], onSelect: function () { pick([a.m], h); }};
     });
     if (same.length > 1) {
       items.push({type: 'submenu', label: 'Усі листи цієї людини ({0})'.replace('{0}', same.length), icon: '✓',
                   items: HOWS.map(function (h) {
-                    return {label: h[2], icon: h[1], onSelect: function () { handled(same, h[0]); }};
+                    return {label: h[2], icon: h[1], onSelect: function () { pick(same, h); }};
                   })});
     }
     items.push({type: 'separator'});
@@ -1559,9 +1793,14 @@
     var t = e.target.closest('[data-pjc-range],[data-pjc-decide],[data-pjc-scan],[data-pjc-mtoggle],[data-pjc-madd],' +
       '[data-pjc-mdel],g[data-mails],g[data-cal],g[data-files],[data-pjc-event-add],[data-pjc-tab],[data-pjc-step-new],[data-pjc-phase-new],[data-pjc-post],' +
       '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase],[data-pjc-risk],' +
-      '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai],[data-pjc-act],[data-pjc-unmark]');
+      '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai],[data-pjc-act],[data-pjc-unmark],' +
+      'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx]');
     if (!t || !root.contains(t)) return;
     e.preventDefault();
+    if (t.matches('g[data-party]')) { openParty(t.getAttribute('data-party')); return; }
+    if (t.hasAttribute('data-pjy-new')) { openParty(''); return; }
+    if (t.hasAttribute('data-pjy-suggest')) { t.disabled = true; send(box().dataset.partySuggest, {}).then(done); return; }
+    if (t.hasAttribute('data-pjx')) { openExport(t.getAttribute('data-pjx')); return; }
     if (t.hasAttribute('data-pjc-act')) { actMenu(t, e); return; }
     if (t.hasAttribute('data-pjc-unmark')) { handled([+t.getAttribute('data-pjc-unmark')], '', true); return; }
     if (t.matches('g[data-mails]')) { mailMenu(t, e); return; }

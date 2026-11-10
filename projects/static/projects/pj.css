@@ -377,3 +377,28 @@
 .pjc-mk:hover, .pjc-mk:focus-visible { opacity: 1; border-color: var(--primary, #79aec8); }
 .pjc-hd { margin-top: 6px; }
 .pjc-hd summary { cursor: pointer; font-size: 12px; opacity: .8; }
+/* 🔗 Сторони проєкту: хто кому постачає (projects/parties.py → svg.pjy) */
+.pjy-wrap { overflow-x: auto; }
+.pjy .pjy-box { fill: var(--bg-card); stroke: var(--border-strong); stroke-width: 1.2; }
+.pjy .pjy-r-customer .pjy-box, .pjy .pjy-r-we .pjy-box { fill: var(--accent2-subtle); }
+.pjy .pjy-ok .pjy-box { stroke: var(--ok); stroke-width: 1.8; }
+.pjy .pjy-warn .pjy-box { stroke: var(--warn); stroke-width: 2; }
+.pjy .pjy-bad .pjy-box { stroke: var(--err); stroke-width: 2.2; }
+.pjy .pjy-role { font-size: 10.5px; fill: var(--text-muted); }
+.pjy .pjy-name { font-size: 13px; font-weight: 600; fill: var(--body-fg); }
+.pjy .pjy-sub { font-size: 10.5px; fill: var(--text-muted); }
+.pjy .pjy-s-bad { fill: var(--err); }
+.pjy .pjy-s-warn { fill: var(--warn); }
+.pjy .pjy-s-ok { fill: var(--ok); }
+.pjy .pjy-edge { fill: none; stroke: var(--border-strong); stroke-width: 1.6; }
+.pjy .pjy-e-ok { stroke: var(--ok); }
+.pjy .pjy-e-warn { stroke: var(--warn); stroke-dasharray: 5 4; }
+.pjy .pjy-e-bad { stroke: var(--err); stroke-width: 2; }
+.pjy .pjy-arrowhead { fill: var(--border-strong); }
+.pjy g[data-party] { cursor: pointer; }
+.pjy g[data-party]:hover .pjy-box, .pjy g[data-party]:focus-visible .pjy-box { stroke: var(--accent); stroke-width: 2.4; }
+.pjy g[data-party]:focus { outline: none; }
+.pjy-k { display: inline-block; padding: 0 6px; border-radius: 8px; border: 2px solid var(--border-strong); }
+.pjy-k-bad { border-color: var(--err); }
+.pjy-k-warn { border-color: var(--warn); }
+.pjy-k-ok { border-color: var(--ok); }

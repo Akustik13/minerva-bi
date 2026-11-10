@@ -8,7 +8,7 @@
      data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"
      data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
      data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
-     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}"
+     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-export="{{ urls.export }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
      data-ai-settings="{{ urls.ai_settings }}" data-ai-since="{{ ai.since|date:'Y-m-d' }}" data-start="{{ start|date:'Y-m-d' }}"
      data-steps="{{ plan.steps|default:0 }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
@@ -177,6 +177,30 @@
       <button type="button" class="pjc-tab" role="tab" data-pjc-tab="plan">📅 План{% if plan.has_plan %} · {{ plan.steps }} кроків{% endif %}</button>
       <button type="button" class="pjc-tab" role="tab" data-pjc-tab="risks">⚠️ Ризики{% if riskreg.total %} · {{ riskreg.total }}{% endif %}</button>
       <button type="button" class="pjc-tab" role="tab" data-pjc-tab="status">📝 Статус{% if status.last %} {{ status.last_dot }}{% endif %}</button>
+      <button type="button" class="pjc-tab" role="tab" data-pjc-tab="parties">🔗 Сторони{% if parties.count %} · {{ parties.count }}{% endif %}</button>
+    </div>
+
+    <div class="pjc-pane" data-pjc-pane="parties" id="pj-parties">
+      <div class="pjc-ptools">
+        <span class="pjc-sub">Хто бере участь і кому віддає свою частину: постачальник компонентів → виробник → ми → замовник.
+          Гілки — кілька сторін, що віддають одній.</span>
+        {% if can_change %}
+          <button type="button" class="pjc-b pjc-right" data-pjy-new>＋ Сторона</button>
+          <button type="button" class="pjc-b" data-pjy-suggest title="Замовник, ми, постачальники закупівель проєкту, JLCPCB, учасники-постачальники — лише ті, яких ще немає">🔎 Підставити з даних проєкту</button>
+        {% endif %}
+        <button type="button" class="pjc-b" data-pjx="chain" title="PDF чи картинка — завантажити або надіслати листом">📤 Експорт / лист</button>
+      </div>
+      {% if parties.svg %}
+        <div class="pjc-svg pjy-wrap" data-pjy-svg>{{ parties.svg|safe }}</div>
+        <p class="pjc-sub">Рамка — стан: <span class="pjy-k pjy-k-bad">прострочено</span> <span class="pjy-k pjy-k-warn">чекаємо</span>
+          <span class="pjy-k pjy-k-ok">готово</span> — із закупівель, JLC-замовлень і кроків плану сторони.{% if can_change %}
+          Клік на сторону — змінити · правий клік — меню (＋ хто їй постачає). У вікні кроку плану можна вибрати сторону — тоді «Хто» на діаграмі Ганта — її назва.{% endif %}</p>
+      {% elif parties.error %}
+        <p class="pjc-sub">Сторони зараз не вдалося показати.</p>
+      {% else %}
+        <p class="pjc-sub">Сторін ще немає.{% if can_change %} «🔎 Підставити з даних проєкту» додасть замовника, нас, постачальників закупівель і JLCPCB; далі — «＋ Сторона» для виробника, підрядника, логістики.{% endif %}</p>
+      {% endif %}
+      {% if can_change %}{{ parties.data|json_script:"pjy-data" }}{% endif %}
     </div>
 
     <div class="pjc-pane" data-pjc-pane="risks" id="pj-risks">
@@ -297,6 +321,7 @@
           </span>
           <span class="pjc-hint" data-pjg-only="classic" hidden>{% if can_change %}Ctrl + коліщатко — масштаб · тягніть фон — прокрутка · тягніть смугу — нові дати, край — тривалість · правий клік — меню · клік на фазу — згорнути{% else %}Ctrl + коліщатко — масштаб · тягніть фон — прокрутка · клік на фазу — згорнути{% endif %}</span>
           {% if can_change %}<span class="pjc-hint" data-pjg-only="ours">Тягніть смугу чи ◆ — нові дати, край смуги — тривалість · клік — вікно кроку · правий клік — меню</span>{% endif %}
+          <button type="button" class="pjc-b pjc-right" data-pjx="plan" title="PDF з таблицею кроків, картинка чи Excel — завантажити або надіслати листом">📤 Експорт / лист</button>
         </div>
         <div class="pjc-svg" data-pjg-pane="ours"><div data-pjg-detail="full">{{ plan.gantt|safe }}</div><div data-pjg-detail="brief" hidden>{{ plan.gantt_brief|safe }}</div></div>
         <div class="pjg2" data-pjg-pane="classic" hidden></div>
@@ -330,7 +355,8 @@
     </div>
 
     <div class="pjc-pane" data-pjc-pane="timeline">
-    {% if can_change %}<h4 class="pjt-head"><button type="button" class="pjc-b pjc-right" data-pjc-event-add title="Зустріч чи термін з вашого календаря, який не прийшов листом проєкту">📅 ＋ Подія з календаря</button></h4>{% endif %}
+    <h4 class="pjt-head">{% if can_change %}<button type="button" class="pjc-b pjc-right" data-pjc-event-add title="Зустріч чи термін з вашого календаря, який не прийшов листом проєкту">📅 ＋ Подія з календаря</button>{% endif %}
+      <button type="button" class="pjc-b{% if not can_change %} pjc-right{% endif %}" data-pjx="timeline" title="PDF чи картинка шкали — завантажити або надіслати листом">📤 Експорт / лист</button></h4>
     {# SVG з сервера — поки браузер не намалював живу шкалу (pj_timeline.js: масштаб, прокрутка, доріжки) #}
     <div class="pjc-svg" data-pjt-live>{{ timeline|safe }}</div>
     {{ timeline_data|json_script:"pjt-data" }}

@@ -250,9 +250,11 @@ class ProjectHighlight(models.Model):
     (ProjectSuggestion, projects/ai_scan.py)."""
     DECISION, APPROVAL, CHANGE, PROBLEM = "decision", "approval", "change", "problem"
     DEADLINE, DELIVERY, PAYMENT, OTHER = "deadline", "delivery", "payment", "other"
+    CALL, MEETING = "call", "meeting"
     KIND_CHOICES = [
         (DECISION, "🧭 Рішення"), (APPROVAL, "✅ Погодження"), (CHANGE, "✏️ Зміна вимог"), (PROBLEM, "⚠️ Проблема"),
-        (DEADLINE, "⏰ Строк"), (DELIVERY, "📦 Поставка"), (PAYMENT, "💶 Оплата"), (OTHER, "📌 Інше"),
+        (DEADLINE, "⏰ Строк"), (DELIVERY, "📦 Поставка"), (PAYMENT, "💶 Оплата"),
+        (CALL, "📞 Дзвінок"), (MEETING, "🤝 Зустріч"), (OTHER, "📌 Інше"),
     ]
     MANUAL, AI, RULE = "manual", "ai", "rule"
     SOURCE_CHOICES = [(MANUAL, "вручну"), (AI, "AI"), (RULE, "правило")]
@@ -265,6 +267,9 @@ class ProjectHighlight(models.Model):
     quote = models.TextField("Цитата / примітка", blank=True, default="")
     message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name="project_highlights", verbose_name="Лист")
+    # 🤝 / 📞 «про що йшла мова»: зустріч або дзвінок з календаря — сюди ж модуль запису нарад додасть транскрипцію
+    event = models.ForeignKey("calendar_app.CalendarEvent", null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name="project_highlights", verbose_name="Подія календаря")
     source = models.CharField("Джерело", max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
     status = models.CharField("Статус", max_length=10, choices=STATUS_CHOICES, default=ProjectLink.CONFIRMED,
                               db_index=True)
@@ -365,6 +370,8 @@ class ProjectStep(models.Model):
     side = models.CharField("Хто", max_length=10, choices=SIDE_CHOICES, default=WE)
     assignee = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                  related_name="project_steps", verbose_name="Виконавець")
+    party = models.ForeignKey("ProjectParty", null=True, blank=True, on_delete=models.SET_NULL, related_name="steps",
+                              verbose_name="Сторона")
     start = models.DateField("Початок (план)", null=True, blank=True)
     end = models.DateField("Кінець (план)", null=True, blank=True)
     duration_days = models.PositiveSmallIntegerField("Тривалість, дн.", default=1)
@@ -658,6 +665,9 @@ class MailHandled(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                              related_name="+", verbose_name="Хто позначив")
     created_at = models.DateTimeField("Позначено", auto_now_add=True)
+    # «Про що йшла мова» — 📌 момент проєкту, записаний разом з позначкою (↶ прибирає і його)
+    highlight = models.ForeignKey("ProjectHighlight", null=True, blank=True, on_delete=models.SET_NULL,
+                                  related_name="+", verbose_name="Момент")
 
     class Meta:
         verbose_name = "Відповідь поза поштою"
@@ -665,3 +675,41 @@ class MailHandled(models.Model):
 
     def __str__(self):
         return f"{self.get_how_display()} · {self.message_id}"
+
+
+class ProjectParty(models.Model):
+    """🔗 Сторона проєкту: хто бере участь і кому віддає свою частину. Ланцюжок (дерево з гілками):
+    постачальник компонентів → виробник → ми → замовник; delivers_to — кому ця сторона постачає / віддає роботу.
+    Кроки плану можуть належати стороні (ProjectStep.party) — тоді «Хто» на діаграмі Ганта — її назва.
+    Логіка — projects/parties.py."""
+    CUSTOMER, WE, CONTRACTOR, MANUFACTURER, SUPPLIER, LOGISTICS, OTHER = (
+        "customer", "we", "contractor", "manufacturer", "supplier", "logistics", "other")
+    ROLE_CHOICES = [
+        (CUSTOMER, "👤 Замовник"), (WE, "🏢 Ми — виконавець"), (CONTRACTOR, "🧑‍🔧 Підрядник"),
+        (MANUFACTURER, "🏭 Виробник"), (SUPPLIER, "📦 Постачальник компонентів"), (LOGISTICS, "🚚 Логістика"),
+        (OTHER, "❓ Інше"),
+    ]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="parties")
+    role = models.CharField("Роль", max_length=12, choices=ROLE_CHOICES, default=SUPPLIER)
+    name = models.CharField("Назва", max_length=200)
+    what = models.CharField("Що постачає / робить", max_length=255, blank=True, default="",
+                            help_text="«Друковані плати», «корпуси», «модулі U3, U101», «складання й тест»")
+    delivers_to = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name="suppliers_of", verbose_name="Кому віддає")
+    email = models.CharField("Email контакту", max_length=254, blank=True, default="")
+    customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+                                 verbose_name="Клієнт CRM")
+    supplier = models.ForeignKey("inventory.Supplier", null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name="+", verbose_name="Постачальник (склад)")
+    note = models.CharField("Примітка", max_length=255, blank=True, default="")
+    order = models.PositiveIntegerField("Порядок", default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Сторона проєкту"
+        verbose_name_plural = "🔗 Сторони проєкту"
+        ordering = ["order", "pk"]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_role_display()})"

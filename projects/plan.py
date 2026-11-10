@@ -293,6 +293,12 @@ def save_step(project, data, user=None) -> ProjectStep:
     step.phase = (ProjectPhase.objects.filter(project=project, pk=phase_id).first()
                   if str(phase_id or "").isdigit() else None)
     step.side = data.get("side") if data.get("side") in dict(ProjectStep.SIDE_CHOICES) else W
+    from .models import ProjectParty
+    from .parties import ROLE_SIDE
+    pid = data.get("party")
+    step.party = (ProjectParty.objects.filter(project=project, pk=pid).first() if str(pid or "").isdigit() else None)
+    if step.party is not None:
+        step.side = ROLE_SIDE[step.party.role]           # «чекаємо клієнта / постачальника» — за роллю сторони
     aid = data.get("assignee")
     step.assignee = (get_user_model().objects.filter(pk=aid, is_active=True, is_staff=True).first()
                      if str(aid or "").isdigit() else None)
@@ -510,6 +516,7 @@ def editor_data(project, plan) -> dict:
         s = c.step
         d = deps.get(s.pk, [])
         steps.append({"id": s.pk, "title": s.title, "kind": s.kind, "phase": s.phase_id or "", "side": s.side,
+                      "party": s.party_id or "",
                       "assignee": s.assignee_id or "", "start": s.start.isoformat() if s.start else "",
                       "end": s.end.isoformat() if s.end else "", "duration": s.duration_days, "status": s.status,
                       "trigger": s.trigger, "auto": s.auto, "after": [p for p, _ in d],
@@ -535,5 +542,7 @@ def editor_data(project, plan) -> dict:
     return {"steps": steps, "phases": [{"id": p.pk, "name": p.name, "icon": p.icon, "gate": p.gate, "order": p.order}
                                        for p in ProjectPhase.objects.filter(project=project).order_by("order", "pk")],
             "users": users, "links": links, "offers": offers, "others": others,
+            "parties": [{"id": p.pk, "label": f"{p.get_role_display().split(' ', 1)[0]} {p.name}", "role": p.role}
+                        for p in project.parties.all()],
             "kinds": ProjectStep.KIND_CHOICES, "sides": ProjectStep.SIDE_CHOICES,
             "statuses": ProjectStep.STATUS_CHOICES, "triggers": TRIGGERS}

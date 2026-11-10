@@ -84,6 +84,17 @@ def _moments(facts, uid) -> list:
     return out
 
 
+def _parties_context(project, can_change, today) -> dict:
+    """Вкладка «🔗 Сторони»: дерево хто кому постачає; збій — порожньо (пульт працює)."""
+    from . import parties
+    try:
+        return parties.context(project, can_change, today)
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception("project parties %s", project.pk)
+        return {"count": 0, "svg": "", "data": {"roles": [], "parties": []}, "error": True}
+
+
 def _handled(facts, uid) -> list:
     """«✓ Позначено вручну»: власні листи, на які відповіли поза поштою (телефоном, на зустрічі…) — з «↶»."""
     out = []
@@ -264,9 +275,15 @@ def context(project, user, range_key="all", notice="") -> dict:
         "plan": plan,
         "ai": ai,
         "riskreg": _risks_context(project, can_change),
+        "parties": _parties_context(project, can_change, today),
         "status": _status_context(project, user, facts, st, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
                  "mail_handled": reverse("projects:mail_handled", args=[pk]),
+                 "event_note": reverse("projects:event_note", args=[pk]),
+                 "party": reverse("projects:party", args=[pk]),
+                 "export": reverse("projects:export", args=[pk]),
+                 "party_suggest": reverse("projects:party_suggest", args=[pk]),
+                 "party_base": f"/projects/api/project/{pk}/party/",
                  "risk": reverse("projects:risk", args=[pk]), "status_save": reverse("projects:status", args=[pk]),
                  "status_draft": reverse("projects:status_draft", args=[pk]),
                  "scan": reverse("projects:scan", args=[pk]), "mail": f"/email/?project={pk}",

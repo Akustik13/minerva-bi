@@ -223,12 +223,89 @@ def highlight_view(request, pk):
 HANDLED_MAX = 200
 
 
+def _talk_title(text) -> str:
+    """Назва моменту з «про що йшла мова»: перший рядок, до 120 символів."""
+    first = " ".join(str(text or "").strip().splitlines()[0].split()) if str(text or "").strip() else ""
+    return first if len(first) <= 120 else first[:119].rstrip() + "…"
+
+
+def _date_or_today(value):
+    from django.utils import timezone
+    try:
+        d = date.fromisoformat(str(value)[:10]) if value else None
+    except ValueError:
+        d = None
+    today = timezone.localdate()
+    return d if d and d <= today else today
+
+
+@staff_member_required
+@require_POST
+def event_note_view(request, pk):
+    """🤝 Зустріч / ⏰ термін з «Що зараз», «Ризиків» чи ромба шкали: {events: [pk…], summary, date, done, undo,
+    highlight} — право змінювати проєкт; лише події власного календаря, що є в проєкті (з його листів або прив'язані).
+    done — ✓ відбулась / виконано (усі однакові події); summary — 📌 момент «про що йшла мова» (🤝 для зустрічі,
+    подія й лист — у моменті: сюди модуль запису нарад додасть транскрипцію). undo — назад: не виконано, момент
+    прибрано."""
+    from . import overview, terms
+    project = _project_for_change(request, pk)
+    body = _body(request)
+    raw = body.get("events") if isinstance(body.get("events"), list) else []
+    ids = {int(i) for i in raw if str(i).isdigit()}
+    events = [e for e in overview._deadlines([x["msg"].pk for x in overview._messages(project)], project)
+              if e.pk in ids and e.user_id == request.user.pk]
+    if not events:
+        return JsonResponse({"ok": False, "error": "Подію не знайдено у вашому календарі серед подій проєкту"},
+                            status=400)
+    first = events[0]
+    if body.get("undo"):
+        for e in events:
+            if e.is_done:
+                e.is_done = False
+                e.save(update_fields=["is_done"])
+        hid = body.get("highlight")
+        if str(hid or "").isdigit():
+            ProjectHighlight.objects.filter(pk=int(hid), project=project, created_by=request.user).delete()
+        return _cockpit(request, project, "↶ Скасовано", extra={"notice": "↶ Скасовано"})
+    if body.get("done"):
+        for e in events:
+            if not e.is_done:
+                e.is_done = True
+                e.save(update_fields=["is_done"])
+    summary = str(body.get("summary") or "").strip()[:2000]
+    moment = None
+    meeting = terms.is_meeting(first)
+    if summary:
+        msg = first.email_message if (first.email_message_id and first.email_message.account_id
+                                      and first.email_message.account.user_id == request.user.pk) else None
+        when = body.get("date") or (timezone_date(first.start_at))
+        moment = services.add_highlight(project, title=_talk_title(summary), date=_date_or_today(when),
+                                        kind=ProjectHighlight.MEETING if meeting else ProjectHighlight.OTHER,
+                                        quote=summary, message=msg, user=request.user, event=first)
+    parts = []
+    if body.get("done"):
+        parts.append("✓ Відбулась" if meeting else "✓ Виконано")
+    if moment:
+        parts.append("📌 записано в моменти")
+    notice = " · ".join(parts) or "✓"
+    return _cockpit(request, project, notice, extra={"notice": notice, "events": [e.pk for e in events],
+                                                     "highlight": moment.pk if moment else None})
+
+
+def timezone_date(value):
+    from django.utils import timezone
+    if value is None:
+        return None
+    return (timezone.localtime(value) if timezone.is_aware(value) else value).date().isoformat()
+
+
 @staff_member_required
 @require_POST
 def mail_handled_view(request, pk):
-    """✓ «Відповіли поза поштою» з «Що зараз» пульта: {messages: [pk…], how, note, undo, range} — право змінювати
-    проєкт; лише листи цього проєкту з власних скриньок людини. how — MailHandled.HOW_CHOICES; undo: true — зняти
-    позначку (лист знову в «Що зараз»). У відповіді — свіжий пульт і marked (позначені листи — для «↶ Скасувати»)."""
+    """✓ «Відповіли поза поштою» з «Що зараз» пульта: {messages: [pk…], how, summary, date, undo, range} — право
+    змінювати проєкт; лише листи цього проєкту з власних скриньок людини. how — MailHandled.HOW_CHOICES; summary —
+    «про що йшла мова»: примітка позначки й 📌 момент (📞 / 🤝, з найновішим листом, дата — date або сьогодні);
+    undo: true — зняти позначку і її момент (лист знову в «Що зараз»). У відповіді — свіжий пульт і marked."""
     from django.db.models import Q
 
     from . import state
@@ -247,20 +324,115 @@ def mail_handled_view(request, pk):
     if not own:
         return JsonResponse({"ok": False, "error": "Листи не знайдено серед ваших листів цього проєкту"}, status=400)
     if undo:
-        MailHandled.objects.filter(message_id__in=own).delete()
+        marks = MailHandled.objects.filter(message_id__in=own)
+        ProjectHighlight.objects.filter(pk__in=marks.exclude(highlight=None).values("highlight_id"), project=project,
+                                        created_by=request.user).delete()
+        marks.delete()
         notice = ("↶ Позначку знято — лист знову в «Що зараз»" if len(own) == 1 else
                   f"↶ Позначки знято: {len(own)} — листи знову в «Що зараз»")
     else:
-        note = " ".join(str(body.get("note") or "").split())[:255]
+        summary = str(body.get("summary") or body.get("note") or "").strip()[:2000]
+        note = " ".join(summary.split())[:255]
+        moment = None
+        if summary:
+            from email_assistant.models import EmailMessage as _EM
+            last = _EM.objects.filter(pk__in=own).order_by("-sent_at", "-pk").first()
+            kind = {MailHandled.PHONE: ProjectHighlight.CALL,
+                    MailHandled.MEETING: ProjectHighlight.MEETING}.get(how, ProjectHighlight.OTHER)
+            moment = services.add_highlight(project, title=_talk_title(summary), date=_date_or_today(body.get("date")),
+                                            kind=kind, quote=summary, message=last, user=request.user)
         for mid in own:
-            MailHandled.objects.update_or_create(message_id=mid,
-                                                 defaults={"how": how, "note": note, "user": request.user})
-        notice = f"✓ {hows[how]}" + (f": листів {len(own)}" if len(own) > 1 else "")
+            MailHandled.objects.update_or_create(message_id=mid, defaults={"how": how, "note": note,
+                                                                           "user": request.user, "highlight": moment})
+        notice = f"✓ {hows[how]}" + (f": листів {len(own)}" if len(own) > 1 else "") + (
+            " · 📌 записано в моменти" if moment else "")
     from email_assistant.models import EmailMessage
     threads = EmailMessage.objects.filter(pk__in=own).exclude(thread=None).values_list("thread_id", flat=True)
     state.mark_dirty(set(ProjectLink.objects.filter(Q(thread_id__in=threads) | Q(message_id__in=own))
                          .values_list("project_id", flat=True)) | {project.pk})
     return _cockpit(request, project, notice, extra={"marked": own, "undo": undo, "notice": notice})
+
+
+@staff_member_required
+@require_POST
+def export_view(request, pk):
+    """📤 Діаграма проєкту: multipart {image (PNG з браузера), what plan|timeline|chain, lang de|en|uk,
+    formats pdf,png,xlsx, table, send} — право перегляду. send — чернетка листа у власній скриньці з файлами
+    (→ {compose}); інакше — один файл (pdf або xlsx) на завантаження."""
+    from django.http import HttpResponse
+
+    from . import export
+    project = _project_for(request, pk, "view")
+    what = request.POST.get("what") if request.POST.get("what") in export.WHATS else "plan"
+    lang = request.POST.get("lang") if request.POST.get("lang") in export.LANGS else "de"
+    formats = [f for f in str(request.POST.get("formats") or "").split(",") if f in ("pdf", "png", "xlsx")]
+    if what != "plan":
+        formats = [f for f in formats if f != "xlsx"]
+    if not formats:
+        return JsonResponse({"ok": False, "error": "Виберіть хоча б один файл"}, status=400)
+    png = b""
+    try:
+        if "pdf" in formats or "png" in formats:
+            upload = request.FILES.get("image")
+            if upload is None or upload.size > export.IMAGE_MAX:
+                raise export.ExportError("Немає картинки діаграми" if upload is None else
+                                         "Картинка завелика — зменште масштаб діаграми")
+            png = export.check_png(upload.read())
+        files = []
+        for f in formats:
+            if f == "pdf":
+                files.append((export.file_name(project, what, "pdf"), export.pdf(project, what, lang, png,
+                                                                                  bool(request.POST.get("table"))),
+                              "application/pdf"))
+            elif f == "png":
+                files.append((export.file_name(project, what, "png"), png, "image/png"))
+            else:
+                files.append((export.file_name(project, what, "xlsx"), export.xlsx(project, lang),
+                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+        if request.POST.get("send"):
+            return JsonResponse({"ok": True, "compose": export.mail(request.user, project, what, lang, files)})
+    except export.ExportError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    name, data, ctype = next((x for x in files if not x[0].endswith(".png")), files[0])
+    resp = HttpResponse(data, content_type=ctype)
+    resp["Content-Disposition"] = f'attachment; filename="{name}"'
+    return resp
+
+
+@staff_member_required
+@require_POST
+def party_view(request, pk):
+    """🔗 Сторона проєкту: {id, role, name, what, delivers_to, email, note} — створити / змінити (право змінювати)."""
+    from . import parties
+    project = _project_for_change(request, pk)
+    try:
+        p = parties.save(project, _body(request))
+    except parties.PartyError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    return _cockpit(request, project, f"🔗 Збережено: {p.name}")
+
+
+@staff_member_required
+@require_POST
+def party_delete_view(request, pk, party_pk):
+    from . import parties
+    project = _project_for_change(request, pk)
+    try:
+        name = parties.delete(project, party_pk)
+    except parties.PartyError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    return _cockpit(request, project, f"🔗 Прибрано: {name}")
+
+
+@staff_member_required
+@require_POST
+def party_suggest_view(request, pk):
+    """«🔎 Підставити з даних проєкту»: замовник, ми, постачальники закупівель, JLCPCB, учасники-постачальники."""
+    from . import parties
+    project = _project_for_change(request, pk)
+    n = parties.suggest(project)
+    return _cockpit(request, project, f"🔗 Додано сторін: {n}" if n else
+                    "🔗 Нового не знайдено: клієнт, закупівлі, JLC і учасники-постачальники вже серед сторін")
 
 
 @staff_member_required

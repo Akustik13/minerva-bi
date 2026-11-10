@@ -18,6 +18,11 @@ urlpatterns = [
     path("api/project/<int:pk>/highlights/", views.highlight_view, name="highlight"),
     path("api/highlight/<int:hid>/delete/", views.highlight_delete_view, name="highlight_delete"),
     path("api/project/<int:pk>/mail-handled/", views.mail_handled_view, name="mail_handled"),
+    path("api/project/<int:pk>/event-note/", views.event_note_view, name="event_note"),
+    path("api/project/<int:pk>/export/", views.export_view, name="export"),
+    path("api/project/<int:pk>/party/", views.party_view, name="party"),
+    path("api/project/<int:pk>/party/<int:party_pk>/delete/", views.party_delete_view, name="party_delete"),
+    path("api/project/<int:pk>/party/suggest/", views.party_suggest_view, name="party_suggest"),
     path("api/project/<int:pk>/links/<int:link_pk>/decide/", views.link_decide_view, name="link_decide"),
     path("api/project/<int:pk>/scan/", views.scan_view, name="scan"),
     # 📅 План (projects/plan.py)

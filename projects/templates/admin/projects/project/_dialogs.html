@@ -7,6 +7,7 @@
       <label>Вид <select data-s="kind"></select></label>
       <label>Фаза <select data-s="phase"></select></label>
       <label>Хто робить <select data-s="side"></select></label>
+      <label>Сторона <select data-s="party"></select></label>
       <label data-only="person">Відповідальний <select data-s="assignee"></select></label>
       <label data-only="task">Початок <input type="date" data-s="start"></label>
       <label><span data-only="task">Кінець</span><span data-only="milestone">Дата віхи</span> <input type="date" data-s="end"></label>
@@ -92,6 +93,61 @@
       <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
       <span class="pjc-merr" role="alert" data-pjp-err></span>
       <button type="button" class="pjc-b pjc-right pjc-danger" data-pjp-del>🗑 Видалити ризик</button>
+    </div>
+  </dialog>
+  <dialog id="pjy-party" class="pjp-dlg" aria-labelledby="pjy-party-h">
+    <h3 id="pjy-party-h">🔗 Сторона проєкту</h3>
+    <div class="pjp-grid">
+      <label>Роль <select data-y="role"></select></label>
+      <label class="pjp-wide">Назва <input type="text" data-y="name" maxlength="200" autocomplete="off" placeholder="Fa. Müller Elektronik"></label>
+      <label class="pjp-wide">Що постачає / робить <input type="text" data-y="what" maxlength="255" placeholder="Друковані плати, корпуси, модулі U3 / U101, складання й тест"></label>
+      <label class="pjp-wide">Кому віддає <select data-y="delivers_to"></select></label>
+      <label class="pjp-wide">Email контакту <input type="email" data-y="email" maxlength="254" autocomplete="off"></label>
+      <label class="pjp-wide">Примітка <input type="text" data-y="note" maxlength="255"></label>
+    </div>
+    <p class="pjp-hint" data-y-steps></p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>💾 Зберегти</button>
+      <button type="button" class="pjc-b pjc-danger" data-pjp-del>🗑 Прибрати</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+    </div>
+  </dialog>
+  <dialog id="pjx-export" class="pjp-dlg" aria-labelledby="pjx-export-h">
+    <h3 id="pjx-export-h">📤 Експорт і лист</h3>
+    <p class="pjp-hint" data-x-what></p>
+    <div class="pjp-grid">
+      <label class="pjp-inline"><input type="checkbox" data-x="pdf" checked> PDF</label>
+      <label class="pjp-inline" data-x-only="plan"><input type="checkbox" data-x="table" checked> таблиця кроків у PDF</label>
+      <label class="pjp-inline"><input type="checkbox" data-x="png"> картинка PNG</label>
+      <label class="pjp-inline" data-x-only="plan"><input type="checkbox" data-x="xlsx"> Excel (план по тижнях)</label>
+      <label>Мова документа <select data-x="lang">
+        <option value="de">Deutsch</option><option value="en">English</option><option value="uk">Українська</option>
+      </select></label>
+    </div>
+    <p class="pjp-hint">Діаграма — як зараз на екрані (масштаб, «Коротко / Детально»), на білому тлі. «✉️ Надіслати
+      листом» відкриє новий лист з вашої скриньки з цими файлами — адресу й текст ви перевірите перед надсиланням.</p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-x-send>✉️ Надіслати листом</button>
+      <button type="button" class="pjc-b" data-pjp-save>⬇ Завантажити</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+    </div>
+  </dialog>
+  <dialog id="pjh-talk" class="pjp-dlg" aria-labelledby="pjh-talk-h">
+    <h3 id="pjh-talk-h">📝 Про що йшла мова</h3>
+    <p class="pjp-hint" data-pt-what translate="no"></p>
+    <label class="pjp-wide">Коротко: що вирішили, що пообіцяли, що далі
+      <textarea data-pt="summary" rows="5" maxlength="2000"
+        placeholder="Наприклад: обговорили серію 2500 шт. Клієнт погодив роз’єм MHF4, зразки — до 25.11, ціну узгодимо після тесту."></textarea></label>
+    <div class="pjp-row"><label>Дата розмови <input type="date" data-pt="date"></label></div>
+    <p class="pjp-hint">Запис стане 📌 моментом проєкту — його видно на шкалі, в огляді й AI-плані. Коли запрацює
+      модуль запису нарад, транскрипція розмови додасться до цієї зустрічі.</p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>✓ Зберегти</button>
+      <button type="button" class="pjc-b" data-pt-skip>Без опису</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
     </div>
   </dialog>
   <dialog id="pja-ask" class="pjp-dlg" aria-labelledby="pja-ask-h">

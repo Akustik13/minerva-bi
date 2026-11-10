@@ -380,7 +380,7 @@ class HighlightError(ValueError):
     pass
 
 
-def add_highlight(project, *, title, date=None, kind="", quote="", message=None, user=None, source=""):
+def add_highlight(project, *, title, date=None, kind="", quote="", message=None, user=None, source="", event=None):
     """📌 Важливий момент (вручну; source ai — прийнята пропозиція AI-помічника). Дата — з листа, інакше сьогодні.
     Повертає ProjectHighlight."""
     from .models import ProjectHighlight
@@ -393,7 +393,7 @@ def add_highlight(project, *, title, date=None, kind="", quote="", message=None,
     return ProjectHighlight.objects.create(
         project=project, title=title, date=date or timezone.localdate(),
         kind=kind if kind in kinds else ProjectHighlight.OTHER, quote=str(quote or "").strip()[:2000],
-        message=message, created_by=user,
+        message=message, event=event, created_by=user,
         source=ProjectHighlight.AI if source == ProjectHighlight.AI else ProjectHighlight.MANUAL)
 
 
