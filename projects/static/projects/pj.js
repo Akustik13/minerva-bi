@@ -1502,7 +1502,7 @@
 
   root.addEventListener('click', function (e) {
     var t = e.target.closest('[data-pja-scan],[data-pja-decide],[data-pja-forgotten],[data-pja-fdecide],' +
-      '[data-pja-fclose],[data-pja-plan]');
+      '[data-pja-fclose],[data-pja-plan],[data-pja-settings]');
     if (!t || !root.contains(t) || t.disabled) return;
     e.preventDefault();
     if (t.hasAttribute('data-pja-scan')) aiScan(t);
@@ -1605,5 +1605,6 @@
     e.preventDefault();
     if (e.target.closest('[data-pjc-mform]')) addMoment();
     else if (e.target.closest('.pjc-empty')) applyTemplate();
+    else if (e.target.closest('.pja-set')) aiSettings(e.target.closest('.pja-set').querySelector('[data-pja-settings]'));
   });
 })();
