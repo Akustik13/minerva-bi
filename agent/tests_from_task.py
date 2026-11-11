@@ -263,3 +263,79 @@ class AutoPurchaseAndReportTests(FromTaskBase):
         form.is_valid()
         self.assertIn('report_to', form.errors)
         self.assertIn('report_chats', form.errors)
+
+
+class ProcessNowTests(FromTaskBase):
+    """«▶ Обробити зараз» у «🧪 Перевірити, як працює» (agent/mail.py process_now)."""
+
+    def rule(self, **kw):
+        defaults = dict(account=self.account, name='Закупівлі', kind=AgentRule.MAIL_TASK, senders='@raynool.com',
+                        instruction='Внеси закупівлю з листа постачальника.')
+        defaults.update(kw)
+        return AgentRule.objects.create(**defaults)
+
+    def test_old_mail_is_skipped_by_cron_but_processed_by_button(self):
+        old = self.mail()
+        rule = self.rule()
+        rule.seen_pk = agent_mail.start_pk(self.account)
+        rule.save()
+        agent_mail.run_due()
+        self.assertFalse(AgentRun.objects.exists())                       # лист старший за доручення — сам не бере
+        page = self.client.get(reverse('admin:agent_agentrule_change', args=[rule.pk]))
+        url = reverse('admin:agent_agentrule_process', args=[rule.pk, old.pk])
+        self.assertContains(page, url)
+        self.assertContains(page, '▶ Обробити зараз')
+        with mock.patch('agent.tasks._client', return_value=FakeClient([resp('end_turn', text('Готово.'))])):
+            r = self.client.post(url)
+        self.assertRedirects(r, reverse('admin:agent_agentrule_change', args=[rule.pk]) + '#fieldset-0-1-heading',
+                             fetch_redirect_response=False)
+        run = AgentRun.objects.get(rule=rule, message=old)
+        self.assertEqual(run.status, AgentRun.TASKED)
+        self.assertIsNotNone(run.retried_at)
+        self.assertEqual(run.task.status, AgentTask.DONE)                 # агент відпрацював одразу
+        self.assertIn('Внеси закупівлю', run.task.instruction)
+        why, _run = agent_mail.process_now(rule, old)                     # удруге — ні
+        self.assertIn('уже в роботі', why)
+        self.assertNotContains(self.client.get(reverse('admin:agent_agentrule_change', args=[rule.pk])), url)
+
+    def test_old_mail_older_than_three_days_too(self):
+        old = self.mail()
+        from email_assistant.models import EmailMessage
+        EmailMessage.objects.filter(pk=old.pk).update(sent_at=timezone.now() - timezone.timedelta(days=20))
+        old.refresh_from_db()
+        rule = self.rule()
+        with mock.patch('agent.tasks._client', return_value=FakeClient([])):
+            why, run = agent_mail.process_now(rule, old)
+        self.assertEqual(why, '')
+        self.assertEqual(run.status, AgentRun.TASKED)
+
+    def test_refusals(self):
+        rule = self.rule()
+        other = self.mail(frm='anna@kunde.de')
+        why, run = agent_mail.process_now(rule, other)
+        self.assertIn('не підходить', why)
+        self.assertIsNone(run)
+        rule.enabled = False
+        rule.save()
+        self.assertIn('вимкнене', agent_mail.process_now(rule, self.mail())[0])
+        self.assertFalse(AgentRun.objects.exists())
+
+    def test_skipped_run_goes_again(self):
+        rule = self.rule()
+        msg = self.mail()
+        AgentRun.objects.create(rule=rule, message=msg, status=AgentRun.SKIPPED, reason='ліміт на день')
+        with mock.patch('agent.tasks._client', return_value=FakeClient([])):
+            why, run = agent_mail.process_now(rule, msg)
+        self.assertEqual(why, '')
+        run.refresh_from_db()
+        self.assertEqual(run.status, AgentRun.TASKED)
+
+    def test_reply_rule_waits_for_cron_and_foreign_rule_refused(self):
+        rule = self.rule(kind=AgentRule.MAIL_REPLY, instruction='Дякуємо, відповімо.')
+        msg = self.mail()
+        why, run = agent_mail.process_now(rule, msg)
+        self.assertEqual((why, run.status), ('', AgentRun.QUEUED))       # відповідь — cron протягом хвилини
+        bob = User.objects.create_user('bob', 'b@x.y', 'p', is_staff=True, is_superuser=True)
+        self.client.force_login(bob)
+        r = self.client.post(reverse('admin:agent_agentrule_process', args=[rule.pk, msg.pk]))
+        self.assertEqual(r.status_code, 404)                             # чуже доручення

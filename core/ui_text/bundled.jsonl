@@ -6440,6 +6440,7 @@
 {"uk": "З каталогу Minerva", "en": "From the Minerva catalog", "de": "Aus dem Minerva-Katalog"}
 {"uk": "З каталогу продуктів", "en": "From the product catalog", "de": "Aus dem Artikelkatalog"}
 {"uk": "З кожного нового такого листа — завдання агенту{0}.", "en": "A task for the agent from every new such email{0}.", "de": "Aus jeder neuen solchen E-Mail — eine Aufgabe für den Agenten{0}."}
+{"uk": "З кожного нового такого листа — завдання агенту{0}{1}.", "en": "An agent task from every new such e-mail{0}{1}.", "de": "Eine Agentenaufgabe aus jeder neuen solchen E-Mail{0}{1}."}
 {"uk": "З кожного такого листа — завдання агенту ({0}, до {1} $): агент читає лист і вкладення й пропонує зміни на сторінці завдання.", "en": "From each such email — an agent task ({0}, up to {1} $): the agent reads the email and attachments and proposes changes on the task page.", "de": "Aus jeder solchen E-Mail — eine Agenten-Aufgabe ({0}, bis {1} $): der Agent liest E-Mail und Anhänge und schlägt Änderungen auf der Aufgabenseite vor."}
 {"uk": "З листа", "en": "From e-mail", "de": "Aus E-Mail"}
 {"uk": "З листа {0} від {1}: {2}", "en": "From email {0} dated {1}: {2}", "de": "Aus E-Mail {0} vom {1}: {2}"}
@@ -8679,6 +8680,8 @@
 {"uk": "Лист {0}{1} · {2} · від: {3} · тема: {4} {5}", "en": "Лист {0}{1} · {2} · від: {3} · тема: {4} {5}", "de": "Лист {0}{1} · {2} · від: {3} · тема: {4} {5}"}
 {"uk": "Лист «{0}»", "en": "Email “{0}”", "de": "E-Mail „{0}“"}
 {"uk": "Лист «{0}» знову в черзі — агент обробить його протягом хвилини за теперішніми налаштуваннями.", "en": "Email «{0}» is queued again — the agent will process it within a minute with the current settings.", "de": "E-Mail «{0}» ist wieder in der Warteschlange — der Agent verarbeitet sie innerhalb einer Minute mit den aktuellen Einstellungen."}
+{"uk": "Лист «{0}» у черзі — агент обробить його протягом хвилини за теперішніми налаштуваннями доручення.", "en": "E-mail “{0}” is queued — the agent will process it within a minute with the rule’s current settings.", "de": "E-Mail „{0}“ ist in der Warteschlange — der Agent bearbeitet sie innerhalb einer Minute mit den aktuellen Einstellungen der Regel."}
+{"uk": "Лист «{0}»: агент узявся за завдання — пропозиції й звіт будуть, щойно закінчить (стан — у таблиці нижче).", "en": "E-mail “{0}”: the agent has started the task — proposals and the report will follow as soon as it finishes (status in the table below).", "de": "E-Mail „{0}“: der Agent hat mit der Aufgabe begonnen — Vorschläge und Bericht folgen, sobald er fertig ist (Status in der Tabelle unten)."}
 {"uk": "Лист «Ласкаво просимо»", "en": "«Welcome» e-mail", "de": "E-Mail «Willkommen»"}
 {"uk": "Лист «Ласкаво просимо» після підтвердження реєстрації", "en": "“Welcome” e-mail after registration is confirmed", "de": "E-Mail „Willkommen“ nach Bestätigung der Registrierung"}
 {"uk": "Лист «оплату отримано»", "en": "“Payment received” e-mail", "de": "E-Mail „Zahlung eingegangen“"}
@@ -10437,6 +10440,7 @@
 {"uk": "Нові коміти", "en": "New commits", "de": "Neue Commits"}
 {"uk": "Нові листи від клієнтів", "en": "New e-mails from customers", "de": "Neue E-Mails von Kunden"}
 {"uk": "Нові листи від нього в календар не потраплятимуть. Скасувати — «🧹 Почистити» → фільтри.", "en": "New e-mails from this sender will not reach the calendar. To undo — “🧹 Clean up” → filters.", "de": "Neue E-Mails dieses Absenders gelangen nicht in den Kalender. Rückgängig machen — „🧹 Bereinigen“ → Filter."}
+{"uk": "Нові листи доручення бере саме, а цей прийшов раніше за доручення. Агент обробить його зараз за теперішніми налаштуваннями (зі звітом і «✓ … вносити самому»). Інші зміни в картці при цьому не зберігаються.", "en": "The rule picks up new e-mails by itself, but this one arrived before the rule. The agent will process it now with the current settings (with the report and “✓ … by itself”). Other changes on this page are not saved by this.", "de": "Neue E-Mails übernimmt die Regel selbst, diese kam aber vor der Regel. Der Agent bearbeitet sie jetzt mit den aktuellen Einstellungen (mit Bericht und „✓ … selbst“). Andere Änderungen auf dieser Seite werden dabei nicht gespeichert."}
 {"uk": "Нові листи перевіряються автоматично. Щоб позначити листи, отримані раніше, виберіть глибину й збережіть — обробка йде у фоні.", "en": "New e-mails are checked automatically. To mark e-mails received earlier, choose the depth and save — processing runs in the background.", "de": "Neue E-Mails werden automatisch geprüft. Um früher empfangene E-Mails zu markieren, wählen Sie die Tiefe und speichern Sie — die Verarbeitung läuft im Hintergrund."}
 {"uk": "Нові листи перевіряються самі; зміни часу й скасування оновлюють ту саму зустріч.", "en": "New e-mails are checked automatically; time changes and cancellations update the same meeting.", "de": "Neue E-Mails werden automatisch geprüft; Zeitänderungen und Absagen aktualisieren denselben Termin."}
 {"uk": "Нові невиконані задачі", "en": "New open tasks", "de": "Neue offene Aufgaben"}
@@ -10626,6 +10630,7 @@
 {"uk": "Обрати + Jumingo", "en": "Select + Jumingo", "de": "Auswählen + Jumingo"}
 {"uk": "Обрати всі", "en": "Select all", "de": "Alle auswählen"}
 {"uk": "Обробити всі замовлення, не тільки без customer_key", "en": "Process all orders, not only those without customer_key", "de": "Alle Aufträge verarbeiten, nicht nur die ohne customer_key"}
+{"uk": "Обробити зараз", "en": "Process now", "de": "Jetzt bearbeiten"}
 {"uk": "Обробити тільки клієнтів з певного джерела (напр. digikey)", "en": "Process only customers from a given source (e.g. digikey)", "de": "Nur Kunden einer bestimmten Quelle verarbeiten (z. B. digikey)"}
 {"uk": "Обробити тільки конкретний SKU", "en": "Process only a specific SKU", "de": "Nur eine bestimmte SKU verarbeiten"}
 {"uk": "Обробити тільки конкретну компанію (точна назва)", "en": "Process only a specific company (exact name)", "de": "Nur ein bestimmtes Unternehmen verarbeiten (genauer Name)"}
@@ -16371,6 +16376,7 @@
 {"uk": "Що бачить і що може змінити цей ключ", "en": "What this key can see and change", "de": "Was dieser Schlüssel sehen und ändern kann"}
 {"uk": "Що брати", "en": "What to take", "de": "Was übernommen wird"}
 {"uk": "Що буде після цих налаштувань: опис, листи скриньки, що підходять, і «🧪 Що зробив би агент» на будь-якому з них.", "en": "What these settings will do: a description, the mailbox's matching emails and «🧪 What the agent would do» on any of them.", "de": "Was diese Einstellungen bewirken: Beschreibung, passende E-Mails des Postfachs und «🧪 Was der Agent tun würde» an jeder davon."}
+{"uk": "Що буде після цих налаштувань: опис, листи скриньки, що підходять, і «🧪 Що зробив би агент» на будь-якому з них. Нові листи доручення бере саме; лист, що прийшов раніше за доручення, — кнопкою «▶ Обробити зараз».", "en": "What these settings will do: a description, the mailbox e-mails that match, and “🧪 What the agent would do” on any of them. The rule picks up new e-mails by itself; an e-mail that arrived before the rule — with the “▶ Process now” button.", "de": "Was diese Einstellungen bewirken: Beschreibung, passende E-Mails des Postfachs und „🧪 Was der Agent tun würde“ bei jeder davon. Neue E-Mails übernimmt die Regel selbst; eine E-Mail, die vor der Regel kam, — mit der Schaltfläche „▶ Jetzt bearbeiten“."}
 {"uk": "Що в мене на цьому тижні?", "en": "What do I have this week?", "de": "Was steht diese Woche an?"}
 {"uk": "Що в ньому важливого (необов'язково, теж шукається)", "en": "What is important in it (optional, also searchable)", "de": "Was darin wichtig ist (optional, wird ebenfalls durchsucht)"}
 {"uk": "Що в повідомленні", "en": "What the message contains", "de": "Inhalt der Nachricht"}
@@ -17448,6 +17454,7 @@
 {"uk": "дорожче", "en": "more expensive", "de": "teurer"}
 {"uk": "дорожче {0} · ↓ дешевше {1}", "en": "more expensive {0} · ↓ cheaper {1}", "de": "teurer {0} · ↓ günstiger {1}"}
 {"uk": "доручення «{0}»", "en": "rule «{0}»", "de": "Regel «{0}»"}
+{"uk": "доручення вимкнене", "en": "the rule is disabled", "de": "die Regel ist deaktiviert"}
 {"uk": "доручення вимкнене — спершу увімкніть його", "en": "the rule is disabled — enable it first", "de": "die Regel ist deaktiviert — aktivieren Sie sie zuerst"}
 {"uk": "досить початку адреси, напр.", "en": "the beginning of the address is enough, e.g.", "de": "der Anfang der Adresse genügt, z. B."}
 {"uk": "доставка в цю країну недоступна", "en": "delivery to this country is not available", "de": "Lieferung in dieses Land ist nicht möglich"}
@@ -18190,6 +18197,7 @@
 {"uk": "лист клієнту готовий", "en": "email to the customer is ready", "de": "E-Mail an den Kunden ist bereit"}
 {"uk": "лист клієнту й наступне.", "en": "the customer email and the next one.", "de": "E-Mail an den Kunden und der nächste."}
 {"uk": "лист не надіслано", "en": "email not sent", "de": "E-Mail nicht gesendet"}
+{"uk": "лист не підходить під умови доручення ({0})", "en": "the e-mail does not match the rule’s conditions ({0})", "de": "die E-Mail entspricht nicht den Bedingungen der Regel ({0})"}
 {"uk": "лист не у Вхідних (спам, кошик чи надісланий)", "en": "the e-mail is not in the Inbox (spam, trash or sent)", "de": "die E-Mail ist nicht im Posteingang (Spam, Papierkorb oder Gesendet)"}
 {"uk": "лист прив'язаний до цього клієнта CRM", "en": "the e-mail is linked to this CRM customer", "de": "die E-Mail ist diesem CRM-Kunden zugeordnet"}
 {"uk": "лист підтвердження", "en": "confirmation email", "de": "Bestätigungs-E-Mail"}
@@ -18198,6 +18206,7 @@
 {"uk": "лист у кошику (m5) зник", "en": "the e-mail in trash (m5) is gone", "de": "die E-Mail im Papierkorb (m5) ist verschwunden"}
 {"uk": "лист у скриньці {0} (Усі листи скриньки)", "en": "the email is in mailbox {0} (All emails in the mailbox)", "de": "E-Mail im Postfach {0} (Alle E-Mails des Postfachs)"}
 {"uk": "лист у спамі або видалений", "en": "e-mail is in spam or deleted", "de": "E-Mail ist im Spam oder gelöscht"}
+{"uk": "лист уже в роботі за цим дорученням: {0}", "en": "the e-mail is already being handled by this rule: {0}", "de": "die E-Mail wird bereits von dieser Regel bearbeitet: {0}"}
 {"uk": "лист уже оброблено", "en": "e-mail already processed", "de": "E-Mail bereits bearbeitet"}
 {"uk": "лист уже обробляється", "en": "the email is already being processed", "de": "die E-Mail wird bereits verarbeitet"}
 {"uk": "лист із кошика повернувся", "en": "the e-mail from trash is back", "de": "die E-Mail aus dem Papierkorb ist zurück"}
@@ -18797,6 +18806,7 @@
 {"uk": "нових подій стрічки: {0}", "en": "new feed events: {0}", "de": "neue Feed-Ereignisse: {0}"}
 {"uk": "нових упаковок товарів (к-сть — скільки одиниць вмістила коробка)", "en": "new product packagings (qty — how many units the box held)", "de": "neue Artikelverpackungen (Menge — wie viele Einheiten der Karton fasste)"}
 {"uk": "нових файлів немає — сайту надіслано запит звірити свої копії", "en": "no new files — the site was asked to reconcile its copies", "de": "keine neuen Dateien – die Website wurde aufgefordert, ihre Kopien abzugleichen"}
+{"uk": "нову закупівлю заводить сам", "en": "creates the new purchase order by itself", "de": "legt die neue Bestellung selbst an"}
 {"uk": "нову закупівлю не пропоную", "en": "not proposing a new purchase order", "de": "keine neue Bestellung vorgeschlagen"}
 {"uk": "нові {0}", "en": "new {0}", "de": "neu {0}"}
 {"uk": "нові ступені", "en": "new price breaks", "de": "neue Staffeln"}

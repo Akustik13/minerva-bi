@@ -140,7 +140,9 @@ class AgentRuleAdmin(admin.ModelAdmin):
         (None, {'fields': ('promote_panel', 'name', 'enabled', 'account', 'kind')}),
         ('🧪 Перевірити, як працює', {'fields': ('test_panel',),
                                      'description': 'Що буде після цих налаштувань: опис, листи скриньки, що '
-                                                    'підходять, і «🧪 Що зробив би агент» на будь-якому з них.'}),
+                                                    'підходять, і «🧪 Що зробив би агент» на будь-якому з них. Нові '
+                                                    'листи доручення бере саме; лист, що прийшов раніше за '
+                                                    'доручення, — кнопкою «▶ Обробити зараз».'}),
         ('Які листи — усі задані умови разом', {
             'fields': ('senders', 'subject_words', 'body_words', 'category', 'example_link'),
             'description': 'У кожному полі — по одному в рядку, підходить будь-який рядок; «Текст листа містить» — '
@@ -274,8 +276,9 @@ class AgentRuleAdmin(admin.ModelAdmin):
             return format_html('<div style="opacity:.8">{} — кожен новий такий лист{}.</div>',
                                obj.get_importance_display(), ' · 🔔 одразу лист і Telegram вам' if obj.notify else '')
         if obj.kind == AgentRule.MAIL_TASK:
-            return format_html('<div style="opacity:.8">🧩 З кожного нового такого листа — завдання агенту{}.</div>',
-                               ' · трек-номер у порожнє поле замовлення вносить сам' if obj.auto_apply else '')
+            return format_html('<div style="opacity:.8">🧩 З кожного нового такого листа — завдання агенту{}{}.</div>',
+                               ' · трек-номер у порожнє поле замовлення вносить сам' if obj.auto_apply else '',
+                               ' · нову закупівлю заводить сам' if obj.auto_purchase else '')
         if agent_mail.promote_ready(obj):
             return format_html(
                 '<div style="padding:8px 12px;border-radius:6px;background:rgba(46,125,50,.14);'
@@ -303,8 +306,7 @@ class AgentRuleAdmin(admin.ModelAdmin):
             '<tr id="art-res-{}" hidden><td colspan="5"><pre class="art-pre"></pre></td></tr>'), (
             (timezone.localtime(f['msg'].sent_at).strftime('%d.%m %H:%M') if f['msg'].sent_at else '',
              _mail_link(f['msg']), f['why'],
-             (run_state.text(f['run']) if f['run']
-              else ('⚠️ ' + f['blocked'] if f['blocked'] else '')),
+             self._now_cell(obj, f),
              f['msg'].pk, tip, label, f['msg'].pk) for f in data['found']))
         if data['found']:
             table = format_html('<table style="width:100%;margin-top:4px"><tbody>{}</tbody></table>', rows)
@@ -335,8 +337,52 @@ class AgentRuleAdmin(admin.ModelAdmin):
         own = [path('<int:pk>/test/<int:msg_pk>/', self.admin_site.admin_view(self.test_view),
                     name='agent_agentrule_test'),
                path('<int:pk>/retry/<int:run_pk>/', self.admin_site.admin_view(self.retry_view),
-                    name='agent_agentrule_retry')]
+                    name='agent_agentrule_retry'),
+               path('<int:pk>/process/<int:msg_pk>/', self.admin_site.admin_view(self.process_view),
+                    name='agent_agentrule_process')]
         return own + super().get_urls()
+
+    def _now_cell(self, rule, found):
+        """Стан листа в «🧪 Перевірити»: що з ним уже зроблено (і «↻ Ще раз»), чому агент його не візьме, або
+        «▶ Обробити зараз» — лист підходить, але прийшов раніше за доручення."""
+        run = found['run']
+        if run is not None:
+            return format_html('{} {}', run_state.text(run), self._retry_button(rule, run))
+        if found['blocked']:
+            return format_html('⚠️ {}', found['blocked'])
+        if not rule.enabled:
+            return format_html('<span style="opacity:.75">{}</span>', 'доручення вимкнене')
+        return format_html(
+            '<button type="submit" class="button" formaction="{}" formmethod="post" formnovalidate title="{}" '
+            'style="white-space:nowrap">▶ Обробити зараз</button>',
+            reverse('admin:agent_agentrule_process', args=[rule.pk, found['msg'].pk]),
+            'Нові листи доручення бере саме, а цей прийшов раніше за доручення. Агент обробить його зараз за '
+            'теперішніми налаштуваннями (зі звітом і «✓ … вносити самому»). Інші зміни в картці при цьому не '
+            'зберігаються.')
+
+    def process_view(self, request, pk, msg_pk):
+        """POST «▶ Обробити зараз» з «🧪 Перевірити, як працює» (agent/mail.py process_now)."""
+        from email_assistant.models import EmailMessage
+        back = reverse('admin:agent_agentrule_change', args=[pk]) + '#fieldset-0-1-heading'
+        if request.method != 'POST':
+            return redirect(back)
+        rule = self.get_queryset(request).filter(pk=pk).first()
+        if rule is None or not self.has_change_permission(request, rule):
+            raise Http404
+        msg = EmailMessage.objects.filter(pk=msg_pk, account_id=rule.account_id).select_related('account').first()
+        if msg is None:
+            raise Http404
+        why, run = agent_mail.process_now(rule, msg)
+        subject = msg.subject or '(без теми)'
+        if why:
+            messages.error(request, f'▶ Не вдалося: {why}')
+        elif rule.kind == AgentRule.MAIL_TASK and run is not None and run.task_id:
+            messages.success(request, f'▶ Лист «{subject}»: агент узявся за завдання — пропозиції й звіт будуть, '
+                                      f'щойно закінчить (стан — у таблиці нижче).')
+        else:
+            messages.success(request, f'▶ Лист «{subject}» у черзі — агент обробить його протягом хвилини за '
+                                      f'теперішніми налаштуваннями доручення.')
+        return redirect(back)
 
     def retry_view(self, request, pk, run_pk):
         """POST «↻ Обробити ще раз» з «📜 Останні листи»: пропущений лист / лист з помилкою — знову в чергу."""

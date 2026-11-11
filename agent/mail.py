@@ -989,6 +989,36 @@ def retry(run) -> str:
     return '' if done else 'лист уже обробляється'
 
 
+def process_now(rule, msg) -> tuple:
+    """«▶ Обробити зараз» у «🧪 Перевірити, як працює»: лист, що підходить, але прийшов раніше за доручення (таких
+    доручення само не бере — `start_pk`), або пропущений / з помилкою — у роботу за теперішніми налаштуваннями
+    (давній теж — `retried_at`). «🧩 Завдання агенту» — завдання одразу (агент починає у фоні), решта видів — cron
+    протягом хвилини. → ('' або чому ні, AgentRun | None)."""
+    if not rule.enabled:
+        return 'доручення вимкнене — спершу увімкніть його', None
+    ok, why = matches(rule, msg)
+    if not ok:
+        return f'лист не підходить під умови доручення ({why})', None
+    reason = why_not(rule, msg, check_age=False)
+    if reason:
+        return reason, None
+    run, created = AgentRun.objects.get_or_create(rule=rule, message=msg, defaults={'retried_at': timezone.now()})
+    if not created:
+        if run.status not in RETRY_STATES:
+            return f'лист уже в роботі за цим дорученням: {run.get_status_display()}', run
+        error = retry(run)
+        if error:
+            return error, run
+    if rule.kind == AgentRule.MAIL_TASK and _claim(run):
+        from agent import tasks
+        process(AgentRun.objects.select_related('rule', 'rule__account', 'rule__account__user', 'message',
+                                                'message__thread').get(pk=run.pk))
+        run.refresh_from_db()
+        if run.task_id:
+            tasks.start(run.task)
+    return '', run
+
+
 def draft_closed(draft, how, text=''):
     """email_assistant.drafts.discard: чернетку агента надіслали (sent / scheduled) або видалили (deleted)."""
     run = AgentRun.objects.filter(draft=draft).select_related('rule').first()
