@@ -67,13 +67,15 @@ class MobileNavTests(TestCase):
         html = self.client.get("/admin/").content.decode()
         self.assertIn("localStorage.getItem('mv-view')==='pc'", html)      # до першого малювання
         self.assertLess(html.index('name="viewport"'), html.index("localStorage.getItem('mv-view')"))
-        self.assertIn("/static/admin/js/mv_mobile.js?v=4", html)
+        self.assertIn("/static/admin/js/mv_mobile.js?v=5", html)
         self.assertIn("/static/admin/css/mv_mobile.css?v=5", html)
         from pathlib import Path
         from django.conf import settings
         js = (Path(settings.BASE_DIR) / "static/admin/js/mv_mobile.js").read_text(encoding="utf-8")
         self.assertIn("'🖥 Як на ПК'", js)
         self.assertIn("'📱 Телефон'", js)
+        self.assertIn("display-mode: standalone", js)                     # встановлений додаток — свої кроки
+        self.assertIn("Minerva встановлена як додаток, а Chrome показує її як на ПК.", js)
         css = (Path(settings.BASE_DIR) / "static/admin/css/mv_mobile.css").read_text(encoding="utf-8")
         self.assertGreater(css.index("#mv-view-btn {"), css.index("@media (max-width: 768px) {"))   # окремо від телефона
 

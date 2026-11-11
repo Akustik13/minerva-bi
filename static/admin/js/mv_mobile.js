@@ -36,6 +36,22 @@
     return big > 0 && big < 1024 && touch;
   }
   function forcedPc() { return document.documentElement.classList.contains('mv-force-pc'); }
+  /* встановлено як додаток (іконка на головному екрані): меню браузера немає, «Версія для ПК» береться з Chrome */
+  function installedApp() {
+    var mm = function (q) { return !!(window.matchMedia && matchMedia(q).matches); };
+    return mm('(display-mode: standalone)') || mm('(display-mode: fullscreen)') || mm('(display-mode: minimal-ui)') ||
+      window.navigator.standalone === true;
+  }
+  function iosDevice() { return /iPhone|iPad|iPod/.test(navigator.userAgent || '') || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+  function whyPc() {
+    if (installedApp() && iosDevice()) {
+      return 'Minerva встановлена як додаток, а iPhone показує її як на ПК. У самому додатку це не змінити: Налаштування iPhone → Safari → «Запит версії сайту для комп’ютера» → вимкнути для всіх сайтів або для адреси Minerva. Потім закрийте додаток Minerva (змахніть його вгору в переліку програм) і відкрийте знову.';
+    }
+    if (installedApp()) {
+      return 'Minerva встановлена як додаток, а Chrome показує її як на ПК. У самому додатку меню браузера немає, тож змінюється в Chrome: 1) відкрийте звичайний Chrome і зайдіть на адресу Minerva; 2) ⋮ → зніміть галочку «Версія для ПК» (або ⋮ → Налаштування → Налаштування сайтів → «Версія для ПК» — вимкнути чи прибрати адресу Minerva зі списку); 3) закрийте додаток Minerva в «останніх програмах» (|||, змахнути вгору) і відкрийте знову.';
+    }
+    return 'Браузер показує сторінку як на ПК. Щоб повернути вигляд телефону: поверніть телефон вертикально або вимкніть «Версія для ПК» у меню браузера (Chrome: ⋮ → «Версія для ПК»; Safari: «аА» → «Запит мобільного вебсайту»).';
+  }
   function setView(v) {
     try { if (v === 'pc') localStorage.setItem('mv-view', 'pc'); else localStorage.removeItem('mv-view'); } catch (e) { /* приватний режим */ }
     location.reload();
@@ -49,7 +65,7 @@
     b.title = forcedPc() ? 'Повернути вигляд для телефону' : 'Чому сторінка як на ПК і як повернути вигляд телефону';
     b.onclick = function () {
       if (forcedPc()) { setView('phone'); return; }
-      window.alert('Браузер показує сторінку як на ПК. Щоб повернути вигляд телефону: поверніть телефон вертикально або вимкніть «Версія для ПК» у меню браузера (Chrome: ⋮ → «Версія для ПК»; Safari: «аА» → «Запит мобільного вебсайту»).');
+      window.alert(whyPc());
     };
     document.body.appendChild(b);
   }
