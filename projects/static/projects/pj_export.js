@@ -5,13 +5,14 @@
    PJExport.save(blob, name); PJExport.fileName(title, kind, ext). */
 (function () {
   'use strict';
-  var LIGHT = {
-    '--body-fg': '#1f2328', '--text': '#1f2328', '--text-muted': '#57606a', '--text-dim': '#6e7781',
-    '--body-bg': '#ffffff', '--bg-card': '#ffffff', '--darkened-bg': '#f6f8fa', '--body-quiet-color': '#57606a',
-    '--border-strong': '#8c959f', '--border-color': '#d0d7de', '--hairline-color': '#d8dee4',
-    '--accent': '#0969da', '--accent2-subtle': '#ddf4ff', '--accent2-hover': '#0550ae', '--primary': '#0969da',
-    '--ok': '#1a7f37', '--warn': '#9a6700', '--err': '#cf222e'
+  var LIGHT = {                                  // світла тема Minerva (base_site), фон — білий
+    '--body-fg': '#1c2128', '--text': '#1c2128', '--text-muted': '#4b5563', '--text-dim': '#5b636e',
+    '--body-bg': '#ffffff', '--bg-card': '#ffffff', '--darkened-bg': '#eef1f5', '--body-quiet-color': '#57606a',
+    '--border-strong': '#d0d7de', '--border-color': '#d0d7de', '--hairline-color': 'rgba(0,0,0,.08)',
+    '--accent': '#0860c9', '--accent2-subtle': 'rgba(5,80,174,.1)', '--accent2-hover': 'rgba(5,80,174,.06)',
+    '--primary': '#0969da', '--ok': '#1a7f37', '--warn': '#9a6700', '--err': '#cf222e'
   };
+  var PAD = 28, FONT = '"Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif';
   var PROPS = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-dasharray', 'stroke-opacity', 'opacity',
                'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline',
                'visibility', 'display', 'paint-order', 'stroke-linecap', 'stroke-linejoin'];
@@ -53,7 +54,77 @@
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
     });
   }
-  function png(svgs) {
+  // Заголовок і легенда над діаграмою: opts {title, sub, legend: [[вид, колір, підпис]]};
+  // вид — bar | soft | outline | dashbox | diamond | line | dash | base | text (сам текст — колір, напр. «+N»)
+  function legendMark(ctx, kind, color, x, y) {
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    if (kind === 'diamond') {
+      ctx.beginPath(); ctx.moveTo(x + 7, y - 7); ctx.lineTo(x + 14, y); ctx.lineTo(x + 7, y + 7); ctx.lineTo(x, y);
+      ctx.closePath(); ctx.fill();
+    } else if (kind === 'line' || kind === 'dash') {
+      ctx.lineWidth = 2;
+      if (kind === 'dash') ctx.setLineDash([5, 3]);
+      ctx.beginPath(); ctx.moveTo(x + 7, y - 8); ctx.lineTo(x + 7, y + 8); ctx.stroke();
+    } else if (kind === 'outline' || kind === 'dashbox') {
+      ctx.lineWidth = kind === 'dashbox' ? 1.5 : 2;
+      if (kind === 'dashbox') ctx.setLineDash([3, 2]);
+      ctx.strokeRect(x, y - 6, 22, 12);
+    } else if (kind === 'text') {
+      ctx.font = '700 13px ' + FONT; ctx.fillText('+N', x, y + 5);
+      ctx.restore();
+      return 22;
+    } else if (kind === 'base') {
+      ctx.globalAlpha = .7; ctx.fillRect(x, y - 2, 22, 4);
+    } else {
+      ctx.globalAlpha = kind === 'soft' ? .45 : .85; ctx.fillRect(x, y - 6, 22, 12);
+    }
+    ctx.restore();
+    return kind === 'diamond' || kind === 'line' || kind === 'dash' ? 16 : 24;
+  }
+  function headHeight(opts) {
+    if (!opts || !opts.title) return PAD;
+    return PAD + 26 + (opts.sub ? 22 : 0) + (opts.legend && opts.legend.length ? 30 : 0) + 16;
+  }
+  function drawHead(ctx, opts, W) {
+    if (!opts || !opts.title) return;
+    var y = PAD + 20;
+    ctx.fillStyle = '#1c2128';
+    ctx.font = '700 20px ' + FONT;
+    ctx.fillText(opts.title, PAD, y);
+    if (opts.sub) {
+      y += 22;
+      ctx.fillStyle = '#4b5563';
+      ctx.font = '14px ' + FONT;
+      ctx.fillText(opts.sub, PAD, y);
+    }
+    if (opts.legend && opts.legend.length) {
+      y += 28;
+      var x = PAD;
+      ctx.font = '13px ' + FONT;
+      opts.legend.forEach(function (it) {
+        x += legendMark(ctx, it[0], it[1], x, y - 4) + 6;
+        ctx.fillStyle = '#4b5563';
+        ctx.fillText(it[2], x, y);
+        x += ctx.measureText(it[2]).width + 18;
+      });
+    }
+    ctx.strokeStyle = '#d0d7de';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD, y + 12.5); ctx.lineTo(W - PAD, y + 12.5); ctx.stroke();
+  }
+  function headWidth(opts) {
+    if (!opts || !opts.title) return 0;
+    var c = document.createElement('canvas').getContext('2d'), w = 0;
+    c.font = '700 20px ' + FONT; w = Math.max(w, c.measureText(opts.title).width);
+    c.font = '14px ' + FONT; if (opts.sub) w = Math.max(w, c.measureText(opts.sub).width);
+    c.font = '13px ' + FONT;
+    var lw = 0;
+    (opts.legend || []).forEach(function (it) { lw += 30 + c.measureText(it[2]).width + 18; });
+    return Math.max(w, lw) + PAD * 2;
+  }
+  function png(svgs, opts) {
     var holder = (svgs[0] && svgs[0].closest('.pjc')) || document.documentElement;
     var saved = {}, keys = Object.keys(LIGHT).concat(['color']);
     keys.forEach(function (k) { saved[k] = holder.style.getPropertyValue(k); });
@@ -75,8 +146,9 @@
         if (saved[k]) holder.style.setProperty(k, saved[k]); else holder.style.removeProperty(k);
       });
     }
-    var W = parts.reduce(function (s, p) { return s + p.w; }, 0);
-    var H = parts.reduce(function (s, p) { return Math.max(s, p.h); }, 0);
+    var top = headHeight(opts);
+    var W = Math.max(parts.reduce(function (s, p) { return s + p.w; }, 0) + PAD * 2, headWidth(opts));
+    var H = parts.reduce(function (s, p) { return Math.max(s, p.h); }, 0) + top + PAD;
     var scale = Math.min(SCALE, MAX_PX / Math.max(W, H, 1));
     return Promise.all(parts.map(function (p) { return load(p.xml); })).then(function (imgs) {
       var cv = document.createElement('canvas');
@@ -86,9 +158,10 @@
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, cv.width, cv.height);
       ctx.scale(scale, scale);
-      var x = 0;
+      drawHead(ctx, opts, W);
+      var x = PAD;
       imgs.forEach(function (img, i) {
-        ctx.drawImage(img, x, 0, parts[i].w, parts[i].h);
+        ctx.drawImage(img, x, top, parts[i].w, parts[i].h);
         x += parts[i].w;
       });
       return new Promise(function (res, rej) {

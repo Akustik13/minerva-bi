@@ -221,6 +221,41 @@ def highlight_view(request, pk):
 
 
 HANDLED_MAX = 200
+PEEK_CHARS = 900
+
+
+@staff_member_required
+@require_GET
+def mail_peek_view(request):
+    """👁 Лист чи гілка при наведенні в пульті проєкту: ?m=<лист> або ?t=<гілка> (останній лист і скільки листів) —
+    лише з власних скриньок людини (чужий — 404, як і «📬 Листи зі скриньки»). Новий текст без цитат і підпису."""
+    import re
+    from django.utils import timezone as tz
+
+    from email_assistant import quotes
+    from email_assistant.crm_link import is_own, own_addresses
+    from email_assistant.models import EmailMessage
+    qs = EmailMessage.objects.filter(account__user=request.user, is_deleted=False)
+    m, count = None, 0
+    if str(request.GET.get("m") or "").isdigit():
+        m = qs.filter(pk=int(request.GET["m"])).first()
+    elif str(request.GET.get("t") or "").isdigit():
+        thread = qs.filter(thread_id=int(request.GET["t"]))
+        count = thread.count()
+        m = thread.order_by("-sent_at", "-pk").first()
+    if m is None:
+        return JsonResponse({"ok": False, "error": "Лист не знайдено у ваших скриньках"}, status=404)
+    text = quotes.strip_signature(quotes.new_text(m.body_text or "")).strip() or (m.body_text or "").strip()
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    more = len(text) > PEEK_CHARS
+    files = [a.get("name") for a in (m.attachments or []) if isinstance(a, dict) and not a.get("is_inline")
+             and a.get("name")][:8]
+    when = tz.localtime(m.sent_at) if m.sent_at and tz.is_aware(m.sent_at) else m.sent_at
+    return JsonResponse({
+        "ok": True, "subject": m.subject or "(без теми)", "from": m.from_name or m.from_email,
+        "from_email": m.from_email, "to": ", ".join((m.to_emails or [])[:3]), "date": when.strftime("%d.%m.%Y %H:%M")
+        if when else "", "out": is_own(m.from_email, own_addresses()), "text": text[:PEEK_CHARS].rstrip(),
+        "more": more, "files": files, "count": count, "url": f"/email/message/{m.pk}/"})
 
 
 def _talk_title(text) -> str:
@@ -381,9 +416,9 @@ def export_view(request, pk):
         files = []
         for f in formats:
             if f == "pdf":
-                files.append((export.file_name(project, what, "pdf"), export.pdf(project, what, lang, png,
-                                                                                  bool(request.POST.get("table"))),
-                              "application/pdf"))
+                files.append((export.file_name(project, what, "pdf"),
+                              export.pdf(project, what, lang, png, bool(request.POST.get("table")),
+                                         titled=bool(request.POST.get("titled"))), "application/pdf"))
             elif f == "png":
                 files.append((export.file_name(project, what, "png"), png, "image/png"))
             else:

@@ -448,3 +448,12 @@
   .pjc-mt-pending { font-weight: 600; color: var(--warn, #e3b341); }
   .pjc-from-meeting { white-space: nowrap; }
   @media (max-width: 768px) { .pjc-link.pjc-rec { flex: 1 1 100%; text-align: center; padding: 8px 9px; } }
+
+/* 👁 Лист при наведенні (пульт проєкту) */
+.pjm-peek { position: fixed; z-index: 10000; padding: 10px 12px; border-radius: 10px; background: var(--bg-card, #fff);
+  color: var(--body-fg, #1c2128); border: 1px solid var(--border-strong, #d0d7de); box-shadow: 0 6px 22px rgba(0, 0, 0, .28);
+  font-size: 13px; line-height: 1.45; pointer-events: none; }
+.pjm-peek .pjm-s { font-weight: 700; margin-bottom: 2px; }
+.pjm-peek .pjm-m, .pjm-peek .pjm-c, .pjm-peek .pjm-h { color: var(--text-muted, #57606a); font-size: 12px; }
+.pjm-peek .pjm-t { margin: 6px 0; white-space: pre-wrap; word-break: break-word; max-height: 16em; overflow: hidden; }
+.pjm-peek .pjm-f { font-size: 12px; margin-bottom: 4px; word-break: break-word; }

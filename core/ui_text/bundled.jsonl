@@ -8118,6 +8118,7 @@
 {"uk": "Клік на сторону — змінити · правий клік — меню (＋ хто їй постачає). У вікні кроку плану можна вибрати сторону — тоді «Хто» на діаграмі Ганта — її назва.", "en": "Click a party — edit · right-click — menu (＋ who supplies it). In the plan step window you can pick a party — then «Who» on the Gantt chart is its name.", "de": "Klick auf einen Beteiligten — ändern · Rechtsklick — Menü (＋ wer an ihn liefert). Im Fenster eines Planschritts können Sie einen Beteiligten wählen — dann steht im Gantt-Diagramm unter «Wer» sein Name."}
 {"uk": "Клік на 🖨️ — як у «Продажі → Налаштування → 🏷️ Етикетки DYMO»: завантажити .dymo або одразу надрукувати через службу DYMO Connect; правий клік — інші варіанти", "en": "Click on 🖨️ — as in “Sales → Settings → 🏷️ DYMO labels”: download .dymo or print right away via the DYMO Connect service; right-click — other options", "de": "Klick auf 🖨️ – wie unter „Verkauf → Einstellungen → 🏷️ DYMO-Etiketten“: .dymo herunterladen oder sofort über den Dienst DYMO Connect drucken; Rechtsklick – weitere Optionen"}
 {"uk": "Клік по рядку відкриває подробиці праворуч. Натисніть, щоб вимкнути.", "en": "Clicking a row opens its details on the right. Click to turn off.", "de": "Ein Klick auf eine Zeile öffnet die Details rechts. Zum Ausschalten klicken."}
+{"uk": "Клік — відкрити лист", "en": "Click — open the e-mail", "de": "Klick — E-Mail öffnen"}
 {"uk": "Клік — згорнути чи розгорнути кроки фази", "en": "Click — collapse or expand the steps of the phase", "de": "Klick — Schritte der Phase ein- oder ausklappen"}
 {"uk": "Клік — показати цю сторінку", "en": "Click — show this page", "de": "Klick — diese Seite anzeigen"}
 {"uk": "Клік — ✓ виконано, зустріч чи термін, лист", "en": "Click — ✓ done, meeting or deadline, e-mail", "de": "Klick — ✓ erledigt, Besprechung oder Frist, E-Mail"}
@@ -15371,6 +15372,7 @@
 {"uk": "У виробництві", "en": "In production", "de": "In Fertigung"}
 {"uk": "У гіді немає сторінок про це — спробуйте інакше сформулювати.", "en": "The guide has no pages about this — try rephrasing.", "de": "Der Leitfaden enthält keine Seiten dazu — versuchen Sie es mit einer anderen Formulierung."}
 {"uk": "У гіді цього немає", "en": "This is not in the guide", "de": "Das steht nicht im Leitfaden"}
+{"uk": "У гілці листів: {0} · показано останній", "en": "E-mails in the thread: {0} · showing the latest", "de": "E-Mails im Verlauf: {0} · die neueste wird gezeigt"}
 {"uk": "У джерелі «{0}» вже є замовлення з номерами: {1} — їх не перенесено.", "en": "Source “{0}” already has orders with the numbers: {1} — they were not moved.", "de": "In der Quelle „{0}“ gibt es bereits Aufträge mit den Nummern: {1} – sie wurden nicht übertragen."}
 {"uk": "У документи замовлення", "en": "Into order documents", "de": "In die Auftragsdokumente"}
 {"uk": "У документи замовлення й проєкту", "en": "Into order and project documents", "de": "In die Auftrags- und Projektdokumente"}
@@ -17466,6 +17468,7 @@
 {"uk": "дн.", "en": "d.", "de": "Tg."}
 {"uk": "дн. · кроків", "en": "d. · steps", "de": "Tg. · Schritte"}
 {"uk": "дн. від базового плану", "en": "days from the baseline", "de": "Tage vom Basisplan"}
+{"uk": "дн. зсуву від базового плану", "en": "days behind the baseline", "de": "Tage Verzug ggü. Basisplan"}
 {"uk": "дні", "en": "days", "de": "Tage"}
 {"uk": "днів", "en": "days", "de": "Tage"}
 {"uk": "днів дії посилання", "en": "days the link is valid", "de": "Tage Gültigkeit des Links"}

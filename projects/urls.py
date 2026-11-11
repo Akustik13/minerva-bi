@@ -18,6 +18,7 @@ urlpatterns = [
     path("api/project/<int:pk>/highlights/", views.highlight_view, name="highlight"),
     path("api/highlight/<int:hid>/delete/", views.highlight_delete_view, name="highlight_delete"),
     path("api/project/<int:pk>/mail-handled/", views.mail_handled_view, name="mail_handled"),
+    path("api/mail-peek/", views.mail_peek_view, name="mail_peek"),
     path("api/project/<int:pk>/event-note/", views.event_note_view, name="event_note"),
     path("api/project/<int:pk>/export/", views.export_view, name="export"),
     path("api/project/<int:pk>/party/", views.party_view, name="party"),

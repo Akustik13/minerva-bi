@@ -111,3 +111,36 @@ class HelpersTests(PartiesBase):
                                   [101], {})
         self.assertIsNone(items[0]["message"])                                  # #1 — не власний лист
         self.assertEqual(ai_risks.key_for("Затримка  плат"), ai_risks.key_for("затримка плат"))
+
+
+class MailPeekTests(AIBase):
+    """👁 Лист при наведенні в пульті: лише власні скриньки, новий текст без цитат, гілка — останній лист."""
+    def test_own_message_and_thread(self):
+        url = reverse("projects:mail_peek")
+        j = self.client.get(url, {"m": self.reply.pk}).json()
+        self.assertEqual((j["ok"], j["subject"]), (True, "Re: Anfrage 5G Antenne"))
+        self.assertIn("Stecker MHF4", j["text"])
+        self.assertNotIn("Alte Nachricht", j["text"])                         # цитата — ні
+        j = self.client.get(url, {"t": self.reply.thread_id}).json()
+        self.assertEqual(j["count"], 2)
+        self.assertEqual(j["url"], f"/email/message/{self.reply.pk}/")       # останній лист гілки
+
+    def test_foreign_mailbox_is_hidden(self):
+        olga, _acc = self.colleague()
+        self.client.force_login(olga)
+        r = self.client.get(reverse("projects:mail_peek"), {"m": self.reply.pk})
+        self.assertEqual(r.status_code, 404)
+
+
+class TitledPdfTests(PartiesBase):
+    def test_titled_image_skips_the_page_header(self):
+        from projects import export
+        from projects.tests_parties import HAS_PDF, png_bytes
+        if not HAS_PDF:
+            self.skipTest("reportlab не встановлено")
+        from pypdf import PdfReader
+        self.step("Зразки", days=5, start=self.today)
+        data = export.pdf(self.project, "plan", "de", png_bytes(), table=True, titled=True)
+        pages = PdfReader(io.BytesIO(data)).pages
+        self.assertNotIn(self.project.code, pages[0].extract_text())          # заголовок — у картинці
+        self.assertIn(self.project.code, pages[1].extract_text())             # таблиця — з назвою проєкту

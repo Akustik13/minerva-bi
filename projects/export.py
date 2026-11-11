@@ -146,7 +146,7 @@ def _keep(font_name):
     return clean
 
 
-def pdf(project, what, lang, png, table=False, today=None) -> bytes:
+def pdf(project, what, lang, png, table=False, today=None, titled=False) -> bytes:
     from PIL import Image as PILImage
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A3, A4, landscape
@@ -178,10 +178,11 @@ def pdf(project, what, lang, png, table=False, today=None) -> bytes:
     if project.customer_id:
         from .portfolio import customer_name
         line.append(f"{t['customer']}: {customer_name(project.customer)}")
-    story = [Paragraph(_esc(title), h1), Paragraph(_esc(clean(" · ".join(line))), sub), Spacer(1, 4 * mm)]
+    head = [Paragraph(_esc(title), h1), Paragraph(_esc(clean(" · ".join(line))), sub), Spacer(1, 4 * mm)]
+    story = [] if (titled and png) else list(head)       # заголовок і легенда вже в картинці
     if png:
         avail_w = page[0] - 2 * margin
-        avail_h = page[1] - 2 * margin - 22 * mm
+        avail_h = page[1] - 2 * margin - (4 * mm if titled else 22 * mm)
         ratio = min(avail_w / w, avail_h / h)
         story.append(Image(io.BytesIO(png), width=w * ratio, height=h * ratio))
     if table and what == "plan":
@@ -189,6 +190,8 @@ def pdf(project, what, lang, png, table=False, today=None) -> bytes:
         if data:
             if png:
                 story.append(PageBreak())
+            if titled and png:
+                story += head
             story.append(Paragraph(_esc(clean(t["steps_title"])), h1))
             story.append(Spacer(1, 3 * mm))
             head = [t["step"], t["who"], t["start"], t["end"], t["days"], t["status"]]

@@ -1343,6 +1343,45 @@
     expFiles();
     d.showModal();
   }
+  // Заголовок і легенда картинки — мовою документа (як PDF і лист)
+  var EXP_WORDS = {
+    de: {plan: 'Projektplan', timeline: 'Projektverlauf', chain: 'Projektbeteiligte und Lieferkette', asof: 'Stand',
+         customer: 'Kunde', done: 'erledigt', doing: 'in Arbeit', waiting: 'wartet', todo: 'geplant',
+         crit: 'kritischer Pfad', mile: 'Meilenstein', base: 'Basisplan', today: 'heute', due: 'Kundentermin',
+         late: 'überfällig', ok: 'fertig', slip: 'Tage Verzug ggü. Basisplan'},
+    en: {plan: 'Project plan', timeline: 'Project timeline', chain: 'Project parties and supply chain', asof: 'as of',
+         customer: 'Customer', done: 'done', doing: 'in progress', waiting: 'waiting', todo: 'planned',
+         crit: 'critical path', mile: 'milestone', base: 'baseline', today: 'today', due: 'customer deadline',
+         late: 'overdue', ok: 'done', slip: 'days behind the baseline'},
+    uk: {plan: 'План проєкту', timeline: 'Шкала проєкту', chain: 'Сторони проєкту й ланцюжок постачання',
+         asof: 'станом на', customer: 'Клієнт', done: 'виконано', doing: 'в роботі', waiting: 'чекаємо',
+         todo: 'заплановано', crit: 'критичний шлях', mile: 'віха', base: 'базовий план', today: 'сьогодні',
+         due: 'строк клієнту', late: 'прострочено', ok: 'готово', slip: 'дн. зсуву від базового плану'}
+  };
+  function expHead(lang) {
+    var w = EXP_WORDS[lang] || EXP_WORDS.de, b = box(), d = new Date();
+    var day = lang === 'en' ? d.toISOString().slice(0, 10)
+      : ('0' + d.getDate()).slice(-2) + '.' + ('0' + (d.getMonth() + 1)).slice(-2) + '.' + d.getFullYear();
+    var sub = [w[expKind] || '', w.asof + ' ' + day, b.dataset.customer ? w.customer + ': ' + b.dataset.customer : '']
+      .filter(Boolean).join(' · ');
+    var legend = [];
+    var classic = root.querySelector('[data-pjg-pane="classic"]');
+    if (expKind === 'plan' && classic && !classic.hidden) {          // 📋 класична — як у MS Project
+      legend = [['bar', '#1a7f37', w.done], ['bar', '#0860c9', w.doing], ['bar', '#9a6700', w.waiting],
+                ['soft', '#0860c9', w.todo], ['outline', '#cf222e', w.crit], ['diamond', '#1c2128', w.mile],
+                ['base', '#4b5563', w.base], ['line', '#cf222e', w.today]];
+      if (b.dataset.due) legend.push(['dash', '#cf222e', w.due]);
+    } else if (expKind === 'plan') {                                    // 📊 Minerva: план — пунктир, сьогодні — темна
+      legend = [['bar', '#1a7f37', w.done], ['bar', '#0860c9', w.doing], ['bar', '#9a6700', w.waiting],
+                ['dashbox', '#57606a', w.todo], ['outline', '#cf222e', w.crit], ['diamond', '#1c2128', w.mile],
+                ['base', '#4b5563', w.base], ['line', '#1c2128', w.today]];
+      if (b.dataset.due) legend.push(['dash', '#cf222e', w.due]);
+      legend.push(['text', '#cf222e', w.slip]);
+    } else if (expKind === 'chain') {
+      legend = [['outline', '#cf222e', w.late], ['outline', '#9a6700', w.waiting], ['outline', '#1a7f37', w.ok]];
+    }
+    return {title: (b.dataset.code || '') + ' · ' + (b.dataset.title || ''), sub: sub, legend: legend};
+  }
   function expWant() {
     var d = dlg.exp, f = function (k) { return q(d, 'data-x', k); };
     return {pdf: f('pdf').checked, png: f('png').checked, xlsx: expKind === 'plan' && f('xlsx').checked,
@@ -1378,6 +1417,7 @@
     var d = dlg.exp, err = d.querySelector('[data-pjp-err]'), want = expWant();
     try { localStorage.setItem('pj-export-lang', want.lang); } catch (x) { /* немає сховища */ }
     if (!want.pdf && !want.png && !want.xlsx) { err.textContent = 'Виберіть хоча б один файл'; return; }
+    if (gsel && expKind === 'plan') { gsel = null; drawClassic(); }   // виділення смуги — не в експорт
     var svgs = exportSvgs(expKind);
     if ((want.pdf || want.png) && !svgs.length) { err.textContent = 'Діаграми зараз не видно — відкрийте її вкладку'; return; }
     if (!window.PJExport) { err.textContent = 'Експорт не завантажився — оновіть сторінку'; return; }
@@ -1385,7 +1425,7 @@
     btns.forEach(function (b) { b.disabled = true; });
     err.textContent = '⏳ Готую файли…';
     var title = (box().dataset.code || '') + ' · ' + (box().dataset.title || '');
-    var pic = svgs.length && (want.pdf || want.png) ? window.PJExport.png(svgs) : Promise.resolve(null);
+    var pic = svgs.length && (want.pdf || want.png) ? window.PJExport.png(svgs, expHead(want.lang)) : Promise.resolve(null);
     function ask(blob, formats, mail) {
       var fd = new FormData();
       if (blob) fd.append('image', blob, 'diagram.png');
@@ -1394,6 +1434,7 @@
       fd.append('formats', formats.join(','));
       fd.append('table', want.table ? '1' : '');
       fd.append('send', mail ? '1' : '');
+      fd.append('titled', '1');                 // заголовок і легенда вже в картинці — у PDF не дублювати
       return fetch(box().dataset.export, {method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': csrf()},
                                           body: fd})
         .then(function (r) {
@@ -1423,6 +1464,70 @@
       err.textContent = '⚠️ ' + (x && x.message ? x.message : 'не вдалося');
     });
   }
+
+  // 👁 Наведіть на лист чи гілку в пульті — коротко, що всередині (лише ваші скриньки; /projects/api/mail-peek/)
+  var peekBox = null, peekTimer = 0, peekCache = {}, peekKey = '';
+  function peekTarget(a) {
+    var href = a.getAttribute('href') || '', m = /^\/email\/message\/(\d+)\//.exec(href),
+        t = /^\/email\/thread\/(\d+)\//.exec(href);
+    return m ? 'm=' + m[1] : (t ? 't=' + t[1] : '');
+  }
+  function peekHide() {
+    clearTimeout(peekTimer);
+    peekKey = '';
+    if (peekBox) peekBox.hidden = true;
+  }
+  function peekShow(a, key, d) {
+    if (peekKey !== key || !d || !d.ok) return;
+    if (!peekBox) {
+      peekBox = document.createElement('div');
+      peekBox.className = 'pjm-peek';
+      peekBox.setAttribute('role', 'tooltip');
+      document.body.appendChild(peekBox);
+    }
+    peekBox.textContent = '';
+    function el(tag, cls, text, tr) {
+      var n = document.createElement(tag);
+      n.className = cls;
+      if (text) n.textContent = text;
+      if (tr) n.setAttribute('translate', 'no');
+      peekBox.appendChild(n);
+      return n;
+    }
+    el('div', 'pjm-s', (d.out ? '📤 ' : '📥 ') + d.subject, true);
+    el('div', 'pjm-m', [d.from + (d.to ? ' → ' + d.to : ''), d.date].filter(Boolean).join(' · '), true);
+    if (d.count > 1) el('div', 'pjm-c', 'У гілці листів: {n} · показано останній'.replace('{n}', d.count));
+    el('div', 'pjm-t', d.text ? d.text + (d.more ? ' …' : '') : '(порожній лист)', true);
+    if (d.files && d.files.length) el('div', 'pjm-f', '📎 ' + d.files.join(' · '), true);
+    el('div', 'pjm-h', 'Клік — відкрити лист');
+    peekBox.hidden = false;
+    var r = a.getBoundingClientRect(), w = Math.min(460, window.innerWidth - 24);
+    peekBox.style.width = w + 'px';
+    var left = Math.min(Math.max(12, r.left), window.innerWidth - w - 12), h = peekBox.offsetHeight;
+    var top = r.bottom + 8 + h > window.innerHeight && r.top - h - 8 > 0 ? r.top - h - 8 : r.bottom + 8;
+    peekBox.style.left = left + 'px';
+    peekBox.style.top = top + 'px';
+  }
+  root.addEventListener('mouseover', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="/email/message/"], a[href^="/email/thread/"]');
+    if (!a || !root.contains(a) || window.matchMedia('(hover: none)').matches) return;
+    var key = peekTarget(a);
+    if (!key || key === peekKey) return;
+    peekKey = key;
+    clearTimeout(peekTimer);
+    peekTimer = setTimeout(function () {
+      if (peekCache[key]) { peekShow(a, key, peekCache[key]); return; }
+      fetch('/projects/api/mail-peek/?' + key, {credentials: 'same-origin'})
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d && d.ok) peekCache[key] = d; peekShow(a, key, d); })
+        .catch(function () {});
+    }, 350);
+  });
+  root.addEventListener('mouseout', function (e) {
+    var a = e.target.closest && e.target.closest('a[href^="/email/message/"], a[href^="/email/thread/"]');
+    if (a && (!e.relatedTarget || !a.contains(e.relatedTarget))) peekHide();
+  });
+  window.addEventListener('scroll', peekHide, true);
 
   // ✓ «Що зараз» / «Ризики»: відповіли поза поштою (лист) або виконано / зустріч відбулась (подія календаря)
   var HOWS = [['phone', '📞', 'Відповіли телефоном'], ['meeting', '🤝', 'Обговорили на зустрічі'],

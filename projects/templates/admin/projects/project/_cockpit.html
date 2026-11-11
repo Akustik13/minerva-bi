@@ -2,6 +2,7 @@
 {# Без <script> і без <form>: пульт усередині форми картки, поля «📌» без name. #}
 <div class="pjc" data-range="{{ range }}" data-cockpit="{{ urls.cockpit }}" data-highlight="{{ urls.highlight }}"
      data-code="{{ project.code }}" data-title="{{ project.name }}"
+     data-customer="{% if project.customer %}{{ project.customer.company|default:project.customer.name }}{% endif %}" data-due="{{ project.due_date|date:'Y-m-d' }}"
      data-scan="{{ urls.scan }}" data-plan-base="{{ urls.plan_base }}" data-plan-step="{{ urls.plan_step }}"
      data-plan-phase="{{ urls.plan_phase }}" data-plan-save-template="{{ urls.plan_save_template }}"
      data-has-plan="{% if plan.has_plan %}1{% endif %}" data-can-change="{% if can_change %}1{% endif %}"

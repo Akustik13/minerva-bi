@@ -133,7 +133,7 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
         cls = f"pjg-{c.status or 'todo'}" + (" pjg-crit" if c.critical and c.status not in ("done", "skipped") else "")
         g = [f'<g class="pjg-row pjg-step {cls}" data-step="{s.pk}"{focus}><title>{escape(tip)}</title>',
              f'<rect x="0" y="{top}" width="{W}" height="{RH}" class="pjg-rowbg"/>',
-             f'<text x="22" y="{_n(cy + 4)}" class="pjg-t">{STATUS_ICON.get(c.status, "")} {escape(_cut(s.title))}</text>',
+             f'<text x="22" y="{_n(cy + 4)}" class="pjg-t">{STATUS_ICON.get(c.status, "")} {escape(_cut(s.title, 29))}</text>',
              f'<text x="222" y="{_n(cy + 4)}" class="pjg-who pjg-side-{s.side}">{escape(_cut(who, 9))}</text>',
              f'<text x="268" y="{_n(cy + 4)}" class="pjg-dates">'
              f'{_fmt(c.start) if s.kind != ProjectStep.MILESTONE else ""}{"–" if s.kind != ProjectStep.MILESTONE else "◆ "}{_fmt(c.end)}</text>']
