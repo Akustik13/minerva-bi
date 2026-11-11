@@ -740,6 +740,82 @@ class PurchaseReceipt(models.Model):
         return f"{self.purchase_order} · {self.delivery_key}"
 
 
+def po_document_path(instance, filename):
+    """MEDIA/purchase_orders/<закупівля>/<категорія>/<файл> — доступ лише з розділом «Склад» (tabele/media.py)."""
+    return f"purchase_orders/{instance.purchase_order_id}/{instance.category or 'other'}/{filename}"
+
+
+class PurchaseOrderDocument(models.Model):
+    """📎 Документ закупівлі за категоріями: запит, пропозиція, наше замовлення, підтвердження, рахунок, оплата,
+    відвантаження, митниця, сертифікати, рекламація. Логіка — inventory/services/po_documents.py."""
+    RFQ, QUOTE, ORDER, CONFIRMATION = "rfq", "quote", "order", "confirmation"
+    INVOICE, PAYMENT, SHIPPING, CUSTOMS = "invoice", "payment", "shipping", "customs"
+    QUALITY, CLAIM, OTHER = "quality", "claim", "other"
+    CATEGORIES = [
+        (RFQ, "💬 Наш запит (RFQ)"),
+        (QUOTE, "📝 Пропозиція / ціни постачальника"),
+        (ORDER, "🛒 Наше замовлення (PO)"),
+        (CONFIRMATION, "✅ Підтвердження замовлення"),
+        (INVOICE, "🧾 Рахунок (Invoice, Proforma)"),
+        (PAYMENT, "💳 Оплата"),
+        (SHIPPING, "📦 Відвантаження й доставка"),
+        (CUSTOMS, "🛃 Митниця"),
+        (QUALITY, "📄 Сертифікати й якість"),
+        (CLAIM, "↩️ Рекламація, повернення, кредит-нота"),
+        (OTHER, "📎 Інше"),
+    ]
+    UPLOAD, MAIL, AGENT = "upload", "mail", "agent"
+    SOURCES = [(UPLOAD, "📤 Завантажено"), (MAIL, "📧 З листа"), (AGENT, "🤖 Агент з листа")]
+
+    purchase_order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name="documents",
+                                       verbose_name="Закупівля")
+    category = models.CharField("Категорія", max_length=20, choices=CATEGORIES, default=OTHER, db_index=True)
+    file = models.FileField("Файл", upload_to=po_document_path, max_length=300)
+    title = models.CharField("Назва", max_length=200, blank=True, default="",
+                             help_text="Порожньо — назва файлу.")
+    doc_date = models.DateField("Дата документа", null=True, blank=True)
+    amount = models.DecimalField("Сума", max_digits=14, decimal_places=2, null=True, blank=True,
+                                 help_text="Для рахунку й оплати — сума документа.")
+    currency = models.CharField("Валюта", max_length=8, blank=True, default="")
+    note = models.CharField("Примітка", max_length=255, blank=True, default="")
+    source = models.CharField("Звідки", max_length=10, choices=SOURCES, default=UPLOAD)
+    source_ref = models.CharField(max_length=40, blank=True, default="", db_index=True,
+                                  help_text="msg:<лист>:<номер вкладення> — щоб не додати те саме вкладення двічі")
+    email_message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True,
+                                      on_delete=models.SET_NULL, related_name="+", verbose_name="Лист")
+    sha256 = models.CharField(max_length=64, blank=True, default="", db_index=True)
+    uploaded_by = models.ForeignKey("auth.User", null=True, blank=True, on_delete=models.SET_NULL,
+                                    related_name="+", verbose_name="Додав")
+    created_at = models.DateTimeField("Додано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Документ закупівлі"
+        verbose_name_plural = "📎 Документи закупівлі"
+        ordering = ["purchase_order", "category", "-doc_date", "-created_at"]
+
+    def __str__(self):
+        return self.title or self.file_name
+
+    @property
+    def file_name(self) -> str:
+        import os
+        return os.path.basename(self.file.name or "")
+
+    def save(self, *args, **kwargs):
+        if self.file and not self.sha256:                # завантажено вручну — відбиток для «вже є»
+            import hashlib
+            digest = hashlib.sha256()
+            try:
+                for chunk in self.file.chunks():
+                    digest.update(chunk)
+                self.sha256 = digest.hexdigest()
+            except (OSError, ValueError):
+                pass
+        if not self.title and self.file:
+            self.title = self.file_name[:200]
+        super().save(*args, **kwargs)
+
+
 class ProductPriceHistory(models.Model):
     """Історія змін базових цін товару: хто, коли, звідки, було → стало."""
     SOURCE_CHOICES = [

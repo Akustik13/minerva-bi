@@ -291,6 +291,19 @@ def _parcel(po, number, carrier_wanted, user):
         return None, str(e)
 
 
+def _attach_mail(po, p, user) -> int:
+    """Документи-вкладення листа завдання (лише своя скринька) → «📎 Документи» закупівлі
+    (inventory/services/po_documents.py), категорія — за назвою файлу. Збій не скасовує закупівлю."""
+    try:
+        from agent.tools import mail_of
+        from inventory.services import po_documents
+        return po_documents.attach_message(po, mail_of(p.task), user)
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning('agent po %s documents: %s', po.pk, e)
+        return 0
+
+
 def apply_purchase(p, user) -> str:
     from django.db import transaction
     from django.urls import reverse
@@ -322,6 +335,7 @@ def apply_purchase(p, user) -> str:
     AuditLog.log(AuditLog.Action.CREATE, module='inventory', model_name='PurchaseOrder', object_id=po.pk,
                  object_repr=f'{po.code} {supplier.name}', user=user, extra={'via': 'agent', 'task': p.task_id})
     p.result_url = reverse('admin:inventory_purchaseorder_change', args=[po.pk])
+    _attach_mail(po, p, user)                       # рахунок, Lieferschein … з листа → «📎 Документи»
     _shipment, why = _parcel(po, d.get('tracking_number', ''), d.get('carrier', ''), user)
     notes = [w.get('message', '') for w in warnings if isinstance(w, dict)] + ([why] if why else [])
     notes = [n for n in notes if n]
@@ -344,6 +358,7 @@ def apply_parcel(p, user) -> str:
     if shipment is None:
         return why or 'посилку не додано'
     p.result_url = reverse('admin:shipping_shipment_detail', args=[shipment.pk])
+    _attach_mail(po, p, user)
     return ''
 
 

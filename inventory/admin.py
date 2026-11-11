@@ -30,7 +30,7 @@ from .forms import ExcelUploadForm, InventoryTransactionForm, SetStockForm
 from .models import (
     Product, ProductAlias, Location,
     InventoryTransaction, ProductComponent,
-    Supplier, PurchaseOrder, PurchaseOrderLine, PurchaseReceipt,
+    Supplier, PurchaseOrder, PurchaseOrderDocument, PurchaseOrderLine, PurchaseReceipt,
     ProductCategory, InventorySettings, IncomingShipment,
     RFQEmailTemplate,
 )
@@ -4246,6 +4246,69 @@ class PurchaseReceiptInline(admin.TabularInline):
     lines_text.short_description = _("Позиції")
 
 
+class PurchaseOrderDocumentForm(forms.ModelForm):
+    class Meta:
+        model = PurchaseOrderDocument
+        fields = ("category", "file", "title", "doc_date", "amount", "currency", "note")
+
+    def clean_file(self):
+        from inventory.services import po_documents
+        f = self.cleaned_data.get("file")
+        if f is not None and "file" in self.changed_data:
+            if not po_documents.allowed(f.name):
+                raise forms.ValidationError(_("Такий тип файлу не приймаємо: PDF, Word, Excel, картинки, CSV, TXT, ZIP, EML."))
+            if (getattr(f, "size", 0) or 0) > po_documents.FILE_MAX_MB * 1024 * 1024:
+                raise forms.ValidationError(_("Файл більший за %(n)d МБ.") % {"n": po_documents.FILE_MAX_MB})
+        return f
+
+
+class PurchaseOrderDocumentInline(admin.TabularInline):
+    """📎 Документи закупівлі за категоріями (inventory/services/po_documents.py): завантажити тут або «📥 Додати з
+    пошти…» у блоці «📎 Документи» вище."""
+    model = PurchaseOrderDocument
+    form = PurchaseOrderDocumentForm
+    extra = 1
+    fields = ("category", "file", "title", "doc_date", "amount", "currency", "note", "source_col")
+    readonly_fields = ("source_col",)
+    verbose_name = _("Документ")
+    verbose_name_plural = _("📎 Документи: рахунки, оплати, підтвердження, пропозиції … (додати файл)")
+
+    def source_col(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        who = obj.uploaded_by.get_username() if obj.uploaded_by_id else ""
+        return format_html('<span style="white-space:nowrap">{}</span><div style="opacity:.7;font-size:11px">{}{}</div>',
+                           obj.get_source_display(), timezone.localtime(obj.created_at).strftime("%d.%m.%Y"),
+                           f" · {who}" if who else "")
+    source_col.short_description = _("Звідки")
+
+
+class PODocsFilter(admin.SimpleListFilter):
+    """📎 Документи закупівлі: рахунок без оплати, оплачено, без рахунку, без документів."""
+    title = _("📎 Документи")
+    parameter_name = "docs"
+
+    def lookups(self, request, model_admin):
+        return (("unpaid", _("🧾 Рахунок є, 💳 оплати немає")), ("paid", _("💳 Оплата є")),
+                ("no_invoice", _("Рахунку немає")), ("none", _("Без документів")))
+
+    def queryset(self, request, queryset):
+        from django.db.models import Exists, OuterRef
+
+        def has(cat):
+            return Exists(PurchaseOrderDocument.objects.filter(purchase_order=OuterRef("pk"), category=cat))
+        value = self.value()
+        if value == "unpaid":
+            return queryset.filter(has(PurchaseOrderDocument.INVOICE)).exclude(has(PurchaseOrderDocument.PAYMENT))
+        if value == "paid":
+            return queryset.filter(has(PurchaseOrderDocument.PAYMENT))
+        if value == "no_invoice":
+            return queryset.exclude(has(PurchaseOrderDocument.INVOICE))
+        if value == "none":
+            return queryset.exclude(Exists(PurchaseOrderDocument.objects.filter(purchase_order=OuterRef("pk"))))
+        return queryset
+
+
 @admin.register(Supplier)
 class SupplierAdmin(ProjectsBlockMixin, admin.ModelAdmin):
     projects_block_kind = "supplier"           # «📁 Проєкти» (projects/panels.py)
@@ -4273,13 +4336,13 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
     projects_block_kind = "purchase"           # «📁 Проєкти» (projects/panels.py)
     list_display  = ("code", "supplier", "status_badge", "order_date",
                      "expected_date", "received_date", "lines_count",
-                     "total_price", "tracking_number", "external_col")
-    list_filter   = ("supplier", "status", "order_date", "external_source")
+                     "total_price", "tracking_number", "docs_col", "external_col")
+    list_filter   = ("supplier", "status", PODocsFilter, "order_date", "external_source")
     search_fields = ("code", "tracking_number", "supplier__name", "notes", "external_id", "supplier_order_no")
     date_hierarchy = "order_date"
-    inlines       = (PurchaseOrderLineInline, PurchaseReceiptInline)
+    inlines       = (PurchaseOrderLineInline, PurchaseOrderDocumentInline, PurchaseReceiptInline)
     readonly_fields = ("code", "created_at", "updated_at", "external_source", "external_id", "delivered_reported_at",
-                       "parcels_view")
+                       "parcels_view", "documents_view")
     preserve_filters = True
 
     def parcels_view(self, obj):
@@ -4318,7 +4381,93 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
 
     def get_urls(self):
         return [path('<int:pk>/parcels/check/', self.admin_site.admin_view(self.parcels_check_view),
-                     name='inventory_purchaseorder_parcels_check')] + super().get_urls()
+                     name='inventory_purchaseorder_parcels_check'),
+                path('<int:pk>/mail-docs/', self.admin_site.admin_view(self.mail_docs_view),
+                     name='inventory_purchaseorder_mail_docs')] + super().get_urls()
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("documents")
+
+    # ── 📎 Документи закупівлі (inventory/services/po_documents.py) ──
+
+    def documents_view(self, obj):
+        """📎 Документи за категоріями: посилання, дата, сума, звідки; стан «рахунок є — оплати немає»;
+        «📥 Додати з пошти…» — вкладення листів про цю закупівлю."""
+        from inventory.services import po_documents
+        if not obj or not obj.pk:
+            return _("Спершу збережіть закупівлю — тоді можна додавати документи.")
+        s = po_documents.summary(obj)
+        mail = format_html('<a class="button" href="{}">📥 Додати з пошти…</a>',
+                           reverse("admin:inventory_purchaseorder_mail_docs", args=[obj.pk]))
+        if not s["groups"]:
+            return format_html('<div>{}</div><div style="margin-top:6px">{} <span style="opacity:.75">{}</span></div>',
+                               _("Документів ще немає."), mail,
+                               _("або файл — у таблиці «📎 Документи» нижче (категорія, файл, «Зберегти»)."))
+        if s["unpaid"]:
+            state = format_html('<div style="color:var(--warn,#d97706)">{}</div>',
+                                _("⚠️ Рахунок є — документа про оплату ще немає"))
+        elif PurchaseOrderDocument.PAYMENT in s["has"]:
+            state = format_html('<div style="color:var(--ok,#16a34a)">{}</div>', _("✓ Оплату додано"))
+        else:
+            state = ""
+        groups = format_html_join("", '<div style="margin-top:6px"><b>{}</b>{}</div>', (
+            (label, format_html_join("", '<div style="margin-left:12px">• <a href="{}" target="_blank" '
+                                         'translate="no">{}</a>{}{}{} <span style="opacity:.65">{}</span></div>', (
+                (d.file.url if d.file else "#", d.title or d.file_name,
+                 f" · {d.doc_date:%d.%m.%Y}" if d.doc_date else "",
+                 f" · {d.amount} {d.currency}".rstrip() if d.amount is not None else "",
+                 f" — {d.note}" if d.note else "", d.get_source_display()) for d in docs)))
+            for _cat, label, docs in s["groups"]))
+        return format_html('{}{}<div style="margin-top:8px">{}</div>', state, groups, mail)
+    documents_view.short_description = _("📎 Документи")
+
+    def docs_col(self, obj):
+        docs = list(obj.documents.all())
+        if not docs:
+            return "—"
+        icons = {cat: label.split(" ", 1)[0] for cat, label in PurchaseOrderDocument.CATEGORIES}
+        cats = [c for c, _l in PurchaseOrderDocument.CATEGORIES if any(d.category == c for d in docs)]
+        tip = ", ".join(str(dict(PurchaseOrderDocument.CATEGORIES)[c]) for c in cats)
+        unpaid = PurchaseOrderDocument.INVOICE in cats and PurchaseOrderDocument.PAYMENT not in cats
+        warn = format_html(' <b title="{}">⚠️</b>', _("Рахунок є — оплати немає")) if unpaid else ""
+        return format_html('<span title="{}">{}</span>{}', tip, " ".join(icons[c] for c in cats), warn)
+    docs_col.short_description = _("📎")
+
+    def mail_docs_view(self, request, pk):
+        """«📥 Додати з пошти…»: листи своїх скриньок з вкладеннями про цю закупівлю → вибрані — документи."""
+        from django.template.response import TemplateResponse
+        from inventory.services import po_documents
+        po = self.get_queryset(request).filter(pk=pk).select_related("supplier").first()
+        back = reverse("admin:inventory_purchaseorder_change", args=[pk])
+        if po is None or not self.has_change_permission(request, po):
+            self.message_user(request, _("Немає права змінювати закупівлю"), messages.ERROR)
+            return redirect(back)
+        if request.method == "POST":
+            picks = {key: request.POST.get("cat_" + key.replace(":", "_"), "") for key in request.POST.getlist("pick")}
+            if not picks:
+                self.message_user(request, _("Позначте вкладення, які додати."), messages.WARNING)
+                return redirect(request.get_full_path())
+            out = po_documents.add_from_mail(po, request.user, picks)
+            if out["added"]:
+                self.message_user(request, _("📎 Додано документів: %(n)d") % {"n": out["added"]}, messages.SUCCESS)
+            if out["same"]:
+                self.message_user(request, _("Уже були в закупівлі: %(n)d") % {"n": out["same"]}, messages.INFO)
+            for line in out["failed"][:10]:
+                self.message_user(request, f"⚠️ {line}", messages.ERROR)
+            return redirect(back)
+        q = request.GET.get("q", "")
+        context = {**self.admin_site.each_context(request), "title": f"📥 {po.code}",
+                   "po": po, "q": q, "rows": po_documents.mail_candidates(po, request.user, q),
+                   "categories": PurchaseOrderDocument.CATEGORIES, "days": po_documents.MAIL_DAYS,
+                   "back_url": back, "opts": self.model._meta}
+        return TemplateResponse(request, "admin/inventory/purchaseorder/mail_docs.html", context)
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model is PurchaseOrderDocument:          # хто додав документ
+            for f in formset.forms:
+                if f.has_changed() and not f.instance.pk:
+                    f.instance.uploaded_by = request.user
+        super().save_formset(request, form, formset, change)
 
     def parcels_check_view(self, request, pk):
         """«🔄 Перевірити посилки зараз» (POST): трекінг вхідних посилок закупівлі зараз, потім — налаштування
