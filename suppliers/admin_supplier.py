@@ -26,7 +26,7 @@ from suppliers.models import (SupplierAnalysis, SupplierCardPreset, SupplierCate
                               SupplierMedia)
 
 VIEWER = "_sup_viewer"
-PANELS = ("sup_overview", "sup_media", "sup_requests", "sup_ai", "sup_history")
+PANELS = ("sup_overview", "sup_mail", "sup_media", "sup_requests", "sup_ai", "sup_history")
 
 
 def _money(m) -> str:
@@ -269,6 +269,70 @@ class SupplierCardMixin:
         return format_html('{}<div class="sp-tiles">{}</div>{}<div class="sp-row">{}</div>{}{}',
                            _STYLE, tiles_html, score_html, btn, late, format_html("{}{}", orders, products))
 
+    @admin.display(description="Листування й файли")
+    def sup_mail(self, obj):
+        """🧵 Теми листування з вашої пошти: етап, період, файли (без картинок з підписів), 🛒 закупівля з PI."""
+        if not obj or not obj.pk:
+            return "—"
+        from suppliers.services import history
+        viewer = self._viewer(obj)
+        data = history.topics_for(obj, viewer) if viewer is not None else None
+        url = reverse("admin:inventory_supplier_history", args=[obj.pk])
+        rebuild = format_html('<button type="submit" class="button" name="sup_action" value="rebuild" formaction="{}" '
+                              'formmethod="post" formnovalidate>🔄 {}</button>', url,
+                              "Оновити з пошти" if data else f"Зібрати історію з пошти (за {history.YEARS} років)")
+        if not data:
+            return format_html('<div class="sp-muted">{}</div><div class="sp-row">{}</div>',
+                               "Minerva перечитає ваші скриньки й складе листування з постачальником за темами: запити, "
+                               "пропозиції, PI / рахунки, файли (Gerber, BOM, Quotation…) — і запише віхи в «🕘 Історію».",
+                               rebuild)
+        topics = data["topics"]
+        work = [t for t in topics if t["stage"] != "marketing"]
+        ads = [t for t in topics if t["stage"] == "marketing"]
+        rows = []
+        for t in work:
+            seen, chips = set(), []
+            for d in t["docs"]:
+                if d["name"] in seen:
+                    continue
+                seen.add(d["name"])
+                chips.append(format_html(
+                    '<a class="sp-chip" href="{}" target="_blank" title="{} · {}" translate="no">{} {}</a>',
+                    reverse("admin:inventory_supplier_attachment", args=[d["msg"], d["i"]]),
+                    history.KIND_NAMES.get(d["kind"], ""), "від них" if d.get("theirs") else "наш",
+                    history.KIND_NAMES.get(d["kind"], "📎").split(" ")[0], d["name"][:42]))
+            action = ""
+            if t.get("po"):
+                action = format_html('<a href="{}" translate="no">🗒️ {}</a>',
+                                     reverse("admin:inventory_purchaseorder_change", args=[t["po"]]), t.get("po_code"))
+            elif t["stage"] in ("pi", "confirmation") and viewer is not None and viewer.has_perm(
+                    "inventory.add_purchaseorder"):
+                action = format_html(
+                    '<button type="submit" class="button" name="topic" value="{}" formaction="{}?action=po" '
+                    'formmethod="post" formnovalidate title="{}">🛒 Завести закупівлю</button>', t["key"], url,
+                    "Закупівля з датою й номером з PI, документи теми — у документи закупівлі")
+            first, last = (t["first"] or "")[:10], (t["last"] or "")[:10]
+            period = ".".join(reversed(first.split("-"))) + (
+                " – " + ".".join(reversed(last.split("-"))) if last and last != first else "")
+            rows.append(format_html(
+                '<tr><td>{}</td><td><a href="/email/?msg={}" target="_blank" translate="no">{}</a>{}'
+                '<div class="sp-chips">{}</div></td><td style="white-space:nowrap">{}<div class="sp-muted">↓ {} · ↑ {}</div>'
+                '</td><td>{}</td></tr>',
+                history.STAGES.get(t["stage"], ""), t["last_msg"], t["title"][:110],
+                format_html(' <span class="sp-warn" title="{}">⏳</span>', "Останній лист — від них, ми ще не відповіли")
+                if t.get("waiting_us") else "", mark_safe(" ".join(str(c) for c in chips)) or "—",
+                period, t["incoming"], t["outgoing"], action))
+        ads_html = format_html('<div class="sp-muted">📣 Розсилки від них (без наших відповідей): {}</div>',
+                               ", ".join(f"«{t['title'][:50]}»" for t in ads[:6])) if ads else ""
+        return format_html(
+            '<div class="sp-muted">З вашої пошти · {} · оновлено {} · тем {}</div>'
+            '<table class="sp-table"><tr><th>Етап</th><th>Тема й файли</th><th>Період</th><th></th></tr>{}</table>{}'
+            '<div class="sp-row">{} <a class="button" href="{}">✉️ Детально й 🧠 AI-оцінка</a></div>',
+            f"{data['date_from']:%d.%m.%Y} – {data['date_to']:%d.%m.%Y}" if data.get("date_from") else "",
+            timezone.localtime(data["at"]).strftime("%d.%m.%Y %H:%M"), len(work),
+            mark_safe("".join(str(r) for r in rows)) or format_html('<tr><td colspan="4">{}</td></tr>', "—"), ads_html,
+            rebuild, reverse("admin:inventory_supplier_analysis", args=[obj.pk]))
+
     @admin.display(description="Візитки й флаєри")
     def sup_media(self, obj):
         if not obj or not obj.pk:
@@ -392,6 +456,9 @@ class SupplierCardMixin:
             path("card/presets/", view(self.card_presets_view), name="inventory_supplier_card_presets"),
             path("job/<str:job_id>/", view(self.job_view), name="inventory_supplier_job"),
             path("search/", view(self.search_view), name="inventory_supplier_search"),
+            path("attachment/<int:msg_pk>/<int:index>/", view(self.attachment_view),
+                 name="inventory_supplier_attachment"),
+            path("<int:pk>/history/", view(self.history_view), name="inventory_supplier_history"),
             path("<int:pk>/analysis/", view(self.analysis_view), name="inventory_supplier_analysis"),
             path("<int:pk>/research/", view(self.research_view), name="inventory_supplier_research"),
         ] + super().get_urls()
@@ -410,6 +477,50 @@ class SupplierCardMixin:
             raise Http404
         setattr(obj, VIEWER, request.user)
         return obj
+
+    def attachment_view(self, request, msg_pk, index):
+        """Вкладення листа з БУДЬ-ЯКОЇ власної скриньки людини (у пошті — лише з основної)."""
+        from email_assistant.attachments import attachment_bytes
+        from email_assistant.views import _attachment_response
+        msg = self._own_message(request, msg_pk)
+        atts = msg.attachments or []
+        if not 0 <= index < len(atts):
+            raise Http404
+        try:
+            data = attachment_bytes(msg.account, msg, index)
+        except Exception:  # noqa: BLE001 — IMAP недоступний
+            data = None
+        if not data:
+            raise Http404
+        att = atts[index]
+        return _attachment_response(data, att.get("name") or "attachment", att.get("content_type") or "",
+                                    force_download=request.GET.get("download") == "1")
+
+    def history_view(self, request, pk):
+        """POST: sup_action=rebuild — зібрати історію з пошти; action=po + topic — закупівля з теми."""
+        from suppliers.services import history
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        obj = self._supplier(request, pk)
+        back = reverse("admin:inventory_supplier_change", args=[obj.pk])
+        if request.GET.get("action") == "po":
+            if not request.user.has_perm("inventory.add_purchaseorder"):
+                raise Http404
+            try:
+                po, out = history.make_purchase(obj, request.user, request.POST.get("topic", ""))
+            except ValueError as e:
+                self.message_user(request, str(e), messages.ERROR)
+                return redirect(back)
+            history.rebuild(obj, request.user)
+            self.message_user(request, f"🛒 Закупівля {po.code}: документів {out['added']} — перевірте позиції й суми",
+                              messages.SUCCESS)
+            for line in out["failed"][:5]:
+                self.message_user(request, f"⚠️ {line}", messages.WARNING)
+            return redirect(reverse("admin:inventory_purchaseorder_change", args=[po.pk]))
+        out = history.rebuild(obj, request.user)
+        self.message_user(request, f"🧵 Історію зібрано: листів {out['messages']}, тем {out['topics']}, "
+                                   f"нових подій {out['events']}", messages.SUCCESS)
+        return redirect(back)
 
     def search_view(self, request):
         """Підказка постачальника за назвою / email (поле «додати до наявного»)."""
@@ -461,10 +572,8 @@ class SupplierCardMixin:
                 return {"url": back, "message": "🧠 Оцінку складено"}
             return JsonResponse({"job": jobs.start(user, f"evaluate {obj.pk}", run)})
         result = mailscan.scan(obj, user, date_from, date_to)
-        SupplierAnalysis.objects.update_or_create(
-            supplier=obj, kind=SupplierAnalysis.MAIL, owner=user,
-            defaults={"date_from": date_from, "date_to": date_to, "result": mailscan.summary(result),
-                      "created_at": timezone.now()})
+        from suppliers.services import history
+        history.save(obj, user, result)
         p = purchases(obj)
         rfq = requests_stats(obj)
         own_ai = SupplierAnalysis.objects.filter(supplier=obj, kind=SupplierAnalysis.AI, owner=user).first()
@@ -509,7 +618,21 @@ class SupplierCardMixin:
         if changed:
             bits.append(f"доповнено полів: {len(changed)}")
         self.message_user(request, f"✅ {supplier.name}: " + (", ".join(bits) or "уже все є"), messages.SUCCESS)
+        if source == "mail":
+            self._rebuild_quietly(request, supplier)
         return redirect(reverse("admin:inventory_supplier_change", args=[supplier.pk]))
+
+    def _rebuild_quietly(self, request, supplier):
+        """Постачальник з листа → історія з пошти людини одразу (збій — лише повідомлення, створення не скасовує)."""
+        from suppliers.services import history
+        try:
+            out = history.rebuild(supplier, request.user)
+            if out["messages"]:
+                self.message_user(request, f"🧵 Історію з пошти зібрано: листів {out['messages']}, тем {out['topics']}",
+                                  messages.INFO)
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning("supplier history rebuild failed", exc_info=True)
 
     def from_mail_view(self, request, msg_pk):
         from suppliers.services import ai, draft, jobs
@@ -536,6 +659,7 @@ class SupplierCardMixin:
                 self.message_user(request, str(e), messages.ERROR)
                 return redirect(request.path)
             self.message_user(request, f"🏭 Створено постачальника {s.name}", messages.SUCCESS)
+            self._rebuild_quietly(request, s)
             return redirect(reverse("admin:inventory_supplier_change", args=[s.pk]))
         if action == "attach":
             if not _can(request, "change"):
@@ -887,6 +1011,8 @@ _STYLE = mark_safe("""<style>
 .sp-card img{width:100%;height:110px;object-fit:cover;border-radius:6px;background:#fff}
 .sp-note{font-size:12px;white-space:pre-line}.sp-box{border:1px solid var(--border-strong,#ccc);border-radius:8px;padding:8px 12px;margin:6px 0;max-width:980px}
 .sp-job{font-size:12px;color:var(--text-muted,#888)}
+.sp-chips{display:flex;flex-wrap:wrap;gap:3px 6px;margin-top:3px}
+.sp-chip{font-size:11px;border:1px solid var(--border-strong,#ccc);border-radius:9px;padding:0 6px;white-space:nowrap;text-decoration:none}
 </style>""")
 
 # Кнопки data-sp-job: POST (CSRF з форми / cookie) → id завдання → опитування …/job/<id>/ → перехід / повідомлення.

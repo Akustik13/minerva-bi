@@ -72,9 +72,9 @@
     <div class="spf-h">🗒️ Листування й документи по закупівлях</div>
     {% for g in r.groups %}
       <details {% if forloop.counter <= 3 %}open{% endif %} style="margin:6px 0">
-        <summary><b>{% if g.po %}<span translate="no">{{ g.po.code }}</span> · {{ g.po.order_date|date:"d.m.Y" }} · {{ g.po.get_status_display }}{% else %}Без закупівлі{% endif %}</b> — листів {{ g.messages|length }}, документів {{ g.documents|length }}
+        <summary><b>{% if g.po %}<span translate="no">{{ g.po.code }}</span> · {{ g.po.order_date|date:"d.m.Y" }} · {{ g.po.get_status_display }}{% else %}🧵 <span translate="no">{{ g.title }}</span>{% endif %}</b> <span class="spf-tag">{{ g.stage_text }}</span> — листів {{ g.messages|length }}, документів {{ g.documents|length }}
           {% if g.po %} <a href="{% url 'admin:inventory_purchaseorder_change' g.po.pk %}">→ закупівля</a>{% endif %}</summary>
-        {% if g.documents %}<div class="spf-row">{% for d in g.documents %}<a class="spf-tag" href="{% url 'email_assistant:email_attachment' d.message.pk d.index %}" target="_blank" title="{{ d.message.subject }} · {{ d.message.sent_at|date:'d.m.Y' }}" translate="no">📎 {{ d.name|truncatechars:48 }}</a>{% endfor %}</div>{% endif %}
+        {% if g.documents %}<div class="spf-row">{% for d in g.documents %}<a class="spf-tag" href="{% url 'admin:inventory_supplier_attachment' d.message.pk d.index %}" target="_blank" title="{{ d.message.subject }} · {{ d.message.sent_at|date:'d.m.Y' }}" translate="no">📎 {{ d.name|truncatechars:48 }}</a>{% endfor %}</div>{% endif %}
         <table class="spf-table">
           {% for m in g.messages %}<tr><td style="white-space:nowrap">{{ m.sent_at|date:"d.m.Y H:i" }}</td><td>{% if m.theirs %}↓ від них{% elif m.ours %}↑ наш{% else %}↔{% endif %}</td><td><a href="/email/?msg={{ m.pk }}" target="_blank" translate="no">{{ m.subject|default:"(без теми)" }}</a> <span class="spf-muted" translate="no">{{ m.from_email }}</span></td></tr>{% endfor %}
         </table>

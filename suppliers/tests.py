@@ -551,3 +551,107 @@ class EditSavedPhotoTests(Base):
         self.assertIn("?job=", j["url"])
         m.refresh_from_db()
         self.assertEqual(m.extracted["name"], "Cropped GmbH")
+
+
+class HistoryTests(Base):
+    def _att(self, m, name, data, size=None):
+        import os
+        rel = f"email_attachments/{m.account_id}/{m.pk}_{name}"
+        path = os.path.join(self.media, *rel.split("/"))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as fh:
+            fh.write(data)
+        m.attachments = list(m.attachments or []) + [{"name": name, "file_path": rel, "size": size or len(data),
+                                                      "content_type": "application/pdf"}]
+        m.save(update_fields=["attachments"])
+
+    def _thread(self):
+        from email_assistant.models import EmailThread
+        th = EmailThread.objects.create(account=self.account, subject="RFQ for 20 pcs Flexible PCB")
+        t0 = timezone.now() - datetime.timedelta(days=40)
+        self.mail(frm=ME, to=["sales@pcbway.com"], folder="sent", subject="RFQ for 20 pcs Flexible PCB",
+                  body="Please quote", when=t0, thread=th)
+        q = self.mail(frm="sales@pcbway.com", subject="Re: RFQ for 20 pcs Flexible PCB", thread=th,
+                      when=t0 + datetime.timedelta(hours=3), body="Quotation attached")
+        self._att(q, "Quotation 20260121MC02.pdf", b"%PDF-1.4 quote")
+        self._att(q, "image001.png", b"\x89PNG small logo")
+        pi = self.mail(frm="sales@pcbway.com", subject="Re[4]: RFQ for 20 pcs Flexible PCB", thread=th,
+                       when=t0 + datetime.timedelta(days=2), body="PI attached")
+        self._att(pi, "PI#20260402MC02.pdf", b"%PDF-1.4 proforma")
+        self.mail(frm="sales@pcbway.com", subject="Golden October Peak Season - Any PCBA Needs Coming Up?",
+                  when=t0 + datetime.timedelta(days=30), body="Promotion")
+        return th
+
+    def test_helpers(self):
+        from suppliers.services import history
+        self.assertEqual(history.topic_of("Re: Re[2]:  Re: Fw: Re: Re[4]: RFQ for 20 pcs Flexible PCB"),
+                         "RFQ for 20 pcs Flexible PCB")
+        self.assertEqual(history.topic_of("AW: Re: Aw: TM270402-03H"), "TM270402-03H")
+        self.assertFalse(history.is_document({"name": "image001.png", "size": 400_000}))
+        self.assertFalse(history.is_document({"name": "photo.jpg", "size": 20_000}))
+        self.assertTrue(history.is_document({"name": "Stand photo.jpg", "size": 900_000}))
+        self.assertTrue(history.is_document({"name": "BOM_TR140401.xlsx", "size": 9_000}))
+        self.assertFalse(history.is_document({"name": "x.pdf", "is_inline": True}))
+        self.assertEqual([history.doc_kind(n) for n in ("PI#20260402MC02.pdf", "Quotation#20260804MC03.pdf",
+                                                         "Gerber.zip", "BOM_TR140401.xlsx", "TR140401_PandP.txt",
+                                                         "4-Layer Impedance Control Stackup.docx", "notes.txt")],
+                         ["pi", "quotation", "gerber", "bom", "pnp", "stackup", "other"])
+
+    def test_rebuild_topics_events_and_purchase(self):
+        from suppliers.services import history
+        self._thread()
+        out = history.rebuild(self.supplier, self.user)
+        self.assertEqual((out["messages"], out["topics"]), (4, 2))
+        data = history.topics_for(self.supplier, self.user)
+        rfq = next(t for t in data["topics"] if t["title"] == "RFQ for 20 pcs Flexible PCB")
+        self.assertEqual((rfq["stage"], rfq["incoming"], rfq["outgoing"]), ("pi", 2, 1))
+        self.assertEqual(sorted(d["name"] for d in rfq["docs"]), ["PI#20260402MC02.pdf", "Quotation 20260121MC02.pdf"])
+        ads = next(t for t in data["topics"] if t["title"].startswith("Golden October"))
+        self.assertEqual(ads["stage"], "marketing")
+        texts = list(SupplierEvent.objects.filter(supplier=self.supplier).values_list("text", flat=True))
+        self.assertTrue(any(t.startswith("📨 Наш запит: «RFQ for 20 pcs Flexible PCB»") for t in texts))
+        self.assertTrue(any("PI#20260402MC02.pdf" in t for t in texts))
+        self.assertFalse(any("Golden October" in t for t in texts if not t.startswith("✉️ Перше")))
+        self.assertEqual(history.rebuild(self.supplier, self.user)["events"], 0)          # без повторів
+        po, docs = history.make_purchase(self.supplier, self.user, rfq["key"])
+        self.assertEqual((po.supplier_order_no, po.status, docs["added"]), ("20260402MC02", "ordered", 2))
+        cats = dict(po.documents.values_list("title", "category"))
+        self.assertEqual(cats, {"PI#20260402MC02.pdf": "invoice", "Quotation 20260121MC02.pdf": "quote"})
+        history.rebuild(self.supplier, self.user)
+        rfq = next(t for t in history.topics_for(self.supplier, self.user)["topics"] if t.get("po"))
+        self.assertEqual(rfq["po"], po.pk)                                          # тема тепер під закупівлею
+        with self.assertRaises(ValueError):
+            history.make_purchase(self.supplier, self.user, rfq["key"])
+
+    def test_card_block_buttons_and_own_attachments_only(self):
+        self._thread()
+        card = reverse("admin:inventory_supplier_change", args=[self.supplier.pk])
+        self.assertContains(self.client.get(card), "Зібрати історію з пошти")
+        resp = self.client.post(reverse("admin:inventory_supplier_history", args=[self.supplier.pk]),
+                                {"sup_action": "rebuild"})
+        self.assertRedirects(resp, card, fetch_redirect_response=False)
+        page = self.client.get(card)
+        self.assertContains(page, "RFQ for 20 pcs Flexible PCB")
+        self.assertContains(page, "Завести закупівлю")
+        self.assertNotContains(page, "image001.png")
+        msg = next(m for m in self.supplier_messages() if m.attachments)
+        url = reverse("admin:inventory_supplier_attachment", args=[msg.pk, 0])
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.client.force_login(self.other)
+        self.assertNotEqual(self.client.get(url).status_code, 200)
+
+    def supplier_messages(self):
+        from email_assistant.models import EmailMessage
+        return EmailMessage.objects.filter(account=self.account).order_by("pk")
+
+    def test_create_from_mail_collects_history(self):
+        m = self.mail(frm="mia@newfab.example", name="Mia", subject="Request for Quotation PCBA",
+                      body="Hello\n\nBest regards,\nMia\nNew Fab Ltd\n518000 Shenzhen\nChina")
+        self.mail(frm="mia@newfab.example", subject="Re: Request for Quotation PCBA", body="see PI")
+        self.client.post(reverse("admin:inventory_supplier_from_mail", args=[m.pk]),
+                         {"action": "create", "name": "New Fab Ltd", "email": "mia@newfab.example"})
+        s = Supplier.objects.get(name="New Fab Ltd")
+        from suppliers.services import history
+        data = history.topics_for(s, self.user)
+        self.assertEqual([t["title"] for t in data["topics"]], ["Request for Quotation PCBA"])
+        self.assertTrue(SupplierEvent.objects.filter(supplier=s, text__startswith="✉️ Перше листування").exists())

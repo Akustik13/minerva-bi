@@ -1,0 +1,146 @@
+{# 📄 Скан документа в браузері: контур візитки / флаєра (OpenCV.js 4.12 з jsdelivr, вантажиться лише коли потрібно)
+   і вирівнювання перспективи. spDoc.detect(canvas) → 4 кути (TL, TR, BR, BL) у пікселях canvas або null;
+   spDoc.warp(canvas, кути) → новий canvas «як зі сканера». Нічого не надсилає — лише обробка в браузері. #}
+<script>
+window.spDoc = window.spDoc || (function(){
+  var SRC = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.12.0-release.1/dist/opencv.js', ready = null;
+  function load(){
+    if (ready) return ready;
+    ready = new Promise(function(ok, bad){
+      // модуль OpenCV сам «thenable» (Emscripten): віддати його в resolve — нескінченне розгортання, тож then прибираємо
+      function done(m){ if (m && typeof m.then === 'function') { try { delete m.then; } catch (e) { m.then = undefined; } }
+                        window.cv = m; ok(m); }
+      function init(){
+        var c = window.cv;
+        if (!c) return bad(new Error('opencv'));
+        if (c.Mat) return done(c);
+        if (typeof c.then === 'function') return c.then(done);
+        c.onRuntimeInitialized = function(){ done(c); };
+      }
+      if (window.cv) return init();
+      var s = document.createElement('script'); s.src = SRC; s.async = true; s.onload = init;
+      s.onerror = function(){ ready = null; bad(new Error('opencv')); };
+      document.head.appendChild(s);
+    });
+    return ready;
+  }
+  function order(pts){                         // → [TL, TR, BR, BL]
+    var bySum = pts.slice().sort(function(a, b){ return (a.x + a.y) - (b.x + b.y); });
+    var byDiff = pts.slice().sort(function(a, b){ return (a.y - a.x) - (b.y - b.x); });
+    return [bySum[0], byDiff[0], bySum[3], byDiff[3]];
+  }
+  function area(q){ var s = 0; for (var i = 0; i < 4; i++) { var a = q[i], b = q[(i + 1) % 4]; s += a.x * b.y - b.x * a.y; } return Math.abs(s) / 2; }
+  // Найбільший опуклий чотирикутник: краї (Canny) і окремо яскрава пляма (Otsu) — береться більший придатний.
+  // Чотирикутники-кандидати з контурів маски: опукла оболонка (смуга чи текст на візитці роблять «зарубки») → 4 кути.
+  function quadsIn(cv, mat, minArea, mode, limit){
+    var out = [], contours = new cv.MatVector(), hier = new cv.Mat();
+    try {
+      cv.findContours(mat, contours, hier, mode, cv.CHAIN_APPROX_SIMPLE);
+      var list = [];
+      for (var i = 0; i < contours.size(); i++) { var c = contours.get(i), a = cv.contourArea(c); if (a > minArea) list.push([a, c]); else c.delete(); }
+      list.sort(function(x, y){ return y[0] - x[0]; });
+      list.slice(0, limit || 6).forEach(function(item){
+        var hull = new cv.Mat(); cv.convexHull(item[1], hull, false, true);
+        var peri = cv.arcLength(hull, true);
+        [0.02, 0.03, 0.045, 0.06].some(function(eps){
+          var ap = new cv.Mat(); cv.approxPolyDP(hull, ap, eps * peri, true);
+          var okq = ap.rows === 4 && cv.isContourConvex(ap);
+          if (okq) { var q = []; for (var k = 0; k < 4; k++) q.push({x: ap.data32S[k * 2], y: ap.data32S[k * 2 + 1]}); out.push(order(q)); }
+          ap.delete(); return okq;
+        });
+        hull.delete();
+      });
+      list.forEach(function(x){ x[1].delete(); });
+    } finally { contours.delete(); hier.delete(); }
+    return out;
+  }
+  // Яка частка сторін чотирикутника лежить на справжніх краях (Canny): край картки — майже весь, межа зі шматком
+  // фону чи смугою — частково.
+  function support(edges, q){
+    var hit = 0, n = 0, W = edges.cols, H = edges.rows, d = edges.data;
+    for (var i = 0; i < 4; i++) {
+      var a = q[i], b = q[(i + 1) % 4];
+      for (var t = 0.04; t < 0.97; t += 0.02) {
+        var x = Math.round(a.x + (b.x - a.x) * t), y = Math.round(a.y + (b.y - a.y) * t), on = false;
+        for (var dy = -2; dy <= 2 && !on; dy++) for (var dx = -2; dx <= 2 && !on; dx++) {
+          var xx = x + dx, yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < W && yy < H && d[yy * W + xx]) on = true;
+        }
+        hit += on; n++;
+      }
+    }
+    return n ? hit / n : 0;
+  }
+  function percentile(gray, p){
+    var hist = new Array(256).fill(0), d = gray.data, n = d.length, acc = 0;
+    for (var i = 0; i < n; i++) hist[d[i]]++;
+    for (var v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * p) return v; }
+    return 255;
+  }
+  function detectSync(cv, canvas, maxSide){
+    var W = canvas.width, H = canvas.height, k = Math.min(1, (maxSide || 500) / Math.max(W, H));
+    var small = document.createElement('canvas'); small.width = Math.round(W * k); small.height = Math.round(H * k);
+    small.getContext('2d').drawImage(canvas, 0, 0, small.width, small.height);
+    var sw = small.width, sh = small.height, total = sw * sh, minArea = total * 0.06;
+    var src = cv.imread(small), gray = new cv.Mat(), edges = new cv.Mat(), edgesD = new cv.Mat(), mask = new cv.Mat();
+    var k3 = cv.Mat.ones(3, 3, cv.CV_8U), kb = Math.max(5, Math.round(Math.max(sw, sh) * 0.025)) | 1;
+    var kBig = cv.Mat.ones(kb, kb, cv.CV_8U), cands = [];
+    try {
+      cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+      cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
+      cv.Canny(gray, edges, 40, 120);
+      cv.dilate(edges, edgesD, k3);
+      quadsIn(cv, edgesD, minArea, cv.RETR_LIST, 8).forEach(function(q){ cands.push(q); });
+      // яскрава візитка / флаєр на темнішому фоні: кілька порогів (Otsu й верхні відсотки яскравості), зазори
+      // (смуга, текст) закриваються великим ядром
+      var otsu = cv.threshold(gray, mask, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+      [otsu, percentile(gray, 0.6), percentile(gray, 0.75), percentile(gray, 0.88)].forEach(function(t){
+        cv.threshold(gray, mask, t, 255, cv.THRESH_BINARY);
+        cv.morphologyEx(mask, mask, cv.MORPH_CLOSE, kBig);
+        quadsIn(cv, mask, minArea, cv.RETR_EXTERNAL, 3).forEach(function(q){ cands.push(q); });
+      });
+      var best = null, bestScore = 0;
+      cands.forEach(function(q){
+        var a = area(q) / total;
+        if (a < 0.06 || a > 0.97) return;
+        var sp = support(edges, q), score = sp * sp * Math.sqrt(a);
+        if (sp >= 0.55 && score > bestScore) { bestScore = score; best = q; }
+      });
+    } finally { [src, gray, edges, edgesD, mask, k3, kBig].forEach(function(m){ m.delete(); }); }
+    return best ? best.map(function(p){ return {x: p.x / k, y: p.y / k}; }) : null;
+  }
+  function detect(canvas, maxSide){ return load().then(function(cv){ return detectSync(cv, canvas, maxSide); }); }
+  function dist(a, b){ return Math.hypot(a.x - b.x, a.y - b.y); }
+  // Кути → вирівняний прямокутник (довша сторона ≤ maxOut); джерело більше за 3200 px — спершу зменшується.
+  function warp(canvas, quad, maxOut){
+    return load().then(function(cv){
+      var z = Math.min(1, 3200 / Math.max(canvas.width, canvas.height)), srcCanvas = canvas;
+      if (z < 1) { srcCanvas = document.createElement('canvas'); srcCanvas.width = Math.round(canvas.width * z);
+        srcCanvas.height = Math.round(canvas.height * z); srcCanvas.getContext('2d').drawImage(canvas, 0, 0, srcCanvas.width, srcCanvas.height); }
+      var q = quad.map(function(p){ return {x: p.x * z, y: p.y * z}; });
+      var w = Math.max(dist(q[0], q[1]), dist(q[3], q[2])), h = Math.max(dist(q[0], q[3]), dist(q[1], q[2]));
+      var s = Math.min(1, (maxOut || 2400) / Math.max(w, h)); w = Math.max(8, Math.round(w * s)); h = Math.max(8, Math.round(h * s));
+      var src = cv.imread(srcCanvas), dst = new cv.Mat();
+      var from = cv.matFromArray(4, 1, cv.CV_32FC2, [q[0].x, q[0].y, q[1].x, q[1].y, q[2].x, q[2].y, q[3].x, q[3].y]);
+      var to = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, w, 0, w, h, 0, h]);
+      var M = cv.getPerspectiveTransform(from, to), out = document.createElement('canvas');
+      try {
+        cv.warpPerspective(src, dst, M, new cv.Size(w, h), cv.INTER_LINEAR, cv.BORDER_REPLICATE, new cv.Scalar());
+        cv.imshow(out, dst);
+      } finally { src.delete(); dst.delete(); from.delete(); to.delete(); M.delete(); }
+      return out;
+    });
+  }
+  // Малювання контуру на canvas перегляду (k — масштаб перегляду), handles — кружечки кутів для перетягування.
+  function drawQuad(ctx, quad, k, handles){
+    ctx.save(); ctx.beginPath();
+    quad.forEach(function(p, i){ var x = p.x * k, y = p.y * k; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+    ctx.closePath(); ctx.fillStyle = 'rgba(76,175,80,.22)'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#4caf50'; ctx.stroke();
+    if (handles) quad.forEach(function(p){ ctx.beginPath(); ctx.arc(p.x * k, p.y * k, handles, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#4caf50'; ctx.stroke(); });
+    ctx.restore();
+  }
+  function inset(w, h, f){ f = f || 0.08; return [{x: w * f, y: h * f}, {x: w * (1 - f), y: h * f}, {x: w * (1 - f), y: h * (1 - f)}, {x: w * f, y: h * (1 - f)}]; }
+  return {load: load, detect: detect, warp: warp, drawQuad: drawQuad, inset: inset, order: order};
+})();
+</script>

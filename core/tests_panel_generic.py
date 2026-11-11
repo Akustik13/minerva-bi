@@ -206,7 +206,7 @@ class FieldsTests(GenericTestBase):
         s = Supplier.objects.create(name="Muster GmbH")
         groups, html = self.fields(s)
         self.assertEqual([g["title"] for g in groups], [   # «📁 Проєкти» — projects/panels.py, решта — suppliers/
-            "🏢 Постачальник", "📊 Огляд", "📁 Проєкти", "📞 Контакти", "📍 Адреса", "💼 Комерційні умови", "✉️ Пошта",
+            "🏢 Постачальник", "📊 Огляд", "📁 Проєкти", "🧵 Листування й файли", "📞 Контакти", "📍 Адреса", "💼 Комерційні умови", "✉️ Пошта",
             "📷 Візитки й флаєри", "📨 Запити (RFQ)", "🧠 AI та інтернет", "🕘 Історія"])
         for n in (5, 3, 1):
             self.assertIn(f"<summary>Порожні поля ({n})</summary>", html)

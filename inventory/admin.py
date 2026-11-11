@@ -4342,6 +4342,10 @@ class SupplierAdmin(SupplierCardMixin, ProjectsBlockMixin, admin.ModelAdmin):
             "fields": ("sup_overview",),
             "description": "З закупівель і запитів Minerva; швидкість відповіді й проблеми — «✉️ Аналіз пошти».",
         }),
+        ("🧵 Листування й файли", {
+            "fields": ("sup_mail",),
+            "description": "Теми листування з вашої пошти: запити, пропозиції, PI / рахунки й файли — кожен бачить свою пошту.",
+        }),
         ("📞 Контакти", {
             "fields": ("contact_person", "email", "phone"),
             "description": "Основний контакт фірми; інші люди — «👥 Контактні особи» внизу картки.",

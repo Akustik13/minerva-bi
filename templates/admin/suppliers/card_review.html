@@ -27,6 +27,9 @@
               <button type="button" class="button" data-e="crop">✂️ Обрізати</button>
               <button type="button" class="button" data-e="cropok" style="display:none">✓ Обрізати виділене</button>
               <button type="button" class="button" data-e="cropno" style="display:none">✕</button>
+              <button type="button" class="button" data-e="doc" title="Знайти контур візитки чи флаєра й вирівняти фото по ньому">📄 По контуру</button>
+              <button type="button" class="button" data-e="docok" style="display:none">✓ Вирівняти</button>
+              <button type="button" class="button" data-e="docno" style="display:none">✕</button>
               <label class="spf-muted"><input type="checkbox" class="cr-ai"> 🧠 Прочитати AI заново</label>
               <button type="button" class="default" data-e="save">💾 Зберегти зміни</button>
               <button type="button" class="button" data-e="cancel">Скасувати</button>
@@ -34,6 +37,7 @@
             {% if ph.original %}<form method="post" style="display:inline" onsubmit="return confirm('Повернути фото, як його зняли спочатку? Правки зникнуть.')">{% csrf_token %}<input type="hidden" name="action" value="restore"><input type="hidden" name="side" value="{{ ph.key }}"><button type="submit" class="button" title="Фото, як його зняли спочатку">↺ Оригінал</button></form>{% endif %}
           </div>
           <div class="spf-muted cr-cropnote" style="display:none">Проведіть по фото, щоб виділити візитку чи QR-код.</div>
+          <div class="spf-muted cr-docnote" style="display:none"></div>
           <div class="spf-job cr-emsg"></div>
           {% endif %}
         </div>
@@ -107,6 +111,7 @@
   </div>
 </div>
 {% include "admin/suppliers/_qr_js.html" %}
+{% include "admin/suppliers/_doc_scan_js.html" %}
 {{ job_js }}
 <script>
 (function(){
@@ -155,6 +160,7 @@
     var side = box.dataset.side, img = box.querySelector('img'), view = box.querySelector('.cr-view');
     var cv = box.querySelector('.cr-canvas'), ed = box.querySelector('.cr-edit'), msg = box.querySelector('.cr-emsg');
     var note = box.querySelector('.cr-cropnote'), work = null, crop = null, cropping = false, k = 1, start = null;
+    var docnote = box.querySelector('.cr-docnote'), quad = null, corner = -1;
     function btn(name){ return tools.querySelector('[data-e=' + name + ']'); }
     function draw(){
       k = Math.min(1, 900 / Math.max(work.width, work.height));
@@ -165,6 +171,20 @@
         ctx.drawImage(work, crop.x / k, crop.y / k, crop.w / k, crop.h / k, crop.x, crop.y, crop.w, crop.h);
         ctx.strokeStyle = '#4caf50'; ctx.lineWidth = 2; ctx.strokeRect(crop.x, crop.y, crop.w, crop.h);
       }
+      if (quad) spDoc.drawQuad(ctx, quad, k, Math.max(8, cv.width / 45));
+    }
+    function docMode(on){
+      btn('doc').style.display = on ? 'none' : ''; btn('docok').style.display = btn('docno').style.display = on ? '' : 'none';
+      docnote.style.display = on ? '' : 'none'; cv.style.touchAction = on ? 'none' : '';
+      if (!on) { quad = null; draw(); return; }
+      if (cropping) cropMode(false);
+      docnote.textContent = '⏳ Шукаю контур…';
+      spDoc.detect(work, 700).then(function(q){
+        quad = q || spDoc.inset(work.width, work.height);
+        docnote.textContent = q ? '📄 Контур знайдено — за потреби перетягніть кути й натисніть «✓ Вирівняти».'
+                                : '📄 Контур не знайдено — перетягніть кути до країв візитки й натисніть «✓ Вирівняти».';
+        draw();
+      }).catch(function(){ docnote.textContent = '⚠️ Бібліотека контурів не завантажилась — перевірте інтернет.'; });
     }
     function cropMode(on){
       cropping = on; crop = null; cv.style.cursor = on ? 'crosshair' : ''; cv.style.touchAction = on ? 'none' : '';
@@ -188,11 +208,20 @@
     function pos(e){ var r = cv.getBoundingClientRect();
       return {x: Math.max(0, Math.min(cv.width, (e.clientX - r.left) * cv.width / r.width)),
               y: Math.max(0, Math.min(cv.height, (e.clientY - r.top) * cv.height / r.height))}; }
-    cv.addEventListener('pointerdown', function(e){ if (!cropping) return; e.preventDefault(); start = pos(e);
+    cv.addEventListener('pointerdown', function(e){
+      if (quad) {                                     // 📄 тягнемо найближчий кут
+        var p = pos(e), best = -1, bd = 1e9, r = Math.max(24, cv.width / 12);
+        quad.forEach(function(q, i){ var d = Math.hypot(q.x * k - p.x, q.y * k - p.y); if (d < bd) { bd = d; best = i; } });
+        if (bd <= r) { e.preventDefault(); corner = best; try { cv.setPointerCapture(e.pointerId); } catch (x) {} }
+        return;
+      }
+      if (!cropping) return; e.preventDefault(); start = pos(e);
       try { cv.setPointerCapture(e.pointerId); } catch (x) {} });
-    cv.addEventListener('pointermove', function(e){ if (!start) return; var p = pos(e);
+    cv.addEventListener('pointermove', function(e){
+      if (corner >= 0 && quad) { var q = pos(e); quad[corner] = {x: q.x / k, y: q.y / k}; draw(); return; }
+      if (!start) return; var p = pos(e);
       crop = {x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y)}; draw(); });
-    cv.addEventListener('pointerup', function(){ start = null; });
+    cv.addEventListener('pointerup', function(){ start = null; corner = -1; });
     function save(){
       msg.textContent = '⏳ Шукаю QR і зберігаю…';
       var other = document.getElementById('cr-img-' + (side === 'front' ? 'back' : 'front'));
@@ -217,8 +246,14 @@
       var b = e.target.closest('button[data-e]'); if (!b) return;
       var a = b.dataset.e;
       if (a === 'start') { if (img.complete) begin(); else img.onload = begin; }
-      else if (a === 'left') rotate(-1);
-      else if (a === 'right') rotate(1);
+      else if (a === 'doc') docMode(true);
+      else if (a === 'docno') docMode(false);
+      else if (a === 'docok') {
+        if (!quad) return; docnote.textContent = '⏳ Вирівнюю…';
+        spDoc.warp(work, quad).then(function(c){ work = c; docMode(false); });
+      }
+      else if (a === 'left') { if (quad) docMode(false); rotate(-1); }
+      else if (a === 'right') { if (quad) docMode(false); rotate(1); }
       else if (a === 'crop') cropMode(true);
       else if (a === 'cropno') cropMode(false);
       else if (a === 'cropok') {

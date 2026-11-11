@@ -96,8 +96,11 @@ def _is_theirs(m, emails, domains) -> bool:
 
 
 def _documents(m) -> list:
-    from inventory.services.po_documents import _documents as docs
-    return [{"index": i, "name": a.get("name") or "document", "size": a.get("size") or 0} for i, a in docs(m)]
+    """Справжні документи листа (без вбудованих картинок і image001.png з підписів) з видом (history.doc_kind)."""
+    from suppliers.services.history import doc_kind, is_document
+    return [{"index": i, "name": a.get("name") or "document", "size": a.get("size") or 0,
+             "kind": doc_kind(a.get("name") or "")}
+            for i, a in enumerate(m.attachments or []) if is_document(a)]
 
 
 def _snippet(text, m) -> str:
@@ -109,6 +112,7 @@ def _snippet(text, m) -> str:
 def scan(supplier, user, date_from=None, date_to=None) -> dict:
     from email_assistant.crm_link import is_own, own_addresses
     from email_assistant.quotes import new_text
+    from suppliers.services.history import topic_of
     date_from, date_to = period(date_from, date_to)
     msgs, emails, domains, tokens = messages(supplier, user, date_from, date_to)
     own = own_addresses()
@@ -116,6 +120,16 @@ def scan(supplier, user, date_from=None, date_to=None) -> dict:
     groups = {}
     problems = []
     incoming = outgoing = 0
+    from inventory.models import PurchaseOrder
+    topic_po = {}                        # закупівля, заведена з теми листування (history.make_purchase), — її тема
+    for p in PurchaseOrder.objects.filter(supplier=supplier, notes__startswith="З листування: «"):
+        found = re.match(r"З листування: «(.+?)»", p.notes)
+        if found:
+            topic_po[found.group(1).lower()] = p
+    thread_topic = {}                    # гілка → тема першого листа (щоб «Re: …» і змінена тема лишались разом)
+    for m in msgs:
+        if m.thread_id and m.thread_id not in thread_topic:
+            thread_topic[m.thread_id] = topic_of(m.subject)
     for m in msgs:
         theirs = _is_theirs(m, emails, domains)
         ours = not theirs and (m.folder == m.FOLDER_SENT or is_own(m.from_email, own))
@@ -124,12 +138,14 @@ def scan(supplier, user, date_from=None, date_to=None) -> dict:
         outgoing += ours
         threads[m.thread_id or f"m{m.pk}"].append(m)
         text = f"{m.subject or ''}\n{m.body_text or ''}"
-        po = next((po for t, po in tokens.items() if t.lower() in text.lower()), None)
-        gkey = f"po:{po.pk}" if po else "none"
-        g = groups.setdefault(gkey, {"po": po, "messages": [], "documents": []})
+        title = thread_topic.get(m.thread_id) or topic_of(m.subject)
+        po = next((po for t, po in tokens.items() if t.lower() in text.lower()), None) or topic_po.get(title.lower())
+        gkey = f"po:{po.pk}" if po else "t:" + title.lower()
+        g = groups.setdefault(gkey, {"key": gkey, "po": po, "title": po.code if po else title, "messages": [],
+                                     "documents": []})
         g["messages"].append(m)
         for d in _documents(m):
-            g["documents"].append({**d, "message": m})
+            g["documents"].append({**d, "message": m, "theirs": theirs})
         fresh = new_text(m.body_text or "")
         hit = PROBLEM_RE.search(f"{m.subject or ''}\n{fresh}")
         if hit and len(problems) < PROBLEMS_MAX:
@@ -151,10 +167,15 @@ def scan(supplier, user, date_from=None, date_to=None) -> dict:
             waiting_us.append(last)
         elif last.ours and last.sent_at and last.sent_at < timezone.now() - datetime.timedelta(days=3):
             waiting_them.append(last)
-    po_groups = sorted((g for k, g in groups.items() if k != "none"),
+    # спершу закупівлі (найновіші), потім теми листування — найсвіжіші зверху
+    po_groups = sorted((g for g in groups.values() if g["po"] is not None),
                        key=lambda g: g["po"].order_date or datetime.date.min, reverse=True)
-    if "none" in groups:
-        po_groups.append(groups["none"])
+    po_groups += sorted((g for g in groups.values() if g["po"] is None),
+                        key=lambda g: g["messages"][-1].sent_at or timezone.now(), reverse=True)
+    from suppliers.services.history import STAGES, stage_of
+    for g in po_groups:
+        g["stage"] = stage_of(g)
+        g["stage_text"] = STAGES.get(g["stage"], "")
     return {
         "date_from": date_from, "date_to": date_to, "emails": sorted(emails), "domains": sorted(domains),
         "messages": len(msgs), "incoming": incoming, "outgoing": outgoing, "threads": len(threads),

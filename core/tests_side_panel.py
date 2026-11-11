@@ -48,7 +48,7 @@ def register_test_panel():
         blocks=[
             sp.Block("info", "Контакти", lambda s, r: sp.kv([("Email", s.email), ("Телефон", s.phone)]), icon="📇",
                      badge=lambda s, r: sp.Badge(2, "ok", "дві адреси"),
-                     summary=lambda s, r: f"{s.contact_person} · {s.email}", affects=("email",), fieldset=2),
+                     summary=lambda s, r: f"{s.contact_person} · {s.email}", affects=("email",), fieldset=3),
             sp.Block("secret", "Для продажів", lambda s, r: format_html("<p>{}</p>", "Таємні продажі"),
                      perm="sales.view_salesorder"),
             sp.Block("lazy", "Повільний", lambda s, r: format_html("<p>{}</p>", "Повільно пораховано"), lazy=True),
@@ -330,7 +330,7 @@ class ShellTests(PanelTestBase):
         for part in ('data-count="2"', 'data-tone="ok"', 'data-badge="дві адреси"',
                      'data-brief="Anna · anna@muster.example"', 'aria-expanded="true"',
                      # група 1 адмінки («📞 Контакти») — у картці 2: після «🏢 Постачальник» ще «📁 Проєкти»
-                     f'data-card="/admin/inventory/supplier/{pk}/change/#fieldset-0-3-heading"', "mvp-sh-card",
+                     f'data-card="/admin/inventory/supplier/{pk}/change/#fieldset-0-4-heading"', "mvp-sh-card",
                      '<dt>Email</dt><dd><span translate="no">anna@muster.example</span></dd>'):
             self.assertIn(part, info)
         self.assertIn("Таємні продажі", self.section(html, "secret"))
