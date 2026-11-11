@@ -540,6 +540,25 @@ class EditSavedPhotoTests(Base):
                                      "image": SimpleUploadedFile("x.jpg", b"not an image", content_type="image/jpeg")})
         self.assertEqual(bad.status_code, 400)
 
+    def test_drop_one_side(self):
+        m = SupplierMedia(kind=SupplierMedia.CARD, created_by=self.user)
+        m.image.save("front.png", SimpleUploadedFile("front.png", png()), save=False)
+        m.image_back.save("back.png", SimpleUploadedFile("back.png", png()), save=False)
+        m.save()
+        front, back = m.image.name, m.image_back.name
+        url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+        self.assertContains(self.client.get(url), "🗑 Прибрати цю сторону</button>", count=2)
+        self.client.post(url, {"action": "drop_side", "side": "front"})         # лицьову — зворотна стає першою
+        m.refresh_from_db()
+        self.assertEqual((m.image.name, m.image_back.name), (back, ""))
+        self.assertFalse(m.image.storage.exists(front))
+        self.assertNotContains(self.client.get(url), "Прибрати цю сторону")      # одна сторона — лише «повністю»
+        self.client.post(url, {"action": "drop_side", "side": "front"})
+        m.refresh_from_db()
+        self.assertEqual(m.image.name, back)
+        self.client.force_login(self.other)                                     # чужому — ні
+        self.assertIn(self.client.post(url, {"action": "drop_side", "side": "back"}).status_code, (403, 404))
+
     def test_edit_can_reread_with_ai(self):
         m = SupplierMedia(kind=SupplierMedia.CARD, created_by=self.user)
         m.image.save("card.png", SimpleUploadedFile("card.png", png()), save=False)
@@ -655,3 +674,79 @@ class HistoryTests(Base):
         data = history.topics_for(s, self.user)
         self.assertEqual([t["title"] for t in data["topics"]], ["Request for Quotation PCBA"])
         self.assertTrue(SupplierEvent.objects.filter(supplier=s, text__startswith="✉️ Перше листування").exists())
+
+    def test_purchase_as_history_keeps_stock_and_incoming(self):
+        from inventory.models import InventoryTransaction
+        from suppliers.services import history
+        self._thread()
+        history.rebuild(self.supplier, self.user)
+        rfq = next(t for t in history.topics_for(self.supplier, self.user)["topics"] if t["stage"] == "pi")
+        self.assertTrue(history.history_default(rfq))                         # останній лист — 38 днів тому
+        self.assertFalse(history.history_default({"last": timezone.now().isoformat()}))
+        po, out = history.make_purchase(self.supplier, self.user, rfq["key"], as_history=True)
+        self.assertEqual((po.status, po.received_date, po.lines.count(), out["added"]), ("received", None, 0, 2))
+        self.assertTrue(history.is_history(po))
+        self.assertFalse(InventoryTransaction.objects.exists())
+        self.assertEqual(overview.purchases(self.supplier)["open"], 0)       # не «відкрита» й не «Очікується»
+        with self.assertRaises(ValueError):                                     # тема вже під закупівлею — без оновлення
+            history.make_purchase(self.supplier, self.user, rfq["key"])
+        history.rebuild(self.supplier, self.user)
+        t = next(t for t in history.topics_for(self.supplier, self.user)["topics"] if t.get("po"))
+        self.assertEqual((t["po"], t["po_history"]), (po.pk, True))
+        # тема стала закупівлею («— «PO-…»» замість назви теми) — віхи не дублюються, старі повтори прибираються
+        pi_events = SupplierEvent.objects.filter(supplier=self.supplier, text__contains="PI#20260402MC02.pdf")
+        self.assertEqual(pi_events.count(), 1)
+        e = pi_events.get()
+        SupplierEvent.objects.create(supplier=self.supplier, kind=e.kind, message=e.message, user=self.user,
+                                     text=e.text.split(" — «")[0] + " — «PO-999»")
+        history.rebuild(self.supplier, self.user)
+        self.assertEqual(list(pi_events.values_list("pk", flat=True)), [e.pk])
+        self.assertTrue(SupplierEvent.objects.filter(supplier=self.supplier,
+                                                     text__startswith=f"📜 Закупівля {po.code}").exists())
+
+    def test_card_checkbox_picks_history_or_open(self):
+        from suppliers.services import history
+        self._thread()
+        url = reverse("admin:inventory_supplier_history", args=[self.supplier.pk])
+        self.client.post(url, {"sup_action": "rebuild"})
+        page = self.client.get(reverse("admin:inventory_supplier_change", args=[self.supplier.pk]))
+        self.assertContains(page, 'name="hist"')
+        self.assertContains(page, 'name="make_po"')
+        key = next(t for t in history.topics_for(self.supplier, self.user)["topics"] if t["stage"] == "pi")["key"]
+        self.client.post(url + "?action=po", {"topic": key, "hist": ["other", key]})
+        self.assertEqual(PurchaseOrder.objects.get(supplier=self.supplier).status, "received")
+        PurchaseOrder.objects.all().delete()
+        history.rebuild(self.supplier, self.user)
+        self.client.post(url + "?action=po", {"topic": key})                  # без галочки — відкрита закупівля
+        self.assertEqual(PurchaseOrder.objects.get(supplier=self.supplier).status, "ordered")
+        real = User.has_perm                                                    # без права на закупівлі — без галочок
+        with mock.patch.object(User, "has_perm", lambda u, perm, obj=None: perm != "inventory.add_purchaseorder"
+                               and real(u, perm, obj)):
+            page = self.client.get(reverse("admin:inventory_supplier_change", args=[self.supplier.pk]))
+        self.assertContains(page, "RFQ for 20 pcs Flexible PCB")
+        self.assertNotContains(page, 'name="make_po"')
+        self.assertNotContains(page, 'name="hist"')
+
+    def test_rebuild_makes_history_purchases_once(self):
+        self._thread()
+        url = reverse("admin:inventory_supplier_history", args=[self.supplier.pk])
+        self.client.post(url, {"sup_action": "rebuild", "make_po": "1", "po_history": "1"})
+        pos = PurchaseOrder.objects.filter(supplier=self.supplier)
+        self.assertEqual([(p.status, p.supplier_order_no, p.documents.count()) for p in pos],
+                         [("received", "20260402MC02", 2)])                    # лише тема з PI, розсилка — ні
+        self.client.post(url, {"sup_action": "rebuild", "make_po": "1", "po_history": "1"})
+        self.assertEqual(pos.count(), 1)
+        self.client.post(url, {"sup_action": "rebuild"})                        # без галочки — нічого не заводить
+        self.assertEqual(pos.count(), 1)
+
+    def test_create_from_mail_with_history_purchases(self):
+        m = self.mail(frm="mia@newfab.example", name="Mia", subject="PCBA order TR140401", body="Please quote")
+        pi = self.mail(frm="mia@newfab.example", subject="Re: PCBA order TR140401", body="PI attached")
+        self._att(pi, "PI 20261103NF01.pdf", b"%PDF-1.4 pi")
+        page = self.client.get(reverse("admin:inventory_supplier_from_mail", args=[m.pk]))
+        self.assertContains(page, 'name="po_history"')
+        self.client.post(reverse("admin:inventory_supplier_from_mail", args=[m.pk]),
+                         {"action": "create", "name": "New Fab Ltd", "email": "mia@newfab.example", "make_po": "1",
+                          "po_history": "1"})
+        po = PurchaseOrder.objects.get(supplier__name="New Fab Ltd")
+        self.assertEqual((po.status, po.supplier_order_no, po.documents.count()), ("received", "20261103NF01", 1))

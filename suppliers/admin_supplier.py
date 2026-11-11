@@ -52,6 +52,34 @@ def _stars(n) -> str:
     return "★" * n + "☆" * (5 - n) if n else ""
 
 
+_PO_OPTS_JS = mark_safe(
+    "<script>(function(){var K='sp-po-opts',s={};try{s=JSON.parse(localStorage.getItem(K)||'{}')}catch(e){}"
+    "document.querySelectorAll('input.sp-po-opt').forEach(function(el){if(el.dataset.spDone)return;"
+    "el.dataset.spDone='1';var k=el.getAttribute('data-k');"
+    "if(Object.prototype.hasOwnProperty.call(s,k))el.checked=!!s[k];"
+    "el.addEventListener('change',function(){s[k]=el.checked;"
+    "try{localStorage.setItem(K,JSON.stringify(s))}catch(e){}});});})();</script>")
+
+
+# у формі картки Django ставить кожному <label> ширину 160 px і float — галочкам це не потрібно
+_LABEL_CSS = "width:auto;min-width:0;float:none;display:inline;padding:0;font-weight:normal"
+
+
+def po_options(count=None):
+    """Галочки «🛒 одразу завести закупівлі з тем з PI» і «📜 як історію» для збору історії з пошти (картка
+    постачальника, «🏭 Постачальник з листа»); вибір людини браузер пам'ятає (localStorage sp-po-opts)."""
+    return format_html(
+        '<span class="sp-po-opts" style="display:flex;flex-wrap:wrap;gap:2px 14px;flex-basis:100%">'
+        '<label class="sp-muted" style="{}" title="{}"><input type="checkbox" name="make_po" value="1" '
+        'class="sp-po-opt" data-k="make"> 🛒 {}{}</label> <label class="sp-muted" style="{}" title="{}">'
+        '<input type="checkbox" name="po_history" value="1" class="sp-po-opt" data-k="hist" checked> 📜 {}</label>'
+        '</span>{}', _LABEL_CSS,
+        "Для кожної теми, де від них є PI / рахунок або підтвердження, а закупівлі ще немає",
+        "одразу завести закупівлі з тем з PI / рахунком", f" (зараз {count})" if count else "", _LABEL_CSS,
+        "Закупівля в стані «Отримано» без позицій: склад і «Очікується» не змінюються",
+        "як історію — уже отримано, без складу", _PO_OPTS_JS)
+
+
 def _can(request, perm):
     return request.user.has_perm(f"inventory.{perm}_supplier")
 
@@ -278,14 +306,16 @@ class SupplierCardMixin:
         viewer = self._viewer(obj)
         data = history.topics_for(obj, viewer) if viewer is not None else None
         url = reverse("admin:inventory_supplier_history", args=[obj.pk])
+        can_po = viewer is not None and viewer.has_perm("inventory.add_purchaseorder")
+        opts = po_options(sum(1 for t in (data or {}).get("topics", []) if history.can_purchase(t))) if can_po else ""
         rebuild = format_html('<button type="submit" class="button" name="sup_action" value="rebuild" formaction="{}" '
                               'formmethod="post" formnovalidate>🔄 {}</button>', url,
                               "Оновити з пошти" if data else f"Зібрати історію з пошти (за {history.YEARS} років)")
         if not data:
-            return format_html('<div class="sp-muted">{}</div><div class="sp-row">{}</div>',
+            return format_html('<div class="sp-muted">{}</div><div class="sp-row">{}{}</div>',
                                "Minerva перечитає ваші скриньки й складе листування з постачальником за темами: запити, "
                                "пропозиції, PI / рахунки, файли (Gerber, BOM, Quotation…) — і запише віхи в «🕘 Історію».",
-                               rebuild)
+                               rebuild, opts)
         topics = data["topics"]
         work = [t for t in topics if t["stage"] != "marketing"]
         ads = [t for t in topics if t["stage"] == "marketing"]
@@ -303,14 +333,19 @@ class SupplierCardMixin:
                     history.KIND_NAMES.get(d["kind"], "📎").split(" ")[0], d["name"][:42]))
             action = ""
             if t.get("po"):
-                action = format_html('<a href="{}" translate="no">🗒️ {}</a>',
-                                     reverse("admin:inventory_purchaseorder_change", args=[t["po"]]), t.get("po_code"))
-            elif t["stage"] in ("pi", "confirmation") and viewer is not None and viewer.has_perm(
-                    "inventory.add_purchaseorder"):
+                action = format_html('<a href="{}" translate="no">🗒️ {}</a>{}',
+                                     reverse("admin:inventory_purchaseorder_change", args=[t["po"]]), t.get("po_code"),
+                                     format_html(' <span title="{}">📜</span>', "Заведено як історію — без складу")
+                                     if t.get("po_history") else "")
+            elif history.can_purchase(t) and can_po:
                 action = format_html(
                     '<button type="submit" class="button" name="topic" value="{}" formaction="{}?action=po" '
-                    'formmethod="post" formnovalidate title="{}">🛒 Завести закупівлю</button>', t["key"], url,
-                    "Закупівля з датою й номером з PI, документи теми — у документи закупівлі")
+                    'formmethod="post" formnovalidate title="{}">🛒 Завести закупівлю</button>'
+                    '<label class="sp-muted" style="{};display:block;white-space:nowrap" title="{}">'
+                    '<input type="checkbox" name="hist" value="{}"{}> 📜 як історію</label>', t["key"], url,
+                    "Закупівля з датою й номером з PI, документи теми — у документи закупівлі", _LABEL_CSS,
+                    "Уже отримано: закупівля в стані «Отримано» без позицій — склад і «Очікується» не змінюються",
+                    t["key"], mark_safe(" checked") if history.history_default(t) else "")
             first, last = (t["first"] or "")[:10], (t["last"] or "")[:10]
             period = ".".join(reversed(first.split("-"))) + (
                 " – " + ".".join(reversed(last.split("-"))) if last and last != first else "")
@@ -327,11 +362,11 @@ class SupplierCardMixin:
         return format_html(
             '<div class="sp-muted">З вашої пошти · {} · оновлено {} · тем {}</div>'
             '<table class="sp-table"><tr><th>Етап</th><th>Тема й файли</th><th>Період</th><th></th></tr>{}</table>{}'
-            '<div class="sp-row">{} <a class="button" href="{}">✉️ Детально й 🧠 AI-оцінка</a></div>',
+            '<div class="sp-row">{} <a class="button" href="{}">✉️ Детально й 🧠 AI-оцінка</a>{}</div>',
             f"{data['date_from']:%d.%m.%Y} – {data['date_to']:%d.%m.%Y}" if data.get("date_from") else "",
             timezone.localtime(data["at"]).strftime("%d.%m.%Y %H:%M"), len(work),
             mark_safe("".join(str(r) for r in rows)) or format_html('<tr><td colspan="4">{}</td></tr>', "—"), ads_html,
-            rebuild, reverse("admin:inventory_supplier_analysis", args=[obj.pk]))
+            rebuild, reverse("admin:inventory_supplier_analysis", args=[obj.pk]), opts)
 
     @admin.display(description="Візитки й флаєри")
     def sup_media(self, obj):
@@ -506,21 +541,48 @@ class SupplierCardMixin:
         if request.GET.get("action") == "po":
             if not request.user.has_perm("inventory.add_purchaseorder"):
                 raise Http404
+            topic = request.POST.get("topic", "")
+            as_history = topic in request.POST.getlist("hist")
             try:
-                po, out = history.make_purchase(obj, request.user, request.POST.get("topic", ""))
+                po, out = history.make_purchase(obj, request.user, topic, as_history=as_history)
             except ValueError as e:
                 self.message_user(request, str(e), messages.ERROR)
                 return redirect(back)
             history.rebuild(obj, request.user)
-            self.message_user(request, f"🛒 Закупівля {po.code}: документів {out['added']} — перевірте позиції й суми",
-                              messages.SUCCESS)
+            if as_history:
+                self.message_user(request, f"📜 Закупівля {po.code} — як історія (уже отримано, без складу): "
+                                           f"документів {out['added']}", messages.SUCCESS)
+            else:
+                self.message_user(request, f"🛒 Закупівля {po.code}: документів {out['added']} — перевірте позиції й "
+                                           f"суми", messages.SUCCESS)
             for line in out["failed"][:5]:
                 self.message_user(request, f"⚠️ {line}", messages.WARNING)
             return redirect(reverse("admin:inventory_purchaseorder_change", args=[po.pk]))
         out = history.rebuild(obj, request.user)
         self.message_user(request, f"🧵 Історію зібрано: листів {out['messages']}, тем {out['topics']}, "
                                    f"нових подій {out['events']}", messages.SUCCESS)
+        self._make_purchases(request, obj)
         return redirect(back)
+
+    def _make_purchases(self, request, supplier):
+        """Галочка «🛒 одразу завести закупівлі з тем з PI» (po_options) після збору історії з пошти."""
+        from suppliers.services import history
+        if not request.POST.get("make_po") or not request.user.has_perm("inventory.add_purchaseorder"):
+            return
+        as_history = bool(request.POST.get("po_history"))
+        out = history.make_purchases(supplier, request.user, as_history=as_history)
+        n = len(out["pos"])
+        codes = ", ".join(po.code for po in out["pos"][:12]) + ("…" if n > 12 else "")
+        if not n:
+            self.message_user(request, "🛒 Тем з PI / рахунком без закупівлі немає — нічого не заведено", messages.INFO)
+        elif as_history:
+            self.message_user(request, f"📜 Заведено закупівель як історію (уже отримано, без складу): {n} — {codes}",
+                              messages.SUCCESS)
+        else:
+            self.message_user(request, f"🛒 Заведено закупівель: {n} — {codes}; перевірте позиції й суми",
+                              messages.SUCCESS)
+        for line in out["failed"][:5]:
+            self.message_user(request, f"⚠️ {line}", messages.WARNING)
 
     def search_view(self, request):
         """Підказка постачальника за назвою / email (поле «додати до наявного»)."""
@@ -630,6 +692,7 @@ class SupplierCardMixin:
             if out["messages"]:
                 self.message_user(request, f"🧵 Історію з пошти зібрано: листів {out['messages']}, тем {out['topics']}",
                                   messages.INFO)
+            self._make_purchases(request, supplier)
         except Exception:  # noqa: BLE001
             import logging
             logging.getLogger(__name__).warning("supplier history rebuild failed", exc_info=True)
@@ -672,7 +735,8 @@ class SupplierCardMixin:
         return TemplateResponse(request, "admin/suppliers/from_mail.html", self._ctx(
             request, "🏭 Постачальник з листа", msg=msg, d=data, matches=draft.existing(data),
             categories=SupplierCategory.objects.filter(is_active=True), can_add=_can(request, "add"),
-            can_change=_can(request, "change")))
+            can_change=_can(request, "change"),
+            po_opts=po_options() if request.user.has_perm("inventory.add_purchaseorder") else ""))
 
     def find_in_mail_view(self, request):
         """🔎 Хто з вашого листування схожий на постачальника, але його ще немає в Minerva."""
@@ -838,6 +902,29 @@ class SupplierCardMixin:
             request, "🪪 Візитки й флаєри", items=items, show=show, q=q, mark=mark, marks=SupplierMedia.MARKS,
             unassigned=SupplierMedia.objects.filter(supplier=None).count()))
 
+    def _card_drop_side(self, request, m, url):
+        """Прибрати лицьову або зворотну сторону: її фото (і оригінал) видаляється, друга лишається — лицьову
+        заміщає зворотна. Єдину сторону так не прибрати — лише «🗑 Видалити повністю»."""
+        back = request.POST.get("side") == "back"
+        if not (m.image and m.image_back):
+            self.message_user(request, "Це єдина сторона — щоб прибрати її, видаліть фото повністю.", messages.ERROR)
+            return redirect(url)
+        gone, keep = (("image_back", "image_back_original"), ("image", "image_original")) if back else \
+            (("image", "image_original"), ("image_back", "image_back_original"))
+        keep_names = {getattr(m, f).name for f in keep if getattr(m, f)}
+        for f in gone:
+            file = getattr(m, f)
+            if file and file.name not in keep_names:     # той самий файл в іншому полі не чіпаємо
+                file.delete(save=False)
+        if not back:
+            m.image = m.image_back.name
+            m.image_original = m.image_back_original.name if m.image_back_original else ""
+        m.image_back, m.image_back_original = "", ""
+        m.save(update_fields=["image", "image_original", "image_back", "image_back_original"])
+        self.message_user(request, "🗑 Зворотну сторону прибрано" if back else
+                          "🗑 Лицьову сторону прибрано — зворотна тепер перша", messages.SUCCESS)
+        return redirect(url)
+
     def _card_edit(self, request, m, url):
         """POST multipart: side, image (JPEG з браузера), qr_front / qr_back (QR, які браузер знайшов після правки),
         read_ai, model → JSON {url}. Перша правка переносить знімок у *_original (файл не копіюється)."""
@@ -967,6 +1054,8 @@ class SupplierCardMixin:
                 m.save(update_fields=[field, orig])
                 self.message_user(request, "↺ Повернуто оригінал фото", messages.SUCCESS)
             return redirect(url)
+        if action == "drop_side":                  # 🗑 прибрати одну сторону (двічі зняли той самий бік…)
+            return self._card_drop_side(request, m, url)
         if action == "delete":
             if not (_can(request, "change") or m.created_by_id == request.user.pk):
                 raise Http404

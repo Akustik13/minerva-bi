@@ -35,6 +35,7 @@
               <button type="button" class="button" data-e="cancel">Скасувати</button>
             </span>
             {% if ph.original %}<form method="post" style="display:inline" onsubmit="return confirm('Повернути фото, як його зняли спочатку? Правки зникнуть.')">{% csrf_token %}<input type="hidden" name="action" value="restore"><input type="hidden" name="side" value="{{ ph.key }}"><button type="submit" class="button" title="Фото, як його зняли спочатку">↺ Оригінал</button></form>{% endif %}
+            {% if photo_sides|length > 1 %}<form method="post" style="display:inline" onsubmit="return confirm('Прибрати цю сторону? Її фото видалиться назавжди, друга сторона лишиться.')">{% csrf_token %}<input type="hidden" name="action" value="drop_side"><input type="hidden" name="side" value="{{ ph.key }}"><button type="submit" class="button" title="Наприклад, той самий бік зняли двічі">🗑 Прибрати цю сторону</button></form>{% endif %}
           </div>
           <div class="spf-muted cr-cropnote" style="display:none">Проведіть по фото, щоб виділити візитку чи QR-код.</div>
           <div class="spf-muted cr-docnote" style="display:none"></div>
@@ -57,7 +58,7 @@
         {% if can_edit %}<div class="spf-row"><button type="submit" class="button">💾 Зберегти примітки</button></div>{% endif %}
       </form>
       {% if can_edit %}
-      <form method="post" onsubmit="return confirm('Видалити це фото назавжди?')">{% csrf_token %}<input type="hidden" name="action" value="delete"><button type="submit" class="button">🗑 Видалити фото</button></form>
+      <form method="post" onsubmit="return confirm('Видалити назавжди — усі сторони, примітки й позначки? Постачальник і контакт лишаться.')">{% csrf_token %}<input type="hidden" name="action" value="delete"><button type="submit" class="button" title="Неправильна візитка, зайве фото">🗑 Видалити повністю</button></form>
       {% endif %}
     </div>
     <div>

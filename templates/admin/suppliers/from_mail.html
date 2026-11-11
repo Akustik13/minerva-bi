@@ -29,6 +29,8 @@
     {% endif %}
     {% include "admin/suppliers/_supplier_form.html" with picked=None %}
     <label class="spf-wide">Нотатка (піде в «Нотатки» картки)<textarea name="note" rows="2"></textarea></label>
+    <div class="spf-row spf-muted">🧵 Після «Створити» / «Додати до нього» Minerva одразу збере листування з ними з вашої пошти: теми, файли, PI.</div>
+    {% if po_opts %}<div class="spf-row">{{ po_opts }}</div>{% endif %}
     <div class="spf-row">
       {% if can_add %}<button type="submit" class="default">🏭 Створити постачальника</button>{% else %}<span class="spf-muted">Створювати постачальників може той, хто має право додавати постачальників.</span>{% endif %}
       <a href="{% url 'admin:inventory_supplier_changelist' %}">Скасувати</a>

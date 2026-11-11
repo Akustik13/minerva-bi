@@ -299,6 +299,7 @@
 {"uk": "(запис уже видалено)", "en": "(record already deleted)", "de": "(Eintrag bereits gelöscht)"}
 {"uk": "(запит на", "en": "(request for", "de": "(Anfrage für"}
 {"uk": "(запит ціни)", "en": "(price request)", "de": "(Preisanfrage)"}
+{"uk": "(зараз {0})", "en": "(now {0})", "de": "(jetzt {0})"}
 {"uk": "(зараз — за роллю)", "en": "(currently — by role)", "de": "(derzeit — nach Rolle)"}
 {"uk": "(зараз — лише на підтвердження)", "en": "(for now — confirmation only)", "de": "(derzeit — nur zur Bestätigung)"}
 {"uk": "(застарів)", "en": "(outdated)", "de": "(veraltet)"}
@@ -3609,6 +3610,7 @@
 {"uk": "Історія аналізів", "en": "Analysis history", "de": "Analyseverlauf"}
 {"uk": "Історія базових цін", "en": "Base price history", "de": "Historie der Basispreise"}
 {"uk": "Історія бекапів", "en": "Backup history", "de": "Sicherungsverlauf"}
+{"uk": "Історія з листування: заведено вже отриманою — без складу й без «Очікується», дата отримання невідома. Позицій не додавайте — інакше вони потраплять на склад.", "en": "History from correspondence: created as already received — no stock and no «Expected», receipt date unknown. Do not add lines — otherwise they will go into stock.", "de": "Verlauf aus der Korrespondenz: als bereits erhalten angelegt — ohne Lager und ohne «Erwartet», Eingangsdatum unbekannt. Keine Positionen hinzufügen — sonst kommen sie ins Lager."}
 {"uk": "Історія замовлень", "en": "Order history", "de": "Auftragshistorie"}
 {"uk": "Історія запитів", "en": "Request history", "de": "Anfrageverlauf"}
 {"uk": "Історія змін", "en": "Change history", "de": "Änderungshistorie"}
@@ -4703,11 +4705,13 @@
 {"uk": "Видалити крок", "en": "Delete step", "de": "Schritt löschen"}
 {"uk": "Видалити крок «", "en": "Delete step “", "de": "Schritt „"}
 {"uk": "Видалити крок «{0}»? Наступні кроки підуть після його попередників.", "en": "Delete the step «{0}»? The following steps will go after its predecessors.", "de": "Schritt «{0}» löschen? Die folgenden Schritte kommen nach seinen Vorgängern."}
+{"uk": "Видалити назавжди — усі сторони, примітки й позначки? Постачальник і контакт лишаться.", "en": "Delete permanently — all sides, notes and marks? The supplier and the contact stay.", "de": "Dauerhaft löschen — alle Seiten, Notizen und Markierungen? Lieferant und Kontakt bleiben."}
 {"uk": "Видалити нараду", "en": "Delete meeting", "de": "Besprechung löschen"}
 {"uk": "Видалити нараду #{0} разом з розшифровкою й документами бази знань? Це не можна скасувати.", "en": "Delete meeting #{0} together with its transcript and knowledge base documents? This cannot be undone.", "de": "Besprechung #{0} samt Transkript und Dokumenten der Wissensdatenbank löschen? Das kann nicht rückgängig gemacht werden."}
 {"uk": "Видалити нараду, розшифровку й документи бази знань? Це не можна скасувати. Пункти, уже додані в проєкт, лишаться.", "en": "Delete the meeting, transcript and knowledge base documents? This cannot be undone. Items already added to the project will remain.", "de": "Besprechung, Transkript und Dokumente der Wissensdatenbank löschen? Das kann nicht rückgängig gemacht werden. Bereits ins Projekt übernommene Punkte bleiben erhalten."}
 {"uk": "Видалити нараду?", "en": "Delete meeting?", "de": "Besprechung löschen?"}
 {"uk": "Видалити оффер на DigiKey Marketplace", "en": "Delete offer on DigiKey Marketplace", "de": "Offer auf DigiKey Marketplace löschen"}
+{"uk": "Видалити повністю", "en": "Delete completely", "de": "Vollständig löschen"}
 {"uk": "Видалити пресет «", "en": "Delete preset «", "de": "Vorlage löschen «"}
 {"uk": "Видалити ризик", "en": "Delete risk", "de": "Risiko löschen"}
 {"uk": "Видалити ризик «", "en": "Delete risk “", "de": "Risiko löschen: „"}
@@ -6074,6 +6078,7 @@
 {"uk": "Для ключа не налаштовано магазин.", "en": "No shop is configured for the key.", "de": "Für den Schlüssel ist kein Shop konfiguriert."}
 {"uk": "Для ключів API, не прив'язаних до магазину.", "en": "For API keys not bound to a shop.", "de": "Für API-Schlüssel, die keinem Shop zugeordnet sind."}
 {"uk": "Для кожного товару магазину", "en": "For every product of the shop", "de": "Für jeden Artikel des Shops"}
+{"uk": "Для кожної теми, де від них є PI / рахунок або підтвердження, а закупівлі ще немає", "en": "For every topic with a PI / invoice or confirmation from them and no purchase order yet", "de": "Für jedes Thema mit PI / Rechnung oder Bestätigung von ihnen, zu dem es noch keine Bestellung gibt"}
 {"uk": "Для конкретного листа додайте &gid={0} (знайти в URL листа).", "en": "To target a specific sheet, add &gid={0} (found in the sheet URL).", "de": "Für ein bestimmtes Blatt fügen Sie &gid={0} hinzu (in der URL des Blatts zu finden)."}
 {"uk": "Для кількості ≥ min_qty діє ціна ступеня. Діє найбільший ступінь, якого досягла кількість.", "en": "For a quantity ≥ min_qty the break price applies. The highest price break the quantity has reached is used.", "de": "Für eine Menge ≥ min_qty gilt der Staffelpreis. Maßgeblich ist die höchste Staffel, die die Menge erreicht hat."}
 {"uk": "Для малого e-commerce", "en": "For small e-commerce", "de": "Für kleinen E-Commerce"}
@@ -6844,6 +6849,9 @@
 {"uk": "Завдання створено — агент працює.", "en": "Task created — the agent is working.", "de": "Aufgabe erstellt — der Agent arbeitet."}
 {"uk": "Завдання та дедлайни", "en": "Tasks and deadlines", "de": "Aufgaben und Fristen"}
 {"uk": "Завдання — агент виконає його ще раз", "en": "Task — the agent will run it again", "de": "Aufgabe — der Agent führt sie erneut aus"}
+{"uk": "Заведено закупівель як історію (уже отримано, без складу): {0} — {1}", "en": "Purchase orders created as history (already received, no stock): {0} — {1}", "de": "Bestellungen als Verlauf angelegt (bereits erhalten, ohne Lager): {0} — {1}"}
+{"uk": "Заведено закупівель: {0} — {1}; перевірте позиції й суми", "en": "Purchase orders created: {0} — {1}; check lines and totals", "de": "Bestellungen angelegt: {0} — {1}; Positionen und Summen prüfen"}
+{"uk": "Заведено як історію — без складу", "en": "Created as history — no stock", "de": "Als Verlauf angelegt — ohne Lager"}
 {"uk": "Завершена", "en": "Completed", "de": "Abgeschlossen"}
 {"uk": "Завершення", "en": "Closing", "de": "Schluss"}
 {"uk": "Завершення (+ примітка про ступені, якщо є)", "en": "Closing (+ note on price breaks, if any)", "de": "Schluss (+ Hinweis zu Staffelpreisen, falls vorhanden)"}
@@ -6950,11 +6958,14 @@
 {"uk": "Закупівля CRM", "en": "CRM purchase", "de": "CRM-Bestellung"}
 {"uk": "Закупівля {0}", "en": "Purchase order {0}", "de": "Bestellung {0}"}
 {"uk": "Закупівля {0} з листування «{1}» (документів: {2})", "en": "Purchase order {0} from correspondence «{1}» (documents: {2})", "de": "Bestellung {0} aus der Korrespondenz «{1}» (Dokumente: {2})"}
+{"uk": "Закупівля {0} з листування «{1}» — історія, без складу (документів: {2})", "en": "Purchase order {0} from correspondence «{1}» — history, no stock (documents: {2})", "de": "Bestellung {0} aus der Korrespondenz «{1}» — Verlauf, ohne Lager (Dokumente: {2})"}
 {"uk": "Закупівля {0} — {1}", "en": "Purchase order {0} — {1}", "de": "Bestellung {0} — {1}"}
+{"uk": "Закупівля {0} — як історія (уже отримано, без складу): документів {1}", "en": "Purchase order {0} — as history (already received, no stock): {1} documents", "de": "Bestellung {0} — als Verlauf (bereits erhalten, ohne Lager): {1} Dokumente"}
 {"uk": "Закупівля {0}: документів {1} — перевірте позиції й суми", "en": "Purchase order {0}: {1} documents — check lines and totals", "de": "Bestellung {0}: {1} Dokumente — Positionen und Summen prüfen"}
 {"uk": "Закупівля {0}{1} ще чернетка — надіслати постачальнику?", "en": "Purchase order {0}{1} is still a draft — send it to the supplier?", "de": "Bestellung {0}{1} ist noch ein Entwurf — an den Lieferanten senden?"}
 {"uk": "Закупівля {0}{1}: очікується {2}", "en": "Purchase order {0}{1}: expected {2}", "de": "Bestellung {0}{1}: erwartet am {2}"}
 {"uk": "Закупівля {0}{1}: чекали {2}, ще не отримано", "en": "Purchase order {0}{1}: expected {2}, not received yet", "de": "Bestellung {0}{1}: erwartet am {2}, noch nicht eingegangen"}
+{"uk": "Закупівля в стані «Отримано» без позицій: склад і «Очікується» не змінюються", "en": "Purchase order in status «Received» without lines: stock and «Expected» do not change", "de": "Bestellung im Status «Erhalten» ohne Positionen: Lager und «Erwartet» ändern sich nicht"}
 {"uk": "Закупівля вже {0} — нічого не змінено.", "en": "The purchase order is already {0} — nothing changed.", "de": "Die Bestellung ist bereits {0} — nichts geändert."}
 {"uk": "Закупівля з датою й номером з PI, документи теми — у документи закупівлі", "en": "Purchase order with date and number from the PI, the topic's documents go to the order documents", "de": "Bestellung mit Datum und Nummer aus der PI, die Dokumente des Themas kommen zu den Bestelldokumenten"}
 {"uk": "Закупівля ще не прив'язана до проєкту — «🔎 Знайти пов'язане» в пульті проєкту або таблиця «🏭 Закупівлі проєкту» в картці проєкту.", "en": "The purchase is not linked to a project yet — “🔎 Find related” in the project cockpit or the table “🏭 Project purchases” in the project card.", "de": "Der Einkauf ist noch keinem Projekt zugeordnet — „🔎 Zugehöriges finden“ im Projekt-Cockpit oder die Tabelle „🏭 Einkäufe des Projekts“ in der Projektkarte."}
@@ -7716,6 +7727,7 @@
 {"uk": "Зворотний бік", "en": "Back side", "de": "Rückseite"}
 {"uk": "Зворотний бік відскановано.", "en": "Back side scanned.", "de": "Rückseite gescannt."}
 {"uk": "Зворотний бік знято.", "en": "Back side captured.", "de": "Rückseite aufgenommen."}
+{"uk": "Зворотну сторону прибрано", "en": "Back side removed", "de": "Rückseite entfernt"}
 {"uk": "Зворотні втрати", "en": "Return loss", "de": "Rückflussdämpfung"}
 {"uk": "Зворотній зв'язок", "en": "Feedback", "de": "Feedback"}
 {"uk": "Звук наради: програма Teams — «Весь екран» + «Поділитися системним звуком»; Teams або Zoom у браузері — вкладка + «Поділитися звуком вкладки»; очна зустріч — «Лише мікрофон».", "en": "Meeting audio: Teams app — “Entire screen” + “Share system audio”; Teams or Zoom in the browser — the tab + “Share tab audio”; in-person meeting — “Microphone only”.", "de": "Besprechungston: Teams-App — „Gesamter Bildschirm“ + „Systemaudio teilen“; Teams oder Zoom im Browser — Tab + „Tab-Audio teilen“; Präsenztermin — „Nur Mikrofon“."}
@@ -9109,6 +9121,7 @@
 {"uk": "Лицьовий бік", "en": "Front side", "de": "Vorderseite"}
 {"uk": "Лицьовий бік відскановано — можна зняти зворотний.", "en": "Front side scanned — you can capture the back.", "de": "Vorderseite gescannt — Sie können die Rückseite aufnehmen."}
 {"uk": "Лицьовий бік знято — можна зняти зворотний (виберіть «зворотний»).", "en": "Front side captured — you can capture the back (select «back»).", "de": "Vorderseite aufgenommen — Sie können die Rückseite aufnehmen (wählen Sie «Rückseite»)."}
+{"uk": "Лицьову сторону прибрано — зворотна тепер перша", "en": "Front side removed — the back side is now the first one", "de": "Vorderseite entfernt — die Rückseite ist jetzt die erste"}
 {"uk": "Лише Chrome або Edge.", "en": "Chrome or Edge only.", "de": "Nur Chrome oder Edge."}
 {"uk": "Лише Minerva — без звернень до RAG", "en": "Minerva only — no RAG requests", "de": "Nur Minerva — keine Anfragen an RAG"}
 {"uk": "Лише POST", "en": "POST only", "de": "Nur POST"}
@@ -10088,6 +10101,7 @@
 {"uk": "Напр.: які були проблеми з цим товаром? кому продавали й за якою ціною? чого не вистачає?", "en": "E.g.: what problems were there with this product? who was it sold to and at what price? what is missing?", "de": "Z. B.: Welche Probleme gab es mit diesem Artikel? An wen wurde er zu welchem Preis verkauft? Was fehlt?"}
 {"uk": "Наприклад, надіслали email → оберіть", "en": "For example, if you sent an email → select", "de": "Zum Beispiel: E-Mail gesendet → wählen Sie"}
 {"uk": "Наприклад, після зміни проєкту наради", "en": "For example, after changing the meeting’s project", "de": "Zum Beispiel nach Änderung des Projekts der Besprechung"}
+{"uk": "Наприклад, той самий бік зняли двічі", "en": "For example, the same side was photographed twice", "de": "Zum Beispiel wurde dieselbe Seite zweimal fotografiert"}
 {"uk": "Наприклад: 'Please note that cable length L is measured...'", "en": "For example: 'Please note that cable length L is measured...'", "de": "Zum Beispiel: 'Please note that cable length L is measured...'"}
 {"uk": "Наприклад: @minerva_support", "en": "For example: @minerva_support", "de": "Zum Beispiel: @minerva_support"}
 {"uk": "Наприклад: Antennen, Kabel, Elektronische Bauteile. Друкується в CN23 → Description of Contents", "en": "For example: Antennen, Kabel, Elektronische Bauteile. Printed in CN23 → Description of Contents", "de": "Zum Beispiel: Antennen, Kabel, Elektronische Bauteile. Wird in der CN23 gedruckt → Description of Contents"}
@@ -10691,6 +10705,7 @@
 {"uk": "Непоплачені рахунки", "en": "Unpaid invoices", "de": "Unbezahlte Rechnungen"}
 {"uk": "Неправильна адреса", "en": "Invalid address", "de": "Ungültige Adresse"}
 {"uk": "Неправильна адреса або домен", "en": "Invalid address or domain", "de": "Ungültige Adresse oder Domain"}
+{"uk": "Неправильна візитка, зайве фото", "en": "Wrong business card, unnecessary photo", "de": "Falsche Visitenkarte, überflüssiges Foto"}
 {"uk": "Неправильна назва файлу", "en": "Invalid file name", "de": "Ungültiger Dateiname"}
 {"uk": "Неправильний Chat ID або бота ще немає в чаті", "en": "Wrong Chat ID, or the bot is not in the chat yet", "de": "Falsche Chat ID oder der Bot ist noch nicht im Chat"}
 {"uk": "Неправильний JSON", "en": "Invalid JSON", "de": "Ungültiges JSON"}
@@ -13126,6 +13141,8 @@
 {"uk": "Прибрати спам і події від відправників, від яких ви більше не хочете термінів — спершу видно, що саме прибереться", "en": "Remove spam and events from senders you no longer want deadlines from — you will first see exactly what will be removed", "de": "Spam und Termine von Absendern entfernen, von denen Sie keine Fristen mehr wollen — zuerst sehen Sie genau, was entfernt wird"}
 {"uk": "Прибрати сторону «", "en": "Remove the party «", "de": "Beteiligten entfernen «"}
 {"uk": "Прибрати цей важливий момент?", "en": "Remove this key moment?", "de": "Diesen wichtigen Moment entfernen?"}
+{"uk": "Прибрати цю сторону", "en": "Remove this side", "de": "Diese Seite entfernen"}
+{"uk": "Прибрати цю сторону? Її фото видалиться назавжди, друга сторона лишиться.", "en": "Remove this side? Its photo will be deleted permanently, the other side stays.", "de": "Diese Seite entfernen? Ihr Foto wird dauerhaft gelöscht, die andere Seite bleibt."}
 {"uk": "Прибув на склад", "en": "Arrived in stock", "de": "Im Lager eingetroffen"}
 {"uk": "Прив'яжи упаковку нижче (inline) — буде відображатись як рекомендація на замовленні", "en": "Attach the packaging below (inline) — it will be shown as a recommendation on the order", "de": "Verknüpfen Sie unten die Verpackung (inline) — sie wird als Empfehlung im Auftrag angezeigt"}
 {"uk": "Прив'язано", "en": "Linked", "de": "Verknüpft"}
@@ -13663,6 +13680,7 @@
 {"uk": "Після", "en": "After", "de": "Nach"}
 {"uk": "Після «Зберегти» — за новими налаштуваннями. Під ним, як завжди, — підпис скриньки.", "en": "After “Save” — with the new settings. Below it, as always, — the mailbox signature.", "de": "Nach „Speichern“ — mit den neuen Einstellungen. Darunter wie immer — die Signatur des Postfachs."}
 {"uk": "Після «Зберегти» — одразу оновити ціну на DigiKey (з новими базовими цінами, правила — «💲 Налаштування цін DigiKey»)", "en": "After “Save” — update the price on DigiKey immediately (with the new base prices, rules from “💲 DigiKey price settings”)", "de": "Nach „Speichern“ — den Preis sofort auf DigiKey aktualisieren (mit den neuen Basispreisen, Regeln aus „💲 DigiKey-Preiseinstellungen“)"}
+{"uk": "Після «Створити» / «Додати до нього» Minerva одразу збере листування з ними з вашої пошти: теми, файли, PI.", "en": "After «Create» / «Add to it» Minerva immediately collects the correspondence with them from your mail: topics, files, PI.", "de": "Nach «Anlegen» / «Hinzufügen» sammelt Minerva sofort die Korrespondenz mit ihnen aus Ihrer Post: Themen, Dateien, PI."}
 {"uk": "Після впровадження", "en": "After implementation", "de": "Nach der Einführung"}
 {"uk": "Після завершення можна застосувати ціни прямо тут.", "en": "Once finished, you can apply the prices right here.", "de": "Nach Abschluss können Sie die Preise direkt hier übernehmen."}
 {"uk": "Після закінчення кешу каталогу на сайті (", "en": "After the catalog cache on the website expires (", "de": "Nach Ablauf des Katalog-Caches auf der Website ("}
@@ -15340,6 +15358,7 @@
 {"uk": "Телефон/Особисто", "en": "Phone / In person", "de": "Telefon / Persönlich"}
 {"uk": "Телефоном", "en": "By phone", "de": "Telefonisch"}
 {"uk": "Телефонуєте, уточнюєте потреби. Фіксуєте деталі в нотатках.", "en": "You call and clarify the needs. You record the details in the notes.", "de": "Sie rufen an und klären den Bedarf. Sie halten die Details in den Notizen fest."}
+{"uk": "Тем з PI / рахунком без закупівлі немає — нічого не заведено", "en": "No topics with a PI / invoice without a purchase order — nothing created", "de": "Keine Themen mit PI / Rechnung ohne Bestellung — nichts angelegt"}
 {"uk": "Тем: {0}", "en": "Topics: {0}", "de": "Themen: {0}"}
 {"uk": "Тема", "en": "Subject", "de": "Betreff"}
 {"uk": "Тема або відправник…", "en": "Subject or sender…", "de": "Betreff oder Absender…"}
@@ -15995,6 +16014,7 @@
 {"uk": "Уже йде інша перевірка повідомлень.", "en": "Another message check is already running.", "de": "Eine andere Nachrichtenprüfung läuft bereits."}
 {"uk": "Уже йде інша індексація — дочекайтесь її завершення.", "en": "Another indexing is already running — wait for it to finish.", "de": "Eine andere Indexierung läuft bereits — warten Sie, bis sie abgeschlossen ist."}
 {"uk": "Уже йде інше переведення — дочекайтеся, поки воно закінчиться.", "en": "Another conversion is already running — wait until it finishes.", "de": "Es läuft bereits eine andere Umrechnung — warten Sie, bis sie abgeschlossen ist."}
+{"uk": "Уже отримано: закупівля в стані «Отримано» без позицій — склад і «Очікується» не змінюються", "en": "Already received: purchase order in status «Received» without lines — stock and «Expected» do not change", "de": "Bereits erhalten: Bestellung im Status «Erhalten» ohne Positionen — Lager und «Erwartet» ändern sich nicht"}
 {"uk": "Узбекистан", "en": "Uzbekistan", "de": "Usbekistan"}
 {"uk": "Україна", "en": "Ukraine", "de": "Ukraine"}
 {"uk": "Українська", "en": "Ukrainian", "de": "Ukrainisch"}
@@ -16418,6 +16438,7 @@
 {"uk": "Це те, що ти зробив із тим, що маєш.»", "en": "It is what you have done with what you have.”", "de": "Es ist das, was du aus dem gemacht hast, was du hast.“"}
 {"uk": "Це термін, не зустріч", "en": "This is a deadline, not a meeting", "de": "Das ist eine Frist, keine Besprechung"}
 {"uk": "Це тестовий лист з Minerva, надіслано {0} через скриньку {1}.", "en": "This is a test message from Minerva, sent {0} via the mailbox {1}.", "de": "Dies ist eine Testnachricht aus Minerva, gesendet {0} über das Postfach {1}."}
+{"uk": "Це єдина сторона — щоб прибрати її, видаліть фото повністю.", "en": "This is the only side — to remove it, delete the photo completely.", "de": "Das ist die einzige Seite — um sie zu entfernen, löschen Sie das Foto vollständig."}
 {"uk": "Це — доручення агентові в пошті", "en": "This is a rule for the agent in the mail", "de": "Das ist eine Regel für den Agenten im Postfach"}
 {"uk": "Цей Telegram уже прив'язаний до акаунту Minerva.", "en": "This Telegram is already linked to a Minerva account.", "de": "Dieses Telegram ist bereits mit einem Minerva-Konto verknüpft."}
 {"uk": "Цей Telegram ще не прив'язаний до акаунту Minerva.", "en": "This Telegram is not yet linked to a Minerva account.", "de": "Dieses Telegram ist noch nicht mit einem Minerva-Konto verknüpft."}
@@ -19617,6 +19638,7 @@
 {"uk": "одне посилання з налаштувань календаря", "en": "one link from the calendar settings", "de": "ein Link aus den Kalendereinstellungen"}
 {"uk": "одним PDF у новій вкладці", "en": "one PDF in a new tab", "de": "ein PDF in neuem Tab"}
 {"uk": "одноразовий код на {0} хв: на сайті /admin/ → «Підключити до Minerva»; незбережені зміни на сторінці не зберігаються", "en": "one-time code for {0} min: on the site /admin/ → “Connect to Minerva”; unsaved changes on the page are not saved", "de": "Einmalcode für {0} Min.: auf der Website /admin/ → „Mit Minerva verbinden“; nicht gespeicherte Änderungen auf der Seite werden nicht gespeichert"}
+{"uk": "одразу завести закупівлі з тем з PI / рахунком", "en": "create purchase orders right away from topics with a PI / invoice", "de": "sofort Bestellungen aus Themen mit PI / Rechnung anlegen"}
 {"uk": "одразу лист і Telegram вам", "en": "an email and Telegram to you right away", "de": "sofort E-Mail und Telegram an Sie"}
 {"uk": "одразу на DigiKey (товари, вже створені там)", "en": "straight to DigiKey (products already created there)", "de": "direkt an DigiKey (dort bereits angelegte Artikel)"}
 {"uk": "одразу на принтер", "en": "straight to the printer", "de": "direkt zum Drucker"}
@@ -21354,6 +21376,8 @@
 {"uk": "як є, без змін\">📄 Старий файл", "en": "as is, unchanged\">📄 Old file", "de": "unverändert\">📄 Alte Datei"}
 {"uk": "як і раніше.", "en": "as before.", "de": "wie bisher."}
 {"uk": "як інші листи цієї гілки (сам лист під правила не підходить)", "en": "like other emails of this thread (the email itself matches no rules)", "de": "wie andere E-Mails dieses Verlaufs (die E-Mail selbst passt zu keiner Regel)"}
+{"uk": "як історію", "en": "as history", "de": "als Verlauf"}
+{"uk": "як історію — уже отримано, без складу", "en": "as history — already received, no stock", "de": "als Verlauf — bereits erhalten, ohne Lager"}
 {"uk": "яке посилання", "en": "which link", "de": "welcher Link"}
 {"uk": "яке посилання за правилом", "en": "which link by the rule", "de": "welcher Link nach Regel"}
 {"uk": "яким ключем — ще невідомо: сайт звітував до оновлення Minerva; з'явиться після його наступного звіту (до {0} днів, зазвичай за кілька хвилин)", "en": "which key — not known yet: the site reported before the Minerva update; it will show after its next report (up to {0} days, usually within minutes)", "de": "welcher Schlüssel — noch unbekannt: die Website hat vor dem Minerva-Update berichtet; erscheint nach ihrem nächsten Bericht (bis {0} Tage, meist in wenigen Minuten)"}
