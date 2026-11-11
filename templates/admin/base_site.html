@@ -1,5 +1,9 @@
 {% extends "admin/base.html" %}
 
+{% block responsive %}{{ block.super }}
+<script>/* 🖥 / 📱 Вигляд як на ПК на телефоні (static/admin/js/mv_mobile.js): лише цей пристрій, до першого малювання */
+(function(){try{if(localStorage.getItem('mv-view')==='pc'){var m=document.querySelector('meta[name="viewport"]');if(m)m.setAttribute('content','width=1280');document.documentElement.classList.add('mv-force-pc');}}catch(e){}})();
+</script>{% endblock %}
 {% block extrahead %}{{ block.super }}
 <script>/* Anti-flash: тема й доступність до першого малювання (core/ui_prefs.py).
    Тема зі «Моїх налаштувань» однакова на всіх пристроях; не вибрана там — як у цьому браузері.
@@ -41,13 +45,13 @@
 <link rel="stylesheet" href="/static/admin/css/mobile.css">
 {% if MV_MOBILE_JSON %}{# 📱 телефон: нижня панель, меню «Ще», списки картками (core/mobile_nav.py) #}
 <script id="mv-mobile-config" type="application/json">{{ MV_MOBILE_JSON|safe }}</script>
-<link rel="stylesheet" href="/static/admin/css/mv_mobile.css?v=4">
-<script src="/static/admin/js/mv_mobile.js?v=3" defer></script>
+<link rel="stylesheet" href="/static/admin/css/mv_mobile.css?v=5">
+<script src="/static/admin/js/mv_mobile.js?v=4" defer></script>
 {% endif %}
 {% if MV_MENU_JSON %}{# 🧭 ПК, новий вигляд: меню «Просте / Повне», пошук усюди, фільтри (core/main_menu.py) #}
 <script id="mv-menu-config" type="application/json">{{ MV_MENU_JSON|safe }}</script>
 <link rel="stylesheet" href="/static/admin/css/mv_desktop.css?v=4">
-<script src="/static/admin/js/mv_desktop.js?v=4" defer></script>
+<script src="/static/admin/js/mv_desktop.js?v=5" defer></script>
 {% endif %}
 <style>
 /* Emoji fallback font stack for country flags (shown via onerror on flagcdn.com img) */
@@ -1528,17 +1532,36 @@ document.addEventListener('DOMContentLoaded', function(){
   var _dragId = null;
   var _fromHandle = false;
 
+  /* Порядок груп живе в профілі (core/main_menu.py, prefs.order) — однаковий на ПК і телефоні;
+     localStorage — лише запасний для сторінки без налаштувань меню. */
+  var _menuCfg = null;
+  try { var _mc = document.getElementById('mv-menu-config'); if (_mc) _menuCfg = JSON.parse(_mc.textContent); } catch(e) {}
+  function _postOrder(ids) {
+    if (!_menuCfg) return;
+    var tok = (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || '';
+    fetch(_menuCfg.saveUrl || '/core/menu/', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': tok }, body: JSON.stringify({ order: ids }) })
+      .catch(function(){});
+  }
   function _saveOrder() {
     var ids = [];
     sidebar.querySelectorAll('.mg-group[data-group-id]').forEach(function(el){
       ids.push(el.dataset.groupId);
     });
     localStorage.setItem(_ORDER_KEY, JSON.stringify(ids));
+    _postOrder(ids);
   }
 
   function _loadOrder() {
-    try { return JSON.parse(localStorage.getItem(_ORDER_KEY)) || []; }
-    catch(e) { return []; }
+    var server = _menuCfg && _menuCfg.prefs && Array.isArray(_menuCfg.prefs.order) ? _menuCfg.prefs.order : null;
+    if (server) {
+      try { localStorage.setItem(_ORDER_KEY, JSON.stringify(server)); } catch(e) {}
+      return server;
+    }
+    var local = [];
+    try { local = JSON.parse(localStorage.getItem(_ORDER_KEY)) || []; } catch(e) { local = []; }
+    if (local.length && _menuCfg && _menuCfg.prefs) _postOrder(local);   // перший раз: порядок цього ПК → у профіль
+    return local;
   }
 
   var USER_ROLE = '{{ user_role|default:"" }}';

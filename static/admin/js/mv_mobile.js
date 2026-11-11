@@ -5,6 +5,10 @@
  * повне бокове меню, акаунт (налаштування, мова, кошик, вийти). Списки адмінки — картками (підписи з заголовків
  * колонок, порожні поля сховано, понад 6 полів — «⋯ ще»), фільтри — кнопкою «Фільтри» знизу. На формах і під
  * час введення тексту нижньої панелі немає (кнопки «Зберегти» внизу). Ширший екран — усе як було.
+ * «🖥 Як на ПК» (у шапці меню «Ще», лише на телефоні) — цей пристрій показує сторінки як на ПК (localStorage
+ * mv-view = pc → base_site ставить viewport width=1280 до першого малювання); назад — кнопка «📱 Телефон» унизу
+ * ліворуч. Телефон показує вигляд ПК сам (браузер просить «Версію для ПК» або телефон лежить горизонтально) — та
+ * сама кнопка пояснює, як повернути.
  */
 (function () {
   'use strict';
@@ -24,6 +28,31 @@
     return e;
   }
   function item(key) { return cfg.items.filter(function (i) { return i.key === key; })[0]; }
+
+  /* ── 🖥 / 📱 вигляд: лише на телефоні (тачскрин, більший бік екрана < 1024) ── */
+  function phoneDevice() {
+    var big = Math.max(screen.width || 0, screen.height || 0);
+    var touch = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
+    return big > 0 && big < 1024 && touch;
+  }
+  function forcedPc() { return document.documentElement.classList.contains('mv-force-pc'); }
+  function setView(v) {
+    try { if (v === 'pc') localStorage.setItem('mv-view', 'pc'); else localStorage.removeItem('mv-view'); } catch (e) { /* приватний режим */ }
+    location.reload();
+  }
+  function viewButton() {
+    var old = document.getElementById('mv-view-btn');
+    var need = forcedPc() || (phoneDevice() && !mq.matches);
+    if (!need) { if (old) old.remove(); return; }
+    if (old) return;
+    var b = el('button', '', '📱 Телефон'); b.type = 'button'; b.id = 'mv-view-btn';
+    b.title = forcedPc() ? 'Повернути вигляд для телефону' : 'Чому сторінка як на ПК і як повернути вигляд телефону';
+    b.onclick = function () {
+      if (forcedPc()) { setView('phone'); return; }
+      window.alert('Браузер показує сторінку як на ПК. Щоб повернути вигляд телефону: поверніть телефон вертикально або вимкніть «Версія для ПК» у меню браузера (Chrome: ⋮ → «Версія для ПК»; Safari: «аА» → «Запит мобільного вебсайту»).');
+    };
+    document.body.appendChild(b);
+  }
 
   /* ── розділ, у якому людина зараз: найдовша адреса, з якої починається сторінка ── */
   function activeKey() {
@@ -82,6 +111,12 @@
     var box = el('div', 'mvm-box');
     var head = el('div', 'mvm-head');
     head.appendChild(el('div', 'mvm-title', 'Меню'));
+    if (phoneDevice()) {                                  // швидко: вигляд як на ПК саме на цьому телефоні
+      var pc = el('button', 'mvm-view', '🖥 Як на ПК'); pc.type = 'button';
+      pc.title = 'Показувати Minerva на цьому телефоні як на ПК (назад — кнопка «📱 Телефон» унизу ліворуч)';
+      pc.onclick = function () { setView('pc'); };
+      head.appendChild(pc);
+    }
     var x = el('button', 'mvm-x', '✕'); x.type = 'button'; x.setAttribute('aria-label', 'Закрити'); x.onclick = closeSheet;
     head.appendChild(x);
     box.appendChild(head);
@@ -278,6 +313,7 @@
   }
 
   function apply() {
+    viewButton();
     if (!mq.matches) { closeSheet(); toggleFilters(false); return; }
     if (cfg && cfg.items && cfg.items.length && !bar) renderBar();
     cards();
@@ -302,6 +338,6 @@
       closeSheet(); toggleFilters(false);
     });
   }
-  window.MVMobile = { open: openSheet, close: closeSheet, filters: toggleFilters };
+  window.MVMobile = { open: openSheet, close: closeSheet, filters: toggleFilters, view: setView };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

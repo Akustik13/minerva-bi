@@ -72,8 +72,18 @@ def _profile(user):
         return None
 
 
+def pc_favorites(user, allowed=None) -> list:
+    """«⭐ Мої» з меню на ПК (core/main_menu.py), якщо людина їх вибирала, — у тому самому порядку."""
+    from core import main_menu
+    try:
+        return main_menu.saved_pinned(user, allowed) or []
+    except Exception:  # noqa: BLE001 — немає вибору на ПК = як було
+        return []
+
+
 def pinned(user, allowed=None) -> list:
-    """Закріплене людиною; нічого не вибрано (або вибране вже недоступне) — `DEFAULT`, доповнене доступними."""
+    """Закріплене людиною; нічого не вибрано (або вибране вже недоступне) — перші «⭐ Мої» з ПК, інакше `DEFAULT`,
+    доповнене доступними."""
     allowed = available(user) if allowed is None else allowed
     p = _profile(user)
     saved = (getattr(p, "ui_prefs", None) or {}).get("mobile_nav") if p is not None else None
@@ -81,7 +91,7 @@ def pinned(user, allowed=None) -> list:
         mine = clean(saved, allowed)
         if mine or saved == []:
             return mine
-    out = clean(DEFAULT, allowed)
+    out = clean(pc_favorites(user, allowed), allowed) or clean(DEFAULT, allowed)
     for k in allowed:
         if len(out) >= MAX_PINNED:
             break
@@ -112,6 +122,9 @@ def page_config(user, allowed=None) -> str:
         return ""
     from core import main_menu
     icons = main_menu.icons_of(user)                       # свої значки (правий клік у меню на ПК)
-    items = [{"key": k, "icon": icons.get(k) or ITEMS[k][0], "label": ITEMS[k][1], "href": ITEMS[k][2]} for k in allowed]
+    favs = pc_favorites(user, allowed)                     # «⭐ Мої» з ПК — першими, у тому самому порядку
+    keys = favs + [k for k in allowed if k not in favs]
+    items = [{"key": k, "icon": icons.get(k) or ITEMS[k][0], "label": ITEMS[k][1], "href": ITEMS[k][2],
+              "fav": k in favs} for k in keys]
     return json.dumps({"items": items, "pinned": pinned(user, allowed), "max": MAX_PINNED,
                        "saveUrl": "/core/mobile-nav/"}, ensure_ascii=False).replace("<", "\\u003c")

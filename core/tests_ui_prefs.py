@@ -103,7 +103,7 @@ class SettingsPageTests(TestCase):
         self.assertIn('/static/admin/css/mv_menu.css?v=2', html)
         self.assertIn("root.classList.add('mvd-rail')", html)          # значки ще до першого малювання
         self.assertIn("attrs['data-mv-sidebar']", html)
-        self.assertIn('/static/admin/js/mv_desktop.js?v=4', html)
+        self.assertIn('/static/admin/js/mv_desktop.js?v=5', html)
         self.assertIn('/static/admin/css/mv_desktop.css?v=4', html)
         self.assertIn('/static/admin/js/mv_show.js?v=2', html)
         # спільне меню — раніше за панель праворуч і за бокове меню (обидва ним користуються)

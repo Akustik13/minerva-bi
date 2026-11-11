@@ -19,6 +19,8 @@ MODES = ("simple", "full")
 FILTERS = ("drawer", "side")          # фільтри списку: кнопкою збоку («висувна панель») / колонкою, як було
 EXPAND = ("remember", "current")      # «Повне»: відкриті групи — як людина лишила / лише група поточної сторінки
 DEFAULT_PINNED = ["home", "orders", "stock", "mail", "calendar"]
+ORDER_MAX = 60                        # груп повного меню (MV_GROUPS у base_site) у збереженому порядку
+_ORDER_RE = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
 MAX_PINNED = 12
 MAX_ICONS = 60                        # своїх значків (ключі url: / grp: / sg: — будь-які): далі нові не беруться
 LABEL_MAX = 60
@@ -110,6 +112,23 @@ def clean_link(user, href, label):
     return "url:" + href, {"href": href, "label": label}
 
 
+def clean_order(value):
+    """Порядок груп повного меню (id груп MV_GROUPS) — однаковий на ПК і телефоні. Не список — None (як у Minerva)."""
+    if not isinstance(value, list):
+        return None
+    out = [k for k in dict.fromkeys(v for v in value if isinstance(v, str) and _ORDER_RE.match(v))]
+    return out[:ORDER_MAX] or None
+
+
+def saved_pinned(user, allowed=None):
+    """«⭐ Мої», які людина сама вибрала на ПК (лише розділи, без сторінок), або None — не вибирала."""
+    raw = _saved(user).get("pinned")
+    if not isinstance(raw, list):
+        return None
+    allowed = mobile_nav.available(user) if allowed is None else allowed
+    return [k for k in dict.fromkeys(raw) if isinstance(k, str) and k in allowed]
+
+
 def icons_of(user) -> dict:
     out = {}
     saved = _saved(user).get("icons")
@@ -141,12 +160,14 @@ def prefs(user, allowed=None) -> dict:
         "icons": icons_of(user),
         "filters": saved.get("filters") if saved.get("filters") in FILTERS else "drawer",
         "expand": saved.get("expand") if saved.get("expand") in EXPAND else "remember",
+        "order": clean_order(saved.get("order")),
     }
 
 
 def save(user, data) -> dict:
     """Записати зміну: {mode}, {pinned: [...]}, {pin_link: {href, label}}, {icons: {ключ: значок | null}},
-    {filters}, {expand}, {reset: true} — як було. Рядок профілю перечитується під `select_for_update`, змінюється
+    {filters}, {expand}, {order: [id груп] | null} — порядок груп повного меню (той самий на ПК і телефоні),
+    {reset: true} — як було. Рядок профілю перечитується під `select_for_update`, змінюється
     лише `ui_prefs["menu"]` (тема, панелі, нижня панель телефона лишаються). Повертає очищений вибір."""
     from django.db import transaction
 
@@ -171,6 +192,8 @@ def save(user, data) -> dict:
                 new["filters"] = data["filters"]
             if data.get("expand") in EXPAND:
                 new["expand"] = data["expand"]
+            if "order" in data:
+                new["order"] = clean_order(data["order"])
             if isinstance(data.get("pinned"), list):
                 new["pinned"] = [k for k in dict.fromkeys(data["pinned"])
                                  if isinstance(k, str) and (k in allowed or k in cur["links"])][:MAX_PINNED]

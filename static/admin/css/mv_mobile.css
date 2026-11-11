@@ -69,7 +69,10 @@
     background: var(--bg-card); color: var(--text); box-shadow: 0 -10px 40px rgba(0,0,0,.45); }
   .mvm-box::before { content: ''; display: block; width: 40px; height: 4px; margin: 6px auto 2px; border-radius: 4px;
     background: var(--border-strong); }
-  .mvm-head { display: flex; align-items: center; justify-content: space-between; }
+  .mvm-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .mvm-head .mvm-title { flex: 1; }
+  .mvm-view { min-height: 40px; padding: 0 12px; border: 1px solid var(--border-color, #444); border-radius: 20px;
+    background: transparent; color: inherit; font-size: 14px; white-space: nowrap; }
   .mvm-title { font-size: 17px; font-weight: 700; }
   .mvm-x { width: 44px; height: 44px; border: 0; border-radius: 10px; background: none; color: inherit; font-size: 20px;
     cursor: pointer; }
@@ -187,3 +190,10 @@
     min-width: 44px; min-height: 44px; box-sizing: border-box; }
   .actions button, .actions select { min-height: 44px; }
 }
+
+/* 📱 «Телефон» — повернути вигляд для телефону (mv_mobile.js viewButton): поза @media, бо в вигляді ПК на телефоні
+   ширина сторінки 1280, а екран удвічі-втричі менший */
+#mv-view-btn { position: fixed; left: 18px; bottom: 18px; z-index: 10050; padding: 18px 30px; border: 0;
+  border-radius: 999px; background: var(--accent, #1e6fa8); color: #fff; font-size: 40px; line-height: 1.1;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .35); cursor: pointer; }
+@media (max-width: 768px) { #mv-view-btn { font-size: 15px; padding: 10px 16px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } }

@@ -68,6 +68,22 @@ class MainMenuTests(TestCase):
         self.assertEqual(self.client.post("/core/menu/", "[1]", content_type="application/json").status_code, 400)
         self.assertEqual(self.client.get("/core/menu/").status_code, 405)
 
+    def test_group_order_lives_in_the_profile(self):
+        """Порядок груп повного меню — у профілі, тож на телефоні той самий, що на ПК."""
+        self.assertIsNone(cfg_of(self.client.get("/admin/").content.decode(), "mv-menu-config")["prefs"]["order"])
+        p = self.post({"order": ["crm", "sales", "crm", "Bad Id", 5, "<x>", "inventory"]}).json()["prefs"]
+        self.assertEqual(p["order"], ["crm", "sales", "inventory"])         # без повторів і чужого
+        self.assertEqual(cfg_of(self.client.get("/admin/").content.decode(), "mv-menu-config")["prefs"]["order"],
+                         ["crm", "sales", "inventory"])
+        p = self.post({"mode": "full"}).json()["prefs"]
+        self.assertEqual(p["order"], ["crm", "sales", "inventory"])         # інша зміна порядок не губить
+        self.assertIsNone(self.post({"order": None}).json()["prefs"]["order"])   # «Порядок груп як був»
+        self.assertEqual(len(self.post({"order": [f"g{i}" for i in range(99)]}).json()["prefs"]["order"]),
+                         main_menu.ORDER_MAX)
+        html = self.client.get("/admin/").content.decode()
+        self.assertIn("_postOrder(local)", html)                            # порядок цього ПК — у профіль, раз
+        self.assertIn("JSON.stringify({ order: ids })", html)
+
     def test_pin_page_from_full_menu_only_real_and_open(self):
         r = self.post({"pin_link": {"href": "/admin/inventory/supplier/", "label": "  Постачальники  "}}).json()
         self.assertTrue(r["ok"])

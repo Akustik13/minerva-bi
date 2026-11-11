@@ -52,6 +52,31 @@ class MobileNavTests(TestCase):
         self.assertEqual(self.client.post("/core/mobile-nav/", "[1]", content_type="application/json").status_code, 400)
         self.assertEqual(self.client.get("/core/mobile-nav/").status_code, 405)
 
+    def test_phone_follows_favorites_from_pc(self):
+        """«⭐ Мої» з ПК — першими в «☰ Ще» і, поки людина не вибирала інше на телефоні, на нижній панелі."""
+        self.client.post("/core/menu/", json.dumps({"pinned": ["calendar", "customers", "mail", "projects", "offers"]}),
+                         content_type="application/json")
+        cfg = page_cfg(self.client.get("/admin/").content.decode())
+        self.assertEqual([i["key"] for i in cfg["items"]][:5], ["calendar", "customers", "mail", "projects", "offers"])
+        self.assertTrue(cfg["items"][0]["fav"])
+        self.assertEqual(cfg["pinned"], ["calendar", "customers", "mail", "projects"])
+        self.client.post("/core/mobile-nav/", json.dumps({"pinned": ["home", "stock"]}), content_type="application/json")
+        self.assertEqual(page_cfg(self.client.get("/admin/").content.decode())["pinned"], ["home", "stock"])  # свій вибір
+
+    def test_view_switch_pc_on_phone(self):
+        html = self.client.get("/admin/").content.decode()
+        self.assertIn("localStorage.getItem('mv-view')==='pc'", html)      # до першого малювання
+        self.assertLess(html.index('name="viewport"'), html.index("localStorage.getItem('mv-view')"))
+        self.assertIn("/static/admin/js/mv_mobile.js?v=4", html)
+        self.assertIn("/static/admin/css/mv_mobile.css?v=5", html)
+        from pathlib import Path
+        from django.conf import settings
+        js = (Path(settings.BASE_DIR) / "static/admin/js/mv_mobile.js").read_text(encoding="utf-8")
+        self.assertIn("'🖥 Як на ПК'", js)
+        self.assertIn("'📱 Телефон'", js)
+        css = (Path(settings.BASE_DIR) / "static/admin/css/mv_mobile.css").read_text(encoding="utf-8")
+        self.assertGreater(css.index("#mv-view-btn {"), css.index("@media (max-width: 768px) {"))   # окремо від телефона
+
     def test_only_sections_the_person_can_open(self):
         u = User.objects.create_user("clerk", "c@x.y", "p", is_staff=True)
         UserProfile.objects.filter(user=u).update(role="readonly", allowed_modules=["dashboard"])

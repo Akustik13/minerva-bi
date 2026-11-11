@@ -601,9 +601,14 @@
     var b = flyBtn(g);
     if (b && (!document.activeElement || document.activeElement === document.body)) b.focus({ preventScroll: true });
   }
-  function saveOrder() { lsSet('mg-order', JSON.stringify(groupsList().map(function (x) { return x.dataset.groupId; }))); }
+  function saveOrder() {                             // і в профіль — той самий порядок на телефоні (core/main_menu.py)
+    var ids = groupsList().map(function (x) { return x.dataset.groupId; });
+    lsSet('mg-order', JSON.stringify(ids));
+    save({ order: ids });
+  }
   function resetOrder() {
     lsSet('mg-order', null);
+    save({ order: null });
     var list = groupsList();
     if (!list.length) return;
     var after = list[list.length - 1].nextSibling;
@@ -1085,7 +1090,7 @@
     items.push({ label: 'Групу вище', icon: '⬆', disabled: i <= 0, onSelect: function () { moveGroup(g, -1); } });
     items.push({ label: 'Групу нижче', icon: '⬇', disabled: i < 0 || i >= list.length - 1,
                  onSelect: function () { moveGroup(g, 1); } });
-    if (lsGet('mg-order')) items.push({ label: 'Порядок груп як був', icon: '↺', onSelect: resetOrder });
+    if (lsGet('mg-order') || (st.order && st.order.length)) items.push({ label: 'Порядок груп як був', icon: '↺', onSelect: resetOrder });
     if (mods) {
       items.push({ type: 'separator' });
       items.push({ type: 'check', label: 'Показувати всі сторінки розділу', checked: modsOpen(g),

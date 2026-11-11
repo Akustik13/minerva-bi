@@ -4249,6 +4249,7 @@
 {"uk": "Браузер виконується на сервері.", "en": "The browser runs on the server.", "de": "Der Browser läuft auf dem Server."}
 {"uk": "Браузер доступний: {0}/vnc.html", "en": "Browser available: {0}/vnc.html", "de": "Browser verfügbar: {0}/vnc.html"}
 {"uk": "Браузер не дає камеру цій сторінці (потрібен HTTPS) — виберіть файл: на телефоні кнопка вибору файлу сама запропонує камеру.", "en": "The browser does not give this page the camera (HTTPS required) — choose a file: on a phone the file button offers the camera itself.", "de": "Der Browser gibt dieser Seite keine Kamera (HTTPS nötig) — wählen Sie eine Datei: am Handy bietet die Dateiauswahl selbst die Kamera an."}
+{"uk": "Браузер показує сторінку як на ПК. Щоб повернути вигляд телефону: поверніть телефон вертикально або вимкніть «Версія для ПК» у меню браузера (Chrome: ⋮ → «Версія для ПК»; Safari: «аА» → «Запит мобільного вебсайту»).", "en": "The browser shows the page like on a PC. To get the phone view back: hold the phone upright or turn off «Desktop site» in the browser menu (Chrome: ⋮ → «Desktop site»; Safari: «aA» → «Request Mobile Website»).", "de": "Der Browser zeigt die Seite wie am PC. So bekommen Sie die Handy-Ansicht zurück: Handy hochkant halten oder im Browsermenü «Desktopversion» ausschalten (Chrome: ⋮ → «Desktopversion»; Safari: «aA» → «Mobile Website anfordern»)."}
 {"uk": "Бриф", "en": "Brief", "de": "Briefing"}
 {"uk": "Бриф (AI)", "en": "Brief (AI)", "de": "Briefing (KI)"}
 {"uk": "Бриф відповіді", "en": "Reply brief", "de": "Antwort-Briefing"}
@@ -12128,6 +12129,7 @@
 {"uk": "Повернути", "en": "Restore", "de": "Wiederherstellen"}
 {"uk": "Повернути / обрізати", "en": "Rotate / crop", "de": "Drehen / zuschneiden"}
 {"uk": "Повернути в роботу", "en": "Back to work", "de": "Zurück in Arbeit"}
+{"uk": "Повернути вигляд для телефону", "en": "Back to the phone view", "de": "Zurück zur Handy-Ansicht"}
 {"uk": "Повернути ліворуч", "en": "Rotate left", "de": "Nach links drehen"}
 {"uk": "Повернути можна лише пункт «Не те»", "en": "Only a “Not relevant” item can be restored", "de": "Nur ein Punkt „Nicht relevant“ kann wiederhergestellt werden"}
 {"uk": "Повернути праворуч", "en": "Rotate right", "de": "Nach rechts drehen"}
@@ -12404,6 +12406,7 @@
 {"uk": "Показати/приховати виконані події", "en": "Show/hide done events", "de": "Erledigte Termine ein-/ausblenden"}
 {"uk": "Показати/приховати робочий час askDANTE", "en": "Show/hide askDANTE working time", "de": "askDANTE-Arbeitszeit ein-/ausblenden"}
 {"uk": "Показувати", "en": "Show", "de": "Anzeigen"}
+{"uk": "Показувати Minerva на цьому телефоні як на ПК (назад — кнопка «📱 Телефон» унизу ліворуч)", "en": "Show Minerva on this phone like on a PC (to go back — the «📱 Phone» button at the bottom left)", "de": "Minerva auf diesem Handy wie am PC anzeigen (zurück — Schaltfläche «📱 Handy» unten links)"}
 {"uk": "Показувати SKU в листі", "en": "Show SKU in the e-mail", "de": "SKU in der E-Mail anzeigen"}
 {"uk": "Показувати «Автоматичні документи» в картці замовлення", "en": "Show “Automatic documents” in the order card", "de": "„Automatische Dokumente“ in der Auftragskarte anzeigen"}
 {"uk": "Показувати в календарі Minerva", "en": "Show in the Minerva calendar", "de": "Im Minerva-Kalender anzeigen"}
@@ -16786,6 +16789,7 @@
 {"uk": "Чому / примітка", "en": "Why / note", "de": "Begründung / Notiz"}
 {"uk": "Чому API не бачить staged продукти?", "en": "Why doesn't the API see staged products?", "de": "Warum sieht die API Staged-Artikel nicht?"}
 {"uk": "Чому дані на Dashboard не оновились після імпорту?", "en": "Why was the Dashboard data not updated after the import?", "de": "Warum wurden die Dashboard-Daten nach dem Import nicht aktualisiert?"}
+{"uk": "Чому сторінка як на ПК і як повернути вигляд телефону", "en": "Why the page looks like on a PC and how to get the phone view back", "de": "Warum die Seite wie am PC aussieht und wie Sie die Handy-Ansicht zurückbekommen"}
 {"uk": "Чому схоже на постачальника", "en": "Why it looks like a supplier", "de": "Warum es nach Lieferant aussieht"}
 {"uk": "Чому схожий", "en": "Why similar", "de": "Warum ähnlich"}
 {"uk": "Чому: цитата з завдання, листа чи даних", "en": "Why: a quote from the task, e-mail or data", "de": "Begründung: Zitat aus der Aufgabe, E-Mail oder den Daten"}
@@ -17177,6 +17181,7 @@
 {"uk": "Як ми відповіли?", "en": "How did we reply?", "de": "Wie haben wir geantwortet?"}
 {"uk": "Як модулі обмінюються даними та які події тригерять які дії", "en": "How modules exchange data and which events trigger which actions", "de": "Wie Module Daten austauschen und welche Ereignisse welche Aktionen auslösen"}
 {"uk": "Як на DigiKey: 1 / 10 / 100 / 1000 шт. зі знижкою. Шаблон знижок задається в «Налаштуваннях цін», а вручну можна відкоригувати кожну позицію.", "en": "As on DigiKey: 1 / 10 / 100 / 1000 pcs with a discount. The discount template is set in “Price settings”, and each item can be adjusted manually.", "de": "Wie bei DigiKey: 1 / 10 / 100 / 1000 Stk. mit Rabatt. Die Rabattvorlage wird in den „Preiseinstellungen“ festgelegt, und jede Position lässt sich von Hand anpassen."}
+{"uk": "Як на ПК", "en": "Like on PC", "de": "Wie am PC"}
 {"uk": "Як на складі", "en": "As in stock", "de": "Wie im Lager"}
 {"uk": "Як на складі — посилання товару (а без нього — правило «Налаштувань складу»)", "en": "As in stock — the product link (and without it, the “Stock settings” rule)", "de": "Wie im Lager — Link des Artikels (ohne ihn die Regel aus den „Lagereinstellungen“)"}
 {"uk": "Як на сторінці", "en": "As on the page", "de": "Wie auf der Seite"}
