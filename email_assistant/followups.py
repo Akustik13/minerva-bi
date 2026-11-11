@@ -5,10 +5,16 @@
 
 Реакція на лист (`on_incoming`, з `sync.save_message` для кожного нового листа):
 - 📬 підтвердження прочитання (MDN, RFC 8098: multipart/report; report-type=disposition-notification з
-  Original-Message-ID) — `parse_mdn`; запасний шлях — тема «Read: / Gelesen: / Прочитано: …» з In-Reply-To /
-  References на наш лист. «deleted» (видалено без прочитання) — одразу «⚠️ немає реакції»;
+  Original-Message-ID) — `parse_mdn`; запасний шлях — тема «Read: / Gelesen: / Прочитано: …» або текст
+  («Ihre Nachricht … wurde am … gelesen», «was read on») — `receipt_kind`; лист — за In-Reply-To / References,
+  інакше та сама гілка чи тема від отримувача (`_for_receipt`). «deleted» (видалено без прочитання) — одразу
+  «⚠️ немає реакції»;
 - ↩ відповідь — лист із In-Reply-To / References на наш лист, інакше в тій самій гілці від отримувача (або його
   домену). Автовідповіді («Out of Office», «Automatische Antwort»…) і повідомлення про недоставку — не реакція.
+
+«Свій» лист (`_own`) — лише копія нашого: «Надіслані» або від адрес скриньок самої людини; колега з того самого
+домену — ні, його підтвердження й відповідь — реакція. Перед нагадуванням і для вже «⚠️ немає реакції» `run_due`
+ще раз дивиться гілку (`recheck`: підтвердження чи відповідь, що прийшли раніше, — стан виправляється сам).
 
 Немає реакції до `remind_at` (`run_due`, cron `mail_followups` щоцикл) — лист і Telegram власнику скриньки
 (agent/notify.deliver): «⚠️ Немає реакції … — потрібне ручне втручання» з посиланням на лист у Minerva. «Немає
@@ -41,6 +47,13 @@ NOT_REACTION_RE = re.compile(
     r'|автовідповідь|автоответ|undeliverable|unzustellbar|nicht zustellbar|delivery status notification'
     r'|mail delivery failed|returned mail|delivery failure)', re.I)
 _ID_RE = re.compile(r'<[^<>\s]+>')
+# текст підтвердження прочитання без MDN (Outlook / Exchange): «Ihre Nachricht … wurde am 09.11.2026 16:40 gelesen.»
+READ_BODY_RE = re.compile(r'wurde am .{0,60}?gelesen|was read on|has been read on|було прочитано|была прочитана|'
+                          r'было прочитано', re.I | re.S)
+NOT_READ_BODY_RE = re.compile(r'ungelesen gelöscht|ohne gelesen zu werden|deleted without being read|'
+                              r'was deleted without|видалено без прочитання', re.I | re.S)
+RECEIPT_SCAN = 3000         # символів тексту, де шукати ознаки підтвердження
+CLOCK_SKEW = datetime.timedelta(minutes=5)   # годинники серверів різняться; Date листа — без мілісекунд
 
 
 # ── Параметри листа ──────────────────────────────────────────────────────────
@@ -111,8 +124,55 @@ def track_message(msg, days, until=MailFollowup.UNTIL_REACTION, user=None):
 
 
 def _own(msg) -> bool:
-    from email_assistant.crm_link import is_own, own_addresses
-    return msg.folder == EmailMessage.FOLDER_SENT or is_own(msg.from_email, own_addresses())
+    """Копія нашого листа: «Надіслані» або від адреси скриньок самої людини. Колега з того самого домену
+    (sergey@sevskiy.de) — не «свій»: його підтвердження прочитання й відповідь — реакція на лист."""
+    if msg.folder == EmailMessage.FOLDER_SENT:
+        return True
+    sender = (msg.from_email or '').strip().lower()
+    if not sender:
+        return False
+    from email_assistant.models import EmailAccount
+    mine = set()
+    for row in EmailAccount.objects.filter(user_id=msg.account.user_id).values_list(
+            'email_address', 'imap_username', 'smtp_username'):
+        mine.update(a.strip().lower() for a in row if a and '@' in a)
+    return sender in mine
+
+
+def receipt_kind(em) -> str:
+    """Лист — підтвердження прочитання за темою чи текстом? 'displayed' / 'deleted' / ''."""
+    subject = em.subject or ''
+    if NOT_READ_SUBJECT_RE.match(subject):
+        return 'deleted'
+    if READ_SUBJECT_RE.match(subject):
+        return 'displayed'
+    text = (em.body_text or '')[:RECEIPT_SCAN]
+    if NOT_READ_BODY_RE.search(text):
+        return 'deleted'
+    if READ_BODY_RE.search(text):
+        return 'displayed'
+    return ''
+
+
+def _for_receipt(waiting, em, ids):
+    """Лист, на який це підтвердження: In-Reply-To / References; інакше — від отримувача листа і та сама гілка
+    або тема (без «Gelesen: / WG: …»; тема нашого листа є і в тексті Outlook «Betreff: …»)."""
+    if ids:
+        f = waiting.filter(msg_id__in=ids).first()
+        if f is not None:
+            return f
+    from email_assistant.sync import normalize_subject
+    subject = normalize_subject(READ_SUBJECT_RE.sub('', NOT_READ_SUBJECT_RE.sub('', em.subject or '')))
+    text = ' '.join((em.body_text or '')[:RECEIPT_SCAN].split()).lower()
+    for f in waiting.select_related('message').order_by('-sent_at')[:50]:
+        older = bool(em.sent_at and f.sent_at and f.sent_at - em.sent_at > CLOCK_SKEW)
+        if older or not _from_recipient(em.from_email, f):
+            continue
+        ours = normalize_subject(f.subject)
+        same_thread = bool(em.thread_id and f.message_id and f.message.thread_id == em.thread_id)
+        if same_thread or (ours and (ours == subject or ours in text)):
+            return f
+    return None
 
 
 # ── Підтвердження прочитання й відповіді ─────────────────────────────────────
@@ -163,10 +223,10 @@ def on_incoming(em, data):
         return _receipt(f, em, mdn.get('disposition', 'displayed')) if f else None
     ids = _ids(data or {'in_reply_to': em.in_reply_to})
     subject = em.subject or ''
-    if ids and (READ_SUBJECT_RE.match(subject) or NOT_READ_SUBJECT_RE.match(subject)):
-        f = waiting.filter(msg_id__in=ids).first()
-        if f:
-            return _receipt(f, em, 'deleted' if NOT_READ_SUBJECT_RE.match(subject) else 'displayed')
+    kind = receipt_kind(em)
+    if kind:                                   # підтвердження прочитання — не відповідь, навіть без пари
+        f = _for_receipt(waiting, em, ids)
+        return _receipt(f, em, kind) if f else None
     if NOT_REACTION_RE.match(subject):
         return None
     pending = waiting.filter(replied_at__isnull=True)
@@ -195,10 +255,41 @@ def _existing_reply(f):
     later = EmailMessage.objects.filter(thread_id=msg.thread_id, is_deleted=False, sent_at__gt=msg.sent_at) \
         .exclude(folder=EmailMessage.FOLDER_SENT).order_by('sent_at')
     for m in later:
-        if not NOT_REACTION_RE.match(m.subject or '') and not READ_SUBJECT_RE.match(m.subject or '') \
+        if not NOT_REACTION_RE.match(m.subject or '') and not receipt_kind(m) and not _own(m) \
                 and (m.in_reply_to == f.msg_id or _from_recipient(m.from_email, f)):
             return m
     return None
+
+
+def _existing_receipt(f):
+    """Підтвердження прочитання, що вже лежить у гілці листа (і не було помічене)."""
+    msg = f.message
+    if msg is None or not msg.thread_id:
+        return None, ''
+    later = EmailMessage.objects.filter(thread_id=msg.thread_id, is_deleted=False, sent_at__gt=msg.sent_at) \
+        .exclude(folder=EmailMessage.FOLDER_SENT).select_related('account').order_by('sent_at')
+    for m in later:
+        kind = receipt_kind(m)
+        if kind and not _own(m) and (m.in_reply_to == f.msg_id or _from_recipient(m.from_email, f)):
+            return m, kind
+    return None, ''
+
+
+def recheck(f) -> bool:
+    """Відповідь чи підтвердження прочитання, які вже є в гілці, але не були помічені → записати. True — змінилось."""
+    if f.replied_at:
+        return False
+    reply = _existing_reply(f)
+    if reply is not None:
+        _replied(f, reply)
+        return True
+    if f.receipt == 'displayed':
+        return False
+    m, kind = _existing_receipt(f)
+    if m is not None and kind == 'displayed':
+        _receipt(f, m, kind)
+        return True
+    return False
 
 
 def _receipt(f, em, disposition):
@@ -246,11 +337,18 @@ def due(now=None):
 
 
 def run_due(limit=PER_LOOP) -> dict:
-    """Прохід cron: строк минув, реакції немає → повідомити власника скриньки (один раз)."""
-    out = {'notified': 0, 'closed': 0}
+    """Прохід cron: строк минув, реакції немає → повідомити власника скриньки (один раз). Спершу — `recheck`
+    гілки; «⚠️ немає реакції», де реакція насправді є (підтвердження колеги до виправлення `_own`), — виправити."""
+    out = {'notified': 0, 'closed': 0, 'healed': 0}
+    since = timezone.now() - datetime.timedelta(days=MAX_DAYS)
+    for f in (MailFollowup.objects.filter(status=MailFollowup.NO_REACTION, replied_at__isnull=True,
+                                          sent_at__gte=since).exclude(receipt='deleted')
+              .select_related('message').order_by('-sent_at')[:limit]):
+        out['healed'] += recheck(f)
     for f in due()[:limit]:
         if not MailFollowup.objects.filter(pk=f.pk, notified_at__isnull=True).update(notified_at=timezone.now()):
             continue   # уже повідомляє інший запуск
+        recheck(f)
         if satisfied(f):
             out['closed'] += 1
             continue
