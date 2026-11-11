@@ -114,7 +114,8 @@ def fill_missing_product_weights(pairs) -> list:
         p = Product.objects.filter(lookup).filter(Q(net_weight_g__isnull=True) | Q(net_weight_g=0)).first()
         if p:
             p.net_weight_g = grams
-            p.save(update_fields=["net_weight_g"])
+            p.net_weight_source = "customs"
+            p.save(update_fields=["net_weight_g", "net_weight_source"])
             updated.append((p.sku, grams))
     return updated
 

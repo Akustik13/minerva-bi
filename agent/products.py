@@ -116,7 +116,12 @@ def apply(proposal, user) -> str:
                 return f'значення змінилось після пропозиції (зараз «{before or "—"}») — запустіть завдання ще раз'
             setattr(product, proposal.field, Decimal(value) if FIELDS[proposal.field][1] == 'grams'
                     else int(value) if FIELDS[proposal.field][1] == 'days' else value)
-            product.save(update_fields=[proposal.field])
+            fields = [proposal.field]
+            if proposal.field == 'net_weight_g':          # «Звідки вага» в картці товару
+                product.net_weight_source = 'agent'
+                product.net_weight_note = f'🤖 {proposal.evidence}'[:300] if proposal.evidence else '🤖 Агент'
+                fields += ['net_weight_source', 'net_weight_note']
+            product.save(update_fields=fields)
             _audit(user, product, proposal.field, before, value, proposal.task)
         else:
             name, value = clean_attribute(proposal.field, proposal.new_value)

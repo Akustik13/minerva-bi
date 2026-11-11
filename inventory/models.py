@@ -156,6 +156,20 @@ class Product(models.Model):
     country_of_origin = models.CharField("Країна виробника", max_length=2, blank=True, default="")
     net_weight_g      = models.DecimalField("Вага нетто (г/шт)", max_digits=12, decimal_places=4,
                                            null=True, blank=True)
+    WEIGHT_SOURCES = [
+        ("", "—"),
+        ("datasheet", "📄 З даташита"),
+        ("manual", "✍️ Внесено вручну"),
+        ("customs", "🛃 З митної декларації"),
+        ("agent", "🤖 Агент"),
+    ]
+    net_weight_source = models.CharField("Звідки вага", max_length=12, blank=True, default="",
+                                         choices=WEIGHT_SOURCES)
+    net_weight_note   = models.CharField(
+        "Вага: примітка", max_length=300, blank=True, default="",
+        help_text="Цитата з даташита або результат перевірки («у даташиті ваги немає»).",
+    )
+    net_weight_checked_at = models.DateTimeField("Даташит на вагу перевірено", null=True, blank=True)
 
     # ── Медіа та документи ────────────────────────────────────────────────────
     datasheet_url  = models.URLField("Посилання на Datasheet", blank=True, default="")

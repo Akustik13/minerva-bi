@@ -1544,6 +1544,69 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
       {% endif %}
+
+      {% if weight_check %}{% with wc=weight_check %}
+      <details class="wc-box" id="weight-check" {% if wc.missing %}open{% endif %}
+               style="margin:0 0 14px;border:1px solid var(--border-strong);border-radius:8px;padding:8px 12px;font-size:13px">
+        <summary style="cursor:pointer">
+          ⚖️ <b>Вага посилки:</b>
+          {% if wc.tare_g is not None %}📦 тара {{ wc.tare_g|floatformat:"-1" }} г + {% endif %}🧩 товар {{ wc.product_g|floatformat:"-1" }} г
+          = <b>≈ {{ wc.estimate_g|floatformat:"-1" }} г</b>
+          {% if wc.tare_g is None %}<span style="color:var(--text-muted)">· вага порожньої коробки невідома</span>{% endif %}
+          {% if wc.missing %}<span style="color:var(--warn)">· ⚠️ без ваги: {{ wc.missing }}</span>{% endif %}
+        </summary>
+        <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:12.5px">
+          <thead><tr style="color:var(--text-muted)">
+            <th style="text-align:left;padding:4px 6px">Артикул</th>
+            <th style="text-align:right;padding:4px 6px">К-сть</th>
+            <th style="text-align:right;padding:4px 6px">Вага нетто, г/шт</th>
+            <th style="text-align:right;padding:4px 6px">Разом, г</th>
+            <th style="text-align:left;padding:4px 6px">Звідки / що робити</th>
+          </tr></thead>
+          <tbody>
+          {% for r in wc.rows %}
+            <tr data-dsw-row style="border-top:1px solid var(--border-strong)">
+              <td style="padding:4px 6px" translate="no">{% if r.product %}<a href="{% url 'admin:inventory_product_change' r.product.pk %}" target="_blank" style="color:var(--accent)">{{ r.sku }}</a>{% else %}{{ r.sku }}{% endif %}</td>
+              <td style="padding:4px 6px;text-align:right">{{ r.qty|floatformat:"-3" }}</td>
+              <td style="padding:4px 6px;text-align:right">{% if r.grams %}{{ r.grams.normalize }}{% else %}<span style="color:var(--warn)">—</span>{% endif %}</td>
+              <td style="padding:4px 6px;text-align:right">{% if r.sub %}{{ r.sub|floatformat:"-1" }}{% else %}—{% endif %}</td>
+              <td style="padding:4px 6px">
+                {% if r.grams %}<span style="color:var(--text-muted)">{{ r.source_text|default:"звідки — невідомо" }}</span>
+                {% elif not r.product %}<span style="color:var(--warn)">позиція без товару в складі</span>
+                {% else %}
+                  {% if r.note %}<div style="color:var(--text-muted);font-size:11.5px" translate="no">{{ r.note }}</div>{% endif %}
+                  {% if wc.can_change %}
+                  <button type="button" class="button" style="padding:2px 10px"
+                          data-dsw-check="{% url 'admin:inventory_product_weight_check' r.product.pk %}"
+                          data-dsw-save="{% url 'admin:inventory_product_weight_save' r.product.pk %}"
+                          data-dsw-sku="{{ r.sku }}">🔎 Знайти вагу в даташиті</button>
+                  {% else %}<span style="color:var(--text-muted)">немає права змінювати товари</span>{% endif %}
+                  <div class="dsw-out" style="margin-top:4px"></div>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <div style="color:var(--text-muted);font-size:11.5px;margin-top:6px">
+          Тара — «Вага порожньої» коробки з «Пакувальних матеріалів»{% if wc.tare_from == "order_packaging" %} (Фактична упаковка замовлення){% endif %}.
+          Знайдена вага записується в картку товару («🛃 Митне оформлення») і підставляється в митну декларацію нижче.
+        </div>
+      </details>
+      {{ wc.script }}
+      <script>
+      document.addEventListener('dsw:saved', function (e) {   // знайдена вага → «Вага/шт (кг)» у митній декларації
+        var d = e.detail || {};
+        document.querySelectorAll('input[name="ca_sku"]').forEach(function (i) {
+          if ((i.value || '').trim().toUpperCase() !== (d.sku || '').trim().toUpperCase()) return;
+          var tr = i.closest('tr'); if (!tr) return;
+          var w = tr.querySelector('input[name="ca_weight"]'), a = tr.querySelector('input.ca-wauto');
+          if (w) { w.value = d.kg; w.dispatchEvent(new Event('input', {bubbles: true})); }
+          if (a) a.value = '0';
+        });
+      });
+      </script>
+      {% endwith %}{% endif %}
       {% localize off %}
       {# Hidden fallback fields — synced from first package row before submit #}
       <input type="hidden" name="weight_kg" id="id_weight_kg" value="{{ shipment.weight_kg }}">

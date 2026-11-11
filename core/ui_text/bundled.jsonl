@@ -4355,7 +4355,9 @@
 {"uk": "Вага (кг)", "en": "Weight (kg)", "de": "Gewicht (kg)"}
 {"uk": "Вага брутто", "en": "Gross weight", "de": "Bruttogewicht"}
 {"uk": "Вага брутто коробки, кг", "en": "Gross weight of box, kg", "de": "Bruttogewicht des Kartons, kg"}
+{"uk": "Вага з даташита", "en": "Weight from datasheet", "de": "Gewicht aus Datenblatt"}
 {"uk": "Вага кг", "en": "Weight kg", "de": "Gewicht kg"}
+{"uk": "Вага має бути додатним числом у грамах.", "en": "Weight must be a positive number in grams.", "de": "Das Gewicht muss eine positive Zahl in Gramm sein."}
 {"uk": "Вага нетто", "en": "Net weight", "de": "Nettogewicht"}
 {"uk": "Вага нетто (г/шт)", "en": "Net weight (g/pc)", "de": "Nettogewicht (g/Stk.)"}
 {"uk": "Вага нетто 1 шт, кг", "en": "Net weight of 1 pc, kg", "de": "Nettogewicht 1 Stk., kg"}
@@ -4367,10 +4369,12 @@
 {"uk": "Вага порожньої (кг)", "en": "Empty weight (kg)", "de": "Leergewicht (kg)"}
 {"uk": "Вага посилки", "en": "Parcel weight", "de": "Paketgewicht"}
 {"uk": "Вага посилки брутто", "en": "Parcel gross weight", "de": "Paket-Bruttogewicht"}
+{"uk": "Вага посилки:", "en": "Parcel weight:", "de": "Paketgewicht:"}
 {"uk": "Вага рядка (кг)", "en": "Line weight (kg)", "de": "Positionsgewicht (kg)"}
 {"uk": "Вага самої коробки без вмісту", "en": "Weight of the box itself without contents", "de": "Gewicht des Kartons selbst ohne Inhalt"}
 {"uk": "Вага товару", "en": "Product weight", "de": "Artikelgewicht"}
 {"uk": "Вага/шт", "en": "Weight/pc", "de": "Gewicht/Stk."}
+{"uk": "Вага: примітка", "en": "Weight: note", "de": "Gewicht: Hinweis"}
 {"uk": "Вагу заповнено з", "en": "Weight filled from", "de": "Gewicht übernommen aus"}
 {"uk": "Вагу й коробки перевірте: підказка", "en": "Check the weight and boxes: the", "de": "Gewicht und Kartons prüfen: der"}
 {"uk": "Вагу й коробки перевірте: підказка пакування рахує все замовлення, а в посилці лише частина.", "en": "Check the weight and boxes: the packaging suggestion counts the whole order, but the parcel holds only part of it.", "de": "Gewicht und Kartons prüfen: der Verpackungsvorschlag rechnet mit dem ganzen Auftrag, im Paket ist aber nur ein Teil."}
@@ -4773,6 +4777,7 @@
 {"uk": "Використовується в посиланнях email листів (password reset). Приклади: akustik.synology.me:81 | minerva-bi.com | localhost:8000", "en": "Used in e-mail links (password reset). Examples: akustik.synology.me:81 | minerva-bi.com | localhost:8000", "de": "Wird in den Links der E-Mails verwendet (Passwort zurücksetzen). Beispiele: akustik.synology.me:81 | minerva-bi.com | localhost:8000"}
 {"uk": "Використовується для HMAC-SHA256 підпису (X-Minerva-Signature)", "en": "Used for the HMAC-SHA256 signature (X-Minerva-Signature)", "de": "Wird für die HMAC-SHA256-Signatur verwendet (X-Minerva-Signature)"}
 {"uk": "Використовується для автоматичної митної декларації CN23", "en": "Used for the automatic CN23 customs declaration", "de": "Wird für die automatische Zollinhaltserklärung CN23 verwendet"}
+{"uk": "Використовується для автоматичної митної декларації CN23. Вага нетто — за 1 шт; «🔎 Знайти вагу в даташиті» читає даташит товару й пропонує значення з цитатою.", "en": "Used for the automatic CN23 customs declaration. Net weight is per 1 pc; «🔎 Знайти вагу в даташиті» reads the product datasheet and suggests a value with a quote.", "de": "Wird für die automatische CN23-Zollanmeldung verwendet. Nettogewicht pro 1 Stk; «🔎 Знайти вагу в даташиті» liest das Datenblatt und schlägt einen Wert mit Zitat vor."}
 {"uk": "Використовується для габаритів коробок та посилок", "en": "Used for the dimensions of boxes and parcels", "de": "Wird für die Abmessungen von Kartons und Paketen verwendet"}
 {"uk": "Використовується для країн за межами ЄС (автовизначення за addr_country). Змінні: {0} {1} {2} {3} {4} {5} {6}", "en": "Used for countries outside the EU (detected automatically from addr_country). Variables: {0} {1} {2} {3} {4} {5} {6}", "de": "Wird für Länder außerhalb der EU verwendet (automatische Erkennung anhand von addr_country). Variablen: {0} {1} {2} {3} {4} {5} {6}"}
 {"uk": "Використовується звичайний пароль Gmail замість App Password", "en": "A regular Gmail password is used instead of an App Password", "de": "Es wird das normale Gmail-Passwort statt eines App-Passworts verwendet"}
@@ -5012,6 +5017,7 @@
 {"uk": "Вміст посилки не збережено: {0}", "en": "Parcel contents not saved: {0}", "de": "Paketinhalt nicht gespeichert: {0}"}
 {"uk": "Вміст сповіщень (Нові замовлення + DigiKey)", "en": "Notification content (New orders + DigiKey)", "de": "Inhalt der Benachrichtigungen (Neue Aufträge + DigiKey)"}
 {"uk": "Вміст файлу не схожий на .{0}", "en": "The file content does not look like .{0}", "de": "Der Dateiinhalt sieht nicht nach .{0} aus"}
+{"uk": "Внесено вручну", "en": "Entered manually", "de": "Manuell eingetragen"}
 {"uk": "Внесено самому (доручення «", "en": "Entered by itself (instruction «", "de": "Selbst eingetragen (Auftrag «"}
 {"uk": "Внести дані з QR", "en": "Apply data from QR", "de": "Daten aus QR übernehmen"}
 {"uk": "Внести пропозицію вручну", "en": "Enter offer manually", "de": "Angebot manuell eintragen"}
@@ -5031,6 +5037,7 @@
 {"uk": "Востаннє", "en": "Last time", "de": "Zuletzt"}
 {"uk": "Впевненість", "en": "Confidence", "de": "Sicherheit"}
 {"uk": "Вперше", "en": "First time", "de": "Erstmals"}
+{"uk": "Вписати вручну", "en": "Enter manually", "de": "Manuell eintragen"}
 {"uk": "Вписати у «Вартість доставки»", "en": "Enter in “Shipping cost”", "de": "In „Versandkosten“ eintragen"}
 {"uk": "Впиши його в «Мої налаштування» → «Telegram ID» або попроси адміністратора додати цей ID до твого профілю. /myid — показати ID ще раз.", "en": "Enter it in “My settings” → “Telegram ID” or ask the administrator to add this ID to your profile. /myid — show the ID again.", "de": "Trage sie unter „Meine Einstellungen“ → „Telegram-ID“ ein oder bitte den Administrator, diese ID zu deinem Profil hinzuzufügen. /myid – zeigt die ID noch einmal an."}
 {"uk": "Впишіть ID у «Мої налаштування» → «Telegram ID» або передайте його адміністратору.", "en": "Enter the ID in “My settings” → “Telegram ID” or pass it on to the administrator.", "de": "Tragen Sie die ID unter „Meine Einstellungen“ → „Telegram-ID“ ein oder geben Sie sie an den Administrator weiter."}
@@ -5848,10 +5855,13 @@
 {"uk": "Даташит ({0}, {1} стор.) без текстового шару — це скан, прочитати не можна.", "en": "The datasheet ({0}, {1} p.) has no text layer — it is a scan and cannot be read.", "de": "Das Datenblatt ({0}, {1} S.) hat keine Textebene – es ist ein Scan und kann nicht gelesen werden."}
 {"uk": "Даташит {0}", "en": "Datasheet {0}", "de": "Datenblatt {0}"}
 {"uk": "Даташит {0} — {1}, сторінок: {2}", "en": "Datasheet {0} — {1}, pages: {2}", "de": "Datenblatt {0} – {1}, Seiten: {2}"}
+{"uk": "Даташит на вагу перевірено", "en": "Datasheet checked for weight", "de": "Datenblatt auf Gewicht geprüft"}
 {"uk": "Даташит товару {0}", "en": "Product datasheet {0}", "de": "Artikel-Datenblatt {0}"}
 {"uk": "Даташит іде на DigiKey у поле «{0}» ({1}) — разом з карткою товару.", "en": "The datasheet goes to DigiKey in the field “{0}” ({1}) — together with the product card.", "de": "Das Datenblatt geht im Feld „{0}“ ({1}) an DigiKey — zusammen mit der Artikelkarte."}
 {"uk": "Даташит: спільний файл", "en": "Datasheet: shared file", "de": "Datenblatt: gemeinsame Datei"}
 {"uk": "Даташита немає", "en": "No datasheet", "de": "Kein Datenblatt"}
+{"uk": "Даташита немає або він не читається ({0})", "en": "No datasheet or it cannot be read ({0})", "de": "Kein Datenblatt oder nicht lesbar ({0})"}
+{"uk": "Даташита немає або він не читається:", "en": "No datasheet or it cannot be read:", "de": "Kein Datenblatt oder nicht lesbar:"}
 {"uk": "Даташити", "en": "Datasheets", "de": "Datenblätter"}
 {"uk": "Даташити не надіслано — поля даташита DigiKey Minerva не знає.", "en": "Datasheets were not sent — Minerva does not know the DigiKey datasheet field.", "de": "Datenblätter wurden nicht gesendet — Minerva kennt das Datenblattfeld von DigiKey nicht."}
 {"uk": "Даташити товарів", "en": "Product datasheets", "de": "Artikel-Datenblätter"}
@@ -6595,6 +6605,7 @@
 {"uk": "З виконаними", "en": "With done events", "de": "Mit erledigten Terminen"}
 {"uk": "З виставки", "en": "From a trade fair", "de": "Von der Messe"}
 {"uk": "З гумором — легкий жарт на недоречні питання", "en": "With humor — a light joke for inappropriate questions", "de": "Mit Humor – ein leichter Scherz bei unpassenden Fragen"}
+{"uk": "З даташита", "en": "From datasheet", "de": "Aus Datenblatt"}
 {"uk": "З даташитом", "en": "With datasheet", "de": "Mit Datenblatt"}
 {"uk": "З закупівель і запитів Minerva; швидкість відповіді й проблеми — «✉️ Аналіз пошти».", "en": "From Minerva purchases and requests; reply speed and problems — «✉️ Mail analysis».", "de": "Aus Einkäufen und Anfragen in Minerva; Antwortgeschwindigkeit und Probleme — «✉️ Postanalyse»."}
 {"uk": "З запиту {0}", "en": "From request {0}", "de": "Aus Anfrage {0}"}
@@ -6608,6 +6619,7 @@
 {"uk": "З листа {0} від {1}: {2}", "en": "From email {0} dated {1}: {2}", "de": "Aus E-Mail {0} vom {1}: {2}"}
 {"uk": "З листа «{0}»", "en": "From e-mail “{0}”", "de": "Aus E-Mail „{0}“"}
 {"uk": "З листа — кнопка «📝 Angebot» у прев'ю листа: клієнт, адреса, артикули й кількості підставляться самі.", "en": "From an e-mail — the “📝 Angebot” button in the e-mail preview: customer, address, SKUs and quantities are filled in automatically.", "de": "Aus einer E-Mail — Schaltfläche „📝 Angebot“ in der E-Mail-Vorschau: Kunde, Adresse, Artikelnummern und Mengen werden automatisch eingetragen."}
+{"uk": "З митної декларації", "en": "From customs declaration", "de": "Aus Zollanmeldung"}
 {"uk": "З повагою", "en": "Best regards", "de": "Mit freundlichen Grüßen"}
 {"uk": "З повагою, {0}", "en": "Best regards, {0}", "de": "Mit freundlichen Grüßen, {0}"}
 {"uk": "З повагою,?\\s", "en": "З повагою,?\\s", "de": "З повагою,?\\s"}
@@ -7162,6 +7174,7 @@
 {"uk": "Записано в askDANTE: {0} {1}–{2}", "en": "Recorded in askDANTE: {0} {1}–{2}", "de": "In askDANTE eingetragen: {0} {1}–{2}"}
 {"uk": "Записано в askDANTE: {0} · {1} · {2}{3}", "en": "Recorded in askDANTE: {0} · {1} · {2}{3}", "de": "In askDANTE eingetragen: {0} · {1} · {2}{3}"}
 {"uk": "Записано в картки лістингів: {0} посилань.", "en": "Written to the listing cards: {0} links.", "de": "In die Listing-Karten geschrieben: {0} Links."}
+{"uk": "Записано в товар:", "en": "Saved to the product:", "de": "Im Produkt gespeichert:"}
 {"uk": "Записано з DigiKey: змінились ціни у {0}, без змін {1}.", "en": "Recorded from DigiKey: prices changed in {0}, unchanged {1}.", "de": "Von DigiKey übernommen: Preise geändert bei {0}, unverändert {1}."}
 {"uk": "Записано лише звук наради («Нарада»).", "en": "Only the meeting audio was recorded (“Meeting”).", "de": "Nur der Besprechungston wurde aufgenommen („Besprechung“)."}
 {"uk": "Записано мікрофоном у кімнаті — мовців не розділено («У кімнаті (мікрофон)»).", "en": "Recorded with a microphone in the room — speakers are not separated (“In the room (microphone)”).", "de": "Mit einem Mikrofon im Raum aufgenommen — Sprecher nicht getrennt („Im Raum (Mikrofon)“)."}
@@ -7649,10 +7662,12 @@
 {"uk": "Звук наради: програма Teams — «Весь екран» + «Поділитися системним звуком»; Teams або Zoom у браузері — вкладка + «Поділитися звуком вкладки»; очна зустріч — «Лише мікрофон».", "en": "Meeting audio: Teams app — “Entire screen” + “Share system audio”; Teams or Zoom in the browser — the tab + “Share tab audio”; in-person meeting — “Microphone only”.", "de": "Besprechungston: Teams-App — „Gesamter Bildschirm“ + „Systemaudio teilen“; Teams oder Zoom im Browser — Tab + „Tab-Audio teilen“; Präsenztermin — „Nur Mikrofon“."}
 {"uk": "Звідки", "en": "Source", "de": "Quelle"}
 {"uk": "Звідки (порожньо — календар Minerva)", "en": "From (empty — Minerva calendar)", "de": "Von (leer — Minerva-Kalender)"}
+{"uk": "Звідки / що робити", "en": "Source / what to do", "de": "Herkunft / was tun"}
 {"uk": "Звідки price: listing (ціна позиції) / sale_price (ціна продажу) / base (базові ціни за курсом) / null", "en": "Where price comes from: listing (line price) / sale_price (sale price) / base (base prices at the exchange rate) / null", "de": "Woher price stammt: listing (Positionspreis) / sale_price (Verkaufspreis) / base (Basispreise zum Wechselkurs) / null"}
 {"uk": "Звідки базові ціни", "en": "Where the base prices come from", "de": "Herkunft der Basispreise"}
 {"uk": "Звідки береться", "en": "Where it comes from", "de": "Woher es stammt"}
 {"uk": "Звідки брати етикетку DYMO", "en": "Where to take the DYMO label from", "de": "Quelle für das DYMO-Etikett"}
+{"uk": "Звідки вага", "en": "Weight source", "de": "Herkunft des Gewichts"}
 {"uk": "Звідки взявся", "en": "Origin", "de": "Herkunft"}
 {"uk": "Звідки взято", "en": "Where it was taken from", "de": "Woher übernommen"}
 {"uk": "Звідки взято час: стандартний день, активність у Minerva…", "en": "Where the time comes from: standard day, activity in Minerva…", "de": "Woher die Zeit stammt: Standardtag, Aktivität in Minerva…"}
@@ -7881,12 +7896,14 @@
 {"uk": "Змініть поля, підсвічені червоним (натисніть — перейти до поля)", "en": "Change the fields highlighted in red (click to jump to the field)", "de": "Ändern Sie die rot markierten Felder (Klick – zum Feld springen)"}
 {"uk": "Змініть поля, підсвічені червоним: {0}.", "en": "Change the fields highlighted in red: {0}.", "de": "Ändern Sie die rot markierten Felder: {0}."}
 {"uk": "Зміст", "en": "Contents", "de": "Inhalt"}
+{"uk": "Знайдена вага записується в картку товару («🛃 Митне оформлення») і підставляється в митну декларацію нижче.", "en": "The weight found is saved in the product card («🛃 Митне оформлення») and filled into the customs declaration below.", "de": "Das gefundene Gewicht wird in der Produktkarte («🛃 Митне оформлення») gespeichert und unten in die Zollanmeldung übernommen."}
 {"uk": "Знайдений статус", "en": "Status found", "de": "Gefundener Status"}
 {"uk": "Знайдено", "en": "Found", "de": "Gefunden"}
 {"uk": "Знайдено SKU", "en": "SKU found", "de": "Artikelnummer gefunden"}
 {"uk": "Знайдено {0} невідом{1}", "en": "Found {0} unknown{1}", "de": "{0} unbekannt{1} gefunden"}
 {"uk": "Знайдено {0} рядків (формат: {1})", "en": "Found {0} rows (format: {1})", "de": "{0} Zeilen gefunden (Format: {1})"}
 {"uk": "Знайдено {0} тем.", "en": "{0} topics found.", "de": "{0} Themen gefunden."}
+{"uk": "Знайдено в даташиті — перевірте й внесіть:", "en": "Found in the datasheet — check and save:", "de": "Im Datenblatt gefunden — prüfen und übernehmen:"}
 {"uk": "Знайдено в листах {0} рази — показано один раз", "en": "Found in e-mails {0} times — shown once", "de": "In E-Mails {0}-mal gefunden — einmal angezeigt"}
 {"uk": "Знайдено виправлення", "en": "Corrections found", "de": "Korrekturen gefunden"}
 {"uk": "Знайдено востаннє", "en": "Last found", "de": "Zuletzt gefunden"}
@@ -7910,6 +7927,7 @@
 {"uk": "Знайти email листи з конкретним клієнтом. Повертає останні листи з теми, датами і коротким змістом.", "en": "Find emails with a specific customer. Returns the latest emails with subject, dates and a short summary.", "de": "E-Mails mit einem bestimmten Kunden finden. Liefert die letzten E-Mails mit Betreff, Datum und kurzer Zusammenfassung."}
 {"uk": "Знайти в пошті", "en": "Find in mail", "de": "In der Post finden"}
 {"uk": "Знайти в списку замовлень", "en": "Find in the order list", "de": "In der Auftragsliste suchen"}
+{"uk": "Знайти вагу в даташиті", "en": "Find weight in datasheet", "de": "Gewicht im Datenblatt suchen"}
 {"uk": "Знайти за номером", "en": "Find by number", "de": "Nach Nummer suchen"}
 {"uk": "Знайти забуті листи", "en": "Find forgotten emails", "de": "Vergessene E-Mails finden"}
 {"uk": "Знайти замовлення", "en": "Find order", "de": "Auftrag suchen"}
@@ -10452,6 +10470,7 @@
 {"uk": "Немає зв'язку з помічником.", "en": "No connection to the assistant.", "de": "Keine Verbindung zum Assistenten."}
 {"uk": "Немає зв'язку з сервером", "en": "No connection to the server", "de": "Keine Verbindung zum Server"}
 {"uk": "Немає зв’язку з Minerva — спробую ще.", "en": "No connection to Minerva — will try again.", "de": "Keine Verbindung zu Minerva — neuer Versuch folgt."}
+{"uk": "Немає зв’язку з сервером", "en": "No connection to the server", "de": "Keine Verbindung zum Server"}
 {"uk": "Немає змін для збереження.", "en": "No changes to save.", "de": "Keine Änderungen zu speichern."}
 {"uk": "Немає картинки діаграми", "en": "No chart image", "de": "Kein Diagrammbild"}
 {"uk": "Немає категорій товарів — заповніть поле «Категорія» у товарах", "en": "No product categories — fill in the “Category” field in products", "de": "Keine Artikelkategorien — füllen Sie in den Artikeln das Feld „Kategorie“ aus"}
@@ -10511,6 +10530,7 @@
 {"uk": "Немає права змінювати проєкти askDANTE категорій.", "en": "You do not have permission to change the askDANTE projects of categories.", "de": "Sie haben keine Berechtigung, die askDANTE-Projekte der Kategorien zu ändern."}
 {"uk": "Немає права змінювати проєкти askDANTE.", "en": "You do not have permission to change askDANTE projects.", "de": "Sie haben keine Berechtigung, askDANTE-Projekte zu ändern."}
 {"uk": "Немає права змінювати свої категорії", "en": "No permission to edit your own categories", "de": "Keine Berechtigung zum Bearbeiten eigener Kategorien"}
+{"uk": "Немає права змінювати товари", "en": "No permission to change products", "de": "Keine Berechtigung, Produkte zu ändern"}
 {"uk": "Немає права змінювати цей запис.", "en": "You do not have permission to change this record.", "de": "Sie haben nicht das Recht, diesen Datensatz zu ändern."}
 {"uk": "Немає права змінювати цей проєкт — доступний лише ⏰ дедлайн.", "en": "No permission to change this project — only a ⏰ deadline is available.", "de": "Keine Berechtigung, dieses Projekt zu ändern — nur eine ⏰ Frist ist möglich."}
 {"uk": "Немає права на документи бази знань", "en": "No permission for knowledge base documents", "de": "Keine Berechtigung für Dokumente der Wissensdatenbank"}
@@ -15092,6 +15112,7 @@
 {"uk": "Такої швидкої зміни немає.", "en": "No such quick edit exists.", "de": "Diese Schnelländerung gibt es nicht."}
 {"uk": "Там уже є папка з такою назвою", "en": "A folder with this name already exists there", "de": "Dort existiert bereits ein Ordner mit diesem Namen"}
 {"uk": "Танзанія", "en": "Tanzania", "de": "Tansania"}
+{"uk": "Тара — «Вага порожньої» коробки з «Пакувальних матеріалів»", "en": "Tare — «Вага порожньої» of the box from «Пакувальні матеріали»", "de": "Tara — «Вага порожньої» des Kartons aus «Пакувальні матеріали»"}
 {"uk": "Тариф", "en": "Rate", "de": "Tarif"}
 {"uk": "Тариф «до поштомату» — вкажи дату коли здаси посилку.", "en": "“To parcel locker” rate — specify the date when you will drop off the parcel.", "de": "Tarif „zum Paketautomaten“ — geben Sie das Datum an, an dem Sie das Paket abgeben."}
 {"uk": "Тариф збережено в Minerva, але PATCH до Jumingo не вдався: {0}. Оберіть тариф вручну на Jumingo.", "en": "The rate was saved in Minerva, but the PATCH to Jumingo failed: {0}. Select the rate manually on Jumingo.", "de": "Der Tarif wurde in Minerva gespeichert, aber der PATCH an Jumingo ist fehlgeschlagen: {0}. Wählen Sie den Tarif manuell bei Jumingo."}
@@ -15689,6 +15710,7 @@
 {"uk": "У гіді немає сторінок про це — спробуйте інакше сформулювати.", "en": "The guide has no pages about this — try rephrasing.", "de": "Der Leitfaden enthält keine Seiten dazu — versuchen Sie es mit einer anderen Formulierung."}
 {"uk": "У гіді цього немає", "en": "This is not in the guide", "de": "Das steht nicht im Leitfaden"}
 {"uk": "У гілці листів: {0} · показано останній", "en": "E-mails in the thread: {0} · showing the latest", "de": "E-Mails im Verlauf: {0} · die neueste wird gezeigt"}
+{"uk": "У даташиті ваги немає — позначено в товарі.", "en": "No weight in the datasheet — noted in the product.", "de": "Kein Gewicht im Datenblatt — im Produkt vermerkt."}
 {"uk": "У джерелі «{0}» вже є замовлення з номерами: {1} — їх не перенесено.", "en": "Source “{0}” already has orders with the numbers: {1} — they were not moved.", "de": "In der Quelle „{0}“ gibt es bereits Aufträge mit den Nummern: {1} – sie wurden nicht übertragen."}
 {"uk": "У документи замовлення", "en": "Into order documents", "de": "In die Auftragsdokumente"}
 {"uk": "У документи замовлення й проєкту", "en": "Into order and project documents", "de": "In die Auftrags- und Projektdokumente"}
@@ -16272,6 +16294,7 @@
 {"uk": "Цитата", "en": "Quote", "de": "Zitat"}
 {"uk": "Цитата / примітка", "en": "Quote / note", "de": "Zitat / Notiz"}
 {"uk": "Цитата або примітка", "en": "Quote or note", "de": "Zitat oder Notiz"}
+{"uk": "Цитата з даташита або результат перевірки («у даташиті ваги немає»).", "en": "Quote from the datasheet or the check result («у даташиті ваги немає»).", "de": "Zitat aus dem Datenblatt oder Prüfergebnis («у даташиті ваги немає»)."}
 {"uk": "Цитата з листа", "en": "Quote from the e-mail", "de": "Zitat aus der E-Mail"}
 {"uk": "Цитата з листа або примітка (за бажанням)", "en": "Quote from the email or a note (optional)", "de": "Zitat aus der E-Mail oder Notiz (optional)"}
 {"uk": "Цих листів немає у ваших скриньках.", "en": "These e-mails are not in your mailboxes.", "de": "Diese E-Mails sind nicht in Ihren Postfächern."}
@@ -16596,6 +16619,7 @@
 {"uk": "Читання; ?site=… — записує звіт сайту про його налаштування помічника. Відповідь містить ключ веб-моста помічника.", "en": "Read; ?site=… records the website’s report about its assistant settings. The response contains the assistant’s web bridge key.", "de": "Lesen; ?site=… speichert den Bericht der Website über ihre Assistenten-Einstellungen. Die Antwort enthält den Web-Bridge-Schlüssel des Assistenten."}
 {"uk": "Читання; з ?link_de= / ?link_en= Minerva запам'ятовує адреси кабінету для листів.", "en": "Read; with ?link_de= / ?link_en= Minerva remembers the account page addresses for emails.", "de": "Lesen; mit ?link_de= / ?link_en= merkt sich Minerva die Adressen des Kundenkontos für E-Mails."}
 {"uk": "Читати листи з особистого ящика і додавати в хронологію клієнтів.", "en": "Read e-mails from the personal mailbox and add them to the customer timeline.", "de": "E-Mails aus dem persönlichen Postfach lesen und zum Kundenverlauf hinzufügen."}
+{"uk": "Читаю даташит…", "en": "Reading the datasheet…", "de": "Lese Datenblatt…"}
 {"uk": "Читаю листи…", "en": "Reading emails…", "de": "Lese E-Mails…"}
 {"uk": "Читаю розмову з DigiKey і надсилаю лист…", "en": "Reading the conversation from DigiKey and sending the e-mail…", "de": "Gespräch wird von DigiKey gelesen und die E-Mail gesendet…"}
 {"uk": "Читаю товари з DigiKey і перевіряю посилання {0} лістингів — хід нижче, звіт з'явиться сам.", "en": "Reading products from DigiKey and checking the links of {0} listings — progress is shown below, the report will appear by itself.", "de": "Artikel werden von DigiKey gelesen und die Links von {0} Listings geprüft — der Fortschritt wird unten angezeigt, der Bericht erscheint von selbst."}
@@ -17165,6 +17189,7 @@
 {"uk": "або файл — у таблиці «📎 Документи» нижче (категорія, файл, «Зберегти»).", "en": "or a file — in the “📎 Documents” table below (category, file, “Save”).", "de": "oder eine Datei — in der Tabelle „📎 Dokumente“ unten (Kategorie, Datei, „Speichern“)."}
 {"uk": "або через плитку на", "en": "or via the tile on", "de": "oder über die Kachel auf"}
 {"uk": "або числовий ID", "en": "or a numeric ID", "de": "oder eine numerische ID"}
+{"uk": "або інше значення:", "en": "or another value:", "de": "oder anderer Wert:"}
 {"uk": "або: меню", "en": "or: menu", "de": "oder: Menü"}
 {"uk": "авто", "en": "auto", "de": "auto"}
 {"uk": "авто — не зважено", "en": "auto — not weighed", "de": "auto — nicht gewogen"}
@@ -17308,6 +17333,7 @@
 {"uk": "без акаунту UPS відхилить запит. Для", "en": "without an account UPS will reject the request. For", "de": "ohne Konto lehnt UPS die Anfrage ab. Für"}
 {"uk": "без активності в Minerva — стандартний день", "en": "no activity in Minerva — standard day", "de": "keine Aktivität in Minerva — Standardtag"}
 {"uk": "без ваги нетто", "en": "without net weight", "de": "ohne Nettogewicht"}
+{"uk": "без ваги: {0}", "en": "without weight: {0}", "de": "ohne Gewicht: {0}"}
 {"uk": "без валюти", "en": "no currency", "de": "keine Währung"}
 {"uk": "без виконавця", "en": "no assignee", "de": "ohne Bearbeiter"}
 {"uk": "без винятку", "en": "no exception", "de": "keine Ausnahme"}
@@ -17415,6 +17441,7 @@
 {"uk": "вага має бути більша за 0 і менша за 1 000 000 г", "en": "weight must be greater than 0 and less than 1,000,000 g", "de": "Gewicht muss größer als 0 und kleiner als 1.000.000 g sein"}
 {"uk": "вага не вказана", "en": "weight not specified", "de": "Gewicht nicht angegeben"}
 {"uk": "вага неповна", "en": "weight incomplete", "de": "Gewicht unvollständig"}
+{"uk": "вага порожньої коробки невідома", "en": "empty box weight unknown", "de": "Leergewicht des Kartons unbekannt"}
 {"uk": "вага — лише число в грамах (напр. 45 або 0.5)", "en": "weight — a number in grams only (e.g. 45 or 0.5)", "de": "Gewicht – nur eine Zahl in Gramm (z. B. 45 oder 0.5)"}
 {"uk": "вагу нетто (г/шт)", "en": "net weight (g/pc)", "de": "Nettogewicht (g/Stk.)"}
 {"uk": "важливого: {0}", "en": "important: {0}", "de": "wichtig: {0}"}
@@ -17790,6 +17817,7 @@
 {"uk": "дата створення офера на DigiKey (createDateUtc)", "en": "offer creation date on DigiKey (createDateUtc)", "de": "Erstellungsdatum des Offers auf DigiKey (createDateUtc)"}
 {"uk": "даташит", "en": "datasheet", "de": "Datenblatt"}
 {"uk": "даташит {0}: {1}", "en": "datasheet {0}: {1}", "de": "Datenblatt {0}: {1}"}
+{"uk": "даташит — скан без тексту, ваги не знайдено", "en": "datasheet is a scan without text, no weight found", "de": "Datenblatt ist ein Scan ohne Text, kein Gewicht gefunden"}
 {"uk": "даташита немає", "en": "there is no datasheet", "de": "kein Datenblatt vorhanden"}
 {"uk": "даташити", "en": "datasheets", "de": "Datenblätter"}
 {"uk": "даташити, наявність.", "en": "datasheets, availability.", "de": "Datenblätter, Verfügbarkeit."}
@@ -20472,6 +20500,7 @@
 {"uk": "такими самими. Зніміть її, щоб вписати свій курс або клікнути курс «Для порівняння» (🌐 ЄЦБ — сьогоднішній", "en": "the same. Clear it to enter your own rate or click a rate under “For comparison” (🌐 ECB — today’s", "de": "unverändert. Entfernen Sie es, um einen eigenen Kurs einzugeben oder einen Kurs unter „Zum Vergleich“ anzuklicken (🌐 EZB — heutiger"}
 {"uk": "там", "en": "there", "de": "dort"}
 {"uk": "там модуль вмикають і вимикають для всіх.", "en": "that is where a module is switched on and off for everyone.", "de": "dort wird ein Modul für alle ein- und ausgeschaltet."}
+{"uk": "тара {0} г", "en": "tare {0} g", "de": "Tara {0} g"}
 {"uk": "тарифів немає", "en": "no rates", "de": "keine Tarife"}
 {"uk": "те саме", "en": "the same", "de": "dasselbe"}
 {"uk": "теж працюють — ступені рядками в одній комірці). Мова підписів", "en": "also work — price breaks as rows in one cell). The language of the labels", "de": "funktionieren ebenfalls — Staffeln als Zeilen in einer Zelle). Die Sprache der Beschriftungen"}
@@ -20648,6 +20677,7 @@
 {"uk": "у верхньому правому куті форми → готовий A4-документ.", "en": "in the top right corner of the form → a ready A4 document.", "de": "oben rechts im Formular → fertiges A4-Dokument."}
 {"uk": "у власника немає права давати завдання агенту", "en": "the owner may not give tasks to the agent", "de": "der Inhaber darf dem Agenten keine Aufgaben geben"}
 {"uk": "у всій вашій пошті", "en": "in all your email", "de": "in Ihrer gesamten E-Mail"}
+{"uk": "у даташиті ваги немає", "en": "no weight in the datasheet", "de": "kein Gewicht im Datenblatt"}
 {"uk": "у документі будуть вони, а не Minerva", "en": "the document will contain these, not Minerva's", "de": "im Dokument stehen diese, nicht die von Minerva"}
 {"uk": "у документі трек-номер посилки {0} ({1})", "en": "the document has the tracking number of parcel {0} ({1})", "de": "im Dokument steht die Sendungsnummer von Paket {0} ({1})"}
 {"uk": "у документі трек-номер цієї посилки {0}", "en": "the document has this parcel's tracking number {0}", "de": "im Dokument steht die Sendungsnummer dieses Pakets {0}"}

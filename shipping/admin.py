@@ -1817,7 +1817,24 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "agent_wishes":        self._ship_wishes(order, request.user),
             "addr_book_json":      self._build_addr_book_json(request),
             "parcel":              parcel_ctx,
+            "weight_check":        self._weight_check(order, request),
         })
+
+    @staticmethod
+    def _weight_check(order, request):
+        """⚖️ Тара + товар для посилки й «🔎 Знайти вагу в даташиті» (shipping/services/weight_check.py)."""
+        try:
+            from .services import parcels, weight_check
+            qty = parcels.default_contents(order) if parcels.has_parcels(order) else None
+            data = weight_check.breakdown(order, qty)
+        except Exception as e:  # noqa: BLE001 — підказка не обов'язкова
+            logger.info("weight check for order %s: %s", getattr(order, "pk", None), e)
+            return None
+        if data:
+            from inventory.admin_weight import SCRIPT
+            data["can_change"] = request.user.has_perm("inventory.change_product")
+            data["script"] = SCRIPT if data["can_change"] else ""
+        return data
 
     def ship_today_view(self, request):
         """📦 Відправка сьогодні — черга агента відправки (`ship_advice.queue`): що оформити й що завершити."""

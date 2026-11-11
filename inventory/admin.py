@@ -2221,7 +2221,17 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                      "action_base_to_home", "action_sale_price_from_base", "action_media_links", "action_shared_media",
                      "bulk_sync_digikey_attrs", "action_dk_prices", "action_dk_from_stock", "action_agent_task"]
 
+    @admin.display(description="⚖️ Вага з даташита")
+    def weight_panel(self, obj):
+        from .admin_weight import panel
+        return panel(obj, self._weight_can_change)
+
+    _weight_can_change = False
+
     def save_model(self, request, obj, form, change):
+        changed = getattr(form, "changed_data", []) if form is not None else []
+        if "net_weight_g" in changed and "net_weight_source" not in changed:
+            obj.net_weight_source = "manual" if obj.net_weight_g else ""   # людина змінила вагу в картці
         super().save_model(request, obj, form, change)
         if form is not None and "base_prices_text" in getattr(form, "cleaned_data", {}):
             from .services.base_prices import set_base_prices
@@ -2440,7 +2450,7 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
                        "image_preview", "datasheet_link", "movement_history", "shop_listings_info",
-                       "base_prices_info", "shop_media_panel", "dk_price_panel")
+                       "base_prices_info", "shop_media_panel", "dk_price_panel", "weight_panel")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
@@ -2477,9 +2487,11 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             "classes": ("collapse",),
         }),
         ("🛃 Митне оформлення", {
-            "fields": ("name_export", ("hs_code", "country_of_origin"), "net_weight_g"),
+            "fields": ("name_export", ("hs_code", "country_of_origin"), ("net_weight_g", "net_weight_source"),
+                       "net_weight_note", "weight_panel"),
             "classes": ("collapse",),
-            "description": "Використовується для автоматичної митної декларації CN23",
+            "description": "Використовується для автоматичної митної декларації CN23. Вага нетто — за 1 шт; "
+                           "«🔎 Знайти вагу в даташиті» читає даташит товару й пропонує значення з цитатою.",
         }),
         ("📦 Рекомендована упаковка", {
             "fields": (),
@@ -2629,6 +2641,7 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         return super().changeform_view(request, object_id, form_url, extra_context)
 
     def get_form(self, request, obj=None, **kwargs):
+        self._weight_can_change = request.user.has_perm("inventory.change_product")   # «🔎 Знайти вагу»
         form = super().get_form(request, obj, **kwargs)
         cats = list(ProductCategory.objects.order_by("order", "name").values_list("slug", "name"))
         if cats:
@@ -3442,7 +3455,8 @@ class ProductAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             path('dk-sync-cancel/', self.admin_site.admin_view(self._dk_sync_cancel_view),
                  name='inventory_product_dk_sync_cancel'),
         ]
-        return custom + urls
+        from .admin_weight import urls as weight_urls
+        return weight_urls(self.admin_site) + custom + urls
 
     def _thumb_view(self, request, pk):
         from django.core.exceptions import PermissionDenied
