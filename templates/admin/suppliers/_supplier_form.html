@@ -28,7 +28,7 @@
     <label>Валюта<input name="currency" value="{{ d.currency }}" maxlength="3" placeholder="EUR"></label>
   </div>
   <label class="spf-wide">Що роблять / продають<textarea name="description" rows="3">{{ d.description }}</textarea></label>
-  {% if d.notes %}<div class="spf-muted">📝 AI помітив: {{ d.notes }}</div>{% endif %}
+  {% if d.notes %}<div class="spf-muted">📝 Ще помічено: <span translate="no">{{ d.notes }}</span></div>{% endif %}
 </div>
 <div class="spf-card">
   <div class="spf-h">👤 Контактна особа</div>

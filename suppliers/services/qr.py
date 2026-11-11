@@ -193,8 +193,9 @@ def parse(text) -> dict:
     elif low.startswith("tel:"):
         out, kind = {"contact_phone": t[4:].strip()}, "phone"
     elif re.match(r"(https?://)?(wa\.me|api\.whatsapp\.com)/", low):
-        number = re.search(r"(\d{7,15})", t)
-        out, kind = ({"contact_mobile": "+" + number.group(1)} if number else {}), "whatsapp"
+        number = re.search(r"/(\d{7,15})(?:\D|$)", t)
+        out = {"contact_mobile": "+" + number.group(1)} if number else {"notes": f"WhatsApp: {t.split()[0][:200]}"}
+        kind = "whatsapp"
     elif any(rx.search(t) for _k, rx, _n in SOCIAL):
         key, _rx, name = next(x for x in SOCIAL if x[1].search(t))
         out, kind = {"notes": f"{name or 'Профіль'}: {t.split()[0][:200]}"}, key
@@ -234,7 +235,10 @@ def merge(qr_fields: dict, other: dict) -> dict:
     out = dict(other or {})
     keys = [k for k in FIELDS if (qr_fields or {}).get(k)]
     for k in keys:
-        out[k] = qr_fields[k]
+        if k == "notes" and out.get("notes") and qr_fields[k] not in out["notes"]:
+            out[k] = f"{out['notes']}; {qr_fields[k]}"[:1000]     # примітку AI не затирати
+        elif k != "notes" or not out.get("notes"):
+            out[k] = qr_fields[k]
     if keys:
         out["from_qr"] = keys
     return out

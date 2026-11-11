@@ -41,6 +41,13 @@ def _qty(d) -> str:
     return str(int(d)) if d == d.to_integral_value() else format(d.normalize(), "f")
 
 
+def _qr_kind(kind) -> str:
+    names = {"vcard": "vCard", "mecard": "MeCard", "url": "посилання", "whatsapp": "WhatsApp", "email": "email",
+             "phone": "телефон", "wechat": "WeChat", "telegram": "Telegram", "linkedin": "LinkedIn", "skype": "Skype",
+             "line": "LINE", "social": "соцмережа"}
+    return names.get(kind, "посилання" if kind else "")
+
+
 def _stars(n) -> str:
     return "★" * n + "☆" * (5 - n) if n else ""
 
@@ -707,6 +714,54 @@ class SupplierCardMixin:
             request, "🪪 Візитки й флаєри", items=items, show=show, q=q, mark=mark, marks=SupplierMedia.MARKS,
             unassigned=SupplierMedia.objects.filter(supplier=None).count()))
 
+    def _card_edit(self, request, m, url):
+        """POST multipart: side, image (JPEG з браузера), qr_front / qr_back (QR, які браузер знайшов після правки),
+        read_ai, model → JSON {url}. Перша правка переносить знімок у *_original (файл не копіюється)."""
+        from suppliers.services import ai, jobs, qr
+        side = "back" if request.POST.get("side") == "back" else "front"
+        upload = request.FILES.get("image")
+        if upload is None or upload.size > 15 * 1024 * 1024:
+            return JsonResponse({"error": "Немає фото або воно понад 15 МБ."}, status=400)
+        try:
+            from PIL import Image
+            Image.open(upload).verify()
+            upload.seek(0)
+        except Exception:  # noqa: BLE001 — не картинка
+            return JsonResponse({"error": "Це не зображення."}, status=400)
+        field, orig = ("image_back", "image_back_original") if side == "back" else ("image", "image_original")
+        current = getattr(m, field)
+        if not current:
+            return JsonResponse({"error": "Цього боку ще немає."}, status=400)
+        if getattr(m, orig):
+            current.delete(save=False)            # проміжна версія не потрібна — оригінал уже збережено
+        else:
+            setattr(m, orig, current.name)
+        getattr(m, field).save(f"edited_{side}.jpg", upload, save=False)
+        updates = [field, orig]
+        text = qr.join(request.POST.get("qr_front", ""), request.POST.get("qr_back", ""))
+        fields = qr.parse_all(text)
+        if text and text != m.qr_text:
+            m.qr_text = text
+            updates.append("qr_text")
+            if fields:
+                m.extracted = qr.merge(fields, m.extracted or {})
+                updates.append("extracted")
+                if m.state in (SupplierMedia.NEW, SupplierMedia.FAILED):
+                    m.state = SupplierMedia.READ
+                    updates.append("state")
+        m.save(update_fields=updates)
+        out = url
+        if request.POST.get("read_ai"):
+            model, user = ai.model_of(request.POST.get("model")), request.user
+
+            def run():
+                ai.card(m, user=user, model=model)
+                return {"url": url, "message": "🧠 Прочитано"}
+            out += "?job=" + jobs.start(user, f"card {m.pk}", run)
+        self.message_user(request, "💾 Фото збережено" + (" · 🔳 " + qr.labels(qr.merge(fields, {}).get("from_qr"))
+                                                          if fields else ""), messages.SUCCESS)
+        return JsonResponse({"url": out})
+
     def card_review_view(self, request, media_pk):
         from suppliers.services import ai, draft, jobs, match, qr
         m = SupplierMedia.objects.select_related("supplier", "contact", "created_by").filter(pk=media_pk).first()
@@ -754,8 +809,10 @@ class SupplierCardMixin:
             if not _can(request, "add"):
                 raise Http404
             try:
+                extra = (m.extracted or {}).get("notes", "")         # WeChat / LinkedIn з QR, що помітив AI
                 s = draft.create(self._draft_from_post(request), user=request.user, source="card", media=m,
-                                 categories=self._categories_from_post(request), note=m.note)
+                                 categories=self._categories_from_post(request),
+                                 note="\n".join(x for x in (m.note, extra) if x))
             except ValueError as e:
                 self.message_user(request, str(e), messages.ERROR)
                 return redirect(url)
@@ -772,11 +829,25 @@ class SupplierCardMixin:
                 SupplierEvent.objects.create(supplier=s, kind=SupplierEvent.CARD, media=m, user=request.user,
                                              text=f"{m.get_kind_display()} додано" + (f" · {m.event}" if m.event else ""))
             return self._attach_existing(request, s, self._draft_from_post(request), source="card", media=m)
+        if action == "edit":                       # ✏️ браузер повернув / обрізав фото → нова версія, оригінал лишається
+            return self._card_edit(request, m, url)
+        if action == "restore":                    # ↺ Оригінал
+            side = "back" if request.POST.get("side") == "back" else "front"
+            field, orig = ("image_back", "image_back_original") if side == "back" else ("image", "image_original")
+            if getattr(m, orig):
+                current = getattr(m, field)
+                if current and current.name != getattr(m, orig).name:
+                    current.delete(save=False)
+                setattr(m, field, getattr(m, orig).name)
+                setattr(m, orig, "")
+                m.save(update_fields=[field, orig])
+                self.message_user(request, "↺ Повернуто оригінал фото", messages.SUCCESS)
+            return redirect(url)
         if action == "delete":
             if not (_can(request, "change") or m.created_by_id == request.user.pk):
                 raise Http404
             sid = m.supplier_id
-            for f in (m.image, m.image_back):
+            for f in (m.image, m.image_back, m.image_original, m.image_back_original):
                 if f:
                     f.delete(save=False)
             m.delete()
@@ -795,9 +866,10 @@ class SupplierCardMixin:
             categories=SupplierCategory.objects.filter(is_active=True), kinds=SupplierMedia.KINDS,
             marks=SupplierMedia.MARKS, can_edit=can_edit, can_add=_can(request, "add"),
             can_change=_can(request, "change"), job=request.GET.get("job", ""),
+            photo_sides=[{"key": k, "file": f, "original": o} for k, f, o in (
+                ("front", m.image, m.image_original), ("back", m.image_back, m.image_back_original)) if f],
             qr_parts=[x for x in (m.qr_text or "").split(qr.SEPARATOR) if x.strip()],
-            qr_kind={"vcard": "vCard", "mecard": "MeCard", "url": "посилання", "whatsapp": "WhatsApp",
-                     "email": "email", "phone": "телефон"}.get(qr.parse_all(m.qr_text).get("kind"), ""),
+            qr_kind=_qr_kind(qr.parse_all(m.qr_text).get("kind")),
             qr_from=qr.labels(data.get("from_qr")),
             site_domain=match.site_domain(data.get("website", ""))))
 

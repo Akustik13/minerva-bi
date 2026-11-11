@@ -507,3 +507,47 @@ class QRManyCodesTests(Base):
         self.assertEqual(d["notes"], "WeChat: https://u.wechat.com/example-taylor; LinkedIn: https://www.linkedin.com/in/taylor")
         self.assertEqual(qr.parse_all("https://t.me/fabsales")["notes"], "Telegram: https://t.me/fabsales")
         self.assertNotIn("website", qr.parse_all("https://u.wechat.com/x"))
+
+
+class EditSavedPhotoTests(Base):
+    def test_edit_keeps_original_and_restore(self):
+        m = SupplierMedia(kind=SupplierMedia.CARD, created_by=self.user, extracted={"name": "PSElectronics",
+                                                                                   "notes": "booth B3"})
+        m.image.save("card.png", SimpleUploadedFile("card.png", png()), save=False)
+        m.save()
+        first = m.image.name
+        url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+        self.assertContains(self.client.get(url), "Повернути / обрізати")
+        j = self.client.post(url, {"action": "edit", "side": "front",
+                                   "image": SimpleUploadedFile("edited.jpg", png(), content_type="image/jpeg"),
+                                   "qr_front": "https://wa.me/message/5P4DBBAOJ7MEF1?src=qr"}).json()
+        self.assertEqual(j["url"], url)
+        m.refresh_from_db()
+        self.assertEqual(m.image_original.name, first)                   # оригінал — той самий файл
+        self.assertNotEqual(m.image.name, first)
+        self.assertEqual(m.extracted["notes"], "booth B3; WhatsApp: https://wa.me/message/5P4DBBAOJ7MEF1?src=qr")
+        second = m.image.name
+        self.client.post(url, {"action": "edit", "side": "front",
+                               "image": SimpleUploadedFile("edited.jpg", png(), content_type="image/jpeg")})
+        m.refresh_from_db()
+        self.assertEqual(m.image_original.name, first)                   # друга правка — оригінал той самий
+        self.assertFalse(m.image.storage.exists(second))                 # проміжна версія прибрана
+        self.assertContains(self.client.get(url), "↺ Оригінал")
+        self.client.post(url, {"action": "restore", "side": "front"})
+        m.refresh_from_db()
+        self.assertEqual((m.image.name, m.image_original.name), (first, ""))
+        bad = self.client.post(url, {"action": "edit", "side": "front",
+                                     "image": SimpleUploadedFile("x.jpg", b"not an image", content_type="image/jpeg")})
+        self.assertEqual(bad.status_code, 400)
+
+    def test_edit_can_reread_with_ai(self):
+        m = SupplierMedia(kind=SupplierMedia.CARD, created_by=self.user)
+        m.image.save("card.png", SimpleUploadedFile("card.png", png()), save=False)
+        m.save()
+        url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+        with mock.patch.object(ai, "call", return_value=('{"company": "Cropped GmbH"}', Decimal("0.002"))):
+            j = self.client.post(url, {"action": "edit", "side": "front", "read_ai": "1",
+                                       "image": SimpleUploadedFile("e.jpg", png(), content_type="image/jpeg")}).json()
+        self.assertIn("?job=", j["url"])
+        m.refresh_from_db()
+        self.assertEqual(m.extracted["name"], "Cropped GmbH")

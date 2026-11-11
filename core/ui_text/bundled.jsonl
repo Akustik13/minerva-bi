@@ -7562,6 +7562,7 @@
 {"uk": "Зберегти UUID", "en": "Save UUID", "de": "UUID speichern"}
 {"uk": "Зберегти вміст посилки", "en": "Save parcel contents", "de": "Paketinhalt speichern"}
 {"uk": "Зберегти до адресної книги", "en": "Save to address book", "de": "Im Adressbuch speichern"}
+{"uk": "Зберегти зміни", "en": "Save changes", "de": "Änderungen speichern"}
 {"uk": "Зберегти зміни доступу?", "en": "Save access changes?", "de": "Zugriffsänderungen speichern?"}
 {"uk": "Зберегти зміни і продовжити", "en": "Save changes and continue", "de": "Änderungen speichern und fortfahren"}
 {"uk": "Зберегти значок", "en": "Save icon", "de": "Symbol speichern"}
@@ -10630,6 +10631,7 @@
 {"uk": "Немає трекінгу: #{0}", "en": "No tracking: #{0}", "de": "Keine Sendungsnummer: #{0}"}
 {"uk": "Немає файлів", "en": "No files", "de": "Keine Dateien"}
 {"uk": "Немає файлів для обробки", "en": "No files to process", "de": "Keine Dateien zur Verarbeitung"}
+{"uk": "Немає фото або воно понад 15 МБ.", "en": "No photo or it is over 15 MB.", "de": "Kein Foto oder es ist über 15 MB."}
 {"uk": "Немає фото товару", "en": "No product photo", "de": "Kein Artikelfoto"}
 {"uk": "Немає фото.", "en": "No photo.", "de": "Kein Foto."}
 {"uk": "Немає цін (цінові тири порожні)", "en": "No prices (price tiers are empty)", "de": "Keine Preise (Preisstufen leer)"}
@@ -11280,6 +11282,8 @@
 {"uk": "Оренда складу [demo]", "en": "Warehouse rent [demo]", "de": "Lagermiete [demo]"}
 {"uk": "Оренда складу — березень 2026 {0}", "en": "Warehouse rent — March 2026 {0}", "de": "Lagermiete — März 2026 {0}"}
 {"uk": "Оренда складу — лютий 2026 {0}", "en": "Warehouse rent — February 2026 {0}", "de": "Lagermiete — Februar 2026 {0}"}
+{"uk": "Оригінал", "en": "Original", "de": "Original"}
+{"uk": "Оригінал зворотного боку", "en": "Original of the back side", "de": "Original der Rückseite"}
 {"uk": "Оригінальна назва папки на IMAP-сервері (напр. \"Meine Order\")", "en": "Original folder name on the IMAP server (e.g. \"Meine Order\")", "de": "Ursprünglicher Ordnername auf dem IMAP-Server (z. B. \"Meine Order\")"}
 {"uk": "Оригінальний лист", "en": "Original email", "de": "Original-E-Mail"}
 {"uk": "Оригінальний лист --- Від: {0} {1}", "en": "Original email --- From: {0} {1}", "de": "Originalnachricht --- Von: {0} {1}"}
@@ -12087,12 +12091,14 @@
 {"uk": "Поверни ТІЛЬКИ JSON-масив: [{0}].", "en": "Return ONLY a JSON array: [{0}].", "de": "Gib NUR ein JSON-Array zurück: [{0}]."}
 {"uk": "Поверни ТІЛЬКИ виправлений текст, без коментарів і пояснень.", "en": "Return ONLY the corrected text, without comments or explanations.", "de": "Geben Sie NUR den korrigierten Text zurück, ohne Kommentare und Erklärungen."}
 {"uk": "Повернути", "en": "Restore", "de": "Wiederherstellen"}
+{"uk": "Повернути / обрізати", "en": "Rotate / crop", "de": "Drehen / zuschneiden"}
 {"uk": "Повернути в роботу", "en": "Back to work", "de": "Zurück in Arbeit"}
 {"uk": "Повернути ліворуч", "en": "Rotate left", "de": "Nach links drehen"}
 {"uk": "Повернути можна лише пункт «Не те»", "en": "Only a “Not relevant” item can be restored", "de": "Nur ein Punkt „Nicht relevant“ kann wiederhergestellt werden"}
 {"uk": "Повернути праворуч", "en": "Rotate right", "de": "Nach rechts drehen"}
 {"uk": "Повернути сторінку в меню", "en": "Return the page to the menu", "de": "Seite wieder ins Menü aufnehmen"}
 {"uk": "Повернути фото, як було", "en": "Restore the original photo", "de": "Ursprüngliches Foto wiederherstellen"}
+{"uk": "Повернути фото, як його зняли спочатку? Правки зникнуть.", "en": "Restore the photo as it was originally taken? The edits will be lost.", "de": "Foto wie ursprünglich aufgenommen wiederherstellen? Die Änderungen gehen verloren."}
 {"uk": "Повернути ціни позначених товарів, як були при відкритті", "en": "Revert the prices of the marked products to how they were when opened", "de": "Preise der markierten Artikel auf den Stand beim Öffnen zurücksetzen"}
 {"uk": "Повернути № {0} з «{1}» у «{2}»? {3}", "en": "Move № {0} back from “{1}” to “{2}”? {3}", "de": "Nr. {0} von „{1}“ zurück nach „{2}“ versetzen? {3}"}
 {"uk": "Повернути № {0} у роботу («{1}»)? Товар знову забронюється або спишеться. {2}", "en": "Put № {0} back into work (“{1}”)? The product will be reserved or deducted again. {2}", "de": "Nr. {0} wieder in Bearbeitung setzen („{1}“)? Der Artikel wird erneut reserviert oder abgebucht. {2}"}
@@ -12101,6 +12107,7 @@
 {"uk": "Повернутись до відправлення", "en": "Back to shipment", "de": "Zurück zur Sendung"}
 {"uk": "Повернутись до старого вигляду можна будь-коли — тут або в меню «🎨» унизу бокового меню. На телефоні вигляд свій, від цього не залежить.", "en": "You can return to the old look at any time — here or in the “🎨” menu at the bottom of the side menu. The phone has its own look, which is not affected by this.", "de": "Sie können jederzeit zur alten Ansicht zurückkehren — hier oder im Menü „🎨“ unten im Seitenmenü. Auf dem Smartphone gibt es eine eigene Ansicht, die davon unabhängig ist."}
 {"uk": "Повернутися до головної", "en": "Back to home", "de": "Zurück zur Startseite"}
+{"uk": "Повернуто оригінал фото", "en": "The original photo was restored", "de": "Originalfoto wiederhergestellt"}
 {"uk": "Повернуто стандартний шаблон.", "en": "Standard template restored.", "de": "Standardvorlage wiederhergestellt."}
 {"uk": "Повернуто як було", "en": "Restored to the previous state", "de": "Auf den vorherigen Stand zurückgesetzt"}
 {"uk": "Поверніться сюди й натисніть «🔄 Повторити».", "en": "Return here and click “🔄 Retry”.", "de": "Kehren Sie hierher zurück und klicken Sie auf „🔄 Wiederholen“."}
@@ -13382,6 +13389,7 @@
 {"uk": "Прочитано з askDANTE", "en": "Read from askDANTE", "de": "Aus askDANTE gelesen"}
 {"uk": "Прочитано листів: {0} · нових пропозицій: {1}", "en": "Emails read: {0} · new suggestions: {1}", "de": "E-Mails gelesen: {0} · neue Vorschläge: {1}"}
 {"uk": "Прочитані AI листи", "en": "Emails read by AI", "de": "Von der KI gelesene E-Mails"}
+{"uk": "Прочитати AI заново", "en": "Read with AI again", "de": "Erneut mit KI lesen"}
 {"uk": "Прочитати QR з фото", "en": "Read QR from photo", "de": "QR vom Foto lesen"}
 {"uk": "Прочитати з DigiKey і перевірити", "en": "Read from DigiKey and check", "de": "Von DigiKey lesen und prüfen"}
 {"uk": "Прочитати лист і гілку своєї скриньки", "en": "Read an e-mail and thread of your own mailbox", "de": "E-Mail und Verlauf des eigenen Postfachs lesen"}
@@ -16214,6 +16222,7 @@
 {"uk": "Фото з камери", "en": "Photo from camera", "de": "Foto mit Kamera"}
 {"uk": "Фото з картки лістингу Minerva — на DigiKey його ще не бачили", "en": "Photo from the Minerva listing card — DigiKey has not seen it yet", "de": "Foto aus der Minerva-Listing-Karte — DigiKey hat es noch nicht gesehen"}
 {"uk": "Фото завелике для AI (до 4,5 МБ) — сфотографуйте ближче або зменшіть.", "en": "Photo too large for AI (up to 4.5 MB) — take it closer or reduce it.", "de": "Foto zu groß für die KI (bis 4,5 MB) — näher fotografieren oder verkleinern."}
+{"uk": "Фото збережено", "en": "Photo saved", "de": "Foto gespeichert"}
 {"uk": "Фото збережеться в картці", "en": "The photo will be saved in the card of", "de": "Das Foto wird gespeichert in der Karte von"}
 {"uk": "Фото й даташит", "en": "Photo and datasheet", "de": "Foto und Datenblatt"}
 {"uk": "Фото й даташит за правилом", "en": "Photo and datasheet by rule", "de": "Foto und Datenblatt nach Regel"}
@@ -16232,6 +16241,7 @@
 {"uk": "Фото товару", "en": "Product photo", "de": "Artikelfoto"}
 {"uk": "Фото товарів у Telegram", "en": "Product photos in Telegram", "de": "Artikelfotos in Telegram"}
 {"uk": "Фото — мініатюра з посиланням, даташит — «📄 відкрити»; під ними адреса (media.html). Лише http(s).", "en": "Photo — a thumbnail with a link, datasheet — “📄 open”; the address is below them (media.html). http(s) only.", "de": "Foto — Vorschaubild mit Link, Datenblatt — „📄 öffnen“; darunter die Adresse (media.html). Nur http(s)."}
+{"uk": "Фото, як його зняли спочатку", "en": "The photo as it was originally taken", "de": "Das Foto wie ursprünglich aufgenommen"}
 {"uk": "Фото, яке DigiKey показував, коли Minerva востаннє читала товар", "en": "The photo DigiKey showed when Minerva last read the product", "de": "Das Foto, das DigiKey anzeigte, als Minerva den Artikel zuletzt gelesen hat"}
 {"uk": "Фото, яке показує DigiKey (їхня копія)", "en": "The photo DigiKey shows (its own copy)", "de": "Das Foto, das DigiKey anzeigt (dessen eigene Kopie)"}
 {"uk": "Фото: спільний файл", "en": "Photo: shared file", "de": "Foto: gemeinsame Datei"}
@@ -16339,6 +16349,7 @@
 {"uk": "Це короткий технічний код, який система зберігає всередині кожного замовлення замість повної назви. Правила: • тільки латинські літери та цифри • замість пробілу — підкреслення _ • Приклади: digikey, nova_post, webshop Структуру бази даних НЕ змінює — це просто текстове значення, яке зберігається в замовленнях. ❗ Якщо після збереження джерела ви вирішите змінити цей код — замовлення що вже мають старий код перестануть відображатися під цим джерелом. Назву і колір змінювати можна вільно.", "en": "This is a short technical code that the system stores inside every order instead of the full name. Rules: • Latin letters and digits only • use an underscore _ instead of a space • Examples: digikey, nova_post, webshop It does NOT change the database structure — it is just a text value stored in orders. ❗ If after saving the source you decide to change this code, orders that already have the old code will stop being shown under this source. The name and color can be changed freely.", "de": "Das ist ein kurzer technischer Code, den das System in jedem Auftrag anstelle des vollständigen Namens speichert. Regeln: • nur lateinische Buchstaben und Ziffern • statt eines Leerzeichens ein Unterstrich _ • Beispiele: digikey, nova_post, webshop Die Datenbankstruktur wird dadurch NICHT geändert – es ist lediglich ein Textwert, der in den Aufträgen gespeichert wird. ❗ Wenn Sie nach dem Speichern der Quelle beschließen, diesen Code zu ändern, werden Aufträge, die bereits den alten Code haben, nicht mehr unter dieser Quelle angezeigt. Name und Farbe können frei geändert werden."}
 {"uk": "Це короткий технічний код, який система зберігає всередині кожного товару замість повної назви. Правила: • тільки латинські літери та цифри • замість пробілу — підкреслення _ • Приклади: antenna, cable, rf_filter Структуру бази даних НЕ змінює — це просто текстове значення, яке зберігається в товарах. ❗ Якщо після збереження категорії ви вирішите змінити цей код — товари що вже мають старий код перестануть відображатися в цій категорії. Назву і колір змінювати можна вільно.", "en": "This is a short technical code that the system stores inside each product instead of the full name. Rules: • Latin letters and digits only • use an underscore _ instead of a space • Examples: antenna, cable, rf_filter This does NOT change the database structure — it is simply a text value stored in products. ❗ If, after saving the category, you decide to change this code — products that already have the old code will no longer be shown in this category. The name and color can be changed freely.", "de": "Dies ist ein kurzer technischer Code, den das System in jedem Artikel anstelle des vollständigen Namens speichert. Regeln: • nur lateinische Buchstaben und Ziffern • statt eines Leerzeichens ein Unterstrich _ • Beispiele: antenna, cable, rf_filter Dies ändert die Datenbankstruktur NICHT — es ist lediglich ein Textwert, der in den Artikeln gespeichert wird. ❗ Wenn Sie diesen Code nach dem Speichern der Kategorie ändern, werden Artikel, die noch den alten Code haben, nicht mehr in dieser Kategorie angezeigt. Name und Farbe können frei geändert werden."}
 {"uk": "Це може зробити агент Minerva", "en": "The Minerva agent can do this", "de": "Das kann der Minerva-Agent erledigen"}
+{"uk": "Це не зображення.", "en": "This is not an image.", "de": "Das ist kein Bild."}
 {"uk": "Це не посилання", "en": "This is not a link", "de": "Das ist kein Link"}
 {"uk": "Це не посилання iCal. У Google: налаштування календаря → «Інтеграція календаря» → «Секретна адреса у форматі iCal» (закінчується на basic.ics).", "en": "This is not an iCal link. In Google: calendar settings → “Integrate calendar” → “Secret address in iCal format” (ends with basic.ics).", "de": "Das ist kein iCal-Link. In Google: Kalendereinstellungen → „Kalender integrieren“ → „Geheime Adresse im iCal-Format“ (endet auf basic.ics)."}
 {"uk": "Це незворотна операція.", "en": "This operation cannot be undone.", "de": "Dieser Vorgang kann nicht rückgängig gemacht werden."}
@@ -16396,6 +16407,7 @@
 {"uk": "Цитата з листа", "en": "Quote from the e-mail", "de": "Zitat aus der E-Mail"}
 {"uk": "Цитата з листа або примітка (за бажанням)", "en": "Quote from the email or a note (optional)", "de": "Zitat aus der E-Mail oder Notiz (optional)"}
 {"uk": "Цих листів немає у ваших скриньках.", "en": "These e-mails are not in your mailboxes.", "de": "Diese E-Mails sind nicht in Ihren Postfächern."}
+{"uk": "Цього боку ще немає.", "en": "This side does not exist yet.", "de": "Diese Seite gibt es noch nicht."}
 {"uk": "Цього місяця", "en": "This month", "de": "Diesen Monat"}
 {"uk": "Цього місяця {0}", "en": "This month {0}", "de": "Diesen Monat {0}"}
 {"uk": "Цього тижня", "en": "This week", "de": "Diese Woche"}
@@ -16853,6 +16865,7 @@
 {"uk": "Шукати всюди (Ctrl K)", "en": "Search everywhere (Ctrl K)", "de": "Überall suchen (Ctrl K)"}
 {"uk": "Шукати всюди: розділ, замовлення, товар, клієнт, лист", "en": "Search everywhere: section, order, product, customer, e-mail", "de": "Überall suchen: Bereich, Auftrag, Artikel, Kunde, E-Mail"}
 {"uk": "Шукати запрошення в листах від", "en": "Search for invitations in e-mails from", "de": "Einladungen in E-Mails suchen ab"}
+{"uk": "Шукаю QR і зберігаю…", "en": "Looking for QR and saving…", "de": "Suche QR und speichere…"}
 {"uk": "Шукаю QR-код…", "en": "Looking for a QR code…", "de": "Suche QR-Code…"}
 {"uk": "Шукаю в гіді по Minerva…", "en": "Searching the Minerva guide…", "de": "Suche im Minerva-Leitfaden…"}
 {"uk": "Шукаю ключові моменти — з’являться тут самі, зазвичай за 5–20 хв.", "en": "Looking for key points — they will appear here by themselves, usually within 5–20 min.", "de": "Suche nach Kernpunkten — sie erscheinen hier von selbst, meist innerhalb von 5–20 Min."}
@@ -16909,6 +16922,7 @@
 {"uk": "Ще очікуються", "en": "Still expected", "de": "Noch erwartet"}
 {"uk": "Ще параметри, як у наших схожих лістингах ({0}) — за бажанням", "en": "More parameters, as in our similar listings ({0}) — optional", "de": "Weitere Parameter wie in unseren ähnlichen Listings ({0}) — optional"}
 {"uk": "Ще поля", "en": "More fields", "de": "Weitere Felder"}
+{"uk": "Ще помічено", "en": "Also noticed", "de": "Außerdem bemerkt"}
 {"uk": "Ще раз", "en": "Again", "de": "Erneut"}
 {"uk": "Ще рано ({0} хв тому, інтервал {1} хв). Наступна через ~{2} хв.", "en": "Too early ({0} min ago, interval {1} min). Next in ~{2} min.", "de": "Noch zu früh (vor {0} Min., Intervall {1} Min.). Nächste in ca. {2} Min."}
 {"uk": "Ще рано (остання синхронізація {0} год тому, інтервал {1} год). Наступна приблизно через {2} год.", "en": "Too early (last sync {0} h ago, interval {1} h). Next in about {2} h.", "de": "Noch zu früh (letzte Synchronisierung vor {0} Std., Intervall {1} Std.). Nächste in etwa {2} Std."}
@@ -20426,6 +20440,7 @@
 {"uk": "службовий звіт сайту", "en": "internal website report", "de": "interner Bericht der Website"}
 {"uk": "службові коди DigiKey (camelCase) змінювати не можна — назвіть параметр по-людськи, як у даташиті («Operating Temperature»)", "en": "DigiKey internal codes (camelCase) cannot be changed — name the parameter in plain words, as in the datasheet (“Operating Temperature”)", "de": "interne DigiKey-Codes (camelCase) dürfen nicht geändert werden – benennen Sie den Parameter in Klartext wie im Datenblatt („Operating Temperature“)"}
 {"uk": "см (сантиметр)", "en": "cm (centimeter)", "de": "cm (Zentimeter)"}
+{"uk": "соцмережа", "en": "social network", "de": "soziales Netzwerk"}
 {"uk": "спам / чернетка не індексуються", "en": "spam / drafts are not indexed", "de": "Spam / Entwürfe werden nicht indexiert"}
 {"uk": "спам і чернетки", "en": "spam and drafts", "de": "Spam und Entwürfe"}
 {"uk": "спершу коротка відповідь (1–3 речення)", "en": "first a short answer (1–3 sentences)", "de": "zuerst eine kurze Antwort (1–3 Sätze)"}

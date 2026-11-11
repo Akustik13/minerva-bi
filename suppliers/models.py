@@ -92,6 +92,9 @@ class SupplierMedia(models.Model):
     kind = models.CharField("Що це", max_length=8, choices=KINDS, default=CARD)
     image = models.FileField("Фото", upload_to=_media_path)
     image_back = models.FileField("Зворотний бік", upload_to=_media_path, blank=True, default="")
+    # перша версія знімка до «✏️ Редагувати фото» (повернути / обрізати) — «↺ Оригінал» повертає її
+    image_original = models.FileField("Оригінал", upload_to=_media_path, blank=True, default="")
+    image_back_original = models.FileField("Оригінал зворотного боку", upload_to=_media_path, blank=True, default="")
     title = models.CharField("Назва", max_length=200, blank=True, default="")
     event = models.CharField("Де взяли", max_length=200, blank=True, default="",
                              help_text="Виставка, зустріч… напр. «electronica 2026, хол B3»")
