@@ -1,58 +1,101 @@
-{# 🔳 Читання QR-коду з фото в браузері (jsQR 1.4.0 з jsdelivr, лише коли потрібно) — suppliers/services/qr.py розбирає текст #}
+{# 🔳 Читання QR-кодів з фото й камери в браузері — suppliers/services/qr.py розбирає текст.
+   1) BarcodeDetector браузера (Chrome на Android, macOS); 2) ZXing (barcode-detector 3.2.3 → zxing-wasm з jsdelivr):
+   кілька кодів поруч, повернуті, дрібні на великому фото; 3) запасний jsQR 1.4.0 (немає WebAssembly / CDN):
+   усе фото + фрагменти 3×3, бо jsQR губиться, коли кодів кілька. Кілька кодів (vCard + WeChat) — разом через SEP
+   (як qr.SEPARATOR). #}
 <script>
 window.spQR = window.spQR || (function(){
-  var SRC = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js', lib = null;
-  function load(){
+  var ZXING = 'https://cdn.jsdelivr.net/npm/barcode-detector@3.2.3/dist/es/ponyfill.js/+esm';
+  var JSQR = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+  var SEP = '\n\n----\n\n', nativeDet, zxDet, jsLib = null;
+  function uniq(list){ var out = []; (list || []).forEach(function(t){ if (t && out.indexOf(t) < 0) out.push(t); }); return out; }
+  function native(){
+    if (nativeDet === undefined) {
+      nativeDet = !('BarcodeDetector' in window) ? Promise.resolve(null) :
+        window.BarcodeDetector.getSupportedFormats().then(function(f){
+          return f.indexOf('qr_code') >= 0 ? new window.BarcodeDetector({formats: ['qr_code']}) : null;
+        }).catch(function(){ return null; });
+    }
+    return nativeDet;
+  }
+  function zxing(){
+    if (!zxDet) zxDet = import(ZXING).then(function(m){ return new m.BarcodeDetector({formats: ['qr_code']}); })
+      .catch(function(){ zxDet = null; return null; });
+    return zxDet;
+  }
+  function detect(det, source){
+    return det ? det.detect(source).then(function(codes){ return uniq(codes.map(function(c){ return c.rawValue; })); })
+                                   .catch(function(){ return []; }) : Promise.resolve(null);
+  }
+  function loadJs(){
     if (window.jsQR) return Promise.resolve(window.jsQR);
-    if (!lib) lib = new Promise(function(ok, bad){
-      var s = document.createElement('script'); s.src = SRC; s.async = true;
+    if (!jsLib) jsLib = new Promise(function(ok, bad){
+      var s = document.createElement('script'); s.src = JSQR; s.async = true;
       s.onload = function(){ window.jsQR ? ok(window.jsQR) : bad(new Error('jsQR')); };
-      s.onerror = function(){ lib = null; bad(new Error('jsQR')); };
+      s.onerror = function(){ jsLib = null; bad(new Error('jsQR')); };
       document.head.appendChild(s);
     });
-    return lib;
+    return jsLib;
   }
-  // Кілька розмірів: QR на візитці маленький — на 1600 px зазвичай читається, інакше пробуємо більше й менше.
-  function decode(source, w, h){
-    var tried = {}, sizes = [1600, 2400, 1000, 700];
-    for (var i = 0; i < sizes.length; i++) {
-      var k = Math.min(1, sizes[i] / Math.max(w, h)), cw = Math.round(w * k), ch = Math.round(h * k);
-      if (tried[cw]) continue; tried[cw] = 1;
-      var c = document.createElement('canvas'); c.width = cw; c.height = ch;
-      var ctx = c.getContext('2d', {willReadFrequently: true}); ctx.drawImage(source, 0, 0, cw, ch);
-      var d = ctx.getImageData(0, 0, cw, ch), r = window.jsQR(d.data, cw, ch, {inversionAttempts: 'attemptBoth'});
-      if (r && r.data) return r.data;
-    }
-    return '';
+  function canvasOf(source, sx, sy, sw, sh, k){
+    var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(sw * k)); c.height = Math.max(1, Math.round(sh * k));
+    c.getContext('2d', {willReadFrequently: true}).drawImage(source, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    return c;
   }
-  function fromImage(img){
-    return load().then(function(){
-      var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
-      return w && h ? decode(img, w, h) : '';
+  function jsqr(c){
+    var d = c.getContext('2d', {willReadFrequently: true}).getImageData(0, 0, c.width, c.height);
+    var r = window.jsQR(d.data, c.width, c.height, {inversionAttempts: 'attemptBoth'});
+    return r && r.data ? r.data : '';
+  }
+  function decodeJs(source, w, h, deep){
+    var found = [], tried = {};
+    [1600, 2400].forEach(function(size){
+      var k = Math.min(1, size / Math.max(w, h)), key = Math.round(w * k);
+      if (!tried[key]) { tried[key] = 1; found.push(jsqr(canvasOf(source, 0, 0, w, h, k))); }
     });
+    if (deep) for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) {
+      var tw = w / 2, th = h / 2;
+      found.push(jsqr(canvasOf(source, i * w / 4, j * h / 4, tw, th, Math.min(1, 2000 / Math.max(tw, th)))));
+    }
+    return uniq(found);
   }
-  function fromFile(file){
-    if (!file) return Promise.resolve('');
-    return load().then(function(){
-      return new Promise(function(ok){
-        var img = new Image(), url = URL.createObjectURL(file);
-        img.onload = function(){ try { ok(decode(img, img.naturalWidth, img.naturalHeight)); } catch (e) { ok(''); }
-                                 URL.revokeObjectURL(url); };
-        img.onerror = function(){ URL.revokeObjectURL(url); ok(''); };
-        img.src = url;
+  // → Promise<[тексти]>; deep — для фото (запасний jsQR ще й фрагментами), для кадрів камери — ні.
+  function scan(source, w, h, deep){
+    return native().then(function(det){ return detect(det, source); }).then(function(list){
+      if (list && list.length) return list;
+      return zxing().then(function(det){ return detect(det, source); }).then(function(zx){
+        if (zx !== null) return zx;                       // ZXing працює — його відповідь остаточна
+        return loadJs().then(function(){ return decodeJs(source, w, h, deep !== false); });
       });
     });
   }
-  // Коротко для людини: «vCard — Anna Li, Muster GmbH» / посилання.
-  function summary(text){
-    var t = String(text || ''), m;
+  function joined(list){ return (list || []).join(SEP); }
+  function fromImage(img){
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+    return w && h ? scan(img, w, h).then(joined) : Promise.resolve('');
+  }
+  function fromCanvas(c, deep){ return scan(c, c.width, c.height, deep).then(joined); }
+  function fromFile(file){
+    if (!file) return Promise.resolve('');
+    return new Promise(function(ok, bad){
+      var img = new Image(), url = URL.createObjectURL(file);
+      img.onload = function(){ fromImage(img).then(ok, bad).finally(function(){ URL.revokeObjectURL(url); }); };
+      img.onerror = function(){ URL.revokeObjectURL(url); ok(''); };
+      img.src = url;
+    });
+  }
+  function warm(){ native(); zxing(); }                 // завантажити заздалегідь, щоб перше фото не чекало
+  function one(t){
+    var m;
     if (/^BEGIN:VCARD/i.test(t)) {
       var fn = (t.match(/^FN[^:\n]*:(.*)$/mi) || [])[1] || '', org = (t.match(/^ORG[^:\n]*:([^;\n]*)/mi) || [])[1] || '';
       return 'vCard' + ((fn || org) ? ' — ' + [fn, org].filter(Boolean).join(', ') : '');
     }
     if (/^MECARD:/i.test(t)) { m = t.match(/N:([^;]*)/i); return 'MeCard' + (m ? ' — ' + m[1].replace(',', ' ') : ''); }
-    return t.length > 90 ? t.slice(0, 90) + '…' : t;
+    return t.length > 70 ? t.slice(0, 70) + '…' : t;
   }
-  return {load: load, fromFile: fromFile, fromImage: fromImage, summary: summary};
+  function summary(text){ return String(text || '').split(SEP).filter(Boolean).map(one).join(' · '); }
+  return {scan: scan, fromFile: fromFile, fromImage: fromImage, fromCanvas: fromCanvas, summary: summary, warm: warm,
+          SEP: SEP};
 })();
 </script>

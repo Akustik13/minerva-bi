@@ -817,6 +817,7 @@
 {"uk": "AI не відповів — перевірте ключ Anthropic у налаштуваннях AI", "en": "The AI did not reply — check the Anthropic key in the AI settings", "de": "Die KI hat nicht geantwortet — prüfen Sie den Anthropic-Schlüssel in den KI-Einstellungen"}
 {"uk": "AI не відповів: {0}", "en": "AI did not respond: {0}", "de": "KI hat nicht geantwortet: {0}"}
 {"uk": "AI не дав описів (немає ключа Anthropic або листи без тексту) — лишається опис за темами листів.", "en": "The AI returned no descriptions (no Anthropic key or e-mails without text) — the description based on e-mail subjects remains.", "de": "Die KI hat keine Beschreibungen geliefert (kein Anthropic-Schlüssel oder E-Mails ohne Text) – es bleibt die Beschreibung anhand der E-Mail-Betreffs."}
+{"uk": "AI не запускали", "en": "AI was not run", "de": "KI wurde nicht gestartet"}
 {"uk": "AI не зміг згенерувати лист", "en": "AI could not generate the email", "de": "Die KI konnte die E-Mail nicht erstellen"}
 {"uk": "AI не зміг перевірити граматику", "en": "AI could not check the grammar", "de": "Die KI konnte die Grammatik nicht prüfen"}
 {"uk": "AI не знайшов нових ризиків — запропоновані вже є в реєстрі або відхилені раніше", "en": "AI found no new risks — the suggested ones are already in the register or were rejected before", "de": "Die KI hat keine neuen Risiken gefunden — die vorgeschlagenen stehen schon im Register oder wurden abgelehnt"}
@@ -863,6 +864,7 @@
 {"uk": "AI читає листи проєкту з {0}", "en": "The AI reads project e-mails from {0}", "de": "Die KI liest Projekt-E-Mails ab {0}"}
 {"uk": "AI читає листи…", "en": "AI is reading the emails…", "de": "Die KI liest die E-Mails…"}
 {"uk": "AI читає листи… до 2 хвилин", "en": "The AI is reading the e-mails… up to 2 minutes", "de": "Die KI liest die E-Mails… bis zu 2 Minuten"}
+{"uk": "AI читає у фоні; перевірити — «🪪 Усі візитки → ще не внесені»", "en": "AI reads in the background; check — «🪪 All business cards → not entered yet»", "de": "Die KI liest im Hintergrund; prüfen — «🪪 Alle Visitenkarten → noch nicht eingetragen»"}
 {"uk": "AI читає фото…", "en": "AI is reading the photo…", "de": "KI liest das Foto…"}
 {"uk": "AI ще не запускали. «🌐 Знайти в інтернеті» — хто вони, що роблять, сертифікати й ризики з джерелами; «🧠 Оцінка» — з вашого листування й закупівель.", "en": "AI has not been run yet. «🌐 Find on the internet» — who they are, what they do, certificates and risks with sources; «🧠 Assessment» — from your correspondence and purchases.", "de": "KI wurde noch nicht gestartet. «🌐 Im Internet finden» — wer sie sind, was sie machen, Zertifikate und Risiken mit Quellen; «🧠 Bewertung» — aus Ihrer Korrespondenz und Einkäufen."}
 {"uk": "AI є й на місці роботи: у 📥 Пошті — AI-відповідь і «📋 Підготувати відповідь», у картках клієнта", "en": "AI is also where you work: in 📥 Mail — an AI reply and “📋 Prepare reply”, in the cards of the customer", "de": "KI ist auch direkt am Arbeitsplatz: in 📥 E-Mail — KI-Antwort und „📋 Antwort vorbereiten“, in den Karten von Kunde"}
@@ -1806,9 +1808,13 @@
 {"uk": "Push у браузері", "en": "Browser push", "de": "Browser-Push"}
 {"uk": "Push у браузері (спливаючі повідомлення в системі)", "en": "Browser push (pop-up notifications in the system)", "de": "Browser-Push (Popup-Benachrichtigungen im System)"}
 {"uk": "QR не перевірено (немає зв'язку з бібліотекою) — AI прочитає текст з фото.", "en": "QR not checked (no connection to the library) — AI will read the text from the photo.", "de": "QR nicht geprüft (keine Verbindung zur Bibliothek) — die KI liest den Text vom Foto."}
+{"uk": "QR прочитано", "en": "QR read", "de": "QR gelesen"}
 {"uk": "QR прочитано, але це не візитка (vCard / MeCard / посилання) — текст збережено біля фото.", "en": "QR read, but it is not a business card (vCard / MeCard / link) — the text is saved with the photo.", "de": "QR gelesen, aber keine Visitenkarte (vCard / MeCard / Link) — der Text ist beim Foto gespeichert."}
+{"uk": "QR уже прочитано — тепер «⏺ Зробити фото» всієї візитки.", "en": "QR already read — now «⏺ Take photo» of the whole card.", "de": "QR bereits gelesen — jetzt «⏺ Foto aufnehmen» der ganzen Karte."}
 {"uk": "QR-код", "en": "QR code", "de": "QR-Code"}
+{"uk": "QR-код (vCard, сайт) Minerva читає одразу — ці дані точні, AI лише доповнить решту. Не прочитався — «✂️ Обрізати» навколо коду або «🔳 Сканувати лише QR» і піднесіть телефон ближче.", "en": "Minerva reads the QR code (vCard, website) immediately — this data is exact, AI only adds the rest. Not read — «✂️ Crop» around the code or «🔳 Scan QR only» and hold the phone closer.", "de": "Minerva liest den QR-Code (vCard, Website) sofort — diese Daten sind exakt, die KI ergänzt nur den Rest. Nicht gelesen — «✂️ Zuschneiden» um den Code oder «🔳 Nur QR scannen» und das Handy näher halten."}
 {"uk": "QR-коду на фото не знайдено.", "en": "No QR code found in the photo.", "de": "Kein QR-Code auf dem Foto gefunden."}
+{"uk": "QR-коду не знайдено — «✂️ Обрізати» навколо нього або «🔳 Сканувати лише QR».", "en": "No QR code found — «✂️ Crop» around it or «🔳 Scan QR only».", "de": "Kein QR-Code gefunden — «✂️ Zuschneiden» um ihn herum oder «🔳 Nur QR scannen»."}
 {"uk": "QR-коду ще не читали або на фото його немає.", "en": "The QR code has not been read yet or there is none in the photo.", "de": "QR-Code noch nicht gelesen oder keiner auf dem Foto."}
 {"uk": "Qdrant: жодного листа у двох ревізіях", "en": "Qdrant: no e-mail in two revisions", "de": "Qdrant: keine E-Mail in zwei Revisionen"}
 {"uk": "Qdrant: ревізії = чинні в стані RAG", "en": "Qdrant: revisions = current ones in the RAG state", "de": "Qdrant: Revisionen = aktuelle im RAG-Status"}
@@ -4167,6 +4173,7 @@
 {"uk": "Без позначки — лист виглядає як від вас.", "en": "No mark — the email looks like it comes from you.", "de": "Ohne Hinweis — die E-Mail sieht aus, als käme sie von Ihnen."}
 {"uk": "Без позначки — лист як від вас", "en": "No mark — the email as if from you", "de": "Ohne Hinweis — E-Mail wie von Ihnen"}
 {"uk": "Без порівняння", "en": "No comparison", "de": "Ohne Vergleich"}
+{"uk": "Без пресету за замовчуванням", "en": "No default preset", "de": "Keine Standardvorlage"}
 {"uk": "Без прив'язки (поле «Магазин» порожнє), тому працюють з магазином за замовчуванням: {0}", "en": "Not linked (the “Shop” field is empty), so they work with the default shop: {0}", "de": "Ohne Zuordnung (das Feld „Shop“ ist leer), daher arbeiten sie mit dem Standard-Shop: {0}"}
 {"uk": "Без проєкту Minerva", "en": "Without Minerva project", "de": "Ohne Minerva-Projekt"}
 {"uk": "Без підменю", "en": "No submenu", "de": "Ohne Untermenü"}
@@ -4688,12 +4695,14 @@
 {"uk": "Видалити нараду, розшифровку й документи бази знань? Це не можна скасувати. Пункти, уже додані в проєкт, лишаться.", "en": "Delete the meeting, transcript and knowledge base documents? This cannot be undone. Items already added to the project will remain.", "de": "Besprechung, Transkript und Dokumente der Wissensdatenbank löschen? Das kann nicht rückgängig gemacht werden. Bereits ins Projekt übernommene Punkte bleiben erhalten."}
 {"uk": "Видалити нараду?", "en": "Delete meeting?", "de": "Besprechung löschen?"}
 {"uk": "Видалити оффер на DigiKey Marketplace", "en": "Delete offer on DigiKey Marketplace", "de": "Offer auf DigiKey Marketplace löschen"}
+{"uk": "Видалити пресет «", "en": "Delete preset «", "de": "Vorlage löschen «"}
 {"uk": "Видалити ризик", "en": "Delete risk", "de": "Risiko löschen"}
 {"uk": "Видалити ризик «", "en": "Delete risk “", "de": "Risiko löschen: „"}
 {"uk": "Видалити розмову", "en": "Delete conversation", "de": "Unterhaltung löschen"}
 {"uk": "Видалити розмову «", "en": "Delete conversation “", "de": "Unterhaltung löschen: „"}
 {"uk": "Видалити рядок", "en": "Delete row", "de": "Zeile löschen"}
 {"uk": "Видалити рядок?", "en": "Delete row?", "de": "Zeile löschen?"}
+{"uk": "Видалити свій пресет", "en": "Delete your preset", "de": "Eigene Vorlage löschen"}
 {"uk": "Видалити ступені цін", "en": "Delete price breaks", "de": "Staffelpreise löschen"}
 {"uk": "Видалити товар", "en": "Delete product", "de": "Artikel löschen"}
 {"uk": "Видалити фазу", "en": "Delete phase", "de": "Phase löschen"}
@@ -5225,6 +5234,7 @@
 {"uk": "Відкривати на", "en": "Open on", "de": "Öffnen bei"}
 {"uk": "Відкривати панель на", "en": "Open the panel on", "de": "Panel öffnen bei"}
 {"uk": "Відкривати панель на цьому розділі", "en": "Open the panel on this section", "de": "Panel bei diesem Bereich öffnen"}
+{"uk": "Відкривати цю сторінку з цим пресетом", "en": "Open this page with this preset", "de": "Diese Seite mit dieser Vorlage öffnen"}
 {"uk": "Відкриваємо список рахунків: {0}", "en": "Opening invoice list: {0}", "de": "Rechnungsliste wird geöffnet: {0}"}
 {"uk": "Відкриваємо сторінку логіну: {0}", "en": "Opening login page: {0}", "de": "Login-Seite wird geöffnet: {0}"}
 {"uk": "Відкрий", "en": "Open", "de": "Öffnen Sie"}
@@ -6024,6 +6034,7 @@
 {"uk": "Для автоматичних: offer", "en": "For automatic ones: offer", "de": "Für automatische: offer"}
 {"uk": "Для базових цін в іншій валюті: скільки одиниць валюти магазину за 1 одиницю, напр. {\"USD\": 0.86} — 1 USD = 0,86 EUR.", "en": "For base prices in another currency: how many units of the shop currency per 1 unit, e.g. {\"USD\": 0.86} — 1 USD = 0.86 EUR.", "de": "Für Basispreise in einer anderen Währung: wie viele Einheiten der Shop-Währung pro 1 Einheit, z. B. {\"USD\": 0.86} – 1 USD = 0,86 EUR."}
 {"uk": "Для вас AI вимкнено — адміністратор вмикає «AI увімкнено» у вашому профілі.", "en": "AI is turned off for you — an administrator enables “AI enabled” in your profile.", "de": "KI ist für Sie deaktiviert — ein Administrator aktiviert „KI aktiviert“ in Ihrem Profil."}
+{"uk": "Для всіх", "en": "For everyone", "de": "Für alle"}
 {"uk": "Для відповідей, листів клієнту замовлення й пересилань — як галочки в «Написати». Чернетка відкривається з ними вже вибраними; «Надсилати самому» — запланований лист з ними. Немає реакції — лист і Telegram вам: потрібне ручне втручання.", "en": "For replies, emails to the order's customer and forwards — like the checkboxes in «Compose». The draft opens with them already ticked; «Send by itself» — the scheduled email goes with them. No reaction — an email and Telegram to you: manual action needed.", "de": "Für Antworten, E-Mails an den Kunden des Auftrags und Weiterleitungen — wie die Häkchen in «Verfassen». Der Entwurf öffnet sich mit ihnen bereits angehakt; «Selbst senden» — die geplante E-Mail geht mit ihnen. Keine Reaktion — E-Mail und Telegram an Sie: manuelles Eingreifen nötig."}
 {"uk": "Для відповідей, перекладу, історії, граматики й нових листів. Фонове визначення дедлайнів у кожному листі завжди «Автоматично» (дешево).", "en": "For replies, translation, history, grammar and new emails. Background deadline detection in every email is always “Automatic” (cheap).", "de": "Für Antworten, Übersetzung, Verlauf, Grammatik und neue E-Mails. Die Hintergrunderkennung von Fristen in jeder E-Mail ist immer „Automatisch“ (günstig)."}
 {"uk": "Для групи", "en": "For a group", "de": "Für eine Gruppe"}
@@ -7558,6 +7569,8 @@
 {"uk": "Зберегти й знайти", "en": "Save and search", "de": "Speichern und suchen"}
 {"uk": "Зберегти й надіслати", "en": "Save and send", "de": "Speichern und senden"}
 {"uk": "Зберегти й надіслати зараз", "en": "Save and send now", "de": "Speichern und jetzt senden"}
+{"uk": "Зберегти й наступну", "en": "Save and next", "de": "Speichern und nächste"}
+{"uk": "Зберегти й одразу наступна візитка з тим самим пресетом; AI читає у фоні", "en": "Save and go straight to the next card with the same preset; AI reads in the background", "de": "Speichern und gleich die nächste Karte mit derselben Vorlage; die KI liest im Hintergrund"}
 {"uk": "Зберегти й перевірити вже внесені", "en": "Save and check those already added", "de": "Speichern und bereits Eingetragenes prüfen"}
 {"uk": "Зберегти листи на ПК або завантажити листи з файлу.", "en": "Save emails to your PC or upload emails from a file.", "de": "Speichern Sie E-Mails auf Ihrem PC oder laden Sie E-Mails aus einer Datei hoch."}
 {"uk": "Зберегти лог", "en": "Save log", "de": "Protokoll speichern"}
@@ -7566,8 +7579,10 @@
 {"uk": "Зберегти нові ціни (", "en": "Save the new prices (", "de": "Neue Preise speichern ("}
 {"uk": "Зберегти нотатки", "en": "Save notes", "de": "Notizen speichern"}
 {"uk": "Зберегти пароль", "en": "Save password", "de": "Passwort speichern"}
+{"uk": "Зберегти поточні як пресет…", "en": "Save current as preset…", "de": "Aktuelle als Vorlage speichern…"}
 {"uk": "Зберегти права", "en": "Save rights", "de": "Rechte speichern"}
 {"uk": "Зберегти правило", "en": "Save rule", "de": "Regel speichern"}
+{"uk": "Зберегти пресет", "en": "Save preset", "de": "Vorlage speichern"}
 {"uk": "Зберегти примітки", "en": "Save notes", "de": "Notizen speichern"}
 {"uk": "Зберегти профіль", "en": "Save profile", "de": "Profil speichern"}
 {"uk": "Зберегти статус", "en": "Save status", "de": "Status speichern"}
@@ -8128,6 +8143,7 @@
 {"uk": "Камбоджа", "en": "Cambodia", "de": "Kambodscha"}
 {"uk": "Камера знімає на той бік, який вибрано", "en": "The camera captures the side that is selected", "de": "Die Kamera nimmt die gewählte Seite auf"}
 {"uk": "Камера недоступна (", "en": "Camera unavailable (", "de": "Kamera nicht verfügbar ("}
+{"uk": "Камера шукає лише QR-код і сама зробить фото, щойно його прочитає", "en": "The camera looks only for the QR code and takes the photo itself as soon as it reads it", "de": "Die Kamera sucht nur den QR-Code und nimmt das Foto selbst auf, sobald sie ihn liest"}
 {"uk": "Камерун", "en": "Cameroon", "de": "Kamerun"}
 {"uk": "Канада", "en": "Canada", "de": "Kanada"}
 {"uk": "Канал", "en": "Channel", "de": "Kanal"}
@@ -8203,6 +8219,7 @@
 {"uk": "Категорія товарів", "en": "Product category", "de": "Artikelkategorie"}
 {"uk": "Категорії", "en": "Categories", "de": "Kategorien"}
 {"uk": "Категорії витрат", "en": "Expense categories", "de": "Ausgabenkategorien"}
+{"uk": "Категорії для нового постачальника", "en": "Categories for the new supplier", "de": "Kategorien für den neuen Lieferanten"}
 {"uk": "Категорії календаря", "en": "Calendar categories", "de": "Kalenderkategorien"}
 {"uk": "Категорії контактів", "en": "Contact categories", "de": "Kontaktkategorien"}
 {"uk": "Категорії листів", "en": "E-mail categories", "de": "E-Mail-Kategorien"}
@@ -9656,6 +9673,8 @@
 {"uk": "Наведіть на візитку й натисніть «⏺ Зробити фото».", "en": "Point at the business card and press «⏺ Take photo».", "de": "Auf die Visitenkarte richten und «⏺ Foto aufnehmen» drücken."}
 {"uk": "Наведіть на позначку — подробиці, клік — відкрити; клік на точку листа — меню з 📌.", "en": "Hover a mark for details, click to open; click an email dot for a menu with 📌.", "de": "Zeigen Sie auf eine Markierung für Details, Klick öffnet; Klick auf einen E-Mail-Punkt öffnet ein Menü mit 📌."}
 {"uk": "Наведіть на смугу — дати кроку.", "en": "Hover over a bar — the step dates.", "de": "Mit der Maus auf einen Balken zeigen — Daten des Schritts."}
+{"uk": "Наведіть рамку на QR-код — фото зробиться само, щойно Minerva його прочитає.", "en": "Point the frame at the QR code — the photo is taken by itself as soon as Minerva reads it.", "de": "Rahmen auf den QR-Code richten — das Foto wird automatisch aufgenommen, sobald Minerva ihn liest."}
+{"uk": "Наведіть рамку на візитку й натисніть «⏺ Зробити фото». QR-код Minerva шукає вже зараз.", "en": "Point the frame at the business card and press «⏺ Take photo». Minerva is already looking for the QR code.", "de": "Rahmen auf die Visitenkarte richten und «⏺ Foto aufnehmen» drücken. Minerva sucht den QR-Code schon jetzt."}
 {"uk": "Навіть без номера замовлення в листі. Не вмикайте для джерела, через яке замовляє майже кожен.", "en": "Even without an order number in the email. Do not enable it for a source that almost everyone orders through.", "de": "Auch ohne Auftragsnummer in der E-Mail. Aktivieren Sie das nicht für eine Quelle, über die fast jeder bestellt."}
 {"uk": "Нагадали про коробки: {0}", "en": "Reminded about boxes: {0}", "de": "An Kartons erinnert: {0}"}
 {"uk": "Нагадати", "en": "Remind", "de": "Erinnern"}
@@ -9864,6 +9883,7 @@
 {"uk": "Назва помічника", "en": "Assistant name", "de": "Name des Assistenten"}
 {"uk": "Назва постачальника…", "en": "Supplier name…", "de": "Name des Lieferanten…"}
 {"uk": "Назва правила", "en": "Rule name", "de": "Regelname"}
+{"uk": "Назва пресету порожня.", "en": "The preset name is empty.", "de": "Der Vorlagenname ist leer."}
 {"uk": "Назва профілю", "en": "Profile name", "de": "Profilname"}
 {"uk": "Назва профілю…", "en": "Profile name…", "de": "Profilname…"}
 {"uk": "Назва проєкту askDANTE — не довше {0} символів (зараз {1}): «{2}». Скоротіть.", "en": "The askDANTE project name must not be longer than {0} characters (currently {1}): “{2}”. Please shorten it.", "de": "Der Name des askDANTE-Projekts darf höchstens {0} Zeichen lang sein (aktuell {1}): „{2}“. Bitte kürzen Sie ihn."}
@@ -11000,6 +11020,8 @@
 {"uk": "Обробляю запит…", "en": "Processing the request…", "de": "Anfrage wird verarbeitet…"}
 {"uk": "Обробляє Excel файли", "en": "Processes Excel files", "de": "Verarbeitet Excel-Dateien"}
 {"uk": "Обробляється (SEPA тощо)", "en": "Processing (SEPA etc.)", "de": "In Bearbeitung (SEPA usw.)"}
+{"uk": "Обрізати", "en": "Crop", "de": "Zuschneiden"}
+{"uk": "Обрізати виділене", "en": "Crop selection", "de": "Auswahl zuschneiden"}
 {"uk": "Обіцянка", "en": "Promise", "de": "Zusage"}
 {"uk": "Обіцянки", "en": "Promises", "de": "Zusagen"}
 {"uk": "Обіцяно відкритим замовленням і ще не списано (резерви й незаписані замовлення)", "en": "Promised to open orders and not yet written off (reservations and unrecorded orders)", "de": "Offenen Aufträgen zugesagt und noch nicht ausgebucht (Reservierungen und nicht erfasste Aufträge)"}
@@ -12066,8 +12088,11 @@
 {"uk": "Поверни ТІЛЬКИ виправлений текст, без коментарів і пояснень.", "en": "Return ONLY the corrected text, without comments or explanations.", "de": "Geben Sie NUR den korrigierten Text zurück, ohne Kommentare und Erklärungen."}
 {"uk": "Повернути", "en": "Restore", "de": "Wiederherstellen"}
 {"uk": "Повернути в роботу", "en": "Back to work", "de": "Zurück in Arbeit"}
+{"uk": "Повернути ліворуч", "en": "Rotate left", "de": "Nach links drehen"}
 {"uk": "Повернути можна лише пункт «Не те»", "en": "Only a “Not relevant” item can be restored", "de": "Nur ein Punkt „Nicht relevant“ kann wiederhergestellt werden"}
+{"uk": "Повернути праворуч", "en": "Rotate right", "de": "Nach rechts drehen"}
 {"uk": "Повернути сторінку в меню", "en": "Return the page to the menu", "de": "Seite wieder ins Menü aufnehmen"}
+{"uk": "Повернути фото, як було", "en": "Restore the original photo", "de": "Ursprüngliches Foto wiederherstellen"}
 {"uk": "Повернути ціни позначених товарів, як були при відкритті", "en": "Revert the prices of the marked products to how they were when opened", "de": "Preise der markierten Artikel auf den Stand beim Öffnen zurücksetzen"}
 {"uk": "Повернути № {0} з «{1}» у «{2}»? {3}", "en": "Move № {0} back from “{1}” to “{2}”? {3}", "de": "Nr. {0} von „{1}“ zurück nach „{2}“ versetzen? {3}"}
 {"uk": "Повернути № {0} у роботу («{1}»)? Товар знову забронюється або спишеться. {2}", "en": "Put № {0} back into work (“{1}”)? The product will be reserved or deducted again. {2}", "de": "Nr. {0} wieder in Bearbeitung setzen („{1}“)? Der Artikel wird erneut reserviert oder abgebucht. {2}"}
@@ -13007,7 +13032,12 @@
 {"uk": "Працівників з автозаповненням: {0} · період зараз: {1}–{2} («Перевіряти днів назад», не раніше «Не раніше дати», до вчора). Кнопки працюють зі збереженими налаштуваннями — спершу збережіть зміни.", "en": "Employees with auto-fill: {0} · current period: {1}–{2} (“Days back to check”, not earlier than “Not earlier than date”, up to yesterday). The buttons work with the saved settings — save your changes first.", "de": "Mitarbeiter mit automatischem Ausfüllen: {0} · aktueller Zeitraum: {1}–{2} („Tage rückwirkend prüfen“, nicht früher als „Nicht früher als Datum“, bis gestern). Die Schaltflächen arbeiten mit den gespeicherten Einstellungen – speichern Sie zuerst die Änderungen."}
 {"uk": "Працівників: {0} (прив'язано за email: {1}) · проєктів: {2} · видів робіт: {3}", "en": "Employees: {0} (linked by email: {1}) · projects: {2} · work types: {3}", "de": "Mitarbeiter: {0} (per E-Mail verknüpft: {1}) · Projekte: {2} · Tätigkeitsarten: {3}"}
 {"uk": "Преміум", "en": "Premium", "de": "Premium"}
+{"uk": "Пресет", "en": "Preset", "de": "Vorlage"}
+{"uk": "Пресет візиток", "en": "Business card preset", "de": "Visitenkarten-Vorlage"}
+{"uk": "Пресет збережено", "en": "Preset saved", "de": "Vorlage gespeichert"}
+{"uk": "Пресет підставляє «Де взяли», що це, позначки, примітку, категорії й AI — на виставці не треба вводити те саме для кожної візитки.", "en": "A preset fills in «Where obtained», type, marks, note, categories and AI — at a trade fair you do not have to enter the same for every card.", "de": "Eine Vorlage setzt «Woher», Art, Markierungen, Notiz, Kategorien und KI ein — auf der Messe muss nicht für jede Karte dasselbe eingegeben werden."}
 {"uk": "Пресети", "en": "Presets", "de": "Voreinstellungen"}
+{"uk": "Пресети візиток", "en": "Business card presets", "de": "Visitenkarten-Vorlagen"}
 {"uk": "Префікс", "en": "Prefix", "de": "Präfix"}
 {"uk": "Префікс номера", "en": "Number prefix", "de": "Nummernpräfix"}
 {"uk": "Префікс рахунку", "en": "Invoice prefix", "de": "Rechnungspräfix"}
@@ -13193,6 +13223,7 @@
 {"uk": "Провалена", "en": "Failed", "de": "Fehlgeschlagen"}
 {"uk": "Проведено", "en": "Posted", "de": "Gebucht"}
 {"uk": "Проведіть пальцем", "en": "Swipe", "de": "Wischen Sie"}
+{"uk": "Проведіть по фото, щоб виділити візитку чи QR-код.", "en": "Drag over the photo to select the card or QR code.", "de": "Über das Foto ziehen, um Karte oder QR-Code auszuwählen."}
 {"uk": "Провести по кроках (", "en": "Walk through step by step (", "de": "Schritt für Schritt durchführen ("}
 {"uk": "Прогноз", "en": "Forecast", "de": "Prognose"}
 {"uk": "Прогноз {0} пізніше строку клієнту {1} (+{2} дн.)", "en": "Forecast {0} later than the customer deadline {1} (+{2} d.)", "de": "Prognose {0} später als der Kundentermin {1} (+{2} Tg.)"}
@@ -13347,6 +13378,7 @@
 {"uk": "Процес надсилання оновлює після кожної позиції; довго без оновлення — процес зупинився, cron продовжить.", "en": "The sending process updates this after each item; if it has not updated for a long time, the process has stopped and cron will resume it.", "de": "Der Sendevorgang aktualisiert dies nach jeder Position; ohne Aktualisierung über längere Zeit wurde der Vorgang gestoppt, Cron setzt ihn fort."}
 {"uk": "Прочитаний AI лист", "en": "Email read by AI", "de": "Von der KI gelesene E-Mail"}
 {"uk": "Прочитано", "en": "Read", "de": "Gelesen"}
+{"uk": "Прочитано AI · ${0}", "en": "Read by AI · ${0}", "de": "Von KI gelesen · ${0}"}
 {"uk": "Прочитано з askDANTE", "en": "Read from askDANTE", "de": "Aus askDANTE gelesen"}
 {"uk": "Прочитано листів: {0} · нових пропозицій: {1}", "en": "Emails read: {0} · new suggestions: {1}", "de": "E-Mails gelesen: {0} · neue Vorschläge: {1}"}
 {"uk": "Прочитані AI листи", "en": "Emails read by AI", "de": "Von der KI gelesene E-Mails"}
@@ -14336,6 +14368,7 @@
 {"uk": "Сканувати всі лістинги", "en": "Scan all listings", "de": "Alle Listings scannen"}
 {"uk": "Сканувати всі лістинги DigiKey", "en": "Scan all DigiKey listings", "de": "Alle DigiKey-Listings scannen"}
 {"uk": "Сканувати всі лістинги | DigiKey | Minerva", "en": "Scan all listings | DigiKey | Minerva", "de": "Alle Listings scannen | DigiKey | Minerva"}
+{"uk": "Сканувати лише QR", "en": "Scan QR only", "de": "Nur QR scannen"}
 {"uk": "Сканувати лістинги", "en": "Scan listings", "de": "Listings scannen"}
 {"uk": "Сканує DigiKey Marketplace (оффери + продукти) та синхронізує з локальною базою.", "en": "Scans DigiKey Marketplace (offers + products) and synchronizes with the local database.", "de": "Durchsucht den DigiKey Marketplace (Offers + Artikel) und synchronisiert mit der lokalen Datenbank."}
 {"uk": "Сканує DigiKey Marketplace (оффери + продукти) та синхронізує з локальною базою. Оберіть що саме перевіряти та що робити з відсутніми товарами.", "en": "Scans DigiKey Marketplace (offers + products) and synchronizes with the local database. Choose what exactly to check and what to do with missing products.", "de": "Durchsucht den DigiKey Marketplace (Offers + Artikel) und synchronisiert mit der lokalen Datenbank. Wählen Sie, was genau geprüft werden soll und was mit fehlenden Artikeln geschehen soll."}
@@ -14518,6 +14551,7 @@
 {"uk": "Смуга пропускання", "en": "Passband", "de": "Durchlassbereich"}
 {"uk": "Соломонові Острови", "en": "Solomon Islands", "de": "Salomonen"}
 {"uk": "Сомалі", "en": "Somalia", "de": "Somalia"}
+{"uk": "Спалах", "en": "Flash", "de": "Blitz"}
 {"uk": "Спам", "en": "Spam", "de": "Spam"}
 {"uk": "Спам: у пошті — у Спам, з календаря — прибрати", "en": "Spam: in mail — to Spam, from the calendar — remove", "de": "Spam: in der E-Mail — in den Spam-Ordner, aus dem Kalender — entfernen"}
 {"uk": "Спершу адміністратор має внести ключі застосунку (нижче на сторінці).", "en": "First the administrator must enter the app keys (further down on the page).", "de": "Zuerst muss der Administrator die App-Schlüssel eintragen (weiter unten auf der Seite)."}
@@ -15061,6 +15095,7 @@
 {"uk": "Сформувати й перевірити", "en": "Generate and check", "de": "Erzeugen und prüfen"}
 {"uk": "Сформувати й перевірити посилання", "en": "Generate and check links", "de": "Links erzeugen und prüfen"}
 {"uk": "Сфотографуйте візитку, флаєр чи стенд на виставці — камерою (телефон, ноутбук) або виберіть файл. Minerva збереже фото з вашими примітками й позначками", "en": "Photograph a business card, flyer or trade fair booth — with the camera (phone, laptop) or choose a file. Minerva saves the photo with your notes and marks", "de": "Fotografieren Sie Visitenkarte, Flyer oder Messestand — mit der Kamera (Handy, Laptop) oder wählen Sie eine Datei. Minerva speichert das Foto mit Ihren Notizen und Markierungen"}
+{"uk": "Сфотографуйте візитку, флаєр чи стенд — камерою або виберіть файл. Minerva збереже фото з вашими примітками", "en": "Photograph a business card, flyer or booth — with the camera or choose a file. Minerva saves the photo with your notes", "de": "Fotografieren Sie Visitenkarte, Flyer oder Stand — mit der Kamera oder wählen Sie eine Datei. Minerva speichert das Foto mit Ihren Notizen"}
 {"uk": "Схема", "en": "Diagram", "de": "Schema"}
 {"uk": "Схема / зображення", "en": "Diagram / image", "de": "Schema / Bild"}
 {"uk": "Схема зв'язків моделей магазину", "en": "Diagram of the shop model relations", "de": "Schema der Beziehungen der Shop-Modelle"}
@@ -16176,6 +16211,7 @@
 {"uk": "Фото артикулів", "en": "Product photos", "de": "Artikelfotos"}
 {"uk": "Фото артикулів на етикетці замовлення", "en": "SKU photos on the order label", "de": "Artikelfotos auf dem Auftragsetikett"}
 {"uk": "Фото видалено", "en": "Photo deleted", "de": "Foto gelöscht"}
+{"uk": "Фото з камери", "en": "Photo from camera", "de": "Foto mit Kamera"}
 {"uk": "Фото з картки лістингу Minerva — на DigiKey його ще не бачили", "en": "Photo from the Minerva listing card — DigiKey has not seen it yet", "de": "Foto aus der Minerva-Listing-Karte — DigiKey hat es noch nicht gesehen"}
 {"uk": "Фото завелике для AI (до 4,5 МБ) — сфотографуйте ближче або зменшіть.", "en": "Photo too large for AI (up to 4.5 MB) — take it closer or reduce it.", "de": "Foto zu groß für die KI (bis 4,5 MB) — näher fotografieren oder verkleinern."}
 {"uk": "Фото збережеться в картці", "en": "The photo will be saved in the card of", "de": "Das Foto wird gespeichert in der Karte von"}
@@ -16338,6 +16374,7 @@
 {"uk": "Цей пароль буде встановлено для користувача і вказано в листі.", "en": "This password will be set for the user and stated in the email.", "de": "Dieses Passwort wird für den Benutzer festgelegt und in der E-Mail angegeben."}
 {"uk": "Цей пароль буде встановлено для користувача і вказано в листі. Рекомендуємо попросити змінити після першого входу.", "en": "This password will be set for the user and stated in the email. We recommend asking them to change it after the first login.", "de": "Dieses Passwort wird für den Benutzer festgelegt und in der E-Mail angegeben. Bitten Sie den Benutzer am besten, es nach der ersten Anmeldung zu ändern."}
 {"uk": "Цей перевізник буде підставлятися автоматично при створенні відправлення", "en": "This carrier will be filled in automatically when a shipment is created", "de": "Dieser Versanddienstleister wird beim Erstellen einer Sendung automatisch eingesetzt"}
+{"uk": "Цей пресет — за замовчуванням", "en": "This preset is the default", "de": "Diese Vorlage ist Standard"}
 {"uk": "Цей розділ закрито для вас", "en": "This section is closed to you", "de": "Dieser Bereich ist für Sie gesperrt"}
 {"uk": "Цей спосіб не відмічено в «Показувати в касі».", "en": "This method is not checked in “Show at checkout”.", "de": "Diese Zahlungsart ist unter „An der Kasse anzeigen“ nicht aktiviert."}
 {"uk": "Цей час застосовується до нових подій. Для окремої події можна задати своє значення.", "en": "This time applies to new events. A separate value can be set for an individual event.", "de": "Diese Zeit gilt für neue Termine. Für einen einzelnen Termin kann ein eigener Wert festgelegt werden."}
@@ -16679,6 +16716,7 @@
 {"uk": "Читання; ?mail_site=… — записує звіт сайту. Відповідь містить пароль SMTP скриньки магазину.", "en": "Read; ?mail_site=… records the website’s report. The response contains the SMTP password of the shop mailbox.", "de": "Lesen; ?mail_site=… speichert den Bericht der Website. Die Antwort enthält das SMTP-Passwort des Shop-Postfachs."}
 {"uk": "Читання; ?site=… — записує звіт сайту про його налаштування помічника. Відповідь містить ключ веб-моста помічника.", "en": "Read; ?site=… records the website’s report about its assistant settings. The response contains the assistant’s web bridge key.", "de": "Lesen; ?site=… speichert den Bericht der Website über ihre Assistenten-Einstellungen. Die Antwort enthält den Web-Bridge-Schlüssel des Assistenten."}
 {"uk": "Читання; з ?link_de= / ?link_en= Minerva запам'ятовує адреси кабінету для листів.", "en": "Read; with ?link_de= / ?link_en= Minerva remembers the account page addresses for emails.", "de": "Lesen; mit ?link_de= / ?link_en= merkt sich Minerva die Adressen des Kundenkontos für E-Mails."}
+{"uk": "Читати AI", "en": "Read with AI", "de": "Mit KI lesen"}
 {"uk": "Читати листи з особистого ящика і додавати в хронологію клієнтів.", "en": "Read e-mails from the personal mailbox and add them to the customer timeline.", "de": "E-Mails aus dem persönlichen Postfach lesen und zum Kundenverlauf hinzufügen."}
 {"uk": "Читаю даташит…", "en": "Reading the datasheet…", "de": "Lese Datenblatt…"}
 {"uk": "Читаю листи…", "en": "Reading emails…", "de": "Lese E-Mails…"}
@@ -16809,6 +16847,7 @@
 {"uk": "Шукали й не знайшли", "en": "Searched and not found", "de": "Gesucht und nicht gefunden"}
 {"uk": "Шукали й не знайшли: {0}", "en": "Searched and not found: {0}", "de": "Gesucht und nicht gefunden: {0}"}
 {"uk": "Шукати", "en": "Search", "de": "Suchen"}
+{"uk": "Шукати QR ще раз (напр. після обрізання)", "en": "Look for QR again (e.g. after cropping)", "de": "QR erneut suchen (z. B. nach dem Zuschneiden)"}
 {"uk": "Шукати «", "en": "Search “", "de": "Suchen „"}
 {"uk": "Шукати в інтернеті при відповіді", "en": "Search the web when replying", "de": "Beim Antworten im Internet suchen"}
 {"uk": "Шукати всюди (Ctrl K)", "en": "Search everywhere (Ctrl K)", "de": "Überall suchen (Ctrl K)"}
@@ -17420,6 +17459,7 @@
 {"uk": "без плану", "en": "no plan", "de": "ohne Plan"}
 {"uk": "без пояснення", "en": "no explanation", "de": "ohne Erklärung"}
 {"uk": "без правок коду сайту. Один склад може обслуговувати кілька магазинів, і в кожного свої товари та ціни.", "en": "with no changes to the website code. One warehouse can serve several shops, each with its own products and prices.", "de": "ohne Änderungen am Website-Code. Ein Lager kann mehrere Shops bedienen, jeder mit eigenen Artikeln und Preisen."}
+{"uk": "без пресету", "en": "no preset", "de": "ohne Vorlage"}
 {"uk": "без прив'язки (прив'язаних ключів немає) — працює з магазином за замовчуванням; ключ сайту варто прив'язати полем «Магазин»", "en": "not bound (no bound keys) — works with the default shop; the site key should be bound with the “Shop” field", "de": "ohne Zuordnung (keine zugeordneten Schlüssel) – arbeitet mit dem Standard-Shop; der Website-Schlüssel sollte über das Feld „Shop“ zugeordnet werden"}
 {"uk": "без прихованої копії", "en": "no blind copy", "de": "ohne Blindkopie"}
 {"uk": "без проєкту", "en": "without project", "de": "ohne Projekt"}
@@ -17923,6 +17963,7 @@
 {"uk": "для вас не увімкнено «Автозаповнення» (картка працівника askDANTE)", "en": "“Auto-fill” is not enabled for you (askDANTE employee card)", "de": "„Automatisches Ausfüllen“ ist für Sie nicht aktiviert (askDANTE-Mitarbeiterkarte)"}
 {"uk": "для вибраного листа", "en": "for the selected e-mail", "de": "für die ausgewählte E-Mail"}
 {"uk": "для власних внутрішніх ділових потреб. Кількість інсталяцій може бути обмежена", "en": "for its own internal business needs. The number of installations may be limited", "de": "für eigene interne geschäftliche Zwecke. Die Anzahl der Installationen kann"}
+{"uk": "для всіх", "en": "for everyone", "de": "für alle"}
 {"uk": "для кабелів, антен і т.д.", "en": "for cables, antennas, etc.", "de": "für Kabel, Antennen usw."}
 {"uk": "для ключа не налаштовано магазин", "en": "no shop is configured for the key", "de": "für den Schlüssel ist kein Shop konfiguriert"}
 {"uk": "для клієнта {0}", "en": "for customer {0}", "de": "für den Kunden {0}"}
@@ -18843,6 +18884,7 @@
 {"uk": "лише показати, нічого не записувати", "en": "only show, record nothing", "de": "nur anzeigen, nichts eintragen"}
 {"uk": "лише раз на добу після години запуску", "en": "only once a day after the start hour", "de": "nur einmal täglich nach der Startstunde"}
 {"uk": "лише те, чий час настав", "en": "only those whose time has come", "de": "nur diejenigen, deren Zeit gekommen ist"}
+{"uk": "лише те, що в рамці", "en": "only what is in the frame", "de": "nur was im Rahmen ist"}
 {"uk": "лише текст", "en": "text only", "de": "nur Text"}
 {"uk": "лише текст — аудіо видаляється з RAG-ПК, щойно розшифровку готово (рекомендовано)", "en": "text only — audio is deleted from the RAG PC as soon as the transcript is ready (recommended)", "de": "nur Text — das Audio wird vom RAG-PC gelöscht, sobald das Transkript fertig ist (empfohlen)"}
 {"uk": "лише товари, видимі в магазині «{0}»", "en": "only products visible in shop “{0}”", "de": "nur im Shop „{0}“ sichtbare Artikel"}
@@ -19150,6 +19192,7 @@
 {"uk": "не вдалося відкрити", "en": "could not open", "de": "konnte nicht geöffnet werden"}
 {"uk": "не вдалося завантажити", "en": "could not be downloaded", "de": "konnte nicht heruntergeladen werden"}
 {"uk": "не вдалося завантажити: {0}", "en": "could not load: {0}", "de": "Laden fehlgeschlagen: {0}"}
+{"uk": "не вдалося зберегти", "en": "could not save", "de": "Speichern fehlgeschlagen"}
 {"uk": "не вдалося змінити подію в календарі", "en": "could not change the event in the calendar", "de": "der Termin im Kalender konnte nicht geändert werden"}
 {"uk": "не вдалося перечитати замовлення з DigiKey", "en": "could not re-read the order from DigiKey", "de": "Auftrag konnte nicht erneut von DigiKey gelesen werden"}
 {"uk": "не вдалося побудувати графіки — відкрийте звіт або спробуйте пізніше", "en": "could not build the charts — open the report or try later", "de": "Diagramme konnten nicht erstellt werden — öffnen Sie den Bericht oder versuchen Sie es später erneut"}
@@ -19839,6 +19882,7 @@
 {"uk": "поля", "en": "fields", "de": "Felder"}
 {"uk": "поля (для category_type = filter: 139, 398, 21, 428, 327, 69, 16, 46, 966)", "en": "fields (for category_type = filter: 139, 398, 21, 428, 327, 69, 16, 46, 966)", "de": "Felder (für category_type = filter: 139, 398, 21, 428, 327, 69, 16, 46, 966)"}
 {"uk": "поля Рахунок-фактура ПДВ та Net Invoice Amount не застосовуються.", "en": "the VAT invoice and Net Invoice Amount fields do not apply.", "de": "die Felder MwSt.-Rechnung und Net Invoice Amount entfallen."}
+{"uk": "поля заповнено з QR-коду", "en": "fields filled from the QR code", "de": "Felder aus dem QR-Code ausgefüllt"}
 {"uk": "поля профілю покупця (компанія, контакт, адреси)", "en": "buyer profile fields (company, contact, addresses)", "de": "Felder des Käuferprofils (Firma, Kontakt, Adressen)"}
 {"uk": "поля, які треба змінити, підсвітяться червоним у його картці.", "en": "fields that need to be changed will be highlighted in red in its card.", "de": "Felder, die geändert werden müssen, werden in seiner Karte rot hervorgehoben."}
 {"uk": "полів", "en": "fields", "de": "Felder"}
@@ -20125,6 +20169,7 @@
 {"uk": "прочитано AI", "en": "read by AI", "de": "von KI gelesen"}
 {"uk": "прочитано {0}", "en": "read {0}", "de": "gelesen {0}"}
 {"uk": "прочитано {0}, але відповіді немає", "en": "read {0}, but no reply", "de": "gelesen {0}, aber keine Antwort"}
+{"uk": "прочитає QR-код і (за галочкою) AI, перевірить, чи фірма вже є в базі, і запропонує створити постачальника", "en": "reads the QR code and (if checked) AI, checks whether the company is already in the database and offers to create the supplier", "de": "liest den QR-Code und (mit Häkchen) die KI, prüft, ob die Firma schon in der Datenbank ist, und schlägt vor, den Lieferanten anzulegen"}
 {"uk": "проєкт", "en": "project", "de": "Projekt"}
 {"uk": "проєкт askDANTE спільний ще з {0} проєктами Minerva — години спільні", "en": "the askDANTE project is shared with {0} more Minerva projects — the hours are shared", "de": "das askDANTE-Projekt wird mit {0} weiteren Minerva-Projekten geteilt – die Stunden sind gemeinsam"}
 {"uk": "проєкт askDANTE ще не вибрано (🗂 Категорії → askDANTE)", "en": "askDANTE project not yet selected (🗂 Categories → askDANTE)", "de": "askDANTE-Projekt noch nicht gewählt (🗂 Kategorien → askDANTE)"}
@@ -20948,6 +20993,7 @@
 {"uk": "фото", "en": "photo", "de": "Foto"}
 {"uk": "фото (JPG, PNG, WebP, GIF)", "en": "photo (JPG, PNG, WebP, GIF)", "de": "Foto (JPG, PNG, WebP, GIF)"}
 {"uk": "фото видно мініатюрою (клік — відкрити повністю), даташит — «📄 відкрити» («{0}»", "en": "the photo is shown as a thumbnail (click to open in full), the datasheet — “📄 open” (“{0}”", "de": "das Foto wird als Miniaturansicht angezeigt (Klick — vollständig öffnen), das Datenblatt — „📄 öffnen“ („{0}“"}
+{"uk": "фото збережено з кадру", "en": "photo saved from the frame", "de": "Foto aus dem Kamerabild gespeichert"}
 {"uk": "фото й даташит є", "en": "photo and datasheet present", "de": "Foto und Datenblatt vorhanden"}
 {"uk": "фото не відкрилось", "en": "the photo did not open", "de": "das Foto ließ sich nicht öffnen"}
 {"uk": "фото не відкрилось у браузері", "en": "the photo did not open in the browser", "de": "Foto ließ sich im Browser nicht öffnen"}

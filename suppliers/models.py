@@ -103,6 +103,10 @@ class SupplierMedia(models.Model):
                                help_text="Розшифрований текст QR-коду з фото (vCard, посилання…) — suppliers/services/qr.py")
     error = models.TextField(blank=True, default="")
     cost_usd = models.DecimalField(max_digits=8, decimal_places=4, default=0)
+    categories = models.ManyToManyField(SupplierCategory, blank=True, related_name="+",
+                                        verbose_name="Категорії для нового постачальника")
+    preset = models.ForeignKey("SupplierCardPreset", null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name="+", verbose_name="Пресет")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name="+")
     created_at = models.DateTimeField("Додано", default=timezone.now)
@@ -118,6 +122,31 @@ class SupplierMedia(models.Model):
     def marks_text(self) -> str:
         names = dict(self.MARKS)
         return " ".join(names[m] for m in (self.marks or []) if m in names)
+
+
+class SupplierCardPreset(models.Model):
+    """📌 Пресет візиток: «electronica 2026, хол B3» — що підставити в кожне нове фото (де взяли, вид, позначки,
+    примітка, категорії, AI). Свій або спільний для всіх (колеги на тій самій виставці); за замовчуванням —
+    UserProfile.ui_prefs["supplier_card_preset"] людини (suppliers/admin_supplier.py)."""
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    name = models.CharField("Назва", max_length=120)
+    event = models.CharField("Де взяли", max_length=200, blank=True, default="")
+    kind = models.CharField("Що це", max_length=8, choices=SupplierMedia.KINDS, default=SupplierMedia.CARD)
+    marks = models.JSONField("Позначки", default=list, blank=True)
+    note = models.TextField("Примітка", blank=True, default="")
+    categories = models.ManyToManyField(SupplierCategory, blank=True, related_name="+")
+    read_ai = models.BooleanField("Читати AI", default=True)
+    model = models.CharField("Модель AI", max_length=40, blank=True, default="")
+    shared = models.BooleanField("Для всіх", default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name = "Пресет візиток"
+        verbose_name_plural = "Пресети візиток"
+
+    def __str__(self):
+        return self.name
 
 
 class SupplierEvent(models.Model):

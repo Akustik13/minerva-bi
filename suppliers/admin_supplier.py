@@ -22,7 +22,8 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
-from suppliers.models import SupplierAnalysis, SupplierCategory, SupplierContact, SupplierEvent, SupplierMedia
+from suppliers.models import (SupplierAnalysis, SupplierCardPreset, SupplierCategory, SupplierContact, SupplierEvent,
+                              SupplierMedia)
 
 VIEWER = "_sup_viewer"
 PANELS = ("sup_overview", "sup_media", "sup_requests", "sup_ai", "sup_history")
@@ -381,6 +382,7 @@ class SupplierCardMixin:
             path("card/", view(self.card_view), name="inventory_supplier_card"),
             path("cards/", view(self.cards_view), name="inventory_supplier_cards"),
             path("cards/<int:media_pk>/", view(self.card_review_view), name="inventory_supplier_card_review"),
+            path("card/presets/", view(self.card_presets_view), name="inventory_supplier_card_presets"),
             path("job/<str:job_id>/", view(self.job_view), name="inventory_supplier_job"),
             path("search/", view(self.search_view), name="inventory_supplier_search"),
             path("<int:pk>/analysis/", view(self.analysis_view), name="inventory_supplier_analysis"),
@@ -582,26 +584,111 @@ class SupplierCardMixin:
             back = request.FILES.get("image_back")
             if back is not None and back.size <= 15 * 1024 * 1024:
                 m.image_back.save(back.name or "back.jpg", back, save=False)
+            m.preset = SupplierCardPreset.objects.filter(Q(owner=request.user) | Q(shared=True),
+                                                         pk=request.POST.get("preset") or 0).first()
             m.qr_text = qr.join(request.POST.get("qr_front", ""), request.POST.get("qr_back", ""))
             fields = qr.parse_all(m.qr_text)
             if fields:
                 m.extracted, m.state = qr.merge(fields, {}), SupplierMedia.READ
             m.save()
+            m.categories.set(self._categories_from_post(request))
             if supplier is not None:
                 SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.CARD, media=m, user=request.user,
                                              text=f"{m.get_kind_display()} додано" + (f" · {m.event}" if m.event else ""))
             url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+            job = ""
             if request.POST.get("read_ai"):
                 model, user = ai.model_of(request.POST.get("model")), request.user
 
                 def run():
                     ai.card(m, user=user, model=model)
                     return {"url": url, "message": "🧠 Прочитано"}
-                url += "?job=" + jobs.start(user, f"card {m.pk}", run)
-            return redirect(url)
+                job = jobs.start(user, f"card {m.pk}", run)
+            if request.POST.get("go") == "next":       # 🎪 на виставці: одразу наступна візитка з тим самим пресетом
+                self.message_user(request, format_html(
+                    '✅ Збережено <a href="{}">{}</a>{}', url, m.title or m.get_kind_display(),
+                    " — AI читає у фоні; перевірити — «🪪 Усі візитки → ще не внесені»" if job else ""),
+                    messages.SUCCESS)
+                nxt = reverse("admin:inventory_supplier_card") + (f"?preset={m.preset_id}" if m.preset_id else "")
+                if supplier is not None:
+                    nxt += ("&" if "?" in nxt else "?") + f"supplier={supplier.pk}"
+                return redirect(nxt)
+            return redirect(url + (f"?job={job}" if job else ""))
+        presets = self._presets(request.user)
+        chosen = request.GET.get("preset")
+        if not str(chosen or "").isdigit():
+            chosen = self._default_preset(request.user)
         return TemplateResponse(request, "admin/suppliers/card.html", self._ctx(
             request, "📷 Візитка / флаєр", supplier=supplier, kinds=SupplierMedia.KINDS, marks=SupplierMedia.MARKS,
+            categories=SupplierCategory.objects.filter(is_active=True), presets_json=presets,
+            sides=[("front", "Лицьовий бік", True), ("back", "Зворотний бік", False)],
+            preset_now=int(chosen) if str(chosen or "").isdigit() else None,
+            preset_default=self._default_preset(request.user),
             recent=SupplierMedia.objects.select_related("supplier")[:8]))
+
+    # ── 📌 Пресети візиток (виставка: однакові «де взяли», позначки, категорії) ──
+    @staticmethod
+    def _presets(user) -> list:
+        qs = (SupplierCardPreset.objects.filter(Q(owner=user) | Q(shared=True)).select_related("owner")
+              .prefetch_related("categories"))
+        return [{"id": p.pk, "name": p.name, "event": p.event, "kind": p.kind, "marks": p.marks or [],
+                 "note": p.note, "categories": [c.pk for c in p.categories.all()], "read_ai": p.read_ai,
+                 "model": p.model, "shared": p.shared, "mine": p.owner_id == user.pk,
+                 "owner": "" if p.owner_id == user.pk else (p.owner.get_full_name() or p.owner.username)} for p in qs]
+
+    @staticmethod
+    def _default_preset(user):
+        profile = getattr(user, "profile", None)
+        value = (getattr(profile, "ui_prefs", None) or {}).get("supplier_card_preset") if profile else None
+        return value if isinstance(value, int) else None
+
+    def card_presets_view(self, request):
+        """POST {action: save | delete | default, id, name, event, kind, marks, note, categories, read_ai, model,
+        shared, make_default} → {presets, default}. Змінити / видалити — лише свій пресет."""
+        from core.models import UserProfile
+        if not (_can(request, "add") or _can(request, "change")):
+            raise Http404
+        if request.method != "POST":
+            return JsonResponse({"presets": self._presets(request.user), "default": self._default_preset(request.user)})
+        P, action = request.POST, request.POST.get("action")
+        mine = SupplierCardPreset.objects.filter(owner=request.user)
+        default, saved = self._default_preset(request.user), None
+        if action == "save":
+            name = " ".join(P.get("name", "").split())[:120]
+            if not name:
+                return JsonResponse({"error": "Назва пресету порожня."}, status=400)
+            p = mine.filter(pk=P.get("id") or 0).first() or SupplierCardPreset(owner=request.user)
+            p.name, p.event, p.note = name, P.get("event", "")[:200], P.get("note", "")[:4000]
+            p.kind = P.get("kind") if P.get("kind") in dict(SupplierMedia.KINDS) else SupplierMedia.CARD
+            p.marks = [x for x in P.getlist("marks") if x in dict(SupplierMedia.MARKS)]
+            p.read_ai, p.shared = bool(P.get("read_ai")), bool(P.get("shared"))
+            from suppliers.services.ai import MODELS
+            p.model = P.get("model") if P.get("model") in dict(MODELS) else ""
+            p.save()
+            p.categories.set(self._categories_from_post(request))
+            saved = p.pk
+            if P.get("make_default"):
+                default = p.pk
+        elif action == "delete":
+            mine.filter(pk=P.get("id") or 0).delete()
+            if str(default) == str(P.get("id")):
+                default = None
+        elif action == "default":
+            pid = P.get("id")
+            default = int(pid) if str(pid or "").isdigit() and SupplierCardPreset.objects.filter(
+                Q(owner=request.user) | Q(shared=True), pk=int(pid)).exists() else None
+        else:
+            return JsonResponse({"error": "Невідома дія"}, status=400)
+        if default != self._default_preset(request.user):
+            profile, _ = UserProfile.objects.get_or_create(user=request.user)
+            prefs = dict(profile.ui_prefs or {})
+            if default:
+                prefs["supplier_card_preset"] = default
+            else:
+                prefs.pop("supplier_card_preset", None)
+            UserProfile.objects.filter(pk=profile.pk).update(ui_prefs=prefs)
+        return JsonResponse({"presets": self._presets(request.user), "default": default,
+                             "id": saved})
 
     def cards_view(self, request):
         if not _can(request, "view"):
@@ -701,6 +788,7 @@ class SupplierCardMixin:
             data = {k: "" for k in draft.FIELDS + draft.CONTACT_FIELDS}
         names = {c.name.lower(): c.pk for c in SupplierCategory.objects.filter(is_active=True)}
         picked = [names[n.lower()] for n in (data.get("categories") or []) if n.lower() in names]
+        picked += [c for c in m.categories.values_list("pk", flat=True) if c not in picked]
         matches = draft.existing(data) if (data.get("name") or data.get("email") or data.get("website")) else []
         return TemplateResponse(request, "admin/suppliers/card_review.html", self._ctx(
             request, f"📷 {m.title or m.get_kind_display()}", m=m, d=data, matches=matches, picked=picked,

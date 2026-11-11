@@ -1,5 +1,6 @@
 {% extends "admin/base_site.html" %}
-{# 📷 Візитка / флаєр: камера або файл → SupplierMedia → AI читає → картка перевірки (suppliers/admin_supplier.py card_view) #}
+{# 📷 Візитка / флаєр: пресет виставки, камера з рамкою (фото або «лише QR»), обрізати / повернути, QR → поля,
+   AI у фоні, «Зберегти й наступну» — suppliers/admin_supplier.py card_view / card_presets_view, _qr_js.html #}
 {% block title %}{{ title }} | Minerva{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
@@ -11,49 +12,108 @@
 {% block content %}
 {% include "admin/suppliers/_styles.html" %}
 <style>
-  #sc-video { width: 100%; max-width: 560px; border-radius: 8px; background: #000; display: none; }
-  .sc-shot { display: flex; flex-wrap: wrap; gap: 12px; }
-  .sc-side { border: 1px dashed var(--border-strong, #ccc); border-radius: 8px; padding: 10px; min-width: 260px; flex: 1 1 260px; }
-  .sc-side img { max-width: 100%; max-height: 220px; display: none; margin-top: 6px; border-radius: 6px; background: #fff; }
+  .sc-cam { position: relative; max-width: 640px; display: none; margin-top: 8px; }
+  .sc-cam video { width: 100%; display: block; border-radius: 8px; background: #000; }
+  .sc-frame { position: absolute; border: 3px solid rgba(255,255,255,.95); border-radius: 10px;
+              box-shadow: 0 0 0 9999px rgba(0,0,0,.35); pointer-events: none; transition: border-color .2s; }
+  .sc-frame.ok { border-color: #4caf50; }
+  .sc-camctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 6px; }
+  .sc-shot { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+  .sc-side { border: 1px dashed var(--border-strong, #ccc); border-radius: 8px; padding: 10px; min-width: 260px; flex: 1 1 280px; }
+  .sc-side.sel { border-style: solid; border-color: var(--link-fg, #5b8def); }
+  .sc-prev { display: none; max-width: 100%; max-height: 260px; margin-top: 6px; border-radius: 6px; background: #fff; touch-action: auto; }
+  .sc-prev.crop { cursor: crosshair; touch-action: none; }
+  .sc-tools { display: none; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .sc-tools button { padding: 3px 9px; }
   .sc-qr { margin-top: 4px; word-break: break-word; }
+  .sc-qr.ok { color: var(--success-fg, #2e7d32); }
+  .sc-preset { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .sc-psave { display: none; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  @media (max-width: 768px) { .sc-side { min-width: 100%; } .sc-cam { max-width: 100%; } }
 </style>
 <div class="spp">
   <form method="post" enctype="multipart/form-data" id="sc-form">{% csrf_token %}
   {% if supplier %}<input type="hidden" name="supplier" value="{{ supplier.pk }}">{% endif %}
+
   <div class="spf-card">
-    <div class="spf-muted">{% if supplier %}Фото збережеться в картці <b translate="no">{{ supplier.name }}</b>. {% endif %}Сфотографуйте візитку, флаєр чи стенд на виставці — камерою (телефон, ноутбук) або виберіть файл. Minerva збереже фото з вашими примітками й позначками{% if not supplier %}, AI прочитає фірму, контакт і адресу, перевірить, чи вона вже є в базі, і запропонує створити постачальника{% endif %}.</div>
+    <div class="sc-preset">
+      <b>📌 Пресет</b>
+      <select name="preset" id="sc-preset" style="min-width:220px"><option value="">— без пресету</option></select>
+      <button type="button" class="button" id="sc-pdef" title="Відкривати цю сторінку з цим пресетом">☆ За замовчуванням</button>
+      <button type="button" class="button" id="sc-pnew">💾 Зберегти поточні як пресет…</button>
+      <button type="button" class="button" id="sc-pdel" title="Видалити свій пресет">🗑</button>
+      <span class="spf-job" id="sc-pmsg"></span>
+    </div>
+    <div class="sc-psave" id="sc-psave">
+      <input id="sc-pname" maxlength="120" placeholder="напр. electronica 2026, хол B3" style="min-width:240px">
+      <label><input type="checkbox" id="sc-pshared"> 👥 для всіх</label>
+      <label><input type="checkbox" id="sc-pmakedef" checked> ★ за замовчуванням</label>
+      <button type="button" class="button" id="sc-psaveok">💾 Зберегти пресет</button>
+    </div>
+    <div class="spf-muted" style="margin-top:4px">Пресет підставляє «Де взяли», що це, позначки, примітку, категорії й AI — на виставці не треба вводити те саме для кожної візитки.</div>
+  </div>
+
+  <div class="spf-card">
+    <div class="spf-muted">{% if supplier %}Фото збережеться в картці <b translate="no">{{ supplier.name }}</b>. {% endif %}Сфотографуйте візитку, флаєр чи стенд — камерою або виберіть файл. Minerva збереже фото з вашими примітками{% if not supplier %}, прочитає QR-код і (за галочкою) AI, перевірить, чи фірма вже є в базі, і запропонує створити постачальника{% endif %}.</div>
     <div class="spf-row">
-      <button type="button" class="button" id="sc-cam">📷 Увімкнути камеру</button>
-      <button type="button" class="button" id="sc-snap" style="display:none">⏺ Зробити фото</button>
-      <button type="button" class="button" id="sc-stop" style="display:none">✕ Вимкнути камеру</button>
+      <button type="button" class="button" id="sc-cam">📷 Фото з камери</button>
+      <button type="button" class="button" id="sc-qrcam" title="Камера шукає лише QR-код і сама зробить фото, щойно його прочитає">🔳 Сканувати лише QR</button>
       <span class="spf-muted" id="sc-cam-note"></span>
     </div>
-    <video id="sc-video" autoplay playsinline muted></video>
-    <canvas id="sc-canvas" style="display:none"></canvas>
-    <div class="sc-shot">
-      <div class="sc-side"><b>Лицьовий бік</b> <span class="spf-muted" id="sc-front-note"></span>
-        <div><input type="file" name="image" id="sc-front" accept="image/*" capture="environment" required></div><img id="sc-front-img" alt="">
-        <input type="hidden" name="qr_front" id="sc-front-qr"><div class="spf-muted sc-qr" id="sc-front-qr-note"></div></div>
-      <div class="sc-side"><b>Зворотний бік</b> <span class="spf-muted">(якщо є)</span>
-        <div><input type="file" name="image_back" id="sc-back" accept="image/*" capture="environment"></div><img id="sc-back-img" alt="">
-        <input type="hidden" name="qr_back" id="sc-back-qr"><div class="spf-muted sc-qr" id="sc-back-qr-note"></div></div>
+    <div class="sc-cam" id="sc-cambox">
+      <video id="sc-video" autoplay playsinline muted></video>
+      <div class="sc-frame" id="sc-frame"></div>
     </div>
-    <div class="spf-muted" style="margin-top:4px">🔳 Якщо на візитці є QR-код (vCard, сайт), Minerva прочитає його одразу після фото — ці дані точні, AI лише доповнить решту.</div>
-    <div class="spf-muted" id="sc-target-note" style="margin-top:4px">Камера знімає на той бік, який вибрано: <label><input type="radio" name="_side" value="front" checked> лицьовий</label> <label><input type="radio" name="_side" value="back"> зворотний</label></div>
+    <div class="sc-camctl" id="sc-camctl" style="display:none">
+      <button type="button" class="default" id="sc-snap">⏺ Зробити фото</button>
+      <label class="spf-muted" id="sc-cropwrap"><input type="checkbox" id="sc-onlyframe" checked> ✂️ лише те, що в рамці</label>
+      <button type="button" class="button" id="sc-torch" style="display:none">🔦 Спалах</button>
+      <label class="spf-muted" id="sc-zoomwrap" style="display:none">🔍 <input type="range" id="sc-zoom"></label>
+      <button type="button" class="button" id="sc-stop">✕ Вимкнути камеру</button>
+    </div>
+    <div class="sc-shot">
+      {% for side, label, req in sides %}
+      <div class="sc-side{% if forloop.first %} sel{% endif %}" data-side="{{ side }}">
+        <label style="font-weight:600"><input type="radio" name="_side" value="{{ side }}" {% if forloop.first %}checked{% endif %}> {{ label }}</label>
+        {% if not forloop.first %}<span class="spf-muted">(якщо є)</span>{% endif %}
+        <div><input type="file" name="{% if forloop.first %}image{% else %}image_back{% endif %}" id="sc-{{ side }}" accept="image/*" capture="environment" {% if req %}required{% endif %}></div>
+        <canvas class="sc-prev" id="sc-{{ side }}-prev"></canvas>
+        <div class="sc-tools" id="sc-{{ side }}-tools">
+          <button type="button" class="button" data-act="left" title="Повернути ліворуч">⟲</button>
+          <button type="button" class="button" data-act="right" title="Повернути праворуч">⟳</button>
+          <button type="button" class="button" data-act="crop">✂️ Обрізати</button>
+          <button type="button" class="button" data-act="cropok" style="display:none">✓ Обрізати виділене</button>
+          <button type="button" class="button" data-act="cropno" style="display:none">✕</button>
+          <button type="button" class="button" data-act="qr" title="Шукати QR ще раз (напр. після обрізання)">🔳</button>
+          <button type="button" class="button" data-act="reset" title="Повернути фото, як було">↺ Як було</button>
+        </div>
+        <div class="spf-muted" id="sc-{{ side }}-cropnote" style="display:none">Проведіть по фото, щоб виділити візитку чи QR-код.</div>
+        <input type="hidden" name="qr_{{ side }}" id="sc-{{ side }}-qr"><div class="spf-muted sc-qr" id="sc-{{ side }}-qr-note"></div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="spf-muted" style="margin-top:6px">🔳 QR-код (vCard, сайт) Minerva читає одразу — ці дані точні, AI лише доповнить решту. Не прочитався — «✂️ Обрізати» навколо коду або «🔳 Сканувати лише QR» і піднесіть телефон ближче.</div>
   </div>
+
   <div class="spf-card">
     <div class="spf-grid">
-      <label>Що це<select name="kind">{% for v, n in kinds %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></label>
+      <label>Що це<select name="kind" id="sc-kind">{% for v, n in kinds %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></label>
       <label>Назва (необов'язково)<input name="title" maxlength="200" placeholder="напр. Візитка менеджера"></label>
-      <label>Де взяли<input name="event" maxlength="200" placeholder="напр. electronica 2026, хол B3"></label>
+      <label>Де взяли<input name="event" id="sc-event" maxlength="200" placeholder="напр. electronica 2026, хол B3"></label>
     </div>
-    <label class="spf-wide">Наші примітки<textarea name="note" rows="3" placeholder="Що обговорили, що обіцяли, враження…"></textarea></label>
+    <label class="spf-wide">Наші примітки<textarea name="note" id="sc-note" rows="3" placeholder="Що обговорили, що обіцяли, враження…"></textarea></label>
     <div class="spf-marks" style="margin-top:6px">{% for v, n in marks %}<label><input type="checkbox" name="marks" value="{{ v }}"> {{ n }}</label>{% endfor %}</div>
+    {% if categories %}
+    <details style="margin-top:8px" id="sc-catbox"><summary class="spf-muted">🗂 Категорії для нового постачальника</summary>
+      <div class="spf-cats" style="margin-top:6px">{% for c in categories %}<label class="spf-cat"><input type="checkbox" name="categories" value="{{ c.pk }}"> {{ c.icon }} {{ c.name }}</label>{% endfor %}</div>
+    </details>
+    {% endif %}
   </div>
   <div class="spf-row">
-    <label><input type="checkbox" name="read_ai" value="1" checked> 🧠 Прочитати фото AI</label>
-    <select name="model" title="Модель AI">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+    <label><input type="checkbox" name="read_ai" id="sc-ai" value="1" checked> 🧠 Прочитати фото AI</label>
+    <select name="model" id="sc-model" title="Модель AI">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
     <button type="submit" class="default">💾 Зберегти фото</button>
+    <button type="submit" name="go" value="next" class="button" title="Зберегти й одразу наступна візитка з тим самим пресетом; AI читає у фоні">💾 Зберегти й наступну</button>
   </div>
   </form>
   {% if recent %}
@@ -62,56 +122,265 @@
   </div>
   {% endif %}
 </div>
+{{ presets_json|json_script:"sc-presets" }}
+{% include "admin/suppliers/_qr_js.html" %}
 <script>
 (function(){
-  var video = document.getElementById('sc-video'), canvas = document.getElementById('sc-canvas'), stream = null;
-  var cam = document.getElementById('sc-cam'), snap = document.getElementById('sc-snap'), stop = document.getElementById('sc-stop');
-  var note = document.getElementById('sc-cam-note');
-  function preview(input, img){
-    var f = input.files && input.files[0];
-    var qrField = document.getElementById(input.id + '-qr'), qrNote = document.getElementById(input.id + '-qr-note');
-    qrField.value = ''; qrNote.textContent = '';
-    if (!f) { img.style.display = 'none'; return; }
-    img.src = URL.createObjectURL(f); img.style.display = 'block';
-    qrNote.textContent = '🔳 Шукаю QR-код…';
-    spQR.fromFile(f).then(function(text){
-      if (input.files[0] !== f) return;              // тим часом вибрали інше фото
-      qrField.value = text || '';
-      qrNote.textContent = text ? '🔳 QR: ' + spQR.summary(text) : '';
-    }).catch(function(){ qrNote.textContent = '🔳 QR не перевірено (немає зв\'язку з бібліотекою) — AI прочитає текст з фото.'; });
+  var form = document.getElementById('sc-form');
+  spQR.warm();                                      // сканер QR — заздалегідь
+  function $(id){ return document.getElementById(id); }
+  function csrf(){ return form.querySelector('[name=csrfmiddlewaretoken]').value; }
+  function curSide(){ return form.querySelector('input[name=_side]:checked').value; }
+  document.querySelectorAll('input[name=_side]').forEach(function(r){ r.addEventListener('change', function(){
+    document.querySelectorAll('.sc-side').forEach(function(b){ b.classList.toggle('sel', b.dataset.side === curSide()); });
+  }); });
+
+  // ── 📌 Пресети ──
+  var presets = JSON.parse($('sc-presets').textContent || '[]'), def = {{ preset_default|default_if_none:"null" }};
+  var sel = $('sc-preset'), pmsg = $('sc-pmsg'), lastNote = '';
+  function drawPresets(chosen){
+    sel.innerHTML = '<option value="">— без пресету</option>';
+    presets.forEach(function(p){
+      var o = document.createElement('option'); o.value = p.id;
+      o.textContent = (p.id === def ? '★ ' : '') + p.name + (p.shared ? ' 👥' : '') + (p.owner ? ' · ' + p.owner : '');
+      sel.appendChild(o);
+    });
+    sel.value = chosen ? String(chosen) : '';
+    $('sc-pdel').style.display = current() && current().mine ? '' : 'none';
+    $('sc-pdef').textContent = current() && current().id === def ? '★ За замовчуванням' : '☆ За замовчуванням';
   }
-  [['sc-front', 'sc-front-img'], ['sc-back', 'sc-back-img']].forEach(function(p){
-    var input = document.getElementById(p[0]), img = document.getElementById(p[1]);
-    input.addEventListener('change', function(){ preview(input, img); });
+  function current(){ var id = parseInt(sel.value, 10); return presets.filter(function(p){ return p.id === id; })[0] || null; }
+  function apply(p){
+    if (!p) return;
+    $('sc-event').value = p.event || '';
+    $('sc-kind').value = p.kind || 'card';
+    form.querySelectorAll('input[name=marks]').forEach(function(c){ c.checked = (p.marks || []).indexOf(c.value) >= 0; });
+    var note = $('sc-note'); if (!note.value || note.value === lastNote) { note.value = p.note || ''; lastNote = note.value; }
+    form.querySelectorAll('input[name=categories]').forEach(function(c){ c.checked = (p.categories || []).indexOf(parseInt(c.value, 10)) >= 0; });
+    if ((p.categories || []).length && $('sc-catbox')) $('sc-catbox').open = true;
+    $('sc-ai').checked = !!p.read_ai;
+    if (p.model) $('sc-model').value = p.model;
+  }
+  sel.addEventListener('change', function(){ apply(current()); drawPresets(sel.value); });
+  function post(data){
+    var fd = data instanceof FormData ? data : new FormData();
+    if (!(data instanceof FormData)) Object.keys(data).forEach(function(k){ fd.append(k, data[k]); });
+    return fetch('{% url "admin:inventory_supplier_card_presets" %}', {method: 'POST', body: fd, credentials: 'same-origin',
+                 headers: {'X-CSRFToken': csrf()}}).then(function(r){ return r.json(); });
+  }
+  $('sc-pnew').addEventListener('click', function(){
+    var box = $('sc-psave'); box.style.display = box.style.display === 'flex' ? 'none' : 'flex';
+    $('sc-pname').value = (current() && current().mine ? current().name : '') || $('sc-event').value; $('sc-pname').focus();
   });
-  function off(){ if (stream) stream.getTracks().forEach(function(t){ t.stop(); }); stream = null;
-    video.style.display = 'none'; snap.style.display = stop.style.display = 'none'; cam.style.display = ''; }
-  cam.addEventListener('click', function(){
+  $('sc-psaveok').addEventListener('click', function(){
+    var fd = new FormData(); fd.append('action', 'save'); fd.append('name', $('sc-pname').value);
+    var cur = current(); if (cur && cur.mine && cur.name === $('sc-pname').value) fd.append('id', cur.id);
+    ['event', 'kind', 'note', 'model'].forEach(function(k){ fd.append(k, form.querySelector('[name=' + k + ']').value); });
+    form.querySelectorAll('input[name=marks]:checked, input[name=categories]:checked').forEach(function(c){ fd.append(c.name, c.value); });
+    if ($('sc-ai').checked) fd.append('read_ai', '1');
+    if ($('sc-pshared').checked) fd.append('shared', '1');
+    if ($('sc-pmakedef').checked) fd.append('make_default', '1');
+    post(fd).then(function(j){
+      if (j.error) { pmsg.textContent = '⚠️ ' + j.error; return; }
+      presets = j.presets; def = j.default; drawPresets(j.id); $('sc-psave').style.display = 'none'; pmsg.textContent = '💾 Пресет збережено';
+    }).catch(function(){ pmsg.textContent = '⚠️ не вдалося зберегти'; });
+  });
+  $('sc-pdef').addEventListener('click', function(){
+    var cur = current(), id = cur && cur.id !== def ? cur.id : '';
+    post({action: 'default', id: id}).then(function(j){ presets = j.presets; def = j.default; drawPresets(sel.value);
+      pmsg.textContent = def ? '★ Цей пресет — за замовчуванням' : 'Без пресету за замовчуванням'; });
+  });
+  $('sc-pdel').addEventListener('click', function(){
+    var cur = current(); if (!cur || !confirm('Видалити пресет «' + cur.name + '»?')) return;
+    post({action: 'delete', id: cur.id}).then(function(j){ presets = j.presets; def = j.default; drawPresets(''); pmsg.textContent = '🗑 Видалено'; });
+  });
+  drawPresets({{ preset_now|default_if_none:"null" }});
+  apply(current());
+
+  // ── Фото: попередній перегляд, поворот, обрізання, QR ──
+  var sides = {};
+  function side(name){
+    if (sides[name]) return sides[name];
+    var s = sides[name] = {name: name, input: $('sc-' + name), prev: $('sc-' + name + '-prev'), tools: $('sc-' + name + '-tools'),
+                           qr: $('sc-' + name + '-qr'), note: $('sc-' + name + '-qr-note'), work: null, orig: null, crop: null, gen: 0};
+    s.input.addEventListener('change', function(){ var f = s.input.files[0]; s.orig = f || null; load(s, f); });
+    s.tools.addEventListener('click', function(e){ var b = e.target.closest('button'); if (b) tool(s, b.dataset.act); });
+    cropEvents(s);
+    return s;
+  }
+  function load(s, file, qrKnown){
+    s.gen++; s.qr.value = ''; s.note.textContent = ''; s.note.classList.remove('ok');
+    if (!file) { s.work = null; s.prev.style.display = 'none'; s.tools.style.display = 'none'; return; }
+    var img = new Image(), url = URL.createObjectURL(file), gen = s.gen;
+    img.onload = function(){
+      var k = Math.min(1, 4000 / Math.max(img.naturalWidth, img.naturalHeight));
+      var c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      if (gen !== s.gen) return;
+      s.work = c; draw(s); s.tools.style.display = 'flex';
+      if (qrKnown) setQR(s, qrKnown); else scanQR(s);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); };
+    img.src = url;
+  }
+  function draw(s){
+    var c = s.prev, w = s.work, k = Math.min(1, 900 / Math.max(w.width, w.height));
+    c.width = Math.round(w.width * k); c.height = Math.round(w.height * k);
+    var ctx = c.getContext('2d'); ctx.drawImage(w, 0, 0, c.width, c.height);
+    if (s.crop && s.crop.w > 4 && s.crop.h > 4) {
+      ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(w, s.crop.x / k, s.crop.y / k, s.crop.w / k, s.crop.h / k, s.crop.x, s.crop.y, s.crop.w, s.crop.h);
+      ctx.strokeStyle = '#4caf50'; ctx.lineWidth = 2; ctx.strokeRect(s.crop.x, s.crop.y, s.crop.w, s.crop.h);
+    }
+    c.style.display = 'block'; s.k = k;
+  }
+  function setQR(s, text){
+    s.qr.value = text || ''; s.note.classList.toggle('ok', !!text);
+    s.note.textContent = text ? '🔳 QR: ' + spQR.summary(text) : '🔳 QR-коду не знайдено — «✂️ Обрізати» навколо нього або «🔳 Сканувати лише QR».';
+  }
+  function scanQR(s){
+    var gen = s.gen; s.note.classList.remove('ok'); s.note.textContent = '🔳 Шукаю QR-код…';
+    spQR.fromCanvas(s.work, true).then(function(text){ if (gen === s.gen) setQR(s, text); })
+      .catch(function(){ if (gen === s.gen) s.note.textContent = '🔳 QR не перевірено (немає зв\'язку з бібліотекою) — AI прочитає текст з фото.'; });
+  }
+  function commit(s, rescan){                        // змінене фото → у поле файлу (на сервер піде саме воно)
+    s.work.toBlob(function(blob){
+      var dt = new DataTransfer(); dt.items.add(new File([blob], s.name + '.jpg', {type: 'image/jpeg'}));
+      s.input.files = dt.files; draw(s); if (rescan) { s.gen++; scanQR(s); }
+    }, 'image/jpeg', 0.92);
+  }
+  function rotate(s, dir){
+    var w = s.work, c = document.createElement('canvas'); c.width = w.height; c.height = w.width;
+    var ctx = c.getContext('2d'); ctx.translate(c.width / 2, c.height / 2); ctx.rotate(dir * Math.PI / 2);
+    ctx.drawImage(w, -w.width / 2, -w.height / 2); s.work = c; commit(s, false);
+  }
+  function cropMode(s, on){
+    s.cropping = on; s.crop = null; s.prev.classList.toggle('crop', on);
+    s.tools.querySelector('[data-act=crop]').style.display = on ? 'none' : '';
+    s.tools.querySelector('[data-act=cropok]').style.display = on ? '' : 'none';
+    s.tools.querySelector('[data-act=cropno]').style.display = on ? '' : 'none';
+    $('sc-' + s.name + '-cropnote').style.display = on ? '' : 'none'; draw(s);
+  }
+  function tool(s, act){
+    if (!s.work) return;
+    if (act === 'left') rotate(s, -1);
+    else if (act === 'right') rotate(s, 1);
+    else if (act === 'crop') cropMode(s, true);
+    else if (act === 'cropno') cropMode(s, false);
+    else if (act === 'cropok') {
+      var r = s.crop; if (!r || r.w < 8 || r.h < 8) { cropMode(s, false); return; }
+      var k = s.k, c = document.createElement('canvas'); c.width = Math.round(r.w / k); c.height = Math.round(r.h / k);
+      c.getContext('2d').drawImage(s.work, r.x / k, r.y / k, r.w / k, r.h / k, 0, 0, c.width, c.height);
+      s.work = c; cropMode(s, false); commit(s, true);
+    }
+    else if (act === 'qr') { s.gen++; scanQR(s); }
+    else if (act === 'reset' && s.orig) { var dt = new DataTransfer(); dt.items.add(s.orig); s.input.files = dt.files; load(s, s.orig); }
+  }
+  function cropEvents(s){
+    var start = null;
+    function pos(e){ var r = s.prev.getBoundingClientRect(), sx = s.prev.width / r.width, sy = s.prev.height / r.height;
+      return {x: Math.max(0, Math.min(s.prev.width, (e.clientX - r.left) * sx)), y: Math.max(0, Math.min(s.prev.height, (e.clientY - r.top) * sy))}; }
+    s.prev.addEventListener('pointerdown', function(e){ if (!s.cropping) return; e.preventDefault(); start = pos(e); try { s.prev.setPointerCapture(e.pointerId); } catch (x) {} });
+    s.prev.addEventListener('pointermove', function(e){ if (!start) return; var p = pos(e);
+      s.crop = {x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y)}; draw(s); });
+    s.prev.addEventListener('pointerup', function(){ start = null; });
+  }
+  ['front', 'back'].forEach(side);
+
+  // ── 📷 Камера: рамка, фото або «лише QR», постійний пошук QR у кадрі, спалах, зум ──
+  var video = $('sc-video'), frame = $('sc-frame'), note = $('sc-cam-note'), stream = null, track = null, mode = '', timer = null, busy = false;
+  var box = {x: .1, y: .1, w: .8, h: .8};
+  function layout(){
+    var W = video.videoWidth, H = video.videoHeight; if (!W || !H) return;
+    if (mode === 'qr') { var side_ = .62 * Math.min(W, H); box = {w: side_ / W, h: side_ / H}; }
+    else { var fw = (H > W ? .92 : .8) * W, fh = fw / 1.586; if (fh > .9 * H) { fh = .9 * H; fw = fh * 1.586; } box = {w: fw / W, h: fh / H}; }
+    box.x = (1 - box.w) / 2; box.y = (1 - box.h) / 2;
+    frame.style.left = box.x * 100 + '%'; frame.style.top = box.y * 100 + '%';
+    frame.style.width = box.w * 100 + '%'; frame.style.height = box.h * 100 + '%';
+  }
+  function grab(onlyFrame, margin){            // поточний кадр (або рамка з полями) у повній роздільності
+    var W = video.videoWidth, H = video.videoHeight, m = margin || 0;
+    var x = 0, y = 0, w = W, h = H;
+    if (onlyFrame) { x = Math.max(0, (box.x - m) * W); y = Math.max(0, (box.y - m) * H);
+      w = Math.min(W - x, (box.w + 2 * m) * W); h = Math.min(H - y, (box.h + 2 * m) * H); }
+    var c = document.createElement('canvas'); c.width = Math.round(w); c.height = Math.round(h);
+    c.getContext('2d').drawImage(video, x, y, w, h, 0, 0, c.width, c.height);
+    return c;
+  }
+  function toSide(name, canvas, qrText){
+    canvas.toBlob(function(blob){
+      var s = side(name), f = new File([blob], name + '.jpg', {type: 'image/jpeg'}), dt = new DataTransfer();
+      dt.items.add(f); s.input.files = dt.files; s.orig = f; load(s, f, qrText || '');
+    }, 'image/jpeg', 0.92);
+  }
+  function stop(){
+    if (timer) clearInterval(timer); timer = null;
+    if (stream) stream.getTracks().forEach(function(t){ t.stop(); });
+    stream = track = null; mode = ''; $('sc-cambox').style.display = 'none'; $('sc-camctl').style.display = 'none';
+    frame.classList.remove('ok');
+  }
+  function start(m){
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       note.textContent = 'Браузер не дає камеру цій сторінці (потрібен HTTPS) — виберіть файл: на телефоні кнопка вибору файлу сама запропонує камеру.';
       return;
     }
-    navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: 'environment'}, width: {ideal: 1920}, height: {ideal: 1080}}, audio: false})
-      .then(function(s){ stream = s; video.srcObject = s; video.style.display = 'block';
-        snap.style.display = stop.style.display = ''; cam.style.display = 'none'; note.textContent = 'Наведіть на візитку й натисніть «⏺ Зробити фото».'; })
-      .catch(function(e){ note.textContent = 'Камера недоступна (' + e.name + ') — дозвольте камеру в браузері або виберіть файл.'; });
-  });
-  stop.addEventListener('click', off);
-  snap.addEventListener('click', function(){
+    stop(); mode = m;
+    navigator.mediaDevices.getUserMedia({audio: false, video: {facingMode: {ideal: 'environment'},
+                                                               width: {ideal: 3840}, height: {ideal: 2160}}})
+      .then(function(s){
+        stream = s; track = s.getVideoTracks()[0]; video.srcObject = s;
+        $('sc-cambox').style.display = 'block'; $('sc-camctl').style.display = 'flex';
+        $('sc-snap').style.display = $('sc-cropwrap').style.display = m === 'qr' ? 'none' : '';
+        var caps = track.getCapabilities ? track.getCapabilities() : {};
+        try { if ((caps.focusMode || []).indexOf('continuous') >= 0) track.applyConstraints({advanced: [{focusMode: 'continuous'}]}); } catch (e) {}
+        $('sc-torch').style.display = caps.torch ? '' : 'none';
+        var z = $('sc-zoom');
+        if (caps.zoom) { z.min = caps.zoom.min; z.max = caps.zoom.max; z.step = caps.zoom.step || .1;
+          z.value = (track.getSettings() || {}).zoom || caps.zoom.min; $('sc-zoomwrap').style.display = ''; }
+        else $('sc-zoomwrap').style.display = 'none';
+        note.textContent = m === 'qr' ? 'Наведіть рамку на QR-код — фото зробиться само, щойно Minerva його прочитає.'
+                                      : 'Наведіть рамку на візитку й натисніть «⏺ Зробити фото». QR-код Minerva шукає вже зараз.';
+        video.onloadedmetadata = function(){ layout(); };
+        timer = setInterval(tick, 350);
+      })
+      .catch(function(e){ note.textContent = 'Камера недоступна (' + e.name + ') — дозвольте камеру в браузері або виберіть файл.'; stop(); });
+  }
+  function tick(){
+    if (busy || !stream || !video.videoWidth) return;
+    busy = true; layout();
+    var c = grab(true, .02), k = Math.min(1, 1000 / Math.max(c.width, c.height));
+    if (k < 1) { var d = document.createElement('canvas'); d.width = Math.round(c.width * k); d.height = Math.round(c.height * k);
+      d.getContext('2d').drawImage(c, 0, 0, d.width, d.height); c = d; }
+    spQR.fromCanvas(c, false).then(function(text){
+      busy = false; if (!text || !stream) return;
+      var name = curSide(), s = side(name);
+      frame.classList.add('ok'); if (navigator.vibrate) navigator.vibrate(120);
+      if (mode === 'qr') {
+        var shot = grab(true, .15);
+        stop(); toSide(name, shot, text);
+        note.textContent = '✅ QR прочитано: ' + spQR.summary(text) + (s.orig ? '' : ' · фото збережено з кадру');
+      } else {
+        s.qr.value = text; s.note.classList.add('ok'); s.note.textContent = '🔳 QR: ' + spQR.summary(text);
+        s.camQR = text; note.textContent = '🔳 QR уже прочитано — тепер «⏺ Зробити фото» всієї візитки.';
+      }
+    }).catch(function(){ busy = false; });
+  }
+  $('sc-cam').addEventListener('click', function(){ start('photo'); });
+  $('sc-qrcam').addEventListener('click', function(){ start('qr'); });
+  $('sc-stop').addEventListener('click', stop);
+  $('sc-snap').addEventListener('click', function(){
     if (!stream) return;
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    var side = document.querySelector('input[name=_side]:checked').value;
-    canvas.toBlob(function(blob){
-      var input = document.getElementById(side === 'back' ? 'sc-back' : 'sc-front');
-      var dt = new DataTransfer(); dt.items.add(new File([blob], side + '.jpg', {type: 'image/jpeg'}));
-      input.files = dt.files; preview(input, document.getElementById(side === 'back' ? 'sc-back-img' : 'sc-front-img'));
-      note.textContent = side === 'back' ? '✅ Зворотний бік знято.' : '✅ Лицьовий бік знято — можна зняти зворотний (виберіть «зворотний»).';
-      if (side === 'front') { var r = document.querySelector('input[name=_side][value=back]'); if (r) r.checked = true; }
-    }, 'image/jpeg', 0.9);
+    var name = curSide(), shot = grab($('sc-onlyframe').checked, .05), qrText = side(name).camQR || '';
+    side(name).camQR = ''; toSide(name, shot, qrText);
+    note.textContent = name === 'back' ? '✅ Зворотний бік знято.' : '✅ Лицьовий бік знято — можна зняти зворотний (виберіть «зворотний»).';
+    if (name === 'front') { var r = form.querySelector('input[name=_side][value=back]'); r.checked = true; r.dispatchEvent(new Event('change')); }
   });
-  document.getElementById('sc-form').addEventListener('submit', off);
+  $('sc-torch').addEventListener('click', function(){
+    if (!track) return; var on = !this.classList.contains('on'); this.classList.toggle('on', on);
+    track.applyConstraints({advanced: [{torch: on}]}).catch(function(){});
+  });
+  $('sc-zoom').addEventListener('input', function(){ if (track) track.applyConstraints({advanced: [{zoom: parseFloat(this.value)}]}).catch(function(){}); });
+  form.addEventListener('submit', stop);
 })();
 </script>
-{% include "admin/suppliers/_qr_js.html" %}
 {% endblock %}

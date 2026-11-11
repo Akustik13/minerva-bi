@@ -17,6 +17,14 @@ LABELS = {"name": "фірма", "website": "сайт", "email": "email", "phone"
           "contact_position": "посада", "contact_email": "email контакту", "contact_phone": "телефон контакту",
           "contact_mobile": "мобільний", "notes": "примітка"}
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+# Посилання на месенджери й соцмережі — не сайт фірми: у примітку («WeChat: …»)
+SOCIAL = (("wechat", re.compile(r"(u\.wechat\.com|weixin\.qq\.com|wechat\.com)", re.I), "WeChat"),
+          ("telegram", re.compile(r"(t\.me|telegram\.me)/", re.I), "Telegram"),
+          ("linkedin", re.compile(r"linkedin\.com/", re.I), "LinkedIn"),
+          ("skype", re.compile(r"^skype:", re.I), "Skype"),
+          ("line", re.compile(r"line\.me/", re.I), "LINE"),
+          ("social", re.compile(r"(facebook\.com|instagram\.com|x\.com|twitter\.com|youtube\.com)/", re.I), ""))
+PRIORITY = {"vcard": 0, "mecard": 0, "url": 1, "email": 2, "phone": 2, "whatsapp": 2}
 
 
 def clean_text(value) -> str:
@@ -187,6 +195,9 @@ def parse(text) -> dict:
     elif re.match(r"(https?://)?(wa\.me|api\.whatsapp\.com)/", low):
         number = re.search(r"(\d{7,15})", t)
         out, kind = ({"contact_mobile": "+" + number.group(1)} if number else {}), "whatsapp"
+    elif any(rx.search(t) for _k, rx, _n in SOCIAL):
+        key, _rx, name = next(x for x in SOCIAL if x[1].search(t))
+        out, kind = {"notes": f"{name or 'Профіль'}: {t.split()[0][:200]}"}, key
     elif re.match(r"(https?://|www\.)", low):
         out, kind = {"website": _website(t.split()[0])}, "url"
     else:
@@ -202,11 +213,19 @@ def parse(text) -> dict:
 
 
 def parse_all(qr_text) -> dict:
-    """SupplierMedia.qr_text (лицьовий і зворотний бік) → одне злиття полів, перший бік головний."""
-    out = {}
-    for part in str(qr_text or "").split(SEPARATOR):
-        for k, v in parse(part).items():
-            out.setdefault(k, v)
+    """SupplierMedia.qr_text (усі коди обох боків) → одне злиття полів: спершу vCard / MeCard (там уся візитка),
+    потім посилання; у межах виду — у порядку кодів. Примітки (WeChat, LinkedIn…) — разом через «; »."""
+    parsed = [parse(part) for part in str(qr_text or "").split(SEPARATOR)]
+    parsed = sorted((p for p in parsed if p), key=lambda p: PRIORITY.get(p.get("kind"), 3))
+    out, notes = {}, []
+    for p in parsed:
+        for k, v in p.items():
+            if k == "notes":
+                notes.append(v)
+            else:
+                out.setdefault(k, v)
+    if notes:
+        out["notes"] = "; ".join(dict.fromkeys(notes))[:1000]
     return out
 
 

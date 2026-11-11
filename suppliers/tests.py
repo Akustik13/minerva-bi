@@ -412,8 +412,8 @@ class QRTests(Base):
         self.assertEqual(qr.parse("https://www.example.com/de/kontakt")["website"], "https://www.example.com/de/kontakt")
         self.assertEqual(qr.parse("https://wa.me/491701234567")["contact_mobile"], "+491701234567")
         self.assertEqual(qr.parse("just some text"), {})
-        both = qr.parse_all(qr.join("https://www.other.com", VCARD))            # лицьовий бік головний
-        self.assertEqual((both["website"], both["name"]), ("https://www.other.com", "Cable Tech GmbH"))
+        both = qr.parse_all(qr.join("https://www.other.com", VCARD))            # vCard головніший за посилання
+        self.assertEqual((both["website"], both["name"]), ("https://www.cable-tech.de", "Cable Tech GmbH"))
         merged = qr.merge(qr.parse(VCARD), {"name": "Cable Tec", "email": "wrong@x.de", "description": "Kabel"})
         self.assertEqual((merged["name"], merged["email"], merged["description"]),
                          ("Cable Tech GmbH", "tom@cable-tech.de", "Kabel"))
@@ -451,3 +451,59 @@ class QRTests(Base):
         self.client.post(url, {"action": "qr", "qr_front": "", "qr_back": ""})       # нічого — нічого не змінює
         m.refresh_from_db()
         self.assertEqual(m.extracted["name"], "PCBWay")
+
+
+class PresetTests(Base):
+    def test_presets_save_default_shared_and_delete(self):
+        url = reverse("admin:inventory_supplier_card_presets")
+        j = self.client.post(url, {"action": "save", "name": "electronica 2026, хол B3", "event": "electronica 2026, хол B3",
+                                   "kind": "card", "marks": ["fair", "sample", "bogus"], "categories": [self.pcb.pk],
+                                   "read_ai": "1", "model": "claude-haiku-5-5", "shared": "1",
+                                   "make_default": "1"}).json()
+        from suppliers.models import SupplierCardPreset
+        p = SupplierCardPreset.objects.get()
+        self.assertEqual((j["id"], j["default"], p.marks, p.model, p.shared), (p.pk, p.pk, ["fair", "sample"],
+                                                                             "claude-haiku-5-5", True))
+        self.assertEqual(list(p.categories.all()), [self.pcb])
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.ui_prefs.get("supplier_card_preset"), p.pk)
+        page = self.client.get(reverse("admin:inventory_supplier_card"))
+        self.assertContains(page, "electronica 2026, хол B3")
+        # колега бачить спільний пресет, але не може його видалити
+        self.other.profile.role = "warehouse"
+        self.other.profile.save()
+        self.client.force_login(self.other)
+        j = self.client.post(url, {"action": "delete", "id": p.pk}).json()
+        self.assertTrue(SupplierCardPreset.objects.filter(pk=p.pk).exists())
+        self.assertEqual([x["name"] for x in j["presets"]], ["electronica 2026, хол B3"])
+        self.client.force_login(self.user)
+        j = self.client.post(url, {"action": "delete", "id": p.pk}).json()
+        self.assertEqual((j["presets"], j["default"]), ([], None))
+
+    def test_save_and_next_keeps_preset_and_categories(self):
+        from suppliers.models import SupplierCardPreset
+        p = SupplierCardPreset.objects.create(owner=self.user, name="Fair", event="Fair 2026")
+        resp = self.client.post(reverse("admin:inventory_supplier_card"), {
+            "image": SimpleUploadedFile("card.png", png(), content_type="image/png"), "kind": "card",
+            "event": "Fair 2026", "preset": p.pk, "categories": [self.pcb.pk], "go": "next"})
+        self.assertEqual(resp["Location"], reverse("admin:inventory_supplier_card") + f"?preset={p.pk}")
+        m = SupplierMedia.objects.get()
+        self.assertEqual((m.preset, list(m.categories.all())), (p, [self.pcb]))
+        review = self.client.get(reverse("admin:inventory_supplier_card_review", args=[m.pk]))
+        self.assertContains(review, f'name="categories" value="{self.pcb.pk}" checked')
+        foreign = SupplierCardPreset.objects.create(owner=self.other, name="Olga private")
+        self.client.post(reverse("admin:inventory_supplier_card"), {
+            "image": SimpleUploadedFile("card.png", png(), content_type="image/png"), "preset": foreign.pk})
+        self.assertIsNone(SupplierMedia.objects.order_by("-pk").first().preset)     # чужий особистий — ні
+
+
+class QRManyCodesTests(Base):
+    def test_vcard_wins_and_messenger_links_go_to_notes(self):
+        from suppliers.services import qr
+        text = qr.join("https://u.wechat.com/example-taylor" + qr.SEPARATOR + "https://www.linkedin.com/in/taylor",
+                       "BEGIN:VCARD\nFN:Taylor Young\nORG:PSElectronics\nURL:www.pspcb.example\nEND:VCARD")
+        d = qr.parse_all(text)
+        self.assertEqual((d["kind"], d["name"], d["website"]), ("vcard", "PSElectronics", "https://www.pspcb.example"))
+        self.assertEqual(d["notes"], "WeChat: https://u.wechat.com/example-taylor; LinkedIn: https://www.linkedin.com/in/taylor")
+        self.assertEqual(qr.parse_all("https://t.me/fabsales")["notes"], "Telegram: https://t.me/fabsales")
+        self.assertNotIn("website", qr.parse_all("https://u.wechat.com/x"))
