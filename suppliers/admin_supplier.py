@@ -893,6 +893,45 @@ class SupplierCardMixin:
         if not _can(request, "view"):
             raise Http404
         can_read = _can(request, "change") or _can(request, "add")
+        def picked(values):
+            ids = [int(x) for x in values if str(x).isdigit()][:cards.SHARE_MAX]
+            by_pk = {m.pk: m for m in SupplierMedia.objects.filter(pk__in=ids).select_related("supplier")}
+            return [by_pk[i] for i in ids if i in by_pk]          # у порядку, як вибрали на сторінці
+        if request.method == "GET" and request.GET.get("vcf"):    # ⬇ vCard вибраних — одним файлом
+            ms = picked(request.GET["vcf"].split(","))
+            if not ms:
+                raise Http404
+            resp = HttpResponse("".join(cards.vcard(m) for m in ms), content_type="text/vcard; charset=utf-8")
+            resp["Content-Disposition"] = f'attachment; filename="contacts-{len(ms)}.vcf"'
+            return resp
+        if request.method == "POST" and request.POST.get("action") == "share_many":   # ✉️ вибрані — одним листом
+            ms = picked(request.POST.getlist("ids"))
+            try:
+                d = cards.share_many(ms, request.user, {m.pk: request.build_absolute_uri(
+                    reverse("admin:inventory_supplier_card_review", args=[m.pk])) for m in ms})
+            except ValueError as e:
+                self.message_user(request, str(e), messages.ERROR)
+                return redirect(request.path)
+            return redirect(f"/email/compose/?draft={d.pk}")
+        if request.method == "POST" and request.POST.get("action") == "delete_many":  # 🗑 вибрані
+            ids = [int(x) for x in request.POST.getlist("ids") if str(x).isdigit()][:200]
+            gone = refused = 0
+            for m in SupplierMedia.objects.filter(pk__in=ids):
+                if _can(request, "change") or (_can(request, "add") and m.created_by_id == request.user.pk):
+                    cards.delete(m)
+                    gone += 1
+                else:
+                    refused += 1
+            if gone:
+                self.message_user(request, f"🗑 Видалено візиток: {gone}", messages.SUCCESS)
+            if refused:
+                self.message_user(request, f"Не видалено {refused} — це фото інших людей, а права змінювати "
+                                           f"постачальників у вас немає.", messages.WARNING)
+            return redirect(request.get_full_path())
+        if request.method == "POST" and request.POST.get("action") == "tile_prefs":   # ⚙ що показувати — лише собі
+            out = cards.save_tile_prefs(request.user, request.POST.getlist("hide"), request.POST.get("desc"),
+                                        reset=bool(request.POST.get("reset")))
+            return JsonResponse({"ok": True, **out})
         if request.method == "POST":
             if request.POST.get("action") != "read_all" or not can_read:
                 return JsonResponse({"error": "Немає права"}, status=403)
@@ -914,6 +953,11 @@ class SupplierCardMixin:
         show = request.GET.get("show", "")
         if show == "new":
             qs = qs.filter(supplier=None, customer=None)
+        event = " ".join(request.GET.get("event", "").split())[:200]       # клік на подію в «📊 Статистиці»
+        if event == "-":
+            qs = qs.filter(event="")
+        elif event:
+            qs = qs.filter(event__iexact=event)
         ai_filter = request.GET.get("ai", "")
         if ai_filter == "done":
             qs = qs.filter(cost_usd__gt=0)
@@ -937,7 +981,9 @@ class SupplierCardMixin:
         u = request.user
         return TemplateResponse(request, "admin/suppliers/cards.html", self._ctx(
             request, "🪪 Візитки й флаєри", items=items, show=show, q=q, mark=mark, marks=SupplierMedia.MARKS,
-            ai_filter=ai_filter, can_read=can_read,
+            ai_filter=ai_filter, can_read=can_read, prefs=cards.tile_prefs(u), tile_fields=cards.TILE_FIELDS,
+            event=event, stats=cards.stats(),
+            desc_modes=cards.DESC_MODES,
             counts=cards.card_counts(u, _can(request, "change")) if can_read else {},
             unassigned=SupplierMedia.objects.filter(supplier=None, customer=None).count(),
             crm_can=u.has_perm("crm.add_customer") or u.has_perm("crm.change_customer"),
@@ -1167,10 +1213,7 @@ class SupplierCardMixin:
             if not (_can(request, "change") or m.created_by_id == request.user.pk):
                 raise Http404
             sid = m.supplier_id
-            for f in (m.image, m.image_back, m.image_original, m.image_back_original):
-                if f:
-                    f.delete(save=False)
-            m.delete()
+            cards.delete(m)
             self.message_user(request, "🗑 Фото видалено", messages.INFO)
             return redirect(reverse("admin:inventory_supplier_change", args=[sid]) if sid else
                             reverse("admin:inventory_supplier_cards"))

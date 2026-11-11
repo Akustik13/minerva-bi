@@ -879,3 +879,91 @@ class CardsTests(Base):
         with mock.patch.object(ai, "call", side_effect=ai.AIError("Немає ключа AI")) as call:
             out = cards.read_many([self.card().pk for _ in range(5)], self.user, "")
         self.assertEqual((out["done"], out["failed"], call.call_count), (0, 3, 3))
+
+    def test_tile_prefs_per_person(self):
+        from suppliers.services import cards
+        self.card(name="Leeno", description="Pogo pins")
+        url = reverse("admin:inventory_supplier_cards")
+        page = self.client.get(url)
+        self.assertContains(page, 'data-desc="collapsed"')
+        self.assertContains(page, "<summary>📝 Що роблять</summary>")
+        self.assertNotContains(page, "<details class=\"spc-desc spc-f-desc\" open>")
+        self.user.profile.ui_prefs = {"theme": "dark"}
+        self.user.profile.save()
+        j = self.client.post(url, {"action": "tile_prefs", "hide": ["crm", "note", "bogus"], "desc": "full"}).json()
+        self.assertEqual((j["hide"], j["desc"]), (["crm", "note"], "full"))
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.ui_prefs["theme"], "dark")            # решта вибору людини — як була
+        page = self.client.get(url)
+        self.assertContains(page, '<details class="spc-desc spc-f-desc" open>')
+        self.assertContains(page, 'class="spc-cf" value="crm" >')                 # галочка знята
+        self.assertEqual(cards.tile_prefs(self.other), {"hide": [], "desc": "collapsed"})   # інших не зачіпає
+        self.client.post(url, {"action": "tile_prefs", "reset": "1"})
+        self.user.profile.refresh_from_db()
+        self.assertNotIn(cards.PREFS_KEY, self.user.profile.ui_prefs)
+
+    def test_share_many_and_vcard_many(self):
+        from email_assistant.models import EmailDraft
+        a = self.card(name="Leeno Industrial", contact_name="Castor Park")
+        b = self.card(name="Bornico", contact_name="Maciej Bornikowski")
+        url = reverse("admin:inventory_supplier_cards")
+        resp = self.client.post(url, {"action": "share_many", "ids": [b.pk, a.pk, 99999]})
+        d = EmailDraft.objects.get()
+        self.assertRedirects(resp, f"/email/compose/?draft={d.pk}", fetch_redirect_response=False)
+        self.assertEqual(d.subject, "Візитки (2): electronica 2026")
+        self.assertTrue(d.body.startswith("1. ") and "2. " in d.body)
+        self.assertLess(d.body.index("Bornico"), d.body.index("Leeno"))            # у порядку вибору
+        self.assertIn(f"/admin/inventory/supplier/cards/{a.pk}/", d.body)
+        self.assertEqual(len(d.attachments), 5)                                      # 2 × 2 фото + один .vcf
+        self.assertEqual(d.attachments[-1]["name"], "contacts-2.vcf")
+        vcf = self.client.get(url + f"?vcf={a.pk},{b.pk}")
+        self.assertEqual(vcf.content.decode().count("BEGIN:VCARD"), 2)
+        self.assertIn("contacts-2.vcf", vcf["Content-Disposition"])
+        with mock.patch("suppliers.services.cards.PHOTOS_MAX_BYTES", 1):          # фото не влазять — лише текст і .vcf
+            from suppliers.services import cards
+            d2 = cards.share_many([a, b], self.user)
+        self.assertEqual([x["name"] for x in d2.attachments], ["contacts-2.vcf"])
+        self.assertIn("Фото не всіх візиток вклалися", d2.body)
+        self.client.post(url, {"action": "share_many"})                              # нічого не вибрано
+        self.assertEqual(EmailDraft.objects.count(), 2)
+
+    def test_stats_by_event_and_filter(self):
+        from crm.models import Customer
+        from suppliers.services import cards
+        a = self.card(name="Leeno Industrial Co., Ltd", contact_email="park@leeno.co.kr", addr_country="KR")
+        self.card(name="Leeno Industrial", contact_email="kim@leeno.co.kr", addr_country="KR")
+        c = self.card(name="Bornico Sp. z o.o.", contact_name="Maciej", addr_country="PL")
+        SupplierMedia.objects.filter(pk=c.pk).update(event="", customer=Customer.objects.create(name="M"))
+        SupplierMedia.objects.filter(pk=a.pk).update(supplier=self.supplier, cost_usd=Decimal("0.01"), marks=["star"])
+        s = cards.stats()
+        fair = next(g for g in s["events"] if g["event"] == "electronica 2026")
+        self.assertEqual((fair["cards"], fair["people"], fair["companies"], fair["suppliers"], fair["new"], fair["ai"]),
+                         (2, 2, 1, 1, 1, 1))
+        self.assertEqual(fair["countries"][0][1], 2)
+        self.assertEqual(fair["marks"], [("⭐ Важливий", 1)])
+        none = next(g for g in s["events"] if g["key"] == "-")
+        self.assertEqual((none["event"], none["customers"]), (cards.NO_EVENT, 1))
+        self.assertEqual(s["total"]["cards"], 3)
+        url = reverse("admin:inventory_supplier_cards")
+        page = self.client.get(url)
+        self.assertContains(page, "📊 Статистика візиток")
+        self.assertEqual(len(self.client.get(url + "?event=-").context["items"]), 1)
+        self.assertEqual(len(self.client.get(url + "?event=ELECTRONICA 2026").context["items"]), 2)
+
+    def test_delete_many_only_allowed(self):
+        import os
+        mine, theirs = self.card(), self.card()
+        SupplierMedia.objects.filter(pk=theirs.pk).update(created_by=self.other)
+        path = os.path.join(self.media, *mine.image.name.split("/"))
+        self.assertTrue(os.path.exists(path))
+        url = reverse("admin:inventory_supplier_cards")
+        self.client.post(url, {"action": "delete_many", "ids": [mine.pk, theirs.pk]})
+        self.assertFalse(SupplierMedia.objects.exists())                         # суперкористувачу — усі
+        self.assertFalse(os.path.exists(path))                                   # і файли
+        mine, theirs = self.card(), self.card()
+        SupplierMedia.objects.filter(pk=theirs.pk).update(created_by=self.other)
+        real = User.has_perm                                                    # лише «додавати»: чуже — ні
+        with mock.patch.object(User, "has_perm", lambda u, perm, obj=None: perm != "inventory.change_supplier"
+                               and real(u, perm, obj)):
+            self.client.post(url, {"action": "delete_many", "ids": [mine.pk, theirs.pk]})
+        self.assertEqual(list(SupplierMedia.objects.values_list("pk", flat=True)), [theirs.pk])

@@ -1,5 +1,6 @@
 {% extends "admin/base_site.html" %}
-{# 🪪 Усі візитки й флаєри — suppliers/admin_supplier.py cards_view, плитка — suppliers/services/cards.py info #}
+{# 🪪 Усі візитки й флаєри — suppliers/admin_supplier.py cards_view, плитка — suppliers/services/cards.py info, #}
+{# що показувати — cards.tile_prefs (кожна людина своє; поля ховаються класами spc-off-<ключ>, без перезавантаження) #}
 {% block title %}{{ title }} | Minerva{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
@@ -11,20 +12,38 @@
 {% include "admin/suppliers/_styles.html" %}
 {{ style }}
 <style>
-.spc{width:236px;display:flex;flex-direction:column;gap:2px}
+.spc{width:236px;display:flex;flex-direction:column;gap:2px;position:relative}
 .spc img{height:120px}
+.spc-pick{position:absolute;top:10px;left:10px;z-index:2;width:20px;height:20px;margin:0;cursor:pointer;accent-color:var(--primary,#5b8def)}
+.spc.spc-sel{outline:2px solid var(--primary,#5b8def);outline-offset:1px}
 .spc-top{display:flex;justify-content:space-between;gap:4px;align-items:baseline}
 .spc-top a{text-decoration:none;color:inherit}
 .spc-ai{font-size:11px;white-space:nowrap;border-radius:8px;padding:0 5px;border:1px solid var(--border-strong,#ccc)}
 .spc-ai-ai{color:var(--ok,#2e7d32);border-color:currentColor}.spc-ai-failed{color:var(--warning-fg,#b06d00);border-color:currentColor}
 .spc-ai-none{color:var(--text-muted,#888)}
 .spc-co{font-weight:600}
+.spc-line{display:flex;flex-wrap:wrap;gap:2px 10px}
 .spc-guess{opacity:.8;border-style:dashed}
 .spc-new{font-size:12px;border:1px dashed var(--border-strong,#ccc);border-radius:6px;padding:3px 5px}
+.spc-desc summary{cursor:pointer;font-size:12px;color:var(--text-muted,#888);list-style-position:inside}
+.spc-desc .sp-note{margin-top:2px}
 .spc-acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:auto;padding-top:4px}
 .spc-acts form{display:inline;margin:0}
 .spc-acts .button{padding:3px 8px;font-size:12px}
 .spc-bulk{border:1px solid var(--border-strong,#ccc);border-radius:8px;padding:4px 10px;margin:4px 0 8px}
+.spc-cfg{border:1px solid var(--border-strong,#ccc);border-radius:8px;padding:8px 12px;margin:4px 0 8px;background:var(--bg-card,transparent)}
+.spc-cfg label{display:inline-flex;align-items:center;gap:4px;margin:2px 14px 2px 0;width:auto;float:none;padding:0;font-weight:normal}
+.spc-cfg h4{margin:4px 0}
+.spc-stats{overflow-x:auto}
+.spc-stats table{border-collapse:collapse;font-size:13px;min-width:760px}
+.spc-stats th,.spc-stats td{padding:3px 8px;border-bottom:1px solid var(--border-strong,#ccc);text-align:left;vertical-align:top}
+.spc-stats td.n{text-align:right;font-variant-numeric:tabular-nums}
+.spc-stats tr.spc-total td{font-weight:600}
+.spc-stats .on{background:var(--selected-bg,rgba(91,141,239,.15))}
+#spc-bar{position:sticky;bottom:0;z-index:5;display:none;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 12px;margin-top:8px;border:1px solid var(--border-strong,#ccc);border-radius:8px;background:var(--body-bg,#fff);box-shadow:0 -2px 8px rgba(0,0,0,.15)}
+#spc-bar.on{display:flex}
+{% for k, label in tile_fields %}.spc-off-{{ k }} .spc-f-{{ k }}{display:none!important}
+{% endfor %}.spc-desc-off .spc-f-desc{display:none!important}
 @media (max-width:768px){.spc{width:100%}}
 </style>
 <div class="spp">
@@ -41,7 +60,37 @@
     </select>
     <select name="mark"><option value="">будь-яка позначка</option>{% for v, n in marks %}<option value="{{ v }}" {% if v == mark %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
     <button type="submit" class="button">🔍 Показати</button>
+    <button type="button" class="button" id="spc-cfg-btn" aria-expanded="false" aria-controls="spc-cfg" title="Що показувати на плитках — лише для вас">⚙ Що показувати</button>
+    {% if event %}<input type="hidden" name="event" value="{{ event }}">{% endif %}
+    <button type="button" class="button" id="spc-stats-btn" aria-expanded="false" aria-controls="spc-stats" title="Скільки візиток, людей і фірм з кожної виставки, що вже внесено">📊 Статистика</button>
+    {% if items %}<button type="button" class="button" id="spc-all" title="Вибрати всі візитки на сторінці — поділитись разом">☑ Вибрати всі</button>{% endif %}
   </form>
+  {% if event %}<div class="spf-row">🎪 Лише подія: <b translate="no">{% if event == "-" %}без події{% else %}{{ event }}{% endif %}</b> <a class="button" href="?">✕ Усі події</a></div>{% endif %}
+  <div class="spc-cfg spc-stats" id="spc-stats" hidden>
+    <h4>📊 Статистика візиток <span class="sp-muted">— по подіях (поле «Де взяли»), усі візитки</span></h4>
+    <table>
+      <tr><th>Подія</th><th>Візиток</th><th>Людей</th><th>Фірм</th><th title="Внесено постачальником">🏭</th><th title="Внесено клієнтом CRM">👤</th><th>Ще не внесено</th><th title="Прочитав AI">🧠</th><th>Країни</th><th>Категорії</th><th>Позначки</th><th>Коли</th></tr>
+      {% for g in stats.events %}
+      <tr{% if event and g.key == event or event and g.event|lower == event|lower %} class="on"{% endif %}><td><a href="?event={{ g.key|default:'-'|urlencode }}" translate="no">{{ g.event }}</a></td>
+        <td class="n">{{ g.cards }}</td><td class="n">{{ g.people }}</td><td class="n">{{ g.companies }}</td>
+        <td class="n">{{ g.suppliers }}</td><td class="n">{{ g.customers }}</td><td class="n">{{ g.new }}</td><td class="n">{{ g.ai }}</td>
+        <td>{% for c, n in g.countries %}{{ c }} · {{ n }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+        <td>{% for c, n in g.cats %}{{ c }} · {{ n }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+        <td>{% for c, n in g.marks %}{{ c }} · {{ n }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td>
+        <td style="white-space:nowrap">{{ g.first|date:"d.m.Y" }}{% if g.last != g.first %} – {{ g.last|date:"d.m.Y" }}{% endif %}</td></tr>
+      {% endfor %}
+      {% with t=stats.total %}{% if stats.events|length > 1 %}<tr class="spc-total"><td>Усього</td><td class="n">{{ t.cards }}</td><td class="n">{{ t.people }}</td><td class="n">{{ t.companies }}</td><td class="n">{{ t.suppliers }}</td><td class="n">{{ t.customers }}</td><td class="n">{{ t.new }}</td><td class="n">{{ t.ai }}</td>
+        <td>{% for c, n in t.countries %}{{ c }} · {{ n }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td><td>{% for c, n in t.cats %}{{ c }} · {{ n }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</td><td></td><td></td></tr>{% endif %}{% endwith %}
+    </table>
+    <div class="sp-muted">Людей — за email чи іменем контактної особи, фірм — за назвою без форми (Ltd, GmbH…). Клік на подію — лише її візитки.</div>
+  </div>
+  <div class="spc-cfg" id="spc-cfg" hidden>
+    <h4>⚙ Що показувати на плитках <span class="sp-muted">— лише для вас, на всіх пристроях</span></h4>
+    <div>{% for k, label in tile_fields %}<label><input type="checkbox" class="spc-cf" value="{{ k }}" {% if k not in prefs.hide %}checked{% endif %}> {{ label }}</label>{% endfor %}</div>
+    <h4>📝 Що роблять</h4>
+    <div>{% for v, label in desc_modes %}<label><input type="radio" name="spc-desc" class="spc-cd" value="{{ v }}" {% if v == prefs.desc %}checked{% endif %}> {{ label }}</label>{% endfor %}</div>
+    <div class="spf-row"><button type="button" class="button" id="spc-cfg-reset">↺ Як було</button> <span class="spf-job" id="spc-cfg-msg"></span></div>
+  </div>
   {% if can_read and counts.unread or can_read and counts.nocat %}
   <div class="spf-row spc-bulk">
     <span class="sp-muted">🧠 AI для кількох візиток (ще не внесених, до 40 за раз):</span>
@@ -51,40 +100,54 @@
     <span class="spf-job" id="spc-job"></span>
   </div>
   {% endif %}
-  <div class="sp-cards">
+  <div class="sp-cards" id="spc-list" data-desc="{{ prefs.desc }}">
     {% for m in items %}{% with i=m.info %}{% url 'admin:inventory_supplier_card_review' m.pk as review %}
-    <div class="sp-card spc">
+    <div class="sp-card spc" data-pk="{{ m.pk }}">
+      <input type="checkbox" class="spc-pick" value="{{ m.pk }}" title="Вибрати — поділитись разом з іншими" aria-label="Вибрати">
       <a href="{{ review }}">{% if m.image %}<img src="{{ m.image.url }}" alt="" loading="lazy">{% endif %}</a>
       <div class="spc-top"><a href="{{ review }}"><b>{{ m.get_kind_display }}</b> <span translate="no">{{ m.title }}</span></a>
-        <span class="spc-ai spc-ai-{{ i.ai.key }}" title="{{ i.ai.title }}">{{ i.ai.label }}</span></div>
-      {% if i.company %}<div class="spc-co" translate="no">🏢 {{ i.company }}</div>{% endif %}
-      {% if i.person %}<div class="sp-muted"><span translate="no">👤 {{ i.person }}</span>{% if i.position %} · <span translate="no">{{ i.position }}</span>{% endif %}</div>{% endif %}
-      {% if i.country or i.site %}<div class="sp-muted">{% if i.country %}🌍 {{ i.country }}{% endif %}{% if i.country and i.site %} · {% endif %}{% if i.site %}<a href="{{ i.site }}" target="_blank" rel="noopener noreferrer nofollow" translate="no">🌐 {{ i.site_label }}</a>{% endif %}</div>{% endif %}
-      {% if i.cats %}<div class="sp-chips">{% for c in i.cats %}<span class="sp-chip{% if i.cats_guessed %} spc-guess{% endif %}" style="border-color:{{ c.color }}" {% if i.cats_guessed %}title="Вибрав AI — ще не підтверджено"{% endif %}>{{ c.icon }} {{ c.name }}</span>{% endfor %}</div>
-      {% elif i.new_category.name %}<div class="spc-new">💡 AI пропонує нову категорію: <b>{{ i.new_category.icon }} <span translate="no">{{ i.new_category.name }}</span></b>
+        <span class="spc-ai spc-ai-{{ i.ai.key }} spc-f-ai" title="{{ i.ai.title }}">{{ i.ai.label }}</span></div>
+      {% if i.company %}<div class="spc-co spc-f-company" translate="no">🏢 {{ i.company }}</div>{% endif %}
+      {% if i.person %}<div class="sp-muted spc-f-person"><span translate="no">👤 {{ i.person }}</span>{% if i.position %} · <span translate="no">{{ i.position }}</span>{% endif %}</div>{% endif %}
+      {% if i.country or i.site %}<div class="sp-muted spc-line">{% if i.country %}<span class="spc-f-country">🌍 {{ i.country }}</span>{% endif %}{% if i.site %}<a class="spc-f-site" href="{{ i.site }}" target="_blank" rel="noopener noreferrer nofollow" translate="no">🌐 {{ i.site_label }}</a>{% endif %}</div>{% endif %}
+      {% if i.cats %}<div class="sp-chips spc-f-cats">{% for c in i.cats %}<span class="sp-chip{% if i.cats_guessed %} spc-guess{% endif %}" style="border-color:{{ c.color }}" {% if i.cats_guessed %}title="Вибрав AI — ще не підтверджено"{% endif %}>{{ c.icon }} {{ c.name }}</span>{% endfor %}</div>
+      {% elif i.new_category.name %}<div class="spc-new spc-f-newcat">💡 AI пропонує нову категорію: <b>{{ i.new_category.icon }} <span translate="no">{{ i.new_category.name }}</span></b>
         {% if can_add_category %}<form method="post" action="{{ review }}" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="add_category"><input type="hidden" name="back" value="{{ request.get_full_path }}"><button type="submit" class="button" style="padding:1px 6px;font-size:11px">＋ Додати</button></form>{% endif %}</div>
       {% endif %}
-      {% if i.desc %}<div class="sp-note" translate="no" title="{{ i.desc }}">{{ i.desc|truncatechars:120 }}</div>{% endif %}
-      <div class="sp-muted">{{ m.created_at|date:"d.m.Y" }}{% if m.event %} · <span translate="no">{{ m.event }}</span>{% endif %}</div>
-      <div>
+      {% if i.desc %}<details class="spc-desc spc-f-desc"{% if prefs.desc == "full" %} open{% endif %}><summary>📝 Що роблять</summary><div class="sp-note" translate="no">{{ i.desc }}</div></details>{% endif %}
+      <div class="sp-muted spc-f-date">{{ m.created_at|date:"d.m.Y" }}{% if m.event %} · <span translate="no">{{ m.event }}</span>{% endif %}</div>
+      <div class="spc-f-where">
         {% if m.supplier %}🏭 <a href="{% url 'admin:inventory_supplier_change' m.supplier.pk %}" translate="no">{{ m.supplier.name }}</a>{% endif %}
         {% if m.customer %}{% if crm_view %}👤 <a href="{% url 'admin:crm_customer_change' m.customer.pk %}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}👤 у CRM{% endif %}{% endif %}
         {% if not m.supplier and not m.customer %}<span class="spf-warn">ще не внесено</span>{% endif %}
       </div>
-      {% if m.marks %}<div>{{ m.marks_text }}</div>{% endif %}
-      {% if m.note %}<div class="sp-note" translate="no">{{ m.note|truncatechars:100 }}</div>{% endif %}
+      {% if m.marks %}<div class="spc-f-marks">{{ m.marks_text }}</div>{% endif %}
+      {% if m.note %}<div class="sp-note spc-f-note" translate="no">{{ m.note|truncatechars:100 }}</div>{% endif %}
       <div class="spc-acts">
-        <form method="post" action="{{ review }}" target="_blank">{% csrf_token %}<input type="hidden" name="action" value="share"><button type="submit" class="button" title="Чернетка листа з фото, даними й vCard — кому, впишете самі">✉️ Поділитись</button></form>
-        {% if crm_can and not m.customer %}<a class="button" href="{{ review }}#crm" title="Візитка покупця — внести клієнтом у CRM">👤 У CRM</a>{% endif %}
-        <a class="button" href="{{ review }}?vcf=1" title="Контакт для телефону / Outlook (.vcf)">⬇ vCard</a>
+        <form method="post" action="{{ review }}" target="_blank" class="spc-f-share">{% csrf_token %}<input type="hidden" name="action" value="share"><button type="submit" class="button" title="Чернетка листа з фото, даними й vCard — кому, впишете самі">✉️ Поділитись</button></form>
+        {% if crm_can and not m.customer %}<a class="button spc-f-crm" href="{{ review }}#crm" title="Візитка покупця — внести клієнтом у CRM">👤 У CRM</a>{% endif %}
+        <a class="button spc-f-vcard" href="{{ review }}?vcf=1" title="Контакт для телефону / Outlook (.vcf)">⬇ vCard</a>
       </div>
     </div>
     {% endwith %}{% empty %}<div class="spf-muted">Поки порожньо.</div>{% endfor %}
+  </div>
+  <div id="spc-bar" role="region" aria-label="Вибрані візитки">
+    <b id="spc-bar-n"></b>
+    <form method="post" target="_blank" id="spc-share-form" style="display:inline;margin:0">{% csrf_token %}<input type="hidden" name="action" value="share_many">
+      <button type="submit" class="button" title="Одна чернетка листа: дані всіх вибраних візиток, фото й один файл контактів (.vcf) — кому, впишете самі">✉️ Поділитись вибраними</button></form>
+    <a class="button" id="spc-vcf" href="#" title="Усі вибрані контакти одним файлом .vcf — для телефону / Outlook">⬇ vCard</a>
+    {% if can_read %}<form method="post" id="spc-del-form" style="display:inline;margin:0">{% csrf_token %}<input type="hidden" name="action" value="delete_many">
+      <button type="submit" class="button" title="Фото, примітки й позначки вибраних візиток — назавжди; постачальники й клієнти CRM лишаються">🗑 Видалити вибрані</button></form>{% endif %}
+    <button type="button" class="button" id="spc-none">✕ Зняти вибір</button>
+    <span class="sp-muted">до 30 візиток в одному листі</span>
   </div>
 </div>
 {{ job_js }}
 <script>
 (function(){
+  function csrf(){ var i = document.querySelector('input[name=csrfmiddlewaretoken]'); return i ? i.value : ''; }
+  var list = document.getElementById('spc-list');
+  // 🧠 AI для кількох
   var out = document.getElementById('spc-job');
   document.querySelectorAll('[data-read]').forEach(function(b){
     b.addEventListener('click', function(){
@@ -95,6 +158,77 @@
             function(r){ if (out) out.textContent = (r && r.message) || '✅'; setTimeout(function(){ location.reload(); }, 1500); });
     });
   });
+  // ⚙ що показувати: класи на списку одразу, вибір — у профіль людини
+  var cfg = document.getElementById('spc-cfg'), cfgBtn = document.getElementById('spc-cfg-btn'),
+      msg = document.getElementById('spc-cfg-msg');
+  cfgBtn.addEventListener('click', function(){ cfg.hidden = !cfg.hidden; cfgBtn.setAttribute('aria-expanded', String(!cfg.hidden)); });
+  function apply(hide, desc){
+    [].slice.call(list.classList).forEach(function(c){ if (/^spc-(off|desc)-/.test(c)) list.classList.remove(c); });
+    hide.forEach(function(k){ list.classList.add('spc-off-' + k); });
+    list.classList.add('spc-desc-' + desc);
+    list.querySelectorAll('details.spc-desc').forEach(function(d){ d.open = desc === 'full'; });
+  }
+  function current(){
+    return {hide: [].slice.call(cfg.querySelectorAll('.spc-cf')).filter(function(x){ return !x.checked; }).map(function(x){ return x.value; }),
+            desc: (cfg.querySelector('.spc-cd:checked') || {}).value || 'collapsed'};
+  }
+  function save(reset){
+    var c = current(), fd = new FormData();
+    fd.append('action', 'tile_prefs');
+    if (reset) fd.append('reset', '1');
+    c.hide.forEach(function(k){ fd.append('hide', k); }); fd.append('desc', c.desc);
+    fetch(location.pathname, {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': csrf()}})
+      .then(function(r){ return r.json(); }).then(function(j){
+        if (reset && j.ok) {
+          cfg.querySelectorAll('.spc-cf').forEach(function(x){ x.checked = j.hide.indexOf(x.value) < 0; });
+          cfg.querySelectorAll('.spc-cd').forEach(function(x){ x.checked = x.value === j.desc; });
+          apply(j.hide, j.desc);
+        }
+        msg.textContent = j.ok ? '✓ Збережено' : '⚠️ Не вдалося зберегти';
+      }).catch(function(){ msg.textContent = '⚠️ Немає зв’язку з сервером'; });
+  }
+  cfg.addEventListener('change', function(){ var c = current(); apply(c.hide, c.desc); save(false); });
+  document.getElementById('spc-cfg-reset').addEventListener('click', function(){ save(true); });
+  var start = {hide: current().hide, desc: list.getAttribute('data-desc') || 'collapsed'};
+  apply(start.hide, start.desc);
+  // ☑ вибір кількох → ✉️ поділитись / ⬇ vCard разом
+  var bar = document.getElementById('spc-bar'), barN = document.getElementById('spc-bar-n'),
+      form = document.getElementById('spc-share-form'), vcf = document.getElementById('spc-vcf'), MAX = 30;
+  function picks(){ return [].slice.call(list.querySelectorAll('.spc-pick:checked')).map(function(x){ return x.value; }); }
+  function refresh(){
+    var ids = picks();
+    list.querySelectorAll('.spc-pick').forEach(function(x){ x.closest('.spc').classList.toggle('spc-sel', x.checked); });
+    bar.classList.toggle('on', ids.length > 0);
+    barN.textContent = 'Вибрано: ' + ids.length + (ids.length > MAX ? ' (у лист підуть перші ' + MAX + ')' : '');
+    vcf.href = '?vcf=' + ids.slice(0, MAX).join(',');
+  }
+  list.addEventListener('change', function(e){ if (e.target.classList.contains('spc-pick')) refresh(); });
+  var all = document.getElementById('spc-all');
+  if (all) all.addEventListener('click', function(){
+    var boxes = list.querySelectorAll('.spc-pick'), every = [].every.call(boxes, function(x){ return x.checked; });
+    boxes.forEach(function(x){ x.checked = !every; }); refresh();
+  });
+  document.getElementById('spc-none').addEventListener('click', function(){
+    list.querySelectorAll('.spc-pick').forEach(function(x){ x.checked = false; }); refresh();
+  });
+  function withIds(f, limit){
+    f.querySelectorAll('input[name=ids]').forEach(function(x){ x.remove(); });
+    picks().slice(0, limit).forEach(function(id){
+      var i = document.createElement('input'); i.type = 'hidden'; i.name = 'ids'; i.value = id; f.appendChild(i);
+    });
+  }
+  form.addEventListener('submit', function(){ withIds(form, MAX); });
+  var del = document.getElementById('spc-del-form');
+  if (del) del.addEventListener('submit', function(e){
+    var n = picks().length;
+    if (!confirm('Видалити назавжди ' + n + ' візиток — фото, примітки й позначки? Постачальники й клієнти CRM, створені з них, лишаться.')) { e.preventDefault(); return; }
+    withIds(del, 200);
+  });
+  // 📊 статистика: відкрито чи ні — пам'ятає браузер
+  var st = document.getElementById('spc-stats'), stBtn = document.getElementById('spc-stats-btn');
+  function stShow(on){ st.hidden = !on; stBtn.setAttribute('aria-expanded', String(on)); try { localStorage.setItem('spc-stats', on ? '1' : ''); } catch (e) {} }
+  stBtn.addEventListener('click', function(){ stShow(st.hidden); });
+  try { if (localStorage.getItem('spc-stats') === '1') stShow(true); } catch (e) {}
 })();
 </script>
 {% endblock %}

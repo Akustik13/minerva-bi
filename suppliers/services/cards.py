@@ -12,7 +12,8 @@ suppliers/services/cards.py — 🪪 візитки й флаєри поза п�
                              нотатка «🪪 Візитка» в хронології, SupplierMedia.customer;
   to_read(user, scope)     — що прочитати AI разом: unread (AI ще не читав) / nocat (без категорії);
   read_many(ids, user, …)  — AI по черзі (фонове завдання сторінки «🪪 Візитки й флаєри»);
-  add_category(m, user)    — запропонована AI нова категорія → SupplierCategory (та сама назва — наявна) → візитці.
+  add_category(m, user)    — запропонована AI нова категорія → SupplierCategory (та сама назва — наявна) → візитці;
+  tile_prefs / save_tile_prefs — що показувати на плитках (кожна людина своє, UserProfile.ui_prefs["supplier_cards"]).
 """
 import os
 import re
@@ -22,6 +23,17 @@ from django.db.models import Q
 from django.utils import timezone
 
 READ_MAX = 40            # за одне натискання «🧠 Прочитати AI…»
+PREFS_KEY = "supplier_cards"
+# що можна сховати на плитці (ключ — клас spc-f-<ключ> у шаблоні); за замовчуванням видно все
+TILE_FIELDS = [
+    ("ai", "🧠 Стан AI"), ("company", "🏢 Фірма"), ("person", "👤 Людина й посада"), ("country", "🌍 Країна"),
+    ("site", "🌐 Сайт"), ("cats", "🗂 Категорії"), ("newcat", "💡 Пропозиція нової категорії"),
+    ("date", "📅 Дата й де взяли"), ("where", "🏭 / 👤 Куди внесено"), ("marks", "⭐ Позначки"),
+    ("note", "📝 Наші примітки"), ("share", "✉️ Кнопка «Поділитись»"), ("crm", "👤 Кнопка «У CRM»"),
+    ("vcard", "⬇ Кнопка «vCard»"),
+]
+# «Що роблять»: згорнуто (клік — розгорнути) / повністю / не показувати
+DESC_MODES = [("collapsed", "згорнуто — розгорнути кліком"), ("full", "повністю"), ("off", "не показувати")]
 _WORD_RE = re.compile(r"[^\w]+")
 AI_LABELS = {"ai": "🧠 AI ✓", "qr": "🔳 з QR-коду", "failed": "⚠️ AI не прочитав", "none": "○ AI ще не читав"}
 
@@ -187,31 +199,62 @@ def mail_text(m, link="") -> str:
     return "\n".join(body)
 
 
+SHARE_MAX = 30                      # візиток в одному листі «✉️ Поділитись вибраними»
+PHOTOS_MAX_BYTES = 18 * 1024 * 1024  # фото в листі разом — поштові сервери рідко приймають понад 20–25 МБ
+
+
 def share(m, user, link=""):
     """Чернетка в основній скриньці людини (як «💾 Зберегти» в «Написати»): текст візитки, фото обох боків і .vcf.
     Кому — людина вписує сама. Немає скриньки — ValueError."""
+    return share_many([m], user, {m.pk: link} if link else None)
+
+
+def share_many(ms, user, links=None):
+    """Одна чернетка з кількома візитками (до SHARE_MAX): текст кожної, фото обох боків — поки разом не більше
+    PHOTOS_MAX_BYTES (решта — лише за посиланням у тексті), контакти — один .vcf (одна візитка — <ім'я>.vcf)."""
     from email_assistant import attachments
     from email_assistant.models import EmailAccount, EmailDraft
+    ms = list(ms)[:SHARE_MAX]
+    if not ms:
+        raise ValueError("Виберіть візитки.")
     account = EmailAccount.objects.filter(user=user, is_active=True).order_by("-is_primary").first()
     if account is None:
         raise ValueError("У вас немає поштової скриньки в Minerva — підключіть її в «Пошта → Акаунти».")
-    stem = file_stem(m)
-    items = []
-    for f, side in ((m.image, ""), (m.image_back, "-back")):
-        if not f:
-            continue
-        try:
-            with f.open("rb") as fh:
-                data = fh.read()
-        except OSError:
-            continue
-        ext = os.path.splitext(f.name)[1].lower() or ".jpg"
-        items.append(attachments.store_file(f"{stem}{side}{ext}", data))
-    items.append(attachments.store_file(f"{stem}.vcf", vcard(m).encode("utf-8"), "text/vcard"))
-    d = card_data(m)
-    who = " — ".join(x for x in (d.get("name"), d.get("contact_name")) if x) or m.title or m.get_kind_display()
-    return EmailDraft.objects.create(account=account, subject=f"Візитка: {who}"[:500], to_emails=[],
-                                     body=mail_text(m, link), attachments=items, source=EmailDraft.SOURCE_MANUAL)
+    links = links or {}
+    many = len(ms) > 1
+    items, used, skipped = [], 0, 0
+    for m in ms:
+        stem = file_stem(m) + (f"-{m.pk}" if many else "")
+        for f, side in ((m.image, ""), (m.image_back, "-back")):
+            if not f:
+                continue
+            try:
+                with f.open("rb") as fh:
+                    data = fh.read()
+            except OSError:
+                continue
+            if used + len(data) > PHOTOS_MAX_BYTES:
+                skipped += 1
+                continue
+            used += len(data)
+            ext = os.path.splitext(f.name)[1].lower() or ".jpg"
+            items.append(attachments.store_file(f"{stem}{side}{ext}", data))
+    vcf = "".join(vcard(m) for m in ms).encode("utf-8")
+    items.append(attachments.store_file(f"{file_stem(ms[0])}.vcf" if not many else f"contacts-{len(ms)}.vcf", vcf,
+                                        "text/vcard"))
+    if many:
+        events = {m.event for m in ms}
+        subject = f"Візитки ({len(ms)})" + (f": {ms[0].event}" if len(events) == 1 and ms[0].event else "")
+        body = "\n\n————————\n\n".join(f"{n}. " + mail_text(m, links.get(m.pk, "")) for n, m in enumerate(ms, 1))
+    else:
+        d = card_data(ms[0])
+        who = " — ".join(x for x in (d.get("name"), d.get("contact_name")) if x) or ms[0].title or \
+            ms[0].get_kind_display()
+        subject, body = f"Візитка: {who}", mail_text(ms[0], links.get(ms[0].pk, ""))
+    if skipped:
+        body += ("\n\nФото не всіх візиток вклалися в розмір листа — решта в Minerva за посиланнями вище.")
+    return EmailDraft.objects.create(account=account, subject=subject[:500], to_emails=[], body=body,
+                                     attachments=items, source=EmailDraft.SOURCE_MANUAL)
 
 
 # ── 👤 Клієнт CRM з візитки ──
@@ -357,6 +400,85 @@ def read_many(ids, user, model) -> dict:
     return {"done": done, "failed": failed, "cost": cost, "error": error}
 
 
+# ── 🗑 Видалити ──
+
+def delete(m):
+    """Фото обох боків, оригінали до правок і саму візитку; постачальник / клієнт CRM, створені з неї, лишаються."""
+    for f in (m.image, m.image_back, m.image_original, m.image_back_original):
+        if f:
+            f.delete(save=False)
+    m.delete()
+
+
+# ── 📊 Статистика ──
+
+NO_EVENT = "без події"
+
+
+def event_key(event) -> str:
+    return " ".join(str(event or "").lower().split())
+
+
+def stats(user=None) -> dict:
+    """📊 По подіях («Де взяли»: виставка, зустріч…) і разом: візиток, людей (ім'я / email), фірм (назва без форми),
+    🏭 внесено постачальником, 👤 клієнтом CRM, ще не внесено, прочитав AI, позначки, основні країни й категорії,
+    перша й остання дата. Лише читання бази, без AI."""
+    from collections import Counter
+
+    from shop.countries import name as country_name
+    from suppliers.models import SupplierMedia
+    from suppliers.services import match
+
+    def blank(label, key):
+        return {"event": label, "key": key, "cards": 0, "people": set(), "companies": set(), "suppliers": set(),
+                "customers": set(), "new": 0, "ai": 0, "countries": Counter(), "cats": Counter(), "marks": Counter(),
+                "first": None, "last": None}
+
+    groups, total = {}, blank("Усього", "")
+    marks = dict(SupplierMedia.MARKS)
+    qs = (SupplierMedia.objects.select_related("supplier").prefetch_related("categories", "supplier__categories")
+          .order_by("created_at"))
+    for m in qs:
+        key = event_key(m.event)
+        g = groups.setdefault(key, blank((m.event or "").strip() or NO_EVENT, key or "-"))
+        d = card_data(m)
+        person = (d.get("contact_email") or d.get("contact_name") or "").strip().lower()
+        company = match.name_key(d.get("name")) or (d.get("name") or "").strip().lower()
+        cats = list(m.supplier.categories.all()) if m.supplier_id else list(m.categories.all())
+        day = timezone.localtime(m.created_at).date()
+        for x in (g, total):
+            x["cards"] += 1
+            if person:
+                x["people"].add(person)
+            if company:
+                x["companies"].add(company)
+            if m.supplier_id:
+                x["suppliers"].add(m.supplier_id)
+            if m.customer_id:
+                x["customers"].add(m.customer_id)
+            if not (m.supplier_id or m.customer_id):
+                x["new"] += 1
+            if m.cost_usd:
+                x["ai"] += 1
+            if d.get("addr_country"):
+                x["countries"][d["addr_country"].upper()] += 1
+            for c in cats:
+                x["cats"][f"{c.icon} {c.name}"] += 1
+            for k in m.marks or []:
+                if k in marks:
+                    x["marks"][marks[k]] += 1
+            x["first"] = min(x["first"] or day, day)
+            x["last"] = max(x["last"] or day, day)
+
+    def done(x):
+        return {**x, "people": len(x["people"]), "companies": len(x["companies"]), "suppliers": len(x["suppliers"]),
+                "customers": len(x["customers"]),
+                "countries": [(country_name(c), n) for c, n in x["countries"].most_common(3)],
+                "cats": x["cats"].most_common(3), "marks": x["marks"].most_common(4)}
+    events = sorted((done(g) for g in groups.values()), key=lambda g: g["last"] or timezone.localdate(), reverse=True)
+    return {"events": events, "total": done(total)}
+
+
 # ── 💡 Нова категорія від AI ──
 
 def add_category(m, user):
@@ -377,6 +499,37 @@ def add_category(m, user):
     if m.supplier_id:
         m.supplier.categories.add(cat)
     return cat, created
+
+
+def tile_prefs(user) -> dict:
+    """{hide: [ключі TILE_FIELDS], desc: collapsed | full | off} людини; невідоме — відкидається."""
+    profile = getattr(user, "profile", None)
+    raw = ((getattr(profile, "ui_prefs", None) or {}) if profile else {}).get(PREFS_KEY) or {}
+    keys = {k for k, _label in TILE_FIELDS}
+    hide = [k for k in (raw.get("hide") or []) if k in keys] if isinstance(raw, dict) else []
+    desc = raw.get("desc") if isinstance(raw, dict) else None
+    return {"hide": hide, "desc": desc if desc in dict(DESC_MODES) else "collapsed"}
+
+
+def save_tile_prefs(user, hide=None, desc=None, reset=False) -> dict:
+    """Записати вибір людини; решта ui_prefs (тема, меню, панелі…) не змінюється — рядок профілю під блокуванням."""
+    from django.db import transaction
+
+    from core.models import UserProfile
+    with transaction.atomic():
+        profile, _ = UserProfile.objects.select_for_update().get_or_create(user=user)
+        prefs = dict(profile.ui_prefs or {})
+        if reset:
+            prefs.pop(PREFS_KEY, None)
+        else:
+            keys = {k for k, _label in TILE_FIELDS}
+            prefs[PREFS_KEY] = {"hide": [k for k in dict.fromkeys(hide or []) if k in keys],
+                                "desc": desc if desc in dict(DESC_MODES) else "collapsed"}
+        profile.ui_prefs = prefs
+        profile.save(update_fields=["ui_prefs"])
+    if hasattr(user, "profile"):
+        user.profile.ui_prefs = prefs
+    return tile_prefs(user)
 
 
 def card_counts(user, can_all=True) -> dict:
