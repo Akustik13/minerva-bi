@@ -149,15 +149,29 @@ def _s(value, limit=300) -> str:
 
 
 def _categories_text() -> str:
+    """«Виробники плат» (опис) — опис допомагає AI вибрати; повертати треба лише назву."""
     from suppliers.models import SupplierCategory
-    names = [c.name for c in SupplierCategory.objects.filter(is_active=True)]
+    names = [f"«{c.name}»" + (f" ({' '.join(c.description.split())[:120]})" if c.description else "")
+             for c in SupplierCategory.objects.filter(is_active=True)]
     return ", ".join(names) or "(категорій ще немає)"
+
+
+# Візитка рідко прямо пише, що роблять: висновок з назви, логотипа, слогана, сайту — не вигадка (без цього AI лишав
+# «що роблять» і категорію порожніми). Нова категорія — лише пропозиція: створює людина (cards.add_category).
+CARD_HINT = (" Що роблять і категорії визначай з усього на фото: назва фірми (NextPCB, «… Circuits» → друковані "
+             "плати; «… Connectors», «Cable Assembly» → кабелі й роз'єми; «Quartz» → кварцові резонатори), логотип, "
+             "слоган, перелік продукції, сайт і домен пошти — це висновок з даних, а не вигадка. Опис — 1–2 речення; "
+             "якщо висновок лише з назви чи домену, почни зі «Схоже,». Категорій — 1–2 найближчі з переліку (назва "
+             "без опису в дужках). Якщо жодна з переліку не підходить — запропонуй нову в new_category: коротка "
+             "назва в множині, як у переліку (напр. «Виробники кварцових резонаторів»), значок-емодзі й опис одним "
+             "реченням; підходить хоч одна — new_category порожня.")
 
 
 SUPPLIER_JSON = (
     '{"company": "", "website": "", "email": "", "phone": "", "street": "", "zip": "", "city": "", '
     '"country": "ISO-2", "vat_id": "", "description": "що роблять / продають, 1–3 речення українською", '
     '"categories": ["назви з переліку категорій, що підходять"], '
+    '"new_category": {"name": "", "icon": "", "description": ""}, '
     '"contact": {"name": "", "position": "", "email": "", "phone": "", "mobile": ""}, '
     '"products": ["продукція / технології"], "notes": "інше важливе з даних (виставка, зразки, умови)"}')
 
@@ -181,10 +195,21 @@ def clean_supplier(data: dict) -> dict:
         "contact_name": _s(contact.get("name"), 200), "contact_position": _s(contact.get("position"), 200),
         "contact_email": match.addr(contact.get("email")), "contact_phone": _s(contact.get("phone"), 60),
         "contact_mobile": _s(contact.get("mobile"), 80),
-        "categories": [_s(c, 120) for c in (data.get("categories") or []) if _s(c)][:6]
+        "categories": [_s(c, 120).strip("«»\"' ") for c in (data.get("categories") or []) if _s(c)][:6]
         if isinstance(data.get("categories"), list) else [],
+        "new_category": _new_category(data.get("new_category")),
         "notes": _s(data.get("notes"), 1000),
     }
+
+
+def _new_category(value) -> dict:
+    """Пропозиція AI нової категорії → {name, icon, description} або {} (лише рядки, з обмеженням довжини)."""
+    if not isinstance(value, dict):
+        return {}
+    name = " ".join(_s(value.get("name"), 120).strip("«»\"' ").split())
+    if len(name) < 3:
+        return {}
+    return {"name": name, "icon": _s(value.get("icon"), 8) or "🏭", "description": _s(value.get("description"), 300)}
 
 
 IMAGE_PX = 2000
@@ -245,7 +270,7 @@ def card(media, user=None, model=DEFAULT_MODEL) -> dict:
     if media.qr_text:      # браузер уже розшифрував QR — точні дані, AI лише доповнює
         qr_note = "\nQR-код з цієї візитки (точні дані, бери їх як є):\n" + media.qr_text[:2000]
     system = ("Ти читаєш візитки, флаєри й каталоги постачальників для системи закупівель. " + DATA_NOTE +
-              " Відповідай лише JSON такої форми: " + SUPPLIER_JSON +
+              CARD_HINT + " Відповідай лише JSON такої форми: " + SUPPLIER_JSON +
               " Категорії — лише з переліку: " + _categories_text() + ".")
     content = blocks + [{"type": "text", "text": f"<<<ДАНІ: {media.get_kind_display()}"
                          + (f", де взяли: {media.event}" if media.event else "") + qr_note + "\nДАНІ>>>\n"
@@ -263,6 +288,11 @@ def card(media, user=None, model=DEFAULT_MODEL) -> dict:
     SupplierMedia.objects.filter(pk=media.pk).update(
         extracted=data, state=SupplierMedia.READ, error="", cost_usd=price)
     media.extracted, media.state, media.cost_usd = data, SupplierMedia.READ, price
+    if not media.categories.exists():       # категорії, які вибрав AI, — одразу візитці (видно на плитці);
+        from suppliers.services.cards import match_categories   # вибрані людиною чи пресетом не чіпаємо
+        found = match_categories(data.get("categories"))
+        if found:
+            media.categories.set(found)
     return data
 
 

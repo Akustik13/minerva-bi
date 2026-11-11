@@ -39,6 +39,7 @@
 </div>
 {{ job_js }}
 <script>
+document.querySelectorAll('.sp-links a').forEach(function(a){ a.target = '_blank'; a.rel = 'noopener noreferrer nofollow'; });
 (function(){
   var btn = document.getElementById('spf-ai'); if (!btn) return;
   btn.addEventListener('click', function(){

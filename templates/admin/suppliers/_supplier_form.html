@@ -28,7 +28,7 @@
     <label>Валюта<input name="currency" value="{{ d.currency }}" maxlength="3" placeholder="EUR"></label>
   </div>
   <label class="spf-wide">Що роблять / продають<textarea name="description" rows="3">{{ d.description }}</textarea></label>
-  {% if d.notes %}<div class="spf-muted">📝 Ще помічено: <span translate="no">{{ d.notes }}</span></div>{% endif %}
+  {% if d.notes %}<div class="spf-muted sp-links">📝 Ще помічено: <span translate="no">{{ d.notes|urlize }}</span></div>{% endif %}
 </div>
 <div class="spf-card">
   <div class="spf-h">👤 Контактна особа</div>
@@ -45,4 +45,6 @@
   <div class="spf-cats">
     {% for c in categories %}<label class="spf-cat" data-name="{{ c.name|lower }}"><input type="checkbox" name="categories" value="{{ c.pk }}" {% if c.pk in picked %}checked{% endif %}> {{ c.icon }} {{ c.name }}</label>{% empty %}<span class="spf-muted">Категорій ще немає — <a href="{% url 'admin:suppliers_suppliercategory_add' %}" target="_blank">створити</a>.</span>{% endfor %}
   </div>
+  {% if new_category.name %}<div class="spf-row spc-newcat">💡 Жодна наша категорія не підходить — AI пропонує нову: <b>{{ new_category.icon }} <span translate="no">{{ new_category.name }}</span></b>{% if new_category.description %} <span class="spf-muted" translate="no">— {{ new_category.description }}</span>{% endif %}
+    {% if can_add_category %}<button type="button" class="button" id="cr-newcat">＋ Додати категорію й позначити</button>{% endif %}</div>{% endif %}
 </div>

@@ -14,7 +14,7 @@ import json
 from django import forms
 from django.contrib import admin, messages
 from django.db.models import Count, Max, Q
-from django.http import Http404, HttpResponseNotAllowed, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
@@ -488,6 +488,7 @@ class SupplierCardMixin:
             path("card/", view(self.card_view), name="inventory_supplier_card"),
             path("cards/", view(self.cards_view), name="inventory_supplier_cards"),
             path("cards/<int:media_pk>/", view(self.card_review_view), name="inventory_supplier_card_review"),
+            path("cards/crm-search/", view(self.crm_search_view), name="inventory_supplier_crm_search"),
             path("card/presets/", view(self.card_presets_view), name="inventory_supplier_card_presets"),
             path("job/<str:job_id>/", view(self.job_view), name="inventory_supplier_job"),
             path("search/", view(self.search_view), name="inventory_supplier_search"),
@@ -886,21 +887,101 @@ class SupplierCardMixin:
                              "id": saved})
 
     def cards_view(self, request):
+        """🪪 Усі візитки: плитка — фірма, людина, країна, категорії, що роблять, стан AI; ✉️ поділитись,
+        👤 у CRM, 💡 нова категорія від AI; «🧠 Прочитати AI…» для нечитаних / без категорії (фоном)."""
+        from suppliers.services import ai, cards, jobs
         if not _can(request, "view"):
             raise Http404
-        qs = SupplierMedia.objects.select_related("supplier", "created_by")
+        can_read = _can(request, "change") or _can(request, "add")
+        if request.method == "POST":
+            if request.POST.get("action") != "read_all" or not can_read:
+                return JsonResponse({"error": "Немає права"}, status=403)
+            scope = "nocat" if request.POST.get("scope") == "nocat" else "unread"
+            ids = list(cards.to_read(request.user, scope, _can(request, "change"))
+                       .values_list("pk", flat=True)[:cards.READ_MAX])
+            if not ids:
+                return JsonResponse({"error": "Немає що читати"})
+            model, user = ai.model_of(request.POST.get("model")), request.user
+
+            def run():
+                out = cards.read_many(ids, user, model)
+                text = f"🧠 Прочитано {out['done']}" + (f", не вдалося {out['failed']}" if out["failed"] else "") + \
+                    f" · ${out['cost']:.3f}" + (f" — {out['error']}" if out["error"] and not out["done"] else "")
+                return {"message": text}
+            return JsonResponse({"job": jobs.start(user, f"cards read {scope}", run)})
+        qs = SupplierMedia.objects.select_related("supplier", "customer", "created_by").prefetch_related(
+            "categories", "supplier__categories")
         show = request.GET.get("show", "")
         if show == "new":
-            qs = qs.filter(supplier=None)
+            qs = qs.filter(supplier=None, customer=None)
+        ai_filter = request.GET.get("ai", "")
+        if ai_filter == "done":
+            qs = qs.filter(cost_usd__gt=0)
+        elif ai_filter == "none":
+            qs = qs.filter(cost_usd=0).exclude(state=SupplierMedia.FAILED)
+        elif ai_filter == "failed":
+            qs = qs.filter(state=SupplierMedia.FAILED)
+        elif ai_filter == "nocat":
+            qs = qs.filter(categories=None, supplier=None)
         q = " ".join(request.GET.get("q", "").split())[:100]
         if q:
             qs = qs.filter(Q(title__icontains=q) | Q(note__icontains=q) | Q(event__icontains=q) |
-                           Q(supplier__name__icontains=q))
+                           Q(supplier__name__icontains=q) | Q(customer__company__icontains=q) |
+                           Q(extracted__name__icontains=q) | Q(extracted__contact_name__icontains=q) |
+                           Q(extracted__description__icontains=q))
         mark = request.GET.get("mark", "")
         items = [m for m in qs[:300] if not mark or mark in (m.marks or [])][:120]
+        all_cats = list(SupplierCategory.objects.filter(is_active=True))
+        for m in items:
+            m.info = cards.info(m, all_cats)
+        u = request.user
         return TemplateResponse(request, "admin/suppliers/cards.html", self._ctx(
             request, "🪪 Візитки й флаєри", items=items, show=show, q=q, mark=mark, marks=SupplierMedia.MARKS,
-            unassigned=SupplierMedia.objects.filter(supplier=None).count()))
+            ai_filter=ai_filter, can_read=can_read,
+            counts=cards.card_counts(u, _can(request, "change")) if can_read else {},
+            unassigned=SupplierMedia.objects.filter(supplier=None, customer=None).count(),
+            crm_can=u.has_perm("crm.add_customer") or u.has_perm("crm.change_customer"),
+            crm_view=u.has_perm("crm.view_customer"), can_add_category=u.has_perm("suppliers.add_suppliercategory")))
+
+    def crm_search_view(self, request):
+        """Пошук клієнта CRM для «➕ Додати до клієнта» на сторінці візитки."""
+        from suppliers.services import cards
+        if not request.user.has_perm("crm.view_customer"):
+            raise Http404
+        return JsonResponse({"results": cards.search_customers(request.GET.get("q"))})
+
+    def _card_to_crm(self, request, m, url, action):
+        """👤 Візитка → клієнт CRM (поля — з форми сторінки, як для постачальника)."""
+        from crm.models import Customer
+        from suppliers.services import cards
+        customer = None
+        if action == "crm_create":
+            if not request.user.has_perm("crm.add_customer"):
+                raise Http404
+        else:
+            if not request.user.has_perm("crm.change_customer"):
+                raise Http404
+            customer = Customer.objects.filter(pk=request.POST.get("customer") or 0).first()
+            if customer is None:
+                self.message_user(request, "Виберіть клієнта зі списку.", messages.ERROR)
+                return redirect(url)
+        try:
+            out = cards.to_customer(m, request.user, self._draft_from_post(request), customer=customer)
+        except ValueError as e:
+            self.message_user(request, str(e), messages.ERROR)
+            return redirect(url)
+        c = out["customer"]
+        what = "👤 Створено клієнта CRM" if out["created"] else "👤 Додано до клієнта CRM"
+        bits = []
+        if out["filled"]:
+            bits.append(f"дописано полів: {len(out['filled'])}")
+        if out["files"]:
+            bits.append(f"фото в «📎 Документи»: {len(out['files'])}")
+        self.message_user(request, format_html('{} <a href="{}" translate="no">{}</a>{}', what,
+                                               reverse("admin:crm_customer_change", args=[c.pk]),
+                                               " — ".join(x for x in (c.company, c.name) if x) or c.email,
+                                               (" · " + ", ".join(bits)) if bits else ""), messages.SUCCESS)
+        return redirect(url)
 
     def _card_drop_side(self, request, m, url):
         """Прибрати лицьову або зворотну сторону: її фото (і оригінал) видаляється, друга лишається — лицьову
@@ -980,9 +1061,35 @@ class SupplierCardMixin:
             raise Http404
         can_edit = _can(request, "change") or (_can(request, "add") and m.created_by_id == request.user.pk)
         action = request.POST.get("action") if request.method == "POST" else ""
+        url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+        from suppliers.services import cards
+        if request.method == "GET" and request.GET.get("vcf"):          # ⬇ vCard для телефону / Outlook
+            resp = HttpResponse(cards.vcard(m), content_type="text/vcard; charset=utf-8")
+            resp["Content-Disposition"] = f'attachment; filename="{cards.file_stem(m)}.vcf"'
+            return resp
+        if action == "share":                     # ✉️ чернетка листа з фото й vCard — кому, людина вписує сама
+            try:
+                d = cards.share(m, request.user, link=request.build_absolute_uri(url))
+            except ValueError as e:
+                self.message_user(request, str(e), messages.ERROR)
+                return redirect(url)
+            return redirect(f"/email/compose/?draft={d.pk}")
+        if action in ("crm_create", "crm_attach"):
+            return self._card_to_crm(request, m, url, action)
+        if action == "add_category":              # 💡 нова категорія від AI → візитці
+            if not request.user.has_perm("suppliers.add_suppliercategory") or not can_edit:
+                return JsonResponse({"error": "Немає права додавати категорії"}, status=403)
+            try:
+                cat, created = cards.add_category(m, request.user)
+            except ValueError as e:
+                return JsonResponse({"error": str(e)}, status=400)
+            if request.POST.get("back"):
+                self.message_user(request, f"🗂 Категорія «{cat.name}» " + ("створена й " if created else "") +
+                                  "позначена для цієї візитки", messages.SUCCESS)
+                return redirect(request.POST["back"] if str(request.POST["back"]).startswith("/admin/") else url)
+            return JsonResponse({"pk": cat.pk, "name": cat.name, "icon": cat.icon, "created": created})
         if action and not can_edit:
             raise Http404
-        url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
         if action == "note":
             m.note = request.POST.get("note", "")[:4000]
             m.event = request.POST.get("event", "")[:200]
@@ -1070,10 +1177,12 @@ class SupplierCardMixin:
         data = dict(m.extracted or {})
         if not data:
             data = {k: "" for k in draft.FIELDS + draft.CONTACT_FIELDS}
-        names = {c.name.lower(): c.pk for c in SupplierCategory.objects.filter(is_active=True)}
-        picked = [names[n.lower()] for n in (data.get("categories") or []) if n.lower() in names]
+        picked = [c.pk for c in cards.match_categories(data.get("categories"))]
         picked += [c for c in m.categories.values_list("pk", flat=True) if c not in picked]
         matches = draft.existing(data) if (data.get("name") or data.get("email") or data.get("website")) else []
+        u = request.user
+        crm_view = u.has_perm("crm.view_customer")
+        new_cat = data.get("new_category") if isinstance(data.get("new_category"), dict) and not picked else {}
         return TemplateResponse(request, "admin/suppliers/card_review.html", self._ctx(
             request, f"📷 {m.title or m.get_kind_display()}", m=m, d=data, matches=matches, picked=picked,
             categories=SupplierCategory.objects.filter(is_active=True), kinds=SupplierMedia.KINDS,
@@ -1084,7 +1193,11 @@ class SupplierCardMixin:
             qr_parts=[x for x in (m.qr_text or "").split(qr.SEPARATOR) if x.strip()],
             qr_kind=_qr_kind(qr.parse_all(m.qr_text).get("kind")),
             qr_from=qr.labels(data.get("from_qr")),
-            site_domain=match.site_domain(data.get("website", ""))))
+            site_domain=match.site_domain(data.get("website", "")),
+            crm_view=crm_view, crm_add=u.has_perm("crm.add_customer"), crm_change=u.has_perm("crm.change_customer"),
+            crm_matches=cards.customer_matches(data) if crm_view else [], new_category=new_cat or {},
+            can_add_category=u.has_perm("suppliers.add_suppliercategory") and can_edit,
+            ai_info=cards.info(m)))
 
 
 _STYLE = mark_safe("""<style>

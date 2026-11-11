@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{# 🪪 Усі візитки й флаєри — suppliers/admin_supplier.py cards_view #}
+{# 🪪 Усі візитки й флаєри — suppliers/admin_supplier.py cards_view, плитка — suppliers/services/cards.py info #}
 {% block title %}{{ title }} | Minerva{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
@@ -10,25 +10,91 @@
 {% block content %}
 {% include "admin/suppliers/_styles.html" %}
 {{ style }}
+<style>
+.spc{width:236px;display:flex;flex-direction:column;gap:2px}
+.spc img{height:120px}
+.spc-top{display:flex;justify-content:space-between;gap:4px;align-items:baseline}
+.spc-top a{text-decoration:none;color:inherit}
+.spc-ai{font-size:11px;white-space:nowrap;border-radius:8px;padding:0 5px;border:1px solid var(--border-strong,#ccc)}
+.spc-ai-ai{color:var(--ok,#2e7d32);border-color:currentColor}.spc-ai-failed{color:var(--warning-fg,#b06d00);border-color:currentColor}
+.spc-ai-none{color:var(--text-muted,#888)}
+.spc-co{font-weight:600}
+.spc-guess{opacity:.8;border-style:dashed}
+.spc-new{font-size:12px;border:1px dashed var(--border-strong,#ccc);border-radius:6px;padding:3px 5px}
+.spc-acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:auto;padding-top:4px}
+.spc-acts form{display:inline;margin:0}
+.spc-acts .button{padding:3px 8px;font-size:12px}
+.spc-bulk{border:1px solid var(--border-strong,#ccc);border-radius:8px;padding:4px 10px;margin:4px 0 8px}
+@media (max-width:768px){.spc{width:100%}}
+</style>
 <div class="spp">
   <form method="get" class="spf-row">
     <a class="button" href="{% url 'admin:inventory_supplier_card' %}">📷 Нова візитка / флаєр</a>
-    <input type="search" name="q" value="{{ q }}" placeholder="Назва, примітка, виставка, постачальник…" style="min-width:260px">
+    <input type="search" name="q" value="{{ q }}" placeholder="Фірма, людина, що роблять, виставка, примітка…" style="min-width:260px">
     <select name="show"><option value="">усі</option><option value="new" {% if show == "new" %}selected{% endif %}>ще не внесені ({{ unassigned }})</option></select>
+    <select name="ai" title="Чи прочитав AI">
+      <option value="">🧠 AI: усі</option>
+      <option value="done" {% if ai_filter == "done" %}selected{% endif %}>🧠 прочитано AI</option>
+      <option value="none" {% if ai_filter == "none" %}selected{% endif %}>○ AI ще не читав</option>
+      <option value="nocat" {% if ai_filter == "nocat" %}selected{% endif %}>🗂 без категорії</option>
+      <option value="failed" {% if ai_filter == "failed" %}selected{% endif %}>⚠️ AI не прочитав</option>
+    </select>
     <select name="mark"><option value="">будь-яка позначка</option>{% for v, n in marks %}<option value="{{ v }}" {% if v == mark %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
     <button type="submit" class="button">🔍 Показати</button>
   </form>
+  {% if can_read and counts.unread or can_read and counts.nocat %}
+  <div class="spf-row spc-bulk">
+    <span class="sp-muted">🧠 AI для кількох візиток (ще не внесених, до 40 за раз):</span>
+    <select id="spc-model" title="Модель AI">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+    {% if counts.unread %}<button type="button" class="button" data-read="unread" data-n="{{ counts.unread }}">🧠 Прочитати нечитані ({{ counts.unread }})</button>{% endif %}
+    {% if counts.nocat %}<button type="button" class="button" data-read="nocat" data-n="{{ counts.nocat }}" title="AI визначить, що роблять, і категорію; якщо жодна наша не підходить — запропонує нову">🗂 Визначити категорію ({{ counts.nocat }})</button>{% endif %}
+    <span class="spf-job" id="spc-job"></span>
+  </div>
+  {% endif %}
   <div class="sp-cards">
-    {% for m in items %}
-    <a class="sp-card" href="{% url 'admin:inventory_supplier_card_review' m.pk %}">
-      {% if m.image %}<img src="{{ m.image.url }}" alt="" loading="lazy">{% endif %}
-      <div><b>{{ m.get_kind_display }}</b> {{ m.title }}</div>
-      <div class="sp-muted">{{ m.created_at|date:"d.m.Y" }}{% if m.event %} · {{ m.event }}{% endif %}</div>
-      <div>{% if m.supplier %}🏭 <span translate="no">{{ m.supplier.name }}</span>{% else %}<span class="spf-warn">ще не внесено</span>{% endif %}</div>
-      <div>{{ m.marks_text }}</div>
-      <div class="sp-note">{{ m.note|truncatechars:140 }}</div>
-    </a>
-    {% empty %}<div class="spf-muted">Поки порожньо.</div>{% endfor %}
+    {% for m in items %}{% with i=m.info %}{% url 'admin:inventory_supplier_card_review' m.pk as review %}
+    <div class="sp-card spc">
+      <a href="{{ review }}">{% if m.image %}<img src="{{ m.image.url }}" alt="" loading="lazy">{% endif %}</a>
+      <div class="spc-top"><a href="{{ review }}"><b>{{ m.get_kind_display }}</b> <span translate="no">{{ m.title }}</span></a>
+        <span class="spc-ai spc-ai-{{ i.ai.key }}" title="{{ i.ai.title }}">{{ i.ai.label }}</span></div>
+      {% if i.company %}<div class="spc-co" translate="no">🏢 {{ i.company }}</div>{% endif %}
+      {% if i.person %}<div class="sp-muted"><span translate="no">👤 {{ i.person }}</span>{% if i.position %} · <span translate="no">{{ i.position }}</span>{% endif %}</div>{% endif %}
+      {% if i.country or i.site %}<div class="sp-muted">{% if i.country %}🌍 {{ i.country }}{% endif %}{% if i.country and i.site %} · {% endif %}{% if i.site %}<a href="{{ i.site }}" target="_blank" rel="noopener noreferrer nofollow" translate="no">🌐 {{ i.site_label }}</a>{% endif %}</div>{% endif %}
+      {% if i.cats %}<div class="sp-chips">{% for c in i.cats %}<span class="sp-chip{% if i.cats_guessed %} spc-guess{% endif %}" style="border-color:{{ c.color }}" {% if i.cats_guessed %}title="Вибрав AI — ще не підтверджено"{% endif %}>{{ c.icon }} {{ c.name }}</span>{% endfor %}</div>
+      {% elif i.new_category.name %}<div class="spc-new">💡 AI пропонує нову категорію: <b>{{ i.new_category.icon }} <span translate="no">{{ i.new_category.name }}</span></b>
+        {% if can_add_category %}<form method="post" action="{{ review }}" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="add_category"><input type="hidden" name="back" value="{{ request.get_full_path }}"><button type="submit" class="button" style="padding:1px 6px;font-size:11px">＋ Додати</button></form>{% endif %}</div>
+      {% endif %}
+      {% if i.desc %}<div class="sp-note" translate="no" title="{{ i.desc }}">{{ i.desc|truncatechars:120 }}</div>{% endif %}
+      <div class="sp-muted">{{ m.created_at|date:"d.m.Y" }}{% if m.event %} · <span translate="no">{{ m.event }}</span>{% endif %}</div>
+      <div>
+        {% if m.supplier %}🏭 <a href="{% url 'admin:inventory_supplier_change' m.supplier.pk %}" translate="no">{{ m.supplier.name }}</a>{% endif %}
+        {% if m.customer %}{% if crm_view %}👤 <a href="{% url 'admin:crm_customer_change' m.customer.pk %}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}👤 у CRM{% endif %}{% endif %}
+        {% if not m.supplier and not m.customer %}<span class="spf-warn">ще не внесено</span>{% endif %}
+      </div>
+      {% if m.marks %}<div>{{ m.marks_text }}</div>{% endif %}
+      {% if m.note %}<div class="sp-note" translate="no">{{ m.note|truncatechars:100 }}</div>{% endif %}
+      <div class="spc-acts">
+        <form method="post" action="{{ review }}" target="_blank">{% csrf_token %}<input type="hidden" name="action" value="share"><button type="submit" class="button" title="Чернетка листа з фото, даними й vCard — кому, впишете самі">✉️ Поділитись</button></form>
+        {% if crm_can and not m.customer %}<a class="button" href="{{ review }}#crm" title="Візитка покупця — внести клієнтом у CRM">👤 У CRM</a>{% endif %}
+        <a class="button" href="{{ review }}?vcf=1" title="Контакт для телефону / Outlook (.vcf)">⬇ vCard</a>
+      </div>
+    </div>
+    {% endwith %}{% empty %}<div class="spf-muted">Поки порожньо.</div>{% endfor %}
   </div>
 </div>
+{{ job_js }}
+<script>
+(function(){
+  var out = document.getElementById('spc-job');
+  document.querySelectorAll('[data-read]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var n = Math.min(+b.getAttribute('data-n') || 0, 40);
+      if (!confirm('AI прочитає ' + n + ' фото по черзі — це платно (приблизно 1–3 центи за візитку). Продовжити?')) return;
+      spJob(location.pathname, {action: 'read_all', scope: b.getAttribute('data-read'),
+                                model: document.getElementById('spc-model').value}, out,
+            function(r){ if (out) out.textContent = (r && r.message) || '✅'; setTimeout(function(){ location.reload(); }, 1500); });
+    });
+  });
+})();
+</script>
 {% endblock %}

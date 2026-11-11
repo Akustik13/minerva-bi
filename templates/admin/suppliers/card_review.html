@@ -44,7 +44,12 @@
         </div>
         {% endfor %}
         <div class="spf-muted" style="margin-top:6px">{{ m.get_kind_display }} · {{ m.created_at|date:"d.m.Y H:i" }}{% if m.created_by %} · {{ m.created_by.get_full_name|default:m.created_by.username }}{% endif %}
-          {% if m.supplier %}<div>🏭 <a href="{% url 'admin:inventory_supplier_change' m.supplier.pk %}" translate="no">{{ m.supplier.name }}</a></div>{% endif %}</div>
+          {% if m.supplier %}<div>🏭 <a href="{% url 'admin:inventory_supplier_change' m.supplier.pk %}" translate="no">{{ m.supplier.name }}</a></div>{% endif %}
+          {% if m.customer %}<div>👤 {% if crm_view %}<a href="{% url 'admin:crm_customer_change' m.customer.pk %}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}у CRM{% endif %}</div>{% endif %}</div>
+        <div class="spf-row">
+          <form method="post" target="_blank" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="share"><button type="submit" class="button" title="Чернетка листа з фото обох боків, даними й vCard — кому, впишете самі">✉️ Поділитись поштою</button></form>
+          <a class="button" href="?vcf=1" title="Контакт для телефону / Outlook (.vcf)">⬇ vCard</a>
+        </div>
       </div>
       <form method="post" class="spf-card">{% csrf_token %}<input type="hidden" name="action" value="note">
         <div class="spf-h">📝 Наші примітки й позначки</div>
@@ -80,7 +85,7 @@
         <div class="spf-h">🔳 QR-код</div>
         {% if qr_parts %}
           <div class="spf-ok">✓ {{ qr_kind|default:"текст" }}{% if qr_from %} · у полях нижче: {{ qr_from }}{% endif %}</div>
-          {% for t in qr_parts %}<details style="margin-top:4px"><summary class="spf-muted">Текст коду</summary><div class="spf-mail" translate="no">{{ t|truncatechars:1500 }}</div></details>{% endfor %}
+          {% for t in qr_parts %}<details style="margin-top:4px"><summary class="spf-muted">Текст коду</summary><div class="spf-mail sp-links" translate="no">{{ t|truncatechars:1500|urlize }}</div></details>{% endfor %}
         {% else %}<div class="spf-muted" id="cr-qr-none">QR-коду ще не читали або на фото його немає.</div>{% endif %}
         {% if can_edit %}
         <form method="post" id="cr-qr-form" class="spf-row">{% csrf_token %}<input type="hidden" name="action" value="qr">
@@ -90,7 +95,7 @@
         </form>
         {% endif %}
       </div>
-      {% if can_add or can_change %}
+      {% if can_add or can_change or crm_add or crm_change %}
       <form method="post" id="spf-form">{% csrf_token %}
         <input type="hidden" name="action" value="create">
         {% include "admin/suppliers/_supplier_form.html" %}
@@ -104,6 +109,25 @@
             <button type="submit" class="button" formnovalidate onclick="var v=document.getElementById('cr-sup-q').value, o=document.querySelector('#cr-sup-list option[value=&quot;'+v.replace(/&quot;/g,'')+'&quot;]'); if(!o){alert('Виберіть постачальника зі списку');return false;} document.getElementById('cr-sup-id').value=o.dataset.pk; this.form.querySelector('[name=action]').value='attach';">➕ Додати фото й контакт</button></div>
           <datalist id="cr-sup-list"></datalist>
           <div class="spf-muted">Почніть вводити назву — підкажемо з бази.</div>
+        </div>
+        {% endif %}
+        {% if crm_add or crm_change %}
+        <div class="spf-card" id="crm"><div class="spf-h">👤 Клієнт CRM — якщо це візитка покупця</div>
+          {% if m.customer %}<div class="spf-ok">✓ Уже в CRM: {% if crm_view %}<a href="{% url 'admin:crm_customer_change' m.customer.pk %}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}клієнт CRM{% endif %}</div>{% endif %}
+          {% if crm_matches %}
+          <div class="spf-muted">✅ Схоже, клієнт уже є:</div>
+          {% for c, why in crm_matches %}
+          <div class="spf-match"><a href="{% url 'admin:crm_customer_change' c.pk %}" target="_blank" translate="no"><b>{{ c.company|default:c.name }}</b>{% if c.company and c.name %} — {{ c.name }}{% endif %}</a>
+            <span class="spf-muted">— {{ why }}{% if c.email %} · <span translate="no">{{ c.email }}</span>{% endif %}</span>
+            {% if crm_change %}<button type="submit" name="customer" value="{{ c.pk }}" class="button" formnovalidate onclick="this.form.querySelector('[name=action]').value='crm_attach'">➕ Додати до нього</button>{% endif %}</div>
+          {% endfor %}{% endif %}
+          <div class="spf-muted">Ім'я, фірма, email, телефон і адреса — з полів вище (людина — контактна особа). Фото піде в «📎 Документи» клієнта, у хронологію — нотатка «🪪 Візитка»; наявному клієнту дописуються лише порожні поля.</div>
+          <div class="spf-row">
+            {% if crm_add %}<button type="submit" class="button" formnovalidate onclick="this.form.querySelector('[name=action]').value='crm_create'">👤 Створити клієнта CRM</button>{% endif %}
+            {% if crm_change %}<input id="cr-crm-q" placeholder="… або знайти клієнта: фірма, ім'я, email" list="cr-crm-list" style="min-width:260px">
+            <button type="submit" class="button" formnovalidate onclick="var v=document.getElementById('cr-crm-q').value, o=[].slice.call(document.querySelectorAll('#cr-crm-list option')).filter(function(x){return x.value===v;})[0]; if(!o){alert('Виберіть клієнта зі списку');return false;} this.value=o.dataset.pk; this.form.querySelector('[name=action]').value='crm_attach';" name="customer" value="">➕ Додати до клієнта</button>
+            <datalist id="cr-crm-list"></datalist>{% endif %}
+          </div>
         </div>
         {% endif %}
       </form>
@@ -267,6 +291,40 @@
       else if (a === 'save') save();
       else if (a === 'cancel') end();
     });
+  });
+  // посилання з QR-коду й приміток (urlize) — у новій вкладці, без передачі адреси Minerva
+  document.querySelectorAll('.sp-links a').forEach(function(a){ a.target = '_blank'; a.rel = 'noopener noreferrer nofollow'; });
+  // 👤 пошук клієнта CRM
+  var cq = document.getElementById('cr-crm-q'), clist = document.getElementById('cr-crm-list'), ct = null;
+  if (cq) cq.addEventListener('keydown', function(e){ if (e.key === 'Enter') e.preventDefault(); });   // Enter не створює постачальника
+  if (cq) cq.addEventListener('input', function(){
+    clearTimeout(ct); var v = cq.value.trim(); if (v.length < 2) return;
+    ct = setTimeout(function(){
+      fetch('{% url 'admin:inventory_supplier_crm_search' %}?q=' + encodeURIComponent(v), {credentials: 'same-origin'})
+        .then(function(r){ return r.json(); }).then(function(j){
+          clist.innerHTML = '';
+          (j.results || []).forEach(function(x){ var o = document.createElement('option'); o.value = x.text; o.dataset.pk = x.id; clist.appendChild(o); });
+        });
+    }, 250);
+  });
+  // 💡 нова категорія від AI → створити й позначити (поля форми не губляться — без перезавантаження)
+  var nc = document.getElementById('cr-newcat');
+  if (nc) nc.addEventListener('click', function(){
+    var fd = new FormData(); fd.append('action', 'add_category');
+    var tok = document.querySelector('input[name=csrfmiddlewaretoken]');
+    nc.disabled = true;
+    fetch(location.pathname, {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': tok ? tok.value : ''}})
+      .then(function(r){ return r.json(); }).then(function(j){
+        if (j.error) { nc.disabled = false; alert(j.error); return; }
+        var box = document.querySelector('.spf-cats'), have = box && box.querySelector('input[value="' + j.pk + '"]');
+        if (have) have.checked = true;
+        else if (box) {
+          var lab = document.createElement('label'); lab.className = 'spf-cat';
+          var inp = document.createElement('input'); inp.type = 'checkbox'; inp.name = 'categories'; inp.value = j.pk; inp.checked = true;
+          lab.appendChild(inp); lab.appendChild(document.createTextNode(' ' + j.icon + ' ' + j.name)); box.appendChild(lab);
+        }
+        var row = nc.closest('.spc-newcat'); if (row) row.textContent = '✅ Категорію «' + j.name + '» ' + (j.created ? 'створено й ' : '') + 'позначено';
+      }).catch(function(){ nc.disabled = false; });
   });
   var q = document.getElementById('cr-sup-q'), list = document.getElementById('cr-sup-list'), t = null;
   if (q) q.addEventListener('input', function(){

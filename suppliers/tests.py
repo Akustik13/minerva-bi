@@ -750,3 +750,132 @@ class HistoryTests(Base):
                           "po_history": "1"})
         po = PurchaseOrder.objects.get(supplier__name="New Fab Ltd")
         self.assertEqual((po.status, po.supplier_order_no, po.documents.count()), ("received", "20261103NF01", 1))
+
+
+class CardsTests(Base):
+    """🪪 Візитки: плитка, категорії й нова категорія від AI, поділитись поштою, vCard, клієнт CRM, AI для кількох."""
+
+    def card(self, **extracted):
+        m = SupplierMedia(kind=SupplierMedia.CARD, created_by=self.user, event="electronica 2026", note="стенд B3",
+                          extracted=extracted)
+        m.image.save("front.png", SimpleUploadedFile("front.png", png()), save=False)
+        m.image_back.save("back.png", SimpleUploadedFile("back.png", png()), save=False)
+        m.save()
+        return m
+
+    def test_ai_card_picks_categories_and_proposes_new(self):
+        from suppliers.services import cards
+        self.assertEqual(cards.match_categories(["🟩 «Виробники плат»", "виробники ПЛАТ (PCB)", "Щось інше"]),
+                         [self.pcb])
+        m = self.card()
+        answer = json.dumps({"company": "Shenzhen Huaqiu", "description": "Схоже, друковані плати (NextPCB).",
+                             "categories": ["«Виробники плат»"]})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.004"))) as call:
+            ai.card(m, user=self.user)
+        self.assertIn("NextPCB", call.call_args.args[0])                       # підказка: висновок з назви / логотипа
+        self.assertEqual(list(m.categories.all()), [self.pcb])                 # категорія — одразу візитці
+        quartz = self.card()
+        answer = json.dumps({"company": "Donghai Kaikai Quartz", "categories": [],
+                             "new_category": {"name": "«Виробники кварцових резонаторів»", "icon": "💎"}})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.004"))):
+            ai.card(quartz, user=self.user)
+        quartz.refresh_from_db()
+        self.assertEqual(quartz.extracted["new_category"]["name"], "Виробники кварцових резонаторів")
+        page = self.client.get(reverse("admin:inventory_supplier_cards"))
+        self.assertContains(page, "AI пропонує нову категорію")
+        self.assertContains(page, "🧠 AI ✓")
+        url = reverse("admin:inventory_supplier_card_review", args=[quartz.pk])
+        j = self.client.post(url, {"action": "add_category"}).json()
+        self.assertEqual((j["name"], j["icon"], j["created"]), ("Виробники кварцових резонаторів", "💎", True))
+        self.assertEqual(list(quartz.categories.values_list("name", flat=True)), ["Виробники кварцових резонаторів"])
+        self.assertFalse(self.client.post(url, {"action": "add_category"}).json()["created"])   # без дублів
+
+    def test_tile_info_country_site_and_filters(self):
+        from suppliers.services import cards
+        m = self.card(name="Coax Connectors Ltd", contact_name="Lolly Zheng", addr_country="CN",
+                      website="www.coax-connectors.com", description="Роз'єми й кабелі\nПродукція: SMA")
+        m.categories.add(self.pcb)
+        i = cards.info(m)
+        self.assertEqual((i["company"], i["flag"], i["site"]), ("Coax Connectors Ltd", "🇨🇳",
+                                                                 "https://www.coax-connectors.com"))
+        self.assertEqual((i["desc"], i["ai"]["key"], [c.pk for c in i["cats"]]), ("Роз'єми й кабелі", "none",
+                                                                                  [self.pcb.pk]))
+        self.assertEqual(cards.site_url("javascript:alert(1)"), "")
+        page = self.client.get(reverse("admin:inventory_supplier_cards") + "?q=Lolly")
+        self.assertContains(page, "Coax Connectors Ltd")
+        self.assertContains(page, "https://www.coax-connectors.com")
+        self.assertNotContains(self.client.get(reverse("admin:inventory_supplier_cards") + "?ai=done"),
+                               "Coax Connectors Ltd")
+
+    def test_qr_links_clickable(self):
+        m = self.card(name="Coax")
+        SupplierMedia.objects.filter(pk=m.pk).update(qr_text="http://www.coax-connectors.com/")
+        page = self.client.get(reverse("admin:inventory_supplier_card_review", args=[m.pk]))
+        self.assertContains(page, '<a href="http://www.coax-connectors.com/"')
+
+    def test_share_makes_draft_with_photos_and_vcard(self):
+        from email_assistant.models import EmailDraft
+        m = self.card(name="Cable Tech GmbH", contact_name="Tom Becker", contact_position="Sales",
+                      contact_email="tom@cable-tech.de", contact_mobile="+49 170 1234567", website="www.cable-tech.de")
+        url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+        resp = self.client.post(url, {"action": "share"})
+        d = EmailDraft.objects.get()
+        self.assertRedirects(resp, f"/email/compose/?draft={d.pk}", fetch_redirect_response=False)
+        self.assertEqual((d.account, d.to_emails), (self.account, []))
+        self.assertIn("Cable Tech GmbH", d.subject)
+        self.assertIn("Tom Becker — Sales", d.body)
+        self.assertEqual([a["name"] for a in d.attachments], ["Tom_Becker.png", "Tom_Becker-back.png", "Tom_Becker.vcf"])
+        vcf = self.client.get(url + "?vcf=1")
+        self.assertEqual(vcf["Content-Type"], "text/vcard; charset=utf-8")
+        text = vcf.content.decode()
+        for line in ("FN:Tom Becker", "N:Becker;Tom;;;", "ORG:Cable Tech GmbH", "TEL;TYPE=CELL:+49 170 1234567",
+                     "EMAIL;TYPE=INTERNET:tom@cable-tech.de", "URL:www.cable-tech.de"):
+            self.assertIn(line, text)
+        self.client.force_login(self.other)                                     # без права — нічого
+        self.assertNotEqual(self.client.post(url, {"action": "share"}).status_code, 302)
+
+    def test_card_to_crm_customer_new_and_existing(self):
+        import os
+        from crm.models import Customer, CustomerTimeline
+        m = self.card(name="Leeno Industrial", contact_name="Castor Park", contact_email="park@leeno.co.kr",
+                      addr_country="KR")
+        url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+        form = {"name": "Leeno Industrial", "contact_name": "Castor Park", "contact_email": "park@leeno.co.kr",
+                "contact_mobile": "+82 10 5005 7087", "addr_city": "Busan", "addr_country": "KR"}
+        self.client.post(url, {**form, "action": "crm_create"})
+        c = Customer.objects.get()
+        self.assertEqual((c.name, c.company, c.email, c.phone, c.country, c.source),
+                         ("Castor Park", "Leeno Industrial", "park@leeno.co.kr", "+82 10 5005 7087", "KR", "card"))
+        m.refresh_from_db()
+        self.assertEqual(m.customer, c)
+        self.assertTrue(os.path.exists(os.path.join(self.media, "customers", str(c.pk), f"Візитка-{m.pk}.png")))
+        self.assertTrue(CustomerTimeline.objects.filter(customer=c, title__startswith="🪪").exists())
+        self.client.post(url, {**form, "action": "crm_create"})                 # той самий email — без дубля
+        self.assertEqual(Customer.objects.count(), 1)
+        other = self.card(name="Leeno Industrial", contact_email="sales@leeno.co.kr")
+        page = self.client.get(reverse("admin:inventory_supplier_card_review", args=[other.pk]))
+        self.assertContains(page, "той самий домен leeno.co.kr")
+        old = Customer.objects.create(name="Kim", company="")
+        self.client.post(reverse("admin:inventory_supplier_card_review", args=[other.pk]),
+                         {"name": "Leeno Industrial", "contact_email": "sales@leeno.co.kr", "action": "crm_attach",
+                          "customer": old.pk})
+        old.refresh_from_db()
+        self.assertEqual((old.company, old.email), ("Leeno Industrial", "sales@leeno.co.kr"))   # лише порожнє
+        self.assertEqual(self.client.get(reverse("admin:inventory_supplier_crm_search") + "?q=leeno").json()
+                         ["results"][0]["id"], c.pk)
+
+    def test_read_many_unread_only_and_stops_on_errors(self):
+        from suppliers.services import cards
+        a, b = self.card(), self.card()
+        done = self.card()
+        SupplierMedia.objects.filter(pk=done.pk).update(cost_usd=Decimal("0.01"))
+        self.assertEqual(set(cards.to_read(self.user, "unread").values_list("pk", flat=True)), {a.pk, b.pk})
+        answer = json.dumps({"company": "X", "categories": ["Виробники плат"]})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.002"))):
+            j = self.client.post(reverse("admin:inventory_supplier_cards"),
+                                 {"action": "read_all", "scope": "unread"}).json()
+        self.assertIn("Прочитано 2", jobs.state(j["job"], self.user)["result"]["message"])
+        self.assertFalse(cards.to_read(self.user, "nocat").filter(pk__in=[a.pk, b.pk]).exists())
+        with mock.patch.object(ai, "call", side_effect=ai.AIError("Немає ключа AI")) as call:
+            out = cards.read_many([self.card().pk for _ in range(5)], self.user, "")
+        self.assertEqual((out["done"], out["failed"], call.call_count), (0, 3, 3))

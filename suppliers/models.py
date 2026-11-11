@@ -89,6 +89,9 @@ class SupplierMedia(models.Model):
                                  related_name="media", verbose_name="Постачальник")
     contact = models.ForeignKey(SupplierContact, null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name="media", verbose_name="Контактна особа")
+    # візитка покупця — у CRM клієнтом (suppliers/services/cards.py to_customer)
+    customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.SET_NULL,
+                                 related_name="business_cards", verbose_name="Клієнт CRM")
     kind = models.CharField("Що це", max_length=8, choices=KINDS, default=CARD)
     image = models.FileField("Фото", upload_to=_media_path)
     image_back = models.FileField("Зворотний бік", upload_to=_media_path, blank=True, default="")
