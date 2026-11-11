@@ -67,6 +67,17 @@ class MediaAccessTests(TestCase):
         self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))   # і адміністратор — ні
         self.assertEqual(self.client.get(url).status_code, 404)
 
+    def test_meetings_folder_nobody(self):
+        """🎙 Наради: Minerva файлів не зберігає; якщо щось з'явиться в media/meetings/ — нікому, і адміністратору."""
+        path = os.path.join(self.root, "meetings", "1")
+        os.makedirs(path)
+        with open(os.path.join(path, "part.txt"), "wb") as fh:
+            fh.write(b"transcript")
+        for user in (person("olga"), User.objects.create_superuser("root", "r@x.y", "p")):
+            self.client.force_login(user)
+            self.assertEqual(self.client.get("/media/meetings/1/part.txt").status_code, 404)
+            self.assertEqual(self.client.get("/media/meetings/").status_code, 404)
+
     def test_html_never_rendered_inline(self):
         self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
         r = self.client.get("/media/orders/webshop/1/evil.html")

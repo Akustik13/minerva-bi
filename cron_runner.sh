@@ -38,6 +38,7 @@ echo "   auto_import             every loop — profiles whose next run is due (
 echo "   send_alerts             every ${REMINDER_INTERVAL}s — critical stock / overdue, min interval from NotificationSettings"
 echo "   shop_accounts_cleanup   daily — expired shop customer sessions / links"
 echo "   expire_offers           daily — sent Angebote past their validity → expired"
+echo "   meetings_cleanup        every loop — 🎙 stale recordings; transcripts / protocols past retention once per 20 h"
 echo "   worktime_autofill       daily after hour from DanteSettings — empty work days in askDANTE (when enabled)"
 echo "   worktime_sync           daily after the same hour — askDANTE time records and month balances"
 echo "   worktime_reports        askDANTE work-time reports by e-mail (schedule in Minerva)"
@@ -106,6 +107,9 @@ while true; do
 
   # ── Авто-імпорт: профілі, яким настав «Наступний запуск» (інтервал — у профілі) ──
   python manage.py auto_import --all --verbosity 0 2>&1 || true
+
+  # ── 🎙 Наради: завислі записи — щоциклу; строки зберігання — раз на 20 год (атомарна позначка в БД) ──
+  python manage.py meetings_cleanup --if-due 2>&1 || true
 
   # ── Раз на добу: кабінет покупців магазину, журнал API, прострочені Angebote ──
   current_day=$(date +%Y-%m-%d)

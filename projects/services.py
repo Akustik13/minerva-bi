@@ -380,9 +380,10 @@ class HighlightError(ValueError):
     pass
 
 
-def add_highlight(project, *, title, date=None, kind="", quote="", message=None, user=None, source="", event=None):
-    """📌 Важливий момент (вручну; source ai — прийнята пропозиція AI-помічника). Дата — з листа, інакше сьогодні.
-    Повертає ProjectHighlight."""
+def add_highlight(project, *, title, date=None, kind="", quote="", message=None, user=None, source="",
+                  event=None, meeting=None, meeting_second=None):
+    """📌 Важливий момент (вручну; source ai — прийнята пропозиція AI-помічника, meeting — ✓ пункту наради
+    meetings/services.accept). Дата — з листа, з наради (день її початку), інакше сьогодні. Повертає ProjectHighlight."""
     from .models import ProjectHighlight
     title = " ".join(str(title or "").split())[:255]
     if not title:
@@ -390,11 +391,15 @@ def add_highlight(project, *, title, date=None, kind="", quote="", message=None,
     kinds = dict(ProjectHighlight.KIND_CHOICES)
     if not date and message is not None and message.sent_at:
         date = timezone.localtime(message.sent_at).date() if timezone.is_aware(message.sent_at) else message.sent_at.date()
+    if not date and meeting is not None:
+        start = meeting.started_at or meeting.created_at
+        date = timezone.localtime(start).date() if start else None
     return ProjectHighlight.objects.create(
         project=project, title=title, date=date or timezone.localdate(),
         kind=kind if kind in kinds else ProjectHighlight.OTHER, quote=str(quote or "").strip()[:2000],
         message=message, event=event, created_by=user,
-        source=ProjectHighlight.AI if source == ProjectHighlight.AI else ProjectHighlight.MANUAL)
+        source=source if source in (ProjectHighlight.AI, ProjectHighlight.MEETING) else ProjectHighlight.MANUAL,
+        meeting=meeting, meeting_second=max(int(meeting_second), 0) if meeting_second is not None else None)
 
 
 def tags_for_threads(thread_ids) -> dict:

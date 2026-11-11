@@ -4,6 +4,11 @@ timeline.render. Пошта й календар особисті: тема ли�
 
 Маршрути — projects/views.py: cockpit (GET, перегляд), highlight / highlight_delete / link_decide / scan (POST, зміна);
 JS пульта — admin/projects/project/change_form.html (замінює #pj-cockpit без перезавантаження форми).
+
+🎙 Наради (meetings, timeline.own_meetings): «🎙 Записати нараду» — звичайне посилання на підготовку наради
+(?project=), лише коли людина може записувати; блок «🎙 Мої наради» — лише власні наради того, хто дивиться (≤
+MEETINGS_SHOWN, без розшифровки); моменти / ризики / кроки, прийняті з наради, — «🎙 з наради DD.MM», посилання на місце
+в записі — лише тому, хто записав.
 """
 import json
 
@@ -15,9 +20,24 @@ from . import overview, state, timeline
 from .models import ProjectHighlight, ProjectLink
 
 MOMENTS = 6
+MEETINGS_SHOWN = 5
 RECENT_MAILS = 25
 SUGGESTIONS = 20
 RANGE_LABELS = [("all", "усе"), ("3", "3 міс"), ("6", "6 міс"), ("12", "12 міс")]
+
+
+def _step_meetings(data, facts, uid):
+    """Вікно кроку: крок, прийнятий з наради, — «🎙 з наради DD.MM» (посилання — лише тому, хто записав)."""
+    p = facts.get("plan")
+    steps = [c.step for c in (p.steps if p is not None else [])]
+    refs = timeline.meeting_refs(steps)
+    if not refs:
+        return
+    by_id = {s.pk: timeline.meeting_ref(s, refs, uid) for s in steps}
+    for s in data.get("steps", []):
+        ref = by_id.get(s.get("id"))
+        if ref:
+            s["meeting"] = ref
 
 
 def _due(project, today):
@@ -77,10 +97,12 @@ def _suggestions(project, uid) -> list:
 
 def _moments(facts, uid) -> list:
     out = []
+    refs = timeline.meeting_refs(facts["highlights"])
     for h in reversed(facts["highlights"]):          # нові зверху
         icon, _, name = h.get_kind_display().partition(" ")
         out.append({"id": h.pk, "date": h.date, "icon": icon, "kind": name, "kind_key": h.kind, "title": h.title,
-                    "quote": h.quote, "url": f"/email/message/{h.message_id}/" if _own(h.message, uid) else ""})
+                    "quote": h.quote, "url": f"/email/message/{h.message_id}/" if _own(h.message, uid) else "",
+                    "meeting": timeline.meeting_ref(h, refs, uid)})
     return out
 
 
@@ -117,6 +139,18 @@ def _acts(attention, can_change) -> list:
             a = {**a, "act_json": json.dumps(a["act"], ensure_ascii=False)}
         out.append(a)
     return out
+
+
+def _meetings_context(project, user, meetings) -> dict:
+    """«🎙 Мої наради»: наради того, хто дивиться (timeline.own_meetings — лише свої, і адміністратору), «🎙 Записати
+    нараду» — лише коли людина може записувати."""
+    rows = [{"id": m.pk, "title": m.title, "line": timeline.meeting_line(m, pending=False), "cls": timeline.meeting_cls(m) or "def",
+             "pending": getattr(m, "pending", 0), "url": timeline.meeting_url(m.pk)}
+            for m in meetings[:MEETINGS_SHOWN]]
+    all_url = timeline._url("admin:meetings_meeting_changelist") if len(meetings) > MEETINGS_SHOWN else ""
+    return {"rows": rows, "total": len(meetings), "all_url": all_url,
+            "pending": sum(getattr(m, "pending", 0) for m in meetings),
+            "record_url": timeline.new_meeting_url(user, project=project)}
 
 
 def _mails(facts, uid) -> list:
@@ -167,17 +201,21 @@ def _plan_context(project, facts, today, can_change=False) -> dict:
                                                    ("done", "skipped"))}
 
 
-def _risks_context(project, can_change) -> dict:
+def _risks_context(project, can_change, user=None) -> dict:
     """Вкладка «⚠️ Ризики»: матриця 3 × 3 і реєстр (відкриті й ті, за якими стежимо — за балом; закриті окремо);
-    дані вікна ризику — лише тому, хто може змінювати проєкт."""
+    дані вікна ризику — лише тому, хто може змінювати проєкт. Ризик з наради — «🎙 з наради DD.MM» (посилання на
+    місце в записі — лише тому, хто записав)."""
     from django.contrib.auth import get_user_model
     from . import risk_rules
     from .models import ProjectRisk, ProjectStep
     risks = list(ProjectRisk.objects.filter(project=project).select_related("owner").prefetch_related("steps"))
     live = sorted([r for r in risks if r.is_open], key=lambda r: (-r.score, r.status != ProjectRisk.OPEN, r.pk))
     closed = sorted([r for r in risks if not r.is_open], key=lambda r: r.closed_at or r.updated_at, reverse=True)
-    rows = [{"n": n, "risk": r, "rule": risk_rules.rule_name(r.rule_key), "steps": [s.title for s in r.steps.all()]}
-            for n, r in enumerate(live, 1)]
+    refs, uid = timeline.meeting_refs(risks), getattr(user, "pk", None)
+    for r in risks:
+        r.meeting_ref = timeline.meeting_ref(r, refs, uid)
+    rows = [{"n": n, "risk": r, "rule": risk_rules.rule_name(r.rule_key), "steps": [s.title for s in r.steps.all()],
+             "meeting": r.meeting_ref} for n, r in enumerate(live, 1)]
     data = None
     if can_change:
         users = get_user_model().objects.filter(is_active=True, is_staff=True).order_by("first_name", "username")
@@ -253,7 +291,9 @@ def context(project, user, range_key="all", notice="") -> dict:
     ai = _ai_context(project, user, can_change)
     if plan.get("data") is not None:
         plan["data"]["agent"] = bool(ai.get("agent"))
-    evs = timeline.events(project, facts, user, today)          # одні події — для SVG, браузера й телефона
+        _step_meetings(plan["data"], facts, uid)
+    meetings = timeline.own_meetings(project, user)                # 🎙 лише свої — і для шкали, і для блоку
+    evs = timeline.events(project, facts, user, today, meetings=meetings)   # одні події — для SVG, браузера й телефона
     return {
         "project": project, "health": {"key": st.health, "icon": icon, "label": label},
         "due": _due(project, today), "start": project.start_date, "today": today,
@@ -274,8 +314,9 @@ def context(project, user, range_key="all", notice="") -> dict:
         "notice": notice,
         "plan": plan,
         "ai": ai,
-        "riskreg": _risks_context(project, can_change),
+        "riskreg": _risks_context(project, can_change, user),
         "parties": _parties_context(project, can_change, today),
+        "meetings": _meetings_context(project, user, meetings),
         "status": _status_context(project, user, facts, st, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
                  "mail_handled": reverse("projects:mail_handled", args=[pk]),

@@ -167,9 +167,26 @@ def knowledge_item_action(request, pk, action):
     return JsonResponse({"ok": True, "item": item_json(item, request.user)})
 
 
+def _meeting_page(item):
+    """None — не нарада; '' — нарада, але сторінки немає; інакше адреса сторінки наради + «#kb»."""
+    from .models import KnowledgeItem
+    key = item.source_key or ""
+    if item.kind != KnowledgeItem.MEETING and not key.startswith("meeting:"):
+        return None
+    parts = key.split(":")
+    if len(parts) < 2 or not parts[1].isdigit():
+        return ""
+    from django.urls import NoReverseMatch, reverse
+    try:
+        return reverse("admin:meetings_meeting_page", args=[int(parts[1])]) + "#kb"
+    except NoReverseMatch:
+        return ""
+
+
 @require_GET
 def knowledge_item_page(request, pk):
-    """Документ бази знань для людини (посилання з джерел RAG): файл — у браузері, посилання — на сайт."""
+    """Документ бази знань для людини (посилання з джерел RAG): файл — у браузері, посилання — на сайт,
+    🎙 частина розшифровки наради — сторінка наради, розділ «📚 База знань» (там ще раз перевіряють, що нарада своя)."""
     from django.http import FileResponse, HttpResponseRedirect
 
     from . import knowledge_items
@@ -177,6 +194,11 @@ def knowledge_item_page(request, pk):
     item = KnowledgeItem.objects.filter(pk=pk).select_related("customer", "project", "order", "product").first()
     if item is None or not knowledge_items.can_view(request.user, item):
         raise Http404
+    meeting = _meeting_page(item)
+    if meeting is not None:
+        if not meeting:
+            raise Http404
+        return HttpResponseRedirect(meeting)
     path = knowledge_items.file_path(item)
     if path:
         return FileResponse(open(path, "rb"), as_attachment=False, filename=item.file_name or None)

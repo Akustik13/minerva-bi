@@ -676,6 +676,8 @@ from django.db.models import Q  # noqa: E402
 from . import knowledge_items  # noqa: E402
 from .models import KnowledgeItem  # noqa: E402
 
+_MEETING = KnowledgeItem.MEETING      # 🎙 частина розшифровки наради (meetings/knowledge.py)
+
 
 def card_links(customer=None, projects=(), order=None, product=None, empty="—"):
     """Прив'язки посиланнями на картки: 👤 клієнт · 📁 P-… назва · 🛒 замовлення · 📦 артикул."""
@@ -716,11 +718,15 @@ class KnowledgeItemAdmin(RightsMixin, admin.ModelAdmin):
         qs = (super().get_queryset(request).select_related("owner", "customer", "project", "order", "product",
                                                            "knowledge_source")
               .prefetch_related("knowledge_source__projects"))
+        # 🎙 розшифровки нарад — лише тому, хто записав: чужих не бачить ніхто, і суперкористувач теж
+        qs = qs.exclude(Q(kind=_MEETING) & ~Q(owner=request.user))
         if request.user.is_superuser:
             return qs
         return qs.filter(knowledge_items.visible_q(request.user))        # як у картках: 🔒 свої + 👥 за правами
 
     def has_change_permission(self, request, obj=None):
+        if obj is not None and obj.kind == _MEETING:      # частини розшифровки змінює й видаляє лише сторінка наради
+            return False
         if obj is not None and not knowledge_items.can_change(request.user, obj) and not request.user.is_superuser:
             return False
         return super().has_change_permission(request, obj)

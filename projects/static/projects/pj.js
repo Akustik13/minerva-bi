@@ -1045,6 +1045,22 @@
     data.statuses.forEach(function (x) { if (x[0] === s.eff) eff = x[1]; });
     note.textContent = s.note ? '🔗 Зараз: ' + s.note + (s.eff && s.eff !== s.status ? ' · стан за ними: ' + eff : '') : '';
     note.hidden = !s.note;
+    var mt = d.querySelector('[data-s-meeting]');            // 🎙 крок з наради (cockpit._step_meetings)
+    if (mt) {
+      mt.textContent = '';
+      var ref = !isNew && s.meeting ? s.meeting : null;
+      if (ref && ref.url && /^\/(?!\/)/.test(ref.url)) {
+        var ma = document.createElement('a');
+        ma.href = ref.url;
+        ma.target = '_blank';
+        ma.rel = 'noopener';
+        ma.textContent = ref.label + ' — відкрити місце в записі';
+        mt.appendChild(ma);
+      } else if (ref) {
+        mt.textContent = ref.label;
+      }
+      mt.hidden = !ref;
+    }
     var ag = d.querySelector('[data-s-agent]'), agl = d.querySelector('[data-s-agent-tasks]');
     ag.hidden = isNew || !data.agent;
     agl.textContent = '';
@@ -1222,6 +1238,16 @@
     if (c.mail) {
       items.push({type: 'separator'});
       items.push({label: 'Відкрити лист', icon: '✉️', href: '/email/message/' + c.mail + '/', target: '_blank'});
+    }
+    // 🎙 зустріч з вашого календаря: відкрити записану нараду / записати (timeline._term_events: rec, record)
+    var local = function (u) { return typeof u === 'string' && /^\/(?!\/)/.test(u); };
+    if (local(c.rec) || local(c.record)) {
+      items.push({type: 'separator'});
+      if (local(c.rec)) items.push({label: 'Відкрити нараду', icon: '🎙', href: c.rec, target: '_blank'});
+      if (local(c.record)) {
+        items.push({label: local(c.rec) ? 'Записати ще одну нараду' : 'Записати нараду', icon: '🎙',
+                    href: c.record, target: '_blank'});
+      }
     }
     if (c.linked) {
       items.push({type: 'separator'});
@@ -2047,6 +2073,8 @@
       '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai],[data-pjc-act],[data-pjc-unmark],' +
       'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx]');
     if (!t || !root.contains(t)) return;
+    var link = e.target.closest('a[href]');
+    if (link && link !== t && t.contains(link)) return;   // посилання в рядку («🎙 з наради») відкривається саме
     e.preventDefault();
     if (t.matches('g[data-party]')) { openParty(t.getAttribute('data-party')); return; }
     if (t.hasAttribute('data-pjy-new')) { openParty(''); return; }

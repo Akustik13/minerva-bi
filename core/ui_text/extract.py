@@ -18,7 +18,8 @@ CYR = re.compile(r"[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ']")
 LETTERS = re.compile(r"[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ]")
 MAX_LEN = 600                    # довші рядки — інструкції для AI, листи, а не написи інтерфейсу
 SKIP_DIRS = {"venv", ".venv", "node_modules", "staticfiles", "media", ".git", ".claude", "__pycache__",
-             "migrations", "locale", "docs", "integration", "knowledge_sources"}
+             "migrations", "locale", "docs", "integration", "knowledge_sources",
+             "rag_pc"}  # code that runs on the RAG PC (meetings/rag_pc), not Minerva's interface
 SKIP_FILES = re.compile(r"^(tests?_.*|.*_tests?|conftest)\.py$|^tests\w*\.py$")
 LOG_CALLS = {"debug", "info", "warning", "error", "exception", "critical", "log"}
 ATTRS = ("title", "placeholder", "aria-label", "alt", "data-confirm", "data-title", "label")

@@ -190,8 +190,10 @@ class RegistryTests(PanelTestBase):
         block = sp.Block("x", "X", lambda o, r: format_html("{}", "x"))
         sp.register("core.auditlog", title=str, blocks=[block], generic_blocks=())
         sp.register("email_assistant.emailmessage", title=str, blocks=[block], generic_blocks=())
+        sp.register("meetings.meeting", title=str, blocks=[block], generic_blocks=())
         self.assertIsNone(sp.get("core.auditlog"))
         self.assertIsNone(sp.get("email_assistant.emailmessage"))
+        self.assertIsNone(sp.get("meetings.meeting"))                   # 🎙 наради — лише власнику, без панелі
         self.assertIsNone(sp.get("jlcpcb.jlcconfig"))
         r = self.client.get("/admin/core/auditlog/")
         self.assertEqual(r.status_code, 200)

@@ -27,6 +27,9 @@ class HasPermTests(TestCase):
         self.assertTrue(olga.has_perm("projects.change_project"))   # проєкти, Angebote, пошта — робота менеджера
         self.assertTrue(olga.has_perm("offers.add_offer"))
         self.assertFalse(olga.has_perm("offers.delete_offer"))
+        self.assertTrue(olga.has_perm("meetings.add_meeting"))      # 🎙 наради: записати й працювати зі своїми
+        self.assertTrue(olga.has_perm("meetings.change_meeting"))
+        self.assertFalse(olga.has_perm("meetings.delete_meeting"))  # видаляє власник на сторінці наради
         self.assertFalse(olga.has_perm("shop.view_shop"))           # модуля немає в ролі
         self.assertFalse(olga.has_perm("inventory.view_product"))  # модуля немає в ролі
         self.assertTrue(olga.has_module_perms("crm"))

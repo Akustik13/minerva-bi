@@ -1373,6 +1373,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     </div>
     <div id="ag-task-opts" hidden>
       <label class="ag-check"><input type="checkbox" id="ag-auto"> ✓ Трек-номер вносити самому — у замовлення, де поле ще порожнє, і в посилку закупівлі (решту пропозицій застосовуєте ви ✓)</label>
+      <label class="ag-check"><input type="checkbox" id="ag-auto-po"> ✓ Закупівлю вносити самому — нову закупівлю (PO) з листа постачальника, якщо такої ще немає</label>
       <label class="ag-check"><input type="checkbox" id="ag-task-now" checked> І одразу завдання з цього листа</label>
       <div class="ag-muted">Агент читає й листи колег (переслані), знаходить замовлення чи закупівлю й пропонує зміни на сторінці завдання; коли закінчить — повідомить.</div>
     </div>
@@ -4143,6 +4144,7 @@ async function emAgent(pk) {
   (d.kinds || []).forEach(function (k) { if (k.value !== 'mail_task' || d.can_task) kind.add(new Option(k.label, k.value)); });
   kind.value = 'mail_reply';
   document.getElementById('ag-auto').checked = false;
+  document.getElementById('ag-auto-po').checked = false;
   document.getElementById('ag-task-now').checked = true;
   document.getElementById('ag-cc').value = '';
   document.getElementById('ag-forward').value = '';
@@ -4208,7 +4210,8 @@ function agData() {
     subject_words: document.getElementById('ag-subject').value, body_words: document.getElementById('ag-body').value,
     category: document.getElementById('ag-cat').value, instruction: document.getElementById('ag-instr').value,
     mode: document.getElementById('ag-mode').value, kind: document.getElementById('ag-kind').value,
-    auto_apply: document.getElementById('ag-auto').checked, cc: document.getElementById('ag-cc').value,
+    auto_apply: document.getElementById('ag-auto').checked, auto_purchase: document.getElementById('ag-auto-po').checked,
+    cc: document.getElementById('ag-cc').value,
     forward_to: document.getElementById('ag-forward').value,
     importance: document.getElementById('ag-imp').value, notify: document.getElementById('ag-notify').checked,
     opt_important: document.getElementById('ag-opt-imp').checked,

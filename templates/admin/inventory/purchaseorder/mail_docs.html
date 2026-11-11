@@ -1,0 +1,64 @@
+{% extends "admin/base_site.html" %}
+{# 📥 Документи закупівлі з пошти (inventory/admin.py mail_docs_view, inventory/services/po_documents.py) #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:inventory_purchaseorder_changelist' %}">Закупівлі</a> &rsaquo;
+  <a href="{{ back_url }}" translate="no">{{ po.code }}</a> &rsaquo; 📥 Документи з пошти
+</div>
+{% endblock %}
+{% block content %}
+<style>
+  #pod { max-width: 1150px; }
+  #pod .pod-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; padding: 12px 16px; margin: 0 0 12px; }
+  #pod .pod-muted { color: var(--text-muted); font-size: 12px; }
+  #pod .pod-head { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+  #pod .pod-att { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 4px 0 4px 18px; }
+  #pod .pod-att select { max-width: 290px; }
+  #pod .pod-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+</style>
+<div id="pod">
+  <div class="pod-card">
+    <div><b translate="no">{{ po.code }}</b> · <span translate="no">{{ po.supplier.name }}</span>{% if po.supplier.email %} · <span class="pod-muted" translate="no">{{ po.supplier.email }}</span>{% endif %}</div>
+    <div class="pod-muted" style="margin-top:4px">Листи ваших скриньок за {{ days }} днів з вкладеннями: від постачальника, переслані з його адресою в тексті, або де є код закупівлі, трек-номер чи номер замовлення постачальника. Категорію Minerva підставляє за назвою файлу — змініть, якщо треба.</div>
+    <form method="get" class="pod-row" style="margin-top:8px">
+      <input type="search" name="q" value="{{ q }}" placeholder="Тема або відправник…" style="flex:1 1 280px">
+      <button type="submit" class="button">🔍 Шукати</button>
+      {% if q %}<a href="?">✕ листи про цю закупівлю</a>{% endif %}
+    </form>
+  </div>
+
+  <form method="post">{% csrf_token %}
+    {% for r in rows %}
+    <div class="pod-card">
+      <div class="pod-head">
+        <span>{{ r.msg.sent_at|date:"d.m.Y H:i" }}</span>
+        <a href="/email/message/{{ r.msg.pk }}/" target="_blank" translate="no">{{ r.msg.subject|default:"(без теми)"|truncatechars:100 }}</a>
+        <span class="pod-muted" translate="no">{{ r.msg.from_email }}</span>
+        {% if r.why %}<span class="pod-muted">· {{ r.why }}</span>{% endif %}
+      </div>
+      {% for a in r.atts %}
+      <div class="pod-att">
+        <label><input type="checkbox" name="pick" value="{{ r.msg.pk }}:{{ a.index }}"{% if a.added %} disabled{% endif %}>
+          📄 <span translate="no">{{ a.name }}</span></label>
+        <span class="pod-muted">{{ a.size|filesizeformat }}</span>
+        {% if a.added %}<span class="pod-muted">✓ уже в закупівлі</span>{% else %}
+        <select name="cat_{{ r.msg.pk }}_{{ a.index }}">
+          {% for value, label in categories %}<option value="{{ value }}"{% if value == a.category %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% empty %}
+    <div class="pod-card">Листів з вкладеннями не знайдено{% if q %} за «{{ q }}»{% endif %}. Спробуйте пошук за темою чи відправником.</div>
+    {% endfor %}
+    {% if rows %}
+    <div class="pod-row">
+      <button type="submit" class="button default">📎 Додати вибрані до закупівлі</button>
+      <a href="{{ back_url }}">← до закупівлі</a>
+    </div>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

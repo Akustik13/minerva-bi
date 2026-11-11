@@ -887,7 +887,11 @@ def process_mark(run):
 AUTO_FIELDS = ('tracking', 'courier')
 
 
-def _auto_ok(p) -> bool:
+def _auto_ok(p, rule) -> bool:
+    if p.kind == AgentProposal.PURCHASE:                 # «✓ Закупівлю вносити самому» (дублі відсіює apply_purchase)
+        return rule.auto_purchase
+    if not rule.auto_apply:
+        return False
     if p.kind == AgentProposal.PARCEL:
         return True
     return (p.kind == AgentProposal.ORDER and (p.data or {}).get('field') in AUTO_FIELDS
@@ -895,13 +899,14 @@ def _auto_ok(p) -> bool:
 
 
 def auto_apply(task) -> str:
-    """Завдання з доручення з «✓ Трек-номер вносити самому» закінчилось → застосувати трек-номер / кур’єра в
-    порожнє поле замовлення й трек-номер посилки закупівлі; решта чекає ✓ людини. → що зроблено ('' — нічого)."""
+    """Завдання з доручення закінчилось → «✓ Трек-номер вносити самому»: трек-номер / кур’єра в порожнє поле
+    замовлення й трек-номер посилки закупівлі; «✓ Закупівлю вносити самому»: нову закупівлю (PO). Решта чекає ✓
+    людини. → що зроблено ('' — нічого)."""
     from agent import decide
     run = AgentRun.objects.filter(task=task).select_related('rule').first()
-    if run is None or not run.rule.enabled or not run.rule.auto_apply:
+    if run is None or not run.rule.enabled or not (run.rule.auto_apply or run.rule.auto_purchase):
         return ''
-    chosen = [p for p in task.proposals.filter(status=AgentProposal.PENDING) if _auto_ok(p)]
+    chosen = [p for p in task.proposals.filter(status=AgentProposal.PENDING) if _auto_ok(p, run.rule)]
     if not chosen:
         return ''
     out = decide.apply_selected(task, [p.pk for p in chosen], task.owner)
@@ -984,6 +989,36 @@ def retry(run) -> str:
     return '' if done else 'лист уже обробляється'
 
 
+def process_now(rule, msg) -> tuple:
+    """«▶ Обробити зараз» у «🧪 Перевірити, як працює»: лист, що підходить, але прийшов раніше за доручення (таких
+    доручення само не бере — `start_pk`), або пропущений / з помилкою — у роботу за теперішніми налаштуваннями
+    (давній теж — `retried_at`). «🧩 Завдання агенту» — завдання одразу (агент починає у фоні), решта видів — cron
+    протягом хвилини. → ('' або чому ні, AgentRun | None)."""
+    if not rule.enabled:
+        return 'доручення вимкнене — спершу увімкніть його', None
+    ok, why = matches(rule, msg)
+    if not ok:
+        return f'лист не підходить під умови доручення ({why})', None
+    reason = why_not(rule, msg, check_age=False)
+    if reason:
+        return reason, None
+    run, created = AgentRun.objects.get_or_create(rule=rule, message=msg, defaults={'retried_at': timezone.now()})
+    if not created:
+        if run.status not in RETRY_STATES:
+            return f'лист уже в роботі за цим дорученням: {run.get_status_display()}', run
+        error = retry(run)
+        if error:
+            return error, run
+    if rule.kind == AgentRule.MAIL_TASK and _claim(run):
+        from agent import tasks
+        process(AgentRun.objects.select_related('rule', 'rule__account', 'rule__account__user', 'message',
+                                                'message__thread').get(pk=run.pk))
+        run.refresh_from_db()
+        if run.task_id:
+            tasks.start(run.task)
+    return '', run
+
+
 def draft_closed(draft, how, text=''):
     """email_assistant.drafts.discard: чернетку агента надіслали (sent / scheduled) або видалили (deleted)."""
     run = AgentRun.objects.filter(draft=draft).select_related('rule').first()
@@ -1061,6 +1096,7 @@ def rule_from(data, msg, user=None) -> AgentRule:
     if rule.kind == AgentRule.MAIL_FORWARD and not forward_list(rule):
         raise ValueError('Вкажіть, кому пересилати — адресу в «Кому переслати»')
     rule.auto_apply = rule.kind == AgentRule.MAIL_TASK and bool(data.get('auto_apply'))
+    rule.auto_purchase = rule.kind == AgentRule.MAIL_TASK and bool(data.get('auto_purchase'))
     cat = str(data.get('category') or '')
     if cat.isdigit():
         from email_assistant.models import MailCategory

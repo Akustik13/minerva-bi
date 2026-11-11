@@ -5,11 +5,12 @@ import logging
 from decimal import Decimal
 import uuid
 
-from django.db.models.signals import post_save, pre_delete, pre_save
+from django.db.models.signals import post_delete, post_save, pre_delete, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 
 from .models import (
+    PurchaseOrderDocument,
     PurchaseOrderLine,
     InventoryTransaction,
     Location,
@@ -210,3 +211,13 @@ def _salesorder_pre_delete(sender, instance, **kwargs):
         stock.release_order_stock(instance, reason="Видалення")
     except Exception:
         logger.exception("Inventory: stock release failed for deleted order %s", instance.pk)
+
+
+# 📎 Документ закупівлі видалено (рядок картки, видалення закупівлі) — файл з диска теж
+@receiver(post_delete, sender=PurchaseOrderDocument)
+def po_document_file_delete(sender, instance, **kwargs):
+    if instance.file:
+        try:
+            instance.file.delete(save=False)
+        except OSError:
+            pass

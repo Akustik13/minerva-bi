@@ -409,8 +409,9 @@ class KnowledgeItem(models.Model):
     """
     UPLOAD, LINK, OFFER, ORDER_FILE, DATASHEET = "upload", "link", "offer", "order_file", "datasheet"
     SOURCE = "source"
+    MEETING = "meeting"     # 🎙 частина затвердженої розшифровки наради (meetings/knowledge.py; приватна, auto)
     KINDS = [(UPLOAD, "📄 файл"), (LINK, "🔗 посилання"), (OFFER, "📝 Angebot"), (ORDER_FILE, "📦 документ замовлення"),
-             (DATASHEET, "📑 даташит"), (SOURCE, "📂 з джерела знань")]
+             (DATASHEET, "📑 даташит"), (SOURCE, "📂 з джерела знань"), (MEETING, "🎙 нарада")]
     TEAM, PRIVATE = "team", "private"
     VISIBILITY = [(TEAM, "усі, хто бачить картку"), (PRIVATE, "🔒 лише я")]
 

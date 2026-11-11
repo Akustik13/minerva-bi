@@ -40,8 +40,12 @@ SECTIONS = [
     ("stock", "📦 Склад"), ("products", "🏷 Товари"), ("orders", "🧾 Замовлення"), ("shipments", "🚚 Доставка"),
     ("customers", "👥 Клієнти CRM"), ("purchases", "📥 Закупівлі"), ("shop", "🏪 Магазин і сайт"),
     ("account", "👤 Кабінет покупця"), ("payments", "💳 Оплати"), ("webhooks", "🔔 Вебхуки"),
-    ("knowledge", "🧠 База знань (RAG)"), ("service", "🔌 Службові"),
+    ("knowledge", "🧠 База знань (RAG)"), ("meetings", "🎙 Наради (RAG-ПК)"), ("service", "🔌 Службові"),
 ]
+
+# Адреси нарад для вікна запису на RAG-ПК (api/meetings_views.py) — тексти нижче за «Клас.метод»
+MEETING_VIEWS = ("MeetingRedeemView", "MeetingStatusView", "MeetingTranscriptView", "MeetingMomentsView",
+                 "MeetingSyncView", "MeetingPingView")
 
 
 def endpoint_key(view: str, action: str | None, path: str, method: str = "GET") -> str:
@@ -66,7 +70,7 @@ def section_of(path: str) -> str:
     for prefix, name in (("stock", "stock"), ("locations", "stock"), ("products", "products"),
                          ("categories", "products"), ("orders", "orders"), ("shipments", "shipments"),
                          ("customers", "customers"), ("purchase-orders", "purchases"), ("webhooks", "webhooks"),
-                         ("knowledge", "knowledge")):
+                         ("knowledge", "knowledge"), ("meetings/", "meetings")):
         if rest.startswith(prefix):
             return name
     return "service"
@@ -127,9 +131,24 @@ SUMMARIES = {
     "PurchaseOrderViewSet.deliveries": "«Доставлено» — оприбуткування закупівлі",
     "PurchaseOrderViewSet.deliveries_by_ref": "«Доставлено» (номер у тілі)",
     "PurchaseOrderViewSet.cancel": "Скасувати закупівлю зовнішньої CRM",
+    "MeetingRedeemView.post": "RAG-ПК: обміняти одноразовий квиток вікна запису на нараду й ключ надсилання",
+    "MeetingStatusView.post": "RAG-ПК: стан запису наради (згода, запис, розшифровка, готово, помилка)",
+    "MeetingTranscriptView.post": "RAG-ПК: частина розшифровки наради",
+    "MeetingMomentsView.post": "RAG-ПК: ключові моменти наради (локальна модель)",
+    "MeetingSyncView.post": "RAG-ПК: звірка записів нарад — що лишити, видалити, повторити",
+    "MeetingPingView.get": "RAG-ПК: перевірка ключа для нарад",
 }
 
 EFFECTS = {
+    "MeetingRedeemView.post": "Квиток діє один раз: Minerva позначає його використаним і видає ключ надсилання для "
+                              "цього вікна запису (попередній ключ наради більше не діє).",
+    "MeetingStatusView.post": "Змінює стан наради: «Йде запис» (лише з підтвердженою згодою — інакше 409), "
+                              "«Обробка», «Розшифровка готова», «Не вдалося»; записує протокол згоди.",
+    "MeetingTranscriptView.post": "Додає частину розшифровки; коли є всі частини — розшифровка наради готова.",
+    "MeetingMomentsView.post": "Додає ключові моменти «чекають ✓ / ✕» (лише ті, чия цитата є в розшифровці) і "
+                               "повідомляє того, хто записав.",
+    "MeetingSyncView.post": "З блоком bench — оновлює «RAG-ПК на зв'язку»; хід обробки нарад, які ще йдуть.",
+    "MeetingPingView.get": "Нічого не змінює (і «RAG-ПК на зв'язку» — теж).",
     "StockViewSet.check": "Лише перевіряє наявність — нічого не змінює (тому досить права читання).",
     "StockViewSet.count": "Інвентаризація: встановлює фактичний залишок товару на локації — Minerva записує рух "
                           "«Коригування» на різницю.",
@@ -224,6 +243,7 @@ RETURNS_TEXT = {
     "knowledge:AttachmentView.get": "файл вкладення (не JSON)",
     "knowledge:SnapshotPageView.get": "сторінка знімка: документи й ревізії",
     "knowledge:SummaryView.get": "підсумок бази знань для звірки",
+    "MeetingPingView.get": "ok, scopes (права ключа)",
 }
 
 # Тіла без серіалізатора — що приймають
@@ -259,6 +279,16 @@ ACCEPTS_TEXT = {
     "account:CartView.put": "items {sku: qty}",
     "knowledge:SnapshotCreateView.post": "types (схеми api/schemas/knowledge)",
     "knowledge:StatusView.post": "статуси документів від RAG (схеми api/schemas/knowledge)",
+    "MeetingRedeemView.post": "ticket (лише в тілі); відповідь — meeting {id, uid, title, мови, тексти згоди…}, "
+                              "push_token",
+    "MeetingStatusView.post": "session, uid, state, seq, at, started_at, consent, capture, marks, detail, progress… "
+                              "(заголовок X-Meeting-Token)",
+    "MeetingTranscriptView.post": "session, uid, upload_id, parts, part, segments[] {n, start, end, ch, text}, "
+                                  "languages, model (заголовок X-Meeting-Token)",
+    "MeetingMomentsView.post": "session, uid, model, summary, items[] {kind, text, who, due, quote, line} "
+                               "(заголовок X-Meeting-Token)",
+    "MeetingSyncView.post": "sessions[] {meeting, uid, session, stage, progress, audio_on_bench…}, bench {version, "
+                            "live_busy, queue, outbox…}",
 }
 
 
@@ -286,9 +316,13 @@ NO_PREVIEW = {
     "MediaFileView.get": "відповідь — файл, не дані",
     "account:": "потрібна сесія покупця; читання запам'ятовує адреси кабінету",
     "knowledge:": "протокол RAG: читання стрічки змінює її стан",
+    **{f"{name}.": "наради — службовий протокол RAG-ПК: ні прикладу даних, ні запиту з Minerva"
+       for name in MEETING_VIEWS},
 }
 
 SIMULATE_NO = {
+    **{f"{name}.": "наради — службовий протокол RAG-ПК (квиток, ключ надсилання й стан запису) — без наслідків не "
+                   "перевірити" for name in MEETING_VIEWS},
     "WebhookViewSet.test": "надсилає справжній запит на адресу вебхука — Minerva його не виконує",
     "PurchaseOrderViewSet.": "тіло закупівлі перевіряє сервіс закупівель лише під час запису (постачальник, позиції, "
                              "доставки) — без наслідків не перевірити",
@@ -505,6 +539,8 @@ def _access(ctx: KeyContext, cls, action, scope, uses_key, ekey) -> tuple[str, s
         return "unsupported", "не підтримується (405)"
     if ekey.startswith("knowledge:") and ctx.key.shop_id:
         return "denied", "ключ магазину не має доступу до бази знань"
+    if ctx.key.shop_id and getattr(cls, "shop_key_forbidden", False):          # наради (api/meetings_views.py)
+        return "denied", getattr(cls, "shop_denied_text", "") or "ключ магазину не має доступу"
     if scope is None:
         return "allowed", "будь-який ключ"
     if scope in ctx.scopes:

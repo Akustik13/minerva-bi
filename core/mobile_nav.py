@@ -25,6 +25,7 @@ ITEMS = {
     "projects":  ("📁", "Проєкти", "/admin/projects/project/", "projects.view_project"),
     "portfolio": ("📊", "Портфель проєктів", "/admin/projects/project/portfolio/", "projects.view_project"),
     "risks":     ("⚠️", "Ризики проєктів", "/admin/projects/projectrisk/", "projects.view_projectrisk"),
+    "meetings":  ("🎙", "Наради", "/admin/meetings/meeting/", "module:meetings"),
     "worktime":  ("⏱", "Робочий час", "/admin/worktime/workday/", "worktime.view_workday"),
     "signals":   ("🚨", "Сигнали", "/dashboard/signals/", "module:dashboard"),
     "dashboard": ("📊", "Дашборд", "/dashboard/", "module:dashboard"),

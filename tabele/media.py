@@ -5,7 +5,8 @@ tabele/media.py — роздача /media/ (nginx у стеку немає) з �
 мініатюри, файли для сайту, логотип фірми. Решта — лише активному співробітнику з доступом до модуля, якому
 належить тека (`user.has_module_perms` = ролі Minerva, core/permissions.py); вкладення листів — лише власнику
 скриньки; файли бази знань — лише адміністратору (іншим — сторінка документа /rag/knowledge/<pk>/ з перевіркою
-видимості). HTML / SVG / XML / JS ніколи не відкриваються сторінкою Minerva — лише завантаженням, з `nosniff` і
+видимості); теки нарад (`meetings/`) — нікому, і адміністратору теж (Minerva файлів нарад не зберігає: аудіо лишається
+на RAG-ПК, розшифровка — у базі; правило — про всяк випадок). HTML / SVG / XML / JS ніколи не відкриваються сторінкою Minerva — лише завантаженням, з `nosniff` і
 `Content-Security-Policy: sandbox` (інакше вкладення з чужого листа виконувало б скрипт від імені людини).
 """
 import posixpath
@@ -21,15 +22,18 @@ MODULES = (                          # тека → розділ Minerva (пер
     ("orders/", "sales"), ("offers/", "offers"), ("accounting/", "accounting"),
     ("invoices/", "shipping"), ("packing_lists/", "shipping"), ("commercial_invoices/", "shipping"),
     ("shipments/", "shipping"), ("shipping/", "shipping"), ("generated_documents/", "documents"), ("document_templates/", "documents"),
-    ("scraper/", "scraper_hub"), ("rfq_diagrams/", "inventory"), ("customers/", "crm"),
+    ("scraper/", "scraper_hub"), ("rfq_diagrams/", "inventory"), ("purchase_orders/", "inventory"), ("customers/", "crm"),
 )
 ADMIN_ONLY = ("knowledge/", "knowledge_sources/")
+NOBODY = ("meetings/",)              # 🎙 наради — лише власник і лише через сторінку наради, не через /media/
 UNSAFE_TYPES = ("text/html", "image/svg+xml", "application/xhtml+xml", "text/xml", "application/xml",
                 "text/javascript", "application/javascript", "application/x-javascript")
 
 
 def _allowed(user, path: str) -> bool:
     from core.utils import is_minerva_admin
+    if path.startswith(NOBODY) or path + "/" in NOBODY:
+        return False
     if is_minerva_admin(user) and not path.startswith("email_attachments/"):
         return True
     if path.startswith("email_attachments/"):     # email_attachments/<скринька>/… — лише власник скриньки

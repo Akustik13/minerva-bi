@@ -55,6 +55,17 @@
         ➕ {% trans "Нове замовлення" %}
       </a>
     </li>
+    {# 🎙 підготовка запису наради з цим клієнтом: лише коли записування ввімкнено й людина може записувати #}
+    {% load meetings_tags %}{% meetings_can_record as can_rec %}
+    {% url 'admin:meetings_meeting_new' as meeting_new_url %}
+    {% if meeting_new_url and can_rec %}
+    <li>
+      <a href="{{ meeting_new_url }}?customer={{ original.pk }}" target="_blank" rel="noopener"
+         title="Підготувати запис наради з цим клієнтом: назва, проєкт, хто присутній; згоду підтвердите у вікні запису перед ▶">
+        🎙 Записати нараду
+      </a>
+    </li>
+    {% endif %}
   {% endif %}
   {{ block.super }}
 {% endblock %}

@@ -428,6 +428,53 @@ def quick_step(project, title, message=None, user=None) -> ProjectStep:
         source=ProjectStep.MANUAL, created_by=user)
 
 
+MEETING_NOTE = "🎙 з наради від {day:%d.%m.%Y}"
+
+
+def meeting_step(project, title, *, assignee=None, due=None, side=ProjectStep.WE, quote="", meeting=None,
+                 meeting_second=None, user=None) -> ProjectStep:
+    """📅 Крок з пункту наради (meetings/services.accept): як «➕ Крок з листа» — у поточну фазу, після її кроків, від
+    сьогодні до строку (немає — на 1 день); хто робить і виконавець (активний співробітник); у примітці — дата наради й
+    дослівна цитата (її можна прибрати разом із нарадою: meetings/services.scrub_quotes)."""
+    from django.contrib.auth import get_user_model
+    from . import state
+    title = " ".join(str(title or "").split())[:200]
+    if not title:
+        raise PlanError("Напишіть назву кроку")
+    person = None
+    if assignee is not None and assignee != "":
+        pk = getattr(assignee, "pk", assignee)
+        person = (get_user_model().objects.filter(pk=pk, is_active=True, is_staff=True).first()
+                  if str(pk).isdigit() else None)
+        if person is None:
+            raise PlanError("Виконавця не знайдено або його вимкнено")
+    steps = list(ProjectStep.objects.filter(project=project).order_by("phase__order", "order", "pk"))
+    phases = list(ProjectPhase.objects.filter(project=project).order_by("order", "pk"))
+    phase = next((p for p in phases if any(s.phase_id == p.pk and (s.eff_status or s.status) not in CLOSED_STATES
+                                           for s in steps)), phases[-1] if phases else None)
+    same = [s.order for s in steps if s.phase_id == (phase.pk if phase else None)]
+    order = (max(same) + 1) if same else (max([s.order for s in steps] or [0]) + 10)
+    today = timezone.localdate()
+    end = due or today
+    start = min(today, end)
+    if (end - start).days > 998:
+        raise PlanError("Строк кроку задалеко — до трьох років")
+    start_at =(meeting.started_at or meeting.created_at) if meeting is not None else None
+    day = timezone.localtime(start_at).date() if start_at else today
+    note = MEETING_NOTE.format(day=day)
+    quote = " ".join(str(quote or "").split())
+    if quote:
+        note += f": «{quote}»"
+    step = ProjectStep.objects.create(
+        project=project, phase=phase, order=order, title=title, kind=ProjectStep.TASK,
+        side=side if side in dict(ProjectStep.SIDE_CHOICES) else ProjectStep.WE, assignee=person,
+        start=start, end=end, duration_days=(end - start).days + 1, notes=note[:4000],
+        source=ProjectStep.MEETING, meeting=meeting,
+        meeting_second=max(int(meeting_second), 0) if meeting_second is not None else None, created_by=user)
+    state.mark_dirty([project.pk])
+    return step
+
+
 def close_step(project, step_id, message=None, user=None) -> ProjectStep:
     """✅ Закрити крок з листа: «виконано» датою листа; у примітці — що за листом (без теми)."""
     step = ProjectStep.objects.filter(project=project, pk=step_id).first()

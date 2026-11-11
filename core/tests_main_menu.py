@@ -106,6 +106,9 @@ class MainMenuTests(TestCase):
                          {"sales": "🛒", "stock": "📦", "projects": "📁", "comms": "💬", "more": "⋯"})
         self.assertTrue(all(g["title"] and g["keys"] for g in cfg["groups"]))
         self.assertEqual(cfg["maxIcons"], main_menu.MAX_ICONS)
+        projects = next(g for g in cfg["groups"] if g["id"] == "projects")
+        self.assertIn("meetings", projects["keys"])                 # 🎙 Наради — у групі «Проєкти», не своєю групою
+        self.assertNotIn("meetings", [s["key"] for s in cfg.get("search", [])])   # наради приватні — не в пошуку
 
     def test_expand_is_cleaned(self):
         self.assertEqual(main_menu.prefs(User.objects.get(pk=self.root.pk))["expand"], "remember")   # за замовчуванням

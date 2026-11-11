@@ -1,0 +1,15 @@
+# Meeting test bench on the RAG PC (Windows 10, Python 3.12, GTX 1070 / Pascal).
+# Install into D:\Meeting\venv — see README.md. Versions checked 2026-11-09.
+aiohttp==3.14.5
+numpy==2.5.4
+cryptography==50.0.2
+# Final transcript: Whisper via CTranslate2 (wheel has native sm_61 code, CUDA 12.8; cuDNN optional since 4.6.3)
+faster-whisper==1.2.1
+ctranslate2==4.8.5
+# cuBLAS 12 DLLs for ctranslate2 on Windows (12.9.3 has no Windows wheel; 12.8.4.1 = CUDA 12.8 Update 1)
+nvidia-cublas-cu12==12.8.4.1
+# Live captions on the CPU: Parakeet-TDT-0.6B-v3 int8 + Silero VAD
+sherpa-onnx==2.0.1
+# Paid key moments (only after per-recording consent): official Anthropic SDK; 2.3.0 = 23.10.2026, API version
+# 2026-10-21 (no temperature on 5.x models). Pulls httpx2, pydantic, jiter, anyio.
+anthropic==2.3.0

@@ -9,6 +9,7 @@ from .views import (
 )
 
 from . import knowledge_views as kv
+from . import meetings_views as mv
 
 router = DefaultRouter()
 router.register("stock",           StockViewSet,      basename="stock")
@@ -68,6 +69,13 @@ urlpatterns = [
          name="knowledge-snapshot"),
     path("knowledge/status/", kv.StatusView.as_view(), name="knowledge-status"),
     path("knowledge/summary/", kv.SummaryView.as_view(), name="knowledge-summary"),
+    # 🎙 Наради — лише вікно запису на RAG-ПК (ключ meetings:write; логіка — meetings/services.py, README розділ 13)
+    path("meetings/redeem/", mv.MeetingRedeemView.as_view(), name="meetings-redeem"),
+    path("meetings/sync/", mv.MeetingSyncView.as_view(), name="meetings-sync"),
+    path("meetings/ping/", mv.MeetingPingView.as_view(), name="meetings-ping"),
+    path("meetings/<int:meeting_id>/status/", mv.MeetingStatusView.as_view(), name="meetings-status"),
+    path("meetings/<int:meeting_id>/transcript/", mv.MeetingTranscriptView.as_view(), name="meetings-transcript"),
+    path("meetings/<int:meeting_id>/moments/", mv.MeetingMomentsView.as_view(), name="meetings-moments"),
     path("mcp/", mcp.MCPView.as_view(), name="mcp"),   # 🤖 MCP-сервер для зовнішніх агентів (agent/mcp.py)
     path("", include(router.urls)),
 ]

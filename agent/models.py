@@ -61,9 +61,28 @@ class AgentRule(models.Model):
         '✓ Трек-номер вносити самому', default=False,
         help_text='Лише «🧩 Завдання агенту»: трек-номер і кур’єра — у замовлення, де поле ще порожнє, і трек-номер '
                   'посилки до наявної закупівлі. Решту пропозицій (статус, нова закупівля, прихід…) застосовуєте ви ✓.')
+    auto_purchase = models.BooleanField(
+        '✓ Закупівлю вносити самому', default=False,
+        help_text='Лише «🧩 Завдання агенту»: нову закупівлю (PO) з листа постачальника — одразу, без ✓, якщо закупівлі '
+                  'з тим самим трек-номером чи номером замовлення постачальника ще немає. У звіті — що внесено, з '
+                  'посиланням; виправити можна в самій закупівлі.')
     task_model = models.CharField('Модель AI завдання', max_length=40, choices=TASK_MODELS, default=DEFAULT_MODEL)
     task_budget_usd = models.DecimalField('Найбільше на одне завдання, $', max_digits=6, decimal_places=2,
                                           default=0.5)
+    # 🔔 Звіт про зроблене — «🧩 Завдання агенту» (agent/notify.py `rule_report`)
+    REPORT_RESULT, REPORT_ALWAYS = 'result', 'always'
+    REPORT_WHEN = [(REPORT_RESULT, 'коли є що: пропозиції, внесене самому або помилка'),
+                   (REPORT_ALWAYS, 'після кожного листа — і коли агент нічого не знайшов')]
+    report_email = models.BooleanField('✉️ Звіт на пошту', default=True)
+    report_telegram = models.BooleanField('💬 Звіт у Telegram', default=True)
+    report_to = models.TextField(
+        'Кому звіт (пошта)', blank=True, default='',
+        help_text='Адреси по одній у рядку або через кому. Порожньо — вам (email з профілю, інакше ваша скринька).')
+    report_chats = models.TextField(
+        'Telegram-чати звіту', blank=True, default='',
+        help_text='Chat ID по одному в рядку: особистий чат людини з ботом або група, куди доданий бот. Порожньо — ваш '
+                  'Telegram ID з «Мої налаштування». Бот — «Налаштування → Сповіщення».')
+    report_when = models.CharField('Коли надсилати звіт', max_length=10, choices=REPORT_WHEN, default=REPORT_RESULT)
     mode = models.CharField('Режим', max_length=10, choices=MODES, default=DRAFT)
     forward_to = models.TextField(
         'Кому переслати', blank=True, default='',

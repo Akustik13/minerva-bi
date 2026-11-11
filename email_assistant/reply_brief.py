@@ -423,7 +423,9 @@ def rag_sources(src, user, query, *, scope, seen=(), dedup=None, thread=None, cu
     if job.status != job.COMPLETED:
         return 'skipped', f'{(job.message or "RAG не встиг")[:90]} · {asked}', ''
     letters, dropped, fragments, skip_threads = {}, 0, 0, set(excluded)
-    for h in job.hits:
+    hits = retrieval.for_ai(job.hits)           # 🎙 розшифровки нарад AI не отримує (джерела йдуть у промпт)
+    private = len(job.hits or []) - len(hits)
+    for h in hits:
         att = h.get('attachment') or None
         document = h.get('kind') == 'document'
         if (h.get('message_pk') in seen and not att) or (h.get('thread_id') and h.get('thread_id') in skip_threads) \
@@ -453,7 +455,9 @@ def rag_sources(src, user, query, *, scope, seen=(), dedup=None, thread=None, cu
     dedup['rag_dropped'] = dedup.get('rag_dropped', 0) + dropped
     dedup['rag_merged'] = dedup.get('rag_merged', 0) + fragments - len(letters)
     detail = (f'листів {len(letters)} (фрагментів {fragments}) у листуваннях {scope}'
-              + (f' · відкинуто дублів {dropped}' if dropped else '') + f' · {asked}')
+              + (f' · відкинуто дублів {dropped}' if dropped else '')
+              + (f' · фрагментів розшифровок нарад не взято (AI їх не отримує): {private}' if private else '')
+              + f' · {asked}')
     return 'done', detail, f'RAG: листів {len(letters)}'
 
 

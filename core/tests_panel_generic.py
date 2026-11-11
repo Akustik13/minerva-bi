@@ -354,7 +354,8 @@ class RelatedTests(GenericTestBase):
         customer = {r.related_model._meta.label_lower for r in pg.relations_of(Customer)}
         self.assertTrue({"crm.customernote", "offers.offer", "projects.project", "tasks.task"} <= customer)
         for label in customer:
-            self.assertNotIn(label.split(".")[0], {"email_assistant", "calendar_app", "worktime", "rag_assistant"})
+            self.assertNotIn(label.split(".")[0], {"email_assistant", "calendar_app", "worktime", "rag_assistant",
+                                                   "meetings"})
         self.assertNotIn("crm.customertimeline", customer)
         self.assertNotIn("shop.shopcustomer", customer)                        # секрети / приватне (NEVER)
         order = {r.related_model._meta.label_lower for r in pg.relations_of(SalesOrder)}

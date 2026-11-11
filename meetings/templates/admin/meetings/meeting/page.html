@@ -1,0 +1,309 @@
+{% extends "admin/base_site.html" %}
+{# 🎙 Сторінка наради — лише для того, хто записав (meetings/admin.py page_view, дані — admin_pages.page_context). #}
+{# Назва, розшифровка, цитати, імена й адреси — лише в translate="no". JS — meetings/static/meetings/meetings.js. #}
+{% load static %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=3">{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{{ list_url }}">🎙 Наради</a> &rsaquo; <span translate="no">{{ m.title }}</span>
+</div>
+{% endblock %}
+{% block content_title %}{% endblock %}
+{% block content %}
+<div id="mt-page" class="mt-wrap">
+  <div id="mt-new" class="mt-banner" role="status" hidden>
+    <span>🔄 Є нове —</span>
+    <button type="button" class="button mt-primary" data-mt-reload>оновити сторінку</button>
+  </div>
+
+  {# ── 1. Шапка ── #}
+  <section class="mt-card" id="mt-head">
+    <h1 translate="no">{{ m.title }}</h1>
+    <div class="mt-meta">
+      <span class="mt-chip mt-chip-{{ tone }}" id="mt-chip">{{ m.get_status_display }}</span>
+      <span>📅 {{ start|date:"d.m.Y H:i" }}</span>
+      {% if duration %}<span>⏱ {{ duration }}</span>{% endif %}
+      {% if m.project_id %}<span>📁 {% if project_url %}<a href="{{ project_url }}" translate="no">{{ m.project.code }} · {{ m.project.name }}</a>{% else %}<span translate="no">{{ m.project.code }}</span>{% endif %}</span>{% endif %}
+      {% if m.customer_id %}<span>👤 {% if customer_url %}<a href="{{ customer_url }}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}<span translate="no">{{ m.customer.company|default:m.customer.name }}</span>{% endif %}</span>{% endif %}
+      {% if event %}<span>🤝 <span translate="no">{{ event.title }}</span></span>{% endif %}
+      <span title="Режим запису">🗄 {{ retention_label }}</span>
+      {% if capture %}<span title="Що записували">🎚 {{ capture }}</span>{% endif %}
+    </div>
+    {% if no_headset %}<div class="mt-line-warn">⚠️ {{ no_headset_note }}</div>{% endif %}
+    {% if silent %}<div class="mt-line-warn">{% for s in silent %}{{ s }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+    {% if m.continues_id and m.continues.owner_id == m.owner_id %}
+    <div class="mt-muted">↪ Продовження наради <a href="{% url 'admin:meetings_meeting_page' m.continues_id %}">від {{ m.continues.created_at|date:"d.m.Y" }}</a></div>
+    {% endif %}
+    {% if not can_change %}<div class="mt-muted">🔒 {{ no_change_text }} Видалити свою нараду можна й так.</div>{% endif %}
+    <div class="mt-actions">
+      {% if can_change %}
+      <details class="mt-edit" id="mt-edit">
+        <summary class="button">✏️ Змінити</summary>
+        <form method="post" action="{% url 'admin:meetings_meeting_save' m.pk %}" class="mt-editform">{% csrf_token %}
+          <input type="hidden" name="participants_form" value="1">
+          <label>Назва <input type="text" name="title" value="{{ m.title }}" maxlength="200" required></label>
+          {% if can_projects %}
+          <label>Проєкт
+            <select name="project" data-mt-project>
+              <option value="">— без проєкту —</option>
+              {% for p in projects %}<option value="{{ p.pk }}" data-customer="{{ p.customer }}" translate="no"{% if p.selected %} selected{% endif %}>{{ p.code }} · {{ p.name }}</option>{% endfor %}
+            </select></label>
+          {% endif %}
+          {% if can_customers %}
+          <label>Клієнт
+            <select name="customer" data-mt-customer>
+              <option value="">— без клієнта —</option>
+              {% for c in customers %}<option value="{{ c.pk }}" translate="no"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+            </select></label>
+          {% endif %}
+          {% if m.status == "ready" %}
+          <div class="mt-row2">
+            <label>Моя мова (мікрофон)
+              <select name="lang_l">{% for code, label in lang_choices %}<option value="{{ code }}"{% if code == m.lang_l %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+            <label>Мова співрозмовників
+              <select name="lang_r">{% for code, label in lang_choices %}<option value="{{ code }}"{% if code == m.lang_r %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+          </div>
+          <fieldset><legend>Режим</legend>
+            {% for code, label in retention_choices %}<label class="mt-radio"><input type="radio" name="retention" value="{{ code }}"{% if code == m.retention %} checked{% endif %}> {{ label }}</label>{% endfor %}
+          </fieldset>
+          <fieldset><legend>Мова тексту, який читаєте вголос</legend>
+            <div class="mt-langs">{% for l in consent_langs %}<label><input type="radio" name="consent_lang" value="{{ l.code }}"{% if l.selected %} checked{% endif %}> {{ l.label }}</label>{% endfor %}</div>
+          </fieldset>
+          {% endif %}
+          <fieldset><legend>Хто на нараді (для протоколу згоди)</legend>
+            <ul class="mt-people">
+              {% for p in participants %}
+              <li><label><input type="checkbox" name="p_on" value="{{ forloop.counter0 }}" checked>
+                <span translate="no">{{ p.name|default:p.email }}{% if p.name and p.email %} &lt;{{ p.email }}&gt;{% endif %}</span></label>
+                {% if p.source_label %}<span class="mt-muted">· {{ p.source_label }}</span>{% endif %}
+                <input type="hidden" name="p_name" value="{{ p.name }}"><input type="hidden" name="p_email" value="{{ p.email }}">
+                <input type="hidden" name="p_source" value="{{ p.source }}"></li>
+              {% empty %}<li class="mt-muted">Ще нікого не вказано</li>{% endfor %}
+            </ul>
+            <div data-mt-people-extra></div>
+            <button type="button" class="button" data-mt-add-person>＋ Ще хтось</button>
+          </fieldset>
+          <label>Примітка до протоколу <textarea name="consent_note" rows="2">{{ m.consent_note }}</textarea></label>
+          <p class="mt-muted">Зміни учасників і примітки записуються в протокол згоди (видно, що й коли змінено).</p>
+          <div class="mt-actions"><button type="submit" class="button mt-primary">💾 Зберегти</button></div>
+        </form>
+      </details>
+      {% endif %}
+      <button type="button" class="button mt-danger" data-mt-open-dialog="mt-del">🗑 Видалити нараду</button>
+    </div>
+  </section>
+
+  {# ── 2. Запис ── #}
+  <section class="mt-card" id="mt-rec">
+    {% if m.status == "ready" %}
+      <h2>🎙 Запис</h2>
+      {% if m.bench_detail %}<div class="mt-line-warn">{{ m.bench_detail }}</div>{% endif %}
+      {% if can_record %}
+      <div class="mt-rec-desktop">
+        <div class="mt-actions">
+          <form method="post" action="{% url 'admin:meetings_meeting_record' m.pk %}" target="_blank" class="mt-rec-form">{% csrf_token %}
+            <button type="submit" class="button mt-primary mt-big"{% if health.block %} disabled title="{{ health.text }}"{% endif %}>🎙 Відкрити вікно запису</button>
+          </form>
+          <a class="button" href="{{ check_url }}" target="_blank" rel="noopener">🔌 Перевірити вікно запису</a>
+        </div>
+        <p class="mt-hint">Вікно відкриється на RAG-ПК (<span translate="no">{{ host }}</span>). Якщо браузер попередить про сертифікат — «Додатково → Перейти». Посилання діє {{ ttl }} і лише раз; якщо не встигли — натисніть ще раз.</p>
+      </div>
+      <div class="mt-rec-phone mt-line-warn">📱 {{ phone_note }}</div>
+      {% else %}
+      <div class="mt-line-warn">⚠️ {{ refusal }}</div>
+      {% endif %}
+      <div class="mt-health mt-health-{{ health.level }}">{{ health.text }}</div>
+      {% if health.busy_text %}<div class="mt-line-warn">{{ health.busy_text }}</div>{% endif %}
+
+      <details class="mt-first">
+        <summary>💡 Перший раз на цьому ПК?</summary>
+        <ul>
+          <li>Лише Chrome або Edge.</li>
+          <li>Натисніть «🔌 Перевірити вікно запису» (до наради): має відкритися «✅ Цей ПК може відкривати вікно запису».</li>
+          <li>Попередження про сертифікат — це наш RAG-ПК в офісі з власним сертифікатом: «Додатково» → «Перейти на … (небезпечно)».</li>
+          <li>Якщо «Не вдається отримати доступ до сайту» або «⛔ Цей ПК ще не може відкривати вікно запису» — цей ПК ще не дозволено, попросіть адміністратора.</li>
+          <li>Звук наради: програма Teams — «Весь екран» + «Поділитися системним звуком»; Teams або Zoom у браузері — вкладка + «Поділитися звуком вкладки»; очна зустріч — «Лише мікрофон».</li>
+        </ul>
+      </details>
+
+      <details class="mt-saybox" data-mt-langbox open>
+        <summary>🗣 Що сказати вголос перед ▶</summary>
+        <div class="mt-langs">{% for l in consent_langs %}<label><input type="radio" name="say-lang" value="{{ l.code }}" data-mt-langpick{% if l.selected %} checked{% endif %}> {{ l.label }}</label>{% endfor %}</div>
+        {% for l in consent_langs %}
+        <div data-mt-lang="{{ l.code }}"{% if not l.selected %} hidden{% endif %}>
+          <div class="mt-muted">Перед ▶ спитайте:</div>
+          <div class="mt-say" translate="no">{{ l.ask }}</div>
+          {% if l.after %}<div class="mt-muted">Щойно запис почався, скажіть:</div>
+          <div class="mt-say" translate="no">{{ l.after }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="mt-line-warn">⏸ Згоду підтвердите у вікні запису перед ▶: дочекайтеся, поки кожен скаже «так». Якщо хтось проти — не записуйте (можна вести нотатки).</div>
+        <details>
+          <summary>✉️ Примітка для запрошення — скопіюйте в Teams / Outlook</summary>
+          {% for i in invites %}
+          <div data-mt-lang="{{ i.code }}"{% if not i.selected %} hidden{% endif %}>
+            <textarea class="mt-invite" id="mt-inv-{{ i.code }}" rows="6" readonly translate="no">{{ i.text }}</textarea>
+            <div class="mt-actions"><button type="button" class="button" data-mt-copy="mt-inv-{{ i.code }}">📋 Копіювати</button></div>
+          </div>
+          {% endfor %}
+          {% if privacy_url %}<div class="mt-muted">🔒 Інформація за ст. 13 DSGVO: <a href="{{ privacy_url }}" target="_blank" rel="noopener" translate="no">{{ privacy_url }}</a></div>
+          {% else %}<div class="mt-muted">Посилання на інформацію за ст. 13 DSGVO ще не задано («⚙️ Налаштування нарад»).</div>{% endif %}
+        </details>
+      </details>
+
+    {% elif m.status == "recording" or m.status == "processing" %}
+      <h2>{% if m.status == "recording" %}🔴 Йде запис{% else %}⏳ Обробка на RAG-ПК{% endif %}</h2>
+      <div id="mt-lines" aria-live="polite">{% for l in lines %}<div class="mt-line-{{ l.tone }}">{{ l.text }}</div>{% endfor %}</div>
+
+    {% elif m.status == "failed" %}
+      <h2>⚠️ Запис не вдалося обробити</h2>
+      <div class="mt-line-err">{{ m.bench_detail|default:"RAG-ПК повідомив про помилку." }}</div>
+      <div class="mt-actions">
+        {% if can_retry %}
+        <form method="post" action="{% url 'admin:meetings_meeting_retry' m.pk %}">{% csrf_token %}
+          <button type="submit" class="button mt-primary" title="Запис ще на RAG-ПК — він розшифрує його ще раз">🔄 Спробувати ще раз</button>
+        </form>
+        {% endif %}
+        {% if can_record %}
+        <form method="post" action="{% url 'admin:meetings_meeting_record' m.pk %}" target="_blank" class="mt-rec-form mt-rec-desktop" data-confirm="{{ redo_confirm }}">{% csrf_token %}
+          <button type="submit" class="button{% if not can_retry %} mt-primary{% endif %}">🎙 Записати заново</button>
+        </form>
+        {% endif %}
+      </div>
+      {% if can_retry %}<p class="mt-hint">Запис ще на RAG-ПК: «🔄 Спробувати ще раз» розшифрує його знову. «🎙 Записати заново» — лише якщо нарада ще триває або буде повторена: попередній запис буде видалено.</p>{% endif %}
+
+    {% else %}
+      <h2>✅ Розшифровка готова</h2>
+      {% if m.moments_error %}<div class="mt-line-warn">{{ m.moments_error }}</div>
+      {% elif m.bench_detail %}<div class="mt-line-warn">{{ m.bench_detail }}</div>{% endif %}
+      {% if can_retry %}
+      <div class="mt-actions">
+        <form method="post" action="{% url 'admin:meetings_meeting_retry' m.pk %}">{% csrf_token %}
+          <button type="submit" class="button mt-primary" title="RAG-ПК ще раз пошукає ключові моменти в цій розшифровці">🔄 Спробувати ще раз</button>
+        </form>
+      </div>
+      {% endif %}
+      {% if m.audio_deleted_at %}<div class="mt-muted">🗑 Аудіо видалено на RAG-ПК {{ m.audio_deleted_at|date:"d.m.Y H:i" }}</div>{% endif %}
+    {% endif %}
+    {% if can_continue and can_record %}
+    <div class="mt-actions"><a class="button mt-rec-desktop" href="{% url 'admin:meetings_meeting_continue' m.pk %}" title="Нова нарада з тими самими проєктом, клієнтом і учасниками — якщо запис зупинили, а нарада триває">🎙 Записати продовження</a></div>
+    {% endif %}
+  </section>
+
+  {# ── 3. Протокол згоди ── #}
+  <details class="mt-card" id="protocol">
+    <summary><h2>🧾 Протокол згоди</h2></summary>
+    {% if m.consent_at %}
+      <div>✅ Запис оголошено, мету пояснено · ✅ Усі, кого чути, вголос погодились — {{ m.consent_at|date:"d.m.Y H:i" }} <span class="mt-muted">(у вікні запису перед ▶)</span></div>
+      <h3>Текст, який читали вголос{% if consent_lang_label %} ({{ consent_lang_label }}){% endif %}</h3>
+      <div class="mt-say" translate="no">{{ m.consent_text }}</div>
+    {% else %}
+      <div class="mt-muted">Згоду ще не підтверджено — це роблять у вікні запису перед ▶.</div>
+    {% endif %}
+    {% if log %}
+      <h3>Що відбувалось</h3>
+      <ul>{% for e in log %}<li>{{ e.text }}{% if e.at %} — {{ e.at }}{% endif %}</li>{% endfor %}</ul>
+    {% endif %}
+    <h3>Хто на нараді</h3>
+    {% if participants %}
+      <ul>{% for p in participants %}<li><span translate="no">{{ p.name|default:p.email }}{% if p.name and p.email %} &lt;{{ p.email }}&gt;{% endif %}</span>{% if p.source_label %} <span class="mt-muted">· {{ p.source_label }}</span>{% endif %}</li>{% endfor %}</ul>
+    {% else %}<div class="mt-muted">— нікого не вказано (✏️ Змінити)</div>{% endif %}
+    {% if m.consent_note %}<h3>Примітка</h3><div class="mt-pre" translate="no">{{ m.consent_note }}</div>{% endif %}
+    {% if excerpt %}
+      <h3>Уривок розшифровки — згода</h3>
+      {% for e in excerpt %}<div class="mt-row"><a class="mt-time" href="#t={{ e.second }}">[{{ e.time }}]</a> <b>{{ e.who }}:</b> <span translate="no">{{ e.text }}</span></div>{% endfor %}
+    {% endif %}
+    {% if m.audio_deleted_at %}<div class="mt-muted">🗑 Аудіо видалено на RAG-ПК — {{ m.audio_deleted_at|date:"d.m.Y H:i" }}</div>{% endif %}
+  </details>
+
+  {# ── 4. Ключові моменти ── #}
+  <section class="mt-card" id="items">
+    <h2>🧠 Ключові моменти{% if pending %} <span class="mt-chip mt-chip-warn"><span id="mt-pending-n">{{ pending|length }}</span> чекають ✓ / ✕</span>{% endif %}</h2>
+    {% if moments_wait %}<div class="mt-line-warn">{{ moments_wait_text }}</div>{% endif %}
+    {% if summary %}<div class="mt-summary" translate="no">{{ summary|linebreaksbr }}</div>{% endif %}
+    {% if no_project_hint and pending %}<div class="mt-muted">Щоб додавати в проєкт, виберіть проєкт наради (✏️ Змінити). Без проєкту — лише ⏰ дедлайн у вашому календарі.</div>{% endif %}
+    <div id="mt-items">
+      {% for r in pending %}{{ r.html }}{% endfor %}
+      {% for r in accepted %}{{ r.html }}{% endfor %}
+      {% if rejected %}
+      <details class="mt-rejected"><summary>✕ Не те ({{ rejected|length }})</summary>
+        {% for r in rejected %}{{ r.html }}{% endfor %}
+      </details>
+      {% endif %}
+    </div>
+    {% if not items_total %}
+      {% if m.moments_at %}<div class="mt-muted">Ключових моментів не знайдено.</div>
+      {% elif not moments_wait %}<div class="mt-muted">З’являться тут після розшифровки.</div>{% endif %}
+    {% endif %}
+  </section>
+
+  {# ── 5. Розшифровка ── #}
+  <section class="mt-card" id="transcript">
+    <h2>📝 Розшифровка</h2>
+    {% if m.transcript_deleted_at %}
+      <div class="mt-muted">Розшифровку видалено {{ m.transcript_deleted_at|date:"d.m.Y" }} — минув строк зберігання. Протокол згоди й прийняті пункти лишились.</div>
+    {% elif transcript %}
+      <div class="mt-tr-tools">
+        <input type="search" id="mt-tr-q" placeholder="🔎 Пошук у розшифровці" aria-label="Пошук у розшифровці">
+        <span id="mt-tr-count" class="mt-muted" role="status"></span>
+      </div>
+      <div class="mt-tr" id="mt-tr">
+        {% for r in transcript %}
+          {% if r.type == "seg" %}<div class="mt-row mt-seg" id="t-{{ r.n }}" data-s="{{ r.second }}"><a class="mt-time" href="#t={{ r.second }}">[{{ r.time }}]</a> <b class="mt-who mt-who-{{ r.ch }}">{{ r.who }}:</b> <span class="mt-text" translate="no">{{ r.text }}</span></div>
+          {% else %}<div class="mt-row mt-{{ r.type }}" data-s="{{ r.second }}"><a class="mt-time" href="#t={{ r.second }}">[{{ r.time }}]</a> <span translate="no">{{ r.text }}</span></div>{% endif %}
+        {% endfor %}
+      </div>
+      {% if transcript_model %}<div class="mt-muted" style="margin-top:6px">Розпізнавання: <span translate="no">{{ transcript_model }}</span> (на RAG-ПК, без хмари)</div>{% endif %}
+    {% else %}
+      <div class="mt-muted">Розшифровки ще немає — з’явиться тут, коли RAG-ПК її передасть.</div>
+    {% endif %}
+  </section>
+
+  {# ── 6. База знань ── #}
+  <section class="mt-card" id="kb">
+    <h2>📚 База знань</h2>
+    {% if m.approved_at and kb %}
+      <div>✅ Додано у вашу базу знань {{ m.approved_at|date:"d.m.Y H:i" }} — бачите лише ви.</div>
+      {% if kb.note %}<div class="mt-line-warn">{{ kb.note }}</div>{% endif %}
+      {% if kb.parts %}<ul>{% for p in kb.parts %}<li>{{ p.title }} — <span class="mt-muted">{{ p.rag }}</span></li>{% endfor %}</ul>
+      {% else %}<div class="mt-muted">Документів бази знань цієї наради немає (розшифровку видалено).</div>{% endif %}
+      {% if m.has_transcript and can_change %}
+      <form method="post" action="{% url 'admin:meetings_meeting_kb' m.pk %}">{% csrf_token %}
+        <button type="submit" class="button" title="Наприклад, після зміни проєкту наради">🔄 Оновити в базі знань</button>
+      </form>
+      {% endif %}
+    {% elif m.has_transcript %}
+      <p>{{ kb_text }}</p>
+      {% if can_change %}
+      <form method="post" action="{% url 'admin:meetings_meeting_kb' m.pk %}">{% csrf_token %}
+        <button type="submit" class="button mt-primary">📚 Додати в мою базу знань</button>
+      </form>
+      {% else %}<div class="mt-muted">🔒 {{ no_change_text }}</div>{% endif %}
+    {% else %}
+      <div class="mt-muted">Стане доступно, коли буде розшифровка.</div>
+    {% endif %}
+  </section>
+
+  <template id="mt-person-tpl"><div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254"></div></template>
+
+  <dialog id="mt-del" class="mt-dialog" aria-labelledby="mt-del-h">
+    <form method="post" action="{% url 'admin:meetings_meeting_remove' m.pk %}">{% csrf_token %}
+      <h2 id="mt-del-h">🗑 Видалити нараду?</h2>
+      <p>Видалити нараду, розшифровку й документи бази знань? Це не можна скасувати. Пункти, уже додані в проєкт, лишаться.</p>
+      {% if accepted_rows %}
+        <div class="mt-muted">Уже додано ({{ accepted_rows|length }}):</div>
+        <ul>{% for r in accepted_rows %}<li>{{ r.result.label }}: <span translate="no">{{ r.item.title|default:"—" }}</span>{% if r.result.url %} → <a href="{{ r.result.url }}" target="_blank" rel="noopener">відкрити</a>{% endif %}</li>{% endfor %}</ul>
+        <label class="mt-radio"><input type="checkbox" name="scrub" value="1"> Також прибрати цитати з цих пунктів ({{ accepted_rows|length }})</label>
+      {% endif %}
+      <div class="mt-actions">
+        <button type="submit" class="button mt-danger">🗑 Видалити</button>
+        <button type="button" class="button" data-mt-close-dialog>Скасувати</button>
+      </div>
+    </form>
+  </dialog>
+</div>
+{{ config|json_script:"mt-config" }}
+<script src="{% static 'meetings/meetings.js' %}?v=1" defer></script>
+{% endblock %}

@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
+from agent import from_task
 from agent import mail as agent_mail
 from agent import products as product_fields
 from agent import run_state
@@ -46,7 +47,8 @@ class AgentRuleForm(forms.ModelForm):
         model = AgentRule
         fields = ['name', 'enabled', 'account', 'kind', 'senders', 'subject_words', 'body_words', 'category',
                   'instruction', 'mode', 'send_delay_minutes', 'daily_limit', 'forward_to', 'cc', 'auto_apply',
-                  'task_model', 'task_budget_usd', 'importance', 'notify', 'opt_important', 'opt_receipt',
+                  'auto_purchase', 'task_model', 'task_budget_usd', 'report_email', 'report_telegram', 'report_to',
+                  'report_chats', 'report_when', 'importance', 'notify', 'opt_important', 'opt_receipt',
                   'remind_days', 'remind_until']
         widgets = {
             'senders': forms.Textarea(attrs={'rows': 3}),
@@ -55,6 +57,8 @@ class AgentRuleForm(forms.ModelForm):
             'instruction': forms.Textarea(attrs={'rows': 8}),
             'cc': forms.Textarea(attrs={'rows': 2}),
             'forward_to': forms.Textarea(attrs={'rows': 2}),
+            'report_to': forms.Textarea(attrs={'rows': 2, 'placeholder': 'порожньо — вам'}),
+            'report_chats': forms.Textarea(attrs={'rows': 2, 'placeholder': 'порожньо — ваш Telegram'}),
         }
 
     def clean(self):
@@ -70,6 +74,13 @@ class AgentRuleForm(forms.ModelForm):
                    if x and not agent_mail.EMAIL_RE.fullmatch(x)]
             if bad:
                 self.add_error(field, 'Не схоже на адресу: ' + ', '.join(bad[:3]))
+        from dashboard.notify_routes import parse_chats, parse_emails
+        bad = parse_emails(data.get('report_to') or '')[1]
+        if bad:
+            self.add_error('report_to', 'Не схоже на адресу: ' + ', '.join(bad[:3]))
+        bad = parse_chats(data.get('report_chats') or '')[1]
+        if bad:
+            self.add_error('report_chats', 'Chat ID — число (у групи з мінусом): ' + ', '.join(bad[:3]))
         if data.get('kind') not in AgentRule.NO_INSTRUCTION and not (data.get('instruction') or '').strip():
             self.add_error('instruction', 'Напишіть, що робити — інструкцію агенту.')
         if data.get('kind') == AgentRule.MAIL_FORWARD and not (data.get('forward_to') or '').strip():
@@ -129,7 +140,9 @@ class AgentRuleAdmin(admin.ModelAdmin):
         (None, {'fields': ('promote_panel', 'name', 'enabled', 'account', 'kind')}),
         ('🧪 Перевірити, як працює', {'fields': ('test_panel',),
                                      'description': 'Що буде після цих налаштувань: опис, листи скриньки, що '
-                                                    'підходять, і «🧪 Що зробив би агент» на будь-якому з них.'}),
+                                                    'підходять, і «🧪 Що зробив би агент» на будь-якому з них. Нові '
+                                                    'листи доручення бере саме; лист, що прийшов раніше за '
+                                                    'доручення, — кнопкою «▶ Обробити зараз».'}),
         ('Які листи — усі задані умови разом', {
             'fields': ('senders', 'subject_words', 'body_words', 'category', 'example_link'),
             'description': 'У кожному полі — по одному в рядку, підходить будь-який рядок; «Текст листа містить» — '
@@ -156,10 +169,15 @@ class AgentRuleAdmin(admin.ModelAdmin):
                            '«⭐ Важливі», з «🔔» — ще й лист і Telegram вам, щойно такий лист прийде. Без AI. '
                            '«Що робити» — необов’язкова примітка в повідомленні.'}),
         ('🧩 Завдання агенту', {
-            'fields': ('auto_apply', 'task_model', 'task_budget_usd'),
+            'fields': ('auto_apply', 'auto_purchase', 'task_model', 'task_budget_usd'),
             'description': 'Лише для «Завдання агенту з кожного такого листа»: з кожного нового такого листа — '
                            'завдання агенту (як «🧩 Завдання агенту з цього листа»). Пропозиції — на сторінці '
-                           'завдання, коли закінчить — лист і Telegram.'}),
+                           'завдання; з «✓ … вносити самому» це агент вносить сам, решту застосовуєте ви ✓.'}),
+        ('🔔 Звіт про зроблене', {
+            'fields': ('report_email', 'report_telegram', 'report_to', 'report_chats', 'report_when'),
+            'description': 'Лише для «🧩 Завдання агенту»: коли агент закінчить з листом — що він зробив (внесене '
+                           'самому, пропозиції, підсумок) і посилання на завдання. Кому — адреси й Telegram-чати '
+                           'звідси, порожньо — вам.'}),
         ('📜 Останні листи за цим дорученням', {'fields': ('recent_runs',)}),
         ('Службове', {'fields': ('created_by', 'created_at'), 'classes': ('collapse',)}),
     )
@@ -183,12 +201,23 @@ class AgentRuleAdmin(admin.ModelAdmin):
             return False
         return super().has_delete_permission(request, obj)
 
+    def get_changeform_initial_data(self, request):
+        data = super().get_changeform_initial_data(request)
+        task = from_task.task_from_get(request)       # «🤖 Створити доручення з завдання» (agent/from_task.py)
+        if task is not None:
+            data.update(from_task.rule_initial(task, request.user))
+        return data
+
     def save_model(self, request, obj, form, change):
         if obj.account.user_id != request.user.pk:   # форма дає лише свої скриньки — це запобіжник
             raise PermissionError('Не ваша скринька')
         if not change:
             obj.created_by = request.user
             obj.seen_pk = agent_mail.start_pk(obj.account)
+            task = from_task.task_from_get(request)
+            msg = from_task.own_message(task, request.user) if task is not None else None
+            if msg is not None and msg.account_id == obj.account_id:
+                obj.example_message = msg
         elif 'account' in form.changed_data:
             obj.seen_pk = agent_mail.start_pk(obj.account)
         super().save_model(request, obj, form, change)
@@ -196,7 +225,9 @@ class AgentRuleAdmin(admin.ModelAdmin):
     @admin.display(description='Режим')
     def mode_col(self, obj):
         if obj.kind == AgentRule.MAIL_TASK:
-            return '🧩 завдання' + (' · ✓ трек-номер сам' if obj.auto_apply else '')
+            return ('🧩 завдання' + (' · ✓ трек-номер сам' if obj.auto_apply else '')
+                    + (' · ✓ закупівля сама' if obj.auto_purchase else '')
+                    + ('' if obj.report_email or obj.report_telegram else ' · 🔕'))
         mode = '✉️ сам' if obj.mode == AgentRule.SEND else '📝 чернетка'
         mode += (' · ❗' if obj.opt_important else '') + (' · 📬' if obj.opt_receipt else '') + (
             f' · ⏰ {obj.remind_days} дн.' if obj.remind_days else '')
@@ -245,8 +276,9 @@ class AgentRuleAdmin(admin.ModelAdmin):
             return format_html('<div style="opacity:.8">{} — кожен новий такий лист{}.</div>',
                                obj.get_importance_display(), ' · 🔔 одразу лист і Telegram вам' if obj.notify else '')
         if obj.kind == AgentRule.MAIL_TASK:
-            return format_html('<div style="opacity:.8">🧩 З кожного нового такого листа — завдання агенту{}.</div>',
-                               ' · трек-номер у порожнє поле замовлення вносить сам' if obj.auto_apply else '')
+            return format_html('<div style="opacity:.8">🧩 З кожного нового такого листа — завдання агенту{}{}.</div>',
+                               ' · трек-номер у порожнє поле замовлення вносить сам' if obj.auto_apply else '',
+                               ' · нову закупівлю заводить сам' if obj.auto_purchase else '')
         if agent_mail.promote_ready(obj):
             return format_html(
                 '<div style="padding:8px 12px;border-radius:6px;background:rgba(46,125,50,.14);'
@@ -274,8 +306,7 @@ class AgentRuleAdmin(admin.ModelAdmin):
             '<tr id="art-res-{}" hidden><td colspan="5"><pre class="art-pre"></pre></td></tr>'), (
             (timezone.localtime(f['msg'].sent_at).strftime('%d.%m %H:%M') if f['msg'].sent_at else '',
              _mail_link(f['msg']), f['why'],
-             (run_state.text(f['run']) if f['run']
-              else ('⚠️ ' + f['blocked'] if f['blocked'] else '')),
+             self._now_cell(obj, f),
              f['msg'].pk, tip, label, f['msg'].pk) for f in data['found']))
         if data['found']:
             table = format_html('<table style="width:100%;margin-top:4px"><tbody>{}</tbody></table>', rows)
@@ -306,8 +337,52 @@ class AgentRuleAdmin(admin.ModelAdmin):
         own = [path('<int:pk>/test/<int:msg_pk>/', self.admin_site.admin_view(self.test_view),
                     name='agent_agentrule_test'),
                path('<int:pk>/retry/<int:run_pk>/', self.admin_site.admin_view(self.retry_view),
-                    name='agent_agentrule_retry')]
+                    name='agent_agentrule_retry'),
+               path('<int:pk>/process/<int:msg_pk>/', self.admin_site.admin_view(self.process_view),
+                    name='agent_agentrule_process')]
         return own + super().get_urls()
+
+    def _now_cell(self, rule, found):
+        """Стан листа в «🧪 Перевірити»: що з ним уже зроблено (і «↻ Ще раз»), чому агент його не візьме, або
+        «▶ Обробити зараз» — лист підходить, але прийшов раніше за доручення."""
+        run = found['run']
+        if run is not None:
+            return format_html('{} {}', run_state.text(run), self._retry_button(rule, run))
+        if found['blocked']:
+            return format_html('⚠️ {}', found['blocked'])
+        if not rule.enabled:
+            return format_html('<span style="opacity:.75">{}</span>', 'доручення вимкнене')
+        return format_html(
+            '<button type="submit" class="button" formaction="{}" formmethod="post" formnovalidate title="{}" '
+            'style="white-space:nowrap">▶ Обробити зараз</button>',
+            reverse('admin:agent_agentrule_process', args=[rule.pk, found['msg'].pk]),
+            'Нові листи доручення бере саме, а цей прийшов раніше за доручення. Агент обробить його зараз за '
+            'теперішніми налаштуваннями (зі звітом і «✓ … вносити самому»). Інші зміни в картці при цьому не '
+            'зберігаються.')
+
+    def process_view(self, request, pk, msg_pk):
+        """POST «▶ Обробити зараз» з «🧪 Перевірити, як працює» (agent/mail.py process_now)."""
+        from email_assistant.models import EmailMessage
+        back = reverse('admin:agent_agentrule_change', args=[pk]) + '#fieldset-0-1-heading'
+        if request.method != 'POST':
+            return redirect(back)
+        rule = self.get_queryset(request).filter(pk=pk).first()
+        if rule is None or not self.has_change_permission(request, rule):
+            raise Http404
+        msg = EmailMessage.objects.filter(pk=msg_pk, account_id=rule.account_id).select_related('account').first()
+        if msg is None:
+            raise Http404
+        why, run = agent_mail.process_now(rule, msg)
+        subject = msg.subject or '(без теми)'
+        if why:
+            messages.error(request, f'▶ Не вдалося: {why}')
+        elif rule.kind == AgentRule.MAIL_TASK and run is not None and run.task_id:
+            messages.success(request, f'▶ Лист «{subject}»: агент узявся за завдання — пропозиції й звіт будуть, '
+                                      f'щойно закінчить (стан — у таблиці нижче).')
+        else:
+            messages.success(request, f'▶ Лист «{subject}» у черзі — агент обробить його протягом хвилини за '
+                                      f'теперішніми налаштуваннями доручення.')
+        return redirect(back)
 
     def retry_view(self, request, pk, run_pk):
         """POST «↻ Обробити ще раз» з «📜 Останні листи»: пропущений лист / лист з помилкою — знову в чергу."""
@@ -445,6 +520,9 @@ class AgentScheduleAdmin(admin.ModelAdmin):
         preset = schedules_presets().get(request.GET.get('preset', ''))
         if preset:
             data.update(name=preset['name'], instruction=preset['instruction'])
+        task = from_task.task_from_get(request)       # «🤖 Створити доручення з завдання» без листа
+        if task is not None and not task.message_id:
+            data.update(from_task.schedule_initial(task))
         data.setdefault('days', [0, 1, 2, 3, 4])
         return data
 
@@ -637,6 +715,7 @@ class AgentTaskAdmin(admin.ModelAdmin):
     list_filter = ('status',)
     search_fields = ('title', 'instruction')
     autocomplete_fields = ('products',)
+    actions = ['action_repeat', 'action_make_rule']
     DESCRIPTION = ('Напишіть завдання своїми словами. Агент читає картки товарів, їхні даташити, лист завдання з '
                    'вкладеннями (і за бажанням — сайти виробників), а потім ПРОПОНУЄ: зміни в картках, прихід на '
                    'склад, нові товари, події в календарі, лист. Ви бачите «було → стане» з цитатою з джерела й '
@@ -724,8 +803,76 @@ class AgentTaskAdmin(admin.ModelAdmin):
         own = [
             path('<int:pk>/review/', self.admin_site.admin_view(self.review_view), name='agent_agenttask_review'),
             path('<int:pk>/status/', self.admin_site.admin_view(self.status_view), name='agent_agenttask_status'),
+            path('<int:pk>/repeat/', self.admin_site.admin_view(self.repeat_view), name='agent_agenttask_repeat'),
         ]
         return own + super().get_urls()
+
+    # ── 🔁 Те саме для інших листів · 🤖 доручення з завдання (agent/from_task.py) ──
+
+    def has_repeat_permission(self, request):
+        return request.user.has_perm('agent.add_agenttask')
+
+    def has_rule_permission(self, request):
+        return request.user.has_perm('agent.add_agentrule') or request.user.has_perm('agent.add_agentschedule')
+
+    def _one(self, request, queryset):
+        if queryset.count() != 1:
+            messages.warning(request, 'Виберіть одне завдання.')
+            return None
+        return queryset.first()
+
+    @admin.action(description='🔁 Те саме для інших листів…', permissions=['repeat'])
+    def action_repeat(self, request, queryset):
+        task = self._one(request, queryset)
+        if task is None:
+            return None
+        if task.mcp_session:
+            messages.error(request, '⚠️ Пропозиції зовнішнього агента (MCP) Minerva не виконує — повторити нічого.')
+            return None
+        return redirect(reverse('admin:agent_agenttask_repeat', args=[task.pk]))
+
+    @admin.action(description='🤖 Створити доручення з завдання…', permissions=['rule'])
+    def action_make_rule(self, request, queryset):
+        task = self._one(request, queryset)
+        if task is None:
+            return None
+        url, label = from_task.target(task, request.user)
+        if not url:
+            messages.error(request, f'⚠️ {label}')
+            return None
+        return redirect(url)
+
+    def repeat_view(self, request, pk):
+        task = self._task(request, pk)
+        here = reverse('admin:agent_agenttask_repeat', args=[task.pk])
+        if task.mcp_session or not self.has_repeat_permission(request):
+            messages.error(request, '⚠️ Це завдання не можна повторити.')
+            return redirect(reverse('admin:agent_agenttask_review', args=[task.pk]))
+        if request.method == 'POST':
+            ids = request.POST.getlist('ids')
+            if task.message_id and not ids:
+                messages.warning(request, 'Позначте листи, з якими зробити те саме.')
+                return redirect(here)
+            created = from_task.repeat(task, request.user, ids)
+            if not created:
+                messages.error(request, '⚠️ Цих листів немає у ваших скриньках.')
+                return redirect(here)
+            if len(created) == 1:
+                messages.success(request, '🔁 Агент виконує те саме завдання' +
+                                 (' для вибраного листа' if task.message_id else ' ще раз'))
+                return redirect(reverse('admin:agent_agenttask_review', args=[created[0].pk]))
+            messages.success(request, f'🔁 Агент виконує те саме завдання для листів: {len(created)}')
+            return redirect(reverse('admin:agent_agenttask_changelist'))
+        q = request.GET.get('q', '')
+        context = {
+            **self.admin_site.each_context(request),
+            'title': f'🔁 {task.title}', 'task': task, 'q': q, 'max': from_task.REPEAT_MAX,
+            'days': from_task.DAYS, 'instruction': from_task.base_instruction(task),
+            'rows': from_task.candidates(task, request.user, q) if task.message_id else [],
+            'review_url': reverse('admin:agent_agenttask_review', args=[task.pk]),
+            'back_url': reverse('admin:agent_agenttask_changelist'),
+        }
+        return TemplateResponse(request, 'admin/agent/agenttask/repeat.html', context)
 
     def _task(self, request, pk):
         task = AgentTask.objects.filter(pk=pk, owner=request.user).first()
@@ -769,7 +916,10 @@ class AgentTaskAdmin(admin.ModelAdmin):
             'can_apply': any(request.user.has_perm(x) for x in APPLY_PERMS),
             'log': list(reversed((task.log or [])[-80:])),
             'back_url': reverse('admin:agent_agenttask_changelist'),
+            'repeat_url': (reverse('admin:agent_agenttask_repeat', args=[task.pk])
+                           if not task.mcp_session and self.has_repeat_permission(request) else ''),
         }
+        context['rule_url'], context['rule_label'] = from_task.target(task, request.user)
         return TemplateResponse(request, 'admin/agent/agenttask/review.html', context)
 
     def _decide(self, request, task):

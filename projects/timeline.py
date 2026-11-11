@@ -9,8 +9,12 @@
 
 Пошта й календар — особисті: тема листа, назва вкладення чи події видна лише власнику скриньки / календаря, решті —
 кількість листів і файлів «з інших скриньок»; події чужих календарів не показуються. Кольори — змінні тем Minerva (CSS у change_form).
+🎙 Наради (meetings) — так само особисті: доріжка показує лише наради того, хто дивиться (own_meetings, і адміністратору
+лише свої); момент, прийнятий з наради, — «🎙 з наради DD.MM» усім, посилання на місце в записі — лише тому, хто записав
+(meeting_refs / meeting_ref). У overview.collect наради не потрапляють — отже, і в AI-огляд та кеш стану.
 """
 import json
+import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -18,6 +22,8 @@ from django.utils import timezone
 from django.utils.html import escape
 
 from .models import ProjectHighlight
+
+logger = logging.getLogger(__name__)
 
 LANES = [
     ("moments", "📌 Важливі моменти"),
@@ -28,6 +34,7 @@ LANES = [
     ("orders", "🛒 Замовлення й доставка"),
     ("supply", "🏭 Закупівлі й виробництво"),
     ("calendar", "📅 Терміни й зустрічі"),
+    ("meetings", "🎙 Наради"),
     ("hours", "⏱ Час askDANTE"),
 ]
 RANGES = {"all": None, "3": 3, "6": 6, "12": 12}
@@ -73,8 +80,9 @@ def _owner(message):
 
 # ── Події ────────────────────────────────────────────────────────────────────
 
-def events(project, facts, viewer, today=None) -> list:
-    """Події шкали: {lane, shape: flag | dot | point | diamond | bar | hours, start, end, label, tip, url, cls, …}."""
+def events(project, facts, viewer, today=None, meetings=None) -> list:
+    """Події шкали: {lane, shape: flag | dot | point | diamond | bar | hours, start, end, label, tip, url, cls, …}.
+    meetings — наради того, хто дивиться (own_meetings; None — прочитати тут)."""
     today = today or timezone.localdate()
     uid = getattr(viewer, "pk", None)
     out = []
@@ -89,11 +97,16 @@ def events(project, facts, viewer, today=None) -> list:
         out.append({"lane": lane, "shape": shape, "start": start, "end": end, "label": _cut(label), "tip": tip,
                     "url": url, "cls": cls, **extra})
 
-    for h in facts.get("highlights", []):
+    highlights = facts.get("highlights", [])
+    refs = meeting_refs(highlights)
+    for h in highlights:
         own = h.message_id and _owner(h.message) == uid
-        tip = f"📌 {_fmt(h.date)} · {h.get_kind_display()} · {h.title}" + (f"\n«{_cut(h.quote, 240)}»" if h.quote else "")
+        ref = meeting_ref(h, refs, uid)
+        tip = (f"📌 {_fmt(h.date)} · {h.get_kind_display()} · {h.title}" + (f"\n«{_cut(h.quote, 240)}»" if h.quote else "")
+               + (f"\n{ref['label']}" if ref else ""))
         cls = {ProjectHighlight.PROBLEM: "bad", ProjectHighlight.APPROVAL: "ok"}.get(h.kind, "")
-        ev("moments", "flag", h.date, h.title, tip, f"/email/message/{h.message_id}/" if own else "", cls, hid=h.pk)
+        url = f"/email/message/{h.message_id}/" if own else (ref["url"] if ref else "")
+        ev("moments", "flag", h.date, h.title, tip, url, cls, hid=h.pk)
 
     _plan_events(ev, facts, today)
     _mail_events(ev, facts, uid)
@@ -101,32 +114,189 @@ def events(project, facts, viewer, today=None) -> list:
     _file_events(ev, project, facts, uid)
     _order_events(ev, facts, today)
     _supply_events(ev, facts, today)
-    _term_events(ev, project, facts, uid)
+    _term_events(ev, project, facts, viewer)
+    _meeting_events(ev, project, viewer, meetings)
     out.extend(_hours(project, viewer))
     return out
 
 
-def _term_events(ev, project, facts, uid):
+def _term_events(ev, project, facts, viewer):
     """📅 Терміни й зустрічі — лише з календаря того, хто дивиться (чужі події не показуються); стан — terms.py;
-    подія, прив'язана до проєкту вручну, — з «✕ Прибрати з проєкту» в меню."""
+    подія, прив'язана до проєкту вручну, — з «✕ Прибрати з проєкту» в меню; зустріч з часом — «🎙 Записати нараду»
+    (і «🎙 Відкрити нараду», якщо людина її вже записувала)."""
     from . import terms
     from .models import ProjectLink
+    uid = getattr(viewer, "pk", None)
     linked = set(ProjectLink.objects.filter(project=project).exclude(event=None).values_list("event_id", flat=True))
     items = facts.get("terms")
     if items is None:
         items = terms.classify(facts.get("deadlines", []), facts.get("messages", []))
-    for t in items:
+    own = [t for t in items if t.event.user_id == uid]          # календар особистий
+    record = new_meeting_url(viewer, project=project) if any(t.meeting for t in own) else ""
+    recorded = event_meetings(viewer, [t.event.pk for t in own if t.meeting])
+    for t in own:
         e = t.event
-        if e.user_id != uid:            # календар особистий
-            continue
         times = f" ×{t.count}" if t.count > 1 else ""
         tip = (f"{t.icon} {_fmt(e.start_at)} · {e.title} · {t.label}" + (f" — {t.note}" if t.note else "")
                + (f"\nЗнайдено в листах {t.count} рази — показано один раз" if t.count > 1 else "")
                + "\nКлік — ✓ виконано, зустріч чи термін, лист")
-        ev("calendar", "diamond", e.start_at, f"{t.icon} {e.title}{times}", tip, "", t.cls,
-           cal={"ids": [e.pk] + [d.pk for d in t.duplicates], "done": bool(e.is_done), "meeting": t.meeting,
-                "day": _d(e.start_at).isoformat() if e.start_at else "", "what": (e.title or "")[:120],
-                "mail": e.email_message_id or "", "linked": e.pk in linked})
+        cal = {"ids": [e.pk] + [d.pk for d in t.duplicates], "done": bool(e.is_done), "meeting": t.meeting,
+               "day": _d(e.start_at).isoformat() if e.start_at else "", "what": (e.title or "")[:120],
+               "mail": e.email_message_id or "", "linked": e.pk in linked}
+        if t.meeting and not e.all_day:
+            if record:
+                cal["record"] = f"{record}&event={e.pk}"
+            if e.pk in recorded:
+                cal["rec"] = recorded[e.pk]
+        ev("calendar", "diamond", e.start_at, f"{t.icon} {e.title}{times}", tip, "", t.cls, cal=cal)
+
+
+# ── 🎙 Наради (meetings) — лише свої ────────────────────────────────────────
+
+MEETINGS_MAX = 40            # нарад на доріжці
+MEETING_CLS = {"ready": "plan", "recording": "open", "processing": "open", "review": "ok", "failed": "bad"}
+
+
+def _url(name, args=(), query="", anchor="") -> str:
+    from django.urls import NoReverseMatch, reverse
+    try:
+        return reverse(name, args=args) + query + anchor
+    except NoReverseMatch:               # застосунку нарад немає / сторінки ще немає — без посилання
+        return ""
+
+
+def meeting_url(pk, second=None) -> str:
+    """Сторінка наради (там перевіряють, що це нарада того, хто відкриває), #t=<секунда> — місце в розшифровці."""
+    anchor = f"#t={int(second)}" if second is not None and second >= 0 else ""
+    return _url("admin:meetings_meeting_page", args=[pk], anchor=anchor)
+
+
+def can_record(user) -> bool:
+    """«🎙 Записати нараду»: є застосунок нарад і людина може записувати (право + записування ввімкнено)."""
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    try:
+        from meetings.services import can_record as allowed
+    except ImportError:
+        return False
+    try:
+        return bool(allowed(user))
+    except Exception:  # noqa: BLE001 — збій перевірки = кнопки немає
+        logger.warning("meetings.can_record failed", exc_info=True)
+        return False
+
+
+def new_meeting_url(user, **params) -> str:
+    """Адреса підготовки нової наради (?project= / event= / customer=) — лише тому, хто може записувати."""
+    if not can_record(user):
+        return ""
+    query = "&".join(f"{k}={getattr(v, 'pk', v)}" for k, v in params.items() if v is not None)
+    return _url("admin:meetings_meeting_new", query=f"?{query}" if query else "")
+
+
+def _can_view_meetings(viewer) -> bool:
+    try:
+        return bool(viewer is not None and viewer.is_active and viewer.has_perm("meetings.view_meeting"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def own_meetings(project, viewer, limit=MEETINGS_MAX) -> list:
+    """🎙 Наради людини в цьому проєкті — новіші першими; лише її власні (і для адміністратора), без розшифровки й
+    протоколу (лише поля для списку) + pending — скільки пунктів чекають ✓ / ✕. Без застосунку нарад — []."""
+    uid = getattr(viewer, "pk", None)
+    if not uid or project is None or not getattr(project, "pk", None) or not _can_view_meetings(viewer):
+        return []
+    try:
+        from django.db.models import Count, Q
+        from django.db.models.functions import Coalesce
+        from meetings.models import Meeting, MeetingItem
+    except ImportError:
+        return []
+    qs = (Meeting.objects.filter(owner_id=uid, project_id=project.pk)
+          .only("pk", "title", "status", "started_at", "created_at", "duration_s", "approved_at",
+                "transcript_deleted_at", "owner_id", "project_id")
+          .annotate(pending=Count("items", filter=Q(items__status=MeetingItem.PENDING)))
+          .order_by(Coalesce("started_at", "created_at").desc(), "-pk"))
+    return list(qs[:limit]) if limit else list(qs)
+
+
+def meeting_cls(m) -> str:
+    if m.status == "review" and getattr(m, "pending", 0):
+        return "warn"                    # чекають ✓ / ✕
+    return MEETING_CLS.get(m.status, "")
+
+
+def meeting_line(m, pending=True) -> str:
+    """«05.11.2026 10:00 · 45 хв · Розшифровка готова · 3 чекають ✓ / ✕» — без назви (її показують окремо);
+    pending=False — без «чекають» (блок «🎙 Мої наради» показує їх окремим посиланням)."""
+    start = m.started_at or m.created_at
+    when = timezone.localtime(start).strftime("%d.%m.%Y %H:%M") if start else ""
+    parts = [when]
+    if m.duration_s:
+        parts.append(f"{max(int(round(m.duration_s / 60)), 1)} хв")
+    parts.append(m.get_status_display())
+    if pending and getattr(m, "pending", 0):
+        parts.append(f"{m.pending} чекають ✓ / ✕")
+    if m.approved_at and not m.transcript_deleted_at:
+        parts.append("📚 у базі знань")
+    if m.transcript_deleted_at:
+        parts.append("розшифровку видалено")
+    return " · ".join(p for p in parts if p)
+
+
+def _meeting_events(ev, project, viewer, meetings=None):
+    """🎙 Наради на шкалі — лише ті, що записала людина, яка дивиться (чужих не видно нікому, і адміністратору)."""
+    for m in (own_meetings(project, viewer) if meetings is None else meetings):
+        ev("meetings", "point", m.started_at or m.created_at, f"🎙 {m.title}", f"🎙 {m.title}\n{meeting_line(m)}",
+           meeting_url(m.pk), meeting_cls(m))
+
+
+def event_meetings(user, event_ids) -> dict:
+    """{id події календаря: сторінка найновішої наради людини з цієї події} — лише її наради."""
+    ids = [i for i in event_ids if i]
+    if not ids or not _can_view_meetings(user):
+        return {}
+    try:
+        from meetings.models import Meeting
+    except ImportError:
+        return {}
+    out = {}
+    for pk, event_id in (Meeting.objects.filter(owner_id=user.pk, calendar_event_id__in=ids)
+                         .order_by("-created_at", "-pk").values_list("pk", "calendar_event_id")):
+        if event_id not in out:
+            url = meeting_url(pk)
+            if url:
+                out[event_id] = url
+    return out
+
+
+def meeting_refs(objs) -> dict:
+    """{pk наради: (власник, день)} для моментів / ризиків / кроків, прийнятих з наради (лише id і дата — без назви
+    й розшифровки). Нарада видалена — FK порожній, позначки немає."""
+    ids = {getattr(o, "meeting_id", None) for o in objs} - {None}
+    if not ids:
+        return {}
+    try:
+        from meetings.models import Meeting
+    except ImportError:
+        return {}
+    out = {}
+    for r in Meeting.objects.filter(pk__in=ids).values("pk", "owner_id", "started_at", "created_at"):
+        start = r["started_at"] or r["created_at"]
+        out[r["pk"]] = (r["owner_id"], timezone.localtime(start).date() if start else None)
+    return out
+
+
+def meeting_ref(obj, refs, uid):
+    """{label: «🎙 з наради 05.11», url: місце в записі — лише тому, хто записав, інакше ''} або None."""
+    mid = getattr(obj, "meeting_id", None)
+    if not mid or mid not in refs:
+        return None
+    owner, day = refs[mid]
+    label = "🎙 з наради" + (f" {day:%d.%m}" if day else "")
+    url = meeting_url(mid, getattr(obj, "meeting_second", None)) if owner and uid and owner == uid else ""
+    return {"label": label, "url": url}
 
 
 def _plan_events(ev, facts, today):
@@ -220,6 +390,8 @@ def _doc_events(ev, project, facts, viewer):
     except Exception:  # noqa: BLE001 — шкала без документів краще, ніж жодної
         return
     for item in items:
+        if item.source_key.startswith("meeting:"):      # 🎙 частини розшифровки — уже на доріжці «🎙 Наради»
+            continue
         ev("docs", "point", item.created_at, f"📎 {item.title}",
            f"📎 {item.title} · додано {_fmt(item.created_at)}", f"/rag/knowledge/{item.pk}/", "doc")
 
@@ -645,7 +817,7 @@ def _draw_hours(items, top, x):
 
 
 LANE_ICONS = {"moments": "📌", "plan": "📋", "mail": "✉️", "docs": "📝", "files": "📎", "orders": "🛒",
-              "supply": "🏭", "calendar": "📅"}
+              "supply": "🏭", "calendar": "📅", "meetings": "🎙"}
 MOBILE_LIMIT = 40
 
 

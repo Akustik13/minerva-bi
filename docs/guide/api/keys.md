@@ -5,8 +5,8 @@ summary: Як створити ключ API для сайту, CRM чи парт
 where: 🤖 API та скрипти → REST API → 🔑 API ключі
 urls: /admin/api/apikey/, /admin/api/apikey/add/, /admin/api/apirequestlog/
 roles: адміністратор
-keywords: ключ API, токен, API key, token, scopes, права, обмеження, IP, ліміт, rate limit, 401, 403, 429, журнал API, хто звертався, Schlüssel
-related: api/key-insight, api/log-analysis, api/overview, api/console, api/endpoints, shop/site-admin, ai/knowledge-base
+keywords: ключ API, токен, API key, token, scopes, права, обмеження, IP, ліміт, rate limit, 401, 403, 429, журнал API, хто звертався, Schlüssel, meetings:write, ключ RAG-ПК наради
+related: api/key-insight, api/log-analysis, api/overview, api/console, api/endpoints, shop/site-admin, ai/knowledge-base, meetings/settings
 ---
 
 ## Що це
@@ -32,8 +32,9 @@ related: api/key-insight, api/log-analysis, api/overview, api/console, api/endpo
    **«👁 Показати»** / **«📋 Копіювати»**. Там же готова команда перевірки й посилання на консоль API.
 
 > 💡 Ключ для RAG-ПК (база знань) створюється не тут, а кнопкою **«🔑 Створити ключ для RAG»** на сторінці
-> [База знань](guide:ai/knowledge-base). Ключ сайту магазину зручно отримати кодом **«🔗 Підключити сайт»** —
-> див. [Адмінка сайту й підключення](guide:shop/site-admin).
+> [База знань](guide:ai/knowledge-base); ключ вікна запису нарад — кнопкою **«🔑 Створити ключ для RAG-ПК
+> (наради)»** у [Налаштуваннях нарад](guide:meetings/settings#підключити-rag-пк). Ключ сайту магазину зручно
+> отримати кодом **«🔗 Підключити сайт»** — див. [Адмінка сайту й підключення](guide:shop/site-admin).
 
 ## Права (scopes)
 
@@ -49,6 +50,7 @@ related: api/key-insight, api/log-analysis, api/overview, api/console, api/endpo
 | Акаунти покупців магазину — читання / запис | `accounts:read` / `accounts:write` | кабінет покупця на сайті ([Кабінет покупця](guide:shop/customer-accounts)) |
 | Вебхуки — перегляд / створення, зміна, видалення | `webhooks:read` / `webhooks:write` | вебхуки цього ключа ([Вебхуки](guide:api/webhooks)) |
 | База знань — стрічка / статуси | `knowledge:read` / `knowledge:write` | лише службовий ключ RAG-ПК, не магазин |
+| 🎙 Наради — лише службовий ключ RAG-ПК | `meetings:write` | вікно запису нарад на RAG-ПК: обмін одноразового посилання, стан запису, розшифровка, ключові моменти, звірка. Ключ — кнопкою **«🔑 Створити ключ для RAG-ПК (наради)»** ([Налаштування нарад](guide:meetings/settings)); ключ магазину не діє, у консолі API такий ключ не використовується |
 | Агент (MCP) — читання / пропозиції | `agent:read` / `agent:write` | Claude Code, Claude Desktop: товари, даташити, магазини, DigiKey; зміни лише пропонує, застосовує людина ✓ ([MCP](guide:api/mcp)) |
 
 Типові набори:

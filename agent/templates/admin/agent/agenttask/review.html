@@ -74,6 +74,12 @@
     <div style="margin-top:6px;font-size:13px">✉️ З листа <a href="/email/message/{{ task.message_id }}/" target="_blank" translate="no">«{{ task.message.subject|default:"(без теми)" }}»</a>
       <span class="agt-muted" translate="no">{{ task.message.from_email }}</span></div>
     {% endif %}
+    {% if repeat_url or rule_url %}
+    <div class="agt-actions">
+      {% if repeat_url %}<a class="button" href="{{ repeat_url }}" title="Нове завдання з тією самою інструкцією{% if task.message_id %} — для кожного вибраного листа{% endif %}">{% if task.message_id %}🔁 Те саме для інших листів…{% else %}🔁 Запустити ще раз…{% endif %}</a>{% endif %}
+      {% if rule_url %}<a class="button" href="{{ rule_url }}" title="{% if task.message_id %}Доручення: з кожного нового листа, що підходить під умови, — таке саме завдання{% else %}Регулярне завдання за розкладом з цією інструкцією{% endif %}">{{ rule_label }}</a>{% endif %}
+    </div>
+    {% endif %}
     {% if running %}<div class="agt-muted" id="agt-live" style="margin-top:10px">⏳ Агент працює… сторінка оновиться сама.</div>{% endif %}
   </div>
 

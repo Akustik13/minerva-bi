@@ -77,6 +77,7 @@ def calendar_view(request):
 
     for ev in events:
         _event_display(ev, {cat['id']: type('C', (), cat)() for cat in custom_cats})
+    _meeting_links(request.user, events)        # 🎙 у рядках списку — для своїх зустрічей з часом
 
     cal        = _cal.Calendar(firstweekday=0)
     raw_weeks  = cal.monthdayscalendar(year, month)
@@ -254,7 +255,78 @@ def event_detail_api(request, pk):
         'source_email': source_email,
         'sender':       _sender(request.user, ev),
         'custom_cat_id': ev.custom_category_id,
+        **_meeting_urls(request.user, ev),
     })
+
+
+# ── 🎙 Наради (meetings): лише посилання; у подію календаря з наради нічого не пишеться ──────────────
+
+def _is_meeting(ev) -> bool:
+    try:
+        from projects.terms import is_meeting
+    except ImportError:
+        return ev.event_type == 'meeting'
+    return is_meeting(ev)
+
+
+def _can_record(user) -> bool:
+    try:
+        from meetings.services import can_record
+    except ImportError:
+        return False
+    try:
+        return bool(can_record(user))
+    except Exception:  # noqa: BLE001 — збій перевірки = кнопки немає
+        return False
+
+
+def _reverse(name, args=()) -> str:
+    from django.urls import NoReverseMatch, reverse
+    try:
+        return reverse(name, args=args)
+    except NoReverseMatch:
+        return ''
+
+
+def _own_meetings(user, event_ids) -> dict:
+    """{id події: сторінка найновішої наради людини, записаної з цієї події} — лише її власні наради."""
+    if not event_ids:
+        return {}
+    try:
+        if not user.has_perm('meetings.view_meeting'):
+            return {}
+        from meetings.models import Meeting
+    except ImportError:
+        return {}
+    out = {}
+    for pk, event_id in (Meeting.objects.filter(owner_id=user.pk, calendar_event_id__in=list(event_ids))
+                         .order_by('-created_at', '-pk').values_list('pk', 'calendar_event_id')):
+        if event_id not in out:
+            url = _reverse('admin:meetings_meeting_page', args=[pk])
+            if url:
+                out[event_id] = url
+    return out
+
+
+def _meeting_links(user, events) -> None:
+    """Для своїх зустрічей з часом: ev.mt_record — «🎙 Записати нараду» (підготовка з цієї події; лише коли людина
+    може записувати), ev.mt_open — найновіша нарада людини з цієї події. Події тут уже лише свої (user=request.user)."""
+    timed = [ev for ev in events if ev.user_id == user.pk and not ev.all_day and _is_meeting(ev)]
+    for ev in events:
+        ev.mt_record = ev.mt_open = ''
+    if not timed:
+        return
+    new = _reverse('admin:meetings_meeting_new') if _can_record(user) else ''
+    opened = _own_meetings(user, [ev.pk for ev in timed])
+    for ev in timed:
+        ev.mt_record = f'{new}?event={ev.pk}' if new else ''
+        ev.mt_open = opened.get(ev.pk, '')
+
+
+def _meeting_urls(user, ev) -> dict:
+    """record_url / meeting_url для вікна події (calendar.html showEventPopup)."""
+    _meeting_links(user, [ev])
+    return {'record_url': ev.mt_record, 'meeting_url': ev.mt_open}
 
 
 def _sender(user, ev):

@@ -25,6 +25,8 @@
     {% if start %}<span class="pjc-sub">старт {{ start|date:"d.m.Y" }}</span>{% endif %}
     <span class="pjc-sub" title="Листи від клієнта / наші · Angebote · замовлення · закупівлі · JLC-замовлення · відправлення">📥 {{ counts.in }} · 📤 {{ counts.out }} · 📝 {{ counts.offers }} · 🛒 {{ counts.orders }} · 🏭 {{ more.purchases }} · 🔧 {{ more.jlc }} · 🚚 {{ more.shipments }}</span>
     <a class="pjc-link" href="{{ urls.mail }}" target="_blank">✉️ Листи проєкту</a>
+    {% if meetings.record_url %}<a class="pjc-link pjc-rec" href="{{ meetings.record_url }}" target="_blank" rel="noopener"
+       title="Підготувати запис наради цього проєкту: назва, хто присутній, мови; згоду підтвердите у вікні запису перед ▶">🎙 Записати нараду</a>{% endif %}
     <a class="pjc-b pjc-ws-link" href="{{ urls.workspace }}" title="План, діаграми Ганта й шкала на весь екран — без полів картки">⤢ Робочий стіл</a>
     <button type="button" class="pjc-b" data-pjc-fields title="Поля проєкту: назва, клієнт, статус, строки, учасники, прив'язки">⚙️ Поля</button>
   </div>
@@ -117,6 +119,7 @@
             <li class="pjc-m-{{ m.kind_key }}"><time>{{ m.date|date:"d.m.Y" }}</time> {{ m.icon }}
               {% if m.url %}<a href="{{ m.url }}" target="_blank">{{ m.title }}</a>{% else %}{{ m.title }}{% endif %}
               <span class="pjc-sub">· {{ m.kind }}</span>
+              {% if m.meeting %}<span class="pjc-sub pjc-from-meeting">· {% if m.meeting.url %}<a href="{{ m.meeting.url }}" target="_blank" rel="noopener" title="Відкрити це місце в розшифровці наради (бачите лише ви — нараду записали ви)">{{ m.meeting.label }}</a>{% else %}{{ m.meeting.label }}{% endif %}</span>{% endif %}
               {% if can_change %}<button type="button" class="pjc-x" data-pjc-mdel="{% url 'projects:highlight_delete' m.id %}" title="Прибрати момент" aria-label="Прибрати момент">✕</button>{% endif %}
               {% if m.quote %}<div class="pjc-q">«{{ m.quote|truncatechars:180 }}»</div>{% endif %}
             </li>
@@ -130,6 +133,23 @@
       {% if ai.moments %}<a class="pja-ptr" href="#pj-ai">🧠 Моментів з листів чекають ✓/✗: {{ ai.moments }}</a>{% endif %}
     </section>
   </div>
+
+  {% if meetings.rows %}
+  <section class="pjc-card pjc-meet" aria-label="Мої наради">
+    <h4>🎙 Мої наради <span class="pjc-sub">{{ meetings.total }} · бачите лише ви{% if meetings.pending %} · чекають ✓ / ✕: {{ meetings.pending }}{% endif %}</span>
+      {% if meetings.record_url %}<a class="pjc-b pjc-right" href="{{ meetings.record_url }}" target="_blank" rel="noopener">🎙 Записати ще одну</a>{% endif %}</h4>
+    <ul class="pjc-list pjc-mlist">
+      {% for m in meetings.rows %}
+        <li class="pjc-mt-{{ m.cls }}">
+          {% if m.url %}<a href="{{ m.url }}" target="_blank" rel="noopener" translate="no">🎙 {{ m.title }}</a>{% else %}<span translate="no">🎙 {{ m.title }}</span>{% endif %}
+          <span class="pjc-sub">{{ m.line }}</span>
+          {% if m.pending and m.url %}<a class="pjc-mt-pending" href="{{ m.url }}" target="_blank" rel="noopener">чекають ✓ / ✕: {{ m.pending }} →</a>{% elif m.pending %}<span class="pjc-mt-pending">чекають ✓ / ✕: {{ m.pending }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+    {% if meetings.all_url %}<a class="pja-ptr" href="{{ meetings.all_url }}" target="_blank" rel="noopener">Усі мої наради →</a>{% endif %}
+  </section>
+  {% endif %}
 
   {% if ai.on %}
   <section class="pjc-card pja" id="pj-ai" aria-label="AI-помічник проєкту">
@@ -257,7 +277,7 @@
               <tr{% if can_change %} data-pjc-risk="{{ r.pk }}" tabindex="0"{% endif %} title="{{ r.evidence|default:r.description }}">
                 <td>{{ row.n }}</td>
                 <td><b translate="no">{{ r.title }}</b>{% if row.steps %}<div class="pjc-sub">кроки: <span translate="no">{{ row.steps|join:", " }}</span></div>{% endif %}</td>
-                <td class="pjc-sub">{{ r.get_source_display }}{% if row.rule %} «{{ row.rule }}»{% endif %}</td>
+                <td class="pjc-sub">{{ r.get_source_display }}{% if row.rule %} «{{ row.rule }}»{% endif %}{% if row.meeting %}<br><span class="pjc-from-meeting">{% if row.meeting.url %}<a href="{{ row.meeting.url }}" target="_blank" rel="noopener" title="Відкрити це місце в розшифровці наради (бачите лише ви — нараду записали ви)">{{ row.meeting.label }}</a>{% else %}{{ row.meeting.label }}{% endif %}</span>{% endif %}</td>
                 <td><span class="pjr-score pjr-{{ r.level }}">{{ r.score }}</span></td>
                 <td>{% if r.mitigation %}<span translate="no">{{ r.mitigation|truncatechars:90 }}</span>{% else %}<span class="pjc-sub">—</span>{% endif %}</td>
                 <td>{% if r.owner %}<span translate="no">{{ r.owner.get_full_name|default:r.owner.username }}</span>{% else %}<span class="pjc-sub">—</span>{% endif %}</td>
@@ -272,7 +292,7 @@
           </table>
           {% if riskreg.closed %}
             <details class="pjr-closed"><summary>Закриті · {{ riskreg.closed_total }}</summary>
-              <ul class="pjc-list">{% for r in riskreg.closed %}<li{% if can_change %} data-pjc-risk="{{ r.pk }}" class="pjr-link"{% endif %}>✓ <span translate="no">{{ r.title }}</span> <span class="pjc-sub">· {{ r.get_source_display }}{% if r.closed_at %} · {{ r.closed_at|date:"d.m.Y" }}{% endif %}{% if r.closed_auto %} · умова зникла{% endif %}</span></li>{% endfor %}</ul>
+              <ul class="pjc-list">{% for r in riskreg.closed %}<li{% if can_change %} data-pjc-risk="{{ r.pk }}" class="pjr-link"{% endif %}>✓ <span translate="no">{{ r.title }}</span> <span class="pjc-sub">· {{ r.get_source_display }}{% if r.meeting_ref %} · {{ r.meeting_ref.label }}{% endif %}{% if r.closed_at %} · {{ r.closed_at|date:"d.m.Y" }}{% endif %}{% if r.closed_auto %} · умова зникла{% endif %}</span></li>{% endfor %}</ul>
             </details>
           {% endif %}
         </div>

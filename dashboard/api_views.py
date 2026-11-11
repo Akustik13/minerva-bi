@@ -110,12 +110,27 @@ api_docs_example = staff_member_required(api_docs_example)
 # Проксі ходить ЛИШЕ в API цієї ж Minerva (/api/v1/ на тому самому хості) і не робить мережевого запиту:
 # запит виконується всередині Minerva тим самим ланцюжком middleware, що й зовнішній (журнал API, ключі,
 # обмеження IP — за IP адміністратора). Інші хости, внутрішня мережа й loopback — недосяжні.
+# Службові ключі й адреси RAG (база знань) і RAG-ПК (наради) консоль не використовує: інакше адміністратор прочитав би
+# чужі листи й розшифровки нарад (лише той, хто записав нараду, бачить її — і адміністратор ні).
 
 CONSOLE_PREFIX = '/api/v1/'
 CONSOLE_METHODS = ('GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS')
 # заголовки, які консоль не пересилає (адресу, IP і сесію задає сервер)
 _DROP_HEADERS = {'host', 'content-length', 'connection', 'cookie', 'x-real-ip', 'x-forwarded-for',
                  'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port', 'transfer-encoding'}
+SERVICE_SCOPES = ('knowledge:', 'meetings:')          # ключі з будь-яким із цих прав — не для консолі
+CLOSED_AREAS = {
+    'knowledge': 'База знань (/api/v1/knowledge/) — лише для RAG: у консолі не відкривається (там листи й '
+                 'документи людей, зокрема розшифровки нарад)',
+    'meetings':  'Наради (/api/v1/meetings/) — лише для вікна запису на RAG-ПК: у консолі не відкривається',
+}
+SERVICE_KEY_TEXT = ('Це службовий ключ RAG / RAG-ПК (база знань чи наради) — у консолі не використовується: '
+                    'ним читаються чужі листи й розшифровки нарад')
+
+
+def service_key(key) -> bool:
+    """Ключ RAG (база знань) або RAG-ПК (наради): є хоч одне право knowledge:* чи meetings:*."""
+    return any(str(scope).startswith(SERVICE_SCOPES) for scope in (getattr(key, 'scopes', None) or []))
 
 
 def _admin_required(view):
@@ -133,11 +148,12 @@ def _admin_required(view):
 
 
 def console_keys():
-    """Активні ключі для вибору в консолі: id, назва, замаскований ключ — без самого ключа."""
+    """Активні ключі для вибору в консолі: id, назва, замаскований ключ — без самого ключа.
+    Службових ключів RAG / RAG-ПК (права knowledge:* чи meetings:*) у списку немає."""
     from api.models import APIKey
     from core.secrets import mask
     return [{'id': k.pk, 'name': k.name, 'masked': mask(k.key)}
-            for k in APIKey.objects.filter(is_active=True).order_by('name', 'pk')]
+            for k in APIKey.objects.filter(is_active=True).order_by('name', 'pk') if not service_key(k)]
 
 
 def api_console(request):
@@ -177,6 +193,9 @@ def own_api_target(request, url):
     if (not path.startswith(CONSOLE_PREFIX) or '//' in path or '..' in decoded.split('/')
             or '\\' in decoded or any(ord(ch) < 32 for ch in decoded)):
         return None, f'Лише адреси API Minerva: {CONSOLE_PREFIX}…'
+    area = decoded[len(CONSOLE_PREFIX):].split('/', 1)[0].strip().lower()
+    if area in CLOSED_AREAS:
+        return None, CLOSED_AREAS[area]
     return (path, parts.query), None
 
 
@@ -265,6 +284,8 @@ def api_proxy(request):
         key = APIKey.objects.filter(pk=auth_cfg.get('key_id') or 0, is_active=True).first()
         if key is None:
             return JsonResponse({'error': 'Ключ не знайдено або вимкнено — оновіть сторінку консолі'}, status=400)
+        if service_key(key):
+            return JsonResponse({'error': SERVICE_KEY_TEXT}, status=400)
         headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
         headers['Authorization'] = f'Token {key.key}'
         auth_label = f'key: {key.name} ({mask(key.key)})'
@@ -273,6 +294,14 @@ def api_proxy(request):
         headers = {k: v for k, v in headers.items() if k.lower() != 'authorization'}
         headers['Authorization'] = f"{'Bearer' if auth_type == 'bearer' else 'Token'} {token}"
         auth_label = f'{auth_type}: {mask(token)}'
+    # службовий ключ, вставлений вручну (поле «токен» чи заголовок Authorization), — теж ні
+    for name, value in headers.items():
+        if name.strip().lower() == 'authorization':
+            scheme, _, secret = str(value).strip().partition(' ')
+            if scheme.lower() in ('token', 'bearer') and secret.strip():
+                pasted = APIKey.objects.filter(key=secret.strip()).first()
+                if pasted is not None and service_key(pasted):
+                    return JsonResponse({'error': SERVICE_KEY_TEXT}, status=400)
 
     req_data = body.encode('utf-8') if body and method not in ('GET', 'HEAD') else b''
     request_info = {

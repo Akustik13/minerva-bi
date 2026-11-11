@@ -105,7 +105,7 @@ ROLE_DEFAULTS = {
         'modules': ['crm', 'strategy', 'sales', 'shipping', 'dashboard', 'tasks',
                     'email_assistant', 'projects', 'offers', 'calendar_app', 'worktime', 'agent', 'faq',
                     'labels_app',
-                    'documents'],
+                    'documents', 'meetings'],
         'can_delete': False,
         'can_export': True,
         'can_import': False,
@@ -183,6 +183,8 @@ ROLE_OPERATIONS = {
         'worktime':        ['view', 'add', 'change'],
         'agent':           ['view', 'add', 'change'],
         'documents':       ['view', 'add', 'change'],
+        # 🎙 наради: записати й переглядати лише свої (видалення — власником на сторінці наради, не правом delete)
+        'meetings':        ['view', 'add', 'change'],
     },
     'warehouse': {
         'inventory':  ['view', 'add', 'change', 'import'],

@@ -5,8 +5,8 @@ summary: Повний список адрес REST API Minerva прямо з к�
 where: 🤖 API та скрипти → 📖 Документація API
 urls: /dashboard/api/docs/, /dashboard/api/console/
 roles: інтегратор, адміністратор
-keywords: адреси API, endpoints, ендпоінти, маршрути, список API, curl, python, приклад запиту, stock, orders, products, shipments, customers, webhooks, purchase-orders
-related: api/overview, api/keys, api/stock-orders, api/purchases, api/webhooks
+keywords: адреси API, endpoints, ендпоінти, маршрути, список API, curl, python, приклад запиту, stock, orders, products, shipments, customers, webhooks, purchase-orders, meetings
+related: api/overview, api/keys, api/stock-orders, api/purchases, api/webhooks, meetings/settings
 ---
 
 ## Як читати список
@@ -130,6 +130,16 @@ related: api/overview, api/keys, api/stock-orders, api/purchases, api/webhooks
 «База знань» ([База знань](guide:ai/knowledge-base)); іншим програмам вони не потрібні.
 
 {{api_endpoints:knowledge}}
+
+## Наради (лише для RAG-ПК)
+
+Службові адреси вікна запису нарад на RAG-ПК: обміняти одноразове посилання з Minerva, повідомити стан запису,
+передати розшифровку частинами й ключові моменти, звірити, які записи лишити чи видалити, перевірити ключ. Потрібен
+окремий ключ з правом `meetings:write` — кнопка **«🔑 Створити ключ для RAG-ПК (наради)»** у
+[Налаштуваннях нарад](guide:meetings/settings#підключити-rag-пк); ключ магазину не діє. Відповіді не містять
+тексту нарад; аудіо в Minerva не надходить. Іншим програмам ці адреси не потрібні, консоль API їх не відкриває.
+
+{{api_endpoints:meetings}}
 
 ## Інші адреси
 
