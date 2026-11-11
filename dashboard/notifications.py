@@ -1791,6 +1791,70 @@ def notify_incoming_delivered(shipment, out, *, email=True, telegram=True):
             logger.warning('Вхідна посилка #%s: Telegram не надіслано: %s', shipment.pk, e)
 
 
+def packaging_low_message(materials) -> dict:
+    """Текст «📦 Мало коробок»: {subject, head, items: [{name, line, buy, link}], link} — для листа й Telegram."""
+    try:
+        from config.models import SystemSettings
+        ss = SystemSettings.objects.filter(pk=1).first()
+        base = ss.site_url.rstrip('/') if ss is not None and ss.site_domain else ''
+    except Exception:  # noqa: BLE001
+        base = ''
+    items = []
+    for m in materials:
+        line = f'на складі {m.stock_qty} шт · мінімум {m.min_stock} шт'
+        if m.reorder_qty:
+            line += f' · купити ≈ {m.reorder_qty} шт'
+        items.append({'name': str(m), 'line': line, 'buy': m.buy_url or '',
+                      'link': f'{base}/admin/shipping/packagingmaterial/{m.pk}/change/'})
+    head = ('📦 Мало коробок — треба купити' if len(items) > 1
+            else f'📦 Мало коробок: {items[0]["name"]} — треба купити' if items else '📦 Мало коробок')
+    return {'subject': head, 'head': head, 'items': items,
+            'link': f'{base}/admin/shipping/packagingmaterial/?stock=low'}
+
+
+@for_event('packaging')
+def notify_packaging_low(materials, *, email=True, telegram=True) -> list:
+    """📦 Мало коробок (shipping/services/packaging_stock.py) — лист і Telegram (адреси й чати — «🗺 Хто що
+    отримує», SMTP і бот — «Налаштування → Сповіщення»). → куди надіслано: ['лист', 'Telegram']."""
+    ns = _get_ns()
+    if not ns or not materials:
+        return []
+    send_email, send_tg = channels(ns, email and ns.email_enabled, telegram and ns.telegram_enabled)
+    m = packaging_low_message(materials)
+    sent = []
+    if send_email:
+        try:
+            rows = ''.join(
+                f'<tr><td style="padding:6px 8px;border-bottom:1px solid #eee"><a href="{esc(i["link"])}">'
+                f'<b>{esc(i["name"])}</b></a><br><span style="color:#555">{esc(i["line"])}</span>'
+                + (f'<br><a href="{esc(i["buy"])}">🛒 Де купувати</a>' if i['buy'] else '')
+                + '</td></tr>' for i in m['items'])
+            html = (
+                '<div style="font-family:sans-serif;max-width:560px;margin:0 auto;border:1px solid #e0e0e0;'
+                'border-radius:8px;overflow:hidden"><div style="background:#e65100;padding:16px 20px">'
+                f'<span style="color:#fff;font-size:18px;font-weight:700">{esc(m["head"])}</span></div>'
+                '<div style="padding:16px 20px;background:#fafafa;font-size:14px;line-height:1.6">'
+                f'<table style="width:100%;border-collapse:collapse">{rows}</table>'
+                f'<p style="margin:14px 0 0"><a href="{esc(m["link"])}">Усі коробки, яких мало →</a></p>'
+                '</div></div>')
+            _send_event_email(ns, m['subject'], html)
+            if recipients(ns):
+                sent.append('лист')
+        except Exception as e:  # noqa: BLE001
+            logger.warning('Мало коробок: email не надіслано: %s', e)
+    if send_tg:
+        try:
+            text = (f'<b>{esc(m["head"])}</b>\n\n'
+                    + '\n'.join(f'• <a href="{esc(i["link"])}">{esc(i["name"])}</a> — {esc(i["line"])}'
+                                + (f' · <a href="{esc(i["buy"])}">де купувати</a>' if i['buy'] else '')
+                                for i in m['items']))
+            _send_telegram(ns, tg_cut(text))
+            sent.append('Telegram')
+        except Exception as e:  # noqa: BLE001
+            logger.warning('Мало коробок: Telegram не надіслано: %s', e)
+    return sent
+
+
 @for_event(lambda shipment, *a, **kw: '' if getattr(shipment, 'jlc_order_id', None) else 'shipment')
 def notify_shipment_status(shipment, old_status, new_status):
     """Send notification when Shipment status changes."""

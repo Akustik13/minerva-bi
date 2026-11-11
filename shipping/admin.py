@@ -6,7 +6,8 @@ from django.utils.translation import gettext_lazy as _
 
 from django import forms
 from django.contrib import admin, messages
-from django.db import models
+from django.db import models, transaction
+from django.db.models import F
 from core.mixins import AuditableMixin
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -60,7 +61,7 @@ def _copy_shipment_file_local(abs_path: str, shipment) -> None:
         pass
 
 from .models import (
-    Carrier, Shipment, ShipmentPackage, PackagingMaterial, OrderPackaging,
+    Carrier, Shipment, ShipmentPackage, PackagingMaterial, PackagingMovement, OrderPackaging,
     ProductPackaging, ShippingSettings, TrackingRule, TrackingAttemptLog,
     AddressBook,
 )
@@ -69,13 +70,55 @@ from .services.registry import get_service
 
 # ── PackagingMaterial Admin ───────────────────────────────────────────────────
 
+class PackagingStockFilter(admin.SimpleListFilter):
+    title = _('Запас на складі')
+    parameter_name = 'stock'
+
+    def lookups(self, request, model_admin):
+        return (('low', _('⚠️ Мало — треба купити')), ('tracked', _('З обліком')), ('untracked', _('Без обліку')))
+
+    def queryset(self, request, queryset):
+        if self.value() == 'low':
+            return queryset.filter(track_stock=True, min_stock__isnull=False, stock_qty__lte=F('min_stock'))
+        if self.value() == 'tracked':
+            return queryset.filter(track_stock=True)
+        if self.value() == 'untracked':
+            return queryset.filter(track_stock=False)
+        return queryset
+
+
+class PackagingMaterialForm(forms.ModelForm):
+    """Прихід і інвентаризація — не поля моделі: кожна зміна запасу йде рухом (shipping/services/packaging_stock)."""
+    receive_qty = forms.IntegerField(
+        label=_('📥 Прийшло (купили), шт'), required=False, min_value=1,
+        help_text=_('Додати до запасу після «Зберегти».'))
+    count_qty = forms.IntegerField(
+        label=_('🧮 Фактично є зараз, шт'), required=False, min_value=0,
+        help_text=_('Інвентаризація: запас стане рівно стільки (різниця — окремим рухом).'))
+    move_note = forms.CharField(label=_('Примітка до руху'), required=False, max_length=200,
+                                help_text=_('Напр. номер рахунку постачальника.'))
+
+    class Meta:
+        model = PackagingMaterial
+        exclude = ('stock_qty', 'stock_since', 'low_notified_at')
+
+    def clean(self):
+        data = super().clean()
+        moving = data.get('receive_qty') or data.get('count_qty') is not None
+        if moving and not data.get('track_stock'):
+            raise forms.ValidationError(_('Щоб змінити запас, увімкніть «Вести облік на складі».'))
+        return data
+
+
 @admin.register(PackagingMaterial)
 class PackagingMaterialAdmin(admin.ModelAdmin):
-    list_display  = ('type_badge', 'name', 'dimensions_col', 'tare_weight_kg',
+    form = PackagingMaterialForm
+    list_display  = ('type_badge', 'name', 'dimensions_col', 'stock_col', 'tare_weight_kg',
                      'max_weight_kg', 'volume_col', 'cost', 'is_active')
-    list_filter   = ('box_type', 'is_active')
+    list_filter   = (PackagingStockFilter, 'box_type', 'is_active')
     list_editable = ('is_active',)
     search_fields = ('name',)
+    readonly_fields = ('stock_panel', 'movements_panel')
 
     fieldsets = (
         ('📦 Упаковка', {
@@ -91,7 +134,66 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
         ('💰 Вартість', {
             'fields': ('cost',),
         }),
+        ('🏬 Запас на складі', {
+            'fields': ('track_stock', 'stock_panel', ('receive_qty', 'count_qty'), 'move_note',
+                       ('min_stock', 'reorder_qty'), 'buy_url', 'movements_panel'),
+            'description': 'Оформлене відправлення з коробкою цих розмірів (±1 см) списує її, скасоване — '
+                           'повертає. Коли залишиться «Мінімальний запас» або менше — повідомлення; кому й куди — '
+                           '«Налаштування доставки» → «📦 Запас коробок».',
+        }),
     )
+
+    def save_model(self, request, obj, form, change):
+        from .services import packaging_stock
+        super().save_model(request, obj, form, change)
+        note = form.cleaned_data.get('move_note') or ''
+        if form.cleaned_data.get('count_qty') is not None:
+            packaging_stock.count(obj, form.cleaned_data['count_qty'], user=request.user, note=note)
+        if form.cleaned_data.get('receive_qty'):
+            packaging_stock.receive(obj, form.cleaned_data['receive_qty'], user=request.user, note=note)
+        if change and 'min_stock' in form.changed_data:
+            transaction.on_commit(lambda: packaging_stock.check_low(obj.pk))
+
+    @admin.display(description=_('На складі'), ordering='stock_qty')
+    def stock_col(self, obj):
+        if not obj.track_stock:
+            return format_html('<span style="color:var(--text-muted,#607d8b)">{}</span>', '—')
+        if obj.is_low:
+            return format_html('<b style="color:var(--err,#f85149)" title="{}">⚠️ {} шт</b>',
+                               _('Мінімум: {}').format(obj.min_stock), obj.stock_qty)
+        return format_html('{} шт', obj.stock_qty)
+
+    @admin.display(description=_('Зараз на складі'))
+    def stock_panel(self, obj):
+        if not obj or not obj.pk:
+            return _('Збережіть коробку — потім можна вписати, скільки їх є.')
+        if not obj.track_stock:
+            return _('Облік не ведеться — увімкніть «Вести облік на складі» і впишіть «Фактично є зараз».')
+        state = (format_html('<b style="color:var(--err,#f85149)">⚠️ {}</b>', _('мало — треба купити'))
+                 if obj.is_low else format_html('<span style="color:var(--ok,#3fb950)">✓ {}</span>', _('вистачає'))
+                 if obj.min_stock is not None else _('мінімум не задано — без повідомлень'))
+        since = timezone.localtime(obj.stock_since).strftime('%d.%m.%Y %H:%M') if obj.stock_since else '—'
+        return format_html('<b style="font-size:16px">{} шт</b> · {} · <span style="color:var(--text-muted,#607d8b)">'
+                           '{} {}</span>', obj.stock_qty, state, _('облік з'), since)
+
+    @admin.display(description=_('Останні рухи'))
+    def movements_panel(self, obj):
+        if not obj or not obj.pk:
+            return '—'
+        moves = list(obj.movements.select_related('shipment', 'user')[:15])
+        if not moves:
+            return _('Рухів ще немає.')
+        rows = format_html_join('', '<tr><td>{}</td><td>{}</td><td style="text-align:right">{}</td>'
+                                    '<td style="text-align:right">{}</td><td>{}</td></tr>', (
+            (timezone.localtime(m.created_at).strftime('%d.%m.%Y %H:%M'), m.get_kind_display(), f'{m.qty:+d}',
+             m.balance,
+             format_html('<a href="{}">{}</a>', reverse('admin:shipping_shipment_detail', args=[m.shipment_id]),
+                         m.note) if m.shipment_id else (m.note + (f' · {m.user}' if m.user_id else '')))
+            for m in moves))
+        more = reverse('admin:shipping_packagingmovement_changelist') + f'?material__id__exact={obj.pk}'
+        return format_html('<table style="font-size:12px;width:100%"><tr><th>{}</th><th>{}</th><th>{}</th>'
+                           '<th>{}</th><th>{}</th></tr>{}</table><a href="{}">{} →</a>',
+                           _('Коли'), _('Що'), _('Шт'), _('Залишок'), _('Деталі'), rows, more, _('Усі рухи'))
 
     def type_badge(self, obj):
         colors = {
@@ -117,6 +219,32 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
     def volume_col(self, obj):
         return format_html('<span style="color:#607d8b">{} см³</span>', obj.volume_cm3)
     volume_col.short_description = _('Об\'єм')
+
+
+@admin.register(PackagingMovement)
+class PackagingMovementAdmin(admin.ModelAdmin):
+    """Журнал запасу коробок — лише перегляд: рухи пишуть відправлення й картка коробки."""
+    list_display = ('created_at', 'material', 'kind', 'qty', 'balance', 'shipment_link', 'note', 'user')
+    list_filter = ('kind', 'material')
+    search_fields = ('note', 'material__name', 'shipment__tracking_number')
+    list_select_related = ('material', 'shipment', 'user')
+    date_hierarchy = 'created_at'
+
+    @admin.display(description=_('Відправлення'))
+    def shipment_link(self, obj):
+        if not obj.shipment_id:
+            return '—'
+        return format_html('<a href="{}">{}</a>', reverse('admin:shipping_shipment_detail', args=[obj.shipment_id]),
+                           obj.shipment.tracking_number or f'#{obj.shipment_id}')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 # ── Carrier Admin ─────────────────────────────────────────────────────────────
@@ -7961,9 +8089,19 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
     """Singleton — налаштування доставки."""
 
     readonly_fields = ("last_tracking_run", "tracking_actions", "tracking_rules_panel",
-                       "tracking_log_link", "packaging_sync_panel")
+                       "tracking_log_link", "packaging_sync_panel", "packaging_stock_panel")
 
     fieldsets = [
+        ("📦 Запас коробок", {
+            "fields": ("packaging_alert_enabled", ("packaging_alert_email", "packaging_alert_telegram"),
+                       "packaging_alert_repeat_days", "packaging_stock_panel"),
+            "description": (
+                "Коробки з «Вести облік на складі»: оформлене відправлення списує коробку його розмірів, "
+                "скасоване — повертає. Коли залишиться «Мінімальний запас» або менше — повідомлення "
+                "«📦 Мало коробок». Кому на пошту й у які Telegram-чати — «Налаштування → Сповіщення» → "
+                "«🗺 Хто що отримує», рядок «📦 Мало коробок»."
+            ),
+        }),
         ("📦 Синхронізація упаковок", {
             "fields": ("packaging_sync_panel",),
             "description": (
@@ -8178,8 +8316,61 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self._sync_packaging),
                 name="shipping_shippingsettings_sync_packaging",
             ),
+            path(
+                "<int:pk>/packaging-alert/",
+                self.admin_site.admin_view(self._packaging_alert_now),
+                name="shipping_shippingsettings_packaging_alert",
+            ),
         ]
         return custom + urls
+
+    @admin.display(description=_("Коробки з обліком"))
+    def packaging_stock_panel(self, obj):
+        mats = list(PackagingMaterial.objects.filter(track_stock=True).order_by("name"))
+        changelist = reverse("admin:shipping_packagingmaterial_changelist")
+        if not mats:
+            return format_html('{} <a href="{}">{} →</a>', _("Жодна коробка ще не має обліку на складі."),
+                               changelist, _("Пакувальні матеріали"))
+        rows = format_html_join("", '<tr><td><a href="{}">{}</a></td><td style="text-align:right">{}</td>'
+                                    '<td style="text-align:right">{}</td><td>{}</td></tr>', (
+            (reverse("admin:shipping_packagingmaterial_change", args=[m.pk]), str(m), m.stock_qty,
+             m.min_stock if m.min_stock is not None else "—",
+             "⚠️ " + str(_("мало")) if m.is_low else ("✓" if m.min_stock is not None else "—"))
+            for m in mats))
+        routes = reverse("admin:config_notificationsettings_changelist")
+        send = format_html(
+            '<button type="submit" form="pkg-alert-form" class="button" style="margin-top:8px">{}</button>',
+            _("🔔 Надіслати зараз про коробки, яких мало"))
+        return format_html(
+            '<table style="font-size:12px;min-width:360px"><tr><th>{}</th><th>{}</th><th>{}</th><th></th></tr>{}'
+            '</table>{}<div class="help">{} <a href="{}">{} →</a></div>'
+            '<script>(function(){{var f=document.createElement("form");f.id="pkg-alert-form";f.method="post";'
+            'f.action="{}";f.style.display="none";var c=document.querySelector("[name=csrfmiddlewaretoken]");'
+            'if(c){{var i=document.createElement("input");i.type="hidden";i.name=c.name;i.value=c.value;'
+            'f.appendChild(i);}}document.body.appendChild(f);}})();</script>',
+            _("Коробка"), _("На складі"), _("Мінімум"), rows, send,
+            _("Кому на пошту й у які чати —"), routes, _("Хто що отримує"),
+            reverse("admin:shipping_shippingsettings_packaging_alert", args=[obj.pk if obj else 1]))
+
+    def _packaging_alert_now(self, request, pk):
+        """POST «🔔 Надіслати зараз»: «📦 Мало коробок» про всі коробки, яких мало (право змінювати налаштування)."""
+        back = redirect(reverse("admin:shipping_shippingsettings_change", args=[pk]))
+        if request.method != "POST":
+            return back
+        if not self.has_change_permission(request):
+            messages.error(request, _("Немає права змінювати налаштування доставки."))
+            return back
+        from .services import packaging_stock
+        low, sent = packaging_stock.send_now()
+        if not low:
+            messages.info(request, _("Зараз усіх коробок достатньо — повідомляти нема про що."))
+        elif sent:
+            messages.success(request, _("📦 Надіслано ({}) про: {}").format(", ".join(sent),
+                                                                          ", ".join(str(m) for m in low)))
+        else:
+            messages.warning(request, _("Не надіслано: увімкніть ✉️ / 💬 тут і пошту / Telegram у «Налаштування → "
+                                        "Сповіщення» (SMTP, бот, адреси)."))
+        return back
 
     def _redirect_singleton(self, request):
         obj = ShippingSettings.get()

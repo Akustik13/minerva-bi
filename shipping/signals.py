@@ -110,3 +110,47 @@ def connect_parcel_signals():
 
 
 connect_parcel_signals()
+
+
+# ── 📦 Запас коробок (shipping/services/packaging_stock.py) ────────────────────
+
+from django.db.models.signals import post_delete as _post_delete
+
+from .models import ShipmentPackage
+
+
+def _sync_boxes_later(shipment_pk):
+    """Після commit (статус і коробки вже записані): списати / повернути коробки відправлення."""
+    from django.db import transaction
+
+    def run():
+        try:
+            from shipping.services import packaging_stock
+            if packaging_stock.tracked_exist():
+                s = Shipment.objects.filter(pk=shipment_pk).first()
+                if s is not None:
+                    packaging_stock.sync_shipment(s)
+        except Exception:
+            _log.exception("Packaging stock: shipment %s not synced", shipment_pk)
+    transaction.on_commit(run)
+
+
+@receiver(_post_save, sender=Shipment)
+def _packaging_stock_shipment(sender, instance, created, **kwargs):
+    """Оформили / скасували / змінили стан посилки від нас — коробки зі складу коробок."""
+    from shipping.services.packaging_stock import USED
+    old = getattr(instance, "_old_ship_status", None)
+    if getattr(instance, "direction", "out") == "in":
+        return
+    if instance.status in USED or old in USED:
+        _sync_boxes_later(instance.pk)
+
+
+@receiver(_post_save, sender=ShipmentPackage)
+@receiver(_post_delete, sender=ShipmentPackage)
+def _packaging_stock_package(sender, instance, **kwargs):
+    """Змінились коробки вже оформленої посилки — перерахувати списане."""
+    from shipping.services.packaging_stock import USED
+    s = Shipment.objects.filter(pk=instance.shipment_id).values("status", "direction").first()
+    if s and s["direction"] != "in" and s["status"] in USED:
+        _sync_boxes_later(instance.shipment_id)

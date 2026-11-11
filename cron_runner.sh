@@ -71,6 +71,7 @@ while true; do
     python manage.py track_shipments 2>&1 || true
     LAST_TRACK=$(date +%s)
   fi
+  python manage.py packaging_stock_alerts 2>&1 || true   # 📦 коробок досі мало → нагадати (лише з «Нагадувати кожні N днів»)
 
   # ── JLCPCB синхронізація — інтервал з JLCConfig.sync_interval_hours в БД ──
   python manage.py sync_jlc_orders 2>&1 || true

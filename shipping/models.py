@@ -632,6 +632,26 @@ class PackagingMaterial(models.Model):
     notes  = models.TextField('Нотатки', blank=True, default='')
     is_active = models.BooleanField('Активна', default=True)
 
+    # ── Запас на складі (shipping/services/packaging_stock.py) ────────────────
+    track_stock = models.BooleanField(
+        'Вести облік на складі', default=False,
+        help_text='Скільки таких коробок є. Оформлене відправлення з коробкою цих розмірів списує її, '
+                  'скасоване — повертає; прихід і інвентаризація — у картці.')
+    stock_qty = models.IntegerField('На складі, шт', default=0)
+    min_stock = models.PositiveIntegerField(
+        'Мінімальний запас, шт', null=True, blank=True,
+        help_text='Залишилось стільки або менше — повідомлення «мало, треба купити» '
+                  '(кому й куди — «Налаштування доставки» → «📦 Запас коробок»). Порожньо — без повідомлень.')
+    reorder_qty = models.PositiveIntegerField(
+        'Скільки докуповувати, шт', null=True, blank=True,
+        help_text='Підказка в повідомленні «мало коробок».')
+    buy_url = models.URLField('Де купувати', max_length=500, blank=True, default='',
+                              help_text='Посилання на товар у постачальника — буде в повідомленні.')
+    stock_since = models.DateTimeField(
+        'Облік з', null=True, blank=True,
+        help_text='Відправлення, оформлені раніше, коробку не списують (вони вже враховані в кількості).')
+    low_notified_at = models.DateTimeField('Попередили «мало»', null=True, blank=True)
+
     class Meta:
         verbose_name        = 'Пакувальний матеріал'
         verbose_name_plural = 'Пакувальні матеріали'
@@ -643,14 +663,53 @@ class PackagingMaterial(models.Model):
     def save(self, *args, **kwargs):
         if not self.name and self.length_cm and self.width_cm and self.height_cm:
             self.name = self._dim_str()
+        if self.track_stock and not self.stock_since:      # облік почався зараз — давні відправлення не списують
+            from django.utils import timezone
+            self.stock_since = timezone.now()
+        elif not self.track_stock:
+            self.stock_since = None
         super().save(*args, **kwargs)
 
     @property
     def volume_cm3(self):
         return round(float(self.length_cm) * float(self.width_cm) * float(self.height_cm), 1)
 
+    @property
+    def is_low(self):
+        return bool(self.track_stock and self.min_stock is not None and self.stock_qty <= self.min_stock)
+
     def __str__(self):
         return self.name or self._dim_str()
+
+
+class PackagingMovement(models.Model):
+    """Рух запасу коробки: прихід, списання відправленням, повернення (відправлення скасовано), інвентаризація.
+    Залишок — PackagingMaterial.stock_qty; тут — журнал з балансом після руху."""
+
+    class Kind(models.TextChoices):
+        PURCHASE = 'purchase', '📥 Прихід'
+        SHIPMENT = 'shipment', '📦 Відправлення'
+        RETURN   = 'return',   '↩ Повернення (відправлення скасовано)'
+        ADJUST   = 'adjust',   '🧮 Інвентаризація'
+
+    material = models.ForeignKey(PackagingMaterial, on_delete=models.CASCADE, related_name='movements',
+                                 verbose_name='Коробка')
+    kind = models.CharField('Що', max_length=12, choices=Kind.choices)
+    qty = models.IntegerField('Кількість', help_text='+ прихід, − списання')
+    balance = models.IntegerField('Залишок після')
+    shipment = models.ForeignKey(Shipment, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='packaging_movements', verbose_name='Відправлення')
+    note = models.CharField('Примітка', max_length=255, blank=True, default='')
+    user = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Хто')
+    created_at = models.DateTimeField('Коли', auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Рух коробок'
+        verbose_name_plural = 'Рухи коробок'
+        ordering            = ['-created_at', '-pk']
+
+    def __str__(self):
+        return f'{self.material} {self.qty:+d} → {self.balance}'
 
 
 class ProductPackaging(models.Model):
@@ -843,6 +902,18 @@ class ShippingSettings(models.Model):
         "Для яких джерел (магазинів)", default=default_shop_confirm_sources, blank=True,
         help_text="DigiKey — підтвердження через DigiKey API (автоматично або вручну). "
                   "Інші — замовлення позначається як «Відправлено» в Minerva.",
+    )
+
+    # ── 📦 Запас коробок (shipping/services/packaging_stock.py) ───────────────
+    packaging_alert_enabled = models.BooleanField(
+        "Повідомляти, коли коробок мало", default=True,
+        help_text="Коли запас коробки (з обліком на складі) опускається до її «Мінімального запасу».",
+    )
+    packaging_alert_email = models.BooleanField("✉️ Листом", default=True)
+    packaging_alert_telegram = models.BooleanField("💬 У Telegram", default=True)
+    packaging_alert_repeat_days = models.PositiveSmallIntegerField(
+        "Нагадувати кожні N днів", default=0,
+        help_text="Поки коробок мало — нагадувати знову через стільки днів. 0 — лише раз.",
     )
 
     @classmethod

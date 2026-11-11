@@ -62,6 +62,9 @@ EVENTS = (
     Event("incoming", "📥 Вхідну посилку доставлено", "трекінг показав «Доставлено» для посилки до нас із закупівлею",
           ext=("inventory.InventorySettings", "incoming_notify_email", "incoming_notify_telegram",
                "admin:inventory_inventorysettings_changelist", "Налаштування складу")),
+    Event("packaging", "📦 Мало коробок", "запас коробки (з обліком на складі) дійшов до її мінімуму — треба купити",
+          ext=("shipping.ShippingSettings", "packaging_alert_email", "packaging_alert_telegram",
+               "admin:shipping_shippingsettings_changelist", "Налаштування доставки → 📦 Запас коробок")),
 )
 BY_KEY = {e.key: e for e in EVENTS}
 
