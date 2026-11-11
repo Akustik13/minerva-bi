@@ -115,24 +115,31 @@
   </dialog>
   <dialog id="pjx-export" class="pjp-dlg" aria-labelledby="pjx-export-h">
     <h3 id="pjx-export-h">📤 Експорт і лист</h3>
-    <p class="pjp-hint" data-x-what></p>
-    <div class="pjp-grid">
-      <label class="pjp-inline"><input type="checkbox" data-x="pdf" checked> PDF</label>
-      <label class="pjp-inline" data-x-only="plan"><input type="checkbox" data-x="table" checked> таблиця кроків у PDF</label>
-      <label class="pjp-inline"><input type="checkbox" data-x="png"> картинка PNG</label>
-      <label class="pjp-inline" data-x-only="plan"><input type="checkbox" data-x="xlsx"> Excel (план по тижнях)</label>
-      <label>Мова документа <select data-x="lang">
-        <option value="de">Deutsch</option><option value="en">English</option><option value="uk">Українська</option>
-      </select></label>
+    <p class="pjx-what" data-x-what></p>
+    <div class="pjx-step">1. Які файли</div>
+    <div class="pjx-opts" role="group" aria-label="Які файли">
+      <label class="pjx-opt"><input type="checkbox" data-x="pdf" checked>
+        <span><b>📄 PDF</b><small>діаграма такою, як зараз на екрані, на білому тлі — для клієнта чи друку</small></span></label>
+      <label class="pjx-opt pjx-sub" data-x-only="plan"><input type="checkbox" data-x="table" checked>
+        <span><b>＋ таблиця кроків у PDF</b><small>окрема сторінка: фаза, крок, хто, початок, кінець, стан</small></span></label>
+      <label class="pjx-opt"><input type="checkbox" data-x="png">
+        <span><b>🖼 Картинка PNG</b><small>та сама діаграма — вставити в презентацію чи текст листа</small></span></label>
+      <label class="pjx-opt" data-x-only="plan"><input type="checkbox" data-x="xlsx">
+        <span><b>📊 Excel</b><small>план по тижнях: кроки, дати, смуги кольором стану, ◆ віхи</small></span></label>
     </div>
-    <p class="pjp-hint">Діаграма — як зараз на екрані (масштаб, «Коротко / Детально»), на білому тлі. «✉️ Надіслати
-      листом» відкриє новий лист з вашої скриньки з цими файлами — адресу й текст ви перевірите перед надсиланням.</p>
+    <div class="pjx-step">2. Мова документа <select data-x="lang">
+        <option value="de">Deutsch</option><option value="en">English</option><option value="uk">Українська</option>
+      </select> <small>заголовки, стани, дати й текст листа; назви кроків — як ви їх написали</small></div>
+    <div class="pjx-step">3. Що далі</div>
+    <p class="pjx-files" data-x-files></p>
     <div class="pjp-foot">
-      <button type="button" class="pjc-b pri" data-x-send>✉️ Надіслати листом</button>
-      <button type="button" class="pjc-b" data-pjp-save>⬇ Завантажити</button>
+      <button type="button" class="pjc-b pri" data-pjp-save>⬇ Завантажити</button>
+      <button type="button" class="pjc-b" data-x-send>✉️ Надіслати листом…</button>
       <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
       <span class="pjc-merr" role="alert" data-pjp-err></span>
     </div>
+    <p class="pjp-hint">«✉️ Надіслати листом…» відкриє новий лист з вашої скриньки в новій вкладці: файли вже вкладені,
+      «Кому» — клієнт проєкту. Перевірте адресу й текст і надішліть самі — без вас нічого не відправляється.</p>
   </dialog>
   <dialog id="pjh-talk" class="pjp-dlg" aria-labelledby="pjh-talk-h">
     <h3 id="pjh-talk-h">📝 Про що йшла мова</h3>
@@ -146,6 +153,20 @@
     <div class="pjp-foot">
       <button type="button" class="pjc-b pri" data-pjp-save>✓ Зберегти</button>
       <button type="button" class="pjc-b" data-pt-skip>Без опису</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+    </div>
+  </dialog>
+  <dialog id="pjr-ai-ask" class="pjp-dlg" aria-labelledby="pjr-ai-ask-h">
+    <h3 id="pjr-ai-ask-h">🧠 AI-аналіз ризиків</h3>
+    <p class="pjp-hint">AI дивиться, що вже було й де проєкт зараз — план із прогнозом, закупівлі й виробництво, сторони,
+      «потребує уваги», ваші листи (з «📅 Листи для AI — з») і вже відомі ризики — і пропонує нові. Кожен ви
+      приймаєте ✓ чи відхиляєте ✗; сам AI нічого не змінює.</p>
+    <label class="pjp-wide">Що врахувати
+      <textarea data-ra="wish" rows="6" maxlength="2000"
+        placeholder="Наприклад: у Cavli єдине джерело модулів U3 — строк поставки плаває. Клієнт хоче серію до березня, а сертифікацію CE ще не почали. Нарада 05.11 відбулась — погодили схему."></textarea></label>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>🧠 Аналізувати</button>
       <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
       <span class="pjc-merr" role="alert" data-pjp-err></span>
     </div>

@@ -402,3 +402,37 @@
 .pjy-k-bad { border-color: var(--err); }
 .pjy-k-warn { border-color: var(--warn); }
 .pjy-k-ok { border-color: var(--ok); }
+
+/* 🧠 AI-аналіз ризиків у вкладці «⚠️ Ризики» */
+.pjr-ai { margin: 6px 0 10px; padding: 8px 10px; border: 1px dashed var(--border-strong); border-radius: 8px; }
+.pjr-ai-sum { margin: 6px 0; padding: 8px 10px; border-radius: 8px; background: var(--accent2-subtle); color: var(--body-fg); }
+
+/* 📤 Вікно «Експорт і лист» */
+.pjx-what { margin: 0 0 8px; font-weight: 600; color: var(--body-fg); }
+.pjx-step { margin: 10px 0 6px; font-weight: 600; color: var(--body-fg); }
+.pjx-step select { margin-left: 6px; }
+.pjx-step small { display: block; margin-top: 3px; font-weight: 400; color: var(--text-muted); }
+.pjx-opts { display: grid; gap: 6px; }
+.pjx-opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--border-strong);
+  border-radius: 8px; cursor: pointer; }
+.pjx-opt:has(input:checked) { border-color: var(--accent); background: var(--accent2-subtle); }
+.pjx-opt input { margin-top: 3px; flex: none; }
+.pjx-opt b { display: block; color: var(--body-fg); }
+.pjx-opt small { color: var(--text-muted); }
+.pjx-sub { margin-left: 28px; }
+.pjx-opt:has(input:disabled) { opacity: .55; cursor: default; }
+.pjx-files { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--bg-card);
+  border: 1px dashed var(--border-strong); color: var(--body-fg); word-break: break-word; }
+
+/* 📋 Класична діаграма: виділена смуга (подвійний клік), краї, панель, новий крок Shift + протягнути */
+.pjg2-sel .pjg2-bar, .pjg2-sel .pjg2-mile { stroke: var(--accent); stroke-width: 2.5; }
+.pjg2-selbox { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 4 3; }
+.pjg2-hbig { fill: var(--accent); opacity: .9; cursor: ew-resize; }
+.pjg2-hs { cursor: ew-resize; }
+.pjg2-pdrag { cursor: grab; }
+.pjg2-ghost { fill: var(--accent); opacity: .35; }
+.pjg2-tools { position: absolute; z-index: 5; display: flex; flex-wrap: nowrap; gap: 4px; align-items: center;
+  padding: 3px 5px; border-radius: 8px; background: var(--bg-card); border: 1px solid var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .25); white-space: nowrap; }
+.pjg2-tools .pjc-b { padding: 1px 7px; font-size: 12px; }
+.pjg2-thint { font-size: 11px; color: var(--text-muted); margin-left: 4px; }

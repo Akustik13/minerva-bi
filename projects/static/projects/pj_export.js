@@ -107,7 +107,8 @@
   function fileName(title, kind, ext) {
     var d = new Date(), day = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
     var base = String(title || 'project').split(' · ')[0].replace(/[^\w.-]+/g, '_');
-    return base + '_' + kind + '_' + day + '.' + ext;
+    var word = {plan: 'Projektplan', timeline: 'Projektverlauf', chain: 'Projektbeteiligte'}[kind] || kind;
+    return base + '_' + word + '_' + day + '.' + ext;          // як projects/export.py file_name
   }
   window.PJExport = {png: png, save: save, fileName: fileName};
 })();

@@ -75,6 +75,19 @@ def _date_text(d, lang) -> str:
     return d.isoformat() if lang == "en" else d.strftime("%d.%m.%Y")
 
 
+def zip_name(project, what, today=None) -> str:
+    return file_name(project, what, "zip", today)
+
+
+def zip_files(files) -> bytes:
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name, data, _ctype in files:
+            zf.writestr(name, data)
+    return buf.getvalue()
+
+
 def file_name(project, what, ext, today=None) -> str:
     today = today or timezone.localdate()
     return f"{project.code}_{WHATS[what]['file']}_{today.isoformat()}.{ext}"

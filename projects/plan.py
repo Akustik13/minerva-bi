@@ -467,6 +467,41 @@ def move_step(project, step_id, start=None, end=None) -> ProjectStep:
     return step
 
 
+@transaction.atomic
+def shift_phase(project, phase_id, days) -> tuple:
+    """📋 Фазу перетягнули мишкою: невиконані кроки фази — на days днів (планові дати; без своїх дат — від прогнозу),
+    власні дати фази теж. Виконані й пропущені кроки — як були (це вже історія). → (фаза, скільки кроків зсунуто)."""
+    phase = ProjectPhase.objects.filter(project=project, pk=phase_id).first()
+    if phase is None:
+        raise PlanError("Фазу не знайдено")
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        raise PlanError("Скільки днів?") from None
+    if not days or abs(days) > 999:
+        raise PlanError("Зсув — від 1 до 999 днів")
+    delta, moved = timedelta(days=days), 0
+    for s in ProjectStep.objects.filter(project=project, phase=phase):
+        if (s.eff_status or s.status) in (ProjectStep.DONE, ProjectStep.SKIPPED):
+            continue
+        start, end = s.start or s.f_start, s.end or s.f_end
+        if end is None and start is None:
+            continue
+        if s.kind == ProjectStep.MILESTONE:
+            s.start, s.end = None, (end or start) + delta
+        else:
+            start, end = start or end, end or start
+            s.start, s.end = start + delta, end + delta
+            s.duration_days = (s.end - s.start).days + 1
+        s.save(update_fields=["start", "end", "duration_days", "updated_at"])
+        moved += 1
+    if phase.start or phase.end:
+        phase.start = phase.start + delta if phase.start else None
+        phase.end = phase.end + delta if phase.end else None
+        phase.save(update_fields=["start", "end"])
+    return phase, moved
+
+
 def save_phase(project, data) -> ProjectPhase:
     name = " ".join(str(data.get("name") or "").split())[:120]
     if not name:

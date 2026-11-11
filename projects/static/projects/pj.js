@@ -136,6 +136,16 @@
     });
     return out;
   }
+  // Виділена смуга класичної діаграми (подвійний клік): {type: 'step' | 'phase', id} — краї, панель, клавіші
+  var gsel = null, clickTimer = 0;
+  function selectBar(type, id) {
+    gsel = type ? {type: type, id: String(id)} : null;
+    drawClassic();
+  }
+  function laterOpen(fn) {                       // клік — через мить: подвійний клік його скасовує
+    clearTimeout(clickTimer);
+    clickTimer = setTimeout(fn, 260);
+  }
   function drawClassic() {
     var holder = root.querySelector('[data-pjg-pane="classic"]'), node = root.querySelector('#pjg-data');
     if (!holder || !node || holder.hidden) return;
@@ -233,21 +243,32 @@
     });
     var depLayer = sv('g', {'class': 'pjg2-deps'});      // стрілки — під смугами, над фоном
     svg.appendChild(depLayer);
-    var pos = {};
+    var pos = {}, selPos = null;
     rows.forEach(function (r, i) {
       if (!r.start || !r.end) return;
       var y = GHEAD + i * ROW, s = dnum(r.start), e = dnum(r.end);
       var x1 = X(s), x2 = X(e + 1), g;
       if (r.type === 'phase') {
-        g = sv('g', {'class': 'pjg2-sum pjg2-s-' + r.status, 'data-cphase': r.id || 'none'});
+        var psel = gsel && gsel.type === 'phase' && gsel.id === String(r.id || 'none') && r.id;
+        g = sv('g', {'class': 'pjg2-sum pjg2-s-' + r.status + (psel ? ' pjg2-sel pjg2-pdrag' : ''),
+                     'data-cphase': r.id || 'none'});
+        if (psel) {
+          g.appendChild(sv('rect', {x: x1 - 3, y: y + 3, width: Math.max(x2 - x1, 2) + 6, height: ROW - 6, rx: 4,
+                                    'class': 'pjg2-selbox'}));
+          selPos = {x: x1, y: y};
+        }
         g.appendChild(sv('rect', {x: x1, y: y + 9, width: Math.max(x2 - x1, 2), height: 6, 'class': 'pjg2-sumbar'}));
         g.appendChild(sv('path', {d: 'M' + x1 + ',' + (y + 15) + ' l5,0 l-5,6 z', 'class': 'pjg2-sumbar'}));
         g.appendChild(sv('path', {d: 'M' + x2 + ',' + (y + 15) + ' l-5,0 l5,6 z', 'class': 'pjg2-sumbar'}));
-        g.appendChild(sv('title', {}, r.title + ' · ' + dshort(r.start) + ' – ' + dshort(r.end)));
+        g.appendChild(sv('title', {}, r.title + ' · ' + dshort(r.start) + ' – ' + dshort(r.end)
+          + (canChange && r.id ? '\nПодвійний клік — виділити фазу й тягнути її разом з кроками' : '')));
         svg.appendChild(g);
         return;
       }
-      g = sv('g', {'class': 'pjg2-task pjg2-' + r.status + (r.crit ? ' pjg2-crit' : ''), 'data-cstep': r.id});
+      var sel = gsel && gsel.type === 'step' && gsel.id === String(r.id);
+      g = sv('g', {'class': 'pjg2-task pjg2-' + r.status + (r.crit ? ' pjg2-crit' : '') + (sel ? ' pjg2-sel' : ''),
+                   'data-cstep': r.id});
+      if (sel) selPos = {x: x1, y: y};
       if (r.bstart && r.bend) {
         g.appendChild(sv('rect', {x: X(dnum(r.bstart)), y: y + 20, width: Math.max(X(dnum(r.bend) + 1) - X(dnum(r.bstart)), 2),
                                   height: 3, 'class': 'pjg2-base'}));
@@ -258,7 +279,10 @@
         pos[r.id] = {x1: mx - 8, x2: mx + 8, y: y + 13};
       } else {
         g.appendChild(sv('rect', {x: x1, y: y + 5, width: Math.max(x2 - x1, 3), height: 15, rx: 3, 'class': 'pjg2-bar'}));
-        if (canChange && r.status !== 'done' && r.status !== 'skipped') {
+        if (canChange && sel) {                   // виділена: обидва краї — початок і кінець
+          g.appendChild(sv('rect', {x: x1 - 4, y: y + 2, width: 9, height: 21, rx: 2, 'class': 'pjg2-hs pjg2-hbig'}));
+          g.appendChild(sv('rect', {x: x2 - 5, y: y + 2, width: 9, height: 21, rx: 2, 'class': 'pjg2-h pjg2-hbig'}));
+        } else if (canChange && r.status !== 'done' && r.status !== 'skipped') {
           g.appendChild(sv('rect', {x: Math.max(x2 - 6, x1), y: y + 5, width: 6, height: 15, 'class': 'pjg2-h'}));
         }
         pos[r.id] = {x1: x1, x2: x2, y: y + 12.5};
@@ -271,8 +295,9 @@
       }
       g.appendChild(sv('title', {}, r.n + ' ' + r.title + ' · ' + dshort(r.start) + ' – ' + dshort(r.end)
         + (r.crit ? ' · критичний шлях' : '') + (r.slip > 0 ? ' · +' + r.slip + ' дн. від базового плану' : '')
-        + (r.note ? '\n' + r.note : '') + (canChange ? '\nТягніть — нові дати · правий клік — меню' : '')));
-      if (canChange && r.status !== 'done' && r.status !== 'skipped') g.classList.add('pjg2-drag');
+        + (r.note ? '\n' + r.note : '')
+        + (canChange ? '\nТягніть — нові дати · подвійний клік — тягнути початок і кінець · правий клік — меню' : '')));
+      if (canChange && (sel || (r.status !== 'done' && r.status !== 'skipped'))) g.classList.add('pjg2-drag');
       svg.appendChild(g);
     });
     // Залежності: від кінця попереднього кроку до початку наступного
@@ -306,6 +331,17 @@
     function dayAt(clientX) {
       return lo + Math.floor((clientX - chart.getBoundingClientRect().left + chart.scrollLeft) / ppd);
     }
+    function rowAt(clientY) {
+      var i = Math.floor((clientY - svg.getBoundingClientRect().top - GHEAD) / ROW);
+      return i >= 0 && i < rows.length ? rows[i] : null;
+    }
+    function phaseOf(r) {
+      if (!r) return defaultPhase();
+      var ph = r.type === 'phase' ? r.id : r.phase;
+      return ph && ph !== 'none' ? ph : '';
+    }
+    if (gsel && selPos && canChange) selTools(chart, selPos);
+    else if (gsel && !selPos) gsel = null;          // виділеного вже немає (видалили, згорнули)
 
     // Масштаб: Ctrl + коліщатко (щипок на тачпаді) — довкола курсора
     chart.addEventListener('wheel', function (ev) {
@@ -323,15 +359,22 @@
     rows.forEach(function (r) { if (r.type === 'step') byId[r.id] = r; });
     svg.addEventListener('pointerdown', function (ev) {
       if (ev.button !== 0) return;
+      var pg = ev.target.closest('g.pjg2-pdrag');
+      if (pg && canChange) { dragPhase(ev, pg); return; }
       var g = ev.target.closest('g.pjg2-drag');
       if (!g) {
         if (ev.target.closest('g[data-cstep],g[data-cphase]')) return;
-        var p0 = {x: ev.clientX, left: chart.scrollLeft};              // фон — прокрутка
+        if (ev.shiftKey && canChange) { drawNew(ev); return; }
+        var p0 = {x: ev.clientX, left: chart.scrollLeft, moved: false};   // фон — прокрутка
         chart.classList.add('pjg2-grab');
         svg.setPointerCapture(ev.pointerId);
-        var mv = function (e2) { chart.scrollLeft = p0.left - (e2.clientX - p0.x); };
+        var mv = function (e2) {
+          if (Math.abs(e2.clientX - p0.x) > 3) p0.moved = true;
+          chart.scrollLeft = p0.left - (e2.clientX - p0.x);
+        };
         var up = function () {
           chart.classList.remove('pjg2-grab');
+          if (!p0.moved && gsel) selectBar(null);          // клік повз — зняти виділення
           svg.removeEventListener('pointermove', mv);
           svg.removeEventListener('pointerup', up);
           svg.removeEventListener('pointercancel', up);
@@ -344,20 +387,27 @@
       var r = byId[g.getAttribute('data-cstep')];
       if (!r) return;
       var resize = ev.target.classList.contains('pjg2-h'), x0 = ev.clientX, s0 = dnum(r.start), e0 = dnum(r.end);
+      var front = ev.target.classList.contains('pjg2-hs');            // лівий край виділеної смуги — початок
       var bar = g.querySelector('.pjg2-bar'), w0 = bar ? +bar.getAttribute('width') : 0, delta = 0;
+      var bx0 = bar ? +bar.getAttribute('x') : 0;
       var tip = document.createElement('div');
       tip.className = 'pjg2-tip';
       chart.appendChild(tip);
       g.setPointerCapture(ev.pointerId);
       ev.preventDefault();
       function dates() {
+        if (front) return [Math.min(s0 + delta, e0), e0];
         var ns = resize ? s0 : s0 + delta, ne = Math.max(e0 + delta, ns);
         if (r.kind === 'milestone') ns = ne = e0 + delta;
         return [ns, ne];
       }
       function onMove(e2) {
         delta = Math.round((e2.clientX - x0) / ppd);
-        if (resize && bar) bar.setAttribute('width', Math.max(w0 + delta * ppd, ppd));
+        if (front && bar) {
+          var d2 = Math.min(delta, e0 - s0);
+          bar.setAttribute('x', bx0 + d2 * ppd);
+          bar.setAttribute('width', Math.max(w0 - d2 * ppd, ppd));
+        } else if (resize && bar) bar.setAttribute('width', Math.max(w0 + delta * ppd, ppd));
         else g.setAttribute('transform', 'translate(' + (delta * ppd) + ',0)');
         var nd = dates();
         tip.textContent = r.kind === 'milestone' ? '◆ ' + dshort(diso(nd[1]))
@@ -371,7 +421,10 @@
         g.removeEventListener('pointerup', onUp);
         g.removeEventListener('pointercancel', onUp);
         tip.remove();
-        if (!delta) { openStep(r.id); return; }
+        if (!delta) {
+          if (!(gsel && gsel.id === String(r.id))) laterOpen(function () { openStep(r.id); });
+          return;
+        }
         var nd = dates();
         moveStep(r.id, diso(nd[0]), diso(nd[1]), drawClassic);
       }
@@ -381,8 +434,75 @@
     });
     svg.addEventListener('click', function (ev) {          // виконаний крок не тягнеться — клік відкриває вікно
       var g = ev.target.closest('g[data-cstep]');
-      if (g && canChange && !g.classList.contains('pjg2-drag')) openStep(g.getAttribute('data-cstep'));
+      if (g && canChange && !g.classList.contains('pjg2-drag')) {
+        laterOpen(function () { openStep(g.getAttribute('data-cstep')); });
+      }
     });
+    svg.addEventListener('dblclick', function (ev) {      // подвійний клік: виділити смугу / фазу; порожньо — новий крок
+      if (!canChange) return;
+      clearTimeout(clickTimer);
+      ev.preventDefault();
+      var g = ev.target.closest('g[data-cstep]'), ph = ev.target.closest('g[data-cphase]');
+      if (g) { selectBar('step', g.getAttribute('data-cstep')); return; }
+      if (ph) {
+        if (ph.getAttribute('data-cphase') !== 'none') selectBar('phase', ph.getAttribute('data-cphase'));
+        return;
+      }
+      openStep('', {phase: phaseOf(rowAt(ev.clientY)), start: diso(dayAt(ev.clientX))});
+    });
+    function dragPhase(ev, pg) {                           // виділена фаза: тягнути — усі невиконані кроки разом
+      var x0 = ev.clientX, delta = 0, id = pg.getAttribute('data-cphase');
+      var tip = document.createElement('div');
+      tip.className = 'pjg2-tip';
+      chart.appendChild(tip);
+      pg.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+      function mv(e2) {
+        delta = Math.round((e2.clientX - x0) / ppd);
+        pg.setAttribute('transform', 'translate(' + (delta * ppd) + ',0)');
+        tip.textContent = (delta > 0 ? '+' : '') + delta + ' дн.';
+        tip.style.left = (e2.clientX - chart.getBoundingClientRect().left + chart.scrollLeft + 12) + 'px';
+        tip.style.top = (e2.clientY - chart.getBoundingClientRect().top - 28) + 'px';
+        tip.hidden = !delta;
+      }
+      function up() {
+        pg.removeEventListener('pointermove', mv);
+        pg.removeEventListener('pointerup', up);
+        pg.removeEventListener('pointercancel', up);
+        tip.remove();
+        if (!delta) return;
+        send(box().dataset.planBase + 'phase/' + id + '/shift/', {days: delta})
+          .then(function (j) { if (!done(j)) drawClassic(); });
+      }
+      pg.addEventListener('pointermove', mv);
+      pg.addEventListener('pointerup', up);
+      pg.addEventListener('pointercancel', up);
+    }
+    function drawNew(ev) {                                 // Shift + протягнути по порожньому — намалювати новий крок
+      var r0 = rowAt(ev.clientY), d0 = dayAt(ev.clientX), d1 = d0;
+      var i = r0 ? rows.indexOf(r0) : 0, y = GHEAD + Math.max(i, 0) * ROW;
+      var ghost = sv('rect', {x: X(d0), y: y + 5, width: ppd, height: 15, rx: 3, 'class': 'pjg2-ghost'});
+      svg.appendChild(ghost);
+      svg.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+      function mv(e2) {
+        d1 = dayAt(e2.clientX);
+        var a = Math.min(d0, d1), b = Math.max(d0, d1);
+        ghost.setAttribute('x', X(a));
+        ghost.setAttribute('width', (b - a + 1) * ppd);
+      }
+      function up() {
+        svg.removeEventListener('pointermove', mv);
+        svg.removeEventListener('pointerup', up);
+        svg.removeEventListener('pointercancel', up);
+        ghost.remove();
+        var a = Math.min(d0, d1), b = Math.max(d0, d1);
+        openStep('', {phase: phaseOf(r0), start: diso(a), end: diso(b), duration: b - a + 1});
+      }
+      svg.addEventListener('pointermove', mv);
+      svg.addEventListener('pointerup', up);
+      svg.addEventListener('pointercancel', up);
+    }
     svg.addEventListener('contextmenu', function (ev) {
       if (!canChange || ev.shiftKey || !window.MVMenu) return;
       ev.preventDefault();
@@ -417,6 +537,65 @@
       else if (canChange) openStep(g.getAttribute('data-cstep'));
     });
   }
+  function selTools(chart, p) {                       // панель над виділеною смугою чи фазою
+    var bar = document.createElement('div'), s = gsel.type === 'step' ? stepOf(gsel.id) : null;
+    bar.className = 'pjg2-tools';
+    bar.style.left = Math.max(p.x, 0) + 'px';
+    bar.style.top = Math.max(p.y - 30, 22) + 'px';
+    function b(icon, label, fn) {
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'pjc-b';
+      x.textContent = icon + ' ' + label;
+      x.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); fn(); });
+      bar.appendChild(x);
+    }
+    if (gsel.type === 'step' && s) {
+      b('✏️', 'Змінити', function () { openStep(s.id); });
+      b('➕', 'Крок після', function () { openStep('', {phase: s.phase, after: [s.id]}); });
+      b('🗑', 'Видалити', function () { deleteSel(); });
+    } else if (gsel.type === 'phase') {
+      var id = gsel.id;
+      b('✏️', 'Фаза', function () { openPhase(id); });
+      b('➕', 'Крок у фазі', function () { openStep('', {phase: id}); });
+      b('🗑', 'Видалити фазу', function () { deleteSel(); });
+    }
+    b('✕', '', function () { selectBar(null); });
+    var hint = document.createElement('span');
+    hint.className = 'pjg2-thint';
+    hint.textContent = gsel.type === 'step' ? 'тягніть краї — початок і кінець · ← → день · Delete · Esc'
+      : 'тягніть фазу — усі невиконані кроки разом · ← → день · Delete · Esc';
+    bar.appendChild(hint);
+    chart.appendChild(bar);
+  }
+  function deleteSel() {
+    if (!gsel) return;
+    if (gsel.type === 'step') {
+      var s = stepOf(gsel.id);
+      if (!s || !confirm('Видалити крок «{t}»? Наступні кроки підуть після його попередників.'.replace('{t}', s.title))) return;
+      gsel = null;
+      send(box().dataset.planBase + 'step/' + s.id + '/delete/', {}).then(done);
+    } else {
+      if (!confirm('Видалити фазу? Її кроки лишаться — без фази.')) return;
+      var id = gsel.id;
+      gsel = null;
+      send(box().dataset.planBase + 'phase/' + id + '/delete/', {}).then(done);
+    }
+  }
+  document.addEventListener('keydown', function (ev) {      // клавіші для виділеної смуги чи фази
+    if (!gsel || ev.defaultPrevented) return;
+    var t = ev.target, tag = t && t.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)
+        || document.querySelector('dialog[open]')) return;
+    if (ev.key === 'Escape') { ev.preventDefault(); selectBar(null); return; }
+    if (ev.key === 'Delete' || ev.key === 'Backspace') { ev.preventDefault(); deleteSel(); return; }
+    if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
+      ev.preventDefault();
+      var days = (ev.key === 'ArrowLeft' ? -1 : 1) * (ev.shiftKey ? 7 : 1);
+      if (gsel.type === 'step') { var s = stepOf(gsel.id); if (s) shiftStep(s, days); }
+      else send(box().dataset.planBase + 'phase/' + gsel.id + '/shift/', {days: days}).then(done);
+    }
+  });
   function togglePhase(id) {
     if (pref(GD, 'full') === 'brief') { setPref(GD, 'full'); setFold(id, false); applyGantt(); return; }
     setFold(id, !folds()[id]);
@@ -446,14 +625,20 @@
         if (!r || !r.end) return;
         var ctm = svg.getScreenCTM(), k = ctm ? ctm.a : 1;
         var box2 = shape.getBoundingClientRect(), resize = shape.classList.contains('pjg-bar') && ev.clientX > box2.right - 7;
+        var front = !resize && shape.classList.contains('pjg-bar') && ev.clientX < box2.left + 7;   // лівий край — початок
         var x0 = ev.clientX, s0 = dnum(r.start || r.end), e0 = dnum(r.end), delta = 0;
         var w0 = shape.classList.contains('pjg-bar') ? +shape.getAttribute('width') : 0;
+        var bx0 = shape.classList.contains('pjg-bar') ? +shape.getAttribute('x') : 0;
         shape.setPointerCapture(ev.pointerId);
         ev.preventDefault();
         svg.classList.add('pjg-dragging');
         function onMove(e2) {
           delta = Math.round((e2.clientX - x0) / k / ppd);
-          if (resize) shape.setAttribute('width', Math.max(w0 + delta * ppd, ppd));
+          if (front) {
+            var d2 = Math.min(delta, e0 - s0);
+            shape.setAttribute('x', bx0 + d2 * ppd);
+            shape.setAttribute('width', Math.max(w0 - d2 * ppd, ppd));
+          } else if (resize) shape.setAttribute('width', Math.max(w0 + delta * ppd, ppd));
           else shape.setAttribute('transform', 'translate(' + (delta * ppd) + ',0)');
         }
         function onUp() {
@@ -464,8 +649,12 @@
           if (!delta) return;                               // без руху — клік відкриє вікно кроку
           noClickUntil = Date.now() + 400;
           var ns = resize ? s0 : s0 + delta, ne = Math.max(e0 + delta, ns);
+          if (front) { ns = Math.min(s0 + delta, e0); ne = e0; }
           if (r.kind === 'milestone') ns = ne = e0 + delta;
-          moveStep(r.id, diso(ns), diso(ne), function () { shape.removeAttribute('transform'); if (w0) shape.setAttribute('width', w0); });
+          moveStep(r.id, diso(ns), diso(ne), function () {
+            shape.removeAttribute('transform');
+            if (w0) { shape.setAttribute('width', w0); shape.setAttribute('x', bx0); }
+          });
         }
         shape.addEventListener('pointermove', onMove);
         shape.addEventListener('pointerup', onUp);
@@ -475,7 +664,15 @@
   }
   function moveStep(id, start, end, onFail) {
     send(box().dataset.planBase + 'step/' + id + '/dates/', {start: start, end: end})
-      .then(function (j) { if (!done(j) && onFail) onFail(); });
+      .then(function (j) {
+        if (!done(j)) { if (onFail) onFail(); return; }
+        var r = classicById()[id];          // прогноз не там, куди тягнули: уже почався чи чекає попередніх кроків
+        if (r && r.kind !== 'milestone' && (r.start !== start || r.end !== end)) {
+          toast('ℹ️ Збережено {a} – {b}, але прогноз: {c} – {d}. {why}'.replace('{a}', dshort(start)).replace('{b}', dshort(end))
+            .replace('{c}', dshort(r.start)).replace('{d}', dshort(r.end))
+            .replace('{why}', r.note || 'Крок уже почався або чекає попередніх кроків.'));
+        }
+      });
   }
 
   // ── Правий клік на діаграмах: крок, фаза, день ──
@@ -716,7 +913,8 @@
            risk: document.getElementById('pjr-risk'), plan: document.getElementById('pja-plan'),
            agent: document.getElementById('pja-agent'), ask: document.getElementById('pja-ask'),
            talk: document.getElementById('pjh-talk'), party: document.getElementById('pjy-party'),
-           exp: document.getElementById('pjx-export')};
+           exp: document.getElementById('pjx-export'), riskAsk: document.getElementById('pjr-ai-ask')};
+    if (dlg.riskAsk) wire(dlg.riskAsk, runRiskAI, function () {}, false);
     if (dlg.party) wire(dlg.party, saveParty, deleteParty);
     if (dlg.exp) {
       wire(dlg.exp, function () { runExport(false); }, function () {}, false);
@@ -1103,10 +1301,38 @@
     expKind = kind;
     try { lang = localStorage.getItem('pj-export-lang') || 'de'; } catch (x) { lang = 'de'; }
     q(d, 'data-x', 'lang').value = lang;
-    d.querySelector('[data-x-what]').textContent = EXP_TITLES[kind] || '';
+    var what = EXP_TITLES[kind] || '';
+    if (kind === 'plan') {
+      var classic = root.querySelector('[data-pjg-pane="classic"]');
+      what += ' · ' + (classic && !classic.hidden ? 'класична діаграма Ганта' : 'діаграма Minerva') + ' · '
+        + (pref(GD, 'full') === 'brief' ? 'коротко (фази й віхи)' : 'детально');
+    }
+    d.querySelector('[data-x-what]').textContent = what;
     d.querySelectorAll('[data-x-only]').forEach(function (el) { el.hidden = el.dataset.xOnly !== kind; });
     d.querySelector('[data-pjp-err]').textContent = '';
+    if (!d.dataset.bound) {
+      d.dataset.bound = '1';
+      d.addEventListener('change', function () { expFiles(); });
+    }
+    expFiles();
     d.showModal();
+  }
+  function expWant() {
+    var d = dlg.exp, f = function (k) { return q(d, 'data-x', k); };
+    return {pdf: f('pdf').checked, png: f('png').checked, xlsx: expKind === 'plan' && f('xlsx').checked,
+            table: expKind === 'plan' && f('pdf').checked && f('table').checked, lang: f('lang').value};
+  }
+  function expFiles() {                 // «3. Що далі»: які файли вийдуть і як завантажаться
+    var d = dlg.exp, w = expWant(), title = (box().dataset.code || '') + ' · ';
+    var names = [];
+    if (w.pdf) names.push(window.PJExport ? window.PJExport.fileName(title, expKind, 'pdf') : 'pdf');
+    if (w.png) names.push(window.PJExport ? window.PJExport.fileName(title, expKind, 'png') : 'png');
+    if (w.xlsx) names.push(window.PJExport ? window.PJExport.fileName(title, expKind, 'xlsx') : 'xlsx');
+    var tbl = q(d, 'data-x', 'table');
+    if (tbl) tbl.disabled = !q(d, 'data-x', 'pdf').checked;
+    d.querySelector('[data-x-files]').textContent = !names.length ? '⚠️ Виберіть хоча б один файл'
+      : names.length === 1 ? '⬇ Завантажиться файл: {f}'.replace('{f}', names[0])
+      : '⬇ Завантажиться один ZIP з файлами: {f}'.replace('{f}', names.join(', '));
   }
   function exportSvgs(kind) {
     if (kind === 'chain') return Array.prototype.slice.call(root.querySelectorAll('[data-pjy-svg] svg'));
@@ -1123,9 +1349,7 @@
     return ours.length ? Array.prototype.slice.call(ours[0].querySelectorAll('svg')).slice(0, 1) : [];
   }
   function runExport(sendMail) {
-    var d = dlg.exp, err = d.querySelector('[data-pjp-err]'), f = function (k) { return q(d, 'data-x', k); };
-    var want = {pdf: f('pdf').checked, png: f('png').checked, xlsx: expKind === 'plan' && f('xlsx').checked,
-                table: expKind === 'plan' && f('table').checked, lang: f('lang').value};
+    var d = dlg.exp, err = d.querySelector('[data-pjp-err]'), want = expWant();
     try { localStorage.setItem('pj-export-lang', want.lang); } catch (x) { /* немає сховища */ }
     if (!want.pdf && !want.png && !want.xlsx) { err.textContent = 'Виберіть хоча б один файл'; return; }
     var svgs = exportSvgs(expKind);
@@ -1157,13 +1381,11 @@
     }
     pic.then(function (blob) {
       var formats = [want.pdf ? 'pdf' : '', want.png ? 'png' : '', want.xlsx ? 'xlsx' : ''].filter(Boolean);
-      if (sendMail) return ask(blob, formats, true);
-      if (want.png && blob) window.PJExport.save(blob, window.PJExport.fileName(title, expKind, 'png'));
-      var server = formats.filter(function (x) { return x !== 'png'; }), chain = Promise.resolve({ok: true});
-      server.forEach(function (fmt) {
-        chain = chain.then(function (j) { return j && j.ok ? ask(fmt === 'pdf' ? blob : null, [fmt], false) : j; });
-      });
-      return chain;
+      if (!sendMail && formats.length === 1 && want.png && blob) {           // лише картинка — без сервера
+        window.PJExport.save(blob, window.PJExport.fileName(title, expKind, 'png'));
+        return {ok: true};
+      }
+      return ask(blob, formats, sendMail);      // кілька файлів — один ZIP (браузер блокує кілька завантажень поспіль)
     }).then(function (j) {
       btns.forEach(function (b) { b.disabled = false; });
       if (!j || !j.ok) { err.textContent = '⚠️ ' + ((j && j.error) || 'не вдалося'); return; }
@@ -1600,6 +1822,34 @@
     });
   }
 
+  // 🧠 AI-аналіз ризиків: підказка людини → у фоні → пропозиції ✓/✗ у вкладці «⚠️ Ризики»
+  var riskBtn = null;
+  function openRiskAI(btn) {
+    var ds = dialogs();
+    if (!ds || !ds.riskAsk) return;
+    riskBtn = btn;
+    ds.riskAsk.querySelector('[data-pjp-err]').textContent = '';
+    ds.riskAsk.showModal();
+    q(ds.riskAsk, 'data-ra', 'wish').focus();
+  }
+  function riskErr(text) {
+    var n = root.querySelector('[data-pjr-ai-err]');
+    if (n) n.textContent = text || '';
+  }
+  function runRiskAI() {
+    var d = dlg.riskAsk, wish = q(d, 'data-ra', 'wish').value;
+    d.close();
+    var btn = riskBtn && root.contains(riskBtn) ? riskBtn : root.querySelector('[data-pjr-ai]');
+    var undo = btn ? busy(btn, '🧠 AI аналізує проєкт… 1–3 хвилини') : function () {};
+    riskErr('');
+    bgRun(box().dataset.aiRisks, function (j) {
+      if (j.html) put(j.html); else undo();
+      applyTab('risks');
+      var sum = root.querySelector('[data-pjr-ai-sum]');
+      if (sum && j.summary) { sum.textContent = '🧠 ' + j.summary; sum.hidden = false; }
+    }, function (err) { undo(); riskErr('⚠️ ' + err); }, {wish: wish});
+  }
+
   // 🧠 Чернетка плану з листування: перегляд у вікні, галочки кроків, «✓ Застосувати план»
   var SIDE_LABELS = {we: 'ми', customer: 'клієнт', supplier: 'постачальник', colleague: 'колега'};
   // Спершу вікно: що врахувати / що вже відбулось, листи з якої дати, старт, замінити план — далі чернетка у фоні
@@ -1777,7 +2027,7 @@
 
   root.addEventListener('click', function (e) {
     var t = e.target.closest('[data-pja-scan],[data-pja-decide],[data-pja-forgotten],[data-pja-fdecide],' +
-      '[data-pja-fclose],[data-pja-plan],[data-pja-settings]');
+      '[data-pja-fclose],[data-pja-plan],[data-pja-settings],[data-pjr-ai]');
     if (!t || !root.contains(t) || t.disabled) return;
     e.preventDefault();
     if (t.hasAttribute('data-pja-scan')) aiScan(t);
@@ -1787,6 +2037,7 @@
     else if (t.dataset.pjaFclose) { found = null; renderFound(); }
     else if (t.hasAttribute('data-pja-plan')) aiPlan(t);
     else if (t.hasAttribute('data-pja-settings')) aiSettings(t);
+    else if (t.hasAttribute('data-pjr-ai')) openRiskAI(t);
   });
 
   root.addEventListener('click', function (e) {

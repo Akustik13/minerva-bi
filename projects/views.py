@@ -393,7 +393,10 @@ def export_view(request, pk):
             return JsonResponse({"ok": True, "compose": export.mail(request.user, project, what, lang, files)})
     except export.ExportError as e:
         return JsonResponse({"ok": False, "error": str(e)}, status=400)
-    name, data, ctype = next((x for x in files if not x[0].endswith(".png")), files[0])
+    if len(files) == 1:
+        name, data, ctype = files[0]
+    else:                        # кілька файлів — одним ZIP: браузер блокує кілька завантажень поспіль
+        name, data, ctype = export.zip_name(project, what), export.zip_files(files), "application/zip"
     resp = HttpResponse(data, content_type=ctype)
     resp["Content-Disposition"] = f'attachment; filename="{name}"'
     return resp
@@ -656,6 +659,34 @@ def ai_scan_view(request, pk):
 
 
 @staff_member_required
+@require_http_methods(["GET", "POST"])
+def ai_risks_view(request, pk):
+    """🧠 AI-аналіз ризиків (у фоні): POST {wish} — запустити, GET — хід; готово → свіжий пульт з пропозиціями ✓/✗."""
+    from . import ai_risks
+    project = _project_for_change(request, pk)
+    if request.method == "POST":
+        st = ai_risks.start(project, request.user, str(_body(request).get("wish") or ""))
+    else:
+        st = ai_risks.run_state(project, request.user)
+    if st.get("running"):
+        return JsonResponse({"ok": True, "pending": True, "poll_ms": PLAN_POLL_MS})
+    if st.get("error"):
+        return JsonResponse({"ok": False, "error": st["error"]}, status=400)
+    res = st.get("result") if st.get("done") else None
+    if not res:
+        return JsonResponse({"ok": False, "error": "Аналіз ще не запускали"}, status=400)
+    if res["error"]:
+        return JsonResponse({"ok": False, "error": res["error"]}, status=400)
+    if res["found"]:
+        notice = f"🧠 Нових ризиків на перевірку: {res['found']} — ✓ додати, ✗ ні"
+    elif res["proposed"]:
+        notice = "🧠 AI не знайшов нових ризиків — запропоновані вже є в реєстрі або відхилені раніше"
+    else:
+        notice = "🧠 AI не бачить нових ризиків"
+    return _cockpit(request, project, notice, extra={"summary": res.get("summary", "")})
+
+
+@staff_member_required
 @require_POST
 def ai_suggestion_view(request, pk, sid):
     """✓ / ✗ пропозиції AI: {accept: true|false} — лише та людина, з чиїх листів пропозиція."""
@@ -806,6 +837,19 @@ def plan_step_dates_view(request, pk, sid):
         step = plan.move_step(project, sid, body.get("start"), body.get("end"))
         when = f"{step.end:%d.%m.%Y}" if step.kind == step.MILESTONE else f"{step.start:%d.%m} – {step.end:%d.%m.%Y}"
         return f"📋 «{step.title}»: {when}"
+    return _plan_action(request, pk, run)
+
+
+@staff_member_required
+@require_POST
+def plan_phase_shift_view(request, pk, fid):
+    """📋 Фазу перетягнули на діаграмі Ганта: {days} → невиконані кроки фази на стільки днів → свіжий пульт."""
+    from . import plan
+
+    def run(project, body):
+        phase, moved = plan.shift_phase(project, fid, body.get("days"))
+        days = int(body.get("days"))
+        return f"📋 Фаза «{phase.name}»: {'+' if days > 0 else ''}{days} дн., кроків зсунуто: {moved}"
     return _plan_action(request, pk, run)
 
 

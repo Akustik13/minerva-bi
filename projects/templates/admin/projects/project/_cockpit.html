@@ -6,7 +6,7 @@
      data-plan-phase="{{ urls.plan_phase }}" data-plan-save-template="{{ urls.plan_save_template }}"
      data-has-plan="{% if plan.has_plan %}1{% endif %}" data-can-change="{% if can_change %}1{% endif %}"
      data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"
-     data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
+     data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-risks="{{ urls.ai_risks }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
      data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
      data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-export="{{ urls.export }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
      data-ai-settings="{{ urls.ai_settings }}" data-ai-since="{{ ai.since|date:'Y-m-d' }}" data-start="{{ start|date:'Y-m-d' }}"
@@ -206,9 +206,33 @@
     <div class="pjc-pane" data-pjc-pane="risks" id="pj-risks">
       <div class="pjc-ptools">
         {% if can_change %}<button type="button" class="pjc-b pri" data-pjc-risk-new>＋ Ризик</button>{% endif %}
+        {% if ai.on %}<button type="button" class="pjc-b" data-pjr-ai
+                title="Claude Sonnet аналізує проєкт — план, закупівлі, сторони, ваші листи, вже відомі ризики — і вашу підказку; пропонує ризики, ви вирішуєте ✓ / ✗">🧠 AI-аналіз ризиків</button>{% endif %}
         <span class="pjc-sub">бал = ймовірність × вплив: до 2 — 🟢, 3–4 — 🟡, від 6 — 🔴 · ⚙️ правила відкривають і закривають ризики самі</span>
         <a class="pjc-b pjc-right" href="/admin/projects/projectrisk/?project__id__exact={{ project.pk }}">⚠️ Реєстр усіх ризиків →</a>
       </div>
+      <div class="pjc-merr" data-pjr-ai-err role="alert"></div>
+      <div class="pjr-ai-sum" data-pjr-ai-sum hidden></div>
+      {% if ai.risks %}
+        <div class="pjr-ai">
+          <div class="pjc-sgt">🧠 Ризики від AI чекають рішення · {{ ai.risks }}</div>
+          <ul class="pjc-list pja-list">
+            {% for s in ai.items %}{% if s.risk %}
+              <li class="pja-it pja-risk">
+                <span class="pja-k"><span class="pjr-score pjr-{{ s.level }}" title="ймовірність × вплив">{{ s.score }}</span> {{ s.icon }} {{ s.label }}</span>
+                <b translate="no">{{ s.title }}</b>
+                {% if s.url %}<span class="pjc-sub"><a href="{{ s.url }}" target="_blank">✉️ лист</a></span>{% endif %}
+                <span class="pjc-yn">
+                  <button type="button" class="pjc-b" data-pja-decide="{{ s.id }}" data-accept="1" title="Так — додати ризик до проєкту">✓</button>
+                  <button type="button" class="pjc-b" data-pja-decide="{{ s.id }}" data-accept="0" title="Ні — більше не пропонувати">✗</button>
+                </span>
+                <div class="pjc-q" translate="no">{{ s.quote|truncatechars:300 }}</div>
+                {% if s.mitigation %}<div class="pjc-sub">заходи: <span translate="no">{{ s.mitigation }}</span></div>{% endif %}
+              </li>
+            {% endif %}{% endfor %}
+          </ul>
+        </div>
+      {% endif %}
       <div class="pjr">
         <div class="pjr-matrix" aria-label="Матриця ризиків: ймовірність × вплив">
           <div class="pjr-cap">ймовірність ↑</div>

@@ -295,6 +295,7 @@ def context(project, user, range_key="all", notice="") -> dict:
                  "plan_clear": reverse("projects:plan_clear", args=[pk]),
                  "plan_base": f"/projects/api/project/{pk}/plan/",
                  "ai_scan": reverse("projects:ai_scan", args=[pk]), "ai_plan": reverse("projects:ai_plan", args=[pk]),
+                 "ai_risks": reverse("projects:ai_risks", args=[pk]),
                  "ai_plan_apply": reverse("projects:ai_plan_apply", args=[pk]),
                  "ai_settings": reverse("projects:ai_settings", args=[pk]),
                  "ai_base": f"/projects/api/project/{pk}/ai/suggestion/",
