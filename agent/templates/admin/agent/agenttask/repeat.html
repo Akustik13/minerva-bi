@@ -1,0 +1,92 @@
+{% extends "admin/base_site.html" %}
+{# 🔁 Те саме завдання для інших листів (agent/admin.py repeat_view, agent/from_task.py) #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{{ back_url }}">🤖 Завдання агенту</a> &rsaquo;
+  <a href="{{ review_url }}" translate="no">{{ task.title }}</a> &rsaquo; 🔁
+</div>
+{% endblock %}
+{% block content %}
+<style>
+  #agr { max-width: 1100px; }
+  #agr .agr-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px; padding: 14px 16px; margin: 0 0 14px; }
+  #agr .agr-muted { color: var(--text-muted); font-size: 12px; }
+  #agr .agr-pre { white-space: pre-wrap; font-size: 13px; line-height: 1.5; }
+  #agr table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  #agr th { text-align: left; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px;
+    padding: 6px 8px; border-bottom: 2px solid var(--border-strong); }
+  #agr td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  #agr tr.agr-like td { background: var(--bg-hover, rgba(0, 120, 255, .05)); }
+  #agr .agr-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 10px; }
+</style>
+<div id="agr">
+  <div class="agr-card">
+    <div class="agr-muted">Завдання — агент виконає його ще раз{% if task.message_id %} для кожного вибраного листа{% endif %}</div>
+    <div class="agr-pre" translate="no">{{ instruction }}</div>
+    <div class="agr-muted" style="margin-top:6px">Модель і ліміт — як у завданні ({{ task.get_model_display|truncatechars:22 }}, {{ task.budget_usd }} $ на кожне).
+      Пропозиції — на сторінці кожного нового завдання; застосовуєте ви ✓.</div>
+  </div>
+
+  {% if task.message_id %}
+  <div class="agr-card">
+    <form method="get" class="agr-row" style="margin-top:0">
+      <input type="search" name="q" value="{{ q }}" placeholder="Тема або відправник…" style="flex:1 1 280px">
+      <button type="submit" class="button">🔍 Шукати</button>
+      {% if q %}<a href="?">✕ усі</a>{% endif %}
+      <span class="agr-muted">Вхідні ваших скриньок за {{ days }} днів · схожі на лист завдання — першими</span>
+    </form>
+  </div>
+
+  <form method="post">{% csrf_token %}
+    <div class="agr-card">
+      {% if rows %}
+      <table>
+        <thead><tr><th></th><th>Дата</th><th>Від кого</th><th>Тема</th><th>Чому схожий</th><th>Уже було</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr{% if r.score %} class="agr-like"{% endif %}>
+            <td><input type="checkbox" name="ids" value="{{ r.msg.pk }}" class="agr-pick"></td>
+            <td style="white-space:nowrap">{{ r.msg.sent_at|date:"d.m.Y H:i" }}</td>
+            <td translate="no">{{ r.msg.from_name|default:r.msg.from_email|truncatechars:40 }}<div class="agr-muted">{{ r.msg.from_email }}</div></td>
+            <td><a href="/email/message/{{ r.msg.pk }}/" target="_blank" translate="no">{{ r.msg.subject|default:"(без теми)"|truncatechars:90 }}</a></td>
+            <td class="agr-muted">{{ r.why|default:"—" }}</td>
+            <td>{% if r.done %}<a href="{% url 'admin:agent_agenttask_review' r.done.pk %}">🧩 {{ r.done.get_status_display }}</a>{% else %}—{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="agr-row">
+        <button type="submit" class="button default" id="agr-go">▶ Те саме для вибраних</button>
+        <span class="agr-muted" id="agr-count">Вибрано: 0 (найбільше {{ max }})</span>
+      </div>
+      {% else %}
+      <div class="agr-muted">Листів не знайдено{% if q %} за «{{ q }}»{% endif %}.</div>
+      {% endif %}
+    </div>
+  </form>
+  {% else %}
+  <form method="post">{% csrf_token %}
+    <div class="agr-card agr-row" style="margin-top:0">
+      <button type="submit" class="button default">▶ Запустити ще раз</button>
+      <span class="agr-muted">Нове завдання з тією самою інструкцією{% if task.products.exists %} і товарами{% endif %} — агент почне одразу.</span>
+    </div>
+  </form>
+  {% endif %}
+</div>
+<script>
+(function () {
+  var MAX = {{ max }}, boxes = document.querySelectorAll('.agr-pick'), count = document.getElementById('agr-count');
+  if (!count) return;
+  var label = count.textContent.replace(/\d+/, '{n}');
+  function sync() {
+    var n = Array.prototype.filter.call(boxes, function (b) { return b.checked; }).length;
+    count.textContent = label.replace('{n}', n);
+    Array.prototype.forEach.call(boxes, function (b) { b.disabled = !b.checked && n >= MAX; });
+  }
+  Array.prototype.forEach.call(boxes, function (b) { b.addEventListener('change', sync); });
+  sync();
+})();
+</script>
+{% endblock %}

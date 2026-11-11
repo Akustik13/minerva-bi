@@ -72,9 +72,10 @@ def _email_to(user) -> str:
     return acc.email_address if acc else ''
 
 
-def _send_mail(user, m, link_text='Відкрити завдання') -> str:
+def _send_mail(user, m, link_text='Відкрити завдання', to=None) -> str:
+    """to — адреси (звіт доручення «Кому звіт»); None / порожньо — email людини."""
     from worktime import reports
-    to = _email_to(user)
+    to = list(to or []) or [a for a in [_email_to(user)] if a]
     if not to:
         return 'немає email'
     text = '\n'.join([m['head'], ''] + m['lines'] + (['', m['summary']] if m['summary'] else []) +
@@ -82,19 +83,21 @@ def _send_mail(user, m, link_text='Відкрити завдання') -> str:
     html = (f'<p><b>{escape(m["head"])}</b></p><p>' + '<br>'.join(escape(x) for x in m['lines']) + '</p>'
             + (f'<p style="white-space:pre-wrap;color:#444">{escape(m["summary"])}</p>' if m['summary'] else '')
             + f'<p><a href="{escape(m["link"])}">{escape(link_text)} →</a></p>')
-    err = reports.deliver(None, [to], m['subject'], text, html)
+    err = reports.deliver(None, to, m['subject'], text, html)
     if err and 'SMTP' in err:                        # сповіщення не налаштовані — зі своєї скриньки
         from email_assistant.models import EmailAccount
         own = EmailAccount.objects.filter(user=user, is_active=True).exclude(smtp_host='').first()
         if own is not None:
-            err = reports.deliver(own, [to], m['subject'], text, html)
+            err = reports.deliver(own, to, m['subject'], text, html)
     return err
 
 
-def _send_telegram(user, m, link_text='Відкрити завдання') -> str:
+def _send_telegram(user, m, link_text='Відкрити завдання', chats=None) -> str:
+    """chats — Chat ID (звіт доручення «Telegram-чати звіту»); None / порожньо — Telegram ID людини."""
     tg_max = m.get('tg_max', 500)
-    chat = getattr(getattr(user, 'profile', None), 'telegram_id', None)
-    if not chat:
+    own = getattr(getattr(user, 'profile', None), 'telegram_id', None)
+    chats = list(chats or []) or ([own] if own else [])
+    if not chats:
         return ''
     from config.models import NotificationSettings
     from dashboard.notifications import _send_telegram as send
@@ -104,11 +107,13 @@ def _send_telegram(user, m, link_text='Відкрити завдання') -> st
     text = (f'<b>{escape(m["subject"])}</b>\n{escape(m["head"])}\n' + '\n'.join(escape(x) for x in m['lines'])
             + (f'\n\n{escape(m["summary"][:tg_max])}' if m['summary'] else '')
             + f'\n\n<a href="{escape(m["link"])}">{escape(link_text)}</a>')
-    try:
-        send(ns, text, chat_id_override=chat)
-    except Exception as e:  # noqa: BLE001
-        return str(e)[:150]
-    return ''
+    errors = []
+    for chat in chats:
+        try:
+            send(ns, text, chat_id_override=chat)
+        except Exception as e:  # noqa: BLE001
+            errors.append(str(e)[:150])
+    return '; '.join(errors)
 
 
 def task_finished(task_id, note='') -> str:
@@ -119,6 +124,9 @@ def task_finished(task_id, note='') -> str:
     if task.schedule_id:                    # ⏰ регулярне завдання — звіт завжди, у вибрані канали
         s = task.schedule
         return deliver(task.owner, report(task, note), mail=s.notify_email, telegram=s.notify_telegram)
+    rule = rule_of(task)
+    if rule is not None:                    # 🧩 доручення — «🔔 Звіт про зроблене» за його налаштуваннями
+        return rule_report(task, rule, note)
     if not due(task):
         return ''
     return deliver(task.owner, compose(task, note))
@@ -147,17 +155,18 @@ def report(task, note='') -> dict:
             'tg_max': REPORT_TG_MAX}
 
 
-def deliver(user, m, link_text='Відкрити завдання', *, mail=True, telegram=True) -> str:
+def deliver(user, m, link_text='Відкрити завдання', *, mail=True, telegram=True, to=None, chats=None) -> str:
     """Лист і (якщо в профілі є Telegram ID) Telegram людині. m — {subject, head, lines, summary, link}.
+    to / chats — інші адреси й Telegram-чати замість людини (звіт доручення).
     Ним же — «⚠️ Немає реакції на лист» (email_assistant/followups.py), «‼️ Дуже важливий лист» (agent/mail.py).
     → «🔔 Повідомлено: пошта, Telegram» / «🔕 Не вдалося повідомити — …»."""
-    telegram = telegram and bool(getattr(getattr(user, 'profile', None), 'telegram_id', None))
+    telegram = telegram and bool(chats or getattr(getattr(user, 'profile', None), 'telegram_id', None))
     sent, failed = [], []
-    for name, fn, wanted in (('пошта', _send_mail, mail), ('Telegram', _send_telegram, telegram)):
+    for name, fn, wanted, extra in (('пошта', _send_mail, mail, to), ('Telegram', _send_telegram, telegram, chats)):
         if not wanted:
             continue
         try:
-            err = fn(user, m, link_text)
+            err = fn(user, m, link_text, extra)
         except Exception as e:  # noqa: BLE001 — повідомлення не має ламати роботу
             logger.warning('notify %s user %s: %s', name, getattr(user, 'pk', None), e)
             err = type(e).__name__
@@ -168,3 +177,47 @@ def deliver(user, m, link_text='Відкрити завдання', *, mail=True
     parts = (['🔔 Повідомлено: ' + ', '.join(sent)] if sent else []) + \
         (['🔕 Не вдалося повідомити — ' + '; '.join(failed)] if failed else [])
     return '; '.join(parts)
+
+
+# ── 🧩 Звіт доручення «Завдання агенту з кожного такого листа» ─────────────────
+
+RULE_SUMMARY_MAX = 1500
+
+
+def rule_of(task):
+    """Доручення, з якого створено завдання (AgentRun.task), або None."""
+    from agent.models import AgentRule, AgentRun
+    run = AgentRun.objects.filter(task=task, rule__kind=AgentRule.MAIL_TASK).select_related('rule').first()
+    return run.rule if run is not None else None
+
+
+def has_result(task, note='') -> bool:
+    """Чи є про що звітувати: пропозиції (і внесене самому), помилка або зупинка на ліміті."""
+    return bool(task.status == AgentTask.FAILED or note or task.proposals.exists())
+
+
+def recipients(rule) -> tuple:
+    """(адреси, чати) з налаштувань доручення; неправильні рядки пропускаються (форма їх не пускає)."""
+    from dashboard.notify_routes import parse_chats, parse_emails
+    return parse_emails(rule.report_to)[0], parse_chats(rule.report_chats)[0]
+
+
+def rule_report(task, rule, note='') -> str:
+    """Звіт «🔔 що зробив агент» за листом доручення: канали, кому й коли — з доручення (порожньо — власнику)."""
+    if not (rule.report_email or rule.report_telegram):
+        return ''
+    if rule.report_when != rule.REPORT_ALWAYS and not has_result(task, note):
+        return ''
+    m = compose(task, note)
+    summary = (task.summary or '').strip()
+    if len(summary) > RULE_SUMMARY_MAX:
+        summary = summary[:RULE_SUMMARY_MAX].rstrip() + '…'
+    m['summary'] = summary
+    msg = task.message
+    if msg is not None:
+        m['lines'].insert(0, f'✉️ Лист: «{(msg.subject or "(без теми)")[:150]}» від {msg.from_email or "?"}')
+    m['lines'].insert(0, f'🧩 Доручення «{rule.name}»')
+    m['subject'] = f'🧩 {rule.name}: {(msg.subject if msg is not None else task.title) or task.title}'[:200]
+    m['tg_max'] = 1200
+    to, chats = recipients(rule)
+    return deliver(task.owner, m, mail=rule.report_email, telegram=rule.report_telegram, to=to, chats=chats)

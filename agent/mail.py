@@ -887,7 +887,11 @@ def process_mark(run):
 AUTO_FIELDS = ('tracking', 'courier')
 
 
-def _auto_ok(p) -> bool:
+def _auto_ok(p, rule) -> bool:
+    if p.kind == AgentProposal.PURCHASE:                 # «✓ Закупівлю вносити самому» (дублі відсіює apply_purchase)
+        return rule.auto_purchase
+    if not rule.auto_apply:
+        return False
     if p.kind == AgentProposal.PARCEL:
         return True
     return (p.kind == AgentProposal.ORDER and (p.data or {}).get('field') in AUTO_FIELDS
@@ -895,13 +899,14 @@ def _auto_ok(p) -> bool:
 
 
 def auto_apply(task) -> str:
-    """Завдання з доручення з «✓ Трек-номер вносити самому» закінчилось → застосувати трек-номер / кур’єра в
-    порожнє поле замовлення й трек-номер посилки закупівлі; решта чекає ✓ людини. → що зроблено ('' — нічого)."""
+    """Завдання з доручення закінчилось → «✓ Трек-номер вносити самому»: трек-номер / кур’єра в порожнє поле
+    замовлення й трек-номер посилки закупівлі; «✓ Закупівлю вносити самому»: нову закупівлю (PO). Решта чекає ✓
+    людини. → що зроблено ('' — нічого)."""
     from agent import decide
     run = AgentRun.objects.filter(task=task).select_related('rule').first()
-    if run is None or not run.rule.enabled or not run.rule.auto_apply:
+    if run is None or not run.rule.enabled or not (run.rule.auto_apply or run.rule.auto_purchase):
         return ''
-    chosen = [p for p in task.proposals.filter(status=AgentProposal.PENDING) if _auto_ok(p)]
+    chosen = [p for p in task.proposals.filter(status=AgentProposal.PENDING) if _auto_ok(p, run.rule)]
     if not chosen:
         return ''
     out = decide.apply_selected(task, [p.pk for p in chosen], task.owner)
@@ -1061,6 +1066,7 @@ def rule_from(data, msg, user=None) -> AgentRule:
     if rule.kind == AgentRule.MAIL_FORWARD and not forward_list(rule):
         raise ValueError('Вкажіть, кому пересилати — адресу в «Кому переслати»')
     rule.auto_apply = rule.kind == AgentRule.MAIL_TASK and bool(data.get('auto_apply'))
+    rule.auto_purchase = rule.kind == AgentRule.MAIL_TASK and bool(data.get('auto_purchase'))
     cat = str(data.get('category') or '')
     if cat.isdigit():
         from email_assistant.models import MailCategory
