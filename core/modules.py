@@ -25,6 +25,7 @@ MODULES = [
     {'app_label': 'inventory',       'name': 'Склад',                       'tier': 'standard', 'order': 40},
     {'app_label': 'shop',            'name': 'Інтернет-магазин',            'tier': 'premium',  'order': 41},
     {'app_label': 'labels_app',      'name': 'Етикетки DYMO',               'tier': 'standard', 'order': 42},
+    {'app_label': 'suppliers',       'name': 'Постачальники й запити (RFQ)', 'tier': 'standard', 'order': 43},
     {'app_label': 'tasks',           'name': 'Задачі',                      'tier': 'standard', 'order': 50},
     {'app_label': 'ai_assistant',    'name': 'Minerva AI',                  'tier': 'premium',  'order': 55},
     {'app_label': 'rag_assistant',   'name': 'Помічник по продукції (RAG)', 'tier': 'premium',  'order': 55},
@@ -75,7 +76,7 @@ DEFAULT_BUNDLES = [
         'name': '📦 Складник',
         'color': '#4caf50',
         'description': 'Склад та доставка — для складських працівників',
-        'app_labels': ['inventory', 'shipping'],
+        'app_labels': ['inventory', 'suppliers', 'shipping'],
         'is_system': True,
     },
     {

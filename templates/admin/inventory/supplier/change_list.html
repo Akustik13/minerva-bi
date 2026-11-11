@@ -1,0 +1,6 @@
+{% extends "admin/change_list.html" %}
+{# 🏭 Постачальники: кнопки нових сторінок (suppliers/admin_supplier.py SupplierCardMixin.changelist_view) #}
+{% block object-tools-items %}
+  {% for url, label in sup_tools %}<li><a href="{{ url }}">{{ label }}</a></li>{% endfor %}
+  {{ block.super }}
+{% endblock %}

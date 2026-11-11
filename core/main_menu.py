@@ -27,7 +27,7 @@ HREF_MAX = 300
 # групи «Простого» меню: (id, назва, значок, розділи)
 GROUPS = [
     ("sales", "Продажі", "🛒", ["orders", "offers", "customers"]),
-    ("stock", "Склад", "📦", ["stock", "purchases", "labels"]),
+    ("stock", "Склад", "📦", ["stock", "purchases", "suppliers", "rfq", "labels"]),
     ("projects", "Проєкти", "📁", ["portfolio", "projects", "risks", "meetings"]),
     ("comms", "Комунікації й час", "💬", ["mail", "calendar", "worktime"]),
     ("more", "Ще", "⋯", ["shipments", "dashboard", "signals", "settings", "guide"]),

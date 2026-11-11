@@ -1,0 +1,96 @@
+{% extends "admin/base_site.html" %}
+{# ✉️ Листування з постачальником за період і 🧠 AI-оцінка — suppliers/admin_supplier.py analysis_view, services/mailscan.py #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:inventory_supplier_changelist' %}">Постачальники</a> &rsaquo;
+  <a href="{{ back_url }}" translate="no">{{ supplier.name }}</a> &rsaquo; ✉️ Аналіз
+</div>
+{% endblock %}
+{% block content %}
+{% include "admin/suppliers/_styles.html" %}
+<div class="spp">
+  <div class="spf-card">
+    <form method="get" class="spf-row">
+      з <input type="date" name="from" value="{{ r.date_from|date:'Y-m-d' }}"> по <input type="date" name="to" value="{{ r.date_to|date:'Y-m-d' }}">
+      <button type="submit" class="button">🔎 Перечитати</button>
+      {% for d, since in presets %}<a href="?from={{ since }}">{% if d == 1825 %}5 років{% elif d == 730 %}2 роки{% elif d == 365 %}рік{% else %}{{ d }} днів{% endif %}</a>{% endfor %}
+    </form>
+    <div class="spf-muted">Лише листи <b>ваших</b> скриньок: з адрес і доменів постачальника (<span translate="no">{{ r.emails|join:", "|default:"—" }}{% if r.domains %} · @{{ r.domains|join:", @" }}{% endif %}</span>), його контактних осіб, а також листи з кодом закупівлі, номером замовлення постачальника чи трек-номером (переслані колегами). Домени постачальника — поле «✉️ Пошта» в картці.{% if r.truncated %} <span class="spf-warn">Показано перші листи — зменште період.</span>{% endif %}</div>
+  </div>
+  <div class="spf-tiles">
+    <div class="spf-tile"><b>{{ r.messages }}</b>листів · гілок {{ r.threads }}</div>
+    <div class="spf-tile"><b>{{ r.incoming }} / {{ r.outgoing }}</b>від них / наших</div>
+    <div class="spf-tile"><b>{% if r.their_reply_hours is not None %}{{ r.their_reply_hours }} год{% else %}—{% endif %}</b>вони відповідають (медіана{% if r.their_reply_fast is not None %}, {{ r.their_reply_fast }}% за добу{% endif %})</div>
+    <div class="spf-tile"><b>{% if r.our_reply_hours is not None %}{{ r.our_reply_hours }} год{% else %}—{% endif %}</b>ми відповідаємо</div>
+    <div class="spf-tile"><b>{{ r.problems|length }}</b>листів з ознаками проблем</div>
+    <div class="spf-tile"><b>{{ r.documents }}</b>документів у листах</div>
+    <div class="spf-tile"><b>{{ p.count }}</b>закупівель · вчасно {{ p.on_time }} з {{ p.on_time|add:p.late }}</div>
+    <div class="spf-tile"><b>{% if score.value is not None %}{{ score.value }}/100{% else %}—{% endif %}</b>оцінка Minerva</div>
+  </div>
+  {% if score.parts %}<div class="spf-muted" style="margin:-4px 0 10px">{% for n, v, w in score.parts %}{{ n }} {{ v }}% ({{ w }}){% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+
+  <div class="spf-card" id="ai">
+    <div class="spf-h">🧠 AI-оцінка постачальника з цього листування</div>
+    {% if own_ai %}
+      {% with a=own_ai.result %}
+      <div class="spf-muted">{{ own_ai.created_at|date:"d.m.Y H:i" }} · {{ a.mails }} листів{% if own_ai.date_from %} за {{ own_ai.date_from|date:"d.m.Y" }} – {{ own_ai.date_to|date:"d.m.Y" }}{% endif %} · ${{ own_ai.cost_usd|floatformat:3 }}{% if a.rating %} · {% for i in "12345" %}{% if forloop.counter <= a.rating %}★{% else %}☆{% endif %}{% endfor %}{% endif %}</div>
+      <p>{{ a.summary }}</p>
+      {% if a.communication %}<div><b>Зв'язок:</b> {{ a.communication }}</div>{% endif %}
+      {% if a.reliability %}<div><b>Надійність:</b> {{ a.reliability }}</div>{% endif %}
+      {% if a.strengths %}<div><b>Сильні сторони:</b> {{ a.strengths|join:"; " }}</div>{% endif %}
+      {% if a.problems %}<div><b>Проблеми:</b><ul>{% for pr in a.problems %}<li>{{ pr.text }} — «{{ pr.quote }}» <a href="/email/?msg={{ pr.message }}" target="_blank">✉️ {{ pr.date }}</a></li>{% endfor %}</ul></div>{% endif %}
+      {% if a.advice %}<div><b>Поради:</b> {{ a.advice|join:"; " }}</div>{% endif %}
+      {% endwith %}
+    {% else %}<div class="spf-muted">Ще не складали. AI прочитає до 30 листів цього періоду (спершу — з ознаками проблем) і статистику закупівель; кожна проблема — з цитатою з листа.</div>{% endif %}
+    {% if can_change %}
+    <div class="spf-row">
+      <select id="an-model">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <button type="button" class="button" id="an-ai" {% if not r.messages %}disabled{% endif %}>🧠 {% if own_ai %}Скласти заново{% else %}Скласти оцінку{% endif %} за цей період</button>
+      <span class="spf-job" id="an-job"></span>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if r.waiting_us or r.waiting_them %}
+  <div class="spf-card">
+    {% if r.waiting_us %}<div class="spf-h">⏳ Чекають нашої відповіді</div>{% for m in r.waiting_us %}<div>{{ m.sent_at|date:"d.m.Y" }} · <a href="/email/?msg={{ m.pk }}" target="_blank" translate="no">{{ m.subject|default:"(без теми)" }}</a></div>{% endfor %}{% endif %}
+    {% if r.waiting_them %}<div class="spf-h" style="margin-top:8px">🔕 Наш лист без відповіді (понад 3 дні)</div>{% for m in r.waiting_them %}<div>{{ m.sent_at|date:"d.m.Y" }} · <a href="/email/?msg={{ m.pk }}" target="_blank" translate="no">{{ m.subject|default:"(без теми)" }}</a></div>{% endfor %}{% endif %}
+  </div>
+  {% endif %}
+
+  {% if r.problems %}
+  <div class="spf-card">
+    <div class="spf-h">⚠️ Листи з ознаками проблем</div>
+    <div class="spf-muted">Знайдено за словами (затримка, брак, рекламація, пошкоджено…) — перевірте самі; уважніше — «🧠 AI-оцінка».</div>
+    <table class="spf-table">{% for pr in r.problems %}<tr><td style="white-space:nowrap">{{ pr.message.sent_at|date:"d.m.Y" }}</td><td>{% if pr.theirs %}від них{% else %}наш{% endif %}</td><td><a href="/email/?msg={{ pr.message.pk }}" target="_blank" translate="no">{{ pr.message.subject|default:"(без теми)" }}</a><div class="spf-muted" translate="no">{{ pr.snippet }}</div></td><td><span class="spf-tag">{{ pr.word }}</span></td></tr>{% endfor %}</table>
+  </div>
+  {% endif %}
+
+  <div class="spf-card">
+    <div class="spf-h">🗒️ Листування й документи по закупівлях</div>
+    {% for g in r.groups %}
+      <details {% if forloop.counter <= 3 %}open{% endif %} style="margin:6px 0">
+        <summary><b>{% if g.po %}<span translate="no">{{ g.po.code }}</span> · {{ g.po.order_date|date:"d.m.Y" }} · {{ g.po.get_status_display }}{% else %}Без закупівлі{% endif %}</b> — листів {{ g.messages|length }}, документів {{ g.documents|length }}
+          {% if g.po %} <a href="{% url 'admin:inventory_purchaseorder_change' g.po.pk %}">→ закупівля</a>{% endif %}</summary>
+        {% if g.documents %}<div class="spf-row">{% for d in g.documents %}<a class="spf-tag" href="{% url 'email_assistant:email_attachment' d.message.pk d.index %}" target="_blank" title="{{ d.message.subject }} · {{ d.message.sent_at|date:'d.m.Y' }}" translate="no">📎 {{ d.name|truncatechars:48 }}</a>{% endfor %}</div>{% endif %}
+        <table class="spf-table">
+          {% for m in g.messages %}<tr><td style="white-space:nowrap">{{ m.sent_at|date:"d.m.Y H:i" }}</td><td>{% if m.theirs %}↓ від них{% elif m.ours %}↑ наш{% else %}↔{% endif %}</td><td><a href="/email/?msg={{ m.pk }}" target="_blank" translate="no">{{ m.subject|default:"(без теми)" }}</a> <span class="spf-muted" translate="no">{{ m.from_email }}</span></td></tr>{% endfor %}
+        </table>
+      </details>
+    {% empty %}<div class="spf-muted">За цей період листів з постачальником у ваших скриньках немає.</div>{% endfor %}
+  </div>
+</div>
+{{ job_js }}
+<script>
+(function(){
+  var b = document.getElementById('an-ai'); if (!b) return;
+  b.addEventListener('click', function(){
+    spJob(location.pathname, {action: 'ai', model: document.getElementById('an-model').value,
+                              from: '{{ r.date_from|date:"Y-m-d" }}', to: '{{ r.date_to|date:"Y-m-d" }}'},
+          document.getElementById('an-job'));
+  });
+})();
+</script>
+{% endblock %}

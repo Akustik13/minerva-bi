@@ -1,0 +1,99 @@
+{% extends "admin/base_site.html" %}
+{# 📷 Візитка / флаєр: фото, що прочитав AI, «вже є в базі», створити / додати до наявного, примітки й позначки #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:inventory_supplier_changelist' %}">Постачальники</a> &rsaquo;
+  <a href="{% url 'admin:inventory_supplier_cards' %}">Візитки й флаєри</a> &rsaquo; {{ m.get_kind_display }}
+</div>
+{% endblock %}
+{% block content %}
+{% include "admin/suppliers/_styles.html" %}
+<div class="spp">
+  <div class="spf-two">
+    <div>
+      <div class="spf-card">
+        <a href="{{ m.image.url }}" target="_blank"><img class="spf-img" src="{{ m.image.url }}" alt=""></a>
+        {% if m.image_back %}<a href="{{ m.image_back.url }}" target="_blank"><img class="spf-img" src="{{ m.image_back.url }}" alt="" style="margin-top:8px"></a>{% endif %}
+        <div class="spf-muted" style="margin-top:6px">{{ m.get_kind_display }} · {{ m.created_at|date:"d.m.Y H:i" }}{% if m.created_by %} · {{ m.created_by.get_full_name|default:m.created_by.username }}{% endif %}
+          {% if m.supplier %}<div>🏭 <a href="{% url 'admin:inventory_supplier_change' m.supplier.pk %}" translate="no">{{ m.supplier.name }}</a></div>{% endif %}</div>
+      </div>
+      <form method="post" class="spf-card">{% csrf_token %}<input type="hidden" name="action" value="note">
+        <div class="spf-h">📝 Наші примітки й позначки</div>
+        <div class="spf-grid">
+          <label>Що це<select name="kind" {% if not can_edit %}disabled{% endif %}>{% for v, n in kinds %}<option value="{{ v }}" {% if v == m.kind %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+          <label>Назва<input name="title" value="{{ m.title }}" maxlength="200" {% if not can_edit %}disabled{% endif %}></label>
+          <label>Де взяли<input name="event" value="{{ m.event }}" maxlength="200" {% if not can_edit %}disabled{% endif %}></label>
+        </div>
+        <label class="spf-wide">Примітки<textarea name="note" rows="4" {% if not can_edit %}disabled{% endif %}>{{ m.note }}</textarea></label>
+        <div class="spf-marks" style="margin-top:6px">{% for v, n in marks %}<label><input type="checkbox" name="marks" value="{{ v }}" {% if v in m.marks %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> {{ n }}</label>{% endfor %}</div>
+        {% if can_edit %}<div class="spf-row"><button type="submit" class="button">💾 Зберегти примітки</button></div>{% endif %}
+      </form>
+      {% if can_edit %}
+      <form method="post" onsubmit="return confirm('Видалити це фото назавжди?')">{% csrf_token %}<input type="hidden" name="action" value="delete"><button type="submit" class="button">🗑 Видалити фото</button></form>
+      {% endif %}
+    </div>
+    <div>
+      <div class="spf-card">
+        <div class="spf-h">🧠 Що прочитав AI</div>
+        {% if m.state == "read" or m.state == "applied" %}<div class="spf-ok">✓ Прочитано{% if m.cost_usd %} · ${{ m.cost_usd|floatformat:3 }}{% endif %}{% if m.state == "applied" %} · уже внесено{% endif %}</div>
+        {% elif m.state == "failed" %}<div class="spf-bad">⚠️ {{ m.error|default:"Не вдалося прочитати" }}</div>
+        {% else %}<div class="spf-muted">Ще не читали.</div>{% endif %}
+        {% if can_edit %}
+        <div class="spf-row">
+          <select id="cr-model">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+          <button type="button" class="button" id="cr-ai">🧠 {% if m.extracted %}Прочитати ще раз{% else %}Прочитати фото AI{% endif %}</button>
+          <span class="spf-job" id="cr-job"></span>
+        </div>
+        {% endif %}
+      </div>
+      {% if can_add or can_change %}
+      <form method="post" id="spf-form">{% csrf_token %}
+        <input type="hidden" name="action" value="create">
+        {% include "admin/suppliers/_supplier_form.html" %}
+        <div class="spf-row">
+          {% if can_add %}<button type="submit" class="default">🏭 Створити постачальника (фото — у його картці)</button>{% endif %}
+        </div>
+        {% if can_change %}
+        <div class="spf-card"><div class="spf-h">… або додати до наявного</div>
+          <div class="spf-row"><input name="supplier_search" id="cr-sup-q" placeholder="Назва постачальника…" list="cr-sup-list" style="min-width:280px">
+            <input type="hidden" name="supplier" id="cr-sup-id">
+            <button type="submit" class="button" formnovalidate onclick="var v=document.getElementById('cr-sup-q').value, o=document.querySelector('#cr-sup-list option[value=&quot;'+v.replace(/&quot;/g,'')+'&quot;]'); if(!o){alert('Виберіть постачальника зі списку');return false;} document.getElementById('cr-sup-id').value=o.dataset.pk; this.form.querySelector('[name=action]').value='attach';">➕ Додати фото й контакт</button></div>
+          <datalist id="cr-sup-list"></datalist>
+          <div class="spf-muted">Почніть вводити назву — підкажемо з бази.</div>
+        </div>
+        {% endif %}
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{{ job_js }}
+<script>
+(function(){
+  var job = "{{ job|escapejs }}";
+  var out = document.getElementById('cr-job');
+  if (/^[0-9a-f]{32}$/.test(job)) {
+    if (out) out.textContent = '⏳ AI читає фото…';
+    spPoll(job, out, function(){ location.href = location.pathname; });
+  }
+  var b = document.getElementById('cr-ai');
+  if (b) b.addEventListener('click', function(){
+    spJob(location.pathname, {action: 'ai', model: document.getElementById('cr-model').value}, out,
+          function(){ location.href = location.pathname; });
+  });
+  var q = document.getElementById('cr-sup-q'), list = document.getElementById('cr-sup-list'), t = null;
+  if (q) q.addEventListener('input', function(){
+    clearTimeout(t); var v = q.value.trim(); if (v.length < 2) return;
+    t = setTimeout(function(){
+      fetch('{% url 'admin:inventory_supplier_search' %}?q=' + encodeURIComponent(v), {credentials: 'same-origin'})
+        .then(function(r){ return r.json(); }).then(function(j){
+          list.innerHTML = '';
+          (j.results || []).forEach(function(x){ var o = document.createElement('option'); o.value = x.text; o.dataset.pk = x.id; list.appendChild(o); });
+        });
+    }, 250);
+  });
+})();
+</script>
+{% endblock %}

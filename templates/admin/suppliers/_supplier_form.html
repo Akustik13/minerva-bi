@@ -1,0 +1,48 @@
+{# Поля нового постачальника (з листа / з візитки) і «вже є в базі» — suppliers/services/draft.py #}
+{% if matches %}
+<div class="spf-card spf-exists">
+  <div class="spf-h">✅ Схоже, цей постачальник уже є в базі</div>
+  {% for s, why in matches %}
+  <div class="spf-match">
+    <a href="{% url 'admin:inventory_supplier_change' s.pk %}" target="_blank" translate="no"><b>{{ s.name }}</b></a>
+    <span class="spf-muted">— {{ why }}{% if s.email %} · <span translate="no">{{ s.email }}</span>{% endif %}</span>
+    {% if can_change %}<button type="submit" name="supplier" value="{{ s.pk }}" class="button" formnovalidate onclick="this.form.querySelector('[name=action]').value='attach'">➕ Додати до нього</button>{% endif %}
+  </div>
+  {% endfor %}
+  {% if can_change %}<label class="spf-muted"><input type="checkbox" name="fill_empty" value="1" checked> заодно дописати порожні поля його картки (сайт, адреса, VAT…) і категорії, що позначені нижче; контактну особу — якщо її ще немає</label>{% endif %}
+</div>
+{% endif %}
+<div class="spf-card">
+  <div class="spf-h">🏢 Фірма</div>
+  <div class="spf-grid">
+    <label>Назва фірми<input name="name" value="{{ d.name }}" maxlength="255" required></label>
+    <label>Сайт<input name="website" value="{{ d.website }}" maxlength="200"></label>
+    <label>Email фірми<input name="email" value="{{ d.email }}" maxlength="254"></label>
+    <label>Телефон<input name="phone" value="{{ d.phone }}" maxlength="50"></label>
+    <label>Вулиця, будинок<input name="addr_street" value="{{ d.addr_street }}" maxlength="300"></label>
+    <label>Індекс<input name="addr_zip" value="{{ d.addr_zip }}" maxlength="20"></label>
+    <label>Місто<input name="addr_city" value="{{ d.addr_city }}" maxlength="100"></label>
+    <label>Країна (ISO-2)<input name="addr_country" value="{{ d.addr_country }}" maxlength="2" style="text-transform:uppercase"></label>
+    <label>VAT ID<input name="vat_id" value="{{ d.vat_id }}" maxlength="40"></label>
+    <label>Умови оплати<input name="payment_terms" value="{{ d.payment_terms }}" maxlength="100"></label>
+    <label>Валюта<input name="currency" value="{{ d.currency }}" maxlength="3" placeholder="EUR"></label>
+  </div>
+  <label class="spf-wide">Що роблять / продають<textarea name="description" rows="3">{{ d.description }}</textarea></label>
+  {% if d.notes %}<div class="spf-muted">📝 AI помітив: {{ d.notes }}</div>{% endif %}
+</div>
+<div class="spf-card">
+  <div class="spf-h">👤 Контактна особа</div>
+  <div class="spf-grid">
+    <label>Ім'я<input name="contact_name" value="{{ d.contact_name }}" maxlength="200"></label>
+    <label>Посада / відділ<input name="contact_position" value="{{ d.contact_position }}" maxlength="200"></label>
+    <label>Email<input name="contact_email" value="{{ d.contact_email }}" maxlength="254"></label>
+    <label>Телефон<input name="contact_phone" value="{{ d.contact_phone }}" maxlength="60"></label>
+    <label>Мобільний / WhatsApp / WeChat<input name="contact_mobile" value="{{ d.contact_mobile }}" maxlength="80"></label>
+  </div>
+</div>
+<div class="spf-card">
+  <div class="spf-h">🗂 Категорії</div>
+  <div class="spf-cats">
+    {% for c in categories %}<label class="spf-cat" data-name="{{ c.name|lower }}"><input type="checkbox" name="categories" value="{{ c.pk }}" {% if c.pk in picked %}checked{% endif %}> {{ c.icon }} {{ c.name }}</label>{% empty %}<span class="spf-muted">Категорій ще немає — <a href="{% url 'admin:suppliers_suppliercategory_add' %}" target="_blank">створити</a>.</span>{% endfor %}
+  </div>
+</div>

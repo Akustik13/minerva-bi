@@ -205,14 +205,15 @@ class FieldsTests(GenericTestBase):
         from inventory.models import Supplier
         s = Supplier.objects.create(name="Muster GmbH")
         groups, html = self.fields(s)
-        self.assertEqual([g["title"] for g in groups], ["🏢 Постачальник", "📁 Проєкти", "📞 Контакти", "📍 Адреса",
-                                                        "💼 Комерційні умови"])         # «📁 Проєкти» — projects/panels.py
-        for n in (2, 3, 4, 1):
+        self.assertEqual([g["title"] for g in groups], [   # «📁 Проєкти» — projects/panels.py, решта — suppliers/
+            "🏢 Постачальник", "📊 Огляд", "📁 Проєкти", "📞 Контакти", "📍 Адреса", "💼 Комерційні умови", "✉️ Пошта",
+            "📷 Візитки й флаєри", "📨 Запити (RFQ)", "🧠 AI та інтернет", "🕘 Історія"])
+        for n in (5, 3, 1):
             self.assertIn(f"<summary>Порожні поля ({n})</summary>", html)
-        self.assertLess(html.index("Muster GmbH"), html.index("Порожні поля (2)"))
+        self.assertLess(html.index("Muster GmbH"), html.index("Порожні поля (5)"))
         self.assertIn('<dt>Валюта</dt><dd><span translate="no">EUR</span></dd>', html)
-        self.assertEqual(html.count("data-mvp-row"), 12)
-        self.assertNotIn("data-mvp-filter", html)                              # 12 рядків — без пошуку
+        self.assertEqual(html.count("data-mvp-row"), 20)
+        self.assertNotIn("data-mvp-filter", html)                              # 20 рядків — без пошуку
         self.assertIn(f'href="/admin/inventory/supplier/{s.pk}/change/#fieldset-0-1-heading"', html)
 
     def test_long_cards_get_a_field_filter_and_card_only_notes(self):

@@ -1,0 +1,63 @@
+{% extends "admin/base_site.html" %}
+{# 🏭 Постачальник з листа — suppliers/admin_supplier.py from_mail_view, suppliers/services/draft.py #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:inventory_supplier_changelist' %}">Постачальники</a> &rsaquo; 🏭 З листа
+</div>
+{% endblock %}
+{% block content %}
+{% include "admin/suppliers/_styles.html" %}
+<div class="spp">
+  <div class="spf-card">
+    <div class="spf-h">✉️ Лист</div>
+    <div><b translate="no">{{ msg.subject }}</b></div>
+    <div class="spf-muted">від <span translate="no">{{ msg.from_name }} &lt;{{ msg.from_email }}&gt;</span> · {{ msg.sent_at|date:"d.m.Y H:i" }} · <a href="/email/?msg={{ msg.pk }}" target="_blank">відкрити в пошті</a></div>
+    <details style="margin-top:6px"><summary class="spf-muted">Текст листа</summary><div class="spf-mail" translate="no">{{ msg.body_text|truncatechars:4000 }}</div></details>
+    <div class="spf-muted" style="margin-top:6px">Minerva заповнила поля з підпису й адреси відправника (без AI). Перевірте; «🧠 Заповнити з AI» прочитає лист уважніше, а з галочкою «🌐» — ще й знайде сайт і адресу фірми в інтернеті.</div>
+  </div>
+  <form method="post" id="spf-form">{% csrf_token %}
+    <input type="hidden" name="action" value="create">
+    {% if can_add or can_change %}
+    <div class="spf-row">
+      <select id="spf-model" title="Модель AI">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <label class="spf-muted"><input type="checkbox" id="spf-web"> 🌐 шукати в інтернеті</label>
+      <button type="button" class="button" id="spf-ai">🧠 Заповнити з AI</button>
+      <span class="spf-job" id="spf-job"></span>
+    </div>
+    {% endif %}
+    {% include "admin/suppliers/_supplier_form.html" with picked=None %}
+    <label class="spf-wide">Нотатка (піде в «Нотатки» картки)<textarea name="note" rows="2"></textarea></label>
+    <div class="spf-row">
+      {% if can_add %}<button type="submit" class="default">🏭 Створити постачальника</button>{% else %}<span class="spf-muted">Створювати постачальників може той, хто має право додавати постачальників.</span>{% endif %}
+      <a href="{% url 'admin:inventory_supplier_changelist' %}">Скасувати</a>
+    </div>
+  </form>
+</div>
+{{ job_js }}
+<script>
+(function(){
+  var btn = document.getElementById('spf-ai'); if (!btn) return;
+  btn.addEventListener('click', function(){
+    var form = document.getElementById('spf-form');
+    spJob(location.pathname, {action: 'ai', model: document.getElementById('spf-model').value,
+                              web: document.getElementById('spf-web').checked ? '1' : ''},
+          document.getElementById('spf-job'), function(res){
+      var f = res.fields || {}, n = 0;
+      Object.keys(f).forEach(function(k){
+        var el = form.querySelector('[name="' + k + '"]');
+        if (el && f[k] && typeof f[k] === 'string' && el.type !== 'checkbox' && el.type !== 'hidden') {
+          if (!el.value || el.value.length < f[k].length) { el.value = f[k]; n++; el.style.outline = '2px solid #4caf50'; }
+        }
+      });
+      (f.categories || []).forEach(function(name){
+        var lab = form.querySelector('.spf-cat[data-name="' + String(name).toLowerCase() + '"] input');
+        if (lab) { lab.checked = true; n++; }
+      });
+      document.getElementById('spf-job').textContent = '✅ AI заповнив полів: ' + n + (f.cost_usd ? ' · $' + f.cost_usd.toFixed(3) : '') + ' — перевірте й натисніть «Створити»';
+    });
+  });
+})();
+</script>
+{% endblock %}

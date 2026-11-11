@@ -1,0 +1,103 @@
+{% extends "admin/base_site.html" %}
+{# 📷 Візитка / флаєр: камера або файл → SupplierMedia → AI читає → картка перевірки (suppliers/admin_supplier.py card_view) #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:inventory_supplier_changelist' %}">Постачальники</a> &rsaquo;
+  {% if supplier %}<a href="{% url 'admin:inventory_supplier_change' supplier.pk %}" translate="no">{{ supplier.name }}</a> &rsaquo; {% endif %}📷 Візитка / флаєр
+</div>
+{% endblock %}
+{% block content %}
+{% include "admin/suppliers/_styles.html" %}
+<style>
+  #sc-video { width: 100%; max-width: 560px; border-radius: 8px; background: #000; display: none; }
+  .sc-shot { display: flex; flex-wrap: wrap; gap: 12px; }
+  .sc-side { border: 1px dashed var(--border-strong, #ccc); border-radius: 8px; padding: 10px; min-width: 260px; flex: 1 1 260px; }
+  .sc-side img { max-width: 100%; max-height: 220px; display: none; margin-top: 6px; border-radius: 6px; background: #fff; }
+</style>
+<div class="spp">
+  <form method="post" enctype="multipart/form-data" id="sc-form">{% csrf_token %}
+  {% if supplier %}<input type="hidden" name="supplier" value="{{ supplier.pk }}">{% endif %}
+  <div class="spf-card">
+    <div class="spf-muted">{% if supplier %}Фото збережеться в картці <b translate="no">{{ supplier.name }}</b>. {% endif %}Сфотографуйте візитку, флаєр чи стенд на виставці — камерою (телефон, ноутбук) або виберіть файл. Minerva збереже фото з вашими примітками й позначками{% if not supplier %}, AI прочитає фірму, контакт і адресу, перевірить, чи вона вже є в базі, і запропонує створити постачальника{% endif %}.</div>
+    <div class="spf-row">
+      <button type="button" class="button" id="sc-cam">📷 Увімкнути камеру</button>
+      <button type="button" class="button" id="sc-snap" style="display:none">⏺ Зробити фото</button>
+      <button type="button" class="button" id="sc-stop" style="display:none">✕ Вимкнути камеру</button>
+      <span class="spf-muted" id="sc-cam-note"></span>
+    </div>
+    <video id="sc-video" autoplay playsinline muted></video>
+    <canvas id="sc-canvas" style="display:none"></canvas>
+    <div class="sc-shot">
+      <div class="sc-side"><b>Лицьовий бік</b> <span class="spf-muted" id="sc-front-note"></span>
+        <div><input type="file" name="image" id="sc-front" accept="image/*" capture="environment" required></div><img id="sc-front-img" alt=""></div>
+      <div class="sc-side"><b>Зворотний бік</b> <span class="spf-muted">(якщо є)</span>
+        <div><input type="file" name="image_back" id="sc-back" accept="image/*" capture="environment"></div><img id="sc-back-img" alt=""></div>
+    </div>
+    <div class="spf-muted" id="sc-target-note" style="margin-top:4px">Камера знімає на той бік, який вибрано: <label><input type="radio" name="_side" value="front" checked> лицьовий</label> <label><input type="radio" name="_side" value="back"> зворотний</label></div>
+  </div>
+  <div class="spf-card">
+    <div class="spf-grid">
+      <label>Що це<select name="kind">{% for v, n in kinds %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></label>
+      <label>Назва (необов'язково)<input name="title" maxlength="200" placeholder="напр. Візитка менеджера"></label>
+      <label>Де взяли<input name="event" maxlength="200" placeholder="напр. electronica 2026, хол B3"></label>
+    </div>
+    <label class="spf-wide">Наші примітки<textarea name="note" rows="3" placeholder="Що обговорили, що обіцяли, враження…"></textarea></label>
+    <div class="spf-marks" style="margin-top:6px">{% for v, n in marks %}<label><input type="checkbox" name="marks" value="{{ v }}"> {{ n }}</label>{% endfor %}</div>
+  </div>
+  <div class="spf-row">
+    <label><input type="checkbox" name="read_ai" value="1" checked> 🧠 Прочитати фото AI</label>
+    <select name="model" title="Модель AI">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+    <button type="submit" class="default">💾 Зберегти фото</button>
+  </div>
+  </form>
+  {% if recent %}
+  <div class="spf-card"><div class="spf-h">Останні <a href="{% url 'admin:inventory_supplier_cards' %}" style="font-weight:normal">— усі →</a></div>
+    <div class="spf-row">{% for m in recent %}<a href="{% url 'admin:inventory_supplier_card_review' m.pk %}" title="{{ m.get_kind_display }}"><img src="{{ m.image.url }}" alt="" style="height:70px;border-radius:6px;background:#fff"></a>{% endfor %}</div>
+  </div>
+  {% endif %}
+</div>
+<script>
+(function(){
+  var video = document.getElementById('sc-video'), canvas = document.getElementById('sc-canvas'), stream = null;
+  var cam = document.getElementById('sc-cam'), snap = document.getElementById('sc-snap'), stop = document.getElementById('sc-stop');
+  var note = document.getElementById('sc-cam-note');
+  function preview(input, img){
+    var f = input.files && input.files[0]; if (!f) { img.style.display = 'none'; return; }
+    img.src = URL.createObjectURL(f); img.style.display = 'block';
+  }
+  [['sc-front', 'sc-front-img'], ['sc-back', 'sc-back-img']].forEach(function(p){
+    var input = document.getElementById(p[0]), img = document.getElementById(p[1]);
+    input.addEventListener('change', function(){ preview(input, img); });
+  });
+  function off(){ if (stream) stream.getTracks().forEach(function(t){ t.stop(); }); stream = null;
+    video.style.display = 'none'; snap.style.display = stop.style.display = 'none'; cam.style.display = ''; }
+  cam.addEventListener('click', function(){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      note.textContent = 'Браузер не дає камеру цій сторінці (потрібен HTTPS) — виберіть файл: на телефоні кнопка вибору файлу сама запропонує камеру.';
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({video: {facingMode: {ideal: 'environment'}, width: {ideal: 1920}, height: {ideal: 1080}}, audio: false})
+      .then(function(s){ stream = s; video.srcObject = s; video.style.display = 'block';
+        snap.style.display = stop.style.display = ''; cam.style.display = 'none'; note.textContent = 'Наведіть на візитку й натисніть «⏺ Зробити фото».'; })
+      .catch(function(e){ note.textContent = 'Камера недоступна (' + e.name + ') — дозвольте камеру в браузері або виберіть файл.'; });
+  });
+  stop.addEventListener('click', off);
+  snap.addEventListener('click', function(){
+    if (!stream) return;
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    var side = document.querySelector('input[name=_side]:checked').value;
+    canvas.toBlob(function(blob){
+      var input = document.getElementById(side === 'back' ? 'sc-back' : 'sc-front');
+      var dt = new DataTransfer(); dt.items.add(new File([blob], side + '.jpg', {type: 'image/jpeg'}));
+      input.files = dt.files; preview(input, document.getElementById(side === 'back' ? 'sc-back-img' : 'sc-front-img'));
+      note.textContent = side === 'back' ? '✅ Зворотний бік знято.' : '✅ Лицьовий бік знято — можна зняти зворотний (виберіть «зворотний»).';
+      if (side === 'front') { var r = document.querySelector('input[name=_side][value=back]'); if (r) r.checked = true; }
+    }, 'image/jpeg', 0.9);
+  });
+  document.getElementById('sc-form').addEventListener('submit', off);
+})();
+</script>
+{% endblock %}

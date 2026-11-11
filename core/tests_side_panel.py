@@ -48,7 +48,7 @@ def register_test_panel():
         blocks=[
             sp.Block("info", "Контакти", lambda s, r: sp.kv([("Email", s.email), ("Телефон", s.phone)]), icon="📇",
                      badge=lambda s, r: sp.Badge(2, "ok", "дві адреси"),
-                     summary=lambda s, r: f"{s.contact_person} · {s.email}", affects=("email",), fieldset=1),
+                     summary=lambda s, r: f"{s.contact_person} · {s.email}", affects=("email",), fieldset=2),
             sp.Block("secret", "Для продажів", lambda s, r: format_html("<p>{}</p>", "Таємні продажі"),
                      perm="sales.view_salesorder"),
             sp.Block("lazy", "Повільний", lambda s, r: format_html("<p>{}</p>", "Повільно пораховано"), lazy=True),
@@ -72,7 +72,7 @@ def register_test_panel():
             sp.Edit("person", "contact_person", "Контакт", "choice", place="head", choices=_person_choices,
                     confirm={"Bob": "Передати Bob?"}, tones={"Anna": "ok"}, hotkey="KeyS"),
         ],
-        hide_cols=("phone",), generic_blocks=())
+        hide_cols=("addr_country",), generic_blocks=())
 
 
 def register_location_panel():
@@ -276,9 +276,10 @@ class ConfigTests(PanelTestBase):
                          ("mail", "✉️", "Написати", "link", "KeyM"))
         self.assertEqual([e["key"] for e in cfg["edits"]], ["email", "notes", "person"])
         self.assertEqual([c["name"] for c in cfg["columns"]],
-                         ["name", "contact_person", "email", "phone", "currency", "website"])
-        self.assertEqual(cfg["columns"][1]["label"], "Контактна особа")
-        self.assertEqual(cfg["hideDefault"], ["phone"])
+                         ["name", "categories_col", "status_col", "contact_person", "email", "addr_country", "po_col",
+                          "rating_col"])
+        self.assertEqual(cfg["columns"][3]["label"], "Контактна особа")
+        self.assertEqual(cfg["hideDefault"], ["addr_country"])
         self.assertEqual(cfg["width"], {"min": 320, "max": 960, "presets": [360, 440, 560, 720]})
         self.assertEqual(cfg["shared"], ["nav", "view", "chips", "density", "actions_at", "place", "helpers", "empty"])
         self.assertEqual(cfg["prefs"]["nav"], "top")
@@ -329,7 +330,7 @@ class ShellTests(PanelTestBase):
         for part in ('data-count="2"', 'data-tone="ok"', 'data-badge="дві адреси"',
                      'data-brief="Anna · anna@muster.example"', 'aria-expanded="true"',
                      # група 1 адмінки («📞 Контакти») — у картці 2: після «🏢 Постачальник» ще «📁 Проєкти»
-                     f'data-card="/admin/inventory/supplier/{pk}/change/#fieldset-0-2-heading"', "mvp-sh-card",
+                     f'data-card="/admin/inventory/supplier/{pk}/change/#fieldset-0-3-heading"', "mvp-sh-card",
                      '<dt>Email</dt><dd><span translate="no">anna@muster.example</span></dd>'):
             self.assertIn(part, info)
         self.assertIn("Таємні продажі", self.section(html, "secret"))

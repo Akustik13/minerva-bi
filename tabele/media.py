@@ -22,7 +22,8 @@ MODULES = (                          # тека → розділ Minerva (пер
     ("orders/", "sales"), ("offers/", "offers"), ("accounting/", "accounting"),
     ("invoices/", "shipping"), ("packing_lists/", "shipping"), ("commercial_invoices/", "shipping"),
     ("shipments/", "shipping"), ("shipping/", "shipping"), ("generated_documents/", "documents"), ("document_templates/", "documents"),
-    ("scraper/", "scraper_hub"), ("rfq_diagrams/", "inventory"), ("purchase_orders/", "inventory"), ("customers/", "crm"),
+    ("scraper/", "scraper_hub"), ("rfq_diagrams/", "inventory"), ("purchase_orders/", "inventory"),
+    ("suppliers/", "inventory"), ("supplier_requests/", "suppliers"), ("customers/", "crm"),
 )
 ADMIN_ONLY = ("knowledge/", "knowledge_sources/")
 NOBODY = ("meetings/",)              # 🎙 наради — лише власник і лише через сторінку наради, не через /media/

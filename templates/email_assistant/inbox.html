@@ -1128,6 +1128,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   </div>
   {% if email_settings.sender_logos %}<div class="em-ctx-item" data-k="logo" data-g="org" onclick="ctxAction('logo')" title="{% trans "Свій значок замість логотипа сайту — для цієї адреси або всього домену; або буква" %}">🖼 {% trans "Значок відправника…" %}</div>{% endif %}
   {% if mail_time_url %}<div class="em-ctx-item" data-k="dante" data-g="org" onclick="ctxAction('dante')" title="{% trans "Час на проєкт листа в askDANTE: дата й час з листа, AI коротко опише, що зроблено, і що надіслали" %}">⏱ {% trans "Записати в askDANTE з листа…" %}</div>{% endif %}
+  {% if supplier_can %}<div class="em-ctx-item" data-k="supplier" data-g="org" onclick="ctxAction('supplier')" title="{% trans "Новий постачальник з листа (фірма, контакт, адреса з підпису; AI — уважніше й з інтернету) або, якщо він уже є в базі, — контакт і дані до нього" %}">🏭 {% trans "Постачальник з листа…" %}</div>{% endif %}
   <div class="em-ctx-item" data-k="customer" data-g="org" onclick="ctxAction('customer')" title="{% trans "Новий клієнт CRM з даних листа (ім'я, компанія, email, телефон, адреса з підпису) — і гілка, Angebote та проєкти до нього; або вибрати наявного" %}">👤 {% trans "Клієнт CRM з листа…" %}</div>
   <div class="em-ctx-item" data-k="why" data-g="org" onclick="ctxAction('why')" title="{% trans "До якої своєї категорії й чому, хто пише, проєкти — і швидко змінити правило" %}">🔍 {% trans "Чому лист тут — ознаки й правила…" %}</div>
   {% if agent_can %}<div class="em-ctx-item" data-k="agent" data-g="org" onclick="ctxAction('agent')" title="{% trans "Агент Minerva відповідатиме на такі листи за вашою інструкцією — спершу чернетками, які ви перевіряєте" %}">🤖 {% trans "Доручити агенту: відповідати на такі листи…" %}</div>{% endif %}
@@ -4315,6 +4316,7 @@ async function ctxAction(action) {
   if (action === 'followup') { emFollowup(pk); return; }
   if (action === 'agent') { emAgent(pk); return; }
   if (action === 'agent_task') { window.open('/admin/agent/agenttask/add/?msg=' + pk, '_blank'); return; }
+  if (action === 'supplier') { window.open('/admin/inventory/supplier/from-mail/' + pk + '/', '_blank'); return; }
   if (action === 'dante') { window.open('/admin/worktime/workday/from-mail/' + pk + '/', '_blank'); return; }
   if (action === 'customer') {   // «👤 Клієнт CRM з листа»: те саме вікно, одразу з формою нового клієнта
     await emWhy(pk);

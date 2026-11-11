@@ -1,0 +1,42 @@
+{% extends "admin/base_site.html" %}
+{# 🔎 Постачальники з пошти — suppliers/admin_supplier.py find_in_mail_view, suppliers/services/discover.py #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:inventory_supplier_changelist' %}">Постачальники</a> &rsaquo; 🔎 З пошти
+</div>
+{% endblock %}
+{% block content %}
+{% include "admin/suppliers/_styles.html" %}
+<div class="spp">
+  <div class="spf-card">
+    <div class="spf-muted">Minerva переглядає листування <b>ваших</b> скриньок за період і показує фірми, з якими ви говорите про ціни, замовлення, виробництво, зразки (Quotation, Proforma, Auftragsbestätigung, MOQ, PCB…) або яким ви писали запити, — але яких ще немає серед постачальників. Клієнти CRM, перевізники, банки, розсилки й ті, кого ви позначили «🙈 Не постачальник», не показуються. Без AI.</div>
+    <form method="get" class="spf-row">
+      з <input type="date" name="from" value="{{ date_from|date:'Y-m-d' }}"> по <input type="date" name="to" value="{{ date_to|date:'Y-m-d' }}">
+      <button type="submit" class="button">🔎 Перечитати пошту</button>
+    </form>
+  </div>
+  {% if rows %}
+  <table class="spf-table">
+    <tr><th>Хто</th><th>Листів</th><th>Чому схоже на постачальника</th><th>Теми</th><th></th></tr>
+    {% for g in rows %}
+    <tr>
+      <td><b translate="no">{% if g.domain %}{{ g.domain }}{% else %}{{ g.email }}{% endif %}</b>{% if g.name %}<div class="spf-muted" translate="no">{{ g.name }}</div>{% endif %}
+        <div class="spf-muted" translate="no">{{ g.addresses|join:", " }}</div></td>
+      <td>{{ g.mails }}<div class="spf-muted">↓ {{ g.incoming }} · ↑ {{ g.outgoing }} · гілок {{ g.threads }}</div><div class="spf-muted">{{ g.last|date:"d.m.Y" }}</div></td>
+      <td>{% for w in g.why %}<div>{{ w }}</div>{% endfor %}</td>
+      <td class="spf-muted" translate="no">{% for s in g.subjects %}<div>{{ s }}</div>{% endfor %}</td>
+      <td style="white-space:nowrap">
+        {% if can_add and g.message_pk %}<a class="button" href="{% url 'admin:inventory_supplier_from_mail' g.message_pk %}">＋ Створити</a>{% endif %}
+        {% if g.message_pk %}<a href="/email/?msg={{ g.message_pk }}" target="_blank" title="Відкрити останній лист">✉️</a>{% endif %}
+        <form method="post" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="ignore"><input type="hidden" name="key" value="{{ g.key }}"><button type="submit" class="button" title="Більше не пропонувати">🙈 Не постачальник</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <div class="spf-card spf-muted">За цей період нових постачальників у вашій пошті не знайдено. Спробуйте більший період.</div>
+  {% endif %}
+</div>
+{% endblock %}

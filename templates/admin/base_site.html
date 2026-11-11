@@ -1300,6 +1300,17 @@ window.MV_GROUPS = [
       { href:'/labels/',                                   icon:'🏷️', label:'Наклейки DYMO',      app:'inventory' },
       { href:'/admin/inventory/inventorysettings/',        icon:'⚙️', label:'Налаштування',       app:'inventory' },
     ], apps:['inventory'] },
+  /* Постачальники — категорії, візитки, пошук у пошті, запити (RFQ): suppliers/ */
+  { id:'suppliers', icon:'🏭', label:'🏭 Постачальники', href:'/admin/inventory/supplier/', after:'inventory',
+    links:[
+      { href:'/admin/inventory/supplier/',                 icon:'🏭', label:'Усі постачальники',  app:'inventory', model:'Supplier' },
+      { href:'/admin/suppliers/supplierrequest/',          icon:'📨', label:'Запити (RFQ)',        app:'suppliers', model:'SupplierRequest' },
+      { href:'/admin/suppliers/supplierrequest/new/',      icon:'➕', label:'Новий запит',         app:'suppliers', model:'SupplierRequest' },
+      { href:'/admin/inventory/supplier/card/',            icon:'📷', label:'Візитка / флаєр',     app:'inventory', model:'Supplier' },
+      { href:'/admin/inventory/supplier/cards/',           icon:'🪪', label:'Усі візитки',         app:'inventory', model:'Supplier' },
+      { href:'/admin/inventory/supplier/find-in-mail/',    icon:'🔎', label:'Знайти в пошті',      app:'inventory', model:'Supplier' },
+      { href:'/admin/suppliers/suppliercategory/',         icon:'🗂', label:'Категорії',           app:'suppliers', model:'SupplierCategory' },
+    ], apps:['suppliers'] },
   { id:'tasks', icon:'✅', label:'✅ Задачі', apps:['tasks'] },
   { id:'ai', icon:'🏛️', label:'🏛️ Minerva AI', href:'/ai/',
     links:[

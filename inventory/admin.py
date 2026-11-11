@@ -11,6 +11,7 @@ import tempfile
 from django import forms
 from django.contrib import admin, messages
 from projects.panels import ProjectsBlockMixin
+from suppliers.admin_supplier import CategoryFilter, SupplierCardMixin
 from django.db import transaction
 from django.db.models import Sum, Window
 from django.db.models.functions import Coalesce
@@ -4310,23 +4311,47 @@ class PODocsFilter(admin.SimpleListFilter):
 
 
 @admin.register(Supplier)
-class SupplierAdmin(ProjectsBlockMixin, admin.ModelAdmin):
+class SupplierAdmin(SupplierCardMixin, ProjectsBlockMixin, admin.ModelAdmin):
+    # 🏭 категорії, контактні особи, огляд, візитки, запити (RFQ), AI, історія — suppliers/admin_supplier.py
     projects_block_kind = "supplier"           # «📁 Проєкти» (projects/panels.py)
-    projects_block_after = "🏢 Постачальник"
-    list_display  = ("name", "contact_person", "email", "phone", "currency", "website")
-    search_fields = ("name", "contact_person", "email")
+    projects_block_after = "📊 Огляд"
+    list_display  = ("name", "categories_col", "status_col", "contact_person", "email", "addr_country", "po_col",
+                     "rating_col")
+    list_filter   = ("status", CategoryFilter, "addr_country", "source")
+    search_fields = ("name", "contact_person", "email", "website", "domains", "description",
+                     "contacts__name", "contacts__email")
     fieldsets = (
         ("🏢 Постачальник", {
-            "fields": ("name", "website", "notes")
+            "fields": ("name", "status", "categories", "website", "description", "rating", "notes")
+        }),
+        ("📊 Огляд", {
+            "fields": ("sup_overview",),
+            "description": "З закупівель і запитів Minerva; швидкість відповіді й проблеми — «✉️ Аналіз пошти».",
         }),
         ("📞 Контакти", {
-            "fields": ("contact_person", "email", "phone")
+            "fields": ("contact_person", "email", "phone"),
+            "description": "Основний контакт фірми; інші люди — «👥 Контактні особи» внизу картки.",
         }),
         ("📍 Адреса", {
-            "fields": ("addr_street", ("addr_city", "addr_zip", "addr_country"))
+            "fields": ("addr_street", ("addr_city", "addr_zip", "addr_country"), "vat_id")
         }),
         ("💼 Комерційні умови", {
             "fields": ("payment_terms", "currency")
+        }),
+        ("✉️ Пошта", {
+            "fields": ("domains",)
+        }),
+        ("📷 Візитки й флаєри", {
+            "fields": ("sup_media",)
+        }),
+        ("📨 Запити (RFQ)", {
+            "fields": ("sup_requests",)
+        }),
+        ("🧠 AI та інтернет", {
+            "fields": ("sup_ai",)
+        }),
+        ("🕘 Історія", {
+            "fields": ("sup_history", ("source", "created_at"))
         }),
     )
 

@@ -374,6 +374,32 @@ class Supplier(models.Model):
     addr_zip       = models.CharField("Поштовий індекс", max_length=20, blank=True, default="")
     addr_country   = models.CharField("Країна (ISO 2)", max_length=2, blank=True, default="")
 
+    # ── 🏭 Постачальники: категорії, стан, звідки взявся (suppliers/ — контакти, візитки, запити, аналіз) ──
+    STATUS_ACTIVE, STATUS_POTENTIAL, STATUS_PAUSED, STATUS_BLOCKED = "active", "potential", "paused", "blocked"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "✅ Працюємо"),
+        (STATUS_POTENTIAL, "🌱 Потенційний"),
+        (STATUS_PAUSED, "⏸ Не працюємо зараз"),
+        (STATUS_BLOCKED, "⛔ Не працювати"),
+    ]
+    SOURCE_CHOICES = [("manual", "вручну"), ("mail", "з листа"), ("card", "з візитки / флаєра"),
+                      ("discover", "знайдено в пошті"), ("ai", "AI"), ("import", "імпорт / API")]
+    categories = models.ManyToManyField(
+        "suppliers.SupplierCategory", blank=True, related_name="suppliers", verbose_name="Категорії",
+        help_text="Виробники кабелів, виробники плат, закупка компонентів… — постачальник може бути в кількох.")
+    status = models.CharField("Стан", max_length=12, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
+    description = models.TextField("Що роблять / продають", blank=True, default="",
+                                   help_text="Коротко: продукція, технології, сильні сторони.")
+    vat_id = models.CharField("VAT ID / USt-IdNr.", max_length=40, blank=True, default="")
+    domains = models.CharField(
+        "Поштові домени", max_length=300, blank=True, default="",
+        help_text="Через кому, напр. «pcbway.com, pcbway.cn» — листи з цих доменів належать постачальнику "
+                  "(домен з email, сайту й контактних осіб Minerva бере й так).")
+    rating = models.PositiveSmallIntegerField("Наша оцінка", null=True, blank=True,
+                                              help_text="1–5 ⭐ — ваша оцінка; Minerva рахує й свою з закупівель і пошти.")
+    source = models.CharField("Звідки взявся", max_length=12, choices=SOURCE_CHOICES, default="manual", blank=True)
+    created_at = models.DateTimeField("Додано", null=True, blank=True, default=timezone.now)
+
     def __str__(self) -> str:
         return self.name
 

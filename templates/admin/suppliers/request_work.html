@@ -1,0 +1,150 @@
+{% extends "admin/base_site.html" %}
+{# 📨 Сторінка запиту постачальникам — suppliers/admin.py work_view / action_view, services/rfq.py #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:suppliers_supplierrequest_changelist' %}">Запити постачальникам</a> &rsaquo; <span translate="no">{{ req.code }}</span>
+</div>
+{% endblock %}
+{% block content %}
+{% include "admin/suppliers/_styles.html" %}
+<style>
+  .rw-q { display: none; margin-top: 6px; } .rw-q.on { display: block; }
+  .rw-q .spf-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  tr.rw-chosen td { background: rgba(76, 175, 80, .10); }
+  .rw-best { font-size: 11px; border-radius: 8px; padding: 0 6px; border: 1px solid currentColor; margin-left: 4px; }
+</style>
+{% url 'admin:suppliers_supplierrequest_action' req.pk as act %}
+<div class="spp">
+  <div class="spf-card">
+    <div class="spf-row" style="justify-content:space-between">
+      <div><b translate="no">{{ req.code }}</b> · {{ req.title }} · <b>{{ req.get_status_display }}</b>
+        <div class="spf-muted">{% if req.group %}🗂 {{ req.group }} · {% endif %}{% if req.category %}{{ req.category }} · {% endif %}{% if req.project %}📁 <a href="{% url 'admin:projects_project_change' req.project.pk %}" translate="no">{{ req.project.code }} {{ req.project.name }}</a> · {% endif %}{% if quantities %}кількості {{ quantities|join:" / " }} · {% endif %}{% if req.reply_by %}відповідь до {{ req.reply_by|date:"d.m.Y" }} · {% endif %}{% if req.sent_at %}надіслано {{ req.sent_at|date:"d.m.Y H:i" }}{% if req.account %} з <span translate="no">{{ req.account.email_address }}</span>{% endif %}{% endif %}</div>
+      </div>
+      {% if can_change %}<div class="spf-row">
+        <a class="button" href="{% url 'admin:suppliers_supplierrequest_edit' req.pk %}">✏️ Змінити запит</a>
+        {% if planned %}<form method="post" action="{{ act }}" onsubmit="return confirm('Надіслати запит отримувачам, яким ще не надіслано ({{ planned }})?')">{% csrf_token %}<input type="hidden" name="do" value="send"><button type="submit" class="default">📤 Надіслати ({{ planned }})</button></form>{% endif %}
+      </div>{% endif %}
+    </div>
+    {% if overdue %}<div class="spf-warn" style="margin-top:6px">⏰ Строк відповіді минув, мовчать: {% for r in overdue %}<span translate="no">{{ r.supplier.name }}</span>{% if not forloop.last %}, {% endif %}{% endfor %} — нагадайте (⏰ у рядку) або позначте «🔕 Не відповів».</div>{% endif %}
+    {% if files %}<div class="spf-row">{% for f in files %}<a class="spf-tag" href="{{ f.file.url }}" target="_blank" translate="no">📎 {{ f.name }}</a>{% endfor %}</div>{% endif %}
+    <details style="margin-top:6px"><summary class="spf-muted">Текст листа</summary><div class="spf-mail" translate="no"><b>{{ req.subject }}</b>
+
+{{ req.body }}</div></details>
+  </div>
+
+  <div class="spf-card">
+    <div class="spf-h">🏭 Отримувачі й пропозиції</div>
+    <table class="spf-table">
+      <tr><th>Постачальник</th><th>Стан</th><th>Ціна за шт.</th><th>Сума{% if quantities %} ({{ quantities.0 }} шт.){% endif %}</th><th>У {{ rows.0.home|default:"EUR" }}</th><th>Строк</th><th>Доставка</th><th>Оцінка</th><th></th></tr>
+      {% for row in rows %}{% with r=row.recipient %}
+      <tr class="{% if r.chosen %}rw-chosen{% endif %}">
+        <td><a href="{% url 'admin:inventory_supplier_change' r.supplier.pk %}" translate="no"><b>{{ r.supplier.name }}</b></a>{% if r.chosen %} 🏆{% endif %}
+          <div class="spf-muted" translate="no">{% if r.contact %}{{ r.contact.name }} · {% endif %}{{ r.email }}</div></td>
+        <td>{{ r.get_state_display }}
+          <div class="spf-muted">{% if r.sent_at %}↑ {{ r.sent_at|date:"d.m H:i" }}{% if row.sent_link %} <a href="/email/?msg={{ row.sent_link }}" target="_blank">✉️</a>{% endif %}{% endif %}
+            {% if r.replied_at %}<br>↓ {{ r.replied_at|date:"d.m H:i" }}{% if row.reply_link %} <a href="/email/?msg={{ row.reply_link }}" target="_blank">✉️ відповідь</a>{% endif %}{% endif %}
+            {% if r.reminded_at %}<br>⏰ {{ r.reminded_at|date:"d.m" }}{% endif %}</div>
+          {% if r.error %}<div class="spf-bad">{{ r.error|truncatechars:160 }}</div>{% endif %}</td>
+        <td>{% if r.price is not None %}{{ row.price_text }} {{ r.currency }}{% else %}—{% endif %}
+          {% if r.tiers %}<div class="spf-muted">{% for t in r.tiers %}{{ t.qty }} шт: {{ t.unit_price }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}</td>
+        <td>{% if r.total is not None %}{{ r.total }} {{ r.currency }}{% else %}—{% endif %}</td>
+        <td>{% if row.all_in is not None %}{{ row.all_in }}{% if row.cheapest %}<span class="rw-best spf-ok">найдешевше</span>{% endif %}{% elif row.no_rate %}<span class="spf-warn" title="Немає курсу {{ r.currency }} у «Курсах валют»">немає курсу</span>{% else %}—{% endif %}</td>
+        <td>{% if r.lead_days is not None %}{{ r.lead_days }} дн.{% if row.fastest %}<span class="rw-best spf-ok">найшвидше</span>{% endif %}{% else %}—{% endif %}</td>
+        <td>{% if r.shipping is not None %}{{ r.shipping }} {{ r.currency }}{% else %}—{% endif %}</td>
+        <td>{% if row.score is not None %}{{ row.score }}/100{% else %}—{% endif %}</td>
+        <td style="white-space:nowrap">{% if can_change %}
+          {% if r.state == "planned" or r.state == "failed" %}
+            <form method="post" action="{{ act }}" style="display:inline">{% csrf_token %}<input type="hidden" name="rid" value="{{ r.pk }}"><button type="submit" name="do" value="send_one" class="button" title="Надіслати лише йому">📤</button><button type="submit" name="do" value="remove" class="button" title="Прибрати з запиту">✕</button></form>
+          {% else %}
+            <button type="button" class="button" onclick="document.getElementById('rq-{{ r.pk }}').classList.toggle('on')" title="Внести пропозицію вручну">✏️</button>
+            {% if r.thread_id or r.reply_message_id %}<button type="button" class="button" data-rw-ai="{{ r.pk }}" title="AI прочитає відповідь (і вкладення) й заповнить ціни, строк, умови">🧠</button>{% endif %}
+            {% if r.state == "sent" or r.state == "silent" %}<form method="post" action="{{ act }}" style="display:inline" onsubmit="return confirm('Надіслати нагадування в ту саму гілку?')">{% csrf_token %}<input type="hidden" name="rid" value="{{ r.pk }}"><button type="submit" name="do" value="remind" class="button" title="Нагадати">⏰</button></form>{% endif %}
+            {% if r.state == "quoted" or r.state == "replied" %}<form method="post" action="{{ act }}" style="display:inline">{% csrf_token %}<input type="hidden" name="rid" value="{{ r.pk }}"><button type="submit" name="do" value="choose" class="button" title="Вибрати цю пропозицію">🏆</button>{% if r.chosen %}<button type="submit" name="do" value="make_po" class="button" title="Чернетка закупівлі в цього постачальника" onclick="return confirm('Створити чернетку закупівлі?')">🛒</button>{% endif %}</form>{% endif %}
+          {% endif %}
+          <span class="spf-job" id="rw-job-{{ r.pk }}"></span>
+        {% endif %}</td>
+      </tr>
+      {% if r.ai.summary or r.quote_note %}<tr><td></td><td colspan="8" class="spf-muted">{% if r.ai.summary %}🧠 {{ r.ai.summary }}{% if r.ai.questions %} · питають: {{ r.ai.questions|join:"; " }}{% endif %}{% if r.ai.moq %} · MOQ {{ r.ai.moq }}{% endif %} {% endif %}{% if r.quote_note %}📝 {{ r.quote_note|truncatechars:300 }}{% endif %}{% if r.valid_until %} · діє до {{ r.valid_until|date:"d.m.Y" }}{% endif %}</td></tr>{% endif %}
+      {% if can_change %}<tr class="rw-q" id="rq-{{ r.pk }}"><td colspan="9">
+        <form method="post" action="{{ act }}">{% csrf_token %}<input type="hidden" name="do" value="quote"><input type="hidden" name="rid" value="{{ r.pk }}">
+          <div class="spf-grid">
+            <label>Ціна за шт.<input name="price" value="{{ r.price|default_if_none:'' }}"></label>
+            <label>Сума<input name="total" value="{{ r.total|default_if_none:'' }}"></label>
+            <label>Валюта<input name="currency" value="{{ r.currency }}" maxlength="3" placeholder="USD"></label>
+            <label>Строк, днів<input name="lead_days" value="{{ r.lead_days|default_if_none:'' }}"></label>
+            <label>Доставка<input name="shipping" value="{{ r.shipping|default_if_none:'' }}"></label>
+            <label>Діє до<input type="date" name="valid_until" value="{{ r.valid_until|date:'Y-m-d' }}"></label>
+            <label>Стан<select name="state">{% for v, n in states %}<option value="{{ v }}" {% if v == r.state %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+          </div>
+          <label class="spf-wide">Умови / примітки<textarea name="quote_note" rows="2">{{ r.quote_note }}</textarea></label>
+          <div class="spf-row"><button type="submit" class="button">💾 Зберегти</button></div>
+        </form></td></tr>{% endif %}
+      {% endwith %}{% empty %}<tr><td colspan="9" class="spf-muted">Отримувачів ще немає — «✏️ Змінити запит» або «➕ Додати» нижче.</td></tr>{% endfor %}
+    </table>
+    {% if can_change %}
+    <div class="spf-row">
+      <select id="rw-model">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <label class="spf-muted"><input type="checkbox" id="rw-over"> AI перезаписує вже внесене</label>
+      <button type="button" class="button" id="rw-compare">🏆 AI: порівняти й порадити</button>
+      <span class="spf-job" id="rw-cmp-job"></span>
+    </div>
+    {% endif %}
+    {% if req.analysis.summary %}
+    <div class="spf-card" style="margin-top:8px"><div class="spf-h">🏆 Порада AI{% if req.analysis.pick %}: <span translate="no">{{ req.analysis.pick }}</span>{% endif %}</div>
+      <div>{{ req.analysis.summary }}</div>
+      {% if req.analysis.reasons %}<div><b>Чому:</b> {{ req.analysis.reasons|join:"; " }}</div>{% endif %}
+      {% if req.analysis.risks %}<div><b>Ризики:</b> {{ req.analysis.risks|join:"; " }}</div>{% endif %}
+      {% if req.analysis.ask %}<div><b>Уточнити:</b> {{ req.analysis.ask|join:"; " }}</div>{% endif %}
+      <div class="spf-muted">Порада — лише з таблиці вище; вирішуєте ви (🏆 у рядку).</div></div>
+    {% endif %}
+  </div>
+
+  {% if can_change and more %}
+  <div class="spf-card">
+    <details><summary class="spf-h">➕ Додати отримувачів{% if req.category %} ({{ req.category.name }}){% endif %}</summary>
+      <form method="post" action="{{ act }}">{% csrf_token %}<input type="hidden" name="do" value="add">
+        <div class="spf-cats" style="max-height:220px;overflow:auto">{% for s in more %}<label class="spf-cat"><input type="checkbox" name="rcp" value="{{ s.pk }}"> <span translate="no">{{ s.name }}</span></label>{% endfor %}</div>
+        <div class="spf-row"><button type="submit" class="button">➕ Додати (ще не надсилати)</button></div>
+      </form></details>
+  </div>
+  {% endif %}
+
+  <div class="spf-card">
+    <div class="spf-h">✅ Рішення</div>
+    {% if can_change %}
+    <form method="post" action="{{ act }}">{% csrf_token %}
+      <textarea name="decision" rows="3" style="width:100%" placeholder="Що вирішили й чому (піде в історію запиту)">{{ req.decision }}</textarea>
+      <div class="spf-row">
+        <button type="submit" name="do" value="decision" class="button">💾 Зберегти</button>
+        {% if req.status != "closed" and req.status != "cancelled" %}<button type="submit" name="do" value="close" class="button" onclick="return confirm('Закрити запит? Хто не відповів — «Не відповів».')">✅ Закрити запит</button>
+        <button type="submit" name="do" value="cancel" class="button" onclick="return confirm('Скасувати запит?')">✖ Скасувати</button>
+        {% else %}<button type="submit" name="do" value="reopen" class="button">↺ Відкрити знову</button>{% endif %}
+      </div>
+    </form>
+    {% else %}<div>{{ req.decision|default:"—"|linebreaksbr }}</div>{% endif %}
+  </div>
+
+  {% if events %}
+  <div class="spf-card"><div class="spf-h">🕘 Історія</div>
+    <table class="spf-table">{% for e in events %}<tr><td style="white-space:nowrap">{{ e.created_at|date:"d.m.Y H:i" }}</td><td translate="no">{{ e.supplier.name }}</td><td>{{ e.text }}</td><td>{% if e.user %}{{ e.user.get_full_name|default:e.user.username }}{% else %}Minerva{% endif %}</td></tr>{% endfor %}</table>
+  </div>
+  {% endif %}
+</div>
+{{ job_js }}
+<script>
+(function(){
+  var act = "{{ act|escapejs }}";
+  document.querySelectorAll('[data-rw-ai]').forEach(function(b){ b.addEventListener('click', function(){
+    var id = b.getAttribute('data-rw-ai');
+    spJob(act, {do: 'ai_quote', rid: id, model: document.getElementById('rw-model').value,
+                overwrite: document.getElementById('rw-over').checked ? '1' : ''}, document.getElementById('rw-job-' + id));
+  }); });
+  var c = document.getElementById('rw-compare');
+  if (c) c.addEventListener('click', function(){
+    spJob(act, {do: 'compare_ai', model: document.getElementById('rw-model').value}, document.getElementById('rw-cmp-job'));
+  });
+})();
+</script>
+{% endblock %}

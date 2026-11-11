@@ -1,0 +1,28 @@
+<style>
+  .spp { max-width: 1180px; }
+  .spf-card { background: var(--bg-card, transparent); border: 1px solid var(--border-strong, #ccc); border-radius: 8px; padding: 12px 16px; margin: 0 0 12px; }
+  .spf-exists { border-color: var(--success-fg, #2e7d32); }
+  .spf-h { font-weight: 600; margin: 0 0 8px; }
+  .spf-muted { color: var(--text-muted, #888); font-size: 12px; }
+  .spf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 14px; }
+  .spf-grid label, .spf-wide { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-muted, #888); }
+  .spf-grid input, .spf-wide textarea, .spf-wide input { font-size: 14px; color: var(--body-fg); width: 100%; box-sizing: border-box; }
+  .spf-wide { margin-top: 8px; }
+  .spf-match { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin: 4px 0; }
+  .spf-cats { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  .spf-cat { white-space: nowrap; }
+  .spf-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  .spf-mail { white-space: pre-wrap; font-size: 12px; max-height: 280px; overflow: auto; border-left: 3px solid var(--border-strong, #ccc); padding: 4px 10px; }
+  .spf-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  .spf-table td, .spf-table th { border-bottom: 1px solid var(--border-strong, #ddd); padding: 5px 8px; text-align: left; vertical-align: top; }
+  .spf-tag { display: inline-block; border: 1px solid var(--border-strong, #ccc); border-radius: 10px; padding: 0 7px; font-size: 11px; margin: 1px 2px; }
+  .spf-ok { color: var(--success-fg, #2e7d32); } .spf-bad { color: var(--error-fg, #c62828); } .spf-warn { color: var(--warning-fg, #b06d00); }
+  .spf-tiles { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+  .spf-tile { border: 1px solid var(--border-strong, #ccc); border-radius: 8px; padding: 6px 12px; min-width: 140px; }
+  .spf-tile b { display: block; font-size: 18px; }
+  .spf-img { max-width: 100%; max-height: 420px; border-radius: 8px; background: #fff; border: 1px solid var(--border-strong, #ccc); }
+  .spf-two { display: grid; grid-template-columns: minmax(280px, 420px) 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 900px) { .spf-two { grid-template-columns: 1fr; } }
+  .spf-marks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .spf-job { font-size: 12px; color: var(--text-muted, #888); }
+</style>

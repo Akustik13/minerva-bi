@@ -39,6 +39,7 @@ def _get_app_list(self, request, app_label=None):
         'accounting', # 💰 Бухгалтерія
         'shipping',   # 🚚 Доставка
         'inventory',  # 📦 Управління складом
+        'suppliers',  # 🏭 Постачальники: категорії, запити (RFQ)
         'shop',       # 🏪 Інтернет-магазин
         'tasks',      # 📋 Задачі та нагадування
         'autoimport',    # 🔄 Авто-імпорт
@@ -74,6 +75,7 @@ def _get_app_list(self, request, app_label=None):
         'worktime':        ['workday', 'danteproject', 'workreport', 'danteuser', 'booking', 'dantesettings'],
         'email_assistant': ['emailaccount', 'emailsettings', 'mailcategory', 'emailmessage', 'emailthread'],
         'agent':           ['agenttask', 'agentschedule', 'agentrule', 'agentrun'],
+        'suppliers':       ['supplierrequest', 'suppliercategory'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',
                       'inventorytransaction', 'reorderproxy', 'supplier',

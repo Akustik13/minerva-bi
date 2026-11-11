@@ -93,7 +93,7 @@ def ordered(items, es, key_of, n_of=None, name_of=None) -> list:
 CTX_KEYS = (
     "sel_copy", "sel_rag", "sel_ask", "sel_mail",                                  # виділений текст
     "reply", "forward", "ai_reply", "translate", "history", "angebot", "projdo",   # лише у відкритому листі
-    "open", "read", "star", "importance", "followup", "cat", "logo", "dante", "customer", "why", "agent", "agent_task", "project",
+    "open", "read", "star", "importance", "followup", "cat", "logo", "dante", "customer", "supplier", "why", "agent", "agent_task", "project",
     "kbsend", "kb", "rule", "task", "spam", "archive", "restore", "delete",        # restore — лише в Кошику
 )
 CTX_LETTER_ONLY = frozenset(CTX_KEYS[:11])

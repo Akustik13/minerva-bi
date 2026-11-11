@@ -1,0 +1,116 @@
+{% extends "admin/base_site.html" %}
+{# 📨 Новий / ✏️ запит постачальникам — suppliers/admin.py SupplierRequestAdmin.form_view, services/rfq.py #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:suppliers_supplierrequest_changelist' %}">Запити постачальникам</a> &rsaquo;
+  {% if req.pk %}<a href="{% url 'admin:suppliers_supplierrequest_work' req.pk %}" translate="no">{{ req.code }}</a> &rsaquo; ✏️{% else %}＋ Новий{% endif %}
+</div>
+{% endblock %}
+{% block content %}
+{% include "admin/suppliers/_styles.html" %}
+<style>
+  .rq-sup { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 4px 14px; max-height: 360px; overflow: auto; padding: 4px; border: 1px solid var(--border-strong, #ccc); border-radius: 6px; }
+  .rq-sup label { display: flex; gap: 6px; align-items: flex-start; padding: 3px 4px; border-radius: 4px; }
+  .rq-sup label:hover { background: var(--darkened-bg, rgba(127,127,127,.08)); }
+  .rq-sup .rq-sent { opacity: .7; }
+  .rq-spec { display: none; } .rq-spec.on { display: grid; }
+  .rq-cat { cursor: pointer; }
+</style>
+<div class="spp">
+<form method="post" enctype="multipart/form-data" id="rq-form">{% csrf_token %}
+  <div class="spf-card">
+    <div class="spf-h">📨 Що запитуємо</div>
+    <div class="spf-grid">
+      <label style="grid-column:1/-1">Коротко, що потрібно<input name="title" value="{{ req.title }}" maxlength="200" required placeholder="напр. 4-шарова плата 100×80, ENIG, контроль імпедансу"></label>
+      <label>Форма (вид запиту)<select name="template" id="rq-template">{% for t in templates %}<option value="{{ t.key }}" {% if t.key == req.template %}selected{% endif %}>{{ t.label }}</option>{% endfor %}</select></label>
+      <label>Категорія постачальників<select name="category" id="rq-category"><option value="">—</option>{% for c in categories %}<option value="{{ c.pk }}" data-template="{{ c.request_template }}" {% if c.pk == req.category_id %}selected{% endif %}>{{ c.icon }} {{ c.name }}</option>{% endfor %}</select></label>
+      <label>Проєкт<select name="project"><option value="">— без проєкту</option>{% for p in projects %}<option value="{{ p.pk }}" {% if p.pk == req.project_id %}selected{% endif %} translate="no">{{ p.code }} · {{ p.name }}</option>{% endfor %}</select></label>
+      <label>Група / тема (щоб не плутати)<input name="group" value="{{ req.group }}" maxlength="120" list="rq-groups" placeholder="напр. Ціни на виробництво 2026"><datalist id="rq-groups">{% for g in groups %}<option value="{{ g }}">{% endfor %}</datalist></label>
+      <label>Кількості (через «;»)<input name="quantities" value="{{ req.quantities }}" maxlength="120" placeholder="10; 100; 500"></label>
+      <label>Чекаємо відповідь до<input type="date" name="reply_by" value="{{ req.reply_by|date:'Y-m-d' }}"></label>
+      <label>Мова листа<select name="language">{% for v, n in langs %}<option value="{{ v }}" {% if v == req.language %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+      {% if accounts %}<label>З якої скриньки<select name="account">{% for a in accounts %}<option value="{{ a.pk }}" {% if a.pk == req.account_id %}selected{% endif %} translate="no">{{ a.email_address }}</option>{% endfor %}</select></label>{% endif %}
+    </div>
+    {% if not accounts %}<div class="spf-warn" style="margin-top:6px">⚠️ У вас немає поштової скриньки в Minerva — зберегти можна, надіслати — ні.</div>{% endif %}
+  </div>
+
+  <div class="spf-card">
+    <div class="spf-h">📐 Параметри</div>
+    {% for t in templates %}
+    <div class="spf-grid rq-spec {% if t.key == req.template %}on{% endif %}" data-template="{{ t.key }}">
+      {% for f in t.fields %}
+        {% if f.multi %}<label style="grid-column:1/-1">{{ f.label }}<textarea name="spec_{{ f.key }}" rows="3" placeholder="{{ f.hint }}">{{ f.value }}</textarea></label>
+        {% else %}<label>{{ f.label }}<input name="spec_{{ f.key }}" value="{{ f.value }}" placeholder="{{ f.hint }}"></label>{% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+    <label class="spf-wide">Ще (вільним текстом)<textarea name="notes" rows="3" placeholder="Додаткові вимоги, сертифікати, пакування, доставка до…">{{ notes }}</textarea></label>
+  </div>
+
+  <div class="spf-card">
+    <div class="spf-h">📎 Файли (ZIP, Gerber, креслення, BOM) — підуть вкладенням кожному</div>
+    {% for f in files %}<div><a href="{{ f.file.url }}" target="_blank" translate="no">📎 {{ f.name }}</a> <span class="spf-muted">{{ f.size|filesizeformat }}</span> <label class="spf-muted"><input type="checkbox" name="del_file" value="{{ f.pk }}"> прибрати</label></div>{% endfor %}
+    <input type="file" name="files" multiple>
+    <div class="spf-muted">Разом до 20 МБ; більше — стисніть або дайте посилання в тексті.</div>
+  </div>
+
+  <div class="spf-card">
+    <div class="spf-h">🏭 Кому</div>
+    <div class="spf-row">
+      <input type="search" id="rq-q" placeholder="Пошук постачальника…" style="min-width:240px">
+      {% for c in categories %}<span class="spf-tag rq-cat" data-cat="{{ c.pk }}" title="Позначити всіх цієї категорії">{{ c.icon }} {{ c.name }}</span>{% endfor %}
+      <a href="#" id="rq-none">зняти всі</a>
+    </div>
+    <div class="rq-sup" id="rq-sup">
+      {% for s in suppliers %}
+      <label data-cats="{% for c in s.categories.all %}{{ c.pk }} {% endfor %}" data-name="{{ s.name|lower }}">
+        <input type="checkbox" name="rcp" value="{{ s.pk }}" {% if s.pk in picked %}checked{% endif %}>
+        <span><b translate="no">{{ s.name }}</b>{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon }}</span>{% endfor %}
+          {% if s.contacts.all %}<select name="contact_{{ s.pk }}" style="max-width:240px;font-size:12px"><option value="">{{ s.email|default:"— без email фірми" }}</option>{% for c in s.contacts.all %}{% if c.email %}<option value="{{ c.pk }}" {% if c.is_primary %}selected{% endif %}>{{ c.name }} · {{ c.email }}</option>{% endif %}{% endfor %}</select>
+          {% else %}<span class="spf-muted" translate="no">{{ s.email|default:"⚠️ немає email" }}</span>{% endif %}
+        </span>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="spf-muted">Кожен отримає свій лист (не копію чужого) — відповіді Minerva знайде сама й покаже на сторінці запиту. Уже надісланих зняти не можна.</div>
+  </div>
+
+  <div class="spf-card">
+    <div class="spf-h">✉️ Лист</div>
+    <label class="spf-wide">Тема<input name="subject" value="{{ req.subject }}" maxlength="250" placeholder="[RFQ-…] Request for quotation: …"></label>
+    <label class="spf-wide">Текст (привітання кожному — окремо, з ім'ям контакту){% if not req.body %} — заповниться з параметрів після «💾 Зберегти»{% endif %}<textarea name="body" rows="14">{{ req.body }}</textarea></label>
+    <div class="spf-row"><button type="submit" name="regen" value="1" class="button" formnovalidate onclick="return !this.form.body.value || confirm('Скласти текст наново з параметрів? Ваші правки тексту зникнуть.')">🔄 Скласти текст з параметрів</button></div>
+  </div>
+
+  <div class="spf-row">
+    <button type="submit" name="go" value="stay" class="button">💾 Зберегти</button>
+    <button type="submit" name="go" value="work" class="button">💾 Зберегти й до запиту</button>
+    {% if accounts %}<button type="submit" name="go" value="send" class="default" onclick="return this.form.body.value.trim() ? confirm('Надіслати запит усім позначеним, кому ще не надіслано?') : (alert('Спершу «💾 Зберегти» — текст складеться з параметрів, перевірте його.'), false)">📤 Зберегти й надіслати</button>{% endif %}
+  </div>
+</form>
+</div>
+<script>
+(function(){
+  var tpl = document.getElementById('rq-template');
+  function show(){ document.querySelectorAll('.rq-spec').forEach(function(b){ b.classList.toggle('on', b.dataset.template === tpl.value); }); }
+  tpl.addEventListener('change', show);
+  document.getElementById('rq-category').addEventListener('change', function(){
+    var o = this.options[this.selectedIndex]; if (o && o.dataset.template) { tpl.value = o.dataset.template; show(); }
+  });
+  var q = document.getElementById('rq-q');
+  q.addEventListener('input', function(){
+    var v = q.value.trim().toLowerCase();
+    document.querySelectorAll('#rq-sup > label').forEach(function(l){ l.style.display = !v || l.dataset.name.indexOf(v) >= 0 ? '' : 'none'; });
+  });
+  document.querySelectorAll('.rq-cat').forEach(function(t){ t.addEventListener('click', function(){
+    var id = t.dataset.cat;
+    document.querySelectorAll('#rq-sup > label').forEach(function(l){
+      if ((' ' + l.dataset.cats).indexOf(' ' + id + ' ') >= 0) l.querySelector('input').checked = true; });
+  }); });
+  document.getElementById('rq-none').addEventListener('click', function(e){ e.preventDefault();
+    document.querySelectorAll('#rq-sup input[type=checkbox]').forEach(function(c){ c.checked = false; }); });
+})();
+</script>
+{% endblock %}

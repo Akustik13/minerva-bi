@@ -21,6 +21,8 @@ ITEMS = {
     "offers":    ("📝", "Angebote", "/offers/", "offers.view_offer"),
     "shipments": ("🚚", "Відправлення", "/admin/shipping/shipment/", "shipping.view_shipment"),
     "purchases": ("🧾", "Закупівлі", "/admin/inventory/purchaseorder/", "inventory.view_purchaseorder"),
+    "suppliers": ("🏭", "Постачальники", "/admin/inventory/supplier/", "inventory.view_supplier"),
+    "rfq": ("📨", "Запити постачальникам", "/admin/suppliers/supplierrequest/", "suppliers.view_supplierrequest"),
     "labels":    ("🏷", "Етикетки", "/labels/", "module:labels_app"),
     "projects":  ("📁", "Проєкти", "/admin/projects/project/", "projects.view_project"),
     "portfolio": ("📊", "Портфель проєктів", "/admin/projects/project/portfolio/", "projects.view_project"),

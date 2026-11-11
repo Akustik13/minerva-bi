@@ -1,0 +1,742 @@
+"""
+suppliers/admin_supplier.py — 🏭 картка постачальника (inventory.SupplierAdmin) розширена:
+
+  👥 контактні особи (inline), 🗂 категорії й стан, 📊 огляд (закупівлі, строки, документи по закупівлях, товари,
+  запити, оцінка Minerva), 📷 візитки й флаєри, 📨 запити (RFQ), 🧠 AI / 🌐 з інтернету, 🕘 історія «звідки все пішло»;
+  сторінки: ✉️ аналіз пошти за період, 🏭 постачальник з листа, 🔎 постачальники з пошти, 📷 візитка / флаєр (камера).
+
+Права — як у картки постачальника (розділ «Склад»): перегляд — view_supplier, створення — add_supplier, зміни,
+AI й візитки — change_supplier. Пошта — лише власні скриньки людини.
+"""
+import datetime
+import json
+
+from django import forms
+from django.contrib import admin, messages
+from django.db.models import Count, Max, Q
+from django.http import Http404, HttpResponseNotAllowed, JsonResponse
+from django.shortcuts import redirect
+from django.template.response import TemplateResponse
+from django.urls import path, reverse
+from django.utils import timezone
+from django.utils.html import format_html, format_html_join
+from django.utils.safestring import mark_safe
+
+from suppliers.models import SupplierAnalysis, SupplierCategory, SupplierContact, SupplierEvent, SupplierMedia
+
+VIEWER = "_sup_viewer"
+PANELS = ("sup_overview", "sup_media", "sup_requests", "sup_ai", "sup_history")
+
+
+def _money(m) -> str:
+    from sales.revenue import fmt
+    parts = [fmt(m.total, m.home)] if m.total else []
+    parts += [f"{v:,.0f} {k} без курсу".replace(",", " ") for k, v in m.missing.items()]
+    return " + ".join(parts) or "—"
+
+
+def _qty(d) -> str:
+    """Decimal('100.000') → «100», Decimal('2.500') → «2.5»."""
+    return str(int(d)) if d == d.to_integral_value() else format(d.normalize(), "f")
+
+
+def _stars(n) -> str:
+    return "★" * n + "☆" * (5 - n) if n else ""
+
+
+def _can(request, perm):
+    return request.user.has_perm(f"inventory.{perm}_supplier")
+
+
+class SupplierContactInline(admin.TabularInline):
+    model = SupplierContact
+    extra = 0
+    fields = ("is_primary", "name", "position", "email", "phone", "mobile", "notes", "is_active", "source")
+    readonly_fields = ("source",)
+    verbose_name = "контактна особа"
+    verbose_name_plural = "👥 Контактні особи"
+    formfield_overrides = {}
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == "notes":
+            kwargs["widget"] = forms.Textarea(attrs={"rows": 1, "cols": 28})
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
+    # права — як у самої картки постачальника (розділ «Склад»), а не окремого розділу «Постачальники»
+    def has_view_permission(self, request, obj=None):
+        return _can(request, "view") or _can(request, "change")
+
+    def has_add_permission(self, request, obj=None):
+        return _can(request, "change")
+
+    def has_change_permission(self, request, obj=None):
+        return _can(request, "change")
+
+    def has_delete_permission(self, request, obj=None):
+        return _can(request, "change")
+
+
+class CategoryFilter(admin.SimpleListFilter):
+    title = "категорія"
+    parameter_name = "cat"
+
+    def lookups(self, request, model_admin):
+        return [("none", "— без категорії")] + [(str(c.pk), c.path if c.parent_id else str(c))
+                                                 for c in SupplierCategory.objects.filter(is_active=True)]
+
+    def queryset(self, request, queryset):
+        v = self.value()
+        if v == "none":
+            return queryset.filter(categories=None)
+        if v and v.isdigit():
+            ids = {int(v)} | set(SupplierCategory.objects.filter(parent_id=int(v)).values_list("pk", flat=True))
+            return queryset.filter(categories__in=ids).distinct()
+        return queryset
+
+
+class SupplierCardMixin:
+    """Підмішується в inventory.admin.SupplierAdmin."""
+    inlines = (SupplierContactInline,)
+
+    # ── список ──
+    def get_queryset(self, request):
+        return (super().get_queryset(request).prefetch_related("categories")
+                .annotate(_po_count=Count("purchase_orders", filter=~Q(purchase_orders__status="cancelled"),
+                                          distinct=True),
+                          _po_last=Max("purchase_orders__order_date")))
+
+    @admin.display(description="Категорії")
+    def categories_col(self, obj):
+        cats = list(obj.categories.all())
+        if not cats:
+            return "—"
+        return format_html_join(" ", '<span style="white-space:nowrap;border:1px solid {};border-radius:10px;'
+                                     'padding:0 6px;font-size:11px">{} {}</span>',
+                                ((c.color or "#888", c.icon, c.name) for c in cats))
+
+    @admin.display(description="Закупівель", ordering="_po_count")
+    def po_col(self, obj):
+        n = getattr(obj, "_po_count", 0)
+        if not n:
+            return "—"
+        url = reverse("admin:inventory_purchaseorder_changelist") + f"?supplier__id__exact={obj.pk}"
+        last = getattr(obj, "_po_last", None)
+        return format_html('<a href="{}">{}</a>{}', url, n,
+                           format_html(' <span style="color:var(--text-muted);font-size:11px">· {}</span>',
+                                       last.strftime("%d.%m.%Y")) if last else "")
+
+    @admin.display(description="Стан", ordering="status")
+    def status_col(self, obj):
+        return obj.get_status_display()
+
+    @admin.display(description="Оцінка", ordering="rating")
+    def rating_col(self, obj):
+        return _stars(obj.rating) if obj.rating else ""
+
+    def changelist_view(self, request, extra_context=None):
+        extra = {"sup_tools": [
+            (reverse("admin:inventory_supplier_find_in_mail"), "🔎 Знайти постачальників у пошті"),
+            (reverse("admin:inventory_supplier_card"), "📷 Візитка / флаєр"),
+            (reverse("admin:inventory_supplier_cards"), "🪪 Усі візитки"),
+        ]}
+        if request.user.has_perm("suppliers.view_supplierrequest"):
+            extra["sup_tools"].append((reverse("admin:suppliers_supplierrequest_changelist"), "📨 Запити (RFQ)"))
+        if request.user.has_perm("suppliers.view_suppliercategory"):
+            extra["sup_tools"].append((reverse("admin:suppliers_suppliercategory_changelist"), "🗂 Категорії"))
+        return super().changelist_view(request, {**(extra_context or {}), **extra})
+
+    # ── картка ──
+    def formfield_for_manytomany(self, db_field, request, **kwargs):
+        if db_field.name == "categories":
+            kwargs["widget"] = forms.CheckboxSelectMultiple
+            kwargs["queryset"] = SupplierCategory.objects.filter(is_active=True)
+        return super().formfield_for_manytomany(db_field, request, **kwargs)
+
+    def get_object(self, request, object_id, from_field=None):
+        obj = super().get_object(request, object_id, from_field)
+        if obj is not None:
+            setattr(obj, VIEWER, request.user)
+        return obj
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = tuple(super().get_readonly_fields(request, obj))
+        return fields + tuple(f for f in PANELS + ("source", "created_at") if f not in fields)
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is not None and obj.pk:
+            return fieldsets
+        out = []   # нова картка — без огляду, візиток, історії (ще порожні)
+        for name, opts in fieldsets:
+            fields = [f for f in opts.get("fields", ()) if not (isinstance(f, str) and f in PANELS)
+                      and not (isinstance(f, (tuple, list)) and set(f) <= {"source", "created_at"})]
+            if fields:
+                out.append((name, {**opts, "fields": fields}))
+        return out
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change:
+            SupplierEvent.objects.create(supplier=obj, kind=SupplierEvent.CREATED, user=request.user,
+                                         text="Створено вручну")
+
+    def _viewer(self, obj):
+        return getattr(obj, VIEWER, None)
+
+    @admin.display(description="Огляд")
+    def sup_overview(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        from suppliers.services.overview import purchases, requests_stats, score
+        viewer = self._viewer(obj)
+        p = purchases(obj)
+        rfq = requests_stats(obj)
+        mail = None
+        last_mail = SupplierAnalysis.objects.filter(supplier=obj, kind=SupplierAnalysis.MAIL, owner=viewer).first() \
+            if viewer else None
+        if last_mail:
+            mail = last_mail.result
+        sc = score(p, mail, rfq)
+        tiles = [
+            ("Закупівель", f"{p['count']}" + (f" · відкритих {p['open']}" if p["open"] else "")),
+            ("Витрачено", _money(p["spend"])),
+            ("Перша / остання", f"{p['first']:%d.%m.%Y} – {p['last']:%d.%m.%Y}" if p["last"] else "—"),
+            ("Від замовлення до отримання", f"медіана {p['median_days']} дн." if p["median_days"] is not None else "—"),
+            ("Вчасно", f"{p['on_time']} з {p['on_time'] + p['late']}" if (p['on_time'] + p['late']) else "—"),
+            ("Документів закупівель", str(p["documents"])),
+            ("Запити (RFQ)", f"{rfq['total']} · відповіли {rfq['replied']} · вибрано {rfq['chosen']}"
+             if rfq["total"] else "—"),
+        ]
+        if mail:
+            tiles.append(("Відповідають на листи", f"медіана {mail.get('their_reply_hours')} год"
+                          if mail.get("their_reply_hours") is not None else "—"))
+        tiles_html = format_html_join("", '<div class="sp-tile"><div class="sp-k">{}</div><div class="sp-v">{}</div></div>',
+                                      tiles)
+        if sc["value"] is not None:
+            parts = format_html_join(" · ", "{} {}% ({})", ((n, v, w) for n, v, w in sc["parts"]))
+            score_html = format_html('<div class="sp-score"><b>Оцінка Minerva: {}/100</b> <span title="{}">{}</span>'
+                                     '<div class="sp-muted">{}</div></div>', sc["value"],
+                                     "Рахує Minerva з закупівель, запитів і аналізу вашої пошти", _stars(sc["stars"]),
+                                     parts)
+        else:
+            score_html = format_html('<div class="sp-muted">{}</div>',
+                                     "Оцінки Minerva ще немає: немає отриманих закупівель з датами, запитів і аналізу пошти.")
+        orders = ""
+        if p["orders"]:
+            rows = []
+            for po in p["orders"]:
+                docs = format_html_join(" ", '<a href="{}" target="_blank" title="{}">📎 {}</a>',
+                                        ((d.file.url, d.get_category_display(), (d.title or d.file.name.rsplit("/", 1)[-1])[:40])
+                                         for d in po.documents.all() if d.file))
+                rows.append(format_html(
+                    '<tr><td><a href="{}" translate="no">{}</a></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>',
+                    reverse("admin:inventory_purchaseorder_change", args=[po.pk]), po.code or f"#{po.pk}",
+                    po.order_date.strftime("%d.%m.%Y") if po.order_date else "", po.get_status_display(),
+                    f"{po.total_price:,.2f} {po.currency}".replace(",", " ") if po.total_price is not None else "",
+                    docs or "—"))
+            orders = format_html('<h4 class="sp-h">🗒️ Закупівлі й документи по них</h4><table class="sp-table"><tr>'
+                                 '<th>Закупівля</th><th>Дата</th><th>Стан</th><th>Сума</th><th>Документи</th></tr>{}</table>',
+                                 mark_safe("".join(rows)))
+        products = ""
+        if p["products"]:
+            prow = format_html_join("", '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>', (
+                (format_html('<a href="{}" translate="no">{}</a>', reverse("admin:inventory_product_change",
+                                                                          args=[r["product"].pk]), r["product"].sku)
+                 if r["product"] else r["name"][:60], _qty(r["qty"]), r["orders"],
+                 f"{r['last_price']} {r['currency']}" if r["last_price"] is not None else "—") for r in p["products"]))
+            products = format_html('<h4 class="sp-h">🔩 Що в них купували ({} позицій)</h4><table class="sp-table"><tr>'
+                                   '<th>Товар</th><th>Штук разом</th><th>Закупівель</th><th>Остання ціна</th></tr>{}</table>',
+                                   p["products_total"], prow)
+        late = ""
+        if p["late_list"]:
+            late = format_html('<div class="sp-warn">⚠️ Із запізненням: {}</div>', format_html_join(
+                ", ", '<a href="{}" translate="no">{}</a> +{} дн.{}',
+                ((reverse("admin:inventory_purchaseorder_change", args=[x["po"].pk]), x["po"].code, x["days"],
+                  " (ще не отримано)" if x.get("open") else "") for x in p["late_list"])))
+        buttons = [(reverse("admin:inventory_supplier_analysis", args=[obj.pk]), "✉️ Аналіз пошти з цим постачальником")]
+        buttons.append((reverse("admin:inventory_purchaseorder_add") + f"?supplier={obj.pk}", "🛒 Нова закупівля"))
+        if viewer is not None and viewer.has_perm("suppliers.add_supplierrequest"):
+            buttons.append((reverse("admin:suppliers_supplierrequest_new") + f"?supplier={obj.pk}", "📨 Запит цьому постачальнику"))
+        btn = format_html_join(" ", '<a class="button" href="{}">{}</a>', buttons)
+        return format_html('{}<div class="sp-tiles">{}</div>{}<div class="sp-row">{}</div>{}{}',
+                           _STYLE, tiles_html, score_html, btn, late, format_html("{}{}", orders, products))
+
+    @admin.display(description="Візитки й флаєри")
+    def sup_media(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        items = list(obj.media.all()[:24])
+        add = format_html('<a class="button" href="{}">📷 Додати фото / візитку</a>',
+                          reverse("admin:inventory_supplier_card") + f"?supplier={obj.pk}")
+        if not items:
+            return format_html('<div class="sp-muted">Ще немає. Сфотографуйте візитку, флаєр чи стенд — Minerva '
+                               'збереже фото тут з вашими примітками.</div><div class="sp-row">{}</div>', add)
+        cards = format_html_join("", (
+            '<a class="sp-card" href="{}"><img src="{}" alt="" loading="lazy"><div><b>{}</b> {}</div>'
+            '<div class="sp-muted">{}{}</div><div>{}</div><div class="sp-note">{}</div></a>'),
+            ((reverse("admin:inventory_supplier_card_review", args=[m.pk]), m.image.url, m.get_kind_display(),
+              m.title, m.created_at.strftime("%d.%m.%Y"), f" · {m.event}" if m.event else "", m.marks_text(),
+              m.note[:160]) for m in items if m.image))
+        return format_html('<div class="sp-cards">{}</div><div class="sp-row">{}</div>', cards, add)
+
+    @admin.display(description="Запити (RFQ)")
+    def sup_requests(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        viewer = self._viewer(obj)
+        can = viewer is not None and viewer.has_perm("suppliers.view_supplierrequest")
+        rows = list(obj.request_recipients.select_related("request").order_by("-pk")[:20])
+        if not rows:
+            return format_html('<div class="sp-muted">{}</div>', "Запитів цьому постачальнику ще не було.")
+        body = format_html_join("", '<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>', (
+            (format_html('<a href="{}" translate="no">{}</a>', reverse("admin:suppliers_supplierrequest_work",
+                                                                      args=[r.request_id]), r.request.code)
+             if can else r.request.code, r.request.title[:70], r.get_state_display(),
+             r.sent_at.strftime("%d.%m.%Y") if r.sent_at else "—",
+             (f"{r.price} {r.currency}" if r.price is not None else "—") + (f" · {r.lead_days} дн." if r.lead_days else ""),
+             "🏆" if r.chosen else "") for r in rows))
+        return format_html('<table class="sp-table"><tr><th>Запит</th><th>Що</th><th>Стан</th><th>Надіслано</th>'
+                           '<th>Пропозиція</th><th></th></tr>{}</table>', body)
+
+    @admin.display(description="AI та інтернет")
+    def sup_ai(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        from suppliers.services.ai import MODELS
+        viewer = self._viewer(obj)
+        web = SupplierAnalysis.objects.filter(supplier=obj, kind=SupplierAnalysis.WEB).first()
+        own = SupplierAnalysis.objects.filter(supplier=obj, kind=SupplierAnalysis.AI, owner=viewer).first() \
+            if viewer else None
+        parts = []
+        if web:
+            r = web.result or {}
+            facts = [(k, r.get(f)) for k, f in (("📍 Де", "location"), ("🏭 Виробник?", "is_manufacturer"),
+                                                ("📅 Засновано", "founded"), ("👷 Розмір", "size"),
+                                                ("🌍 Ринки", "markets")) if r.get(f)]
+            lists = [(k, r.get(f) or []) for k, f in (("Продукція", "products"), ("Сертифікати", "certifications"),
+                                                      ("Сильні сторони", "strengths"), ("⚠️ Ризики", "risks"))]
+            parts.append(format_html(
+                '<div class="sp-box"><div class="sp-h">🌐 З інтернету · {}</div><div>{}</div>{}{}<div class="sp-muted">'
+                'Джерела: {}</div></div>', web.created_at.strftime("%d.%m.%Y"), r.get("summary", ""),
+                format_html_join("", "<div><b>{}:</b> {}</div>", facts),
+                format_html_join("", "<div><b>{}:</b> {}</div>", ((k, ", ".join(v)) for k, v in lists if v)),
+                format_html_join(" · ", '<a href="{}" target="_blank" rel="noopener noreferrer">{}</a>',
+                                 ((s["url"], s.get("title") or s["url"][:50]) for s in r.get("sources", [])
+                                  if str(s.get("url", "")).startswith("http"))) or "—"))
+        if own:
+            r = own.result or {}
+            probs = format_html_join("", '<li>{} — «{}» <a href="/email/?msg={}" target="_blank">✉️ {}</a></li>',
+                                     ((p["text"], p["quote"][:200], p["message"], p["date"]) for p in r.get("problems", [])))
+            parts.append(format_html(
+                '<div class="sp-box"><div class="sp-h">🧠 AI-оцінка з вашої пошти · {} · {} листів {}</div><div>{}</div>'
+                '<div><b>Зв\'язок:</b> {}</div><div><b>Надійність:</b> {}</div>{}{}</div>',
+                own.created_at.strftime("%d.%m.%Y"), r.get("mails", 0), _stars(r.get("rating") or 0),
+                r.get("summary", ""), r.get("communication", "—"), r.get("reliability", "—"),
+                format_html("<div><b>Проблеми:</b><ul>{}</ul></div>", probs) if probs else "",
+                format_html("<div><b>Поради:</b> {}</div>", "; ".join(r.get("advice") or [])) if r.get("advice") else ""))
+        options = format_html_join("", '<option value="{}">{}</option>', MODELS)
+        can_change = viewer is not None and viewer.has_perm("inventory.change_supplier")
+        controls = ""
+        if can_change:
+            controls = format_html(
+                '<div class="sp-row"><select class="sp-model" title="Модель AI">{}</select>'
+                '<button type="button" class="button" data-sp-job="{}">🌐 Знайти про них в інтернеті</button>'
+                '<a class="button" href="{}">🧠 Оцінка з листування…</a><span class="sp-job"></span></div>',
+                options, reverse("admin:inventory_supplier_research", args=[obj.pk]),
+                reverse("admin:inventory_supplier_analysis", args=[obj.pk]) + "#ai")
+        if not parts:
+            parts.append(format_html('<div class="sp-muted">{}</div>', "AI ще не запускали. «🌐 Знайти в інтернеті» — "
+                                     "хто вони, що роблять, сертифікати й ризики з джерелами; «🧠 Оцінка» — з вашого "
+                                     "листування й закупівель."))
+        return format_html("{}{}{}", mark_safe("".join(str(x) for x in parts)), controls, _JOB_JS)
+
+    @admin.display(description="Історія")
+    def sup_history(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        viewer = self._viewer(obj)
+        events = list(obj.events.select_related("user", "message__account", "media")[:40])
+        if not events:
+            return "—"
+        rows = []
+        for e in events:
+            link = ""
+            if e.message_id and viewer is not None and e.message and e.message.account.user_id == viewer.pk:
+                link = format_html(' <a href="/email/?msg={}" target="_blank">✉️ лист</a>', e.message_id)
+            if e.media_id:
+                link += format_html(' <a href="{}">📷 фото</a>', reverse("admin:inventory_supplier_card_review",
+                                                                       args=[e.media_id]))
+            rows.append(format_html('<tr><td>{}</td><td>{}</td><td>{}{}</td><td>{}</td></tr>',
+                                    timezone.localtime(e.created_at).strftime("%d.%m.%Y %H:%M"),
+                                    e.get_kind_display(), e.text, link,
+                                    (e.user.get_full_name() or e.user.username) if e.user else "Minerva"))
+        return format_html('<table class="sp-table">{}</table>', mark_safe("".join(rows)))
+
+    # ── сторінки ──
+    def get_urls(self):
+        view = self.admin_site.admin_view
+        return [
+            path("find-in-mail/", view(self.find_in_mail_view), name="inventory_supplier_find_in_mail"),
+            path("from-mail/<int:msg_pk>/", view(self.from_mail_view), name="inventory_supplier_from_mail"),
+            path("card/", view(self.card_view), name="inventory_supplier_card"),
+            path("cards/", view(self.cards_view), name="inventory_supplier_cards"),
+            path("cards/<int:media_pk>/", view(self.card_review_view), name="inventory_supplier_card_review"),
+            path("job/<str:job_id>/", view(self.job_view), name="inventory_supplier_job"),
+            path("search/", view(self.search_view), name="inventory_supplier_search"),
+            path("<int:pk>/analysis/", view(self.analysis_view), name="inventory_supplier_analysis"),
+            path("<int:pk>/research/", view(self.research_view), name="inventory_supplier_research"),
+        ] + super().get_urls()
+
+    def _ctx(self, request, title, **extra):
+        from suppliers.services.ai import MODELS
+        return {**self.admin_site.each_context(request), "title": title, "opts": self.model._meta,
+                "models": MODELS, "style": _STYLE, "job_js": _JOB_JS, **extra}
+
+    def _supplier(self, request, pk, perm="view"):
+        obj = self.get_queryset(request).filter(pk=pk).first()
+        if obj is None:
+            raise Http404
+        ok = self.has_view_permission(request, obj) if perm == "view" else self.has_change_permission(request, obj)
+        if not ok:
+            raise Http404
+        setattr(obj, VIEWER, request.user)
+        return obj
+
+    def search_view(self, request):
+        """Підказка постачальника за назвою / email (поле «додати до наявного»)."""
+        if not _can(request, "view"):
+            raise Http404
+        q = " ".join(request.GET.get("q", "").split())[:80]
+        qs = self.get_queryset(request).filter(Q(name__icontains=q) | Q(email__icontains=q)) if len(q) >= 2 else []
+        return JsonResponse({"results": [{"id": s.pk, "text": s.name} for s in list(qs.order_by("name")[:15])]})
+
+    def job_view(self, request, job_id):
+        from suppliers.services import jobs
+        s = jobs.state(job_id, request.user)
+        if s is None:
+            return JsonResponse({"status": "gone"}, status=404)
+        return JsonResponse(s)
+
+    def research_view(self, request, pk):
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        obj = self._supplier(request, pk, "change")
+        from suppliers.services import ai, jobs
+        model = ai.model_of(request.POST.get("model"))
+        user = request.user
+        url = reverse("admin:inventory_supplier_change", args=[obj.pk])
+
+        def run():
+            ai.research(obj, user=user, model=model)
+            return {"url": url, "message": "🌐 Готово"}
+        return JsonResponse({"job": jobs.start(user, f"research {obj.pk}", run)})
+
+    def analysis_view(self, request, pk):
+        """✉️ Листування з постачальником за період (лише ваші скриньки) + 🧠 AI-оцінка."""
+        from suppliers.services import ai, jobs, mailscan
+        from suppliers.services.overview import purchases, requests_stats, score
+        obj = self._supplier(request, pk)
+        user = request.user
+        date_from, date_to = mailscan.period(request.GET.get("from") or request.POST.get("from"),
+                                             request.GET.get("to") or request.POST.get("to"))
+        if request.method == "POST" and request.POST.get("action") == "ai":
+            if not self.has_change_permission(request, obj):
+                return JsonResponse({"error": "Немає права змінювати постачальника"}, status=403)
+            model = ai.model_of(request.POST.get("model"))
+            back = reverse("admin:inventory_supplier_analysis", args=[obj.pk]) + \
+                f"?from={date_from:%Y-%m-%d}&to={date_to:%Y-%m-%d}#ai"
+
+            def run():
+                res = mailscan.scan(obj, user, date_from, date_to)
+                ai.evaluate(obj, user, res, purchases(obj), model=model)
+                return {"url": back, "message": "🧠 Оцінку складено"}
+            return JsonResponse({"job": jobs.start(user, f"evaluate {obj.pk}", run)})
+        result = mailscan.scan(obj, user, date_from, date_to)
+        SupplierAnalysis.objects.update_or_create(
+            supplier=obj, kind=SupplierAnalysis.MAIL, owner=user,
+            defaults={"date_from": date_from, "date_to": date_to, "result": mailscan.summary(result),
+                      "created_at": timezone.now()})
+        p = purchases(obj)
+        rfq = requests_stats(obj)
+        own_ai = SupplierAnalysis.objects.filter(supplier=obj, kind=SupplierAnalysis.AI, owner=user).first()
+        return TemplateResponse(request, "admin/suppliers/analysis.html", self._ctx(
+            request, f"✉️ {obj.name} — листування й оцінка", supplier=obj, r=result, p=p, rfq=rfq,
+            score=score(p, mailscan.summary(result), rfq), own_ai=own_ai, can_change=self.has_change_permission(request, obj),
+            back_url=reverse("admin:inventory_supplier_change", args=[obj.pk]),
+            presets=[(d, (timezone.localdate() - datetime.timedelta(days=d)).strftime("%Y-%m-%d"))
+                     for d in (90, 365, 730, 1825)]))
+
+    # ── 🏭 Постачальник з листа ──
+    def _own_message(self, request, msg_pk):
+        from email_assistant.models import EmailMessage
+        msg = EmailMessage.objects.filter(pk=msg_pk, account__user=request.user).select_related("account").first()
+        if msg is None:
+            raise Http404
+        return msg
+
+    def _draft_from_post(self, request) -> dict:
+        from suppliers.services.draft import CONTACT_FIELDS, FIELDS
+        return {k: request.POST.get(k, "") for k in FIELDS + CONTACT_FIELDS}
+
+    def _categories_from_post(self, request):
+        ids = [int(x) for x in request.POST.getlist("categories") if str(x).isdigit()]
+        return list(SupplierCategory.objects.filter(pk__in=ids))
+
+    def _attach_existing(self, request, supplier, data, *, source, message=None, media=None):
+        from suppliers.services import draft
+        contact, created = draft.add_contact(supplier, data, source=source, user=request.user, media=media,
+                                             message=message)
+        changed = draft.fill_empty(supplier, data, user=request.user, why="з листа" if source == "mail"
+                                   else "з візитки") if request.POST.get("fill_empty") else []
+        cats = self._categories_from_post(request)
+        if cats:
+            supplier.categories.add(*cats)
+        if message is not None:
+            SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.MAIL, message=message, user=request.user,
+                                         text=f"Лист «{(message.subject or '')[:150]}» від {message.from_email}")
+        bits = []
+        if created:
+            bits.append(f"👤 контакт {contact.name}")
+        if changed:
+            bits.append(f"доповнено полів: {len(changed)}")
+        self.message_user(request, f"✅ {supplier.name}: " + (", ".join(bits) or "уже все є"), messages.SUCCESS)
+        return redirect(reverse("admin:inventory_supplier_change", args=[supplier.pk]))
+
+    def from_mail_view(self, request, msg_pk):
+        from suppliers.services import ai, draft, jobs
+        msg = self._own_message(request, msg_pk)
+        if not (_can(request, "view") or _can(request, "add")):
+            raise Http404
+        action = request.POST.get("action") if request.method == "POST" else ""
+        if action == "ai":
+            if not (_can(request, "add") or _can(request, "change")):
+                return JsonResponse({"error": "Немає права"}, status=403)
+            model, web, user = ai.model_of(request.POST.get("model")), bool(request.POST.get("web")), request.user
+
+            def run():
+                return {"fields": ai.from_mail(msg, user=user, model=model, web=web), "message": "🧠 Заповнено"}
+            return JsonResponse({"job": jobs.start(user, f"from-mail {msg.pk}", run)})
+        if action == "create":
+            if not _can(request, "add"):
+                raise Http404
+            data = self._draft_from_post(request)
+            try:
+                s = draft.create(data, user=request.user, source="mail", message=msg,
+                                 categories=self._categories_from_post(request), note=request.POST.get("note", ""))
+            except ValueError as e:
+                self.message_user(request, str(e), messages.ERROR)
+                return redirect(request.path)
+            self.message_user(request, f"🏭 Створено постачальника {s.name}", messages.SUCCESS)
+            return redirect(reverse("admin:inventory_supplier_change", args=[s.pk]))
+        if action == "attach":
+            if not _can(request, "change"):
+                raise Http404
+            s = self.get_queryset(request).filter(pk=request.POST.get("supplier") or 0).first()
+            if s is None:
+                raise Http404
+            return self._attach_existing(request, s, self._draft_from_post(request), source="mail", message=msg)
+        data = draft.from_message(msg)
+        return TemplateResponse(request, "admin/suppliers/from_mail.html", self._ctx(
+            request, "🏭 Постачальник з листа", msg=msg, d=data, matches=draft.existing(data),
+            categories=SupplierCategory.objects.filter(is_active=True), can_add=_can(request, "add"),
+            can_change=_can(request, "change")))
+
+    def find_in_mail_view(self, request):
+        """🔎 Хто з вашого листування схожий на постачальника, але його ще немає в Minerva."""
+        from suppliers.services import discover, mailscan
+        if not _can(request, "view"):
+            raise Http404
+        if request.method == "POST" and request.POST.get("action") == "ignore":
+            if discover.ignore(request.POST.get("key"), request.user):
+                self.message_user(request, f"🙈 {request.POST.get('key')} — більше не пропонувати", messages.INFO)
+            return redirect(request.get_full_path())
+        date_from, date_to = mailscan.period(request.GET.get("from"), request.GET.get("to"), days=discover.DAYS)
+        rows = discover.candidates(request.user, date_from=date_from, date_to=date_to)
+        return TemplateResponse(request, "admin/suppliers/find_in_mail.html", self._ctx(
+            request, "🔎 Постачальники з пошти", rows=rows, date_from=date_from, date_to=date_to,
+            can_add=_can(request, "add")))
+
+    # ── 📷 Візитка / флаєр ──
+    def card_view(self, request):
+        from suppliers.services import ai, jobs
+        if not (_can(request, "add") or _can(request, "change")):
+            raise Http404
+        supplier = None
+        sid = request.POST.get("supplier") or request.GET.get("supplier")
+        if sid and str(sid).isdigit():
+            supplier = self.get_queryset(request).filter(pk=int(sid)).first()
+        if request.method == "POST":
+            image = request.FILES.get("image")
+            if image is None:
+                self.message_user(request, "Зробіть фото або виберіть файл.", messages.ERROR)
+                return redirect(request.get_full_path())
+            if image.size > 15 * 1024 * 1024:
+                self.message_user(request, "Фото понад 15 МБ.", messages.ERROR)
+                return redirect(request.get_full_path())
+            kind = request.POST.get("kind") if request.POST.get("kind") in dict(SupplierMedia.KINDS) else SupplierMedia.CARD
+            m = SupplierMedia(supplier=supplier, kind=kind, title=request.POST.get("title", "")[:200],
+                              event=request.POST.get("event", "")[:200], note=request.POST.get("note", "")[:4000],
+                              marks=[x for x in request.POST.getlist("marks") if x in dict(SupplierMedia.MARKS)],
+                              created_by=request.user)
+            m.image.save(image.name or "photo.jpg", image, save=False)
+            back = request.FILES.get("image_back")
+            if back is not None and back.size <= 15 * 1024 * 1024:
+                m.image_back.save(back.name or "back.jpg", back, save=False)
+            m.save()
+            if supplier is not None:
+                SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.CARD, media=m, user=request.user,
+                                             text=f"{m.get_kind_display()} додано" + (f" · {m.event}" if m.event else ""))
+            url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+            if request.POST.get("read_ai"):
+                model, user = ai.model_of(request.POST.get("model")), request.user
+
+                def run():
+                    ai.card(m, user=user, model=model)
+                    return {"url": url, "message": "🧠 Прочитано"}
+                url += "?job=" + jobs.start(user, f"card {m.pk}", run)
+            return redirect(url)
+        return TemplateResponse(request, "admin/suppliers/card.html", self._ctx(
+            request, "📷 Візитка / флаєр", supplier=supplier, kinds=SupplierMedia.KINDS, marks=SupplierMedia.MARKS,
+            recent=SupplierMedia.objects.select_related("supplier")[:8]))
+
+    def cards_view(self, request):
+        if not _can(request, "view"):
+            raise Http404
+        qs = SupplierMedia.objects.select_related("supplier", "created_by")
+        show = request.GET.get("show", "")
+        if show == "new":
+            qs = qs.filter(supplier=None)
+        q = " ".join(request.GET.get("q", "").split())[:100]
+        if q:
+            qs = qs.filter(Q(title__icontains=q) | Q(note__icontains=q) | Q(event__icontains=q) |
+                           Q(supplier__name__icontains=q))
+        mark = request.GET.get("mark", "")
+        items = [m for m in qs[:300] if not mark or mark in (m.marks or [])][:120]
+        return TemplateResponse(request, "admin/suppliers/cards.html", self._ctx(
+            request, "🪪 Візитки й флаєри", items=items, show=show, q=q, mark=mark, marks=SupplierMedia.MARKS,
+            unassigned=SupplierMedia.objects.filter(supplier=None).count()))
+
+    def card_review_view(self, request, media_pk):
+        from suppliers.services import ai, draft, jobs, match
+        m = SupplierMedia.objects.select_related("supplier", "contact", "created_by").filter(pk=media_pk).first()
+        if m is None or not _can(request, "view"):
+            raise Http404
+        can_edit = _can(request, "change") or (_can(request, "add") and m.created_by_id == request.user.pk)
+        action = request.POST.get("action") if request.method == "POST" else ""
+        if action and not can_edit:
+            raise Http404
+        url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+        if action == "note":
+            m.note = request.POST.get("note", "")[:4000]
+            m.event = request.POST.get("event", "")[:200]
+            m.title = request.POST.get("title", "")[:200]
+            if request.POST.get("kind") in dict(SupplierMedia.KINDS):
+                m.kind = request.POST["kind"]
+            m.marks = [x for x in request.POST.getlist("marks") if x in dict(SupplierMedia.MARKS)]
+            m.save(update_fields=["note", "event", "title", "kind", "marks"])
+            self.message_user(request, "💾 Збережено", messages.SUCCESS)
+            return redirect(url)
+        if action == "ai":
+            model, user = ai.model_of(request.POST.get("model")), request.user
+
+            def run():
+                ai.card(m, user=user, model=model)
+                return {"url": url, "message": "🧠 Прочитано"}
+            return JsonResponse({"job": jobs.start(user, f"card {m.pk}", run)})
+        if action == "create":
+            if not _can(request, "add"):
+                raise Http404
+            try:
+                s = draft.create(self._draft_from_post(request), user=request.user, source="card", media=m,
+                                 categories=self._categories_from_post(request), note=m.note)
+            except ValueError as e:
+                self.message_user(request, str(e), messages.ERROR)
+                return redirect(url)
+            SupplierMedia.objects.filter(pk=m.pk).update(state=SupplierMedia.APPLIED, supplier=s)
+            self.message_user(request, f"🏭 Створено постачальника {s.name} — фото збережено в його картці", messages.SUCCESS)
+            return redirect(reverse("admin:inventory_supplier_change", args=[s.pk]))
+        if action == "attach":
+            s = self.get_queryset(request).filter(pk=request.POST.get("supplier") or 0).first()
+            if s is None:
+                raise Http404
+            first = m.supplier_id is None
+            SupplierMedia.objects.filter(pk=m.pk).update(supplier=s, state=SupplierMedia.APPLIED)
+            if first:
+                SupplierEvent.objects.create(supplier=s, kind=SupplierEvent.CARD, media=m, user=request.user,
+                                             text=f"{m.get_kind_display()} додано" + (f" · {m.event}" if m.event else ""))
+            return self._attach_existing(request, s, self._draft_from_post(request), source="card", media=m)
+        if action == "delete":
+            if not (_can(request, "change") or m.created_by_id == request.user.pk):
+                raise Http404
+            sid = m.supplier_id
+            for f in (m.image, m.image_back):
+                if f:
+                    f.delete(save=False)
+            m.delete()
+            self.message_user(request, "🗑 Фото видалено", messages.INFO)
+            return redirect(reverse("admin:inventory_supplier_change", args=[sid]) if sid else
+                            reverse("admin:inventory_supplier_cards"))
+        data = dict(m.extracted or {})
+        if not data:
+            data = {k: "" for k in draft.FIELDS + draft.CONTACT_FIELDS}
+        names = {c.name.lower(): c.pk for c in SupplierCategory.objects.filter(is_active=True)}
+        picked = [names[n.lower()] for n in (data.get("categories") or []) if n.lower() in names]
+        matches = draft.existing(data) if (data.get("name") or data.get("email") or data.get("website")) else []
+        return TemplateResponse(request, "admin/suppliers/card_review.html", self._ctx(
+            request, f"📷 {m.title or m.get_kind_display()}", m=m, d=data, matches=matches, picked=picked,
+            categories=SupplierCategory.objects.filter(is_active=True), kinds=SupplierMedia.KINDS,
+            marks=SupplierMedia.MARKS, can_edit=can_edit, can_add=_can(request, "add"),
+            can_change=_can(request, "change"), job=request.GET.get("job", ""),
+            suppliers_json=None, site_domain=match.site_domain(data.get("website", ""))))
+
+
+_STYLE = mark_safe("""<style>
+.sp-tiles{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 8px}
+.sp-tile{border:1px solid var(--border-strong,#ccc);border-radius:8px;padding:6px 10px;min-width:150px;background:var(--bg-card,transparent)}
+.sp-k{font-size:11px;color:var(--text-muted,#888)}.sp-v{font-weight:600}
+.sp-muted{color:var(--text-muted,#888);font-size:12px}.sp-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+.sp-score{margin:4px 0 6px}.sp-warn{margin:6px 0;color:var(--warning-fg,#b06d00)}
+.sp-h{margin:10px 0 4px;font-weight:600}.sp-table{border-collapse:collapse;margin:2px 0 6px;font-size:12px}
+.sp-table td,.sp-table th{border-bottom:1px solid var(--border-strong,#ddd);padding:3px 8px;text-align:left;vertical-align:top}
+.sp-cards{display:flex;flex-wrap:wrap;gap:10px}
+.sp-card{display:block;width:190px;border:1px solid var(--border-strong,#ccc);border-radius:8px;padding:6px;text-decoration:none;color:inherit;background:var(--bg-card,transparent)}
+.sp-card img{width:100%;height:110px;object-fit:cover;border-radius:6px;background:#fff}
+.sp-note{font-size:12px;white-space:pre-line}.sp-box{border:1px solid var(--border-strong,#ccc);border-radius:8px;padding:8px 12px;margin:6px 0;max-width:980px}
+.sp-job{font-size:12px;color:var(--text-muted,#888)}
+</style>""")
+
+# Кнопки data-sp-job: POST (CSRF з форми / cookie) → id завдання → опитування …/job/<id>/ → перехід / повідомлення.
+_JOB_JS = mark_safe("""<script>
+(function(){
+  if (window.spJob) return;
+  function csrf(){ var i=document.querySelector('input[name=csrfmiddlewaretoken]'); if(i) return i.value;
+    var m=document.cookie.match(/csrftoken=([^;]+)/); return m?m[1]:''; }
+  window.spJob = function(url, data, out, done){
+    var fd = new FormData(); Object.keys(data||{}).forEach(function(k){ fd.append(k, data[k]); });
+    if (out) out.textContent = '⏳ AI працює… (до хвилини)';
+    fetch(url, {method:'POST', body:fd, headers:{'X-CSRFToken':csrf()}, credentials:'same-origin'})
+      .then(function(r){ return r.json(); }).then(function(j){
+        if (!j.job) { if (out) out.textContent = '⚠️ ' + (j.error || 'не вдалося'); return; }
+        spPoll(j.job, out, done);
+      }).catch(function(){ if (out) out.textContent = '⚠️ немає зв\\'язку'; });
+  };
+  window.spPoll = function(job, out, done){
+    var base = (window.SP_JOB_URL || '/admin/inventory/supplier/job/'), t0 = Date.now();
+    (function tick(){
+      fetch(base + job + '/', {credentials:'same-origin'}).then(function(r){ return r.json(); }).then(function(s){
+        if (s.status === 'running') { if (out) out.textContent = '⏳ AI працює… ' + Math.round((Date.now()-t0)/1000) + ' с';
+          return setTimeout(tick, 2000); }
+        if (s.status === 'failed') { if (out) out.textContent = '⚠️ ' + (s.error || 'помилка'); return; }
+        if (s.status === 'done') { if (done) return done(s.result || {}); var r = s.result || {};
+          if (r.url) { var u = new URL(r.url, location.href); if (u.pathname + u.search === location.pathname + location.search) location.reload(); else location.href = r.url; } else if (out) out.textContent = r.message || '✅'; return; }
+        if (out) out.textContent = '⚠️ завдання не знайдено';
+      }).catch(function(){ setTimeout(tick, 4000); });
+    })();
+  };
+  document.addEventListener('click', function(e){
+    var b = e.target.closest('[data-sp-job]'); if (!b) return; e.preventDefault();
+    var box = b.closest('.sp-row') || b.parentNode, sel = box.querySelector('.sp-model');
+    spJob(b.getAttribute('data-sp-job'), {model: sel ? sel.value : ''}, box.querySelector('.sp-job'));
+  });
+})();
+</script>""")

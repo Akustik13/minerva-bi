@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'calendar_app',     # 📅 Календар
     'worktime',         # ⏱ Робочий час — askDANTE (прийшов / пішов, проєкти)
     'agent',            # 🤖 Агент Minerva — доручення («на такі листи відповідай так»), після email_assistant
+    'suppliers',        # 🏭 Постачальники: категорії, контакти, візитки, аналіз, запити (RFQ) — після email_assistant і projects
     'meetings',         # 🎙 Наради — запис на RAG-ПК, розшифровка й ключові моменти (після projects, crm, calendar_app)
     'bots',             # 🤖 Боти та AI
     'jlcpcb',           # 🔬 JLCPCB виробництво

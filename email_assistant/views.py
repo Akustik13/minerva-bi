@@ -697,6 +697,7 @@ def inbox_view(request):
         'mail_time_url':         _mail_time_url(),
         'agent_can':             request.user.has_perm('agent.add_agentrule'),
         'agent_task_can':        request.user.has_perm('agent.add_agenttask'),
+        'supplier_can':          request.user.has_perm('inventory.add_supplier') or request.user.has_perm('inventory.change_supplier'),
         'can_delete_work_category': request.user.has_perm('email_assistant.delete_mailcategory'),
         'grouped':               grouped,
         'category_choices':      EmailMessage.CATEGORY_CHOICES,

@@ -105,7 +105,7 @@ ROLE_DEFAULTS = {
         'modules': ['crm', 'strategy', 'sales', 'shipping', 'dashboard', 'tasks',
                     'email_assistant', 'projects', 'offers', 'calendar_app', 'worktime', 'agent', 'faq',
                     'labels_app',
-                    'documents', 'meetings'],
+                    'documents', 'meetings', 'suppliers'],
         'can_delete': False,
         'can_export': True,
         'can_import': False,
@@ -113,7 +113,7 @@ ROLE_DEFAULTS = {
         'can_manage_users': False,
     },
     'warehouse': {
-        'modules': ['inventory', 'shipping', 'labels_app', 'dashboard', 'tasks',
+        'modules': ['inventory', 'suppliers', 'shipping', 'labels_app', 'dashboard', 'tasks',
                     'calendar_app', 'faq'],
         'can_delete': False,
         'can_export': False,
@@ -185,9 +185,12 @@ ROLE_OPERATIONS = {
         'documents':       ['view', 'add', 'change'],
         # 🎙 наради: записати й переглядати лише свої (видалення — власником на сторінці наради, не правом delete)
         'meetings':        ['view', 'add', 'change'],
+        # 📨 запити постачальникам (RFQ) — створити, надіслати, вести; картки постачальників — розділ «Склад»
+        'suppliers':       ['view', 'add', 'change'],
     },
     'warehouse': {
         'inventory':  ['view', 'add', 'change', 'import'],
+        'suppliers':  ['view', 'add', 'change'],
         'shipping':   ['view', 'add', 'change'],
         'labels_app': ['view', 'add'],
         'dashboard':  ['view'],
