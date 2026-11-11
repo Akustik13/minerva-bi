@@ -475,6 +475,11 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
       {% if ev.email_message_id %}
       <a class="cal-email-badge" href="/email/message/{{ ev.email_message_id }}/" target="_blank" title="Відкрити лист">📧</a>
       {% endif %}
+      {% if ev.mt_open %}
+      <a class="cal-admin-link cal-mt" href="{{ ev.mt_open }}" target="_blank" rel="noopener" title="Відкрити нараду, записану з цієї зустрічі (бачите лише ви)">🎙</a>
+      {% elif ev.mt_record %}
+      <a class="cal-admin-link cal-mt" href="{{ ev.mt_record }}" target="_blank" rel="noopener" title="Записати нараду: підготовка запису з цієї зустрічі">🎙</a>
+      {% endif %}
       <a class="cal-admin-link" href="/admin/calendar_app/calendarevent/{{ ev.pk }}/change/" title="Редагувати">✏️</a>
       <button class="cal-done-btn{% if ev.is_done %} done{% endif %}"
               title="{% if ev.is_done %}Відновити{% else %}Виконано{% endif %}"
@@ -543,6 +548,13 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
        style="flex:1;padding:6px 4px;border-radius:6px;border:1px solid var(--border-strong);text-align:center;color:var(--link-fg);text-decoration:none;font-size:12px;display:block">
       ✏️ Редагувати
     </a>
+    <a id="cal-popup-rec" href="#" target="_blank" rel="noopener"
+       style="flex:1;padding:6px 4px;border-radius:6px;border:1px solid var(--border-strong);text-align:center;color:var(--link-fg);text-decoration:none;font-size:12px;display:none">
+      🎙 Записати нараду
+    </a>
+  </div>
+  <div id="cal-popup-rec-more" style="display:none;margin-top:6px;text-align:right;font-size:11px">
+    <a id="cal-popup-rec-more-link" href="#" target="_blank" rel="noopener" style="color:var(--text-muted);text-decoration:underline">записати ще одну</a>
   </div>
 </div>
 
@@ -1066,6 +1078,19 @@ async function showEventPopup(ev, pk) {
     }
     var editLink = document.getElementById('cal-popup-edit-link');
     if (editLink) editLink.href = '/admin/calendar_app/calendarevent/' + pk + '/change/';
+    // 🎙 наради (event_detail_api: meeting_url — ваша нарада з цієї зустрічі, record_url — підготувати запис)
+    var _local = function (u) { return typeof u === 'string' && /^\/(?!\/)/.test(u) ? u : ''; };
+    var recLink = document.getElementById('cal-popup-rec'), recMore = document.getElementById('cal-popup-rec-more');
+    var openUrl = _local(d.meeting_url), recUrl = _local(d.record_url);
+    if (recLink) {
+      recLink.href = openUrl || recUrl || '#';
+      recLink.textContent = openUrl ? '🎙 Відкрити нараду' : '🎙 Записати нараду';
+      recLink.style.display = (openUrl || recUrl) ? 'block' : 'none';
+    }
+    if (recMore) {
+      document.getElementById('cal-popup-rec-more-link').href = recUrl || '#';
+      recMore.style.display = (openUrl && recUrl) ? 'block' : 'none';
+    }
     var x = ev.clientX+14, y = ev.clientY+14;
     if (x+360 > window.innerWidth)  x = ev.clientX-360;
     if (y+340 > window.innerHeight) y = ev.clientY-340;

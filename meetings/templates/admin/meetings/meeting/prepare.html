@@ -1,0 +1,117 @@
+{% extends "admin/base_site.html" %}
+{# 🎙 Підготовка наради («🎙 Записати нараду»): назва, проєкт, клієнт, хто присутній, мови, режим, мова тексту згоди. #}
+{# Галочок згоди тут немає — їх ставлять у вікні запису перед ▶ (meetings/admin.py new_view / continue_view). #}
+{% load static %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=3">{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{{ list_url }}">🎙 Наради</a> &rsaquo; {{ title }}
+</div>
+{% endblock %}
+{% block content_title %}{% endblock %}
+{% block content %}
+<div id="mt-page" class="mt-wrap">
+  <h1>🎙 Записати нараду</h1>
+  {% if refusal %}
+  <section class="mt-card">
+    <div class="mt-line-warn" role="alert">⚠️ {{ refusal }}</div>
+    <div class="mt-actions"><a class="button" href="{{ list_url }}">← До нарад</a></div>
+  </section>
+  {% else %}
+  {% if continues %}<p class="mt-muted">↪ Продовження наради «<span translate="no">{{ continues.title }}</span>» від {{ continues.created_at|date:"d.m.Y" }} — проєкт, клієнт, учасники й мови вже підставлено.</p>{% endif %}
+  {% if error %}<p class="errornote" role="alert">❌ {{ error }}</p>{% endif %}
+  <p class="mt-muted">Підготуйте нараду заздалегідь: назва, проєкт, хто присутній. Згоду на запис підтвердите у вікні запису перед ▶ — тут галочок немає.</p>
+  <form method="post" action="{{ form_url }}" class="mt-form">{% csrf_token %}
+    <input type="hidden" name="event" value="{{ state.event.pk|default:'' }}">
+    <input type="hidden" name="continues" value="{{ state.continues.pk|default:'' }}">
+    <div class="mt-grid">
+      <section class="mt-card">
+        <h2>Про нараду</h2>
+        <label>Назва <input type="text" name="title" value="{{ state.title }}" maxlength="200" required></label>
+        {% if state.event %}<div class="mt-muted">🤝 Подія календаря: <span translate="no">{{ state.event.title }}</span> · {{ state.event.start_at|date:"d.m.Y H:i" }}</div>{% endif %}
+        {% if can_projects %}
+        <label>Проєкт
+          <select name="project" data-mt-project>
+            <option value="">— без проєкту —</option>
+            {% for p in projects %}<option value="{{ p.pk }}" data-customer="{{ p.customer }}" translate="no"{% if p.selected %} selected{% endif %}>{{ p.code }} · {{ p.name }}</option>{% endfor %}
+          </select></label>
+        {% endif %}
+        {% if can_customers %}
+        <label>Клієнт
+          <select name="customer" data-mt-customer>
+            <option value="">— без клієнта —</option>
+            {% for c in customers %}<option value="{{ c.pk }}" translate="no"{% if c.selected %} selected{% endif %}>{{ c.label }}</option>{% endfor %}
+          </select></label>
+        <div class="mt-muted">Без клієнта, але з проєктом — візьметься клієнт проєкту.</div>
+        {% endif %}
+        <div class="mt-row2">
+          <label>Моя мова (мікрофон)
+            <select name="lang_l">{% for code, label in lang_choices %}<option value="{{ code }}"{% if code == state.lang_l %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+          <label>Мова співрозмовників
+            <select name="lang_r">{% for code, label in lang_choices %}<option value="{{ code }}"{% if code == state.lang_r %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        </div>
+        <div class="mt-muted">Мови можна змінити й у вікні запису до ▶. На коротких фразах українську можна сплутати з російською — виберіть мову, якщо нарада однією мовою.</div>
+        <fieldset><legend>Режим</legend>
+          {% for code, label in retention_choices %}<label class="mt-radio"><input type="radio" name="retention" value="{{ code }}"{% if code == state.retention %} checked{% endif %}> {{ label }}</label>{% endfor %}
+        </fieldset>
+      </section>
+
+      <section class="mt-card">
+        <h2>Хто на нараді (для протоколу згоди)</h2>
+        <p class="mt-muted">Відмічені потраплять у протокол згоди. Організатор і ті, хто прийняв запрошення, відмічені одразу; учасники проєкту й контакти клієнта — лише підказки.</p>
+        <ul class="mt-people">
+          {% for p in state.participants %}
+          <li><label><input type="checkbox" name="p_on" value="{{ forloop.counter0 }}"{% if p.checked %} checked{% endif %}>
+            <span translate="no">{{ p.name|default:p.email }}{% if p.name and p.email %} &lt;{{ p.email }}&gt;{% endif %}</span></label>
+            {% if p.source_label %}<span class="mt-muted">· {{ p.source_label }}</span>{% endif %}
+            <input type="hidden" name="p_name" value="{{ p.name }}"><input type="hidden" name="p_email" value="{{ p.email }}">
+            <input type="hidden" name="p_source" value="{{ p.source }}"></li>
+          {% empty %}<li class="mt-muted">Підказок немає — додайте учасників нижче.</li>{% endfor %}
+        </ul>
+        <div data-mt-people-extra>
+          <div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254"></div>
+        </div>
+        <button type="button" class="button" data-mt-add-person>＋ Ще хтось</button>
+        <label>Примітка до протоколу <textarea name="consent_note" rows="2">{{ state.consent_note }}</textarea></label>
+      </section>
+    </div>
+
+    <section class="mt-card" data-mt-langbox>
+      <h2>🗣 Що сказати вголос перед ▶</h2>
+      <div class="mt-langs">{% for l in consent_langs %}<label><input type="radio" name="consent_lang" value="{{ l.code }}" data-mt-langpick{% if l.code == state.consent_lang %} checked{% endif %}> {{ l.label }}</label>{% endfor %}</div>
+      {% for l in consent_langs %}
+      <div data-mt-lang="{{ l.code }}"{% if l.code != state.consent_lang %} hidden{% endif %}>
+        <div class="mt-muted">Перед ▶ спитайте:</div>
+        <div class="mt-say" translate="no">{{ l.ask }}</div>
+        {% if l.after %}<div class="mt-muted">Щойно запис почався, скажіть:</div>
+        <div class="mt-say" translate="no">{{ l.after }}</div>{% endif %}
+      </div>
+      {% endfor %}
+      <div class="mt-line-warn">⏸ Згоду підтвердите у вікні запису перед ▶: дочекайтеся, поки кожен скаже «так». Якщо хтось проти — не записуйте (можна вести нотатки).</div>
+      <details>
+        <summary>✉️ Примітка для запрошення — скопіюйте в Teams / Outlook</summary>
+        {% for i in invites %}
+        <div data-mt-lang="{{ i.code }}"{% if i.code != state.consent_lang %} hidden{% endif %}>
+          <textarea class="mt-invite" id="mt-inv-{{ i.code }}" rows="6" readonly translate="no">{{ i.text }}</textarea>
+          <div class="mt-actions"><button type="button" class="button" data-mt-copy="mt-inv-{{ i.code }}">📋 Копіювати</button></div>
+        </div>
+        {% endfor %}
+        {% if privacy_url %}<div class="mt-muted">🔒 Інформація за ст. 13 DSGVO: <a href="{{ privacy_url }}" target="_blank" rel="noopener" translate="no">{{ privacy_url }}</a></div>
+        {% else %}<div class="mt-muted">Посилання на інформацію за ст. 13 DSGVO ще не задано («⚙️ Налаштування нарад»).</div>{% endif %}
+      </details>
+    </section>
+
+    <div class="mt-health mt-health-{{ health.level }}">{{ health.text }}</div>
+    <div class="mt-actions">
+      <button type="submit" class="button mt-primary mt-big">💾 Підготувати нараду</button>
+      <a class="button" href="{{ list_url }}">Скасувати</a>
+    </div>
+    <p class="mt-hint">🔒 Нараду, розшифровку й ключові моменти бачите лише ви. Прийняті вами пункти (назва й цитата) побачать усі, хто бачить проєкт.</p>
+  </form>
+  <template id="mt-person-tpl"><div class="mt-person"><input type="text" name="x_name" placeholder="Ім’я" maxlength="200"><input type="email" name="x_email" placeholder="Email (необов’язково)" maxlength="254"></div></template>
+  {% endif %}
+</div>
+<script src="{% static 'meetings/meetings.js' %}?v=1" defer></script>
+{% endblock %}

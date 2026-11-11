@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вікно запису наради</title>
+<link rel="stylesheet" href="/static/bench.css?v=0.3.0">
+<script src="/static/bench.js?v=0.3.0" defer></script>
+</head>
+<body class="boot">
+<header class="top">
+  <h1 id="page-title">🎙 Вікно запису наради</h1>
+  <div id="chips" class="chips stage0" aria-live="polite"></div>
+</header>
+
+<!-- opened without Minerva while test recordings are off -->
+<div id="landing" class="card landing" hidden>
+  <p class="big">🎙 Вікно запису наради.</p>
+  <p>Щоб записати нараду, відкрийте її в Minerva: сторінка наради → «🎙 Відкрити вікно запису».</p>
+</div>
+
+<!-- «🔌 Перевірити вікно запису» in Minerva opens #check -->
+<div id="check-ok" class="card landing" hidden>
+  <p class="big">✅ Цей ПК може відкривати вікно запису — вкладку можна закрити.</p>
+  <p id="check-link" class="muted"></p>
+</div>
+
+<!-- Minerva mode: the meeting this window records -->
+<div id="mn-banner" class="notice mn" hidden>
+  <div id="mn-title" class="mn-title" translate="no"></div>
+  <div id="mn-mode"></div>
+  <div id="mn-until" class="muted"></div>
+  <div id="mn-busy" class="hint warn" hidden></div>
+  <a id="mn-back" class="mn-back" hidden rel="noopener noreferrer">← Повернутися в Minerva</a>
+</div>
+<div id="mn-error" class="card mn-error" hidden role="alert"></div>
+
+<p id="stage0-notice" class="notice stage0">🧪 Тестовий режим без Minerva (увімкнено в «RAG — керування» → «🎙 Наради»).
+  ⚖️ Записуйте лише з дозволу <b>всіх</b>, кого чути (§ 201 StGB). Записи лежать лише на RAG-ПК, їх бачать усі
+  дозволені ПК, і вони самі видаляються через <b id="retention">14</b> днів. Текст розшифровки йде в хмару, лише коли
+  ви окремо дозволите це для запису.</p>
+<p id="config-error" class="notice" hidden></p>
+
+<nav class="tabs stage0" role="tablist">
+  <button type="button" data-tab="live" class="on" role="tab">🔴 Наживо</button>
+  <button type="button" data-tab="upload" role="tab">📁 Свій файл</button>
+  <button type="button" data-tab="list" role="tab">🗂 Записи <span id="count" class="badge"></span></button>
+  <button type="button" data-tab="metrics" role="tab">📊 Заміри</button>
+  <button type="button" data-tab="help" role="tab">❓ Довідка</button>
+</nav>
+
+<main>
+<section id="tab-live" class="tab">
+  <!-- Minerva mode: consent right before ▶ -->
+  <div id="mn-consent" class="card mn-consent" hidden>
+    <div class="row between">
+      <b>Перед записом — прочитайте вголос</b>
+      <span id="mn-langs" class="row" role="group" aria-label="Мова тексту"></span>
+    </div>
+    <blockquote id="mn-text" class="mn-text" translate="no"></blockquote>
+    <p id="mn-after-box" class="muted" hidden>Одразу після «▶ Почати» скажіть вголос: <b id="mn-after" translate="no"></b></p>
+    <p class="hint warn">⏸ Дочекайтеся, поки кожен скаже «так». Якщо хтось проти — не записуйте (можна вести нотатки).</p>
+    <label class="consent"><input type="checkbox" id="mn-announced"> Запис оголошено, мету пояснено</label>
+    <label class="consent"><input type="checkbox" id="mn-agreed"> Усі, кого чути, вголос погодились (хто приєднається
+      пізніше — спитаю ще раз)</label>
+  </div>
+
+  <div class="card" id="lv-card">
+    <label class="field stage0" id="lv-title-field">Назва
+      <input id="lv-title" maxlength="200" placeholder="Напр.: Тест — інтерв'ю німецькою з YouTube">
+    </label>
+    <div class="grid2">
+      <fieldset>
+        <legend>Що записувати</legend>
+        <label><input type="radio" name="lv-mode" value="both" checked> Нарада + мій мікрофон</label>
+        <label><input type="radio" name="lv-mode" value="meeting"> Лише звук наради (вкладка, вікно або екран)</label>
+        <label><input type="radio" name="lv-mode" value="mic"> Лише мікрофон (очна зустріч)</label>
+      </fieldset>
+      <fieldset>
+        <legend id="lv-engine-legend">Текст наживо</legend>
+        <label id="lv-engine-parakeet"><input type="radio" name="lv-engine" value="parakeet" checked> <span>⚡ Parakeet — на процесорі (рекомендовано)</span></label>
+        <label id="lv-engine-whisper" class="stage0"><input type="radio" name="lv-engine" value="whisper"> 🎯 Whisper turbo — на відеокарті</label>
+        <label id="lv-engine-none"><input type="radio" name="lv-engine" value="none"> <span>Без тексту наживо — лише запис</span></label>
+      </fieldset>
+    </div>
+    <div class="row">
+      <label class="field small">Мікрофон<select id="lv-mic"><option value="">Як вибере браузер (перевірте, який саме)</option></select></label>
+      <label class="field small">Обробка мікрофона
+        <select id="lv-proc">
+          <option value="standard">Звичайна — браузер прибирає шум і луну (рекомендовано)</option>
+          <option value="headset">Гарнітура — без придушення луни, чистіший голос</option>
+          <option value="system">Без гарнітури, нарада в програмі Teams / Zoom — прибирати весь звук комп’ютера</option>
+        </select>
+      </label>
+      <button type="button" id="lv-check">🎤 Перевірити мікрофон</button>
+      <button type="button" id="lv-find">🔎 Знайти мікрофон, який вас чує</button>
+    </div>
+    <div id="lv-check-box" class="check" hidden>
+      <div class="meter"><span>🎤</span><div class="bar"><i id="lv-check-meter"></i></div><b id="lv-check-db" class="num"></b></div>
+      <div id="lv-check-verdict" class="hint" role="status"></div>
+      <div id="lv-check-device" class="muted"></div>
+      <table id="lv-scan-table" class="list"></table>
+      <details id="lv-check-tips">
+        <summary>Мікрофон мовчить або дуже тихий — що перевірити</summary>
+        <ol>
+          <li>Натисніть «🔎 Знайти мікрофон, який вас чує» і говоріть 5 секунд: вікно послухає всі мікрофони одразу й
+            вибере той, що чує голос. Браузер часто бере не той — напр. USB-колонки чи звукову карту без мікрофона.</li>
+          <li>Кнопка вимкнення мікрофона на гарнітурі чи ноутбуці (часто світиться червоним).</li>
+          <li>Windows: <b>Параметри → Система → Звук → Введення</b> — вибрати мікрофон, у який говорите, гучність
+            70–100 %, смужка рівня має рухатися, коли говорите.</li>
+          <li>Windows: <b>Параметри → Конфіденційність і безпека → Мікрофон</b> — доступ увімкнено, зокрема для
+            класичних програм.</li>
+          <li>Спробуйте «Обробка мікрофона: Гарнітура» — якщо так чути, винна обробка браузера.</li>
+          <li>Chrome запам’ятовує свій улюблений мікрофон: <code>chrome://settings/content/microphone</code> (Edge:
+            <code>edge://settings/content/microphone</code>) — виберіть там потрібний.</li>
+          <li>Закрийте інші програми, які могли захопити мікрофон монопольно (Teams, Zoom, диктування).</li>
+        </ol>
+      </details>
+    </div>
+    <div class="row">
+      <label class="field small">Моя мова (мікрофон)<select id="lv-lang-l" class="lang"></select></label>
+      <label class="field small">Мова співрозмовників<select id="lv-lang-r" class="lang"></select></label>
+    </div>
+    <p class="muted" id="lv-lang-note">Мову бере до уваги Whisper (наживо й у точній розшифровці). Parakeet визначає мову сам.</p>
+    <label class="consent stage0" id="lv-consent-label"><input type="checkbox" id="lv-consent"> Усі, кого чути, погодились на запис (або це тестовий звук)</label>
+    <div class="row buttons">
+      <button type="button" id="lv-start" class="primary">▶ Почати</button>
+      <button type="button" id="lv-mark" disabled>📌 Позначка</button>
+      <button type="button" id="lv-pause" disabled>⏸ Пауза</button>
+      <button type="button" id="lv-stop" class="danger" disabled>⏹ Зупинити</button>
+      <span id="lv-timer" class="timer">00:00</span>
+    </div>
+    <div id="mn-start-note" class="hint" hidden></div>
+    <div id="mn-rec-buttons" class="row buttons" hidden>
+      <button type="button" id="mn-join" disabled>🙋 Новий учасник погодився</button>
+      <button type="button" id="mn-ok" disabled>✅ Згоду підтверджено вголос</button>
+      <button type="button" id="mn-discard" class="danger" disabled>⛔ Хтось не згоден — зупинити й видалити</button>
+    </div>
+    <div id="mn-silence" class="hint warn mn-silence" role="alert" hidden>
+      <span>🔕 Нарада закінчилась? Звуку наради вже 10 хвилин немає.</span>
+      <button type="button" id="mn-silence-stop" class="danger">⏹ Зупинити</button>
+    </div>
+    <div class="meters">
+      <div class="meter"><span>🎙 Ви</span><div class="bar"><i id="lv-meter-l"></i></div></div>
+      <div class="meter"><span>🖥 Нарада</span><div class="bar"><i id="lv-meter-r"></i></div></div>
+    </div>
+    <div id="lv-hint" class="hint" role="status"></div>
+    <div id="lv-warn" class="hint warn" role="alert" hidden></div>
+    <div id="lv-miclost" class="hint bad" role="alert" hidden></div>
+    <details class="howto">
+      <summary>Як захопити звук наради</summary>
+      <ol>
+        <li>Teams, Zoom чи Meet у <b>браузері</b>: у вікні вибору — вкладка наради і галочка «Поділитися звуком вкладки».</li>
+        <li>Програма Teams / Zoom: «Весь екран» і галочка «Поділитися системним звуком».</li>
+        <li>Найкраще — у гарнітурі: тоді мікрофон не чує динаміків.</li>
+        <li>Браузер покаже смугу «Ви показуєте…» — це нормально, відео не зберігається.</li>
+      </ol>
+    </details>
+  </div>
+
+  <div id="mn-done" class="card mn-done" hidden>
+    <div id="mn-done-text"></div>
+    <div id="mn-progress" class="hint ok" role="status"></div>
+    <a id="mn-done-back" class="mn-back" hidden rel="noopener noreferrer">← Повернутися в Minerva</a>
+  </div>
+
+  <div class="card" id="lv-text-card">
+    <div class="row between">
+      <b>Текст наживо</b>
+      <span id="lv-stats" class="muted"></span>
+    </div>
+    <div class="row translate">
+      <label><input type="checkbox" id="tr-on"> 🌐 Переклад у браузері на</label>
+      <select id="tr-target">
+        <option value="uk">українську</option>
+        <option value="de">німецьку</option>
+        <option value="en">англійську</option>
+      </select>
+      <span id="tr-note" class="muted"></span>
+    </div>
+    <div id="lv-lines" class="lines" aria-live="polite" translate="no"></div>
+    <div id="lv-saved" class="saved" hidden></div>
+  </div>
+</section>
+
+<section id="tab-upload" class="tab" hidden>
+  <div class="card">
+    <label class="field">Аудіо чи відео (mp3, m4a, wav, ogg, webm, mp4…)
+      <input type="file" id="up-file" accept="audio/*,video/*">
+    </label>
+    <label class="field">Назва <input id="up-title" maxlength="200" placeholder="Як у назві файлу"></label>
+    <div class="row">
+      <label class="field small">Мова<select id="up-lang" class="lang"></select></label>
+      <label class="field small">Розшифровка
+        <select id="up-model">
+          <option value="accurate">🎯 Точна — large-v3</option>
+          <option value="fast">⚡ Швидка — large-v3-turbo</option>
+        </select>
+      </label>
+    </div>
+    <label class="field">Слова-підказки (необов'язково, через кому)
+      <input id="up-hotwords" maxlength="300" placeholder="Напр.: Minerva, DigiKey, AN220213-01C, Teillieferung">
+    </label>
+    <label><input type="checkbox" id="up-split"> Стерео: лівий і правий канал — різні люди (як у записах цього стенду)</label>
+    <label><input type="checkbox" id="up-unload" checked> Можна звільнити відеокарту: моделі Ollama вивантажаться й потім завантажаться знову</label>
+    <label class="consent"><input type="checkbox" id="up-consent"> Усі, кого чути в записі, погодились (або це публічний чи тестовий запис)</label>
+    <div class="row buttons">
+      <button type="button" id="up-send" class="primary">⬆ Завантажити й розшифрувати</button>
+    </div>
+    <progress id="up-progress" max="100" value="0" hidden></progress>
+    <div id="up-msg" class="hint" role="status"></div>
+  </div>
+</section>
+
+<section id="tab-list" class="tab" hidden>
+  <div class="card">
+    <table class="list">
+      <thead><tr><th>Коли</th><th>Назва</th><th>Тривалість</th><th>Розшифровка</th><th>Моменти</th><th></th></tr></thead>
+      <tbody id="list-body"></tbody>
+    </table>
+    <p id="list-empty" class="muted" hidden>Записів ще немає.</p>
+  </div>
+</section>
+
+<section id="tab-metrics" class="tab" hidden>
+  <div class="card">
+    <div class="row between">
+      <b>Заміри всіх записів</b>
+      <a id="metrics-csv" href="/api/metrics.csv" download>⬇ CSV для Excel</a>
+    </div>
+    <p class="muted">«Швидкість» — у скільки разів швидше за реальний час. «Затримка» наживо — від кінця фрази до тексту
+      без урахування паузи 0,5 с, якою Parakeet визначає кінець фрази.</p>
+    <div class="scroll"><table class="list" id="metrics-table"></table></div>
+  </div>
+</section>
+
+<section id="tab-help" class="tab" hidden>
+  <div class="card help" id="help-box"><p class="muted">Завантажую довідку…</p></div>
+</section>
+
+<section id="tab-session" class="tab" hidden>
+  <div class="card">
+    <div class="row between">
+      <h2 id="ss-title" class="title"></h2>
+      <div class="row">
+        <button type="button" id="ss-rename">✏️ Назва</button>
+        <button type="button" id="ss-back">← До записів</button>
+      </div>
+    </div>
+    <div id="ss-info" class="muted"></div>
+    <audio id="ss-audio" controls preload="none"></audio>
+    <div class="row" id="ss-controls">
+      <select id="ss-model">
+        <option value="accurate">🎯 Точна — large-v3</option>
+        <option value="fast">⚡ Швидка — large-v3-turbo</option>
+      </select>
+      <select id="ss-device">
+        <option value="auto">Пристрій: авто</option>
+        <option value="gpu">лише відеокарта</option>
+        <option value="cpu">процесор (повільно)</option>
+      </select>
+      <span id="ss-langs"></span>
+      <input id="ss-hotwords" maxlength="300" placeholder="Слова-підказки, через кому">
+      <label><input type="checkbox" id="ss-unload" checked> можна звільнити відеокарту</label>
+      <button type="button" id="ss-transcribe" class="primary">📝 Розшифрувати</button>
+    </div>
+    <div id="ss-job" class="job" role="status"></div>
+  </div>
+  <div class="cols">
+    <div class="card">
+      <div class="row between">
+        <b id="ss-lines-title">Розшифровка</b>
+        <div class="row">
+          <input id="ss-search" type="search" placeholder="🔍 Пошук">
+          <a id="ss-export" href="#" download>⬇ .txt</a>
+        </div>
+      </div>
+      <div id="ss-lines" class="lines tall"></div>
+    </div>
+    <div class="card">
+      <b>🧠 Ключові моменти</b>
+      <div class="row">
+        <select id="ss-llm"></select>
+        <select id="ss-outlang">
+          <option value="uk">українською</option>
+          <option value="de">німецькою</option>
+          <option value="en">англійською</option>
+        </select>
+        <button type="button" id="ss-moments">Знайти</button>
+      </div>
+      <div id="ss-cloud" class="cloud" hidden>
+        <div>☁️ Платна модель: <b>текст розшифровки</b> цього запису піде в Anthropic (США). Аудіо не передається.
+          Можна лише тоді, коли всі учасники на це погодились, а з клієнтом — якщо це дозволяє договір чи NDA.</div>
+        <label><input type="checkbox" id="ss-cloud-ok"> Учасники погодились на обробку тексту в хмарі</label>
+      </div>
+      <div id="ss-moments-box"></div>
+    </div>
+  </div>
+  <div class="card">
+    <b>Заміри цього запису</b>
+    <div id="ss-metrics"></div>
+  </div>
+  <div class="row"><button type="button" id="ss-delete" class="danger">🗑 Видалити запис</button></div>
+</section>
+</main>
+<footer class="muted stage0">Тестовий режим без Minerva · <span id="version"></span></footer>
+</body>
+</html>

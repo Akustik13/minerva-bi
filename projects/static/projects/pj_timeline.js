@@ -11,9 +11,10 @@
   var DAY = 864e5, LEFT = 156, RIGHT = 14, HEAD = 30, ROW_H = 18, PAD = 6, MAX_ROWS = 3;
   var MAIL_H = 36, HOURS_H = 42, CHAR_W = 6.2, MIN_SPAN = 7, MAX_SPAN = 3650, CLUSTER_PX = 18;
   var MONTHS = ['січ', 'лют', 'бер', 'кві', 'тра', 'чер', 'лип', 'сер', 'вер', 'жов', 'лис', 'гру'];
-  var BRIEF = ['moments', 'plan', 'calendar'];
+  var BRIEF = ['moments', 'plan', 'calendar', 'meetings'];
   var SHORT = {moments: '📌 Моменти', plan: '📋 Фази', mail: '✉️ Листи', docs: '📝 Документи', files: '📎 Файли',
-               orders: '🛒 Замовлення', supply: '🏭 Закупівлі', calendar: '📅 Терміни', hours: '⏱ Години'};
+               orders: '🛒 Замовлення', supply: '🏭 Закупівлі', calendar: '📅 Терміни', meetings: '🎙 Наради',
+               hours: '⏱ Години'};
   var RANGES = [['all', 'усе'], ['3', '3 міс'], ['6', '6 міс'], ['12', '12 міс']];
   // цілі речення — щоб «🌐 Переклади інтерфейсу» знаходили їх (змінна частина — {n})
   var EMPTY_TEXT = 'На шкалі поки порожньо: додайте листування, Angebot, замовлення чи закупівлю до проєкту — вони з’являться тут самі.';
@@ -92,7 +93,7 @@
       '<button type="button" class="pjc-b" data-tl-zoom="in" title="Наблизити (Ctrl + коліщатко, подвійний клік)">＋</button>' +
       '<button type="button" class="pjc-b" data-tl-zoom="today" title="Сьогодні — посередині">⌖ сьогодні</button></span>' +
       '<span class="pjc-ranges pjt-lanes" role="group" aria-label="Доріжки шкали">' +
-      '<button type="button" class="pjc-b" data-tl-lanes="brief" title="Лише важливі моменти, фази й віхи, терміни й зустрічі">Коротко</button>' +
+      '<button type="button" class="pjc-b" data-tl-lanes="brief" title="Лише важливі моменти, фази й віхи, терміни й зустрічі, ваші наради">Коротко</button>' +
       '<button type="button" class="pjc-b" data-tl-lanes="all" title="Усі доріжки">Усе</button>';
     this.lanes.forEach(function (l) {
       html += '<button type="button" class="pjc-b pjt-chip" data-tl-lane="' + l[0] + '" title="' + esc(l[1]) + '">' +

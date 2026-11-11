@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'calendar_app',     # 📅 Календар
     'worktime',         # ⏱ Робочий час — askDANTE (прийшов / пішов, проєкти)
     'agent',            # 🤖 Агент Minerva — доручення («на такі листи відповідай так»), після email_assistant
+    'meetings',         # 🎙 Наради — запис на RAG-ПК, розшифровка й ключові моменти (після projects, crm, calendar_app)
     'bots',             # 🤖 Боти та AI
     'jlcpcb',           # 🔬 JLCPCB виробництво
     'documents',        # 📄 Документи
@@ -278,7 +279,8 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_THROTTLE_CLASSES": ["api.throttling.APIKeyRateThrottle", "api.throttling.APIKeyQuotaThrottle"],
     "DEFAULT_THROTTLE_RATES": {"apikey": os.getenv("API_RATE_LIMIT", "120/min"),
-                               "knowledge": os.getenv("KNOWLEDGE_RATE_LIMIT", "600/min")},
+                               "knowledge": os.getenv("KNOWLEDGE_RATE_LIMIT", "600/min"),
+                               "meetings": os.getenv("MEETINGS_RATE_LIMIT", "300/min")},
     "COERCE_DECIMAL_TO_STRING": False,
 }
 

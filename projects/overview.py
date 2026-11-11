@@ -604,20 +604,40 @@ def validate(data, refs, docs, resolve=None) -> dict:
 
 def _documents_block(project, user, refs) -> tuple:
     """Файли й посилання проєкту з бази знань (rag_assistant.knowledge_items), які бачить користувач;
-    номери [#N] — після листів, refs доповнюється адресами документів. → (текст, document_id)."""
+    номери [#N] — після листів, refs доповнюється адресами документів. → (текст, document_id).
+    Огляд — спільний для всіх, хто бачить проєкт: документи «🔒 лише я» (і 🎙 розшифровки нарад, закриті для AI) у
+    промпт не йдуть, але їхні id повертаються — щоб і RAG їх не приніс (_rag_block)."""
     if user is None:
         return "", set()
     try:
         from rag_assistant import knowledge_items
+        from rag_assistant.models import KnowledgeItem
     except ImportError:
         return "", set()
     blocks, ids = [], set()
-    for item in knowledge_items.items_for(user, "project", project)[:10]:
-        refs.append(f"/rag/knowledge/{item.pk}/")
+    for item in knowledge_items.items_for(user, "project", project):
         ids.add(item.document_id)
+        if item.visibility == KnowledgeItem.PRIVATE or knowledge_items.ai_blocked(item):
+            continue
+        if len(blocks) >= 10:
+            continue
+        refs.append(f"/rag/knowledge/{item.pk}/")
         blocks.append(f"[#{len(refs)}] {item.get_kind_display()} «{item.title}»\n"
                       f"{knowledge_items.local_text(item, 3000) or '—'}")
     return ("ДОКУМЕНТИ Й ПОСИЛАННЯ ПРОЄКТУ:\n\n" + "\n\n".join(blocks) if blocks else ""), ids
+
+
+def _private_documents(user) -> set:
+    """document_id документів людини, які в спільний огляд не йдуть: «🔒 лише я» і 🎙 розшифровки нарад."""
+    try:
+        from django.db.models import Q
+        from rag_assistant.models import KnowledgeItem
+    except ImportError:
+        return set()
+    if user is None:
+        return set()
+    blocked = Q(visibility=KnowledgeItem.PRIVATE) | Q(kind=KnowledgeItem.MEETING)
+    return {f"document:{pk}" for pk in KnowledgeItem.objects.filter(blocked, owner=user).values_list("pk", flat=True)}
 
 
 def _rag_block(project, user, facts, refs, seen_documents=()) -> str:
@@ -625,6 +645,7 @@ def _rag_block(project, user, facts, refs, seen_documents=()) -> str:
     База знань RAG для огляду: листування клієнта поза гілками проєкту (без клієнта — уся пошта користувача),
     запит — з картки проєкту (rag_assistant.entity_help.build_query). Номери [#N] — далі після листів проєкту,
     refs доповнюється адресами знайдених листів. RAG не налаштований чи недоступний — огляд без нього.
+    Огляд спільний: «🔒 лише я» документи й 🎙 розшифровки нарад людини (_private_documents) RAG сюди не приносить.
     """
     if user is None:
         return ""
@@ -639,7 +660,8 @@ def _rag_block(project, user, facts, refs, seen_documents=()) -> str:
         status, _detail, _note = rag_sources(
             src, user, build_query("project", project), scope="клієнта проєкту" if project.customer_id else "усій пошті",
             seen={x["msg"].pk for x in facts["messages"]}, customer_id=project.customer_id or None,
-            exclude_thread_ids=threads, purpose="overview", seen_documents=set(seen_documents))
+            exclude_thread_ids=threads, purpose="overview",
+            seen_documents=set(seen_documents) | _private_documents(user))
     except Exception as e:  # noqa: BLE001 — огляд без бази знань краще, ніж жодного
         logger.warning("project overview %s: RAG failed: %s", project.code, e)
         return ""

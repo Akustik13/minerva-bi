@@ -402,3 +402,15 @@
 .pjy-k-bad { border-color: var(--err); }
 .pjy-k-warn { border-color: var(--warn); }
 .pjy-k-ok { border-color: var(--ok); }
+  /* 🎙 Мої наради (cockpit._meetings_context) — лише власні наради того, хто дивиться */
+  .pjc-link.pjc-rec { margin-left: 0; }
+  .pjc-meet { margin-top: 10px; }
+  .pjc ul.pjc-mlist li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding-left: 7px;
+                         border-left: 3px solid var(--border-strong, #2a3f52); }
+  .pjc ul.pjc-mlist li.pjc-mt-warn { border-left-color: var(--warn, #e3b341); }
+  .pjc ul.pjc-mlist li.pjc-mt-bad { border-left-color: var(--err, #f85149); }
+  .pjc ul.pjc-mlist li.pjc-mt-ok { border-left-color: var(--ok, #3fb950); }
+  .pjc ul.pjc-mlist li.pjc-mt-open { border-left-color: var(--accent, #58a6ff); }
+  .pjc-mt-pending { font-weight: 600; color: var(--warn, #e3b341); }
+  .pjc-from-meeting { white-space: nowrap; }
+  @media (max-width: 768px) { .pjc-link.pjc-rec { flex: 1 1 100%; text-align: center; padding: 8px 9px; } }

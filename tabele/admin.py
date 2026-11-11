@@ -48,6 +48,7 @@ def _get_app_list(self, request, app_label=None):
         'email_assistant',  # 📧 Email Асистент
         'agent',            # 🤖 Агент Minerva
         'projects',         # 📁 Проєкти з пошти
+        'meetings',         # 🎙 Наради (запис і розшифровка)
         'offers',           # 📝 Angebote
         'worktime',         # ⏱ Робочий час (askDANTE)
         'bots',             # 🤖 Боти та AI
@@ -68,7 +69,8 @@ def _get_app_list(self, request, app_label=None):
         'ai_assistant':    ['aiconversation', 'aibudgetlog'],
         'rag_assistant':   ['ragsettings', 'ragconversation', 'knowledgesettings', 'knowledgesource', 'knowledgeitem', 'knowledgedoc'],
         'projects':        ['project', 'projectrisk', 'projecttemplate', 'projectsettings', 'dismissedthread'],
-        'offers':          ['offer', 'offersettings', 'offerrevision'],
+        'meetings':        ['meeting', 'meetingsettings'],
+        'offers':         ['offer', 'offersettings', 'offerrevision'],
         'worktime':        ['workday', 'danteproject', 'workreport', 'danteuser', 'booking', 'dantesettings'],
         'email_assistant': ['emailaccount', 'emailsettings', 'mailcategory', 'emailmessage', 'emailthread'],
         'agent':           ['agenttask', 'agentschedule', 'agentrule', 'agentrun'],

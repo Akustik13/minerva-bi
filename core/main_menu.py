@@ -28,7 +28,7 @@ HREF_MAX = 300
 GROUPS = [
     ("sales", "Продажі", "🛒", ["orders", "offers", "customers"]),
     ("stock", "Склад", "📦", ["stock", "purchases", "labels"]),
-    ("projects", "Проєкти", "📁", ["portfolio", "projects", "risks"]),
+    ("projects", "Проєкти", "📁", ["portfolio", "projects", "risks", "meetings"]),
     ("comms", "Комунікації й час", "💬", ["mail", "calendar", "worktime"]),
     ("more", "Ще", "⋯", ["shipments", "dashboard", "signals", "settings", "guide"]),
 ]

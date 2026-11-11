@@ -1252,7 +1252,10 @@ window.MV_GROUPS = [
       { href:'/admin/projects/projecttemplate/',            icon:'🧩', label:'Шаблони планів',  app:'projects', model:'ProjectTemplate' },
       { href:'/admin/projects/project/triage/',             icon:'📥', label:'Розбір пошти',    app:'projects', model:'Project' },
       { href:'/admin/projects/projectsettings/',            icon:'⚙️', label:'Налаштування проєктів', app:'projects', model:'ProjectSettings' },
-    ], apps:['projects'] },
+      /* 🎙 Наради — запис і розшифровка (meetings/): кожен бачить лише свої */
+      { href:'/admin/meetings/meeting/',                    icon:'🎙', label:'Наради',          app:'meetings', model:'Meeting' },
+      { href:'/admin/meetings/meetingsettings/',            icon:'⚙️', label:'Налаштування нарад', app:'meetings', model:'MeetingSettings' },
+    ], apps:['projects','meetings'] },
   { id:'sales', icon:'🛒', label:'🛒 Продажі',
     links:[
       { href:'/offers/',                                        icon:'📝', label:'📝 Angebote — огляд', app:'offers' },
@@ -1606,6 +1609,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/dashboard/':       'analytics',
     '/admin/crm/':            'crm',
     '/admin/projects/':       'projects',
+    '/admin/meetings/':       'projects',
     '/admin/offers/':         'sales',
     '/offers/':               'sales',
     '/admin/strategy/':       'crm',

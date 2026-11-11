@@ -44,17 +44,19 @@ def set_status(risk, status, now=None):
     risk.status = status
 
 
-def save(project, data, user=None, message=None, source=ProjectRisk.MANUAL) -> ProjectRisk:
-    """{id, title, description, category, probability, impact, owner, mitigation, status, review_on, steps: [id]}.
-    source — для нового ризику: вручну або прийнята пропозиція AI-помічника (ai); правило — лише risk_rules."""
+def save(project, data, user=None, message=None, source=ProjectRisk.MANUAL, meeting=None,
+         meeting_second=None) -> ProjectRisk:
+    """{id, title, description, category, probability, impact, owner, mitigation, status, review_on, steps: [id],
+    quote}. source — для нового ризику: вручну, прийнята пропозиція AI-помічника (ai) або ✓ пункту наради (meeting —
+    з meeting і секундою; підстава — цитата, інакше «🎙 Нарада DD.MM.YYYY»); правило — лише risk_rules."""
     rid = data.get("id")
     risk = ProjectRisk.objects.filter(project=project, pk=rid).first() if str(rid or "").isdigit() else None
     if rid and risk is None:
         raise RiskError("Ризик не знайдено")
     new = risk is None
     if new:
-        risk = ProjectRisk(project=project, source=ProjectRisk.AI if source == ProjectRisk.AI else ProjectRisk.MANUAL,
-                           created_by=user, owner=project.owner)
+        risk = ProjectRisk(project=project, created_by=user, owner=project.owner,
+                           source=source if source in (ProjectRisk.AI, ProjectRisk.MEETING) else ProjectRisk.MANUAL)
     if risk.source != ProjectRisk.RULE:
         title = " ".join(str(data.get("title") or "").split())[:200]
         if not title:
@@ -81,10 +83,19 @@ def save(project, data, user=None, message=None, source=ProjectRisk.MANUAL) -> P
         risk.message = message
         risk.evidence = (str(data.get("quote") or "").strip()[:1000]
                          or f"Лист «{message.subject or '(без теми)'}»")
+    if meeting is not None and new:
+        start = meeting.started_at or meeting.created_at
+        day = timezone.localtime(start).date() if start else timezone.localdate()
+        risk.meeting = meeting
+        risk.meeting_second = max(int(meeting_second), 0) if meeting_second is not None else None
+        risk.evidence = str(data.get("quote") or "").strip()[:1000] or f"🎙 Нарада {day:%d.%m.%Y}"
     risk.save()
     if "steps" in data:
         ids = [int(x) for x in (data.get("steps") or []) if str(x).isdigit()]
         risk.steps.set(ProjectStep.objects.filter(project=project, pk__in=ids))
+    if meeting is not None:
+        from . import state
+        state.mark_dirty([project.pk])
     return risk
 
 

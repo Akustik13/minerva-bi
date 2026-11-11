@@ -1,0 +1,58 @@
+{% extends "admin/base_site.html" %}
+{# 🧾 Протоколи згоди — лише адміністратор Minerva і лише метадані (services.protocols): назв, розшифровок, пунктів #}
+{# і уривків тут немає. «🗑 Видалити» — запит учасника за ст. 17 DSGVO (services.admin_delete + журнал аудиту). #}
+{% load static %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=3">{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{{ list_url }}">🎙 Наради</a> &rsaquo; {{ title }}
+</div>
+{% endblock %}
+{% block content_title %}{% endblock %}
+{% block content %}
+<div id="mt-page" class="mt-wrap">
+  <h1>🧾 Протоколи згоди</h1>
+  <p class="mt-muted">Лише метадані — для запитів учасників (ст. 15 / 17 DSGVO) і перевірки, що згоду спитали: дата, хто записав, проєкт, час і галочки згоди, адреси учасників. Назв, розшифровок, ключових моментів і уривків тут немає. «🗑 Видалити» прибирає нараду разом з розшифровкою й документами бази знань; у журналі аудиту лишається номер наради й час згоди.</p>
+  <form method="get" class="mt-actions">
+    <input type="search" name="q" value="{{ q }}" placeholder="Пошук за email учасника" class="mt-invite" style="max-width:360px">
+    <button type="submit" class="button">🔎 Знайти</button>
+    {% if q %}<a class="button" href="{% url 'admin:meetings_meeting_protocols' %}">✕ Усі</a>{% endif %}
+  </form>
+  <section class="mt-card mt-scroll">
+    <table class="mt-table">
+      <thead><tr>
+        <th>Нарада</th><th>День</th><th>Хто записав</th><th>Проєкт</th><th>Згода</th><th>Мова</th><th>Стан</th>
+        <th>Розшифровка</th><th>Учасники (email)</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>#{{ r.pk }}</td>
+          <td class="mt-nowrap">{{ r.day|date:"d.m.Y" }}</td>
+          <td translate="no">{{ r.recorder|default:"—" }}</td>
+          <td translate="no" class="mt-nowrap">{{ r.project_code|default:"—" }}</td>
+          <td>{% if r.consent_at %}<span class="mt-nowrap">{{ r.consent_at|date:"d.m.Y H:i" }}</span><br><span class="mt-muted">{% if r.announced %}✅ оголошено{% else %}⬜ не оголошено{% endif %} · {% if r.all_agreed %}✅ усі погодились{% else %}⬜ не всі{% endif %}</span>{% else %}<span class="mt-muted">ще не записували</span>{% endif %}</td>
+          <td>{{ r.lang_label|default:"—" }}</td>
+          <td>{{ r.status_label }}</td>
+          <td>{% if r.transcript %}є{% else %}немає{% endif %}</td>
+          <td translate="no">{{ r.emails|join:", "|default:"—" }}</td>
+          <td>
+            <form method="post" data-confirm="Видалити нараду #{{ r.pk }} разом з розшифровкою й документами бази знань? Це не можна скасувати.">{% csrf_token %}
+              <input type="hidden" name="action" value="delete"><input type="hidden" name="pk" value="{{ r.pk }}">
+              <input type="hidden" name="q" value="{{ q }}">
+              <button type="submit" class="button mt-danger">🗑 Видалити</button>
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="10" class="mt-muted">{% if q %}Нічого не знайдено{% else %}Нарад ще немає{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if total >= max_rows %}<p class="mt-muted">Показано перші {{ max_rows }} — уточніть пошук.</p>{% endif %}
+  </section>
+</div>
+<script src="{% static 'meetings/meetings.js' %}?v=1" defer></script>
+{% endblock %}

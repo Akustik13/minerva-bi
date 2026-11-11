@@ -1,0 +1,72 @@
+{# 🎙 Один ключовий момент наради: ✓ Прийняти ▾ (куди додати) / ✕ Не те / ↺ Повернути. Без <form> і <script> — #}
+{# дії робить meetings.js (POST JSON на data-url, у відповідь — цей самий фрагмент заново, meetings/admin_pages.py). #}
+<div class="mt-item mt-item-{{ item.status }}" id="mt-item-{{ item.pk }}" data-url="{{ item_url }}" data-me="{{ me }}">
+  <div class="mt-item-head">
+    <span class="mt-item-kind">{{ item.get_kind_display }}</span>
+    {% if time %}<a class="mt-time" href="#t={{ second }}" title="Показати в розшифровці">[{{ time }}]</a>{% endif %}
+    {% if speaker %}<span>{{ speaker }}</span>{% endif %}
+    {% if item.who %}<span>👤 <span translate="no">{{ item.who }}</span></span>{% endif %}
+    {% if item.due_text %}<span>⏰ <span translate="no">{{ item.due_text }}</span></span>{% endif %}
+  </div>
+  <div class="mt-item-title" translate="no">{{ item.title|default:"—" }}</div>
+  {% if item.quote %}<div class="mt-q">«<span translate="no">{{ item.quote }}</span>»</div>{% endif %}
+
+  {% if item.status == "pending" and not can_change %}
+  <div class="mt-muted">Чекає ✓ / ✕ · 🔒 {{ no_change_text }}</div>
+  {% elif item.status == "pending" %}
+  <div class="mt-actions">
+    <button type="button" class="button mt-primary" data-mt-toggle aria-expanded="false">✓ Прийняти ▾</button>
+    <button type="button" class="button" data-mt-act="reject" title="Більше не пропонувати">✕ Не те</button>
+    <span class="mt-err" role="alert"></span>
+  </div>
+  <div class="mt-panel" hidden>
+    <fieldset>
+      <legend>Куди додати</legend>
+      {% for t in targets %}
+      <label class="mt-target{% if t.reason %} is-off{% endif %}">
+        <input type="radio" name="tgt-{{ item.pk }}" value="{{ t.key }}"{% if t.checked %} checked{% endif %}{% if t.reason %} disabled{% endif %}>
+        <span><b>{{ t.label }}</b> — {{ t.meaning }}</span>
+      </label>
+      {% if t.reason %}<div class="mt-reason">{{ t.reason }}</div>{% endif %}
+      {% endfor %}
+    </fieldset>
+    <label class="mt-f">Назва
+      <input type="text" name="title" value="{{ item.title }}" maxlength="200"></label>
+    <div data-for="moment">
+      <label class="mt-f">Вид моменту
+        <select name="kind">{% for k in moment_kinds %}<option value="{{ k.code }}"{% if k.selected %} selected{% endif %}>{{ k.label }}</option>{% endfor %}</select></label>
+    </div>
+    <div data-for="risk">
+      <label class="mt-f">Категорія ризику
+        <select name="category">{% for code, label in categories %}<option value="{{ code }}"{% if code == "other" %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+      <label class="mt-f">Власник ризику
+        <select name="owner"><option value="">— відповідальний за проєкт —</option>{% for u in staff %}<option value="{{ u.pk }}" translate="no">{{ u.name }}</option>{% endfor %}</select></label>
+    </div>
+    <div data-for="step">
+      <label class="mt-f">Хто робить
+        <select name="side">{% for s in sides %}<option value="{{ s.code }}"{% if s.selected %} selected{% endif %}>{{ s.label }}</option>{% endfor %}</select></label>
+      <label class="mt-f">Виконавець
+        <select name="assignee"><option value="">— без виконавця —</option>{% for u in staff %}<option value="{{ u.pk }}" translate="no"{% if u.pk == me and side_default == "we" %} selected{% endif %}>{{ u.name }}</option>{% endfor %}</select></label>
+    </div>
+    <div data-for="step deadline">
+      <label class="mt-f">Дата
+        <input type="date" name="date" value="{{ date }}"></label>
+      {% if item.due_text %}<div class="mt-muted">Сказано: «<span translate="no">{{ item.due_text }}</span>»{% if not date %} — виберіть дату{% endif %}</div>{% endif %}
+    </div>
+    <div class="mt-warnline" data-for="moment risk step">{{ shared_warning }}</div>
+    <div class="mt-warnline" data-for="deadline">{{ deadline_warning }}</div>
+    <div class="mt-actions">
+      <button type="button" class="button mt-primary" data-mt-act="accept">✓ Додати</button>
+      <button type="button" class="button" data-mt-toggle>Скасувати</button>
+    </div>
+  </div>
+  {% elif item.status == "accepted" %}
+  <div class="mt-done">✓ Додано: {{ result.label }}{% if result.url %} → <a href="{{ result.url }}">відкрити</a>{% else %} <span class="mt-muted">(запис уже видалено)</span>{% endif %}</div>
+  {% else %}
+  <div class="mt-actions">
+    <span class="mt-muted">✕ Не те — більше не пропонується</span>
+    {% if can_change %}<button type="button" class="button" data-mt-act="restore">↺ Повернути</button>{% endif %}
+    <span class="mt-err" role="alert"></span>
+  </div>
+  {% endif %}
+</div>

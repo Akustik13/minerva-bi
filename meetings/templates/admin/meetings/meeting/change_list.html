@@ -1,0 +1,13 @@
+{% extends "admin/change_list.html" %}
+{# 🎙 Наради — список лише своїх нарад; замість «Додати» — «🎙 Записати нараду» (meetings/admin.py changelist_view). #}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=3">{% endblock %}
+{% block object-tools-items %}
+  {% if can_record %}<li><a href="{{ new_url }}">🎙 Записати нараду</a></li>{% endif %}
+  {% if is_admin %}<li><a href="{{ protocols_url }}" title="Лише метадані — для запитів учасників за ст. 15 / 17 DSGVO">🧾 Протоколи згоди</a></li>{% endif %}
+{% endblock %}
+{% block content %}
+{% if refusal %}<p class="mt-muted">⚠️ {{ refusal }}</p>{% endif %}
+<p class="mt-muted">🔒 Тут лише наради, які записали ви. Ваших нарад і розшифровок не бачить ніхто інший — і адміністратор теж.</p>
+{{ block.super }}
+{% endblock %}

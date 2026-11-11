@@ -2,7 +2,7 @@
 
 Базовий URL: `https://<ваш-домен>/api/v1/` (локально `http://localhost:8000/api/v1/`)
 
-**Зміст:** 1. Підключення · 2. Склад · 2a. Закупівлі з CRM · 3. Товари · 4. Замовлення · 5. Доставка · 6. Вебхуки · 7. Як протестувати · 8. Як впровадити в магазин · 8a. Як впровадити в CRM · 9. Коди помилок · 10. Безпека і запуск · 11. Інтернет-магазин сайту
+**Зміст:** 1. Підключення · 2. Склад · 2a. Закупівлі з CRM · 3. Товари · 4. Замовлення · 5. Доставка · 6. Вебхуки · 7. Як протестувати · 8. Як впровадити в магазин · 8a. Як впровадити в CRM · 9. Коди помилок · 10. Безпека і запуск · 11. Інтернет-магазин сайту · 12. Зовнішня RAG-система · 13. Наради (RAG-ПК)
 
 ## 1. Підключення
 
@@ -31,6 +31,7 @@
 | `webhooks:read` / `webhooks:write` | вебхуки, зареєстровані цим ключем |
 | `accounts:read` / `accounts:write` | особистий кабінет покупців магазину ключа (розділ 11a) |
 | `agent:read` / `agent:write` | MCP-сервер `POST /api/v1/mcp/` для Claude Code / Claude Desktop (JSON-RPC 2.0, `Authorization: Bearer <ключ>`): читання товарів, даташитів, магазинів, DigiKey / пропозиції змін — застосовує людина з поля ключа «🤖 Агент (MCP) — від імені кого» у «🧩 Завдання агенту» (гід `docs/guide/api/mcp.md`) |
+| `meetings:write` | лише службовий ключ RAG-ПК для вікна запису нарад: квиток, стан запису, розшифровка, ключові моменти, звірка (розділ 13). Ключ — кнопкою «🔑 Створити ключ для RAG-ПК (наради)» у «⚙️ Налаштування нарад»; ключ магазину не діє |
 
 **Ліміт:** 120 запитів/хв на ключ (змінна оточення `API_RATE_LIMIT`, напр. `300/min`), або свій у ключа (нижче). При перевищенні — `429` + заголовок `Retry-After`.
 **Пагінація:** `?page=2&page_size=200` (макс. 500). Відповідь: `{count, next, previous, results}`.
@@ -863,3 +864,86 @@ RAG читає Minerva під час запиту (без індексації �
 - Звуження на боці Minerva: `?sku=A,B`, `?search=…` (SKU, назва, виробник), `?category=…`,
   `?attr=Назва:значення` (входження без регістру; кілька `attr` — усі умови), напр.
   `/shop/products/?attr=RF Family/Standard:Bluetooth&attr=Antenna Type:PCB`.
+
+## 13. Наради (RAG-ПК)
+
+Адреси для вікна запису нарад на RAG-ПК (`https://192.168.2.68:8791`): Minerva видає одноразовий квиток, RAG-ПК записує
+нараду, розшифровує її (Whisper) і шукає ключові моменти **локальною** моделлю, потім надсилає сюди текст і пункти.
+Аудіо в Minerva не надходить. Логіка — `meetings/services.py`, HTTP — `api/meetings_views.py`, тести —
+`api/tests_meetings.py`.
+
+**Ключ.** «🎙 Наради» → «⚙️ Налаштування нарад» → **«🔑 Створити ключ для RAG-ПК (наради)»**: новий ключ з одним правом
+`meetings:write` (журнал — лише помилки), повністю ключ видно на його сторінці («Технічна інформація»). Ключ вставляють на
+RAG-ПК: «RAG — керування» → «🎙 Наради» → «Ключ Minerva (наради)», адреса Minerva — `https://sevskiy.minerva-bi.com`.
+
+- Лише `Authorization: Token <ключ>` (сесія адмінки не діє — `401`), право `meetings:write` для **усіх** адрес, також
+  для `GET /ping/` (інакше `403 forbidden_scope`). Ключ магазину — `403 shop_key_forbidden`, навіть з цим правом.
+- Квиток — **лише в тілі** `redeem`. Ключ надсилання (`push_token` з відповіді `redeem`) — **лише в заголовку**
+  `X-Meeting-Token` для `status / transcript / moments`. Адреса й параметри йдуть у журнал API, тіло й заголовки — ні;
+  параметри адреси тут не потрібні й записуються лише як `***`.
+- Відповіді — без змісту наради: ні тексту розшифровки, ні цитат (назва наради — лише в `redeem`, для банера вікна).
+- Тіло ≤ 2 МБ (RAG-ПК ділить розшифровку на частини ≤ 512 КБ). Більше — `413 payload_too_large`, `retryable: false`,
+  `details.max_bytes`: зменшити частини й надіслати розшифровку заново з новим `upload_id`.
+- Ліміт — `300/min` на ключ (`MEETINGS_RATE_LIMIT`), або свій у ключа; `429 rate_limited` + `Retry-After`.
+- Кожна відповідь — `Cache-Control: no-store`.
+
+| Метод і адреса | Тіло | Відповідь `200` |
+|---|---|---|
+| `POST /meetings/redeem/` | `{ticket}` | `{meeting: {id, uid, title, project_code, retention, retention_days, audio_days, lang_l, lang_r, consent_lang, consent_texts: {de, en, uk: {ask, after}}, hotwords, return_url}, push_token}` |
+| `POST /meetings/{id}/status/` | `{session, uid, state, seq, at, started_at?, consent?, capture?, lang_l?, lang_r?, detail?, progress?, duration?, levels?, silent?, marks?, stage?, message?, segments?}` | `{ok, applied, status}` |
+| `POST /meetings/{id}/transcript/` | `{session, uid, upload_id, parts, part, segments: [{n, start, end, ch, text}], languages?, model?, duration?, marks?}` | `{ok, complete, missing}` або `{ok, complete: true, segments}` |
+| `POST /meetings/{id}/moments/` | `{session, uid, model, summary, items: [{kind, text, who, due, quote, line}]}` | `{ok, added, skipped, known}` |
+| `POST /meetings/sync/` | `{sessions: [{meeting, uid, session, token_sha256?, stage, progress, queue_pos, audio_on_bench}], bench?: {version, live_busy, queue, outbox, failed, last_error, retention_days, standalone}}` | `{sessions: [{meeting, uid, session, action}]}` |
+| `GET /meetings/ping/` | — | `{ok, scopes}` — перевірка ключа з «RAG — керування»; «RAG-ПК на зв'язку» не змінює |
+
+**Обмін квитка.** «🎙 Відкрити вікно запису» на сторінці наради → Minerva переходить на
+`<адреса RAG-ПК>/#minerva=<квиток>` (квиток — у фрагменті, не йде в журнали й Referer). Квиток діє 120 с
+(«⚙️ Налаштування нарад») і лише раз; у базі — лише SHA-256. Кожен `redeem` видає новий `push_token` — попередній для
+цієї наради одразу не діє (`403 push_forbidden`).
+
+**Стан запису** (`state`): `recording` (лише з `consent: {announced: true, all_agreed: true, lang, at}`, інакше
+`409 consent_missing`; разом із `capture {mode both|mic|meeting, processing, headset}` і мовами), `recorded`
+(`duration`, `levels {L|R: {peak_dbfs}}`, `silent`, `marks [{t, note, auto?}]`), `transcribing` (`progress`),
+`transcribed`, `finding_moments`, `done` (`segments` — скільки сегментів передано), `error` (`stage`, `message` ≤ 300),
+`discarded` (учасник не погодився — запис видалено на RAG-ПК, нарада знову «Готово до запису»), `audio_deleted`.
+`seq` зростає з кожним станом; старий або той самий `seq` → `200 {applied: false}` без змін. Невідомий стан —
+ігнорується (`200`). Перший запит із `session` прив'язує нараду до цього запису на RAG-ПК; інша `session` — `409`.
+
+**Розшифровка частинами.** Усі частини однієї передачі мають той самий `upload_id` і `parts`; `n` сегментів — поспіль
+від 1 через усі частини; текст сегмента, довший за 2000 знаків, обрізається (не відкидається), разом ≤ 3 000 000 знаків.
+Повтор частини — без змін. Після збирання той самий `upload_id` → `{complete: true}`, інший — `409 transcript_exists`.
+Ключові моменти раніше за зібрану розшифровку — `409 transcript_incomplete` (`retryable: true`, повторити пізніше).
+`line` ключового моменту — номер сегмента `n`; пункт, цитати якого немає в розшифровці, відкидається (`skipped`), уже
+відомий — `known`.
+
+**Звірка** (`action` для кожного запису на RAG-ПК): `keep`, `delete` (нараду чи розшифровку видалено, стара сесія,
+власника немає — запис на RAG-ПК видалити), `unknown` (Minerva не знає — не видаляти), `retry` (людина натиснула
+«🔄 Спробувати ще раз»), `drop_audio` (аудіо більше не потрібне). Блок `bench` оновлює «RAG-ПК на зв'язку» на сторінці
+налаштувань; без нього звірка цього не змінює.
+
+Помилки — `{code, message, retryable, request_id, details?}` (як у бази знань). RAG-ПК вирішує за `code`, а не лише за
+HTTP-статусом: під час оновлення Minerva проксі відповідає HTML-сторінками 502 / 504 — це тимчасово, повторити.
+
+| HTTP | `code` | Причина | Що робить RAG-ПК |
+|---|---|---|---|
+| 400 | `invalid_request` | некоректні дані (`details.field`) або тіло не JSON-об'єкт | не повторювати те саме; стан `error` `{stage: "push"}` |
+| 401 | `unauthorized` | немає ключа, ключ невірний, вимкнений, прострочений або не з «Дозволених IP» | пауза, перевірити ключ |
+| 403 | `forbidden_scope` | у ключа немає `meetings:write` | пауза |
+| 403 | `shop_key_forbidden` | ключ магазину | пауза |
+| 403 | `push_forbidden` | `X-Meeting-Token` не той (нараду відкрили для запису знову) | зупинити чергу цього запису; вирішить звірка |
+| 404 | `ticket_invalid` | квиток невідомий або вже використаний | «Посилання застаріло — відкрийте вікно з Minerva ще раз» |
+| 404 | `meeting_unknown` | Minerva не знає цієї наради (інший `uid`) | не видаляти; запис прибере власне зберігання RAG-ПК |
+| 405 | `invalid_request` | метод не підтримується | — |
+| 409 | `session_mismatch` | нараду вже записує інше вікно запису | зупинити чергу цього запису; вирішить звірка |
+| 409 | `consent_missing` | `recording` без обох підтверджень згоди; розшифровка без запису | не повторювати |
+| 409 | `transcript_exists` | розшифровку вже отримано з іншим `upload_id` | вважати переданою |
+| 409 | `transcript_incomplete` | ключові моменти раніше за зібрану розшифровку (`retryable: true`) | повторити пізніше |
+| 410 | `ticket_expired` | квиток застарів | «Посилання застаріло…» |
+| 410 | `meeting_gone` | нараду видалено в Minerva (або розшифровку, або власника вже немає) | видалити запис на RAG-ПК |
+| 413 | `payload_too_large` | тіло більше за межу (`details.max_bytes`) | менші частини, новий `upload_id` |
+| 429 | `rate_limited` | ліміт запитів (`details.retry_after_seconds`, `Retry-After`) | чекати й повторити |
+| 500 | `internal_error` | помилка Minerva (`retryable: true`; текст помилки не віддається) | повторити пізніше |
+
+Консоль API (`/dashboard/api/console/`) адрес `/api/v1/meetings/` і `/api/v1/knowledge/` не відкриває, а ключів із
+правами `meetings:*` чи `knowledge:*` не показує й не використовує: розшифровку наради бачить лише той, хто записав
+(і адміністратор — ні). «🔍 Що бачить ключ» показує адреси нарад, але без «👁 Приклад даних» і «🧪 Що змінить запит».

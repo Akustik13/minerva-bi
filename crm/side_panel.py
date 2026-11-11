@@ -80,6 +80,17 @@ def _plural(n, one, few, many) -> str:
     return many
 
 
+def _can_record(request, obj=None) -> bool:
+    """«🎙 Записати нараду»: право meetings.add_meeting і записування ввімкнено (meetings.services.can_record)."""
+    if not request.user.has_perm("meetings.add_meeting"):
+        return False
+    try:
+        from meetings.services import can_record
+    except ImportError:
+        return False
+    return bool(can_record(request.user))
+
+
 def _url(name, *args, query=None) -> str:
     try:
         url = reverse(name, args=list(args))
@@ -894,6 +905,8 @@ ACTIONS = [
               lambda c, r: _url("admin:worktime_danteproject_changelist", query={"crm": c.pk}),
               default=False, perm="worktime.view_danteproject"),
     sp.Action("phone", "📞 Подзвонити", lambda c, r: _tel(c.phone), default=False),
+    sp.Action("meeting", "🎙 Записати нараду", lambda c, r: _url("admin:meetings_meeting_new", query={"customer": c.pk}),
+              default=False, new_tab=True, perm=_can_record),
 ]
 
 EDITS = [

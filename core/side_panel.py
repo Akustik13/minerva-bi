@@ -44,7 +44,7 @@ PROVIDERS = {"sales.salesorder": "sales.side_panel", "inventory.product": "inven
 GENERIC = ("shipping.shipment", "inventory.purchaseorder", "inventory.supplier", "inventory.inventorytransaction",
            "offers.offer", "shop.shoplisting", "bots.digikeylisting", "accounting.invoice", "tasks.task")
 NEVER_APPS = {"email_assistant", "calendar_app", "rag_assistant", "ai_assistant", "api", "auth", "admin",
-              "contenttypes", "sessions", "config"}
+              "contenttypes", "sessions", "config", "meetings"}
 NEVER_MODELS = {"core.userprofile", "core.auditlog", "core.tenantaccount", "core.uitext", "core.moduleregistry",
                 "shop.shop", "shop.shopcustomer", "shop.shopcustomersession", "shop.shopcustomertoken",
                 "shop.shoppairing", "shop.shoppayment", "bots.digikeyconfig", "worktime.dantesettings",

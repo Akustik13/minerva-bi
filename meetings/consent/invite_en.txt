@@ -1,0 +1,2 @@
+Note: With your consent we would like to record this meeting and transcribe it automatically, so that agreements, tasks and dates are captured correctly. Processing takes place on our own servers in Germany; nothing is passed to third parties. The audio is deleted after {audio} at the latest, the transcript after {transcript}. We will ask again at the start. You can say "no" at any time without any disadvantage.
+Information under Art. 13 GDPR: {privacy}

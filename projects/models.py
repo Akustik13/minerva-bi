@@ -256,8 +256,8 @@ class ProjectHighlight(models.Model):
         (DEADLINE, "⏰ Строк"), (DELIVERY, "📦 Поставка"), (PAYMENT, "💶 Оплата"),
         (CALL, "📞 Дзвінок"), (MEETING, "🤝 Зустріч"), (OTHER, "📌 Інше"),
     ]
-    MANUAL, AI, RULE = "manual", "ai", "rule"
-    SOURCE_CHOICES = [(MANUAL, "вручну"), (AI, "AI"), (RULE, "правило")]
+    MANUAL, AI, RULE, MEETING = "manual", "ai", "rule", "meeting"
+    SOURCE_CHOICES = [(MANUAL, "вручну"), (AI, "AI"), (RULE, "правило"), (MEETING, "🎙 нарада")]
     STATUS_CHOICES = ProjectLink.STATUS_CHOICES
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="highlights")
@@ -271,6 +271,9 @@ class ProjectHighlight(models.Model):
     event = models.ForeignKey("calendar_app.CalendarEvent", null=True, blank=True, on_delete=models.SET_NULL,
                               related_name="project_highlights", verbose_name="Подія календаря")
     source = models.CharField("Джерело", max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
+    meeting = models.ForeignKey("meetings.Meeting", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="project_highlights", verbose_name="Нарада")
+    meeting_second = models.PositiveIntegerField("Секунда наради", null=True, blank=True)
     status = models.CharField("Статус", max_length=10, choices=STATUS_CHOICES, default=ProjectLink.CONFIRMED,
                               db_index=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
@@ -358,8 +361,8 @@ class ProjectStep(models.Model):
     TODO, DOING, WAITING, DONE, SKIPPED = "todo", "doing", "waiting", "done", "skipped"
     STATUS_CHOICES = [(TODO, "○ Заплановано"), (DOING, "● В роботі"), (WAITING, "⏳ Чекаємо"),
                       (DONE, "✓ Виконано"), (SKIPPED, "⤼ Пропущено")]
-    MANUAL, TEMPLATE, AI = "manual", "template", "ai"
-    SOURCE_CHOICES = [(MANUAL, "вручну"), (TEMPLATE, "шаблон"), (AI, "AI")]
+    MANUAL, TEMPLATE, AI, MEETING = "manual", "template", "ai", "meeting"
+    SOURCE_CHOICES = [(MANUAL, "вручну"), (TEMPLATE, "шаблон"), (AI, "AI"), (MEETING, "🎙 нарада")]
 
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="steps")
     phase = models.ForeignKey(ProjectPhase, null=True, blank=True, on_delete=models.SET_NULL, related_name="steps",
@@ -388,6 +391,9 @@ class ProjectStep(models.Model):
                                          verbose_name="Завдання агенту")
     notes = models.TextField("Примітки", blank=True, default="")
     source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default=MANUAL)
+    meeting = models.ForeignKey("meetings.Meeting", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="project_steps", verbose_name="Нарада")
+    meeting_second = models.PositiveIntegerField("Секунда наради", null=True, blank=True)
     # кеш розрахунку (schedule.persist)
     f_start = models.DateField(null=True, blank=True)
     f_end = models.DateField(null=True, blank=True)
@@ -456,8 +462,8 @@ class ProjectRisk(models.Model):
     edited — людина змінила ймовірність / вплив: правило їх не перезаписує."""
     OPEN, WATCH, CLOSED = "open", "watch", "closed"
     STATUS_CHOICES = [(OPEN, "⚠️ Відкритий"), (WATCH, "👀 Стежимо"), (CLOSED, "✓ Закрито")]
-    RULE, MANUAL, AI = "rule", "manual", "ai"
-    SOURCE_CHOICES = [(RULE, "⚙️ Правило"), (MANUAL, "✍️ Вручну"), (AI, "🧠 AI")]
+    RULE, MANUAL, AI, MEETING = "rule", "manual", "ai", "meeting"
+    SOURCE_CHOICES = [(RULE, "⚙️ Правило"), (MANUAL, "✍️ Вручну"), (AI, "🧠 AI"), (MEETING, "🎙 Нарада")]
     SCHEDULE, SUPPLY, CUSTOMER, QUALITY, COST, OTHER = "schedule", "supply", "customer", "quality", "cost", "other"
     CATEGORY_CHOICES = [(SCHEDULE, "⏰ Строки"), (SUPPLY, "🏭 Постачання й склад"), (CUSTOMER, "👤 Клієнт"),
                         (QUALITY, "🔧 Технічне й якість"), (COST, "💶 Гроші"), (OTHER, "❓ Інше")]
@@ -481,6 +487,9 @@ class ProjectRisk(models.Model):
     evidence = models.TextField("Підстава", blank=True, default="")
     message = models.ForeignKey("email_assistant.EmailMessage", null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name="+", verbose_name="Лист")
+    meeting = models.ForeignKey("meetings.Meeting", null=True, blank=True, on_delete=models.SET_NULL,
+                                related_name="project_risks", verbose_name="Нарада")
+    meeting_second = models.PositiveIntegerField("Секунда наради", null=True, blank=True)
     steps = models.ManyToManyField(ProjectStep, blank=True, related_name="risks", verbose_name="Кроки під впливом")
     edited = models.BooleanField(default=False)
     closed_auto = models.BooleanField(default=False)

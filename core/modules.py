@@ -17,6 +17,7 @@ MODULES = [
     {'app_label': 'crm',             'name': 'CRM',                         'tier': 'standard', 'order': 10},
     {'app_label': 'strategy',        'name': 'Стратегії CRM',               'tier': 'standard', 'order': 11},
     {'app_label': 'projects',        'name': 'Проєкти',                     'tier': 'standard', 'order': 12},
+    {'app_label': 'meetings',        'name': 'Наради (запис і розшифровка)', 'tier': 'premium',  'order': 13},
     {'app_label': 'sales',           'name': 'Продажі',                     'tier': 'standard', 'order': 20},
     {'app_label': 'accounting',      'name': 'Бухгалтерія',                 'tier': 'standard', 'order': 21},
     {'app_label': 'offers',          'name': 'Angebote (пропозиції)',       'tier': 'standard', 'order': 22},

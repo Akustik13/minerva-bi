@@ -1,0 +1,4 @@
+{% extends "admin/change_form.html" %}
+{# ⚙️ Налаштування нарад — стилі списку «Що ще треба до першого запису» (meetings/admin.py MeetingSettingsAdmin). #}
+{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=3">{% endblock %}

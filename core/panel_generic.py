@@ -38,7 +38,7 @@ FIELDS, RELATED, HISTORY = "fields", "related", "history"
 KEYS = (FIELDS, RELATED, HISTORY)
 
 RELATED_SKIP_APPS = {"email_assistant", "rag_assistant", "calendar_app", "worktime", "core", "api", "admin", "auth",
-                     "contenttypes", "sessions", "ai_assistant"}
+                     "contenttypes", "sessions", "ai_assistant", "meetings"}
 RELATED_SKIP_MODELS = {"crm.customertimeline"} | set(sp.NEVER_MODELS)
 RELATED_MAX = 12                 # зв'язків із записами — не більше, найбільші першими
 RELATED_FIRST = 3                # перших записів кожного зв'язку
@@ -48,7 +48,7 @@ FILTER_FROM = 20                 # рядків більше — поле «🔎
 M2M_MAX = 10
 JSON_MAX = 2000
 # посилання на записи пошти, календаря, бази знань, ключів API — без назви (тема листа, подія — не для всіх)
-PRIVATE_TARGET_APPS = {"email_assistant", "calendar_app", "rag_assistant", "ai_assistant", "api"}
+PRIVATE_TARGET_APPS = {"email_assistant", "calendar_app", "rag_assistant", "ai_assistant", "api", "meetings"}
 
 # назви ключів: tabele.admin.SECRET_NAME_RE (у кінці назви) + будь-де в назві
 SECRET_ANY_RE = re.compile(r"(password|passwd|secret|token|api_?key|apikey|private|credential|_hash)", re.I)

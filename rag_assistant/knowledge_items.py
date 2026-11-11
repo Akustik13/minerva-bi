@@ -83,6 +83,30 @@ def linked_kinds(item) -> list:
     return kinds
 
 
+def ai_blocked(item) -> bool:
+    """Документ, який не можна передавати хмарним AI-помічникам Minerva (Claude): 🎙 розшифровка наради — учасникам
+    обіцяли обробку лише на власних серверах. Людина (власник) бачить його в пошуку й картках; у промпти — ні.
+    item — KnowledgeItem або вже перевірений фрагмент RAG (dict з позначкою ai_blocked від retrieval.verify_hits)."""
+    if item is None:
+        return False
+    if isinstance(item, dict):
+        return bool(item.get("ai_blocked"))
+    from .models import KnowledgeItem
+    return getattr(item, "kind", "") == KnowledgeItem.MEETING or str(getattr(item, "source_key", "")
+                                                                         ).startswith("meeting:")
+
+
+def wire_kind(item) -> str:
+    """Вид документа для RAG — лише з погодженого переліку контракту (upload | link | offer | order_file |
+    datasheet): документ із «📂 Джерела знань» — файл (папка) або посилання (сайт); 🎙 нарада — текст, який дала
+    Minerva, як посилання без адреси. Що це насправді — знає Minerva."""
+    if item.kind == item.SOURCE:
+        return "upload" if source_file(item) else "link"
+    if item.kind == item.MEETING:
+        return "link"
+    return item.kind
+
+
 def can_view(user, item) -> bool:
     if not (user and user.is_authenticated and user.is_active):
         return False
@@ -440,9 +464,9 @@ class Handler:
         from .knowledge import TEXT_MAX, _iso
         body = "\n\n".join(p for p in [item.note.strip(), item.text.strip()] if p)
         return {
-            # вид для RAG — з погодженого переліку контракту: документ із «📂 Джерела знань» іде як файл (папка)
-            # або посилання (сайт), тож RAG-ПК не треба оновлювати; що це джерело — знає Minerva
-            "kind": item.kind if item.kind != item.SOURCE else ("upload" if source_file(item) else "link"),
+            # вид для RAG — з погодженого переліку контракту (wire_kind): «📂 Джерело знань» — файл або посилання,
+            # 🎙 нарада — посилання без адреси, тож RAG-ПК не треба оновлювати; що це насправді — знає Minerva
+            "kind": wire_kind(item),
             "title": item.title[:500],
             "created_at": _iso(item.created_at),
             "source_url": item.url[:2000] or None,

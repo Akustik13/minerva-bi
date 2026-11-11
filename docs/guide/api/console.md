@@ -5,7 +5,7 @@ summary: Як перевірити API без програмування — к�
 where: 🤖 API та скрипти → 🔌 API Інтеграції → «Відкрити Console →»
 urls: /dashboard/api/console/, /dashboard/api/, /dashboard/api/docs/, /admin/api/apirequestlog/
 roles: адміністратор, інтегратор
-keywords: консоль API, console, тестування, тест API, API-тестер, перевірити ключ, ping, пресети, curl, Postman, shop_client, crm_purchases, webhook_receiver, Test
+keywords: консоль API, console, тестування, тест API, API-тестер, перевірити ключ, ping, пресети, curl, Postman, shop_client, crm_purchases, webhook_receiver, Test, службовий ключ, knowledge, meetings
 related: api/overview, api/keys, api/endpoints, api/stock-orders, api/purchases, api/webhooks
 ---
 
@@ -29,6 +29,12 @@ related: api/overview, api/keys, api/endpoints, api/stock-orders, api/purchases,
 Консоль надсилає запити **лише до API цієї Minerva** (`/api/v1/…` на тій самій адресі, з якої її відкрито).
 Інші сайти, зовнішні API (DHL, DigiKey, Jumingo) і адреси внутрішньої мережі вона не відкриває — їх перевіряють
 кнопки на сторінках перевізників і DigiKey.
+
+> 🔒 **Службові ключі й адреси RAG закрито.** Адреси бази знань (`/api/v1/knowledge/`) і нарад
+> (`/api/v1/meetings/`) консоль не відкриває, а ключів з правами `knowledge:*` чи `meetings:*` (ключ RAG і ключ
+> вікна запису нарад на RAG-ПК) немає в списку й не приймається, навіть вставленим вручну: ними читаються чужі листи
+> й розшифровки нарад, яких не бачить і адміністратор. Перевірити ключ нарад — кнопкою **«🔍 Перевірити зв’язок з
+> Minerva»** на RAG-ПК ([Налаштування нарад](guide:meetings/settings#підключити-rag-пк)).
 
 1. **«Пресети»** — готові запити до Minerva: **«🔌 Ping»**, **«🏬 Залишки»**, **«🛒 Перевірка кошика»**,
    **«📥 Прихід»**, **«🧾 Нове замовлення»**, **«🚚 Відправлення»**, **«🏠 Minerva Orders»**,

@@ -456,16 +456,27 @@ def _mail(src, user, kind, obj) -> tuple:
 
 def _documents(src, user, kind, obj) -> tuple:
     """Файли й посилання, прив'язані до картки (knowledge_items), які бачить користувач — текст бере Minerva сама,
-    без RAG. → (document_id для пропуску в RAG, деталь етапу)."""
+    без RAG. → (document_id для пропуску в RAG, деталь етапу). 🎙 Розшифровки нарад (knowledge_items.ai_blocked) —
+    ні: джерела йдуть у промпт AI; їхні id — у пропуск, щоб і RAG їх не повернув."""
     from . import knowledge_items
-    ids = []
-    for item in knowledge_items.items_for(user, kind, obj)[:DOCUMENTS]:
+    ids, used, blocked = [], 0, 0
+    for item in knowledge_items.items_for(user, kind, obj):
+        if knowledge_items.ai_blocked(item):
+            ids.append(item.document_id)
+            blocked += 1
+            continue
+        if used >= DOCUMENTS:
+            continue
         text = knowledge_items.local_text(item)
         src.add("document", f"{item.get_kind_display()} «{item.title}»"
                 + (f" · {item.file_name}" if item.file_name else "") + (f" · {item.url}" if item.url else ""),
                 text or "(тексту ще немає — лише назва)", f"/rag/knowledge/{item.pk}/")
         ids.append(item.document_id)
-    return ids, (f"документів {len(ids)}" if ids else "не додано")
+        used += 1
+    detail = f"документів {used}" if used else "не додано"
+    if blocked:
+        detail += f" · розшифровок нарад {blocked} — AI їх не отримує"
+    return ids, detail
 
 
 def _rag(src, user, kind, obj, question, seen, threads, dedup, seen_documents=()) -> tuple:
