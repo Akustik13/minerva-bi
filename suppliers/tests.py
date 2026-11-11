@@ -967,3 +967,22 @@ class CardsTests(Base):
                                and real(u, perm, obj)):
             self.client.post(url, {"action": "delete_many", "ids": [mine.pk, theirs.pk]})
         self.assertEqual(list(SupplierMedia.objects.values_list("pk", flat=True)), [theirs.pk])
+
+    def test_filter_by_category(self):
+        cable, _ = SupplierCategory.objects.get_or_create(name="Виробники кабелів", defaults={"icon": "🔌"})
+        a = self.card(name="Victory PCB")
+        a.categories.add(self.pcb)
+        guessed = self.card(name="Hitech Circuits", categories=["Виробники плат"])     # лише запропонував AI
+        b = self.card(name="Mingxin Sleeving")
+        b.categories.add(cable)
+        sup = self.card(name="PCBWay")
+        SupplierMedia.objects.filter(pk=sup.pk).update(supplier=self.supplier)
+        self.supplier.categories.add(self.pcb)                                       # категорія постачальника
+        url = reverse("admin:inventory_supplier_cards")
+        names = lambda resp: sorted(m.info["company"] for m in resp.context["items"])   # noqa: E731
+        self.assertEqual(names(self.client.get(url + f"?cat={self.pcb.pk}")), ["Hitech Circuits", "PCBWay", "Victory PCB"])
+        self.assertEqual(names(self.client.get(url + f"?cat={cable.pk}")), ["Mingxin Sleeving"])
+        page = self.client.get(url)
+        self.assertContains(page, f'<option value="{self.pcb.pk}" >🟩 Виробники плат (3)</option>')
+        self.assertContains(page, f'href="?cat={cable.pk}"')                         # категорія на плитці — фільтр
+        self.assertEqual(guessed.categories.count(), 0)

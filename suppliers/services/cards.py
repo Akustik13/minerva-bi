@@ -426,13 +426,14 @@ def stats(user=None) -> dict:
     from collections import Counter
 
     from shop.countries import name as country_name
-    from suppliers.models import SupplierMedia
+    from suppliers.models import SupplierCategory, SupplierMedia
     from suppliers.services import match
+    all_cats = list(SupplierCategory.objects.filter(is_active=True))
 
     def blank(label, key):
         return {"event": label, "key": key, "cards": 0, "people": set(), "companies": set(), "suppliers": set(),
                 "customers": set(), "new": 0, "ai": 0, "countries": Counter(), "cats": Counter(), "marks": Counter(),
-                "first": None, "last": None}
+                "cat_pks": Counter(), "first": None, "last": None}
 
     groups, total = {}, blank("Усього", "")
     marks = dict(SupplierMedia.MARKS)
@@ -444,7 +445,8 @@ def stats(user=None) -> dict:
         d = card_data(m)
         person = (d.get("contact_email") or d.get("contact_name") or "").strip().lower()
         company = match.name_key(d.get("name")) or (d.get("name") or "").strip().lower()
-        cats = list(m.supplier.categories.all()) if m.supplier_id else list(m.categories.all())
+        cats = ((list(m.supplier.categories.all()) if m.supplier_id else []) or list(m.categories.all())
+                or match_categories(d.get("categories"), all_cats))          # як на плитці (info)
         day = timezone.localtime(m.created_at).date()
         for x in (g, total):
             x["cards"] += 1
@@ -464,6 +466,7 @@ def stats(user=None) -> dict:
                 x["countries"][d["addr_country"].upper()] += 1
             for c in cats:
                 x["cats"][f"{c.icon} {c.name}"] += 1
+                x["cat_pks"][c.pk] += 1
             for k in m.marks or []:
                 if k in marks:
                     x["marks"][marks[k]] += 1
@@ -474,7 +477,7 @@ def stats(user=None) -> dict:
         return {**x, "people": len(x["people"]), "companies": len(x["companies"]), "suppliers": len(x["suppliers"]),
                 "customers": len(x["customers"]),
                 "countries": [(country_name(c), n) for c, n in x["countries"].most_common(3)],
-                "cats": x["cats"].most_common(3), "marks": x["marks"].most_common(4)}
+                "cats": x["cats"].most_common(3), "marks": x["marks"].most_common(4), "by_cat": dict(x["cat_pks"])}
     events = sorted((done(g) for g in groups.values()), key=lambda g: g["last"] or timezone.localdate(), reverse=True)
     return {"events": events, "total": done(total)}
 

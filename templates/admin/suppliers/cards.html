@@ -14,7 +14,8 @@
 <style>
 .spc{width:236px;display:flex;flex-direction:column;gap:2px;position:relative}
 .spc img{height:120px}
-.spc-pick{position:absolute;top:10px;left:10px;z-index:2;width:20px;height:20px;margin:0;cursor:pointer;accent-color:var(--primary,#5b8def)}
+.spc-head{display:flex;align-items:center;gap:6px;min-width:0}
+.spc-pick{flex:none;width:18px;height:18px;margin:0;cursor:pointer;accent-color:var(--primary,#5b8def)}
 .spc.spc-sel{outline:2px solid var(--primary,#5b8def);outline-offset:1px}
 .spc-top{display:flex;justify-content:space-between;gap:4px;align-items:baseline}
 .spc-top a{text-decoration:none;color:inherit}
@@ -58,6 +59,7 @@
       <option value="nocat" {% if ai_filter == "nocat" %}selected{% endif %}>🗂 без категорії</option>
       <option value="failed" {% if ai_filter == "failed" %}selected{% endif %}>⚠️ AI не прочитав</option>
     </select>
+    <select name="cat" title="Лише візитки цієї категорії (і ті, що AI лише запропонував)"><option value="">🗂 усі категорії</option>{% for c, n in cat_opts %}<option value="{{ c.pk }}" {% if c.pk == cat_id %}selected{% endif %}>{{ c.icon }} {{ c.name }} ({{ n }})</option>{% endfor %}</select>
     <select name="mark"><option value="">будь-яка позначка</option>{% for v, n in marks %}<option value="{{ v }}" {% if v == mark %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
     <button type="submit" class="button">🔍 Показати</button>
     <button type="button" class="button" id="spc-cfg-btn" aria-expanded="false" aria-controls="spc-cfg" title="Що показувати на плитках — лише для вас">⚙ Що показувати</button>
@@ -65,6 +67,7 @@
     <button type="button" class="button" id="spc-stats-btn" aria-expanded="false" aria-controls="spc-stats" title="Скільки візиток, людей і фірм з кожної виставки, що вже внесено">📊 Статистика</button>
     {% if items %}<button type="button" class="button" id="spc-all" title="Вибрати всі візитки на сторінці — поділитись разом">☑ Вибрати всі</button>{% endif %}
   </form>
+  {% if cat_now %}<div class="spf-row">🗂 Лише категорія: <b>{{ cat_now.icon }} {{ cat_now.name }}</b> <a class="button" href="?{% if event %}event={{ event|urlencode }}{% endif %}">✕ Усі категорії</a></div>{% endif %}
   {% if event %}<div class="spf-row">🎪 Лише подія: <b translate="no">{% if event == "-" %}без події{% else %}{{ event }}{% endif %}</b> <a class="button" href="?">✕ Усі події</a></div>{% endif %}
   <div class="spc-cfg spc-stats" id="spc-stats" hidden>
     <h4>📊 Статистика візиток <span class="sp-muted">— по подіях (поле «Де взяли»), усі візитки</span></h4>
@@ -103,14 +106,14 @@
   <div class="sp-cards" id="spc-list" data-desc="{{ prefs.desc }}">
     {% for m in items %}{% with i=m.info %}{% url 'admin:inventory_supplier_card_review' m.pk as review %}
     <div class="sp-card spc" data-pk="{{ m.pk }}">
-      <input type="checkbox" class="spc-pick" value="{{ m.pk }}" title="Вибрати — поділитись разом з іншими" aria-label="Вибрати">
       <a href="{{ review }}">{% if m.image %}<img src="{{ m.image.url }}" alt="" loading="lazy">{% endif %}</a>
-      <div class="spc-top"><a href="{{ review }}"><b>{{ m.get_kind_display }}</b> <span translate="no">{{ m.title }}</span></a>
+      <div class="spc-top"><span class="spc-head"><input type="checkbox" class="spc-pick" value="{{ m.pk }}" title="Вибрати — поділитись разом з іншими" aria-label="Вибрати">
+        <a href="{{ review }}"><b>{{ m.get_kind_display }}</b> <span translate="no">{{ m.title }}</span></a></span>
         <span class="spc-ai spc-ai-{{ i.ai.key }} spc-f-ai" title="{{ i.ai.title }}">{{ i.ai.label }}</span></div>
       {% if i.company %}<div class="spc-co spc-f-company" translate="no">🏢 {{ i.company }}</div>{% endif %}
       {% if i.person %}<div class="sp-muted spc-f-person"><span translate="no">👤 {{ i.person }}</span>{% if i.position %} · <span translate="no">{{ i.position }}</span>{% endif %}</div>{% endif %}
       {% if i.country or i.site %}<div class="sp-muted spc-line">{% if i.country %}<span class="spc-f-country">🌍 {{ i.country }}</span>{% endif %}{% if i.site %}<a class="spc-f-site" href="{{ i.site }}" target="_blank" rel="noopener noreferrer nofollow" translate="no">🌐 {{ i.site_label }}</a>{% endif %}</div>{% endif %}
-      {% if i.cats %}<div class="sp-chips spc-f-cats">{% for c in i.cats %}<span class="sp-chip{% if i.cats_guessed %} spc-guess{% endif %}" style="border-color:{{ c.color }}" {% if i.cats_guessed %}title="Вибрав AI — ще не підтверджено"{% endif %}>{{ c.icon }} {{ c.name }}</span>{% endfor %}</div>
+      {% if i.cats %}<div class="sp-chips spc-f-cats">{% for c in i.cats %}<a class="sp-chip{% if i.cats_guessed %} spc-guess{% endif %}" style="border-color:{{ c.color }};color:inherit" href="?cat={{ c.pk }}" title="{% if i.cats_guessed %}Вибрав AI — ще не підтверджено. {% endif %}Показати лише цю категорію">{{ c.icon }} {{ c.name }}</a>{% endfor %}</div>
       {% elif i.new_category.name %}<div class="spc-new spc-f-newcat">💡 AI пропонує нову категорію: <b>{{ i.new_category.icon }} <span translate="no">{{ i.new_category.name }}</span></b>
         {% if can_add_category %}<form method="post" action="{{ review }}" style="display:inline">{% csrf_token %}<input type="hidden" name="action" value="add_category"><input type="hidden" name="back" value="{{ request.get_full_path }}"><button type="submit" class="button" style="padding:1px 6px;font-size:11px">＋ Додати</button></form>{% endif %}</div>
       {% endif %}
@@ -147,6 +150,9 @@
 (function(){
   function csrf(){ var i = document.querySelector('input[name=csrfmiddlewaretoken]'); return i ? i.value : ''; }
   var list = document.getElementById('spc-list');
+  // фільтри над плитками — одразу, без «Показати»
+  var filters = document.querySelector('.spp > form.spf-row');
+  if (filters) filters.querySelectorAll('select').forEach(function(s){ s.addEventListener('change', function(){ filters.submit(); }); });
   // 🧠 AI для кількох
   var out = document.getElementById('spc-job');
   document.querySelectorAll('[data-read]').forEach(function(b){

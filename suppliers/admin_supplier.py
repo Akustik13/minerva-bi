@@ -973,16 +973,31 @@ class SupplierCardMixin:
                            Q(supplier__name__icontains=q) | Q(customer__company__icontains=q) |
                            Q(extracted__name__icontains=q) | Q(extracted__contact_name__icontains=q) |
                            Q(extracted__description__icontains=q))
+        cat = request.GET.get("cat", "")
+        cat_id = int(cat) if cat.isdigit() else None
+        if cat_id:          # категорія постачальника / візитки — у базі; лише запропонована AI — перевіряє info нижче
+            qs = qs.filter(Q(categories=cat_id) | Q(supplier__categories=cat_id) | Q(categories=None)).distinct()
         mark = request.GET.get("mark", "")
-        items = [m for m in qs[:300] if not mark or mark in (m.marks or [])][:120]
         all_cats = list(SupplierCategory.objects.filter(is_active=True))
-        for m in items:
+        items = []
+        for m in qs[:600]:
+            if mark and mark not in (m.marks or []):
+                continue
             m.info = cards.info(m, all_cats)
+            if cat_id and not any(c.pk == cat_id for c in m.info["cats"]):
+                continue
+            items.append(m)
+            if len(items) >= 120:
+                break
         u = request.user
+        stats = cards.stats()
+        by_cat = stats["total"].get("by_cat", {})
+        cat_opts = [(c, by_cat.get(c.pk, 0)) for c in all_cats if by_cat.get(c.pk) or c.pk == cat_id]
         return TemplateResponse(request, "admin/suppliers/cards.html", self._ctx(
             request, "🪪 Візитки й флаєри", items=items, show=show, q=q, mark=mark, marks=SupplierMedia.MARKS,
             ai_filter=ai_filter, can_read=can_read, prefs=cards.tile_prefs(u), tile_fields=cards.TILE_FIELDS,
-            event=event, stats=cards.stats(),
+            event=event, stats=stats, cat_id=cat_id, cat_opts=cat_opts,
+            cat_now=next((c for c in all_cats if c.pk == cat_id), None),
             desc_modes=cards.DESC_MODES,
             counts=cards.card_counts(u, _can(request, "change")) if can_read else {},
             unassigned=SupplierMedia.objects.filter(supplier=None, customer=None).count(),

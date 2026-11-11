@@ -4629,6 +4629,7 @@
 {"uk": "Виберіть, як відповіли", "en": "Choose how you replied", "de": "Wählen Sie, wie Sie geantwortet haben"}
 {"uk": "Вибирається в таблиці «Що звідки йде»: для «Willkommen» / оплат, команди й сайту — скринька або SMTP сповіщень; не вибрано — як «Відправник листів покупцям».", "en": "Chosen in the «Що звідки йде» table: for «Willkommen» / payments, team and site — a mailbox or the notification SMTP; not chosen — as «Відправник листів покупцям».", "de": "Wird in der Tabelle «Що звідки йде» gewählt: für «Willkommen» / Zahlungen, Team und Website — ein Postfach oder SMTP der Benachrichtigungen; nicht gewählt — wie «Відправник листів покупцям»."}
 {"uk": "Вибрав AI — ще не підтверджено", "en": "Chosen by AI — not confirmed yet", "de": "Von der KI gewählt — noch nicht bestätigt"}
+{"uk": "Вибрав AI — ще не підтверджено.", "en": "Chosen by AI — not confirmed yet.", "de": "Von der KI gewählt — noch nicht bestätigt."}
 {"uk": "Вибрано", "en": "Selected", "de": "Ausgewählt"}
 {"uk": "Вибрано «Свій курс», але курс не вписано — діє «Курси валют» Minerva.", "en": "“Own rate” is selected but no rate was entered — Minerva’s “Exchange rates” apply.", "de": "„Eigener Kurs“ ist ausgewählt, aber kein Kurs eingetragen — es gelten die „Wechselkurse“ von Minerva."}
 {"uk": "Вибрано в запиті {0}", "en": "Chosen in request {0}", "de": "In Anfrage {0} gewählt"}
@@ -9182,6 +9183,7 @@
 {"uk": "Лише в цьому магазині", "en": "Only in this shop", "de": "Nur in diesem Shop"}
 {"uk": "Лише вибрані вручну", "en": "Only manually selected", "de": "Nur manuell ausgewählte"}
 {"uk": "Лише вручну", "en": "Manual only", "de": "Nur manuell"}
+{"uk": "Лише візитки цієї категорії (і ті, що AI лише запропонував)", "en": "Only business cards of this category (including those AI only proposed)", "de": "Nur Visitenkarten dieser Kategorie (auch die, die die KI nur vorgeschlagen hat)"}
 {"uk": "Лише групу поточної сторінки", "en": "Only the group of the current page", "de": "Nur die Gruppe der aktuellen Seite"}
 {"uk": "Лише дані", "en": "Data only", "de": "Nur Daten"}
 {"uk": "Лише для «Відповідати на такі листи».", "en": "Only for «Reply to such emails».", "de": "Nur für «Auf solche E-Mails antworten»."}
@@ -9204,6 +9206,7 @@
 {"uk": "Лише зустрічі (з учасниками або посиланням Teams / Zoom)", "en": "Meetings only (with attendees or a Teams / Zoom link)", "de": "Nur Besprechungen (mit Teilnehmern oder einem Teams-/Zoom-Link)"}
 {"uk": "Лише зі своєї скриньки: ця скринька належить іншому користувачу.", "en": "Only from your own mailbox: this mailbox belongs to another user.", "de": "Nur aus dem eigenen Postfach: Dieses Postfach gehört einem anderen Benutzer."}
 {"uk": "Лише зі словом у назві", "en": "Only with a word in the title", "de": "Nur mit einem Wort im Titel"}
+{"uk": "Лише категорія", "en": "Only category", "de": "Nur Kategorie"}
 {"uk": "Лише критичні — не відправлені, строк близько або прострочено", "en": "Critical only — not shipped, deadline close or overdue", "de": "Nur kritische — nicht versendet, Frist nah oder überschritten"}
 {"uk": "Лише латиниця в нижньому регістрі, цифри, - і _", "en": "Lowercase Latin letters only, digits, - and _", "de": "Nur lateinische Kleinbuchstaben, Ziffern, - und _"}
 {"uk": "Лише листи", "en": "Only e-mails of", "de": "Nur E-Mails"}
@@ -12464,6 +12467,7 @@
 {"uk": "Показати всім, хто бачить картку", "en": "Show to everyone who can see the card", "de": "Allen zeigen, die die Karte sehen"}
 {"uk": "Показати деталі", "en": "Show details", "de": "Details anzeigen"}
 {"uk": "Показати знайдені листи без збереження", "en": "Show the found e-mails without saving", "de": "Gefundene E-Mails anzeigen, ohne zu speichern"}
+{"uk": "Показати лише цю категорію", "en": "Show only this category", "de": "Nur diese Kategorie anzeigen"}
 {"uk": "Показати на екрані (Minerva підсвітить елемент, сама нічого не натискає)", "en": "Show on screen (Minerva highlights the element, does not click anything itself)", "de": "Auf dem Bildschirm zeigen (Minerva hebt das Element hervor, klickt selbst nichts an)"}
 {"uk": "Показати папки", "en": "Show folders", "de": "Ordner anzeigen"}
 {"uk": "Показати розклад всіх активних сайтів і вийти.", "en": "Show the schedule of all active sites and exit.", "de": "Zeitplan aller aktiven Websites anzeigen und beenden."}
@@ -16159,6 +16163,7 @@
 {"uk": "Усі записи відповіді", "en": "All records of the response", "de": "Alle Datensätze der Antwort"}
 {"uk": "Усі запити", "en": "All requests", "de": "Alle Anfragen"}
 {"uk": "Усі запити на сайті", "en": "All queries on the site", "de": "Alle Anfragen auf der Website"}
+{"uk": "Усі категорії", "en": "All categories", "de": "Alle Kategorien"}
 {"uk": "Усі категорії Minerva", "en": "All Minerva categories", "de": "Alle Minerva-Kategorien"}
 {"uk": "Усі ключі", "en": "All keys", "de": "Alle Schlüssel"}
 {"uk": "Усі коробки, яких мало", "en": "All boxes that are low", "de": "Alle knappen Kartons"}
@@ -21119,6 +21124,7 @@
 {"uk": "усі види", "en": "all types", "de": "alle Typen"}
 {"uk": "усі джерела", "en": "all sources", "de": "alle Quellen"}
 {"uk": "усі документи джерела", "en": "all source documents", "de": "alle Dokumente der Quelle"}
+{"uk": "усі категорії", "en": "all categories", "de": "alle Kategorien"}
 {"uk": "усі кроки виконано ({0})", "en": "all steps done ({0})", "de": "alle Schritte erledigt ({0})"}
 {"uk": "усі листи прочитано", "en": "all emails read", "de": "alle E-Mails gelesen"}
 {"uk": "усі погодились", "en": "everyone agreed", "de": "alle haben zugestimmt"}
