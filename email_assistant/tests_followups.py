@@ -296,3 +296,68 @@ class RemindExistingTests(Base):
                                     in_reply_to=OUR_ID, sent_at=timezone.now())
         f = followups.track_message(msg, 3)
         self.assertEqual(f.status, MailFollowup.REPLIED)
+
+
+RECEIPT_BODY = ('Ihre Nachricht\n\n   An:  sergey@sevskiy.de\n   Cc:  slava@sevskiy.de\n'
+                '   Betreff:  WG: Rechnung Nr. 969025\n   Gesendet:  09.11.2026 16:26\n\n'
+                'wurde am 09.11.2026 16:40 gelesen.')
+
+
+class ColleagueTests(Base):
+    """Лист колезі з того самого домену: його підтвердження (Outlook без MDN) і відповідь — реакція; наша копія
+    в CC — ні; уже «⚠️ немає реакції» виправляється саме."""
+
+    def setUp(self):
+        super().setUp()
+        from email_assistant.models import EmailThread
+        self.thread = EmailThread.objects.create(account=self.account, subject='WG: Rechnung Nr. 969025')
+        self.msg = self.sent(subject='WG: Rechnung Nr. 969025', days_ago=2)
+        self.msg.to_emails, self.msg.thread = ['sergey@sevskiy.de'], self.thread
+        self.msg.save(update_fields=['to_emails', 'thread'])
+        self.f = followups.track(self.account, msg_id=OUR_ID, subject=self.msg.subject, sent_at=self.msg.sent_at,
+                                 recipients=['sergey@sevskiy.de'], message=self.msg, read_receipt=True, remind_days=2)
+
+    def test_outlook_receipt_without_mdn_and_without_references(self):
+        self.assertEqual(followups.receipt_kind(EmailMessage(subject='WG: Rechnung', body_text=RECEIPT_BODY)),
+                         'displayed')
+        self.incoming(raw_mail(subject='Gelesen: WG: Rechnung Nr. 969025', frm='sergey@sevskiy.de',
+                               body=RECEIPT_BODY))
+        self.f.refresh_from_db()
+        self.assertEqual((self.f.status, self.f.receipt, self.f.read_by),
+                         (MailFollowup.READ, 'displayed', 'sergey@sevskiy.de'))
+
+    def test_receipt_by_text_only(self):
+        self.incoming(raw_mail(subject='WG: Rechnung Nr. 969025', frm='sergey@sevskiy.de', body=RECEIPT_BODY))
+        self.f.refresh_from_db()
+        self.assertEqual((self.f.status, self.f.replied_at), (MailFollowup.READ, None))   # не «відповідь»
+
+    def test_colleague_reply_counts(self):
+        reply = self.incoming(raw_mail(subject='AW: WG: Rechnung Nr. 969025', frm='sergey@sevskiy.de',
+                                       headers={'In-Reply-To': OUR_ID}, body='Erledigt.'))
+        self.f.refresh_from_db()
+        self.assertEqual((self.f.status, self.f.reply_id), (MailFollowup.REPLIED, reply.pk))
+
+    def test_own_cc_copy_is_not_a_reaction(self):
+        self.incoming(raw_mail(subject='WG: Rechnung Nr. 969025', frm='slava@sevskiy.de',
+                               headers={'In-Reply-To': OUR_ID}, body='Hallo Sergey, bitte die Rechnung …'))
+        self.f.refresh_from_db()
+        self.assertEqual(self.f.status, MailFollowup.WAITING)
+        MailFollowup.objects.filter(pk=self.f.pk).update(remind_at=timezone.now() - datetime.timedelta(minutes=1))
+        with self.deliver() as deliver:
+            self.assertEqual(followups.run_due()['notified'], 1)
+        deliver.assert_called_once()
+
+    def test_no_reaction_heals_from_receipt_already_in_thread(self):
+        MailFollowup.objects.filter(pk=self.f.pk).update(status=MailFollowup.NO_REACTION,
+                                                         notified_at=timezone.now())
+        EmailMessage.objects.create(account=self.account, folder='inbox', imap_folder_name='INBOX', imap_uid=999,
+                                    subject='WG: Rechnung Nr. 969025', from_email='sergey@sevskiy.de',
+                                    body_text=RECEIPT_BODY, thread=self.thread,
+                                    sent_at=timezone.now() - datetime.timedelta(days=2) + datetime.timedelta(minutes=15))
+        with self.deliver() as deliver:
+            out = followups.run_due()
+        deliver.assert_not_called()
+        self.assertEqual(out['healed'], 1)
+        self.f.refresh_from_db()
+        self.assertEqual((self.f.status, self.f.receipt), (MailFollowup.READ, 'displayed'))
+        self.assertEqual(followups.run_due()['healed'], 0)                   # удруге — нічого
