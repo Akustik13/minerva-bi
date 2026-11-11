@@ -1,0 +1,58 @@
+{# 🔳 Читання QR-коду з фото в браузері (jsQR 1.4.0 з jsdelivr, лише коли потрібно) — suppliers/services/qr.py розбирає текст #}
+<script>
+window.spQR = window.spQR || (function(){
+  var SRC = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js', lib = null;
+  function load(){
+    if (window.jsQR) return Promise.resolve(window.jsQR);
+    if (!lib) lib = new Promise(function(ok, bad){
+      var s = document.createElement('script'); s.src = SRC; s.async = true;
+      s.onload = function(){ window.jsQR ? ok(window.jsQR) : bad(new Error('jsQR')); };
+      s.onerror = function(){ lib = null; bad(new Error('jsQR')); };
+      document.head.appendChild(s);
+    });
+    return lib;
+  }
+  // Кілька розмірів: QR на візитці маленький — на 1600 px зазвичай читається, інакше пробуємо більше й менше.
+  function decode(source, w, h){
+    var tried = {}, sizes = [1600, 2400, 1000, 700];
+    for (var i = 0; i < sizes.length; i++) {
+      var k = Math.min(1, sizes[i] / Math.max(w, h)), cw = Math.round(w * k), ch = Math.round(h * k);
+      if (tried[cw]) continue; tried[cw] = 1;
+      var c = document.createElement('canvas'); c.width = cw; c.height = ch;
+      var ctx = c.getContext('2d', {willReadFrequently: true}); ctx.drawImage(source, 0, 0, cw, ch);
+      var d = ctx.getImageData(0, 0, cw, ch), r = window.jsQR(d.data, cw, ch, {inversionAttempts: 'attemptBoth'});
+      if (r && r.data) return r.data;
+    }
+    return '';
+  }
+  function fromImage(img){
+    return load().then(function(){
+      var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      return w && h ? decode(img, w, h) : '';
+    });
+  }
+  function fromFile(file){
+    if (!file) return Promise.resolve('');
+    return load().then(function(){
+      return new Promise(function(ok){
+        var img = new Image(), url = URL.createObjectURL(file);
+        img.onload = function(){ try { ok(decode(img, img.naturalWidth, img.naturalHeight)); } catch (e) { ok(''); }
+                                 URL.revokeObjectURL(url); };
+        img.onerror = function(){ URL.revokeObjectURL(url); ok(''); };
+        img.src = url;
+      });
+    });
+  }
+  // Коротко для людини: «vCard — Anna Li, Muster GmbH» / посилання.
+  function summary(text){
+    var t = String(text || ''), m;
+    if (/^BEGIN:VCARD/i.test(t)) {
+      var fn = (t.match(/^FN[^:\n]*:(.*)$/mi) || [])[1] || '', org = (t.match(/^ORG[^:\n]*:([^;\n]*)/mi) || [])[1] || '';
+      return 'vCard' + ((fn || org) ? ' — ' + [fn, org].filter(Boolean).join(', ') : '');
+    }
+    if (/^MECARD:/i.test(t)) { m = t.match(/N:([^;]*)/i); return 'MeCard' + (m ? ' — ' + m[1].replace(',', ' ') : ''); }
+    return t.length > 90 ? t.slice(0, 90) + '…' : t;
+  }
+  return {load: load, fromFile: fromFile, fromImage: fromImage, summary: summary};
+})();
+</script>

@@ -15,6 +15,7 @@
   .sc-shot { display: flex; flex-wrap: wrap; gap: 12px; }
   .sc-side { border: 1px dashed var(--border-strong, #ccc); border-radius: 8px; padding: 10px; min-width: 260px; flex: 1 1 260px; }
   .sc-side img { max-width: 100%; max-height: 220px; display: none; margin-top: 6px; border-radius: 6px; background: #fff; }
+  .sc-qr { margin-top: 4px; word-break: break-word; }
 </style>
 <div class="spp">
   <form method="post" enctype="multipart/form-data" id="sc-form">{% csrf_token %}
@@ -31,10 +32,13 @@
     <canvas id="sc-canvas" style="display:none"></canvas>
     <div class="sc-shot">
       <div class="sc-side"><b>Лицьовий бік</b> <span class="spf-muted" id="sc-front-note"></span>
-        <div><input type="file" name="image" id="sc-front" accept="image/*" capture="environment" required></div><img id="sc-front-img" alt=""></div>
+        <div><input type="file" name="image" id="sc-front" accept="image/*" capture="environment" required></div><img id="sc-front-img" alt="">
+        <input type="hidden" name="qr_front" id="sc-front-qr"><div class="spf-muted sc-qr" id="sc-front-qr-note"></div></div>
       <div class="sc-side"><b>Зворотний бік</b> <span class="spf-muted">(якщо є)</span>
-        <div><input type="file" name="image_back" id="sc-back" accept="image/*" capture="environment"></div><img id="sc-back-img" alt=""></div>
+        <div><input type="file" name="image_back" id="sc-back" accept="image/*" capture="environment"></div><img id="sc-back-img" alt="">
+        <input type="hidden" name="qr_back" id="sc-back-qr"><div class="spf-muted sc-qr" id="sc-back-qr-note"></div></div>
     </div>
+    <div class="spf-muted" style="margin-top:4px">🔳 Якщо на візитці є QR-код (vCard, сайт), Minerva прочитає його одразу після фото — ці дані точні, AI лише доповнить решту.</div>
     <div class="spf-muted" id="sc-target-note" style="margin-top:4px">Камера знімає на той бік, який вибрано: <label><input type="radio" name="_side" value="front" checked> лицьовий</label> <label><input type="radio" name="_side" value="back"> зворотний</label></div>
   </div>
   <div class="spf-card">
@@ -64,8 +68,17 @@
   var cam = document.getElementById('sc-cam'), snap = document.getElementById('sc-snap'), stop = document.getElementById('sc-stop');
   var note = document.getElementById('sc-cam-note');
   function preview(input, img){
-    var f = input.files && input.files[0]; if (!f) { img.style.display = 'none'; return; }
+    var f = input.files && input.files[0];
+    var qrField = document.getElementById(input.id + '-qr'), qrNote = document.getElementById(input.id + '-qr-note');
+    qrField.value = ''; qrNote.textContent = '';
+    if (!f) { img.style.display = 'none'; return; }
     img.src = URL.createObjectURL(f); img.style.display = 'block';
+    qrNote.textContent = '🔳 Шукаю QR-код…';
+    spQR.fromFile(f).then(function(text){
+      if (input.files[0] !== f) return;              // тим часом вибрали інше фото
+      qrField.value = text || '';
+      qrNote.textContent = text ? '🔳 QR: ' + spQR.summary(text) : '';
+    }).catch(function(){ qrNote.textContent = '🔳 QR не перевірено (немає зв\'язку з бібліотекою) — AI прочитає текст з фото.'; });
   }
   [['sc-front', 'sc-front-img'], ['sc-back', 'sc-back-img']].forEach(function(p){
     var input = document.getElementById(p[0]), img = document.getElementById(p[1]);
@@ -100,4 +113,5 @@
   document.getElementById('sc-form').addEventListener('submit', off);
 })();
 </script>
+{% include "admin/suppliers/_qr_js.html" %}
 {% endblock %}

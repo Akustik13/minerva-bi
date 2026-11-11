@@ -14,8 +14,8 @@
   <div class="spf-two">
     <div>
       <div class="spf-card">
-        <a href="{{ m.image.url }}" target="_blank"><img class="spf-img" src="{{ m.image.url }}" alt=""></a>
-        {% if m.image_back %}<a href="{{ m.image_back.url }}" target="_blank"><img class="spf-img" src="{{ m.image_back.url }}" alt="" style="margin-top:8px"></a>{% endif %}
+        <a href="{{ m.image.url }}" target="_blank"><img class="spf-img" id="cr-img-front" src="{{ m.image.url }}" alt=""></a>
+        {% if m.image_back %}<a href="{{ m.image_back.url }}" target="_blank"><img class="spf-img" id="cr-img-back" src="{{ m.image_back.url }}" alt="" style="margin-top:8px"></a>{% endif %}
         <div class="spf-muted" style="margin-top:6px">{{ m.get_kind_display }} · {{ m.created_at|date:"d.m.Y H:i" }}{% if m.created_by %} · {{ m.created_by.get_full_name|default:m.created_by.username }}{% endif %}
           {% if m.supplier %}<div>🏭 <a href="{% url 'admin:inventory_supplier_change' m.supplier.pk %}" translate="no">{{ m.supplier.name }}</a></div>{% endif %}</div>
       </div>
@@ -37,15 +37,30 @@
     <div>
       <div class="spf-card">
         <div class="spf-h">🧠 Що прочитав AI</div>
-        {% if m.state == "read" or m.state == "applied" %}<div class="spf-ok">✓ Прочитано{% if m.cost_usd %} · ${{ m.cost_usd|floatformat:3 }}{% endif %}{% if m.state == "applied" %} · уже внесено{% endif %}</div>
+        {% if m.cost_usd %}<div class="spf-ok">✓ Прочитано AI · ${{ m.cost_usd|floatformat:3 }}{% if m.state == "applied" %} · уже внесено{% endif %}</div>
+        {% elif m.state == "read" or m.state == "applied" %}<div class="spf-muted">AI не запускали{% if d.from_qr %} — поля заповнено з QR-коду{% endif %}{% if m.state == "applied" %} · уже внесено{% endif %}.</div>
         {% elif m.state == "failed" %}<div class="spf-bad">⚠️ {{ m.error|default:"Не вдалося прочитати" }}</div>
         {% else %}<div class="spf-muted">Ще не читали.</div>{% endif %}
         {% if can_edit %}
         <div class="spf-row">
           <select id="cr-model">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
-          <button type="button" class="button" id="cr-ai">🧠 {% if m.extracted %}Прочитати ще раз{% else %}Прочитати фото AI{% endif %}</button>
+          <button type="button" class="button" id="cr-ai">🧠 {% if m.cost_usd %}Прочитати ще раз{% else %}Прочитати фото AI{% endif %}</button>
           <span class="spf-job" id="cr-job"></span>
         </div>
+        {% endif %}
+      </div>
+      <div class="spf-card">
+        <div class="spf-h">🔳 QR-код</div>
+        {% if qr_parts %}
+          <div class="spf-ok">✓ {{ qr_kind|default:"текст" }}{% if qr_from %} · у полях нижче: {{ qr_from }}{% endif %}</div>
+          {% for t in qr_parts %}<details style="margin-top:4px"><summary class="spf-muted">Текст коду</summary><div class="spf-mail" translate="no">{{ t|truncatechars:1500 }}</div></details>{% endfor %}
+        {% else %}<div class="spf-muted" id="cr-qr-none">QR-коду ще не читали або на фото його немає.</div>{% endif %}
+        {% if can_edit %}
+        <form method="post" id="cr-qr-form" class="spf-row">{% csrf_token %}<input type="hidden" name="action" value="qr">
+          <input type="hidden" name="qr_front" id="cr-qr-front"><input type="hidden" name="qr_back" id="cr-qr-back">
+          <button type="button" class="button" id="cr-qr">🔳 Прочитати QR з фото</button>
+          <span class="spf-job" id="cr-qr-job"></span>
+        </form>
         {% endif %}
       </div>
       {% if can_add or can_change %}
@@ -69,6 +84,7 @@
     </div>
   </div>
 </div>
+{% include "admin/suppliers/_qr_js.html" %}
 {{ job_js }}
 <script>
 (function(){
@@ -83,6 +99,34 @@
     spJob(location.pathname, {action: 'ai', model: document.getElementById('cr-model').value}, out,
           function(){ location.href = location.pathname; });
   });
+  // 🔳 QR: браузер розшифровує код зі збереженого фото → сервер розбирає (vCard / MeCard / посилання) і вносить
+  var qrBtn = document.getElementById('cr-qr'), qrOut = document.getElementById('cr-qr-job');
+  function scanQR(){
+    var front = document.getElementById('cr-img-front'), back = document.getElementById('cr-img-back');
+    return Promise.all([front ? spQR.fromImage(front) : '', back ? spQR.fromImage(back) : '']);
+  }
+  function readyImages(){
+    return Promise.all([].slice.call(document.querySelectorAll('.spf-img')).map(function(img){
+      return img.complete ? null : new Promise(function(ok){ img.onload = img.onerror = ok; });
+    }));
+  }
+  if (qrBtn) {
+    qrBtn.addEventListener('click', function(){
+      qrOut.textContent = '⏳ Шукаю QR-код…';
+      readyImages().then(scanQR).then(function(r){
+        if (!r[0] && !r[1]) { qrOut.textContent = 'QR-коду на фото не знайдено.'; return; }
+        document.getElementById('cr-qr-front').value = r[0] || '';
+        document.getElementById('cr-qr-back').value = r[1] || '';
+        document.getElementById('cr-qr-form').submit();
+      }).catch(function(){ qrOut.textContent = '⚠️ Бібліотека QR не завантажилась — перевірте інтернет.'; });
+    });
+    if (document.getElementById('cr-qr-none')) {   // ще не читали — тихо глянути, чи є код, і підказати
+      readyImages().then(scanQR).then(function(r){
+        var t = r[0] || r[1];
+        if (t) { qrOut.textContent = '🔳 На фото є QR: ' + spQR.summary(t); qrBtn.textContent = '🔳 Внести дані з QR'; }
+      }).catch(function(){});
+    }
+  }
   var q = document.getElementById('cr-sup-q'), list = document.getElementById('cr-sup-list'), t = null;
   if (q) q.addEventListener('input', function(){
     clearTimeout(t); var v = q.value.trim(); if (v.length < 2) return;

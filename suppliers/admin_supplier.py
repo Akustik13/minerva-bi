@@ -558,7 +558,7 @@ class SupplierCardMixin:
 
     # ── 📷 Візитка / флаєр ──
     def card_view(self, request):
-        from suppliers.services import ai, jobs
+        from suppliers.services import ai, jobs, qr
         if not (_can(request, "add") or _can(request, "change")):
             raise Http404
         supplier = None
@@ -582,6 +582,10 @@ class SupplierCardMixin:
             back = request.FILES.get("image_back")
             if back is not None and back.size <= 15 * 1024 * 1024:
                 m.image_back.save(back.name or "back.jpg", back, save=False)
+            m.qr_text = qr.join(request.POST.get("qr_front", ""), request.POST.get("qr_back", ""))
+            fields = qr.parse_all(m.qr_text)
+            if fields:
+                m.extracted, m.state = qr.merge(fields, {}), SupplierMedia.READ
             m.save()
             if supplier is not None:
                 SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.CARD, media=m, user=request.user,
@@ -617,7 +621,7 @@ class SupplierCardMixin:
             unassigned=SupplierMedia.objects.filter(supplier=None).count()))
 
     def card_review_view(self, request, media_pk):
-        from suppliers.services import ai, draft, jobs, match
+        from suppliers.services import ai, draft, jobs, match, qr
         m = SupplierMedia.objects.select_related("supplier", "contact", "created_by").filter(pk=media_pk).first()
         if m is None or not _can(request, "view"):
             raise Http404
@@ -643,6 +647,22 @@ class SupplierCardMixin:
                 ai.card(m, user=user, model=model)
                 return {"url": url, "message": "🧠 Прочитано"}
             return JsonResponse({"job": jobs.start(user, f"card {m.pk}", run)})
+        if action == "qr":
+            text = qr.join(request.POST.get("qr_front", ""), request.POST.get("qr_back", ""))
+            fields = qr.parse_all(text)
+            if not text:
+                self.message_user(request, "🔳 QR-коду на фото не знайдено.", messages.WARNING)
+                return redirect(url)
+            state = m.state if m.state == SupplierMedia.APPLIED else SupplierMedia.READ
+            SupplierMedia.objects.filter(pk=m.pk).update(
+                qr_text=text, extracted=qr.merge(fields, m.extracted or {}), state=state if fields else m.state)
+            if fields:
+                self.message_user(request, "🔳 З QR-коду: " + qr.labels(qr.merge(fields, {}).get("from_qr")),
+                                  messages.SUCCESS)
+            else:
+                self.message_user(request, "🔳 QR прочитано, але це не візитка (vCard / MeCard / посилання) — "
+                                           "текст збережено біля фото.", messages.INFO)
+            return redirect(url)
         if action == "create":
             if not _can(request, "add"):
                 raise Http404
@@ -687,7 +707,11 @@ class SupplierCardMixin:
             categories=SupplierCategory.objects.filter(is_active=True), kinds=SupplierMedia.KINDS,
             marks=SupplierMedia.MARKS, can_edit=can_edit, can_add=_can(request, "add"),
             can_change=_can(request, "change"), job=request.GET.get("job", ""),
-            suppliers_json=None, site_domain=match.site_domain(data.get("website", ""))))
+            qr_parts=[x for x in (m.qr_text or "").split(qr.SEPARATOR) if x.strip()],
+            qr_kind={"vcard": "vCard", "mecard": "MeCard", "url": "посилання", "whatsapp": "WhatsApp",
+                     "email": "email", "phone": "телефон"}.get(qr.parse_all(m.qr_text).get("kind"), ""),
+            qr_from=qr.labels(data.get("from_qr")),
+            site_domain=match.site_domain(data.get("website", ""))))
 
 
 _STYLE = mark_safe("""<style>

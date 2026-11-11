@@ -378,3 +378,76 @@ class AdminPagesTests(Base):
         self.client.force_login(self.other)
         self.assertNotEqual(self.client.get(reverse("admin:inventory_supplier_find_in_mail")).status_code, 200)
         self.assertNotEqual(self.client.get(reverse("admin:suppliers_supplierrequest_new")).status_code, 200)
+
+
+VCARD = ("BEGIN:VCARD\r\nVERSION:3.0\r\nN:Becker;Tom;;;\r\nFN:Tom Becker\r\nORG:Cable Tech GmbH;Vertrieb\r\n"
+         "TITLE:Sales Manager\r\nTEL;TYPE=WORK,VOICE:+49 711 123456\r\nTEL;TYPE=CELL:+49 170 1234567\r\n"
+         "EMAIL;TYPE=INTERNET:tom@cable-tech.de\r\nURL:www.cable-tech.de\r\n"
+         "ADR;TYPE=WORK:;;Hauptstr. 5;Stuttgart;;70173;Germany\r\nNOTE:Messe electronica\\, Halle B3\r\n"
+         " Stand 101\r\nEND:VCARD")
+
+
+class QRTests(Base):
+    def test_vcard_mecard_links(self):
+        from suppliers.services import qr
+        d = qr.parse(VCARD)
+        self.assertEqual((d["kind"], d["name"], d["contact_name"], d["contact_position"]),
+                         ("vcard", "Cable Tech GmbH", "Tom Becker", "Sales Manager"))
+        self.assertEqual((d["contact_phone"], d["contact_mobile"], d["phone"]),
+                         ("+49 711 123456", "+49 170 1234567", "+49 711 123456"))
+        self.assertEqual((d["email"], d["contact_email"], d["website"]),
+                         ("tom@cable-tech.de", "tom@cable-tech.de", "https://www.cable-tech.de"))
+        self.assertEqual((d["addr_street"], d["addr_city"], d["addr_zip"], d["addr_country"]),
+                         ("Hauptstr. 5", "Stuttgart", "70173", "DE"))
+        self.assertEqual(d["notes"], "Messe electronica, Halle B3Stand 101")       # згорнутий рядок склеєно
+        old = ("BEGIN:VCARD\nVERSION:2.1\nN:Petrenko;Olena\n"
+               "ORG;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:=D0=A2=D0=9E=D0=92 =D0=90=D0=BD=D1=82=D0=B5=D0=BD=D0=B0\n"
+               "TEL;CELL:+380501234567\nEND:VCARD")
+        d = qr.parse(old)
+        self.assertEqual((d["name"], d["contact_name"], d["contact_mobile"]),
+                         ("ТОВ Антена", "Olena Petrenko", "+380501234567"))
+        d = qr.parse("MECARD:N:Li,Anna;ORG:PCBWay;TEL:+86 755 1;EMAIL:anna@pcbway.com;URL:www.pcbway.com;;")
+        self.assertEqual((d["kind"], d["contact_name"], d["name"], d["website"]),
+                         ("mecard", "Anna Li", "PCBWay", "https://www.pcbway.com"))
+        self.assertEqual(qr.parse("https://www.example.com/de/kontakt")["website"], "https://www.example.com/de/kontakt")
+        self.assertEqual(qr.parse("https://wa.me/491701234567")["contact_mobile"], "+491701234567")
+        self.assertEqual(qr.parse("just some text"), {})
+        both = qr.parse_all(qr.join("https://www.other.com", VCARD))            # лицьовий бік головний
+        self.assertEqual((both["website"], both["name"]), ("https://www.other.com", "Cable Tech GmbH"))
+        merged = qr.merge(qr.parse(VCARD), {"name": "Cable Tec", "email": "wrong@x.de", "description": "Kabel"})
+        self.assertEqual((merged["name"], merged["email"], merged["description"]),
+                         ("Cable Tech GmbH", "tom@cable-tech.de", "Kabel"))
+        self.assertIn("contact_mobile", merged["from_qr"])
+
+    def test_upload_with_qr_fills_without_ai_and_ai_keeps_qr(self):
+        with mock.patch.object(ai, "call") as call:
+            self.client.post(reverse("admin:inventory_supplier_card"), {
+                "image": SimpleUploadedFile("card.png", png(), content_type="image/png"), "kind": "card",
+                "qr_front": VCARD})
+        call.assert_not_called()
+        m = SupplierMedia.objects.get()
+        self.assertEqual((m.state, m.extracted["name"], m.extracted["contact_mobile"]),
+                         (SupplierMedia.READ, "Cable Tech GmbH", "+49 170 1234567"))
+        page = self.client.get(reverse("admin:inventory_supplier_card_review", args=[m.pk]))
+        self.assertContains(page, "vCard")
+        self.assertContains(page, 'value="Cable Tech GmbH"')
+        answer = json.dumps({"company": "Cable Tec", "email": "info@cable-tech.de", "products": ["SMA"]})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.003"))) as call:
+            data = ai.card(m, user=self.user)
+        self.assertIn("QR-код з цієї візитки", call.call_args.args[1][-1]["text"])   # AI бачить QR
+        self.assertEqual((data["name"], data["email"]), ("Cable Tech GmbH", "tom@cable-tech.de"))
+        self.assertIn("SMA", data["description"])
+
+    def test_review_reads_qr_later(self):
+        m = SupplierMedia(kind=SupplierMedia.CARD, created_by=self.user, extracted={"name": "Guess GmbH"},
+                          state=SupplierMedia.READ)
+        m.image.save("card.png", SimpleUploadedFile("card.png", png()), save=False)
+        m.save()
+        url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+        self.client.post(url, {"action": "qr", "qr_front": "MECARD:N:Li,Anna;ORG:PCBWay;;"})
+        m.refresh_from_db()
+        self.assertEqual((m.extracted["name"], m.extracted["contact_name"]), ("PCBWay", "Anna Li"))
+        self.assertTrue(m.qr_text.startswith("MECARD:"))
+        self.client.post(url, {"action": "qr", "qr_front": "", "qr_back": ""})       # нічого — нічого не змінює
+        m.refresh_from_db()
+        self.assertEqual(m.extracted["name"], "PCBWay")

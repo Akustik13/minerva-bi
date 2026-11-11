@@ -1805,7 +1805,11 @@
 {"uk": "PurchaseOrderLine }o--o| Product : \"товар\"", "en": "PurchaseOrderLine }o--o| Product : \"product\"", "de": "PurchaseOrderLine }o--o| Product : \"Artikel\""}
 {"uk": "Push у браузері", "en": "Browser push", "de": "Browser-Push"}
 {"uk": "Push у браузері (спливаючі повідомлення в системі)", "en": "Browser push (pop-up notifications in the system)", "de": "Browser-Push (Popup-Benachrichtigungen im System)"}
+{"uk": "QR не перевірено (немає зв'язку з бібліотекою) — AI прочитає текст з фото.", "en": "QR not checked (no connection to the library) — AI will read the text from the photo.", "de": "QR nicht geprüft (keine Verbindung zur Bibliothek) — die KI liest den Text vom Foto."}
+{"uk": "QR прочитано, але це не візитка (vCard / MeCard / посилання) — текст збережено біля фото.", "en": "QR read, but it is not a business card (vCard / MeCard / link) — the text is saved with the photo.", "de": "QR gelesen, aber keine Visitenkarte (vCard / MeCard / Link) — der Text ist beim Foto gespeichert."}
 {"uk": "QR-код", "en": "QR code", "de": "QR-Code"}
+{"uk": "QR-коду на фото не знайдено.", "en": "No QR code found in the photo.", "de": "Kein QR-Code auf dem Foto gefunden."}
+{"uk": "QR-коду ще не читали або на фото його немає.", "en": "The QR code has not been read yet or there is none in the photo.", "de": "QR-Code noch nicht gelesen oder keiner auf dem Foto."}
 {"uk": "Qdrant: жодного листа у двох ревізіях", "en": "Qdrant: no e-mail in two revisions", "de": "Qdrant: keine E-Mail in zwei Revisionen"}
 {"uk": "Qdrant: ревізії = чинні в стані RAG", "en": "Qdrant: revisions = current ones in the RAG state", "de": "Qdrant: Revisionen = aktuelle im RAG-Status"}
 {"uk": "Qdrant: старих поколінь немає (retention)", "en": "Qdrant: no old generations (retention)", "de": "Qdrant: keine alten Generationen (retention)"}
@@ -2421,6 +2425,7 @@
 {"uk": "email для відповіді", "en": "e-mail for reply", "de": "E-Mail für die Antwort"}
 {"uk": "email доставки", "en": "shipping email", "de": "E-Mail (Lieferung)"}
 {"uk": "email з «Налаштування → Сповіщення»", "en": "email from “Settings → Notifications”", "de": "E-Mail aus „Einstellungen → Benachrichtigungen“"}
+{"uk": "email контакту", "en": "contact e-mail", "de": "E-Mail des Kontakts"}
 {"uk": "email не підтверджено", "en": "email not verified", "de": "E-Mail nicht bestätigt"}
 {"uk": "email підтверджено {0}", "en": "email verified {0}", "de": "E-Mail bestätigt {0}"}
 {"uk": "email, password, company, name, phone, vat_id, адреса, confirm_b2b, lang, link", "en": "email, password, company, name, phone, vat_id, address, confirm_b2b, lang, link", "de": "email, password, company, name, phone, vat_id, Adresse, confirm_b2b, lang, link"}
@@ -4280,6 +4285,7 @@
 {"uk": "Бюджет AI вичерпано або немає відповіді.", "en": "The AI budget is exhausted or there is no response.", "de": "Das KI-Budget ist erschöpft oder es gibt keine Antwort."}
 {"uk": "Бюджет AI вичерпано на цей місяць.", "en": "The AI budget for this month has been used up.", "de": "Das KI-Budget für diesen Monat ist aufgebraucht."}
 {"uk": "Бюджет цього місяця", "en": "This month's budget", "de": "Budget dieses Monats"}
+{"uk": "Бібліотека QR не завантажилась — перевірте інтернет.", "en": "The QR library did not load — check the internet connection.", "de": "Die QR-Bibliothek wurde nicht geladen — Internetverbindung prüfen."}
 {"uk": "Білорусь", "en": "Belarus", "de": "Belarus"}
 {"uk": "Більша зміна (вгору чи вниз) чекає підтвердження людини навіть в режимі «Оновлювати самостійно». Рахується для кожної кількості: новий ступінь — від ціни DigiKey, що зараз діє на цю кількість, прибраний — до нової ціни для неї.", "en": "A larger change (up or down) waits for a person’s confirmation even in the “Update automatically” mode. It is calculated for each quantity: a new price break — from the DigiKey price currently in effect for that quantity, a removed one — to the new price for it.", "de": "Eine größere Änderung (nach oben oder unten) wartet auch im Modus „Selbstständig aktualisieren“ auf die Bestätigung durch eine Person. Sie wird für jede Menge berechnet: bei einer neuen Staffel ausgehend vom aktuell gültigen DigiKey-Preis für diese Menge, bei einer entfernten Staffel bis zum neuen Preis für sie."}
 {"uk": "Більше замовлень до відправки немає.", "en": "No more orders waiting to ship.", "de": "Keine weiteren Aufträge zum Versand."}
@@ -5007,6 +5013,7 @@
 {"uk": "Вміст сповіщень (Нові замовлення + DigiKey)", "en": "Notification content (New orders + DigiKey)", "de": "Inhalt der Benachrichtigungen (Neue Aufträge + DigiKey)"}
 {"uk": "Вміст файлу не схожий на .{0}", "en": "The file content does not look like .{0}", "de": "Der Dateiinhalt sieht nicht nach .{0} aus"}
 {"uk": "Внесено самому (доручення «", "en": "Entered by itself (instruction «", "de": "Selbst eingetragen (Auftrag «"}
+{"uk": "Внести дані з QR", "en": "Apply data from QR", "de": "Daten aus QR übernehmen"}
 {"uk": "Внести пропозицію вручну", "en": "Enter offer manually", "de": "Angebot manuell eintragen"}
 {"uk": "Внизу кожного листа: компанія, адреса, контакти.", "en": "At the bottom of every e-mail: company, address, contacts.", "de": "Am Ende jeder E-Mail: Firma, Adresse, Kontaktdaten."}
 {"uk": "Вносимі втрати", "en": "Insertion loss", "de": "Einfügedämpfung"}
@@ -6580,6 +6587,7 @@
 {"uk": "Журналі аудиту", "en": "Audit log", "de": "Audit-Protokoll"}
 {"uk": "З AI", "en": "With AI", "de": "Mit KI"}
 {"uk": "З AI-чернетки", "en": "From an AI draft", "de": "Aus einem KI-Entwurf"}
+{"uk": "З QR-коду", "en": "From QR code", "de": "Aus QR-Code"}
 {"uk": "З БД", "en": "From DB", "de": "Aus DB"}
 {"uk": "З блоком bench — оновлює «RAG-ПК на зв'язку»; хід обробки нарад, які ще йдуть.", "en": "With the bench block — updates “RAG PC online”; progress of meetings still being processed.", "de": "Mit dem bench-Block — aktualisiert „RAG-PC erreichbar“; Fortschritt noch laufender Besprechungen."}
 {"uk": "З будь-якої адреси.", "en": "From any address.", "de": "Von jeder Adresse."}
@@ -9584,6 +9592,7 @@
 {"uk": "На сторінці немає тексту", "en": "The page has no text", "de": "Die Seite enthält keinen Text"}
 {"uk": "На сторінці стратегії → кнопка", "en": "On the strategy page → button", "de": "Auf der Strategieseite → Schaltfläche"}
 {"uk": "На сторінці товару (під «In den Warenkorb») і в кошику — «Lieferung nach [країна ▾]»: ціна доставки й термін для вибраної країни; вибір запам'ятовується і підставляється в касі (адреса з акаунта покупця важливіша). Далі «Lieferzeit: 1–2 Werktage nach Versand» — у касі, на сторінці підтвердження і в листі про замовлення. Без терміну рядок не показується.", "en": "On the product page (under “In den Warenkorb”) and in the cart — “Lieferung nach [country ▾]”: the shipping price and lead time for the selected country; the choice is remembered and filled into the checkout (the address from the buyer’s account takes priority). Then “Lieferzeit: 1–2 Werktage nach Versand” — in the checkout, on the confirmation page and in the order email. Without a lead time, the line is not shown.", "de": "Auf der Artikelseite (unter „In den Warenkorb“) und im Warenkorb — „Lieferung nach [Land ▾]“: Versandpreis und Lieferzeit für das gewählte Land; die Auswahl wird gemerkt und in der Kasse übernommen (die Adresse aus dem Käuferkonto hat Vorrang). Weiter „Lieferzeit: 1–2 Werktage nach Versand“ — in der Kasse, auf der Bestätigungsseite und in der Auftrags-E-Mail. Ohne Lieferzeit wird die Zeile nicht angezeigt."}
+{"uk": "На фото є QR", "en": "The photo has a QR code", "de": "Auf dem Foto ist ein QR-Code"}
 {"uk": "На цей Telegram ID Minerva пише вам особисто: ранковий брифінг, нагадування, чат з 🏛️ Minerva AI.", "en": "Minerva writes to you personally at this Telegram ID: morning briefing, reminders, chat with 🏛️ Minerva AI.", "de": "An diese Telegram-ID schreibt Minerva Ihnen persönlich: Morgenbriefing, Erinnerungen, Chat mit 🏛️ Minerva AI."}
 {"uk": "На цей Telegram ID Minerva пише вам особисто: ранковий брифінг, нагадування, чат з 🏛️ Minerva AI. Порожнє поле — особистих повідомлень у Telegram немає. Що саме надсилати, налаштовується там, де повідомлення виникають: брифінг і звіти — «Налаштування сповіщень» / «Налаштування брифінгу», нагадування — «📅 Календар → Сповіщення», нові листи — налаштування вашої скриньки.", "en": "Minerva writes to you personally at this Telegram ID: morning briefing, reminders, chat with 🏛️ Minerva AI. Empty field — no personal Telegram messages. What exactly to send is configured where the messages originate: briefing and reports — “Notification settings” / “Briefing settings”, reminders — “📅 Calendar → Notifications”, new e-mails — your mailbox settings.", "de": "An diese Telegram-ID schreibt Minerva Ihnen persönlich: Morgenbriefing, Erinnerungen, Chat mit 🏛️ Minerva AI. Leeres Feld – keine persönlichen Nachrichten in Telegram. Was genau gesendet wird, wird dort eingestellt, wo die Nachrichten entstehen: Briefing und Berichte – „Benachrichtigungseinstellungen“ / „Briefing-Einstellungen“, Erinnerungen – „📅 Kalender → Benachrichtigungen“, neue E-Mails – die Einstellungen Ihres Postfachs."}
 {"uk": "На цей сайт вебхук не налаштовано: зміни складу й цін з'являться на сайті лише після його кешу (зазвичай хвилина-дві). Налаштування: REST API → Вебхуки, URL {0}api/shop/webhook.php, подія stock.changed; секрет вставити на сайті в private/shop-config.php ('webhook_secret').", "en": "No webhook is set up for this site: stock and price changes will appear on the site only after its cache expires (usually a minute or two). Setup: REST API → Webhooks, URL {0}api/shop/webhook.php, event stock.changed; paste the secret on the site in private/shop-config.php ('webhook_secret').", "de": "Für diese Website ist kein Webhook eingerichtet: Änderungen bei Bestand und Preisen erscheinen auf der Website erst nach Ablauf ihres Caches (in der Regel ein bis zwei Minuten). Einrichtung: REST API → Webhooks, URL {0}api/shop/webhook.php, Ereignis stock.changed; das Secret auf der Website in private/shop-config.php einfügen ('webhook_secret')."}
@@ -13269,6 +13278,7 @@
 {"uk": "Прочитано з askDANTE", "en": "Read from askDANTE", "de": "Aus askDANTE gelesen"}
 {"uk": "Прочитано листів: {0} · нових пропозицій: {1}", "en": "Emails read: {0} · new suggestions: {1}", "de": "E-Mails gelesen: {0} · neue Vorschläge: {1}"}
 {"uk": "Прочитані AI листи", "en": "Emails read by AI", "de": "Von der KI gelesene E-Mails"}
+{"uk": "Прочитати QR з фото", "en": "Read QR from photo", "de": "QR vom Foto lesen"}
 {"uk": "Прочитати з DigiKey і перевірити", "en": "Read from DigiKey and check", "de": "Von DigiKey lesen und prüfen"}
 {"uk": "Прочитати лист і гілку своєї скриньки", "en": "Read an e-mail and thread of your own mailbox", "de": "E-Mail und Verlauf des eigenen Postfachs lesen"}
 {"uk": "Прочитати листи (AI)", "en": "Read the emails (AI)", "de": "E-Mails lesen (KI)"}
@@ -13844,6 +13854,7 @@
 {"uk": "Розширення через кому: .pdf або .pdf,.xml", "en": "Comma-separated extensions: .pdf or .pdf,.xml", "de": "Erweiterungen durch Komma getrennt: .pdf oder .pdf,.xml"}
 {"uk": "Розширте назву до 40+ символів", "en": "Expand the name to 40+ characters", "de": "Erweitern Sie den Namen auf 40+ Zeichen"}
 {"uk": "Розширюваність", "en": "Extensibility", "de": "Erweiterbarkeit"}
+{"uk": "Розшифрований текст QR-коду з фото (vCard, посилання…) — suppliers/services/qr.py", "en": "Decoded QR code text from the photo (vCard, link…) — suppliers/services/qr.py", "de": "Entschlüsselter QR-Code-Text vom Foto (vCard, Link…) — suppliers/services/qr.py"}
 {"uk": "Розшифровка", "en": "Transcript", "de": "Transkript"}
 {"uk": "Розшифровка #{0}", "en": "Transcript #{0}", "de": "Transkript #{0}"}
 {"uk": "Розшифровка готова", "en": "Transcript ready", "de": "Transkript fertig"}
@@ -15115,6 +15126,7 @@
 {"uk": "Текст для читання вголос — Deutsch", "en": "Text to read aloud — Deutsch", "de": "Vorlesetext — Deutsch"}
 {"uk": "Текст для читання вголос — English", "en": "Text to read aloud — English", "de": "Vorlesetext — English"}
 {"uk": "Текст для читання вголос — українська", "en": "Text to read aloud — Ukrainian", "de": "Vorlesetext — Ukrainisch"}
+{"uk": "Текст коду", "en": "Code text", "de": "Code-Text"}
 {"uk": "Текст листа", "en": "E-mail text", "de": "E-Mail-Text"}
 {"uk": "Текст листа (без процитованої історії)", "en": "E-mail text (without the quoted history)", "de": "E-Mail-Text (ohne zitierten Verlauf)"}
 {"uk": "Текст листа (шаблон)", "en": "E-mail text (template)", "de": "E-Mail-Text (Vorlage)"}
@@ -16716,6 +16728,7 @@
 {"uk": "Шукати всюди (Ctrl K)", "en": "Search everywhere (Ctrl K)", "de": "Überall suchen (Ctrl K)"}
 {"uk": "Шукати всюди: розділ, замовлення, товар, клієнт, лист", "en": "Search everywhere: section, order, product, customer, e-mail", "de": "Überall suchen: Bereich, Auftrag, Artikel, Kunde, E-Mail"}
 {"uk": "Шукати запрошення в листах від", "en": "Search for invitations in e-mails from", "de": "Einladungen in E-Mails suchen ab"}
+{"uk": "Шукаю QR-код…", "en": "Looking for a QR code…", "de": "Suche QR-Code…"}
 {"uk": "Шукаю в гіді по Minerva…", "en": "Searching the Minerva guide…", "de": "Suche im Minerva-Leitfaden…"}
 {"uk": "Шукаю ключові моменти — з’являться тут самі, зазвичай за 5–20 хв.", "en": "Looking for key points — they will appear here by themselves, usually within 5–20 min.", "de": "Suche nach Kernpunkten — sie erscheinen hier von selbst, meist innerhalb von 5–20 Min."}
 {"uk": "Шукаю ключові моменти…", "en": "Looking for key points…", "de": "Suche nach Kernpunkten…"}
@@ -17069,6 +17082,7 @@
 {"uk": "Якщо картки ще немає — буде створена нова.", "en": "If there is no card yet, a new one will be created.", "de": "Falls noch keine Karte vorhanden ist, wird eine neue erstellt."}
 {"uk": "Якщо клієнт відповів", "en": "If the customer replied", "de": "Wenn der Kunde geantwortet hat"}
 {"uk": "Якщо конкретних дат немає — поверни []", "en": "If there are no specific dates — return []", "de": "Gibt es keine konkreten Daten — geben Sie [] zurück"}
+{"uk": "Якщо на візитці є QR-код (vCard, сайт), Minerva прочитає його одразу після фото — ці дані точні, AI лише доповнить решту.", "en": "If the business card has a QR code (vCard, website), Minerva reads it right after the photo — this data is exact, AI only adds the rest.", "de": "Hat die Visitenkarte einen QR-Code (vCard, Website), liest Minerva ihn gleich nach dem Foto — diese Daten sind exakt, die KI ergänzt nur den Rest."}
 {"uk": "Якщо не вдасться — з'явиться попередження з ID файлу для ручного додавання на", "en": "If that fails, a warning with the file ID appears for adding it manually on", "de": "Gelingt das nicht, erscheint eine Warnung mit der Datei-ID zum manuellen Hinzufügen auf"}
 {"uk": "Якщо не відповів", "en": "If they did not reply", "de": "Wenn keine Antwort kam"}
 {"uk": "Якщо не знайдено в БД", "en": "If not found in the DB", "de": "Wenn in der DB nicht gefunden"}
@@ -18814,6 +18828,7 @@
 {"uk": "митні дані з відправлення #{0}", "en": "customs data from shipment #{0}", "de": "Zolldaten aus Sendung #{0}"}
 {"uk": "мм", "en": "mm", "de": "mm"}
 {"uk": "мм (міліметр)", "en": "mm (millimeter)", "de": "mm (Millimeter)"}
+{"uk": "мобільний", "en": "mobile", "de": "Mobil"}
 {"uk": "мова PDF, packing list, proforma, CN23", "en": "PDF language, packing list, proforma, CN23", "de": "PDF-Sprache, Packliste, Proforma, CN23"}
 {"uk": "мова, ціни, нотатки тощо. Зміни діють лише для цього разу, без збереження.", "en": "language, prices, notes, etc. Changes apply only this one time, without saving.", "de": "Sprache, Preise, Notizen usw. Änderungen gelten nur für dieses Mal, ohne Speichern."}
 {"uk": "мова: {0}", "en": "language: {0}", "de": "Sprache: {0}"}
@@ -19785,6 +19800,7 @@
 {"uk": "порівняй", "en": "compare", "de": "vergleiche"}
 {"uk": "порівняння в кожному рядку.", "en": "comparison in each row.", "de": "Vergleich in jeder Zeile."}
 {"uk": "порівняння з останніх збережених; натисніть «🔄 Прочитати»", "en": "comparison with the last saved ones; click “🔄 Read”", "de": "Vergleich mit den zuletzt gespeicherten; auf „🔄 Lesen“ klicken"}
+{"uk": "посада", "en": "position", "de": "Position"}
 {"uk": "посилання", "en": "link", "de": "Link"}
 {"uk": "посилання Minerva додає кнопкою. Лист підтвердження замовлення з сайту поки надсилає сам сайт (не з цього списку).", "en": "Minerva adds links as a button. The order confirmation e-mail from the site is still sent by the site itself (not from this list).", "de": "Minerva fügt Links als Schaltfläche hinzu. Die Auftragsbestätigung von der Website sendet vorerst die Website selbst (nicht aus dieser Liste)."}
 {"uk": "посилання {0}", "en": "link {0}", "de": "Link {0}"}
@@ -20470,6 +20486,7 @@
 {"uk": "телефон", "en": "phone", "de": "Telefon"}
 {"uk": "телефон {0}", "en": "phone {0}", "de": "Telefon {0}"}
 {"uk": "телефон доставки", "en": "shipping phone", "de": "Telefon (Lieferung)"}
+{"uk": "телефон контакту", "en": "contact phone", "de": "Telefon des Kontakts"}
 {"uk": "тем {0}, розмов прочитано {1}", "en": "{0} topics, {1} conversations read", "de": "{0} Themen, {1} Gespräche gelesen"}
 {"uk": "тема", "en": "subject", "de": "Betreff"}
 {"uk": "тема «{0}»", "en": "subject “{0}”", "de": "Betreff „{0}“"}
@@ -20668,6 +20685,7 @@
 {"uk": "у пам'яті", "en": "in memory", "de": "im Speicher"}
 {"uk": "у панелі швидких фільтрів або", "en": "in the quick filter bar or", "de": "in der Schnellfilterleiste oder"}
 {"uk": "у пересланому листі від {0}", "en": "in the forwarded e-mail from {0}", "de": "in der weitergeleiteten E-Mail von {0}"}
+{"uk": "у полях нижче: {0}", "en": "in the fields below: {0}", "de": "in den Feldern unten: {0}"}
 {"uk": "у пошті", "en": "in mail", "de": "in der E-Mail"}
 {"uk": "у працівника askDANTE немає логіна й табельного номера", "en": "the askDANTE employee has no login or personnel number", "de": "der askDANTE-Mitarbeiter hat weder Login noch Personalnummer"}
 {"uk": "у підвалі картки або колонці таблиці. Натисніть — розкривається поле вводу.", "en": "in the footer of the card or the table column. Click — an input field expands.", "de": "in der Fußzeile der Karte oder in der Tabellenspalte. Klicken Sie darauf — ein Eingabefeld klappt auf."}
@@ -20843,6 +20861,7 @@
 {"uk": "фільтр проєкту — лише листи гілки ANT-2400", "en": "project filter — only e-mails of thread ANT-2400", "de": "Projektfilter — nur E-Mails des Verlaufs ANT-2400"}
 {"uk": "фільтра", "en": "filter", "de": "Filter"}
 {"uk": "фільтри", "en": "filters", "de": "Filter"}
+{"uk": "фірма", "en": "company", "de": "Firma"}
 {"uk": "характеристики товарів, даташити й наявність на складі", "en": "product specifications, datasheets and stock availability", "de": "Artikeleigenschaften, Datenblätter und Lagerverfügbarkeit"}
 {"uk": "хв", "en": "min", "de": "Min."}
 {"uk": "хв тому", "en": "min ago", "de": "Min. her"}
@@ -21193,6 +21212,7 @@
 {"uk": "із зони «", "en": "from zone “", "de": "aus Zone „"}
 {"uk": "із посиланням на лист.", "en": "with a link to the e-mail.", "de": "mit Link zur E-Mail."}
 {"uk": "із поясненням кожного поля. Рядок 2 — назви колонок, рядок 3 — підказки, рядки 4+ — ваші дані.", "en": "with an explanation of each field. Row 2 — column names, row 3 — hints, rows 4+ — your data.", "de": "mit Erklärung jedes Feldes. Zeile 2 — Spaltennamen, Zeile 3 — Hinweise, Zeilen 4+ — Ihre Daten."}
+{"uk": "ім'я", "en": "name", "de": "Name"}
 {"uk": "ім'я людини (FABIEN SANTOS тощо).", "en": "a person's name (FABIEN SANTOS, etc.).", "de": "Name einer Person (FABIEN SANTOS usw.)."}
 {"uk": "ім'я людини (FABIEN SANTOS).", "en": "person's name (FABIEN SANTOS).", "de": "Name der Person (FABIEN SANTOS)."}
 {"uk": "ім'я отримувача", "en": "recipient name", "de": "Name des Empfängers"}

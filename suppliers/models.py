@@ -99,6 +99,8 @@ class SupplierMedia(models.Model):
     marks = models.JSONField("Позначки", default=list, blank=True)
     state = models.CharField("Стан", max_length=8, choices=STATES, default=NEW)
     extracted = models.JSONField("Що прочитав AI", default=dict, blank=True)
+    qr_text = models.TextField("QR-код", blank=True, default="",
+                               help_text="Розшифрований текст QR-коду з фото (vCard, посилання…) — suppliers/services/qr.py")
     error = models.TextField(blank=True, default="")
     cost_usd = models.DecimalField(max_digits=8, decimal_places=4, default=0)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,

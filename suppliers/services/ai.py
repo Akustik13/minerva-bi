@@ -236,18 +236,23 @@ def _image_block(field) -> dict | None:
 def card(media, user=None, model=DEFAULT_MODEL) -> dict:
     """📷 Візитка / флаєр → поля постачальника. Пише media.extracted / state / cost_usd."""
     from suppliers.models import SupplierMedia
+    from suppliers.services import qr
     blocks = [b for b in (_image_block(media.image), _image_block(media.image_back)) if b]
     if not blocks:
         raise AIError("Немає фото.")
+    qr_fields = qr.parse_all(media.qr_text)
+    qr_note = ""
+    if media.qr_text:      # браузер уже розшифрував QR — точні дані, AI лише доповнює
+        qr_note = "\nQR-код з цієї візитки (точні дані, бери їх як є):\n" + media.qr_text[:2000]
     system = ("Ти читаєш візитки, флаєри й каталоги постачальників для системи закупівель. " + DATA_NOTE +
               " Відповідай лише JSON такої форми: " + SUPPLIER_JSON +
               " Категорії — лише з переліку: " + _categories_text() + ".")
     content = blocks + [{"type": "text", "text": f"<<<ДАНІ: {media.get_kind_display()}"
-                         + (f", де взяли: {media.event}" if media.event else "") + " ДАНІ>>>\n"
+                         + (f", де взяли: {media.event}" if media.event else "") + qr_note + "\nДАНІ>>>\n"
                          "Прочитай усе з фото (обидва боки, якщо їх два) і поверни JSON."}]
     try:
         text, price = call(system, content, model=model_of(model), user=user, effort="low", max_tokens=4000)
-        data = clean_supplier(parse_json(text))
+        data = qr.merge(qr_fields, clean_supplier(parse_json(text)))
     except AIError as e:
         SupplierMedia.objects.filter(pk=media.pk).update(state=SupplierMedia.FAILED, error=str(e)[:500])
         raise
