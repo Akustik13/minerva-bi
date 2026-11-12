@@ -401,6 +401,27 @@ def relations(rows, impacts) -> dict:
         if key not in seen:
             seen.add(key)
             edges.append({"a": f"p{part.project_id}", "b": node["id"], "kind": "plan", "key": key, "labels": []})
+    from . import sourcing                     # 📨 запити постачальникам: обрано — суцільна, запит — пунктир, ні — бліда
+    for req in (sourcing.requests_for(list(projects)) if sourcing.available() else []):
+        for r in req.recipients.all():
+            o = sourcing.outcome(r)
+            node = supplier_node(f"s{r.supplier_id}", r.supplier.name, f"/admin/inventory/supplier/{r.supplier_id}/change/")
+            kind = "supply" if o == "chosen" else ("no" if o in sourcing.OFF else "plan")
+            note = ("✅ " + (r.award or req.title))[:40] if o == "chosen" else sourcing.OUTCOME_TEXT[o]
+            if note not in node["notes"]:
+                node["notes"].append(note)
+            key = (req.project_id, node["id"])
+            label = sourcing.line(r, req)
+            found = next((e for e in edges if e.get("key") == key), None)
+            if found is not None:
+                found["labels"].append(label)
+                if kind == "supply":
+                    found["kind"] = "supply"
+                elif found["kind"] == "no" and kind == "plan":
+                    found["kind"] = "plan"
+                continue
+            seen.add(key)
+            edges.append({"a": f"p{req.project_id}", "b": node["id"], "kind": kind, "key": key, "labels": [label]})
     products = {}
     for i in impacts:
         if i.kind == "stock":

@@ -334,6 +334,10 @@ class SupplierRequestRecipient(models.Model):
     quote_note = models.TextField("Умови / примітки", blank=True, default="")
     ai = models.JSONField(default=dict, blank=True)
     chosen = models.BooleanField("Вибрано", default=False)
+    # Рішення з проєкту (projects/sourcing.py): кому що доручили — кілька переможців на різні партії; кого не взяли й чому
+    award = models.CharField("Що доручили", max_length=200, blank=True, default="",
+                             help_text="Партія, кількість, строк: «партія 1 · 1500 шт · до 15.03»")
+    reject_reason = models.CharField("Чому не взяли", max_length=255, blank=True, default="")
 
     class Meta:
         ordering = ["pk"]

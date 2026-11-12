@@ -502,6 +502,32 @@ def choose(recipient, user=None):
                                  user=user, text=f"🏆 Вибрано в запиті {recipient.request.code}")
 
 
+def award(recipient, text="", user=None):
+    """✅ Доручити цьому постачальнику (партію, кількість, строк) — без зняття вибору з інших: різні партії можуть
+    піти різним постачальникам (projects/sourcing.py). Причина відмови знімається."""
+    from suppliers.models import SupplierEvent
+    text = " ".join(str(text or "").split())[:200]
+    type(recipient).objects.filter(pk=recipient.pk).update(chosen=True, award=text, reject_reason="")
+    SupplierEvent.objects.create(supplier=recipient.supplier, kind=SupplierEvent.REQUEST, request=recipient.request,
+                                 user=user, text=f"🏆 Вибрано в запиті {recipient.request.code}"
+                                 + (f": {text}" if text else ""))
+
+
+def reject(recipient, reason="", user=None):
+    """✖ Не беремо цього постачальника (причина — для історії й наступних запитів)."""
+    from suppliers.models import SupplierEvent
+    reason = " ".join(str(reason or "").split())[:255]
+    type(recipient).objects.filter(pk=recipient.pk).update(chosen=False, award="", reject_reason=reason or "—")
+    SupplierEvent.objects.create(supplier=recipient.supplier, kind=SupplierEvent.REQUEST, request=recipient.request,
+                                 user=user, text=f"✖ Не взяли в запиті {recipient.request.code}"
+                                 + (f": {reason}" if reason else ""))
+
+
+def undecide(recipient):
+    """↺ Ще не вирішено: без вибору й без відмови."""
+    type(recipient).objects.filter(pk=recipient.pk).update(chosen=False, award="", reject_reason="")
+
+
 def close(req, decision="", user=None):
     """✅ Запит вирішено: хто не відповів — «🔕 Не відповів»."""
     from suppliers.models import SupplierRequest, SupplierRequestRecipient as R

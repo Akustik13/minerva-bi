@@ -142,6 +142,17 @@
     <p class="pjp-hint">«✉️ Надіслати листом…» відкриє новий лист з вашої скриньки в новій вкладці: файли вже вкладені,
       «Кому» — клієнт проєкту. Перевірте адресу й текст і надішліть самі — без вас нічого не відправляється.</p>
   </dialog>
+  <dialog id="pjq-decide" class="pjp-dlg" aria-labelledby="pjq-decide-h">
+    <h3 id="pjq-decide-h"></h3>
+    <label class="pjp-wide" data-q-label>
+      <textarea data-q="text" rows="3" maxlength="255"></textarea></label>
+    <p class="pjp-hint" data-q-hint></p>
+    <div class="pjp-foot">
+      <button type="button" class="pjc-b pri" data-pjp-save>💾 Зберегти</button>
+      <button type="button" class="pjc-b" data-pjp-close>Скасувати</button>
+      <span class="pjc-merr" role="alert" data-pjp-err></span>
+    </div>
+  </dialog>
   <dialog id="pjh-talk" class="pjp-dlg" aria-labelledby="pjh-talk-h">
     <h3 id="pjh-talk-h">📝 Про що йшла мова</h3>
     <p class="pjp-hint" data-pt-what translate="no"></p>

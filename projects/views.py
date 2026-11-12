@@ -439,6 +439,24 @@ def export_view(request, pk):
 
 @staff_member_required
 @require_POST
+def sourcing_view(request, pk):
+    """📨 Рішення щодо постачальника із запиту проєкту: {recipient, action award | reject | reset, text} — право
+    змінювати проєкт і запити постачальникам (suppliers.change_supplierrequest)."""
+    from . import sourcing
+    project = _project_for_change(request, pk)
+    if not request.user.has_perm("suppliers.change_supplierrequest"):
+        return JsonResponse({"ok": False, "error": "Немає права змінювати запити постачальникам"}, status=403)
+    body = _body(request)
+    try:
+        notice = sourcing.decide(project, body.get("recipient"), str(body.get("action") or ""),
+                                 str(body.get("text") or ""), request.user)
+    except sourcing.SourcingError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    return _cockpit(request, project, notice)
+
+
+@staff_member_required
+@require_POST
 def party_view(request, pk):
     """🔗 Сторона проєкту: {id, role, name, what, delivers_to, email, note} — створити / змінити (право змінювати)."""
     from . import parties

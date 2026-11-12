@@ -913,7 +913,9 @@
            risk: document.getElementById('pjr-risk'), plan: document.getElementById('pja-plan'),
            agent: document.getElementById('pja-agent'), ask: document.getElementById('pja-ask'),
            talk: document.getElementById('pjh-talk'), party: document.getElementById('pjy-party'),
-           exp: document.getElementById('pjx-export'), riskAsk: document.getElementById('pjr-ai-ask')};
+           exp: document.getElementById('pjx-export'), riskAsk: document.getElementById('pjr-ai-ask'),
+           quote: document.getElementById('pjq-decide')};
+    if (dlg.quote) wire(dlg.quote, saveQuote, function () {}, false);
     if (dlg.riskAsk) wire(dlg.riskAsk, runRiskAI, function () {}, false);
     if (dlg.party) wire(dlg.party, saveParty, deleteParty);
     if (dlg.exp) {
@@ -1257,6 +1259,32 @@
     }
     window.MVMenu.open(e, items, {title: 'Подія в календарі'});
   }
+  // 📨 Запити постачальникам: ✅ обрати (яку партію) / ✖ не брати (чому) / ↺ ще не вирішено
+  function openQuote(btn) {
+    var act = btn.getAttribute('data-pjq'), rid = btn.getAttribute('data-rid');
+    if (act === 'reset') { send(box().dataset.sourcing, {recipient: rid, action: 'reset'}).then(done); return; }
+    var ds = dialogs();
+    if (!ds || !ds.quote) return;
+    var d = ds.quote, name = btn.getAttribute('data-name') || '', t = q(d, 'data-q', 'text');
+    d.dataset.rid = rid;
+    d.dataset.act = act;
+    d.querySelector('h3').textContent = (act === 'award' ? '✅ Обрати: ' : '✖ Не беремо: ') + name;
+    d.querySelector('[data-q-label]').firstChild.textContent = act === 'award'
+      ? 'Що доручаємо — партія, кількість, строк' : 'Чому не беремо';
+    t.placeholder = act === 'award' ? 'Партія 1 · 1500 шт · до 15.03' : 'Ціна на 18 % вища, строк 8 тижнів';
+    d.querySelector('[data-q-hint]').textContent = act === 'award'
+      ? 'Можна обрати кількох постачальників на різні партії — кожному своє «що доручаємо».'
+      : 'Причина лишиться в запиті й у картці постачальника — знадобиться для наступних запитів.';
+    t.value = btn.getAttribute('data-text') || '';
+    d.querySelector('[data-pjp-err]').textContent = '';
+    d.showModal();
+    t.focus();
+  }
+  function saveQuote() {
+    var d = dlg.quote;
+    post(d, box().dataset.sourcing, {recipient: d.dataset.rid, action: d.dataset.act, text: q(d, 'data-q', 'text').value});
+  }
+
   // 🔗 Сторони проєкту: вікно, меню, «Підставити з даних проєкту»
   var ROLE_SIDE = {customer: 'customer', we: 'we', contractor: 'supplier', manufacturer: 'supplier',
                    supplier: 'supplier', logistics: 'supplier', other: 'colleague'};
@@ -2176,7 +2204,7 @@
       '[data-pjc-mdel],g[data-mails],g[data-cal],g[data-files],[data-pjc-event-add],[data-pjc-tab],[data-pjc-step-new],[data-pjc-phase-new],[data-pjc-post],' +
       '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase],[data-pjc-risk],' +
       '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai],[data-pjc-act],[data-pjc-unmark],' +
-      'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx]');
+      'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx],[data-pjq]');
     if (!t || !root.contains(t)) return;
     var link = e.target.closest('a[href]');
     if (link && link !== t && t.contains(link)) return;   // посилання в рядку («🎙 з наради») відкривається саме
@@ -2185,6 +2213,7 @@
     if (t.hasAttribute('data-pjy-new')) { openParty(''); return; }
     if (t.hasAttribute('data-pjy-suggest')) { t.disabled = true; send(box().dataset.partySuggest, {}).then(done); return; }
     if (t.hasAttribute('data-pjx')) { openExport(t.getAttribute('data-pjx')); return; }
+    if (t.hasAttribute('data-pjq')) { openQuote(t); return; }
     if (t.hasAttribute('data-pjc-act')) { actMenu(t, e); return; }
     if (t.hasAttribute('data-pjc-unmark')) { handled([+t.getAttribute('data-pjc-unmark')], '', true); return; }
     if (t.matches('g[data-mails]')) { mailMenu(t, e); return; }

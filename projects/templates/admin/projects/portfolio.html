@@ -100,13 +100,14 @@
   .pf-m-node:focus-visible .pf-m-box { stroke-width: 2.5; }
   .pf-m-edge { fill: none; stroke: var(--text-muted, #9aafbe); stroke-width: 1.2; opacity: .7; }
   .pf-m-dash { stroke-dasharray: 5 4; }
+  .pf-m-no { stroke-dasharray: 2 4; opacity: .35; }
   .pf-m-short { fill: none; stroke: var(--warn, #e3b341); stroke-width: 2; }
   .pf-m-dep { fill: none; stroke: var(--text-muted, #9aafbe); stroke-width: 1.6; }
   .pf-m-dep.pf-m-late { stroke: var(--err, #f85149); }
   .pf-map.pf-sel [data-e], .pf-map.pf-sel .pf-m-node { opacity: .15; }
   .pf-map.pf-sel .pf-hl { opacity: 1 !important; }
   .pf-map.pf-sel path.pf-hl { stroke-width: 2.4; }
-  .pf-map.pf-hide-dep .pf-m-dep, .pf-map.pf-hide-supply [data-k="supply"], .pf-map.pf-hide-supply [data-k="plan"],
+  .pf-map.pf-hide-dep .pf-m-dep, .pf-map.pf-hide-supply [data-k="supply"], .pf-map.pf-hide-supply [data-k="plan"], .pf-map.pf-hide-supply [data-k="no"],
   .pf-map.pf-hide-short [data-k="short"], .pf-map.pf-hide-short .pf-m-node[data-n^="g"] { display: none; }
   .pf-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11.5px; color: var(--text-muted, #9aafbe); margin: 8px 2px 0; }
   .lg-sw { display: inline-block; width: 18px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
@@ -222,13 +223,13 @@
   {% else %}
     <div class="pf-bar">
       <label class="pf-sub"><input type="checkbox" data-pf-show="dep" checked> ⛓ залежності</label>
-      <label class="pf-sub"><input type="checkbox" data-pf-show="supply" checked> 🏭 закупівлі й виробництво</label>
+      <label class="pf-sub"><input type="checkbox" data-pf-show="supply" checked> 🏭 закупівлі, виробництво й запити постачальникам</label>
       <label class="pf-sub"><input type="checkbox" data-pf-show="short" checked> 📦 товари, яких бракує</label>
       <span class="pf-sub">Клік на вузол — показати його зв’язки, подвійний клік або Enter — відкрити.</span>
     </div>
     <div class="pf-card" id="pf-map">{{ svg|safe }}</div>
     <div class="pf-legend">
-      <span>— клієнт → проєкт, закупівля, виробництво</span><span>- - заплановано (чернетка закупівлі, учасник-постачальник)</span>
+      <span>— клієнт → проєкт, закупівля, виробництво, ✅ обрано в запиті</span><span>- - заплановано (чернетка закупівлі, учасник-постачальник, 📨 запит постачальнику)</span><span class="pf-m-legno">·· ✖ не взяли / відмовився / не відповів</span>
       <span><i class="lg-ln"></i>⛓ залежність, що затримує</span><span><i class="lg-sw late"></i>спільний товар, якого бракує</span>
     </div>
   {% endif %}

@@ -9,7 +9,7 @@
      data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"
      data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-risks="{{ urls.ai_risks }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
      data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
-     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-export="{{ urls.export }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
+     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-sourcing="{{ urls.sourcing }}" data-export="{{ urls.export }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
      data-ai-settings="{{ urls.ai_settings }}" data-ai-since="{{ ai.since|date:'Y-m-d' }}" data-start="{{ start|date:'Y-m-d' }}"
      data-steps="{{ plan.steps|default:0 }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
@@ -222,6 +222,43 @@
         <p class="pjc-sub">Сторін ще немає.{% if can_change %} «🔎 Підставити з даних проєкту» додасть замовника, нас, постачальників закупівель і JLCPCB; далі — «＋ Сторона» для виробника, підрядника, логістики.{% endif %}</p>
       {% endif %}
       {% if can_change %}{{ parties.data|json_script:"pjy-data" }}{% endif %}
+      {% if sourcing.on %}
+        <h4 class="pjq-head">📨 Запити постачальникам{% if sourcing.rows %} · {{ sourcing.rows|length }}{% endif %}
+          {% if sourcing.can_add and can_change %}<a class="pjc-b pjc-right" href="{{ sourcing.new_url }}" target="_blank"
+             title="Новий запит (RFQ) кільком постачальникам — уже прив'язаний до цього проєкту">＋ Запит постачальникам</a>{% endif %}</h4>
+        {% if sourcing.rows %}
+          {% for q in sourcing.rows %}
+            <div class="pjq-head"><b><a href="{{ q.url }}" target="_blank" translate="no">{{ q.code }}</a> · <span translate="no">{{ q.title }}</span></b>
+              {% if q.qty %}<span class="pjc-sub">кількості: <span translate="no">{{ q.qty }}</span></span>{% endif %}
+              <span class="pjq-chip">{{ q.status }}</span>{% if q.chosen %}<span class="pjq-chip pjq-ok">✅ обрано: {{ q.chosen }}</span>{% endif %}</div>
+            <table class="pjq-t">
+              <thead><tr><th>Постачальник</th><th>Стан</th><th>Пропозиція</th><th>Рішення</th>{% if sourcing.can_decide and can_change %}<th></th>{% endif %}</tr></thead>
+              <tbody>
+              {% for r in q.recipients %}
+                <tr class="pjq-r-{{ r.cls }}">
+                  <td><a href="{{ r.supplier_url }}" target="_blank" translate="no">{{ r.supplier }}</a></td>
+                  <td><span class="pjq-chip pjq-{{ r.cls }}">{{ r.label }}</span></td>
+                  <td translate="no">{{ r.price|default:"—" }}</td>
+                  <td>{% if r.outcome == "chosen" %}✅ {% if r.award %}<span translate="no">{{ r.award }}</span>{% else %}обрано{% endif %}
+                      {% elif r.outcome == "rejected" %}✖ не взяли{% if r.reason %}: <span translate="no">{{ r.reason }}</span>{% endif %}
+                      {% else %}<span class="pjc-sub">—</span>{% endif %}</td>
+                  {% if sourcing.can_decide and can_change %}<td class="pjc-yn">{% if r.can_decide %}
+                    <button type="button" class="pjc-b" data-pjq="award" data-rid="{{ r.id }}" data-name="{{ r.supplier }}" data-text="{{ r.award }}"
+                            title="Обрати цього постачальника — для якої партії, скільки, до коли">✅</button>
+                    <button type="button" class="pjc-b" data-pjq="reject" data-rid="{{ r.id }}" data-name="{{ r.supplier }}" data-text="{{ r.reason }}"
+                            title="Не беремо — чому (ціна, строк, якість…)">✖</button>
+                    {% if r.outcome == "chosen" or r.outcome == "rejected" %}<button type="button" class="pjc-b" data-pjq="reset" data-rid="{{ r.id }}" title="Ще не вирішено">↺</button>{% endif %}
+                  {% endif %}</td>{% endif %}
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          {% endfor %}
+        {% else %}
+          <p class="pjc-sub">Запитів постачальникам для цього проєкту ще немає.{% if sourcing.can_add and can_change %} «＋ Запит постачальникам» —
+            один запит (PCB, PCBA, кабелі, корпуси…) кільком постачальникам; відповіді Minerva знайде в пошті, а тут буде видно, кому писали, хто що запропонував, кого обрали на яку партію і кого не взяли.{% endif %}</p>
+        {% endif %}
+      {% endif %}
     </div>
 
     <div class="pjc-pane" data-pjc-pane="risks" id="pj-risks">

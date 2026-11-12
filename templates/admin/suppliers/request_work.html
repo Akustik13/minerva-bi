@@ -41,6 +41,8 @@
       {% for row in rows %}{% with r=row.recipient %}
       <tr class="{% if r.chosen %}rw-chosen{% endif %}">
         <td><a href="{% url 'admin:inventory_supplier_change' r.supplier.pk %}" translate="no"><b>{{ r.supplier.name }}</b></a>{% if r.chosen %} 🏆{% endif %}
+          {% if r.award %}<div class="spf-muted">✅ <span translate="no">{{ r.award }}</span></div>{% endif %}
+          {% if r.reject_reason %}<div class="spf-muted">✖ не взяли{% if r.reject_reason != "—" %}: <span translate="no">{{ r.reject_reason }}</span>{% endif %}</div>{% endif %}
           <div class="spf-muted" translate="no">{% if r.contact %}{{ r.contact.name }} · {% endif %}{{ r.email }}</div></td>
         <td>{{ r.get_state_display }}
           <div class="spf-muted">{% if r.sent_at %}↑ {{ r.sent_at|date:"d.m H:i" }}{% if row.sent_link %} <a href="/email/?msg={{ row.sent_link }}" target="_blank">✉️</a>{% endif %}{% endif %}

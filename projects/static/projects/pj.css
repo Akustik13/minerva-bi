@@ -457,3 +457,22 @@
 .pjm-peek .pjm-m, .pjm-peek .pjm-c, .pjm-peek .pjm-h { color: var(--text-muted, #57606a); font-size: 12px; }
 .pjm-peek .pjm-t { margin: 6px 0; white-space: pre-wrap; word-break: break-word; max-height: 16em; overflow: hidden; }
 .pjm-peek .pjm-f { font-size: 12px; margin-bottom: 4px; word-break: break-word; }
+
+/* 📨 Запити постачальникам на діаграмі сторін і в таблиці */
+.pjy .pjy-cand .pjy-box { stroke-dasharray: 5 4; }
+.pjy .pjy-off { opacity: .45; }
+.pjy .pjy-off .pjy-box { stroke-dasharray: 2 3; }
+.pjy .pjy-s-off { fill: var(--text-muted); text-decoration: line-through; }
+.pjy .pjy-s-open { fill: var(--text-muted); }
+.pjy .pjy-e-cand { stroke-dasharray: 5 4; }
+.pjy .pjy-e-off { stroke-dasharray: 2 4; opacity: .5; }
+.pjq-t { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 13px; }
+.pjq-t th { text-align: left; font-weight: 600; color: var(--text-muted); padding: 4px 6px; border-bottom: 1px solid var(--border-strong); }
+.pjq-t td { padding: 5px 6px; border-bottom: 1px solid var(--hairline-color, rgba(127,127,127,.15)); vertical-align: top; }
+.pjq-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; margin-top: 10px; }
+.pjq-chip { display: inline-block; padding: 0 8px; border-radius: 10px; border: 1px solid var(--border-strong); white-space: nowrap; }
+.pjq-ok { border-color: var(--ok); color: var(--ok); }
+.pjq-warn { border-color: var(--warn); color: var(--warn); }
+.pjq-off { opacity: .6; }
+tr.pjq-r-off td { opacity: .6; }
+tr.pjq-r-ok td { background: rgba(26, 127, 55, .08); }

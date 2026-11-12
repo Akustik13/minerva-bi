@@ -242,7 +242,7 @@ def relation_map(data) -> str:
         x1, x2 = COL[ca][1], COL[cb][0]
         mid = (x1 + x2) / 2
         cls = {"customer": "pf-m-edge", "supply": "pf-m-edge", "plan": "pf-m-edge pf-m-dash",
-               "short": "pf-m-short"}.get(e["kind"], "pf-m-edge")
+               "short": "pf-m-short", "no": "pf-m-edge pf-m-no"}.get(e["kind"], "pf-m-edge")
         tip = ", ".join(e.get("labels") or [])
         out.append(f'<path d="M{x1},{_n(ya)} C{_n(mid)},{_n(ya)} {_n(mid)},{_n(yb)} {x2},{_n(yb)}" class="{cls}" '
                    f'data-e="{e["a"]} {e["b"]}" data-k="{e["kind"]}">'

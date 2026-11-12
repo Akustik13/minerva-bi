@@ -108,6 +108,13 @@ def suggest(project) -> int:
             what=", ".join(skus[:4])[:255], delivers_to=we)
     if _jlc(project, purchases):
         add(P.MANUFACTURER, JLC, what="друковані плати / складання", delivers_to=we)
+    from . import sourcing
+    for req in sourcing.requests(project):                 # 📨 обрані в запитах постачальникам
+        for r in req.recipients.all():
+            if r.chosen:
+                role = P.MANUFACTURER if req.template in ("pcb", "pcba") else P.SUPPLIER
+                add(role, r.supplier.name, supplier=r.supplier, email=(r.email or "")[:254],
+                    what=(req.title + (f" · {r.award}" if r.award else ""))[:255], delivers_to=we)
     for part in project.participants.filter(role="supplier"):
         sup = Supplier.objects.filter(email__iexact=part.email).first()
         if sup is not None:
@@ -277,6 +284,35 @@ def layout(parties):
     return placed, depth, max(row[0] - 0.4, 1)
 
 
+def rfq_nodes(project, parties, stats) -> list:
+    """📨 Постачальники із запитів проєкту: сторона з тим самим постачальником — рядки в її стан; немає такої
+    сторони — окремий вузол (кандидат пунктиром, відхилений — блідо), «віддає» нам (або замовнику)."""
+    from types import SimpleNamespace
+
+    from . import sourcing
+    rfq = sourcing.by_supplier(project)
+    if not rfq:
+        return []
+    by_sup = {p.supplier_id: p for p in parties if p.supplier_id}
+    by_name = {" ".join(p.name.lower().split()): p for p in parties}      # сторону завели раніше за постачальника
+    target = next((p for p in parties if p.role == P.WE), None) or next((p for p in parties if p.role == P.CUSTOMER),
+                                                                         None)
+    extra, order = [], max([p.order for p in parties] or [0])
+    for sid, it in rfq.items():
+        lines = [{"text": t, "cls": sourcing.CLS[o]} for o, t in it["lines"]]
+        same = by_sup.get(sid) or by_name.get(" ".join(it["name"].lower().split()))
+        if same is not None:
+            stats.setdefault(same.pk, []).extend(lines)
+            continue
+        order += 10
+        node = SimpleNamespace(pk=f"r{sid}", role=P.SUPPLIER, name=it["name"], what="", email="", note="",
+                               delivers_to_id=target.pk if target else None, order=order, virtual=True,
+                               best=it["best"])
+        stats[node.pk] = lines
+        extra.append(node)
+    return extra
+
+
 def render(parties, stats, can_change=False) -> str:
     if not parties:
         return ""
@@ -298,13 +334,24 @@ def render(parties, stats, can_change=False) -> str:
             x2, y2 = pos[p.delivers_to_id]
             sx, sy, ex, ey = x1 + NODE_W, y1 + NODE_H / 2, x2, y2 + NODE_H / 2
             mx = (sx + ex) / 2
+            best = getattr(p, "best", "")
+            ecls = ("pjy-e-off" if best in ("rejected", "declined", "silent") else
+                    "pjy-e-ok" if best == "chosen" else "pjy-e-cand" if best else
+                    f"pjy-e-{worst(stats.get(p.pk, []))}")
             out.append(f'<path d="M{sx:.1f},{sy:.1f} C{mx:.1f},{sy:.1f} {mx:.1f},{ey:.1f} {ex - 2:.1f},{ey:.1f}" '
-                       f'class="pjy-edge pjy-e-{worst(stats.get(p.pk, []))}" marker-end="url(#pjy-arrow)"/>')
+                       f'class="pjy-edge {ecls}"'
+                       + ('' if best in ("rejected", "declined", "silent") else ' marker-end="url(#pjy-arrow)"') + '/>')
     for p, _depth, _r in placed:
         x, y = pos[p.pk]
         lines = stats.get(p.pk, [])
         state = worst(lines)
-        tip = [f"{ROLE_ICON[p.role]} {ROLE_NAME[p.role]}: {p.name}"]
+        best = getattr(p, "best", "")
+        virtual = getattr(p, "virtual", False)
+        if virtual:                     # 📨 лише із запиту: стан — найкращий результат запитів
+            state = {"chosen": "ok", "quoted": "warn", "replied": "warn"}.get(best, "open")
+            if best in ("rejected", "declined", "silent"):
+                state = "off"
+        tip = [f"{ROLE_ICON[p.role]} {ROLE_NAME[p.role]}: {p.name}" + (" (із запитів постачальникам)" if virtual else "")]
         if p.what:
             tip.append(f"Що: {p.what}")
         if p.delivers_to_id in pos:
@@ -314,12 +361,17 @@ def render(parties, stats, can_change=False) -> str:
         tip += [x["text"] for x in lines]
         if p.note:
             tip.append(p.note)
-        attrs = f' data-party="{p.pk}" tabindex="0" role="button"' if can_change else ""
-        sub = lines[0]["text"] if lines and state in ("bad", "warn") else (p.what or (lines[0]["text"] if lines else ""))
+        attrs = f' data-party="{p.pk}" tabindex="0" role="button"' if can_change and not virtual else ""
+        if virtual:
+            sub = next((x["text"] for x in lines if x["cls"] == state), lines[0]["text"] if lines else "")
+        else:
+            sub = lines[0]["text"] if lines and state in ("bad", "warn") else (p.what or (lines[0]["text"] if lines else ""))
+        role_text = "📨 Запит постачальнику" if virtual else f"{ROLE_ICON[p.role]} {ROLE_NAME[p.role]}"
+        vcls = " pjy-cand" if virtual and best not in ("chosen",) and state != "off" else ""
         out.append(
-            f'<g class="pjy-node pjy-r-{p.role} pjy-{state}"{attrs}><title>{escape(chr(10).join(tip))}</title>'
+            f'<g class="pjy-node pjy-r-{p.role} pjy-{state}{vcls}"{attrs}><title>{escape(chr(10).join(tip))}</title>'
             f'<rect x="{x}" y="{y}" width="{NODE_W}" height="{NODE_H}" rx="8" class="pjy-box"/>'
-            f'<text x="{x + 10}" y="{y + 16}" class="pjy-role">{escape(ROLE_ICON[p.role])} {escape(ROLE_NAME[p.role])}</text>'
+            f'<text x="{x + 10}" y="{y + 16}" class="pjy-role">{escape(role_text)}</text>'
             f'<text x="{x + 10}" y="{y + 35}" class="pjy-name">{escape(_cut(p.name, 28))}</text>'
             f'<text x="{x + 10}" y="{y + 52}" class="pjy-sub pjy-s-{state}">{escape(_cut(sub, 34))}</text></g>')
     out.append("</svg>")
@@ -331,9 +383,10 @@ def context(project, can_change, today=None) -> dict:
     from django.db.models import Count
     parties = list(project.parties.select_related("delivers_to", "supplier", "customer").annotate(n_steps=Count("steps")))
     stats = statuses(project, parties, today)
+    extra = rfq_nodes(project, parties, stats)
     return {
         "count": len(parties),
-        "svg": render(parties, stats, can_change),
+        "svg": render(parties + extra, stats, can_change),
         "roles": P.ROLE_CHOICES,
         "data": {"roles": [[k, v] for k, v in P.ROLE_CHOICES],
                  "parties": [{"id": p.pk, "role": p.role, "name": p.name, "what": p.what,

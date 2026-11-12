@@ -90,6 +90,10 @@ def _facts(project, user, today, since=None) -> tuple:
         extra.append("СТОРОНИ ПРОЄКТУ (хто кому постачає):\n" + "\n".join(
             f"- {p.get_role_display()}: {p.name}" + (f" — {p.what}" if p.what else "")
             + (f" → віддає {p.delivers_to.name}" if p.delivers_to_id else "") for p in parties))
+    from . import sourcing
+    rfq = sourcing.facts_text(project)
+    if rfq:
+        extra.append(rfq)
     if project.due_date:
         extra.append(f"СТРОК КЛІЄНТУ: {project.due_date:%d.%m.%Y}. СЬОГОДНІ: {today:%d.%m.%Y}.")
     return "\n\n".join(extra + [text]), refs

@@ -106,6 +106,17 @@ def _moments(facts, uid) -> list:
     return out
 
 
+def _sourcing_context(project, user) -> dict:
+    """📨 Запити постачальникам проєкту (suppliers): хто, стан, ціна, обрано / не взяли; збій — без блоку."""
+    from . import sourcing
+    try:
+        return sourcing.context(project, user)
+    except Exception:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).exception("project sourcing %s", project.pk)
+        return {"on": False}
+
+
 def _parties_context(project, can_change, today) -> dict:
     """Вкладка «🔗 Сторони»: дерево хто кому постачає; збій — порожньо (пульт працює)."""
     from . import parties
@@ -316,12 +327,14 @@ def context(project, user, range_key="all", notice="") -> dict:
         "ai": ai,
         "riskreg": _risks_context(project, can_change, user),
         "parties": _parties_context(project, can_change, today),
+        "sourcing": _sourcing_context(project, user),
         "meetings": _meetings_context(project, user, meetings),
         "status": _status_context(project, user, facts, st, today, can_change),
         "urls": {"cockpit": reverse("projects:cockpit", args=[pk]), "highlight": reverse("projects:highlight", args=[pk]),
                  "mail_handled": reverse("projects:mail_handled", args=[pk]),
                  "event_note": reverse("projects:event_note", args=[pk]),
                  "party": reverse("projects:party", args=[pk]),
+                 "sourcing": reverse("projects:sourcing", args=[pk]),
                  "export": reverse("projects:export", args=[pk]),
                  "party_suggest": reverse("projects:party_suggest", args=[pk]),
                  "party_base": f"/projects/api/project/{pk}/party/",
