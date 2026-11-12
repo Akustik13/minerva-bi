@@ -280,6 +280,9 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
 .em-reply-send{padding:7px 20px;border-radius:7px;font-size:13px;font-weight:600;background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff;border:none;cursor:pointer;transition:opacity .15s}
 .em-reply-send:hover{opacity:.88}
 .em-reply-status{font-size:12px;color:var(--text-muted)}
+.em-reply-quote{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);cursor:pointer;min-width:0}
+.em-reply-quote input{margin:0}
+.em-reply-on{color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
 </style>
 
 <div id="pv-toast"></div>
@@ -531,7 +534,8 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
     {% for msg in emails %}
     {% with is_last=forloop.last %}
     {# розгорнутий — найновіший лист, хоч би де він стояв (нові зверху чи знизу) #}
-    <div class="em-card{% if msg.pk == last_msg.pk %} expanded{% endif %}" id="pv-card-{{ msg.pk }}" data-subject="{{ msg.subject }}">
+    <div class="em-card{% if msg.pk == last_msg.pk %} expanded{% endif %}" id="pv-card-{{ msg.pk }}" data-subject="{{ msg.subject }}"
+         data-from="{{ msg.from_email }}" data-when="{{ msg.sent_at|date:'d.m.Y H:i' }}">
 
       <!-- Header: always visible, clickable to expand/collapse -->
       <div class="em-card-hd" onclick="pvToggleCard({{ msg.pk }}, event)">
@@ -619,6 +623,7 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 {% trans "Копіювати" %}</button>
           <button class="em-pv-btn ai" id="pv-ai-use-{{ msg.pk }}" onclick="pvUseAsReply({{ msg.pk }})">{% trans "Вставити у відповідь" %} →</button>
+          <button class="em-pv-btn" onclick="pvReplyFull({{ msg.pk }})" title="{% trans "Повна відповідь на цей лист: текст AI, підпис та історія листування — у тій самій гілці" %}">↩ {% trans "Відповісти" %}</button>
         </div>
       </div>
 
@@ -769,6 +774,10 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
         </details>
         {% endif %}
         <div class="em-reply-footer">
+          <label class="em-reply-quote" title="{% trans "Під текстом — лист, на який відповідаєте, разом з попереднім листуванням (як в Outlook / Thunderbird)" %}">
+            <input type="checkbox" id="pv-reply-quote" checked> 📜 {% trans "З історією листування" %}
+            <span class="em-reply-on" id="pv-reply-on"></span>
+          </label>
           <button class="em-reply-send" onclick="pvSendReply2()">
             {% trans "Відправити" %} →
           </button>
@@ -928,6 +937,16 @@ function _pvEnsureReply(to, subj, cc) {
   if (ccInp && !ccInp.value.trim() && cc) { ccInp.value = cc; pvShowCc(true); }
   if (subjInp && !subjInp.value.trim()) subjInp.value = _pvReSubject('reply', subj);
   _pvReplySubj = subjInp ? subjInp.value : _pvReSubject('reply', subj);
+  _pvReplyOn();
+}
+
+// «📜 З історією листування»: на який лист відповідь (його цитата піде під текстом)
+function _pvReplyOn() {
+  var on = document.getElementById('pv-reply-on');
+  var card = document.getElementById('pv-card-' + _pvReplyPk);
+  if (!on) return;
+  on.textContent = card ? '— ' + '{% trans "на лист" %} ' + (card.dataset.from || '') +
+    (card.dataset.when ? ' · ' + card.dataset.when : '') : '';
 }
 
 window.pvToggleReply = function() {
@@ -958,6 +977,7 @@ window.pvOpenReply = function(mode, toEmail, subj, cc) {
   _pvReplySubj = _pvReSubject(mode, subj);
   var subjInp = document.getElementById('pv-reply-subj');
   if (subjInp) subjInp.value = _pvReplySubj;
+  _pvReplyOn();
   body.style.display = 'block';
   if (arrow) arrow.style.transform = '';
   var ed = document.getElementById('pv-reply-editor');
@@ -980,6 +1000,8 @@ window.pvSendReply2 = async function() {
   status.textContent = '{% trans "Відправляю..." %}'; status.style.color = 'var(--text-muted)';
   var fd = new FormData();
   fd.append('reply_to_pk', _pvReplyPk);
+  var quoteBox = document.getElementById('pv-reply-quote');
+  fd.append('with_quote', quoteBox && !quoteBox.checked ? '0' : '1');   // історія листування під текстом
   fd.append('body',      textBody);
   fd.append('body_html', htmlBody);
   var subjInp = document.getElementById('pv-reply-subj');
@@ -2154,6 +2176,19 @@ window.pvUseAsReply = function(pk) {
   ed.innerText = txt.textContent;
   ed.scrollIntoView({behavior:'smooth'});
   ed.focus();
+};
+
+// «↩ Відповісти» в AI-панелі: повна форма відповіді на цей лист — текст AI, підпис, історія листування,
+// In-Reply-To / References (та сама гілка в пошті клієнта); адресат — той, кого вибрала Minerva
+window.pvReplyFull = function(pk) {
+  var txt = document.getElementById('pv-ai-txt-' + pk);
+  var box = document.getElementById('pv-ai-' + pk);
+  var q = new URLSearchParams({reply_to: pk});
+  var text = txt ? txt.textContent.trim() : '';
+  if (text) q.set('body', text.slice(0, 6000));
+  if (box && box._to) q.set('to', box._to);
+  if (box && box._cc) q.set('cc', box._cc);
+  location.href = '/email/compose/?' + q.toString();
 };
 
 window.pvToggleSpam = async function(pk, btn) {

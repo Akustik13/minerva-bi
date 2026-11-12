@@ -97,10 +97,15 @@ class SMTPClient:
                 msg['Return-Receipt-To'] = self.account.email_address
 
             if reply_to_message and reply_to_message.message_id:
-                # Відповідь, а не новий лист: поштові програми клієнта ставлять її в ту саму гілку
+                # Відповідь, а не новий лист: поштові програми клієнта ставлять її в ту саму гілку.
+                # References — усі листи гілки до цього (email_assistant/reply_quote.py)
                 msg['In-Reply-To'] = reply_to_message.message_id
-                chain = [reply_to_message.in_reply_to, reply_to_message.message_id]
-                msg['References']  = ' '.join(r for r in chain if r)
+                try:
+                    from email_assistant.reply_quote import references
+                    refs = references(reply_to_message)
+                except Exception:  # noqa: BLE001 — без бази гілки: лист і той, на який він відповідав
+                    refs = ' '.join(r for r in [reply_to_message.in_reply_to, reply_to_message.message_id] if r)
+                msg['References'] = refs
 
             # Account signature > UserProfile.smtp_signature ({name} placeholder)
             # Appended to plain-text body only (HTML body already contains sig from frontend)
@@ -122,7 +127,8 @@ class SMTPClient:
                     sig_pos = getattr(self.account, 'signature_position', 'after_reply')
                     if sig_pos == 'after_reply':
                         # Insert before quoted original message (if any)
-                        quote_markers = ['\n--- Оригінальний лист ---', '\n--- Переслано ---']
+                        from email_assistant.reply_quote import MARKER
+                        quote_markers = ['\n--- Оригінальний лист ---', '\n--- Переслано ---', '\n' + MARKER]
                         insert_at = None
                         for marker in quote_markers:
                             idx = body_text.find(marker)

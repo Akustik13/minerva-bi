@@ -1279,6 +1279,16 @@ def compose_view(request):
                 reply_to.body_text,
             ),
         }
+        # «↩ Відповісти» з AI-панелі листа: текст AI — над підписом і цитатою; адресат — той, кого вибрала
+        # Minerva (клієнт, якщо лист — внутрішнє пересилання)
+        ai_text = (request.GET.get('body') or '')[:20000]
+        if ai_text.strip():
+            from email_assistant import drafts as _drafts
+            initial['body_html'] = _drafts.text_html(ai_text)
+        for key in ('to', 'cc'):
+            value = (request.GET.get(key) or '').strip()[:1000]
+            if value:
+                initial[key] = value
     elif forward_pk:
         from email_assistant.models import EmailMessage
         fwd  = get_object_or_404(EmailMessage, pk=forward_pk, account=account)
@@ -1351,6 +1361,10 @@ def _handle_send(request, account, reply_to=None):
         subject = _reply_subject(reply_to.subject)
     body      = request.POST.get('body', '')
     body_html = request.POST.get('body_html', '').strip()
+    if reply_to is not None and request.POST.get('with_quote') == '1':
+        # швидка відповідь (прев'ю листа, сторінка гілки): історія листування під текстом, як у формі «Написати»
+        from email_assistant.reply_quote import with_quote
+        body, body_html = with_quote(reply_to, body, body_html)
 
     to_list = [e.strip() for e in to_raw.split(',') if e.strip()]
     cc_list = [e.strip() for e in cc_raw.split(',') if e.strip()]

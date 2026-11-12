@@ -37,6 +37,7 @@ textarea.em-ai-prompt-inp { font-family:inherit; line-height:1.45; min-height:58
 .em-reply-editor[placeholder]:empty::before { content:attr(placeholder); color:var(--text-dim); pointer-events:none; }
 .em-send-btn { padding:8px 20px; border-radius:7px; font-size:13px; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; border:none; cursor:pointer; font-weight:600; transition:opacity .15s; }
 .em-send-btn:hover { opacity:.88; }
+.em-reply-quote { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-muted); cursor:pointer; }
 </style>
 {% endblock %}
 
@@ -152,6 +153,7 @@ textarea.em-ai-prompt-inp { font-family:inherit; line-height:1.45; min-height:58
     <div id="quick-reply" class="em-reply-editor" contenteditable="true"
          placeholder="{% trans "Текст відповіді..." %}"></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+      <label class="em-reply-quote" title="{% trans "Під текстом — лист, на який відповідаєте, разом з попереднім листуванням (як в Outlook / Thunderbird)" %}"><input type="checkbox" id="quick-reply-quote" checked> 📜 {% trans "З історією листування" %}</label>
       <button class="em-send-btn" onclick="sendQuickReply()">{% trans "Відправити" %} →</button>
     </div>
     <div id="reply-status" style="font-size:12px;margin-top:6px;min-height:16px"></div>
@@ -255,6 +257,8 @@ async function sendQuickReply() {
   status.textContent = '{% trans "Відправляю..." %}'; status.style.color = 'var(--text-muted)';
   var form = new FormData();
   form.append('reply_to_pk', LAST_PK);
+  var quoteBox = document.getElementById('quick-reply-quote');
+  form.append('with_quote', quoteBox && !quoteBox.checked ? '0' : '1');   // історія листування під текстом
   form.append('body', body);
   form.append('subject', SUBJ.startsWith('Re:') ? SUBJ : 'Re: ' + SUBJ);
   form.append('to', LAST_FROM);
