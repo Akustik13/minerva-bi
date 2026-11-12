@@ -64,11 +64,12 @@ class SMTPClient:
              body_html: str = '', cc_emails: list = None,
              bcc_emails: list = None, reply_to_message=None,
              attachments: list = None, calendar: tuple = None, importance: str = '',
-             read_receipt: bool = False) -> dict:
+             read_receipt: bool = False, signature: bool = True) -> dict:
         """calendar — (метод iTIP, текст iCalendar), напр. ('REPLY', ics): частина text/calendar; method=… поруч з
         текстом (так відповідь на запрошення розуміють Outlook / Google / Teams) і той самий файл invite.ics.
         importance «important» — ❗ Importance: high / X-Priority: 1; read_receipt — 📬 запит на прочитання
-        (Disposition-Notification-To на адресу скриньки; відповідь розпізнає email_assistant/followups.py)."""
+        (Disposition-Notification-To на адресу скриньки; відповідь розпізнає email_assistant/followups.py).
+        signature False — без підпису скриньки (лист за шаблоном, напр. листи клієнтам dashboard/customer_mail.py)."""
         cc_emails   = cc_emails   or []
         bcc_emails  = bcc_emails  or []
         attachments = attachments or []
@@ -104,8 +105,8 @@ class SMTPClient:
             # Account signature > UserProfile.smtp_signature ({name} placeholder)
             # Appended to plain-text body only (HTML body already contains sig from frontend)
             try:
-                sig_html = (self.account.signature or '').strip()
-                if not sig_html:
+                sig_html = (self.account.signature or '').strip() if signature else ''
+                if not sig_html and signature:
                     sig_html = (self.account.user.profile.smtp_signature or '').strip()
                 if sig_html:
                     name = (self.account.user.get_full_name()

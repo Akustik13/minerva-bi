@@ -323,6 +323,15 @@ def _notify_blocked(ns, order, kind) -> str:
     return ""
 
 
+def _mail_from(ns, kind) -> dict:
+    """«Від:» у вікні листа клієнту (kind ship | confirm): адреса, з якої лист піде зараз, і чому не з вибраної
+    скриньки (dashboard/customer_mail.py)."""
+    from dashboard import customer_mail
+    s = customer_mail.sender(ns, kind)
+    note = f"⚠ {s.problem} — лист піде з SMTP сповіщень" if s.problem else s.source
+    return {'from': s.address, 'from_note': note}
+
+
 def _mail_html(text) -> str:
     """HTML-версія листа клієнту з тексту форми: усе екранується, рядки — <br> (текст не стає розміткою листа)."""
     from django.template.defaultfilters import linebreaksbr
@@ -3497,6 +3506,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                 'is_eu':     is_eu,
                 'country':   country,
                 'auto':      ns.customer_notify_auto,
+                **_mail_from(ns, 'ship'),
             })
 
         if request.method == 'POST':
@@ -3516,21 +3526,10 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                 return JsonResponse({'ok': False, 'error': 'Не вказано тему листа'})
 
             try:
-                from django.core.mail import EmailMultiAlternatives
-                from dashboard.notifications import _smtp_connection
-
-                from_email = (ns.email_from or ns.email_host_user or '').strip()
-                html_body  = _mail_html(body_text)
-                msg = EmailMultiAlternatives(
-                    subject=subject,
-                    body=body_text,
-                    from_email=from_email,
-                    to=[to_email],
-                    cc=[a.strip() for a in cc_email.split(',') if a.strip()] if cc_email else [],
-                    connection=_smtp_connection(ns),
-                )
-                msg.attach_alternative(html_body, 'text/html')
-                msg.send()
+                from dashboard import customer_mail
+                # з адреси «👤 Клієнтам — з адреси» (SMTP сповіщень або скринька пошти Minerva)
+                customer_mail.send(ns, 'ship', [to_email], subject, body_text, _mail_html(body_text),
+                                   cc=customer_mail.cc_list(cc_email))
                 from dashboard.notifications import mark_ship_mail_sent
                 from shipping.services.parcels import current_parcel
                 mark_ship_mail_sent(order, current_parcel(order, self._notify_parcel(request, order)))
@@ -3591,6 +3590,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             return JsonResponse({
                 'ok': True, 'to': to_email, 'cc': cc,
                 'subject': subject, 'body': body, 'auto': auto,
+                **_mail_from(ns, 'confirm'),
             })
 
         if request.method == 'POST':
@@ -3609,20 +3609,10 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                 return JsonResponse({'ok': False, 'error': 'Не вказано тему листа'})
 
             try:
-                from django.core.mail import EmailMultiAlternatives
-                from dashboard.notifications import _smtp_connection
-                from_email = (ns.email_from or ns.email_host_user or '').strip()
-                html_body  = _mail_html(body_text)
-                msg = EmailMultiAlternatives(
-                    subject=subject,
-                    body=body_text,
-                    from_email=from_email,
-                    to=[to_email],
-                    cc=[a.strip() for a in cc_email.split(',') if a.strip()] if cc_email else [],
-                    connection=_smtp_connection(ns),
-                )
-                msg.attach_alternative(html_body, 'text/html')
-                msg.send()
+                from dashboard import customer_mail
+                # з адреси «👤 Клієнтам — з адреси» (SMTP сповіщень або скринька пошти Minerva)
+                customer_mail.send(ns, 'confirm', [to_email], subject, body_text, _mail_html(body_text),
+                                   cc=customer_mail.cc_list(cc_email))
                 from django.utils import timezone as _tz
                 SalesOrder.objects.filter(pk=pk).update(order_confirm_sent_at=_tz.now())
                 return JsonResponse({'ok': True})

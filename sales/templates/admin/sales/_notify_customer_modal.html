@@ -22,6 +22,10 @@
     {% endif %}
     <div id="nc-loading" style="text-align:center;padding:20px;color:var(--text-muted,#607d8b)">⏳ {% trans "Генерація..." %}</div>
     <div id="nc-form" style="display:none">
+      <div style="margin-bottom:12px;font-size:12px;color:var(--text-muted,#607d8b)">
+        {% trans "Від:" %} <b id="nc-from" translate="no" style="color:var(--text,#c9d8e4)"></b>
+        <span id="nc-from-note"></span>
+      </div>
       <div style="margin-bottom:12px">
         <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Кому" %} *</label>
         <input id="nc-to" type="email"
@@ -121,6 +125,8 @@ function ncOpen(url) {
       document.getElementById('nc-to').value      = d.to      || '';
       document.getElementById('nc-cc').value      = d.cc      || '';
       document.getElementById('nc-subject').value = d.subject || '';
+      document.getElementById('nc-from').textContent = d.from || '—';
+      document.getElementById('nc-from-note').textContent = d.from_note ? '(' + d.from_note + ')' : '';
       document.getElementById('nc-form').style.display = 'block';
       if (d.auto){ ncSend(); }
     })
