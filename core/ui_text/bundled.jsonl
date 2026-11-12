@@ -2689,6 +2689,7 @@
 {"uk": "{0} (рік тому {1})", "en": "{0} (a year ago {1})", "de": "{0} (vor einem Jahr {1})"}
 {"uk": "{0} (сьогодні вже {1}); уже переглянуті — без обмежень, решта у списках приховується.", "en": "{0} (already {1} today); records already viewed are not limited, the rest are hidden in lists.", "de": "{0} (heute bereits {1}); bereits angesehene Datensätze unterliegen keiner Beschränkung, der Rest wird in Listen ausgeblendet."}
 {"uk": "{0} (також немає {1})", "en": "{0} (also no {1})", "de": "{0} (auch kein {1})"}
+{"uk": "{0} (текст)", "en": "{0} (text)", "de": "{0} (Text)"}
 {"uk": "{0} (у Minerva: {1})", "en": "{0} (in Minerva: {1})", "de": "{0} (in Minerva: {1})"}
 {"uk": "{0} (є {1}, треба {2})", "en": "{0} (have {1}, need {2})", "de": "{0} (vorhanden {1}, benötigt {2})"}
 {"uk": "{0} / {1} записів", "en": "{0} / {1} records", "de": "{0} / {1} Einträge"}
@@ -4023,6 +4024,7 @@
 {"uk": "Артикул із зовнішньої системи", "en": "SKU from the external system", "de": "Artikelnummer aus dem externen System"}
 {"uk": "Артикул, кількість і рік перевірено — зауважень немає.", "en": "SKU, quantity and year checked — no remarks.", "de": "Artikelnummer, Menge und Jahr geprüft — keine Anmerkungen."}
 {"uk": "Артикули / номери", "en": "SKUs / numbers", "de": "Artikelnummern / Nummern"}
+{"uk": "Артикули з назв документів, файлів у ZIP-архіві (Gerber), теми листа й тексту рахунку → поле «Що замовляли». Лише дописує.", "en": "Item numbers from document names, files in the ZIP archive (Gerber), the e-mail subject and the invoice text → the “Ordered items” field. Only adds.", "de": "Artikelnummern aus Dokumentnamen, Dateien im ZIP-Archiv (Gerber), dem E-Mail-Betreff und dem Rechnungstext → Feld „Bestellte Artikel“. Ergänzt nur."}
 {"uk": "Артикули що передаються до Jumingo для позаєвропейських відправлень.", "en": "SKUs passed to Jumingo for non-European shipments.", "de": "Artikelnummern, die bei außereuropäischen Sendungen an Jumingo übergeben werden."}
 {"uk": "Артикули що передаються до Jumingo для позаєвропейських відправлень. MRN з Ausfuhrbegleitdokument UPS приймає лише під час оформлення.", "en": "Items sent to Jumingo for shipments outside the EU. UPS accepts the MRN from the Ausfuhrbegleitdokument only when the shipment is booked.", "de": "Artikel, die bei Sendungen außerhalb der EU an Jumingo übermittelt werden. UPS akzeptiert die MRN aus dem Ausfuhrbegleitdokument nur bei der Buchung."}
 {"uk": "Артикули, чиї даташити додати до листа", "en": "SKUs whose datasheets to attach to the e-mail", "de": "Artikelnummern, deren Datenblätter der E-Mail beigefügt werden sollen"}
@@ -4787,6 +4789,8 @@
 {"uk": "Визначається автоматично (email_assistant/categorize.py); порожньо — ще не визначено", "en": "Determined automatically (email_assistant/categorize.py); empty — not yet determined", "de": "Wird automatisch bestimmt (email_assistant/categorize.py); leer — noch nicht bestimmt"}
 {"uk": "Визначити вручну", "en": "Define manually", "de": "Manuell festlegen"}
 {"uk": "Визначити категорію ({0})", "en": "Determine category ({0})", "de": "Kategorie ermitteln ({0})"}
+{"uk": "Визначити, що замовляли", "en": "Detect ordered items", "de": "Bestellte Artikel ermitteln"}
+{"uk": "Визначити, що замовляли (з документів)", "en": "Detect ordered items (from documents)", "de": "Bestellte Artikel ermitteln (aus Dokumenten)"}
 {"uk": "Вийти", "en": "Log out", "de": "Abmelden"}
 {"uk": "Виконавець", "en": "Contractor", "de": "Auftragnehmer"}
 {"uk": "Виконавця не знайдено або його вимкнено", "en": "Assignee not found or deactivated", "de": "Bearbeiter nicht gefunden oder deaktiviert"}
@@ -6391,6 +6395,7 @@
 {"uk": "Домівка", "en": "Home", "de": "Startseite"}
 {"uk": "Домініканська Республіка", "en": "Dominican Republic", "de": "Dominikanische Republik"}
 {"uk": "Доповнено {0}", "en": "Completed {0}", "de": "Ergänzt {0}"}
+{"uk": "Доповнено закупівель: {0}", "en": "Purchase orders updated: {0}", "de": "Bestellungen ergänzt: {0}"}
 {"uk": "Допускається символ валюти.", "en": "A currency symbol is allowed.", "de": "Ein Währungssymbol ist zulässig."}
 {"uk": "Допуски", "en": "Tolerances", "de": "Toleranzen"}
 {"uk": "Допустима потужність", "en": "Rated power", "de": "Zulässige Leistung"}
@@ -10892,6 +10897,7 @@
 {"uk": "Новинки", "en": "New arrivals", "de": "Neuheiten"}
 {"uk": "Новинки: бейдж «Neu» і місце вгорі каталогу", "en": "New arrivals: “Neu” badge and a spot at the top of the catalog", "de": "Neuheiten: Badge „Neu“ und ein Platz oben im Katalog"}
 {"uk": "Нових", "en": "New", "de": "Neue"}
+{"uk": "Нових артикулів у документах не знайдено.", "en": "No new item numbers found in the documents.", "de": "Keine neuen Artikelnummern in den Dokumenten gefunden."}
 {"uk": "Нових замовлень немає.", "en": "No new orders.", "de": "Keine neuen Aufträge."}
 {"uk": "Нових листів від клієнтів: {0} ({1})", "en": "New e-mails from customers: {0} ({1})", "de": "Neue E-Mails von Kunden: {0} ({1})"}
 {"uk": "Нових листів немає — усі ваші листи проєкту вже прочитано", "en": "No new emails — all your project emails have already been read", "de": "Keine neuen E-Mails — alle Ihre Projekt-E-Mails wurden bereits gelesen"}
@@ -15956,6 +15962,7 @@
 {"uk": "У гілці листів: {0} · показано останній", "en": "E-mails in the thread: {0} · showing the latest", "de": "E-Mails im Verlauf: {0} · die neueste wird gezeigt"}
 {"uk": "У даташиті ваги немає — позначено в товарі.", "en": "No weight in the datasheet — noted in the product.", "de": "Kein Gewicht im Datenblatt — im Produkt vermerkt."}
 {"uk": "У джерелі «{0}» вже є замовлення з номерами: {1} — їх не перенесено.", "en": "Source “{0}” already has orders with the numbers: {1} — they were not moved.", "de": "In der Quelle „{0}“ gibt es bereits Aufträge mit den Nummern: {1} – sie wurden nicht übertragen."}
+{"uk": "У документах вибраних закупівель нових артикулів не знайдено. Назвіть Gerber-архів артикулом (TR240401-01.zip) або впишіть «Що замовляли» вручну.", "en": "No new item numbers found in the documents of the selected purchase orders. Name the Gerber archive after the item (TR240401-01.zip) or enter “Ordered items” manually.", "de": "In den Dokumenten der ausgewählten Bestellungen wurden keine neuen Artikelnummern gefunden. Benennen Sie das Gerber-Archiv nach dem Artikel (TR240401-01.zip) oder tragen Sie „Bestellte Artikel“ manuell ein."}
 {"uk": "У документи замовлення", "en": "Into order documents", "de": "In die Auftragsdokumente"}
 {"uk": "У документи замовлення й проєкту", "en": "Into order and project documents", "de": "In die Auftrags- und Projektdokumente"}
 {"uk": "У замовлення {0} уже так", "en": "Order {0} already has this", "de": "Auftrag {0} ist bereits so"}
@@ -16817,6 +16824,7 @@
 {"uk": "Через кому, напр. archiv@… Копія листів «Ласкаво просимо», «Оплату отримано» тощо; листи з одноразовими посиланнями (підтвердження, новий пароль, запрошення) не копіюються.", "en": "Comma-separated, e.g. archiv@… A copy of the “Welcome”, “Payment received” e-mails etc.; e-mails with one-time links (confirmation, new password, invitation) are not copied.", "de": "Durch Komma getrennt, z. B. archiv@… Kopie der E-Mails „Willkommen“, „Zahlung eingegangen“ usw.; E-Mails mit einmaligen Links (Bestätigung, neues Passwort, Einladung) werden nicht kopiert."}
 {"uk": "Через кому, напр. «pcbway.com, pcbway.cn» — листи з цих доменів належать постачальнику (домен з email, сайту й контактних осіб Minerva бере й так).", "en": "Comma-separated, e.g. «pcbway.com, pcbway.cn» — e-mails from these domains belong to the supplier (Minerva takes the domain from the e-mail, website and contact persons anyway).", "de": "Durch Komma getrennt, z. B. «pcbway.com, pcbway.cn» — E-Mails aus diesen Domains gehören zum Lieferanten (die Domain aus E-Mail, Website und Ansprechpartnern nimmt Minerva ohnehin)."}
 {"uk": "Через кому, напр.: webshop. Порожньо = замовлення з усіх джерел. Стосується order.* і shipment.", "en": "Comma-separated, e.g.: webshop. Empty = orders from all sources. Applies to order.* and shipment.", "de": "Durch Komma getrennt, z. B.: webshop. Leer = Aufträge aus allen Quellen. Gilt für order.* und shipment."}
+{"uk": "Через кому. Minerva дописує сама з документів закупівлі — назва Gerber-архіву «TR240401-01.zip», файли в архіві, тема листа, артикули каталогу в рахунку. Можна виправити: ваше лишається, нове лише додається. На склад не впливає (позиції — нижче).", "en": "Comma-separated. Minerva fills it in from the purchase order documents — the Gerber archive name “TR240401-01.zip”, files in the archive, the e-mail subject, catalog items in the invoice. You can correct it: your entries stay, new ones are only added. Does not affect stock (lines — below).", "de": "Durch Kommas getrennt. Minerva ergänzt es selbst aus den Bestelldokumenten — Name des Gerber-Archivs „TR240401-01.zip“, Dateien im Archiv, E-Mail-Betreff, Katalogartikel in der Rechnung. Sie können es korrigieren: Ihre Einträge bleiben, Neues wird nur ergänzt. Wirkt sich nicht auf den Bestand aus (Positionen — unten)."}
 {"uk": "Через кому. Оплати, нові акаунти покупців, а з «Сайт надсилає листи з цієї ж скриньки» — і нові замовлення з сайту. Порожньо — email з «Налаштування → Сповіщення» (замовлення — як на сайті).", "en": "Comma-separated. Payments, new customer accounts, and with “The site sends e-mails from this same mailbox” — new orders from the site too. Empty — the e-mail from “Settings → Notifications” (orders — as on the site).", "de": "Durch Komma getrennt. Zahlungen, neue Kundenkonten und – mit „Die Website sendet E-Mails aus demselben Postfach“ – auch neue Aufträge von der Website. Leer – die E-Mail aus „Einstellungen → Benachrichtigungen“ (Aufträge – wie auf der Website)."}
 {"uk": "Через кому: pdf, docx, txt, csv", "en": "Comma-separated: pdf, docx, txt, csv", "de": "Durch Komma getrennt: pdf, docx, txt, csv"}
 {"uk": "Через кому; порожньо — pdf, docx, txt, csv, md, html, htm, xlsx. PDF / DOCX / TXT / CSV читає RAG, Excel / HTML / Markdown — Minerva. Скани без тексту не розпізнаються.", "en": "Comma-separated; empty — pdf, docx, txt, csv, md, html, htm, xlsx. PDF / DOCX / TXT / CSV are read by RAG, Excel / HTML / Markdown by Minerva. Scans without text are not recognized.", "de": "Durch Komma getrennt; leer — pdf, docx, txt, csv, md, html, htm, xlsx. PDF / DOCX / TXT / CSV liest RAG, Excel / HTML / Markdown liest Minerva. Scans ohne Text werden nicht erkannt."}
@@ -17134,6 +17142,8 @@
 {"uk": "Що дає", "en": "What it gives", "de": "Was es bringt"}
 {"uk": "Що доручити", "en": "What to delegate", "de": "Was übertragen wird"}
 {"uk": "Що замовити", "en": "What to order", "de": "Was zu bestellen ist"}
+{"uk": "Що замовляли", "en": "Ordered items", "de": "Bestellte Artikel"}
+{"uk": "Що замовляли (артикули)", "en": "Ordered items (item numbers)", "de": "Bestellte Artikel (Artikelnummern)"}
 {"uk": "Що записалось би зараз (без запису)", "en": "What would be recorded now (without recording)", "de": "Was jetzt eingetragen würde (ohne Eintrag)"}
 {"uk": "Що записували", "en": "What was recorded", "de": "Was aufgenommen wurde"}
 {"uk": "Що запитуємо", "en": "What we request", "de": "Was wir anfragen"}
@@ -18990,6 +19000,7 @@
 {"uk": "лист {0} відсутній", "en": "e-mail {0} is missing", "de": "E-Mail {0} fehlt"}
 {"uk": "лист {0}: «Expresszuschlag», вкладення Prüfbericht", "en": "e-mail {0}: “Expresszuschlag”, attachment Prüfbericht", "de": "E-Mail {0}: „Expresszuschlag“, Anhang Prüfbericht"}
 {"uk": "лист {0}: дата CAB-7 {1} → {2}", "en": "e-mail {0}: CAB-7 date {1} → {2}", "de": "E-Mail {0}: CAB-7-Datum {1} → {2}"}
+{"uk": "лист «{0}»", "en": "e-mail “{0}”", "de": "E-Mail „{0}“"}
 {"uk": "лист видалено або в кошику", "en": "e-mail deleted or in the trash", "de": "E-Mail gelöscht oder im Papierkorb"}
 {"uk": "лист видалено без прочитання ({0})", "en": "email deleted without reading ({0})", "de": "E-Mail ungelesen gelöscht ({0})"}
 {"uk": "лист від нас самих", "en": "an e-mail from ourselves", "de": "E-Mail von uns selbst"}
@@ -21443,6 +21454,7 @@
 {"uk": "що в картці лістингу", "en": "what is in the listing card", "de": "was in der Listing-Karte steht"}
 {"uk": "що вже є в базі (можливо, виправлений вручну), замінюється тільки після підтвердження.", "en": "that is already in the database (possibly corrected manually) is replaced only after confirmation.", "de": "die bereits in der Datenbank vorhanden ist (möglicherweise manuell korrigiert), wird erst nach Bestätigung ersetzt."}
 {"uk": "що вміє розділ", "en": "what the section can do", "de": "was der Bereich kann"}
+{"uk": "що замовляли", "en": "ordered items", "de": "bestellte Artikel"}
 {"uk": "що змінити: visible чи price", "en": "what to change: visible or price", "de": "was zu ändern ist: visible oder price"}
 {"uk": "що можна додати без переробки", "en": "what can be added without rework", "de": "was sich ohne Umbau ergänzen lässt"}
 {"uk": "що робили (піде в askDANTE)", "en": "what was done (goes to askDANTE)", "de": "was gemacht wurde (geht an askDANTE)"}

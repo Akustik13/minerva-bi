@@ -97,6 +97,14 @@ class PurchaseTests(Base):
                         tracking_number='JD0001234567', evidence='x', source='y')
         self.assertIn('Трекінгу приходу', out)
 
+    def test_find_by_ordered_skus(self):
+        """«Що замовляли» (з назви Gerber-архіву) — агент знаходить закупівлю за цим артикулом."""
+        po = PurchaseOrder.objects.create(supplier=Supplier.objects.create(name='HongRong'), status='received',
+                                          ordered_skus='TR240401-01, TR240402-01')
+        found = json.loads(self.call(self.ctx(), 'find_purchase_orders', query='TR240402-01'))
+        self.assertEqual([r['code'] for r in found['purchase_orders']], [po.code])
+        self.assertEqual(found['purchase_orders'][0]['ordered'], 'TR240401-01, TR240402-01')
+
     def test_unknown_sku_needs_new_product(self):
         out = self.propose(self.ctx(), ok=False, lines=[{'sku': 'CA-NOPE-1', 'qty': 5}], tracking_number='')
         self.assertIn('propose_product', out)
