@@ -109,6 +109,7 @@
 {"uk": "% від базової ціни", "en": "% of base price", "de": "% vom Basispreis"}
 {"uk": "% до", "en": "% to", "de": "% auf"}
 {"uk": "% має бути числом", "en": "% must be a number", "de": "% muss eine Zahl sein"}
+{"uk": "% ширини тексту листа", "en": "% of the letter text width", "de": "% der Textbreite der E-Mail"}
 {"uk": "% — від 1 до 1000", "en": "% — from 1 to 1000", "de": "% — von 1 bis 1000"}
 {"uk": "&bull; {0} дн.", "en": "&bull; {0} days", "de": "&bull; {0} Tage"}
 {"uk": "&bull; {0} кг", "en": "&bull; {0} kg", "de": "&bull; {0} kg"}
@@ -13256,6 +13257,7 @@
 {"uk": "Прибрати з нижньої панелі", "en": "Remove from the bottom bar", "de": "Aus der unteren Leiste entfernen"}
 {"uk": "Прибрати з проєкту", "en": "Remove from the project", "de": "Aus dem Projekt entfernen"}
 {"uk": "Прибрати й більше не заносити", "en": "Remove and do not add again", "de": "Entfernen und nicht mehr eintragen"}
+{"uk": "Прибрати картинку з листа", "en": "Remove the image from the letter", "de": "Bild aus der E-Mail entfernen"}
 {"uk": "Прибрати лише цю подію — з пошти вона не повернеться", "en": "Remove this event only — it will not come back from mail", "de": "Nur diesen Termin entfernen — er kommt aus den E-Mails nicht zurück"}
 {"uk": "Прибрати момент", "en": "Remove moment", "de": "Moment entfernen"}
 {"uk": "Прибрати спам і події від відправників, від яких ви більше не хочете термінів — спершу видно, що саме прибереться", "en": "Remove spam and events from senders you no longer want deadlines from — you will first see exactly what will be removed", "de": "Spam und Termine von Absendern entfernen, von denen Sie keine Fristen mehr wollen — zuerst sehen Sie genau, was entfernt wird"}
@@ -14855,6 +14857,7 @@
 {"uk": "Спочатку прив'яжіть товар до замовлення.", "en": "First link a product to the order.", "de": "Verknüpfen Sie zuerst einen Artikel mit der Bestellung."}
 {"uk": "Спочатку прив'яжіть товар до цієї позиції.", "en": "First link a product to this line.", "de": "Verknüpfen Sie zuerst einen Artikel mit dieser Position."}
 {"uk": "Спочатку створіть хоча б одного постачальника.", "en": "First create at least one supplier.", "de": "Legen Sie zuerst mindestens einen Lieferanten an."}
+{"uk": "Справжній розмір картинки (не ширше за текст листа)", "en": "Actual image size (no wider than the letter text)", "de": "Originalgröße des Bildes (nicht breiter als der Text der E-Mail)"}
 {"uk": "Спроб", "en": "Attempts", "de": "Versuche"}
 {"uk": "Спроб: {0}", "en": "Attempts: {0}", "de": "Versuche: {0}"}
 {"uk": "Спроба {0}: запис оголошено, усі погодились — підтверджено у вікні запису", "en": "Attempt {0}: recording announced, everyone agreed — confirmed in the recording window", "de": "Versuch {0}: Aufnahme angekündigt, alle haben zugestimmt — im Aufnahmefenster bestätigt"}
@@ -17032,6 +17035,7 @@
 {"uk": "Шир. (см)", "en": "Width (cm)", "de": "Breite (cm)"}
 {"uk": "Ширина", "en": "Width", "de": "Breite"}
 {"uk": "Ширина (см)", "en": "Width (cm)", "de": "Breite (cm)"}
+{"uk": "Ширина картинки", "en": "Image width", "de": "Bildbreite"}
 {"uk": "Ширина панелі", "en": "Panel width", "de": "Panel-Breite"}
 {"uk": "Ширина смуги на рівні -3 дБ від максимуму", "en": "Bandwidth at the -3 dB level from the maximum", "de": "Bandbreite bei -3 dB unter dem Maximum"}
 {"uk": "Ширина смуги пропускання на рівні -3 дБ", "en": "Passband width at the -3 dB level", "de": "Breite des Durchlassbereichs bei -3 dB"}
