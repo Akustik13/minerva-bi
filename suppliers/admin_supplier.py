@@ -52,6 +52,12 @@ def _stars(n) -> str:
     return "★" * n + "☆" * (5 - n) if n else ""
 
 
+# «свої дати…» біля «🔄 Зібрати / Оновити з пошти» — поля з … по … лише для цього вибору
+_PERIOD_JS = mark_safe(
+    "<script>(function(){document.querySelectorAll('select.sp-hist-period').forEach(function(s){"
+    "if(s.dataset.spDone)return;s.dataset.spDone='1';var d=s.parentNode.querySelector('.sp-hist-dates');"
+    "function f(){if(d)d.hidden=s.value!=='custom';}s.addEventListener('change',f);f();});})();</script>")
+
 _PO_OPTS_JS = mark_safe(
     "<script>(function(){var K='sp-po-opts',s={};try{s=JSON.parse(localStorage.getItem(K)||'{}')}catch(e){}"
     "document.querySelectorAll('input.sp-po-opt').forEach(function(el){if(el.dataset.spDone)return;"
@@ -308,9 +314,19 @@ class SupplierCardMixin:
         url = reverse("admin:inventory_supplier_history", args=[obj.pk])
         can_po = viewer is not None and viewer.has_perm("inventory.add_purchaseorder")
         opts = po_options(sum(1 for t in (data or {}).get("topics", []) if history.can_purchase(t))) if can_po else ""
-        rebuild = format_html('<button type="submit" class="button" name="sup_action" value="rebuild" formaction="{}" '
-                              'formmethod="post" formnovalidate>🔄 {}</button>', url,
-                              "Оновити з пошти" if data else f"Зібрати історію з пошти (за {history.YEARS} років)")
+        chosen = history.period_choice(data["date_from"], data["date_to"], timezone.localtime(data["at"]).date()
+                                       if data.get("at") else None) if data else str(history.YEARS)
+        rebuild = format_html(
+            '<button type="submit" class="button" name="sup_action" value="rebuild" formaction="{}" formmethod="post" '
+            'formnovalidate>🔄 {}</button> <select name="hist_period" class="sp-hist-period" title="{}">{}</select>'
+            '<span class="sp-hist-dates" hidden> <input type="date" name="hist_from" value="{}" aria-label="{}"> – '
+            '<input type="date" name="hist_to" value="{}" aria-label="{}"></span>{}',
+            url, "Оновити з пошти" if data else "Зібрати історію з пошти",
+            "За який час перечитати пошту — більший період нічого не коштує, лише довше читається",
+            format_html_join("", '<option value="{}"{}>{}</option>', (
+                (v, mark_safe(" selected") if v == chosen else "", label) for v, label in history.PERIODS)),
+            f"{data['date_from']:%Y-%m-%d}" if data and data.get("date_from") else "", "з",
+            f"{data['date_to']:%Y-%m-%d}" if data and data.get("date_to") else "", "по", _PERIOD_JS)
         if not data:
             return format_html('<div class="sp-muted">{}</div><div class="sp-row">{}{}</div>',
                                "Minerva перечитає ваші скриньки й складе листування з постачальником за темами: запити, "
@@ -359,6 +375,11 @@ class SupplierCardMixin:
                 period, t["incoming"], t["outgoing"], action))
         ads_html = format_html('<div class="sp-muted">📣 Розсилки від них (без наших відповідей): {}</div>',
                                ", ".join(f"«{t['title'][:50]}»" for t in ads[:6])) if ads else ""
+        if data.get("truncated"):
+            from suppliers.services.mailscan import SCAN_MAX
+            ads_html = format_html('{}<div class="sp-warn">⚠️ {}</div>', ads_html,
+                                   f"Листів з ними за цей період понад {SCAN_MAX} — показано найновіші {SCAN_MAX}; "
+                                   f"для давніших виберіть коротший період або свої дати.")
         return format_html(
             '<div class="sp-muted">З вашої пошти · {} · оновлено {} · тем {}</div>'
             '<table class="sp-table"><tr><th>Етап</th><th>Тема й файли</th><th>Період</th><th></th></tr>{}</table>{}'
@@ -539,6 +560,9 @@ class SupplierCardMixin:
             return HttpResponseNotAllowed(["POST"])
         obj = self._supplier(request, pk)
         back = reverse("admin:inventory_supplier_change", args=[obj.pk])
+        # період — з вибору біля кнопки (у ньому вже стоїть той, за який зібрано теми)
+        date_from, date_to = history.period_of(request.POST.get("hist_period"), request.POST.get("hist_from"),
+                                               request.POST.get("hist_to"))
         if request.GET.get("action") == "po":
             if not request.user.has_perm("inventory.add_purchaseorder"):
                 raise Http404
@@ -549,7 +573,7 @@ class SupplierCardMixin:
             except ValueError as e:
                 self.message_user(request, str(e), messages.ERROR)
                 return redirect(back)
-            history.rebuild(obj, request.user)
+            history.rebuild(obj, request.user, date_from=date_from, date_to=date_to)
             if as_history:
                 self.message_user(request, f"📜 Закупівля {po.code} — як історія (уже отримано, без складу): "
                                            f"документів {out['added']}", messages.SUCCESS)
@@ -559,9 +583,14 @@ class SupplierCardMixin:
             for line in out["failed"][:5]:
                 self.message_user(request, f"⚠️ {line}", messages.WARNING)
             return redirect(reverse("admin:inventory_purchaseorder_change", args=[po.pk]))
-        out = history.rebuild(obj, request.user)
-        self.message_user(request, f"🧵 Історію зібрано: листів {out['messages']}, тем {out['topics']}, "
-                                   f"нових подій {out['events']}", messages.SUCCESS)
+        out = history.rebuild(obj, request.user, date_from=date_from, date_to=date_to)
+        self.message_user(request, f"🧵 Історію зібрано ({out['date_from']:%d.%m.%Y} – {out['date_to']:%d.%m.%Y}): "
+                                   f"листів {out['messages']}, тем {out['topics']}, нових подій {out['events']}",
+                          messages.SUCCESS)
+        if out["truncated"]:
+            from suppliers.services.mailscan import SCAN_MAX
+            self.message_user(request, f"⚠️ Листів понад {SCAN_MAX} — узято найновіші; для давніших виберіть "
+                                       f"коротший період або свої дати.", messages.WARNING)
         self._make_purchases(request, obj)
         return redirect(back)
 

@@ -986,3 +986,52 @@ class CardsTests(Base):
         self.assertContains(page, f'<option value="{self.pcb.pk}" >🟩 Виробники плат (3)</option>')
         self.assertContains(page, f'href="?cat={cable.pk}"')                         # категорія на плитці — фільтр
         self.assertEqual(guessed.categories.count(), 0)
+
+
+class HistoryPeriodTests(Base):
+    """«🔄 Зібрати / Оновити з пошти» за вибраний період; понад SCAN_MAX — найновіші листи."""
+    _att = HistoryTests._att
+    _thread = HistoryTests._thread
+
+    def test_period_helpers(self):
+        from suppliers.services import history
+        today = timezone.localdate()
+        self.assertEqual(history.period_of("1"), (today - datetime.timedelta(days=365), today))
+        self.assertEqual(history.period_of("all"), (history.ALL_FROM, today))
+        self.assertEqual(history.period_of("custom", "2026-01-01", "2026-03-31"),
+                         (datetime.date(2026, 1, 1), datetime.date(2026, 3, 31)))
+        self.assertEqual(history.period_of("bogus"), (today - datetime.timedelta(days=365 * history.YEARS), today))
+        for value in ("1", "2", "5", "all"):
+            self.assertEqual(history.period_choice(*history.period_of(value)), value)
+        self.assertEqual(history.period_choice(datetime.date(2026, 1, 1), datetime.date(2026, 3, 31)), "custom")
+        yesterday = today - datetime.timedelta(days=1)                           # зібрано вчора «за рік»
+        self.assertEqual(history.period_choice(yesterday - datetime.timedelta(days=365), yesterday, yesterday), "1")
+
+    def test_rebuild_for_chosen_period(self):
+        from suppliers.services import history
+        self._thread()                                         # листи 40 днів тому
+        url = reverse("admin:inventory_supplier_history", args=[self.supplier.pk])
+        card = reverse("admin:inventory_supplier_change", args=[self.supplier.pk])
+        self.client.post(url, {"sup_action": "rebuild", "hist_period": "1"})
+        data = history.topics_for(self.supplier, self.user)
+        self.assertEqual(len(data["topics"]), 2)
+        self.assertContains(self.client.get(card), '<option value="1" selected>')
+        old = (timezone.localdate() - datetime.timedelta(days=400)).isoformat()
+        self.client.post(url, {"sup_action": "rebuild", "hist_period": "custom", "hist_from": old,
+                               "hist_to": (timezone.localdate() - datetime.timedelta(days=300)).isoformat()})
+        data = history.topics_for(self.supplier, self.user)
+        self.assertEqual((data["topics"], data["date_from"].isoformat()), ([], old))
+        self.assertContains(self.client.get(card), '<option value="custom" selected>')
+
+    def test_too_many_mails_keep_newest(self):
+        from suppliers.services import history
+        self._thread()
+        with mock.patch.object(mailscan, "SCAN_MAX", 2):
+            out = history.rebuild(self.supplier, self.user)
+        self.assertTrue(out["truncated"])
+        data = history.topics_for(self.supplier, self.user)
+        self.assertTrue(data["truncated"])
+        self.assertTrue(any(t["title"].startswith("Golden October") for t in data["topics"]))   # найновіший лист є
+        with mock.patch.object(mailscan, "SCAN_MAX", 2):
+            page = self.client.get(reverse("admin:inventory_supplier_change", args=[self.supplier.pk]))
+        self.assertContains(page, "показано найновіші 2")

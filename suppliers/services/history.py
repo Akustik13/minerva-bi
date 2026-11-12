@@ -6,7 +6,8 @@ suppliers/services/history.py — 🧵 історія постачальника
   topic_of(subject)   — тема без «Re: / AW: / Fw: / Re[4]:»;
   is_document(att)    — вкладення-документ (не вбудована картинка, не логотип / image001.png з підпису);
   doc_kind(name)      — quotation / pi / invoice / confirmation / packing / gerber / bom / pnp / stackup / drawing / other;
-  rebuild(s, user)    — пошта за YEARS років → SupplierAnalysis MAIL (теми) + події історії (без повторів);
+  rebuild(s, user)    — пошта за період (PERIODS: рік / 2 / 5 років / уся / свої дати; за замовчуванням YEARS)
+                        → SupplierAnalysis MAIL (теми) + події історії (без повторів);
   make_purchase(...)  — закупівля з теми: постачальник, дата й номер з PI, документи теми → документи закупівлі;
                         as_history — уже отримана (Received без позицій: без складу й без «Очікується»);
   make_purchases(...) — те саме для всіх тем з PI / підтвердженням, яких ще немає серед закупівель.
@@ -17,6 +18,9 @@ import re
 from django.utils import timezone
 
 YEARS = 5
+# «🔄 Зібрати / Оновити з пошти» — за який час (значення поля hist_period картки)
+PERIODS = [("1", "за рік"), ("2", "за 2 роки"), ("5", "за 5 років"), ("all", "уся пошта"), ("custom", "свої дати…")]
+ALL_FROM = datetime.date(2000, 1, 1)
 FRESH_DAYS = 30            # тема з листом за останні N днів — закупівля ще може бути в дорозі
 HISTORY_NOTE = ("📜 Історія з листування: заведено вже отриманою — без складу й без «Очікується», "
                 "дата отримання невідома. Позицій не додавайте — інакше вони потраплять на склад.")
@@ -115,12 +119,44 @@ def _serialize(group) -> dict:
     }
 
 
-def rebuild(supplier, user, years=YEARS) -> dict:
-    """Пошта людини за `years` років → теми в SupplierAnalysis MAIL + події історії. → {topics, events, messages}"""
+def period_of(value, date_from=None, date_to=None) -> tuple:
+    """Вибір біля кнопки → (від, до): «1» / «2» / «5» років, «all» — з ALL_FROM, «custom» — свої дати (порожні —
+    рік до сьогодні), невідоме — YEARS."""
     from suppliers.services import mailscan
     today = timezone.localdate()
-    result = mailscan.scan(supplier, user, today - datetime.timedelta(days=365 * years), today)
-    return save(supplier, user, result)
+    if value == "custom":
+        return mailscan.period(date_from, date_to)
+    if value == "all":
+        return ALL_FROM, today
+    years = int(value) if str(value) in {"1", "2", "5"} else YEARS
+    return today - datetime.timedelta(days=365 * years), today
+
+
+def period_choice(date_from, date_to, today=None) -> str:
+    """Збережений період історії → значення вибору (щоб «🔄 Оновити з пошти» взяв той самий). today — день, коли
+    збирали: «за 5 років», зібране вчора, — і сьогодні «за 5 років», а не «свої дати»."""
+    today = today or timezone.localdate()
+    if not date_from or not date_to:
+        return str(YEARS)
+    if date_from <= ALL_FROM and date_to >= today:
+        return "all"
+    if date_to >= today:
+        for value in ("1", "2", "5"):
+            if abs((date_to - date_from).days - 365 * int(value)) <= 2:
+                return value
+    return "custom"
+
+
+def rebuild(supplier, user, years=YEARS, date_from=None, date_to=None) -> dict:
+    """Пошта людини за `years` років (або з date_from по date_to) → SupplierAnalysis MAIL (теми) + події історії.
+    → {topics, events, messages, date_from, date_to, truncated}"""
+    from suppliers.services import mailscan
+    today = timezone.localdate()
+    if date_from is None:
+        date_from, date_to = today - datetime.timedelta(days=365 * years), today
+    result = mailscan.scan(supplier, user, date_from, date_to or today)
+    return {**save(supplier, user, result), "date_from": result["date_from"], "date_to": result["date_to"],
+            "truncated": bool(result.get("truncated"))}
 
 
 def save(supplier, user, result) -> dict:
@@ -202,7 +238,8 @@ def topics_for(supplier, user) -> dict | None:
     a = SupplierAnalysis.objects.filter(supplier=supplier, kind=SupplierAnalysis.MAIL, owner=user).first()
     if a is None or "topics" not in (a.result or {}):
         return None
-    return {"topics": a.result["topics"], "at": a.created_at, "date_from": a.date_from, "date_to": a.date_to}
+    return {"topics": a.result["topics"], "at": a.created_at, "date_from": a.date_from, "date_to": a.date_to,
+            "truncated": bool(a.result.get("truncated"))}
 
 
 def is_history(po) -> bool:

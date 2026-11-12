@@ -3617,6 +3617,7 @@
 {"uk": "Існуючі об'єкти будуть", "en": "Existing objects will be", "de": "Vorhandene Objekte werden"}
 {"uk": "Іспанія", "en": "Spain", "de": "Spanien"}
 {"uk": "Історію з пошти зібрано: листів {0}, тем {1}", "en": "History collected from mail: {0} e-mails, {1} topics", "de": "Verlauf aus der Post erstellt: {0} E-Mails, {1} Themen"}
+{"uk": "Історію зібрано ({0} – {1}): листів {2}, тем {3}, нових подій {4}", "en": "History collected ({0} – {1}): {2} e-mails, {3} topics, {4} new events", "de": "Verlauf erstellt ({0} – {1}): {2} E-Mails, {3} Themen, {4} neue Ereignisse"}
 {"uk": "Історію зібрано: листів {0}, тем {1}, нових подій {2}", "en": "History collected: {0} e-mails, {1} topics, {2} new events", "de": "Verlauf erstellt: {0} E-Mails, {1} Themen, {2} neue Ereignisse"}
 {"uk": "Історія", "en": "History", "de": "Historie"}
 {"uk": "Історія (як у «📜 Історії»), огляд проєкту, інші листування з клієнтом", "en": "History (as in “📜 History”), project overview, other correspondence with the customer", "de": "Verlauf (wie unter „📜 Verlauf“), Projektübersicht, weiterer Schriftverkehr mit dem Kunden"}
@@ -6778,6 +6779,7 @@
 {"uk": "За часом Берліна.", "en": "Berlin time.", "de": "Berliner Zeit."}
 {"uk": "За часом Берліна. Розклад сервера сам надсилає брифінг у цей час (раз на день).", "en": "In Berlin time. The server schedule sends the briefing itself at this time (once a day).", "de": "In Berliner Zeit. Der Serverzeitplan sendet das Briefing zu dieser Zeit selbst (einmal täglich)."}
 {"uk": "За шаблоном ступенів магазину (знижки від ціни 1 шт.)", "en": "By the shop price break template (discounts from the 1 pc price)", "de": "Nach der Staffelpreis-Vorlage des Shops (Rabatte auf den Preis für 1 Stk.)"}
+{"uk": "За який час перечитати пошту — більший період нічого не коштує, лише довше читається", "en": "Which period of mail to re-read — a longer period costs nothing, it just takes longer", "de": "Welcher Zeitraum der Post neu gelesen wird — ein längerer kostet nichts, dauert nur länger"}
 {"uk": "Забагато адрес — не більше {0}.", "en": "Too many addresses — no more than {0}.", "de": "Zu viele Adressen — höchstens {0}."}
 {"uk": "Забагато запитів — повторіть пізніше.", "en": "Too many requests — try again later.", "de": "Zu viele Anfragen — bitte später erneut versuchen."}
 {"uk": "Забагато запитів.", "en": "Too many requests.", "de": "Zu viele Anfragen."}
@@ -8160,6 +8162,7 @@
 {"uk": "Зібрати з полів Ship to", "en": "Assemble from the Ship to fields", "de": "Aus den Ship-to-Feldern zusammenstellen"}
 {"uk": "Зібрати написи з коду", "en": "Collect labels from code", "de": "Beschriftungen aus dem Code sammeln"}
 {"uk": "Зібрати статику", "en": "Collect static files", "de": "Statische Dateien sammeln"}
+{"uk": "Зібрати історію з пошти", "en": "Collect history from mail", "de": "Verlauf aus der Post erstellen"}
 {"uk": "Зібрати історію з пошти (за {0} років)", "en": "Collect history from mail (last {0} years)", "de": "Verlauf aus der Post erstellen (letzte {0} Jahre)"}
 {"uk": "Зімбабве", "en": "Zimbabwe", "de": "Simbabwe"}
 {"uk": "Зіставте колонки", "en": "Map the columns", "de": "Ordnen Sie die Spalten zu"}
@@ -9150,12 +9153,14 @@
 {"uk": "Листів", "en": "E-mails", "de": "E-Mails"}
 {"uk": "Листів без категорії: {0}, груп: {1}", "en": "Emails without a category: {0}, groups: {1}", "de": "E-Mails ohne Kategorie: {0}, Gruppen: {1}"}
 {"uk": "Листів з вкладеннями не знайдено", "en": "No e-mails with attachments found", "de": "Keine E-Mails mit Anhängen gefunden"}
+{"uk": "Листів з ними за цей період понад {0} — показано найновіші {1}; для давніших виберіть коротший період або свої дати.", "en": "More than {0} e-mails with them in this period — the newest {1} are shown; for older ones choose a shorter period or your own dates.", "de": "Mehr als {0} E-Mails mit ihnen in diesem Zeitraum — die neuesten {1} werden gezeigt; für ältere einen kürzeren Zeitraum oder eigene Daten wählen."}
 {"uk": "Листів за 30 днів", "en": "Emails in 30 days", "de": "E-Mails in 30 Tagen"}
 {"uk": "Листів за {0} год ({1}): {2}, непрочитаних: {3}", "en": "Листів за {0} год ({1}): {2}, непрочитаних: {3}", "de": "Листів за {0} год ({1}): {2}, непрочитаних: {3}"}
 {"uk": "Листів за прохід (за замовч. PER_LOOP)", "en": "E-mails per pass (default PER_LOOP)", "de": "E-Mails pro Durchlauf (Standard: PER_LOOP)"}
 {"uk": "Листів за тиждень: від клієнта {0}, наших {1}.", "en": "Emails this week: from the customer {0}, ours {1}.", "de": "E-Mails diese Woche: vom Kunden {0}, von uns {1}."}
 {"uk": "Листів не знайдено", "en": "No e-mails found", "de": "Keine E-Mails gefunden"}
 {"uk": "Листів не знайдено.", "en": "No e-mails found.", "de": "Keine E-Mails gefunden."}
+{"uk": "Листів понад {0} — узято найновіші; для давніших виберіть коротший період або свої дати.", "en": "More than {0} e-mails — the newest were taken; for older ones choose a shorter period or your own dates.", "de": "Mehr als {0} E-Mails — die neuesten wurden genommen; für ältere einen kürzeren Zeitraum oder eigene Daten wählen."}
 {"uk": "Листів про це замовлення", "en": "Emails about this order", "de": "E-Mails zu diesem Auftrag"}
 {"uk": "Листів про це замовлення у ваших скриньках немає.", "en": "There are no e-mails about this order in your mailboxes.", "de": "In Ihren Postfächern gibt es keine E-Mails zu diesem Auftrag."}
 {"uk": "Листів про це замовлення у вашій пошті немає.", "en": "No emails about this order in your mailboxes.", "de": "Keine E-Mails zu diesem Auftrag in Ihren Postfächern."}
@@ -18343,7 +18348,9 @@
 {"uk": "за", "en": "at", "de": "zu"}
 {"uk": "за 1 шт, 12 міс", "en": "per 1 pc, 12 mo", "de": "pro 1 Stk, 12 Mon."}
 {"uk": "за 12 міс", "en": "over 12 months", "de": "in 12 Monaten"}
+{"uk": "за 2 роки", "en": "last 2 years", "de": "letzte 2 Jahre"}
 {"uk": "за 30 днів", "en": "over 30 days", "de": "in 30 Tagen"}
+{"uk": "за 5 років", "en": "last 5 years", "de": "letzte 5 Jahre"}
 {"uk": "за 90 днів", "en": "over 90 days", "de": "in 90 Tagen"}
 {"uk": "за ID офера, інакше за артикулом. Нічого не змінюється, поки не натиснете кнопку.", "en": "by offer ID, otherwise by SKU. Nothing changes until you click the button.", "de": "nach Offer-ID, andernfalls nach Artikelnummer. Es ändert sich nichts, bis Sie auf die Schaltfläche klicken."}
 {"uk": "за {0} дн.", "en": "for {0} days", "de": "für {0} Tage"}
@@ -18387,6 +18394,7 @@
 {"uk": "за правилом; перевірка й надсилання — у фоні (bots/services/dk_media.py), хід — media/status/.", "en": "by the rule; checking and sending run in the background (bots/services/dk_media.py), progress — media/status/.", "de": "nach Regel; Prüfung und Versand laufen im Hintergrund (bots/services/dk_media.py), Fortschritt — media/status/."}
 {"uk": "за роллю", "en": "by role", "de": "nach Rolle"}
 {"uk": "за роллю (", "en": "by role (", "de": "nach Rolle ("}
+{"uk": "за рік", "en": "last year", "de": "letztes Jahr"}
 {"uk": "за ставками askDANTE", "en": "at askDANTE rates", "de": "nach askDANTE-Sätzen"}
 {"uk": "за сьогодні", "en": "for today", "de": "für heute"}
 {"uk": "за типом", "en": "by type", "de": "nach Typ"}
@@ -20537,6 +20545,7 @@
 {"uk": "сб", "en": "сб", "de": "сб"}
 {"uk": "своя", "en": "own", "de": "eigene"}
 {"uk": "своя адреса, Enter", "en": "your own address, Enter", "de": "eigene Adresse, Enter"}
+{"uk": "свої дати…", "en": "own dates…", "de": "eigene Daten…"}
 {"uk": "свої правила", "en": "own rules", "de": "eigene Regeln"}
 {"uk": "свята й відпустки askDANTE не прочитано", "en": "askDANTE holidays and vacations were not read", "de": "askDANTE-Feiertage und -Urlaube wurden nicht gelesen"}
 {"uk": "свята й відпустки askDANTE не прочитано — день не відкрито", "en": "askDANTE holidays and vacations were not read — the day was not opened", "de": "askDANTE-Feiertage und -Urlaube wurden nicht gelesen — der Tag wurde nicht geöffnet"}

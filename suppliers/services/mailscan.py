@@ -62,7 +62,8 @@ def po_tokens(supplier) -> dict:
 
 
 def messages(supplier, user, date_from, date_to):
-    """Листи власних скриньок людини, що стосуються постачальника, за період (старі першими)."""
+    """Листи власних скриньок людини, що стосуються постачальника, за період (старі першими). Понад SCAN_MAX —
+    найновіші SCAN_MAX (раніше відкидались найновіші: за «уся пошта» зникали саме свіжі листи)."""
     from email_assistant.models import EmailMessage
     emails, domains = match.keys(supplier)
     tokens = po_tokens(supplier)
@@ -79,9 +80,11 @@ def messages(supplier, user, date_from, date_to):
     qs = (EmailMessage.objects.filter(account__user=user, is_deleted=False, is_spam=False,
                                       sent_at__gte=start, sent_at__lt=end)
           .exclude(folder__in=[EmailMessage.FOLDER_DRAFT, EmailMessage.FOLDER_SPAM])
-          .filter(cond).select_related("thread", "account").order_by("sent_at", "pk"))
+          .filter(cond).select_related("thread", "account"))
+    newest = list(qs.order_by("-sent_at", "-pk")[:SCAN_MAX])
+    newest.reverse()
     seen, out = set(), []
-    for m in qs[:SCAN_MAX]:
+    for m in newest:
         key = m.message_id or f"pk:{m.pk}"     # копія з «Надісланих» і запис Minerva — один лист
         if key in seen:
             continue
@@ -199,4 +202,5 @@ def summary(result: dict) -> dict:
         "problems": [{"pk": p["message"].pk, "word": p["word"]} for p in result["problems"]],
         "documents": result["documents"],
         "orders": [g["po"].code for g in result["groups"] if g["po"] is not None][:30],
+        "truncated": bool(result.get("truncated")),
     }
