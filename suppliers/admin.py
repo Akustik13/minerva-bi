@@ -168,6 +168,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                                             else "generic"),
                                   reply_by=timezone.localdate() + datetime.timedelta(days=7))
             picked = {int(initial_supplier)} if str(initial_supplier or "").isdigit() else set()
+            # «📨 Запит (RFQ) вибраним» зі списку постачальників — ?suppliers=1,2,3
+            picked |= {int(x) for x in str(request.GET.get("suppliers") or "").split(",") if x.isdigit()}
             if category is not None and not picked:
                 picked = set(category.suppliers.values_list("pk", flat=True))
         else:

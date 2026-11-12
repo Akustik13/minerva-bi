@@ -27,14 +27,18 @@ def _set(job_id, **data):
     return state
 
 
-def start(user, title, fn) -> str:
-    """fn() → dict (результат для сторінки: {url, message} …). → id завдання."""
+def start(user, title, fn, progress=False) -> str:
+    """fn() → dict (результат для сторінки: {url, message} …). → id завдання. progress=True — fn(report): report(текст)
+    показує людині, що зараз робиться («3 / 16 · PCBWay»)."""
     job_id = uuid.uuid4().hex
-    _set(job_id, user=getattr(user, "pk", None), title=title, status="running", result=None, error="")
+    _set(job_id, user=getattr(user, "pk", None), title=title, status="running", result=None, error="", progress="")
+
+    def report(text):
+        _set(job_id, progress=str(text or "")[:200])
 
     def run():
         try:
-            result = fn() or {}
+            result = (fn(report) if progress else fn()) or {}
             _set(job_id, status="done", result=result)
         except Exception as e:  # noqa: BLE001 — показати людині, а не впасти мовчки
             from suppliers.services.ai import AIError

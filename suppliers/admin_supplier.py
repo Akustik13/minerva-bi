@@ -136,9 +136,113 @@ class CategoryFilter(admin.SimpleListFilter):
         return queryset
 
 
+BULK_AI_MAX = 20          # 🧠 / 🌐 за один запуск — платно, кожен постачальник — окремий запит AI
+
+
 class SupplierCardMixin:
     """Підмішується в inventory.admin.SupplierAdmin."""
     inlines = (SupplierContactInline,)
+    actions = ["action_history", "action_evaluate", "action_research", "action_rfq"]
+
+    # ── дії для вибраних у списку — те саме, що в картці; сторінка …/supplier/bulk/ (bulk_view) ──
+    def _bulk_redirect(self, do, queryset):
+        ids = ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)[:100])
+        return redirect(reverse("admin:inventory_supplier_bulk") + f"?do={do}&ids={ids}")
+
+    @admin.action(description="🧵 Зібрати історію з пошти (і контакти, закупівлі з PI)…", permissions=["view"])
+    def action_history(self, request, queryset):
+        return self._bulk_redirect("history", queryset)
+
+    @admin.action(description="🧠 AI-оцінка з листування…", permissions=["change"])
+    def action_evaluate(self, request, queryset):
+        return self._bulk_redirect("evaluate", queryset)
+
+    @admin.action(description="🌐 Знайти про них в інтернеті (AI)…", permissions=["change"])
+    def action_research(self, request, queryset):
+        return self._bulk_redirect("research", queryset)
+
+    @admin.action(description="📨 Запит (RFQ) вибраним постачальникам", permissions=["rfq"])
+    def action_rfq(self, request, queryset):
+        ids = ",".join(str(pk) for pk in queryset.values_list("pk", flat=True)[:100])
+        return redirect(reverse("admin:suppliers_supplierrequest_new") + f"?suppliers={ids}")
+
+    def has_rfq_permission(self, request):
+        return request.user.has_perm("suppliers.add_supplierrequest")
+
+    def bulk_view(self, request):
+        """GET — що зробити з вибраними (період, закупівлі з PI / модель AI); POST — фоново по одному, хід — у
+        jobs.state («3 / 16 · PCBWay»), підсумок по кожному. 🧵 — право бачити, 🧠 / 🌐 — змінювати (як у картці)."""
+        from inventory.models import Supplier
+        from suppliers.services import ai, history, jobs, mailscan
+        from suppliers.services.overview import purchases
+        do = request.GET.get("do") or request.POST.get("do")
+        titles = {"history": "🧵 Історія з пошти для вибраних", "evaluate": "🧠 AI-оцінка вибраних",
+                  "research": "🌐 Пошук в інтернеті для вибраних"}
+        if do not in titles:
+            raise Http404
+        ids = [int(x) for x in str(request.GET.get("ids") or request.POST.get("ids") or "").split(",") if x.isdigit()]
+        sups = [s for s in self.get_queryset(request).filter(pk__in=ids[:100]).order_by("name")
+                if (self.has_view_permission(request, s) if do == "history" else self.has_change_permission(request, s))]
+        if do != "history":
+            sups = sups[:BULK_AI_MAX]
+        user = request.user
+        if request.method == "POST":
+            if not sups:
+                return JsonResponse({"error": "Немає вибраних постачальників, з якими вам це дозволено."}, status=400)
+            pks = [s.pk for s in sups]
+            if do == "history":
+                date_from, date_to = history.period_of(request.POST.get("hist_period"), request.POST.get("hist_from"),
+                                                       request.POST.get("hist_to"))
+                make_po = bool(request.POST.get("make_po")) and user.has_perm("inventory.add_purchaseorder")
+                as_history = bool(request.POST.get("po_history"))
+
+                def run(report):
+                    rows, tot = [], {"messages": 0, "topics": 0, "contacts": 0, "pos": 0}
+                    for i, s in enumerate(Supplier.objects.filter(pk__in=pks).order_by("name"), 1):
+                        report(f"{i} / {len(pks)} · {s.name}")
+                        out = history.rebuild(s, user, date_from=date_from, date_to=date_to)
+                        made = history.make_purchases(s, user, as_history=as_history)["pos"] if make_po else []
+                        for k in ("messages", "topics", "contacts"):
+                            tot[k] += out.get(k) or 0
+                        tot["pos"] += len(made)
+                        rows.append({"name": s.name, "url": reverse("admin:inventory_supplier_change", args=[s.pk]),
+                                     "text": f"листів {out['messages']}, тем {out['topics']}"
+                                             + (f", 👥 +{out['contacts']}" if out.get("contacts") else "")
+                                             + (f", 🛒 {', '.join(p.code for p in made)}" if made else "")
+                                             + (" · ⚠️ понад 1500 листів" if out.get("truncated") else "")})
+                    return {"message": f"🧵 Готово: постачальників {len(rows)}, листів {tot['messages']}, тем "
+                                       f"{tot['topics']}, нових контактних осіб {tot['contacts']}"
+                                       + (f", закупівель {tot['pos']}" if make_po else ""), "rows": rows}
+            else:
+                model = ai.model_of(request.POST.get("model"))
+
+                def run(report):
+                    rows, done, streak = [], 0, 0
+                    for i, s in enumerate(Supplier.objects.filter(pk__in=pks).order_by("name"), 1):
+                        report(f"{i} / {len(pks)} · {s.name}")
+                        url = reverse("admin:inventory_supplier_change", args=[s.pk])
+                        try:
+                            if do == "evaluate":
+                                a = ai.evaluate(s, user, mailscan.scan(s, user), purchases(s), model=model)
+                                text = f"оцінка {a.result.get('rating') or '—'}/5"
+                            else:
+                                ai.research(s, user=user, model=model)
+                                text = "✓ знайдено"
+                            done, streak = done + 1, 0
+                        except ai.AIError as e:
+                            text, streak = f"⚠️ {e}", streak + 1
+                        rows.append({"name": s.name, "url": url, "text": text})
+                        if streak >= 3:
+                            rows.append({"name": "", "url": "", "text": "⏹ Зупинено після трьох помилок поспіль."})
+                            break
+                    return {"message": f"{'🧠' if do == 'evaluate' else '🌐'} Готово: {done} з {len(pks)}",
+                            "rows": rows}
+            return JsonResponse({"job": jobs.start(user, f"suppliers bulk {do}", run, progress=True)})
+        return TemplateResponse(request, "admin/suppliers/bulk.html", self._ctx(
+            request, titles[do], do=do, sups=sups, ids=",".join(str(s.pk) for s in sups), asked=len(ids),
+            periods=history.PERIODS, default_period=str(history.YEARS), ai_max=BULK_AI_MAX,
+            po_opts=po_options() if do == "history" and user.has_perm("inventory.add_purchaseorder") else "",
+            back=reverse("admin:inventory_supplier_changelist")))
 
     # ── список ──
     def get_queryset(self, request):
@@ -510,6 +614,7 @@ class SupplierCardMixin:
             path("cards/", view(self.cards_view), name="inventory_supplier_cards"),
             path("cards/<int:media_pk>/", view(self.card_review_view), name="inventory_supplier_card_review"),
             path("cards/crm-search/", view(self.crm_search_view), name="inventory_supplier_crm_search"),
+            path("bulk/", view(self.bulk_view), name="inventory_supplier_bulk"),
             path("card/presets/", view(self.card_presets_view), name="inventory_supplier_card_presets"),
             path("job/<str:job_id>/", view(self.job_view), name="inventory_supplier_job"),
             path("search/", view(self.search_view), name="inventory_supplier_search"),
@@ -585,7 +690,8 @@ class SupplierCardMixin:
             return redirect(reverse("admin:inventory_purchaseorder_change", args=[po.pk]))
         out = history.rebuild(obj, request.user, date_from=date_from, date_to=date_to)
         self.message_user(request, f"🧵 Історію зібрано ({out['date_from']:%d.%m.%Y} – {out['date_to']:%d.%m.%Y}): "
-                                   f"листів {out['messages']}, тем {out['topics']}, нових подій {out['events']}",
+                                   f"листів {out['messages']}, тем {out['topics']}, нових подій {out['events']}" +
+                          (f", 👥 нових контактних осіб {out['contacts']}" if out.get("contacts") else ""),
                           messages.SUCCESS)
         if out["truncated"]:
             from suppliers.services.mailscan import SCAN_MAX
@@ -720,7 +826,8 @@ class SupplierCardMixin:
         try:
             out = history.rebuild(supplier, request.user)
             if out["messages"]:
-                self.message_user(request, f"🧵 Історію з пошти зібрано: листів {out['messages']}, тем {out['topics']}",
+                self.message_user(request, f"🧵 Історію з пошти зібрано: листів {out['messages']}, тем {out['topics']}" +
+                                  (f", 👥 нових контактних осіб {out['contacts']}" if out.get("contacts") else ""),
                                   messages.INFO)
             self._make_purchases(request, supplier)
         except Exception:  # noqa: BLE001
@@ -1323,7 +1430,7 @@ _JOB_JS = mark_safe("""<script>
     var base = (window.SP_JOB_URL || '/admin/inventory/supplier/job/'), t0 = Date.now();
     (function tick(){
       fetch(base + job + '/', {credentials:'same-origin'}).then(function(r){ return r.json(); }).then(function(s){
-        if (s.status === 'running') { if (out) out.textContent = '⏳ AI працює… ' + Math.round((Date.now()-t0)/1000) + ' с';
+        if (s.status === 'running') { if (out) out.textContent = '⏳ ' + (s.progress || 'AI працює…') + ' · ' + Math.round((Date.now()-t0)/1000) + ' с';
           return setTimeout(tick, 2000); }
         if (s.status === 'failed') { if (out) out.textContent = '⚠️ ' + (s.error || 'помилка'); return; }
         if (s.status === 'done') { if (done) return done(s.result || {}); var r = s.result || {};

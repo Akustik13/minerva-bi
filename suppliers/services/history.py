@@ -169,7 +169,9 @@ def save(supplier, user, result) -> dict:
         defaults={"date_from": result["date_from"], "date_to": result["date_to"],
                   "result": {**mailscan.summary(result), "topics": topics}, "created_at": timezone.now()})
     events = _events(supplier, user, result)
-    return {"topics": len(topics), "events": events, "messages": result["messages"]}
+    from suppliers.services import people          # 👥 усі люди постачальника з листування → контактні особи
+    contacts = people.sync(supplier, [m for g in result["groups"] for m in g["messages"]], user)
+    return {"topics": len(topics), "events": events, "messages": result["messages"], "contacts": len(contacts)}
 
 
 _MILESTONE_DOCS = ("quotation", "pi", "invoice", "confirmation")

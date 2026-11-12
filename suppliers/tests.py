@@ -1035,3 +1035,71 @@ class HistoryPeriodTests(Base):
         with mock.patch.object(mailscan, "SCAN_MAX", 2):
             page = self.client.get(reverse("admin:inventory_supplier_change", args=[self.supplier.pk]))
         self.assertContains(page, "показано найновіші 2")
+
+
+class PeopleAndBulkTests(Base):
+    """👥 Усі люди з листування → контактні особи; дії для вибраних постачальників у списку."""
+    _att = HistoryTests._att
+    _thread = HistoryTests._thread
+
+    def test_people_from_mail_become_contacts(self):
+        from suppliers.services import history, people
+        self.mail(frm="anna@pcbway.com", name="Anna Li", subject="Quotation", body="Price\n\n--\nAnna Li\n+86 755 1234 5678")
+        self.mail(frm=ME, to=["anna@pcbway.com"], folder="sent", subject="Re: Quotation", body="Thanks")
+        m = self.mail(frm=ME, to=["anna@pcbway.com"], folder="sent", subject="Order", body="Order")
+        m.cc_emails = ["Bob Wu <bob.wu@pcbway.com>", "colleague@sevskiy.de", "x@other-firm.com"]
+        m.save(update_fields=["cc_emails"])
+        self.mail(frm="newsletter@pcbway.com", name="PCBWay News", subject="Peak season", body="Promo")
+        msgs = [x for g in mailscan.scan(self.supplier, self.user)["groups"] for x in g["messages"]]
+        found = {p["email"]: p for p in people.collect(self.supplier, msgs)}
+        self.assertEqual(set(found), {"anna@pcbway.com", "bob.wu@pcbway.com"})
+        self.assertEqual((found["anna@pcbway.com"]["name"], found["anna@pcbway.com"]["phone"]),
+                         ("Anna Li", "+86 755 1234 5678"))
+        out = history.rebuild(self.supplier, self.user)
+        self.assertEqual(out["contacts"], 2)
+        self.assertEqual(sorted(self.supplier.contacts.values_list("name", "email")),
+                         [("Anna Li", "anna@pcbway.com"), ("Bob Wu", "bob.wu@pcbway.com")])
+        self.assertEqual(history.rebuild(self.supplier, self.user)["contacts"], 0)          # без дублів
+        self.assertEqual(people.pretty("cindy.pan@ringpcb.com"), "Cindy Pan")
+        self.assertEqual(people.pretty("sales@ringpcb.com"), "Sales")
+
+    def test_actions_redirect_to_bulk_and_rfq(self):
+        other = Supplier.objects.create(name="Ring PCB", email="cindy.pan@ringpcb.com")
+        url = reverse("admin:inventory_supplier_changelist")
+        resp = self.client.post(url, {"action": "action_history", "_selected_action": [self.supplier.pk, other.pk]})
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(reverse("admin:inventory_supplier_bulk") + "?do=history&ids=", resp["Location"])
+        page = self.client.get(resp["Location"])
+        self.assertContains(page, "Ring PCB")
+        self.assertContains(page, 'name="hist_period"')
+        self.assertContains(page, 'name="make_po"')
+        resp = self.client.post(url, {"action": "action_rfq", "_selected_action": [self.supplier.pk, other.pk]})
+        self.assertIn("?suppliers=", resp["Location"])
+        form = self.client.get(resp["Location"])
+        self.assertEqual(form.status_code, 200)
+        self.assertEqual(set(form.context["picked"]), {self.supplier.pk, other.pk})
+
+    def test_bulk_history_collects_contacts_and_purchases(self):
+        self._thread()
+        bulk = reverse("admin:inventory_supplier_bulk")
+        j = self.client.post(bulk + f"?do=history&ids={self.supplier.pk}",
+                             {"do": "history", "ids": str(self.supplier.pk), "hist_period": "1", "make_po": "1",
+                              "po_history": "1"}).json()
+        s = jobs.state(j["job"], self.user)
+        self.assertEqual(s["status"], "done")
+        self.assertIn("постачальників 1", s["result"]["message"])
+        self.assertEqual(PurchaseOrder.objects.get(supplier=self.supplier).status, "received")
+        self.assertIn("🛒 PO-", s["result"]["rows"][0]["text"])
+        self.assertTrue(self.supplier.contacts.filter(email="sales@pcbway.com").exists())
+
+    def test_bulk_evaluate_with_ai_and_rights(self):
+        self.mail(frm="anna@pcbway.com", body="Boards ready")
+        bulk = reverse("admin:inventory_supplier_bulk")
+        answer = json.dumps({"summary": "ok", "rating": 4, "problems": []})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.01"))):
+            j = self.client.post(bulk, {"do": "evaluate", "ids": str(self.supplier.pk)}).json()
+        s = jobs.state(j["job"], self.user)
+        self.assertEqual(s["result"]["rows"][0]["text"], "оцінка 4/5")
+        self.assertTrue(SupplierAnalysis.objects.filter(supplier=self.supplier, kind=SupplierAnalysis.AI).exists())
+        self.client.force_login(self.other)                                     # без права — нічого
+        self.assertNotEqual(self.client.post(bulk, {"do": "evaluate", "ids": str(self.supplier.pk)}).status_code, 200)

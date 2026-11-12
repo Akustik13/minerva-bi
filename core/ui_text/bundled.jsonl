@@ -279,6 +279,7 @@
 {"uk": "(відкинуто {0}: немає доступу або індекс ще оновлюється)", "en": "({0} rejected: no access or the index is still being updated)", "de": "({0} verworfen: kein Zugriff oder der Index wird noch aktualisiert)"}
 {"uk": "(відповідь обрізано)", "en": "(reply truncated)", "de": "(Antwort gekürzt)"}
 {"uk": "(відправ\\w*|відвантаж\\w*|ship\\w*|versand|versend\\w*)\\W+(\\w+\\W+){0,3}(сьогодні|today|heute|черг\\w*)|(черг\\w*|queue)\\W+(\\w+\\W+){0,2}(відправ\\w*|ship\\w*|versand)", "en": "(відправ\\w*|відвантаж\\w*|ship\\w*|versand|versend\\w*)\\W+(\\w+\\W+){0,3}(сьогодні|today|heute|черг\\w*)|(черг\\w*|queue)\\W+(\\w+\\W+){0,2}(відправ\\w*|ship\\w*|versand)", "de": "(відправ\\w*|відвантаж\\w*|ship\\w*|versand|versend\\w*)\\W+(\\w+\\W+){0,3}(сьогодні|today|heute|черг\\w*)|(черг\\w*|queue)\\W+(\\w+\\W+){0,2}(відправ\\w*|ship\\w*|versand)"}
+{"uk": "(відправники їхніх листів і їхні колеги в «Кому» / «Копія»). AI не працює — це безкоштовно.", "en": "(senders of their e-mails and their colleagues in «To» / «Cc»). No AI is used — it is free.", "de": "(Absender ihrer E-Mails und ihre Kollegen in «An» / «Cc»). Keine KI — kostenlos."}
 {"uk": "(г/шт)", "en": "(g/pc)", "de": "(g/Stk.)"}
 {"uk": "(давно мовчить)", "en": "(silent for a long time)", "de": "(schweigt seit Langem)"}
 {"uk": "(дані змінились)", "en": "(data changed)", "de": "(Daten geändert)"}
@@ -291,6 +292,7 @@
 {"uk": "(довше 200 символів)", "en": "(longer than 200 characters)", "de": "(länger als 200 Zeichen)"}
 {"uk": "(дізнатись через /myid в боті)", "en": "(find out via /myid in the bot)", "de": "(über /myid im Bot herausfinden)"}
 {"uk": "(з Minerva)", "en": "(from Minerva)", "de": "(aus Minerva)"}
+{"uk": "(з {0}", "en": "(of {0}", "de": "(von {0}"}
 {"uk": "(з {0})", "en": "(since {0})", "de": "(seit {0})"}
 {"uk": "(з замовлення)", "en": "(from order)", "de": "(aus dem Auftrag)"}
 {"uk": "(за бажанням)", "en": "(optional)", "de": "(optional)"}
@@ -808,6 +810,7 @@
 {"uk": "AI загалом: {0}", "en": "AI total: {0}", "de": "KI gesamt: {0}"}
 {"uk": "AI запитів всього", "en": "AI requests total", "de": "KI-Anfragen gesamt"}
 {"uk": "AI заповнив полів", "en": "AI filled fields", "de": "KI hat Felder ausgefüllt"}
+{"uk": "AI знайде в інтернеті про кожного: хто вони, продукція, виробництво, сертифікати, ризики, джерела.", "en": "AI will find on the internet about each: who they are, products, production, certificates, risks, sources.", "de": "Die KI sucht im Internet zu jedem: wer sie sind, Produkte, Fertigung, Zertifikate, Risiken, Quellen."}
 {"uk": "AI класифікація: {0}", "en": "AI classification: {0}", "de": "KI-Klassifizierung: {0}"}
 {"uk": "AI модель", "en": "AI model", "de": "KI-Modell"}
 {"uk": "AI модель пошти", "en": "Mail AI model", "de": "KI-Modell für E-Mail"}
@@ -841,6 +844,8 @@
 {"uk": "AI не підключений — налаштуйте UserProfile", "en": "AI is not connected — configure UserProfile", "de": "KI ist nicht verbunden — konfigurieren Sie UserProfile"}
 {"uk": "AI не склав жодного кроку — спробуйте ще раз або візьміть шаблон", "en": "The AI did not draft a single step — try again or take a template", "de": "Die KI hat keinen einzigen Schritt erstellt — versuchen Sie es erneut oder nehmen Sie eine Vorlage"}
 {"uk": "AI недоступний — перевірте ключ і ліміти в «Налаштуваннях AI»", "en": "AI is unavailable — check the key and limits in «AI settings»", "de": "KI nicht verfügbar — Schlüssel und Limits in den «KI-Einstellungen» prüfen"}
+{"uk": "AI опрацює {0} постачальників по черзі — це платно. Продовжити?", "en": "AI will process {0} suppliers one by one — this costs money. Continue?", "de": "Die KI bearbeitet {0} Lieferanten nacheinander — das ist kostenpflichtig. Fortfahren?"}
+{"uk": "AI оцінить кожного за", "en": "AI will assess each by", "de": "Die KI bewertet jeden anhand"}
 {"uk": "AI перевірив {0} з {1} листів, термінів {2}", "en": "AI checked {0} of {1} e-mails, deadlines {2}", "de": "KI hat {0} von {1} E-Mails geprüft, Fristen {2}"}
 {"uk": "AI перезаписує вже внесене", "en": "AI overwrites what is already entered", "de": "KI überschreibt bereits Eingetragenes"}
 {"uk": "AI перепише тему й текст за вашим побажанням і мовою; номери, артикули, дати й кількості лишаються ті самі. Нічого не надсилається.", "en": "AI rewrites the subject and text as you ask and in the chosen language; numbers, SKUs, dates and quantities stay the same. Nothing is sent.", "de": "Die KI schreibt Betreff und Text nach Ihrem Wunsch und in der gewählten Sprache um; Nummern, Artikel, Daten und Mengen bleiben gleich. Nichts wird gesendet."}
@@ -900,8 +905,10 @@
 {"uk": "AI-огляд проєкту", "en": "AI project overview", "de": "KI-Projektübersicht"}
 {"uk": "AI-огляд проєкту від {0}", "en": "AI project overview from {0}", "de": "KI-Projektübersicht vom {0}"}
 {"uk": "AI-оцінка", "en": "AI assessment", "de": "KI-Bewertung"}
+{"uk": "AI-оцінка вибраних", "en": "AI assessment of selected", "de": "KI-Bewertung der Ausgewählten"}
 {"uk": "AI-оцінка з вашої пошти · {0} · {1} листів {2}", "en": "AI assessment from your mail · {0} · {1} e-mails {2}", "de": "KI-Bewertung aus Ihrer Post · {0} · {1} E-Mails {2}"}
 {"uk": "AI-оцінка з листування ({0} листів, ${1})", "en": "AI assessment from correspondence ({0} e-mails, ${1})", "de": "KI-Bewertung aus der Korrespondenz ({0} E-Mails, ${1})"}
+{"uk": "AI-оцінка з листування…", "en": "AI assessment from correspondence…", "de": "KI-Bewertung aus der Korrespondenz…"}
 {"uk": "AI-оцінка постачальника з цього листування", "en": "AI assessment of the supplier from this correspondence", "de": "KI-Bewertung des Lieferanten aus dieser Korrespondenz"}
 {"uk": "AI-помічник", "en": "AI assistant", "de": "KI-Assistent"}
 {"uk": "AI-помічник · {0}{1}", "en": "AI assistant · {0}{1}", "de": "KI-Assistent · {0}{1}"}
@@ -2804,6 +2811,7 @@
 {"uk": "{0} Відкрийте askDANTE і відмітьте відхід або виправте день: {1} Minerva закриває робочий день сама лише тоді, коли в askDANTE за день нічого не внесено вручну.", "en": "{0} Open askDANTE and mark the clock-out or correct the day: {1} Minerva closes the working day by itself only when nothing was entered manually in askDANTE for the day.", "de": "{0} Öffnen Sie askDANTE und markieren Sie das Gehen oder korrigieren Sie den Tag: {1} Minerva schließt den Arbeitstag nur dann selbst, wenn in askDANTE für den Tag nichts manuell eingetragen wurde."}
 {"uk": "{0} Відправлення #{1} → Скасовано.", "en": "{0} Shipment #{1} → Cancelled.", "de": "{0} Sendung #{1} → Storniert."}
 {"uk": "{0} Відправлення #{1}: {2}", "en": "{0} Shipment #{1}: {2}", "de": "{0} Sendung #{1}: {2}"}
+{"uk": "{0} Готово: {1} з {2}", "en": "{0} Done: {1} of {2}", "de": "{0} Fertig: {1} von {2}"}
 {"uk": "{0} Звідки: поле товару «{1}» — {2}{3}{4}", "en": "{0} Source: product field “{1}” — {2}{3}{4}", "de": "{0} Herkunft: Artikelfeld „{1}“ — {2}{3}{4}"}
 {"uk": "{0} Змініть URL у картці вебхука (REST API → Вебхуки) на {1}.", "en": "{0} Change the URL in the webhook card (REST API → Вебхуки) to {1}.", "de": "{0} In der Webhook-Karte (REST API → Вебхуки) die URL auf {1} ändern."}
 {"uk": "{0} КБ", "en": "{0} KB", "de": "{0} KB"}
@@ -3639,6 +3647,7 @@
 {"uk": "Історія базових цін", "en": "Base price history", "de": "Historie der Basispreise"}
 {"uk": "Історія бекапів", "en": "Backup history", "de": "Sicherungsverlauf"}
 {"uk": "Історія з листування: заведено вже отриманою — без складу й без «Очікується», дата отримання невідома. Позицій не додавайте — інакше вони потраплять на склад.", "en": "History from correspondence: created as already received — no stock and no «Expected», receipt date unknown. Do not add lines — otherwise they will go into stock.", "de": "Verlauf aus der Korrespondenz: als bereits erhalten angelegt — ohne Lager und ohne «Erwartet», Eingangsdatum unbekannt. Keine Positionen hinzufügen — sonst kommen sie ins Lager."}
+{"uk": "Історія з пошти для вибраних", "en": "History from mail for selected", "de": "Verlauf aus der Post für Ausgewählte"}
 {"uk": "Історія замовлень", "en": "Order history", "de": "Auftragshistorie"}
 {"uk": "Історія запитів", "en": "Request history", "de": "Anfrageverlauf"}
 {"uk": "Історія змін", "en": "Change history", "de": "Änderungshistorie"}
@@ -5786,6 +5795,7 @@
 {"uk": "Готово: Замовлень створено: {0} Замовлень оновлено: {1} Замовлень без змін: {2} Рядків створено: {3} Рядків пропущено: {4}", "en": "Done: Orders created: {0} Orders updated: {1} Orders unchanged: {2} Lines created: {3} Lines skipped: {4}", "de": "Fertig: Aufträge erstellt: {0} Aufträge aktualisiert: {1} Aufträge unverändert: {2} Positionen erstellt: {3} Positionen übersprungen: {4}"}
 {"uk": "Готово: затверджено {0}, ще очікує {1}, помилок {2}.", "en": "Done: approved {0}, still waiting {1}, errors {2}.", "de": "Fertig: genehmigt {0}, noch ausstehend {1}, Fehler {2}."}
 {"uk": "Готово: нових листів {0}, подій стрічки {1}.", "en": "Done: {0} new e-mails, {1} feed events.", "de": "Fertig: {0} neue E-Mails, {1} Feed-Ereignisse."}
+{"uk": "Готово: постачальників {0}, листів {1}, тем {2}, нових контактних осіб {3}", "en": "Done: {0} suppliers, {1} e-mails, {2} topics, {3} new contacts", "de": "Fertig: {0} Lieferanten, {1} E-Mails, {2} Themen, {3} neue Kontaktpersonen"}
 {"uk": "Готову папку на сервері — кнопкою «📂 Вибрати папку на сервері…»; Minerva читає лише ці корені (файли не копіює)", "en": "An existing folder on the server — with the “📂 Choose folder on the server…” button; Minerva reads only these roots (it does not copy the files)", "de": "Einen vorhandenen Ordner auf dem Server — über die Schaltfläche „📂 Ordner auf dem Server wählen…“; Minerva liest nur diese Wurzelverzeichnisse (Dateien werden nicht kopiert)"}
 {"uk": "Готові до", "en": "Ready until", "de": "Bereit bis"}
 {"uk": "Готові з", "en": "Ready from", "de": "Bereit ab"}
@@ -6127,6 +6137,7 @@
 {"uk": "Для каналу", "en": "For a channel", "de": "Für einen Kanal"}
 {"uk": "Для ключа не налаштовано магазин.", "en": "No shop is configured for the key.", "de": "Für den Schlüssel ist kein Shop konfiguriert."}
 {"uk": "Для ключів API, не прив'язаних до магазину.", "en": "For API keys not bound to a shop.", "de": "Für API-Schlüssel, die keinem Shop zugeordnet sind."}
+{"uk": "Для кожного Minerva перечитає", "en": "For each, Minerva will re-read", "de": "Für jeden liest Minerva"}
 {"uk": "Для кожного товару магазину", "en": "For every product of the shop", "de": "Für jeden Artikel des Shops"}
 {"uk": "Для кожної теми, де від них є PI / рахунок або підтвердження, а закупівлі ще немає", "en": "For every topic with a PI / invoice or confirmation from them and no purchase order yet", "de": "Für jedes Thema mit PI / Rechnung oder Bestätigung von ihnen, zu dem es noch keine Bestellung gibt"}
 {"uk": "Для конкретного листа додайте &gid={0} (знайти в URL листа).", "en": "To target a specific sheet, add &gid={0} (found in the sheet URL).", "de": "Für ein bestimmtes Blatt fügen Sie &gid={0} hinzu (in der URL des Blatts zu finden)."}
@@ -6183,6 +6194,7 @@
 {"uk": "До року", "en": "To year", "de": "Bis Jahr"}
 {"uk": "До скількох знаків округлити ціни перед генерацією інвойсу?", "en": "To how many decimals should prices be rounded before generating the invoice?", "de": "Auf wie viele Nachkommastellen sollen die Preise vor der Rechnungserstellung gerundet werden?"}
 {"uk": "До списку лістингів", "en": "To the listings list", "de": "Zur Listing-Liste"}
+{"uk": "До списку постачальників", "en": "Back to the supplier list", "de": "Zur Lieferantenliste"}
 {"uk": "До сплати", "en": "Amount due", "de": "Zu zahlen"}
 {"uk": "До товарів", "en": "To products", "de": "Zu den Artikeln"}
 {"uk": "До цього часу Minerva не звертається до RAG.", "en": "Until then Minerva does not contact RAG.", "de": "Bis dahin wendet sich Minerva nicht an RAG."}
@@ -7361,6 +7373,7 @@
 {"uk": "Записів часу: {0} ({1}–{2}), прибрано зниклих: {3}.", "en": "Time entries: {0} ({1}–{2}), removed missing: {3}.", "de": "Zeiteinträge: {0} ({1}–{2}), entfernte nicht mehr vorhandene: {3}."}
 {"uk": "Запит", "en": "Request", "de": "Anfrage"}
 {"uk": "Запит (JSON)", "en": "Request (JSON)", "de": "Anfrage (JSON)"}
+{"uk": "Запит (RFQ) вибраним постачальникам", "en": "Request (RFQ) to selected suppliers", "de": "Anfrage (RFQ) an ausgewählte Lieferanten"}
 {"uk": "Запит / потенційний", "en": "Inquiry / potential", "de": "Anfrage / potenziell"}
 {"uk": "Запит API", "en": "API request", "de": "API-Anfrage"}
 {"uk": "Запит {0} «{1}» → {2}", "en": "Request {0} «{1}» → {2}", "de": "Anfrage {0} «{1}» → {2}"}
@@ -7547,6 +7560,7 @@
 {"uk": "Запустити браузер у фоновому режимі (без вікна)", "en": "Run the browser in the background (no window)", "de": "Browser im Hintergrund ausführen (ohne Fenster)"}
 {"uk": "Запустити всі", "en": "Run all", "de": "Alle ausführen"}
 {"uk": "Запустити всі ({0})", "en": "Run all ({0})", "de": "Alle starten ({0})"}
+{"uk": "Запустити для {0}", "en": "Run for {0}", "de": "Für {0} starten"}
 {"uk": "Запустити зараз", "en": "Run now", "de": "Jetzt starten"}
 {"uk": "Запустити зараз (зі звітом)", "en": "Run now (with report)", "de": "Jetzt starten (mit Bericht)"}
 {"uk": "Запустити навіть якщо msg_check_enabled=False", "en": "Run even if msg_check_enabled=False", "de": "Auch ausführen, wenn msg_check_enabled=False"}
@@ -8070,6 +8084,7 @@
 {"uk": "Знайти поле", "en": "Find field", "de": "Feld suchen"}
 {"uk": "Знайти постачальників у пошті", "en": "Find suppliers in mail", "de": "Lieferanten in der Post finden"}
 {"uk": "Знайти про них в інтернеті", "en": "Find them on the internet", "de": "Im Internet über sie suchen"}
+{"uk": "Знайти про них в інтернеті (AI)…", "en": "Find them on the internet (AI)…", "de": "Im Internet über sie suchen (KI)…"}
 {"uk": "Знайти прострочені й більше не актуальні дедлайни — події типу deadline або email_follow_up, дата яких вже минула і вони не виконані. Використовуй перш ніж пропонувати очищення.", "en": "Find overdue and no longer relevant deadlines — events of type deadline or email_follow_up whose date has passed and which are not done. Use before suggesting a cleanup.", "de": "Überfällige und nicht mehr aktuelle Fristen finden — Termine vom Typ deadline oder email_follow_up, deren Datum bereits verstrichen ist und die nicht erledigt sind. Vor einem Bereinigungsvorschlag verwenden."}
 {"uk": "Знайти та синхронізувати один конкретний SKU (Supplier SKU DigiKey)", "en": "Find and sync one specific SKU (DigiKey Supplier SKU)", "de": "Eine bestimmte SKU (DigiKey Supplier SKU) suchen und synchronisieren"}
 {"uk": "Знайти товари складу за артикулом, назвою, виробником, категорією чи параметром. Повертає до 15 товарів (артикул, назва, доступно на складі).", "en": "Find stock products by SKU, name, manufacturer, category or parameter. Returns up to 15 products (SKU, name, available in stock).", "de": "Lagerartikel nach Artikelnummer, Name, Hersteller, Kategorie oder Parameter finden. Liefert bis zu 15 Artikel (Artikelnummer, Name, verfügbar im Lager)."}
@@ -8165,6 +8180,7 @@
 {"uk": "Зрозуміло", "en": "Got it", "de": "Verstanden"}
 {"uk": "Зсув — від 1 до 999 днів", "en": "Shift — from 1 to 999 days", "de": "Verschiebung — 1 bis 999 Tage"}
 {"uk": "Зупинено", "en": "Stopped", "de": "Gestoppt"}
+{"uk": "Зупинено після трьох помилок поспіль.", "en": "Stopped after three errors in a row.", "de": "Nach drei Fehlern in Folge gestoppt."}
 {"uk": "Зупинено: забагато кроків для одного завдання.", "en": "Stopped: too many steps for one task.", "de": "Angehalten: zu viele Schritte für eine Aufgabe."}
 {"uk": "Зупинено: токен не отримано", "en": "Stopped: token not received", "de": "Angehalten: Token nicht erhalten"}
 {"uk": "Зупинити", "en": "Stop", "de": "Stoppen"}
@@ -8186,6 +8202,7 @@
 {"uk": "Зібрати статику", "en": "Collect static files", "de": "Statische Dateien sammeln"}
 {"uk": "Зібрати історію з пошти", "en": "Collect history from mail", "de": "Verlauf aus der Post erstellen"}
 {"uk": "Зібрати історію з пошти (за {0} років)", "en": "Collect history from mail (last {0} years)", "de": "Verlauf aus der Post erstellen (letzte {0} Jahre)"}
+{"uk": "Зібрати історію з пошти (і контакти, закупівлі з PI)…", "en": "Collect history from mail (and contacts, purchase orders from PI)…", "de": "Verlauf aus der Post erstellen (und Kontakte, Bestellungen aus PI)…"}
 {"uk": "Зімбабве", "en": "Zimbabwe", "de": "Simbabwe"}
 {"uk": "Зіставте колонки", "en": "Map the columns", "de": "Ordnen Sie die Spalten zu"}
 {"uk": "З’являться тут після розшифровки.", "en": "Will appear here after transcription.", "de": "Erscheinen hier nach der Transkription."}
@@ -8715,6 +8732,7 @@
 {"uk": "Контакт (необов'язково)", "en": "Contact (optional)", "de": "Kontakt (optional)"}
 {"uk": "Контакт адресної книги", "en": "Address book contact", "de": "Adressbuchkontakt"}
 {"uk": "Контакт для телефону / Outlook (.vcf)", "en": "Contact for phone / Outlook (.vcf)", "de": "Kontakt für Telefon / Outlook (.vcf)"}
+{"uk": "Контакт з листування: {0} · {1}", "en": "Contact from correspondence: {0} · {1}", "de": "Kontakt aus der Korrespondenz: {0} · {1}"}
 {"uk": "Контакт: {0}", "en": "Contact: {0}", "de": "Kontakt: {0}"}
 {"uk": "Контакти", "en": "Contacts", "de": "Kontakte"}
 {"uk": "Контактна особа", "en": "Contact person", "de": "Ansprechpartner"}
@@ -10625,6 +10643,7 @@
 {"uk": "Немає в askDANTE", "en": "Not in askDANTE", "de": "Nicht in askDANTE"}
 {"uk": "Немає в каталозі Minerva і на DigiKey — схоже на виробництво / розробку: ціну введіть вручну", "en": "Not in the Minerva catalog or on DigiKey — looks like production / development: enter the price manually", "de": "Weder im Minerva-Katalog noch auf DigiKey — sieht nach Fertigung / Entwicklung aus: Preis manuell eingeben"}
 {"uk": "Немає в наявності", "en": "Out of stock", "de": "Nicht auf Lager"}
+{"uk": "Немає вибраних постачальників, з якими вам це дозволено.", "en": "No selected suppliers you are allowed to do this with.", "de": "Keine ausgewählten Lieferanten, bei denen Ihnen das erlaubt ist."}
 {"uk": "Немає власника наради", "en": "The meeting has no owner", "de": "Die Besprechung hat keinen Eigentümer"}
 {"uk": "Немає віджетів.", "en": "No widgets.", "de": "Keine Widgets."}
 {"uk": "Немає відповіді", "en": "No reply", "de": "Keine Antwort"}
@@ -13079,6 +13098,7 @@
 {"uk": "Пошук / фільтр списку", "en": "Search / list filter", "de": "Suche / Listenfilter"}
 {"uk": "Пошук будь-якого компонента або виробника через DigiKey Product Information V4 API. Показує наявність, ціни та цінові сходинки, lead time, статус.", "en": "Search for any component or manufacturer via the DigiKey Product Information V4 API. Shows availability, prices and price breaks, lead time, status.", "de": "Suche nach beliebigen Bauteilen oder Herstellern über die DigiKey Product Information V4 API. Zeigt Verfügbarkeit, Preise und Staffelpreise, Lead Time, Status."}
 {"uk": "Пошук в інтернеті (якщо дозволено в завданні)", "en": "Web search (if allowed in the task)", "de": "Internetsuche (wenn in der Aufgabe erlaubt)"}
+{"uk": "Пошук в інтернеті для вибраних", "en": "Internet search for selected", "de": "Internetsuche für Ausgewählte"}
 {"uk": "Пошук в історії RAG: листи своїх скриньок і документи бази знань, лише перевірені Minerva (право «🔎»)", "en": "Search in RAG history: e-mails of your own mailboxes and knowledge base documents, only those verified by Minerva (“🔎” right)", "de": "Suche in der RAG-Historie: E-Mails der eigenen Postfächer und Dokumente der Wissensdatenbank, nur von Minerva geprüfte (Recht „🔎“)"}
 {"uk": "Пошук в історії бази знань (RAG): листування ваших скриньок (і вкладення) та документи бази знань — домовленості, ціни й строки постачальників, HS-коди, що писали клієнти. Повертає лише фрагменти, які Minerva перевірила (ви їх бачите): лист (дата, від кого, тема, посилання) або документ і текст. customer — клієнт CRM (#номер, компанія чи email), project — код P-РРРР-NNN.", "en": "Search in the knowledge base history (RAG): correspondence of your mailboxes (and attachments) and knowledge base documents — agreements, supplier prices and lead times, HS codes, what customers wrote. Returns only fragments verified by Minerva (you see them): an e-mail (date, sender, subject, link) or a document and text. customer — a CRM customer (#number, company or e-mail), project — code P-YYYY-NNN.", "de": "Suche in der Historie der Wissensdatenbank (RAG): Korrespondenz Ihrer Postfächer (und Anhänge) sowie Dokumente der Wissensdatenbank – Vereinbarungen, Preise und Lieferzeiten von Lieferanten, HS-Codes, was Kunden geschrieben haben. Liefert nur von Minerva geprüfte Fragmente (Sie sehen sie): eine E-Mail (Datum, Absender, Betreff, Link) oder ein Dokument und Text. customer – CRM-Kunde (#Nummer, Firma oder E-Mail), project – Code P-JJJJ-NNN."}
 {"uk": "Пошук відправника…", "en": "Search sender…", "de": "Absender suchen…"}
@@ -16527,6 +16547,7 @@
 {"uk": "Хід", "en": "Progress", "de": "Fortschritt"}
 {"uk": "Хід виробництва", "en": "Production progress", "de": "Fertigungsfortschritt"}
 {"uk": "Хід запиту", "en": "Request progress", "de": "Anfrageverlauf"}
+{"uk": "Це", "en": "This is", "de": "Das ist"}
 {"uk": "Це автоматичний лист.", "en": "This is an automatic email.", "de": "Dies ist eine automatische E-Mail."}
 {"uk": "Це був dry-run. Запусти без --dry-run для реальних змін.", "en": "That was a dry run. Run without --dry-run for real changes.", "de": "Das war ein Probelauf (dry-run). Führen Sie den Befehl ohne --dry-run aus, um echte Änderungen vorzunehmen."}
 {"uk": "Це буде записано в лог.", "en": "This will be written to the log.", "de": "Dies wird im Protokoll festgehalten."}
@@ -17787,10 +17808,12 @@
 {"uk": "ваша відповідь: {0} {1}", "en": "your reply: {0} {1}", "de": "Ihre Antwort: {0} {1}"}
 {"uk": "ваша роль в AI — «{0}», потрібна «{1}»: її вибирає адміністратор у профілі → «Роль в AI асистенті»", "en": "your AI role is “{0}”, “{1}” is required: the administrator chooses it in the profile → “AI assistant role”", "de": "Ihre KI-Rolle ist „{0}“, erforderlich ist „{1}“: Sie wird vom Administrator im Profil gewählt → „Rolle im KI-Assistenten“"}
 {"uk": "ваше правило: {0}", "en": "your rule: {0}", "de": "Ihre Regel: {0}"}
+{"uk": "вашим", "en": "your", "de": "Ihrer"}
 {"uk": "ваших", "en": "your", "de": "Ihrer"}
 {"uk": "ваших категорій з лістингів", "en": "your categories from listings", "de": "Ihre Kategorien aus den Listings"}
 {"uk": "ваших категорій з лістингів знайдено в каталозі: {0} з {1}", "en": "your categories from listings found in the catalog: {0} of {1}", "de": "Ihre Kategorien aus den Listings im Katalog gefunden: {0} von {1}"}
 {"uk": "ваших листів прочитано", "en": "your emails read", "de": "Ihre E-Mails gelesen"}
+{"uk": "ваші", "en": "your", "de": "Ihre"}
 {"uk": "ваші офери з DigiKey (один запит на всіх), нічого не змінює. Товар (опис, параметри) — у звірці одного лістингу.", "en": "your offers from DigiKey (one request for all), changes nothing. The product (description, parameters) is in the single-listing reconciliation.", "de": "Ihre Offers von DigiKey (eine Anfrage für alle), ändert nichts. Der Artikel (Beschreibung, Parameter) steht im Abgleich eines einzelnen Listings."}
 {"uk": "введіть нові в копії", "en": "enter new ones in the copy", "de": "geben Sie in der Kopie neue ein"}
 {"uk": "ввести назву виробника", "en": "enter the manufacturer name", "de": "den Herstellernamen eingeben"}
@@ -18217,6 +18240,7 @@
 {"uk": "до 8 рядків, кожен рядок — один крок. Лише адреси й елементи, про які знаєш з гіда чи списку елементів.", "en": "up to 8 lines, each line is one step. Only addresses and elements you know from the guide or the list of elements.", "de": "bis zu 8 Zeilen, jede Zeile ein Schritt. Nur Adressen und Elemente, die Sie aus dem Leitfaden oder der Elementliste kennen."}
 {"uk": "до seq {0}", "en": "up to seq {0}", "de": "bis seq {0}"}
 {"uk": "до {0}", "en": "until {0}", "de": "bis {0}"}
+{"uk": "до {0} за раз і лише ті, які вам можна змінювати", "en": "up to {0} at a time and only those you may change", "de": "bis zu {0} auf einmal und nur die, die Sie ändern dürfen"}
 {"uk": "до {0} шт у коробці", "en": "up to {0} pcs in a box", "de": "bis zu {0} Stk. pro Karton"}
 {"uk": "до {0})", "en": "by {0})", "de": "bis {0})"}
 {"uk": "до ±{0}", "en": "up to ±{0}", "de": "bis ±{0}"}
@@ -19082,6 +19106,7 @@
 {"uk": "листування", "en": "correspondence", "de": "Schriftverkehr"}
 {"uk": "листування з {0}", "en": "correspondence with {0}", "de": "Korrespondenz mit {0}"}
 {"uk": "листування продовжилось — перевірте", "en": "the correspondence continued — check", "de": "die Korrespondenz ging weiter — prüfen"}
+{"uk": "листуванням за рік і закупівлями: як швидко й чітко відповідають, строки, проблеми з цитатами, порада.", "en": "correspondence over the year and purchase orders: how fast and clearly they answer, deadlines, problems with quotes, advice.", "de": "Korrespondenz des Jahres und Bestellungen: wie schnell und klar sie antworten, Termine, Probleme mit Zitaten, Rat."}
 {"uk": "листуємось в обидва боки", "en": "correspondence in both directions", "de": "Korrespondenz in beide Richtungen"}
 {"uk": "листів", "en": "emails", "de": "E-Mails"}
 {"uk": "листів / зустрічей. Перевірте й за потреби виправте.", "en": "e-mails / meetings. Check and correct if necessary.", "de": "E-Mails / Besprechungen. Prüfen und bei Bedarf korrigieren."}
@@ -19089,6 +19114,7 @@
 {"uk": "листів {0} (гілок {1})", "en": "e-mails {0} (threads {1})", "de": "E-Mails {0} (Verläufe {1})"}
 {"uk": "листів {0} (фрагментів {1}) у листуваннях {2}", "en": "emails {0} (fragments {1}) in correspondences {2}", "de": "E-Mails {0} (Fragmente {1}) in Schriftverkehren {2}"}
 {"uk": "листів {0}, документів {1}", "en": "e-mails {0}, documents {1}", "de": "E-Mails {0}, Dokumente {1}"}
+{"uk": "листів {0}, тем {1}", "en": "{0} e-mails, {1} topics", "de": "{0} E-Mails, {1} Themen"}
 {"uk": "листів · гілок {0}", "en": "e-mails · threads {0}", "de": "E-Mails · Verläufe {0}"}
 {"uk": "листів від клієнта {0}, наших {1}", "en": "emails from the customer {0}, ours {1}", "de": "E-Mails vom Kunden {0}, von uns {1}"}
 {"uk": "листів гілки: {0}", "en": "emails in the thread: {0}", "de": "E-Mails im Verlauf: {0}"}
@@ -19696,6 +19722,7 @@
 {"uk": "новий ступінь; зараз на DigiKey {0} шт — по {1}", "en": "new price break; currently on DigiKey {0} pcs — {1} each", "de": "neue Staffel; aktuell auf DigiKey {0} Stk. — je {1}"}
 {"uk": "нових", "en": "new", "de": "neue"}
 {"uk": "нових (", "en": "new (", "de": "neue ("}
+{"uk": "нових контактних осіб {0}", "en": "new contacts {0}", "de": "neue Kontaktpersonen {0}"}
 {"uk": "нових повідомлень {0}", "en": "{0} new messages", "de": "{0} neue Nachrichten"}
 {"uk": "нових повідомлень немає", "en": "no new messages", "de": "keine neuen Nachrichten"}
 {"uk": "нових подій стрічки: {0}", "en": "new feed events: {0}", "de": "neue Feed-Ereignisse: {0}"}
@@ -19813,6 +19840,7 @@
 {"uk": "одразу шукати тарифи", "en": "look up rates right away", "de": "Tarife sofort abfragen"}
 {"uk": "одразу, звіт прийде як за розкладом; збережені налаштування", "en": "right away, the report comes as on schedule; saved settings", "de": "sofort, der Bericht kommt wie nach Zeitplan; gespeicherte Einstellungen"}
 {"uk": "окрема сторінка: фаза, крок, хто, початок, кінець, стан", "en": "a separate page: phase, step, who, start, end, status", "de": "eigene Seite: Phase, Schritt, wer, Beginn, Ende, Status"}
+{"uk": "окремий запит AI на кожного постачальника; результат — у картці кожного.", "en": "a separate AI request for each supplier; the result is in each one's card.", "de": "eine eigene KI-Anfrage pro Lieferant; das Ergebnis steht in der jeweiligen Karte."}
 {"uk": "окремо для DigiKey. Фото DigiKey приймає полем товару, даташит — лише додатковим полем DigiKey, якщо воно є.", "en": "separately for DigiKey. DigiKey accepts the photo as a product field, the datasheet only as an additional DigiKey field, if one exists.", "de": "separat für DigiKey. DigiKey nimmt das Foto als Artikelfeld an, das Datenblatt nur als zusätzliches DigiKey-Feld, sofern vorhanden."}
 {"uk": "окремі абзаци; все між ними (заголовок, таблиця, розмір/вага) повторюється для кожної коробки.", "en": "separate paragraphs; everything between them (heading, table, size/weight) is repeated for each box.", "de": "eigene Absätze; alles dazwischen (Überschrift, Tabelle, Größe/Gewicht) wird für jeden Karton wiederholt."}
 {"uk": "окремі абзаци; все між ними (заголовок, таблиця, розмір/вага) повторюється для кожної коробки. У таблиці рядки з", "en": "separate paragraphs; everything between them (heading, table, size/weight) is repeated for each box. In the table, rows with", "de": "eigene Absätze; alles dazwischen (Überschrift, Tabelle, Größe/Gewicht) wird für jeden Karton wiederholt. In der Tabelle stehen Zeilen mit"}
@@ -19910,6 +19938,7 @@
 {"uk": "оформити замовлення через Jumingo API автоматично (потрібен метод оплати на Jumingo: Zahlungsmethoden).", "en": "place the order automatically via the Jumingo API (a payment method on Jumingo is required: Zahlungsmethoden).", "de": "Bestellung automatisch über die Jumingo API aufgeben (ein Zahlungsmittel bei Jumingo ist erforderlich: Zahlungsmethoden)."}
 {"uk": "оформити замовлення через Jumingo API автоматично (потрібен метод оплати на Jumingo: Zahlungsmethoden). Після оплати трекінг-номер з'явиться автоматично (або натисніть «🔄 Оновити трекінг»).", "en": "place the order automatically via the Jumingo API (a payment method on Jumingo is required: Zahlungsmethoden). After payment the tracking number will appear automatically (or click “🔄 Refresh tracking”).", "de": "Bestellung automatisch über die Jumingo API aufgeben (ein Zahlungsmittel bei Jumingo ist erforderlich: Zahlungsmethoden). Nach der Zahlung erscheint die Sendungsnummer automatisch (oder klicken Sie auf „🔄 Tracking aktualisieren“)."}
 {"uk": "оцінка Minerva", "en": "Minerva rating", "de": "Minerva-Bewertung"}
+{"uk": "оцінка {0}/5", "en": "rating {0}/5", "de": "Bewertung {0}/5"}
 {"uk": "очікували {0}", "en": "expected {0}", "de": "erwartet am {0}"}
 {"uk": "очікувати N днів", "en": "wait N days", "de": "N Tage warten"}
 {"uk": "очікують підтвердження: {0}", "en": "awaiting confirmation: {0}", "de": "warten auf Bestätigung: {0}"}
@@ -20031,6 +20060,7 @@
 {"uk": "плану немає", "en": "no plan", "de": "kein Plan"}
 {"uk": "платежів", "en": "payments", "de": "Zahlungen"}
 {"uk": "платить RAG своїм ключем. Чим RAG відповідав востаннє — рядок «RAG відповідає» нижче.", "en": "paid by RAG with its own key. What RAG last answered with — the “RAG answers” line below.", "de": "bezahlt RAG mit seinem eigenen Schlüssel. Womit RAG zuletzt geantwortet hat — Zeile „RAG antwortet“ unten."}
+{"uk": "платно", "en": "paid", "de": "kostenpflichtig"}
 {"uk": "платно — ключ RAG", "en": "paid — RAG key", "de": "kostenpflichtig – RAG-Schlüssel"}
 {"uk": "пн", "en": "пн", "de": "пн"}
 {"uk": "по", "en": "to", "de": "bis"}
@@ -20169,6 +20199,7 @@
 {"uk": "помічник Minerva (без ключа), нотатки", "en": "Minerva assistant (without the key), notes", "de": "Minerva-Assistent (ohne Schlüssel), Notizen"}
 {"uk": "помічник по продукції не налаштований — відповідає гід", "en": "product assistant is not configured — the guide answers", "de": "Produktassistent ist nicht eingerichtet — der Leitfaden antwortet"}
 {"uk": "понад 10 годин", "en": "over 10 hours", "de": "über 10 Stunden"}
+{"uk": "понад 1500 листів", "en": "over 1500 e-mails", "de": "über 1500 E-Mails"}
 {"uk": "понеділок", "en": "Monday", "de": "Montag"}
 {"uk": "попередні 12 міс: {0} шт · замовлень: {1}", "en": "previous 12 mo: {0} pcs · orders: {1}", "de": "vorherige 12 Mon.: {0} Stk · Aufträge: {1}"}
 {"uk": "попередні: {0}", "en": "previous: {0}", "de": "vorherige: {0}"}
@@ -20523,6 +20554,7 @@
 {"uk": "рекомендованої упаковки", "en": "of the recommended packaging", "de": "der empfohlenen Verpackung"}
 {"uk": "рекомендовані або за бажанням, ще не зроблені", "en": "recommended or optional, not done yet", "de": "empfohlen oder optional, noch nicht erledigt"}
 {"uk": "реченнями скажи, що саме вимкнено, чому і як увімкнути, і де в Minerva зробити це інакше", "en": "sentences say what exactly is disabled, why, how to enable it, and where in Minerva to do it differently", "de": "Sätzen sage, was genau deaktiviert ist, warum, wie man es aktiviert und wo man es in Minerva anders erledigen kann"}
+{"uk": "решту вам не видно", "en": "the rest you cannot see", "de": "den Rest sehen Sie nicht"}
 {"uk": "реєстр", "en": "register", "de": "Register"}
 {"uk": "реєстрація / «забули пароль» відповідають однаково — не видно, чи є акаунт", "en": "registration / “forgot password” respond identically — it is not visible whether an account exists", "de": "Registrierung / „Passwort vergessen“ antworten gleich — es ist nicht erkennbar, ob ein Konto existiert"}
 {"uk": "реєстрація покупця", "en": "buyer registration", "de": "Registrierung eines Käufers"}
@@ -20678,6 +20710,7 @@
 {"uk": "скринька неактивна або без власника", "en": "mailbox inactive or without an owner", "de": "Postfach inaktiv oder ohne Besitzer"}
 {"uk": "скринька пошти Minerva", "en": "Minerva mailbox", "de": "Minerva-Postfach"}
 {"uk": "скринька пошти Minerva, копія — у її «Надісланих»", "en": "Minerva mailbox, copy in its «Sent»", "de": "Minerva-Postfach, Kopie in seinen «Gesendet»"}
+{"uk": "скриньки й складе листування за темами (як «🔄 Зібрати історію з пошти» в картці): файли, віхи в «🕘 Історію»", "en": "mailboxes and arrange the correspondence by topic (like «🔄 Collect history from mail» in the card): files, milestones in «🕘 History»", "de": "Postfächer neu und ordnet die Korrespondenz nach Themen (wie «🔄 Verlauf aus der Post erstellen» in der Karte): Dateien, Meilensteine in «🕘 Verlauf»"}
 {"uk": "скриньку {0} вимкнено", "en": "mailbox {0} is disabled", "de": "Postfach {0} ist deaktiviert"}
 {"uk": "скриньку пошти №{0} видалено", "en": "mailbox no. {0} was deleted", "de": "Postfach Nr. {0} wurde gelöscht"}
 {"uk": "скриньок за період і показує фірми, з якими ви говорите про ціни, замовлення, виробництво, зразки (Quotation, Proforma, Auftragsbestätigung, MOQ, PCB…) або яким ви писали запити, — але яких ще немає серед постачальників. Клієнти CRM, перевізники, банки, розсилки й ті, кого ви позначили «🙈 Не постачальник», не показуються. Без AI.", "en": "mailboxes for the period and shows companies you talk to about prices, orders, production, samples (Quotation, Proforma, Auftragsbestätigung, MOQ, PCB…) or to whom you sent requests — but who are not suppliers yet. CRM customers, carriers, banks, newsletters and those you marked «🙈 Not a supplier» are not shown. No AI.", "de": "Postfächer im Zeitraum und zeigt Firmen, mit denen Sie über Preise, Bestellungen, Fertigung, Muster sprechen (Quotation, Proforma, Auftragsbestätigung, MOQ, PCB…) oder an die Sie Anfragen geschrieben haben — die aber noch keine Lieferanten sind. CRM-Kunden, Versanddienste, Banken, Newsletter und mit «🙈 Kein Lieferant» markierte werden nicht angezeigt. Ohne KI."}
@@ -21203,6 +21236,7 @@
 {"uk": "усі категорії", "en": "all categories", "de": "alle Kategorien"}
 {"uk": "усі кроки виконано ({0})", "en": "all steps done ({0})", "de": "alle Schritte erledigt ({0})"}
 {"uk": "усі листи прочитано", "en": "all emails read", "de": "alle E-Mails gelesen"}
+{"uk": "усі люди з листування — у контактні особи", "en": "all people from the correspondence — into contacts", "de": "alle Personen aus der Korrespondenz — in die Kontaktpersonen"}
 {"uk": "усі погодились", "en": "everyone agreed", "de": "alle haben zugestimmt"}
 {"uk": "усі позиції повністю; часткове відправлення — через «Вручну»", "en": "all items in full; partial shipment — via “Manually”", "de": "alle Positionen vollständig; Teilsendung — über „Manuell“"}
 {"uk": "усі сховано", "en": "all hidden", "de": "alle ausgeblendet"}

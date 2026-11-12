@@ -1,0 +1,68 @@
+{% extends "admin/base_site.html" %}
+{# Дії для вибраних постачальників — suppliers/admin_supplier.py bulk_view (фон — suppliers/services/jobs.py) #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{{ back }}">Постачальники</a> &rsaquo; {{ title }}
+</div>
+{% endblock %}
+{% block content %}
+{% include "admin/suppliers/_styles.html" %}
+{{ style }}
+<div class="spp">
+  <div class="spf-card">
+    <div class="spf-h">Вибрано: {{ sups|length }}{% if asked > sups|length %} <span class="spf-muted">(з {{ asked }} — {% if do == "history" %}решту вам не видно{% else %}до {{ ai_max }} за раз і лише ті, які вам можна змінювати{% endif %})</span>{% endif %}</div>
+    <div class="sp-chips" translate="no">{% for s in sups %}<a class="sp-chip" href="{% url 'admin:inventory_supplier_change' s.pk %}" target="_blank">{{ s.name }}</a>{% empty %}<span class="spf-muted">—</span>{% endfor %}</div>
+  </div>
+  {% if sups %}
+  <form class="spf-card" id="sb-form" onsubmit="return false">
+    {% if do == "history" %}
+    <div class="spf-muted">Для кожного Minerva перечитає <b>ваші</b> скриньки й складе листування за темами (як «🔄 Зібрати історію з пошти» в картці): файли, віхи в «🕘 Історію», <b>👥 усі люди з листування — у контактні особи</b> (відправники їхніх листів і їхні колеги в «Кому» / «Копія»). AI не працює — це безкоштовно.</div>
+    <div class="spf-row">Період:
+      <select name="hist_period" class="sp-hist-period">{% for v, label in periods %}<option value="{{ v }}" {% if v == default_period %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+      <span class="sp-hist-dates" hidden> <input type="date" name="hist_from" aria-label="з"> – <input type="date" name="hist_to" aria-label="по"></span>
+    </div>
+    {% if po_opts %}<div class="spf-row">{{ po_opts }}</div>{% endif %}
+    {% else %}
+    <div class="spf-muted">{% if do == "evaluate" %}🧠 AI оцінить кожного за <b>вашим</b> листуванням за рік і закупівлями: як швидко й чітко відповідають, строки, проблеми з цитатами, порада.{% else %}🌐 AI знайде в інтернеті про кожного: хто вони, продукція, виробництво, сертифікати, ризики, джерела.{% endif %} Це <b>платно</b> — окремий запит AI на кожного постачальника; результат — у картці кожного.</div>
+    <div class="spf-row">Модель AI: <select name="model">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select></div>
+    {% endif %}
+    <div class="spf-row">
+      <button type="button" class="default" id="sb-go">▶ Запустити для {{ sups|length }}</button>
+      <a href="{{ back }}">← До списку постачальників</a>
+      <span class="spf-job" id="sb-job"></span>
+    </div>
+    <table class="sp-table" id="sb-rows" hidden></table>
+  </form>
+  {% endif %}
+</div>
+{{ job_js }}
+<script>
+(function(){
+  var form = document.getElementById('sb-form'); if (!form) return;
+  var per = form.querySelector('.sp-hist-period'), dates = form.querySelector('.sp-hist-dates');
+  if (per) per.addEventListener('change', function(){ dates.hidden = per.value !== 'custom'; });
+  var go = document.getElementById('sb-go'), out = document.getElementById('sb-job'), table = document.getElementById('sb-rows');
+  go.addEventListener('click', function(){
+    {% if do != "history" %}if (!confirm('AI опрацює {{ sups|length }} постачальників по черзі — це платно. Продовжити?')) return;{% endif %}
+    var data = {do: '{{ do }}', ids: '{{ ids }}'};
+    form.querySelectorAll('select, input').forEach(function(el){
+      if (!el.name || (el.type === 'checkbox' && !el.checked)) return;
+      data[el.name] = el.value;
+    });
+    go.disabled = true;
+    spJob(location.pathname + location.search, data, out, function(r){
+      go.disabled = false;
+      out.textContent = (r && r.message) || '✅';
+      table.innerHTML = ''; table.hidden = false;
+      (r.rows || []).forEach(function(x){
+        var tr = document.createElement('tr'), a = document.createElement('td'), t = document.createElement('td');
+        if (x.url) { var l = document.createElement('a'); l.href = x.url; l.target = '_blank'; l.textContent = x.name; l.setAttribute('translate', 'no'); a.appendChild(l); }
+        t.textContent = x.text; tr.appendChild(a); tr.appendChild(t); table.appendChild(tr);
+      });
+    });
+  });
+})();
+</script>
+{% endblock %}
