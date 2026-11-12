@@ -1458,6 +1458,10 @@ document.addEventListener('DOMContentLoaded',function(){
     {% endif %}
     <div id="nco-loading" style="text-align:center;padding:20px;color:var(--text-muted,#607d8b)">⏳ {% trans "Генерація..." %}</div>
     <div id="nco-form" style="display:none">
+      <div style="margin-bottom:12px;font-size:12px;color:var(--text-muted,#607d8b)">
+        {% trans "Від:" %} <b id="nco-from" translate="no" style="color:var(--text,#c9d8e4)"></b>
+        <span id="nco-from-note"></span>
+      </div>
       <div style="margin-bottom:12px">
         <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Кому" %} *</label>
         <input id="nco-to" type="email"
@@ -1518,6 +1522,8 @@ function ncoOpen(url) {
       document.getElementById('nco-cc').value      = d.cc      || '';
       document.getElementById('nco-subject').value = d.subject || '';
       document.getElementById('nco-body').value    = d.body    || '';
+      document.getElementById('nco-from').textContent = d.from || '—';
+      document.getElementById('nco-from-note').textContent = d.from_note ? '(' + d.from_note + ')' : '';
       document.getElementById('nco-form').style.display = 'block';
       if (d.auto){ ncoSend(); }
     })

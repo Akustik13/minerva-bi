@@ -511,10 +511,17 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         if not obj or not obj.pk:
             return "—"
         from config import admin_notify_map
-        return admin_notify_map.render(obj)
+        return admin_notify_map.render(obj, getattr(obj, "_mv_viewer", None))
+
+    def get_object(self, request, object_id, from_field=None):
+        """Хто дивиться — для меню «з адреси» листів клієнтам (лише скриньки, які людина може вибрати)."""
+        obj = super().get_object(request, object_id, from_field)
+        if obj is not None:
+            obj._mv_viewer = request.user
+        return obj
 
     def save_model(self, request, obj, form, change):
-        if any(k.startswith("nr_") for k in request.POST):   # таблиця «🗺 Хто що отримує»
+        if any(k.startswith("nr_") or k == "cm_seen" for k in request.POST):   # таблиця «🗺 Хто що отримує»
             from config import admin_notify_map
             admin_notify_map.save(request, obj)
         super().save_model(request, obj, form, change)

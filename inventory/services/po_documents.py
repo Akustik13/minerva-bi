@@ -11,12 +11,22 @@
 • `add_from_mail(po, user, picks)` — вибрані вкладення {«<лист>:<номер>»: категорія} → документи (лише свої листи).
 • `attach_message(po, msg, user, source)` — усі документи-вкладення листа (агент після ✓ закупівлі / посилки).
 • `summary(po)` — групи за категоріями й стан «🧾 рахунок є — 💳 оплати немає».
+
+🔎 Що замовляли (`PurchaseOrder.ordered_skus`) — артикули з документів, без AI:
+• `detect(po, docs, catalog)` → [(артикул, звідки)]: назва документа й файлу, назви файлів у ZIP-архіві (Gerber —
+  «TR240401-01.zip», «TR240401-01.GTL»), тема листа, з якого документ, текст PDF / DOCX / Excel / CSV / TXT (рахунок).
+  Артикул каталогу або аліас (`Catalog`: точний збіг, без розділювачів, «TR240401-01-gerber» → TR240401-01) — звідусіль;
+  схожий на наш артикул без каталогу (`CODE_RE`: TR240401-01, AN220213-01C) — лише з назв (архіву — і після «-»), не з
+  тексту; номери документів (`NOT_CODE`: INV…, PI…, IMG…), код закупівлі, номер постачальника й трек-номер — ні.
+• `update_ordered(po, docs)` — нове дописується в поле (виправлене людиною лишається); викликають `add`, збереження
+  документів у картці, кнопка «🔎 Визначити з документів» і дія списку.
 """
 import datetime
 import hashlib
 import logging
 import os
 import re
+import zipfile
 
 from django.core.files.base import ContentFile
 from django.db.models import Q
@@ -25,7 +35,7 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 FILE_MAX_MB = 25
-ALLOWED = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'xlsm', 'odt', 'ods', 'rtf', 'csv', 'txt', 'xml', 'zip',
+ALLOWED = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'xlsm', 'odt', 'ods', 'rtf', 'csv', 'txt', 'xml', 'zip', 'rar', '7z',
            'png', 'jpg', 'jpeg', 'gif', 'webp', 'tif', 'tiff', 'heic', 'eml', 'msg'}
 IMAGES = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 LOGO_MAX = 20 * 1024            # картинка менша — логотип з підпису, не документ
@@ -100,6 +110,10 @@ def add(po, name, data, category=None, *, source=None, message=None, user=None, 
             doc_date=doc_date)
     doc.file.save(name, ContentFile(data), save=False)
     doc.save()
+    try:
+        update_ordered(po, [doc])
+    except Exception as e:  # noqa: BLE001 — документ уже додано, артикули — додатково
+        logger.warning('po %s: ordered skus from %s: %s', po.pk, name, e)
     return doc, True
 
 
@@ -242,3 +256,197 @@ def summary(po) -> dict:
     groups = [(cat, label, by[cat]) for cat, label in D.CATEGORIES if cat in by]
     return {'groups': groups, 'has': set(by), 'count': len(docs),
             'unpaid': D.INVOICE in by and D.PAYMENT not in by}
+
+
+# ── 🔎 Що замовляли ──────────────────────────────────────────────────────────
+
+ARCHIVES = {'zip', 'rar', '7z'}
+ARCHIVE_NAMES_MAX = 500          # назв файлів з одного ZIP-архіву
+TEXT_TYPES = {'pdf', 'docx', 'txt', 'csv', 'xlsx', 'xlsm'}
+TEXT_CHARS = 20000
+TEXT_MAX_MB = 15
+ORDERED_MAX = 500                # довжина поля «Що замовляли»
+# Схоже на наш артикул: TR240401-01, AN220213-01C — 1–4 літери, 4–8 цифр, «-», 1–3 цифри, до 3 літер.
+# Перед ним у назві документа / темі листа — не літера, не цифра й не «-» (PI-HR241105-01 — номер рахунку),
+# у назві архіву й файлів у ньому «-» можна (Gerber-TR240401-01.zip).
+CODE_RE = re.compile(r'(?<![A-Za-z0-9-])([A-Za-z]{1,4}\d{4,8}-\d{1,3}[A-Za-z]{0,3})(?![A-Za-z0-9])')
+ARCHIVE_CODE_RE = re.compile(r'(?<![A-Za-z0-9])([A-Za-z]{1,4}\d{4,8}-\d{1,3}[A-Za-z]{0,3})(?![A-Za-z0-9])')
+# Номери документів і файли з телефона / сканера, а не артикули: INV240401-01, IMG20241105-01 …
+NOT_CODE = {'INV', 'PI', 'CI', 'PO', 'OC', 'AB', 'RE', 'DN', 'PL', 'SO', 'ORD', 'NR', 'NO', 'ID', 'IMG', 'DSC', 'SCAN',
+            'SCN', 'DOC', 'FILE', 'PIC', 'VID', 'WA', 'PXL', 'RMA', 'CN', 'AWB', 'REF', 'QT', 'QUO', 'RFQ', 'TRK'}
+_TOKEN_SPLIT = re.compile(r'[^A-Za-z0-9.\-]+')
+_SEP = re.compile(r'[^A-Za-z0-9]+')
+_LIST_SPLIT = re.compile(r'[,;\n]+')
+
+
+def _key(code) -> str:
+    return _SEP.sub('', code or '').upper()
+
+
+def ordered_codes(value) -> list:
+    """«TR240401-01, AN220213-01C» → ['TR240401-01', 'AN220213-01C']."""
+    return [c.strip() for c in _LIST_SPLIT.split(value or '') if c.strip()]
+
+
+class Catalog:
+    """Артикули й аліаси складу — один запит на всі закупівлі: {ВЕЛИКИМИ: артикул} і {без розділювачів: артикул}.
+    Лише з літерою й цифрою, від 5 знаків (інакше «PCB», «2024» в тексті рахунку схожі на артикул)."""
+
+    def __init__(self):
+        from inventory.models import Product, ProductAlias
+        self.exact, self.norm = {}, {}
+        for sku in Product.objects.exclude(sku='').values_list('sku', flat=True):
+            self._add(sku, sku)
+        for alias, sku in ProductAlias.objects.values_list('alias', 'product__sku'):
+            if alias and sku:
+                self._add(alias, sku)
+
+    def _add(self, code, sku):
+        key = _key(code)
+        if len(key) < 5 or not re.search(r'[A-Z]', key) or not re.search(r'\d', key):
+            return
+        self.exact.setdefault(code.strip().upper(), sku)
+        self.norm.setdefault(key, sku)
+
+    def find(self, code):
+        """Точний артикул / аліас (без огляду на регістр і розділювачі) → артикул каталогу або None."""
+        return self.exact.get((code or '').strip().upper()) or self.norm.get(_key(code))
+
+    def match(self, token):
+        """Слово з назви чи тексту → артикул каталогу. Хвіст відрізається лише на «.» (розширення, версія) і на «-»
+        перед літерою («TR240401-01-gerber»), а не перед цифрою — «AN220213-01C» не стане «AN220213»."""
+        t = (token or '').strip('.-').upper()
+        if len(t) < 5:
+            return None
+        cuts = [len(t)] + [i for i in range(len(t) - 1, 3, -1)
+                           if t[i] == '.' or (t[i] == '-' and i + 1 < len(t) and t[i + 1].isalpha())]
+        for i in cuts:
+            sku = self.exact.get(t[:i]) or self.norm.get(_key(t[:i]))
+            if sku:
+                return sku
+        return None
+
+
+class _Found:
+    def __init__(self, catalog, skip):
+        self.catalog, self.skip = catalog, skip
+        self.rows, self.keys = [], set()
+
+    def _put(self, code, where, known):
+        key = _key(code)
+        if not key or key in self.keys or key in self.skip:
+            return
+        self.keys.add(key)
+        self.rows.append((code, where, known))
+
+    def scan(self, text, where, *, pattern=True, archive=False):
+        if not text:
+            return
+        for token in _TOKEN_SPLIT.split(text):
+            sku = self.catalog.match(token)
+            if sku:
+                self._put(sku, where, True)
+        if not pattern:
+            return
+        for m in (ARCHIVE_CODE_RE if archive else CODE_RE).finditer(text):
+            code = m.group(1).upper()
+            if re.match(r'[A-Z]+', code).group(0) in NOT_CODE:
+                continue
+            sku = self.catalog.find(code)
+            self._put(sku or code, where, bool(sku))
+
+    def result(self) -> list:
+        """[(артикул, звідки)]; схожий на артикул, що є лише початком артикула каталогу («AN220213-01C» з
+        «AN220213-01C-175-MHF1»), — не окремо."""
+        known = [_key(c) for c, _w, k in self.rows if k]
+        return [(c, w) for c, w, k in self.rows
+                if k or not any(o != _key(c) and o.startswith(_key(c)) for o in known)]
+
+
+def _zip_names(doc) -> list:
+    try:
+        with doc.file.open('rb') as fh, zipfile.ZipFile(fh) as z:
+            return [n for n in z.namelist() if not n.startswith('__MACOSX')][:ARCHIVE_NAMES_MAX]
+    except Exception as e:  # noqa: BLE001 — пошкоджений / не ZIP: лише назва архіву
+        logger.info('po document %s: zip not readable: %s', doc.pk, e)
+        return []
+
+
+def _text(doc, ext) -> str:
+    """Текст документа (рахунок, підтвердження) — лише щоб знайти артикули каталогу."""
+    try:
+        path = doc.file.path
+        if os.path.getsize(path) > TEXT_MAX_MB * 1024 * 1024:
+            return ''
+        if ext in ('xlsx', 'xlsm'):
+            from openpyxl import load_workbook
+            wb = load_workbook(path, read_only=True, data_only=True)
+            parts, size = [], 0
+            for ws in wb.worksheets[:5]:
+                for row in ws.iter_rows(max_row=400, values_only=True):
+                    line = ' '.join(str(v) for v in row if v not in (None, ''))
+                    parts.append(line)
+                    size += len(line)
+                    if size > TEXT_CHARS:
+                        break
+            wb.close()
+            return '\n'.join(parts)[:TEXT_CHARS]
+        from email_assistant.reply_brief import read_attachment_text
+        return read_attachment_text({'name': 'x.' + ext}, limit=TEXT_CHARS, path=path) or ''
+    except Exception as e:  # noqa: BLE001 — файл не читається: лише назва
+        logger.info('po document %s: text not readable: %s', doc.pk, e)
+        return ''
+
+
+def detect(po, docs=None, catalog=None) -> list:
+    """[(артикул, звідки)] — що замовляли, за документами закупівлі (див. початок модуля)."""
+    catalog = catalog or Catalog()
+    found = _Found(catalog, {_key(t) for t in _tokens(po)})
+    if docs is None:
+        docs = po.documents.select_related('email_message')
+    for d in docs:
+        name = d.file_name if d.file else ''
+        ext = _ext(name) or _ext(d.title)
+        archive = ext in ARCHIVES
+        where = d.title or name
+        found.scan(d.title, where, archive=archive)
+        if name != d.title:
+            found.scan(name, where, archive=archive)
+        if ext == 'zip' and d.file:
+            for inner in _zip_names(d):
+                found.scan(inner, f'{where} → {inner}', archive=True)
+        if d.email_message_id and d.email_message is not None:
+            found.scan(d.email_message.subject, f'лист «{(d.email_message.subject or "")[:60]}»')
+        if ext in TEXT_TYPES and d.file:
+            found.scan(_text(d, ext), f'{where} (текст)', pattern=False)
+    return found.result()
+
+
+def merge(current, codes) -> str:
+    """Дописати нові артикули в кінець; наявні (і виправлені людиною) лишаються, повтори — ні."""
+    parts = ordered_codes(current)
+    have = {_key(c) for c in parts}
+    for code in codes:
+        key = _key(code)
+        if not key or key in have or len(', '.join(parts + [code])) > ORDERED_MAX:
+            continue
+        parts.append(code)
+        have.add(key)
+    return ', '.join(parts)
+
+
+def update_ordered(po, docs=None, catalog=None) -> list:
+    """Знайдене в документах → «Що замовляли» (лише дописує). → [(новий артикул, звідки)]."""
+    from inventory.models import PurchaseOrder
+    found = detect(po, docs, catalog)
+    if not found:
+        return []
+    current = PurchaseOrder.objects.filter(pk=po.pk).values_list('ordered_skus', flat=True).first() or ''
+    have = {_key(c) for c in ordered_codes(current)}
+    new = [(c, w) for c, w in found if _key(c) not in have]
+    value = merge(current, [c for c, _w in new])
+    if value != current:
+        PurchaseOrder.objects.filter(pk=po.pk).update(ordered_skus=value)   # без сигналів і вебхука
+    po.ordered_skus = value
+    added = {_key(c) for c in ordered_codes(value)} - have
+    return [(c, w) for c, w in new if _key(c) in added]

@@ -266,6 +266,7 @@
 {"uk": "(в коробці кілька товарів — вага на всю коробку)", "en": "(the box contains several products — weight is for the whole box)", "de": "(im Karton befinden sich mehrere Artikel — das Gewicht gilt für den ganzen Karton)"}
 {"uk": "(валюта Minerva)", "en": "(Minerva currency)", "de": "(Minerva-Währung)"}
 {"uk": "(варіант 3 — в розробці).", "en": "(option 3 — in development).", "de": "(Variante 3 — in Entwicklung)."}
+{"uk": "(ваша)", "en": "(yours)", "de": "(Ihr Postfach)"}
 {"uk": "(ви адміністратор Minerva)", "en": "(you are a Minerva administrator)", "de": "(Sie sind Minerva-Administrator)"}
 {"uk": "(видалено", "en": "(deleted", "de": "(gelöscht"}
 {"uk": "(виконано)", "en": "(done)", "de": "(erledigt)"}
@@ -1998,6 +1999,8 @@
 {"uk": "SMTP пароль", "en": "SMTP password", "de": "SMTP-Passwort"}
 {"uk": "SMTP порт", "en": "SMTP port", "de": "SMTP-Port"}
 {"uk": "SMTP скриньки {0}", "en": "SMTP of mailbox {0}", "de": "SMTP des Postfachs {0}"}
+{"uk": "SMTP сповіщень", "en": "notification SMTP", "de": "Benachrichtigungs-SMTP"}
+{"uk": "SMTP сповіщень (не задано)", "en": "notification SMTP (not set)", "de": "Benachrichtigungs-SMTP (nicht eingerichtet)"}
 {"uk": "SMTP сповіщень Minerva", "en": "Minerva notification SMTP", "de": "SMTP für Minerva-Benachrichtigungen"}
 {"uk": "SMTP хост", "en": "SMTP host", "de": "SMTP-Host"}
 {"uk": "SMTP, Bot Token, Chat ID, алерти", "en": "SMTP, Bot Token, Chat ID, alerts", "de": "SMTP, Bot Token, Chat ID, Warnungen"}
@@ -2691,6 +2694,7 @@
 {"uk": "{0} (рік тому {1})", "en": "{0} (a year ago {1})", "de": "{0} (vor einem Jahr {1})"}
 {"uk": "{0} (сьогодні вже {1}); уже переглянуті — без обмежень, решта у списках приховується.", "en": "{0} (already {1} today); records already viewed are not limited, the rest are hidden in lists.", "de": "{0} (heute bereits {1}); bereits angesehene Datensätze unterliegen keiner Beschränkung, der Rest wird in Listen ausgeblendet."}
 {"uk": "{0} (також немає {1})", "en": "{0} (also no {1})", "de": "{0} (auch kein {1})"}
+{"uk": "{0} (текст)", "en": "{0} (text)", "de": "{0} (Text)"}
 {"uk": "{0} (у Minerva: {1})", "en": "{0} (in Minerva: {1})", "de": "{0} (in Minerva: {1})"}
 {"uk": "{0} (є {1}, треба {2})", "en": "{0} (have {1}, need {2})", "de": "{0} (vorhanden {1}, benötigt {2})"}
 {"uk": "{0} / {1} записів", "en": "{0} / {1} records", "de": "{0} / {1} Einträge"}
@@ -2969,6 +2973,7 @@
 {"uk": "{0} – {1} ({2} дн.). Хто й що робив через API, скільки даних отримав, які саме товари й замовлення, що змінював і де отримав відмову. Записи журналу зберігаються 60 днів.", "en": "{0} – {1} ({2} days). Who did what via the API, how much data was received, which products and orders exactly, what was changed and where access was denied. Log entries are kept for 60 days.", "de": "{0} – {1} ({2} Tage). Wer was über die API getan hat, wie viele Daten abgerufen wurden, welche Artikel und Aufträge genau, was geändert wurde und wo der Zugriff verweigert wurde. Protokolleinträge werden 60 Tage aufbewahrt."}
 {"uk": "{0} — Datasheet (📁 файл)", "en": "{0} — Datasheet (📁 file)", "de": "{0} — Datenblatt (📁 Datei)"}
 {"uk": "{0} — Minerva сама надсилає їм події (те, на що в ключа є право).", "en": "{0} — Minerva sends them events itself (whatever the key has permission for).", "de": "{0} — Minerva sendet ihnen selbst Ereignisse (alles, wofür der Schlüssel eine Berechtigung hat)."}
+{"uk": "{0} — SMTP сповіщень", "en": "{0} — notification SMTP", "de": "{0} — Benachrichtigungs-SMTP"}
 {"uk": "{0} — SMTP сповіщень Minerva", "en": "{0} — Minerva notification SMTP", "de": "{0} — SMTP der Minerva-Benachrichtigungen"}
 {"uk": "{0} — Supplier SKU DigiKey товару {1}: на етикетці {2}, спершу дані старої етикетки {3}, потім DigiKey і склад.", "en": "{0} — the DigiKey Supplier SKU of product {1}: the label shows {2}, first the data of the old label {3}, then DigiKey and stock.", "de": "{0} — DigiKey Supplier SKU des Artikels {1}: auf dem Etikett steht {2}, zuerst die Daten des alten Etiketts {3}, dann DigiKey und Lager."}
 {"uk": "{0} — {1} г", "en": "{0} — {1} g", "de": "{0} — {1} g"}
@@ -2986,6 +2991,8 @@
 {"uk": "{0} — затверджено DigiKey! Offer створено: {1}. Товар тепер активний у маркетплейсі.", "en": "{0} — approved by DigiKey! Offer created: {1}. The product is now active in the marketplace.", "de": "{0} — von DigiKey genehmigt! Offer erstellt: {1}. Der Artikel ist jetzt im Marketplace aktiv."}
 {"uk": "{0} — кожен новий такий лист{1}.", "en": "{0} — every new such email{1}.", "de": "{0} — jede neue solche E-Mail{1}."}
 {"uk": "{0} — копія DigiKey", "en": "{0} — DigiKey copy", "de": "{0} — DigiKey-Kopie"}
+{"uk": "{0} — лист піде з SMTP сповіщень", "en": "{0} — the e-mail will be sent via notification SMTP", "de": "{0} — die E-Mail wird über das Benachrichtigungs-SMTP gesendet"}
+{"uk": "{0} — листи клієнтам ідуть з SMTP сповіщень. Виберіть іншу адресу.", "en": "{0} — customer e-mails are sent via notification SMTP. Choose another address.", "de": "{0} — Kunden-E-Mails werden über das Benachrichtigungs-SMTP gesendet. Wählen Sie eine andere Adresse."}
 {"uk": "{0} — листування й оцінка", "en": "{0} — correspondence and assessment", "de": "{0} — Korrespondenz und Bewertung"}
 {"uk": "{0} — надіслано ({1}).", "en": "{0} — sent ({1}).", "de": "{0} — gesendet ({1})."}
 {"uk": "{0} — немає в довіднику джерел", "en": "{0} — not in the sources list", "de": "{0} – nicht im Quellenverzeichnis"}
@@ -3894,6 +3901,7 @@
 {"uk": "Адресна етикетка з доставки", "en": "Address label from shipping", "de": "Adressetikett aus dem Versand"}
 {"uk": "Адресна книга", "en": "Address book", "de": "Adressbuch"}
 {"uk": "Адресна книга порожня", "en": "Address book is empty", "de": "Das Adressbuch ist leer"}
+{"uk": "Адресу листів клієнтам не змінено: скриньку може вибрати лише її власник або адміністратор Minerva, і вона має бути активна з SMTP", "en": "The sender address for customer e-mails was not changed: a mailbox can only be chosen by its owner or a Minerva administrator, and it must be active with SMTP", "de": "Die Absenderadresse für Kunden-E-Mails wurde nicht geändert: Ein Postfach kann nur sein Inhaber oder ein Minerva-Administrator auswählen, und es muss aktiv sein und SMTP haben"}
 {"uk": "Адресу сервера «{0}» не знайдено", "en": "Server address «{0}» not found", "de": "Serveradresse «{0}» nicht gefunden"}
 {"uk": "Азербайджан", "en": "Azerbaijan", "de": "Aserbaidschan"}
 {"uk": "Азія", "en": "Asia", "de": "Asien"}
@@ -4030,6 +4038,7 @@
 {"uk": "Артикул із зовнішньої системи", "en": "SKU from the external system", "de": "Artikelnummer aus dem externen System"}
 {"uk": "Артикул, кількість і рік перевірено — зауважень немає.", "en": "SKU, quantity and year checked — no remarks.", "de": "Artikelnummer, Menge und Jahr geprüft — keine Anmerkungen."}
 {"uk": "Артикули / номери", "en": "SKUs / numbers", "de": "Artikelnummern / Nummern"}
+{"uk": "Артикули з назв документів, файлів у ZIP-архіві (Gerber), теми листа й тексту рахунку → поле «Що замовляли». Лише дописує.", "en": "Item numbers from document names, files in the ZIP archive (Gerber), the e-mail subject and the invoice text → the “Ordered items” field. Only adds.", "de": "Artikelnummern aus Dokumentnamen, Dateien im ZIP-Archiv (Gerber), dem E-Mail-Betreff und dem Rechnungstext → Feld „Bestellte Artikel“. Ergänzt nur."}
 {"uk": "Артикули що передаються до Jumingo для позаєвропейських відправлень.", "en": "SKUs passed to Jumingo for non-European shipments.", "de": "Artikelnummern, die bei außereuropäischen Sendungen an Jumingo übergeben werden."}
 {"uk": "Артикули що передаються до Jumingo для позаєвропейських відправлень. MRN з Ausfuhrbegleitdokument UPS приймає лише під час оформлення.", "en": "Items sent to Jumingo for shipments outside the EU. UPS accepts the MRN from the Ausfuhrbegleitdokument only when the shipment is booked.", "de": "Artikel, die bei Sendungen außerhalb der EU an Jumingo übermittelt werden. UPS akzeptiert die MRN aus dem Ausfuhrbegleitdokument nur bei der Buchung."}
 {"uk": "Артикули, чиї даташити додати до листа", "en": "SKUs whose datasheets to attach to the e-mail", "de": "Artikelnummern, deren Datenblätter der E-Mail beigefügt werden sollen"}
@@ -4794,6 +4803,8 @@
 {"uk": "Визначається автоматично (email_assistant/categorize.py); порожньо — ще не визначено", "en": "Determined automatically (email_assistant/categorize.py); empty — not yet determined", "de": "Wird automatisch bestimmt (email_assistant/categorize.py); leer — noch nicht bestimmt"}
 {"uk": "Визначити вручну", "en": "Define manually", "de": "Manuell festlegen"}
 {"uk": "Визначити категорію ({0})", "en": "Determine category ({0})", "de": "Kategorie ermitteln ({0})"}
+{"uk": "Визначити, що замовляли", "en": "Detect ordered items", "de": "Bestellte Artikel ermitteln"}
+{"uk": "Визначити, що замовляли (з документів)", "en": "Detect ordered items (from documents)", "de": "Bestellte Artikel ermitteln (aus Dokumenten)"}
 {"uk": "Вийти", "en": "Log out", "de": "Abmelden"}
 {"uk": "Виконавець", "en": "Contractor", "de": "Auftragnehmer"}
 {"uk": "Виконавця не знайдено або його вимкнено", "en": "Assignee not found or deactivated", "de": "Bearbeiter nicht gefunden oder deaktiviert"}
@@ -6398,6 +6409,7 @@
 {"uk": "Домівка", "en": "Home", "de": "Startseite"}
 {"uk": "Домініканська Республіка", "en": "Dominican Republic", "de": "Dominikanische Republik"}
 {"uk": "Доповнено {0}", "en": "Completed {0}", "de": "Ergänzt {0}"}
+{"uk": "Доповнено закупівель: {0}", "en": "Purchase orders updated: {0}", "de": "Bestellungen ergänzt: {0}"}
 {"uk": "Допускається символ валюти.", "en": "A currency symbol is allowed.", "de": "Ein Währungssymbol ist zulässig."}
 {"uk": "Допуски", "en": "Tolerances", "de": "Toleranzen"}
 {"uk": "Допустима потужність", "en": "Rated power", "de": "Zulässige Leistung"}
@@ -6726,6 +6738,7 @@
 {"uk": "З цін Minerva стане", "en": "From Minerva prices it will become", "de": "Aus den Minerva-Preisen wird"}
 {"uk": "З цінами, реквізитами компанії та банківськими даними.", "en": "With prices, company details and bank details.", "de": "Mit Preisen, Firmendaten und Bankdaten."}
 {"uk": "З якої адреси", "en": "From which address", "de": "Von welcher Adresse"}
+{"uk": "З якої адреси листи клієнтам", "en": "Sender address for customer e-mails", "de": "Absenderadresse für Kunden-E-Mails"}
 {"uk": "З якої скриньки", "en": "From which mailbox", "de": "Aus welchem Postfach"}
 {"uk": "З якої скриньки Minerva", "en": "From which Minerva mailbox", "de": "Aus welchem Minerva-Postfach"}
 {"uk": "З якої скриньки Minerva пише покупцям цього магазину (кабінет, «Ласкаво просимо», «Оплату отримано»), куди приходять відповіді і кому з команди — сповіщення. Скриньку магазину додайте в Minerva як акаунт пошти (Email → Акаунти): тоді відповіді покупців потрапляють у пошту Minerva й прив'язуються до клієнта в CRM. Тексти — «Шаблони листів». Підтвердження замовлення й контактну форму надсилає сайт: з «Сайт надсилає листи з цієї ж скриньки» — з цієї самої скриньки, інакше — з власних налаштувань сайту (/admin/ → «Пошта»).", "en": "The mailbox from which Minerva writes to this shop’s customers (account, “Welcome”, “Payment received”), where replies arrive, and which team members receive notifications. Add the shop’s mailbox to Minerva as a mail account (Email → Accounts): then customer replies land in Minerva mail and are linked to the customer in CRM. Texts — “Email templates”. The order confirmation and the contact form are sent by the site: with “The site sends emails from this same mailbox” — from this same mailbox, otherwise — from the site’s own settings (/admin/ → “Mail”).", "de": "Das Postfach, von dem Minerva an die Kunden dieses Shops schreibt (Kundenkonto, „Willkommen“, „Zahlung erhalten“), wohin die Antworten gelangen und welche Teammitglieder Benachrichtigungen erhalten. Fügen Sie das Postfach des Shops in Minerva als E-Mail-Konto hinzu (E-Mail → Konten): Dann landen die Antworten der Kunden in der Minerva-E-Mail und werden dem Kunden im CRM zugeordnet. Texte — „E-Mail-Vorlagen“. Die Auftragsbestätigung und das Kontaktformular sendet die Website: mit „Die Website sendet E-Mails aus diesem Postfach“ — aus diesem Postfach, andernfalls — aus den eigenen Einstellungen der Website (/admin/ → „E-Mail“)."}
@@ -9116,6 +9129,7 @@
 {"uk": "Лист: склади його інструментом compose_email; юзер відкриє його в пошті кнопкою «✉️ Відкрити в пошті» під", "en": "E-mail: compose it with the compose_email tool; the user will open it in the mail with the “✉️ Open in mail” button under", "de": "E-Mail: Verfasse sie mit dem Werkzeug compose_email; der Benutzer öffnet sie im Postfach über die Schaltfläche „✉️ Im Postfach öffnen“ unter"}
 {"uk": "Листи", "en": "E-mails", "de": "E-Mails"}
 {"uk": "Листи {0}–{1} розкладаються у фоні — далі виберіть їм проєкт askDANTE.", "en": "E-mails {0}–{1} are being sorted in the background — then choose an askDANTE project for them.", "de": "Die E-Mails {0}–{1} werden im Hintergrund einsortiert – wählen Sie anschließend ein askDANTE-Projekt dafür."}
+{"uk": "Листи «📧 про відправку» і «📥 підтвердження замовлення»: SMTP сповіщень або скринька пошти Minerva.", "en": "E-mails «📧 shipped» and «📥 order confirmation»: notification SMTP or a Minerva mailbox.", "de": "E-Mails «📧 Versand» und «📥 Auftragsbestätigung»: Benachrichtigungs-SMTP oder ein Minerva-Postfach."}
 {"uk": "Листи агента", "en": "Agent emails", "de": "E-Mails des Agenten"}
 {"uk": "Листи агента (відповідь, клієнту замовлення, пересилання) — з позначкою «важливо» для отримувача.", "en": "Agent emails (reply, to the order's customer, forward) — marked «important» for the recipient.", "de": "E-Mails des Agenten (Antwort, an den Kunden des Auftrags, Weiterleitung) — für den Empfänger als «wichtig» markiert."}
 {"uk": "Листи агента просять підтвердження прочитання; коли воно прийде — «📬 прочитано» біля листа.", "en": "Agent emails request a read receipt; when it arrives — «📬 read» next to the email.", "de": "E-Mails des Agenten fordern eine Lesebestätigung an; wenn sie eintrifft — «📬 gelesen» neben der E-Mail."}
@@ -10908,6 +10922,7 @@
 {"uk": "Новинки", "en": "New arrivals", "de": "Neuheiten"}
 {"uk": "Новинки: бейдж «Neu» і місце вгорі каталогу", "en": "New arrivals: “Neu” badge and a spot at the top of the catalog", "de": "Neuheiten: Badge „Neu“ und ein Platz oben im Katalog"}
 {"uk": "Нових", "en": "New", "de": "Neue"}
+{"uk": "Нових артикулів у документах не знайдено.", "en": "No new item numbers found in the documents.", "de": "Keine neuen Artikelnummern in den Dokumenten gefunden."}
 {"uk": "Нових замовлень немає.", "en": "No new orders.", "de": "Keine neuen Aufträge."}
 {"uk": "Нових листів від клієнтів: {0} ({1})", "en": "New e-mails from customers: {0} ({1})", "de": "Neue E-Mails von Kunden: {0} ({1})"}
 {"uk": "Нових листів немає — усі ваші листи проєкту вже прочитано", "en": "No new emails — all your project emails have already been read", "de": "Keine neuen E-Mails — alle Ihre Projekt-E-Mails wurden bereits gelesen"}
@@ -12818,6 +12833,7 @@
 {"uk": "Порожньо → використовується системний email", "en": "Empty → the system email is used", "de": "Leer → es wird die System-E-Mail verwendet"}
 {"uk": "Порожня відповідь API", "en": "Empty API response", "de": "Leere API-Antwort"}
 {"uk": "Порожня команда", "en": "Empty command", "de": "Leerer Befehl"}
+{"uk": "Порожнє «кому» — діють адреси «Кому (email)» і основний чат Telegram. «＋ з Minerva» — співробітники, скриньки пошти, особисті чати з ботом (Telegram ID у «Ролі користувачів»); свою адресу чи Chat ID — впишіть і Enter. «Клієнтам — з адреси» — SMTP сповіщень або скринька пошти Minerva (свою може вибрати кожен, чужу — лише адміністратор); у кожного листа клієнту — своя адреса або «як для всіх». Збереже кнопка «Зберегти» внизу сторінки. «↓» — до розділу на цій сторінці, «→» — інша сторінка.", "en": "Empty «to» — the «To (email)» addresses and the main Telegram chat apply. «＋ from Minerva» — employees, mailboxes, personal chats with the bot (Telegram ID in «User roles»); your own address or Chat ID — type it and press Enter. «To customers — from address» — notification SMTP or a Minerva mailbox (anyone can choose their own, someone else's — only an administrator); each customer e-mail has its own address or «same as for all». The «Save» button at the bottom of the page saves. «↓» — to a section on this page, «→» — another page.", "de": "Leeres «an» — es gelten die Adressen «An (E-Mail)» und der Haupt-Telegram-Chat. «＋ aus Minerva» — Mitarbeiter, Postfächer, persönliche Chats mit dem Bot (Telegram-ID in «Benutzerrollen»); eigene Adresse oder Chat-ID — eingeben und Enter. «An Kunden — von Adresse» — Benachrichtigungs-SMTP oder ein Minerva-Postfach (das eigene kann jeder wählen, ein fremdes nur ein Administrator); jede Kunden-E-Mail hat ihre eigene Adresse oder «wie für alle». Gespeichert wird mit «Speichern» unten auf der Seite. «↓» — zu einem Abschnitt auf dieser Seite, «→» — andere Seite."}
 {"uk": "Порожнє «кому» — діють адреси «Кому (email)» і основний чат Telegram. «＋ з Minerva» — співробітники, скриньки пошти, особисті чати з ботом (Telegram ID у «Ролі користувачів»); свою адресу чи Chat ID — впишіть і Enter. Збереже кнопка «Зберегти» внизу сторінки. «↓» — до розділу на цій сторінці, «→» — інша сторінка.", "en": "Empty «to whom» — the «To (email)» addresses and the main Telegram chat apply. «＋ from Minerva» — staff, mailboxes, personal chats with the bot (Telegram ID in «User roles»); type your own address or Chat ID and press Enter. The «Save» button at the bottom saves it. «↓» — to the section on this page, «→» — another page.", "de": "Leeres «an wen» — es gelten die Adressen «An (E-Mail)» und der Telegram-Hauptchat. «＋ aus Minerva» — Mitarbeiter, Postfächer, persönliche Chats mit dem Bot (Telegram-ID in «Benutzerrollen»); eigene Adresse oder Chat-ID eintippen und Enter drücken. Gespeichert wird mit «Speichern» unten auf der Seite. «↓» — zum Abschnitt auf dieser Seite, «→» — andere Seite."}
 {"uk": "Порожнє повідомлення", "en": "Empty message", "de": "Leere Nachricht"}
 {"uk": "Порожнє поле — без обмеження. Приклад «лише кількість зі складу»: право «Склад — читання», поля", "en": "An empty field means no restriction. Example “stock quantity only”: permission “Stock — read”, fields", "de": "Ein leeres Feld bedeutet keine Einschränkung. Beispiel „nur Bestandsmenge“: Recht „Lager — Lesen“, Felder"}
@@ -15976,6 +15992,7 @@
 {"uk": "У гілці листів: {0} · показано останній", "en": "E-mails in the thread: {0} · showing the latest", "de": "E-Mails im Verlauf: {0} · die neueste wird gezeigt"}
 {"uk": "У даташиті ваги немає — позначено в товарі.", "en": "No weight in the datasheet — noted in the product.", "de": "Kein Gewicht im Datenblatt — im Produkt vermerkt."}
 {"uk": "У джерелі «{0}» вже є замовлення з номерами: {1} — їх не перенесено.", "en": "Source “{0}” already has orders with the numbers: {1} — they were not moved.", "de": "In der Quelle „{0}“ gibt es bereits Aufträge mit den Nummern: {1} – sie wurden nicht übertragen."}
+{"uk": "У документах вибраних закупівель нових артикулів не знайдено. Назвіть Gerber-архів артикулом (TR240401-01.zip) або впишіть «Що замовляли» вручну.", "en": "No new item numbers found in the documents of the selected purchase orders. Name the Gerber archive after the item (TR240401-01.zip) or enter “Ordered items” manually.", "de": "In den Dokumenten der ausgewählten Bestellungen wurden keine neuen Artikelnummern gefunden. Benennen Sie das Gerber-Archiv nach dem Artikel (TR240401-01.zip) oder tragen Sie „Bestellte Artikel“ manuell ein."}
 {"uk": "У документи замовлення", "en": "Into order documents", "de": "In die Auftragsdokumente"}
 {"uk": "У документи замовлення й проєкту", "en": "Into order and project documents", "de": "In die Auftrags- und Projektdokumente"}
 {"uk": "У замовлення {0} уже так", "en": "Order {0} already has this", "de": "Auftrag {0} ist bereits so"}
@@ -16838,6 +16855,7 @@
 {"uk": "Через кому, напр. archiv@… Копія листів «Ласкаво просимо», «Оплату отримано» тощо; листи з одноразовими посиланнями (підтвердження, новий пароль, запрошення) не копіюються.", "en": "Comma-separated, e.g. archiv@… A copy of the “Welcome”, “Payment received” e-mails etc.; e-mails with one-time links (confirmation, new password, invitation) are not copied.", "de": "Durch Komma getrennt, z. B. archiv@… Kopie der E-Mails „Willkommen“, „Zahlung eingegangen“ usw.; E-Mails mit einmaligen Links (Bestätigung, neues Passwort, Einladung) werden nicht kopiert."}
 {"uk": "Через кому, напр. «pcbway.com, pcbway.cn» — листи з цих доменів належать постачальнику (домен з email, сайту й контактних осіб Minerva бере й так).", "en": "Comma-separated, e.g. «pcbway.com, pcbway.cn» — e-mails from these domains belong to the supplier (Minerva takes the domain from the e-mail, website and contact persons anyway).", "de": "Durch Komma getrennt, z. B. «pcbway.com, pcbway.cn» — E-Mails aus diesen Domains gehören zum Lieferanten (die Domain aus E-Mail, Website und Ansprechpartnern nimmt Minerva ohnehin)."}
 {"uk": "Через кому, напр.: webshop. Порожньо = замовлення з усіх джерел. Стосується order.* і shipment.", "en": "Comma-separated, e.g.: webshop. Empty = orders from all sources. Applies to order.* and shipment.", "de": "Durch Komma getrennt, z. B.: webshop. Leer = Aufträge aus allen Quellen. Gilt für order.* und shipment."}
+{"uk": "Через кому. Minerva дописує сама з документів закупівлі — назва Gerber-архіву «TR240401-01.zip», файли в архіві, тема листа, артикули каталогу в рахунку. Можна виправити: ваше лишається, нове лише додається. На склад не впливає (позиції — нижче).", "en": "Comma-separated. Minerva fills it in from the purchase order documents — the Gerber archive name “TR240401-01.zip”, files in the archive, the e-mail subject, catalog items in the invoice. You can correct it: your entries stay, new ones are only added. Does not affect stock (lines — below).", "de": "Durch Kommas getrennt. Minerva ergänzt es selbst aus den Bestelldokumenten — Name des Gerber-Archivs „TR240401-01.zip“, Dateien im Archiv, E-Mail-Betreff, Katalogartikel in der Rechnung. Sie können es korrigieren: Ihre Einträge bleiben, Neues wird nur ergänzt. Wirkt sich nicht auf den Bestand aus (Positionen — unten)."}
 {"uk": "Через кому. Оплати, нові акаунти покупців, а з «Сайт надсилає листи з цієї ж скриньки» — і нові замовлення з сайту. Порожньо — email з «Налаштування → Сповіщення» (замовлення — як на сайті).", "en": "Comma-separated. Payments, new customer accounts, and with “The site sends e-mails from this same mailbox” — new orders from the site too. Empty — the e-mail from “Settings → Notifications” (orders — as on the site).", "de": "Durch Komma getrennt. Zahlungen, neue Kundenkonten und – mit „Die Website sendet E-Mails aus demselben Postfach“ – auch neue Aufträge von der Website. Leer – die E-Mail aus „Einstellungen → Benachrichtigungen“ (Aufträge – wie auf der Website)."}
 {"uk": "Через кому: pdf, docx, txt, csv", "en": "Comma-separated: pdf, docx, txt, csv", "de": "Durch Komma getrennt: pdf, docx, txt, csv"}
 {"uk": "Через кому; порожньо — pdf, docx, txt, csv, md, html, htm, xlsx. PDF / DOCX / TXT / CSV читає RAG, Excel / HTML / Markdown — Minerva. Скани без тексту не розпізнаються.", "en": "Comma-separated; empty — pdf, docx, txt, csv, md, html, htm, xlsx. PDF / DOCX / TXT / CSV are read by RAG, Excel / HTML / Markdown by Minerva. Scans without text are not recognized.", "de": "Durch Komma getrennt; leer — pdf, docx, txt, csv, md, html, htm, xlsx. PDF / DOCX / TXT / CSV liest RAG, Excel / HTML / Markdown liest Minerva. Scans ohne Text werden nicht erkannt."}
@@ -17160,6 +17178,8 @@
 {"uk": "Що доручили", "en": "What was assigned", "de": "Was vergeben wurde"}
 {"uk": "Що доручити", "en": "What to delegate", "de": "Was übertragen wird"}
 {"uk": "Що замовити", "en": "What to order", "de": "Was zu bestellen ist"}
+{"uk": "Що замовляли", "en": "Ordered items", "de": "Bestellte Artikel"}
+{"uk": "Що замовляли (артикули)", "en": "Ordered items (item numbers)", "de": "Bestellte Artikel (Artikelnummern)"}
 {"uk": "Що записалось би зараз (без запису)", "en": "What would be recorded now (without recording)", "de": "Was jetzt eingetragen würde (ohne Eintrag)"}
 {"uk": "Що записували", "en": "What was recorded", "de": "Was aufgenommen wurde"}
 {"uk": "Що запитуємо", "en": "What we request", "de": "Was wir anfragen"}
@@ -17841,6 +17861,7 @@
 {"uk": "використовується стандартний текст. Поля на кшталт", "en": "the default text is used. Fields like", "de": "es wird der Standardtext verwendet. Felder wie"}
 {"uk": "вимк", "en": "off", "de": "aus"}
 {"uk": "вимкнена", "en": "disabled", "de": "deaktiviert"}
+{"uk": "вимкнена або без SMTP", "en": "disabled or without SMTP", "de": "deaktiviert oder ohne SMTP"}
 {"uk": "вимкнена скринька: RAG напряму → 0", "en": "disabled mailbox: RAG directly → 0", "de": "deaktiviertes Postfach: RAG direkt → 0"}
 {"uk": "вимкнена — нові повідомлення самі не перевіряються", "en": "off — new messages are not checked automatically", "de": "aus — neue Nachrichten werden nicht automatisch geprüft"}
 {"uk": "вимкнено", "en": "disabled", "de": "deaktiviert"}
@@ -18330,6 +18351,7 @@
 {"uk": "з «Налаштувань Angebote»", "en": "from “Angebote settings”", "de": "aus den „Angebote-Einstellungen“"}
 {"uk": "з «Налаштувань Angebote» (мову листа не визначено)", "en": "from “Angebote settings” (e-mail language not determined)", "de": "aus den „Angebote-Einstellungen“ (Sprache der E-Mail nicht bestimmt)"}
 {"uk": "з «Налаштувань Angebote» — виберіть клієнта, і валюта стане за його країною", "en": "from “Angebote settings” — choose a customer and the currency will follow their country", "de": "aus den „Angebote-Einstellungen“ — wählen Sie einen Kunden, und die Währung richtet sich nach dessen Land"}
+{"uk": "з адреси", "en": "from address", "de": "von Adresse"}
 {"uk": "з архіву.", "en": "from the archive.", "de": "aus dem Archiv."}
 {"uk": "з базовими цінами", "en": "with base prices", "de": "mit Basispreisen"}
 {"uk": "з вашою підказкою", "en": "with your hint", "de": "mit Ihrem Hinweis"}
@@ -19022,6 +19044,7 @@
 {"uk": "лист {0} відсутній", "en": "e-mail {0} is missing", "de": "E-Mail {0} fehlt"}
 {"uk": "лист {0}: «Expresszuschlag», вкладення Prüfbericht", "en": "e-mail {0}: “Expresszuschlag”, attachment Prüfbericht", "de": "E-Mail {0}: „Expresszuschlag“, Anhang Prüfbericht"}
 {"uk": "лист {0}: дата CAB-7 {1} → {2}", "en": "e-mail {0}: CAB-7 date {1} → {2}", "de": "E-Mail {0}: CAB-7-Datum {1} → {2}"}
+{"uk": "лист «{0}»", "en": "e-mail “{0}”", "de": "E-Mail „{0}“"}
 {"uk": "лист видалено або в кошику", "en": "e-mail deleted or in the trash", "de": "E-Mail gelöscht oder im Papierkorb"}
 {"uk": "лист видалено без прочитання ({0})", "en": "email deleted without reading ({0})", "de": "E-Mail ungelesen gelöscht ({0})"}
 {"uk": "лист від нас самих", "en": "an e-mail from ourselves", "de": "E-Mail von uns selbst"}
@@ -20431,6 +20454,7 @@
 {"uk": "пунктів — спершу приберіть один.", "en": "items — remove one first.", "de": "Einträge — entfernen Sie zuerst einen."}
 {"uk": "під це замовлення вже враховано {0}", "en": "{0} already accounted for this order", "de": "für diesen Auftrag sind bereits {0} berücksichtigt"}
 {"uk": "підготовка…", "en": "preparing…", "de": "wird vorbereitet…"}
+{"uk": "піде з", "en": "will be sent from", "de": "wird gesendet von"}
 {"uk": "підказки пошуку", "en": "search suggestions", "de": "Suchvorschläge"}
 {"uk": "підказки, повідомлення). Переклад робиться", "en": "hints, messages). Translation is done", "de": "Hinweise, Meldungen). Die Übersetzung erfolgt"}
 {"uk": "підключення сайту кодом", "en": "connecting a website with a code", "de": "Verbinden einer Website per Code"}
@@ -20648,10 +20672,14 @@
 {"uk": "скоро", "en": "soon", "de": "bald"}
 {"uk": "скринька Minerva {0} ({1})", "en": "Minerva mailbox {0} ({1})", "de": "Minerva-Postfach {0} ({1})"}
 {"uk": "скринька vertrieb: власник anna, активна", "en": "mailbox vertrieb: owner anna, active", "de": "Postfach vertrieb: Eigentümer anna, aktiv"}
+{"uk": "скринька {0} не надіслала лист", "en": "mailbox {0} did not send the e-mail", "de": "Postfach {0} hat die E-Mail nicht gesendet"}
 {"uk": "скринька знову активна — m2 знайдено", "en": "mailbox active again — m2 found", "de": "Postfach wieder aktiv — m2 gefunden"}
 {"uk": "скринька не вибрана в налаштуваннях", "en": "mailbox is not selected in settings", "de": "Postfach ist in den Einstellungen nicht ausgewählt"}
 {"uk": "скринька неактивна або без власника", "en": "mailbox inactive or without an owner", "de": "Postfach inaktiv oder ohne Besitzer"}
 {"uk": "скринька пошти Minerva", "en": "Minerva mailbox", "de": "Minerva-Postfach"}
+{"uk": "скринька пошти Minerva, копія — у її «Надісланих»", "en": "Minerva mailbox, copy in its «Sent»", "de": "Minerva-Postfach, Kopie in seinen «Gesendet»"}
+{"uk": "скриньку {0} вимкнено", "en": "mailbox {0} is disabled", "de": "Postfach {0} ist deaktiviert"}
+{"uk": "скриньку пошти №{0} видалено", "en": "mailbox no. {0} was deleted", "de": "Postfach Nr. {0} wurde gelöscht"}
 {"uk": "скриньок за період і показує фірми, з якими ви говорите про ціни, замовлення, виробництво, зразки (Quotation, Proforma, Auftragsbestätigung, MOQ, PCB…) або яким ви писали запити, — але яких ще немає серед постачальників. Клієнти CRM, перевізники, банки, розсилки й ті, кого ви позначили «🙈 Не постачальник», не показуються. Без AI.", "en": "mailboxes for the period and shows companies you talk to about prices, orders, production, samples (Quotation, Proforma, Auftragsbestätigung, MOQ, PCB…) or to whom you sent requests — but who are not suppliers yet. CRM customers, carriers, banks, newsletters and those you marked «🙈 Not a supplier» are not shown. No AI.", "de": "Postfächer im Zeitraum und zeigt Firmen, mit denen Sie über Preise, Bestellungen, Fertigung, Muster sprechen (Quotation, Proforma, Auftragsbestätigung, MOQ, PCB…) oder an die Sie Anfragen geschrieben haben — die aber noch keine Lieferanten sind. CRM-Kunden, Versanddienste, Banken, Newsletter und mit «🙈 Kein Lieferant» markierte werden nicht angezeigt. Ohne KI."}
 {"uk": "скриньок: з адрес і доменів постачальника (", "en": "mailboxes: from the supplier's addresses and domains (", "de": "Postfächer: von Adressen und Domains des Lieferanten ("}
 {"uk": "скільки даних отримав, які саме товари й замовлення, що змінював і де отримав відмову. Записи журналу", "en": "how much data was received, which products and orders exactly, what was changed and where access was denied. Log entries", "de": "wie viele Daten abgerufen wurden, welche Artikel und Aufträge genau, was geändert wurde und wo der Zugriff verweigert wurde. Protokolleinträge"}
@@ -21088,6 +21116,7 @@
 {"uk": "у системі UPS.", "en": "in the UPS system.", "de": "im UPS-System."}
 {"uk": "у системі UPS. Буде списано кошти з акаунту", "en": "in the UPS system. Funds will be debited from the account", "de": "im UPS-System. Der Betrag wird vom Konto abgebucht"}
 {"uk": "у скриньки немає власника", "en": "the mailbox has no owner", "de": "das Postfach hat keinen Inhaber"}
+{"uk": "у скриньці {0} не задано SMTP", "en": "mailbox {0} has no SMTP set", "de": "im Postfach {0} ist kein SMTP eingerichtet"}
 {"uk": "у скількох активних товарів заповнене посилання («Посилання на", "en": "how many active products have the link filled in (“Link to", "de": "bei wie vielen aktiven Artikeln der Link ausgefüllt ist („Link zum"}
 {"uk": "у скількох активних товарів заповнене посилання («Посилання на Datasheet» / «Зображення (URL)»)", "en": "how many active products have the link filled in (“Link to Datasheet” / “Image (URL)”)", "de": "bei wie vielen aktiven Artikeln der Link ausgefüllt ist („Link zum Datenblatt“ / „Bild (URL)“)"}
 {"uk": "у скількох уже є копія файлу на", "en": "how many already have a copy of the file on", "de": "bei wie vielen bereits eine Kopie der Datei auf dem"}
@@ -21482,6 +21511,7 @@
 {"uk": "що в картці лістингу", "en": "what is in the listing card", "de": "was in der Listing-Karte steht"}
 {"uk": "що вже є в базі (можливо, виправлений вручну), замінюється тільки після підтвердження.", "en": "that is already in the database (possibly corrected manually) is replaced only after confirmation.", "de": "die bereits in der Datenbank vorhanden ist (möglicherweise manuell korrigiert), wird erst nach Bestätigung ersetzt."}
 {"uk": "що вміє розділ", "en": "what the section can do", "de": "was der Bereich kann"}
+{"uk": "що замовляли", "en": "ordered items", "de": "bestellte Artikel"}
 {"uk": "що змінити: visible чи price", "en": "what to change: visible or price", "de": "was zu ändern ist: visible oder price"}
 {"uk": "що можна додати без переробки", "en": "what can be added without rework", "de": "was sich ohne Umbau ergänzen lässt"}
 {"uk": "що робили (піде в askDANTE)", "en": "what was done (goes to askDANTE)", "de": "was gemacht wurde (geht an askDANTE)"}
@@ -21513,6 +21543,7 @@
 {"uk": "як джерело.", "en": "as the source.", "de": "als Quelle."}
 {"uk": "як для DigiKey", "en": "as for DigiKey", "de": "wie bei DigiKey"}
 {"uk": "як для DigiKey: {0}", "en": "as for DigiKey: {0}", "de": "wie für DigiKey: {0}"}
+{"uk": "як для всіх листів клієнтам ({0})", "en": "same as for all customer e-mails ({0})", "de": "wie für alle Kunden-E-Mails ({0})"}
 {"uk": "як записано в замовленні", "en": "as recorded in the order", "de": "wie im Auftrag erfasst"}
 {"uk": "як зараз", "en": "as now", "de": "wie jetzt"}
 {"uk": "як минулого разу", "en": "as last time", "de": "wie beim letzten Mal"}

@@ -2060,25 +2060,17 @@ def send_order_confirm_notification(order):
     body_text = _render(getattr(ns, 'order_confirm_notify_body', '') or '')
     body_html = _render(getattr(ns, 'order_confirm_notify_body', '') or '', esc)
     cc_str    = (getattr(ns, 'order_confirm_notify_cc', '') or '').strip()
-    from_email = (ns.email_from or ns.email_host_user or '').strip()
 
     if not subject or not body_text:
         return False
 
     try:
-        from django.core.mail import EmailMultiAlternatives
+        from . import customer_mail
         html_body = ('<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">'
                      + body_html.replace('\n', '<br>') + '</body></html>')
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=body_text,
-            from_email=from_email,
-            to=[to_email],
-            cc=[a.strip() for a in cc_str.split(',') if a.strip()] if cc_str else [],
-            connection=_smtp_connection(ns),
-        )
-        msg.attach_alternative(outlook_safe(html_body), 'text/html')
-        msg.send()
+        # з адреси, вибраної в «👤 Клієнтам — з адреси» (SMTP сповіщень або скринька пошти Minerva)
+        customer_mail.send(ns, 'confirm', [to_email], subject, body_text, outlook_safe(html_body),
+                           cc=customer_mail.cc_list(cc_str))
         from django.utils import timezone as _tz
         from sales.models import SalesOrder
         SalesOrder.objects.filter(pk=order.pk).update(order_confirm_sent_at=_tz.now())
@@ -2204,26 +2196,17 @@ def send_ship_notification(order, shipment=None) -> bool:
     body_text = _render(body_tpl)
     body_html = _render(body_tpl, {k: esc(v) for k, v in ctx.items()})
     cc_str    = (getattr(ns, 'customer_notify_cc', '') or '').strip()
-    from_email = (ns.email_from or ns.email_host_user or '').strip()
 
     if not subject or not body_text:
         return False
 
     try:
-        from django.core.mail import EmailMultiAlternatives
-        from django.utils import timezone as _tz
+        from . import customer_mail
         html_body = ('<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">'
                      + body_html.replace('\n', '<br>') + '</body></html>')
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=body_text,
-            from_email=from_email,
-            to=[to_email],
-            cc=[a.strip() for a in cc_str.split(',') if a.strip()] if cc_str else [],
-            connection=_smtp_connection(ns),
-        )
-        msg.attach_alternative(outlook_safe(html_body), 'text/html')
-        msg.send()
+        # з адреси, вибраної в «👤 Клієнтам — з адреси» (SMTP сповіщень або скринька пошти Minerva)
+        customer_mail.send(ns, 'ship', [to_email], subject, body_text, outlook_safe(html_body),
+                           cc=customer_mail.cc_list(cc_str))
 
         mark_ship_mail_sent(order, parcel)
         return True

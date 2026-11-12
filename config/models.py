@@ -768,6 +768,11 @@ class NotificationSettings(models.Model):
         "🚫 Не надсилати листи цим клієнтам", blank=True, default="",
         help_text="Адреси або @домени через кому чи з нового рядка: їм не йдуть ні автоматичні, ні ручні листи "
                   "«📧 про відправку» і «📥 підтвердження замовлення».")
+    # «👤 Клієнтам — з адреси» (dashboard/customer_mail.py): {"all": "" | "acc:<pk>", "ship" / "confirm": "" (як
+    # «all») | "ns" | "acc:<pk>"}; "" / "ns" — SMTP вище, "acc:<pk>" — скринька пошти Minerva (EmailAccount)
+    customer_senders = models.JSONField(
+        "З якої адреси листи клієнтам", default=dict, blank=True,
+        help_text="Листи «📧 про відправку» і «📥 підтвердження замовлення»: SMTP сповіщень або скринька пошти Minerva.")
 
     class Meta:
         verbose_name = "Налаштування сповіщень"

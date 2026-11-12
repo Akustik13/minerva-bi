@@ -450,6 +450,11 @@ class PurchaseOrder(models.Model):
         help_text="Одне замовлення на пару «система + номер»: повтор з тим самим номером оновлює це замовлення.")
     supplier_order_no = models.CharField(
         "Номер замовлення / підтвердження постачальника", max_length=64, blank=True, default="")
+    ordered_skus = models.CharField(
+        "Що замовляли (артикули)", max_length=500, blank=True, default="",
+        help_text="Через кому. Minerva дописує сама з документів закупівлі — назва Gerber-архіву «TR240401-01.zip», "
+                  "файли в архіві, тема листа, артикули каталогу в рахунку. Можна виправити: ваше лишається, нове "
+                  "лише додається. На склад не впливає (позиції — нижче).")
     delivered_reported_at = models.DateTimeField(
         "Доставку повідомила зовнішня система", null=True, blank=True)
 

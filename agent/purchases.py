@@ -100,6 +100,7 @@ def _po_row(po) -> dict:
             'status': po.get_status_display(), 'order_date': po.order_date.isoformat() if po.order_date else '',
             'expected': po.expected_date.isoformat() if po.expected_date else '',
             'supplier_order_no': po.supplier_order_no, 'tracking': po.tracking_number,
+            'ordered': po.ordered_skus,
             'lines': [f'{(l.product.sku if l.product else l.external_sku) or l.description} × {_n(l.qty_ordered)}'
                       + (f' (отримано {_n(l.qty_received)})' if l.qty_received else '') for l in po.lines.all()[:20]],
             'parcels': [f'{s.tracking_number} — {s.get_status_display()}' for s in po.parcels.all()[:10]]
@@ -119,6 +120,7 @@ def find_purchase_orders(ctx, args):
         qs = qs.filter(Q(code__iexact=q) | Q(supplier__name__icontains=q) | Q(supplier__email__icontains=q)
                        | Q(supplier_order_no__icontains=q) | Q(tracking_number__iexact=q)
                        | Q(lines__product__sku__iexact=q) | Q(lines__external_sku__iexact=q)
+                       | (Q(ordered_skus__icontains=q) if len(q) >= 4 else Q(pk__in=[]))
                        | Q(parcels__tracking_number__iexact=q) | Q(incoming_shipments__tracking_number__iexact=q)
                        ).distinct()
     rows = [_po_row(po) for po in qs.order_by('-order_date', '-pk')[:LIST_LIMIT]]

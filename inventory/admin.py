@@ -36,6 +36,9 @@ from .models import (
     RFQEmailTemplate,
 )
 from shipping.models import ProductPackaging
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ── Утиліти ────────────────────────────────────────────────────────────────────
@@ -4377,11 +4380,13 @@ class SupplierAdmin(SupplierCardMixin, ProjectsBlockMixin, admin.ModelAdmin):
 @admin.register(PurchaseOrder)
 class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
     projects_block_kind = "purchase"           # «📁 Проєкти» (projects/panels.py)
-    list_display  = ("code", "supplier", "status_badge", "order_date",
+    list_display  = ("code", "supplier", "status_badge", "ordered_col", "order_date",
                      "expected_date", "received_date", "lines_count",
                      "total_price", "tracking_number", "docs_col", "external_col")
     list_filter   = ("supplier", "status", PODocsFilter, "order_date", "external_source")
-    search_fields = ("code", "tracking_number", "supplier__name", "notes", "external_id", "supplier_order_no")
+    search_fields = ("code", "tracking_number", "supplier__name", "notes", "external_id", "supplier_order_no",
+                     "ordered_skus", "lines__product__sku", "lines__external_sku")
+    actions       = ["detect_ordered"]
     date_hierarchy = "order_date"
     inlines       = (PurchaseOrderLineInline, PurchaseOrderDocumentInline, PurchaseReceiptInline)
     readonly_fields = ("code", "created_at", "updated_at", "external_source", "external_id", "delivered_reported_at",
@@ -4426,10 +4431,87 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
         return [path('<int:pk>/parcels/check/', self.admin_site.admin_view(self.parcels_check_view),
                      name='inventory_purchaseorder_parcels_check'),
                 path('<int:pk>/mail-docs/', self.admin_site.admin_view(self.mail_docs_view),
-                     name='inventory_purchaseorder_mail_docs')] + super().get_urls()
+                     name='inventory_purchaseorder_mail_docs'),
+                path('<int:pk>/ordered-detect/', self.admin_site.admin_view(self.ordered_detect_view),
+                     name='inventory_purchaseorder_ordered_detect')] + super().get_urls()
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related("documents")
+        return super().get_queryset(request).prefetch_related("documents", "lines__product")
+
+    # ── 🔎 Що замовляли (po_documents.detect / update_ordered) ──
+
+    def get_changelist_instance(self, request):
+        """Товари для колонки «Що замовляли» — одним запитом на сторінку."""
+        cl = super().get_changelist_instance(request)
+        from inventory.services.po_documents import ordered_codes
+        codes = {c.upper() for po in cl.result_list for c in ordered_codes(po.ordered_skus)}
+        self._ordered_products = {sku.upper(): pk for sku, pk in Product.objects.filter(
+            sku__in=codes | {c.lower() for c in codes}).values_list("sku", "pk")} if codes else {}
+        return cl
+
+    def ordered_col(self, obj):
+        """Що замовляли: артикули з поля (з документів чи вписані) + товари позицій; товар каталогу — посилання."""
+        from inventory.services.po_documents import ordered_codes
+        links = getattr(self, "_ordered_products", {})
+        items, seen = [], set()
+        for line in obj.lines.all():
+            if line.product_id and line.product.sku.upper() not in seen:
+                seen.add(line.product.sku.upper())
+                items.append((line.product.sku, line.product_id))
+        for code in ordered_codes(obj.ordered_skus):
+            if code.upper() not in seen:
+                seen.add(code.upper())
+                items.append((code, links.get(code.upper())))
+        if not items:
+            return "—"
+        shown = format_html_join(", ", "{}", ((
+            format_html('<a href="{}" translate="no">{}</a>', reverse("admin:inventory_product_change", args=[pk]),
+                        code) if pk else format_html('<span translate="no">{}</span>', code),) for code, pk in items[:4]))
+        more = format_html(' <span style="opacity:.65" title="{}">+{}</span>', ", ".join(c for c, _p in items[4:]),
+                           len(items) - 4) if len(items) > 4 else ""
+        return format_html("{}{}", shown, more)
+    ordered_col.short_description = _("Що замовляли")
+    ordered_col.admin_order_field = "ordered_skus"
+
+    def _ordered_message(self, request, po, found):
+        if found:
+            self.message_user(request, format_html(
+                "🔎 {} — {}: {}", po.code, _("що замовляли"),
+                format_html_join(", ", '<b translate="no">{}</b> <span style="opacity:.7">← {}</span>',
+                                 ((c, w) for c, w in found[:10]))), messages.SUCCESS)
+
+    @admin.action(description=_("🔎 Визначити, що замовляли (з документів)"), permissions=["change"])
+    def detect_ordered(self, request, queryset):
+        from inventory.services import po_documents
+        catalog = po_documents.Catalog()
+        done = 0
+        for po in queryset.prefetch_related("documents__email_message")[:300]:
+            found = po_documents.update_ordered(po, list(po.documents.all()), catalog)
+            if found:
+                done += 1
+                if done <= 15:
+                    self._ordered_message(request, po, found)
+        if not done:
+            self.message_user(request, _("🔎 У документах вибраних закупівель нових артикулів не знайдено. Назвіть "
+                                         "Gerber-архів артикулом (TR240401-01.zip) або впишіть «Що замовляли» вручну."),
+                              messages.INFO)
+        elif done > 15:
+            self.message_user(request, _("🔎 Доповнено закупівель: %(n)d") % {"n": done}, messages.SUCCESS)
+
+    def ordered_detect_view(self, request, pk):
+        """«🔎 Визначити з документів» на сторінці закупівлі (POST, право change)."""
+        from inventory.services import po_documents
+        po = self.get_queryset(request).filter(pk=pk).first()
+        back = reverse("admin:inventory_purchaseorder_change", args=[pk])
+        if po is None or request.method != "POST" or not self.has_change_permission(request, po):
+            self.message_user(request, _("Немає права змінювати закупівлю"), messages.ERROR)
+            return redirect(back)
+        found = po_documents.update_ordered(po)
+        if found:
+            self._ordered_message(request, po, found)
+        else:
+            self.message_user(request, _("🔎 Нових артикулів у документах не знайдено."), messages.INFO)
+        return redirect(back)
 
     # ── 📎 Документи закупівлі (inventory/services/po_documents.py) ──
 
@@ -4440,8 +4522,13 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
         if not obj or not obj.pk:
             return _("Спершу збережіть закупівлю — тоді можна додавати документи.")
         s = po_documents.summary(obj)
-        mail = format_html('<a class="button" href="{}">📥 Додати з пошти…</a>',
-                           reverse("admin:inventory_purchaseorder_mail_docs", args=[obj.pk]))
+        mail = format_html('<a class="button" href="{}">📥 Додати з пошти…</a> <button type="submit" class="button" '
+                           'formaction="{}" formmethod="post" formnovalidate title="{}">🔎 Визначити, що замовляли'
+                           '</button>',
+                           reverse("admin:inventory_purchaseorder_mail_docs", args=[obj.pk]),
+                           reverse("admin:inventory_purchaseorder_ordered_detect", args=[obj.pk]),
+                           _("Артикули з назв документів, файлів у ZIP-архіві (Gerber), теми листа й тексту рахунку "
+                             "→ поле «Що замовляли». Лише дописує."))
         if not s["groups"]:
             return format_html('<div>{}</div><div style="margin-top:6px">{} <span style="opacity:.75">{}</span></div>',
                                _("Документів ще немає."), mail,
@@ -4511,6 +4598,16 @@ class PurchaseOrderAdmin(ProjectsBlockMixin, admin.ModelAdmin):
                 if f.has_changed() and not f.instance.pk:
                     f.instance.uploaded_by = request.user
         super().save_formset(request, form, formset, change)
+        if formset.model is PurchaseOrderDocument:          # 🔎 що замовляли — з нових / замінених файлів
+            docs = list(formset.new_objects) + [o for o, fields in formset.changed_objects
+                                                if {"file", "title"} & set(fields)]
+            if docs:
+                from inventory.services import po_documents
+                try:
+                    self._ordered_message(request, form.instance,
+                                          po_documents.update_ordered(form.instance, docs))
+                except Exception as e:  # noqa: BLE001 — документи збережено, артикули — додатково
+                    logger.warning("po %s: ordered skus: %s", form.instance.pk, e)
 
     def parcels_check_view(self, request, pk):
         """«🔄 Перевірити посилки зараз» (POST): трекінг вхідних посилок закупівлі зараз, потім — налаштування
