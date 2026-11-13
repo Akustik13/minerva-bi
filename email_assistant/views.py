@@ -1564,6 +1564,9 @@ def draft_delete_view(request, draft_pk):
     return JsonResponse({'ok': True})
 
 
+AI_PROMPT_MAX = 8000   # символів інструкції для AI-відповіді
+
+
 @staff_member_required
 def ai_suggest_reply(request, message_pk):
     from email_assistant.models import EmailMessage
@@ -1580,7 +1583,9 @@ def ai_suggest_reply(request, message_pk):
     thread_messages = [m for m in ctx['thread_msgs'] if not m.sent_at or not msg.sent_at
                        or m.sent_at <= msg.sent_at] or [msg]
     to_email, to_label = _reply_recipient(thread_messages[-1], ctx)
-    instruction = request.GET.get('prompt', '')
+    # інструкція — у тілі POST: довга (сотні слів кирилицею) в адресі не проходить ліміт рядка запиту gunicorn
+    # (4094 байти → 400 не-JSON); ?prompt= — для старих сторінок
+    instruction = (request.POST.get('prompt') or request.GET.get('prompt', ''))[:AI_PROMPT_MAX]
     rag = _rag_for_ai(request.user, ctx, 'reply', instruction)
     facts = context_text(ctx) + (('\n\n' + rag['facts']) if rag['facts'] else '')
     reply = generate_reply(thread_messages, account, profile,

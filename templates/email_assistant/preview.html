@@ -1130,17 +1130,25 @@ window.pvReplyAI = function(pk) {
   }
 };
 
+// AI-відповідь (email_assistant/views.ai_suggest_reply): інструкція — у тілі POST (довга в адресі не проходить
+// ліміт рядка запиту сервера); відповідь не JSON (збій, тайм-аут) — помилка з кодом відповіді
+async function _pvAiReplyFetch(pk, prompt) {
+  var fd = new FormData();
+  fd.append('prompt', prompt || '');
+  var r = await fetch('/email/message/' + pk + '/ai-reply/', {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd});
+  try { return await r.json(); }
+  catch (e) { return {ok: false, error: '{% trans "Сервер не відповів як очікувалось" %} (HTTP ' + r.status + ')'}; }
+}
+
 window.pvReplyAIGenerate = async function(pk) {
   var inp    = document.getElementById('pv-reply-ai-prompt');
   var result = document.getElementById('pv-reply-ai-result');
   var acts   = document.getElementById('pv-reply-ai-actions');
-  var query  = inp ? encodeURIComponent(inp.value.trim()) : '';
   result.textContent = '⏳ {% trans "Minerva думає..." %}';
   if (acts) acts.style.display = 'none';
   _pvUsed('pv-reply-ai-used', null);
   try {
-    var r = await fetch('/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : ''));
-    var d = await r.json();
+    var d = await _pvAiReplyFetch(pk, inp ? inp.value.trim() : '');
     result.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
     _pvUsed('pv-reply-ai-used', d.used);
     if (d.ok && acts) acts.style.display = 'flex';
@@ -1255,13 +1263,10 @@ window.pvAiReply = function(pk) {
 window.pvAiGenerate = async function(pk) {
   var txt   = document.getElementById('pv-ai-txt-' + pk);
   var inp   = document.getElementById('pv-ai-prompt-' + pk);
-  var query = inp ? encodeURIComponent(inp.value.trim()) : '';
   txt.textContent = '⏳ {% trans "Minerva думає..." %}';
   _pvUsed('pv-ai-used-' + pk, null);
-  var url = '/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : '');
   try {
-    var r = await fetch(url);
-    var d = await r.json();
+    var d = await _pvAiReplyFetch(pk, inp ? inp.value.trim() : '');
     txt.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
     var aiBox = document.getElementById('pv-ai-' + pk);
     if (aiBox) { aiBox._to = d.to || ''; aiBox._cc = (d.cc || []).join(', '); }
@@ -1552,9 +1557,8 @@ window.pvHistoryDraft = async function(pk) {
   out.textContent = '⏳ {% trans "Minerva пише лист..." %}';
   acts.style.display = 'none';
   _pvUsed('pv-history-draft-used', null);
-  var q = inp && inp.value.trim() ? '?prompt=' + encodeURIComponent(inp.value.trim()) : '';
   try {
-    var d = await (await fetch('/email/message/' + pk + '/ai-reply/' + q)).json();
+    var d = await _pvAiReplyFetch(pk, inp ? inp.value.trim() : '');
     if (!d.ok) { out.textContent = '⚠️ ' + (d.error || '{% trans "Помилка" %}'); return; }
     _pvDraft = d;
     out.textContent = d.reply;

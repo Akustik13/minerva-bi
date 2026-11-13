@@ -209,12 +209,15 @@ function aiReply(pk) {
 async function aiGenerate(pk) {
   var text  = document.getElementById('ai-text-' + pk);
   var inp   = document.getElementById('ai-prompt-' + pk);
-  var query = inp ? encodeURIComponent(inp.value.trim()) : '';
   text.textContent = '⏳ {% trans "Мінерва думає..." %}';
-  var url = '/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : '');
+  // інструкція — у тілі POST: довга в адресі не проходить ліміт рядка запиту сервера
+  var fd = new FormData();
+  fd.append('prompt', inp ? inp.value.trim() : '');
   try {
-    var r = await fetch(url);
-    var d = await r.json();
+    var r = await fetch('/email/message/' + pk + '/ai-reply/', {method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd});
+    var d;
+    try { d = await r.json(); }
+    catch (e) { d = {ok: false, error: '{% trans "Сервер не відповів як очікувалось" %} (HTTP ' + r.status + ')'}; }
     text.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
   } catch { text.textContent = '⚠️ {% trans "Помилка" %}'; }
 }
