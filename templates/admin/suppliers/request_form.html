@@ -59,6 +59,10 @@
   .rq-ms-pop label { display: flex; gap: 6px; align-items: center; width: auto; float: none; padding: 3px 2px; margin: 0;
     font-weight: normal; cursor: pointer; white-space: nowrap; }
   .rq-ms-pop .rq-ms-clear { display: block; margin-top: 4px; font-size: 12px; }
+  #rq-ai-wish { resize: vertical; min-height: 58px; max-height: 320px; overflow-y: auto; line-height: 1.4; }
+  .rq-test-in { position: relative; display: inline-block; }
+  .rq-test-in input { width: 340px; max-width: 70vw; }
+  .rq-test-in .rq-sug { position: absolute; left: 0; top: 100%; margin-top: 2px; width: 420px; max-width: 80vw; }
   .rq-sug { position: relative; z-index: 40; margin-top: -4px; max-width: 520px; background: var(--body-bg, #fff);
     border: 1px solid var(--border-strong, #ccc); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); max-height: 260px; overflow-y: auto; }
   .rq-sug div { padding: 4px 10px; cursor: pointer; font-size: 13px; }
@@ -176,7 +180,7 @@
       <span class="spf-job" id="rq-ai-out"></span>
     </div>
     <label class="spf-wide">🧠 Що врахувати AI <span class="spf-muted">— необов'язково, лише для «AI: скласти запит»</span>
-      <input name="ai_wish" id="rq-ai-wish" maxlength="1500" placeholder="напр. коротко; спершу зразки 50 шт; згадати RoHS і маркування; ціни в EUR"></label>
+      <textarea name="ai_wish" id="rq-ai-wish" rows="3" maxlength="3000" placeholder="напр. коротко; спершу зразки 50 шт; згадати RoHS і маркування; ціни в EUR&#10;можна кількома рядками — кожне побажання з нового рядка"></textarea></label>
     <div class="spf-row"><button type="button" class="button" id="rq-example" title="Готовий лист зі змінними мовою запиту — допишіть деталі">✍️ Приклад зі змінними</button>
       <button type="submit" name="regen" value="1" class="button" formnovalidate onclick="return !this.form.body.value || confirm('Скласти текст наново з параметрів? Ваші правки тексту зникнуть.')">🔄 Скласти текст з параметрів</button></div>
     {{ examples|json_script:"rq-examples" }}
@@ -190,6 +194,13 @@
       <span class="spf-job" id="rq-pv-msg"></span>
     </div>
     <div class="rq-pv" id="rq-pv" hidden></div>
+    {% if accounts %}<div class="spf-row rq-test">✉️ Тестовий лист на:
+      <span class="rq-test-in"><input id="rq-test-to" value="{{ test_to }}" placeholder="ваш email або колеги" autocomplete="off" translate="no">
+      <span class="rq-sug" id="rq-test-sug" hidden></span></span>
+      <button type="button" class="button" id="rq-test-go">✉️ Надіслати тест</button>
+      <span class="spf-job" id="rq-test-msg"></span>
+    </div>
+    <div class="spf-muted">Тест іде <b>лише на ці адреси</b> (до 5, через кому) з вашої скриньки: тема з «[TEST]», текст, змінні й файли — як отримає постачальник, вибраний у «👁» (не вибрано — зразок «Example Supplier Ltd»). Без копії, у запит і в картку постачальника не записується; постачальникам нічого не йде.</div>{% endif %}
   </div>
 
   <div class="spf-muted">📤 <b>«Зберегти й надіслати»</b> — після підтвердження Minerva <b>одразу</b> надсилає кожному позначеному окремий лист з вашої скриньки (тема й текст зі змінними, копія, файли запиту); копія — у «Надіслані», відповіді Minerva знаходить сама. «💾 Зберегти» нічого не надсилає. Перед надсиланням перегляньте «👁 Як виглядатиме лист».</div>
@@ -329,8 +340,9 @@
       if (e.target.checked && pAuto.checked) openPanel(l.dataset.pk); });
   });
   // «Копія (CC)»: підказки — колеги й адресна книга пошти (/email/crm-contacts/), за останнім словом після коми
-  var ccIn = document.getElementById('rq-cc'), ccSug = document.getElementById('rq-cc-sug'),
-      mates = JSON.parse(document.getElementById('rq-colleagues').textContent || '[]'), ccT = null, ccPick = -1;
+  var mates = JSON.parse(document.getElementById('rq-colleagues').textContent || '[]');
+  function addrSuggest(ccIn, ccSug){
+  var ccT = null, ccPick = -1;
   function ccToken(){ var parts = ccIn.value.split(/[,;]/); return parts[parts.length - 1].trim(); }
   function ccShow(list){
     ccSug.innerHTML = ''; ccPick = -1;
@@ -371,6 +383,13 @@
     else if (e.key === 'Escape') ccSug.hidden = true;
   });
   ccIn.addEventListener('blur', function(){ setTimeout(function(){ ccSug.hidden = true; }, 150); });
+  }
+  addrSuggest(document.getElementById('rq-cc'), document.getElementById('rq-cc-sug'));
+  if (document.getElementById('rq-test-to')) addrSuggest(document.getElementById('rq-test-to'), document.getElementById('rq-test-sug'));
+  // «🧠 Що врахувати AI» росте разом з текстом (до max-height, далі — прокрутка)
+  var wish = document.getElementById('rq-ai-wish');
+  function wishFit(){ wish.style.height = 'auto'; wish.style.height = Math.min(wish.scrollHeight + 2, 320) + 'px'; }
+  wish.addEventListener('input', wishFit);
   // 🧠 AI: лист із полів форми й вашого тексту (фоном; ↶ — повернути те, що було)
   var aiGo = document.getElementById('rq-ai-go'), aiOut = document.getElementById('rq-ai-out'),
       aiUndo = document.getElementById('rq-ai-undo'), aiPrev = null;
@@ -461,15 +480,19 @@
   pvList();
   function line(label, value){ var d = document.createElement('div'); var b = document.createElement('b'); b.textContent = label + ': ';
     d.appendChild(b); d.appendChild(document.createTextNode(value)); return d; }
-  document.getElementById('rq-pv-go').addEventListener('click', function(){
-    var pk = pvSel.value; if (!pk) { pvMsg.textContent = 'Позначте постачальників у «Кому».'; return; }
+  function letterData(pk){
     var fd = new FormData(); ['title', 'language', 'subject', 'body', 'cc', 'reply_by'].forEach(function(n){
       var el = form.querySelector('[name="' + n + '"]'); if (el) fd.append(n, el.value); });
     if (form.querySelector('[name=cc_contacts]').checked) fd.append('cc_contacts', '1');
-    fd.append('supplier', pk);
-    var cs = form.querySelector('select[name="contact_' + pk + '"]'); if (cs) fd.append('contact', cs.value);
+    if (pk) { fd.append('supplier', pk);
+      var cs = form.querySelector('select[name="contact_' + pk + '"]'); if (cs) fd.append('contact', cs.value); }
     {% if req.pk %}fd.append('req', '{{ req.pk }}');{% endif %}
-    var tok = form.querySelector('input[name=csrfmiddlewaretoken]').value;
+    return fd;
+  }
+  var tok = form.querySelector('input[name=csrfmiddlewaretoken]').value;
+  document.getElementById('rq-pv-go').addEventListener('click', function(){
+    var pk = pvSel.value; if (!pk) { pvMsg.textContent = 'Позначте постачальників у «Кому».'; return; }
+    var fd = letterData(pk);
     pvMsg.textContent = '⏳';
     fetch('{% url "admin:suppliers_supplierrequest_preview" %}', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': tok}})
       .then(function(r){ return r.json(); }).then(function(j){
@@ -482,6 +505,25 @@
         var pre = document.createElement('pre'); pre.setAttribute('translate', 'no');
         pre.textContent = j.body || '(текст порожній — «🔄 Скласти текст з параметрів» або напишіть свій)'; pvBox.appendChild(pre);
       }).catch(function(){ pvMsg.textContent = '⚠️ Немає зв’язку з сервером'; });
+  });
+  // ✉️ тестовий лист — лише на вказані адреси, як отримає вибраний у «👁» постачальник
+  var tGo = document.getElementById('rq-test-go');
+  if (tGo) tGo.addEventListener('click', function(){
+    var tMsg = document.getElementById('rq-test-msg'), to = document.getElementById('rq-test-to').value.trim();
+    if (!to) { tMsg.textContent = '⚠️ Вкажіть адресу'; return; }
+    if (!form.querySelector('textarea[name=body]').value.trim()) { tMsg.textContent = '⚠️ Порожній текст листа'; return; }
+    var fd = letterData(pvSel.value); fd.append('test_to', to);
+    form.querySelectorAll('input[name=del_file]:checked').forEach(function(c){ fd.append('del_file', c.value); });
+    [].forEach.call(document.getElementById('rq-files').files, function(x){ fd.append('files', x); });
+    tGo.disabled = true; tMsg.textContent = '⏳ Надсилаю…';
+    fetch('{% url "admin:suppliers_supplierrequest_test_mail" %}', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': tok}})
+      .then(function(r){ return r.json(); }).then(function(j){
+        tGo.disabled = false;
+        if (j.error) { tMsg.textContent = '⚠️ ' + j.error; return; }
+        tMsg.textContent = '✅ Надіслано на ' + j.sent_to.join(', ') + ' — так отримає ' + j.company +
+          (j.as_to ? ' (' + j.as_to + ')' : '') + (j.cc && j.cc.length ? '; копія в розсилці: ' + j.cc.join(', ') : '') +
+          (j.files && j.files.length ? '; файлів: ' + j.files.length : '');
+      }).catch(function(){ tGo.disabled = false; tMsg.textContent = '⚠️ Немає зв’язку з сервером'; });
   });
 })();
 </script>

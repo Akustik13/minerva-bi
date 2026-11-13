@@ -1286,6 +1286,73 @@ class RequestLetterTests(Base):
         self.assertEqual((self.req.cc, self.req.cc_contacts), ("x@y.de, z@w.com", True))
 
 
+class RequestTestMailTests(Base):
+    """✉️ Тестовий лист: лише на вказані адреси, як отримає вибраний постачальник; розсилка й запит не змінюються."""
+
+    def setUp(self):
+        super().setUp()
+        self.s2 = Supplier.objects.create(name="JLC", email="")
+        self.mia = SupplierContact.objects.create(supplier=self.s2, name="Mia Chen", email="mia@jlcpcb.com",
+                                                  is_primary=True)
+        self.req = SupplierRequest.objects.create(title="PCB 4 layers", owner=self.user, language="en")
+        rfq.add_recipients(self.req, [self.s2])
+
+    def post(self, sent, **data):
+        def fake_send(client, to_emails, subject, body_text, **kw):
+            sent.append({"to": to_emails, "subject": subject, "body": body_text, "cc": kw.get("cc_emails"),
+                         "files": [a["name"] for a in kw.get("attachments") or []]})
+            return {"ok": True, "message_id": "<t@y>"}
+        base = {"req": self.req.pk, "title": "PCB 4 layers", "language": "en", "subject": "[{code}] Quote for {company}",
+                "body": "Hi {first_name},\nplease quote {title}.", "cc": "boss@sevskiy.de"}
+        base.update(data)
+        with mock.patch("email_assistant.smtp_client.SMTPClient.send", fake_send):
+            return self.client.post(reverse("admin:suppliers_supplierrequest_test_mail"), base)
+
+    def test_test_mail_only_to_given_address(self):
+        from suppliers.models import SupplierRequestFile as RequestFile
+        RequestFile.objects.create(request=self.req, name="old.pdf",
+                                   file=SimpleUploadedFile("old.pdf", b"%PDF-1.4 old"))
+        gone = RequestFile.objects.create(request=self.req, name="gone.pdf",
+                                          file=SimpleUploadedFile("gone.pdf", b"%PDF-1.4 x"))
+        sent = []
+        j = self.post(sent, supplier=self.s2.pk, contact=self.mia.pk, test_to="me@sevskiy.de, colleague@sevskiy.de",
+                      del_file=[gone.pk], files=[SimpleUploadedFile("stackup.pdf", b"%PDF-1.4 new")]).json()
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sent[0]["to"], ["me@sevskiy.de", "colleague@sevskiy.de"])
+        self.assertEqual(sent[0]["subject"], f"[TEST] [{self.req.code}] Quote for JLC")
+        self.assertEqual(sent[0]["body"], "Hi Mia,\nplease quote PCB 4 layers.")       # як отримає Mia
+        self.assertIsNone(sent[0]["cc"])                                                  # копії в тесті немає
+        self.assertEqual(sent[0]["files"], ["old.pdf", "stackup.pdf"])                   # «прибрати» — ні
+        self.assertEqual((j["company"], j["as_to"], j["cc"]), ("JLC", "mia@jlcpcb.com", ["boss@sevskiy.de"]))
+        r = self.req.recipients.get()
+        self.assertEqual(r.state, R.PLANNED)                                              # розсилка не почалась
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.status, SupplierRequest.DRAFT)
+        self.assertFalse(SupplierEvent.objects.exists())
+        from email_assistant.models import EmailMessage
+        self.assertFalse(EmailMessage.objects.filter(subject__startswith="[TEST]").exists())
+
+    def test_without_supplier_and_limits(self):
+        sent = []
+        j = self.post(sent, test_to="me@sevskiy.de").json()                                # не вибрано — зразок
+        self.assertEqual(j["company"], rfq.SAMPLE_COMPANY)
+        self.assertTrue(sent[0]["body"].startswith("Hi team,"))
+        many = ", ".join(f"a{i}@x.de" for i in range(rfq.TEST_MAX + 1))
+        self.assertEqual(self.post(sent, test_to=many).status_code, 400)
+        self.assertEqual(self.post(sent, test_to="not an address").status_code, 400)
+        self.assertEqual(self.post(sent, test_to="me@sevskiy.de", body=" ").status_code, 400)
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(self.client.get(reverse("admin:suppliers_supplierrequest_test_mail")).status_code, 405)
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_edit", args=[self.req.pk]))
+        self.assertContains(page, f'id="rq-test-to" value="{ME}"')                      # за замовчуванням — собі
+        self.assertContains(page, '<textarea name="ai_wish"')
+        self.other.profile.role = "readonly"
+        self.other.profile.save()
+        self.client.force_login(self.other)
+        self.assertNotEqual(self.post(sent, test_to="me@sevskiy.de").status_code, 200)
+        self.assertEqual(len(sent), 1)
+
+
 class RequestFormPanelTests(Base):
     """📨 Форма запиту: фото візитки при наведенні, панель «дані постачальника» праворуч."""
 
@@ -1328,14 +1395,15 @@ class RequestAiLetterTests(Base):
             j = self.client.post(url, {"title": "4-layer PCB", "template": "pcb", "language": "de",
                                        "spec_layers": "4", "spec_thickness": "1.6", "quantities": "10; 100",
                                        "reply_by": "2026-12-01", "body": "Bitte schnell, Muster zuerst.",
-                                       "ai_wish": "Erst 50 Muster, RoHS erwähnen",
+                                       "ai_wish": "Erst 50 Muster,   RoHS erwähnen\n\n  Preise in EUR ",
                                        "file_names": ["gerber.zip", "bom.xlsx"]}).json()
         system, content = call.call_args.args
         self.assertIn("німецькою", system)
         for part in ("Lagen: 4", "Dicke, mm: 1.6", "10 / 100", "gerber.zip, bom.xlsx", "{reply_by}",
                      "Bitte schnell, Muster zuerst."):
             self.assertIn(part, content)
-        self.assertIn("ПОБАЖАННЯ МЕНЕДЖЕРА (довірене — врахуй обов'язково): Erst 50 Muster, RoHS erwähnen", content)
+        self.assertIn("ПОБАЖАННЯ МЕНЕДЖЕРА (довірене — врахуй обов'язково): Erst 50 Muster, RoHS erwähnen\n"
+                      "Preise in EUR", content)                                          # кілька рядків лишаються
         r = jobs.state(j["job"], self.user)["result"]
         self.assertEqual(r["subject"], "[{code}] RFQ: 4-layer PCB")
         self.assertTrue(r["body"].startswith("{greeting}\n\nDear Sir or Madam"))       # привітання — змінною

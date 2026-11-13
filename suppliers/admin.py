@@ -115,6 +115,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             path("<int:pk>/action/", view(self.action_view), name="suppliers_supplierrequest_action"),
             path("preview/", view(self.preview_view), name="suppliers_supplierrequest_preview"),
             path("ai-letter/", view(self.ai_letter_view), name="suppliers_supplierrequest_ai_letter"),
+            path("test-mail/", view(self.test_mail_view), name="suppliers_supplierrequest_test_mail"),
         ] + super().get_urls()
 
     def add_view(self, request, form_url="", extra_context=None):
@@ -134,13 +135,11 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         return [{"email": u.email, "name": u.get_full_name() or u.username, "source": "колега"}
                 for u in User.objects.filter(is_active=True, is_staff=True).exclude(email="").order_by("first_name")[:200]]
 
-    def preview_view(self, request):
-        """👁 Як виглядатиме лист одному отримувачу — з того, що зараз у формі (ще не збережене теж): тема й текст
-        зі змінними (rfq.render), кому, копія (rfq.cc_for), вкладення запиту. Нічого не зберігає й не надсилає."""
+    def _draft(self, request):
+        """(запит або None, чернетка з того, що зараз у формі — ще не збережене теж, отримувач або None) — для
+        👁 перегляду й ✉️ тестового листа. Отримувач — позначений постачальник (supplier) і його контакт (contact)."""
         from inventory.models import Supplier
         from suppliers.models import SupplierContact
-        if request.method != "POST":
-            return HttpResponseNotAllowed(["POST"])
         P = request.POST
         req = self._request(request, int(P["req"]), "change") if str(P.get("req") or "").isdigit() else None
         if req is None and not self.has_add_permission(request):
@@ -148,22 +147,61 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         draft = SupplierRequest(code=req.code if req else "", title=P.get("title", "").strip()[:200],
                                 language=P.get("language") if P.get("language") in dict(SupplierRequest.LANGS) else "en",
                                 subject=P.get("subject", "").strip()[:250], body=P.get("body", ""),
-                                cc=P.get("cc", "")[:500], cc_contacts=bool(P.get("cc_contacts")))
+                                cc=P.get("cc", "")[:500], cc_contacts=bool(P.get("cc_contacts")),
+                                account_id=req.account_id if req else None)
         try:
             draft.reply_by = datetime.date.fromisoformat(P.get("reply_by", "")) if P.get("reply_by") else None
         except ValueError:
             draft.reply_by = None
-        supplier = Supplier.objects.filter(pk=P.get("supplier") or 0).first()
+        pk = str(P.get("supplier") or "")
+        supplier = Supplier.objects.filter(pk=int(pk)).first() if pk.isdigit() else None
         if supplier is None:
-            return JsonResponse({"error": "Позначте постачальника в «🏭 Кому»."}, status=400)
-        contact = SupplierContact.objects.filter(supplier=supplier, pk=P.get("contact") or 0).first()
+            return req, draft, None
+        cpk = str(P.get("contact") or "")
+        contact = SupplierContact.objects.filter(supplier=supplier, pk=int(cpk)).first() if cpk.isdigit() else None
         email, contact = rfq.pick_email(supplier, contact)
-        r = SupplierRequestRecipient(request=draft, supplier=supplier, contact=contact, email=email)
+        return req, draft, SupplierRequestRecipient(request=draft, supplier=supplier, contact=contact, email=email)
+
+    def preview_view(self, request):
+        """👁 Як виглядатиме лист одному отримувачу — з того, що зараз у формі (ще не збережене теж): тема й текст
+        зі змінними (rfq.render), кому, копія (rfq.cc_for), вкладення запиту. Нічого не зберігає й не надсилає."""
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        req, draft, r = self._draft(request)
+        if r is None:
+            return JsonResponse({"error": "Позначте постачальника в «🏭 Кому»."}, status=400)
         subject, body = rfq.render(draft, r)
         if not draft.body.strip():
             body = ""
-        return JsonResponse({"to": email or "⚠️ немає email", "cc": rfq.cc_for(draft, r), "subject": subject,
+        return JsonResponse({"to": r.email or "⚠️ немає email", "cc": rfq.cc_for(draft, r), "subject": subject,
                              "body": body, "files": [f.name for f in req.files.all()] if req else []})
+
+    def test_mail_view(self, request):
+        """✉️ Тестовий лист собі / колезі: як отримає вибраний у «👁» постачальник (не вибрано — зразок
+        rfq.SAMPLE_COMPANY), лише на адреси test_to (rfq.send_test) — без копії й без запису в запит і в картку
+        постачальника. Вкладення — файли запиту (крім позначених «прибрати») і ще не збережені з форми."""
+        from inventory.models import Supplier
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        req, draft, r = self._draft(request)
+        if r is None:
+            r = SupplierRequestRecipient(request=draft, supplier=Supplier(name=rfq.SAMPLE_COMPANY), email="")
+        cap = rfq.ATTACH_MAX_MB * 1024 * 1024 + 1
+        blobs = []
+        try:
+            if req is not None:
+                gone = set(request.POST.getlist("del_file"))
+                for f in req.files.all():
+                    if str(f.pk) not in gone:
+                        with f.file.open("rb") as fh:
+                            blobs.append((f.name, fh.read(cap)))
+            blobs += [(u.name, u.read(cap)) for u in request.FILES.getlist("files")[:20]]
+            out = rfq.send_test(draft, r, request.user, request.POST.get("test_to", ""), rfq.as_attachments(blobs))
+        except OSError as e:
+            return JsonResponse({"error": f"Файл недоступний: {e}"}, status=400)
+        except rfq.RFQError as e:
+            return JsonResponse({"error": str(e)}, status=400)
+        return JsonResponse(out)
 
     def ai_letter_view(self, request):
         """🧠 AI складає тему й текст запиту з того, що зараз у формі (поля, параметри, файли, чернетка людини). Фоном
@@ -203,7 +241,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 "notes": P.get("notes", "").strip()[:4000], "quantities": P.get("quantities", "")[:120],
                 "files": files, "reply_by": P.get("reply_by", ""), "company": company,
                 "subject": P.get("subject", "").strip()[:250], "body": P.get("body", "").strip(),
-                "wish": " ".join(P.get("ai_wish", "").split())[:1500]}
+                "wish": "\n".join(" ".join(x.split()) for x in P.get("ai_wish", "").splitlines()
+                                  if x.strip())[:ai.WISH_MAX]}
         model, user = ai.model_of(P.get("model")), request.user
 
         def run():
@@ -321,7 +360,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             categories=SupplierCategory.objects.filter(is_active=True), projects=projects, groups=groups,
             picked=picked, sent=sent, accounts=accounts, placeholders=rfq.PLACEHOLDERS, **self._recipients(),
             examples={k: {"subject": v[0], "body": v[1]} for k, v in rfq.EXAMPLES.items()},
-            colleagues=self._colleagues(),
+            colleagues=self._colleagues(), test_to=accounts[0].email_address if accounts else request.user.email,
             example_body=rfq.EXAMPLES.get(req.language, rfq.EXAMPLES["en"])[1],
             langs=SupplierRequest.LANGS, files=list(req.files.all()) if req.pk else [],
             notes=(req.specs or {}).get("_notes", "")))

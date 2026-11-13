@@ -308,6 +308,52 @@ def _attachments(req) -> list:
     return out
 
 
+def as_attachments(blobs) -> list:
+    """[(назва, байти)] → вкладення SMTPClient; разом понад ATTACH_MAX_MB — RFQError."""
+    import mimetypes
+    out = [{"name": n, "content": d, "content_type": mimetypes.guess_type(n)[0] or "application/octet-stream"}
+           for n, d in blobs]
+    if sum(len(a["content"]) for a in out) > ATTACH_MAX_MB * 1024 * 1024:
+        raise RFQError(f"Файли разом понад {ATTACH_MAX_MB} МБ — більшість пошт не прийме. Стисніть у ZIP або "
+                       f"дайте посилання в тексті.")
+    return out
+
+
+TEST_PREFIX = "[TEST] "
+TEST_MAX = 5                                    # адрес у тестовому листі
+SAMPLE_COMPANY = "Example Supplier Ltd"         # «як отримає» без позначеного постачальника
+
+
+def send_test(req, recipient, user, to, attachments=()) -> dict:
+    """✉️ Тестовий лист: тема й текст точно такі, як отримає recipient (render), але лише на адреси to (≤ TEST_MAX),
+    без копії, без запису в запит, у Minerva й у картку постачальника; тема з «[TEST]». Скринька — як у розсилки
+    (account_for), тож підпис і відправник ті самі. → {sent_to, subject, from, as_to, company, cc, files}."""
+    from email_assistant.smtp_client import SMTPClient
+    to = addresses(to)
+    if not to:
+        raise RFQError("Вкажіть адресу для тестового листа — напр. свою.")
+    if len(to) > TEST_MAX:
+        raise RFQError(f"Тестовий лист — не більше {TEST_MAX} адрес; розсилка — кнопкою «📤 Зберегти й надіслати».")
+    if not (req.body or "").strip():
+        raise RFQError("Порожній текст листа — спершу напишіть його або складіть з параметрів.")
+    account = account_for(user, req)
+    if account is None:
+        raise RFQError("У вас немає активної поштової скриньки в Minerva — тест нема з чого надіслати.")
+    subject, body = render(req, recipient)
+    subject = (TEST_PREFIX + subject)[:250]
+    attachments = list(attachments)
+    try:
+        result = SMTPClient(account).send(to_emails=to, subject=subject, body_text=body, attachments=attachments)
+    except Exception as e:  # noqa: BLE001
+        result = {"ok": False, "error": str(e)}
+    if not result.get("ok"):
+        raise RFQError("Не надіслано: " + str(result.get("error") or "помилка SMTP")[:400])
+    real = recipient.supplier.pk is not None
+    return {"sent_to": to, "subject": subject, "from": account.email_address,
+            "as_to": (recipient.email or "") if real else "", "company": recipient.supplier.name,
+            "cc": cc_for(req, recipient) if real else addresses(req.cc), "files": [a["name"] for a in attachments]}
+
+
 def store_sent(account, result, to, cc, subject, body, attachments, reply_to=None):
     """Копія надісланого листа в Minerva й гілка (так само, як лист з «Написати»), щоб відповідь лягла поруч."""
     from email_assistant.models import EmailMessage

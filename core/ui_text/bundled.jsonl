@@ -290,6 +290,7 @@
 {"uk": "(даташит|datasheet|datenblatt|частот|frequen|ghz|mhz|dbi|антен|antenn|фільтр|filter|кабел|cable|kabel|роз'?єм|connector|stecker|sma\\b|u\\.fl|ipex|mhf|vswr|gain|підсил|характеристик|параметр|наявн|на складі|in stock|аналог|замін|сумісн|lte|5g\\b|gnss|gps|lora|bluetooth|wi-?fi|nb-iot|zigbee|uwb|потужн|імпеданс|ohm|ом\\b|ваг[аиу]\\b|weight|gewicht|розмір|габарит|dimension|матеріал|температур)", "en": "(даташит|datasheet|datenblatt|частот|frequen|ghz|mhz|dbi|антен|antenn|фільтр|filter|кабел|cable|kabel|роз'?єм|connector|stecker|sma\\b|u\\.fl|ipex|mhf|vswr|gain|підсил|характеристик|параметр|наявн|на складі|in stock|аналог|замін|сумісн|lte|5g\\b|gnss|gps|lora|bluetooth|wi-?fi|nb-iot|zigbee|uwb|потужн|імпеданс|ohm|ом\\b|ваг[аиу]\\b|weight|gewicht|розмір|габарит|dimension|матеріал|температур)", "de": "(даташит|datasheet|datenblatt|частот|frequen|ghz|mhz|dbi|антен|antenn|фільтр|filter|кабел|cable|kabel|роз'?єм|connector|stecker|sma\\b|u\\.fl|ipex|mhf|vswr|gain|підсил|характеристик|параметр|наявн|на складі|in stock|аналог|замін|сумісн|lte|5g\\b|gnss|gps|lora|bluetooth|wi-?fi|nb-iot|zigbee|uwb|потужн|імпеданс|ohm|ом\\b|ваг[аиу]\\b|weight|gewicht|розмір|габарит|dimension|матеріал|температур)"}
 {"uk": "(дефолтний)", "en": "(default)", "de": "(Standard)"}
 {"uk": "(для фото", "en": "(for photos", "de": "(für Fotos"}
+{"uk": "(до 5, через кому) з вашої скриньки: тема з «[TEST]», текст, змінні й файли — як отримає постачальник, вибраний у «👁» (не вибрано — зразок «Example Supplier Ltd»). Без копії, у запит і в картку постачальника не записується; постачальникам нічого не йде.", "en": "(up to 5, comma-separated) from your mailbox: subject with «[TEST]», text, variables and files — exactly as the supplier selected in «👁» will receive it (none selected — the sample «Example Supplier Ltd»). No copy, nothing is recorded in the request or the supplier card; nothing goes to suppliers.", "de": "(bis zu 5, durch Komma getrennt) aus Ihrem Postfach: Betreff mit «[TEST]», Text, Variablen und Dateien — genau so, wie der in «👁» gewählte Lieferant sie erhält (keiner gewählt — Muster «Example Supplier Ltd»). Ohne Kopie, nichts wird in der Anfrage oder in der Lieferantenkarte gespeichert; an Lieferanten geht nichts."}
 {"uk": "(до {0})", "en": "(by {0})", "de": "(bis {0})"}
 {"uk": "(довше 200 символів)", "en": "(longer than 200 characters)", "de": "(länger als 200 Zeichen)"}
 {"uk": "(дописано порожніх полів: {0})", "en": "(empty fields filled: {0})", "de": "(leere Felder ergänzt: {0})"}
@@ -5022,7 +5023,9 @@
 {"uk": "Вкажіть {0} — ключовий параметр пошуку", "en": "Specify {0} — the key search parameter", "de": "Geben Sie {0} an — der wichtigste Suchparameter"}
 {"uk": "Вкажіть «Адреса сайту» повністю, напр. https://www.sevskiy.de — без неї Minerva не знає, куди звертатися.", "en": "Enter the full “Site address”, e.g. https://www.sevskiy.de — without it Minerva does not know where to connect.", "de": "Geben Sie die „Website-Adresse“ vollständig an, z. B. https://www.sevskiy.de – ohne sie weiß Minerva nicht, wohin sie sich verbinden soll."}
 {"uk": "Вкажіть «з … по …» або тривалість.", "en": "Specify “from … to …” or a duration.", "de": "Geben Sie „von … bis …“ oder eine Dauer an."}
+{"uk": "Вкажіть адресу", "en": "Enter an address", "de": "Adresse angeben"}
 {"uk": "Вкажіть адресу Minerva, напр. https://sevskiy.minerva-bi.com/", "en": "Enter the Minerva address, e.g. https://sevskiy.minerva-bi.com/", "de": "Geben Sie die Minerva-Adresse an, z. B. https://sevskiy.minerva-bi.com/"}
+{"uk": "Вкажіть адресу для тестового листа — напр. свою.", "en": "Enter an address for the test e-mail — e.g. your own.", "de": "Geben Sie eine Adresse für die Test-E-Mail an — z. B. Ihre eigene."}
 {"uk": "Вкажіть адресу отримувача", "en": "Enter the recipient’s address", "de": "Geben Sie die Empfängeradresse an"}
 {"uk": "Вкажіть вагу, розміри, тип вмісту, задекларовану вартість", "en": "Enter the weight, dimensions, content type and declared value", "de": "Geben Sie Gewicht, Maße, Inhaltsart und deklarierten Wert an"}
 {"uk": "Вкажіть вартість товарів для митниці", "en": "Enter the value of the goods for customs", "de": "Geben Sie den Warenwert für den Zoll an"}
@@ -9924,6 +9927,7 @@
 {"uk": "Надсилаються нові повідомлення покупця й оператора DigiKey (ваші відповіді — ні): у Telegram — коротко, листом — повний текст, попередні повідомлення й посилання на відповідь у Minerva. Відповідати — у «💬 Messages Hub».", "en": "New messages from the buyer and the DigiKey operator are sent (your replies are not): briefly to Telegram, by e-mail with the full text, earlier messages and a link to reply in Minerva. Reply in \"💬 Messages Hub\".", "de": "Gesendet werden neue Nachrichten des Käufers und des DigiKey-Operators (Ihre Antworten nicht): kurz an Telegram, per E-Mail mit vollem Text, früheren Nachrichten und Link zum Antworten in Minerva. Antworten Sie im „💬 Messages Hub“."}
 {"uk": "Надсилаються нові повідомлення покупця й оператора DigiKey (відповіді з нашого боку — ні).", "en": "New messages from the buyer and the DigiKey operator are sent (replies from our side are not).", "de": "Gesendet werden neue Nachrichten des Käufers und des DigiKey-Operators (Antworten von unserer Seite nicht)."}
 {"uk": "Надсилаються нові повідомлення покупця, оператора DigiKey і відповіді з нашого боку (колеги чи ваші).", "en": "New messages from the buyer, the DigiKey operator and replies from our side (colleagues or yours) are sent.", "de": "Gesendet werden neue Nachrichten des Käufers, des DigiKey-Operators und Antworten von unserer Seite (Kollegen oder Ihre)."}
+{"uk": "Надсилаю…", "en": "Sending…", "de": "Wird gesendet…"}
 {"uk": "Надсилає email нагадування для задач з notify_email=True і due_date <= сьогодні", "en": "Sends email reminders for tasks with notify_email=True and due_date <= today", "de": "Sendet E-Mail-Erinnerungen für Aufgaben mit notify_email=True und due_date <= heute"}
 {"uk": "Надсилає лист підтвердження ще раз.", "en": "Sends the confirmation email again.", "de": "Sendet die Bestätigungs-E-Mail erneut."}
 {"uk": "Надсилає нагадування з CustomerTimeline", "en": "Sends reminders from CustomerTimeline", "de": "Sendet Erinnerungen aus CustomerTimeline"}
@@ -9950,6 +9954,7 @@
 {"uk": "Надіслано зараз: {0}.", "en": "Sent now: {0}.", "de": "Jetzt gesendet: {0}."}
 {"uk": "Надіслано листів для нового пароля: {0}. Посилання діє 1 годину.", "en": "Emails for a new password sent: {0}. The link is valid for 1 hour.", "de": "Gesendete E-Mails für ein neues Passwort: {0}. Der Link ist 1 Stunde gültig."}
 {"uk": "Надіслано листів підтвердження / запрошень: {0} (підтверджені акаунти пропущено).", "en": "Confirmation / invitation emails sent: {0} (confirmed accounts skipped).", "de": "Gesendete Bestätigungs-/Einladungs-E-Mails: {0} (bestätigte Konten übersprungen)."}
+{"uk": "Надіслано на", "en": "Sent to", "de": "Gesendet an"}
 {"uk": "Надіслано о", "en": "Sent at", "de": "Gesendet um"}
 {"uk": "Надіслано — перевіряємо DigiKey", "en": "Sent — checking DigiKey", "de": "Gesendet — DigiKey wird geprüft"}
 {"uk": "Надіслано, чекаємо", "en": "Sent, waiting", "de": "Gesendet, wartend"}
@@ -12926,6 +12931,8 @@
 {"uk": "Порожній день — робочий день без приходу й відходу в askDANTE (без відпустки, лікарняного, свята). Minerva · робочий час askDANTE.", "en": "Empty day — a working day with no clock-in and clock-out in askDANTE (no vacation, sick leave or holiday). Minerva · askDANTE working time.", "de": "Leerer Tag — ein Arbeitstag ohne Kommen und Gehen in askDANTE (ohne Urlaub, Krankheit, Feiertag). Minerva · askDANTE-Arbeitszeit."}
 {"uk": "Порожній запит", "en": "Empty query", "de": "Leere Anfrage"}
 {"uk": "Порожній лист — нічого зберігати", "en": "Empty email — nothing to save", "de": "Leere E-Mail — nichts zu speichern"}
+{"uk": "Порожній текст листа", "en": "The e-mail text is empty", "de": "Der E-Mail-Text ist leer"}
+{"uk": "Порожній текст листа — спершу напишіть його або складіть з параметрів.", "en": "The e-mail text is empty — write it first or compose it from the parameters.", "de": "Der E-Mail-Text ist leer — schreiben Sie ihn zuerst oder erstellen Sie ihn aus den Parametern."}
 {"uk": "Порожній текст листа.", "en": "Empty e-mail text.", "de": "Leerer E-Mail-Text."}
 {"uk": "Порожній файл", "en": "Empty file", "de": "Leere Datei"}
 {"uk": "Порожній файл.", "en": "Empty file.", "de": "Leere Datei."}
@@ -15624,6 +15631,7 @@
 {"uk": "Тест тижневого звіту", "en": "Weekly report test", "de": "Test des Wochenberichts"}
 {"uk": "Тест у клієнта", "en": "Test at the customer", "de": "Test beim Kunden"}
 {"uk": "Тест щоденного звіту", "en": "Daily report test", "de": "Test des Tagesberichts"}
+{"uk": "Тест іде", "en": "The test goes", "de": "Der Test geht"}
 {"uk": "Тест із SAMPLE_ORDER", "en": "Test with SAMPLE_ORDER", "de": "Test mit SAMPLE_ORDER"}
 {"uk": "Тест-панель {0}×{1} ({2}) #{3}", "en": "Test panel {0}×{1} ({2}) #{3}", "de": "Testpaneel {0}×{1} ({2}) #{3}"}
 {"uk": "Тест-файл", "en": "Test file", "de": "Testdatei"}
@@ -15640,8 +15648,10 @@
 {"uk": "Тестовий запуск (без збереження в БД)", "en": "Test run (without saving to the database)", "de": "Testlauf (ohne Speichern in der Datenbank)"}
 {"uk": "Тестовий лист", "en": "Test e-mail", "de": "Test-E-Mail"}
 {"uk": "Тестовий лист «{0}» надіслано на {1}.", "en": "Test email “{0}” sent to {1}.", "de": "Test-E-Mail „{0}“ an {1} gesendet."}
+{"uk": "Тестовий лист на", "en": "Test e-mail to", "de": "Test-E-Mail an"}
 {"uk": "Тестовий лист надіслано на {0} ({1}).", "en": "Test email sent to {0} ({1}).", "de": "Test-E-Mail an {0} ({1}) gesendet."}
 {"uk": "Тестовий лист надіслано на {0} від {1} ({2}; {3}).", "en": "Test e-mail sent to {0} from {1} ({2}; {3}).", "de": "Testnachricht an {0} von {1} gesendet ({2}; {3})."}
+{"uk": "Тестовий лист — не більше {0} адрес; розсилка — кнопкою «📤 Зберегти й надіслати».", "en": "Test e-mail — no more than {0} addresses; the mailing is sent with «📤 Save and send».", "de": "Test-E-Mail — höchstens {0} Adressen; der Versand erfolgt mit «📤 Speichern und senden»."}
 {"uk": "Тестовий лист — після збереження скриньки.", "en": "Test e-mail — after saving the mailbox.", "de": "Testnachricht — nach dem Speichern des Postfachs."}
 {"uk": "Тестовий магазин", "en": "Test shop", "de": "Testshop"}
 {"uk": "Тестовий номер (TEST-N)", "en": "Test number (TEST-N)", "de": "Testnummer (TEST-N)"}
@@ -16063,6 +16073,7 @@
 {"uk": "У блоці «🔗 Медіа та документи» — «🖼 Для сайту»: що взято, звідки, помилки, чи вже на сайті, і «🔄 Перевірити зараз».", "en": "In the “🔗 Media and documents” block — “🖼 For the website”: what was taken, from where, errors, whether it is already on the website, and “🔄 Check now”.", "de": "Im Block „🔗 Medien und Dokumente“ — „🖼 Für die Website“: was übernommen wurde, woher, Fehler, ob es schon auf der Website ist, und „🔄 Jetzt prüfen“."}
 {"uk": "У валюті DigiKey, після відсотка; може бути від'ємною (напр. −0,50).", "en": "In DigiKey currency, applied after the percentage; can be negative (e.g. −0.50).", "de": "In DigiKey-Währung, nach dem Prozentsatz angewendet; kann negativ sein (z. B. −0,50)."}
 {"uk": "У вас немає активної поштової скриньки в Minerva — запит нема з чого надіслати.", "en": "You have no active mailbox in Minerva — there is nothing to send the request from.", "de": "Sie haben kein aktives Postfach in Minerva — die Anfrage kann nicht gesendet werden."}
+{"uk": "У вас немає активної поштової скриньки в Minerva — тест нема з чого надіслати.", "en": "You have no active mailbox in Minerva — there is nothing to send the test from.", "de": "Sie haben kein aktives Postfach in Minerva — der Test kann nicht gesendet werden."}
 {"uk": "У вас немає відкритих проєктів, де ви відповідальний — звіту немає.", "en": "You have no open projects where you are responsible — there is no report.", "de": "Sie haben keine offenen Projekte, für die Sie verantwortlich sind — es gibt keinen Bericht."}
 {"uk": "У вас немає доступу до розділу", "en": "You do not have access to the section", "de": "Sie haben keinen Zugriff auf den Bereich"}
 {"uk": "У вас немає поштової скриньки в Minerva — зберегти можна, надіслати — ні.", "en": "You have no mailbox in Minerva — you can save, but not send.", "de": "Sie haben kein Postfach in Minerva — speichern ja, senden nein."}
@@ -16411,6 +16422,7 @@
 {"uk": "Файл не знайдено.", "en": "File not found.", "de": "Datei nicht gefunden."}
 {"uk": "Файл не знайдено. Пересинхронізуйте пошту.", "en": "File not found. Re-sync the mail.", "de": "Datei nicht gefunden. Synchronisieren Sie die E-Mails erneut."}
 {"uk": "Файл не знайдено: {0}", "en": "File not found: {0}", "de": "Datei nicht gefunden: {0}"}
+{"uk": "Файл недоступний: {0}", "en": "File not available: {0}", "de": "Datei nicht verfügbar: {0}"}
 {"uk": "Файл понад {0} МБ.", "en": "File over {0} MB.", "de": "Datei über {0} MB."}
 {"uk": "Файл пошкоджений або невірний формат.", "en": "The file is corrupted or in the wrong format.", "de": "Die Datei ist beschädigt oder hat ein falsches Format."}
 {"uk": "Файл шаблону", "en": "Template file", "de": "Vorlagendatei"}
@@ -17882,6 +17894,7 @@
 {"uk": "вартість", "en": "cost", "de": "Kosten"}
 {"uk": "вартість доставки", "en": "shipping cost", "de": "Versandkosten"}
 {"uk": "вартість — за посилкою.", "en": "value follow the parcel.", "de": "Wert richten sich nach dem Paket."}
+{"uk": "ваш email або колеги", "en": "your e-mail or a colleague's", "de": "Ihre E-Mail oder die eines Kollegen"}
 {"uk": "ваш логін", "en": "your username", "de": "Ihr Benutzername"}
 {"uk": "ваша відповідь: {0} {1}", "en": "your reply: {0} {1}", "de": "Ihre Antwort: {0} {1}"}
 {"uk": "ваша роль в AI — «{0}», потрібна «{1}»: її вибирає адміністратор у профілі → «Роль в AI асистенті»", "en": "your AI role is “{0}”, “{1}” is required: the administrator chooses it in the profile → “AI assistant role”", "de": "Ihre KI-Rolle ist „{0}“, erforderlich ist „{1}“: Sie wird vom Administrator im Profil gewählt → „Rolle im KI-Assistenten“"}
@@ -19068,6 +19081,7 @@
 {"uk": "копіювання або відтворення ПЗ повністю чи частково", "en": "copying or reproducing the Software in whole or in part", "de": "Kopieren oder Vervielfältigen der Software ganz oder teilweise"}
 {"uk": "копіювати в інший магазин з коефіцієнтом", "en": "copy to another shop with a factor", "de": "in einen anderen Shop mit Faktor kopieren"}
 {"uk": "копія", "en": "copy", "de": "Kopie"}
+{"uk": "копія в розсилці", "en": "copy in the mailing", "de": "Kopie beim Versand"}
 {"uk": "копія з DigiKey", "en": "copy from DigiKey", "de": "Kopie von DigiKey"}
 {"uk": "копія й іншим контактним особам того самого постачальника", "en": "copy also to the other contacts of the same supplier", "de": "Kopie auch an die anderen Kontaktpersonen desselben Lieferanten"}
 {"uk": "копія фото на сервері DigiKey", "en": "photo copy on the DigiKey server", "de": "Fotokopie auf dem DigiKey-Server"}
@@ -19235,6 +19249,7 @@
 {"uk": "лише коли настав час за налаштуваннями", "en": "only when the time set in the settings has come", "de": "nur wenn der in den Einstellungen festgelegte Zeitpunkt erreicht ist"}
 {"uk": "лише метадані (дата, хто записав, час і галочки згоди, адреси учасників) для запитів за ст. 15 / 17 DSGVO; бачить лише адміністратор Minerva", "en": "metadata only (date, who recorded, consent time and ticks, participants’ addresses) for requests under Art. 15 / 17 GDPR; only the Minerva administrator sees it", "de": "nur Metadaten (Datum, wer aufgenommen hat, Zeit und Häkchen der Einwilligung, Adressen der Teilnehmer) für Anfragen nach Art. 15 / 17 DSGVO; sieht nur der Minerva-Administrator"}
 {"uk": "лише мікрофон (очна зустріч)", "en": "microphone only (in-person meeting)", "de": "nur Mikrofon (Präsenztermin)"}
+{"uk": "лише на ці адреси", "en": "only to these addresses", "de": "nur an diese Adressen"}
 {"uk": "лише перегляд", "en": "view only", "de": "nur Ansicht"}
 {"uk": "лише позначені", "en": "only ticked", "de": "nur markierte"}
 {"uk": "лише показати, нічого не записувати", "en": "only show, record nothing", "de": "nur anzeigen, nichts eintragen"}
@@ -19338,6 +19353,7 @@
 {"uk": "модулі ще не зареєстровано — усі працюють", "en": "modules are not registered yet — all are active", "de": "Module sind noch nicht registriert — alle sind aktiv"}
 {"uk": "можна з повним префіксом", "en": "may include the full prefix", "de": "auch mit vollständigem Präfix möglich"}
 {"uk": "можна зібрати {0}", "en": "can build {0}", "de": "herstellbar: {0}"}
+{"uk": "можна кількома рядками — кожне побажання з нового рядка", "en": "several lines are fine — each wish on a new line", "de": "mehrere Zeilen möglich — jeder Wunsch in einer neuen Zeile"}
 {"uk": "можна надсилати", "en": "can be sent", "de": "kann gesendet werden"}
 {"uk": "можна треба потрібно буде було був була бути таке такий така такі the a an is are to of in on for and or how what", "en": "можна треба потрібно буде було був була бути таке такий така такі the a an is are to of in on for and or how what", "de": "можна треба потрібно буде було був була бути таке такий така такі the a an is are to of in on for and or how what"}
 {"uk": "момент", "en": "moment", "de": "Moment"}
@@ -19515,6 +19531,7 @@
 {"uk": "напр. Корпус алюмінієвий 120×80×40", "en": "e.g. Aluminium housing 120×80×40", "de": "z. B. Aluminiumgehäuse 120×80×40"}
 {"uk": "напр. Ціни на виробництво 2026", "en": "e.g. Production prices 2026", "de": "z. B. Fertigungspreise 2026"}
 {"uk": "напр. коротко; спершу зразки 50 шт; згадати RoHS і маркування; ціни в EUR", "en": "e.g. short; 50 samples first; mention RoHS and marking; prices in EUR", "de": "z. B. kurz; zuerst 50 Muster; RoHS und Kennzeichnung erwähnen; Preise in EUR"}
+{"uk": "напр. коротко; спершу зразки 50 шт; згадати RoHS і маркування; ціни в EUR можна кількома рядками — кожне побажання з нового рядка", "en": "e.g. short; 50 samples first; mention RoHS and marking; prices in EUR several lines are fine — each wish on a new line", "de": "z. B. kurz; zuerst 50 Muster; RoHS und Kennzeichnung erwähnen; Preise in EUR mehrere Zeilen möglich — jeder Wunsch in einer neuen Zeile"}
 {"uk": "напр.: «Звернення: Привіт, Сергію!», «коротше», «на ти»", "en": "e.g.: «Greeting: Hi Sergey!», «shorter», «informal»", "de": "z. B.: «Anrede: Hallo Sergey!», «kürzer», «duzen»"}
 {"uk": "наприклад", "en": "for example", "de": "zum Beispiel"}
 {"uk": "нарада", "en": "meeting", "de": "Besprechung"}
@@ -21010,6 +21027,7 @@
 {"uk": "так вирішив агент", "en": "the agent decided so", "de": "so hat der Agent entschieden"}
 {"uk": "так відправляли в {0} ({1} раз.)", "en": "shipped like this to {0} ({1} times)", "de": "so nach {0} versandt ({1}-mal)"}
 {"uk": "так відправляли цьому клієнту ({0} раз.)", "en": "shipped like this to this customer ({0} times)", "de": "so an diesen Kunden versandt ({0}-mal)"}
+{"uk": "так отримає", "en": "this is how it will reach", "de": "so erhält es"}
 {"uk": "так — готово; ні — «🔄 Повне підключення» (запис і правила)", "en": "yes — done; no — “🔄 Full connection” (writing and rules)", "de": "ja — fertig; nein — „🔄 Vollständige Verbindung“ (Schreiben und Regeln)"}
 {"uk": "так, перекладати (це коштує грошей)", "en": "yes, translate (this costs money)", "de": "ja, übersetzen (das kostet Geld)"}
 {"uk": "такий тип файлу не індексується", "en": "this file type is not indexed", "de": "dieser Dateityp wird nicht indexiert"}

@@ -316,6 +316,8 @@ def from_mail(msg, user=None, model=DEFAULT_MODEL, web=False) -> dict:
     return out
 
 
+WISH_MAX = 3000                     # «🧠 Що врахувати AI» — кілька рядків
+
 LETTER_JSON = '{"subject": "тема листа", "body": "текст листа"}'
 LETTER_LANGS = {"en": "англійською (English)", "de": "німецькою (Deutsch, на «Sie»)", "uk": "українською"}
 # Як ми зазвичай пишемо запит (зразок користувача, без конкретних номерів деталей) — стиль і порядок для AI
@@ -380,7 +382,7 @@ def letter(form: dict, user=None, model=DEFAULT_MODEL, files=()) -> dict:
         + LETTER_STYLE + "\nЗРАЗОК>>>\nВідповідай лише JSON такої форми: " + LETTER_JSON)
     content = "<<<ДАНІ\n" + "\n".join(lines) + "\nДАНІ>>>\nСклади тему й текст листа."
     if form.get("wish"):            # вказівка людини, що складає запит, — довірена (не з файлів і не з листів)
-        content += "\nПОБАЖАННЯ МЕНЕДЖЕРА (довірене — врахуй обов'язково): " + form["wish"][:1500]
+        content += "\nПОБАЖАННЯ МЕНЕДЖЕРА (довірене — врахуй обов'язково): " + form["wish"][:WISH_MAX]
     text, price = call(system, content, model=model_of(model), user=user, effort="low", max_tokens=4000)
     data = parse_json(text)
     body = str(data.get("body") or "").strip()[:8000]
