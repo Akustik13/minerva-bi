@@ -1136,3 +1136,57 @@ class SourceEventListTests(Base):
         cl = self.client.get(url + "?o=-5").context["cl"]                          # «Де взяли» за спаданням
         self.assertEqual([o.name for o in cl.result_list][:2], ["Victory PCB", "Kontron"])
         self.assertEqual(mail.pk, Supplier.objects.get(name="Ring PCB").pk)
+
+
+class CardsToSuppliersTests(Base):
+    """🏭 Вибрані візитки → постачальники: створити нових, додати до наявних (дописати порожнє), позначка «✅ Уже в базі»."""
+
+    def card(self, **extracted):
+        m = SupplierMedia(kind=SupplierMedia.CARD, created_by=self.user, event="electronica 2026", extracted=extracted)
+        m.image.save("c.png", SimpleUploadedFile("c.png", png()), save=False)
+        m.save()
+        return m
+
+    def test_create_attach_skip_and_fill_empty(self):
+        from suppliers.models import SupplierContact
+        SupplierContact.objects.create(supplier=self.supplier, name="Anna Li", email="anna@pcbway.com")
+        known = self.card(name="Shenzhen PCBWay Co., Ltd", contact_name="Anna Li", contact_email="anna@pcbway.com",
+                          contact_position="Sales Manager", contact_mobile="+86 138 0000 0000", phone="+86 755 1",
+                          addr_city="Shenzhen", addr_country="CN")
+        new1 = self.card(name="Hitech Circuits Co., Ltd", email="sales@hitechcircuits.com", contact_name="Susie Zhao")
+        new2 = self.card(name="Hitech Circuits", contact_email="susie@hitechcircuits.com")   # та сама фірма
+        empty = self.card()
+        maybe = self.card(name="PCBWay")                                                     # лише схожа назва
+        url = reverse("admin:inventory_supplier_cards")
+        page = self.client.get(url)
+        self.assertContains(page, "✅ Уже в базі:")
+        self.assertContains(page, "❔ Схоже на:")
+        self.assertEqual(len(self.client.get(url + "?show=inbase").context["items"]), 2)
+        self.client.post(url, {"action": "to_suppliers", "ids": [known.pk, new1.pk, new2.pk, empty.pk, maybe.pk]})
+        for m in (known, new1, new2, empty, maybe):
+            m.refresh_from_db()
+        self.assertEqual(known.supplier, self.supplier)                             # додано до наявного
+        self.supplier.refresh_from_db()
+        self.assertEqual((self.supplier.phone, self.supplier.addr_city, self.supplier.contact_person),
+                         ("+86 755 1", "Shenzhen", "Anna Li"))                     # дописано порожнє
+        self.assertEqual(self.supplier.website, "https://www.pcbway.com")           # заповнене не чіпаємо
+        anna = self.supplier.contacts.get(email="anna@pcbway.com")
+        self.assertEqual((anna.position, anna.mobile), ("Sales Manager", "+86 138 0000 0000"))
+        self.assertEqual(self.supplier.contacts.filter(email="anna@pcbway.com").count(), 1)
+        hitech = Supplier.objects.get(name="Hitech Circuits Co., Ltd")
+        self.assertEqual((new1.supplier, new2.supplier), (hitech, hitech))          # друга візитка — без дубля
+        self.assertEqual((hitech.source, hitech.status), ("card", Supplier.STATUS_POTENTIAL))
+        self.assertIsNone(empty.supplier)                                           # без даних — пропуск
+        self.assertIsNone(maybe.supplier)                                           # «схожа назва» — вирішує людина
+        self.assertEqual(Supplier.objects.count(), 2)
+
+    def test_only_editable_cards(self):
+        theirs = self.card(name="Bornico Sp. z o.o.", email="m@bornico.com.pl")
+        SupplierMedia.objects.filter(pk=theirs.pk).update(created_by=self.other)
+        real = User.has_perm
+        with mock.patch.object(User, "has_perm", lambda u, perm, obj=None: perm != "inventory.change_supplier"
+                               and real(u, perm, obj)):
+            self.client.post(reverse("admin:inventory_supplier_cards"), {"action": "to_suppliers", "ids": [theirs.pk]})
+        theirs.refresh_from_db()
+        self.assertIsNone(theirs.supplier)
+        self.assertFalse(Supplier.objects.filter(name="Bornico Sp. z o.o.").exists())

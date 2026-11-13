@@ -291,6 +291,7 @@
 {"uk": "(для фото", "en": "(for photos", "de": "(für Fotos"}
 {"uk": "(до {0})", "en": "(by {0})", "de": "(bis {0})"}
 {"uk": "(довше 200 символів)", "en": "(longer than 200 characters)", "de": "(länger als 200 Zeichen)"}
+{"uk": "(дописано порожніх полів: {0})", "en": "(empty fields filled: {0})", "de": "(leere Felder ergänzt: {0})"}
 {"uk": "(дізнатись через /myid в боті)", "en": "(find out via /myid in the bot)", "de": "(über /myid im Bot herausfinden)"}
 {"uk": "(з Minerva)", "en": "(from Minerva)", "de": "(aus Minerva)"}
 {"uk": "(з {0}", "en": "(of {0}", "de": "(von {0}"}
@@ -3070,6 +3071,7 @@
 {"uk": "{0}: {1} шт. × {2} = {3}", "en": "{0}: {1} pcs × {2} = {3}", "de": "{0}: {1} Stk. × {2} = {3}"}
 {"uk": "{0}: {1} — таких адрес API немає", "en": "{0}: {1} — no such API endpoints", "de": "{0}: {1} — solche API-Adressen gibt es nicht"}
 {"uk": "{0}: «{1}» (листів {2}, файлів {3})", "en": "{0}: «{1}» ({2} e-mails, {3} files)", "de": "{0}: «{1}» ({2} E-Mails, {3} Dateien)"}
+{"uk": "{0}: «{1}» уже є — немає права змінювати", "en": "{0}: «{1}» already exists — no right to change", "de": "{0}: «{1}» existiert bereits — kein Recht zu ändern"}
 {"uk": "{0}: «від» більше за «до».", "en": "{0}: “from” is greater than “to”.", "de": "{0}: „von“ ist größer als „bis“."}
 {"uk": "{0}: Компанія: {1} Власник: {2}", "en": "{0}: Company: {1} Owner: {2}", "de": "{0}: Firma: {1} Inhaber: {2}"}
 {"uk": "{0}: ПОМИЛКА — {1}", "en": "{0}: ERROR — {1}", "de": "{0}: FEHLER — {1}"}
@@ -3140,6 +3142,7 @@
 {"uk": "{0}: немає жодної ціни — не змінено", "en": "{0}: no prices at all — unchanged", "de": "{0}: kein einziger Preis — unverändert"}
 {"uk": "{0}: немає курсу {1} → {2} («Налаштування цін» магазину) — ціни в {3} не показано.", "en": "{0}: no rate {1} → {2} (shop “Price settings”) — prices in {3} are not shown.", "de": "{0}: Kein Kurs {1} → {2} („Preiseinstellungen“ des Webshops) — Preise in {3} werden nicht angezeigt."}
 {"uk": "{0}: немає курсу {1} → {2} («Налаштування цін» → «Курси валют»).", "en": "{0}: no exchange rate {1} → {2} (“Price settings” → “Exchange rates”).", "de": "{0}: kein Wechselkurs {1} → {2} („Preiseinstellungen“ → „Wechselkurse“)."}
+{"uk": "{0}: немає права створювати постачальників", "en": "{0}: no right to create suppliers", "de": "{0}: kein Recht, Lieferanten anzulegen"}
 {"uk": "{0}: немає сторінки гіда «{1}»", "en": "{0}: no guide page “{1}”", "de": "{0}: keine Leitfaden-Seite „{1}“"}
 {"uk": "{0}: оновлено листів {1}", "en": "{0}: e-mails updated {1}", "de": "{0}: aktualisierte E-Mails {1}"}
 {"uk": "{0}: оприбутковано на склад — {1}", "en": "{0}: received into stock — {1}", "de": "{0}: ins Lager eingebucht — {1}"}
@@ -3170,6 +3173,7 @@
 {"uk": "{0}: скасування знято (компонент BOM)", "en": "{0}: cancellation reverted (BOM component)", "de": "{0}: Stornierung aufgehoben (BOM-Komponente)"}
 {"uk": "{0}: склад не показано — у ключа немає права stock:read (для демо додайте його)", "en": "{0}: stock not shown — the key lacks the stock:read permission (add it for the demo)", "de": "{0}: Bestand nicht angezeigt — dem Schlüssel fehlt die Berechtigung stock:read (für die Demo hinzufügen)"}
 {"uk": "{0}: ступені змінено вручну — позицію від'єднано від базових цін.", "en": "{0}: price breaks were changed manually — the item has been detached from base prices.", "de": "{0}: Die Staffelpreise wurden manuell geändert — die Position wurde von den Basispreisen getrennt."}
+{"uk": "{0}: схоже на «{1}» ({2}) — перевірте на сторінці фото", "en": "{0}: looks like «{1}» ({2}) — check on the photo page", "de": "{0}: ähnlich wie «{1}» ({2}) — auf der Fotoseite prüfen"}
 {"uk": "{0}: термін «{1}» — не ціле число днів.", "en": "{0}: lead time “{1}” is not a whole number of days.", "de": "{0}: Lieferzeit „{1}“ ist keine ganze Zahl von Tagen."}
 {"uk": "{0}: термін має бути від 0 до 365 днів.", "en": "{0}: the lead time must be between 0 and 365 days.", "de": "{0}: Die Lieferzeit muss zwischen 0 und 365 Tagen liegen."}
 {"uk": "{0}: товар надіслано — DigiKey перевірить зміни (на supplier.digikey.com: Products → Pending); до того діє затверджена версія.", "en": "{0}: product sent — DigiKey will review the changes (on supplier.digikey.com: Products → Pending); until then the approved version remains in effect.", "de": "{0}: Artikel gesendet — DigiKey prüft die Änderungen (auf supplier.digikey.com: Products → Pending); bis dahin gilt die genehmigte Version."}
@@ -3178,6 +3182,7 @@
 {"uk": "{0}: у товару немає базових цін.", "en": "{0}: the product has no base prices.", "de": "{0}: Der Artikel hat keine Basispreise."}
 {"uk": "{0}: у шапці немає «{1}»", "en": "{0}: header has no “{1}”", "de": "{0}: im Kopf fehlt „{1}“"}
 {"uk": "{0}: увімкнути / вимкнути", "en": "{0}: turn on / off", "de": "{0}: ein- / ausschalten"}
+{"uk": "{0}: уже в картці «{1}»", "en": "{0}: already in the card of «{1}»", "de": "{0}: bereits in der Karte von «{1}»"}
 {"uk": "{0}: уже позначено", "en": "{0}: already marked", "de": "{0}: bereits markiert"}
 {"uk": "{0}: ціна «{1}» — не число.", "en": "{0}: price “{1}” is not a number.", "de": "{0}: Preis „{1}“ ist keine Zahl."}
 {"uk": "{0}: ціна змінилась без запису в історії — показано з {1}.", "en": "{0}: the price changed without a history entry — shown from {1}.", "de": "{0}: Der Preis hat sich ohne Verlaufseintrag geändert — angezeigt ab {1}."}
@@ -3186,6 +3191,7 @@
 {"uk": "{0}: ще {1} посилок у дорозі — дочекаюсь усіх", "en": "{0}: {1} more parcels on the way — I will wait for all", "de": "{0}: noch {1} Pakete unterwegs — ich warte auf alle"}
 {"uk": "{0}: ще не вирішено", "en": "{0}: not decided yet", "de": "{0}: noch nicht entschieden"}
 {"uk": "{0}: ще не перевірено", "en": "{0}: not checked yet", "de": "{0}: noch nicht geprüft"}
+{"uk": "{0}: ще немає даних — прочитайте AI або QR", "en": "{0}: no data yet — read it with AI or QR", "de": "{0}: noch keine Daten — mit KI oder QR lesen"}
 {"uk": "{0}: індекси вкладень повторюються", "en": "{0}: attachment indexes are repeated", "de": "{0}: Anhangsindizes wiederholen sich"}
 {"uk": "{0}: ✓ як за правилом", "en": "{0}: ✓ same as by rule", "de": "{0}: ✓ wie nach Regel"}
 {"uk": "{0}:{1} · {2} · від {3}", "en": "{0}:{1} · {2} · from {3}", "de": "{0}:{1} · {2} · vom {3}"}
@@ -8606,6 +8612,7 @@
 {"uk": "Кожен товар / замовлення, який ключ отримав, і в скількох запитах", "en": "Every product / order the key received, and in how many requests", "de": "Jeder Artikel / Auftrag, den der Schlüssel erhalten hat, und in wie vielen Anfragen"}
 {"uk": "Кожен файл — з посилання в картці свого товару. Посилання за правилом вище записує «🔗 Сформувати й перевірити посилання →»; у картці товару його можна змінити.", "en": "Each file comes from the link in its own product card. The rule-based link above is written by “🔗 Generate and check links →”; it can be changed in the product card.", "de": "Jede Datei stammt aus dem Link in der Karte des jeweiligen Artikels. Den Link nach der obigen Regel schreibt „🔗 Links erzeugen und prüfen →“; in der Artikelkarte kann er geändert werden."}
 {"uk": "Кожен шаблон містить", "en": "Each template contains", "de": "Jede Vorlage enthält"}
+{"uk": "Кожна вибрана: такий постачальник уже є — фото й контакт до нього; немає — новий постачальник (🌱 потенційний); уже внесені й без даних — пропускаються", "en": "Each selected: the supplier already exists — photo and contact go to it; otherwise a new supplier (🌱 potential); already entered ones and ones without data are skipped", "de": "Jede ausgewählte: Lieferant existiert bereits — Foto und Kontakt zu ihm; sonst ein neuer Lieferant (🌱 potenziell); bereits erfasste und ohne Daten werden übersprungen"}
 {"uk": "Кожна зміна — у", "en": "Every change is recorded in the", "de": "Jede Änderung steht im"}
 {"uk": "Кожна надіслана версія Angebot (DOCX / PDF) — документ бази знань, прив'язаний до клієнта й проєкту.", "en": "Every sent version of an Angebot (DOCX / PDF) is a knowledge base document linked to the customer and the project.", "de": "Jede versendete Version eines Angebots (DOCX / PDF) ist ein Dokument der Wissensdatenbank, das dem Kunden und dem Projekt zugeordnet ist."}
 {"uk": "Кожне замовлення має «Джерело» = код магазину. Фільтр у Продажах, дашборд і RFM рахують по всіх джерелах разом або окремо.", "en": "Every order has a “Source” = the shop code. The filter in Sales, the dashboard and RFM count all sources together or separately.", "de": "Jeder Auftrag hat eine „Quelle“ = Shop-Code. Der Filter im Verkauf, das Dashboard und RFM rechnen alle Quellen zusammen oder getrennt."}
@@ -8736,6 +8743,7 @@
 {"uk": "Контакт (необов'язково)", "en": "Contact (optional)", "de": "Kontakt (optional)"}
 {"uk": "Контакт адресної книги", "en": "Address book contact", "de": "Adressbuchkontakt"}
 {"uk": "Контакт для телефону / Outlook (.vcf)", "en": "Contact for phone / Outlook (.vcf)", "de": "Kontakt für Telefon / Outlook (.vcf)"}
+{"uk": "Контакт доповнено: {0}", "en": "Contact completed: {0}", "de": "Kontakt ergänzt: {0}"}
 {"uk": "Контакт з листування: {0} · {1}", "en": "Contact from correspondence: {0} · {1}", "de": "Kontakt aus der Korrespondenz: {0} · {1}"}
 {"uk": "Контакт: {0}", "en": "Contact: {0}", "de": "Kontakt: {0}"}
 {"uk": "Контакти", "en": "Contacts", "de": "Kontakte"}
@@ -10647,6 +10655,7 @@
 {"uk": "Немає в askDANTE", "en": "Not in askDANTE", "de": "Nicht in askDANTE"}
 {"uk": "Немає в каталозі Minerva і на DigiKey — схоже на виробництво / розробку: ціну введіть вручну", "en": "Not in the Minerva catalog or on DigiKey — looks like production / development: enter the price manually", "de": "Weder im Minerva-Katalog noch auf DigiKey — sieht nach Fertigung / Entwicklung aus: Preis manuell eingeben"}
 {"uk": "Немає в наявності", "en": "Out of stock", "de": "Nicht auf Lager"}
+{"uk": "Немає вибраних візиток, які вам можна вносити.", "en": "No selected business cards you are allowed to enter.", "de": "Keine ausgewählten Visitenkarten, die Sie erfassen dürfen."}
 {"uk": "Немає вибраних постачальників, з якими вам це дозволено.", "en": "No selected suppliers you are allowed to do this with.", "de": "Keine ausgewählten Lieferanten, bei denen Ihnen das erlaubt ist."}
 {"uk": "Немає власника наради", "en": "The meeting has no owner", "de": "Die Besprechung hat keinen Eigentümer"}
 {"uk": "Немає віджетів.", "en": "No widgets.", "de": "Keine Widgets."}
@@ -15044,6 +15053,7 @@
 {"uk": "Створено подію «{0}» на {1}", "en": "Created event “{0}” for {1}", "de": "Termin „{0}“ für {1} erstellt"}
 {"uk": "Створено постачальника {0}", "en": "Supplier {0} created", "de": "Lieferant {0} angelegt"}
 {"uk": "Створено постачальника {0} — фото збережено в його картці", "en": "Supplier {0} created — the photo is saved in its card", "de": "Lieferant {0} angelegt — das Foto ist in seiner Karte gespeichert"}
+{"uk": "Створено постачальників: {0} · ➕ додано до наявних: {1}{2}{3}", "en": "Suppliers created: {0} · ➕ added to existing: {1}{2}{3}", "de": "Lieferanten angelegt: {0} · ➕ zu vorhandenen hinzugefügt: {1}{2}{3}"}
 {"uk": "Створено проєкт", "en": "Project created", "de": "Projekt erstellt"}
 {"uk": "Створено шаблонів зі стандартних текстів: {0} (наявні не змінено). Тепер їх можна редагувати.", "en": "Templates created from standard texts: {0} (existing ones unchanged). You can now edit them.", "de": "Aus Standardtexten erstellte Vorlagen: {0} (vorhandene unverändert). Sie können jetzt bearbeitet werden."}
 {"uk": "Створено: {0}", "en": "Created: {0}", "de": "Erstellt: {0}"}
@@ -15319,6 +15329,7 @@
 {"uk": "Сховати фільтри в кнопку «⚙ Фільтри» над списком", "en": "Hide filters behind the “⚙ Filters” button above the list", "de": "Filter hinter der Schaltfläche „⚙ Filter“ über der Liste ausblenden"}
 {"uk": "Сховати цю сторінку", "en": "Hide this page", "de": "Diese Seite ausblenden"}
 {"uk": "Сховати цю сторінку від людини", "en": "Hide this page from the person", "de": "Diese Seite vor der Person ausblenden"}
+{"uk": "Схоже на", "en": "Looks like", "de": "Ähnlich wie"}
 {"uk": "Схоже, клієнт уже є", "en": "Looks like the customer already exists", "de": "Der Kunde scheint bereits vorhanden zu sein"}
 {"uk": "Схоже, цей постачальник уже є в базі", "en": "This supplier seems to be in the database already", "de": "Dieser Lieferant scheint bereits in der Datenbank zu sein"}
 {"uk": "Східний Тимор", "en": "Timor-Leste", "de": "Osttimor"}
@@ -16060,6 +16071,7 @@
 {"uk": "У посилці немає жодної позиції — вкажіть, скільки чого в ній лежить.", "en": "The parcel has no items — enter how much of each item it holds.", "de": "Das Paket hat keine Position — tragen Sie ein, wie viel von jeder Position darin ist."}
 {"uk": "У посилці нічого немає", "en": "The parcel is empty", "de": "Das Paket ist leer"}
 {"uk": "У посилці нічого немає — впишіть, скільки чого в ній лежить.", "en": "The parcel is empty — enter how much of each item it holds.", "de": "Das Paket ist leer — tragen Sie ein, wie viel von jeder Position darin ist."}
+{"uk": "У постачальники", "en": "To suppliers", "de": "Zu Lieferanten"}
 {"uk": "У проєкт askDANTE «{0}» час записувати не можна (архів або вимкнено).", "en": "Time cannot be recorded in the askDANTE project “{0}” (archived or disabled).", "de": "Im askDANTE-Projekt „{0}“ kann keine Zeit erfasst werden (archiviert oder deaktiviert)."}
 {"uk": "У проєкті вже {0} сторін", "en": "The project already has {0} parties", "de": "Das Projekt hat bereits {0} Beteiligte"}
 {"uk": "У проєкті вже є план — AI складає чернетку лише для порожнього плану", "en": "The project already has a plan — the AI drafts only for an empty plan", "de": "Das Projekt hat bereits einen Plan — die KI erstellt Entwürfe nur für einen leeren Plan"}
@@ -16141,6 +16153,8 @@
 {"uk": "Уже були в закупівлі: {0}", "en": "Already in the purchase order: {0}", "de": "Bereits in der Bestellung: {0}"}
 {"uk": "Уже було", "en": "Already done", "de": "Bereits erledigt"}
 {"uk": "Уже в CRM", "en": "Already in CRM", "de": "Bereits im CRM"}
+{"uk": "Уже в базі", "en": "Already in the base", "de": "Bereits in der Datenbank"}
+{"uk": "Уже в базі постачальників", "en": "Already in the supplier base", "de": "Bereits in der Lieferantendatenbank"}
 {"uk": "Уже відомі моменти й ризики проєкту (нижче) не повторюй.", "en": "Do not repeat the project's already known moments and risks (below).", "de": "Wiederhole die bereits bekannten Momente und Risiken des Projekts (unten) nicht."}
 {"uk": "Уже відправлено на DigiKey", "en": "Already shipped on DigiKey", "de": "Bereits auf DigiKey versendet"}
 {"uk": "Уже додано ({0})", "en": "Already added ({0})", "de": "Bereits hinzugefügt ({0})"}
@@ -16454,6 +16468,7 @@
 {"uk": "Фото товарів у Telegram", "en": "Product photos in Telegram", "de": "Artikelfotos in Telegram"}
 {"uk": "Фото — мініатюра з посиланням, даташит — «📄 відкрити»; під ними адреса (media.html). Лише http(s).", "en": "Photo — a thumbnail with a link, datasheet — “📄 open”; the address is below them (media.html). http(s) only.", "de": "Foto — Vorschaubild mit Link, Datenblatt — „📄 öffnen“; darunter die Adresse (media.html). Nur http(s)."}
 {"uk": "Фото — у «📎 Документи»: {0}", "en": "Photos — in «📎 Documents»: {0}", "de": "Fotos — in «📎 Dokumente»: {0}"}
+{"uk": "Фото — у його картці, контактна особа, порожні поля й категорії з візитки", "en": "Photo — into its card, contact person, empty fields and categories from the business card", "de": "Foto — in seine Karte, Kontaktperson, leere Felder und Kategorien von der Visitenkarte"}
 {"uk": "Фото, примітки й позначки вибраних візиток — назавжди; постачальники й клієнти CRM лишаються", "en": "Photos, notes and marks of the selected business cards — permanently; suppliers and CRM customers stay", "de": "Fotos, Notizen und Markierungen der ausgewählten Visitenkarten — dauerhaft; Lieferanten und CRM-Kunden bleiben"}
 {"uk": "Фото, як його зняли спочатку", "en": "The photo as it was originally taken", "de": "Das Foto wie ursprünglich aufgenommen"}
 {"uk": "Фото, яке DigiKey показував, коли Minerva востаннє читала товар", "en": "The photo DigiKey showed when Minerva last read the product", "de": "Das Foto, das DigiKey anzeigte, als Minerva den Artikel zuletzt gelesen hat"}
@@ -19495,6 +19510,7 @@
 {"uk": "не вказано, кому!", "en": "recipient not set!", "de": "kein Empfänger angegeben!"}
 {"uk": "не вказувати", "en": "do not specify", "de": "nicht angeben"}
 {"uk": "не вмістився — лист із вкладеннями завеликий", "en": "did not fit — the e-mail with attachments is too large", "de": "passt nicht – die E-Mail mit Anhängen ist zu groß"}
+{"uk": "не внесені, але вже є в базі", "en": "not entered, but already in the base", "de": "nicht erfasst, aber bereits in der Datenbank"}
 {"uk": "не впевнений", "en": "not sure", "de": "nicht sicher"}
 {"uk": "не впевнений у відповіді — завжди чернетка.", "en": "not sure about the reply — always a draft.", "de": "bei unsicherer Antwort — immer ein Entwurf."}
 {"uk": "не впливає на склад", "en": "does not affect stock", "de": "wirkt sich nicht auf das Lager aus"}
@@ -21729,6 +21745,7 @@
 {"uk": "… ще {0} — у звіті", "en": "… {0} more — in the report", "de": "… {0} weitere — im Bericht"}
 {"uk": "… і ще {0}", "en": "… and {0} more", "de": "… und {0} weitere"}
 {"uk": "… і ще {0} товарів — за тими самими курсами.", "en": "… and {0} more products — at the same rates.", "de": "… und {0} weitere Artikel — zu denselben Kursen."}
+{"uk": "… і ще пропущено {0}", "en": "… and {0} more skipped", "de": "… und {0} weitere übersprungen"}
 {"uk": "…(обрізано)", "en": "…(обрізано)", "de": "…(обрізано)"}
 {"uk": "…або назва файлу", "en": "…or a file name", "de": "…oder ein Dateiname"}
 {"uk": "…або спільний файл за правилом для", "en": "…or a shared file by rule for", "de": "…oder eine gemeinsame Datei nach Regel für"}

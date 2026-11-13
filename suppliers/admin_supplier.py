@@ -1118,6 +1118,28 @@ class SupplierCardMixin:
                 self.message_user(request, str(e), messages.ERROR)
                 return redirect(request.path)
             return redirect(f"/email/compose/?draft={d.pk}")
+        if request.method == "POST" and request.POST.get("action") == "to_suppliers":  # 🏭 вибрані → постачальники
+            ids = [int(x) for x in request.POST.getlist("ids") if str(x).isdigit()][:100]
+            mine = [m for m in SupplierMedia.objects.filter(pk__in=ids).select_related("supplier")
+                    .prefetch_related("categories").order_by("created_at")
+                    if _can(request, "change") or (_can(request, "add") and m.created_by_id == request.user.pk)]
+            if not mine:
+                self.message_user(request, "Немає вибраних візиток, які вам можна вносити.", messages.ERROR)
+                return redirect(request.get_full_path())
+            out = cards.to_suppliers(mine, request.user, can_add=_can(request, "add"),
+                                     can_change=_can(request, "change"))
+            if out["created"] or out["attached"]:
+                self.message_user(request, format_html(
+                    "🏭 Створено постачальників: {} · ➕ додано до наявних: {}{}{}", len(out["created"]),
+                    len(out["attached"]), f" (дописано порожніх полів: {out['filled']})" if out["filled"] else "",
+                    format_html_join("", ' · <a href="{}" translate="no">{}</a>', (
+                        (reverse("admin:inventory_supplier_change", args=[s.pk]), s.name)
+                        for _m, s in (out["created"] + out["attached"])[:12]))), messages.SUCCESS)
+            for line in out["skipped"][:10]:
+                self.message_user(request, f"⏭ {line}", messages.WARNING)
+            if len(out["skipped"]) > 10:
+                self.message_user(request, f"… і ще пропущено {len(out['skipped']) - 10}", messages.WARNING)
+            return redirect(request.get_full_path())
         if request.method == "POST" and request.POST.get("action") == "delete_many":  # 🗑 вибрані
             ids = [int(x) for x in request.POST.getlist("ids") if str(x).isdigit()][:200]
             gone = refused = 0
@@ -1158,6 +1180,8 @@ class SupplierCardMixin:
         show = request.GET.get("show", "")
         if show == "new":
             qs = qs.filter(supplier=None, customer=None)
+        elif show == "inbase":                  # ще не внесені, а такий постачальник уже є (base_match нижче)
+            qs = qs.filter(supplier=None)
         event = " ".join(request.GET.get("event", "").split())[:200]       # клік на подію в «📊 Статистиці»
         if event == "-":
             qs = qs.filter(event="")
@@ -1184,12 +1208,17 @@ class SupplierCardMixin:
             qs = qs.filter(Q(categories=cat_id) | Q(supplier__categories=cat_id) | Q(categories=None)).distinct()
         mark = request.GET.get("mark", "")
         all_cats = list(SupplierCategory.objects.filter(is_active=True))
+        from suppliers.services import match
+        idx = match.Index()                     # один на сторінку: «✅ Уже в базі» для кожної не внесеної візитки
         items = []
         for m in qs[:600]:
             if mark and mark not in (m.marks or []):
                 continue
             m.info = cards.info(m, all_cats)
             if cat_id and not any(c.pk == cat_id for c in m.info["cats"]):
+                continue
+            m.info["base"] = cards.base_match(m, idx)
+            if show == "inbase" and not m.info["base"]:
                 continue
             items.append(m)
             if len(items) >= 120:

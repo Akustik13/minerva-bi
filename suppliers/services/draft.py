@@ -49,10 +49,11 @@ def from_message(msg) -> dict:
     }
 
 
-def existing(data: dict) -> list:
+def existing(data: dict, idx=None) -> list:
     """[(постачальник, чому)] — схожі на чернетку."""
     emails = [data.get("email"), data.get("contact_email")]
-    return match.find(emails=[e for e in emails if e], name=data.get("name", ""), website=data.get("website", ""))
+    return match.find(emails=[e for e in emails if e], name=data.get("name", ""), website=data.get("website", ""),
+                      idx=idx)
 
 
 def clean(data: dict) -> dict:
@@ -83,8 +84,23 @@ def add_contact(supplier, data: dict, source="mail", user=None, media=None, mess
     if not (name or email):
         return None, False
     if _contact_exists(supplier, email, name):
-        c = supplier.contacts.filter(email__iexact=email).first() if email else \
-            supplier.contacts.filter(name__iexact=name).first()
+        c = (supplier.contacts.filter(email__iexact=email).first() if email else None) or \
+            (supplier.contacts.filter(name__iexact=name).first() if name else None)
+        if c is not None:      # уже є — дописати лише порожнє (посада, телефони, email з нової візитки / листа)
+            upd = []
+            for f, value, size in (("position", data.get("contact_position"), 200),
+                                   ("phone", data.get("contact_phone"), 60),
+                                   ("mobile", data.get("contact_mobile"), 80), ("email", email, 254)):
+                value = (value or "").strip()
+                if value and not getattr(c, f):
+                    setattr(c, f, value[:size])
+                    upd.append(f)
+            if upd:
+                c.save(update_fields=upd)
+                SupplierEvent.objects.create(
+                    supplier=supplier, kind=SupplierEvent.CONTACT, user=user, media=media, message=message,
+                    text=f"Контакт доповнено: {c.name} · " + ", ".join(
+                        str(SupplierContact._meta.get_field(f).verbose_name) for f in upd))
         return c, False
     c = SupplierContact.objects.create(
         supplier=supplier, name=(name or email.split("@")[0])[:200], position=(data.get("contact_position") or "")[:200],
@@ -139,6 +155,9 @@ def fill_empty(supplier, data: dict, user=None, why="") -> list:
         if d.get(f) and not getattr(supplier, f):
             setattr(supplier, f, d[f][:supplier._meta.get_field(f).max_length or 4000])
             changed.append(f)
+    if d.get("contact_name") and not supplier.contact_person:
+        supplier.contact_person = d["contact_name"][:255]
+        changed.append("contact_person")
     if changed:
         supplier.save(update_fields=changed)
         SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.NOTE, user=user,

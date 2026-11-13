@@ -115,10 +115,11 @@ class Index:
         return self.by_name.get(key) if len(key) >= 3 else None
 
 
-def find(emails=(), name="", website="", domains=()) -> list:
-    """Наявні постачальники, схожі на ці дані: [(постачальник, чому)] — спершу найнадійніше."""
+def find(emails=(), name="", website="", domains=(), idx=None) -> list:
+    """Наявні постачальники, схожі на ці дані: [(постачальник, чому)] — спершу найнадійніше. idx — один Index на
+    багато перевірок (сторінка візиток), інакше — новий."""
     from inventory.models import Supplier
-    idx = Index()
+    idx = idx or Index()
     hits = {}
 
     def hit(pk, why):

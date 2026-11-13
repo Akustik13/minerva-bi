@@ -28,7 +28,8 @@ PREFS_KEY = "supplier_cards"
 TILE_FIELDS = [
     ("ai", "🧠 Стан AI"), ("company", "🏢 Фірма"), ("person", "👤 Людина й посада"), ("country", "🌍 Країна"),
     ("site", "🌐 Сайт"), ("cats", "🗂 Категорії"), ("newcat", "💡 Пропозиція нової категорії"),
-    ("date", "📅 Дата й де взяли"), ("where", "🏭 / 👤 Куди внесено"), ("marks", "⭐ Позначки"),
+    ("date", "📅 Дата й де взяли"), ("where", "🏭 / 👤 Куди внесено"),
+    ("base", "✅ Уже в базі постачальників"), ("marks", "⭐ Позначки"),
     ("note", "📝 Наші примітки"), ("share", "✉️ Кнопка «Поділитись»"), ("crm", "👤 Кнопка «У CRM»"),
     ("vcard", "⬇ Кнопка «vCard»"),
 ]
@@ -408,6 +409,95 @@ def delete(m):
         if f:
             f.delete(save=False)
     m.delete()
+
+
+# ── 🏭 Візитки → постачальники ──
+
+def has_data(d) -> bool:
+    return bool(d.get("name") or d.get("email") or d.get("contact_email") or d.get("website"))
+
+
+def base_match(m, idx=None):
+    """Ще не внесена візитка, а такий постачальник уже є? → {supplier, why, strong} | None. strong — той самий
+    email, домен / сайт чи назва (можна додати без питань); лише «схожа назва» — підказка, вирішує людина."""
+    from suppliers.services import draft
+    if m.supplier_id:
+        return None
+    d = m.extracted or {}
+    if not has_data(d):
+        return None
+    hits = draft.existing(d, idx=idx)
+    if not hits:
+        return None
+    strong = [(s, why) for s, why in hits if not why.startswith("схожа назва")]
+    s, why = (strong or hits)[0]
+    return {"supplier": s, "why": why, "strong": bool(strong)}
+
+
+def attach(m, supplier, user=None) -> list:
+    """Візитка → наявний постачальник (як «➕ Додати фото й контакт»): фото в його картці, контактна особа (є —
+    дописати їй порожнє), порожні поля картки й категорії візитки. Заповнене не перезаписується. → дописані поля."""
+    from suppliers.models import SupplierEvent, SupplierMedia
+    from suppliers.services import draft
+    d = m.extracted or {}
+    first = m.supplier_id is None
+    SupplierMedia.objects.filter(pk=m.pk).update(supplier=supplier, state=SupplierMedia.APPLIED)
+    m.supplier = supplier
+    if first:
+        SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.CARD, media=m, user=user,
+                                     text=f"{m.get_kind_display()} додано" + (f" · {m.event}" if m.event else ""))
+    draft.add_contact(supplier, d, source="card", user=user, media=m)
+    filled = draft.fill_empty(supplier, d, user=user, why="з візитки")
+    cats = list(m.categories.all())
+    if cats:
+        supplier.categories.add(*cats)
+    return filled
+
+
+def to_suppliers(ms, user, can_add=True, can_change=True) -> dict:
+    """🏭 Вибрані візитки → постачальники: уже в картці — пропуск; такий постачальник уже є (надійний збіг) —
+    додати до нього; лише «схожа назва» — не чіпати (людина перевірить); немає — створити (стан 🌱 потенційний).
+    Без даних (AI / QR ще не читали) — пропуск. → {created, attached, skipped: [текст]}"""
+    from suppliers.models import SupplierMedia
+    from suppliers.services import draft, match
+    idx = match.Index()
+    out = {"created": [], "attached": [], "skipped": [], "filled": 0}
+    for m in ms:
+        label = m.title or (m.extracted or {}).get("name") or f"#{m.pk}"
+        if m.supplier_id:
+            out["skipped"].append(f"{label}: уже в картці «{m.supplier.name}»")
+            continue
+        d = m.extracted or {}
+        if not has_data(d):
+            out["skipped"].append(f"{label}: ще немає даних — прочитайте AI або QR")
+            continue
+        found = base_match(m, idx)
+        if found and found["strong"]:
+            if not can_change:
+                out["skipped"].append(f"{label}: «{found['supplier'].name}» уже є — немає права змінювати")
+                continue
+            out["filled"] += len(attach(m, found["supplier"], user))
+            out["attached"].append((m, found["supplier"]))
+            continue
+        if found:
+            out["skipped"].append(f"{label}: схоже на «{found['supplier'].name}» ({found['why']}) — перевірте на "
+                                  f"сторінці фото")
+            continue
+        if not can_add:
+            out["skipped"].append(f"{label}: немає права створювати постачальників")
+            continue
+        try:
+            extra = d.get("notes", "")
+            s = draft.create(d, user=user, source="card", media=m, categories=list(m.categories.all()),
+                             note="\n".join(x for x in (m.note, extra) if x))
+        except ValueError as e:
+            out["skipped"].append(f"{label}: {e}")
+            continue
+        SupplierMedia.objects.filter(pk=m.pk).update(state=SupplierMedia.APPLIED, supplier=s)
+        m.supplier = s
+        out["created"].append((m, s))
+        idx = match.Index()                 # наступна візитка тієї самої фірми — уже до нього, без дубля
+    return out
 
 
 # ── 📊 Статистика ──

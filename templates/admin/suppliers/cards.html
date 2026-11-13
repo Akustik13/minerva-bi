@@ -25,6 +25,8 @@
 .spc-co{font-weight:600}
 .spc-line{display:flex;flex-wrap:wrap;gap:2px 10px}
 .spc-guess{opacity:.8;border-style:dashed}
+.spc-base{font-size:12px;border:1px solid var(--ok,#2e7d32);border-radius:6px;padding:3px 5px}
+.spc-base-maybe{border-color:var(--warning-fg,#b06d00);border-style:dashed}
 .spc-new{font-size:12px;border:1px dashed var(--border-strong,#ccc);border-radius:6px;padding:3px 5px}
 .spc-desc summary{cursor:pointer;font-size:12px;color:var(--text-muted,#888);list-style-position:inside}
 .spc-desc .sp-note{margin-top:2px}
@@ -51,7 +53,7 @@
   <form method="get" class="spf-row">
     <a class="button" href="{% url 'admin:inventory_supplier_card' %}">📷 Нова візитка / флаєр</a>
     <input type="search" name="q" value="{{ q }}" placeholder="Фірма, людина, що роблять, виставка, примітка…" style="min-width:260px">
-    <select name="show"><option value="">усі</option><option value="new" {% if show == "new" %}selected{% endif %}>ще не внесені ({{ unassigned }})</option></select>
+    <select name="show"><option value="">усі</option><option value="new" {% if show == "new" %}selected{% endif %}>ще не внесені ({{ unassigned }})</option><option value="inbase" {% if show == "inbase" %}selected{% endif %}>✅ не внесені, але вже є в базі</option></select>
     <select name="ai" title="Чи прочитав AI">
       <option value="">🧠 AI: усі</option>
       <option value="done" {% if ai_filter == "done" %}selected{% endif %}>🧠 прочитано AI</option>
@@ -124,6 +126,11 @@
         {% if m.customer %}{% if crm_view %}👤 <a href="{% url 'admin:crm_customer_change' m.customer.pk %}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}👤 у CRM{% endif %}{% endif %}
         {% if not m.supplier and not m.customer %}<span class="spf-warn">ще не внесено</span>{% endif %}
       </div>
+      {% if i.base %}<div class="spc-base spc-f-base{% if not i.base.strong %} spc-base-maybe{% endif %}">
+        {% if i.base.strong %}✅ Уже в базі:{% else %}❔ Схоже на:{% endif %} <a href="{% url 'admin:inventory_supplier_change' i.base.supplier.pk %}" target="_blank" translate="no">{{ i.base.supplier.name }}</a> <span class="sp-muted">· {{ i.base.why }}</span>
+        {% if i.base.strong and can_read %}<form method="post" style="display:inline;margin:0">{% csrf_token %}<input type="hidden" name="action" value="to_suppliers"><input type="hidden" name="ids" value="{{ m.pk }}"><button type="submit" class="button" style="padding:1px 6px;font-size:11px" title="Фото — у його картці, контактна особа, порожні поля й категорії з візитки">➕ Додати до нього</button></form>
+        {% elif not i.base.strong %}<a class="button" style="padding:1px 6px;font-size:11px" href="{{ review }}">Перевірити</a>{% endif %}
+      </div>{% endif %}
       {% if m.marks %}<div class="spc-f-marks">{{ m.marks_text }}</div>{% endif %}
       {% if m.note %}<div class="sp-note spc-f-note" translate="no">{{ m.note|truncatechars:100 }}</div>{% endif %}
       <div class="spc-acts">
@@ -139,6 +146,8 @@
     <form method="post" target="_blank" id="spc-share-form" style="display:inline;margin:0">{% csrf_token %}<input type="hidden" name="action" value="share_many">
       <button type="submit" class="button" title="Одна чернетка листа: дані всіх вибраних візиток, фото й один файл контактів (.vcf) — кому, впишете самі">✉️ Поділитись вибраними</button></form>
     <a class="button" id="spc-vcf" href="#" title="Усі вибрані контакти одним файлом .vcf — для телефону / Outlook">⬇ vCard</a>
+    {% if can_read %}<form method="post" id="spc-sup-form" style="display:inline;margin:0">{% csrf_token %}<input type="hidden" name="action" value="to_suppliers">
+      <button type="submit" class="button" title="Кожна вибрана: такий постачальник уже є — фото й контакт до нього; немає — новий постачальник (🌱 потенційний); уже внесені й без даних — пропускаються">🏭 У постачальники</button></form>{% endif %}
     {% if can_read %}<form method="post" id="spc-del-form" style="display:inline;margin:0">{% csrf_token %}<input type="hidden" name="action" value="delete_many">
       <button type="submit" class="button" title="Фото, примітки й позначки вибраних візиток — назавжди; постачальники й клієнти CRM лишаються">🗑 Видалити вибрані</button></form>{% endif %}
     <button type="button" class="button" id="spc-none">✕ Зняти вибір</button>
@@ -224,6 +233,8 @@
     });
   }
   form.addEventListener('submit', function(){ withIds(form, MAX); });
+  var sup = document.getElementById('spc-sup-form');
+  if (sup) sup.addEventListener('submit', function(){ withIds(sup, 100); });
   var del = document.getElementById('spc-del-form');
   if (del) del.addEventListener('submit', function(e){
     var n = picks().length;
