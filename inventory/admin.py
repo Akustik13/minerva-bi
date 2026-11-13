@@ -11,7 +11,7 @@ import tempfile
 from django import forms
 from django.contrib import admin, messages
 from projects.panels import ProjectsBlockMixin
-from suppliers.admin_supplier import CategoryFilter, SupplierCardMixin
+from suppliers.admin_supplier import CategoryFilter, EventFilter, SourceFilter, SupplierCardMixin
 from django.db import transaction
 from django.db.models import Sum, Window
 from django.db.models.functions import Coalesce
@@ -4332,9 +4332,9 @@ class SupplierAdmin(SupplierCardMixin, ProjectsBlockMixin, admin.ModelAdmin):
     # 🏭 категорії, контактні особи, огляд, візитки, запити (RFQ), AI, історія — suppliers/admin_supplier.py
     projects_block_kind = "supplier"           # «📁 Проєкти» (projects/panels.py)
     projects_block_after = "📊 Огляд"
-    list_display  = ("name", "categories_col", "status_col", "contact_person", "email", "addr_country", "po_col",
-                     "rating_col")
-    list_filter   = ("status", CategoryFilter, "addr_country", "source")
+    list_display  = ("name", "categories_col", "status_col", "source_col", "event_col", "contact_person", "email",
+                     "addr_country", "po_col", "rating_col")
+    list_filter   = ("status", CategoryFilter, SourceFilter, EventFilter, "addr_country")
     search_fields = ("name", "contact_person", "email", "website", "domains", "description",
                      "contacts__name", "contacts__email")
     fieldsets = (

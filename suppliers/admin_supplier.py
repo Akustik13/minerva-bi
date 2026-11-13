@@ -10,10 +10,11 @@ AI й візитки — change_supplier. Пошта — лише власні �
 """
 import datetime
 import json
+from urllib.parse import urlencode
 
 from django import forms
 from django.contrib import admin, messages
-from django.db.models import Count, Max, Q
+from django.db.models import Count, Exists, Max, OuterRef, Q, Subquery
 from django.http import Http404, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
@@ -136,6 +137,56 @@ class CategoryFilter(admin.SimpleListFilter):
         return queryset
 
 
+SOURCE_LABELS = {"manual": "✋ Вручну", "mail": "✉️ З пошти", "card": "🪪 З візитки",
+                 "discover": "🔎 Знайдено в пошті", "ai": "🧠 AI", "import": "📥 Імпорт / API"}
+FAIR_LABEL = "🎪 З виставки"     # візитка постачальника з позначкою «🎪 З виставки» (SupplierMedia.marks "fair")
+
+
+def _media_of_row():
+    return SupplierMedia.objects.filter(supplier=OuterRef("pk"))
+
+
+class SourceFilter(admin.SimpleListFilter):
+    """Звідки взявся постачальник: 🎪 з виставки (візитка з позначкою) або Supplier.source."""
+    title = "звідки"
+    parameter_name = "src"
+
+    def lookups(self, request, model_admin):
+        return [("fair", FAIR_LABEL)] + list(SOURCE_LABELS.items())
+
+    def queryset(self, request, queryset):
+        v = self.value()
+        if v == "fair":
+            return queryset.filter(Exists(_media_of_row().filter(marks__icontains='"fair"')))
+        if v == "manual":
+            return queryset.filter(Q(source="manual") | Q(source=""))
+        if v in SOURCE_LABELS:
+            return queryset.filter(source=v)
+        return queryset
+
+
+class EventFilter(admin.SimpleListFilter):
+    """«Де взяли» з візиток постачальника (те, що людина пише: «Electronica 2026»), без огляду на регістр."""
+    title = "де взяли"
+    parameter_name = "where"
+
+    def lookups(self, request, model_admin):
+        seen = {}
+        for ev in (SupplierMedia.objects.exclude(supplier=None).exclude(event="")
+                   .values_list("event", flat=True).order_by("created_at")):   # назва — як написали вперше
+            key = " ".join(ev.lower().split())
+            seen.setdefault(key, " ".join(ev.split()))
+        return [("-", "— не вказано")] + sorted(((v, v) for v in seen.values()), key=lambda x: x[1].lower())[:60]
+
+    def queryset(self, request, queryset):
+        v = " ".join((self.value() or "").split())
+        if v == "-":
+            return queryset.exclude(Exists(_media_of_row().exclude(event="")))
+        if v:
+            return queryset.filter(Exists(_media_of_row().filter(event__iexact=v)))
+        return queryset
+
+
 BULK_AI_MAX = 20          # 🧠 / 🌐 за один запуск — платно, кожен постачальник — окремий запит AI
 
 
@@ -249,7 +300,25 @@ class SupplierCardMixin:
         return (super().get_queryset(request).prefetch_related("categories")
                 .annotate(_po_count=Count("purchase_orders", filter=~Q(purchase_orders__status="cancelled"),
                                           distinct=True),
-                          _po_last=Max("purchase_orders__order_date")))
+                          _po_last=Max("purchase_orders__order_date"),
+                          # «Де взяли» — з найновішої візитки, де його вписали; 🎪 — є візитка «З виставки»
+                          _event=Subquery(_media_of_row().exclude(event="").order_by("-created_at")
+                                          .values("event")[:1]),
+                          _fair=Exists(_media_of_row().filter(marks__icontains='"fair"'))))
+
+    @admin.display(description="Звідки", ordering="source")
+    def source_col(self, obj):
+        label = FAIR_LABEL if getattr(obj, "_fair", False) else SOURCE_LABELS.get(obj.source or "manual", "—")
+        return format_html('<span style="white-space:nowrap" title="{}">{}</span>', obj.get_source_display() or "",
+                           label)
+
+    @admin.display(description="Де взяли", ordering="_event")
+    def event_col(self, obj):
+        ev = getattr(obj, "_event", None)
+        if not ev:
+            return "—"
+        return format_html('<a href="?{}" title="{}" translate="no">{}</a>', urlencode({"where": ev}),
+                           "Показати лише постачальників звідти", ev)
 
     @admin.display(description="Категорії")
     def categories_col(self, obj):

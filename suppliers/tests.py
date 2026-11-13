@@ -1103,3 +1103,36 @@ class PeopleAndBulkTests(Base):
         self.assertTrue(SupplierAnalysis.objects.filter(supplier=self.supplier, kind=SupplierAnalysis.AI).exists())
         self.client.force_login(self.other)                                     # без права — нічого
         self.assertNotEqual(self.client.post(bulk, {"do": "evaluate", "ids": str(self.supplier.pk)}).status_code, 200)
+
+
+class SourceEventListTests(Base):
+    """Список постачальників: «Звідки» (🎪 з виставки / з пошти / з візитки…) і «Де взяли» — колонки й фільтри."""
+
+    def card_for(self, supplier, event="", marks=()):
+        m = SupplierMedia(supplier=supplier, kind=SupplierMedia.CARD, event=event, marks=list(marks))
+        m.image.save("c.png", SimpleUploadedFile("c.png", png()), save=False)
+        m.save()
+        return m
+
+    def test_columns_filters_and_sort(self):
+        fair = Supplier.objects.create(name="Victory PCB", source="card")
+        self.card_for(fair, "Electronica 2026", ["fair", "star"])
+        mail = Supplier.objects.create(name="Ring PCB", source="mail")
+        old = Supplier.objects.create(name="Kontron", source="")
+        self.card_for(old, "ELECTRONICA 2026")
+        url = reverse("admin:inventory_supplier_changelist")
+        names = lambda resp: sorted(o.name for o in resp.context["cl"].result_list)   # noqa: E731
+        page = self.client.get(url)
+        self.assertContains(page, "🎪 З виставки")
+        self.assertContains(page, "✉️ З пошти")
+        self.assertContains(page, '?where=Electronica+2026')
+        self.assertEqual(names(self.client.get(url + "?src=fair")), ["Victory PCB"])
+        self.assertEqual(names(self.client.get(url + "?src=mail")), ["Ring PCB"])
+        self.assertEqual(names(self.client.get(url + "?src=manual")), ["Kontron", "Shenzhen PCBWay Co., Ltd"])
+        self.assertEqual(names(self.client.get(url + "?where=electronica 2026")), ["Kontron", "Victory PCB"])
+        self.assertEqual(names(self.client.get(url + "?where=-")), ["Ring PCB", "Shenzhen PCBWay Co., Ltd"])
+        lookups = dict(self.client.get(url).context["cl"].filter_specs[3].lookup_choices)
+        self.assertEqual(list(lookups), ["-", "Electronica 2026"])                 # регістр — одна подія
+        cl = self.client.get(url + "?o=-5").context["cl"]                          # «Де взяли» за спаданням
+        self.assertEqual([o.name for o in cl.result_list][:2], ["Victory PCB", "Kontron"])
+        self.assertEqual(mail.pk, Supplier.objects.get(name="Ring PCB").pk)

@@ -3509,6 +3509,7 @@
 {"uk": "Імена файлів з усіх позицій замовлення (через \\n). Використовується для пошуку.", "en": "File names from all order lines (separated by \\n). Used for search.", "de": "Dateinamen aller Bestellpositionen (getrennt durch \\n). Wird für die Suche verwendet."}
 {"uk": "Імпеданс", "en": "Impedance", "de": "Impedanz"}
 {"uk": "Імпорт", "en": "Import", "de": "Import"}
+{"uk": "Імпорт / API", "en": "Import / API", "de": "Import / API"}
 {"uk": "Імпорт Excel", "en": "Excel import", "de": "Excel-Import"}
 {"uk": "Імпорт атрибутів з Excel", "en": "Import attributes from Excel", "de": "Attribute aus Excel importieren"}
 {"uk": "Імпорт даних", "en": "Data import", "de": "Datenimport"}
@@ -6740,6 +6741,7 @@
 {"uk": "З повагою, {0}", "en": "Best regards, {0}", "de": "Mit freundlichen Grüßen, {0}"}
 {"uk": "З повагою,?\\s", "en": "З повагою,?\\s", "de": "З повагою,?\\s"}
 {"uk": "З позначками", "en": "With marks", "de": "Mit Markierungen"}
+{"uk": "З пошти", "en": "From mail", "de": "Aus der Post"}
 {"uk": "З пошти — 📌 біля проєкту в прев'ю листа, зі шкали — клік на точку листа.", "en": "From mail — 📌 next to the project in the email preview; from the timeline — click an email dot.", "de": "Aus der Mail — 📌 neben dem Projekt in der E-Mail-Vorschau, aus der Zeitleiste — Klick auf einen E-Mail-Punkt."}
 {"uk": "З проєкту {0} · {1}", "en": "From project {0} · {1}", "de": "Aus Projekt {0} · {1}"}
 {"uk": "З підпапками", "en": "With subfolders", "de": "Mit Unterordnern"}
@@ -8050,6 +8052,7 @@
 {"uk": "Знайдено {0} тем.", "en": "{0} topics found.", "de": "{0} Themen gefunden."}
 {"uk": "Знайдено в даташиті — перевірте й внесіть:", "en": "Found in the datasheet — check and save:", "de": "Im Datenblatt gefunden — prüfen und übernehmen:"}
 {"uk": "Знайдено в листах {0} рази — показано один раз", "en": "Found in e-mails {0} times — shown once", "de": "In E-Mails {0}-mal gefunden — einmal angezeigt"}
+{"uk": "Знайдено в пошті", "en": "Found in mail", "de": "In der Post gefunden"}
 {"uk": "Знайдено виправлення", "en": "Corrections found", "de": "Korrekturen gefunden"}
 {"uk": "Знайдено востаннє", "en": "Last found", "de": "Zuletzt gefunden"}
 {"uk": "Знайдено груп з дублікатами: {0}", "en": "Groups with duplicates found: {0}", "de": "Gefundene Gruppen mit Duplikaten: {0}"}
@@ -12526,6 +12529,7 @@
 {"uk": "Показати всім, хто бачить картку", "en": "Show to everyone who can see the card", "de": "Allen zeigen, die die Karte sehen"}
 {"uk": "Показати деталі", "en": "Show details", "de": "Details anzeigen"}
 {"uk": "Показати знайдені листи без збереження", "en": "Show the found e-mails without saving", "de": "Gefundene E-Mails anzeigen, ohne zu speichern"}
+{"uk": "Показати лише постачальників звідти", "en": "Show only suppliers from there", "de": "Nur Lieferanten von dort zeigen"}
 {"uk": "Показати лише цю категорію", "en": "Show only this category", "de": "Nur diese Kategorie anzeigen"}
 {"uk": "Показати на екрані (Minerva підсвітить елемент, сама нічого не натискає)", "en": "Show on screen (Minerva highlights the element, does not click anything itself)", "de": "Auf dem Bildschirm zeigen (Minerva hebt das Element hervor, klickt selbst nichts an)"}
 {"uk": "Показати папки", "en": "Show folders", "de": "Ordner anzeigen"}
@@ -18185,6 +18189,7 @@
 {"uk": "дати звірено з DigiKey", "en": "dates reconciled with DigiKey", "de": "Daten mit DigiKey abgeglichen"}
 {"uk": "датою (вручну або пресети 30/60/90/365 днів), джерелом замовлень та", "en": "date (manually or presets of 30/60/90/365 days), order source and", "de": "Datum (manuell oder Voreinstellungen 30/60/90/365 Tage), Auftragsquelle und"}
 {"uk": "двійкові дані", "en": "binary data", "de": "Binärdaten"}
+{"uk": "де взяли", "en": "where obtained", "de": "woher"}
 {"uk": "де взяли: {0}", "en": "obtained at: {0}", "de": "erhalten: {0}"}
 {"uk": "де купувати", "en": "where to buy", "de": "wo kaufen"}
 {"uk": "де повідомлення виникають: брифінг і звіти — «Налаштування сповіщень» / «Налаштування брифінгу»", "en": "where the messages originate: briefing and reports — “Notification settings” / “Briefing settings”", "de": "dort, wo die Nachrichten entstehen: Briefing und Berichte – „Benachrichtigungseinstellungen“ / „Briefing-Einstellungen“"}
@@ -18715,6 +18720,7 @@
 {"uk": "звертається до Stripe", "en": "contacts Stripe", "de": "greift auf Stripe zu"}
 {"uk": "зворотний", "en": "back", "de": "Rückseite"}
 {"uk": "звуку наради не було", "en": "there was no meeting audio", "de": "kein Besprechungston"}
+{"uk": "звідки", "en": "source", "de": "Herkunft"}
 {"uk": "звідки за {0} днів", "en": "from where in {0} days", "de": "von wo in {0} Tagen"}
 {"uk": "звірив записи нарад на RAG-ПК", "en": "reconciled the meeting recordings on the RAG PC", "de": "hat die Besprechungsaufnahmen auf dem RAG-PC abgeglichen"}
 {"uk": "звірка записів нарад", "en": "meeting recordings reconciliation", "de": "Abgleich der Besprechungsaufnahmen"}
@@ -21767,4 +21773,5 @@
 {"uk": "ℹ️ у замовленні на DigiKey рахунок уже був", "en": "ℹ️ the order on DigiKey already had an invoice", "de": "ℹ️ der Auftrag bei DigiKey hatte bereits eine Rechnung"}
 {"uk": "🪪 Візитка", "en": "🪪 Business card", "de": "🪪 Visitenkarte"}
 {"uk": "🪪 Візитки й флаєри", "en": "🪪 Business cards & flyers", "de": "🪪 Visitenkarten & Flyer"}
+{"uk": "🪪 З візитки", "en": "🪪 From business card", "de": "🪪 Von Visitenkarte"}
 {"uk": "🪪 Усі візитки", "en": "🪪 All business cards", "de": "🪪 Alle Visitenkarten"}

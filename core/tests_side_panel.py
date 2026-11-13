@@ -276,9 +276,9 @@ class ConfigTests(PanelTestBase):
                          ("mail", "✉️", "Написати", "link", "KeyM"))
         self.assertEqual([e["key"] for e in cfg["edits"]], ["email", "notes", "person"])
         self.assertEqual([c["name"] for c in cfg["columns"]],
-                         ["name", "categories_col", "status_col", "contact_person", "email", "addr_country", "po_col",
-                          "rating_col"])
-        self.assertEqual(cfg["columns"][3]["label"], "Контактна особа")
+                         ["name", "categories_col", "status_col", "source_col", "event_col", "contact_person", "email",
+                          "addr_country", "po_col", "rating_col"])
+        self.assertEqual(cfg["columns"][5]["label"], "Контактна особа")
         self.assertEqual(cfg["hideDefault"], ["addr_country"])
         self.assertEqual(cfg["width"], {"min": 320, "max": 960, "presets": [360, 440, 560, 720]})
         self.assertEqual(cfg["shared"], ["nav", "view", "chips", "density", "actions_at", "place", "helpers", "empty"])
