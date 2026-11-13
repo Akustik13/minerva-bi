@@ -379,6 +379,8 @@ def letter(form: dict, user=None, model=DEFAULT_MODEL, files=()) -> dict:
         "вказати в пропозиції, коротке завершення); це лише зразок форми, його дані НЕ переноси:\n<<<ЗРАЗОК\n"
         + LETTER_STYLE + "\nЗРАЗОК>>>\nВідповідай лише JSON такої форми: " + LETTER_JSON)
     content = "<<<ДАНІ\n" + "\n".join(lines) + "\nДАНІ>>>\nСклади тему й текст листа."
+    if form.get("wish"):            # вказівка людини, що складає запит, — довірена (не з файлів і не з листів)
+        content += "\nПОБАЖАННЯ МЕНЕДЖЕРА (довірене — врахуй обов'язково): " + form["wish"][:1500]
     text, price = call(system, content, model=model_of(model), user=user, effort="low", max_tokens=4000)
     data = parse_json(text)
     body = str(data.get("body") or "").strip()[:8000]

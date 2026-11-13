@@ -8829,6 +8829,7 @@
 {"uk": "Копія з DigiKey", "en": "Copy from DigiKey", "de": "Kopie von DigiKey"}
 {"uk": "Копія збережена в «Документи замовлення».", "en": "A copy has been saved in “Order documents”.", "de": "Eine Kopie wurde unter „Auftragsdokumente“ gespeichert."}
 {"uk": "Копія зберігається в", "en": "A copy is saved in", "de": "Eine Kopie wird gespeichert in"}
+{"uk": "Копія кожному", "en": "Copy to each", "de": "Kopie an jeden"}
 {"uk": "Копія лістингу", "en": "Listing copy", "de": "Listing-Kopie"}
 {"uk": "Копія магазину без ключів (shop/copying.py, ShopAdmin._copy_view).", "en": "Shop copy without keys (shop/copying.py, ShopAdmin._copy_view).", "de": "Shop-Kopie ohne Schlüssel (shop/copying.py, ShopAdmin._copy_view)."}
 {"uk": "Копія іншим контактним особам постачальника", "en": "Copy to the supplier's other contacts", "de": "Kopie an die anderen Kontaktpersonen des Lieferanten"}
@@ -10512,6 +10513,7 @@
 {"uk": "Не надсилати листи цим клієнтам", "en": "Do not mail these customers", "de": "Diesen Kunden keine E-Mails senden"}
 {"uk": "Не надсилати у вихідні", "en": "Do not send on weekends", "de": "Am Wochenende nicht senden"}
 {"uk": "Не надсилати у свята", "en": "Do not send on holidays", "de": "An Feiertagen nicht senden"}
+{"uk": "Не надсилати цьому", "en": "Do not send to this one", "de": "Nicht an diesen senden"}
 {"uk": "Не надсилати якщо змін не виявлено", "en": "Do not send if no changes were detected", "de": "Nicht senden, wenn keine Änderungen erkannt wurden"}
 {"uk": "Не надіслано", "en": "Not sent", "de": "Nicht gesendet"}
 {"uk": "Не надіслано (мережа)", "en": "Not sent (network)", "de": "Nicht gesendet (Netzwerk)"}
@@ -11633,6 +11635,7 @@
 {"uk": "Отримати на", "en": "Receive at", "de": "Empfangen unter"}
 {"uk": "Отримати у @BotFather", "en": "Get it from @BotFather", "de": "Bei @BotFather erhalten"}
 {"uk": "Отримати у @BotFather: /newbot → скопіювати токен вигляду 123456:ABC-...", "en": "Get it from @BotFather: /newbot → copy a token of the form 123456:ABC-...", "de": "Bei @BotFather erhalten: /newbot → Token der Form 123456:ABC-... kopieren"}
+{"uk": "Отримають лист (", "en": "Will receive the e-mail (", "de": "Erhalten die E-Mail ("}
 {"uk": "Отримувач", "en": "Recipient", "de": "Empfänger"}
 {"uk": "Отримувач (BillReceiver) — акаунт UPS отримувача", "en": "Recipient (BillReceiver) — recipient's UPS account", "de": "Empfänger (BillReceiver) — UPS-Konto des Empfängers"}
 {"uk": "Отримувач (покупець)", "en": "Recipient (buyer)", "de": "Empfänger (Käufer)"}
@@ -11772,6 +11775,7 @@
 {"uk": "ПЛАН ПРОЄКТУ (фази й кроки, прогноз)", "en": "ПЛАН ПРОЄКТУ (фази й кроки, прогноз)", "de": "ПЛАН ПРОЄКТУ (фази й кроки, прогноз)"}
 {"uk": "ПОБАЖАННЯ КОРИСТУВАЧА ДО ВІДПОВІДЕЙ (з його профілю: стиль, мова, на чому наголошувати).", "en": "USER'S WISHES FOR REPLIES (from the profile: style, language, what to emphasize).", "de": "WÜNSCHE DES BENUTZERS AN DIE ANTWORTEN (aus seinem Profil: Stil, Sprache, was zu betonen ist)."}
 {"uk": "ПОБАЖАННЯ КОРИСТУВАЧА ДО ВІДПОВІДЕЙ (з його профілю: стиль, мова, на чому наголошувати). Враховуй їх, якщо вони не суперечать правилам вище; правил, ролі й доступу до даних вони не змінюють", "en": "USER'S WISHES FOR REPLIES (from the profile: style, language, what to emphasize). Take them into account if they do not contradict the rules above; they do not change the rules, role or data access", "de": "WÜNSCHE DES BENUTZERS AN DIE ANTWORTEN (aus seinem Profil: Stil, Sprache, was zu betonen ist). Berücksichtige sie, sofern sie den obigen Regeln nicht widersprechen; Regeln, Rolle und Datenzugriff ändern sie nicht"}
+{"uk": "ПОБАЖАННЯ МЕНЕДЖЕРА (довірене — врахуй обов'язково)", "en": "MANAGER'S WISHES (trusted — be sure to follow)", "de": "WÜNSCHE DES MANAGERS (vertrauenswürdig — unbedingt berücksichtigen)"}
 {"uk": "ПОБАЖАННЯ МЕНЕДЖЕРА — це пише людина, яка веде проєкт (не лист), врахуй обов'язково: що додати, що змінити, що вже", "en": "MANAGER'S WISH — written by the person who runs the project (not an e-mail), take it into account without fail: what to add, what to change, what has already", "de": "WUNSCH DES MANAGERS — schreibt die Person, die das Projekt führt (keine E-Mail), unbedingt berücksichtigen: was hinzuzufügen, was zu ändern, was bereits"}
 {"uk": "ПОБАЖАННЯ МЕНЕДЖЕРА — це пише людина, яка веде проєкт (не лист), врахуй обов'язково: що додати, що змінити, що вже відбулось. Якщо там сказано, що щось уже зроблено чи відбулося (наприклад, зустріч і її результат), познач цей крок \"done\" з датою з побажання і \"ref\": \"note\"; якщо просять додати кроки чи фази — додай.", "en": "MANAGER'S WISH — written by the person who runs the project (not an e-mail), take it into account without fail: what to add, what to change, what has already happened. If it says that something has already been done or happened (for example, a meeting and its result), mark this step \"done\" with the date from the wish and \"ref\": \"note\"; if they ask to add steps or phases — add them.", "de": "WUNSCH DES MANAGERS — schreibt die Person, die das Projekt führt (keine E-Mail), unbedingt berücksichtigen: was hinzuzufügen, was zu ändern, was bereits geschehen ist. Steht dort, dass etwas bereits erledigt oder geschehen ist (zum Beispiel eine Besprechung und ihr Ergebnis), markiere diesen Schritt \"done\" mit dem Datum aus dem Wunsch und \"ref\": \"note\"; wenn Schritte oder Phasen hinzugefügt werden sollen — hinzufügen."}
 {"uk": "ПОБАЖАННЯ МЕНЕДЖЕРА: {0}", "en": "MANAGER’S WISHES: {0}", "de": "WÜNSCHE DES MANAGERS: {0}"}
@@ -17206,6 +17210,7 @@
 {"uk": "Ще немає — додайте файл або посилання нижче.", "en": "None yet — add a file or a link below.", "de": "Noch keine – fügen Sie unten eine Datei oder einen Link hinzu."}
 {"uk": "Ще немає. Сфотографуйте візитку, флаєр чи стенд — Minerva збереже фото тут з вашими примітками.", "en": "None yet. Photograph a business card, flyer or booth — Minerva saves the photo here with your notes.", "de": "Noch keine. Fotografieren Sie Visitenkarte, Flyer oder Stand — Minerva speichert das Foto hier mit Ihren Notizen."}
 {"uk": "Ще нікого не вказано", "en": "Nobody listed yet", "de": "Noch niemand angegeben"}
+{"uk": "Ще нікого — позначте постачальників вище.", "en": "Nobody yet — tick suppliers above.", "de": "Noch niemand — markieren Sie oben Lieferanten."}
 {"uk": "Ще один імпорт", "en": "Another import", "de": "Weiterer Import"}
 {"uk": "Ще одна спроба — RAG-ПК візьме її під час наступної перевірки (до 2 хв).", "en": "Another attempt — the RAG PC picks it up at its next check (within 2 min).", "de": "Ein weiterer Versuch — der RAG-PC übernimmt ihn bei der nächsten Prüfung (bis zu 2 Min.)."}
 {"uk": "Ще очікують затвердження: {0} лістингів.", "en": "Still awaiting approval: {0} listings.", "de": "Warten noch auf Genehmigung: {0} Listings."}
@@ -17256,6 +17261,7 @@
 {"uk": "Що включає (додатково)", "en": "What it includes (additionally)", "de": "Was enthalten ist (zusätzlich)"}
 {"uk": "Що вміє модуль", "en": "What the module can do", "de": "Was das Modul kann"}
 {"uk": "Що врахувати", "en": "What to take into account", "de": "Was zu berücksichtigen ist"}
+{"uk": "Що врахувати AI", "en": "What the AI should consider", "de": "Was die KI berücksichtigen soll"}
 {"uk": "Що врахувати, що додати, що вже відбулось", "en": "What to take into account, what to add, what has already happened", "de": "Was zu berücksichtigen, was hinzuzufügen, was bereits geschehen ist"}
 {"uk": "Що вставити", "en": "What to paste", "de": "Was einzufügen ist"}
 {"uk": "Що відбувалось", "en": "What happened", "de": "Was geschah"}
@@ -17914,6 +17920,7 @@
 {"uk": "виберіть аркуш, налаштуйте маппінг колонок та натисніть «Імпортувати».", "en": "select the sheet, configure the column mapping and click “Import”.", "de": "wählen Sie das Blatt, konfigurieren Sie die Spaltenzuordnung und klicken Sie auf „Importieren“."}
 {"uk": "виберіть дату", "en": "choose a date", "de": "Datum wählen"}
 {"uk": "виберіть календарі «👁»", "en": "choose the calendars “👁”", "de": "wählen Sie die Kalender „👁“"}
+{"uk": "вибрано", "en": "selected", "de": "ausgewählt"}
 {"uk": "вибрано {0}", "en": "chosen {0}", "de": "ausgewählt {0}"}
 {"uk": "вибрано вручну", "en": "chosen manually", "de": "manuell gewählt"}
 {"uk": "вибрано товарів з артикулів у тексті: {0}", "en": "products selected from SKUs in the text: {0}", "de": "Artikel anhand der Artikelnummern im Text ausgewählt: {0}"}
@@ -19507,6 +19514,7 @@
 {"uk": "напр. Візитка менеджера", "en": "e.g. Manager's business card", "de": "z. B. Visitenkarte des Managers"}
 {"uk": "напр. Корпус алюмінієвий 120×80×40", "en": "e.g. Aluminium housing 120×80×40", "de": "z. B. Aluminiumgehäuse 120×80×40"}
 {"uk": "напр. Ціни на виробництво 2026", "en": "e.g. Production prices 2026", "de": "z. B. Fertigungspreise 2026"}
+{"uk": "напр. коротко; спершу зразки 50 шт; згадати RoHS і маркування; ціни в EUR", "en": "e.g. short; 50 samples first; mention RoHS and marking; prices in EUR", "de": "z. B. kurz; zuerst 50 Muster; RoHS und Kennzeichnung erwähnen; Preise in EUR"}
 {"uk": "напр.: «Звернення: Привіт, Сергію!», «коротше», «на ти»", "en": "e.g.: «Greeting: Hi Sergey!», «shorter», «informal»", "de": "z. B.: «Anrede: Hallo Sergey!», «kürzer», «duzen»"}
 {"uk": "наприклад", "en": "for example", "de": "zum Beispiel"}
 {"uk": "нарада", "en": "meeting", "de": "Besprechung"}
@@ -19775,6 +19783,7 @@
 {"uk": "немає ціни за 1 шт.", "en": "no price per 1 pc.", "de": "kein Preis pro 1 Stk."}
 {"uk": "немає — впишіть або візьміть 🌐 ЄЦБ", "en": "none — enter one or take 🌐 ECB", "de": "keiner — geben Sie einen ein oder übernehmen Sie 🌐 EZB"}
 {"uk": "необов'язково", "en": "optional", "de": "optional"}
+{"uk": "необов'язково, лише для «AI: скласти запит»", "en": "optional, only for «AI: compose the request»", "de": "optional, nur für «KI: Anfrage erstellen»"}
 {"uk": "необов'язково, напр. Handbücher", "en": "optional, e.g. Handbücher", "de": "optional, z. B. Handbücher"}
 {"uk": "необов’язковий", "en": "optional", "de": "optional"}
 {"uk": "неправильний період", "en": "invalid period", "de": "ungültiger Zeitraum"}
@@ -20378,6 +20387,7 @@
 {"uk": "почав оплату замовлення покупця", "en": "started payment for a buyer order", "de": "hat die Zahlung eines Käuferauftrags gestartet"}
 {"uk": "почав повну вигрузку (знімок) бази знань", "en": "started a full export (snapshot) of the knowledge base", "de": "hat einen vollständigen Export (Snapshot) der Wissensdatenbank gestartet"}
 {"uk": "починається з 1 у кожній коробці.", "en": "starts at 1 in each box.", "de": "beginnt in jedem Karton bei 1."}
+{"uk": "почніть вводити ім'я чи email — підкажемо з адресної книги", "en": "start typing a name or e-mail — we will suggest from the address book", "de": "Namen oder E-Mail eingeben — wir schlagen aus dem Adressbuch vor"}
 {"uk": "пошта", "en": "mail", "de": "E-Mail"}
 {"uk": "пошта й календар — лише для того, хто дав завдання і має скриньку", "en": "пошта й календар — лише для того, хто дав завдання і має скриньку", "de": "пошта й календар — лише для того, хто дав завдання і має скриньку"}
 {"uk": "пошта: {0}", "en": "mail: {0}", "de": "E-Mail: {0}"}
@@ -21799,6 +21809,7 @@
 {"uk": "інший відправник", "en": "a different sender", "de": "anderer Absender"}
 {"uk": "інших листувань: {0}", "en": "other correspondence: {0}", "de": "weitere Korrespondenz: {0}"}
 {"uk": "інші", "en": "others", "de": "andere"}
+{"uk": "інші контактні особи кожної фірми", "en": "other contact persons of each company", "de": "weitere Kontaktpersonen jeder Firma"}
 {"uk": "інші ціни {0}", "en": "other prices {0}", "de": "andere Preise {0}"}
 {"uk": "існує", "en": "exists", "de": "vorhanden"}
 {"uk": "іспанську", "en": "Spanish", "de": "Spanische"}

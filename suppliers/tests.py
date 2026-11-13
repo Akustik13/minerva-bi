@@ -1211,11 +1211,14 @@ class RequestRecipientFiltersTests(Base):
         page = self.client.get(reverse("admin:suppliers_supplierrequest_new"))
         self.assertContains(page, 'data-status="potential" data-src="fair" data-where="electronica 2026" '
                                   'data-country="CN"')
-        self.assertContains(page, '<option value="fair">🎪 З виставки</option>')
-        self.assertContains(page, '<option value="electronica 2026">Electronica 2026</option>')
-        self.assertContains(page, '<option value="CN">')
+        self.assertContains(page, '<input type="checkbox" value="fair"> 🎪 З виставки')      # кілька значень — галочки
+        self.assertContains(page, '<input type="checkbox" value="electronica 2026"> <span translate="no">Electronica 2026</span>')
+        self.assertContains(page, '<input type="checkbox" value="CN">')
+        self.assertContains(page, 'id="rq-who"')                                           # 📤 Отримають лист
+        self.assertContains(page, 'id="rq-colleagues"')                                    # підказки «Копія (CC)»
+        self.assertContains(page, 'name="ai_wish"')
         self.assertNotContains(page, "Never Again Ltd")                            # ⛔ не працювати — не пропонуємо
-        self.assertNotContains(page, '<option value="blocked">')
+        self.assertNotContains(page, 'value="blocked"')
         self.assertContains(page, "Позначити всіх показаних")
 
 
@@ -1325,12 +1328,14 @@ class RequestAiLetterTests(Base):
             j = self.client.post(url, {"title": "4-layer PCB", "template": "pcb", "language": "de",
                                        "spec_layers": "4", "spec_thickness": "1.6", "quantities": "10; 100",
                                        "reply_by": "2026-12-01", "body": "Bitte schnell, Muster zuerst.",
+                                       "ai_wish": "Erst 50 Muster, RoHS erwähnen",
                                        "file_names": ["gerber.zip", "bom.xlsx"]}).json()
         system, content = call.call_args.args
         self.assertIn("німецькою", system)
         for part in ("Lagen: 4", "Dicke, mm: 1.6", "10 / 100", "gerber.zip, bom.xlsx", "{reply_by}",
                      "Bitte schnell, Muster zuerst."):
             self.assertIn(part, content)
+        self.assertIn("ПОБАЖАННЯ МЕНЕДЖЕРА (довірене — врахуй обов'язково): Erst 50 Muster, RoHS erwähnen", content)
         r = jobs.state(j["job"], self.user)["result"]
         self.assertEqual(r["subject"], "[{code}] RFQ: 4-layer PCB")
         self.assertTrue(r["body"].startswith("{greeting}\n\nDear Sir or Madam"))       # привітання — змінною

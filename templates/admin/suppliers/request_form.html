@@ -50,7 +50,26 @@
   .rq-pv pre { white-space: pre-wrap; font-family: inherit; margin: 6px 0 0; }
   .rq-sup .rq-sent { opacity: .7; }
   .rq-filters { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 4px 0 6px; }
-  .rq-filters select { max-width: 220px; }
+  .rq-ms { position: relative; }
+  .rq-ms-btn { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rq-ms.rq-on .rq-ms-btn { outline: 2px solid var(--primary, #5b8def); }
+  .rq-ms-pop { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; min-width: 240px; max-width: 360px;
+    max-height: 320px; overflow-y: auto; background: var(--body-bg, #fff); border: 1px solid var(--border-strong, #ccc);
+    border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.2); padding: 6px 8px; }
+  .rq-ms-pop label { display: flex; gap: 6px; align-items: center; width: auto; float: none; padding: 3px 2px; margin: 0;
+    font-weight: normal; cursor: pointer; white-space: nowrap; }
+  .rq-ms-pop .rq-ms-clear { display: block; margin-top: 4px; font-size: 12px; }
+  .rq-sug { position: relative; z-index: 40; margin-top: -4px; max-width: 520px; background: var(--body-bg, #fff);
+    border: 1px solid var(--border-strong, #ccc); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); max-height: 260px; overflow-y: auto; }
+  .rq-sug div { padding: 4px 10px; cursor: pointer; font-size: 13px; }
+  .rq-sug div.on, .rq-sug div:hover { background: var(--selected-bg, rgba(91,141,239,.15)); }
+  .rq-sug small { color: var(--text-muted, #888); }
+  .rq-who { margin-top: 8px; border: 1px solid var(--border-strong, #ccc); border-radius: 8px; padding: 6px 10px; }
+  .rq-who-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center;
+    padding: 3px 0; border-bottom: 1px solid var(--hairline-color, rgba(127,127,127,.15)); font-size: 13px; }
+  .rq-who-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rq-who-row button { padding: 0 6px; }
+  @media (max-width: 700px) { .rq-who-row { grid-template-columns: minmax(0, 1fr) auto; } .rq-who-row .rq-who-to { grid-column: 1; } }
   .rq-count { color: var(--text-muted, #888); font-size: 12px; }
   .rq-spec { display: none; } .rq-spec.on { display: grid; }
 </style>
@@ -100,11 +119,16 @@
     <div class="spf-h">🏭 Кому</div>
     <div class="rq-filters" id="rq-filters">
       <input type="search" id="rq-q" placeholder="Пошук постачальника…" style="min-width:220px">
-      <select data-f="status" title="Стан"><option value="">Стан: усі</option>{% for v, n in f_statuses %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
-      <select data-f="cat" title="Категорія"><option value="">Категорія: усі</option><option value="none">— без категорії</option>{% for c in categories %}<option value="{{ c.pk }}">{{ c.icon }} {{ c.name }}</option>{% endfor %}</select>
-      <select data-f="src" title="Звідки"><option value="">Звідки: усі</option>{% for v, n in f_sources %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
-      <select data-f="where" title="Де взяли — з візиток постачальника"><option value="">Де взяли: усі</option><option value="-">— не вказано</option>{% for v, n in f_events %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
-      <select data-f="country" title="Країна"><option value="">Країна: усі</option>{% for v, n in f_countries %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <div class="rq-ms" data-f="status" data-title="Стан"><button type="button" class="button rq-ms-btn">Стан: усі ▾</button>
+        <div class="rq-ms-pop" hidden>{% for v, n in f_statuses %}<label><input type="checkbox" value="{{ v }}"> {{ n }}</label>{% endfor %}<a href="#" class="rq-ms-clear">✕ усі</a></div></div>
+      <div class="rq-ms" data-f="cat" data-title="Категорія"><button type="button" class="button rq-ms-btn">Категорія: усі ▾</button>
+        <div class="rq-ms-pop" hidden><label><input type="checkbox" value="none"> — без категорії</label>{% for c in categories %}<label><input type="checkbox" value="{{ c.pk }}"> {{ c.icon }} {{ c.name }}</label>{% endfor %}<a href="#" class="rq-ms-clear">✕ усі</a></div></div>
+      <div class="rq-ms" data-f="src" data-title="Звідки"><button type="button" class="button rq-ms-btn">Звідки: усі ▾</button>
+        <div class="rq-ms-pop" hidden>{% for v, n in f_sources %}<label><input type="checkbox" value="{{ v }}"> {{ n }}</label>{% endfor %}<a href="#" class="rq-ms-clear">✕ усі</a></div></div>
+      <div class="rq-ms" data-f="where" data-title="Де взяли"><button type="button" class="button rq-ms-btn" title="Де взяли — з візиток постачальника">Де взяли: усі ▾</button>
+        <div class="rq-ms-pop" hidden><label><input type="checkbox" value="-"> — не вказано</label>{% for v, n in f_events %}<label><input type="checkbox" value="{{ v }}"> <span translate="no">{{ n }}</span></label>{% endfor %}<a href="#" class="rq-ms-clear">✕ усі</a></div></div>
+      <div class="rq-ms" data-f="country" data-title="Країна"><button type="button" class="button rq-ms-btn">Країна: усі ▾</button>
+        <div class="rq-ms-pop" hidden>{% for v, n in f_countries %}<label><input type="checkbox" value="{{ v }}"> {{ n }}</label>{% endfor %}<a href="#" class="rq-ms-clear">✕ усі</a></div></div>
       <label class="rq-count" style="width:auto;float:none;padding:0"><input type="checkbox" id="rq-only"> лише позначені</label>
     </div>
     <div class="spf-row">
@@ -116,7 +140,7 @@
     <div class="spf-muted">«⛔ Не працювати» в запит не потрапляють.</div>
     <div class="rq-sup" id="rq-sup">
       {% for s in suppliers %}
-      <label class="rq-row" data-pk="{{ s.pk }}" data-cats="{% for c in s.categories.all %}{{ c.pk }} {% endfor %}" data-name="{{ s.name|lower }} {{ s.email|lower }}" data-status="{{ s.status }}" data-src="{{ s.f_src }}" data-where="{{ s.f_where }}" data-country="{{ s.f_country }}">
+      <label class="rq-row" data-pk="{{ s.pk }}" data-label="{{ s.name }}" data-email="{{ s.email }}" data-cats="{% for c in s.categories.all %}{{ c.pk }} {% endfor %}" data-name="{{ s.name|lower }} {{ s.email|lower }}" data-status="{{ s.status }}" data-src="{{ s.f_src }}" data-where="{{ s.f_where }}" data-country="{{ s.f_country }}">
         <input type="checkbox" name="rcp" value="{{ s.pk }}" {% if s.pk in picked %}checked{% endif %}>
         <span class="rq-nm" data-photo="{{ s.f_photo }}" data-photo-note="{{ s.f_photo_note }}"><b translate="no" title="{{ s.name }} — клік: дані постачальника праворуч">{{ s.name }}{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon }}</span>{% endfor %}</b>
           <span class="rq-meta">{% if s.status == "potential" %}🌱 {% elif s.status == "paused" %}⏸ {% endif %}{% if s.f_country %}🌍 {{ s.f_country }}{% endif %}{% if s.f_fair %} · 🎪{% endif %}{% if s.f_where_label %} · <span translate="no">{{ s.f_where_label }}</span>{% endif %}</span></span>
@@ -126,6 +150,11 @@
       {% endfor %}
     </div>
     <div class="spf-muted">Кожен отримає свій лист (не копію чужого) — відповіді Minerva знайде сама й покаже на сторінці запиту. Уже надісланих зняти не можна. Наведіть на назву — фото візитки; клік на назву — дані постачальника праворуч.</div>
+    <div class="rq-who" id="rq-who">
+      <div class="spf-h">📤 Отримають лист (<span id="rq-who-n">0</span>)</div>
+      <div id="rq-who-list"></div>
+      <div class="spf-muted" id="rq-who-cc"></div>
+    </div>
     <div id="rq-photo" hidden></div>
     <aside id="rq-panel" hidden aria-label="Дані постачальника">
       <div class="rq-panel-h"><label title="Ставите галочку — тут з'являються дані цього постачальника"><input type="checkbox" id="rq-panel-auto"> відкривати при виборі</label>
@@ -146,10 +175,14 @@
       <button type="button" class="button" id="rq-ai-undo" hidden>↶ Повернути мій текст</button>
       <span class="spf-job" id="rq-ai-out"></span>
     </div>
+    <label class="spf-wide">🧠 Що врахувати AI <span class="spf-muted">— необов'язково, лише для «AI: скласти запит»</span>
+      <input name="ai_wish" id="rq-ai-wish" maxlength="1500" placeholder="напр. коротко; спершу зразки 50 шт; згадати RoHS і маркування; ціни в EUR"></label>
     <div class="spf-row"><button type="button" class="button" id="rq-example" title="Готовий лист зі змінними мовою запиту — допишіть деталі">✍️ Приклад зі змінними</button>
       <button type="submit" name="regen" value="1" class="button" formnovalidate onclick="return !this.form.body.value || confirm('Скласти текст наново з параметрів? Ваші правки тексту зникнуть.')">🔄 Скласти текст з параметрів</button></div>
     {{ examples|json_script:"rq-examples" }}
-    <label class="spf-wide">Копія (CC) кожному листу <span class="spf-muted">— адреси через кому, напр. колега</span><input name="cc" value="{{ req.cc }}" maxlength="500" placeholder="colleague@sevskiy.de"></label>
+    <label class="spf-wide">Копія (CC) кожному листу <span class="spf-muted">— адреси через кому, напр. колега</span><input name="cc" id="rq-cc" value="{{ req.cc }}" maxlength="500" placeholder="почніть вводити ім'я чи email — підкажемо з адресної книги" autocomplete="off"></label>
+    <div class="rq-sug" id="rq-cc-sug" hidden></div>
+    {{ colleagues|json_script:"rq-colleagues" }}
     <label class="spf-muted" style="width:auto;float:none;padding:0"><input type="checkbox" name="cc_contacts" value="1" {% if req.cc_contacts %}checked{% endif %}> копія й іншим контактним особам того самого постачальника</label>
     <div class="spf-row">👁 Як виглядатиме лист:
       <select id="rq-pv-sup"></select>
@@ -175,25 +208,50 @@
   tpl.addEventListener('change', show);
   document.getElementById('rq-category').addEventListener('change', function(){
     var o = this.options[this.selectedIndex]; if (o && o.dataset.template) { tpl.value = o.dataset.template; show(); }
-    var fc = box && box.querySelector('select[data-f="cat"]');      // категорія запиту → і фільтр «Кому»
-    if (fc && this.value) { fc.value = this.value; apply(); }
+    if (this.value && typeof setFilter === 'function') { setFilter('cat', [this.value]); }   // категорія запиту → фільтр «Кому»
   });
   // 🏭 Кому — фільтри як у списку постачальників (стан, категорія, звідки, де взяли, країна) + пошук
   var q = document.getElementById('rq-q'), box = document.getElementById('rq-filters'),
       only = document.getElementById('rq-only'), count = document.getElementById('rq-count');
   var rows = [].slice.call(document.querySelectorAll('#rq-sup > label'));
-  function val(f){ var s = box.querySelector('select[data-f="' + f + '"]'); return s ? s.value : ''; }
+  // кожен фільтр — кілька значень (галочки): усередині фільтра «або», між фільтрами — «і»
+  function sel(f){ var m = box.querySelector('.rq-ms[data-f="' + f + '"]');
+    return m ? [].slice.call(m.querySelectorAll('input:checked')).map(function(x){ return x.value; }) : []; }
+  function msLabel(m){
+    var on = [].slice.call(m.querySelectorAll('input:checked')), b = m.querySelector('.rq-ms-btn'), t = m.dataset.title;
+    b.textContent = t + ': ' + (!on.length ? 'усі' : on.length === 1 ? on[0].parentNode.textContent.trim() : 'вибрано ' + on.length) + ' ▾';
+    m.classList.toggle('rq-on', on.length > 0);
+  }
+  function setFilter(f, values){
+    var m = box.querySelector('.rq-ms[data-f="' + f + '"]'); if (!m) return;
+    m.querySelectorAll('input').forEach(function(x){ x.checked = values.indexOf(x.value) >= 0; }); msLabel(m); apply();
+  }
+  window.setFilter = setFilter;
   function fits(l){
-    var v = q.value.trim().toLowerCase(), cat = val('cat'), where = val('where'), cats = ' ' + l.dataset.cats;
+    var v = q.value.trim().toLowerCase();
     if (v && l.dataset.name.indexOf(v) < 0) return false;
-    if (val('status') && l.dataset.status !== val('status')) return false;
-    if (cat === 'none' ? l.dataset.cats.trim() !== '' : cat && cats.indexOf(' ' + cat + ' ') < 0) return false;
-    if (val('src') && l.dataset.src !== val('src')) return false;
-    if (where === '-' ? l.dataset.where !== '' : where && ('|' + l.dataset.where + '|').indexOf('|' + where + '|') < 0) return false;
-    if (val('country') && l.dataset.country !== val('country')) return false;
+    var st = sel('status'); if (st.length && st.indexOf(l.dataset.status) < 0) return false;
+    var cs = sel('cat'); if (cs.length) {
+      var mine = l.dataset.cats.trim() ? l.dataset.cats.trim().split(/\s+/) : [];
+      if (!cs.some(function(c){ return c === 'none' ? !mine.length : mine.indexOf(c) >= 0; })) return false; }
+    var sr = sel('src'); if (sr.length && sr.indexOf(l.dataset.src) < 0) return false;
+    var ws = sel('where'); if (ws.length) {
+      var have = l.dataset.where ? l.dataset.where.split('|') : [];
+      if (!ws.some(function(w){ return w === '-' ? !have.length : have.indexOf(w) >= 0; })) return false; }
+    var co = sel('country'); if (co.length && co.indexOf(l.dataset.country) < 0) return false;
     if (only.checked && !l.querySelector('input[name=rcp]').checked) return false;
     return true;
   }
+  box.querySelectorAll('.rq-ms').forEach(function(m){
+    var pop = m.querySelector('.rq-ms-pop');
+    m.querySelector('.rq-ms-btn').addEventListener('click', function(e){ e.stopPropagation();
+      var open = pop.hidden; box.querySelectorAll('.rq-ms-pop').forEach(function(p){ p.hidden = true; }); pop.hidden = !open; });
+    pop.addEventListener('click', function(e){ e.stopPropagation(); });
+    pop.addEventListener('change', function(){ msLabel(m); });
+    m.querySelector('.rq-ms-clear').addEventListener('click', function(e){ e.preventDefault(); setFilter(m.dataset.f, []); });
+  });
+  document.addEventListener('click', function(){ box.querySelectorAll('.rq-ms-pop').forEach(function(p){ p.hidden = true; }); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') box.querySelectorAll('.rq-ms-pop').forEach(function(p){ p.hidden = true; }); });
   function apply(){
     var shown = 0, marked = 0;
     rows.forEach(function(l){ var ok = fits(l); l.style.display = ok ? '' : 'none'; shown += ok;
@@ -208,8 +266,36 @@
   document.getElementById('rq-none').addEventListener('click', function(e){ e.preventDefault();
     document.querySelectorAll('#rq-sup input[type=checkbox]').forEach(function(c){ if (!c.disabled) c.checked = false; }); apply(); });
   document.getElementById('rq-reset').addEventListener('click', function(e){ e.preventDefault();
-    q.value = ''; only.checked = false; box.querySelectorAll('select').forEach(function(s){ s.value = ''; }); apply(); });
+    q.value = ''; only.checked = false;
+    box.querySelectorAll('.rq-ms').forEach(function(m){ m.querySelectorAll('input').forEach(function(x){ x.checked = false; }); msLabel(m); });
+    apply(); });
   apply();
+  // 📤 хто отримає лист: позначені постачальники, кому саме (контакт / email), копія; ✕ — зняти
+  var whoN = document.getElementById('rq-who-n'), whoList = document.getElementById('rq-who-list'),
+      whoCc = document.getElementById('rq-who-cc');
+  function renderWho(){
+    whoList.innerHTML = ''; var n = 0;
+    rows.forEach(function(l){
+      var cb = l.querySelector('input[name=rcp]'); if (!cb.checked) return; n++;
+      var sel = l.querySelector('.rq-to select'), to = sel ? sel.options[sel.selectedIndex].text : (l.dataset.email || '⚠️ немає email');
+      var row = document.createElement('div'), a = document.createElement('span'), b = document.createElement('span'), x = document.createElement('button');
+      row.className = 'rq-who-row'; a.textContent = l.dataset.label; a.setAttribute('translate', 'no');
+      b.className = 'rq-who-to'; b.textContent = '→ ' + to; b.setAttribute('translate', 'no');
+      x.type = 'button'; x.className = 'button'; x.textContent = '✕'; x.title = 'Не надсилати цьому';
+      x.addEventListener('click', function(){ cb.checked = false; cb.dispatchEvent(new Event('change', {bubbles: true})); });
+      row.appendChild(a); row.appendChild(b); row.appendChild(x); whoList.appendChild(row);
+    });
+    whoN.textContent = n;
+    if (!n) whoList.textContent = 'Ще нікого — позначте постачальників вище.';
+    var cc = (document.querySelector('[name=cc]') || {}).value || '', more = (document.querySelector('[name=cc_contacts]') || {}).checked;
+    whoCc.textContent = n ? ('Копія кожному: ' + (cc.trim() || '—') + (more ? ' · + інші контактні особи кожної фірми' : '')) : '';
+  }
+  document.getElementById('rq-sup').addEventListener('change', renderWho);
+  ['cc', 'cc_contacts'].forEach(function(nm){ var el = document.querySelector('[name="' + nm + '"]');
+    if (el) { el.addEventListener('input', renderWho); el.addEventListener('change', renderWho); } });
+  document.getElementById('rq-all').addEventListener('click', renderWho);
+  document.getElementById('rq-none').addEventListener('click', renderWho);
+  renderWho();
   // 🪪 фото візитки при наведенні на назву
   var photo = document.getElementById('rq-photo');
   if (window.matchMedia('(hover: hover)').matches) rows.forEach(function(l){
@@ -242,6 +328,49 @@
     l.querySelector('input[name=rcp]').addEventListener('change', function(e){
       if (e.target.checked && pAuto.checked) openPanel(l.dataset.pk); });
   });
+  // «Копія (CC)»: підказки — колеги й адресна книга пошти (/email/crm-contacts/), за останнім словом після коми
+  var ccIn = document.getElementById('rq-cc'), ccSug = document.getElementById('rq-cc-sug'),
+      mates = JSON.parse(document.getElementById('rq-colleagues').textContent || '[]'), ccT = null, ccPick = -1;
+  function ccToken(){ var parts = ccIn.value.split(/[,;]/); return parts[parts.length - 1].trim(); }
+  function ccShow(list){
+    ccSug.innerHTML = ''; ccPick = -1;
+    list.slice(0, 12).forEach(function(c){
+      var d = document.createElement('div'), b = document.createElement('b'), s = document.createElement('small');
+      b.textContent = c.name || c.email; s.textContent = '  ' + c.email + (c.source ? ' · ' + c.source : '');
+      d.setAttribute('translate', 'no'); d.appendChild(b); d.appendChild(s);
+      d.addEventListener('mousedown', function(e){ e.preventDefault(); ccTake(c.email); });
+      ccSug.appendChild(d);
+    });
+    ccSug.hidden = !list.length;
+  }
+  function ccTake(email){
+    var parts = ccIn.value.split(/[,;]/).map(function(x){ return x.trim(); }).filter(Boolean); parts.pop();
+    if (parts.indexOf(email) < 0) parts.push(email);
+    ccIn.value = parts.join(', ') + ', '; ccSug.hidden = true; ccIn.focus(); ccIn.dispatchEvent(new Event('input'));
+  }
+  ccIn.addEventListener('input', function(){
+    var t = ccToken().toLowerCase(); clearTimeout(ccT);
+    if (t.length < 2) { ccSug.hidden = true; return; }
+    var local = mates.filter(function(c){ return (c.email + ' ' + c.name).toLowerCase().indexOf(t) >= 0; });
+    ccShow(local);
+    ccT = setTimeout(function(){
+      fetch('/email/crm-contacts/?q=' + encodeURIComponent(t), {credentials: 'same-origin'})
+        .then(function(r){ return r.ok ? r.json() : {contacts: []}; }).then(function(j){
+          if (ccToken().toLowerCase() !== t) return;
+          var seen = {}; ccShow(local.concat(j.contacts || []).filter(function(c){
+            var k = (c.email || '').toLowerCase(); if (!k || seen[k]) return false; seen[k] = 1; return true; }));
+        }).catch(function(){});
+    }, 250);
+  });
+  ccIn.addEventListener('keydown', function(e){
+    var items = ccSug.querySelectorAll('div'); if (ccSug.hidden || !items.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault();
+      ccPick = (ccPick + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
+      items.forEach(function(d, i){ d.classList.toggle('on', i === ccPick); }); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (ccPick >= 0) items[ccPick].dispatchEvent(new Event('mousedown')); }
+    else if (e.key === 'Escape') ccSug.hidden = true;
+  });
+  ccIn.addEventListener('blur', function(){ setTimeout(function(){ ccSug.hidden = true; }, 150); });
   // 🧠 AI: лист із полів форми й вашого тексту (фоном; ↶ — повернути те, що було)
   var aiGo = document.getElementById('rq-ai-go'), aiOut = document.getElementById('rq-ai-out'),
       aiUndo = document.getElementById('rq-ai-undo'), aiPrev = null;

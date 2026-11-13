@@ -127,6 +127,13 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         return super().change_view(request, object_id, form_url, extra_context)
 
     # ── допоміжне ──
+    @staticmethod
+    def _colleagues() -> list:
+        """Колеги (активні співробітники з email) — підказки в «Копія (CC)» разом з адресною книгою пошти."""
+        from django.contrib.auth.models import User
+        return [{"email": u.email, "name": u.get_full_name() or u.username, "source": "колега"}
+                for u in User.objects.filter(is_active=True, is_staff=True).exclude(email="").order_by("first_name")[:200]]
+
     def preview_view(self, request):
         """👁 Як виглядатиме лист одному отримувачу — з того, що зараз у формі (ще не збережене теж): тема й текст
         зі змінними (rfq.render), кому, копія (rfq.cc_for), вкладення запиту. Нічого не зберігає й не надсилає."""
@@ -195,7 +202,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 "specs": {f[0]: P.get(f"spec_{f[0]}", "").strip()[:2000] for f in rfq.fields_of(template)},
                 "notes": P.get("notes", "").strip()[:4000], "quantities": P.get("quantities", "")[:120],
                 "files": files, "reply_by": P.get("reply_by", ""), "company": company,
-                "subject": P.get("subject", "").strip()[:250], "body": P.get("body", "").strip()}
+                "subject": P.get("subject", "").strip()[:250], "body": P.get("body", "").strip(),
+                "wish": " ".join(P.get("ai_wish", "").split())[:1500]}
         model, user = ai.model_of(P.get("model")), request.user
 
         def run():
@@ -313,6 +321,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             categories=SupplierCategory.objects.filter(is_active=True), projects=projects, groups=groups,
             picked=picked, sent=sent, accounts=accounts, placeholders=rfq.PLACEHOLDERS, **self._recipients(),
             examples={k: {"subject": v[0], "body": v[1]} for k, v in rfq.EXAMPLES.items()},
+            colleagues=self._colleagues(),
             example_body=rfq.EXAMPLES.get(req.language, rfq.EXAMPLES["en"])[1],
             langs=SupplierRequest.LANGS, files=list(req.files.all()) if req.pk else [],
             notes=(req.specs or {}).get("_notes", "")))
