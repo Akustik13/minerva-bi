@@ -87,7 +87,18 @@
   .pf-bc { border: 1px solid var(--hairline-color, rgba(127,127,127,.3)); border-radius: 8px; padding: 7px 9px; display: grid; gap: 3px; }
   .pf-bc.pf-stuck { border-left: 3px solid var(--err, #f85149); }
   /* карта */
-  svg.pf-map { display: block; width: 100%; min-width: 980px; height: auto; }
+  svg.pf-map { display: block; width: 100%; min-width: 980px; height: auto; touch-action: pan-y; }
+  #pf-map { position: relative; }
+  .pf-icard { position: absolute; top: 44px; right: 12px; width: min(420px, 90%); max-height: 70%; overflow: auto;
+    z-index: 3; padding: 10px 12px; border-radius: 10px; background: var(--bg-card, #fff); color: var(--body-fg);
+    border: 1px solid var(--border-strong, #d0d7de); box-shadow: 0 8px 24px rgba(0, 0, 0, .28); font-size: 13px; }
+  .pf-ic-h { display: flex; gap: 8px; align-items: baseline; font-weight: 700; margin-bottom: 6px; }
+  .pf-ic-h a, .pf-ic-h b { flex: 1; }
+  .pf-ic-x { border: 0; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 14px; }
+  .pf-icard ul { margin: 0; padding-left: 16px; }
+  .pf-icard li { margin: 3px 0; }
+  .pf-ic-p { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 8px; font-size: 11px;
+    border: 1px solid var(--border-strong, #d0d7de); color: var(--text-muted); }
   .pf-map .pf-th { fill: var(--text-muted, #9aafbe); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; }
   .pf-m-box { fill: var(--bg-card, transparent); stroke: var(--border-strong, #2a3f52); stroke-width: 1.2; }
   .pf-m-p .pf-m-box { stroke: var(--accent, #58a6ff); }
@@ -225,9 +236,11 @@
       <label class="pf-sub"><input type="checkbox" data-pf-show="dep" checked> ⛓ залежності</label>
       <label class="pf-sub"><input type="checkbox" data-pf-show="supply" checked> 🏭 закупівлі, виробництво й запити постачальникам</label>
       <label class="pf-sub"><input type="checkbox" data-pf-show="short" checked> 📦 товари, яких бракує</label>
-      <span class="pf-sub">Клік на вузол — показати його зв’язки, подвійний клік або Enter — відкрити.</span>
+      <span class="pf-sub">Клік на вузол — зв’язки й деталі (що замовляли, які запити), подвійний клік або Enter — відкрити · Ctrl + коліщатко — масштаб, тягніть фон — прокрутка.</span>
     </div>
-    <div class="pf-card" id="pf-map">{{ svg|safe }}</div>
+    <div class="pf-card" id="pf-map">{{ svg|safe }}
+      <div class="pf-icard" id="pf-icard" hidden role="dialog" aria-label="Деталі"></div></div>
+    {{ map_info|json_script:"pf-info" }}
     <div class="pf-legend">
       <span>— клієнт → проєкт, закупівля, виробництво, ✅ обрано в запиті</span><span>- - заплановано (чернетка закупівлі, учасник-постачальник, 📨 запит постачальнику)</span><span class="pf-m-legno">·· ✖ не взяли / відмовився / не відповів</span>
       <span><i class="lg-ln"></i>⛓ залежність, що затримує</span><span><i class="lg-sw late"></i>спільний товар, якого бракує</span>
@@ -251,6 +264,8 @@
   </section>
 </div>
 
+{% load static %}<link rel="stylesheet" href="{% static 'projects/pj.css' %}?v=14">
+<script src="{% static 'projects/pj_zoom.js' %}?v=14"></script>
 <script>
 (function () {
   var tl = document.getElementById('pf-tl');
@@ -304,12 +319,54 @@
       });
     }
   }
+  var infoNode = document.getElementById('pf-info'), card = document.getElementById('pf-icard'), INFO = {};
+  try { INFO = infoNode ? JSON.parse(infoNode.textContent) : {}; } catch (x) { INFO = {}; }
+  function showCard(id) {                    // картка вузла: що замовляли, які запити, посилання
+    var it = INFO[id];
+    if (!card || !it) { if (card) card.hidden = true; return; }
+    card.textContent = '';
+    var head = document.createElement('div');
+    head.className = 'pf-ic-h';
+    var t = document.createElement(it.url ? 'a' : 'b');
+    t.textContent = it.title || '';
+    t.setAttribute('translate', 'no');
+    if (it.url) { t.href = it.url; t.target = '_blank'; }
+    head.appendChild(t);
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'pf-ic-x';
+    x.textContent = '✕';
+    x.setAttribute('aria-label', 'Закрити');
+    x.addEventListener('click', function () { card.hidden = true; clear(); });
+    head.appendChild(x);
+    card.appendChild(head);
+    var ul = document.createElement('ul');
+    (it.lines || []).forEach(function (l) {
+      var li = document.createElement('li');
+      if (l.p) { var code = document.createElement('span'); code.className = 'pf-ic-p'; code.textContent = l.p; li.appendChild(code); }
+      var s = document.createElement(l.u ? 'a' : 'span');
+      s.textContent = l.t;
+      s.setAttribute('translate', 'no');
+      if (l.u) { s.href = l.u; s.target = '_blank'; }
+      li.appendChild(s);
+      ul.appendChild(li);
+    });
+    if (!(it.lines || []).length) {
+      var li0 = document.createElement('li');
+      li0.textContent = 'Більше подробиць немає.';
+      ul.appendChild(li0);
+    }
+    card.appendChild(ul);
+    card.hidden = false;
+  }
   svg.addEventListener('click', function (e) {
+    if (window.PJZoom && PJZoom.justPanned(svg)) return;
     var n = e.target.closest('[data-n]');
-    if (!n) { clear(); return; }
+    if (!n) { clear(); if (card) card.hidden = true; return; }
     var id = n.getAttribute('data-n');
-    if (picked === id) clear(); else pick(id);
+    if (picked === id) { clear(); if (card) card.hidden = true; } else { pick(id); showCard(id); }
   });
+  if (window.PJZoom) PJZoom.attach(svg);
   svg.addEventListener('dblclick', function (e) {
     var n = e.target.closest('[data-href]');
     if (n) location.href = n.getAttribute('data-href');

@@ -211,6 +211,21 @@
         {% endif %}
         <button type="button" class="pjc-b" data-pjx="chain" title="PDF чи картинка — завантажити або надіслати листом">📤 Експорт / лист</button>
       </div>
+      <span class="pjc-ranges" role="group" aria-label="Вигляд сторін">
+        <button type="button" class="pjc-b" data-pjy-view-btn="tree" aria-pressed="true" title="Хто кому віддає свою частину — дерево з гілками">🌳 Хто кому постачає</button>
+        <button type="button" class="pjc-b" data-pjy-view-btn="flow" aria-pressed="false" title="Сторони в часі: коли кому писали, що запитували, кого обрали, що замовили й отримали">🕒 Як рухалось</button>
+      </span>
+      <div data-pjy-view="flow" hidden>
+        {% if parties.flow %}
+          <div class="pjc-svg pjy-wrap" data-pjy-svg>{{ parties.flow|safe }}</div>
+          <p class="pjc-sub">Рядки — сторони, зверху — фази плану. 📝 Angebot · 🛒 замовлення / закупівля · 📨 запит постачальнику ·
+            💶 пропозиція · ✅ обрано · ✖ ні · ⏳ чекаємо · 📥 отримано · 🔧 JLC · 🚚 відправлення · 📌 момент · • листування.
+            Наведіть на позначку — подробиці, клік — відкрити. Ctrl + коліщатко — масштаб, тягніть фон — прокрутка.</p>
+        {% else %}
+          <p class="pjc-sub">Ще немає подій зі сторонами: Angebote, замовлення, закупівлі, запити постачальникам, листування.</p>
+        {% endif %}
+      </div>
+      <div data-pjy-view="tree">
       {% if parties.svg %}
         <div class="pjc-svg pjy-wrap" data-pjy-svg>{{ parties.svg|safe }}</div>
         <p class="pjc-sub">Рамка — стан: <span class="pjy-k pjy-k-bad">прострочено</span> <span class="pjy-k pjy-k-warn">чекаємо</span>
@@ -221,6 +236,7 @@
       {% else %}
         <p class="pjc-sub">Сторін ще немає.{% if can_change %} «🔎 Підставити з даних проєкту» додасть замовника, нас, постачальників закупівель і JLCPCB; далі — «＋ Сторона» для виробника, підрядника, логістики.{% endif %}</p>
       {% endif %}
+      </div>
       {% if can_change %}{{ parties.data|json_script:"pjy-data" }}{% endif %}
       {% if sourcing.on %}
         <h4 class="pjq-head">📨 Запити постачальникам{% if sourcing.rows %} · {{ sourcing.rows|length }}{% endif %}

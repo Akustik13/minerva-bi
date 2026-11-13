@@ -476,3 +476,42 @@
 .pjq-off { opacity: .6; }
 tr.pjq-r-off td { opacity: .6; }
 tr.pjq-r-ok td { background: rgba(26, 127, 55, .08); }
+
+/* 🔍 Масштаб діаграм (pj_zoom.js) */
+.pjz-tools { position: absolute; top: 8px; right: 8px; z-index: 2; display: flex; gap: 4px; }
+.pjz-tools button { min-width: 28px; height: 26px; border-radius: 6px; border: 1px solid var(--border-strong, #d0d7de);
+  background: var(--bg-card, #fff); color: var(--body-fg); cursor: pointer; font-size: 15px; line-height: 1; }
+.pjz-tools button:disabled { opacity: .4; cursor: default; }
+svg.pjz-grab { cursor: grabbing; }
+
+/* 🕒 Як рухався проєкт (projects/party_flow.py → svg.pjf) */
+.pjy-wrap svg.pjy, .pjy-wrap svg.pjf { width: 100%; height: auto; max-height: 78vh; display: block; touch-action: pan-y; }
+.pjy-wrap { overflow: hidden; position: relative; }
+.pjf .pjf-rbg { fill: transparent; }
+.pjf .pjf-r1 { fill: var(--hairline-color, rgba(127,127,127,.06)); }
+.pjf .pjf-band { fill: transparent; }
+.pjf .pjf-b1 { fill: var(--accent2-hover, rgba(127,127,127,.05)); }
+.pjf .pjf-ph { fill: var(--accent2-subtle, rgba(5,80,174,.12)); stroke: var(--border-strong); stroke-width: .6; }
+.pjf .pjf-p1 { fill: var(--accent2-hover, rgba(5,80,174,.06)); }
+.pjf .pjf-pht { font-size: 11px; font-weight: 600; fill: var(--body-fg); }
+.pjf .pjf-mon { stroke: var(--border-strong); stroke-width: .6; stroke-dasharray: 2 3; }
+.pjf .pjf-mt { font-size: 10px; fill: var(--text-muted); }
+.pjf .pjf-name { font-size: 13px; font-weight: 600; fill: var(--body-fg); }
+.pjf .pjf-sub { font-size: 10.5px; fill: var(--text-muted); }
+.pjf .pjf-line { stroke: var(--border-strong); stroke-width: 2; }
+.pjf .pjf-chosen .pjf-line { stroke: var(--ok); }
+.pjf .pjf-off { opacity: .5; }
+.pjf .pjf-off .pjf-line { stroke-dasharray: 3 3; }
+.pjf .pjf-dot { fill: var(--bg-card); stroke: var(--border-strong); stroke-width: 1.4; }
+.pjf .pjf-ok { stroke: var(--ok); stroke-width: 2; }
+.pjf .pjf-warn { stroke: var(--warn); stroke-width: 2; }
+.pjf .pjf-bad { stroke: var(--err); stroke-width: 2; }
+.pjf .pjf-open { stroke-dasharray: 3 2; }
+.pjf .pjf-ic { font-size: 13px; }
+.pjf .pjf-n { font-size: 9.5px; font-weight: 700; fill: var(--accent); }
+.pjf .pjf-mail { fill: var(--text-muted); opacity: .7; }
+.pjf .pjf-ev { cursor: pointer; }
+.pjf .pjf-ev:hover .pjf-dot { stroke: var(--accent); stroke-width: 2.4; }
+.pjf .pjf-today { stroke: var(--err); stroke-width: 1.4; }
+.pjf .pjf-due { stroke: var(--err); stroke-width: 1.4; stroke-dasharray: 5 3; }
+.pjf .pjf-sep { stroke: var(--border-strong); stroke-width: 1; }

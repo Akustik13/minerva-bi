@@ -369,21 +369,37 @@ def relations(rows, impacts) -> dict:
         return suppliers.setdefault(key, {"id": key, "name": name, "url": url, "pos": [], "notes": []})
 
     seen = set()
+    info = {}
+
+    def note(nid, project_id, text, url=""):
+        """Рядок картки вузла (клік на карті): «P-2026-001 · 🛒 PO-12 · 1500 шт AN… · замовлено»."""
+        p = projects.get(project_id)
+        info.setdefault(nid, {"lines": []})["lines"].append(
+            {"p": p.project.code if p else "", "t": text, "u": url})
+
     for link in (ProjectLink.objects.filter(project_id__in=projects, status=ProjectLink.CONFIRMED)
                  .filter(Q(purchase_order__isnull=False) | Q(jlc_order__isnull=False))
-                 .select_related("purchase_order__supplier", "jlc_order")):
+                 .select_related("purchase_order__supplier", "jlc_order")
+                 .prefetch_related("purchase_order__lines__product")):
         if link.purchase_order_id and link.purchase_order.supplier_id:
             sup = link.purchase_order.supplier
             node = supplier_node(f"s{sup.pk}", sup.name, f"/admin/inventory/supplier/{sup.pk}/change/")
             po = link.purchase_order
             planned = po.status not in ("ordered", "partial", "received")
-            label = str(po)
+            label = po_label(po)
+            url = f"/admin/inventory/purchaseorder/{po.pk}/change/"
+            short = label.split(" · ", 1)[-1] if " · " in label else label
+            if f"🛒 {short}"[:60] not in node["notes"]:
+                node["notes"].append(f"🛒 {short}"[:60])
         elif link.jlc_order_id:
             node = supplier_node("jlc", JLC_NAME, "/admin/jlcpcb/jlcorder/")
             planned = False
-            label = f"JLC {link.jlc_order.jlc_order_number or link.jlc_order.jlc_order_id}"
+            j = link.jlc_order
+            label = f"🔧 JLC {j.jlc_order_number or j.jlc_order_id} · {j.get_local_status_display()}"
+            url = f"/admin/jlcpcb/jlcorder/{j.pk}/change/"
         else:
             continue
+        note(node["id"], link.project_id, label, url)
         key = (link.project_id, node["id"])
         if key in seen:
             next(e for e in edges if e.get("key") == key)["labels"].append(label)
@@ -407,11 +423,12 @@ def relations(rows, impacts) -> dict:
             o = sourcing.outcome(r)
             node = supplier_node(f"s{r.supplier_id}", r.supplier.name, f"/admin/inventory/supplier/{r.supplier_id}/change/")
             kind = "supply" if o == "chosen" else ("no" if o in sourcing.OFF else "plan")
-            note = ("✅ " + (r.award or req.title))[:40] if o == "chosen" else sourcing.OUTCOME_TEXT[o]
-            if note not in node["notes"]:
-                node["notes"].append(note)
+            sub_ = sourcing.short(r, req)
+            if sub_ not in node["notes"]:
+                node["notes"].append(sub_)
             key = (req.project_id, node["id"])
             label = sourcing.line(r, req)
+            note(node["id"], req.project_id, label, f"/admin/suppliers/supplierrequest/{req.pk}/work/")
             found = next((e for e in edges if e.get("key") == key), None)
             if found is not None:
                 found["labels"].append(label)
@@ -441,5 +458,48 @@ def relations(rows, impacts) -> dict:
             edges.append({"a": f"p{i.data['pred'].project_id}", "b": f"p{i.data['succ'].project_id}",
                           "kind": "dep", "late": i.data["late"] > 0,
                           "label": f"{i.data['pred'].title} → {i.data['succ'].title}"})
+    for r in rows:                                     # картка проєкту
+        p = r.project
+        lines = [{"t": f"{r.dot} {r.reason or 'за планом'}", "u": ""},
+                 {"t": f"Фаза: {r.phase_text or 'без плану'}", "u": ""}]
+        if p.customer_id:
+            lines.append({"t": f"Клієнт: {customer_name(p.customer)}", "u": f"/admin/crm/customer/{p.customer_id}/change/"})
+        if r.next:
+            lines.append({"t": f"Далі: {r.next.get('title', '')}" + (f" · {r.next['end']:%d.%m}" if r.next.get("end") else ""),
+                          "u": ""})
+        if r.waiting:
+            lines.append({"t": f"Чекаємо: {r.waiting}", "u": ""})
+        lines.append({"t": "🔗 Сторони й запити постачальникам", "u": f"/admin/projects/project/{p.pk}/change/#pj-parties"})
+        info[f"p{p.pk}"] = {"lines": lines}
+    for c in customers.values():                       # картка клієнта — його проєкти
+        info[c["id"]] = {"lines": [{"p": "", "t": f"{r.project.code} · {r.project.name}",
+                                    "u": f"/admin/projects/project/{r.project.pk}/change/"}
+                                   for r in rows if r.project.customer_id and f"c{r.project.customer_id}" == c["id"]]}
+    names = {**{c["id"]: c["name"] for c in customers.values()}, **{s["id"]: s["name"] for s in suppliers.values()},
+             **{f"p{r.project.pk}": f"{r.project.code} · {r.project.name}" for r in rows},
+             **{g["id"]: g["name"] for g in products.values()}}
+    urls = {**{c["id"]: c["url"] for c in customers.values()}, **{s["id"]: s["url"] for s in suppliers.values()},
+            **{f"p{r.project.pk}": f"/admin/projects/project/{r.project.pk}/change/" for r in rows},
+            **{g["id"]: g["url"] for g in products.values()}}
+    for nid in names:
+        it = info.setdefault(nid, {"lines": []})
+        it["title"], it["url"] = names[nid], urls.get(nid, "")
+    for g in products.values():
+        info[g["id"]]["lines"] += [{"p": "", "t": n, "u": ""} for n in g["notes"]]
     return {"customers": list(customers.values()), "projects": rows, "suppliers": list(suppliers.values()),
-            "products": list(products.values()), "edges": edges}
+            "products": list(products.values()), "edges": edges, "info": info}
+
+
+def po_label(po) -> str:
+    """«🛒 PO-12 · 1500 шт AN220213 (+2) · замовлено» — що саме замовили."""
+    lines = list(po.lines.all())
+    what = ""
+    if lines:
+        first = lines[0]
+        name = first.product.sku if first.product_id else (first.description or "")
+        qty = first.qty_ordered
+        qty_t = f"{int(qty)}" if qty == int(qty) else f"{qty}"
+        what = f"{qty_t} шт {name}".strip() + (f" (+{len(lines) - 1})" if len(lines) > 1 else "")
+    status = {"draft": "чернетка", "ordered": "замовлено", "partial": "частково отримано", "received": "отримано",
+              "cancelled": "скасовано"}.get(po.status, po.status)
+    return " · ".join(x for x in (f"🛒 {po}", what, status) if x)

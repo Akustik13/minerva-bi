@@ -16,7 +16,20 @@
     var n = root.querySelector('.pjc-merr');
     if (n) n.textContent = text;
   }
-  function put(html) { root.innerHTML = html; applyTab(curTab); renderFound(); applyGantt(); applyTimeline(); }
+  function put(html) { root.innerHTML = html; applyTab(curTab); renderFound(); applyGantt(); applyTimeline(); applyPartyView(); }
+  // 🔗 Сторони: «🌳 Хто кому постачає» / «🕒 Як рухалось» (вибір — localStorage), масштаб (pj_zoom.js)
+  var PV = 'pj-parties-view';
+  function applyPartyView(set) {
+    var v = set || pref(PV, 'tree');
+    if (set) setPref(PV, set);
+    root.querySelectorAll('[data-pjy-view]').forEach(function (el) { el.hidden = el.dataset.pjyView !== v; });
+    root.querySelectorAll('[data-pjy-view-btn]').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.pjyViewBtn === v ? 'true' : 'false');
+    });
+    if (window.PJZoom) {
+      root.querySelectorAll('[data-pjy-view]:not([hidden]) [data-pjy-svg] svg').forEach(function (s) { PJZoom.attach(s); });
+    }
+  }
   // ── 🗓 Шкала в браузері (pj_timeline.js): масштаб, прокрутка, доріжки; вікно — для кожного проєкту окремо ──
   var tl = null;
   function applyTimeline() {
@@ -57,6 +70,7 @@
     if (curTab === 'timeline' && tl) tl.render();
   }
   applyTab();
+  setTimeout(function () { applyPartyView(); }, 0);
   window.addEventListener('hashchange', function () { if (HASH[location.hash]) applyTab(HASH[location.hash]); });
   // ── 📋 Діаграми Ганта: «📊 Minerva» (SVG з сервера) і «📋 Класична» (малює браузер); «Коротко» — фази й віхи,
   // «Детально» — усі кроки (фазу можна згорнути); класична: Ctrl + коліщатко — масштаб, тягнути фон — прокрутка,
@@ -1428,7 +1442,9 @@
       : '⬇ Завантажиться один ZIP з файлами: {f}'.replace('{f}', names.join(', '));
   }
   function exportSvgs(kind) {
-    if (kind === 'chain') return Array.prototype.slice.call(root.querySelectorAll('[data-pjy-svg] svg'));
+    if (kind === 'chain') {
+      return Array.prototype.slice.call(root.querySelectorAll('[data-pjy-view]:not([hidden]) [data-pjy-svg] svg'));
+    }
     if (kind === 'timeline') {
       var t = root.querySelector('[data-pjt-live] svg');
       return t ? [t] : [];
@@ -2204,16 +2220,22 @@
       '[data-pjc-mdel],g[data-mails],g[data-cal],g[data-files],[data-pjc-event-add],[data-pjc-tab],[data-pjc-step-new],[data-pjc-phase-new],[data-pjc-post],' +
       '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase],[data-pjc-risk],' +
       '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai],[data-pjc-act],[data-pjc-unmark],' +
-      'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx],[data-pjq]');
+      'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx],[data-pjq],[data-pjy-view-btn]');
     if (!t || !root.contains(t)) return;
     var link = e.target.closest('a[href]');
     if (link && link !== t && t.contains(link)) return;   // посилання в рядку («🎙 з наради») відкривається саме
     e.preventDefault();
-    if (t.matches('g[data-party]')) { openParty(t.getAttribute('data-party')); return; }
+    if (t.matches('g[data-party]')) {
+      var zsvg = t.closest('svg');
+      if (window.PJZoom && PJZoom.justPanned(zsvg)) return;
+      openParty(t.getAttribute('data-party'));
+      return;
+    }
     if (t.hasAttribute('data-pjy-new')) { openParty(''); return; }
     if (t.hasAttribute('data-pjy-suggest')) { t.disabled = true; send(box().dataset.partySuggest, {}).then(done); return; }
     if (t.hasAttribute('data-pjx')) { openExport(t.getAttribute('data-pjx')); return; }
     if (t.hasAttribute('data-pjq')) { openQuote(t); return; }
+    if (t.hasAttribute('data-pjy-view-btn')) { applyPartyView(t.dataset.pjyViewBtn); return; }
     if (t.hasAttribute('data-pjc-act')) { actMenu(t, e); return; }
     if (t.hasAttribute('data-pjc-unmark')) { handled([+t.getAttribute('data-pjc-unmark')], '', true); return; }
     if (t.matches('g[data-mails]')) { mailMenu(t, e); return; }

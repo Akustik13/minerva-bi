@@ -65,6 +65,28 @@ def requests_for(project_ids):
                 .prefetch_related("recipients__supplier"))
 
 
+def qty_text(req) -> str:
+    """«5» → «5 шт», «10; 100» → «10 / 100 шт»; інше — як написано."""
+    parts = [p.strip() for p in str(req.quantities or "").split(";") if p.strip()]
+    if parts and all(p.replace(" ", "").isdigit() for p in parts):
+        return " / ".join(parts) + " шт"
+    return str(req.quantities or "").strip()
+
+
+def what(req) -> str:
+    q = qty_text(req)
+    return req.title + (f" · {q}" if q else "")
+
+
+def short(r, req) -> str:
+    """Підпис під постачальником на карті: «✅ партія 1 · 500 шт», «📤 Прототип LTE · 5 шт · чекаємо»."""
+    o = outcome(r)
+    if o == "chosen":
+        return ("✅ " + (r.award or req.title))[:60]
+    icon, text = OUTCOME_TEXT[o].split(" ", 1)
+    return f"{icon} {what(req)} · {text}"
+
+
 def line(r, req) -> str:
     """Рядок для вузла діаграми й підказки: «✅ PCBA · партія 1», «💶 RFQ-…: 12,40 USD / шт», «✖ не взяли: ціна»."""
     o = outcome(r)
@@ -74,8 +96,8 @@ def line(r, req) -> str:
         return f"✖ {req.title}: не взяли" + (f" — {r.reject_reason}" if r.reject_reason not in ("", "—") else "")
     if o in ("quoted", "replied"):
         price = _price(r)
-        return f"💶 {req.code}: {price}" if price else f"📥 {req.code}: відповів"
-    return f"{OUTCOME_TEXT[o].split(' ', 1)[0]} {req.code}: {OUTCOME_TEXT[o].split(' ', 1)[1]}"
+        return f"💶 {req.code} «{what(req)}»: {price}" if price else f"📥 {req.code} «{what(req)}»: відповів"
+    return f"{OUTCOME_TEXT[o].split(' ', 1)[0]} {req.code} «{what(req)}»: {OUTCOME_TEXT[o].split(' ', 1)[1]}"
 
 
 def context(project, user) -> dict:

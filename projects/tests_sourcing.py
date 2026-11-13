@@ -112,3 +112,46 @@ class ChooseStillSingleTests(SourcingBase):
         rfq.choose(R.objects.get(pk=self.sup["Toptek PCB"].pk))
         self.assertEqual(list(R.objects.filter(request=self.req, chosen=True).values_list("supplier__name", flat=True)),
                          ["Toptek PCB"])
+
+
+class FlowAndMapTests(SourcingBase):
+    """🕒 «Як рухалось» по сторонах і картка вузла на карті зв'язків."""
+    def setUp(self):
+        super().setUp()
+        from django.utils import timezone
+        from inventory.models import PurchaseOrder, PurchaseOrderLine
+        from projects.models import ProjectLink
+        hong = self.sup["HongRong Electronics"]
+        R.objects.filter(pk=hong.pk).update(sent_at=timezone.now(), replied_at=timezone.now())
+        self.po = PurchaseOrder.objects.create(supplier=hong.supplier, status=PurchaseOrder.Status.ORDERED,
+                                               order_date=self.today)
+        PurchaseOrderLine.objects.create(purchase_order=self.po, product=self.antenna, qty_ordered=1500)
+        ProjectLink.objects.update_or_create(project=self.project, purchase_order=self.po,   # сигнал уже запропонував
+                                             defaults={"status": ProjectLink.CONFIRMED, "source": ProjectLink.MANUAL})
+
+    def test_flow_rows_and_events(self):
+        from projects import overview, party_flow
+        self.decide("HongRong Electronics", "award", "серія 1500 шт")
+        facts = overview.collect(self.project)
+        rows, _phases = party_flow.collect(self.project, facts, self.user)
+        by = {r["name"]: r for r in rows}
+        hong = by["HongRong Electronics"]
+        icons = {e["icon"] for e in hong["events"]}
+        self.assertTrue({"📨", "🛒", "✅"} <= icons)                               # запит, закупівля, обрано
+        self.assertIn("1500 шт AN220213-01C", " ".join(e["text"] for e in hong["events"]))
+        self.assertEqual(hong["sub"], "✅ серія 1500 шт")
+        svg = party_flow.render(self.project, facts, self.user)
+        self.assertIn('class="pjf"', svg)
+        self.assertIn("HongRong Electronics", svg)
+
+    def test_map_card_says_what_was_ordered_and_requested(self):
+        rows = portfolio.load([self.project], self.user)
+        rel = portfolio.relations(rows, [])
+        sid = f"s{self.sup['HongRong Electronics'].supplier_id}"
+        lines = [l["t"] for l in rel["info"][sid]["lines"]]
+        self.assertTrue(any(t.startswith(f"🛒 {self.po}") and "1500 шт AN220213-01C" in t for t in lines))
+        self.assertTrue(any("«PCBA LTE-плата · 500 / 1500 шт»" in t for t in lines))       # що запитували
+        quiet = f"s{self.sup['Quiet Boards'].supplier_id}"
+        node = next(s for s in rel["suppliers"] if s["id"] == quiet)
+        self.assertIn("📤 PCBA LTE-плата · 500 / 1500 шт · чекаємо", node["notes"])
+        self.assertEqual(rel["info"][f"p{self.project.pk}"]["title"], f"{self.project.code} · {self.project.name}")

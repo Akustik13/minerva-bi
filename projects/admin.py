@@ -390,7 +390,9 @@ class ProjectAdmin(admin.ModelAdmin):
         elif params.view == "board":
             ctx["columns"] = portfolio.board(rows)
         else:
-            ctx["svg"] = draw.relation_map(portfolio.relations(rows, impacts))
+            rel = portfolio.relations(rows, impacts)
+            ctx["svg"] = draw.relation_map(rel)
+            ctx["map_info"] = rel["info"]
         return render(request, "admin/projects/portfolio.html", ctx)
 
     def triage_view(self, request):

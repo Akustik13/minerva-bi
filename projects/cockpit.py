@@ -117,15 +117,22 @@ def _sourcing_context(project, user) -> dict:
         return {"on": False}
 
 
-def _parties_context(project, can_change, today) -> dict:
-    """Вкладка «🔗 Сторони»: дерево хто кому постачає; збій — порожньо (пульт працює)."""
-    from . import parties
+def _parties_context(project, can_change, today, facts=None, user=None) -> dict:
+    """Вкладка «🔗 Сторони»: дерево хто кому постачає і «🕒 Як рухалось» (party_flow); збій — порожньо."""
+    import logging
+
+    from . import parties, party_flow
     try:
-        return parties.context(project, can_change, today)
+        ctx = parties.context(project, can_change, today)
     except Exception:  # noqa: BLE001
-        import logging
         logging.getLogger(__name__).exception("project parties %s", project.pk)
-        return {"count": 0, "svg": "", "data": {"roles": [], "parties": []}, "error": True}
+        ctx = {"count": 0, "svg": "", "data": {"roles": [], "parties": []}, "error": True}
+    try:
+        ctx["flow"] = party_flow.render(project, facts or {}, user, today) if facts is not None else ""
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("project party flow %s", project.pk)
+        ctx["flow"] = ""
+    return ctx
 
 
 def _handled(facts, uid) -> list:
@@ -326,7 +333,7 @@ def context(project, user, range_key="all", notice="") -> dict:
         "plan": plan,
         "ai": ai,
         "riskreg": _risks_context(project, can_change, user),
-        "parties": _parties_context(project, can_change, today),
+        "parties": _parties_context(project, can_change, today, facts, user),
         "sourcing": _sourcing_context(project, user),
         "meetings": _meetings_context(project, user, meetings),
         "status": _status_context(project, user, facts, st, today, can_change),

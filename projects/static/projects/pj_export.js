@@ -42,6 +42,8 @@
     for (var i = 0; i < src.children.length && i < dst.children.length; i++) inline(src.children[i], dst.children[i]);
   }
   function size(svg) {
+    var vb0 = (svg.getAttribute('data-vb0') || '').split(' ').map(Number);     // масштаб (pj_zoom.js) — уся діаграма
+    if (vb0.length === 4 && vb0[2] > 0) return {w: vb0[2], h: vb0[3], vb: vb0.join(' ')};
     var r = svg.getBoundingClientRect();
     return {w: parseFloat(svg.getAttribute('width')) || r.width || 600,
             h: parseFloat(svg.getAttribute('height')) || r.height || 300};
@@ -138,7 +140,8 @@
         c.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
         c.setAttribute('width', sz.w);
         c.setAttribute('height', sz.h);
-        if (!c.getAttribute('viewBox')) c.setAttribute('viewBox', '0 0 ' + sz.w + ' ' + sz.h);
+        if (sz.vb) c.setAttribute('viewBox', sz.vb);
+        else if (!c.getAttribute('viewBox')) c.setAttribute('viewBox', '0 0 ' + sz.w + ' ' + sz.h);
         parts.push({xml: new XMLSerializer().serializeToString(c), w: sz.w, h: sz.h});
       });
     } finally {
