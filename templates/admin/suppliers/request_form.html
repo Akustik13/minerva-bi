@@ -11,12 +11,25 @@
 {% block content %}
 {% include "admin/suppliers/_styles.html" %}
 <style>
-  .rq-sup { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 4px 14px; max-height: 360px; overflow: auto; padding: 4px; border: 1px solid var(--border-strong, #ccc); border-radius: 6px; }
-  .rq-sup label { display: flex; gap: 6px; align-items: flex-start; padding: 3px 4px; border-radius: 4px; }
-  .rq-sup label:hover { background: var(--darkened-bg, rgba(127,127,127,.08)); }
+  .rq-sup { max-height: 440px; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--border-strong, #ccc); border-radius: 6px; }
+  .rq-sup > label.rq-row { display: grid; grid-template-columns: 22px minmax(0, 1.2fr) minmax(0, 1fr); gap: 4px 12px; align-items: center;
+    width: auto; float: none; margin: 0; padding: 5px 10px; border-bottom: 1px solid var(--hairline-color, rgba(127,127,127,.18)); font-weight: normal; cursor: pointer; }
+  .rq-sup > label.rq-row:hover { background: var(--darkened-bg, rgba(127,127,127,.08)); }
+  .rq-sup > label.rq-row.rq-on { background: var(--selected-bg, rgba(91,141,239,.10)); }
+  .rq-nm { min-width: 0; }
+  .rq-nm b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rq-meta { display: block; font-size: 11px; color: var(--text-muted, #888); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rq-to select { width: 100%; font-size: 12px; }
+  .rq-to .spf-muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+  @media (max-width: 700px) { .rq-sup > label.rq-row { grid-template-columns: 22px minmax(0, 1fr); } .rq-to { grid-column: 2; } }
+  .rq-ph { cursor: pointer; font-family: monospace; }
+  .rq-pv { border: 1px solid var(--border-strong, #ccc); border-radius: 6px; padding: 8px 12px; margin-top: 6px; background: var(--body-bg, #fff); }
+  .rq-pv pre { white-space: pre-wrap; font-family: inherit; margin: 6px 0 0; }
   .rq-sup .rq-sent { opacity: .7; }
+  .rq-filters { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin: 4px 0 6px; }
+  .rq-filters select { max-width: 220px; }
+  .rq-count { color: var(--text-muted, #888); font-size: 12px; }
   .rq-spec { display: none; } .rq-spec.on { display: grid; }
-  .rq-cat { cursor: pointer; }
 </style>
 <div class="spp">
 <form method="post" enctype="multipart/form-data" id="rq-form">{% csrf_token %}
@@ -58,19 +71,30 @@
 
   <div class="spf-card">
     <div class="spf-h">🏭 Кому</div>
-    <div class="spf-row">
-      <input type="search" id="rq-q" placeholder="Пошук постачальника…" style="min-width:240px">
-      {% for c in categories %}<span class="spf-tag rq-cat" data-cat="{{ c.pk }}" title="Позначити всіх цієї категорії">{{ c.icon }} {{ c.name }}</span>{% endfor %}
-      <a href="#" id="rq-none">зняти всі</a>
+    <div class="rq-filters" id="rq-filters">
+      <input type="search" id="rq-q" placeholder="Пошук постачальника…" style="min-width:220px">
+      <select data-f="status" title="Стан"><option value="">Стан: усі</option>{% for v, n in f_statuses %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <select data-f="cat" title="Категорія"><option value="">Категорія: усі</option><option value="none">— без категорії</option>{% for c in categories %}<option value="{{ c.pk }}">{{ c.icon }} {{ c.name }}</option>{% endfor %}</select>
+      <select data-f="src" title="Звідки"><option value="">Звідки: усі</option>{% for v, n in f_sources %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <select data-f="where" title="Де взяли — з візиток постачальника"><option value="">Де взяли: усі</option><option value="-">— не вказано</option>{% for v, n in f_events %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <select data-f="country" title="Країна"><option value="">Країна: усі</option>{% for v, n in f_countries %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <label class="rq-count" style="width:auto;float:none;padding:0"><input type="checkbox" id="rq-only"> лише позначені</label>
     </div>
+    <div class="spf-row">
+      <button type="button" class="button" id="rq-all" title="Поставити галочку всім, кого зараз видно за фільтрами">☑ Позначити всіх показаних</button>
+      <a href="#" id="rq-none">зняти всі</a>
+      <a href="#" id="rq-reset">скинути фільтри</a>
+      <span class="rq-count" id="rq-count"></span>
+    </div>
+    <div class="spf-muted">«⛔ Не працювати» в запит не потрапляють.</div>
     <div class="rq-sup" id="rq-sup">
       {% for s in suppliers %}
-      <label data-cats="{% for c in s.categories.all %}{{ c.pk }} {% endfor %}" data-name="{{ s.name|lower }}">
+      <label class="rq-row" data-pk="{{ s.pk }}" data-cats="{% for c in s.categories.all %}{{ c.pk }} {% endfor %}" data-name="{{ s.name|lower }} {{ s.email|lower }}" data-status="{{ s.status }}" data-src="{{ s.f_src }}" data-where="{{ s.f_where }}" data-country="{{ s.f_country }}">
         <input type="checkbox" name="rcp" value="{{ s.pk }}" {% if s.pk in picked %}checked{% endif %}>
-        <span><b translate="no">{{ s.name }}</b>{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon }}</span>{% endfor %}
-          {% if s.contacts.all %}<select name="contact_{{ s.pk }}" style="max-width:240px;font-size:12px"><option value="">{{ s.email|default:"— без email фірми" }}</option>{% for c in s.contacts.all %}{% if c.email %}<option value="{{ c.pk }}" {% if c.is_primary %}selected{% endif %}>{{ c.name }} · {{ c.email }}</option>{% endif %}{% endfor %}</select>
-          {% else %}<span class="spf-muted" translate="no">{{ s.email|default:"⚠️ немає email" }}</span>{% endif %}
-        </span>
+        <span class="rq-nm"><b translate="no" title="{{ s.name }}">{{ s.name }}{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon }}</span>{% endfor %}</b>
+          <span class="rq-meta">{% if s.status == "potential" %}🌱 {% elif s.status == "paused" %}⏸ {% endif %}{% if s.f_country %}🌍 {{ s.f_country }}{% endif %}{% if s.f_src == "fair" %} · 🎪{% endif %}{% if s.f_where_label %} · <span translate="no">{{ s.f_where_label }}</span>{% endif %}</span></span>
+        <span class="rq-to">{% if s.contacts.all %}<select name="contact_{{ s.pk }}" title="Кому піде лист"><option value="">{{ s.email|default:"— без email фірми" }}</option>{% for c in s.contacts.all %}{% if c.email %}<option value="{{ c.pk }}" {% if c.is_primary %}selected{% endif %}>{{ c.name }} · {{ c.email }}</option>{% endif %}{% endfor %}</select>
+          {% else %}<span class="spf-muted" translate="no">{{ s.email|default:"⚠️ немає email" }}</span>{% endif %}</span>
       </label>
       {% endfor %}
     </div>
@@ -80,10 +104,21 @@
   <div class="spf-card">
     <div class="spf-h">✉️ Лист</div>
     <label class="spf-wide">Тема<input name="subject" value="{{ req.subject }}" maxlength="250" placeholder="[RFQ-…] Request for quotation: …"></label>
-    <label class="spf-wide">Текст (привітання кожному — окремо, з ім'ям контакту){% if not req.body %} — заповниться з параметрів після «💾 Зберегти»{% endif %}<textarea name="body" rows="14">{{ req.body }}</textarea></label>
+    <label class="spf-wide">Текст — можна свій, у будь-якому вигляді{% if not req.body %} (або заповниться з параметрів після «💾 Зберегти»){% endif %}<textarea name="body" rows="14">{{ req.body }}</textarea></label>
+    <div class="spf-muted">Змінні — кожному своє (клік — вставити в текст): {% for k, hint in placeholders %}<code class="rq-ph" data-ph="{{ k }}" title="{{ hint }}">{{ "{" }}{{ k }}{{ "}" }}</code> {% endfor %}<br>
+      Немає в тексті {{ "{" }}greeting{{ "}" }}, {{ "{" }}name{{ "}" }} чи {{ "{" }}first_name{{ "}" }} — привітання з ім'ям («Dear Wendy Wu,») стане першим рядком саме. Номер {{ "{" }}code{{ "}" }} у темі допомагає Minerva знаходити відповіді.</div>
     <div class="spf-row"><button type="submit" name="regen" value="1" class="button" formnovalidate onclick="return !this.form.body.value || confirm('Скласти текст наново з параметрів? Ваші правки тексту зникнуть.')">🔄 Скласти текст з параметрів</button></div>
+    <label class="spf-wide">Копія (CC) кожному листу <span class="spf-muted">— адреси через кому, напр. колега</span><input name="cc" value="{{ req.cc }}" maxlength="500" placeholder="colleague@sevskiy.de"></label>
+    <label class="spf-muted" style="width:auto;float:none;padding:0"><input type="checkbox" name="cc_contacts" value="1" {% if req.cc_contacts %}checked{% endif %}> копія й іншим контактним особам того самого постачальника</label>
+    <div class="spf-row">👁 Як виглядатиме лист:
+      <select id="rq-pv-sup"></select>
+      <button type="button" class="button" id="rq-pv-go">👁 Показати</button>
+      <span class="spf-job" id="rq-pv-msg"></span>
+    </div>
+    <div class="rq-pv" id="rq-pv" hidden></div>
   </div>
 
+  <div class="spf-muted">📤 <b>«Зберегти й надіслати»</b> — після підтвердження Minerva <b>одразу</b> надсилає кожному позначеному окремий лист з вашої скриньки (тема й текст зі змінними, копія, файли запиту); копія — у «Надіслані», відповіді Minerva знаходить сама. «💾 Зберегти» нічого не надсилає. Перед надсиланням перегляньте «👁 Як виглядатиме лист».</div>
   <div class="spf-row">
     <button type="submit" name="go" value="stay" class="button">💾 Зберегти</button>
     <button type="submit" name="go" value="work" class="button">💾 Зберегти й до запиту</button>
@@ -98,19 +133,86 @@
   tpl.addEventListener('change', show);
   document.getElementById('rq-category').addEventListener('change', function(){
     var o = this.options[this.selectedIndex]; if (o && o.dataset.template) { tpl.value = o.dataset.template; show(); }
+    var fc = box && box.querySelector('select[data-f="cat"]');      // категорія запиту → і фільтр «Кому»
+    if (fc && this.value) { fc.value = this.value; apply(); }
   });
-  var q = document.getElementById('rq-q');
-  q.addEventListener('input', function(){
-    var v = q.value.trim().toLowerCase();
-    document.querySelectorAll('#rq-sup > label').forEach(function(l){ l.style.display = !v || l.dataset.name.indexOf(v) >= 0 ? '' : 'none'; });
-  });
-  document.querySelectorAll('.rq-cat').forEach(function(t){ t.addEventListener('click', function(){
-    var id = t.dataset.cat;
-    document.querySelectorAll('#rq-sup > label').forEach(function(l){
-      if ((' ' + l.dataset.cats).indexOf(' ' + id + ' ') >= 0) l.querySelector('input').checked = true; });
-  }); });
+  // 🏭 Кому — фільтри як у списку постачальників (стан, категорія, звідки, де взяли, країна) + пошук
+  var q = document.getElementById('rq-q'), box = document.getElementById('rq-filters'),
+      only = document.getElementById('rq-only'), count = document.getElementById('rq-count');
+  var rows = [].slice.call(document.querySelectorAll('#rq-sup > label'));
+  function val(f){ var s = box.querySelector('select[data-f="' + f + '"]'); return s ? s.value : ''; }
+  function fits(l){
+    var v = q.value.trim().toLowerCase(), cat = val('cat'), where = val('where'), cats = ' ' + l.dataset.cats;
+    if (v && l.dataset.name.indexOf(v) < 0) return false;
+    if (val('status') && l.dataset.status !== val('status')) return false;
+    if (cat === 'none' ? l.dataset.cats.trim() !== '' : cat && cats.indexOf(' ' + cat + ' ') < 0) return false;
+    if (val('src') && l.dataset.src !== val('src')) return false;
+    if (where === '-' ? l.dataset.where !== '' : where && ('|' + l.dataset.where + '|').indexOf('|' + where + '|') < 0) return false;
+    if (val('country') && l.dataset.country !== val('country')) return false;
+    if (only.checked && !l.querySelector('input[name=rcp]').checked) return false;
+    return true;
+  }
+  function apply(){
+    var shown = 0, marked = 0;
+    rows.forEach(function(l){ var ok = fits(l); l.style.display = ok ? '' : 'none'; shown += ok;
+      marked += l.querySelector('input[name=rcp]').checked; });
+    count.textContent = 'показано ' + shown + ' з ' + rows.length + ' · позначено ' + marked;
+  }
+  q.addEventListener('input', apply);
+  box.addEventListener('change', apply);
+  document.getElementById('rq-sup').addEventListener('change', apply);
+  document.getElementById('rq-all').addEventListener('click', function(){
+    rows.forEach(function(l){ if (l.style.display !== 'none') l.querySelector('input[name=rcp]').checked = true; }); apply(); });
   document.getElementById('rq-none').addEventListener('click', function(e){ e.preventDefault();
-    document.querySelectorAll('#rq-sup input[type=checkbox]').forEach(function(c){ c.checked = false; }); });
+    document.querySelectorAll('#rq-sup input[type=checkbox]').forEach(function(c){ if (!c.disabled) c.checked = false; }); apply(); });
+  document.getElementById('rq-reset').addEventListener('click', function(e){ e.preventDefault();
+    q.value = ''; only.checked = false; box.querySelectorAll('select').forEach(function(s){ s.value = ''; }); apply(); });
+  apply();
+  // змінні {…} — вставити в текст на місце курсора
+  var bodyEl = document.querySelector('textarea[name=body]');
+  document.querySelectorAll('.rq-ph').forEach(function(c){ c.addEventListener('click', function(){
+    var t = '{' + c.dataset.ph + '}', a = bodyEl.selectionStart || 0, b = bodyEl.selectionEnd || 0;
+    bodyEl.value = bodyEl.value.slice(0, a) + t + bodyEl.value.slice(b); bodyEl.focus();
+    bodyEl.selectionStart = bodyEl.selectionEnd = a + t.length;
+  }); });
+  // 👁 попередній перегляд — позначені постачальники; сервер складає лист так само, як при надсиланні
+  var pvSel = document.getElementById('rq-pv-sup'), pvBox = document.getElementById('rq-pv'),
+      pvMsg = document.getElementById('rq-pv-msg'), form = document.getElementById('rq-form');
+  function pvList(){
+    var cur = pvSel.value; pvSel.innerHTML = '';
+    rows.forEach(function(l){ if (!l.querySelector('input[name=rcp]').checked) return;
+      var o = document.createElement('option'); o.value = l.dataset.pk; o.textContent = l.querySelector('.rq-nm b').textContent.trim();
+      pvSel.appendChild(o); });
+    if (!pvSel.options.length) { var o = document.createElement('option'); o.value = ''; o.textContent = '— позначте постачальників у «Кому»'; pvSel.appendChild(o); }
+    else if (cur) pvSel.value = cur;
+    rows.forEach(function(l){ l.classList.toggle('rq-on', l.querySelector('input[name=rcp]').checked); });
+  }
+  document.getElementById('rq-sup').addEventListener('change', pvList);
+  pvList();
+  function line(label, value){ var d = document.createElement('div'); var b = document.createElement('b'); b.textContent = label + ': ';
+    d.appendChild(b); d.appendChild(document.createTextNode(value)); return d; }
+  document.getElementById('rq-pv-go').addEventListener('click', function(){
+    var pk = pvSel.value; if (!pk) { pvMsg.textContent = 'Позначте постачальників у «Кому».'; return; }
+    var fd = new FormData(); ['title', 'language', 'subject', 'body', 'cc', 'reply_by'].forEach(function(n){
+      var el = form.querySelector('[name="' + n + '"]'); if (el) fd.append(n, el.value); });
+    if (form.querySelector('[name=cc_contacts]').checked) fd.append('cc_contacts', '1');
+    fd.append('supplier', pk);
+    var cs = form.querySelector('select[name="contact_' + pk + '"]'); if (cs) fd.append('contact', cs.value);
+    {% if req.pk %}fd.append('req', '{{ req.pk }}');{% endif %}
+    var tok = form.querySelector('input[name=csrfmiddlewaretoken]').value;
+    pvMsg.textContent = '⏳';
+    fetch('{% url "admin:suppliers_supplierrequest_preview" %}', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': tok}})
+      .then(function(r){ return r.json(); }).then(function(j){
+        pvMsg.textContent = '';
+        if (j.error) { pvMsg.textContent = '⚠️ ' + j.error; return; }
+        pvBox.innerHTML = ''; pvBox.hidden = false;
+        pvBox.appendChild(line('Кому', j.to)); pvBox.appendChild(line('Копія', (j.cc || []).join(', ') || '—'));
+        pvBox.appendChild(line('Тема', j.subject));
+        if (j.files && j.files.length) pvBox.appendChild(line('Вкладення', j.files.join(', ')));
+        var pre = document.createElement('pre'); pre.setAttribute('translate', 'no');
+        pre.textContent = j.body || '(текст порожній — «🔄 Скласти текст з параметрів» або напишіть свій)'; pvBox.appendChild(pre);
+      }).catch(function(){ pvMsg.textContent = '⚠️ Немає зв’язку з сервером'; });
+  });
 })();
 </script>
 {% endblock %}

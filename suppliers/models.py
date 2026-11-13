@@ -235,6 +235,9 @@ class SupplierRequest(models.Model):
     language = models.CharField("Мова листа", max_length=2, choices=LANGS, default="en")
     subject = models.CharField("Тема листа", max_length=250, blank=True, default="")
     body = models.TextField("Текст листа", blank=True, default="")
+    # копія кожному листу запиту (колеги…) і — галочкою — іншим контактним особам того самого постачальника
+    cc = models.CharField("Копія (CC) кожному листу", max_length=500, blank=True, default="")
+    cc_contacts = models.BooleanField("Копія іншим контактним особам постачальника", default=False)
     reply_by = models.DateField("Чекаємо відповідь до", null=True, blank=True)
     account = models.ForeignKey("email_assistant.EmailAccount", null=True, blank=True, on_delete=models.SET_NULL,
                                 related_name="+", verbose_name="З якої скриньки")

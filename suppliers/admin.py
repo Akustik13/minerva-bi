@@ -113,6 +113,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             path("<int:pk>/edit/", view(self.form_view), name="suppliers_supplierrequest_edit"),
             path("<int:pk>/work/", view(self.work_view), name="suppliers_supplierrequest_work"),
             path("<int:pk>/action/", view(self.action_view), name="suppliers_supplierrequest_action"),
+            path("preview/", view(self.preview_view), name="suppliers_supplierrequest_preview"),
         ] + super().get_urls()
 
     def add_view(self, request, form_url="", extra_context=None):
@@ -125,6 +126,37 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         return super().change_view(request, object_id, form_url, extra_context)
 
     # ── допоміжне ──
+    def preview_view(self, request):
+        """👁 Як виглядатиме лист одному отримувачу — з того, що зараз у формі (ще не збережене теж): тема й текст
+        зі змінними (rfq.render), кому, копія (rfq.cc_for), вкладення запиту. Нічого не зберігає й не надсилає."""
+        from inventory.models import Supplier
+        from suppliers.models import SupplierContact
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        P = request.POST
+        req = self._request(request, int(P["req"]), "change") if str(P.get("req") or "").isdigit() else None
+        if req is None and not self.has_add_permission(request):
+            raise Http404
+        draft = SupplierRequest(code=req.code if req else "", title=P.get("title", "").strip()[:200],
+                                language=P.get("language") if P.get("language") in dict(SupplierRequest.LANGS) else "en",
+                                subject=P.get("subject", "").strip()[:250], body=P.get("body", ""),
+                                cc=P.get("cc", "")[:500], cc_contacts=bool(P.get("cc_contacts")))
+        try:
+            draft.reply_by = datetime.date.fromisoformat(P.get("reply_by", "")) if P.get("reply_by") else None
+        except ValueError:
+            draft.reply_by = None
+        supplier = Supplier.objects.filter(pk=P.get("supplier") or 0).first()
+        if supplier is None:
+            return JsonResponse({"error": "Позначте постачальника в «🏭 Кому»."}, status=400)
+        contact = SupplierContact.objects.filter(supplier=supplier, pk=P.get("contact") or 0).first()
+        email, contact = rfq.pick_email(supplier, contact)
+        r = SupplierRequestRecipient(request=draft, supplier=supplier, contact=contact, email=email)
+        subject, body = rfq.render(draft, r)
+        if not draft.body.strip():
+            body = ""
+        return JsonResponse({"to": email or "⚠️ немає email", "cc": rfq.cc_for(draft, r), "subject": subject,
+                             "body": body, "files": [f.name for f in req.files.all()] if req else []})
+
     def _ctx(self, request, title, **extra):
         from suppliers.admin_supplier import _JOB_JS, _STYLE
         from suppliers.services.ai import MODELS
@@ -146,6 +178,41 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         from inventory.models import Supplier
         return (Supplier.objects.exclude(status=Supplier.STATUS_BLOCKED).prefetch_related("categories", "contacts")
                 .order_by("name"))
+
+    @classmethod
+    def _recipients(cls) -> dict:
+        """«🏭 Кому»: постачальники (без ⛔ «Не працювати») з ознаками для фільтрів, як у списку постачальників:
+        стан, категорії, звідки (🎪 з виставки — візитка з позначкою, інакше source), де взяли (події всіх візиток),
+        країна; і варіанти фільтрів — лише ті, що трапляються."""
+        from inventory.models import Supplier
+        from shop.countries import name as country_name
+        from suppliers.admin_supplier import FAIR_LABEL, SOURCE_LABELS
+        from suppliers.models import SupplierMedia
+        from suppliers.services.cards import event_key
+        sups = list(cls._suppliers())
+        events, names = {}, {}
+        for sid, ev in (SupplierMedia.objects.exclude(supplier=None).exclude(event="").order_by("created_at")
+                        .values_list("supplier_id", "event")):
+            key = event_key(ev)
+            events.setdefault(sid, set()).add(key)
+            names.setdefault(key, " ".join(ev.split()))
+        fair = set(SupplierMedia.objects.exclude(supplier=None).filter(marks__icontains='"fair"')
+                   .values_list("supplier_id", flat=True))
+        for s in sups:
+            s.f_src = "fair" if s.pk in fair else (s.source or "manual")
+            s.f_where = "|".join(sorted(events.get(s.pk, ())))
+            s.f_where_label = ", ".join(names[k] for k in sorted(events.get(s.pk, ())))[:80]
+            s.f_country = (s.addr_country or "").upper()
+        used_src = {s.f_src for s in sups}
+        return {
+            "suppliers": sups,
+            "f_statuses": [(k, v) for k, v in Supplier.STATUS_CHOICES if k != Supplier.STATUS_BLOCKED],
+            "f_sources": [(k, v) for k, v in [("fair", FAIR_LABEL)] + list(SOURCE_LABELS.items()) if k in used_src],
+            "f_events": sorted(((k, names[k]) for k in names if any(k in events.get(s.pk, ()) for s in sups)),
+                               key=lambda x: x[1].lower()),
+            "f_countries": sorted({(s.f_country, country_name(s.f_country)) for s in sups if s.f_country},
+                                  key=lambda x: x[1]),
+        }
 
     # ── ＋ Новий / ✏️ запит ──
     def form_view(self, request, pk=None):
@@ -190,7 +257,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         return TemplateResponse(request, "admin/suppliers/request_form.html", self._ctx(
             request, f"✏️ {req.code}" if req.pk else "📨 Новий запит постачальникам", req=req, templates=templates,
             categories=SupplierCategory.objects.filter(is_active=True), projects=projects, groups=groups,
-            suppliers=self._suppliers(), picked=picked, sent=sent, accounts=accounts,
+            picked=picked, sent=sent, accounts=accounts, placeholders=rfq.PLACEHOLDERS, **self._recipients(),
             langs=SupplierRequest.LANGS, files=list(req.files.all()) if req.pk else [],
             notes=(req.specs or {}).get("_notes", "")))
 
@@ -217,6 +284,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         if P.get("notes", "").strip():
             specs["_notes"] = P["notes"].strip()[:4000]
         req.specs = specs
+        req.cc = ", ".join(rfq.addresses(P.get("cc", "")))[:500]
+        req.cc_contacts = bool(P.get("cc_contacts"))
         from email_assistant.models import EmailAccount
         acc = EmailAccount.objects.filter(pk=P.get("account") or 0, user=request.user).first()
         if acc is not None:

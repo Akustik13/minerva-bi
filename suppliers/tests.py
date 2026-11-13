@@ -1190,3 +1190,88 @@ class CardsToSuppliersTests(Base):
         theirs.refresh_from_db()
         self.assertIsNone(theirs.supplier)
         self.assertFalse(Supplier.objects.filter(name="Bornico Sp. z o.o.").exists())
+
+
+class RequestRecipientFiltersTests(Base):
+    """📨 Запит → «🏭 Кому»: фільтри стан / категорія / звідки / де взяли / країна, як у списку постачальників."""
+
+    def test_filter_data_and_options(self):
+        fair = Supplier.objects.create(name="Victory PCB", source="card", status=Supplier.STATUS_POTENTIAL,
+                                       addr_country="CN")
+        m = SupplierMedia(supplier=fair, kind=SupplierMedia.CARD, event="Electronica 2026", marks=["fair"])
+        m.image.save("c.png", SimpleUploadedFile("c.png", png()), save=False)
+        m.save()
+        Supplier.objects.create(name="Never Again Ltd", status=Supplier.STATUS_BLOCKED)
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_new"))
+        self.assertContains(page, 'data-status="potential" data-src="fair" data-where="electronica 2026" '
+                                  'data-country="CN"')
+        self.assertContains(page, '<option value="fair">🎪 З виставки</option>')
+        self.assertContains(page, '<option value="electronica 2026">Electronica 2026</option>')
+        self.assertContains(page, '<option value="CN">')
+        self.assertNotContains(page, "Never Again Ltd")                            # ⛔ не працювати — не пропонуємо
+        self.assertNotContains(page, '<option value="blocked">')
+        self.assertContains(page, "Позначити всіх показаних")
+
+
+class RequestLetterTests(Base):
+    """📨 Лист запиту: свій текст зі змінними, копія (CC), 👁 попередній перегляд, надсилання."""
+
+    def setUp(self):
+        super().setUp()
+        self.s2 = Supplier.objects.create(name="JLC", email="")
+        self.mia = SupplierContact.objects.create(supplier=self.s2, name="Mia Chen", email="mia@jlcpcb.com",
+                                                  is_primary=True)
+        SupplierContact.objects.create(supplier=self.s2, name="Bob", email="bob@jlcpcb.com")
+        self.req = SupplierRequest.objects.create(title="PCB 4 layers", owner=self.user, language="en",
+                                                  subject="[{code}] Quote for {company}",
+                                                  body="Hi {first_name},\nplease quote {title} by {reply_by}.",
+                                                  cc="boss@sevskiy.de, not-an-address",
+                                                  reply_by=datetime.date(2026, 12, 1))
+        rfq.add_recipients(self.req, [self.s2])
+
+    def test_render_cc_and_send(self):
+        r = self.req.recipients.get()
+        subject, body = rfq.render(self.req, r)
+        self.assertEqual(subject, f"[{self.req.code}] Quote for JLC")
+        self.assertEqual(body, "Hi Mia,\nplease quote PCB 4 layers by 01.12.2026.")          # без авто-привітання
+        self.assertEqual(rfq.cc_for(self.req, r), ["boss@sevskiy.de"])
+        nobody = R(request=self.req, supplier=Supplier(name="Cable Tech GmbH"), email="info@cable.de")
+        self.assertTrue(rfq.render(self.req, nobody)[1].startswith("Hi team,"))           # без людини — не «Hi Cable»
+        self.req.cc_contacts = True
+        self.assertEqual(rfq.cc_for(self.req, r), ["boss@sevskiy.de", "bob@jlcpcb.com"])   # себе — ні
+        self.req.body = "Please quote {title}."                                             # без змінних імені
+        self.assertTrue(rfq.render(self.req, r)[1].startswith("Dear Mia Chen,\n\nPlease quote PCB 4 layers."))
+        self.req.save()
+        sent = []
+
+        def fake_send(client, to_emails, subject, body_text, **kw):
+            sent.append((to_emails, subject, body_text, kw.get("cc_emails")))
+            return {"ok": True, "message_id": "<x@y>"}
+        with mock.patch("email_assistant.smtp_client.SMTPClient.send", fake_send):
+            rfq.send(self.req, self.user)
+        self.assertEqual(sent[0][:2], (["mia@jlcpcb.com"], f"[{self.req.code}] Quote for JLC"))
+        self.assertEqual(sent[0][3], ["boss@sevskiy.de", "bob@jlcpcb.com"])
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.subject, "[{code}] Quote for {company}")                  # шаблон теми лишився
+
+    def test_preview_and_form_save(self):
+        url = reverse("admin:suppliers_supplierrequest_preview")
+        j = self.client.post(url, {"req": self.req.pk, "title": "Cable 1 m", "language": "en",
+                                   "subject": "RFQ {code}: {title}", "body": "Hello {name} ({company})",
+                                   "cc": "a@b.de", "cc_contacts": "1", "supplier": self.s2.pk,
+                                   "contact": self.mia.pk}).json()
+        self.assertEqual((j["to"], j["subject"], j["body"]), ("mia@jlcpcb.com", f"RFQ {self.req.code}: Cable 1 m",
+                                                              "Hello Mia Chen (JLC)"))
+        self.assertEqual(j["cc"], ["a@b.de", "bob@jlcpcb.com"])
+        self.req.refresh_from_db()
+        self.assertEqual(self.req.title, "PCB 4 layers")                                    # перегляд не зберігає
+        self.assertEqual(self.client.post(url, {"body": "x"}).status_code, 400)               # без постачальника
+        edit = reverse("admin:suppliers_supplierrequest_edit", args=[self.req.pk])
+        page = self.client.get(edit)
+        self.assertContains(page, 'data-ph="first_name"')
+        self.assertContains(page, "одразу</b> надсилає")
+        self.client.post(edit, {"title": "PCB 4 layers", "template": "generic", "language": "en", "rcp": [self.s2.pk],
+                                "subject": "S", "body": "B {name}", "cc": "x@y.de; nope, z@w.com",
+                                "cc_contacts": "1", "go": "stay"})
+        self.req.refresh_from_db()
+        self.assertEqual((self.req.cc, self.req.cc_contacts), ("x@y.de, z@w.com", True))

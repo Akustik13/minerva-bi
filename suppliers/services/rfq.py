@@ -166,6 +166,70 @@ def build_body(req) -> str:
     return "\n".join(lines).strip()
 
 
+# Змінні в темі й тексті листа — кожному своє (render). Без {greeting} / {name} / {first_name} у тексті привітання
+# стає першим рядком саме (як було до змінних).
+PLACEHOLDERS = [("greeting", "привітання: «Dear Wendy Wu,» / «Dear Sir or Madam,»"),
+                ("name", "ім'я контактної особи (немає — назва фірми)"),
+                ("first_name", "лише ім'я (немає контактної особи — «team» / «Team» / «колеги»)"),
+                ("company", "назва постачальника"), ("email", "адреса отримувача"), ("code", "номер запиту RFQ-…"),
+                ("reply_by", "«чекаємо до» (дд.мм.рррр)"), ("title", "що запитуємо")]
+_PH_RE = re.compile(r"\{(" + "|".join(k for k, _ in PLACEHOLDERS) + r")\}")
+_GREETED_RE = re.compile(r"\{(greeting|name|first_name)\}")
+
+
+TEAM = {"en": "team", "de": "Team", "uk": "колеги"}
+
+
+def values_for(req, recipient) -> dict:
+    person = (recipient.contact.name if getattr(recipient, "contact", None) is not None and recipient.contact.name
+              else "").strip()
+    name = person or recipient.supplier.name
+    return {"greeting": greeting(req, recipient), "name": name,
+            "first_name": person.split()[0] if person else TEAM.get(req.language, "team"),
+            "company": recipient.supplier.name, "email": recipient.email or "", "code": req.code or "RFQ-…",
+            "reply_by": f"{req.reply_by:%d.%m.%Y}" if req.reply_by else "", "title": req.title or ""}
+
+
+def render(req, recipient) -> tuple:
+    """(тема, текст) листа цьому отримувачу: змінні {…} → його ім'я, фірма…; невідомі {…} лишаються як є."""
+    values = values_for(req, recipient)
+    body = (req.body or "").strip()
+    if body and not _GREETED_RE.search(body):
+        body = "{greeting}\n\n" + body
+    subject = req.subject or subject_for(req)
+
+    def fill(text):
+        return _PH_RE.sub(lambda m: values[m.group(1)], text)
+    return fill(subject)[:250], fill(body)
+
+
+def addresses(text) -> list:
+    """«a@x.de, b@y.com; c@z» → перевірені адреси без повторів."""
+    from django.core.exceptions import ValidationError
+    from django.core.validators import validate_email
+    out = []
+    for a in re.split(r"[,;\s]+", str(text or "")):
+        a = a.strip().strip("<>").lower()
+        if not a or a in out:
+            continue
+        try:
+            validate_email(a)
+        except ValidationError:
+            continue
+        out.append(a)
+    return out
+
+
+def cc_for(req, recipient) -> list:
+    """Копія листа отримувачу: «Копія (CC)» запиту + його власна + (галочкою) інші контактні особи постачальника."""
+    out = addresses(req.cc) + addresses(getattr(recipient, "cc", ""))
+    if req.cc_contacts:
+        out += [e.lower() for e in recipient.supplier.contacts.filter(is_active=True).exclude(email="")
+                .values_list("email", flat=True)]
+    to = (recipient.email or "").lower()
+    return [a for a in dict.fromkeys(out) if a != to][:20]
+
+
 def greeting(req, recipient) -> str:
     t = TEXTS.get(req.language, TEXTS["en"])
     name = recipient.contact.name if recipient.contact_id and recipient.contact.name else ""
@@ -258,7 +322,7 @@ def send(req, user, only=None) -> dict:
     if not req.body.strip():
         raise RFQError("Порожній текст листа.")
     attachments = _attachments(req)
-    subject = req.subject or subject_for(req)
+    template_subject = req.subject or subject_for(req)
     qs = req.recipients.filter(state__in=[R.PLANNED, R.FAILED]).select_related("supplier", "contact")
     if only:
         qs = qs.filter(pk__in=list(only))
@@ -269,8 +333,8 @@ def send(req, user, only=None) -> dict:
         if not R.objects.filter(pk=r.pk, state__in=[R.PLANNED, R.FAILED]).update(
                 state=R.SENT, sent_at=timezone.now(), error=""):
             continue
-        cc = [a.strip() for a in (r.cc or "").split(",") if "@" in a]
-        body = f"{greeting(req, r)}\n\n{req.body.strip()}"
+        cc = cc_for(req, r)
+        subject, body = render(req, r)
         try:
             result = SMTPClient(account).send(to_emails=[r.email], subject=subject, body_text=body, cc_emails=cc,
                                               attachments=attachments)
@@ -295,8 +359,8 @@ def send(req, user, only=None) -> dict:
         out["sent"] += 1
     if out["sent"]:
         SupplierRequest.objects.filter(pk=req.pk, status=SupplierRequest.DRAFT).update(
-            status=SupplierRequest.SENT, sent_at=timezone.now(), account=account, subject=subject)
-        SupplierRequest.objects.filter(pk=req.pk).update(account=account, subject=subject)
+            status=SupplierRequest.SENT, sent_at=timezone.now(), account=account, subject=template_subject)
+        SupplierRequest.objects.filter(pk=req.pk).update(account=account, subject=template_subject)
     if req.project_id and project_threads:
         try:
             from projects.services import link_thread
@@ -359,7 +423,7 @@ def remind(recipient, user) -> dict:
         raise RFQError("Нагадувати можна лише тим, хто ще не відповів.")
     t = TEXTS.get(req.language, TEXTS["en"])
     prev = recipient.sent_message
-    subject = req.subject or subject_for(req)
+    subject = prev.subject if prev is not None and prev.subject else render(req, recipient)[0]
     subject = subject if subject.lower().startswith(("re:", "aw:")) else f"Re: {subject}"
     quote = "\n".join("> " + ln for ln in ((prev.body_text if prev else req.body) or "").splitlines()[:60])
     body = f"{greeting(req, recipient)}\n\n{t['remind'].format(code=req.code)}\n\n{t['bye']}\n\n{quote}"
