@@ -10,6 +10,7 @@
 {% endblock %}
 {% block content %}
 {% include "admin/suppliers/_styles.html" %}
+{{ style }}
 <style>
   .rq-sup { max-height: 440px; overflow-y: auto; overflow-x: hidden; border: 1px solid var(--border-strong, #ccc); border-radius: 6px; }
   .rq-sup > label.rq-row { display: grid; grid-template-columns: 22px minmax(0, 1.2fr) minmax(0, 1fr); gap: 4px 12px; align-items: center;
@@ -23,6 +24,28 @@
   .rq-to .spf-muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
   @media (max-width: 700px) { .rq-sup > label.rq-row { grid-template-columns: 22px minmax(0, 1fr); } .rq-to { grid-column: 2; } }
   .rq-ph { cursor: pointer; font-family: monospace; }
+  .rq-drop { border: 1px dashed var(--border-strong, #ccc); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+  .rq-drop.rq-over { background: var(--selected-bg, rgba(91,141,239,.12)); border-style: solid; }
+  #rq-flist div { display: flex; gap: 8px; align-items: center; font-size: 13px; margin-top: 3px; }
+  #rq-flist button { padding: 0 6px; }
+  .rq-nm b { cursor: help; }
+  #rq-photo { position: fixed; z-index: 60; pointer-events: none; background: #fff; border: 1px solid var(--border-strong, #ccc);
+    border-radius: 8px; padding: 4px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+  #rq-photo img { display: block; max-width: 360px; max-height: 240px; border-radius: 6px; }
+  #rq-photo div { font-size: 11px; color: #555; padding: 2px 2px 0; }
+  #rq-panel { position: fixed; top: 70px; right: 12px; bottom: 12px; width: 380px; z-index: 55; overflow-y: auto;
+    background: var(--body-bg, #fff); border: 1px solid var(--border-strong, #ccc); border-radius: 10px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.2); padding: 10px 14px; }
+  #rq-panel .rq-panel-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+  #rq-panel .rq-panel-h label { width: auto; float: none; padding: 0; font-weight: normal; font-size: 12px; color: var(--text-muted, #888); }
+  .rqb-h { font-size: 15px; margin-bottom: 4px; }
+  .rqb-line { margin: 4px 0; font-size: 13px; }
+  .rqb-sub { margin: 10px 0 4px; font-weight: 600; font-size: 13px; }
+  .rqb-contact { margin: 3px 0; font-size: 13px; }
+  .rqb-cards { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rqb-cards img { width: 160px; height: 100px; object-fit: cover; border-radius: 6px; background: #fff; }
+  @media (min-width: 1200px) { body.rq-panel-open .spp { margin-right: 400px; } }
+  @media (max-width: 700px) { #rq-panel { left: 8px; right: 8px; width: auto; top: auto; height: 70vh; } }
   .rq-pv { border: 1px solid var(--border-strong, #ccc); border-radius: 6px; padding: 8px 12px; margin-top: 6px; background: var(--body-bg, #fff); }
   .rq-pv pre { white-space: pre-wrap; font-family: inherit; margin: 6px 0 0; }
   .rq-sup .rq-sent { opacity: .7; }
@@ -65,7 +88,11 @@
   <div class="spf-card">
     <div class="spf-h">📎 Файли (ZIP, Gerber, креслення, BOM) — підуть вкладенням кожному</div>
     {% for f in files %}<div><a href="{{ f.file.url }}" target="_blank" translate="no">📎 {{ f.name }}</a> <span class="spf-muted">{{ f.size|filesizeformat }}</span> <label class="spf-muted"><input type="checkbox" name="del_file" value="{{ f.pk }}"> прибрати</label></div>{% endfor %}
-    <input type="file" name="files" multiple>
+    <div class="rq-drop" id="rq-drop">
+      <input type="file" name="files" id="rq-files" multiple>
+      <span class="spf-muted">або перетягніть файли сюди; ще раз «вибрати» — додає до списку</span>
+      <div id="rq-flist"></div>
+    </div>
     <div class="spf-muted">Разом до 20 МБ; більше — стисніть або дайте посилання в тексті.</div>
   </div>
 
@@ -91,23 +118,37 @@
       {% for s in suppliers %}
       <label class="rq-row" data-pk="{{ s.pk }}" data-cats="{% for c in s.categories.all %}{{ c.pk }} {% endfor %}" data-name="{{ s.name|lower }} {{ s.email|lower }}" data-status="{{ s.status }}" data-src="{{ s.f_src }}" data-where="{{ s.f_where }}" data-country="{{ s.f_country }}">
         <input type="checkbox" name="rcp" value="{{ s.pk }}" {% if s.pk in picked %}checked{% endif %}>
-        <span class="rq-nm"><b translate="no" title="{{ s.name }}">{{ s.name }}{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon }}</span>{% endfor %}</b>
-          <span class="rq-meta">{% if s.status == "potential" %}🌱 {% elif s.status == "paused" %}⏸ {% endif %}{% if s.f_country %}🌍 {{ s.f_country }}{% endif %}{% if s.f_src == "fair" %} · 🎪{% endif %}{% if s.f_where_label %} · <span translate="no">{{ s.f_where_label }}</span>{% endif %}</span></span>
+        <span class="rq-nm" data-photo="{{ s.f_photo }}" data-photo-note="{{ s.f_photo_note }}"><b translate="no" title="{{ s.name }} — клік: дані постачальника праворуч">{{ s.name }}{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon }}</span>{% endfor %}</b>
+          <span class="rq-meta">{% if s.status == "potential" %}🌱 {% elif s.status == "paused" %}⏸ {% endif %}{% if s.f_country %}🌍 {{ s.f_country }}{% endif %}{% if s.f_fair %} · 🎪{% endif %}{% if s.f_where_label %} · <span translate="no">{{ s.f_where_label }}</span>{% endif %}</span></span>
         <span class="rq-to">{% if s.contacts.all %}<select name="contact_{{ s.pk }}" title="Кому піде лист"><option value="">{{ s.email|default:"— без email фірми" }}</option>{% for c in s.contacts.all %}{% if c.email %}<option value="{{ c.pk }}" {% if c.is_primary %}selected{% endif %}>{{ c.name }} · {{ c.email }}</option>{% endif %}{% endfor %}</select>
           {% else %}<span class="spf-muted" translate="no">{{ s.email|default:"⚠️ немає email" }}</span>{% endif %}</span>
       </label>
       {% endfor %}
     </div>
-    <div class="spf-muted">Кожен отримає свій лист (не копію чужого) — відповіді Minerva знайде сама й покаже на сторінці запиту. Уже надісланих зняти не можна.</div>
+    <div class="spf-muted">Кожен отримає свій лист (не копію чужого) — відповіді Minerva знайде сама й покаже на сторінці запиту. Уже надісланих зняти не можна. Наведіть на назву — фото візитки; клік на назву — дані постачальника праворуч.</div>
+    <div id="rq-photo" hidden></div>
+    <aside id="rq-panel" hidden aria-label="Дані постачальника">
+      <div class="rq-panel-h"><label title="Ставите галочку — тут з'являються дані цього постачальника"><input type="checkbox" id="rq-panel-auto"> відкривати при виборі</label>
+        <button type="button" class="button" id="rq-panel-x" aria-label="Закрити">✕</button></div>
+      <div id="rq-panel-body"></div>
+    </aside>
   </div>
 
   <div class="spf-card">
     <div class="spf-h">✉️ Лист</div>
     <label class="spf-wide">Тема<input name="subject" value="{{ req.subject }}" maxlength="250" placeholder="[RFQ-…] Request for quotation: …"></label>
-    <label class="spf-wide">Текст — можна свій, у будь-якому вигляді{% if not req.body %} (або заповниться з параметрів після «💾 Зберегти»){% endif %}<textarea name="body" rows="14">{{ req.body }}</textarea></label>
+    <label class="spf-wide">Текст — можна свій, у будь-якому вигляді{% if not req.body %} (або заповниться з параметрів після «💾 Зберегти»){% endif %}<textarea name="body" rows="14" placeholder="{{ example_body }}">{{ req.body }}</textarea></label>
     <div class="spf-muted">Змінні — кожному своє (клік — вставити в текст): {% for k, hint in placeholders %}<code class="rq-ph" data-ph="{{ k }}" title="{{ hint }}">{{ "{" }}{{ k }}{{ "}" }}</code> {% endfor %}<br>
       Немає в тексті {{ "{" }}greeting{{ "}" }}, {{ "{" }}name{{ "}" }} чи {{ "{" }}first_name{{ "}" }} — привітання з ім'ям («Dear Wendy Wu,») стане першим рядком саме. Номер {{ "{" }}code{{ "}" }} у темі допомагає Minerva знаходити відповіді.</div>
-    <div class="spf-row"><button type="submit" name="regen" value="1" class="button" formnovalidate onclick="return !this.form.body.value || confirm('Скласти текст наново з параметрів? Ваші правки тексту зникнуть.')">🔄 Скласти текст з параметрів</button></div>
+    <div class="spf-row rq-ai">
+      <select id="rq-ai-model" title="Модель AI">{% for v, n in models %}<option value="{{ v }}">{{ n }}</option>{% endfor %}</select>
+      <button type="button" class="button" id="rq-ai-go" title="AI бере все, що заповнено у формі (що запитуємо, параметри, кількості, строк, мова), читає файли (стекап, BOM, README, Gerber у ZIP) і ваш текст — і складає охайний лист і тему зі змінними. Нічого не надсилає.">🧠 AI: скласти запит</button>
+      <button type="button" class="button" id="rq-ai-undo" hidden>↶ Повернути мій текст</button>
+      <span class="spf-job" id="rq-ai-out"></span>
+    </div>
+    <div class="spf-row"><button type="button" class="button" id="rq-example" title="Готовий лист зі змінними мовою запиту — допишіть деталі">✍️ Приклад зі змінними</button>
+      <button type="submit" name="regen" value="1" class="button" formnovalidate onclick="return !this.form.body.value || confirm('Скласти текст наново з параметрів? Ваші правки тексту зникнуть.')">🔄 Скласти текст з параметрів</button></div>
+    {{ examples|json_script:"rq-examples" }}
     <label class="spf-wide">Копія (CC) кожному листу <span class="spf-muted">— адреси через кому, напр. колега</span><input name="cc" value="{{ req.cc }}" maxlength="500" placeholder="colleague@sevskiy.de"></label>
     <label class="spf-muted" style="width:auto;float:none;padding:0"><input type="checkbox" name="cc_contacts" value="1" {% if req.cc_contacts %}checked{% endif %}> копія й іншим контактним особам того самого постачальника</label>
     <div class="spf-row">👁 Як виглядатиме лист:
@@ -126,6 +167,7 @@
   </div>
 </form>
 </div>
+{{ job_js }}
 <script>
 (function(){
   var tpl = document.getElementById('rq-template');
@@ -168,6 +210,105 @@
   document.getElementById('rq-reset').addEventListener('click', function(e){ e.preventDefault();
     q.value = ''; only.checked = false; box.querySelectorAll('select').forEach(function(s){ s.value = ''; }); apply(); });
   apply();
+  // 🪪 фото візитки при наведенні на назву
+  var photo = document.getElementById('rq-photo');
+  if (window.matchMedia('(hover: hover)').matches) rows.forEach(function(l){
+    var nm = l.querySelector('.rq-nm'); if (!nm || !nm.dataset.photo) return;
+    nm.addEventListener('mouseenter', function(){
+      photo.innerHTML = ''; var img = document.createElement('img'); img.src = nm.dataset.photo; img.alt = '';
+      photo.appendChild(img);
+      if (nm.dataset.photoNote) { var d = document.createElement('div'); d.textContent = '🎪 ' + nm.dataset.photoNote; photo.appendChild(d); }
+      var r = nm.getBoundingClientRect(), top = Math.min(r.bottom + 4, window.innerHeight - 260);
+      photo.style.left = Math.max(8, r.left) + 'px'; photo.style.top = Math.max(8, top) + 'px'; photo.hidden = false;
+    });
+    nm.addEventListener('mouseleave', function(){ photo.hidden = true; });
+  });
+  // 📋 дані постачальника праворуч: клік на назву або галочка (якщо «відкривати при виборі»)
+  var panel = document.getElementById('rq-panel'), pBody = document.getElementById('rq-panel-body'),
+      pAuto = document.getElementById('rq-panel-auto'), briefUrl = '{% url "admin:inventory_supplier_brief" 0 %}', pNow = null;
+  try { pAuto.checked = localStorage.getItem('rq-panel-auto') !== '0'; } catch (e) { pAuto.checked = true; }
+  pAuto.addEventListener('change', function(){ try { localStorage.setItem('rq-panel-auto', pAuto.checked ? '1' : '0'); } catch (e) {} });
+  function openPanel(pk){
+    if (pNow === pk && !panel.hidden) return;
+    pNow = pk; panel.hidden = false; document.body.classList.add('rq-panel-open'); pBody.textContent = '⏳';
+    fetch(briefUrl.replace('/0/', '/' + pk + '/'), {credentials: 'same-origin'}).then(function(r){ return r.ok ? r.text() : ''; })
+      .then(function(html){ if (pNow === pk) pBody.innerHTML = html || '—'; });
+  }
+  document.getElementById('rq-panel-x').addEventListener('click', function(){
+    panel.hidden = true; pNow = null; document.body.classList.remove('rq-panel-open'); });
+  rows.forEach(function(l){
+    var b = l.querySelector('.rq-nm b');
+    if (b) b.addEventListener('click', function(e){ e.preventDefault(); openPanel(l.dataset.pk); });
+    l.querySelector('input[name=rcp]').addEventListener('change', function(e){
+      if (e.target.checked && pAuto.checked) openPanel(l.dataset.pk); });
+  });
+  // 🧠 AI: лист із полів форми й вашого тексту (фоном; ↶ — повернути те, що було)
+  var aiGo = document.getElementById('rq-ai-go'), aiOut = document.getElementById('rq-ai-out'),
+      aiUndo = document.getElementById('rq-ai-undo'), aiPrev = null;
+  aiGo.addEventListener('click', function(){
+    var f = document.getElementById('rq-form'), fd = new FormData();
+    [].forEach.call(f.elements, function(el){
+      if (!el.name || el.type === 'file' || el.name === 'csrfmiddlewaretoken' || el.name === 'rcp' || /^contact_/.test(el.name)) return;
+      if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) return;
+      fd.append(el.name, el.value);
+    });
+    [].forEach.call(document.getElementById('rq-files').files, function(x){ fd.append('files', x); });   // AI прочитає вміст
+    fd.append('model', document.getElementById('rq-ai-model').value);
+    {% if req.pk %}fd.append('req', '{{ req.pk }}');{% endif %}
+    aiGo.disabled = true; aiOut.textContent = '⏳ AI складає лист…';
+    fetch('{% url "admin:suppliers_supplierrequest_ai_letter" %}', {method: 'POST', body: fd, credentials: 'same-origin',
+          headers: {'X-CSRFToken': f.querySelector('input[name=csrfmiddlewaretoken]').value}})
+      .then(function(r){ return r.json(); }).then(function(j){
+        if (!j.job) { aiGo.disabled = false; aiOut.textContent = '⚠️ ' + (j.error || 'не вдалося'); return; }
+        spPoll(j.job, aiOut, function(r){
+          aiGo.disabled = false;
+          var body = f.querySelector('textarea[name=body]'), subj = f.querySelector('[name=subject]');
+          aiPrev = {body: body.value, subject: subj.value};
+          body.value = r.body || body.value; subj.value = r.subject || subj.value;
+          aiUndo.hidden = false; aiOut.textContent = r.message || '✅';
+        });
+      }).catch(function(){ aiGo.disabled = false; aiOut.textContent = '⚠️ Немає зв’язку з сервером'; });
+  });
+  aiUndo.addEventListener('click', function(){
+    if (!aiPrev) return;
+    var f = document.getElementById('rq-form');
+    f.querySelector('textarea[name=body]').value = aiPrev.body; f.querySelector('[name=subject]').value = aiPrev.subject;
+    aiPrev = null; aiUndo.hidden = true; aiOut.textContent = '';
+  });
+  // ✍️ приклад листа зі змінними — мовою запиту
+  var examples = JSON.parse(document.getElementById('rq-examples').textContent);
+  document.getElementById('rq-example').addEventListener('click', function(){
+    var f = document.getElementById('rq-form'), lang = f.querySelector('[name=language]').value,
+        ex = examples[lang] || examples.en, body = f.querySelector('textarea[name=body]'), subj = f.querySelector('[name=subject]');
+    if (body.value.trim() && !confirm('Замінити текст листа прикладом?')) return;
+    body.value = ex.body; if (!subj.value.trim()) subj.value = ex.subject; body.focus();
+  });
+  document.querySelector('[name=language]').addEventListener('change', function(){
+    var ex = examples[this.value] || examples.en; document.querySelector('textarea[name=body]').placeholder = ex.body; });
+  // 📎 файли накопичуються: кожен вибір / перетягування додає, ✕ — прибрати (DataTransfer → input.files)
+  var fin = document.getElementById('rq-files'), flist = document.getElementById('rq-flist'),
+      drop = document.getElementById('rq-drop'), picked = [];
+  function syncFiles(){
+    try { var dt = new DataTransfer(); picked.forEach(function(f){ dt.items.add(f); }); fin.files = dt.files; } catch (e) { return; }
+    flist.innerHTML = '';
+    picked.forEach(function(f, i){
+      var row = document.createElement('div'), t = document.createElement('span'), x = document.createElement('button');
+      t.textContent = '📎 ' + f.name + ' · ' + (f.size > 1048576 ? (f.size / 1048576).toFixed(1) + ' МБ' : Math.ceil(f.size / 1024) + ' КБ');
+      t.setAttribute('translate', 'no');
+      x.type = 'button'; x.className = 'button'; x.textContent = '✕'; x.title = 'Прибрати';
+      x.addEventListener('click', function(){ picked.splice(i, 1); syncFiles(); });
+      row.appendChild(t); row.appendChild(x); flist.appendChild(row);
+    });
+  }
+  function addFiles(list){
+    [].forEach.call(list || [], function(f){
+      if (!picked.some(function(p){ return p.name === f.name && p.size === f.size; })) picked.push(f); });
+    syncFiles();
+  }
+  fin.addEventListener('change', function(){ var now = [].slice.call(fin.files); addFiles(now); });
+  ['dragenter', 'dragover'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('rq-over'); }); });
+  ['dragleave', 'drop'].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove('rq-over'); }); });
+  drop.addEventListener('drop', function(e){ addFiles(e.dataTransfer && e.dataTransfer.files); });
   // змінні {…} — вставити в текст на місце курсора
   var bodyEl = document.querySelector('textarea[name=body]');
   document.querySelectorAll('.rq-ph').forEach(function(c){ c.addEventListener('click', function(){

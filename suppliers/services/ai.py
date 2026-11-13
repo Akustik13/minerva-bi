@@ -316,6 +316,80 @@ def from_mail(msg, user=None, model=DEFAULT_MODEL, web=False) -> dict:
     return out
 
 
+LETTER_JSON = '{"subject": "тема листа", "body": "текст листа"}'
+LETTER_LANGS = {"en": "англійською (English)", "de": "німецькою (Deutsch, на «Sie»)", "uk": "українською"}
+# Як ми зазвичай пишемо запит (зразок користувача, без конкретних номерів деталей) — стиль і порядок для AI
+LETTER_STYLE = (
+    "{greeting}\n\nPlease provide a quote for manufacturing and assembly of 7000 pieces of the attached PCBA.\n"
+    "PCB Specifications:\n* Layers: 4\n* Thickness: 1 mm\n* Material: FR4\n* PCB size: 34 mm x 85 mm\n"
+    "* Outer Copper: 1 oz\n* Solder mask: Both sides, green\n* Silkscreen: Both sides, white\n"
+    "* Gerber files: Standard format as listed in the README\n\nAssembly Notes:\n"
+    "* SMD Components: Only the SMD components specified in the BOM are to be used. No substitutions from other "
+    "manufacturers are allowed.\n* The following components will be supplied by us and shipped directly to your "
+    "facility for assembly:\n  * U1: …\n  * U3: …\n\nPlease include in your quote:\n"
+    "* PCBA unit price (for each quantity)\n* Lead time\n* Shipping cost\n\n"
+    "Let me know if you need any additional information or documentation.")
+
+
+def letter(form: dict, user=None, model=DEFAULT_MODEL, files=()) -> dict:
+    """🧠 Лист запиту (RFQ) з полів форми, вмісту файлів (rfq_files.texts: стекап, BOM, README, Gerber у ZIP) і
+    чернетки людини → {subject, body, cost_usd}. Стиль — LETTER_STYLE (як пишемо зазвичай). Нічого не зберігає й не
+    надсилає. Змінні лишаються змінними: {greeting} — першим рядком, {reply_by} / {code} — замість дати й номера
+    (rfq.render підставить кожному отримувачу)."""
+    from suppliers.services import rfq
+    lang = form.get("language") if form.get("language") in LETTER_LANGS else "en"
+    col = {"uk": 1, "en": 2, "de": 3}[lang]
+    params = [f"- {f[col]}: {form['specs'][f[0]]}" for f in rfq.fields_of(form.get("template"))
+              if (form.get("specs") or {}).get(f[0])]
+    qty = rfq.parse_quantities(form.get("quantities"))
+    lines = [f"Що запитуємо: {form.get('title') or '—'}",
+             f"Форма: {rfq.TEMPLATES.get(form.get('template'), rfq.TEMPLATES['generic'])[0]}"]
+    if form.get("category"):
+        lines.append(f"Категорія постачальників: {form['category']}")
+    lines += ["Параметри:"] + (params or ["(не заповнено)"])
+    if form.get("notes"):
+        lines += ["Ще (вільним текстом):", form["notes"]]
+    lines.append("Кількості: " + (" / ".join(str(q) for q in qty) if qty else "(не вказано)"))
+    lines.append("Файли у вкладенні: " + (", ".join(form.get("files") or []) or "(немає)"))
+    lines.append("Чекаємо відповідь до: " + ("є дата — пиши змінною {reply_by}" if form.get("reply_by")
+                                          else "(не вказано — строк не згадуй)"))
+    if form.get("company"):
+        lines.append(f"Наша фірма: {form['company']}")
+    if form.get("subject"):
+        lines += ["Тема, яку вже написала людина:", form["subject"]]
+    if form.get("body"):
+        lines += ["Чернетка листа людини (збережи зміст, побажання й тон):", form["body"][:6000]]
+    for name, text in files or ():
+        if text:
+            lines += [f"=== Вміст файлу «{name}» ===", text]
+    system = (
+        "Ти пишеш запит пропозиції (RFQ) постачальнику для відділу закупівель. " + DATA_NOTE +
+        f" Пиши {LETTER_LANGS[lang]}, діловий стиль, коротко й чітко. Використай УСІ дані форми — параметри, кількості, "
+        "файли, строк; нічого не вигадуй і не додавай параметрів, яких немає. З ВМІСТУ ФАЙЛІВ візьми те, що потрібно "
+        "постачальнику для ціни: шари й товщини зі стекапу, матеріал, розмір, мідь, маску, кількість позицій і "
+        "компонентів BOM, компоненти, які надаємо ми, примітки README, шари з назв Gerber — цифри точно як у файлах, "
+        "не переписуй файли повністю; суперечить полям форми — бери з форми й попроси постачальника уточнити. "
+        "Перший рядок тексту — рівно {greeting} "
+        "(Minerva підставить кожному привітання з ім'ям); прощання й підпис не пиши — їх додає пошта. Наш номер — "
+        "змінною {code} (і в темі), дату відповіді — змінною {reply_by}, якщо вона є. Для кількох кількостей "
+        "(партій) — ціна за одиницю й сума для КОЖНОЇ партії. Попроси вказати: ціну, строк "
+        "виготовлення / поставки, вартість доставки, умови оплати, мінімальне замовлення й термін дії пропозиції. "
+        "Інші змінні з чернетки ({name}, {first_name}, {company}…) залиш як є. Тема — коротка, з {code} і суттю. "
+        "Стиль і порядок — як у нашому звичному запиті (розділи-списки: специфікація, нотатки до складання, що "
+        "вказати в пропозиції, коротке завершення); це лише зразок форми, його дані НЕ переноси:\n<<<ЗРАЗОК\n"
+        + LETTER_STYLE + "\nЗРАЗОК>>>\nВідповідай лише JSON такої форми: " + LETTER_JSON)
+    content = "<<<ДАНІ\n" + "\n".join(lines) + "\nДАНІ>>>\nСклади тему й текст листа."
+    text, price = call(system, content, model=model_of(model), user=user, effort="low", max_tokens=4000)
+    data = parse_json(text)
+    body = str(data.get("body") or "").strip()[:8000]
+    if not body:
+        raise AIError("AI не склав текст листа — спробуйте ще раз.")
+    if not re.search(r"\{(greeting|name|first_name)\}", body):
+        body = "{greeting}\n\n" + body
+    subject = _s(data.get("subject"), 250) or rfq.EXAMPLES[lang][0]
+    return {"subject": subject, "body": body, "cost_usd": float(price)}
+
+
 RESEARCH_JSON = (
     '{"summary": "3–6 речень українською: хто вони, що роблять, для кого", "products": ["…"], '
     '"location": "країна, місто, де виробництво", "founded": "", "size": "працівників / оборот, якщо відомо", '

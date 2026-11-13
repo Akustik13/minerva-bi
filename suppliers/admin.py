@@ -114,6 +114,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             path("<int:pk>/work/", view(self.work_view), name="suppliers_supplierrequest_work"),
             path("<int:pk>/action/", view(self.action_view), name="suppliers_supplierrequest_action"),
             path("preview/", view(self.preview_view), name="suppliers_supplierrequest_preview"),
+            path("ai-letter/", view(self.ai_letter_view), name="suppliers_supplierrequest_ai_letter"),
         ] + super().get_urls()
 
     def add_view(self, request, form_url="", extra_context=None):
@@ -157,6 +158,51 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         return JsonResponse({"to": email or "⚠️ немає email", "cc": rfq.cc_for(draft, r), "subject": subject,
                              "body": body, "files": [f.name for f in req.files.all()] if req else []})
 
+    def ai_letter_view(self, request):
+        """🧠 AI складає тему й текст запиту з того, що зараз у формі (поля, параметри, файли, чернетка людини). Фоном
+        (suppliers/services/jobs.py) → {subject, body}; нічого не зберігає й не надсилає."""
+        from config.models import SystemSettings
+        from suppliers.services import ai, jobs
+        if request.method != "POST":
+            return HttpResponseNotAllowed(["POST"])
+        P = request.POST
+        req = self._request(request, int(P["req"]), "change") if str(P.get("req") or "").isdigit() else None
+        if req is None and not self.has_add_permission(request):
+            raise Http404
+        template = P.get("template") if P.get("template") in rfq.TEMPLATES else "generic"
+        category = SupplierCategory.objects.filter(pk=P.get("category") or 0).first()
+        # файли — і ще не збережені (браузер шле їх сюди), і вже прикріплені; вміст читаємо тут, не у фоні
+        from suppliers.services import rfq_files
+        blobs = [(u.name, u.read(rfq_files.FILE_MAX + 1)) for u in request.FILES.getlist("files")[:20]]
+        if req is not None:
+            gone = set(P.getlist("del_file"))
+            for f in req.files.all():
+                if str(f.pk) in gone:
+                    continue
+                try:
+                    with f.file.open("rb") as fh:
+                        blobs.insert(0, (f.name, fh.read(rfq_files.FILE_MAX + 1)))
+                except OSError:
+                    blobs.insert(0, (f.name, b""))
+        files = [n for n, _ in blobs] + [n[:120] for n in P.getlist("file_names") if n.strip()][:30]
+        file_texts = rfq_files.texts(blobs)
+        try:
+            company = SystemSettings.objects.first().company_name
+        except AttributeError:
+            company = ""
+        form = {"language": P.get("language"), "template": template, "title": P.get("title", "").strip()[:200],
+                "category": str(category) if category else "",
+                "specs": {f[0]: P.get(f"spec_{f[0]}", "").strip()[:2000] for f in rfq.fields_of(template)},
+                "notes": P.get("notes", "").strip()[:4000], "quantities": P.get("quantities", "")[:120],
+                "files": files, "reply_by": P.get("reply_by", ""), "company": company,
+                "subject": P.get("subject", "").strip()[:250], "body": P.get("body", "").strip()}
+        model, user = ai.model_of(P.get("model")), request.user
+
+        def run():
+            out = ai.letter(form, user=user, model=model, files=file_texts)
+            return {**out, "message": f"🧠 Готово · ${out['cost_usd']:.3f} — перевірте й за потреби виправте"}
+        return JsonResponse({"job": jobs.start(user, "rfq letter", run)})
+
     def _ctx(self, request, title, **extra):
         from suppliers.admin_supplier import _JOB_JS, _STYLE
         from suppliers.services.ai import MODELS
@@ -198,8 +244,16 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             names.setdefault(key, " ".join(ev.split()))
         fair = set(SupplierMedia.objects.exclude(supplier=None).filter(marks__icontains='"fair"')
                    .values_list("supplier_id", flat=True))
+        photos = {}                         # найновіша візитка з фото — показ при наведенні
+        for m in (SupplierMedia.objects.exclude(supplier=None).exclude(image="").order_by("-created_at")
+                  .only("pk", "supplier_id", "image", "event")):
+            photos.setdefault(m.supplier_id, m)
         for s in sups:
-            s.f_src = "fair" if s.pk in fair else (s.source or "manual")
+            card = photos.get(s.pk)
+            s.f_photo = card.image.url if card else ""
+            s.f_photo_note = (card.event or "") if card else ""
+            s.f_src = "fair" if s.pk in fair and s.source == "card" else (s.source or "manual")   # як «Звідки» в списку
+            s.f_fair = s.pk in fair
             s.f_where = "|".join(sorted(events.get(s.pk, ())))
             s.f_where_label = ", ".join(names[k] for k in sorted(events.get(s.pk, ())))[:80]
             s.f_country = (s.addr_country or "").upper()
@@ -250,7 +304,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         accounts = list(EmailAccount.objects.filter(user=request.user, is_active=True).order_by("-is_primary", "pk"))
         templates = [{"key": k, "label": v[0], "fields": [{"key": f[0], "label": f[1], "hint": f[4],
                                                             "value": (req.specs or {}).get(f[0], ""),
-                                                            "multi": f[0] in ("parts", "stackup", "spec")}
+                                                            "multi": f[0] in ("parts", "stackup", "spec", "consigned")}
                                                            for f in v[1]]}
                      for k, v in rfq.TEMPLATES.items()]
         sent = {r.supplier_id: r for r in req.recipients.all()} if req.pk else {}
@@ -258,6 +312,8 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             request, f"✏️ {req.code}" if req.pk else "📨 Новий запит постачальникам", req=req, templates=templates,
             categories=SupplierCategory.objects.filter(is_active=True), projects=projects, groups=groups,
             picked=picked, sent=sent, accounts=accounts, placeholders=rfq.PLACEHOLDERS, **self._recipients(),
+            examples={k: {"subject": v[0], "body": v[1]} for k, v in rfq.EXAMPLES.items()},
+            example_body=rfq.EXAMPLES.get(req.language, rfq.EXAMPLES["en"])[1],
             langs=SupplierRequest.LANGS, files=list(req.files.all()) if req.pk else [],
             notes=(req.specs or {}).get("_notes", "")))
 

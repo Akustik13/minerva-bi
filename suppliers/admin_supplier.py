@@ -139,7 +139,14 @@ class CategoryFilter(admin.SimpleListFilter):
 
 SOURCE_LABELS = {"manual": "✋ Вручну", "mail": "✉️ З пошти", "card": "🪪 З візитки",
                  "discover": "🔎 Знайдено в пошті", "ai": "🧠 AI", "import": "📥 Імпорт / API"}
-FAIR_LABEL = "🎪 З виставки"     # візитка постачальника з позначкою «🎪 З виставки» (SupplierMedia.marks "fair")
+# «Звідки» — як постачальник з'явився вперше (Supplier.source): 🎪 — лише коли його й створили з візитки з позначкою
+# «🎪 З виставки». Пізніша візитка з виставки в постачальника з пошти «Звідки» не змінює — лише відмітка «+ 🎪».
+FAIR_LABEL = "🎪 З виставки"
+FAIR_LATER = "+ 🎪 також з виставки"
+
+
+def _fair_media():
+    return _media_of_row().filter(marks__icontains='"fair"')
 
 
 def _media_of_row():
@@ -147,17 +154,20 @@ def _media_of_row():
 
 
 class SourceFilter(admin.SimpleListFilter):
-    """Звідки взявся постачальник: 🎪 з виставки (візитка з позначкою) або Supplier.source."""
+    """Звідки взявся постачальник: 🎪 з виставки (створено з візитки «🎪 З виставки») або Supplier.source;
+    «🎪 Зустрічали на виставці» — будь-яка його візитка з виставки, звідки б він не взявся."""
     title = "звідки"
     parameter_name = "src"
 
     def lookups(self, request, model_admin):
-        return [("fair", FAIR_LABEL)] + list(SOURCE_LABELS.items())
+        return [("fair", FAIR_LABEL), ("fair_any", "🎪 Зустрічали на виставці")] + list(SOURCE_LABELS.items())
 
     def queryset(self, request, queryset):
         v = self.value()
         if v == "fair":
-            return queryset.filter(Exists(_media_of_row().filter(marks__icontains='"fair"')))
+            return queryset.filter(source="card").filter(Exists(_fair_media()))
+        if v == "fair_any":
+            return queryset.filter(Exists(_fair_media()))
         if v == "manual":
             return queryset.filter(Q(source="manual") | Q(source=""))
         if v in SOURCE_LABELS:
@@ -219,6 +229,27 @@ class SupplierCardMixin:
 
     def has_rfq_permission(self, request):
         return request.user.has_perm("suppliers.add_supplierrequest")
+
+    def brief_view(self, request, pk):
+        """Коротко про постачальника — панель праворуч у формі запиту (📨): стан, звідки, категорії, контакти, сайт,
+        візитки, закупівлі, попередні запити, оцінка. Лише читання; право бачити постачальника."""
+        from suppliers.models import SupplierRequestRecipient as R
+        obj = self._supplier(request, pk)
+        cards = list(obj.media.exclude(image="").order_by("-created_at")[:4])
+        fair = obj.media.filter(marks__icontains='"fair"').exists()
+        origin = obj.source or "manual"
+        pos = obj.purchase_orders.exclude(status="cancelled")
+        asked = obj.request_recipients.exclude(state=R.PLANNED)
+        return TemplateResponse(request, "admin/suppliers/_brief.html", {
+            "s": obj, "cards": cards, "contacts": list(obj.contacts.all()), "cats": list(obj.categories.all()),
+            "source": FAIR_LABEL if origin == "card" and fair else SOURCE_LABELS.get(origin, "—"),
+            "fair_later": fair and origin != "card", "fair_later_text": FAIR_LATER,
+            "events": sorted({m.event for m in obj.media.exclude(event="")}),
+            "po_count": pos.count(), "po_last": pos.order_by("-order_date").values_list("order_date", flat=True).first(),
+            "asked": asked.count(), "quoted": asked.filter(state=R.QUOTED).count(),
+            "chosen": asked.filter(chosen=True).count() if hasattr(R, "chosen") else 0,
+            "stars": _stars(obj.rating) if obj.rating else "",
+            "card_url": reverse("admin:inventory_supplier_change", args=[obj.pk])})
 
     def bulk_view(self, request):
         """GET — що зробити з вибраними (період, закупівлі з PI / модель AI); POST — фоново по одному, хід — у
@@ -304,13 +335,17 @@ class SupplierCardMixin:
                           # «Де взяли» — з найновішої візитки, де його вписали; 🎪 — є візитка «З виставки»
                           _event=Subquery(_media_of_row().exclude(event="").order_by("-created_at")
                                           .values("event")[:1]),
-                          _fair=Exists(_media_of_row().filter(marks__icontains='"fair"'))))
+                          _fair=Exists(_fair_media())))
 
     @admin.display(description="Звідки", ordering="source")
     def source_col(self, obj):
-        label = FAIR_LABEL if getattr(obj, "_fair", False) else SOURCE_LABELS.get(obj.source or "manual", "—")
-        return format_html('<span style="white-space:nowrap" title="{}">{}</span>', obj.get_source_display() or "",
-                           label)
+        origin, fair = obj.source or "manual", getattr(obj, "_fair", False)
+        label = FAIR_LABEL if origin == "card" and fair else SOURCE_LABELS.get(origin, "—")
+        later = format_html('<div class="sp-muted" style="white-space:nowrap" title="{}">{}</div>',
+                            "Уже був у базі, пізніше зустрічали на виставці — візитка в його картці, подія — в «🕘 Історії»",
+                            FAIR_LATER) if fair and origin != "card" else ""
+        return format_html('<span style="white-space:nowrap" title="{}">{}</span>{}', obj.get_source_display() or "",
+                           label, later)
 
     @admin.display(description="Де взяли", ordering="_event")
     def event_col(self, obj):
@@ -684,6 +719,7 @@ class SupplierCardMixin:
             path("cards/<int:media_pk>/", view(self.card_review_view), name="inventory_supplier_card_review"),
             path("cards/crm-search/", view(self.crm_search_view), name="inventory_supplier_crm_search"),
             path("bulk/", view(self.bulk_view), name="inventory_supplier_bulk"),
+            path("<int:pk>/brief/", view(self.brief_view), name="inventory_supplier_brief"),
             path("card/presets/", view(self.card_presets_view), name="inventory_supplier_card_presets"),
             path("job/<str:job_id>/", view(self.job_view), name="inventory_supplier_job"),
             path("search/", view(self.search_view), name="inventory_supplier_search"),

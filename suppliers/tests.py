@@ -7,6 +7,7 @@ import io
 import json
 import shutil
 import tempfile
+import zipfile
 from decimal import Decimal
 from unittest import mock
 
@@ -1120,21 +1121,26 @@ class SourceEventListTests(Base):
         mail = Supplier.objects.create(name="Ring PCB", source="mail")
         old = Supplier.objects.create(name="Kontron", source="")
         self.card_for(old, "ELECTRONICA 2026")
+        later = Supplier.objects.create(name="HongRong", source="mail")             # з пошти, візитка — пізніше
+        self.card_for(later, "Electronica 2026", ["fair"])
         url = reverse("admin:inventory_supplier_changelist")
         names = lambda resp: sorted(o.name for o in resp.context["cl"].result_list)   # noqa: E731
         page = self.client.get(url)
         self.assertContains(page, "🎪 З виставки")
         self.assertContains(page, "✉️ З пошти")
         self.assertContains(page, '?where=Electronica+2026')
-        self.assertEqual(names(self.client.get(url + "?src=fair")), ["Victory PCB"])
-        self.assertEqual(names(self.client.get(url + "?src=mail")), ["Ring PCB"])
+        self.assertEqual(names(self.client.get(url + "?src=fair")), ["Victory PCB"])     # створено з виставки
+        self.assertEqual(names(self.client.get(url + "?src=fair_any")), ["HongRong", "Victory PCB"])
+        self.assertEqual(names(self.client.get(url + "?src=mail")), ["HongRong", "Ring PCB"])
+        self.assertContains(page, "+ 🎪 також з виставки", count=1)                 # «Звідки» лишається «з пошти»
         self.assertEqual(names(self.client.get(url + "?src=manual")), ["Kontron", "Shenzhen PCBWay Co., Ltd"])
-        self.assertEqual(names(self.client.get(url + "?where=electronica 2026")), ["Kontron", "Victory PCB"])
+        self.assertEqual(names(self.client.get(url + "?where=electronica 2026")), ["HongRong", "Kontron",
+                                                                                    "Victory PCB"])
         self.assertEqual(names(self.client.get(url + "?where=-")), ["Ring PCB", "Shenzhen PCBWay Co., Ltd"])
         lookups = dict(self.client.get(url).context["cl"].filter_specs[3].lookup_choices)
         self.assertEqual(list(lookups), ["-", "Electronica 2026"])                 # регістр — одна подія
         cl = self.client.get(url + "?o=-5").context["cl"]                          # «Де взяли» за спаданням
-        self.assertEqual([o.name for o in cl.result_list][:2], ["Victory PCB", "Kontron"])
+        self.assertEqual({o.name for o in cl.result_list[:2]}, {"Victory PCB", "HongRong"})
         self.assertEqual(mail.pk, Supplier.objects.get(name="Ring PCB").pk)
 
 
@@ -1275,3 +1281,115 @@ class RequestLetterTests(Base):
                                 "cc_contacts": "1", "go": "stay"})
         self.req.refresh_from_db()
         self.assertEqual((self.req.cc, self.req.cc_contacts), ("x@y.de, z@w.com", True))
+
+
+class RequestFormPanelTests(Base):
+    """📨 Форма запиту: фото візитки при наведенні, панель «дані постачальника» праворуч."""
+
+    def test_photo_and_brief(self):
+        SupplierContact.objects.create(supplier=self.supplier, name="Anna Li", email="anna@pcbway.com", is_primary=True,
+                                       position="Sales")
+        self.supplier.source = "mail"
+        self.supplier.save()
+        m = SupplierMedia(supplier=self.supplier, kind=SupplierMedia.CARD, event="Electronica 2026", marks=["fair"])
+        m.image.save("c.png", SimpleUploadedFile("c.png", png()), save=False)
+        m.save()
+        page = self.client.get(reverse("admin:suppliers_supplierrequest_new"))
+        self.assertContains(page, f'data-photo="{m.image.url}" data-photo-note="Electronica 2026"')
+        self.assertContains(page, 'id="rq-panel"')
+        brief = self.client.get(reverse("admin:inventory_supplier_brief", args=[self.supplier.pk]))
+        self.assertContains(brief, "Shenzhen PCBWay Co., Ltd")
+        self.assertContains(brief, "✉️ З пошти")                                      # «Звідки» — як з'явився вперше
+        self.assertContains(brief, "+ 🎪 також з виставки")
+        self.assertContains(brief, "Anna Li")
+        self.assertContains(brief, m.image.url)
+        self.assertContains(brief, "Закупівель: <b>0</b>")
+        self.assertContains(page, 'id="rq-examples"')                                 # ✍️ приклад зі змінними
+        self.assertContains(page, 'id="rq-files" multiple')
+        req = SupplierRequest.objects.create(title="PCB", owner=self.user, language="de")
+        self.assertTrue(rfq.build_body(req).startswith("{greeting}\n\nwir bitten"))     # змінну видно в тексті
+        self.assertIn("{reply_by}", rfq.EXAMPLES["uk"][1])
+        self.client.force_login(self.other)                                          # без права — нічого
+        self.assertNotEqual(self.client.get(reverse("admin:inventory_supplier_brief",
+                                                    args=[self.supplier.pk])).status_code, 200)
+
+
+class RequestAiLetterTests(Base):
+    """🧠 AI: лист запиту з полів форми й чернетки людини (AI підмінено)."""
+
+    def test_ai_letter_uses_form_and_keeps_variables(self):
+        url = reverse("admin:suppliers_supplierrequest_ai_letter")
+        answer = json.dumps({"subject": "[{code}] RFQ: 4-layer PCB",
+                             "body": "Dear Sir or Madam,\nplease quote. Reply by {reply_by}."})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.003"))) as call:
+            j = self.client.post(url, {"title": "4-layer PCB", "template": "pcb", "language": "de",
+                                       "spec_layers": "4", "spec_thickness": "1.6", "quantities": "10; 100",
+                                       "reply_by": "2026-12-01", "body": "Bitte schnell, Muster zuerst.",
+                                       "file_names": ["gerber.zip", "bom.xlsx"]}).json()
+        system, content = call.call_args.args
+        self.assertIn("німецькою", system)
+        for part in ("Lagen: 4", "Dicke, mm: 1.6", "10 / 100", "gerber.zip, bom.xlsx", "{reply_by}",
+                     "Bitte schnell, Muster zuerst."):
+            self.assertIn(part, content)
+        r = jobs.state(j["job"], self.user)["result"]
+        self.assertEqual(r["subject"], "[{code}] RFQ: 4-layer PCB")
+        self.assertTrue(r["body"].startswith("{greeting}\n\nDear Sir or Madam"))       # привітання — змінною
+        self.assertEqual(SupplierRequest.objects.count(), 0)                            # нічого не зберігає
+        self.other.profile.role = "readonly"                                            # без права на запити
+        self.other.profile.save()
+        self.client.force_login(self.other)
+        self.assertNotEqual(self.client.post(url, {"title": "x"}).status_code, 200)
+
+
+class RequestFilesForAiTests(Base):
+    """🧠 AI читає файли запиту: стекап (docx), BOM (xlsx), README і назви Gerber у ZIP."""
+
+    def files(self):
+        from docx import Document
+        from openpyxl import Workbook
+        doc = Document()
+        doc.add_paragraph("4-Layer Impedance Control Stackup")
+        t = doc.add_table(rows=2, cols=3)
+        for i, row in enumerate([("L1", "Signal", "0.035"), ("Prepreg", "7628", "0.2")]):
+            for j, v in enumerate(row):
+                t.cell(i, j).text = v
+        d = io.BytesIO()
+        doc.save(d)
+        wb = Workbook()
+        wb.active.append(["Designator", "MPN", "Qty"])
+        wb.active.append(["U101", "EFR32BG24A010F1024IM40-B", 1])
+        x = io.BytesIO()
+        wb.save(x)
+        z = io.BytesIO()
+        with zipfile.ZipFile(z, "w") as zf:
+            zf.writestr("board.GTL", "G04 top copper*")
+            zf.writestr("board.GBL", "G04 bottom copper*")
+            zf.writestr("README.txt", "Gerber RS-274X, 4 layers, 34 x 85 mm")
+            zf.writestr("drill.txt", "X1Y1\n" * 1000)
+        return [("stackup.docx", d.getvalue()), ("BOM.xlsx", x.getvalue()), ("gerber.zip", z.getvalue()),
+                ("photo.jpg", b"\xff\xd8\xff")]
+
+    def test_read_files(self):
+        from suppliers.services import rfq_files
+        out = dict(rfq_files.texts(self.files()))
+        self.assertIn("Prepreg | 7628 | 0.2", out["stackup.docx"])
+        self.assertIn("EFR32BG24A010F1024IM40-B", out["BOM.xlsx"])
+        self.assertIn("board.GTL", out["gerber.zip"])
+        self.assertIn("34 x 85 mm", out["gerber.zip"])
+        self.assertNotIn("X1Y1", out["gerber.zip"])                                # свердління не читаємо
+        self.assertEqual(out["photo.jpg"], "")
+
+    def test_files_reach_ai_with_style(self):
+        url = reverse("admin:suppliers_supplierrequest_ai_letter")
+        uploads = [SimpleUploadedFile(n, data) for n, data in self.files()[:3]]
+        answer = json.dumps({"subject": "[{code}] PCBA", "body": "{greeting}\n\nPlease provide a quote."})
+        with mock.patch.object(ai, "call", return_value=(answer, Decimal("0.004"))) as call:
+            self.client.post(url, {"title": "PCBA 7000 pcs", "template": "pcb_pcba", "language": "en",
+                                   "spec_consigned": "U1: modem", "files": uploads})
+        system, content = call.call_args.args
+        self.assertIn("Please include in your quote", system)                        # наш звичний стиль
+        self.assertIn("Customer-supplied (consigned) parts: U1: modem", content)
+        self.assertIn("=== Вміст файлу «stackup.docx» ===", content)
+        self.assertIn("EFR32BG24A010F1024IM40-B", content)
+        self.assertIn("Файли у вкладенні: stackup.docx, BOM.xlsx, gerber.zip", content)
+        self.assertIn("pcb_pcba", rfq.TEMPLATES)

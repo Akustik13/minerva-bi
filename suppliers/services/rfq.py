@@ -59,6 +59,10 @@ TEMPLATES = {
         ("fine", "Дрібний крок / BGA", "Fine pitch / BGA", "Fine-Pitch / BGA", "0.4 mm QFN, 1 BGA"),
         ("test", "Тестування", "Testing", "Prüfung", "AOI, X-ray, functional test"),
         ("coating", "Лак / пакування", "Coating / packing", "Schutzlack / Verpackung", "no / ESD bags"),
+        ("consigned", "Компоненти надаємо ми (надішлемо)", "Customer-supplied (consigned) parts",
+         "Beigestellte Bauteile", "U1: модуль LTE (надішлемо)\nU3: SIM-чип MFF2"),
+        ("substitutes", "Заміни компонентів", "Component substitutions", "Bauteilalternativen",
+         "лише з BOM, без замін / аналоги з погодженням"),
     ]),
     "cable": ("🔌 Кабелі й збірки", [
         ("cable", "Кабель", "Cable type", "Kabeltyp", "RG316 / LMR-200"),
@@ -82,6 +86,9 @@ TEMPLATES = {
         ("tolerance", "Допуски", "Tolerances", "Toleranzen", "ISO 2768-m"),
     ]),
 }
+# 🟩🔧 плати й складання разом (PCBA під ключ) — поля обох форм; «Плати» тут не питаємо, бо виготовляє постачальник
+TEMPLATES["pcb_pcba"] = ("🟩🔧 Плати + складання (PCBA під ключ)",
+                         TEMPLATES["pcb"][1] + [f for f in TEMPLATES["pcba"][1] if f[0] != "boards"])
 TEMPLATE_CHOICES = [(k, v[0]) for k, v in TEMPLATES.items()]
 
 TEXTS = {
@@ -138,10 +145,11 @@ def subject_for(req) -> str:
 
 
 def build_body(req) -> str:
-    """Текст запиту мовою запиту (без привітання — воно своє кожному отримувачу, greeting)."""
+    """Текст запиту мовою запиту; перший рядок — змінна {greeting} (кожному своє привітання, render) — щоб людина
+    бачила, як працюють змінні, і могла замінити на свої."""
     t = TEXTS.get(req.language, TEXTS["en"])
     col = {"uk": 1, "en": 2, "de": 3}.get(req.language, 2)
-    lines = [t["intro"], "", req.title, ""]
+    lines = ["{greeting}", "", t["intro"], "", req.title, ""]
     for f in fields_of(req.template):
         value = str((req.specs or {}).get(f[0]) or "").strip()
         if value:
@@ -164,6 +172,27 @@ def build_body(req) -> str:
         lines.append(t["by"].format(date=req.reply_by.strftime("%d.%m.%Y")))
     lines += ["", f"{t['ref']}: {req.code}", "", t["thanks"]]
     return "\n".join(lines).strip()
+
+
+# «✍️ Приклад зі змінними» у формі — (тема, текст) мовою запиту; людина дописує деталі й міняє як хоче
+EXAMPLES = {
+    "en": ("[{code}] Request for quotation: {title}",
+           "{greeting}\n\nwe would like to receive your quotation for {title}.\n\n"
+           "… details: quantities, specifications, attached files …\n\n"
+           "Please include the unit price for each quantity, lead time, shipping cost and validity of the offer. "
+           "We would appreciate your reply by {reply_by}.\n\nOur reference: {code}\n\nThank you in advance."),
+    "de": ("[{code}] Angebotsanfrage: {title}",
+           "{greeting}\n\nwir bitten um Ihr Angebot für {title}.\n\n"
+           "… Details: Mengen, Spezifikation, Anhänge …\n\n"
+           "Bitte nennen Sie den Stückpreis je Menge, die Lieferzeit, die Versandkosten und die Gültigkeit des "
+           "Angebots. Wir freuen uns über Ihre Antwort bis {reply_by}.\n\nUnsere Referenz: {code}\n\n"
+           "Vielen Dank im Voraus."),
+    "uk": ("[{code}] Запит пропозиції: {title}",
+           "{greeting}\n\nпросимо надіслати пропозицію на {title}.\n\n"
+           "… деталі: кількості, параметри, файли …\n\n"
+           "Вкажіть, будь ласка, ціну за одиницю для кожної кількості, строк виготовлення, вартість доставки й "
+           "термін дії пропозиції. Чекаємо відповідь до {reply_by}.\n\nНаш номер: {code}\n\nДякуємо!"),
+}
 
 
 # Змінні в темі й тексті листа — кожному своє (render). Без {greeting} / {name} / {first_name} у тексті привітання

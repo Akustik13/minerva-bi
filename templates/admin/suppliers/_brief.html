@@ -1,0 +1,26 @@
+{# Коротко про постачальника — панель праворуч у формі запиту: suppliers/admin_supplier.py brief_view #}
+<div class="rqb">
+  <div class="rqb-h"><a href="{{ card_url }}" target="_blank" translate="no"><b>{{ s.name }}</b></a></div>
+  <div class="rqb-line">{{ s.get_status_display }} · {{ source }}{% if fair_later %} <span class="spf-muted">{{ fair_later_text }}</span>{% endif %}{% if stars %} · <span title="Наша оцінка">{{ stars }}</span>{% endif %}</div>
+  {% if cats %}<div class="sp-chips">{% for c in cats %}<span class="sp-chip" style="border-color:{{ c.color }}">{{ c.icon }} {{ c.name }}</span>{% endfor %}</div>{% endif %}
+  <div class="rqb-line" translate="no">
+    {% if s.addr_city or s.addr_country %}🌍 {{ s.addr_city }}{% if s.addr_city and s.addr_country %}, {% endif %}{{ s.addr_country }}<br>{% endif %}
+    {% if s.website %}🌐 <a href="{% if '://' in s.website %}{{ s.website }}{% else %}https://{{ s.website }}{% endif %}" target="_blank" rel="noopener noreferrer nofollow">{{ s.website }}</a><br>{% endif %}
+    {% if s.email %}✉️ {{ s.email }}<br>{% endif %}
+    {% if s.phone %}📞 {{ s.phone }}{% endif %}
+  </div>
+  {% if events %}<div class="rqb-line">🎪 <span translate="no">{{ events|join:", " }}</span></div>{% endif %}
+  {% if s.description %}<details class="rqb-desc"><summary>📝 Що роблять</summary><div class="sp-note" translate="no">{{ s.description|truncatechars:600 }}</div></details>{% endif %}
+  <div class="rqb-sub">👥 Контактні особи ({{ contacts|length }})</div>
+  {% for c in contacts %}
+  <div class="rqb-contact" translate="no">{% if c.is_primary %}⭐ {% endif %}<b>{{ c.name }}</b>{% if c.position %} · {{ c.position }}{% endif %}
+    <div class="spf-muted">{% if c.email %}{{ c.email }}{% endif %}{% if c.phone %} · 📞 {{ c.phone }}{% endif %}{% if c.mobile %} · 📱 {{ c.mobile }}{% endif %}{% if not c.is_active %} · <span translate="yes">уже не працює</span>{% endif %}</div></div>
+  {% empty %}<div class="spf-muted">—</div>{% endfor %}
+  <div class="rqb-sub">📊 Історія з нами</div>
+  <div class="rqb-line">🗒️ Закупівель: <b>{{ po_count }}</b>{% if po_last %} · остання {{ po_last|date:"d.m.Y" }}{% endif %}<br>
+    📨 Запитів надсилали: <b>{{ asked }}</b>{% if asked %} · з пропозицією {{ quoted }}{% if chosen %} · вибрано {{ chosen }}{% endif %}{% endif %}</div>
+  {% if cards %}<div class="rqb-sub">🪪 Візитки й фото</div>
+  <div class="rqb-cards">{% for m in cards %}<a href="{% url 'admin:inventory_supplier_card_review' m.pk %}" target="_blank" title="{{ m.event }}"><img src="{{ m.image.url }}" alt="" loading="lazy"></a>{% endfor %}</div>{% endif %}
+  {% if s.notes %}<div class="rqb-sub">📝 Нотатки</div><div class="sp-note" translate="no">{{ s.notes|truncatechars:400 }}</div>{% endif %}
+  <div class="rqb-line" style="margin-top:8px"><a class="button" href="{{ card_url }}" target="_blank">Відкрити картку →</a></div>
+</div>
