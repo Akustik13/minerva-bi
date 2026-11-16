@@ -346,8 +346,11 @@ async def transcribe(request):
 
 
 async def dictate_ping(request):
-    """🎤 Чи можна диктувати через RAG-ПК (Minerva питає перед записом; CORS — guard)."""
+    """🎤 Чи можна диктувати через RAG-ПК (Minerva питає перед записом; CORS — guard). ?warm=1 — людина почала
+    говорити: модель вантажиться у фоні вже зараз (Dictation.warm)."""
     ctx = _bench(request)
+    if request.query.get("warm") == "1":
+        ctx["dictation"].warm()
     return web.json_response({"ok": True, "version": VERSION, "ip": request["client_ip"], **ctx["dictation"].info()})
 
 

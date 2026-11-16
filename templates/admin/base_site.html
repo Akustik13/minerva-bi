@@ -24,7 +24,7 @@
 <script src="/static/admin/js/mv_contrast.js?v=2" defer></script>
 {% if user.is_authenticated and user.is_staff %}<script src="/static/admin/js/mv_show.js?v=2" defer></script>{% endif %}
 {% if user.is_authenticated and user.is_staff %}{# 🧭 спільне меню (правий клік, ⚙ / ⋯): панель праворуч і бокове меню #}<link rel="stylesheet" href="/static/admin/css/mv_menu.css?v=2"><script src="/static/admin/js/mv_menu.js?v=2" defer></script>{% endif %}
-{% if user.is_authenticated and user.is_staff %}{# 🎤 голосовий набір у полях, де пишуть текст (вимкнути — «Мої налаштування») #}<script src="/static/admin/js/mv_voice.js?v=3" data-bench="{{ MV_VOICE_BENCH|default:'' }}" defer></script>{% endif %}
+{% if user.is_authenticated and user.is_staff %}{# 🎤 голосовий набір у полях, де пишуть текст (вимкнути — «Мої налаштування») #}<script src="/static/admin/js/mv_voice.js?v=4" data-bench="{{ MV_VOICE_BENCH|default:'' }}" defer></script>{% endif %}
 {% load side_panel_tags %}{% if cl %}{% side_panel_config cl %}{% endif %}{# 📌 панель праворуч у списку (core/side_panel.py) #}
 {% if MV_UI_DICT %}{# інтерфейс іншою мовою (core/ui_text): сторінку видно, щойно переклад готовий (не довше 1,5 с) #}
 <style>html.mv-tr-pending body{visibility:hidden}</style>

@@ -1474,7 +1474,7 @@ class LinkPipelineTests(LinkTestBase):
         self.assertEqual(sync["sessions"][0], {"meeting": 12, "uid": UID, "session": sid,
                                                "token_sha256": __import__("hashlib").sha256(PUSH.encode()).hexdigest(),
                                                "stage": "done", "progress": None, "queue_pos": 0, "audio_on_bench": False})
-        self.assertEqual(sync["bench"], {"version": "0.3.4", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
+        self.assertEqual(sync["bench"], {"version": "0.3.5", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
                                          "last_error": "", "retention_days": 30, "standalone": False})
 
     async def test_empty_transcript_and_audio_text(self):
@@ -2524,7 +2524,7 @@ class QuickStartPageTests(unittest.TestCase):
     def test_assets_carry_the_version(self):
         from bench import VERSION
 
-        self.assertEqual(VERSION, "0.3.4")
+        self.assertEqual(VERSION, "0.3.5")
         self.assertIn(f"/static/bench.js?v={VERSION}", self.html)
         self.assertIn(f"/static/bench.css?v={VERSION}", self.html)
 
@@ -3028,6 +3028,85 @@ class ServerDictationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.status, 403)
         self.assertEqual((await r.json())["code"], "not_allowed")            # Minerva скаже, що цей ПК не дозволено
         self.assertEqual(r.headers["Access-Control-Allow-Origin"], self.MINERVA)
+
+
+
+# ==== 0.3.5: 🎤 the model loads while the person still speaks (ping ?warm=1) =========================================
+class DictationWarmTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = config.load(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_warm_loads_once_in_the_background_and_is_not_released_meanwhile(self):
+        import threading
+        import time
+
+        from bench import dictate
+        d = dictate.Dictation(self.cfg)
+        gate, loads = threading.Event(), []
+
+        def slow_load():
+            loads.append(1)
+            gate.wait(5)
+            d.model, d.device = _FakeWhisper(), "cuda"
+
+        d._load = slow_load
+        self.assertTrue(d.warm())
+        self.assertTrue(d.info()["warming"])
+        self.assertFalse(d.warm())                                            # уже вантажиться — вдруге ні
+        self.assertFalse(d.release(idle_only=False))                          # під час завантаження не вивантажити
+        gate.set()
+        d._warm_thread.join(5)
+        self.assertEqual((len(loads), d.info()["warming"], d.info()["loaded"]), (1, False, True))
+        self.assertFalse(d.warm())                                            # модель уже є
+        self.assertGreater(d.last, time.time() - 5)                           # одразу після прогріву не вивантажиться
+        self.assertFalse(d.release())
+
+    def test_a_failed_warm_up_is_not_fatal(self):
+        from bench import dictate
+        d = dictate.Dictation(self.cfg)
+
+        def broken():
+            raise RuntimeError("CUDA out of memory")
+
+        d._load = broken
+        self.assertTrue(d.warm())
+        d._warm_thread.join(5)
+        self.assertEqual((d.info()["warming"], d.info()["loaded"]), (False, False))
+
+
+class ServerWarmTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        from aiohttp.test_utils import TestClient, TestServer
+
+        from bench import server
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = config.load(self.tmp.name)
+        self.cfg.override("minerva_url", "https://sevskiy.minerva-bi.example")
+        self.app = server.create_app(self.cfg, background=False)
+        self.client = TestClient(TestServer(self.app, host="127.0.0.1"))
+        await self.client.start_server()
+        self.ctx = self.app[server.APP_KEY]
+
+    async def asyncTearDown(self):
+        await self.client.close()
+        self.tmp.cleanup()
+
+    async def test_ping_warm_starts_loading(self):
+        from unittest.mock import patch
+        origin = {"Origin": "https://sevskiy.minerva-bi.example"}
+        with patch.object(self.ctx["dictation"], "warm", return_value=True) as warm:
+            r = await self.client.get("/api/dictate/ping", headers=origin)
+            self.assertEqual(r.status, 200)
+            warm.assert_not_called()                                          # звичайна перевірка — без прогріву
+            r = await self.client.get("/api/dictate/ping?warm=1", headers=origin)
+            self.assertEqual(r.status, 200)
+            warm.assert_called_once_with()
+            self.assertIn("warming", await r.json())
 
 
 if __name__ == "__main__":

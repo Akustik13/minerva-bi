@@ -240,6 +240,13 @@
       .then(function (good) { clearTimeout(timer); rag.at = Date.now(); rag.pending = null; return good; });
     return rag.pending;
   }
+  function warm() {
+    // людина почала говорити — RAG-ПК вантажить модель уже зараз (після паузи це ~12 с), а не після «стоп»
+    fetch(BENCH + '/api/dictate/ping?warm=1', {mode: 'cors', credentials: 'omit', cache: 'no-store'})
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d && d.ok) { rag.info = d; rag.state = 'ok'; rag.at = Date.now(); } })
+      .catch(function () { /* скаже сам запит на розпізнавання */ });
+  }
   function ragProblem() {
     if (rag.why === 'not_allowed') return 'цей ПК' + (rag.ip ? ' (' + rag.ip + ')' : '') + ' не в списку дозволених на RAG-ПК';
     if (rag.why === 'error') return 'RAG-ПК відповів помилкою';
@@ -472,6 +479,7 @@
       var t = {el: el, clean: clean, stream: stream, recorder: recorder, chunks: [], started: Date.now(), peak: 0,
                level: 0, cancel: false, sending: false};
       take = t;
+      warm();
       recorder.ondataavailable = function (ev) { if (ev.data && ev.data.size) t.chunks.push(ev.data); };
       recorder.onstop = function () { ragSend(t); };
       try {
@@ -543,7 +551,9 @@
     var url = BENCH + '/api/dictate?lang=' + encodeURIComponent(l === 'auto' ? 'auto' : l.slice(0, 2)) +
       '&clean=' + (t.clean ? '1' : '0');
     if (btn) { btn.classList.add('wait'); title(); }
-    say([['', '⏳ Розпізнаю на RAG-ПК' + (t.clean ? ' (спершу чистка шуму)' : '') + '…']]);
+    var cold = !!(rag.info && (rag.info.warming || !rag.info.loaded));
+    say([['', '⏳ Розпізнаю на RAG-ПК' + (t.clean ? ' (спершу чистка шуму)' : '') + '…']].concat(cold
+      ? [['', '\n'], ['i', 'модель ще завантажується — після паузи перший раз до 15 с']] : []));
     var ctl = window.AbortController ? new AbortController() : null;
     var timer = setTimeout(function () { if (ctl) ctl.abort(); }, SEND_TIMEOUT);
     fetch(url, {method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store', body: blob,
@@ -557,7 +567,9 @@
         var d = res.d;
         if (d.text) insert(t.el, d.text, d.language);       // «кома» / «крапка» — мовою, яку почув RAG-ПК
         var where = (d.device === 'cuda' ? 'відеокарта' : 'процесор') + (d.cleaned ? ' · 🧹' : '');
-        say(d.text ? [['', '✅ RAG-ПК · ' + where + ' · ' + String(d.seconds).replace('.', ',') + ' с']]
+        if (rag.info) { rag.info.loaded = true; rag.info.warming = false; rag.info.device = d.device; }
+        var load = d.load_s ? ' (модель завантажено за ' + String(d.load_s).replace('.', ',') + ' с)' : '';
+        say(d.text ? [['', '✅ RAG-ПК · ' + where + ' · ' + String(d.seconds).replace('.', ',') + ' с' + load]]
           : [['', '🎤 RAG-ПК нічого не почув — говоріть ближче до мікрофона.']], d.text ? 2500 : 6000);
       }, function (err) {
         rag.state = 'down';                                 // наступний клік — знову перевірка (і браузер, якщо треба)

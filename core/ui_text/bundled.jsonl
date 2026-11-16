@@ -339,6 +339,7 @@
 {"uk": "(майбутнє)", "en": "(future)", "de": "(Zukunft)"}
 {"uk": "(макс. 35 симв.)", "en": "(max. 35 chars)", "de": "(max. 35 Zeichen)"}
 {"uk": "(митна декларація вивозу).", "en": "(export customs declaration).", "de": "(Ausfuhranmeldung)."}
+{"uk": "(модель завантажено за", "en": "(model loaded in", "de": "(Modell geladen in"}
 {"uk": "(на (такі|ці|подібні|всі|усі) лист|на листи (від|з|типу|про)|завжди відповідай|відповідай (сам|сама|автоматично)|автовідповід|відповідати (на такі|самому|самій|автоматично))", "en": "(на (такі|ці|подібні|всі|усі) лист|на листи (від|з|типу|про)|завжди відповідай|відповідай (сам|сама|автоматично)|автовідповід|відповідати (на такі|самому|самій|автоматично))", "de": "(на (такі|ці|подібні|всі|усі) лист|на листи (від|з|типу|про)|завжди відповідай|відповідай (сам|сама|автоматично)|автовідповід|відповідати (на такі|самому|самій|автоматично))"}
 {"uk": "(на RAG-ПК, без хмари)", "en": "(on the RAG PC, no cloud)", "de": "(auf dem RAG-PC, ohne Cloud)"}
 {"uk": "(назва, IBAN, адреса)", "en": "(name, IBAN, address)", "de": "(Name, IBAN, Adresse)"}
@@ -20029,6 +20030,7 @@
 {"uk": "мова: {0}", "en": "language: {0}", "de": "Sprache: {0}"}
 {"uk": "модель {0}", "en": "model {0}", "de": "Modell {0}"}
 {"uk": "модель недоступна для цього рахунку API — виберіть іншу модель", "en": "the model is not available for this API account — select another model", "de": "das Modell ist für dieses API-Konto nicht verfügbar – wählen Sie ein anderes Modell"}
+{"uk": "модель ще завантажується — після паузи перший раз до 15 с", "en": "the model is still loading — the first time after a pause takes up to 15 s", "de": "das Modell wird noch geladen — beim ersten Mal nach einer Pause bis zu 15 s"}
 {"uk": "модуль", "en": "module", "de": "Modul"}
 {"uk": "модуль shipping недоступний", "en": "the shipping module is unavailable", "de": "das Modul shipping ist nicht verfügbar"}
 {"uk": "модуль вимкнено", "en": "module disabled", "de": "Modul deaktiviert"}

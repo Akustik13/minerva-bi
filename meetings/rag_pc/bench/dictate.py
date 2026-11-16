@@ -59,12 +59,36 @@ class Dictation:
         self.last = 0.0
         self.lock = threading.Lock()      # одне диктування за раз (наступне чекає)
         self.busy = False
+        self.loading = False              # прогрів: модель вантажиться, поки людина ще говорить
+        self._warm_thread = None
 
     # ---- стан і модель --------------------------------------------------------------------------
     def info(self):
         return {"model": self.cfg["whisper_live_model"], "loaded": self.model is not None, "device": self.device,
-                "busy": self.busy, "denoise": denoise.exe_path(self.cfg) is not None,
+                "busy": self.busy, "warming": self.loading, "denoise": denoise.exe_path(self.cfg) is not None,
                 "max_seconds": MAX_SECONDS}
+
+    def warm(self):
+        """Завантажити модель наперед — Minerva просить на початку запису (ping ?warm=1), тож перші ~12 с завантаження
+        на відеокарту припадають на те, поки людина говорить. У фоні; уже є / вантажиться / диктують — нічого."""
+        if self.model is not None or self.loading or self.busy:
+            return False
+        self.loading = True
+
+        def work():
+            try:
+                with self.lock:
+                    if self.model is None:
+                        self._load()
+                    self.last = time.time()      # щоб не вивантажилась одразу після прогріву
+            except Exception as exc:  # noqa: BLE001 - диктування саме спробує ще раз і скаже, що не так
+                log.warning("dictation warm-up failed: %s", exc)
+            finally:
+                self.loading = False
+
+        self._warm_thread = threading.Thread(target=work, name="dictation-warm", daemon=True)
+        self._warm_thread.start()
+        return True
 
     def _device(self):
         if self.live_gpu():
@@ -101,7 +125,7 @@ class Dictation:
 
     def release(self, idle_only=True):
         """Вивантажити модель (відеопам'ять — іншим): якщо зараз не диктують; idle_only — лише після паузи."""
-        if self.model is None or self.busy:
+        if self.model is None or self.busy or self.loading:
             return False
         if idle_only and time.time() - self.last < int(self.cfg["dictate_idle_seconds"]):
             return False
