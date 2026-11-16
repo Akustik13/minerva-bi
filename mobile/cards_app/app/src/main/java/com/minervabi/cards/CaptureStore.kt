@@ -15,6 +15,7 @@ data class Capture(
     var front: String = "",
     var back: String = "",
     var kind: String = "card",
+    var role: String = "",
     var event: String = "",
     var note: String = "",
     var marks: List<String> = emptyList(),
@@ -35,6 +36,7 @@ data class Capture(
 
     fun toJson(): JSONObject = JSONObject()
         .put("uuid", uuid).put("created_at", createdAt).put("front", front).put("back", back).put("kind", kind)
+        .put("role", role)
         .put("event", event).put("note", note).put("marks", JSONArray(marks)).put("categories", JSONArray(categories))
         .put("preset", presetId ?: JSONObject.NULL).put("read_ai", readAi).put("model", model)
         .put("qr_front", qrFront).put("qr_back", qrBack).put("status", status).put("server_id", serverId)
@@ -48,7 +50,7 @@ data class Capture(
 
         fun parse(o: JSONObject) = Capture(
             uuid = o.str("uuid"), createdAt = o.optLong("created_at"), front = o.str("front"), back = o.str("back"),
-            kind = o.str("kind").ifEmpty { "card" }, event = o.str("event"), note = o.str("note"),
+            kind = o.str("kind").ifEmpty { "card" }, role = o.str("role"), event = o.str("event"), note = o.str("note"),
             marks = o.optJSONArray("marks").strings(), categories = o.optJSONArray("categories").ints(),
             presetId = if (o.isNull("preset")) null else o.optInt("preset"), readAi = o.optBoolean("read_ai", true),
             model = o.str("model"), qrFront = o.str("qr_front"), qrBack = o.str("qr_back"),

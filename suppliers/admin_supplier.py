@@ -1020,7 +1020,8 @@ class SupplierCardMixin:
                              kind=P.get("kind"), title=P.get("title", ""), event=P.get("event", ""),
                              note=P.get("note", ""), marks=P.getlist("marks"),
                              categories=self._categories_from_post(request), preset_id=P.get("preset"),
-                             qr_front=P.get("qr_front", ""), qr_back=P.get("qr_back", ""), supplier=supplier)
+                             qr_front=P.get("qr_front", ""), qr_back=P.get("qr_back", ""), supplier=supplier,
+                             role=P.get("role", ""))
             url =reverse("admin:inventory_supplier_card_review", args=[m.pk])
             job = ""
             if request.POST.get("read_ai"):
@@ -1046,6 +1047,7 @@ class SupplierCardMixin:
             chosen = self._default_preset(request.user)
         return TemplateResponse(request, "admin/suppliers/card.html", self._ctx(
             request, "📷 Візитка / флаєр", supplier=supplier, kinds=SupplierMedia.KINDS, marks=SupplierMedia.MARKS,
+            roles=SupplierMedia.ROLES,
             categories=SupplierCategory.objects.filter(is_active=True), presets_json=presets,
             sides=[("front", "Лицьовий бік", True), ("back", "Зворотний бік", False)],
             preset_now=int(chosen) if str(chosen or "").isdigit() else None,
@@ -1130,6 +1132,31 @@ class SupplierCardMixin:
             if len(out["skipped"]) > 10:
                 self.message_user(request, f"… і ще пропущено {len(out['skipped']) - 10}", messages.WARNING)
             return redirect(request.get_full_path())
+        if request.method == "POST" and request.POST.get("action") == "to_customers":  # 👤 вибрані → клієнти CRM
+            u = request.user
+            if not (u.has_perm("crm.add_customer") or u.has_perm("crm.change_customer")):
+                self.message_user(request, "Немає права вносити клієнтів у CRM.", messages.ERROR)
+                return redirect(request.get_full_path())
+            ids = [int(x) for x in request.POST.getlist("ids") if str(x).isdigit()][:100]
+            mine = [m for m in SupplierMedia.objects.filter(pk__in=ids).select_related("supplier", "customer")
+                    .order_by("created_at")
+                    if _can(request, "change") or (_can(request, "add") and m.created_by_id == u.pk)]
+            if not mine:
+                self.message_user(request, "Немає вибраних візиток, які вам можна вносити.", messages.ERROR)
+                return redirect(request.get_full_path())
+            out = cards.to_customers(mine, u, can_add=u.has_perm("crm.add_customer"),
+                                     can_change=u.has_perm("crm.change_customer"))
+            if out["created"] or out["attached"]:
+                self.message_user(request, format_html(
+                    "👤 Нових клієнтів CRM: {} · ➕ додано до наявних: {}{}", len(out["created"]), len(out["attached"]),
+                    format_html_join("", ' · <a href="{}" translate="no">{}</a>', (
+                        (reverse("admin:crm_customer_change", args=[c.pk]), c.company or c.name)
+                        for _m, c in (out["created"] + out["attached"])[:12]))), messages.SUCCESS)
+            for line in out["skipped"][:10]:
+                self.message_user(request, f"⏭ {line}", messages.WARNING)
+            if len(out["skipped"]) > 10:
+                self.message_user(request, f"… і ще пропущено {len(out['skipped']) - 10}", messages.WARNING)
+            return redirect(request.get_full_path())
         if request.method == "POST" and request.POST.get("action") == "delete_many":  # 🗑 вибрані
             ids = [int(x) for x in request.POST.getlist("ids") if str(x).isdigit()][:200]
             gone = refused = 0
@@ -1172,6 +1199,11 @@ class SupplierCardMixin:
             qs = qs.filter(supplier=None, customer=None)
         elif show == "inbase":                  # ще не внесені, а такий постачальник уже є (base_match нижче)
             qs = qs.filter(supplier=None)
+        role = request.GET.get("role", "")                  # 👥 хто це: постачальник / клієнт / інше / «-» не вказано
+        if role == "-":
+            qs = qs.filter(role="")
+        elif role and role in dict(SupplierMedia.ROLES):
+            qs = qs.filter(role=role)
         event = " ".join(request.GET.get("event", "").split())[:200]       # клік на подію в «📊 Статистиці»
         if event == "-":
             qs = qs.filter(event="")
@@ -1219,6 +1251,7 @@ class SupplierCardMixin:
         cat_opts = [(c, by_cat.get(c.pk, 0)) for c in all_cats if by_cat.get(c.pk) or c.pk == cat_id]
         return TemplateResponse(request, "admin/suppliers/cards.html", self._ctx(
             request, "🪪 Візитки й флаєри", items=items, show=show, q=q, mark=mark, marks=SupplierMedia.MARKS,
+            role=role, role_opts=cards.role_counts(),
             ai_filter=ai_filter, can_read=can_read, prefs=cards.tile_prefs(u), tile_fields=cards.TILE_FIELDS,
             event=event, stats=stats, cat_id=cat_id, cat_opts=cat_opts,
             cat_now=next((c for c in all_cats if c.pk == cat_id), None),
@@ -1426,7 +1459,12 @@ class SupplierCardMixin:
             if request.POST.get("kind") in dict(SupplierMedia.KINDS):
                 m.kind = request.POST["kind"]
             m.marks = [x for x in request.POST.getlist("marks") if x in dict(SupplierMedia.MARKS)]
-            m.save(update_fields=["note", "event", "title", "kind", "marks"])
+            fields = ["note", "event", "title", "kind", "marks"]
+            role = request.POST.get("role")
+            if role is not None and role in dict(SupplierMedia.ROLES) and (role != m.role or m.role_ai):
+                m.role, m.role_ai = role, False          # людина вибрала — AI вже не міняє
+                fields += ["role", "role_ai"]
+            m.save(update_fields=fields)
             self.message_user(request, "💾 Збережено", messages.SUCCESS)
             return redirect(url)
         if action == "ai":
@@ -1512,6 +1550,7 @@ class SupplierCardMixin:
         return TemplateResponse(request, "admin/suppliers/card_review.html", self._ctx(
             request, f"📷 {m.title or m.get_kind_display()}", m=m, d=data, matches=matches, picked=picked,
             categories=SupplierCategory.objects.filter(is_active=True), kinds=SupplierMedia.KINDS,
+            roles=SupplierMedia.ROLES,
             marks=SupplierMedia.MARKS, can_edit=can_edit, can_add=_can(request, "add"),
             can_change=_can(request, "change"), job=request.GET.get("job", ""),
             photo_sides=[{"key": k, "file": f, "original": o} for k, f, o in (

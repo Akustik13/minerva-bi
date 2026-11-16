@@ -66,6 +66,10 @@ object Dialogs {
         val kinds = ChipGroup(context).apply { isSingleSelection = true; isSelectionRequired = true }
         meta.kinds.forEach { (k, l) -> kinds.addToggle(l, k == (p?.kind ?: "card"), k).isCheckedIconVisible = false }
         box.addView(kinds)
+        box.addView(context.label("👥 Хто це для нас (напр. «наш стенд» — відвідувачі: 👤 клієнти)"))
+        val roles = ChipGroup(context).apply { isSingleSelection = true }
+        meta.roles.forEach { (k, l) -> roles.addToggle(l, k == (p?.role ?: ""), k).isCheckedIconVisible = false }
+        box.addView(roles)
         box.addView(context.label("⭐ Позначки"))
         val marks = ChipGroup(context)
         meta.marks.forEach { (k, l) -> marks.addToggle(l, k in (p?.marks ?: listOf("fair")), k) }
@@ -87,6 +91,7 @@ object Dialogs {
                 val body = JSONObject().put("action", "save").put("name", name.text.toString().trim())
                     .put("event", event.text.toString().trim())
                     .put("kind", kinds.checkedTags().firstOrNull()?.toString() ?: "card")
+                    .put("role", roles.checkedTags().firstOrNull()?.toString() ?: "")
                     .put("marks", JSONArray(marks.checkedTags())).put("categories", JSONArray(cats.checkedTags()))
                     .put("note", note.text.toString().trim()).put("read_ai", ai.isChecked).put("shared", shared.isChecked)
                     .put("make_default", def.isChecked).put("model", p?.model.orEmpty())

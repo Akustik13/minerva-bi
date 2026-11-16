@@ -40,6 +40,7 @@ class BrowseFragment : Fragment() {
     private var show = ""
     private var cat = 0
     private var event = ""
+    private var role = ""
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, s: Bundle?): View {
         _b = FragmentListBinding.inflate(inflater, container, false)
@@ -87,6 +88,7 @@ class BrowseFragment : Fragment() {
         if (ai.isNotEmpty()) active(aiLabels.first { it.first == ai }.second) { ai = "" }
         if (cat > 0) active(meta.category(cat)?.label ?: "🗂 категорія") { cat = 0 }
         if (event.isNotEmpty()) active(if (event == "-") "🎪 без події" else "🎪 ${event.take(28)}") { event = "" }
+        if (role.isNotEmpty()) active(if (role == "-") "👥 не вказано" else meta.roleLabel(role)) { role = "" }
         val n = bb.filters.childCount
         bb.filters.show(n > 0)
         bb.btnFilters.text = if (n > 0) "⚙ Фільтри · $n" else "⚙ Фільтри"
@@ -104,6 +106,13 @@ class BrowseFragment : Fragment() {
         who.addToggle("👤 Лише мої", mine) { mine = it }
         who.addToggle("🆕 Ще не внесені в постачальники / CRM", show == "new") { show = if (it) "new" else "" }
         box.addView(who)
+
+        section("👥 Хто це для нас")
+        val roleGroup = ChipGroup(ctx).apply { isSingleSelection = true; isSelectionRequired = true }
+        roleGroup.addToggle("Усі", role.isEmpty(), "") { on -> if (on) role = "" }.isCheckedIconVisible = false
+        meta.roles.forEach { (k, l) -> roleGroup.addToggle(l, role == k, k) { on -> if (on) role = k }.isCheckedIconVisible = false }
+        roleGroup.addToggle("❔ Не вказано", role == "-", "-") { on -> if (on) role = "-" }.isCheckedIconVisible = false
+        box.addView(roleGroup)
 
         section("🧠 AI")
         val aiGroup = ChipGroup(ctx).apply { isSingleSelection = true; isSelectionRequired = true }
@@ -131,7 +140,7 @@ class BrowseFragment : Fragment() {
             setPadding(0, ctx.dp(16), 0, ctx.dp(20))
         }
         row.addRowButton(ctx.button("outlined", "↺ Скинути все") {
-            mine = false; show = ""; ai = ""; cat = 0; event = ""
+            mine = false; show = ""; ai = ""; cat = 0; event = ""; role = ""
             dialog.dismiss()
         }, false)
         row.addRowButton(ctx.button("filled", "✓ Показати") { dialog.dismiss() }, true)
@@ -155,7 +164,8 @@ class BrowseFragment : Fragment() {
 
     private fun params(p: Int) = mapOf(
         "q" to b.search.text?.toString()?.trim().orEmpty(), "mine" to (if (mine) "1" else ""), "ai" to ai,
-        "show" to show, "cat" to (if (cat > 0) cat.toString() else ""), "event" to event, "page" to p.toString(),
+        "show" to show, "cat" to (if (cat > 0) cat.toString() else ""), "event" to event, "role" to role,
+        "page" to p.toString(),
     )
 
     private val firstPage get() = params(1).filterKeys { it != "page" }.values.all { it.isEmpty() }
@@ -204,8 +214,9 @@ class BrowseFragment : Fragment() {
             val c = items[pos]
             val meta = Prefs.meta()
             ImageLoader.server(requireContext(), viewLifecycleOwner.lifecycleScope, h.v.thumb, c.id)
-            h.v.line1.text = listOf(c.company, c.person).filter { it.isNotEmpty() }.joinToString(" · ")
-                .ifEmpty { c.title.ifEmpty { meta.kindLabel(c.kind) } }
+            h.v.line1.text = (meta.roleIcon(c.role).let { if (it.isEmpty()) "" else "$it " }) +
+                listOf(c.company, c.person).filter { it.isNotEmpty() }.joinToString(" · ")
+                    .ifEmpty { c.title.ifEmpty { meta.kindLabel(c.kind) } }
             val where = when {
                 c.supplierName.isNotEmpty() -> "🏭 ${c.supplierName}"
                 c.customerName.isNotEmpty() -> "👤 ${c.customerName}"

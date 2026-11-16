@@ -174,6 +174,7 @@ class QueueFragment : Fragment() {
             h.v.line2.text = statusText(c)
             val bits = mutableListOf<String>()
             bits += shortDate(c.createdAt)
+            meta.roleIcon(card?.role ?: c.role).takeIf { it.isNotEmpty() }?.let { bits += it }
             if (c.back.isNotEmpty()) bits += "2 боки"
             if (c.qrFront.isNotEmpty() || c.qrBack.isNotEmpty()) bits += "🔳 QR"
             c.marks.mapTo(bits) { meta.markLabel(it).take(2) }

@@ -106,6 +106,11 @@ class CardDetailActivity : AppCompatActivity() {
 
         // що можна змінити
         val editable = c.editable
+        body.addView(label("👥 Хто це для нас" + if (c.roleAi && c.role.isNotEmpty()) " (підказав AI)" else "", 14f))
+        val roles = ChipGroup(this).apply { isSingleSelection = true }
+        meta.roles.forEach { (k, l) -> roles.addToggle(l, k == c.role, k).apply { isCheckedIconVisible = false; isEnabled = editable } }
+        body.addView(roles)
+        if (c.roleAi && c.roleWhy.isNotEmpty()) body.addView(label("🧠 ${c.roleWhy}", 13f, true))
         body.addView(label("⭐ Позначки", 14f))
         val marks = ChipGroup(this)
         meta.marks.forEach { (k, l) -> marks.addToggle(l, k in c.marks, k).isEnabled = editable }
@@ -134,6 +139,8 @@ class CardDetailActivity : AppCompatActivity() {
         if (editable) add(button("💾 Зберегти", tonal = false) {
             val body2 = JSONObject().put("note", note.text.toString()).put("event", event.text.toString())
                 .put("marks", JSONArray(marks.checkedTags())).put("categories", JSONArray(cats.checkedTags()))
+            val role = roles.checkedTags().firstOrNull()?.toString() ?: ""
+            if (role != c.role) body2.put("role", role)
             push(body2, "💾 Збережено")
         })
         if (meta.perms.upload) add(button(if (c.ai == "ai") "🧠 Прочитати AI ще раз" else "🧠 Прочитати AI") {
@@ -143,7 +150,25 @@ class CardDetailActivity : AppCompatActivity() {
                 } catch (e: ApiException) { alert("AI", e.message.orEmpty()) }
             }
         })
-        if (editable && c.supplierName.isEmpty()) add(button("🏭 У постачальники") {
+        val crm = editable && c.customerName.isEmpty() && meta.perms.crm
+        val toCrm = {
+            lifecycleScope.launch {
+                try {
+                    val r = Api.toCustomer(id)
+                    val n = r.optJSONObject("customer")?.str("name").orEmpty()
+                    val skipped = r.optJSONArray("skipped").strings()
+                    when {
+                        r.optBoolean("created") -> toast("👤 Новий клієнт CRM «$n»")
+                        r.optBoolean("attached") -> toast("➕ Додано до клієнта «$n»")
+                        skipped.isNotEmpty() -> alert("Не внесено", skipped.joinToString("\n"))
+                    }
+                    load()
+                } catch (e: ApiException) { alert("Не внесено", e.message.orEmpty()) }
+            }
+            Unit
+        }
+        if (crm && c.role == "customer") add(button("👤 У CRM (клієнт)", tonal = false) { toCrm() })   // клієнт — першим
+        if (editable && c.supplierName.isEmpty() && c.role != "customer") add(button("🏭 У постачальники") {
             lifecycleScope.launch {
                 try {
                     val r = Api.toSupplier(id)
@@ -158,6 +183,7 @@ class CardDetailActivity : AppCompatActivity() {
                 } catch (e: ApiException) { alert("Не внесено", e.message.orEmpty()) }
             }
         })
+        if (crm && c.role != "customer") add(button("👤 У CRM") { toCrm() })
         add(button("🌐 Відкрити в Minerva") { open("${Prefs.server}/admin/inventory/supplier/cards/$id/") })
         if (editable) add(button("🗑 Видалити з Minerva") {
             confirm("Видалити візитку?", "Фото й примітки зникнуть з Minerva. Постачальник / клієнт, створені з неї, лишаються.", "🗑 Видалити") {

@@ -119,6 +119,7 @@ def info(m, cats=None) -> dict:
     new_cat = d.get("new_category") if isinstance(d.get("new_category"), dict) else {}
     key = ai_state(m)
     return {
+        "role": m.role, "role_label": role_label(m), "role_why": d.get("role_why") or "" if m.role_ai else "",
         "company": d.get("name") or "", "person": d.get("contact_name") or "",
         "position": d.get("contact_position") or "",
         "country": country_name(country) if country else "", "flag": flag(country),
@@ -132,6 +133,37 @@ def info(m, cats=None) -> dict:
                (m.error or "AI не прочитав фото") if key == "failed" else
                "Поля заповнено з QR-коду, AI не запускали" if key == "qr" else "AI ще не читав це фото"},
     }
+
+
+# ── 👥 Хто це: постачальник / клієнт / інше ──
+
+def role_label(m) -> str:
+    from suppliers.models import SupplierMedia
+    if not m.role:
+        return ""
+    return dict(SupplierMedia.ROLES).get(m.role, "") + (" · 🧠" if m.role_ai else "")
+
+
+def clean_role(value) -> str:
+    from suppliers.models import SupplierMedia
+    value = str(value or "").strip()
+    return value if value in dict(SupplierMedia.ROLES) else ""
+
+
+def role_counts() -> list:
+    """[(роль, назва, скільки візиток)] — фільтр «👥 Хто це» у списку візиток."""
+    from django.db.models import Count
+    from suppliers.models import SupplierMedia
+    n = dict(SupplierMedia.objects.values_list("role").annotate(c=Count("pk")).values_list("role", "c"))
+    return [(v, label, n.get(v, 0)) for v, label in SupplierMedia.ROLES]
+
+
+def set_role(m, role):
+    """Людина вибрала «Хто це» (сторінка фото, додаток) — AI цього вже не міняє."""
+    from suppliers.models import SupplierMedia
+    role = clean_role(role)
+    SupplierMedia.objects.filter(pk=m.pk).update(role=role, role_ai=False)
+    m.role, m.role_ai = role, False
 
 
 # ── vCard і «✉️ Поділитись» ──
@@ -358,9 +390,47 @@ def to_customer(m, user, data, customer=None) -> dict:
         customer=customer, user=user, event_type="note",
         title=(f"{m.get_kind_display()}" + (f" · {m.event}" if m.event else "") + (f": {who}" if who else ""))[:300],
         body=mail_text(m) + (f"\n\nФото — у «📎 Документи»: {', '.join(files)}" if files else ""))
-    SupplierMedia.objects.filter(pk=m.pk).update(customer=customer)
-    m.customer = customer
+    SupplierMedia.objects.filter(pk=m.pk).update(customer=customer, role=SupplierMedia.R_CUSTOMER, role_ai=False)
+    m.customer, m.role, m.role_ai = customer, SupplierMedia.R_CUSTOMER, False
     return {"customer": customer, "created": created, "filled": filled, "files": files}
+
+
+def to_customers(ms, user, can_add=True, can_change=True) -> dict:
+    """👤 Вибрані візитки → клієнти CRM (як «🏭 У постачальники»): уже в CRM — пропуск; без даних — пропуск; той
+    самий email чи та сама фірма вже є — до нього (лише порожні поля, фото, нотатка); лише той самий домен —
+    не чіпати (людина перевірить на сторінці фото); немає — новий клієнт. → {created, attached, skipped: [текст]}"""
+    out = {"created": [], "attached": [], "skipped": []}
+    for m in ms:
+        d = card_data(m)
+        label = m.title or d.get("name") or d.get("contact_name") or f"#{m.pk}"
+        if m.customer_id:
+            out["skipped"].append(f"{label}: уже в CRM")
+            continue
+        if not (d.get("name") or d.get("contact_name") or d.get("email") or d.get("contact_email")):
+            out["skipped"].append(f"{label}: ще немає даних — прочитайте AI або QR")
+            continue
+        found = customer_matches(d, limit=3)
+        strong = [(c, why) for c, why in found if why in ("той самий email", "та сама фірма")]
+        if strong:
+            if not can_change:
+                out["skipped"].append(f"{label}: «{strong[0][0]}» уже в CRM — немає права змінювати клієнтів")
+                continue
+            to_customer(m, user, d, customer=strong[0][0])
+            out["attached"].append((m, strong[0][0]))
+            continue
+        if found:
+            out["skipped"].append(f"{label}: схоже на «{found[0][0]}» ({found[0][1]}) — перевірте на сторінці фото")
+            continue
+        if not can_add:
+            out["skipped"].append(f"{label}: немає права створювати клієнтів")
+            continue
+        try:
+            res = to_customer(m, user, d)
+        except ValueError as e:
+            out["skipped"].append(f"{label}: {e}")
+            continue
+        (out["created"] if res["created"] else out["attached"]).append((m, res["customer"]))
+    return out
 
 
 # ── 🧠 AI для кількох візиток ──
@@ -404,7 +474,7 @@ def read_many(ids, user, model) -> dict:
 # ── 📷 Нова візитка ──
 
 def create(user, image, back=None, *, kind="card", title="", event="", note="", marks=(), categories=(),
-           preset_id=None, qr_front="", qr_back="", supplier=None, client_uuid=""):
+           preset_id=None, qr_front="", qr_back="", supplier=None, client_uuid="", role=""):
     """📷 Нова візитка / флаєр — сторінка «📷 Візитка / флаєр» і додаток «Minerva Візитки»: фото обох боків, де
     взяли, примітка, позначки, категорії, пресет; QR, уже розшифрований браузером / телефоном, одразу заповнює поля
     (AI — окремо, ai.card). Постачальник — фото в його картці + подія в історії."""
@@ -419,6 +489,9 @@ def create(user, image, back=None, *, kind="card", title="", event="", note="", 
         m.image_back.save(os.path.basename(back.name or "") or "back.jpg", back, save=False)
     if str(preset_id or "").isdigit():
         m.preset = SupplierCardPreset.objects.filter(Q(owner=user) | Q(shared=True), pk=int(preset_id)).first()
+    # 👥 хто це: вибрано людиною → пресет («наш стенд» — відвідувачі-клієнти) → фото до постачальника; інакше — AI
+    m.role = clean_role(role) or (m.preset.role if m.preset else "") or (
+        SupplierMedia.R_SUPPLIER if supplier is not None else "")
     m.qr_text = qr.join(qr_front or "", qr_back or "")
     fields = qr.parse_all(m.qr_text)
     if fields:
@@ -471,8 +544,9 @@ def attach(m, supplier, user=None) -> list:
     from suppliers.services import draft
     d = m.extracted or {}
     first = m.supplier_id is None
-    SupplierMedia.objects.filter(pk=m.pk).update(supplier=supplier, state=SupplierMedia.APPLIED)
-    m.supplier = supplier
+    SupplierMedia.objects.filter(pk=m.pk).update(supplier=supplier, state=SupplierMedia.APPLIED,
+                                                 role=SupplierMedia.R_SUPPLIER, role_ai=False)
+    m.supplier, m.role, m.role_ai = supplier, SupplierMedia.R_SUPPLIER, False
     if first:
         SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.CARD, media=m, user=user,
                                      text=f"{m.get_kind_display()} додано" + (f" · {m.event}" if m.event else ""))
@@ -498,6 +572,9 @@ def to_suppliers(ms, user, can_add=True, can_change=True) -> dict:
             out["skipped"].append(f"{label}: уже в картці «{m.supplier.name}»")
             continue
         d = m.extracted or {}
+        if m.role == SupplierMedia.R_CUSTOMER:
+            out["skipped"].append(f"{label}: позначено «👤 Клієнт» — «👤 У CRM» (або змініть «Хто це»)")
+            continue
         if not has_data(d):
             out["skipped"].append(f"{label}: ще немає даних — прочитайте AI або QR")
             continue
@@ -523,8 +600,9 @@ def to_suppliers(ms, user, can_add=True, can_change=True) -> dict:
         except ValueError as e:
             out["skipped"].append(f"{label}: {e}")
             continue
-        SupplierMedia.objects.filter(pk=m.pk).update(state=SupplierMedia.APPLIED, supplier=s)
-        m.supplier = s
+        SupplierMedia.objects.filter(pk=m.pk).update(state=SupplierMedia.APPLIED, supplier=s,
+                                                     role=SupplierMedia.R_SUPPLIER, role_ai=False)
+        m.supplier, m.role = s, SupplierMedia.R_SUPPLIER
         out["created"].append((m, s))
         idx = match.Index()                 # наступна візитка тієї самої фірми — уже до нього, без дубля
     return out
