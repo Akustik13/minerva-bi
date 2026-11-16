@@ -535,6 +535,7 @@
 {"uk": ". Оберіть клієнта → snapshot заповниться автоматично.", "en": ". Select a customer → the snapshot is filled in automatically.", "de": ". Wählen Sie einen Kunden → der Snapshot wird automatisch ausgefüllt."}
 {"uk": ". Обов'язкові поля", "en": ". Required fields", "de": ". Pflichtfelder"}
 {"uk": ". Перевірте RAG-ПК: задача «Minerva-Private-RAG», журнал D:\\\\RAG-private-prod\\\\logs\\\\runtime.log.", "en": ". Check the RAG PC: task “Minerva-Private-RAG”, log D:\\\\RAG-private-prod\\\\logs\\\\runtime.log.", "de": ". Prüfen Sie den RAG-PC: Aufgabe „Minerva-Private-RAG“, Protokoll D:\\\\RAG-private-prod\\\\logs\\\\runtime.log."}
+{"uk": ". Перевірте поля перед оформленням.", "en": ". Check the fields before booking.", "de": ". Felder vor der Buchung prüfen."}
 {"uk": ". Передбачає потреби складу", "en": ". Anticipates stock needs", "de": ". Sieht den Lagerbedarf voraus"}
 {"uk": ". Повторне натискання «Передати» оновлює те саме замовлення, повторне «Доставлено» з тією самою накладною", "en": ". Pressing “Transfer” again updates the same order; pressing “Delivered” again with the same delivery note", "de": ". Erneutes Klicken auf „Übergeben“ aktualisiert denselben Auftrag, erneutes „Geliefert“ mit demselben Lieferschein"}
 {"uk": ". Поля в Minerva вже є.", "en": ". The fields already exist in Minerva.", "de": ". Die Felder sind in Minerva bereits vorhanden."}
@@ -791,6 +792,7 @@
 {"uk": "ABD в UPS — лише для оформленого відправлення UPS з номером 1Z….", "en": "ABD to UPS — only for a booked UPS shipment with a 1Z… number.", "de": "ABD an UPS — nur für eine gebuchte UPS-Sendung mit 1Z…-Nummer."}
 {"uk": "ACL: інша скринька — лист не повертається", "en": "ACL: another mailbox — the e-mail is not returned", "de": "ACL: anderes Postfach — E-Mail wird nicht zurückgegeben"}
 {"uk": "ACL: інший користувач не бачить лист", "en": "ACL: another user does not see the e-mail", "de": "ACL: anderer Benutzer sieht die E-Mail nicht"}
+{"uk": "AI (Claude Haiku) розбирає будь-який формат і пише телефон з кодом країни; без AI — за правилами", "en": "AI (Claude Haiku) reads any format and writes the phone with the country code; without AI — by rules", "de": "KI (Claude Haiku) erkennt jedes Format und schreibt die Telefonnummer mit Ländervorwahl; ohne KI — nach Regeln"}
 {"uk": "AI ({0}, сьогодні {1} з {2}, ≈ {3})", "en": "AI ({0}, today {1} of {2}, ≈ {3})", "de": "KI ({0}, heute {1} von {2}, ≈ {3})"}
 {"uk": "AI (Штучний інтелект)", "en": "AI (Artificial Intelligence)", "de": "KI (Künstliche Intelligenz)"}
 {"uk": "AI (штучний інтелект)", "en": "AI (artificial intelligence)", "de": "KI (künstliche Intelligenz)"}
@@ -849,6 +851,7 @@
 {"uk": "AI не відповів — перевірте ключ AI або спробуйте ще раз", "en": "The AI did not reply — check the AI key or try again", "de": "Die KI hat nicht geantwortet — prüfen Sie den KI-Schlüssel oder versuchen Sie es erneut"}
 {"uk": "AI не відповів — перевірте ключ AI в «⚙️ Налаштування AI»", "en": "The AI did not respond — check the AI key in “⚙️ AI settings”", "de": "Die KI hat nicht geantwortet – prüfen Sie den KI-Schlüssel unter „⚙️ KI-Einstellungen“"}
 {"uk": "AI не відповів — перевірте ключ Anthropic у налаштуваннях AI", "en": "The AI did not reply — check the Anthropic key in the AI settings", "de": "Die KI hat nicht geantwortet — prüfen Sie den Anthropic-Schlüssel in den KI-Einstellungen"}
+{"uk": "AI не відповів — розібрано за правилами, перевірте поля.", "en": "AI did not answer — parsed by rules, check the fields.", "de": "KI hat nicht geantwortet — nach Regeln erkannt, Felder prüfen."}
 {"uk": "AI не відповів: {0}", "en": "AI did not respond: {0}", "de": "KI hat nicht geantwortet: {0}"}
 {"uk": "AI не дав описів (немає ключа Anthropic або листи без тексту) — лишається опис за темами листів.", "en": "The AI returned no descriptions (no Anthropic key or e-mails without text) — the description based on e-mail subjects remains.", "de": "Die KI hat keine Beschreibungen geliefert (kein Anthropic-Schlüssel oder E-Mails ohne Text) – es bleibt die Beschreibung anhand der E-Mail-Betreffs."}
 {"uk": "AI не запускали", "en": "AI was not run", "de": "KI wurde nicht gestartet"}
@@ -887,6 +890,7 @@
 {"uk": "AI прочитає листи цього замовлення з ваших скриньок і випише прохання про відправку — з цитатами", "en": "AI reads this order's emails from your mailboxes and lists the shipping requests — with quotes", "de": "Die KI liest die E-Mails zu diesem Auftrag aus Ihren Postfächern und listet Versandwünsche — mit Zitaten"}
 {"uk": "AI прочитає фірму, контакт і адресу, перевірить, чи вона вже є в базі, і запропонує створити постачальника", "en": "AI reads the company, contact and address, checks whether it is already in the database and offers to create the supplier", "de": "KI liest Firma, Kontakt und Adresse, prüft, ob sie schon in der Datenbank ist, und schlägt vor, den Lieferanten anzulegen"}
 {"uk": "AI резюме", "en": "AI summary", "de": "KI-Zusammenfassung"}
+{"uk": "AI розбирає адресу…", "en": "AI is reading the address…", "de": "KI erkennt die Adresse…"}
 {"uk": "AI рішення: {0}", "en": "AI decision: {0}", "de": "KI-Entscheidung: {0}"}
 {"uk": "AI складає лист…", "en": "AI is composing the letter…", "de": "Die KI erstellt den Brief…"}
 {"uk": "AI складає огляд лише з листів проєкту, даних Minerva і бази знань RAG", "en": "The AI compiles the overview only from the project e-mails, Minerva data and the RAG knowledge base", "de": "Die KI erstellt die Übersicht ausschließlich aus den Projekt-E-Mails, Minerva-Daten und der RAG-Wissensdatenbank"}
@@ -5251,13 +5255,17 @@
 {"uk": "Все одно згенерувати?", "en": "Generate anyway?", "de": "Trotzdem erzeugen?"}
 {"uk": "Все чудово!", "en": "All good!", "de": "Alles in Ordnung!"}
 {"uk": "Всередині замовлення", "en": "Inside the order", "de": "Innerhalb des Auftrags"}
+{"uk": "Вставити адресу", "en": "Paste address", "de": "Adresse einfügen"}
+{"uk": "Вставити адресу з листа чи підпису — Minerva розкладе її по полях", "en": "Paste an address from an e-mail or signature — Minerva splits it into the fields", "de": "Adresse aus E-Mail oder Signatur einfügen — Minerva verteilt sie auf die Felder"}
 {"uk": "Вставити посилання на календар", "en": "Paste the calendar link", "de": "Kalender-Link einfügen"}
 {"uk": "Вставити схему в тіло листа", "en": "Insert the diagram into the e-mail body", "de": "Schema in den E-Mail-Text einfügen"}
 {"uk": "Вставити у відповідь", "en": "Insert into reply", "de": "In Antwort einfügen"}
 {"uk": "Вставляється після таблиці в панелі Email кошика", "en": "Inserted after the table in the cart’s E-mail panel", "de": "Wird nach der Tabelle im E-Mail-Bereich des Warenkorbs eingefügt"}
 {"uk": "Вставте API-ключ.", "en": "Paste the API key.", "de": "Fügen Sie den API-Schlüssel ein."}
 {"uk": "Вставте адресу Minerva і API-ключ, натискайте кнопки — сторінка сама формує запит і показує відповідь сервера. Ключ нікуди, крім вказаного сервера, не надсилається.", "en": "Paste the Minerva address and the API key, then press the buttons — the page builds the request itself and shows the server’s response. The key is not sent anywhere except the specified server.", "de": "Fügen Sie die Minerva-Adresse und den API-Schlüssel ein und klicken Sie auf die Schaltflächen — die Seite erstellt die Anfrage selbst und zeigt die Antwort des Servers an. Der Schlüssel wird nur an den angegebenen Server gesendet."}
+{"uk": "Вставте адресу з листа, підпису чи сайту — як є. Minerva розкладе її по полях отримувача: ім’я, компанія, вулиця, індекс, місто, країна (код), телефон, email.", "en": "Paste the address from an e-mail, signature or website as it is. Minerva splits it into the recipient fields: name, company, street, postcode, city, country (code), phone, e-mail.", "de": "Adresse aus E-Mail, Signatur oder Website unverändert einfügen. Minerva verteilt sie auf die Empfängerfelder: Name, Firma, Straße, PLZ, Ort, Land (Code), Telefon, E-Mail."}
 {"uk": "Вставте готове посилання або позначте «Фото» / «Даташит» для спільного файлу.", "en": "Paste a ready-made link or tick “Photo” / “Datasheet” for a shared file.", "de": "Fügen Sie einen fertigen Link ein oder markieren Sie „Foto“ / „Datenblatt“ für eine gemeinsame Datei."}
+{"uk": "Вставте текст адреси.", "en": "Paste the address text.", "de": "Adresstext einfügen."}
 {"uk": "Встановити", "en": "Install", "de": "Installieren"}
 {"uk": "Встановити Minerva", "en": "Install Minerva", "de": "Minerva installieren"}
 {"uk": "Встановити Minerva на телефон", "en": "Install Minerva on your phone", "de": "Minerva auf dem Smartphone installieren"}
@@ -7627,6 +7635,7 @@
 {"uk": "Заповнити вручну", "en": "Fill in manually", "de": "Manuell ausfüllen"}
 {"uk": "Заповнити з AI", "en": "Fill with AI", "de": "Mit KI ausfüllen"}
 {"uk": "Заповнити зараз", "en": "Fill now", "de": "Jetzt ausfüllen"}
+{"uk": "Заповнити отримувача", "en": "Fill in the recipient", "de": "Empfänger ausfüllen"}
 {"uk": "Заповнити порожні робочі дні в askDANTE (режим і період — у налаштуваннях askDANTE)", "en": "Fill empty working days in askDANTE (mode and period are in the askDANTE settings)", "de": "Leere Arbeitstage in askDANTE ausfüllen (Modus und Zeitraum – in den askDANTE-Einstellungen)"}
 {"uk": "Заповнити пропуски", "en": "Fill gaps", "de": "Lücken füllen"}
 {"uk": "Заповнить поля «📦 Фактична упаковка» нижче автоматично", "en": "Fills in the “📦 Actual packaging” fields below automatically", "de": "Füllt die Felder „📦 Tatsächliche Verpackung“ unten automatisch aus"}
@@ -10658,6 +10667,7 @@
 {"uk": "Не збережено.", "en": "Not saved.", "de": "Nicht gespeichert."}
 {"uk": "Не зберігати", "en": "Do not save", "de": "Nicht speichern"}
 {"uk": "Не зберігати (опублікувати без збереження)", "en": "Do not save (publish without saving)", "de": "Nicht speichern (ohne Speichern veröffentlichen)"}
+{"uk": "Не знайдено", "en": "Not found", "de": "Nicht gefunden"}
 {"uk": "Не знайдено SKU: {0}", "en": "SKU not found: {0}", "de": "SKU nicht gefunden: {0}"}
 {"uk": "Не знайдено жодного offer/product для поточного Marketplace токена. UUID знаходиться в supplier.digikey.com → Account → Company Information (поле Supplier GUID / API Supplier ID).", "en": "No offer/product found for the current Marketplace token. The UUID is located in supplier.digikey.com → Account → Company Information (field Supplier GUID / API Supplier ID).", "de": "Für das aktuelle Marketplace-Token wurde kein Offer/Artikel gefunden. Die UUID befindet sich unter supplier.digikey.com → Account → Company Information (Feld Supplier GUID / API Supplier ID)."}
 {"uk": "Не знайдено колонки SKU та/або кількості", "en": "SKU and/or quantity column not found", "de": "Spalte SKU und/oder Menge nicht gefunden"}
@@ -10718,6 +10728,7 @@
 {"uk": "Не прив’язана до закупівлі.", "en": "Not linked to a purchase order.", "de": "Keiner Bestellung zugeordnet."}
 {"uk": "Не пропонувати підтвердження в магазині", "en": "Do not suggest confirmation in the shop", "de": "Bestätigung im Shop nicht vorschlagen"}
 {"uk": "Не підключено: {0}", "en": "Not connected: {0}", "de": "Nicht verbunden: {0}"}
+{"uk": "Не підставлено (у тексті цього немає)", "en": "Not filled in (not in the text)", "de": "Nicht übernommen (steht nicht im Text)"}
 {"uk": "Не підтверджено: у замовленні DigiKey цього немає або вже відправлено", "en": "Not confirmed: not in the DigiKey order or already shipped", "de": "Nicht bestätigt: nicht im DigiKey-Auftrag oder bereits versendet"}
 {"uk": "Не підтримується (405) — через API це не видаляється.", "en": "Not supported (405) — this cannot be deleted via the API.", "de": "Nicht unterstützt (405) — dies wird über die API nicht gelöscht."}
 {"uk": "Не підходить", "en": "Not suitable", "de": "Passt nicht"}
@@ -10980,6 +10991,7 @@
 {"uk": "Немає права надсилати звіт", "en": "No permission to send the report", "de": "Keine Berechtigung, den Bericht zu senden"}
 {"uk": "Немає права надсилати повідомлення DigiKey.", "en": "You may not send DigiKey messages.", "de": "Sie dürfen keine DigiKey-Nachrichten senden."}
 {"uk": "Немає права призначати стратегії клієнтам", "en": "You do not have permission to assign strategies to customers", "de": "Sie haben nicht das Recht, Kunden Strategien zuzuweisen"}
+{"uk": "Немає права створювати відправлення", "en": "No right to create shipments", "de": "Keine Berechtigung, Sendungen anzulegen"}
 {"uk": "Немає права створювати доручення агенту", "en": "No permission to create agent rules", "de": "Keine Berechtigung, Agentenregeln zu erstellen"}
 {"uk": "Немає права створювати закупівлі.", "en": "No permission to create purchase orders.", "de": "Keine Berechtigung, Bestellungen anzulegen."}
 {"uk": "Немає права створювати категорії", "en": "No permission to create categories", "de": "Keine Berechtigung zum Erstellen von Kategorien"}
@@ -11101,6 +11113,7 @@
 {"uk": "Нове PCB замовлення — Gerber", "en": "New PCB order — Gerber", "de": "Neue PCB-Bestellung — Gerber"}
 {"uk": "Нове відправлення", "en": "New shipment", "de": "Neue Sendung"}
 {"uk": "Нове відправлення | Minerva", "en": "New shipment | Minerva", "de": "Neue Sendung | Minerva"}
+{"uk": "Нове відправлення на цю адресу: Minerva розкладе виділене по полях отримувача", "en": "New shipment to this address: Minerva splits the selection into the recipient fields", "de": "Neue Sendung an diese Adresse: Minerva verteilt die Auswahl auf die Empfängerfelder"}
 {"uk": "Нове відправлення — {0}", "en": "New shipment — {0}", "de": "Neue Sendung — {0}"}
 {"uk": "Нове відправлення — вибір замовлення", "en": "New shipment — select an order", "de": "Neue Sendung — Auftrag auswählen"}
 {"uk": "Нове відправлення, у якому ви вкажете, скільки чого лежить у коробці; решта замовлення лишиться відкритою.", "en": "A new shipment where you enter how much of each item is in the box; the rest of the order stays open.", "de": "Neue Sendung, in der Sie angeben, wie viel von jeder Position im Karton ist; der Rest des Auftrags bleibt offen."}
@@ -13137,6 +13150,7 @@
 {"uk": "Порожній текст листа", "en": "The e-mail text is empty", "de": "Der E-Mail-Text ist leer"}
 {"uk": "Порожній текст листа — спершу напишіть його або складіть з параметрів.", "en": "The e-mail text is empty — write it first or compose it from the parameters.", "de": "Der E-Mail-Text ist leer — schreiben Sie ihn zuerst oder erstellen Sie ihn aus den Parametern."}
 {"uk": "Порожній текст листа.", "en": "Empty e-mail text.", "de": "Leerer E-Mail-Text."}
+{"uk": "Порожній текст — нічого розбирати.", "en": "Empty text — nothing to parse.", "de": "Leerer Text — nichts zu erkennen."}
 {"uk": "Порожній файл", "en": "Empty file", "de": "Leere Datei"}
 {"uk": "Порожній файл.", "en": "Empty file.", "de": "Leere Datei."}
 {"uk": "Порт", "en": "Port", "de": "Port"}
@@ -14356,6 +14370,7 @@
 {"uk": "Роз'єм", "en": "Connector", "de": "Steckverbinder"}
 {"uk": "Роз'єм A", "en": "Connector A", "de": "Stecker A"}
 {"uk": "Роз'єм B", "en": "Connector B", "de": "Stecker B"}
+{"uk": "Розбираю адресу…", "en": "Reading the address…", "de": "Adresse wird erkannt…"}
 {"uk": "Розбирає SKU кабелю (CA-…-MCx.xx-…) та формує окремі колонки: довжина, товщина, з'єднувачі", "en": "Parses the cable SKU (CA-…-MCx.xx-…) and creates separate columns: length, thickness, connectors", "de": "Zerlegt die Kabel-SKU (CA-…-MCx.xx-…) und erzeugt separate Spalten: Länge, Dicke, Steckverbinder"}
 {"uk": "Розблоковано: {0}.", "en": "Unblocked: {0}.", "de": "Entsperrt: {0}."}
 {"uk": "Розбори пошти", "en": "Mail sorting runs", "de": "E-Mail-Sortierläufe"}
@@ -14475,6 +14490,7 @@
 {"uk": "Розшифровку цієї наради вже отримано", "en": "This meeting’s transcript has already been received", "de": "Das Transkript dieser Besprechung wurde bereits empfangen"}
 {"uk": "Розшифровку ще не зібрано — спробуйте трохи згодом", "en": "The transcript is not assembled yet — try a bit later", "de": "Das Transkript ist noch nicht zusammengesetzt — bitte etwas später erneut versuchen"}
 {"uk": "Розібрано", "en": "Parsed", "de": "Ausgewertet"}
+{"uk": "Розібрати з AI", "en": "Parse with AI", "de": "Mit KI erkennen"}
 {"uk": "Роль", "en": "Role", "de": "Rolle"}
 {"uk": "Роль в AI", "en": "Role in AI", "de": "Rolle in der KI"}
 {"uk": "Роль в AI асистенті", "en": "Role in the AI assistant", "de": "Rolle im KI-Assistenten"}
@@ -18704,6 +18720,7 @@
 {"uk": "домен email .{0}", "en": "e-mail domain .{0}", "de": "E-Mail-Domain .{0}"}
 {"uk": "домен {0}", "en": "domain {0}", "de": "Domain {0}"}
 {"uk": "дописано полів: {0}", "en": "fields filled: {0}", "de": "Felder ergänzt: {0}"}
+{"uk": "допишіть вручну.", "en": "add them by hand.", "de": "bitte von Hand ergänzen."}
 {"uk": "доповнено полів: {0}", "en": "fields completed: {0}", "de": "Felder ergänzt: {0}"}
 {"uk": "допоможу", "en": "I can help", "de": "ich helfe"}
 {"uk": "доречна відповідь на останній лист", "en": "an appropriate reply to the last email", "de": "eine passende Antwort auf die letzte E-Mail"}
@@ -22172,6 +22189,7 @@
 {"uk": "імпорт / третя країна", "en": "import / third country", "de": "Import / Drittland"}
 {"uk": "імпортує атрибути, ціну", "en": "imports attributes, price", "de": "importiert Attribute, Preis"}
 {"uk": "імпортує атрибути, ціну, фото/датагарт для", "en": "imports attributes, price, photo/datasheet for", "de": "importiert Attribute, Preis, Foto/Datenblatt für"}
+{"uk": "ім’я", "en": "name", "de": "Name"}
 {"uk": "ім’я невідоме", "en": "name unknown", "de": "Name unbekannt"}
 {"uk": "інакше", "en": "otherwise", "de": "andernfalls"}
 {"uk": "інакше нові файли не з'являться у production через WhiteNoise.", "en": "otherwise new files will not appear in production because of WhiteNoise.", "de": "andernfalls erscheinen neue Dateien wegen WhiteNoise nicht in der Produktion."}
