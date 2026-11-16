@@ -84,6 +84,9 @@ class SupplierMedia(models.Model):
     MARKS = [("star", "⭐ Важливий"), ("fair", "🎪 З виставки"), ("meet", "🤝 Зустрічались"),
              ("check", "❗ Перевірити"), ("sample", "📦 Попросити зразки"), ("price", "💶 Чекаємо ціни"),
              ("cheap", "💸 Дешево"), ("quality", "🏅 Якість"), ("no", "👎 Не підходить")]
+    # 👥 Хто це для нас — постачальник (🏭 у постачальники) чи клієнт (👤 у CRM); категорії — лише постачальників
+    R_SUPPLIER, R_CUSTOMER, R_OTHER = "supplier", "customer", "other"
+    ROLES = [("", "❔ Ще не вказано"), (R_SUPPLIER, "🏭 Постачальник"), (R_CUSTOMER, "👤 Клієнт"), (R_OTHER, "🤝 Інше")]
 
     supplier = models.ForeignKey("inventory.Supplier", null=True, blank=True, on_delete=models.SET_NULL,
                                  related_name="media", verbose_name="Постачальник")
@@ -93,6 +96,8 @@ class SupplierMedia(models.Model):
     customer = models.ForeignKey("crm.Customer", null=True, blank=True, on_delete=models.SET_NULL,
                                  related_name="business_cards", verbose_name="Клієнт CRM")
     kind = models.CharField("Що це", max_length=8, choices=KINDS, default=CARD)
+    role = models.CharField("Хто це", max_length=8, choices=ROLES, blank=True, default="", db_index=True)
+    role_ai = models.BooleanField("Хто це — підказав AI", default=False)
     image = models.FileField("Фото", upload_to=_media_path)
     image_back = models.FileField("Зворотний бік", upload_to=_media_path, blank=True, default="")
     # перша версія знімка до «✏️ Редагувати фото» (повернути / обрізати) — «↺ Оригінал» повертає її
@@ -141,6 +146,8 @@ class SupplierCardPreset(models.Model):
     name = models.CharField("Назва", max_length=120)
     event = models.CharField("Де взяли", max_length=200, blank=True, default="")
     kind = models.CharField("Що це", max_length=8, choices=SupplierMedia.KINDS, default=SupplierMedia.CARD)
+    role = models.CharField("Хто це", max_length=8, choices=SupplierMedia.ROLES, blank=True, default="",
+                            help_text="Напр. «наш стенд на виставці» — відвідувачі: 👤 клієнти")
     marks = models.JSONField("Позначки", default=list, blank=True)
     note = models.TextField("Примітка", blank=True, default="")
     categories = models.ManyToManyField(SupplierCategory, blank=True, related_name="+")

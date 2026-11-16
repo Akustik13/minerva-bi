@@ -118,7 +118,7 @@ object Api {
             b.addFormDataPart("image_back", "back.jpg", File(c.back).asRequestBody(jpeg))
         }
         val fields = mapOf(
-            "uuid" to c.uuid, "kind" to c.kind, "event" to c.event, "note" to c.note,
+            "uuid" to c.uuid, "kind" to c.kind, "role" to c.role, "event" to c.event, "note" to c.note,
             "marks" to c.marks.joinToString(","), "categories" to c.categories.joinToString(","),
             "preset" to (c.presetId?.toString() ?: ""), "read_ai" to (if (c.readAi) "1" else ""),
             "model" to c.model, "qr_front" to c.qrFront, "qr_back" to c.qrBack,
@@ -144,6 +144,8 @@ object Api {
         ServerCard(postJson("cards/$id/read/", JSONObject().put("model", model)).getJSONObject("card"))
 
     suspend fun toSupplier(id: Int): JSONObject = postJson("cards/$id/to-supplier/", JSONObject())
+
+    suspend fun toCustomer(id: Int): JSONObject = postJson("cards/$id/to-customer/", JSONObject())
 
     suspend fun deleteCard(id: Int): JSONObject = postJson("cards/$id/delete/", JSONObject())
 

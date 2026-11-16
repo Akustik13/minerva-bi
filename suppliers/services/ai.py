@@ -258,6 +258,27 @@ def _image_block(field) -> dict | None:
                                         "data": base64.standard_b64encode(data).decode("ascii")}}
 
 
+ROLE_HINT = (" Ще визнач, хто ця фірма для нас (поле role): supplier — виробляє чи продає те, що ми могли б купувати "
+             "(компоненти, плати, кабелі, корпуси, складання, послуги виробництва); customer — їй могла б знадобитися "
+             "наша продукція (виробники обладнання, інтегратори, розробники, дистриб'ютори нашої галузі); other — "
+             "сервіси, медіа, організатори, банки; не впевнений — порожньо. role_why — одне коротке речення українською, "
+             "чому. Додай до JSON поля \"role\" і \"role_why\".")
+
+
+def _us_text() -> str:
+    """Хто ми — для «хто ця фірма для нас»: назва з налаштувань і категорії наших товарів."""
+    try:
+        from config.models import SystemSettings
+        from inventory.models import ProductCategory
+        name = (SystemSettings.objects.filter(pk=1).values_list("company_name", flat=True).first() or "").strip()
+        cats = list(ProductCategory.objects.order_by("order", "name").values_list("name", flat=True)[:15])
+    except Exception:  # noqa: BLE001
+        return ""
+    if not (name or cats):
+        return ""
+    return (" Ми — " + (name or "наша фірма") + (", продаємо: " + ", ".join(cats) if cats else "") + ".")
+
+
 def card(media, user=None, model=DEFAULT_MODEL) -> dict:
     """📷 Візитка / флаєр → поля постачальника. Пише media.extracted / state / cost_usd."""
     from suppliers.models import SupplierMedia
@@ -270,14 +291,18 @@ def card(media, user=None, model=DEFAULT_MODEL) -> dict:
     if media.qr_text:      # браузер уже розшифрував QR — точні дані, AI лише доповнює
         qr_note = "\nQR-код з цієї візитки (точні дані, бери їх як є):\n" + media.qr_text[:2000]
     system = ("Ти читаєш візитки, флаєри й каталоги постачальників для системи закупівель. " + DATA_NOTE +
-              CARD_HINT + " Відповідай лише JSON такої форми: " + SUPPLIER_JSON +
+              CARD_HINT + _us_text() + ROLE_HINT + " Відповідай лише JSON такої форми: " + SUPPLIER_JSON +
               " Категорії — лише з переліку: " + _categories_text() + ".")
     content = blocks + [{"type": "text", "text": f"<<<ДАНІ: {media.get_kind_display()}"
                          + (f", де взяли: {media.event}" if media.event else "") + qr_note + "\nДАНІ>>>\n"
                          "Прочитай усе з фото (обидва боки, якщо їх два) і поверни JSON."}]
     try:
         text, price = call(system, content, model=model_of(model), user=user, effort="low", max_tokens=4000)
-        data = qr.merge(qr_fields, clean_supplier(parse_json(text)))
+        raw = parse_json(text)
+        data = qr.merge(qr_fields, clean_supplier(raw))
+        role = _s(raw.get("role"), 10).lower() if isinstance(raw, dict) else ""
+        if role in ("supplier", "customer", "other"):
+            data["role_ai"], data["role_why"] = role, _s(raw.get("role_why"), 200)
     except AIError as e:
         SupplierMedia.objects.filter(pk=media.pk).update(state=SupplierMedia.FAILED, error=str(e)[:500])
         raise
@@ -288,6 +313,9 @@ def card(media, user=None, model=DEFAULT_MODEL) -> dict:
     SupplierMedia.objects.filter(pk=media.pk).update(
         extracted=data, state=SupplierMedia.READ, error="", cost_usd=price)
     media.extracted, media.state, media.cost_usd = data, SupplierMedia.READ, price
+    if data.get("role_ai") and (not media.role or media.role_ai):    # 👥 підказка — лише якщо людина не вибрала
+        SupplierMedia.objects.filter(pk=media.pk).update(role=data["role_ai"], role_ai=True)
+        media.role, media.role_ai = data["role_ai"], True
     if not media.categories.exists():       # категорії, які вибрав AI, — одразу візитці (видно на плитці);
         from suppliers.services.cards import match_categories   # вибрані людиною чи пресетом не чіпаємо
         found = match_categories(data.get("categories"))

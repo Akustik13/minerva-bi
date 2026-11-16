@@ -155,7 +155,7 @@ def presets_for(user) -> list:
     from suppliers.models import SupplierCardPreset
     qs = (SupplierCardPreset.objects.filter(Q(owner=user) | Q(shared=True)).select_related("owner")
           .prefetch_related("categories"))
-    return [{"id": p.pk, "name": p.name, "event": p.event, "kind": p.kind, "marks": p.marks or [],
+    return [{"id": p.pk, "name": p.name, "event": p.event, "kind": p.kind, "role": p.role, "marks": p.marks or [],
              "note": p.note, "categories": [c.pk for c in p.categories.all()], "read_ai": p.read_ai,
              "model": p.model, "shared": p.shared, "mine": p.owner_id == user.pk,
              "owner": "" if p.owner_id == user.pk else (p.owner.get_full_name() or p.owner.username)} for p in qs]
@@ -180,7 +180,7 @@ def _strs(values) -> list:
 
 
 def save_preset(user, data: dict) -> dict:
-    """data: action save | delete | default, id, name, event, kind, marks, note, categories, read_ai, model, shared,
+    """data: action save | delete | default, id, name, event, kind, role, marks, note, categories, read_ai, model, shared,
     make_default → {presets, default, id}. Змінити / видалити — лише свій пресет. ValueError — зрозуміла причина."""
     from core.models import UserProfile
     from suppliers.models import SupplierCardPreset, SupplierCategory, SupplierMedia
@@ -195,6 +195,7 @@ def save_preset(user, data: dict) -> dict:
         p = (mine.filter(pk=int(pid)).first() if pid.isdigit() else None) or SupplierCardPreset(owner=user)
         p.name, p.event, p.note = name, str(data.get("event") or "")[:200], str(data.get("note") or "")[:4000]
         p.kind = data.get("kind") if data.get("kind") in dict(SupplierMedia.KINDS) else SupplierMedia.CARD
+        p.role = data.get("role") if data.get("role") in dict(SupplierMedia.ROLES) else ""
         p.marks = [x for x in _strs(data.get("marks")) if x in dict(SupplierMedia.MARKS)]
         p.read_ai, p.shared = _bool(data.get("read_ai")), _bool(data.get("shared"))
         p.model = data.get("model") if data.get("model") in dict(MODELS) else ""
@@ -299,6 +300,7 @@ def card_json(m, user, cats=None) -> dict:
                                                                      if y), i["country"]) if x)
     return {
         "id": m.pk, "uuid": m.client_uuid, "kind": m.kind, "title": m.title, "event": m.event, "note": m.note,
+        "role": m.role, "role_ai": m.role_ai, "role_why": i["role_why"],
         "marks": m.marks or [], "state": m.state, "ai": i["ai"]["key"], "ai_label": i["ai"]["label"],
         "reading": reading(m.pk), "error": m.error, "cost_usd": float(m.cost_usd or 0),
         "company": i["company"], "person": i["person"], "position": i["position"], "country": i["country"],
@@ -324,7 +326,7 @@ def cards_qs():
 
 
 def search(user, params) -> tuple:
-    """Фільтри списку (як «🪪 Візитки й флаєри»): q, cat, ai (done / none / failed / nocat), event, mark, mine,
+    """Фільтри списку (як «🪪 Візитки й флаєри»): q, cat, ai (done / none / failed / nocat), event, mark, mine, role,
     show new; ids — лише ці (стан знімків, ще не прочитаних AI). → (візитки, є ще)."""
     from suppliers.models import SupplierCategory, SupplierMedia
     qs = cards_qs()
@@ -335,6 +337,11 @@ def search(user, params) -> tuple:
         return [card_json(m, user, all_cats) for m in qs], False
     if _bool(params.get("mine")):
         qs = qs.filter(created_by=user)
+    role = params.get("role") or ""
+    if role == "-":
+        qs = qs.filter(role="")
+    elif role and role in dict(SupplierMedia.ROLES):
+        qs = qs.filter(role=role)
     if params.get("show") == "new":
         qs = qs.filter(supplier=None, customer=None)
     event = " ".join(str(params.get("event") or "").split())[:200]
@@ -405,7 +412,9 @@ def meta(user) -> dict:
         "perms": {"add": can(user, "add"), "change": can(user, "change"), "view": can(user, "view"),
                   "cat_add": user.has_perm("suppliers.add_suppliercategory"),
                   "cat_change": user.has_perm("suppliers.change_suppliercategory"),
-                  "upload": can_upload(user)},
+                  "upload": can_upload(user),
+                  "crm_add": user.has_perm("crm.add_customer"), "crm_change": user.has_perm("crm.change_customer")},
+        "roles": [[k, v] for k, v in SupplierMedia.ROLES],
         "categories": [category_json(c) for c in SupplierCategory.objects.filter(is_active=True)],
         "presets": presets_for(user), "default_preset": default_preset(user),
         "kinds": [[k, v] for k, v in SupplierMedia.KINDS], "marks": [[k, v] for k, v in SupplierMedia.MARKS],

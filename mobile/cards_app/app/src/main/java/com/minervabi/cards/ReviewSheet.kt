@@ -40,6 +40,7 @@ class ReviewSheet : BottomSheetDialogFragment() {
     private var edges = true
     private var done = false
     private var editing: Capture? = null
+    private var initialRole = ""
 
     private val speech = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         if (r.resultCode == Activity.RESULT_OK) {
@@ -113,6 +114,14 @@ class ReviewSheet : BottomSheetDialogFragment() {
             CaptureStore.all().map { it.event }).filter { it.isNotBlank() }.distinct()
         b.event.setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, events))
         b.noteBox.setEndIconOnClickListener { listen() }
+
+        // 👥 хто це: знімок → що в Minerva (AI міг підказати) → пресет («наш стенд» — клієнти)
+        initialRole = c?.card?.role ?: c?.role ?: preset?.role.orEmpty()
+        meta.roles.forEach { (k, label) -> b.roles.addToggle(label, k == initialRole, k).isCheckedIconVisible = false }
+        if (c?.card?.roleAi == true && initialRole.isNotEmpty()) {
+            b.roleHint.text = "🧠 Підказав AI" + (c.card?.roleWhy?.takeIf { it.isNotEmpty() }?.let { ": $it" } ?: "") +
+                ". Не так — виберіть інше."
+        }
 
         val marks = c?.marks ?: preset?.marks.orEmpty()
         meta.marks.forEach { (k, label) -> b.marks.addToggle(label, k in marks, k) }
@@ -190,6 +199,7 @@ class ReviewSheet : BottomSheetDialogFragment() {
         val marks = b.marks.checkedTags().filterIsInstance<String>()
         val cats = b.cats.checkedTags().filterIsInstance<Int>()
         val kind = b.kinds.checkedTags().filterIsInstance<String>().firstOrNull() ?: "card"
+        val role = b.roles.checkedTags().filterIsInstance<String>().firstOrNull() ?: ""
         val note = b.note.text?.toString()?.trim().orEmpty()
         val event = b.event.text?.toString()?.trim().orEmpty()
         val c = editing
@@ -197,7 +207,7 @@ class ReviewSheet : BottomSheetDialogFragment() {
             val preset = meta.preset(currentPresetId())
             val args = requireArguments()
             CaptureStore.add(Capture(
-                front = front, back = back, kind = kind, event = event, note = note, marks = marks,
+                front = front, back = back, kind = kind, role = role, event = event, note = note, marks = marks,
                 categories = cats, presetId = preset?.id, readAi = b.readAi.isChecked,
                 model = preset?.model?.ifEmpty { null } ?: Prefs.model,
                 qrFront = args.getString("qr_front").orEmpty(), qrBack = if (back.isEmpty()) "" else args.getString("qr_back").orEmpty(),
@@ -207,14 +217,15 @@ class ReviewSheet : BottomSheetDialogFragment() {
             requireContext().toast(if (Prefs.paired) "✅ Збережено — надішлемо в Minerva" else "✅ Збережено на телефоні — підключіть Minerva, щоб надіслати")
         } else {
             CaptureStore.update(c.uuid) {
-                it.kind = kind; it.event = event; it.note = note; it.marks = marks; it.categories = cats
+                it.kind = kind; it.role = role; it.event = event; it.note = note; it.marks = marks; it.categories = cats
                 if (it.status != Capture.UPLOADED) {
                     it.back = back; it.readAi = b.readAi.isChecked
                     if (back.isEmpty()) it.qrBack = ""
                     if (it.status == Capture.FAILED) it.status = Capture.PENDING
                 }
             }
-            if (c.status == Capture.UPLOADED && c.serverId > 0) pushEdit(c.serverId, kind, event, note, marks, cats)
+            if (c.status == Capture.UPLOADED && c.serverId > 0) pushEdit(c.serverId, kind, event, note, marks, cats,
+                role.takeIf { it != initialRole })
             else Sync.uploadNow(requireContext())
         }
         setFragmentResult("review", bundleOf("action" to action, "uuid" to (c?.uuid ?: "")))
@@ -222,10 +233,12 @@ class ReviewSheet : BottomSheetDialogFragment() {
     }
 
     /** Знімок уже в Minerva — правка йде туди ж (без інтернету — повідомити). */
-    private fun pushEdit(id: Int, kind: String, event: String, note: String, marks: List<String>, cats: List<Int>) {
+    private fun pushEdit(id: Int, kind: String, event: String, note: String, marks: List<String>, cats: List<Int>,
+                         role: String?) {
         val app = requireContext().applicationContext
         val body = JSONObject().put("kind", kind).put("event", event).put("note", note)
             .put("marks", JSONArray(marks)).put("categories", JSONArray(cats))
+        if (role != null) body.put("role", role)          // лише якщо змінили — підказку AI не затираємо
         requireActivity().lifecycleScope.launch {
             try {
                 val card = Api.updateCard(id, body)

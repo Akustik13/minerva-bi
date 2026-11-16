@@ -31,14 +31,14 @@ data class Category(val id: Int, val name: String, val icon: String, val color: 
 data class Preset(
     val id: Int, val name: String, val event: String, val kind: String, val marks: List<String>, val note: String,
     val categories: List<Int>, val readAi: Boolean, val model: String, val shared: Boolean, val mine: Boolean,
-    val owner: String,
+    val owner: String, val role: String = "",
 ) {
     companion object {
         fun parse(o: JSONObject) = Preset(
             o.optInt("id"), o.str("name"), o.str("event"), o.str("kind").ifEmpty { "card" },
             o.optJSONArray("marks").strings(), o.str("note"), o.optJSONArray("categories").ints(),
             o.optBoolean("read_ai", true), o.str("model"), o.optBoolean("shared"), o.optBoolean("mine"),
-            o.str("owner"),
+            o.str("owner"), o.str("role"),
         )
     }
 }
@@ -46,7 +46,10 @@ data class Preset(
 data class Perms(
     val add: Boolean = false, val change: Boolean = false, val view: Boolean = false,
     val catAdd: Boolean = false, val catChange: Boolean = false, val upload: Boolean = false,
-)
+    val crmAdd: Boolean = false, val crmChange: Boolean = false,
+) {
+    val crm get() = crmAdd || crmChange
+}
 
 /** Відповідь /meta/ (кешується в Prefs.metaJson — без інтернету теж є категорії й пресети). */
 data class Meta(
@@ -55,6 +58,8 @@ data class Meta(
     val defaultPreset: Int? = null,
     val kinds: List<Pair<String, String>> = DEFAULT_KINDS,
     val marks: List<Pair<String, String>> = DEFAULT_MARKS,
+    /** 👥 Хто це для нас — без «не вказано» (його показує відсутність вибору). */
+    val roles: List<Pair<String, String>> = DEFAULT_ROLES,
     val models: List<Pair<String, String>> = emptyList(),
     val defaultModel: String = "",
     val events: List<String> = emptyList(),
@@ -65,6 +70,8 @@ data class Meta(
     fun preset(id: Int?) = presets.firstOrNull { it.id == id }
     fun kindLabel(k: String) = kinds.firstOrNull { it.first == k }?.second ?: k
     fun markLabel(k: String) = marks.firstOrNull { it.first == k }?.second ?: k
+    fun roleLabel(k: String) = if (k.isEmpty()) "" else roles.firstOrNull { it.first == k }?.second ?: k
+    fun roleIcon(k: String) = roleLabel(k).substringBefore(" ")
 
     companion object {
         val DEFAULT_KINDS = listOf("card" to "🪪 Візитка", "flyer" to "📄 Флаєр / каталог", "photo" to "📷 Фото",
@@ -72,6 +79,7 @@ data class Meta(
         val DEFAULT_MARKS = listOf("star" to "⭐ Важливий", "fair" to "🎪 З виставки", "meet" to "🤝 Зустрічались",
             "check" to "❗ Перевірити", "sample" to "📦 Попросити зразки", "price" to "💶 Чекаємо ціни",
             "cheap" to "💸 Дешево", "quality" to "🏅 Якість", "no" to "👎 Не підходить")
+        val DEFAULT_ROLES = listOf("supplier" to "🏭 Постачальник", "customer" to "👤 Клієнт", "other" to "🤝 Інше")
 
         fun parse(o: JSONObject?): Meta {
             if (o == null) return Meta()
@@ -84,11 +92,13 @@ data class Meta(
                 defaultPreset = if (o.isNull("default_preset")) null else o.optInt("default_preset"),
                 kinds = pairs(o.optJSONArray("kinds")).ifEmpty { DEFAULT_KINDS },
                 marks = pairs(o.optJSONArray("marks")).ifEmpty { DEFAULT_MARKS },
+                roles = pairs(o.optJSONArray("roles")).filter { it.first.isNotEmpty() }.ifEmpty { DEFAULT_ROLES },
                 models = pairs(o.optJSONArray("models")),
                 defaultModel = o.str("default_model"),
                 events = o.optJSONArray("events").strings(),
                 perms = Perms(p.optBoolean("add"), p.optBoolean("change"), p.optBoolean("view"),
-                    p.optBoolean("cat_add"), p.optBoolean("cat_change"), p.optBoolean("upload")),
+                    p.optBoolean("cat_add"), p.optBoolean("cat_change"), p.optBoolean("upload"),
+                    p.optBoolean("crm_add"), p.optBoolean("crm_change")),
                 appUrl = o.str("app_url"),
             )
         }
@@ -106,6 +116,9 @@ data class ServerCard(val json: JSONObject) {
     val event get() = json.str("event")
     val note get() = json.str("note")
     val kind get() = json.str("kind")
+    val role get() = json.str("role")
+    val roleAi get() = json.optBoolean("role_ai")
+    val roleWhy get() = json.str("role_why")
     val title get() = json.str("title")
     val ai get() = json.str("ai")
     val aiLabel get() = json.str("ai_label")

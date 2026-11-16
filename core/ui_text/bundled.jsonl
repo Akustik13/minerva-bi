@@ -529,6 +529,7 @@
 {"uk": ". Налаштовується. Cron запускає команду кожні 5 хв, але вона сама перевіряє чи вже час.", "en": ". Configurable. Cron runs the command every 5 minutes, but it checks by itself whether it is time yet.", "de": ". Einstellbar. Cron startet den Befehl alle 5 Minuten, prüft aber selbst, ob es schon Zeit ist."}
 {"uk": ". Наступний номер збільшується автоматично.", "en": ". The next number increases automatically.", "de": ". Die nächste Nummer wird automatisch erhöht."}
 {"uk": ". Натисніть Tab — побачите рамку фокусу.", "en": ". Press Tab — you will see the focus outline.", "de": ". Drücken Sie Tab – Sie sehen den Fokusrahmen."}
+{"uk": ". Не так — виберіть «Хто це» й збережіть.", "en": ". Not right — choose «Who is it» and save.", "de": ". Stimmt nicht — «Wer ist das» wählen und speichern."}
 {"uk": ". Нові: {0}", "en": ". New: {0}", "de": ". Neu: {0}"}
 {"uk": ". Оберіть клієнта → snapshot заповниться автоматично.", "en": ". Select a customer → the snapshot is filled in automatically.", "de": ". Wählen Sie einen Kunden → der Snapshot wird automatisch ausgefüllt."}
 {"uk": ". Обов'язкові поля", "en": ". Required fields", "de": ". Pflichtfelder"}
@@ -3128,6 +3129,7 @@
 {"uk": "{0}: {1} шт. × {2} = {3}", "en": "{0}: {1} pcs × {2} = {3}", "de": "{0}: {1} Stk. × {2} = {3}"}
 {"uk": "{0}: {1} — таких адрес API немає", "en": "{0}: {1} — no such API endpoints", "de": "{0}: {1} — solche API-Adressen gibt es nicht"}
 {"uk": "{0}: «{1}» (листів {2}, файлів {3})", "en": "{0}: «{1}» ({2} e-mails, {3} files)", "de": "{0}: «{1}» ({2} E-Mails, {3} Dateien)"}
+{"uk": "{0}: «{1}» уже в CRM — немає права змінювати клієнтів", "en": "{0}: «{1}» is already in CRM — no permission to change customers", "de": "{0}: «{1}» ist schon im CRM — keine Berechtigung, Kunden zu ändern"}
 {"uk": "{0}: «{1}» уже є — немає права змінювати", "en": "{0}: «{1}» already exists — no right to change", "de": "{0}: «{1}» existiert bereits — kein Recht zu ändern"}
 {"uk": "{0}: «від» більше за «до».", "en": "{0}: “from” is greater than “to”.", "de": "{0}: „von“ ist größer als „bis“."}
 {"uk": "{0}: Компанія: {1} Власник: {2}", "en": "{0}: Company: {1} Owner: {2}", "de": "{0}: Firma: {1} Inhaber: {2}"}
@@ -3200,6 +3202,7 @@
 {"uk": "{0}: немає жодної ціни — не змінено", "en": "{0}: no prices at all — unchanged", "de": "{0}: kein einziger Preis — unverändert"}
 {"uk": "{0}: немає курсу {1} → {2} («Налаштування цін» магазину) — ціни в {3} не показано.", "en": "{0}: no rate {1} → {2} (shop “Price settings”) — prices in {3} are not shown.", "de": "{0}: Kein Kurs {1} → {2} („Preiseinstellungen“ des Webshops) — Preise in {3} werden nicht angezeigt."}
 {"uk": "{0}: немає курсу {1} → {2} («Налаштування цін» → «Курси валют»).", "en": "{0}: no exchange rate {1} → {2} (“Price settings” → “Exchange rates”).", "de": "{0}: kein Wechselkurs {1} → {2} („Preiseinstellungen“ → „Wechselkurse“)."}
+{"uk": "{0}: немає права створювати клієнтів", "en": "{0}: no permission to create customers", "de": "{0}: keine Berechtigung, Kunden anzulegen"}
 {"uk": "{0}: немає права створювати постачальників", "en": "{0}: no right to create suppliers", "de": "{0}: kein Recht, Lieferanten anzulegen"}
 {"uk": "{0}: немає сторінки гіда «{1}»", "en": "{0}: no guide page “{1}”", "de": "{0}: keine Leitfaden-Seite „{1}“"}
 {"uk": "{0}: оновлено листів {1}", "en": "{0}: e-mails updated {1}", "de": "{0}: aktualisierte E-Mails {1}"}
@@ -3211,6 +3214,7 @@
 {"uk": "{0}: перший ступінь має бути від 1 шт. — не змінено", "en": "{0}: the first price break must start from 1 pc. — unchanged", "de": "{0}: Die erste Staffel muss ab 1 Stk. gelten — unverändert"}
 {"uk": "{0}: подій {1}, очищено журналу до seq {2}", "en": "{0}: {1} events, log cleared up to seq {2}", "de": "{0}: {1} Ereignisse, Protokoll bis seq {2} bereinigt"}
 {"uk": "{0}: позначено «прибуло» — оприбуткуйте на сторінці закупівлі", "en": "{0}: marked «arrived» — receive it on the purchase order page", "de": "{0}: als «angekommen» markiert — auf der Bestellseite einbuchen"}
+{"uk": "{0}: позначено «👤 Клієнт» — «👤 У CRM» (або змініть «Хто це»)", "en": "{0}: marked «👤 Customer» — «👤 To CRM» (or change «Who is it»)", "de": "{0}: als «👤 Kunde» markiert — «👤 Ins CRM» (oder «Wer ist das» ändern)"}
 {"uk": "{0}: помилка — {1} {2}", "en": "{0}: error — {1} {2}", "de": "{0}: Fehler — {1} {2}"}
 {"uk": "{0}: порожня сторінка", "en": "{0}: empty page", "de": "{0}: leere Seite"}
 {"uk": "{0}: посилку не відправлено — списання {1} повернуто", "en": "{0}: parcel not shipped — deduction of {1} returned", "de": "{0}: Paket nicht versendet — Ausbuchung von {1} zurückgebucht"}
@@ -3241,6 +3245,7 @@
 {"uk": "{0}: у товару немає базових цін.", "en": "{0}: the product has no base prices.", "de": "{0}: Der Artikel hat keine Basispreise."}
 {"uk": "{0}: у шапці немає «{1}»", "en": "{0}: header has no “{1}”", "de": "{0}: im Kopf fehlt „{1}“"}
 {"uk": "{0}: увімкнути / вимкнути", "en": "{0}: turn on / off", "de": "{0}: ein- / ausschalten"}
+{"uk": "{0}: уже в CRM", "en": "{0}: already in CRM", "de": "{0}: schon im CRM"}
 {"uk": "{0}: уже в картці «{1}»", "en": "{0}: already in the card of «{1}»", "de": "{0}: bereits in der Karte von «{1}»"}
 {"uk": "{0}: уже позначено", "en": "{0}: already marked", "de": "{0}: bereits markiert"}
 {"uk": "{0}: ціна «{1}» — не число.", "en": "{0}: price “{1}” is not a number.", "de": "{0}: Preis „{1}“ ist keine Zahl."}
@@ -8759,6 +8764,7 @@
 {"uk": "Кожен файл — з посилання в картці свого товару. Посилання за правилом вище записує «🔗 Сформувати й перевірити посилання →»; у картці товару його можна змінити.", "en": "Each file comes from the link in its own product card. The rule-based link above is written by “🔗 Generate and check links →”; it can be changed in the product card.", "de": "Jede Datei stammt aus dem Link in der Karte des jeweiligen Artikels. Den Link nach der obigen Regel schreibt „🔗 Links erzeugen und prüfen →“; in der Artikelkarte kann er geändert werden."}
 {"uk": "Кожен шаблон містить", "en": "Each template contains", "de": "Jede Vorlage enthält"}
 {"uk": "Кожна вибрана: такий постачальник уже є — фото й контакт до нього; немає — новий постачальник (🌱 потенційний); уже внесені й без даних — пропускаються", "en": "Each selected: the supplier already exists — photo and contact go to it; otherwise a new supplier (🌱 potential); already entered ones and ones without data are skipped", "de": "Jede ausgewählte: Lieferant existiert bereits — Foto und Kontakt zu ihm; sonst ein neuer Lieferant (🌱 potenziell); bereits erfasste und ohne Daten werden übersprungen"}
+{"uk": "Кожна вибрана: той самий email чи фірма вже в CRM — фото й нотатка до нього; немає — новий клієнт; уже в CRM і без даних — пропускаються", "en": "Each selected: same e-mail or company already in CRM — photo and note to it; none — new customer; already in CRM and without data — skipped", "de": "Jede ausgewählte: gleiche E-Mail oder Firma schon im CRM — Foto und Notiz dazu; keine — neuer Kunde; schon im CRM und ohne Daten — übersprungen"}
 {"uk": "Кожна зміна — у", "en": "Every change is recorded in the", "de": "Jede Änderung steht im"}
 {"uk": "Кожна коробка йде до перевізника окремо — ціна для всієї посилки.", "en": "Every box goes to the carrier separately — the price is for the whole shipment.", "de": "Jeder Karton geht einzeln an den Versanddienst — der Preis gilt für die ganze Sendung."}
 {"uk": "Кожна надіслана версія Angebot (DOCX / PDF) — документ бази знань, прив'язаний до клієнта й проєкту.", "en": "Every sent version of an Angebot (DOCX / PDF) is a knowledge base document linked to the customer and the project.", "de": "Jede versendete Version eines Angebots (DOCX / PDF) ist ein Dokument der Wissensdatenbank, das dem Kunden und dem Projekt zugeordnet ist."}
@@ -10370,6 +10376,7 @@
 {"uk": "Напр. «Sevskiy Shop». Порожньо — назва магазину.", "en": "E.g. “Sevskiy Shop”. Empty — the shop name.", "de": "Z. B. „Sevskiy Shop“. Leer – der Name des Shops."}
 {"uk": "Напр. «sku, available» — у списках і картках записів лишаться тільки ці поля. Порожньо — усі поля.", "en": "E.g. “sku, available” — only these fields remain in lists and record cards. Empty — all fields.", "de": "Z. B. „sku, available“ — in Listen und Datensatzkarten bleiben nur diese Felder erhalten. Leer — alle Felder."}
 {"uk": "Напр. «Брак 29.10» або «Повернення 102497269».", "en": "E.g. “Defect 29.10” or “Return 102497269”.", "de": "Z. B. „Ausschuss 29.10“ oder „Retoure 102497269“."}
+{"uk": "Напр. «наш стенд на виставці» — відвідувачі: 👤 клієнти", "en": "E.g. «our booth at the fair» — visitors: 👤 customers", "de": "Z. B. «unser Messestand» — Besucher: 👤 Kunden"}
 {"uk": "Напр. номер рахунку постачальника.", "en": "E.g. the supplier's invoice number.", "de": "Z. B. die Rechnungsnummer des Lieferanten."}
 {"uk": "Напр. скринька магазину shop@… — усе, що в неї приходить і з неї йде.", "en": "E.g. the shop mailbox shop@… — everything that arrives in it and leaves from it.", "de": "Z. B. das Postfach des Shops shop@… — alles, was dort eingeht und von dort ausgeht."}
 {"uk": "Напр.: \"Electronic components\"", "en": "E.g.: \"Electronic components\"", "de": "Z. B.: \"Electronic components\""}
@@ -10918,6 +10925,7 @@
 {"uk": "Немає права бачити клієнтів CRM", "en": "No permission to view CRM customers", "de": "Keine Berechtigung, CRM-Kunden zu sehen"}
 {"uk": "Немає права бачити проєкти", "en": "No permission to view projects", "de": "Keine Berechtigung, Projekte zu sehen"}
 {"uk": "Немає права видаляти свої категорії", "en": "No permission to delete your own categories", "de": "Keine Berechtigung zum Löschen eigener Kategorien"}
+{"uk": "Немає права вносити клієнтів у CRM.", "en": "No permission to add customers to CRM.", "de": "Keine Berechtigung, Kunden ins CRM einzutragen."}
 {"uk": "Немає права вносити цю візитку.", "en": "No permission to file this business card.", "de": "Keine Berechtigung, diese Visitenkarte einzutragen."}
 {"uk": "Немає права давати завдання агенту", "en": "No permission to give tasks to the agent", "de": "Keine Berechtigung, dem Agenten Aufgaben zu geben"}
 {"uk": "Немає права додавати візитки.", "en": "No permission to add business cards.", "de": "Keine Berechtigung, Visitenkarten hinzuzufügen."}
@@ -11147,6 +11155,7 @@
 {"uk": "Нових", "en": "New", "de": "Neue"}
 {"uk": "Нових артикулів у документах не знайдено.", "en": "No new item numbers found in the documents.", "de": "Keine neuen Artikelnummern in den Dokumenten gefunden."}
 {"uk": "Нових замовлень немає.", "en": "No new orders.", "de": "Keine neuen Aufträge."}
+{"uk": "Нових клієнтів CRM: {0} · ➕ додано до наявних: {1}{2}", "en": "New CRM customers: {0} · ➕ added to existing: {1}{2}", "de": "Neue CRM-Kunden: {0} · ➕ zu bestehenden hinzugefügt: {1}{2}"}
 {"uk": "Нових листів від клієнтів: {0} ({1})", "en": "New e-mails from customers: {0} ({1})", "de": "Neue E-Mails von Kunden: {0} ({1})"}
 {"uk": "Нових листів немає — усі ваші листи проєкту вже прочитано", "en": "No new emails — all your project emails have already been read", "de": "Keine neuen E-Mails — alle Ihre Projekt-E-Mails wurden bereits gelesen"}
 {"uk": "Нових обіцянок (строків, цін, знижок) понад бриф не давай.", "en": "Do not make any new promises (deadlines, prices, discounts) beyond the brief.", "de": "Geben Sie keine neuen Zusagen (Fristen, Preise, Rabatte) über das Briefing hinaus."}
@@ -12660,6 +12669,7 @@
 {"uk": "Позначати такі листи важливими (без AI)", "en": "Mark such emails as important (no AI)", "de": "Solche E-Mails als wichtig markieren (ohne KI)"}
 {"uk": "Позначає CustomerStep done", "en": "Marks CustomerStep as done", "de": "Markiert CustomerStep als erledigt"}
 {"uk": "Позначено", "en": "Marked", "de": "Markiert"}
+{"uk": "Позначено «Клієнт» — внесіть у CRM: «👤 Створити клієнта CRM» або «➕ Додати до клієнта».", "en": "Marked «Customer» — add to CRM: «👤 Create CRM customer» or «➕ Add to customer».", "de": "Als «Kunde» markiert — ins CRM eintragen: «👤 CRM-Kunden anlegen» oder «➕ Zum Kunden hinzufügen»."}
 {"uk": "Позначено «Свій інвойс», але PDF не завантажено.", "en": "“Custom invoice” is checked, but no PDF has been uploaded.", "de": "„Eigene Rechnung“ ist markiert, aber es wurde kein PDF hochgeladen."}
 {"uk": "Позначено «не стосується проєктів»: {0}. Скасувати — «Гілки поза проєктами».", "en": "Marked as “not project-related”: {0}. To undo — “Threads outside projects”.", "de": "Als „nicht projektbezogen“ markiert: {0}. Rückgängig — „Verläufe außerhalb von Projekten“."}
 {"uk": "Позначено в календарі", "en": "Marked in the calendar", "de": "Im Kalender markiert"}
@@ -16843,6 +16853,10 @@
 {"uk": "Хто позначив", "en": "Marked by", "de": "Markiert von"}
 {"uk": "Хто підтвердив", "en": "Confirmed by", "de": "Bestätigt von"}
 {"uk": "Хто робить", "en": "Who does it", "de": "Wer erledigt es"}
+{"uk": "Хто це", "en": "Who is it", "de": "Wer ist das"}
+{"uk": "Хто це для нас", "en": "Who is it for us", "de": "Wer ist das für uns"}
+{"uk": "Хто це для нас: постачальник чи клієнт", "en": "Who is it for us: supplier or customer", "de": "Wer ist das für uns: Lieferant oder Kunde"}
+{"uk": "Хто це — підказав AI", "en": "Who is it — suggested by AI", "de": "Wer ist das — von AI vorgeschlagen"}
 {"uk": "Хто чекає товар", "en": "Who is waiting for the product", "de": "Wer auf den Artikel wartet"}
 {"uk": "Хто читає", "en": "Who reads it", "de": "Wer liest es"}
 {"uk": "Хто що отримує", "en": "Who gets what", "de": "Wer bekommt was"}
@@ -17426,6 +17440,7 @@
 {"uk": "Ще не в посилках", "en": "Not in parcels yet", "de": "Noch in keinem Paket"}
 {"uk": "Ще не виконано", "en": "Not done yet", "de": "Noch nicht erledigt"}
 {"uk": "Ще не вирішено", "en": "Not decided yet", "de": "Noch nicht entschieden"}
+{"uk": "Ще не вказано", "en": "Not set yet", "de": "Noch nicht angegeben"}
 {"uk": "Ще не внесено", "en": "Not entered yet", "de": "Noch nicht erfasst"}
 {"uk": "Ще не відправлено", "en": "Not shipped yet", "de": "Noch nicht versendet"}
 {"uk": "Ще не завантажено ({0}) — артикул і посилання, з якого качатиметься", "en": "Not downloaded yet ({0}) — SKU and the link it will be downloaded from", "de": "Noch nicht heruntergeladen ({0}) — Artikelnummer und Link, von dem heruntergeladen wird"}
@@ -20639,6 +20654,7 @@
 {"uk": "постачальник {0}", "en": "supplier {0}", "de": "Lieferant {0}"}
 {"uk": "постачальник закупівлі — учасник проєкту", "en": "the supplier of the purchase order is a project participant", "de": "der Lieferant der Bestellung ist Projektbeteiligter"}
 {"uk": "постачальник неактивний", "en": "supplier is inactive", "de": "Lieferant ist inaktiv"}
+{"uk": "постачальник — «🏭 У постачальники», 👤 клієнт — «👤 У CRM»; не вказано — AI підкаже", "en": "supplier — «🏭 To suppliers», 👤 customer — «👤 To CRM»; not set — AI will suggest", "de": "Lieferant — «🏭 Zu Lieferanten», 👤 Kunde — «👤 Ins CRM»; nicht angegeben — AI schlägt vor"}
 {"uk": "постачальника", "en": "supplier", "de": "Lieferanten"}
 {"uk": "постачальника «{0}» ще немає, а створювати постачальників немає права", "en": "supplier «{0}» does not exist yet, and there is no permission to create suppliers", "de": "Lieferant «{0}» existiert noch nicht, und es fehlt die Berechtigung, Lieferanten anzulegen"}
 {"uk": "постачальника заблоковано", "en": "supplier is blocked", "de": "Lieferant ist gesperrt"}

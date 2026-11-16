@@ -15,6 +15,7 @@ suppliers/app_api.py — JSON API для 📱 додатка «Minerva Візи�
                                    categories, preset, read_ai, model, qr_front, qr_back); той самий uuid — та сама;
   GET|POST cards/<id>/           — візитка / правка (note, event, title, kind, marks, categories);
   POST cards/<id>/read/          — 🧠 прочитати AI; cards/<id>/to-supplier/ — 🏭 у постачальники;
+  POST cards/<id>/to-customer/   — 👤 у CRM (той самий email / фірма — до нього, немає — новий клієнт);
   POST cards/<id>/delete/        — 🗑; GET cards/<id>/image/?side=front|back&size=thumb|full — фото.
 """
 import functools
@@ -197,7 +198,7 @@ def cards(request):
     m = card_svc.create(u, image, back, kind=d.get("kind"), title=d.get("title") or "", event=d.get("event") or "",
                         note=d.get("note") or "", marks=d.getlist("marks"), categories=cats,
                         preset_id=d.get("preset"), qr_front=d.get("qr_front") or "", qr_back=d.get("qr_back") or "",
-                        client_uuid=uuid)
+                        client_uuid=uuid, role=d.get("role") or "")
     job = ""
     if card_app._bool(d.get("read_ai")):
         job = card_app.start_read(m, u, d.get("model"))
@@ -230,6 +231,9 @@ def card(request, pk):
         if "marks" in d:
             m.marks = [x for x in d.getlist("marks") if x in dict(SupplierMedia.MARKS)]
             fields.append("marks")
+        if "role" in d and (d.get("role") or "") in dict(SupplierMedia.ROLES):
+            m.role, m.role_ai = d.get("role") or "", False          # людина вибрала — AI вже не міняє
+            fields += ["role", "role_ai"]
         if fields:
             m.save(update_fields=fields)
         if "categories" in d:
@@ -267,6 +271,28 @@ def card_to_supplier(request, pk):
                          "created": bool(out["created"]), "attached": bool(out["attached"]),
                          "supplier": {"id": done[0][1].pk, "name": done[0][1].name} if done else None,
                          "skipped": out["skipped"], "filled": out["filled"]})
+
+
+@api(("POST",))
+def card_to_customer(request, pk):
+    """👤 Візитка → клієнт CRM (як «👤 У CRM» для вибраних): той самий email / фірма — до нього, немає — новий."""
+    from suppliers.services import card_app, cards as card_svc
+    u = request.app_user
+    m = _card(request, pk)
+    if m is None:
+        return _err("Візитки немає", 404)
+    if not card_app.can_edit(u, m):
+        raise PermissionError("Немає права вносити цю візитку.")
+    if not (u.has_perm("crm.add_customer") or u.has_perm("crm.change_customer")):
+        raise PermissionError("Немає права вносити клієнтів у CRM.")
+    out = card_svc.to_customers([m], u, can_add=u.has_perm("crm.add_customer"),
+                                can_change=u.has_perm("crm.change_customer"))
+    done = out["created"] + out["attached"]
+    m = _card(request, pk)
+    return JsonResponse({"card": card_app.card_json(m, u), "created": bool(out["created"]),
+                         "attached": bool(out["attached"]),
+                         "customer": {"id": done[0][1].pk, "name": done[0][1].company or done[0][1].name} if done else None,
+                         "skipped": out["skipped"]})
 
 
 @api(("POST",))

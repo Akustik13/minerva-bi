@@ -149,6 +149,28 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
+            android:text="👥 Хто це для нас" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/roles"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:chipSpacingVertical="0dp"
+            app:singleSelection="true" />
+
+        <TextView
+            android:id="@+id/roleHint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Не вибрано — AI підкаже з візитки. 👤 Клієнт — потім «👤 У CRM»."
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp" />
+
+        <TextView
+            style="@style/TextAppearance.Material3.LabelLarge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
             android:text="⭐ Позначки" />
 
         <com.google.android.material.chip.ChipGroup

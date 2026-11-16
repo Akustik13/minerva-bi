@@ -55,9 +55,11 @@
         <div class="spf-h">📝 Наші примітки й позначки</div>
         <div class="spf-grid">
           <label>Що це<select name="kind" {% if not can_edit %}disabled{% endif %}>{% for v, n in kinds %}<option value="{{ v }}" {% if v == m.kind %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
+          <label>Хто це для нас<select name="role" {% if not can_edit %}disabled{% endif %}>{% for v, n in roles %}<option value="{{ v }}" {% if v == m.role %}selected{% endif %}>{{ n }}</option>{% endfor %}</select></label>
           <label>Назва<input name="title" value="{{ m.title }}" maxlength="200" {% if not can_edit %}disabled{% endif %}></label>
           <label>Де взяли<input name="event" value="{{ m.event }}" maxlength="200" {% if not can_edit %}disabled{% endif %}></label>
         </div>
+        {% if m.role_ai %}<div class="spf-muted">🧠 AI: {{ m.get_role_display }}{% if d.role_why %} — <span translate="no">{{ d.role_why }}</span>{% endif %}. Не так — виберіть «Хто це» й збережіть.</div>{% endif %}
         <label class="spf-wide">Примітки<textarea name="note" rows="4" {% if not can_edit %}disabled{% endif %}>{{ m.note }}</textarea></label>
         <div class="spf-marks" style="margin-top:6px">{% for v, n in marks %}<label><input type="checkbox" name="marks" value="{{ v }}" {% if v in m.marks %}checked{% endif %} {% if not can_edit %}disabled{% endif %}> {{ n }}</label>{% endfor %}</div>
         {% if can_edit %}<div class="spf-row"><button type="submit" class="button">💾 Зберегти примітки</button></div>{% endif %}
@@ -96,7 +98,8 @@
         {% endif %}
       </div>
       {% if can_add or can_change or crm_add or crm_change %}
-      <form method="post" id="spf-form">{% csrf_token %}
+      <form method="post" id="spf-form"{% if m.role == 'customer' %} class="cr-customer"{% endif %}>{% csrf_token %}
+        {% if m.role == 'customer' and not m.customer %}<div class="spf-ok cr-role-note">👤 Позначено «Клієнт» — внесіть у CRM: «👤 Створити клієнта CRM» або «➕ Додати до клієнта».</div>{% endif %}
         <input type="hidden" name="action" value="create">
         {% include "admin/suppliers/_supplier_form.html" %}
         <div class="spf-row">
@@ -135,6 +138,11 @@
     </div>
   </div>
 </div>
+<style>
+  .cr-customer { display: flex; flex-direction: column; }
+  .cr-customer > #crm { order: -1; margin-bottom: 10px; }
+  .cr-customer > .cr-role-note { order: -2; margin-bottom: 6px; }
+</style>
 {% include "admin/suppliers/_qr_js.html" %}
 {% include "admin/suppliers/_doc_scan_js.html" %}
 {{ job_js }}

@@ -45,6 +45,10 @@
 .spc-stats .on{background:var(--selected-bg,rgba(91,141,239,.15))}
 #spc-bar{position:sticky;bottom:0;z-index:5;display:none;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 12px;margin-top:8px;border:1px solid var(--border-strong,#ccc);border-radius:8px;background:var(--body-bg,#fff);box-shadow:0 -2px 8px rgba(0,0,0,.15)}
 #spc-bar.on{display:flex}
+.spc-role{display:inline-block;font-size:11px;border:1px solid var(--border-strong,#ccc);border-radius:9px;padding:0 7px;margin:2px 0}
+.spc-role-customer{border-color:#2e7d32;color:var(--success-fg,#2e7d32)}
+.spc-role-supplier{border-color:#1565c0}
+.spc-crm-hot{border-color:var(--success-fg,#2e7d32)!important;font-weight:600}
 {% for k, label in tile_fields %}.spc-off-{{ k }} .spc-f-{{ k }}{display:none!important}
 {% endfor %}.spc-desc-off .spc-f-desc{display:none!important}
 @media (max-width:768px){.spc{width:100%}}
@@ -55,6 +59,7 @@
     {% if can_read %}<a class="button" href="{% url 'admin:inventory_supplier_card_app' %}" title="Фотографувати візитки телефоном — навіть без інтернету, надішле само">📱 Додаток на телефон</a>{% endif %}
     <input type="search" name="q" value="{{ q }}" placeholder="Фірма, людина, що роблять, виставка, примітка…" style="min-width:260px">
     <select name="show"><option value="">усі</option><option value="new" {% if show == "new" %}selected{% endif %}>ще не внесені ({{ unassigned }})</option><option value="inbase" {% if show == "inbase" %}selected{% endif %}>✅ не внесені, але вже є в базі</option></select>
+    <select name="role" title="Хто це для нас: постачальник чи клієнт"><option value="">👥 усі</option>{% for v, n, c in role_opts %}<option value="{{ v|default:'-' }}" {% if v|default:'-' == role %}selected{% endif %}>{{ n }} ({{ c }})</option>{% endfor %}</select>
     <select name="ai" title="Чи прочитав AI">
       <option value="">🧠 AI: усі</option>
       <option value="done" {% if ai_filter == "done" %}selected{% endif %}>🧠 прочитано AI</option>
@@ -113,6 +118,7 @@
       <div class="spc-top"><span class="spc-head"><input type="checkbox" class="spc-pick" value="{{ m.pk }}" title="Вибрати — поділитись разом з іншими" aria-label="Вибрати">
         <a href="{{ review }}"><b>{{ m.get_kind_display }}</b> <span translate="no">{{ m.title }}</span></a></span>
         <span class="spc-ai spc-ai-{{ i.ai.key }} spc-f-ai" title="{{ i.ai.title }}">{{ i.ai.label }}</span></div>
+      {% if i.role_label %}<div class="spc-role spc-role-{{ i.role }}"{% if i.role_why %} title="{{ i.role_why }}"{% endif %}>{{ i.role_label }}</div>{% endif %}
       {% if i.company %}<div class="spc-co spc-f-company" translate="no">🏢 {{ i.company }}</div>{% endif %}
       {% if i.person %}<div class="sp-muted spc-f-person"><span translate="no">👤 {{ i.person }}</span>{% if i.position %} · <span translate="no">{{ i.position }}</span>{% endif %}</div>{% endif %}
       {% if i.country or i.site %}<div class="sp-muted spc-line">{% if i.country %}<span class="spc-f-country">🌍 {{ i.country }}</span>{% endif %}{% if i.site %}<a class="spc-f-site" href="{{ i.site }}" target="_blank" rel="noopener noreferrer nofollow" translate="no">🌐 {{ i.site_label }}</a>{% endif %}</div>{% endif %}
@@ -136,7 +142,7 @@
       {% if m.note %}<div class="sp-note spc-f-note" translate="no">{{ m.note|truncatechars:100 }}</div>{% endif %}
       <div class="spc-acts">
         <form method="post" action="{{ review }}" target="_blank" class="spc-f-share">{% csrf_token %}<input type="hidden" name="action" value="share"><button type="submit" class="button" title="Чернетка листа з фото, даними й vCard — кому, впишете самі">✉️ Поділитись</button></form>
-        {% if crm_can and not m.customer %}<a class="button spc-f-crm" href="{{ review }}#crm" title="Візитка покупця — внести клієнтом у CRM">👤 У CRM</a>{% endif %}
+        {% if crm_can and not m.customer %}<a class="button spc-f-crm{% if m.role == 'customer' %} spc-crm-hot{% endif %}" href="{{ review }}#crm" title="Візитка покупця — внести клієнтом у CRM">👤 У CRM</a>{% endif %}
         <a class="button spc-f-vcard" href="{{ review }}?vcf=1" title="Контакт для телефону / Outlook (.vcf)">⬇ vCard</a>
       </div>
     </div>
@@ -149,6 +155,8 @@
     <a class="button" id="spc-vcf" href="#" title="Усі вибрані контакти одним файлом .vcf — для телефону / Outlook">⬇ vCard</a>
     {% if can_read %}<form method="post" id="spc-sup-form" style="display:inline;margin:0">{% csrf_token %}<input type="hidden" name="action" value="to_suppliers">
       <button type="submit" class="button" title="Кожна вибрана: такий постачальник уже є — фото й контакт до нього; немає — новий постачальник (🌱 потенційний); уже внесені й без даних — пропускаються">🏭 У постачальники</button></form>{% endif %}
+    {% if crm_can %}<form method="post" id="spc-crm-form" style="display:inline;margin:0">{% csrf_token %}<input type="hidden" name="action" value="to_customers">
+      <button type="submit" class="button" title="Кожна вибрана: той самий email чи фірма вже в CRM — фото й нотатка до нього; немає — новий клієнт; уже в CRM і без даних — пропускаються">👤 У CRM</button></form>{% endif %}
     {% if can_read %}<form method="post" id="spc-del-form" style="display:inline;margin:0">{% csrf_token %}<input type="hidden" name="action" value="delete_many">
       <button type="submit" class="button" title="Фото, примітки й позначки вибраних візиток — назавжди; постачальники й клієнти CRM лишаються">🗑 Видалити вибрані</button></form>{% endif %}
     <button type="button" class="button" id="spc-none">✕ Зняти вибір</button>
@@ -236,6 +244,8 @@
   form.addEventListener('submit', function(){ withIds(form, MAX); });
   var sup = document.getElementById('spc-sup-form');
   if (sup) sup.addEventListener('submit', function(){ withIds(sup, 100); });
+  var crmf = document.getElementById('spc-crm-form');
+  if (crmf) crmf.addEventListener('submit', function(){ withIds(crmf, 100); });
   var del = document.getElementById('spc-del-form');
   if (del) del.addEventListener('submit', function(e){
     var n = picks().length;
