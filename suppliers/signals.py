@@ -2,7 +2,7 @@
 import logging
 
 from django.db import transaction
-from django.db.models.signals import post_save
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 logger = logging.getLogger(__name__)
@@ -24,3 +24,11 @@ def rfq_reply(sender, instance, created, **kwargs):
             logger.warning("suppliers: rfq reply check failed for message %s", instance.pk, exc_info=True)
 
     transaction.on_commit(run)
+
+
+@receiver([post_save, post_delete], sender="inventory.Supplier", dispatch_uid="suppliers_mail_link_reset")
+@receiver([post_save, post_delete], sender="suppliers.SupplierContact", dispatch_uid="suppliers_mail_link_reset_c")
+def mail_link_reset(sender, **kwargs):
+    """Змінили постачальника / контакт — довідник адрес для 🏭 у пошті зібрати заново (suppliers/services/mail_link.py)."""
+    from suppliers.services.mail_link import reset
+    reset()

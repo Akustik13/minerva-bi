@@ -9,6 +9,7 @@ from unittest import mock
 from django.urls import reverse
 from django.utils import timezone
 
+from inventory.models import Supplier
 from suppliers.models import SupplierReplyFile, SupplierRequest, SupplierRequestRecipient as R
 from suppliers.services import rfq, rfq_replies
 from suppliers.tests import ME, Base
@@ -155,3 +156,54 @@ class InboxOpenMessageTests(Base):
         foreign = self.mail(account=self.other_account, subject="Olga's")
         self.assertEqual(self.client.get("/email/", {"msg": foreign.pk}).context["open_msg"], -1)
         self.assertEqual(self.client.get("/email/").context["open_msg"], 0)
+
+
+class MailSupplierTests(Base):
+    """🏭 постачальник у шапці листа: хто зі співрозмовників — постачальник, запит цієї гілки, коротко праворуч."""
+
+    def setUp(self):
+        super().setUp()
+        from suppliers.models import SupplierContact
+        from suppliers.services import mail_link
+        self.wendy = SupplierContact.objects.create(supplier=self.supplier, name="Wendy Wu", email="Wendy@PCBWay.com")
+        mail_link.reset()
+
+    def preview(self, m):
+        return self.client.get(f"/email/message/{m.pk}/preview/")
+
+    def test_contact_email_domain_and_rfq_of_thread(self):
+        from email_assistant.models import EmailThread
+        from suppliers.services import mail_link
+        th = EmailThread.objects.create(account=self.account, subject="RFQ")
+        req = SupplierRequest.objects.create(title="PCBA", owner=self.user, account=self.account, body="x")
+        r = R.objects.create(request=req, supplier=self.supplier, email="wendy@pcbway.com", state=R.REPLIED, thread=th)
+        m = self.mail(frm="wendy@pcbway.com", thread=th, subject="Re: RFQ")
+        page = self.preview(m)
+        sup = page.context["mail_suppliers"]
+        self.assertEqual([(s["pk"], s["contact"]) for s in sup], [(self.supplier.pk, "Wendy Wu")])
+        self.assertEqual(sup[0]["rfq"][0]["url"], reverse("admin:suppliers_supplierrequest_work", args=[req.pk]) + f"#r{r.pk}")
+        html = page.content.decode()
+        self.assertIn(f"pvSupplier('{reverse('admin:inventory_supplier_brief', args=[self.supplier.pk])}')", html)
+        self.assertIn(f"📨 {req.code}", html)
+        # колега з того самого домену (і піддомен) — той самий постачальник; поштовик і свої — ні
+        other = self.mail(frm="tom@mail.pcbway.com", subject="Invoice")
+        self.assertEqual([s["why"] for s in mail_link.for_messages([other], None, self.user)], ["домен @mail.pcbway.com"])
+        gmail = self.mail(frm="someone@gmail.com", subject="hi")
+        self.assertEqual(mail_link.for_messages([gmail], None, self.user), [])
+        ours = self.mail(frm=ME, to=["boss@sevskiy.de"], folder="sent", subject="internal")
+        self.assertEqual(mail_link.for_messages([ours], None, self.user), [])
+        self.assertNotIn("em-pv-sup", self.preview(gmail).content.decode().split("</style>", 1)[1])
+
+    def test_rights_and_new_supplier_seen_at_once(self):
+        from suppliers.services import mail_link
+        m = self.mail(frm="ann@newfab.cn", subject="Offer")
+        self.assertEqual(mail_link.for_messages([m], None, self.user), [])
+        self.assertEqual(mail_link.for_messages([m], None, self.other), [])          # без права бачити постачальників
+        fab = Supplier.objects.create(name="NewFab", email="sales@newfab.cn")          # довідник оновлюється сам
+        self.assertEqual([s["pk"] for s in mail_link.for_messages([m], None, self.user)], [fab.pk])
+        self.assertEqual(mail_link.for_messages([m], None, self.other), [])
+
+    def test_brief_carries_its_own_styles(self):
+        page = self.client.get(reverse("admin:inventory_supplier_brief", args=[self.supplier.pk])).content.decode()
+        self.assertIn(".rqb-cards img", page)
+        self.assertIn("Wendy Wu", page)
