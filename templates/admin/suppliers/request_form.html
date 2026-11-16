@@ -70,9 +70,56 @@
   @media (max-width: 700px) { .rq-who-row { grid-template-columns: minmax(0, 1fr) auto; } .rq-who-row .rq-who-to { grid-column: 1; } }
   .rq-count { color: var(--text-muted, #888); font-size: 12px; }
   .rq-spec { display: none; } .rq-spec.on { display: grid; }
+  /* 📋 копія: поля, які зазвичай треба змінити (червоне) / перевірити (жовте) — services/rfq_copy.py */
+  .rq-copy { border-left: 4px solid var(--primary, #5b8def); }
+  .rq-rv { outline: 2px solid var(--error-fg, #ba2121); outline-offset: 3px; border-radius: 6px;
+    background: rgba(229, 72, 77, .07); }
+  .rq-rv.rq-rv-maybe { outline-color: #d08a00; background: rgba(245, 165, 36, .09); }
+  .rq-rv-tag { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 11px; font-weight: normal;
+    color: var(--error-fg, #ba2121); margin-top: 3px; }
+  .rq-rv-maybe .rq-rv-tag { color: #9a6200; }
+  .rq-rv-tag button { padding: 0 6px; font-size: 11px; line-height: 18px; }
+  .rq-rv-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .rq-rv-chip { border: 1px solid var(--error-fg, #ba2121); border-radius: 12px; padding: 1px 9px; font-size: 12px;
+    color: var(--error-fg, #ba2121); text-decoration: none; }
+  .rq-rv-chip.rq-rv-maybe { border-color: #d08a00; color: #9a6200; }
+  .rq-rv-chip.rq-rv-ok { border-color: var(--hairline-color, #ccc); color: var(--text-muted, #888); text-decoration: line-through; }
+  .rq-rv-sum { font-weight: 600; }
+  .rq-picks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+  .rq-picks button.on { outline: 2px solid var(--primary, #5b8def); }
 </style>
 <div class="spp">
 <form method="post" enctype="multipart/form-data" id="rq-form">{% csrf_token %}
+  {% if src %}<input type="hidden" name="copy_from" value="{{ src.pk }}">{% endif %}
+  <span id="rq-reviewed"></span>
+  {% if copy_src or review_items %}
+  <div class="spf-card rq-copy" id="rq-copy">
+    <div class="spf-h">📋 {% if src %}Новий запит на основі{% else %}Копія запиту{% endif %}
+      {% if copy_src %}<a href="{% url 'admin:suppliers_supplierrequest_work' copy_src.pk %}" target="_blank" translate="no">{{ copy_src.code }}</a> <span class="spf-muted" translate="no">· {{ copy_src.title }}</span>{% endif %}</div>
+    {% if src %}<div class="spf-muted">Нічого ще не створено й не надіслано: новий номер буде після «💾 Зберегти».</div>{% endif %}
+    {% if review_items %}
+    <div style="margin-top:6px">Підсвічено <b style="color:var(--error-fg,#ba2121)">червоним</b> те, що після копіювання зазвичай треба змінити,
+      <b style="color:#9a6200">жовтим</b> — перевірити. Змінили — підсвітка зникає сама; лишаєте як було — «✓ Так і лишити» біля поля.</div>
+    <div class="rq-rv-list" id="rq-rv-list"></div>
+    <div class="spf-row"><span class="rq-rv-sum" id="rq-rv-sum"></span>
+      <button type="button" class="button" id="rq-rv-all" title="Зняти всю підсвітку — усе перевірено, так і лишити">✓ Усе перевірено</button></div>
+    {{ review_data|json_script:"rq-review" }}
+    {% endif %}
+    {% if src %}
+    <div class="rq-picks" id="rq-picks"><span>🏭 Кому:</span>
+      <button type="button" class="button on" data-pick="all">як у <span translate="no">{{ src.code }}</span> ({{ copy.all|length }})</button>
+      {% if copy.answered %}<button type="button" class="button" data-pick="answered" title="Ті, хто відповів на старий запит">📥 лише ті, хто відповів ({{ copy.answered|length }})</button>{% endif %}
+      {% if copy.quoted %}<button type="button" class="button" data-pick="quoted" title="Ті, хто надіслав ціну">💶 лише з пропозицією ({{ copy.quoted|length }})</button>{% endif %}
+      {% if copy.chosen %}<button type="button" class="button" data-pick="chosen">🏆 лише вибрані ({{ copy.chosen|length }})</button>{% endif %}
+      <button type="button" class="button" data-pick="none">нікого — виберу сам</button>
+    </div>
+    {% if copy.blocked %}<div class="spf-muted">⛔ Не потрапили («Не працювати»): <span translate="no">{{ copy.blocked|join:", " }}</span></div>{% endif %}
+    {% if copy.auto_subject or copy.auto_body %}<div class="spf-muted" style="margin-top:4px">✉️ {% if copy.auto_subject and copy.auto_body %}Тему й текст листа{% elif copy.auto_subject %}Тему листа{% else %}Текст листа{% endif %} склала Minerva — вони складуться заново з нових даних після «💾 Зберегти» (новий номер, кількості, файли, дата).</div>{% endif %}
+    {% if copy.replaced %}<div class="spf-muted" style="margin-top:4px">✉️ У вашому тексті старі {% for k in copy.replaced %}{% if k == "code" %}номер{% elif k == "reply_by" %}дату «чекаємо до»{% else %}назву{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %} замінено змінними {% for k in copy.replaced %}<code>{{ "{" }}{{ k }}{{ "}" }}</code> {% endfor %}— у листі будуть нові.</div>{% endif %}
+    {{ copy|json_script:"rq-copy-data" }}
+    {% endif %}
+  </div>
+  {% endif %}
   <div class="spf-card">
     <div class="spf-h">📨 Що запитуємо</div>
     <div class="spf-grid">
@@ -102,9 +149,9 @@
     <label class="spf-wide">Ще (вільним текстом)<textarea name="notes" rows="3" placeholder="Додаткові вимоги, сертифікати, пакування, доставка до…">{{ notes }}</textarea></label>
   </div>
 
-  <div class="spf-card">
+  <div class="spf-card" id="rq-files-card">
     <div class="spf-h">📎 Файли (ZIP, Gerber, креслення, BOM) — підуть вкладенням кожному</div>
-    {% for f in files %}<div><a href="{{ f.file.url }}" target="_blank" translate="no">📎 {{ f.name }}</a> <span class="spf-muted">{{ f.size|filesizeformat }}</span> <label class="spf-muted"><input type="checkbox" name="del_file" value="{{ f.pk }}"> прибрати</label></div>{% endfor %}
+    {% for f in files %}<div><a href="{{ f.file.url }}" target="_blank" translate="no">📎 {{ f.name }}</a> <span class="spf-muted">{{ f.size|filesizeformat }}</span> <label class="spf-muted"><input type="checkbox" name="del_file" value="{{ f.pk }}"> {% if src %}не брати{% else %}прибрати{% endif %}</label></div>{% endfor %}
     <div class="rq-drop" id="rq-drop">
       <input type="file" name="files" id="rq-files" multiple>
       <span class="spf-muted">або перетягніть файли сюди; ще раз «вибрати» — додає до списку</span>
@@ -142,7 +189,7 @@
         <input type="checkbox" name="rcp" value="{{ s.pk }}" {% if s.pk in picked %}checked{% endif %}>
         <span class="rq-nm" data-photo="{{ s.f_photo }}" data-photo-note="{{ s.f_photo_note }}"><b translate="no" title="{{ s.name }} — клік: дані постачальника праворуч">{{ s.name }}{% for c in s.categories.all %} <span title="{{ c.name }}">{{ c.icon }}</span>{% endfor %}</b>
           <span class="rq-meta">{% if s.status == "potential" %}🌱 {% elif s.status == "paused" %}⏸ {% endif %}{% if s.f_country %}🌍 {{ s.f_country }}{% endif %}{% if s.f_fair %} · 🎪{% endif %}{% if s.f_where_label %} · <span translate="no">{{ s.f_where_label }}</span>{% endif %}</span></span>
-        <span class="rq-to">{% if s.contacts.all %}<select name="contact_{{ s.pk }}" title="Кому піде лист"><option value="">{{ s.email|default:"— без email фірми" }}</option>{% for c in s.contacts.all %}{% if c.email %}<option value="{{ c.pk }}" {% if c.is_primary %}selected{% endif %}>{{ c.name }} · {{ c.email }}</option>{% endif %}{% endfor %}</select>
+        <span class="rq-to">{% if s.contacts.all %}<select name="contact_{{ s.pk }}" title="Кому піде лист"><option value="">{{ s.email|default:"— без email фірми" }}</option>{% for c in s.contacts.all %}{% if c.email %}<option value="{{ c.pk }}" {% if s.f_contact %}{% if c.pk == s.f_contact %}selected{% endif %}{% elif c.is_primary %}selected{% endif %}>{{ c.name }} · {{ c.email }}</option>{% endif %}{% endfor %}</select>
           {% else %}<span class="spf-muted" translate="no">{{ s.email|default:"⚠️ немає email" }}</span>{% endif %}</span>
       </label>
       {% endfor %}
@@ -201,7 +248,7 @@
   <div class="spf-row">
     <button type="submit" name="go" value="stay" class="button">💾 Зберегти</button>
     <button type="submit" name="go" value="work" class="button">💾 Зберегти й до запиту</button>
-    {% if accounts %}<button type="submit" name="go" value="send" class="default" onclick="return this.form.body.value.trim() ? confirm('Надіслати запит усім позначеним, кому ще не надіслано?') : (alert('Спершу «💾 Зберегти» — текст складеться з параметрів, перевірте його.'), false)">📤 Зберегти й надіслати</button>{% endif %}
+    {% if accounts %}<button type="submit" name="go" value="send" class="default" onclick="return window.rqSendOk ? window.rqSendOk(this.form) : false">📤 Зберегти й надіслати</button>{% endif %}
   </div>
 </form>
 </div>
@@ -209,8 +256,17 @@
 <script>
 (function(){
   var tpl = document.getElementById('rq-template');
-  function show(){ document.querySelectorAll('.rq-spec').forEach(function(b){ b.classList.toggle('on', b.dataset.template === tpl.value); }); }
+  // поля прихованих форм не надсилаються (disabled): одна назва (spec_layers…) є в кількох формах, і сервер брав
+  // останню — правка у видимій формі губилась
+  function show(){ document.querySelectorAll('.rq-spec').forEach(function(b){
+    var on = b.dataset.template === tpl.value; b.classList.toggle('on', on);
+    b.querySelectorAll('input, textarea, select').forEach(function(el){ el.disabled = !on; }); }); }
   tpl.addEventListener('change', show);
+  show();
+  document.querySelectorAll('.rq-spec').forEach(function(b){ b.addEventListener('input', function(e){
+    var el = e.target; if (!el.name) return;     // те саме поле в інших формах — те саме значення (перемкнули форму — не загубиться)
+    document.querySelectorAll('.rq-spec [name="' + el.name + '"]').forEach(function(x){ if (x !== el) x.value = el.value; });
+  }); });
   document.getElementById('rq-category').addEventListener('change', function(){
     var o = this.options[this.selectedIndex]; if (o && o.dataset.template) { tpl.value = o.dataset.template; show(); }
     if (this.value && typeof setFilter === 'function') { setFilter('cat', [this.value]); }   // категорія запиту → фільтр «Кому»
@@ -481,6 +537,8 @@
     if (pk) { fd.append('supplier', pk);
       var cs = form.querySelector('select[name="contact_' + pk + '"]'); if (cs) fd.append('contact', cs.value); }
     {% if req.pk %}fd.append('req', '{{ req.pk }}');{% endif %}
+    var cf = form.querySelector('input[name=copy_from]'); if (cf) fd.append('copy_from', cf.value);
+    form.querySelectorAll('input[name=del_file]:checked').forEach(function(c){ fd.append('del_file', c.value); });
     return fd;
   }
   var tok = form.querySelector('input[name=csrfmiddlewaretoken]').value;
@@ -507,7 +565,6 @@
     if (!to) { tMsg.textContent = '⚠️ Вкажіть адресу'; return; }
     if (!form.querySelector('textarea[name=body]').value.trim()) { tMsg.textContent = '⚠️ Порожній текст листа'; return; }
     var fd = letterData(pvSel.value); fd.append('test_to', to);
-    form.querySelectorAll('input[name=del_file]:checked').forEach(function(c){ fd.append('del_file', c.value); });
     [].forEach.call(document.getElementById('rq-files').files, function(x){ fd.append('files', x); });
     tGo.disabled = true; tMsg.textContent = '⏳ Надсилаю…';
     fetch('{% url "admin:suppliers_supplierrequest_test_mail" %}', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': tok}})
@@ -519,6 +576,80 @@
           (j.files && j.files.length ? '; файлів: ' + j.files.length : '');
       }).catch(function(){ tGo.disabled = false; tMsg.textContent = '⚠️ Немає зв’язку з сервером'; });
   });
+  // 📋 копія: швидкий вибір «Кому» — як у старому, лише ті, хто відповів / з пропозицією / вибрані, нікого
+  var cdata = document.getElementById('rq-copy-data');
+  if (cdata) {
+    var groupsOf = JSON.parse(cdata.textContent || '{}');
+    document.querySelectorAll('#rq-picks button[data-pick]').forEach(function(b){ b.addEventListener('click', function(){
+      var want = (groupsOf[b.dataset.pick] || []).map(String);
+      rows.forEach(function(l){ var cb = l.querySelector('input[name=rcp]'); if (!cb.disabled) cb.checked = want.indexOf(l.dataset.pk) >= 0; });
+      document.querySelectorAll('#rq-picks button').forEach(function(x){ x.classList.toggle('on', x === b); });
+      document.getElementById('rq-sup').dispatchEvent(new Event('change'));
+    }); });
+  }
+  // 📋 підсвітка: поле на перевірці, доки значення те саме, що при копіюванні (rfq_copy.norm — те саме тут)
+  var rvEl = document.getElementById('rq-review'), RV = rvEl ? JSON.parse(rvEl.textContent || '{}') : {},
+      reviewed = {}, rvBox = document.getElementById('rq-reviewed');
+  function rqNorm(v){ return String(v == null ? '' : v).replace(/\r\n?/g, '\n').split('\n')
+    .map(function(x){ return x.replace(/\s+$/, ''); }).join('\n').trim(); }
+  function fieldOf(k){
+    if (k === 'files') return document.getElementById('rq-files-card');
+    var name = k.indexOf('spec:') === 0 ? 'spec_' + k.slice(5) : k, found = null;
+    form.querySelectorAll('[name="' + name + '"]').forEach(function(el){ if (!found && !el.disabled) found = el; });
+    return found;
+  }
+  function boxOf(k, el){ return k === 'files' ? el : (el.closest('label') || el); }
+  function same(k, el){
+    if (k === 'files') return !form.querySelector('input[name=del_file]:checked') &&
+      !document.getElementById('rq-files').files.length;
+    return rqNorm(el.value) === RV[k].value;
+  }
+  function rvLeft(){ return Object.keys(RV).filter(function(k){ var el = fieldOf(k); return el && !reviewed[k] && same(k, el); }); }
+  function rvMark(k, ok){ reviewed[k] = ok; rvBox.innerHTML = '';
+    Object.keys(reviewed).forEach(function(x){ if (!reviewed[x]) return;
+      var i = document.createElement('input'); i.type = 'hidden'; i.name = 'reviewed'; i.value = x; rvBox.appendChild(i); });
+    rvPaint(); }
+  function rvPaint(){
+    if (!rvEl) return;
+    var list = document.getElementById('rq-rv-list'), left = rvLeft(), must = 0;
+    list.innerHTML = '';
+    document.querySelectorAll('.rq-rv').forEach(function(b){ b.classList.remove('rq-rv', 'rq-rv-must', 'rq-rv-maybe'); });
+    document.querySelectorAll('.rq-rv-tag').forEach(function(t){ t.remove(); });
+    Object.keys(RV).forEach(function(k){
+      var el = fieldOf(k), info = RV[k], on = left.indexOf(k) >= 0, chip = document.createElement('a');
+      chip.href = '#'; chip.className = 'rq-rv-chip' + (info.level === 'maybe' ? ' rq-rv-maybe' : '') + (on ? '' : ' rq-rv-ok');
+      chip.textContent = (on ? '' : '✓ ') + info.label; chip.title = info.why;
+      chip.addEventListener('click', function(e){ e.preventDefault(); var x = fieldOf(k); if (!x) return;
+        boxOf(k, x).scrollIntoView({behavior: 'smooth', block: 'center'}); if (x.focus && k !== 'files') x.focus({preventScroll: true}); });
+      if (el) list.appendChild(chip);
+      if (!on || !el) return;
+      if (info.level === 'must') must++;
+      var box = boxOf(k, el), tag = document.createElement('span'), t = document.createElement('span'), b = document.createElement('button');
+      box.classList.add('rq-rv', info.level === 'maybe' ? 'rq-rv-maybe' : 'rq-rv-must');
+      tag.className = 'rq-rv-tag'; t.textContent = (info.level === 'maybe' ? '🟡 перевірте: ' : '🔴 зі старого запиту: ') + info.why;
+      b.type = 'button'; b.className = 'button'; b.textContent = '✓ Так і лишити'; b.title = 'Значення правильне — більше не підсвічувати';
+      b.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); rvMark(k, true); });
+      tag.appendChild(t); tag.appendChild(b); box.appendChild(tag);
+    });
+    var sum = document.getElementById('rq-rv-sum');
+    sum.textContent = left.length ? 'Ще перевірити: ' + left.length + (must ? ' (червоних ' + must + ')' : '') : '✅ Усе перевірено';
+    document.getElementById('rq-rv-all').hidden = !left.length;
+  }
+  if (rvEl) {
+    form.addEventListener('input', rvPaint); form.addEventListener('change', rvPaint);
+    document.getElementById('rq-rv-all').addEventListener('click', function(){
+      Object.keys(RV).forEach(function(k){ reviewed[k] = true; }); rvMark(Object.keys(RV)[0], true); });
+    tpl.addEventListener('change', rvPaint);
+    rvPaint();
+  }
+  // 📤 надіслати: текст є, і що не перевірено після копіювання — спершу питаємо
+  window.rqSendOk = function(f){
+    if (!f.body.value.trim()) { alert('Спершу «💾 Зберегти» — текст складеться з параметрів, перевірте його.'); return false; }
+    var left = rvEl ? rvLeft().filter(function(k){ return RV[k].level === 'must'; }) : [];
+    if (left.length && !confirm('Після копіювання ще не змінено й не перевірено: ' +
+        left.map(function(k){ return RV[k].label; }).join(', ') + '.\nНадіслати так?')) return false;
+    return confirm('Надіслати запит усім позначеним, кому ще не надіслано?');
+  };
 })();
 </script>
 {% endblock %}

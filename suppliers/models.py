@@ -278,6 +278,10 @@ class SupplierRequest(models.Model):
                               related_name="+", verbose_name="Хто веде")
     decision = models.TextField("Рішення / підсумок", blank=True, default="")
     analysis = models.JSONField(default=dict, blank=True)
+    # 📋 копія іншого запиту (services/rfq_copy.py): з якого, і що ще не перевірено {ключ поля: значення при копіюванні}
+    copied_from = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="copies",
+                                    verbose_name="Копія запиту")
+    review = models.JSONField("Перевірити після копіювання", default=dict, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     sent_at = models.DateTimeField(null=True, blank=True)
     closed_at = models.DateTimeField(null=True, blank=True)

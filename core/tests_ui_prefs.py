@@ -62,6 +62,24 @@ class SettingsPageTests(TestCase):
         for key in ui_prefs.OPTIONS:
             self.assertContains(page, f'id="ui-{key}"')
 
+    def test_one_menu_group_open(self):
+        """«📂 Розгорнуті розділи меню: лише один» — атрибут data-mv-groups на сторінці, перемикач у меню й «Моїх
+        налаштуваннях»; згортання інших груп робить mv_desktop.js."""
+        self.assertEqual(self.post({"ui": {"menu_groups": "one"}}).status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.ui_prefs["menu_groups"], "one")
+        self.assertEqual(_page_ui(self.client.get("/admin/").content.decode())["attrs"]["data-mv-groups"], "one")
+        self.assertContains(self.client.get("/core/my-settings/"), "📂 Розгорнуті розділи меню")
+        self.post({"ui": {"menu_groups": "all"}})                       # чужого значення немає
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.ui_prefs["menu_groups"], "one")
+        from pathlib import Path
+        from django.conf import settings
+        js = (Path(settings.BASE_DIR) / "static/admin/js/mv_desktop.js").read_text(encoding="utf-8")
+        self.assertIn("root.getAttribute('data-mv-groups') === 'one'", js)
+        self.assertIn("'Лише один — інші згортаються'", js)
+        self.assertIn("{ ui: { menu_groups: v } }", js)
+
     def test_saved_prefs_follow_to_other_pages(self):
         r = self.post({"ui": {"theme": "hc-light", "font": "readable", "text_size": "125",
                               "links": "underline", "focus": "always", "motion": "reduce", "fix_contrast": "0"}})
@@ -74,6 +92,7 @@ class SettingsPageTests(TestCase):
         self.assertEqual(ui["attrs"], {
             "data-mv-design": "new",                                 # вигляд ПК — за замовчуванням новий
             "data-mv-sidebar": "auto",                               # бокове меню — само звужується до значків
+            "data-mv-groups": "many",                                # розгорнуті розділи меню — як людина лишила
             "data-mv-fix-contrast": "0", "data-mv-font": "readable", "data-mv-size": "125",
             "data-mv-focus": "always", "data-mv-links": "underline", "data-mv-motion": "reduce",
             "data-mv-voice": "on"})                                  # 🎤 голосовий набір — за замовчуванням є
@@ -104,7 +123,7 @@ class SettingsPageTests(TestCase):
         self.assertIn('/static/admin/css/mv_menu.css?v=2', html)
         self.assertIn("root.classList.add('mvd-rail')", html)          # значки ще до першого малювання
         self.assertIn("attrs['data-mv-sidebar']", html)
-        self.assertIn('/static/admin/js/mv_desktop.js?v=5', html)
+        self.assertIn('/static/admin/js/mv_desktop.js?v=6', html)
         self.assertIn('/static/admin/css/mv_desktop.css?v=4', html)
         self.assertIn('/static/admin/js/mv_show.js?v=2', html)
         # спільне меню — раніше за панель праворуч і за бокове меню (обидва ним користуються)

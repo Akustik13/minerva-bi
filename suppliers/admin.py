@@ -86,19 +86,48 @@ class SupplierRequestAdmin(admin.ModelAdmin):
     list_filter = ("status", GroupFilter, "category", "project")
     search_fields = ("code", "title", "group", "body", "recipients__supplier__name")
     date_hierarchy = "created_at"
+    actions = ["copy_selected"]
+    _can_add = False
 
     def get_queryset(self, request):
         R = SupplierRequestRecipient
-        return super().get_queryset(request).select_related("project", "category").annotate(
+        return super().get_queryset(request).select_related("project", "category", "copied_from").annotate(
             _sent=Count("recipients", filter=~Q(recipients__state__in=[R.PLANNED, R.FAILED]), distinct=True),
             _ans=Count("recipients", filter=Q(recipients__state__in=[R.REPLIED, R.QUOTED, R.DECLINED]), distinct=True),
             _quoted=Count("recipients", filter=Q(recipients__state=R.QUOTED), distinct=True),
             _all=Count("recipients", distinct=True))
 
+    def changelist_view(self, request, extra_context=None):
+        self._can_add = self.has_add_permission(request)
+        return super().changelist_view(request, extra_context)
+
     @admin.display(description="Номер", ordering="code")
     def code_col(self, obj):
-        return format_html('<a href="{}" translate="no"><b>{}</b></a>',
+        from suppliers.services import rfq_copy
+        html = format_html('<a href="{}" translate="no"><b>{}</b></a>',
                            reverse("admin:suppliers_supplierrequest_work", args=[obj.pk]), obj.code)
+        if obj.copied_from_id and obj.copied_from:
+            html += format_html('<br><small class="spf-muted" title="Копія цього запиту">📋 з <span translate="no">{}'
+                                '</span></small>', obj.copied_from.code)
+        left = rfq_copy.pending(obj)
+        if left:
+            html += format_html('<br><a href="{}" class="rq-left" title="{}">⚠️ перевірити: {}</a>',
+                                reverse("admin:suppliers_supplierrequest_edit", args=[obj.pk]),
+                                ", ".join(x["label"] for x in left), len(left))
+        if self._can_add:
+            html += format_html('<br><a href="{}?copy={}" title="Новий запит на основі цього: що, параметри, кількості, '
+                                'файли, кому, лист — що зазвичай треба змінити, буде підсвічено">📋 Копіювати</a>',
+                                reverse("admin:suppliers_supplierrequest_new"), obj.pk)
+        return html
+
+    @admin.action(description="📋 Копіювати — новий запит на основі вибраного", permissions=["add"])
+    def copy_selected(self, request, queryset):
+        ids = list(queryset.values_list("pk", flat=True)[:2])
+        if len(ids) != 1:
+            self.message_user(request, "📋 Виберіть один запит — на його основі відкриється форма нового.",
+                              messages.WARNING)
+            return None
+        return redirect(f"{reverse('admin:suppliers_supplierrequest_new')}?copy={ids[0]}")
 
     @admin.display(description="Відповіли")
     def answers_col(self, obj):
@@ -145,7 +174,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         req = self._request(request, int(P["req"]), "change") if str(P.get("req") or "").isdigit() else None
         if req is None and not self.has_add_permission(request):
             raise Http404
-        draft = SupplierRequest(code=req.code if req else "", title=P.get("title", "").strip()[:200],
+        draft = SupplierRequest(code=req.code if req else "RFQ-…", title=P.get("title", "").strip()[:200],
                                 language=P.get("language") if P.get("language") in dict(SupplierRequest.LANGS) else "en",
                                 subject=P.get("subject", "").strip()[:250], body=P.get("body", ""),
                                 cc=P.get("cc", "")[:500], cc_contacts=bool(P.get("cc_contacts")),
@@ -163,6 +192,19 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         email, contact = rfq.pick_email(supplier, contact)
         return req, draft, SupplierRequestRecipient(request=draft, supplier=supplier, contact=contact, email=email)
 
+    def _form_files(self, request, req):
+        """Файли, що зараз у формі: збереженого запиту або (📋 копія, ще не збережена) запиту copy_from — крім
+        позначених «прибрати» / «не брати»."""
+        P = request.POST
+        if req is not None:
+            files = req.files.all()
+        elif str(P.get("copy_from") or "").isdigit():
+            files = self._request(request, int(P["copy_from"]), "view").files.all()
+        else:
+            return []
+        gone = set(P.getlist("del_file"))
+        return [f for f in files if str(f.pk) not in gone]
+
     def preview_view(self, request):
         """👁 Як виглядатиме лист одному отримувачу — з того, що зараз у формі (ще не збережене теж): тема й текст
         зі змінними (rfq.render), кому, копія (rfq.cc_for), вкладення запиту. Нічого не зберігає й не надсилає."""
@@ -175,7 +217,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         if not draft.body.strip():
             body = ""
         return JsonResponse({"to": r.email or "⚠️ немає email", "cc": rfq.cc_for(draft, r), "subject": subject,
-                             "body": body, "files": [f.name for f in req.files.all()] if req else []})
+                             "body": body, "files": [f.name for f in self._form_files(request, req)]})
 
     def test_mail_view(self, request):
         """✉️ Тестовий лист собі / колезі: як отримає вибраний у «👁» постачальник (не вибрано — зразок
@@ -190,12 +232,9 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         cap = rfq.ATTACH_MAX_MB * 1024 * 1024 + 1
         blobs = []
         try:
-            if req is not None:
-                gone = set(request.POST.getlist("del_file"))
-                for f in req.files.all():
-                    if str(f.pk) not in gone:
-                        with f.file.open("rb") as fh:
-                            blobs.append((f.name, fh.read(cap)))
+            for f in self._form_files(request, req):
+                with f.file.open("rb") as fh:
+                    blobs.append((f.name, fh.read(cap)))
             blobs += [(u.name, u.read(cap)) for u in request.FILES.getlist("files")[:20]]
             out = rfq.send_test(draft, r, request.user, request.POST.get("test_to", ""), rfq.as_attachments(blobs))
         except OSError as e:
@@ -220,16 +259,12 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         # файли — і ще не збережені (браузер шле їх сюди), і вже прикріплені; вміст читаємо тут, не у фоні
         from suppliers.services import rfq_files
         blobs = [(u.name, u.read(rfq_files.FILE_MAX + 1)) for u in request.FILES.getlist("files")[:20]]
-        if req is not None:
-            gone = set(P.getlist("del_file"))
-            for f in req.files.all():
-                if str(f.pk) in gone:
-                    continue
-                try:
-                    with f.file.open("rb") as fh:
-                        blobs.insert(0, (f.name, fh.read(rfq_files.FILE_MAX + 1)))
-                except OSError:
-                    blobs.insert(0, (f.name, b""))
+        for f in reversed(self._form_files(request, req)):
+            try:
+                with f.file.open("rb") as fh:
+                    blobs.insert(0, (f.name, fh.read(rfq_files.FILE_MAX + 1)))
+            except OSError:
+                blobs.insert(0, (f.name, b""))
         files = [n for n, _ in blobs] + [n[:120] for n in P.getlist("file_names") if n.strip()][:30]
         file_texts = rfq_files.texts(blobs)
         try:
@@ -258,7 +293,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 "models": MODELS, "style": _STYLE, "job_js": _JOB_JS, **extra}
 
     def _request(self, request, pk, need="view"):
-        req = SupplierRequest.objects.select_related("project", "category", "account", "owner").filter(pk=pk).first()
+        req = SupplierRequest.objects.select_related("project", "category", "account", "owner", "copied_from").filter(pk=pk).first()
         if req is None:
             raise Http404
         ok = (self.has_view_permission(request, req) if need == "view" else
@@ -318,11 +353,16 @@ class SupplierRequestAdmin(admin.ModelAdmin):
 
     # ── ＋ Новий / ✏️ запит ──
     def form_view(self, request, pk=None):
+        from suppliers.services import rfq_copy
         req = self._request(request, pk, "change") if pk else None
         if req is None and not self.has_add_permission(request):
             raise Http404
         if request.method == "POST":
             return self._save_form(request, req)
+        # 📋 ?copy=<pk> — новий запит на основі іншого (rfq_copy.draft); нічого не створюється до «💾 Зберегти»
+        src = (self._request(request, int(request.GET["copy"]), "view")
+               if req is None and str(request.GET.get("copy") or "").isdigit() else None)
+        copy, contact_pick = None, {}
         initial_supplier = request.GET.get("supplier")
         project = None
         if req is None and str(request.GET.get("project") or "").isdigit():
@@ -331,7 +371,11 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         category = None
         if req is None and str(request.GET.get("category") or "").isdigit():
             category = SupplierCategory.objects.filter(pk=int(request.GET["category"])).first()
-        if req is None:
+        if src is not None:
+            req, copy = rfq_copy.draft(src, request.user)
+            copy.update(rfq_copy.recipients(src))
+            picked, contact_pick = set(copy["all"]), copy["contacts"]
+        elif req is None:
             req = SupplierRequest(language="en", project=project, category=category,
                                   template=(category.request_template if category and category.request_template
                                             else "generic"),
@@ -343,6 +387,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                 picked = set(category.suppliers.values_list("pk", flat=True))
         else:
             picked = set(req.recipients.values_list("supplier_id", flat=True))
+            contact_pick = {s: (c or -1) for s, c in req.recipients.values_list("supplier_id", "contact_id")}
         from projects.models import Project
         projects = Project.objects.filter(Q(status__in=Project.OPEN_STATUSES) | Q(pk=req.project_id)).order_by("-pk")[:300]
         groups = list(SupplierRequest.objects.exclude(group="").values_list("group", flat=True)
@@ -356,23 +401,41 @@ class SupplierRequestAdmin(admin.ModelAdmin):
                                                            for f in v[1]]}
                      for k, v in rfq.TEMPLATES.items()]
         sent = {r.supplier_id: r for r in req.recipients.all()} if req.pk else {}
+        files = list(req.files.all()) if req.pk else list(src.files.all()) if src is not None else []
+        if src is not None:
+            review = rfq_copy.initial(req, files)
+        else:
+            review = req.review if req.pk and req.status == SupplierRequest.DRAFT else {}
+        review_items = rfq_copy.describe(review, req)
+        rcp = self._recipients()
+        for s in rcp["suppliers"]:      # кому піде лист: контакт з запиту (копії — зі старого), інакше основний
+            s.f_contact = contact_pick.get(s.pk)
+        copy_src = src or (req.copied_from if req.pk and req.copied_from_id else None)
+        title = (f"📋 Новий запит на основі {src.code}" if src is not None else
+                 f"✏️ {req.code}" if req.pk else "📨 Новий запит постачальникам")
         return TemplateResponse(request, "admin/suppliers/request_form.html", self._ctx(
-            request, f"✏️ {req.code}" if req.pk else "📨 Новий запит постачальникам", req=req, templates=templates,
+            request, title, req=req, templates=templates,
             categories=SupplierCategory.objects.filter(is_active=True), projects=projects, groups=groups,
-            picked=picked, sent=sent, accounts=accounts, placeholders=rfq.PLACEHOLDERS, **self._recipients(),
+            picked=picked, sent=sent, accounts=accounts, placeholders=rfq.PLACEHOLDERS, **rcp,
             examples={k: {"subject": v[0], "body": v[1]} for k, v in rfq.EXAMPLES.items()},
             colleagues=self._colleagues(), test_to=accounts[0].email_address if accounts else request.user.email,
             example_body=rfq.EXAMPLES.get(req.language, rfq.EXAMPLES["en"])[1],
-            langs=SupplierRequest.LANGS, files=list(req.files.all()) if req.pk else [],
-            notes=(req.specs or {}).get("_notes", "")))
+            langs=SupplierRequest.LANGS, files=files, notes=(req.specs or {}).get("_notes", ""),
+            src=src, copy=copy, copy_src=copy_src, review_items=review_items,
+            review_must=sum(1 for x in review_items if x["level"] == rfq_copy.MUST),
+            review_data={x["key"]: {"value": x["value"], "level": x["level"], "label": x["label"], "why": x["why"]}
+                         for x in review_items}))
 
     def _save_form(self, request, req):
         from inventory.models import Supplier
         from projects.models import Project
+        from suppliers.services import rfq_copy
         new = req is None
-        if new:
-            req = SupplierRequest(owner=request.user)
         P = request.POST
+        src = (self._request(request, int(P["copy_from"]), "view")
+               if new and str(P.get("copy_from") or "").isdigit() else None)
+        if new:
+            req = SupplierRequest(owner=request.user, copied_from=src)
         req.title = P.get("title", "").strip()[:200] or "Запит"
         req.template = P.get("template") if P.get("template") in rfq.TEMPLATES else "generic"
         req.category = SupplierCategory.objects.filter(pk=P.get("category") or 0).first()
@@ -396,12 +459,17 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         if acc is not None:
             req.account = acc
         req.save()
+        if src is not None:     # 📋 файли старого запиту — крім «не брати»
+            missing = rfq_copy.copy_files(src, req, request.user, skip=P.getlist("del_file"))
+            if missing:
+                self.message_user(request, "⚠️ Файлів старого запиту вже немає на диску (не скопійовано): "
+                                  + ", ".join(missing), messages.WARNING)
         for upload in request.FILES.getlist("files")[:20]:
             try:
                 rfq.add_file(req, upload, request.user)
             except rfq.RFQError as e:
                 self.message_user(request, f"⚠️ {upload.name}: {e}", messages.ERROR)
-        for fid in P.getlist("del_file"):
+        for fid in ([] if src is not None else P.getlist("del_file")):
             f = req.files.filter(pk=fid).first()
             if f is not None:
                 f.file.delete(save=False)
@@ -430,7 +498,14 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         req.subject = P.get("subject", "").strip()[:250] or rfq.subject_for(req)
         if P.get("regen"):
             req.subject = rfq.subject_for(req)
-        req.save(update_fields=["body", "subject"])
+        # 📋 що ще не перевірено після копіювання: значення те саме, що при копіюванні, і не «✓ так і лишити»
+        if src is not None:     # файли — усі старого запиту: «не брати» щось = файли переглянуто (як у формі)
+            base = rfq_copy.initial(rfq_copy.draft(src, request.user)[0], list(src.files.all()))
+        else:
+            base = req.review if req.status == SupplierRequest.DRAFT else {}
+        reviewed = P.getlist("reviewed") + (list(base) if P.get("review_done") else [])
+        req.review = rfq_copy.settle(base, req, reviewed) if base else {}
+        req.save(update_fields=["body", "subject", "review"])
         work =reverse("admin:suppliers_supplierrequest_work", args=[req.pk])
         if P.get("go") == "send":
             return self._send(request, req, work)
@@ -458,7 +533,7 @@ class SupplierRequestAdmin(admin.ModelAdmin):
     # ── сторінка запиту ──
     def work_view(self, request, pk):
         from suppliers.models import SupplierReplyFile
-        from suppliers.services import rfq_replies
+        from suppliers.services import rfq_copy, rfq_replies
         req = self._request(request, pk)
         for r in req.recipients.exclude(thread=None, reply_message=None):
             try:   # 📎 вкладення відповідей, що вже на диску (з пошти — панель рядка)
@@ -485,6 +560,9 @@ class SupplierRequestAdmin(admin.ModelAdmin):
         return TemplateResponse(request, "admin/suppliers/request_work.html", self._ctx(
             request, f"📨 {req.code} · {req.title}", req=req, rows=rows, files=list(req.files.all()),
             overdue=rfq.waiting_overdue(req), can_change=self.has_change_permission(request, req),
+            can_add=self.has_add_permission(request), review_left=rfq_copy.pending(req),
+            review_must=", ".join(x["label"] for x in rfq_copy.pending(req) if x["level"] == rfq_copy.MUST),
+            copies=list(req.copies.order_by("-created_at").values("pk", "code", "status")[:10]),
             states=[s for s in SupplierRequestRecipient.STATES if s[0] != SupplierRequestRecipient.PLANNED],
             more=more.order_by("name")[:200], events=events, quantities=rfq.parse_quantities(req.quantities),
             planned=sum(1 for row in rows if row["recipient"].state in (SupplierRequestRecipient.PLANNED,
@@ -583,6 +661,9 @@ class SupplierRequestAdmin(admin.ModelAdmin):
             elif do == "cancel":
                 SupplierRequest.objects.filter(pk=req.pk).update(status=SupplierRequest.CANCELLED,
                                                                  closed_at=timezone.now())
+            elif do == "review_done":       # 📋 після копіювання: усе перевірено, підсвітку зняти
+                SupplierRequest.objects.filter(pk=req.pk).update(review={})
+                self.message_user(request, "✓ Усе перевірено", messages.SUCCESS)
             elif do == "decision":
                 SupplierRequest.objects.filter(pk=req.pk).update(decision=request.POST.get("decision", "")[:4000])
         except rfq.RFQError as e:
