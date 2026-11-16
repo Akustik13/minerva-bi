@@ -412,10 +412,85 @@ def mail_state(order, user, shipment=None) -> dict:
         why = 'Налаштування сповіщень недоступні'
     if why:
         return {'sent': sent, 'blocked': why}
-    to = (order.ship_email or order.email or '').strip()
-    if not to:
+    to = (order.ship_email or order.email or getattr(shipment, 'recipient_email', '') or '').strip()
+    if not to and shipment is None:
         return {'sent': sent, 'blocked': 'у замовленні немає email клієнта'}
+    # зі сторінки відправлення — і без email: лист формується, адресу людина вписує у вікні
     return {'sent': sent, 'to': to, 'url': reverse('admin:sales_salesorder_notify_customer', args=[order.pk]) + query}
+
+
+def parcel_mail_state(shipment, user) -> dict:
+    """Лист отримувачу посилки БЕЗ замовлення («✉️ Лист клієнту…» на сторінці відправлення): {sent, url, to} або
+    {sent, blocked}. Посилка із замовленням — mail_state (лист замовлення)."""
+    from django.urls import reverse
+    sent = shipment.customer_notified_at
+    if not user.has_perm('shipping.change_shipment'):
+        return {'sent': sent, 'blocked': 'немає права змінювати відправлення'}
+    why = parcel_mail_blocked(shipment)
+    if why:
+        return {'sent': sent, 'blocked': why}
+    return {'sent': sent, 'to': shipment.recipient_email.strip(),
+            'url': reverse('admin:shipping_shipment_notify_customer', args=[shipment.pk])}
+
+
+def parcel_mail_blocked(shipment) -> str:
+    """Чому лист отримувачу посилки не можна ('' — можна): ті самі правила, що лист клієнту замовлення."""
+    try:
+        from config.models import NotificationSettings
+        ns = NotificationSettings.get()
+    except Exception:  # noqa: BLE001
+        return 'Налаштування сповіщень недоступні'
+    if not ns.email_enabled:
+        return 'SMTP не налаштовано. Увімкніть Email у Налаштуваннях сповіщень.'
+    if not ns.customer_notify_enabled:
+        return 'Лист клієнту про відправку вимкнено в Налаштуваннях сповіщень.'
+    # немає email отримувача — лист однаково формується, адресу людина вписує у вікні
+    to = (shipment.recipient_email or '').strip()
+    from dashboard.notify_routes import blocked
+    rule = blocked(ns, to)
+    if rule:
+        return f'Отримувач у списку «🚫 Не надсилати листи цим клієнтам» ({rule}).'
+    return ''
+
+
+def parcel_mail_context(shipment) -> dict:
+    """Змінні шаблону листа клієнту про відправку для посилки без замовлення: номер — референс посилки
+    (інакше трек-номер), що відправлено — рядки митної декларації, інакше опис вмісту."""
+    rows = shipment.customs_articles or {}
+    if isinstance(rows, dict):
+        rows = rows.get('customs_line_items') or rows.get('items') or []
+    items = []
+    for r in rows if isinstance(rows, list) else []:
+        if not isinstance(r, dict):
+            continue
+        name = str(r.get('sku') or r.get('description') or '').strip()
+        if not name:
+            continue
+        qty = r.get('quantity')
+        try:
+            qty = int(qty) if float(qty) == int(float(qty)) else qty
+        except (TypeError, ValueError):
+            pass
+        items.append(f'• {name} — {qty} pcs.' if qty not in (None, '') else f'• {name}')
+    if not items and (shipment.description or '').strip():
+        items = [f'• {shipment.description.strip()}']
+    when = shipment.submitted_at or shipment.created_at
+    if when:
+        from django.utils import timezone
+        when = timezone.localtime(when) if timezone.is_aware(when) else when
+    country = (shipment.recipient_country or '').strip().upper()
+    addr = [shipment.recipient_company or shipment.recipient_name, shipment.recipient_street,
+            f'{shipment.recipient_zip or ""} {shipment.recipient_city or ""}'.strip(), country]
+    return {
+        'order_number':    (shipment.reference or '').strip() or (shipment.tracking_number or '').strip()
+                           or str(shipment.pk),
+        'customer_name':   (shipment.recipient_name or shipment.recipient_company or '').strip(),
+        'tracking_number': (shipment.tracking_number or '').strip(),
+        'carrier':         shipment.carrier.get_carrier_type_display() if shipment.carrier_id else '',
+        'shipped_date':    when.strftime('%d.%m.%Y') if when else '',
+        'items':           '\n'.join(items) or '—',
+        'ship_address':    '\n'.join(a for a in addr if a),
+    }
 
 
 LABEL_TYPES = {'.pdf': 'application/pdf', '.png': 'image/png', '.gif': 'image/gif', '.jpg': 'image/jpeg',

@@ -317,6 +317,36 @@ class ShipmentMailTests(Base):
         self.s.refresh_from_db()
         self.assertIsNotNone(self.s.customer_notified_at)
 
+    def test_parcel_without_order(self):
+        s = Shipment.objects.create(carrier=self.ups, status=Shipment.Status.LABEL_READY, tracking_number='1Z777',
+                                    label_url='/media/shipping/labels/ups_1.pdf', recipient_country='DE',
+                                    recipient_name='Joel', recipient_email='joel@lynx.example',
+                                    submitted_at=timezone.now(),
+                                    customs_articles={'customs_line_items': [
+                                        {'description': 'Antenna', 'sku': 'AN1', 'quantity': 3, 'value': 9}]})
+        page = self.client.get(f'/admin/shipping/shipment/{s.pk}/detail/')
+        url = f'/admin/shipping/shipment/{s.pk}/notify-customer/'
+        self.assertContains(page, url)
+        d = self.client.get(url).json()
+        self.assertEqual(d['to'], 'joel@lynx.example')
+        self.assertIn('1Z777', d['body'])
+        self.assertIn('AN1 — 3 pcs.', d['body'])
+        self.assertEqual(d['label'], {'name': 'Label_1Z777.pdf'})
+        from unittest import mock
+        with mock.patch('dashboard.customer_mail.send') as send:
+            r = self.client.post(url, {'to': 'joel@lynx.example', 'subject': 'S', 'body': 'B', 'attach_label': True},
+                                 content_type='application/json')
+        self.assertTrue(r.json()['ok'])
+        self.assertEqual(send.call_args.kwargs['attachments'][0]['name'], 'Label_1Z777.pdf')
+        s.refresh_from_db()
+        self.assertIsNotNone(s.customer_notified_at)
+        # без email — лист однаково формується, адресу вписують у вікні
+        Shipment.objects.filter(pk=s.pk).update(recipient_email='')
+        self.assertContains(self.client.get(f'/admin/shipping/shipment/{s.pk}/detail/'), url)
+        self.assertEqual(self.client.get(url).json()['to'], '')
+        self.client.force_login(staff('bea', 'accountant'))
+        self.assertEqual(self.client.post(url, {}, content_type='application/json').status_code, 403)
+
     def test_label_outside_media_refused(self):
         Shipment.objects.filter(pk=self.s.pk).update(label_url='/media/../../etc/passwd.pdf')
         self.s.refresh_from_db()

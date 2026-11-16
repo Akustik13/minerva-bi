@@ -11007,6 +11007,7 @@
 {"uk": "Немає права додавати упаковку товарів", "en": "No permission to add product packaging", "de": "Keine Berechtigung, Artikelverpackungen hinzuzufügen"}
 {"uk": "Немає права записувати наради — попросіть адміністратора відкрити розділ «🎙 Наради».", "en": "No permission to record meetings — ask the administrator to open the “🎙 Meetings” section.", "de": "Keine Berechtigung, Besprechungen aufzunehmen — bitten Sie den Administrator, den Bereich „🎙 Besprechungen“ freizuschalten."}
 {"uk": "Немає права змінювати «Налаштування цін».", "en": "You do not have permission to change “Price settings”.", "de": "Sie haben keine Berechtigung, die „Preiseinstellungen“ zu ändern."}
+{"uk": "Немає права змінювати відправлення", "en": "No permission to change shipments", "de": "Keine Berechtigung, Sendungen zu ändern"}
 {"uk": "Немає права змінювати відправлення.", "en": "No permission to change shipments.", "de": "Keine Berechtigung, Sendungen zu ändern."}
 {"uk": "Немає права змінювати доручення", "en": "No permission to change instructions", "de": "Keine Berechtigung, Aufträge zu ändern"}
 {"uk": "Немає права змінювати закупівлю", "en": "No permission to change the purchase order", "de": "Keine Berechtigung, die Bestellung zu ändern"}
@@ -11891,6 +11892,7 @@
 {"uk": "Отримувач посилки (адреса доставки, лише довідка): {0}", "en": "Отримувач посилки (адреса доставки, лише довідка): {0}", "de": "Отримувач посилки (адреса доставки, лише довідка): {0}"}
 {"uk": "Отримувач посилки (може відрізнятись від білінгового клієнта). Якщо поля порожні — при створенні відправлення беруться з розділу «Клієнт (білінг)».", "en": "Parcel recipient (may differ from the billing customer). If the fields are empty — they are taken from the “Customer (billing)” section when a shipment is created.", "de": "Empfänger des Pakets (kann vom Rechnungskunden abweichen). Sind die Felder leer, werden sie beim Anlegen der Sendung aus dem Bereich „Kunde (Rechnung)“ übernommen."}
 {"uk": "Отримувач посилки (може відрізнятись від клієнта)", "en": "Parcel recipient (may differ from the customer)", "de": "Paketempfänger (kann vom Kunden abweichen)"}
+{"uk": "Отримувач у списку «🚫 Не надсилати листи цим клієнтам» ({0}).", "en": "The recipient is on the «🚫 Do not email these customers» list ({0}).", "de": "Der Empfänger steht auf der Liste «🚫 Diesen Kunden keine E-Mails senden» ({0})."}
 {"uk": "Отримувач — його UPS-акаунт", "en": "Recipient — their UPS account", "de": "Empfänger — sein UPS-Konto"}
 {"uk": "Отримувач — стандарт (DAP)", "en": "Recipient — standard (DAP)", "de": "Empfänger — Standard (DAP)"}
 {"uk": "Отримувачі", "en": "Recipients", "de": "Empfänger"}
@@ -13291,6 +13293,7 @@
 {"uk": "Посилка з трек-номером {0} вже є — #{1}.", "en": "A parcel with tracking number {0} already exists — #{1}.", "de": "Ein Paket mit der Sendungsnummer {0} gibt es schon — #{1}."}
 {"uk": "Посилка затримується", "en": "The parcel is delayed", "de": "Das Paket verzögert sich"}
 {"uk": "Посилка передана в службу доставки", "en": "The parcel has been handed over to the delivery service", "de": "Das Paket wurde an den Zustelldienst übergeben"}
+{"uk": "Посилка із замовленням — лист у картці замовлення", "en": "Parcel with an order — the email is in the order card", "de": "Paket mit Auftrag — die E-Mail ist in der Auftragskarte"}
 {"uk": "Посилка — відправлення", "en": "Parcel — shipment", "de": "Paket — Sendung"}
 {"uk": "Посилки", "en": "Parcels", "de": "Pakete"}
 {"uk": "Посилки (трекінг)", "en": "Parcels (tracking)", "de": "Pakete (Sendungsverfolgung)"}
@@ -20204,6 +20207,7 @@
 {"uk": "немає права додавати товари в магазин", "en": "no permission to add products to the shop", "de": "keine Berechtigung, Artikel zum Shop hinzuzufügen"}
 {"uk": "немає права записувати рухи складу", "en": "no permission to record stock movements", "de": "keine Berechtigung, Lagerbewegungen zu erfassen"}
 {"uk": "немає права змінювати асортимент магазину", "en": "no permission to change the shop assortment", "de": "keine Berechtigung, das Shop-Sortiment zu ändern"}
+{"uk": "немає права змінювати відправлення", "en": "no permission to change shipments", "de": "keine Berechtigung, Sendungen zu ändern"}
 {"uk": "немає права змінювати замовлення", "en": "no permission to change orders", "de": "keine Berechtigung, Aufträge zu ändern"}
 {"uk": "немає права змінювати лістинги DigiKey", "en": "no permission to change DigiKey listings", "de": "keine Berechtigung, DigiKey-Listings zu ändern"}
 {"uk": "немає права змінювати товари", "en": "no permission to change products", "de": "keine Berechtigung, Artikel zu ändern"}

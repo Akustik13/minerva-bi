@@ -3503,6 +3503,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                 found = label_file(chosen)
                 if found:
                     label = {'name': found[1]}
+                to_email = to_email or (chosen.recipient_email or '').strip()
 
             return JsonResponse({
                 'label':     label,
