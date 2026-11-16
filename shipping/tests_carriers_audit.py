@@ -167,3 +167,9 @@ class JumingoTests(TestCase):
         self.assertEqual(len(body["packages"]), 2)
         self.assertEqual(body["from_address"]["country"], "CN")
         self.assertEqual(out["tariffs"], [{"id": "t1"}])
+        # Доставка «до +30 днів», як калькулятор jumingo.com (з «завтра» — порожньо для Китаю й важких посилок)
+        from datetime import date, timedelta
+        rates = call.call_args_list[1].kwargs["json"]
+        self.assertEqual(rates["deliveryDate"][:10], (date.today() + timedelta(days=30)).isoformat())
+        self.assertEqual(rates["pickupDateMode"], "flex")
+        self.assertTrue(rates["settings"]["getExternalTariffs"])

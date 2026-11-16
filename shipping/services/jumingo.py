@@ -400,18 +400,26 @@ class JumingoService(BaseCarrierService):
 
     # ── Отримання тарифів ─────────────────────────────────────────────────────
 
+    # Доставка «не пізніше» — як калькулятор jumingo.com (+30 днів). Раніше стояло «завтра»: Jumingo віддавав
+    # лише тарифи з доставкою наступного дня — для Китаю, Японії, Австралії, важких посилок — порожньо
+    RATES_DELIVERY_DAYS = 30
+
+    @classmethod
+    def _rates_payload(cls, shipment_id: str) -> dict:
+        today = date.today()
+        return {
+            "shipmentId":     shipment_id,
+            "pickupDate":     today.strftime("%Y-%m-%dT00:00:00"),
+            "pickupDateMode": "flex",
+            "deliveryDate":   (today + timedelta(days=cls.RATES_DELIVERY_DAYS)).strftime("%Y-%m-%dT00:00:00"),
+            "settings":       {"mode": "m", "getExternalTariffs": True},
+        }
+
     def get_rates(self, carrier_shipment_id: str) -> dict:
         """POST /v1/shipment-rates — повертає список тарифів для відправлення."""
         import requests as req
 
-        today    = date.today()
-        tomorrow = today + timedelta(days=1)
-        payload  = {
-            "shipmentId":  carrier_shipment_id,
-            "pickupDate":  today.strftime("%Y-%m-%dT12:00:00"),
-            "deliveryDate": tomorrow.strftime("%Y-%m-%dT12:00:00"),
-            "settings":    {"mode": "m"},
-        }
+        payload = self._rates_payload(carrier_shipment_id)
         try:
             from tabele.api_logger import logged_request
             resp = logged_request('jumingo', 'get_rates', 'POST',
@@ -536,14 +544,7 @@ class JumingoService(BaseCarrierService):
             return {"tariffs": [], "preview_id": "", "error": "Jumingo не повернув shipment_id"}
 
         # Крок 2: Тарифи
-        today    = date.today()
-        tomorrow = today + timedelta(days=1)
-        rates_payload = {
-            "shipmentId":  preview_id,
-            "pickupDate":  today.strftime("%Y-%m-%dT12:00:00"),
-            "deliveryDate": tomorrow.strftime("%Y-%m-%dT12:00:00"),
-            "settings":    {"mode": "m"},
-        }
+        rates_payload = self._rates_payload(preview_id)
         try:
             r2 = logged_request('jumingo', 'get_rates_preview', 'POST',
                                 f"{self._base()}/shipment-rates", req.post,
