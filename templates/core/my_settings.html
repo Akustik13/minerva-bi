@@ -134,6 +134,16 @@ input:checked + .ms-slider:before { transform: translateX(18px); }
     </div>
   </div>
 
+  {# ── 📱 Пошта на телефоні (email_assistant/app_api.page_view) ── #}
+  <div class="ms-card">
+    <h3>📱 Пошта на телефоні</h3>
+    <div class="ms-info" style="color:var(--text-dim,#607d8b);font-size:12px">
+      Додаток «Minerva Пошта» для Android: листи, відповіді, чернетки, AI й доручення агенту — з телефона.
+      Підключення — QR-кодом під вашим акаунтом, без пароля в телефоні.
+    </div>
+    <div style="margin-top:8px"><a class="button" href="{% url 'email_assistant:mail_app' %}">📱 Підключити телефон</a></div>
+  </div>
+
   {# ── Інтерфейс ── #}
   <div class="ms-card">
     <h3>🖥 Інтерфейс</h3>

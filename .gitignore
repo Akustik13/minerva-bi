@@ -54,6 +54,8 @@ tabele_fixed/
 data/
 app/
 ai/
+# Android-частина додатка «Minerva Пошта» (Flutter) — не стара папка
+!mobile/mail_app/android/app/
 
 # ── Web Scraper ───────────────────────────────────────────
 downloads/

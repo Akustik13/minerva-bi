@@ -547,6 +547,34 @@ def _filter_qs(cat, customer, project=None, quote=False, wcat=None, fu=False) ->
     return ('&' + urlencode(params)) if params else ''
 
 
+def filter_messages(qs, account, *, cat='', work=None, customer=None, project=None, quote=False, quote_all=False,
+                    fu=False):
+    """Фільтри лівої колонки поверх _build_qs: тип співрозмовника, своя категорія (NO_CATEGORY — без своєї), клієнт
+    CRM, проєкт, запити пропозицій (quote_all — ще й оброблені), «⏰ Чекаю реакції». Ті самі для скриньки й для
+    📱 додатка «Minerva Пошта» (mail_app.messages)."""
+    from email_assistant.models import EmailMessage
+    if cat:
+        qs = qs.filter(category=cat)
+    if work == NO_CATEGORY:
+        qs = qs.filter(work_category=None)
+    elif work:   # лист у кількох категоріях — у кожній
+        from email_assistant.work_categories import in_category
+        qs = qs.filter(in_category([work.pk]))
+    if customer:
+        from django.db.models import Q
+        qs = qs.filter(pk__in=EmailMessage.objects.filter(
+            Q(thread__crm_customer_id=customer.pk) | Q(crm_events__customer_id=customer.pk)).values('pk'))
+    if project:
+        from projects.services import project_messages
+        qs = qs.filter(pk__in=project_messages(project).values('pk'))
+    if quote:
+        qs = qs.filter(pk__in=_quote_messages(account, with_done=quote_all))
+    if fu:
+        from email_assistant import followups
+        qs = qs.filter(pk__in=followups.message_pks(account))
+    return qs
+
+
 def _open_projects():
     from projects.models import Project
     return list(Project.objects.filter(status__in=Project.OPEN_STATUSES).order_by('-updated_at')[:200])
@@ -619,27 +647,10 @@ def inbox_view(request):
     ctx_hidden = nav_prefs.ctx_hidden(_es)
     from email_assistant import layout as _layout
     mail_layout = _layout.get(_es)
-    if cat_filter:
-        qs = qs.filter(category=cat_filter)
-    if work_filter == NO_CATEGORY:
-        qs = qs.filter(work_category=None)
-    elif work_filter:   # лист у кількох категоріях — у кожній
-        from email_assistant.work_categories import in_category
-        qs = qs.filter(in_category([work_filter.pk]))
-    if customer_filter:
-        from django.db.models import Q as _CQ
-        qs = qs.filter(pk__in=EmailMessage.objects.filter(
-            _CQ(thread__crm_customer_id=customer_filter.pk) |
-            _CQ(crm_events__customer_id=customer_filter.pk)).values('pk'))
-    if project_filter:
-        from projects.services import project_messages
-        qs = qs.filter(pk__in=project_messages(project_filter).values('pk'))
-    if quote_filter:
-        qs = qs.filter(pk__in=_quote_messages(account, with_done=quote_all))
+    qs = filter_messages(qs, account, cat=cat_filter, work=work_filter, customer=customer_filter,
+                         project=project_filter, quote=quote_filter, quote_all=quote_all, fu=fu_filter)
     quote_count, quote_done_count = _quote_counts(counts_qs)
     from email_assistant import followups as _followups
-    if fu_filter:
-        qs = qs.filter(pk__in=_followups.message_pks(account))
     # «Групувати по гілці» (⎘, cookie): один рядок на гілку — її найновіший лист у цьому списку
     grouped = request.COOKIES.get('em_group') == '1'
     if grouped:

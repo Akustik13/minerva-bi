@@ -162,6 +162,7 @@
 {"uk": "&rsaquo; 📚 Гід по Minerva", "en": "&rsaquo; 📚 Minerva Guide", "de": "&rsaquo; 📚 Minerva-Leitfaden"}
 {"uk": "&rsaquo; 📥 Документи з пошти", "en": "&rsaquo; 📥 Documents from mail", "de": "&rsaquo; 📥 Dokumente aus E-Mails"}
 {"uk": "&rsaquo; 📱 Додаток на телефон", "en": "&rsaquo; 📱 Phone app", "de": "&rsaquo; 📱 Handy-App"}
+{"uk": "&rsaquo; 📱 Пошта на телефоні", "en": "&rsaquo; 📱 Mail on phone", "de": "&rsaquo; 📱 Mail auf dem Telefon"}
 {"uk": "&rsaquo; 🔎 З пошти", "en": "&rsaquo; 🔎 From mail", "de": "&rsaquo; 🔎 Aus der Post"}
 {"uk": "&rsaquo; 🔐 Доступ", "en": "&rsaquo; 🔐 Access", "de": "&rsaquo; 🔐 Zugriff"}
 {"uk": "&rsaquo; 🪪 Візитки й флаєри", "en": "&rsaquo; 🪪 Business cards & flyers", "de": "&rsaquo; 🪪 Visitenkarten & Flyer"}
@@ -720,6 +721,7 @@
 {"uk": "2nd Contact Gender — 2-й гендер", "en": "2nd Contact Gender — 2nd gender", "de": "2nd Contact Gender — 2. Geschlecht"}
 {"uk": "2️⃣ Пакет: {0}", "en": "2️⃣ Bundle: {0}", "de": "2️⃣ Paket: {0}"}
 {"uk": "2️⃣ Підключити телефон до вашого акаунта", "en": "2️⃣ Connect the phone to your account", "de": "2️⃣ Handy mit Ihrem Konto verbinden"}
+{"uk": "2️⃣ Підключити телефон до вашої пошти", "en": "2️⃣ Connect the phone to your mail", "de": "2️⃣ Telefon mit Ihrer Mail verbinden"}
 {"uk": "3 дні", "en": "3 days", "de": "3 Tage"}
 {"uk": "3 знаки", "en": "3 decimals", "de": "3 Nachkommastellen"}
 {"uk": "3 міс", "en": "3 mo", "de": "3 Mon."}
@@ -945,6 +947,7 @@
 {"uk": "AI-асистент DigiKey", "en": "DigiKey AI assistant", "de": "DigiKey-KI-Assistent"}
 {"uk": "AI-асистент для вас вимкнений.", "en": "The AI assistant is disabled for you.", "de": "Der KI-Assistent ist für Sie deaktiviert."}
 {"uk": "AI-асистент для тебе вимкнений.", "en": "The AI assistant is disabled for you.", "de": "Der KI-Assistent ist für dich deaktiviert."}
+{"uk": "AI-відповідь, «📋 Підготувати відповідь», «❓ Запитати про лист», переклад", "en": "AI reply, «📋 Prepare a reply», «❓ Ask about this message», translation", "de": "KI-Antwort, «📋 Antwort vorbereiten», «❓ Frage zur Nachricht», Übersetzung"}
 {"uk": "AI-генерована", "en": "AI-generated", "de": "KI-generiert"}
 {"uk": "AI-модель підказок", "en": "AI model for suggestions", "de": "KI-Modell für Vorschläge"}
 {"uk": "AI-огляд проєкту", "en": "AI project overview", "de": "KI-Projektübersicht"}
@@ -1425,6 +1428,7 @@
 {"uk": "Email — подяка VIP", "en": "Email — thank-you to VIP", "de": "E-Mail — Dank an VIP"}
 {"uk": "Email — при затвердженні", "en": "Email — on approval", "de": "E-Mail — bei Genehmigung"}
 {"uk": "Email — при новому повідомленні", "en": "Email — on new message", "de": "E-Mail — bei neuer Nachricht"}
+{"uk": "Email → Акаунти → Додати", "en": "Email → Accounts → Add", "de": "E-Mail → Konten → Hinzufügen"}
 {"uk": "Email → Пауза 14 дн. → Email → Рішення → Пауза 60 дн.", "en": "Email → Pause 14 d → Email → Decision → Pause 60 d.", "de": "E-Mail → Pause 14 Tage → E-Mail → Entscheidung → Pause 60 Tage."}
 {"uk": "Email → Рішення → Дзвінок → Рішення → Пауза 90 дн.", "en": "Email → Decision → Call → Decision → Pause 90 d.", "de": "E-Mail → Entscheidung → Anruf → Entscheidung → Pause 90 Tage."}
 {"uk": "Email-агент", "en": "Email agent", "de": "E-Mail-Agent"}
@@ -1908,6 +1912,8 @@
 {"uk": "Push у браузері (спливаючі повідомлення в системі)", "en": "Browser push (pop-up notifications in the system)", "de": "Browser-Push (Popup-Benachrichtigungen im System)"}
 {"uk": "QR діє {0} хв і лише один раз. Не показуйте його іншим — хто відсканує, працюватиме під вашим акаунтом.", "en": "The QR is valid for {0} min and only once. Do not show it to others — whoever scans it will work under your account.", "de": "Der QR gilt {0} Min. und nur einmal. Zeigen Sie ihn niemandem — wer ihn scannt, arbeitet unter Ihrem Konto."}
 {"uk": "QR діє {0} хв і лише один раз. Не показуйте його іншим — хто відсканує, працюватиме під вашим акаунтом. Адреса Minerva для телефона", "en": "The QR is valid for {0} min and only once. Do not show it to others — whoever scans it will work under your account. Minerva address for the phone", "de": "Der QR gilt {0} Min. und nur einmal. Zeigen Sie ihn niemandem — wer ihn scannt, arbeitet unter Ihrem Konto. Minerva-Adresse für das Handy"}
+{"uk": "QR діє {0} хв і лише один раз. Не показуйте його іншим — хто відсканує, читатиме вашу пошту.", "en": "The QR code is valid for {0} min and only once. Do not show it to others — whoever scans it will read your mail.", "de": "Der QR-Code gilt {0} Min. und nur einmal. Zeigen Sie ihn niemandem — wer ihn scannt, liest Ihre Mails."}
+{"uk": "QR діє {0} хв і лише один раз. Не показуйте його іншим — хто відсканує, читатиме вашу пошту. Адреса Minerva для телефона", "en": "The QR code is valid for {0} min and only once. Do not show it to others — whoever scans it will read your mail. Minerva address for the phone", "de": "Der QR-Code gilt {0} Min. und nur einmal. Zeigen Sie ihn niemandem — wer ihn scannt, liest Ihre Mails. Minerva-Adresse für das Telefon"}
 {"uk": "QR застарів — покажіть новий.", "en": "The QR has expired — show a new one.", "de": "Der QR ist abgelaufen — zeigen Sie einen neuen."}
 {"uk": "QR не перевірено (немає зв'язку з бібліотекою) — AI прочитає текст з фото.", "en": "QR not checked (no connection to the library) — AI will read the text from the photo.", "de": "QR nicht geprüft (keine Verbindung zur Bibliothek) — die KI liest den Text vom Foto."}
 {"uk": "QR прочитано", "en": "QR read", "de": "QR gelesen"}
@@ -1916,6 +1922,7 @@
 {"uk": "QR-код", "en": "QR code", "de": "QR-Code"}
 {"uk": "QR-код (vCard, сайт) Minerva читає одразу — ці дані точні, AI лише доповнить решту. Не прочитався — «✂️ Обрізати» навколо коду або «🔳 Сканувати лише QR» і піднесіть телефон ближче.", "en": "Minerva reads the QR code (vCard, website) immediately — this data is exact, AI only adds the rest. Not read — «✂️ Crop» around the code or «🔳 Scan QR only» and hold the phone closer.", "de": "Minerva liest den QR-Code (vCard, Website) sofort — diese Daten sind exakt, die KI ergänzt nur den Rest. Nicht gelesen — «✂️ Zuschneiden» um den Code oder «🔳 Nur QR scannen» und das Handy näher halten."}
 {"uk": "QR-код недійсний або застарів — на сторінці «📱 Додаток на телефон» у Minerva покажіть новий.", "en": "The QR code is invalid or expired — show a new one on the «📱 Phone app» page in Minerva.", "de": "Der QR-Code ist ungültig oder abgelaufen — zeigen Sie auf der Seite «📱 Handy-App» in Minerva einen neuen."}
+{"uk": "QR-код недійсний або застарів — на сторінці «📱 Пошта на телефоні» в Minerva покажіть новий.", "en": "The QR code is invalid or expired — show a new one on the «📱 Mail on phone» page in Minerva.", "de": "Der QR-Code ist ungültig oder abgelaufen — zeigen Sie auf der Seite «📱 Mail auf dem Telefon» in Minerva einen neuen."}
 {"uk": "QR-коду на фото не знайдено.", "en": "No QR code found in the photo.", "de": "Kein QR-Code auf dem Foto gefunden."}
 {"uk": "QR-коду не знайдено — «✂️ Обрізати» навколо нього або «🔳 Сканувати лише QR».", "en": "No QR code found — «✂️ Crop» around it or «🔳 Scan QR only».", "de": "Kein QR-Code gefunden — «✂️ Zuschneiden» um ihn herum oder «🔳 Nur QR scannen»."}
 {"uk": "QR-коду ще не читали або на фото його немає.", "en": "The QR code has not been read yet or there is none in the photo.", "de": "QR-Code noch nicht gelesen oder keiner auf dem Foto."}
@@ -3352,6 +3359,8 @@
 {"uk": "«Certificates & secrets» → «New client secret» → значення (Value) сюди; Application (client) ID — з «Overview».", "en": "“Certificates & secrets” → “New client secret” → enter the value (Value) here; Application (client) ID — from “Overview”.", "de": "„Certificates & secrets“ → „New client secret“ → den Wert (Value) hier eintragen; Application (client) ID — aus „Overview“."}
 {"uk": "«Credentials» → «Create OAuth client ID» → Web application → Authorized redirect URI — адреса вище → скопіювати Client ID і Secret сюди.", "en": "“Credentials” → “Create OAuth client ID” → Web application → Authorized redirect URI — the address above → copy the Client ID and Secret here.", "de": "„Credentials“ → „Create OAuth client ID“ → Web application → Authorized redirect URI — die Adresse oben → Client ID und Secret hierher kopieren."}
 {"uk": "«Deutsch + English» — один документ з підписами обома мовами", "en": "“Deutsch + English” — one document with labels in both languages", "de": "„Deutsch + English“ — ein Dokument mit Beschriftungen in beiden Sprachen"}
+{"uk": "«Minerva Пошта» — ваша пошта Minerva в телефоні: та сама скринька, ті самі листи, категорії, AI-відповіді", "en": "«Minerva Mail» — your Minerva mail on the phone: the same mailbox, the same messages, categories, AI replies", "de": "«Minerva Mail» — Ihre Minerva-Mail auf dem Telefon: dasselbe Postfach, dieselben Nachrichten, Kategorien, KI-Antworten"}
+{"uk": "«Minerva Пошта» — ваша пошта Minerva в телефоні: та сама скринька, ті самі листи, категорії, AI-відповіді й доручення агенту, але зручно однією рукою. Телефон працює від вашого імені з вашими правами; пароля скриньки в телефоні немає — лише ключ, який можна відключити тут будь-коли.", "en": "«Minerva Mail» — your Minerva mail on the phone: the same mailbox, the same messages, categories, AI replies and agent rules, but comfortable with one hand. The phone works in your name with your rights; there is no mailbox password on the phone — only a key you can revoke here at any time.", "de": "«Minerva Mail» — Ihre Minerva-Mail auf dem Telefon: dasselbe Postfach, dieselben Nachrichten, Kategorien, KI-Antworten und Agenten-Regeln, aber bequem mit einer Hand. Das Telefon arbeitet in Ihrem Namen mit Ihren Rechten; auf dem Telefon liegt kein Postfach-Passwort — nur ein Schlüssel, den Sie hier jederzeit sperren können."}
 {"uk": "«Minerva врахувала»", "en": "“Minerva took into account”", "de": "„Minerva hat berücksichtigt“"}
 {"uk": "«OAuth consent screen»: External, додати свою пошту; потім «Publish app» → «In production» (у режимі Testing Google відкликає доступ кожні 7 днів; попередження «неперевірений застосунок» — нормально для власного).", "en": "“OAuth consent screen”: External, add your own e-mail; then “Publish app” → “In production” (in Testing mode Google revokes access every 7 days; the “unverified app” warning is normal for your own app).", "de": "„OAuth consent screen“: External, eigene E-Mail-Adresse hinzufügen; dann „Publish app“ → „In production“ (im Modus Testing widerruft Google den Zugriff alle 7 Tage; die Warnung „nicht verifizierte App“ ist bei einer eigenen App normal)."}
 {"uk": "«Void» — лише для відправлень UPS.", "en": "“Void” is only for UPS shipments.", "de": "„Void“ gilt nur für UPS-Sendungen."}
@@ -5739,6 +5748,7 @@
 {"uk": "Відповісти", "en": "Reply", "de": "Antworten"}
 {"uk": "Відповісти в Minerva", "en": "Reply in Minerva", "de": "In Minerva antworten"}
 {"uk": "Відповісти листом не можна — DigiKey приймає відповідь лише в Marketplace: у Minerva («💬 Messages Hub») або на supplier.digikey.com.", "en": "Replying by e-mail is not possible — DigiKey accepts replies only in the Marketplace: in Minerva (\"💬 Messages Hub\") or on supplier.digikey.com.", "de": "Per E-Mail kann nicht geantwortet werden — DigiKey nimmt Antworten nur im Marketplace an: in Minerva („💬 Messages Hub“) oder auf supplier.digikey.com."}
+{"uk": "Відповісти, відповісти всім, переслати, новий лист, вкладення з телефона", "en": "Reply, reply all, forward, new message, attachments from the phone", "de": "Antworten, allen antworten, weiterleiten, neue Nachricht, Anhänge vom Telefon"}
 {"uk": "Відповісти: {0}", "en": "Reply: {0}", "de": "Antworten: {0}"}
 {"uk": "Відправили лише частину?", "en": "Shipped only part?", "de": "Nur einen Teil versendet?"}
 {"uk": "Відправили чи скасували замовлення — його дедлайн стає «✓ Виконано» і зникає з календаря й", "en": "Once an order is shipped or cancelled, its deadline becomes “✓ Done” and disappears from the calendar and", "de": "Wird ein Auftrag versandt oder storniert, wird seine Frist zu „✓ Erledigt“ und verschwindet aus dem Kalender und"}
@@ -6580,6 +6590,9 @@
 {"uk": "Додаткові інструкції: {0}", "en": "Additional instructions: {0}", "de": "Zusätzliche Anweisungen: {0}"}
 {"uk": "Додатна кількість", "en": "Positive quantity", "de": "Positive Menge"}
 {"uk": "Додаток «Minerva Візитки»", "en": "«Minerva Cards» app", "de": "App «Minerva Visitenkarten»"}
+{"uk": "Додаток «Minerva Пошта» для Android: листи, відповіді, чернетки, AI й доручення агенту — з телефона.", "en": "The «Minerva Mail» app for Android: messages, replies, drafts, AI and agent rules — from your phone.", "de": "Die App «Minerva Mail» für Android: Nachrichten, Antworten, Entwürfe, KI und Agenten-Regeln — vom Telefon."}
+{"uk": "Додаток «Minerva Пошта» для Android: листи, відповіді, чернетки, AI й доручення агенту — з телефона. Підключення — QR-кодом під вашим акаунтом, без пароля в телефоні.", "en": "The «Minerva Mail» app for Android: messages, replies, drafts, AI and agent rules — from your phone. Connect with a QR code under your account, no password on the phone.", "de": "Die App «Minerva Mail» für Android: Nachrichten, Antworten, Entwürfe, KI und Agenten-Regeln — vom Telefon. Verbindung per QR-Code unter Ihrem Konto, ohne Passwort auf dem Telefon."}
+{"uk": "Додаток «Minerva Пошта» для Android: підключити телефон QR-кодом", "en": "The «Minerva Mail» app for Android: connect the phone with a QR code", "de": "Die App «Minerva Mail» für Android: Telefon per QR-Code verbinden"}
 {"uk": "Додаток на телефон", "en": "Phone app", "de": "Handy-App"}
 {"uk": "Додаю…", "en": "Adding…", "de": "Wird hinzugefügt…"}
 {"uk": "Додає ключові моменти «чекають ✓ / ✕» (лише ті, чия цитата є в розшифровці) і повідомляє того, хто записав.", "en": "Adds key points “awaiting ✓ / ✕” (only those whose quote is in the transcript) and notifies the person who recorded.", "de": "Fügt Kernpunkte „warten auf ✓ / ✕“ hinzu (nur solche, deren Zitat im Transkript steht) und benachrichtigt die aufnehmende Person."}
@@ -6685,6 +6698,7 @@
 {"uk": "Доручення: з кожного нового листа, що підходить під умови, — таке саме завдання", "en": "Agent rule: the same task for every new e-mail that matches the conditions", "de": "Agentenregel: dieselbe Aufgabe für jede neue E-Mail, die den Bedingungen entspricht"}
 {"uk": "Доручити агенту", "en": "Delegate to the agent", "de": "Dem Agenten übertragen"}
 {"uk": "Доручити агенту роботу за цим проєктом", "en": "Assign work on this project to the agent", "de": "Arbeit an diesem Projekt dem Agenten übertragen"}
+{"uk": "Доручити агенту: «на такі листи відповідай так»", "en": "Delegate to the agent: «reply to such mail like this»", "de": "An den Agenten übergeben: «auf solche Mails so antworten»"}
 {"uk": "Доріжки шкали", "en": "Timeline lanes", "de": "Spuren der Zeitleiste"}
 {"uk": "Досить однієї ознаки. Те саме можна робити зі скриньки: правий клік по листу → «Віднести до категорії» → своя (адреса або весь домен потрапляє в «Відправники»). Відповіді в тій самій гілці йдуть у ту саму категорію.", "en": "One criterion is enough. The same can be done from the mailbox: right-click an email → “Assign to category” → your own (the address or the whole domain goes into “Senders”). Replies in the same thread go to the same category.", "de": "Ein Merkmal genügt. Dasselbe können Sie im Postfach tun: Rechtsklick auf eine E-Mail → „Einer Kategorie zuordnen“ → eigene (Adresse oder gesamte Domain landet in „Absender“). Antworten im selben Verlauf gehen in dieselbe Kategorie."}
 {"uk": "Дослано завислих оновлень: {0}", "en": "Stuck updates resent: {0}", "de": "Hängende Aktualisierungen nachgesendet: {0}"}
@@ -11795,6 +11809,7 @@
 {"uk": "Оновлення цін DigiKey #{0} · {1}", "en": "DigiKey price update #{0} · {1}", "de": "DigiKey-Preisaktualisierung #{0} · {1}"}
 {"uk": "Оновлення цін, кількості", "en": "Updates prices, quantities", "de": "Aktualisiert Preise, Mengen"}
 {"uk": "Оновлення — так само: завантажити й встановити поверх, дані й підключення лишаються.", "en": "Updates — the same: download and install over it, data and connection stay.", "de": "Updates — genauso: herunterladen und darüber installieren, Daten und Verbindung bleiben."}
+{"uk": "Оновлення — так само: завантажити й встановити поверх, підключення лишається.", "en": "Updates work the same way: download and install over it, the connection stays.", "de": "Updates genauso: herunterladen und drüber installieren, die Verbindung bleibt."}
 {"uk": "Оновлено", "en": "Updated", "de": "Aktualisiert"}
 {"uk": "Оновлено #{0}", "en": "Updated #{0}", "de": "Aktualisiert #{0}"}
 {"uk": "Оновлено {0} замовлень", "en": "{0} orders updated", "de": "{0} Bestellungen aktualisiert"}
@@ -11897,6 +11912,7 @@
 {"uk": "Оригінал", "en": "Original", "de": "Original"}
 {"uk": "Оригінал зворотного боку", "en": "Original of the back side", "de": "Original der Rückseite"}
 {"uk": "Оригінал змінили після перекладу — переклад оновиться", "en": "The original was changed after translation — the translation will be updated", "de": "Das Original wurde nach der Übersetzung geändert — die Übersetzung wird aktualisiert"}
+{"uk": "Оригінал листа (HTML) і вкладення — в один дотик", "en": "Original message (HTML) and attachments — one tap", "de": "Original-Nachricht (HTML) und Anhänge — mit einem Tippen"}
 {"uk": "Оригінальна назва папки на IMAP-сервері (напр. \"Meine Order\")", "en": "Original folder name on the IMAP server (e.g. \"Meine Order\")", "de": "Ursprünglicher Ordnername auf dem IMAP-Server (z. B. \"Meine Order\")"}
 {"uk": "Оригінальний лист", "en": "Original email", "de": "Original-E-Mail"}
 {"uk": "Оригінальний лист --- Від: {0} {1}", "en": "Original email --- From: {0} {1}", "de": "Originalnachricht --- Von: {0} {1}"}
@@ -12260,6 +12276,7 @@
 {"uk": "Папка: шлях файлу відносно папки джерела; сайт — адреса сторінки", "en": "Folder: file path relative to the source folder; website — page address", "de": "Ordner: Dateipfad relativ zum Quellordner; Website – Adresse der Seite"}
 {"uk": "Папки немає (або Minerva її не бачить) — перевірте шлях і монтування в Docker.", "en": "The folder does not exist (or Minerva cannot see it) — check the path and the mount in Docker.", "de": "Der Ordner existiert nicht (oder Minerva kann ihn nicht sehen) – prüfen Sie den Pfad und die Einbindung in Docker."}
 {"uk": "Папки, категорії, проєкти й клієнти — підряд в одній колонці, розділи згортаються", "en": "Folders, categories, projects and customers — one after another in a single column, sections collapse", "de": "Ordner, Kategorien, Projekte und Kunden — untereinander in einer Spalte, Bereiche lassen sich einklappen"}
+{"uk": "Папки, свої категорії, клієнти, проєкти, «📝 Запити пропозицій», «⏰ Чекаю реакції»", "en": "Folders, own categories, customers, projects, «📝 Quote requests», «⏰ Awaiting reaction»", "de": "Ordner, eigene Kategorien, Kunden, Projekte, «📝 Angebotsanfragen», «⏰ Warte auf Reaktion»"}
 {"uk": "Папку «{0}» Minerva не бере (прихована або службова)", "en": "Minerva does not take the folder “{0}” (hidden or system)", "de": "Minerva übernimmt den Ordner „{0}“ nicht (versteckt oder systemintern)"}
 {"uk": "Папку не прочитати: {0}", "en": "The folder cannot be read: {0}", "de": "Der Ordner kann nicht gelesen werden: {0}"}
 {"uk": "Папку створено: {0}. Тепер завантажте файли з ПК — «📤 Завантажити файли».", "en": "Folder created: {0}. Now upload files from your PC — “📤 Upload files”.", "de": "Ordner erstellt: {0}. Laden Sie jetzt Dateien vom PC hoch — „📤 Dateien hochladen“."}
@@ -13608,6 +13625,7 @@
 {"uk": "Пошта Minerva для Windows", "en": "Minerva Mail for Windows", "de": "Minerva Mail für Windows"}
 {"uk": "Пошта й 📅 календар — у вас немає скриньки в Minerva", "en": "Mail and 📅 calendar — you have no mailbox in Minerva", "de": "Post und 📅 Kalender — Sie haben kein Postfach in Minerva"}
 {"uk": "Пошта магазину", "en": "Shop mail", "de": "Shop-E-Mail"}
+{"uk": "Пошта на телефоні", "en": "Mail on phone", "de": "Mail auf dem Telefon"}
 {"uk": "Пошта сайтів", "en": "Site mail", "de": "E-Mail der Websites"}
 {"uk": "Пошта — на {0}", "en": "Email — to {0}", "de": "E-Mail — an {0}"}
 {"uk": "Пошта — немає вашої адреси", "en": "Email — no address of yours", "de": "E-Mail — keine Adresse von Ihnen"}
@@ -13646,6 +13664,7 @@
 {"uk": "Пошук перервано ({0}) — спробуйте ще раз", "en": "Search interrupted ({0}) — try again", "de": "Suche unterbrochen ({0}) — bitte erneut versuchen"}
 {"uk": "Пошук по SKU…", "en": "Search by SKU…", "de": "Suche nach SKU…"}
 {"uk": "Пошук по ВСІХ даташитах і каталогу в RAG (помічник по продукції), зокрема даташитах, яких немає в картці Minerva. Для кандидатів: товари з параметром («antenna 5.8 GHz SMA»), аналог, де згадано артикул. Повертає товари (і чи є вони в Minerva) та фрагменти: документ, сторінка, текст. Точну цитату для пропозиції беріть з read_datasheet, коли даташит товару є в Minerva.", "en": "Search across ALL datasheets and the catalog in RAG (product assistant), including datasheets that are not in a Minerva card. For candidates: products with a parameter (“antenna 5.8 GHz SMA”), an equivalent in which the SKU is mentioned. Returns products (and whether they exist in Minerva) and fragments: document, page, text. Take the exact quote for a proposal from read_datasheet when the product's datasheet exists in Minerva.", "de": "Suche in ALLEN Datenblättern und im Katalog im RAG (Produktassistent), auch in Datenblättern, die nicht in einer Minerva-Karte vorhanden sind. Für Kandidaten: Artikel mit einem Parameter („antenna 5.8 GHz SMA“), ein Äquivalent, in dem die Artikelnummer erwähnt wird. Liefert Artikel (und ob sie in Minerva vorhanden sind) sowie Fragmente: Dokument, Seite, Text. Das genaue Zitat für einen Vorschlag nehmen Sie aus read_datasheet, wenn das Datenblatt des Artikels in Minerva vorhanden ist."}
+{"uk": "Пошук по всій пошті, гілки листування", "en": "Search all mail, conversations", "de": "Suche in allen Mails, Unterhaltungen"}
 {"uk": "Пошук по всіх даташитах у RAG (помічник по продукції, право «📦»)", "en": "Search across all datasheets in RAG (product assistant, “📦” right)", "de": "Suche in allen Datenblättern im RAG (Produktassistent, Recht „📦“)"}
 {"uk": "Пошук по назві або SKU", "en": "Search by name or SKU", "de": "Suche nach Name oder SKU"}
 {"uk": "Пошук по назві або опису (нечутливо до регістру).", "en": "Search by title or description (case-insensitive).", "de": "Suche nach Titel oder Beschreibung (Groß-/Kleinschreibung wird ignoriert)."}
@@ -13929,6 +13948,7 @@
 {"uk": "Причина лишиться в запиті й у картці постачальника — знадобиться для наступних запитів.", "en": "The reason stays in the request and on the supplier card — useful for future requests.", "de": "Der Grund bleibt in der Anfrage und in der Lieferantenkarte — nützlich für künftige Anfragen."}
 {"uk": "Приєднатися до Zoom", "en": "Join Zoom", "de": "Zoom beitreten"}
 {"uk": "Про Minerva — за гідом (📚), про товари — за даташитами й каталогом (📦). Перевіряйте важливе в джерелах.", "en": "About Minerva — from the guide (📚), about products — from datasheets and the catalog (📦). Verify important things in the sources.", "de": "Zu Minerva – anhand des Leitfadens (📚), zu Artikeln – anhand von Datenblättern und Katalog (📦). Prüfen Sie Wichtiges in den Quellen."}
+{"uk": "Про версію", "en": "About this version", "de": "Zur Version"}
 {"uk": "Про нараду", "en": "About the meeting", "de": "Zur Besprechung"}
 {"uk": "Про те саме замовлення клієнту вдруге не пише.", "en": "Does not write to the customer a second time about the same order.", "de": "Schreibt dem Kunden zum selben Auftrag kein zweites Mal."}
 {"uk": "Про те саме замовлення ще раз — {0}: повторне нагадування з датою попереднього листа; чернетка, яку ви ще не надіслали, — друга не створюється.", "en": "About the same order again — {0}: a repeat reminder with the date of the previous email; if a draft you have not sent yet exists, no second one is created.", "de": "Zum selben Auftrag erneut — {0}: wiederholte Erinnerung mit dem Datum der vorherigen E-Mail; liegt noch ein nicht gesendeter Entwurf vor, wird kein zweiter erstellt."}
@@ -14258,6 +14278,7 @@
 {"uk": "Підключення зовнішніх сервісів: ERP, CRM, платіжні системи, логістика (Jumingo, DHL, UPS, FedEx).", "en": "Connecting external services: ERP, CRM, payment systems, logistics (Jumingo, DHL, UPS, FedEx).", "de": "Anbindung externer Dienste: ERP, CRM, Zahlungssysteme, Logistik (Jumingo, DHL, UPS, FedEx)."}
 {"uk": "Підключення магазину — що зроблено і що далі", "en": "Shop connection — what is done and what is next", "de": "Shop-Anbindung — was erledigt ist und was als Nächstes kommt"}
 {"uk": "Підключення скасовано: {0}", "en": "Connection cancelled: {0}", "de": "Verbindung abgebrochen: {0}"}
+{"uk": "Підключення — QR-кодом під вашим акаунтом, без пароля в телефоні.", "en": "Connect with a QR code under your account, no password on the phone.", "de": "Verbindung per QR-Code unter Ihrem Konto, ohne Passwort auf dem Telefon."}
 {"uk": "Підключено", "en": "Connected", "de": "Verbunden"}
 {"uk": "Підключено ({0}). Знайдено замовлень: {1}.", "en": "Connected ({0}). Orders found: {1}.", "de": "Verbunden ({0}). Aufträge gefunden: {1}."}
 {"uk": "Підключено ({0}). Отримано тарифів: {1}.", "en": "Connected ({0}). Rates received: {1}.", "de": "Verbunden ({0}). Erhaltene Tarife: {1}."}
@@ -14268,6 +14289,7 @@
 {"uk": "Підключити Telegram-сповіщення", "en": "Connect Telegram notifications", "de": "Telegram-Benachrichtigungen verbinden"}
 {"uk": "Підключити до проєкту", "en": "Link to a project", "de": "Mit Projekt verknüpfen"}
 {"uk": "Підключити сайт (код)", "en": "Connect site (code)", "de": "Website verbinden (Code)"}
+{"uk": "Підключити телефон", "en": "Connect phone", "de": "Telefon verbinden"}
 {"uk": "Підключіть сайт", "en": "Connect the website", "de": "Website verbinden"}
 {"uk": "Підкреслений", "en": "Underline", "de": "Unterstrichen"}
 {"uk": "Підкреслені посилання видно й без розрізнення кольорів.", "en": "Underlined links are visible even without telling colors apart.", "de": "Unterstrichene Links sind auch ohne Farbunterscheidung erkennbar."}
@@ -14957,6 +14979,7 @@
 {"uk": "Сб", "en": "Sat", "de": "Sa"}
 {"uk": "Свайп", "en": "Swipe", "de": "Wischen"}
 {"uk": "Свайп вліво або торкніть затемнену область — закриє.", "en": "Swipe left or tap the dimmed area — it closes.", "de": "Nach links wischen oder auf den abgedunkelten Bereich tippen — schließt es."}
+{"uk": "Свайп ліворуч — в архів, праворуч — прочитано / непрочитано", "en": "Swipe left — archive, right — read / unread", "de": "Nach links wischen — archivieren, nach rechts — gelesen / ungelesen"}
 {"uk": "Своя категорія листа", "en": "E-mail's own category", "de": "Eigene Kategorie der E-Mail"}
 {"uk": "Своя категорія листів", "en": "Own email category", "de": "Eigene E-Mail-Kategorie"}
 {"uk": "Своя надбавка / знижка, %", "en": "Custom markup / discount, %", "de": "Eigener Aufschlag / Rabatt, %"}
@@ -15372,6 +15395,7 @@
 {"uk": "Спершу вкажіть адресу й API-Key askDANTE і збережіть.", "en": "First enter the askDANTE address and API key and save.", "de": "Geben Sie zuerst die askDANTE-Adresse und den API-Key an und speichern Sie."}
 {"uk": "Спершу вкажіть ціну за 1 шт.", "en": "First enter the price per 1 pc.", "de": "Geben Sie zuerst den Preis pro 1 Stk. an."}
 {"uk": "Спершу відмітьте «Прийшов».", "en": "First mark “Clock in”.", "de": "Markieren Sie zuerst „Kommen“."}
+{"uk": "Спершу додайте її", "en": "Add it first", "de": "Fügen Sie es zuerst hinzu"}
 {"uk": "Спершу задайте тут адресу й ключ помічника — інакше без файлу чат на сайті зупиниться.", "en": "First set the assistant address and key here — otherwise, without the file, the chat on the site will stop.", "de": "Legen Sie zuerst hier Adresse und Schlüssel des Assistenten fest — andernfalls stoppt der Chat auf der Website ohne die Datei."}
 {"uk": "Спершу заповніть «Ціна закупки» (у валюті базових цін).", "en": "First fill in “Purchase price” (in the base price currency).", "de": "Füllen Sie zuerst „Einkaufspreis“ aus (in der Währung der Basispreise)."}
 {"uk": "Спершу збережіть доручення — тоді тут можна перевірити його на листах скриньки.", "en": "Save the instruction first — then you can check it on the mailbox's emails here.", "de": "Speichern Sie den Auftrag zuerst — dann können Sie ihn hier an den E-Mails des Postfachs prüfen."}
@@ -16113,9 +16137,11 @@
 {"uk": "Телефон (будь-який формат)", "en": "Phone (any format)", "de": "Telefon (beliebiges Format)"}
 {"uk": "Телефон (білінг)", "en": "Phone (billing)", "de": "Telefon (Rechnung)"}
 {"uk": "Телефон «{0}» відключено — з нього більше нічого не прийде.", "en": "Phone «{0}» disconnected — nothing more will come from it.", "de": "Handy «{0}» getrennt — von ihm kommt nichts mehr."}
+{"uk": "Телефон «{0}» відключено — ключ більше не діє.", "en": "Phone «{0}» disconnected — the key no longer works.", "de": "Telefon «{0}» getrennt — der Schlüssel gilt nicht mehr."}
 {"uk": "Телефон відправника", "en": "Sender phone", "de": "Telefon des Absenders"}
 {"uk": "Телефон доставки", "en": "Delivery phone", "de": "Telefon für die Lieferung"}
 {"uk": "Телефон з додатком візиток", "en": "Phone with the cards app", "de": "Handy mit der Visitenkarten-App"}
+{"uk": "Телефон з поштою Minerva", "en": "Phone with Minerva mail", "de": "Telefon mit Minerva-Mail"}
 {"uk": "Телефон клієнта", "en": "Customer phone", "de": "Telefon des Kunden"}
 {"uk": "Телефон контакту", "en": "Contact phone", "de": "Kontakttelefon"}
 {"uk": "Телефон не підключено або відключено в Minerva — підключіть знову QR-кодом.", "en": "The phone is not connected or was disconnected in Minerva — connect it again with a QR code.", "de": "Das Handy ist nicht verbunden oder wurde in Minerva getrennt — verbinden Sie es erneut per QR-Code."}
@@ -16148,6 +16174,7 @@
 {"uk": "Теми", "en": "Subjects", "de": "Betreffe"}
 {"uk": "Теми листування з вашої пошти: запити, пропозиції, PI / рахунки й файли — кожен бачить свою пошту.", "en": "Correspondence topics from your mail: requests, quotations, PI / invoices and files — everyone sees their own mail.", "de": "Korrespondenzthemen aus Ihrer Post: Anfragen, Angebote, PI / Rechnungen und Dateien — jeder sieht seine eigene Post."}
 {"uk": "Темна", "en": "Dark", "de": "Dunkel"}
+{"uk": "Темна й світла тема, українська / English / Deutsch", "en": "Dark and light theme, Ukrainian / English / German", "de": "Dunkles und helles Design, Ukrainisch / Englisch / Deutsch"}
 {"uk": "Темп зростання MoM (%)", "en": "MoM growth rate (%)", "de": "MoM-Wachstumsrate (%)"}
 {"uk": "Температура AI", "en": "AI temperature", "de": "KI-Temperatur"}
 {"uk": "Тему й текст бачить лише власник скриньки.", "en": "Only the mailbox owner can see the subject and text.", "de": "Betreff und Text sieht nur der Postfachinhaber."}
@@ -16655,6 +16682,9 @@
 {"uk": "У вас немає прав для перегляду цієї сторінки.", "en": "You do not have permission to view this page.", "de": "Sie haben keine Berechtigung, diese Seite anzuzeigen."}
 {"uk": "У ваших скриньках листів з цим клієнтом немає.", "en": "There are no emails with this customer in your mailboxes.", "de": "In Ihren Postfächern gibt es keine E-Mails mit diesem Kunden."}
 {"uk": "У вашого користувача Minerva не задано email.", "en": "Your Minerva user has no email set.", "de": "Für Ihren Minerva-Benutzer ist keine E-Mail-Adresse hinterlegt."}
+{"uk": "У вашому акаунті Minerva немає активної скриньки пошти.", "en": "Your Minerva account has no active mailbox.", "de": "Ihr Minerva-Konto hat kein aktives Postfach."}
+{"uk": "У вашому акаунті немає скриньки пошти — спершу додайте її в «Email → Акаунти».", "en": "Your account has no mailbox — add it first in «Email → Accounts».", "de": "Ihr Konto hat kein Postfach — fügen Sie es zuerst unter «E-Mail → Konten» hinzu."}
+{"uk": "У вашому акаунті немає скриньки пошти.", "en": "Your account has no mailbox.", "de": "Ihr Konto hat kein Postfach."}
 {"uk": "У вашому календарі навколо сьогодні немає подій поза проєктом", "en": "Your calendar has no events around today outside the project", "de": "In Ihrem Kalender gibt es rund um heute keine Termine außerhalb des Projekts"}
 {"uk": "У вашому тексті старі", "en": "In your text the old", "de": "In Ihrem Text wurden die alte(n)"}
 {"uk": "У вашій пошті й документах бази знань нічого не знайдено за запитом «{0}»", "en": "Nothing found in your mail and knowledge base documents for the query “{0}”", "de": "In Ihren E-Mails und Dokumenten der Wissensdatenbank wurde zur Anfrage „{0}“ nichts gefunden"}
@@ -16665,6 +16695,7 @@
 {"uk": "У даташиті ваги немає — позначено в товарі.", "en": "No weight in the datasheet — noted in the product.", "de": "Kein Gewicht im Datenblatt — im Produkt vermerkt."}
 {"uk": "У джерелі «{0}» вже є замовлення з номерами: {1} — їх не перенесено.", "en": "Source “{0}” already has orders with the numbers: {1} — they were not moved.", "de": "In der Quelle „{0}“ gibt es bereits Aufträge mit den Nummern: {1} – sie wurden nicht übertragen."}
 {"uk": "У додатку «⌨ Ввести адресу й код вручну»: адреса", "en": "In the app «⌨ Enter address and code manually»: address", "de": "In der App «⌨ Adresse und Code manuell eingeben»: Adresse"}
+{"uk": "У додатку — «📷 Сканувати QR з Minerva». Телефон працюватиме від вашого імені", "en": "In the app — «📷 Scan QR from Minerva». The phone will work in your name", "de": "In der App — «📷 QR aus Minerva scannen». Das Telefon arbeitet in Ihrem Namen"}
 {"uk": "У додатку — «📷 Сканувати QR з Minerva». Телефон працюватиме від вашого імені (", "en": "In the app — «📷 Scan QR from Minerva». The phone will work in your name (", "de": "In der App — «📷 QR aus Minerva scannen». Das Handy arbeitet in Ihrem Namen ("}
 {"uk": "У документах вибраних закупівель нових артикулів не знайдено. Назвіть Gerber-архів артикулом (TR240401-01.zip) або впишіть «Що замовляли» вручну.", "en": "No new item numbers found in the documents of the selected purchase orders. Name the Gerber archive after the item (TR240401-01.zip) or enter “Ordered items” manually.", "de": "In den Dokumenten der ausgewählten Bestellungen wurden keine neuen Artikelnummern gefunden. Benennen Sie das Gerber-Archiv nach dem Artikel (TR240401-01.zip) oder tragen Sie „Bestellte Artikel“ manuell ein."}
 {"uk": "У документи замовлення", "en": "Into order documents", "de": "In die Auftragsdokumente"}
@@ -16736,6 +16767,7 @@
 {"uk": "У товарів цієї вибірки немає технічних параметрів для фільтра — синхронізуйте з DigiKey («🔄 Синх технічних атрибутів з DigiKey») або додайте їх у картці товару («📡 Технічні атрибути»).", "en": "The products in this selection have no technical parameters for the filter — synchronize with DigiKey (“🔄 Sync technical attributes from DigiKey”) or add them in the product card (“📡 Technical attributes”).", "de": "Die Artikel dieser Auswahl haben keine technischen Parameter für den Filter — mit DigiKey synchronisieren („🔄 Technische Attribute von DigiKey synchronisieren“) oder in der Artikelkarte hinzufügen („📡 Technische Attribute“)."}
 {"uk": "У товарів цієї категорії немає технічних параметрів для фільтра — синхронізуйте з DigiKey або додайте їх у картці товару («📡 Технічні атрибути»).", "en": "Products in this category have no technical parameters for the filter — sync with DigiKey or add them in the product card (“📡 Technical attributes”).", "de": "Die Artikel dieser Kategorie haben keine technischen Parameter für den Filter — synchronisieren Sie mit DigiKey oder fügen Sie sie in der Artikelkarte hinzu („📡 Technische Attribute“)."}
 {"uk": "У фазу", "en": "To phase", "de": "In Phase"}
+{"uk": "У цього акаунта Minerva немає скриньки пошти — додайте її в «Email → Акаунти».", "en": "This Minerva account has no mailbox — add it in «Email → Accounts».", "de": "Dieses Minerva-Konto hat kein Postfach — fügen Sie es unter «E-Mail → Konten» hinzu."}
 {"uk": "У цьому періоді на вибраних доріжках подій немає — віддаліть масштаб чи ввімкніть доріжки.", "en": "No events in this period on the chosen lanes — zoom out or turn lanes on.", "de": "In diesem Zeitraum keine Ereignisse auf den gewählten Spuren — herauszoomen oder Spuren einschalten."}
 {"uk": "У цій посилці", "en": "In this parcel", "de": "In diesem Paket"}
 {"uk": "У цінових тирах є кількість < 1 або ціна ≤ 0", "en": "Price tiers contain a quantity < 1 or a price ≤ 0", "de": "In den Preisstufen gibt es eine Menge < 1 oder einen Preis ≤ 0"}
@@ -17288,6 +17320,7 @@
 {"uk": "Цей Telegram уже прив'язаний до акаунту Minerva.", "en": "This Telegram is already linked to a Minerva account.", "de": "Dieses Telegram ist bereits mit einem Minerva-Konto verknüpft."}
 {"uk": "Цей Telegram ще не прив'язаний до акаунту Minerva.", "en": "This Telegram is not yet linked to a Minerva account.", "de": "Dieses Telegram ist noch nicht mit einem Minerva-Konto verknüpft."}
 {"uk": "Цей акаунт Minerva вимкнено або він не має доступу до пошти.", "en": "This Minerva account is disabled or has no access to mail.", "de": "Dieses Minerva-Konto ist deaktiviert oder hat keinen Zugriff auf die E-Mail."}
+{"uk": "Цей акаунт Minerva не активний.", "en": "This Minerva account is not active.", "de": "Dieses Minerva-Konto ist nicht aktiv."}
 {"uk": "Цей акаунт Minerva не може додавати візитки.", "en": "This Minerva account cannot add business cards.", "de": "Dieses Minerva-Konto kann keine Visitenkarten hinzufügen."}
 {"uk": "Цей браузер сам голос не розпізнає — виберіть RAG-ПК (правий клік на 🎤).", "en": "This browser cannot recognise speech itself — choose the RAG PC (right-click 🎤).", "de": "Dieser Browser kann Sprache nicht selbst erkennen — wählen Sie den RAG-PC (Rechtsklick auf 🎤)."}
 {"uk": "Цей календар уже підключено — оновлено.", "en": "This calendar is already connected — updated.", "de": "Dieser Kalender ist bereits verbunden — aktualisiert."}
@@ -17623,6 +17656,7 @@
 {"uk": "Чернетка плану з листування", "en": "Plan draft from the correspondence", "de": "Planentwurf aus der Korrespondenz"}
 {"uk": "Чернетки", "en": "Drafts", "de": "Entwürfe"}
 {"uk": "Чернетки немає — натисніть «🧠 Скласти план з листування»", "en": "There is no draft — click «🧠 Draft a plan from the correspondence»", "de": "Kein Entwurf vorhanden — klicken Sie auf «🧠 Plan aus der Korrespondenz erstellen»"}
+{"uk": "Чернетки — ті самі, що на комп'ютері", "en": "Drafts — the same as on the computer", "de": "Entwürfe — dieselben wie am Computer"}
 {"uk": "Чернетку агента відклали «⏰ Пізніше» — Message-ID з’явиться, коли піде", "en": "The agent's draft was postponed «⏰ Later» — the Message-ID appears once it is sent", "de": "Der Entwurf des Agenten wurde «⏰ Später» verschoben — die Message-ID erscheint nach dem Versand"}
 {"uk": "Чернетку видалено", "en": "Draft deleted", "de": "Entwurf gelöscht"}
 {"uk": "Чернетку закрито", "en": "Draft closed", "de": "Entwurf geschlossen"}
@@ -17925,6 +17959,7 @@
 {"uk": "Що включає (Telegram приклад)", "en": "What it includes (Telegram example)", "de": "Was enthalten ist (Telegram-Beispiel)"}
 {"uk": "Що включає (додатково до щоденного)", "en": "What it includes (in addition to the daily one)", "de": "Was enthalten ist (zusätzlich zum täglichen)"}
 {"uk": "Що включає (додатково)", "en": "What it includes (additionally)", "de": "Was enthalten ist (zusätzlich)"}
+{"uk": "Що вміє додаток", "en": "What the app can do", "de": "Was die App kann"}
 {"uk": "Що вміє модуль", "en": "What the module can do", "de": "Was das Modul kann"}
 {"uk": "Що врахувати", "en": "What to take into account", "de": "Was zu berücksichtigen ist"}
 {"uk": "Що врахувати AI", "en": "What the AI should consider", "de": "Was die KI berücksichtigen soll"}
@@ -18558,6 +18593,7 @@
 {"uk": "вага — лише число в грамах (напр. 45 або 0.5)", "en": "weight — a number in grams only (e.g. 45 or 0.5)", "de": "Gewicht – nur eine Zahl in Gramm (z. B. 45 oder 0.5)"}
 {"uk": "вагу нетто (г/шт)", "en": "net weight (g/pc)", "de": "Nettogewicht (g/Stk.)"}
 {"uk": "важливого: {0}", "en": "important: {0}", "de": "wichtig: {0}"}
+{"uk": "важливість, 🚫 спам, 🗑 кошик, ↩ відновити", "en": "importance, 🚫 spam, 🗑 trash, ↩ restore", "de": "Wichtigkeit, 🚫 Spam, 🗑 Papierkorb, ↩ wiederherstellen"}
 {"uk": "валюта", "en": "currency", "de": "Währung"}
 {"uk": "валюта {0} → {1} без перерахунку цін", "en": "currency {0} → {1} without converting prices", "de": "Währung {0} → {1} ohne Preisumrechnung"}
 {"uk": "валюта доставки", "en": "shipping currency", "de": "Versandwährung"}
@@ -19618,8 +19654,10 @@
 {"uk": "зі складом", "en": "with stock", "de": "mit Lager"}
 {"uk": "зі складу", "en": "from stock", "de": "ab Lager"}
 {"uk": "зі складу Minerva", "en": "from Minerva stock", "de": "aus dem Minerva-Lager"}
+{"uk": "зі скринькою", "en": "with mailbox", "de": "mit dem Postfach"}
 {"uk": "зі старого запиту", "en": "from the old request", "de": "aus der alten Anfrage"}
 {"uk": "зіставлено за", "en": "matched by", "de": "zugeordnet nach"}
+{"uk": "й доручення агенту, але зручно однією рукою. Телефон працює від вашого імені з вашими правами; пароля скриньки в", "en": "and agent rules, but comfortable with one hand. The phone works in your name with your rights; there is no mailbox password", "de": "und Agenten-Regeln, aber bequem mit einer Hand. Das Telefon arbeitet in Ihrem Namen mit Ihren Rechten; auf dem Telefon liegt kein"}
 {"uk": "й у товар, наступного разу питати не будемо.", "en": "to the product as well, so we will not ask next time.", "de": "auch im Artikel, beim nächsten Mal fragen wir nicht mehr."}
 {"uk": "й фактичні тривалості кроків з минулих проєктів. Склади ЧЕРНЕТКУ ПЛАНУ цього проєкту.", "en": "and the actual durations of steps from past projects. Draft a PLAN of this project.", "de": "und die tatsächlichen Dauern der Schritte aus früheren Projekten. Erstelle einen PLANENTWURF dieses Projekts."}
 {"uk": "йде", "en": "in progress", "de": "läuft"}
@@ -21182,6 +21220,7 @@
 {"uk": "починається з 1 у кожній коробці.", "en": "starts at 1 in each box.", "de": "beginnt in jedem Karton bei 1."}
 {"uk": "почніть вводити ім'я чи email — підкажемо з адресної книги", "en": "start typing a name or e-mail — we will suggest from the address book", "de": "Namen oder E-Mail eingeben — wir schlagen aus dem Adressbuch vor"}
 {"uk": "пошта", "en": "mail", "de": "E-Mail"}
+{"uk": "пошта вже в телефоні. Оновіть сторінку, щоб побачити його в списку.", "en": "mail is already on the phone. Reload the page to see it in the list.", "de": "die Mails sind schon auf dem Telefon. Laden Sie die Seite neu, um es in der Liste zu sehen."}
 {"uk": "пошта й календар — лише для того, хто дав завдання і має скриньку", "en": "пошта й календар — лише для того, хто дав завдання і має скриньку", "de": "пошта й календар — лише для того, хто дав завдання і має скриньку"}
 {"uk": "пошта: {0}", "en": "mail: {0}", "de": "E-Mail: {0}"}
 {"uk": "пошту вимкнено в «Налаштування → Сповіщення»", "en": "e-mail is off in \"Settings → Notifications\"", "de": "E-Mail ist in „Einstellungen → Benachrichtigungen“ deaktiviert"}
@@ -21850,6 +21889,7 @@
 {"uk": "телефон {0}", "en": "phone {0}", "de": "Telefon {0}"}
 {"uk": "телефон доставки", "en": "shipping phone", "de": "Telefon (Lieferung)"}
 {"uk": "телефон контакту", "en": "contact phone", "de": "Telefon des Kontakts"}
+{"uk": "телефоні немає — лише ключ, який можна відключити тут будь-коли.", "en": "on the phone — only a key you can revoke here at any time.", "de": "Postfach-Passwort — nur ein Schlüssel, den Sie hier jederzeit sperren können."}
 {"uk": "тем {0}, розмов прочитано {1}", "en": "{0} topics, {1} conversations read", "de": "{0} Themen, {1} Gespräche gelesen"}
 {"uk": "тема", "en": "subject", "de": "Betreff"}
 {"uk": "тема «{0}»", "en": "subject “{0}”", "de": "Betreff „{0}“"}
@@ -22709,6 +22749,9 @@
 {"uk": "ℹ️ Хід виробництва недоступний для цього замовлення.", "en": "ℹ️ Production progress is not available for this order.", "de": "ℹ️ Der Fertigungsfortschritt ist für diese Bestellung nicht verfügbar."}
 {"uk": "ℹ️ Цю дію запускає кнопка на сторінці налаштувань JLCPCB.", "en": "ℹ️ This action is started by the button on the JLCPCB settings page.", "de": "ℹ️ Diese Aktion wird über die Schaltfläche auf der JLCPCB-Einstellungsseite gestartet."}
 {"uk": "ℹ️ у замовленні на DigiKey рахунок уже був", "en": "ℹ️ the order on DigiKey already had an invoice", "de": "ℹ️ der Auftrag bei DigiKey hatte bereits eine Rechnung"}
+{"uk": "📱 Пошта на телефоні", "en": "📱 Mail on phone", "de": "📱 Mail auf dem Telefon"}
+{"uk": "📱 Підключити телефон", "en": "📱 Connect phone", "de": "📱 Telefon verbinden"}
+{"uk": "📱 Телефони з поштою Minerva", "en": "📱 Phones with Minerva mail", "de": "📱 Telefone mit Minerva-Mail"}
 {"uk": "🪪 Візитка", "en": "🪪 Business card", "de": "🪪 Visitenkarte"}
 {"uk": "🪪 Візитки й флаєри", "en": "🪪 Business cards & flyers", "de": "🪪 Visitenkarten & Flyer"}
 {"uk": "🪪 Візитки й фото", "en": "🪪 Business cards and photos", "de": "🪪 Visitenkarten und Fotos"}

@@ -1,10 +1,12 @@
-from django.urls import path
+from django.urls import include, path
 from . import views, views_categories, views_desktop, views_sort
 
 app_name = 'email_assistant'
 
 urlpatterns = [
     path('',                                             views.inbox_view,           name='inbox'),
+    # 📱 додаток «Minerva Пошта»: сторінка підключення телефону й API (app_api.py, mail_app.py)
+    path('phone/',                                       include('email_assistant.app_urls')),
     # Full-page standalone views (open separately)
     path('thread/<int:thread_pk>/',                      views.thread_view,          name='thread'),
     path('thread/<int:thread_pk>/knowledge/',            views.thread_knowledge_view, name='thread_knowledge'),

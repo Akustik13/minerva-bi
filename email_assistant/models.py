@@ -825,3 +825,26 @@ class MailFollowup(models.Model):
 
     def __str__(self):
         return f'{self.subject[:60]} → {", ".join(self.recipients[:2])}'
+
+
+class MailAppDevice(models.Model):
+    """📱 Телефон з додатком «Minerva Пошта» (Android, mobile/mail_app) — підключений QR-кодом зі сторінки
+    «📱 Пошта на телефоні» (/email/app/) під акаунтом людини (email_assistant/mail_app.py). У базі — лише SHA-256
+    ключа; «🚫 Відключити» — revoked_at (ключ перестає діяти одразу)."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='+', verbose_name='Користувач')
+    name = models.CharField('Телефон', max_length=120, blank=True, default='')
+    token_hash = models.CharField(max_length=64, unique=True)
+    token_hint = models.CharField(max_length=8, blank=True, default='')
+    app_version = models.CharField('Версія додатка', max_length=20, blank=True, default='')
+    created_at = models.DateTimeField('Підключено', auto_now_add=True)
+    last_seen_at = models.DateTimeField("Востаннє на зв'язку", null=True, blank=True)
+    last_ip = models.GenericIPAddressField(null=True, blank=True)
+    revoked_at = models.DateTimeField('Відключено', null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Телефон з поштою Minerva'
+        verbose_name_plural = '📱 Телефони з поштою Minerva'
+
+    def __str__(self):
+        return self.name or f'📱 #{self.pk}'

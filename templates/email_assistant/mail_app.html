@@ -1,0 +1,163 @@
+{% extends "admin/base_site.html" %}
+{# 📱 Пошта на телефоні: APK «Minerva Пошта» з GitHub, QR підключення телефону під акаунтом людини, підключені телефони —
+   email_assistant/app_api.py page_view, email_assistant/mail_app.py; API телефону — /email/phone/api/… #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'email_assistant:inbox' %}">📧 Пошта</a> &rsaquo; 📱 Пошта на телефоні
+</div>
+{% endblock %}
+{% block content %}
+<style>
+  .ma { max-width: 1100px; }
+  .ma-lead { font-size: 15px; color: var(--text-muted, var(--body-quiet-color)); margin: 0 0 12px; }
+  .ma-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .ma-card { flex: 1 1 340px; min-width: 290px; background: var(--bg-card, var(--darkened-bg)); border: 1px solid var(--border, var(--hairline-color));
+             border-radius: 12px; padding: 14px 16px; }
+  .ma-h { font-size: 16px; font-weight: 700; margin: 0 0 8px; color: var(--text, var(--body-fg)); }
+  .ma-muted { color: var(--text-dim, var(--body-quiet-color)); font-size: 13px; }
+  .ma-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  .ma-qr { background: #fff; display: inline-block; padding: 10px; border-radius: 10px; line-height: 0; margin: 8px 0; }
+  .ma-qr svg { width: 220px; height: 220px; display: block; }
+  .ma-steps { margin: 6px 0 0 18px; padding: 0; }
+  .ma-steps li { margin: 3px 0; }
+  .ma-ok { color: var(--ok, #2e7d32); font-weight: bold; }
+  .ma-warn { color: var(--warn, #b26a00); font-weight: bold; }
+  .ma-off { opacity: .55; }
+  .ma-tbl { border-collapse: collapse; width: 100%; }
+  .ma-tbl td, .ma-tbl th { padding: 5px 8px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border, var(--hairline-color)); }
+  .ma-feat { columns: 2 240px; margin: 4px 0 0 18px; padding: 0; }
+  .ma-feat li { margin: 2px 0; }
+</style>
+<div class="ma">
+  <p class="ma-lead">«Minerva Пошта» — ваша пошта Minerva в телефоні: та сама скринька, ті самі листи, категорії, AI-відповіді
+    й доручення агенту, але зручно однією рукою. Телефон працює від вашого імені з вашими правами; пароля скриньки в
+    телефоні немає — лише ключ, який можна відключити тут будь-коли.</p>
+
+  {% if not account %}
+  <div class="ma-card" style="margin-bottom:14px"><span class="ma-warn">⚠️ У вашому акаунті немає скриньки пошти.</span>
+    <span class="ma-muted">Спершу додайте її: <a href="/admin/email_assistant/emailaccount/add/">Email → Акаунти → Додати</a>.</span></div>
+  {% endif %}
+
+  <div class="ma-grid">
+    <div class="ma-card">
+      <div class="ma-h">1️⃣ Встановити додаток (Android)</div>
+      <div class="ma-qr" id="ma-dl-qr" translate="no"></div>
+      <div class="ma-row">
+        <a class="button default" href="{{ app_url }}" rel="noopener">⬇ Завантажити APK</a>
+        <a class="button" href="{{ releases_url }}" target="_blank" rel="noopener">Про версію ↗</a>
+        <span class="ma-muted">версія <b translate="no">{{ app_version }}</b></span>
+      </div>
+      <ol class="ma-steps ma-muted">
+        <li>Відскануйте цей QR камерою телефона або відкрийте посилання в Chrome на телефоні.</li>
+        <li>Відкрийте завантажений <b translate="no">minerva-mail.apk</b>. Android спитає дозвіл «Встановлювати невідомі додатки» для Chrome / «Файли» — дозвольте.</li>
+        <li>Оновлення — так само: завантажити й встановити поверх, підключення лишається.</li>
+      </ol>
+    </div>
+    <div class="ma-card">
+      <div class="ma-h">2️⃣ Підключити телефон до вашої пошти</div>
+      <div class="ma-muted">У додатку — «📷 Сканувати QR з Minerva». Телефон працюватиме від вашого імені
+        (<b translate="no">{{ request.user.get_full_name|default:request.user.username }}</b>){% if account %} зі скринькою <b translate="no">{{ account.email_address }}</b>{% endif %}.</div>
+      <div class="ma-row"><button type="button" class="button default" id="ma-pair"{% if not account %} disabled{% endif %}>🔗 Показати QR для підключення</button>
+        <span class="ma-muted" id="ma-msg"></span></div>
+      <div id="ma-pair-box" hidden>
+        <div class="ma-qr" id="ma-pair-qr" translate="no"></div>
+        <div id="ma-pair-state" class="ma-muted"></div>
+        <details class="ma-muted" style="margin-top:6px"><summary>Камера не читає QR? Ввести вручну</summary>
+          У додатку «⌨ Ввести адресу й код вручну»: адреса <b translate="no" id="ma-manual-url"></b>, код <code translate="no" id="ma-manual-code" style="user-select:all"></code></details>
+      </div>
+      <div class="ma-muted">QR діє {{ pair_ttl }} хв і лише один раз. Не показуйте його іншим — хто відсканує, читатиме вашу пошту.
+        Адреса Minerva для телефона: <b translate="no">{{ base }}</b></div>
+    </div>
+  </div>
+
+  <div class="ma-card" style="margin-top:14px">
+    <div class="ma-h">✉️ Що вміє додаток</div>
+    <ul class="ma-feat ma-muted">
+      <li>Папки, свої категорії, клієнти, проєкти, «📝 Запити пропозицій», «⏰ Чекаю реакції»</li>
+      <li>Пошук по всій пошті, гілки листування</li>
+      <li>Свайп ліворуч — в архів, праворуч — прочитано / непрочитано</li>
+      <li>⭐, ❗ важливість, 🚫 спам, 🗑 кошик, ↩ відновити</li>
+      <li>Відповісти, відповісти всім, переслати, новий лист, вкладення з телефона</li>
+      <li>📝 Чернетки — ті самі, що на комп'ютері</li>
+      <li>🏛 AI-відповідь, «📋 Підготувати відповідь», «❓ Запитати про лист», переклад</li>
+      <li>🤖 Доручити агенту: «на такі листи відповідай так»</li>
+      <li>Оригінал листа (HTML) і вкладення — в один дотик</li>
+      <li>Темна й світла тема, українська / English / Deutsch</li>
+    </ul>
+  </div>
+
+  <div class="ma-card" style="margin-top:14px">
+    <div class="ma-h">📱 Підключені телефони{% if admin_all %} (усі люди){% endif %} · діють: {{ active }}</div>
+    {% if devices %}
+    <table class="ma-tbl">
+      <tr><th>Телефон</th>{% if admin_all %}<th>Людина</th>{% endif %}<th>Версія</th><th>Підключено</th><th>Востаннє на зв'язку</th><th></th></tr>
+      {% for d in devices %}
+      <tr class="{% if d.revoked_at %}ma-off{% endif %}">
+        <td translate="no">📱 {{ d.name }} <span class="ma-muted">…{{ d.token_hint }}</span></td>
+        {% if admin_all %}<td translate="no">{{ d.user.get_full_name|default:d.user.username }}</td>{% endif %}
+        <td translate="no">{{ d.app_version|default:"—" }}</td>
+        <td>{{ d.created_at|date:"d.m.Y H:i" }}</td>
+        <td>{% if d.last_seen_at %}{{ d.last_seen_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</td>
+        <td>{% if d.revoked_at %}🚫 відключено {{ d.revoked_at|date:"d.m.Y" }}{% else %}
+          <form method="post" style="display:inline" onsubmit="return confirm('Відключити цей телефон? Пошта на ньому перестане оновлюватися, а листи з нього — надсилатися. Підключити знову можна новим QR.')">{% csrf_token %}
+            <input type="hidden" name="action" value="revoke"><input type="hidden" name="id" value="{{ d.pk }}">
+            <button type="submit" class="button">🚫 Відключити</button></form>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<div class="ma-muted">Ще жодного — покажіть QR для підключення вище.</div>{% endif %}
+    <div class="ma-muted" style="margin-top:6px">Загубили телефон — «🚫 Відключити»: ключ перестане діяти одразу.</div>
+  </div>
+</div>
+{{ app_url|json_script:"ma-app-url" }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(function(){
+  function drawQr(box, text){
+    box.innerHTML = '';
+    if (typeof qrcode !== 'function') { box.textContent = text; box.style.lineHeight = '1.3'; return; }
+    var q = qrcode(0, 'M'); q.addData(text); q.make();
+    box.innerHTML = q.createSvgTag({cellSize: 6, margin: 2, scalable: true});
+  }
+  drawQr(document.getElementById('ma-dl-qr'), JSON.parse(document.getElementById('ma-app-url').textContent));
+  var btn = document.getElementById('ma-pair'), msg = document.getElementById('ma-msg'),
+      box = document.getElementById('ma-pair-box'), state = document.getElementById('ma-pair-state'),
+      tok = '{{ csrf_token }}', timer = null, tick = null;
+  btn.addEventListener('click', function(){
+    clearInterval(timer); clearInterval(tick);
+    msg.textContent = '⏳';
+    var fd = new FormData(); fd.append('action', 'pair');
+    fetch(location.pathname, {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': tok}})
+      .then(function(r){ return r.json(); }).then(function(j){
+        if (!j.qr) { msg.textContent = '⚠️ ' + (j.error || 'Не вдалося'); return; }
+        msg.textContent = ''; box.hidden = false; btn.textContent = '🔄 Новий QR';
+        drawQr(document.getElementById('ma-pair-qr'), j.qr);
+        document.getElementById('ma-manual-url').textContent = j.url;
+        document.getElementById('ma-manual-code').textContent = j.code;
+        var left = j.expires_in;
+        function show(){ state.textContent = '⏳ Чекаю, поки телефон відсканує… ще ' + Math.floor(left / 60) + ':' + ('0' + (left % 60)).slice(-2); }
+        show();
+        tick = setInterval(function(){
+          left -= 1;
+          if (left <= 0) { clearInterval(tick); clearInterval(timer); state.textContent = '⌛ QR застарів — покажіть новий.'; document.getElementById('ma-pair-qr').innerHTML = ''; return; }
+          show();
+        }, 1000);
+        timer = setInterval(function(){
+          fetch(location.pathname + '?state=' + encodeURIComponent(j.key), {credentials: 'same-origin'})
+            .then(function(r){ return r.json(); }).then(function(s){
+              if (!s.paired) return;
+              clearInterval(timer); clearInterval(tick);
+              document.getElementById('ma-pair-qr').innerHTML = '';
+              state.innerHTML = '';
+              var ok = document.createElement('span'); ok.className = 'ma-ok';
+              ok.textContent = '✅ Підключено: ' + (s.device || 'телефон') + ' — пошта вже в телефоні. Оновіть сторінку, щоб побачити його в списку.';
+              state.appendChild(ok);
+            }).catch(function(){});
+        }, 2500);
+      }).catch(function(){ msg.textContent = '⚠️ Немає зв’язку з сервером'; });
+  });
+})();
+</script>
+{% endblock %}
