@@ -474,8 +474,8 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
               title="{% trans "Створити чернетку Angebot: клієнт і проєкт листування, артикули й кількості з листа, ціни з Minerva" %}">📝 Angebot</button>
       {% endif %}
       <button class="em-pv-btn danger" onclick="pvDelete({{ last.pk }})">🗑️</button>
-      <a href="{% if thread %}/email/thread/{{ thread.pk }}/{% else %}/email/message/{{ last.pk }}/{% endif %}"
-         class="em-pv-btn" target="_blank" title="{% trans "Відкрити на повній сторінці" %}">↗ {% trans "Окремо" %}</a>
+      <a href="/email/?msg={{ last.pk }}&amp;solo=1"
+         class="em-pv-btn" target="_blank" title="{% trans "Відкрити на повній сторінці — з тими самими кнопками, AI і RAG" %}">↗ {% trans "Окремо" %}</a>
       {% endif %}
     </div>
   </div>

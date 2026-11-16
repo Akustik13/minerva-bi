@@ -1821,18 +1821,23 @@ document.addEventListener('DOMContentLoaded', function(){
     sidebar.appendChild(group);
   });
 
-  /* ── Email unread badge ── */
+  /* ── Email unread badge (сторінка пошти оновлює його сама: window.mvMailBadge) ── */
   (function(){
     var inboxLink = document.querySelector('a.mg-link[href="/email/"]');
     if (!inboxLink) return;
+    window.mvMailBadge = function(n) {
+      var old = inboxLink.querySelector('span[data-mv-mail]');
+      if (old) old.remove();
+      var s = document.createElement('span');   // новий вузол — бокове меню (mv_desktop.js) теж бачить зміну
+      s.setAttribute('data-mv-mail', '1');
+      s.setAttribute('style', 'background:var(--accent,#58a6ff);color:#fff;border-radius:10px;' +
+        'font-size:10px;padding:1px 7px;font-weight:700;margin-left:4px' + (n > 0 ? '' : ';display:none'));
+      s.textContent = String(n > 0 ? n : 0);
+      inboxLink.appendChild(s);
+    };
     fetch('/email/unread-count/', {credentials:'same-origin'})
       .then(function(r){ return r.json(); })
-      .then(function(d){
-        if (!d.count) return;
-        inboxLink.innerHTML = inboxLink.textContent +
-          ' <span style="background:var(--accent,#58a6ff);color:#fff;border-radius:10px;' +
-          'font-size:10px;padding:1px 7px;font-weight:700;margin-left:4px">' + d.count + '</span>';
-      })
+      .then(function(d){ if (d.count) window.mvMailBadge(d.count); })
       .catch(function(){});
   })();
 

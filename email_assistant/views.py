@@ -4,7 +4,7 @@ import logging
 import re
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_POST
 from django.utils import timezone
@@ -539,11 +539,16 @@ def inbox_view(request):
 
     folder   = request.GET.get('folder', 'inbox')
     q        = request.GET.get('q', '').strip()
-    # /email/?msg=<pk> (посилання «✉️ лист» з усієї Minerva) — одразу відкрити цей лист; чужий / видалений — -1
-    open_msg = 0
+    # /email/?msg=<pk> (посилання «✉️ лист» з усієї Minerva) — одразу відкрити цей лист; чужий / видалений — -1.
+    # &solo=1 — «↗ Окремо»: лише цей лист (вся гілка) на всю ширину, з тими самими кнопками, AI і RAG, що в прев'ю
+    open_msg, open_thread, solo_subject = 0, 0, ''
     if str(request.GET.get('msg', '')).isdigit():
-        open_msg = int(request.GET['msg']) if EmailMessage.objects.filter(
-            pk=int(request.GET['msg']), account=account).exists() else -1
+        opened = EmailMessage.objects.filter(pk=int(request.GET['msg']), account=account) \
+            .values('pk', 'thread_id', 'subject').first()
+        open_msg = opened['pk'] if opened else -1
+        if opened:
+            open_thread, solo_subject = opened['thread_id'] or 0, opened['subject'] or ''
+    solo = open_msg > 0 and request.GET.get('solo') == '1'
     page     = max(1, int(request.GET.get('page', 1)))
     per_page = 30
 
@@ -660,6 +665,10 @@ def inbox_view(request):
         'title':                 'Email Асистент',
         'account':               account,
         'open_msg':              open_msg,
+        'open_thread':           open_thread if solo else 0,
+        'solo':                  solo,
+        'solo_subject':          solo_subject,
+        'latest_pk':             _latest_pk(account),
         'email_settings':        EmailSettings.get_for_user(request.user),
         'ctx_hidden':            ctx_hidden,
         'mail_layout':           mail_layout,
@@ -731,23 +740,14 @@ def inbox_view(request):
 
 @staff_member_required
 def thread_view(request, thread_pk):
-    """Full-page standalone thread view (open separately)."""
+    """«↗ Окремо» / посилання на гілку з CRM, проєктів, календаря — скринька з лише цією гілкою на всю ширину
+    (той самий вигляд, що прев'ю: зв'язки, база знань, AI, RAG, кнопки)."""
     from email_assistant.models import EmailThread
 
     account = _get_account(request)
     thread  = get_object_or_404(EmailThread, pk=thread_pk, account=account)
-    emails  = list(thread.messages.filter(is_deleted=False).order_by('sent_at'))
-    for m in emails:
-        m.fix_html_body()
-    set_read(account, emails, True)
-
-    return render(request, 'email_assistant/thread.html', _ctx(request, {
-        'title':    thread.subject,
-        'account':  account,
-        'thread':   thread,
-        'emails':   _thread_display_order(request, emails),
-        'last_msg': emails[-1] if emails else None,
-    }))
+    last = thread.messages.filter(is_deleted=False).order_by('-sent_at', '-pk').first()
+    return redirect(f'/email/?msg={last.pk}&solo=1' if last else '/email/')
 
 
 def _newest_first(request) -> bool:
@@ -761,21 +761,18 @@ def _thread_display_order(request, emails):
 
 @staff_member_required
 def message_view(request, message_pk):
-    """Full-page standalone single message view."""
+    """Посилання на лист (CRM, календар, джерела AI) — як «↗ Окремо»: лист і його гілка на всю ширину."""
     from email_assistant.models import EmailMessage
 
     account = _get_account(request)
     msg     = get_object_or_404(EmailMessage, pk=message_pk, account=account)
-    msg.fix_html_body()
-    set_read(account, [msg], True)
+    return redirect(f'/email/?msg={msg.pk}&solo=1')
 
-    return render(request, 'email_assistant/thread.html', _ctx(request, {
-        'title':    msg.subject,
-        'account':  account,
-        'thread':   msg.thread,
-        'emails':   [msg],
-        'last_msg': msg,
-    }))
+
+def _latest_pk(account) -> int:
+    """Найновіший лист скриньки (pk) — сторінка порівнює з /email/unread-count/ і сама підтягує нові листи."""
+    from email_assistant.models import EmailMessage
+    return EmailMessage.objects.filter(account=account).order_by('-pk').values_list('pk', flat=True).first() or 0
 
 
 def _attach_chips(emails, limit=3):
@@ -2031,7 +2028,7 @@ def unread_count_view(request):
     spam    = base.filter(is_spam=True).count()
     from email_assistant import drafts as _drafts
     return JsonResponse({'count': inbox, 'inbox': inbox, 'starred': starred, 'spam': spam,
-                         'drafts': _drafts.count(account)})
+                         'drafts': _drafts.count(account), 'latest': _latest_pk(account)})
 
 
 @staff_member_required
