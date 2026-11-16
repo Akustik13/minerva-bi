@@ -2570,8 +2570,12 @@ class LinkMomentsChoiceTests(LinkTestBase):
         await self.finish(sid, "transcribe")
 
     async def test_default_is_local_and_options_are_offered(self):
+        from unittest.mock import patch
+
+        from bench import cloud
         sid, folder, token = await self.bound()
-        view = self.link.progress(token)
+        with patch.object(cloud.keystore, "get", return_value=None):              # a real key may be stored on this PC
+            view = self.link.progress(token)
         self.assertTrue(view["can_choose"])
         self.assertEqual(view["choice"]["provider"], "ollama")
         self.assertIn("локальна модель", view["choice_label"])
@@ -2598,7 +2602,8 @@ class LinkMomentsChoiceTests(LinkTestBase):
 
         from bench import cloud
         sid, folder, token = await self.bound()
-        view, error = self.link.set_moments_choice(token, "anthropic", "claude-sonnet-5-5", consent=True)
+        with patch.object(cloud.keystore, "get", return_value=None):              # a real key may be stored on this PC
+            view, error = self.link.set_moments_choice(token, "anthropic", "claude-sonnet-5-5", consent=True)
         self.assertIsNone(view)
         self.assertIn("ключ Anthropic", error)
         with patch.object(cloud.keystore, "get", return_value="sk-ant-x"):
