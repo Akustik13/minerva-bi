@@ -759,9 +759,10 @@ def hotwords(m) -> str:
     items = []
     if m.customer_id:
         items.append((m.customer.company or m.customer.name or "").strip())
-    if m.project_id:
-        items += [m.project.code, (m.project.name or "").strip()]
-        items += [sku for sku in m.project.products.order_by("sku").values_list("sku", flat=True)[:HOTWORD_SKUS]]
+    from . import parts
+    for project in parts.links(m):           # головний першим, далі інші проєкти наради
+        items += [project.code, (project.name or "").strip()]
+        items += [sku for sku in project.products.order_by("sku").values_list("sku", flat=True)[:HOTWORD_SKUS]]
     out, seen = [], set()
     for item in items:
         item = " ".join(str(item or "").split())
@@ -1543,19 +1544,32 @@ DEFAULT_TARGET = {"decision": "moment", "info": "moment", "question": "moment", 
                   "task": "step", "promise": "step", "deadline": "deadline"}
 
 
-def targets(user, m, item=None) -> dict:
-    """Куди можна додати пункт: {target: '' (можна) | причина}; default — що вибрати першим."""
+NO_PROJECT_TEXT = "Нарада без проєкту — підключіть її до проєкту: «📁 Проєкти наради» вгорі"
+NO_PLAN_TEXT = "У проєкті ще немає плану. Додайте як ⏰ дедлайн або спершу створіть план (вкладка «📅 План»)."
+_UNSET = object()
+
+
+def targets(user, m, item=None, project=_UNSET, plans=None) -> dict:
+    """Куди можна додати пункт: {target: '' (можна) | причина}; default — що вибрати першим. project — проєкт
+    пункту (meetings/parts.item_project; не вказано — рахується тут); plans — кеш {pk проєкту: є план}."""
+    from . import parts
+    if project is _UNSET:
+        project = parts.item_project(m, item) if item is not None else (m.project if m.project_id else None)
     out = {}
-    if not m.project_id:
-        reason = "Нарада без проєкту — виберіть проєкт: ✏️ Змінити"
+    if project is None:
+        reason = NO_PROJECT_TEXT
         out = {"moment": reason, "risk": reason, "step": reason}
     elif not user.has_perm("projects.change_project"):
         reason = "Немає права змінювати цей проєкт — доступний лише ⏰ дедлайн."
         out = {"moment": reason, "risk": reason, "step": reason}
     else:
-        out = {"moment": "", "risk": "",
-               "step": "" if has_plan(m.project) else ("У проєкті ще немає плану. Додайте як ⏰ дедлайн або спершу "
-                                                       "створіть план (вкладка «📅 План»).")}
+        if plans is not None and project.pk in plans:
+            planned = plans[project.pk]
+        else:
+            planned = has_plan(project)
+            if plans is not None:
+                plans[project.pk] = planned
+        out = {"moment": "", "risk": "", "step": "" if planned else NO_PLAN_TEXT}
     out["deadline"] = ""
     default = DEFAULT_TARGET.get(item.kind if item else "", "moment")
     if out.get(default):
@@ -1575,16 +1589,25 @@ def _step_side(m, item, data) -> str:
 
 def accept(user, item, target, data=None) -> MeetingItem:
     """✓ — пункт у проєкт (📌 момент, ⚠️ ризик, 📅 крок плану) або ⏰ дедлайн у СВІЙ календар (до проєкту не
-    прив'язується; назва без цитати). data: title, kind (моменту), category / probability / impact / owner (ризику),
-    date, assignee, side (кроку / дедлайну)."""
+    прив'язується; назва без цитати). data: project (один із проєктів наради; порожньо — проєкт частини, де пункт
+    прозвучав, інакше головний — meetings/parts.item_project), title, kind (моменту), category / probability / impact /
+    owner (ризику), date, assignee, side (кроку / дедлайну)."""
     from projects import plan, risk_rules, risks, services as project_services
     from projects.models import ProjectHighlight
+    from . import parts
     data = data or {}
     m = item.meeting
     _check_owner(user, m)
     if item.status != MeetingItem.PENDING:
         raise MeetingError("Пункт уже вирішено")
-    allowed = targets(user, m, item)["targets"]
+    chosen = _pk(data.get("project"))
+    if chosen:
+        project = next((p for p in parts.links(m) if p.pk == chosen), None)
+        if project is None:
+            raise MeetingError("Цього проєкту немає серед проєктів наради — спершу додайте його вгорі")
+    else:
+        project = parts.item_project(m, item)
+    allowed = targets(user, m, item, project=project)["targets"]
     if target not in allowed:
         raise MeetingError("Виберіть, куди додати пункт")
     if allowed[target]:
@@ -1603,7 +1626,7 @@ def accept(user, item, target, data=None) -> MeetingItem:
                 kind = data.get("kind") if data.get("kind") in dict(ProjectHighlight.KIND_CHOICES) else \
                     DEFAULT_MOMENT_KIND.get(item.kind, ProjectHighlight.OTHER)
                 item.highlight = project_services.add_highlight(
-                    m.project, title=title, date=m.day, kind=kind, quote=item.quote, user=user,
+                    project, title=title, date=m.day, kind=kind, quote=item.quote, user=user,
                     source=ProjectHighlight.MEETING, meeting=m, meeting_second=second)
                 fields.append("highlight")
             elif target == "risk":
@@ -1612,7 +1635,7 @@ def accept(user, item, target, data=None) -> MeetingItem:
                            "quote": item.quote, "review_on": risk_rules.review_default().isoformat()}
                 if _int(data.get("owner")):
                     payload["owner"] = data.get("owner")
-                item.risk = risks.save(m.project, payload, user=user, source="meeting", meeting=m,
+                item.risk = risks.save(project, payload, user=user, source="meeting", meeting=m,
                                        meeting_second=second)
                 fields.append("risk")
             elif target == "step":
@@ -1622,12 +1645,15 @@ def accept(user, item, target, data=None) -> MeetingItem:
                 else:
                     assignee = user.pk if side == "we" else None
                 due = parse_day(data.get("date")) if data.get("date") else None
-                item.step = plan.meeting_step(m.project, title, assignee=assignee, due=due, side=side,
+                item.step = plan.meeting_step(project, title, assignee=assignee, due=due, side=side,
                                               quote=item.quote, meeting=m, meeting_second=second, user=user)
                 fields.append("step")
             else:
                 item.event = _deadline_event(user, m, title, data.get("date"))
                 fields.append("event")
+            if target != "deadline" and project is not None and item.project_id != project.pk:
+                item.project = project
+                fields.append("project")
             item.status, item.target, item.decided_at = MeetingItem.ACCEPTED, target, timezone.now()
             item.save(update_fields=fields)
     except (project_services.HighlightError, risks.RiskError, plan.PlanError) as e:

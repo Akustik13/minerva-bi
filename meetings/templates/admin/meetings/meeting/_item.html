@@ -7,6 +7,7 @@
     {% if speaker %}<span>{{ speaker }}</span>{% endif %}
     {% if item.who %}<span>👤 <span translate="no">{{ item.who }}</span></span>{% endif %}
     {% if item.due_text %}<span>⏰ <span translate="no">{{ item.due_text }}</span></span>{% endif %}
+    {% if pj_show and item.target != "deadline" %}{% if project %}<span class="mt-pj-chip {{ pj_cls }}" title="Проєкт пункту">📁 <span translate="no">{{ project.code }}</span></span>{% else %}<span class="mt-pj-chip mt-pj-gen">📁 без проєкту</span>{% endif %}{% endif %}
   </div>
   <div class="mt-item-title" translate="no">{{ item.title|default:"—" }}</div>
   {% if item.quote %}<div class="mt-q">«<span translate="no">{{ item.quote }}</span>»</div>{% endif %}
@@ -30,6 +31,12 @@
       {% if t.reason %}<div class="mt-reason">{{ t.reason }}</div>{% endif %}
       {% endfor %}
     </fieldset>
+    {% if pj_choices %}
+    <label class="mt-f" data-for="moment risk step">Проєкт
+      <select name="project" data-mt-item-project data-noplan-text="{{ no_plan_text }}">
+        {% for c in pj_choices %}<option value="{{ c.pk }}" translate="no"{% if c.selected %} selected{% endif %}{% if c.noplan %} data-noplan="1"{% endif %}>{{ c.code }} · {{ c.name }}</option>{% endfor %}
+      </select></label>
+    {% endif %}
     <label class="mt-f">Назва
       <input type="text" name="title" value="{{ item.title }}" maxlength="200"></label>
     <div data-for="moment">

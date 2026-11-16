@@ -3,7 +3,9 @@
 Частини ≤ rag_assistant.knowledge.TEXT_MAX (100 000) знаків, поділ — по рядках «[ГГ:ХХ:СС] Я: …» (задовгий рядок
 ріжеться). KnowledgeItem: kind MEETING (для RAG — «link»: текст дала Minerva), auto (у 📎 картки без 👥 / ✕),
 visibility private — бачить і знаходить лише той, хто записав; проєкт і клієнт наради; назва нейтральна
-«🎙 Нарада P-… · ДД.ММ.РРРР · n/N» (без назви наради); created_at — день наради. Хмарні AI-помічники Minerva цих
+«🎙 Нарада P-… · ДД.ММ.РРРР · n/N» (без назви наради); created_at — день наради. Нарада про кілька проєктів
+(🏷 частини, meetings/parts.py) — кожен шматок розшифровки окремими частинами зі своїм проєктом і клієнтом проєкту
+(«загальне» — головний проєкт); заголовок частини каже, про який проєкт. Хмарні AI-помічники Minerva цих
 документів не отримують (rag_assistant.knowledge_items.ai_blocked).
 
 unpublish — прибрати всі частини (tombstone у стрічці для RAG) і копії тексту у збережених результатах пошуку RAG,
@@ -40,11 +42,13 @@ def lines(meeting, segments) -> list:
     return out
 
 
-def header(meeting, n, total) -> str:
+def header(meeting, n, total, project=None) -> str:
     from .models import Meeting
     from .services import user_name
     day = f"{meeting.day:%d.%m.%Y}"
     head = f"🎙 Нарада {day} · частина {n} з {total}."
+    if project is not None and getattr(meeting, "_several_projects", False):
+        head += f" Ця частина — про проєкт {project.code} · {project.name}."
     mode = meeting.capture_mode or ""
     if mode == Meeting.MIC:
         return head + " Записано мікрофоном у кімнаті — мовців не розділено («У кімнаті (мікрофон)»)."
@@ -78,20 +82,27 @@ def split(text_lines, budget) -> list:
     return parts
 
 
-def title_for(meeting, n, total) -> str:
-    code = f" {meeting.project.code}" if meeting.project_id else ""
+def title_for(meeting, n, total, project=None) -> str:
+    project = project if project is not None else (meeting.project if meeting.project_id else None)
+    code = f" {project.code}" if project is not None else ""
     return f"🎙 Нарада{code} · {meeting.day:%d.%m.%Y} · {n}/{total}"[:300]
 
 
-def build(meeting, segments) -> list:
-    """[(назва, текст)] частин."""
+def build(meeting, segments, groups=None) -> list:
+    """[(назва, текст, проєкт)] частин. groups — [(проєкт, сегменти)] (meetings/parts.groups); не вказано — за
+    🏷 частинами наради (без них — уся розшифровка з головним проєктом)."""
     from rag_assistant.knowledge import TEXT_MAX
-    body = split(lines(meeting, segments), TEXT_MAX - HEADER_RESERVE)
-    total = max(len(body), 1)
-    if not body:
-        return []
-    return [(title_for(meeting, n, total), f"{header(meeting, n, total)}\n{text}"[:TEXT_MAX])
-            for n, text in enumerate(body, 1)]
+    from . import parts as meeting_parts
+    main = meeting.project if meeting.project_id else None
+    if groups is None:
+        marks = meeting_parts.parts_of(meeting) if meeting.pk else []
+        groups = meeting_parts.groups(segments, marks, main) if marks else [(main, segments)]
+    meeting._several_projects = len({(p.pk if p is not None else None) for p, _segs in groups}) > 1
+    chunks = [(project, text) for project, segs in groups
+              for text in split(lines(meeting, segs), TEXT_MAX - HEADER_RESERVE)]
+    total = len(chunks)
+    return [(title_for(meeting, n, total, project), f"{header(meeting, n, total, project)}\n{text}"[:TEXT_MAX], project)
+            for n, (project, text) in enumerate(chunks, 1)]
 
 
 def publish(meeting) -> list:
@@ -111,16 +122,19 @@ def publish(meeting) -> list:
     if not parts:
         raise MeetingError("У розшифровці немає тексту")
     pre = prefix(m)
-    customer = m.customer or (m.project.customer if m.project_id else None)
     old = {i.source_key: i for i in KnowledgeItem.objects.filter(source_key__startswith=pre)}
     pks = []
     with transaction.atomic():
         with knowledge_items.quiet():
-            for n, (title, text) in enumerate(parts, 1):
+            for n, (title, text, project) in enumerate(parts, 1):
                 key = f"{pre}{n}"
                 item = old.pop(key, None) or KnowledgeItem(source_key=key)
                 item.kind, item.auto, item.visibility = KnowledgeItem.MEETING, True, KnowledgeItem.PRIVATE
-                item.owner, item.project, item.customer = m.owner, m.project, customer
+                if project is not None and project.pk != m.project_id and project.customer_id:
+                    customer = project.customer          # частина про інший проєкт — його клієнт
+                else:
+                    customer = m.customer or (project.customer if project is not None and project.customer_id else None)
+                item.owner, item.project, item.customer = m.owner, project, customer
                 item.order = item.product = item.offer = None
                 item.title, item.text, item.note, item.url = title, text, "", ""
                 item.save()

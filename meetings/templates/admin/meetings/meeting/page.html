@@ -3,7 +3,7 @@
 {# Назва, розшифровка, цитати, імена й адреси — лише в translate="no". JS — meetings/static/meetings/meetings.js. #}
 {% load static %}
 {% block title %}{{ title }} | Minerva{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=4">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=5">{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
@@ -25,12 +25,32 @@
       <span class="mt-chip mt-chip-{{ tone }}" id="mt-chip">{{ m.get_status_display }}</span>
       <span>📅 {{ start|date:"d.m.Y H:i" }}</span>
       {% if duration %}<span>⏱ {{ duration }}</span>{% endif %}
-      {% if m.project_id %}<span>📁 {% if project_url %}<a href="{{ project_url }}" translate="no">{{ m.project.code }} · {{ m.project.name }}</a>{% else %}<span translate="no">{{ m.project.code }}</span>{% endif %}</span>{% endif %}
       {% if m.customer_id %}<span>👤 {% if customer_url %}<a href="{{ customer_url }}" translate="no">{{ m.customer.company|default:m.customer.name }}</a>{% else %}<span translate="no">{{ m.customer.company|default:m.customer.name }}</span>{% endif %}</span>{% endif %}
       {% if event %}<span>🤝 <span translate="no">{{ event.title }}</span></span>{% endif %}
       <span title="Режим запису">🗄 {{ retention_label }}</span>
       {% if capture %}<span title="Що записували">🎚 {{ capture }}</span>{% endif %}
     </div>
+    <div class="mt-pj" id="mt-pj">
+      <span class="mt-pj-label">📁 {% if pj_rows|length > 1 %}Проєкти наради:{% else %}Проєкт:{% endif %}</span>
+      {% for r in pj_rows %}
+      <span class="mt-pj-chip {{ r.cls }}">
+        {% if r.main %}<span title="Головний проєкт наради: з ним уся нарада, доки не позначено 🏷 інше">⭐</span>{% elif pj_edit %}<button type="button" class="mt-pj-x" data-mt-pj="main" data-project="{{ r.p.pk }}" title="Зробити головним проєктом наради">☆</button>{% endif %}
+        {% if r.url %}<a href="{{ r.url }}" translate="no">{{ r.p.code }} · {{ r.p.name }}</a>{% else %}<span translate="no">{{ r.p.code }}</span>{% endif %}
+        {% if pj_edit %}<button type="button" class="mt-pj-x" data-mt-pj="remove" data-project="{{ r.p.pk }}" title="Прибрати проєкт з наради" data-confirm="Прибрати цей проєкт з наради? Його 🏷 позначки в розшифровці теж зникнуть. Уже додане в проєкт лишиться там.">✕</button>{% endif %}
+      </span>
+      {% empty %}<span class="mt-muted">без проєкту</span>{% endfor %}
+      {% if pj_edit and pj_add %}
+      <span class="mt-pj-add">
+        <select data-mt-pj-pick aria-label="Проєкт">
+          <option value="">{% if pj_rows %}＋ ще один проєкт…{% else %}виберіть проєкт…{% endif %}</option>
+          {% for o in pj_add %}<option value="{{ o.pk }}" translate="no">{{ o.code }} · {{ o.name }}</option>{% endfor %}
+        </select>
+        <button type="button" class="button{% if not pj_rows %} mt-primary{% endif %}" data-mt-pj="add">{% if pj_rows %}＋ Додати{% else %}📁 Підключити до проєкту{% endif %}</button>
+      </span>
+      {% endif %}
+    </div>
+    {% if pj_edit and not pj_rows %}<div class="mt-line-warn">📁 Нарада ще не в проєкті. Підключіть її — вона з’явиться в проєкті («🎙 Мої наради», шкала; бачите лише ви), а ключові моменти можна буде додати туди. Обговорили кілька проєктів — додайте всі.</div>
+    {% elif pj_rows|length > 1 %}<div class="mt-muted">Нарада про кілька проєктів: позначте в розшифровці 🏷, з якого місця про який проєкт — частини бази знань і ключові моменти підуть кожна у свій проєкт.</div>{% endif %}
     {% if no_headset %}<div class="mt-line-warn">⚠️ {{ no_headset_note }}</div>{% endif %}
     {% if silent %}<div class="mt-line-warn">{% for s in silent %}{{ s }}{% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
     {% if m.continues_id and m.continues.owner_id == m.owner_id %}
@@ -44,13 +64,7 @@
         <form method="post" action="{% url 'admin:meetings_meeting_save' m.pk %}" class="mt-editform">{% csrf_token %}
           <input type="hidden" name="participants_form" value="1">
           <label>Назва <input type="text" name="title" value="{{ m.title }}" maxlength="200" required></label>
-          {% if can_projects %}
-          <label>Проєкт
-            <select name="project" data-mt-project>
-              <option value="">— без проєкту —</option>
-              {% for p in projects %}<option value="{{ p.pk }}" data-customer="{{ p.customer }}" translate="no"{% if p.selected %} selected{% endif %}>{{ p.code }} · {{ p.name }}</option>{% endfor %}
-            </select></label>
-          {% endif %}
+          {% if can_projects %}<div class="mt-muted">Проєкти наради — «📁» над цією кнопкою: можна кілька.</div>{% endif %}
           {% if can_customers %}
           <label>Клієнт
             <select name="customer" data-mt-customer>
@@ -223,7 +237,7 @@
     <h2>🧠 Ключові моменти{% if pending %} <span class="mt-chip mt-chip-warn"><span id="mt-pending-n">{{ pending|length }}</span> чекають ✓ / ✕</span>{% endif %}</h2>
     {% if moments_wait %}<div class="mt-line-warn">{{ moments_wait_text }}</div>{% endif %}
     {% if summary %}<div class="mt-summary" translate="no">{{ summary|linebreaksbr }}</div>{% endif %}
-    {% if no_project_hint and pending %}<div class="mt-muted">Щоб додавати в проєкт, виберіть проєкт наради (✏️ Змінити). Без проєкту — лише ⏰ дедлайн у вашому календарі.</div>{% endif %}
+    {% if no_project_hint and pending %}<div class="mt-muted">Щоб додавати в проєкт, підключіть нараду до проєкту («📁» угорі). Без проєкту — лише ⏰ дедлайн у вашому календарі.</div>{% endif %}
     <div id="mt-items">
       {% for r in pending %}{{ r.html }}{% endfor %}
       {% for r in accepted %}{{ r.html }}{% endfor %}
@@ -245,13 +259,39 @@
     {% if m.transcript_deleted_at %}
       <div class="mt-muted">Розшифровку видалено {{ m.transcript_deleted_at|date:"d.m.Y" }} — минув строк зберігання. Протокол згоди й прийняті пункти лишились.</div>
     {% elif transcript %}
+      {% if pj_spans or pj_edit and pj_rows %}
+      <div class="mt-parts" id="mt-parts">
+        {% if pj_spans %}
+        <div class="mt-parts-bar" aria-label="Частини наради за проєктами">
+          {% for s in pj_spans %}<a class="mt-pj-chip {{ s.cls }}" href="#t={{ s.second }}">{% if s.name %}<b translate="no">{{ s.label }}</b>{% else %}<b>{{ s.label }}</b>{% endif %} <span>{{ s.start }}–{% if s.end %}{{ s.end }}{% else %}кінець{% endif %}</span>{% if s.note %} · <span translate="no">{{ s.note }}</span>{% endif %}</a>{% endfor %}
+        </div>
+        {% endif %}
+        {% if pj_edit %}<div class="mt-muted">🏷 Наведіть на рядок розшифровки й натисніть 🏷 (або правий клік на рядку): «звідси — про проєкт …». Позначка діє до наступної.</div>{% endif %}
+        {% if pj_suggest %}
+        <details class="mt-suggest" open>
+          <summary>💡 Схоже, тут мова про інший проєкт ({{ pj_suggest|length }})</summary>
+          <ul>
+            {% for s in pj_suggest %}
+            <li><a class="mt-time" href="#t={{ s.second }}">[{{ s.time }}]</a>
+              <span class="mt-pj-chip {{ s.cls }}" translate="no">{{ s.project.code }}</span>
+              <span class="mt-muted">{{ s.why }} «<span translate="no">{{ s.word }}</span>»</span> —
+              «<span translate="no">{{ s.text }}</span>»
+              <button type="button" class="button" data-mt-part="set" data-second="{{ s.second|stringformat:'.1f' }}" data-project="{{ s.project.pk }}">🏷 Позначити</button></li>
+            {% endfor %}
+          </ul>
+          <div class="mt-muted">Підказки — за словами з назв, клієнтів і артикулів проєктів, без AI. Нічого не змінюється, доки ви не натиснете «🏷 Позначити».</div>
+        </details>
+        {% endif %}
+      </div>
+      {% endif %}
       <div class="mt-tr-tools">
         <input type="search" id="mt-tr-q" placeholder="🔎 Пошук у розшифровці" aria-label="Пошук у розшифровці">
         <span id="mt-tr-count" class="mt-muted" role="status"></span>
       </div>
       <div class="mt-tr" id="mt-tr">
         {% for r in transcript %}
-          {% if r.type == "seg" %}<div class="mt-row mt-seg" id="t-{{ r.n }}" data-s="{{ r.second }}"><a class="mt-time" href="#t={{ r.second }}">[{{ r.time }}]</a> <b class="mt-who mt-who-{{ r.ch }}">{{ r.who }}:</b> <span class="mt-text" translate="no">{{ r.text }}</span></div>
+          {% if r.type == "seg" %}<div class="mt-row mt-seg {{ r.pj }}" id="t-{{ r.n }}" data-s="{{ r.second }}" data-t="{{ r.t|stringformat:'.1f' }}"><a class="mt-time" href="#t={{ r.second }}">[{{ r.time }}]</a> <b class="mt-who mt-who-{{ r.ch }}">{{ r.who }}:</b> <span class="mt-text" translate="no">{{ r.text }}</span></div>
+          {% elif r.type == "part" %}<div class="mt-row mt-partrow {{ r.pj }}" data-s="{{ r.second }}"><a class="mt-time" href="#t={{ r.second }}">[{{ r.time }}]</a> 🏷 Далі — {% if r.text %}<b translate="no">{{ r.text }}</b>{% else %}<b>загальне, не про проєкт</b>{% endif %}{% if r.note %} · <span translate="no">{{ r.note }}</span>{% endif %}{% if pj_edit %} <button type="button" class="mt-pj-x" data-mt-part="remove" data-part="{{ r.part }}" title="Прибрати позначку">✕</button>{% endif %}</div>
           {% else %}<div class="mt-row mt-{{ r.type }}" data-s="{{ r.second }}"><a class="mt-time" href="#t={{ r.second }}">[{{ r.time }}]</a> <span translate="no">{{ r.text }}</span></div>{% endif %}
         {% endfor %}
       </div>
@@ -305,5 +345,5 @@
   </dialog>
 </div>
 {{ config|json_script:"mt-config" }}
-<script src="{% static 'meetings/meetings.js' %}?v=2" defer></script>
+<script src="{% static 'meetings/meetings.js' %}?v=3" defer></script>
 {% endblock %}

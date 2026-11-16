@@ -4729,9 +4729,11 @@
 {"uk": "Виберіть один або кілька днів тижня.", "en": "Select one or more days of the week.", "de": "Wählen Sie einen oder mehrere Wochentage."}
 {"uk": "Виберіть один магазин для копіювання.", "en": "Select one shop to copy.", "de": "Wählen Sie einen Shop zum Kopieren aus."}
 {"uk": "Виберіть одне завдання.", "en": "Select one task.", "de": "Wählen Sie eine Aufgabe aus."}
+{"uk": "Виберіть проєкт", "en": "Choose a project", "de": "Projekt wählen"}
 {"uk": "Виберіть проєкт askDANTE або «створити новий».", "en": "Select an askDANTE project or “create new”.", "de": "Wählen Sie ein askDANTE-Projekt oder „neu erstellen“."}
 {"uk": "Виберіть проєкт askDANTE або «＋ Створити в askDANTE».", "en": "Select an askDANTE project or “＋ Create in askDANTE”.", "de": "Wählen Sie ein askDANTE-Projekt oder „＋ In askDANTE erstellen“."}
 {"uk": "Виберіть проєкт askDANTE.", "en": "Select an askDANTE project.", "de": "Wählen Sie ein askDANTE-Projekt."}
+{"uk": "Виберіть проєкт у списку", "en": "Choose a project in the list", "de": "Projekt in der Liste wählen"}
 {"uk": "Виберіть проєкт.", "en": "Choose a project.", "de": "Wählen Sie ein Projekt."}
 {"uk": "Виберіть файл", "en": "Choose a file", "de": "Wählen Sie eine Datei"}
 {"uk": "Виберіть файл ABD з листа або з ПК.", "en": "Choose the ABD file from the e-mail or from your PC.", "de": "Wählen Sie die ABD-Datei aus der E-Mail oder vom PC."}
@@ -5870,6 +5872,7 @@
 {"uk": "Години цього проєкту askDANTE рахуються клієнту в CRM.", "en": "Hours of this askDANTE project are counted for the customer in CRM.", "de": "Die Stunden dieses askDANTE-Projekts werden im CRM dem Kunden zugerechnet."}
 {"uk": "Головна", "en": "Home", "de": "Startseite"}
 {"uk": "Головна, Замовлення, Склад, Пошта", "en": "Home, Orders, Stock, Mail", "de": "Start, Aufträge, Lager, E-Mail"}
+{"uk": "Головний проєкт наради: з ним уся нарада, доки не позначено 🏷 інше", "en": "Main project of the meeting: the whole meeting belongs to it until 🏷 marks say otherwise", "de": "Hauptprojekt der Besprechung: Die ganze Besprechung gehört dazu, bis 🏷 etwas anderes markiert"}
 {"uk": "Головні розділи", "en": "Main sections", "de": "Hauptbereiche"}
 {"uk": "Голос не розпізнано (", "en": "Voice not recognised (", "de": "Stimme nicht erkannt ("}
 {"uk": "Голосовий набір", "en": "Voice typing", "de": "Spracheingabe"}
@@ -6873,6 +6876,7 @@
 {"uk": "З проєкту {0} · {1}", "en": "From project {0} · {1}", "de": "Aus Projekt {0} · {1}"}
 {"uk": "З підпапками", "en": "With subfolders", "de": "Mit Unterordnern"}
 {"uk": "З рекомендацій", "en": "From recommendations", "de": "Aus Empfehlungen"}
+{"uk": "З секунди запису", "en": "From second of the recording", "de": "Ab Sekunde der Aufnahme"}
 {"uk": "З таблиці", "en": "From a table", "de": "Aus Tabelle"}
 {"uk": "З телефонів надіслано ваших фото: {0} · усі — у", "en": "Your photos sent from phones: {0} · all of them — in", "de": "Ihre vom Handy gesendeten Fotos: {0} · alle — in"}
 {"uk": "З фото", "en": "With photo", "de": "Mit Foto"}
@@ -7981,6 +7985,8 @@
 {"uk": "Звідки: тема й дата листа або проєкт", "en": "Source: subject and date of the e-mail or the project", "de": "Quelle: Betreff und Datum der E-Mail oder das Projekt"}
 {"uk": "Звідки: тема й дата листа, назва вкладення", "en": "Where from: email subject and date, attachment name", "de": "Woher: Betreff und Datum der E-Mail, Name des Anhangs"}
 {"uk": "Звідки: усі", "en": "Source: all", "de": "Herkunft: alle"}
+{"uk": "Звідси — про проєкт", "en": "From here — about project", "de": "Ab hier — zum Projekt"}
+{"uk": "Звідси — про проєкт…", "en": "From here — about project…", "de": "Ab hier — zum Projekt…"}
 {"uk": "Звільнити відеопам'ять; наступний запит завантажить потрібну модель сам (перший запит буде повільніший)", "en": "Free video memory; the next request will load the needed model by itself (the first request will be slower)", "de": "Videospeicher freigeben; die nächste Anfrage lädt das benötigte Modell selbst (die erste Anfrage ist langsamer)"}
 {"uk": "Звірити всі лістинги з офером", "en": "Reconcile all listings with the offer", "de": "Alle Listings mit dem Offer abgleichen"}
 {"uk": "Звірити з DigiKey", "en": "Reconcile with DigiKey", "de": "Mit DigiKey abgleichen"}
@@ -8326,6 +8332,7 @@
 {"uk": "Зроби стислий підсумок цієї переписки (2-3 речення): {0}", "en": "Write a brief summary of this correspondence (2-3 sentences): {0}", "de": "Erstellen Sie eine kurze Zusammenfassung dieses Schriftverkehrs (2-3 Sätze): {0}"}
 {"uk": "Зробити", "en": "Do it", "de": "Erledigen"}
 {"uk": "Зробити бекап", "en": "Make a backup", "de": "Sicherung erstellen"}
+{"uk": "Зробити головним проєктом наради", "en": "Make it the main project of the meeting", "de": "Zum Hauptprojekt der Besprechung machen"}
 {"uk": "Зробити фото", "en": "Take photo", "de": "Foto aufnehmen"}
 {"uk": "Зроблено за тиждень", "en": "Done this week", "de": "Diese Woche erledigt"}
 {"uk": "Зробіть перший бекап за допомогою розділу вище.", "en": "Make your first backup using the section above.", "de": "Erstellen Sie die erste Sicherung mit dem Bereich oben."}
@@ -10000,6 +10007,7 @@
 {"uk": "Наведіть на візитку й натисніть «⏺ Зробити фото».", "en": "Point at the business card and press «⏺ Take photo».", "de": "Auf die Visitenkarte richten und «⏺ Foto aufnehmen» drücken."}
 {"uk": "Наведіть на позначку — подробиці, клік — відкрити. Ctrl + коліщатко — масштаб, тягніть фон — прокрутка.", "en": "Hover a mark — details, click — open. Ctrl + wheel — zoom, drag the background — scroll.", "de": "Auf eine Markierung zeigen — Details, Klick — öffnen. Strg + Mausrad — Zoom, Hintergrund ziehen — scrollen."}
 {"uk": "Наведіть на позначку — подробиці, клік — відкрити; клік на точку листа — меню з 📌.", "en": "Hover a mark for details, click to open; click an email dot for a menu with 📌.", "de": "Zeigen Sie auf eine Markierung für Details, Klick öffnet; Klick auf einen E-Mail-Punkt öffnet ein Menü mit 📌."}
+{"uk": "Наведіть на рядок розшифровки й натисніть 🏷 (або правий клік на рядку): «звідси — про проєкт …». Позначка діє до наступної.", "en": "Point at a transcript line and click 🏷 (or right-click the line): “from here — about project …”. A mark applies until the next one.", "de": "Auf eine Zeile des Transkripts zeigen und 🏷 klicken (oder Rechtsklick auf die Zeile): „ab hier — zum Projekt …“. Eine Markierung gilt bis zur nächsten."}
 {"uk": "Наведіть на смугу — дати кроку.", "en": "Hover over a bar — the step dates.", "de": "Mit der Maus auf einen Balken zeigen — Daten des Schritts."}
 {"uk": "Наведіть рамку на QR-код — фото зробиться само, щойно Minerva його прочитає.", "en": "Point the frame at the QR code — the photo is taken by itself as soon as Minerva reads it.", "de": "Rahmen auf den QR-Code richten — das Foto wird automatisch aufgenommen, sobald Minerva ihn liest."}
 {"uk": "Наведіть рамку на візитку й натисніть «⏺ Зробити фото». QR-код Minerva шукає вже зараз.", "en": "Point the frame at the business card and press «⏺ Take photo». Minerva is already looking for the QR code.", "de": "Rahmen auf die Visitenkarte richten und «⏺ Foto aufnehmen» drücken. Minerva sucht den QR-Code schon jetzt."}
@@ -10427,11 +10435,14 @@
 {"uk": "Нарада {0} · {1}", "en": "Meeting {0} · {1}", "de": "Besprechung {0} · {1}"}
 {"uk": "Нарада {0} · частина {1} з {2}.", "en": "Meeting {0} · part {1} of {2}.", "de": "Besprechung {0} · Teil {1} von {2}."}
 {"uk": "Нарада без проєкту — виберіть проєкт: ✏️ Змінити", "en": "Meeting without a project — choose a project: ✏️ Edit", "de": "Besprechung ohne Projekt — wählen Sie ein Projekt: ✏️ Bearbeiten"}
+{"uk": "Нарада без проєкту — підключіть її до проєкту: «📁 Проєкти наради» вгорі", "en": "Meeting without a project — link it to a project: “📁 Meeting projects” at the top", "de": "Besprechung ohne Projekt — mit einem Projekt verknüpfen: „📁 Projekte der Besprechung“ oben"}
 {"uk": "Нарада вже записується або записана. Щоб записати решту — «🎙 Записати продовження».", "en": "The meeting is already being recorded or has been recorded. To record the rest — “🎙 Record continuation”.", "de": "Die Besprechung wird bereits aufgenommen oder ist aufgenommen. Um den Rest aufzunehmen — „🎙 Fortsetzung aufnehmen“."}
 {"uk": "Нарада від {0}", "en": "Meeting of {0}", "de": "Besprechung vom {0}"}
 {"uk": "Нарада від {0}{1} розшифрована — {2} {3} {4} перевірки (✓ / ✕).", "en": "Meeting of {0}{1} transcribed — {2} {3} {4} for review (✓ / ✕).", "de": "Besprechung vom {0}{1} transkribiert — {2} {3} {4} auf Prüfung (✓ / ✕)."}
 {"uk": "Нарада від {0}{1} розшифрована — ключових моментів не знайдено.", "en": "Meeting of {0}{1} transcribed — no key points found.", "de": "Besprechung vom {0}{1} transkribiert — keine Kernpunkte gefunden."}
 {"uk": "Нарада від {0}{1} розшифрована, але ключові моменти знайти не вдалося.", "en": "Meeting of {0}{1} transcribed, but key points could not be found.", "de": "Besprechung vom {0}{1} transkribiert, aber Kernpunkte konnten nicht gefunden werden."}
+{"uk": "Нарада про кілька проєктів: позначте в розшифровці 🏷, з якого місця про який проєкт — частини бази знань і ключові моменти підуть кожна у свій проєкт.", "en": "Meeting about several projects: mark 🏷 in the transcript where each project starts — knowledge base parts and key points will each go to their own project.", "de": "Besprechung zu mehreren Projekten: Im Transkript mit 🏷 markieren, ab wo es um welches Projekt geht — Teile der Wissensbasis und Kernpunkte gehen jeweils in ihr Projekt."}
+{"uk": "Нарада ще не в проєкті. Підключіть її — вона з’явиться в проєкті («🎙 Мої наради», шкала; бачите лише ви), а ключові моменти можна буде додати туди. Обговорили кілька проєктів — додайте всі.", "en": "The meeting is not in a project yet. Link it — it will appear in the project (“🎙 My meetings”, timeline; only you see it) and key points can be added there. Discussed several projects — add them all.", "de": "Die Besprechung ist noch in keinem Projekt. Verknüpfen Sie sie — sie erscheint im Projekt („🎙 Meine Besprechungen“, Zeitleiste; nur für Sie sichtbar), und Kernpunkte lassen sich dort hinzufügen. Mehrere Projekte besprochen — alle hinzufügen."}
 {"uk": "Нарада{0} · {1} · {2}/{3}", "en": "Meeting{0} · {1} · {2}/{3}", "de": "Besprechung{0} · {1} · {2}/{3}"}
 {"uk": "Наради", "en": "Meetings", "de": "Besprechungen"}
 {"uk": "Наради (/api/v1/meetings/) — лише для вікна запису на RAG-ПК: у консолі не відкривається", "en": "Meetings (/api/v1/meetings/) — only for the recording window on the RAG PC: not available in the console", "de": "Besprechungen (/api/v1/meetings/) — nur für das Aufnahmefenster auf dem RAG-PC: in der Konsole nicht verfügbar"}
@@ -10606,6 +10617,7 @@
 {"uk": "Не вказано SMTP Host", "en": "SMTP Host not set", "de": "SMTP-Host nicht angegeben"}
 {"uk": "Не вказано Supplier UUID у налаштуваннях DigiKey («🪪 Отримати Supplier UUID»)", "en": "Supplier UUID is not specified in the DigiKey settings (“🪪 Get Supplier UUID”)", "de": "Supplier UUID ist in den DigiKey-Einstellungen nicht angegeben („🪪 Supplier UUID abrufen“)"}
 {"uk": "Не вказано адресу отримувача", "en": "Recipient address not specified", "de": "Empfängeradresse nicht angegeben"}
+{"uk": "Не вказано місце в записі", "en": "No place in the recording given", "de": "Keine Stelle in der Aufnahme angegeben"}
 {"uk": "Не вказано отримувача (Кому)", "en": "No recipient specified (To)", "de": "Kein Empfänger angegeben (An)"}
 {"uk": "Не вказано постачальника (supplier).", "en": "Supplier (supplier) not specified.", "de": "Lieferant (supplier) nicht angegeben."}
 {"uk": "Не вказано постачальника (supplier.name).", "en": "Supplier (supplier.name) not specified.", "de": "Lieferant (supplier.name) nicht angegeben."}
@@ -12707,6 +12719,7 @@
 {"uk": "Позначити проєкт завершеним?", "en": "Mark the project as completed?", "de": "Projekt als abgeschlossen markieren?"}
 {"uk": "Позначити спамом", "en": "Mark as spam", "de": "Als Spam markieren"}
 {"uk": "Позначити цей лист як важливий момент проєкту (виділений текст — цитата)", "en": "Mark this email as a key project moment (the selected text is the quote)", "de": "Diese E-Mail als wichtigen Projektmoment markieren (der markierte Text ist das Zitat)"}
+{"uk": "Позначити частину наради", "en": "Mark a part of the meeting", "de": "Teil der Besprechung markieren"}
 {"uk": "Позначити як \"Ігнорувати\"", "en": "Mark as \"Ignore\"", "de": "Als \"Ignorieren\" markieren"}
 {"uk": "Позначити як \"Тільки трекінг\"", "en": "Mark as \"Tracking only\"", "de": "Als \"Nur Tracking\" markieren"}
 {"uk": "Позначити як важливе", "en": "Mark as important", "de": "Als wichtig markieren"}
@@ -12727,6 +12740,7 @@
 {"uk": "Позначку знято", "en": "Mark removed", "de": "Markierung entfernt"}
 {"uk": "Позначку знято — лист знову в «Що зараз»", "en": "Mark removed — the e-mail is back in «What now»", "de": "Markierung entfernt — die E-Mail steht wieder unter «Was jetzt»"}
 {"uk": "Позначку знято: {0} позицій", "en": "Mark removed: {0} items", "de": "Markierung entfernt: {0} Positionen"}
+{"uk": "Позначку не знайдено", "en": "Mark not found", "de": "Markierung nicht gefunden"}
 {"uk": "Позначок під час запису чекають перевірки: {0}", "en": "Marks made during recording awaiting review: {0}", "de": "Markierungen aus der Aufnahme warten auf Prüfung: {0}"}
 {"uk": "Позначте вкладення, які додати.", "en": "Select the attachments to add.", "de": "Markieren Sie die Anhänge, die hinzugefügt werden sollen."}
 {"uk": "Позначте відправленим", "en": "Mark it as shipped", "de": "Markieren Sie als versendet"}
@@ -13080,6 +13094,7 @@
 {"uk": "Порожньо — назва файлу.", "en": "Empty — the file name.", "de": "Leer — der Dateiname."}
 {"uk": "Порожньо — натисни 📥 Стягнути поля з DigiKey щоб заповнити.", "en": "Empty — click 📥 Pull fields from DigiKey to fill it in.", "de": "Leer — klicken Sie auf 📥 Felder von DigiKey abrufen, um es zu füllen."}
 {"uk": "Порожньо — натисніть 📥 Стягнути поля з DigiKey.", "en": "Empty — click 📥 Pull fields from DigiKey.", "de": "Leer — auf 📥 Felder von DigiKey abrufen klicken."}
+{"uk": "Порожньо — проєкт частини наради, де прозвучав пункт, інакше головний", "en": "Empty — the project of the meeting part where the point was said, otherwise the main one", "de": "Leer — Projekt des Besprechungsteils, in dem der Punkt fiel, sonst das Hauptprojekt"}
 {"uk": "Порожньо — рекомендована заміна з картки товару.", "en": "Empty — the recommended replacement from the product card.", "de": "Leer – der empfohlene Ersatz aus der Artikelkarte."}
 {"uk": "Порожньо — стандартна інструкція генерації відповіді", "en": "Empty — the standard reply-generation instruction", "de": "Leer — Standardanweisung zur Antworterstellung"}
 {"uk": "Порожньо — стандартний мовою листа (німецька, англійська, українська). Свій — однаковий для всіх листів; можна вставити {0} (ім’я помічника), {1} (ваше ім’я), {2} (фірма).", "en": "Empty — the standard one in the email’s language (German, English, Ukrainian). Your own — the same for all emails; you can insert {0} (assistant’s name), {1} (your name), {2} (company).", "de": "Leer — die Standardsignatur in der Sprache der E-Mail (Deutsch, Englisch, Ukrainisch). Eigene — für alle E-Mails gleich; Sie können {0} (Name des Assistenten), {1} (Ihr Name), {2} (Firma) einfügen."}
@@ -13510,10 +13525,13 @@
 {"uk": "Прибрати крок", "en": "Remove the step", "de": "Schritt entfernen"}
 {"uk": "Прибрати лише цю подію — з пошти вона не повернеться", "en": "Remove this event only — it will not come back from mail", "de": "Nur diesen Termin entfernen — er kommt aus den E-Mails nicht zurück"}
 {"uk": "Прибрати момент", "en": "Remove moment", "de": "Moment entfernen"}
+{"uk": "Прибрати позначку", "en": "Remove the mark", "de": "Markierung entfernen"}
+{"uk": "Прибрати проєкт з наради", "en": "Remove the project from the meeting", "de": "Projekt aus der Besprechung entfernen"}
 {"uk": "Прибрати спам і події від відправників, від яких ви більше не хочете термінів — спершу видно, що саме прибереться", "en": "Remove spam and events from senders you no longer want deadlines from — you will first see exactly what will be removed", "de": "Spam und Termine von Absendern entfernen, von denen Sie keine Fristen mehr wollen — zuerst sehen Sie genau, was entfernt wird"}
 {"uk": "Прибрати сторону «", "en": "Remove the party «", "de": "Beteiligten entfernen «"}
 {"uk": "Прибрати фазу (її кроки лишаться без фази)", "en": "Remove the phase (its steps stay without a phase)", "de": "Phase entfernen (ihre Schritte bleiben ohne Phase)"}
 {"uk": "Прибрати цей важливий момент?", "en": "Remove this key moment?", "de": "Diesen wichtigen Moment entfernen?"}
+{"uk": "Прибрати цей проєкт з наради? Його 🏷 позначки в розшифровці теж зникнуть. Уже додане в проєкт лишиться там.", "en": "Remove this project from the meeting? Its 🏷 marks in the transcript go too. What was already added to the project stays there.", "de": "Dieses Projekt aus der Besprechung entfernen? Seine 🏷 Markierungen im Transkript verschwinden ebenfalls. Bereits ins Projekt Übernommenes bleibt dort."}
 {"uk": "Прибрати цю сторону", "en": "Remove this side", "de": "Diese Seite entfernen"}
 {"uk": "Прибрати цю сторону? Її фото видалиться назавжди, друга сторона лишиться.", "en": "Remove this side? Its photo will be deleted permanently, the other side stays.", "de": "Diese Seite entfernen? Ihr Foto wird dauerhaft gelöscht, die andere Seite bleibt."}
 {"uk": "Прибув на склад", "en": "Arrived in stock", "de": "Im Lager eingetroffen"}
@@ -13639,6 +13657,7 @@
 {"uk": "Про нараду", "en": "About the meeting", "de": "Zur Besprechung"}
 {"uk": "Про те саме замовлення клієнту вдруге не пише.", "en": "Does not write to the customer a second time about the same order.", "de": "Schreibt dem Kunden zum selben Auftrag kein zweites Mal."}
 {"uk": "Про те саме замовлення ще раз — {0}: повторне нагадування з датою попереднього листа; чернетка, яку ви ще не надіслали, — друга не створюється.", "en": "About the same order again — {0}: a repeat reminder with the date of the previous email; if a draft you have not sent yet exists, no second one is created.", "de": "Zum selben Auftrag erneut — {0}: wiederholte Erinnerung mit dem Datum der vorherigen E-Mail; liegt noch ein nicht gesendeter Entwurf vor, wird kein zweiter erstellt."}
+{"uk": "Про що", "en": "About", "de": "Worum es geht"}
 {"uk": "Про що йшла мова", "en": "What it was about", "de": "Worum es ging"}
 {"uk": "Про що йшла мова…", "en": "What it was about…", "de": "Worum es ging…"}
 {"uk": "Про що питали (назва картки)", "en": "What was asked about (card name)", "de": "Wonach gefragt wurde (Name der Karte)"}
@@ -13853,7 +13872,9 @@
 {"uk": "Проєкт {0}: стан", "en": "Project {0}: status", "de": "Projekt {0}: Status"}
 {"uk": "Проєкт листа", "en": "Project of the e-mail", "de": "Projekt der E-Mail"}
 {"uk": "Проєкт листа: момент, крок, ризик…", "en": "Project of the e-mail: moment, step, risk…", "de": "Projekt der E-Mail: Moment, Schritt, Risiko…"}
+{"uk": "Проєкт наради", "en": "Meeting project", "de": "Projekt der Besprechung"}
 {"uk": "Проєкт не знайдено", "en": "Project not found", "de": "Projekt nicht gefunden"}
+{"uk": "Проєкт пункту", "en": "Project of the point", "de": "Projekt des Punkts"}
 {"uk": "Проєкт цього листа: важливий момент, крок плану, ризик, закрити крок", "en": "Project of this e-mail: key moment, plan step, risk, close a step", "de": "Projekt dieser E-Mail: wichtiger Moment, Planschritt, Risiko, Schritt abschließen"}
 {"uk": "Проєкт ще не зв'язаний з проєктом askDANTE", "en": "The project is not yet linked to an askDANTE project", "de": "Das Projekt ist noch nicht mit einem askDANTE-Projekt verknüpft"}
 {"uk": "Проєкт: інші гілки", "en": "Project: other threads", "de": "Projekt: andere Verläufe"}
@@ -13864,6 +13885,10 @@
 {"uk": "Проєкти з листування", "en": "Projects from correspondence", "de": "Projekte aus dem E-Mail-Verkehr"}
 {"uk": "Проєкти за тиждень — відкритих {0}", "en": "Projects of the week — {0} open", "de": "Projekte der Woche — {0} offen"}
 {"uk": "Проєкти клієнта", "en": "Customer projects", "de": "Kundenprojekte"}
+{"uk": "Проєкти нарад", "en": "Meeting projects", "de": "Projekte der Besprechungen"}
+{"uk": "Проєкти наради", "en": "Meeting projects", "de": "Projekte der Besprechung"}
+{"uk": "Проєкти наради — «📁» над цією кнопкою: можна кілька.", "en": "Meeting projects — “📁” above this button: several are possible.", "de": "Projekte der Besprechung — „📁“ über dieser Schaltfläche: mehrere möglich."}
+{"uk": "Проєкти наради:", "en": "Meeting projects:", "de": "Projekte der Besprechung:"}
 {"uk": "Проєкти не заважають один одному: немає затримок через інші проєкти, спільних товарів, яких бракує, і перевантажених людей.", "en": "The projects do not get in each other's way: no delays caused by other projects, no shared products in short supply and no overloaded people.", "de": "Die Projekte behindern sich nicht: keine Verzögerungen durch andere Projekte, keine knappen gemeinsamen Artikel und keine überlasteten Personen."}
 {"uk": "Проєкти — записувати автоматично", "en": "Projects — record automatically", "de": "Projekte – automatisch eintragen"}
 {"uk": "Проєкти, гілки пошти, Angebote, документи бази знань, зустрічі календаря, проєкти askDANTE", "en": "Projects, mail threads, Angebote, knowledge base documents, calendar meetings, askDANTE projects", "de": "Projekte, E-Mail-Verläufe, Angebote, Dokumente der Wissensdatenbank, Kalendertermine, askDANTE-Projekte"}
@@ -13936,6 +13961,7 @@
 {"uk": "Підказки в пошуку на сайті", "en": "Search suggestions on the site", "de": "Suchvorschläge auf der Website"}
 {"uk": "Підказки в пошуку сайту (Minerva)", "en": "Website search suggestions (Minerva)", "de": "Vorschläge in der Websitesuche (Minerva)"}
 {"uk": "Підказки під полем пошуку на сайті. Будь-який збій — сайт шукає як звичайно; на сайті підказки можна вимкнути в /admin/ → «Магазин».", "en": "Suggestions under the search field on the site. In case of any failure, the site searches as usual; on the site the suggestions can be turned off in /admin/ → “Shop”.", "de": "Vorschläge unter dem Suchfeld auf der Website. Bei jeder Störung sucht die Website wie gewohnt; auf der Website können die Vorschläge unter /admin/ → „Shop“ deaktiviert werden."}
+{"uk": "Підказки — за словами з назв, клієнтів і артикулів проєктів, без AI. Нічого не змінюється, доки ви не натиснете «🏷 Позначити».", "en": "Hints come from words in project names, customers and item numbers, without AI. Nothing changes until you click “🏷 Mark”.", "de": "Hinweise aus Wörtern in Projektnamen, Kunden und Artikelnummern, ohne KI. Nichts ändert sich, bis Sie „🏷 Markieren“ klicken."}
 {"uk": "Підказок немає — додайте учасників нижче.", "en": "No suggestions — add participants below.", "de": "Keine Vorschläge — fügen Sie unten Teilnehmer hinzu."}
 {"uk": "Підключений календар", "en": "Connected calendar", "de": "Verbundener Kalender"}
 {"uk": "Підключення", "en": "Connection", "de": "Verbindung"}
@@ -13954,6 +13980,7 @@
 {"uk": "Підключені календарі", "en": "Connected calendars", "de": "Verbundene Kalender"}
 {"uk": "Підключені телефони", "en": "Connected phones", "de": "Verbundene Handys"}
 {"uk": "Підключити Telegram-сповіщення", "en": "Connect Telegram notifications", "de": "Telegram-Benachrichtigungen verbinden"}
+{"uk": "Підключити до проєкту", "en": "Link to a project", "de": "Mit Projekt verknüpfen"}
 {"uk": "Підключити сайт (код)", "en": "Connect site (code)", "de": "Website verbinden (Code)"}
 {"uk": "Підключіть сайт", "en": "Connect the website", "de": "Website verbinden"}
 {"uk": "Підкреслений", "en": "Underline", "de": "Unterstrichen"}
@@ -15596,6 +15623,7 @@
 {"uk": "Сховати цю сторінку від людини", "en": "Hide this page from the person", "de": "Diese Seite vor der Person ausblenden"}
 {"uk": "Схоже на", "en": "Looks like", "de": "Ähnlich wie"}
 {"uk": "Схоже, клієнт уже є", "en": "Looks like the customer already exists", "de": "Der Kunde scheint bereits vorhanden zu sein"}
+{"uk": "Схоже, тут мова про інший проєкт", "en": "Looks like another project is discussed here", "de": "Hier geht es offenbar um ein anderes Projekt"}
 {"uk": "Схоже, цей постачальник уже є в базі", "en": "This supplier seems to be in the database already", "de": "Dieser Lieferant scheint bereits in der Datenbank zu sein"}
 {"uk": "Східний Тимор", "en": "Timor-Leste", "de": "Osttimor"}
 {"uk": "Сьогодні", "en": "Today", "de": "Heute"}
@@ -16884,6 +16912,7 @@
 {"uk": "Це короткий технічний код, який система зберігає всередині кожного замовлення замість повної назви. Правила: • тільки латинські літери та цифри • замість пробілу — підкреслення _ • Приклади: digikey, nova_post, webshop Структуру бази даних НЕ змінює — це просто текстове значення, яке зберігається в замовленнях. ❗ Якщо після збереження джерела ви вирішите змінити цей код — замовлення що вже мають старий код перестануть відображатися під цим джерелом. Назву і колір змінювати можна вільно.", "en": "This is a short technical code that the system stores inside every order instead of the full name. Rules: • Latin letters and digits only • use an underscore _ instead of a space • Examples: digikey, nova_post, webshop It does NOT change the database structure — it is just a text value stored in orders. ❗ If after saving the source you decide to change this code, orders that already have the old code will stop being shown under this source. The name and color can be changed freely.", "de": "Das ist ein kurzer technischer Code, den das System in jedem Auftrag anstelle des vollständigen Namens speichert. Regeln: • nur lateinische Buchstaben und Ziffern • statt eines Leerzeichens ein Unterstrich _ • Beispiele: digikey, nova_post, webshop Die Datenbankstruktur wird dadurch NICHT geändert – es ist lediglich ein Textwert, der in den Aufträgen gespeichert wird. ❗ Wenn Sie nach dem Speichern der Quelle beschließen, diesen Code zu ändern, werden Aufträge, die bereits den alten Code haben, nicht mehr unter dieser Quelle angezeigt. Name und Farbe können frei geändert werden."}
 {"uk": "Це короткий технічний код, який система зберігає всередині кожного товару замість повної назви. Правила: • тільки латинські літери та цифри • замість пробілу — підкреслення _ • Приклади: antenna, cable, rf_filter Структуру бази даних НЕ змінює — це просто текстове значення, яке зберігається в товарах. ❗ Якщо після збереження категорії ви вирішите змінити цей код — товари що вже мають старий код перестануть відображатися в цій категорії. Назву і колір змінювати можна вільно.", "en": "This is a short technical code that the system stores inside each product instead of the full name. Rules: • Latin letters and digits only • use an underscore _ instead of a space • Examples: antenna, cable, rf_filter This does NOT change the database structure — it is simply a text value stored in products. ❗ If, after saving the category, you decide to change this code — products that already have the old code will no longer be shown in this category. The name and color can be changed freely.", "de": "Dies ist ein kurzer technischer Code, den das System in jedem Artikel anstelle des vollständigen Namens speichert. Regeln: • nur lateinische Buchstaben und Ziffern • statt eines Leerzeichens ein Unterstrich _ • Beispiele: antenna, cable, rf_filter Dies ändert die Datenbankstruktur NICHT — es ist lediglich ein Textwert, der in den Artikeln gespeichert wird. ❗ Wenn Sie diesen Code nach dem Speichern der Kategorie ändern, werden Artikel, die noch den alten Code haben, nicht mehr in dieser Kategorie angezeigt. Name und Farbe können frei geändert werden."}
 {"uk": "Це може зробити агент Minerva", "en": "The Minerva agent can do this", "de": "Das kann der Minerva-Agent erledigen"}
+{"uk": "Це місце поза записом", "en": "This place is outside the recording", "de": "Diese Stelle liegt außerhalb der Aufnahme"}
 {"uk": "Це не зображення.", "en": "This is not an image.", "de": "Das ist kein Bild."}
 {"uk": "Це не посилання", "en": "This is not a link", "de": "Das ist kein Link"}
 {"uk": "Це не посилання iCal. У Google: налаштування календаря → «Інтеграція календаря» → «Секретна адреса у форматі iCal» (закінчується на basic.ics).", "en": "This is not an iCal link. In Google: calendar settings → “Integrate calendar” → “Secret address in iCal format” (ends with basic.ics).", "de": "Das ist kein iCal-Link. In Google: Kalendereinstellungen → „Kalender integrieren“ → „Geheime Adresse im iCal-Format“ (endet auf basic.ics)."}
@@ -16950,6 +16979,8 @@
 {"uk": "Цього місяця", "en": "This month", "de": "Diesen Monat"}
 {"uk": "Цього місяця {0}", "en": "This month {0}", "de": "Diesen Monat {0}"}
 {"uk": "Цього постачальника немає серед запитів проєкту", "en": "This supplier is not among the project's requests", "de": "Dieser Lieferant ist nicht unter den Anfragen des Projekts"}
+{"uk": "Цього проєкту немає серед проєктів наради", "en": "This project is not among the meeting projects", "de": "Dieses Projekt gehört nicht zu den Projekten der Besprechung"}
+{"uk": "Цього проєкту немає серед проєктів наради — спершу додайте його вгорі", "en": "This project is not among the meeting projects — add it at the top first", "de": "Dieses Projekt gehört nicht zu den Projekten der Besprechung — zuerst oben hinzufügen"}
 {"uk": "Цього тижня", "en": "This week", "de": "Diese Woche"}
 {"uk": "Цього товару ще немає в Angebote.", "en": "This product is not in any Angebote yet.", "de": "Dieser Artikel ist noch in keinem Angebot enthalten."}
 {"uk": "Цьому ключу", "en": "For this key", "de": "Für diesen Schlüssel"}
@@ -17153,7 +17184,10 @@
 {"uk": "Частина URL, яка з'являється після успішного логіну (для верифікації).", "en": "Part of the URL that appears after a successful login (for verification).", "de": "Teil der URL, der nach erfolgreichem Login erscheint (zur Verifizierung)."}
 {"uk": "Частина даних з помилками: {0}", "en": "Some data had errors: {0}", "de": "Ein Teil der Daten mit Fehlern: {0}"}
 {"uk": "Частина замовлення", "en": "Part of the order", "de": "Teil des Auftrags"}
+{"uk": "Частина наради", "en": "Meeting part", "de": "Teil der Besprechung"}
 {"uk": "Частинами", "en": "In parts", "de": "In Teilen"}
+{"uk": "Частини нарад", "en": "Meeting parts", "de": "Teile der Besprechungen"}
+{"uk": "Частини наради за проєктами", "en": "Meeting parts by project", "de": "Teile der Besprechung nach Projekt"}
 {"uk": "Частину файлів сайт не завантажив — деталі в «🖼 Фото й даташити».", "en": "The site did not download some of the files — details in “🖼 Photos and datasheets”.", "de": "Die Website hat einen Teil der Dateien nicht heruntergeladen – Details unter „🖼 Fotos und Datenblätter“."}
 {"uk": "Частка відбитої потужності. Норма: > 15 дБ (|S11| < -15 дБ)", "en": "Share of reflected power. Normal: > 15 dB (|S11| < -15 dB)", "de": "Anteil der reflektierten Leistung. Normal: > 15 dB (|S11| < -15 dB)"}
 {"uk": "Часткова помилка: {0}", "en": "Partial error: {0}", "de": "Teilweiser Fehler: {0}"}
@@ -17631,6 +17665,7 @@
 {"uk": "Що: {0}", "en": "What: {0}", "de": "Was: {0}"}
 {"uk": "Щоб встановити новий пароль, перейдіть за посиланням", "en": "To set a new password, follow the link", "de": "Um ein neues Passwort festzulegen, folgen Sie dem Link"}
 {"uk": "Щоб додавати в проєкт, виберіть проєкт наради (✏️ Змінити). Без проєкту — лише ⏰ дедлайн у вашому календарі.", "en": "To add to a project, choose the meeting’s project (✏️ Edit). Without a project — only a ⏰ deadline in your calendar.", "de": "Um ins Projekt zu übernehmen, wählen Sie das Projekt der Besprechung (✏️ Bearbeiten). Ohne Projekt — nur eine ⏰ Frist in Ihrem Kalender."}
+{"uk": "Щоб додавати в проєкт, підключіть нараду до проєкту («📁» угорі). Без проєкту — лише ⏰ дедлайн у вашому календарі.", "en": "To add to a project, link the meeting to a project (“📁” at the top). Without a project — only a ⏰ deadline in your calendar.", "de": "Zum Hinzufügen ins Projekt die Besprechung mit einem Projekt verknüpfen („📁“ oben). Ohne Projekt — nur eine ⏰ Frist in Ihrem Kalender."}
 {"uk": "Щоб змінити запас, увімкніть «Вести облік на складі».", "en": "To change the stock, turn on «Track stock».", "de": "Um den Bestand zu ändern, «Bestand führen» einschalten."}
 {"uk": "Щоб керувати чатом з Minerva — «Увімкнено» в блоці «🤖 Помічник Minerva на сайті», потім «🧪 Перевірити RAG».", "en": "To control the chat from Minerva — “Enabled” in the “🤖 Minerva assistant on the site” block, then “🧪 Check RAG”.", "de": "Um den Chat von Minerva aus zu steuern – „Aktiviert“ im Block „🤖 Minerva-Assistent auf der Website“, danach „🧪 RAG prüfen“."}
 {"uk": "Щоб не плутати: «Плати для X», «Ціни на виробництво 2026»… — запити з тією самою групою стоять разом.", "en": "To keep things apart: «Boards for X», «Production prices 2026»… — requests with the same group stand together.", "de": "Zur Übersicht: «Leiterplatten für X», «Fertigungspreise 2026»… — Anfragen derselben Gruppe stehen zusammen."}
@@ -18193,6 +18228,7 @@
 {"uk": "виберіть аркуш, налаштуйте маппінг колонок та натисніть «Імпортувати».", "en": "select the sheet, configure the column mapping and click “Import”.", "de": "wählen Sie das Blatt, konfigurieren Sie die Spaltenzuordnung und klicken Sie auf „Importieren“."}
 {"uk": "виберіть дату", "en": "choose a date", "de": "Datum wählen"}
 {"uk": "виберіть календарі «👁»", "en": "choose the calendars “👁”", "de": "wählen Sie die Kalender „👁“"}
+{"uk": "виберіть проєкт…", "en": "choose a project…", "de": "Projekt wählen…"}
 {"uk": "вибрано", "en": "selected", "de": "ausgewählt"}
 {"uk": "вибрано {0}", "en": "chosen {0}", "de": "ausgewählt {0}"}
 {"uk": "вибрано вручну", "en": "chosen manually", "de": "manuell gewählt"}
@@ -18877,6 +18913,8 @@
 {"uk": "завжди", "en": "always", "de": "immer"}
 {"uk": "завтра", "en": "tomorrow", "de": "morgen"}
 {"uk": "завтра після {0}:00", "en": "tomorrow after {0}:00", "de": "morgen nach {0}:00"}
+{"uk": "загальне", "en": "general", "de": "allgemein"}
+{"uk": "загальне, не про проєкт", "en": "general, not about a project", "de": "allgemein, kein Projekt"}
 {"uk": "загальні", "en": "general", "de": "allgemein"}
 {"uk": "загальні документи — без клієнта, проєкту й товару", "en": "general documents — without customer, project and product", "de": "allgemeine Dokumente — ohne Kunde, Projekt und Artikel"}
 {"uk": "заголовки, стани, дати й текст листа; назви кроків — як ви їх написали", "en": "headings, statuses, dates and the e-mail text; step names stay as you wrote them", "de": "Überschriften, Status, Termine und E-Mail-Text; Schrittnamen bleiben, wie Sie sie geschrieben haben"}
@@ -19315,6 +19353,7 @@
 {"uk": "код {0} в askDANTE", "en": "code {0} in askDANTE", "de": "Code {0} in askDANTE"}
 {"uk": "код {0} у листі", "en": "code {0} in the e-mail", "de": "Code {0} in der E-Mail"}
 {"uk": "код магазину", "en": "shop code", "de": "Shop-Code"}
+{"uk": "код проєкту", "en": "project code", "de": "Projektcode"}
 {"uk": "кожна кількість ступенів — окрема позиція, як на бланку Quotation (старі шаблони з", "en": "each price-break quantity is a separate line, as on the Quotation letterhead (old templates with", "de": "jede Staffelmenge ist eine eigene Position, wie auf dem Quotation-Briefbogen (alte Vorlagen mit"}
 {"uk": "кожна — рядок, ＋ ще одна", "en": "each is a row, ＋ for another", "de": "jede eine Zeile, ＋ für eine weitere"}
 {"uk": "кожному співробітнику з Telegram ID", "en": "to every staff member with a Telegram ID", "de": "an jeden Mitarbeiter mit Telegram-ID"}
@@ -19430,6 +19469,7 @@
 {"uk": "кількість має бути більша за 0", "en": "the quantity must be greater than 0", "de": "Menge muss größer als 0 sein"}
 {"uk": "кількість — ціле число від 1", "en": "quantity — a whole number from 1", "de": "Menge — ganze Zahl ab 1"}
 {"uk": "кількість — число", "en": "quantity — a number", "de": "Menge – eine Zahl"}
+{"uk": "кінець", "en": "end", "de": "Ende"}
 {"uk": "кінець має бути пізніше за початок", "en": "the end must be later than the start", "de": "das Ende muss nach dem Beginn liegen"}
 {"uk": "кінець раніше за початок.", "en": "the end is before the start.", "de": "das Ende liegt vor dem Beginn."}
 {"uk": "кінець: повернення вихідного стану", "en": "end: restoring the initial state", "de": "Ende: Wiederherstellung des Ausgangszustands"}
@@ -21137,6 +21177,7 @@
 {"uk": "скриньок: з адрес і доменів постачальника (", "en": "mailboxes: from the supplier's addresses and domains (", "de": "Postfächer: von Adressen und Domains des Lieferanten ("}
 {"uk": "скільки даних отримав, які саме товари й замовлення, що змінював і де отримав відмову. Записи журналу", "en": "how much data was received, which products and orders exactly, what was changed and where access was denied. Log entries", "de": "wie viele Daten abgerufen wurden, welche Artikel und Aufträge genau, was geändert wurde und wo der Zugriff verweigert wurde. Protokolleinträge"}
 {"uk": "слова", "en": "words", "de": "Wörter"}
+{"uk": "слово з назви проєкту", "en": "word from the project name", "de": "Wort aus dem Projektnamen"}
 {"uk": "службовий запис журналу сайту", "en": "internal website log entry", "de": "interner Eintrag im Website-Protokoll"}
 {"uk": "службовий звіт сайту", "en": "internal website report", "de": "interner Bericht der Website"}
 {"uk": "службові коди DigiKey (camelCase) змінювати не можна — назвіть параметр по-людськи, як у даташиті («Operating Temperature»)", "en": "DigiKey internal codes (camelCase) cannot be changed — name the parameter in plain words, as in the datasheet (“Operating Temperature”)", "de": "interne DigiKey-Codes (camelCase) dürfen nicht geändert werden – benennen Sie den Parameter in Klartext wie im Datenblatt („Operating Temperature“)"}
@@ -21598,6 +21639,7 @@
 {"uk": "у фазі {0} дн.", "en": "{0} days in the phase", "de": "{0} Tage in der Phase"}
 {"uk": "у файлі формату", "en": "in a file of the format", "de": "in einer Datei im Format"}
 {"uk": "у формі введено вручну", "en": "entered manually in the form", "de": "im Formular manuell eingegeben"}
+{"uk": "у цьому проєкті без позначених частин", "en": "no marked parts in this project", "de": "in diesem Projekt keine markierten Teile"}
 {"uk": "у частини товарів немає «Вага нетто», вагу взято з «Орієнт. ваги посилки»", "en": "some products have no “Net weight”; the weight was taken from the “Approx. parcel weight”", "de": "bei einem Teil der Artikel fehlt das „Nettogewicht“, das Gewicht stammt aus dem „Ungef. Paketgewicht“"}
 {"uk": "у черзі", "en": "in queue", "de": "in der Warteschlange"}
 {"uk": "у черзі RAG", "en": "in the RAG queue", "de": "in der RAG-Warteschlange"}
@@ -21812,6 +21854,7 @@
 {"uk": "ціну доставки. Порогу безкоштовної доставки й терміну в API DigiKey немає, тож перевірте зони після імпорту.", "en": "the shipping price. The DigiKey API has no free-shipping threshold or lead time, so check the zones after the import.", "de": "den Versandpreis. Eine Schwelle für kostenlosen Versand und eine Lieferzeit gibt es in der DigiKey-API nicht, prüfen Sie die Zonen daher nach dem Import."}
 {"uk": "ціну за 1 шт. і будь-який ступінь можна змінити в рядку, видно «було → стало». «📐 Ступені за шаблоном…» — свої ступені для", "en": "the price per 1 pc and any price break can be changed in the row, with “before → after” shown. “📐 Price breaks from template…” — own price breaks for", "de": "der Preis pro 1 Stk. und jede Staffel lassen sich in der Zeile ändern, „vorher → nachher“ ist sichtbar. „📐 Staffeln nach Vorlage…“ — eigene Staffeln für"}
 {"uk": "час на проєкт", "en": "project time", "de": "Projektzeit"}
+{"uk": "частин про цей проєкт: {0}", "en": "parts about this project: {0}", "de": "Teile zu diesem Projekt: {0}"}
 {"uk": "частина", "en": "part", "de": "Teil"}
 {"uk": "частина SKU або назви (необов'язково)", "en": "part of the SKU or name (optional)", "de": "Teil der SKU oder des Namens (optional)"}
 {"uk": "частина замовлення", "en": "part of the order", "de": "Teil des Auftrags"}
@@ -21966,6 +22009,7 @@
 {"uk": "ще немає — RAG-ПК не зможе передавати розшифровки", "en": "none yet — the RAG PC will not be able to send transcripts", "de": "noch keiner — der RAG-PC kann keine Transkripte senden"}
 {"uk": "ще ні", "en": "not yet", "de": "noch nicht"}
 {"uk": "ще ніхто", "en": "nobody yet", "de": "noch niemand"}
+{"uk": "ще один проєкт…", "en": "another project…", "de": "weiteres Projekt…"}
 {"uk": "ще подій {0}", "en": "{0} more events", "de": "noch {0} Ereignisse"}
 {"uk": "ще попереду", "en": "still ahead", "de": "noch offen"}
 {"uk": "ще потрібно: {0}", "en": "still needed: {0}", "de": "noch erforderlich: {0}"}
