@@ -575,11 +575,11 @@ def rules_summary(cat) -> list:
 def counts(qs) -> list:
     """[(категорія, листів, непрочитаних)] для фільтра скриньки — лист рахується в кожній своїй категорії."""
     from django.db.models import Count, Q
-    from email_assistant.models import EmailMessage, MailCategory
-    through = EmailMessage.work_categories.through
-    rows = {r['mailcategory']: r for r in through.objects.filter(emailmessage__in=qs.order_by().values('pk'))
-            .values('mailcategory').annotate(n=Count('emailmessage'),
-                                             unread=Count('emailmessage', filter=Q(emailmessage__is_read=False)))}
+    from email_assistant.models import MailCategory
+    # від листів (індекс лічильників скриньки) до таблиці зв'язків — пара лист × категорія одна, тож Count('id') —
+    # листів у категорії; раніше від таблиці зв'язків з підзапитом і читанням кожного листа
+    rows = {r['work_categories']: r for r in qs.order_by().filter(work_categories__isnull=False)
+            .values('work_categories').annotate(n=Count('id'), unread=Count('id', filter=Q(is_read=False)))}
     return [(c, rows.get(c.pk, {}).get('n', 0), rows.get(c.pk, {}).get('unread', 0))
             for c in MailCategory.objects.filter(is_active=True)]
 

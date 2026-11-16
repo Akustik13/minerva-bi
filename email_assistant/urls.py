@@ -15,6 +15,8 @@ urlpatterns = [
     # AJAX preview fragments (3-panel inbox)
     path('thread/<int:thread_pk>/preview/',              views.thread_preview_view,  name='thread_preview'),
     path('message/<int:message_pk>/preview/',            views.message_preview_view, name='message_preview'),
+    path('thread/<int:thread_pk>/links/',                views.thread_links_view,    name='thread_links'),
+    path('message/<int:message_pk>/links/',              views.message_links_view,   name='message_links'),
     # Compose
     path('compose/',                                     views.compose_view,         name='compose'),
     path('send/',                                        views.send_api,             name='send_api'),

@@ -359,20 +359,21 @@ def line_sent(line):
     return max(getattr(line, "_held_sent", None) or Decimal("0"), Decimal("0"))
 
 
-def line_held(line):
+def line_held(line, ships_late=None):
     """Скільки товару вже рахується за цією позицією (списано, резерв або бронь незаписаного замовлення).
-    available + line_held(line) — скільки було б вільно без цього замовлення. Потрібен annotate_line_held."""
+    available + line_held(line) — скільки було б вільно без цього замовлення. Потрібен annotate_line_held.
+    ships_late — _ships_late(), уже прочитане (список замовлень: раз на сторінку, а не на кожну позицію)."""
     held = getattr(line, "_held_tx", None) or Decimal("0")
     if held > 0:
         return held
     o = line.order
     if (o.affects_stock and o.status not in NOT_PENDING_STATUSES and line.product_id and (line.qty or 0) > 0
-            and (o.status not in SHIPPED_STATUSES or _ships_late())):
+            and (o.status not in SHIPPED_STATUSES or (_ships_late() if ships_late is None else ships_late))):
         return line.qty
     return Decimal("0")
 
 
-def line_cover_held(line):
+def line_cover_held(line, ships_late=None):
     """Скільки додати до «Доступно», щоб позиція не показувала нестачу власного товару (картка й список
     замовлень). Відправлена позиція, товар якої вже списано (Outgoing), — 0: товар пішов зі складу. Відправлена,
     але ще не списана (списання «при Доставлено») — як незакрита: її кількість ще в «Резерв».
@@ -380,7 +381,7 @@ def line_cover_held(line):
     if line.order.status in SHIPPED_STATUSES and getattr(line, "_held_out", False):
         return Decimal("0")
     # частину відправлено посилками: вона вже пішла зі складу — додається лише те, що тримається під залишок
-    return max(line_held(line) - line_sent(line), Decimal("0"))
+    return max(line_held(line, ships_late) - line_sent(line), Decimal("0"))
 
 
 def order_lines_cover(order):

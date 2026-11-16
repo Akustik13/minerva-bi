@@ -3137,3 +3137,30 @@ msgstr "UPS-Website"
 
 msgid "Jumingo Shipment ID"
 msgstr "Jumingo-Sendungs-ID"
+
+msgid "Увімкнено — натисніть, щоб вимкнути"
+msgstr "Aktiv — klicken zum Ausschalten"
+
+msgid "Статус «Відправлено» і посилка в дорозі"
+msgstr "Status „Versendet“ und das Paket ist unterwegs"
+
+msgid "Перевізник позначив затримку посилки в дорозі"
+msgstr "Der Versanddienst meldet eine Verzögerung des Pakets"
+
+msgid "Ще чекають відправки, а дедлайн відправки вже минув"
+msgstr "Warten noch auf den Versand, und die Versandfrist ist abgelaufen"
+
+msgid "Діє:"
+msgstr "Aktiv:"
+
+msgid "Прибрати цей фільтр"
+msgstr "Diesen Filter entfernen"
+
+msgid "Скинути фільтри"
+msgstr "Filter zurücksetzen"
+
+msgid "Показано"
+msgstr "Angezeigt"
+
+msgid "Завантаження карток…"
+msgstr "Karten werden geladen…"

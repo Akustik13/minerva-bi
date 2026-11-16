@@ -3138,3 +3138,30 @@ msgstr "UPS website"
 
 msgid "Jumingo Shipment ID"
 msgstr "Jumingo Shipment ID"
+
+msgid "Увімкнено — натисніть, щоб вимкнути"
+msgstr "On — click to turn off"
+
+msgid "Статус «Відправлено» і посилка в дорозі"
+msgstr "Status “Shipped” and the parcel is in transit"
+
+msgid "Перевізник позначив затримку посилки в дорозі"
+msgstr "The carrier reported a delay of the parcel in transit"
+
+msgid "Ще чекають відправки, а дедлайн відправки вже минув"
+msgstr "Still waiting to be shipped, and the shipping deadline has passed"
+
+msgid "Діє:"
+msgstr "Active:"
+
+msgid "Прибрати цей фільтр"
+msgstr "Remove this filter"
+
+msgid "Скинути фільтри"
+msgstr "Reset filters"
+
+msgid "Показано"
+msgstr "Showing"
+
+msgid "Завантаження карток…"
+msgstr "Loading cards…"

@@ -332,21 +332,26 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
       {% endfor %}
     </div>
     {% endif %}
-    {% if links %}
-    <div class="em-pv-links">
-      {% for l in links %}
-      <div class="em-pv-link">
-        <span>🔗</span>
-        <a href="{{ l.url }}" target="_blank" title="{% trans "Відкрити замовлення" %}">🛒 {{ l.label }}</a>
-        {% if l.customer %}<a href="{{ l.customer_url }}" target="_blank" title="{% trans "Картка клієнта в CRM" %}">👤 {{ l.customer.name }}</a>{% endif %}
-        {% for s in l.shipments %}
-        <a href="{{ s.url }}" target="_blank" title="{{ s.carrier }}">🚚 {{ s.tracking|default:"—" }} · {{ s.status }}</a>
-        {% endfor %}
-        <span class="why">{% trans "знайдено" %}: {{ l.reason }}</span>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
+    {# 🔗 зв'язки; вкладення, які ще треба прочитати (PDF з диска / IMAP), — окремим запитом після показу листа #}
+    <div id="pv-links-box"{% if links_url %} data-url="{{ links_url }}"{% endif %}>{% include "email_assistant/_preview_links.html" %}</div>
+    {% if links_url %}<script>
+    (function () {
+      var box = document.getElementById('pv-links-box');
+      if (!box || !box.dataset.url) return;
+      var url = box.dataset.url;
+      fetch(url, {credentials: 'same-origin', headers: {'X-Requested-With': 'XMLHttpRequest'}})
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          var b = document.getElementById('pv-links-box');
+          if (!d || !b || b.dataset.url !== url) return;      // уже відкрито інший лист
+          b.innerHTML = d.html;
+          b.removeAttribute('data-url');
+          var docs = document.getElementById('pv-att-orderdocs');
+          if (docs && typeof d.docs === 'string') docs.innerHTML = d.docs;
+          if (typeof _pvAttRender === 'function') { try { _pvAttRender(); } catch (e) {} }
+        }).catch(function () {});
+    })();
+    </script>{% endif %}
     {% if quote_request %}
     <div class="em-pv-link em-pv-quote" id="pv-quote">
       <span>📝 <b>{% trans "Схоже на запит пропозиції" %}</b> · {{ quote_request.reason }}</span>
@@ -780,13 +785,7 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
           <div class="em-att-pick" id="pv-att-pick">
             <label class="em-att-opt">💻 {% trans "Файл з комп'ютера…" %}
               <input type="file" multiple style="display:none" onchange="pvAttFiles(this)"></label>
-            {% if attach_options.order_docs %}
-            <h5>📄 {% trans "Документи замовлення" %}</h5>
-            {% for d in attach_options.order_docs %}
-            <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="pvAttRef(this)">
-              📄 {{ d.name }}<span class="sz">{{ d.group }} · {{ d.size|filesizeformat }}</span></div>
-            {% endfor %}
-            {% endif %}
+            <div id="pv-att-orderdocs">{% include "email_assistant/_preview_order_docs.html" %}</div>
             {% if attach_options.thread_files %}
             <h5>📎 {% trans "Вкладення з цього листування" %}</h5>
             {% for d in attach_options.thread_files %}

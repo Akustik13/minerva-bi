@@ -108,7 +108,8 @@ _MIDDLEWARE_BASE = [
 # Whitenoise — тільки production (DEBUG=False), щоб не гальмувати локальний dev
 if not DEBUG:
     _MIDDLEWARE_BASE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")
-MIDDLEWARE = _MIDDLEWARE_BASE
+# gzip — першим (стискає готову сторінку): HTML пошти й замовлень 0,7–2 МБ → у 10–15 разів менше (core/gzip.py)
+MIDDLEWARE = ["core.gzip.PageGZipMiddleware"] + _MIDDLEWARE_BASE
 
 ROOT_URLCONF = "tabele.urls"
 

@@ -193,6 +193,12 @@ class SalesOrder(models.Model):
     def order_total(self):
         """Сума з рядків якщо є unit_price, інакше total_price замовлення."""
         from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+        prefetched = getattr(self, '_prefetched_objects_cache', {}).get('lines')
+        if prefetched is not None:   # список замовлень: позиції вже завантажені — без запиту на кожне замовлення
+            from decimal import Decimal
+            line_total = sum((l.qty * l.unit_price for l in prefetched
+                              if l.qty is not None and l.unit_price is not None), Decimal('0'))
+            return line_total or self.total_price or 0
         line_total = self.lines.aggregate(
             t=Sum(ExpressionWrapper(
                 F('qty') * F('unit_price'),

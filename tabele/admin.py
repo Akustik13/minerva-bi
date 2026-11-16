@@ -135,13 +135,16 @@ def _get_app_list(self, request, app_label=None):
 
         profile = getattr(getattr(request, 'user', None), 'profile', None)
         is_super = _was_super or (profile and profile.role == 'superadmin')
+        # вимкнені модулі — одним запитом (раніше ModuleRegistry.check_active на кожен розділ меню: ~30 запитів
+        # на кожній сторінці); розділу немає в реєстрі — відкритий, як check_active
+        inactive = set(ModuleRegistry.objects.filter(is_active=False).values_list("app_label", flat=True))
 
         if is_super:
             # Superuser/superadmin: show all active modules
             app_list = [
                 a for a in app_list
                 if a["app_label"] in always_show
-                or ModuleRegistry.check_active(a["app_label"])
+                or a["app_label"] not in inactive
             ]
         else:
             from core.middleware import with_hooks
@@ -154,7 +157,7 @@ def _get_app_list(self, request, app_label=None):
                 a for a in app_list
                 if a["app_label"] in (always_show - {"config"})
                 or (
-                    ModuleRegistry.check_active(a["app_label"])
+                    a["app_label"] not in inactive
                     and (allowed == '__all__' or a["app_label"] in allowed)
                 )
             ]

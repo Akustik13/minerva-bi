@@ -5,6 +5,7 @@ import re
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_POST
 from django.utils import timezone
@@ -365,16 +366,19 @@ def _quote_messages(account, with_done=False):
     return QuoteRequest.objects.filter(status__in=statuses, message__account=account).values('message_id')
 
 
-def _category_counts(qs):
-    """[(ключ, назва, листів, непрочитаних)] і клієнти з листами — для меню фільтра (усі папки)."""
+def _category_counts(qs, with_no_category=False):
+    """[(ключ, назва, листів, непрочитаних)] і клієнти з листами — для меню фільтра (усі папки).
+    with_no_category — третім ще й скільки листів без своєї категорії (той самий прохід по листах)."""
     from django.db.models import Count, Q
     from email_assistant.models import EmailMessage
 
     base = qs.order_by()
     counts = {r['category']: r for r in base.values('category').annotate(
-        n=Count('id'), unread=Count('id', filter=Q(is_read=False)))}
+        n=Count('id'), unread=Count('id', filter=Q(is_read=False)),
+        no_wc=Count('id', filter=Q(work_category=None)))}
     categories = [(key, label, counts.get(key, {}).get('n', 0), counts.get(key, {}).get('unread', 0))
                   for key, label in EmailMessage.CATEGORY_CHOICES]
+    no_category = sum(r['no_wc'] for r in counts.values())
     customers = [
         {'id': r['thread__crm_customer'], 'name': r['thread__crm_customer__name'],
          'email': r['thread__crm_customer__email'], 'n': r['n'], 'unread': r['unread']}
@@ -383,7 +387,33 @@ def _category_counts(qs):
                   .annotate(n=Count('id'), unread=Count('id', filter=Q(is_read=False)))
                   .order_by('-unread', '-n')[:1000])
     ]
+    if with_no_category:
+        return categories, customers, no_category
     return categories, customers
+
+
+def _unread_counts(account) -> dict:
+    """Непрочитані для лічильників папок — одним проходом по листах скриньки (раніше три окремі): Вхідні (як
+    _build_qs 'inbox': без архівних гілок), ⭐ Важливі (зірочка або ❗ / ‼️), Спам."""
+    from django.db.models import Count, Q
+    from email_assistant.models import EmailMessage, EmailThread
+    archived = EmailThread.objects.filter(account=account, is_archived=True).values('id')
+    unread = Q(is_read=False)
+    return EmailMessage.objects.filter(account=account, is_deleted=False).aggregate(
+        inbox=Count('id', filter=unread & Q(folder='inbox') & _inbox_q(account) & ~Q(thread_id__in=archived)),
+        starred=Count('id', filter=unread & _imp_folder_q()),
+        spam=Count('id', filter=unread & Q(is_spam=True)),
+    )
+
+
+def _quote_counts(counts_qs) -> tuple:
+    """(відкриті запити пропозицій, оброблені — з Angebot / відповів колега) серед листів counts_qs — один запит."""
+    from django.db.models import Count, Q
+    from offers.models import QuoteRequest
+    row = (counts_qs.order_by()
+           .filter(quote_request__status__in=(QuoteRequest.NEW, QuoteRequest.DONE, QuoteRequest.ANSWERED))
+           .aggregate(new=Count('id', filter=Q(quote_request__status=QuoteRequest.NEW)), all=Count('id')))
+    return row['new'], row['all'] - row['new']
 
 
 CATEGORY_ICONS = ['🏷', '🟥', '🟧', '🟨', '🟩', '🟦', '🟪', '⬛', '⭐', '🛒', '📦', '🚚', '✈️', '🛃', '🧾', '💳', '💶', '🏭', '🔌', '📡', '📶', '🔋', '🛠️', '🧪', '📐', '🖥️', '📱', '🎛️', '🧲', '🏢', '👥', '🤝', '✉️', '🌐', '📢', '⚙️', '💡', '📄', '🗂️', '⚖️', '🎓', '🔔', '🧩', '🚀']   # палітра «Значок» своєї категорії (або будь-який емодзі)
@@ -518,6 +548,9 @@ def _open_projects():
     return list(Project.objects.filter(status__in=Project.OPEN_STATUSES).order_by('-updated_at')[:200])
 
 
+LIST_DEFER = ('body_text', 'body_html', 'ai_summary', 'ai_reply_draft', 'ai_translated')   # рядок списку їх не показує
+BODY_HEAD = 300   # символів тексту для рядка списку (шаблон обрізає до 220)
+
 FOLDERS = [
     ('inbox',    'Вхідні',    '📥'),
     ('sent',     'Надіслані', '📤'),
@@ -567,7 +600,7 @@ def inbox_view(request):
         and folder not in ('spam', 'trash') and not drafts_view
     qs = _build_qs(account, ALL_FOLDERS if search_all else folder, q)
     counts_qs = qs if folder in ('spam', 'trash') else _build_qs(account, ALL_FOLDERS, '' if drafts_view else q)
-    categories, mail_customers = _category_counts(counts_qs)
+    categories, mail_customers, no_category_count = _category_counts(counts_qs, with_no_category=True)
     from email_assistant.work_categories import counts as _work_counts
     work_categories = _work_counts(counts_qs)
     from email_assistant import nav_prefs
@@ -599,7 +632,7 @@ def inbox_view(request):
         qs = qs.filter(pk__in=project_messages(project_filter).values('pk'))
     if quote_filter:
         qs = qs.filter(pk__in=_quote_messages(account, with_done=quote_all))
-    quote_count = counts_qs.filter(pk__in=_quote_messages(account)).count()
+    quote_count, quote_done_count = _quote_counts(counts_qs)
     from email_assistant import followups as _followups
     if fu_filter:
         qs = qs.filter(pk__in=_followups.message_pks(account))
@@ -623,7 +656,11 @@ def inbox_view(request):
         total = qs.count()
         start = (page - 1) * per_page
     # rename key to `emails` to avoid shadowing Django messages framework
-    emails = list(qs.select_related('thread', 'thread__crm_customer', 'work_category')[start:start + per_page])
+    # тіла листів у списку не потрібні — лише початок тексту для рядка (body_head; truncatechars:220 дає те саме),
+    # HTML і AI-тексти 30 листів не читаються з бази
+    from django.db.models.functions import Substr
+    emails = list(qs.select_related('thread', 'thread__crm_customer', 'work_category')
+                  .defer(*LIST_DEFER).annotate(body_head=Substr('body_text', 1, BODY_HEAD))[start:start + per_page])
     if grouped:
         _attach_thread_stats(emails)
     _attach_crm_customers(emails)
@@ -642,16 +679,12 @@ def inbox_view(request):
     elif folder == 'trash':
         _attach_trash_tags(account, emails)
 
-    from email_assistant.models import EmailThread as _ET
-    _archived_ids = _ET.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
-    unread_inbox = EmailMessage.objects.filter(
-        account=account, folder='inbox',
-        is_read=False, is_deleted=False,
-    ).filter(_inbox_q(account)).exclude(thread_id__in=_archived_ids).count()
+    _unread = _unread_counts(account)   # Вхідні, Важливі, Спам — одним проходом
+    unread_inbox = _unread['inbox']
     unread_counts = {
         'inbox':    unread_inbox,
-        'starred':  EmailMessage.objects.filter(_imp_folder_q(), account=account, is_read=False, is_deleted=False).count(),
-        'spam':     EmailMessage.objects.filter(account=account, is_spam=True, is_read=False, is_deleted=False).count(),
+        'starred':  _unread['starred'],
+        'spam':     _unread['spam'],
         'sent':     0,
         'archived': 0,
         'trash':    0,
@@ -690,7 +723,7 @@ def inbox_view(request):
         'customer_form_fields':  CUSTOMER_FORM_FIELDS,
         'quote_count':           quote_count,
         'quote_all':             quote_all,
-        'quote_done_count':      counts_qs.filter(pk__in=_quote_messages(account, with_done=True)).count() - quote_count,
+        'quote_done_count':      quote_done_count,
         'categories':            categories,
         'mail_customers':        mail_customers,
         'cust_sources':          _customer_sources(mail_customers),
@@ -700,7 +733,7 @@ def inbox_view(request):
         'fu_counts':             _followups.counts(account),
         'work_filter':           work_filter,
         'no_category':           work_filter == NO_CATEGORY,
-        'no_category_count':     counts_qs.filter(work_category=None).count() if work_categories else 0,
+        'no_category_count':     no_category_count if work_categories else 0,
         'nav_projects':          _nav_projects(account),
         'work_categories':       work_categories,
         'can_add_work_category': request.user.has_perm('email_assistant.add_mailcategory'),
@@ -810,7 +843,8 @@ def thread_preview_view(request, thread_pk):
     # Minerva → сервер у фоні: прев'ю відкривається без очікування IMAP
     set_read(account, emails, True)
 
-    links = _mail_links(emails)
+    # вкладення, які ще не читались (PDF з диска або з IMAP), — окремим запитом після показу листа
+    links, links_url = _preview_links(emails, reverse('email_assistant:thread_links', args=[thread.pk]))
     _attach_logos(emails)
     _attach_importance(emails)
     _attach_text_fold(emails)
@@ -826,6 +860,7 @@ def thread_preview_view(request, thread_pk):
         'meeting_invites': _meeting_invites(request.user, emails),
         'mail_suppliers':  _mail_suppliers(request.user, emails, thread),
         'links':           links,
+        'links_url':       links_url,
         'attach_options':  _attach_options(emails, links),
         'reply_to_addr':   reply_to_addr,
         'reply_cc':        ', '.join(reply_cc),
@@ -913,7 +948,7 @@ def message_preview_view(request, message_pk):
     msg.fix_html_body()
     set_read(account, [msg], True)
 
-    links = _mail_links([msg])
+    links, links_url = _preview_links([msg], reverse('email_assistant:message_links', args=[msg.pk]))
     _attach_logos([msg])
     _attach_importance([msg])
     _attach_text_fold([msg])
@@ -928,6 +963,7 @@ def message_preview_view(request, message_pk):
         'followups':       _followups_for([msg]),
         'mail_suppliers':  _mail_suppliers(request.user, [msg], msg.thread),
         'links':           links,
+        'links_url':       links_url,
         'attach_options':  _attach_options([msg], links),
         'reply_to_addr':   reply_to_addr,
         'reply_cc':        ', '.join(reply_cc),
@@ -982,18 +1018,60 @@ def _mail_suppliers(user, emails, thread):
         return []
 
 
-def _mail_links(emails):
-    """Замовлення / клієнти / відправлення, згадані в листах гілки (номер замовлення, трек-номер)."""
+def _mail_links(emails, read=True):
+    """Замовлення / клієнти / відправлення, згадані в листах гілки (номер замовлення, трек-номер).
+    read=False — номери лише з уже прочитаних вкладень (без читання PDF і без IMAP)."""
     from email_assistant.links import PREVIEW_FETCH, allow_fetch, find_links
     texts = []
     for m in emails:
         texts += [m.subject or '', (m.body_text or '')[:50000]]
     try:
         with allow_fetch(PREVIEW_FETCH):    # PDF, якого синхронізація не зберегла, — з IMAP (раз)
-            return find_links(texts, messages=emails)
+            return find_links(texts, messages=emails, read=read)
     except Exception as e:
         logger.warning('mail links: %s', e)
         return []
+
+
+def _preview_links(emails, url) -> tuple:
+    """(зв'язки для прев'ю, адреса довантаження або ''). Є ще не прочитані вкладення-документи — прев'ю
+    відкривається одразу зі зв'язками з тексту й уже прочитаних вкладень, а читання файлів (PDF з диска, з IMAP —
+    секунди на першому відкритті листа) — окремим запитом preview_links_view, що доповнює блок «🔗»."""
+    from email_assistant.links import needs_reading
+    try:
+        pending = needs_reading(emails)
+    except Exception as e:  # noqa: BLE001 — як раніше: усе одразу
+        logger.warning('mail links pending: %s', e)
+        pending = False
+    return _mail_links(emails, read=not pending), (url if pending else '')
+
+
+def _links_response(request, account, emails):
+    """JSON {html — блок «🔗», docs — «📄 Документи замовлення» для «📎 Вкладення» відповіді} після читання вкладень."""
+    from django.template.loader import render_to_string
+    links = _mail_links(emails)
+    options = _attach_options(emails, links)
+    return JsonResponse({
+        'html': render_to_string('email_assistant/_preview_links.html', {'links': links}, request=request),
+        'docs': render_to_string('email_assistant/_preview_order_docs.html', {'attach_options': options},
+                                 request=request),
+    })
+
+
+@staff_member_required
+def thread_links_view(request, thread_pk):
+    """Довантаження прев'ю гілки: номери з ще не прочитаних вкладень (PDF / DOCX — з диска або з IMAP)."""
+    from email_assistant.models import EmailThread
+    account = _get_account(request)
+    thread = get_object_or_404(EmailThread, pk=thread_pk, account=account)
+    return _links_response(request, account, list(thread.messages.filter(is_deleted=False).order_by('sent_at')))
+
+
+@staff_member_required
+def message_links_view(request, message_pk):
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    return _links_response(request, account, [get_object_or_404(EmailMessage, pk=message_pk, account=account)])
 
 
 # Лист — чужий HTML: його скрипти, плагіни й форми не діють (інакше лист виконав би код від імені Minerva);
@@ -1934,18 +2012,60 @@ def sync_now(request):
 
 @staff_member_required
 def list_imap_folders_view(request):
-    """Return JSON list of IMAP folders from the server."""
+    """«Папки сервера» в лівій колонці (JSON). Скринька питає їх при кожному відкритті — тож перелік береться зі
+    спільного кешу одразу, а сервер IMAP перепитується у фоні, якщо перелік старший за FOLDERS_FRESH (раніше кожне
+    відкриття пошти логінилось на IMAP і на 1–3 с займало один із двох процесів gunicorn — перше відкриття листа
+    чекало в черзі). Уперше й після створення / перейменування / видалення папки — як раніше, одразу з сервера."""
     account = _get_account(request)
     if not account:
         return JsonResponse({'folders': []})
+    import time
+    from core.shared_cache import cache
+    cached = cache.get(_folders_key(account))
+    if cached is not None:
+        if time.time() - cached.get('at', 0) > FOLDERS_FRESH and cache.add(_folders_key(account) + ':busy', 1, 120):
+            from email_assistant.sync import _start_background
+
+            def _refresh(pk=account.pk):
+                from email_assistant.models import EmailAccount
+                try:
+                    _fetch_imap_folders(EmailAccount.objects.get(pk=pk))
+                except Exception as e:  # noqa: BLE001 — лишається попередній перелік
+                    logger.warning('list_imap_folders (background) failed: %s', e)
+                finally:
+                    cache.delete(_folders_key(account) + ':busy')
+            _start_background(_refresh)
+        return JsonResponse({'folders': cached.get('folders', [])})
     try:
-        from email_assistant.imap_client import IMAPClient
-        with IMAPClient(account) as imap:
-            folders = imap.list_folders()
-        return JsonResponse({'folders': folders})
+        return JsonResponse({'folders': _fetch_imap_folders(account)})
     except Exception as e:
         logger.warning('list_imap_folders failed: %s', e)
         return JsonResponse({'folders': [], 'error': str(e)})
+
+
+FOLDERS_FRESH = 300          # с: старіший перелік «Папок сервера» перепитується у фоні
+FOLDERS_KEEP = 7 * 24 * 3600
+
+
+def _folders_key(account) -> str:
+    return f'email-imap-folders:{account.pk}'
+
+
+def _fetch_imap_folders(account) -> list:
+    """Папки з сервера IMAP → спільний кеш (list_imap_folders_view)."""
+    import time
+    from core.shared_cache import cache
+    from email_assistant.imap_client import IMAPClient
+    with IMAPClient(account) as imap:
+        folders = imap.list_folders()
+    cache.set(_folders_key(account), {'at': time.time(), 'folders': folders}, FOLDERS_KEEP)
+    return folders
+
+
+def _forget_imap_folders(account):
+    """Папку створено / перейменовано / видалено — наступний «Папки сервера» одразу з сервера."""
+    from core.shared_cache import cache
+    cache.delete(_folders_key(account))
 
 
 @staff_member_required
@@ -2025,17 +2145,11 @@ def sync_all_folders_view(request):
 
 @staff_member_required
 def unread_count_view(request):
-    from email_assistant.models import EmailMessage, EmailThread
     account = _get_account(request)
     if not account:
         return JsonResponse({'count': 0, 'inbox': 0, 'starred': 0, 'spam': 0})
-    from django.db.models import Q
-    base = EmailMessage.objects.filter(account=account, is_deleted=False, is_read=False)
-    archived_ids = EmailThread.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
-    inbox = base.filter(folder='inbox').filter(_inbox_q(account)).exclude(thread_id__in=archived_ids).count()
-    from email_assistant.importance import folder_q
-    starred = base.filter(folder_q()).count()
-    spam    = base.filter(is_spam=True).count()
+    unread = _unread_counts(account)   # Вхідні, Важливі, Спам — одним проходом (опитує кожна сторінка Minerva)
+    inbox, starred, spam = unread['inbox'], unread['starred'], unread['spam']
     from email_assistant import drafts as _drafts
     return JsonResponse({'count': inbox, 'inbox': inbox, 'starred': starred, 'spam': spam,
                          'drafts': _drafts.count(account), 'latest': _latest_pk(account)})
@@ -2433,6 +2547,7 @@ def imap_create_folder_view(request):
         with IMAPClient(account) as imap:
             result = imap.create_folder(name)
         if result is True:
+            _forget_imap_folders(account)
             return JsonResponse({'ok': True})
         return JsonResponse({'ok': False, 'error': str(result) if result else 'Сервер відхилив запит'})
     except Exception as e:
@@ -2452,6 +2567,7 @@ def imap_rename_folder_view(request):
         with IMAPClient(account) as imap:
             result = imap.rename_folder(old_name, new_name)
         if result is True:
+            _forget_imap_folders(account)
             from email_assistant.models import EmailMessage
             EmailMessage.objects.filter(
                 account=account, imap_folder_name=old_name
@@ -2474,6 +2590,7 @@ def imap_delete_folder_view(request):
         with IMAPClient(account) as imap:
             result = imap.delete_folder(name)
         if result is True:
+            _forget_imap_folders(account)
             from email_assistant.models import EmailMessage
             EmailMessage.objects.filter(
                 account=account, imap_folder_name=name

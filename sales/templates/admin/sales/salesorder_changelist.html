@@ -116,11 +116,33 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-qf-sep{width:1px;height:20px;background:var(--border-strong);margin:0 4px;flex-shrink:0}
 .sv-qf-btn{padding:4px 12px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg-input,#141f2b);color:var(--text-muted);cursor:pointer;font-size:12px;font-weight:600;text-decoration:none;transition:background .12s,color .12s;white-space:nowrap}
 .sv-qf-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
-.sv-qf-btn.sv-qf-active{background:#1565c0;color:#fff;border-color:transparent}
+.sv-qf-lbl{font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap}
+/* увімкнений фільтр: заливка + кільце + «✓ … ✕» — видно одразу, що саме звужує список */
+.sv-qf-btn.sv-qf-active{background:#1565c0;color:#fff;border-color:#1565c0;box-shadow:0 0 0 2px rgba(21,101,192,.45)}
+.sv-qf-btn.sv-qf-active::before{content:"✓ ";font-weight:800}
+.sv-qf-btn.sv-qf-active:hover{background:#0d47a1;color:#fff}
+.sv-qf-x{margin-left:6px;font-size:10px;opacity:.85}
+/* «Всі» без фільтра — лише обведено, не заливкою (заливка — тільки в увімкнених фільтрів) */
+.sv-qf-btn.sv-qf-all-on{border-color:var(--text-muted);color:var(--text);font-weight:700;background:transparent}
 .sv-qf-btn.sv-qf-warn{background:rgba(198,40,40,.15);color:#ef5350;border-color:#c62828}
-.sv-qf-btn.sv-qf-warn.sv-qf-active{background:#c62828;color:#fff}
-.sv-qf-cnt{display:inline-block;background:rgba(255,255,255,.15);color:inherit;font-size:10px;font-weight:700;line-height:1;padding:1px 5px;border-radius:8px;margin-left:3px;vertical-align:middle}
+.sv-qf-btn.sv-qf-warn.sv-qf-active{background:#c62828;color:#fff;border-color:#c62828;box-shadow:0 0 0 2px rgba(198,40,40,.45)}
+.sv-qf-cnt{display:inline-block;background:rgba(127,127,127,.18);color:inherit;font-size:10px;font-weight:700;line-height:1;padding:1px 5px;border-radius:8px;margin-left:3px;vertical-align:middle}
 .sv-qf-btn.sv-qf-active .sv-qf-cnt{background:rgba(255,255,255,.25)}
+/* «Діє:» — усі фільтри, що зараз звужують список, з ✕ і «Скинути фільтри» */
+.sv-af-bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:-4px 0 10px;padding:7px 12px;border-radius:7px;
+  background:rgba(21,101,192,.10);border:1px solid rgba(21,101,192,.45);border-left:4px solid #1565c0}
+.sv-af-lbl{font-size:12px;font-weight:800;color:var(--text);white-space:nowrap}
+.sv-af-chip{display:inline-flex;align-items:center;gap:3px;padding:3px 6px 3px 10px;border-radius:14px;font-size:12px;
+  background:#1565c0;color:#fff!important;text-decoration:none;white-space:nowrap;max-width:360px;overflow:hidden;text-overflow:ellipsis}
+.sv-af-chip:hover{background:#0d47a1}
+.sv-af-t{opacity:.85;font-weight:600}
+.sv-af-x{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;
+  background:rgba(255,255,255,.22);font-size:10px;margin-left:3px}
+.sv-af-chip:hover .sv-af-x{background:rgba(255,255,255,.4)}
+.sv-af-reset{margin-left:4px;padding:3px 12px;border-radius:14px;font-size:12px;font-weight:700;white-space:nowrap;
+  border:1px solid #c62828;color:#ef5350!important;background:rgba(198,40,40,.08);text-decoration:none}
+.sv-af-reset:hover{background:#c62828;color:#fff!important}
+.sv-af-n{margin-left:auto;font-size:12px;color:var(--text-muted);white-space:nowrap}
 /* Date hierarchy (year/month links) — style consistently */
 .xfull{margin-bottom:10px}
 .toplinks{display:flex;flex-wrap:wrap;align-items:center;gap:5px;list-style:none;padding:0;margin:0}
@@ -181,30 +203,44 @@ document.addEventListener('DOMContentLoaded', function () {
 {% block result_list %}
 
 {# ── Quick filter bar ──────────────────────────────────────────────────────── #}
+{# Підсвітка — з адреси на сервері (sv_on); числа — скільки покаже кнопка з іншими увімкненими фільтрами (_top_counts) #}
 <div class="sv-qf-bar" id="sv-qf-bar">
-  {# Status filters — built by JS from window.location #}
-  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">{% trans "Статус:" %}</span>
-  <a class="sv-qf-btn" id="svf-s-all"       onclick="svQFStatus('');return false" href="#">{% trans "Всі" %}</a>
-  <a class="sv-qf-btn" id="svf-s-received"  onclick="svQFStatus('received');return false" href="#">📥 {% trans "Отримано" %}{% if sv_status_counts.received %} <span class="sv-qf-cnt">{{ sv_status_counts.received }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-s-processing" onclick="svQFStatus('processing');return false" href="#">⚙️ {% trans "Обробка" %}{% if sv_status_counts.processing %} <span class="sv-qf-cnt">{{ sv_status_counts.processing }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-s-shipped"   onclick="svQFStatus('shipped');return false" href="#">🚚 {% trans "Відправлено" %}{% if sv_status_counts.shipped %} <span class="sv-qf-cnt">{{ sv_status_counts.shipped }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-s-delivered" onclick="svQFStatus('delivered');return false" href="#">✅ {% trans "Доставлено" %}{% if sv_status_counts.delivered %} <span class="sv-qf-cnt">{{ sv_status_counts.delivered }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-s-cancelled" onclick="svQFStatus('cancelled');return false" href="#">🚫 {% trans "Скасовано" %}{% if sv_status_counts.cancelled %} <span class="sv-qf-cnt">{{ sv_status_counts.cancelled }}</span>{% endif %}</a>
+  <span class="sv-qf-lbl">{% trans "Статус:" %}</span>
+  <a class="sv-qf-btn{% if not sv_on.status %} sv-qf-all-on{% endif %}" id="svf-s-all" onclick="svQFStatus('');return false" href="#">{% trans "Всі" %}</a>
+  {% with st=sv_on.status %}
+  <a class="sv-qf-btn{% if st == 'received' %} sv-qf-active{% endif %}" id="svf-s-received" onclick="svQFStatus('received');return false" href="#"{% if st == 'received' %} title="{% trans "Увімкнено — натисніть, щоб вимкнути" %}"{% endif %}>📥 {% trans "Отримано" %} <span class="sv-qf-cnt">{{ sv_status_counts.received|default:0 }}</span>{% if st == 'received' %}<span class="sv-qf-x">✕</span>{% endif %}</a>
+  <a class="sv-qf-btn{% if st == 'processing' %} sv-qf-active{% endif %}" id="svf-s-processing" onclick="svQFStatus('processing');return false" href="#"{% if st == 'processing' %} title="{% trans "Увімкнено — натисніть, щоб вимкнути" %}"{% endif %}>⚙️ {% trans "Обробка" %} <span class="sv-qf-cnt">{{ sv_status_counts.processing|default:0 }}</span>{% if st == 'processing' %}<span class="sv-qf-x">✕</span>{% endif %}</a>
+  <a class="sv-qf-btn{% if st == 'shipped' %} sv-qf-active{% endif %}" id="svf-s-shipped" onclick="svQFStatus('shipped');return false" href="#"{% if st == 'shipped' %} title="{% trans "Увімкнено — натисніть, щоб вимкнути" %}"{% endif %}>🚚 {% trans "Відправлено" %} <span class="sv-qf-cnt">{{ sv_status_counts.shipped|default:0 }}</span>{% if st == 'shipped' %}<span class="sv-qf-x">✕</span>{% endif %}</a>
+  <a class="sv-qf-btn{% if st == 'delivered' %} sv-qf-active{% endif %}" id="svf-s-delivered" onclick="svQFStatus('delivered');return false" href="#"{% if st == 'delivered' %} title="{% trans "Увімкнено — натисніть, щоб вимкнути" %}"{% endif %}>✅ {% trans "Доставлено" %} <span class="sv-qf-cnt">{{ sv_status_counts.delivered|default:0 }}</span>{% if st == 'delivered' %}<span class="sv-qf-x">✕</span>{% endif %}</a>
+  <a class="sv-qf-btn{% if st == 'cancelled' %} sv-qf-active{% endif %}" id="svf-s-cancelled" onclick="svQFStatus('cancelled');return false" href="#"{% if st == 'cancelled' %} title="{% trans "Увімкнено — натисніть, щоб вимкнути" %}"{% endif %}>🚫 {% trans "Скасовано" %} <span class="sv-qf-cnt">{{ sv_status_counts.cancelled|default:0 }}</span>{% if st == 'cancelled' %}<span class="sv-qf-x">✕</span>{% endif %}</a>
+  {% endwith %}
   <div class="sv-qf-sep"></div>
-  <a class="sv-qf-btn" id="svf-in-transit" onclick="svQFToggle('in_transit');return false" href="#">🚚 {% trans "В дорозі" %}{% if sv_count_in_transit %} <span class="sv-qf-cnt">{{ sv_count_in_transit }}</span>{% endif %}</a>
-  <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQFToggle('delayed');return false" href="#">🚨 {% trans "Затримки" %}{% if sv_count_delayed %} <span class="sv-qf-cnt">{{ sv_count_delayed }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-overdue" onclick="svQFToggle('overdue');return false" href="#">🔴 {% trans "Прострочені" %}{% if sv_count_overdue %} <span class="sv-qf-cnt">{{ sv_count_overdue }}</span>{% endif %}</a>
+  <a class="sv-qf-btn{% if sv_on.in_transit == '1' %} sv-qf-active{% endif %}" id="svf-in-transit" onclick="svQFToggle('in_transit');return false" href="#" title="{% trans "Статус «Відправлено» і посилка в дорозі" %}">🚚 {% trans "В дорозі" %} <span class="sv-qf-cnt">{{ sv_count_in_transit|default:0 }}</span>{% if sv_on.in_transit == '1' %}<span class="sv-qf-x">✕</span>{% endif %}</a>
+  <a class="sv-qf-btn sv-qf-warn{% if sv_on.delayed == '1' %} sv-qf-active{% endif %}" id="svf-delayed" onclick="svQFToggle('delayed');return false" href="#" title="{% trans "Перевізник позначив затримку посилки в дорозі" %}">🚨 {% trans "Затримки" %} <span class="sv-qf-cnt">{{ sv_count_delayed|default:0 }}</span>{% if sv_on.delayed == '1' %}<span class="sv-qf-x">✕</span>{% endif %}</a>
+  <a class="sv-qf-btn{% if sv_on.overdue == '1' %} sv-qf-active{% endif %}" id="svf-overdue" onclick="svQFToggle('overdue');return false" href="#" title="{% trans "Ще чекають відправки, а дедлайн відправки вже минув" %}">🔴 {% trans "Прострочені" %} <span class="sv-qf-cnt">{{ sv_count_overdue|default:0 }}</span>{% if sv_on.overdue == '1' %}<span class="sv-qf-x">✕</span>{% endif %}</a>
   <div class="sv-qf-sep"></div>
-  <a class="sv-qf-btn" id="svf-flagged" onclick="svQFToggle('flagged');return false" href="#">⭐ {% trans "Важливі" %}{% if sv_count_flagged %} <span class="sv-qf-cnt">{{ sv_count_flagged }}</span>{% endif %}</a>
+  <a class="sv-qf-btn{% if sv_on.flagged == '1' %} sv-qf-active{% endif %}" id="svf-flagged" onclick="svQFToggle('flagged');return false" href="#">⭐ {% trans "Важливі" %} <span class="sv-qf-cnt">{{ sv_count_flagged|default:0 }}</span>{% if sv_on.flagged == '1' %}<span class="sv-qf-x">✕</span>{% endif %}</a>
   {% if sv_sources %}
   <div class="sv-qf-sep"></div>
-  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">{% trans "Джерело:" %}</span>
-  <a class="sv-qf-btn" id="svf-src-all" onclick="svQFSource('');return false" href="#">{% trans "Всі" %}</a>
+  <span class="sv-qf-lbl">{% trans "Джерело:" %}</span>
+  <a class="sv-qf-btn{% if not sv_on.source %} sv-qf-all-on{% endif %}" id="svf-src-all" onclick="svQFSource('');return false" href="#">{% trans "Всі" %}</a>
   {% for src in sv_sources %}
-  <a class="sv-qf-btn" id="svf-src-{{ src.slug }}" onclick="svQFSource('{{ src.slug }}');return false" href="#">{{ src.name }}{% if src.count %} <span class="sv-qf-cnt">{{ src.count }}</span>{% endif %}</a>
+  <a class="sv-qf-btn{% if sv_on.source == src.slug %} sv-qf-active{% endif %}" id="svf-src-{{ src.slug }}" data-src="{{ src.slug }}" onclick="svQFSource(this.dataset.src);return false" href="#" translate="no">{{ src.name }} <span class="sv-qf-cnt">{{ src.count }}</span>{% if sv_on.source == src.slug %}<span class="sv-qf-x">✕</span>{% endif %}</a>
   {% endfor %}
   {% endif %}
 </div>
+
+{# ── Що діє зараз: кожен фільтр з ✕ і «Скинути фільтри» (sales/admin._active_filters) ────────── #}
+{% if sv_active.chips %}
+<div class="sv-af-bar" id="sv-af-bar" role="status">
+  <span class="sv-af-lbl">🔎 {% trans "Діє:" %}</span>
+  {% for c in sv_active.chips %}
+  <a class="sv-af-chip" href="{{ c.remove }}" data-key="{{ c.key }}" title="{% trans "Прибрати цей фільтр" %}"><span class="sv-af-t">{{ c.title }}:</span> <b{% if c.key == 'q' or c.key == 'source' or c.key == 'addr_country' %} translate="no"{% endif %}>{{ c.value }}</b> <span class="sv-af-x" aria-hidden="true">✕</span></a>
+  {% endfor %}
+  <a class="sv-af-reset" id="sv-af-reset" href="{{ sv_active.reset }}">✕ {% trans "Скинути фільтри" %}</a>
+  <span class="sv-af-n">{% trans "Показано" %} <b>{{ cl.result_count }}</b>{% if cl.show_full_result_count %} {% trans "з" %} {{ cl.full_result_count }}{% endif %}</span>
+</div>
+{% endif %}
 
 {# ── Action + View toggle row ─────────────────────────────────────────────── #}
 <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -228,7 +264,8 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 {# ── Card view ────────────────────────────────────────────────────────────── #}
-<div id="sv-cards" style="display:none">
+<div id="sv-cards" style="display:none" data-rendered="{% if sv_render_cards %}1{% else %}0{% endif %}">
+  {% if sv_render_cards %}
   {% for order in cl.result_list %}
   {% with lines=order.lines.all %}
   <div class="sv-card sv-card-{{ order.status|default:'default' }} {% if order.is_flagged %}sv-card-flagged{% endif %}" data-pk="{{ order.pk }}">
@@ -615,6 +652,10 @@ document.addEventListener('DOMContentLoaded', function () {
   {% endwith %}{# end with lines #}
   {% endwith %}{# end with s/sh — moved here so sh is available in footer #}
   {% endfor %}
+  {% else %}
+    {# картки не малювались (вигляд «Таблиця», cookie sv_view) — svSetView('cards') перезавантажить сторінку #}
+    <p style="color:var(--text-muted);padding:20px 0">⏳ {% trans "Завантаження карток…" %}</p>
+  {% endif %}
 
   {% if not cl.result_list %}
     <p style="color:var(--text-muted);padding:20px 0">{% trans "Замовлень не знайдено." %}</p>
@@ -646,48 +687,30 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
 })();
 
 // ── Quick filter bar ─────────────────────────────────────────────────────────
-// Status group: mutually exclusive
+// Підсвітка увімкнених — на сервері (sv_on); тут лише перехід. Повторне натискання вимикає фільтр.
+function _svQFGo(p) {
+  p.delete('p');
+  var qs = p.toString();
+  window.location.search = qs ? '?' + qs : '';
+}
+// Status group: mutually exclusive; the active one again — off
 function svQFStatus(value) {
   var p = new URLSearchParams(window.location.search);
-  if (!value) { p.delete('status'); } else { p.set('status', value); }
-  p.delete('p');
-  window.location.search = p.toString();
+  if (!value || p.get('status') === value) { p.delete('status'); } else { p.set('status', value); }
+  _svQFGo(p);
 }
 // Toggle filters: click again to deactivate
 function svQFToggle(key) {
   var p = new URLSearchParams(window.location.search);
   if (p.get(key) === '1') { p.delete(key); } else { p.set(key, '1'); }
-  p.delete('p');
-  window.location.search = p.toString();
+  _svQFGo(p);
 }
-// Source group: mutually exclusive
+// Source group: mutually exclusive; the active one again — off
 function svQFSource(value) {
   var p = new URLSearchParams(window.location.search);
-  if (!value) { p.delete('source'); } else { p.set('source', value); }
-  p.delete('p');
-  window.location.search = p.toString();
+  if (!value || p.get('source') === value) { p.delete('source'); } else { p.set('source', value); }
+  _svQFGo(p);
 }
-(function() {
-  var p = new URLSearchParams(window.location.search);
-  var status  = p.get('status')  || '';
-  var delayed = p.get('delayed') || '';
-  var overdue = p.get('overdue') || '';
-  var source  = p.get('source')  || '';
-  // Status buttons
-  var smap = {
-    '': 'svf-s-all', 'received': 'svf-s-received',
-    'processing': 'svf-s-processing', 'shipped': 'svf-s-shipped',
-    'delivered': 'svf-s-delivered', 'cancelled': 'svf-s-cancelled',
-  };
-  var activeS = document.getElementById(smap[status] || 'svf-s-all');
-  if (activeS) activeS.classList.add('sv-qf-active');
-  if (delayed === '1') { var d = document.getElementById('svf-delayed'); if(d) d.classList.add('sv-qf-active'); }
-  if (overdue === '1') { var o = document.getElementById('svf-overdue'); if(o) o.classList.add('sv-qf-active'); }
-  if (p.get('flagged') === '1') { var fl = document.getElementById('svf-flagged'); if(fl) fl.classList.add('sv-qf-active'); }
-  if (p.get('in_transit') === '1') { var it = document.getElementById('svf-in-transit'); if(it) it.classList.add('sv-qf-active'); }
-  if (source) { var sr = document.getElementById('svf-src-' + source); if(sr) sr.classList.add('sv-qf-active'); else { var sa = document.getElementById('svf-src-all'); if(sa) sa.classList.add('sv-qf-active'); } }
-  else { var sa2 = document.getElementById('svf-src-all'); if(sa2) sa2.classList.add('sv-qf-active'); }
-})();
 
 // ── Card expand ──────────────────────────────────────────────────────────────
 var _SV_CEX_KEY = 'sv_cex_open_' + window.location.pathname;
@@ -816,11 +839,12 @@ function _cexToggleOvr(id) {
   var lmP = new URLSearchParams(p);
   lmP.set('order_date__year', lmY);
   lmP.set('order_date__month', lmM);
+  lmP.delete('order_date__day');   // день з іншого місяця — інакше «минулий місяць» показав би лише той день
   lmP.delete('p');
 
   var btn = document.createElement('a');
   btn.href = '?' + lmP.toString();
-  btn.className = 'sv-lm-btn' + (isActive ? ' sv-lm-active' : '');
+  btn.className = 'sv-lm-btn' + (isActive && !p.get('order_date__day') ? ' sv-lm-active' : '');
   btn.textContent = '📅 ' + MONTHS_UK[lmM - 1] + ' ' + lmY;
   dh.appendChild(btn);
 })();
@@ -847,8 +871,21 @@ function svCheckAll(master) {
 // телефон — свій вибір і за замовчуванням картки (static/admin/js/mv_mobile.js)
 var SV_VIEW_KEY = window.matchMedia('(max-width: 768px)').matches ? 'salesorder_view_phone' : 'salesorder_view';
 function svSetView(mode) {
-  localStorage.setItem(SV_VIEW_KEY, mode);
+  try { localStorage.setItem(SV_VIEW_KEY, mode); } catch (e) {}
+  // сервер малює картки лише для вигляду «Картки» (sales/admin.py sv_render_cards): cookie — для наступних відкриттів
+  document.cookie = 'sv_view=' + mode + '; path=' + window.location.pathname + '; max-age=31536000; SameSite=Lax';
   var isCards = mode === 'cards';
+  var cardsBox = document.getElementById('sv-cards');
+  if (isCards && cardsBox && cardsBox.dataset.rendered === '0') {
+    var guard = 'sv-view-reload';
+    var last = 0;
+    try { last = +sessionStorage.getItem(guard) || 0; } catch (e) {}
+    if (Date.now() - last > 10000) {     // без cookie (заблоковано) — не перезавантажувати по колу
+      try { sessionStorage.setItem(guard, String(Date.now())); } catch (e) {}
+      window.location.reload();
+      return;
+    }
+  }
   document.getElementById('sv-cards').style.display = isCards ? 'block' : 'none';
   document.getElementById('sv-table').style.display = isCards ? 'none' : 'block';
   document.getElementById('sv-btn-cards').classList.toggle('active', isCards);
@@ -881,7 +918,9 @@ function svSetView(mode) {
     clone.style.border = 'none';
     actArea.appendChild(clone);
   }
-  svSetView(localStorage.getItem(SV_VIEW_KEY) || (SV_VIEW_KEY === 'salesorder_view' ? 'table' : 'cards'));
+  var saved = null;
+  try { saved = localStorage.getItem(SV_VIEW_KEY); } catch (e) {}
+  svSetView(saved || (SV_VIEW_KEY === 'salesorder_view' ? 'table' : 'cards'));
 })();
 
 // ── Country flag: img from flagcdn.com + emoji fallback ──────────────────────

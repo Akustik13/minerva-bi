@@ -181,14 +181,28 @@ def order_in_attachments(msg, customer=None):
     return None
 
 
-def find_links(texts, messages=()) -> list:
+def needs_reading(messages) -> bool:
+    """Є вкладення-документ, номери якого ще не прочитано (attachment_tokens читатиме файл або братиме його з
+    IMAP) — прев'ю показує лист одразу, а вкладення читає окремим запитом (views.preview_links_view)."""
+    from email_assistant.reply_brief import ATTACHMENT_TYPES
+    for m in messages:
+        docs = [att for att in (getattr(m, 'attachments', None) or [])     # ті самі, що бере attachment_tokens
+                if isinstance(att, dict) and not att.get('is_inline')
+                and (att.get('name') or '').rsplit('.', 1)[-1].lower() in ATTACHMENT_TYPES][:ATTACHMENT_FILES]
+        if any(_unread(att) for att in docs):
+            return True
+    return False
+
+
+def find_links(texts, messages=(), read=True) -> list:
     """Зв'язки для прев'ю листа: замовлення → клієнт, відправлення (статус, трек). messages — листи гілки:
-    номери з їхніх вкладень теж (причина «… у вкладенні»)."""
+    номери з їхніх вкладень теж (причина «… у вкладенні»). read=False — лише вже прочитані вкладення (кеш
+    tokens), без читання файлів і без IMAP: прев'ю відкривається одразу, решта — needs_reading / окремим запитом."""
     from shipping.models import Shipment
 
     found = orders_for_tokens(tokens_in(texts))
     if messages and len(found) < MAX_ORDERS:
-        budget, extra, per_message = [PREVIEW_FILES], {}, []
+        budget, extra, per_message = [PREVIEW_FILES if read else 0], {}, []
         for m in messages:
             try:
                 tokens = attachment_tokens(m, budget)

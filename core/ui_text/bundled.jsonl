@@ -5756,6 +5756,7 @@
 {"uk": "Відправити клієнту", "en": "Ship to the customer", "de": "An den Kunden versenden"}
 {"uk": "Відправити лише частину", "en": "Ship only part", "de": "Nur einen Teil versenden"}
 {"uk": "Відправити сьогодні", "en": "Ship today", "de": "Heute versenden"}
+{"uk": "Відправка", "en": "Shipping", "de": "Versand"}
 {"uk": "Відправка сьогодні", "en": "Shipping today", "de": "Versand heute"}
 {"uk": "Відправка…", "en": "Sending…", "de": "Wird gesendet…"}
 {"uk": "Відправку не знайдено", "en": "Shipment not found", "de": "Sendung nicht gefunden"}
@@ -5826,6 +5827,7 @@
 {"uk": "Відправлено", "en": "Shipped", "de": "Versendet"}
 {"uk": "Відправлено {0}", "en": "Shipped {0}", "de": "Versendet {0}"}
 {"uk": "Відправлено {0} але трекінг не вказано. Клієнт: {1}", "en": "Shipped {0} but no tracking specified. Customer: {1}", "de": "Versendet {0}, aber keine Sendungsnummer angegeben. Kunde: {1}"}
+{"uk": "Відправлено за місяць", "en": "Shipped this month", "de": "Diesen Monat versendet"}
 {"uk": "Відправлено за період", "en": "Shipped during the period", "de": "Im Zeitraum versandt"}
 {"uk": "Відправлено лист", "en": "Email sent", "de": "E-Mail gesendet"}
 {"uk": "Відправлено пізно", "en": "Shipped late", "de": "Verspätet versendet"}
@@ -13614,6 +13616,7 @@
 {"uk": "Поштомат", "en": "Parcel locker", "de": "Paketautomat"}
 {"uk": "Пошту (SMTP) не налаштовано — заповніть «Email (SMTP)» у налаштуваннях сповіщень.", "en": "Mail (SMTP) is not configured — fill in “Email (SMTP)” in the notification settings.", "de": "E-Mail (SMTP) ist nicht konfiguriert — füllen Sie „E-Mail (SMTP)“ in den Benachrichtigungseinstellungen aus."}
 {"uk": "Пошту оновлено: {0}", "en": "Mail refreshed: {0}", "de": "E-Mails aktualisiert: {0}"}
+{"uk": "Пошук", "en": "Search", "de": "Suche"}
 {"uk": "Пошук / фільтр списку", "en": "Search / list filter", "de": "Suche / Listenfilter"}
 {"uk": "Пошук будь-якого компонента або виробника через DigiKey Product Information V4 API. Показує наявність, ціни та цінові сходинки, lead time, статус.", "en": "Search for any component or manufacturer via the DigiKey Product Information V4 API. Shows availability, prices and price breaks, lead time, status.", "de": "Suche nach beliebigen Bauteilen oder Herstellern über die DigiKey Product Information V4 API. Zeigt Verfügbarkeit, Preise und Staffelpreise, Lead Time, Status."}
 {"uk": "Пошук в інтернеті (якщо дозволено в завданні)", "en": "Web search (if allowed in the task)", "de": "Internetsuche (wenn in der Aufgabe erlaubt)"}
@@ -17559,6 +17562,8 @@
 {"uk": "Чекають ✓ /", "en": "Awaiting ✓ /", "de": "Warten auf ✓ /"}
 {"uk": "Чекає", "en": "Waiting", "de": "Wartet"}
 {"uk": "Чекає вашої перевірки", "en": "Awaiting your review", "de": "Wartet auf Ihre Prüfung"}
+{"uk": "Чекає відправки", "en": "Waiting to be shipped", "de": "Wartet auf Versand"}
+{"uk": "Чекає відправки {0}", "en": "Waiting to be shipped {0}", "de": "Wartet auf Versand {0}"}
 {"uk": "Чекає нашої відповіді {0}: «{1}» від {2}", "en": "Awaiting our reply for {0}: “{1}” from {2}", "de": "Wartet seit {0} auf unsere Antwort: „{1}“ von {2}"}
 {"uk": "Чекає нашої відповіді {0}: лист з іншої скриньки", "en": "Waiting for our reply for {0}: email from another mailbox", "de": "Wartet seit {0} auf unsere Antwort: E-Mail aus einem anderen Postfach"}
 {"uk": "Чекає перевірки", "en": "Awaiting check", "de": "Wartet auf Prüfung"}
@@ -18473,6 +18478,7 @@
 {"uk": "безповоротно втрачені", "en": "irretrievably lost", "de": "unwiderruflich verloren"}
 {"uk": "бер", "en": "Mar", "de": "Mär"}
 {"uk": "бере свіжі ціни з Minerva, рахує ПДВ і доставку", "en": "takes fresh prices from Minerva, calculates VAT and shipping", "de": "nimmt aktuelle Preise aus Minerva, berechnet MwSt. und Versand"}
+{"uk": "березень", "en": "March", "de": "März"}
 {"uk": "березня", "en": "March", "de": "März"}
 {"uk": "беремо найбільш просунутий (DigiKey виграє).", "en": "we take the most advanced (DigiKey wins).", "de": "es wird der am weitesten fortgeschrittene genommen (DigiKey gewinnt)."}
 {"uk": "бери ту тривалість.", "en": "take that duration.", "de": "nimm diese Dauer."}
@@ -18576,6 +18582,7 @@
 {"uk": "вебхук працює (остання подія {0}) — автоперевірка не потрібна; незавершені оплати можна перевірити кнопкою", "en": "the webhook works (last event {0}) — no automatic check needed; unfinished payments can be checked with the button", "de": "der Webhook funktioniert (letztes Ereignis {0}) – automatische Prüfung nicht nötig; unvollständige Zahlungen lassen sich mit der Schaltfläche prüfen"}
 {"uk": "вебхуків від Stripe ще немає — Minerva перевіряє незавершені оплати кожні {0} хв{1}", "en": "no webhooks from Stripe yet — Minerva checks unfinished payments every {0} min{1}", "de": "noch keine Webhooks von Stripe – Minerva prüft unvollständige Zahlungen alle {0} Min.{1}"}
 {"uk": "вер", "en": "Sep", "de": "Sep"}
+{"uk": "вересень", "en": "September", "de": "September"}
 {"uk": "вересня", "en": "September", "de": "September"}
 {"uk": "версія {0}", "en": "version {0}", "de": "Version {0}"}
 {"uk": "версія стає «надісланою» й незмінною", "en": "the version becomes “sent” and immutable", "de": "die Version wird „gesendet“ und unveränderlich"}
@@ -18893,6 +18900,7 @@
 {"uk": "готую перегляд…", "en": "preparing the preview…", "de": "Vorschau wird vorbereitet…"}
 {"uk": "гроші не списуються, картка 4242 4242 4242 4242", "en": "no money is charged, card 4242 4242 4242 4242", "de": "es wird kein Geld abgebucht, Karte 4242 4242 4242 4242"}
 {"uk": "гру", "en": "Dec", "de": "Dez"}
+{"uk": "грудень", "en": "December", "de": "Dezember"}
 {"uk": "грудня", "en": "December", "de": "Dezember"}
 {"uk": "група / тема", "en": "group / topic", "de": "Gruppe / Thema"}
 {"uk": "гібридний режим", "en": "hybrid mode", "de": "Hybridmodus"}
@@ -19128,6 +19136,7 @@
 {"uk": "елементів, і покажи 2–4 головні кнопки через show:.", "en": "elements, and show 2–4 main buttons via show:.", "de": "Elemente, und zeigen Sie 2–4 wichtige Schaltflächen über show:."}
 {"uk": "життєвий цикл товару", "en": "product lifecycle", "de": "Artikel-Lebenszyklus"}
 {"uk": "жов", "en": "Oct", "de": "Okt"}
+{"uk": "жовтень", "en": "October", "de": "Oktober"}
 {"uk": "жовтим", "en": "in yellow", "de": "gelb"}
 {"uk": "жовтня", "en": "October", "de": "Oktober"}
 {"uk": "жоден корінь ще не створено на сервері", "en": "no root has been created on the server yet", "de": "auf dem Server wurde noch kein Wurzelverzeichnis erstellt"}
@@ -19655,6 +19664,7 @@
 {"uk": "квиток вікна запису застарів", "en": "recording window ticket expired", "de": "Ticket des Aufnahmefensters abgelaufen"}
 {"uk": "квиток вікна запису недійсний або вже використаний", "en": "recording window ticket invalid or already used", "de": "Ticket des Aufnahmefensters ungültig oder bereits verwendet"}
 {"uk": "кві", "en": "Apr", "de": "Apr"}
+{"uk": "квітень", "en": "April", "de": "April"}
 {"uk": "квітня", "en": "April", "de": "April"}
 {"uk": "кг", "en": "kg", "de": "kg"}
 {"uk": "кг (кілограм)", "en": "kg (kilogram)", "de": "kg (Kilogramm)"}
@@ -19861,6 +19871,7 @@
 {"uk": "кінець раніше за початок.", "en": "the end is before the start.", "de": "das Ende liegt vor dem Beginn."}
 {"uk": "кінець: повернення вихідного стану", "en": "end: restoring the initial state", "de": "Ende: Wiederherstellung des Ausgangszustands"}
 {"uk": "лип", "en": "Jul", "de": "Jul"}
+{"uk": "липень", "en": "July", "de": "Juli"}
 {"uk": "липня", "en": "July", "de": "Juli"}
 {"uk": "лис", "en": "Nov", "de": "Nov"}
 {"uk": "лист", "en": "e-mail", "de": "E-Mail"}
@@ -19904,6 +19915,7 @@
 {"uk": "листи — не частіше 1 на хвилину; посилання лише на домен магазину", "en": "emails — no more than 1 per minute; links only to the shop’s domain", "de": "E-Mails — höchstens 1 pro Minute; Links nur auf die Domain des Shops"}
 {"uk": "листи: {0}", "en": "e-mails: {0}", "de": "E-Mails: {0}"}
 {"uk": "листом» відкриє новий лист з вашої скриньки з цими файлами — адресу й текст ви перевірите перед надсиланням.", "en": "by e-mail» opens a new e-mail from your mailbox with these files — you check the address and text before sending.", "de": "E-Mail senden» öffnet eine neue E-Mail aus Ihrem Postfach mit diesen Dateien — Adresse und Text prüfen Sie vor dem Senden."}
+{"uk": "листопад", "en": "November", "de": "November"}
 {"uk": "листопада", "en": "November", "de": "November"}
 {"uk": "листувались", "en": "corresponded", "de": "haben korrespondiert"}
 {"uk": "листування", "en": "correspondence", "de": "Schriftverkehr"}
@@ -19988,6 +20000,7 @@
 {"uk": "людина", "en": "human", "de": "Mensch"}
 {"uk": "людина вибирає 🌐 EN / DE, сторінки перекладаються зі словника — без AI й без витрат. Дані (листи, товари", "en": "someone selects 🌐 EN / DE, pages are translated from the dictionary — without AI and at no cost. Data (emails, products", "de": "eine Person 🌐 EN / DE wählt, werden die Seiten aus dem Wörterbuch übersetzt — ohne KI und ohne Kosten. Daten (E-Mails, Artikel"}
 {"uk": "лют", "en": "Feb", "de": "Feb"}
+{"uk": "лютий", "en": "February", "de": "Februar"}
 {"uk": "лютого", "en": "February", "de": "Februar"}
 {"uk": "ліворуч — ваш календар («Налаштування моїх календарів») → «Інтеграція календаря» → «Секретна адреса у форматі iCal» → копіювати", "en": "on the left — your calendar (“Settings for my calendars”) → “Integrate calendar” → “Secret address in iCal format” → copy", "de": "links — Ihr Kalender („Einstellungen für meine Kalender“) → „Kalender integrieren“ → „Geheime Adresse im iCal-Format“ → kopieren"}
 {"uk": "лікарняний", "en": "sick leave", "de": "Krankheit"}
@@ -21554,6 +21567,7 @@
 {"uk": "сервісні сповіщення", "en": "service notifications", "de": "Service-Benachrichtigungen"}
 {"uk": "середа", "en": "Wednesday", "de": "Mittwoch"}
 {"uk": "середня", "en": "medium", "de": "mittel"}
+{"uk": "серпень", "en": "August", "de": "August"}
 {"uk": "серпня", "en": "August", "de": "August"}
 {"uk": "серіалізатором, що й справжній запит, прочитає потрібне з бази (товар за артикулом, залишок, наявне замовлення) і", "en": "serializer as a real request, will read what it needs from the database (product by SKU, stock level, existing order) and", "de": "Serializer wie eine echte Anfrage, liest das Nötige aus der Datenbank (Artikel nach Artikelnummer, Bestand, vorhandenen Auftrag) und"}
 {"uk": "сесія закінчилась {0}", "en": "session ended {0}", "de": "Sitzung beendet {0}"}
@@ -21776,6 +21790,7 @@
 {"uk": "сірий", "en": "gray", "de": "grau"}
 {"uk": "сірий=дефолт ролі · синій=перевизначено · світлий=тільки view", "en": "gray=role default · blue=overridden · light=view only", "de": "grau=Standard der Rolle · blau=überschrieben · hell=nur view"}
 {"uk": "січ", "en": "Jan", "de": "Jan"}
+{"uk": "січень", "en": "January", "de": "Januar"}
 {"uk": "січня", "en": "January", "de": "Januar"}
 {"uk": "та", "en": "and", "de": "und"}
 {"uk": "та в останній", "en": "and in the last", "de": "und in der letzten"}
@@ -21925,6 +21940,7 @@
 {"uk": "точний видимий текст елемента: як у гіді (без зірочок) або зі списку «ЕЛЕМЕНТИ ПОТОЧНОЇ СТОРІНКИ». Адреса — з", "en": "the exact visible text of the element: as in the guide (without asterisks) or from the “ELEMENTS OF THE CURRENT PAGE” list. The address is from", "de": "der genaue sichtbare Text des Elements: wie im Leitfaden (ohne Sternchen) oder aus der Liste „ELEMENTE DER AKTUELLEN SEITE“. Die Adresse stammt aus dem"}
 {"uk": "точок {0}, листів {1}", "en": "points {0}, e-mails {1}", "de": "Punkte {0}, E-Mails {1}"}
 {"uk": "тра", "en": "May", "de": "Mai"}
+{"uk": "травень", "en": "May", "de": "Mai"}
 {"uk": "травня", "en": "May", "de": "Mai"}
 {"uk": "транзакцію типу ADJUSTMENT.", "en": "a transaction of type ADJUSTMENT.", "de": "eine Transaktion vom Typ ADJUSTMENT."}
 {"uk": "треба змінити: {0}", "en": "needs changing: {0}", "de": "muss geändert werden: {0}"}
@@ -22330,6 +22346,7 @@
 {"uk": "чекаємо {0}", "en": "waiting {0}", "de": "wir warten {0}"}
 {"uk": "чекаємо понад план", "en": "waiting longer than planned", "de": "Warten länger als geplant"}
 {"uk": "чер", "en": "Jun", "de": "Jun"}
+{"uk": "червень", "en": "June", "de": "Juni"}
 {"uk": "червня", "en": "June", "de": "Juni"}
 {"uk": "червоним", "en": "in red", "de": "rot"}
 {"uk": "через", "en": "via", "de": "über"}

@@ -1,0 +1,16 @@
+{% load i18n %}{# Блок «🔗» прев'ю листа (views._mail_links); його ж повертає preview_links_view після читання вкладень #}
+{% if links %}
+<div class="em-pv-links">
+  {% for l in links %}
+  <div class="em-pv-link">
+    <span>🔗</span>
+    <a href="{{ l.url }}" target="_blank" title="{% trans "Відкрити замовлення" %}">🛒 {{ l.label }}</a>
+    {% if l.customer %}<a href="{{ l.customer_url }}" target="_blank" title="{% trans "Картка клієнта в CRM" %}">👤 {{ l.customer.name }}</a>{% endif %}
+    {% for s in l.shipments %}
+    <a href="{{ s.url }}" target="_blank" title="{{ s.carrier }}">🚚 {{ s.tracking|default:"—" }} · {{ s.status }}</a>
+    {% endfor %}
+    <span class="why">{% trans "знайдено" %}: {{ l.reason }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

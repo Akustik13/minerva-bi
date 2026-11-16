@@ -207,6 +207,15 @@ class EmailMessage(models.Model):
         verbose_name_plural = 'Email листи'
         ordering = ['-sent_at']
         unique_together = [('account', 'imap_uid', 'imap_folder_name')]
+        indexes = [
+            # скринька: найновіші листи сторінки — без сортування всіх листів (email_assistant/views.inbox_view)
+            models.Index(fields=['account', '-sent_at'], name='em_msg_acc_sent_idx'),
+            # лічильники скриньки (папки, типи, свої категорії, клієнти, запити) — лише з індексу, без читання листів
+            # з тілами з диска: «перше відкриття пошти» читало всю таблицю
+            models.Index(fields=['account', 'folder', 'is_deleted', 'is_spam', 'is_read', 'category', 'work_category',
+                                 'thread', 'is_starred', 'importance', 'imap_folder_name', 'id'],
+                         name='em_msg_counts_idx'),
+        ]
 
     def __str__(self):
         return f'{self.subject[:60]} ({self.from_email})'

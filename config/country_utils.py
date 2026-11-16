@@ -200,16 +200,17 @@ def get_country_format() -> str:
         return "iso2"
 
 
-def display_country(iso2: str) -> str:
+def display_country(iso2: str, fmt=None) -> str:
     """Повертає код країни у форматі згідно SystemSettings.
 
     iso2="DE" → "DE"  (якщо iso2)
     iso2="DE" → "DEU" (якщо iso3)
+    fmt — формат, уже прочитаний з налаштувань (список замовлень читає його раз на сторінку).
     """
     c = (iso2 or "").strip().upper()
     if not c:
         return ""
-    if get_country_format() == "iso3":
+    if (fmt or get_country_format()) == "iso3":
         return ISO2_TO_ISO3.get(c, c)
     return c
 

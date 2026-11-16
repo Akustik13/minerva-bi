@@ -1012,7 +1012,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
             {% endif %}
           </div>
           {% endif %}
-          <div class="em-row-prev">{{ msg.body_text|truncatechars:220 }}</div>
+          <div class="em-row-prev">{{ msg.body_head|default:""|truncatechars:220 }}</div>
           {% if msg.att_chips %}<div class="em-row-atts">{% for idx, name in msg.att_chips %}<a class="em-att-chip" href="/email/message/{{ msg.pk }}/attachment/{{ idx }}/" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="{{ name }}">📎 {{ name }}</a>{% endfor %}{% if msg.att_more %}<span class="em-att-chip">+{{ msg.att_more }}</span>{% endif %}</div>{% endif %}
         </div>
 

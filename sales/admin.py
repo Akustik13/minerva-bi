@@ -301,6 +301,257 @@ def _base_qs():
     return SalesOrder.objects.all()
 
 
+# ── Фільтри списку замовлень: одне правило для кнопок угорі, бічних фільтрів, лічильників і плиток Продажів ──
+
+def _overdue(qs):
+    """🔴 Прострочені: чекають відправки (sales.revenue.to_ship — без скасованих, відправлених, доставлених і запитів
+    пропозиції, з «Впливає на склад»), а дедлайн відправки вже минув (сьогодні — ще ні). Те саме правило, що
+    дашборд, сповіщення й задачі; раніше сюди потрапляли й запити пропозиції та замовлення без складу."""
+    from django.utils import timezone
+    from sales.revenue import to_ship
+    return to_ship(qs).filter(shipping_deadline__lt=timezone.localdate())
+
+
+def _shipped_this_month(qs):
+    """🚚 Відправлено цього місяця: дата відправки — у поточному місяці (за часом Minerva, Europe/Berlin)."""
+    from datetime import timedelta
+    from django.utils import timezone
+    start = timezone.localdate().replace(day=1)
+    return qs.filter(shipped_at__gte=start, shipped_at__lt=(start + timedelta(days=32)).replace(day=1))
+
+
+def _waiting(qs):
+    """⏳ Чекає відправки — sales.revenue.to_ship (раніше «без дати відправки»: туди потрапляли й доставлені
+    без дати, скасовані та запити пропозиції)."""
+    from sales.revenue import to_ship
+    return to_ship(qs)
+
+
+def _shipped(qs):
+    """✅ Відправлено: є дата відправки або статус «Відправлено» / «Доставлено» (імпортовані без дати — теж)."""
+    from django.db.models import Q
+    return qs.filter(Q(shipped_at__isnull=False) | Q(status__in=("shipped", "delivered")))
+
+
+def _delayed(qs):
+    """🚨 Затримка: є відправлення в дорозі, яке перевізник позначив затримкою."""
+    from django.db.models import Exists, OuterRef
+    from shipping.models import Shipment
+    return qs.filter(Exists(Shipment.objects.filter(order=OuterRef("pk"), carrier_delayed=True,
+                                                    status="in_transit")))
+
+
+def _in_transit(qs):
+    """🚚 В дорозі: статус «Відправлено» і є відправлення в дорозі."""
+    from django.db.models import Exists, OuterRef
+    from shipping.models import Shipment
+    return qs.filter(Exists(Shipment.objects.filter(order=OuterRef("pk"), status="in_transit")), status="shipped")
+
+
+def _list_counts(request) -> dict:
+    """Лічильники кнопок угорі й бічних фільтрів — один раз на запит (раніше кожен фільтр і changelist_view
+    рахували те саме ще раз: ~16 запитів по всіх замовленнях)."""
+    cached = getattr(request, "_sv_list_counts", None)
+    if cached is not None:
+        return cached
+    from django.db.models import Count, Q
+    base = _base_qs().order_by()
+    flags = base.aggregate(flagged=Count("id", filter=Q(is_flagged=True)))
+    counts = {
+        "status": dict(base.values_list("status").annotate(n=Count("id")).values_list("status", "n")),
+        "source": dict(base.values_list("source").annotate(n=Count("id")).values_list("source", "n")),
+        "country": list(base.exclude(addr_country="").values_list("addr_country").annotate(n=Count("id"))
+                        .order_by("-n").values_list("addr_country", "n")),
+        "flagged": flags["flagged"],
+        "overdue": _overdue(base).count(),
+        "month": _shipped_this_month(base).count(),
+        "waiting": _waiting(base).count(),
+        "shipped": _shipped(base).count(),
+        "delayed": _delayed(base).count(),
+        "in_transit": _in_transit(base).count(),
+    }
+    if request is not None:
+        request._sv_list_counts = counts
+    return counts
+
+
+DATE_PARAMS = ("order_date__year", "order_date__month", "order_date__day")   # date_hierarchy = "order_date"
+MONTHS = ("січень", "лютий", "березень", "квітень", "травень", "червень", "липень", "серпень", "вересень",
+          "жовтень", "листопад", "грудень")
+_KEEP_PARAMS = ("o", "_popup", "_to_field")   # сортування й службове — «Скинути фільтри» їх лишає
+_SERVICE_PARAMS = ("q", "all", "e", "_facets", "_changelist_filters")   # не фільтри (пошук — окремим пунктом)
+
+
+def _active_filters(cl) -> dict:
+    """Що зараз звужує список замовлень (смуга «Діє:» над списком): кожен увімкнений фільтр — назва, значення й
+    посилання «✕» без нього; дата (рік / місяць / день угорі), пошук; «✕ Скинути фільтри» — без усього цього
+    (сортування лишається). Значення, якого немає серед варіантів фільтра (напр. статус без замовлень), — як є."""
+    from django.contrib.admin.views.main import SEARCH_VAR
+    params = cl.params
+    chips = []
+    filter_params = []
+    for spec in cl.filter_specs:
+        expected = list(spec.expected_parameters())
+        filter_params += expected
+        if not any(p in params for p in expected):
+            continue
+        without = cl.get_query_string(remove=expected)
+        display = None
+        for choice in spec.choices(cl):
+            if choice.get("selected") and choice.get("query_string") != without:
+                display = re.sub(r"\s+\d+$", "", str(choice.get("display")))   # без лічильника «… 120»
+                break
+        if display is None:
+            display = ", ".join(str(params[p]) for p in expected if p in params)
+        chips.append({"key": expected[0], "title": str(spec.title), "value": display, "remove": without})
+    date = [params.get(p) for p in DATE_PARAMS]
+    if date[0]:
+        parts = [str(date[0])]
+        if date[1] and str(date[1]).isdigit() and 1 <= int(date[1]) <= 12:
+            parts.append(MONTHS[int(date[1]) - 1])
+        if date[2]:
+            parts.append(str(date[2]))
+        chips.append({"key": "date", "title": "Дата замовлення", "value": " · ".join(parts),
+                      "remove": cl.get_query_string(remove=list(DATE_PARAMS))})
+    if cl.query:
+        chips.append({"key": "q", "title": "Пошук", "value": f"«{cl.query}»",
+                      "remove": cl.get_query_string(remove=[SEARCH_VAR])})
+    # поле з адреси (посилання з інших сторінок: ?email=…, ?customer_key=…) — Django фільтрує й за ним; параметр
+    # бічного фільтра без варіантів (напр. країна, якої немає в замовленнях) Django не застосовує — без смуги
+    consumed = {getattr(f, "parameter_name", None) for f in (cl.list_filter or ())}
+    for p in params:
+        if p in consumed or p in filter_params or p in DATE_PARAMS or p in _KEEP_PARAMS or p in _SERVICE_PARAMS:
+            continue
+        try:
+            title = str(cl.model._meta.get_field(p.split("__")[0]).verbose_name)
+        except Exception:   # noqa: BLE001 — не поле моделі: як є
+            title = p
+        chips.append({"key": p, "title": title, "value": str(params[p]), "remove": cl.get_query_string(remove=[p])})
+    known = set(filter_params) | set(DATE_PARAMS) | {SEARCH_VAR}
+    remove_all = list(known) + [p for p in params if p not in known and p not in _KEEP_PARAMS]
+    return {"chips": chips, "reset": cl.get_query_string(remove=remove_all)}
+
+
+def _top_counts(cl, request, active=None) -> dict:
+    """Числа на кнопках угорі: скільки замовлень покаже список, якщо натиснути кнопку, — з усіма іншими увімкненими
+    фільтрами (пошук, дата, інші кнопки, бічні фільтри). Без жодного фільтра — ті самі загальні числа, що в бічних
+    фільтрах (_list_counts). Раніше числа завжди були по всіх замовленнях: «DigiKey 500» поруч із вибраним
+    «Отримано», а натиснеш — 12."""
+    counts = _list_counts(request)
+    keys = ("status", "source", "in_transit", "delayed", "overdue", "flagged")
+    if not (active if active is not None else _active_filters(cl))["chips"]:
+        return {k: counts[k] for k in keys}
+    from django.db.models import Count
+
+    def base(param):    # як ChangeList для лічильників Django (filters.get_facet_queryset): усе, крім цього фільтра
+        return cl.get_queryset(request, exclude_parameters=[param]).order_by()
+
+    try:
+        return {
+            "status": dict(base("status").values_list("status").annotate(n=Count("id")).values_list("status", "n")),
+            "source": dict(base("source").values_list("source").annotate(n=Count("id")).values_list("source", "n")),
+            "in_transit": _in_transit(base("in_transit")).count(),
+            "delayed": _delayed(base("delayed")).count(),
+            "overdue": _overdue(base("overdue")).count(),
+            "flagged": base("flagged").filter(is_flagged=True).count(),
+        }
+    except Exception:   # noqa: BLE001 — неправильні параметри адреси: загальні числа, список Django покаже сам
+        return {k: counts[k] for k in keys}
+
+
+def _prime_list(orders) -> None:
+    """Сторінка списку замовлень: усе, що картки й колонки беруть про кожне замовлення, — кількома запитами на
+    всю сторінку замість 20–30 на кожне (клієнт CRM і його RFM, відправлення, сума, країна, етикетки).
+    Правила ті самі, що SalesOrder.crm_customer / customer_link_display / label_buttons_list."""
+    from django.db.models import Q, prefetch_related_objects
+    from crm.models import Customer
+    from crm import utils as crm_utils
+
+    orders = list(orders)
+    if not orders:
+        return
+    prefetch_related_objects(orders, "shipments")
+
+    # клієнт CRM: ключ → email (SalesOrder.crm_customer), для колонки «Клієнт» ще й назва компанії (iexact)
+    keys = {o.customer_key for o in orders if o.customer_key}
+    by_key = {c.external_key: c for c in Customer.objects.filter(external_key__in=keys)} if keys else {}
+    emails = {o.email for o in orders if o.email and by_key.get(o.customer_key) is None}
+    by_email = {}
+    if emails:
+        for c in Customer.objects.filter(email__in=emails):     # порядок моделі — як .first()
+            by_email.setdefault(c.email, c)
+    for o in orders:
+        o._crm_cust = (by_key.get(o.customer_key) if o.customer_key else None) or (
+            by_email.get(o.email) if o.email else None)
+    names = {o.client for o in orders if o._crm_cust is None and o.client}
+    by_name = {}
+    if names:
+        cond = Q()
+        for n in names:
+            cond |= Q(name__iexact=n)
+        for c in Customer.objects.filter(cond):
+            for n in names:
+                if (c.name or "").casefold() == n.casefold():
+                    by_name.setdefault(n.casefold(), c)
+    for o in orders:
+        o._crm_by_name = by_name.get(o.client.casefold()) if (o._crm_cust is None and o.client) else None
+
+    # один об'єкт на клієнта — RFM / «замов.» рахуються груповими запитами на всіх (crm/utils.prefetch_stats)
+    unique = {}
+    for o in orders:
+        for attr in ("_crm_cust", "_crm_by_name"):
+            c = getattr(o, attr)
+            if c is not None:
+                setattr(o, attr, unique.setdefault(c.pk, c))
+    if unique:
+        try:
+            crm_utils.prefetch_stats(unique.values())
+        except Exception:   # noqa: BLE001 — без RFM (колонка покаже «RFM error», як раніше)
+            pass
+
+    # країна — формат коду з «Налаштувань системи» один раз (config/country_utils.display_country)
+    from config.country_utils import get_country_format
+    fmt = get_country_format()
+    for o in orders:
+        o._country_fmt = fmt
+
+    # етикетки: файли .dymo — один перелік теки, вид шаблону — один запит на всі артикули сторінки
+    from django.conf import settings
+    from labels_app.views import label_kinds
+    labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
+    try:
+        stems = [f.stem.upper() for f in labels_dir.glob('*.dymo')]
+    except OSError:
+        stems = []
+    skus = {_label_sku(line) for o in orders for line in o.lines.all()} - {''}
+    kinds = label_kinds(sorted(skus)) if skus else {}
+    for o in orders:
+        o._label_info = (labels_dir, stems, kinds)
+
+
+def _label_sku(line) -> str:
+    """Артикул етикетки позиції (той, що замовили: DigiKey Supplier SKU може відрізнятись від товару);
+    Unicode-дефіси → ASCII."""
+    sku = (line.sku_raw or '').strip() or (line.product.sku if line.product else '')
+    return sku.strip().replace('–', '-').replace('—', '-').replace('‐', '-').replace('‑', '-')
+
+
+def _has_label_file(stems, sku) -> bool:
+    """Є файл етикетки артикула: «<артикул>.dymo» або «<артикул> …» / «<артикул>_…» (без регістру)."""
+    sku_up = sku.upper()
+    return any(s == sku_up or (s.startswith(sku_up) and len(s) > len(sku_up) and s[len(sku_up)] in (' ', '_'))
+               for s in stems)
+
+
+def _lines_total(obj):
+    """Σ total_price позицій (колонка «Сума»): з уже завантажених позицій, без запиту на кожне замовлення."""
+    cache = getattr(obj, "_prefetched_objects_cache", {})
+    if "lines" in cache:
+        vals = [l.total_price for l in cache["lines"] if l.total_price is not None]
+        return sum(vals, Decimal("0")) if vals else None
+    return obj.lines.aggregate(t=Sum("total_price"))["t"]
+
+
 def _notify_blocked(ns, order, kind) -> str:
     """Чому «Налаштування сповіщень» не дозволяють лист клієнту цього виду ('' — дозволяють): «📧 Надіслати
     клієнту» (customer) — customer_notify_enabled; «📥 Підтвердження замовлення» (order_confirm) —
@@ -352,13 +603,9 @@ class StatusFilter(admin.SimpleListFilter):
     }
 
     def lookups(self, request, model_admin):
-        from django.db.models import Count
-        counts = dict(
-            _base_qs().values_list("status").annotate(n=Count("id")).values_list("status", "n")
-        )
+        counts = _list_counts(request)["status"]
         return [
-            (val, f"{self.STATUS_ICONS.get(val, '')} {label} {counts[val]}"
-                  if val in counts else f"{self.STATUS_ICONS.get(val, '')} {label}")
+            (val, f"{self.STATUS_ICONS.get(val, '')} {label} {counts[val]}")
             for val, label in SalesOrder.STATUS_CHOICES
             if val in counts
         ]
@@ -374,10 +621,7 @@ class SourceFilter(admin.SimpleListFilter):
     parameter_name = "source"
 
     def lookups(self, request, model_admin):
-        from django.db.models import Count
-        counts = dict(
-            _base_qs().values_list("source").annotate(n=Count("id")).values_list("source", "n")
-        )
+        counts = _list_counts(request)["source"]
         # Pull friendly names from SalesSource
         names = dict(SalesSource.objects.values_list("slug", "name"))
         return [
@@ -396,16 +640,7 @@ class CountryFilter(admin.SimpleListFilter):
     parameter_name = "addr_country"
 
     def lookups(self, request, model_admin):
-        from django.db.models import Count
-        return [
-            (cc, f"{cc} {n}")
-            for cc, n in _base_qs()
-                .exclude(addr_country="")
-                .values_list("addr_country")
-                .annotate(n=Count("id"))
-                .order_by("-n")
-                .values_list("addr_country", "n")
-        ]
+        return [(cc, f"{cc} {n}") for cc, n in _list_counts(request)["country"]]
 
     def queryset(self, request, queryset):
         if self.value():
@@ -414,20 +649,22 @@ class CountryFilter(admin.SimpleListFilter):
 
 
 class UnshippedFilter(admin.SimpleListFilter):
-    title = "Відправлено"
+    title = "Відправка"
     parameter_name = "shipped"
 
     def lookups(self, request, model_admin):
-        not_shipped = _base_qs().filter(shipped_at__isnull=True).count()
-        shipped     = _base_qs().filter(shipped_at__isnull=False).count()
+        counts = _list_counts(request)
+        waiting, shipped = counts["waiting"], counts["shipped"]
         return [
-            ("no",  f"⏳ Не відправлено {not_shipped}" if not_shipped else "⏳ Не відправлено"),
-            ("yes", f"✅ Відправлено {shipped}"         if shipped     else "✅ Відправлено"),
+            ("no",  f"⏳ Чекає відправки {waiting}" if waiting else "⏳ Чекає відправки"),
+            ("yes", f"✅ Відправлено {shipped}" if shipped else "✅ Відправлено"),
         ]
 
     def queryset(self, request, queryset):
-        if self.value() == "no": return queryset.filter(shipped_at__isnull=True)
-        if self.value() == "yes": return queryset.filter(shipped_at__isnull=False)
+        if self.value() == "no":
+            return _waiting(queryset)
+        if self.value() == "yes":
+            return _shipped(queryset)
         return queryset
 
 
@@ -436,40 +673,28 @@ class OverdueFilter(admin.SimpleListFilter):
     parameter_name = "overdue"
 
     def lookups(self, request, model_admin):
-        from datetime import date
-        n = _base_qs().filter(
-            shipping_deadline__lt=date.today(),
-            status__in=["received", "processing"],
-        ).count()
+        n = _list_counts(request)["overdue"]
         label = f"🔴 Прострочений дедлайн {n}" if n else "🔴 Прострочений дедлайн"
         return [("1", label)]
 
     def queryset(self, request, queryset):
         if self.value() == "1":
-            from datetime import date
-            return queryset.filter(
-                shipping_deadline__lt=date.today(),
-                status__in=["received", "processing"],
-            )
+            return _overdue(queryset)
         return queryset
 
 
 class ShippedThisMonthFilter(admin.SimpleListFilter):
-    title = "Відправлено"
+    title = "Відправлено за місяць"
     parameter_name = "shipped_period"
 
     def lookups(self, request, model_admin):
-        from datetime import date
-        today = date.today()
-        n = _base_qs().filter(shipped_at__year=today.year, shipped_at__month=today.month).count()
+        n = _list_counts(request)["month"]
         label = f"🚚 Цього місяця {n}" if n else "🚚 Цього місяця"
         return [("month", label)]
 
     def queryset(self, request, queryset):
         if self.value() == "month":
-            from datetime import date
-            today = date.today()
-            return queryset.filter(shipped_at__year=today.year, shipped_at__month=today.month)
+            return _shipped_this_month(queryset)
         return queryset
 
 
@@ -478,19 +703,13 @@ class DelayedShipmentFilter(admin.SimpleListFilter):
     parameter_name = "delayed"
 
     def lookups(self, request, model_admin):
-        n = _base_qs().filter(
-            shipments__carrier_delayed=True,
-            shipments__status="in_transit",
-        ).distinct().count()
+        n = _list_counts(request)["delayed"]
         label = f"🚨 Затримка відправлення {n}" if n else "🚨 Затримка відправлення"
         return [("1", label)]
 
     def queryset(self, request, queryset):
         if self.value() == "1":
-            return queryset.filter(
-                shipments__carrier_delayed=True,
-                shipments__status="in_transit",
-            ).distinct()
+            return _delayed(queryset)
         return queryset
 
 
@@ -499,18 +718,12 @@ class InTransitFilter(admin.SimpleListFilter):
     parameter_name = "in_transit"
 
     def lookups(self, request, model_admin):
-        n = _base_qs().filter(
-            status='shipped',
-            shipments__status='in_transit',
-        ).distinct().count()
+        n = _list_counts(request)["in_transit"]
         return [("1", f"🚚 В дорозі {n}" if n else "🚚 В дорозі")]
 
     def queryset(self, request, queryset):
         if self.value() == "1":
-            return queryset.filter(
-                status='shipped',
-                shipments__status='in_transit',
-            ).distinct()
+            return _in_transit(queryset)
         return queryset
 
 
@@ -519,7 +732,7 @@ class FlaggedFilter(admin.SimpleListFilter):
     parameter_name = "flagged"
 
     def lookups(self, request, model_admin):
-        n = _base_qs().filter(is_flagged=True).count()
+        n = _list_counts(request)["flagged"]
         return [("1", f"⭐ Важливі {n}" if n else "⭐ Важливі")]
 
     def queryset(self, request, queryset):
@@ -604,36 +817,22 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
         from .models import SalesSource
-        from django.db.models import Count
-        from datetime import date
 
-        # Status counts (all orders)
-        sc = dict(_base_qs().values_list('status').annotate(n=Count('id')).values_list('status', 'n'))
-        extra_context['sv_status_counts'] = sc
-
-        # Sources enriched with counts
-        source_counts = dict(
-            _base_qs().values_list('source').annotate(n=Count('id')).values_list('source', 'n')
-        )
-        extra_context['sv_sources'] = [
-            {'slug': s['slug'], 'name': s['name'], 'count': source_counts.get(s['slug'], 0)}
-            for s in SalesSource.objects.values('slug', 'name').order_by('name')
-        ]
-
-        # Special filter counts
-        today = date.today()
-        extra_context['sv_count_delayed'] = (
-            _base_qs().filter(shipments__carrier_delayed=True, shipments__status='in_transit')
-            .distinct().count()
-        )
-        extra_context['sv_count_overdue'] = (
-            _base_qs().filter(shipping_deadline__lt=today, status__in=['received', 'processing']).count()
-        )
-        extra_context['sv_count_flagged']     = _base_qs().filter(is_flagged=True).count()
+        # Лічильники кнопок угорі — ті самі, що в бічних фільтрах (_list_counts: один раз на запит)
+        counts = _list_counts(request)
+        extra_context['sv_status_counts'] = counts['status']
+        # джерела з довідника + джерела замовлень, яких у довіднику немає (інакше фільтр без кнопки)
+        names = dict(SalesSource.objects.values_list('slug', 'name'))
+        extra_context['sv_sources'] = sorted(
+            ({'slug': slug, 'name': names.get(slug) or slug, 'count': counts['source'].get(slug, 0)}
+             for slug in set(names) | {s for s in counts['source'] if s}),
+            key=lambda s: (s['name'] or '').lower())
+        extra_context['sv_count_delayed'] = counts['delayed']
+        extra_context['sv_count_overdue'] = counts['overdue']
+        extra_context['sv_count_flagged'] = counts['flagged']
+        extra_context['sv_count_in_transit'] = counts['in_transit']
         # ⭐ і 📝 у рядку / картці — лише з правом змінювати (сервер усе одно відмовить 403); flag_col читає з self
         self._list_can_change = extra_context['sv_can_change'] = self.has_change_permission(request)
-        extra_context['sv_count_in_transit']  = _base_qs().filter(
-            status='shipped', shipments__status='in_transit').distinct().count()
         _ss = SalesSettings.get()
         extra_context['sv_show_img_tooltip'] = _ss.show_product_image_tooltip
         extra_context['sv_show_pdf_preview'] = _ss.show_pdf_preview
@@ -643,8 +842,29 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         extra_context['sv_dymo_open_mode']   = _ss.dymo_open_mode
         extra_context['sv_dymo_label_source'] = _ss.dymo_label_source
         extra_context['sv_dymo_print_preview'] = _ss.dymo_print_preview
+        # Картки малюються, лише коли людина дивиться картки (cookie sv_view, ставить svSetView у шаблоні; без неї —
+        # обидва вигляди, як раніше): 100 карток — половина часу сторінки й 1,2 МБ HTML
+        extra_context['sv_render_cards'] = request.COOKIES.get('sv_view') != 'table'
 
         response = super().changelist_view(request, extra_context=extra_context)
+
+        # Що діє зараз: смуга «Діє:» з ✕ на кожному фільтрі й «✕ Скинути фільтри»; підсвітка кнопок угорі — з адреси
+        # на сервері; числа на кнопках — скільки покаже кнопка з іншими увімкненими фільтрами
+        if hasattr(response, 'context_data') and response.context_data.get('cl') is not None:
+            cl = response.context_data['cl']
+            ctx = response.context_data
+            try:
+                active = _active_filters(cl)
+                top = _top_counts(cl, request, active)
+                ctx['sv_active'] = active
+                ctx['sv_on'] = {k: cl.params.get(k, '') for k in
+                                ('status', 'source', 'in_transit', 'delayed', 'overdue', 'flagged')}
+                ctx['sv_status_counts'] = top['status']
+                ctx['sv_sources'] = [dict(s, count=top['source'].get(s['slug'], 0)) for s in ctx['sv_sources']]
+                for key in ('delayed', 'overdue', 'flagged', 'in_transit'):
+                    ctx[f'sv_count_{key}'] = top[key]
+            except Exception:   # noqa: BLE001 — без смуги «Діє:», список працює
+                ctx['sv_active'] = {'chips': [], 'reset': ''}
 
         # Batch-fetch stock for every product on current page — 2 queries total
         if hasattr(response, 'context_data'):
@@ -666,10 +886,11 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                     # списане чи заброньоване під нього не рахується як нестача (stock.line_cover_held —
                     # так само, як картка замовлення)
                     avail = {pid: p._available for pid, p in stock_service.stock_map(product_ids).items()}
+                    ships_late = stock_service._ships_late()     # налаштування складу — раз на сторінку
                     order_stock = {}
                     line_rows = []
                     for l in line_objs:
-                        free = avail.get(l.product_id, 0) + stock_service.line_cover_held(l)
+                        free = avail.get(l.product_id, 0) + stock_service.line_cover_held(l, ships_late)
                         sent = stock_service.line_sent(l)       # відправлено посилками — уже пішло
                         row = {
                             'pid':   l.product_id,
@@ -2033,6 +2254,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             parcels.annotate_orders(cl.result_list)
         except Exception:
             pass
+        _prime_list(cl.result_list)    # клієнт CRM і RFM, відправлення, країна, етикетки — пакетом на сторінку
         return cl
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
@@ -2254,18 +2476,20 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
         
         if not obj.email and not obj.client:
             return "—"
-        
+
         from crm.models import Customer
-        from django.db.models import Q
-        
-        # Шукаємо клієнта
-        customer = None
-        if obj.customer_key:
-            customer = Customer.objects.filter(external_key=obj.customer_key).first()
-        if not customer and obj.email:
-            customer = Customer.objects.filter(email=obj.email).first()
-        if not customer and obj.client:
-            customer = Customer.objects.filter(name__iexact=obj.client).first()
+
+        # Шукаємо клієнта: ключ → email → назва компанії; сторінка списку вже знайшла всіх (_prime_list)
+        if hasattr(obj, "_crm_by_name"):
+            customer = obj._crm_cust or obj._crm_by_name
+        else:
+            customer = None
+            if obj.customer_key:
+                customer = Customer.objects.filter(external_key=obj.customer_key).first()
+            if not customer and obj.email:
+                customer = Customer.objects.filter(email=obj.email).first()
+            if not customer and obj.client:
+                customer = Customer.objects.filter(name__iexact=obj.client).first()
         
         if not customer:
             return format_html(
@@ -2346,7 +2570,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
 
     def country_display(self, obj):
         from config.country_utils import display_country
-        return display_country(obj.addr_country or "")
+        return display_country(obj.addr_country or "", getattr(obj, "_country_fmt", None))
     country_display.short_description = "Країна"
     country_display.admin_order_field = "addr_country"
 
@@ -2405,7 +2629,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             from inventory.models import Product
             from inventory.utils import get_assembly_status
 
-            lines = obj.lines.all().select_related('product')
+            lines = obj.lines.all()      # уже завантажені з товаром (get_queryset: prefetch lines__product)
             bom_lines = [l for l in lines if l.product and l.product.bom_type == Product.BomType.KEY]
 
             if not bom_lines:
@@ -2433,7 +2657,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     def order_total(self, obj):
         """Показує суму з валютою."""
         try:
-            total = obj.lines.aggregate(t=Sum("total_price"))["t"]
+            total = _lines_total(obj)
         except Exception:
             total = None
         
@@ -2526,7 +2750,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
 
         # Додати БОМ інформацію
         try:
-            lines = obj.lines.all().select_related('product')
+            lines = obj.lines.all()      # уже завантажені з товаром
             bom_lines = [l for l in lines if l.product and l.product.bom_type == Product.BomType.KEY]
             if bom_lines:
                 bom_parts = []
@@ -2556,27 +2780,25 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
     # ── Кнопки етикеток у списку ───────────────────────────────────────────────
 
     def label_buttons_list(self, obj):
-        from pathlib import Path
         from django.conf import settings
         from labels_app.views import label_kinds
-        labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
+        # тека етикеток і вид шаблону — один раз на сторінку (_prime_list); раніше — перелік теки на кожну позицію
+        info = getattr(obj, "_label_info", None)
+        if info is None:
+            labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
+            stems = [f.stem.upper() for f in labels_dir.glob('*.dymo')]
+            kinds = {}
+        else:
+            labels_dir, stems, kinds = info
         buttons = []
         for line in obj.lines.all():
             # етикетка — для артикула, який замовили (DigiKey: Supplier SKU може відрізнятись від товару), як у картках
-            sku = (line.sku_raw or '').strip() or (line.product.sku if line.product else '')
+            sku = _label_sku(line)
             qty = int(line.qty or 1)
             if not sku:
                 continue
-            # Нормалізація: прибрати пробіли + замінити Unicode-дефіси на ASCII
-            sku = sku.strip().replace('\u2013', '-').replace('\u2014', '-').replace('\u2010', '-').replace('\u2011', '-')
-            found = False
-            sku_up = sku.upper()
-            for f in labels_dir.glob('*.dymo'):
-                s = f.stem.upper()
-                if s == sku_up or (s.startswith(sku_up) and len(s) > len(sku_up) and s[len(sku_up)] in (' ', '_')):
-                    found = True
-                    break
-            kind = label_kinds([sku])[sku]
+            found = _has_label_file(stems, sku)
+            kind = kinds[sku] if sku in kinds else label_kinds([sku])[sku]
             if found or kind:
                 # клік / правий клік — labels/_label_actions.html (підключено в salesorder_changelist.html);
                 # файлу в базі немає — етикетка з шаблону: інший колір і 🧩
@@ -2592,7 +2814,7 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
                 buttons.append(
                     f'<span style="display:inline-block;margin:2px;background:#bdbdbd;color:#fff;'
                     f'padding:3px 8px;border-radius:6px;font-size:11px;white-space:nowrap" '
-                    f'title="Пошук: {labels_dir} | SKU={repr(sku)}">❌ {sku}</span>')
+                    f'title="Пошук: {escape(str(labels_dir))} | SKU={escape(repr(sku))}">❌ {escape(sku)}</span>')
         return mark_safe("".join(buttons)) if buttons else format_html('<span style="color:#999">—</span>')
     label_buttons_list.short_description = "🏷️ Етикетки"
 
@@ -4421,22 +4643,12 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
 def _get_sales_stats():
     try:
         from django.db.models import Count
-        today = date.today()
-        import calendar
-        month_start = today.replace(day=1)
-
         qs = SalesOrder.objects.values("status").annotate(n=Count("pk"))
         by_status = {row["status"]: row["n"] for row in qs}
 
-        overdue = SalesOrder.objects.filter(
-            shipping_deadline__lt=today,
-            status__in=["received", "processing"],
-        ).count()
-
-        shipped_month = SalesOrder.objects.filter(
-            status="shipped",
-            shipped_at__gte=month_start,
-        ).count()
+        # ті самі правила, що фільтри списку, куди ведуть плитки (?overdue=1, ?shipped_period=month)
+        overdue = _overdue(SalesOrder.objects.all()).count()
+        shipped_month = _shipped_this_month(SalesOrder.objects.all()).count()
 
         return {
             "received":      by_status.get("received", 0),
