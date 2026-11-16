@@ -64,7 +64,29 @@ def ui_context(request):
                 out['MV_UI_DICT'] = {'lang': lang, 'ver': info['ver']}
         except Exception:
             pass
+        out['MV_VOICE_BENCH'] = voice_bench()
     return out
+
+
+VOICE_BENCH_KEY = 'mv-voice-bench'
+
+
+def voice_bench() -> str:
+    """🎤 Адреса RAG-ПК для голосового набору (static/admin/js/mv_voice.js → <bench>/api/dictate): вікно запису нарад,
+    коли наради ввімкнено («⚙️ Налаштування нарад»), інакше '' — лише браузер. Кеш 60 с (кожна сторінка адмінки)."""
+    from django.core.cache import cache
+    value = cache.get(VOICE_BENCH_KEY)
+    if value is None:
+        value = ''
+        try:
+            from meetings import services
+            settings = services.settings_obj()
+            if settings.enabled:
+                value = services.bench_url(settings)
+        except Exception:
+            value = ''
+        cache.set(VOICE_BENCH_KEY, value, 60)
+    return value
 
 
 def public_registration(request):

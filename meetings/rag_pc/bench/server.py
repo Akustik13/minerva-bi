@@ -17,7 +17,7 @@ from pathlib import Path
 
 from aiohttp import WSMsgType, web
 
-from . import VERSION, access, capture, cloud, config, denoise, gpu, keystore, minerva
+from . import VERSION, access, capture, cloud, config, denoise, dictate, gpu, keystore, minerva
 from .jobs import JobError, Jobs
 from .link import EXPIRED, OFFLINE, Link, LinkError
 from .live import SR, LiveSession
@@ -80,6 +80,16 @@ def _secure(request, resp):
     return resp
 
 
+DICTATE = ("/api/dictate", "/api/dictate/ping")
+
+
+def _cors(resp, origin):
+    if origin:
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Vary"] = "Origin"
+    return resp
+
+
 @web.middleware
 async def guard(request, handler):
     ctx = _bench(request)
@@ -88,8 +98,13 @@ async def guard(request, handler):
         log.info("config.json changed: settings reloaded")
     ip = access.client_ip(request.remote, request.headers, cfg["trusted_proxies"])
     request["client_ip"] = ip
+    # 🎤 голосовий набір зі сторінок Minerva (інший сайт): CORS лише для DICTATE і лише для origin cfg minerva_url
+    cors = access.cors_origin(request.headers, cfg.get("minerva_url")) if request.path in DICTATE else ""
     if not access.allowed(ip, cfg["allowed_clients"]):
         log.warning("refused %s %s", ip, request.path)
+        if cors:                                   # Minerva покаже людині, що цей ПК не дозволено
+            return _cors(web.json_response({"error": f"Цей ПК ({ip}) не в списку дозволених на RAG-ПК.",
+                                            "code": "not_allowed", "ip": ip}, status=403), cors)
         if request.method in ("GET", "HEAD") and not request.path.startswith(("/api/", "/static/", "/ws")):
             # a person opened the window from Minerva on a PC that is not allowed yet: say what to do
             resp = web.Response(status=403, text=REFUSED_PAGE.format(ip=html.escape(ip)), content_type="text/html",
@@ -98,17 +113,28 @@ async def guard(request, handler):
             return _secure(request, resp)
         return web.Response(status=403, text=f"Доступ лише з дозволених адрес. Ваша адреса: {ip}\n",
                             content_type="text/plain", charset="utf-8")
+    if request.method == "OPTIONS" and request.path in DICTATE:
+        if not cors:
+            return web.json_response({"error": "Запит не зі сторінки Minerva."}, status=403)
+        resp = _cors(web.Response(status=204), cors)
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Bench"
+        resp.headers["Access-Control-Allow-Private-Network"] = "true"   # сайт в інтернеті -> ПК у локальній мережі
+        resp.headers["Access-Control-Max-Age"] = "600"
+        return resp
     is_ws = request.headers.get("Upgrade", "").lower() == "websocket"
     if request.method not in ("GET", "HEAD") or is_ws:
         via_proxy = access.allowed(request.remote, cfg["trusted_proxies"])
-        if not access.same_origin(request.headers, _scheme(request, cfg), via_proxy):
+        if not cors and not access.same_origin(request.headers, _scheme(request, cfg), via_proxy):
             return web.json_response({"error": "Запит не з цієї сторінки."}, status=403)
         if not is_ws and request.headers.get("X-Bench") != "1":
-            return web.json_response({"error": "Запит не з цієї сторінки."}, status=403)
+            return _cors(web.json_response({"error": "Запит не з цієї сторінки."}, status=403), cors)
     try:
         resp = await handler(request)
     except web.HTTPException as exc:
         resp = exc
+    if cors and isinstance(resp, web.StreamResponse) and not resp.prepared:
+        _cors(resp, cors)
     if not is_ws and isinstance(resp, web.StreamResponse) and not resp.prepared:
         resp.headers["Content-Security-Policy"] = _csp(request)
         resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -317,6 +343,34 @@ async def transcribe(request):
     except JobError as exc:
         return web.json_response({"error": str(exc)}, status=409)
     return web.json_response({"ok": True, "job": _job_view(st)})
+
+
+async def dictate_ping(request):
+    """🎤 Чи можна диктувати через RAG-ПК (Minerva питає перед записом; CORS — guard)."""
+    ctx = _bench(request)
+    return web.json_response({"ok": True, "version": VERSION, "ip": request["client_ip"], **ctx["dictation"].info()})
+
+
+async def dictate_audio(request):
+    """🎤 Аудіо голосового набору -> текст (bench/dictate.py). Тіло — сам звук; ?lang=auto|uk|…&clean=0|1."""
+    ctx = _bench(request)
+    data = bytearray()
+    async for chunk in request.content.iter_chunked(1 << 16):
+        data += chunk
+        if len(data) > dictate.MAX_BYTES:
+            return web.json_response({"error": "Задовгий запис для голосового набору."}, status=413)
+    try:
+        res = await asyncio.get_running_loop().run_in_executor(
+            None, ctx["dictation"].run, bytes(data), request.headers.get("Content-Type", ""),
+            request.query.get("lang", "auto"), request.query.get("clean") == "1")
+    except dictate.DictationError as exc:
+        return web.json_response({"error": str(exc)}, status=exc.status)
+    except Exception as exc:  # noqa: BLE001 - модель / CUDA: зрозуміла відповідь, Minerva покаже її
+        log.exception("dictation failed")
+        return web.json_response({"error": f"RAG-ПК не зміг розпізнати: {exc}"[:300]}, status=500)
+    log.info("dictate %.1f s audio, %s, %.1f s on %s%s by %s", res["audio_s"], res["language"], res["seconds"],
+             res["device"], " + denoise" if res["cleaned"] else "", request["client_ip"])
+    return web.json_response({"ok": True, **res})
 
 
 async def denoise_copy(request):
@@ -848,10 +902,21 @@ async def _housekeeping(app):
         await asyncio.sleep(6 * 3600)
 
 
+async def _dictation_idle(app):
+    """🎤 модель голосового набору — з пам'яті після dictate_idle_seconds без диктування."""
+    ctx = app[APP_KEY]
+    while True:
+        await asyncio.sleep(30)
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, ctx["dictation"].release)
+        except Exception:  # noqa: BLE001
+            log.exception("dictation release failed")
+
+
 async def _start_background(app):
     ctx = app[APP_KEY]
     ctx["tasks"] = [asyncio.create_task(ctx["jobs"].run_forever()), asyncio.create_task(_housekeeping(app)),
-                    asyncio.create_task(ctx["link"].run_forever())]
+                    asyncio.create_task(ctx["link"].run_forever()), asyncio.create_task(_dictation_idle(app))]
 
 
 async def _stop_background(app):
@@ -865,6 +930,8 @@ def create_app(cfg, background=True):
     ctx["jobs"] = Jobs(cfg, store, live_busy=lambda: ctx.get("live_engine") == "whisper")
     ctx["link"] = Link(cfg, store, ctx["jobs"], live_sid=lambda: ctx.get("live_sid"))
     ctx["jobs"].on_finish = ctx["link"].on_job_finish
+    ctx["dictation"] = dictate.Dictation(cfg, live_gpu=lambda: ctx.get("live_engine") == "whisper")
+    ctx["jobs"].free_gpu = lambda: ctx["dictation"].release(idle_only=False)
     app = web.Application(middlewares=[guard], client_max_size=4 * 2**20)
     app[APP_KEY] = ctx
     r = app.router
@@ -886,6 +953,8 @@ def create_app(cfg, background=True):
     r.add_post("/api/sessions/{sid}/moments", find_moments)
     r.add_post("/api/sessions/{sid}/denoise", denoise_copy)
     r.add_post("/api/upload", upload)
+    r.add_get("/api/dictate/ping", dictate_ping)
+    r.add_post("/api/dictate", dictate_audio)
     r.add_get("/api/metrics", metrics)
     r.add_get("/api/metrics.csv", metrics_csv)
     r.add_get("/ws", live_ws)

@@ -68,6 +68,10 @@ DEFAULTS = {
     # deep-filter*.exe in <root>\tools\deep-filter (official DeepFilterNet release, not in the venv)
     "denoise_exe": "",
     "denoise_max_minutes": 60,           # longer test recordings are not cleaned (48 kHz WAVs in memory)
+    # 🎤 voice typing in Minerva through this PC (bench/dictate.py): whisper_live_model, on the GPU when this much
+    # VRAM (MB) is free, else on the CPU; unloaded after this many seconds without dictation
+    "dictate_vram_mb": 1600,
+    "dictate_idle_seconds": 300,
 }
 
 

@@ -1,4 +1,4 @@
-# 🎙 Вікно запису нарад (RAG-ПК) — етап 1, версія 0.3.3
+# 🎙 Вікно запису нарад (RAG-ПК) — етап 1, версія 0.3.4
 
 Вікно запису нарад на RAG-ПК (192.168.2.68). З 0.3.0 його відкриває Minerva (сторінка наради → «🎙 Відкрити вікно
 запису»): RAG-ПК записує, розшифровує, шукає ключові моменти локальною моделлю й передає текст на сторінку наради.
@@ -157,6 +157,17 @@
 - Parakeet не дозволяє задати мову: на змішаній нараді він іноді видає слова іншої мови або переклад.
   Whisper наживо дозволяє, але потребує ≈ 2,8 ГБ вільної відеопам'яті (займає ≈ 1,2 ГБ).
 - Точна розшифровка large-v3 займає ≈ 5,6 ГБ відеопам'яті, turbo — ≈ 2,5 ГБ (заміри 09.11.2026).
+
+## 🎤 Голосовий набір Minerva (0.3.4)
+
+`bench/dictate.py` + `static/admin/js/mv_voice.js` у Minerva: `GET /api/dictate/ping` (стан: модель, пристрій,
+чистка) і `POST /api/dictate?lang=auto|uk|…&clean=0|1` (тіло — аудіо від MediaRecorder, ≤ `MAX_BYTES`, ≤ 5 хв) →
+{text, language, device, seconds, cleaned}. Доступ: `allowed_clients` + CORS лише для origin `minerva_url`
+(`access.cors_origin`; preflight з `Access-Control-Allow-Private-Network`), POST — ще й `X-Bench: 1`; іншим сайтам і
+адресам — 403, CORS-заголовків для інших адрес вікна немає. `Dictation`: `whisper_live_model` у процесі вікна (GPU,
+якщо вільно ≥ `dictate_vram_mb`, і немає запису наживо з Whisper, інакше CPU), один запит за раз, вивантаження
+після `dictate_idle_seconds` (`_dictation_idle`) і перед GPU-розшифровкою (`Jobs.free_gpu`); `clean` — DeepFilterNet
+−24 дБ на копії 48 кГц. Тимчасові файли — `data/tmp/dictate-*`, видаляються одразу.
 
 ## 🧹 Чистка звуку (0.3.3, вкладка тестового режиму)
 

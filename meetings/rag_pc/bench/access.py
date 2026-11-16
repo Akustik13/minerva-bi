@@ -58,3 +58,18 @@ def same_origin(headers, scheme, via_proxy=False):
         return False
     parts = urlsplit(origin)
     return parts.scheme == scheme and parts.netloc.lower() in hosts
+
+
+def origin_of(url):
+    """«https://sevskiy.minerva-bi.com/…» -> «https://sevskiy.minerva-bi.com» (lower case); '' — не http(s)."""
+    parts = urlsplit((url or "").strip())
+    if parts.scheme not in ("http", "https") or not parts.netloc:
+        return ""
+    return f"{parts.scheme}://{parts.netloc}".lower()
+
+
+def cors_origin(headers, minerva_url):
+    """Origin запиту, якщо це сторінка Minerva (cfg minerva_url) — їй можна 🎤 голосовий набір через RAG-ПК."""
+    origin = (headers.get("Origin") or "").strip()
+    want = origin_of(minerva_url)
+    return origin if origin and want and origin.lower() == want else ""

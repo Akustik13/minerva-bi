@@ -379,6 +379,7 @@
 {"uk": "(поточний статус)", "en": "(current status)", "de": "(aktueller Status)"}
 {"uk": "(поточний)", "en": "(current)", "de": "(aktuell)"}
 {"uk": "(потрібні 2 літери ISO, напр. DE)", "en": "(2 ISO letters required, e.g. DE)", "de": "(2 ISO-Buchstaben erforderlich, z. B. DE)"}
+{"uk": "(правий клік — налаштування)", "en": "(right-click — settings)", "de": "(Rechtsklick — Einstellungen)"}
 {"uk": "(правий клік — інша)", "en": "(right-click — another)", "de": "(Rechtsklick — eine andere)"}
 {"uk": "(пропустити дублі) або", "en": "(skip duplicates) or", "de": "(Duplikate überspringen) oder"}
 {"uk": "(пусто)", "en": "(empty)", "de": "(leer)"}
@@ -394,6 +395,7 @@
 {"uk": "(сесія відкрита або оплата обробляється). Оплачені, прострочені й повернені не перевіряються.", "en": "(session open or payment being processed). Paid, expired and refunded ones are not checked.", "de": "(Sitzung offen oder Zahlung in Bearbeitung). Bezahlte, abgelaufene und erstattete werden nicht geprüft."}
 {"uk": "(сесія — заголовок X-Customer-Session)", "en": "(session — X-Customer-Session header)", "de": "(Sitzung — Header X-Customer-Session)"}
 {"uk": "(склад, нотатка)", "en": "(stock, note)", "de": "(Lager, Notiz)"}
+{"uk": "(спершу чистка шуму)", "en": "(noise removal first)", "de": "(zuerst Rauschentfernung)"}
 {"uk": "(старші за {0} хв сторінка читає сама)", "en": "(the page reads those older than {0} min by itself)", "de": "(Preise, die älter als {0} Min. sind, liest die Seite selbst)"}
 {"uk": "(сторінка {0}", "en": "(page {0}", "de": "(Seite {0}"}
 {"uk": "(строк {0})", "en": "(deadline {0})", "de": "(Frist {0})"}
@@ -1973,21 +1975,32 @@
 {"uk": "RAG ще не приймає документи", "en": "RAG does not accept documents yet", "de": "RAG nimmt noch keine Dokumente an"}
 {"uk": "RAG щойно не відповів — 5 хв пауза, сайт показує підказки за правилами", "en": "RAG just failed to respond — 5 min pause, the site shows rule-based suggestions", "de": "RAG hat gerade nicht geantwortet – 5 Min. Pause, die Website zeigt regelbasierte Vorschläge"}
 {"uk": "RAG — база знань ({0})", "en": "RAG — knowledge base ({0})", "de": "RAG — Wissensdatenbank ({0})"}
+{"uk": "RAG-ПК", "en": "RAG PC", "de": "RAG-PC"}
+{"uk": "RAG-ПК + чистка", "en": "RAG PC + noise removal", "de": "RAG-PC + Rauschentfernung"}
+{"uk": "RAG-ПК + 🧹 чистка шуму", "en": "RAG PC + 🧹 noise removal", "de": "RAG-PC + 🧹 Rauschentfernung"}
 {"uk": "RAG-ПК виходив на зв'язок", "en": "RAG PC has connected", "de": "RAG-PC hat sich gemeldet"}
 {"uk": "RAG-ПК востаннє на зв'язку", "en": "RAG PC last connected", "de": "RAG-PC zuletzt verbunden"}
+{"uk": "RAG-ПК відповів помилкою", "en": "the RAG PC answered with an error", "de": "der RAG-PC hat mit einem Fehler geantwortet"}
 {"uk": "RAG-ПК давно не повідомляв про хід (останнє — {0}). Запис лишається на RAG-ПК; якщо так буде й завтра — повідомте адміністратора.", "en": "The RAG PC has not reported progress for a long time (last — {0}). The recording stays on the RAG PC; if this is still the case tomorrow, tell the administrator.", "de": "Der RAG-PC hat lange keinen Fortschritt gemeldet (zuletzt — {0}). Die Aufnahme bleibt auf dem RAG-PC; falls das morgen noch so ist, informieren Sie den Administrator."}
+{"uk": "RAG-ПК доступний", "en": "RAG PC available", "de": "RAG-PC erreichbar"}
 {"uk": "RAG-ПК зараз", "en": "RAG PC now", "de": "RAG-PC aktuell"}
 {"uk": "RAG-ПК на зв'язку", "en": "RAG PC online", "de": "RAG-PC erreichbar"}
 {"uk": "RAG-ПК на зв'язку: {0}", "en": "RAG PC online: {0}", "de": "RAG-PC erreichbar: {0}"}
 {"uk": "RAG-ПК не виходив на зв'язок з {0} — запис може не відкритися; якщо так і буде, повідомте адміністратора.", "en": "The RAG PC has not connected since {0} — recording may not open; if so, tell the administrator.", "de": "Der RAG-PC hat sich seit {0} nicht gemeldet — die Aufnahme öffnet sich eventuell nicht; falls ja, informieren Sie den Administrator."}
+{"uk": "RAG-ПК не відповів вчасно.", "en": "The RAG PC did not answer in time.", "de": "Der RAG-PC hat nicht rechtzeitig geantwortet."}
 {"uk": "RAG-ПК не відповів: {0}", "en": "The RAG PC did not respond: {0}", "de": "Der RAG-PC hat nicht geantwortet: {0}"}
+{"uk": "RAG-ПК не відповідає (вимкнений, інша мережа або браузер ще не прийняв його сертифікат)", "en": "the RAG PC does not answer (switched off, another network, or the browser has not accepted its certificate yet)", "de": "der RAG-PC antwortet nicht (ausgeschaltet, anderes Netz oder der Browser hat sein Zertifikat noch nicht akzeptiert)"}
+{"uk": "RAG-ПК не налаштовано («⚙️ Налаштування нарад»)", "en": "RAG PC not set up (“⚙️ Meeting settings”)", "de": "RAG-PC nicht eingerichtet („⚙️ Besprechungseinstellungen“)"}
 {"uk": "RAG-ПК не повідомив результат за добу", "en": "The RAG PC did not report a result within a day", "de": "Der RAG-PC hat innerhalb eines Tages kein Ergebnis gemeldet"}
+{"uk": "RAG-ПК не розпізнав.", "en": "The RAG PC could not recognise it.", "de": "Der RAG-PC hat nichts erkannt."}
+{"uk": "RAG-ПК нічого не почув — говоріть ближче до мікрофона.", "en": "The RAG PC heard nothing — speak closer to the microphone.", "de": "Der RAG-PC hat nichts gehört — sprechen Sie näher am Mikrofon."}
 {"uk": "RAG-ПК повідомив про помилку", "en": "The RAG PC reported an error", "de": "Der RAG-PC hat einen Fehler gemeldet"}
 {"uk": "RAG-ПК працює, але ще не повідомляє модель — перезапустіть на RAG-ПК задачу «RAG-Integration-API» (оновлений rag_api.py уже там)", "en": "The RAG PC is running but does not report the model yet — restart the “RAG-Integration-API” task on the RAG PC (the updated rag_api.py is already there)", "de": "Der RAG-PC läuft, meldet das Modell aber noch nicht – starten Sie auf dem RAG-PC die Aufgabe „RAG-Integration-API“ neu (die aktualisierte rag_api.py liegt dort bereits)"}
 {"uk": "RAG-ПК ще не підключено до Minerva. Попросіть адміністратора: «⚙️ Налаштування нарад» → «🔑 Створити ключ для RAG-ПК (наради)».", "en": "The RAG PC is not connected to Minerva yet. Ask the administrator: “⚙️ Meeting settings” → “🔑 Create key for the RAG PC (meetings)”.", "de": "Der RAG-PC ist noch nicht mit Minerva verbunden. Bitten Sie den Administrator: „⚙️ Besprechungseinstellungen“ → „🔑 Schlüssel für den RAG-PC erstellen (Besprechungen)“."}
 {"uk": "RAG-ПК ще ні разу не виходив на зв'язок (немає ключа або адреси Minerva на RAG-ПК).", "en": "The RAG PC has never connected yet (no key or Minerva address on the RAG PC).", "de": "Der RAG-PC hat sich noch nie gemeldet (kein Schlüssel oder keine Minerva-Adresse auf dem RAG-PC)."}
 {"uk": "RAG-ПК ще раз пошукає ключові моменти в цій розшифровці", "en": "The RAG PC will look for key points in this transcript again", "de": "Der RAG-PC sucht in diesem Transkript erneut nach Kernpunkten"}
 {"uk": "RAG-ПК — наради ({0})", "en": "RAG PC — meetings ({0})", "de": "RAG-PC — Besprechungen ({0})"}
+{"uk": "RAG-ПК — наша модель (Whisper)", "en": "RAG PC — our model (Whisper)", "de": "RAG-PC — unser Modell (Whisper)"}
 {"uk": "RAG-ПК: звірка записів нарад — що лишити, видалити, повторити", "en": "RAG PC: reconcile meeting recordings — what to keep, delete, retry", "de": "RAG-PC: Abgleich der Besprechungsaufnahmen — was behalten, löschen, wiederholen"}
 {"uk": "RAG-ПК: ключові моменти наради (локальна модель)", "en": "RAG PC: meeting key points (local model)", "de": "RAG-PC: Kernpunkte der Besprechung (lokales Modell)"}
 {"uk": "RAG-ПК: обміняти одноразовий квиток вікна запису на нараду й ключ надсилання", "en": "RAG PC: exchange the one-time recording window ticket for the meeting and a push key", "de": "RAG-PC: Einmal-Ticket des Aufnahmefensters gegen Besprechung und Sendeschlüssel tauschen"}
@@ -3877,6 +3890,7 @@
 {"uk": "Автоматично створювати транзакцію Incoming при статусі \"Доставлено\". Вимкніть для ручного підтвердження через кнопку в адміні.", "en": "Automatically create an Incoming transaction when the status is \"Delivered\". Turn off for manual confirmation via the button in the admin.", "de": "Bei Status \"Geliefert\" automatisch eine Incoming-Transaktion erstellen. Deaktivieren Sie dies für eine manuelle Bestätigung über die Schaltfläche im Admin-Bereich."}
 {"uk": "Автоматично через signal", "en": "Automatically via signal", "de": "Automatisch über Signal"}
 {"uk": "Автоматично — RAG, коли потрібна історія інших листувань", "en": "Automatic — RAG when the history of other correspondence is needed", "de": "Automatisch — RAG, wenn der Verlauf anderer Korrespondenz benötigt wird"}
+{"uk": "Автоматично: RAG-ПК визначає мову сам; браузер — мовою інтерфейсу.", "en": "Automatic: the RAG PC detects the language itself; the browser uses the interface language.", "de": "Automatisch: Der RAG-PC erkennt die Sprache selbst; der Browser nutzt die Sprache der Oberfläche."}
 {"uk": "Автоматично: коли вперше пройдено кожен крок публікації (bots/services/dk_publish.py)", "en": "Automatic: when each publishing step was first completed (bots/services/dk_publish.py)", "de": "Automatisch: wann jeder Veröffentlichungsschritt erstmals abgeschlossen wurde (bots/services/dk_publish.py)"}
 {"uk": "Автоматично: хронологія помилок синхронізації (макс. 20)", "en": "Automatic: sync error history (max. 20)", "de": "Automatisch: Verlauf der Synchronisierungsfehler (max. 20)"}
 {"uk": "Автоматично: ціна за 1 шт. з dk_prices (для сортування)", "en": "Automatic: price per 1 pc from dk_prices (for sorting)", "de": "Automatisch: Preis pro 1 Stk. aus dk_prices (zum Sortieren)"}
@@ -4416,10 +4430,14 @@
 {"uk": "Бракує перекладу", "en": "Translation missing", "de": "Übersetzung fehlt"}
 {"uk": "Брати й інші сторінки сайту", "en": "Also take other pages of the site", "de": "Auch weitere Seiten der Website übernehmen"}
 {"uk": "Брати участь в автоматичному оновленні цін DigiKey з базових цін Minerva (якщо воно увімкнене в «💲 Налаштуваннях цін DigiKey»).", "en": "Take part in the automatic update of DigiKey prices from the Minerva base prices (if it is enabled in “💲 DigiKey price settings”).", "de": "Am automatischen Aktualisieren der DigiKey-Preise aus den Minerva-Basispreisen teilnehmen (sofern in den „💲 DigiKey-Preiseinstellungen“ aktiviert)."}
+{"uk": "Браузер (Google / Microsoft)", "en": "Browser (Google / Microsoft)", "de": "Browser (Google / Microsoft)"}
+{"uk": "Браузер бере мікрофон Windows «за замовчуванням»; звук іде до Google / Microsoft.", "en": "The browser uses the Windows “default” microphone; the sound goes to Google / Microsoft.", "de": "Der Browser nutzt das Windows-„Standard“-Mikrofon; der Ton geht an Google / Microsoft."}
 {"uk": "Браузер виконується на сервері.", "en": "The browser runs on the server.", "de": "Der Browser läuft auf dem Server."}
 {"uk": "Браузер доступний: {0}/vnc.html", "en": "Browser available: {0}/vnc.html", "de": "Browser verfügbar: {0}/vnc.html"}
+{"uk": "Браузер не вміє записувати звук для RAG-ПК.", "en": "This browser cannot record sound for the RAG PC.", "de": "Dieser Browser kann keinen Ton für den RAG-PC aufnehmen."}
 {"uk": "Браузер не дає камеру цій сторінці (потрібен HTTPS) — виберіть файл: на телефоні кнопка вибору файлу сама запропонує камеру.", "en": "The browser does not give this page the camera (HTTPS required) — choose a file: on a phone the file button offers the camera itself.", "de": "Der Browser gibt dieser Seite keine Kamera (HTTPS nötig) — wählen Sie eine Datei: am Handy bietet die Dateiauswahl selbst die Kamera an."}
 {"uk": "Браузер не дозволив мікрофон — дозвольте його (значок 🔒 або 🎤 в адресному рядку) й клікніть 🎤 ще раз.", "en": "The browser did not allow the microphone — allow it (the 🔒 or 🎤 icon in the address bar) and click 🎤 again.", "de": "Der Browser hat das Mikrofon nicht erlaubt — erlauben Sie es (Symbol 🔒 oder 🎤 in der Adressleiste) und klicken Sie erneut auf 🎤."}
+{"uk": "Браузер не дозволив мікрофон — дозвольте його (значок 🔒 або 🎤 в адресному рядку).", "en": "The browser did not allow the microphone — allow it (🔒 or 🎤 icon in the address bar).", "de": "Der Browser hat das Mikrofon nicht erlaubt — erlauben Sie es (Symbol 🔒 oder 🎤 in der Adressleiste)."}
 {"uk": "Браузер не дозволив розпізнавання голосу на цій сторінці.", "en": "The browser did not allow speech recognition on this page.", "de": "Der Browser hat die Spracherkennung auf dieser Seite nicht erlaubt."}
 {"uk": "Браузер не розпізнає цю мову — правий клік на 🎤, щоб вибрати іншу.", "en": "The browser does not recognise this language — right-click 🎤 to choose another.", "de": "Der Browser erkennt diese Sprache nicht — Rechtsklick auf 🎤, um eine andere zu wählen."}
 {"uk": "Браузер показує сторінку як на ПК. Щоб повернути вигляд телефону: поверніть телефон вертикально або вимкніть «Версія для ПК» у меню браузера (Chrome: ⋮ → «Версія для ПК»; Safari: «аА» → «Запит мобільного вебсайту»).", "en": "The browser shows the page like on a PC. To get the phone view back: hold the phone upright or turn off «Desktop site» in the browser menu (Chrome: ⋮ → «Desktop site»; Safari: «aA» → «Request Mobile Website»).", "de": "Der Browser zeigt die Seite wie am PC. So bekommen Sie die Handy-Ansicht zurück: Handy hochkant halten oder im Browsermenü «Desktopversion» ausschalten (Chrome: ⋮ → «Desktopversion»; Safari: «aA» → «Mobile Website anfordern»)."}
@@ -5513,6 +5531,7 @@
 {"uk": "Відкрити Jumingo", "en": "Open Jumingo", "de": "Jumingo öffnen"}
 {"uk": "Відкрити Messages Hub", "en": "Open Messages Hub", "de": "Messages Hub öffnen"}
 {"uk": "Відкрити PO", "en": "Open PO", "de": "Bestellung öffnen"}
+{"uk": "Відкрити RAG-ПК (прийняти сертифікат)", "en": "Open the RAG PC (accept the certificate)", "de": "RAG-PC öffnen (Zertifikat akzeptieren)"}
 {"uk": "Відкрити askDANTE", "en": "Open askDANTE", "de": "askDANTE öffnen"}
 {"uk": "Відкрити canvas", "en": "Open canvas", "de": "Canvas öffnen"}
 {"uk": "Відкрити noVNC", "en": "Open noVNC", "de": "noVNC öffnen"}
@@ -7009,6 +7028,7 @@
 {"uk": "За журналом дій: статус, відправка, документи… 0 — не рахувати.", "en": "Based on the action log: status, shipping, documents… 0 — do not count.", "de": "Laut Aktionsprotokoll: Status, Versand, Dokumente… 0 – nicht zählen."}
 {"uk": "За замовч.", "en": "Default", "de": "Standard"}
 {"uk": "За замовчуванням", "en": "Default", "de": "Standard"}
+{"uk": "За замовчуванням Windows", "en": "Windows default", "de": "Windows-Standard"}
 {"uk": "За замовчуванням «Кому (email)»", "en": "Default «To (email)»", "de": "Standard «An (E-Mail)»"}
 {"uk": "За замовчуванням для нових Angebote; у формі можна вибрати інше. Інша валюта — × курс із «Налаштувань цін» магазину.", "en": "Default for new Angebote; you can choose another in the form. Another currency — × the rate from the web shop's “Price settings”.", "de": "Standard für neue Angebote; im Formular kann eine andere gewählt werden. Andere Währung — × Kurs aus den „Preiseinstellungen“ des Webshops."}
 {"uk": "За замовчуванням кожні", "en": "By default every", "de": "Standardmäßig alle"}
@@ -8138,6 +8158,7 @@
 {"uk": "Звіти робочого часу", "en": "Working time reports", "de": "Arbeitszeitberichte"}
 {"uk": "Звіти сайтів про помічника", "en": "Site reports about the assistant", "de": "Berichte der Websites über den Assistenten"}
 {"uk": "Звіти сайтів про пошту", "en": "Site reports about mail", "de": "Berichte der Websites über E-Mail"}
+{"uk": "Зв’язок з RAG-ПК перервався.", "en": "The connection to the RAG PC was lost.", "de": "Die Verbindung zum RAG-PC ist abgebrochen."}
 {"uk": "Згенерований документ", "en": "Generated document", "de": "Erzeugtes Dokument"}
 {"uk": "Згенеровані ({0})", "en": "Generated ({0})", "de": "Erstellt ({0})"}
 {"uk": "Згенеровані документи", "en": "Generated documents", "de": "Erzeugte Dokumente"}
@@ -10009,7 +10030,10 @@
 {"uk": "Міжнародні поставки, reverse-charge, звільнені послуги", "en": "International deliveries, reverse charge, exempt services", "de": "Internationale Lieferungen, Reverse-Charge, steuerbefreite Leistungen"}
 {"uk": "Мій дашборд", "en": "My dashboard", "de": "Mein Dashboard"}
 {"uk": "Мій календар", "en": "My calendar", "de": "Mein Kalender"}
+{"uk": "Мікрофон", "en": "Microphone", "de": "Mikrofon"}
+{"uk": "Мікрофон мовчить — правий клік на 🎤 → «🎙 Мікрофон».", "en": "The microphone is silent — right-click 🎤 → “🎙 Microphone”.", "de": "Das Mikrofon ist stumm — Rechtsklick auf 🎤 → „🎙 Mikrofon“."}
 {"uk": "Мікрофон не знайдено — під’єднайте його або виберіть у налаштуваннях Windows.", "en": "No microphone found — connect one or choose it in the Windows settings.", "de": "Kein Mikrofon gefunden — schließen Sie eines an oder wählen Sie es in den Windows-Einstellungen."}
+{"uk": "Мікрофон не знайдено — під’єднайте його.", "en": "No microphone found — connect one.", "de": "Kein Mikrofon gefunden — schließen Sie eines an."}
 {"uk": "Мін. доріжка / зазор", "en": "Min. track / space", "de": "Min. Leiterbahn / Abstand"}
 {"uk": "Мін. залишок (алерт)", "en": "Min. stock (alert)", "de": "Mindestbestand (Warnung)"}
 {"uk": "Мін. отвір, переходи", "en": "Min. drill, vias", "de": "Min. Bohrung, Vias"}
@@ -10393,6 +10417,7 @@
 {"uk": "Назва/reference JLC", "en": "JLC name / reference", "de": "JLC-Name/Referenz"}
 {"uk": "Назва: {0}", "en": "Name: {0}", "de": "Name: {0}"}
 {"uk": "Назви кнопок і полів — точно як у гіді, жирним: **«📤 Вибрати файли…»**.", "en": "Button and field names — exactly as in the guide, in bold: **“📤 Select files…”**.", "de": "Namen von Schaltflächen und Feldern — genau wie im Leitfaden, fett: **„📤 Dateien auswählen…“**."}
+{"uk": "Назви мікрофонів з’являться після першого запису (дозвіл браузера на мікрофон).", "en": "Microphone names appear after the first recording (the browser’s microphone permission).", "de": "Die Mikrofonnamen erscheinen nach der ersten Aufnahme (Mikrofonfreigabe des Browsers)."}
 {"uk": "Назву і колір змінювати можна вільно.", "en": "The name and color can be changed freely.", "de": "Name und Farbe können frei geändert werden."}
 {"uk": "Найближчих зустрічей і термінів немає.", "en": "No upcoming meetings or deadlines.", "de": "Keine anstehenden Besprechungen oder Fristen."}
 {"uk": "Найближчі 7 днів: {0} подій. Прострочених: {1}. Виконано сьогодні: {2}.", "en": "Next 7 days: {0} events. Overdue: {1}. Done today: {2}.", "de": "Nächste 7 Tage: {0} Termine. Überfällig: {1}. Heute erledigt: {2}."}
@@ -10862,6 +10887,7 @@
 {"uk": "Не потрібно", "en": "Not needed", "de": "Nicht erforderlich"}
 {"uk": "Не потрібно обговорювати", "en": "No need to discuss", "de": "Muss nicht besprochen werden"}
 {"uk": "Не потрібні терміни", "en": "Unwanted deadlines", "de": "Nicht benötigte Fristen"}
+{"uk": "Не почув — браузер слухає мікрофон Windows «за замовчуванням». Говоріть ближче або виберіть RAG-ПК і свій мікрофон (правий клік на 🎤).", "en": "Heard nothing — the browser listens to the Windows “default” microphone. Speak closer or choose the RAG PC and your microphone (right-click 🎤).", "de": "Nichts gehört — der Browser hört auf das Windows-„Standard“-Mikrofon. Sprechen Sie näher oder wählen Sie den RAG-PC und Ihr Mikrofon (Rechtsklick auf 🎤)."}
 {"uk": "Не почув — говоріть ближче до мікрофона й клікніть 🎤 ще раз.", "en": "Didn't hear anything — speak closer to the microphone and click 🎤 again.", "de": "Nichts gehört — sprechen Sie näher am Mikrofon und klicken Sie erneut auf 🎤."}
 {"uk": "Не працювати", "en": "Do not work with", "de": "Nicht zusammenarbeiten"}
 {"uk": "Не працюють", "en": "Not working", "de": "Funktionieren nicht"}
@@ -10899,6 +10925,7 @@
 {"uk": "Не той курс, що для DigiKey: ціни на DigiKey після «💲 Ціни на DigiKey» зміняться на", "en": "Not the rate used for DigiKey: after “💲 Prices on DigiKey”, the prices on DigiKey will change by", "de": "Nicht der Kurs von DigiKey: Nach „💲 Preise auf DigiKey“ ändern sich die Preise auf DigiKey um"}
 {"uk": "Не той курс, що для DigiKey: ціни на DigiKey після «💲 Ціни на DigiKey» зміняться на {0}", "en": "Not the rate used for DigiKey: after “💲 Prices on DigiKey”, the prices on DigiKey will change by {0}", "de": "Nicht der Kurs von DigiKey: Nach „💲 Preise auf DigiKey“ ändern sich die Preise auf DigiKey um {0}"}
 {"uk": "Не число: {0}", "en": "Not a number: {0}", "de": "Keine Zahl: {0}"}
+{"uk": "Не чує? «🎙 Мікрофон» — той, у який ви говорите.", "en": "Not hearing you? “🎙 Microphone” — the one you speak into.", "de": "Hört nichts? „🎙 Mikrofon“ — das, in das Sie sprechen."}
 {"uk": "Не індексувати в базі знань", "en": "Do not index in the knowledge base", "de": "Nicht in der Wissensdatenbank indizieren"}
 {"uk": "Неактивний", "en": "Inactive", "de": "Inaktiv"}
 {"uk": "Неактивний товар не показується в аналізі запасів і огляді складу.", "en": "An inactive product is not shown in the stock analysis and stock overview.", "de": "Ein inaktiver Artikel wird in der Bestandsanalyse und der Lagerübersicht nicht angezeigt."}
@@ -12428,6 +12455,7 @@
 {"uk": "Перевіряти кожні, год", "en": "Check every, h", "de": "Prüfen alle, Std."}
 {"uk": "Перевіряти кожні, хв", "en": "Check every, min", "de": "Prüfen alle, Min."}
 {"uk": "Перевіряти сертифікат HTTPS", "en": "Verify HTTPS certificate", "de": "HTTPS-Zertifikat prüfen"}
+{"uk": "Перевіряю RAG-ПК…", "en": "Checking the RAG PC…", "de": "Prüfe den RAG-PC…"}
 {"uk": "Перевіряю RAG… (із запитанням — до хвилини)", "en": "Checking RAG… (with a question — up to a minute)", "de": "RAG wird geprüft… (mit einer Frage – bis zu einer Minute)"}
 {"uk": "Перевіряю «{0}»...", "en": "Checking “{0}”...", "de": "Prüfe „{0}“..."}
 {"uk": "Перевіряю підключення до IMAP…", "en": "Checking the IMAP connection…", "de": "IMAP-Verbindung wird geprüft…"}
@@ -14656,6 +14684,7 @@
 {"uk": "Розподіл товарів по коробках", "en": "Distribution of products across boxes", "de": "Verteilung der Artikel auf die Kartons"}
 {"uk": "Розпочато", "en": "Started", "de": "Gestartet"}
 {"uk": "Розпізнавання", "en": "Recognition", "de": "Erkennung"}
+{"uk": "Розпізнаю на RAG-ПК", "en": "Recognising on the RAG PC", "de": "Erkenne auf dem RAG-PC"}
 {"uk": "Розпізнає браузер: у Chrome — сервіс Google, в Edge — Microsoft", "en": "The browser recognises it: in Chrome — a Google service, in Edge — Microsoft", "de": "Der Browser erkennt sie: in Chrome — ein Google-Dienst, in Edge — Microsoft"}
 {"uk": "Розпізнає браузер: у Chrome — сервіс Google, в Edge — Microsoft. Не диктуйте паролі.", "en": "The browser recognises it: in Chrome — a Google service, in Edge — Microsoft. Do not dictate passwords.", "de": "Der Browser erkennt sie: in Chrome — ein Google-Dienst, in Edge — Microsoft. Diktieren Sie keine Passwörter."}
 {"uk": "Розпізнає цей ПК — голос нікуди не йде", "en": "Recognised on this PC — the voice goes nowhere", "de": "Erkennung auf diesem PC — die Stimme verlässt ihn nicht"}
@@ -15119,6 +15148,7 @@
 {"uk": "Скасовано організатором", "en": "Cancelled by the organizer", "de": "Vom Organisator abgesagt"}
 {"uk": "Скасовано після {0}/{1}", "en": "Cancelled after {0}/{1}", "de": "Abgebrochen nach {0}/{1}"}
 {"uk": "Скасовано через DHL API. Трекінг: {0}", "en": "Cancelled via the DHL API. Tracking: {0}", "de": "Über die DHL API storniert. Tracking: {0}"}
+{"uk": "Скасовано.", "en": "Cancelled.", "de": "Abgebrochen."}
 {"uk": "Скасовано: {0}", "en": "Cancelled: {0}", "de": "Storniert: {0}"}
 {"uk": "Скасовано: {0} задач.", "en": "Cancelled: {0} tasks.", "de": "Storniert: {0} Aufgaben."}
 {"uk": "Скасовує закупівлю зовнішньої CRM.", "en": "Cancels a purchase order of the external CRM.", "de": "Storniert eine Bestellung des externen CRM."}
@@ -15286,6 +15316,8 @@
 {"uk": "Службові коди DigiKey {hts, eccnNumber, rohsStatus, …} — лише заповнені", "en": "DigiKey service codes {hts, eccnNumber, rohsStatus, …} — only the filled ones", "de": "DigiKey-Servicecodes {hts, eccnNumber, rohsStatus, …} — nur ausgefüllte"}
 {"uk": "Службові поля — покупець їх не бачить", "en": "Internal fields — the buyer does not see them", "de": "Interne Felder — der Käufer sieht sie nicht"}
 {"uk": "Слухаю (", "en": "Listening (", "de": "Ich höre zu ("}
+{"uk": "Слухаю · RAG-ПК", "en": "Listening · RAG PC", "de": "Höre zu · RAG-PC"}
+{"uk": "Слухаю — клік", "en": "Listening — click", "de": "Höre zu — Klick"}
 {"uk": "Слухаю — клік: зупинити", "en": "Listening — click to stop", "de": "Ich höre zu — Klick: stoppen"}
 {"uk": "Слухаю…", "en": "Listening…", "de": "Ich höre zu…"}
 {"uk": "Слід видаленої наради", "en": "Trace of a deleted meeting", "de": "Spur einer gelöschten Besprechung"}
@@ -16016,6 +16048,7 @@
 {"uk": "Текст листа порожній", "en": "The email text is empty", "de": "Der E-Mail-Text ist leer"}
 {"uk": "Текст листа...", "en": "E-mail text...", "de": "E-Mail-Text..."}
 {"uk": "Текст над пересланим листом, напр.: Сергію, прошу оплатити рахунок. Дякую!", "en": "Text above the forwarded email, e.g.: Sergey, please pay the invoice. Thanks!", "de": "Text über der weitergeleiteten E-Mail, z. B.: Sergey, bitte die Rechnung bezahlen. Danke!"}
+{"uk": "Текст не вставлено — спробуйте ще раз.", "en": "No text inserted — try again.", "de": "Kein Text eingefügt — bitte erneut versuchen."}
 {"uk": "Текст нотатки...", "en": "Note text...", "de": "Notiztext..."}
 {"uk": "Текст повідомлення…", "en": "Message text…", "de": "Nachrichtentext…"}
 {"uk": "Текст порожній", "en": "The text is empty", "de": "Der Text ist leer"}
@@ -17171,6 +17204,7 @@
 {"uk": "Хто позначив", "en": "Marked by", "de": "Markiert von"}
 {"uk": "Хто підтвердив", "en": "Confirmed by", "de": "Bestätigt von"}
 {"uk": "Хто робить", "en": "Who does it", "de": "Wer erledigt es"}
+{"uk": "Хто розпізнає", "en": "Who recognises", "de": "Wer erkennt"}
 {"uk": "Хто це", "en": "Who is it", "de": "Wer ist das"}
 {"uk": "Хто це для нас", "en": "Who is it for us", "de": "Wer ist das für uns"}
 {"uk": "Хто це для нас: постачальник чи клієнт", "en": "Who is it for us: supplier or customer", "de": "Wer ist das für uns: Lieferant oder Kunde"}
@@ -17222,6 +17256,7 @@
 {"uk": "Цей Telegram уже прив'язаний до акаунту Minerva.", "en": "This Telegram is already linked to a Minerva account.", "de": "Dieses Telegram ist bereits mit einem Minerva-Konto verknüpft."}
 {"uk": "Цей Telegram ще не прив'язаний до акаунту Minerva.", "en": "This Telegram is not yet linked to a Minerva account.", "de": "Dieses Telegram ist noch nicht mit einem Minerva-Konto verknüpft."}
 {"uk": "Цей акаунт Minerva не може додавати візитки.", "en": "This Minerva account cannot add business cards.", "de": "Dieses Minerva-Konto kann keine Visitenkarten hinzufügen."}
+{"uk": "Цей браузер сам голос не розпізнає — виберіть RAG-ПК (правий клік на 🎤).", "en": "This browser cannot recognise speech itself — choose the RAG PC (right-click 🎤).", "de": "Dieser Browser kann Sprache nicht selbst erkennen — wählen Sie den RAG-PC (Rechtsklick auf 🎤)."}
 {"uk": "Цей календар уже підключено — оновлено.", "en": "This calendar is already connected — updated.", "de": "Dieser Kalender ist bereits verbunden — aktualisiert."}
 {"uk": "Цей ключ не дозволено використовувати з адреси {0}.", "en": "This key may not be used from address {0}.", "de": "Dieser Schlüssel darf nicht von der Adresse {0} aus verwendet werden."}
 {"uk": "Цей контейнер не має доступу до Docker.", "en": "This container has no access to Docker.", "de": "Dieser Container hat keinen Zugriff auf Docker."}
@@ -18193,6 +18228,7 @@
 {"uk": "а кількість, назва, MOQ і строк офера", "en": "while the quantity, name, MOQ and lead time of the offer", "de": "während Menge, Name, MOQ und Lieferzeit des Offers"}
 {"uk": "а кількість, назва, MOQ і строк офера лишаються як є. Після оновлення Minerva сама перевіряє, що нові ціни діють на DigiKey.", "en": "while the quantity, name, MOQ and lead time of the offer stay as they are. After the update, Minerva itself checks that the new prices are in effect on DigiKey.", "de": "während Menge, Name, MOQ und Lieferzeit des Offers unverändert bleiben. Nach der Aktualisierung prüft Minerva selbst, ob die neuen Preise bei DigiKey gelten."}
 {"uk": "а роботу («знайди й внеси», «підготуй відправлення») — підготую завдання агентові Minerva", "en": "and for work (“find and enter”, “prepare a shipment”) — I will prepare a task for the Minerva agent", "de": "und für Arbeiten („suchen und eintragen“, „Sendung vorbereiten“) – bereite ich eine Aufgabe für den Minerva-Agenten vor"}
+{"uk": "а цей браузер сам голос не розпізнає.", "en": "and this browser cannot recognise speech itself.", "de": "und dieser Browser kann Sprache nicht selbst erkennen."}
 {"uk": "або", "en": "or", "de": "oder"}
 {"uk": "або DD.MM.YYYY", "en": "or DD.MM.YYYY", "de": "oder DD.MM.YYYY"}
 {"uk": "або all", "en": "or all", "de": "oder all"}
@@ -18425,6 +18461,7 @@
 {"uk": "бракує {0}: потрібно {1}, вільно {2}", "en": "{0} is short: need {1}, available {2}", "de": "{0} fehlt: benötigt {1}, verfügbar {2}"}
 {"uk": "бракує даних чи погодження. probability і impact — 1 (мало) … 3 (дуже).", "en": "missing data or approval. probability and impact — 1 (low) … 3 (high).", "de": "fehlende Daten oder Freigabe. probability und impact — 1 (gering) … 3 (hoch)."}
 {"uk": "бракує прав", "en": "missing rights", "de": "fehlende Rechte"}
+{"uk": "браузер", "en": "browser", "de": "Browser"}
 {"uk": "бренд", "en": "brand", "de": "Marke"}
 {"uk": "бриф", "en": "brief", "de": "Briefing"}
 {"uk": "бриф — {0}", "en": "brief — {0}", "de": "Briefing — {0}"}
@@ -18533,6 +18570,7 @@
 {"uk": "виберіть календарі «👁»", "en": "choose the calendars “👁”", "de": "wählen Sie die Kalender „👁“"}
 {"uk": "виберіть на ПК", "en": "choose on the PC", "de": "am PC auswählen"}
 {"uk": "виберіть проєкт…", "en": "choose a project…", "de": "Projekt wählen…"}
+{"uk": "вибраний раніше", "en": "chosen earlier", "de": "früher gewählt"}
 {"uk": "вибрано", "en": "selected", "de": "ausgewählt"}
 {"uk": "вибрано {0}", "en": "chosen {0}", "de": "ausgewählt {0}"}
 {"uk": "вибрано вручну", "en": "chosen manually", "de": "manuell gewählt"}
@@ -18707,6 +18745,7 @@
 {"uk": "відбулась", "en": "took place", "de": "hat stattgefunden"}
 {"uk": "відбулось. Якщо там сказано, що щось уже зроблено чи відбулося (наприклад, зустріч і її результат), познач цей крок", "en": "happened. If it says that something has already been done or happened (for example, a meeting and its result), mark this step", "de": "geschehen ist. Steht dort, dass etwas bereits erledigt oder geschehen ist (zum Beispiel eine Besprechung und ihr Ergebnis), markiere diesen Schritt"}
 {"uk": "відгул за переробки", "en": "time off in lieu of overtime", "de": "Freizeitausgleich für Überstunden"}
+{"uk": "відеокарта", "en": "graphics card", "de": "Grafikkarte"}
 {"uk": "відкинуто", "en": "discarded", "de": "verworfen"}
 {"uk": "відкинуто Minerva: {0}", "en": "rejected by Minerva: {0}", "de": "von Minerva verworfen: {0}"}
 {"uk": "відкинуто дублів {0}", "en": "duplicates discarded: {0}", "de": "Duplikate verworfen: {0}"}
@@ -19160,6 +19199,7 @@
 {"uk": "за добу", "en": "per day", "de": "pro Tag"}
 {"uk": "за замовленнями", "en": "by orders", "de": "nach Aufträgen"}
 {"uk": "за замовчуванням", "en": "by default", "de": "standardmäßig"}
+{"uk": "за замовчуванням Windows", "en": "Windows default", "de": "Windows-Standard"}
 {"uk": "за замовчуванням для ключів без прив'язки", "en": "default for keys without a binding", "de": "Standard für Schlüssel ohne Zuordnung"}
 {"uk": "за замовчуванням — завжди", "en": "by default — always", "de": "standardmäßig — immer"}
 {"uk": "за замовчуванням — ні", "en": "by default — no", "de": "standardmäßig — nein"}
@@ -19528,6 +19568,7 @@
 {"uk": "зупинено людиною", "en": "stopped by a person", "de": "von einer Person gestoppt"}
 {"uk": "зупинилась з помилкою", "en": "stopped with an error", "de": "mit einem Fehler angehalten"}
 {"uk": "зупинилось на {0} з {1} — можна запустити знову", "en": "stopped at {0} of {1} — can be run again", "de": "bei {0} von {1} stehen geblieben — kann erneut gestartet werden"}
+{"uk": "зупинити", "en": "stop", "de": "stoppen"}
 {"uk": "зупиняється…", "en": "stopping…", "de": "wird angehalten…"}
 {"uk": "зустріч", "en": "meeting", "de": "Besprechung"}
 {"uk": "зі збережених налаштувань (спершу «Зберегти»); копія — у «Надіслані» скриньки", "en": "with the saved settings (click «Save» first); a copy goes to the mailbox's «Sent»", "de": "mit den gespeicherten Einstellungen (zuerst «Speichern»); Kopie — unter «Gesendet» des Postfachs"}
@@ -19622,6 +19663,7 @@
 {"uk": "ключів", "en": "keys", "de": "Schlüssel"}
 {"uk": "ключів: {0}", "en": "keys: {0}", "de": "Schlüssel: {0}"}
 {"uk": "клік", "en": "click", "de": "Klick"}
+{"uk": "клік на 🎤 — розпізнати, Esc — скасувати", "en": "click 🎤 — recognise, Esc — cancel", "de": "Klick auf 🎤 — erkennen, Esc — abbrechen"}
 {"uk": "кліки й правий клік змінюють чернетку, сторінка одразу перемальовується з неї (POST action=preview, замінюється", "en": "clicks and right-clicks change the draft, the page is immediately redrawn from it (POST action=preview, replaces", "de": "Klicks und Rechtsklicks ändern den Entwurf, die Seite wird sofort daraus neu aufgebaut (POST action=preview, ersetzt"}
 {"uk": "клікніть крок — що зроблено й що далі", "en": "click a step — what has been done and what comes next", "de": "Schritt anklicken — was erledigt ist und wie es weitergeht"}
 {"uk": "клітинки з: {0}, {1}, тощо", "en": "cells with: {0}, {1}, etc.", "de": "Zellen mit: {0}, {1}, usw."}
@@ -20217,6 +20259,7 @@
 {"uk": "не буде ні підтвердження прочитання, ні відповіді", "en": "there is neither a read receipt nor a reply", "de": "weder Lesebestätigung noch Antwort kommt"}
 {"uk": "не в базі знань", "en": "not in the knowledge base", "de": "nicht in der Wissensdatenbank"}
 {"uk": "не в базі знань (індексацію вимкнено або немає тексту)", "en": "not in the knowledge base (indexing disabled or no text)", "de": "nicht in der Wissensdatenbank (Indexierung deaktiviert oder kein Text)"}
+{"uk": "не в списку дозволених на RAG-ПК", "en": "is not on the RAG PC’s list of allowed PCs", "de": "steht nicht auf der Liste der erlaubten PCs des RAG-PC"}
 {"uk": "не в усіх посилок є трек-номер", "en": "not all parcels have a tracking number", "de": "nicht alle Pakete haben eine Sendungsnummer"}
 {"uk": "не вдалося", "en": "failed", "de": "fehlgeschlagen"}
 {"uk": "не вдалося {0}", "en": "failed {0}", "de": "fehlgeschlagen {0}"}
@@ -20950,6 +20993,7 @@
 {"uk": "показується {0} з {1}", "en": "{0} of {1} shown", "de": "{0} von {1} angezeigt"}
 {"uk": "поки Minerva недоступна — курсор стоїть, last_error unavailable", "en": "while Minerva is unavailable — the cursor stays put, last_error unavailable", "de": "solange Minerva nicht verfügbar ist — der Cursor bleibt stehen, last_error unavailable"}
 {"uk": "поки відправлення активне (UPS/DHL не delivered), маркетплейс не може встановити «Доставлено».", "en": "while the shipment is active (UPS/DHL not delivered), the marketplace cannot set “Delivered”.", "de": "solange die Sendung aktiv ist (UPS/DHL nicht zugestellt), kann der Marktplatz nicht „Zugestellt“ setzen."}
+{"uk": "поки що розпізнає браузер", "en": "the browser recognises for now", "de": "vorerst erkennt der Browser"}
 {"uk": "покупець", "en": "buyer", "de": "Käufer"}
 {"uk": "покупцю", "en": "to the customer", "de": "an den Kunden"}
 {"uk": "покупцю (без прихованої копії — в листі одноразове посилання)", "en": "to the customer (no blind copy — the e-mail contains a one-time link)", "de": "an den Kunden (ohne Blindkopie — die E-Mail enthält einen Einmal-Link)"}
@@ -21217,6 +21261,7 @@
 {"uk": "протокол RAG: читання стрічки змінює її стан", "en": "RAG protocol: reading the feed changes its state", "de": "RAG-Protokoll: Das Lesen des Feeds ändert dessen Zustand"}
 {"uk": "профіль покупця", "en": "buyer profile", "de": "Käuferprofil"}
 {"uk": "профіль покупця (email, компанія, адреси, Kundennummer)", "en": "buyer profile (email, company, addresses, Kundennummer)", "de": "Käuferprofil (E-Mail, Firma, Adressen, Kundennummer)"}
+{"uk": "процесор", "en": "processor", "de": "Prozessor"}
 {"uk": "прочитав", "en": "read", "de": "hat gelesen"}
 {"uk": "прочитав вебхук #{0}", "en": "read webhook #{0}", "de": "hat Webhook #{0} gelesen"}
 {"uk": "прочитав відправлення {0}", "en": "read shipment {0}", "de": "hat Sendung {0} gelesen"}
@@ -21388,6 +21433,8 @@
 {"uk": "розклад автоматичних листів не зсувається.", "en": "the schedule of automatic e-mails does not shift.", "de": "der Zeitplan der automatischen E-Mails verschiebt sich nicht."}
 {"uk": "розміри", "en": "dimensions", "de": "Maße"}
 {"uk": "розподільник слухає 127.0.0.1:{0} (публічний → {1}, {2} → {3})", "en": "router listens on 127.0.0.1:{0} (public → {1}, {2} → {3})", "de": "Verteiler lauscht auf 127.0.0.1:{0} (öffentlich → {1}, {2} → {3})"}
+{"uk": "розпізнати", "en": "recognise", "de": "erkennen"}
+{"uk": "розпізнає браузер.", "en": "the browser recognises.", "de": "der Browser erkennt."}
 {"uk": "розсилки", "en": "newsletters", "de": "Newsletter"}
 {"uk": "розумний пошук і підказки за правилами (без AI)", "en": "smart search and rule-based suggestions (no AI)", "de": "intelligente Suche und regelbasierte Vorschläge (ohne KI)"}
 {"uk": "розуміє", "en": "understands", "de": "versteht"}
@@ -22162,6 +22209,7 @@
 {"uk": "це не ваше запрошення", "en": "this is not your invitation", "de": "das ist nicht Ihre Einladung"}
 {"uk": "це робота для агента Minerva", "en": "this is a job for the Minerva agent", "de": "das ist eine Aufgabe für den Minerva-Agenten"}
 {"uk": "це розгалуження. Minerva дивиться на ваш результат і веде по різних гілках.", "en": "is a branching. Minerva looks at your result and leads down different branches.", "de": "ist eine Verzweigung. Minerva betrachtet Ihr Ergebnis und führt über unterschiedliche Zweige weiter."}
+{"uk": "цей ПК", "en": "this PC", "de": "dieser PC"}
 {"uk": "цей курс", "en": "this rate", "de": "dieser Kurs"}
 {"uk": "цим ключем ще ніхто не звертався", "en": "nobody has used this key yet", "de": "dieser Schlüssel wurde noch von niemandem verwendet"}
 {"uk": "цитати прибрано в {0}", "en": "quotes removed in {0}", "de": "Zitate entfernt in {0}"}
@@ -22557,6 +22605,7 @@
 {"uk": "… або додати до наявного", "en": "… or add to an existing one", "de": "… oder einem vorhandenen hinzufügen"}
 {"uk": "… або знайти клієнта: фірма, ім'я, email", "en": "… or find a customer: company, name, e-mail", "de": "… oder Kunden suchen: Firma, Name, E-Mail"}
 {"uk": "… далі не вмістилось — продовжте з first_page={0}", "en": "… the rest did not fit — continue from first_page={0}", "de": "… der Rest passte nicht mehr – fahren Sie mit first_page={0} fort"}
+{"uk": "… перевіряю RAG-ПК", "en": "… checking the RAG PC", "de": "… prüfe den RAG-PC"}
 {"uk": "… показано перші {0}", "en": "… showing the first {0}", "de": "… die ersten {0} werden angezeigt"}
 {"uk": "… ще", "en": "… more", "de": "… weitere"}
 {"uk": "… ще {0}", "en": "… {0} more", "de": "… {0} weitere"}

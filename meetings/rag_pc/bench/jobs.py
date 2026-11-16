@@ -44,6 +44,7 @@ class Jobs:
         self.store = store
         self.live_busy = live_busy  # callable: is a live session holding the GPU?
         self.on_finish = on_finish  # callable(sid, kind, state, text) on the event loop, after a job ends
+        self.free_gpu = None        # () -> None: free VRAM held elsewhere (🎤 dictation model) before a GPU job
         self.queue = asyncio.Queue()
         self.status = {}
         self.current = None
@@ -140,6 +141,8 @@ class Jobs:
         device, unloaded, fallback = "cpu", [], None
         loop = asyncio.get_running_loop()
         if wanted in ("auto", "gpu"):
+            if self.free_gpu is not None:
+                await loop.run_in_executor(None, self.free_gpu)
             while self.live_busy():
                 st["text"] = "Чекаю: відеокарту зараз тримає запис наживо (Whisper)…"
                 await asyncio.sleep(2)

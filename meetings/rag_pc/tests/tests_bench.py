@@ -1474,7 +1474,7 @@ class LinkPipelineTests(LinkTestBase):
         self.assertEqual(sync["sessions"][0], {"meeting": 12, "uid": UID, "session": sid,
                                                "token_sha256": __import__("hashlib").sha256(PUSH.encode()).hexdigest(),
                                                "stage": "done", "progress": None, "queue_pos": 0, "audio_on_bench": False})
-        self.assertEqual(sync["bench"], {"version": "0.3.3", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
+        self.assertEqual(sync["bench"], {"version": "0.3.4", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
                                          "last_error": "", "retention_days": 30, "standalone": False})
 
     async def test_empty_transcript_and_audio_text(self):
@@ -2524,7 +2524,7 @@ class QuickStartPageTests(unittest.TestCase):
     def test_assets_carry_the_version(self):
         from bench import VERSION
 
-        self.assertEqual(VERSION, "0.3.3")
+        self.assertEqual(VERSION, "0.3.4")
         self.assertIn(f"/static/bench.js?v={VERSION}", self.html)
         self.assertIn(f"/static/bench.css?v={VERSION}", self.html)
 
@@ -2886,6 +2886,148 @@ class JobsDenoiseTests(unittest.IsolatedAsyncioTestCase):
         store.write_json(folder / "minerva.json", {"meeting": 1})
         with self.assertRaises(JobError):
             await self.jobs._denoise(self.sid, {"from": private}, {})
+
+
+
+# ==== 0.3.4: 🎤 voice typing in Minerva through the RAG PC (bench/dictate.py) ========================================
+class _FakeSeg:
+    def __init__(self, text, no_speech=0.0, logprob=-0.2):
+        self.text, self.no_speech_prob, self.avg_logprob = text, no_speech, logprob
+
+
+class _FakeWhisper:
+    calls = []
+
+    def transcribe(self, audio, **kw):
+        from types import SimpleNamespace
+        _FakeWhisper.calls.append(kw)
+        segs = [_FakeSeg(" Добрий день,"), _FakeSeg(" Thank you."), _FakeSeg(" шум", no_speech=0.9, logprob=-1.5),
+                _FakeSeg(" надішліть креслення.")]
+        return iter(segs), SimpleNamespace(language=kw.get("language") or "uk")
+
+
+class DictationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = config.load(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def dictation(self):
+        from bench import dictate
+        d = dictate.Dictation(self.cfg)
+        d._load = lambda: (setattr(d, "model", d.model or _FakeWhisper()), setattr(d, "device", "cpu"))
+        return d
+
+    def test_language_and_suffix(self):
+        from bench import dictate
+        self.assertIsNone(dictate.lang_of("auto"))
+        self.assertEqual(dictate.lang_of("uk-UA"), "uk")
+        self.assertIsNone(dictate.lang_of("xx"))
+        self.assertEqual(dictate.suffix_for("audio/webm;codecs=opus"), ".webm")
+        self.assertEqual(dictate.suffix_for("audio/ogg"), ".ogg")
+
+    @unittest.skipUnless(_has_av(), "PyAV is not installed")
+    def test_text_without_phantoms_and_nothing_left_on_disk(self):
+        import os
+        from pathlib import Path
+        d = self.dictation()
+        wav = Path(self.tmp.name, "v.wav")
+        write_tone(wav, seconds=1.0, channels=1)
+        _FakeWhisper.calls = []
+        res = d.run(wav.read_bytes(), "audio/wav", "de", clean=False)
+        self.assertEqual(res["text"], "Добрий день, надішліть креслення.")
+        self.assertEqual((res["language"], res["device"], res["cleaned"], res["audio_s"]), ("de", "cpu", False, 1.0))
+        self.assertEqual(_FakeWhisper.calls[0]["language"], "de")
+        d.run(wav.read_bytes(), "audio/wav", "auto")
+        self.assertIsNone(_FakeWhisper.calls[1]["language"])                  # «Авто» — Whisper визначає сам
+        tmp = Path(self.cfg.data_dir, "tmp")
+        self.assertEqual([x for x in os.listdir(tmp) if x.startswith("dictate-")], [])
+
+    def test_empty_and_too_big(self):
+        from bench import dictate
+        d = self.dictation()
+        with self.assertRaises(dictate.DictationError):
+            d.run(b"", "audio/webm")
+        with self.assertRaises(dictate.DictationError) as cm:
+            d.run(b"x" * (dictate.MAX_BYTES + 1), "audio/webm")
+        self.assertEqual(cm.exception.status, 413)
+
+    def test_release_only_when_idle(self):
+        import time
+        d = self.dictation()
+        d.model, d.device, d.last = _FakeWhisper(), "cuda", time.time()
+        self.assertFalse(d.release())                                         # щойно диктували
+        d.last = time.time() - 10_000
+        self.assertTrue(d.release())
+        self.assertIsNone(d.model)
+        d.model, d.last = _FakeWhisper(), time.time()
+        self.assertTrue(d.release(idle_only=False))                           # перед розшифровкою наради
+
+
+class ServerDictationTests(unittest.IsolatedAsyncioTestCase):
+    MINERVA = "https://sevskiy.minerva-bi.example"
+
+    async def asyncSetUp(self):
+        from aiohttp.test_utils import TestClient, TestServer
+
+        from bench import server
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = config.load(self.tmp.name)
+        self.cfg.override("minerva_url", self.MINERVA + "/")
+        self.app = server.create_app(self.cfg, background=False)
+        self.client = TestClient(TestServer(self.app, host="127.0.0.1"))
+        await self.client.start_server()
+        self.ctx = self.app[server.APP_KEY]
+
+    async def asyncTearDown(self):
+        await self.client.close()
+        self.tmp.cleanup()
+
+    async def test_minerva_page_may_ping_and_dictate(self):
+        from unittest.mock import patch
+        r = await self.client.get("/api/dictate/ping", headers={"Origin": self.MINERVA})
+        self.assertEqual(r.status, 200)
+        self.assertEqual(r.headers["Access-Control-Allow-Origin"], self.MINERVA)
+        self.assertIn("model", await r.json())
+        pre = await self.client.options("/api/dictate", headers={
+            "Origin": self.MINERVA, "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-bench", "Access-Control-Request-Private-Network": "true"})
+        self.assertEqual(pre.status, 204)
+        self.assertEqual(pre.headers["Access-Control-Allow-Private-Network"], "true")
+        self.assertIn("X-Bench", pre.headers["Access-Control-Allow-Headers"])
+        done = {"text": "Привіт", "language": "uk", "model": "large-v3-turbo", "device": "cuda", "seconds": 0.8,
+                "audio_s": 2.0, "cleaned": True, "load_s": 0.0}
+        with patch.object(self.ctx["dictation"], "run", return_value=done) as run:
+            r = await self.client.post("/api/dictate?lang=uk&clean=1", data=b"OggS-audio", headers={
+                "Origin": self.MINERVA, "X-Bench": "1", "Content-Type": "audio/ogg"})
+            self.assertEqual(r.status, 200, await r.text())
+            self.assertEqual((await r.json())["text"], "Привіт")
+            self.assertEqual(r.headers["Access-Control-Allow-Origin"], self.MINERVA)
+            run.assert_called_once_with(b"OggS-audio", "audio/ogg", "uk", True)
+            r = await self.client.post("/api/dictate", data=b"x", headers={"Origin": self.MINERVA})
+            self.assertEqual(r.status, 403)                                   # без X-Bench — ні
+            self.assertEqual(run.call_count, 1)
+
+    async def test_other_sites_and_other_pcs_are_refused(self):
+        from unittest.mock import patch
+        evil = {"Origin": "https://evil.example", "X-Bench": "1", "Content-Type": "audio/webm"}
+        with patch.object(self.ctx["dictation"], "run") as run:
+            r = await self.client.post("/api/dictate", data=b"x", headers=evil)
+            self.assertEqual(r.status, 403)
+            self.assertNotIn("Access-Control-Allow-Origin", r.headers)
+            r = await self.client.options("/api/dictate", headers={"Origin": "https://evil.example"})
+            self.assertEqual(r.status, 403)
+            run.assert_not_called()
+        r = await self.client.get("/api/sessions", headers={"Origin": self.MINERVA})
+        self.assertNotIn("Access-Control-Allow-Origin", r.headers)            # CORS — лише голосовий набір
+        self.cfg.override("allowed_clients", ["10.9.9.9"])
+        r = await self.client.get("/api/dictate/ping", headers={"Origin": self.MINERVA})
+        self.assertEqual(r.status, 403)
+        self.assertEqual((await r.json())["code"], "not_allowed")            # Minerva скаже, що цей ПК не дозволено
+        self.assertEqual(r.headers["Access-Control-Allow-Origin"], self.MINERVA)
 
 
 if __name__ == "__main__":
