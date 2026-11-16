@@ -421,6 +421,9 @@
 .pjx-opt small { color: var(--text-muted); }
 .pjx-sub { margin-left: 28px; }
 .pjx-opt:has(input:disabled) { opacity: .55; cursor: default; }
+.pjx-ai { display: grid; gap: 6px; margin-top: 6px; }
+.pjx-model { display: flex; gap: 8px; align-items: center; margin-left: 28px; color: var(--body-fg); }
+.pjx-model select { max-width: 100%; }
 .pjx-files { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: var(--bg-card);
   border: 1px dashed var(--border-strong); color: var(--body-fg); word-break: break-word; }
 

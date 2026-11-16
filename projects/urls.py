@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/mail-peek/", views.mail_peek_view, name="mail_peek"),
     path("api/project/<int:pk>/event-note/", views.event_note_view, name="event_note"),
     path("api/project/<int:pk>/export/", views.export_view, name="export"),
+    path("api/project/<int:pk>/export/names/", views.export_names_view, name="export_names"),
     path("api/project/<int:pk>/party/", views.party_view, name="party"),
     path("api/project/<int:pk>/sourcing/", views.sourcing_view, name="sourcing"),
     path("api/project/<int:pk>/party/<int:party_pk>/delete/", views.party_delete_view, name="party_delete"),

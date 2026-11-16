@@ -154,7 +154,21 @@
     return dicts[lang];
   }
   var CYR = /[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ]/;
+  // 🌐 Назви кроків і фаз, перекладені AI (o.names {назва: переклад}, вікно експорту): [data-mv-tr="exact"] —
+  // повна назва в data-mv-full (значок «◆ » попереду лишається), показано скорочено — data-mv-cut символів
+  function applyNames(c, names) {
+    c.querySelectorAll('[data-mv-tr="exact"]').forEach(function (el) {
+      var full = (el.getAttribute('data-mv-full') || el.textContent || '').replace(/\s+/g, ' ').trim();
+      var m = /^([^\p{L}\p{N}]*)([\s\S]*)$/u.exec(full), t = names[full] || names[m[2]];
+      if (!t) return;
+      var out = (names[full] ? '' : m[1]) + t, cut = +el.getAttribute('data-mv-cut') || 0;
+      if (cut > 1 && out.length > cut) out = out.slice(0, cut - 1) + '\u2026';
+      el.textContent = out;
+      el.setAttribute('translate', 'no');       // уже перекладено — словник інтерфейсу не чіпає
+    });
+  }
   function localize(c, o) {
+    if (o && o.names) applyNames(c, o.names);
     if (!o || !o.lang || o.lang === 'uk') return;
     var fm = null;
     try { fm = new Intl.DateTimeFormat(o.lang, {month: 'short', year: 'numeric', timeZone: 'UTC'}); } catch (e) { fm = null; }

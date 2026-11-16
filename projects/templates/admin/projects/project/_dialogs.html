@@ -130,7 +130,17 @@
     </div>
     <div class="pjx-step">2. Мова документа <select data-x="lang">
         <option value="de">Deutsch</option><option value="en">English</option><option value="uk">Українська</option>
-      </select> <small>підписи діаграми, заголовки, стани, дати й текст листа, назви кроків і фаз зі стандартних шаблонів; свої назви — як ви їх написали</small></div>
+      </select> <small>підписи діаграми, заголовки, стани, дати й текст листа, назви кроків і фаз зі стандартних шаблонів</small></div>
+    <div class="pjx-ai" data-x-only="plan timeline">
+      <label class="pjx-opt"><input type="checkbox" data-x="ai">
+        <span><b>🌐 Перекласти назви кроків і фаз (AI)</b><small data-x-ai-hint>план написано іншою мовою — Claude перекладе назви кроків і фаз мовою документа (назви фірм, людей і артикули лишаються); переклад запам’ятовується — повторний експорт без оплати</small></span></label>
+      <label class="pjx-model" data-x-model hidden>Модель
+        <select data-x="model">
+          <option value="claude-haiku-5-5">Haiku 5.5 — найдешевше</option>
+          <option value="claude-sonnet-5-5">Sonnet 5.5 — якісніше</option>
+          <option value="claude-opus-5-5">Opus 5.5 — найякісніше, найдорожче</option>
+        </select></label>
+    </div>
     <div class="pjx-step">3. Що далі</div>
     <p class="pjx-files" data-x-files></p>
     <div class="pjp-foot">

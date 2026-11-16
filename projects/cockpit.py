@@ -306,6 +306,16 @@ def _ai_context(project, user, can_change) -> dict:
             "rag": forgotten.rag_ready(user), "agent": delegate.can(user)}
 
 
+def export_names_script(project) -> str:
+    """Якою абеткою написано план (export.names_script) — вікно експорту саме ставить «🌐 Перекласти назви», коли
+    мова документа інша."""
+    try:
+        from . import export
+        return export.names_script(project)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def context(project, user, range_key="all", notice="") -> dict:
     today = timezone.localdate()
     if range_key not in timeline.RANGES:
@@ -342,6 +352,7 @@ def context(project, user, range_key="all", notice="") -> dict:
         "range": range_key, "ranges": RANGE_LABELS,
         "can_change": can_change,
         "has_products": project.products.exists(),
+        "names_script": export_names_script(project),
         "notice": notice,
         "plan": plan,
         "ai": ai,
@@ -356,6 +367,7 @@ def context(project, user, range_key="all", notice="") -> dict:
                  "party": reverse("projects:party", args=[pk]),
                  "sourcing": reverse("projects:sourcing", args=[pk]),
                  "export": reverse("projects:export", args=[pk]),
+                 "export_names": reverse("projects:export_names", args=[pk]),
                  "party_suggest": reverse("projects:party_suggest", args=[pk]),
                  "party_base": f"/projects/api/project/{pk}/party/",
                  "risk": reverse("projects:risk", args=[pk]), "status_save": reverse("projects:status", args=[pk]),

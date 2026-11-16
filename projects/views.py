@@ -390,6 +390,24 @@ def mail_handled_view(request, pk):
 
 @staff_member_required
 @require_POST
+def export_names_view(request, pk):
+    """🌐 Назви кроків і фаз мовою документа (AI, core/ai_texts): POST JSON {lang, model} → {ok, names: {назва:
+    переклад}}; той самий план, мова й модель — з кешу. Право перегляду проєкту."""
+    from . import export
+    project = _project_for(request, pk, "view")
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except (ValueError, UnicodeDecodeError):
+        body = {}
+    try:
+        names = export.translate_names(project, request.user, str(body.get("lang") or ""), str(body.get("model") or ""))
+    except export.ExportError as e:
+        return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    return JsonResponse({"ok": True, "names": names})
+
+
+@staff_member_required
+@require_POST
 def export_view(request, pk):
     """📤 Діаграма проєкту: multipart {image (PNG з браузера), what plan|timeline|chain, lang de|en|uk,
     formats pdf,png,xlsx, table, send} — право перегляду. send — чернетка листа у власній скриньці з файлами
@@ -413,16 +431,17 @@ def export_view(request, pk):
                 raise export.ExportError("Немає картинки діаграми" if upload is None else
                                          "Картинка завелика — зменште масштаб діаграми")
             png = export.check_png(upload.read())
+        names = export.clean_names(project, request.POST.get("names")) if what == "plan" else {}
         files = []
         for f in formats:
             if f == "pdf":
                 files.append((export.file_name(project, what, "pdf"),
                               export.pdf(project, what, lang, png, bool(request.POST.get("table")),
-                                         titled=bool(request.POST.get("titled"))), "application/pdf"))
+                                         titled=bool(request.POST.get("titled")), names=names), "application/pdf"))
             elif f == "png":
                 files.append((export.file_name(project, what, "png"), png, "image/png"))
             else:
-                files.append((export.file_name(project, what, "xlsx"), export.xlsx(project, lang),
+                files.append((export.file_name(project, what, "xlsx"), export.xlsx(project, lang, names=names),
                               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
         if request.POST.get("send"):
             return JsonResponse({"ok": True, "compose": export.mail(request.user, project, what, lang, files)})

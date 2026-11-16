@@ -93,7 +93,85 @@ def file_name(project, what, ext, today=None) -> str:
     return f"{project.code}_{WHATS[what]['file']}_{today.isoformat()}.{ext}"
 
 
-def names_in(lang):
+# ── 🌐 Назви кроків і фаз іншою мовою, ніж план (AI, core/ai_texts) ─────────────
+NAMES_TTL = 30 * 24 * 3600          # переклад тих самих назв тією самою мовою й моделлю — з кешу, без оплати
+NAME_MAX = 300
+CYR = "абвгґдеєжзиіїйклмнопрстуфхцчшщьюяъыэё"
+
+
+def _norm(text) -> str:
+    return " ".join(str(text or "").split())
+
+
+def plan_names(project) -> list:
+    """Назви фаз і кроків плану (без повторів, у порядку плану) — що перекладати."""
+    out, seen = [], set()
+    phases = list(project.phases.order_by("order", "pk").values_list("name", flat=True))
+    steps = list(ProjectStep.objects.filter(project=project).order_by("phase__order", "phase_id", "order", "pk")
+                 .values_list("title", flat=True))
+    for name in phases + steps:
+        name = _norm(name)
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+def names_script(project) -> str:
+    """Якою абеткою написано план: cyr — переважно кирилицею, lat — латиницею, '' — немає назв."""
+    names = plan_names(project)
+    if not names:
+        return ""
+    cyr = sum(1 for n in names if any(ch in CYR for ch in n.lower()))
+    return "cyr" if cyr * 2 >= len(names) else "lat"
+
+
+def translate_names(project, user, lang, model="") -> dict:
+    """{назва: переклад} усіх фаз і кроків мовою lang (core/ai_texts, модель — model). Той самий набір назв, мова й
+    модель — з кешу core.shared_cache (NAMES_TTL), без нового запиту до AI."""
+    import hashlib
+    import json
+
+    from core import ai_texts
+    from core.shared_cache import cache
+    if lang not in LANGS:
+        raise ExportError("Виберіть мову документа")
+    model = model if model in ai_texts.MODELS else ai_texts.DEFAULT_MODEL
+    names = plan_names(project)
+    if not names:
+        return {}
+    digest = hashlib.sha1(json.dumps(names, ensure_ascii=False).encode("utf-8")).hexdigest()[:20]
+    key = f"pj-export-names:{project.pk}:{lang}:{model}:{digest}"
+    hit = cache.get(key)
+    if isinstance(hit, dict):
+        return hit
+    try:
+        done = ai_texts.translate_list(user, names, lang, model,
+                                       about="These are names of phases and steps of a project plan (Gantt chart).")
+    except ai_texts.TranslateError as e:
+        raise ExportError(f"{e} — або експортуйте без перекладу назв") from None
+    out = {n: t[:NAME_MAX] for n, t in zip(names, done) if t and t != n}
+    cache.set(key, out, NAMES_TTL)
+    return out
+
+
+def clean_names(project, raw) -> dict:
+    """Переклад назв з форми експорту (JSON) — лише справжні назви цього плану, рядки до NAME_MAX."""
+    import json
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw) if isinstance(raw, str) else raw
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    known = set(plan_names(project))
+    return {_norm(k): _norm(v)[:NAME_MAX] for k, v in data.items()
+            if isinstance(k, str) and isinstance(v, str) and _norm(k) in known and _norm(v)}
+
+
+def names_in(lang, names=None):
     """Назва кроку чи фази мовою документа — лише повним збігом зі словником інтерфейсу (назви з шаблонів плану:
     «Прототип» → «Prototype»), свої — як написано; так само, як сторінка й діаграма ([data-mv-tr="exact"])."""
     from core.ui_text import catalog
@@ -104,18 +182,21 @@ def names_in(lang):
         exact = {}
 
     def name(text):
+        got = (names or {}).get(_norm(text))              # 🌐 переклад AI з вікна експорту — першим
+        if got:
+            return got
         pre, core, suf = edges(text or "")
         got = exact.get(core)
         return f"{pre}{got}{suf}" if got else (text or "")
     return name
 
 
-def rows(project, lang) -> list:
+def rows(project, lang, names=None) -> list:
     """Кроки плану з прогнозом (кеш schedule.persist — оновлює overview.collect) для таблиці PDF і Excel."""
     from . import overview
     overview.collect(project)                                   # свіжий прогноз кроків
     t = L[lang]
-    name = names_in(lang)
+    name = names_in(lang, names)
     out = []
     phases = {p.pk: p for p in project.phases.all()}
     steps = list(ProjectStep.objects.filter(project=project).select_related("phase", "party", "assignee")
@@ -164,7 +245,7 @@ def _keep(font_name):
     return clean
 
 
-def pdf(project, what, lang, png, table=False, today=None, titled=False) -> bytes:
+def pdf(project, what, lang, png, table=False, today=None, titled=False, names=None) -> bytes:
     from PIL import Image as PILImage
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A3, A4, landscape
@@ -204,7 +285,7 @@ def pdf(project, what, lang, png, table=False, today=None, titled=False) -> byte
         ratio = min(avail_w / w, avail_h / h)
         story.append(Image(io.BytesIO(png), width=w * ratio, height=h * ratio))
     if table and what == "plan":
-        data = rows(project, lang)
+        data = rows(project, lang, names)
         if data:
             if png:
                 story.append(PageBreak())
@@ -253,14 +334,14 @@ def pdf(project, what, lang, png, table=False, today=None, titled=False) -> byte
 
 # ── Excel ─────────────────────────────────────────────────────────────────────
 
-def xlsx(project, lang, today=None) -> bytes:
+def xlsx(project, lang, today=None, names=None) -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
     today = today or timezone.localdate()
     t = L[lang]
-    data = rows(project, lang)
+    data = rows(project, lang, names)
     wb = Workbook()
     ws = wb.active
     ws.title = WHATS["plan"]["file"]

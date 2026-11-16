@@ -39,8 +39,8 @@ def _name(text, n) -> str:
     скорочену — за повною в data-mv-full."""
     full = " ".join(str(text or "").split())
     shown = _cut(full, n)
-    more = f' data-mv-full="{escape(full)}" data-mv-cut="{len(shown)}"' if shown != full else ""
-    return f'<tspan data-mv-tr="exact"{more}>{escape(shown)}</tspan>'
+    cut = f' data-mv-cut="{len(shown)}"' if shown != full else ""
+    return f'<tspan data-mv-tr="exact" data-mv-full="{escape(full)}"{cut}>{escape(shown)}</tspan>'
 
 
 def _fmt(d) -> str:

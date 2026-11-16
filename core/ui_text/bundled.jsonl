@@ -865,6 +865,7 @@
 {"uk": "AI не зміг перевірити граматику", "en": "AI could not check the grammar", "de": "Die KI konnte die Grammatik nicht prüfen"}
 {"uk": "AI не знайшов нових ризиків — запропоновані вже є в реєстрі або відхилені раніше", "en": "AI found no new risks — the suggested ones are already in the register or were rejected before", "de": "Die KI hat keine neuen Risiken gefunden — die vorgeschlagenen stehen schon im Register oder wurden abgelehnt"}
 {"uk": "AI не переклав агенду — спробуйте ще раз або надішліть без перекладу", "en": "AI did not translate the agenda — try again or send it without translation", "de": "Die AI hat die Tagesordnung nicht übersetzt — erneut versuchen oder ohne Übersetzung senden"}
+{"uk": "AI не переклав — спробуйте ще раз або без перекладу", "en": "AI did not translate — try again or go without translation", "de": "Die AI hat nicht übersetzt — erneut versuchen oder ohne Übersetzung"}
 {"uk": "AI не повернув бриф — перевірте ключ AI або спробуйте ще раз", "en": "The AI did not return a brief — check the AI key or try again", "de": "Die KI hat kein Briefing geliefert — prüfen Sie den KI-Schlüssel oder versuchen Sie es erneut"}
 {"uk": "AI не повернув валідний JSON. Спробуйте ще раз.", "en": "AI did not return valid JSON. Please try again.", "de": "Die KI hat kein gültiges JSON zurückgegeben. Bitte versuchen Sie es erneut."}
 {"uk": "AI не повернув відповідь", "en": "The AI did not return a reply", "de": "Die KI hat keine Antwort geliefert"}
@@ -2123,6 +2124,7 @@
 {"uk": "Sonderangebot: знижка на ціну і всі ступені. 0 — без акції.", "en": "Sonderangebot: discount on the price and all price breaks. 0 — no promotion.", "de": "Sonderangebot: Rabatt auf den Preis und alle Staffelpreise. 0 – keine Aktion."}
 {"uk": "Sonnet 5.5 — збалансовано", "en": "Sonnet 5.5 — balanced", "de": "Sonnet 5.5 — ausgewogen"}
 {"uk": "Sonnet 5.5 — якісно (рекомендую)", "en": "Sonnet 5.5 — good quality (recommended)", "de": "Sonnet 5.5 — gute Qualität (empfohlen)"}
+{"uk": "Sonnet 5.5 — якісніше", "en": "Sonnet 5.5 — better quality", "de": "Sonnet 5.5 — bessere Qualität"}
 {"uk": "Staff — продажі, склад, клієнти", "en": "Staff — sales, stock, customers", "de": "Staff — Verkauf, Lager, Kunden"}
 {"uk": "Staged лістингів: {0}", "en": "Staged listings: {0}", "de": "Staged-Listings: {0}"}
 {"uk": "Standard — стандартне страхування до задекларованої вартості", "en": "Standard — standard insurance up to the declared value", "de": "Standard — Standardversicherung bis zum deklarierten Wert"}
@@ -3064,6 +3066,8 @@
 {"uk": "{0} — {1} — {2} шт.", "en": "{0} — {1} — {2} pcs", "de": "{0} — {1} — {2} Stk."}
 {"uk": "{0} — «{1}» немає серед значень DigiKey", "en": "{0} — “{1}” is not among the DigiKey values", "de": "{0} — „{1}“ ist nicht unter den DigiKey-Werten"}
 {"uk": "{0} — Підтвердіть email", "en": "{0} — Confirm your email", "de": "{0} — E-Mail bestätigen"}
+{"uk": "{0} — або експортуйте без перекладу назв", "en": "{0} — or export without translating the names", "de": "{0} — oder ohne Übersetzung der Namen exportieren"}
+{"uk": "{0} — або надішліть агенду без перекладу", "en": "{0} — or send the agenda without translation", "de": "{0} — oder die Tagesordnung ohne Übersetzung senden"}
 {"uk": "{0} — адміністратор і бачить усе; щоб обмежити, спершу змініть роль у профілі.", "en": "{0} is an administrator and sees everything; to restrict, first change the role in the profile.", "de": "{0} ist Administrator und sieht alles; um dies einzuschränken, ändern Sie zuerst die Rolle im Profil."}
 {"uk": "{0} — артикул товару (або «Даташит: спільний файл»), напр. https://sevskiy.i234.me/datasheets/download.php?file={1}.pdf", "en": "{0} — the product SKU (or “Datasheet: shared file”), e.g. https://sevskiy.i234.me/datasheets/download.php?file={1}.pdf", "de": "{0} — Artikelnummer des Artikels (oder „Datenblatt: gemeinsame Datei“), z. B. https://sevskiy.i234.me/datasheets/download.php?file={1}.pdf"}
 {"uk": "{0} — артикул товару (або «Даташит: спільний файл»); досить початку адреси — Minerva допише {1}.pdf.", "en": "{0} — the product SKU (or “Datasheet: shared file”); the beginning of the address is enough — Minerva will append {1}.pdf.", "de": "{0} — Artikelnummer des Artikels (oder „Datenblatt: gemeinsame Datei“); der Anfang der Adresse genügt — Minerva ergänzt {1}.pdf."}
@@ -4759,6 +4763,8 @@
 {"uk": "Виберіть колір", "en": "Choose a color", "de": "Wählen Sie eine Farbe"}
 {"uk": "Виберіть колір статусу", "en": "Choose the status color", "de": "Wählen Sie die Statusfarbe"}
 {"uk": "Виберіть листи галочками.", "en": "Select e-mails with the checkboxes.", "de": "Wählen Sie E-Mails mit den Häkchen aus."}
+{"uk": "Виберіть мову", "en": "Choose a language", "de": "Sprache wählen"}
+{"uk": "Виберіть мову документа", "en": "Choose the document language", "de": "Dokumentsprache wählen"}
 {"uk": "Виберіть мову листа", "en": "Choose the language of the e-mail", "de": "Sprache der E-Mail wählen"}
 {"uk": "Виберіть один або кілька днів тижня.", "en": "Select one or more days of the week.", "de": "Wählen Sie einen oder mehrere Wochentage."}
 {"uk": "Виберіть один запит — на його основі відкриється форма нового.", "en": "Select one request — a new request form based on it will open.", "de": "Wählen Sie eine Anfrage — das Formular einer neuen Anfrage auf ihrer Grundlage öffnet sich."}
@@ -7024,6 +7030,7 @@
 {"uk": "Забагато рядків: фаз до {0}, кроків до {1}", "en": "Too many rows: up to {0} phases, up to {1} steps", "de": "Zu viele Zeilen: bis zu {0} Phasen, bis zu {1} Schritte"}
 {"uk": "Забагато сегментів в одній частині", "en": "Too many segments in one part", "de": "Zu viele Segmente in einem Teil"}
 {"uk": "Забагато спроб підключення — спробуйте за годину.", "en": "Too many connection attempts — try again in an hour.", "de": "Zu viele Verbindungsversuche — versuchen Sie es in einer Stunde."}
+{"uk": "Забагато текстів для перекладу — не більше {0}", "en": "Too many texts to translate — no more than {0}", "de": "Zu viele Texte zum Übersetzen — höchstens {0}"}
 {"uk": "Заблок.", "en": "Blocked", "de": "Gesperrt"}
 {"uk": "Заблокований", "en": "Blocked", "de": "Gesperrt"}
 {"uk": "Заблоковано", "en": "Blocked", "de": "Gesperrt"}
@@ -12471,6 +12478,7 @@
 {"uk": "Переклад зупинився: {0}", "en": "Translation stopped: {0}", "de": "Die Übersetzung wurde angehalten: {0}"}
 {"uk": "Переклад робить Claude (хмарний AI) — туди піде текст агенди; рахується в бюджеті AI. Без перекладу пункти йдуть, як написано.", "en": "Claude (cloud AI) translates — the agenda text is sent there; it counts towards the AI budget. Without translation the items go as written.", "de": "Die Übersetzung macht Claude (Cloud-AI) — dorthin geht der Text der Tagesordnung; zählt zum AI-Budget. Ohne Übersetzung gehen die Punkte wie geschrieben."}
 {"uk": "Переклад уже йде.", "en": "A translation is already running.", "de": "Eine Übersetzung läuft bereits."}
+{"uk": "Перекладаю назви кроків і фаз (AI)…", "en": "Translating the step and phase names (AI)…", "de": "Übersetze die Namen der Schritte und Phasen (AI)…"}
 {"uk": "Перекладаю…", "en": "Translating…", "de": "Übersetze…"}
 {"uk": "Перекладається…", "en": "Translating…", "de": "Wird übersetzt…"}
 {"uk": "Перекладено: {0} · відхилено перевіркою: {1}{2}", "en": "Translated: {0} · rejected by validation: {1}{2}", "de": "Übersetzt: {0} · von der Prüfung abgelehnt: {1}{2}"}
@@ -12485,6 +12493,7 @@
 {"uk": "Перекласти {0} написів", "en": "Translate {0} labels", "de": "{0} Beschriftungen übersetzen"}
 {"uk": "Перекласти вибрані (AI, Sonnet 5.5)", "en": "Translate selected (AI, Sonnet 5.5)", "de": "Ausgewählte übersetzen (KI, Sonnet 5.5)"}
 {"uk": "Перекласти відсутнє (AI)", "en": "Translate missing (AI)", "de": "Fehlendes übersetzen (KI)"}
+{"uk": "Перекласти назви кроків і фаз (AI)", "en": "Translate the step and phase names (AI)", "de": "Namen der Schritte und Phasen übersetzen (AI)"}
 {"uk": "Перекласти пункти цією мовою (AI)", "en": "Translate the items into this language (AI)", "de": "Punkte in diese Sprache übersetzen (AI)"}
 {"uk": "Переконайся що Marketplace авторизований (", "en": "Make sure the Marketplace is authorized (", "de": "Stellen Sie sicher, dass der Marketplace autorisiert ist ("}
 {"uk": "Переконайся що в DigiKey App налаштований Redirect URI", "en": "Make sure the Redirect URI is configured in the DigiKey App", "de": "Stellen Sie sicher, dass in der DigiKey App der Redirect URI eingerichtet ist"}
@@ -20150,6 +20159,7 @@
 {"uk": "не вдалося завантажити: {0}", "en": "could not load: {0}", "de": "Laden fehlgeschlagen: {0}"}
 {"uk": "не вдалося зберегти", "en": "could not save", "de": "Speichern fehlgeschlagen"}
 {"uk": "не вдалося змінити подію в календарі", "en": "could not change the event in the calendar", "de": "der Termin im Kalender konnte nicht geändert werden"}
+{"uk": "не вдалося перекласти назви", "en": "could not translate the names", "de": "Namen konnten nicht übersetzt werden"}
 {"uk": "не вдалося перечитати замовлення з DigiKey", "en": "could not re-read the order from DigiKey", "de": "Auftrag konnte nicht erneut von DigiKey gelesen werden"}
 {"uk": "не вдалося побудувати графіки — відкрийте звіт або спробуйте пізніше", "en": "could not build the charts — open the report or try later", "de": "Diagramme konnten nicht erstellt werden — öffnen Sie den Bericht oder versuchen Sie es später erneut"}
 {"uk": "не вдалося прочитати", "en": "could not read", "de": "konnte nicht gelesen werden"}
@@ -20764,6 +20774,7 @@
 {"uk": "пишіть як колезі — або продиктуйте", "en": "write as to a colleague — or dictate", "de": "schreiben Sie wie einem Kollegen — oder diktieren Sie"}
 {"uk": "план {0}", "en": "plan {0}", "de": "Plan {0}"}
 {"uk": "план {0}–{1}", "en": "plan {0}–{1}", "de": "Plan {0}–{1}"}
+{"uk": "план написано іншою мовою — Claude перекладе назви кроків і фаз мовою документа (назви фірм, людей і артикули лишаються); переклад запам’ятовується — повторний експорт без оплати", "en": "the plan is written in another language — Claude translates the step and phase names into the document language (company and people names and part numbers stay); the translation is remembered — exporting again costs nothing", "de": "der Plan ist in einer anderen Sprache geschrieben — Claude übersetzt die Namen der Schritte und Phasen in die Dokumentsprache (Firmen-, Personennamen und Artikelnummern bleiben); die Übersetzung wird gespeichert — erneuter Export kostet nichts"}
 {"uk": "план не складено", "en": "no plan yet", "de": "kein Plan erstellt"}
 {"uk": "план по тижнях: кроки, дати, смуги кольором стану, ◆ віхи", "en": "plan by weeks: steps, dates, bars coloured by status, ◆ milestones", "de": "Plan nach Wochen: Schritte, Termine, Balken in Statusfarbe, ◆ Meilensteine"}
 {"uk": "план роботи з конкретним клієнтом", "en": "a plan for working with a specific customer", "de": "ein Plan für die Arbeit mit einem bestimmten Kunden"}
@@ -21218,6 +21229,7 @@
 {"uk": "піднято до закупівельної + {0} %", "en": "raised to purchase price + {0} %", "de": "auf Einkaufspreis + {0} % angehoben"}
 {"uk": "підпапок немає", "en": "no subfolders", "de": "keine Unterordner"}
 {"uk": "підпис листа", "en": "e-mail signature", "de": "E-Mail-Signatur"}
+{"uk": "підписи діаграми, заголовки, стани, дати й текст листа, назви кроків і фаз зі стандартних шаблонів", "en": "diagram labels, headers, statuses, dates and the e-mail text, step and phase names from the standard templates", "de": "Beschriftungen der Grafik, Überschriften, Status, Daten und der E-Mail-Text, Namen von Schritten und Phasen aus den Standardvorlagen"}
 {"uk": "підписи діаграми, заголовки, стани, дати й текст листа, назви кроків і фаз зі стандартних шаблонів; свої назви — як ви їх написали", "en": "diagram labels, headers, statuses, dates and the e-mail text, step and phase names from the standard templates; your own names — as you wrote them", "de": "Beschriftungen der Grafik, Überschriften, Status, Daten und der E-Mail-Text, Namen von Schritten und Phasen aus den Standardvorlagen; eigene Namen — wie Sie sie geschrieben haben"}
 {"uk": "підписи діаграми, заголовки, стани, дати й текст листа; назви кроків, фаз і сторін — як ви їх написали", "en": "diagram labels, headings, statuses, dates and the e-mail text; names of steps, phases and parties stay as you wrote them", "de": "Diagrammbeschriftungen, Überschriften, Status, Termine und E-Mail-Text; Namen von Schritten, Phasen und Beteiligten bleiben, wie Sie sie geschrieben haben"}
 {"uk": "підписки (видно з «показати виконані»); повернули в роботу — дедлайн повертається. Прострочені завжди видно.", "en": "the subscription (visible with “show completed”); if put back into work, the deadline returns. Overdue ones are always visible.", "de": "dem Abonnement (sichtbar mit „Erledigte anzeigen“); wird er wieder in Bearbeitung genommen, kehrt die Frist zurück. Überfällige sind immer sichtbar."}

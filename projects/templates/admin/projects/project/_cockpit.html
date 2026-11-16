@@ -10,7 +10,7 @@
      data-plan-save-all="{{ urls.plan_save_all }}" data-plan-revise="{{ urls.plan_revise }}"{% if ai.on %} data-ai-on="1"{% endif %}
      data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-risks="{{ urls.ai_risks }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
      data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
-     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-sourcing="{{ urls.sourcing }}" data-export="{{ urls.export }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
+     data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-sourcing="{{ urls.sourcing }}" data-export="{{ urls.export }}" data-export-names="{{ urls.export_names }}" data-names-script="{{ names_script }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
      data-ai-settings="{{ urls.ai_settings }}" data-ai-since="{{ ai.since|date:'Y-m-d' }}" data-start="{{ start|date:'Y-m-d' }}"
      data-steps="{{ plan.steps|default:0 }}"{% if can_change %}
      data-name="{{ project.name }}"{% endif %}>
@@ -38,7 +38,7 @@
       {% for f in plan.strip %}
         <li class="pjc-ph pjc-ph-{{ f.status }}{% if f.gate %} pjc-ph-gate{% endif %}"{% if f.id and can_change %} data-pjc-phase="{{ f.id }}"{% endif %}
             title="{{ f.name }}{% if f.gate %} · умова переходу: {{ f.gate }}{% if f.gate_done %} ✓{% endif %}{% endif %}{% if f.dates %} · {{ f.dates }}{% endif %}">
-          <b>{% if f.status == "done" %}✓ {% elif f.status == "active" %}● {% endif %}<span data-mv-tr="exact">{{ f.name }}</span></b>
+          <b>{% if f.status == "done" %}✓ {% elif f.status == "active" %}● {% endif %}<span data-mv-tr="exact" data-mv-full="{{ f.name }}">{{ f.name }}</span></b>
           <small>{% if f.progress %}{{ f.progress }}{% endif %}{% if f.dates %} · {{ f.dates }}{% endif %}{% if f.slip %} · <span class="pjc-slip">+{{ f.slip }} дн.</span>{% endif %}</small>
         </li>
       {% endfor %}

@@ -226,8 +226,9 @@ class ExportLanguageTests(EditorBase):
         ProjectStep.objects.filter(pk=self.b.pk).update(assignee=self.user)
         ProjectStep.objects.filter(pk=self.c.pk).update(title="Клієнт погодив специфікацію й креслення корпусу")
         svg = gantt.render(self.project, schedule.compute(self.project, today=self.today), today=self.today)
-        self.assertIn('class="pjg-pname">🔧 <tspan data-mv-tr="exact">Prototyp</tspan>', svg)
-        self.assertRegex(svg, r'class="pjg-t">\S* ?<tspan data-mv-tr="exact">Platinen bestellen</tspan>')
+        self.assertIn('class="pjg-pname">🔧 <tspan data-mv-tr="exact" data-mv-full="Prototyp">Prototyp</tspan>', svg)
+        self.assertRegex(svg, r'class="pjg-t">\S* ?<tspan data-mv-tr="exact" data-mv-full="Platinen bestellen">'
+                              r'Platinen bestellen</tspan>')
         self.assertIn('<tspan data-mv-tr="exact" data-mv-full="Клієнт погодив специфікацію й креслення корпусу" '
                       'data-mv-cut="29">Клієнт погодив специфікацію …</tspan>', svg)
         self.assertNotIn('class="pjg-t" translate="no"', svg)
@@ -246,12 +247,12 @@ class ExportLanguageTests(EditorBase):
         self.assertEqual([p for p in parts if p not in tr], [])
         js = (base / "projects/static/projects/pj.js").read_text(encoding="utf-8")
         self.assertIn("exactName(t, String(vals.title || ''))", js)
-        self.assertIn("e.lane === 'plan' ? ' data-mv-tr=\"exact\">'",
+        self.assertIn("e.lane === 'plan' ? ' data-mv-tr=\"exact\" data-mv-full=\"'",
                       (base / "projects/static/projects/pj_timeline.js").read_text(encoding="utf-8"))
         self.assertIn("o.tr.node ? o.tr.node(node)",
                       (base / "projects/static/projects/pj_export.js").read_text(encoding="utf-8"))
         html = self.client.get(f"/admin/projects/project/{self.project.pk}/change/").content.decode()
-        self.assertIn('<span data-mv-tr="exact">🔧 Prototyp</span>', html)          # смуга фаз
+        self.assertIn('<span data-mv-tr="exact" data-mv-full="🔧 Prototyp">🔧 Prototyp</span>', html)   # смуга фаз
 
     def test_table_export_translates_template_names_only(self):
         from core.models import UIText
@@ -265,3 +266,59 @@ class ExportLanguageTests(EditorBase):
         self.assertIn("Measure samples", titles)                         # назва є в словнику — мовою документа
         self.assertIn("Platinen bestellen", titles)                      # своя — як написано
         self.assertIn("Muster messen", {r["title"] for r in export.rows(self.project, "uk")})
+
+
+class ExportNamesAITests(EditorBase):
+    """🌐 Назви кроків і фаз мовою документа через AI (export.translate_names / clean_names, вікно експорту)."""
+    def setUp(self):
+        super().setUp()
+        from core.shared_cache import cache
+        cache.clear()
+        self.answer = json.dumps(["Prototype", "Series", "Order boards", "Measure samples", "Series production"])
+
+    def test_translate_names_once_then_cache(self):
+        from projects import export
+        self.assertEqual(export.plan_names(self.project),
+                         ["Prototyp", "Serie", "Platinen bestellen", "Muster messen", "Serienfertigung"])
+        self.assertEqual(export.names_script(self.project), "lat")
+        with patch("email_assistant.ai_helper._call_ai_direct", return_value=self.answer) as ai:
+            names = export.translate_names(self.project, self.user, "en", "claude-sonnet-5-5")
+            again = export.translate_names(self.project, self.user, "en", "claude-sonnet-5-5")
+        self.assertEqual(ai.call_count, 1)                                           # удруге — з кешу
+        self.assertEqual(ai.call_args.kwargs["model"], "claude-sonnet-5-5")
+        self.assertIn('"Platinen bestellen"', ai.call_args.args[0])                  # назви — даними, JSON
+        self.assertEqual(names, again)
+        self.assertEqual(names["Muster messen"], "Measure samples")
+        titles = [r["title"] for r in export.rows(self.project, "en", names)]
+        self.assertIn("Order boards", titles)
+        self.assertEqual({r["phase"] for r in export.rows(self.project, "en", names)}, {"Prototype", "Series"})
+        with patch("email_assistant.ai_helper._call_ai_direct", return_value="no json"):
+            with self.assertRaises(export.ExportError):
+                export.translate_names(self.project, self.user, "de", "claude-haiku-5-5")
+
+    def test_clean_names_keeps_only_this_plan(self):
+        from projects import export
+        raw = json.dumps({"Muster messen": "Measure samples", "Fremd": "x", "Serie": "  "})
+        self.assertEqual(export.clean_names(self.project, raw), {"Muster messen": "Measure samples"})
+        self.assertEqual(export.clean_names(self.project, "not json"), {})
+
+    def test_endpoint_dialog_and_excel(self):
+        from django.urls import reverse
+        url = reverse("projects:export_names", args=[self.project.pk])
+        with patch("email_assistant.ai_helper._call_ai_direct", return_value=self.answer):
+            data = self.client.post(url, json.dumps({"lang": "en", "model": "claude-haiku-5-5"}),
+                                    content_type="application/json").json()
+        self.assertTrue(data["ok"], data)
+        self.assertEqual(data["names"]["Platinen bestellen"], "Order boards")
+        self.assertEqual(self.client.get(url).status_code, 405)
+        r = self.client.post(reverse("projects:export", args=[self.project.pk]),
+                             {"what": "plan", "lang": "en", "formats": "xlsx", "names": json.dumps(data["names"])})
+        self.assertEqual(r.status_code, 200)
+        from openpyxl import load_workbook
+        import io
+        ws = load_workbook(io.BytesIO(r.content)).active
+        self.assertIn("Order boards", [ws.cell(row=i, column=2).value for i in range(1, 15)])
+        html = self.client.get(f"/admin/projects/project/{self.project.pk}/change/").content.decode()
+        self.assertIn('data-names-script="lat"', html)
+        self.assertIn('data-x="ai"', html)
+        self.assertIn('value="claude-opus-5-5"', html)

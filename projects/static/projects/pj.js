@@ -110,10 +110,8 @@
   // 🌐 назва кроку чи фази: інша мова перекладає лише повним збігом зі словником (назви з шаблонів плану), свої — як є
   function exactName(node, full) {
     node.setAttribute('data-mv-tr', 'exact');
-    if (node.textContent !== full) {
-      node.setAttribute('data-mv-full', full);
-      node.setAttribute('data-mv-cut', String(node.textContent.length));
-    }
+    node.setAttribute('data-mv-full', full);    // оригінал — і для перекладу назв AI в експорті
+    if (node.textContent !== full) node.setAttribute('data-mv-cut', String(node.textContent.length));
   }
   function ganttPpd() {
     var p = parseFloat(pref(GP, ''));
@@ -1383,10 +1381,13 @@
   function openExport(kind) {
     var ds = dialogs();
     if (!ds || !ds.exp) return;
-    var d = ds.exp, lang = 'de';
+    var d = ds.exp, lang = 'de', model = '';
     expKind = kind;
     try { lang = localStorage.getItem('pj-export-lang') || 'de'; } catch (x) { lang = 'de'; }
+    try { model = localStorage.getItem('pj-export-model') || ''; } catch (x) { model = ''; }
     q(d, 'data-x', 'lang').value = lang;
+    if (model && q(d, 'data-x', 'model').querySelector('option[value="' + model + '"]')) q(d, 'data-x', 'model').value = model;
+    expAiDefault();
     var what = EXP_TITLES[kind] || '';
     if (kind === 'plan') {
       var classic = root.querySelector('[data-pjg-pane="classic"]');
@@ -1394,11 +1395,17 @@
         + (pref(GD, 'full') === 'brief' ? 'коротко (фази й віхи)' : 'детально');
     }
     d.querySelector('[data-x-what]').textContent = what;
-    d.querySelectorAll('[data-x-only]').forEach(function (el) { el.hidden = el.dataset.xOnly !== kind; });
+    d.querySelectorAll('[data-x-only]').forEach(function (el) { el.hidden = el.dataset.xOnly.split(' ').indexOf(kind) < 0; });
     d.querySelector('[data-pjp-err]').textContent = '';
     if (!d.dataset.bound) {
       d.dataset.bound = '1';
-      d.addEventListener('change', function () { expFiles(); });
+      d.addEventListener('change', function (e) {
+        if (e.target === q(d, 'data-x', 'lang')) expAiDefault();
+        if (e.target === q(d, 'data-x', 'model')) {
+          try { localStorage.setItem('pj-export-model', e.target.value); } catch (x) { /* немає сховища */ }
+        }
+        expFiles();
+      });
     }
     expFiles();
     d.showModal();
@@ -1445,7 +1452,13 @@
   function expWant() {
     var d = dlg.exp, f = function (k) { return q(d, 'data-x', k); };
     return {pdf: f('pdf').checked, png: f('png').checked, xlsx: expKind === 'plan' && f('xlsx').checked,
-            table: expKind === 'plan' && f('pdf').checked && f('table').checked, lang: f('lang').value};
+            table: expKind === 'plan' && f('pdf').checked && f('table').checked, lang: f('lang').value,
+            ai: expKind !== 'chain' && f('ai').checked, model: f('model').value};
+  }
+  // 🌐 План написано іншою абеткою, ніж мова документа (кирилиця ↔ латиниця) — «Перекласти назви (AI)» саме
+  function expAiDefault() {
+    var d = dlg.exp, script = box().dataset.namesScript || '', lang = q(d, 'data-x', 'lang').value;
+    q(d, 'data-x', 'ai').checked = !!script && (script === 'cyr') !== (lang === 'uk');
   }
   function expFiles() {                 // «3. Що далі»: які файли вийдуть і як завантажаться
     var d = dlg.exp, w = expWant(), title = (box().dataset.code || '') + ' · ';
@@ -1455,6 +1468,8 @@
     if (w.xlsx) names.push(window.PJExport ? window.PJExport.fileName(title, expKind, 'xlsx') : 'xlsx');
     var tbl = q(d, 'data-x', 'table');
     if (tbl) tbl.disabled = !q(d, 'data-x', 'pdf').checked;
+    var mdl = d.querySelector('[data-x-model]');
+    if (mdl) mdl.hidden = !q(d, 'data-x', 'ai').checked;
     d.querySelector('[data-x-files]').textContent = !names.length ? '⚠️ Виберіть хоча б один файл'
       : names.length === 1 ? '⬇ Завантажиться файл: {f}'.replace('{f}', names[0])
       : '⬇ Завантажиться один ZIP з файлами: {f}'.replace('{f}', names.join(', '));
@@ -1487,11 +1502,26 @@
     btns.forEach(function (b) { b.disabled = true; });
     err.textContent = '⏳ Готую файли…';
     var title = (box().dataset.code || '') + ' · ' + (box().dataset.title || '');
-    var pic = svgs.length && (want.pdf || want.png)
-      ? (window.PJExport.translator ? window.PJExport.translator(want.lang) : Promise.resolve(null)).then(function (tr) {
-        return window.PJExport.png(svgs, Object.assign(expHead(want.lang), {lang: want.lang, tr: tr}));
-      })
-      : Promise.resolve(null);
+    var names = null;                           // 🌐 {назва: переклад} — назви кроків і фаз (AI, з кешу сервера)
+    var named = !want.ai ? Promise.resolve(null) : (function () {
+      err.textContent = '⏳ Перекладаю назви кроків і фаз (AI)…';
+      return fetch(box().dataset.exportNames, {method: 'POST', credentials: 'same-origin',
+        headers: {'X-CSRFToken': csrf(), 'Content-Type': 'application/json'},
+        body: JSON.stringify({lang: want.lang, model: want.model})})
+        .then(function (r) { return r.json().catch(function () { return {ok: false, error: 'HTTP ' + r.status}; }); })
+        .then(function (j) {
+          if (!j || !j.ok) throw new Error((j && j.error) || 'не вдалося перекласти назви');
+          names = j.names || {};
+          err.textContent = '⏳ Готую файли…';
+          return names;
+        });
+    })();
+    var pic = named.then(function () {
+      if (!svgs.length || !(want.pdf || want.png)) return null;
+      return (window.PJExport.translator ? window.PJExport.translator(want.lang) : Promise.resolve(null)).then(function (tr) {
+        return window.PJExport.png(svgs, Object.assign(expHead(want.lang), {lang: want.lang, tr: tr, names: names}));
+      });
+    });
     function ask(blob, formats, mail) {
       var fd = new FormData();
       if (blob) fd.append('image', blob, 'diagram.png');
@@ -1501,6 +1531,7 @@
       fd.append('table', want.table ? '1' : '');
       fd.append('send', mail ? '1' : '');
       fd.append('titled', '1');                 // заголовок і легенда вже в картинці — у PDF не дублювати
+      if (names) fd.append('names', JSON.stringify(names));   // таблиця PDF і Excel — тими самими назвами
       return fetch(box().dataset.export, {method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': csrf()},
                                           body: fd})
         .then(function (r) {
