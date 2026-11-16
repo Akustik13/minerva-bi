@@ -13,6 +13,7 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+from . import contents
 from .models import JLCConfig, JLCOrder, JLCOrderLine, JLCProductMapping
 
 # ── Badge helpers ─────────────────────────────────────────────────────────────
@@ -228,7 +229,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
 
     list_display = (
         'gerber_thumb', 'jlc_order_id_link', 'order_type', 'description_short',
-        'quantity', 'status_badge',
+        'quantity_col', 'status_badge',
         'files_summary_col', 'tracking_display',
         'order_date', 'shipped_date',
     )
@@ -1110,15 +1111,49 @@ class JLCOrderAdmin(admin.ModelAdmin):
             obj.jlc_order_id,
         )
 
-    @admin.display(description='Опис')
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related('lines__product')
 
+    def _items(self, obj):
+        """Позиції замовлення раз на рядок списку (колонки «Опис» і «Кількість» беруть ті самі)."""
+        cached = getattr(obj, '_jlc_items', None)
+        if cached is None:
+            cached = obj._jlc_items = contents.items(obj)
+        return cached
+
+    @admin.display(description='Опис')
     def description_short(self, obj):
+        found = self._items(obj)
+        if len(found) > 1:
+            # Кілька файлів — що саме в замовленні, а не назва першого файлу
+            from django.utils.html import format_html_join
+            files = '\n'.join(f'{it.file_name} × {it.qty}' for it in found)
+            gs = contents.groups(found)
+            rows = format_html_join(
+                '', '<span style="display:block;white-space:nowrap">{}{} <b>×{}</b></span>',
+                (('' if g.linked else '⬜ ', g.name, g.qty_text) for g in gs[:contents.COMPACT_GROUPS + 1]),
+            )
+            more = len(gs) - (contents.COMPACT_GROUPS + 1)
+            return format_html(
+                '<span title="{}" translate="no">{}</span>{}', files, rows,
+                format_html('<span style="display:block;font-size:10px;color:var(--text-dim)">… +{}</span>', more)
+                if more > 0 else '',
+            )
         txt = obj.description or ''
         if len(txt) > 45:
             return format_html('<span title="{}">{}&hellip;</span>', txt, txt[:45])
         return txt or '—'
+
+    @admin.display(description='Кількість (шт)')
+    def quantity_col(self, obj):
+        found = self._items(obj)
+        if len(found) > 1:
+            return format_html(
+                '<b>{}</b><span style="display:block;font-size:10px;color:var(--text-dim)" '
+                'title="Разом усіх позицій замовлення">{}</span>',
+                contents.total_qty(found), f'{len(found)} поз.',
+            )
+        return found[0].qty if found else obj.quantity
 
     _STATUS_UK_SHORT = {
         'ordered': 'Замовлено', 'reviewed': 'Перевірено', 'in_production': 'Виробництво',
@@ -1265,7 +1300,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
 
     @admin.display(description='Файли / Товари')
     def files_summary_col(self, obj):
-        from django.utils.html import mark_safe
+        from django.utils.html import escape, mark_safe
         lines = list(obj.lines.all())  # prefetched
         if not lines:
             # Fallback to old product_link logic
@@ -1303,7 +1338,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 rows.append(
                     f'<div style="padding:1px 0;font-size:11px;white-space:nowrap">'
                     f'✅ {recv_icon}<a href="/admin/inventory/product/{ln.product_id}/change/" '
-                    f'style="color:var(--link-fg)">{ln.product.sku}</a>'
+                    f'style="color:var(--link-fg)">{escape(ln.product.sku)}</a>'
                     f' <span style="color:var(--text-dim)">{icon}</span>'
                     f'</div>'
                 )
@@ -1311,7 +1346,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 short = ln.file_name[:30] + ('…' if len(ln.file_name) > 30 else '')
                 rows.append(
                     f'<div style="padding:1px 0;font-size:11px;white-space:nowrap;color:var(--text-dim)">'
-                    f'⬜ {short} {icon}'
+                    f'⬜ {escape(short)} {icon}'
                     f'</div>'
                 )
         summary = f'{len(lines)} файлів · {bound} прив\'язано'
@@ -1442,7 +1477,13 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 and float(obj.received_qty) < obj.quantity
             )
             extra['is_unmatched'] = obj.mapping_status == JLCOrder.MappingStatus.UNMATCHED
-            extra['refresh_url']           = reverse('admin:jlcpcb_jlcorder_refresh', args=[obj.pk])
+            # Що в замовленні — усі позиції (чипи вгорі картки), а не лише перша
+            found = contents.items(obj)
+            extra['jlc_multi']     = len(found) > 1
+            extra['jlc_groups']    = contents.groups(found)
+            extra['jlc_total_qty'] = contents.total_qty(found)
+            extra['jlc_items_n']   = len(found)
+            extra['refresh_url']          = reverse('admin:jlcpcb_jlcorder_refresh', args=[obj.pk])
             extra['receive_url']           = reverse('admin:jlcpcb_jlcorder_receive', args=[obj.pk])
             extra['match_url']             = reverse('admin:jlcpcb_jlcorder_match', args=[obj.pk])
             extra['set_track_only_url']    = reverse('admin:jlcpcb_jlcorder_set_track_only', args=[obj.pk])

@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 import urllib.request
 import urllib.error
+from html import escape
+
+from . import contents
 
 logger = logging.getLogger(__name__)
 
@@ -198,62 +201,75 @@ def _build_jlc_html(order, old_status: str, new_status: str,
 
     now_str = tz.now().strftime('%d.%m.%Y %H:%M')
 
-    # Product/description
-    product_name = ''
-    if order.product_id:
-        product_name = order.product.sku
-    elif order.description:
-        product_name = order.description[:80]
+    # Усі позиції замовлення (не лише перша)
+    found = contents.items(order)
+    if len(found) == 1:
+        it = found[0]
+        product_name = escape(it.name if it.linked else contents.short(it.file_name or it.name, 80))
+        qty_html = f'{it.qty} шт.'
+    else:
+        product_name = escape(contents.compact(found, limit=len(found)))
+        qty_html = (f'{contents.total_qty(found)} шт. '
+                    f'<span style="font-size:12px;font-weight:400;color:#888">'
+                    f'· позицій: {len(found)}</span>')
 
-    # PCB specs from raw_data
-    specs_rows = ''
+    # Специфікація кожної плати з raw_data (за назвою файлу)
+    pcb_by_file = {}
     raw = getattr(order, 'raw_data', None)
     if isinstance(raw, dict):
         for item in raw.get('orderItem', []):
-            pcb = item.get('pcbItem') or {}
-            if not pcb:
-                continue
-            st_int = pcb.get('orderStatus')
-            st_key = new_status  # use current
-            spec_items = []
-            if pcb.get('width') and pcb.get('length'):
-                spec_items.append(f"{pcb['width']}×{pcb['length']} мм")
-            if pcb.get('layer'):
-                spec_items.append(f"{pcb['layer']} шари")
-            if pcb.get('thickness'):
-                spec_items.append(f"{pcb['thickness']} мм")
-            if pcb.get('pcbColor'):
-                spec_items.append(pcb['pcbColor'])
-            if pcb.get('surfaceFinish'):
-                spec_items.append(pcb['surfaceFinish'])
-            if pcb.get('materialDetails'):
-                spec_items.append(pcb['materialDetails'])
-            specs_str = ' · '.join(spec_items)
-            fn = pcb.get('fileName', '')
-            count = pcb.get('count', 0)
-            price = pcb.get('price', '')
-            price_str = f'{price} USD' if price else ''
-            specs_rows += (
-                f'<tr>'
-                f'<td style="padding:8px 10px;font-family:monospace;font-size:12px;'
-                f'color:#1a237e;font-weight:600">{fn}</td>'
-                f'<td style="padding:8px 10px;text-align:center;font-weight:700">{count}</td>'
-                f'<td style="padding:8px 10px;font-size:11px;color:#555">{specs_str}</td>'
-                f'<td style="padding:8px 10px;text-align:right;white-space:nowrap">{price_str}</td>'
-                f'</tr>'
-            )
-            break  # show only first pcbItem for brevity
+            pcb = (item or {}).get('pcbItem') or {}
+            if pcb.get('fileName'):
+                pcb_by_file.setdefault(pcb['fileName'], pcb)
+
+    specs_rows = ''
+    for it in found:
+        pcb = pcb_by_file.get(it.file_name, {})
+        spec_items = []
+        if pcb.get('width') and pcb.get('length'):
+            spec_items.append(f"{pcb['width']}×{pcb['length']} мм")
+        if pcb.get('layer'):
+            spec_items.append(f"{pcb['layer']} шари")
+        if pcb.get('thickness'):
+            spec_items.append(f"{pcb['thickness']} мм")
+        for key in ('pcbColor', 'surfaceFinish', 'materialDetails'):
+            if pcb.get(key):
+                spec_items.append(str(pcb[key]))
+        specs_str = escape(' · '.join(spec_items))
+        price = pcb.get('price', '')
+        price_str = escape(f'{price} USD') if price else ''
+        variant = f' · {escape(it.variant)}' if it.variant else ''
+        note = contents.status_note(it, new_status)
+        sub = []
+        if it.file_name and it.file_name != it.name:
+            sub.append(escape(it.file_name))
+        if not it.linked:
+            sub.append('⬜ не прив’язано до товару складу')
+        if note:
+            sub.append(escape(note))
+        sub_html = ''.join(f'<div style="font-size:11px;color:#888;font-weight:400;'
+                           f'font-family:Arial,sans-serif">{s}</div>' for s in sub)
+        specs_rows += (
+            f'<tr style="border-top:1px solid #eee">'
+            f'<td style="padding:8px 10px;font-family:monospace;font-size:12px;'
+            f'color:#1a237e;font-weight:600">{escape(it.name)}{variant}{sub_html}</td>'
+            f'<td style="padding:8px 10px;text-align:center;font-weight:700">{it.qty}</td>'
+            f'<td style="padding:8px 10px;font-size:11px;color:#555">{specs_str}</td>'
+            f'<td style="padding:8px 10px;text-align:right;white-space:nowrap">{price_str}</td>'
+            f'</tr>'
+        )
 
     specs_section = ''
     if specs_rows:
+        title = 'Специфікація PCB' if len(found) == 1 else f'Що в замовленні — позицій: {len(found)}'
         specs_section = (
             '<div style="padding:0 24px 16px">'
             '<p style="margin:0 0 8px;font-size:12px;font-weight:700;'
-            'text-transform:uppercase;letter-spacing:.05em;color:#888">Специфікація PCB</p>'
-            '<table style="width:100%;border-collapse:collapse;font-size:13px;'
+            f'text-transform:uppercase;letter-spacing:.05em;color:#888">{title}</p>'
+            '<table width="100%" style="width:100%;border-collapse:collapse;font-size:13px;'
             'border:1px solid #e0e0e0;border-radius:4px">'
             '<tr style="background:#f5f5f5;font-size:11px;color:#666;font-weight:600">'
-            '<td style="padding:6px 10px">Файл</td>'
+            '<td style="padding:6px 10px">Товар / файл</td>'
             '<td style="padding:6px 10px;text-align:center">К-сть</td>'
             '<td style="padding:6px 10px">Специфікація</td>'
             '<td style="padding:6px 10px;text-align:right">Ціна</td>'
@@ -357,7 +373,7 @@ def _build_jlc_html(order, old_status: str, new_status: str,
       </tr>"""}
       <tr>
         <td style="padding:6px 0;color:#888;font-size:12px">Кількість</td>
-        <td style="padding:6px 0;font-weight:700;font-size:16px">{order.quantity} шт.</td>
+        <td style="padding:6px 0;font-weight:700;font-size:16px">{qty_html}</td>
       </tr>
       <tr>
         <td style="padding:6px 0;color:#888;font-size:12px">Статус</td>
@@ -438,12 +454,9 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
     if not eta_str and not order.tracking_number:
         est_ship_date, est_ship_label = _calc_estimated_ship_date(order)
 
-    # Product / description
-    product_info = ''
-    if order.product_id:
-        product_info = f'\n🏷 Товар: <b>{order.product.sku}</b>'
-    elif order.description:
-        product_info = f'\n📄 {order.description[:80]}'
+    # Що в замовленні — усі позиції (раніше — лише перша: order.product / order.quantity)
+    found = contents.items(order)
+    items_tg = contents.telegram_block(found, new_status)
 
     # ETA / estimated ship
     if eta_str:
@@ -482,22 +495,21 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
 
     tg_text = (
         f'{icon} <b>JLCPCB — {new_label}</b>\n'
-        f'Замовлення: <code>{order.jlc_order_id}</code>\n'
-        f'Кількість: <b>{order.quantity}</b> шт.'
-        f'{product_info}'
+        f'Замовлення: <code>{escape(order.jlc_order_id)}</code>'
+        f'{items_tg}'
         f'{status_line}'
         f'{eta_line}'
         f'{tracking_info}\n'
-        f'<i>{company}</i>'
+        f'<i>{escape(company)}</i>'
     )
 
     # Plain text fallback
     plain_body = (
         f'Замовлення JLCPCB {order.jlc_order_id}\n'
         f'Статус: {new_label}\n'
-        f'Кількість: {order.quantity} шт.\n'
+        f'{contents.plain_block(found, new_status)}'
     )
-    if order.description:
+    if len(found) == 1 and not found[0].linked and order.description:
         plain_body += f'Опис: {order.description}\n'
     if eta_str:
         plain_body += f'Очікувана доставка: {eta_str}\n'
@@ -533,7 +545,7 @@ def notify_jlc_active_orders_summary() -> dict:
     active = list(
         JLCOrder.objects.exclude(
             local_status__in=['delivered', 'cancelled']
-        ).select_related('product').order_by('order_date')
+        ).select_related('product').prefetch_related('lines__product').order_by('order_date')
     )
 
     # ── Telegram ──────────────────────────────────────────────────────────────
@@ -545,7 +557,7 @@ def notify_jlc_active_orders_summary() -> dict:
         for o in active:
             icon  = _STATUS_ICONS.get(o.local_status, '📋')
             label = _STATUS_LABELS_UK.get(o.local_status, o.local_status)
-            name  = o.product.sku if o.product_id else (o.description[:35] if o.description else o.jlc_order_id)
+            name  = escape(contents.compact(contents.items(o)))
             ed    = _extract_expected_date(o)
             eta   = f' | 📅 {_format_eta(ed)}' if ed else ''
             trk   = f' | 📍 <code>{o.tracking_number}</code>' if o.tracking_number else ''
@@ -566,14 +578,14 @@ def notify_jlc_active_orders_summary() -> dict:
             icon  = _STATUS_ICONS.get(o.local_status, '📋')
             label = _STATUS_LABELS_UK.get(o.local_status, o.local_status)
             color = _STATUS_COLORS.get(o.local_status, '#607d8b')
-            name  = o.product.sku if o.product_id else (o.description[:40] if o.description else '—')
+            name  = contents.compact(contents.items(o)) or '—'
             ed    = _extract_expected_date(o)
             eta   = _format_eta(ed) if ed else '—'
             trk   = o.tracking_number or '—'
             rows_html += (
                 f'<tr style="background:{bg}">'
                 f'<td style="padding:9px 10px;font-family:monospace;font-size:12px;color:#1a237e">{o.jlc_order_id}</td>'
-                f'<td style="padding:9px 10px">{name}</td>'
+                f'<td style="padding:9px 10px">{escape(name)}</td>'
                 f'<td style="padding:9px 10px">'
                 f'<span style="background:{color};color:#fff;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600">'
                 f'{icon} {label}</span></td>'

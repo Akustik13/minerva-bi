@@ -350,6 +350,7 @@
 {"uk": "(не вибрана)", "en": "(not selected)", "de": "(nicht ausgewählt)"}
 {"uk": "(не збережуться, поки не виправите)", "en": "(will not be saved until you fix them)", "de": "(werden nicht gespeichert, bis Sie sie korrigieren)"}
 {"uk": "(не натиснете — відмітить сама о {0}, як відхід у налаштуваннях).", "en": "(if you don't press it, it will be marked automatically at {0}, as the clock-out time in the settings).", "de": "(wenn Sie nicht klicken, wird es automatisch um {0} markiert, entsprechend der Gehenzeit in den Einstellungen)."}
+{"uk": "(не прив’язано до складу)", "en": "(not linked to stock)", "de": "(nicht mit Lager verknüpft)"}
 {"uk": "(неактивна)", "en": "(inactive)", "de": "(inaktiv)"}
 {"uk": "(неактивний)", "en": "(inactive)", "de": "(inaktiv)"}
 {"uk": "(незбережені зміни на сторінці не зберігаються)", "en": "(unsaved changes on the page are not saved)", "de": "(nicht gespeicherte Änderungen auf der Seite werden nicht gespeichert)"}
@@ -2996,6 +2997,7 @@
 {"uk": "{0} повторно надіслав замовлення {1} — воно вже було, нового не створено", "en": "{0} resent order {1} — it already existed, no new one was created", "de": "{0} hat den Auftrag {1} erneut gesendet — er existierte bereits, es wurde kein neuer angelegt"}
 {"uk": "{0} повід. · {1}", "en": "{0} msg. · {1}", "de": "{0} Nachr. · {1}"}
 {"uk": "{0} подій тут — клік, щоб наблизити", "en": "{0} events here — click to zoom in", "de": "{0} Ereignisse hier — Klick zum Heranzoomen"}
+{"uk": "{0} поз.", "en": "{0} items", "de": "{0} Pos."}
 {"uk": "{0} позицій", "en": "{0} lines", "de": "{0} Positionen"}
 {"uk": "{0} позицій, усі сховані", "en": "{0} items, all hidden", "de": "{0} Positionen, alle ausgeblendet"}
 {"uk": "{0} позначено як доставлено.", "en": "{0} marked as delivered.", "de": "{0} als geliefert markiert."}
@@ -3041,6 +3043,7 @@
 {"uk": "{0} шт → {1}{2}", "en": "{0} pcs → {1}{2}", "de": "{0} Stk. → {1}{2}"}
 {"uk": "{0} шт.", "en": "{0} pcs.", "de": "{0} Stk."}
 {"uk": "{0} шт. {1} додано на склад.", "en": "{0} pcs {1} added to stock.", "de": "{0} Stk. {1} ins Lager gebucht."}
+{"uk": "{0} шт. · позицій: {1}", "en": "{0} pcs · items: {1}", "de": "{0} Stk. · Positionen: {1}"}
 {"uk": "{0} шт: {1}", "en": "{0} pcs: {1}", "de": "{0} Stk.: {1}"}
 {"uk": "{0} шт: {1} {2}", "en": "{0} pcs: {1} {2}", "de": "{0} Stk.: {1} {2}"}
 {"uk": "{0} шт: {1} {2} · {3}", "en": "{0} pcs: {1} {2} · {3}", "de": "{0} Stk.: {1} {2} · {3}"}
@@ -7295,6 +7298,7 @@
 {"uk": "Замовлення DigiKey", "en": "DigiKey order", "de": "DigiKey-Auftrag"}
 {"uk": "Замовлення JLCPCB", "en": "JLCPCB order", "de": "JLCPCB-Bestellung"}
 {"uk": "Замовлення JLCPCB {0}", "en": "JLCPCB order {0}", "de": "JLCPCB-Bestellung {0}"}
+{"uk": "Замовлення JLCPCB {0} Статус: {1} {2}", "en": "JLCPCB order {0} Status: {1} {2}", "de": "JLCPCB-Bestellung {0} Status: {1} {2}"}
 {"uk": "Замовлення JLCPCB {0} Статус: {1} Кількість: {2} шт.", "en": "JLCPCB order {0} Status: {1} Quantity: {2} pcs.", "de": "JLCPCB-Bestellung {0} Status: {1} Menge: {2} Stk."}
 {"uk": "Замовлення JLCPCB.", "en": "JLCPCB order.", "de": "JLCPCB-Auftrag."}
 {"uk": "Замовлення {0}", "en": "Order {0}", "de": "Auftrag {0}"}
@@ -12715,6 +12719,7 @@
 {"uk": "Позицій не знайдено в {0}", "en": "No items found in {0}", "de": "Keine Positionen in {0} gefunden"}
 {"uk": "Позицій немає.", "en": "No items.", "de": "Keine Positionen."}
 {"uk": "Позицій: {0}", "en": "Items: {0}", "de": "Positionen: {0}"}
+{"uk": "Позицій: {0}, разом {1} шт.", "en": "Items: {0}, total {1} pcs", "de": "Positionen: {0}, gesamt {1} Stk."}
 {"uk": "Позиція", "en": "Line", "de": "Position"}
 {"uk": "Позиція (з 1 у кожній коробці)", "en": "Position (from 1 in each box)", "de": "Position (ab 1 in jedem Karton)"}
 {"uk": "Позиція замовлення", "en": "Order line", "de": "Auftragsposition"}
@@ -14206,6 +14211,7 @@
 {"uk": "Разом з ПДВ", "en": "Including VAT", "de": "Inkl. USt."}
 {"uk": "Разом за посилки", "en": "Total for parcels", "de": "Summe der Pakete"}
 {"uk": "Разом у {0}", "en": "Total in {0}", "de": "Gesamt in {0}"}
+{"uk": "Разом усіх позицій замовлення", "en": "Total of all order items", "de": "Summe aller Bestellpositionen"}
 {"uk": "Разом чекають: {0}", "en": "Waiting in total: {0}", "de": "Insgesamt wartend: {0}"}
 {"uk": "Разом, USD", "en": "Total, USD", "de": "Gesamt, USD"}
 {"uk": "Разом: {0} USD", "en": "Total: {0} USD", "de": "Gesamt: {0} USD"}
@@ -16141,6 +16147,7 @@
 {"uk": "Товар (опис, категорію, параметри) DigiKey змінює лише після перевірки — надсилається цілком", "en": "DigiKey changes the product (description, category, parameters) only after review — it is sent in full", "de": "DigiKey ändert den Artikel (Beschreibung, Kategorie, Parameter) erst nach Prüfung — er wird vollständig gesendet"}
 {"uk": "Товар (опис, категорію, параметри) DigiKey змінює лише після перевірки — надсилається цілком, і до затвердження діє теперішня версія (на supplier.digikey.com: Products → Pending).", "en": "DigiKey changes the product (description, category, parameters) only after review — it is sent in full, and until approval the current version stays in effect (on supplier.digikey.com: Products → Pending).", "de": "DigiKey ändert den Artikel (Beschreibung, Kategorie, Parameter) erst nach Prüfung — er wird vollständig gesendet, und bis zur Freigabe gilt die aktuelle Version (auf supplier.digikey.com: Products → Pending)."}
 {"uk": "Товар / Файл", "en": "Product / File", "de": "Artikel / Datei"}
+{"uk": "Товар / файл", "en": "Product / file", "de": "Artikel / Datei"}
 {"uk": "Товар {0}", "en": "Product {0}", "de": "Artikel {0}"}
 {"uk": "Товар {0} уже запропоновано", "en": "Product {0} has already been proposed", "de": "Artikel {0} wurde bereits vorgeschlagen"}
 {"uk": "Товар {0}: картка і склад", "en": "Product {0}: card and stock", "de": "Artikel {0}: Karte und Lager"}
@@ -16160,6 +16167,7 @@
 {"uk": "Товар каталогу", "en": "Catalog product", "de": "Katalogartikel"}
 {"uk": "Товар на сайті DigiKey", "en": "Product on the DigiKey site", "de": "Artikel auf der DigiKey-Website"}
 {"uk": "Товар на складі", "en": "Product in stock", "de": "Artikel im Lager"}
+{"uk": "Товар на складі · кожна позиція окремо", "en": "Stock product · each item separately", "de": "Lagerartikel · jede Position einzeln"}
 {"uk": "Товар надіслано в DigiKey на перевірку (Products API: stage/upsert). DigiKey відповідає ID чернетки, сам товар з'являється після затвердження.", "en": "The product has been sent to DigiKey for review (Products API: stage/upsert). DigiKey responds with a draft ID; the product itself appears after approval.", "de": "Der Artikel wurde zur Prüfung an DigiKey gesendet (Products API: stage/upsert). DigiKey antwortet mit einer Entwurfs-ID; der Artikel selbst erscheint nach der Freigabe."}
 {"uk": "Товар не використовується в проєктах (ні в «Товарах проєкту», ні в замовленнях чи Angebote проєктів).", "en": "The product is not used in projects (neither in “Project products” nor in project orders or Angebote).", "de": "Der Artikel wird in keinem Projekt verwendet (weder in „Projektartikel“ noch in Aufträgen oder Angeboten von Projekten)."}
 {"uk": "Товар не знайдено", "en": "Product not found", "de": "Artikel nicht gefunden"}
@@ -16761,6 +16769,7 @@
 {"uk": "Файл не знайдено.", "en": "File not found.", "de": "Datei nicht gefunden."}
 {"uk": "Файл не знайдено. Пересинхронізуйте пошту.", "en": "File not found. Re-sync the mail.", "de": "Datei nicht gefunden. Synchronisieren Sie die E-Mails erneut."}
 {"uk": "Файл не знайдено: {0}", "en": "File not found: {0}", "de": "Datei nicht gefunden: {0}"}
+{"uk": "Файл не прив'язано до товару складу", "en": "File not linked to a stock product", "de": "Datei nicht mit einem Lagerartikel verknüpft"}
 {"uk": "Файл недоступний: {0}", "en": "File not available: {0}", "de": "Datei nicht verfügbar: {0}"}
 {"uk": "Файл понад {0} МБ.", "en": "File over {0} MB.", "de": "Datei über {0} MB."}
 {"uk": "Файл пошкоджений або невірний формат.", "en": "The file is corrupted or in the wrong format.", "de": "Die Datei ist beschädigt oder hat ein falsches Format."}
@@ -17629,6 +17638,7 @@
 {"uk": "Що брати", "en": "What to take", "de": "Was übernommen wird"}
 {"uk": "Що буде після цих налаштувань: опис, листи скриньки, що підходять, і «🧪 Що зробив би агент» на будь-якому з них.", "en": "What these settings will do: a description, the mailbox's matching emails and «🧪 What the agent would do» on any of them.", "de": "Was diese Einstellungen bewirken: Beschreibung, passende E-Mails des Postfachs und «🧪 Was der Agent tun würde» an jeder davon."}
 {"uk": "Що буде після цих налаштувань: опис, листи скриньки, що підходять, і «🧪 Що зробив би агент» на будь-якому з них. Нові листи доручення бере саме; лист, що прийшов раніше за доручення, — кнопкою «▶ Обробити зараз».", "en": "What these settings will do: a description, the mailbox e-mails that match, and “🧪 What the agent would do” on any of them. The rule picks up new e-mails by itself; an e-mail that arrived before the rule — with the “▶ Process now” button.", "de": "Was diese Einstellungen bewirken: Beschreibung, passende E-Mails des Postfachs und „🧪 Was der Agent tun würde“ bei jeder davon. Neue E-Mails übernimmt die Regel selbst; eine E-Mail, die vor der Regel kam, — mit der Schaltfläche „▶ Jetzt bearbeiten“."}
+{"uk": "Що в замовленні — позицій: {0}", "en": "Order contents — items: {0}", "de": "Bestellinhalt — Positionen: {0}"}
 {"uk": "Що в мене на цьому тижні?", "en": "What do I have this week?", "de": "Was steht diese Woche an?"}
 {"uk": "Що в них купували ({0} позицій)", "en": "What we bought from them ({0} items)", "de": "Was wir bei ihnen gekauft haben ({0} Positionen)"}
 {"uk": "Що в ньому важливого (необов'язково, теж шукається)", "en": "What is important in it (optional, also searchable)", "de": "Was darin wichtig ist (optional, wird ebenfalls durchsucht)"}
@@ -20068,6 +20078,7 @@
 {"uk": "не потрібно", "en": "not required", "de": "nicht erforderlich"}
 {"uk": "не потрібні, — у календарі: подія → «🚫 Більше не заносити від нього» (адреса або весь домен).", "en": "are not needed — in the calendar: event → “🚫 Stop adding from this sender” (address or whole domain).", "de": "nicht benötigt werden – im Kalender: Termin → „🚫 Von diesem Absender nicht mehr übernehmen“ (Adresse oder ganze Domain)."}
 {"uk": "не прив'язано", "en": "not linked", "de": "nicht verknüpft"}
+{"uk": "не прив’язано до товару складу", "en": "not linked to a stock product", "de": "nicht mit einem Lagerartikel verknüpft"}
 {"uk": "не прочитано", "en": "not read", "de": "nicht gelesen"}
 {"uk": "не прочитано розмов {0}", "en": "{0} conversations not read", "de": "{0} Gespräche nicht gelesen"}
 {"uk": "не підключений у вашому пакеті Minerva.", "en": "is not enabled in your Minerva package.", "de": "ist in Ihrem Minerva-Paket nicht aktiviert."}
@@ -20658,6 +20669,7 @@
 {"uk": "позицій закупівель: {0}", "en": "purchase order lines: {0}", "de": "Bestellpositionen: {0}"}
 {"uk": "позицій замовлень: {0}", "en": "order lines: {0}", "de": "Auftragspositionen: {0}"}
 {"uk": "позицій немає", "en": "no lines", "de": "keine Positionen"}
+{"uk": "позицій: {0}", "en": "items: {0}", "de": "Positionen: {0}"}
 {"uk": "позицію вже отримано", "en": "the line has already been received", "de": "die Position wurde bereits erhalten"}
 {"uk": "позицію сховано — сайт її не отримує", "en": "the item is hidden — the site does not receive it", "de": "Position ausgeblendet — die Website erhält sie nicht"}
 {"uk": "позиція", "en": "item", "de": "Position"}
@@ -21081,6 +21093,7 @@
 {"uk": "після терміну інша сторона написала {0}", "en": "after the deadline the other side wrote {0}", "de": "nach der Frist hat die andere Seite am {0} geschrieben"}
 {"uk": "раз на місяць", "en": "once a month", "de": "einmal im Monat"}
 {"uk": "раз на тиждень", "en": "once a week", "de": "einmal pro Woche"}
+{"uk": "разом", "en": "total", "de": "gesamt"}
 {"uk": "разом з неактивними товарами ({0})", "en": "including inactive products ({0})", "de": "einschließlich inaktiver Artikel ({0})"}
 {"uk": "раніше переведено за курсом {0}", "en": "previously converted at rate {0}", "de": "zuvor zum Kurs {0} umgerechnet"}
 {"uk": "раніші замовлення відправника: {0}", "en": "sender’s earlier orders: {0}", "de": "frühere Aufträge des Absenders: {0}"}
@@ -21840,6 +21853,7 @@
 {"uk": "файл завеликий для сервера (обмеження проксі NAS)", "en": "file too large for the server (NAS proxy limit)", "de": "Datei zu groß für den Server (Begrenzung des NAS-Proxys)"}
 {"uk": "файл не завантажено", "en": "file not downloaded", "de": "Datei nicht heruntergeladen"}
 {"uk": "файл не збережено в Minerva — лише на поштовому сервері", "en": "file not saved in Minerva — only on the mail server", "de": "Datei nicht in Minerva gespeichert – nur auf dem Mailserver"}
+{"uk": "файл не прив’язано до товару складу", "en": "file not linked to a stock product", "de": "Datei nicht mit einem Lagerartikel verknüpft"}
 {"uk": "файл сайту", "en": "site file", "de": "Website-Datei"}
 {"uk": "файл товару в Minerva", "en": "product file in Minerva", "de": "Artikeldatei in Minerva"}
 {"uk": "файл у Minerva", "en": "file in Minerva", "de": "Datei in Minerva"}
@@ -22293,6 +22307,7 @@
 {"uk": "… показано перші {0}", "en": "… showing the first {0}", "de": "… die ersten {0} werden angezeigt"}
 {"uk": "… ще", "en": "… more", "de": "… weitere"}
 {"uk": "… ще {0}", "en": "… {0} more", "de": "… {0} weitere"}
+{"uk": "… ще {0} поз. ({1} шт.)", "en": "… {0} more items ({1} pcs)", "de": "… {0} weitere Pos. ({1} Stk.)"}
 {"uk": "… ще {0} — у звіті", "en": "… {0} more — in the report", "de": "… {0} weitere — im Bericht"}
 {"uk": "… і ще {0}", "en": "… and {0} more", "de": "… und {0} weitere"}
 {"uk": "… і ще {0} товарів — за тими самими курсами.", "en": "… and {0} more products — at the same rates.", "de": "… und {0} weitere Artikel — zu denselben Kursen."}
