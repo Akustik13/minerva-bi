@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from core.models import UIText, UserProfile
 from core.ui_text import bundled, catalog, extract, translate
@@ -33,6 +33,14 @@ class ExtractTests(TestCase):
                        "готово"):
             self.assertIn(phrase, found)
         self.assertNotIn("Дані користувача", found)                     # json_script — дані, не інтерфейс
+
+    def test_html_attributes_in_js_strings(self):
+        found = extract.from_template("""<script>var h = '<button title="Сьогодні — посередині">⌖ сьогодні</button>' +
+          '<input placeholder="Назва параметру" autocomplete="off">';</script>""")
+        self.assertIn("Сьогодні — посередині", found)                # підказка кнопки, зібраної в JS
+        self.assertIn("Назва параметру", found)
+        self.assertIn("сьогодні", found)
+        self.assertFalse([f for f in found if "title=" in f or "placeholder=" in f])
 
     def test_python_literals_fstrings_skip_docstrings_and_logs(self):
         src = ('"""Модуль-опис."""\nimport logging\nlogger = logging.getLogger()\n'
@@ -246,3 +254,76 @@ class BundledTests(CacheReset):
         bad = [src for src, langs in data.items()
                if set(langs) != set(catalog.TARGETS) or not all(translate.valid(src, t) for t in langs.values())]
         self.assertEqual(bad[:10], [])
+
+
+class AutoSyncTests(CacheReset):
+    """Код оновили без перезапуску контейнера («🚀 Повне оновлення»: git pull + reload) — каталог збирається сам,
+    раз на зміну коду; кнопка оновлення має крок «ui_texts collect»."""
+    def setUp(self):
+        super().setUp()
+        catalog._stamp.update(at=0.0, value="")
+        self.addCleanup(catalog._stamp.update, at=0.0, value="")
+
+    def test_sync_once_per_code_change(self):
+        with override_settings(UI_TEXT_AUTOSYNC=True), mock.patch.object(catalog, "BACKGROUND", False), \
+                mock.patch.object(catalog, "code_stamp", return_value="v1") as stamp, \
+                mock.patch.object(catalog, "sync", return_value={}) as sync:
+            self.assertTrue(catalog.ensure_synced())
+            self.assertFalse(catalog.ensure_synced())                   # той самий код — удруге ні
+            stamp.return_value = "v2"
+            self.assertTrue(catalog.ensure_synced())
+        self.assertEqual(sync.call_count, 2)
+
+    def test_off_in_tests_and_failure_waits(self):
+        with mock.patch.object(catalog, "sync") as sync:
+            self.assertFalse(catalog.ensure_synced())                   # settings_test: UI_TEXT_AUTOSYNC = False
+        sync.assert_not_called()
+        with override_settings(UI_TEXT_AUTOSYNC=True), mock.patch.object(catalog, "BACKGROUND", False), \
+                mock.patch.object(catalog, "code_stamp", return_value="v1"), \
+                mock.patch.object(catalog, "sync", side_effect=RuntimeError("db")) as sync:
+            self.assertTrue(catalog.ensure_synced())                    # збій — у журнал
+            self.assertFalse(catalog.ensure_synced())                   # повтор — коли мине SYNC_LOCK_SECONDS
+        self.assertEqual(sync.call_count, 1)
+
+    def test_page_starts_it(self):
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+        with mock.patch.object(catalog, "ensure_synced", return_value=False) as ensure:
+            self.client.get("/admin/")
+        ensure.assert_called()
+
+    def test_code_stamp_follows_git_head_and_bundle(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        git = Path(tmp.name) / ".git"
+        (git / "refs" / "heads").mkdir(parents=True)
+        (git / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        (git / "refs" / "heads" / "main").write_text("abc123\n", encoding="utf-8")
+        self.assertEqual(catalog._git_head(tmp.name), "abc123")
+        (git / "refs" / "heads" / "main").unlink()
+        (git / "packed-refs").write_text("# pack-refs\ndef456 refs/heads/main\n", encoding="utf-8")
+        self.assertEqual(catalog._git_head(tmp.name), "def456")
+        self.assertEqual(catalog._git_head(Path(tmp.name) / "nowhere"), "")
+        path = Path(tmp.name) / "bundled.jsonl"
+        path.write_text("", encoding="utf-8")
+        with mock.patch.object(bundled, "PATH", path), override_settings(BASE_DIR=Path(tmp.name)):
+            first = catalog.code_stamp(fresh=True)
+            self.assertTrue(first.endswith("|def456"))
+            path.write_text('{"uk": "Зберегти", "en": "Save"}\n', encoding="utf-8")
+            self.assertEqual(catalog.code_stamp(), first)                # у процесі — не частіше STAMP_MEMO
+            self.assertNotEqual(catalog.code_stamp(fresh=True), first)
+
+    def test_full_update_has_translations_step(self):
+        from django.conf import settings
+        from django.urls import reverse
+        html = (Path(settings.BASE_DIR) / "backup/templates/admin/backup/info.html").read_text(encoding="utf-8")
+        self.assertIn("{ id: 'texts',   url: UI_TEXTS_URL", html)
+        from config.models import SystemSettings
+        SystemSettings.objects.update_or_create(pk=1, defaults={"is_onboarding_complete": True})
+        self.client.force_login(User.objects.create_superuser("root", "r@x.y", "p"))
+        url = reverse("admin:backup_ui_texts")
+        self.assertEqual(self.client.get(url).status_code, 405)
+        with mock.patch("backup.utils.run_ui_texts", return_value={"ok": True, "output": "Написів: 1"}) as run:
+            self.assertEqual(self.client.post(url).json()["ok"], True)
+        run.assert_called_once()

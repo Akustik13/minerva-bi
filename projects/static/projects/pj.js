@@ -107,6 +107,14 @@
     text = String(text || '');
     return text.length > max ? text.slice(0, max - 1) + '…' : text;
   }
+  // 🌐 назва кроку чи фази: інша мова перекладає лише повним збігом зі словником (назви з шаблонів плану), свої — як є
+  function exactName(node, full) {
+    node.setAttribute('data-mv-tr', 'exact');
+    if (node.textContent !== full) {
+      node.setAttribute('data-mv-full', full);
+      node.setAttribute('data-mv-cut', String(node.textContent.length));
+    }
+  }
   function ganttPpd() {
     var p = parseFloat(pref(GP, ''));
     if (!(p > 0)) p = PPD[pref(GS, 'week')] || 9;
@@ -216,7 +224,8 @@
         var indent = c[0] === 'title' && r.type === 'step' ? 12 : 0;
         var t = sv('text', {x: cx + 6 + indent, y: y + 17, 'class': 'pjg2-td pjg2-c-' + c[0]},
                    cut(vals[c[0]], c[2] - 10 - indent));
-        if (c[0] === 'title' || (c[0] === 'who' && r.who)) t.setAttribute('translate', 'no');
+        if (c[0] === 'title') exactName(t, String(vals.title || ''));
+        else if (c[0] === 'who' && r.who) t.setAttribute('translate', 'no');
         g.appendChild(t);
         cx += c[2];
       });

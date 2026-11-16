@@ -321,7 +321,7 @@
           🚀 Повне оновлення
         </button>
         <div style="font-size:.72rem;color:var(--text-dim);text-align:center;margin-top:-4px">
-          git pull → static → migrate → reload
+          git pull → static → migrate → переклади → reload
         </div>
       </div>
 
@@ -1011,6 +1011,7 @@ const GIT_UPDATE_URL    = '{% url "admin:backup_git_update" %}';
 const MIGRATE_URL       = '{% url "admin:backup_migrate" %}';
 const SETUP_MODULES_URL = '{% url "admin:backup_setup_modules" %}';
 const RESTART_WEB_URL   = '{% url "admin:backup_restart_web" %}';
+const UI_TEXTS_URL      = '{% url "admin:backup_ui_texts" %}';
 const COLLECTSTATIC_URL = '{% url "admin:backup_collectstatic" %}';
 
 /* Estimated seconds per step */
@@ -1233,6 +1234,7 @@ const DEPLOY_STEPS = [
   { id: 'static',  url: COLLECTSTATIC_URL, label: 'collectstatic',  logKey: 'output',  est: 40, tail: 6 },
   { id: 'migrate', url: MIGRATE_URL,       label: 'migrate',        logKey: 'output',  est: 15 },
   { id: 'modules', url: SETUP_MODULES_URL, label: 'setup_modules',  logKey: 'output',  est: 6  },
+  { id: 'texts',   url: UI_TEXTS_URL,      label: 'ui_texts collect', logKey: 'output', est: 20, tail: 6 },
   { id: 'restart', url: RESTART_WEB_URL,   label: 'restart',        logKey: 'message', est: 5  },
 ];
 const TOTAL_EST = DEPLOY_STEPS.reduce((s, st) => s + st.est, 0);

@@ -429,7 +429,8 @@
       }
       if (p[4]) {
         inner += '<text x="' + n1(p[6]) + '" y="' + n1(cy + 4) + '" class="pjt-t"' +
-          (p[5] === 'end' ? ' text-anchor="end"' : '') + ' translate="no">' + esc(p[4]) + '</text>';
+          (p[5] === 'end' ? ' text-anchor="end"' : '') +
+          (e.lane === 'plan' ? ' data-mv-tr="exact">' : ' translate="no">') + esc(p[4]) + '</text>';
       }
       parts.push(wrapEv(e, inner));
     });

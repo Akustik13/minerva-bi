@@ -3,6 +3,7 @@ AI лише пропонує зміни, перевіряє clean_changes); 🎤
 python manage.py test projects --settings=tabele.settings_test"""
 import json
 from datetime import timedelta
+from pathlib import Path
 from unittest.mock import patch
 
 from projects import bg, plan, plan_editor
@@ -217,15 +218,49 @@ class VoiceTests(EditorBase):
 
 
 class ExportLanguageTests(EditorBase):
-    """🌐 Експорт іншою мовою перекладає підписи діаграми (pj_export.js), а назви кроків, фаз і сторін — дані."""
+    """🌐 Інша мова (сторінка й експорт) перекладає підписи діаграми; назви кроків і фаз — лише повним збігом зі
+    словником (назви з шаблонів плану), назви сторін і людей — дані."""
     def test_names_on_diagrams_are_marked_as_data(self):
         from projects import gantt, parties, schedule
         from projects.models import ProjectParty
         ProjectStep.objects.filter(pk=self.b.pk).update(assignee=self.user)
+        ProjectStep.objects.filter(pk=self.c.pk).update(title="Клієнт погодив специфікацію й креслення корпусу")
         svg = gantt.render(self.project, schedule.compute(self.project, today=self.today), today=self.today)
-        self.assertIn('class="pjg-pname" translate="no">🔧 Prototyp', svg)
-        self.assertIn('class="pjg-t" translate="no">', svg)
+        self.assertIn('class="pjg-pname">🔧 <tspan data-mv-tr="exact">Prototyp</tspan>', svg)
+        self.assertRegex(svg, r'class="pjg-t">\S* ?<tspan data-mv-tr="exact">Platinen bestellen</tspan>')
+        self.assertIn('<tspan data-mv-tr="exact" data-mv-full="Клієнт погодив специфікацію й креслення корпусу" '
+                      'data-mv-cut="29">Клієнт погодив специфікацію …</tspan>', svg)
+        self.assertNotIn('class="pjg-t" translate="no"', svg)
         self.assertRegex(svg, r'class="pjg-who pjg-side-supplier">[^<]+</text>')         # «постач.» — підпис
         self.assertIn('class="pjg-who pjg-side-we" translate="no">', svg)                # ім'я людини — дані
         parties.save(self.project, {"role": ProjectParty.SUPPLIER, "name": "Leiterplatten Nord"})
         self.assertIn('class="pjy-name" translate="no">Leiterplatten Nord', parties.context(self.project, True)["svg"])
+
+    def test_page_scripts_translate_names_only_by_exact_match(self):
+        from django.conf import settings
+        base = Path(settings.BASE_DIR)
+        tr = (base / "static/admin/js/mv_translate.js").read_text(encoding="utf-8")
+        parts = ("data-mv-tr", "data-mv-full", "data-mv-cut", "tr.node = forNode", "if (LOWER.test(v)) return null;",
+                 "any && !low", "runs && !stay", "leftover(best || c)", "(?<=[.!?…])", "NOL + '.*?)'")
+        self.assertEqual([p for p in parts if p not in tr], [])
+        js = (base / "projects/static/projects/pj.js").read_text(encoding="utf-8")
+        self.assertIn("exactName(t, String(vals.title || ''))", js)
+        self.assertIn("e.lane === 'plan' ? ' data-mv-tr=\"exact\">'",
+                      (base / "projects/static/projects/pj_timeline.js").read_text(encoding="utf-8"))
+        self.assertIn("o.tr.node ? o.tr.node(node)",
+                      (base / "projects/static/projects/pj_export.js").read_text(encoding="utf-8"))
+        html = self.client.get(f"/admin/projects/project/{self.project.pk}/change/").content.decode()
+        self.assertIn('<span data-mv-tr="exact">🔧 Prototyp</span>', html)          # смуга фаз
+
+    def test_table_export_translates_template_names_only(self):
+        from core.models import UIText
+        from core.shared_cache import cache
+        from core.ui_text import catalog
+        from projects import export
+        cache.clear()
+        row = UIText.objects.create(key=catalog.key_of("Muster messen"), source="Muster messen")
+        catalog.set_text(row, "en", "Measure samples")
+        titles = {r["title"] for r in export.rows(self.project, "en")}
+        self.assertIn("Measure samples", titles)                         # назва є в словнику — мовою документа
+        self.assertIn("Platinen bestellen", titles)                      # своя — як написано
+        self.assertIn("Muster messen", {r["title"] for r in export.rows(self.project, "uk")})

@@ -97,6 +97,11 @@ class BackupAdmin(admin.ModelAdmin):
                 name="backup_restart_web",
             ),
             path(
+                "ui-texts/",
+                self.admin_site.admin_view(self.ui_texts_view),
+                name="backup_ui_texts",
+            ),
+            path(
                 "collectstatic/",
                 self.admin_site.admin_view(self.collectstatic_view),
                 name="backup_collectstatic",
@@ -347,6 +352,12 @@ class BackupAdmin(admin.ModelAdmin):
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
         return JsonResponse(utils.run_collectstatic())
+
+    def ui_texts_view(self, request):
+        """AJAX — 🌐 переклади: compilemessages + каталог написів ← код і комплект (manage.py ui_texts collect)."""
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        return JsonResponse(utils.run_ui_texts())
 
     def restart_web_view(self, request):
         """AJAX — graceful gunicorn reload via SIGHUP to PID 1."""

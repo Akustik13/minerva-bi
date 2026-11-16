@@ -93,11 +93,29 @@ def file_name(project, what, ext, today=None) -> str:
     return f"{project.code}_{WHATS[what]['file']}_{today.isoformat()}.{ext}"
 
 
+def names_in(lang):
+    """Назва кроку чи фази мовою документа — лише повним збігом зі словником інтерфейсу (назви з шаблонів плану:
+    «Прототип» → «Prototype»), свої — як написано; так само, як сторінка й діаграма ([data-mv-tr="exact"])."""
+    from core.ui_text import catalog
+    from core.ui_text.text import edges
+    try:
+        exact = catalog.dictionary(lang)["exact"] if lang in catalog.TARGETS else {}
+    except Exception:
+        exact = {}
+
+    def name(text):
+        pre, core, suf = edges(text or "")
+        got = exact.get(core)
+        return f"{pre}{got}{suf}" if got else (text or "")
+    return name
+
+
 def rows(project, lang) -> list:
     """Кроки плану з прогнозом (кеш schedule.persist — оновлює overview.collect) для таблиці PDF і Excel."""
     from . import overview
     overview.collect(project)                                   # свіжий прогноз кроків
     t = L[lang]
+    name = names_in(lang)
     out = []
     phases = {p.pk: p for p in project.phases.all()}
     steps = list(ProjectStep.objects.filter(project=project).select_related("phase", "party", "assignee")
@@ -114,8 +132,8 @@ def rows(project, lang) -> list:
         else:
             who = t["side_map"].get(s.side, s.side)
         status = s.eff_status or s.status
-        out.append({"phase": phases[s.phase_id].name if s.phase_id in phases else t["nophase"],
-                    "phase_id": s.phase_id or 0, "title": s.title, "milestone": s.kind == ProjectStep.MILESTONE,
+        out.append({"phase": name(phases[s.phase_id].name) if s.phase_id in phases else t["nophase"],
+                    "phase_id": s.phase_id or 0, "title": name(s.title), "milestone": s.kind == ProjectStep.MILESTONE,
                     "who": who, "start": start, "end": end,
                     "days": (end - start).days + 1 if start and end and s.kind != ProjectStep.MILESTONE else 0,
                     "status": status, "status_text": t["status_map"].get(status, status)})

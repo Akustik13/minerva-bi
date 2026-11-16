@@ -28,15 +28,42 @@
       var entry = { src: p[0], dst: p[1], re: null };
       if (word) (index[word] = index[word] || []).push(entry); else starts.push(entry);
     });
+    /* {0} впритул до літери: перед літерою («{0}м», «{0}хв») — число, не кінець слова: «роз'єм» — не «{0}м» («…mo»);
+       після літери («лістинг{0}», «невідом{0}») — закінчення слова (до 4 малих літер) або щось з не-літери */
+    var LET = 'A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u024F\\u0370-\\u03FF\\u0400-\\u04FF', NOL = '[^' + LET + ']';
+    var ENDING = "[a-z\\u0430-\\u0449\\u044c\\u044e\\u044f\\u0454\\u0456\\u0457\\u0491'\u2019]{1,4}";
+    var LET_END = new RegExp('[' + LET + ']$'), LET_START = new RegExp('^[' + LET + ']');
     function compile(e) {
       if (!e.re) {
-        var order = [];
-        var body = e.src.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\{(\d+)\}/g, function (_, n) {
-          order.push(n); return '(.+?)';
-        });
-        e.re = new RegExp('^' + body + '$'); e.order = order;
+        var order = [], loose = {}, bits = e.src.split(/(\{\d+\})/), body = '';
+        for (var i = 0; i < bits.length; i++) {
+          var b = bits[i], m = /^\{(\d+)\}$/.exec(b);
+          if (!m) { body += b.replace(/[.*+?^$()|[\]\\{}]/g, '\\$&'); continue; }
+          order.push(m[1]);
+          var before = LET_END.test(bits[i - 1] || ''), after = LET_START.test(bits[i + 1] || '');
+          body += before && after ? '(' + ENDING + '|' + NOL + '(?:.*?' + NOL + ')?)' :
+                  before ? '(' + ENDING + '|' + NOL + '.*?)' : after ? '(.*?' + NOL + ')' : '(.+?)';
+          /* закінчення слова, або {1}{2} впритул (де межа — невідомо): перевірки «дані чи текст» не діють */
+          if (before || (i > 1 && bits[i - 1] === '') || (i + 2 < bits.length && bits[i + 1] === '')) loose[m[1]] = true;
+        }
+        e.re = new RegExp('^' + body + '$'); e.order = order; e.loose = loose;
       }
       return e.re;
+    }
+    /* {0} шаблону — дані (число, назва, артикул). Значення, що починається з малої кириличної літери, — це
+       неперекладений текст інтерфейсу, а не дані: «Усі {0}» на «Усі проєкти» дало б «All проєкти», «{0} з {1}» на
+       «План з листування» — «План of листування». Тоді шаблон не підходить; значення, яке є в словнику, — перекладається. */
+    var LOWER = /^[^\p{L}\p{N}]*[а-щьюяєіїґ]/u, SEP = /\s[·—–|]\s|:\s|;\s/,
+        CYR_START = /^[^\p{L}\p{N}]*[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ]/u;
+    function value(v, loose) {
+      if (!CYR.test(v)) return v;
+      var e = edges(v), t = core(e[1], 2);              // «59 дн.» → «59 d.» (словник і шаблони, без шматків)
+      if (t !== null) return e[0] + t + e[2];
+      if (loose) return v;
+      if (LOWER.test(v)) return null;
+      /* неперекладені фрази через « · », «: » («План · 21») — не дані: хай їх перекладуть по частинах;
+         перелік даних («PO-1 до 04.11; PO-2 …») лишається */
+      return SEP.test(v) && v.split(SEP).some(function (x) { return CYR_START.test(x); }) ? null : v;
     }
     function viaPattern(core) {
       var word = (core.split(/\s+/)[0] || '').toLowerCase();
@@ -44,8 +71,9 @@
       for (var i = 0; i < list.length; i++) {
         var e = list[i], m = compile(e).exec(core);
         if (m) {
-          var vals = {};
-          e.order.forEach(function (n, k) { vals[n] = m[k + 1]; });
+          var vals = {}, ok = true;
+          e.order.forEach(function (n, k) { var v = value(m[k + 1], e.loose[n]); if (v === null) ok = false; vals[n] = v; });
+          if (!ok) continue;
           return e.dst.replace(/\{(\d+)\}/g, function (_, n) { return vals[n] !== undefined ? vals[n] : ''; });
         }
       }
@@ -59,25 +87,47 @@
       var core = rest.slice(0, rest.length - suf.length);
       return [pre, core.replace(/\s+/g, ' '), suf];
     }
+    /* Шматки напису (речення чи фрази) з роздільниками між ними: кілька шматків поспіль — один запис словника
+       (найдовший), інакше кожен окремо. Лишився б неперекладений шматок з малої літери — переклад не годиться. */
+    function pieces(list, depth) {
+      var any = false, low = false, out = [];
+      for (var i = 0; i < list.length;) {
+        var got = null, upto = i;
+        for (var k = list.length - 1; k > i && got === null; k -= 2) {
+          var je = edges(list.slice(i, k + 1).join(''));
+          if (exact[je[1]] !== undefined) { got = je[0] + exact[je[1]] + je[2]; upto = k; }
+        }
+        if (got === null) {
+          var e = edges(list[i]), t = core(e[1], depth + 1);
+          if (t !== null) got = e[0] + t + e[2]; else if (LOWER.test(e[1])) low = true;
+        }
+        if (got !== null) any = true;
+        out.push(got !== null ? got : list.slice(i, upto + 1).join(''));
+        if (upto + 1 < list.length) out.push(list[upto + 1]);
+        i = upto + 2;
+      }
+      return any && !low ? out.join('') : null;
+    }
+    function leftover(s) { var m = s.match(/[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ]/g); return m ? m.length : 0; }
     function core(c, depth) {
       if (!c || !CYR.test(c)) return null;
       if (exact[c] !== undefined) return exact[c];
       var t = viaPattern(c);
       if (t !== null) return t;
       if (depth > 1) return null;
+      /* Запасні шляхи — речення окремо, фрази окремо, число в кінці; з тих, що вдалися, — той, після якого лишилось
+         найменше української (речення «… клієнти. Складає лист клієнту — ви відкриваєте …» перекладається
+         фразами, бо запис словника охоплює частини двох речень) */
+      var best = null;
+      function take(r) { if (r !== null && (best === null || leftover(r) < leftover(best))) best = r; }
+      var sent = c.split(/(?<=[.!?…])(\s+)(?=[A-ZА-ЩЬЮЯЄІЇҐ«“"])/);
+      if (sent.length > 1) take(pieces(sent, depth));
+      var parts = c.split(/(\s[·—–|]\s|:\s|;\s)/);   // ті самі роздільники, що SEP
+      if (parts.length > 1 && leftover(best || c)) take(pieces(parts, depth));
       /* число в кінці («Зберегти (2)», «Сторінок: 12») */
       var m = c.match(/^(.*?[^\s\d])(\s*[([]?[\d\s.,:/×x%+−-]+[)\]]?)$/);
-      if (m && CYR.test(m[1])) { t = core(m[1], depth + 1); if (t !== null) return t + m[2]; }
-      /* кілька фраз через « · », « — », « | », «: », «; » */
-      var parts = c.split(/(\s[·—–|]\s|:\s|;\s)/);
-      if (parts.length > 1) {
-        var changed = false;
-        for (var i = 0; i < parts.length; i += 2) {
-          var e = edges(parts[i]), tt = core(e[1], depth + 1);
-          if (tt !== null) { parts[i] = e[0] + tt + e[2]; changed = true; }
-        }
-        if (changed) return parts.join('');
-      }
+      if (m && CYR.test(m[1]) && leftover(best || c)) { t = core(m[1], depth + 1); if (t !== null) take(t + m[2]); }
+      if (best !== null) return best;
       /* англійське слово Django перед нашою назвою («By BOM (комплектація)», «Add Товар»): без перших слів */
       var words = c.split(' ');
       for (var k = 1; k <= 3 && k < words.length && !CYR.test(words[k - 1]); k++) {
@@ -85,18 +135,38 @@
         if (exact[rest] !== undefined) return words.slice(0, k).join(' ') + ' ' + exact[rest];
       }
       /* українські шматки всередині чужої фрази («Select Товар to change», «By Категорія», «5 Товари») */
-      var runs = false, out = c.replace(RUN, function (run) {
+      var runs = false, stay = false, out = c.replace(RUN, function (run) {
         var e = edges(run), tt = e[1] === c ? null : core(e[1], depth + 1);
-        if (tt === null) return run;
+        if (tt === null) { if (LOWER.test(e[1])) stay = true; return run; }
         runs = true; return e[0] + tt + e[2];
       });
-      return runs ? out : null;
+      return runs && !stay ? out : null;
     }
     function tr(s) {
       if (!s || !CYR.test(s)) return null;
       var e = edges(s), t = core(e[1], 0);
       return t === null ? null : e[0] + t + e[2];
     }
+    function exactOnly(s) {
+      if (!s || !CYR.test(s)) return null;
+      var e = edges(s), t = exact[e[1]];
+      return t === undefined ? null : e[0] + t + e[2];
+    }
+    function cutTo(s, n) { return n > 1 && s.length > n ? s.slice(0, n - 1) + '\u2026' : s; }
+    /* Назви, які людина могла взяти з шаблону (кроки й фази плану проєкту…), — [data-mv-tr="exact"]: лише повний
+       збіг зі словником («Прототип» → «Prototype»), без шматків — свої назви лишаються, як написано. Показано
+       скорочено — повна назва в data-mv-full, довжина показаного — data-mv-cut. */
+    function forNode(node) {
+      var el = node.parentElement, hold = el && el.closest ? el.closest('[data-mv-tr]') : null;
+      if (!hold) return tr(node.nodeValue);
+      if (hold.getAttribute('data-mv-tr') !== 'exact') return null;
+      var full = hold.getAttribute('data-mv-full');
+      if (!full) return exactOnly(node.nodeValue);
+      var t = exactOnly(full);
+      return t === null ? null : cutTo(t, +hold.getAttribute('data-mv-cut') || 0);
+    }
+    tr.exact = exactOnly;
+    tr.node = forNode;
     return tr;
   }
   window.MVTranslateKit = { make: make };
@@ -109,11 +179,13 @@
   function skipped(el) { return !el || (el.closest && el.closest(SKIP)); }
   function textNode(n) {
     if (mine.get(n) === n.nodeValue || skipped(n.parentElement)) return;
-    var t = tr(n.nodeValue);
+    var t = tr.node(n);
     if (t !== null && t !== n.nodeValue) { n.nodeValue = t; mine.set(n, t); }
   }
   function attrs(el) {
-    if (skipped(el)) return;
+    /* текст поля — дані, а підказка в ньому (placeholder, title) — напис інтерфейсу */
+    var field = el.tagName === 'TEXTAREA' && !el.matches('[translate="no"],.notranslate');
+    if (field ? skipped(el.parentElement) : skipped(el)) return;
     ATTRS.forEach(function (a) {
       var v = el.getAttribute(a);
       if (v && CYR.test(v)) { var t = tr(v); if (t !== null) el.setAttribute(a, t); }
@@ -125,7 +197,8 @@
   function walk(scope) {
     if (!scope) return;
     if (scope.nodeType === 3) { textNode(scope); return; }
-    if (scope.nodeType !== 1 || skipped(scope)) return;
+    if (scope.nodeType !== 1) return;
+    if (skipped(scope)) { if (scope.tagName === 'TEXTAREA') attrs(scope); return; }
     var w = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT, null), n;
     while ((n = w.nextNode())) if (CYR.test(n.nodeValue)) textNode(n);
     attrs(scope);
