@@ -676,6 +676,38 @@ def plan_clear_view(request, pk):
     return _plan_action(request, pk, run)
 
 
+@staff_member_required
+@require_POST
+def plan_save_all_view(request, pk):
+    """✏️ Редактор плану: уся таблиця одним запитом (projects/plan_editor.save_all) → свіжий пульт."""
+    from . import plan_editor
+    return _plan_action(request, pk, lambda project, body: plan_editor.saved_text(
+        plan_editor.save_all(project, body, user=request.user)))
+
+
+@staff_member_required
+def plan_revise_view(request, pk):
+    """🧠 «Що змінити в плані» (у фоні, нічого не пише): POST {wish, table} — почати, GET — хід; готово → зміни для
+    редактора."""
+    from . import plan_editor
+    project = _project_for_change(request, pk)
+    if request.method == "POST":
+        body = _body(request)
+        try:
+            st = plan_editor.start(project, request.user, str(body.get("wish") or ""), body.get("table"))
+        except ValueError as e:
+            return JsonResponse({"ok": False, "error": str(e)}, status=400)
+    else:
+        st = plan_editor.run_state(project, request.user)
+    if st.get("running"):
+        return JsonResponse({"ok": True, "pending": True, "poll_ms": PLAN_POLL_MS})
+    if st.get("error"):
+        return JsonResponse({"ok": False, "error": st["error"]}, status=400)
+    if not st.get("done"):
+        return JsonResponse({"ok": False, "error": "AI ще не питали"}, status=400)
+    return JsonResponse({"ok": True, "result": st.get("result") or {}})
+
+
 # ── 🧠 AI-помічник проєкту (projects/ai_scan.py, ai_plan.py, forgotten.py, delegate.py) ───────────────────────────
 # Усе — з правом змінювати проєкт; пошта — лише власні скриньки людини (перевіряють самі модулі).
 

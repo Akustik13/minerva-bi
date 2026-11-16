@@ -354,6 +354,8 @@ def context(project, user, range_key="all", notice="") -> dict:
                  "plan_baseline": reverse("projects:plan_baseline", args=[pk]),
                  "plan_save_template": reverse("projects:plan_save_template", args=[pk]),
                  "plan_clear": reverse("projects:plan_clear", args=[pk]),
+                 "plan_save_all": reverse("projects:plan_save_all", args=[pk]),
+                 "plan_revise": reverse("projects:plan_revise", args=[pk]),
                  "plan_base": f"/projects/api/project/{pk}/plan/",
                  "ai_scan": reverse("projects:ai_scan", args=[pk]), "ai_plan": reverse("projects:ai_plan", args=[pk]),
                  "ai_risks": reverse("projects:ai_risks", args=[pk]),

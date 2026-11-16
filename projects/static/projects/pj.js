@@ -16,7 +16,16 @@
     var n = root.querySelector('.pjc-merr');
     if (n) n.textContent = text;
   }
-  function put(html) { root.innerHTML = html; applyTab(curTab); renderFound(); applyGantt(); applyTimeline(); applyPartyView(); }
+  function put(html) {
+    root.innerHTML = html; applyTab(curTab); renderFound(); applyGantt(); applyTimeline(); applyPartyView();
+  }
+  // ✏️ Редактор плану (pj_editor.js): уся таблиця фаз і кроків, 🧠 «Що змінити в плані»
+  function openEditor() {
+    var b = box();
+    if (!window.PJEditor || !b) return;
+    window.PJEditor.open({data: planData(), urls: {save: b.dataset.planSaveAll, revise: b.dataset.planRevise},
+                          ai: !!b.dataset.aiOn, send: send, bgRun: bgRun, put: put});
+  }
   // 🔗 Сторони: «🌳 Хто кому постачає» / «🕒 Як рухалось» (вибір — localStorage), масштаб (pj_zoom.js)
   var PV = 'pj-parties-view';
   function applyPartyView(set) {
@@ -2220,7 +2229,7 @@
       '[data-pjc-mdel],g[data-mails],g[data-cal],g[data-files],[data-pjc-event-add],[data-pjc-tab],[data-pjc-step-new],[data-pjc-phase-new],[data-pjc-post],' +
       '[data-pjc-save-tpl],[data-pjc-tpl-apply],[data-pjc-phase],g[data-step],g[data-phase],[data-pjc-risk],' +
       '[data-pjc-risk-new],[data-pjs-health],[data-pjs-save],[data-pjs-ai],[data-pjc-act],[data-pjc-unmark],' +
-      'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx],[data-pjq],[data-pjy-view-btn]');
+      'g[data-party],[data-pjy-new],[data-pjy-suggest],[data-pjx],[data-pjq],[data-pjy-view-btn],[data-pje-open]');
     if (!t || !root.contains(t)) return;
     var link = e.target.closest('a[href]');
     if (link && link !== t && t.contains(link)) return;   // посилання в рядку («🎙 з наради») відкривається саме
@@ -2231,6 +2240,7 @@
       openParty(t.getAttribute('data-party'));
       return;
     }
+    if (t.hasAttribute('data-pje-open')) { openEditor(); return; }
     if (t.hasAttribute('data-pjy-new')) { openParty(''); return; }
     if (t.hasAttribute('data-pjy-suggest')) { t.disabled = true; send(box().dataset.partySuggest, {}).then(done); return; }
     if (t.hasAttribute('data-pjx')) { openExport(t.getAttribute('data-pjx')); return; }

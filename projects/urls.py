@@ -43,6 +43,8 @@ urlpatterns = [
     path("api/project/<int:pk>/plan/baseline/", views.plan_baseline_view, name="plan_baseline"),
     path("api/project/<int:pk>/plan/save-template/", views.plan_save_template_view, name="plan_save_template"),
     path("api/project/<int:pk>/plan/clear/", views.plan_clear_view, name="plan_clear"),
+    path("api/project/<int:pk>/plan/save-all/", views.plan_save_all_view, name="plan_save_all"),
+    path("api/project/<int:pk>/plan/revise/", views.plan_revise_view, name="plan_revise"),
     # ⚠️ Ризики й 📝 тижневий статус (projects/risks.py, health.py)
     path("api/project/<int:pk>/risk/", views.risk_view, name="risk"),
     path("api/project/<int:pk>/risk/<int:rid>/delete/", views.risk_delete_view, name="risk_delete"),

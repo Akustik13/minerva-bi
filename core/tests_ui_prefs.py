@@ -75,7 +75,8 @@ class SettingsPageTests(TestCase):
             "data-mv-design": "new",                                 # вигляд ПК — за замовчуванням новий
             "data-mv-sidebar": "auto",                               # бокове меню — само звужується до значків
             "data-mv-fix-contrast": "0", "data-mv-font": "readable", "data-mv-size": "125",
-            "data-mv-focus": "always", "data-mv-links": "underline", "data-mv-motion": "reduce"})
+            "data-mv-focus": "always", "data-mv-links": "underline", "data-mv-motion": "reduce",
+            "data-mv-voice": "on"})                                  # 🎤 голосовий набір — за замовчуванням є
 
     def test_sidebar_rail_saved_and_rendered(self):
         page = self.client.get("/core/my-settings/")

@@ -597,11 +597,12 @@ def editor_data(project, plan) -> dict:
     for c in plan.steps:
         s = c.step
         d = deps.get(s.pk, [])
-        steps.append({"id": s.pk, "title": s.title, "kind": s.kind, "phase": s.phase_id or "", "side": s.side,
+        steps.append({"id": s.pk, "order": s.order, "title": s.title, "kind": s.kind, "phase": s.phase_id or "",
+                      "side": s.side,
                       "party": s.party_id or "",
                       "assignee": s.assignee_id or "", "start": s.start.isoformat() if s.start else "",
                       "end": s.end.isoformat() if s.end else "", "duration": s.duration_days, "status": s.status,
-                      "trigger": s.trigger, "auto": s.auto, "after": [p for p, _ in d],
+                      "trigger": s.trigger, "auto": s.auto, "after": [p for p, _ in d], "deps": d,
                       "lag": d[0][1] if d else 0, "links": link_ids.get(s.pk, []), "offers": offer_ids.get(s.pk, []),
                       "notes": s.notes, "eff": c.status, "note": c.note, "agent": agent.get(s.pk, [])[:3],
                       "f_start": c.start.isoformat() if c.start else "", "f_end": c.end.isoformat() if c.end else ""})

@@ -7,6 +7,7 @@
      data-plan-phase="{{ urls.plan_phase }}" data-plan-save-template="{{ urls.plan_save_template }}"
      data-has-plan="{% if plan.has_plan %}1{% endif %}" data-can-change="{% if can_change %}1{% endif %}"
      data-risk="{{ urls.risk }}" data-status-save="{{ urls.status_save }}" data-status-draft="{{ urls.status_draft }}"
+     data-plan-save-all="{{ urls.plan_save_all }}" data-plan-revise="{{ urls.plan_revise }}"{% if ai.on %} data-ai-on="1"{% endif %}
      data-ai-scan="{{ urls.ai_scan }}" data-ai-plan="{{ urls.ai_plan }}" data-ai-risks="{{ urls.ai_risks }}" data-ai-plan-apply="{{ urls.ai_plan_apply }}"
      data-ai-base="{{ urls.ai_base }}" data-forgotten="{{ urls.forgotten }}" data-forgotten-decide="{{ urls.forgotten_decide }}"
      data-events="{{ urls.events }}" data-event-link="{{ urls.event_link }}" data-mail-handled="{{ urls.mail_handled }}" data-event-note="{{ urls.event_note }}" data-party="{{ urls.party }}" data-sourcing="{{ urls.sourcing }}" data-export="{{ urls.export }}" data-party-base="{{ urls.party_base }}" data-party-suggest="{{ urls.party_suggest }}"
@@ -391,7 +392,9 @@
       {% if plan.has_plan %}
         <div class="pjc-ptools">
           {% if can_change %}
-            <button type="button" class="pjc-b pri" data-pjc-step-new>＋ Крок</button>
+            <button type="button" class="pjc-b pri" data-pje-open
+                    title="Усі фази й кроки однією таблицею: назви, дати, тривалості, хто робить, «після №», стан, порядок{% if ai.on %} — і 🧠 «Що змінити в плані»: AI пропонує виправлення{% endif %}">✏️ Редактор плану</button>
+            <button type="button" class="pjc-b" data-pjc-step-new>＋ Крок</button>
             <button type="button" class="pjc-b" data-pjc-phase-new>＋ Фаза</button>
             <button type="button" class="pjc-b" data-pjc-post="{{ urls.plan_baseline }}"
                     data-confirm="{% if plan.baseline_at %}Перезаписати базовий план поточним прогнозом?{% else %}Зафіксувати поточний план як базовий — з ним порівнюватиметься зсув?{% endif %}">📌 {% if plan.baseline_at %}Перезаписати{% else %}Зафіксувати{% endif %} базовий план</button>
@@ -444,6 +447,8 @@
               <label class="pjc-sub">старт <input type="date" data-pjc-tpl-start value="{% if start %}{{ start|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}"></label>
               <button type="button" class="pjc-b pri" data-pjc-tpl-apply data-url="{{ urls.plan_template }}">🧩 Скласти план з шаблону</button>
               <button type="button" class="pjc-b" data-pjc-phase-new>＋ Фаза вручну</button>
+              <button type="button" class="pjc-b" data-pje-open
+                      title="Фази й кроки таблицею — як у Excel{% if ai.on %}; або напишіть AI, що скласти{% endif %}">✏️ Скласти в редакторі</button>
               {% if ai.on %}<button type="button" class="pjc-b" data-pja-plan
                       title="Claude Sonnet складає чернетку плану з ваших листів, шаблонів і тривалостей минулих проєктів; перед застосуванням ви її переглядаєте">🧠 Скласти план з листування</button>{% endif %}
             </div>
