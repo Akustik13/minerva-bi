@@ -5773,6 +5773,7 @@
 {"uk": "Візитка покупця — внести клієнтом у CRM", "en": "A buyer's business card — add as a CRM customer", "de": "Visitenkarte eines Käufers — als CRM-Kunden erfassen"}
 {"uk": "Візитки ({0})", "en": "Business cards ({0})", "de": "Visitenkarten ({0})"}
 {"uk": "Візитки й флаєри", "en": "Business cards & flyers", "de": "Visitenkarten & Flyer"}
+{"uk": "Візитки й фото постачальника", "en": "The supplier's business cards and photos", "de": "Visitenkarten und Fotos des Lieferanten"}
 {"uk": "Візитки немає", "en": "No such business card", "de": "Keine solche Visitenkarte"}
 {"uk": "Візитки немає — можливо, її видалили в Minerva.", "en": "No such business card — it may have been deleted in Minerva.", "de": "Keine solche Visitenkarte — vielleicht wurde sie in Minerva gelöscht."}
 {"uk": "Візиток", "en": "Cards", "de": "Karten"}
@@ -7498,6 +7499,7 @@
 {"uk": "Запит не відправлено", "en": "Request not sent", "de": "Anfrage nicht gesendet"}
 {"uk": "Запит постачальникам", "en": "Request to suppliers", "de": "Lieferantenanfrage"}
 {"uk": "Запит постачальникам {0}", "en": "Request to suppliers {0}", "de": "Lieferantenanfrage {0}"}
+{"uk": "Запит постачальникам — відкриється з цим постачальником праворуч", "en": "Supplier request — opens with this supplier on the right", "de": "Lieferantenanfrage — öffnet sich mit diesem Lieferanten rechts"}
 {"uk": "Запит постачальнику", "en": "Supplier request", "de": "Lieferantenanfrage"}
 {"uk": "Запит прийнято", "en": "Request accepted", "de": "Anfrage angenommen"}
 {"uk": "Запит пройде: Minerva видалить вебхук «{0}» ({1}).", "en": "The request will go through: Minerva will delete webhook “{0}” ({1}).", "de": "Die Anfrage wird durchgehen: Minerva löscht den Webhook „{0}“ ({1})."}
@@ -8401,6 +8403,7 @@
 {"uk": "Картка магазину → ✉️ Пошта магазину", "en": "Shop card → ✉️ Shop mail", "de": "Shop-Karte → ✉️ Shop-E-Mail"}
 {"uk": "Картка магазину: редактор країн зон доставки (як на DigiKey) — регіони з галочками, пошук", "en": "Shop card: shipping zone country editor (as on DigiKey) — regions with checkboxes, search", "de": "Shop-Karte: Länder-Editor der Versandzonen (wie bei DigiKey) – Regionen mit Kontrollkästchen, Suche"}
 {"uk": "Картка магазину: редактор країн зон доставки (як на DigiKey) — регіони з галочками, пошук, країни інших зон (перенести сюди), «усі інші країни», винятки країни (своя ціна / термін). Дані: прихований JSON у полі «Країни» і «Винятки» кожної зони (shop/admin.py → CountryPickerWidget).", "en": "Shop card: shipping zone country editor (as on DigiKey) — regions with checkboxes, search, countries of other zones (move here), “all other countries”, country exceptions (own price / lead time). Data: hidden JSON in the “Countries” and “Exceptions” fields of each zone (shop/admin.py → CountryPickerWidget).", "de": "Shop-Karte: Länder-Editor der Versandzonen (wie bei DigiKey) – Regionen mit Kontrollkästchen, Suche, Länder anderer Zonen (hierher verschieben), „alle übrigen Länder“, Länderausnahmen (eigener Preis / eigene Lieferzeit). Daten: verstecktes JSON in den Feldern „Länder“ und „Ausnahmen“ jeder Zone (shop/admin.py → CountryPickerWidget)."}
+{"uk": "Картка постачальника", "en": "Supplier card", "de": "Lieferantenkarte"}
 {"uk": "Картка проєкту", "en": "Project card", "de": "Projektkarte"}
 {"uk": "Картка товару", "en": "Product card", "de": "Artikelkarte"}
 {"uk": "Картка товару → «🏪 Інтернет-магазини»: усі магазини (нові з'являються самі), ціна й звідки вона; галочка «застосувати базові» з %", "en": "Product card → “🏪 Web shops”: all shops (new ones appear on their own), the price and where it comes from; the “apply base” checkbox with %", "de": "Artikelkarte → „🏪 Webshops“: alle Shops (neue erscheinen von selbst), der Preis und seine Herkunft; Häkchen „Basispreise anwenden“ mit %"}
@@ -8952,6 +8955,7 @@
 {"uk": "Короткий проєкт: Angebot → замовлення → відправка зі складу.", "en": "Short project: Angebot → order → shipping from stock.", "de": "Kurzes Projekt: Angebot → Auftrag → Versand ab Lager."}
 {"uk": "Коротко", "en": "Brief", "de": "Kurz"}
 {"uk": "Коротко й по ділу: 1–2 речення суті, далі нумеровані кроки «де натиснути → що з'явиться».", "en": "Short and to the point: 1–2 sentences of substance, then numbered steps “where to click → what appears”.", "de": "Kurz und sachlich: 1–2 Sätze zum Kern, danach nummerierte Schritte „wo klicken → was erscheint“."}
+{"uk": "Коротко про постачальника праворуч: візитки, контакти, закупівлі, запити", "en": "The supplier in short on the right: business cards, contacts, purchases, requests", "de": "Kurz zum Lieferanten rechts: Visitenkarten, Kontakte, Einkäufe, Anfragen"}
 {"uk": "Коротко, що потрібно", "en": "Briefly, what is needed", "de": "Kurz, was benötigt wird"}
 {"uk": "Коротко: продукція, технології, сильні сторони.", "en": "Briefly: products, technologies, strengths.", "de": "Kurz: Produkte, Technologien, Stärken."}
 {"uk": "Коротко: що вирішили, що пообіцяли, що далі", "en": "Briefly: what was decided, what was promised, what is next", "de": "Kurz: was beschlossen, was zugesagt wurde, wie es weitergeht"}
@@ -18893,6 +18897,7 @@
 {"uk": "запит до RAG-ПК", "en": "request to the RAG PC", "de": "Anfrage an den RAG-PC"}
 {"uk": "запит завеликий", "en": "request too large", "de": "Anfrage zu groß"}
 {"uk": "запит на прочитання — ще не підтверджено", "en": "read receipt requested — not confirmed yet", "de": "Lesebestätigung angefordert — noch nicht bestätigt"}
+{"uk": "запит постачальнику в цій гілці", "en": "supplier request in this thread", "de": "Lieferantenanfrage in diesem Verlauf"}
 {"uk": "запит пропозиції", "en": "request for quotation", "de": "Angebotsanfrage"}
 {"uk": "запит пропозиції (QUOTE, без цін і складу)", "en": "quote request (QUOTE, without prices and stock)", "de": "Angebotsanfrage (QUOTE, ohne Preise und Lager)"}
 {"uk": "запит під час паузи — RAG чекає", "en": "request during the pause — RAG is waiting", "de": "Anfrage während der Pause — RAG wartet"}

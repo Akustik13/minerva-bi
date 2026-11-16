@@ -826,6 +826,7 @@ def thread_preview_view(request, thread_pk):
         'agent_runs':      _agent_runs(emails),
         'followups':       _followups_for(emails),
         'meeting_invites': _meeting_invites(request.user, emails),
+        'mail_suppliers':  _mail_suppliers(request.user, emails, thread),
         'links':           links,
         'attach_options':  _attach_options(emails, links),
         'reply_to_addr':   reply_to_addr,
@@ -918,6 +919,7 @@ def message_preview_view(request, message_pk):
         'agent_runs':      _agent_runs([msg]),
         'meeting_invites': _meeting_invites(request.user, [msg]),
         'followups':       _followups_for([msg]),
+        'mail_suppliers':  _mail_suppliers(request.user, [msg], msg.thread),
         'links':           links,
         'attach_options':  _attach_options([msg], links),
         'reply_to_addr':   reply_to_addr,
@@ -960,6 +962,17 @@ def _attach_options(emails, links):
     except Exception as e:
         logger.warning('attach options: %s', e)
         return {'order_docs': [], 'thread_files': []}
+
+
+def _mail_suppliers(user, emails, thread):
+    """🏭 Постачальники серед співрозмовників гілки (і запити RFQ цієї гілки) — рядок у шапці листа;
+    клік — коротко про постачальника праворуч (suppliers/services/mail_link.py)."""
+    try:
+        from suppliers.services.mail_link import for_messages
+        return for_messages(emails, thread, user)
+    except Exception as e:  # noqa: BLE001 — без розділу постачальників пошта працює як була
+        logger.warning('mail suppliers: %s', e)
+        return []
 
 
 def _mail_links(emails):

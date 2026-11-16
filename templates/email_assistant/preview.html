@@ -21,6 +21,16 @@
 .em-imp-btn.on{opacity:1;color:#e53935}
 /* Проєкти гілки: підтверджені (зелені), пропозиції системи (✓/✗), панель «До проєкту» */
 .em-pv-proj{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.em-pv-sup{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.em-pv-supi{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--border);border-radius:14px;padding:1px 4px 1px 2px;font-size:12px;background:var(--bg-card,transparent)}
+.em-pv-supi button{border:0;background:transparent;color:var(--link-fg,#1a73e8);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:12px}
+.em-pv-supi button:hover,.em-pv-supi a:hover{background:rgba(127,127,127,.12)}
+.em-pv-supi a{color:var(--link-fg,#1a73e8);text-decoration:none;padding:2px 6px;border-radius:12px;white-space:nowrap}
+.em-pv-supi .c{color:var(--text-muted)}
+#em-sup-panel{position:fixed;top:0;right:0;bottom:0;width:min(440px,94vw);z-index:1200;overflow:auto;background:var(--bg-card,var(--body-bg,#fff));color:var(--text,var(--body-fg));border-left:1px solid var(--border);box-shadow:-10px 0 30px rgba(0,0,0,.28);padding:0 14px 90px;box-sizing:border-box;font-size:13px}
+#em-sup-panel .esp-hd{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:10px 0 8px;background:inherit;border-bottom:1px solid var(--border);margin-bottom:8px;z-index:1}
+#em-sup-panel .esp-hd button{border:1px solid var(--border);background:transparent;color:inherit;border-radius:6px;width:30px;height:30px;cursor:pointer}
+#em-sup-panel a{color:var(--link-fg,#1a73e8)}
 .em-pv-kb{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;font-size:12px;color:var(--text-muted)}
 .em-pv-kb .kb-in{color:#16a34a}.em-pv-kb .kb-fail{color:#dc2626}.em-pv-kb .kb-wait{color:#d97706}
 .em-pv-kb button{font-size:11px;padding:1px 8px}
@@ -304,6 +314,19 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
       </a>
       {% endif %}
     </div>
+    {% if mail_suppliers %}
+    <div class="em-pv-sup" id="pv-sup">
+      {% for s in mail_suppliers %}
+      <span class="em-pv-supi">
+        <button type="button" onclick="pvSupplier('{{ s.brief_url }}')"
+                title="{% trans "Коротко про постачальника праворуч: візитки, контакти, закупівлі, запити" %} ({{ s.why }})">🏭 <b translate="no">{{ s.name }}</b>{% if s.contact %} <span class="c" translate="no">· {{ s.contact }}</span>{% endif %}</button>
+        {% if s.cards %}<button type="button" onclick="pvSupplier('{{ s.brief_url }}', 'cards')" title="{% trans "Візитки й фото постачальника" %}">🪪 {{ s.cards }}</button>{% endif %}
+        {% for q in s.rfq %}<a href="{{ q.url }}" target="_blank" title="{% trans "Запит постачальникам — відкриється з цим постачальником праворуч" %}: {{ q.title }}" translate="no">📨 {{ q.code }}</a>{% endfor %}
+        <a href="{{ s.url }}" target="_blank" title="{% trans "Картка постачальника" %}">↗</a>
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
     {% if links %}
     <div class="em-pv-links">
       {% for l in links %}
@@ -2375,5 +2398,41 @@ window.attTipHide = function() {
   fetch(url).then(function(r) { return r.json(); }).then(render).catch(function() {});
 })();
 
+})();
+
+/* 🏭 постачальник з шапки листа — коротко праворуч (suppliers brief_view): візитки, дані фірми, контакти, закупівлі */
+(function() {
+  var old = document.getElementById('em-sup-panel');
+  if (old) old.remove();                       // інший лист — панель попереднього закривається
+  window.pvSupplier = async function(url, focus) {
+    var p = document.getElementById('em-sup-panel');
+    if (!p) {
+      p = document.createElement('aside');
+      p.id = 'em-sup-panel';
+      p.innerHTML = '<div class="esp-hd"><b>🏭 {% trans "Постачальник" %}</b><button type="button" title="{% trans "Закрити (Esc)" %}">✕</button></div><div class="esp-body"></div>';
+      document.body.appendChild(p);
+      p.querySelector('.esp-hd button').addEventListener('click', function() { p.remove(); });
+    }
+    var body = p.querySelector('.esp-body');
+    body.innerHTML = '<div style="padding:16px;color:var(--text-muted)">⏳ {% trans "Завантажую…" %}</div>';
+    try {
+      var r = await fetch(url, {credentials: 'same-origin'});
+      if (!r.ok) throw new Error(r.status);
+      body.innerHTML = await r.text();
+      if (focus === 'cards') {
+        var c = body.querySelector('.rqb-cards');
+        if (c) c.scrollIntoView({block: 'start', behavior: 'smooth'});
+      }
+    } catch (e) {
+      body.innerHTML = '<div style="padding:16px;color:var(--err,#c62828)">⚠️ {% trans "Не вдалося завантажити." %}</div>';
+    }
+  };
+  if (!window._espKeys) {
+    window._espKeys = true;
+    document.addEventListener('keydown', function(e) {
+      var p = document.getElementById('em-sup-panel');
+      if (p && e.key === 'Escape') { p.remove(); e.stopPropagation(); }
+    }, true);
+  }
 })();
 </script>
