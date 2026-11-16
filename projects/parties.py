@@ -372,7 +372,7 @@ def render(parties, stats, can_change=False) -> str:
             f'<g class="pjy-node pjy-r-{p.role} pjy-{state}{vcls}"{attrs}><title>{escape(chr(10).join(tip))}</title>'
             f'<rect x="{x}" y="{y}" width="{NODE_W}" height="{NODE_H}" rx="8" class="pjy-box"/>'
             f'<text x="{x + 10}" y="{y + 16}" class="pjy-role">{escape(role_text)}</text>'
-            f'<text x="{x + 10}" y="{y + 35}" class="pjy-name">{escape(_cut(p.name, 28))}</text>'
+            f'<text x="{x + 10}" y="{y + 35}" class="pjy-name" translate="no">{escape(_cut(p.name, 28))}</text>'
             f'<text x="{x + 10}" y="{y + 52}" class="pjy-sub pjy-s-{state}">{escape(_cut(sub, 34))}</text></g>')
     out.append("</svg>")
     return "".join(out)

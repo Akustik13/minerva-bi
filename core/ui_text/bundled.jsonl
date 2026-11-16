@@ -20882,6 +20882,7 @@
 {"uk": "піднято до закупівельної + {0} %", "en": "raised to purchase price + {0} %", "de": "auf Einkaufspreis + {0} % angehoben"}
 {"uk": "підпапок немає", "en": "no subfolders", "de": "keine Unterordner"}
 {"uk": "підпис листа", "en": "e-mail signature", "de": "E-Mail-Signatur"}
+{"uk": "підписи діаграми, заголовки, стани, дати й текст листа; назви кроків, фаз і сторін — як ви їх написали", "en": "diagram labels, headings, statuses, dates and the e-mail text; names of steps, phases and parties stay as you wrote them", "de": "Diagrammbeschriftungen, Überschriften, Status, Termine und E-Mail-Text; Namen von Schritten, Phasen und Beteiligten bleiben, wie Sie sie geschrieben haben"}
 {"uk": "підписки (видно з «показати виконані»); повернули в роботу — дедлайн повертається. Прострочені завжди видно.", "en": "the subscription (visible with “show completed”); if put back into work, the deadline returns. Overdue ones are always visible.", "de": "dem Abonnement (sichtbar mit „Erledigte anzeigen“); wird er wieder in Bearbeitung genommen, kehrt die Frist zurück. Überfällige sind immer sichtbar."}
 {"uk": "підпроєкт під «{0}»", "en": "subproject under “{0}”", "de": "Unterprojekt unter „{0}“"}
 {"uk": "підставити", "en": "insert", "de": "einsetzen"}

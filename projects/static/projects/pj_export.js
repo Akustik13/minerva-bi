@@ -126,6 +126,52 @@
     (opts.legend || []).forEach(function (it) { lw += 30 + c.measureText(it[2]).width + 18; });
     return Math.max(w, lw) + PAD * 2;
   }
+  // 🌐 Мова документа: підписи діаграми (не дані — [translate="no"]) перекладаються словником інтерфейсу Minerva
+  // (core/ui_text, /core/ui-dict/<мова>.js) тим самим алгоритмом, що й сторінка (mv_translate.js → MVTranslateKit);
+  // місяці класичної діаграми (data-md) — Intl цією мовою. Українська — як на екрані.
+  var KIT_URL = '/static/admin/js/mv_translate.js?v=4', dicts = {};
+  function kit() {
+    if (window.MVTranslateKit) return Promise.resolve(window.MVTranslateKit);
+    return new Promise(function (ok) {
+      var s = document.createElement('script');
+      s.src = KIT_URL;
+      s.onload = function () { ok(window.MVTranslateKit || null); };
+      s.onerror = function () { ok(null); };
+      document.head.appendChild(s);
+    });
+  }
+  function translator(lang) {
+    if (!lang || lang === 'uk') return Promise.resolve(null);
+    if (dicts[lang]) return dicts[lang];
+    dicts[lang] = Promise.all([kit(), fetch('/core/ui-dict/' + encodeURIComponent(lang) + '.js', {credentials: 'same-origin'})
+      .then(function (r) { return r.ok ? r.text() : ''; }).catch(function () { return ''; })])
+      .then(function (res) {
+        var k = res[0], text = res[1].trim().replace(/^window\.MV_UI_DICT=/, '').replace(/;$/, ''), d = null;
+        try { d = JSON.parse(text); } catch (e) { d = null; }
+        if (!k || !d) { delete dicts[lang]; return null; }     // не вдалось — наступний експорт спробує знову
+        return k.make(d);
+      });
+    return dicts[lang];
+  }
+  var CYR = /[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ]/;
+  function localize(c, o) {
+    if (!o || !o.lang || o.lang === 'uk') return;
+    var fm = null;
+    try { fm = new Intl.DateTimeFormat(o.lang, {month: 'short', year: 'numeric', timeZone: 'UTC'}); } catch (e) { fm = null; }
+    c.querySelectorAll('[data-md]').forEach(function (t) {
+      var d = new Date(t.getAttribute('data-md') + 'T00:00:00Z');
+      if (fm && !isNaN(d)) t.textContent = fm.format(d);
+    });
+    if (!o.tr) return;
+    var w = document.createTreeWalker(c, NodeFilter.SHOW_TEXT, null), n, list = [];
+    while ((n = w.nextNode())) list.push(n);
+    list.forEach(function (node) {
+      var el = node.parentNode;
+      if (!CYR.test(node.nodeValue) || !el || (el.closest && el.closest('[translate="no"],title,style,script'))) return;
+      var t = o.tr(node.nodeValue);
+      if (t !== null && t !== undefined) node.nodeValue = t;
+    });
+  }
   function png(svgs, opts) {
     var holder = (svgs[0] && svgs[0].closest('.pjc')) || document.documentElement;
     var saved = {}, keys = Object.keys(LIGHT).concat(['color']);
@@ -137,6 +183,7 @@
       svgs.forEach(function (svg) {
         var sz = size(svg), c = svg.cloneNode(true);
         inline(svg, c);
+        localize(c, opts);
         c.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
         c.setAttribute('width', sz.w);
         c.setAttribute('height', sz.h);
@@ -186,5 +233,5 @@
     var word = {plan: 'Projektplan', timeline: 'Projektverlauf', chain: 'Projektbeteiligte'}[kind] || kind;
     return base + '_' + word + '_' + day + '.' + ext;          // як projects/export.py file_name
   }
-  window.PJExport = {png: png, save: save, fileName: fileName};
+  window.PJExport = {png: png, save: save, fileName: fileName, translator: translator};
 })();

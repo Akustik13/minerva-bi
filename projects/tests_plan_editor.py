@@ -214,3 +214,18 @@ class VoiceTests(EditorBase):
         from core import ui_prefs
         self.assertEqual(ui_prefs.clean({"voice": "off"}).get("voice"), "off")
         self.assertNotIn("voice", ui_prefs.clean({"voice": "sometimes"}))
+
+
+class ExportLanguageTests(EditorBase):
+    """🌐 Експорт іншою мовою перекладає підписи діаграми (pj_export.js), а назви кроків, фаз і сторін — дані."""
+    def test_names_on_diagrams_are_marked_as_data(self):
+        from projects import gantt, parties, schedule
+        from projects.models import ProjectParty
+        ProjectStep.objects.filter(pk=self.b.pk).update(assignee=self.user)
+        svg = gantt.render(self.project, schedule.compute(self.project, today=self.today), today=self.today)
+        self.assertIn('class="pjg-pname" translate="no">🔧 Prototyp', svg)
+        self.assertIn('class="pjg-t" translate="no">', svg)
+        self.assertRegex(svg, r'class="pjg-who pjg-side-supplier">[^<]+</text>')         # «постач.» — підпис
+        self.assertIn('class="pjg-who pjg-side-we" translate="no">', svg)                # ім'я людини — дані
+        parties.save(self.project, {"role": ProjectParty.SUPPLIER, "name": "Leiterplatten Nord"})
+        self.assertIn('class="pjy-name" translate="no">Leiterplatten Nord', parties.context(self.project, True)["svg"])

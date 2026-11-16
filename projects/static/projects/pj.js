@@ -216,7 +216,7 @@
         var indent = c[0] === 'title' && r.type === 'step' ? 12 : 0;
         var t = sv('text', {x: cx + 6 + indent, y: y + 17, 'class': 'pjg2-td pjg2-c-' + c[0]},
                    cut(vals[c[0]], c[2] - 10 - indent));
-        if (c[0] === 'title' || c[0] === 'who') t.setAttribute('translate', 'no');
+        if (c[0] === 'title' || (c[0] === 'who' && r.who)) t.setAttribute('translate', 'no');
         g.appendChild(t);
         cx += c[2];
       });
@@ -249,7 +249,7 @@
       if (dt.getUTCDate() === 1 || dn === lo) {
         svg.appendChild(sv('line', {x1: X(dn), y1: 0, x2: X(dn), y2: height, 'class': 'pjg2-mon'}));
         var days = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth() + 1, 1)) / DAY - dn;
-        if (days * ppd > 40) svg.appendChild(sv('text', {x: X(dn) + 4, y: 14, 'class': 'pjg2-mt'}, fmtM.format(dt)));
+        if (days * ppd > 40) svg.appendChild(sv('text', {x: X(dn) + 4, y: 14, 'class': 'pjg2-mt', 'data-md': diso(dn)}, fmtM.format(dt)));
         else if (dt.getUTCMonth() === 0) svg.appendChild(sv('text', {x: X(dn) + 3, y: 14, 'class': 'pjg2-mt'}, String(dt.getUTCFullYear())));
       }
       if (showDays) {
@@ -313,7 +313,7 @@
       var label = r.who || r.side || '';
       if (label) {
         var lt = sv('text', {x: (r.kind === 'milestone' ? X(e) + ppd / 2 + 11 : x2 + 5), y: y + 17, 'class': 'pjg2-lab'}, label);
-        lt.setAttribute('translate', 'no');
+        if (r.who) lt.setAttribute('translate', 'no');           // ім'я — дані; «ми / клієнт» — підпис
         g.appendChild(lt);
       }
       g.appendChild(sv('title', {}, r.n + ' ' + r.title + ' · ' + dshort(r.start) + ' – ' + dshort(r.end)
@@ -1478,7 +1478,11 @@
     btns.forEach(function (b) { b.disabled = true; });
     err.textContent = '⏳ Готую файли…';
     var title = (box().dataset.code || '') + ' · ' + (box().dataset.title || '');
-    var pic = svgs.length && (want.pdf || want.png) ? window.PJExport.png(svgs, expHead(want.lang)) : Promise.resolve(null);
+    var pic = svgs.length && (want.pdf || want.png)
+      ? (window.PJExport.translator ? window.PJExport.translator(want.lang) : Promise.resolve(null)).then(function (tr) {
+        return window.PJExport.png(svgs, Object.assign(expHead(want.lang), {lang: want.lang, tr: tr}));
+      })
+      : Promise.resolve(null);
     function ask(blob, formats, mail) {
       var fd = new FormData();
       if (blob) fd.append('image', blob, 'diagram.png');

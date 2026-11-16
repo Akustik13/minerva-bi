@@ -233,7 +233,7 @@ def render(project, facts, viewer=None, today=None) -> str:
         out.append(f'<rect x="{x1:.1f}" y="8" width="{max(x2 - x1, 2):.1f}" height="18" rx="4" class="pjf-ph pjf-p{i % 2}">'
                    f'<title>{escape(name)} · {_fmt(a)} – {_fmt(b)}</title></rect>')
         if x2 - x1 > 40:
-            out.append(f'<text x="{x1 + 5:.1f}" y="21" class="pjf-pht">{escape(_cut(name, max(int((x2 - x1) / 7), 4)))}</text>')
+            out.append(f'<text x="{x1 + 5:.1f}" y="21" class="pjf-pht" translate="no">{escape(_cut(name, max(int((x2 - x1) / 7), 4)))}</text>')
     # місяці
     d = date(lo.year, lo.month, 1)
     while d <= hi:
@@ -249,7 +249,7 @@ def render(project, facts, viewer=None, today=None) -> str:
         off = r.get("outcome") in ("rejected", "declined", "silent") and r["key"] not in ("c", "we")
         out.append(f'<g class="pjf-row{" pjf-off" if off else ""}{" pjf-chosen" if r.get("outcome") == "chosen" else ""}">')
         out.append(f'<rect x="0" y="{y}" width="{W}" height="{ROW}" class="pjf-rbg pjf-r{i % 2}"/>')
-        out.append(f'<text x="10" y="{cy - 2:.1f}" class="pjf-name">{escape(r["icon"])} {escape(_cut(r["name"], 26))}</text>')
+        out.append(f'<text x="10" y="{cy - 2:.1f}" class="pjf-name" translate="no">{escape(r["icon"])} {escape(_cut(r["name"], 26))}</text>')
         if r["sub"]:
             out.append(f'<text x="28" y="{cy + 12:.1f}" class="pjf-sub">{escape(_cut(r["sub"], 30))}</text>')
         evs = sorted(r["events"], key=lambda e: e["d"])

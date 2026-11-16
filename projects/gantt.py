@@ -106,7 +106,7 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
             attr = f' data-phase="{ph.pk}"{focus}' if ph else ""
             g = [f'<g class="pjg-row pjg-phase pjg-{pc.status}"{attr}><title>{escape(tip)}</title>',
                  f'<rect x="0" y="{top}" width="{W}" height="{RH}" class="pjg-rowbg pjg-phbg"/>',
-                 f'<text x="10" y="{_n(cy + 4)}" class="pjg-pname">{escape(_cut(name, 40))}</text>',
+                 f'<text x="10" y="{_n(cy + 4)}" class="pjg-pname" translate="no">{escape(_cut(name, 40))}</text>',
                  f'<text x="268" y="{_n(cy + 4)}" class="pjg-dates">{_fmt(pc.start)}–{_fmt(pc.end)}</text>']
             if pc.start and pc.end:
                 g.append(f'<rect x="{_n(x(pc.start))}" y="{_n(cy - 4)}" width="{_n(max(x(pc.end + timedelta(days=1)) - x(pc.start), 2))}" '
@@ -124,6 +124,9 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
             if s.assignee_id and s.side in (ProjectStep.WE, ProjectStep.COLLEAGUE) else SIDE_SHORT.get(s.side, "")
         if s.party_id and not s.assignee_id:
             who = s.party.name
+        # ім'я людини чи сторони — дані (🌐 переклад інтерфейсу й експорт іншою мовою їх не чіпають)
+        data_attr = ' translate="no"' if s.party_id or (s.assignee_id and s.side in (ProjectStep.WE, ProjectStep.COLLEAGUE)) else ""
+
         tip = (f"{STATUS_ICON.get(c.status, '')} {s.title} · "
                f"{s.party.name if s.party_id else s.get_side_display()}"
                + (f" · {who}" if s.assignee_id else "") + f" · прогноз {_fmt(c.start)}–{_fmt(c.end)}"
@@ -133,8 +136,9 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
         cls = f"pjg-{c.status or 'todo'}" + (" pjg-crit" if c.critical and c.status not in ("done", "skipped") else "")
         g = [f'<g class="pjg-row pjg-step {cls}" data-step="{s.pk}"{focus}><title>{escape(tip)}</title>',
              f'<rect x="0" y="{top}" width="{W}" height="{RH}" class="pjg-rowbg"/>',
-             f'<text x="22" y="{_n(cy + 4)}" class="pjg-t">{STATUS_ICON.get(c.status, "")} {escape(_cut(s.title, 29))}</text>',
-             f'<text x="222" y="{_n(cy + 4)}" class="pjg-who pjg-side-{s.side}">{escape(_cut(who, 9))}</text>',
+             f'<text x="22" y="{_n(cy + 4)}" class="pjg-t" translate="no">{STATUS_ICON.get(c.status, "")} {escape(_cut(s.title, 29))}</text>',
+             f'<text x="222" y="{_n(cy + 4)}" class="pjg-who pjg-side-{s.side}"'
+             f'{data_attr}>{escape(_cut(who, 9))}</text>',
              f'<text x="268" y="{_n(cy + 4)}" class="pjg-dates">'
              f'{_fmt(c.start) if s.kind != ProjectStep.MILESTONE else ""}{"–" if s.kind != ProjectStep.MILESTONE else "◆ "}{_fmt(c.end)}</text>']
         if s.baseline_start and s.baseline_end:
