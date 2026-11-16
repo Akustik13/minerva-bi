@@ -3,6 +3,8 @@
 
 Адреси (MeetingAdmin.get_urls; жодна не закінчується на add / change / delete — Layer 4 ModuleAccessMiddleware):
   new/                       підготовка «🎙 Записати нараду» (GET форма, POST — services.create)
+  quick/                     «⚡ Швидкий запис» (GET сторінка, ?from=bench — з вікна запису; POST — services.quick_start
+                             + квиток → 302 на вікно запису)
   <pk>/page/                 сторінка наради (change_view веде сюди)
   <pk>/record/               POST → одноразове посилання → 302 на вікно запису (RAG-ПК) з #minerva=<квиток>
   <pk>/status/               GET JSON для опитування (без розшифровки)
@@ -14,7 +16,7 @@
   <pk>/remove/               POST «🗑 Видалити нараду»
   protocols/                 «🧾 Протоколи згоди» — лише адміністратор Minerva, лише метадані
 Права (правило 16 CLAUDE.md): зміни — лише POST; item / save / kb / retry — ще й has_perm('meetings.change_meeting'),
-record / continue / new — services.can_record (право add + записування ввімкнено); remove — власнику завжди (прибрати
+record / continue / new / quick — services.can_record (право add + записування ввімкнено); remove — власнику завжди (прибрати
 свій запис і розшифровку людина може й тоді, коли їй лишили лише перегляд). Кнопок без права сторінка не показує.
 Логіка — meetings/services.py, що показати — meetings/admin_pages.py.
 """
@@ -106,6 +108,8 @@ class MeetingAdmin(admin.ModelAdmin):
                  and request.user.has_perm("meetings.add_meeting") else "",
                  "is_admin": services._is_admin(request.user),
                  "protocols_url": reverse("admin:meetings_meeting_protocols")}
+        if extra["can_record"]:
+            extra["quick"] = admin_pages.quick_context(request.user)
         return super().changelist_view(request, {**(extra_context or {}), **extra})
 
     def add_view(self, request, form_url="", extra_context=None):
@@ -143,6 +147,7 @@ class MeetingAdmin(admin.ModelAdmin):
         w = self.admin_site.admin_view
         own = [
             path("new/", w(self.new_view), name="meetings_meeting_new"),
+            path("quick/", w(self.quick_view), name="meetings_meeting_quick"),
             path("protocols/", w(self.protocols_view), name="meetings_meeting_protocols"),
             path("<int:pk>/page/", w(self.page_view), name="meetings_meeting_page"),
             path("<int:pk>/record/", w(self.record_view), name="meetings_meeting_record"),
@@ -189,6 +194,27 @@ class MeetingAdmin(admin.ModelAdmin):
                                 event=_digits(request.GET.get("event")),
                                 customer=_digits(request.GET.get("customer")))
         return self._prepare(request, admin_pages.state_from_prefill(data))
+
+    def quick_view(self, request):
+        """«⚡ Записати зараз»: GET — сторінка швидкого запису (з вікна запису на RAG-ПК — ?from=bench), POST —
+        нарада (services.quick_start) і одразу одноразове посилання → 302 на вікно запису, як record/."""
+        from_bench = (request.POST if request.method == "POST" else request.GET).get("from") == "bench"
+        back = reverse("admin:meetings_meeting_quick") + ("?from=bench" if from_bench else "")
+        if request.method != "POST":
+            ctx = self._ctx(request, "⚡ Швидкий запис наради",
+                            quick=admin_pages.quick_context(request.user, from_bench=from_bench))
+            return TemplateResponse(request, "admin/meetings/meeting/quick.html", ctx)
+        try:
+            m = services.quick_start(request.user, {"title": request.POST.get("title"),
+                                                    "project": _digits(request.POST.get("project")),
+                                                    "event": _digits(request.POST.get("event"))})
+            ticket = services.issue_ticket(m, request.user)
+        except MeetingError as e:
+            messages.error(request, f"❌ {e}")
+            return redirect(back)
+        response = HttpResponseRedirect(services.record_url(ticket))
+        response["Referrer-Policy"] = "no-referrer"
+        return response
 
     def continue_view(self, request, pk):
         m = services.get_own(request.user, pk)

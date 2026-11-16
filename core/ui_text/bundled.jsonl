@@ -356,6 +356,7 @@
 {"uk": "(немає курсу)", "en": "(no rate)", "de": "(kein Kurs)"}
 {"uk": "(немає ціни): замовлення синхронізовані через старий DigiKey API без цін.", "en": "(no price): orders synced via the old DigiKey API without prices.", "de": "(kein Preis): Aufträge wurden über die alte DigiKey-API ohne Preise synchronisiert."}
 {"uk": "(немає ціни): замовлення синхронізовані через старий DigiKey API без цін. Повторно синхронізуйте через DigiKey API для оновлення цін.", "en": "(no price): orders synced via the old DigiKey API without prices. Re-sync via the DigiKey API to update prices.", "de": "(kein Preis): Aufträge wurden über die alte DigiKey-API ohne Preise synchronisiert. Synchronisieren Sie erneut über die DigiKey-API, um die Preise zu aktualisieren."}
+{"uk": "(необов’язково)", "en": "(optional)", "de": "(optional)"}
 {"uk": "(оновити).", "en": "(update).", "de": "(aktualisieren)."}
 {"uk": "(оновлено)", "en": "(updated)", "de": "(aktualisiert)"}
 {"uk": "(останні 50)", "en": "(last 50)", "de": "(letzte 50)"}
@@ -6845,6 +6846,7 @@
 {"uk": "З вашої пошти · {0} · оновлено {1} · тем {2}", "en": "From your mail · {0} · updated {1} · {2} topics", "de": "Aus Ihrer Post · {0} · aktualisiert {1} · {2} Themen"}
 {"uk": "З виконаними", "en": "With done events", "de": "Mit erledigten Terminen"}
 {"uk": "З виставки", "en": "From a trade fair", "de": "Von der Messe"}
+{"uk": "З вікна запису на RAG-ПК: після «⚡ Записати зараз» воно відкриється тут же, з вашими налаштуваннями мікрофона.", "en": "From the recording window on the RAG PC: after «⚡ Record now» it opens right here, with your microphone settings.", "de": "Aus dem Aufnahmefenster auf dem RAG-PC: nach «⚡ Jetzt aufnehmen» öffnet es sich hier, mit Ihren Mikrofoneinstellungen."}
 {"uk": "З гумором — легкий жарт на недоречні питання", "en": "With humor — a light joke for inappropriate questions", "de": "Mit Humor – ein leichter Scherz bei unpassenden Fragen"}
 {"uk": "З даташита", "en": "From datasheet", "de": "Aus Datenblatt"}
 {"uk": "З даташитом", "en": "With datasheet", "de": "Mit Datenblatt"}
@@ -7476,6 +7478,7 @@
 {"uk": "Записати вибрані (", "en": "Save selected (", "de": "Ausgewählte speichern ("}
 {"uk": "Записати вибрані в картки", "en": "Write selected to the cards", "de": "Ausgewählte in die Karten schreiben"}
 {"uk": "Записати заново", "en": "Record again", "de": "Neu aufnehmen"}
+{"uk": "Записати зараз", "en": "Record now", "de": "Jetzt aufnehmen"}
 {"uk": "Записати нараду", "en": "Record meeting", "de": "Besprechung aufnehmen"}
 {"uk": "Записати нараду: підготовка запису з цієї зустрічі", "en": "Record meeting: prepare a recording from this appointment", "de": "Besprechung aufnehmen: Aufnahme aus diesem Termin vorbereiten"}
 {"uk": "Записати продовження", "en": "Record continuation", "de": "Fortsetzung aufnehmen"}
@@ -11466,6 +11469,7 @@
 {"uk": "Одне речення про суть листів (Claude Haiku, тема й новий текст листів без цитат). Вимкнено або AI недоступний — теми листів. Перед записом опис видно й можна виправити.", "en": "One sentence about the gist of the e-mails (Claude Haiku, subject and new text of the e-mails without quotes). If off or the AI is unavailable — the e-mail subjects. The description is visible and can be corrected before recording.", "de": "Ein Satz zum Kern der E-Mails (Claude Haiku, Betreff und neuer Text der E-Mails ohne Zitate). Bei Deaktivierung oder wenn die KI nicht verfügbar ist – die Betreffs der E-Mails. Die Beschreibung ist vor dem Eintragen sichtbar und kann korrigiert werden."}
 {"uk": "Одним рядком", "en": "In one line", "de": "In einer Zeile"}
 {"uk": "Одноразово: після збереження обробка йде у фоні, а поле повертається на «—». Нова пошта перевіряється автоматично; листи з уже прийнятим рішенням не змінюються.", "en": "One-time: after saving, processing runs in the background and the field returns to “—”. New mail is checked automatically; e-mails with a decision already made are not changed.", "de": "Einmalig: Nach dem Speichern läuft die Verarbeitung im Hintergrund, und das Feld springt auf „—“ zurück. Neue E-Mails werden automatisch geprüft; E-Mails mit bereits getroffener Entscheidung bleiben unverändert."}
+{"uk": "Одразу відкриється вікно запису", "en": "The recording window opens right away", "de": "Das Aufnahmefenster öffnet sich sofort"}
 {"uk": "Одразу лист і Telegram вам.", "en": "An email and Telegram to you right away.", "de": "Sofort E-Mail und Telegram an Sie."}
 {"uk": "Одразу на принтер, 1 копія", "en": "Straight to the printer, 1 copy", "de": "Direkt zum Drucker, 1 Kopie"}
 {"uk": "Одразу на принтер, без перегляду", "en": "Straight to the printer, without preview", "de": "Direkt zum Drucker, ohne Vorschau"}
@@ -13908,6 +13912,7 @@
 {"uk": "Під час перевірки сайт сам звернувся до Minerva ключем «{0}» — зв'язок працює в обидва боки.", "en": "During the check the site itself contacted Minerva with the key “{0}” — the connection works in both directions.", "de": "Während der Prüfung hat sich die Website selbst mit dem Schlüssel „{0}“ an Minerva gewandt – die Verbindung funktioniert in beide Richtungen."}
 {"uk": "Під час роботи — живий прогрес: N з M, поточний товар, скільки ще. Після ввімкнення Minerva сама перевіряє нові й змінені кожні 5 хв.", "en": "While it runs, live progress is shown: N of M, the current product, how many are left. Once enabled, Minerva checks new and changed ones itself every 5 min.", "de": "Während des Laufs wird der Fortschritt live angezeigt: N von M, aktueller Artikel, wie viele noch fehlen. Nach dem Aktivieren prüft Minerva neue und geänderte alle 5 Min. selbst."}
 {"uk": "Підготовка міжнародного відправлення (PDF-документи)", "en": "Preparing an international shipment (PDF documents)", "de": "Vorbereitung einer internationalen Sendung (PDF-Dokumente)"}
+{"uk": "Підготовлені — ще не записані", "en": "Prepared — not recorded yet", "de": "Vorbereitet — noch nicht aufgenommen"}
 {"uk": "Підготувати Angebot", "en": "Prepare an Angebot", "de": "Angebot vorbereiten"}
 {"uk": "Підготувати завдання агенту", "en": "Prepare a task for the agent", "de": "Aufgabe für den Agenten vorbereiten"}
 {"uk": "Підготувати закупівлю", "en": "Prepare a purchase order", "de": "Bestellung vorbereiten"}
@@ -13917,6 +13922,7 @@
 {"uk": "Підготувати лист (людина перевірить і надішле). Адреси — лише ті, що є в тексті завдання. attach_datasheets — артикули, чиї даташити додати до листа.", "en": "Prepare an e-mail (a person will review and send it). Addresses — only those that are in the task text. attach_datasheets — SKUs whose datasheets to attach to the e-mail.", "de": "E-Mail vorbereiten (eine Person prüft und sendet sie). Adressen – nur die im Aufgabentext. attach_datasheets – Artikelnummern, deren Datenblätter der E-Mail beigefügt werden."}
 {"uk": "Підготувати лист на адресу з тексту завдання — надсилає людина", "en": "Prepare an e-mail to an address from the task text — sent by a person", "de": "E-Mail an eine Adresse aus dem Aufgabentext vorbereiten – wird von einer Person gesendet"}
 {"uk": "Підготувати нараду", "en": "Prepare meeting", "de": "Besprechung vorbereiten"}
+{"uk": "Підготувати нараду докладно", "en": "Prepare the meeting in detail", "de": "Besprechung ausführlich vorbereiten"}
 {"uk": "Підготуй ввічливий лист клієнту {0} ({1}): нагадай про цей крок і попроси відповісти, коли буде. Мова — як у листуванні з клієнтом. Лист лише запропонуй — надішлю я сам.", "en": "Prepare a polite email to the customer {0} ({1}): remind them of this step and ask them to reply when it will be done. Language — as in the correspondence with the customer. Only suggest the email — I will send it myself.", "de": "Bereite eine höfliche E-Mail an den Kunden {0} ({1}) vor: erinnere an diesen Schritt und bitte um Antwort, wann er erledigt wird. Sprache — wie in der Korrespondenz mit dem Kunden. Schlage die E-Mail nur vor — senden werde ich sie selbst."}
 {"uk": "Підготуй закупівлю (замовлення постачальнику) для цього кроку. Товари проєкту: {0}.{1} Кількості візьми із замовлень і Angebote проєкту; постачальника — з минулих закупівель цих товарів, якщо його не названо. Закупівлю лише запропонуй — створю її я після перевірки.", "en": "Prepare a purchase order (order to a supplier) for this step. Project products: {0}.{1} Take the quantities from the project's orders and Angebote; the supplier — from past purchase orders of these products, if none is named. Only suggest the purchase order — I will create it after checking.", "de": "Bereite eine Bestellung (Auftrag an einen Lieferanten) für diesen Schritt vor. Artikel des Projekts: {0}.{1} Mengen aus den Aufträgen und Angeboten des Projekts; den Lieferanten — aus früheren Bestellungen dieser Artikel, falls keiner genannt ist. Schlage die Bestellung nur vor — anlegen werde ich sie nach der Prüfung."}
 {"uk": "Підготуй лист-нагадування постачальнику {0} ({1}): попроси підтвердити дату відвантаження й трек-номер. Мова листа — як у нашому останньому листуванні з ним, інакше англійська. Лист лише запропонуй — надішлю я сам.", "en": "Prepare a reminder email to the supplier {0} ({1}): ask them to confirm the dispatch date and the tracking number. Language — as in our last correspondence with them, otherwise English. Only suggest the email — I will send it myself.", "de": "Bereite eine Erinnerungs-E-Mail an den Lieferanten {0} ({1}) vor: bitte um Bestätigung des Versanddatums und der Sendungsnummer. Sprache — wie in unserer letzten Korrespondenz mit ihm, sonst Englisch. Schlage die E-Mail nur vor — senden werde ich sie selbst."}
@@ -15598,6 +15604,7 @@
 {"uk": "Сьогодні {0}.", "en": "Today {0}.", "de": "Heute {0}."}
 {"uk": "Сьогодні {0}. Дати — YYYY-MM-DD. Не більше 8 пунктів у кожному списку.", "en": "Today is {0}. Dates — YYYY-MM-DD. No more than 8 items in each list.", "de": "Heute ist {0}. Daten — YYYY-MM-DD. Nicht mehr als 8 Punkte in jeder Liste."}
 {"uk": "Сьогодні {0}. Дати — у форматі YYYY-MM-DD.", "en": "Today is {0}. Dates — in YYYY-MM-DD format.", "de": "Heute ist der {0}. Datumsangaben — im Format YYYY-MM-DD."}
+{"uk": "Сьогодні в календарі", "en": "Today in the calendar", "de": "Heute im Kalender"}
 {"uk": "Сьогодні вже надіслано.", "en": "Already sent today.", "de": "Heute bereits gesendet."}
 {"uk": "Сьогодні!", "en": "Today!", "de": "Heute!"}
 {"uk": "Сьогодні: {0}, час Europe/Berlin.", "en": "Today: {0}, time zone Europe/Berlin.", "de": "Heute: {0}, Zeit Europe/Berlin."}
@@ -16570,6 +16577,7 @@
 {"uk": "Учасники", "en": "Participants", "de": "Teilnehmer"}
 {"uk": "Учасники (email)", "en": "Participants (e-mail)", "de": "Teilnehmer (E-Mail)"}
 {"uk": "Учасники (з листування — автоматично; роль можна виправити)", "en": "Participants (from correspondence — automatic; the role can be corrected)", "de": "Teilnehmer (aus der Korrespondenz — automatisch; die Rolle kann korrigiert werden)"}
+{"uk": "Учасники, що прийняли запрошення, і організатор потраплять у протокол згоди самі.", "en": "Participants who accepted the invitation and the organiser are added to the consent record automatically.", "de": "Teilnehmer, die die Einladung angenommen haben, und der Organisator kommen automatisch ins Einwilligungsprotokoll."}
 {"uk": "ФІЗИЧНІ ПАРАМЕТРИ", "en": "PHYSICAL PARAMETERS", "de": "PHYSISCHE PARAMETER"}
 {"uk": "ФІНАНСИ", "en": "FINANCE", "de": "FINANZEN"}
 {"uk": "ФІНЛЯНДІЯ", "en": "FINLAND", "de": "FINNLAND"}
@@ -17347,6 +17355,8 @@
 {"uk": "Швидкий вибір", "en": "Quick select", "de": "Schnellauswahl"}
 {"uk": "Швидкий доступ", "en": "Quick access", "de": "Schnellzugriff"}
 {"uk": "Швидкий доступ — Конфігурація", "en": "Quick access — Configuration", "de": "Schnellzugriff — Konfiguration"}
+{"uk": "Швидкий запис", "en": "Quick recording", "de": "Schnellaufnahme"}
+{"uk": "Швидкий запис наради", "en": "Quick meeting recording", "de": "Schnellaufnahme einer Besprechung"}
 {"uk": "Швидкий старт", "en": "Quick start", "de": "Schnellstart"}
 {"uk": "Швидко", "en": "Quick", "de": "Schnell"}
 {"uk": "Швидкі дії", "en": "Quick actions", "de": "Schnellaktionen"}
@@ -18370,6 +18380,7 @@
 {"uk": "відкрити", "en": "open", "de": "öffnen"}
 {"uk": "відкрити в пошті", "en": "open in mail", "de": "in der Post öffnen"}
 {"uk": "відкрити місце в записі", "en": "open the spot in the recording", "de": "Stelle in der Aufnahme öffnen"}
+{"uk": "відкрити нараду", "en": "open the meeting", "de": "Besprechung öffnen"}
 {"uk": "відкрити чернетку", "en": "open draft", "de": "Entwurf öffnen"}
 {"uk": "відкритий", "en": "open", "de": "geöffnet"}
 {"uk": "відкритих {0}", "en": "{0} open", "de": "{0} offen"}
@@ -18986,6 +18997,7 @@
 {"uk": "записати ще одну", "en": "record another one", "de": "weitere aufnehmen"}
 {"uk": "записи на RAG-ПК — до {0} днів", "en": "recordings on the RAG PC — up to {0} days", "de": "Aufnahmen auf dem RAG-PC — bis zu {0} Tage"}
 {"uk": "записує запит у журнал пошуку й може викликати платний AI", "en": "records the query in the search log and may call paid AI", "de": "protokolliert die Anfrage im Suchprotokoll und kann kostenpflichtige KI aufrufen"}
+{"uk": "записується", "en": "recording", "de": "wird aufgenommen"}
 {"uk": "записів", "en": "records", "de": "Datensätze"}
 {"uk": "записів (1–500)", "en": "entries (1–500)", "de": "Einträge (1–500)"}
 {"uk": "записів (1–500) — спільне для DHL / FedEx / Jumingo / DigiKey", "en": "records (1–500) — shared by DHL / FedEx / Jumingo / DigiKey", "de": "Einträge (1–500) — gemeinsam für DHL / FedEx / Jumingo / DigiKey"}
@@ -20195,6 +20207,7 @@
 {"uk": "обраних)?", "en": "selected)?", "de": "ausgewählt)?"}
 {"uk": "обрано", "en": "chosen", "de": "gewählt"}
 {"uk": "обрано: {0}", "en": "chosen: {0}", "de": "gewählt: {0}"}
+{"uk": "обробка", "en": "processing", "de": "Verarbeitung"}
 {"uk": "обробляється {0}", "en": "processing {0}", "de": "in Bearbeitung {0}"}
 {"uk": "обіця|домовл|раніше|минул|попередн|previous|earlier|agreed|promis|zugesagt|vereinbart|früher|letzte|bisher", "en": "обіця|домовл|раніше|минул|попередн|previous|earlier|agreed|promis|zugesagt|vereinbart|früher|letzte|bisher", "de": "обіця|домовл|раніше|минул|попередн|previous|earlier|agreed|promis|zugesagt|vereinbart|früher|letzte|bisher"}
 {"uk": "обіцянки (наші, клієнта, постачальника) зі статусом, що виконано, відкриті питання й наступну дію — кожен пункт", "en": "promises (ours, the customer's, the supplier's) with a status, what has been done, open questions and the next action — each item", "de": "Zusagen (unsere, des Kunden, des Lieferanten) mit Status, was erledigt ist, offene Fragen und die nächste Aktion — jeder Punkt"}
@@ -20886,6 +20899,7 @@
 {"uk": "пунктів — спершу приберіть один.", "en": "items — remove one first.", "de": "Einträge — entfernen Sie zuerst einen."}
 {"uk": "під це замовлення вже враховано {0}", "en": "{0} already accounted for this order", "de": "für diesen Auftrag sind bereits {0} berücksichtigt"}
 {"uk": "підготовка…", "en": "preparing…", "de": "wird vorbereitet…"}
+{"uk": "підготовлено", "en": "prepared", "de": "vorbereitet"}
 {"uk": "піде з", "en": "will be sent from", "de": "wird gesendet von"}
 {"uk": "підказки пошуку", "en": "search suggestions", "de": "Suchvorschläge"}
 {"uk": "підказки, повідомлення). Переклад робиться", "en": "hints, messages). Translation is done", "de": "Hinweise, Meldungen). Die Übersetzung erfolgt"}
@@ -21324,6 +21338,7 @@
 {"uk": "такими самими. Зніміть її, щоб вписати свій курс або клікнути курс «Для порівняння» (🌐 ЄЦБ — сьогоднішній", "en": "the same. Clear it to enter your own rate or click a rate under “For comparison” (🌐 ECB — today’s", "de": "unverändert. Entfernen Sie es, um einen eigenen Kurs einzugeben oder einen Kurs unter „Zum Vergleich“ anzuklicken (🌐 EZB — heutiger"}
 {"uk": "також з виставки", "en": "also from a trade fair", "de": "auch von einer Messe"}
 {"uk": "там", "en": "there", "de": "dort"}
+{"uk": "там виберіть мікрофон, прочитайте вголос текст згоди, поставте галочки й «▶ Почати». Учасників, проєкт і клієнта можна додати потім — «✏️ Змінити» на сторінці наради.", "en": "there, choose the microphone, read the consent text aloud, tick the boxes and press «▶ Start». Participants, project and customer can be added later — «✏️ Edit» on the meeting page.", "de": "dort Mikrofon wählen, den Einwilligungstext vorlesen, die Häkchen setzen und «▶ Starten». Teilnehmer, Projekt und Kunde lassen sich später ergänzen — «✏️ Ändern» auf der Besprechungsseite."}
 {"uk": "там модуль вмикають і вимикають для всіх.", "en": "that is where a module is switched on and off for everyone.", "de": "dort wird ein Modul für alle ein- und ausgeschaltet."}
 {"uk": "тара {0} г", "en": "tare {0} g", "de": "Tara {0} g"}
 {"uk": "тарифів немає", "en": "no rates", "de": "keine Tarife"}
@@ -21541,6 +21556,7 @@
 {"uk": "у магазині", "en": "in the shop", "de": "im Webshop"}
 {"uk": "у магазині змінилось після пропозиції — запустіть завдання ще раз", "en": "it changed in the shop after the proposal — run the task again", "de": "im Shop hat sich nach dem Vorschlag etwas geändert – starten Sie die Aufgabe erneut"}
 {"uk": "у налаштуваннях вимкнено «Пішов» автоматично — без нього день не закриється", "en": "automatic “Clock out” is disabled in the settings — without it the day will not be closed", "de": "automatisches „Gehen“ ist in den Einstellungen deaktiviert — ohne es wird der Tag nicht abgeschlossen"}
+{"uk": "у новій вкладці", "en": "in a new tab", "de": "in einem neuen Tab"}
 {"uk": "у пам'яті", "en": "in memory", "de": "im Speicher"}
 {"uk": "у панелі швидких фільтрів або", "en": "in the quick filter bar or", "de": "in der Schnellfilterleiste oder"}
 {"uk": "у пересланому листі від {0}", "en": "in the forwarded e-mail from {0}", "de": "in der weitergeleiteten E-Mail von {0}"}

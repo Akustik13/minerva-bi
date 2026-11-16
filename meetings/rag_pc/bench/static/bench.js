@@ -50,6 +50,9 @@ const radio = (name) => ($(`input[name="${name}"]:checked`) || {}).value;
 function showTab(name) {
   $$('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
   $$('.tab').forEach((s) => { s.hidden = s.id !== 'tab-' + name; });
+  if (name !== 'quick') stopQuickScan(); // the microphones are free again for «🎤 Перевірити» and the recording
+  placeConsent(name);
+  if (name === 'quick') quickShow();
   if (name === 'list') loadList();
   if (name === 'metrics') loadMetrics();
   if (name === 'help') loadHelp();
@@ -130,6 +133,7 @@ async function pollStatus() {
   try {
     STATUS = await api('/api/status');
     renderChips();
+    quickReady();
   } catch (e) {
     $('#chips').replaceChildren(el('span', {class: 'chip bad', text: 'Немає зв’язку зі стендом'}));
   }
@@ -398,6 +402,7 @@ function analyser(ctx, stream) {
 
 async function micCheck() {
   if (Check.stream || Check.opening) { cancelCheck(); return; }
+  stopQuickScan();
   if (Live.running || Live.starting || Check.scanning) return;
   $('#lv-check-box').hidden = false; // before any verdict: the HTTPS message used to stay hidden
   if (!window.isSecureContext || !navigator.mediaDevices) { checkVerdict('Сторінку відкрито не через HTTPS — браузер не дасть мікрофона.', 'bad'); return; }
@@ -457,6 +462,7 @@ async function micCheck() {
 /** Open every microphone at once (no processing), let the user talk 5 s, pick the one that hears speech best. */
 async function findMic() {
   if (Live.running || Live.starting || Check.scanning) return;
+  stopQuickScan();
   if (Check.stream || Check.opening) cancelCheck();
   $('#lv-check-box').hidden = false;
   if (!window.isSecureContext || !navigator.mediaDevices) { checkVerdict('Сторінку відкрито не через HTTPS — браузер не дасть мікрофона.', 'bad'); return; }
@@ -667,6 +673,7 @@ function setLiveButtons(running) {
       updateStart();
     }
   }
+  quickSync();
 }
 
 async function liveStart() {
@@ -1070,7 +1077,13 @@ function setMode(mode) { // minerva | landing | check | test
   $$('.stage0').forEach((e) => { e.hidden = !test; });
   $('#landing').hidden = mode !== 'landing';
   $('#check-ok').hidden = mode !== 'check';
-  $('main').hidden = !(mode === 'minerva' || test);
+  // landing (test recordings off, opened without Minerva): only «⚡ Швидкий старт» — set up the microphone in advance
+  $('main').hidden = !(mode === 'minerva' || test || mode === 'landing');
+  $('#tab-btn-live').hidden = mode === 'landing';
+  $('#tab-btn-live').textContent = mode === 'minerva' ? '🔴 Запис · усі налаштування' : '🔴 Наживо';
+  $('#q-all-note').textContent = mode === 'landing' ? 'Вибір запам’ятовується на цьому ПК — вікно запису з Minerva візьме його саме.'
+    : `Усі налаштування — вкладка «${$('#tab-btn-live').textContent}». Вибір запам’ятовується на цьому ПК.`;
+  QUICK.mode = mode;
   $('#page-title').textContent = test ? '🎙 Стенд нарад · тестовий режим без Minerva' : '🎙 Вікно запису наради';
   document.title = test ? 'Стенд нарад — тест' : 'Вікно запису наради';
 }
@@ -1088,6 +1101,7 @@ function updateStart() {
   note.className = `hint ${MN.dead ? 'bad' : ''}`;
   note.hidden = !text;
   if (!Live.running && !Live.starting) $('#lv-start').disabled = !!(MN.dead || MN.recorded || !mnReady());
+  quickReady();
 }
 
 function consentText(lang) {
@@ -1150,7 +1164,7 @@ function minervaUi(view) {
   consentText(view.consent_lang || 'de');
   $('#mn-consent').hidden = !!view.used;
   $('#mn-rec-buttons').hidden = false;
-  showTab('live');
+  showTab(view.used ? 'live' : 'quick');
   if (view.used) {
     MN.recorded = true;
     afterRecording('Цей запис уже передано на розшифровку.');
@@ -1241,8 +1255,12 @@ async function startPage() {
   }
   if (s && s.standalone) {
     setMode('test');
+    showTab('quick');
     api('/api/sessions').then((d) => { $('#count').textContent = d.sessions.length ? `(${d.sessions.length})` : ''; }).catch(() => {});
-  } else setMode('landing');
+  } else {
+    setMode('landing');
+    showTab('quick');
+  }
 }
 
 async function startTranscribe(id, model, open) {
@@ -1671,6 +1689,429 @@ async function sessionDelete() {
   try { await api(`/api/sessions/${SS.id}/delete`, {json: {}}); showTab('list'); } catch (e) { alert(e.message); }
 }
 
+// ---- ⚡ quick start (0.3.1) ---------------------------------------------------------------------
+// One screen before ▶: every microphone listened to at once with a live bar each, the one that hears speech is picked
+// by itself; what to record, headset, languages and live text — written straight into the controls of «🔴 Наживо»
+// (they stay the source of truth for liveBegin) and remembered on this PC. ▶ is the same liveStart(), called in the
+// click itself (getDisplayMedia needs the click); consent stays as it is: Minerva — the two ticks of #mn-consent,
+// moved right above ▶; test bench — its tick. Landing (no Minerva meeting, test recordings off): a link to Minerva's
+// «⚡ Швидкий запис» page, which sends this same tab back here with a ticket.
+const QUICK = {mode: 'boot', autoTried: false};
+const QM = {token: 0, ctx: null, opened: [], timer: null, t0: 0, running: false, manual: false, pick: '', pickedAt: 0};
+const QUICK_LISTEN_MS = 45000; // longest listening: Bluetooth headsets may sit in "call" mode while every mic is open
+const QUICK_WINDOW = 30;       // the last 3 s of 100 ms frames decide "hears"
+const QUICK_STABLE_MS = 4000;  // the picked microphone kept hearing this long: done, every microphone is closed again
+const QUICK_SPEECH_DB = -60;   // the same bar as «🔎 Знайти мікрофон»
+const QUICK_SNR = 10;
+const QUICK_MODES = ['both', 'mic', 'meeting'];
+const QUICK_ENGINES = ['parakeet', 'whisper', 'none'];
+const PROC_NOTES = {
+  headset: 'Обробка мікрофона: гарнітура — без придушення луни, чистіший голос.',
+  system: 'Обробка мікрофона: браузер прибирає з мікрофона весь звук комп’ютера (голоси з колонок).',
+  standard: 'Обробка мікрофона: звичайна — браузер прибирає шум і луну.',
+};
+
+function quickMicState(text, cls = '') {
+  const e = $('#q-mic-state');
+  e.textContent = text || '';
+  e.className = `hint ${cls}`;
+}
+
+function quickHint(text, cls = '') {
+  const e = $('#q-hint');
+  e.textContent = text || '';
+  e.className = `hint ${cls}`;
+}
+
+const micLabel = (id) => {
+  const o = [...$('#lv-mic').options].find((x) => x.value === id);
+  return o ? o.textContent : '';
+};
+
+/** Rows of #q-mics: every microphone the browser knows, the chosen one marked; live bars while listening. */
+async function quickRows() {
+  const table = $('#q-mics');
+  const inputs = QM.opened.length ? [] : (await audioDevices()).filter((d) => d.kind === 'audioinput');
+  const list = QM.opened.length ? QM.opened.map((o) => ({id: o.device.deviceId, label: o.device.label, o}))
+    : inputs.filter((d) => d.deviceId && !['default', 'communications'].includes(d.deviceId))
+      .map((d, i) => ({id: d.deviceId, label: d.label || `Мікрофон ${i + 1} (назва з’явиться після дозволу на мікрофон)`}));
+  const chosen = $('#lv-mic').value;
+  table.replaceChildren(...list.map((m) => {
+    const tr = el('tr', {class: `pick${m.id === chosen ? ' on' : ''}`});
+    tr.dataset.id = m.id;
+    const r = el('input', {type: 'radio', name: 'q-mic', 'aria-label': m.label || 'Мікрофон'});
+    r.checked = m.id === chosen;
+    tr.append(el('td', {}, r), el('td', {class: 'name', text: m.label || 'без назви'}),
+      el('td', {class: 'lvl'}, el('div', {class: 'bar'}, el('i'))), el('td', {class: 'num'}),
+      el('td', {class: 'verdict', text: m.o && m.o.error ? `не відкрився (${m.o.error})` : ''}));
+    if (m.o) m.o.tr = tr;
+    tr.addEventListener('click', () => quickChoose(m.id, true));
+    return tr;
+  }));
+  if (!list.length) {
+    // before the permission Chrome lists microphones without ids: they are there, only not shown yet
+    const text = inputs.length ? 'Мікрофони з’являться тут після дозволу — «🎤 Слухати мікрофони».'
+      : 'Браузер не бачить жодного мікрофона — підключіть гарнітуру або вебкамеру з мікрофоном.';
+    table.append(el('tr', {}, el('td', {class: 'muted', text})));
+  }
+}
+
+function quickChoose(id, manual) {
+  if (Live.running || Live.starting) return;
+  if (![...$('#lv-mic').options].some((o) => o.value === id)) return;
+  $('#lv-mic').value = id;
+  saved.set('bench-mic', id);
+  if (manual) QM.manual = true;
+  QM.pick = id;
+  QM.pickedAt = Date.now();
+  $$('#q-mics tr').forEach((tr) => {
+    const on = tr.dataset.id === id;
+    tr.classList.toggle('on', on);
+    const r = tr.querySelector('input');
+    if (r) r.checked = on;
+  });
+  if (manual) quickMicState(`Вибрано «${micLabel(id)}».`, 'ok');
+  quickReady();
+}
+
+function stopQuickScan(note = '', cls = '') {
+  QM.token += 1;
+  clearInterval(QM.timer);
+  QM.timer = null;
+  QM.opened.forEach((o) => stopTracks(o.stream));
+  if (QM.ctx) QM.ctx.close().catch(() => {});
+  QM.ctx = null;
+  const was = QM.running;
+  QM.running = false;
+  QM.opened.forEach((o) => {
+    if (o.tr) { const i = o.tr.querySelector('.bar i'); if (i) i.style.width = '0%'; }
+  });
+  QM.opened = [];
+  $('#q-scan').textContent = '🎤 Слухати мікрофони';
+  if (was && note) quickMicState(note, cls);
+  if (was) quickReady();
+}
+
+/** Listen to every microphone at once (no processing). byUser — the button (asks for the permission); otherwise only
+ * when the microphone is already allowed for this address (no permission prompt on opening the window). */
+async function quickScan(byUser = false) {
+  if (QM.running) { stopQuickScan('Зупинено.'); return; }
+  if (Live.running || Live.starting || Check.scanning) return;
+  if (!window.isSecureContext || !navigator.mediaDevices) {
+    quickMicState('Сторінку відкрито не через HTTPS — браузер не дасть мікрофона.', 'bad');
+    return;
+  }
+  if (!byUser) {
+    let state = 'prompt';
+    try { state = (await navigator.permissions.query({name: 'microphone'})).state; } catch (e) { /* not supported */ }
+    if (state !== 'granted') {
+      quickMicState('🎤 Натисніть «Слухати мікрофони» — браузер спитає дозвіл на мікрофон.');
+      return;
+    }
+  }
+  if (Check.stream || Check.opening) cancelCheck();
+  const token = ++QM.token;
+  const opened = [];
+  Object.assign(QM, {running: true, manual: false, pick: '', pickedAt: 0, opened});
+  $('#q-scan').textContent = '⏹ Досить слухати';
+  quickMicState('Відкриваю мікрофони…');
+  try {
+    stopTracks(await navigator.mediaDevices.getUserMedia({audio: true})); // permission + device names
+  } catch (e) {
+    if (token !== QM.token) return;
+    stopQuickScan();
+    quickMicState(e.name === 'NotAllowedError' ? '⛔ Браузер не дав доступу до мікрофона — дозвольте його (🎤 праворуч в адресному рядку) і спробуйте ще раз.'
+      : `⛔ Мікрофон не відкрився: ${e.message}`, 'bad');
+    return;
+  }
+  if (token !== QM.token) return;
+  await fillMics();
+  const devices = (await audioDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId && !['default', 'communications'].includes(d.deviceId));
+  if (token !== QM.token) return;
+  if (!devices.length) {
+    stopQuickScan();
+    quickMicState('⛔ Браузер не бачить жодного мікрофона — підключіть гарнітуру або вебкамеру з мікрофоном.', 'bad');
+    return;
+  }
+  const ctx = new AudioContext();
+  QM.ctx = ctx;
+  for (const d of devices) {
+    let stream = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({audio: micConstraints('raw', d.deviceId)});
+    } catch (e) {
+      if (token !== QM.token) return;
+      opened.push({device: d, error: e.name});
+      continue;
+    }
+    if (token !== QM.token) { stopTracks(stream); return; } // stopped meanwhile: this one was not in the list yet
+    opened.push({device: d, stream, ...analyser(ctx, stream), blocks: [], speech: -Infinity, hears: false});
+  }
+  await quickRows();
+  if (token !== QM.token) return;
+  // without a click on this page the browser may keep the audio paused (autoplay rules): wait briefly, then ask
+  await Promise.race([ctx.resume().catch(() => {}), new Promise((r) => { setTimeout(r, 400); })]);
+  if (token !== QM.token) return;
+  const n = opened.filter((o) => o.stream).length;
+  const listening = `Слухаю ${n} мікрофон(и) одночасно — скажіть кілька слів звичайним голосом.`;
+  if (ctx.state !== 'running') {
+    quickMicState('👆 Клацніть будь-де на сторінці — тоді вікно почне слухати мікрофони.');
+    document.addEventListener('pointerdown', () => {
+      if (token === QM.token) ctx.resume().then(() => { if (token === QM.token) quickMicState(listening); }).catch(() => {});
+    }, {once: true, capture: true});
+  } else quickMicState(listening);
+  QM.t0 = Date.now();
+  QM.timer = setInterval(() => quickTick(token), 100);
+}
+
+function quickTick(token) {
+  if (token !== QM.token || !QM.ctx) return;
+  if (QM.ctx.state !== 'running') { QM.t0 = Date.now(); return; } // the clock starts once the audio runs
+  const age = Date.now() - QM.t0;
+  for (const o of QM.opened) {
+    if (!o.an) continue;
+    o.an.getFloatTimeDomainData(o.buf);
+    const db = toDb(rms(o.buf));
+    if (age >= SKIP_MS) {
+      o.blocks.push(db);
+      if (o.blocks.length > QUICK_WINDOW) o.blocks.shift();
+    }
+    o.speech = percentile(o.blocks, 0.9);
+    const floor = Math.max(percentile(o.blocks, 0.1), -100);
+    o.hears = o.blocks.length >= 10 && o.speech >= QUICK_SPEECH_DB && o.speech - floor >= QUICK_SNR;
+    if (!o.tr) continue;
+    o.tr.classList.toggle('hears', o.hears);
+    o.tr.querySelector('.bar i').style.width = `${meterPct(db)}%`;
+    o.tr.querySelector('.num').textContent = Number.isFinite(db) ? `${Math.round(db)} дБ` : 'тиша';
+    o.tr.querySelector('.verdict').textContent = o.blocks.length < 10 ? '…'
+      : o.hears ? '✅ чує вас' : !Number.isFinite(o.speech) ? '⛔ цифрова тиша' : 'лише шум';
+  }
+  if (!QM.manual) {
+    const best = QM.opened.filter((o) => o.hears).sort((a, b) => b.speech - a.speech)[0];
+    const cur = QM.opened.find((o) => o.device.deviceId === QM.pick);
+    if (best && (!cur || !cur.hears || best.speech > cur.speech + 6) && best.device.deviceId !== QM.pick) {
+      quickChoose(best.device.deviceId, false);
+      quickMicState(`✅ «${best.device.label || 'без назви'}» чує вас — вибрано. Говоріть ще кілька секунд…`, 'ok');
+    }
+  }
+  const cur = QM.opened.find((o) => o.device.deviceId === QM.pick);
+  if (cur && cur.hears && Date.now() - QM.pickedAt >= QUICK_STABLE_MS) {
+    stopQuickScan(`✅ Вибрано «${cur.device.label || 'без назви'}» — він чує вас найкраще.`, 'ok');
+    return;
+  }
+  if (age > QUICK_LISTEN_MS) {
+    if (QM.pick) stopQuickScan(`Вибрано «${micLabel(QM.pick)}». Слухав ${Math.round(QUICK_LISTEN_MS / 1000)} с.`, 'ok');
+    else if (QM.manual) stopQuickScan('Готово.');
+    else stopQuickScan('⛔ Жоден мікрофон не чув голосу. Перевірте кнопку вимкнення на гарнітурі й рівень мікрофона в Windows, потім «🎤 Слухати мікрофони» ще раз.', 'bad');
+  }
+}
+
+// ---- quick settings: written into the controls of «🔴 Наживо» ----
+function quickProc(headset) {
+  const mode = radio('lv-mode');
+  return headset === 'headset' ? 'headset' : mode === 'mic' ? 'standard' : 'system';
+}
+
+function quickSetMode(v) {
+  if (!QUICK_MODES.includes(v) || Live.running || Live.starting) return;
+  const r = $(`input[name="lv-mode"][value="${v}"]`);
+  if (r) r.checked = true;
+  saved.set('bench-mode', v);
+  const hs = saved.get('bench-headset');
+  if (hs === 'headset' || hs === 'speakers') quickSetHeadset(hs); // no headset: «весь звук» online, «звичайна» in person
+  quickSync();
+}
+
+function quickSetHeadset(v) {
+  if (Live.running || Live.starting) return;
+  saved.set('bench-headset', v);
+  const proc = quickProc(v);
+  if ([...$('#lv-proc').options].some((o) => o.value === proc)) {
+    $('#lv-proc').value = proc;
+    saved.set('bench-proc', proc);
+  }
+  quickSync();
+}
+
+function quickSetLiveText(on) {
+  if (Live.running || Live.starting) return;
+  const now = radio('lv-engine');
+  const want = on ? (now !== 'none' ? now : (saved.get('bench-engine-on') === 'whisper' && !MN.active ? 'whisper' : 'parakeet')) : 'none';
+  const r = $(`input[name="lv-engine"][value="${want}"]`);
+  if (r) r.checked = true;
+  saved.set('bench-engine', want);
+  quickSync();
+}
+
+function quickLangs() {
+  for (const side of ['l', 'r']) {
+    const src = $(`#lv-lang-${side}`), dst = $(`#q-lang-${side}`);
+    const sig = [...src.options].map((o) => o.value + o.text).join('|');
+    if (dst.dataset.sig !== sig) {
+      dst.replaceChildren(...[...src.options].map((o) => el('option', {value: o.value, text: o.text})));
+      dst.dataset.sig = sig;
+    }
+    dst.value = src.value;
+  }
+}
+
+/** Show the controls as they are now (after Minerva filled the languages, a change in «🔴 Наживо», a recording). */
+function quickSync() {
+  const busy = Live.running || Live.starting;
+  const mode = radio('lv-mode'), proc = $('#lv-proc').value, engine = radio('lv-engine');
+  $$('#q-mode button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.v === mode);
+    b.setAttribute('aria-checked', String(b.dataset.v === mode));
+    b.disabled = busy;
+  });
+  const hs = proc === 'headset' ? 'headset' : proc === 'system' || saved.get('bench-headset') === 'speakers' ? 'speakers' : '';
+  $$('#q-headset button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.v === hs);
+    b.setAttribute('aria-checked', String(b.dataset.v === hs));
+    b.disabled = busy || mode === 'meeting';
+  });
+  $('#q-headset').hidden = mode === 'meeting';
+  $('#q-proc-note').textContent = mode === 'meeting' ? 'Мікрофон не записується — лише звук наради.' : (PROC_NOTES[proc] || '');
+  quickLangs();
+  ['#q-lang-l', '#q-lang-r', '#q-livetext', '#q-scan', '#q-autoscan', '#q-consent'].forEach((s) => { $(s).disabled = busy; });
+  $('#q-livetext').checked = engine !== 'none';
+  $('#q-consent').checked = $('#lv-consent').checked;
+  $('#q-meeting-tip').hidden = mode === 'mic';
+  quickReady();
+}
+
+function quickReady() {
+  const list = $('#q-ready');
+  if (!list) return;
+  const items = [];
+  const add = (icon, text, cls = '') => items.push(el('li', {class: cls}, el('span', {text: icon}), el('span', {text})));
+  const s = STATUS;
+  const mode = radio('lv-mode'), engine = radio('lv-engine');
+  const landing = QUICK.mode === 'landing';
+  if (!window.isSecureContext) add('⛔', 'Сторінку відкрито не через HTTPS — браузер не дасть звуку.', 'bad');
+  if (mode === 'meeting') add('✅', 'Мікрофон не потрібен — лише звук наради.');
+  else {
+    const id = $('#lv-mic').value, cur = QM.opened.find((o) => o.device.deviceId === id);
+    if (id && cur && cur.hears) add('✅', `Мікрофон «${micLabel(id)}» чує вас.`);
+    else if (id && QM.running) add('🎤', `Мікрофон «${micLabel(id)}» — говоріть, вікно слухає.`);
+    else if (id) add('✅', `Мікрофон «${micLabel(id)}».`);
+    else add('⚠️', 'Мікрофон вибере браузер — краще знайти свій: «🎤 Слухати мікрофони».', 'warn');
+  }
+  if (engine === 'none') add('ℹ️', 'Без тексту під час запису — розшифровка буде після запису.');
+  else if (s && s.parakeet && !s.parakeet.ready && engine === 'parakeet') add('⚠️', 'Parakeet не встановлено на RAG-ПК — тексту під час запису не буде (сам запис буде).', 'warn');
+  else add('✅', 'Текст під час запису — так.');
+  if (s && s.live_busy && !Live.running) add('⛔', 'На RAG-ПК зараз іде інший запис — одночасно лише один.', 'bad');
+  if (landing) {
+    const m = (s && s.minerva) || {};
+    if (!s) add('…', 'Перевіряю зв’язок з RAG-ПК…');
+    else if (m.configured && m.key_saved && m.url) add('✅', 'RAG-ПК підключено до Minerva.');
+    else add('⛔', 'RAG-ПК ще не підключено до Minerva — «RAG — керування» → «🎙 Наради».', 'bad');
+  } else if (MN.active) {
+    if (MN.dead) add('⛔', MN.dead, 'bad');
+    else if (MN.recorded) add('✅', 'Запис уже передано на розшифровку.');
+    else if (mnReady()) add('✅', 'Згоду підтверджено галочками.');
+    else add('⏸', 'Прочитайте вголос текст згоди нижче й поставте обидві галочки.', 'warn');
+  } else if ($('#lv-consent').checked) add('✅', 'Усі погодились на запис.');
+  else add('⏸', 'Поставте галочку згоди нижче.', 'warn');
+  list.replaceChildren(...items);
+  quickStartButton();
+}
+
+function quickStartButton() {
+  const btn = $('#q-start'), link = $('#q-minerva');
+  const landing = QUICK.mode === 'landing';
+  btn.hidden = landing;
+  link.hidden = !landing;
+  if (landing) {
+    const m = (STATUS && STATUS.minerva) || {};
+    const ok = !!(m.configured && m.key_saved && typeof m.url === 'string' && m.url.startsWith('https://'));
+    if (ok) link.href = `${m.url.replace(/\/+$/, '')}/admin/meetings/meeting/quick/?from=bench`;
+    else link.removeAttribute('href');
+    link.classList.toggle('disabled', !ok);
+    link.setAttribute('aria-disabled', String(!ok));
+    return;
+  }
+  const busy = Live.running || Live.starting;
+  const ready = MN.active ? !(MN.dead || MN.recorded) && mnReady() : $('#lv-consent').checked;
+  btn.disabled = busy || !ready;
+  btn.textContent = busy ? '🔴 Йде запис' : '▶ Почати запис';
+}
+
+/** ▶ in «⚡ Швидкий старт»: liveStart() in the click itself (the screen-share picker needs the click), then «🔴». */
+function quickStart() {
+  if (Live.running || Live.starting) { showTab('live'); return; }
+  if (MN.active ? (MN.dead || MN.recorded || !mnReady()) : !$('#lv-consent').checked) {
+    quickHint(MN.active ? 'Спершу прочитайте текст згоди вголос і поставте обидві галочки.' : 'Поставте галочку згоди.', 'warn');
+    return;
+  }
+  quickHint('');
+  showTab('live'); // closes the microphones of the scan
+  liveStart();
+}
+
+function quickShow() {
+  quickSync();
+  if (!QM.running) quickRows();
+  if (!QUICK.autoTried && $('#q-autoscan').checked) {
+    QUICK.autoTried = true;
+    quickScan(false);
+  }
+}
+
+function placeConsent(name) {
+  const card = $('#mn-consent');
+  const slot = name === 'quick' ? $('#q-consent-slot') : $('#lv-consent-slot');
+  if (card && slot && card.parentNode !== slot) slot.append(card);
+}
+
+/** Remembered choices (test bench and landing; a Minerva meeting brings its own languages). */
+function quickRestore() {
+  const mode = saved.get('bench-mode'), engine = saved.get('bench-engine');
+  if (QUICK_MODES.includes(mode)) $(`input[name="lv-mode"][value="${mode}"]`).checked = true;
+  if (QUICK_ENGINES.includes(engine)) $(`input[name="lv-engine"][value="${engine}"]`).checked = true;
+  for (const side of ['l', 'r']) {
+    const v = saved.get(`bench-lang-${side}`), sel = $(`#lv-lang-${side}`);
+    if (v && [...sel.options].some((o) => o.value === v)) sel.value = v;
+  }
+  $('#q-autoscan').checked = saved.get('bench-autoscan', '1') === '1';
+}
+
+function quickWire() {
+  $$('#q-mode button').forEach((b) => b.addEventListener('click', () => quickSetMode(b.dataset.v)));
+  $$('#q-headset button').forEach((b) => b.addEventListener('click', () => quickSetHeadset(b.dataset.v)));
+  $('#q-livetext').addEventListener('change', (e) => quickSetLiveText(e.target.checked));
+  for (const side of ['l', 'r']) {
+    $(`#q-lang-${side}`).addEventListener('change', (e) => {
+      $(`#lv-lang-${side}`).value = e.target.value;
+      if (!MN.active) saved.set(`bench-lang-${side}`, e.target.value);
+    });
+    $(`#lv-lang-${side}`).addEventListener('change', (e) => {
+      if (!MN.active) saved.set(`bench-lang-${side}`, e.target.value);
+      quickSync();
+    });
+  }
+  $('#q-autoscan').addEventListener('change', (e) => saved.set('bench-autoscan', e.target.checked ? '1' : '0'));
+  $('#q-scan').addEventListener('click', () => quickScan(true));
+  $('#q-start').addEventListener('click', quickStart);
+  $('#q-consent').addEventListener('change', (e) => { $('#lv-consent').checked = e.target.checked; quickReady(); });
+  $('#lv-consent').addEventListener('change', quickSync);
+  $$('input[name="lv-mode"]').forEach((r) => r.addEventListener('change', () => { saved.set('bench-mode', r.value); quickSync(); }));
+  $$('input[name="lv-engine"]').forEach((r) => r.addEventListener('change', () => {
+    saved.set('bench-engine', r.value);
+    if (r.value !== 'none') saved.set('bench-engine-on', r.value);
+    quickSync();
+  }));
+  $('#lv-proc').addEventListener('change', () => {
+    const p = $('#lv-proc').value;
+    saved.set('bench-headset', p === 'headset' ? 'headset' : p === 'system' ? 'speakers' : '');
+    quickSync();
+  });
+  $('#lv-mic').addEventListener('change', () => { if (!QM.running) quickRows(); quickReady(); });
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', () => { if (!QM.running) setTimeout(quickRows, 300); });
+  }
+}
+
 // ---- start -------------------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   for (const s of $$('select.lang')) for (const [v, t] of LANGS) s.append(el('option', {value: v, text: t}));
@@ -1685,6 +2126,8 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#lv-find').addEventListener('click', findMic);
   fillMics();
   if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', fillMics);
+  quickRestore();
+  quickWire();
   $('#lv-start').addEventListener('click', liveStart);
   $('#lv-stop').addEventListener('click', () => liveStop(''));
   $('#lv-mark').addEventListener('click', () => sendMark(''));
@@ -1710,6 +2153,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#ss-delete').addEventListener('click', sessionDelete);
   $('#ss-search').addEventListener('input', search);
   window.addEventListener('beforeunload', (e) => { if (Live.running) { e.preventDefault(); e.returnValue = ''; } });
+  quickSync();
   startPage();
   pollStatus();
 });

@@ -330,6 +330,46 @@ def prepare_context(user, state, settings=None) -> dict:
     }
 
 
+# ── ⚡ швидкий запис (список нарад і quick/) ────────────────────────────────
+
+QUICK_STATE = {Meeting.RECORDING: "🔴 записується", Meeting.PROCESSING: "⏳ обробка", Meeting.REVIEW: "✅ записано",
+               Meeting.FAILED: "⚠️ не вдалося"}
+
+
+def quick_context(user, *, from_bench=False, settings=None, now=None) -> dict:
+    """Блок «⚡ Швидкий запис»: «⚡ Записати зараз» (назва й проєкт — необов’язково), зустрічі календаря на сьогодні
+    (ще не записана — «⚡ Записати»; вже є нарада — її стан і посилання), підготовлені й ще не записані наради
+    («🎙 Записати» — той самий record/). from_bench — сторінку відкрили з вікна запису на RAG-ПК: форми без нової
+    вкладки (вікно запису відкриється в цій самій). Нічого не змінює."""
+    s = settings or services.settings_obj()
+    refusal = services.record_refusal(user)
+    out = {"refusal": refusal, "can": not refusal, "from_bench": from_bench, "health": health(user, s),
+           "phone_note": PHONE_NOTE, "action": url("admin:meetings_meeting_quick"),
+           "placeholder": services.quick_title(now=now), "events": [], "prepared": [], "projects": []}
+    if refusal:
+        return out
+    out["projects"] = project_options(user) if user.has_perm("projects.view_project") else []
+    events = services.quick_events(user, now)
+    linked = {}
+    for m in services.own(user).filter(calendar_event__in=events).order_by("pk"):
+        linked[m.calendar_event_id] = m           # найновіша нарада зустрічі
+    shown = set()
+    for ev in events:
+        m = linked.get(ev.pk)
+        row = {"event": ev, "start": local(ev.start_at), "meeting": m, "state": "", "page": ""}
+        if m is not None:
+            row["page"] = services.page_path(m)
+            if m.status == Meeting.READY:
+                shown.add(m.pk)
+            else:
+                row["state"] = QUICK_STATE.get(m.status, m.get_status_display())
+        out["events"].append(row)
+    prepared = (services.own(user).filter(status=Meeting.READY, transcript_deleted_at__isnull=True)
+                .exclude(pk__in=shown).select_related("project").order_by("-created_at")[:services.QUICK_PREPARED_MAX])
+    out["prepared"] = [{"meeting": m, "page": services.page_path(m), "created": local(m.created_at)} for m in prepared]
+    return out
+
+
 # ── сторінка наради ─────────────────────────────────────────────────────────
 
 def staff_options() -> list:

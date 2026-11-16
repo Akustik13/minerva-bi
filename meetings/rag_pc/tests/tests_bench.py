@@ -1474,7 +1474,7 @@ class LinkPipelineTests(LinkTestBase):
         self.assertEqual(sync["sessions"][0], {"meeting": 12, "uid": UID, "session": sid,
                                                "token_sha256": __import__("hashlib").sha256(PUSH.encode()).hexdigest(),
                                                "stage": "done", "progress": None, "queue_pos": 0, "audio_on_bench": False})
-        self.assertEqual(sync["bench"], {"version": "0.3.0", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
+        self.assertEqual(sync["bench"], {"version": "0.3.1", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
                                          "last_error": "", "retention_days": 30, "standalone": False})
 
     async def test_empty_transcript_and_audio_text(self):
@@ -2496,6 +2496,70 @@ class QuoteParityTests(unittest.TestCase):
         for name, quote, line, expected in cases.CASES:
             with self.subTest(name):
                 self.assertEqual(moments.place(quote, line, by_no, ordered), expected)
+
+
+
+class QuickStartPageTests(unittest.TestCase):
+    """0.3.1 «⚡ Швидкий старт»: the page itself (no browser here) — every id bench.js asks for exists, the quick tab
+    is the first and open one, assets carry the version, ▶ calls liveStart() in the click, consent is not skipped."""
+
+    @classmethod
+    def setUpClass(cls):
+        import pathlib
+        import re
+
+        static = pathlib.Path(__file__).resolve().parent.parent / "bench" / "static"
+        cls.js = (static / "bench.js").read_text(encoding="utf-8")
+        cls.html = (static / "index.html").read_text(encoding="utf-8")
+        cls.css = (static / "bench.css").read_text(encoding="utf-8")
+        cls.re = re
+
+    def test_every_id_of_the_script_is_on_the_page(self):
+        asked = set(self.re.findall(r"""\$\$?\(\s*[`'"]#([A-Za-z0-9_-]+)""", self.js))
+        asked = {i for i in asked if not i.endswith("-")}           # `#lv-lang-${side}` — both sides checked below
+        asked |= {f"{p}-{s}" for p in ("lv-lang", "q-lang") for s in ("l", "r")}
+        have = set(self.re.findall(r'id="([^"]+)"', self.html))
+        self.assertEqual(sorted(asked - have), [])
+
+    def test_assets_carry_the_version(self):
+        from bench import VERSION
+
+        self.assertEqual(VERSION, "0.3.1")
+        self.assertIn(f"/static/bench.js?v={VERSION}", self.html)
+        self.assertIn(f"/static/bench.css?v={VERSION}", self.html)
+
+    def test_quick_tab_is_first_and_open(self):
+        nav = self.html.split('<nav class="tabs"', 1)[1].split("</nav>", 1)[0]
+        tabs = self.re.findall(r'data-tab="([a-z]+)"', nav)
+        self.assertEqual(tabs[:2], ["quick", "live"])
+        self.assertIn('data-tab="quick" class="on"', nav)
+        self.assertIn('<section id="tab-quick" class="tab">', self.html)
+        self.assertIn('<section id="tab-live" class="tab" hidden>', self.html)
+        main = self.html.split("<main>", 1)[1]
+        self.assertIn('<nav class="tabs"', main)                       # hidden together with <main> in the error view
+        for test_only in ("upload", "list", "metrics", "help"):
+            self.assertIn(f'data-tab="{test_only}" class="stage0"', nav)
+
+    def test_start_keeps_consent_and_the_click(self):
+        start = self.js.split("function quickStart() {", 1)[1].split("\n}\n", 1)[0]
+        self.assertIn("mnReady()", start)
+        self.assertIn("$('#lv-consent').checked", start)
+        self.assertNotIn("await", start)                               # getDisplayMedia needs the click itself
+        self.assertLess(start.index("showTab('live')"), start.index("liveStart()"))
+        self.assertIn("consent stage0", self.html.split('id="q-consent-label"', 1)[0][-60:])
+
+    def test_scan_is_closed_before_anything_else_takes_the_microphone(self):
+        self.assertIn("if (name !== 'quick') stopQuickScan();", self.js)
+        for fn in ("async function micCheck() {", "async function findMic() {"):
+            body = self.js.split(fn, 1)[1][:200]
+            self.assertIn("stopQuickScan();", body)
+        self.assertIn("navigator.permissions.query({name: 'microphone'})", self.js)   # no prompt on opening
+        self.assertIn("QUICK_LISTEN_MS = 45000", self.js)
+
+    def test_landing_links_to_the_minerva_quick_page(self):
+        self.assertIn("/admin/meetings/meeting/quick/?from=bench", self.js)
+        self.assertIn("m.url.startsWith('https://')", self.js)
+        self.assertIn("a.button.disabled", self.css)
 
 
 if __name__ == "__main__":

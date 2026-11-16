@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Вікно запису наради</title>
-<link rel="stylesheet" href="/static/bench.css?v=0.3.0">
-<script src="/static/bench.js?v=0.3.0" defer></script>
+<link rel="stylesheet" href="/static/bench.css?v=0.3.1">
+<script src="/static/bench.js?v=0.3.1" defer></script>
 </head>
 <body class="boot">
 <header class="top">
@@ -16,7 +16,8 @@
 <!-- opened without Minerva while test recordings are off -->
 <div id="landing" class="card landing" hidden>
   <p class="big">🎙 Вікно запису наради.</p>
-  <p>Щоб записати нараду, відкрийте її в Minerva: сторінка наради → «🎙 Відкрити вікно запису».</p>
+  <p>Записати нараду: «⚡ Почати запис у Minerva» нижче або в Minerva — сторінка наради → «🎙 Відкрити вікно запису».
+    Мікрофон і режим можна налаштувати тут заздалегідь — вікно запису на цьому ПК візьме їх саме.</p>
 </div>
 
 <!-- «🔌 Перевірити вікно запису» in Minerva opens #check -->
@@ -41,17 +42,70 @@
   ви окремо дозволите це для запису.</p>
 <p id="config-error" class="notice" hidden></p>
 
-<nav class="tabs stage0" role="tablist">
-  <button type="button" data-tab="live" class="on" role="tab">🔴 Наживо</button>
-  <button type="button" data-tab="upload" role="tab">📁 Свій файл</button>
-  <button type="button" data-tab="list" role="tab">🗂 Записи <span id="count" class="badge"></span></button>
-  <button type="button" data-tab="metrics" role="tab">📊 Заміри</button>
-  <button type="button" data-tab="help" role="tab">❓ Довідка</button>
+<main>
+<nav class="tabs" role="tablist">
+  <button type="button" data-tab="quick" class="on" role="tab">⚡ Швидкий старт</button>
+  <button type="button" data-tab="live" id="tab-btn-live" role="tab">🔴 Наживо</button>
+  <button type="button" data-tab="upload" class="stage0" role="tab">📁 Свій файл</button>
+  <button type="button" data-tab="list" class="stage0" role="tab">🗂 Записи <span id="count" class="badge"></span></button>
+  <button type="button" data-tab="metrics" class="stage0" role="tab">📊 Заміри</button>
+  <button type="button" data-tab="help" class="stage0" role="tab">❓ Довідка</button>
 </nav>
 
-<main>
-<section id="tab-live" class="tab">
-  <!-- Minerva mode: consent right before ▶ -->
+<!-- ⚡ quick start: one screen — microphone (auto-scan), what to record, language, readiness, ▶ -->
+<section id="tab-quick" class="tab">
+  <div class="card quick">
+    <div class="row between">
+      <h2 class="q-h">1. Мікрофон</h2>
+      <label class="muted"><input type="checkbox" id="q-autoscan"> Слухати мікрофони одразу, коли відкриваю вікно</label>
+    </div>
+    <div id="q-mic-state" class="hint" role="status"></div>
+    <table id="q-mics" class="list qmics"></table>
+    <div class="row">
+      <button type="button" id="q-scan">🎤 Слухати мікрофони</button>
+      <span class="muted">Скажіть кілька слів звичайним голосом — вікно саме вибере мікрофон, який вас чує.
+        Інший — клацніть його рядок.</span>
+    </div>
+
+    <h2 class="q-h">2. Що записуємо</h2>
+    <div class="seg" id="q-mode" role="radiogroup" aria-label="Що записуємо">
+      <button type="button" data-v="both" role="radio">🖥 + 🎙 Онлайн-нарада <small>Teams / Zoom і мій мікрофон</small></button>
+      <button type="button" data-v="mic" role="radio">🎙 Очна зустріч <small>лише мікрофон</small></button>
+      <button type="button" data-v="meeting" role="radio">🖥 Лише звук наради <small>вкладка, вікно або екран</small></button>
+    </div>
+    <div class="seg" id="q-headset" role="radiogroup" aria-label="Гарнітура">
+      <button type="button" data-v="headset" role="radio">🎧 Я в гарнітурі</button>
+      <button type="button" data-v="speakers" role="radio">🔈 Без гарнітури</button>
+    </div>
+    <div id="q-proc-note" class="muted"></div>
+
+    <h2 class="q-h">3. Мова й текст</h2>
+    <div class="row">
+      <label class="field small">Моя мова (мікрофон)<select id="q-lang-l"></select></label>
+      <label class="field small">Мова співрозмовників<select id="q-lang-r"></select></label>
+    </div>
+    <label><input type="checkbox" id="q-livetext"> Показувати текст під час запису</label>
+
+    <h2 class="q-h">Готовність</h2>
+    <ul id="q-ready" class="q-ready"></ul>
+
+    <div id="q-consent-slot"></div>
+    <label class="consent stage0" id="q-consent-label"><input type="checkbox" id="q-consent"> Усі, кого чути, погодились
+      на запис (або це тестовий звук)</label>
+    <div class="row buttons">
+      <button type="button" id="q-start" class="primary big">▶ Почати запис</button>
+      <a id="q-minerva" class="button primary big" hidden>⚡ Почати запис у Minerva</a>
+    </div>
+    <div id="q-hint" class="hint" role="status"></div>
+    <p id="q-meeting-tip" class="muted">Після ▶ браузер спитає, звідки брати звук наради: Teams / Zoom у браузері —
+      вкладка й «Поділитися звуком вкладки»; програма Teams / Zoom — «Весь екран» і «Поділитися системним звуком».</p>
+    <p id="q-all-note" class="muted">Усі налаштування — вкладка «🔴 Наживо». Вибір запам’ятовується на цьому ПК.</p>
+  </div>
+</section>
+
+<section id="tab-live" class="tab" hidden>
+  <!-- Minerva mode: consent right before ▶ (moved into #q-consent-slot while «⚡ Швидкий старт» is open) -->
+  <div id="lv-consent-slot">
   <div id="mn-consent" class="card mn-consent" hidden>
     <div class="row between">
       <b>Перед записом — прочитайте вголос</b>
@@ -63,6 +117,7 @@
     <label class="consent"><input type="checkbox" id="mn-announced"> Запис оголошено, мету пояснено</label>
     <label class="consent"><input type="checkbox" id="mn-agreed"> Усі, кого чути, вголос погодились (хто приєднається
       пізніше — спитаю ще раз)</label>
+  </div>
   </div>
 
   <div class="card" id="lv-card">

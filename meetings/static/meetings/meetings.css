@@ -135,6 +135,22 @@ ul.mt-check li { padding: 2px 0; }
 ul.mt-check li.todo { color: var(--text); }
 .mt-warn { color: var(--err); }
 
+/* ⚡ швидкий запис (список нарад і quick/) */
+.mt-list-quick { margin-bottom: 4px; }
+.mt-quick { border-color: var(--link-fg); }
+.mt-quick h3 { margin-top: 14px; }
+.mt-quick-now { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 0; }
+.mt-quick-field { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--text); margin: 0; }
+.mt-quick-field input, .mt-quick-field select { min-width: 260px; max-width: 420px; padding: 6px 8px; font-size: 14px;
+  background: var(--bg-card); color: var(--text); border: 1px solid var(--border-strong); border-radius: 6px; }
+ul.mt-quick-list { list-style: none; margin: 0; padding: 0; }
+ul.mt-quick-list li { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 6px 0;
+  border-bottom: 1px solid var(--border); }
+ul.mt-quick-list li:last-child { border-bottom: 0; }
+ul.mt-quick-list form { margin: 0; }
+.mt-quick-time { font-variant-numeric: tabular-nums; color: var(--text-muted); min-width: 72px; font-size: 13px; }
+.mt-quick-name { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+
 @media (max-width: 768px) {
   .mt-card { padding: 12px; }
   .mt-grid, .mt-row2 { grid-template-columns: 1fr; }
@@ -144,4 +160,5 @@ ul.mt-check li.todo { color: var(--text); }
   .mt-rec-phone { display: block; }
   .mt-tr { max-height: none; }
   .mt-person { flex-direction: column; }
+  .mt-quick-field input, .mt-quick-field select { min-width: 0; width: 100%; }
 }

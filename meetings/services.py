@@ -564,6 +564,69 @@ def create(user, data) -> Meeting:
         consent_note=str(data.get("consent_note") or "").strip()[:2000])
 
 
+QUICK_REUSE = timedelta(minutes=2)     # «⚡ Записати зараз» ще раз за 2 хв — та сама нарада, не нова
+QUICK_EVENTS_BEFORE = timedelta(hours=3)  # зустрічі календаря, що почались до 3 год тому, — ще «сьогодні»
+QUICK_EVENTS_MAX = 6
+QUICK_PREPARED_MAX = 5
+QUICK_SKIP_TITLE = ("✖", "✕")           # «✖ Скасовано: …», «✕ Відхилено: …» (calendar_app.invites)
+
+
+def quick_title(project=None, customer=None, now=None) -> str:
+    """Назва «⚡ Записати зараз» без назви від людини: з проєктом / клієнтом — як підготовка, інакше з часом
+    («Нарада 16.11.2026 14:05» — кілька швидких нарад одного дня різняться)."""
+    now = timezone.localtime(now or timezone.now())
+    if project is None and customer is None:
+        return f"Нарада {now:%d.%m.%Y %H:%M}"
+    return default_title(project, customer, None, now.date())
+
+
+def quick_events(user, now=None) -> list:
+    """Зустрічі 🤝 з календаря людини на сьогодні (почались до 3 год тому або ще почнуться до кінця дня), без
+    скасованих, відхилених і виконаних. [CalendarEvent] за часом, ≤ QUICK_EVENTS_MAX."""
+    from calendar_app.models import CalendarEvent
+    now = now or timezone.now()
+    day_end = timezone.make_aware(datetime.combine(timezone.localtime(now).date(), time.max))
+    qs = (CalendarEvent.objects.filter(user=user, event_type=CalendarEvent.TYPE_MEETING, all_day=False, is_done=False,
+                                       start_at__gte=now - QUICK_EVENTS_BEFORE, start_at__lte=day_end)
+          .order_by("start_at"))
+    return [ev for ev in qs[:QUICK_EVENTS_MAX * 2] if not (ev.title or "").lstrip().startswith(QUICK_SKIP_TITLE)
+            ][:QUICK_EVENTS_MAX]
+
+
+def quick_start(user, data, now=None) -> Meeting:
+    """«⚡ Записати зараз» (список нарад, сторінка швидкого запису, посилання з вікна запису): нарада одразу готова
+    до запису — далі issue_ticket і вікно запису. data: title (порожньо — quick_title / назва зустрічі), project,
+    event. Зустріч календаря — учасники лише відмічені (організатор і ті, хто прийняв запрошення), як у підготовці;
+    уже підготовлена нарада цієї зустрічі (ще не записана) — та сама, без нової. Повтор за QUICK_REUSE з тими самими
+    назвою, проєктом і зустріччю (подвійний клік, оновлення сторінки) — та сама нарада. Згоду підтверджують у вікні
+    запису перед ▶, як завжди."""
+    if not can_record(user):
+        raise MeetingError(record_refusal(user) or NO_RIGHT_TEXT)
+    now = now or timezone.now()
+    event = _event(user, data.get("event"))
+    if event is not None:
+        prepared = own(user).filter(calendar_event=event, status=Meeting.READY,
+                                    transcript_deleted_at__isnull=True).order_by("-pk").first()
+        if prepared is not None:
+            return prepared
+    project = _project(user, data.get("project"))
+    pre = prefill(user, project=project.pk if project else None, event=event.pk if event else None)
+    project = project or pre["project"]
+    customer = pre["customer"]
+    title = " ".join(str(data.get("title") or "").split())[:200]
+    if not title:
+        title = pre["title"] if event is not None else quick_title(project, customer, now)
+    recent = own(user).filter(status=Meeting.READY, created_at__gte=now - QUICK_REUSE, title=title, project=project,
+                              calendar_event=event).order_by("-pk").first()
+    if recent is not None:
+        return recent
+    return create(user, {
+        "title": title, "project": project.pk if project else None, "customer": customer.pk if customer else None,
+        "calendar_event": event.pk if event else None, "lang_l": pre["lang_l"], "lang_r": pre["lang_r"],
+        "retention": pre["retention"], "consent_lang": pre["consent_lang"],
+        "participants": [p for p in pre["participants"] if p.get("checked")]})
+
+
 def continue_prefill(user, meeting) -> dict:
     """«🎙 Записати продовження»: нова підготовка з назвою «… (продовження)», тими самими проєктом, клієнтом,
     учасниками й мовами; continues — ця нарада."""

@@ -1,0 +1,71 @@
+{% comment %}
+⚡ Швидкий запис — список нарад (changelist) і сторінка quick/ (з вікна запису на RAG-ПК — ?from=bench).
+Дані — meetings/admin_pages.quick_context; запис — POST quick/ (services.quick_start + квиток) або record/.
+Форми з target=_blank (вікно запису — нова вкладка) мають data-mt-reload-after: список оновиться сам.
+Назви зустрічей, нарад і проєктів — лише в translate="no".
+{% endcomment %}
+<section class="mt-card mt-quick" id="mt-quick">
+  <h2>⚡ Швидкий запис</h2>
+  {% if quick.refusal %}
+  <div class="mt-line-warn">⚠️ {{ quick.refusal }}</div>
+  {% else %}
+  <div class="mt-rec-desktop">
+    <form method="post" action="{{ quick.action }}" class="mt-rec-form mt-quick-now"{% if not quick.from_bench %} target="_blank" data-mt-reload-after{% endif %}>{% csrf_token %}
+      {% if quick.from_bench %}<input type="hidden" name="from" value="bench">{% endif %}
+      <label class="mt-quick-field"><span>Назва <span class="mt-muted">(необов’язково)</span></span>
+        <input type="text" name="title" maxlength="200" placeholder="{{ quick.placeholder }}" translate="no"></label>
+      {% if quick.projects %}
+      <label class="mt-quick-field"><span>Проєкт <span class="mt-muted">(необов’язково)</span></span>
+        <select name="project">
+          <option value="">— без проєкту —</option>
+          {% for p in quick.projects %}<option value="{{ p.pk }}" translate="no">{{ p.code }} · {{ p.name }}</option>{% endfor %}
+        </select></label>
+      {% endif %}
+      <button type="submit" class="button mt-primary mt-big"{% if quick.health.block %} disabled title="{{ quick.health.text }}"{% endif %}{% if quick.from_bench %} autofocus{% endif %}>⚡ Записати зараз</button>
+    </form>
+    <p class="mt-hint">Одразу відкриється вікно запису{% if not quick.from_bench %} у новій вкладці{% endif %}: там виберіть мікрофон, прочитайте вголос текст згоди, поставте галочки й «▶ Почати». Учасників, проєкт і клієнта можна додати потім — «✏️ Змінити» на сторінці наради.</p>
+
+    {% if quick.events %}
+    <h3>🤝 Сьогодні в календарі</h3>
+    <ul class="mt-quick-list">
+      {% for r in quick.events %}
+      <li>
+        <span class="mt-quick-time">{{ r.start|date:"H:i" }}</span>
+        <span class="mt-quick-name" translate="no">{{ r.event.title }}</span>
+        {% if r.state %}
+          <span class="mt-muted">{{ r.state }}</span> <a href="{{ r.page }}">відкрити нараду</a>
+        {% else %}
+          <form method="post" action="{{ quick.action }}" class="mt-rec-form"{% if not quick.from_bench %} target="_blank" data-mt-reload-after{% endif %}>{% csrf_token %}
+            <input type="hidden" name="event" value="{{ r.event.pk }}">
+            {% if quick.from_bench %}<input type="hidden" name="from" value="bench">{% endif %}
+            <button type="submit" class="button"{% if quick.health.block %} disabled{% endif %}>⚡ Записати</button>
+          </form>
+          {% if r.meeting %}<a class="mt-muted" href="{{ r.page }}">підготовлено ↗</a>{% endif %}
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="mt-muted">Учасники, що прийняли запрошення, і організатор потраплять у протокол згоди самі.</p>
+    {% endif %}
+
+    {% if quick.prepared %}
+    <h3>🎙 Підготовлені — ще не записані</h3>
+    <ul class="mt-quick-list">
+      {% for r in quick.prepared %}
+      <li>
+        <span class="mt-quick-time">{{ r.created|date:"d.m H:i" }}</span>
+        <a class="mt-quick-name" href="{{ r.page }}" translate="no">{{ r.meeting.title }}</a>
+        {% if r.meeting.project_id %}<span class="mt-muted" translate="no">{{ r.meeting.project.code }}</span>{% endif %}
+        <form method="post" action="{% url 'admin:meetings_meeting_record' r.meeting.pk %}" class="mt-rec-form"{% if not quick.from_bench %} target="_blank" data-mt-reload-after{% endif %}>{% csrf_token %}
+          <button type="submit" class="button"{% if quick.health.block %} disabled{% endif %}>🎙 Записати</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  <div class="mt-rec-phone mt-line-warn">📱 {{ quick.phone_note }}</div>
+  <div class="mt-health mt-health-{{ quick.health.level }}">{{ quick.health.text }}</div>
+  {% if quick.health.busy_text %}<div class="mt-line-warn">{{ quick.health.busy_text }}</div>{% endif %}
+  {% endif %}
+</section>
