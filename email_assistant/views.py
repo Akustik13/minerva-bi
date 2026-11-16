@@ -813,6 +813,7 @@ def thread_preview_view(request, thread_pk):
     links = _mail_links(emails)
     _attach_logos(emails)
     _attach_importance(emails)
+    _attach_text_fold(emails)
     _attach_agent_marks(account, emails)
     reply_to_addr, reply_cc = _reply_addresses(account, emails[-1]) if emails else ('', [])
     return render(request, 'email_assistant/preview.html', _ctx(request, {
@@ -865,6 +866,14 @@ def _attach_agent_drafts(account, drafts):
     letters.draft_marks(account, drafts)
 
 
+def _attach_text_fold(emails):
+    """Лист без HTML: msg.text_new і msg.text_quote — історію листування прев'ю показує згорнутою («··· Показати
+    історію листування»). HTML-листи згортає сторінка (preview.html `_pvFold`)."""
+    from email_assistant.quotes import split_quote
+    for m in emails:
+        m.text_new, m.text_quote = split_quote(m.body_text) if not m.body_html else (m.body_text, '')
+
+
 def _attach_importance(emails):
     """msg.imp_text — підказка позначки ❗ / ‼️ («‼️ Дуже важливо — позначили ви»)."""
     from email_assistant.importance import describe
@@ -907,6 +916,7 @@ def message_preview_view(request, message_pk):
     links = _mail_links([msg])
     _attach_logos([msg])
     _attach_importance([msg])
+    _attach_text_fold([msg])
     _attach_agent_marks(account, [msg])
     reply_to_addr, reply_cc = _reply_addresses(account, msg)
     return render(request, 'email_assistant/preview.html', _ctx(request, {

@@ -36,6 +36,15 @@
 .em-sec-btn { padding:8px 16px; border-radius:7px; font-size:13px; border:1px solid var(--border-strong); background:none; cursor:pointer; color:var(--text-muted); transition:background .1s; }
 .em-sec-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
 .em-sec-btn.active { border-color:var(--accent); color:var(--accent); }
+/* кнопки й угорі — довгий лист з історією не треба гортати до низу */
+.em-top-acts { margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.em-top-acts .em-top-status { font-size:12px; color:var(--text-muted); max-width:360px; }
+/* 📜 історія листування у формі — згорнута, але йде в лист повністю */
+#body-editor.em-q-folded .em-quote-in { display:none; }
+.em-qbar { padding:4px 0 2px; }
+.em-qbar button { border:1px solid var(--border-strong); background:var(--bg-input); color:var(--text-muted);
+  border-radius:12px; padding:3px 12px; font-size:12px; cursor:pointer; }
+.em-qbar button:hover { color:var(--text); }
 .em-att-btn { padding:7px 14px; border-radius:7px; font-size:13px; border:1px solid var(--border-strong); background:none; cursor:pointer; color:var(--text-muted); transition:background .1s; display:inline-flex; align-items:center; gap:6px; }
 .em-att-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); border-color:#1a73e8; }
 .em-att-list { font-size:12px; color:var(--text-muted); margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; }
@@ -114,6 +123,14 @@
     <a href="{% url 'email_assistant:inbox' %}{% if draft %}?folder=drafts{% endif %}" style="color:var(--text-muted);text-decoration:none;font-size:13px">← {% if draft %}📝 {% trans "Чернетки" %}{% else %}{% trans "Вхідні" %}{% endif %}</a>
     <h2 style="font-size:18px;color:var(--text)">{{ title }}</h2>
     {% if draft %}<span style="font-size:12px;color:var(--text-muted)">{{ draft.get_source_display }} · {% trans "збережено" %} {{ draft.updated_at|date:"d.m.Y H:i" }}</span>{% endif %}
+    <div class="em-top-acts">
+      <span class="em-top-status" id="send-status-top"></span>
+      <button type="button" class="em-send-btn" id="send-btn-top" onclick="sendOrSchedule()">{% trans "Відправити" %} →</button>
+      <button type="button" class="em-sec-btn" id="schedule-toggle-btn-top" onclick="toggleSchedule(); _schedReveal()"
+              title="{% trans "Відправити пізніше" %}">⏰ {% trans "Пізніше" %}</button>
+      <button type="button" class="em-sec-btn" onclick="saveDraft()"
+              title="{% trans "Зберегти як чернетку (📝 Чернетки в скриньці) — лист не надсилається" %}">💾 {% trans "Зберегти" %}</button>
+    </div>
   </div>
 
   <div class="em-compose-card">
@@ -190,7 +207,8 @@
         </div>
 
         <div id="body-editor" class="em-body-editor" contenteditable="true"
-             placeholder="Текст листа...">{% if initial.draft_html %}{{ initial.draft_html|safe }}{% elif signature and account.signature_position == 'after_reply' and initial.quote %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div><br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% elif initial.quote %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}<br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% if signature %}<br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% else %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}{% if signature %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% endif %}</div>
+             placeholder="Текст листа...">{% if initial.draft_html %}{{ initial.draft_html|safe }}{% elif signature and account.signature_position == 'after_reply' and initial.quote %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div><br><br><div class="em-quote-in">{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}</div>{% elif initial.quote %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}<br><br><div class="em-quote-in">{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}</div>{% if signature %}<br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% else %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}{% if signature %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% endif %}</div>
+        <div class="em-qbar" id="em-qbar" hidden><button type="button" onclick="toggleQuote()"></button></div>
       </div>
 
       <textarea name="body"      id="body-hidden"      style="display:none"></textarea>
@@ -443,7 +461,10 @@ function _getBodyPayload() {
   var htmlBody = editor.innerHTML;
   var sigEl = editor.querySelector('.em-sig-in');
   if (sigEl) sigEl.style.display = 'none';
+  var folded = editor.classList.contains('em-q-folded');   // згорнута історія — у тексті листа теж повністю
+  if (folded) editor.classList.remove('em-q-folded');
   var textBody = editor.innerText || editor.textContent;
+  if (folded) editor.classList.add('em-q-folded');
   if (sigEl) sigEl.style.display = '';
   document.getElementById('body-hidden').value      = textBody;
   document.getElementById('body-html-hidden').value = htmlBody;
@@ -510,7 +531,10 @@ async function scheduleEmail(dtVal) {
 var _grammarCorrected = '';
 async function checkGrammar() {
   var editor = document.getElementById('body-editor');
+  var unfolded = !editor.classList.contains('em-q-folded');   // граматика — лише ваш текст, без історії листування
+  if (unfolded) editor.classList.add('em-q-folded');
   var text = editor.innerText || editor.textContent;
+  if (unfolded) { editor.classList.remove('em-q-folded'); }
   if (!text.trim()) {
     alert('Введіть текст листа перед перевіркою граматики.');
     return;
@@ -541,11 +565,62 @@ async function checkGrammar() {
 function applyGrammar() {
   if (!_grammarCorrected) return;
   var editor = document.getElementById('body-editor');
+  var quote = editor.querySelector('.em-quote-in');   // історію листування граматика не чіпає — лишається під текстом
+  if (quote) quote.remove();
   editor.focus();
   document.execCommand('selectAll', false, null);
   document.execCommand('insertText', false, _grammarCorrected);
+  if (quote) editor.appendChild(quote);
   dismissGrammar();
 }
+
+/* ── 📜 Історія листування у формі: згорнута, у лист іде повністю ── */
+function _quoteLabel() {
+  var ed = document.getElementById('body-editor'), bar = document.getElementById('em-qbar');
+  if (!ed || !bar) return;
+  var q = ed.querySelector('.em-quote-in');
+  bar.hidden = !q;
+  if (!q) return;
+  bar.querySelector('button').textContent = ed.classList.contains('em-q-folded')
+    ? '📜 {% trans "Історія листування згорнута (іде в лист повністю)" %} · ▸ {% trans "Показати" %}'
+    : '▴ {% trans "Згорнути історію листування" %}';
+}
+function toggleQuote() {
+  document.getElementById('body-editor').classList.toggle('em-q-folded');
+  _quoteLabel();
+}
+(function() {
+  var ed = document.getElementById('body-editor');
+  if (ed && ed.querySelector('.em-quote-in')) ed.classList.add('em-q-folded');
+  _quoteLabel();
+})();
+
+/* ── кнопки вгорі — як унизу: той самий стан і повідомлення ── */
+function _schedReveal() {
+  if (!_scheduleOn) return;
+  var row = document.getElementById('schedule-row');
+  if (row) row.scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+(function() {
+  var b = document.getElementById('send-btn'), t = document.getElementById('send-btn-top');
+  var sb = document.getElementById('schedule-toggle-btn'), st = document.getElementById('schedule-toggle-btn-top');
+  var s = document.getElementById('send-status'), ts = document.getElementById('send-status-top');
+  if (!b || !t || !s || !ts) return;
+  function sync() {
+    t.textContent = b.textContent.trim();
+    t.disabled = b.disabled;
+    t.style.opacity = b.style.opacity;
+    t.classList.toggle('scheduled', b.classList.contains('scheduled'));
+    if (sb && st) st.classList.toggle('active', sb.classList.contains('active'));
+    ts.textContent = s.textContent;
+    ts.style.color = s.style.color;
+  }
+  var opts = {attributes: true, childList: true, characterData: true, subtree: true};
+  new MutationObserver(sync).observe(b, opts);
+  new MutationObserver(sync).observe(s, opts);
+  if (sb) new MutationObserver(sync).observe(sb, {attributes: true});
+  sync();
+})();
 function dismissGrammar() {
   document.getElementById('grammar-panel').style.display = 'none';
   _grammarCorrected = '';

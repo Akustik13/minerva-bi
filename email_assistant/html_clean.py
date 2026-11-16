@@ -50,7 +50,7 @@ ALLOWED_ATTRS = {
     'div': {'width'}, 'p': set(), 'span': set(),
 }
 URL_ATTRS = frozenset({'href', 'src'})
-ALLOWED_CLASSES = frozenset({'em-sig-in', 'se-sig-div'})   # підпис у формі листа / запланованого листа
+ALLOWED_CLASSES = frozenset({'em-sig-in', 'se-sig-div', 'em-quote-in'})   # підпис / історія листування у формі
 HREF_SCHEMES = frozenset({'http', 'https', 'mailto'})
 SRC_SCHEMES = frozenset({'http', 'https', 'cid'})
 _DATA_IMAGE = re.compile(r'^data:image/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]*$', re.IGNORECASE)
