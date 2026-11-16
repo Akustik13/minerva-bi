@@ -219,6 +219,18 @@ ul.mt-quick-list form { margin: 0; }
 .mt-ag-send legend { font-weight: 600; font-size: 13px; padding: 0; margin-bottom: 4px; width: 100%; }
 .mt-ag-send input[name=extra] { flex: 1 1 280px; min-width: 0; padding: 5px 8px; }
 .mt-ag-send .mt-muted { width: 100%; margin: 2px 0 0; }
+.mt-ag-attach { display: block; margin: 0 0 8px; font-size: 13px; }
+.mt-ag-files { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.mt-ag-file { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 3px 6px; background: var(--bg-card); max-width: 260px; }
+.mt-ag-file a { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--link-fg); text-decoration: none; }
+.mt-ag-file a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
+.mt-ag-file img { width: 56px; height: 40px; object-fit: cover; border-radius: 4px; flex: none; background: var(--bg-hover); }
+.mt-ag-file button { border: none; background: none; color: var(--text-muted); cursor: pointer; padding: 0 2px; }
+.mt-ag-drop { margin-top: 8px; padding: 8px 10px; border: 1px dashed var(--border-strong); border-radius: 8px; }
+.mt-ag-over { outline: 2px dashed var(--link-fg); outline-offset: 2px; background: var(--bg-hover); }
+.mt-ag-link { border: none; background: none; padding: 0; color: var(--link-fg); text-decoration: underline; cursor: pointer;
+  font: inherit; }
 .mt-ag-box { margin-top: 3px; width: 18px; height: 18px; flex: none; cursor: pointer; }
 span.mt-ag-box { cursor: default; text-align: center; color: var(--text-muted); }
 .mt-ag-body { flex: 1; min-width: 0; }

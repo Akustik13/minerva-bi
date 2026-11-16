@@ -1,7 +1,7 @@
 {% extends "admin/change_list.html" %}
 {# 🎙 Наради — список лише своїх нарад; замість «Додати» — «🎙 Записати нараду»; угорі — «⚡ Швидкий запис» (_quick.html, meetings/admin.py changelist_view). #}
 {% load static %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=8">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=9">{% endblock %}
 {% block object-tools-items %}
   {% if can_record %}<li><a href="{{ new_url }}">🎙 Записати нараду</a></li>{% endif %}
   {% if is_admin %}<li><a href="{{ protocols_url }}" title="Лише метадані — для запитів учасників за ст. 15 / 17 DSGVO">🧾 Протоколи згоди</a></li>{% endif %}
@@ -11,5 +11,5 @@
 {% if quick %}<div id="mt-page" class="mt-wrap mt-list-quick">{% include "admin/meetings/meeting/_quick.html" %}</div>{% endif %}
 <p class="mt-muted">🔒 Тут лише наради, які записали ви. Ваших нарад і розшифровок не бачить ніхто інший — і адміністратор теж.</p>
 {{ block.super }}
-{% if quick %}<script src="{% static 'meetings/meetings.js' %}?v=6" defer></script>{% endif %}
+{% if quick %}<script src="{% static 'meetings/meetings.js' %}?v=7" defer></script>{% endif %}
 {% endblock %}

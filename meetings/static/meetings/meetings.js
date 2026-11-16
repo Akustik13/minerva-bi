@@ -7,7 +7,7 @@
    - 📁 проєкти наради (додати / ⭐ головний / ✕) і 🏷 «звідси — про проєкт …» на рядках розшифровки — POST JSON,
      потім сторінка оновлюється;
    - пошук у розшифровці й #t=<секунда> в адресі;
-   - 📋 агенда: додати, ＋ Підпункт, ☑ обговорили, ✏️ текст і «що вирішили», ⏭, ↑ ↓, ✕, 🧭 підказки з проєкту,
+   - 📋 агенда: додати, ＋ Підпункт, 📎 файли (вибір, перетягування, Ctrl+V скріншот), ☑ обговорили, ✏️ текст і «що вирішили», ⏭, ↑ ↓, ✕, 🧭 підказки з проєкту,
      📋 копіювати, ✉️ надіслати (вкладка листа відкривається одразу, адреса — після відповіді);
    - опитування стану кожні 5 с: нове — перезавантаження, але не тоді, коли відкрито панель ✓ або курсор у полі
      (тоді смуга «🔄 Є нове — оновити сторінку»).
@@ -405,6 +405,63 @@
       }
     });
   }
+  // 📎 файли агенди: вибір на ПК (📎 у пункті чи «виберіть на ПК»), перетягування на агенду чи пункт, Ctrl+V скріншот
+  function agendaUpload(list, item) {
+    var box = agendaBox();
+    if (!box || !list || !list.length) return;
+    var fd = new FormData(), stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, '-');
+    Array.prototype.forEach.call(list, function (f, k) {
+      var name = f.name && !/^image\.(png|jpe?g|gif|webp)$/i.test(f.name) ? f.name
+        : 'screenshot-' + stamp + (k ? '-' + (k + 1) : '') + '.' + ((f.type || 'image/png').split('/')[1] || 'png').replace('jpeg', 'jpg');
+      fd.append('file', f, name);
+    });
+    fd.append('item', item || '');
+    box.classList.add('mt-ag-busy');
+    toast('📎 Завантажую…');
+    fetch(box.getAttribute('data-ag-upload'), {method: 'POST', credentials: 'same-origin',
+      headers: {'X-CSRFToken': csrf(), 'Accept': 'application/json'}, body: fd})
+      .then(function (r) { return r.json().catch(function () { return {ok: false, error: 'HTTP ' + r.status}; }); },
+            function () { return {ok: false, error: 'Сервер не відповідає — спробуйте ще раз'}; })
+      .then(function (j) {
+        var cur = agendaBox();
+        if (cur) cur.classList.remove('mt-ag-busy');
+        if (j && j.html && cur) cur.outerHTML = j.html;
+        if (!j || !j.ok || j.error) toast('⚠️ ' + ((j && j.error) || 'Не вдалося'));
+        else toast('📎 Додано: ' + j.added);
+      });
+  }
+  root.addEventListener('dragover', function (e) {
+    var zone = e.target.closest && e.target.closest('#agenda [data-ag-drop], #agenda [data-ag]');
+    if (!zone || !e.dataTransfer || Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') < 0) return;
+    e.preventDefault();
+    zone.classList.add('mt-ag-over');
+  });
+  root.addEventListener('dragleave', function (e) {
+    var zone = e.target.closest && e.target.closest('.mt-ag-over');
+    if (zone) zone.classList.remove('mt-ag-over');
+  });
+  root.addEventListener('drop', function (e) {
+    var zone = e.target.closest && e.target.closest('#agenda [data-ag-drop], #agenda [data-ag]');
+    if (!zone || !e.dataTransfer || !e.dataTransfer.files.length) return;
+    e.preventDefault();
+    zone.classList.remove('mt-ag-over');
+    agendaUpload(e.dataTransfer.files, zone.getAttribute('data-ag') || '');
+  });
+  document.addEventListener('paste', function (e) {
+    var box = agendaBox(), data = e.clipboardData;
+    if (!box || !box.querySelector('[data-ag-file]') || !data || !data.files || !data.files.length) return;
+    var a = document.activeElement, inAgenda = a && box.contains(a);
+    if (!inAgenda && a && a !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;   // чуже поле
+    if (!inAgenda && a && a.isContentEditable) return;
+    e.preventDefault();
+    var row = inAgenda && a.closest('[data-ag], [data-ag-subadd]');
+    agendaUpload(data.files, row ? (row.getAttribute('data-ag') || row.getAttribute('data-ag-subadd')) : '');
+  });
+  root.addEventListener('change', function (e) {
+    if (!e.target.matches || !e.target.matches('#agenda [data-ag-file]')) return;
+    agendaUpload(e.target.files, e.target.getAttribute('data-item') || '');
+    e.target.value = '';
+  });
   function agendaMail(form) {                     // ✉️ лист з агендою: вкладка відкривається одразу (інакше блокує браузер)
     var to = Array.prototype.map.call(form.querySelectorAll('input[name=to]:checked'), function (c) { return c.value; });
     var lang = (form.querySelector('input[name=lang]:checked') || {}).value || 'de';
@@ -413,8 +470,9 @@
     var btn = form.querySelector('button[type=submit]'), label = btn.textContent;
     btn.disabled = true;
     btn.textContent = ai ? '⏳ Перекладаю…' : '⏳ Готую лист…';
+    var attach = form.elements.attach ? form.elements.attach.checked : false;
     post(agendaBox().getAttribute('data-mt-agenda'), {action: 'send', to: to, extra: form.elements.extra.value,
-                                                       lang: lang, ai: ai ? 1 : 0}).then(function (j) {
+                                                       lang: lang, ai: ai ? 1 : 0, attach: attach ? 1 : 0}).then(function (j) {
       btn.disabled = false;
       btn.textContent = label;
       if (!j || !j.ok || !j.compose) {
@@ -471,6 +529,13 @@
       agendaSend({action: 'remove', item: id});
     } else if (act === 'sub') {
       openSub(b.getAttribute('data-parent'));
+    } else if (act === 'attach') {
+      var input = agendaBox().querySelector('[data-ag-file]');
+      if (!input) return;
+      input.setAttribute('data-item', id || '');
+      input.click();
+    } else if (act === 'file_remove') {
+      agendaSend({action: 'file_remove', file: b.getAttribute('data-file')});
     } else if (act === 'subclose') {
       var sr = b.closest('[data-ag-subadd]');
       if (sr) sr.hidden = true;

@@ -1,6 +1,6 @@
 {# 📋 Агенда наради (meetings/agenda.py, контекст — admin_pages.agenda_context). Лише власник наради. Тексти пунктів, #}
 {# підказок і «що вирішили» — дані людини / проєкту: лише в translate="no". JS — meetings.js «агенда». #}
-<section class="mt-card mt-ag" id="agenda" data-mt-agenda="{{ agenda.url }}" data-ag-copy="{{ agenda.copy }}">
+<section class="mt-card mt-ag" id="agenda" data-mt-agenda="{{ agenda.url }}" data-ag-upload="{{ agenda.upload_url }}" data-ag-copy="{{ agenda.copy }}">
   <h2>📋 Агенда{% if agenda.progress.total %} <span class="mt-muted">· обговорили {{ agenda.progress.done }} з {{ agenda.progress.total }}</span>{% endif %}</h2>
   <p class="mt-muted">{% if agenda.after %}Відмітьте ☑, що обговорили, і ✏️ — що вирішили. Не обговорене запропонується до наступної наради цього проєкту.{% else %}Що обговорити, щоб нічого не забути. Бачите лише ви. На нараді тримайте цю сторінку відкритою (можна на телефоні) і відмічайте ☑.{% endif %}</p>
   {% if agenda.rows %}
@@ -18,6 +18,7 @@
               {% if i.status == "skipped" %}<span class="mt-ag-why">⏭ не потрібно</span>{% elif i.status == "moved" %}<span class="mt-ag-why">→ перенесено на наступну нараду</span>{% endif %}
               {% if i.note %}<span class="mt-ag-note">✍️ <span translate="no">{{ i.note }}</span></span>{% endif %}
             </div>
+            {% if i.file_list %}<div class="mt-ag-files">{% for f in i.file_list %}{% include "admin/meetings/meeting/_agenda_file.html" %}{% endfor %}</div>{% endif %}
             {% if agenda.can and not i.frozen %}
               <form class="mt-ag-edit" data-ag-edit hidden>
                 <input name="text" maxlength="300" value="{{ i.text }}" aria-label="Що обговорити" translate="no">
@@ -30,6 +31,7 @@
           {% if agenda.can and not i.frozen %}
             {% if not i.level %}<button type="button" class="mt-ag-subbtn" data-ag-act="sub" data-parent="{{ i.pk }}" title="Додати підпункт до цього пункту (1.1, 1.2…)">＋ Підпункт</button>{% endif %}
             <span class="mt-ag-acts">
+              <button type="button" data-ag-act="attach" title="Додати файл чи скріншот до цього пункту (або перетягніть файл на пункт)">📎</button>
               <button type="button" data-ag-act="edit" title="Змінити текст і записати, що вирішили">✏️</button>
               <button type="button" data-ag-act="skip" title="{% if i.status == 'skipped' %}Повернути: обговорити{% else %}Не потрібно обговорювати{% endif %}">⏭</button>
               <button type="button" data-ag-act="up" title="Вище"{% if i.first %} disabled{% endif %}>↑</button>
@@ -51,6 +53,13 @@
     </ol>
   {% elif not agenda.suggestions %}
     <p class="mt-muted">{% if agenda.can and agenda.can_suggest %}Агенда порожня. Напишіть, що обговорити, або «🧭 Підказати з проєкту» — Minerva запропонує теми з плану, ризиків і «Що зараз».{% elif agenda.can %}Агенда порожня. Напишіть, що обговорити.{% else %}Агенда порожня.{% endif %}</p>
+  {% endif %}
+  {% if agenda.files or agenda.can %}
+    <div class="mt-ag-drop" data-ag-drop>
+      {% if agenda.files %}<div class="mt-ag-files">{% for f in agenda.files %}{% include "admin/meetings/meeting/_agenda_file.html" %}{% endfor %}</div>{% endif %}
+      {% if agenda.can %}<div class="mt-muted">📎 Файли й скріншоти до агенди: перетягніть сюди, вставте скріншот (Ctrl+V) або <button type="button" class="mt-ag-link" data-ag-act="attach">виберіть на ПК</button> — до {{ agenda.file_max }} МБ. До пункту — 📎 біля нього. Підуть вкладеннями в «✉️ Надіслати агенду».</div>
+        <input type="file" data-ag-file multiple hidden accept="{{ agenda.accept }}">{% endif %}
+    </div>
   {% endif %}
   {% if agenda.can %}
     <form class="mt-ag-add" data-ag-add>
@@ -78,6 +87,7 @@
           <label class="mt-ag-ai"><input type="checkbox" name="ai" value="1"{% if agenda.lang != "uk" %} checked{% endif %}> 🌐 Перекласти пункти цією мовою (AI)</label>
           <p class="mt-muted">Переклад робить Claude (хмарний AI) — туди піде текст агенди; рахується в бюджеті AI. Без перекладу пункти йдуть, як написано.</p>
         </fieldset>
+        {% if agenda.files_total %}<label class="mt-ag-attach"><input type="checkbox" name="attach" value="1" checked> 📎 Додати файли агенди вкладеннями ({{ agenda.files_total }})</label>{% endif %}
         <div class="mt-actions">
           <button type="submit" class="button mt-primary">✉️ Відкрити лист</button>
           <button type="button" class="button" data-ag-act="sendclose">Скасувати</button>

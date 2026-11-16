@@ -479,6 +479,10 @@ def agenda_context(user, m, suggestions=None) -> dict:
             "after": m.status != Meeting.READY, "suggestions": suggestions,
             "groups": agenda.grouped(suggestions or []),
             "people": agenda.people(m, user), "langs": list(agenda.LANGS.items()),
+            "files": [f for f in agenda.files(m) if not f.item_id], "files_total": len(agenda.files(m)),
+            "upload_url": url("admin:meetings_meeting_agenda_upload", m.pk),
+            "file_url": url("admin:meetings_meeting_agenda_file", m.pk, 0).rstrip("/").rsplit("/", 1)[0] + "/",
+            "file_max": agenda.FILE_MAX_MB, "accept": ",".join(sorted(agenda.FILE_EXT)),
             "lang": m.consent_lang if m.consent_lang in agenda.LANGS else "de"}
 
 

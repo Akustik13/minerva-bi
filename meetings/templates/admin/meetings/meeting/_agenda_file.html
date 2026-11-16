@@ -1,0 +1,2 @@
+{# 📎 Файл агенди (_agenda.html): назва й мініатюра скріншота — дані людини, translate="no"; відкриває сторінка наради. #}
+<span class="mt-ag-file"><a href="{{ agenda.file_url }}{{ f.pk }}/" target="_blank" rel="noopener" translate="no" title="{{ f.name }} · {{ f.size|filesizeformat }}">{% if f.is_image %}<img src="{{ agenda.file_url }}{{ f.pk }}/" alt="" loading="lazy">{% else %}📄{% endif %}<span>{{ f.name }}</span></a>{% if agenda.can %}<button type="button" data-ag-act="file_remove" data-file="{{ f.pk }}" title="Прибрати файл з агенди">✕</button>{% endif %}</span>

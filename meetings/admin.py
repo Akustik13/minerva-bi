@@ -167,6 +167,8 @@ class MeetingAdmin(admin.ModelAdmin):
             path("<int:pk>/projects/", w(self.projects_view), name="meetings_meeting_projects"),
             path("<int:pk>/part/", w(self.part_view), name="meetings_meeting_part"),
             path("<int:pk>/agenda/", w(self.agenda_view), name="meetings_meeting_agenda"),
+            path("<int:pk>/agenda/file/", w(self.agenda_upload_view), name="meetings_meeting_agenda_upload"),
+            path("<int:pk>/agenda/file/<int:fid>/", w(self.agenda_file_view), name="meetings_meeting_agenda_file"),
         ]
         return own + super().get_urls()
 
@@ -323,8 +325,10 @@ class MeetingAdmin(admin.ModelAdmin):
             elif action == "send":
                 to = list(data.get("to") or []) if isinstance(data.get("to"), list) else [data.get("to")]
                 compose = agenda.send(user, m, to + [data.get("extra") or ""], str(data.get("lang") or ""),
-                                      ai=bool(data.get("ai")))
+                                      ai=bool(data.get("ai")), attach=bool(data.get("attach", True)))
                 return JsonResponse({"ok": True, "compose": compose})
+            elif action == "file_remove":
+                agenda.remove_file(user, m, data.get("file"))
             elif action == "edit":
                 agenda.edit(user, m, item, text=data.get("text"), note=data.get("note"))
             elif action == "status":
@@ -345,6 +349,49 @@ class MeetingAdmin(admin.ModelAdmin):
         if suggestions is not None and not suggestions and action == "take":
             suggestions = None                                   # узяли останню підказку — список ховається
         return JsonResponse({"ok": True, "html": admin_pages.render_agenda(user, m, suggestions)})
+
+    def agenda_upload_view(self, request, pk):
+        """📎 Файли агенди: POST multipart {file (кілька), item — до пункту, порожньо — до агенди} → {ok, html}."""
+        from . import agenda
+        refused = _post_only(request)
+        if refused:
+            return refused
+        m = services.get_own(request.user, pk)
+        refused = self._change_refused(request, m, as_json=True)
+        if refused:
+            return refused
+        uploads = request.FILES.getlist("file")
+        if not uploads:
+            return JsonResponse({"ok": False, "error": "Виберіть файл"}, status=400)
+        added, errors = 0, []
+        for upload in uploads:
+            try:
+                agenda.add_file(request.user, m, upload, item=request.POST.get("item"))
+                added += 1
+            except MeetingError as e:
+                errors.append(f"{upload.name}: {e}")
+        return JsonResponse({"ok": bool(added), "added": added, "error": "; ".join(errors),
+                             "html": admin_pages.render_agenda(request.user, m)}, status=200 if added else 400)
+
+    def agenda_file_view(self, request, pk, fid):
+        """📎 Файл агенди — лише власнику наради (/media/ теку meetings/ не віддає): картинки й PDF — у браузері,
+        інше — завантаженням; nosniff, CSP sandbox."""
+        from django.http import FileResponse
+
+        from . import agenda
+        m = services.get_own(request.user, pk)
+        try:
+            f = agenda.file_for(request.user, m, fid)
+            handle = f.file.open("rb")
+        except (MeetingError, OSError):
+            raise Http404("Файл не знайдено") from None
+        inline = f.content_type in ("image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf")
+        response = FileResponse(handle, as_attachment=not inline, filename=f.name,
+                                content_type=f.content_type if inline else "application/octet-stream")
+        response["X-Content-Type-Options"] = "nosniff"
+        if f.content_type != "application/pdf":
+            response["Content-Security-Policy"] = "sandbox"
+        return response
 
     def projects_view(self, request, pk):
         """📁 Проєкти наради: POST JSON {action: add | remove | main, project} → {ok} (сторінка оновлюється)."""

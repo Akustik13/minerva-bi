@@ -3915,6 +3915,7 @@
 {"uk": "Агенда порожня. Напишіть, що обговорити.", "en": "The agenda is empty. Write what to discuss.", "de": "Die Tagesordnung ist leer. Schreiben Sie, was zu besprechen ist."}
 {"uk": "Агенда текстом — вставити в запрошення, лист чи чат учасникам", "en": "The agenda as text — paste it into the invitation, an e-mail or the participants' chat", "de": "Die Tagesordnung als Text — in die Einladung, eine E-Mail oder den Chat der Teilnehmer einfügen"}
 {"uk": "Агенда: {0}", "en": "Agenda: {0}", "de": "Tagesordnung: {0}"}
+{"uk": "Агенди нарад", "en": "Meeting agendas", "de": "Tagesordnungen der Besprechungen"}
 {"uk": "Агенду скопійовано — вставте в запрошення чи лист", "en": "Agenda copied — paste it into the invitation or an e-mail", "de": "Tagesordnung kopiert — in die Einladung oder eine E-Mail einfügen"}
 {"uk": "Агент", "en": "Agent", "de": "Agent"}
 {"uk": "Агент (AI) пише відповідь відправнику листа за інструкцією «Що робити».", "en": "The agent (AI) writes a reply to the sender following the «What to do» instruction.", "de": "Der Agent (KI) schreibt dem Absender eine Antwort nach der Anweisung «Was tun»."}
@@ -6360,6 +6361,7 @@
 {"uk": "До 0,50", "en": "Up to 0.50", "de": "Bis 0,50"}
 {"uk": "До 1,00", "en": "Up to 1.00", "de": "Bis 1,00"}
 {"uk": "До 20 символів", "en": "Up to 20 characters", "de": "Bis zu 20 Zeichen"}
+{"uk": "До агенди вже додано {0} файлів", "en": "{0} files are already attached to the agenda", "de": "Zur Tagesordnung sind schon {0} Dateien hinzugefügt"}
 {"uk": "До адресної книги", "en": "To address book", "de": "Ins Adressbuch"}
 {"uk": "До закупівлі ще {0} посилок у дорозі", "en": "{0} more parcels of the purchase order are on the way", "de": "Noch {0} Pakete der Bestellung unterwegs"}
 {"uk": "До замовлення", "en": "To order", "de": "Zu bestellen"}
@@ -6371,6 +6373,7 @@
 {"uk": "До переведення, {0}", "en": "Before conversion, {0}", "de": "Vor der Umrechnung, {0}"}
 {"uk": "До порівняння", "en": "To the comparison", "de": "Zum Vergleich"}
 {"uk": "До поштомату — ти везеш самостійно", "en": "To a parcel locker — you bring it yourself", "de": "Zum Paketautomaten — Sie bringen es selbst hin"}
+{"uk": "До пункту", "en": "To item", "de": "Zum Punkt"}
 {"uk": "До підменю розділів / назад до рядка", "en": "To the section submenu / back to the row", "de": "Zum Untermenü der Bereiche / zurück zur Zeile"}
 {"uk": "До року", "en": "To year", "de": "Bis Jahr"}
 {"uk": "До скількох знаків округлити ціни перед генерацією інвойсу?", "en": "To how many decimals should prices be rounded before generating the invoice?", "de": "Auf wie viele Nachkommastellen sollen die Preise vor der Rechnungserstellung gerundet werden?"}
@@ -6510,6 +6513,8 @@
 {"uk": "Додати трек-номер посилки", "en": "Add the parcel tracking number", "de": "Sendungsnummer des Pakets hinzufügen"}
 {"uk": "Додати трекінг", "en": "Add tracking", "de": "Tracking hinzufügen"}
 {"uk": "Додати файл", "en": "Add file", "de": "Datei hinzufügen"}
+{"uk": "Додати файл чи скріншот до цього пункту (або перетягніть файл на пункт)", "en": "Add a file or screenshot to this item (or drag a file onto the item)", "de": "Datei oder Screenshot zu diesem Punkt hinzufügen (oder Datei auf den Punkt ziehen)"}
+{"uk": "Додати файли агенди вкладеннями ({0})", "en": "Attach the agenda files ({0})", "de": "Dateien der Tagesordnung anhängen ({0})"}
 {"uk": "Додати фото / візитку", "en": "Add photo / business card", "de": "Foto / Visitenkarte hinzufügen"}
 {"uk": "Додати фото й контакт", "en": "Add photo and contact", "de": "Foto und Kontakt hinzufügen"}
 {"uk": "Додати шаблон", "en": "Add template", "de": "Vorlage hinzufügen"}
@@ -7116,7 +7121,7 @@
 {"uk": "Завантажте файл шаблону — після цього з'являться кнопки перевірки", "en": "Upload the template file — the check buttons will then appear", "de": "Laden Sie die Vorlagendatei hoch — danach erscheinen die Prüfschaltflächen"}
 {"uk": "Завантажую", "en": "Downloading", "de": "Wird heruntergeladen"}
 {"uk": "Завантажую і парсю файл…", "en": "Uploading and parsing the file…", "de": "Datei wird hochgeladen und ausgewertet…"}
-{"uk": "Завантажую…", "en": "Loading…", "de": "Wird geladen…"}
+{"uk": "Завантажую…", "en": "Uploading…", "de": "Lade hoch…"}
 {"uk": "Завантажуємо на ПК…", "en": "Downloading to PC…", "de": "Wird auf den PC heruntergeladen…"}
 {"uk": "Завдання", "en": "Task", "de": "Aufgabe"}
 {"uk": "Завдання RAG не знайдено (минув строк)", "en": "RAG job not found (expired)", "de": "RAG-Auftrag nicht gefunden (abgelaufen)"}
@@ -10546,6 +10551,8 @@
 {"uk": "Нарада #{0}", "en": "Meeting #{0}", "de": "Besprechung #{0}"}
 {"uk": "Нарада #{0} (видалено)", "en": "Meeting #{0} (deleted)", "de": "Besprechung #{0} (gelöscht)"}
 {"uk": "Нарада #{0} · з {1} с", "en": "Meeting #{0} · from {1} s", "de": "Besprechung #{0} · ab {1} s"}
+{"uk": "Нарада #{0} · пункт агенди #{1}", "en": "Meeting #{0} · agenda item #{1}", "de": "Besprechung #{0} · Tagesordnungspunkt #{1}"}
+{"uk": "Нарада #{0} · файл агенди #{1}", "en": "Meeting #{0} · agenda file #{1}", "de": "Besprechung #{0} · Datei der Tagesordnung #{1}"}
 {"uk": "Нарада #{0} → проєкт #{1}", "en": "Meeting #{0} → project #{1}", "de": "Besprechung #{0} → Projekt #{1}"}
 {"uk": "Нарада {0}", "en": "Meeting {0}", "de": "Besprechung {0}"}
 {"uk": "Нарада {0} · {1}", "en": "Meeting {0} · {1}", "de": "Besprechung {0} · {1}"}
@@ -13700,6 +13707,7 @@
 {"uk": "Прибрати спам і події від відправників, від яких ви більше не хочете термінів — спершу видно, що саме прибереться", "en": "Remove spam and events from senders you no longer want deadlines from — you will first see exactly what will be removed", "de": "Spam und Termine von Absendern entfernen, von denen Sie keine Fristen mehr wollen — zuerst sehen Sie genau, was entfernt wird"}
 {"uk": "Прибрати сторону «", "en": "Remove the party «", "de": "Beteiligten entfernen «"}
 {"uk": "Прибрати фазу (її кроки лишаться без фази)", "en": "Remove the phase (its steps stay without a phase)", "de": "Phase entfernen (ihre Schritte bleiben ohne Phase)"}
+{"uk": "Прибрати файл з агенди", "en": "Remove the file from the agenda", "de": "Datei von der Tagesordnung entfernen"}
 {"uk": "Прибрати цей важливий момент?", "en": "Remove this key moment?", "de": "Diesen wichtigen Moment entfernen?"}
 {"uk": "Прибрати цей проєкт з наради? Його 🏷 позначки в розшифровці теж зникнуть. Уже додане в проєкт лишиться там.", "en": "Remove this project from the meeting? Its 🏷 marks in the transcript go too. What was already added to the project stays there.", "de": "Dieses Projekt aus der Besprechung entfernen? Seine 🏷 Markierungen im Transkript verschwinden ebenfalls. Bereits ins Projekt Übernommenes bleibt dort."}
 {"uk": "Прибрати цю кількість", "en": "Remove this quantity", "de": "Diese Menge entfernen"}
@@ -14095,6 +14103,7 @@
 {"uk": "Пульт проєкту", "en": "Project cockpit", "de": "Projekt-Cockpit"}
 {"uk": "Пульт проєкту зараз не вдалося показати — поля нижче працюють як звичайно.", "en": "The project cockpit could not be shown right now — the fields below work as usual.", "de": "Das Projekt-Cockpit kann gerade nicht angezeigt werden — die Felder unten funktionieren wie gewohnt."}
 {"uk": "Пункт #{0}", "en": "Item #{0}", "de": "Punkt #{0}"}
+{"uk": "Пункт агенди наради", "en": "Meeting agenda item", "de": "Tagesordnungspunkt"}
 {"uk": "Пункт агенди не знайдено — оновіть сторінку", "en": "Agenda item not found — reload the page", "de": "Tagesordnungspunkt nicht gefunden — Seite neu laden"}
 {"uk": "Пункт не знайдено", "en": "Item not found", "de": "Punkt nicht gefunden"}
 {"uk": "Пункт перенесено на наступну нараду — відмічайте його там", "en": "The item was moved to the next meeting — tick it there", "de": "Der Punkt wurde auf die nächste Besprechung verschoben — dort abhaken"}
@@ -14192,6 +14201,7 @@
 {"uk": "Підправляти нечитабельний текст", "en": "Fix unreadable text", "de": "Unlesbaren Text korrigieren"}
 {"uk": "Підпункт", "en": "Sub-item", "de": "Unterpunkt"}
 {"uk": "Підпункт додається до пункту агенди, не до іншого підпункту", "en": "A sub-item is added to an agenda item, not to another sub-item", "de": "Ein Unterpunkt gehört zu einem Tagesordnungspunkt, nicht zu einem anderen Unterpunkt"}
+{"uk": "Підпункт пункту", "en": "Sub-item of", "de": "Unterpunkt von"}
 {"uk": "Підпункт — напр. «точність у приміщенні»", "en": "Sub-item — e.g. «indoor accuracy»", "de": "Unterpunkt — z. B. «Genauigkeit in Innenräumen»"}
 {"uk": "Підрядник", "en": "Contractor", "de": "Auftragnehmer"}
 {"uk": "Підсвічено", "en": "Highlighted", "de": "Hervorgehoben"}
@@ -15902,6 +15912,7 @@
 {"uk": "Такий код уже є — оберіть інший.", "en": "This code already exists — choose another.", "de": "Dieser Code ist bereits vergeben — wählen Sie einen anderen."}
 {"uk": "Такий самий запис щойно вже пішов в askDANTE — оновіть сторінку.", "en": "An identical entry has just been sent to askDANTE — refresh the page.", "de": "Ein identischer Eintrag wurde gerade an askDANTE gesendet — aktualisieren Sie die Seite."}
 {"uk": "Такий тип файлу не приймаємо: PDF, Word, Excel, картинки, CSV, TXT, ZIP, EML.", "en": "This file type is not accepted: PDF, Word, Excel, images, CSV, TXT, ZIP, EML.", "de": "Dieser Dateityp wird nicht angenommen: PDF, Word, Excel, Bilder, CSV, TXT, ZIP, EML."}
+{"uk": "Такий файл до агенди не додається ({0}) — картинки, PDF, документи Office, текст, CSV, ZIP, креслення", "en": "This kind of file cannot be added to the agenda ({0}) — images, PDF, Office documents, text, CSV, ZIP, drawings", "de": "Diese Datei kann nicht zur Tagesordnung hinzugefügt werden ({0}) — Bilder, PDF, Office-Dokumente, Text, CSV, ZIP, Zeichnungen"}
 {"uk": "Таких адрес API немає.", "en": "There are no such API endpoints.", "de": "Solche API-Adressen gibt es nicht."}
 {"uk": "Такого значення тут немає.", "en": "No such value here.", "de": "Diesen Wert gibt es hier nicht."}
 {"uk": "Такого правила в категорії вже немає", "en": "There is no such rule in the category anymore", "de": "Eine solche Regel gibt es in der Kategorie nicht mehr"}
@@ -16877,7 +16888,9 @@
 {"uk": "Файл {0} уже є в базі етикеток (його могли виправити вручну) — без підтвердження не перезаписується.", "en": "File {0} already exists in the label database (it may have been corrected manually) — it is not overwritten without confirmation.", "de": "Die Datei {0} ist bereits in der Etikettendatenbank vorhanden (sie wurde möglicherweise manuell korrigiert) — ohne Bestätigung wird sie nicht überschrieben."}
 {"uk": "Файл {0}.dymo не знайдено", "en": "File {0}.dymo not found", "de": "Datei {0}.dymo nicht gefunden"}
 {"uk": "Файл «FT220407_Datenblatt.pdf» прив'яжеться до товару FT220407 (артикул каталогу в назві файлу чи сторінки)", "en": "The file “FT220407_Datenblatt.pdf” will be linked to product FT220407 (catalog SKU in the file or page name)", "de": "Die Datei „FT220407_Datenblatt.pdf“ wird dem Artikel FT220407 zugeordnet (Artikelnummer aus dem Katalog im Datei- oder Seitennamen)"}
+{"uk": "Файл «{0}» не знайдено на сервері — прибрати його з агенди й додати знову", "en": "The file «{0}» is not on the server — remove it from the agenda and add it again", "de": "Die Datei «{0}» ist nicht auf dem Server — von der Tagesordnung entfernen und erneut hinzufügen"}
 {"uk": "Файл «{0}» недоступний: {1}", "en": "File «{0}» unavailable: {1}", "de": "Datei «{0}» nicht verfügbar: {1}"}
+{"uk": "Файл агенди наради", "en": "Meeting agenda file", "de": "Datei der Tagesordnung"}
 {"uk": "Файл бекапу (.sql / .zip / .mbackup)", "en": "Backup file (.sql / .zip / .mbackup)", "de": "Sicherungsdatei (.sql / .zip / .mbackup)"}
 {"uk": "Файл більший за 10 МБ — UPS його не прийме.", "en": "The file is larger than 10 MB — UPS will not accept it.", "de": "Die Datei ist größer als 10 MB — UPS nimmt sie nicht an."}
 {"uk": "Файл більший за {0} МБ", "en": "The file is larger than {0} MB", "de": "Die Datei ist größer als {0} MB"}
@@ -16886,6 +16899,7 @@
 {"uk": "Файл етикетки не знайдено — зніміть галочку «Етикетка»", "en": "Label file not found — untick «Label»", "de": "Etikettendatei nicht gefunden — Haken bei «Etikett» entfernen"}
 {"uk": "Файл з ПК", "en": "File from PC", "de": "Datei vom PC"}
 {"uk": "Файл завантажиться з правильною кількістю (QTY з рядка замовлення).", "en": "The file downloads with the correct quantity (QTY from the order line).", "de": "Die Datei wird mit der richtigen Menge heruntergeladen (QTY aus der Auftragsposition)."}
+{"uk": "Файл завеликий — не більше {0} МБ", "en": "The file is too large — no more than {0} MB", "de": "Die Datei ist zu groß — höchstens {0} MB"}
 {"uk": "Файл ключа порожній.", "en": "The key file is empty.", "de": "Die Schlüsseldatei ist leer."}
 {"uk": "Файл містить лише заголовки без даних", "en": "The file contains only headers with no data", "de": "Die Datei enthält nur Kopfzeilen ohne Daten"}
 {"uk": "Файл не вибрано", "en": "No file selected", "de": "Keine Datei ausgewählt"}
@@ -16895,10 +16909,12 @@
 {"uk": "Файл не згенеровано", "en": "File not generated", "de": "Datei nicht erstellt"}
 {"uk": "Файл не знайдено", "en": "File not found", "de": "Datei nicht gefunden"}
 {"uk": "Файл не знайдено (лист не у ваших скриньках або файл видалено) — завантажте його з ПК.", "en": "File not found (the e-mail is not in your mailboxes or the file was deleted) — upload it from your PC.", "de": "Datei nicht gefunden (E-Mail nicht in Ihren Postfächern oder Datei gelöscht) — laden Sie sie vom PC hoch."}
+{"uk": "Файл не знайдено — оновіть сторінку", "en": "File not found — reload the page", "de": "Datei nicht gefunden — Seite neu laden"}
 {"uk": "Файл не знайдено.", "en": "File not found.", "de": "Datei nicht gefunden."}
 {"uk": "Файл не знайдено. Пересинхронізуйте пошту.", "en": "File not found. Re-sync the mail.", "de": "Datei nicht gefunden. Synchronisieren Sie die E-Mails erneut."}
 {"uk": "Файл не знайдено: {0}", "en": "File not found: {0}", "de": "Datei nicht gefunden: {0}"}
 {"uk": "Файл не прив'язано до товару складу", "en": "File not linked to a stock product", "de": "Datei nicht mit einem Lagerartikel verknüpft"}
+{"uk": "Файл не той, за кого себе видає (вміст не збігається з розширенням)", "en": "The file is not what it claims to be (content does not match the extension)", "de": "Die Datei ist nicht, was sie vorgibt (Inhalt passt nicht zur Endung)"}
 {"uk": "Файл недоступний: {0}", "en": "File not available: {0}", "de": "Datei nicht verfügbar: {0}"}
 {"uk": "Файл понад {0} МБ.", "en": "File over {0} MB.", "de": "Datei über {0} MB."}
 {"uk": "Файл пошкоджений або невірний формат.", "en": "The file is corrupted or in the wrong format.", "de": "Die Datei ist beschädigt oder hat ein falsches Format."}
@@ -16911,6 +16927,7 @@
 {"uk": "Файли (ZIP, Gerber, креслення, BOM) — підуть вкладенням кожному", "en": "Files (ZIP, Gerber, drawings, BOM) — attached for everyone", "de": "Dateien (ZIP, Gerber, Zeichnungen, Stückliste) — gehen als Anhang an alle"}
 {"uk": "Файли .{0} у це джерело не беруться (типи: {1})", "en": "Files .{0} are not accepted in this source (types: {1})", "de": "Dateien .{0} werden in dieser Quelle nicht übernommen (Typen: {1})"}
 {"uk": "Файли / Товари", "en": "Files / Products", "de": "Dateien / Artikel"}
+{"uk": "Файли агенд нарад", "en": "Meeting agenda files", "de": "Dateien der Tagesordnungen"}
 {"uk": "Файли дня", "en": "Files of the day", "de": "Dateien des Tages"}
 {"uk": "Файли з ПК або телефона", "en": "Files from a PC or phone", "de": "Dateien vom PC oder Telefon"}
 {"uk": "Файли з листів", "en": "Files from e-mails", "de": "Dateien aus E-Mails"}
@@ -16919,11 +16936,13 @@
 {"uk": "Файли завантажуються лише в джерело-папку", "en": "Files can only be uploaded to a folder source", "de": "Dateien können nur in eine Ordnerquelle hochgeladen werden"}
 {"uk": "Файли замовлення", "en": "Order files", "de": "Bestelldateien"}
 {"uk": "Файли зі старого запиту — ті самі версії? Непотрібні — «не брати», нові — додайте.", "en": "Files from the old request — the same versions? Unneeded — «don't take», new ones — add.", "de": "Dateien aus der alten Anfrage — dieselben Versionen? Unnötige — «nicht übernehmen», neue — hinzufügen."}
+{"uk": "Файли й скріншоти до агенди: перетягніть сюди, вставте скріншот (Ctrl+V) або", "en": "Files and screenshots for the agenda: drag them here, paste a screenshot (Ctrl+V) or", "de": "Dateien und Screenshots zur Tagesordnung: hierher ziehen, Screenshot einfügen (Strg+V) oder"}
 {"uk": "Файли клієнта ({0} шт.)", "en": "Customer files ({0} pcs.)", "de": "Kundendateien ({0} Stk.)"}
 {"uk": "Файли клієнта: договори, рахунки, листування. Зберігаються у", "en": "Customer files: contracts, invoices, correspondence. Stored in", "de": "Kundendateien: Verträge, Rechnungen, Korrespondenz. Gespeichert in"}
 {"uk": "Файли нашого запиту ({0})", "en": "Files of our request ({0})", "de": "Dateien unserer Anfrage ({0})"}
 {"uk": "Файли не вибрані", "en": "No files selected", "de": "Keine Dateien ausgewählt"}
 {"uk": "Файли не знайдено. Відкрийте DevTools (F12) → Console і скопіюйте вивід «Order files debug»", "en": "No files found. Open DevTools (F12) → Console and copy the output of “Order files debug”", "de": "Keine Dateien gefunden. Öffnen Sie DevTools (F12) → Console und kopieren Sie die Ausgabe von „Order files debug“"}
+{"uk": "Файли разом завеликі для листа (понад {0} МБ) — зніміть «📎 Додати файли» або приберіть частину файлів", "en": "The files together are too large for an e-mail (over {0} MB) — untick «📎 Attach files» or remove some files", "de": "Die Dateien sind zusammen zu groß für eine E-Mail (über {0} MB) — «📎 Dateien anhängen» abwählen oder einige Dateien entfernen"}
 {"uk": "Файли разом понад {0} МБ — більшість пошт не прийме. Стисніть у ZIP або дайте посилання в тексті.", "en": "Files together exceed {0} MB — most mail servers will not accept them. Compress into a ZIP or put a link in the text.", "de": "Dateien zusammen über {0} MB — die meisten Mailserver nehmen das nicht an. In ZIP komprimieren oder Link in den Text."}
 {"uk": "Файли у вкладенні", "en": "Attached files", "de": "Anhänge"}
 {"uk": "Файлів", "en": "Files", "de": "Dateien"}
@@ -18334,6 +18353,7 @@
 {"uk": "без прихованої копії", "en": "no blind copy", "de": "ohne Blindkopie"}
 {"uk": "без проєкту", "en": "without project", "de": "ohne Projekt"}
 {"uk": "без реакції", "en": "no reaction", "de": "ohne Reaktion"}
+{"uk": "без розширення", "en": "no extension", "de": "ohne Endung"}
 {"uk": "без сесії, за {0}", "en": "without a session, for {0}", "de": "ohne Sitzung, für {0}"}
 {"uk": "без трек-номера", "en": "no tracking number", "de": "ohne Sendungsnummer"}
 {"uk": "без фази", "en": "no phase", "de": "ohne Phase"}
@@ -18468,6 +18488,7 @@
 {"uk": "виберіть аркуш, налаштуйте маппінг колонок та натисніть «Імпортувати».", "en": "select the sheet, configure the column mapping and click “Import”.", "de": "wählen Sie das Blatt, konfigurieren Sie die Spaltenzuordnung und klicken Sie auf „Importieren“."}
 {"uk": "виберіть дату", "en": "choose a date", "de": "Datum wählen"}
 {"uk": "виберіть календарі «👁»", "en": "choose the calendars “👁”", "de": "wählen Sie die Kalender „👁“"}
+{"uk": "виберіть на ПК", "en": "choose on the PC", "de": "am PC auswählen"}
 {"uk": "виберіть проєкт…", "en": "choose a project…", "de": "Projekt wählen…"}
 {"uk": "вибрано", "en": "selected", "de": "ausgewählt"}
 {"uk": "вибрано {0}", "en": "chosen {0}", "de": "ausgewählt {0}"}
@@ -18878,6 +18899,7 @@
 {"uk": "до 8 рядків, кожен рядок — один крок. Лише адреси й елементи, про які знаєш з гіда чи списку елементів.", "en": "up to 8 lines, each line is one step. Only addresses and elements you know from the guide or the list of elements.", "de": "bis zu 8 Zeilen, jede Zeile ein Schritt. Nur Adressen und Elemente, die Sie aus dem Leitfaden oder der Elementliste kennen."}
 {"uk": "до seq {0}", "en": "up to seq {0}", "de": "bis seq {0}"}
 {"uk": "до {0}", "en": "until {0}", "de": "bis {0}"}
+{"uk": "до {0} МБ. До пункту — 📎 біля нього. Підуть вкладеннями в «✉️ Надіслати агенду».", "en": "up to {0} MB. For an item — 📎 next to it. They go as attachments in «✉️ Send the agenda».", "de": "bis {0} MB. Zu einem Punkt — 📎 daneben. Sie gehen als Anhänge mit «✉️ Tagesordnung senden»."}
 {"uk": "до {0} за раз і лише ті, які вам можна змінювати", "en": "up to {0} at a time and only those you may change", "de": "bis zu {0} auf einmal und nur die, die Sie ändern dürfen"}
 {"uk": "до {0} шт у коробці", "en": "up to {0} pcs in a box", "de": "bis zu {0} Stk. pro Karton"}
 {"uk": "до {0})", "en": "by {0})", "de": "bis {0})"}
@@ -20485,8 +20507,10 @@
 {"uk": "о {0} Minerva запише день в askDANTE сама", "en": "at {0} Minerva will record the day in askDANTE by itself", "de": "um {0} erfasst Minerva den Tag selbst in askDANTE"}
 {"uk": "об'єднуються в одне замовлення.", "en": "are combined into one order.", "de": "werden zu einem Auftrag zusammengefasst."}
 {"uk": "об'єднуються в одне замовлення. Поля замовлення (клієнт, адреса…) достатньо вказати лише в", "en": "are merged into one order. The order fields (customer, address…) only need to be specified in", "de": "werden zu einem Auftrag zusammengefasst. Die Auftragsfelder (Kunde, Adresse…) müssen nur angegeben werden in"}
+{"uk": "обговорили", "en": "discussed", "de": "besprochen"}
 {"uk": "обговорили {0} з {1}", "en": "discussed {0} of {1}", "de": "{0} von {1} besprochen"}
 {"uk": "обговорили на зустрічі", "en": "discussed at a meeting", "de": "in einer Besprechung besprochen"}
+{"uk": "обговорити", "en": "to discuss", "de": "besprechen"}
 {"uk": "оберіть \"Mail\" + \"Other (Custom name)\" → скопіюйте 16-символьний пароль.", "en": "select \"Mail\" + \"Other (Custom name)\" → copy the 16-character password.", "de": "wählen Sie \"Mail\" + \"Other (Custom name)\" → kopieren Sie das 16-stellige Passwort."}
 {"uk": "оберіть дію", "en": "select an action", "de": "wählen Sie eine Aktion"}
 {"uk": "оберіть категорію", "en": "select a category", "de": "Kategorie auswählen"}

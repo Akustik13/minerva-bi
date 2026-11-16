@@ -11,6 +11,9 @@
 - узяли пункт з минулої наради (carry:<pk>) — там він стає «перенесено» (moved_to), його не закриті підпункти
   переходять разом з ним; прибрали — там знову «обговорити»;
 - `copy_text` — агенда текстом (підпункти з відступом) для запрошення чи листа учасникам;
+- 📎 файли (MeetingAgendaFile: скріншот з буфера, перетягнуті, з ПК) — до агенди або до пункту: `add_file` (тип за
+  розширенням `FILE_EXT`, картинки й PDF — за першими байтами, ≤ `FILE_MAX_MB`, ≤ `FILES_MAX`), `remove_file`,
+  `file_for` (лише власник; сторінка наради віддає його, /media/ теку meetings/ нікому не віддає);
 - `send` — «✉️ Надіслати агенду»: чернетка у власній скриньці (учасники наради + дописані адреси, тема й привітання
   мовою листа), за бажанням пункти перекладає AI (`translate` → core/ai_texts, Claude Haiku 5.5, бюджет AI) — людина перевіряє й
   надсилає сама.
@@ -25,7 +28,7 @@ from django.db import transaction
 from django.db.models import Max, Q
 from django.utils import timezone
 
-from .models import Meeting, MeetingAgendaItem
+from .models import Meeting, MeetingAgendaFile, MeetingAgendaItem
 
 TEXT_MAX = 300
 NOTE_MAX = 300
@@ -35,6 +38,13 @@ STEP_DAYS = 14                     # віхи й кроки клієнта / п�
 SKIP_ICONS = {"🤝", "➡️", "💤"}    # «Скоро зустріч» (це ж і є нарада), «не задано наступну дію», «тиша» — не теми
 SKIP_TEXTS = ("Тижневого статусу",)   # нагадування для Minerva («📝 Статус»), а не тема наради
 SEND_MAX = 30                      # адрес в одному листі
+FILE_MAX_MB = 15
+FILES_MAX = 20                     # файлів на нараду
+MAIL_MAX_MB = 20                   # усіх файлів у листі (поштові сервери далі відмовляють)
+FILE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt",
+            ".odt", ".ods", ".txt", ".csv", ".zip", ".step", ".stp", ".dxf", ".dwg", ".eml", ".msg"}
+SNIFFED = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+           ".webp": "image/webp", ".pdf": "application/pdf"}
 AI_MODEL = "claude-haiku-5-5"
 GROUPS = [("carry", "⏭ Не обговорили минулого разу"), ("attn", "🎯 Що зараз потребує уваги"),
           ("risk", "⚠️ Відкриті ризики"), ("step", "📅 Найближчі віхи й кроки"),
@@ -63,11 +73,21 @@ def _fmt(d) -> str:
     return d.strftime("%d.%m") if d else ""
 
 
+def files(m) -> list:
+    return list(MeetingAgendaFile.objects.filter(meeting=m).order_by("created_at", "pk"))
+
+
 def items(m) -> list:
     """Пункти по порядку, за кожним — його підпункти: level 0 / 1, num «1» / «1.1», first / last — серед сусідів,
     kid_count — скільки підпунктів, group_top / group_end — пункт групи й останній рядок групи (поле «＋ Підпункт»),
     frozen — пункт перенесено (і його підпункти лише для читання)."""
     rows = list(MeetingAgendaItem.objects.filter(meeting=m).select_related("project").order_by("order", "pk"))
+    by_item = {}
+    for f in files(m):
+        if f.item_id:
+            by_item.setdefault(f.item_id, []).append(f)
+    for r in rows:
+        r.file_list = by_item.get(r.pk, [])
     tops = [r for r in rows if not r.parent_id]
     kids = {}
     for r in rows:
@@ -257,14 +277,16 @@ def _live(rows) -> list:
     return [r for r in rows if r.pk not in gone and r.parent_id not in gone]
 
 
-def agenda_lines(rows, texts=None, notes=None, indent="   ") -> list:
+def agenda_lines(rows, texts=None, notes=None, indent="   ", with_files=True) -> list:
     """«1. …», «   1.1. …» (+ « — що вирішили»); texts / notes — {pk: переклад}; indent — відступ підпункту (у листі —
     нерозривні пробіли: редактор листа звичайні на початку рядка прибирає)."""
     out = []
     for r in _live(rows):
         text = (texts or {}).get(r.pk) or r.text
         note = (notes or {}).get(r.pk) or r.note
-        out.append((indent if r.level else "") + f"{r.num}. {text}" + (f" — {note}" if note else ""))
+        names = ", ".join(f.name for f in getattr(r, "file_list", [])) if with_files else ""
+        out.append((indent if r.level else "") + f"{r.num}. {text}" + (f" — {note}" if note else "")
+                   + (f" (📎 {names})" if names else ""))
     return out
 
 
@@ -476,6 +498,68 @@ def translate(user, texts, lang) -> list:
         raise _err(f"{e} — або надішліть агенду без перекладу") from None
 
 
+# ── 📎 Файли агенди ────────────────────────────────────────────────────────────
+
+def add_file(user, m, upload, item=None) -> MeetingAgendaFile:
+    """Файл з форми (multipart) → до агенди або до пункту item. Тип — за розширенням; картинка чи PDF — і за вмістом."""
+    import os
+
+    from email_assistant.imap_client import sniff_content_type
+    _owner(user, m)
+    if upload is None:
+        raise _err("Виберіть файл")
+    name = os.path.basename(str(upload.name or "").replace("\\", "/")).strip()[:200] or "file"
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in FILE_EXT:
+        raise _err(f"Такий файл до агенди не додається ({ext or 'без розширення'}) — картинки, PDF, документи Office, "
+                   f"текст, CSV, ZIP, креслення")
+    if upload.size > FILE_MAX_MB * 1024 * 1024:
+        raise _err(f"Файл завеликий — не більше {FILE_MAX_MB} МБ")
+    if MeetingAgendaFile.objects.filter(meeting=m).count() >= FILES_MAX:
+        raise _err(f"До агенди вже додано {FILES_MAX} файлів")
+    target = None
+    if item not in (None, "", 0, "0"):
+        target = _item(user, m, item)
+    head = upload.read(2048)
+    upload.seek(0)
+    ctype = SNIFFED.get(ext, "")
+    if ctype and sniff_content_type(head) != ctype:
+        raise _err("Файл не той, за кого себе видає (вміст не збігається з розширенням)")
+    import mimetypes
+    ctype = ctype or mimetypes.guess_type(name)[0] or "application/octet-stream"
+    return MeetingAgendaFile.objects.create(meeting=m, item=target, file=upload, name=name, size=upload.size,
+                                            content_type=ctype[:100])
+
+
+def file_for(user, m, pk) -> MeetingAgendaFile:
+    _owner(user, m)
+    f = MeetingAgendaFile.objects.filter(meeting=m, pk=pk).first() if str(pk or "").isdigit() else None
+    if f is None:
+        raise _err("Файл не знайдено — оновіть сторінку")
+    return f
+
+
+def remove_file(user, m, pk) -> None:
+    file_for(user, m, pk).delete()                 # з диска — сигнал post_delete
+
+
+def mail_files(m) -> list:
+    """Файли агенди для листа: [(назва, bytes, тип)]; разом більше MAIL_MAX_MB — помилка."""
+    out, total = [], 0
+    for f in files(m):
+        try:
+            with f.file.open("rb") as fh:
+                data = fh.read()
+        except OSError:
+            raise _err(f"Файл «{f.name}» не знайдено на сервері — прибрати його з агенди й додати знову") from None
+        total += len(data)
+        out.append((f.name, data, f.content_type))
+    if total > MAIL_MAX_MB * 1024 * 1024:
+        raise _err(f"Файли разом завеликі для листа (понад {MAIL_MAX_MB} МБ) — зніміть «📎 Додати файли» або "
+                   f"приберіть частину файлів")
+    return out
+
+
 def _when(m, lang) -> str:
     ev = m.calendar_event if m.calendar_event_id else None
     start = getattr(ev, "start_at", None)
@@ -485,7 +569,7 @@ def _when(m, lang) -> str:
     return MAIL[lang]["when"].format(date=day.isoformat() if lang == "en" else day.strftime("%d.%m.%Y"))
 
 
-def compose(user, m, lang, ai=False) -> dict:
+def compose(user, m, lang, ai=False, attach=True) -> dict:
     """Тема й текст листа з агендою мовою lang; ai — пункти, назву й «що вирішили» перекладає AI."""
     if lang not in MAIL:
         raise _err("Виберіть мову листа")
@@ -506,20 +590,26 @@ def compose(user, m, lang, ai=False) -> dict:
                 notes[pk] = value
     t = MAIL[lang]
     lines = [t["hello"], "", t["intro"].format(title=title, when=_when(m, lang)), ""]
-    lines += agenda_lines(rows, texts, notes, indent="\u00a0" * 4)
+    lines += agenda_lines(rows, texts, notes, indent="\u00a0" * 4, with_files=attach)
+    general = [f.name for f in files(m) if not f.item_id] if attach else []
+    if general:                                     # 📎 файли до всієї агенди
+        lines += ["", "📎 " + ", ".join(general)]
     lines += ["", t["outro"]]
     return {"subject": t["subject"].format(title=title)[:500], "body": "\n".join(lines)}
 
 
-def send(user, m, to, lang, ai=False) -> str:
-    """Чернетка листа з агендою у власній скриньці → адреса форми листа (надсилає людина)."""
+def send(user, m, to, lang, ai=False, attach=True) -> str:
+    """Чернетка листа з агендою у власній скриньці (attach — і 📎 файли агенди вкладеннями) → адреса форми листа
+    (надсилає людина)."""
+    from email_assistant import attachments
     from email_assistant.models import EmailAccount, EmailDraft
     _owner(user, m)
     account = EmailAccount.objects.filter(user=user, is_active=True).order_by("-is_primary").first()
     if account is None:
         raise _err("У Minerva немає вашої поштової скриньки — скопіюйте агенду текстом («📋 Копіювати текстом»)")
     emails = clean_emails(to)
-    mail = compose(user, m, lang, ai=ai)
+    stored = [attachments.store_file(n, d, t) for n, d, t in mail_files(m)] if attach else []
+    mail = compose(user, m, lang, ai=ai, attach=attach)
     draft = EmailDraft.objects.create(account=account, to_emails=emails, subject=mail["subject"], body=mail["body"],
-                                      source=EmailDraft.SOURCE_MANUAL)
+                                      attachments=stored, source=EmailDraft.SOURCE_MANUAL)
     return f"/email/compose/?draft={draft.pk}"

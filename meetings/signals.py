@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from .models import Meeting, MeetingTombstone
+from .models import Meeting, MeetingAgendaFile, MeetingTombstone
 
 logger = logging.getLogger(__name__)
 
@@ -41,3 +41,13 @@ def meeting_main_project(sender, instance, raw=False, **kwargs):
         return
     from . import parts
     parts.ensure_main_link(instance)
+
+
+@receiver(post_delete, sender=MeetingAgendaFile)
+def agenda_file_deleted(sender, instance, **kwargs):
+    """📎 Файл агенди прибрано (✕ або разом з нарадою) — і з диска."""
+    try:
+        if instance.file:
+            instance.file.delete(save=False)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("agenda file %s: %s", instance.pk, e)

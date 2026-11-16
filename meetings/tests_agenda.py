@@ -255,3 +255,73 @@ class SendAgendaTests(AgendaBase):
         with self.assertRaises(Exception) as e:
             agenda.send(self.other, m, [], "uk")
         self.assertIn("немає вашої поштової скриньки", str(e.exception))
+
+
+class AgendaFilesTests(AgendaBase):
+    """📎 Файли агенди: до агенди й до пункту, лише власнику, перевірка вмісту, з диска — разом із записом, у лист."""
+    def setUp(self):
+        super().setUp()
+        import shutil
+        import tempfile
+
+        from django.test import override_settings
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        media = override_settings(MEDIA_ROOT=tmp)
+        media.enable()
+        self.addCleanup(media.disable)
+        from email_assistant.models import EmailAccount
+        EmailAccount.objects.create(user=self.owner, email_address="slava@sevskiy.example")
+
+    def upload(self, m, name, data, item=""):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return self.client.post(self.url("agenda_upload", m), {"file": SimpleUploadedFile(name, data), "item": item})
+
+    def test_upload_view_remove_and_mail(self):
+        import os
+
+        from email_assistant.models import EmailDraft
+        from projects.tests_parties import png_bytes
+        m = self.meeting()
+        top = agenda.add(self.owner, m, "Демонстрація біконів")
+        self.login(self.owner)
+        data = self.upload(m, "image.png", png_bytes()).json()                       # скріншот з буфера — до агенди
+        self.assertTrue(data["ok"], data)
+        self.assertIn("mt-ag-file", data["html"])
+        data = self.upload(m, "plan.docx", b"PK\x03\x04 docx", item=top.pk).json()  # документ — до пункту
+        self.assertTrue(data["ok"], data)
+        shot, doc = list(m.agenda_files.order_by("pk"))
+        self.assertEqual((shot.item_id, doc.item_id), (None, top.pk))
+        self.assertEqual(shot.content_type, "image/png")
+        r = self.client.get(self.url("agenda_file", m, shot.pk))
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("attachment", r.get("Content-Disposition", ""))            # картинка — у браузері
+        self.assertEqual(r["X-Content-Type-Options"], "nosniff")
+        r.close()                                                                    # Windows: файл не тримати відкритим
+        r = self.client.get(self.url("agenda_file", m, doc.pk))
+        self.assertIn("attachment", r["Content-Disposition"])
+        r.close()
+        self.assertFalse(self.upload(m, "fake.png", b"not a png").json()["ok"])      # вміст ≠ розширення
+        self.assertFalse(self.upload(m, "virus.exe", b"MZ").json()["ok"])            # тип не дозволено
+        url = agenda.send(self.owner, m, [], "uk")
+        draft = EmailDraft.objects.get(pk=int(url.rsplit("=", 1)[1]))
+        self.assertEqual(sorted(a["name"] for a in draft.attachments), ["image.png", "plan.docx"])
+        self.assertIn("1. Демонстрація біконів (📎 plan.docx)", draft.body)
+        self.assertIn("📎 image.png", draft.body)
+        url = agenda.send(self.owner, m, [], "uk", attach=False)
+        self.assertEqual(EmailDraft.objects.get(pk=int(url.rsplit("=", 1)[1])).attachments, [])
+        path = shot.file.path
+        self.assertTrue(os.path.exists(path))
+        self.assertTrue(self.send(m, action="file_remove", file=shot.pk).json()["ok"])
+        self.assertFalse(os.path.exists(path))                                       # і з диска
+
+    def test_only_owner_sees_files_and_media_is_closed(self):
+        from projects.tests_parties import png_bytes
+        m = self.meeting()
+        self.login(self.owner)
+        self.upload(m, "shot.png", png_bytes())
+        f = m.agenda_files.get()
+        self.login(self.other)                                                       # чужа нарада — навіть адміну
+        self.assertEqual(self.client.get(self.url("agenda_file", m, f.pk)).status_code, 404)
+        self.assertEqual(self.upload(m, "x.png", png_bytes()).status_code, 404)
+        self.assertEqual(self.client.get("/media/" + f.file.name).status_code, 404)  # /media/meetings/ — нікому

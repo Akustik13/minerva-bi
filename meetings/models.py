@@ -338,6 +338,38 @@ class MeetingAgendaItem(models.Model):
         return f"🎙 Нарада #{self.meeting_id} · пункт агенди #{self.pk}"
 
 
+def _agenda_file_path(instance, filename):
+    """MEDIA/meetings/agenda/<нарада>/<uuid>/<назва> — /media/ теку meetings/ нікому не віддає (tabele/media.py), файл
+    відкриває лише сторінка наради власнику."""
+    from email_assistant.attachments import safe_name
+    return f"meetings/agenda/{instance.meeting_id}/{uuid.uuid4().hex}/{safe_name(filename)}"
+
+
+class MeetingAgendaFile(models.Model):
+    """📎 Файл агенди (скріншот, PDF, документ) — до всієї агенди або до пункту (item). Іде вкладенням у «✉️ Надіслати
+    агенду». Лише власник наради (meetings/agenda.py)."""
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="agenda_files")
+    item = models.ForeignKey(MeetingAgendaItem, null=True, blank=True, on_delete=models.SET_NULL, related_name="files",
+                             verbose_name="До пункту")
+    file = models.FileField("Файл", upload_to=_agenda_file_path, max_length=300)
+    name = models.CharField("Назва", max_length=200)
+    size = models.PositiveIntegerField(default=0)
+    content_type = models.CharField(max_length=100, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Файл агенди наради"
+        verbose_name_plural = "Файли агенд нарад"
+        ordering = ["meeting", "created_at", "pk"]
+
+    def __str__(self):
+        return f"🎙 Нарада #{self.meeting_id} · файл агенди #{self.pk}"
+
+    @property
+    def is_image(self) -> bool:
+        return self.content_type.startswith("image/")
+
+
 class MeetingTombstone(models.Model):
     """Слід видаленої наради (без змісту): RAG-ПК, який ще має її запис, отримує «видалити» (410 / sync), а не
     «невідома нарада». Пишеться в post_delete наради, живе щонайменше TOMBSTONE_DAYS (services.cleanup)."""
