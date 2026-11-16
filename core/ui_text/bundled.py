@@ -1,16 +1,19 @@
 """Переклади в комплекті з кодом (core/ui_text/bundled.jsonl) — без AI і без оплати.
 
 Файл — рядок на напис: {"uk": напис, "en": …, "de": …}, за абеткою. `apply()` заповнює ними написи каталогу
-(core.models.UIText), яким бракує перекладу цією мовою: людські правки й наявні переклади (AI чи свої) не
-змінюються, переклад з іншими місцями вставок ({0}, {1}…) не береться. Викликає `catalog.sync()` — тобто
-«🔄 Зібрати» і запуск контейнера (entrypoint.sh → `manage.py ui_texts collect`), тож після оновлення нові написи
-вже перекладені. Позначка — by «ai», model «Claude Code (у комплекті)»; виправити можна, як будь-який переклад.
+(core.models.UIText), яким бракує перекладу цією мовою, і оновлює переклади, що раніше прийшли з комплекту (у
+комплекті їх виправили); людські правки й переклади «🤖 Перекласти» не змінюються, переклад з іншими місцями
+вставок ({0}, {1}…) не береться. Викликає `catalog.sync()` — тобто «🔄 Зібрати» і запуск контейнера
+(entrypoint.sh → `manage.py ui_texts collect`). Позначка — by «ai», model «Claude Code (у комплекті)»; виправити
+можна, як будь-який переклад. Словник для браузера (`catalog.dictionary`) бере комплект і сам — для написів, яких
+каталог ще не зібрав (оновили код, а «Зібрати» ще не було), тож ціла фраза з комплекту діє одразу.
 
 Нові написи в коді → `manage.py ui_texts bundled --todo <файл>` (чого бракує в комплекті) → перекласти й дописати
 сюди (`write`).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -50,6 +53,20 @@ def load(path=None) -> dict:
     return data
 
 
+def tag(path=None) -> str:
+    """Відбиток файлу комплекту для версії словника: змінився файл — нова адреса словника в браузері."""
+    try:
+        stat = os.stat(Path(path or PATH))
+    except OSError:
+        return "0"
+    return hashlib.sha1(f"{stat.st_size}:{stat.st_mtime_ns}".encode()).hexdigest()[:8]
+
+
+def from_bundle(entry: dict | None) -> bool:
+    """Переклад у каталозі прийшов з комплекту (а не від людини чи «🤖 Перекласти»)."""
+    return bool(entry) and entry.get("by") == "ai" and entry.get("model") == MODEL
+
+
 def write(entries: dict, path=None) -> int:
     """Записати комплект: {напис: {мова: переклад}} → файл за абеткою (наявні рядки файлу лишаються, нові
     доповнюють / замінюють). → скільки написів у файлі."""
@@ -67,7 +84,8 @@ def write(entries: dict, path=None) -> int:
 
 
 def apply(path=None) -> int:
-    """Заповнити переклади з комплекту там, де їх немає. → скільки перекладів додано (усі мови разом)."""
+    """Заповнити переклади з комплекту там, де їх немає, і оновити ті, що прийшли з комплекту раніше, а тепер у
+    комплекті інші. → скільки перекладів додано чи оновлено (усі мови разом)."""
     from core.models import UIText
     from core.ui_text import catalog
     from core.ui_text.translate import valid
@@ -84,7 +102,10 @@ def apply(path=None) -> int:
         tr = dict(row.translations or {})
         touched = False
         for lang, text in langs.items():
-            if (tr.get(lang) or {}).get("text") or not valid(row.source, text):
+            cur = tr.get(lang) or {}
+            if cur.get("text") and not from_bundle(cur):      # людське чи «🤖 Перекласти» — як є
+                continue
+            if cur.get("text") == text or not valid(row.source, text):
                 continue
             tr[lang] = {"text": text[:2000], "by": "ai", "model": MODEL, "at": at}
             touched = True

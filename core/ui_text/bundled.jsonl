@@ -4913,7 +4913,7 @@
 {"uk": "Визначити, що замовляли", "en": "Detect ordered items", "de": "Bestellte Artikel ermitteln"}
 {"uk": "Визначити, що замовляли (з документів)", "en": "Detect ordered items (from documents)", "de": "Bestellte Artikel ermitteln (aus Dokumenten)"}
 {"uk": "Вийти", "en": "Log out", "de": "Abmelden"}
-{"uk": "Виконавець", "en": "Contractor", "de": "Auftragnehmer"}
+{"uk": "Виконавець", "en": "Assignee", "de": "Bearbeiter"}
 {"uk": "Виконавця не знайдено або його вимкнено", "en": "Assignee not found or deactivated", "de": "Bearbeiter nicht gefunden oder deaktiviert"}
 {"uk": "Виконай завдання для цього товару.", "en": "Carry out the task for this product.", "de": "Führe die Aufgabe für diesen Artikel aus."}
 {"uk": "Виконайте", "en": "Run", "de": "Führen Sie aus"}
@@ -10440,6 +10440,8 @@
 {"uk": "Нарада", "en": "Meeting", "de": "Besprechung"}
 {"uk": "Нарада #{0}", "en": "Meeting #{0}", "de": "Besprechung #{0}"}
 {"uk": "Нарада #{0} (видалено)", "en": "Meeting #{0} (deleted)", "de": "Besprechung #{0} (gelöscht)"}
+{"uk": "Нарада #{0} · з {1} с", "en": "Meeting #{0} · from {1} s", "de": "Besprechung #{0} · ab {1} s"}
+{"uk": "Нарада #{0} → проєкт #{1}", "en": "Meeting #{0} → project #{1}", "de": "Besprechung #{0} → Projekt #{1}"}
 {"uk": "Нарада {0}", "en": "Meeting {0}", "de": "Besprechung {0}"}
 {"uk": "Нарада {0} · {1}", "en": "Meeting {0} · {1}", "de": "Besprechung {0} · {1}"}
 {"uk": "Нарада {0} · частина {1} з {2}.", "en": "Meeting {0} · part {1} of {2}.", "de": "Besprechung {0} · Teil {1} von {2}."}
@@ -12755,6 +12757,7 @@
 {"uk": "Позначку знято: {0} позицій", "en": "Mark removed: {0} items", "de": "Markierung entfernt: {0} Positionen"}
 {"uk": "Позначку не знайдено", "en": "Mark not found", "de": "Markierung nicht gefunden"}
 {"uk": "Позначок під час запису чекають перевірки: {0}", "en": "Marks made during recording awaiting review: {0}", "de": "Markierungen aus der Aufnahme warten auf Prüfung: {0}"}
+{"uk": "Позначок уже {0} — приберіть зайві", "en": "There are already {0} marks — remove the ones you do not need", "de": "Es gibt bereits {0} Markierungen — entfernen Sie überflüssige"}
 {"uk": "Позначте вкладення, які додати.", "en": "Select the attachments to add.", "de": "Markieren Sie die Anhänge, die hinzugefügt werden sollen."}
 {"uk": "Позначте відправленим", "en": "Mark it as shipped", "de": "Markieren Sie als versendet"}
 {"uk": "Позначте листи, з якими зробити те саме.", "en": "Select the e-mails to do the same with.", "de": "Markieren Sie die E-Mails, mit denen dasselbe geschehen soll."}
@@ -13583,7 +13586,7 @@
 {"uk": "Призупинити активні контакти на 90 днів. Повернутися пізніше.", "en": "Pause active contact for 90 days. Come back later.", "de": "Aktive Kontakte für 90 Tage pausieren. Später wieder aufnehmen."}
 {"uk": "Приймає поля: {0}", "en": "Accepts fields: {0}", "de": "Akzeptiert Felder: {0}"}
 {"uk": "Приймає: {0}", "en": "Accepts: {0}", "de": "Akzeptiert: {0}"}
-{"uk": "Прийняти", "en": "Receive", "de": "Übernehmen"}
+{"uk": "Прийняти", "en": "Accept", "de": "Übernehmen"}
 {"uk": "Прийняти можна надіслану (або погоджену) пропозицію.", "en": "Only a sent (or approved) quotation can be accepted.", "de": "Angenommen werden kann ein gesendetes (oder genehmigtes) Angebot."}
 {"uk": "Прийняти на склад", "en": "Receive into stock", "de": "Ins Lager übernehmen"}
 {"uk": "Прийнято", "en": "Accepted", "de": "Angenommen"}
@@ -15640,6 +15643,7 @@
 {"uk": "Схоже на", "en": "Looks like", "de": "Ähnlich wie"}
 {"uk": "Схоже, клієнт уже є", "en": "Looks like the customer already exists", "de": "Der Kunde scheint bereits vorhanden zu sein"}
 {"uk": "Схоже, тут мова про інший проєкт", "en": "Looks like another project is discussed here", "de": "Hier geht es offenbar um ein anderes Projekt"}
+{"uk": "Схоже, тут мова про інший проєкт ({0})", "en": "This seems to be about another project ({0})", "de": "Hier scheint es um ein anderes Projekt zu gehen ({0})"}
 {"uk": "Схоже, цей постачальник уже є в базі", "en": "This supplier seems to be in the database already", "de": "Dieser Lieferant scheint bereits in der Datenbank zu sein"}
 {"uk": "Східний Тимор", "en": "Timor-Leste", "de": "Osttimor"}
 {"uk": "Сьогодні", "en": "Today", "de": "Heute"}
@@ -21874,6 +21878,7 @@
 {"uk": "частин про цей проєкт: {0}", "en": "parts about this project: {0}", "de": "Teile zu diesem Projekt: {0}"}
 {"uk": "частина", "en": "part", "de": "Teil"}
 {"uk": "частина SKU або назви (необов'язково)", "en": "part of the SKU or name (optional)", "de": "Teil der SKU oder des Namens (optional)"}
+{"uk": "частина {0}–{1}", "en": "part {0}–{1}", "de": "Teil {0}–{1}"}
 {"uk": "частина замовлення", "en": "part of the order", "de": "Teil des Auftrags"}
 {"uk": "частина замовлення. DigiKey приймає лише все замовлення разом: тут — усе на один трек-номер. Кілька посилок, кожну своїм трек-номером, підтверджує кнопка на сторінці посилки, коли відправлено все.", "en": "part of the order. DigiKey accepts only the whole order at once: here — everything on one tracking number. Several parcels, each with its own tracking number, are confirmed by the button on the parcel page once everything has shipped.", "de": "Teil des Auftrags. DigiKey akzeptiert nur den ganzen Auftrag auf einmal: hier — alles auf eine Sendungsnummer. Mehrere Pakete, jedes mit eigener Sendungsnummer, bestätigt die Schaltfläche auf der Paketseite, wenn alles versendet ist."}
 {"uk": "частина розшифровки наради", "en": "meeting transcript part", "de": "Teil des Besprechungstranskripts"}

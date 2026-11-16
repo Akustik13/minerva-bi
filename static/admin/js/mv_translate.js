@@ -6,6 +6,11 @@
  * пізніше (MutationObserver). Не чіпає дані: поля вводу, textarea, редактори, [translate="no"], .notranslate,
  * листи й нотатки (SKIP). Порівнюється так само, як у core/ui_text/text.py: по краях знімаються емодзі, значки,
  * «:», тире, «·».
+ *
+ * Фразу перекладаємо цілою або лишаємо українською — окремих слів посеред українського речення не міняємо.
+ * Тому шаблон з {0} підходить, лише коли на місці {0} — значення (число, дата, код, ім'я, щось у «лапках»), а не
+ * продовження речення: «на {0}» не перекладе «на шкалі проєкту», «Крок {0}» — «Крок плану» (valueOk). Українські
+ * шматки всередині чужої фрази («Select Товар to change») міняються лише всі разом (viaRuns).
  */
 (function () {
   'use strict';
@@ -14,6 +19,11 @@
   var CYR = /[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ]/;
   /* суцільний український шматок: слова з кирилиці (і цифри всередині) через пробіли, коми, дужки */
   var RUN = /[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ][А-ЩЬЮЯЄІЇҐа-щьюяєіїґ'’-]*(?:[ ,()]+[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ0-9][А-ЩЬЮЯЄІЇҐа-щьюяєіїґ0-9'’-]*)*\)?/g;
+  var LATIN = /[A-Za-z]/;
+  var LOWER_START = /^[а-щьюяєіїґ]/;                 // з малої літери — продовження речення, не ім'я й не назва
+  var WORD3 = /[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ'’]{3,}/g;      // «опорне» слово шаблону: від 3 літер
+  var OPEN_Q = '«“„"\'‘', CLOSE_Q = '»”“"\'’', QUOTES = /[«»“”„"]/;
+  var WORD = /[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ][А-ЩЬЮЯЄІЇҐа-щьюяєіїґ'’-]*/g;
   var SKIP = 'script,style,textarea,code,pre,[translate="no"],.notranslate,[contenteditable],[contenteditable="true"],' +
              '.em-card-body,.em-card-body-text,.em-snippet,.em-subj,.mv-user-text,.ap-draft';
   var ATTRS = ['title', 'placeholder', 'aria-label', 'alt', 'data-confirm', 'label'];
@@ -30,26 +40,71 @@
     });
     function compile(e) {
       if (!e.re) {
-        var order = [];
-        var body = e.src.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\{(\d+)\}/g, function (_, n) {
+        var order = [], quoted = [], src = e.src;
+        var body = src.replace(/[.*+?^$()|[\]\\]/g, '\\$&').replace(/\{(\d+)\}/g, function (_, n) {
           order.push(n); return '(.+?)';
         });
-        e.re = new RegExp('^' + body + '$'); e.order = order;
+        src.replace(/\{\d+\}/g, function (ph, at) {           // значення в лапках: «{0}», "{0}" — завжди дані
+          var before = at > 0 ? src.charAt(at - 1) : '', after = src.charAt(at + ph.length);
+          quoted.push(!!before && !!after && OPEN_Q.indexOf(before) >= 0 && CLOSE_Q.indexOf(after) >= 0);
+          return ph;
+        });
+        e.re = new RegExp('^' + body + '$'); e.order = order; e.quoted = quoted;
+        /* опора — щонайменше два слова від 3 літер поза {0} («Ризик додано: {0}», «для клієнта {0}»);
+           «на {0}», «Крок {0}», «{0} з {1}» — слабкі: на їхньому місці українського тексту не приймаємо.
+           Шаблон, що починається з {0} («{0} без змін»), — теж: фраза з українського слова — це інтерфейс */
+        e.strong = (src.replace(/\{\d+\}/g, ' ').match(WORD3) || []).length >= 2;
+        e.lead = /^\{\d+\}/.test(src);
       }
       return e.re;
+    }
+    /* українське значення — ім'я чи назва («ТОВ Антена», «Іван Петренко»): кожне слово з великої літери і не
+       слово інтерфейсу; слово з малої («або», «шт.», «шкалі») чи напис зі словника («Отримати») — це вже
+       речення інтерфейсу, а не дані */
+    function nameLike(v) {
+      return (v.match(WORD) || []).every(function (w) { return !LOWER_START.test(w) && exact[w] === undefined; });
+    }
+    /* те, що стало на місце {n}: значення (→ як є чи перекладене) або null — це шматок іншого українського речення */
+    function value(v, k, e) {
+      if (!/[\p{L}\p{N}]/u.test(v)) return null;           // лише значки («✓ /») — не значення
+      if (!CYR.test(v)) return v;                           // число, дата, код, латиниця
+      if (e.quoted[k]) {                                     // «{0}»: назва в лапках — дані або назва з інтерфейсу
+        if (QUOTES.test(v)) return null;                    // захопило кілька «…» одразу
+        var q = edges(v);
+        if (exact[q[1]] !== undefined) return q[0] + exact[q[1]] + q[2];
+        return LOWER_START.test(q[1]) ? null : v;           // «оплату отримано» — шматок речення
+      }
+      return e.strong && !e.lead && nameLike(v) ? v : null;
     }
     function viaPattern(core) {
       var word = (core.split(/\s+/)[0] || '').toLowerCase();
       var list = (index[word] || []).concat(starts);
       for (var i = 0; i < list.length; i++) {
         var e = list[i], m = compile(e).exec(core);
-        if (m) {
-          var vals = {};
-          e.order.forEach(function (n, k) { vals[n] = m[k + 1]; });
-          return e.dst.replace(/\{(\d+)\}/g, function (_, n) { return vals[n] !== undefined ? vals[n] : ''; });
-        }
+        if (!m) continue;
+        var vals = {}, ok = true;
+        e.order.forEach(function (n, k) {
+          var v = ok ? value(m[k + 1], k, e) : null;
+          if (v === null) ok = false; else vals[n] = v;
+        });
+        if (ok) return e.dst.replace(/\{(\d+)\}/g, function (_, n) { return vals[n] !== undefined ? vals[n] : ''; });
       }
       return null;
+    }
+    /* українські шматки всередині фрази — лише всі разом: «Select Товар to change» → «Select Product to change»;
+       без латиниці навколо (українська фраза, розірвана значками: «Товар / Послуга») — лише назви з великої
+       літери; хоч один шматок без перекладу — нічого (не «Надіслати на DigiKey now») */
+    function viaRuns(c, depth) {
+      var foreign = LATIN.test(c.replace(RUN, ' ')), bad = false, any = false;
+      var out = c.replace(RUN, function (run) {
+        if (bad) return run;
+        var e = edges(run);
+        if (e[1] === c || (!foreign && LOWER_START.test(e[1]))) { bad = true; return run; }
+        var tt = core(e[1], depth + 1);
+        if (tt === null) { bad = true; return run; }
+        any = true; return e[0] + tt + e[2];
+      });
+      return bad || !any ? null : out;
     }
     function edges(s) {                              // як core/ui_text/text.py → edges
       var pre = '', suf = '', m;
@@ -65,18 +120,28 @@
       var t = viaPattern(c);
       if (t !== null) return t;
       if (depth > 1) return null;
-      /* число в кінці («Зберегти (2)», «Сторінок: 12») */
+      /* число в кінці («Зберегти (2)», «Сторінок: 12») — хвіст із цифрою, не «✓ /» */
       var m = c.match(/^(.*?[^\s\d])(\s*[([]?[\d\s.,:/×x%+−-]+[)\]]?)$/);
-      if (m && CYR.test(m[1])) { t = core(m[1], depth + 1); if (t !== null) return t + m[2]; }
-      /* кілька фраз через « · », « — », « | », «: », «; » */
+      if (m && /\d/.test(m[2]) && CYR.test(m[1])) {
+        var h = edges(m[1]);
+        t = core(h[1], depth + 1);
+        if (t !== null) return h[0] + t + h[2] + m[2];
+      }
+      /* кілька фраз через « · », « — », « | », «: », «; ». Без перекладу може лишитись лише значення після
+         назви («Клієнт: ТОВ Антена» → «Customer: ТОВ Антена»); перша частина чи не схоже на ім'я / назву
+         (nameLike) без перекладу — це український інтерфейс, тоді нічого («Строк — ціле число днів» не стане
+         «Lead time — ціле число днів») */
       var parts = c.split(/(\s[·—–|]\s|:\s|;\s)/);
       if (parts.length > 1) {
-        var changed = false;
-        for (var i = 0; i < parts.length; i += 2) {
-          var e = edges(parts[i]), tt = core(e[1], depth + 1);
+        var changed = false, whole = true;
+        for (var i = 0; i < parts.length && whole; i += 2) {
+          var e = edges(parts[i]);
+          if (!CYR.test(e[1])) continue;
+          var tt = core(e[1], depth + 1);
           if (tt !== null) { parts[i] = e[0] + tt + e[2]; changed = true; }
+          else if (i === 0 || !nameLike(e[1])) whole = false;
         }
-        if (changed) return parts.join('');
+        if (changed && whole) return parts.join('');
       }
       /* англійське слово Django перед нашою назвою («By BOM (комплектація)», «Add Товар»): без перших слів */
       var words = c.split(' ');
@@ -84,13 +149,8 @@
         var rest = words.slice(k).join(' ');
         if (exact[rest] !== undefined) return words.slice(0, k).join(' ') + ' ' + exact[rest];
       }
-      /* українські шматки всередині чужої фрази («Select Товар to change», «By Категорія», «5 Товари») */
-      var runs = false, out = c.replace(RUN, function (run) {
-        var e = edges(run), tt = e[1] === c ? null : core(e[1], depth + 1);
-        if (tt === null) return run;
-        runs = true; return e[0] + tt + e[2];
-      });
-      return runs ? out : null;
+      /* українські шматки всередині чужої фрази («Select Товар to change») — усі разом або нічого */
+      return viaRuns(c, depth);
     }
     function tr(s) {
       if (!s || !CYR.test(s)) return null;

@@ -3,23 +3,34 @@
     python manage.py test core.tests_ui_text --settings=tabele.settings_test
 """
 import json
+import re
+import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 
 from core.models import UIText, UserProfile
 from core.ui_text import bundled, catalog, extract, translate
 from core.ui_text.text import edges
+
+REAL_BUNDLE = bundled.PATH
+NO_BUNDLE = Path(tempfile.gettempdir()) / "minerva-tests-no-bundle.jsonl"     # файлу немає — комплект порожній
+CYR = re.compile("[А-ЩЬЮЯЄІЇҐа-щьюяєіїґ]")
 
 
 class CacheReset(TestCase):
     def setUp(self):
         from core.shared_cache import cache
         cache.clear()                                   # хід перекладу й версія словника — у спільному кеші
+        patcher = mock.patch.object(bundled, "PATH", NO_BUNDLE)       # словник — лише з того, що дає тест
+        patcher.start()
+        self.addCleanup(patcher.stop)
         super().setUp()
 
 
@@ -240,9 +251,204 @@ class BundledTests(CacheReset):
         self.assertEqual(bundled.missing(found, self.path), ["Новий напис"])
 
     def test_real_bundle_is_valid(self):
-        data = bundled.load()
+        data = bundled.load(REAL_BUNDLE)
         if not data:
             self.skipTest("bundled.jsonl ще немає")
         bad = [src for src, langs in data.items()
                if set(langs) != set(catalog.TARGETS) or not all(translate.valid(src, t) for t in langs.values())]
         self.assertEqual(bad[:10], [])
+
+    def test_apply_updates_earlier_bundle_translations_only(self):
+        """У комплекті виправили переклад («Прийняти» → не «Receive», а «Accept») — каталог його отримує; людське й
+        «🤖 Перекласти» лишаються."""
+        bundled.write({"Прийняти": {"en": "Accept", "de": "Übernehmen"}}, self.path)
+        old = {"text": "Receive", "by": "ai", "model": bundled.MODEL}
+        mine = UIText.objects.create(key=catalog.key_of("Прийняти"), source="Прийняти", translations={"en": old})
+        self.assertEqual(bundled.apply(self.path), 2)                  # en оновлено, de дописано
+        mine.refresh_from_db()
+        self.assertEqual((mine.text("en"), mine.text("de")), ("Accept", "Übernehmen"))
+        for by, model in (("human", ""), ("ai", "claude-haiku-5-5")):
+            UIText.objects.filter(pk=mine.pk).update(
+                translations={"en": {"text": "Take", "by": by, "model": model}})
+            bundled.apply(self.path)
+            mine.refresh_from_db()
+            self.assertEqual(mine.text("en"), "Take")
+
+
+class DictionaryBundleTests(CacheReset):
+    """Словник для браузера бере комплект і сам: код оновили, а «🔄 Зібрати» ще не було — фрази цілі одразу."""
+
+    def setUp(self):
+        super().setUp()
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.path = Path(tmp.name) / "bundled.jsonl"
+        bundled.write({"Куди додати": {"en": "Where to add", "de": "Wohin hinzufügen"},
+                       "на шкалі проєкту": {"en": "on the project timeline", "de": "auf der Projekt-Zeitleiste"},
+                       "Прийняти": {"en": "Accept", "de": "Übernehmen"},
+                       "Зберегти": {"en": "Save", "de": "Speichern"},
+                       "Видно {0} з {1}": {"en": "Visible {0} of {1}", "de": "Sichtbar {0} von {1}"},
+                       "Зламано {0}": {"en": "Broken", "de": "Kaputt {0}"}}, self.path)
+        patcher = mock.patch.object(bundled, "PATH", self.path)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_bundle_fills_what_the_catalog_lacks(self):
+        UIText.objects.create(key=catalog.key_of("Прийняти"), source="Прийняти",
+                              translations={"en": {"text": "Receive", "by": "ai", "model": bundled.MODEL}})
+        UIText.objects.create(key=catalog.key_of("Зберегти"), source="Зберегти",
+                              translations={"en": {"text": "Store", "by": "human"}})
+        d = catalog.dictionary("en")
+        self.assertEqual(d["exact"]["Куди додати"], "Where to add")          # каталог ще не зібрав — з комплекту
+        self.assertEqual(d["exact"]["на шкалі проєкту"], "on the project timeline")
+        self.assertEqual(d["exact"]["Прийняти"], "Accept")                   # старий переклад комплекту — новий
+        self.assertEqual(d["exact"]["Зберегти"], "Store")                    # людське — головніше
+        self.assertIn(["Видно {0} з {1}", "Visible {0} of {1}"], d["patterns"])
+        self.assertNotIn("Зламано {0}", dict(d["patterns"]))                 # без {0} у перекладі — ні
+        self.assertIsNotNone(catalog.page_info("de"))
+
+    def test_version_follows_bundle_file(self):
+        v1 = catalog.version()
+        bundled.write({"Назва": {"en": "Name", "de": "Name"}}, self.path)
+        self.assertNotEqual(catalog.version(), v1)
+        self.assertEqual(catalog.dictionary("en")["exact"]["Назва"], "Name")
+
+
+JS = Path(settings.BASE_DIR) / "static" / "admin" / "js" / "mv_translate.js"
+HARNESS = r"""
+const fs = require('fs'), vm = require('vm');
+const [jsPath, inPath] = process.argv.slice(2);
+const ctx = { document: { documentElement: { classList: { remove() {} } } } };
+ctx.window = ctx;
+vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(jsPath, 'utf8'), ctx);
+const input = JSON.parse(fs.readFileSync(inPath, 'utf8'));
+const tr = ctx.MVTranslateKit.make(input.dict);
+const out = input.texts.map((t, i) => {
+  const key = input.drop ? input.drop[i] : null;          // «каталог ще без цієї фрази»
+  const saved = key === null ? undefined : input.dict.exact[key];
+  if (saved !== undefined) delete input.dict.exact[key];
+  const r = tr(t);
+  if (saved !== undefined) input.dict.exact[key] = saved;
+  return r;
+});
+process.stdout.write(JSON.stringify(out));
+"""
+
+
+class BrowserTranslateTests(SimpleTestCase):
+    """static/admin/js/mv_translate.js (через node): фраза перекладається цілою або лишається українською —
+    окремих слів посеред українського речення не міняє (16.11.2026: «— for шкалі проєкту», «Step плану»)."""
+
+    DICT = {"exact": {"Прийняти": "Accept", "Назва": "Name", "Куди додати": "Where to add", "Клієнт": "Customer",
+                      "Строк": "Lead time", "Склад": "Stock", "Резерв": "Reserved", "Товар": "Product",
+                      "Товари": "Products", "Зберегти": "Save", "Сторінок": "Pages", "зараз": "now", "на": "on",
+                      "чекають": "waiting", "Надіслано": "Sent", "Номер замовлення": "Order number",
+                      "Отримати": "Get"},
+            "patterns": [["Крок «{0}» прострочено: мав закінчитися {1}", "Step “{0}” is overdue: it was due {1}"],
+                         ["Номер замовлення: {0}", "Order number: {0}"],
+                         ["для клієнта {0}", "for customer {0}"], ["Колонка «{0}»", "Column “{0}”"],
+                         ["Видно {0} з {1}", "Visible {0} of {1}"], ["{0} без змін", "{0} unchanged"],
+                         ["чекають {0}", "{0} waiting"], ["Крок {0}", "Step {0}"], ["на {0}", "for {0}"],
+                         ["з {0}", "of {0}"], ["у {0}", "in {0}"], ["{0} з {1}", "{0} of {1}"]]}
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.node = shutil.which("node")
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.harness = Path(cls.tmp.name) / "harness.js"
+        cls.harness.write_text(HARNESS, encoding="utf-8")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+        super().tearDownClass()
+
+    def tr(self, texts, dictionary=None, drop=False):
+        if not self.node:
+            self.skipTest("node не встановлено")
+        data = {"dict": dictionary or self.DICT, "texts": list(texts),
+                "drop": [edges(t)[1] for t in texts] if drop else None}
+        inp = Path(self.tmp.name) / "in.json"
+        inp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        run = subprocess.run([self.node, str(self.harness), str(JS), str(inp)], capture_output=True, text=True,
+                             encoding="utf-8", timeout=120)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        return dict(zip(texts, json.loads(run.stdout)))
+
+    def test_short_patterns_do_not_swap_words_inside_sentences(self):
+        out = self.tr([" — на шкалі проєкту (бачать усі в проєкті)", " — у реєстр ризиків проєкту",
+                       " — з виконавцем і строком, з’явиться в календарі виконавця", " чекають ✓ / ✕",
+                       "📅 Крок плану", "Надіслано без змін", "Ризик з Петром", "Номер замовлення: 1234567 або A-1"])
+        self.assertEqual(out, {k: None for k in out})                        # лишаються українською
+
+    def test_values_still_fill_patterns(self):
+        out = self.tr(["Крок 3", "на 5", "Видно 10 з 20", "✓ Прийняти ▾", "Крок «Монтаж антени» прострочено: "
+                       "мав закінчитися 01.12.2026", "Колонка «Зберегти»", "для клієнта Іван Петренко",
+                       "Номер замовлення: 1234567"])
+        self.assertEqual(out, {"Крок 3": "Step 3", "на 5": "for 5", "Видно 10 з 20": "Visible 10 of 20",
+                               "✓ Прийняти ▾": "✓ Accept ▾",
+                               "Крок «Монтаж антени» прострочено: мав закінчитися 01.12.2026":
+                                   "Step “Монтаж антени” is overdue: it was due 01.12.2026",   # у лапках — дані
+                               "Колонка «Зберегти»": "Column “Save”",                     # назва з інтерфейсу
+                               "для клієнта Іван Петренко": "for customer Іван Петренко",
+                               "Номер замовлення: 1234567": "Order number: 1234567"})
+
+    def test_parts_label_with_value_but_not_half_a_sentence(self):
+        out = self.tr(["Клієнт: ТОВ Антена", "Склад: 5 · Резерв: 2", "Крок 2 — Отримати Chat ID",
+                       "Строк — ціле число днів", "Назва · щось нове", "Клієнт: Склад Резерв"])
+        self.assertEqual(out, {"Клієнт: ТОВ Антена": "Customer: ТОВ Антена", "Склад: 5 · Резерв: 2":
+                               "Stock: 5 · Reserved: 2", "Крок 2 — Отримати Chat ID": "Step 2 — Get Chat ID",
+                               "Строк — ціле число днів": None, "Назва · щось нове": None,
+                               "Клієнт: Склад Резерв": None})                # слова зі словника — не дані
+
+    def test_fragments_only_all_together(self):
+        out = self.tr(["Select Товар to change", "Add Товар", "5 Товари", "Зберегти (2)", "Сторінок: 12",
+                       "Надіслати на DigiKey зараз", "Товар / Товари", "Товар / Послуга"])
+        self.assertEqual(out, {"Select Товар to change": "Select Product to change", "Add Товар": "Add Product",
+                               "5 Товари": "5 Products", "Зберегти (2)": "Save (2)", "Сторінок: 12": "Pages: 12",
+                               "Надіслати на DigiKey зараз": None, "Товар / Товари": "Product / Products",
+                               "Товар / Послуга": None})
+
+    def _real(self, lang):
+        data = bundled.load(REAL_BUNDLE)
+        if not data:
+            self.skipTest("bundled.jsonl ще немає")
+        exact, patterns = {}, []
+        for src, langs in data.items():
+            if langs.get(lang):
+                (patterns.append([src, langs[lang]]) if "{0}" in src else exact.__setitem__(src, langs[lang]))
+        patterns.sort(key=lambda p: -len(p[0]))                               # як catalog.dictionary
+        return {"exact": exact, "patterns": patterns}
+
+    MEETING = ["✓ Прийняти ▾", " — на шкалі проєкту (бачать усі в проєкті)", " — у реєстр ризиків проєкту",
+               " — з виконавцем і строком, з’явиться в календарі виконавця", " — бачите лише ви", " чекають ✓ / ✕",
+               "📌 Важливий момент", "⚠️ Ризик", "📅 Крок плану", "⏰ Дедлайн у моєму календарі", "Куди додати",
+               "Назва", "Виконавець", "✓ Додати", "Скасувати"]
+
+    def test_meeting_page_with_real_bundle(self):
+        for lang, want in (("en", {"✓ Прийняти ▾": "✓ Accept ▾", "Куди додати": "Where to add",
+                                   " — на шкалі проєкту (бачать усі в проєкті)":
+                                       " — on the project timeline (everyone in the project sees it)",
+                                   "📅 Крок плану": "📅 Plan step", "Виконавець": "Assignee"}),
+                           ("de", {"✓ Прийняти ▾": "✓ Übernehmen ▾", "Виконавець": "Bearbeiter"})):
+            d = self._real(lang)
+            out = self.tr(self.MEETING, d)
+            for text, got in out.items():
+                self.assertIsNotNone(got, text)                               # кожна фраза — ціла
+                self.assertIsNone(CYR.search(got), got)
+            for text, got in want.items():
+                self.assertEqual(out[text], got)
+            stale = self.tr(self.MEETING, d, drop=True)                       # каталог без цих фраз
+            for text, got in stale.items():
+                self.assertTrue(got is None or not CYR.search(got), f"{text} → {got}")
+
+    def test_real_bundle_without_own_phrase_is_not_mixed(self):
+        """Будь-яка фраза комплекту, якої в словнику немає: лишається українською або перекладена вся (до
+        16.11.2026 так виходила мішанина в третини фраз)."""
+        d = self._real("en")
+        texts = sorted(src for src in d["exact"] if CYR.search(src))
+        out = self.tr(texts, d, drop=True)
+        mixed = [f"{t} → {o}" for t, o in out.items() if o is not None and CYR.search(o)]
+        self.assertLessEqual(len(mixed), len(texts) // 1000, mixed[:20])

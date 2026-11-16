@@ -129,7 +129,7 @@
   // 🌐 Мова документа: підписи діаграми (не дані — [translate="no"]) перекладаються словником інтерфейсу Minerva
   // (core/ui_text, /core/ui-dict/<мова>.js) тим самим алгоритмом, що й сторінка (mv_translate.js → MVTranslateKit);
   // місяці класичної діаграми (data-md) — Intl цією мовою. Українська — як на екрані.
-  var KIT_URL = '/static/admin/js/mv_translate.js?v=4', dicts = {};
+  var KIT_URL = '/static/admin/js/mv_translate.js?v=5', dicts = {};
   function kit() {
     if (window.MVTranslateKit) return Promise.resolve(window.MVTranslateKit);
     return new Promise(function (ok) {

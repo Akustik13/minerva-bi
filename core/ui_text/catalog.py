@@ -2,9 +2,9 @@
 
 `sync()` — зібрати написи з коду (extract.collect) і записати: нові — додати, наявні — оновити «де / скільки», зниклі з
 коду — `active=False` (переклади лишаються: напис може повернутись). `dictionary(lang)` — {exact: {напис: переклад},
-patterns: [[напис з {0}, переклад з {0}], …]} лише з активних перекладених; кеш у core.shared_cache за версією
-(`version()` змінюється з кожною зміною каталогу чи перекладів — адреса словника в сторінці з ?v=, тож браузер
-кешує його надовго).
+patterns: [[напис з {0}, переклад з {0}], …]} з активних перекладених і комплекту (bundled.jsonl); кеш у
+core.shared_cache за версією (`version()` змінюється з кожною зміною каталогу, перекладів чи файлу комплекту —
+адреса словника в сторінці з ?v=, тож браузер кешує його надовго).
 """
 from __future__ import annotations
 
@@ -69,7 +69,9 @@ def counts() -> dict:
 
 
 def version() -> str:
-    """Версія словника: нова з кожною зміною (bump); кеш загубився — з бази (кількість + остання зміна)."""
+    """Версія словника: нова з кожною зміною (bump); кеш загубився — з бази (кількість + остання зміна);
+    плюс відбиток файлу комплекту (оновили код — новий словник і без «🔄 Зібрати»)."""
+    from core.ui_text import bundled
     cache = _cache()
     ver = cache.get(VERSION_KEY)
     if not ver:
@@ -78,7 +80,7 @@ def version() -> str:
         stamp = int(agg["last"].timestamp() * 1e6) if agg["last"] else 0
         ver = f"{UIText.objects.count()}-{stamp:x}"
         cache.set(VERSION_KEY, ver, 30 * 24 * 3600)
-    return ver
+    return f"{ver}.{bundled.tag()}"
 
 
 def bump():
@@ -87,7 +89,11 @@ def bump():
 
 
 def dictionary(lang: str) -> dict:
-    """Словник для браузера: лише активні написи з перекладом цією мовою."""
+    """Словник для браузера: активні написи каталогу з перекладом цією мовою + комплект (bundled.jsonl).
+
+    Комплект — для написів без перекладу, для перекладів, що прийшли з комплекту раніше (його виправили), і для
+    написів, яких каталог ще не має (код оновили, а «🔄 Зібрати» не було): інакше фрази бракує цілої, і браузер
+    лишає її українською. Людські правки й «🤖 Перекласти» — головніші за комплект."""
     if lang not in TARGETS:
         return {"exact": {}, "patterns": []}
     cache = _cache()
@@ -96,9 +102,29 @@ def dictionary(lang: str) -> dict:
     if hit is not None:
         return hit
     from core.models import UIText
-    exact, patterns = {}, []
+    from core.ui_text import bundled
+    from core.ui_text.translate import valid
+    pack = bundled.load()
+
+    def packed(src):
+        text = (pack.get(src) or {}).get(lang)
+        return text if text and valid(src, text) else None
+
+    exact, patterns, known = {}, [], set()
     for src, tr in UIText.objects.filter(active=True).values_list("source", "translations").iterator():
-        text = ((tr or {}).get(lang) or {}).get("text")
+        known.add(src)
+        entry = (tr or {}).get(lang) or {}
+        text = entry.get("text")
+        if not text or bundled.from_bundle(entry):
+            text = packed(src) or text
+        if not text:
+            continue
+        if "{0}" in src:
+            patterns.append([src, text])
+        else:
+            exact[src] = text
+    for src in pack:
+        text = None if src in known else packed(src)
         if not text:
             continue
         if "{0}" in src:
