@@ -52,6 +52,7 @@
 <div class="spp">
   <form method="get" class="spf-row">
     <a class="button" href="{% url 'admin:inventory_supplier_card' %}">📷 Нова візитка / флаєр</a>
+    {% if can_read %}<a class="button" href="{% url 'admin:inventory_supplier_card_app' %}" title="Фотографувати візитки телефоном — навіть без інтернету, надішле само">📱 Додаток на телефон</a>{% endif %}
     <input type="search" name="q" value="{{ q }}" placeholder="Фірма, людина, що роблять, виставка, примітка…" style="min-width:260px">
     <select name="show"><option value="">усі</option><option value="new" {% if show == "new" %}selected{% endif %}>ще не внесені ({{ unassigned }})</option><option value="inbase" {% if show == "inbase" %}selected{% endif %}>✅ не внесені, але вже є в базі</option></select>
     <select name="ai" title="Чи прочитав AI">

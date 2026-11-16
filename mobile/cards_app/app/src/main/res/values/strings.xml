@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Minerva Візитки</string>
+    <string name="tab_capture">Знімати</string>
+    <string name="tab_queue">Мої знімки</string>
+    <string name="tab_browse">У Minerva</string>
+    <string name="tab_settings">Налаштування</string>
+</resources>

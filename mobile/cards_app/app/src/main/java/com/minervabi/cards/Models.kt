@@ -1,0 +1,142 @@
+package com.minervabi.cards
+
+import org.json.JSONArray
+import org.json.JSONObject
+
+fun JSONArray?.strings(): List<String> =
+    if (this == null) emptyList() else (0 until length()).map { optString(it) }
+
+fun JSONArray?.ints(): List<Int> =
+    if (this == null) emptyList() else (0 until length()).mapNotNull { optString(it).toIntOrNull() }
+
+fun JSONObject.str(key: String): String = if (isNull(key)) "" else optString(key, "")
+
+fun pairs(arr: JSONArray?): List<Pair<String, String>> {
+    if (arr == null) return emptyList()
+    return (0 until arr.length()).mapNotNull { i ->
+        val p = arr.optJSONArray(i) ?: return@mapNotNull null
+        p.optString(0) to p.optString(1)
+    }
+}
+
+data class Category(val id: Int, val name: String, val icon: String, val color: String, val description: String) {
+    val label get() = "$icon $name".trim()
+
+    companion object {
+        fun parse(o: JSONObject) = Category(o.optInt("id"), o.str("name"), o.str("icon"), o.str("color"),
+            o.str("description"))
+    }
+}
+
+data class Preset(
+    val id: Int, val name: String, val event: String, val kind: String, val marks: List<String>, val note: String,
+    val categories: List<Int>, val readAi: Boolean, val model: String, val shared: Boolean, val mine: Boolean,
+    val owner: String,
+) {
+    companion object {
+        fun parse(o: JSONObject) = Preset(
+            o.optInt("id"), o.str("name"), o.str("event"), o.str("kind").ifEmpty { "card" },
+            o.optJSONArray("marks").strings(), o.str("note"), o.optJSONArray("categories").ints(),
+            o.optBoolean("read_ai", true), o.str("model"), o.optBoolean("shared"), o.optBoolean("mine"),
+            o.str("owner"),
+        )
+    }
+}
+
+data class Perms(
+    val add: Boolean = false, val change: Boolean = false, val view: Boolean = false,
+    val catAdd: Boolean = false, val catChange: Boolean = false, val upload: Boolean = false,
+)
+
+/** Відповідь /meta/ (кешується в Prefs.metaJson — без інтернету теж є категорії й пресети). */
+data class Meta(
+    val categories: List<Category> = emptyList(),
+    val presets: List<Preset> = emptyList(),
+    val defaultPreset: Int? = null,
+    val kinds: List<Pair<String, String>> = DEFAULT_KINDS,
+    val marks: List<Pair<String, String>> = DEFAULT_MARKS,
+    val models: List<Pair<String, String>> = emptyList(),
+    val defaultModel: String = "",
+    val events: List<String> = emptyList(),
+    val perms: Perms = Perms(),
+    val appUrl: String = "",
+) {
+    fun category(id: Int) = categories.firstOrNull { it.id == id }
+    fun preset(id: Int?) = presets.firstOrNull { it.id == id }
+    fun kindLabel(k: String) = kinds.firstOrNull { it.first == k }?.second ?: k
+    fun markLabel(k: String) = marks.firstOrNull { it.first == k }?.second ?: k
+
+    companion object {
+        val DEFAULT_KINDS = listOf("card" to "🪪 Візитка", "flyer" to "📄 Флаєр / каталог", "photo" to "📷 Фото",
+            "other" to "📎 Інше")
+        val DEFAULT_MARKS = listOf("star" to "⭐ Важливий", "fair" to "🎪 З виставки", "meet" to "🤝 Зустрічались",
+            "check" to "❗ Перевірити", "sample" to "📦 Попросити зразки", "price" to "💶 Чекаємо ціни",
+            "cheap" to "💸 Дешево", "quality" to "🏅 Якість", "no" to "👎 Не підходить")
+
+        fun parse(o: JSONObject?): Meta {
+            if (o == null) return Meta()
+            val p = o.optJSONObject("perms") ?: JSONObject()
+            val cats = o.optJSONArray("categories") ?: JSONArray()
+            val pres = o.optJSONArray("presets") ?: JSONArray()
+            return Meta(
+                categories = (0 until cats.length()).map { Category.parse(cats.getJSONObject(it)) },
+                presets = (0 until pres.length()).map { Preset.parse(pres.getJSONObject(it)) },
+                defaultPreset = if (o.isNull("default_preset")) null else o.optInt("default_preset"),
+                kinds = pairs(o.optJSONArray("kinds")).ifEmpty { DEFAULT_KINDS },
+                marks = pairs(o.optJSONArray("marks")).ifEmpty { DEFAULT_MARKS },
+                models = pairs(o.optJSONArray("models")),
+                defaultModel = o.str("default_model"),
+                events = o.optJSONArray("events").strings(),
+                perms = Perms(p.optBoolean("add"), p.optBoolean("change"), p.optBoolean("view"),
+                    p.optBoolean("cat_add"), p.optBoolean("cat_change"), p.optBoolean("upload")),
+                appUrl = o.str("app_url"),
+            )
+        }
+    }
+}
+
+/** Візитка в Minerva (suppliers/services/card_app.py card_json). */
+data class ServerCard(val json: JSONObject) {
+    val id get() = json.optInt("id")
+    val company get() = json.str("company")
+    val person get() = json.str("person")
+    val position get() = json.str("position")
+    val country get() = json.str("country")
+    val flag get() = json.str("flag")
+    val event get() = json.str("event")
+    val note get() = json.str("note")
+    val kind get() = json.str("kind")
+    val title get() = json.str("title")
+    val ai get() = json.str("ai")
+    val aiLabel get() = json.str("ai_label")
+    val reading get() = json.optBoolean("reading")
+    val error get() = json.str("error")
+    val desc get() = json.str("desc")
+    val site get() = json.str("site")
+    val email get() = json.str("email")
+    val phone get() = json.str("phone")
+    val mobile get() = json.str("mobile")
+    val address get() = json.str("address")
+    val notes get() = json.str("notes")
+    val marks get() = json.optJSONArray("marks").strings()
+    val categories get() = json.optJSONArray("categories").ints()
+    val ownCategories get() = json.optJSONArray("own_categories").ints()
+    val catsGuessed get() = json.optBoolean("cats_guessed")
+    val hasBack get() = json.optBoolean("has_back")
+    val editable get() = json.optBoolean("editable")
+    val mine get() = json.optBoolean("mine")
+    val by get() = json.str("by")
+    val createdAt get() = json.str("created_at")
+    val supplierName get() = json.optJSONObject("supplier")?.str("name") ?: ""
+    val customerName get() = json.optJSONObject("customer")?.str("name") ?: ""
+    val newCategory get() = json.optJSONObject("new_category")?.str("name") ?: ""
+
+    /** Стан AI одним рядком: 🧠 читає / прочитано / не вдалося / ще не читав. */
+    fun aiText(): String = when {
+        reading -> "🧠 AI читає…"
+        else -> aiLabel.ifEmpty { "○ AI ще не читав" }
+    }
+
+    /** AI ще працює над цією візиткою — варто перепитати Minerva трохи згодом. */
+    val pending get() = reading
+}

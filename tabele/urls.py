@@ -118,6 +118,7 @@ urlpatterns = [
     path("guide/", include("guide.urls")),
     path("offers/", include("offers.urls")),
     path("calendar/", include("calendar_app.urls")),
+    path("suppliers/app/", include("suppliers.app_urls")),     # 📱 додаток «Minerva Візитки»
     path("bots/", include("bots.urls")),
     path("documents/", include("documents.urls")),
     path("invoices/", include("shipping.urls_invoices")),

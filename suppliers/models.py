@@ -116,6 +116,9 @@ class SupplierMedia(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL,
                                    related_name="+")
     created_at = models.DateTimeField("Додано", default=timezone.now)
+    # 📱 знімок з додатка «Minerva Візитки»: його id на телефоні — повторне надсилання (зник інтернет посеред
+    # вивантаження) не створює другої візитки (suppliers/services/card_app.py)
+    client_uuid = models.CharField("ID знімка в додатку", max_length=40, blank=True, default="", db_index=True)
 
     class Meta:
         ordering = ["-created_at"]
@@ -153,6 +156,29 @@ class SupplierCardPreset(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class CardAppDevice(models.Model):
+    """📱 Телефон з додатком «Minerva Візитки» — підключений QR-кодом зі сторінки «📱 Додаток на телефон» під
+    акаунтом людини (suppliers/services/card_app.py). У базі — лише SHA-256 ключа; «🚫 Відключити» — revoked_at."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+",
+                             verbose_name="Користувач")
+    name = models.CharField("Телефон", max_length=120, blank=True, default="")
+    token_hash = models.CharField(max_length=64, unique=True)
+    token_hint = models.CharField(max_length=8, blank=True, default="")
+    app_version = models.CharField("Версія додатка", max_length=20, blank=True, default="")
+    created_at = models.DateTimeField("Підключено", default=timezone.now)
+    last_seen_at = models.DateTimeField("Востаннє на зв'язку", null=True, blank=True)
+    last_ip = models.GenericIPAddressField(null=True, blank=True)
+    revoked_at = models.DateTimeField("Відключено", null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Телефон з додатком візиток"
+        verbose_name_plural = "📱 Телефони з додатком візиток"
+
+    def __str__(self):
+        return self.name or f"📱 #{self.pk}"
 
 
 class SupplierEvent(models.Model):

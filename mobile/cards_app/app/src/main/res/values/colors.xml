@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#5B8DEF</color>
+    <color name="accent_dark">#3E6FD0</color>
+    <color name="gold">#F5C451</color>
+    <color name="ok">#3FB950</color>
+    <color name="warn">#F0A030</color>
+    <color name="bad">#E5534B</color>
+    <color name="ink">#0F1724</color>
+    <color name="panel">#1B2333</color>
+    <color name="scrim">#99000000</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="icon_bg">#101B33</color>
+</resources>

@@ -1,0 +1,132 @@
+{% extends "admin/base_site.html" %}
+{# 📱 Додаток «Minerva Візитки»: APK з GitHub, QR підключення телефону під акаунтом людини, підключені телефони —
+   suppliers/admin_supplier.py card_app_view, suppliers/services/card_app.py, API — suppliers/app_api.py #}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:inventory_supplier_changelist' %}">Постачальники</a> &rsaquo;
+  <a href="{% url 'admin:inventory_supplier_cards' %}">🪪 Візитки й флаєри</a> &rsaquo; 📱 Додаток на телефон
+</div>
+{% endblock %}
+{% block content %}
+{% include "admin/suppliers/_styles.html" %}
+<style>
+  .ca-grid { display: flex; flex-wrap: wrap; gap: 14px; }
+  .ca-grid > .spf-card { flex: 1 1 340px; min-width: 300px; }
+  .ca-qr { background: #fff; display: inline-block; padding: 10px; border-radius: 10px; line-height: 0; margin: 8px 0; }
+  .ca-qr svg, .ca-qr img { width: 220px; height: 220px; display: block; }
+  .ca-big { font-size: 15px; }
+  .ca-steps { margin: 6px 0 0 18px; padding: 0; }
+  .ca-steps li { margin: 3px 0; }
+  .ca-ok { color: var(--success-fg, #2e7d32); font-weight: bold; }
+  .ca-off { opacity: .55; }
+  .ca-tbl td, .ca-tbl th { padding: 4px 8px; text-align: left; vertical-align: top; }
+</style>
+<div class="spp">
+  <div class="spf-muted ca-big">Фотографуйте візитки, флаєри й стенди телефоном: камера з рамкою, обидва боки, QR-код, пресети виставки,
+    примітки голосом з клавіатури. Немає інтернету — фото чекають у телефоні й самі підуть у Minerva, щойно з'явиться зв'язок;
+    далі — AI, категорії й усе інше, як у «🪪 Візитки й флаєри».</div>
+  <div class="ca-grid" style="margin-top:10px">
+    <div class="spf-card">
+      <div class="spf-h">1️⃣ Встановити додаток (Android)</div>
+      <div class="ca-qr" id="ca-dl-qr" translate="no"></div>
+      <div class="spf-row">
+        <a class="button default" href="{{ app_url }}" rel="noopener">⬇ Завантажити APK</a>
+        <a class="button" href="{{ releases_url }}" target="_blank" rel="noopener">Усі версії ↗</a>
+      </div>
+      <ol class="ca-steps spf-muted">
+        <li>Відскануйте цей QR камерою телефона або відкрийте посилання в Chrome на телефоні.</li>
+        <li>Відкрийте завантажений <b translate="no">minerva-cards.apk</b>. Android спитає дозвіл «Встановлювати невідомі додатки» для Chrome / «Файли» — дозвольте.</li>
+        <li>Оновлення — так само: завантажити й встановити поверх, дані й підключення лишаються.</li>
+      </ol>
+    </div>
+    <div class="spf-card">
+      <div class="spf-h">2️⃣ Підключити телефон до вашого акаунта</div>
+      <div class="spf-muted">У додатку — «📷 Сканувати QR з Minerva». Телефон працюватиме від вашого імені (<b translate="no">{{ request.user.get_full_name|default:request.user.username }}</b>) з вашими правами.</div>
+      <div class="spf-row"><button type="button" class="button default" id="ca-pair">🔗 Показати QR для підключення</button>
+        <span class="spf-job" id="ca-msg"></span></div>
+      <div id="ca-pair-box" hidden>
+        <div class="ca-qr" id="ca-pair-qr" translate="no"></div>
+        <div id="ca-pair-state" class="spf-muted"></div>
+        <details class="spf-muted" style="margin-top:6px"><summary>Камера не читає QR? Ввести вручну</summary>
+          У додатку «⌨ Ввести адресу й код вручну»: адреса <b translate="no" id="ca-manual-url"></b>, код <code translate="no" id="ca-manual-code" style="user-select:all"></code></details>
+      </div>
+      <div class="spf-muted">QR діє {{ pair_ttl }} хв і лише один раз. Не показуйте його іншим — хто відсканує, працюватиме під вашим акаунтом.
+        Адреса Minerva для телефона: <b translate="no">{{ base }}</b></div>
+    </div>
+  </div>
+
+  <div class="spf-card" style="margin-top:14px">
+    <div class="spf-h">📱 Підключені телефони{% if admin_all %} (усі люди){% endif %} · діють: {{ active }}</div>
+    {% if devices %}
+    <table class="ca-tbl">
+      <tr><th>Телефон</th>{% if admin_all %}<th>Людина</th>{% endif %}<th>Версія</th><th>Підключено</th><th>Востаннє на зв'язку</th><th></th></tr>
+      {% for d in devices %}
+      <tr class="{% if d.revoked_at %}ca-off{% endif %}">
+        <td translate="no">📱 {{ d.name }} <span class="spf-muted">…{{ d.token_hint }}</span></td>
+        {% if admin_all %}<td translate="no">{{ d.user.get_full_name|default:d.user.username }}</td>{% endif %}
+        <td translate="no">{{ d.app_version|default:"—" }}</td>
+        <td>{{ d.created_at|date:"d.m.Y H:i" }}</td>
+        <td>{% if d.last_seen_at %}{{ d.last_seen_at|date:"d.m.Y H:i" }}{% else %}—{% endif %}</td>
+        <td>{% if d.revoked_at %}🚫 відключено {{ d.revoked_at|date:"d.m.Y" }}{% else %}
+          <form method="post" style="display:inline" onsubmit="return confirm('Відключити цей телефон? Фото, які ще не надіслано, з нього більше не прийдуть — підключіть знову новим QR.')">{% csrf_token %}
+            <input type="hidden" name="action" value="revoke"><input type="hidden" name="id" value="{{ d.pk }}">
+            <button type="submit" class="button">🚫 Відключити</button></form>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}<div class="spf-muted">Ще жодного — покажіть QR для підключення вище.</div>{% endif %}
+    <div class="spf-muted" style="margin-top:6px">З телефонів надіслано ваших фото: {{ uploaded }} · усі — у <a href="{% url 'admin:inventory_supplier_cards' %}">🪪 Візитки й флаєри</a>.
+      Загубили телефон — «🚫 Відключити»: ключ перестане діяти одразу.</div>
+  </div>
+</div>
+{{ app_url|json_script:"ca-app-url" }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(function(){
+  function drawQr(box, text){
+    box.innerHTML = '';
+    if (typeof qrcode !== 'function') { box.textContent = text; box.style.lineHeight = '1.3'; return; }
+    var q = qrcode(0, 'M'); q.addData(text); q.make();
+    box.innerHTML = q.createSvgTag({cellSize: 6, margin: 2, scalable: true});
+  }
+  drawQr(document.getElementById('ca-dl-qr'), JSON.parse(document.getElementById('ca-app-url').textContent));
+  var btn = document.getElementById('ca-pair'), msg = document.getElementById('ca-msg'),
+      box = document.getElementById('ca-pair-box'), state = document.getElementById('ca-pair-state'),
+      tok = '{{ csrf_token }}', timer = null, tick = null;
+  btn.addEventListener('click', function(){
+    clearInterval(timer); clearInterval(tick);
+    msg.textContent = '⏳';
+    var fd = new FormData(); fd.append('action', 'pair');
+    fetch(location.pathname, {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-CSRFToken': tok}})
+      .then(function(r){ return r.json(); }).then(function(j){
+        msg.textContent = ''; box.hidden = false; btn.textContent = '🔄 Новий QR';
+        drawQr(document.getElementById('ca-pair-qr'), j.qr);
+        document.getElementById('ca-manual-url').textContent = j.url;
+        document.getElementById('ca-manual-code').textContent = j.code;
+        var left = j.expires_in;
+        function show(){ state.textContent = '⏳ Чекаю, поки телефон відсканує… ще ' + Math.floor(left / 60) + ':' + ('0' + (left % 60)).slice(-2); }
+        show();
+        tick = setInterval(function(){
+          left -= 1;
+          if (left <= 0) { clearInterval(tick); clearInterval(timer); state.textContent = '⌛ QR застарів — покажіть новий.'; document.getElementById('ca-pair-qr').innerHTML = ''; return; }
+          show();
+        }, 1000);
+        timer = setInterval(function(){
+          fetch(location.pathname + '?state=' + encodeURIComponent(j.key), {credentials: 'same-origin'})
+            .then(function(r){ return r.json(); }).then(function(s){
+              if (!s.paired) return;
+              clearInterval(timer); clearInterval(tick);
+              document.getElementById('ca-pair-qr').innerHTML = '';
+              state.innerHTML = '';
+              var ok = document.createElement('span'); ok.className = 'ca-ok';
+              ok.textContent = '✅ Підключено: ' + (s.device || 'телефон') + ' — можна фотографувати. Оновіть сторінку, щоб побачити його в списку.';
+              state.appendChild(ok);
+            }).catch(function(){});
+        }, 2500);
+      }).catch(function(){ msg.textContent = '⚠️ Немає зв’язку з сервером'; });
+  });
+})();
+</script>
+{% endblock %}

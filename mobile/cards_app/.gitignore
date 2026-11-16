@@ -1,0 +1,12 @@
+# Корінь репозиторію ігнорує будь-яку теку app/ (стара тека) — модуль додатка потрібен
+!/app/
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+*.jks
+*.keystore
+keystore.properties
+*.apk

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/black">
+
+    <androidx.camera.view.PreviewView
+        android:id="@+id/preview"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:scaleType="fillCenter" />
+
+    <com.minervabi.cards.FrameOverlayView
+        android:id="@+id/overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- верх: пресет, вид, рамка, спалах, черга — компактно, не закриває рамку -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:paddingTop="6dp"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipPreset"
+                style="@style/CamChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:maxWidth="220dp"
+                android:text="📌 Без пресету ▾" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipKind"
+                style="@style/CamChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="🪪 Візитка" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipFrame"
+                style="@style/CamChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="▭ Рамка" />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipFlash"
+                style="@style/CamChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="6dp"
+                android:text="⚡ Вимк." />
+
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipQueue"
+                style="@style/CamChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="✓ усе надіслано" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <TextView
+        android:id="@+id/qrChip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="56dp"
+        android:background="@drawable/qr_badge"
+        android:maxWidth="300dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:paddingStart="12dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="4dp"
+        android:textColor="@color/white"
+        android:visibility="gone" />
+
+    <!-- низ: підказка, «зворотний бік?», кнопки -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingBottom="18dp">
+
+        <TextView
+            android:id="@+id/hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:background="@drawable/qr_badge"
+            android:paddingStart="12dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="4dp"
+            android:text="Лицьовий бік — наведіть рамку"
+            android:textColor="@color/white" />
+
+        <LinearLayout
+            android:id="@+id/backStrip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/panel_round"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/frontThumb"
+                android:layout_width="72dp"
+                android:layout_height="46dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="Лицьовий бік"
+                android:scaleType="centerCrop" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnBack"
+                style="@style/Widget.Material3.Button.TonalButton"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:text="↩ Зворот" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDone"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="✓ Готово" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/btnGallery"
+                android:layout_width="58dp"
+                android:layout_height="58dp"
+                android:background="@drawable/round_scrim"
+                android:contentDescription="Фото з галереї"
+                android:gravity="center"
+                android:text="🖼"
+                android:textSize="24sp" />
+
+            <ImageButton
+                android:id="@+id/shutter"
+                android:layout_width="86dp"
+                android:layout_height="86dp"
+                android:layout_marginStart="40dp"
+                android:layout_marginEnd="40dp"
+                android:background="@drawable/shutter"
+                android:contentDescription="Зняти" />
+
+            <TextView
+                android:id="@+id/btnScan"
+                android:layout_width="58dp"
+                android:layout_height="58dp"
+                android:background="@drawable/round_scrim"
+                android:contentDescription="Скан по контуру"
+                android:gravity="center"
+                android:text="📄"
+                android:textSize="24sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/noCamera"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:padding="24dp"
+        android:textColor="@color/white"
+        android:textSize="16sp"
+        android:visibility="gone" />
+</FrameLayout>

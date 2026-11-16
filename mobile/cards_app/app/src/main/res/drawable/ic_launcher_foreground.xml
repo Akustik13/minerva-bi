@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Візитка з літерою M і рамкою видошукача (108×108, безпечна зона — центр 66×66) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- кути видошукача -->
+    <path
+        android:strokeColor="#F5C451"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M27,38 L27,32 L33,32 M75,32 L81,32 L81,38 M81,70 L81,76 L75,76 M33,76 L27,76 L27,70" />
+    <!-- візитка -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,39 L74,39 Q77,39 77,42 L77,66 Q77,69 74,69 L34,69 Q31,69 31,66 L31,42 Q31,39 34,39 Z" />
+    <!-- M -->
+    <path
+        android:fillColor="#5B8DEF"
+        android:pathData="M37,62 L37,46 L41,46 L45,54 L49,46 L53,46 L53,62 L49.5,62 L49.5,53 L46.3,59.5 L43.7,59.5 L40.5,53 L40.5,62 Z" />
+    <!-- рядки тексту -->
+    <path
+        android:fillColor="#9AA7BD"
+        android:pathData="M57,48 L72,48 L72,51 L57,51 Z M57,54 L69,54 L69,57 L57,57 Z M57,60 L71,60 L71,63 L57,63 Z" />
+</vector>

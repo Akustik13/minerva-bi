@@ -718,6 +718,7 @@ class SupplierCardMixin:
             path("cards/", view(self.cards_view), name="inventory_supplier_cards"),
             path("cards/<int:media_pk>/", view(self.card_review_view), name="inventory_supplier_card_review"),
             path("cards/crm-search/", view(self.crm_search_view), name="inventory_supplier_crm_search"),
+            path("cards/app/", view(self.card_app_view), name="inventory_supplier_card_app"),
             path("bulk/", view(self.bulk_view), name="inventory_supplier_bulk"),
             path("<int:pk>/brief/", view(self.brief_view), name="inventory_supplier_brief"),
             path("card/presets/", view(self.card_presets_view), name="inventory_supplier_card_presets"),
@@ -997,7 +998,7 @@ class SupplierCardMixin:
 
     # ── 📷 Візитка / флаєр ──
     def card_view(self, request):
-        from suppliers.services import ai, jobs, qr
+        from suppliers.services import ai, jobs
         if not (_can(request, "add") or _can(request, "change")):
             raise Http404
         supplier = None
@@ -1012,27 +1013,15 @@ class SupplierCardMixin:
             if image.size > 15 * 1024 * 1024:
                 self.message_user(request, "Фото понад 15 МБ.", messages.ERROR)
                 return redirect(request.get_full_path())
-            kind = request.POST.get("kind") if request.POST.get("kind") in dict(SupplierMedia.KINDS) else SupplierMedia.CARD
-            m = SupplierMedia(supplier=supplier, kind=kind, title=request.POST.get("title", "")[:200],
-                              event=request.POST.get("event", "")[:200], note=request.POST.get("note", "")[:4000],
-                              marks=[x for x in request.POST.getlist("marks") if x in dict(SupplierMedia.MARKS)],
-                              created_by=request.user)
-            m.image.save(image.name or "photo.jpg", image, save=False)
+            from suppliers.services import cards
             back = request.FILES.get("image_back")
-            if back is not None and back.size <= 15 * 1024 * 1024:
-                m.image_back.save(back.name or "back.jpg", back, save=False)
-            m.preset = SupplierCardPreset.objects.filter(Q(owner=request.user) | Q(shared=True),
-                                                         pk=request.POST.get("preset") or 0).first()
-            m.qr_text = qr.join(request.POST.get("qr_front", ""), request.POST.get("qr_back", ""))
-            fields = qr.parse_all(m.qr_text)
-            if fields:
-                m.extracted, m.state = qr.merge(fields, {}), SupplierMedia.READ
-            m.save()
-            m.categories.set(self._categories_from_post(request))
-            if supplier is not None:
-                SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.CARD, media=m, user=request.user,
-                                             text=f"{m.get_kind_display()} додано" + (f" · {m.event}" if m.event else ""))
-            url = reverse("admin:inventory_supplier_card_review", args=[m.pk])
+            P = request.POST
+            m = cards.create(request.user, image, back if back is not None and back.size <= 15 * 1024 * 1024 else None,
+                             kind=P.get("kind"), title=P.get("title", ""), event=P.get("event", ""),
+                             note=P.get("note", ""), marks=P.getlist("marks"),
+                             categories=self._categories_from_post(request), preset_id=P.get("preset"),
+                             qr_front=P.get("qr_front", ""), qr_back=P.get("qr_back", ""), supplier=supplier)
+            url =reverse("admin:inventory_supplier_card_review", args=[m.pk])
             job = ""
             if request.POST.get("read_ai"):
                 model, user = ai.model_of(request.POST.get("model")), request.user
@@ -1066,66 +1055,31 @@ class SupplierCardMixin:
     # ── 📌 Пресети візиток (виставка: однакові «де взяли», позначки, категорії) ──
     @staticmethod
     def _presets(user) -> list:
-        qs = (SupplierCardPreset.objects.filter(Q(owner=user) | Q(shared=True)).select_related("owner")
-              .prefetch_related("categories"))
-        return [{"id": p.pk, "name": p.name, "event": p.event, "kind": p.kind, "marks": p.marks or [],
-                 "note": p.note, "categories": [c.pk for c in p.categories.all()], "read_ai": p.read_ai,
-                 "model": p.model, "shared": p.shared, "mine": p.owner_id == user.pk,
-                 "owner": "" if p.owner_id == user.pk else (p.owner.get_full_name() or p.owner.username)} for p in qs]
+        from suppliers.services import card_app
+        return card_app.presets_for(user)
 
     @staticmethod
     def _default_preset(user):
-        profile = getattr(user, "profile", None)
-        value = (getattr(profile, "ui_prefs", None) or {}).get("supplier_card_preset") if profile else None
-        return value if isinstance(value, int) else None
+        from suppliers.services import card_app
+        return card_app.default_preset(user)
 
     def card_presets_view(self, request):
         """POST {action: save | delete | default, id, name, event, kind, marks, note, categories, read_ai, model,
-        shared, make_default} → {presets, default}. Змінити / видалити — лише свій пресет."""
-        from core.models import UserProfile
+        shared, make_default} → {presets, default}. Змінити / видалити — лише свій пресет (card_app.save_preset —
+        те саме для додатка «Minerva Візитки»)."""
+        from suppliers.services import card_app
         if not (_can(request, "add") or _can(request, "change")):
             raise Http404
         if request.method != "POST":
             return JsonResponse({"presets": self._presets(request.user), "default": self._default_preset(request.user)})
-        P, action = request.POST, request.POST.get("action")
-        mine = SupplierCardPreset.objects.filter(owner=request.user)
-        default, saved = self._default_preset(request.user), None
-        if action == "save":
-            name = " ".join(P.get("name", "").split())[:120]
-            if not name:
-                return JsonResponse({"error": "Назва пресету порожня."}, status=400)
-            p = mine.filter(pk=P.get("id") or 0).first() or SupplierCardPreset(owner=request.user)
-            p.name, p.event, p.note = name, P.get("event", "")[:200], P.get("note", "")[:4000]
-            p.kind = P.get("kind") if P.get("kind") in dict(SupplierMedia.KINDS) else SupplierMedia.CARD
-            p.marks = [x for x in P.getlist("marks") if x in dict(SupplierMedia.MARKS)]
-            p.read_ai, p.shared = bool(P.get("read_ai")), bool(P.get("shared"))
-            from suppliers.services.ai import MODELS
-            p.model = P.get("model") if P.get("model") in dict(MODELS) else ""
-            p.save()
-            p.categories.set(self._categories_from_post(request))
-            saved = p.pk
-            if P.get("make_default"):
-                default = p.pk
-        elif action == "delete":
-            mine.filter(pk=P.get("id") or 0).delete()
-            if str(default) == str(P.get("id")):
-                default = None
-        elif action == "default":
-            pid = P.get("id")
-            default = int(pid) if str(pid or "").isdigit() and SupplierCardPreset.objects.filter(
-                Q(owner=request.user) | Q(shared=True), pk=int(pid)).exists() else None
-        else:
-            return JsonResponse({"error": "Невідома дія"}, status=400)
-        if default != self._default_preset(request.user):
-            profile, _ = UserProfile.objects.get_or_create(user=request.user)
-            prefs = dict(profile.ui_prefs or {})
-            if default:
-                prefs["supplier_card_preset"] = default
-            else:
-                prefs.pop("supplier_card_preset", None)
-            UserProfile.objects.filter(pk=profile.pk).update(ui_prefs=prefs)
-        return JsonResponse({"presets": self._presets(request.user), "default": default,
-                             "id": saved})
+        P = request.POST
+        data = {k: P.get(k) for k in ("action", "id", "name", "event", "kind", "note", "read_ai", "model", "shared",
+                                      "make_default")}
+        data.update(marks=P.getlist("marks"), categories=P.getlist("categories"))
+        try:
+            return JsonResponse(card_app.save_preset(request.user, data))
+        except ValueError as e:
+            return JsonResponse({"error": str(e)}, status=400)
 
     def cards_view(self, request):
         """🪪 Усі візитки: плитка — фірма, людина, країна, категорії, що роблять, стан AI; ✉️ поділитись,
@@ -1273,6 +1227,50 @@ class SupplierCardMixin:
             unassigned=SupplierMedia.objects.filter(supplier=None, customer=None).count(),
             crm_can=u.has_perm("crm.add_customer") or u.has_perm("crm.change_customer"),
             crm_view=u.has_perm("crm.view_customer"), can_add_category=u.has_perm("suppliers.add_suppliercategory")))
+
+    def card_app_view(self, request):
+        """📱 Додаток «Minerva Візитки» на телефон: завантажити APK (QR на GitHub), «🔗 Підключити телефон» — QR з
+        одноразовим кодом під вашим акаунтом (card_app.new_pairing), сторінка сама бачить, що телефон підключився
+        (?state=), «🚫 Відключити». Адміністратор Minerva бачить телефони всіх."""
+        from core.utils import is_minerva_admin
+        from suppliers.models import CardAppDevice
+        from suppliers.services import card_app
+        if not card_app.can_upload(request.user):
+            raise Http404
+        admin_all = is_minerva_admin(request.user)
+        if request.method == "GET" and request.GET.get("state"):
+            return JsonResponse(card_app.pair_state(request.user, request.GET["state"]))
+        if request.method == "POST":
+            action = request.POST.get("action")
+            if action == "pair":
+                return JsonResponse(card_app.new_pairing(request.user, self._site_base(request)))
+            if action == "revoke":
+                dev = card_app.devices_for(request.user, admin_all).filter(pk=request.POST.get("id") or 0).first()
+                if dev is None:
+                    raise Http404
+                card_app.revoke(dev)
+                self.message_user(request, f"🚫 Телефон «{dev.name}» відключено — з нього більше нічого не прийде.",
+                                  messages.SUCCESS)
+            return redirect(request.path)
+        devices = list(card_app.devices_for(request.user, admin_all)[:100])
+        return TemplateResponse(request, "admin/suppliers/card_app.html", self._ctx(
+            request, "📱 Додаток «Minerva Візитки»", devices=devices, admin_all=admin_all,
+            app_url=card_app.APP_URL, releases_url=card_app.RELEASES_URL, base=self._site_base(request),
+            pair_ttl=card_app.PAIR_TTL // 60, active=sum(1 for d in devices if d.revoked_at is None),
+            uploaded=SupplierMedia.objects.exclude(client_uuid="").filter(created_by=request.user).count(),
+            CardAppDevice=CardAppDevice))
+
+    @staticmethod
+    def _site_base(request) -> str:
+        """Адреса Minerva для телефона: «Налаштування системи → домен сайту», інакше — як відкрили сторінку."""
+        try:
+            from config.models import SystemSettings
+            s = SystemSettings.objects.filter(pk=1).first()
+            if s is not None and s.site_domain:
+                return s.site_url.rstrip("/")
+        except Exception:  # noqa: BLE001
+            pass
+        return request.build_absolute_uri("/").rstrip("/")
 
     def crm_search_view(self, request):
         """Пошук клієнта CRM для «➕ Додати до клієнта» на сторінці візитки."""

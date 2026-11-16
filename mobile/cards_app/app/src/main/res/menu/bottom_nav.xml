@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/nav_capture" android:icon="@android:drawable/ic_menu_camera" android:title="@string/tab_capture" />
+    <item android:id="@+id/nav_queue" android:icon="@android:drawable/ic_menu_upload" android:title="@string/tab_queue" />
+    <item android:id="@+id/nav_browse" android:icon="@android:drawable/ic_menu_gallery" android:title="@string/tab_browse" />
+    <item android:id="@+id/nav_settings" android:icon="@android:drawable/ic_menu_preferences" android:title="@string/tab_settings" />
+</menu>

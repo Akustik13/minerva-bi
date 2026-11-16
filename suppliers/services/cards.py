@@ -401,6 +401,36 @@ def read_many(ids, user, model) -> dict:
     return {"done": done, "failed": failed, "cost": cost, "error": error}
 
 
+# ── 📷 Нова візитка ──
+
+def create(user, image, back=None, *, kind="card", title="", event="", note="", marks=(), categories=(),
+           preset_id=None, qr_front="", qr_back="", supplier=None, client_uuid=""):
+    """📷 Нова візитка / флаєр — сторінка «📷 Візитка / флаєр» і додаток «Minerva Візитки»: фото обох боків, де
+    взяли, примітка, позначки, категорії, пресет; QR, уже розшифрований браузером / телефоном, одразу заповнює поля
+    (AI — окремо, ai.card). Постачальник — фото в його картці + подія в історії."""
+    from suppliers.models import SupplierCardPreset, SupplierEvent, SupplierMedia
+    from suppliers.services import qr
+    m = SupplierMedia(supplier=supplier, kind=kind if kind in dict(SupplierMedia.KINDS) else SupplierMedia.CARD,
+                      title=str(title or "")[:200], event=str(event or "")[:200], note=str(note or "")[:4000],
+                      marks=[x for x in (marks or []) if x in dict(SupplierMedia.MARKS)], created_by=user,
+                      client_uuid=str(client_uuid or "")[:40])
+    m.image.save(os.path.basename(image.name or "") or "photo.jpg", image, save=False)
+    if back is not None:
+        m.image_back.save(os.path.basename(back.name or "") or "back.jpg", back, save=False)
+    if str(preset_id or "").isdigit():
+        m.preset = SupplierCardPreset.objects.filter(Q(owner=user) | Q(shared=True), pk=int(preset_id)).first()
+    m.qr_text = qr.join(qr_front or "", qr_back or "")
+    fields = qr.parse_all(m.qr_text)
+    if fields:
+        m.extracted, m.state = qr.merge(fields, {}), SupplierMedia.READ
+    m.save()
+    m.categories.set(list(categories or []))
+    if supplier is not None:
+        SupplierEvent.objects.create(supplier=supplier, kind=SupplierEvent.CARD, media=m, user=user,
+                                     text=f"{m.get_kind_display()} додано" + (f" · {m.event}" if m.event else ""))
+    return m
+
+
 # ── 🗑 Видалити ──
 
 def delete(m):

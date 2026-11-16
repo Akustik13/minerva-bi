@@ -33,6 +33,8 @@
   @media (max-width: 768px) { .sc-side { min-width: 100%; } .sc-cam { max-width: 100%; } }
 </style>
 <div class="spp">
+  <div class="spf-row"><a class="button" href="{% url 'admin:inventory_supplier_card_app' %}">📱 Додаток на телефон</a>
+    <span class="spf-muted">— фотографувати візитки й флаєри телефоном, навіть без інтернету: надішле в Minerva само, щойно буде зв'язок</span></div>
   <form method="post" enctype="multipart/form-data" id="sc-form">{% csrf_token %}
   {% if supplier %}<input type="hidden" name="supplier" value="{{ supplier.pk }}">{% endif %}
 
