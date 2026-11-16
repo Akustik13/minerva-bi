@@ -101,6 +101,12 @@ class CompareRatesBoxesTests(TestCase):
         rs = post.call_args.args[1]["requestedShipment"]
         self.assertEqual((rs["packagingType"], len(rs["requestedPackageLineItems"])), ("YOUR_PACKAGING", 2))
 
+    def test_fedex_state_only_two_letters_where_needed(self):
+        c = FedExClient(carrier=fedex())
+        self.assertNotIn("stateOrProvinceCode", c._fmt_addr({"country": "CN", "state": "GUANGDONG"}))
+        self.assertNotIn("stateOrProvinceCode", c._fmt_addr({"country": "DE", "state": "BY"}))
+        self.assertEqual(c._fmt_addr({"country": "US", "state": "tx"})["stateOrProvinceCode"], "TX")
+
     def test_dhl_same_product_once(self):
         from shipping.services import dhl
 

@@ -600,8 +600,11 @@ class FedExClient:
             'countryCode':  (addr.get('country') or 'DE').upper(),
             'residential':  False,
         }
-        if addr.get('state'):
-            result['stateOrProvinceCode'] = addr['state'].upper()
+        # Штат / провінція — лише дволітерний код і лише там, де FedEx його вимагає (США, Канада, Мексика…);
+        # «GUANGDONG» для Китаю FedEx не приймає
+        state = (addr.get('state') or '').strip().upper()
+        if state and len(state) <= 2 and result['countryCode'] in ('US', 'CA', 'MX', 'AE', 'IN', 'PR'):
+            result['stateOrProvinceCode'] = state
         return result
 
     def _pkg_dict(self, pkg: dict, index: int = 0, reference: str = '') -> dict:
