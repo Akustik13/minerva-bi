@@ -212,7 +212,8 @@ class MeetingTranscript(models.Model):
 
 class MeetingItem(models.Model):
     """Ключовий момент наради з дослівною цитатою (або 📌 позначка під час запису) — чекає ✓ / ✕ того, хто записав.
-    ✓ — 📌 момент / ⚠️ ризик / 📅 крок плану проєкту або ⏰ дедлайн у його календарі; ✕ — більше не пропонується
+    ✓ — 📌 момент / ⚠️ ризик / 📅 крок плану проєкту або ⏰ дедлайн у його календарі; 💬 лише обговорення — пункт
+    лишається тільки в нараді (теза розмови, нікуди не додається, можна повернути); ✕ — більше не пропонується
     (key однаковий для того самого виду й цитати, тож повторна передача його не повертає)."""
     DECISION, TASK, DEADLINE, RISK = "decision", "task", "deadline", "risk"
     QUESTION, PROMISE, INFO, MARK = "question", "promise", "info", "mark"
@@ -222,9 +223,9 @@ class MeetingItem(models.Model):
     BENCH_KINDS = (DECISION, TASK, DEADLINE, RISK, QUESTION, PROMISE, INFO)
     PENDING, ACCEPTED, REJECTED = "pending", "accepted", "rejected"
     STATUS_CHOICES = [(PENDING, "Чекає ✓ / ✕"), (ACCEPTED, "Прийнято"), (REJECTED, "Не те")]
-    MOMENT, RISK_TARGET, STEP, DEADLINE_TARGET = "moment", "risk", "step", "deadline"
+    MOMENT, RISK_TARGET, STEP, DEADLINE_TARGET, NOTE = "moment", "risk", "step", "deadline", "note"
     TARGET_CHOICES = [("", "—"), (MOMENT, "📌 Важливий момент"), (RISK_TARGET, "⚠️ Ризик"), (STEP, "📅 Крок плану"),
-                      (DEADLINE_TARGET, "⏰ Дедлайн у календарі")]
+                      (DEADLINE_TARGET, "⏰ Дедлайн у календарі"), (NOTE, "💬 Лише обговорення")]
 
     meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="items")
     key = models.CharField(max_length=40)

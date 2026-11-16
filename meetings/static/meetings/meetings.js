@@ -2,7 +2,8 @@
    - мова тексту згоди (de / en / uk), «📋 Копіювати», «＋ Ще хтось», клієнт за проєктом, confirm за data-confirm;
    - «🎙 Відкрити вікно запису»: після кліку кнопка 5 с неактивна (подвійний клік відкрив би дві вкладки);
    - «⚡ Швидкий запис» (data-mt-reload-after): вікно запису — у новій вкладці, ця сторінка оновлюється за 3 с;
-   - ✓ Прийняти ▾ / ✕ Не те / ↺ Повернути — POST JSON, у відповідь свіжий фрагмент пункту (і проєкт пункту);
+   - ✓ Прийняти ▾ / 💬 Лише обговорення / ✕ Не те / ↺ Повернути — POST JSON, у відповідь свіжий фрагмент пункту
+     (і проєкт пункту);
    - 📁 проєкти наради (додати / ⭐ головний / ✕) і 🏷 «звідси — про проєкт …» на рядках розшифровки — POST JSON,
      потім сторінка оновлюється;
    - пошук у розшифровці й #t=<секунда> в адресі;
@@ -154,10 +155,13 @@
       var act = btn.getAttribute('data-mt-act');
       if (!act) return;
       var body = {action: act};
-      if (act === 'accept') {
+      var val = function (name) { var f = item.querySelector('[name=' + name + ']'); return f ? f.value : ''; };
+      if (act === 'note') {                     // 💬 одним кліком: теза наради, у проєкт нічого не йде
+        body = {action: 'accept', target: 'note'};
+        if (val('project')) body.project = val('project');
+      } else if (act === 'accept') {
         body.target = panelTarget(item);
         if (!body.target) { showError(item, 'Виберіть, куди додати пункт'); return; }
-        var val = function (name) { var f = item.querySelector('[name=' + name + ']'); return f ? f.value : ''; };
         body.title = val('title');
         if (body.target === 'moment') body.kind = val('kind');
         if (body.target === 'risk') { body.category = val('category'); if (val('owner')) body.owner = val('owner'); }
@@ -178,7 +182,8 @@
         var fresh = wrap.firstElementChild;
         if (fresh) { item.replaceWith(fresh); showFor(fresh); syncPlan(fresh); }
         setPending(res.pending);
-        if (act === 'accept') toast('✓ Додано');
+        if (act === 'note' || body.target === 'note') toast('💬 Позначено: лише обговорення');
+        else if (act === 'accept') toast('✓ Додано');
         else if (act === 'reject') toast('✕ Більше не пропонується');
       });
     });

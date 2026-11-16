@@ -135,6 +135,10 @@ ul.mt-check li { padding: 2px 0; }
 ul.mt-check li.todo { color: var(--text); }
 .mt-warn { color: var(--err); }
 
+/* 💬 лише обговорення — теза наради, нікуди не додана */
+.mt-note-done { color: var(--text-muted); font-size: 13px; }
+.mt-item-accepted .mt-note-done + .button { padding: 2px 10px; }
+
 /* ⚡ швидкий запис (список нарад і quick/) */
 .mt-list-quick { margin-bottom: 4px; }
 .mt-quick { border-color: var(--link-fg); }

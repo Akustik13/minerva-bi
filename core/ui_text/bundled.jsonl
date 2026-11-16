@@ -8278,6 +8278,7 @@
 {"uk": "Знижка: {0} USD", "en": "Discount: {0} USD", "de": "Rabatt: {0} USD"}
 {"uk": "Знижки за шаблоном", "en": "Discounts by template", "de": "Rabatte nach Vorlage"}
 {"uk": "Знову в черзі: {0} — агент обробить протягом хвилини за теперішніми налаштуваннями доручень.", "en": "Queued again: {0} — the agent will process them within a minute with the current rule settings.", "de": "Wieder in der Warteschlange: {0} — der Agent verarbeitet sie innerhalb einer Minute mit den aktuellen Einstellungen der Regeln."}
+{"uk": "Знову на розгляд", "en": "Back for review", "de": "Wieder zur Prüfung"}
 {"uk": "Знову рахуються (знято рішень: {0}).", "en": "Counted again (decisions removed: {0}).", "de": "Werden wieder gezählt (aufgehobene Entscheidungen: {0})."}
 {"uk": "Знову шаблон на бланку Commercial Invoice.", "en": "The template is again based on the Commercial Invoice letterhead.", "de": "Die Vorlage basiert wieder auf dem Commercial-Invoice-Briefbogen."}
 {"uk": "Зняти", "en": "Clear", "de": "Entfernen"}
@@ -9450,6 +9451,9 @@
 {"uk": "Лише метадані — для запитів учасників за ст. 15 / 17 DSGVO", "en": "Metadata only — for participants’ requests under Art. 15 / 17 GDPR", "de": "Nur Metadaten — für Anfragen von Teilnehmern nach Art. 15 / 17 DSGVO"}
 {"uk": "Лише на замовленнях DigiKey", "en": "Only on DigiKey orders", "de": "Nur bei DigiKey-Aufträgen"}
 {"uk": "Лише не відправлені — відправлене / скасоване прибирається само", "en": "Not shipped only — shipped / cancelled ones are removed automatically", "de": "Nur nicht versendete — versendete / stornierte werden automatisch entfernt"}
+{"uk": "Лише обговорення", "en": "Discussion only", "de": "Nur Gesprächsthema"}
+{"uk": "Лише обговорення ({0})", "en": "Discussion only ({0})", "de": "Nur Gesprächsthema ({0})"}
+{"uk": "Лише обговорення — лишається в цій нараді", "en": "Discussion only — stays in this meeting", "de": "Nur Gesprächsthema — bleibt in dieser Besprechung"}
 {"uk": "Лише обриси й деталі, без заливки — термопринтер не друкує чорної плями", "en": "Only contours and details, no fill — the thermal printer does not print a black blot", "de": "Nur Konturen und Details, ohne Füllung — der Thermodrucker druckt keinen schwarzen Fleck"}
 {"uk": "Лише останні ревізії даташитів", "en": "Only the latest datasheet revisions", "de": "Nur die neuesten Datenblatt-Revisionen"}
 {"uk": "Лише перевіряє наявність — нічого не змінює (тому досить права читання).", "en": "Only checks availability — changes nothing (so the read permission is enough).", "de": "Prüft nur die Verfügbarkeit — ändert nichts (daher genügt das Leserecht)."}
@@ -12504,6 +12508,7 @@
 {"uk": "Повернути крок", "en": "Restore the step", "de": "Schritt wiederherstellen"}
 {"uk": "Повернути ліворуч", "en": "Rotate left", "de": "Nach links drehen"}
 {"uk": "Повернути можна лише пункт «Не те»", "en": "Only a “Not relevant” item can be restored", "de": "Nur ein Punkt „Nicht relevant“ kann wiederhergestellt werden"}
+{"uk": "Повернути можна лише пункт «Не те» або «Лише обговорення»", "en": "Only items marked «Not relevant» or «Discussion only» can be restored", "de": "Wiederherstellen lassen sich nur Punkte «Nicht relevant» oder «Nur Gesprächsthema»"}
 {"uk": "Повернути мій текст", "en": "Restore my text", "de": "Meinen Text wiederherstellen"}
 {"uk": "Повернути праворуч", "en": "Rotate right", "de": "Nach rechts drehen"}
 {"uk": "Повернути сторінку в меню", "en": "Return the page to the menu", "de": "Seite wieder ins Menü aufnehmen"}
@@ -12693,6 +12698,7 @@
 {"uk": "Позначено відхиленою.", "en": "Marked as rejected.", "de": "Als abgelehnt markiert."}
 {"uk": "Позначено як важливе", "en": "Marked as important", "de": "Als wichtig markiert"}
 {"uk": "Позначено як перевірене — поля більше не підсвічуються.", "en": "Marked as reviewed — the fields are no longer highlighted.", "de": "Als geprüft markiert — die Felder werden nicht mehr hervorgehoben."}
+{"uk": "Позначено: лише обговорення", "en": "Marked: discussion only", "de": "Markiert: nur Gesprächsthema"}
 {"uk": "Позначені рядки за замовчуванням — нові посилання, які відповідають. Можна позначити й інші.", "en": "Rows marked by default are new links that match. You can mark others too.", "de": "Standardmäßig markierte Zeilen sind neue Links, die passen. Sie können auch weitere markieren."}
 {"uk": "Позначені товари в різних валютах — залиште курс порожнім (курси з «Налаштувань цін») або позначте товари однієї валюти.", "en": "The marked products are in different currencies — leave the rate empty (rates from “Price settings”) or mark products in a single currency.", "de": "Die markierten Artikel haben unterschiedliche Währungen — lassen Sie den Kurs leer (Kurse aus den „Preiseinstellungen“) oder markieren Sie Artikel in einer Währung."}
 {"uk": "Позначити", "en": "Mark", "de": "Markieren"}
@@ -13923,6 +13929,7 @@
 {"uk": "Пульт проєкту зараз не вдалося показати — поля нижче працюють як звичайно.", "en": "The project cockpit could not be shown right now — the fields below work as usual.", "de": "Das Projekt-Cockpit kann gerade nicht angezeigt werden — die Felder unten funktionieren wie gewohnt."}
 {"uk": "Пункт #{0}", "en": "Item #{0}", "de": "Punkt #{0}"}
 {"uk": "Пункт не знайдено", "en": "Item not found", "de": "Punkt nicht gefunden"}
+{"uk": "Пункт стосується наради, але це не момент, ризик, крок чи дедлайн — просто тема обговорення. У проєкт нічого не додається; повернути можна будь-коли.", "en": "The item belongs to the meeting but is not a moment, risk, step or deadline — just a topic of discussion. Nothing is added to the project; you can restore it at any time.", "de": "Der Punkt gehört zur Besprechung, ist aber weder Moment, Risiko, Schritt noch Frist — nur ein Gesprächsthema. Ins Projekt wird nichts übernommen; jederzeit wiederherstellbar."}
 {"uk": "Пункт уже вирішено", "en": "Item already decided", "de": "Punkt bereits entschieden"}
 {"uk": "Пункт і цитату побачать усі, хто бачить проєкт. Назву пункту можуть отримати AI-помічники Minerva.", "en": "Everyone who sees the project will see the item and the quote. Minerva’s AI assistants may receive the item title.", "de": "Alle, die das Projekt sehen, sehen Punkt und Zitat. Den Titel des Punkts können Minervas KI-Assistenten erhalten."}
 {"uk": "Пунктів, уже доданих у проєкт або календар, лишилось: {0}", "en": "Items already added to the project or calendar remaining: {0}", "de": "Bereits ins Projekt oder in den Kalender übernommene Punkte bleiben: {0}"}
@@ -15624,6 +15631,7 @@
 {"uk": "Схоже на", "en": "Looks like", "de": "Ähnlich wie"}
 {"uk": "Схоже, клієнт уже є", "en": "Looks like the customer already exists", "de": "Der Kunde scheint bereits vorhanden zu sein"}
 {"uk": "Схоже, тут мова про інший проєкт", "en": "Looks like another project is discussed here", "de": "Hier geht es offenbar um ein anderes Projekt"}
+{"uk": "Схоже, тут мова про інший проєкт ({0})", "en": "Looks like this is about another project ({0})", "de": "Hier geht es wohl um ein anderes Projekt ({0})"}
 {"uk": "Схоже, цей постачальник уже є в базі", "en": "This supplier seems to be in the database already", "de": "Dieser Lieferant scheint bereits in der Datenbank zu sein"}
 {"uk": "Східний Тимор", "en": "Timor-Leste", "de": "Osttimor"}
 {"uk": "Сьогодні", "en": "Today", "de": "Heute"}
@@ -17666,6 +17674,7 @@
 {"uk": "Щоб встановити новий пароль, перейдіть за посиланням", "en": "To set a new password, follow the link", "de": "Um ein neues Passwort festzulegen, folgen Sie dem Link"}
 {"uk": "Щоб додавати в проєкт, виберіть проєкт наради (✏️ Змінити). Без проєкту — лише ⏰ дедлайн у вашому календарі.", "en": "To add to a project, choose the meeting’s project (✏️ Edit). Without a project — only a ⏰ deadline in your calendar.", "de": "Um ins Projekt zu übernehmen, wählen Sie das Projekt der Besprechung (✏️ Bearbeiten). Ohne Projekt — nur eine ⏰ Frist in Ihrem Kalender."}
 {"uk": "Щоб додавати в проєкт, підключіть нараду до проєкту («📁» угорі). Без проєкту — лише ⏰ дедлайн у вашому календарі.", "en": "To add to a project, link the meeting to a project (“📁” at the top). Without a project — only a ⏰ deadline in your calendar.", "de": "Zum Hinzufügen ins Projekt die Besprechung mit einem Projekt verknüpfen („📁“ oben). Ohne Projekt — nur eine ⏰ Frist in Ihrem Kalender."}
+{"uk": "Щоб додавати в проєкт, підключіть нараду до проєкту («📁» угорі). Без проєкту — ⏰ дедлайн у вашому календарі або 💬 лише обговорення.", "en": "To add items to a project, link the meeting to a project («📁» at the top). Without a project — ⏰ a deadline in your calendar or 💬 discussion only.", "de": "Um Punkte ins Projekt zu übernehmen, verknüpfen Sie die Besprechung mit einem Projekt («📁» oben). Ohne Projekt — ⏰ Frist in Ihrem Kalender oder 💬 nur Gesprächsthema."}
 {"uk": "Щоб змінити запас, увімкніть «Вести облік на складі».", "en": "To change the stock, turn on «Track stock».", "de": "Um den Bestand zu ändern, «Bestand führen» einschalten."}
 {"uk": "Щоб керувати чатом з Minerva — «Увімкнено» в блоці «🤖 Помічник Minerva на сайті», потім «🧪 Перевірити RAG».", "en": "To control the chat from Minerva — “Enabled” in the “🤖 Minerva assistant on the site” block, then “🧪 Check RAG”.", "de": "Um den Chat von Minerva aus zu steuern – „Aktiviert“ im Block „🤖 Minerva-Assistent auf der Website“, danach „🧪 RAG prüfen“."}
 {"uk": "Щоб не плутати: «Плати для X», «Ціни на виробництво 2026»… — запити з тією самою групою стоять разом.", "en": "To keep things apart: «Boards for X», «Production prices 2026»… — requests with the same group stand together.", "de": "Zur Übersicht: «Leiterplatten für X», «Fertigungspreise 2026»… — Anfragen derselben Gruppe stehen zusammen."}
@@ -19568,6 +19577,7 @@
 {"uk": "лише метадані (дата, хто записав, час і галочки згоди, адреси учасників) для запитів за ст. 15 / 17 DSGVO; бачить лише адміністратор Minerva", "en": "metadata only (date, who recorded, consent time and ticks, participants’ addresses) for requests under Art. 15 / 17 GDPR; only the Minerva administrator sees it", "de": "nur Metadaten (Datum, wer aufgenommen hat, Zeit und Häkchen der Einwilligung, Adressen der Teilnehmer) für Anfragen nach Art. 15 / 17 DSGVO; sieht nur der Minerva-Administrator"}
 {"uk": "лише мікрофон (очна зустріч)", "en": "microphone only (in-person meeting)", "de": "nur Mikrofon (Präsenztermin)"}
 {"uk": "лише на ці адреси", "en": "only to these addresses", "de": "nur an diese Adressen"}
+{"uk": "лише обговорення", "en": "discussion only", "de": "nur Gesprächsthema"}
 {"uk": "лише перегляд", "en": "view only", "de": "nur Ansicht"}
 {"uk": "лише позначені", "en": "only ticked", "de": "nur markierte"}
 {"uk": "лише показати, нічого не записувати", "en": "only show, record nothing", "de": "nur anzeigen, nichts eintragen"}
@@ -21385,6 +21395,7 @@
 {"uk": "тарифів немає", "en": "no rates", "de": "keine Tarife"}
 {"uk": "те саме", "en": "the same", "de": "dasselbe"}
 {"uk": "теж працюють — ступені рядками в одній комірці). Мова підписів", "en": "also work — price breaks as rows in one cell). The language of the labels", "de": "funktionieren ebenfalls — Staffeln als Zeilen in einer Zelle). Die Sprache der Beschriftungen"}
+{"uk": "теза цієї наради: лишається тільки тут, у проєкт і календар нічого не додається", "en": "a point of this meeting: stays only here, nothing is added to the project or the calendar", "de": "ein Punkt dieser Besprechung: bleibt nur hier, ins Projekt und in den Kalender wird nichts übernommen"}
 {"uk": "текст", "en": "text", "de": "Text"}
 {"uk": "текст збережено в браузері.", "en": "text saved in the browser.", "de": "Text im Browser gespeichert."}
 {"uk": "текст між", "en": "текст між", "de": "текст між"}

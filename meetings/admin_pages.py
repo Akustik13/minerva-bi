@@ -33,8 +33,12 @@ TARGET_TEXT = {
     "risk": ("⚠️ Ризик", "у реєстр ризиків проєкту"),
     "step": ("📅 Крок плану", "з виконавцем і строком, з’явиться в календарі виконавця"),
     "deadline": ("⏰ Дедлайн у моєму календарі", "бачите лише ви"),
+    "note": ("💬 Лише обговорення", "теза цієї наради: лишається тільки тут, у проєкт і календар нічого не додається"),
 }
-TARGET_DONE = {"moment": "📌 момент", "risk": "⚠️ ризик", "step": "📅 крок плану", "deadline": "⏰ дедлайн"}
+TARGET_DONE = {"moment": "📌 момент", "risk": "⚠️ ризик", "step": "📅 крок плану", "deadline": "⏰ дедлайн",
+               "note": "💬 лише обговорення"}
+NOTE_TITLE = ("Пункт стосується наради, але це не момент, ризик, крок чи дедлайн — просто тема обговорення. У проєкт "
+              "нічого не додається; повернути можна будь-коли.")
 SHARED_WARNING = ("🔒 Пункт і цитату побачать усі, хто бачить проєкт. Назву пункту можуть отримати "
                   "AI-помічники Minerva.")
 DEADLINE_WARNING = ("🔒 Дедлайн бачите лише ви; назва піде й у ваші підписки календаря (Google / Outlook), "
@@ -428,7 +432,7 @@ def item_context(user, m, item, base=None, staff=None, pj=None) -> dict:
         default = "deadline"
     targets = [{"key": key, "label": TARGET_TEXT[key][0], "meaning": TARGET_TEXT[key][1],
                 "reason": reasons.get(key, ""), "checked": key == default} for key in ("moment", "risk", "step",
-                                                                                        "deadline")]
+                                                                                        "deadline", "note")]
     day = services.parse_day(item.due_text) if item.due_text else None
     labels = services.speaker_labels(m)
     side = services._step_side(m, item, {})
@@ -445,7 +449,7 @@ def item_context(user, m, item, base=None, staff=None, pj=None) -> dict:
         "sides": [{"code": code, "label": label, "selected": code == side} for code, label in ProjectStep.SIDE_CHOICES],
         "me": user.pk, "staff": staff if staff is not None else staff_options(),
         "date": day.isoformat() if day else "", "result": result_link(item) if item.status == MeetingItem.ACCEPTED
-        else None, "shared_warning": SHARED_WARNING, "deadline_warning": DEADLINE_WARNING,
+        else None, "shared_warning": SHARED_WARNING, "deadline_warning": DEADLINE_WARNING, "note_title": NOTE_TITLE,
         "item_url": url("admin:meetings_meeting_item", m.pk, item.pk),
         "project": project, "pj_cls": (pj["colors"].get(project.pk, "") if project is not None else ""),
         "pj_show": len(pj["links"]) > 1 or bool(pj["parts"]), "pj_choices": choices,
@@ -578,7 +582,9 @@ def page_context(user, m, settings=None) -> dict:
     staff = staff_options() if items else []
     rendered = [{"item": i, "html": render_item(user, m, i, None, staff, pj)} for i in items]
     pending = [r for r in rendered if r["item"].status == MeetingItem.PENDING]
-    accepted = [r for r in rendered if r["item"].status == MeetingItem.ACCEPTED]
+    accepted = [r for r in rendered if r["item"].status == MeetingItem.ACCEPTED
+                and r["item"].target != MeetingItem.NOTE]
+    notes = [r for r in rendered if r["item"].status == MeetingItem.ACCEPTED and r["item"].target == MeetingItem.NOTE]
     rejected = [r for r in rendered if r["item"].status == MeetingItem.REJECTED]
     can_projects = user.has_perm("projects.view_project")
     can_customers = user.has_perm("crm.view_customer")
@@ -603,7 +609,7 @@ def page_context(user, m, settings=None) -> dict:
         "can_retry": services.can_retry(m) and can_change(user), "redo_confirm": REDO_CONFIRM,
         "phone_note": PHONE_NOTE,
         "can_continue": m.status in (Meeting.RECORDING, Meeting.PROCESSING, Meeting.REVIEW),
-        "pending": pending, "accepted": accepted, "rejected": rejected, "items_total": len(items),
+        "pending": pending, "accepted": accepted, "notes": notes, "rejected": rejected, "items_total": len(items),
         "summary": tr.summary if tr else "", "moments_wait": m.status == Meeting.PROCESSING and m.has_transcript
         and not m.moments_at, "moments_wait_text": MOMENTS_WAIT,
         "no_project_hint": not pj["links"], "transcript": transcript_rows(m, tr, pj) if tr else [],
