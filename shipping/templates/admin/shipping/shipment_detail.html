@@ -1059,15 +1059,25 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           <div class="sd-info-row">
             <span class="sd-info-key">{% trans "Друк усього" %}</span>
             <span class="sd-info-val">
-              <a href="{% url 'admin:shipping_shipment_print_all' shipment.pk %}"
-                 target="_blank"
+              <a href="{% url 'admin:shipping_shipment_print_all' shipment.pk %}?print=1"
+                 target="_blank" title="{% trans 'Один PDF і одразу вікно друку' %}"
                  style="display:inline-flex;align-items:center;gap:6px;
                         background:#1b5e20;color:#fff;padding:6px 16px;border-radius:6px;
                         text-decoration:none;font-weight:600;font-size:13px">
                 🖨️ {% trans "Друкувати всі документи" %}
               </a>
+              <a href="{% url 'admin:shipping_shipment_print_all' shipment.pk %}" target="_blank"
+                 style="font-size:12px;margin-left:6px">📄 {% trans "лише PDF" %}</a>
               <span style="font-size:11px;color:var(--text-dim);margin-left:8px">
-                {% trans "Пак-ліст + Інвойс/Митна + Етикетка → один PDF" %}
+                {% if print_info.customs %}
+                  {% if print_info.paperless %}
+                    {% trans "Етикетка + інвойс (1 примірник — інвойс уже пішов перевізнику електронно) + пак-ліст → один PDF" %}
+                  {% else %}
+                    {% blocktrans with n=print_info.copies %}Етикетка + інвойс ({{ n }} примірники: один — у кишеню на коробку, решта — до посилки) + пак-ліст → один PDF{% endblocktrans %}
+                  {% endif %}
+                {% else %}
+                  {% trans "Етикетка + пак-ліст → один PDF (без митниці — у межах ЄС)" %}
+                {% endif %}
               </span>
             </span>
           </div>
@@ -1485,7 +1495,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           {% if abd.abd_ok %}
           <div class="sd-divider" id="ups-abd">
             <details id="abd-box" {% if not abd.abd_sent %}open{% endif %}>
-            <summary class="sd-section-label" style="cursor:pointer">📑 {% trans "Документи для митниці в UPS" %}{% if abd.abd_parcels > 1 %} · {% trans "посилка" %} {{ abd.abd_parcel_no }}/{{ abd.abd_parcels }}{% endif %}{% if abd.abd_sent %} · <span style="color:var(--ok)">✅ {% trans "надіслано" %}: {{ abd.abd_sent|length }}</span>{% endif %}</summary>
+            <summary class="sd-section-label" style="cursor:pointer">📑 {% trans "Документи для митниці в" %} <span translate="no">{{ abd.abd_carrier }}</span>{% if abd.abd_parcels > 1 %} · {% trans "посилка" %} {{ abd.abd_parcel_no }}/{{ abd.abd_parcels }}{% endif %}{% if abd.abd_sent %} · <span style="color:var(--ok)">✅ {% trans "надіслано" %}: {{ abd.abd_sent|length }}</span>{% endif %}</summary>
             {% for s in abd.abd_sent %}
             <div class="sd-section-note" style="color:var(--ok)">✅ {% trans "Надіслано" %} {{ s.when }} · {{ s.type_name }} · <span translate="no">{{ s.name }}</span></div>
             {% endfor %}
@@ -1523,7 +1533,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
               {% endfor %}
               <div style="margin:8px 0;font-size:12.5px">
                 {% if abd.abd_files %}{% trans "або файли з ПК:" %}{% endif %}
-                <input type="file" name="pc_file" id="abd-file" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.doc,.docx,.rtf,.txt,.xls,.xlsx">
+                <input type="file" name="pc_file" id="abd-file" multiple accept="{{ abd.abd_accept }}">
                 <button type="button" class="button" style="padding:1px 8px" data-abd-local
                   title="{% trans 'Швидкий перегляд вибраного файлу' %}">👁</button>
                 <div style="margin-top:4px">
@@ -1534,17 +1544,17 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
                 </div>
               </div>
               <button type="submit" class="button default"
-                onclick="return confirm('{% trans "Надіслати вибрані документи в UPS до цієї посилки?" %}')">
-                📑 {% trans "Надіслати в UPS" %}
+                onclick="return confirm('{% trans "Надіслати вибрані документи до цієї посилки?" as q %}{{ q|escapejs }} ({{ abd.abd_carrier|escapejs }})')">
+                📑 {% trans "Надіслати в" %} <span translate="no">{{ abd.abd_carrier }}</span>
               </button>
               <span style="font-size:11.5px;color:var(--text-dim)">· {% trans "ще можна" %}: {{ abd.abd_left }}</span>
             </form>
             <details class="sd-section-note" style="margin-top:6px">
               <summary style="cursor:pointer">❓ {% trans "Які документи потрібні й що куди" %}</summary>
               <div style="margin-top:4px">
-                {% trans "Документи прив’язуються до вже оформленої посилки (UPS Paperless). Файл до 10 МБ, до 13 документів на посилку. Копія — у документах замовлення. Тип Minerva визначає за назвою й текстом файлу; посилку — за трек-номером або MRN у документі, інакше підказує за датою." %}
+                {% blocktrans with how=abd.abd_how mb=abd.abd_max_mb per=abd.abd_per_parcel fmts=abd.abd_formats %}Документи прив’язуються до вже оформленої посилки ({{ how }}). Файл до {{ mb }} МБ ({{ fmts }}), до {{ per }} документів на посилку. Копія — у документах замовлення. Тип Minerva визначає за назвою й текстом файлу; посилку — за трек-номером або MRN у документі, інакше підказує за датою.{% endblocktrans %}
                 <ul style="margin:6px 0 0 16px;padding:0">
-                  {% for code, name, de, hint in abd.abd_types %}<li style="margin:2px 0"><b>{{ name }}</b> <span style="color:var(--text-dim)">· ups.com: «{{ de }}»</span><br>{{ hint }}</li>{% endfor %}
+                  {% for code, name, de, hint in abd.abd_types %}<li style="margin:2px 0"><b>{{ name }}</b> <span style="color:var(--text-dim)">· {{ de }}</span><br>{{ hint }}</li>{% endfor %}
                 </ul>
               </div>
             </details>

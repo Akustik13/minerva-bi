@@ -151,6 +151,8 @@ UPS приймає PDF, JPG, PNG, GIF, BMP, DOC(X), RTF, TXT, XLS(X), до 10 М
 > ⚠️ Якщо UPS відповідає, що функцію не ввімкнено, акаунту UPS потрібен доступ **«Upload Forms Created
 > Offline»** (Paperless). Попросіть UPS його ввімкнути, а поки завантажте документ вручну на ups.com.
 
+> ℹ️ Такий самий блок є й для посилок DHL Express і FedEx — див. [DHL Express, Jumingo, FedEx](guide:shipping/other-carriers).
+
 ## Скасувати відправлення UPS (Void)
 
 Поки кур'єр не забрав посилку, відправлення можна анулювати в UPS — етикетка стане недійсною, і UPS не

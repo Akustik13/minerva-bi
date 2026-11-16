@@ -209,7 +209,7 @@ class AbdToUpsTests(MrnFromMailTests):
     def test_draft_and_get_do_nothing(self):
         self.assertEqual(self.client.get(self.url).status_code, 302)
         Shipment.objects.filter(pk=self.shipment.pk).update(status=Shipment.Status.DRAFT)
-        self.assertNotContains(self.client.get(self.detail), "Документи для митниці в UPS")
+        self.assertNotContains(self.client.get(self.detail), "Документи для митниці в")
 
     def test_push_payload(self):
         from datetime import datetime as _dt

@@ -474,6 +474,15 @@ def create_shipment(carrier, shipment, product_code: str,
 
     # Акаунт: відправник у DE — експорт / Innerdeutsch, з-за кордону — імпорт / третя країна
     acct, acct_kind = account_choice(carrier, _scountry, account)
+    # Свій інвойс (PDF) замість інвойсу DHL — іде в DHL електронно разом із відправленням (Paperless Trade)
+    own_invoice = b""
+    if getattr(shipment, "use_custom_invoice", False) and getattr(shipment, "custom_invoice_pdf", None):
+        try:
+            with shipment.custom_invoice_pdf.open("rb") as fh:
+                own_invoice = fh.read()
+        except Exception:  # noqa: BLE001 — файлу немає: інвойс DHL, як завжди
+            own_invoice = b""
+    mrn = (getattr(shipment, "export_mrn", "") or "").strip().upper()
     is_customs = customs_needed(_scountry, dest_country)
     # Явний override з форми (чекбокс)
     if include_customs is not None:
@@ -636,27 +645,42 @@ def create_shipment(carrier, shipment, product_code: str,
             export_items.append(li)
 
         if export_items:
+            invoice = {
+                "number": str(shipment.reference or shipment.pk)[:35],
+                "date":   ship_date.isoformat(),
+            }
+            # MRN з Ausfuhrbegleitdokument — референс інвойсу типу MRN (MyDHL API reference data)
+            if mrn:
+                invoice["customerReferences"] = [{"typeCode": "MRN", "value": mrn[:35]}]
             payload["content"]["exportDeclaration"] = {
                 "lineItems": export_items,
-                "invoice": {
-                    "number": str(shipment.reference or shipment.pk)[:35],
-                    "date":   ship_date.isoformat(),
-                },
+                "invoice": invoice,
                 "exportReason":      _EXPORT_REASON_MAP.get(
                     shipment.export_reason, "COMMERCIAL_PURPOSE_OR_SALE"
                 ),
                 "additionalCharges": [],
                 "placeOfIncoterm":   _scity or "Frankfurt",
             }
-            # Інвойс DHL (шаблон COMMERCIAL_INVOICE_P_10) — PDF у відповіді, зберігається в Minerva
-            # (як митна декларація UPS) і йде в «Друкувати всі документи»
-            payload["outputImageProperties"]["imageOptions"].append({
-                "typeCode": "invoice", "templateName": "COMMERCIAL_INVOICE_P_10",
-                "isRequested": True, "invoiceType": "commercial",
-            })
+            if own_invoice:
+                # Свій інвойс — зображенням документа відправлення (PLT), DHL свого не генерує
+                payload["documentImages"] = [{"typeCode": "INV", "imageFormat": "PDF",
+                                              "content": base64.b64encode(own_invoice).decode()}]
+            else:
+                # Інвойс DHL (шаблон COMMERCIAL_INVOICE_P_10) — PDF у відповіді, зберігається в Minerva
+                # (як митна декларація UPS) і йде в «Друкувати всі документи»
+                payload["outputImageProperties"]["imageOptions"].append({
+                    "typeCode": "invoice", "templateName": "COMMERCIAL_INVOICE_P_10",
+                    "isRequested": True, "invoiceType": "commercial",
+                })
             # Paperless Trade (WY): DHL бере інвойс в електронному вигляді, папір до посилки не потрібен.
             # Якщо акаунт не має цієї послуги — повтор без неї (нижче)
             payload["valueAddedServices"] = [{"serviceCode": "WY"}]
+
+    # DDP від нас — мито й податки отримувача платимо ми: послуга DD і наш акаунт як платник мита
+    # (посилка до нас — мито й так на нас як на отримувача)
+    if is_customs and incoterm == "DDP" and acct and acct_kind == "export":
+        payload.setdefault("valueAddedServices", []).append({"serviceCode": "DD"})
+        payload["accounts"].append({"typeCode": "duties-taxes", "number": acct})
 
     if dry_run:
         return payload
@@ -682,11 +706,20 @@ def create_shipment(carrier, shipment, product_code: str,
         except Exception:
             data = {"raw_text": resp.text[:3000]}
         # Акаунт без Paperless Trade (WY): DHL відмовляє (400 / 422) — ще раз без неї, інвойс лишається PDF
-        if (attempt == 0 and not resp.ok and resp.status_code in (400, 422) and payload.get("valueAddedServices")
-                and re.search(r"\bWY\b|paperless|value.?added", str(data), re.I)):
-            payload.pop("valueAddedServices", None)
-            notes.append("Paperless Trade (WY) для цього акаунта DHL не ввімкнено — інвойс треба роздрукувати "
-                         "й покласти до посилки.")
+        has_wy = any(s.get("serviceCode") == "WY" for s in payload.get("valueAddedServices") or [])
+        if (attempt == 0 and not resp.ok and resp.status_code in (400, 422) and has_wy
+                and re.search(r"\bWY\b|paperless|value.?added|document.?image", str(data), re.I)):
+            rest = [s for s in payload["valueAddedServices"] if s.get("serviceCode") != "WY"]
+            if rest:
+                payload["valueAddedServices"] = rest
+            else:
+                payload.pop("valueAddedServices", None)
+            if payload.pop("documentImages", None) is not None:
+                notes.append("Paperless Trade (WY) для цього акаунта DHL не ввімкнено — свій інвойс DHL не "
+                             "прийняв електронно: роздрукуйте його (3 примірники) й покладіть до посилки.")
+            else:
+                notes.append("Paperless Trade (WY) для цього акаунта DHL не ввімкнено — інвойс треба роздрукувати "
+                             "(3 примірники) й покласти до посилки.")
             continue
         break
 
@@ -734,7 +767,9 @@ def create_shipment(carrier, shipment, product_code: str,
         "invoice_bytes":    _doc("invoice"),
         "account":          acct,
         "account_kind":     acct_kind,
-        "paperless":        bool(payload.get("valueAddedServices")),
+        "paperless":        any(s.get("serviceCode") == "WY" for s in payload.get("valueAddedServices") or []),
+        "own_invoice":      bool(payload.get("documentImages")),
+        "mrn":              mrn if payload.get("content", {}).get("exportDeclaration") else "",
         "notes":            notes,
         "carrier_service":  product_name or product_code,
         "carrier_price":    price,
@@ -742,6 +777,56 @@ def create_shipment(carrier, shipment, product_code: str,
         "raw_response":     data,
         "error":            None,
     }
+
+
+IMAGE_FORMATS = {"pdf": "PDF", "png": "PNG", "gif": "GIF", "tif": "TIFF", "tiff": "TIFF", "jpg": "JPEG", "jpeg": "JPEG"}
+
+
+def upload_images(carrier, shipment, files: list) -> dict:
+    """PATCH /shipments/{AWB}/upload-image — митні документи (Paperless Trade) до вже оформленої посилки.
+    files: [(назва, байти, typeCode DHL: INV / PNV / COO / NAF / CIN / DCL / AWB)].
+    Продукт, акаунт і дата — з того самого запиту, яким посилку оформлено (shipment.raw_request)."""
+    import base64
+    import requests as req
+
+    raw = shipment.raw_request if isinstance(shipment.raw_request, dict) else {}
+    awb = (shipment.tracking_number or "").strip()
+    if not (awb and raw.get("productCode")):
+        return {"success": False, "error": "Посилку оформлено не через MyDHL API — документи можна додати "
+                                           "лише на mydhl.express.dhl."}
+    accounts = [a for a in (raw.get("accounts") or []) if a.get("typeCode") == "shipper"] or \
+        [{"typeCode": "shipper", "number": carrier.connection_uuid}]
+    images = []
+    for name, data, code in files:
+        ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        images.append({"typeCode": code, "imageFormat": IMAGE_FORMATS.get(ext, "PDF"),
+                       "content": base64.b64encode(data).decode()})
+    body = {
+        "originalPlannedShippingDate": (raw.get("plannedShippingDateAndTime") or "")[:10],
+        "accounts":       accounts,
+        "productCode":    raw.get("productCode"),
+        "documentImages": images,
+    }
+    base = _TEST_BASE if (carrier.api_url or "").strip().lower() == "test" else _PROD_BASE
+    try:
+        from tabele.api_logger import logged_request
+        resp = logged_request('dhl', 'upload_image', 'PATCH', f"{base}/shipments/{awb}/upload-image", req.patch,
+                              json=body, auth=(carrier.api_key, carrier.api_secret),
+                              headers={"Accept": "application/json", "Content-Type": "application/json"},
+                              timeout=60)
+    except Exception as e:  # noqa: BLE001
+        return {"success": False, "error": str(e)}
+    if resp.ok:
+        return {"success": True}
+    try:
+        data = resp.json()
+    except Exception:  # noqa: BLE001
+        data = {"detail": resp.text[:300]}
+    detail = data.get("detail") or data.get("title") or data.get("message") or str(data)[:300]
+    extras = data.get("additionalDetails") or []
+    if isinstance(extras, list) and extras:
+        detail += " — " + "; ".join(str(x.get("message") if isinstance(x, dict) else x) for x in extras[:3])
+    return {"success": False, "error": f"HTTP {resp.status_code}: {detail}"}
 
 
 def cancel_shipment(carrier, tracking_number: str) -> dict:

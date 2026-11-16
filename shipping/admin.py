@@ -3533,6 +3533,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "tracking_url":              _tracking_url,
             "jumingo_order":             jumingo_order,
             "label_display_url":         _label_display_url,
+            "print_info":                self._print_info(shipment),
             "label_a4_url":              _label_a4_url,
             "shop_confirm":              self._shop_confirm_context(shipment),
             "abd":                       self._ups_abd_context(request, shipment),
@@ -3916,6 +3917,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     # ── Print All Documents ───────────────────────────────────────────────────
 
+    @staticmethod
+    def _print_info(shipment) -> dict:
+        """Що піде в «🖨️ Друкувати всі документи»: митниця, скільки примірників інвойсу, чи пішов він електронно."""
+        from .services import carrier_docs
+        try:
+            return {'customs': carrier_docs.needs_customs(shipment), 'copies': carrier_docs.invoice_copies(shipment),
+                    'paperless': carrier_docs.paperless(shipment)}
+        except Exception:  # noqa: BLE001 — лише підказка
+            return {}
+
     def print_all_view(self, request, shipment_id):
         """
         GET — збирає всі потрібні PDF (етикетка + пак-ліст/інвойс/митна),
@@ -3943,8 +3954,26 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         pdf_paths: list[Path] = []
         errors:    list[str]  = []
 
+        # ?print=1 — сторінка, що одразу відкриває вікно друку для зведеного PDF
+        if request.GET.get("print") == "1" and not debug:
+            from django.utils.html import escape as _esc
+            pdf = request.path + "?" + "&".join(f"{k}={v}" for k, v in request.GET.items() if k != "print")
+            return HttpResponse(
+                "<!doctype html><html><head><meta charset='utf-8'><title>Print</title>"
+                "<style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%}</style></head>"
+                f"<body><iframe id='p' src='{_esc(pdf)}'></iframe><script>"
+                "var f=document.getElementById('p');f.addEventListener('load',function(){"
+                "setTimeout(function(){try{f.contentWindow.focus();f.contentWindow.print();}catch(e){}},400);});"
+                "</script></body></html>", content_type="text/html; charset=utf-8")
+
+        from .services import carrier_docs
         dest_country = (shipment.recipient_country or "").upper()
-        is_eu        = dest_country in EU_COUNTRIES
+        # Митниця — коли посилка перетинає кордон ЄС (і для імпорту до нас), не лише за країною отримувача
+        is_eu        = not carrier_docs.needs_customs(shipment)
+        try:
+            copies = max(0, min(int(request.GET.get("copies", "")), 9))
+        except ValueError:
+            copies = carrier_docs.invoice_copies(shipment)
 
         log.append(f"shipment={shipment_id} order={order} source={getattr(order,'source','—')} "
                    f"order_no={getattr(order,'order_number','—')} country={dest_country} eu={is_eu}")
@@ -4050,9 +4079,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         else:
             log.append(f"[PL] skipped — not DigiKey (source={getattr(order,'source','—')})")
 
-        # ── Порядок: Етикетка → Митна → Пак-ліст ───────────────────────────
+        # ── Порядок: Етикетка → Митна (copies примірників: на папері — 3, електронно — 1) → Пак-ліст ──
+        log.append(f"[CN] copies={copies} paperless={carrier_docs.paperless(shipment)}")
         for _doc in (doc_label, doc_customs, doc_packlist):
-            if _doc is not None:
+            if _doc is None:
+                continue
+            for _ in range(copies if _doc is doc_customs else 1):
                 pdf_paths.append(_doc)
 
         log.append(f"pdf_paths ({len(pdf_paths)}): {[p.name for p in pdf_paths]}")
@@ -4479,6 +4511,63 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # на час звернення до перевізника воно атомарно стає «📤 Передано перевізнику» — другий запит
     # (подвійний клік, «Назад» і ще раз, друга вкладка) цього стану вже не застане й до перевізника не дійде.
     BOOKABLE = (Shipment.Status.DRAFT, Shipment.Status.ERROR)
+
+    def _customs_extras_check(self, request, shipment) -> str:
+        """MRN і «свій інвойс» зі сторінки перевірки DHL / FedEx (як UPS) — перевірка ДО бронювання.
+        Порожньо — усе гаразд; інакше — текст помилки."""
+        from .services import mrn as _mrn
+        if 'export_mrn' in request.POST:
+            value = _mrn.normalize(request.POST.get('export_mrn', ''))
+            problem = _mrn.problem(value, self._ups_extract_shipper(shipment).get('country'))
+            if problem:
+                return f'MRN: {problem}'
+        if request.POST.get('use_custom_invoice') == '1':
+            pdf = request.FILES.get('custom_invoice_pdf')
+            if pdf and not pdf.name.lower().endswith('.pdf'):
+                return 'Власний інвойс має бути PDF-файлом.'
+            if not pdf and not shipment.custom_invoice_pdf:
+                return 'Позначено «Свій інвойс», але PDF не завантажено.'
+        return ''
+
+    def _customs_extras_save(self, request, shipment) -> None:
+        """Після бронювання — записати MRN і свій інвойс у відправлення (лише поля, що були у формі)."""
+        from .services import mrn as _mrn
+        fields = []
+        if 'export_mrn' in request.POST:
+            shipment.export_mrn = _mrn.normalize(request.POST.get('export_mrn', ''))
+            fields.append('export_mrn')
+        if 'export_mrn' in request.POST or 'use_custom_invoice' in request.POST:
+            use_custom = request.POST.get('use_custom_invoice') == '1'
+            pdf = request.FILES.get('custom_invoice_pdf')
+            if use_custom and pdf:
+                shipment.custom_invoice_pdf = pdf
+                fields.append('custom_invoice_pdf')
+            shipment.use_custom_invoice = use_custom
+            fields.append('use_custom_invoice')
+        if fields:
+            shipment.save(update_fields=fields)
+
+    def _customs_extras_context(self, request, shipment, shipper) -> dict:
+        from .services import mrn as _mrn
+        found = None
+        if not shipment.export_mrn:
+            try:
+                found = _mrn.find_in_mail(shipment.order, request.user, shipper.get('country'))
+            except Exception as e:  # noqa: BLE001 — пошта не обов'язкова
+                logger.info('MRN from mail for shipment %s: %s', shipment.pk, e)
+        return {'mrn_value': shipment.export_mrn or (found or {}).get('mrn', ''), 'mrn_found': found,
+                'mrn_country': (shipper.get('country') or '').upper()[:2]}
+
+    @staticmethod
+    def _payer_text(shipper_country, home_country, incoterm, carrier_label) -> dict:
+        """Хто платить за доставку й мито — для сторінок перевірки DHL / FedEx."""
+        importing = (shipper_country or home_country).upper() != (home_country or 'DE').upper()
+        if importing:
+            return {'shipping': f'{carrier_label} — ми як отримувач (імпорт)',
+                    'duties': 'ми (отримувач, імпорт)'}
+        if (incoterm or 'DAP').upper() == 'DDP':
+            return {'shipping': f'{carrier_label} — ми як відправник', 'duties': 'ми (DDP)'}
+        return {'shipping': f'{carrier_label} — ми як відправник', 'duties': 'отримувач'}
 
     @classmethod
     def _claim_booking(cls, shipment) -> bool:
@@ -5177,9 +5266,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     @classmethod
     def _ups_abd_ok(cls, shipment) -> bool:
-        return bool(shipment.carrier and shipment.carrier.carrier_type == 'ups'
-                    and shipment.status in cls.UPS_ABD_STATUSES
-                    and (shipment.carrier_shipment_id or shipment.tracking_number or '').strip())
+        """Оформлено через API UPS / DHL / FedEx — документи для митниці можна дослати (carrier_docs)."""
+        from .services import carrier_docs
+        return carrier_docs.booked_ok(shipment)
 
     @staticmethod
     def _ups_abd_sent(shipment) -> list:
@@ -5192,21 +5281,26 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         і папки документів замовлення, тип і посилка — автоматично (shipping/services/ups_docs.py)."""
         if not self._ups_abd_ok(shipment):
             return {}
-        from .services import ups_docs
+        from .services import carrier_docs, ups_docs
         files = []
         try:
             files = ups_docs.candidates(shipment, request.user)
         except Exception as e:  # noqa: BLE001 — пошта / файли не обов'язкові
             logger.info('UPS docs for shipment %s: %s', shipment.pk, e)
+        k = carrier_docs.kind(shipment)
         parcels = ups_docs.live_parcels(shipment.order)
         number = next((n for n, p in enumerate(parcels, 1) if p.pk == shipment.pk), None)
         return {'abd_ok': True, 'abd_files': files, 'abd_sent': ups_docs.sent(shipment),
                 'abd_can': self.has_change_permission(request, shipment),
                 'abd_url': reverse('admin:shipping_shipment_ups_abd', args=[shipment.pk]),
                 'abd_preview_url': reverse('admin:shipping_shipment_ups_abd_preview', args=[shipment.pk]),
-                'abd_types': ups_docs.DOC_TYPES, 'abd_formats': ', '.join(ups_docs.UPS_FORMATS),
+                'abd_types': carrier_docs.doc_types(k), 'abd_formats': ', '.join(carrier_docs.FORMATS[k]),
+                'abd_accept': ','.join('.' + f for f in carrier_docs.FORMATS[k]),
+                'abd_carrier': carrier_docs.NAMES[k], 'abd_how': carrier_docs.HOW[k],
+                'abd_max_mb': carrier_docs.FILE_MAX[k] // (1024 * 1024),
+                'abd_per_parcel': carrier_docs.PER_PARCEL[k],
                 'abd_parcel_no': number, 'abd_parcels': len(parcels),
-                'abd_left': max(ups_docs.PER_PARCEL - len(ups_docs.sent(shipment)), 0)}
+                'abd_left': max(carrier_docs.PER_PARCEL[k] - len(ups_docs.sent(shipment)), 0)}
 
     def ups_abd_preview_view(self, request, shipment_id):
         """GET ?ref=msg:<pk>:<i> | order:<файл> — швидкий перегляд документа перед надсиланням в UPS (лише файли
@@ -5241,8 +5335,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         import re as _re
         from django.conf import settings as django_settings
         from django.core.exceptions import PermissionDenied
-        from .services import ups_docs
-        from .ups_client import UPSClient, UPSError
+        from .services import carrier_docs, ups_docs
 
         detail = reverse('admin:shipping_shipment_detail', args=[shipment_id])
         if request.method != 'POST':
@@ -5251,10 +5344,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if not self.has_change_permission(request, shipment):
             raise PermissionDenied
         if not self._ups_abd_ok(shipment):
-            messages.error(request, '❌ Документи в UPS — лише для оформленого відправлення UPS з номером 1Z….')
+            messages.error(request, '❌ Документи для митниці — лише для відправлення UPS / DHL / FedEx, '
+                                    'оформленого в Minerva (з трек-номером).')
             return redirect(detail)
+        k = carrier_docs.kind(shipment)
+        cname = carrier_docs.NAMES[k]
 
-        codes = {c for c, *_ in ups_docs.DOC_TYPES}
         files = []                                   # (назва, байти, тип, копіювати в документи замовлення)
         refs = request.POST.getlist('doc') or ([request.POST['abd_ref']] if request.POST.get('abd_ref') else [])
         for ref in refs:
@@ -5272,8 +5367,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         pc_files = request.FILES.getlist('pc_file') or request.FILES.getlist('abd_file')
         for upload in pc_files:
             name = os.path.basename(upload.name or 'document.pdf')
-            if upload.size > ups_docs.FILE_MAX:
-                messages.error(request, f'❌ «{name}» більший за 10 МБ — UPS його не прийме.')
+            if upload.size > carrier_docs.FILE_MAX[k]:
+                messages.error(request, f'❌ «{name}» більший за {carrier_docs.FILE_MAX[k] // (1024 * 1024)} МБ — '
+                                        f'{cname} його не прийме.')
                 return redirect(detail)
             code = request.POST.get('pc_type') or ups_docs.detect(name)[0] or '004'
             files.append((name, upload.read(), code, True))
@@ -5281,36 +5377,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             messages.error(request, '❌ Виберіть документи з листа, документів замовлення або з ПК.')
             return redirect(detail)
 
-        for name, data, code, _copy in files:
-            ext = name.rsplit('.', 1)[-1].lower() if '.' in name else ''
-            if ext not in ups_docs.UPS_FORMATS:
-                messages.error(request, f'❌ UPS приймає лише {", ".join(ups_docs.UPS_FORMATS)} — «{name}» не підходить.')
-                return redirect(detail)
-            if len(data) > ups_docs.FILE_MAX:
-                messages.error(request, f'❌ «{name}» більший за 10 МБ — UPS його не прийме.')
-                return redirect(detail)
-            if code not in codes:
-                messages.error(request, f'❌ Невідомий тип документа для «{name}».')
-                return redirect(detail)
-        if len(ups_docs.sent(shipment)) + len(files) > ups_docs.PER_PARCEL:
-            messages.error(request, '❌ UPS приймає до 13 документів на посилку — більше додати не можна.')
+        problem = carrier_docs.check(k, [(n, d, c) for n, d, c, _copy in files], len(ups_docs.sent(shipment)))
+        if problem:
+            messages.error(request, f'❌ {problem}')
             return redirect(detail)
 
-        ups_id = (shipment.carrier_shipment_id or shipment.tracking_number).strip()
-        tracking = [shipment.tracking_number or ups_id] + [t for t in (shipment.package_tracking or [])
-                                                           if t and t != shipment.tracking_number]
-        uploaded = []
+        number = (shipment.carrier_shipment_id or shipment.tracking_number).strip()
         try:
-            client = UPSClient(carrier=shipment.carrier)
-            for name, data, code, _copy in files:
-                ext = name.rsplit('.', 1)[-1].lower()
-                uploaded.append((name, code, client.upload_paperless_document(
-                    data, name, document_type=code, file_format='jpg' if ext == 'jpeg' else ext)))
-            client.push_paperless_documents([d for _n, _c, d in uploaded], ups_id, tracking,
-                                            timezone.localtime(shipment.submitted_at or shipment.created_at))
-        except UPSError as e:
-            messages.error(request, f'❌ UPS не прийняв документи: {e}. Можна завантажити вручну на ups.com → '
-                                    '«Meine Dokumente hochladen».')
+            uploaded = carrier_docs.upload(shipment, [(n, d, c) for n, d, c, _copy in files])
+        except carrier_docs.CarrierDocError as e:
+            manual = {'ups': 'на ups.com → «Meine Dokumente hochladen»',
+                      'dhl': 'на mydhl.express.dhl → відправлення → «Dokumente hochladen»',
+                      'fedex': 'на fedex.com → «FedEx Electronic Trade Documents» (Dokumente hochladen)'}[k]
+            messages.error(request, f'❌ {cname} не прийняв документи: {e}. Можна завантажити вручну {manual}.')
             return redirect(detail)
 
         for name, data, _code, copy in files:      # копія в документи замовлення
@@ -5320,18 +5399,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 folder = os.path.join(django_settings.MEDIA_ROOT, 'shipping', 'customs')
                 os.makedirs(folder, exist_ok=True)
                 safe = _re.sub(r'[^\w.\- ]+', '_', name).strip(' .') or 'document.pdf'
-                fpath = os.path.join(folder, f'ups_doc_{shipment.pk}_{safe}')
+                fpath = os.path.join(folder, f'{k}_doc_{shipment.pk}_{safe}')
                 with open(fpath, 'wb') as fh:
                     fh.write(data)
                 _copy_shipment_file_to_order_docs(fpath, shipment)
             except Exception as e:  # noqa: BLE001 — копія не обов'язкова
-                logger.warning('UPS doc copy for shipment %s: %s', shipment.pk, e)
+                logger.warning('%s doc copy for shipment %s: %s', cname, shipment.pk, e)
 
-        lines = [ups_docs.note_line(code, doc_id, name) for name, code, doc_id in uploaded]
+        lines = [carrier_docs.note_line(k, code, doc_id, name) for name, code, doc_id in uploaded]
         shipment.notes = ((shipment.notes.rstrip() + '\n') if shipment.notes else '') + '\n'.join(lines)
         shipment.save(update_fields=['notes'])
         names = ', '.join(f'«{n}» ({ups_docs.TYPE_NAMES.get(c, c)})' for n, c, _d in uploaded)
-        messages.success(request, f'✅ Надіслано в UPS і прив\'язано до {ups_id}: {names}.')
+        messages.success(request, f'✅ Надіслано в {cname} і прив\'язано до {number}: {names}.')
         return redirect(detail)
 
     # ── UPS Pickup standalone (Abholung для вже існуючого відправлення) ────────
@@ -5492,8 +5571,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         service_name = FEDEX_SERVICES.get(service_code, service_code)
 
         if request.method == 'POST':
+            problem = self._customs_extras_check(request, shipment)
+            if problem:
+                messages.error(request, f'❌ {problem}')
+                return redirect(reverse('admin:shipping_shipment_fedex_confirm', args=[shipment.pk])
+                                + f'?service_code={service_code}')
             if not self._claim_booking(shipment):
                 return self._booking_refused(request, shipment, 'FedEx')
+            self._customs_extras_save(request, shipment)
             return self._fedex_book(request, shipment, service_code)
 
         # Уже оформлене / оформлюється — сторінка перевірки не потрібна
@@ -5525,6 +5610,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'price':        price,
             'confirm_url':  reverse('admin:shipping_shipment_fedex_confirm', args=[shipment.pk]),
             'back_url':     back_url,
+            'payer':        self._payer_text(shipper.get('country'),
+                                             (shipment.carrier.sender_country if shipment.carrier else '') or 'DE',
+                                             (customs or {}).get('terms_of_shipment'),
+                                             f'FedEx {shipment.carrier.connection_uuid if shipment.carrier else ""}'
+                                             .strip()),
+            **self._customs_extras_context(request, shipment, shipper),
         })
         return render(request, 'admin/shipping/fedex_confirm.html', context)
 
@@ -5549,6 +5640,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             customs  = self._ups_extract_customs(shipment)
             is_intl  = (to_addr.get('country', 'DE').upper() != (shipper.get('country') or 'DE').upper())
             client = FedExClient(carrier=shipment.carrier)
+            own_invoice = None
+            if is_intl and shipment.use_custom_invoice and shipment.custom_invoice_pdf:
+                with shipment.custom_invoice_pdf.open('rb') as fh:
+                    own_invoice = (fh.read(), os.path.basename(shipment.custom_invoice_pdf.name))
             result = client.create_shipment(
                 to_address   = to_addr,
                 packages     = packages,
@@ -5556,6 +5651,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 from_address = shipper,
                 customs_info = customs if is_intl else None,
                 reference    = str(shipment.reference or shipment.pk),
+                mrn          = shipment.export_mrn if is_intl else '',
+                own_invoice  = own_invoice,
             )
         except Exception as e:
             # FedEx відмовив або не відповів — знову «❌ Помилка»: виправити й оформити ще раз
@@ -5604,6 +5701,44 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         elif result.get('label_url'):
             shipment.label_url = result['label_url'][:500]
             shipment.save(update_fields=['label_url'])
+
+        # Митний документ відправлення: свій інвойс або інвойс FedEx (PDF) → «Друкувати всі документи»
+        extra = []
+        if result.get('own_invoice') and shipment.custom_invoice_pdf:
+            shipment.customs_url = shipment.custom_invoice_pdf.url
+            extra.append('customs_url')
+            try:
+                _copy_shipment_file_local(shipment.custom_invoice_pdf.path, shipment)
+                _copy_shipment_file_to_order_docs(shipment.custom_invoice_pdf.path, shipment)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning('FedEx own invoice copy failed: %s', exc)
+        elif result.get('invoice_base64'):
+            try:
+                cdir = os.path.join(django_settings.MEDIA_ROOT, 'shipping', 'customs')
+                os.makedirs(cdir, exist_ok=True)
+                cname = f'fedex_invoice_{shipment.pk}_{shipment.tracking_number or "doc"}.pdf'
+                cpath = os.path.join(cdir, cname)
+                with open(cpath, 'wb') as fh:
+                    fh.write(_b64.b64decode(result['invoice_base64']))
+                shipment.customs_url = f'{django_settings.MEDIA_URL}shipping/customs/{cname}'
+                extra.append('customs_url')
+                _copy_shipment_file_local(cpath, shipment)
+                _copy_shipment_file_to_order_docs(cpath, shipment)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning('FedEx invoice save failed: %s', exc)
+        if result.get('paperless') or shipment.export_mrn:
+            bits = []
+            if result.get('paperless'):
+                bits.append('Electronic Trade Documents' + (' (свій інвойс)' if result.get('own_invoice') else ''))
+            if shipment.export_mrn:
+                bits.append(f'MRN {shipment.export_mrn}')
+            shipment.notes = ((shipment.notes.rstrip() + '\n') if shipment.notes else '') + \
+                ('FEDEX_ETD | ' if result.get('paperless') else 'FEDEX | ') + ' | '.join(bits)
+            extra.append('notes')
+        if extra:
+            shipment.save(update_fields=extra)
+        for note in result.get('notes') or []:
+            messages.warning(request, f'⚠️ {note}')
 
         order = shipment.order                 # трек-номер і перевізник у замовлення — як UPS / DHL
         if order:
@@ -6817,14 +6952,25 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             messages.error(request, '❌ Не передано product_code.')
             return redirect(back_url)
 
+        # Перевізник DHL відправлення (вибраний у формі), інакше — перший активний
+        dhl_carrier = (shipment.carrier if shipment.carrier and shipment.carrier.carrier_type == 'dhl'
+                       and shipment.carrier.is_active else
+                       Carrier.objects.filter(carrier_type="dhl", is_active=True).first())
+
         # POST — підтверджено: оформлюємо в DHL
         if request.method == 'POST':
-            dhl_carrier = Carrier.objects.filter(carrier_type="dhl", is_active=True).first()
             if not dhl_carrier:
                 messages.error(request, "❌ Немає активного DHL перевізника.")
                 return redirect(back_url)
+            problem = self._customs_extras_check(request, shipment)
+            if problem:
+                messages.error(request, f'❌ {problem}')
+                return redirect(reverse('admin:shipping_shipment_dhl_confirm', args=[shipment.pk]) + '?'
+                                + urlencode({'product_code': product_code, 'product_name': product_name,
+                                             'price': price_str, 'account': param('account', 'auto')}))
             if not self._claim_booking(shipment):
                 return self._booking_refused(request, shipment, 'DHL')
+            self._customs_extras_save(request, shipment)
             customs = self._booking_param(request, 'customs', None)
             return self._dhl_book(request, shipment, dhl_carrier, {
                 'product_code':    product_code,
@@ -6867,7 +7013,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                'account': param('account', 'auto')})
         )
         from .services.dhl import account_choice
-        _dhl_c = Carrier.objects.filter(carrier_type="dhl", is_active=True).first()   # як `_dhl_book`
+        _dhl_c = dhl_carrier                                                       # як `_dhl_book`
         dhl_acct = (account_choice(_dhl_c, shipment.sender_country or _dhl_c.sender_country, param('account', 'auto'))
                     if _dhl_c else ('', ''))
 
@@ -6894,6 +7040,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'pickup_default_date':  _tomorrow.strftime('%Y-%m-%d'),
             'dhl_account':          {'number': dhl_acct[0], 'kind': dhl_acct[1],
                                      'choice': param('account', 'auto')},
+            'payer':                self._payer_text(sender_country, (_dhl_c.sender_country if _dhl_c else '') or 'DE',
+                                                     (customs or {}).get('terms_of_shipment'),
+                                                     f'DHL {dhl_acct[0]}'.strip()),
+            **self._customs_extras_context(request, shipment, shipper),
         })
 
     # ── DHL Book (POST /shipments) ────────────────────────────────────────────
@@ -6955,9 +7105,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         for note in result.get("notes") or []:
             messages.warning(request, f"⚠️ {note}")
 
-        # Інвойс DHL (COMMERCIAL_INVOICE_P_10) → митний документ відправлення, документи замовлення
+        # Інвойс DHL (COMMERCIAL_INVOICE_P_10) або свій інвойс → митний документ відправлення, документи замовлення
         customs_url = ""
-        if result.get("invoice_bytes") and tracking_number:
+        if result.get("own_invoice") and shipment.custom_invoice_pdf:
+            customs_url = shipment.custom_invoice_pdf.url
+            try:
+                _copy_shipment_file_local(shipment.custom_invoice_pdf.path, shipment)
+                _copy_shipment_file_to_order_docs(shipment.custom_invoice_pdf.path, shipment)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("DHL own invoice copy failed: %s", exc)
+        elif result.get("invoice_bytes") and tracking_number:
             try:
                 cdir = os.path.join(settings.MEDIA_ROOT, "shipping", "customs")
                 os.makedirs(cdir, exist_ok=True)
@@ -7014,7 +7171,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if result.get("account"):
             kind = "імпорт / третя країна" if result.get("account_kind") == "import" else "експорт / Innerdeutsch"
             shipment.notes = ((shipment.notes.rstrip() + "\n") if shipment.notes else "") + \
-                f"DHL_ACCOUNT | {result['account']} ({kind})" + (" | Paperless Trade" if result.get("paperless") else "")
+                f"DHL_ACCOUNT | {result['account']} ({kind})" + (" | Paperless Trade" if result.get("paperless") else "") \
+                + (" | свій інвойс" if result.get("own_invoice") else "") \
+                + (f" | MRN {result['mrn']}" if result.get("mrn") else "")
             update_fields.append("notes")
         shipment.save(update_fields=update_fields)
 

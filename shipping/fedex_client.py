@@ -17,6 +17,7 @@ Credentials зберігаються в моделі Carrier:
   Cancel: PUT  /ship/v1/shipments/cancel
 """
 import logging
+import re
 import time as _time
 from decimal import Decimal
 from datetime import datetime, timezone as _tz
@@ -59,6 +60,14 @@ _PACKAGING_DEFAULT = 'YOUR_PACKAGING'
 
 _BASE_SANDBOX    = 'https://apis-sandbox.fedex.com'
 _BASE_PRODUCTION = 'https://apis.fedex.com'
+# Trade Documents Upload API (ETD) — окремий хост
+_DOCS_SANDBOX    = 'https://documentapitest.prod.fedex.com/sandbox'
+_DOCS_PRODUCTION = 'https://documentapi.prod.fedex.com'
+_ETD_MIME = {'pdf': 'application/pdf', 'png': 'image/png', 'gif': 'image/gif', 'jpg': 'image/jpeg',
+             'jpeg': 'image/jpeg', 'doc': 'application/msword', 'txt': 'text/plain', 'rtf': 'application/rtf',
+             'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+             'xls': 'application/vnd.ms-excel',
+             'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
 
 
 class FedExError(Exception):
@@ -359,15 +368,22 @@ class FedExClient:
                         from_address: dict = None,
                         customs_info: dict = None,
                         reference: str = '',
-                        dry_run: bool = False) -> dict:
+                        dry_run: bool = False,
+                        mrn: str = '',
+                        own_invoice: tuple = None,
+                        etd: bool = True) -> dict:
         """
         POST /ship/v1/shipments
-        Повертає: {tracking_number, master_tracking, label_base64, label_format,
-                   total_charge, currency, service_code, service_name}
-        label_base64: PDF рядок (base64).
+        Повертає: {tracking_number, master_tracking, label_base64, label_format, invoice_base64,
+                   total_charge, currency, service_code, service_name, paperless, own_invoice, notes}
+        label_base64 / invoice_base64: PDF рядок (base64).
+        Митниця: MRN — exportDetail.exportComplianceStatement; інвойс FedEx у PDF (shippingDocumentSpecification);
+        etd — Electronic Trade Documents (інвойс FedEx або свій own_invoice=(байти, назва) іде електронно,
+        документи можна дослати після оформлення); акаунт без ETD — повтор без нього, інвойс друкується.
         """
         shipper      = from_address or self._default_shipper()
         label_format = 'PDF'
+        notes        = []
 
         is_intl = (
             (to_address.get('country') or 'DE').upper() !=
@@ -420,8 +436,36 @@ class FedExClient:
                 'value': reference[:40],
             }]
 
+        own_doc_id = ''
         if is_intl and customs_info:
-            requested_shipment['customsClearanceDetail'] = self._build_customs(customs_info, shipper)
+            requested_shipment['customsClearanceDetail'] = self._build_customs(
+                customs_info, shipper, importing=(payment_type == 'RECIPIENT'))
+            if mrn:
+                requested_shipment['customsClearanceDetail']['exportDetail'] = {
+                    'exportComplianceStatement': mrn.strip().upper()[:35]}
+            if own_invoice and etd and not dry_run:
+                # Свій інвойс — спершу в ETD (pre-shipment), потім посилання на нього у відправленні
+                data_bytes, fname = own_invoice
+                own_doc_id = self.upload_etd(data_bytes, fname, 'COMMERCIAL_INVOICE',
+                                             (shipper.get('country') or 'DE').upper(),
+                                             (to_address.get('country') or '').upper())
+            elif not own_invoice:
+                # Інвойс FedEx у PDF — для «Друкувати всі документи» і документів замовлення
+                requested_shipment['shippingDocumentSpecification'] = {
+                    'shippingDocumentTypes': ['COMMERCIAL_INVOICE'],
+                    'commercialInvoiceDetail': {
+                        'documentFormat': {'docType': 'PDF', 'stockType': 'PAPER_LETTER'}},
+                }
+            if etd:
+                etd_detail = {'attributes': ['POST_SHIPMENT_UPLOAD_REQUESTED']}
+                if own_doc_id or (own_invoice and dry_run):
+                    etd_detail['attachedDocuments'] = [{
+                        'documentType': 'COMMERCIAL_INVOICE', 'documentReference': (own_invoice[1] or '')[:40],
+                        'description': 'Commercial Invoice', 'documentId': own_doc_id or '<docId>'}]
+                else:
+                    etd_detail['requestedDocumentTypes'] = ['COMMERCIAL_INVOICE']
+                requested_shipment['shipmentSpecialServices'] = {
+                    'specialServiceTypes': ['ELECTRONIC_TRADE_DOCUMENTS'], 'etdDetail': etd_detail}
 
         payload = {
             # LABEL — етикетка кожної коробки у відповіді (base64), Minerva зводить їх в один PDF
@@ -433,8 +477,80 @@ class FedExClient:
         if dry_run:
             return payload
 
-        data = self._post('/ship/v1/shipments', payload)
-        return self._parse_shipment_response(data, service_code, label_format)
+        try:
+            data = self._post('/ship/v1/shipments', payload)
+        except FedExError as e:
+            # Акаунт без Electronic Trade Documents — ще раз без ETD, інвойс друкується (3 примірники)
+            etd_refused = ('shipmentSpecialServices' in requested_shipment and e.code in (400, 422)
+                           and re.search(r'ETD|ELECTRONIC.?TRADE|TRADE.?DOCUMENT', str(e) + str(e.response or ''),
+                                         re.I))
+            if not etd_refused:
+                raise
+            requested_shipment.pop('shipmentSpecialServices', None)
+            if own_invoice:
+                notes.append('Electronic Trade Documents для цього акаунта FedEx не ввімкнено — свій інвойс не '
+                             'пішов електронно: роздрукуйте його (3 примірники) й покладіть до посилки.')
+            else:
+                requested_shipment['shippingDocumentSpecification'] = {
+                    'shippingDocumentTypes': ['COMMERCIAL_INVOICE'],
+                    'commercialInvoiceDetail': {'documentFormat': {'docType': 'PDF', 'stockType': 'PAPER_LETTER'}},
+                }
+                notes.append('Electronic Trade Documents для цього акаунта FedEx не ввімкнено — інвойс FedEx '
+                             'треба роздрукувати (3 примірники) й покласти до посилки.')
+            data = self._post('/ship/v1/shipments', payload)
+        result = self._parse_shipment_response(data, service_code, label_format)
+        result['paperless'] = 'shipmentSpecialServices' in requested_shipment
+        result['own_invoice'] = bool(own_invoice)
+        result['notes'] = notes
+        return result
+
+    # ── Trade Documents Upload (ETD) ───────────────────────────────────────────
+
+    def upload_etd(self, data: bytes, name: str, doc_type: str, origin: str, dest: str,
+                   tracking: str = '', ship_date=None) -> str:
+        """POST /documents/v1/etds/upload (multipart: document JSON + attachment) → docId.
+        Без tracking — до оформлення (ETDPreshipment), з ним — до вже оформленої посилки (ETDPostshipment;
+        посилку оформлено з POST_SHIPMENT_UPLOAD_REQUESTED). doc_type: COMMERCIAL_INVOICE / PRO_FORMA_INVOICE /
+        CERTIFICATE_OF_ORIGIN / USMCA_CERTIFICATION_OF_ORIGIN / OTHER."""
+        import json as _json
+        from tabele.api_logger import log_call
+
+        ext = name.rsplit('.', 1)[-1].lower() if '.' in name else 'pdf'
+        mime = _ETD_MIME.get(ext, 'application/pdf')
+        meta = {'shipDocumentType': doc_type, 'originCountryCode': origin, 'destinationCountryCode': dest}
+        if tracking:
+            when = ship_date or datetime.now(_tz.utc)
+            meta.update({'trackingNumber': tracking, 'shipmentDate': when.strftime('%Y-%m-%dT%H:%M:%S')})
+        document = {'workflowName': 'ETDPostshipment' if tracking else 'ETDPreshipment',
+                    'carrierCode': 'FDXE', 'name': name[:80], 'contentType': mime, 'meta': meta}
+        url = f'{_DOCS_SANDBOX if self._is_sandbox else _DOCS_PRODUCTION}/documents/v1/etds/upload'
+        headers = {'Authorization': f'Bearer {self.get_token()}', 'X-locale': 'en_US'}
+        t0, r, body, err = _time.time(), None, None, None
+        try:
+            r = requests.post(url, headers=headers, timeout=60,
+                              files={'document': (None, _json.dumps(document), 'application/json'),
+                                     'attachment': (name, data, mime)})
+            try:
+                body = r.json()
+            except Exception:  # noqa: BLE001
+                body = {'_raw': r.text[:500]}
+            if not r.ok:
+                self._handle_error(r)
+            doc_id = ((body.get('output') or {}).get('meta') or {}).get('docId') or ''
+            if not doc_id:
+                raise FedExError(f'FedEx ETD: у відповіді немає docId: {str(body)[:200]}')
+            return doc_id
+        except FedExError as e:
+            err = str(e)
+            raise
+        except requests.RequestException as e:
+            err = str(e)
+            raise FedExError(f"Помилка з'єднання з FedEx (документи): {e}")
+        finally:
+            log_call(service='fedex', action='etd_upload', method='POST', url=url, req_headers=headers,
+                     req_body={**document, '_file': f'{name} ({len(data)} B)'},
+                     resp_status=r.status_code if r is not None else None, resp_body=body,
+                     duration_ms=int((_time.time() - t0) * 1000), error=err)
 
     def _parse_shipment_response(self, data: dict, service_code: str, label_format: str) -> dict:
         output         = data.get('output', {})
@@ -458,6 +574,10 @@ class FedExClient:
         label_b64 = _merge_pdfs(labels) if len(labels) > 1 else (labels[0] if labels else '')
         label_url = urls[0] if urls else ''
         package_tracking = [p.get('trackingNumber') for p in pkg_results if p.get('trackingNumber')]
+        # Інвойс FedEx (COMMERCIAL_INVOICE) — у документах відправлення
+        invoices = [d.get('encodedLabel') for d in (ship_result.get('shipmentDocuments') or [])
+                    if d.get('encodedLabel') and 'INVOICE' in (d.get('contentType') or d.get('docType') or '').upper()]
+        invoice_b64 = _merge_pdfs(invoices) if len(invoices) > 1 else (invoices[0] if invoices else '')
 
         charges = ship_result.get('shipmentRating', {}).get('shipmentRateDetails', [{}])
         charges = charges[0] if charges else {}
@@ -474,6 +594,7 @@ class FedExClient:
             'package_tracking': package_tracking,
             'shipment_id':      transaction_id,
             'label_base64':     label_b64,
+            'invoice_base64':   invoice_b64,
             'label_url':        label_url,
             'label_format':     label_format,
             'total_charge':     Decimal(str(total)) if total else Decimal('0'),
@@ -625,7 +746,7 @@ class FedExClient:
             p['customerReferences'] = [{'customerReferenceType': 'CUSTOMER_REFERENCE', 'value': reference[:40]}]
         return p
 
-    def _build_customs(self, info: dict, shipper: dict) -> dict:
+    def _build_customs(self, info: dict, shipper: dict, importing: bool = False) -> dict:
         """Build customsClearanceDetail payload for FedEx Ship API."""
         items_list = info.get('items') or [{
             'description': info.get('description', 'Goods'),
@@ -681,11 +802,14 @@ class FedExClient:
                 cm['harmonizedCode'] = item['hs_code']
             commodities.append(cm)
 
-        # Мито й податки: DDP — ми (рахунок відправника), інакше (DAP…) — отримувач
+        # Мито й податки: DDP — ми (рахунок відправника); посилка до нас (імпорт) — ми як отримувач, нашим
+        # рахунком; інакше (DAP… від нас) — отримувач
         terms = (info.get('terms_of_shipment') or 'DAP').upper()
-        if terms == 'DDP':
-            duties = {'paymentType': 'SENDER',
-                      'payor': {'responsibleParty': {'accountNumber': {'value': self.carrier.connection_uuid}}}}
+        our = {'responsibleParty': {'accountNumber': {'value': self.carrier.connection_uuid}}}
+        if terms == 'DDP' and not importing:
+            duties = {'paymentType': 'SENDER', 'payor': our}
+        elif importing:
+            duties = {'paymentType': 'RECIPIENT', 'payor': our}
         else:
             duties = {'paymentType': 'RECIPIENT'}
 

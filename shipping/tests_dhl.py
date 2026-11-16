@@ -105,14 +105,29 @@ class ShipmentPayloadTests(BookingBase):
 
     def test_export_payload(self):
         p = dhl.create_shipment(self.carrier, self.shipment, "P", dry_run=True)
-        self.assertEqual(p["accounts"], [{"typeCode": "shipper", "number": "144648348"}])
+        # DDP від нас — ще й платник мита (duties-taxes) і послуга DD
+        self.assertEqual(p["accounts"], [{"typeCode": "shipper", "number": "144648348"},
+                                         {"typeCode": "duties-taxes", "number": "144648348"}])
         self.assertEqual(p["content"]["incoterm"], "DDP")
         line = p["content"]["exportDeclaration"]["lineItems"][0]
         self.assertEqual(line["weight"]["netValue"], 0.05)              # 0,0125 кг × 4
         self.assertEqual(line["commodityCodes"], [{"typeCode": "outbound", "value": "85299000"}])
         self.assertIn({"typeCode": "invoice", "templateName": "COMMERCIAL_INVOICE_P_10", "isRequested": True,
                        "invoiceType": "commercial"}, p["outputImageProperties"]["imageOptions"])
-        self.assertEqual(p["valueAddedServices"], [{"serviceCode": "WY"}])
+        self.assertEqual(p["valueAddedServices"], [{"serviceCode": "WY"}, {"serviceCode": "DD"}])
+        self.assertNotIn("customerReferences", p["content"]["exportDeclaration"]["invoice"])
+
+    def test_mrn_and_own_invoice(self):
+        from django.core.files.base import ContentFile
+        s = self.shipment
+        s.export_mrn = "26DE760298696748B4"
+        s.use_custom_invoice = True
+        s.custom_invoice_pdf.save("ci.pdf", ContentFile(b"%PDF-own"), save=True)
+        p = dhl.create_shipment(self.carrier, self.reload(), "P", dry_run=True)
+        self.assertEqual(p["content"]["exportDeclaration"]["invoice"]["customerReferences"],
+                         [{"typeCode": "MRN", "value": "26DE760298696748B4"}])
+        self.assertEqual(p["documentImages"][0]["typeCode"], "INV")
+        self.assertNotIn("invoice", [o["typeCode"] for o in p["outputImageProperties"]["imageOptions"]])
 
     def test_import_uses_import_account(self):
         Shipment.objects.filter(pk=self.shipment.pk).update(sender_country="CN", sender_city="Shenzhen",
@@ -129,7 +144,7 @@ class ShipmentPayloadTests(BookingBase):
             r = dhl.create_shipment(self.carrier, self.shipment, "P")
         self.assertTrue(r["success"])
         self.assertEqual(call.call_count, 2)
-        self.assertNotIn("valueAddedServices", call.call_args.kwargs["json"])
+        self.assertEqual(call.call_args.kwargs["json"]["valueAddedServices"], [{"serviceCode": "DD"}])  # WY — ні
         self.assertFalse(r["paperless"])
         self.assertTrue(r["notes"])
         self.assertEqual((r["label_bytes"], r["invoice_bytes"]), (b"%PDF-", b"%PDF-"))

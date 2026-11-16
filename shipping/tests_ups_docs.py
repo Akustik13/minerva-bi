@@ -69,7 +69,7 @@ class UpsDocsViewTests(BookingBase):
         self.assertEqual((rows["Invoice_300002.pdf"]["type"], rows["Packing List_300002.pdf"]["type"]),
                          ("002", "010"))
         page = self.client.get(self.detail)
-        self.assertContains(page, "Документи для митниці в UPS")
+        self.assertContains(page, 'Документи для митниці в <span translate="no">UPS</span>')
         self.assertContains(page, "Invoice_300002.pdf")
         self.assertContains(page, "Які документи потрібні")
         r = self.client.get(f"/admin/shipping/shipment/{self.shipment.pk}/ups-abd/preview/",

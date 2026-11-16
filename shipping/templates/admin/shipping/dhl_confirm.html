@@ -222,10 +222,18 @@
           <b>{{ customs.currency|default:"EUR" }}</b></span>
         <span><span class="dc-lbl" style="display:inline">{% trans "Тип" %}: </span>
           <b>{{ customs.contents_type|default:"SALE" }}</b></span>
+        <span><span class="dc-lbl" style="display:inline">Incoterm: </span>
+          <b>{{ customs.terms_of_shipment|default:"DAP" }}</b></span>
         {% if customs.description %}
         <span><span class="dc-lbl" style="display:inline">{% trans "Опис" %}: </span>
           <b>{{ customs.description }}</b></span>
         {% endif %}
+      </div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
+        <span><span class="dc-lbl" style="display:inline">💳 {% trans "Доставку оплачує" %}: </span>
+          <b>{% trans "наш акаунт DHL" %} <span translate="no">{{ dhl_account.number|default:"—" }}</span></b></span>
+        <span><span class="dc-lbl" style="display:inline">🛃 {% trans "Мито/податки оплачує" %}: </span>
+          <b>{{ payer.duties }}</b></span>
       </div>
       {% if customs.items %}
       <table class="dc-table">
@@ -254,6 +262,7 @@
         </tbody>
       </table>
       {% endif %}
+      {% include "admin/shipping/_customs_extras.html" with form_id="dhl-confirm-form" carrier_name="DHL" paperless_name="Paperless Trade" %}
     </div>
   </div>
   {% endif %}
@@ -332,7 +341,7 @@
         <b style="color:var(--text)">створить реальне відправлення</b> у системі DHL.
         Буде згенеровано трекінг-номер та PDF-етикетку.{% endblocktrans %}
       </p>
-      <form method="post" action="{{ confirm_url }}" id="dhl-confirm-form">
+      <form method="post" action="{{ confirm_url }}" id="dhl-confirm-form" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="pickup_type"     id="fld_pickup_type"     value="dropoff">
         <input type="hidden" name="pickup_date"     id="fld_pickup_date"     value="{{ pickup_default_date }}">

@@ -98,7 +98,8 @@ def live_parcels(order):
     return list(order.shipments.exclude(status=Shipment.Status.CANCELLED).exclude(direction="in").order_by("pk"))
 
 
-_SENT = re.compile(r"UPS_(?:DOC|ABD) \| ([^|]+?) \| (?:(\d{3}) \| )?DocID:(\S+) \| ([^\n]*)")
+# UPS_DOC / UPS_ABD, а також DHL_DOC і FEDEX_DOC (carrier_docs.note_line) — однаковий формат
+_SENT = re.compile(r"(?:UPS|DHL|FEDEX)_(?:DOC|ABD) \| ([^|]+?) \| (?:(\d{3}) \| )?DocID:(\S+) \| ([^\n]*)")
 
 
 def sent(shipment) -> list:
@@ -163,6 +164,8 @@ def candidates(shipment, user) -> list:
         return []
     parcels = live_parcels(order)
     country = (shipment.carrier.sender_country if shipment.carrier_id else "") or "DE"
+    from . import carrier_docs
+    formats = carrier_docs.FORMATS.get(carrier_docs.kind(shipment)) or UPS_FORMATS
     sent_to = {}
     for n, p in enumerate(parcels, 1):
         for row in sent(p):
@@ -177,7 +180,7 @@ def candidates(shipment, user) -> list:
                     continue
                 name = att.get("name") or ""
                 ext = _ext(name)
-                if ext not in UPS_FORMATS:
+                if ext not in formats:
                     continue
                 code, why = detect(name)
                 if ext in IMAGES and not code:
@@ -200,7 +203,7 @@ def candidates(shipment, user) -> list:
         for name in sorted(os.listdir(folder)):
             path = os.path.join(folder, name)
             ext = _ext(name)
-            if not os.path.isfile(path) or ext not in UPS_FORMATS or _LABEL_FILE.search(name) or name in seen_names:
+            if not os.path.isfile(path) or ext not in formats or _LABEL_FILE.search(name) or name in seen_names:
                 continue
             code, why = detect(name)
             text = "" if ext in IMAGES else _text_of({"name": name}, path=path)
@@ -239,7 +242,9 @@ def read(shipment, user, ref):
         if not name or name.startswith(".") or not shipment.order_id:
             return None
         path = os.path.join(order_folder(shipment.order), name)
-        if _ext(name) not in UPS_FORMATS or not os.path.isfile(path):
+        from . import carrier_docs
+        if _ext(name) not in set(UPS_FORMATS) | set(carrier_docs.FORMATS.get(carrier_docs.kind(shipment), ())) \
+                or not os.path.isfile(path):
             return None
         with open(path, "rb") as fh:
             return name, fh.read(), ""

@@ -384,6 +384,7 @@
 {"uk": "(реєстрація з підтвердженням email) — вони з'являються тут автоматично. Можна створити й за покупця", "en": "(registration with e-mail confirmation) — they appear here automatically. You can also create one on behalf of the customer", "de": "(Registrierung mit E-Mail-Bestätigung) – sie erscheinen hier automatisch. Sie können auch im Namen des Kunden eines erstellen"}
 {"uk": "(розшифровку наради видалено)", "en": "(meeting transcript deleted)", "de": "(Besprechungstranskript gelöscht)"}
 {"uk": "(свої скриньки, документи за видимістю) — право вирішує, чи можна шукати взагалі.", "en": "(own mailboxes, documents according to visibility) — the right decides whether searching is allowed at all.", "de": "(eigene Postfächer, Dokumente nach Sichtbarkeit) – das Recht entscheidet, ob überhaupt gesucht werden darf."}
+{"uk": "(свій інвойс)", "en": "(own invoice)", "de": "(eigene Rechnung)"}
 {"uk": "(сервіси web і cron, напр.", "en": "(web and cron services, e.g.", "de": "(Dienste web und cron, z. B."}
 {"uk": "(сесія відкрита або оплата обробляється).", "en": "(session open or payment being processed).", "de": "(Sitzung offen oder Zahlung in Bearbeitung)."}
 {"uk": "(сесія відкрита або оплата обробляється). Оплачені, прострочені й повернені не перевіряються.", "en": "(session open or payment being processed). Paid, expired and refunded ones are not checked.", "de": "(Sitzung offen oder Zahlung in Bearbeitung). Bezahlte, abgelaufene und erstattete werden nicht geprüft."}
@@ -1170,6 +1171,7 @@
 {"uk": "DHL Трекінг", "en": "DHL tracking", "de": "DHL-Sendungsverfolgung"}
 {"uk": "DHL Трекінг — {0}", "en": "DHL Tracking — {0}", "de": "DHL Tracking — {0}"}
 {"uk": "DHL відправлення створено! Трекінг: {0}.", "en": "DHL shipment created! Tracking: {0}.", "de": "DHL-Sendung erstellt! Tracking: {0}."}
+{"uk": "DHL не прийняв документи", "en": "DHL did not accept the documents", "de": "DHL hat die Dokumente nicht angenommen"}
 {"uk": "DHL повернув 405 — посилка або вже передана кур'єру, або акаунт не має права скасовувати через API. URL: {0}", "en": "DHL returned 405 — the parcel has either already been handed to the courier, or the account is not allowed to cancel via the API. URL: {0}", "de": "DHL hat 405 zurückgegeben — das Paket wurde entweder bereits dem Kurier übergeben, oder das Konto darf nicht über die API stornieren. URL: {0}"}
 {"uk": "DHL трекінг", "en": "DHL tracking", "de": "DHL-Tracking"}
 {"uk": "DHL щомісячна доставка {0}", "en": "DHL monthly shipping {0}", "de": "DHL monatlicher Versand {0}"}
@@ -1331,6 +1333,8 @@
 {"uk": "ETA доставки", "en": "Delivery ETA", "de": "Voraussichtliche Lieferung"}
 {"uk": "EUR — Євро", "en": "EUR — Euro", "de": "EUR — Euro"}
 {"uk": "EXW + доставка «Відправник»", "en": "EXW + shipping “Sender”", "de": "EXW + Versand „Absender“"}
+{"uk": "Electronic Trade Documents для цього акаунта FedEx не ввімкнено — свій інвойс не пішов електронно: роздрукуйте його (3 примірники) й покладіть до посилки.", "en": "Electronic Trade Documents is not enabled for this FedEx account — your own invoice was not sent electronically: print it (3 copies) and put it with the parcel.", "de": "Electronic Trade Documents ist für dieses FedEx-Konto nicht aktiviert — die eigene Rechnung wurde nicht elektronisch übermittelt: drucken Sie sie aus (3 Exemplare) und legen Sie sie dem Paket bei."}
+{"uk": "Electronic Trade Documents для цього акаунта FedEx не ввімкнено — інвойс FedEx треба роздрукувати (3 примірники) й покласти до посилки.", "en": "Electronic Trade Documents is not enabled for this FedEx account — print the FedEx invoice (3 copies) and put it with the parcel.", "de": "Electronic Trade Documents ist für dieses FedEx-Konto nicht aktiviert — die FedEx-Rechnung muss ausgedruckt (3 Exemplare) und dem Paket beigelegt werden."}
 {"uk": "Email (IMAP логін)", "en": "Email (IMAP login)", "de": "E-Mail (IMAP-Login)"}
 {"uk": "Email (білінг)", "en": "Email (billing)", "de": "E-Mail (Rechnung)"}
 {"uk": "Email (логін)", "en": "E-mail (login)", "de": "E-Mail (Login)"}
@@ -1421,6 +1425,7 @@
 {"uk": "FedEx API не відповідає", "en": "FedEx API is not responding", "de": "FedEx API antwortet nicht"}
 {"uk": "FedEx API не відповідає (timeout 60с)", "en": "FedEx API is not responding (timeout 60s)", "de": "FedEx API antwortet nicht (Timeout 60 s)"}
 {"uk": "FedEx Carrier «{0}»: заповніть API ключ (Client ID), API Secret (Client Secret) і Connection UUID (Account Number).", "en": "FedEx Carrier “{0}”: fill in API key (Client ID), API Secret (Client Secret) and Connection UUID (Account Number).", "de": "FedEx Carrier „{0}“: API-Schlüssel (Client ID), API Secret (Client Secret) und Connection UUID (Account Number) ausfüllen."}
+{"uk": "FedEx ETD: у відповіді немає docId: {0}", "en": "FedEx ETD: no docId in the response: {0}", "de": "FedEx ETD: keine docId in der Antwort: {0}"}
 {"uk": "FedEx auth: відсутній access_token у відповіді: {0}", "en": "FedEx auth: access_token is missing in the response: {0}", "de": "FedEx-Authentifizierung: access_token fehlt in der Antwort: {0}"}
 {"uk": "FedEx Трекінг", "en": "FedEx Tracking", "de": "FedEx Tracking"}
 {"uk": "FedEx відправлення створено! Трекінг: {0} | Сервіс: {1} | Вартість: {2} {3}", "en": "FedEx shipment created! Tracking: {0} | Service: {1} | Cost: {2} {3}", "de": "FedEx-Sendung erstellt! Tracking: {0} | Service: {1} | Kosten: {2} {3}"}
@@ -1608,6 +1613,7 @@
 {"uk": "MRN {0} — як у посилки {1}", "en": "MRN {0} — same as parcel {1}", "de": "MRN {0} — wie bei Paket {1}"}
 {"uk": "MRN {0} — як у цієї посилки", "en": "MRN {0} — same as this parcel", "de": "MRN {0} — wie bei diesem Paket"}
 {"uk": "MRN має бути рівно {0} знаків (зараз {1}).", "en": "The MRN must be exactly {0} characters (currently {1}).", "de": "Die MRN muss genau {0} Zeichen lang sein (derzeit {1})."}
+{"uk": "MRN іде в {0} разом з оформленням: 18 латинських літер і цифр, символи 3–4 — країна відправника. Потрібен для експорту з ЄС (Ausfuhr) — без нього немає підтвердження вивозу.", "en": "The MRN goes to {0} with the booking: 18 Latin letters and digits, characters 3–4 are the sender country. Needed for exports from the EU — without it there is no proof of export.", "de": "Die MRN geht mit der Buchung an {0}: 18 lateinische Buchstaben und Ziffern, Zeichen 3–4 = Absenderland. Nötig für die Ausfuhr aus der EU — ohne sie gibt es keinen Ausfuhrnachweis."}
 {"uk": "MRN — лише латинські літери й цифри.", "en": "MRN — Latin letters and digits only.", "de": "MRN — nur lateinische Buchstaben und Ziffern."}
 {"uk": "Manager — + аналітика, звіти", "en": "Manager — + analytics, reports", "de": "Manager — + Analysen, Berichte"}
 {"uk": "Marketplace API (3-legged OAuth), спроб: {0}", "en": "Marketplace API (3-legged OAuth), attempts: {0}", "de": "Marketplace-API (3-legged OAuth), Versuche: {0}"}
@@ -1809,6 +1815,7 @@
 {"uk": "PDF файл", "en": "PDF file", "de": "PDF-Datei"}
 {"uk": "PDF чи картинка шкали — завантажити або надіслати листом", "en": "PDF or image of the timeline — download or send by e-mail", "de": "PDF oder Bild des Verlaufs — herunterladen oder per E-Mail senden"}
 {"uk": "PDF чи картинка — завантажити або надіслати листом", "en": "PDF or image — download or send by e-mail", "de": "PDF oder Bild — herunterladen oder per E-Mail senden"}
+{"uk": "PDF іде в {0} електронно ({1}), {2} не генеруватиме свій інвойс. Якщо ця послуга для акаунта не ввімкнена — Minerva оформить без неї й попередить: тоді надрукуйте свій інвойс (3 примірники) й покладіть до посилки.", "en": "The PDF goes to {0} electronically ({1}), {2} will not create its own invoice. If this service is not enabled for the account, Minerva books without it and warns you: then print your invoice (3 copies) and put it with the parcel.", "de": "Das PDF geht elektronisch an {0} ({1}), {2} erstellt keine eigene Rechnung. Ist dieser Service für das Konto nicht aktiviert, bucht Minerva ohne ihn und weist darauf hin: Drucken Sie dann Ihre Rechnung aus (3 Exemplare) und legen Sie sie dem Paket bei."}
 {"uk": "PDF інвойс/CN23/CN22 вашої компанії", "en": "PDF invoice/CN23/CN22 of your company", "de": "PDF-Rechnung/CN23/CN22 Ihres Unternehmens"}
 {"uk": "PDF-генерація", "en": "PDF generation", "de": "PDF-Erzeugung"}
 {"uk": "PDF-документи: пакувальний лист, proforma, митна декларація CN23.", "en": "PDF documents: packing list, proforma, CN23 customs declaration.", "de": "PDF-Dokumente: Packliste, Proforma, Zollerklärung CN23."}
@@ -1831,6 +1838,8 @@
 {"uk": "Packing List (свій шаблон)", "en": "Packing List (custom template)", "de": "Packing List (eigene Vorlage)"}
 {"uk": "Packing List цієї посилки", "en": "Packing List for this parcel", "de": "Packing List für dieses Paket"}
 {"uk": "Packing List — пакувальний лист", "en": "Packing List", "de": "Packing List — Packliste"}
+{"uk": "Paperless Trade (WY) для цього акаунта DHL не ввімкнено — свій інвойс DHL не прийняв електронно: роздрукуйте його (3 примірники) й покладіть до посилки.", "en": "Paperless Trade (WY) is not enabled for this DHL account — DHL did not accept your own invoice electronically: print it (3 copies) and put it with the parcel.", "de": "Paperless Trade (WY) ist für dieses DHL-Konto nicht aktiviert — DHL hat die eigene Rechnung nicht elektronisch angenommen: drucken Sie sie aus (3 Exemplare) und legen Sie sie dem Paket bei."}
+{"uk": "Paperless Trade (WY) для цього акаунта DHL не ввімкнено — інвойс треба роздрукувати (3 примірники) й покласти до посилки.", "en": "Paperless Trade (WY) is not enabled for this DHL account — print the invoice (3 copies) and put it with the parcel.", "de": "Paperless Trade (WY) ist für dieses DHL-Konto nicht aktiviert — die Rechnung muss ausgedruckt (3 Exemplare) und dem Paket beigelegt werden."}
 {"uk": "Paperless Trade (WY) для цього акаунта DHL не ввімкнено — інвойс треба роздрукувати й покласти до посилки.", "en": "Paperless Trade (WY) is not enabled for this DHL account — print the invoice and put it in the parcel.", "de": "Paperless Trade (WY) ist für dieses DHL-Konto nicht aktiviert — Rechnung ausdrucken und dem Paket beilegen."}
 {"uk": "Parcel {0}: нетто {1} кг > брутто {2} кг", "en": "Parcel {0}: net {1} kg > gross {2} kg", "de": "Parcel {0}: netto {1} kg > brutto {2} kg"}
 {"uk": "Personal Effects — особисті речі", "en": "Personal Effects — personal belongings", "de": "Personal Effects — persönliche Gegenstände"}
@@ -2949,6 +2958,7 @@
 {"uk": "{0} не в базі", "en": "{0} not in the database", "de": "{0} nicht in der Datenbank"}
 {"uk": "{0} не заповнена", "en": "{0} is not filled in", "de": "{0} ist nicht ausgefüllt"}
 {"uk": "{0} не прив'язано", "en": "{0} not linked", "de": "{0} nicht verknüpft"}
+{"uk": "{0} не прийняв документи: {1}. Можна завантажити вручну {2}.", "en": "{0} did not accept the documents: {1}. You can upload them manually {2}.", "de": "{0} hat die Dokumente nicht angenommen: {1}. Sie können sie manuell hochladen {2}."}
 {"uk": "{0} невдач поспіль (HTTP {1})", "en": "{0} failures in a row (HTTP {1})", "de": "{0} Fehlschläge in Folge (HTTP {1})"}
 {"uk": "{0} невідом{1}", "en": "{0} unknown{1}", "de": "{0} unbekannt{1}"}
 {"uk": "{0} нових, {1} помилок", "en": "{0} new, {1} errors", "de": "{0} neue, {1} Fehler"}
@@ -2971,6 +2981,7 @@
 {"uk": "{0} пол.", "en": "{0} fields", "de": "{0} Felder"}
 {"uk": "{0} помилок", "en": "{0} errors", "de": "{0} Fehler"}
 {"uk": "{0} помилок рядків: {1}", "en": "{0} row errors: {1}", "de": "{0} Zeilenfehler: {1}"}
+{"uk": "{0} приймає до {1} документів на посилку — більше додати не можна.", "en": "{0} accepts up to {1} documents per parcel — no more can be added.", "de": "{0} nimmt bis zu {1} Dokumente pro Sendung an — mehr können nicht hinzugefügt werden."}
 {"uk": "{0} прийнято", "en": "{0} received", "de": "{0} eingebucht"}
 {"uk": "{0} проблем", "en": "{0} issues", "de": "{0} Probleme"}
 {"uk": "{0} пропущено (use --force to recreate)", "en": "{0} skipped (use --force to recreate)", "de": "{0} übersprungen (use --force to recreate)"}
@@ -3038,6 +3049,8 @@
 {"uk": "{0} — лист піде з SMTP сповіщень", "en": "{0} — the e-mail will be sent via notification SMTP", "de": "{0} — die E-Mail wird über das Benachrichtigungs-SMTP gesendet"}
 {"uk": "{0} — листи клієнтам ідуть з SMTP сповіщень. Виберіть іншу адресу.", "en": "{0} — customer e-mails are sent via notification SMTP. Choose another address.", "de": "{0} — Kunden-E-Mails werden über das Benachrichtigungs-SMTP gesendet. Wählen Sie eine andere Adresse."}
 {"uk": "{0} — листування й оцінка", "en": "{0} — correspondence and assessment", "de": "{0} — Korrespondenz und Bewertung"}
+{"uk": "{0} — ми як відправник", "en": "{0} — we as the sender", "de": "{0} — wir als Absender"}
+{"uk": "{0} — ми як отримувач (імпорт)", "en": "{0} — we as the recipient (import)", "de": "{0} — wir als Empfänger (Import)"}
 {"uk": "{0} — надіслано ({1}).", "en": "{0} — sent ({1}).", "de": "{0} — gesendet ({1})."}
 {"uk": "{0} — немає в довіднику джерел", "en": "{0} — not in the sources list", "de": "{0} – nicht im Quellenverzeichnis"}
 {"uk": "{0} — новий лист від {1}", "en": "{0} — new email from {1}", "de": "{0} — neue E-Mail von {1}"}
@@ -4907,6 +4920,7 @@
 {"uk": "Використати нумерацію DigiKey → #{0}", "en": "Use DigiKey numbering → #{0}", "de": "DigiKey-Nummerierung verwenden → #{0}"}
 {"uk": "Використати нумерацію системи → #{0}", "en": "Use system numbering → #{0}", "de": "Systemnummerierung verwenden → #{0}"}
 {"uk": "Використати розділи до яких є доступ", "en": "Use the sections you have access to", "de": "Nutzen Sie die Bereiche, auf die Sie Zugriff haben"}
+{"uk": "Використати свій інвойс (PDF) замість інвойсу {0}", "en": "Use your own invoice (PDF) instead of the {0} invoice", "de": "Eigene Rechnung (PDF) statt der {0}-Rechnung verwenden"}
 {"uk": "Використовувати", "en": "Use", "de": "Verwenden"}
 {"uk": "Використовувати свій інвойс", "en": "Use own invoice", "de": "Eigene Rechnung verwenden"}
 {"uk": "Використовуй {0} в тексті шаблону для підстановки даних", "en": "Use {0} in the template text to insert data", "de": "Verwenden Sie {0} im Vorlagentext, um Daten einzusetzen"}
@@ -6467,6 +6481,8 @@
 {"uk": "Документи в папці замовлення", "en": "Documents in the order folder", "de": "Dokumente im Auftragsordner"}
 {"uk": "Документи джерела", "en": "Source documents", "de": "Dokumente der Quelle"}
 {"uk": "Документи джерела видно в «📎 Документи й посилання» цих карток; у RAG вони прив'язані до всіх вибраних проєктів. Без прив'язок — загальні документи.", "en": "Source documents are visible in “📎 Documents and links” of these cards; in RAG they are linked to all selected projects. Without links — general documents.", "de": "Die Dokumente der Quelle sind in „📎 Dokumente und Links“ dieser Karten sichtbar; in RAG sind sie allen ausgewählten Projekten zugeordnet. Ohne Zuordnung — allgemeine Dokumente."}
+{"uk": "Документи для митниці в", "en": "Customs documents to", "de": "Zolldokumente an"}
+{"uk": "Документи для митниці — лише для відправлення UPS / DHL / FedEx, оформленого в Minerva (з трек-номером).", "en": "Customs documents only for a UPS / DHL / FedEx shipment booked in Minerva (with a tracking number).", "de": "Zolldokumente nur für eine in Minerva gebuchte UPS- / DHL- / FedEx-Sendung (mit Sendungsnummer)."}
 {"uk": "Документи закупівлі", "en": "Purchase order documents", "de": "Bestelldokumente"}
 {"uk": "Документи замовлення", "en": "Order documents", "de": "Auftragsdokumente"}
 {"uk": "Документи замовлень", "en": "Order documents", "de": "Auftragsdokumente"}
@@ -6475,6 +6491,8 @@
 {"uk": "Документи й посилання бази знань", "en": "Knowledge base documents and links", "de": "Dokumente und Links der Wissensdatenbank"}
 {"uk": "Документи й посилання картки", "en": "Documents and links of the card", "de": "Dokumente und Links der Karte"}
 {"uk": "Документи клієнта", "en": "Customer documents", "de": "Kundendokumente"}
+{"uk": "Документи надсилаються лише для посилок UPS, DHL і FedEx, оформлених у Minerva.", "en": "Documents are sent only for UPS, DHL and FedEx parcels booked in Minerva.", "de": "Dokumente werden nur für in Minerva gebuchte UPS-, DHL- und FedEx-Sendungen übermittelt."}
+{"uk": "Документи прив’язуються до вже оформленої посилки ({0}). Файл до {1} МБ ({2}), до {3} документів на посилку. Копія — у документах замовлення. Тип Minerva визначає за назвою й текстом файлу; посилку — за трек-номером або MRN у документі, інакше підказує за датою.", "en": "Documents are attached to an already booked parcel ({0}). File up to {1} MB ({2}), up to {3} documents per parcel. A copy goes to the order documents. Minerva detects the type from the file name and text; the parcel — from the tracking number or MRN in the document, otherwise it suggests by date.", "de": "Dokumente werden einer bereits gebuchten Sendung zugeordnet ({0}). Datei bis {1} MB ({2}), bis {3} Dokumente pro Sendung. Eine Kopie kommt in die Auftragsdokumente. Den Typ erkennt Minerva an Dateiname und Text; die Sendung an Sendungsnummer oder MRN im Dokument, sonst Vorschlag nach Datum."}
 {"uk": "Документи та звітність", "en": "Documents and reporting", "de": "Dokumente und Berichtswesen"}
 {"uk": "Документи: рахунки, оплати, підтвердження, пропозиції … (додати файл)", "en": "Documents: invoices, payments, confirmations, quotations … (add a file)", "de": "Dokumente: Rechnungen, Zahlungen, Bestätigungen, Angebote … (Datei hinzufügen)"}
 {"uk": "Документів", "en": "Documents", "de": "Dokumente"}
@@ -6717,6 +6735,9 @@
 {"uk": "Етапи публікації", "en": "Publishing stages", "de": "Veröffentlichungsphasen"}
 {"uk": "Етапи індексації", "en": "Indexing stages", "de": "Indexierungsphasen"}
 {"uk": "Етикетка", "en": "Label", "de": "Etikett"}
+{"uk": "Етикетка + пак-ліст → один PDF (без митниці — у межах ЄС)", "en": "Label + packing list → one PDF (no customs — within the EU)", "de": "Etikett + Packliste → ein PDF (ohne Zoll — innerhalb der EU)"}
+{"uk": "Етикетка + інвойс (1 примірник — інвойс уже пішов перевізнику електронно) + пак-ліст → один PDF", "en": "Label + invoice (1 copy — the invoice already went to the carrier electronically) + packing list → one PDF", "de": "Etikett + Rechnung (1 Exemplar — die Rechnung ging bereits elektronisch an den Versanddienst) + Packliste → ein PDF"}
+{"uk": "Етикетка + інвойс ({0} примірники: один — у кишеню на коробку, решта — до посилки) + пак-ліст → один PDF", "en": "Label + invoice ({0} copies: one in the pouch on the box, the rest with the parcel) + packing list → one PDF", "de": "Etikett + Rechnung ({0} Exemplare: eines in die Tasche am Karton, der Rest zur Sendung) + Packliste → ein PDF"}
 {"uk": "Етикетка DYMO", "en": "DYMO label", "de": "DYMO-Etikett"}
 {"uk": "Етикетка PDF", "en": "Label PDF", "de": "Etikett-PDF"}
 {"uk": "Етикетка готова", "en": "Label ready", "de": "Etikett fertig"}
@@ -10034,7 +10055,9 @@
 {"uk": "Надіслати email-сповіщення коли покупець надсилає нове повідомлення", "en": "Send an e-mail notification when a buyer sends a new message", "de": "E-Mail-Benachrichtigung senden, wenn ein Käufer eine neue Nachricht sendet"}
 {"uk": "Надіслати {0}-запит? Він може змінити дані.", "en": "Send a {0} request? It may change data.", "de": "{0}-Anfrage senden? Sie kann Daten ändern."}
 {"uk": "Надіслати алерт коли витрачено більше цієї суми", "en": "Send an alert when more than this amount has been spent", "de": "Warnung senden, wenn mehr als dieser Betrag ausgegeben wurde"}
+{"uk": "Надіслати в", "en": "Send to", "de": "Senden an"}
 {"uk": "Надіслати весь офер з Minerva", "en": "Send the whole offer from Minerva", "de": "Gesamtes Offer aus Minerva senden"}
+{"uk": "Надіслати вибрані документи до цієї посилки?", "en": "Send the selected documents to this parcel?", "de": "Ausgewählte Dokumente an diese Sendung senden?"}
 {"uk": "Надіслати відповідь співрозмовнику гілки (через кілька хвилин, можна скасувати)", "en": "Send a reply to the thread's correspondent (after a few minutes, can be cancelled)", "de": "Antwort an den Gesprächspartner des Verlaufs senden (nach einigen Minuten, abbrechbar)"}
 {"uk": "Надіслати вітальний email. Представитися, описати процес роботи, надати контакти.", "en": "Send a welcome email. Introduce yourself, describe how we work, provide contact details.", "de": "Eine Begrüßungs-E-Mail senden. Sich vorstellen, den Arbeitsablauf beschreiben, Kontaktdaten angeben."}
 {"uk": "Надіслати до Jumingo", "en": "Send to Jumingo", "de": "An Jumingo senden"}
@@ -11327,6 +11350,7 @@
 {"uk": "Од.вим.", "en": "Unit", "de": "Einheit"}
 {"uk": "Одержувач", "en": "Recipient", "de": "Empfänger"}
 {"uk": "Одержувач отримав посилку", "en": "The recipient received the parcel", "de": "Der Empfänger hat das Paket erhalten"}
+{"uk": "Один PDF і одразу вікно друку", "en": "One PDF and the print dialog right away", "de": "Ein PDF und sofort das Druckfenster"}
 {"uk": "Один вебхук цього ключа", "en": "One webhook of this key", "de": "Ein Webhook dieses Schlüssels"}
 {"uk": "Один клієнт CRM", "en": "One CRM customer", "de": "Ein CRM-Kunde"}
 {"uk": "Один лист (копія у Вхідних і в Надісланих) — одна подія", "en": "One email (a copy in Inbox and in Sent) — one event", "de": "Eine E-Mail (Kopie im Posteingang und in „Gesendet“) — ein Ereignis"}
@@ -12794,6 +12818,7 @@
 {"uk": "Помилка даних форми", "en": "Form data error", "de": "Fehler in den Formulardaten"}
 {"uk": "Помилка з'єднання", "en": "Connection error", "de": "Verbindungsfehler"}
 {"uk": "Помилка з'єднання з DHL API", "en": "Connection error to the DHL API", "de": "Verbindungsfehler zur DHL API"}
+{"uk": "Помилка з'єднання з FedEx (документи): {0}", "en": "FedEx connection error (documents): {0}", "de": "Verbindungsfehler zu FedEx (Dokumente): {0}"}
 {"uk": "Помилка з'єднання з FedEx: {0}", "en": "FedEx connection error: {0}", "de": "Verbindungsfehler zu FedEx: {0}"}
 {"uk": "Помилка з'єднання з UPS: {0}", "en": "UPS connection error: {0}", "de": "Verbindungsfehler zu UPS: {0}"}
 {"uk": "Помилка з'єднання: {0}", "en": "Connection error: {0}", "de": "Verbindungsfehler: {0}"}
@@ -13096,6 +13121,7 @@
 {"uk": "Посилку доставлено — відкрийте закупівлю й оприбуткуйте товар.", "en": "The parcel is delivered — open the purchase order and receive the goods.", "de": "Das Paket ist zugestellt — Bestellung öffnen und Ware einbuchen."}
 {"uk": "Посилку доставлено — закупівлю ще не оприбутковано.", "en": "Parcel delivered — the purchase order is not received yet.", "de": "Paket zugestellt — die Bestellung ist noch nicht eingebucht."}
 {"uk": "Посилку доставлено. Налаштування складу — «Лише повідомити», тож оприбуткуйте вручну: «Status» → Received → «Зберегти» (або виберіть «✅ … одразу оприбуткувати» в налаштуваннях складу).", "en": "Parcel delivered. The stock setting is «Notify only», so receive it by hand: «Status» → Received → «Save» (or choose «✅ … receive right away» in the stock settings).", "de": "Paket zugestellt. Die Lagereinstellung ist «Nur benachrichtigen», also von Hand einbuchen: «Status» → Received → «Sichern» (oder «✅ … sofort einbuchen» in den Lagereinstellungen wählen)."}
+{"uk": "Посилку оформлено не через MyDHL API — документи можна додати лише на mydhl.express.dhl.", "en": "The parcel was not booked via the MyDHL API — documents can only be added on mydhl.express.dhl.", "de": "Die Sendung wurde nicht über die MyDHL API gebucht — Dokumente können nur auf mydhl.express.dhl hinzugefügt werden."}
 {"uk": "Посилку оформлено — ще кілька кроків, і можна братися за наступне замовлення.", "en": "The parcel is booked — a few more steps and you can move on to the next order.", "de": "Das Paket ist gebucht — noch ein paar Schritte, dann geht es mit dem nächsten Auftrag weiter."}
 {"uk": "Посилку підтверджено в магазині {0}.", "en": "Parcel confirmed in the shop on {0}.", "de": "Paket im Shop bestätigt am {0}."}
 {"uk": "Посилок з чужим трек-номером не знайдено.", "en": "No parcels with another parcel's tracking number found.", "de": "Keine Pakete mit fremder Sendungsnummer gefunden."}
@@ -19326,6 +19352,7 @@
 {"uk": "листів: {0}", "en": "emails: {0}", "de": "E-Mails: {0}"}
 {"uk": "лицьовий", "en": "front", "de": "Vorderseite"}
 {"uk": "лишаються як є. Після оновлення Minerva сама перевіряє, що нові ціни діють на DigiKey.", "en": "stay as they are. After the update, Minerva itself checks that the new prices are in effect on DigiKey.", "de": "bleiben unverändert. Nach der Aktualisierung prüft Minerva selbst, ob die neuen Preise bei DigiKey gelten."}
+{"uk": "лише PDF", "en": "PDF only", "de": "nur PDF"}
 {"uk": "лише Windows (скрипти e2e)", "en": "Windows only (e2e scripts)", "de": "nur Windows (e2e-Skripte)"}
 {"uk": "лише адреса", "en": "address only", "de": "nur Adresse"}
 {"uk": "лише адреси з тексту завдання", "en": "only addresses from the task text", "de": "nur Adressen aus dem Aufgabentext"}
@@ -19430,6 +19457,8 @@
 {"uk": "метод", "en": "method", "de": "Methode"}
 {"uk": "метод не підтримується", "en": "method not supported", "de": "Methode nicht unterstützt"}
 {"uk": "ми", "en": "we", "de": "wir"}
+{"uk": "ми (DDP)", "en": "we (DDP)", "de": "wir (DDP)"}
+{"uk": "ми (отримувач, імпорт)", "en": "we (recipient, import)", "de": "wir (Empfänger, Import)"}
 {"uk": "ми відповідаємо", "en": "we reply", "de": "wir antworten"}
 {"uk": "минув {0} дн. тому", "en": "passed {0} days ago", "de": "vor {0} Tagen abgelaufen"}
 {"uk": "минула", "en": "past", "de": "vergangen"}
@@ -19493,6 +19522,8 @@
 {"uk": "на DigiKey — усі кроки пройдено", "en": "on DigiKey — all steps completed", "de": "auf DigiKey — alle Schritte abgeschlossen"}
 {"uk": "на DigiKey — їхня копія фото; надіслати, лише якщо фото змінилось", "en": "on DigiKey it is their copy of the photo; send only if the photo has changed", "de": "auf DigiKey liegt deren Kopie des Fotos; nur senden, wenn sich das Foto geändert hat"}
 {"uk": "на digikey.com", "en": "on digikey.com", "de": "auf digikey.com"}
+{"uk": "на fedex.com → «FedEx Electronic Trade Documents» (Dokumente hochladen)", "en": "on fedex.com → «FedEx Electronic Trade Documents» (upload documents)", "de": "auf fedex.com → «FedEx Electronic Trade Documents» (Dokumente hochladen)"}
+{"uk": "на mydhl.express.dhl → відправлення → «Dokumente hochladen»", "en": "on mydhl.express.dhl → shipment → «Upload documents»", "de": "auf mydhl.express.dhl → Sendung → «Dokumente hochladen»"}
 {"uk": "на {0}", "en": "for {0}", "de": "für {0}"}
 {"uk": "на {0} {1} дорожче за найдешевший ({2} · {3})", "en": "{0} {1} more than the cheapest ({2} · {3})", "de": "{0} {1} teurer als der günstigste ({2} · {3})"}
 {"uk": "на {0} дн. пізніше за план кроку ({1})", "en": "{0} days later than the step's plan ({1})", "de": "{0} Tage später als der Plan des Schritts ({1})"}
@@ -19651,6 +19682,7 @@
 {"uk": "натисніть «＋» і увійдіть", "en": "click “＋” and sign in", "de": "auf „＋“ klicken und anmelden"}
 {"uk": "націнка за замовчуванням", "en": "default markup", "de": "Standardaufschlag"}
 {"uk": "наш", "en": "ours", "de": "unsere"}
+{"uk": "наш акаунт DHL", "en": "our DHL account", "de": "unser DHL-Konto"}
 {"uk": "наш лист", "en": "our email", "de": "unsere E-Mail"}
 {"uk": "наш надісланий лист, чернетка або кошик", "en": "our sent e-mail, draft or trash", "de": "unsere gesendete E-Mail, Entwurf oder Papierkorb"}
 {"uk": "наша відповідь", "en": "our reply", "de": "unsere Antwort"}
@@ -20872,6 +20904,7 @@
 {"uk": "свій курс для DigiKey", "en": "own rate for DigiKey", "de": "eigener Kurs für DigiKey"}
 {"uk": "свій курс не вписано — «Курси валют»", "en": "own rate not entered — “Exchange rates”", "de": "eigener Kurs nicht eingetragen — „Wechselkurse“"}
 {"uk": "свій файл", "en": "own file", "de": "eigene Datei"}
+{"uk": "свій інвойс", "en": "own invoice", "de": "eigene Rechnung"}
 {"uk": "сегмент {0}", "en": "segment {0}", "de": "Segment {0}"}
 {"uk": "секрет — на сайті /admin/ → «🔌 Minerva».", "en": "the secret is on the site at /admin/ → “🔌 Minerva”.", "de": "das Secret befindet sich auf der Website unter /admin/ → „🔌 Minerva“."}
 {"uk": "секретний ключ для підпису запитів.", "en": "secret key for signing requests.", "de": "geheimer Schlüssel zum Signieren der Anfragen."}
