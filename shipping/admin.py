@@ -1476,6 +1476,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_create_blank",
             ),
             path(
+                "parse-address/",
+                self.admin_site.admin_view(self.parse_address_view),
+                name="shipping_shipment_parse_address",
+            ),
+            path(
                 "create/<int:order_id>/",
                 self.admin_site.admin_view(self.create_from_order_view),
                 name="shipping_shipment_create",
@@ -3699,6 +3704,37 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
     # ── Зберегти упаковку з параметрів відправлення ──────────────────────────
+
+    def parse_address_view(self, request):
+        """POST JSON {text, msg?, ai?} → поля отримувача з тексту («📋 Вставити адресу» у формі, «📦 Відправлення» з
+        виділеного в листі) — `services.address_paste.parse`. Нічого не зберігає. Право — створювати або змінювати
+        відправлення; лист — лише з власної скриньки людини (інакше без листа)."""
+        import json as _json
+        from django.http import JsonResponse
+        from .services import address_paste
+        if request.method != "POST":
+            response = JsonResponse({"ok": False, "error": "Лише POST"}, status=405)
+            response["Allow"] = "POST"
+            return response
+        if not (self.has_add_permission(request) or self.has_change_permission(request)):
+            return JsonResponse({"ok": False, "error": "Немає права створювати відправлення"}, status=403)
+        try:
+            data = _json.loads(request.body.decode("utf-8") or "{}")
+        except (ValueError, UnicodeDecodeError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        text = str(data.get("text") or "")
+        message = None
+        pk = str(data.get("msg") or "").strip()
+        if pk.isdigit():
+            try:
+                from email_assistant.models import EmailMessage
+                message = EmailMessage.objects.filter(pk=int(pk), account__user=request.user).first()
+            except ImportError:
+                message = None
+        result = address_paste.parse(text, request.user, message=message, use_ai=data.get("ai", True) is not False)
+        return JsonResponse({"ok": True, **result})
 
     def save_packaging_view(self, request, shipment_id):
         """POST: запам'ятовує упаковку цієї посилки для товарів замовлення
