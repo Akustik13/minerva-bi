@@ -1,7 +1,9 @@
 /* 🎙 Наради — підготовка, сторінка наради, протоколи (meetings/templates/admin/meetings/meeting/*.html).
    - мова тексту згоди (de / en / uk), «📋 Копіювати», «＋ Ще хтось», клієнт за проєктом, confirm за data-confirm;
    - «🎙 Відкрити вікно запису»: після кліку кнопка 5 с неактивна (подвійний клік відкрив би дві вкладки);
-   - ✓ Прийняти ▾ / ✕ Не те / ↺ Повернути — POST JSON, у відповідь свіжий фрагмент пункту;
+   - ✓ Прийняти ▾ / ✕ Не те / ↺ Повернути — POST JSON, у відповідь свіжий фрагмент пункту (і проєкт пункту);
+   - 📁 проєкти наради (додати / ⭐ головний / ✕) і 🏷 «звідси — про проєкт …» на рядках розшифровки — POST JSON,
+     потім сторінка оновлюється;
    - пошук у розшифровці й #t=<секунда> в адресі;
    - опитування стану кожні 5 с: нове — перезавантаження, але не тоді, коли відкрито панель ✓ або курсор у полі
      (тоді смуга «🔄 Є нове — оновити сторінку»).
@@ -158,6 +160,8 @@
         if (body.target === 'deadline') {
           body.date = val('date');
           if (!body.date) { showError(item, 'Виберіть дату дедлайну'); return; }
+        } else if (val('project')) {
+          body.project = val('project');
         }
       }
       btn.disabled = true;
@@ -167,7 +171,7 @@
         var wrap = document.createElement('div');
         wrap.innerHTML = res.html;              // фрагмент сервера: дані людини вже екрановано шаблоном
         var fresh = wrap.firstElementChild;
-        if (fresh) { item.replaceWith(fresh); showFor(fresh); }
+        if (fresh) { item.replaceWith(fresh); showFor(fresh); syncPlan(fresh); }
         setPending(res.pending);
         if (act === 'accept') toast('✓ Додано');
         else if (act === 'reject') toast('✕ Більше не пропонується');
@@ -184,6 +188,123 @@
       item.appendChild(el);
     }
     el.textContent = '⚠️ ' + text;
+  }
+
+  // ── 📁 проєкти наради й 🏷 частини запису (meetings/parts.py; адреси й проєкти — mt-config) ──
+  var pcfg = null;
+  try {
+    var pcfgEl = document.getElementById('mt-config');
+    pcfg = pcfgEl ? JSON.parse(pcfgEl.textContent) : null;
+  } catch (err) { pcfg = null; }
+
+  function pjPost(url, body, btn) {
+    if (!url) return;
+    if (btn) btn.disabled = true;
+    post(url, body).then(function (res) {
+      if (!res || !res.ok) {
+        if (btn) btn.disabled = false;
+        toast('⚠️ ' + ((res && res.error) || 'Не вдалося'));
+        return;
+      }
+      location.reload();
+    });
+  }
+
+  root.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-mt-pj], [data-mt-part]');
+    if (!b || !root.contains(b) || !pcfg) return;
+    if (b.getAttribute('data-confirm') && !window.confirm(b.getAttribute('data-confirm'))) return;
+    if (b.hasAttribute('data-mt-pj')) {
+      var act = b.getAttribute('data-mt-pj'), project = b.getAttribute('data-project') || '';
+      if (act === 'add') {
+        var pick = root.querySelector('[data-mt-pj-pick]');
+        project = pick ? pick.value : '';
+        if (!project) { toast('Виберіть проєкт у списку'); if (pick) pick.focus(); return; }
+      }
+      pjPost(pcfg.projects_url, {action: act, project: project}, b);
+    } else if (b.getAttribute('data-mt-part') === 'remove') {
+      pjPost(pcfg.part_url, {action: 'remove', part: b.getAttribute('data-part')}, b);
+    } else {
+      pjPost(pcfg.part_url, {action: 'set', second: b.getAttribute('data-second'),
+                             project: b.getAttribute('data-project') || ''}, b);
+    }
+  });
+
+  // 🏷 на рядку розшифровки: одна кнопка, що переходить за курсором (тисячі рядків — без тисяч кнопок), і правий
+  // клік на рядку (з виділеним текстом або з Shift — звичайне меню браузера)
+  var trBox = document.getElementById('mt-tr');
+  if (trBox && pcfg && pcfg.can_parts && pcfg.pj && pcfg.pj.length && window.MVMenu) {
+    var tagBtn = document.createElement('button');
+    tagBtn.type = 'button';
+    tagBtn.className = 'mt-tag-btn';
+    tagBtn.textContent = '🏷';
+    tagBtn.title = 'Звідси — про проєкт…';
+    tagBtn.setAttribute('aria-haspopup', 'menu');
+    var tagRow = null;
+
+    var tagMenu = function (row, at) {
+      var second = row.getAttribute('data-t') || row.getAttribute('data-s') || '0';
+      var timeEl = row.querySelector('.mt-time');
+      var set = function (project) {
+        return function () { pjPost(pcfg.part_url, {action: 'set', second: second, project: project}); };
+      };
+      var list = pcfg.pj.map(function (p) { return {label: p.label, data: true, icon: '📁', onSelect: set(p.pk)}; });
+      list.push({type: 'separator'});
+      list.push({label: 'загальне, не про проєкт', icon: '💬', onSelect: set('')});
+      window.MVMenu.open(at, list, {title: '🏷 Звідси — про проєкт', titleData: timeEl ? timeEl.textContent : true,
+                                    label: 'Позначити частину наради'});
+    };
+    trBox.addEventListener('mouseover', function (e) {
+      var row = e.target.closest('.mt-seg');
+      if (!row || row === tagRow) return;
+      tagRow = row;
+      row.appendChild(tagBtn);
+    });
+    tagBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (tagRow) tagMenu(tagRow, tagBtn);
+    });
+    trBox.addEventListener('contextmenu', function (e) {
+      if (e.shiftKey) return;
+      var row = e.target.closest('.mt-seg');
+      if (!row) return;
+      if (window.getSelection && String(window.getSelection()).trim()) return;
+      e.preventDefault();
+      tagMenu(row, e);
+    });
+  }
+
+  // проєкт пункту в «✓ Прийняти ▾»: у проєкті без плану «📅 Крок плану» недоступний
+  function syncPlan(item) {
+    var sel = item && item.querySelector('[data-mt-item-project]');
+    if (!sel) return;
+    var opt = sel.options[sel.selectedIndex];
+    var noplan = !!(opt && opt.hasAttribute('data-noplan'));
+    var step = item.querySelector('input[type=radio][value=step]');
+    var moment = item.querySelector('input[type=radio][value=moment]');
+    if (!step || !moment || moment.disabled) return;      // немає права чи проєкту — пояснення від сервера
+    var label = step.closest('label');
+    step.disabled = noplan;
+    if (label) label.classList.toggle('is-off', noplan);
+    var reason = label && label.nextElementSibling && label.nextElementSibling.classList.contains('mt-reason')
+      ? label.nextElementSibling : null;
+    if (noplan && !reason && label) {
+      reason = document.createElement('div');
+      reason.className = 'mt-reason';
+      label.after(reason);
+    }
+    if (reason) {
+      if (noplan) reason.textContent = sel.getAttribute('data-noplan-text') || ''; else reason.remove();
+    }
+    if (noplan && step.checked) { moment.checked = true; showFor(item); }
+  }
+
+  if (items) {
+    items.querySelectorAll('.mt-item').forEach(syncPlan);
+    items.addEventListener('change', function (e) {
+      if (e.target.matches('[data-mt-item-project]')) syncPlan(e.target.closest('.mt-item'));
+    });
   }
 
   // ── розшифровка: пошук і #t=<секунда> ──

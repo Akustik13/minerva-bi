@@ -1,10 +1,11 @@
 """Нарада видалена (кнопкою, прибиранням або каскадом — напр. разом із користувачем) → її документи бази знань
 прибираються (tombstone у стрічці для RAG), а MeetingTombstone каже RAG-ПК видалити запис, а не «невідома нарада».
-Збій тут не ламає видалення (кожен крок — у своїй точці збереження)."""
+Збій тут не ламає видалення (кожен крок — у своїй точці збереження).
+Нарада збережена з головним проєктом → він і серед «📁 Проєктів наради» (meetings/parts.py)."""
 import logging
 
 from django.db import transaction
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from .models import Meeting, MeetingTombstone
@@ -28,3 +29,15 @@ def meeting_deleted(sender, instance, **kwargs):
             knowledge.unpublish(instance)
     except Exception as e:  # noqa: BLE001
         logger.warning("meeting %s unpublish: %s", instance.pk, e)
+
+
+@receiver(post_save, sender=Meeting)
+def meeting_main_project(sender, instance, raw=False, **kwargs):
+    """Головний проєкт — завжди серед проєктів наради (create, ✏️ Змінити, ⚡ швидкий запис, будь-який шлях)."""
+    if raw or not instance.project_id:
+        return
+    fields = kwargs.get("update_fields")
+    if fields is not None and "project" not in fields:     # стан від RAG-ПК, розшифровка… — проєкт не змінювався
+        return
+    from . import parts
+    parts.ensure_main_link(instance)

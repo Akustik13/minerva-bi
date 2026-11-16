@@ -145,3 +145,34 @@ ul.mt-check li.todo { color: var(--text); }
   .mt-tr { max-height: none; }
   .mt-person { flex-direction: column; }
 }
+
+/* 📁 проєкти наради й 🏷 частини (meetings/parts.py): кольори проєктів однакові в шапці, смузі частин, рядках і
+   пунктах; текст — змінними теми (читабельність — mv_contrast.js) */
+.mt-pj-c0 { --mt-pj: #3b82f6; } .mt-pj-c1 { --mt-pj: #e8590c; } .mt-pj-c2 { --mt-pj: #2f9e44; }
+.mt-pj-c3 { --mt-pj: #ae3ec9; } .mt-pj-c4 { --mt-pj: #d6336c; } .mt-pj-c5 { --mt-pj: #0c8599; }
+.mt-pj-gen { --mt-pj: #868e96; }
+.mt-pj { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin: 10px 0 4px; font-size: 13px; }
+.mt-pj-label { color: var(--text-muted); }
+.mt-pj-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--mt-pj, var(--border-strong)); color: var(--text);
+  background: color-mix(in srgb, var(--mt-pj, var(--bg-hover)) 14%, transparent); font-size: 12.5px; line-height: 1.5; }
+.mt-pj-chip a { color: var(--text); }
+.mt-pj-x { border: 0; background: none; color: var(--text-muted); cursor: pointer; padding: 0 2px; font-size: 12px;
+  line-height: 1; }
+.mt-pj-x:hover, .mt-pj-x:focus-visible { color: var(--text); }
+.mt-pj-add { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.mt-pj-add select { max-width: 320px; }
+.mt-parts { margin: 0 0 10px; }
+.mt-parts-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+.mt-parts-bar a { text-decoration: none; }
+.mt-suggest { margin: 6px 0 0; font-size: 13px; }
+.mt-suggest summary { cursor: pointer; }
+.mt-suggest ul { margin: 6px 0; padding-left: 18px; }
+.mt-suggest li { margin: 4px 0; }
+.mt-tr .mt-seg[class*="mt-pj-"] { border-left: 3px solid var(--mt-pj); padding-left: 6px; }
+.mt-tr .mt-partrow { margin: 8px 0 4px; padding: 4px 8px; border-radius: 6px; font-size: 13px; color: var(--text);
+  border-left: 3px solid var(--mt-pj, var(--border-strong));
+  background: color-mix(in srgb, var(--mt-pj, var(--bg-hover)) 14%, transparent); }
+.mt-tr .mt-seg { position: relative; }
+.mt-tag-btn { margin-left: 6px; border: 1px solid var(--border-strong); background: var(--bg-card); color: var(--text);
+  border-radius: 6px; padding: 0 6px; cursor: pointer; font-size: 12px; line-height: 1.6; }
