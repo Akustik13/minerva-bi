@@ -1474,7 +1474,7 @@ class LinkPipelineTests(LinkTestBase):
         self.assertEqual(sync["sessions"][0], {"meeting": 12, "uid": UID, "session": sid,
                                                "token_sha256": __import__("hashlib").sha256(PUSH.encode()).hexdigest(),
                                                "stage": "done", "progress": None, "queue_pos": 0, "audio_on_bench": False})
-        self.assertEqual(sync["bench"], {"version": "0.3.2", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
+        self.assertEqual(sync["bench"], {"version": "0.3.3", "live_busy": False, "queue": 0, "outbox": 0, "failed": 0,
                                          "last_error": "", "retention_days": 30, "standalone": False})
 
     async def test_empty_transcript_and_audio_text(self):
@@ -2524,7 +2524,7 @@ class QuickStartPageTests(unittest.TestCase):
     def test_assets_carry_the_version(self):
         from bench import VERSION
 
-        self.assertEqual(VERSION, "0.3.2")
+        self.assertEqual(VERSION, "0.3.3")
         self.assertIn(f"/static/bench.js?v={VERSION}", self.html)
         self.assertIn(f"/static/bench.css?v={VERSION}", self.html)
 
@@ -2673,6 +2673,219 @@ class JobsMinervaCloudChoiceTests(unittest.IsolatedAsyncioTestCase):
         with patch.object(cloud, "extract", return_value=ok) as ext, self.assertRaises(JobError):
             await self.jobs._moments(self.sid, params, {})
         ext.assert_not_called()
+
+
+
+# ==== 0.3.3: 🧹 noise removal — a cleaned copy (DeepFilterNet) against the original ==================================
+def _has_av():
+    try:
+        import av  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+FAKE_FILTER = """import os, shutil, sys, wave
+args = sys.argv[1:]
+out = args[args.index('-o') + 1]
+os.makedirs(out, exist_ok=True)
+for f in args[args.index('-o') + 2:]:
+    with wave.open(f) as w:
+        params, frames = w.getparams(), w.readframes(w.getnframes())
+    with wave.open(os.path.join(out, os.path.basename(f)), 'wb') as w:   # like deep-filter -D: a few ms shorter
+        w.setparams(params)
+        w.writeframes(frames[:-2 * 480])
+"""
+
+
+def write_tone(path, seconds=1.0, channels=2, sr=16000):
+    import wave
+
+    import numpy as np
+    t = np.arange(int(sr * seconds)) / sr
+    left = (0.3 * np.sin(2 * np.pi * 440 * t) * 32767).astype("<i2")
+    right = (0.1 * np.sin(2 * np.pi * 880 * t) * 32767).astype("<i2")
+    data = np.stack([left, right], axis=1) if channels == 2 else left
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(channels)
+        w.setsampwidth(2)
+        w.setframerate(sr)
+        w.writeframes(np.ascontiguousarray(data).tobytes())
+
+
+class DenoiseTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = config.load(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_program_is_found_in_tools_or_config(self):
+        from pathlib import Path
+
+        from bench import denoise
+        self.assertIsNone(denoise.exe_path(self.cfg))
+        self.assertFalse(denoise.info(self.cfg)["ready"])
+        folder = Path(self.tmp.name, "tools", "deep-filter")
+        folder.mkdir(parents=True)
+        (folder / "deep-filter-0.5.6-x86_64-pc-windows-msvc.exe").write_bytes(b"MZ")
+        (folder / "readme.txt").write_text("x")
+        self.assertEqual(denoise.exe_path(self.cfg).name, "deep-filter-0.5.6-x86_64-pc-windows-msvc.exe")
+        self.assertTrue(denoise.info(self.cfg)["ready"])
+        self.cfg.override("denoise_exe", str(folder / "missing.exe"))
+        self.assertIsNone(denoise.exe_path(self.cfg))                     # a wrong path is not silently replaced
+
+    def test_command_and_stereo(self):
+        from bench import denoise
+        plan = {"files": {"L": "a/dn_in_L.wav", "R": "a/dn_in_R.wav"}, "clean": ["L"]}
+        cmd = denoise.command("deep-filter.exe", plan, "a/out", "medium")
+        self.assertEqual(cmd, ["deep-filter.exe", "-D", "-a", "24", "-o", "a/out", "a/dn_in_L.wav"])
+        self.assertIn("100", denoise.command("x", plan, "o", "nonsense") + denoise.command("x", plan, "o", "full"))
+        self.assertTrue(denoise.is_stereo({"kind": "live"}))
+        self.assertTrue(denoise.is_stereo({"kind": "denoise", "source_kind": "live"}))
+        self.assertFalse(denoise.is_stereo({"kind": "upload"}))
+
+    @unittest.skipUnless(_has_av(), "PyAV is not installed")
+    def test_prepare_and_merge_keep_length_and_the_other_channel(self):
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        from bench import denoise
+        folder = Path(self.tmp.name)
+        write_tone(folder / "audio.wav", seconds=1.0, channels=2)
+        plan = denoise.prepare(folder / "audio.wav", folder, stereo=True, channels="mic")
+        self.assertEqual((plan["clean"], plan["frames"], plan["stereo"]), (["L"], 48000, True))
+        script = folder / "fake_filter.py"
+        script.write_text(FAKE_FILTER)
+        subprocess.run([sys.executable, str(script), "-o", str(folder / "dn_out"), plan["files"]["L"]], check=True)
+        target = denoise.merge(plan, folder / "dn_out", folder)
+        data = denoise.read_wav(target)
+        self.assertEqual(data.shape, (48000, 2))                          # padded back to the original length
+        self.assertEqual(int(abs(data[-100:, 0]).max()), 0)               # the cleaned channel ends with silence
+        self.assertGreater(int(abs(data[-100:, 1]).max()), 0)             # R kept as it was
+        self.assertFalse(any(folder.glob("dn_in_*.wav")))
+        self.assertFalse((folder / "dn_out").exists())
+
+
+class ServerDenoiseTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        from aiohttp.test_utils import TestClient, TestServer
+
+        from bench import server
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = config.load(self.tmp.name)
+        self.cfg.override("standalone_enabled", True)
+        self.app = server.create_app(self.cfg)
+        self.client = TestClient(TestServer(self.app, host="127.0.0.1"))
+        await self.client.start_server()
+        self.ctx = self.app[server.APP_KEY]
+        self.headers = {"X-Bench": "1", "Origin": str(self.client.make_url("/"))[:-1]}
+        self.sid, folder, _ = self.ctx["store"].create("live", "Тест шуму", mode="both", lang_l="uk", duration=1.0)
+        write_wav(folder / "audio.wav")
+
+    async def asyncTearDown(self):
+        await self.client.close()
+        self.tmp.cleanup()
+
+    async def test_copy_is_a_new_session_with_its_job(self):
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from bench import denoise
+        url = f"/api/sessions/{self.sid}/denoise"
+        r = await self.client.post(url, json={"level": "soft"}, headers=self.headers)
+        self.assertEqual(r.status, 409)                                   # no deep-filter on this PC
+        queued = {"kind": "denoise", "state": "queued", "text": "У черзі…"}
+        with patch.object(denoise, "exe_path", return_value=Path("deep-filter.exe")), \
+                patch.object(self.ctx["jobs"], "submit", return_value=queued) as submit:
+            r = await self.client.post(url, json={"level": "soft", "channels": "mic"}, headers=self.headers)
+            self.assertEqual(r.status, 200, await r.text())
+            new = (await r.json())["id"]
+            meta = self.ctx["store"].meta(new)
+            self.assertEqual((meta["kind"], meta["denoised_from"], meta["level"], meta["channels"], meta["source_kind"],
+                              meta["lang_l"]), ("denoise", self.sid, "soft", "mic", "live", "uk"))
+            submit.assert_called_once_with(new, "denoise", {"from": self.sid, "level": "soft", "channels": "mic"})
+            r = await self.client.post(f"/api/sessions/{new}/denoise", json={}, headers=self.headers)
+            self.assertEqual(r.status, 400)                               # a copy of a copy — no
+            status = await (await self.client.get("/api/status", headers=self.headers)).json()
+            self.assertTrue(status["denoise"]["ready"])
+        listed = await (await self.client.get("/api/sessions", headers=self.headers)).json()
+        self.assertIn("denoise", [s["kind"] for s in listed["sessions"]])
+        self.cfg.override("standalone_enabled", False)
+        r = await self.client.post(url, json={}, headers=self.headers)
+        self.assertEqual(r.status, 403)                                   # the test bench only
+
+
+class JobsDenoiseTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        from bench.jobs import Jobs
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.cfg = config.load(self.tmp.name)
+        self.store = store.Store(self.cfg)
+        self.jobs = Jobs(self.cfg, self.store, live_busy=lambda: False)
+        self.src, folder, _ = self.store.create("live", "Тест", mode="both")
+        write_tone(folder / "audio.wav", seconds=1.0, channels=2)
+        self.sid, _, _ = self.store.create("denoise", "Тест · почищено", denoised_from=self.src, source_kind="live",
+                                           mode="both", level="medium", channels="all")
+
+    async def asyncTearDown(self):
+        self.tmp.cleanup()
+
+    @unittest.skipUnless(_has_av(), "PyAV is not installed")
+    async def test_clean_copy_then_both_transcribed(self):
+        import sys
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from bench import denoise
+        script = Path(self.tmp.name, "fake_filter.py")
+        script.write_text(FAKE_FILTER)
+
+        def command(exe, plan, out_dir, level):
+            return [sys.executable, str(script), "-o", str(out_dir), *[plan["files"][c] for c in plan["clean"]]]
+
+        st = {}
+        with patch.object(denoise, "exe_path", return_value=script), patch.object(denoise, "command", command):
+            await self.jobs._denoise(self.sid, {"from": self.src, "level": "medium", "channels": "all"}, st)
+        audio = self.store.audio_file(self.sid)
+        self.assertEqual(audio.name, "source.wav")
+        self.assertEqual(denoise.read_wav(audio).shape, (48000, 2))
+        meta = self.store.meta(self.sid)
+        self.assertEqual((meta["denoise"]["channels"], meta["duration"]), (["L", "R"], 1.0))
+        self.assertEqual([(s, k) for s, k, _ in st["then"]], [(self.sid, "transcribe"), (self.src, "transcribe")])
+
+    async def test_follow_up_jobs_are_queued_after_the_copy(self):
+        calls = []
+
+        async def fake_denoise(sid, params, st):
+            st["then"] = [(sid, "transcribe", {"model": "accurate"})]
+
+        async def fake_transcribe(sid, params, st):
+            calls.append((sid, params))
+
+        self.jobs._denoise, self.jobs._transcribe = fake_denoise, fake_transcribe
+        import asyncio
+        task = asyncio.create_task(self.jobs.run_forever())
+        try:
+            self.jobs.submit(self.sid, "denoise", {"from": self.src})
+            for _ in range(50):
+                if calls:
+                    break
+                await asyncio.sleep(0.02)
+        finally:
+            task.cancel()
+        self.assertEqual(calls, [(self.sid, {"model": "accurate"})])
+
+    async def test_minerva_meetings_are_never_cleaned(self):
+        from bench.jobs import JobError
+        private, folder, _ = self.store.create("live", "Нарада", mode="both", minerva={"meeting": 1})
+        store.write_json(folder / "minerva.json", {"meeting": 1})
+        with self.assertRaises(JobError):
+            await self.jobs._denoise(self.sid, {"from": private}, {})
 
 
 if __name__ == "__main__":

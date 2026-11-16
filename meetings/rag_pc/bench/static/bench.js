@@ -56,6 +56,7 @@ function showTab(name) {
   if (name === 'list') loadList();
   if (name === 'metrics') loadMetrics();
   if (name === 'help') loadHelp();
+  if (name === 'denoise') dnLoad(); else clearTimeout(DN.timer);
   if (name !== 'session') SS.id = null;
 }
 
@@ -1448,7 +1449,7 @@ async function loadList() {
   for (const s of d.sessions) {
     const tr = el('tr', {class: 'clickable'},
       el('td', {class: 'num', text: s.created || ''}),
-      el('td', {text: `${s.kind === 'live' ? '🔴' : '📁'} ${s.title || '—'}${(s.silent || []).length ? ' · 🔇 ' +
+      el('td', {text: `${s.kind === 'live' ? '🔴' : s.kind === 'denoise' ? '🧹' : '📁'} ${s.title || '—'}${(s.silent || []).length ? ' · 🔇 ' +
         s.silent.map((c) => (c === 'L' ? 'мікрофон мовчав' : 'без звуку наради')).join(', ') : ''}`}),
       el('td', {class: 'num', text: s.duration ? clock(s.duration) : '—'}),
       el('td', {text: jobText(s)}),
@@ -1504,7 +1505,7 @@ async function refreshSession() {
   try { d = await api(`/api/sessions/${SS.id}`); } catch (e) { $('#ss-job').textContent = e.message; return; }
   SS.data = d;
   const m = d.meta || {};
-  $('#ss-title').textContent = `${m.kind === 'live' ? '🔴' : '📁'} ${m.title || m.id}`;
+  $('#ss-title').textContent = `${m.kind === 'live' ? '🔴' : m.kind === 'denoise' ? '🧹' : '📁'} ${m.title || m.id}`;
   const info = [m.created, m.duration ? `тривалість ${clock(m.duration)}` : null,
     m.kind === 'live' ? ({both: 'нарада + мікрофон', mic: 'лише мікрофон', meeting: 'лише нарада'}[m.mode] || '') : (m.source_name || ''),
     m.size_mb ? `${num(m.size_mb)} МБ` : null, m.engine ? `наживо: ${m.engine}` : null];
@@ -2180,6 +2181,198 @@ function quickWire() {
   }
 }
 
+// ---- 🧹 noise removal: a cleaned copy against the original (bench/denoise.py) ------------------
+const DN = {list: [], timer: null, levelsSig: ''};
+const DN_LEVELS = {soft: 'м’яко', medium: 'середньо', full: 'повністю'};
+const dnStereo = (s) => s.kind === 'live' || s.source_kind === 'live' || !!s.split;
+const dnBusy = (d) => !!(d && d.job && (d.job.state === 'queued' || d.job.state === 'running'));
+
+function dnTool() {
+  const info = STATUS && STATUS.denoise;
+  const box = $('#dn-tool');
+  if (!info) { box.textContent = ''; return; }
+  box.textContent = info.ready ? `Програма: ${info.exe} (на процесорі, хвилина звуку ≈ 7–10 с).`
+    : `⚠️ Програму DeepFilterNet не знайдено: покладіть deep-filter-…-windows-msvc.exe у ${info.folder}.`;
+  $('#dn-start').disabled = !info.ready;
+  const sig = JSON.stringify(info.levels);
+  if (sig === DN.levelsSig) return;
+  DN.levelsSig = sig;
+  const fs = $('#dn-levels');
+  fs.replaceChildren(el('legend', {text: 'Сила чистки'}));
+  for (const lv of info.levels) {
+    const input = el('input', {type: 'radio', name: 'dn-level', value: lv.key});
+    if (lv.key === info.default) input.checked = true;
+    fs.append(el('label', {}, input, ` ${lv.label}`));
+  }
+}
+
+async function dnLoad(pick = '') {
+  let d;
+  try { d = await api('/api/sessions'); } catch (e) { $('#dn-msg').textContent = e.message; return; }
+  DN.list = d.sessions;
+  const src = $('#dn-src'), keepSrc = src.value;
+  src.replaceChildren();
+  for (const s of DN.list.filter((x) => x.kind !== 'denoise' && x.has_audio)) {
+    src.append(el('option', {value: s.id, text: `${s.created || ''} · ${s.title || s.id}${s.duration ? ' · ' + clock(s.duration) : ''}`}));
+  }
+  if (keepSrc && [...src.options].some((o) => o.value === keepSrc)) src.value = keepSrc;
+  if (!src.options.length) src.append(el('option', {value: '', text: 'Тестових записів зі звуком ще немає'}));
+  const pair = $('#dn-pair'), keepPair = pick || pair.value;
+  pair.replaceChildren();
+  for (const s of DN.list.filter((x) => x.kind === 'denoise')) {
+    pair.append(el('option', {value: s.id, text: `${s.created || ''} · ${s.title || s.id}`}));
+  }
+  if (keepPair && [...pair.options].some((o) => o.value === keepPair)) pair.value = keepPair;
+  dnSrcChange();
+  dnTool();
+  dnShow();
+}
+
+function dnSrcChange() {
+  const s = DN.list.find((x) => x.id === $('#dn-src').value);
+  $('#dn-ch-field').hidden = !(s && dnStereo(s));
+}
+
+async function dnStart() {
+  const id = $('#dn-src').value;
+  if (!id) { $('#dn-msg').textContent = 'Спершу запишіть або завантажте тестовий запис.'; return; }
+  const s = DN.list.find((x) => x.id === id);
+  $('#dn-start').disabled = true;
+  $('#dn-msg').textContent = '⏳ Ставлю в чергу…';
+  try {
+    const r = await api(`/api/sessions/${id}/denoise`, {
+      json: {level: radio('dn-level') || 'medium', channels: s && dnStereo(s) ? $('#dn-ch').value : 'all'}});
+    $('#dn-msg').textContent = '🧹 Чищу копію; потім RAG-ПК розшифрує обидва записи — результат нижче.';
+    await dnLoad(r.id);
+  } catch (e) {
+    $('#dn-msg').textContent = `⚠️ ${e.message}`;
+  } finally {
+    $('#dn-start').disabled = !(STATUS && STATUS.denoise && STATUS.denoise.ready);
+  }
+}
+
+function dnWords(text) {
+  return (text || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').split(' ').filter(Boolean);
+}
+
+function dnErrors(ref, hyp) {
+  // word-level edit distance: substitutions + insertions + deletions (WER = errors / words of the reference)
+  let prev = Array.from({length: hyp.length + 1}, (_, j) => j);
+  for (let i = 1; i <= ref.length; i += 1) {
+    const cur = [i];
+    for (let j = 1; j <= hyp.length; j += 1) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ref[i - 1] === hyp[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[hyp.length];
+}
+
+function dnText(d) {
+  const tr = d && d.transcript;
+  return tr && tr.segments ? tr.segments.slice().sort((a, b) => a.start - b.start).map((s) => s.text).join(' ') : null;
+}
+
+function dnConfidence(d) {
+  // Whisper's own certainty: mean of exp(avg_logprob) weighted by the length of each line
+  const segs = (d && d.transcript && d.transcript.segments) || [];
+  let sum = 0, len = 0;
+  for (const s of segs) {
+    if (typeof s.avg_logprob !== 'number') continue;
+    const w = Math.max(0.1, (s.end || 0) - (s.start || 0));
+    sum += Math.exp(s.avg_logprob) * w;
+    len += w;
+  }
+  return len ? sum / len : null;
+}
+
+function dnColumn(box, d, id, title) {
+  box.replaceChildren(el('b', {text: title}));
+  if (!d) { box.append(el('p', {class: 'muted', text: 'Оригінал уже видалено.'})); return; }
+  if (d.has_audio) box.append(el('audio', {controls: '', preload: 'none', src: `/api/sessions/${id}/audio`}));
+  const dn = d.meta && d.meta.denoise;
+  if (dn) {
+    box.append(el('div', {class: 'muted', text: `Чистка: ${clock(dn.audio_s)} звуку за ${num(dn.seconds)} с` +
+      (dn.speed_x ? ` (×${num(dn.speed_x)})` : '') + ` · ${dn.exe}`}));
+  }
+  if (dnBusy(d)) box.append(el('div', {class: 'job', text: `⏳ ${d.job.text}`}));
+  else if (d.job && d.job.state === 'error') box.append(el('div', {class: 'job', text: `⚠️ ${d.job.text}`}));
+  const tr = d.transcript;
+  if (!tr || !tr.segments) {
+    if (!dnBusy(d)) box.append(el('p', {class: 'muted', text: 'Розшифровки ще немає.'}));
+    return;
+  }
+  const conf = dnConfidence(d);
+  box.append(el('div', {class: 'muted', text: `${tr.model} · слів: ${dnWords(dnText(d)).length}` +
+    (conf !== null ? ` · впевненість Whisper ${Math.round(conf * 100)} %` : '')}));
+  const lines = el('div', {class: 'lines'});
+  for (const s of tr.segments) {
+    const line = lineEl(s.ch, s.start, s.text);
+    const audio = $('audio', box);
+    $('.t', line).addEventListener('click', () => { if (audio) { audio.currentTime = s.start; audio.play(); } });
+    lines.append(line);
+  }
+  if (!tr.segments.length) lines.append(el('p', {class: 'muted', text: 'Мови не знайдено.'}));
+  box.append(lines);
+}
+
+function dnVerdict(orig, copy) {
+  const box = $('#dn-verdict');
+  box.replaceChildren();
+  const a = dnText(orig), b = dnText(copy);
+  if (a === null || b === null) {
+    box.textContent = (dnBusy(orig) || dnBusy(copy)) ? '⏳ Чекаю, поки RAG-ПК розшифрує обидва записи…' : '';
+    return;
+  }
+  const ref = dnWords($('#dn-ref').value);
+  if (ref.length >= 5) {
+    const ea = dnErrors(ref, dnWords(a)), eb = dnErrors(ref, dnWords(b));
+    const pa = Math.round(ea / ref.length * 100), pb = Math.round(eb / ref.length * 100);
+    const verdict = pb < pa ? el('span', {class: 'dn-good', text: '→ почищене розпізнано краще'})
+      : pb > pa ? el('span', {class: 'dn-bad', text: '→ почищене розпізнано гірше'})
+        : el('span', {text: '→ однаково'});
+    box.append(`Помилок розпізнавання (на ${ref.length} слів тексту): як записано — ${pa} % (${ea}), ` +
+      `почищено — ${pb} % (${eb}) `, verdict);
+    return;
+  }
+  const ca = dnConfidence(orig), cb = dnConfidence(copy);
+  if (ca !== null && cb !== null) {
+    box.textContent = `Впевненість Whisper: як записано ${Math.round(ca * 100)} %, почищено ${Math.round(cb * 100)} %. ` +
+      'Точніше — вставте текст, який читали, у поле вище.';
+  }
+}
+
+async function dnShow() {
+  clearTimeout(DN.timer);
+  const id = $('#dn-pair').value;
+  if (!id) {
+    $('#dn-a').replaceChildren(el('p', {class: 'muted', text: 'Почищених копій ще немає — виберіть запис і натисніть «🧹 Почистити й порівняти».'}));
+    $('#dn-b').replaceChildren();
+    $('#dn-verdict').textContent = '';
+    return;
+  }
+  let copy = null, orig = null;
+  try { copy = await api(`/api/sessions/${id}`); } catch (e) { $('#dn-verdict').textContent = e.message; return; }
+  const from = copy.meta && copy.meta.denoised_from;
+  try { orig = from ? await api(`/api/sessions/${from}`) : null; } catch (e) { orig = null; }
+  if ($('#dn-pair').value !== id) return;           // another copy was picked meanwhile
+  const level = DN_LEVELS[copy.meta.level] || '';
+  const playing = $$('#tab-denoise audio').some((a) => !a.paused);
+  if (!playing) {                                   // never cut a player that is running
+    dnColumn($('#dn-a'), orig, from, 'Як записано');
+    dnColumn($('#dn-b'), copy, id, `Почищено${level ? ' · ' + level : ''}${copy.meta.channels === 'mic' ? ' · лише мікрофон' : ''}`);
+  }
+  dnVerdict(orig, copy);
+  if (dnBusy(orig) || dnBusy(copy) || playing) DN.timer = setTimeout(dnShow, 3000);
+}
+
+function dnWire() {
+  $('#dn-src').addEventListener('change', dnSrcChange);
+  $('#dn-start').addEventListener('click', dnStart);
+  $('#dn-pair').addEventListener('change', dnShow);
+  $('#dn-ref').addEventListener('input', () => { clearTimeout(DN.refTimer); DN.refTimer = setTimeout(dnShow, 400); });
+}
+
 // ---- start -------------------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
   for (const s of $$('select.lang')) for (const [v, t] of LANGS) s.append(el('option', {value: v, text: t}));
@@ -2223,6 +2416,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#ss-rename').addEventListener('click', sessionRename);
   $('#ss-delete').addEventListener('click', sessionDelete);
   $('#ss-search').addEventListener('input', search);
+  dnWire();
   window.addEventListener('beforeunload', (e) => { if (Live.running) { e.preventDefault(); e.returnValue = ''; } });
   quickSync();
   startPage();

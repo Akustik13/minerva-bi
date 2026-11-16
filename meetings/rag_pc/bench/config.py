@@ -64,6 +64,10 @@ DEFAULTS = {
     # recording without Minerva (stage-0 test bench: upload, list, metrics). Off in production: such recordings have
     # no consent protocol in Minerva and every allowed PC sees them.
     "standalone_enabled": False,
+    # 🧹 noise removal for the comparison tab (bench/denoise.py): the deep-filter program; empty = the newest
+    # deep-filter*.exe in <root>\tools\deep-filter (official DeepFilterNet release, not in the venv)
+    "denoise_exe": "",
+    "denoise_max_minutes": 60,           # longer test recordings are not cleaned (48 kHz WAVs in memory)
 }
 
 

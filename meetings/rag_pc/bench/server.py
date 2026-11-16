@@ -17,7 +17,7 @@ from pathlib import Path
 
 from aiohttp import WSMsgType, web
 
-from . import VERSION, access, capture, cloud, config, gpu, keystore, minerva
+from . import VERSION, access, capture, cloud, config, denoise, gpu, keystore, minerva
 from .jobs import JobError, Jobs
 from .link import EXPIRED, OFFLINE, Link, LinkError
 from .live import SR, LiveSession
@@ -174,6 +174,7 @@ async def status(request):
         "job": _current_job(ctx), "queue": jobs.queue.qsize(),
         "retention_days": cfg["retention_days"], "max_upload_mb": cfg["max_upload_mb"],
         "standalone": bool(cfg.get("standalone_enabled")), "minerva": ctx["link"].status(),
+        "denoise": denoise.info(cfg),
     })
 
 
@@ -316,6 +317,41 @@ async def transcribe(request):
     except JobError as exc:
         return web.json_response({"error": str(exc)}, status=409)
     return web.json_response({"ok": True, "job": _job_view(st)})
+
+
+async def denoise_copy(request):
+    """«🧹 Почистити й порівняти»: a cleaned copy of this test recording as a new session (kind "denoise") + the job
+    (deep-filter, then Whisper for both). {level soft | medium | full, channels all | mic} -> {id, job}."""
+    ctx = _bench(request)
+    cfg, store = ctx["cfg"], ctx["store"]
+    sid = _sid(request)
+    data = await request.json()
+    meta = store.meta(sid)
+    if meta.get("kind") == "denoise":
+        return web.json_response({"error": "Це вже почищена копія — виберіть оригінал."}, status=400)
+    if store.audio_file(sid) is None:
+        return web.json_response({"error": "У цьому записі немає аудіо."}, status=400)
+    if denoise.exe_path(cfg) is None:
+        return web.json_response({"error": "Програму чистки DeepFilterNet не знайдено на RAG-ПК."}, status=409)
+    limit = int(cfg["denoise_max_minutes"])
+    if (meta.get("duration") or 0) > limit * 60:
+        return web.json_response({"error": f"Запис довший за {limit} хв — для порівняння візьміть коротший."},
+                                 status=400)
+    level = data.get("level") if data.get("level") in denoise.LEVELS else denoise.DEFAULT_LEVEL
+    stereo = denoise.is_stereo(meta)
+    channels = data.get("channels") if stereo and data.get("channels") in denoise.CHANNELS else "all"
+    label = denoise.LEVELS[level][1] + (", лише мікрофон" if channels == "mic" else "")
+    keep = {k: meta[k] for k in ("lang", "lang_l", "lang_r", "mode", "split", "duration") if k in meta}
+    new, _, _ = store.create("denoise", f"{meta.get('title') or sid} · почищено ({label})", denoised_from=sid, level=level,
+                             channels=channels, source_kind=meta.get("kind"), consent=True,
+                             client=request["client_ip"], **keep)
+    try:
+        st = ctx["jobs"].submit(new, "denoise", {"from": sid, "level": level, "channels": channels})
+    except JobError as exc:
+        store.delete(new)
+        return web.json_response({"error": str(exc)}, status=409)
+    log.info("denoise copy %s of %s (%s, %s) by %s", new, sid, level, channels, request["client_ip"])
+    return web.json_response({"ok": True, "id": new, "job": _job_view(st)})
 
 
 async def find_moments(request):
@@ -848,6 +884,7 @@ def create_app(cfg, background=True):
     r.add_post("/api/sessions/{sid}/delete", delete)
     r.add_post("/api/sessions/{sid}/transcribe", transcribe)
     r.add_post("/api/sessions/{sid}/moments", find_moments)
+    r.add_post("/api/sessions/{sid}/denoise", denoise_copy)
     r.add_post("/api/upload", upload)
     r.add_get("/api/metrics", metrics)
     r.add_get("/api/metrics.csv", metrics_csv)

@@ -1,4 +1,5 @@
-"""One job at a time: final transcript (worker process on the GPU or CPU) or key moments (Ollama).
+"""One job at a time: final transcript (worker process on the GPU or CPU), key moments (Ollama) or a cleaned copy of
+a test recording (deep-filter on the CPU, bench/denoise.py — then both are transcribed for the comparison tab).
 
 State lives in memory for the page (`status`) and on disk in the session folder. `on_finish(sid, kind, state, text)`
 tells bench/link.py when a job of a Minerva session ends, so it can push the result and start the next step.
@@ -11,7 +12,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import cloud, gpu, moments
+from . import cloud, denoise, gpu, moments
 from .store import read_json, write_json
 
 log = logging.getLogger("bench.jobs")
@@ -19,7 +20,8 @@ log = logging.getLogger("bench.jobs")
 APP_DIR = Path(__file__).resolve().parent.parent
 BELOW_NORMAL = 0x00004000
 NO_WINDOW = 0x08000000
-KINDS = ("transcribe", "moments")
+KINDS = ("transcribe", "moments", "denoise")
+COMPARE_PARAMS = {"model": "accurate", "device": "auto", "allow_unload": True}
 
 
 class JobError(Exception):
@@ -99,6 +101,8 @@ class Jobs:
                     await self._transcribe(sid, params, st)
                 elif kind == "moments":
                     await self._moments(sid, params, st)
+                elif kind == "denoise":
+                    await self._denoise(sid, params, st)
                 else:
                     raise JobError("Невідоме завдання.")
                 st.update(state="done", text="Готово", finished=time.time())
@@ -110,6 +114,12 @@ class Jobs:
             finally:
                 self.current = None
                 self.procs.pop(sid, None)
+            for nxt_sid, nxt_kind, nxt_params in st.pop("then", None) or []:
+                if st["state"] == "done":
+                    try:
+                        self.submit(nxt_sid, nxt_kind, nxt_params)
+                    except JobError:
+                        pass
             if self.on_finish is not None:
                 try:
                     self.on_finish(sid, kind, st["state"], st.get("text") or "")
@@ -149,8 +159,8 @@ class Jobs:
                 raise JobError(f"Не вистачає пам'яті відеокарти: вільно {mem['free']} МБ, потрібно ≈ {need} МБ.")
             else:
                 fallback = f"на відеокарті вільно {mem['free']} МБ із потрібних ≈ {need} — рахую на процесорі"
-        split = meta.get("kind") == "live" or bool(meta.get("split"))
-        if meta.get("kind") == "live":
+        split = denoise.is_stereo(meta)
+        if meta.get("kind") == "live" or meta.get("source_kind") == "live":   # a cleaned copy keeps L / R languages
             mode = meta.get("mode", "both")
             names = {"both": ("L", "R"), "mic": ("L",), "meeting": ("R",)}.get(mode, ("L", "R"))
             langs = {"L": params.get("lang_l", meta.get("lang_l")), "R": params.get("lang_r", meta.get("lang_r"))}
@@ -203,6 +213,73 @@ class Jobs:
         err = read_json(folder / "error.json")
         if proc.returncode != 0 or err:
             raise JobError((err or {}).get("message") or f"Розшифровка зупинилась (код {proc.returncode}).")
+
+    # ---- 🧹 cleaned copy (comparison tab) ------------------------------------------------------
+    async def _denoise(self, sid, params, st):
+        """deep-filter on a copy of a test recording -> source.wav of this session; then Whisper for the copy and,
+        when it has no transcript yet, for the original (same model), so the two can be compared."""
+        source = params.get("from") or ""
+        meta = self.store.meta(sid)
+        if meta.get("minerva") or self.store.private(source):
+            raise JobError("Записи нарад Minerva тут не чистяться.")
+        src = self.store.audio_file(source)
+        if src is None:
+            raise JobError("В оригіналі немає аудіо.")
+        exe = denoise.exe_path(self.cfg)
+        if exe is None:
+            raise JobError("Програму чистки DeepFilterNet не знайдено на RAG-ПК.")
+        while self.live_busy():                          # deep-filter and the live captions both use the CPU
+            st["text"] = "Чекаю: іде запис наживо…"
+            await asyncio.sleep(2)
+        folder = self.store.path(sid)
+        out_dir = folder / "dn_out"
+        loop = asyncio.get_running_loop()
+        st["text"] = "Готую звук (48 кГц)…"
+        try:
+            plan = await loop.run_in_executor(None, denoise.prepare, src, folder, denoise.is_stereo(meta),
+                                              params.get("channels", "all"))
+        except Exception as exc:  # noqa: BLE001 - unreadable audio: a readable message
+            raise JobError(f"Не вдалося прочитати аудіо оригіналу: {exc}"[:300]) from exc
+        st["text"] = "Чищу звук (DeepFilterNet)…"
+        started = time.time()
+        logf = open(folder / "denoise.log", "w", encoding="utf-8")
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *denoise.command(exe, plan, out_dir, params.get("level")), cwd=str(folder),
+                stdout=logf, stderr=subprocess.STDOUT,
+                creationflags=(BELOW_NORMAL | NO_WINDOW) if sys.platform == "win32" else 0,
+            )
+            self.procs[sid] = proc
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=denoise.timeout(plan["seconds"]))
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+                raise JobError("Чистка звуку триває задовго — зупинено.")
+        finally:
+            logf.close()
+        seconds = time.time() - started
+        if st.get("cancelled"):
+            denoise.cleanup(plan, out_dir)
+            raise JobError("Скасовано: запис видаляється.")
+        if proc.returncode != 0:
+            denoise.cleanup(plan, out_dir)
+            raise JobError(f"DeepFilterNet зупинився (код {proc.returncode}) — див. denoise.log.")
+        st["text"] = "Зберігаю почищений звук…"
+        try:
+            await loop.run_in_executor(None, denoise.merge, plan, out_dir, folder)
+        except Exception as exc:  # noqa: BLE001
+            denoise.cleanup(plan, out_dir)
+            raise JobError(f"Не вдалося зібрати почищений звук: {exc}"[:300]) from exc
+        self.store.update_meta(sid, duration=plan["seconds"], denoise={
+            "seconds": round(seconds, 1), "audio_s": plan["seconds"], "exe": exe.name,
+            "speed_x": round(plan["seconds"] / seconds, 1) if seconds > 0 else None,
+            "channels": plan["clean"], "level": params.get("level") or denoise.DEFAULT_LEVEL})
+        # both through the same Whisper model: the copy, and the original if it was never transcribed (queued by
+        # run_forever once this job is done — this session is still «running» here)
+        st["then"] = [(sid, "transcribe", dict(COMPARE_PARAMS))]
+        if not (self.store.path(source) / "transcript.json").exists() and not self.busy(source):
+            st["then"].append((source, "transcribe", dict(COMPARE_PARAMS)))
 
     # ---- key moments ------------------------------------------------------------------------
     async def _moments(self, sid, params, st):

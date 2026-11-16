@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Вікно запису наради</title>
-<link rel="stylesheet" href="/static/bench.css?v=0.3.2">
-<script src="/static/bench.js?v=0.3.2" defer></script>
+<link rel="stylesheet" href="/static/bench.css?v=0.3.3">
+<script src="/static/bench.js?v=0.3.3" defer></script>
 </head>
 <body class="boot">
 <header class="top">
@@ -49,6 +49,7 @@
   <button type="button" data-tab="upload" class="stage0" role="tab">📁 Свій файл</button>
   <button type="button" data-tab="list" class="stage0" role="tab">🗂 Записи <span id="count" class="badge"></span></button>
   <button type="button" data-tab="metrics" class="stage0" role="tab">📊 Заміри</button>
+  <button type="button" data-tab="denoise" class="stage0" role="tab">🧹 Чистка звуку</button>
   <button type="button" data-tab="help" class="stage0" role="tab">❓ Довідка</button>
 </nav>
 
@@ -297,6 +298,46 @@
     <p class="muted">«Швидкість» — у скільки разів швидше за реальний час. «Затримка» наживо — від кінця фрази до тексту
       без урахування паузи 0,5 с, якою Parakeet визначає кінець фрази.</p>
     <div class="scroll"><table class="list" id="metrics-table"></table></div>
+  </div>
+</section>
+
+<section id="tab-denoise" class="tab" hidden>
+  <div class="card">
+    <b>🧹 Чистка звуку — «як записано» проти «почищено»</b>
+    <p class="muted">DeepFilterNet прибирає шум (вентилятор, клавіатура, гул кімнати, вулиця) на процесорі RAG-ПК. Тут
+      видно, чи допомагає це розпізнаванню: RAG-ПК робить почищену копію тестового запису й розшифровує обидва однією
+      моделлю. Оригінал не змінюється; звук і текст нікуди не йдуть.</p>
+    <p id="dn-tool" class="muted"></p>
+    <div class="row">
+      <label class="field">Запис <select id="dn-src"></select></label>
+      <label class="field" id="dn-ch-field" hidden>Що чистити
+        <select id="dn-ch">
+          <option value="mic">лише мій мікрофон (співрозмовників Teams / Zoom уже чистить сам)</option>
+          <option value="all">обидва канали</option>
+        </select>
+      </label>
+    </div>
+    <fieldset id="dn-levels"><legend>Сила чистки</legend></fieldset>
+    <div class="row">
+      <button type="button" id="dn-start" class="primary">🧹 Почистити й порівняти</button>
+      <span id="dn-msg" class="muted" role="status"></span>
+    </div>
+    <p class="muted">Найточніше: запишіть у «🔴 Наживо» (або «📁 Свій файл») хвилину, де ви читаєте відомий текст при
+      шумі, і вставте цей текст нижче — вкладка порахує помилки розпізнавання для обох.</p>
+  </div>
+  <div class="card">
+    <div class="row between">
+      <b>Порівняння</b>
+      <label class="field small">Почищена копія <select id="dn-pair"></select></label>
+    </div>
+    <label class="field">Текст, який читали вголос (необов’язково)
+      <textarea id="dn-ref" rows="3" placeholder="Вставте сюди текст, який ви читали під час запису"></textarea>
+    </label>
+    <div id="dn-verdict" class="job" role="status"></div>
+    <div class="dn-cols">
+      <div class="card" id="dn-a"></div>
+      <div class="card" id="dn-b"></div>
+    </div>
   </div>
 </section>
 

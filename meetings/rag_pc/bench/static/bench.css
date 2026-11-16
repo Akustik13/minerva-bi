@@ -142,3 +142,12 @@ a.button.disabled { opacity: .5; pointer-events: none; }
 .mn-moments { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .mn-moments-opts { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
 .mn-moments-opt { display: block; }
+
+/* 🧹 Чистка звуку: два стовпчики «як записано» / «почищено» */
+.dn-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.dn-cols audio { width: 100%; margin: 6px 0; }
+.dn-cols .lines { max-height: 460px; }
+#dn-ref { width: 100%; box-sizing: border-box; font: inherit; }
+.dn-good { color: var(--ok); font-weight: 600; }
+.dn-bad { color: var(--bad); font-weight: 600; }
+@media (max-width: 900px) { .dn-cols { grid-template-columns: minmax(0, 1fr); } }
