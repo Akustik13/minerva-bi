@@ -129,7 +129,7 @@
   // 🌐 Мова документа: підписи діаграми (не дані — [translate="no"]) перекладаються словником інтерфейсу Minerva
   // (core/ui_text, /core/ui-dict/<мова>.js) тим самим алгоритмом, що й сторінка (mv_translate.js → MVTranslateKit);
   // місяці класичної діаграми (data-md) — Intl цією мовою. Українська — як на екрані.
-  var KIT_URL = '/static/admin/js/mv_translate.js?v=5', dicts = {};
+  var KIT_URL = '/static/admin/js/mv_translate.js?v=13', dicts = {};
   function kit() {
     if (window.MVTranslateKit) return Promise.resolve(window.MVTranslateKit);
     return new Promise(function (ok) {
@@ -168,7 +168,7 @@
     list.forEach(function (node) {
       var el = node.parentNode;
       if (!CYR.test(node.nodeValue) || !el || (el.closest && el.closest('[translate="no"],title,style,script'))) return;
-      var t = o.tr(node.nodeValue);
+      var t = o.tr.node ? o.tr.node(node) : o.tr(node.nodeValue);   // назви кроків і фаз — лише повний збіг
       if (t !== null && t !== undefined) node.nodeValue = t;
     });
   }

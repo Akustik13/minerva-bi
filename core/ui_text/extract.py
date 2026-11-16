@@ -117,6 +117,10 @@ def _js_literals(code: str) -> list[str]:
         s = m.group(1) if m.group(1) is not None else m.group(2) if m.group(2) is not None else m.group(3)
         if s and CYR.search(s):
             s = s.replace("\\'", "'").replace('\\"', '"').replace("\\n", "\n")
+            if "<" in s:                    # HTML у рядку JS: підказки (title, placeholder, aria-label…) — теж написи
+                for a in _ATTR_RE.finditer(s):
+                    out.extend(phrases(a.group(2) if a.group(2) is not None else a.group(3), html=False))
+                s = _ATTR_RE.sub(" ", s)
             out.extend(phrases(s))
     return out
 

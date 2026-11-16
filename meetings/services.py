@@ -703,7 +703,7 @@ def _reset_recording(m) -> list:
     m.capture_mode, m.no_headset, m.transcript_chars, m.moments_error = "", False, 0, ""
     m.consent_announced = m.consent_all_agreed = False
     MeetingTranscript.objects.filter(meeting=m).delete()
-    m.items.exclude(status=MeetingItem.ACCEPTED).delete()
+    drop_unused_items(m)
     if m.approved_at:
         from . import knowledge
         knowledge.unpublish(m)
@@ -1571,6 +1571,7 @@ def targets(user, m, item=None, project=_UNSET, plans=None) -> dict:
                 plans[project.pk] = planned
         out = {"moment": "", "risk": "", "step": "" if planned else NO_PLAN_TEXT}
     out["deadline"] = ""
+    out["note"] = ""            # 💬 лише обговорення: нічого не створюється — можна завжди, і без проєкту
     default = DEFAULT_TARGET.get(item.kind if item else "", "moment")
     if out.get(default):
         default = "deadline"
@@ -1589,7 +1590,8 @@ def _step_side(m, item, data) -> str:
 
 def accept(user, item, target, data=None) -> MeetingItem:
     """✓ — пункт у проєкт (📌 момент, ⚠️ ризик, 📅 крок плану) або ⏰ дедлайн у СВІЙ календар (до проєкту не
-    прив'язується; назва без цитати). data: project (один із проєктів наради; порожньо — проєкт частини, де пункт
+    прив'язується; назва без цитати); 💬 note — лише позначка «стосується наради»: нічого не створюється, назва (якщо
+    її змінили) і проєкт пункту запам'ятовуються в самому пункті. data: project (один із проєктів наради; порожньо — проєкт частини, де пункт
     прозвучав, інакше головний — meetings/parts.item_project), title, kind (моменту), category / probability / impact /
     owner (ризику), date, assignee, side (кроку / дедлайну)."""
     from projects import plan, risk_rules, risks, services as project_services
@@ -1648,9 +1650,12 @@ def accept(user, item, target, data=None) -> MeetingItem:
                 item.step = plan.meeting_step(project, title, assignee=assignee, due=due, side=side,
                                               quote=item.quote, meeting=m, meeting_second=second, user=user)
                 fields.append("step")
-            else:
+            elif target == "deadline":
                 item.event = _deadline_event(user, m, title, data.get("date"))
                 fields.append("event")
+            elif title and title[:300] != item.title:      # note: лише в нараді — назва тези, як її виправили
+                item.title = title[:300]
+                fields.append("title")
             if target != "deadline" and project is not None and item.project_id != project.pk:
                 item.project = project
                 fields.append("project")
@@ -1682,19 +1687,29 @@ def reject(user, item) -> MeetingItem:
 
 
 def restore(user, item) -> MeetingItem:
+    """↺ Повернути: «✕ Не те» і «💬 лише обговорення» (нічого ніде не створено) знову чекають ✓ / ✕."""
     _check_owner(user, item.meeting)
-    if item.status != MeetingItem.REJECTED:
-        raise MeetingError("Повернути можна лише пункт «Не те»")
-    item.status, item.decided_at = MeetingItem.PENDING, None
-    item.save(update_fields=["status", "decided_at"])
+    note = item.status == MeetingItem.ACCEPTED and item.target == MeetingItem.NOTE
+    if item.status != MeetingItem.REJECTED and not note:
+        raise MeetingError("Повернути можна лише пункт «Не те» або «Лише обговорення»")
+    item.status, item.target, item.decided_at = MeetingItem.PENDING, "", None
+    item.save(update_fields=["status", "target", "decided_at"])
     return item
+
+
+def drop_unused_items(m):
+    """Пункти, що живуть лише в нараді: ще не вирішені, «✕ Не те» і «💬 лише обговорення» (у проєкті й календарі
+    їх немає). Додані в проєкт / календар лишаються."""
+    m.items.exclude(status=MeetingItem.ACCEPTED).delete()
+    m.items.filter(target=MeetingItem.NOTE).delete()
 
 
 # ── видалення й прибирання ───────────────────────────────────────────────────
 
 def accepted_items(meeting) -> list:
-    """Прийняті пункти (для вікна «🗑 Видалити нараду»: що лишиться в проєкті / календарі)."""
-    return list(meeting.items.filter(status=MeetingItem.ACCEPTED)
+    """Прийняті пункти (для вікна «🗑 Видалити нараду»: що лишиться в проєкті / календарі; «💬 лише обговорення» —
+    ні, вони тільки в нараді)."""
+    return list(meeting.items.filter(status=MeetingItem.ACCEPTED).exclude(target=MeetingItem.NOTE)
                 .select_related("highlight", "risk", "step", "event").order_by("start_s", "pk"))
 
 
@@ -1787,7 +1802,7 @@ def admin_delete(user, meeting, request=None) -> dict:
     if not _is_admin(user):
         raise Http404("Сторінку не знайдено")
     from core.models import AuditLog
-    accepted = meeting.items.filter(status=MeetingItem.ACCEPTED).count()
+    accepted = meeting.items.filter(status=MeetingItem.ACCEPTED).exclude(target=MeetingItem.NOTE).count()
     pk = meeting.pk
     extra = {"consent_at": _iso(meeting.consent_at), "consent_all_agreed": meeting.consent_all_agreed,
              "accepted_items": accepted, "by_admin": True}
@@ -1803,13 +1818,13 @@ def admin_delete(user, meeting, request=None) -> dict:
 
 
 def drop_transcript(m, now=None) -> None:
-    """Строк зберігання минув / власника немає: розшифровка, підсумок, позначки, неприйняті пункти, документи бази
-    знань — геть; прийняті пункти — без назви й цитати (ключ, стан, куди додано лишаються). Протокол згоди лишається."""
+    """Строк зберігання минув / власника немає: розшифровка, підсумок, позначки, неприйняті пункти й «💬 лише
+    обговорення», документи бази знань — геть; прийняті пункти — без назви й цитати (ключ, стан, куди додано лишаються). Протокол згоди лишається."""
     now = now or timezone.now()
     from . import knowledge
     knowledge.unpublish(m)
     MeetingTranscript.objects.filter(meeting=m).delete()
-    m.items.exclude(status=MeetingItem.ACCEPTED).delete()
+    drop_unused_items(m)
     m.items.filter(status=MeetingItem.ACCEPTED).update(title="", quote="", who="", due_text="")
     m.marks = [{"t": mk.get("t"), "label": "", "kind": mk.get("kind")} for mk in m.marks or []]
     m.transcript_deleted_at, m.moments_error, m.bench_detail = now, "", ""

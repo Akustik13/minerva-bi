@@ -660,6 +660,43 @@ def run_setup_modules() -> dict:
         return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
 
 
+def run_ui_texts() -> dict:
+    """🌐 Переклади після оновлення коду — те саме, що entrypoint.sh при запуску контейнера («🚀 Повне оновлення»
+    контейнер не перезапускає): compilemessages (.po → .mo, збій — лише попередження) і каталог написів ← код +
+    переклади з комплекту (`manage.py ui_texts collect`)."""
+    start = time.time()
+    import sys
+    notes = []
+    try:
+        res = subprocess.run(
+            [sys.executable, "manage.py", "compilemessages", "--ignore=venv", "--ignore=staticfiles",
+             "--ignore=node_modules"],
+            capture_output=True, text=True, timeout=120, cwd=str(settings.BASE_DIR),
+        )
+        if res.returncode != 0:
+            last = ((res.stderr or res.stdout).strip().splitlines() or ["?"])[-1]
+            notes.append(f"⚠️ compilemessages: {last}")
+    except Exception as exc:
+        notes.append(f"⚠️ compilemessages: {exc}")
+    try:
+        result = subprocess.run(
+            [sys.executable, "manage.py", "ui_texts", "collect"],
+            capture_output=True, text=True, timeout=300, cwd=str(settings.BASE_DIR),
+        )
+        output = "\n".join(notes + [(result.stdout + result.stderr).strip()]).strip()
+        ok = result.returncode == 0
+        return {
+            "ok": ok,
+            "output": output,
+            "duration": round(time.time() - start, 1),
+            **({"error": output} if not ok else {}),
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "ui_texts collect timeout (>300с)", "duration": round(time.time() - start, 1)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
+
+
 def run_collectstatic() -> dict:
     """Run manage.py collectstatic --noinput and return output."""
     start = time.time()

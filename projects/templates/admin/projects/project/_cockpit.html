@@ -38,7 +38,7 @@
       {% for f in plan.strip %}
         <li class="pjc-ph pjc-ph-{{ f.status }}{% if f.gate %} pjc-ph-gate{% endif %}"{% if f.id and can_change %} data-pjc-phase="{{ f.id }}"{% endif %}
             title="{{ f.name }}{% if f.gate %} · умова переходу: {{ f.gate }}{% if f.gate_done %} ✓{% endif %}{% endif %}{% if f.dates %} · {{ f.dates }}{% endif %}">
-          <b>{% if f.status == "done" %}✓ {% elif f.status == "active" %}● {% endif %}{{ f.name }}</b>
+          <b>{% if f.status == "done" %}✓ {% elif f.status == "active" %}● {% endif %}<span data-mv-tr="exact">{{ f.name }}</span></b>
           <small>{% if f.progress %}{{ f.progress }}{% endif %}{% if f.dates %} · {{ f.dates }}{% endif %}{% if f.slip %} · <span class="pjc-slip">+{{ f.slip }} дн.</span>{% endif %}</small>
         </li>
       {% endfor %}
@@ -160,7 +160,7 @@
       <button type="button" class="pjc-b" data-pja-scan{% if not ai.unread %} disabled{% endif %}
               title="Claude Haiku читає ваші листи проєкту, яких ще не читав (до 12 за раз), і пропонує важливі моменти й ризики — з цитатою з листа">🧠 Знайти моменти й ризики{% if ai.unread %} · непрочитаних листів {{ ai.unread }}{% elif ai.own %} · усі листи прочитано{% endif %}</button>
       <button type="button" class="pjc-b" data-pja-forgotten
-              title="Гілки з ваших скриньок, які стосуються проєкту, але не прив'язані: учасники, клієнт, номери замовлень і закупівель, артикули{% if ai.rag %} і база знань{% endif %}">🔎 Знайти забуті листи</button>
+              title="{% if ai.rag %}Гілки з ваших скриньок, які стосуються проєкту, але не прив'язані: учасники, клієнт, номери замовлень і закупівель, артикули і база знань{% else %}Гілки з ваших скриньок, які стосуються проєкту, але не прив'язані: учасники, клієнт, номери замовлень і закупівель, артикули{% endif %}">🔎 Знайти забуті листи</button>
       <button type="button" class="pjc-b" data-pja-plan
               title="Claude Sonnet складає чернетку плану з ваших листів, шаблонів, тривалостей минулих проєктів і вашої підказки (що врахувати, що вже відбулось); перед застосуванням ви її переглядаєте">🧠 {% if plan.has_plan %}Переробити план з листування{% else %}Скласти план з листування{% endif %}</button>
       <span class="pjc-merr" data-pja-err role="alert"></span>
@@ -341,7 +341,7 @@
               </tr>
               {% endwith %}
             {% empty %}
-              <tr><td colspan="8" class="pjc-sub">✅ Відкритих ризиків немає. Правила відкриють їх самі, коли щось почне загрожувати строку{% if can_change %}, або додайте свій — «＋ Ризик»{% endif %}.</td></tr>
+              <tr><td colspan="8" class="pjc-sub">✅ {% if can_change %}Відкритих ризиків немає. Правила відкриють їх самі, коли щось почне загрожувати строку, або додайте свій — «＋ Ризик».{% else %}Відкритих ризиків немає. Правила відкриють їх самі, коли щось почне загрожувати строку.{% endif %}</td></tr>
             {% endfor %}
             </tbody>
           </table>
@@ -393,11 +393,11 @@
         <div class="pjc-ptools">
           {% if can_change %}
             <button type="button" class="pjc-b pri" data-pje-open
-                    title="Усі фази й кроки однією таблицею: назви, дати, тривалості, хто робить, «після №», стан, порядок{% if ai.on %} — і 🧠 «Що змінити в плані»: AI пропонує виправлення{% endif %}">✏️ Редактор плану</button>
+                    title="{% if ai.on %}Усі фази й кроки однією таблицею: назви, дати, тривалості, хто робить, «після №», стан, порядок — і 🧠 «Що змінити в плані»: AI пропонує виправлення{% else %}Усі фази й кроки однією таблицею: назви, дати, тривалості, хто робить, «після №», стан, порядок{% endif %}">✏️ Редактор плану</button>
             <button type="button" class="pjc-b" data-pjc-step-new>＋ Крок</button>
             <button type="button" class="pjc-b" data-pjc-phase-new>＋ Фаза</button>
             <button type="button" class="pjc-b" data-pjc-post="{{ urls.plan_baseline }}"
-                    data-confirm="{% if plan.baseline_at %}Перезаписати базовий план поточним прогнозом?{% else %}Зафіксувати поточний план як базовий — з ним порівнюватиметься зсув?{% endif %}">📌 {% if plan.baseline_at %}Перезаписати{% else %}Зафіксувати{% endif %} базовий план</button>
+                    data-confirm="{% if plan.baseline_at %}Перезаписати базовий план поточним прогнозом?{% else %}Зафіксувати поточний план як базовий — з ним порівнюватиметься зсув?{% endif %}">📌 {% if plan.baseline_at %}Перезаписати базовий план{% else %}Зафіксувати базовий план{% endif %}</button>
             <button type="button" class="pjc-b" data-pjc-save-tpl>💾 Зберегти як шаблон</button>
           {% endif %}
           <span class="pjc-sub">{% if plan.baseline_at %}базовий план від {{ plan.baseline_at|date:"d.m.Y" }}{% else %}базовий план не зафіксовано{% endif %}{% if plan.critical %} · на критичному шляху {{ plan.critical }}{% endif %}</span>

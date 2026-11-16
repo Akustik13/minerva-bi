@@ -33,6 +33,16 @@ def _cut(text, n=TITLE_MAX) -> str:
     return text if len(text) <= n else text[:n - 1] + "…"
 
 
+def _name(text, n) -> str:
+    """Назва кроку чи фази: 🌐 інша мова інтерфейсу (і експорт) перекладає її лише повним збігом зі словником — назви
+    з шаблонів плану («Прототип» → «Prototype»), свої — як написано (mv_translate.js, [data-mv-tr="exact"]);
+    скорочену — за повною в data-mv-full."""
+    full = " ".join(str(text or "").split())
+    shown = _cut(full, n)
+    more = f' data-mv-full="{escape(full)}" data-mv-cut="{len(shown)}"' if shown != full else ""
+    return f'<tspan data-mv-tr="exact"{more}>{escape(shown)}</tspan>'
+
+
 def _fmt(d) -> str:
     return d.strftime("%d.%m") if d else ""
 
@@ -104,9 +114,10 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
             tip = name + (f" · умова переходу: {ph.gate}" if ph and ph.gate else "") + \
                 f" · {pc.done} з {len(pc.steps)} кроків" + (f" · {_fmt(pc.start)}–{_fmt(pc.end)}" if pc.start else "")
             attr = f' data-phase="{ph.pk}"{focus}' if ph else ""
+            pname = ((f"{escape(ph.icon)} " if ph.icon else "") + _name(ph.name, 38 if ph.icon else 40)) if ph else escape(name)
             g = [f'<g class="pjg-row pjg-phase pjg-{pc.status}"{attr}><title>{escape(tip)}</title>',
                  f'<rect x="0" y="{top}" width="{W}" height="{RH}" class="pjg-rowbg pjg-phbg"/>',
-                 f'<text x="10" y="{_n(cy + 4)}" class="pjg-pname" translate="no">{escape(_cut(name, 40))}</text>',
+                 f'<text x="10" y="{_n(cy + 4)}" class="pjg-pname">{pname}</text>',
                  f'<text x="268" y="{_n(cy + 4)}" class="pjg-dates">{_fmt(pc.start)}–{_fmt(pc.end)}</text>']
             if pc.start and pc.end:
                 g.append(f'<rect x="{_n(x(pc.start))}" y="{_n(cy - 4)}" width="{_n(max(x(pc.end + timedelta(days=1)) - x(pc.start), 2))}" '
@@ -136,7 +147,7 @@ def render(project, plan, today=None, editable=False, brief=False) -> str:
         cls = f"pjg-{c.status or 'todo'}" + (" pjg-crit" if c.critical and c.status not in ("done", "skipped") else "")
         g = [f'<g class="pjg-row pjg-step {cls}" data-step="{s.pk}"{focus}><title>{escape(tip)}</title>',
              f'<rect x="0" y="{top}" width="{W}" height="{RH}" class="pjg-rowbg"/>',
-             f'<text x="22" y="{_n(cy + 4)}" class="pjg-t" translate="no">{STATUS_ICON.get(c.status, "")} {escape(_cut(s.title, 29))}</text>',
+             f'<text x="22" y="{_n(cy + 4)}" class="pjg-t">{STATUS_ICON.get(c.status, "")} {_name(s.title, 29)}</text>',
              f'<text x="222" y="{_n(cy + 4)}" class="pjg-who pjg-side-{s.side}"'
              f'{data_attr}>{escape(_cut(who, 9))}</text>',
              f'<text x="268" y="{_n(cy + 4)}" class="pjg-dates">'

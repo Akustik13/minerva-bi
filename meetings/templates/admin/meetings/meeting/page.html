@@ -3,7 +3,7 @@
 {# Назва, розшифровка, цитати, імена й адреси — лише в translate="no". JS — meetings/static/meetings/meetings.js. #}
 {% load static %}
 {% block title %}{{ title }} | Minerva{% endblock %}
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=5">{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'meetings/meetings.css' %}?v=6">{% endblock %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
@@ -237,10 +237,15 @@
     <h2>🧠 Ключові моменти{% if pending %} <span class="mt-chip mt-chip-warn"><span id="mt-pending-n">{{ pending|length }}</span> чекають ✓ / ✕</span>{% endif %}</h2>
     {% if moments_wait %}<div class="mt-line-warn">{{ moments_wait_text }}</div>{% endif %}
     {% if summary %}<div class="mt-summary" translate="no">{{ summary|linebreaksbr }}</div>{% endif %}
-    {% if no_project_hint and pending %}<div class="mt-muted">Щоб додавати в проєкт, підключіть нараду до проєкту («📁» угорі). Без проєкту — лише ⏰ дедлайн у вашому календарі.</div>{% endif %}
+    {% if no_project_hint and pending %}<div class="mt-muted">Щоб додавати в проєкт, підключіть нараду до проєкту («📁» угорі). Без проєкту — ⏰ дедлайн у вашому календарі або 💬 лише обговорення.</div>{% endif %}
     <div id="mt-items">
       {% for r in pending %}{{ r.html }}{% endfor %}
       {% for r in accepted %}{{ r.html }}{% endfor %}
+      {% if notes %}
+      <details class="mt-rejected mt-notes"><summary>💬 Лише обговорення ({{ notes|length }})</summary>
+        {% for r in notes %}{{ r.html }}{% endfor %}
+      </details>
+      {% endif %}
       {% if rejected %}
       <details class="mt-rejected"><summary>✕ Не те ({{ rejected|length }})</summary>
         {% for r in rejected %}{{ r.html }}{% endfor %}
@@ -345,5 +350,5 @@
   </dialog>
 </div>
 {{ config|json_script:"mt-config" }}
-<script src="{% static 'meetings/meetings.js' %}?v=3" defer></script>
+<script src="{% static 'meetings/meetings.js' %}?v=4" defer></script>
 {% endblock %}

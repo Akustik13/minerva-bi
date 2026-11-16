@@ -53,6 +53,11 @@ def ui_context(request):
     if profile is not None:
         try:
             from core.ui_text import catalog
+            catalog.ensure_synced()           # код оновили без перезапуску контейнера — зібрати каталог у фоні
+        except Exception:
+            pass
+        try:
+            from core.ui_text import catalog
             lang = (getattr(request, 'LANGUAGE_CODE', '') or '')[:2]
             info = catalog.page_info(lang)
             if info:
