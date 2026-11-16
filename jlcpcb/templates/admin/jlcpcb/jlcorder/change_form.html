@@ -194,7 +194,17 @@
         {% if jlc_order.local_status == 'ordered' %}📋{% elif jlc_order.local_status == 'reviewed' %}🔍{% elif jlc_order.local_status == 'in_production' %}🏭{% elif jlc_order.local_status == 'shipped' %}📦{% elif jlc_order.local_status == 'delivered' %}🎉{% elif jlc_order.local_status == 'cancelled' %}❌{% else %}✅{% endif %}
         <strong>{{ jlc_order.get_local_status_display }}</strong>
       </span>
-      {% if jlc_order.product_id %}
+      {% if jlc_multi %}
+      {% for g in jlc_groups %}
+      {% if g.linked %}
+      <a class="jlc-info-chip jlc-chip-ok" href="/admin/inventory/product/{{ g.product_id }}/change/"
+         title="Товар на складі · кожна позиція окремо"><span translate="no">🏷 {{ g.name }} ×{{ g.qty_text }}</span></a>
+      {% else %}
+      <span class="jlc-info-chip{% if is_unmatched %} jlc-chip-warn{% endif %}"
+            title="Файл не прив'язано до товару складу"><span translate="no">⬜ {{ g.name }} ×{{ g.qty_text }}</span></span>
+      {% endif %}
+      {% endfor %}
+      {% elif jlc_order.product_id %}
       <span class="jlc-info-chip jlc-chip-ok">🏷 {{ jlc_order.product.sku }}</span>
       {% elif is_unmatched %}
       <span class="jlc-info-chip jlc-chip-warn">⚠️ Товар не прив'язано</span>
@@ -205,7 +215,9 @@
       {% if jlc_order.expected_date %}
       <span class="jlc-info-chip">📅 ETA {{ jlc_order.expected_date|date:"d.m.Y" }}</span>
       {% endif %}
-      {% if jlc_order.quantity %}
+      {% if jlc_multi %}
+      <span class="jlc-info-chip" title="Разом усіх позицій замовлення">🔢 {{ jlc_total_qty }} шт. · позицій: {{ jlc_items_n }}</span>
+      {% elif jlc_order.quantity %}
       <span class="jlc-info-chip">🔢 {{ jlc_order.quantity }} шт.</span>
       {% endif %}
     </div>
