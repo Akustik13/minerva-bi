@@ -2,14 +2,19 @@ package com.minervabi.cards
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.net.Uri
 import android.text.InputType
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -39,13 +44,25 @@ fun Context.confirm(title: String, text: String, yes: String, action: () -> Unit
 
 fun shortDate(ms: Long): String = SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()).format(Date(ms))
 
-/** Чип-перемикач (позначки, категорії, фільтри). */
 /** Чипи щільніше: видима висота 40dp (зручно пальцем) без невидимих полів навколо. */
 private fun Chip.compact() {
     setEnsureMinTouchTargetSize(false)
     chipMinHeight = context.dp(40).toFloat()
 }
 
+/** Вибране видно одразу: синій чип з білим текстом, невибране — лише контур. */
+private fun Chip.selectedLook() {
+    val accent = ContextCompat.getColor(context, R.color.accent_dark)
+    val checked = intArrayOf(android.R.attr.state_checked)
+    val text = textColors.defaultColor
+    chipBackgroundColor = ColorStateList(arrayOf(checked, intArrayOf()), intArrayOf(accent, Color.TRANSPARENT))
+    setTextColor(ColorStateList(arrayOf(checked, intArrayOf()), intArrayOf(Color.WHITE, text)))
+    chipStrokeWidth = context.dp(1).toFloat()
+    chipStrokeColor = ColorStateList(arrayOf(checked, intArrayOf()), intArrayOf(accent, (text and 0x00FFFFFF) or 0x66000000))
+    checkedIconTint = ColorStateList.valueOf(Color.WHITE)
+}
+
+/** Чип-перемикач (позначки, категорії, фільтри). */
 fun ChipGroup.addToggle(text: String, checked: Boolean, tag: Any? = null, onChange: ((Boolean) -> Unit)? = null): Chip {
     chipSpacingVertical = context.dp(6)
     val c = Chip(context).apply {
@@ -54,6 +71,7 @@ fun ChipGroup.addToggle(text: String, checked: Boolean, tag: Any? = null, onChan
         isCheckable = true
         isChecked = checked
         this.tag = tag
+        selectedLook()
         setOnCheckedChangeListener { _, on -> onChange?.invoke(on) }
     }
     addView(c)
@@ -107,4 +125,30 @@ fun Context.label(text: String, size: Float = 14f, secondary: Boolean = false): 
 
 fun View.show(on: Boolean) {
     visibility = if (on) View.VISIBLE else View.GONE
+}
+
+/**
+ * Кнопка зі стилем Material: tonal — звичайна дія, outlined — другорядна, text — тиха / небезпечна, filled — головна
+ * (стиль задається лише розміткою — btn_*.xml).
+ */
+fun Context.button(kind: String, text: String, onClick: () -> Unit): MaterialButton {
+    val res = when (kind) {
+        "outlined" -> R.layout.btn_outlined
+        "text" -> R.layout.btn_text
+        "filled" -> R.layout.btn_filled
+        else -> R.layout.btn_tonal
+    }
+    return (LayoutInflater.from(this).inflate(res, null, false) as MaterialButton).apply {
+        this.text = text
+        setOnClickListener { onClick() }
+    }
+}
+
+/** Ряд кнопок однакової ширини (не виходить за край екрана). */
+fun LinearLayout.addRowButton(btn: MaterialButton, gapStart: Boolean) {
+    // однакова висота, навіть якщо текст однієї кнопки — у два рядки
+    btn.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+        .apply { if (gapStart) marginStart = context.dp(8) }
+    btn.maxLines = 2
+    addView(btn)
 }

@@ -53,6 +53,16 @@ object Prefs {
         get() = sp.getBoolean("flash", false)
         set(v) = sp.edit().putBoolean("flash", v).apply()
 
+    /** 📐 Візитку / флаєр обрізати по знайдених краях і вирівняти (ні — по рамці). */
+    var edges: Boolean
+        get() = sp.getBoolean("edges", true)
+        set(v) = sp.edit().putBoolean("edges", v).apply()
+
+    /** Підказку «утримуйте 📐 — скан Google» вже показали. */
+    var edgesTip: Boolean
+        get() = sp.getBoolean("edges_tip", false)
+        set(v) = sp.edit().putBoolean("edges_tip", v).apply()
+
     /** Після лицьового боку одразу пропонувати зворотний. */
     var askBack: Boolean
         get() = sp.getBoolean("ask_back", true)

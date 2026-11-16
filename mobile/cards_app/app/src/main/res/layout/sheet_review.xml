@@ -87,6 +87,14 @@
             </FrameLayout>
         </LinearLayout>
 
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/edges"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="📐 Обрізано по краях і вирівняно (вимкніть — по рамці)"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/qrInfo"
             android:layout_width="match_parent"

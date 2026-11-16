@@ -6,12 +6,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.widget.LinearLayout
+import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.chip.Chip
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.chip.ChipGroup
 import com.minervabi.cards.databinding.FragmentListBinding
 import com.minervabi.cards.databinding.ItemCardBinding
 import kotlinx.coroutines.Job
@@ -19,7 +22,11 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** 🪪 У Minerva: усі візитки й флаєри з бази (як «🪪 Візитки й флаєри» на комп'ютері) — пошук і фільтри. */
+/**
+ * 🪪 У Minerva: усі візитки й флаєри з бази (як «🪪 Візитки й флаєри» на комп'ютері) — пошук і «⚙ Фільтри»: вікно,
+ * де всі категорії й «де взяли» видно одразу (чипи переносяться на новий рядок); вибрані фільтри — чипи з ✕ під
+ * пошуком.
+ */
 class BrowseFragment : Fragment() {
     private var _b: FragmentListBinding? = null
     private val b get() = _b!!
@@ -33,8 +40,6 @@ class BrowseFragment : Fragment() {
     private var show = ""
     private var cat = 0
     private var event = ""
-    private lateinit var catChip: Chip
-    private lateinit var eventChip: Chip
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, s: Bundle?): View {
         _b = FragmentListBinding.inflate(inflater, container, false)
@@ -43,7 +48,7 @@ class BrowseFragment : Fragment() {
 
     override fun onViewCreated(view: View, s: Bundle?) {
         b.title.text = "🪪 Візитки в Minerva"
-        b.searchBox.show(true)
+        b.searchRow.show(true)
         val lm = LinearLayoutManager(requireContext())
         b.list.layoutManager = lm
         b.list.adapter = adapter
@@ -56,30 +61,86 @@ class BrowseFragment : Fragment() {
         b.search.setOnEditorActionListener { _, id, e ->
             if (id == EditorInfo.IME_ACTION_SEARCH || e?.keyCode == KeyEvent.KEYCODE_ENTER) { load(1); true } else false
         }
-        b.filters.addToggle("👤 Мої", false) { mine = it; load(1) }
-        aiChip("🧠 Не прочитані", "none")
-        aiChip("🗂 Без категорії", "nocat")
-        aiChip("⚠️ AI не прочитав", "failed")
-        b.filters.addToggle("🆕 Не внесені", false) { show = if (it) "new" else ""; load(1) }
-        catChip = b.filters.addAction("🗂 Категорія ▾") { chooseCategory() }
-        eventChip = b.filters.addAction("🎪 Де взяли ▾") { chooseEvent() }
+        b.searchBox.setEndIconOnClickListener { b.search.setText(""); load(1) }
+        b.btnFilters.setOnClickListener { filterSheet() }
+        renderFilters()
         fromCache()
         load(1)
     }
 
-    /** Стан AI — один з трьох (вибір іншого знімає попередній). */
-    private fun aiChip(label: String, key: String) {
-        b.filters.addToggle(label, false, key) { on ->
-            if (on) { ai = key; uncheckOthers(key) } else if (ai == key) ai = ""
-            load(1)
+    private val aiLabels = listOf("" to "Усі", "none" to "🧠 Ще не прочитані", "failed" to "⚠️ AI не прочитав",
+        "nocat" to "🗂 Без категорії")
+
+    /** Вибрані фільтри — чипи з ✕ (дотик — змінити), кількість — на кнопці «⚙ Фільтри». */
+    private fun renderFilters() {
+        val bb = _b ?: return
+        val meta = Prefs.meta()
+        bb.filters.removeAllViews()
+        fun active(text: String, clear: () -> Unit) {
+            bb.filters.addAction(text) { filterSheet() }.apply {
+                isCloseIconVisible = true
+                setOnCloseIconClickListener { clear(); renderFilters(); load(1) }
+            }
         }
+        if (mine) active("👤 Мої") { mine = false }
+        if (show == "new") active("🆕 Не внесені") { show = "" }
+        if (ai.isNotEmpty()) active(aiLabels.first { it.first == ai }.second) { ai = "" }
+        if (cat > 0) active(meta.category(cat)?.label ?: "🗂 категорія") { cat = 0 }
+        if (event.isNotEmpty()) active(if (event == "-") "🎪 без події" else "🎪 ${event.take(28)}") { event = "" }
+        val n = bb.filters.childCount
+        bb.filters.show(n > 0)
+        bb.btnFilters.text = if (n > 0) "⚙ Фільтри · $n" else "⚙ Фільтри"
     }
 
-    private fun uncheckOthers(keep: String) {
-        for (i in 0 until b.filters.childCount) {
-            val c = b.filters.getChildAt(i) as? Chip ?: continue
-            if (c.tag is String && c.tag != keep && c.isChecked && c.tag in setOf("none", "nocat", "failed")) c.isChecked = false
+    /** Усі фільтри в одному вікні знизу: чипи переносяться на новий рядок — видно все, що є. */
+    private fun filterSheet() {
+        val ctx = requireContext()
+        val meta = Prefs.meta()
+        val box = ctx.vbox(16)
+        fun section(title: String) = box.addView(ctx.label(title, 15f).apply { setPadding(0, ctx.dp(10), 0, 0) })
+
+        section("Чиї й що")
+        val who = ChipGroup(ctx)
+        who.addToggle("👤 Лише мої", mine) { mine = it }
+        who.addToggle("🆕 Ще не внесені в постачальники / CRM", show == "new") { show = if (it) "new" else "" }
+        box.addView(who)
+
+        section("🧠 AI")
+        val aiGroup = ChipGroup(ctx).apply { isSingleSelection = true; isSelectionRequired = true }
+        aiLabels.forEach { (k, l) -> aiGroup.addToggle(l, ai == k, k) { on -> if (on) ai = k }.isCheckedIconVisible = false }
+        box.addView(aiGroup)
+
+        if (meta.categories.isNotEmpty()) {
+            section("🗂 Категорія")
+            val cats = ChipGroup(ctx).apply { isSingleSelection = true; isSelectionRequired = true }
+            cats.addToggle("Усі", cat == 0, 0) { on -> if (on) cat = 0 }.isCheckedIconVisible = false
+            meta.categories.forEach { c -> cats.addToggle(c.label, cat == c.id, c.id) { on -> if (on) cat = c.id }.isCheckedIconVisible = false }
+            box.addView(cats)
         }
+
+        section("🎪 Де взяли")
+        val events = ChipGroup(ctx).apply { isSingleSelection = true; isSelectionRequired = true }
+        events.addToggle("Усі", event.isEmpty(), "") { on -> if (on) event = "" }.isCheckedIconVisible = false
+        events.addToggle("— без події", event == "-", "-") { on -> if (on) event = "-" }.isCheckedIconVisible = false
+        meta.events.forEach { e -> events.addToggle(e, event == e, e) { on -> if (on) event = e }.isCheckedIconVisible = false }
+        box.addView(events)
+
+        val dialog = BottomSheetDialog(ctx)
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, ctx.dp(16), 0, ctx.dp(20))
+        }
+        row.addRowButton(ctx.button("outlined", "↺ Скинути все") {
+            mine = false; show = ""; ai = ""; cat = 0; event = ""
+            dialog.dismiss()
+        }, false)
+        row.addRowButton(ctx.button("filled", "✓ Показати") { dialog.dismiss() }, true)
+        box.addView(row)
+        dialog.setContentView(NestedScrollView(ctx).apply { addView(box) })
+        dialog.behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        dialog.behavior.skipCollapsed = true
+        dialog.setOnDismissListener { renderFilters(); load(1) }
+        dialog.show()
     }
 
     override fun onHiddenChanged(hidden: Boolean) {
@@ -90,28 +151,6 @@ class BrowseFragment : Fragment() {
     override fun onDestroyView() {
         _b = null
         super.onDestroyView()
-    }
-
-    private fun chooseCategory() {
-        val cats = Prefs.meta().categories
-        val labels = listOf("Усі категорії") + cats.map { it.label }
-        MaterialAlertDialogBuilder(requireContext()).setTitle("🗂 Категорія")
-            .setItems(labels.toTypedArray()) { _, i ->
-                cat = if (i == 0) 0 else cats[i - 1].id
-                catChip.text = if (i == 0) "🗂 Категорія ▾" else "${cats[i - 1].label} ✕"
-                load(1)
-            }.show()
-    }
-
-    private fun chooseEvent() {
-        val events = Prefs.meta().events
-        val labels = listOf("Усі", "— без події") + events
-        MaterialAlertDialogBuilder(requireContext()).setTitle("🎪 Де взяли")
-            .setItems(labels.toTypedArray()) { _, i ->
-                event = when (i) { 0 -> ""; 1 -> "-"; else -> events[i - 2] }
-                eventChip.text = when (i) { 0 -> "🎪 Де взяли ▾"; 1 -> "🎪 без події ✕"; else -> "🎪 ${events[i - 2].take(24)} ✕" }
-                load(1)
-            }.show()
     }
 
     private fun params(p: Int) = mapOf(

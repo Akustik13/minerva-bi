@@ -2,10 +2,12 @@ package com.minervabi.cards
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import androidx.core.content.ContextCompat
 import androidx.core.widget.NestedScrollView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -13,6 +15,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.radiobutton.MaterialRadioButton
 import kotlinx.coroutines.launch
 
 /** ⚙ Підключення до Minerva, пресети, категорії, як знімати й надсилати, версія додатка. */
@@ -51,13 +54,13 @@ class SettingsFragment : Fragment() {
         return box
     }
 
-    private fun button(box: LinearLayout, text: String, onClick: () -> Unit) {
-        box.addView(MaterialButton(requireContext()).apply {
-            this.text = text
-            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, requireContext().dp(52))
-                .apply { topMargin = requireContext().dp(8) }
-            setOnClickListener { onClick() }
-        })
+    /** tonal — звичайна дія, outlined — другорядна, text — тиха / небезпечна. */
+    private fun button(box: LinearLayout, text: String, kind: String = "tonal", onClick: () -> Unit): MaterialButton {
+        val btn = requireContext().button(kind, text, onClick)
+        btn.layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            .apply { topMargin = requireContext().dp(6) }
+        box.addView(btn)
+        return btn
     }
 
     private fun switch(box: LinearLayout, text: String, value: Boolean, onChange: (Boolean) -> Unit) {
@@ -81,33 +84,52 @@ class SettingsFragment : Fragment() {
             acc.addView(ctx.label("🌐 ${Prefs.server.removePrefix("https://")}", secondary = true))
             acc.addView(ctx.label("📱 ${Api.deviceName()}", secondary = true))
             if (Prefs.needsPairing) acc.addView(ctx.label("⚠️ Minerva не приймає ключ цього телефона (відключили?) — підключіть знову."))
-            button(acc, "🔗 Підключити знову (новий QR)") { startActivity(Intent(ctx, PairActivity::class.java)) }
             button(acc, "🌐 Візитки в Minerva (браузер)") { ctx.open("${Prefs.server}/admin/inventory/supplier/cards/") }
-            button(acc, "🚪 Забути Minerva на цьому телефоні") {
+            button(acc, "🔗 Підключити знову (новий QR)", "outlined") { startActivity(Intent(ctx, PairActivity::class.java)) }
+            button(acc, "🚪 Забути Minerva на цьому телефоні", "text") {
                 ctx.confirm("Забути підключення?", "Ключ зникне з телефона. Фото, які ще не надіслано, лишаться — " +
                     "надішлемо після нового підключення. У Minerva телефон варто ще й «🚫 Відключити».", "🚪 Забути") {
                     Prefs.forget(); build()
                 }
-            }
+            }.setTextColor(ContextCompat.getColor(ctx, R.color.bad))
         } else {
             acc.addView(ctx.label("Ще не підключено. На комп'ютері: Minerva → Постачальники → 🪪 Візитки й флаєри → «📱 Додаток на телефон» → «🔗 Показати QR». Фотографувати можна вже зараз — надішлемо після підключення.", secondary = true))
-            button(acc, "📷 Сканувати QR з Minerva") { startActivity(Intent(ctx, PairActivity::class.java)) }
+            button(acc, "📷 Сканувати QR з Minerva", "filled") { startActivity(Intent(ctx, PairActivity::class.java)) }
         }
 
         val pre = card("📌 Пресети (виставка, зустріч)")
         pre.addView(ctx.label("Пресет підставляє «де взяли», позначки, категорії, примітку й AI у кожне нове фото. Ті самі, що в Minerva на комп'ютері.", 13f, true))
-        val current = Prefs.presetId ?: meta.defaultPreset
-        meta.presets.forEach { p ->
-            val mark = when { p.id == current -> "✅ "; meta.defaultPreset == p.id -> "★ "; else -> "📌 " }
-            val who = if (p.shared && !p.mine) " · 👥 ${p.owner}" else if (p.shared) " · 👥" else ""
-            button(pre, "$mark${p.name}$who") {
-                Prefs.presetId = p.id; Prefs.kind = p.kind
-                ctx.toast("📌 Нові фото — з пресетом «${p.name}»")
-                if (p.mine) Dialogs.preset(ctx, scope, p) { build() } else build()
+        // список з вибором (як радіокнопки): дотик — знімати з цим пресетом, ✏️ — змінити свій
+        val current = Prefs.presetId ?: meta.defaultPreset ?: -1
+        fun row(id: Int, title: String, sub: String, edit: (() -> Unit)?) {
+            val line = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+            val radio = MaterialRadioButton(ctx).apply {
+                text = if (sub.isEmpty()) title else "$title\n$sub"
+                isChecked = id == current
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                setOnClickListener {
+                    Prefs.presetId = id
+                    meta.preset(id)?.let { Prefs.kind = it.kind }
+                    ctx.toast(if (id > 0) "📌 Нові фото — з пресетом «$title»" else "Нові фото — без пресету")
+                    build()
+                }
             }
+            line.addView(radio)
+            if (edit != null) line.addView(ctx.button("text", "✏️") { edit() }.apply {
+                layoutParams = LinearLayout.LayoutParams(ctx.dp(52), ViewGroup.LayoutParams.WRAP_CONTENT)
+            })
+            pre.addView(line)
         }
-        if (Prefs.paired && meta.perms.upload) button(pre, "＋ Новий пресет") { Dialogs.preset(ctx, scope, null) { build() } }
-        if (current != null && current > 0) button(pre, "— Знімати без пресету") { Prefs.presetId = -1; build() }
+        meta.presets.forEach { p ->
+            val bits = listOfNotNull(
+                p.event.takeIf { it.isNotEmpty() && it != p.name }?.let { "🎪 $it" },
+                "★ за замовчуванням".takeIf { meta.defaultPreset == p.id },
+                when { p.shared && !p.mine -> "👥 ${p.owner}"; p.shared -> "👥 для всіх"; else -> null },
+            )
+            row(p.id, "📌 ${p.name}", bits.joinToString(" · "), if (p.mine) ({ Dialogs.preset(ctx, scope, p) { build() } }) else null)
+        }
+        row(-1, "— Без пресету", "", null)
+        if (Prefs.paired && meta.perms.upload) button(pre, "＋ Новий пресет", "outlined") { Dialogs.preset(ctx, scope, null) { build() } }
 
         val cats = card("🗂 Категорії постачальників")
         cats.addView(ctx.label("Ті самі, що в Minerva. Нова тут — одразу і в Minerva.", 13f, true))
@@ -123,6 +145,7 @@ class SettingsFragment : Fragment() {
         if (meta.categories.isEmpty()) cats.addView(ctx.label(if (Prefs.paired) "Оновлюю з Minerva…" else "З'являться після підключення.", 13f, true))
 
         val shoot = card("📷 Фото")
+        switch(shoot, "📐 Візитку й флаєр обрізати по краях і вирівнювати (вимкнено — по рамці)", Prefs.edges) { Prefs.edges = it }
         switch(shoot, "Після лицьового боку пропонувати зворотний", Prefs.askBack) { Prefs.askBack = it }
         switch(shoot, "🧠 Читати AI за замовчуванням", Prefs.readAiDefault) { Prefs.readAiDefault = it }
         switch(shoot, "📶 Надсилати лише через Wi-Fi", Prefs.wifiOnly) {
@@ -144,7 +167,7 @@ class SettingsFragment : Fragment() {
 
         val about = card("ℹ️ Додаток")
         about.addView(ctx.label("Minerva Візитки ${BuildConfig.VERSION_NAME} · кнопка гучності — теж знімок · без інтернету фото чекають у «📤 Мої знімки».", 13f, true))
-        button(about, "⬇ Остання версія додатка") {
+        button(about, "⬇ Остання версія додатка", "outlined") {
             ctx.open(meta.appUrl.ifEmpty { "https://github.com/Akustik13/minerva-bi/releases/latest" })
         }
     }

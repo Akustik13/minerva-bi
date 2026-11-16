@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/black">
@@ -16,73 +17,61 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- верх: пресет, вид, рамка, спалах, черга — компактно, не закриває рамку -->
-    <HorizontalScrollView
+    <!-- верх: пресет (на всю ширину, що лишилась), світло, черга — один рядок, нічого не ховається за край -->
+    <LinearLayout
+        android:id="@+id/topBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
         android:paddingTop="6dp"
-        android:scrollbars="none">
+        android:paddingEnd="8dp">
 
-        <LinearLayout
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipPreset"
+            style="@style/CamChip"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="📌 Без пресету ▾" />
+
+        <TextView
+            android:id="@+id/btnFlash"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/round_scrim"
+            android:contentDescription="Світло"
+            android:gravity="center"
+            android:text="⚡"
+            android:textSize="20sp" />
+
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipQueue"
+            style="@style/CamChip"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingStart="8dp"
-            android:paddingEnd="8dp">
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipPreset"
-                style="@style/CamChip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
-                android:maxWidth="220dp"
-                android:text="📌 Без пресету ▾" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipKind"
-                style="@style/CamChip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
-                android:text="🪪 Візитка" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipFrame"
-                style="@style/CamChip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
-                android:text="▭ Рамка" />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipFlash"
-                style="@style/CamChip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="6dp"
-                android:text="⚡ Вимк." />
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/chipQueue"
-                style="@style/CamChip"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="✓ усе надіслано" />
-        </LinearLayout>
-    </HorizontalScrollView>
+            android:layout_marginStart="6dp"
+            android:maxWidth="150dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="✓ усе в Minerva" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/qrChip"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|center_horizontal"
-        android:layout_marginTop="56dp"
+        android:layout_marginTop="58dp"
         android:background="@drawable/qr_badge"
-        android:maxWidth="300dp"
-        android:maxLines="1"
         android:ellipsize="end"
+        android:maxLines="1"
+        android:maxWidth="300dp"
         android:paddingStart="12dp"
         android:paddingTop="4dp"
         android:paddingEnd="12dp"
@@ -90,21 +79,26 @@
         android:textColor="@color/white"
         android:visibility="gone" />
 
-    <!-- низ: підказка, «зворотний бік?», кнопки -->
+    <!-- низ: підказка, режими (або «зворотний бік?»), кнопки -->
     <LinearLayout
+        android:id="@+id/bottomPanel"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:gravity="center_horizontal"
         android:orientation="vertical"
-        android:paddingBottom="18dp">
+        android:paddingBottom="12dp">
 
         <TextView
             android:id="@+id/hint"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="8dp"
             android:background="@drawable/qr_badge"
+            android:gravity="center"
+            android:maxLines="2"
             android:paddingStart="12dp"
             android:paddingTop="4dp"
             android:paddingEnd="12dp"
@@ -112,78 +106,142 @@
             android:text="Лицьовий бік — наведіть рамку"
             android:textColor="@color/white" />
 
-        <LinearLayout
-            android:id="@+id/backStrip"
+        <!-- одне місце: режими або «зворотний бік?» — рамка не стрибає -->
+        <FrameLayout
+            android:id="@+id/slot"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="64dp"
             android:layout_marginStart="12dp"
-            android:layout_marginEnd="12dp"
-            android:layout_marginBottom="12dp"
-            android:background="@drawable/panel_round"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:padding="8dp"
-            android:visibility="gone">
+            android:layout_marginEnd="12dp">
 
-            <ImageView
-                android:id="@+id/frontThumb"
-                android:layout_width="72dp"
-                android:layout_height="46dp"
-                android:layout_marginEnd="8dp"
-                android:contentDescription="Лицьовий бік"
-                android:scaleType="centerCrop" />
+            <LinearLayout
+                android:id="@+id/modes"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_gravity="center"
+                android:background="@drawable/mode_pill"
+                android:orientation="horizontal"
+                android:padding="4dp">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnBack"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_marginEnd="8dp"
-                android:layout_weight="1"
-                android:text="↩ Зворот" />
+                <TextView
+                    android:id="@+id/modeCard"
+                    style="@style/CamMode"
+                    android:text="🪪 Візитка" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnDone"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="1"
-                android:text="✓ Готово" />
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/modeFlyer"
+                    style="@style/CamMode"
+                    android:text="📄 Флаєр" />
+
+                <TextView
+                    android:id="@+id/modeQr"
+                    style="@style/CamMode"
+                    android:text="🔳 QR" />
+
+                <TextView
+                    android:id="@+id/modePhoto"
+                    style="@style/CamMode"
+                    android:text="📷 Фото" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/backStrip"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/panel_round"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="6dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/frontThumb"
+                    android:layout_width="68dp"
+                    android:layout_height="44dp"
+                    android:layout_marginEnd="6dp"
+                    android:contentDescription="Лицьовий бік — зняти знову"
+                    android:scaleType="centerCrop" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBack"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="↩ Зворот" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnDone"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="0dp"
+                    android:layout_height="52dp"
+                    android:layout_weight="1"
+                    android:text="✓ Готово" />
+            </LinearLayout>
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:gravity="center"
             android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/btnGallery"
-                android:layout_width="58dp"
-                android:layout_height="58dp"
-                android:background="@drawable/round_scrim"
-                android:contentDescription="Фото з галереї"
-                android:gravity="center"
-                android:text="🖼"
-                android:textSize="24sp" />
+            <LinearLayout
+                android:id="@+id/galleryBox"
+                android:layout_width="76dp"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/btnGallery"
+                    android:layout_width="58dp"
+                    android:layout_height="58dp"
+                    android:background="@drawable/round_scrim"
+                    android:contentDescription="Фото з галереї"
+                    android:gravity="center"
+                    android:text="🖼"
+                    android:textSize="24sp" />
+
+                <TextView
+                    style="@style/CamLabel"
+                    android:text="Галерея" />
+            </LinearLayout>
 
             <ImageButton
                 android:id="@+id/shutter"
                 android:layout_width="86dp"
                 android:layout_height="86dp"
-                android:layout_marginStart="40dp"
-                android:layout_marginEnd="40dp"
+                android:layout_marginStart="32dp"
+                android:layout_marginEnd="32dp"
                 android:background="@drawable/shutter"
                 android:contentDescription="Зняти" />
 
-            <TextView
-                android:id="@+id/btnScan"
-                android:layout_width="58dp"
-                android:layout_height="58dp"
-                android:background="@drawable/round_scrim"
-                android:contentDescription="Скан по контуру"
-                android:gravity="center"
-                android:text="📄"
-                android:textSize="24sp" />
+            <LinearLayout
+                android:id="@+id/edgesBox"
+                android:layout_width="76dp"
+                android:layout_height="wrap_content"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/btnEdges"
+                    android:layout_width="58dp"
+                    android:layout_height="58dp"
+                    android:background="@drawable/round_on"
+                    android:contentDescription="Обрізати по краях візитки"
+                    android:gravity="center"
+                    android:text="📐"
+                    android:textSize="24sp" />
+
+                <TextView
+                    android:id="@+id/edgesLabel"
+                    style="@style/CamLabel"
+                    android:text="по краях" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

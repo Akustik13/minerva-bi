@@ -25,13 +25,20 @@ import java.io.File
 /**
  * Після знімка (mode new) або правка знімка з «📤 Мої знімки» (mode edit): примітка (🎤 голосом), де взяли, позначки,
  * категорії (＋ нова), що це, AI. Значення за замовчуванням — з пресету. Великі кнопки «Зберегти» — угорі вікна.
+ * 📐 Знімок «по краях» має й версію «по рамці» — перемикач вибирає, яку надіслати. Нове фото не губиться: закрили
+ * вікно жестом «назад» або потягнули вниз — збережено, як «💾 Зберегти й наступну»; прибрати — «✕ Не зберігати».
  * Результат — setFragmentResult("review", {action: next | save | cancel, uuid}).
  */
 class ReviewSheet : BottomSheetDialogFragment() {
     private var _b: SheetReviewBinding? = null
     private val b get() = _b!!
     private lateinit var meta: Meta
+    private var front: String = ""
     private var back: String = ""
+    private var frontFrame: String = ""     // 📐 та сама сторона «по рамці»
+    private var backFrame: String = ""
+    private var edges = true
+    private var done = false
     private var editing: Capture? = null
 
     private val speech = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -56,24 +63,42 @@ class ReviewSheet : BottomSheetDialogFragment() {
             state = BottomSheetBehavior.STATE_EXPANDED
             skipCollapsed = true
         }
+        dialog?.setCanceledOnTouchOutside(false)       // випадковий дотик поза вікном не прибирає фото
+    }
+
+    /** «Назад» або потягнули вниз: нове фото — зберегти (його ж і знімали), правка — без змін. */
+    override fun onCancel(dialog: android.content.DialogInterface) {
+        super.onCancel(dialog)
+        if (editing == null && !done && _b != null) save("next", close = false)
     }
 
     override fun onViewCreated(view: View, s: Bundle?) {
         meta = Prefs.meta()
         val args = requireArguments()
         editing = args.getString("uuid")?.let { CaptureStore.get(it) }
-        val front = editing?.front ?: args.getString("front").orEmpty()
+        front = editing?.front ?: args.getString("front").orEmpty()
         back = editing?.back ?: args.getString("back").orEmpty()
+        if (editing == null) {
+            frontFrame = args.getString("front_alt").orEmpty()
+            backFrame = args.getString("back_alt").orEmpty()
+        }
         val qr = listOfNotNull(editing?.qrFront ?: args.getString("qr_front"), editing?.qrBack ?: args.getString("qr_back"))
             .filter { it.isNotBlank() }
-        ImageLoader.local(viewLifecycleOwner.lifecycleScope, b.imgFront, front)
+        showFront()
         showBack()
-        b.imgFront.setOnClickListener { PhotoActivity.openFile(requireContext(), front) }
-        b.imgBack.setOnClickListener { if (back.isNotEmpty()) PhotoActivity.openFile(requireContext(), back) }
+        b.imgFront.setOnClickListener { PhotoActivity.openFile(requireContext(), shownFront()) }
+        b.imgBack.setOnClickListener { if (back.isNotEmpty()) PhotoActivity.openFile(requireContext(), shownBack()) }
         b.dropBack.setOnClickListener {
-            if (editing == null) File(back).delete()
-            back = ""
+            if (editing == null) { File(back).delete(); if (backFrame.isNotEmpty()) File(backFrame).delete() }
+            back = ""; backFrame = ""
             showBack()
+            b.edges.show(frontFrame.isNotEmpty())
+        }
+        b.edges.show(frontFrame.isNotEmpty() || backFrame.isNotEmpty())
+        b.edges.setOnCheckedChangeListener { _, on ->
+            edges = on
+            b.edges.text = if (on) "📐 Обрізано по краях і вирівняно (вимкніть — по рамці)" else "▭ Обрізано по рамці (увімкніть — по краях)"
+            showFront(); showBack()
         }
         if (qr.isNotEmpty()) {
             b.qrInfo.show(true)
@@ -106,15 +131,21 @@ class ReviewSheet : BottomSheetDialogFragment() {
             b.btnSave.show(false)
             b.btnCancel.text = "Закрити"
         }
-        b.btnSaveNext.setOnClickListener { save(if (c != null) "save" else "next", front) }
-        b.btnSave.setOnClickListener { save("save", front) }
+        b.btnSaveNext.setOnClickListener { save(if (c != null) "save" else "next") }
+        b.btnSave.setOnClickListener { save("save") }
         b.btnCancel.setOnClickListener {
-            if (c == null) {
-                File(front).delete(); if (back.isNotEmpty()) File(back).delete()
-            }
+            done = true
+            if (c == null) listOf(front, back, frontFrame, backFrame).filter { it.isNotEmpty() }.forEach { File(it).delete() }
             setFragmentResult("review", bundleOf("action" to "cancel"))
             dismiss()
         }
+    }
+
+    private fun shownFront() = if (!edges && frontFrame.isNotEmpty()) frontFrame else front
+    private fun shownBack() = if (!edges && backFrame.isNotEmpty()) backFrame else back
+
+    private fun showFront() {
+        ImageLoader.local(viewLifecycleOwner.lifecycleScope, b.imgFront, shownFront())
     }
 
     private fun currentPresetId(): Int? = Prefs.presetId?.takeIf { it > 0 } ?: if (Prefs.presetId == null) meta.defaultPreset else null
@@ -123,7 +154,7 @@ class ReviewSheet : BottomSheetDialogFragment() {
         val has = back.isNotEmpty()
         b.noBack.show(!has)
         b.dropBack.show(has)
-        if (has) ImageLoader.local(viewLifecycleOwner.lifecycleScope, b.imgBack, back) else b.imgBack.setImageDrawable(null)
+        if (has) ImageLoader.local(viewLifecycleOwner.lifecycleScope, b.imgBack, shownBack()) else b.imgBack.setImageDrawable(null)
     }
 
     private fun fillCategories(selected: List<Int>) {
@@ -147,7 +178,15 @@ class ReviewSheet : BottomSheetDialogFragment() {
         runCatching { speech.launch(i) }.onFailure { requireContext().toast("На телефоні немає розпізнавання мовлення") }
     }
 
-    private fun save(action: String, front: String) {
+    /** close = false — вікно вже закривається («назад» / потягнули вниз). */
+    private fun save(action: String, close: Boolean = true) {
+        if (done) return
+        done = true
+        // 📐 вибрана версія фото лишається, інша — геть з телефона
+        val keepFront = shownFront(); val keepBack = shownBack()
+        listOf(front, frontFrame).filter { it.isNotEmpty() && it != keepFront }.forEach { File(it).delete() }
+        if (back.isNotEmpty()) listOf(back, backFrame).filter { it.isNotEmpty() && it != keepBack }.forEach { File(it).delete() }
+        front = keepFront; back = if (back.isNotEmpty()) keepBack else ""
         val marks = b.marks.checkedTags().filterIsInstance<String>()
         val cats = b.cats.checkedTags().filterIsInstance<Int>()
         val kind = b.kinds.checkedTags().filterIsInstance<String>().firstOrNull() ?: "card"
@@ -179,7 +218,7 @@ class ReviewSheet : BottomSheetDialogFragment() {
             else Sync.uploadNow(requireContext())
         }
         setFragmentResult("review", bundleOf("action" to action, "uuid" to (c?.uuid ?: "")))
-        dismiss()
+        if (close) dismiss()
     }
 
     /** Знімок уже в Minerva — правка йде туди ж (без інтернету — повідомити). */
@@ -206,9 +245,11 @@ class ReviewSheet : BottomSheetDialogFragment() {
     }
 
     companion object {
-        fun forNew(front: String, back: String, qrFront: String, qrBack: String) = ReviewSheet().apply {
-            arguments = bundleOf("front" to front, "back" to back, "qr_front" to qrFront, "qr_back" to qrBack)
-        }
+        fun forNew(front: String, back: String, qrFront: String, qrBack: String, frontAlt: String = "", backAlt: String = "") =
+            ReviewSheet().apply {
+                arguments = bundleOf("front" to front, "back" to back, "qr_front" to qrFront, "qr_back" to qrBack,
+                    "front_alt" to frontAlt, "back_alt" to backAlt)
+            }
 
         fun forEdit(uuid: String) = ReviewSheet().apply { arguments = bundleOf("uuid" to uuid) }
     }

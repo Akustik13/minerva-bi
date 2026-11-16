@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,6 +20,7 @@ class QueueFragment : Fragment() {
     private var _b: FragmentListBinding? = null
     private val b get() = _b!!
     private var filter = "all"
+    private val segIds = mutableMapOf<String, Int>()
     private val adapter = Adapter()
     private val listener: () -> Unit = { render() }
 
@@ -32,20 +34,33 @@ class QueueFragment : Fragment() {
         b.list.layoutManager = LinearLayoutManager(requireContext())
         b.list.adapter = adapter
         b.refresh.setOnRefreshListener { refresh() }
-        b.filters.isSingleSelection = true          // до чипів: зміна режиму знімає позначку
-        b.filters.isSelectionRequired = true
-        listOf("all" to "Усі", "waiting" to "⏳ Чекають", "done" to "✅ У Minerva", "failed" to "⚠️ Помилки").forEach { (k, l) ->
-            b.filters.addToggle(l, k == filter, k) { on -> if (on) { filter = k; render() } }.isCheckedIconVisible = false
+        val ctx = requireContext()
+        // стан — чотири однакові кнопки в один рядок з лічильниками (нічого не гортається вбік)
+        b.seg.show(true)
+        listOf("all", "waiting", "done", "failed").forEach { k ->
+            val btn = ctx.button("outlined", "") {}
+            btn.id = View.generateViewId()
+            btn.maxLines = 1
+            btn.setPadding(ctx.dp(4), 0, ctx.dp(4), 0)
+            btn.insetTop = 0; btn.insetBottom = 0
+            btn.layoutParams = LinearLayout.LayoutParams(0, ctx.dp(44), 1f)
+            segIds[k] = btn.id
+            b.seg.addView(btn)
         }
-        b.filters.addAction("⬆ Надіслати зараз") {
-            if (!Prefs.paired || Prefs.needsPairing) startActivity(Intent(requireContext(), PairActivity::class.java))
-            else { Sync.uploadNow(requireContext()); requireContext().toast("⬆ Надсилаю, щойно буде інтернет") }
+        b.seg.check(segIds.getValue(filter))
+        b.seg.addOnButtonCheckedListener { _, id, checked ->
+            if (checked) { filter = segIds.entries.first { it.value == id }.key; render() }
         }
-        b.filters.addAction("🧹 Прибрати надіслані") {
-            requireContext().confirm("Прибрати надіслані з телефона?",
+        b.actions.show(true)
+        b.actions.addRowButton(ctx.button("tonal", "⬆ Надіслати зараз") {
+            if (!Prefs.paired || Prefs.needsPairing) startActivity(Intent(ctx, PairActivity::class.java))
+            else { Sync.uploadNow(ctx); ctx.toast("⬆ Надсилаю, щойно буде інтернет") }
+        }, false)
+        b.actions.addRowButton(ctx.button("outlined", "🧹 Прибрати надіслані") {
+            ctx.confirm("Прибрати надіслані з телефона?",
                 "Фото, які вже в Minerva, зникнуть лише з телефона — у Minerva вони лишаються (вкладка «🪪 У Minerva»).",
-                "🧹 Прибрати") { requireContext().toast("Прибрано: ${CaptureStore.clearUploaded()}") }
-        }
+                "🧹 Прибрати") { ctx.toast("Прибрано: ${CaptureStore.clearUploaded()}") }
+        }, true)
         CaptureStore.listen(listener)
         render()
     }
@@ -78,13 +93,15 @@ class QueueFragment : Fragment() {
         val bb = _b ?: return
         val all = CaptureStore.all()
         val c = CaptureStore.counts()
-        bb.summary.text = buildString {
-            if (!Prefs.paired) append("🔗 Minerva не підключено — фото чекають на телефоні. «⚙ Налаштування → Підключити».\n")
-            else if (Prefs.needsPairing) append("🔗 Телефон відключили в Minerva — підключіть знову QR-кодом.\n")
-            append("⏳ чекають: ${c["waiting"]} · ✅ у Minerva: ${c["done"]}")
-            if ((c["reading"] ?: 0) > 0) append(" · 🧠 AI читає: ${c["reading"]}")
-            if ((c["failed"] ?: 0) > 0) append(" · ⚠️ помилки: ${c["failed"]}")
+        bb.summary.text = when {
+            !Prefs.paired -> "🔗 Minerva не підключено — фото чекають на телефоні. «⚙ Налаштування → Підключити»."
+            Prefs.needsPairing -> "🔗 Телефон відключили в Minerva — підключіть знову QR-кодом."
+            (c["reading"] ?: 0) > 0 -> "🧠 AI читає: ${c["reading"]} · потягніть донизу — оновити"
+            else -> "Потягніть донизу — оновити стан з Minerva"
         }
+        val labels = mapOf("all" to "Усі ${all.size}", "waiting" to "⏳ ${c["waiting"]}", "done" to "✅ ${c["done"]}",
+            "failed" to "⚠️ ${c["failed"]}")
+        segIds.forEach { (k, id) -> bb.seg.findViewById<android.widget.Button>(id)?.text = labels[k] }
         val items = all.filter {
             when (filter) {
                 "waiting" -> it.waiting

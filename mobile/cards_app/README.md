@@ -1,7 +1,8 @@
 # 📱 Minerva Візитки (Android)
 
-Додаток для фото візиток і флаєрів: камера з рамкою (CameraX), обидва боки, QR (ML Kit), скан по контуру
-(ML Kit Document Scanner), пресети, примітки голосом, черга без інтернету (WorkManager), перегляд візиток з Minerva.
+Додаток для фото візиток і флаєрів: камера з рамкою (CameraX), 📐 обрізка по краях з вирівнюванням (`DocDetect`, без
+бібліотек), обидва боки, QR (ML Kit), скан Google (ML Kit Document Scanner — утримати 📐), пресети, примітки голосом,
+черга без інтернету (WorkManager), перегляд візиток з Minerva.
 
 Сервер — Minerva: `suppliers/app_api.py` (`/suppliers/app/api/…`), `suppliers/services/card_app.py`,
 сторінка підключення «📱 Додаток на телефон» `/admin/inventory/supplier/cards/app/`. Гід —
@@ -14,6 +15,15 @@
   Лише https (http — тільки `10.0.2.2` / `localhost` для розробки, `res/xml/network_security_config.xml`).
 - **Знімок** → `ImageUtils.cropToFrame` (ділянка рамки з урахуванням FILL_CENTER і EXIF, BitmapRegionDecoder, ≤ maxPx,
   JPEG 90) + QR зі знімка й видошукача → `CaptureStore` (`files/captures.json` + `files/captures/*.jpg`).
+- **📐 По краях** (`Prefs.edges`, лише рамки візитки й A4) — `DocDetect.detect`: сіре ≤ ~400 px → кандидати (кілька
+  порогів яскравості — Оцу на 2 і 3 класи, обидві полярності; контур перепадів — коли візитка двоколірна або біла
+  на білому) → опукла оболонка → найбільший вписаний чотирикутник → сторони уточнюються прямими (PCA) → перевірка
+  (кути, заповнення, перепад упоперек кожної сторони) → найкращий за площею. Наживо — площина Y кадру `ImageAnalysis`
+  (1280×960, `cropRect` = видиме в PreviewView) раз на 150 мс у межах рамки + 12 % → зелений контур
+  (`FrameOverlayView.quad`); знімок — ділянка `ImageUtils.viewRegion`, пошук ще раз на ній, `warp`
+  (`Matrix.setPolyToPoly`), версія «по рамці» — поруч (`*-frame-*.jpg`), вибір — перемикач у `ReviewSheet`.
+  Знайдене < `CaptureFragment.MIN_FRAC` ділянки (логотип / QR на візитці) не береться. Тести — `src/test/…/DocDetectTest.kt`
+  (`gradlew testDebugUnitTest`, синтетичні знімки у перспективі).
 - **Вивантаження**: `Sync` / `UploadWorker` — WorkManager з умовою «є мережа» (або Wi-Fi), повтори з наростанням,
   `uuid` знімка → Minerva не створює дубля після обриву; 401 → «підключіть знову».
 - **Кеш**: `/meta/` (категорії, пресети, позначки, події) і перша сторінка «🪪 У Minerva» — у SharedPreferences, тож
