@@ -6,9 +6,10 @@
   {% if agenda.rows %}
     <ol class="mt-ag-list">
       {% for i in agenda.rows %}
-        <li class="mt-ag-row mt-ag-{{ i.status }}" data-ag="{{ i.pk }}">
-          {% if i.status == "moved" %}<span class="mt-ag-box" title="Перенесено на наступну нараду">→</span>
-          {% elif agenda.can %}<input type="checkbox" class="mt-ag-box" data-ag-act="toggle"{% if i.status == "done" %} checked{% endif %} title="Обговорили" aria-label="Обговорили">
+        <li class="mt-ag-row mt-ag-{{ i.status }}{% if i.level %} mt-ag-sub{% endif %}" data-ag="{{ i.pk }}"{% if i.level %} data-ag-parent="{{ i.parent_id }}"{% endif %}>
+          <span class="mt-ag-num">{{ i.num }}.</span>
+          {% if i.frozen %}<span class="mt-ag-box" title="Перенесено на наступну нараду">→</span>
+          {% elif agenda.can %}<input type="checkbox" class="mt-ag-box" data-ag-act="toggle"{% if i.status == "done" %} checked{% endif %} title="{% if i.kid_count %}Обговорили — разом з підпунктами{% else %}Обговорили{% endif %}" aria-label="Обговорили">
           {% else %}<span class="mt-ag-box">{% if i.status == "done" %}☑{% else %}☐{% endif %}</span>{% endif %}
           <div class="mt-ag-body">
             <div class="mt-ag-text" translate="no">{% if i.url %}<a href="{{ i.url }}" target="_blank" rel="noopener">{{ i.text }}</a>{% else %}{{ i.text }}{% endif %}</div>
@@ -17,7 +18,7 @@
               {% if i.status == "skipped" %}<span class="mt-ag-why">⏭ не потрібно</span>{% elif i.status == "moved" %}<span class="mt-ag-why">→ перенесено на наступну нараду</span>{% endif %}
               {% if i.note %}<span class="mt-ag-note">✍️ <span translate="no">{{ i.note }}</span></span>{% endif %}
             </div>
-            {% if agenda.can and i.status != "moved" %}
+            {% if agenda.can and not i.frozen %}
               <form class="mt-ag-edit" data-ag-edit hidden>
                 <input name="text" maxlength="300" value="{{ i.text }}" aria-label="Що обговорити" translate="no">
                 <input name="note" maxlength="300" value="{{ i.note }}" placeholder="Що вирішили (за бажанням)" aria-label="Що вирішили" translate="no">
@@ -26,16 +27,26 @@
               </form>
             {% endif %}
           </div>
-          {% if agenda.can and i.status != "moved" %}
+          {% if agenda.can and not i.frozen %}
+            {% if not i.level %}<button type="button" class="mt-ag-subbtn" data-ag-act="sub" data-parent="{{ i.pk }}" title="Додати підпункт до цього пункту (1.1, 1.2…)">＋ Підпункт</button>{% endif %}
             <span class="mt-ag-acts">
               <button type="button" data-ag-act="edit" title="Змінити текст і записати, що вирішили">✏️</button>
               <button type="button" data-ag-act="skip" title="{% if i.status == 'skipped' %}Повернути: обговорити{% else %}Не потрібно обговорювати{% endif %}">⏭</button>
-              <button type="button" data-ag-act="up" title="Вище"{% if forloop.first %} disabled{% endif %}>↑</button>
-              <button type="button" data-ag-act="down" title="Нижче"{% if forloop.last %} disabled{% endif %}>↓</button>
-              <button type="button" data-ag-act="remove" title="Прибрати з агенди">✕</button>
+              <button type="button" data-ag-act="up" title="Вище"{% if i.first %} disabled{% endif %}>↑</button>
+              <button type="button" data-ag-act="down" title="Нижче"{% if i.last %} disabled{% endif %}>↓</button>
+              <button type="button" data-ag-act="remove" title="{% if i.kid_count %}Прибрати з агенди разом з підпунктами{% else %}Прибрати з агенди{% endif %}"{% if i.kid_count %} data-confirm="Прибрати пункт разом з його підпунктами?"{% endif %}>✕</button>
             </span>
           {% endif %}
         </li>
+        {% if i.group_end and agenda.can and not i.frozen %}
+          <li class="mt-ag-row mt-ag-sub mt-ag-subadd" data-ag-subadd="{{ i.group_top }}" hidden>
+            <form class="mt-ag-add" data-ag-add data-parent="{{ i.group_top }}">
+              <input name="text" maxlength="300" placeholder="Підпункт — напр. «точність у приміщенні»" aria-label="Новий підпункт" autocomplete="off">
+              <button type="submit" class="button mt-primary">＋ Додати підпункт</button>
+              <button type="button" class="button" data-ag-act="subclose">Готово</button>
+            </form>
+          </li>
+        {% endif %}
       {% endfor %}
     </ol>
   {% elif not agenda.suggestions %}
@@ -46,8 +57,34 @@
       <input name="text" maxlength="300" placeholder="Що обговорити — напр. «погодити строк зразків»" aria-label="Новий пункт агенди" autocomplete="off">
       <button type="submit" class="button mt-primary">＋ Додати</button>
       {% if agenda.can_suggest %}<button type="button" class="button" data-ag-act="suggest">🧭 Підказати з проєкту</button>{% endif %}
-      {% if agenda.rows %}<button type="button" class="button" data-ag-act="copy" title="Агенда текстом — вставити в запрошення, лист чи чат учасникам">📋 Копіювати текстом</button>{% endif %}
+      {% if agenda.rows %}<button type="button" class="button" data-ag-act="copy" title="Агенда текстом — вставити в запрошення, лист чи чат учасникам">📋 Копіювати текстом</button>
+        <button type="button" class="button" data-ag-act="send" title="Лист з агендою учасникам — за бажанням перекладений AI; відкриється у вашій пошті, надсилаєте ви">✉️ Надіслати агенду…</button>{% endif %}
     </form>
+    {% if agenda.rows %}
+      <form class="mt-ag-send" data-ag-send hidden>
+        <h3>✉️ Надіслати агенду</h3>
+        <fieldset class="mt-ag-to">
+          <legend>Кому</legend>
+          {% for p in agenda.people %}
+            <label><input type="checkbox" name="to" value="{{ p.email }}" checked> <span translate="no">{{ p.name|default:p.email }}{% if p.name %} &lt;{{ p.email }}&gt;{% endif %}</span></label>
+          {% empty %}
+            <p class="mt-muted">У нараді немає учасників з адресою — впишіть адреси нижче (або додасте в листі).</p>
+          {% endfor %}
+          <input name="extra" placeholder="Ще адреси — колеги, через кому" aria-label="Ще адреси" autocomplete="off" translate="no">
+        </fieldset>
+        <fieldset class="mt-ag-lang">
+          <legend>Мова листа</legend>
+          {% for code, label in agenda.langs %}<label><input type="radio" name="lang" value="{{ code }}"{% if code == agenda.lang %} checked{% endif %}> {{ label }}</label>{% endfor %}
+          <label class="mt-ag-ai"><input type="checkbox" name="ai" value="1"{% if agenda.lang != "uk" %} checked{% endif %}> 🌐 Перекласти пункти цією мовою (AI)</label>
+          <p class="mt-muted">Переклад робить Claude (хмарний AI) — туди піде текст агенди; рахується в бюджеті AI. Без перекладу пункти йдуть, як написано.</p>
+        </fieldset>
+        <div class="mt-actions">
+          <button type="submit" class="button mt-primary">✉️ Відкрити лист</button>
+          <button type="button" class="button" data-ag-act="sendclose">Скасувати</button>
+          <span class="mt-muted">Лист відкриється у вашій пошті Minerva в новій вкладці — перевірте й надішліть самі.</span>
+        </div>
+      </form>
+    {% endif %}
   {% elif not agenda.rows %}
     <p class="mt-muted">🔒 Немає права змінювати наради — агенду складає той, хто може.</p>
   {% endif %}

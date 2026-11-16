@@ -306,7 +306,7 @@ class MeetingAgendaItem(models.Model):
     """📋 Пункт агенди наради — що обговорити, щоб не забути (meetings/agenda.py). Як і нарада, бачить лише її
     власник. ref — звідки підказано («risk:12», «step:34», «attn:<sha1>», «q:<sha1>», «carry:<pk пункту>»): той самий
     пункт двічі не додається. Не обговорили (open) після наради — підказується до наступної наради цього проєкту;
-    узяли туди — moved."""
+    узяли туди — moved. parent — підпункт (один рівень: 1.1, 1.2), прибирається разом з пунктом."""
     OPEN, DONE, SKIPPED, MOVED = "open", "done", "skipped", "moved"
     STATUS_CHOICES = [(OPEN, "обговорити"), (DONE, "обговорили"), (SKIPPED, "не потрібно"),
                       (MOVED, "перенесено на наступну нараду")]
@@ -322,6 +322,8 @@ class MeetingAgendaItem(models.Model):
     status = models.CharField("Стан", max_length=10, choices=STATUS_CHOICES, default=OPEN, db_index=True)
     note = models.CharField("Що вирішили", max_length=300, blank=True, default="")
     moved_to = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
+    parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE, related_name="kids",
+                               verbose_name="Підпункт пункту")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

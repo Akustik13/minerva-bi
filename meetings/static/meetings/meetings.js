@@ -7,7 +7,8 @@
    - 📁 проєкти наради (додати / ⭐ головний / ✕) і 🏷 «звідси — про проєкт …» на рядках розшифровки — POST JSON,
      потім сторінка оновлюється;
    - пошук у розшифровці й #t=<секунда> в адресі;
-   - 📋 агенда: додати, ☑ обговорили, ✏️ текст і «що вирішили», ⏭, ↑ ↓, ✕, 🧭 підказки з проєкту, 📋 копіювати;
+   - 📋 агенда: додати, ＋ Підпункт, ☑ обговорили, ✏️ текст і «що вирішили», ⏭, ↑ ↓, ✕, 🧭 підказки з проєкту,
+     📋 копіювати, ✉️ надіслати (вкладка листа відкривається одразу, адреса — після відповіді);
    - опитування стану кожні 5 с: нове — перезавантаження, але не тоді, коли відкрито панель ✓ або курсор у полі
      (тоді смуга «🔄 Є нове — оновити сторінку»).
    Дані людини — лише через textContent; розшифровку браузер не зберігає (localStorage не використовується). */
@@ -379,6 +380,14 @@
 
   // ── 📋 Агенда (meetings/agenda.py, _agenda.html): POST JSON на data-mt-agenda, у відповідь — свіжий блок ──
   function agendaBox() { return document.getElementById('agenda'); }
+  function openSub(parent) {                     // «＋ Підпункт»: поле під останнім підпунктом цього пункту
+    var row = document.querySelector('#agenda [data-ag-subadd="' + parent + '"]');
+    if (!row) return;
+    document.querySelectorAll('#agenda [data-ag-subadd]').forEach(function (r) { if (r !== row) r.hidden = true; });
+    row.hidden = false;
+    var input = row.querySelector('input[name=text]');
+    if (input) input.focus();
+  }
   function agendaSend(body, focusAdd) {
     var box = agendaBox();
     if (!box) return;
@@ -388,10 +397,34 @@
       if (cur) cur.classList.remove('mt-ag-busy');
       if (!j || !j.ok) { toast('⚠️ ' + ((j && j.error) || 'Не вдалося')); return; }
       if (cur) cur.outerHTML = j.html;
-      if (focusAdd) {
-        var input = document.querySelector('#agenda [data-ag-add] input[name=text]');
+      if (focusAdd && body.parent) {
+        openSub(body.parent);                     // підпункти — один за одним, поле лишається відкритим
+      } else if (focusAdd) {
+        var input = document.querySelector('#agenda > [data-ag-add] input[name=text]');
         if (input) input.focus();
       }
+    });
+  }
+  function agendaMail(form) {                     // ✉️ лист з агендою: вкладка відкривається одразу (інакше блокує браузер)
+    var to = Array.prototype.map.call(form.querySelectorAll('input[name=to]:checked'), function (c) { return c.value; });
+    var lang = (form.querySelector('input[name=lang]:checked') || {}).value || 'de';
+    var ai = form.elements.ai && form.elements.ai.checked;
+    var tab = window.open('about:blank', '_blank');
+    var btn = form.querySelector('button[type=submit]'), label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = ai ? '⏳ Перекладаю…' : '⏳ Готую лист…';
+    post(agendaBox().getAttribute('data-mt-agenda'), {action: 'send', to: to, extra: form.elements.extra.value,
+                                                       lang: lang, ai: ai ? 1 : 0}).then(function (j) {
+      btn.disabled = false;
+      btn.textContent = label;
+      if (!j || !j.ok || !j.compose) {
+        if (tab) tab.close();
+        toast('⚠️ ' + ((j && j.error) || 'Не вдалося'));
+        return;
+      }
+      if (tab) { tab.opener = null; tab.location.href = j.compose; } else { location.href = j.compose; }
+      form.hidden = true;
+      toast('✉️ Лист з агендою відкрито в новій вкладці — перевірте й надішліть');
     });
   }
   root.addEventListener('submit', function (e) {
@@ -400,7 +433,10 @@
     e.preventDefault();
     if (form.hasAttribute('data-ag-add')) {
       var text = (form.elements.text.value || '').trim();
-      if (text) agendaSend({action: 'add', text: text}, true);
+      var parent = form.getAttribute('data-parent') || '';
+      if (text) agendaSend(parent ? {action: 'add', text: text, parent: parent} : {action: 'add', text: text}, true);
+    } else if (form.hasAttribute('data-ag-send')) {
+      agendaMail(form);
     } else if (form.hasAttribute('data-ag-edit')) {
       var row = form.closest('[data-ag]');
       agendaSend({action: 'edit', item: row.getAttribute('data-ag'), text: form.elements.text.value,
@@ -409,6 +445,11 @@
   });
   root.addEventListener('change', function (e) {
     var t = e.target;
+    if (t.matches && t.matches('#agenda [data-ag-send] input[name=lang]')) {      // українська — без перекладу
+      var ai = t.form.elements.ai;
+      if (ai) ai.checked = t.value !== 'uk';
+      return;
+    }
     if (!t.matches || !t.matches('#agenda [data-ag-act=toggle]')) return;
     agendaSend({action: 'status', item: t.closest('[data-ag]').getAttribute('data-ag'), status: t.checked ? 'done' : 'open'});
   });
@@ -426,7 +467,17 @@
     } else if (act === 'up' || act === 'down') {
       agendaSend({action: 'move', item: id, delta: act === 'up' ? -1 : 1});
     } else if (act === 'remove') {
+      if (b.getAttribute('data-confirm') && !window.confirm(b.getAttribute('data-confirm'))) return;
       agendaSend({action: 'remove', item: id});
+    } else if (act === 'sub') {
+      openSub(b.getAttribute('data-parent'));
+    } else if (act === 'subclose') {
+      var sr = b.closest('[data-ag-subadd]');
+      if (sr) sr.hidden = true;
+    } else if (act === 'send' || act === 'sendclose') {
+      var sf = agendaBox().querySelector('[data-ag-send]');
+      if (sf) sf.hidden = act === 'sendclose' ? true : !sf.hidden;
+      if (sf && !sf.hidden) sf.scrollIntoView({block: 'nearest'});
     } else if (act === 'suggest' || act === 'take_all') {
       agendaSend({action: act});
     } else if (act === 'take') {
@@ -456,7 +507,8 @@
     if (document.querySelector('#mt-items .mt-panel:not([hidden])')) return true;
     if (document.querySelector('dialog[open]')) return true;
     if (document.querySelector('details.mt-edit[open]')) return true;
-    if (document.querySelector('#agenda [data-ag-edit]:not([hidden]), #agenda .mt-ag-sug')) return true;
+    if (document.querySelector('#agenda [data-ag-edit]:not([hidden]), #agenda .mt-ag-sug, #agenda [data-ag-send]:not([hidden]), '
+                               + '#agenda [data-ag-subadd]:not([hidden])')) return true;
     var a = document.activeElement;
     return !!(a && root.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
   }

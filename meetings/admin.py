@@ -301,9 +301,10 @@ class MeetingAdmin(admin.ModelAdmin):
                              "pending": m.items.filter(status=MeetingItem.PENDING).count()})
 
     def agenda_view(self, request, pk):
-        """📋 Агенда: POST JSON {action: add {text} | edit {item, text, note} | status {item, status} | move {item,
-        delta} | remove {item} | suggest | take {ref} | take_all} → {ok, html} — свіжий блок агенди (з підказками
-        після suggest / take, поки вони є). Лише власник з правом змінювати наради."""
+        """📋 Агенда: POST JSON {action: add {text, parent} | edit {item, text, note} | status {item, status} | move
+        {item, delta} | remove {item} | suggest | take {ref} | take_all} → {ok, html} — свіжий блок агенди (з
+        підказками після suggest / take, поки вони є); send {to: [...], extra, lang, ai} → {ok, compose} — чернетка
+        листа з агендою у власній скриньці. Лише власник з правом змінювати наради."""
         from . import agenda
         refused = _post_only(request)
         if refused:
@@ -318,7 +319,12 @@ class MeetingAdmin(admin.ModelAdmin):
         suggestions = None
         try:
             if action == "add":
-                agenda.add(user, m, data.get("text"))
+                agenda.add(user, m, data.get("text"), parent=data.get("parent"))
+            elif action == "send":
+                to = list(data.get("to") or []) if isinstance(data.get("to"), list) else [data.get("to")]
+                compose = agenda.send(user, m, to + [data.get("extra") or ""], str(data.get("lang") or ""),
+                                      ai=bool(data.get("ai")))
+                return JsonResponse({"ok": True, "compose": compose})
             elif action == "edit":
                 agenda.edit(user, m, item, text=data.get("text"), note=data.get("note"))
             elif action == "status":

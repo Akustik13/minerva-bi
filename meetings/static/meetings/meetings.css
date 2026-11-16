@@ -200,11 +200,25 @@ ul.mt-quick-list form { margin: 0; }
 
 /* 📋 Агенда (_agenda.html) */
 .mt-ag-busy { opacity: .7; }
-.mt-ag-list { list-style: none; margin: 6px 0 10px; padding: 0; counter-reset: ag; }
-.mt-ag-row { display: flex; gap: 10px; align-items: flex-start; padding: 7px 8px; border-bottom: 1px solid var(--border);
-  counter-increment: ag; }
-.mt-ag-row::before { content: counter(ag) "."; min-width: 1.6em; color: var(--text-muted); font-size: 13px; padding-top: 2px;
-  text-align: right; }
+.mt-ag-list { list-style: none; margin: 6px 0 10px; padding: 0; }
+.mt-ag-row { display: flex; gap: 10px; align-items: flex-start; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+.mt-ag-num { min-width: 1.8em; color: var(--text-muted); font-size: 13px; padding-top: 2px; text-align: right; flex: none; }
+.mt-ag-sub { padding-left: 38px; border-bottom-style: dashed; }
+.mt-ag-sub .mt-ag-num { min-width: 2.4em; }
+.mt-ag-sub .mt-ag-text { font-size: 13.5px; }
+.mt-ag-subadd { border-bottom: none; }
+.mt-ag-subadd form { flex: 1; margin: 0; }
+.mt-ag-subbtn { flex: none; border: 1px dashed var(--border-strong); background: none; color: var(--link-fg);
+  border-radius: 6px; padding: 2px 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.mt-ag-subbtn:hover { background: var(--bg-hover); border-style: solid; }
+.mt-ag-send { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--bg-hover); }
+.mt-ag-send h3 { margin-top: 0; }
+.mt-ag-send fieldset { border: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px;
+  align-items: center; }
+.mt-ag-send legend { font-weight: 600; font-size: 13px; padding: 0; margin-bottom: 4px; width: 100%; }
+.mt-ag-send input[name=extra] { flex: 1 1 280px; min-width: 0; padding: 5px 8px; }
+.mt-ag-send .mt-muted { width: 100%; margin: 2px 0 0; }
 .mt-ag-box { margin-top: 3px; width: 18px; height: 18px; flex: none; cursor: pointer; }
 span.mt-ag-box { cursor: default; text-align: center; color: var(--text-muted); }
 .mt-ag-body { flex: 1; min-width: 0; }
@@ -233,4 +247,6 @@ span.mt-ag-box { cursor: default; text-align: center; color: var(--text-muted); 
 .mt-ag-take { font-weight: 700; color: var(--link-fg); }
 @media (max-width: 768px) {
   .mt-ag-acts { opacity: 1; flex-wrap: wrap; justify-content: flex-end; max-width: 92px; }
+  .mt-ag-row { flex-wrap: wrap; }
+  .mt-ag-sub { padding-left: 18px; }
 }

@@ -862,6 +862,7 @@
 {"uk": "AI не зміг згенерувати лист", "en": "AI could not generate the email", "de": "Die KI konnte die E-Mail nicht erstellen"}
 {"uk": "AI не зміг перевірити граматику", "en": "AI could not check the grammar", "de": "Die KI konnte die Grammatik nicht prüfen"}
 {"uk": "AI не знайшов нових ризиків — запропоновані вже є в реєстрі або відхилені раніше", "en": "AI found no new risks — the suggested ones are already in the register or were rejected before", "de": "Die KI hat keine neuen Risiken gefunden — die vorgeschlagenen stehen schon im Register oder wurden abgelehnt"}
+{"uk": "AI не переклав агенду — спробуйте ще раз або надішліть без перекладу", "en": "AI did not translate the agenda — try again or send it without translation", "de": "Die AI hat die Tagesordnung nicht übersetzt — erneut versuchen oder ohne Übersetzung senden"}
 {"uk": "AI не повернув бриф — перевірте ключ AI або спробуйте ще раз", "en": "The AI did not return a brief — check the AI key or try again", "de": "Die KI hat kein Briefing geliefert — prüfen Sie den KI-Schlüssel oder versuchen Sie es erneut"}
 {"uk": "AI не повернув валідний JSON. Спробуйте ще раз.", "en": "AI did not return valid JSON. Please try again.", "de": "Die KI hat kein gültiges JSON zurückgegeben. Bitte versuchen Sie es erneut."}
 {"uk": "AI не повернув відповідь", "en": "The AI did not return a reply", "de": "Die KI hat keine Antwort geliefert"}
@@ -3902,6 +3903,7 @@
 {"uk": "Автоімпорт даних (Excel)", "en": "Automatic data import (Excel)", "de": "Automatischer Datenimport (Excel)"}
 {"uk": "Агенда", "en": "Agenda", "de": "Tagesordnung"}
 {"uk": "Агенда наради: скільки пунктів уже обговорили", "en": "Meeting agenda: how many items have been discussed", "de": "Tagesordnung: wie viele Punkte besprochen sind"}
+{"uk": "Агенда порожня — спершу додайте пункти", "en": "The agenda is empty — add items first", "de": "Die Tagesordnung ist leer — zuerst Punkte hinzufügen"}
 {"uk": "Агенда порожня.", "en": "The agenda is empty.", "de": "Die Tagesordnung ist leer."}
 {"uk": "Агенда порожня. Напишіть, що обговорити, або «🧭 Підказати з проєкту» — Minerva запропонує теми з плану, ризиків і «Що зараз».", "en": "The agenda is empty. Write what to discuss, or «🧭 Suggest from the project» — Minerva proposes topics from the plan, risks and «What now».", "de": "Die Tagesordnung ist leer. Schreiben Sie, was zu besprechen ist, oder «🧭 Aus dem Projekt vorschlagen» — Minerva schlägt Themen aus Plan, Risiken und «Was jetzt» vor."}
 {"uk": "Агенда порожня. Напишіть, що обговорити.", "en": "The agenda is empty. Write what to discuss.", "de": "Die Tagesordnung ist leer. Schreiben Sie, was zu besprechen ist."}
@@ -3972,6 +3974,7 @@
 {"uk": "Адреса localhost заборонена для вебхуків.", "en": "The localhost address is not allowed for webhooks.", "de": "Die Adresse localhost ist für Webhooks nicht zulässig."}
 {"uk": "Адреса {0} заборонена для вебхуків.", "en": "The address {0} is not allowed for webhooks.", "de": "Die Adresse {0} ist für Webhooks nicht zulässig."}
 {"uk": "Адреса {0} — внутрішня мережа: лише для вебхуків адміністратора.", "en": "The address {0} is on the internal network: only for administrator webhooks.", "de": "Die Adresse {0} liegt im internen Netzwerk: nur für Webhooks des Administrators."}
+{"uk": "Адреса «{0}» неправильна", "en": "The address «{0}» is not valid", "de": "Die Adresse «{0}» ist ungültig"}
 {"uk": "Адреса або @домен", "en": "Address or @domain", "de": "Adresse oder @Domain"}
 {"uk": "Адреса або ключ помічника задані лише у файлі сайту — Minerva їх не знає. Задайте їх тут або перевірте через «🔌 Перевірити зв'язок із сайтом».", "en": "The assistant address or key is set only in the site file — Minerva does not know them. Set them here or check via “🔌 Check connection to the site”.", "de": "Adresse oder Schlüssel des Assistenten sind nur in der Datei der Website festgelegt — Minerva kennt sie nicht. Legen Sie sie hier fest oder prüfen Sie über „🔌 Verbindung zur Website prüfen“."}
 {"uk": "Адреса береться з блоку «Отримувач». Без UPS-акаунту отримувача UPS не прийме оплату доставки отримувачем.", "en": "The address is taken from the “Recipient” block. Without the recipient's UPS account, UPS will not accept payment of shipping by the recipient.", "de": "Die Adresse wird aus dem Block „Empfänger“ übernommen. Ohne UPS-Konto des Empfängers akzeptiert UPS keine Bezahlung der Versandkosten durch den Empfänger."}
@@ -4754,6 +4757,7 @@
 {"uk": "Виберіть колір", "en": "Choose a color", "de": "Wählen Sie eine Farbe"}
 {"uk": "Виберіть колір статусу", "en": "Choose the status color", "de": "Wählen Sie die Statusfarbe"}
 {"uk": "Виберіть листи галочками.", "en": "Select e-mails with the checkboxes.", "de": "Wählen Sie E-Mails mit den Häkchen aus."}
+{"uk": "Виберіть мову листа", "en": "Choose the language of the e-mail", "de": "Sprache der E-Mail wählen"}
 {"uk": "Виберіть один або кілька днів тижня.", "en": "Select one or more days of the week.", "de": "Wählen Sie einen oder mehrere Wochentage."}
 {"uk": "Виберіть один магазин для копіювання.", "en": "Select one shop to copy.", "de": "Wählen Sie einen Shop zum Kopieren aus."}
 {"uk": "Виберіть одне завдання.", "en": "Select one task.", "de": "Wählen Sie eine Aufgabe aus."}
@@ -5960,6 +5964,7 @@
 {"uk": "Готові до", "en": "Ready until", "de": "Bereit bis"}
 {"uk": "Готові з", "en": "Ready from", "de": "Bereit ab"}
 {"uk": "Готові приклади: {0}", "en": "Ready examples: {0}", "de": "Fertige Beispiele: {0}"}
+{"uk": "Готую лист…", "en": "Preparing the e-mail…", "de": "E-Mail wird vorbereitet…"}
 {"uk": "Готую файли…", "en": "Preparing files…", "de": "Dateien werden vorbereitet…"}
 {"uk": "Готує", "en": "Preparing", "de": "Bereitet vor"}
 {"uk": "Готується до відправки.", "en": "Being prepared for shipping.", "de": "Wird für den Versand vorbereitet."}
@@ -6481,6 +6486,8 @@
 {"uk": "Додати параметр", "en": "Add parameter", "de": "Parameter hinzufügen"}
 {"uk": "Додати перевізника", "en": "Add carrier", "de": "Versanddienstleister hinzufügen"}
 {"uk": "Додати позицію", "en": "Add item", "de": "Position hinzufügen"}
+{"uk": "Додати підпункт", "en": "Add sub-item", "de": "Unterpunkt hinzufügen"}
+{"uk": "Додати підпункт до цього пункту (1.1, 1.2…)", "en": "Add a sub-item to this item (1.1, 1.2…)", "de": "Unterpunkt zu diesem Punkt hinzufügen (1.1, 1.2…)"}
 {"uk": "Додати ризик проєкту з цього листа (виділений текст — підстава)", "en": "Add a project risk from this email (the selected text is the evidence)", "de": "Projektrisiko aus dieser E-Mail hinzufügen (der markierte Text ist der Beleg)"}
 {"uk": "Додати розділ", "en": "Add section", "de": "Bereich hinzufügen"}
 {"uk": "Додати рядок", "en": "Add row", "de": "Zeile hinzufügen"}
@@ -6594,6 +6601,7 @@
 {"uk": "Домен системи", "en": "System domain", "de": "System-Domain"}
 {"uk": "Домівка", "en": "Home", "de": "Startseite"}
 {"uk": "Домініканська Республіка", "en": "Dominican Republic", "de": "Dominikanische Republik"}
+{"uk": "Доповнення — у відповіді на цей лист.", "en": "Additions — in a reply to this e-mail.", "de": "Ergänzungen — als Antwort auf diese E-Mail."}
 {"uk": "Доповнено {0}", "en": "Completed {0}", "de": "Ergänzt {0}"}
 {"uk": "Доповнено закупівель: {0}", "en": "Purchase orders updated: {0}", "de": "Bestellungen ergänzt: {0}"}
 {"uk": "Допускається символ валюти.", "en": "A currency symbol is allowed.", "de": "Ein Währungssymbol ist zulässig."}
@@ -6999,6 +7007,7 @@
 {"uk": "За часом Берліна. Розклад сервера сам надсилає брифінг у цей час (раз на день).", "en": "In Berlin time. The server schedule sends the briefing itself at this time (once a day).", "de": "In Berliner Zeit. Der Serverzeitplan sendet das Briefing zu dieser Zeit selbst (einmal täglich)."}
 {"uk": "За шаблоном ступенів магазину (знижки від ціни 1 шт.)", "en": "By the shop price break template (discounts from the 1 pc price)", "de": "Nach der Staffelpreis-Vorlage des Shops (Rabatte auf den Preis für 1 Stk.)"}
 {"uk": "За який час перечитати пошту — більший період нічого не коштує, лише довше читається", "en": "Which period of mail to re-read — a longer period costs nothing, it just takes longer", "de": "Welcher Zeitraum der Post neu gelesen wird — ein längerer kostet nichts, dauert nur länger"}
+{"uk": "Забагато адрес — не більше {0} в одному листі", "en": "Too many addresses — no more than {0} in one e-mail", "de": "Zu viele Adressen — höchstens {0} in einer E-Mail"}
 {"uk": "Забагато адрес — не більше {0}.", "en": "Too many addresses — no more than {0}.", "de": "Zu viele Adressen — höchstens {0}."}
 {"uk": "Забагато запитів — повторіть пізніше.", "en": "Too many requests — try again later.", "de": "Zu viele Anfragen — bitte später erneut versuchen."}
 {"uk": "Забагато запитів.", "en": "Too many requests.", "de": "Zu viele Anfragen."}
@@ -9347,7 +9356,10 @@
 {"uk": "Лист агента", "en": "Agent email", "de": "E-Mail des Agenten"}
 {"uk": "Лист без гілки листування", "en": "Email without a thread", "de": "E-Mail ohne Verlauf"}
 {"uk": "Лист від {0} ({1}) не надіслано: {2}", "en": "E-mail from {0} ({1}) not sent: {2}", "de": "E-Mail von {0} ({1}) nicht gesendet: {2}"}
+{"uk": "Лист відкриється у вашій пошті Minerva в новій вкладці — перевірте й надішліть самі.", "en": "The e-mail opens in your Minerva mail in a new tab — check it and send it yourself.", "de": "Die E-Mail öffnet sich in Ihrer Minerva-Mail in einem neuen Tab — prüfen und selbst senden."}
 {"uk": "Лист відправлено на", "en": "Email sent to", "de": "E-Mail gesendet an"}
+{"uk": "Лист з агендою відкрито в новій вкладці — перевірте й надішліть", "en": "The e-mail with the agenda is open in a new tab — check it and send it", "de": "Die E-Mail mit der Tagesordnung ist in einem neuen Tab geöffnet — prüfen und senden"}
+{"uk": "Лист з агендою учасникам — за бажанням перекладений AI; відкриється у вашій пошті, надсилаєте ви", "en": "An e-mail with the agenda to the participants — translated by AI if you like; it opens in your mail and you send it", "de": "Eine E-Mail mit der Tagesordnung an die Teilnehmer — auf Wunsch von der AI übersetzt; sie öffnet sich in Ihrer Mail, Sie senden sie"}
 {"uk": "Лист з одноразовим посиланням (60 хв). Новий пароль завершує всі інші входи; покупець отримує лист «пароль змінено».", "en": "An email with a one-time link (60 min). The new password ends all other sessions; the buyer receives a “password changed” email.", "de": "E-Mail mit einem Einmal-Link (60 Min.). Das neue Passwort beendet alle anderen Anmeldungen; der Käufer erhält eine E-Mail „Passwort geändert“."}
 {"uk": "Лист з першим файлом", "en": "E-mail with the first file", "de": "E-Mail mit der ersten Datei"}
 {"uk": "Лист з файлами відкрито в новій вкладці", "en": "E-mail with the files opened in a new tab", "de": "E-Mail mit den Dateien in neuem Tab geöffnet"}
@@ -9639,6 +9651,7 @@
 {"uk": "Ліміт gunicorn.", "en": "gunicorn limit.", "de": "gunicorn-Limit."}
 {"uk": "Ліміт «різних записів за добу»: приховано {0} — ключ сьогодні вже бачив {1} з {2}.", "en": "“Distinct records per day” limit: {0} hidden — the key has already seen {1} of {2} today.", "de": "Limit „verschiedene Datensätze pro Tag“: {0} ausgeblendet — der Schlüssel hat heute bereits {1} von {2} gesehen."}
 {"uk": "Ліміт бюджету AI вичерпано", "en": "The AI budget limit has been reached", "de": "Das KI-Budgetlimit ist ausgeschöpft"}
+{"uk": "Ліміт бюджету AI вичерпано — надішліть без перекладу", "en": "The AI budget limit is reached — send without translation", "de": "Das AI-Budget ist ausgeschöpft — ohne Übersetzung senden"}
 {"uk": "Ліміт витрат AI вичерпано.", "en": "AI spending limit reached.", "de": "KI-Ausgabenlimit erreicht."}
 {"uk": "Ліміт ключа: {0} запитів {1} — вичерпано.", "en": "Key limit: {0} requests {1} — exhausted.", "de": "Schlüssel-Limit: {0} Anfragen {1} — ausgeschöpft."}
 {"uk": "Ліміт ключа: {0} різних записів за добу вичерпано. Уже переглянуті сьогодні записи доступні й далі; нові — завтра.", "en": "Key limit: {0} distinct records per day exhausted. Records already viewed today remain available; new ones — tomorrow.", "de": "Schlüssel-Limit: {0} verschiedene Datensätze pro Tag ausgeschöpft. Heute bereits angesehene Datensätze bleiben weiter verfügbar; neue — morgen."}
@@ -10189,6 +10202,8 @@
 {"uk": "Надіслати email-повідомлення коли DigiKey затвердить лістинг (staged → published)", "en": "Send an e-mail when DigiKey approves the listing (staged → published)", "de": "E-Mail senden, wenn DigiKey das Listing freigibt (staged → published)"}
 {"uk": "Надіслати email-сповіщення коли покупець надсилає нове повідомлення", "en": "Send an e-mail notification when a buyer sends a new message", "de": "E-Mail-Benachrichtigung senden, wenn ein Käufer eine neue Nachricht sendet"}
 {"uk": "Надіслати {0}-запит? Він може змінити дані.", "en": "Send a {0} request? It may change data.", "de": "{0}-Anfrage senden? Sie kann Daten ändern."}
+{"uk": "Надіслати агенду", "en": "Send the agenda", "de": "Tagesordnung senden"}
+{"uk": "Надіслати агенду…", "en": "Send the agenda…", "de": "Tagesordnung senden…"}
 {"uk": "Надіслати алерт коли витрачено більше цієї суми", "en": "Send an alert when more than this amount has been spent", "de": "Warnung senden, wenn mehr als dieser Betrag ausgegeben wurde"}
 {"uk": "Надіслати в", "en": "Send to", "de": "Senden an"}
 {"uk": "Надіслати весь офер з Minerva", "en": "Send the whole offer from Minerva", "de": "Gesamtes Offer aus Minerva senden"}
@@ -11150,6 +11165,7 @@
 {"uk": "Нижче (Alt + ↓)", "en": "Down (Alt + ↓)", "de": "Nach unten (Alt + ↓)"}
 {"uk": "Нижче в «Мої»", "en": "Lower in “My”", "de": "Weiter unten in „Meine“"}
 {"uk": "Нижче точки дозамовлення: {0}", "en": "Below the reorder point: {0}", "de": "Unter dem Meldebestand: {0}"}
+{"uk": "Нижче — агенда нашої наради «{0}»{1}.", "en": "Below is the agenda of our meeting «{0}»{1}.", "de": "Unten die Tagesordnung unserer Besprechung «{0}»{1}."}
 {"uk": "Нижче: {0}", "en": "Down: {0}", "de": "Nach unten: {0}"}
 {"uk": "Низький", "en": "Low", "de": "Niedrig"}
 {"uk": "Низько", "en": "Low", "de": "Niedrig"}
@@ -11239,6 +11255,7 @@
 {"uk": "Новий профіль", "en": "New profile", "de": "Neues Profil"}
 {"uk": "Новий проєкт", "en": "New project", "de": "Neues Projekt"}
 {"uk": "Новий пункт агенди", "en": "New agenda item", "de": "Neuer Tagesordnungspunkt"}
+{"uk": "Новий підпункт", "en": "New sub-item", "de": "Neuer Unterpunkt"}
 {"uk": "Новий рахунок", "en": "New invoice", "de": "Neue Rechnung"}
 {"uk": "Новий ризик", "en": "New risk", "de": "Neues Risiko"}
 {"uk": "Новий строк, днів", "en": "New lead time, days", "de": "Neue Lieferzeit, Tage"}
@@ -11430,6 +11447,7 @@
 {"uk": "Об'єм", "en": "Volume", "de": "Volumen"}
 {"uk": "Обговорили", "en": "Discussed", "de": "Besprochen"}
 {"uk": "Обговорили на зустрічі", "en": "Discussed at a meeting", "de": "In einer Besprechung besprochen"}
+{"uk": "Обговорили — разом з підпунктами", "en": "Discussed — together with the sub-items", "de": "Besprochen — samt Unterpunkten"}
 {"uk": "Оберіть .docx файл", "en": "Select a .docx file", "de": "Wählen Sie eine .docx-Datei aus"}
 {"uk": "Оберіть аркуш. Система", "en": "Select a sheet. The system", "de": "Wählen Sie ein Blatt. Das System"}
 {"uk": "Оберіть дату...", "en": "Select a date...", "de": "Datum wählen..."}
@@ -12423,7 +12441,9 @@
 {"uk": "Переклав AI", "en": "Translated by AI", "de": "Von der KI übersetzt"}
 {"uk": "Переклад запущено у фоні — хід видно вгорі сторінки.", "en": "Translation started in the background — progress is shown at the top of the page.", "de": "Die Übersetzung wurde im Hintergrund gestartet — der Fortschritt ist oben auf der Seite zu sehen."}
 {"uk": "Переклад зупинився: {0}", "en": "Translation stopped: {0}", "de": "Die Übersetzung wurde angehalten: {0}"}
+{"uk": "Переклад робить Claude (хмарний AI) — туди піде текст агенди; рахується в бюджеті AI. Без перекладу пункти йдуть, як написано.", "en": "Claude (cloud AI) translates — the agenda text is sent there; it counts towards the AI budget. Without translation the items go as written.", "de": "Die Übersetzung macht Claude (Cloud-AI) — dorthin geht der Text der Tagesordnung; zählt zum AI-Budget. Ohne Übersetzung gehen die Punkte wie geschrieben."}
 {"uk": "Переклад уже йде.", "en": "A translation is already running.", "de": "Eine Übersetzung läuft bereits."}
+{"uk": "Перекладаю…", "en": "Translating…", "de": "Übersetze…"}
 {"uk": "Перекладається…", "en": "Translating…", "de": "Wird übersetzt…"}
 {"uk": "Перекладено: {0} · відхилено перевіркою: {1}{2}", "en": "Translated: {0} · rejected by validation: {1}{2}", "de": "Übersetzt: {0} · von der Prüfung abgelehnt: {1}{2}"}
 {"uk": "Переклади", "en": "Translations", "de": "Übersetzungen"}
@@ -12437,6 +12457,7 @@
 {"uk": "Перекласти {0} написів", "en": "Translate {0} labels", "de": "{0} Beschriftungen übersetzen"}
 {"uk": "Перекласти вибрані (AI, Sonnet 5.5)", "en": "Translate selected (AI, Sonnet 5.5)", "de": "Ausgewählte übersetzen (KI, Sonnet 5.5)"}
 {"uk": "Перекласти відсутнє (AI)", "en": "Translate missing (AI)", "de": "Fehlendes übersetzen (KI)"}
+{"uk": "Перекласти пункти цією мовою (AI)", "en": "Translate the items into this language (AI)", "de": "Punkte in diese Sprache übersetzen (AI)"}
 {"uk": "Переконайся що Marketplace авторизований (", "en": "Make sure the Marketplace is authorized (", "de": "Stellen Sie sicher, dass der Marketplace autorisiert ist ("}
 {"uk": "Переконайся що в DigiKey App налаштований Redirect URI", "en": "Make sure the Redirect URI is configured in the DigiKey App", "de": "Stellen Sie sicher, dass in der DigiKey App der Redirect URI eingerichtet ist"}
 {"uk": "Перекривається", "en": "Overlaps", "de": "Überschneidet sich"}
@@ -13626,6 +13647,7 @@
 {"uk": "Прибрати всі залежності", "en": "Remove all dependencies", "de": "Alle Abhängigkeiten entfernen"}
 {"uk": "Прибрати з «Мої»", "en": "Remove from “My”", "de": "Aus „Meine“ entfernen"}
 {"uk": "Прибрати з агенди", "en": "Remove from the agenda", "de": "Von der Tagesordnung entfernen"}
+{"uk": "Прибрати з агенди разом з підпунктами", "en": "Remove from the agenda with its sub-items", "de": "Samt Unterpunkten von der Tagesordnung entfernen"}
 {"uk": "Прибрати з запиту", "en": "Remove from request", "de": "Aus der Anfrage entfernen"}
 {"uk": "Прибрати з календаря", "en": "Remove from the calendar", "de": "Aus dem Kalender entfernen"}
 {"uk": "Прибрати з нижньої панелі", "en": "Remove from the bottom bar", "de": "Aus der unteren Leiste entfernen"}
@@ -13637,6 +13659,7 @@
 {"uk": "Прибрати момент", "en": "Remove moment", "de": "Moment entfernen"}
 {"uk": "Прибрати позначку", "en": "Remove the mark", "de": "Markierung entfernen"}
 {"uk": "Прибрати проєкт з наради", "en": "Remove the project from the meeting", "de": "Projekt aus der Besprechung entfernen"}
+{"uk": "Прибрати пункт разом з його підпунктами?", "en": "Remove the item together with its sub-items?", "de": "Punkt samt seinen Unterpunkten entfernen?"}
 {"uk": "Прибрати спам і події від відправників, від яких ви більше не хочете термінів — спершу видно, що саме прибереться", "en": "Remove spam and events from senders you no longer want deadlines from — you will first see exactly what will be removed", "de": "Spam und Termine von Absendern entfernen, von denen Sie keine Fristen mehr wollen — zuerst sehen Sie genau, was entfernt wird"}
 {"uk": "Прибрати сторону «", "en": "Remove the party «", "de": "Beteiligten entfernen «"}
 {"uk": "Прибрати фазу (її кроки лишаться без фази)", "en": "Remove the phase (its steps stay without a phase)", "de": "Phase entfernen (ihre Schritte bleiben ohne Phase)"}
@@ -14129,6 +14152,9 @@
 {"uk": "Підписує", "en": "Signed by", "de": "Unterzeichner"}
 {"uk": "Підписує й посада (як у Commercial Invoice)", "en": "Signatory and position (as in Commercial Invoice)", "de": "Unterzeichner und Position (wie in der Commercial Invoice)"}
 {"uk": "Підправляти нечитабельний текст", "en": "Fix unreadable text", "de": "Unlesbaren Text korrigieren"}
+{"uk": "Підпункт", "en": "Sub-item", "de": "Unterpunkt"}
+{"uk": "Підпункт додається до пункту агенди, не до іншого підпункту", "en": "A sub-item is added to an agenda item, not to another sub-item", "de": "Ein Unterpunkt gehört zu einem Tagesordnungspunkt, nicht zu einem anderen Unterpunkt"}
+{"uk": "Підпункт — напр. «точність у приміщенні»", "en": "Sub-item — e.g. «indoor accuracy»", "de": "Unterpunkt — z. B. «Genauigkeit in Innenräumen»"}
 {"uk": "Підрядник", "en": "Contractor", "de": "Auftragnehmer"}
 {"uk": "Підсвічування зникає, щойно поле змінено й збережено. Якщо поле", "en": "The highlight disappears as soon as the field is changed and saved. If the field", "de": "Die Hervorhebung verschwindet, sobald das Feld geändert und gespeichert wurde. Wenn das Feld"}
 {"uk": "Підсвічування зникає, щойно поле змінено й збережено. Якщо поле навмисно лишається таким самим", "en": "The highlight disappears as soon as the field is changed and saved. If the field intentionally stays the same", "de": "Die Hervorhebung verschwindet, sobald das Feld geändert und gespeichert wurde. Wenn das Feld bewusst unverändert bleibt"}
@@ -16428,6 +16454,7 @@
 {"uk": "У Minerva відкрито з {0} (ще не в askDANTE)", "en": "Opened in Minerva since {0} (not yet in askDANTE)", "de": "In Minerva seit {0} geöffnet (noch nicht in askDANTE)"}
 {"uk": "У Minerva зони не задані — сайт рахує доставку за своїми правилами з shop-config.php.", "en": "No zones are set in Minerva — the site calculates shipping by its own rules from shop-config.php.", "de": "In Minerva sind keine Zonen festgelegt – die Website berechnet den Versand nach eigenen Regeln aus shop-config.php."}
 {"uk": "У Minerva немає", "en": "Not in Minerva", "de": "Nicht in Minerva"}
+{"uk": "У Minerva немає вашої поштової скриньки — скопіюйте агенду текстом («📋 Копіювати текстом»)", "en": "You have no mailbox in Minerva — copy the agenda as text («📋 Copy as text»)", "de": "Sie haben kein Postfach in Minerva — Tagesordnung als Text kopieren («📋 Als Text kopieren»)"}
 {"uk": "У Minerva немає вашої поштової скриньки — файли можна завантажити й надіслати самому", "en": "You have no mailbox in Minerva — download the files and send them yourself", "de": "Sie haben in Minerva kein Postfach — laden Sie die Dateien herunter und senden Sie sie selbst"}
 {"uk": "У Minerva створено проєкт {0} «{1}», зв'язаний з askDANTE.", "en": "Project {0} “{1}” created in Minerva, linked to askDANTE.", "de": "In Minerva wurde das Projekt {0} „{1}“ erstellt, verknüpft mit askDANTE."}
 {"uk": "У Minerva увімкнено, але на сайті кнопки немає: {0}.{1}", "en": "Enabled in Minerva, but the button is missing on the site: {0}.{1}", "de": "In Minerva aktiviert, aber die Schaltfläche fehlt auf der Website: {0}.{1}"}
@@ -16503,6 +16530,7 @@
 {"uk": "У магазині не вказано «Адреса сайту» — адресу повернення з оплати неможливо перевірити.", "en": "The shop has no “Site address” set — the return address from the payment cannot be verified.", "de": "Im Shop ist keine „Website-Adresse“ angegeben – die Rücksprungadresse von der Zahlung kann nicht geprüft werden."}
 {"uk": "У магазині не вказано «Адреса сайту» — посилання в листах кабінету неможливо перевірити.", "en": "The shop has no “Site address” set — links in account emails cannot be verified.", "de": "Im Shop ist keine „Website-Adresse“ angegeben — Links in den E-Mails des Kundenkontos können nicht geprüft werden."}
 {"uk": "У магазині не задано секретний ключ Stripe.", "en": "The shop has no Stripe secret key set.", "de": "Im Shop ist kein geheimer Stripe-Schlüssel festgelegt."}
+{"uk": "У нараді немає учасників з адресою — впишіть адреси нижче (або додасте в листі).", "en": "The meeting has no participants with an address — enter addresses below (or add them in the e-mail).", "de": "Die Besprechung hat keine Teilnehmer mit Adresse — Adressen unten eintragen (oder in der E-Mail ergänzen)."}
 {"uk": "У новій вкладці", "en": "In a new tab", "de": "In neuem Tab"}
 {"uk": "У панелі", "en": "In the panel", "de": "Im Panel"}
 {"uk": "У плані немає кроків", "en": "The plan has no steps", "de": "Der Plan hat keine Schritte"}
@@ -17607,6 +17635,8 @@
 {"uk": "Ще (вільним текстом)", "en": "More (free text)", "de": "Weiteres (Freitext)"}
 {"uk": "Ще {0} лишилось у пошті — не вдалося забрати: {1}. Відкрийте панель пізніше або лист у пошті.", "en": "{0} more still in mail — could not fetch: {1}. Open the panel later or the e-mail in mail.", "de": "Noch {0} in der Post — konnte nicht abgerufen werden: {1}. Öffnen Sie das Panel später oder die E-Mail in der Post."}
 {"uk": "Ще {0} у пошті — забираю…", "en": "{0} more in mail — fetching…", "de": "Noch {0} in der Post — wird abgerufen…"}
+{"uk": "Ще адреси", "en": "More addresses", "de": "Weitere Adressen"}
+{"uk": "Ще адреси — колеги, через кому", "en": "More addresses — colleagues, comma-separated", "de": "Weitere Adressen — Kollegen, durch Komma getrennt"}
 {"uk": "Ще в картці", "en": "Also in the card", "de": "Weitere in der Karte"}
 {"uk": "Ще відправити", "en": "Still to ship", "de": "Noch zu versenden"}
 {"uk": "Ще відправити: {0} — замовлення «{1}».", "en": "Still to ship: {0} — order “{1}”.", "de": "Noch zu versenden: {0} — Auftrag „{1}“."}
@@ -21128,6 +21158,7 @@
 {"uk": "підписи діаграми, заголовки, стани, дати й текст листа; назви кроків, фаз і сторін — як ви їх написали", "en": "diagram labels, headings, statuses, dates and the e-mail text; names of steps, phases and parties stay as you wrote them", "de": "Diagrammbeschriftungen, Überschriften, Status, Termine und E-Mail-Text; Namen von Schritten, Phasen und Beteiligten bleiben, wie Sie sie geschrieben haben"}
 {"uk": "підписки (видно з «показати виконані»); повернули в роботу — дедлайн повертається. Прострочені завжди видно.", "en": "the subscription (visible with “show completed”); if put back into work, the deadline returns. Overdue ones are always visible.", "de": "dem Abonnement (sichtbar mit „Erledigte anzeigen“); wird er wieder in Bearbeitung genommen, kehrt die Frist zurück. Überfällige sind immer sichtbar."}
 {"uk": "підпроєкт під «{0}»", "en": "subproject under “{0}”", "de": "Unterprojekt unter „{0}“"}
+{"uk": "підпунктів: {0}", "en": "sub-items: {0}", "de": "Unterpunkte: {0}"}
 {"uk": "підставити", "en": "insert", "de": "einsetzen"}
 {"uk": "підставлено (", "en": "filled in (", "de": "eingetragen ("}
 {"uk": "підставляються в таблицю, зберігаються кнопкою «Зберегти»\">🌐 Підставити курси ЄЦБ", "en": "are filled into the table, saved with the “Save” button\">🌐 Fill in ECB rates", "de": "werden in die Tabelle eingetragen, gespeichert mit der Schaltfläche „Speichern“\">🌐 EZB-Kurse eintragen"}

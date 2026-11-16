@@ -477,7 +477,9 @@ def agenda_context(user, m, suggestions=None) -> dict:
             "url": url("admin:meetings_meeting_agenda", m.pk), "can": can_change(user),
             "can_suggest": can_change(user) and user.has_perm("projects.view_project"), "projects": len(projects),
             "after": m.status != Meeting.READY, "suggestions": suggestions,
-            "groups": agenda.grouped(suggestions or [])}
+            "groups": agenda.grouped(suggestions or []),
+            "people": agenda.people(m, user), "langs": list(agenda.LANGS.items()),
+            "lang": m.consent_lang if m.consent_lang in agenda.LANGS else "de"}
 
 
 def render_agenda(user, m, suggestions=None) -> str:

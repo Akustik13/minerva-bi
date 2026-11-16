@@ -1,12 +1,13 @@
 """📋 Агенда наради (meetings/agenda.py, admin agenda_view, _agenda.html, пульт проєкту «🎙 Мої наради»):
 python manage.py test meetings.tests_agenda --settings=tabele.settings_test
 
-Пункти — лише власнику наради; підказки з проєкту без AI (ризики, віхи, кроки клієнта, «Що зараз», AI-огляд), уже
+Пункти й підпункти (1.1) — лише власнику наради; підказки з проєкту без AI (ризики, віхи, кроки клієнта, «Що зараз», AI-огляд), уже
 додане не пропонується; не обговорене на минулій нараді проєкту — підказка до наступної, узяли — там «перенесено»,
-прибрали — знову «обговорити»; у пульті — «📋 агенда N / M» і «📋 Підготувати агенду» до зустрічі з календаря.
+прибрали — знову «обговорити»; ✉️ лист з агендою — чернетка у власній скриньці, переклад AI (підмінено); у пульті — «📋 агенда N / M» і «📋 Підготувати агенду» до зустрічі з календаря.
 """
 import json
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.utils import timezone
 
@@ -152,3 +153,105 @@ class CockpitAgendaTests(AgendaBase):
         self.login(self.owner)
         html = self.client.get(f"/admin/projects/project/{self.project.pk}/change/").content.decode()
         self.assertIn("📋 агенда 1 / 2", html)
+
+
+class SubItemsTests(AgendaBase):
+    def test_sub_items_numbering_status_order_and_copy(self):
+        m = self.meeting()
+        self.login(self.owner)
+        top = agenda.add(self.owner, m, "Демонстрація біконів")
+        agenda.add(self.owner, m, "Ціна серії")
+        data = self.send(m, action="add", text="Точність у приміщенні", parent=top.pk).json()
+        self.assertTrue(data["ok"], data)
+        self.assertIn('data-ag-subadd="%d"' % top.pk, data["html"])                 # поле «＋ Підпункт» є
+        self.assertIn("＋ Підпункт", data["html"])
+        self.send(m, action="add", text="Час роботи батареї", parent=top.pk)
+        a, b = MeetingAgendaItem.objects.filter(parent=top).order_by("order")
+        self.assertEqual([(r.num, r.text) for r in agenda.items(m)],
+                         [("1", "Демонстрація біконів"), ("1.1", "Точність у приміщенні"),
+                          ("1.2", "Час роботи батареї"), ("2", "Ціна серії")])
+        self.assertFalse(self.send(m, action="add", text="x", parent=a.pk).json()["ok"])  # лише один рівень
+        self.send(m, action="move", item=b.pk, delta=-1)                              # серед підпунктів пункту
+        self.assertEqual([r.text for r in agenda.items(m)][1:3], ["Час роботи батареї", "Точність у приміщенні"])
+        agenda.set_status(self.owner, m, a.pk, "done")
+        top.refresh_from_db()
+        self.assertEqual(top.status, "open")
+        agenda.set_status(self.owner, m, b.pk, "skipped")
+        top.refresh_from_db()
+        self.assertEqual(top.status, "done")                                          # усі ☑ / ⏭ — пункт ☑
+        agenda.set_status(self.owner, m, a.pk, "open")
+        top.refresh_from_db()
+        self.assertEqual(top.status, "open")
+        agenda.set_status(self.owner, m, top.pk, "done")                              # пункт ☑ — відкриті підпункти теж
+        a.refresh_from_db()
+        self.assertEqual(a.status, "done")
+        self.assertEqual(agenda.progress(m), {"total": 2, "done": 1, "open": 1})      # лише пункти
+        text = agenda.copy_text(m)
+        self.assertIn("1. Демонстрація біконів\n   1.1. Час роботи батареї\n   1.2. Точність у приміщенні\n2. Ціна серії",
+                      text)
+        self.send(m, action="remove", item=top.pk)
+        self.assertEqual(self.texts(m), ["Ціна серії"])                               # разом з підпунктами
+
+    def test_carry_takes_open_sub_items_along(self):
+        first = self.meeting()
+        top = agenda.add(self.owner, first, "Демонстрація біконів")
+        agenda.add(self.owner, first, "Точність", parent=top.pk)
+        done = agenda.add(self.owner, first, "Батарея", parent=top.pk)
+        agenda.set_status(self.owner, first, done.pk, "done")
+        second = self.meeting()
+        carry = next(r for r in agenda.suggest(self.owner, second) if r["group"] == "carry")
+        self.assertIn("підпунктів: 1", carry["why"])
+        new = agenda.add(self.owner, second, carry["text"], ref=carry["ref"])
+        self.assertEqual(list(new.kids.values_list("text", flat=True)), ["Точність"])
+
+
+class SendAgendaTests(AgendaBase):
+    def setUp(self):
+        super().setUp()
+        from email_assistant.models import EmailAccount
+        EmailAccount.objects.create(user=self.owner, email_address="slava@sevskiy.example")
+
+    def test_draft_in_own_mailbox_without_ai(self):
+        from email_assistant.models import EmailDraft
+        m = self.meeting(participants=[{"name": "Max Muster", "email": "max@client.example", "source": "manual"},
+                                       {"name": "Slava", "email": "slava@sevskiy.example", "source": "manual"}])
+        top = agenda.add(self.owner, m, "Demo der Beacons")
+        agenda.add(self.owner, m, "Genauigkeit", parent=top.pk)
+        self.assertEqual([p["email"] for p in agenda.people(m, self.owner)], ["max@client.example"])  # без своїх
+        self.login(self.owner)
+        with patch("email_assistant.ai_helper._call_ai_direct") as ai:
+            data = self.send(m, action="send", to=["max@client.example"], extra="kollege@sevskiy.example; ",
+                             lang="de", ai=0).json()
+        ai.assert_not_called()
+        self.assertTrue(data["ok"], data)
+        draft = EmailDraft.objects.get()
+        self.assertEqual(data["compose"], f"/email/compose/?draft={draft.pk}")
+        self.assertEqual(draft.to_emails, ["max@client.example", "kollege@sevskiy.example"])
+        self.assertEqual(draft.subject, f"Tagesordnung: {m.title}")
+        self.assertIn("Guten Tag,", draft.body)
+        self.assertIn("1. Demo der Beacons\n    1.1. Genauigkeit", draft.body)   # відступ — і в редакторі
+        self.assertFalse(self.send(m, action="send", to=["not-an-address"], lang="de").json()["ok"])
+
+    def test_ai_translation_and_bad_answer(self):
+        from email_assistant.models import EmailDraft
+        m = self.meeting()
+        top = agenda.add(self.owner, m, "Демонстрація біконів")
+        agenda.add(self.owner, m, "Точність", parent=top.pk)
+        agenda.edit(self.owner, m, top.pk, note="Зразки до 25.11")
+        answer = json.dumps([f"{m.title} EN", "Beacon demo", "Accuracy", "Samples by 25.11"])
+        with patch("email_assistant.ai_helper._call_ai_direct", return_value=f"Here: {answer}") as ai:
+            url = agenda.send(self.owner, m, [], "en", ai=True)
+        self.assertIn('"Демонстрація біконів"', ai.call_args.args[0])                   # тексти — даними, JSON
+        draft = EmailDraft.objects.get(pk=int(url.rsplit("=", 1)[1]))
+        self.assertEqual(draft.subject, f"Agenda: {m.title} EN")
+        self.assertIn("1. Beacon demo — Samples by 25.11\n    1.1. Accuracy", draft.body)
+        with patch("email_assistant.ai_helper._call_ai_direct", return_value="sorry"):
+            with self.assertRaises(Exception):
+                agenda.send(self.owner, m, [], "en", ai=True)
+
+    def test_without_mailbox(self):
+        m = self.meeting(self.other)
+        agenda.add(self.other, m, "Пункт")
+        with self.assertRaises(Exception) as e:
+            agenda.send(self.other, m, [], "uk")
+        self.assertIn("немає вашої поштової скриньки", str(e.exception))
