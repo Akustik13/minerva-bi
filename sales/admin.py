@@ -3495,7 +3495,18 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             body_noneu = _render(getattr(ns, 'customer_notify_body_noneu', '') or ns.customer_notify_body)
             subject    = _render(ns.customer_notify_subject) + subject_suffix
 
+            # 🏷️ етикетка посилки — у вкладення (галочка у вікні), лише коли лист про посилку зі сторінки відправлення
+            label = None
+            chosen = self._notify_parcel(request, order)
+            if chosen is not None:
+                from shipping.services.ship_advice import label_file
+                found = label_file(chosen)
+                if found:
+                    label = {'name': found[1]}
+                to_email = to_email or (chosen.recipient_email or '').strip()
+
             return JsonResponse({
+                'label':     label,
                 'ok':        True,
                 'to':        to_email,
                 'cc':        (getattr(ns, 'customer_notify_cc', '') or '').strip(),
@@ -3525,14 +3536,24 @@ class SalesOrderAdmin(ProjectsBlockMixin, AuditableMixin, admin.ModelAdmin):
             if not subject:
                 return JsonResponse({'ok': False, 'error': 'Не вказано тему листа'})
 
+            attachments = []
+            chosen = self._notify_parcel(request, order)
+            if data.get('attach_label') and chosen is not None:
+                from shipping.services.ship_advice import label_file
+                found = label_file(chosen)
+                if not found:
+                    return JsonResponse({'ok': False, 'error': 'Файл етикетки не знайдено — зніміть галочку «Етикетка»'})
+                with open(found[0], 'rb') as fh:
+                    attachments.append({'name': found[1], 'content': fh.read(), 'content_type': found[2]})
+
             try:
                 from dashboard import customer_mail
                 # з адреси «👤 Клієнтам — з адреси» (SMTP сповіщень або скринька пошти Minerva)
                 customer_mail.send(ns, 'ship', [to_email], subject, body_text, _mail_html(body_text),
-                                   cc=customer_mail.cc_list(cc_email))
+                                   cc=customer_mail.cc_list(cc_email), attachments=attachments)
                 from dashboard.notifications import mark_ship_mail_sent
                 from shipping.services.parcels import current_parcel
-                mark_ship_mail_sent(order, current_parcel(order, self._notify_parcel(request, order)))
+                mark_ship_mail_sent(order, current_parcel(order, chosen) or chosen)
                 return JsonResponse({'ok': True})
             except Exception as e:
                 return JsonResponse({'ok': False, 'error': str(e)})

@@ -581,7 +581,6 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   </div>
   {{ agent_next.labels|json_script:"agn-labels" }}
   {% include "labels/_label_actions.html" %}
-  {% if agent_next.mail.url %}{% include "admin/sales/_notify_customer_modal.html" with notify_customer_url=agent_next.mail.url ship_notify_sent_at=agent_next.mail.sent %}{% endif %}
   <style>
     .agn { background:var(--bg-card); border:1px solid var(--border-strong); border-left:4px solid var(--link-fg);
            border-radius:8px; padding:12px 16px; margin-bottom:16px; color:var(--text); font-size:13px; }
@@ -1425,11 +1424,17 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
                   {{ a.label }}
                 </button>
               </form>
+              {% elif a.mail %}
+              <button type="button" class="sd-btn sd-btn-{{ a.cls }}" title="{{ a.title }}"
+                      style="width:100%;border:none;cursor:pointer"
+                      onclick="ncOpen('{{ a.mail|escapejs }}')">{{ a.label }}</button>
               {% else %}
               <a href="{{ a.url }}"{% if a.external %} target="_blank"{% endif %}
                  class="sd-btn sd-btn-{{ a.cls }}">{{ a.label }}</a>
               {% endif %}
               {% endfor %}
+              {% if ship_mail.blocked %}<div style="font-size:11px;color:var(--text-muted);text-align:center">✉️ {% trans "Лист клієнту" %}: {{ ship_mail.blocked }}</div>{% endif %}
+              {% if ship_mail.sent %}<div style="font-size:11px;color:var(--text-muted);text-align:center">✓ {% trans "Лист клієнту надіслано" %} {{ ship_mail.sent|date:"d.m.Y H:i" }}</div>{% endif %}
             </div>
           </div>
           {% endif %}
@@ -1932,4 +1937,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+{% if mail_modal_url %}
+  {% include "admin/sales/_notify_customer_modal.html" with notify_customer_url=mail_modal_url ship_notify_sent_at=mail_modal_sent %}
+{% endif %}
 {% endblock %}

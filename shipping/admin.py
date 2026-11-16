@@ -1526,6 +1526,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_dhl_rates",
             ),
             path(
+                "<int:shipment_id>/notify-customer/",
+                self.admin_site.admin_view(self.notify_customer_view),
+                name="shipping_shipment_notify_customer",
+            ),
+            path(
                 "<int:shipment_id>/dhl-track/",
                 self.admin_site.admin_view(self.dhl_track_view),
                 name="shipping_shipment_dhl_track",
@@ -3161,6 +3166,24 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         has_dhl   = Carrier.objects.filter(carrier_type="dhl", is_active=True).exists()
         is_jumingo = bool(shipment.carrier and shipment.carrier.carrier_type == "jumingo")
         is_ups    = bool(shipment.carrier and shipment.carrier.carrier_type == "ups")
+        # «📡 DHL Трекінг» — лише для посилок DHL (раніше й для UPS / FedEx, якщо підключено хоч якийсь DHL)
+        is_dhl_parcel = bool(has_dhl and shipment.carrier and (
+            shipment.carrier.carrier_type == "dhl"
+            or (is_jumingo and "dhl" in (shipment.carrier_service or "").lower())))
+        # ✉️ Лист клієнту про відправку: трек-номер, що відправлено, етикетка у вкладенні (ship_advice.mail_state)
+        ship_mail = None
+        if shipment.direction != Shipment.IN and shipment.tracking_number:
+            try:
+                from .services.ship_advice import mail_state, parcel_mail_state
+                ship_mail = (mail_state(order, request.user, shipment) if order
+                             else parcel_mail_state(shipment, request.user))
+            except Exception:  # noqa: BLE001 — сторінка працює й без листа
+                logger.warning("mail_state failed for shipment %s", shipment.pk, exc_info=True)
+        mail_action = None
+        if ship_mail and ship_mail.get("url"):
+            mail_action = {"label": "✉️ Лист клієнту…" if not ship_mail.get("sent") else "✉️ Лист клієнту ще раз…",
+                           "mail": ship_mail["url"], "cls": "yellow",
+                           "title": f"{ship_mail['to']} · трек-номер, що відправлено, етикетка у вкладенні"}
         actions = []
         st = shipment.status
 
@@ -3210,10 +3233,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 actions.append({"label": "📄 Етикетка PDF",
                                  "url": shipment.label_url,
                                  "cls": "teal", "external": True})
-            if shipment.tracking_number and has_dhl:
+            if mail_action:
+                actions.append(mail_action)
+            if shipment.tracking_number and is_dhl_parcel:
                 actions.append({"label": "📡 DHL Трекінг",
                                  "url": reverse("admin:shipping_shipment_dhl_track", args=[shipment.pk]),
-                                 "cls": "yellow"})
+                                 "cls": "blue"})
 
         elif st == "delivered":
             if order and order.status != "delivered":
@@ -3232,10 +3257,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 actions.append({"label": "📄 Етикетка PDF",
                                  "url": shipment.label_url,
                                  "cls": "teal", "external": True})
-            if shipment.tracking_number and has_dhl:
+            if mail_action:
+                actions.append(mail_action)
+            if shipment.tracking_number and is_dhl_parcel:
                 actions.append({"label": "📡 DHL Трекінг",
                                  "url": reverse("admin:shipping_shipment_dhl_track", args=[shipment.pk]),
-                                 "cls": "yellow"})
+                                 "cls": "blue"})
 
         # UPS Pickup (Abholung) — для будь-якого статусу де є трекінг
         if is_ups and shipment.tracking_number and st not in ("draft", "cancelled", "error"):
@@ -3544,6 +3571,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "abd":                       self._ups_abd_context(request, shipment),
             "parcel":                    self._parcel_context(shipment, request),
             "agent_next":                agent_next,
+            "ship_mail":                 ship_mail,
+            # вікно листа — одне на сторінку: для кнопки в «⚡ Дії» і кроку 3 агента
+            "mail_modal_url":            ((ship_mail or {}).get("url")
+                                          or ((agent_next or {}).get("mail") or {}).get("url") or ""),
+            "mail_modal_sent":           ((ship_mail or {}).get("sent")
+                                          or ((agent_next or {}).get("mail") or {}).get("sent")),
             "incoming_info":             incoming_info,
             **(label_context() if agent_next else {}),
         })
@@ -3962,6 +3995,76 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     'paperless': carrier_docs.paperless(shipment)}
         except Exception:  # noqa: BLE001 — лише підказка
             return {}
+
+    def notify_customer_view(self, request, shipment_id):
+        """✉️ Лист отримувачу посилки без замовлення (ship_advice.parcel_mail_*): GET — JSON шаблону листа
+        («Текст листа клієнту» налаштувань сповіщень) + етикетка, POST {to, cc, subject, body, attach_label} —
+        надіслати. Лише з правом змінювати відправлення. Посилка із замовленням — лист замовлення (sales)."""
+        import json as _json
+        from django.http import JsonResponse
+        from .services import ship_advice
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        if request.method not in ("GET", "POST"):
+            r = JsonResponse({"ok": False, "error": "Method not allowed"}, status=405)
+            r["Allow"] = "GET, POST"
+            return r
+        if not self.has_change_permission(request, shipment):
+            return JsonResponse({"ok": False, "error": "Немає права змінювати відправлення"}, status=403)
+        if shipment.order_id:
+            return JsonResponse({"ok": False, "error": "Посилка із замовленням — лист у картці замовлення"}, status=400)
+        why = ship_advice.parcel_mail_blocked(shipment)
+        if why:
+            return JsonResponse({"ok": False, "error": why}, status=403)
+        from config.models import NotificationSettings
+        from sales.admin import _mail_from, _mail_html
+        ns = NotificationSettings.get()
+        found = ship_advice.label_file(shipment)
+        if request.method == "GET":
+            ctx = ship_advice.parcel_mail_context(shipment)
+
+            def _render(tpl):
+                try:
+                    return (tpl or "").format(**ctx)
+                except (KeyError, IndexError, ValueError):
+                    return tpl or ""
+            body_eu = _render(ns.customer_notify_body)
+            body_noneu = _render(getattr(ns, "customer_notify_body_noneu", "") or ns.customer_notify_body)
+            country = (shipment.recipient_country or "").strip().upper()
+            is_eu = country in ship_advice.eu()
+            return JsonResponse({
+                "ok": True, "to": shipment.recipient_email.strip(),
+                "cc": (getattr(ns, "customer_notify_cc", "") or "").strip(),
+                "subject": _render(ns.customer_notify_subject),
+                "body": body_eu if is_eu else body_noneu, "body_eu": body_eu, "body_noneu": body_noneu,
+                "is_eu": is_eu, "country": country, "auto": False,
+                "label": {"name": found[1]} if found else None,
+                **_mail_from(ns, "ship"),
+            })
+        try:
+            data = _json.loads(request.body or b"{}")
+        except ValueError:
+            data = {}
+        to = (data.get("to") or "").strip()
+        subject = (data.get("subject") or "").strip()
+        body = (data.get("body") or "").strip()
+        if not to:
+            return JsonResponse({"ok": False, "error": "Не вказано отримувача (Кому)"})
+        if not subject:
+            return JsonResponse({"ok": False, "error": "Не вказано тему листа"})
+        attachments = []
+        if data.get("attach_label"):
+            if not found:
+                return JsonResponse({"ok": False, "error": "Файл етикетки не знайдено — зніміть галочку «Етикетка»"})
+            with open(found[0], "rb") as fh:
+                attachments.append({"name": found[1], "content": fh.read(), "content_type": found[2]})
+        try:
+            from dashboard import customer_mail
+            customer_mail.send(ns, "ship", [to], subject, body, _mail_html(body),
+                               cc=customer_mail.cc_list(data.get("cc") or ""), attachments=attachments)
+        except Exception as e:  # noqa: BLE001 — помилку SMTP показуємо у вікні
+            return JsonResponse({"ok": False, "error": str(e)})
+        Shipment.objects.filter(pk=shipment.pk).update(customer_notified_at=timezone.now())
+        return JsonResponse({"ok": True})
 
     def print_all_view(self, request, shipment_id):
         """

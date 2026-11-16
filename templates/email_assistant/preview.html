@@ -170,6 +170,11 @@
 .em-card-body{padding:0;font-size:13px;line-height:1.75;color:var(--text);word-break:break-word}
 .em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:500px;overflow-y:auto}
 .em-body-iframe{width:100%;border:none;display:block;min-height:200px;overflow-x:auto;}
+.em-qfold-t{margin-top:6px}
+.em-qfold-t > summary{display:inline-block;cursor:pointer;list-style:none;font-size:12px;color:var(--text-muted);
+  border:1px solid var(--border-strong);border-radius:10px;padding:1px 10px;background:var(--bg-input)}
+.em-qfold-t > summary::-webkit-details-marker{display:none}
+.em-qfold-t[open] > summary{margin-bottom:6px}
 /* ── Thread scroll: all messages stack normally, last expanded ── */
 .em-msgs{position:relative}
 .em-card-body-text{max-height:none!important}
@@ -474,8 +479,8 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
               title="{% trans "Створити чернетку Angebot: клієнт і проєкт листування, артикули й кількості з листа, ціни з Minerva" %}">📝 Angebot</button>
       {% endif %}
       <button class="em-pv-btn danger" onclick="pvDelete({{ last.pk }})">🗑️</button>
-      <a href="{% if thread %}/email/thread/{{ thread.pk }}/{% else %}/email/message/{{ last.pk }}/{% endif %}"
-         class="em-pv-btn" target="_blank" title="{% trans "Відкрити на повній сторінці" %}">↗ {% trans "Окремо" %}</a>
+      <a href="/email/?msg={{ last.pk }}&amp;solo=1"
+         class="em-pv-btn" target="_blank" title="{% trans "Відкрити на повній сторінці — з тими самими кнопками, AI і RAG" %}">↗ {% trans "Окремо" %}</a>
       {% endif %}
     </div>
   </div>
@@ -661,7 +666,7 @@ textarea.em-ai-prompt-inp{font-family:inherit;line-height:1.45;min-height:58px;m
                   sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-scripts"
                   onload="emResizeIframe(this)"></iframe>
           {% else %}
-          <div class="em-card-body-text">{{ msg.body_text|urlize }}</div>
+          <div class="em-card-body-text">{% if msg.text_quote %}{{ msg.text_new|urlize }}<details class="em-qfold-t"><summary title="{% trans "Попередні листи, процитовані в цьому листі" %}">··· {% trans "Показати історію листування" %}</summary>{{ msg.text_quote|urlize }}</details>{% else %}{{ msg.body_text|urlize }}{% endif %}</div>
           {% endif %}
         </div>
 
@@ -1777,6 +1782,123 @@ function _pvSelHook(doc, frame) {
   });
 }
 _pvSelHook(document, null);
+/* ··· Історія листування в листі — згорнута (як у Gmail): усе від «Van / From / Von:», «On … wrote», «-----
+   Original Message», Gmail / Thunderbird / Outlook-цитати — до кінця листа ховається, кнопка показує / згортає.
+   Лише на сторінці: лист, відповідь і «Вставити у відповідь» беруть текст з сервера. */
+var _PV_Q_SEL = '.gmail_quote, blockquote[type="cite"], #divRplyFwdMsg, #appendonsend, .moz-cite-prefix, .yahoo_quoted, ' +
+                'div[id^="mail-editor-reference-message"]';
+var _PV_Q_RE = [
+  /(?:^|\n)[ \t>]*-{2,}\s*(?:original\s*message|ursprüngliche\s*nachricht|forwarded\s*message|weitergeleitete\s*nachricht|оригінальний\s*лист|пересланий\s*лист|исходное\s*сообщение)/i,
+  /(?:^|\n)[ \t>]*(?:on|am|le|el|op)\s[^\n]{4,200}?(?:wrote|schrieb|a écrit|escribió|schreef)\s*:/i,
+  /(?:^|\n)[ \t>*]*(?:von|from|van|de|від|от)\s*:[\s\S]{1,300}?(?:gesendet|sent|verzonden|date|datum|надіслано|отправлено|дата|envoyé|enviado)\s*:/i
+];
+var _PV_BLOCK = /^(P|DIV|BLOCKQUOTE|TABLE|TBODY|TR|TD|TH|LI|UL|OL|H[1-6]|PRE|HR|CENTER|SECTION|ARTICLE|HEADER|FOOTER)$/;
+function _pvQuoteStart(doc) {
+  var body = doc.body;
+  if (!body) return null;
+  var parts = [], text = '', prevBlock = null;
+  var it = doc.createNodeIterator(body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {acceptNode: function(n) {
+    if (n.nodeType === 1) return /^(SCRIPT|STYLE|HEAD|TITLE)$/.test(n.tagName) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    return NodeFilter.FILTER_ACCEPT;
+  }});
+  for (var n = it.nextNode(); n; n = it.nextNode()) {
+    if (n.nodeType === 1) { if (n.tagName === 'BR') text += '\n'; continue; }
+    if (n.parentElement && n.parentElement.closest('style,script')) continue;
+    var b = n.parentElement;
+    while (b && b !== body && !_PV_BLOCK.test(b.tagName)) b = b.parentElement;
+    if (b !== prevBlock) { text += '\n'; prevBlock = b; }
+    parts.push({node: n, at: text.length});
+    text += n.data;
+  }
+  var best = null;   // {node, at} — найраніше в тексті
+  function partAt(i) {   // текстовий вузол, де стоїть позиція i
+    for (var k = parts.length - 1; k >= 0; k--) if (parts[k].at <= i) return parts[k];
+    return null;
+  }
+  _PV_Q_RE.forEach(function(re) {
+    var m = re.exec(text);
+    if (!m) return;
+    var i = m.index + m[0].search(/\S/);
+    var p = partAt(i);
+    if (p && (!best || p.at < best.at)) best = {node: p.node, at: p.at};
+  });
+  var el = body.querySelector(_PV_Q_SEL);
+  if (el) {
+    for (var k = 0; k < parts.length; k++) {
+      if (el.contains(parts[k].node)) {
+        if (!best || parts[k].at < best.at) best = {node: el, at: parts[k].at};
+        break;
+      }
+    }
+  }
+  // переслано без коментаря / відповідь лише цитата — згортати нічого (інакше зникне сам лист)
+  if (!best || text.slice(0, best.at).replace(/\s+/g, '').length < 15) return null;
+  return best.node;
+}
+function _pvRefit(f) {   // висота рамки — під новий вміст (менша теж)
+  try { f.style.height = '60px'; _pvIframeH(f); } catch (e) {}
+}
+function _pvFold(f) {
+  var doc;
+  try { doc = f.contentDocument; } catch (e) { return; }
+  if (!doc || !doc.body || doc.body._pvFolded) return;
+  doc.body._pvFolded = true;
+  var start = _pvQuoteStart(doc);
+  if (!start) return;
+  var hidden = [];
+  function hide(n) {
+    if (n.nodeType === 3) {
+      if (!n.data.trim()) return;
+      var s = doc.createElement('span');
+      n.parentNode.insertBefore(s, n);
+      s.appendChild(n);
+      n = s;
+    }
+    if (n.nodeType !== 1 || n === btnBox) return;
+    hidden.push([n, n.style.display]);
+    n.style.display = 'none';
+  }
+  var btnBox = doc.createElement('div');
+  btnBox.setAttribute('style', 'margin:10px 0 4px;clear:both');
+  var btn = doc.createElement('button');
+  btn.type = 'button';
+  btn.setAttribute('style', 'display:inline-block;padding:2px 12px;border:1px solid #c8ccd2;border-radius:12px;' +
+    'background:#f1f3f4;color:#444;font:12px/1.6 Arial,sans-serif;cursor:pointer');
+  btn.title = '{% trans "Попередні листи, процитовані в цьому листі" %}';
+  btnBox.appendChild(btn);
+  // кнопка — перед першим блоком історії (для «Van:» у тому самому абзаці — просто перед ним)
+  start.parentNode.insertBefore(btnBox, start);
+  function after(n) {   // наступні сусіди — спершу список: обгортання тексту в span змінює ланцюжок сусідів
+    var out = [];
+    for (var s = n.nextSibling; s; s = s.nextSibling) out.push(s);
+    return out;
+  }
+  var cur = start;
+  hide(cur);
+  var top = cur.nodeType === 3 ? cur.parentNode : cur;   // текстовий вузол обгорнуто в span
+  after(top).forEach(hide);
+  while (top.parentElement && top.parentElement !== doc.body && top.parentElement !== doc.documentElement) {
+    top = top.parentElement;
+    after(top).forEach(hide);
+  }
+  var open = false;
+  function label() {
+    btn.textContent = open ? '▴ {% trans "Згорнути історію листування" %}' : '··· {% trans "Показати історію листування" %}';
+  }
+  label();
+  btn.addEventListener('click', function(e) {
+    e.preventDefault(); e.stopPropagation();
+    open = !open;
+    hidden.forEach(function(h) { h[0].style.display = open ? h[1] : 'none'; });
+    label();
+    _pvRefit(f);
+  });
+  _pvRefit(f);
+}
+document.querySelectorAll('iframe.em-body-iframe').forEach(function(f) {
+  f.addEventListener('load', function() { _pvFold(f); });
+  try { if (f.contentDocument && f.contentDocument.readyState === 'complete' && f.src) _pvFold(f); } catch (e) {}
+});
 document.querySelectorAll('iframe.em-body-iframe').forEach(function(f) {
   var hook = function() { try { _pvSelHook(f.contentDocument, f); } catch (e) {} };
   f.addEventListener('load', hook);

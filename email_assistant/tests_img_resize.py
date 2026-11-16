@@ -23,7 +23,7 @@ class ImageResizeTests(Base):
     def test_script_on_every_mail_editor_page(self):
         self.assertTrue((Path(settings.BASE_DIR) / SCRIPT.lstrip('/')).is_file())
         for url in ('/email/', '/email/compose/', f'/email/compose/?reply_to={self.msg.pk}',
-                    f'/email/thread/{self.msg.thread_id}/'):
+                    f'/email/?msg={self.msg.pk}&solo=1'):
             self.assertContains(self.client.get(url), SCRIPT, msg_prefix=url)
 
     def test_size_survives_draft_cleaning(self):

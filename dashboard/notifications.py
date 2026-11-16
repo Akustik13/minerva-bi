@@ -2119,6 +2119,14 @@ def ship_mail_context(order, shipment=None) -> tuple:
         suffix = part['subject_suffix']
     elif parcel is not None and (parcel.tracking_number or '').strip():
         tracking = parcel.tracking_number.strip()
+    elif shipment is not None and getattr(shipment, 'order_id', None) == order.pk:
+        # лист зі сторінки відправлення (усе замовлення однією посилкою) — її трек-номер і перевізник
+        tracking = (shipment.tracking_number or '').strip() or tracking
+        if shipment.carrier_id:
+            carrier = shipment.carrier.get_carrier_type_display() or carrier
+    shipped = order.shipped_at
+    if not shipped and shipment is not None:
+        shipped = getattr(shipment, 'submitted_at', None)
     country = (order.addr_country or '').strip().upper()
     addr_parts = filter(None, [
         getattr(order, 'ship_name', '') or order.client,
@@ -2135,7 +2143,7 @@ def ship_mail_context(order, shipment=None) -> tuple:
                             getattr(order, 'contact_name', '') or '').strip(),
         'tracking_number': tracking,
         'carrier':         carrier,
-        'shipped_date':    order.shipped_at.strftime('%d.%m.%Y') if order.shipped_at else '',
+        'shipped_date':    shipped.strftime('%d.%m.%Y') if shipped else '',
         'items':           items_text,
         'ship_address':    '\n'.join(addr_parts),
     }

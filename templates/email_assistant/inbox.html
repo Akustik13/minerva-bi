@@ -1,6 +1,6 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
-{% block title %}{% trans "Email Асистент" %} — Minerva{% endblock %}
+{% block title %}{% if solo %}{{ solo_subject|default:"(без теми)" }}{% else %}{% trans "Email Асистент" %}{% endif %} — Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 {% block messages %}{% endblock %}
 
@@ -119,6 +119,17 @@
 .em-back-btn{border:1px solid var(--border-strong);background:var(--bg-input,transparent);color:var(--text);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12.5px}
 .em-back-btn:hover{border-color:#1a73e8;color:#1a73e8}
 .em-back-bar small{font-size:11px;color:var(--text-dim)}
+/* ↗ Окремо (/email/?msg=<pk>&solo=1): лише лист на всю ширину — ті самі кнопки, AI, RAG і статуси, що в прев'ю */
+.em-app.em-solo{display:flex!important}
+.em-app.em-solo > .em-p1,.em-app.em-solo > .em-p2,.em-app.em-solo > .em-drag,.em-app.em-solo > .em-drag-v,
+.em-app.em-solo .em-p2-toggle{display:none!important}
+.em-app.em-solo > .em-p3{display:flex!important;flex:1;width:auto!important;min-width:0}
+.em-app.em-solo .em-back-bar{display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.em-app.em-solo .em-p3-content{width:100%;max-width:1320px;margin:0 auto}
+/* нові листи, що з'явились самі, і підвантаження наступної сторінки */
+@keyframes em-new-row{from{background:color-mix(in srgb,var(--accent,#1a73e8) 22%,transparent)}to{background:transparent}}
+.em-row.em-row-new{animation:em-new-row 2.5s ease-out}
+.em-more{padding:12px;text-align:center;font-size:12px;color:var(--text-muted)}
 .em-app.lay-pane-off .em-row-sender{max-width:280px}
 .em-row.kb-cur{box-shadow:inset 3px 0 0 #f59e0b}
 /* щільність рядків */
@@ -569,7 +580,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
 
 {% block content %}
 {{ layout_data|json_script:"em-layout-data" }}
-<div class="em-app {{ layout_classes }}" id="em-app">
+<div class="em-app {{ layout_classes }}{% if solo %} em-solo{% endif %}" id="em-app">
   <!-- P1 expand tab (visible when folders panel is hidden) -->
   <button id="em-p1-expand" onclick="toggleP1()" title="Показати папки">▶</button>
 
@@ -1012,6 +1023,7 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
     </div>
 
     <div id="em-p2-pag" style="flex-shrink:0">
+    <span id="em-p2-next" hidden data-next="{% if has_next %}{{ page|add:'1' }}{% endif %}"></span>
     {% if total_pages > 1 %}
     <div class="em-pagination">
       {% if has_prev %}
@@ -1047,7 +1059,11 @@ body.em-dragging .em-drop{outline:1px dashed rgba(26,115,232,.6);outline-offset:
   <!-- ═══ Panel 3: Preview ═══ -->
   <div class="em-p3" id="em-p3">
     <button class="em-p2-toggle" id="p2-toggle" onclick="toggleP2()" title="{% trans "Згорнути/розгорнути список" %}">◀</button>
+    {% if solo %}
+    <div class="em-back-bar"><a class="em-back-btn" href="/email/?msg={{ open_msg }}">← {% trans "До всієї пошти" %}</a><small>{% trans "лист відкрито окремо — усі кнопки, AI й RAG як у скриньці" %}</small></div>
+    {% else %}
     <div class="em-back-bar"><button type="button" class="em-back-btn" onclick="emBackToList()">← {% trans "До списку" %}</button><small>Esc · u — {% trans "назад" %} · j / k — {% trans "наступний / попередній" %}</small></div>
+    {% endif %}
     <div class="em-p3-empty" id="em-p3-empty">
       <span>📩</span>
       {% trans "Виберіть лист для перегляду" %}
@@ -1823,7 +1839,9 @@ async function previewMsg(pk, tpk, rowEl) {
 
   // Auto-collapse P2 on small screens only when no explicit preference saved (лист праворуч — під списком і
   // «замість списку» список і так не заважає)
-  if (window.innerWidth < 1200 && !localStorage.getItem('em-p2-col') && document.getElementById('em-app').classList.contains('lay-pane-right')) {
+  var _app = document.getElementById('em-app');
+  if (window.innerWidth < 1200 && !localStorage.getItem('em-p2-col') && _app.classList.contains('lay-pane-right')
+      && !_app.classList.contains('em-solo')) {
     window.toggleP2 && window.toggleP2();
   }
 }
@@ -4479,6 +4497,92 @@ async function saveTask() {
   } catch(e) { err.textContent = 'Помилка мережі'; }
 }
 
+/* ── Нові листи самі з'являються вгорі списку; гортання вниз підвантажує наступну сторінку ── */
+var _emLatest = {{ latest_pk|default:0 }};
+function _p2Url(page) {
+  var params = new URLSearchParams(location.search);
+  params.delete('msg'); params.delete('solo');
+  if (page) params.set('page', page); else params.delete('page');
+  return location.pathname + (params.toString() ? '?' + params.toString() : '');
+}
+async function _p2Doc(url) {
+  var r = await fetch(url, {credentials: 'same-origin'});
+  if (!r.ok) return null;
+  var doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+  return doc.getElementById('em-p2-list') ? doc : null;
+}
+function _p2After() {   // після зміни рядків: порядок, фільтр «лише непрочитані», панель масових дій
+  var sortSel = document.getElementById('sort-sel');
+  if (sortSel && sortSel.value !== 'date-desc') sortRows(sortSel.value);
+  _applyP2Visibility();
+  _updateBulkBar();
+}
+async function _p2PrependNew() {
+  var app = document.getElementById('em-app');
+  if (app.classList.contains('em-solo') || document.querySelector('#em-p2-list .em-drow')) return;
+  var page = parseInt(new URLSearchParams(location.search).get('page') || '1', 10);
+  if (page > 1) return;   // гортаєте старі листи — новий видно в лічильнику, список не чіпаємо
+  var list = document.getElementById('em-p2-list');
+  try {
+    var doc = await _p2Doc(_p2Url(0));
+    if (!doc) return;
+    var newest = 0;
+    list.querySelectorAll('.em-row').forEach(function(r) { newest = Math.max(newest, +r.dataset.ts || 0); });
+    var grouped = document.getElementById('em-group-btn') && document.getElementById('em-group-btn').classList.contains('on');
+    var fresh = Array.prototype.filter.call(doc.querySelectorAll('#em-p2-list > .em-row'), function(r) {
+      return !document.getElementById(r.id) && (+r.dataset.ts || 0) >= newest;
+    });
+    if (!fresh.length) return;
+    fresh.reverse().forEach(function(r) {
+      if (grouped && r.dataset.tpk && r.dataset.tpk !== '0') {   // гілка одним рядком — старий рядок гілки геть
+        list.querySelectorAll('.em-row[data-tpk="' + r.dataset.tpk + '"]').forEach(function(o) {
+          if (!o.classList.contains('active')) o.remove();
+        });
+      }
+      var row = document.importNode(r, true);
+      row.classList.add('em-row-new');
+      list.insertBefore(row, list.firstChild);
+    });
+    var total = doc.getElementById('em-total'), cur = document.getElementById('em-total');
+    if (total && cur) cur.textContent = total.textContent;
+    _p2After();
+  } catch (e) { /* мережа — наступна перевірка */ }
+}
+var _p2Loading = false;
+async function _p2More() {
+  var next = document.getElementById('em-p2-next');
+  var page = next && next.dataset.next;
+  if (_p2Loading || !page || document.getElementById('em-app').classList.contains('em-solo')) return;
+  _p2Loading = true;
+  var list = document.getElementById('em-p2-list');
+  var wait = document.createElement('div');
+  wait.className = 'em-more';
+  wait.textContent = '⏳ ' + _i18n.завантажуюПошту;
+  list.appendChild(wait);
+  try {
+    var doc = await _p2Doc(_p2Url(page));
+    if (!doc) return;
+    Array.prototype.forEach.call(doc.getElementById('em-p2-list').children, function(r) {
+      if (r.id && document.getElementById(r.id)) return;   // уже є (лист прийшов, поки гортали)
+      list.appendChild(document.importNode(r, true));
+    });
+    var pag = document.getElementById('em-p2-pag'), freshPag = doc.getElementById('em-p2-pag');
+    if (pag && freshPag) pag.innerHTML = freshPag.innerHTML;   // «Далі» — уже з наступної сторінки
+    _p2After();
+  } catch (e) { /* мережа — гортніть ще раз */ }
+  finally { wait.remove(); _p2Loading = false; }
+}
+(function() {
+  var list = document.getElementById('em-p2-list');
+  if (!list) return;
+  list.addEventListener('scroll', function() {
+    if (list.scrollTop + list.clientHeight >= list.scrollHeight - 400) _p2More();
+  }, {passive: true});
+  // кожну хвилину, поки вкладка відкрита: лічильники й нові листи (сервер забирає пошту щохвилини сам)
+  setInterval(function() { if (!document.hidden) window.refreshBadges(); }, 60000);
+  document.addEventListener('visibilitychange', function() { if (!document.hidden) window.refreshBadges(); });
+})();
+
 /* ── Badge helpers ── */
 function _setBadge(id, count) {
   var b = document.getElementById(id);
@@ -4495,7 +4599,9 @@ window.refreshBadges = async function() {
     _setBadge('badge-starred', d.starred || 0);
     _setBadge('badge-spam',    d.spam    || 0);
     _setBadge('badge-drafts',  d.drafts  || 0);
+    if (window.mvMailBadge) window.mvMailBadge(d.count || 0);   // і в головному меню Minerva
     if (_p2UnreadOnly) _applyP2Visibility();
+    if ((d.latest || 0) > _emLatest) { _emLatest = d.latest; _p2PrependNew(); }   // прийшли нові листи — у список
     return d.inbox || 0;
   } catch(e) { return null; }
 };
@@ -4688,14 +4794,15 @@ window.bulkAction = async function(action) {
   } catch(e) {}
 };
 
-/* /email/?msg=<pk> — посилання «✉️ лист» з інших сторінок Minerva: одразу відкрити цей лист */
+/* /email/?msg=<pk> — посилання «✉️ лист» з інших сторінок Minerva: одразу відкрити цей лист;
+   &solo=1 («↗ Окремо») — уся гілка на всю ширину */
 (function() {
   var pk = {{ open_msg|default:0 }};
   if (!pk) return;
   if (pk < 0) { _showToast('⚠️ {% trans "Цього листа немає у вашій скриньці (інша скринька або видалено)" %}'); return; }
   var row = document.getElementById('row-' + pk);
   if (row) row.scrollIntoView({block: 'center'});
-  previewMsg(pk, 0, row || document.createElement('div'));
+  previewMsg(pk, {{ open_thread|default:0 }}, row || document.createElement('div'));
 })();
 </script>
 {% endblock %}

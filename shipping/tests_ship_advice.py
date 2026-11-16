@@ -260,6 +260,99 @@ class AfterBookingTests(Base):
         self.assertTrue(ship_advice.after_booking(s, self.user)['shipped'])
 
 
+class ShipmentMailTests(Base):
+    """✉️ Лист клієнту зі сторінки відправлення: трек-номер посилки, що відправлено, етикетка у вкладенні."""
+    booked = AfterBookingTests.booked
+
+    def setUp(self):
+        super().setUp()
+        self.user = User.objects.create_superuser('boss', 'b@x.y', 'p')
+        import os
+        import tempfile
+
+        from django.test import override_settings
+        from config.models import NotificationSettings
+        self.media = tempfile.mkdtemp()
+        self._ov = override_settings(MEDIA_ROOT=self.media)
+        self._ov.enable()
+        os.makedirs(os.path.join(self.media, 'shipping', 'labels'))
+        with open(os.path.join(self.media, 'shipping', 'labels', 'ups_1.pdf'), 'wb') as fh:
+            fh.write(b'%PDF label')
+        NotificationSettings.objects.update_or_create(pk=1, defaults={
+            'email_enabled': True, 'customer_notify_enabled': True,
+            'customer_notify_subject': 'Order {order_number} shipped',
+            'customer_notify_body': '{carrier} {tracking_number} {shipped_date}\n{items}'})
+        self.o = self.order()
+        self.s = self.booked(self.o, submitted_at=timezone.now())
+        self.client.force_login(self.user)
+
+    def tearDown(self):
+        import shutil
+        self._ov.disable()
+        shutil.rmtree(self.media, ignore_errors=True)
+        super().tearDown()
+
+    def test_button_instead_of_dhl_tracking(self):
+        page = self.client.get(f'/admin/shipping/shipment/{self.s.pk}/detail/')
+        self.assertContains(page, '✉️ Лист клієнту…')
+        self.assertContains(page, f'notify-customer/?shipment={self.s.pk}')
+        self.assertNotContains(page, '📡 DHL Трекінг')                # посилка UPS
+        self.assertContains(page, 'id="nc-modal"', count=1)
+
+    def test_mail_with_tracking_items_and_label(self):
+        url = f'/admin/sales/salesorder/{self.o.pk}/notify-customer/?shipment={self.s.pk}'
+        d = self.client.get(url).json()
+        self.assertIn('1Z999', d['body'])
+        self.assertIn('AN220213-01C — 2 pcs.', d['body'])
+        self.assertIn(timezone.localdate().strftime('%d.%m.%Y')[:5], d['body'])
+        self.assertEqual(d['label'], {'name': 'Label_1Z999.pdf'})
+        from unittest import mock
+        with mock.patch('dashboard.customer_mail.send') as send:
+            r = self.client.post(url, {'to': 'a@acme.example', 'subject': 'S', 'body': 'B', 'attach_label': True},
+                                 content_type='application/json')
+        self.assertTrue(r.json()['ok'])
+        att = send.call_args.kwargs['attachments']
+        self.assertEqual([(a['name'], a['content'], a['content_type']) for a in att],
+                         [('Label_1Z999.pdf', b'%PDF label', 'application/pdf')])
+        self.s.refresh_from_db()
+        self.assertIsNotNone(self.s.customer_notified_at)
+
+    def test_parcel_without_order(self):
+        s = Shipment.objects.create(carrier=self.ups, status=Shipment.Status.LABEL_READY, tracking_number='1Z777',
+                                    label_url='/media/shipping/labels/ups_1.pdf', recipient_country='DE',
+                                    recipient_name='Joel', recipient_email='joel@lynx.example',
+                                    submitted_at=timezone.now(),
+                                    customs_articles={'customs_line_items': [
+                                        {'description': 'Antenna', 'sku': 'AN1', 'quantity': 3, 'value': 9}]})
+        page = self.client.get(f'/admin/shipping/shipment/{s.pk}/detail/')
+        url = f'/admin/shipping/shipment/{s.pk}/notify-customer/'
+        self.assertContains(page, url)
+        d = self.client.get(url).json()
+        self.assertEqual(d['to'], 'joel@lynx.example')
+        self.assertIn('1Z777', d['body'])
+        self.assertIn('AN1 — 3 pcs.', d['body'])
+        self.assertEqual(d['label'], {'name': 'Label_1Z777.pdf'})
+        from unittest import mock
+        with mock.patch('dashboard.customer_mail.send') as send:
+            r = self.client.post(url, {'to': 'joel@lynx.example', 'subject': 'S', 'body': 'B', 'attach_label': True},
+                                 content_type='application/json')
+        self.assertTrue(r.json()['ok'])
+        self.assertEqual(send.call_args.kwargs['attachments'][0]['name'], 'Label_1Z777.pdf')
+        s.refresh_from_db()
+        self.assertIsNotNone(s.customer_notified_at)
+        # без email — лист однаково формується, адресу вписують у вікні
+        Shipment.objects.filter(pk=s.pk).update(recipient_email='')
+        self.assertContains(self.client.get(f'/admin/shipping/shipment/{s.pk}/detail/'), url)
+        self.assertEqual(self.client.get(url).json()['to'], '')
+        self.client.force_login(staff('bea', 'accountant'))
+        self.assertEqual(self.client.post(url, {}, content_type='application/json').status_code, 403)
+
+    def test_label_outside_media_refused(self):
+        Shipment.objects.filter(pk=self.s.pk).update(label_url='/media/../../etc/passwd.pdf')
+        self.s.refresh_from_db()
+        self.assertIsNone(ship_advice.label_file(self.s))
+
+
 class QueueTests(AfterBookingTests):
     """📦 Відправка сьогодні — черга агента відправки."""
 

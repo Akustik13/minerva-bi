@@ -55,7 +55,7 @@ class AiReplyPostTests(Base):
         gen.assert_not_called()
 
     def test_pages_send_instruction_by_post(self):
-        for url in (f'/email/message/{self.msg.pk}/preview/', f'/email/thread/{self.msg.thread_id}/'):
+        for url in (f'/email/message/{self.msg.pk}/preview/', f'/email/thread/{self.msg.thread_id}/preview/'):
             html = self.client.get(url).content.decode()
             self.assertNotIn('?prompt=', html, url)
             self.assertIn("fd.append('prompt'", html, url)

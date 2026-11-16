@@ -3,9 +3,9 @@ import re
 
 # Початок процитованої історії; «Am 01.10.2026 um 10:00 schrieb Max Muster <max@x.de>:» — ім'я після «schrieb»
 QUOTE_START_RE = re.compile(
-    r"^\s*(?:>|-{2,}\s*(?:original|ursprüngliche|forwarded|weitergeleitete)"
-    r"|(?:on|am)\s.{5,80}(?:wrote|schrieb)(?:\s[^\n]{0,120}?)?\s*:"
-    r"|von:\s|from:\s|gesendet:\s|sent:\s|від:\s|от:\s)", re.IGNORECASE)
+    r"^\s*(?:>|-{2,}\s*(?:original|ursprüngliche|forwarded|weitergeleitete|оригінальний|пересланий)"
+    r"|(?:on|am|op)\s.{5,80}(?:wrote|schrieb|schreef)(?:\s[^\n]{0,120}?)?\s*:"
+    r"|von:\s|from:\s|gesendet:\s|sent:\s|van:\s|verzonden:\s|від:\s|от:\s)", re.IGNORECASE)
 
 
 # Пересланий лист: «-------- Ursprüngliche Nachricht --------» / «---------- Forwarded message ---------» і заголовки
@@ -117,6 +117,19 @@ def signature(text) -> dict:
         return {"lines": address, "name": "", "phone": phone}
     # ім'я — окремо (контактна особа), далі — фірма й адреса
     return {"lines": address[1:] or address, "name": name, "phone": phone}
+
+
+def split_quote(body, min_new: int = 15):
+    """(новий текст, історія листування) — для згортання історії в листі; новий текст коротший за min_new знаків
+    (переслано без коментаря) — ('усе', ''), нічого не згортаємо."""
+    lines = (body or "").splitlines()
+    for n, line in enumerate(lines):
+        if QUOTE_START_RE.match(line):
+            new = "\n".join(lines[:n]).rstrip()
+            if len(re.sub(r"\s", "", new)) < min_new:
+                return body or "", ""
+            return new, "\n".join(lines[n:])
+    return body or "", ""
 
 
 def new_text(body) -> str:
